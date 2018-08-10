@@ -7,10 +7,12 @@
 #include <linux/sched/task.h>
 #include <linux/slab.h>
 
+#include <hf/call.h>
+
 struct hf_vcpu {
 	spinlock_t lock;
-	long vm_index;
-	long vcpu_index;
+	uint32_t vm_index;
+	uint32_t vcpu_index;
 	struct task_struct *task;
 	struct hrtimer timer;
 	bool pending_irq;
@@ -21,22 +23,10 @@ struct hf_vm {
 	struct hf_vcpu *vcpu;
 };
 
-long hf_hvc(size_t arg0, size_t arg1, size_t arg2, size_t arg3);
-
 static struct hf_vm *hf_vms;
 static long hf_vm_count;
 static struct page *hf_send_page = NULL;
 static struct page *hf_recv_page = NULL;
-
-/* TODO: Define constants below according to spec. Include shared header. */
-#define HF_VCPU_RUN         0xff00
-#define HF_VM_GET_COUNT     0xff01
-#define HF_VCPU_GET_COUNT   0xff02
-#define HF_VM_CONFIGURE     0xff03
-#define HF_RPC_REQUEST      0xff04
-#define HF_RPC_READ_REQUEST 0xff05
-#define HF_RPC_ACK          0xff06
-#define HF_RPC_REPLY        0xff07
 
 /**
  * Wakes up the thread associated with the vcpu that owns the given timer. This
@@ -73,8 +63,7 @@ static int hf_vcpu_thread(void *data)
 		spin_unlock_irqrestore(&vcpu->lock, flags);
 
 		/* Call into hafnium to run vcpu. */
-		ret = hf_hvc(HF_VCPU_RUN, vcpu->vm_index, vcpu->vcpu_index,
-			     irqs);
+		ret = hf_vcpu_run(vcpu->vm_index, vcpu->vcpu_index);
 
 		/* A negative return value indicates that this vcpu needs to
 		 * sleep for the given number of nanoseconds.
@@ -119,7 +108,7 @@ static int hf_vcpu_thread(void *data)
 				for (i = 0; i < count; i++)
 					printk(KERN_CONT "%c", buf[i]);
 				printk(KERN_CONT "\n");
-				hf_hvc(HF_RPC_ACK, 0, 0, 0);
+				hf_rpc_ack();
 			}
 			break;
 		}
@@ -199,7 +188,7 @@ static ssize_t hf_send_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	/* Copy data to send buffer. */
 	memcpy(page_address(hf_send_page), buf, count);
-	ret = hf_hvc(HF_RPC_REQUEST, 0, count, 0);
+	ret = hf_rpc_request(0, count);
 	if (ret < 0)
 		return -EAGAIN;
 
@@ -256,8 +245,8 @@ static int __init hf_init(void)
 	 * because the hypervisor will use them, even if the module is
 	 * unloaded.
 	 */
-	ret = hf_hvc(HF_VM_CONFIGURE, (size_t)page_to_phys(hf_send_page),
-		     (size_t)page_to_phys(hf_recv_page), 0);
+	ret = hf_vm_configure(page_to_phys(hf_send_page),
+			      page_to_phys(hf_recv_page));
 	if (ret) {
 		__free_page(hf_send_page);
 		__free_page(hf_recv_page);
@@ -268,7 +257,7 @@ static int __init hf_init(void)
 	}
 
 	/* Get the number of VMs and allocate storage for them. */
-	ret = hf_hvc(HF_VM_GET_COUNT, 0, 0, 0);
+	ret = hf_vm_get_count();
 	if (ret < 0) {
 		pr_err("Unable to retrieve number of VMs: %ld\n", ret);
 		return ret;
@@ -283,7 +272,7 @@ static int __init hf_init(void)
 	for (i = 0; i < hf_vm_count; i++) {
 		struct hf_vm *vm = hf_vms + i;
 
-		ret = hf_hvc(HF_VCPU_GET_COUNT, i, 0, 0);
+		ret = hf_vcpu_get_count(i);
 		if (ret < 0) {
 			pr_err("HF_VCPU_GET_COUNT failed for vm=%ld: %ld", i,
 			       ret);
