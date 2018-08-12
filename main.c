@@ -2,6 +2,7 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/kthread.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/sched/task.h>
 #include <linux/slab.h>
@@ -24,12 +25,18 @@ long hf_hvc(size_t arg0, size_t arg1, size_t arg2, size_t arg3);
 
 static struct hf_vm *hf_vms;
 static long hf_vm_count;
-
+static struct page *hf_send_page = NULL;
+static struct page *hf_recv_page = NULL;
 
 /* TODO: Define constants below according to spec. Include shared header. */
-#define HF_VCPU_RUN       0xff00
-#define HF_VM_GET_COUNT   0xff01
-#define HF_VCPU_GET_COUNT 0xff02
+#define HF_VCPU_RUN         0xff00
+#define HF_VM_GET_COUNT     0xff01
+#define HF_VCPU_GET_COUNT   0xff02
+#define HF_VM_CONFIGURE     0xff03
+#define HF_RPC_REQUEST      0xff04
+#define HF_RPC_READ_REQUEST 0xff05
+#define HF_RPC_ACK          0xff06
+#define HF_RPC_REPLY        0xff07
 
 /**
  * Wakes up the thread associated with the vcpu that owns the given timer. This
@@ -102,6 +109,19 @@ static int hf_vcpu_thread(void *data)
 					wake_up_process(vm->vcpu[target].task);
 			}
 			break;
+
+		case 0x03: /* Response available. */
+			{
+				size_t i, count = ret >> 8;
+				const char *buf = page_address(hf_recv_page);
+				pr_info("Received response (%zu bytes): ",
+					count);
+				for (i = 0; i < count; i++)
+					printk(KERN_CONT "%c", buf[i]);
+				printk(KERN_CONT "\n");
+				hf_hvc(HF_RPC_ACK, 0, 0, 0);
+			}
+			break;
 		}
 	}
 
@@ -148,7 +168,6 @@ static ssize_t hf_interrupt_store(struct kobject *kobj,
 	struct task_struct *task;
 
 	/* TODO: Parse input to determine which vcpu to interrupt. */
-	pr_info("Interrupting the first vcpu of the first vm\n");
 	/* TODO: Check bounds. */
 
 	vcpu = hf_vms[0].vcpu + 0;
@@ -168,9 +187,46 @@ static ssize_t hf_interrupt_store(struct kobject *kobj,
 	return count;
 }
 
+static ssize_t hf_send_store(struct kobject *kobj, struct kobj_attribute *attr,
+			     const char *buf, size_t count)
+{
+	long ret;
+	struct hf_vm *vm;
+
+	/* TODO: Use constant. */
+	if (count > 4096)
+		count = 4096;
+
+	/* Copy data to send buffer. */
+	memcpy(page_address(hf_send_page), buf, count);
+	ret = hf_hvc(HF_RPC_REQUEST, 0, count, 0);
+	if (ret < 0)
+		return -EAGAIN;
+
+	vm = hf_vms + 0;
+	if (ret > vm->vcpu_count)
+		return -EINVAL;
+
+	if (ret == 0) {
+		/*
+		 * TODO: We need to interrupt some CPU because none is actually
+		 * waiting for data.
+		 */
+	} else {
+		/* Wake up the vcpu that is going to process the data. */
+		/* TODO: There's a race where thread may get wake up before it
+		 * goes to sleep. Fix this. */
+		wake_up_process(vm->vcpu[ret - 1].task);
+	}
+
+	return count;
+}
+
 static struct kobject *hf_sysfs_obj = NULL;
 static struct kobj_attribute interrupt_attr =
 	__ATTR(interrupt, 0200, NULL, hf_interrupt_store);
+static struct kobj_attribute send_attr =
+	__ATTR(send, 0200, NULL, hf_send_store);
 
 /**
  * Initializes the hafnium driver by creating a thread for each vCPU of each
@@ -180,6 +236,36 @@ static int __init hf_init(void)
 {
 	long ret;
 	long i, j;
+
+	/* Allocate a page for send and receive buffers. */
+	hf_send_page = alloc_page(GFP_KERNEL);
+	if (!hf_send_page) {
+		pr_err("Unable to allocate send buffer\n");
+		return -ENOMEM;
+	}
+
+	hf_recv_page = alloc_page(GFP_KERNEL);
+	if (!hf_recv_page) {
+		__free_page(hf_send_page);
+		pr_err("Unable to allocate receive buffer\n");
+		return -ENOMEM;
+	}
+
+	/*
+	 * Configure both addresses. Once configured, we cannot free these pages
+	 * because the hypervisor will use them, even if the module is
+	 * unloaded.
+	 */
+	ret = hf_hvc(HF_VM_CONFIGURE, (size_t)page_to_phys(hf_send_page),
+		     (size_t)page_to_phys(hf_recv_page), 0);
+	if (ret) {
+		__free_page(hf_send_page);
+		__free_page(hf_recv_page);
+		/* TODO: We may want to grab this information from hypervisor
+		 * and go from there. */
+		pr_err("Unable to configure VM\n");
+		return -EIO;
+	}
 
 	/* Get the number of VMs and allocate storage for them. */
 	ret = hf_hvc(HF_VM_GET_COUNT, 0, 0, 0);
@@ -257,6 +343,10 @@ static int __init hf_init(void)
 		ret = sysfs_create_file(hf_sysfs_obj, &interrupt_attr.attr);
 		if (ret)
 			pr_err("Unable to create 'interrupt' sysfs file");
+
+		ret = sysfs_create_file(hf_sysfs_obj, &send_attr.attr);
+		if (ret)
+			pr_err("Unable to create 'send' sysfs file");
 	}
 
 	return 0;
