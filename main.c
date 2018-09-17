@@ -78,30 +78,33 @@ static int hf_vcpu_thread(void *data)
 			continue;
 		}
 
-		/* TODO: Use constants below. */
-		switch ((u8)ret) {
-		case 0x0: /* Yield (forcibly or voluntarily). */
+		switch (HF_VCPU_RUN_CODE(ret)) {
+		/* Yield (forcibly or voluntarily). */
+		case HF_VCPU_RUN_YIELD:
 			break;
 
-		case 0x01: /* WFI. */
+		 /* WFI. */
+		case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
 			set_current_state(TASK_INTERRUPTIBLE);
 			if (kthread_should_stop())
 				break;
 			schedule();
 			break;
 
-		case 0x02: /* Wake up another vcpu. */
+		/* Wake up another vcpu. */
+		case HF_VCPU_RUN_WAKE_UP:
 			{
-				struct hf_vm *vm = hf_vms + vcpu->vm_index;
-				long target = ret >> 8;
+				struct hf_vm *vm = &hf_vms[vcpu->vm_index];
+				long target = HF_VCPU_RUN_DATA(ret);
 				if (target < vm->vcpu_count)
 					wake_up_process(vm->vcpu[target].task);
 			}
 			break;
 
-		case 0x03: /* Response available. */
+		/* Response available. */
+		case HF_VCPU_RUN_RESPONSE_READY:
 			{
-				size_t i, count = ret >> 8;
+				size_t i, count = HF_VCPU_RUN_DATA(ret);
 				const char *buf = page_address(hf_recv_page);
 				pr_info("Received response (%zu bytes): ",
 					count);
@@ -132,14 +135,14 @@ static void hf_free_resources(long vm_count)
 	 * safe to free resources after they have all stopped.
 	 */
 	for (i = 0; i < vm_count; i++) {
-		struct hf_vm *vm = hf_vms + i;
+		struct hf_vm *vm = &hf_vms[i];
 		for (j = 0; j < vm->vcpu_count; j++)
 			kthread_stop(vm->vcpu[j].task);
 	}
 
 	/* Free resources. */
 	for (i = 0; i < vm_count; i++) {
-		struct hf_vm *vm = hf_vms + i;
+		struct hf_vm *vm = &hf_vms[i];
 		for (j = 0; j < vm->vcpu_count; j++)
 			put_task_struct(vm->vcpu[j].task);
 		kfree(vm->vcpu);
@@ -159,7 +162,7 @@ static ssize_t hf_interrupt_store(struct kobject *kobj,
 	/* TODO: Parse input to determine which vcpu to interrupt. */
 	/* TODO: Check bounds. */
 
-	vcpu = hf_vms[0].vcpu + 0;
+	vcpu = &hf_vms[0].vcpu[0];
 
 	spin_lock_irqsave(&vcpu->lock, flags);
 	vcpu->pending_irq = true;
@@ -182,9 +185,7 @@ static ssize_t hf_send_store(struct kobject *kobj, struct kobj_attribute *attr,
 	long ret;
 	struct hf_vm *vm;
 
-	/* TODO: Use constant. */
-	if (count > 4096)
-		count = 4096;
+	count = min_t(size_t, count, HF_RPC_REQUEST_MAX_SIZE);
 
 	/* Copy data to send buffer. */
 	memcpy(page_address(hf_send_page), buf, count);
@@ -192,11 +193,11 @@ static ssize_t hf_send_store(struct kobject *kobj, struct kobj_attribute *attr,
 	if (ret < 0)
 		return -EAGAIN;
 
-	vm = hf_vms + 0;
+	vm = &hf_vms[0];
 	if (ret > vm->vcpu_count)
 		return -EINVAL;
 
-	if (ret == 0) {
+	if (ret == vm->vcpu_count) {
 		/*
 		 * TODO: We need to interrupt some CPU because none is actually
 		 * waiting for data.
@@ -205,7 +206,7 @@ static ssize_t hf_send_store(struct kobject *kobj, struct kobj_attribute *attr,
 		/* Wake up the vcpu that is going to process the data. */
 		/* TODO: There's a race where thread may get wake up before it
 		 * goes to sleep. Fix this. */
-		wake_up_process(vm->vcpu[ret - 1].task);
+		wake_up_process(vm->vcpu[ret].task);
 	}
 
 	return count;
@@ -270,7 +271,7 @@ static int __init hf_init(void)
 
 	/* Initialize each VM. */
 	for (i = 0; i < hf_vm_count; i++) {
-		struct hf_vm *vm = hf_vms + i;
+		struct hf_vm *vm = &hf_vms[i];
 
 		ret = hf_vcpu_get_count(i);
 		if (ret < 0) {
@@ -292,7 +293,7 @@ static int __init hf_init(void)
 
 		/* Create a kernel thread for each vcpu. */
 		for (j = 0; j < vm->vcpu_count; j++) {
-			struct hf_vcpu *vcpu = vm->vcpu + j;
+			struct hf_vcpu *vcpu = &vm->vcpu[j];
 			vcpu->task = kthread_create(hf_vcpu_thread, vcpu,
 						    "vcpu_thread_%ld_%ld",
 						    i, j);
@@ -314,7 +315,7 @@ static int __init hf_init(void)
 
 	/* Start running threads now that all is initialized. */
 	for (i = 0; i < hf_vm_count; i++) {
-		struct hf_vm *vm = hf_vms + i;
+		struct hf_vm *vm = &hf_vms[i];
 		for (j = 0; j < vm->vcpu_count; j++)
 			wake_up_process(vm->vcpu[j].task);
 	}
