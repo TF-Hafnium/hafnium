@@ -20,12 +20,12 @@ struct hf_vcpu {
 
 struct hf_vm {
 	uint32_t id;
-	long vcpu_count;
+	uint32_t vcpu_count;
 	struct hf_vcpu *vcpu;
 };
 
 static struct hf_vm *hf_vms;
-static long hf_vm_count;
+static uint32_t hf_vm_count;
 static struct page *hf_send_page = NULL;
 static struct page *hf_recv_page = NULL;
 
@@ -46,7 +46,7 @@ static enum hrtimer_restart hf_vcpu_timer_expired(struct hrtimer *timer)
 static int hf_vcpu_thread(void *data)
 {
 	struct hf_vcpu *vcpu = data;
-	long ret;
+	int64_t ret;
 
 	hrtimer_init(&vcpu->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	vcpu->timer.function = &hf_vcpu_timer_expired;
@@ -63,7 +63,7 @@ static int hf_vcpu_thread(void *data)
 		vcpu->pending_irq = false;
 		spin_unlock_irqrestore(&vcpu->lock, flags);
 
-		/* Call into hafnium to run vcpu. */
+		/* Call into Hafnium to run vcpu. */
 		ret = hf_vcpu_run(vcpu->vm->id, vcpu->vcpu_index);
 
 		/* A negative return value indicates that this vcpu needs to
@@ -95,7 +95,7 @@ static int hf_vcpu_thread(void *data)
 		/* Wake up another vcpu. */
 		case HF_VCPU_RUN_WAKE_UP:
 			{
-				long target = HF_VCPU_RUN_DATA(ret);
+				int32_t target = HF_VCPU_RUN_DATA(ret);
 				struct hf_vm *vm = vcpu->vm;
 				if (target < vm->vcpu_count)
 					wake_up_process(vm->vcpu[target].task);
@@ -124,11 +124,11 @@ static int hf_vcpu_thread(void *data)
 }
 
 /**
- * Frees all resources, including threads, associated with the hafnium driver.
+ * Frees all resources, including threads, associated with the Hafnium driver.
  */
-static void hf_free_resources(long vm_count)
+static void hf_free_resources(uint32_t vm_count)
 {
-	long i, j;
+	uint32_t i, j;
 
 	/*
 	 * First stop all worker threads. We need to do this before freeing
@@ -183,7 +183,7 @@ static ssize_t hf_interrupt_store(struct kobject *kobj,
 static ssize_t hf_send_store(struct kobject *kobj, struct kobj_attribute *attr,
 			     const char *buf, size_t count)
 {
-	long ret;
+	int64_t ret;
 	struct hf_vm *vm;
 
 	count = min_t(size_t, count, HF_RPC_REQUEST_MAX_SIZE);
@@ -221,13 +221,35 @@ static struct kobj_attribute send_attr =
 	__ATTR(send, 0200, NULL, hf_send_store);
 
 /**
- * Initializes the hafnium driver by creating a thread for each vCPU of each
+ * Initializes the Hafnium driver's sysfs interface.
+ */
+static void __init hf_init_sysfs(void)
+{
+	int ret;
+
+	/* Create the sysfs interface to interrupt vcpus. */
+	hf_sysfs_obj = kobject_create_and_add("hafnium", kernel_kobj);
+	if (!hf_sysfs_obj) {
+		pr_err("Unable to create sysfs object");
+	} else {
+		ret = sysfs_create_file(hf_sysfs_obj, &interrupt_attr.attr);
+		if (ret)
+			pr_err("Unable to create 'interrupt' sysfs file");
+
+		ret = sysfs_create_file(hf_sysfs_obj, &send_attr.attr);
+		if (ret)
+			pr_err("Unable to create 'send' sysfs file");
+	}
+}
+
+/**
+ * Initializes the Hafnium driver by creating a thread for each vCPU of each
  * virtual machine.
  */
 static int __init hf_init(void)
 {
-	long ret;
-	long i, j;
+	int64_t ret;
+	uint32_t i, j;
 
 	/* Allocate a page for send and receive buffers. */
 	hf_send_page = alloc_page(GFP_KERNEL);
@@ -262,7 +284,7 @@ static int __init hf_init(void)
 	/* Get the number of VMs and allocate storage for them. */
 	ret = hf_vm_get_count();
 	if (ret < 1) {
-		pr_err("Unable to retrieve number of VMs: %ld\n", ret);
+		pr_err("Unable to retrieve number of VMs: %lld\n", ret);
 		return ret;
 	}
 
@@ -281,8 +303,8 @@ static int __init hf_init(void)
 
 		ret = hf_vcpu_get_count(vm->id);
 		if (ret < 0) {
-			pr_err("HF_VCPU_GET_COUNT failed for vm=%d: %ld", vm->id,
-			       ret);
+			pr_err("HF_VCPU_GET_COUNT failed for vm=%u: %lld",
+			       vm->id, ret);
 			hf_free_resources(i);
 			return ret;
 		}
@@ -291,7 +313,7 @@ static int __init hf_init(void)
 		vm->vcpu = kmalloc(sizeof(struct hf_vcpu) * vm->vcpu_count,
 				   GFP_KERNEL);
 		if (!vm->vcpu) {
-			pr_err("No memory for %ld vcpus for vm %d",
+			pr_err("No memory for %u vcpus for vm %u",
 			       vm->vcpu_count, vm->id);
 			hf_free_resources(i);
 			return -ENOMEM;
@@ -301,10 +323,10 @@ static int __init hf_init(void)
 		for (j = 0; j < vm->vcpu_count; j++) {
 			struct hf_vcpu *vcpu = &vm->vcpu[j];
 			vcpu->task = kthread_create(hf_vcpu_thread, vcpu,
-						    "vcpu_thread_%d_%ld",
+						    "vcpu_thread_%u_%u",
 						    vm->id, j);
 			if (IS_ERR(vcpu->task)) {
-				pr_err("Error creating task (vm=%d,vcpu=%ld)"
+				pr_err("Error creating task (vm=%u,vcpu=%u)"
 				       ": %ld\n", vm->id, j, PTR_ERR(vcpu->task));
 				vm->vcpu_count = j;
 				hf_free_resources(i + 1);
@@ -327,31 +349,19 @@ static int __init hf_init(void)
 	}
 
 	/* Dump vm/vcpu count info. */
-	pr_info("Hafnium successfully loaded with %ld VMs:\n", hf_vm_count);
+	pr_info("Hafnium successfully loaded with %u VMs:\n", hf_vm_count);
 	for (i = 0; i < hf_vm_count; i++) {
 		struct hf_vm *vm = &hf_vms[i];
-		pr_info("\tVM %d: %ld vCPUS\n", vm->id, vm->vcpu_count);
+		pr_info("\tVM %u: %u vCPUS\n", vm->id, vm->vcpu_count);
 	}
 
-	/* Create the sysfs interface to interrupt vcpus. */
-	hf_sysfs_obj = kobject_create_and_add("hafnium", kernel_kobj);
-	if (!hf_sysfs_obj) {
-		pr_err("Unable to create sysfs object");
-	} else {
-		ret = sysfs_create_file(hf_sysfs_obj, &interrupt_attr.attr);
-		if (ret)
-			pr_err("Unable to create 'interrupt' sysfs file");
-
-		ret = sysfs_create_file(hf_sysfs_obj, &send_attr.attr);
-		if (ret)
-			pr_err("Unable to create 'send' sysfs file");
-	}
+	hf_init_sysfs();
 
 	return 0;
 }
 
 /**
- * Frees up all resources used by the hafnium driver in preparation for
+ * Frees up all resources used by the Hafnium driver in preparation for
  * unloading it.
  */
 static void __exit hf_exit(void)
@@ -359,7 +369,7 @@ static void __exit hf_exit(void)
 	if (hf_sysfs_obj)
 		kobject_put(hf_sysfs_obj);
 
-	pr_info("Preparing to unload hafnium\n");
+	pr_info("Preparing to unload Hafnium\n");
 	hf_free_resources(hf_vm_count);
 	pr_info("Hafnium ready to unload\n");
 }
