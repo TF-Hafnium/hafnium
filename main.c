@@ -9,6 +9,9 @@
 
 #include <hf/call.h>
 
+#define CONFIG_HAFNIUM_MAX_VMS   16
+#define CONFIG_HAFNIUM_MAX_VCPUS 32
+
 struct hf_vcpu {
 	spinlock_t lock;
 	struct hf_vm *vm;
@@ -128,7 +131,7 @@ static int hf_vcpu_thread(void *data)
 /**
  * Frees all resources, including threads, associated with the Hafnium driver.
  */
-static void hf_free_resources(uint32_t vm_count)
+static void hf_free_resources(void)
 {
 	uint32_t i, j;
 
@@ -137,14 +140,14 @@ static void hf_free_resources(uint32_t vm_count)
 	 * resources because workers may reference each other, so it is only
 	 * safe to free resources after they have all stopped.
 	 */
-	for (i = 0; i < vm_count; i++) {
+	for (i = 0; i < hf_vm_count; i++) {
 		struct hf_vm *vm = &hf_vms[i];
 		for (j = 0; j < vm->vcpu_count; j++)
 			kthread_stop(vm->vcpu[j].task);
 	}
 
 	/* Free resources. */
-	for (i = 0; i < vm_count; i++) {
+	for (i = 0; i < hf_vm_count; i++) {
 		struct hf_vm *vm = &hf_vms[i];
 		for (j = 0; j < vm->vcpu_count; j++)
 			put_task_struct(vm->vcpu[j].task);
@@ -254,6 +257,8 @@ static int __init hf_init(void)
 {
 	int64_t ret;
 	uint32_t i, j;
+	uint32_t total_vm_count;
+	uint32_t total_vcpu_count;
 
 	/* Allocate a page for send and receive buffers. */
 	hf_send_page = alloc_page(GFP_KERNEL);
@@ -285,21 +290,32 @@ static int __init hf_init(void)
 		return -EIO;
 	}
 
-	/* Get the number of VMs and allocate storage for them. */
+	/* Get the number of VMs. */
 	ret = hf_vm_get_count();
-	if (ret < 1) {
+	if (ret < 0) {
 		pr_err("Unable to retrieve number of VMs: %lld\n", ret);
-		return ret;
+		return -EIO;
+	}
+
+	/* Confirm the maximum number of VMs looks sane. */
+	BUILD_BUG_ON(CONFIG_HAFNIUM_MAX_VMS < 1);
+	BUILD_BUG_ON(CONFIG_HAFNIUM_MAX_VMS > U16_MAX);
+
+	/* Validate the number of VMs. There must at least be the primary. */
+	if (ret < 1 || ret > CONFIG_HAFNIUM_MAX_VMS) {
+		pr_err("Number of VMs is out of range: %lld\n", ret);
+		return -EDQUOT;
 	}
 
 	/* Only track the secondary VMs. */
-	hf_vm_count = ret - 1;
-	hf_vms = kmalloc(sizeof(struct hf_vm) * hf_vm_count, GFP_KERNEL);
+	total_vm_count = ret - 1;
+	hf_vms = kmalloc(sizeof(struct hf_vm) * total_vm_count, GFP_KERNEL);
 	if (!hf_vms)
 		return -ENOMEM;
 
 	/* Initialize each VM. */
-	for (i = 0; i < hf_vm_count; i++) {
+	total_vcpu_count = 0;
+	for (i = 0; i < total_vm_count; i++) {
 		struct hf_vm *vm = &hf_vms[i];
 
 		/* Adjust the ID as only the secondaries are tracked. */
@@ -307,10 +323,29 @@ static int __init hf_init(void)
 
 		ret = hf_vcpu_get_count(vm->id);
 		if (ret < 0) {
-			pr_err("HF_VCPU_GET_COUNT failed for vm=%u: %lld",
-			       vm->id, ret);
-			hf_free_resources(i);
-			return ret;
+			pr_err("HF_VCPU_GET_COUNT failed for vm=%u: %lld", vm->id,
+			       ret);
+			ret = -EIO;
+			goto fail_with_cleanup;
+		}
+
+		/* Avoid overflowing the vcpu count. */
+		if (ret > (U32_MAX - total_vcpu_count)) {
+			pr_err("Too many vcpus: %u\n", total_vcpu_count);
+			ret = -EDQUOT;
+			goto fail_with_cleanup;
+		}
+
+		/* Confirm the maximum number of VCPUs looks sane. */
+		BUILD_BUG_ON(CONFIG_HAFNIUM_MAX_VCPUS < 1);
+		BUILD_BUG_ON(CONFIG_HAFNIUM_MAX_VCPUS > U16_MAX);
+
+		/* Enforce the limit on vcpus. */
+		total_vcpu_count += ret;
+		if (total_vcpu_count > CONFIG_HAFNIUM_MAX_VCPUS) {
+			pr_err("Too many vcpus: %u\n", total_vcpu_count);
+			ret = -EDQUOT;
+			goto fail_with_cleanup;
 		}
 
 		vm->vcpu_count = ret;
@@ -319,9 +354,12 @@ static int __init hf_init(void)
 		if (!vm->vcpu) {
 			pr_err("No memory for %u vcpus for vm %u",
 			       vm->vcpu_count, vm->id);
-			hf_free_resources(i);
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto fail_with_cleanup;
 		}
+
+		/* Update the number of initialized VMs. */
+		hf_vm_count = i + 1;
 
 		/* Create a kernel thread for each vcpu. */
 		for (j = 0; j < vm->vcpu_count; j++) {
@@ -333,8 +371,8 @@ static int __init hf_init(void)
 				pr_err("Error creating task (vm=%u,vcpu=%u)"
 				       ": %ld\n", vm->id, j, PTR_ERR(vcpu->task));
 				vm->vcpu_count = j;
-				hf_free_resources(i + 1);
-				return PTR_ERR(vcpu->task);
+				ret = PTR_ERR(vcpu->task);
+				goto fail_with_cleanup;
 			}
 
 			get_task_struct(vcpu->task);
@@ -362,6 +400,10 @@ static int __init hf_init(void)
 	hf_init_sysfs();
 
 	return 0;
+
+fail_with_cleanup:
+	hf_free_resources();
+	return ret;
 }
 
 /**
@@ -374,7 +416,7 @@ static void __exit hf_exit(void)
 		kobject_put(hf_sysfs_obj);
 
 	pr_info("Preparing to unload Hafnium\n");
-	hf_free_resources(hf_vm_count);
+	hf_free_resources();
 	pr_info("Hafnium ready to unload\n");
 }
 
