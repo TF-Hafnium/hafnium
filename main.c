@@ -95,24 +95,33 @@ static int hf_vcpu_thread(void *data)
 		/* Wake up another vcpu. */
 		case HF_VCPU_RUN_WAKE_UP:
 			{
-				int32_t target = HF_VCPU_RUN_DATA(ret);
-				struct hf_vm *vm = vcpu->vm;
-				if (target < vm->vcpu_count)
-					wake_up_process(vm->vcpu[target].task);
+				uint32_t vm_id = HF_VCPU_RUN_VM_ID(ret);
+				uint32_t vcpu = HF_VCPU_RUN_DATA(ret);
+				struct hf_vm *vm;
+				if (vm_id > hf_vm_count)
+					break;
+				vm = &hf_vms[vm_id - 1];
+				if (vcpu < vm->vcpu_count) {
+					wake_up_process(vm->vcpu[vcpu].task);
+				} else if (vcpu == HF_INVALID_VCPU) {
+					/* TODO: pick one to interrupt. */
+					pr_warning("No vcpu to wake.");
+				}
 			}
 			break;
 
 		/* Response available. */
-		case HF_VCPU_RUN_RESPONSE_READY:
+		case HF_VCPU_RUN_MESSAGE:
 			{
-				size_t i, count = HF_VCPU_RUN_DATA(ret);
+				size_t i;
+				uint32_t count = HF_VCPU_RUN_DATA(ret);
 				const char *buf = page_address(hf_recv_page);
-				pr_info("Received response (%zu bytes): ",
-					count);
+				pr_info("Received response from vm %u (%u bytes): ",
+					vcpu->vm->id, count);
 				for (i = 0; i < count; i++)
 					printk(KERN_CONT "%c", buf[i]);
 				printk(KERN_CONT "\n");
-				hf_rpc_ack();
+				hf_mailbox_clear();
 			}
 			break;
 		}
@@ -186,30 +195,32 @@ static ssize_t hf_send_store(struct kobject *kobj, struct kobj_attribute *attr,
 	int64_t ret;
 	struct hf_vm *vm;
 
-	count = min_t(size_t, count, HF_RPC_REQUEST_MAX_SIZE);
+	count = min_t(size_t, count, HF_MAILBOX_SIZE);
 
 	/* Copy data to send buffer. */
 	memcpy(page_address(hf_send_page), buf, count);
 
 	vm = &hf_vms[0];
-	ret = hf_rpc_request(vm->id, count);
+	ret = hf_mailbox_send(vm->id, count);
 	if (ret < 0)
 		return -EAGAIN;
 
-	if (ret > vm->vcpu_count)
+	if (ret == HF_INVALID_VCPU) {
+		/*
+		 * TODO: We need to interrupt some vcpu because none are waiting
+		 * for data.
+		 */
+		pr_warning("No vcpu to receive message.");
+		return -ENOSYS;
+	}
+
+	if (ret >= vm->vcpu_count)
 		return -EINVAL;
 
-	if (ret == vm->vcpu_count) {
-		/*
-		 * TODO: We need to interrupt some CPU because none is actually
-		 * waiting for data.
-		 */
-	} else {
-		/* Wake up the vcpu that is going to process the data. */
-		/* TODO: There's a race where thread may get wake up before it
-		 * goes to sleep. Fix this. */
-		wake_up_process(vm->vcpu[ret].task);
-	}
+	/* Wake up the vcpu that is going to process the data. */
+	/* TODO: There's a race where thread may get wake up before it
+	 * goes to sleep. Fix this. */
+	wake_up_process(vm->vcpu[ret].task);
 
 	return count;
 }
