@@ -46,7 +46,7 @@ static enum hrtimer_restart hf_vcpu_timer_expired(struct hrtimer *timer)
 static int hf_vcpu_thread(void *data)
 {
 	struct hf_vcpu *vcpu = data;
-	int64_t ret;
+	struct hf_vcpu_run_return ret;
 
 	hrtimer_init(&vcpu->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	vcpu->timer.function = &hf_vcpu_timer_expired;
@@ -66,20 +66,7 @@ static int hf_vcpu_thread(void *data)
 		/* Call into Hafnium to run vcpu. */
 		ret = hf_vcpu_run(vcpu->vm->id, vcpu->vcpu_index);
 
-		/* A negative return value indicates that this vcpu needs to
-		 * sleep for the given number of nanoseconds.
-		 */
-		if (ret < 0) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			if (kthread_should_stop())
-				break;
-			hrtimer_start(&vcpu->timer, -ret, HRTIMER_MODE_REL);
-			schedule();
-			hrtimer_cancel(&vcpu->timer);
-			continue;
-		}
-
-		switch (HF_VCPU_RUN_CODE(ret)) {
+		switch (ret.code) {
 		/* Yield (forcibly or voluntarily). */
 		case HF_VCPU_RUN_YIELD:
 			break;
@@ -95,15 +82,13 @@ static int hf_vcpu_thread(void *data)
 		/* Wake up another vcpu. */
 		case HF_VCPU_RUN_WAKE_UP:
 			{
-				uint32_t vm_id = HF_VCPU_RUN_VM_ID(ret);
-				uint32_t vcpu = HF_VCPU_RUN_DATA(ret);
 				struct hf_vm *vm;
-				if (vm_id > hf_vm_count)
+				if (ret.wake_up.vm_id > hf_vm_count)
 					break;
-				vm = &hf_vms[vm_id - 1];
-				if (vcpu < vm->vcpu_count) {
-					wake_up_process(vm->vcpu[vcpu].task);
-				} else if (vcpu == HF_INVALID_VCPU) {
+				vm = &hf_vms[ret.wake_up.vm_id - 1];
+				if (ret.wake_up.vcpu < vm->vcpu_count) {
+					wake_up_process(vm->vcpu[ret.wake_up.vcpu].task);
+				} else if (ret.wake_up.vcpu == HF_INVALID_VCPU) {
 					/* TODO: pick one to interrupt. */
 					pr_warning("No vcpu to wake.");
 				}
@@ -113,16 +98,24 @@ static int hf_vcpu_thread(void *data)
 		/* Response available. */
 		case HF_VCPU_RUN_MESSAGE:
 			{
-				size_t i;
-				uint32_t count = HF_VCPU_RUN_DATA(ret);
+				uint32_t i;
 				const char *buf = page_address(hf_recv_page);
 				pr_info("Received response from vm %u (%u bytes): ",
-					vcpu->vm->id, count);
-				for (i = 0; i < count; i++)
+					vcpu->vm->id, ret.message.size);
+				for (i = 0; i < ret.message.size; i++)
 					printk(KERN_CONT "%c", buf[i]);
 				printk(KERN_CONT "\n");
 				hf_mailbox_clear();
 			}
+			break;
+
+		case HF_VCPU_RUN_SLEEP:
+			set_current_state(TASK_INTERRUPTIBLE);
+			if (kthread_should_stop())
+				break;
+			hrtimer_start(&vcpu->timer, ret.sleep.ns, HRTIMER_MODE_REL);
+			schedule();
+			hrtimer_cancel(&vcpu->timer);
 			break;
 		}
 	}
