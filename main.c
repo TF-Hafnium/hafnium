@@ -136,7 +136,14 @@ static int hf_vcpu_thread(void *data)
 					break;
 				vm = &hf_vms[ret.wake_up.vm_id - 1];
 				if (ret.wake_up.vcpu < vm->vcpu_count) {
-					hf_vcpu_wake_up(&vm->vcpu[ret.wake_up.vcpu]);
+					if (hf_vcpu_wake_up(&vm->vcpu[ret.wake_up.vcpu]) == 0) {
+						/*
+						 * The task was already running (presumably on a
+						 * different physical CPU); interrupt it. This gives
+						 * Hafnium a chance to inject any new interrupts.
+						 */
+						kick_process(vm->vcpu[ret.wake_up.vcpu].task);
+					}
 				} else if (ret.wake_up.vcpu == HF_INVALID_VCPU) {
 					/* TODO: pick one to interrupt. */
 					pr_warning("No vcpu to wake.");
