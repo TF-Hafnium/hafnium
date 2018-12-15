@@ -34,8 +34,8 @@ struct hf_vcpu {
 	struct hf_vm *vm;
 	uint32_t vcpu_index;
 	struct task_struct *task;
+	atomic_t abort_sleep;
 	struct hrtimer timer;
-	bool pending_irq;
 };
 
 struct hf_vm {
@@ -50,13 +50,50 @@ static struct page *hf_send_page = NULL;
 static struct page *hf_recv_page = NULL;
 
 /**
+ * Wakes up the kernel thread responsible for running the given vcpu.
+ *
+ * Returns 0 if the thread was already running, 1 otherwise.
+ */
+static int hf_vcpu_wake_up(struct hf_vcpu *vcpu)
+{
+	/* Set a flag indicating that the thread should not go to sleep. */
+	atomic_set(&vcpu->abort_sleep, 1);
+
+	/* Set the thread to running state. */
+	return wake_up_process(vcpu->task);
+}
+
+/**
+ * Puts the current thread to sleep. The current thread must be responsible for
+ * running the given vcpu.
+ *
+ * Going to sleep will fail if hf_vcpu_wake_up() or kthread_stop() was called on
+ * this vcpu/thread since the last time it [re]started running.
+ */
+static void hf_vcpu_sleep(struct hf_vcpu *vcpu)
+{
+	int abort;
+
+	set_current_state(TASK_INTERRUPTIBLE);
+
+	/* Check the sleep-abort flag after making thread interruptible. */
+	abort = atomic_read(&vcpu->abort_sleep);
+	if (!abort && !kthread_should_stop())
+		schedule();
+
+	/* Set state back to running on the way out. */
+	set_current_state(TASK_RUNNING);
+}
+
+/**
  * Wakes up the thread associated with the vcpu that owns the given timer. This
  * is called when the timer the thread is waiting on expires.
  */
 static enum hrtimer_restart hf_vcpu_timer_expired(struct hrtimer *timer)
 {
 	struct hf_vcpu *vcpu = container_of(timer, struct hf_vcpu, timer);
-	wake_up_process(vcpu->task);
+	/* TODO: Inject interrupt. */
+	hf_vcpu_wake_up(vcpu);
 	return HRTIMER_NORESTART;
 }
 
@@ -72,16 +109,11 @@ static int hf_vcpu_thread(void *data)
 	vcpu->timer.function = &hf_vcpu_timer_expired;
 
 	while (!kthread_should_stop()) {
-		unsigned long flags;
-		size_t irqs;
-
-		set_current_state(TASK_RUNNING);
-
-		/* Determine if we must interrupt the vcpu. */
-		spin_lock_irqsave(&vcpu->lock, flags);
-		irqs = vcpu->pending_irq ? 1 : 0;
-		vcpu->pending_irq = false;
-		spin_unlock_irqrestore(&vcpu->lock, flags);
+		/*
+		 * We're about to run the vcpu, so we can reset the abort-sleep
+		 * flag.
+		 */
+		atomic_set(&vcpu->abort_sleep, 0);
 
 		/* Call into Hafnium to run vcpu. */
 		ret = hf_vcpu_run(vcpu->vm->id, vcpu->vcpu_index);
@@ -93,10 +125,7 @@ static int hf_vcpu_thread(void *data)
 
 		 /* WFI. */
 		case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
-			set_current_state(TASK_INTERRUPTIBLE);
-			if (kthread_should_stop())
-				break;
-			schedule();
+			hf_vcpu_sleep(vcpu);
 			break;
 
 		/* Wake up another vcpu. */
@@ -107,7 +136,7 @@ static int hf_vcpu_thread(void *data)
 					break;
 				vm = &hf_vms[ret.wake_up.vm_id - 1];
 				if (ret.wake_up.vcpu < vm->vcpu_count) {
-					wake_up_process(vm->vcpu[ret.wake_up.vcpu].task);
+					hf_vcpu_wake_up(&vm->vcpu[ret.wake_up.vcpu]);
 				} else if (ret.wake_up.vcpu == HF_INVALID_VCPU) {
 					/* TODO: pick one to interrupt. */
 					pr_warning("No vcpu to wake.");
@@ -130,17 +159,12 @@ static int hf_vcpu_thread(void *data)
 			break;
 
 		case HF_VCPU_RUN_SLEEP:
-			set_current_state(TASK_INTERRUPTIBLE);
-			if (kthread_should_stop())
-				break;
 			hrtimer_start(&vcpu->timer, ret.sleep.ns, HRTIMER_MODE_REL);
-			schedule();
+			hf_vcpu_sleep(vcpu);
 			hrtimer_cancel(&vcpu->timer);
 			break;
 		}
 	}
-
-	set_current_state(TASK_RUNNING);
 
 	return 0;
 }
@@ -174,34 +198,6 @@ static void hf_free_resources(void)
 	kfree(hf_vms);
 }
 
-static ssize_t hf_interrupt_store(struct kobject *kobj,
-				  struct kobj_attribute *attr, const char *buf,
-				  size_t count)
-{
-	struct hf_vcpu *vcpu;
-	unsigned long flags;
-	struct task_struct *task;
-
-	/* TODO: Parse input to determine which vcpu to interrupt. */
-	/* TODO: Check bounds. */
-
-	vcpu = &hf_vms[0].vcpu[0];
-
-	spin_lock_irqsave(&vcpu->lock, flags);
-	vcpu->pending_irq = true;
-	/* TODO: Do we need to increment the task's ref count here? */
-	task = vcpu->task;
-	spin_unlock_irqrestore(&vcpu->lock, flags);
-
-	/* Wake up the task. If it's already running, kick it out. */
-	/* TODO: There's a race here: the kick may happen right before we go
-	 * to the hypervisor. */
-	if (wake_up_process(task) == 0)
-		kick_process(task);
-
-	return count;
-}
-
 static ssize_t hf_send_store(struct kobject *kobj, struct kobj_attribute *attr,
 			     const char *buf, size_t count)
 {
@@ -231,16 +227,12 @@ static ssize_t hf_send_store(struct kobject *kobj, struct kobj_attribute *attr,
 		return -EINVAL;
 
 	/* Wake up the vcpu that is going to process the data. */
-	/* TODO: There's a race where thread may get wake up before it
-	 * goes to sleep. Fix this. */
-	wake_up_process(vm->vcpu[ret].task);
+	hf_vcpu_wake_up(&vm->vcpu[ret]);
 
 	return count;
 }
 
 static struct kobject *hf_sysfs_obj = NULL;
-static struct kobj_attribute interrupt_attr =
-	__ATTR(interrupt, 0200, NULL, hf_interrupt_store);
 static struct kobj_attribute send_attr =
 	__ATTR(send, 0200, NULL, hf_send_store);
 
@@ -256,10 +248,6 @@ static void __init hf_init_sysfs(void)
 	if (!hf_sysfs_obj) {
 		pr_err("Unable to create sysfs object");
 	} else {
-		ret = sysfs_create_file(hf_sysfs_obj, &interrupt_attr.attr);
-		if (ret)
-			pr_err("Unable to create 'interrupt' sysfs file");
-
 		ret = sysfs_create_file(hf_sysfs_obj, &send_attr.attr);
 		if (ret)
 			pr_err("Unable to create 'send' sysfs file");
@@ -396,7 +384,7 @@ static int __init hf_init(void)
 			spin_lock_init(&vcpu->lock);
 			vcpu->vm = vm;
 			vcpu->vcpu_index = j;
-			vcpu->pending_irq = false;
+			atomic_set(&vcpu->abort_sleep, 0);
 		}
 	}
 
