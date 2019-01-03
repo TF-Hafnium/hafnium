@@ -29,7 +29,7 @@ ccflags-y = -I$(HAFNIUM_PATH)/inc/vmapi
 
 else
 
-KERNEL_PATH ?= $(HAFNIUM_PATH)/../linux
+KERNEL_PATH ?= $(HAFNIUM_PATH)/third_party/linux
 ARCH ?= arm64
 CROSS_COMPILE ?= aarch64-linux-gnu-
 
