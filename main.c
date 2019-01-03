@@ -172,7 +172,8 @@ static void hf_handle_message(struct hf_vm *sender, const void *ptr, size_t len)
 	if (!hsock)
 		return;
 
-	/* TODO: From this point on, there are two failure paths: when we
+	/*
+	 * TODO: From this point on, there are two failure paths: when we
 	 * create the skb below, and when we enqueue it to the socket. What
 	 * should we do if they fail? Ideally we would have some form of flow
 	 * control to prevent message loss, but how to do it efficiently?
@@ -352,7 +353,7 @@ static int hf_sock_release(struct socket *sock)
 
 	/*
 	 * Wait for in-flight lookups to finish. We need to do this here because
-	 * in-flight lookups  rely on the reference to the socket we're about to
+	 * in-flight lookups rely on the reference to the socket we're about to
 	 * release.
 	 */
 	synchronize_rcu();
