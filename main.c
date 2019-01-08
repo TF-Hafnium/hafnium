@@ -274,8 +274,16 @@ static int hf_vcpu_thread(void *data)
 		ret = hf_vcpu_run(vcpu->vm->id, vcpu->vcpu_index);
 
 		switch (ret.code) {
-		/* Yield (forcibly or voluntarily). */
+		/* Preempted. */
+		case HF_VCPU_RUN_PREEMPTED:
+			if (need_resched())
+				schedule();
+			break;
+
+		/* Yield. */
 		case HF_VCPU_RUN_YIELD:
+			if (!kthread_should_stop())
+				schedule();
 			break;
 
 		 /* WFI. */
