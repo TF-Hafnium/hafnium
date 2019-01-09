@@ -451,7 +451,7 @@ static int hf_send_skb(struct sk_buff *skb)
 	 */
 	spin_lock_irqsave(&hf_send_lock, flags);
 	memcpy(page_address(hf_send_page), skb->data, skb->len);
-	ret = hf_mailbox_send(vm->id, skb->len);
+	ret = hf_mailbox_send(vm->id, skb->len, false);
 	spin_unlock_irqrestore(&hf_send_lock, flags);
 
 	if (ret < 0)
