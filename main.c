@@ -235,7 +235,7 @@ static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu)
 		 * we want to be smarter.
 		 */
 		vcpu = 0;
-		ret = hf_inject_interrupt(vm_id, vcpu, MESSAGE_INT_ID);
+		ret = hf_interrupt_inject(vm_id, vcpu, MESSAGE_INT_ID);
 		if (ret != 1) {
 			/* We don't need to wake up the vcpu. */
 			return;
