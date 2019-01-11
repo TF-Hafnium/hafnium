@@ -33,8 +33,6 @@
 #define AF_HF AF_ECONET
 #define PF_HF AF_HF
 
-#define MESSAGE_INT_ID 1
-
 #define CONFIG_HAFNIUM_MAX_VMS   16
 #define CONFIG_HAFNIUM_MAX_VCPUS 32
 
@@ -208,14 +206,15 @@ exit:
  *
  * It wakes up the thread if it's sleeping, or kicks it if it's already running.
  *
- * If vCPU is HF_INVALID_VCPU, it injects a MESSAGE_INT_ID interrupt into a vCPU
- * belonging to the specified VM.
+ * If vCPU is HF_INVALID_VCPU, it injects an interrupt into a vCPU belonging to
+ * the specified VM.
  */
-static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu)
+static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu,
+				      uint64_t int_id)
 {
 	struct hf_vm *vm;
 
-	if (vm_id > hf_vm_count) {
+	if (vm_id < 1 || vm_id > hf_vm_count) {
 		pr_warn("Request to wake up non-existent VM id: %u\n", vm_id);
 		return;
 	}
@@ -235,7 +234,7 @@ static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu)
 		 * we want to be smarter.
 		 */
 		vcpu = 0;
-		ret = hf_interrupt_inject(vm_id, vcpu, MESSAGE_INT_ID);
+		ret = hf_interrupt_inject(vm_id, vcpu, int_id);
 		if (ret != 1) {
 			/* We don't need to wake up the vcpu. */
 			return;
@@ -249,6 +248,26 @@ static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu)
 		 * inject any new interrupts.
 		 */
 		kick_process(vm->vcpu[vcpu].task);
+	}
+}
+
+/**
+ * Notify all waiters on the given VM.
+ */
+static void hf_notify_waiters(uint32_t vm_id)
+{
+	int64_t ret;
+
+	while ((ret = hf_mailbox_waiter_get(vm_id)) != -1) {
+		if (ret == HF_PRIMARY_VM_ID) {
+			/*
+			 * TODO: Use this information when implementing per-vm
+			 * queues.
+			 */
+		} else {
+			hf_handle_wake_up_request(ret, HF_INVALID_VCPU,
+						  HF_MAILBOX_WRITABLE_INTID);
+		}
 	}
 }
 
@@ -294,14 +313,16 @@ static int hf_vcpu_thread(void *data)
 		/* Wake up another vcpu. */
 		case HF_VCPU_RUN_WAKE_UP:
 			hf_handle_wake_up_request(ret.wake_up.vm_id,
-						  ret.wake_up.vcpu);
+						  ret.wake_up.vcpu,
+						  HF_MAILBOX_READBLE_INTID);
 			break;
 
 		/* Response available. */
 		case HF_VCPU_RUN_MESSAGE:
 			hf_handle_message(vcpu->vm, page_address(hf_recv_page),
 					  ret.message.size);
-			hf_mailbox_clear();
+			if (hf_mailbox_clear() == 1)
+				hf_notify_waiters(HF_PRIMARY_VM_ID);
 			break;
 
 		case HF_VCPU_RUN_SLEEP:
@@ -309,6 +330,11 @@ static int hf_vcpu_thread(void *data)
 				      HRTIMER_MODE_REL);
 			hf_vcpu_sleep(vcpu);
 			hrtimer_cancel(&vcpu->timer);
+			break;
+
+		/* Notify all waiters. */
+		case HF_VCPU_RUN_NOTIFY_WAITERS:
+			hf_notify_waiters(vcpu->vm->id);
 			break;
 		}
 	}
@@ -466,7 +492,7 @@ static int hf_send_skb(struct sk_buff *skb)
 		return -EAGAIN;
 
 	/* Wake some vcpu up to handle the new message. */
-	hf_handle_wake_up_request(vm->id, ret);
+	hf_handle_wake_up_request(vm->id, ret, HF_MAILBOX_READBLE_INTID);
 
 	kfree_skb(skb);
 
