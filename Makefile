@@ -32,11 +32,15 @@ else
 KERNEL_PATH ?= $(HAFNIUM_PATH)/third_party/linux
 ARCH ?= arm64
 CROSS_COMPILE ?= aarch64-linux-gnu-
+CHECKPATCH ?= $(KERNEL_PATH)/scripts/checkpatch.pl -q
 
 all:
 	make -C $(KERNEL_PATH) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
 
 clean:
 	make -C $(KERNEL_PATH) M=$(PWD) clean
+
+checkpatch:
+	$(CHECKPATCH) -f main.c hf_call.S
 
 endif

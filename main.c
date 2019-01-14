@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright 2018 Google LLC
  *
@@ -12,7 +13,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,
+ * USA.
  */
 
 #include <linux/hrtimer.h>
@@ -305,7 +307,7 @@ static int hf_vcpu_thread(void *data)
 				schedule();
 			break;
 
-		 /* WFI. */
+		/* WFI. */
 		case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
 			hf_vcpu_sleep(vcpu);
 			break;
@@ -414,8 +416,8 @@ static void hf_sock_destruct(struct sock *sk)
  * Connects the Hafnium socket to the provided VM and port. After the socket is
  * connected, it can be used to exchange datagrams with the specified peer.
  */
-static int hf_sock_connect(struct socket *sock, struct sockaddr *saddr,
-			   int len, int connect_flags)
+static int hf_sock_connect(struct socket *sock, struct sockaddr *saddr, int len,
+			   int connect_flags)
 {
 	struct sock *sk = sock->sk;
 	struct hf_sock *hsock = hsock_from_sk(sk);
@@ -636,7 +638,7 @@ static int hf_sock_recvmsg(struct socket *sock, struct msghdr *m, size_t len,
  * and receive messages through it.
  */
 static int hf_sock_create(struct net *net, struct socket *sock, int protocol,
-		      int kern)
+			  int kern)
 {
 	static const struct proto_ops ops = {
 		.family = PF_HF,
@@ -784,8 +786,8 @@ static int __init hf_init(void)
 
 	/* Only track the secondary VMs. */
 	total_vm_count = ret - 1;
-	hf_vms = kmalloc_array(total_vm_count, sizeof(struct hf_vm),
-			       GFP_KERNEL);
+	hf_vms =
+		kmalloc_array(total_vm_count, sizeof(struct hf_vm), GFP_KERNEL);
 	if (!hf_vms)
 		return -ENOMEM;
 
@@ -828,8 +830,6 @@ static int __init hf_init(void)
 		vm->vcpu = kmalloc_array(vm->vcpu_count, sizeof(struct hf_vcpu),
 					 GFP_KERNEL);
 		if (!vm->vcpu) {
-			pr_err("No memory for %u vcpus for vm %u",
-			       vm->vcpu_count, vm->id);
 			ret = -ENOMEM;
 			goto fail_with_cleanup;
 		}
@@ -840,9 +840,10 @@ static int __init hf_init(void)
 		/* Create a kernel thread for each vcpu. */
 		for (j = 0; j < vm->vcpu_count; j++) {
 			struct hf_vcpu *vcpu = &vm->vcpu[j];
-			vcpu->task = kthread_create(hf_vcpu_thread, vcpu,
-						    "vcpu_thread_%u_%u",
-						    vm->id, j);
+
+			vcpu->task =
+				kthread_create(hf_vcpu_thread, vcpu,
+					       "vcpu_thread_%u_%u", vm->id, j);
 			if (IS_ERR(vcpu->task)) {
 				pr_err("Error creating task (vm=%u,vcpu=%u): %ld\n",
 				       vm->id, j, PTR_ERR(vcpu->task));
@@ -880,6 +881,7 @@ static int __init hf_init(void)
 	 */
 	for (i = 0; i < hf_vm_count; i++) {
 		struct hf_vm *vm = &hf_vms[i];
+
 		for (j = 0; j < vm->vcpu_count; j++)
 			wake_up_process(vm->vcpu[j].task);
 	}
