@@ -33,6 +33,8 @@
 #define CONFIG_HAFNIUM_MAX_VMS   16
 #define CONFIG_HAFNIUM_MAX_VCPUS 32
 
+#define FIRST_SECONDARY_VM_ID 1
+
 struct hf_vcpu {
 	struct hf_vm *vm;
 	uint32_t vcpu_index;
@@ -85,6 +87,18 @@ static atomic64_t hf_next_port = ATOMIC64_INIT(0);
 static DEFINE_SPINLOCK(hf_send_lock);
 static DEFINE_HASHTABLE(hf_local_port_hash, 7);
 static DEFINE_SPINLOCK(hf_local_port_hash_lock);
+
+/**
+ * Retrieves a VM from its ID, returning NULL if the VM doesn't exist.
+ */
+static struct hf_vm *hf_vm_from_id(uint32_t vm_id)
+{
+	if (vm_id < FIRST_SECONDARY_VM_ID ||
+	    vm_id >= FIRST_SECONDARY_VM_ID + hf_vm_count)
+		return NULL;
+
+	return &hf_vms[vm_id - FIRST_SECONDARY_VM_ID];
+}
 
 /**
  * Wakes up the kernel thread responsible for running the given vcpu.
@@ -209,14 +223,13 @@ exit:
 static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu,
 				      uint64_t int_id)
 {
-	struct hf_vm *vm;
+	struct hf_vm *vm = hf_vm_from_id(vm_id);
 
-	if (vm_id < 1 || vm_id > hf_vm_count) {
+	if (!vm) {
 		pr_warn("Request to wake up non-existent VM id: %u\n", vm_id);
 		return;
 	}
 
-	vm = &hf_vms[vm_id - 1];
 	if (vcpu >= vm->vcpu_count) {
 		int64_t ret;
 
@@ -311,7 +324,7 @@ static int hf_vcpu_thread(void *data)
 		case HF_VCPU_RUN_WAKE_UP:
 			hf_handle_wake_up_request(ret.wake_up.vm_id,
 						  ret.wake_up.vcpu,
-						  HF_MAILBOX_READBLE_INTID);
+						  HF_MAILBOX_READABLE_INTID);
 			break;
 
 		/* Response available. */
@@ -426,10 +439,9 @@ static int hf_sock_connect(struct socket *sock, struct sockaddr *saddr, int len,
 		return -EINVAL;
 
 	addr = (struct sockaddr_hf *)saddr;
-	if (addr->vm_id > hf_vm_count)
+	vm = hf_vm_from_id(addr->vm_id);
+	if (!vm)
 		return -ENETUNREACH;
-
-	vm = &hf_vms[addr->vm_id - 1];
 
 	/*
 	 * TODO: Once we implement access control in Hafnium, check that the
@@ -489,7 +501,7 @@ static int hf_send_skb(struct sk_buff *skb)
 		return -EAGAIN;
 
 	/* Wake some vcpu up to handle the new message. */
-	hf_handle_wake_up_request(vm->id, ret, HF_MAILBOX_READBLE_INTID);
+	hf_handle_wake_up_request(vm->id, ret, HF_MAILBOX_READABLE_INTID);
 
 	kfree_skb(skb);
 
@@ -792,7 +804,7 @@ static int __init hf_init(void)
 		struct hf_vm *vm = &hf_vms[i];
 
 		/* Adjust the ID as only the secondaries are tracked. */
-		vm->id = i + 1;
+		vm->id = i + FIRST_SECONDARY_VM_ID;
 
 		ret = hf_vcpu_get_count(vm->id);
 		if (ret < 0) {
