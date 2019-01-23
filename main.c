@@ -293,6 +293,8 @@ static int hf_vcpu_thread(void *data)
 	vcpu->timer.function = &hf_vcpu_timer_expired;
 
 	while (!kthread_should_stop()) {
+		uint32_t i;
+
 		/*
 		 * We're about to run the vcpu, so we can reset the abort-sleep
 		 * flag.
@@ -345,6 +347,15 @@ static int hf_vcpu_thread(void *data)
 		/* Notify all waiters. */
 		case HF_VCPU_RUN_NOTIFY_WAITERS:
 			hf_notify_waiters(vcpu->vm->id);
+			break;
+
+		case HF_VCPU_RUN_ABORTED:
+			for (i = 0; i < vcpu->vm->vcpu_count; i++) {
+				if (i == vcpu->vcpu_index)
+					continue;
+				hf_handle_wake_up_request(vcpu->vm->id, i, 0);
+			}
+			hf_vcpu_sleep(vcpu);
 			break;
 		}
 	}
