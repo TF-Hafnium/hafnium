@@ -12,16 +12,22 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/hrtimer.h>
+#include <clocksource/arm_arch_timer.h>
 #include <linux/atomic.h>
+#include <linux/cpuhotplug.h>
+#include <linux/hrtimer.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/kthread.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/net.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
 #include <linux/sched/task.h>
 #include <linux/slab.h>
-#include <linux/net.h>
 #include <net/sock.h>
 
 #include <hf/call.h>
@@ -29,6 +35,8 @@
 /* TODO: Reusing AF_ECONET for now as it's otherwise unused. */
 #define AF_HF AF_ECONET
 #define PF_HF AF_HF
+
+#define HYPERVISOR_TIMER_NAME "el2_timer"
 
 #define CONFIG_HAFNIUM_MAX_VMS   16
 #define CONFIG_HAFNIUM_MAX_VCPUS 32
@@ -87,6 +95,7 @@ static atomic64_t hf_next_port = ATOMIC64_INIT(0);
 static DEFINE_SPINLOCK(hf_send_lock);
 static DEFINE_HASHTABLE(hf_local_port_hash, 7);
 static DEFINE_SPINLOCK(hf_local_port_hash_lock);
+static int hf_irq;
 
 /**
  * Retrieves a VM from its ID, returning NULL if the VM doesn't exist.
@@ -738,6 +747,119 @@ static void hf_free_resources(void)
 }
 
 /**
+ * Handles the hypervisor timer interrupt.
+ */
+static irqreturn_t hf_nop_irq_handler(int irq, void *dev)
+{
+	/*
+	 * No need to do anything, the interrupt only exists to return to the
+	 * primary vCPU so that the virtual timer will be restored and fire as
+	 * normal.
+	 */
+	return IRQ_HANDLED;
+}
+
+/**
+ * Enables the hypervisor timer interrupt on a CPU, when it starts or after the
+ * driver is first loaded.
+ */
+static int hf_starting_cpu(unsigned int cpu)
+{
+	if (hf_irq != 0) {
+		/* Enable the interrupt, and set it to be edge-triggered. */
+		enable_percpu_irq(hf_irq, IRQ_TYPE_EDGE_RISING);
+	}
+	return 0;
+}
+
+/**
+ * Disables the hypervisor timer interrupt on a CPU when it is powered down.
+ */
+static int hf_dying_cpu(unsigned int cpu)
+{
+	if (hf_irq != 0) {
+		/* Disable the interrupt while the CPU is asleep. */
+		disable_percpu_irq(hf_irq);
+	}
+
+	return 0;
+}
+
+/**
+ * Registers for the hypervisor timer interrupt.
+ */
+static int hf_int_driver_probe(struct platform_device *pdev)
+{
+	int irq;
+	int ret;
+
+	/*
+	 * Register a handler for the hyperviser timer IRQ, as it is needed for
+	 * Hafnium to emulate the virtual timer for Linux while a secondary vCPU
+	 * is running.
+	 */
+	irq = platform_get_irq(pdev, ARCH_TIMER_HYP_PPI);
+	if (irq < 0) {
+		pr_err("Error getting hypervisor timer IRQ: %d\n", irq);
+		return irq;
+	}
+	hf_irq = irq;
+
+	ret = request_percpu_irq(irq, hf_nop_irq_handler, HYPERVISOR_TIMER_NAME,
+				 pdev);
+	if (ret != 0) {
+		pr_err("Error registering hypervisor timer IRQ %d: %d\n",
+		       irq, ret);
+		return ret;
+	}
+	pr_info("Hafnium registered for IRQ %d\n", irq);
+	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN,
+				"hafnium/hypervisor_timer:starting",
+				hf_starting_cpu, hf_dying_cpu);
+	if (ret < 0) {
+		pr_err("Error enabling timer on all CPUs: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * Unregisters for the hypervisor timer interrupt.
+ */
+static int hf_int_driver_remove(struct platform_device *pdev)
+{
+	int irq;
+
+	irq = platform_get_irq(pdev, ARCH_TIMER_HYP_PPI);
+	if (irq < 0) {
+		pr_err("Error getting hypervisor timer IRQ: %d\n", irq);
+		return irq;
+	}
+
+	disable_percpu_irq(irq);
+	free_percpu_irq(irq, pdev);
+
+	return 0;
+}
+
+static const struct of_device_id hf_int_driver_id[] = {
+	{.compatible = "arm,armv7-timer"},
+	{.compatible = "arm,armv8-timer"},
+	{}
+};
+
+static struct platform_driver hf_int_driver = {
+	.driver = {
+		.name = HYPERVISOR_TIMER_NAME,
+		.owner = THIS_MODULE,
+		.of_match_table = of_match_ptr(hf_int_driver_id),
+	},
+	.probe = hf_int_driver_probe,
+	.remove = hf_int_driver_remove,
+};
+
+/**
  * Initializes the Hafnium driver by creating a thread for each vCPU of each
  * virtual machine.
  */
@@ -892,10 +1014,20 @@ static int __init hf_init(void)
 	}
 
 	/*
+	 * Register as a driver for the timer device, so we can register a
+	 * handler for the hyperviser timer IRQ.
+	 */
+	ret = platform_driver_register(&hf_int_driver);
+	if (ret != 0) {
+		pr_err("Error registering timer driver %lld\n", ret);
+		goto fail_unregister_socket;
+	}
+
+	/*
 	 * Start running threads now that all is initialized.
 	 *
-	 * Any failures from this point on must also unregister the socket
-	 * family with a call to sock_unregister().
+	 * Any failures from this point on must also unregister the driver with
+	 * platform_driver_unregister().
 	 */
 	for (i = 0; i < hf_vm_count; i++) {
 		struct hf_vm *vm = &hf_vms[i];
@@ -914,6 +1046,8 @@ static int __init hf_init(void)
 
 	return 0;
 
+fail_unregister_socket:
+	sock_unregister(PF_HF);
 fail_unregister_proto:
 	proto_unregister(&hf_sock_proto);
 fail_with_cleanup:
@@ -930,6 +1064,7 @@ static void __exit hf_exit(void)
 	pr_info("Preparing to unload Hafnium\n");
 	sock_unregister(PF_HF);
 	proto_unregister(&hf_sock_proto);
+	platform_driver_unregister(&hf_int_driver);
 	hf_free_resources();
 	pr_info("Hafnium ready to unload\n");
 }
