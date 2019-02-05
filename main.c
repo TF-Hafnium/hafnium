@@ -48,6 +48,7 @@ struct hf_vcpu {
 	uint32_t vcpu_index;
 	struct task_struct *task;
 	atomic_t abort_sleep;
+	atomic_t waiting_for_message;
 	struct hrtimer timer;
 };
 
@@ -163,12 +164,8 @@ static enum hrtimer_restart hf_vcpu_timer_expired(struct hrtimer *timer)
  * vCPU that belongs to a secondary VM.
  *
  * It wakes up the thread if it's sleeping, or kicks it if it's already running.
- *
- * If vCPU is HF_INVALID_VCPU, it injects an interrupt into a vCPU belonging to
- * the specified VM.
  */
-static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu,
-				      uint64_t int_id)
+static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu)
 {
 	struct hf_vm *vm = hf_vm_from_id(vm_id);
 
@@ -178,24 +175,9 @@ static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu,
 	}
 
 	if (vcpu >= vm->vcpu_count) {
-		int64_t ret;
-
-		if (vcpu != HF_INVALID_VCPU) {
-			pr_warn("Request to wake up non-existent vCPU: %u.%u\n",
-				vm_id, vcpu);
-			return;
-		}
-
-		/*
-		 * TODO: For now we're picking the first vcpu to interrupt, but
-		 * we want to be smarter.
-		 */
-		vcpu = 0;
-		ret = hf_interrupt_inject(vm_id, vcpu, int_id);
-		if (ret != 1) {
-			/* We don't need to wake up the vcpu. */
-			return;
-		}
+		pr_warn("Request to wake up non-existent vCPU: %u.%u\n",
+			vm_id, vcpu);
+		return;
 	}
 
 	if (hf_vcpu_wake_up(&vm->vcpu[vcpu]) == 0) {
@@ -209,23 +191,86 @@ static void hf_handle_wake_up_request(uint32_t vm_id, uint16_t vcpu,
 }
 
 /**
+ * Injects an interrupt into a vCPU of the VM and ensures the vCPU will run to
+ * handle the interrupt.
+ */
+static void hf_interrupt_vm(uint32_t vm_id, uint64_t int_id)
+{
+	struct hf_vm *vm = hf_vm_from_id(vm_id);
+	uint16_t vcpu;
+	int64_t ret;
+
+	if (!vm) {
+		pr_warn("Request to wake up non-existent VM id: %u\n", vm_id);
+		return;
+	}
+
+	/*
+	 * TODO: For now we're picking the first vcpu to interrupt, but
+	 * we want to be smarter.
+	 */
+	vcpu = 0;
+	ret = hf_interrupt_inject(vm_id, vcpu, int_id);
+
+	if (ret == -1) {
+		pr_warn("Failed to inject interrupt %lld to vCPU %d of VM %d",
+			int_id, vcpu, vm_id);
+		return;
+	}
+
+	if (ret != 1) {
+		/* We don't need to wake up the vcpu. */
+		return;
+	}
+
+	hf_handle_wake_up_request(vm_id, vcpu);
+}
+
+/**
  * Notify all waiters on the given VM.
  */
 static void hf_notify_waiters(uint32_t vm_id)
 {
-	int64_t ret;
+	int64_t waiter_vm_id;
 
-	while ((ret = hf_mailbox_waiter_get(vm_id)) != -1) {
-		if (ret == HF_PRIMARY_VM_ID) {
+	while ((waiter_vm_id = hf_mailbox_waiter_get(vm_id)) != -1) {
+		if (waiter_vm_id == HF_PRIMARY_VM_ID) {
 			/*
 			 * TODO: Use this information when implementing per-vm
 			 * queues.
 			 */
 		} else {
-			hf_handle_wake_up_request(ret, HF_INVALID_VCPU,
-						  HF_MAILBOX_WRITABLE_INTID);
+			hf_interrupt_vm(waiter_vm_id,
+					HF_MAILBOX_WRITABLE_INTID);
 		}
 	}
+}
+
+/**
+ * Delivers a message to a VM.
+ */
+static void hf_deliver_message(uint32_t vm_id)
+{
+	struct hf_vm *vm = hf_vm_from_id(vm_id);
+	uint32_t i;
+
+	if (!vm) {
+		pr_warn("Tried to deliver message to non-existent VM id: %u\n",
+			vm_id);
+		return;
+	}
+
+	/* Try to wake a vCPU that is waiting for a message. */
+	for (i = 0; i < vm->vcpu_count; i++) {
+		if (atomic_read(&vm->vcpu[i].waiting_for_message)) {
+			hf_handle_wake_up_request(vm->id,
+						  vm->vcpu[i].vcpu_index);
+			return;
+		}
+	}
+
+	/* None were waiting for a message so interrupt one. */
+	hf_interrupt_vm(vm->id, HF_MAILBOX_READABLE_INTID);
 }
 
 /**
@@ -289,6 +334,9 @@ static void hf_handle_message(struct hf_vm *sender, const void *ptr, size_t len)
 
 exit:
 	sock_put(&hsock->sk);
+
+	if (hf_mailbox_clear() == 1)
+		hf_notify_waiters(HF_PRIMARY_VM_ID);
 }
 
 /**
@@ -329,29 +377,41 @@ static int hf_vcpu_thread(void *data)
 
 		/* WFI. */
 		case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
+			if (ret.sleep.ns != HF_SLEEP_INDEFINITE) {
+				hrtimer_start(&vcpu->timer, ret.sleep.ns,
+					      HRTIMER_MODE_REL);
+			}
 			hf_vcpu_sleep(vcpu);
+			hrtimer_cancel(&vcpu->timer);
+			break;
+
+		/* Waiting for a message. */
+		case HF_VCPU_RUN_WAIT_FOR_MESSAGE:
+			atomic_set(&vcpu->waiting_for_message, 1);
+			if (ret.sleep.ns != HF_SLEEP_INDEFINITE) {
+				hrtimer_start(&vcpu->timer, ret.sleep.ns,
+					      HRTIMER_MODE_REL);
+			}
+			hf_vcpu_sleep(vcpu);
+			hrtimer_cancel(&vcpu->timer);
+			atomic_set(&vcpu->waiting_for_message, 0);
 			break;
 
 		/* Wake up another vcpu. */
 		case HF_VCPU_RUN_WAKE_UP:
 			hf_handle_wake_up_request(ret.wake_up.vm_id,
-						  ret.wake_up.vcpu,
-						  HF_MAILBOX_READABLE_INTID);
+						  ret.wake_up.vcpu);
 			break;
 
 		/* Response available. */
 		case HF_VCPU_RUN_MESSAGE:
-			hf_handle_message(vcpu->vm, page_address(hf_recv_page),
-					  ret.message.size);
-			if (hf_mailbox_clear() == 1)
-				hf_notify_waiters(HF_PRIMARY_VM_ID);
-			break;
-
-		case HF_VCPU_RUN_SLEEP:
-			hrtimer_start(&vcpu->timer, ret.sleep.ns,
-				      HRTIMER_MODE_REL);
-			hf_vcpu_sleep(vcpu);
-			hrtimer_cancel(&vcpu->timer);
+			if (ret.message.vm_id == HF_PRIMARY_VM_ID) {
+				hf_handle_message(vcpu->vm,
+						  page_address(hf_recv_page),
+						  ret.message.size);
+			} else {
+				hf_deliver_message(ret.message.vm_id);
+			}
 			break;
 
 		/* Notify all waiters. */
@@ -359,11 +419,12 @@ static int hf_vcpu_thread(void *data)
 			hf_notify_waiters(vcpu->vm->id);
 			break;
 
+		/* Abort was triggered. */
 		case HF_VCPU_RUN_ABORTED:
 			for (i = 0; i < vcpu->vm->vcpu_count; i++) {
 				if (i == vcpu->vcpu_index)
 					continue;
-				hf_handle_wake_up_request(vcpu->vm->id, i, 0);
+				hf_handle_wake_up_request(vcpu->vm->id, i);
 			}
 			hf_vcpu_sleep(vcpu);
 			break;
@@ -521,8 +582,8 @@ static int hf_send_skb(struct sk_buff *skb)
 	if (ret < 0)
 		return -EAGAIN;
 
-	/* Wake some vcpu up to handle the new message. */
-	hf_handle_wake_up_request(vm->id, ret, HF_MAILBOX_READABLE_INTID);
+	/* Ensure the VM will run to pick up the message. */
+	hf_deliver_message(vm->id);
 
 	kfree_skb(skb);
 
