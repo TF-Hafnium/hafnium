@@ -96,6 +96,7 @@ static DEFINE_SPINLOCK(hf_send_lock);
 static DEFINE_HASHTABLE(hf_local_port_hash, 7);
 static DEFINE_SPINLOCK(hf_local_port_hash_lock);
 static int hf_irq;
+static enum cpuhp_state hf_cpuhp_state;
 
 /**
  * Retrieves a VM from its ID, returning NULL if the VM doesn't exist.
@@ -769,6 +770,7 @@ static int hf_starting_cpu(unsigned int cpu)
 		/* Enable the interrupt, and set it to be edge-triggered. */
 		enable_percpu_irq(hf_irq, IRQ_TYPE_EDGE_RISING);
 	}
+
 	return 0;
 }
 
@@ -818,8 +820,10 @@ static int hf_int_driver_probe(struct platform_device *pdev)
 				hf_starting_cpu, hf_dying_cpu);
 	if (ret < 0) {
 		pr_err("Error enabling timer on all CPUs: %d\n", ret);
+		free_percpu_irq(irq, pdev);
 		return ret;
 	}
+	hf_cpuhp_state = ret;
 
 	return 0;
 }
@@ -829,16 +833,12 @@ static int hf_int_driver_probe(struct platform_device *pdev)
  */
 static int hf_int_driver_remove(struct platform_device *pdev)
 {
-	int irq;
-
-	irq = platform_get_irq(pdev, ARCH_TIMER_HYP_PPI);
-	if (irq < 0) {
-		pr_err("Error getting hypervisor timer IRQ: %d\n", irq);
-		return irq;
-	}
-
-	disable_percpu_irq(irq);
-	free_percpu_irq(irq, pdev);
+	/*
+	 * This will cause hf_dying_cpu to be called on each CPU, which will
+	 * disable the IRQs.
+	 */
+	cpuhp_remove_state(hf_cpuhp_state);
+	free_percpu_irq(hf_irq, pdev);
 
 	return 0;
 }
@@ -1064,8 +1064,8 @@ static void __exit hf_exit(void)
 	pr_info("Preparing to unload Hafnium\n");
 	sock_unregister(PF_HF);
 	proto_unregister(&hf_sock_proto);
-	platform_driver_unregister(&hf_int_driver);
 	hf_free_resources();
+	platform_driver_unregister(&hf_int_driver);
 	pr_info("Hafnium ready to unload\n");
 }
 
