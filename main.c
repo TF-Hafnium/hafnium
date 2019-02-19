@@ -159,69 +159,6 @@ static enum hrtimer_restart hf_vcpu_timer_expired(struct hrtimer *timer)
 }
 
 /**
- * Handles a message delivered to this VM by validating that it's well-formed
- * and then queueing it for delivery to the appropriate socket.
- */
-static void hf_handle_message(struct hf_vm *sender, const void *ptr, size_t len)
-{
-	struct hf_sock *hsock;
-	const struct hf_msg_hdr *hdr = ptr;
-	struct sk_buff *skb;
-	int err;
-
-	/* Ignore messages that are too small to hold a header. */
-	if (len < sizeof(struct hf_msg_hdr))
-		return;
-
-	len -= sizeof(struct hf_msg_hdr);
-
-	/* Go through the colliding sockets. */
-	rcu_read_lock();
-	hash_for_each_possible_rcu(hf_local_port_hash, hsock, sk.sk_node,
-				   hdr->dst_port) {
-		if (hsock->peer_vm == sender &&
-		    hsock->remote_port == hdr->src_port) {
-			sock_hold(&hsock->sk);
-			break;
-		}
-	}
-	rcu_read_unlock();
-
-	/* Nothing to do if we couldn't find the target. */
-	if (!hsock)
-		return;
-
-	/*
-	 * TODO: From this point on, there are two failure paths: when we
-	 * create the skb below, and when we enqueue it to the socket. What
-	 * should we do if they fail? Ideally we would have some form of flow
-	 * control to prevent message loss, but how to do it efficiently?
-	 *
-	 * One option is to have a pre-allocated message that indicates to the
-	 * sender that a message was dropped. This way we guarantee that the
-	 * sender will be aware of loss and should back-off.
-	 */
-	/* Create the skb. */
-	skb = alloc_skb(len, GFP_KERNEL);
-	if (!skb)
-		goto exit;
-
-	memcpy(skb_put(skb, len), hdr + 1, len);
-
-	/*
-	 * Add the skb to the receive queue of the target socket. On success it
-	 * calls sk->sk_data_ready, which is currently set to sock_def_readable,
-	 * which wakes up any waiters.
-	 */
-	err = sock_queue_rcv_skb(&hsock->sk, skb);
-	if (err)
-		kfree_skb(skb);
-
-exit:
-	sock_put(&hsock->sk);
-}
-
-/**
  * This function is called when Hafnium requests that the primary VM wake up a
  * vCPU that belongs to a secondary VM.
  *
@@ -289,6 +226,69 @@ static void hf_notify_waiters(uint32_t vm_id)
 						  HF_MAILBOX_WRITABLE_INTID);
 		}
 	}
+}
+
+/**
+ * Handles a message delivered to this VM by validating that it's well-formed
+ * and then queueing it for delivery to the appropriate socket.
+ */
+static void hf_handle_message(struct hf_vm *sender, const void *ptr, size_t len)
+{
+	struct hf_sock *hsock;
+	const struct hf_msg_hdr *hdr = ptr;
+	struct sk_buff *skb;
+	int err;
+
+	/* Ignore messages that are too small to hold a header. */
+	if (len < sizeof(struct hf_msg_hdr))
+		return;
+
+	len -= sizeof(struct hf_msg_hdr);
+
+	/* Go through the colliding sockets. */
+	rcu_read_lock();
+	hash_for_each_possible_rcu(hf_local_port_hash, hsock, sk.sk_node,
+				   hdr->dst_port) {
+		if (hsock->peer_vm == sender &&
+		    hsock->remote_port == hdr->src_port) {
+			sock_hold(&hsock->sk);
+			break;
+		}
+	}
+	rcu_read_unlock();
+
+	/* Nothing to do if we couldn't find the target. */
+	if (!hsock)
+		return;
+
+	/*
+	 * TODO: From this point on, there are two failure paths: when we
+	 * create the skb below, and when we enqueue it to the socket. What
+	 * should we do if they fail? Ideally we would have some form of flow
+	 * control to prevent message loss, but how to do it efficiently?
+	 *
+	 * One option is to have a pre-allocated message that indicates to the
+	 * sender that a message was dropped. This way we guarantee that the
+	 * sender will be aware of loss and should back-off.
+	 */
+	/* Create the skb. */
+	skb = alloc_skb(len, GFP_KERNEL);
+	if (!skb)
+		goto exit;
+
+	memcpy(skb_put(skb, len), hdr + 1, len);
+
+	/*
+	 * Add the skb to the receive queue of the target socket. On success it
+	 * calls sk->sk_data_ready, which is currently set to sock_def_readable,
+	 * which wakes up any waiters.
+	 */
+	err = sock_queue_rcv_skb(&hsock->sk, skb);
+	if (err)
+		kfree_skb(skb);
+
+exit:
+	sock_put(&hsock->sk);
 }
 
 /**
