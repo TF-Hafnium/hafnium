@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright 2018 Google LLC
+ * Copyright 2018 The Hafnium Authors.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
