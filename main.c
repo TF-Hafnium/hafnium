@@ -31,6 +31,7 @@
 #include <net/sock.h>
 
 #include <hf/call.h>
+#include <hf/spci.h>
 
 /* TODO: Reusing AF_ECONET for now as it's otherwise unused. */
 #define AF_HF AF_ECONET
@@ -98,6 +99,7 @@ static DEFINE_HASHTABLE(hf_local_port_hash, 7);
 static DEFINE_SPINLOCK(hf_local_port_hash_lock);
 static int hf_irq;
 static enum cpuhp_state hf_cpuhp_state;
+static spci_vm_id_t current_vm_id;
 
 /**
  * Retrieves a VM from its ID, returning NULL if the VM doesn't exist.
@@ -569,14 +571,18 @@ static int hf_send_skb(struct sk_buff *skb)
 	int64_t ret;
 	struct hf_sock *hsock = hsock_from_sk(skb->sk);
 	struct hf_vm *vm = hsock->peer_vm;
+	struct spci_message *message = page_address(hf_send_page);
 
 	/*
 	 * Call Hafnium under the send lock so that we serialize the use of the
 	 * global send buffer.
 	 */
 	spin_lock_irqsave(&hf_send_lock, flags);
-	memcpy(page_address(hf_send_page), skb->data, skb->len);
-	ret = hf_mailbox_send(vm->id, skb->len, false);
+	memcpy(message->payload, skb->data, skb->len);
+	spci_message_init(message, skb->len,
+				    vm->id, current_vm_id);
+
+	ret = spci_msg_send(0);
 	spin_unlock_irqrestore(&hf_send_lock, flags);
 
 	if (ret < 0)
@@ -991,6 +997,9 @@ static int __init hf_init(void)
 		kmalloc_array(total_vm_count, sizeof(struct hf_vm), GFP_KERNEL);
 	if (!hf_vms)
 		return -ENOMEM;
+
+	/* Cache the VM id for later usage. */
+	current_vm_id = hf_vm_get_id();
 
 	/* Initialize each VM. */
 	total_vcpu_count = 0;
