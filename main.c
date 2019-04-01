@@ -622,9 +622,11 @@ static int hf_sock_sendmsg(struct socket *sock, struct msghdr *m, size_t len)
 	int err;
 	struct hf_msg_hdr *hdr;
 	struct hf_sock *hsock = hsock_from_sk(sk);
+	size_t payload_max_len = HF_MAILBOX_SIZE - sizeof(struct spci_message)
+				 - sizeof(struct hf_msg_hdr);
 
 	/* Check length. */
-	if (len > HF_MAILBOX_SIZE - sizeof(struct hf_msg_hdr))
+	if (len > payload_max_len)
 		return -EMSGSIZE;
 
 	/* We don't allow the destination address to be specified. */
