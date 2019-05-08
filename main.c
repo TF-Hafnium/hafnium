@@ -1069,6 +1069,7 @@ static int __init hf_init(void)
 			vcpu->vm = vm;
 			vcpu->vcpu_index = j;
 			atomic_set(&vcpu->abort_sleep, 0);
+			atomic_set(&vcpu->waiting_for_message, 0);
 		}
 	}
 
