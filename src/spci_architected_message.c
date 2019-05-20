@@ -81,6 +81,23 @@ spci_return_t spci_msg_handle_architected_message(
 			memory_share_size, to_mode, message_type);
 		break;
 
+	case SPCI_MEMORY_RELINQUISH:
+
+		memory_region = (struct spci_memory_region *)
+					architected_message_replica->payload;
+
+		memory_share_size =
+			from_msg_replica->length -
+			sizeof(struct spci_architected_message_header);
+
+		to_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+
+		ret = spci_validate_call_share_memory(
+			to_locked, from_locked, memory_region,
+			memory_share_size, to_mode, message_type);
+
+		break;
+
 	default:
 		dlog("Invalid memory sharing message.\n");
 		return SPCI_INVALID_PARAMETERS;
@@ -208,6 +225,30 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 			.to_mode = 0,
 		},
 	};
+
+	static const struct spci_mem_transitions relinquish_transitions[] = {
+		{
+			/* 1) {!O-EA, O-NA} -> {!O-NA, O-EA} */
+			.orig_from_mode = MM_MODE_UNOWNED,
+			.orig_to_mode = MM_MODE_INVALID,
+			.from_mode = MM_MODE_INVALID | MM_MODE_UNOWNED |
+				     MM_MODE_SHARED,
+			.to_mode = 0,
+		},
+		{
+			/* 2) {!O-SA, O-SA} -> {!O-NA, O-EA} */
+			.orig_from_mode = MM_MODE_UNOWNED | MM_MODE_SHARED,
+			.orig_to_mode = MM_MODE_SHARED,
+			.from_mode = MM_MODE_INVALID | MM_MODE_UNOWNED |
+				     MM_MODE_SHARED,
+			.to_mode = 0,
+		},
+	};
+
+	static const uint32_t size_relinquish_transitions =
+		sizeof(relinquish_transitions) /
+		sizeof(struct spci_mem_transitions);
+
 	static const uint32_t size_donate_transitions =
 		ARRAY_SIZE(donate_transitions);
 
@@ -230,6 +271,11 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 	case SPCI_MEMORY_DONATE:
 		mem_transition_table = donate_transitions;
 		transition_table_size = size_donate_transitions;
+		break;
+
+	case SPCI_MEMORY_RELINQUISH:
+		mem_transition_table = relinquish_transitions;
+		transition_table_size = size_relinquish_transitions;
 		break;
 
 	default:
