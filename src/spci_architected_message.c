@@ -98,6 +98,32 @@ spci_return_t spci_msg_handle_architected_message(
 
 		break;
 
+	case SPCI_MEMORY_LEND: {
+		/* TODO: Add support for lend exclusive. */
+		struct spci_memory_lend *lend_descriptor;
+		uint32_t borrower_attributes;
+
+		lend_descriptor = (struct spci_memory_lend *)
+					  architected_message_replica->payload;
+
+		borrower_attributes = lend_descriptor->borrower_attributes;
+
+		memory_region =
+			(struct spci_memory_region *)lend_descriptor->payload;
+		memory_share_size =
+			from_msg_replica->length -
+			sizeof(struct spci_architected_message_header) -
+			sizeof(struct spci_memory_lend);
+
+		to_mode = spci_memory_attrs_to_mode(borrower_attributes);
+
+		ret = spci_validate_call_share_memory(
+			to_locked, from_locked, memory_region,
+			memory_share_size, to_mode, message_type);
+
+		break;
+	}
+
 	default:
 		dlog("Invalid memory sharing message.\n");
 		return SPCI_INVALID_PARAMETERS;
@@ -146,11 +172,9 @@ static bool spci_msg_get_next_state(
 		    ((orig_to_mode & state_mask) == table_orig_to_mode)) {
 			*to_mode = transitions[index].to_mode |
 				   memory_to_attributes;
-			/*
-			 * TODO: Change access permission assignment to cater
-			 * for the lend case.
-			 */
-			*from_mode = transitions[index].from_mode;
+
+			*from_mode = transitions[index].from_mode |
+				     (~state_mask & orig_from_mode);
 
 			return true;
 		}
@@ -226,6 +250,9 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 		},
 	};
 
+	static const uint32_t size_donate_transitions =
+		ARRAY_SIZE(donate_transitions);
+
 	static const struct spci_mem_transitions relinquish_transitions[] = {
 		{
 			/* 1) {!O-EA, O-NA} -> {!O-NA, O-EA} */
@@ -246,11 +273,40 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 	};
 
 	static const uint32_t size_relinquish_transitions =
-		sizeof(relinquish_transitions) /
-		sizeof(struct spci_mem_transitions);
+		ARRAY_SIZE(relinquish_transitions);
 
-	static const uint32_t size_donate_transitions =
-		ARRAY_SIZE(donate_transitions);
+	/*
+	 * This data structure holds the allowed state transitions for the "lend
+	 * with shared access" state machine. In this state machine the owner
+	 * keeps the lent pages mapped on its stage2 table and keeps access as
+	 * well.
+	 */
+	static const struct spci_mem_transitions shared_lend_transitions[] = {
+		{
+			/* 1) {O-EA, !O-NA} -> {O-SA, !O-SA} */
+			.orig_from_mode = 0,
+			.orig_to_mode = MM_MODE_INVALID | MM_MODE_UNOWNED |
+					MM_MODE_SHARED,
+			.from_mode = MM_MODE_SHARED,
+			.to_mode = MM_MODE_UNOWNED | MM_MODE_SHARED,
+		},
+		{
+			/*
+			 * Duplicate of 1) in order to cater for an alternative
+			 * representation of !O-NA:
+			 * (INVALID | UNOWNED | SHARED) and (INVALID | UNOWNED)
+			 * are both alternate representations of !O-NA.
+			 */
+			/* 2) {O-EA, !O-NA} -> {O-SA, !O-SA} */
+			.orig_from_mode = 0,
+			.orig_to_mode = MM_MODE_INVALID | MM_MODE_UNOWNED,
+			.from_mode = MM_MODE_SHARED,
+			.to_mode = MM_MODE_UNOWNED | MM_MODE_SHARED,
+		},
+	};
+
+	static const uint32_t size_shared_lend_transitions =
+		ARRAY_SIZE(shared_lend_transitions);
 
 	/* Fail if addresses are not page-aligned. */
 	if (!is_aligned(ipa_addr(begin), PAGE_SIZE) ||
@@ -276,6 +332,11 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 	case SPCI_MEMORY_RELINQUISH:
 		mem_transition_table = relinquish_transitions;
 		transition_table_size = size_relinquish_transitions;
+		break;
+
+	case SPCI_MEMORY_LEND:
+		mem_transition_table = shared_lend_transitions;
+		transition_table_size = size_shared_lend_transitions;
 		break;
 
 	default:
