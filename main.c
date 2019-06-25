@@ -55,7 +55,7 @@ struct hf_vcpu {
 
 struct hf_vm {
 	uint32_t id;
-	uint32_t vcpu_count;
+	spci_vcpu_count_t vcpu_count;
 	struct hf_vcpu *vcpu;
 };
 
@@ -255,7 +255,7 @@ static void hf_notify_waiters(spci_vm_id_t vm_id)
 static void hf_deliver_message(spci_vm_id_t vm_id)
 {
 	struct hf_vm *vm = hf_vm_from_id(vm_id);
-	uint32_t i;
+	spci_vcpu_index_t i;
 
 	if (!vm) {
 		pr_warn("Tried to deliver message to non-existent VM id: %u\n",
@@ -356,7 +356,7 @@ static int hf_vcpu_thread(void *data)
 	vcpu->timer.function = &hf_vcpu_timer_expired;
 
 	while (!kthread_should_stop()) {
-		uint32_t i;
+		spci_vcpu_index_t i;
 
 		/*
 		 * We're about to run the vcpu, so we can reset the abort-sleep
@@ -1009,20 +1009,21 @@ static int __init hf_init(void)
 	total_vcpu_count = 0;
 	for (i = 0; i < total_vm_count; i++) {
 		struct hf_vm *vm = &hf_vms[i];
+		spci_vcpu_count_t vcpu_count;
 
 		/* Adjust the ID as only the secondaries are tracked. */
 		vm->id = i + FIRST_SECONDARY_VM_ID;
 
-		ret = hf_vcpu_get_count(vm->id);
-		if (ret < 0) {
-			pr_err("HF_VCPU_GET_COUNT failed for vm=%u: %lld",
-			       vm->id, ret);
+		vcpu_count = hf_vcpu_get_count(vm->id);
+		if (vcpu_count < 0) {
+			pr_err("HF_VCPU_GET_COUNT failed for vm=%u: %d",
+			       vm->id, vcpu_count);
 			ret = -EIO;
 			goto fail_with_cleanup;
 		}
 
 		/* Avoid overflowing the vcpu count. */
-		if (ret > (U32_MAX - total_vcpu_count)) {
+		if (vcpu_count > (U32_MAX - total_vcpu_count)) {
 			pr_err("Too many vcpus: %u\n", total_vcpu_count);
 			ret = -EDQUOT;
 			goto fail_with_cleanup;
@@ -1033,14 +1034,14 @@ static int __init hf_init(void)
 		BUILD_BUG_ON(CONFIG_HAFNIUM_MAX_VCPUS > U16_MAX);
 
 		/* Enforce the limit on vcpus. */
-		total_vcpu_count += ret;
+		total_vcpu_count += vcpu_count;
 		if (total_vcpu_count > CONFIG_HAFNIUM_MAX_VCPUS) {
 			pr_err("Too many vcpus: %u\n", total_vcpu_count);
 			ret = -EDQUOT;
 			goto fail_with_cleanup;
 		}
 
-		vm->vcpu_count = ret;
+		vm->vcpu_count = vcpu_count;
 		vm->vcpu = kmalloc_array(vm->vcpu_count, sizeof(struct hf_vcpu),
 					 GFP_KERNEL);
 		if (!vm->vcpu) {
