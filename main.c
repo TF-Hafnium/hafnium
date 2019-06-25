@@ -46,7 +46,7 @@
 
 struct hf_vcpu {
 	struct hf_vm *vm;
-	uint32_t vcpu_index;
+	spci_vcpu_index_t vcpu_index;
 	struct task_struct *task;
 	atomic_t abort_sleep;
 	atomic_t waiting_for_message;
@@ -167,7 +167,8 @@ static enum hrtimer_restart hf_vcpu_timer_expired(struct hrtimer *timer)
  *
  * It wakes up the thread if it's sleeping, or kicks it if it's already running.
  */
-static void hf_handle_wake_up_request(spci_vm_id_t vm_id, uint16_t vcpu)
+static void hf_handle_wake_up_request(spci_vm_id_t vm_id,
+				      spci_vcpu_index_t vcpu)
 {
 	struct hf_vm *vm = hf_vm_from_id(vm_id);
 
@@ -199,7 +200,7 @@ static void hf_handle_wake_up_request(spci_vm_id_t vm_id, uint16_t vcpu)
 static void hf_interrupt_vm(spci_vm_id_t vm_id, uint64_t int_id)
 {
 	struct hf_vm *vm = hf_vm_from_id(vm_id);
-	uint16_t vcpu;
+	spci_vcpu_index_t vcpu;
 	int64_t ret;
 
 	if (!vm) {
