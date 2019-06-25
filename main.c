@@ -54,7 +54,7 @@ struct hf_vcpu {
 };
 
 struct hf_vm {
-	uint32_t id;
+	spci_vm_id_t id;
 	spci_vcpu_count_t vcpu_count;
 	struct hf_vcpu *vcpu;
 };
@@ -79,7 +79,7 @@ struct hf_sock {
 
 struct sockaddr_hf {
 	sa_family_t family;
-	uint32_t vm_id;
+	spci_vm_id_t vm_id;
 	uint64_t port;
 };
 
@@ -90,7 +90,7 @@ static struct proto hf_sock_proto = {
 };
 
 static struct hf_vm *hf_vms;
-static uint32_t hf_vm_count;
+static spci_vm_count_t hf_vm_count;
 static struct page *hf_send_page;
 static struct page *hf_recv_page;
 static atomic64_t hf_next_port = ATOMIC64_INIT(0);
@@ -792,7 +792,8 @@ static int hf_sock_create(struct net *net, struct socket *sock, int protocol,
  */
 static void hf_free_resources(void)
 {
-	uint32_t i, j;
+	spci_vm_id_t i;
+	spci_vcpu_index_t j;
 
 	/*
 	 * First stop all worker threads. We need to do this before freeing
@@ -942,8 +943,9 @@ static int __init hf_init(void)
 		.owner = THIS_MODULE,
 	};
 	int64_t ret;
-	uint32_t i, j;
-	uint32_t total_vm_count;
+	spci_vm_id_t i;
+	spci_vcpu_index_t j;
+	spci_vm_count_t secondary_vm_count;
 	uint32_t total_vcpu_count;
 
 	/* Allocate a page for send and receive buffers. */
@@ -978,27 +980,23 @@ static int __init hf_init(void)
 		return -EIO;
 	}
 
-	/* Get the number of VMs. */
-	ret = hf_vm_get_count();
-	if (ret < 0) {
-		pr_err("Unable to retrieve number of VMs: %lld\n", ret);
-		return -EIO;
-	}
+	/* Get the number of secondary VMs. */
+	secondary_vm_count = hf_vm_get_count() - 1;
 
 	/* Confirm the maximum number of VMs looks sane. */
 	BUILD_BUG_ON(CONFIG_HAFNIUM_MAX_VMS < 1);
 	BUILD_BUG_ON(CONFIG_HAFNIUM_MAX_VMS > U16_MAX);
 
 	/* Validate the number of VMs. There must at least be the primary. */
-	if (ret < 1 || ret > CONFIG_HAFNIUM_MAX_VMS) {
-		pr_err("Number of VMs is out of range: %lld\n", ret);
+	if (secondary_vm_count > CONFIG_HAFNIUM_MAX_VMS - 1) {
+		pr_err("Number of VMs is out of range: %lld\n",
+		       secondary_vm_count);
 		return -EDQUOT;
 	}
 
 	/* Only track the secondary VMs. */
-	total_vm_count = ret - 1;
-	hf_vms =
-		kmalloc_array(total_vm_count, sizeof(struct hf_vm), GFP_KERNEL);
+	hf_vms = kmalloc_array(secondary_vm_count, sizeof(struct hf_vm),
+			       GFP_KERNEL);
 	if (!hf_vms)
 		return -ENOMEM;
 
@@ -1007,7 +1005,7 @@ static int __init hf_init(void)
 
 	/* Initialize each VM. */
 	total_vcpu_count = 0;
-	for (i = 0; i < total_vm_count; i++) {
+	for (i = 0; i < secondary_vm_count; i++) {
 		struct hf_vm *vm = &hf_vms[i];
 		spci_vcpu_count_t vcpu_count;
 
