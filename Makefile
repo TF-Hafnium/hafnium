@@ -31,10 +31,10 @@ CROSS_COMPILE ?= aarch64-linux-gnu-
 CHECKPATCH ?= $(KERNEL_PATH)/scripts/checkpatch.pl -q
 
 all:
-	make -C $(KERNEL_PATH) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
+	make -C $(KERNEL_PATH) M=$(PWD) O=$(O) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
 
 clean:
-	make -C $(KERNEL_PATH) M=$(PWD) clean
+	make -C $(KERNEL_PATH) M=$(PWD) O=$(O) clean
 
 checkpatch:
 	$(CHECKPATCH) -f main.c hf_call.S
