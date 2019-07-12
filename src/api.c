@@ -1664,7 +1664,9 @@ int64_t api_debug_log(char c, struct vcpu *current)
 
 	if (c == '\n' || c == '\0' ||
 	    vm->log_buffer_length == sizeof(vm->log_buffer)) {
-		dlog_flush_vm_buffer(vm_locked);
+		dlog_flush_vm_buffer(vm->id, vm->log_buffer,
+				     vm->log_buffer_length);
+		vm->log_buffer_length = 0;
 	} else {
 		vm->log_buffer[vm->log_buffer_length++] = c;
 	}

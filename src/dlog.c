@@ -20,9 +20,9 @@
 #include <stddef.h>
 
 #include "hf/plat/console.h"
+#include "hf/spci.h"
 #include "hf/spinlock.h"
 #include "hf/std.h"
-#include "hf/vm.h"
 
 /* Keep macro alignment */
 /* clang-format off */
@@ -215,19 +215,18 @@ static const char *parse_flags(const char *p, int *flags)
  * Send the contents of the given VM's log buffer to the log, preceded by the VM
  * ID and followed by a newline.
  */
-void dlog_flush_vm_buffer(struct vm_locked vm)
+void dlog_flush_vm_buffer(spci_vm_id_t id, char buffer[], size_t length)
 {
 	lock();
 
 	print_raw_string("VM ");
-	print_num(vm.vm->id, 10, 0, 0);
+	print_num(id, 10, 0, 0);
 	print_raw_string(": ");
 
-	for (size_t i = 0; i < vm.vm->log_buffer_length; ++i) {
-		plat_console_putchar(vm.vm->log_buffer[i]);
-		vm.vm->log_buffer[i] = '\0';
+	for (size_t i = 0; i < length; ++i) {
+		plat_console_putchar(buffer[i]);
+		buffer[i] = '\0';
 	}
-	vm.vm->log_buffer_length = 0;
 	plat_console_putchar('\n');
 
 	unlock();
