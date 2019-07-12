@@ -928,11 +928,11 @@ bool mm_init(struct mpool *ppool)
 	/* Locking is not enabled yet so fake it, */
 	struct mm_stage1_locked stage1_locked = mm_stage1_lock_unsafe();
 
-	dlog("text: 0x%x - 0x%x\n", pa_addr(layout_text_begin()),
+	dlog("text: %#x - %#x\n", pa_addr(layout_text_begin()),
 	     pa_addr(layout_text_end()));
-	dlog("rodata: 0x%x - 0x%x\n", pa_addr(layout_rodata_begin()),
+	dlog("rodata: %#x - %#x\n", pa_addr(layout_rodata_begin()),
 	     pa_addr(layout_rodata_end()));
-	dlog("data: 0x%x - 0x%x\n", pa_addr(layout_data_begin()),
+	dlog("data: %#x - %#x\n", pa_addr(layout_data_begin()),
 	     pa_addr(layout_data_end()));
 
 	if (!mm_ptable_init(&ptable, MM_FLAG_STAGE1, ppool)) {

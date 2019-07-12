@@ -198,10 +198,10 @@ noreturn void sync_current_exception(uintreg_t elr, uintreg_t spsr)
 
 	switch (esr >> 26) {
 	case 0x25: /* EC = 100101, Data abort. */
-		dlog("Data abort: pc=0x%x, esr=0x%x, ec=0x%x", elr, esr,
+		dlog("Data abort: pc=%#x, esr=%#x, ec=%#x", elr, esr,
 		     esr >> 26);
 		if (!(esr & (1u << 10))) { /* Check FnV bit. */
-			dlog(", far=0x%x", read_msr(far_el2));
+			dlog(", far=%#x", read_msr(far_el2));
 		} else {
 			dlog(", far=invalid");
 		}
@@ -210,8 +210,8 @@ noreturn void sync_current_exception(uintreg_t elr, uintreg_t spsr)
 		break;
 
 	default:
-		dlog("Unknown current sync exception pc=0x%x, esr=0x%x, "
-		     "ec=0x%x\n",
+		dlog("Unknown current sync exception pc=%#x, esr=%#x, "
+		     "ec=%#x\n",
 		     elr, esr, esr >> 26);
 		break;
 	}
@@ -477,7 +477,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 		if (!smc_handler(vcpu, vcpu->regs.r[0], vcpu->regs.r[1],
 				 vcpu->regs.r[2], vcpu->regs.r[3], &ret,
 				 &next)) {
-			dlog("Unsupported SMC call: 0x%x\n", vcpu->regs.r[0]);
+			dlog("Unsupported SMC call: %#x\n", vcpu->regs.r[0]);
 			ret = PSCI_ERROR_NOT_SUPPORTED;
 		}
 
@@ -488,8 +488,8 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 	}
 
 	default:
-		dlog("Unknown lower sync exception pc=0x%x, esr=0x%x, "
-		     "ec=0x%x\n",
+		dlog("Unknown lower sync exception pc=%#x, esr=%#x, "
+		     "ec=%#x\n",
 		     vcpu->regs.pc, esr, esr >> 26);
 		break;
 	}

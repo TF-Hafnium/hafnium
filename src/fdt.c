@@ -387,7 +387,7 @@ void fdt_dump(struct fdt_header *hdr)
 				 *)((uintptr_t)hdr +
 				    be32toh(hdr->off_mem_rsvmap));
 		while (e->address || e->size) {
-			dlog("Entry: %p (0x%x bytes)\n", be64toh(e->address),
+			dlog("Entry: %p (%#x bytes)\n", be64toh(e->address),
 			     be64toh(e->size));
 			e++;
 		}

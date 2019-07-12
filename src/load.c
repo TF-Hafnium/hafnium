@@ -347,7 +347,7 @@ bool load_secondary(struct mm_stage1_locked stage1_locked,
 			return false;
 		}
 
-		dlog("Loaded with %u vcpus, entry at 0x%x\n", cpu,
+		dlog("Loaded with %u vcpus, entry at %#x\n", cpu,
 		     pa_addr(secondary_mem_begin));
 
 		vcpu = vm_get_vcpu(vm, 0);

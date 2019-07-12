@@ -79,12 +79,12 @@ static void one_time_init(void)
 	cpu_module_init(params.cpu_ids, params.cpu_count);
 
 	for (i = 0; i < params.mem_ranges_count; ++i) {
-		dlog("Memory range:  0x%x - 0x%x\n",
+		dlog("Memory range:  %#x - %#x\n",
 		     pa_addr(params.mem_ranges[i].begin),
 		     pa_addr(params.mem_ranges[i].end) - 1);
 	}
 
-	dlog("Ramdisk range: 0x%x - 0x%x\n", pa_addr(params.initrd_begin),
+	dlog("Ramdisk range: %#x - %#x\n", pa_addr(params.initrd_begin),
 	     pa_addr(params.initrd_end) - 1);
 
 	/* Map initrd in, and initialise cpio parser. */
