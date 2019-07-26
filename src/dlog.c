@@ -42,6 +42,13 @@
 static bool dlog_lock_enabled = false;
 static struct spinlock sl = SPINLOCK_INIT;
 
+/*
+ * These global variables for the log buffer are not static because a test needs
+ * to access them directly.
+ */
+size_t dlog_buffer_offset;
+char dlog_buffer[DLOG_BUFFER_SIZE];
+
 /**
  * Takes the lock, if it is enabled.
  */
@@ -70,6 +77,13 @@ void dlog_enable_lock(void)
 	dlog_lock_enabled = true;
 }
 
+static void dlog_putchar(char c)
+{
+	dlog_buffer[dlog_buffer_offset] = c;
+	dlog_buffer_offset = (dlog_buffer_offset + 1) % DLOG_BUFFER_SIZE;
+	plat_console_putchar(c);
+}
+
 /**
  * Prints a raw string to the debug log and returns its length.
  */
@@ -78,7 +92,7 @@ static size_t print_raw_string(const char *str)
 	const char *c = str;
 
 	while (*c != '\0') {
-		plat_console_putchar(*c++);
+		dlog_putchar(*c++);
 	}
 
 	return c - str;
@@ -100,14 +114,14 @@ static void print_string(const char *str, const char *suffix, size_t width,
 
 	/* Print the string up to the beginning of the suffix. */
 	while (str != suffix) {
-		plat_console_putchar(*str++);
+		dlog_putchar(*str++);
 	}
 
 	if (flags & FLAG_MINUS) {
 		/* Left-aligned. Print suffix, then print padding if needed. */
 		len += print_raw_string(suffix);
 		while (len < width) {
-			plat_console_putchar(' ');
+			dlog_putchar(' ');
 			len++;
 		}
 		return;
@@ -116,7 +130,7 @@ static void print_string(const char *str, const char *suffix, size_t width,
 	/* Fill until we reach the desired length. */
 	len += strnlen_s(suffix, DLOG_MAX_STRING_LENGTH);
 	while (len < width) {
-		plat_console_putchar(fill);
+		dlog_putchar(fill);
 		len++;
 	}
 
@@ -224,10 +238,10 @@ void dlog_flush_vm_buffer(spci_vm_id_t id, char buffer[], size_t length)
 	print_raw_string(": ");
 
 	for (size_t i = 0; i < length; ++i) {
-		plat_console_putchar(buffer[i]);
+		dlog_putchar(buffer[i]);
 		buffer[i] = '\0';
 	}
-	plat_console_putchar('\n');
+	dlog_putchar('\n');
 
 	unlock();
 }
@@ -247,7 +261,7 @@ void vdlog(const char *fmt, va_list args)
 	for (p = fmt; *p; p++) {
 		switch (*p) {
 		default:
-			plat_console_putchar(*p);
+			dlog_putchar(*p);
 			break;
 
 		case '%':
@@ -335,7 +349,7 @@ void vdlog(const char *fmt, va_list args)
 				break;
 
 			default:
-				plat_console_putchar('%');
+				dlog_putchar('%');
 			}
 
 			break;
