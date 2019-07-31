@@ -989,7 +989,7 @@ static int __init hf_init(void)
 
 	/* Validate the number of VMs. There must at least be the primary. */
 	if (secondary_vm_count > CONFIG_HAFNIUM_MAX_VMS - 1) {
-		pr_err("Number of VMs is out of range: %lld\n",
+		pr_err("Number of VMs is out of range: %d\n",
 		       secondary_vm_count);
 		return -EDQUOT;
 	}
