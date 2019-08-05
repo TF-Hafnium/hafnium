@@ -42,7 +42,7 @@
 #define CONFIG_HAFNIUM_MAX_VMS   16
 #define CONFIG_HAFNIUM_MAX_VCPUS 32
 
-#define FIRST_SECONDARY_VM_ID 1
+#define FIRST_SECONDARY_VM_ID (HF_VM_ID_OFFSET + 1)
 
 struct hf_vcpu {
 	struct hf_vm *vm;
@@ -792,7 +792,7 @@ static int hf_sock_create(struct net *net, struct socket *sock, int protocol,
  */
 static void hf_free_resources(void)
 {
-	spci_vm_id_t i;
+	uint16_t i;
 	spci_vcpu_index_t j;
 
 	/*
