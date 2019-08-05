@@ -27,6 +27,15 @@
 static struct vm vms[MAX_VMS];
 static spci_vm_count_t vm_count;
 
+/**
+ * Returns the index of the VM within the VM array.
+ */
+static uint16_t vm_get_vm_index(spci_vm_id_t vm_id)
+{
+	CHECK(vm_id >= HF_VM_ID_OFFSET);
+	return vm_id - HF_VM_ID_OFFSET;
+}
+
 bool vm_init(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
 	     struct vm **new_vm)
 {
@@ -45,7 +54,8 @@ bool vm_init(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
 	list_init(&vm->mailbox.ready_list);
 	sl_init(&vm->lock);
 
-	vm->id = vm_count;
+	/* Generate IDs based on an offset, as low IDs e.g., 0, are reserved */
+	vm->id = vm_count + HF_VM_ID_OFFSET;
 	vm->vcpu_count = vcpu_count;
 	vm->mailbox.state = MAILBOX_STATE_EMPTY;
 	atomic_init(&vm->aborting, false);
@@ -79,12 +89,14 @@ spci_vm_count_t vm_get_count(void)
 
 struct vm *vm_find(spci_vm_id_t id)
 {
+	uint16_t vm_index = vm_get_vm_index(id);
+
 	/* Ensure the VM is initialized. */
-	if (id >= vm_count) {
+	if (vm_index >= vm_count) {
 		return NULL;
 	}
 
-	return &vms[id];
+	return &vms[vm_index];
 }
 
 /**
