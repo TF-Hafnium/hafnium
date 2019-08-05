@@ -1457,6 +1457,101 @@ out:
 	return ret;
 }
 
+/**
+ * Clears a region of physical memory by overwriting it with zeros. The data is
+ * flushed from the cache so the memory has been cleared across the system.
+ */
+static bool api_clear_memory_region(struct spci_memory_region *memory_region)
+{
+	struct mpool local_page_pool;
+	struct spci_memory_region_constituent *constituents =
+		spci_memory_region_get_constituents(memory_region);
+	uint32_t memory_constituent_count = memory_region->constituent_count;
+	struct mm_stage1_locked stage1_locked;
+	bool ret = false;
+
+	/*
+	 * Create a local pool so any freed memory can't be used by another
+	 * thread. This is to ensure each constituent that is mapped can be
+	 * unmapped again afterwards.
+	 */
+	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
+
+	/* Iterate over the memory region constituents. */
+	for (uint32_t i = 0; i < memory_constituent_count; ++i) {
+		size_t size = constituents[i].page_count * PAGE_SIZE;
+		paddr_t begin = pa_from_ipa(ipa_init(constituents[i].address));
+		paddr_t end = pa_add(begin, size);
+
+		if (!api_clear_memory(begin, end, &local_page_pool)) {
+			/*
+			 * api_clear_memory will defrag on failure, so no need
+			 * to do it here.
+			 */
+			goto out;
+		}
+	}
+
+	/*
+	 * Need to defrag after clearing, as it may have added extra mappings to
+	 * the stage 1 page table.
+	 */
+	stage1_locked = mm_lock_stage1();
+	mm_defrag(stage1_locked, &local_page_pool);
+	mm_unlock_stage1(&stage1_locked);
+
+	ret = true;
+
+out:
+	mpool_fini(&local_page_pool);
+	return ret;
+}
+
+/**
+ * Updates a VM's page table such that the given set of physical address ranges
+ * are mapped in the address space at the corresponding address ranges, in the
+ * mode provided.
+ *
+ * If commit is false, the page tables will be allocated from the mpool but no
+ * mappings will actually be updated. This function must always be called first
+ * with commit false to check that it will succeed before calling with commit
+ * true, to avoid leaving the page table in a half-updated state. To make a
+ * series of changes atomically you can call them all with commit false before
+ * calling them all with commit true.
+ *
+ * mm_vm_defrag should always be called after a series of page table updates,
+ * whether they succeed or fail.
+ *
+ * Returns true on success, or false if the update failed and no changes were
+ * made to memory mappings.
+ */
+static bool spci_region_group_identity_map(
+	struct mm_ptable *t, struct spci_memory_region *memory_region, int mode,
+	struct mpool *ppool, bool commit)
+{
+	struct spci_memory_region_constituent *constituents =
+		spci_memory_region_get_constituents(memory_region);
+	uint32_t memory_constituent_count = memory_region->constituent_count;
+
+	/* Iterate over the memory region constituents. */
+	for (uint32_t index = 0; index < memory_constituent_count; index++) {
+		size_t size = constituents[index].page_count * PAGE_SIZE;
+		paddr_t pa_begin =
+			pa_from_ipa(ipa_init(constituents[index].address));
+		paddr_t pa_end = pa_add(pa_begin, size);
+
+		if (commit) {
+			mm_vm_identity_commit(t, pa_begin, pa_end, mode, ppool,
+					      NULL);
+		} else if (!mm_vm_identity_prepare(t, pa_begin, pa_end, mode,
+						   ppool)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 /** TODO: Move function to spci_architected_message.c. */
 /**
  * Shares memory from the calling VM with another. The memory can be shared in
@@ -1484,14 +1579,8 @@ struct spci_value api_spci_share_memory(
 	uint32_t to_mode;
 	struct mpool local_page_pool;
 	struct spci_value ret;
-	paddr_t pa_begin;
-	paddr_t pa_end;
-	ipaddr_t begin;
-	ipaddr_t end;
 	struct spci_memory_region_constituent *constituents =
 		spci_memory_region_get_constituents(memory_region);
-
-	size_t size;
 
 	/*
 	 * Make sure constituents are properly aligned to a 64-bit boundary. If
@@ -1508,75 +1597,84 @@ struct spci_value api_spci_share_memory(
 	}
 
 	/*
-	 * Create a local pool so any freed memory can't be used by another
-	 * thread. This is to ensure the original mapping can be restored if any
-	 * stage of the process fails.
-	 */
-	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
-
-	/* Obtain the single contiguous set of pages from the memory_region. */
-	/* TODO: Add support for multiple constituent regions. */
-	size = constituents[0].page_count * PAGE_SIZE;
-	begin = ipa_init(constituents[0].address);
-	end = ipa_add(begin, size);
-
-	/*
 	 * Check if the state transition is lawful for both VMs involved
 	 * in the memory exchange, ensure that all constituents of a memory
 	 * region being shared are at the same state.
 	 */
-	if (!spci_msg_check_transition(to, from, share, &orig_from_mode, begin,
-				       end, memory_to_attributes, &from_mode,
-				       &to_mode)) {
+	if (!spci_msg_check_transition(to, from, share, &orig_from_mode,
+				       memory_region, memory_to_attributes,
+				       &from_mode, &to_mode)) {
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	pa_begin = pa_from_ipa(begin);
-	pa_end = pa_from_ipa(end);
+	/*
+	 * Create a local pool so any freed memory can't be used by another
+	 * thread. This is to ensure the original mapping can be restored if the
+	 * clear fails.
+	 */
+	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
 
 	/*
-	 * First update the mapping for the sender so there is not overlap with
-	 * the recipient.
+	 * First reserve all required memory for the new page table entries in
+	 * both sender and recipient page tables without committing, to make
+	 * sure the entire operation will succeed without exhausting the page
+	 * pool.
 	 */
-	if (!mm_vm_identity_map(&from->ptable, pa_begin, pa_end, from_mode,
-				&local_page_pool, NULL)) {
+	if (!spci_region_group_identity_map(&from->ptable, memory_region,
+					    from_mode, &api_page_pool, false) ||
+	    !spci_region_group_identity_map(&to->ptable, memory_region, to_mode,
+					    &api_page_pool, false)) {
+		/* TODO: partial defrag of failed range. */
 		ret = spci_error(SPCI_NO_MEMORY);
 		goto out;
 	}
+
+	/*
+	 * First update the mapping for the sender so there is no overlap with
+	 * the recipient. This won't allocate because the transaction was
+	 * already prepared above, but may free pages in the case that a whole
+	 * block is being unmapped that was previously partially mapped.
+	 */
+	CHECK(spci_region_group_identity_map(&from->ptable, memory_region,
+					     from_mode, &local_page_pool,
+					     true));
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if ((memory_region->flags & SPCI_MEMORY_REGION_FLAG_CLEAR) &&
-	    !api_clear_memory(pa_begin, pa_end, &local_page_pool)) {
+	    !api_clear_memory_region(memory_region)) {
+		/*
+		 * On failure, roll back by returning memory to the sender. This
+		 * may allocate pages which were previously freed into
+		 * `local_page_pool` by the call above, but will never allocate
+		 * more pages than that so can never fail.
+		 */
+		CHECK(spci_region_group_identity_map(
+			&from->ptable, memory_region, orig_from_mode,
+			&local_page_pool, true));
+
 		ret = spci_error(SPCI_NO_MEMORY);
-
-		/* Return memory to the sender. */
-		CHECK(mm_vm_identity_map(&from->ptable, pa_begin, pa_end,
-					 orig_from_mode, &local_page_pool,
-					 NULL));
-
 		goto out;
 	}
 
-	/* Complete the transfer by mapping the memory into the recipient. */
-	if (!mm_vm_identity_map(&to->ptable, pa_begin, pa_end, to_mode,
-				&local_page_pool, NULL)) {
-		/* TODO: partial defrag of failed range. */
-		/* Recover any memory consumed in failed mapping. */
-		mm_vm_defrag(&from->ptable, &local_page_pool);
-
-		ret = spci_error(SPCI_NO_MEMORY);
-
-		CHECK(mm_vm_identity_map(&from->ptable, pa_begin, pa_end,
-					 orig_from_mode, &local_page_pool,
-					 NULL));
-
-		goto out;
-	}
+	/*
+	 * Complete the transfer by mapping the memory into the recipient. This
+	 * won't allocate because the transaction was already prepared above, so
+	 * it doesn't need to use the `local_page_pool`.
+	 */
+	CHECK(spci_region_group_identity_map(&to->ptable, memory_region,
+					     to_mode, &api_page_pool, true));
 
 	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 
 out:
 	mpool_fini(&local_page_pool);
+
+	/*
+	 * Tidy up the page tables by reclaiming failed mappings (if there was
+	 * an error) or merging entries into blocks where possible (on success).
+	 */
+	mm_vm_defrag(&to->ptable, &api_page_pool);
+	mm_vm_defrag(&from->ptable, &api_page_pool);
 
 	return ret;
 }

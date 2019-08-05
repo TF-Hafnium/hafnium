@@ -118,9 +118,7 @@ struct spci_value spci_msg_handle_architected_message(
 /**
  * Obtain the next mode to apply to the two VMs.
  *
- * Returns:
- *  The error code -1 indicates that a state transition was not found.
- *  Success is indicated by 0.
+ * Returns true iff a state transition was found.
  */
 static bool spci_msg_get_next_state(
 	const struct spci_mem_transitions *transitions,
@@ -168,13 +166,15 @@ static bool spci_msg_get_next_state(
  */
 bool spci_msg_check_transition(struct vm *to, struct vm *from,
 			       enum spci_memory_share share,
-			       uint32_t *orig_from_mode, ipaddr_t begin,
-			       ipaddr_t end, uint32_t memory_to_attributes,
+			       uint32_t *orig_from_mode,
+			       struct spci_memory_region *memory_region,
+			       uint32_t memory_to_attributes,
 			       uint32_t *from_mode, uint32_t *to_mode)
 {
 	uint32_t orig_to_mode;
 	const struct spci_mem_transitions *mem_transition_table;
 	uint32_t transition_table_size;
+	uint32_t i;
 
 	/*
 	 * TODO: Transition table does not currently consider the multiple
@@ -308,16 +308,52 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 	static const uint32_t size_relinquish_transitions =
 		ARRAY_SIZE(relinquish_transitions);
 
-	/* Fail if addresses are not page-aligned. */
-	if (!is_aligned(ipa_addr(begin), PAGE_SIZE) ||
-	    !is_aligned(ipa_addr(end), PAGE_SIZE)) {
+	struct spci_memory_region_constituent *constituents =
+		spci_memory_region_get_constituents(memory_region);
+
+	if (memory_region->constituent_count == 0) {
+		/*
+		 * Fail if there are no constituents. Otherwise
+		 * spci_msg_get_next_state would get an unitialised
+		 * *orig_from_mode and orig_to_mode.
+		 */
 		return false;
 	}
 
-	/* Ensure that the memory range is mapped with the same mode. */
-	if (!mm_vm_get_mode(&from->ptable, begin, end, orig_from_mode) ||
-	    !mm_vm_get_mode(&to->ptable, begin, end, &orig_to_mode)) {
-		return false;
+	for (i = 0; i < memory_region->constituent_count; ++i) {
+		ipaddr_t begin = ipa_init(constituents[i].address);
+		size_t size = constituents[i].page_count * PAGE_SIZE;
+		ipaddr_t end = ipa_add(begin, size);
+		uint32_t current_from_mode;
+		uint32_t current_to_mode;
+
+		/* Fail if addresses are not page-aligned. */
+		if (!is_aligned(ipa_addr(begin), PAGE_SIZE) ||
+		    !is_aligned(ipa_addr(end), PAGE_SIZE)) {
+			return false;
+		}
+
+		/*
+		 * Ensure that this constituent memory range is all mapped with
+		 * the same mode.
+		 */
+		if (!mm_vm_get_mode(&from->ptable, begin, end,
+				    &current_from_mode) ||
+		    !mm_vm_get_mode(&to->ptable, begin, end,
+				    &current_to_mode)) {
+			return false;
+		}
+
+		/*
+		 * Ensure that all constituents are mapped with the same mode.
+		 */
+		if (i == 0) {
+			*orig_from_mode = current_from_mode;
+			orig_to_mode = current_to_mode;
+		} else if (current_from_mode != *orig_from_mode ||
+			   current_to_mode != orig_to_mode) {
+			return false;
+		}
 	}
 
 	/* Ensure the address range is normal memory and not a device. */

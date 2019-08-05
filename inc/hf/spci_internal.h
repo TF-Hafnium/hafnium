@@ -69,6 +69,7 @@ struct spci_value spci_msg_handle_architected_message(
 
 bool spci_msg_check_transition(struct vm *to, struct vm *from,
 			       enum spci_memory_share share,
-			       uint32_t *orig_from_mode, ipaddr_t begin,
-			       ipaddr_t end, uint32_t memory_to_attributes,
+			       uint32_t *orig_from_mode,
+			       struct spci_memory_region *memory_region,
+			       uint32_t memory_to_attributes,
 			       uint32_t *from_mode, uint32_t *to_mode);
