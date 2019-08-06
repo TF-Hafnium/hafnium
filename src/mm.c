@@ -32,9 +32,6 @@
  * contain only 1-1 mappings, aligned on the block boundaries.
  */
 
-/* The type of addresses stored in the page table. */
-typedef uintvaddr_t ptable_addr_t;
-
 /*
  * For stage 2, the input is an intermediate physical addresses rather than a
  * virtual address so:
@@ -45,15 +42,6 @@ static_assert(
 	"which only works if the virtual and intermediate physical addresses "
 	"are the same size. It looks like that assumption might not be holding "
 	"so we need to check that everything is going to be ok.");
-
-/* Keep macro alignment */
-/* clang-format off */
-
-#define MM_FLAG_COMMIT       0x01
-#define MM_FLAG_UNMAP        0x02
-#define MM_FLAG_STAGE1       0x04
-
-/* clang-format on */
 
 static struct mm_ptable ptable;
 static struct spinlock ptable_lock;
@@ -210,9 +198,19 @@ static void mm_free_page_pte(pte_t pte, uint8_t level, struct mpool *ppool)
 }
 
 /**
+ * Returns the first address which cannot be encoded in page tables given by
+ * `flags`. It is the exclusive end of the address space created by the tables.
+ */
+ptable_addr_t mm_ptable_addr_space_end(int flags)
+{
+	return mm_root_table_count(flags) *
+	       mm_entry_size(mm_max_level(flags) + 1);
+}
+
+/**
  * Initialises the given page table.
  */
-static bool mm_ptable_init(struct mm_ptable *t, int flags, struct mpool *ppool)
+bool mm_ptable_init(struct mm_ptable *t, int flags, struct mpool *ppool)
 {
 	uint8_t i;
 	size_t j;
@@ -492,8 +490,7 @@ static bool mm_ptable_identity_update(struct mm_ptable *t, paddr_t pa_begin,
 				      struct mpool *ppool)
 {
 	uint8_t root_level = mm_max_level(flags) + 1;
-	ptable_addr_t ptable_end =
-		mm_root_table_count(flags) * mm_entry_size(root_level);
+	ptable_addr_t ptable_end = mm_ptable_addr_space_end(flags);
 	ptable_addr_t end = mm_round_up_to_page(pa_addr(pa_end));
 	ptable_addr_t begin = pa_addr(arch_mm_clear_pa(pa_begin));
 
