@@ -936,11 +936,9 @@ spci_return_t api_spci_msg_send(uint32_t attributes, struct vcpu *current,
 		 * Buffer holding the internal copy of the shared memory
 		 * regions.
 		 */
-		/* TODO: Buffer is temporarily in the stack. */
-		uint8_t message_buffer
-			[sizeof(struct spci_architected_message_header) +
-			 sizeof(struct spci_memory_region_constituent) +
-			 sizeof(struct spci_memory_region)];
+		uint8_t *message_buffer = cpu_get_buffer(current->cpu->id);
+		uint32_t message_buffer_size =
+			cpu_get_buffer_size(current->cpu->id);
 
 		struct spci_architected_message_header *architected_header =
 			spci_get_architected_message_header(from->mailbox.send);
@@ -948,7 +946,7 @@ spci_return_t api_spci_msg_send(uint32_t attributes, struct vcpu *current,
 		const struct spci_architected_message_header
 			*architected_message_replica;
 
-		if (from_msg_replica.length > sizeof(message_buffer)) {
+		if (from_msg_replica.length > message_buffer_size) {
 			ret = SPCI_INVALID_PARAMETERS;
 			goto out;
 		}
@@ -960,7 +958,7 @@ spci_return_t api_spci_msg_send(uint32_t attributes, struct vcpu *current,
 		}
 
 		/* Copy the architected message into an internal buffer. */
-		memcpy_s(message_buffer, sizeof(message_buffer),
+		memcpy_s(message_buffer, message_buffer_size,
 			 architected_header, from_msg_replica.length);
 
 		architected_message_replica =

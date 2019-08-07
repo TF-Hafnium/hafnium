@@ -119,6 +119,8 @@ size_t cpu_index(struct cpu *c);
 bool cpu_on(struct cpu *c, ipaddr_t entry, uintreg_t arg);
 void cpu_off(struct cpu *c);
 struct cpu *cpu_find(cpu_id_t id);
+uint8_t *cpu_get_buffer(cpu_id_t cpu_id);
+uint32_t cpu_get_buffer_size(cpu_id_t cpu_id);
 
 struct vcpu_locked vcpu_lock(struct vcpu *vcpu);
 void vcpu_unlock(struct vcpu_locked *locked);

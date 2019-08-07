@@ -34,6 +34,31 @@
 /* The stack to be used by the CPUs. */
 alignas(2 * sizeof(uintreg_t)) static char callstacks[MAX_CPUS][STACK_SIZE];
 
+/**
+ * Internal buffer used to store SPCI messages from a VM Tx. Its usage prevents
+ * TOCTOU issues while Hafnium performs actions on information that would
+ * otherwise be re-writable by the VM.
+ *
+ * Each buffer is owned by a single cpu. The buffer can only be used for
+ * spci_msg_send. The information stored in the buffer is only valid during the
+ * spci_msg_send request is performed.
+ */
+alignas(PAGE_SIZE) uint8_t cpu_message_buffer[MAX_CPUS][PAGE_SIZE];
+
+uint8_t *cpu_get_buffer(cpu_id_t cpu_id)
+{
+	CHECK(cpu_id < MAX_CPUS);
+
+	return cpu_message_buffer[cpu_id];
+}
+
+uint32_t cpu_get_buffer_size(cpu_id_t cpu_id)
+{
+	CHECK(cpu_id < MAX_CPUS);
+
+	return sizeof(cpu_message_buffer[cpu_id]);
+}
+
 /* State of all supported CPUs. The stack of the first one is initialized. */
 struct cpu cpus[MAX_CPUS] = {
 	{
