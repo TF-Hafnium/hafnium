@@ -15,105 +15,10 @@
  */
 
 #include "hf/api.h"
+#include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/spci_internal.h"
 #include "hf/std.h"
-
-/**
- * Check if the message length and the number of memory region constituents
- * match, if the check is correct call the memory sharing routine.
- */
-static struct spci_value spci_validate_call_share_memory(
-	struct vm_locked to_locked, struct vm_locked from_locked,
-	struct spci_memory_region *memory_region, uint32_t memory_share_size,
-	enum spci_memory_share share)
-{
-	uint32_t memory_to_attributes;
-	uint32_t attributes_size;
-	uint32_t constituents_size;
-
-	/*
-	 * Ensure the number of constituents are within the memory
-	 * bounds.
-	 */
-	attributes_size = sizeof(struct spci_memory_region_attributes) *
-			  memory_region->attribute_count;
-	constituents_size = sizeof(struct spci_memory_region_constituent) *
-			    memory_region->constituent_count;
-	if (memory_region->constituent_offset <
-		    sizeof(struct spci_memory_region) + attributes_size ||
-	    memory_share_size !=
-		    memory_region->constituent_offset + constituents_size) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
-	}
-
-	/* We only support a single recipient. */
-	if (memory_region->attribute_count != 1) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
-	}
-
-	switch (share) {
-	case SPCI_MEMORY_DONATE:
-	case SPCI_MEMORY_LEND:
-	case SPCI_MEMORY_SHARE:
-		memory_to_attributes = spci_memory_attrs_to_mode(
-			memory_region->attributes[0].memory_attributes);
-		break;
-	case SPCI_MEMORY_RELINQUISH:
-		memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
-		break;
-	default:
-		dlog("Invalid memory sharing message.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
-	}
-
-	return api_spci_share_memory(to_locked, from_locked, memory_region,
-				     memory_to_attributes, share);
-}
-
-/**
- * Performs initial architected message information parsing. Calls the
- * corresponding api functions implementing the functionality requested
- * in the architected message.
- */
-struct spci_value spci_msg_handle_architected_message(
-	struct vm_locked to_locked, struct vm_locked from_locked,
-	const struct spci_architected_message_header
-		*architected_message_replica,
-	uint32_t size)
-{
-	struct spci_value ret;
-	struct spci_memory_region *memory_region =
-		(struct spci_memory_region *)
-			architected_message_replica->payload;
-	uint32_t message_type = architected_message_replica->type;
-	uint32_t memory_share_size =
-		size - sizeof(struct spci_architected_message_header);
-
-	ret = spci_validate_call_share_memory(to_locked, from_locked,
-					      memory_region, memory_share_size,
-					      message_type);
-
-	/* Copy data to the destination Rx. */
-	/*
-	 * TODO: Translate the <from> IPA addresses to <to> IPA addresses.
-	 * Currently we assume identity mapping of the stage 2 translation.
-	 * Removing this assumption relies on a mechanism to handle scenarios
-	 * where the memory region fits in the source Tx buffer but cannot fit
-	 * in the destination Rx buffer. This mechanism will be defined at the
-	 * spec level.
-	 */
-	if (ret.func == SPCI_SUCCESS_32) {
-		memcpy_s(to_locked.vm->mailbox.recv, SPCI_MSG_PAYLOAD_MAX,
-			 architected_message_replica, size);
-		to_locked.vm->mailbox.recv_size = size;
-		to_locked.vm->mailbox.recv_sender = from_locked.vm->id;
-		to_locked.vm->mailbox.recv_attributes =
-			SPCI_MSG_SEND_LEGACY_MEMORY;
-	}
-
-	return ret;
-}
 
 /**
  * Obtain the next mode to apply to the two VMs.
@@ -164,12 +69,12 @@ static bool spci_msg_get_next_state(
  *  Success is indicated by true.
  *
  */
-bool spci_msg_check_transition(struct vm *to, struct vm *from,
-			       enum spci_memory_share share,
-			       uint32_t *orig_from_mode,
-			       struct spci_memory_region *memory_region,
-			       uint32_t memory_to_attributes,
-			       uint32_t *from_mode, uint32_t *to_mode)
+static bool spci_msg_check_transition(struct vm *to, struct vm *from,
+				      enum spci_memory_share share,
+				      uint32_t *orig_from_mode,
+				      struct spci_memory_region *memory_region,
+				      uint32_t memory_to_attributes,
+				      uint32_t *from_mode, uint32_t *to_mode)
 {
 	uint32_t orig_to_mode;
 	const struct spci_mem_transitions *mem_transition_table;
@@ -390,4 +295,363 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 				       transition_table_size,
 				       memory_to_attributes, *orig_from_mode,
 				       orig_to_mode, from_mode, to_mode);
+}
+
+/**
+ * Updates a VM's page table such that the given set of physical address ranges
+ * are mapped in the address space at the corresponding address ranges, in the
+ * mode provided.
+ *
+ * If commit is false, the page tables will be allocated from the mpool but no
+ * mappings will actually be updated. This function must always be called first
+ * with commit false to check that it will succeed before calling with commit
+ * true, to avoid leaving the page table in a half-updated state. To make a
+ * series of changes atomically you can call them all with commit false before
+ * calling them all with commit true.
+ *
+ * mm_vm_defrag should always be called after a series of page table updates,
+ * whether they succeed or fail.
+ *
+ * Returns true on success, or false if the update failed and no changes were
+ * made to memory mappings.
+ */
+static bool spci_region_group_identity_map(
+	struct mm_ptable *t, struct spci_memory_region *memory_region, int mode,
+	struct mpool *ppool, bool commit)
+{
+	struct spci_memory_region_constituent *constituents =
+		spci_memory_region_get_constituents(memory_region);
+	uint32_t memory_constituent_count = memory_region->constituent_count;
+
+	/* Iterate over the memory region constituents. */
+	for (uint32_t index = 0; index < memory_constituent_count; index++) {
+		size_t size = constituents[index].page_count * PAGE_SIZE;
+		paddr_t pa_begin =
+			pa_from_ipa(ipa_init(constituents[index].address));
+		paddr_t pa_end = pa_add(pa_begin, size);
+
+		if (commit) {
+			mm_vm_identity_commit(t, pa_begin, pa_end, mode, ppool,
+					      NULL);
+		} else if (!mm_vm_identity_prepare(t, pa_begin, pa_end, mode,
+						   ppool)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/**
+ * Clears a region of physical memory by overwriting it with zeros. The data is
+ * flushed from the cache so the memory has been cleared across the system.
+ */
+static bool clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool)
+{
+	/*
+	 * TODO: change this to a cpu local single page window rather than a
+	 *       global mapping of the whole range. Such an approach will limit
+	 *       the changes to stage-1 tables and will allow only local
+	 *       invalidation.
+	 */
+	bool ret;
+	struct mm_stage1_locked stage1_locked = mm_lock_stage1();
+	void *ptr =
+		mm_identity_map(stage1_locked, begin, end, MM_MODE_W, ppool);
+	size_t size = pa_difference(begin, end);
+
+	if (!ptr) {
+		/* TODO: partial defrag of failed range. */
+		/* Recover any memory consumed in failed mapping. */
+		mm_defrag(stage1_locked, ppool);
+		goto fail;
+	}
+
+	memset_s(ptr, size, 0, size);
+	arch_mm_flush_dcache(ptr, size);
+	mm_unmap(stage1_locked, begin, end, ppool);
+
+	ret = true;
+	goto out;
+
+fail:
+	ret = false;
+
+out:
+	mm_unlock_stage1(&stage1_locked);
+
+	return ret;
+}
+
+/**
+ * Clears a region of physical memory by overwriting it with zeros. The data is
+ * flushed from the cache so the memory has been cleared across the system.
+ */
+static bool spci_clear_memory_region(struct spci_memory_region *memory_region,
+				     struct mpool *api_page_pool)
+{
+	struct mpool local_page_pool;
+	struct spci_memory_region_constituent *constituents =
+		spci_memory_region_get_constituents(memory_region);
+	uint32_t memory_constituent_count = memory_region->constituent_count;
+	struct mm_stage1_locked stage1_locked;
+	bool ret = false;
+
+	/*
+	 * Create a local pool so any freed memory can't be used by another
+	 * thread. This is to ensure each constituent that is mapped can be
+	 * unmapped again afterwards.
+	 */
+	mpool_init_with_fallback(&local_page_pool, api_page_pool);
+
+	/* Iterate over the memory region constituents. */
+	for (uint32_t i = 0; i < memory_constituent_count; ++i) {
+		size_t size = constituents[i].page_count * PAGE_SIZE;
+		paddr_t begin = pa_from_ipa(ipa_init(constituents[i].address));
+		paddr_t end = pa_add(begin, size);
+
+		if (!clear_memory(begin, end, &local_page_pool)) {
+			/*
+			 * api_clear_memory will defrag on failure, so no need
+			 * to do it here.
+			 */
+			goto out;
+		}
+	}
+
+	/*
+	 * Need to defrag after clearing, as it may have added extra mappings to
+	 * the stage 1 page table.
+	 */
+	stage1_locked = mm_lock_stage1();
+	mm_defrag(stage1_locked, &local_page_pool);
+	mm_unlock_stage1(&stage1_locked);
+
+	ret = true;
+
+out:
+	mpool_fini(&local_page_pool);
+	return ret;
+}
+
+/**
+ * Shares memory from the calling VM with another. The memory can be shared in
+ * different modes.
+ *
+ * This function requires the calling context to hold the <to> and <from> locks.
+ *
+ * Returns:
+ *  In case of error one of the following values is returned:
+ *   1) SPCI_INVALID_PARAMETERS - The endpoint provided parameters were
+ *     erroneous;
+ *   2) SPCI_NO_MEMORY - Hafnium did not have sufficient memory to complete
+ *     the request.
+ *  Success is indicated by SPCI_SUCCESS.
+ */
+static struct spci_value spci_share_memory(
+	struct vm_locked to_locked, struct vm_locked from_locked,
+	struct spci_memory_region *memory_region, uint32_t memory_to_attributes,
+	enum spci_memory_share share, struct mpool *api_page_pool)
+{
+	struct vm *to = to_locked.vm;
+	struct vm *from = from_locked.vm;
+	uint32_t orig_from_mode;
+	uint32_t from_mode;
+	uint32_t to_mode;
+	struct mpool local_page_pool;
+	struct spci_value ret;
+	struct spci_memory_region_constituent *constituents =
+		spci_memory_region_get_constituents(memory_region);
+
+	/*
+	 * Make sure constituents are properly aligned to a 64-bit boundary. If
+	 * not we would get alignment faults trying to read (64-bit) page
+	 * addresses.
+	 */
+	if (!is_aligned(constituents, 8)) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/* Disallow reflexive shares as this suggests an error in the VM. */
+	if (to == from) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Check if the state transition is lawful for both VMs involved
+	 * in the memory exchange, ensure that all constituents of a memory
+	 * region being shared are at the same state.
+	 */
+	if (!spci_msg_check_transition(to, from, share, &orig_from_mode,
+				       memory_region, memory_to_attributes,
+				       &from_mode, &to_mode)) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Create a local pool so any freed memory can't be used by another
+	 * thread. This is to ensure the original mapping can be restored if the
+	 * clear fails.
+	 */
+	mpool_init_with_fallback(&local_page_pool, api_page_pool);
+
+	/*
+	 * First reserve all required memory for the new page table entries in
+	 * both sender and recipient page tables without committing, to make
+	 * sure the entire operation will succeed without exhausting the page
+	 * pool.
+	 */
+	if (!spci_region_group_identity_map(&from->ptable, memory_region,
+					    from_mode, api_page_pool, false) ||
+	    !spci_region_group_identity_map(&to->ptable, memory_region, to_mode,
+					    api_page_pool, false)) {
+		/* TODO: partial defrag of failed range. */
+		ret = spci_error(SPCI_NO_MEMORY);
+		goto out;
+	}
+
+	/*
+	 * First update the mapping for the sender so there is no overlap with
+	 * the recipient. This won't allocate because the transaction was
+	 * already prepared above, but may free pages in the case that a whole
+	 * block is being unmapped that was previously partially mapped.
+	 */
+	CHECK(spci_region_group_identity_map(&from->ptable, memory_region,
+					     from_mode, &local_page_pool,
+					     true));
+
+	/* Clear the memory so no VM or device can see the previous contents. */
+	if ((memory_region->flags & SPCI_MEMORY_REGION_FLAG_CLEAR) &&
+	    !spci_clear_memory_region(memory_region, api_page_pool)) {
+		/*
+		 * On failure, roll back by returning memory to the sender. This
+		 * may allocate pages which were previously freed into
+		 * `local_page_pool` by the call above, but will never allocate
+		 * more pages than that so can never fail.
+		 */
+		CHECK(spci_region_group_identity_map(
+			&from->ptable, memory_region, orig_from_mode,
+			&local_page_pool, true));
+
+		ret = spci_error(SPCI_NO_MEMORY);
+		goto out;
+	}
+
+	/*
+	 * Complete the transfer by mapping the memory into the recipient. This
+	 * won't allocate because the transaction was already prepared above, so
+	 * it doesn't need to use the `local_page_pool`.
+	 */
+	CHECK(spci_region_group_identity_map(&to->ptable, memory_region,
+					     to_mode, api_page_pool, true));
+
+	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
+
+out:
+	mpool_fini(&local_page_pool);
+
+	/*
+	 * Tidy up the page tables by reclaiming failed mappings (if there was
+	 * an error) or merging entries into blocks where possible (on success).
+	 */
+	mm_vm_defrag(&to->ptable, api_page_pool);
+	mm_vm_defrag(&from->ptable, api_page_pool);
+
+	return ret;
+}
+
+/**
+ * Check if the message length and the number of memory region constituents
+ * match, if the check is correct call the memory sharing routine.
+ */
+static struct spci_value spci_validate_call_share_memory(
+	struct vm_locked to_locked, struct vm_locked from_locked,
+	struct spci_memory_region *memory_region, uint32_t memory_share_size,
+	enum spci_memory_share share, struct mpool *api_page_pool)
+{
+	uint32_t memory_to_attributes;
+	uint32_t attributes_size;
+	uint32_t constituents_size;
+
+	/*
+	 * Ensure the number of constituents are within the memory
+	 * bounds.
+	 */
+	attributes_size = sizeof(struct spci_memory_region_attributes) *
+			  memory_region->attribute_count;
+	constituents_size = sizeof(struct spci_memory_region_constituent) *
+			    memory_region->constituent_count;
+	if (memory_region->constituent_offset <
+		    sizeof(struct spci_memory_region) + attributes_size ||
+	    memory_share_size !=
+		    memory_region->constituent_offset + constituents_size) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/* We only support a single recipient. */
+	if (memory_region->attribute_count != 1) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	switch (share) {
+	case SPCI_MEMORY_DONATE:
+	case SPCI_MEMORY_LEND:
+	case SPCI_MEMORY_SHARE:
+		memory_to_attributes = spci_memory_attrs_to_mode(
+			memory_region->attributes[0].memory_attributes);
+		break;
+	case SPCI_MEMORY_RELINQUISH:
+		memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+		break;
+	default:
+		dlog("Invalid memory sharing message.\n");
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	return spci_share_memory(to_locked, from_locked, memory_region,
+				 memory_to_attributes, share, api_page_pool);
+}
+
+/**
+ * Performs initial architected message information parsing. Calls the
+ * corresponding api functions implementing the functionality requested
+ * in the architected message.
+ */
+struct spci_value spci_msg_handle_architected_message(
+	struct vm_locked to_locked, struct vm_locked from_locked,
+	const struct spci_architected_message_header
+		*architected_message_replica,
+	uint32_t size, struct mpool *api_page_pool)
+{
+	struct spci_value ret;
+	struct spci_memory_region *memory_region =
+		(struct spci_memory_region *)
+			architected_message_replica->payload;
+	uint32_t message_type = architected_message_replica->type;
+	uint32_t memory_share_size =
+		size - sizeof(struct spci_architected_message_header);
+
+	ret = spci_validate_call_share_memory(to_locked, from_locked,
+					      memory_region, memory_share_size,
+					      message_type, api_page_pool);
+
+	/* Copy data to the destination Rx. */
+	/*
+	 * TODO: Translate the <from> IPA addresses to <to> IPA addresses.
+	 * Currently we assume identity mapping of the stage 2 translation.
+	 * Removing this assumption relies on a mechanism to handle scenarios
+	 * where the memory region fits in the source Tx buffer but cannot fit
+	 * in the destination Rx buffer. This mechanism will be defined at the
+	 * spec level.
+	 */
+	if (ret.func == SPCI_SUCCESS_32) {
+		memcpy_s(to_locked.vm->mailbox.recv, SPCI_MSG_PAYLOAD_MAX,
+			 architected_message_replica, size);
+		to_locked.vm->mailbox.recv_size = size;
+		to_locked.vm->mailbox.recv_sender = from_locked.vm->id;
+		to_locked.vm->mailbox.recv_attributes =
+			SPCI_MSG_SEND_LEGACY_MEMORY;
+	}
+
+	return ret;
 }

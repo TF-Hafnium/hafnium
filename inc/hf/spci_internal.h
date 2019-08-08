@@ -65,11 +65,4 @@ struct spci_value spci_msg_handle_architected_message(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	const struct spci_architected_message_header
 		*architected_message_replica,
-	uint32_t size);
-
-bool spci_msg_check_transition(struct vm *to, struct vm *from,
-			       enum spci_memory_share share,
-			       uint32_t *orig_from_mode,
-			       struct spci_memory_region *memory_region,
-			       uint32_t memory_to_attributes,
-			       uint32_t *from_mode, uint32_t *to_mode);
+	uint32_t size, struct mpool *api_page_pool);
