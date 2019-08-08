@@ -21,7 +21,7 @@ obj-m += hafnium.o
 hafnium-y += main.o
 hafnium-y += hf_call.o
 
-ccflags-y = -I$(HAFNIUM_PATH)/inc/vmapi
+ccflags-y = -I$(HAFNIUM_PATH)/inc/vmapi -I$(PWD)/inc
 
 else
 

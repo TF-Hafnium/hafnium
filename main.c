@@ -32,10 +32,9 @@
 
 #include <hf/call.h>
 #include <hf/spci.h>
+#include <hf/transport.h>
 
-/* TODO: Reusing AF_ECONET for now as it's otherwise unused. */
-#define AF_HF AF_ECONET
-#define PF_HF AF_HF
+#include "uapi/hf/socket.h"
 
 #define HYPERVISOR_TIMER_NAME "el2_timer"
 
@@ -59,11 +58,6 @@ struct hf_vm {
 	struct hf_vcpu *vcpu;
 };
 
-struct hf_msg_hdr {
-	uint64_t src_port;
-	uint64_t dst_port;
-};
-
 struct hf_sock {
 	/* This needs to be the first field. */
 	struct sock sk;
@@ -75,12 +69,6 @@ struct hf_sock {
 	uint64_t local_port;
 	uint64_t remote_port;
 	struct hf_vm *peer_vm;
-};
-
-struct sockaddr_hf {
-	sa_family_t family;
-	spci_vm_id_t vm_id;
-	uint64_t port;
 };
 
 static struct proto hf_sock_proto = {
@@ -516,15 +504,15 @@ static int hf_sock_connect(struct socket *sock, struct sockaddr *saddr, int len,
 	struct sock *sk = sock->sk;
 	struct hf_sock *hsock = hsock_from_sk(sk);
 	struct hf_vm *vm;
-	struct sockaddr_hf *addr;
+	struct hf_sockaddr *addr;
 	int err;
 	unsigned long flags;
 
 	/* Basic address validation. */
-	if (len < sizeof(struct sockaddr_hf) || saddr->sa_family != AF_HF)
+	if (len < sizeof(struct hf_sockaddr) || saddr->sa_family != AF_HF)
 		return -EINVAL;
 
-	addr = (struct sockaddr_hf *)saddr;
+	addr = (struct hf_sockaddr *)saddr;
 	vm = hf_vm_from_id(addr->vm_id);
 	if (!vm)
 		return -ENETUNREACH;
