@@ -950,10 +950,10 @@ bool mm_init(struct mpool *ppool)
 	mm_identity_map(stage1_locked, layout_data_begin(), layout_data_end(),
 			MM_MODE_R | MM_MODE_W, ppool);
 
-	return arch_mm_init(ptable.root, true);
+	return arch_mm_init();
 }
 
-bool mm_cpu_init(void)
+void mm_cpu_init(void)
 {
-	return arch_mm_init(ptable.root, false);
+	arch_mm_enable(ptable.root);
 }

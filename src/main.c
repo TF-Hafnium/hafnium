@@ -66,6 +66,8 @@ static void one_time_init(void)
 		panic("mm_init failed");
 	}
 
+	mm_cpu_init();
+
 	/* Enable locks now that mm is initialised. */
 	dlog_enable_lock();
 	mpool_enable_locks();
@@ -150,10 +152,8 @@ struct vcpu *cpu_main(struct cpu *c)
 	if (cpu_index(c) == 0 && !inited) {
 		inited = true;
 		one_time_init();
-	}
-
-	if (!mm_cpu_init()) {
-		panic("mm_cpu_init failed");
+	} else {
+		mm_cpu_init();
 	}
 
 	vcpu = vm_get_vcpu(vm_find(HF_PRIMARY_VM_ID), cpu_index(c));
