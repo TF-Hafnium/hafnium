@@ -17,30 +17,13 @@
 #include "hf/fdt_handler.h"
 
 #include "hf/boot_params.h"
+#include "hf/check.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/fdt.h"
 #include "hf/layout.h"
 #include "hf/mm.h"
 #include "hf/std.h"
-
-static uint64_t convert_number(const char *data, uint32_t size)
-{
-	union {
-		volatile uint64_t v;
-		char a[8];
-	} t;
-
-	switch (size) {
-	case sizeof(uint32_t):
-		return be32toh(*(uint32_t *)data);
-	case sizeof(uint64_t):
-		memcpy_s(t.a, sizeof(t.a), data, sizeof(uint64_t));
-		return be64toh(t.v);
-	default:
-		return 0;
-	}
-}
 
 static bool fdt_read_number(const struct fdt_node *node, const char *name,
 			    uint64_t *value)
@@ -55,7 +38,7 @@ static bool fdt_read_number(const struct fdt_node *node, const char *name,
 	switch (size) {
 	case sizeof(uint32_t):
 	case sizeof(uint64_t):
-		*value = convert_number(data, size);
+		CHECK(fdt_parse_number(data, size, value));
 		break;
 
 	default:
@@ -163,13 +146,18 @@ void fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
 
 		/* Get all entries for this CPU. */
 		while (size >= address_size) {
+			uint64_t value;
+
 			if (*cpu_count >= MAX_CPUS) {
 				dlog("Found more than %d CPUs\n", MAX_CPUS);
 				return;
 			}
 
-			cpu_ids[(*cpu_count)++] =
-				convert_number(data, address_size);
+			if (!fdt_parse_number(data, address_size, &value)) {
+				dlog("Could not parse CPU id\n");
+				return;
+			}
+			cpu_ids[(*cpu_count)++] = value;
 
 			size -= address_size;
 			data += address_size;
@@ -219,9 +207,12 @@ void fdt_find_memory_ranges(const struct fdt_node *root, struct boot_params *p)
 
 		/* Traverse all memory ranges within this node. */
 		while (size >= entry_size) {
-			uintpaddr_t addr = convert_number(data, address_size);
-			size_t len =
-				convert_number(data + address_size, size_size);
+			uintpaddr_t addr;
+			size_t len;
+
+			CHECK(fdt_parse_number(data, address_size, &addr));
+			CHECK(fdt_parse_number(data + address_size, size_size,
+					       &len));
 
 			if (mem_range_index < MAX_MEM_RANGES) {
 				p->mem_ranges[mem_range_index].begin =

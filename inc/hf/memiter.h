@@ -29,4 +29,8 @@ void memiter_init(struct memiter *it, const void *data, size_t size);
 bool memiter_parse_uint(struct memiter *it, uint64_t *value);
 bool memiter_parse_str(struct memiter *it, struct memiter *str);
 bool memiter_iseq(const struct memiter *it, const char *str);
+void memiter_dlog_str(struct memiter *it);
 bool memiter_advance(struct memiter *it, size_t v);
+
+const void *memiter_base(struct memiter *it);
+size_t memiter_size(struct memiter *it);

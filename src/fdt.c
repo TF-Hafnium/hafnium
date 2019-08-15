@@ -16,8 +16,10 @@
 
 #include "hf/fdt.h"
 
+#include <stdalign.h>
 #include <stdint.h>
 
+#include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/std.h"
 
@@ -56,6 +58,8 @@ struct fdt_tokenizer {
 #define FDT_VERSION 17
 #define FDT_MAGIC 0xd00dfeed
 
+#define FDT_TOKEN_ALIGNMENT sizeof(uint32_t)
+
 static void fdt_tokenizer_init(struct fdt_tokenizer *t, const char *strs,
 			       const char *begin, const char *end)
 {
@@ -66,7 +70,7 @@ static void fdt_tokenizer_init(struct fdt_tokenizer *t, const char *strs,
 
 static void fdt_tokenizer_align(struct fdt_tokenizer *t)
 {
-	t->cur = (char *)align_up(t->cur, 4);
+	t->cur = (char *)align_up(t->cur, FDT_TOKEN_ALIGNMENT);
 }
 
 static bool fdt_tokenizer_uint32(struct fdt_tokenizer *t, uint32_t *res)
@@ -276,6 +280,43 @@ bool fdt_read_property(const struct fdt_node *node, const char *name,
 	return false;
 }
 
+/**
+ * Helper method for parsing 32/64-bit uints from FDT data.
+ */
+bool fdt_parse_number(const char *data, uint32_t size, uint64_t *value)
+{
+	union {
+		volatile uint64_t v;
+		char a[8];
+	} t;
+
+	/* FDT values should be aligned to 32-bit boundary. */
+	CHECK(is_aligned(data, FDT_TOKEN_ALIGNMENT));
+
+	switch (size) {
+	case sizeof(uint32_t):
+		/*
+		 * Assert that `data` is already sufficiently aligned to
+		 * dereference as uint32_t. We cannot use static_assert()
+		 * because alignof() is not an expression under ISO C11.
+		 */
+		CHECK(alignof(uint32_t) <= FDT_TOKEN_ALIGNMENT);
+		*value = be32toh(*(uint32_t *)data);
+		return true;
+	case sizeof(uint64_t):
+		/*
+		 * ARMv8 requires `data` to be realigned to 64-bit boundary
+		 * to dereference as uint64_t. May not be needed on other
+		 * architectures.
+		 */
+		memcpy_s(t.a, sizeof(t.a), data, sizeof(uint64_t));
+		*value = be64toh(t.v);
+		return true;
+	default:
+		return false;
+	}
+}
+
 bool fdt_first_child(struct fdt_node *node, const char **child_name)
 {
 	struct fdt_tokenizer t;
@@ -333,7 +374,7 @@ bool fdt_find_child(struct fdt_node *node, const char *child)
 	return false;
 }
 
-void fdt_dump(struct fdt_header *hdr)
+void fdt_dump(const struct fdt_header *hdr)
 {
 	uint32_t token;
 	size_t depth = 0;

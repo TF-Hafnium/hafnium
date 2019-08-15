@@ -22,6 +22,7 @@
 #include "hf/boot_params.h"
 #include "hf/dlog.h"
 #include "hf/layout.h"
+#include "hf/manifest.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
@@ -40,8 +41,10 @@
  * so the data must be available without the cache.
  */
 static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
-			     const void *from, size_t size, struct mpool *ppool)
+			     struct memiter *from_it, struct mpool *ppool)
 {
+	const void *from = memiter_base(from_it);
+	size_t size = memiter_size(from_it);
 	paddr_t to_end = pa_add(to, size);
 	void *ptr;
 
@@ -120,8 +123,7 @@ bool load_primary(struct mm_stage1_locked stage1_locked,
 	}
 
 	dlog("Copying primary to %p\n", pa_addr(primary_begin));
-	if (!copy_to_unmapped(stage1_locked, primary_begin, it.next,
-			      it.limit - it.next, ppool)) {
+	if (!copy_to_unmapped(stage1_locked, primary_begin, &it, ppool)) {
 		dlog("Unable to relocate kernel for primary vm.\n");
 		return false;
 	}
@@ -254,12 +256,11 @@ bool load_secondary(struct mm_stage1_locked stage1_locked,
 		    struct boot_params_update *update, struct mpool *ppool)
 {
 	struct vm *primary;
-	struct memiter it;
-	struct memiter name;
-	uint64_t mem;
-	uint64_t cpu;
+	struct manifest manifest;
+	struct memiter manifest_fdt;
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	size_t i;
+	enum manifest_return_code manifest_ret;
 
 	static_assert(
 		sizeof(mem_ranges_available) == sizeof(params->mem_ranges),
@@ -272,61 +273,74 @@ bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	primary = vm_find(HF_PRIMARY_VM_ID);
 
-	if (!find_file(cpio, "vms.txt", &it)) {
-		dlog("vms.txt is missing\n");
-		return true;
-	}
-
 	/* Round the last addresses down to the page size. */
 	for (i = 0; i < params->mem_ranges_count; ++i) {
 		mem_ranges_available[i].end = pa_init(align_down(
 			pa_addr(mem_ranges_available[i].end), PAGE_SIZE));
 	}
 
-	while (memiter_parse_uint(&it, &mem) && memiter_parse_uint(&it, &cpu) &&
-	       memiter_parse_str(&it, &name)) {
+	if (!find_file(cpio, "manifest.dtb", &manifest_fdt)) {
+		dlog("Could not find \"manifest.dtb\" in cpio.\n");
+		return false;
+	}
+
+	manifest_ret = manifest_init(&manifest, &manifest_fdt);
+	if (manifest_ret != MANIFEST_SUCCESS) {
+		dlog("Could not parse manifest: %s.\n",
+		     manifest_strerror(manifest_ret));
+		return false;
+	}
+
+	for (i = 0; i < manifest.num_vms; ++i) {
+		struct manifest_vm *manifest_vm = &manifest.vm[i];
+		spci_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
+		struct vm *vm;
+		struct vcpu *vcpu;
 		struct memiter kernel;
+		uint64_t mem_size;
 		paddr_t secondary_mem_begin;
 		paddr_t secondary_mem_end;
 		ipaddr_t secondary_entry;
-		const char *p;
-		struct vm *vm;
-		struct vcpu *vcpu;
 
-		dlog("Loading ");
-		for (p = name.next; p != name.limit; ++p) {
-			dlog("%c", *p);
-		}
-		dlog("\n");
-
-		if (!memiter_find_file(cpio, &name, &kernel)) {
-			dlog("Unable to load kernel\n");
+		if (vm_id == HF_PRIMARY_VM_ID) {
 			continue;
 		}
 
-		/* Round up to page size. */
-		mem = (mem + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+		dlog("Loading VM%d: ", (int)vm_id);
+		memiter_dlog_str(&manifest_vm->debug_name);
+		dlog(".\n");
 
-		if (mem < kernel.limit - kernel.next) {
+		if (!memiter_find_file(cpio,
+				       &manifest_vm->secondary.kernel_filename,
+				       &kernel)) {
+			dlog("Could not find kernel file \"");
+			memiter_dlog_str(
+				&manifest_vm->secondary.kernel_filename);
+			dlog("\".\n");
+			continue;
+		}
+
+		mem_size = align_up(manifest_vm->secondary.mem_size, PAGE_SIZE);
+		if (mem_size < memiter_size(&kernel)) {
 			dlog("Kernel is larger than available memory\n");
 			continue;
 		}
 
-		if (!carve_out_mem_range(
-			    mem_ranges_available, params->mem_ranges_count, mem,
-			    &secondary_mem_begin, &secondary_mem_end)) {
-			dlog("Not enough memory (%u bytes)\n", mem);
+		if (!carve_out_mem_range(mem_ranges_available,
+					 params->mem_ranges_count, mem_size,
+					 &secondary_mem_begin,
+					 &secondary_mem_end)) {
+			dlog("Not enough memory (%u bytes)\n", mem_size);
 			continue;
 		}
 
 		if (!copy_to_unmapped(stage1_locked, secondary_mem_begin,
-				      kernel.next, kernel.limit - kernel.next,
-				      ppool)) {
+				      &kernel, ppool)) {
 			dlog("Unable to copy kernel\n");
 			continue;
 		}
 
-		if (!vm_init(cpu, ppool, &vm)) {
+		if (!vm_init(manifest_vm->secondary.vcpu_count, ppool, &vm)) {
 			dlog("Unable to initialise VM\n");
 			continue;
 		}
@@ -347,7 +361,8 @@ bool load_secondary(struct mm_stage1_locked stage1_locked,
 			return false;
 		}
 
-		dlog("Loaded with %u vcpus, entry at %#x\n", cpu,
+		dlog("Loaded with %u vcpus, entry at %#x\n",
+		     manifest_vm->secondary.vcpu_count,
 		     pa_addr(secondary_mem_begin));
 
 		vcpu = vm_get_vcpu(vm, 0);
