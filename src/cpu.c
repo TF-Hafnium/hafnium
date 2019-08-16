@@ -44,12 +44,6 @@ struct cpu cpus[MAX_CPUS] = {
 
 static uint32_t cpu_count = 1;
 
-static void cpu_init(struct cpu *c)
-{
-	/* TODO: Assumes that c is zeroed out already. */
-	sl_init(&c->lock);
-}
-
 void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 {
 	uint32_t i;
@@ -71,15 +65,17 @@ void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 		cpu_id_t id = cpu_ids[i];
 
 		if (found_boot_cpu || id != boot_cpu_id) {
-			c = &cpus[--j];
+			--j;
+			c = &cpus[j];
+			c->stack_bottom = &callstacks[j][STACK_SIZE];
 		} else {
 			found_boot_cpu = true;
 			c = &cpus[0];
+			CHECK(c->stack_bottom == &callstacks[0][STACK_SIZE]);
 		}
 
-		cpu_init(c);
+		sl_init(&c->lock);
 		c->id = id;
-		c->stack_bottom = &callstacks[i][STACK_SIZE];
 	}
 
 	if (!found_boot_cpu) {
