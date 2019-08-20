@@ -1016,6 +1016,27 @@ out:
 }
 
 /**
+ * Checks whether the vCPU's attempt to block for a message has already been
+ * interrupted or whether it is allowed to block.
+ */
+bool api_spci_msg_recv_block_interrupted(struct vcpu *current)
+{
+	bool interrupted;
+
+	sl_lock(&current->lock);
+
+	/*
+	 * Don't block if there are enabled and pending interrupts, to match
+	 * behaviour of wait_for_interrupt.
+	 */
+	interrupted = (current->interrupts.enabled_and_pending_count > 0);
+
+	sl_unlock(&current->lock);
+
+	return interrupted;
+}
+
+/**
  * Receives a message from the mailbox. If one isn't available, this function
  * can optionally block the caller until one becomes available.
  *
@@ -1058,12 +1079,7 @@ int32_t api_spci_msg_recv(uint32_t attributes, struct vcpu *current,
 	 * that time to SPCI_SUCCESS.
 	 */
 	return_code = SPCI_INTERRUPTED;
-
-	/*
-	 * Don't block if there are enabled and pending interrupts, to match
-	 * behaviour of wait_for_interrupt.
-	 */
-	if (current->interrupts.enabled_and_pending_count > 0) {
+	if (api_spci_msg_recv_block_interrupted(current)) {
 		goto out;
 	}
 
