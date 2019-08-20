@@ -1675,16 +1675,21 @@ int32_t api_spci_version(void)
 
 int64_t api_debug_log(char c, struct vcpu *current)
 {
+	bool flush;
 	struct vm *vm = current->vm;
 	struct vm_locked vm_locked = vm_lock(vm);
 
-	if (c == '\n' || c == '\0' ||
-	    vm->log_buffer_length == sizeof(vm->log_buffer)) {
+	if (c == '\n' || c == '\0') {
+		flush = true;
+	} else {
+		vm->log_buffer[vm->log_buffer_length++] = c;
+		flush = (vm->log_buffer_length == sizeof(vm->log_buffer));
+	}
+
+	if (flush) {
 		dlog_flush_vm_buffer(vm->id, vm->log_buffer,
 				     vm->log_buffer_length);
 		vm->log_buffer_length = 0;
-	} else {
-		vm->log_buffer[vm->log_buffer_length++] = c;
 	}
 
 	vm_unlock(&vm_locked);
