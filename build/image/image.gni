@@ -164,7 +164,9 @@ template("device_tree") {
       dtb_file,
     ]
     args = [
+      "-i",
       "{{source}}",
+      "-o",
       rebase_path(dtb_file),
     ]
   }
