@@ -144,6 +144,12 @@ class ManifestDtBuilder
 		return *this;
 	}
 
+	ManifestDtBuilder &Compatible(const std::vector<std::string_view>
+					      &value = {"hafnium,hafnium"})
+	{
+		return StringListProperty("compatible", value);
+	}
+
 	ManifestDtBuilder &DebugName(const std::string_view &value)
 	{
 		return StringProperty("debug_name", value);
@@ -172,6 +178,25 @@ class ManifestDtBuilder
 		return *this;
 	}
 
+	ManifestDtBuilder &StringListProperty(
+		const std::string_view &name,
+		const std::vector<std::string_view> &value)
+	{
+		bool is_first = true;
+
+		dts_ << name << " = ";
+		for (const std::string_view &entry : value) {
+			if (is_first) {
+				is_first = false;
+			} else {
+				dts_ << ", ";
+			}
+			dts_ << "\"" << entry << "\"";
+		}
+		dts_ << ";" << std::endl;
+		return *this;
+	}
+
 	ManifestDtBuilder &IntegerProperty(const std::string_view &name,
 					   uint64_t value)
 	{
@@ -193,7 +218,7 @@ TEST(manifest, no_hypervisor_node)
 		  MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE);
 }
 
-TEST(manifest, no_vms)
+TEST(manifest, no_compatible_property)
 {
 	struct manifest m;
 	struct memiter it;
@@ -206,10 +231,10 @@ TEST(manifest, no_vms)
 	/* clang-format on */
 
 	memiter_init(&it, dtb.data(), dtb.size());
-	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_ERROR_NO_PRIMARY_VM);
+	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 }
 
-TEST(manifest, reserved_vmid)
+TEST(manifest, not_compatible)
 {
 	struct manifest m;
 	struct memiter it;
@@ -217,6 +242,61 @@ TEST(manifest, reserved_vmid)
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
 		.StartChild("hypervisor")
+			.Compatible({ "foo,bar" })
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	memiter_init(&it, dtb.data(), dtb.size());
+	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_ERROR_NOT_COMPATIBLE);
+}
+
+TEST(manifest, compatible_one_of_many)
+{
+	struct manifest m;
+	struct memiter it;
+
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible({ "foo,bar", "hafnium,hafnium" })
+			.StartChild("vm1")
+				.DebugName("primary")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	memiter_init(&it, dtb.data(), dtb.size());
+	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_SUCCESS);
+}
+
+TEST(manifest, no_vm_nodes)
+{
+	struct manifest m;
+	struct memiter it;
+
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	memiter_init(&it, dtb.data(), dtb.size());
+	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_ERROR_NO_PRIMARY_VM);
+}
+
+TEST(manifest, reserved_vm_id)
+{
+	struct manifest m;
+	struct memiter it;
+
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
 			.EndChild()
@@ -239,6 +319,7 @@ static std::vector<char> gen_vcpu_count_limit_dtb(uint64_t vcpu_count)
 	/* clang-format off */
 	return ManifestDtBuilder()
 		.StartChild("hypervisor")
+			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
 			.EndChild()
@@ -279,6 +360,7 @@ TEST(manifest, valid)
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
 		.StartChild("hypervisor")
+			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
 			.EndChild()

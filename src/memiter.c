@@ -153,7 +153,7 @@ bool memiter_advance(struct memiter *it, size_t v)
 	return true;
 }
 
-const void *memiter_base(struct memiter *it)
+const void *memiter_base(const struct memiter *it)
 {
 	return (const void *)it->next;
 }
@@ -161,7 +161,7 @@ const void *memiter_base(struct memiter *it)
 /**
  * Returns the number of bytes in interval [it.next, it.limit).
  */
-size_t memiter_size(struct memiter *it)
+size_t memiter_size(const struct memiter *it)
 {
 	return it->limit - it->next;
 }

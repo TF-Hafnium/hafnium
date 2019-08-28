@@ -64,7 +64,11 @@ static enum manifest_return_code read_string(const struct fdt_node *node,
 		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
 	}
 
-	if (data[size - 1] != '\0') {
+	/*
+	 * Require that the value contains exactly one NULL character and that
+	 * it is the last byte.
+	 */
+	if (memchr(data, '\0', size) != &data[size - 1]) {
 		return MANIFEST_ERROR_MALFORMED_STRING;
 	}
 
@@ -106,6 +110,87 @@ static enum manifest_return_code read_uint16(const struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
+/**
+ * Represents the value of property whose type is a list of strings. These are
+ * encoded as one contiguous byte buffer with NULL-separated entries.
+ */
+struct stringlist_iter {
+	struct memiter mem_it;
+};
+
+static enum manifest_return_code read_stringlist(const struct fdt_node *node,
+						 const char *property,
+						 struct stringlist_iter *out)
+{
+	const char *data;
+	uint32_t size;
+
+	if (!fdt_read_property(node, property, &data, &size)) {
+		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
+	}
+
+	/*
+	 * Require that the value ends with a NULL terminator. Other NULL
+	 * characters separate the string list entries.
+	 */
+	if (data[size - 1] != '\0') {
+		return MANIFEST_ERROR_MALFORMED_STRING_LIST;
+	}
+
+	memiter_init(&out->mem_it, data, size - 1);
+	return MANIFEST_SUCCESS;
+}
+
+static bool stringlist_has_next(const struct stringlist_iter *list)
+{
+	return memiter_size(&list->mem_it) > 0;
+}
+
+static void stringlist_get_next(struct stringlist_iter *list,
+				struct memiter *out)
+{
+	const char *mem_base = memiter_base(&list->mem_it);
+	size_t mem_size = memiter_size(&list->mem_it);
+	const char *null_term;
+
+	CHECK(stringlist_has_next(list));
+
+	null_term = memchr(mem_base, '\0', mem_size);
+	if (null_term == NULL) {
+		/*
+		 * NULL terminator not found, this is the last entry.
+		 * Set entry memiter to the entire byte range and advance list
+		 * memiter to the end of the byte range.
+		 */
+		memiter_init(out, mem_base, mem_size);
+		memiter_advance(&list->mem_it, mem_size);
+	} else {
+		/*
+		 * Found NULL terminator. Set entry memiter to byte range
+		 * [base, null) and move list memiter past the terminator.
+		 */
+		size_t entry_size = null_term - mem_base;
+
+		memiter_init(out, mem_base, entry_size);
+		memiter_advance(&list->mem_it, entry_size + 1);
+	}
+}
+
+static bool stringlist_contains(const struct stringlist_iter *list,
+				const char *str)
+{
+	struct stringlist_iter it = *list;
+	struct memiter entry;
+
+	while (stringlist_has_next(&it)) {
+		stringlist_get_next(&it, &entry);
+		if (memiter_iseq(&entry, str)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 static enum manifest_return_code parse_vm(struct fdt_node *node,
 					  struct manifest_vm *vm,
 					  spci_vm_id_t vm_id)
@@ -128,6 +213,7 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 {
 	char vm_name_buf[VM_NAME_BUF_SIZE];
 	struct fdt_node hyp_node;
+	struct stringlist_iter compatible_list;
 	size_t i = 0;
 	bool found_primary_vm = false;
 
@@ -143,6 +229,12 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 	}
 	if (!fdt_find_child(&hyp_node, "hypervisor")) {
 		return MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE;
+	}
+
+	/* Check "compatible" property. */
+	TRY(read_stringlist(&hyp_node, "compatible", &compatible_list));
+	if (!stringlist_contains(&compatible_list, "hafnium,hafnium")) {
+		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
 	/* Iterate over reserved VM IDs and check no such nodes exist. */
@@ -197,6 +289,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Could not find root node of manifest";
 	case MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE:
 		return "Could not find \"hypervisor\" node in manifest";
+	case MANIFEST_ERROR_NOT_COMPATIBLE:
+		return "Hypervisor manifest entry not compatible with Hafnium";
 	case MANIFEST_ERROR_RESERVED_VM_ID:
 		return "Manifest defines a VM with a reserved ID";
 	case MANIFEST_ERROR_NO_PRIMARY_VM:
@@ -208,6 +302,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Property not found";
 	case MANIFEST_ERROR_MALFORMED_STRING:
 		return "Malformed string property";
+	case MANIFEST_ERROR_MALFORMED_STRING_LIST:
+		return "Malformed string list property";
 	case MANIFEST_ERROR_MALFORMED_INTEGER:
 		return "Malformed integer property";
 	case MANIFEST_ERROR_INTEGER_OVERFLOW:

@@ -16,7 +16,7 @@
 
 #include "hf/std.h"
 
-#include "hf/panic.h"
+#include "hf/check.h"
 
 /* Declare unsafe functions locally so they are not available globally. */
 void *memset(void *s, int c, size_t n);
@@ -86,6 +86,30 @@ void memmove_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
 	CHECK_OR_ZERO_FILL(count <= destsz, dest, destsz);
 
 	memmove(dest, src, count);
+}
+
+/**
+ * Finds the first occurrence of character `ch` in the first `count` bytes of
+ * memory pointed to by `ptr`.
+ *
+ * Returns NULL if `ch` is not found.
+ * Panics if `ptr` is NULL (undefined behaviour).
+ */
+void *memchr(const void *ptr, int ch, size_t count)
+{
+	size_t i;
+	const unsigned char *p = (const unsigned char *)ptr;
+
+	CHECK(ptr != NULL);
+
+	/* Iterate over at most `strsz` characters of `str`. */
+	for (i = 0; i < count; ++i) {
+		if (p[i] == (unsigned char)ch) {
+			return (void *)(&p[i]);
+		}
+	}
+
+	return NULL;
 }
 
 /**
