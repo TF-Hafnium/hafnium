@@ -287,6 +287,59 @@ static bool smc_forwarder(const struct vcpu *vcpu, smc_res_t *ret)
 	return false;
 }
 
+static bool spci_handler(uintreg_t func, uintreg_t arg1, uintreg_t arg2,
+			 uintreg_t arg3, uintreg_t *ret, struct vcpu **next)
+{
+	(void)arg2;
+	(void)arg3;
+
+	switch (func & ~SMCCC_CONVENTION_MASK) {
+	case SPCI_VERSION_32:
+		*ret = api_spci_version();
+		return true;
+	case SPCI_YIELD_32:
+		*ret = api_spci_yield(current(), next);
+		return true;
+	case SPCI_MSG_SEND_32:
+		*ret = api_spci_msg_send(arg1, current(), next);
+		return true;
+	case SPCI_MSG_RECV_32:
+		*ret = api_spci_msg_recv(arg1, current(), next);
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Set or clear VI bit according to pending interrupts.
+ */
+static void update_vi(struct vcpu *next)
+{
+	if (next == NULL) {
+		/*
+		 * Not switching vCPUs, set the bit for the current vCPU
+		 * directly in the register.
+		 */
+		struct vcpu *vcpu = current();
+
+		sl_lock(&vcpu->lock);
+		set_virtual_interrupt_current(
+			vcpu->interrupts.enabled_and_pending_count > 0);
+		sl_unlock(&vcpu->lock);
+	} else {
+		/*
+		 * About to switch vCPUs, set the bit for the vCPU to which we
+		 * are switching in the saved copy of the register.
+		 */
+		sl_lock(&next->lock);
+		set_virtual_interrupt(
+			&next->regs,
+			next->interrupts.enabled_and_pending_count > 0);
+		sl_unlock(&next->lock);
+	}
+}
+
 /**
  * Processes SMC instruction calls.
  */
@@ -295,7 +348,7 @@ static bool smc_handler(struct vcpu *vcpu, smc_res_t *ret, struct vcpu **next)
 	uint32_t func = vcpu->regs.r[0];
 
 	if (psci_handler(vcpu, func, vcpu->regs.r[1], vcpu->regs.r[2],
-			 vcpu->regs.r[3], &(ret->res0), next)) {
+			 vcpu->regs.r[3], &ret->res0, next)) {
 		/* SMC PSCI calls are processed by the PSCI handler. */
 		return true;
 	}
@@ -322,11 +375,12 @@ struct hvc_handler_return hvc_handler(uintreg_t arg0, uintreg_t arg1,
 		return ret;
 	}
 
-	switch ((uint32_t)arg0) {
-	case SPCI_VERSION_32:
-		ret.user_ret = api_spci_version();
-		break;
+	if (spci_handler(arg0, arg1, arg2, arg3, &ret.user_ret, &ret.new)) {
+		update_vi(ret.new);
+		return ret;
+	}
 
+	switch ((uint32_t)arg0) {
 	case HF_VM_GET_ID:
 		ret.user_ret = api_vm_get_id(current());
 		break;
@@ -344,21 +398,9 @@ struct hvc_handler_return hvc_handler(uintreg_t arg0, uintreg_t arg1,
 			api_vcpu_run(arg1, arg2, current(), &ret.new));
 		break;
 
-	case SPCI_YIELD_32:
-		ret.user_ret = api_spci_yield(current(), &ret.new);
-		break;
-
 	case HF_VM_CONFIGURE:
 		ret.user_ret = api_vm_configure(ipa_init(arg1), ipa_init(arg2),
 						current(), &ret.new);
-		break;
-
-	case SPCI_MSG_SEND_32:
-		ret.user_ret = api_spci_msg_send(arg1, current(), &ret.new);
-		break;
-
-	case SPCI_MSG_RECV_32:
-		ret.user_ret = api_spci_msg_recv(arg1, current(), &ret.new);
 		break;
 
 	case HF_MAILBOX_CLEAR:
@@ -400,29 +442,7 @@ struct hvc_handler_return hvc_handler(uintreg_t arg0, uintreg_t arg1,
 		ret.user_ret = -1;
 	}
 
-	/* Set or clear VI bit. */
-	if (ret.new == NULL) {
-		/*
-		 * Not switching vCPUs, set the bit for the current vCPU
-		 * directly in the register.
-		 */
-		struct vcpu *vcpu = current();
-
-		sl_lock(&vcpu->lock);
-		set_virtual_interrupt_current(
-			vcpu->interrupts.enabled_and_pending_count > 0);
-		sl_unlock(&vcpu->lock);
-	} else {
-		/*
-		 * About to switch vCPUs, set the bit for the vCPU to which we
-		 * are switching in the saved copy of the register.
-		 */
-		sl_lock(&ret.new->lock);
-		set_virtual_interrupt(
-			&ret.new->regs,
-			ret.new->interrupts.enabled_and_pending_count > 0);
-		sl_unlock(&ret.new->lock);
-	}
+	update_vi(ret.new);
 
 	return ret;
 }
