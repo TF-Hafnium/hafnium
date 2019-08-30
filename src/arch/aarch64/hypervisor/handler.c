@@ -408,6 +408,11 @@ static void smc_handler(struct vcpu *vcpu, struct spci_value *ret,
 		return;
 	}
 
+	if (spci_handler(ret, next)) {
+		update_vi(*next);
+		return;
+	}
+
 	switch (func & ~SMCCC_CONVENTION_MASK) {
 	case HF_DEBUG_LOG:
 		ret->func = api_debug_log(vcpu->regs.r[1], vcpu);
