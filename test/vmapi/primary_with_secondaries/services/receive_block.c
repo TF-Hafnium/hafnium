@@ -46,7 +46,7 @@ TEST_SERVICE(receive_block)
 	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
 
 	for (i = 0; i < 10; ++i) {
-		int32_t res = spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+		int32_t res = spci_msg_wait();
 		EXPECT_EQ(res, SPCI_INTERRUPTED);
 	}
 

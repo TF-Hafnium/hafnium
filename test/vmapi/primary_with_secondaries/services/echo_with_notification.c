@@ -53,7 +53,7 @@ TEST_SERVICE(echo_with_notification)
 
 	/* Loop, echo messages back to the sender. */
 	for (;;) {
-		spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+		spci_msg_wait();
 
 		struct spci_message *send_buf = SERVICE_SEND_BUFFER();
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();

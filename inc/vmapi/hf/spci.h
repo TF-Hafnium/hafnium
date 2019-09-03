@@ -26,24 +26,31 @@
 #define SPCI_HIGH_32_ID 0x8400007F
 
 /* SPCI function identifiers. */
-#define SPCI_VERSION_32               0x84000060
-#define SPCI_MSG_BUF_LIST_EXCHANGE_32 0x84000061
-#define SPCI_MSG_RECV_32              0x84000062
-#define SPCI_MSG_PUT_32               0x84000063
-#define SPCI_MSG_SEND_32              0x84000064
-#define SPCI_MSG_SEND_REC_32          0x84000065
-#define SPCI_RUN_32                   0x84000066
-#define SPCI_YIELD_32                 0x84000067
+#define SPCI_ERROR_32                 0x84000060
+#define SPCI_SUCCESS_32               0x84000061
+#define SPCI_INTERRUPT_32             0x84000062
+#define SPCI_VERSION_32               0x84000063
+#define SPCI_RX_RELEASE_32            0x84000064
+#define SPCI_RXTX_MAP_32              0x84000065
+#define SPCI_RXTX_UNMAP_32            0x84000066
+#define SPCI_PARTITION_INFO_GET_32    0x84000067
+#define SPCI_ID_GET_32                0x84000068
+#define SPCI_MSG_WAIT_32              0x84000069
+#define SPCI_MSG_POLL_32              0x8400006A
+#define SPCI_YIELD_32                 0x8400006B
+#define SPCI_MSG_SEND_32              0x8400006C
+#define SPCI_RUN_32                   0x8400006D
+#define SPCI_MSG_SEND_DIRECT_REQ_32   0x8400006E
+#define SPCI_MSG_SEND_DIRECT_RESP_32  0x8400006F
 
-/* SPCI return codes. */
 #define SPCI_SUCCESS            INT32_C(0)
+/* SPCI error codes. */
 #define SPCI_NOT_SUPPORTED      INT32_C(-1)
 #define SPCI_INVALID_PARAMETERS INT32_C(-2)
 #define SPCI_NO_MEMORY          INT32_C(-3)
 #define SPCI_BUSY               INT32_C(-4)
 #define SPCI_INTERRUPTED        INT32_C(-5)
 #define SPCI_DENIED             INT32_C(-6)
-/* TODO: return code currently undefined in SPCI alpha2. */
 #define SPCI_RETRY              INT32_C(-7)
 
 /* Architected memory sharing message IDs. */

@@ -113,7 +113,7 @@ TEST_SERVICE(timer)
 				event_wait();
 			}
 		} else if (receive) {
-			int32_t res = spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+			int32_t res = spci_msg_wait();
 
 			EXPECT_EQ(res, SPCI_INTERRUPTED);
 		} else {

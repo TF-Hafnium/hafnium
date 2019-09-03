@@ -1040,13 +1040,10 @@ bool api_spci_msg_recv_block_interrupted(struct vcpu *current)
  *
  * No new messages can be received until the mailbox has been cleared.
  */
-int32_t api_spci_msg_recv(uint32_t attributes, struct vcpu *current,
-			  struct vcpu **next)
+int32_t api_spci_msg_recv(bool block, struct vcpu *current, struct vcpu **next)
 {
 	struct vm *vm = current->vm;
 	int32_t return_code;
-	bool block =
-		(attributes & SPCI_MSG_RECV_BLOCK_MASK) == SPCI_MSG_RECV_BLOCK;
 
 	/*
 	 * The primary VM will receive messages as a status code from running

@@ -303,8 +303,11 @@ static bool spci_handler(uintreg_t func, uintreg_t arg1, uintreg_t arg2,
 	case SPCI_MSG_SEND_32:
 		*ret = api_spci_msg_send(arg1, current(), next);
 		return true;
-	case SPCI_MSG_RECV_32:
-		*ret = api_spci_msg_recv(arg1, current(), next);
+	case SPCI_MSG_WAIT_32:
+		*ret = api_spci_msg_recv(true, current(), next);
+		return true;
+	case SPCI_MSG_POLL_32:
+		*ret = api_spci_msg_recv(false, current(), next);
 		return true;
 	}
 

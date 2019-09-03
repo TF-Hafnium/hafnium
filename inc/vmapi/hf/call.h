@@ -125,17 +125,16 @@ static inline int64_t spci_msg_send(uint32_t attributes)
 }
 
 /**
- * Called by secondary VMs to receive a message. The call can optionally block
- * until a message is received.
+ * Called by secondary VMs to receive a message. This will block until a message
+ * is received.
  *
  * The mailbox must be cleared before a new message can be received.
  *
- * If no message is immediately available, `block` is true, and there are no
- * enabled and pending interrupts (irrespective of whether interrupts are
- * enabled globally), then this will block until a message is available or an
- * enabled interrupt becomes pending. This matches the behaviour of the WFI
- * instruction on aarch64, except that a message becoming available is also
- * treated like a wake-up event.
+ * If no message is immediately available and there are no enabled and pending
+ * interrupts (irrespective of whether interrupts are enabled globally), then
+ * this will block until a message is available or an enabled interrupt becomes
+ * pending. This matches the behaviour of the WFI instruction on aarch64, except
+ * that a message becoming available is also treated like a wake-up event.
  *
  * Returns:
  *  - SPCI_SUCCESS if a message is successfully received.
@@ -143,9 +142,26 @@ static inline int64_t spci_msg_send(uint32_t attributes)
  *    during the call.
  *  - SPCI_RETRY if there was no pending message, and `block` was false.
  */
-static inline int32_t spci_msg_recv(int32_t attributes)
+static inline int32_t spci_msg_wait(void)
 {
-	return hf_call(SPCI_MSG_RECV_32, attributes, 0, 0);
+	return hf_call(SPCI_MSG_WAIT_32, 0, 0, 0);
+}
+
+/**
+ * Called by secondary VMs to receive a message. The call will return whether or
+ * not a message is available.
+ *
+ * The mailbox must be cleared before a new message can be received.
+ *
+ * Returns:
+ *  - SPCI_SUCCESS if a message is successfully received.
+ *  - SPCI_INTERRUPTED if the caller is the primary VM or an interrupt happened
+ *    during the call.
+ *  - SPCI_RETRY if there was no pending message, and `block` was false.
+ */
+static inline int32_t spci_msg_poll(void)
+{
+	return hf_call(SPCI_MSG_POLL_32, 0, 0, 0);
 }
 
 /**

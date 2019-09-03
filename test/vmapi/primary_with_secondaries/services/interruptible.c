@@ -56,7 +56,7 @@ int32_t mailbox_receive_retry()
 	int32_t received;
 
 	do {
-		received = spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+		received = spci_msg_wait();
 	} while (received == SPCI_INTERRUPTED);
 
 	return received;

@@ -41,7 +41,7 @@ TEST_SERVICE(spci_check)
 	};
 
 	/* Wait for single message to be sent by the primary VM. */
-	spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+	spci_msg_wait();
 
 	/* Ensure message header has all fields correctly set. */
 	EXPECT_EQ(recv_buf->flags, expected_message.flags);
@@ -70,7 +70,7 @@ TEST_SERVICE(spci_length)
 	const char message[] = "this should be truncated";
 
 	/* Wait for single message to be sent by the primary VM. */
-	spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+	spci_msg_wait();
 
 	/* Verify the length is as expected. */
 	EXPECT_EQ(16, recv_buf->length);
@@ -85,7 +85,7 @@ TEST_SERVICE(spci_length)
 TEST_SERVICE(spci_recv_non_blocking)
 {
 	/* Wait for single message to be sent by the primary VM. */
-	EXPECT_EQ(spci_msg_recv(0), SPCI_RETRY);
+	EXPECT_EQ(spci_msg_poll(), SPCI_RETRY);
 
 	spci_yield();
 }

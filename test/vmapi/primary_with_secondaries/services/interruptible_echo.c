@@ -38,14 +38,14 @@ TEST_SERVICE(interruptible_echo)
 	arch_irq_enable();
 
 	for (;;) {
-		uint32_t res = spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+		uint32_t res = spci_msg_wait();
 		struct spci_message *message = SERVICE_SEND_BUFFER();
 		struct spci_message *recv_message = SERVICE_RECV_BUFFER();
 
 		/* Retry if interrupted but made visible with the yield. */
 		while (res == SPCI_INTERRUPTED) {
 			spci_yield();
-			res = spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+			res = spci_msg_wait();
 		}
 
 		memcpy_s(message->payload, SPCI_MSG_PAYLOAD_MAX,

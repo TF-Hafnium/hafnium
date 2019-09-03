@@ -28,7 +28,7 @@ TEST_SERVICE(memory_increment)
 {
 	/* Loop, writing message to the shared memory. */
 	for (;;) {
-		EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), 0);
+		EXPECT_EQ(spci_msg_wait(), 0);
 		uint8_t *ptr;
 		size_t i;
 
@@ -60,7 +60,7 @@ TEST_SERVICE(memory_lend_relinquish_spci)
 {
 	/* Loop, giving memory back to the sender. */
 	for (;;) {
-		spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+		spci_msg_wait();
 		uint8_t *ptr;
 
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -98,7 +98,7 @@ TEST_SERVICE(memory_return)
 {
 	/* Loop, giving memory back to the sender. */
 	for (;;) {
-		EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), 0);
+		EXPECT_EQ(spci_msg_wait(), 0);
 		uint8_t *ptr;
 
 		/* Check the memory was cleared. */
@@ -179,7 +179,7 @@ TEST_SERVICE(spci_memory_return)
 {
 	/* Loop, giving memory back to the sender. */
 	for (;;) {
-		EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), 0);
+		EXPECT_EQ(spci_msg_wait(), 0);
 		uint8_t *ptr;
 
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -211,7 +211,7 @@ TEST_SERVICE(spci_memory_return)
 
 TEST_SERVICE(spci_donate_check_upper_bound)
 {
-	EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), 0);
+	EXPECT_EQ(spci_msg_wait(), 0);
 	uint8_t *ptr;
 
 	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -227,7 +227,7 @@ TEST_SERVICE(spci_donate_check_upper_bound)
 
 TEST_SERVICE(spci_donate_check_lower_bound)
 {
-	EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), 0);
+	EXPECT_EQ(spci_msg_wait(), 0);
 	uint8_t *ptr;
 
 	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -246,7 +246,7 @@ TEST_SERVICE(spci_donate_check_lower_bound)
  */
 TEST_SERVICE(spci_donate_secondary_and_fault)
 {
-	EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), 0);
+	EXPECT_EQ(spci_msg_wait(), 0);
 	uint8_t *ptr;
 
 	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -274,7 +274,7 @@ TEST_SERVICE(spci_donate_secondary_and_fault)
  */
 TEST_SERVICE(spci_donate_twice)
 {
-	EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), 0);
+	EXPECT_EQ(spci_msg_wait(), 0);
 
 	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
 	struct spci_message *send_buf = SERVICE_SEND_BUFFER();
@@ -307,7 +307,7 @@ TEST_SERVICE(spci_donate_twice)
 TEST_SERVICE(spci_memory_receive)
 {
 	for (;;) {
-		EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), 0);
+		EXPECT_EQ(spci_msg_wait(), 0);
 		uint8_t *ptr;
 
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -330,7 +330,7 @@ TEST_SERVICE(spci_memory_receive)
  */
 TEST_SERVICE(spci_donate_invalid_source)
 {
-	EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), 0);
+	EXPECT_EQ(spci_msg_wait(), 0);
 
 	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
 	struct spci_message *send_buf = SERVICE_SEND_BUFFER();
@@ -356,7 +356,7 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 {
 	/* Loop, giving memory back to the sender. */
 	for (;;) {
-		EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), SPCI_SUCCESS);
+		EXPECT_EQ(spci_msg_wait(), SPCI_SUCCESS);
 		uint8_t *ptr;
 
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -396,7 +396,7 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 TEST_SERVICE(spci_memory_donate_relinquish)
 {
 	for (;;) {
-		EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), SPCI_SUCCESS);
+		EXPECT_EQ(spci_msg_wait(), SPCI_SUCCESS);
 		uint8_t *ptr;
 
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -429,7 +429,7 @@ TEST_SERVICE(spci_memory_donate_relinquish)
  */
 TEST_SERVICE(spci_lend_invalid_source)
 {
-	EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), SPCI_SUCCESS);
+	EXPECT_EQ(spci_msg_wait(), SPCI_SUCCESS);
 
 	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
 	struct spci_message *send_buf = SERVICE_SEND_BUFFER();
@@ -465,7 +465,7 @@ TEST_SERVICE(spci_lend_invalid_source)
 TEST_SERVICE(spci_memory_lend_relinquish_X)
 {
 	for (;;) {
-		EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), SPCI_SUCCESS);
+		EXPECT_EQ(spci_msg_wait(), SPCI_SUCCESS);
 		uint64_t *ptr;
 
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -499,7 +499,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_X)
 TEST_SERVICE(spci_memory_lend_relinquish_RW)
 {
 	for (;;) {
-		EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), SPCI_SUCCESS);
+		EXPECT_EQ(spci_msg_wait(), SPCI_SUCCESS);
 		uint8_t *ptr;
 
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -537,7 +537,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
  */
 TEST_SERVICE(spci_lend_check_lower_bound)
 {
-	EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), SPCI_SUCCESS);
+	EXPECT_EQ(spci_msg_wait(), SPCI_SUCCESS);
 	uint8_t *ptr;
 
 	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -557,7 +557,7 @@ TEST_SERVICE(spci_lend_check_lower_bound)
  */
 TEST_SERVICE(spci_lend_check_upper_bound)
 {
-	EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), SPCI_SUCCESS);
+	EXPECT_EQ(spci_msg_wait(), SPCI_SUCCESS);
 	uint8_t *ptr;
 
 	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
@@ -574,7 +574,7 @@ TEST_SERVICE(spci_lend_check_upper_bound)
 
 TEST_SERVICE(spci_memory_lend_twice)
 {
-	EXPECT_EQ(spci_msg_recv(SPCI_MSG_RECV_BLOCK), SPCI_SUCCESS);
+	EXPECT_EQ(spci_msg_wait(), SPCI_SUCCESS);
 	uint8_t *ptr;
 
 	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();

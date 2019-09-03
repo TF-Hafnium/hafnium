@@ -83,7 +83,7 @@ noreturn void kmain(size_t memory_size)
 		struct spci_message *recv_buf = (struct spci_message *)recv;
 
 		/* Receive the packet. */
-		spci_msg_recv(SPCI_MSG_RECV_BLOCK);
+		spci_msg_wait();
 		EXPECT_LE(recv_buf->length, SPCI_MSG_PAYLOAD_MAX);
 
 		/* Echo the message back to the sender. */
