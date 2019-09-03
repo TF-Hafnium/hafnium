@@ -43,7 +43,7 @@ TEST_SERVICE(memory_increment)
 		}
 
 		/* Allow the memory to be populated. */
-		EXPECT_EQ(spci_yield(), SPCI_SUCCESS);
+		EXPECT_EQ(spci_yield().func, SPCI_SUCCESS_32);
 
 		/* Increment each byte of memory. */
 		for (i = 0; i < PAGE_SIZE; ++i) {

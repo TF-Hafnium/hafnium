@@ -111,7 +111,7 @@ TEST(hf_vcpu_run, cannot_run_absent_secondary)
  */
 TEST(spci_yield, yield_is_noop_for_primary)
 {
-	EXPECT_EQ(spci_yield(), SPCI_SUCCESS);
+	EXPECT_EQ(spci_yield().func, SPCI_SUCCESS_32);
 }
 
 /**

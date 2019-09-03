@@ -310,7 +310,11 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 		*args = api_spci_version();
 		return true;
 	case SPCI_YIELD_32:
-		args->func = api_spci_yield(current(), next);
+		api_yield(current(), next);
+
+		/* SPCI_YIELD always returns SPCI_SUCCESS. */
+		*args = (struct spci_value){.func = SPCI_SUCCESS_32};
+
 		return true;
 	case SPCI_MSG_SEND_32:
 		args->func = api_spci_msg_send(args->arg1, current(), next);
@@ -552,7 +556,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 			 * TODO: consider giving the scheduler more context,
 			 * somehow.
 			 */
-			api_spci_yield(vcpu, &new_vcpu);
+			api_yield(vcpu, &new_vcpu);
 			return new_vcpu;
 		}
 		/* WFI */

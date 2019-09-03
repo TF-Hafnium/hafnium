@@ -89,9 +89,9 @@ static inline struct hf_vcpu_run_return hf_vcpu_run(spci_vm_id_t vm_id,
  * Hints that the vcpu is willing to yield its current use of the physical CPU.
  * This call always returns SPCI_SUCCESS.
  */
-static inline int64_t spci_yield(void)
+static inline struct spci_value spci_yield(void)
 {
-	return hf_call(SPCI_YIELD_32, 0, 0, 0);
+	return spci_call((struct spci_value){.func = SPCI_YIELD_32});
 }
 
 /**
