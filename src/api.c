@@ -1653,7 +1653,7 @@ out:
 }
 
 /** Returns the version of the implemented SPCI specification. */
-int32_t api_spci_version(void)
+struct spci_value api_spci_version(void)
 {
 	/*
 	 * Ensure that both major and minor revision representation occupies at
@@ -1664,8 +1664,11 @@ int32_t api_spci_version(void)
 	static_assert(0x10000 > SPCI_VERSION_MINOR,
 		      "Minor revision representation take more than 16 bits.");
 
-	return (SPCI_VERSION_MAJOR << SPCI_VERSION_MAJOR_OFFSET) |
-	       SPCI_VERSION_MINOR;
+	struct spci_value ret = {
+		.func = SPCI_SUCCESS_32,
+		.arg1 = (SPCI_VERSION_MAJOR << SPCI_VERSION_MAJOR_OFFSET) |
+			SPCI_VERSION_MINOR};
+	return ret;
 }
 
 int64_t api_debug_log(char c, struct vcpu *current)

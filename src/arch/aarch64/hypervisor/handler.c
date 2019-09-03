@@ -303,33 +303,23 @@ static bool smc_forwarder(const struct vcpu *vcpu, smc_res_t *ret)
 	return false;
 }
 
-static bool spci_handler(uintreg_t func, uintreg_t arg1, uintreg_t arg2,
-			 uintreg_t arg3, uintreg_t arg4, uintreg_t arg5,
-			 uintreg_t arg6, uintreg_t arg7, uintreg_t *ret,
-			 struct vcpu **next)
+static bool spci_handler(struct spci_value *args, struct vcpu **next)
 {
-	(void)arg2;
-	(void)arg3;
-	(void)arg4;
-	(void)arg5;
-	(void)arg6;
-	(void)arg7;
-
-	switch (func & ~SMCCC_CONVENTION_MASK) {
+	switch (args->func & ~SMCCC_CONVENTION_MASK) {
 	case SPCI_VERSION_32:
-		*ret = api_spci_version();
+		*args = api_spci_version();
 		return true;
 	case SPCI_YIELD_32:
-		*ret = api_spci_yield(current(), next);
+		args->func = api_spci_yield(current(), next);
 		return true;
 	case SPCI_MSG_SEND_32:
-		*ret = api_spci_msg_send(arg1, current(), next);
+		args->func = api_spci_msg_send(args->arg1, current(), next);
 		return true;
 	case SPCI_MSG_WAIT_32:
-		*ret = api_spci_msg_recv(true, current(), next);
+		args->func = api_spci_msg_recv(true, current(), next);
 		return true;
 	case SPCI_MSG_POLL_32:
-		*ret = api_spci_msg_recv(false, current(), next);
+		args->func = api_spci_msg_recv(false, current(), next);
 		return true;
 	}
 
@@ -390,28 +380,37 @@ static bool smc_handler(struct vcpu *vcpu, smc_res_t *ret, struct vcpu **next)
 
 struct vcpu *hvc_handler(struct vcpu *vcpu)
 {
-	uint32_t func = vcpu->regs.r[0];
-	uintreg_t arg1 = vcpu->regs.r[1];
-	uintreg_t arg2 = vcpu->regs.r[2];
-	uintreg_t arg3 = vcpu->regs.r[3];
-	uintreg_t arg4 = vcpu->regs.r[4];
-	uintreg_t arg5 = vcpu->regs.r[5];
-	uintreg_t arg6 = vcpu->regs.r[6];
-	uintreg_t arg7 = vcpu->regs.r[7];
+	struct spci_value args = {
+		.func = vcpu->regs.r[0],
+		.arg1 = vcpu->regs.r[1],
+		.arg2 = vcpu->regs.r[2],
+		.arg3 = vcpu->regs.r[3],
+		.arg4 = vcpu->regs.r[4],
+		.arg5 = vcpu->regs.r[5],
+		.arg6 = vcpu->regs.r[6],
+		.arg7 = vcpu->regs.r[7],
+	};
 	struct vcpu *next = NULL;
 
-	if (psci_handler(vcpu, func, arg1, arg2, arg3, &vcpu->regs.r[0],
-			 &next)) {
+	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
+			 &vcpu->regs.r[0], &next)) {
 		return next;
 	}
 
-	if (spci_handler(func, arg1, arg2, arg3, arg4, arg5, arg6, arg7,
-			 &vcpu->regs.r[0], &next)) {
+	if (spci_handler(&args, &next)) {
+		vcpu->regs.r[0] = args.func;
+		vcpu->regs.r[1] = args.arg1;
+		vcpu->regs.r[2] = args.arg2;
+		vcpu->regs.r[3] = args.arg3;
+		vcpu->regs.r[4] = args.arg4;
+		vcpu->regs.r[5] = args.arg5;
+		vcpu->regs.r[6] = args.arg6;
+		vcpu->regs.r[7] = args.arg7;
 		update_vi(next);
 		return next;
 	}
 
-	switch (func) {
+	switch (args.func) {
 	case HF_VM_GET_ID:
 		vcpu->regs.r[0] = api_vm_get_id(vcpu);
 		break;
@@ -421,17 +420,17 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 		break;
 
 	case HF_VCPU_GET_COUNT:
-		vcpu->regs.r[0] = api_vcpu_get_count(arg1, vcpu);
+		vcpu->regs.r[0] = api_vcpu_get_count(args.arg1, vcpu);
 		break;
 
 	case HF_VCPU_RUN:
 		vcpu->regs.r[0] = hf_vcpu_run_return_encode(
-			api_vcpu_run(arg1, arg2, vcpu, &next));
+			api_vcpu_run(args.arg1, args.arg2, vcpu, &next));
 		break;
 
 	case HF_VM_CONFIGURE:
-		vcpu->regs.r[0] = api_vm_configure(ipa_init(arg1),
-						   ipa_init(arg2), vcpu, &next);
+		vcpu->regs.r[0] = api_vm_configure(
+			ipa_init(args.arg1), ipa_init(args.arg2), vcpu, &next);
 		break;
 
 	case HF_MAILBOX_CLEAR:
@@ -443,11 +442,12 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 		break;
 
 	case HF_MAILBOX_WAITER_GET:
-		vcpu->regs.r[0] = api_mailbox_waiter_get(arg1, vcpu);
+		vcpu->regs.r[0] = api_mailbox_waiter_get(args.arg1, vcpu);
 		break;
 
 	case HF_INTERRUPT_ENABLE:
-		vcpu->regs.r[0] = api_interrupt_enable(arg1, arg2, vcpu);
+		vcpu->regs.r[0] =
+			api_interrupt_enable(args.arg1, args.arg2, vcpu);
 		break;
 
 	case HF_INTERRUPT_GET:
@@ -455,18 +455,18 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 		break;
 
 	case HF_INTERRUPT_INJECT:
-		vcpu->regs.r[0] =
-			api_interrupt_inject(arg1, arg2, arg3, vcpu, &next);
+		vcpu->regs.r[0] = api_interrupt_inject(args.arg1, args.arg2,
+						       args.arg3, vcpu, &next);
 		break;
 
 	case HF_SHARE_MEMORY:
-		vcpu->regs.r[0] =
-			api_share_memory(arg1 >> 32, ipa_init(arg2), arg3,
-					 arg1 & 0xffffffff, vcpu);
+		vcpu->regs.r[0] = api_share_memory(
+			args.arg1 >> 32, ipa_init(args.arg2), args.arg3,
+			args.arg1 & 0xffffffff, vcpu);
 		break;
 
 	case HF_DEBUG_LOG:
-		vcpu->regs.r[0] = api_debug_log(arg1, vcpu);
+		vcpu->regs.r[0] = api_debug_log(args.arg1, vcpu);
 		break;
 
 	default:

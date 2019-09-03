@@ -182,6 +182,16 @@ typedef spci_vcpu_index_t spci_vcpu_count_t;
 /** Return type of SPCI functions. */
 /* TODO: Reuse spci_return_t type on all SPCI functions declarations. */
 typedef int32_t spci_return_t;
+struct spci_value {
+	uint64_t func;
+	uint64_t arg1;
+	uint64_t arg2;
+	uint64_t arg3;
+	uint64_t arg4;
+	uint64_t arg5;
+	uint64_t arg6;
+	uint64_t arg7;
+};
 
 /** SPCI common message header. */
 struct spci_message {

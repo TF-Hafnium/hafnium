@@ -47,6 +47,7 @@
  * mechanism to call to the hypervisor.
  */
 int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
+struct spci_value spci_call(struct spci_value args);
 
 /**
  * Returns the VM's own ID.
@@ -274,7 +275,7 @@ static inline int64_t hf_debug_log(char c)
 }
 
 /** Obtains the Hafnium's version of the implemented SPCI specification. */
-static inline int64_t spci_version(void)
+static inline struct spci_value spci_version(void)
 {
-	return hf_call(SPCI_VERSION_32, 0, 0, 0);
+	return spci_call((struct spci_value){.func = SPCI_VERSION_32});
 }

@@ -153,7 +153,9 @@ TEST(spci, spci_version)
 	const int32_t current_version =
 		(major_revision << major_revision_offset) | minor_revision;
 
-	EXPECT_EQ(spci_version(), current_version);
+	struct spci_value ret = spci_version();
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	EXPECT_EQ(ret.arg1, current_version);
 }
 
 /**
