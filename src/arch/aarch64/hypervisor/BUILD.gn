@@ -23,6 +23,7 @@ source_set("hypervisor") {
   ]
 
   sources += [
+    "debug_el1.c",
     "handler.c",
     "offsets.c",
     "psci_handler.c",
