@@ -22,7 +22,6 @@
 #include "hf/boot_params.h"
 #include "hf/dlog.h"
 #include "hf/layout.h"
-#include "hf/manifest.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
@@ -251,16 +250,13 @@ static bool update_reserved_ranges(struct boot_params_update *update,
  * Memory reserved for the VMs is added to the `reserved_ranges` of `update`.
  */
 bool load_secondary(struct mm_stage1_locked stage1_locked,
-		    const struct memiter *cpio,
+		    const struct manifest *manifest, const struct memiter *cpio,
 		    const struct boot_params *params,
 		    struct boot_params_update *update, struct mpool *ppool)
 {
 	struct vm *primary;
-	struct manifest manifest;
-	struct memiter manifest_fdt;
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	size_t i;
-	enum manifest_return_code manifest_ret;
 
 	static_assert(
 		sizeof(mem_ranges_available) == sizeof(params->mem_ranges),
@@ -279,24 +275,13 @@ bool load_secondary(struct mm_stage1_locked stage1_locked,
 			pa_addr(mem_ranges_available[i].end), PAGE_SIZE));
 	}
 
-	if (!find_file(cpio, "manifest.dtb", &manifest_fdt)) {
-		dlog("Could not find \"manifest.dtb\" in cpio.\n");
-		return false;
-	}
-
-	manifest_ret = manifest_init(&manifest, &manifest_fdt);
-	if (manifest_ret != MANIFEST_SUCCESS) {
-		dlog("Could not parse manifest: %s.\n",
-		     manifest_strerror(manifest_ret));
-		return false;
-	}
-
-	for (i = 0; i < manifest.num_vms; ++i) {
-		struct manifest_vm *manifest_vm = &manifest.vm[i];
+	for (i = 0; i < manifest->num_vms; ++i) {
+		const struct manifest_vm *manifest_vm = &manifest->vm[i];
 		spci_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
 		struct vm *vm;
 		struct vcpu *vcpu;
 		struct memiter kernel;
+		struct memiter kernel_filename;
 		uint64_t mem_size;
 		paddr_t secondary_mem_begin;
 		paddr_t secondary_mem_end;
@@ -306,17 +291,16 @@ bool load_secondary(struct mm_stage1_locked stage1_locked,
 			continue;
 		}
 
-		dlog("Loading VM%d: ", (int)vm_id);
-		memiter_dlog_str(&manifest_vm->debug_name);
-		dlog(".\n");
+		dlog("Loading VM%d: %s.\n", (int)vm_id,
+		     manifest_vm->debug_name);
 
-		if (!memiter_find_file(cpio,
-				       &manifest_vm->secondary.kernel_filename,
-				       &kernel)) {
-			dlog("Could not find kernel file \"");
-			memiter_dlog_str(
-				&manifest_vm->secondary.kernel_filename);
-			dlog("\".\n");
+		memiter_init(&kernel_filename,
+			     manifest_vm->secondary.kernel_filename,
+			     strnlen_s(manifest_vm->secondary.kernel_filename,
+				       MANIFEST_MAX_STRING_LENGTH));
+		if (!memiter_find_file(cpio, &kernel_filename, &kernel)) {
+			dlog("Could not find kernel file \"%s\".\n",
+			     manifest_vm->secondary.kernel_filename);
 			continue;
 		}
 

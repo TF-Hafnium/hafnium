@@ -80,25 +80,25 @@ static bool fdt_write_number(struct fdt_node *node, const char *name,
 }
 
 /**
- * Finds the memory region where initrd is stored, and updates the fdt node
- * cursor to the node called "chosen".
+ * Finds the memory region where initrd is stored.
  */
-bool fdt_find_initrd(struct fdt_node *n, paddr_t *begin, paddr_t *end)
+bool fdt_find_initrd(const struct fdt_node *root, paddr_t *begin, paddr_t *end)
 {
+	struct fdt_node n = *root;
 	uint64_t initrd_begin;
 	uint64_t initrd_end;
 
-	if (!fdt_find_child(n, "chosen")) {
+	if (!fdt_find_child(&n, "chosen")) {
 		dlog("Unable to find 'chosen'\n");
 		return false;
 	}
 
-	if (!fdt_read_number(n, "linux,initrd-start", &initrd_begin)) {
+	if (!fdt_read_number(&n, "linux,initrd-start", &initrd_begin)) {
 		dlog("Unable to read linux,initrd-start\n");
 		return false;
 	}
 
-	if (!fdt_read_number(n, "linux,initrd-end", &initrd_end)) {
+	if (!fdt_read_number(&n, "linux,initrd-end", &initrd_end)) {
 		dlog("Unable to read linux,initrd-end\n");
 		return false;
 	}
@@ -109,7 +109,7 @@ bool fdt_find_initrd(struct fdt_node *n, paddr_t *begin, paddr_t *end)
 	return true;
 }
 
-void fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
+bool fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
 		   size_t *cpu_count)
 {
 	struct fdt_node n = *root;
@@ -120,7 +120,7 @@ void fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
 
 	if (!fdt_find_child(&n, "cpus")) {
 		dlog("Unable to find 'cpus'\n");
-		return;
+		return false;
 	}
 
 	if (fdt_read_number(&n, "#address-cells", &address_size)) {
@@ -130,7 +130,7 @@ void fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
 	}
 
 	if (!fdt_first_child(&n, &name)) {
-		return;
+		return false;
 	}
 
 	do {
@@ -150,12 +150,12 @@ void fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
 
 			if (*cpu_count >= MAX_CPUS) {
 				dlog("Found more than %d CPUs\n", MAX_CPUS);
-				return;
+				return false;
 			}
 
 			if (!fdt_parse_number(data, address_size, &value)) {
 				dlog("Could not parse CPU id\n");
-				return;
+				return false;
 			}
 			cpu_ids[(*cpu_count)++] = value;
 
@@ -163,9 +163,11 @@ void fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
 			data += address_size;
 		}
 	} while (fdt_next_sibling(&n, &name));
+
+	return true;
 }
 
-void fdt_find_memory_ranges(const struct fdt_node *root, struct boot_params *p)
+bool fdt_find_memory_ranges(const struct fdt_node *root, struct boot_params *p)
 {
 	struct fdt_node n = *root;
 	const char *name;
@@ -191,7 +193,7 @@ void fdt_find_memory_ranges(const struct fdt_node *root, struct boot_params *p)
 
 	/* Look for nodes with the device_type set to "memory". */
 	if (!fdt_first_child(&n, &name)) {
-		return;
+		return false;
 	}
 
 	do {
@@ -234,6 +236,8 @@ void fdt_find_memory_ranges(const struct fdt_node *root, struct boot_params *p)
 	p->mem_ranges_count = mem_range_index;
 
 	/* TODO: Check for "reserved-memory" nodes. */
+
+	return true;
 }
 
 struct fdt_header *fdt_map(struct mm_stage1_locked stage1_locked,

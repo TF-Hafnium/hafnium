@@ -54,8 +54,8 @@ static const char *generate_vm_node_name(char *buf, spci_vm_id_t vm_id)
 }
 
 static enum manifest_return_code read_string(const struct fdt_node *node,
-					     const char *property,
-					     struct memiter *out)
+					     const char *property, char *out,
+					     rsize_t out_sz)
 {
 	const char *data;
 	uint32_t size;
@@ -72,7 +72,12 @@ static enum manifest_return_code read_string(const struct fdt_node *node,
 		return MANIFEST_ERROR_MALFORMED_STRING;
 	}
 
-	memiter_init(out, data, size - 1);
+	/* Check that the string fits into the buffer. */
+	if (size > out_sz) {
+		return MANIFEST_ERROR_STRING_TOO_LONG;
+	}
+
+	memcpy_s(out, out_sz, data, size);
 	return MANIFEST_SUCCESS;
 }
 
@@ -195,10 +200,12 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 					  struct manifest_vm *vm,
 					  spci_vm_id_t vm_id)
 {
-	TRY(read_string(node, "debug_name", &vm->debug_name));
+	TRY(read_string(node, "debug_name", vm->debug_name,
+			sizeof(vm->debug_name)));
 	if (vm_id != HF_PRIMARY_VM_ID) {
 		TRY(read_string(node, "kernel_filename",
-				&vm->secondary.kernel_filename));
+				vm->secondary.kernel_filename,
+				sizeof(vm->secondary.kernel_filename)));
 		TRY(read_uint64(node, "mem_size", &vm->secondary.mem_size));
 		TRY(read_uint16(node, "vcpu_count", &vm->secondary.vcpu_count));
 	}
@@ -209,7 +216,7 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
  * Parse manifest from FDT.
  */
 enum manifest_return_code manifest_init(struct manifest *manifest,
-					struct memiter *fdt)
+					const struct fdt_node *fdt_root)
 {
 	char vm_name_buf[VM_NAME_BUF_SIZE];
 	struct fdt_node hyp_node;
@@ -220,13 +227,7 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 	memset_s(manifest, sizeof(*manifest), 0, sizeof(*manifest));
 
 	/* Find hypervisor node. */
-	if (!fdt_root_node(&hyp_node,
-			   (const struct fdt_header *)memiter_base(fdt))) {
-		return MANIFEST_ERROR_CORRUPTED_FDT;
-	}
-	if (!fdt_find_child(&hyp_node, "")) {
-		return MANIFEST_ERROR_NO_ROOT_FDT_NODE;
-	}
+	hyp_node = *fdt_root;
 	if (!fdt_find_child(&hyp_node, "hypervisor")) {
 		return MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE;
 	}
@@ -283,10 +284,6 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	switch (ret_code) {
 	case MANIFEST_SUCCESS:
 		return "Success";
-	case MANIFEST_ERROR_CORRUPTED_FDT:
-		return "Manifest failed FDT validation";
-	case MANIFEST_ERROR_NO_ROOT_FDT_NODE:
-		return "Could not find root node of manifest";
 	case MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE:
 		return "Could not find \"hypervisor\" node in manifest";
 	case MANIFEST_ERROR_NOT_COMPATIBLE:
@@ -302,6 +299,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Property not found";
 	case MANIFEST_ERROR_MALFORMED_STRING:
 		return "Malformed string property";
+	case MANIFEST_ERROR_STRING_TOO_LONG:
+		return "String too long";
 	case MANIFEST_ERROR_MALFORMED_STRING_LIST:
 		return "Malformed string list property";
 	case MANIFEST_ERROR_MALFORMED_INTEGER:

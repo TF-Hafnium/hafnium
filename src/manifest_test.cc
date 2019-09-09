@@ -30,7 +30,7 @@ using ::testing::Eq;
 using ::testing::NotNull;
 
 template <typename T>
-void exec(const char *program, char *const args[], const T &stdin,
+void exec(const char *program, const char *args[], const T &stdin,
 	  std::vector<char> *stdout)
 {
 	/* Create two pipes, one for stdin and one for stdout. */
@@ -93,7 +93,7 @@ void exec(const char *program, char *const args[], const T &stdin,
 		close(parent_write_fd);
 
 		/* Execute the given program. */
-		execv(program, args);
+		execv(program, const_cast<char *const *>(args));
 	}
 }
 
@@ -122,13 +122,14 @@ class ManifestDtBuilder
 
 	std::vector<char> Build()
 	{
-		char *const dtc_args[] = {NULL};
+		const char *program = "./build/image/dtc.py";
+		const char *dtc_args[] = {program, "compile", NULL};
 		std::vector<char> dtc_stdout;
 
 		/* Finish root node. */
 		EndChild();
 
-		exec("./build/image/dtc.py", dtc_args, dts_.str(), &dtc_stdout);
+		exec(program, dtc_args, dts_.str(), &dtc_stdout);
 		return dtc_stdout;
 	}
 
@@ -207,21 +208,31 @@ class ManifestDtBuilder
 	std::stringstream dts_;
 };
 
+static bool get_fdt_root(const std::vector<char> &dtb,
+			 struct fdt_node *fdt_root)
+{
+	const struct fdt_header *fdt_header;
+
+	fdt_header = reinterpret_cast<const struct fdt_header *>(dtb.data());
+	return fdt_root_node(fdt_root, fdt_header) &&
+	       fdt_find_child(fdt_root, "");
+}
+
 TEST(manifest, no_hypervisor_node)
 {
 	struct manifest m;
-	struct memiter it;
+	struct fdt_node fdt_root;
 	std::vector<char> dtb = ManifestDtBuilder().Build();
 
-	memiter_init(&it, dtb.data(), dtb.size());
-	ASSERT_EQ(manifest_init(&m, &it),
+	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root),
 		  MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE);
 }
 
 TEST(manifest, no_compatible_property)
 {
 	struct manifest m;
-	struct memiter it;
+	struct fdt_node fdt_root;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -230,14 +241,15 @@ TEST(manifest, no_compatible_property)
 		.Build();
 	/* clang-format on */
 
-	memiter_init(&it, dtb.data(), dtb.size());
-	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_ERROR_PROPERTY_NOT_FOUND);
+	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root),
+		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 }
 
 TEST(manifest, not_compatible)
 {
 	struct manifest m;
-	struct memiter it;
+	struct fdt_node fdt_root;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -247,14 +259,14 @@ TEST(manifest, not_compatible)
 		.Build();
 	/* clang-format on */
 
-	memiter_init(&it, dtb.data(), dtb.size());
-	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_ERROR_NOT_COMPATIBLE);
+	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_ERROR_NOT_COMPATIBLE);
 }
 
 TEST(manifest, compatible_one_of_many)
 {
 	struct manifest m;
-	struct memiter it;
+	struct fdt_node fdt_root;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -267,14 +279,14 @@ TEST(manifest, compatible_one_of_many)
 		.Build();
 	/* clang-format on */
 
-	memiter_init(&it, dtb.data(), dtb.size());
-	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_SUCCESS);
+	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
 }
 
 TEST(manifest, no_vm_nodes)
 {
 	struct manifest m;
-	struct memiter it;
+	struct fdt_node fdt_root;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -284,14 +296,48 @@ TEST(manifest, no_vm_nodes)
 		.Build();
 	/* clang-format on */
 
-	memiter_init(&it, dtb.data(), dtb.size());
-	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_ERROR_NO_PRIMARY_VM);
+	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_ERROR_NO_PRIMARY_VM);
+}
+
+static std::vector<char> gen_long_string_dtb(bool valid)
+{
+	const char last_valid[] = "1234567890123456789012345678901";
+	const char first_invalid[] = "12345678901234567890123456789012";
+	static_assert(sizeof(last_valid) == MANIFEST_MAX_STRING_LENGTH);
+	static_assert(sizeof(first_invalid) == MANIFEST_MAX_STRING_LENGTH + 1);
+
+	/* clang-format off */
+	return ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+			.StartChild("vm1")
+				.DebugName(valid ? last_valid : first_invalid)
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+}
+
+TEST(manifest, long_string)
+{
+	struct manifest m;
+	struct fdt_node fdt_root;
+
+	std::vector<char> dtb_last_valid = gen_long_string_dtb(true);
+	std::vector<char> dtb_first_invalid = gen_long_string_dtb(false);
+
+	ASSERT_TRUE(get_fdt_root(dtb_last_valid, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
+
+	ASSERT_TRUE(get_fdt_root(dtb_first_invalid, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_ERROR_STRING_TOO_LONG);
 }
 
 TEST(manifest, reserved_vm_id)
 {
 	struct manifest m;
-	struct memiter it;
+	struct fdt_node fdt_root;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -310,8 +356,8 @@ TEST(manifest, reserved_vm_id)
 		.Build();
 	/* clang-format on */
 
-	memiter_init(&it, dtb.data(), dtb.size());
-	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_ERROR_RESERVED_VM_ID);
+	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_ERROR_RESERVED_VM_ID);
 }
 
 static std::vector<char> gen_vcpu_count_limit_dtb(uint64_t vcpu_count)
@@ -337,25 +383,26 @@ static std::vector<char> gen_vcpu_count_limit_dtb(uint64_t vcpu_count)
 TEST(manifest, vcpu_count_limit)
 {
 	struct manifest m;
-	struct memiter it;
+	struct fdt_node fdt_root;
 	std::vector<char> dtb_last_valid = gen_vcpu_count_limit_dtb(UINT16_MAX);
 	std::vector<char> dtb_first_invalid =
 		gen_vcpu_count_limit_dtb(UINT16_MAX + 1);
 
-	memiter_init(&it, dtb_last_valid.data(), dtb_last_valid.size());
-	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_SUCCESS);
+	ASSERT_TRUE(get_fdt_root(dtb_last_valid, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
 	ASSERT_EQ(m.num_vms, 2);
 	ASSERT_EQ(m.vm[1].secondary.vcpu_count, UINT16_MAX);
 
-	memiter_init(&it, dtb_first_invalid.data(), dtb_first_invalid.size());
-	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_ERROR_INTEGER_OVERFLOW);
+	ASSERT_TRUE(get_fdt_root(dtb_first_invalid, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root),
+		  MANIFEST_ERROR_INTEGER_OVERFLOW);
 }
 
 TEST(manifest, valid)
 {
 	struct manifest m;
 	struct manifest_vm *vm;
-	struct memiter it;
+	struct fdt_node fdt_root;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -380,27 +427,25 @@ TEST(manifest, valid)
 		.Build();
 	/* clang-format on */
 
-	memiter_init(&it, dtb.data(), dtb.size());
+	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
 
-	ASSERT_EQ(manifest_init(&m, &it), MANIFEST_SUCCESS);
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
 	ASSERT_EQ(m.num_vms, 3);
 
 	vm = &m.vm[0];
-	ASSERT_TRUE(memiter_iseq(&vm->debug_name, "primary_vm"));
+	ASSERT_STREQ(vm->debug_name, "primary_vm");
 
 	vm = &m.vm[1];
-	ASSERT_TRUE(memiter_iseq(&vm->debug_name, "first_secondary_vm"));
+	ASSERT_STREQ(vm->debug_name, "first_secondary_vm");
 	ASSERT_EQ(vm->secondary.vcpu_count, 42);
 	ASSERT_EQ(vm->secondary.mem_size, 12345);
-	ASSERT_TRUE(
-		memiter_iseq(&vm->secondary.kernel_filename, "first_kernel"));
+	ASSERT_STREQ(vm->secondary.kernel_filename, "first_kernel");
 
 	vm = &m.vm[2];
-	ASSERT_TRUE(memiter_iseq(&vm->debug_name, "second_secondary_vm"));
+	ASSERT_STREQ(vm->debug_name, "second_secondary_vm");
 	ASSERT_EQ(vm->secondary.vcpu_count, 43);
 	ASSERT_EQ(vm->secondary.mem_size, 0x12345);
-	ASSERT_TRUE(
-		memiter_iseq(&vm->secondary.kernel_filename, "second_kernel"));
+	ASSERT_STREQ(vm->secondary.kernel_filename, "second_kernel");
 }
 
 } /* namespace */

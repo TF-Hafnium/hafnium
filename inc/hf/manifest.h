@@ -16,19 +16,25 @@
 
 #pragma once
 
+#include "hf/fdt.h"
 #include "hf/memiter.h"
 #include "hf/spci.h"
+
+/**
+ * Maximum length of a string parsed from the FDT, including NULL terminator.
+ */
+#define MANIFEST_MAX_STRING_LENGTH 32
 
 /**
  * Holds information about one of the VMs described in the manifest.
  */
 struct manifest_vm {
 	/* Properties defined for both primary and secondary VMs. */
-	struct memiter debug_name;
+	char debug_name[MANIFEST_MAX_STRING_LENGTH];
 
 	/* Properties specific to secondary VMs. */
 	struct {
-		struct memiter kernel_filename;
+		char kernel_filename[MANIFEST_MAX_STRING_LENGTH];
 		uint64_t mem_size;
 		spci_vcpu_count_t vcpu_count;
 	} secondary;
@@ -44,8 +50,6 @@ struct manifest {
 
 enum manifest_return_code {
 	MANIFEST_SUCCESS = 0,
-	MANIFEST_ERROR_CORRUPTED_FDT,
-	MANIFEST_ERROR_NO_ROOT_FDT_NODE,
 	MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE,
 	MANIFEST_ERROR_NOT_COMPATIBLE,
 	MANIFEST_ERROR_RESERVED_VM_ID,
@@ -53,12 +57,13 @@ enum manifest_return_code {
 	MANIFEST_ERROR_TOO_MANY_VMS,
 	MANIFEST_ERROR_PROPERTY_NOT_FOUND,
 	MANIFEST_ERROR_MALFORMED_STRING,
+	MANIFEST_ERROR_STRING_TOO_LONG,
 	MANIFEST_ERROR_MALFORMED_STRING_LIST,
 	MANIFEST_ERROR_MALFORMED_INTEGER,
 	MANIFEST_ERROR_INTEGER_OVERFLOW,
 };
 
 enum manifest_return_code manifest_init(struct manifest *manifest,
-					struct memiter *fdt);
+					const struct fdt_node *fdt_root);
 
 const char *manifest_strerror(enum manifest_return_code ret_code);

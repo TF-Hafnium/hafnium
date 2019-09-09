@@ -94,19 +94,6 @@ bool memiter_parse_str(struct memiter *it, struct memiter *str)
 }
 
 /**
- * Prints the contents of memory covered by the iterator to dlog. It does *not*
- * assume that the string is null-terminated.
- */
-void memiter_dlog_str(struct memiter *it)
-{
-	const char *p;
-
-	for (p = it->next; p < it->limit; ++p) {
-		dlog("%c", *p);
-	}
-}
-
-/**
  * Parses the next string that represents a 64-bit number.
  */
 bool memiter_parse_uint(struct memiter *it, uint64_t *value)

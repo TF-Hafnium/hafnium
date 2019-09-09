@@ -14,21 +14,12 @@
  * limitations under the License.
  */
 
-/dts-v1/;
-/plugin/;
+#pragma once
 
-&{/} {
-	hypervisor {
-		compatible = "hafnium,hafnium";
-		vm1 {
-			debug_name = "primary";
-		};
+#include "hf/boot_params.h"
+#include "hf/manifest.h"
+#include "hf/mm.h"
 
-		vm2 {
-			debug_name = "socket0";
-			vcpu_count = <1>;
-			mem_size = <0x100000>;
-			kernel_filename = "socket0";
-		};
-	};
-};
+bool boot_flow_init(struct mm_stage1_locked stage1_locked,
+		    struct manifest *manifest, struct boot_params *boot_params,
+		    struct mpool *ppool);

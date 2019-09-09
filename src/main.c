@@ -20,6 +20,7 @@
 #include "hf/arch/init.h"
 
 #include "hf/api.h"
+#include "hf/boot_flow.h"
 #include "hf/boot_params.h"
 #include "hf/cpio.h"
 #include "hf/cpu.h"
@@ -43,6 +44,7 @@ alignas(alignof(
  */
 static void one_time_init(void)
 {
+	struct manifest manifest;
 	struct boot_params params;
 	struct boot_params_update update;
 	struct memiter primary_initrd;
@@ -74,9 +76,7 @@ static void one_time_init(void)
 
 	mm_stage1_locked = mm_lock_stage1();
 
-	if (!plat_get_boot_params(mm_stage1_locked, &params, &ppool)) {
-		panic("unable to retrieve boot params");
-	}
+	boot_flow_init(mm_stage1_locked, &manifest, &params, &ppool);
 
 	cpu_module_init(params.cpu_ids, params.cpu_count);
 
@@ -112,13 +112,13 @@ static void one_time_init(void)
 	update.initrd_begin = pa_from_va(va_from_ptr(primary_initrd.next));
 	update.initrd_end = pa_from_va(va_from_ptr(primary_initrd.limit));
 	update.reserved_ranges_count = 0;
-	if (!load_secondary(mm_stage1_locked, &cpio, &params, &update,
-			    &ppool)) {
+	if (!load_secondary(mm_stage1_locked, &manifest, &cpio, &params,
+			    &update, &ppool)) {
 		panic("unable to load secondary VMs");
 	}
 
 	/* Prepare to run by updating bootparams as seen by primary VM. */
-	if (!plat_update_boot_params(mm_stage1_locked, &update, &ppool)) {
+	if (!boot_params_patch_fdt(mm_stage1_locked, &update, &ppool)) {
 		panic("plat_update_boot_params failed");
 	}
 
