@@ -268,7 +268,7 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 			found_primary_vm = true;
 		}
 
-		manifest->num_vms = i + 1;
+		manifest->vm_count = i + 1;
 		TRY(parse_vm(&vm_node, &manifest->vm[i], vm_id));
 	}
 

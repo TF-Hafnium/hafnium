@@ -390,7 +390,7 @@ TEST(manifest, vcpu_count_limit)
 
 	ASSERT_TRUE(get_fdt_root(dtb_last_valid, &fdt_root));
 	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
-	ASSERT_EQ(m.num_vms, 2);
+	ASSERT_EQ(m.vm_count, 2);
 	ASSERT_EQ(m.vm[1].secondary.vcpu_count, UINT16_MAX);
 
 	ASSERT_TRUE(get_fdt_root(dtb_first_invalid, &fdt_root));
@@ -430,7 +430,7 @@ TEST(manifest, valid)
 	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
 
 	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
-	ASSERT_EQ(m.num_vms, 3);
+	ASSERT_EQ(m.vm_count, 3);
 
 	vm = &m.vm[0];
 	ASSERT_STREQ(vm->debug_name, "primary_vm");

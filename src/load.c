@@ -275,7 +275,7 @@ bool load_secondary(struct mm_stage1_locked stage1_locked,
 			pa_addr(mem_ranges_available[i].end), PAGE_SIZE));
 	}
 
-	for (i = 0; i < manifest->num_vms; ++i) {
+	for (i = 0; i < manifest->vm_count; ++i) {
 		const struct manifest_vm *manifest_vm = &manifest->vm[i];
 		spci_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
 		struct vm *vm;

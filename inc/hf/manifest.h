@@ -44,7 +44,7 @@ struct manifest_vm {
  * Hafnium manifest parsed from FDT.
  */
 struct manifest {
-	spci_vm_count_t num_vms;
+	spci_vm_count_t vm_count;
 	struct manifest_vm vm[MAX_VMS];
 };
 
