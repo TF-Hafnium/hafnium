@@ -37,6 +37,6 @@ clean:
 	make -C $(KERNEL_PATH) M=$(PWD) O=$(O) clean
 
 checkpatch:
-	$(CHECKPATCH) -f main.c hf_call.S
+	$(CHECKPATCH) -f main.c hf_call.c
 
 endif
