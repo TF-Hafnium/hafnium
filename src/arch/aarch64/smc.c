@@ -37,7 +37,14 @@ static smc_res_t smc_internal(uint32_t func, uint64_t arg0, uint64_t arg1,
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3), "+r"(r4), "+r"(r5),
 		"+r"(r6), "+r"(r7));
 
-	return (smc_res_t){.res0 = r0, .res1 = r1, .res2 = r2, .res3 = r3};
+	return (smc_res_t){.res0 = r0,
+			   .res1 = r1,
+			   .res2 = r2,
+			   .res3 = r3,
+			   .res4 = r4,
+			   .res5 = r5,
+			   .res6 = r6,
+			   .res7 = r7};
 }
 
 smc_res_t smc32(uint32_t func, uint32_t arg0, uint32_t arg1, uint32_t arg2,

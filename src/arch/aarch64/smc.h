@@ -52,6 +52,10 @@ typedef struct smc_res {
 	uint64_t res1;
 	uint64_t res2;
 	uint64_t res3;
+	uint64_t res4;
+	uint64_t res5;
+	uint64_t res6;
+	uint64_t res7;
 } smc_res_t;
 
 smc_res_t smc32(uint32_t func, uint32_t arg0, uint32_t arg1, uint32_t arg2,

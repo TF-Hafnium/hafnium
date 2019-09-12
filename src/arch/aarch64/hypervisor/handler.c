@@ -51,6 +51,11 @@
 #define GET_NEXT_PC_INC(esr) (((esr) & (1u << 25)) ? 4 : 2)
 
 /**
+ * The Client ID field within X7 for an SMC64 call.
+ */
+#define CLIENT_ID_MASK UINT64_C(0xffff)
+
+/**
  * Returns a reference to the currently executing vCPU.
  */
 static struct vcpu *current(void)
@@ -272,11 +277,25 @@ static bool smc_forwarder(const struct vcpu *vcpu, smc_res_t *ret)
 	uint32_t func = vcpu->regs.r[0];
 	/* TODO(b/132421503): obtain vmid according to new scheme. */
 	uint32_t client_id = vcpu->vm->id;
+	/*
+	 * Set the Client ID but keep the existing Secure OS ID and anything
+	 * else (currently unspecified) that the client may have passed in the
+	 * upper bits.
+	 */
+	uintreg_t arg7 = client_id | (vcpu->regs.r[7] & ~CLIENT_ID_MASK);
 
 	if (smc_check_client_privileges(vcpu)) {
 		*ret = smc_forward(func, vcpu->regs.r[1], vcpu->regs.r[2],
 				   vcpu->regs.r[3], vcpu->regs.r[4],
-				   vcpu->regs.r[5], vcpu->regs.r[6], client_id);
+				   vcpu->regs.r[5], vcpu->regs.r[6], arg7);
+		/*
+		 * Preserve the value passed by the caller, rather than the
+		 * client_id we generated. Note that this would also overwrite
+		 * any return value that may be in x7, but the SMCs that we are
+		 * forwarding are legacy calls from before SMCCC 1.2 so won't
+		 * have more than 4 return values anyway.
+		 */
+		ret->res7 = vcpu->regs.r[7];
 		return true;
 	}
 
@@ -284,10 +303,16 @@ static bool smc_forwarder(const struct vcpu *vcpu, smc_res_t *ret)
 }
 
 static bool spci_handler(uintreg_t func, uintreg_t arg1, uintreg_t arg2,
-			 uintreg_t arg3, uintreg_t *ret, struct vcpu **next)
+			 uintreg_t arg3, uintreg_t arg4, uintreg_t arg5,
+			 uintreg_t arg6, uintreg_t arg7, uintreg_t *ret,
+			 struct vcpu **next)
 {
 	(void)arg2;
 	(void)arg3;
+	(void)arg4;
+	(void)arg5;
+	(void)arg6;
+	(void)arg7;
 
 	switch (func & ~SMCCC_CONVENTION_MASK) {
 	case SPCI_VERSION_32:
@@ -368,6 +393,10 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 	uintreg_t arg1 = vcpu->regs.r[1];
 	uintreg_t arg2 = vcpu->regs.r[2];
 	uintreg_t arg3 = vcpu->regs.r[3];
+	uintreg_t arg4 = vcpu->regs.r[4];
+	uintreg_t arg5 = vcpu->regs.r[5];
+	uintreg_t arg6 = vcpu->regs.r[6];
+	uintreg_t arg7 = vcpu->regs.r[7];
 	struct vcpu *next = NULL;
 
 	if (psci_handler(vcpu, func, arg1, arg2, arg3, &vcpu->regs.r[0],
@@ -375,7 +404,8 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 		return next;
 	}
 
-	if (spci_handler(func, arg1, arg2, arg3, &vcpu->regs.r[0], &next)) {
+	if (spci_handler(func, arg1, arg2, arg3, arg4, arg5, arg6, arg7,
+			 &vcpu->regs.r[0], &next)) {
 		update_vi(next);
 		return next;
 	}
