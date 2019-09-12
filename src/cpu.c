@@ -31,8 +31,20 @@
 
 #define STACK_SIZE PAGE_SIZE
 
-/* The stack to be used by the CPUs. */
-alignas(2 * sizeof(uintreg_t)) static char callstacks[MAX_CPUS][STACK_SIZE];
+/**
+ * The stacks to be used by the CPUs.
+ *
+ * Align to page boundaries to ensure that cache lines are not shared between a
+ * CPU's stack and data that can be accessed from other CPUs. If this did
+ * happen, there may be coherency problems when the stack is being used before
+ * caching is enabled.
+ */
+alignas(PAGE_SIZE) static char callstacks[MAX_CPUS][STACK_SIZE];
+
+/* NOLINTNEXTLINE(misc-redundant-expression) */
+static_assert((STACK_SIZE % PAGE_SIZE) == 0, "Keep each stack page aligned.");
+static_assert((PAGE_SIZE % STACK_ALIGN) == 0,
+	      "Page alignment is too weak for the stack.");
 
 /**
  * Internal buffer used to store SPCI messages from a VM Tx. Its usage prevents
