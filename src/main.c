@@ -76,7 +76,9 @@ static void one_time_init(void)
 
 	mm_stage1_locked = mm_lock_stage1();
 
-	boot_flow_init(mm_stage1_locked, &manifest, &params, &ppool);
+	if (!boot_flow_init(mm_stage1_locked, &manifest, &params, &ppool)) {
+		panic("Could not parse data from FDT.");
+	}
 
 	cpu_module_init(params.cpu_ids, params.cpu_count);
 

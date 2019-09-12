@@ -105,7 +105,7 @@ void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 
 	if (!found_boot_cpu) {
 		/* Boot CPU was initialized but with wrong ID. */
-		dlog("Boot CPU's ID not found in config.");
+		dlog("Boot CPU's ID not found in config.\n");
 		cpus[0].id = boot_cpu_id;
 	}
 }
