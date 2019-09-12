@@ -95,6 +95,19 @@
 	cbnz x18, slow_sync_lower
 
 	/*
+	 * Save x4-x17, x29 and x30, which are not saved by the callee, then jump to
+	 * HVC handler.
+	 */
+	stp x4, x5, [sp, #-16]!
+	stp x6, x7, [sp, #-16]!
+	stp x8, x9, [sp, #-16]!
+	stp x10, x11, [sp, #-16]!
+	stp x12, x13, [sp, #-16]!
+	stp x14, x15, [sp, #-16]!
+	stp x16, x17, [sp, #-16]!
+	stp x29, x30, [sp, #-16]!
+
+	/*
 	 * Make room for hvc_handler_return on stack, and point x8 (the indirect
 	 * result location register in the AAPCS64 standard) to it.
 	 * hvc_handler_return is returned this way according to paragraph
@@ -105,34 +118,23 @@
 	stp xzr, xzr, [sp, #-16]!
 	mov x8, sp
 
-	/*
-	 * Save x29 and x30, which are not saved by the callee, then jump to
-	 * HVC handler.
-	 */
-	stp x29, x30, [sp, #-16]!
 	bl hvc_handler
-	ldp x29, x30, [sp], #16
 
 	/* Get the hvc_handler_return back off the stack. */
 	ldp x0, x1, [sp], #16
 	ldp x2, x3, [sp], #16
-	ldr x4, [sp], #16
+	ldr x18, [sp], #16
 
-	cbnz x4, sync_lower_switch
-
-	/*
-	 * Zero out volatile registers (except x0-x3, which contain results) and
-	 * return.
-	 */
-	stp xzr, xzr, [sp, #-16]!
-	ldp x4, x5, [sp]
-	ldp x6, x7, [sp]
-	ldp x8, x9, [sp]
-	ldp x10, x11, [sp]
-	ldp x12, x13, [sp]
-	ldp x14, x15, [sp]
+	ldp x29, x30, [sp], #16
 	ldp x16, x17, [sp], #16
+	ldp x14, x15, [sp], #16
+	ldp x12, x13, [sp], #16
+	ldp x10, x11, [sp], #16
+	ldp x8, x9, [sp], #16
+	ldp x6, x7, [sp], #16
+	ldp x4, x5, [sp], #16
 
+	cbnz x18, sync_lower_switch
 	/* Restore x18, which was saved on the stack. */
 	ldr x18, [sp], #16
 	eret
@@ -258,20 +260,26 @@ system_register_access:
 	b vcpu_restore_nonvolatile_and_run
 
 sync_lower_switch:
+	/* Store new vcpu on stack temporarily so we can use x18 for the old one. */
+	str x18, [sp, #-16]!
+
 	/* We'll have to switch, so save volatile state before doing so. */
 	mrs x18, tpidr_el2
 
-	/* Store zeroes in volatile register storage, except x0-x3. */
+	/* Store volatile registers. */
 	stp x0, x1, [x18, #VCPU_REGS + 8 * 0]
 	stp x2, x3, [x18, #VCPU_REGS + 8 * 2]
-	stp xzr, xzr, [x18, #VCPU_REGS + 8 * 4]
-	stp xzr, xzr, [x18, #VCPU_REGS + 8 * 6]
-	stp xzr, xzr, [x18, #VCPU_REGS + 8 * 8]
-	stp xzr, xzr, [x18, #VCPU_REGS + 8 * 10]
-	stp xzr, xzr, [x18, #VCPU_REGS + 8 * 12]
-	stp xzr, xzr, [x18, #VCPU_REGS + 8 * 14]
-	stp xzr, xzr, [x18, #VCPU_REGS + 8 * 16]
+	stp x4, x5, [x18, #VCPU_REGS + 8 * 4]
+	stp x6, x7, [x18, #VCPU_REGS + 8 * 6]
+	stp x8, x9, [x18, #VCPU_REGS + 8 * 8]
+	stp x10, x11, [x18, #VCPU_REGS + 8 * 10]
+	stp x12, x13, [x18, #VCPU_REGS + 8 * 12]
+	stp x14, x15, [x18, #VCPU_REGS + 8 * 14]
+	stp x16, x17, [x18, #VCPU_REGS + 8 * 16]
 	stp x29, x30, [x18, #VCPU_REGS + 8 * 29]
+
+	/* Now we can pop the new vcpu to a volatile register that is now available. */
+	ldr x0, [sp], #16
 
 	/* x18 was saved on the stack, so we move it to vcpu regs buffer. */
 	ldr x2, [sp], #16
@@ -283,7 +291,6 @@ sync_lower_switch:
 	stp x2, x3, [x18, #VCPU_REGS + 8 * 31]
 
 	/* Save lazy state, then switch to new vcpu. */
-	mov x0, x4
 
 	/* Intentional fallthrough. */
 /**

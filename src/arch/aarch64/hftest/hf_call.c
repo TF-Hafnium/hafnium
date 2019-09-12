@@ -24,19 +24,10 @@ int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	register uint64_t r2 __asm__("x2") = arg2;
 	register uint64_t r3 __asm__("x3") = arg3;
 
-	/*
-	 * We currently implement SMCCC 1.0, which specifies that the callee can
-	 * use x4–x17 as scratch registers. If we move to SMCCC 1.1 then this
-	 * will change.
-	 */
 	__asm__ volatile(
 		"hvc #0"
 		: /* Output registers, also used as inputs ('+' constraint). */
-		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3)
-		:
-		: /* Clobber registers. */
-		"x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
-		"x14", "x15", "x16", "x17");
+		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3));
 
 	return r0;
 }

@@ -31,20 +31,11 @@ static smc_res_t smc_internal(uint32_t func, uint64_t arg0, uint64_t arg1,
 	register uint64_t r6 __asm__("x6") = arg5;
 	register uint64_t r7 __asm__("x7") = caller_id;
 
-	/*
-	 * We currently implement SMCCC 1.0, which specifies that the callee can
-	 * use x4–x17 as scratch registers. If we move to SMCCC 1.1 then this
-	 * will change.
-	 */
 	__asm__ volatile(
 		"smc #0"
 		: /* Output registers, also used as inputs ('+' constraint). */
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3), "+r"(r4), "+r"(r5),
-		"+r"(r6), "+r"(r7)
-		:
-		: /* Clobber registers. */
-		"x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16",
-		"x17");
+		"+r"(r6), "+r"(r7));
 
 	return (smc_res_t){.res0 = r0, .res1 = r1, .res2 = r2, .res3 = r3};
 }
