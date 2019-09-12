@@ -53,7 +53,7 @@ static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
 	}
 
 	memcpy_s(ptr, size, from, size);
-	arch_mm_write_back_dcache(ptr, size);
+	arch_mm_flush_dcache(ptr, size);
 
 	mm_unmap(stage1_locked, to, to_end, ppool);
 

@@ -1382,7 +1382,7 @@ static bool api_clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool)
 	}
 
 	memset_s(ptr, size, 0, size);
-	arch_mm_write_back_dcache(ptr, size);
+	arch_mm_flush_dcache(ptr, size);
 	mm_unmap(stage1_locked, begin, end, ppool);
 
 	ret = true;
