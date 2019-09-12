@@ -28,7 +28,10 @@ int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	__asm__ volatile(
 		"hvc #0"
 		: /* Output registers, also used as inputs ('+' constraint). */
-		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3));
+		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3)
+		:
+		: /* Clobber registers. */
+		"x4", "x5", "x6", "x7");
 
 	return r0;
 }
