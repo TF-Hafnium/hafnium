@@ -165,14 +165,9 @@ int arch_mm_stage2_attrs_to_mode(uint64_t attrs)
 	return attrs >> PTE_ATTR_MODE_SHIFT;
 }
 
-bool arch_mm_init(void)
+bool arch_mm_init(paddr_t table)
 {
 	/* No initialization required. */
-	return true;
-}
-
-void arch_mm_enable(paddr_t table)
-{
-	/* There's no modelling of the MMU. */
 	(void)table;
+	return true;
 }

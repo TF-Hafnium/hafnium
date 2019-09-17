@@ -115,13 +115,23 @@
 /** Mask for the attribute bits of the pte. */
 #define PTE_ATTR_MASK (~(PTE_ADDR_MASK | (UINT64_C(1) << 1)))
 
+/**
+ * Configuration information for memory management. Order is important as this
+ * is read from assembly.
+ *
+ * It must only be written to from `arch_mm_one_time_init()` to avoid cache and
+ * synchronization problems.
+ */
+struct arch_mm_config {
+	uintreg_t ttbr0_el2;
+	uintreg_t vtcr_el2;
+	uintreg_t mair_el2;
+	uintreg_t tcr_el2;
+	uintreg_t sctlr_el2;
+} arch_mm_config;
+
 static uint8_t mm_s2_max_level;
 static uint8_t mm_s2_root_table_count;
-
-static uintreg_t mm_vtcr_el2;
-static uintreg_t mm_mair_el2;
-static uintreg_t mm_tcr_el2;
-static uintreg_t mm_sctlr_el2;
 
 /**
  * Returns the encoding of a page table entry that isn't present.
@@ -530,7 +540,40 @@ uint8_t arch_mm_stage2_root_table_count(void)
 	return mm_s2_root_table_count;
 }
 
-bool arch_mm_init(void)
+/**
+ * Given the attrs from a table at some level and the attrs from all the blocks
+ * in that table, returns equivalent attrs to use for a block which will replace
+ * the entire table.
+ */
+uint64_t arch_mm_combine_table_entry_attrs(uint64_t table_attrs,
+					   uint64_t block_attrs)
+{
+	/*
+	 * Only stage 1 table descriptors have attributes, but the bits are res0
+	 * for stage 2 table descriptors so this code is safe for both.
+	 */
+	if (table_attrs & TABLE_NSTABLE) {
+		block_attrs |= STAGE1_NS;
+	}
+	if (table_attrs & TABLE_APTABLE1) {
+		block_attrs |= STAGE1_AP2;
+	}
+	if (table_attrs & TABLE_APTABLE0) {
+		block_attrs &= ~STAGE1_AP1;
+	}
+	if (table_attrs & TABLE_XNTABLE) {
+		block_attrs |= STAGE1_XN;
+	}
+	if (table_attrs & TABLE_PXNTABLE) {
+		block_attrs |= STAGE1_PXN;
+	}
+	return block_attrs;
+}
+
+/**
+ * This is called early in initialization without MMU or caches enabled.
+ */
+bool arch_mm_init(paddr_t table)
 {
 	static const int pa_bits_table[16] = {32, 36, 40, 42, 44, 48};
 	uint64_t features = read_msr(id_aa64mmfr0_el1);
@@ -588,94 +631,55 @@ bool arch_mm_init(void)
 	dlog("Stage 2 has %d page table levels with %d pages at the root.\n",
 	     mm_s2_max_level + 1, mm_s2_root_table_count);
 
-	mm_vtcr_el2 = (1u << 31) |		 /* RES1. */
-		      ((features & 0xf) << 16) | /* PS, matching features. */
-		      (0 << 14) |		 /* TG0: 4 KB granule. */
-		      (3 << 12) |		 /* SH0: inner shareable. */
-		      (1 << 10) |	     /* ORGN0: normal, cacheable ... */
-		      (1 << 8) |	      /* IRGN0: normal, cacheable ... */
-		      (sl0 << 6) |	    /* SL0. */
-		      ((64 - pa_bits) << 0) | /* T0SZ: dependent on PS. */
-		      0;
+	arch_mm_config = (struct arch_mm_config){
+		.ttbr0_el2 = pa_addr(table),
 
-	/*
-	 * 0    -> Device-nGnRnE memory
-	 * 0xff -> Normal memory, Inner/Outer Write-Back Non-transient,
-	 *         Write-Alloc, Read-Alloc.
-	 */
-	mm_mair_el2 = (0 << (8 * STAGE1_DEVICEINDX)) |
-		      (0xff << (8 * STAGE1_NORMALINDX));
+		.vtcr_el2 =
+			(1u << 31) |		   /* RES1. */
+			((features & 0xf) << 16) | /* PS, matching features. */
+			(0 << 14) |		   /* TG0: 4 KB granule. */
+			(3 << 12) |		   /* SH0: inner shareable. */
+			(1 << 10) |  /* ORGN0: normal, cacheable ... */
+			(1 << 8) |   /* IRGN0: normal, cacheable ... */
+			(sl0 << 6) | /* SL0. */
+			((64 - pa_bits) << 0) | /* T0SZ: dependent on PS. */
+			0,
 
-	/*
-	 * Configure tcr_el2.
-	 */
-	mm_tcr_el2 = (1 << 20) |		/* TBI, top byte ignored. */
-		     ((features & 0xf) << 16) | /* PS. */
-		     (0 << 14) |		/* TG0, granule size, 4KB. */
-		     (3 << 12) |		/* SH0, inner shareable. */
-		     (1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
-		     (1 << 8) |  /* IRGN0, normal mem, WB RA WA Cacheable. */
-		     (25 << 0) | /* T0SZ, input address is 2^39 bytes. */
-		     0;
+		/*
+		 * 0    -> Device-nGnRnE memory
+		 * 0xff -> Normal memory, Inner/Outer Write-Back Non-transient,
+		 *         Write-Alloc, Read-Alloc.
+		 */
+		.mair_el2 = (0 << (8 * STAGE1_DEVICEINDX)) |
+			    (0xff << (8 * STAGE1_NORMALINDX)),
 
-	mm_sctlr_el2 = (1 << 0) |  /* M, enable stage 1 EL2 MMU. */
-		       (1 << 1) |  /* A, enable alignment check faults. */
-		       (1 << 2) |  /* C, data cache enable. */
-		       (1 << 3) |  /* SA, enable stack alignment check. */
-		       (3 << 4) |  /* RES1 bits. */
-		       (1 << 11) | /* RES1 bit. */
-		       (1 << 12) | /* I, instruction cache enable. */
-		       (1 << 16) | /* RES1 bit. */
-		       (1 << 18) | /* RES1 bit. */
-		       (1 << 19) | /* WXN bit, writable execute never. */
-		       (3 << 22) | /* RES1 bits. */
-		       (3 << 28) | /* RES1 bits. */
-		       0;
+		/*
+		 * Configure tcr_el2.
+		 */
+		.tcr_el2 =
+			(1 << 20) |		   /* TBI, top byte ignored. */
+			((features & 0xf) << 16) | /* PS. */
+			(0 << 14) |		   /* TG0, granule size, 4KB. */
+			(3 << 12) |		   /* SH0, inner shareable. */
+			(1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
+			(1 << 8) |  /* IRGN0, normal mem, WB RA WA Cacheable. */
+			(25 << 0) | /* T0SZ, input address is 2^39 bytes. */
+			0,
+
+		.sctlr_el2 = (1 << 0) |  /* M, enable stage 1 EL2 MMU. */
+			     (1 << 1) |  /* A, enable alignment check faults. */
+			     (1 << 2) |  /* C, data cache enable. */
+			     (1 << 3) |  /* SA, enable stack alignment check. */
+			     (3 << 4) |  /* RES1 bits. */
+			     (1 << 11) | /* RES1 bit. */
+			     (1 << 12) | /* I, instruction cache enable. */
+			     (1 << 16) | /* RES1 bit. */
+			     (1 << 18) | /* RES1 bit. */
+			     (1 << 19) | /* WXN bit, writable execute never. */
+			     (3 << 22) | /* RES1 bits. */
+			     (3 << 28) | /* RES1 bits. */
+			     0,
+	};
 
 	return true;
-}
-
-void arch_mm_enable(paddr_t table)
-{
-	/* Configure translation management registers. */
-	write_msr(ttbr0_el2, pa_addr(table));
-	write_msr(vtcr_el2, mm_vtcr_el2);
-	write_msr(mair_el2, mm_mair_el2);
-	write_msr(tcr_el2, mm_tcr_el2);
-
-	/* Configure sctlr_el2 to enable MMU and cache. */
-	dsb(sy);
-	isb();
-	write_msr(sctlr_el2, mm_sctlr_el2);
-	isb();
-}
-
-/**
- * Given the attrs from a table at some level and the attrs from all the blocks
- * in that table, returns equivalent attrs to use for a block which will replace
- * the entire table.
- */
-uint64_t arch_mm_combine_table_entry_attrs(uint64_t table_attrs,
-					   uint64_t block_attrs)
-{
-	/*
-	 * Only stage 1 table descriptors have attributes, but the bits are res0
-	 * for stage 2 table descriptors so this code is safe for both.
-	 */
-	if (table_attrs & TABLE_NSTABLE) {
-		block_attrs |= STAGE1_NS;
-	}
-	if (table_attrs & TABLE_APTABLE1) {
-		block_attrs |= STAGE1_AP2;
-	}
-	if (table_attrs & TABLE_APTABLE0) {
-		block_attrs &= ~STAGE1_AP1;
-	}
-	if (table_attrs & TABLE_XNTABLE) {
-		block_attrs |= STAGE1_XN;
-	}
-	if (table_attrs & TABLE_PXNTABLE) {
-		block_attrs |= STAGE1_PXN;
-	}
-	return block_attrs;
 }

@@ -99,7 +99,7 @@ TEST(fdt, find_memory_ranges)
 
 	mpool_init(&ppool, sizeof(struct mm_page_table));
 	mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
-	ASSERT_TRUE(mm_init(&ppool));
+	mm_init(&ppool);
 
 	struct fdt_header *fdt;
 	struct fdt_node n;

@@ -161,9 +161,4 @@ int arch_mm_stage2_attrs_to_mode(uint64_t attrs);
 /**
  * Initializes the arch specific memory management.
  */
-bool arch_mm_init(void);
-
-/**
- * Enables the current CPU with arch specific memory management state.
- */
-void arch_mm_enable(paddr_t table);
+bool arch_mm_init(paddr_t table);
