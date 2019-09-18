@@ -21,7 +21,8 @@
 	hypervisor {
 		compatible = "hafnium,hafnium";
 		vm1 {
-			debug_name = "primary";
+			debug_name = "primary_only_test";
+			kernel_filename = "primary_only_test";
 		};
 	};
 };

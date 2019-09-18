@@ -31,5 +31,6 @@ vm_kernel("primary_only_test_vm") {
 initrd("primary_only_test") {
   testonly = true
   manifest = "manifest.dts"
+  primary_name = "primary_only_test"
   primary_vm = ":primary_only_test_vm"
 }

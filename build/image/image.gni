@@ -173,6 +173,8 @@ template("device_tree") {
 
 # Build the initial RAM disk for the hypervisor.
 template("initrd") {
+  assert(defined(invoker.primary_name),
+         "initrd() must specify a \"primary_name\" value")
   assert(defined(invoker.primary_vm),
          "initrd() must specify a \"primary_vm\" value")
 
@@ -203,6 +205,8 @@ template("initrd") {
       invoker.primary_vm,
     ]
     args = [
+      "--primary_name",
+      invoker.primary_name,
       "--primary_vm",
       rebase_path(primary_vm_image),
       "--staging",

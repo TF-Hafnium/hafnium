@@ -12,6 +12,7 @@ The format of the manifest is a simple DeviceTree overlay:
 	hypervisor {
 		vm1 {
 			debug_name = "name";
+			kernel_filename = "vmlinuz";
 		};
 
 		vm2 {
@@ -31,10 +32,12 @@ it yet.
 
 ## Example
 
-The following manifest defines two secondary VMs, the first one with 1MB of
-memory, 2 CPUs and kernel image called `kernel0` (matches filename in Hafnium's
-[ramdisk](HafniumRamDisk.md)), while the second one has 2MB of memory, 4 CPUs
-and a kernel image called `kernel1`.
+The following manifest defines a primary VM with two secondary VMs. The first
+secondary VM has 1MB of memory, 2 CPUs and kernel image called `kernel0`
+(matches filename in Hafnium's [ramdisk](HafniumRamDisk.md)). The second has 2MB
+of memory, 4 CPUs and, by omitting the `kernel_filename` property, a kernel
+preloaded into memory. The primary VM is given all remaining memory, the same
+number of CPUs as the hardware and a kernel image called `vmlinuz`.
 
 ```
 /dts-v1/;
@@ -44,6 +47,7 @@ and a kernel image called `kernel1`.
 	hypervisor {
 		vm1 {
 			debug_name = "primary VM";
+			kernel_filename = "vmlinuz";
 		};
 
 		vm2 {
@@ -55,7 +59,6 @@ and a kernel image called `kernel1`.
 
 		vm3 {
 			debug_name = "secondary VM 2";
-			kernel_filename = "kernel1";
 			vcpu_count = <4>;
 			mem_size = <0x200000>;
 		};

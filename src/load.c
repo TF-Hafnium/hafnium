@@ -20,6 +20,7 @@
 
 #include "hf/api.h"
 #include "hf/boot_params.h"
+#include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/layout.h"
 #include "hf/memiter.h"
@@ -55,7 +56,7 @@ static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
 	memcpy_s(ptr, size, from, size);
 	arch_mm_flush_dcache(ptr, size);
 
-	mm_unmap(stage1_locked, to, to_end, ppool);
+	CHECK(mm_unmap(stage1_locked, to, to_end, ppool));
 
 	return true;
 }
@@ -106,31 +107,73 @@ static bool find_file(const struct memiter *cpio, const char *name,
 	return false;
 }
 
+static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
+			paddr_t end, const struct manifest_vm *manifest_vm,
+			const struct memiter *cpio, struct mpool *ppool)
+{
+	struct memiter kernel_filename;
+	struct memiter kernel;
+
+	memiter_init(&kernel_filename, manifest_vm->kernel_filename,
+		     strnlen_s(manifest_vm->kernel_filename,
+			       MANIFEST_MAX_STRING_LENGTH));
+
+	if (memiter_size(&kernel_filename) == 0) {
+		/* This signals the kernel has been preloaded. */
+		return true;
+	}
+
+	if (!memiter_find_file(cpio, &kernel_filename, &kernel)) {
+		dlog("Could not find kernel file \"%s\".\n",
+		     manifest_vm->kernel_filename);
+		return false;
+	}
+
+	if (pa_difference(begin, end) < memiter_size(&kernel)) {
+		dlog("Kernel is larger than available memory.\n");
+		return false;
+	}
+
+	if (!copy_to_unmapped(stage1_locked, begin, &kernel, ppool)) {
+		dlog("Unable to copy kernel.\n");
+		return false;
+	}
+
+	return true;
+}
+
 /**
  * Loads the primary VM.
  */
-bool load_primary(struct mm_stage1_locked stage1_locked,
-		  const struct memiter *cpio, uintreg_t kernel_arg,
-		  struct memiter *initrd, struct mpool *ppool)
+static bool load_primary(struct mm_stage1_locked stage1_locked,
+			 const struct manifest *manifest,
+			 const struct memiter *cpio, uintreg_t kernel_arg,
+			 struct boot_params_update *update, struct mpool *ppool)
 {
-	struct memiter it;
 	paddr_t primary_begin = layout_primary_begin();
+	const struct manifest_vm *manifest_vm =
+		&manifest->vm[HF_PRIMARY_VM_ID - HF_VM_ID_OFFSET];
+	struct memiter initrd;
 
-	if (!find_file(cpio, "vmlinuz", &it)) {
-		dlog("Unable to find vmlinuz\n");
+	/*
+	 * TODO: This bound is currently meaningless but will be addressed when
+	 * the manifest specifies the load address.
+	 */
+	paddr_t primary_end = pa_add(primary_begin, 0x8000000);
+
+	if (!load_kernel(stage1_locked, primary_begin, primary_end, manifest_vm,
+			 cpio, ppool)) {
+		dlog("Unable to load primary kernel.");
 		return false;
 	}
 
-	dlog("Copying primary to %p\n", pa_addr(primary_begin));
-	if (!copy_to_unmapped(stage1_locked, primary_begin, &it, ppool)) {
-		dlog("Unable to relocate kernel for primary vm.\n");
-		return false;
-	}
-
-	if (!find_file(cpio, "initrd.img", initrd)) {
+	if (!find_file(cpio, "initrd.img", &initrd)) {
 		dlog("Unable to find initrd.img\n");
 		return false;
 	}
+
+	update->initrd_begin = pa_from_va(va_from_ptr(initrd.next));
+	update->initrd_end = pa_from_va(va_from_ptr(initrd.limit));
 
 	{
 		struct vm *vm;
@@ -165,6 +208,47 @@ bool load_primary(struct mm_stage1_locked stage1_locked,
 		vcpu_on(vcpu_locked, ipa_from_pa(primary_begin), kernel_arg);
 		vcpu_unlock(&vcpu_locked);
 	}
+
+	return true;
+}
+
+/*
+ * Loads a secondary VM.
+ */
+static bool load_secondary(struct mm_stage1_locked stage1_locked,
+			   paddr_t mem_begin, paddr_t mem_end,
+			   const struct manifest_vm *manifest_vm,
+			   const struct memiter *cpio, struct mpool *ppool)
+{
+	struct vm *vm;
+	struct vcpu *vcpu;
+	ipaddr_t secondary_entry;
+
+	if (!load_kernel(stage1_locked, mem_begin, mem_end, manifest_vm, cpio,
+			 ppool)) {
+		dlog("Unable to load kernel.\n");
+		return false;
+	}
+
+	if (!vm_init(manifest_vm->secondary.vcpu_count, ppool, &vm)) {
+		dlog("Unable to initialise VM.\n");
+		return false;
+	}
+
+	/* Grant the VM access to the memory. */
+	if (!mm_vm_identity_map(&vm->ptable, mem_begin, mem_end,
+				MM_MODE_R | MM_MODE_W | MM_MODE_X,
+				&secondary_entry, ppool)) {
+		dlog("Unable to initialise memory.\n");
+		return false;
+	}
+
+	dlog("Loaded with %u vcpus, entry at %#x.\n",
+	     manifest_vm->secondary.vcpu_count, pa_addr(mem_begin));
+
+	vcpu = vm_get_vcpu(vm, 0);
+	vcpu_secondary_reset_and_start(vcpu, secondary_entry,
+				       pa_difference(mem_begin, mem_end));
 
 	return true;
 }
@@ -245,18 +329,23 @@ static bool update_reserved_ranges(struct boot_params_update *update,
 	return true;
 }
 
-/**
- * Loads all secondary VMs into the memory ranges from the given params.
- * Memory reserved for the VMs is added to the `reserved_ranges` of `update`.
+/*
+ * Loads alls VMs from the manifest.
  */
-bool load_secondary(struct mm_stage1_locked stage1_locked,
-		    const struct manifest *manifest, const struct memiter *cpio,
-		    const struct boot_params *params,
-		    struct boot_params_update *update, struct mpool *ppool)
+bool load_vms(struct mm_stage1_locked stage1_locked,
+	      const struct manifest *manifest, const struct memiter *cpio,
+	      const struct boot_params *params,
+	      struct boot_params_update *update, struct mpool *ppool)
 {
 	struct vm *primary;
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	size_t i;
+
+	if (!load_primary(stage1_locked, manifest, cpio, params->kernel_arg,
+			  update, ppool)) {
+		dlog("Unable to load primary VM.\n");
+		return false;
+	}
 
 	static_assert(
 		sizeof(mem_ranges_available) == sizeof(params->mem_ranges),
@@ -278,14 +367,9 @@ bool load_secondary(struct mm_stage1_locked stage1_locked,
 	for (i = 0; i < manifest->vm_count; ++i) {
 		const struct manifest_vm *manifest_vm = &manifest->vm[i];
 		spci_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
-		struct vm *vm;
-		struct vcpu *vcpu;
-		struct memiter kernel;
-		struct memiter kernel_filename;
 		uint64_t mem_size;
 		paddr_t secondary_mem_begin;
 		paddr_t secondary_mem_end;
-		ipaddr_t secondary_entry;
 
 		if (vm_id == HF_PRIMARY_VM_ID) {
 			continue;
@@ -294,65 +378,28 @@ bool load_secondary(struct mm_stage1_locked stage1_locked,
 		dlog("Loading VM%d: %s.\n", (int)vm_id,
 		     manifest_vm->debug_name);
 
-		memiter_init(&kernel_filename,
-			     manifest_vm->secondary.kernel_filename,
-			     strnlen_s(manifest_vm->secondary.kernel_filename,
-				       MANIFEST_MAX_STRING_LENGTH));
-		if (!memiter_find_file(cpio, &kernel_filename, &kernel)) {
-			dlog("Could not find kernel file \"%s\".\n",
-			     manifest_vm->secondary.kernel_filename);
-			continue;
-		}
-
 		mem_size = align_up(manifest_vm->secondary.mem_size, PAGE_SIZE);
-		if (mem_size < memiter_size(&kernel)) {
-			dlog("Kernel is larger than available memory\n");
-			continue;
-		}
-
 		if (!carve_out_mem_range(mem_ranges_available,
 					 params->mem_ranges_count, mem_size,
 					 &secondary_mem_begin,
 					 &secondary_mem_end)) {
-			dlog("Not enough memory (%u bytes)\n", mem_size);
+			dlog("Not enough memory (%u bytes).\n", mem_size);
 			continue;
 		}
 
-		if (!copy_to_unmapped(stage1_locked, secondary_mem_begin,
-				      &kernel, ppool)) {
-			dlog("Unable to copy kernel\n");
-			continue;
-		}
-
-		if (!vm_init(manifest_vm->secondary.vcpu_count, ppool, &vm)) {
-			dlog("Unable to initialise VM\n");
-			continue;
-		}
-
-		/* Grant the VM access to the memory. */
-		if (!mm_vm_identity_map(&vm->ptable, secondary_mem_begin,
-					secondary_mem_end,
-					MM_MODE_R | MM_MODE_W | MM_MODE_X,
-					&secondary_entry, ppool)) {
-			dlog("Unable to initialise memory\n");
+		if (!load_secondary(stage1_locked, secondary_mem_begin,
+				    secondary_mem_end, manifest_vm, cpio,
+				    ppool)) {
+			dlog("Unable to load VM.\n");
 			continue;
 		}
 
 		/* Deny the primary VM access to this memory. */
 		if (!mm_vm_unmap(&primary->ptable, secondary_mem_begin,
 				 secondary_mem_end, ppool)) {
-			dlog("Unable to unmap secondary VM from primary VM\n");
+			dlog("Unable to unmap secondary VM from primary VM.\n");
 			return false;
 		}
-
-		dlog("Loaded with %u vcpus, entry at %#x\n",
-		     manifest_vm->secondary.vcpu_count,
-		     pa_addr(secondary_mem_begin));
-
-		vcpu = vm_get_vcpu(vm, 0);
-		vcpu_secondary_reset_and_start(
-			vcpu, secondary_entry,
-			pa_difference(secondary_mem_begin, secondary_mem_end));
 	}
 
 	/*

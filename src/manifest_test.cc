@@ -410,18 +410,18 @@ TEST(manifest, valid)
 			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
+				.KernelFilename("primary_kernel")
 			.EndChild()
 			.StartChild("vm3")
 				.DebugName("second_secondary_vm")
 				.VcpuCount(43)
 				.MemSize(0x12345)
-				.KernelFilename("second_kernel")
+				.KernelFilename("second_secondary_kernel")
 			.EndChild()
 			.StartChild("vm2")
 				.DebugName("first_secondary_vm")
 				.VcpuCount(42)
 				.MemSize(12345)
-				.KernelFilename("first_kernel")
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -434,18 +434,19 @@ TEST(manifest, valid)
 
 	vm = &m.vm[0];
 	ASSERT_STREQ(vm->debug_name, "primary_vm");
+	ASSERT_STREQ(vm->kernel_filename, "primary_kernel");
 
 	vm = &m.vm[1];
 	ASSERT_STREQ(vm->debug_name, "first_secondary_vm");
+	ASSERT_STREQ(vm->kernel_filename, "");
 	ASSERT_EQ(vm->secondary.vcpu_count, 42);
 	ASSERT_EQ(vm->secondary.mem_size, 12345);
-	ASSERT_STREQ(vm->secondary.kernel_filename, "first_kernel");
 
 	vm = &m.vm[2];
 	ASSERT_STREQ(vm->debug_name, "second_secondary_vm");
+	ASSERT_STREQ(vm->kernel_filename, "second_secondary_kernel");
 	ASSERT_EQ(vm->secondary.vcpu_count, 43);
 	ASSERT_EQ(vm->secondary.mem_size, 0x12345);
-	ASSERT_STREQ(vm->secondary.kernel_filename, "second_kernel");
 }
 
 } /* namespace */

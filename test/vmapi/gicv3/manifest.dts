@@ -21,7 +21,8 @@
 	hypervisor {
 		compatible = "hafnium,hafnium";
 		vm1 {
-			debug_name = "primary";
+			debug_name = "gicv3_test";
+			kernel_filename = "gicv3_test";
 		};
 
 		vm2 {

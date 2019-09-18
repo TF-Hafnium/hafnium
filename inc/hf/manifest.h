@@ -31,10 +31,10 @@
 struct manifest_vm {
 	/* Properties defined for both primary and secondary VMs. */
 	char debug_name[MANIFEST_MAX_STRING_LENGTH];
+	char kernel_filename[MANIFEST_MAX_STRING_LENGTH];
 
 	/* Properties specific to secondary VMs. */
 	struct {
-		char kernel_filename[MANIFEST_MAX_STRING_LENGTH];
 		uint64_t mem_size;
 		spci_vcpu_count_t vcpu_count;
 	} secondary;

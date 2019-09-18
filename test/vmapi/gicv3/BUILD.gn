@@ -42,6 +42,7 @@ initrd("gicv3_test") {
   testonly = true
 
   manifest = "manifest.dts"
+  primary_name = "gicv3_test"
   primary_vm = ":gicv3_test_vm"
   secondary_vms = [ [
         "services0",

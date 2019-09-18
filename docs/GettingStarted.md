@@ -61,6 +61,7 @@ Follow the [Manifest](Manifest.md) instructions and build a DTBO with:
 	hypervisor {
 		vm1 {
 			debug_name = "Linux VM";
+			kernel_filename = "vmlinuz";
 		};
 	};
 };

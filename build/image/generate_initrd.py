@@ -29,6 +29,7 @@ import sys
 
 def Main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--primary_name", required=True)
     parser.add_argument("--primary_vm", required=True)
     parser.add_argument("--primary_vm_initrd")
     parser.add_argument(
@@ -39,17 +40,19 @@ def Main():
     parser.add_argument("--staging", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
-    staged_files = ["vmlinuz", "initrd.img"]
+    staged_files = [args.primary_name, "initrd.img"]
 
     # Create staging folder if needed.
     if not os.path.isdir(args.staging):
         os.makedirs(args.staging)
 
     # Prepare the primary VM image.
-    shutil.copyfile(args.primary_vm, os.path.join(args.staging, "vmlinuz"))
+    shutil.copyfile(args.primary_vm,
+                    os.path.join(args.staging, args.primary_name))
     # Prepare the primary VM's initrd.
     if args.primary_vm_initrd:
-        shutil.copyfile(args.primary_vm_initrd, os.path.join(args.staging, "initrd.img"))
+        shutil.copyfile(args.primary_vm_initrd,
+                        os.path.join(args.staging, "initrd.img"))
     else:
         open(os.path.join(args.staging, "initrd.img"), "w").close()
     # Prepare the secondary VMs.

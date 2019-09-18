@@ -21,7 +21,8 @@
 	hypervisor {
 		compatible = "hafnium,hafnium";
 		vm1 {
-			debug_name = "primary";
+			debug_name = "linux_test";
+			kernel_filename = "vmlinuz";
 		};
 
 		vm2 {

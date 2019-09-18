@@ -71,7 +71,6 @@ void one_time_init(void)
 	struct manifest manifest;
 	struct boot_params params;
 	struct boot_params_update update;
-	struct memiter primary_initrd;
 	struct memiter cpio;
 	void *initrd;
 	size_t i;
@@ -104,28 +103,17 @@ void one_time_init(void)
 	initrd = mm_identity_map(mm_stage1_locked, params.initrd_begin,
 				 params.initrd_end, MM_MODE_R, &ppool);
 	if (!initrd) {
-		panic("unable to map initrd in");
+		panic("Unable to map initrd.");
 	}
 
 	memiter_init(&cpio, initrd,
 		     pa_difference(params.initrd_begin, params.initrd_end));
 
 	/* Load all VMs. */
-	if (!load_primary(mm_stage1_locked, &cpio, params.kernel_arg,
-			  &primary_initrd, &ppool)) {
-		panic("unable to load primary VM");
-	}
-
-	/*
-	 * load_secondary will add regions assigned to the secondary VMs from
-	 * mem_ranges to reserved_ranges.
-	 */
-	update.initrd_begin = pa_from_va(va_from_ptr(primary_initrd.next));
-	update.initrd_end = pa_from_va(va_from_ptr(primary_initrd.limit));
 	update.reserved_ranges_count = 0;
-	if (!load_secondary(mm_stage1_locked, &manifest, &cpio, &params,
-			    &update, &ppool)) {
-		panic("unable to load secondary VMs");
+	if (!load_vms(mm_stage1_locked, &manifest, &cpio, &params, &update,
+		      &ppool)) {
+		panic("Unable to load VMs.");
 	}
 
 	/* Prepare to run by updating bootparams as seen by primary VM. */
