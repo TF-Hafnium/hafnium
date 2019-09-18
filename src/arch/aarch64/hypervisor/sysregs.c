@@ -22,6 +22,7 @@
 #include "hf/types.h"
 
 #include "msr.h"
+#include "perfmon.h"
 
 /**
  * Returns the value for MDCR_EL2 for the particular VM.
@@ -31,6 +32,11 @@ uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id)
 {
 	uintreg_t mdcr_el2_value = read_msr(MDCR_EL2);
 	uintreg_t pmcr_el0 = read_msr(PMCR_EL0);
+
+	/*
+	 * TODO: Investigate gating settings these values depending on which
+	 * features are supported by the current CPU.
+	 */
 
 	/*
 	 * Preserve E2PB for now, which depends on the SPE implementation.
@@ -53,7 +59,22 @@ uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id)
 		 * but trap them for additional security.
 		 */
 		mdcr_el2_value |= MDCR_EL2_TDE;
+
+		/*
+		 * Trap secondary VM accesses to performance monitor registers
+		 * for fine-grained control.
+		 *
+		 * Do *not* trap primary VM accesses to performance monitor
+		 * registers. Sensitive registers are context switched, and
+		 * access to performance monitor registers is more common than
+		 * access to debug registers, therefore, trapping them all could
+		 * impose a non-trivial overhead.
+		 */
+		mdcr_el2_value |= MDCR_EL2_TPM | MDCR_EL2_TPMCR;
 	}
+
+	/* Disable cycle and event counting at EL2. */
+	mdcr_el2_value |= MDCR_EL2_HCCD | MDCR_EL2_HPMD;
 
 	/* All available event counters accessible from all exception levels. */
 	mdcr_el2_value |= GET_PMCR_EL0_N(pmcr_el0) & MDCR_EL2_HPMN;

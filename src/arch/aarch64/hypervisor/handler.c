@@ -32,6 +32,7 @@
 
 #include "debug_el1.h"
 #include "msr.h"
+#include "perfmon.h"
 #include "psci.h"
 #include "psci_handler.h"
 #include "smc.h"
@@ -631,16 +632,26 @@ struct vcpu *handle_system_register_access(uintreg_t esr)
 	CHECK(ec == 0x18);
 
 	/*
-	 * Handle accesses to debug registers.
+	 * Handle accesses to debug and performance monitor registers.
 	 * Abort when encountering unhandled register accesses.
 	 */
-	if (is_debug_el1_register_access(esr) &&
-	    debug_el1_process_access(vcpu, vm_id, esr)) {
-		/* Instruction was fulfilled. Skip it and run the next one. */
-		vcpu->regs.pc += GET_NEXT_PC_INC(esr);
-		return NULL;
+	if (debug_el1_is_register_access(esr)) {
+		if (!debug_el1_process_access(vcpu, vm_id, esr)) {
+			goto fail;
+		}
+	} else if (perfmon_is_register_access(esr)) {
+		if (!perfmon_process_access(vcpu, vm_id, esr)) {
+			goto fail;
+		}
+	} else {
+		goto fail;
 	}
 
+	/* Instruction was fulfilled. Skip it and run the next one. */
+	vcpu->regs.pc += GET_NEXT_PC_INC(esr);
+	return NULL;
+
+fail:
 	direction_str = ISS_IS_READ(esr) ? "read" : "write";
 
 	dlog("Unhandled system register %s: op0=%d, op1=%d, crn=%d, "

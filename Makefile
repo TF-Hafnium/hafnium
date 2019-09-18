@@ -45,7 +45,8 @@ CHECKPATCH := $(PWD)/third_party/linux/scripts/checkpatch.pl \
 # Specifies the grep pattern for ignoring specific files in checkpatch.
 # Separate the different items in the list with a grep or (\|).
 # debug_el1.c : uses XMACROS, which checkpatch doesn't understand.
-CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c"
+# perfmon.c : uses XMACROS, which checkpatch doesn't understand.
+CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c"
 
 # Select the project to build.
 PROJECT ?= reference

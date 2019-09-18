@@ -21,7 +21,7 @@
 #define CPU_STACK_BOTTOM 8
 #define VCPU_REGS 32
 #define VCPU_LAZY (VCPU_REGS + 264)
-#define VCPU_FREGS (VCPU_LAZY + 248)
+#define VCPU_FREGS (VCPU_LAZY + 280)
 
 #if GIC_VERSION == 3 || GIC_VERSION == 4
 #define VCPU_GIC (VCPU_FREGS + 528)

@@ -111,6 +111,10 @@ struct arch_regs {
 		uintreg_t vttbr_el2;
 		uintreg_t mdcr_el2;
 		uintreg_t mdscr_el1;
+		uintreg_t pmccfiltr_el0;
+		uintreg_t pmcr_el0;
+		uintreg_t pmcntenset_el0;
+		uintreg_t pmintenset_el1;
 	} lazy;
 
 	/* Floating point registers. */

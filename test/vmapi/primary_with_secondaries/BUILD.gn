@@ -32,6 +32,7 @@ vm_kernel("primary_with_secondaries_test_vm") {
     "mailbox.c",
     "memory_sharing.c",
     "no_services.c",
+    "perfmon.c",
     "run_race.c",
     "smp.c",
     "spci.c",

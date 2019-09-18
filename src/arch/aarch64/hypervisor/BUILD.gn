@@ -25,6 +25,7 @@ source_set("hypervisor") {
     "debug_el1.c",
     "handler.c",
     "offsets.c",
+    "perfmon.c",
     "psci_handler.c",
     "sysregs.c",
   ]

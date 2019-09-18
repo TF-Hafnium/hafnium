@@ -23,9 +23,18 @@
 
 #define TRY_READ(REG) dlog(#REG "=%#x\n", read_msr(REG))
 
+#define CHECK_READ(REG, VALUE)       \
+	do {                         \
+		uintreg_t x;         \
+		x = read_msr(REG);   \
+		EXPECT_EQ(x, VALUE); \
+	} while (0)
+
 #define TRY_WRITE_READ(REG, VALUE)     \
 	do {                           \
 		uintreg_t x;           \
+		x = read_msr(REG);     \
+		EXPECT_NE(x, VALUE);   \
 		write_msr(REG, VALUE); \
 		x = read_msr(REG);     \
 		EXPECT_EQ(x, VALUE);   \

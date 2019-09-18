@@ -70,24 +70,26 @@
 #define MDCR_EL2_TDE (0x1u << 8)
 
 /**
- * Controls traps for all PMU register accesses other than PMCR_EL0.
+ * Controls traps for all performance monitor register accesses other than
+ * PMCR_EL0.
  */
 #define MDCR_EL2_TPM (0x1u << 6)
 
 /**
- * Controls traps for PMU register PMCR_EL0.
+ * Controls traps for performance monitor register PMCR_EL0.
  */
 #define MDCR_EL2_TPMCR (0x1u << 5)
 
 /**
  * Defines the number of event counters that are accessible from various
- * exception levels, if permitted.  Dependant on whether PMUv3 is implemented.
+ * exception levels, if permitted. Dependant on whether PMUv3
+ * is implemented.
  */
 #define MDCR_EL2_HPMN (0x1fu << 0)
 
 /**
  * System register are identified by op0, op2, op1, crn, crm. The ISS encoding
- * includes also rt and direction. Exclude them,  @see D13.2.37 (D13-2977).
+ * includes also rt and direction. Exclude them, @see D13.2.37 (D13-2977).
  */
 #define ISS_SYSREG_MASK                                \
 	(((1u << 22) - 1u) & /* Select the ISS bits */ \

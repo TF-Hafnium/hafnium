@@ -23,6 +23,7 @@
 #include "hf/addr.h"
 #include "hf/std.h"
 
+#include "hypervisor/perfmon.h"
 #include "hypervisor/sysregs.h"
 
 void arch_irq_disable(void)
@@ -115,6 +116,9 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 	 * that needs to be protected.
 	 */
 	r->lazy.mdscr_el1 = 0x0u & ~(0x1u << 15);
+
+	/* Disable cycle counting on initialization. */
+	r->lazy.pmccfiltr_el0 = perfmon_get_pmccfiltr_el0_init_value(vm_id);
 
 	gic_regs_reset(r, is_primary);
 }

@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-#include "debug_el1.h"
-
 #include "primary_with_secondary.h"
+#include "sysregs.h"
 #include "util.h"
 
 /**
@@ -88,8 +87,7 @@ TEST(debug_el1, secondary_dbgwvr0_el1)
 }
 
 /**
- * Attempts to access many debug registers for read, without validating their
- * value.
+ * Attempts to access debug registers for read, without validating their value.
  */
 TEST(debug_el1, primary_basic)
 {

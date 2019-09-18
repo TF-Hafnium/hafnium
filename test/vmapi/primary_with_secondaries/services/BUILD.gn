@@ -38,6 +38,16 @@ source_set("debug_el1") {
   ]
 }
 
+# Service to try to access performance monitor registers.
+source_set("perfmon") {
+  testonly = true
+  public_configs = [ "//test/hftest:hftest_config" ]
+
+  sources = [
+    "perfmon.c",
+  ]
+}
+
 # Service to listen for messages and echo them back to the sender.
 source_set("echo") {
   testonly = true
@@ -205,6 +215,7 @@ vm_kernel("service_vm0") {
     ":floating_point",
     ":interruptible",
     ":memory",
+    ":perfmon",
     ":receive_block",
     ":relay",
     ":spci_check",

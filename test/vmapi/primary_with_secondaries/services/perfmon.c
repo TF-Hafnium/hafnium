@@ -18,37 +18,23 @@
 
 #include "../sysregs.h"
 
-TEST_SERVICE(debug_el1_secondary_mdccint_el1)
+TEST_SERVICE(perfmon_secondary_pmccfiltr_el0)
 {
 	EXPECT_GT(hf_vm_get_id(), HF_PRIMARY_VM_ID);
-	TRY_READ(MDCCINT_EL1);
-	FAIL("Reading debug EL1 register in secondary VM didn't trap.");
+	TRY_READ(PMCCFILTR_EL0);
+	FAIL("Accessing perfmon register in secondary VM didn't trap.");
 }
 
-TEST_SERVICE(debug_el1_secondary_dbgbcr0_el1)
+TEST_SERVICE(perfmon_secondary_pmcr_el0)
 {
 	EXPECT_GT(hf_vm_get_id(), HF_PRIMARY_VM_ID);
-	TRY_READ(DBGBCR0_EL1);
-	FAIL("Reading debug EL1 register in secondary VM didn't trap.");
+	TRY_READ(PMCR_EL0);
+	FAIL("Accessing perfmon register in secondary VM didn't trap.");
 }
 
-TEST_SERVICE(debug_el1_secondary_dbgbvr0_el1)
+TEST_SERVICE(perfmon_secondary_pmintenset_el1)
 {
 	EXPECT_GT(hf_vm_get_id(), HF_PRIMARY_VM_ID);
-	TRY_READ(DBGBVR0_EL1);
-	FAIL("Reading debug EL1 register in secondary VM didn't trap.");
-}
-
-TEST_SERVICE(debug_el1_secondary_dbgwcr0_el1)
-{
-	EXPECT_GT(hf_vm_get_id(), HF_PRIMARY_VM_ID);
-	TRY_READ(DBGWCR0_EL1);
-	FAIL("Reading debug EL1 register in secondary VM didn't trap.");
-}
-
-TEST_SERVICE(debug_el1_secondary_dbgwvr0_el1)
-{
-	EXPECT_GT(hf_vm_get_id(), HF_PRIMARY_VM_ID);
-	TRY_READ(DBGWVR0_EL1);
-	FAIL("Reading debug EL1 register in secondary VM didn't trap.");
+	write_msr(PMINTENSET_EL1, 0xf);
+	FAIL("Accessing perfmon register in secondary VM didn't trap.");
 }

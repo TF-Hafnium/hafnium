@@ -129,7 +129,7 @@
 /**
  * Returns true if the ESR register shows an access to an EL1 debug register.
  */
-bool is_debug_el1_register_access(uintreg_t esr)
+bool debug_el1_is_register_access(uintreg_t esr)
 {
 	/*
 	 * Architecture Reference Manual D12.2: op0 == 2 is for debug and trace
