@@ -47,7 +47,3 @@ struct boot_params_update {
 	paddr_t initrd_begin;
 	paddr_t initrd_end;
 };
-
-bool boot_params_init(struct boot_params *p, const struct fdt_node *fdt_root);
-bool boot_params_patch_fdt(struct mm_stage1_locked stage1_locked,
-			   struct boot_params_update *p, struct mpool *ppool);

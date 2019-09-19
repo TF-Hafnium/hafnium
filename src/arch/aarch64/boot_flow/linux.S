@@ -18,7 +18,7 @@
 .global plat_boot_flow_hook
 plat_boot_flow_hook:
 	/* Save the FDT pointer to a global variable. */
-	adrp x25, plat_fdt_addr
-	add x25, x25, :lo12:plat_fdt_addr
+	adrp x25, plat_boot_flow_fdt_addr
+	add x25, x25, :lo12:plat_boot_flow_fdt_addr
 	str x0, [x25]
 	ret

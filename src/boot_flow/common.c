@@ -20,6 +20,21 @@
 #include "hf/plat/boot_flow.h"
 
 /**
+ * Extract the boot parameters from the FDT and the boot-flow driver.
+ */
+static bool boot_params_init(struct boot_params *p,
+			     const struct fdt_node *fdt_root)
+{
+	p->mem_ranges_count = 0;
+	p->kernel_arg = plat_boot_flow_get_kernel_arg();
+
+	return plat_boot_flow_get_initrd_range(fdt_root, &p->initrd_begin,
+					       &p->initrd_end) &&
+	       fdt_find_cpus(fdt_root, p->cpu_ids, &p->cpu_count) &&
+	       fdt_find_memory_ranges(fdt_root, p);
+}
+
+/**
  * Parses information from FDT needed to initialize Hafnium.
  * FDT is mapped at the beginning and unmapped before exiting the function.
  */
@@ -33,7 +48,8 @@ bool boot_flow_init(struct mm_stage1_locked stage1_locked,
 	enum manifest_return_code manifest_ret;
 
 	/* Get the memory map from the FDT. */
-	fdt = fdt_map(stage1_locked, plat_get_fdt_addr(), &fdt_root, ppool);
+	fdt = fdt_map(stage1_locked, plat_boot_flow_get_fdt_addr(), &fdt_root,
+		      ppool);
 	if (fdt == NULL) {
 		dlog("Unable to map FDT.\n");
 		return false;
@@ -65,4 +81,13 @@ out_unmap_fdt:
 	}
 
 	return ret;
+}
+
+/**
+ * Takes action on any updates that were generated.
+ */
+bool boot_flow_update(struct mm_stage1_locked stage1_locked,
+		      struct boot_params_update *p, struct mpool *ppool)
+{
+	return plat_boot_flow_update(stage1_locked, p, ppool);
 }

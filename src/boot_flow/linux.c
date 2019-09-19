@@ -18,31 +18,38 @@
 #include "hf/plat/boot_flow.h"
 
 /* Set by arch-specific boot-time hook. */
-uintreg_t plat_fdt_addr;
+uintreg_t plat_boot_flow_fdt_addr;
 
 /**
  * Returns the physical address of board FDT. This was passed to Hafnium in the
  * first kernel arg by the boot loader.
  */
-paddr_t plat_get_fdt_addr(void)
+paddr_t plat_boot_flow_get_fdt_addr(void)
 {
-	return pa_init((uintpaddr_t)plat_fdt_addr);
+	return pa_init((uintpaddr_t)plat_boot_flow_fdt_addr);
 }
 
 /**
  * When handing over to the primary, give it the same FDT address that was given
  * to Hafnium. The FDT may have been modified during Hafnium init.
  */
-uintreg_t plat_get_kernel_arg(void)
+uintreg_t plat_boot_flow_get_kernel_arg(void)
 {
-	return plat_fdt_addr;
+	return plat_boot_flow_fdt_addr;
 }
 
 /**
  * Load initrd range from the board FDT.
  */
-bool plat_get_initrd_range(const struct fdt_node *fdt_root, paddr_t *begin,
-			   paddr_t *end)
+bool plat_boot_flow_get_initrd_range(const struct fdt_node *fdt_root,
+				     paddr_t *begin, paddr_t *end)
 {
 	return fdt_find_initrd(fdt_root, begin, end);
+}
+
+bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,
+			   struct boot_params_update *p, struct mpool *ppool)
+{
+	return fdt_patch(stage1_locked, plat_boot_flow_get_fdt_addr(), p,
+			 ppool);
 }

@@ -27,7 +27,6 @@ hypervisor("hafnium") {
 # src targets will merge!
 source_set("src_not_testable_yet") {
   sources = [
-    "boot_params.c",
     "cpio.c",
     "init.c",
     "load.c",

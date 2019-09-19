@@ -116,9 +116,8 @@ void one_time_init(void)
 		panic("Unable to load VMs.");
 	}
 
-	/* Prepare to run by updating bootparams as seen by primary VM. */
-	if (!boot_params_patch_fdt(mm_stage1_locked, &update, &ppool)) {
-		panic("plat_update_boot_params failed");
+	if (!boot_flow_update(mm_stage1_locked, &update, &ppool)) {
+		panic("Unable to update boot flow.");
 	}
 
 	mm_defrag(mm_stage1_locked, &ppool);

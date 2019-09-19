@@ -21,7 +21,7 @@
  * FDT was compiled into Hafnium. Return physical address of the `.plat.fdt`
  * section of Hafnium image.
  */
-paddr_t plat_get_fdt_addr(void)
+paddr_t plat_boot_flow_get_fdt_addr(void)
 {
 	return layout_fdt_begin();
 }
@@ -29,7 +29,7 @@ paddr_t plat_get_fdt_addr(void)
 /**
  * Android boot flow does not use kernel arguments. Pass zero.
  */
-uintreg_t plat_get_kernel_arg(void)
+uintreg_t plat_boot_flow_get_kernel_arg(void)
 {
 	return 0;
 }
@@ -37,12 +37,25 @@ uintreg_t plat_get_kernel_arg(void)
 /**
  * Initrd was compiled into Hafnium. Return range of the '.plat.initrd' section.
  */
-bool plat_get_initrd_range(const struct fdt_node *fdt_root, paddr_t *begin,
-			   paddr_t *end)
+bool plat_boot_flow_get_initrd_range(const struct fdt_node *fdt_root,
+				     paddr_t *begin, paddr_t *end)
 {
 	(void)fdt_root;
 
 	*begin = layout_initrd_begin();
 	*end = layout_initrd_end();
+	return true;
+}
+
+/**
+ * Android boot flow does not change based on the updates.
+ */
+bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,
+			   struct boot_params_update *p, struct mpool *ppool)
+{
+	(void)stage1_locked;
+	(void)p;
+	(void)ppool;
+
 	return true;
 }
