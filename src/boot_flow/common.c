@@ -87,7 +87,8 @@ out_unmap_fdt:
  * Takes action on any updates that were generated.
  */
 bool boot_flow_update(struct mm_stage1_locked stage1_locked,
-		      struct boot_params_update *p, struct mpool *ppool)
+		      struct boot_params_update *p, struct memiter *cpio,
+		      struct mpool *ppool)
 {
-	return plat_boot_flow_update(stage1_locked, p, ppool);
+	return plat_boot_flow_update(stage1_locked, p, cpio, ppool);
 }

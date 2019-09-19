@@ -66,9 +66,8 @@ static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
  * null-terminated, so we use a memory iterator to represent it. The file, if
  * found, is returned in the "it" argument.
  */
-static bool memiter_find_file(const struct memiter *cpio,
-			      const struct memiter *filename,
-			      struct memiter *it)
+static bool find_file(const struct memiter *cpio,
+		      const struct memiter *filename, struct memiter *it)
 {
 	const char *fname;
 	const void *fcontents;
@@ -77,28 +76,6 @@ static bool memiter_find_file(const struct memiter *cpio,
 
 	while (cpio_next(&iter, &fname, &fcontents, &fsize)) {
 		if (memiter_iseq(filename, fname)) {
-			memiter_init(it, fcontents, fsize);
-			return true;
-		}
-	}
-
-	return false;
-}
-
-/**
- * Looks for a file in the given cpio archive. The file, if found, is returned
- * in the "it" argument.
- */
-static bool find_file(const struct memiter *cpio, const char *name,
-		      struct memiter *it)
-{
-	const char *fname;
-	const void *fcontents;
-	size_t fsize;
-	struct memiter iter = *cpio;
-
-	while (cpio_next(&iter, &fname, &fcontents, &fsize)) {
-		if (!strcmp(fname, name)) {
 			memiter_init(it, fcontents, fsize);
 			return true;
 		}
@@ -123,7 +100,7 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 		return true;
 	}
 
-	if (!memiter_find_file(cpio, &kernel_filename, &kernel)) {
+	if (!find_file(cpio, &kernel_filename, &kernel)) {
 		dlog("Could not find kernel file \"%s\".\n",
 		     manifest_vm->kernel_filename);
 		return false;
@@ -148,12 +125,11 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 static bool load_primary(struct mm_stage1_locked stage1_locked,
 			 const struct manifest *manifest,
 			 const struct memiter *cpio, uintreg_t kernel_arg,
-			 struct boot_params_update *update, struct mpool *ppool)
+			 struct mpool *ppool)
 {
 	paddr_t primary_begin = layout_primary_begin();
 	const struct manifest_vm *manifest_vm =
 		&manifest->vm[HF_PRIMARY_VM_ID - HF_VM_ID_OFFSET];
-	struct memiter initrd;
 
 	/*
 	 * TODO: This bound is currently meaningless but will be addressed when
@@ -166,14 +142,6 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		dlog("Unable to load primary kernel.");
 		return false;
 	}
-
-	if (!find_file(cpio, "initrd.img", &initrd)) {
-		dlog("Unable to find initrd.img\n");
-		return false;
-	}
-
-	update->initrd_begin = pa_from_va(va_from_ptr(initrd.next));
-	update->initrd_end = pa_from_va(va_from_ptr(initrd.limit));
 
 	{
 		struct vm *vm;
@@ -342,7 +310,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	size_t i;
 
 	if (!load_primary(stage1_locked, manifest, cpio, params->kernel_arg,
-			  update, ppool)) {
+			  ppool)) {
 		dlog("Unable to load primary VM.\n");
 		return false;
 	}

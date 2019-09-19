@@ -18,6 +18,7 @@
 
 #include "hf/boot_params.h"
 #include "hf/manifest.h"
+#include "hf/memiter.h"
 #include "hf/mm.h"
 
 bool boot_flow_init(struct mm_stage1_locked stage1_locked,
@@ -25,4 +26,5 @@ bool boot_flow_init(struct mm_stage1_locked stage1_locked,
 		    struct mpool *ppool);
 
 bool boot_flow_update(struct mm_stage1_locked stage1_locked,
-		      struct boot_params_update *p, struct mpool *ppool);
+		      struct boot_params_update *p, struct memiter *cpio,
+		      struct mpool *ppool);
