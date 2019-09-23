@@ -53,29 +53,9 @@ static const char *generate_vm_node_name(char *buf, spci_vm_id_t vm_id)
 	return ptr;
 }
 
-static enum manifest_return_code extract_string(const char *data, uint32_t size,
-						char *out, rsize_t out_sz)
-{
-	/*
-	 * Require that the value contains exactly one NULL character and that
-	 * it is the last byte.
-	 */
-	if (memchr(data, '\0', size) != &data[size - 1]) {
-		return MANIFEST_ERROR_MALFORMED_STRING;
-	}
-
-	/* Check that the string fits into the buffer. */
-	if (size > out_sz) {
-		return MANIFEST_ERROR_STRING_TOO_LONG;
-	}
-
-	memcpy_s(out, out_sz, data, size);
-	return MANIFEST_SUCCESS;
-}
-
 static enum manifest_return_code read_string(const struct fdt_node *node,
-					     const char *property, char *out,
-					     rsize_t out_sz)
+					     const char *property,
+					     struct string *out)
 {
 	const char *data;
 	uint32_t size;
@@ -84,26 +64,27 @@ static enum manifest_return_code read_string(const struct fdt_node *node,
 		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
 	}
 
-	return extract_string(data, size, out, out_sz);
+	switch (string_init(out, data, size)) {
+	case STRING_SUCCESS:
+		return MANIFEST_SUCCESS;
+	case STRING_ERROR_INVALID_INPUT:
+		return MANIFEST_ERROR_MALFORMED_STRING;
+	case STRING_ERROR_TOO_LONG:
+		return MANIFEST_ERROR_STRING_TOO_LONG;
+	}
 }
 
 static enum manifest_return_code read_optional_string(
-	const struct fdt_node *node, const char *property, char *out,
-	rsize_t out_sz)
+	const struct fdt_node *node, const char *property, struct string *out)
 {
-	const char *data;
-	uint32_t size;
+	enum manifest_return_code ret;
 
-	if (!fdt_read_property(node, property, &data, &size)) {
-		if (out_sz < 1) {
-			return MANIFEST_ERROR_STRING_TOO_LONG;
-		}
-
-		*out = '\0';
-		return MANIFEST_SUCCESS;
+	ret = read_string(node, property, out);
+	if (ret == MANIFEST_ERROR_PROPERTY_NOT_FOUND) {
+		string_init_empty(out);
+		ret = MANIFEST_SUCCESS;
 	}
-
-	return extract_string(data, size, out, out_sz);
+	return ret;
 }
 
 static enum manifest_return_code read_uint64(const struct fdt_node *node,
@@ -225,10 +206,9 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 					  struct manifest_vm *vm,
 					  spci_vm_id_t vm_id)
 {
-	TRY(read_string(node, "debug_name", vm->debug_name,
-			sizeof(vm->debug_name)));
-	TRY(read_optional_string(node, "kernel_filename", vm->kernel_filename,
-				 sizeof(vm->kernel_filename)));
+	TRY(read_string(node, "debug_name", &vm->debug_name));
+	TRY(read_optional_string(node, "kernel_filename",
+				 &vm->kernel_filename));
 	if (vm_id != HF_PRIMARY_VM_ID) {
 		TRY(read_uint64(node, "mem_size", &vm->secondary.mem_size));
 		TRY(read_uint16(node, "vcpu_count", &vm->secondary.vcpu_count));

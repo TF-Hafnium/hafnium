@@ -52,6 +52,7 @@ source_set("src_testable") {
     "manifest.c",
     "panic.c",
     "spci_architected_message.c",
+    "string.c",
     "vm.c",
   ]
 
@@ -158,6 +159,7 @@ executable("unit_tests") {
     "mm_test.cc",
     "mpool_test.cc",
     "spci_test.cc",
+    "string_test.cc",
   ]
   sources += [ "layout_fake.c" ]
   cflags_cc = [

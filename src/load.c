@@ -61,48 +61,20 @@ static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
 	return true;
 }
 
-/**
- * Looks for a file in the given cpio archive. The filename is not
- * null-terminated, so we use a memory iterator to represent it. The file, if
- * found, is returned in the "it" argument.
- */
-static bool find_file(const struct memiter *cpio,
-		      const struct memiter *filename, struct memiter *it)
-{
-	const char *fname;
-	const void *fcontents;
-	size_t fsize;
-	struct memiter iter = *cpio;
-
-	while (cpio_next(&iter, &fname, &fcontents, &fsize)) {
-		if (memiter_iseq(filename, fname)) {
-			memiter_init(it, fcontents, fsize);
-			return true;
-		}
-	}
-
-	return false;
-}
-
 static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 			paddr_t end, const struct manifest_vm *manifest_vm,
 			const struct memiter *cpio, struct mpool *ppool)
 {
-	struct memiter kernel_filename;
 	struct memiter kernel;
 
-	memiter_init(&kernel_filename, manifest_vm->kernel_filename,
-		     strnlen_s(manifest_vm->kernel_filename,
-			       MANIFEST_MAX_STRING_LENGTH));
-
-	if (memiter_size(&kernel_filename) == 0) {
+	if (string_is_empty(&manifest_vm->kernel_filename)) {
 		/* This signals the kernel has been preloaded. */
 		return true;
 	}
 
-	if (!find_file(cpio, &kernel_filename, &kernel)) {
+	if (!cpio_get_file(cpio, &manifest_vm->kernel_filename, &kernel)) {
 		dlog("Could not find kernel file \"%s\".\n",
-		     manifest_vm->kernel_filename);
+		     string_data(&manifest_vm->kernel_filename));
 		return false;
 	}
 

@@ -41,8 +41,8 @@ struct cpio_header {
  * advances the iterator such that another call to this function would return
  * the following file.
  */
-bool cpio_next(struct memiter *iter, const char **name, const void **contents,
-	       size_t *size)
+static bool cpio_next(struct memiter *iter, const char **name,
+		      const void **contents, size_t *size)
 {
 	size_t len;
 	struct memiter lit = *iter;
@@ -79,4 +79,26 @@ bool cpio_next(struct memiter *iter, const char **name, const void **contents,
 	*iter = lit;
 
 	return true;
+}
+
+/**
+ * Looks for a file in the given cpio archive. The file, if found, is returned
+ * in the "it" argument.
+ */
+bool cpio_get_file(const struct memiter *cpio, const struct string *name,
+		   struct memiter *it)
+{
+	const char *fname;
+	const void *fcontents;
+	size_t fsize;
+	struct memiter iter = *cpio;
+
+	while (cpio_next(&iter, &fname, &fcontents, &fsize)) {
+		if (!strcmp(fname, string_data(name))) {
+			memiter_init(it, fcontents, fsize);
+			return true;
+		}
+	}
+
+	return false;
 }

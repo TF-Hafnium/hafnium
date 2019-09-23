@@ -304,8 +304,8 @@ static std::vector<char> gen_long_string_dtb(bool valid)
 {
 	const char last_valid[] = "1234567890123456789012345678901";
 	const char first_invalid[] = "12345678901234567890123456789012";
-	static_assert(sizeof(last_valid) == MANIFEST_MAX_STRING_LENGTH);
-	static_assert(sizeof(first_invalid) == MANIFEST_MAX_STRING_LENGTH + 1);
+	static_assert(sizeof(last_valid) == STRING_MAX_SIZE);
+	static_assert(sizeof(first_invalid) == STRING_MAX_SIZE + 1);
 
 	/* clang-format off */
 	return ManifestDtBuilder()
@@ -433,18 +433,19 @@ TEST(manifest, valid)
 	ASSERT_EQ(m.vm_count, 3);
 
 	vm = &m.vm[0];
-	ASSERT_STREQ(vm->debug_name, "primary_vm");
-	ASSERT_STREQ(vm->kernel_filename, "primary_kernel");
+	ASSERT_STREQ(string_data(&vm->debug_name), "primary_vm");
+	ASSERT_STREQ(string_data(&vm->kernel_filename), "primary_kernel");
 
 	vm = &m.vm[1];
-	ASSERT_STREQ(vm->debug_name, "first_secondary_vm");
-	ASSERT_STREQ(vm->kernel_filename, "");
+	ASSERT_STREQ(string_data(&vm->debug_name), "first_secondary_vm");
+	ASSERT_STREQ(string_data(&vm->kernel_filename), "");
 	ASSERT_EQ(vm->secondary.vcpu_count, 42);
 	ASSERT_EQ(vm->secondary.mem_size, 12345);
 
 	vm = &m.vm[2];
-	ASSERT_STREQ(vm->debug_name, "second_secondary_vm");
-	ASSERT_STREQ(vm->kernel_filename, "second_secondary_kernel");
+	ASSERT_STREQ(string_data(&vm->debug_name), "second_secondary_vm");
+	ASSERT_STREQ(string_data(&vm->kernel_filename),
+		     "second_secondary_kernel");
 	ASSERT_EQ(vm->secondary.vcpu_count, 43);
 	ASSERT_EQ(vm->secondary.mem_size, 0x12345);
 }

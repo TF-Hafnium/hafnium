@@ -19,19 +19,15 @@
 #include "hf/fdt.h"
 #include "hf/memiter.h"
 #include "hf/spci.h"
-
-/**
- * Maximum length of a string parsed from the FDT, including NULL terminator.
- */
-#define MANIFEST_MAX_STRING_LENGTH 32
+#include "hf/string.h"
 
 /**
  * Holds information about one of the VMs described in the manifest.
  */
 struct manifest_vm {
 	/* Properties defined for both primary and secondary VMs. */
-	char debug_name[MANIFEST_MAX_STRING_LENGTH];
-	char kernel_filename[MANIFEST_MAX_STRING_LENGTH];
+	struct string debug_name;
+	struct string kernel_filename;
 
 	/* Properties specific to secondary VMs. */
 	struct {

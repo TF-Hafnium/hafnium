@@ -20,6 +20,7 @@
 #include <stddef.h>
 
 #include "hf/memiter.h"
+#include "hf/string.h"
 
-bool cpio_next(struct memiter *iter, const char **name, const void **contents,
-	       size_t *size);
+bool cpio_get_file(const struct memiter *cpio, const struct string *name,
+		   struct memiter *it);
