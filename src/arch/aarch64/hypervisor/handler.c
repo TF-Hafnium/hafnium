@@ -49,11 +49,6 @@
  */
 #define GET_NEXT_PC_INC(esr) (((esr) & (1u << 25)) ? 4 : 2)
 
-struct hvc_handler_return {
-	smc_res_t user_ret;
-	struct vcpu *new;
-};
-
 /**
  * Returns a reference to the currently executing vCPU.
  */
@@ -366,89 +361,89 @@ static bool smc_handler(struct vcpu *vcpu, smc_res_t *ret, struct vcpu **next)
 	return smc_forwarder(vcpu, ret);
 }
 
-struct hvc_handler_return hvc_handler(uintreg_t arg0, uintreg_t arg1,
-				      uintreg_t arg2, uintreg_t arg3)
+struct vcpu *hvc_handler(struct vcpu *vcpu)
 {
-	struct hvc_handler_return ret;
+	uint32_t func = vcpu->regs.r[0];
+	uintreg_t arg1 = vcpu->regs.r[1];
+	uintreg_t arg2 = vcpu->regs.r[2];
+	uintreg_t arg3 = vcpu->regs.r[3];
+	struct vcpu *next = NULL;
 
-	ret.new = NULL;
-
-	if (psci_handler(current(), arg0, arg1, arg2, arg3, &ret.user_ret.res0,
-			 &ret.new)) {
-		return ret;
+	if (psci_handler(vcpu, func, arg1, arg2, arg3, &vcpu->regs.r[0],
+			 &next)) {
+		return next;
 	}
 
-	if (spci_handler(arg0, arg1, arg2, arg3, &ret.user_ret.res0,
-			 &ret.new)) {
-		update_vi(ret.new);
-		return ret;
+	if (spci_handler(func, arg1, arg2, arg3, &vcpu->regs.r[0], &next)) {
+		update_vi(next);
+		return next;
 	}
 
-	switch ((uint32_t)arg0) {
+	switch (func) {
 	case HF_VM_GET_ID:
-		ret.user_ret.res0 = api_vm_get_id(current());
+		vcpu->regs.r[0] = api_vm_get_id(vcpu);
 		break;
 
 	case HF_VM_GET_COUNT:
-		ret.user_ret.res0 = api_vm_get_count();
+		vcpu->regs.r[0] = api_vm_get_count();
 		break;
 
 	case HF_VCPU_GET_COUNT:
-		ret.user_ret.res0 = api_vcpu_get_count(arg1, current());
+		vcpu->regs.r[0] = api_vcpu_get_count(arg1, vcpu);
 		break;
 
 	case HF_VCPU_RUN:
-		ret.user_ret.res0 = hf_vcpu_run_return_encode(
-			api_vcpu_run(arg1, arg2, current(), &ret.new));
+		vcpu->regs.r[0] = hf_vcpu_run_return_encode(
+			api_vcpu_run(arg1, arg2, vcpu, &next));
 		break;
 
 	case HF_VM_CONFIGURE:
-		ret.user_ret.res0 = api_vm_configure(
-			ipa_init(arg1), ipa_init(arg2), current(), &ret.new);
+		vcpu->regs.r[0] = api_vm_configure(ipa_init(arg1),
+						   ipa_init(arg2), vcpu, &next);
 		break;
 
 	case HF_MAILBOX_CLEAR:
-		ret.user_ret.res0 = api_mailbox_clear(current(), &ret.new);
+		vcpu->regs.r[0] = api_mailbox_clear(vcpu, &next);
 		break;
 
 	case HF_MAILBOX_WRITABLE_GET:
-		ret.user_ret.res0 = api_mailbox_writable_get(current());
+		vcpu->regs.r[0] = api_mailbox_writable_get(vcpu);
 		break;
 
 	case HF_MAILBOX_WAITER_GET:
-		ret.user_ret.res0 = api_mailbox_waiter_get(arg1, current());
+		vcpu->regs.r[0] = api_mailbox_waiter_get(arg1, vcpu);
 		break;
 
 	case HF_INTERRUPT_ENABLE:
-		ret.user_ret.res0 = api_interrupt_enable(arg1, arg2, current());
+		vcpu->regs.r[0] = api_interrupt_enable(arg1, arg2, vcpu);
 		break;
 
 	case HF_INTERRUPT_GET:
-		ret.user_ret.res0 = api_interrupt_get(current());
+		vcpu->regs.r[0] = api_interrupt_get(vcpu);
 		break;
 
 	case HF_INTERRUPT_INJECT:
-		ret.user_ret.res0 = api_interrupt_inject(arg1, arg2, arg3,
-							 current(), &ret.new);
+		vcpu->regs.r[0] =
+			api_interrupt_inject(arg1, arg2, arg3, vcpu, &next);
 		break;
 
 	case HF_SHARE_MEMORY:
-		ret.user_ret.res0 =
+		vcpu->regs.r[0] =
 			api_share_memory(arg1 >> 32, ipa_init(arg2), arg3,
-					 arg1 & 0xffffffff, current());
+					 arg1 & 0xffffffff, vcpu);
 		break;
 
 	case HF_DEBUG_LOG:
-		ret.user_ret.res0 = api_debug_log(arg1, current());
+		vcpu->regs.r[0] = api_debug_log(arg1, vcpu);
 		break;
 
 	default:
-		ret.user_ret.res0 = -1;
+		vcpu->regs.r[0] = SMCCC_ERROR_UNKNOWN;
 	}
 
-	update_vi(ret.new);
+	update_vi(next);
 
-	return ret;
+	return next;
 }
 
 struct vcpu *irq_lower(void)
@@ -546,6 +541,9 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 		}
 		break;
 
+	case 0x16: /* EC = 010110, HVC instruction */
+		return hvc_handler(vcpu);
+
 	case 0x17: /* EC = 010111, SMC instruction. */ {
 		uintreg_t smc_pc = vcpu->regs.pc;
 		smc_res_t ret;
@@ -554,7 +552,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 		if (!smc_handler(vcpu, &ret, &next)) {
 			/* TODO(b/132421503): handle SMC forward rejection  */
 			dlog("Unsupported SMC call: %#x\n", vcpu->regs.r[0]);
-			ret.res0 = PSCI_ERROR_NOT_SUPPORTED;
+			ret.res0 = SMCCC_ERROR_UNKNOWN;
 		}
 
 		/* Skip the SMC instruction. */

@@ -18,19 +18,15 @@
 #include "exception_macros.S"
 
 /**
- * Saves the volatile registers into the register buffer of the current vcpu. It
- * allocates space on the stack for x18 and saves it if "also_save_x18" is
- * specified; otherwise the caller is expected to have saved x18 in a similar
- * fashion.
+ * Saves the volatile registers into the register buffer of the current vcpu.
  */
-.macro save_volatile_to_vcpu also_save_x18
-.ifnb \also_save_x18
+.macro save_volatile_to_vcpu
 	/*
 	 * Save x18 since we're about to clobber it. We subtract 16 instead of
 	 * 8 from the stack pointer to keep it 16-byte aligned.
 	 */
 	str x18, [sp, #-16]!
-.endif
+
 	/* Get the current vcpu. */
 	mrs x18, tpidr_el2
 	stp x0, x1, [x18, #VCPU_REGS + 8 * 0]
@@ -63,7 +59,7 @@
  * registers from the new vcpu.
  */
 .macro lower_exception handler:req
-	save_volatile_to_vcpu also_save_x18
+	save_volatile_to_vcpu
 
 	/* Call C handler. */
 	bl \handler
@@ -77,67 +73,29 @@
 .endm
 
 /**
- * This is the handler for a sync exception taken at a lower EL. If the reason
- * for the exception is an HVC call, it calls the faster hvc_handler without
- * saving a lot of the registers, otherwise it goes to slow_sync_lower, which is
- * the slow path where all registers needs to be saved/restored.
+ * This is the handler for a sync exception taken at a lower EL.
  */
 .macro lower_sync_exception
-	/* Save x18 as save_volatile_to_vcpu would have. */
-	str x18, [sp, #-16]!
+	save_volatile_to_vcpu
 
 	/* Extract the exception class (EC) from exception syndrome register. */
 	mrs x18, esr_el2
 	lsr x18, x18, #26
 
-	/* Take the slow path if exception is not due to an HVC instruction. */
-	sub x18, x18, #0x16
-	cbnz x18, slow_sync_lower
+	/* Take the system register path for EC 0x18. */
+	sub x18, x18, #0x18
+	cbz x18, system_register_access
 
-	/*
-	 * Save x4-x17, x29 and x30, which are not saved by the callee, then jump to
-	 * HVC handler.
-	 */
-	stp x4, x5, [sp, #-16]!
-	stp x6, x7, [sp, #-16]!
-	stp x8, x9, [sp, #-16]!
-	stp x10, x11, [sp, #-16]!
-	stp x12, x13, [sp, #-16]!
-	stp x14, x15, [sp, #-16]!
-	stp x16, x17, [sp, #-16]!
-	stp x29, x30, [sp, #-16]!
+	/* Read syndrome register and call C handler. */
+	mrs x0, esr_el2
+	bl sync_lower_exception
 
-	/*
-	 * Make room for hvc_handler_return on stack, and point x8 (the indirect
-	 * result location register in the AAPCS64 standard) to it.
-	 * hvc_handler_return is returned this way according to paragraph
-	 * 5.4.2.B.3 and section 5.5 because it is larger than 16 bytes.
-	 */
-	stp xzr, xzr, [sp, #-16]!
-	stp xzr, xzr, [sp, #-16]!
-	stp xzr, xzr, [sp, #-16]!
-	mov x8, sp
+	/* Switch vcpu if requested by handler. */
+	cbnz x0, vcpu_switch
 
-	bl hvc_handler
-
-	/* Get the hvc_handler_return back off the stack. */
-	ldp x0, x1, [sp], #16
-	ldp x2, x3, [sp], #16
-	ldr x18, [sp], #16
-
-	ldp x29, x30, [sp], #16
-	ldp x16, x17, [sp], #16
-	ldp x14, x15, [sp], #16
-	ldp x12, x13, [sp], #16
-	ldp x10, x11, [sp], #16
-	ldp x8, x9, [sp], #16
-	ldp x6, x7, [sp], #16
-	ldp x4, x5, [sp], #16
-
-	cbnz x18, sync_lower_switch
-	/* Restore x18, which was saved on the stack. */
-	ldr x18, [sp], #16
-	eret
+	/* vcpu is not changing. */
+	mrs x0, tpidr_el2
+	b vcpu_restore_volatile_and_run
 .endm
 
 /**
@@ -212,26 +170,6 @@ serr_lower_32:
 	lower_exception serr_lower
 
 .balign 0x40
-slow_sync_lower:
-	/* The caller must have saved x18, so we don't save it here. */
-	save_volatile_to_vcpu
-
-	/* Extract the exception class (EC) from exception syndrome register. */
-	mrs x18, esr_el2
-	lsr x18, x18, #26
-
-	/* Take the system register path for EC 0x18. */
-	sub x18, x18, #0x18
-	cbz x18, system_register_access
-
-	/* Read syndrome register and call C handler. */
-	mrs x0, esr_el2
-	bl sync_lower_exception
-	cbnz x0, vcpu_switch
-
-	/* vcpu is not changing. */
-	mrs x0, tpidr_el2
-	b vcpu_restore_volatile_and_run
 
 /**
  * Handle accesses to system registers (EC=0x18) and return to original caller.
