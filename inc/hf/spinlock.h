@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2018 The Hafnium Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,27 @@
 
 #pragma once
 
-/*
- * Includes the arch-specific definition of 'struct spinlock' and
- * implementations of:
- *  - SPINLOCK_INIT
- *  - sl_lock()
- *  - sl_unlock()
- */
-#include "hf/arch/spinlock.h"
+#include <stdatomic.h>
+
+struct spinlock {
+	atomic_flag v;
+};
+
+#define SPINLOCK_INIT                 \
+	{                             \
+		.v = ATOMIC_FLAG_INIT \
+	}
 
 static inline void sl_init(struct spinlock *l)
 {
-	*l = SPINLOCK_INIT;
+	*l = (struct spinlock)SPINLOCK_INIT;
+}
+
+static inline void sl_lock(struct spinlock *l)
+{
+	while (atomic_flag_test_and_set_explicit(&l->v, memory_order_acquire)) {
+		/* do nothing */
+	}
 }
 
 /**
@@ -43,4 +52,9 @@ static inline void sl_lock_both(struct spinlock *a, struct spinlock *b)
 		sl_lock(b);
 		sl_lock(a);
 	}
+}
+
+static inline void sl_unlock(struct spinlock *l)
+{
+	atomic_flag_clear_explicit(&l->v, memory_order_release);
 }
