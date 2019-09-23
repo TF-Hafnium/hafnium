@@ -129,6 +129,11 @@
 	X(OSLSR_EL1, 0x280402)
 
 /**
+ * Definitions of write-only debug registers' ISS signatures.
+ */
+#define EL1_DEBUG_REGISTERS_WRITE X(OSLAR_EL1, 0x280400)
+
+/**
  * Definitions of readable and writeable debug registers' ISS signatures.
  */
 #define EL1_DEBUG_REGISTERS_READ_WRITE \
@@ -205,13 +210,6 @@
 	X(DBGWVR13_EL1, 0x2c001a)      \
 	X(DBGWVR14_EL1, 0x2c001c)      \
 	X(DBGWVR15_EL1, 0x2c001e)
-
-/**
- * Definitions of all debug registers' ISS signatures.
- */
-#define EL1_DEBUG_REGISTERS      \
-	EL1_DEBUG_REGISTERS_READ \
-	EL1_DEBUG_REGISTERS_READ_WRITE
 
 /**
  * Returns the value for MDCR_EL2 for the particular VM.
@@ -296,7 +294,8 @@ bool debug_el1_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
 	case reg_sig:                       \
 		value = read_msr(reg_name); \
 		break;
-			EL1_DEBUG_REGISTERS
+			EL1_DEBUG_REGISTERS_READ
+			EL1_DEBUG_REGISTERS_READ_WRITE
 #undef X
 		default:
 			value = vcpu->regs.r[rt_register];
@@ -313,6 +312,7 @@ bool debug_el1_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
 	case reg_sig:                       \
 		write_msr(reg_name, value); \
 		break;
+			EL1_DEBUG_REGISTERS_WRITE
 			EL1_DEBUG_REGISTERS_READ_WRITE
 #undef X
 		default:
