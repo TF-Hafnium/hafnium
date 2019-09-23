@@ -35,6 +35,7 @@
 #include "psci.h"
 #include "psci_handler.h"
 #include "smc.h"
+#include "sysregs.h"
 
 #define HCR_EL2_VI (1u << 7)
 
@@ -595,23 +596,29 @@ struct vcpu *handle_system_register_access(uintreg_t esr)
 	struct vcpu *vcpu = current();
 	spci_vm_id_t vm_id = vcpu->vm->id;
 	uintreg_t ec = GET_EC(esr);
+	char *direction_str;
 
 	CHECK(ec == 0x18);
 
 	/*
-	 * Handle accesses to other registers that trap with the same EC.
+	 * Handle accesses to debug registers.
 	 * Abort when encountering unhandled register accesses.
 	 */
-	if (!is_debug_el1_register_access(esr)) {
-		return api_abort(vcpu);
+	if (is_debug_el1_register_access(esr) &&
+	    debug_el1_process_access(vcpu, vm_id, esr)) {
+		/* Instruction was fulfilled. Skip it and run the next one. */
+		vcpu->regs.pc += GET_NEXT_PC_INC(esr);
+		return NULL;
 	}
 
-	/* Abort if unable to fulfill the debug register access. */
-	if (!debug_el1_process_access(vcpu, vm_id, esr)) {
-		return api_abort(vcpu);
-	}
+	direction_str = ISS_IS_READ(esr) ? "read" : "write";
 
-	/* Instruction was fulfilled above. Skip it and run the next one. */
-	vcpu->regs.pc += GET_NEXT_PC_INC(esr);
-	return NULL;
+	dlog("Unhandled system register %s: op0=%d, op1=%d, crn=%d, "
+	     "crm=%d, op2=%d, rt=%d.\n",
+	     direction_str, GET_ISS_OP0(esr), GET_ISS_OP1(esr),
+	     GET_ISS_CRN(esr), GET_ISS_CRM(esr), GET_ISS_OP2(esr),
+	     GET_ISS_RT(esr));
+
+	/* Abort if unable to fulfill the register access. */
+	return api_abort(vcpu);
 }

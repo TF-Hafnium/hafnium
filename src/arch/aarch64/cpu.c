@@ -23,7 +23,7 @@
 #include "hf/addr.h"
 #include "hf/std.h"
 
-#include "hypervisor/debug_el1.h"
+#include "hypervisor/sysregs.h"
 
 void arch_irq_disable(void)
 {

@@ -22,8 +22,6 @@
 
 #include "vmapi/hf/spci.h"
 
-uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id);
-
 bool is_debug_el1_register_access(uintreg_t esr_el2);
 
 bool debug_el1_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,

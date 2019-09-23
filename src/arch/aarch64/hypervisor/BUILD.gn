@@ -26,6 +26,7 @@ source_set("hypervisor") {
     "handler.c",
     "offsets.c",
     "psci_handler.c",
+    "sysregs.c",
   ]
 
   deps = [
