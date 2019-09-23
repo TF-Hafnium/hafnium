@@ -26,5 +26,6 @@ bool boot_flow_init(struct mm_stage1_locked stage1_locked,
 		    struct mpool *ppool);
 
 bool boot_flow_update(struct mm_stage1_locked stage1_locked,
+		      const struct manifest *manifest,
 		      struct boot_params_update *p, struct memiter *cpio,
 		      struct mpool *ppool);

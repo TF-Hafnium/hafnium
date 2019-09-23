@@ -29,11 +29,17 @@ struct manifest_vm {
 	struct string debug_name;
 	struct string kernel_filename;
 
-	/* Properties specific to secondary VMs. */
-	struct {
-		uint64_t mem_size;
-		spci_vcpu_count_t vcpu_count;
-	} secondary;
+	union {
+		/* Properties specific to the primary VM. */
+		struct {
+			struct string ramdisk_filename;
+		} primary;
+		/* Properties specific to secondary VMs. */
+		struct {
+			uint64_t mem_size;
+			spci_vcpu_count_t vcpu_count;
+		} secondary;
+	};
 };
 
 /**

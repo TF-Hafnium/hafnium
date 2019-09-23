@@ -161,6 +161,11 @@ class ManifestDtBuilder
 		return StringProperty("kernel_filename", value);
 	}
 
+	ManifestDtBuilder &RamdiskFilename(const std::string_view &value)
+	{
+		return StringProperty("ramdisk_filename", value);
+	}
+
 	ManifestDtBuilder &VcpuCount(uint64_t value)
 	{
 		return IntegerProperty("vcpu_count", value);
@@ -398,6 +403,29 @@ TEST(manifest, vcpu_count_limit)
 		  MANIFEST_ERROR_INTEGER_OVERFLOW);
 }
 
+TEST(manifest, no_ramdisk_primary)
+{
+	struct manifest m;
+	struct fdt_node fdt_root;
+
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+			.StartChild("vm1")
+				.DebugName("primary_vm")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
+	ASSERT_EQ(m.vm_count, 1);
+	ASSERT_STREQ(string_data(&m.vm[0].debug_name), "primary_vm");
+	ASSERT_STREQ(string_data(&m.vm[0].primary.ramdisk_filename), "");
+}
+
 TEST(manifest, valid)
 {
 	struct manifest m;
@@ -411,6 +439,7 @@ TEST(manifest, valid)
 			.StartChild("vm1")
 				.DebugName("primary_vm")
 				.KernelFilename("primary_kernel")
+				.RamdiskFilename("primary_ramdisk")
 			.EndChild()
 			.StartChild("vm3")
 				.DebugName("second_secondary_vm")
@@ -435,6 +464,8 @@ TEST(manifest, valid)
 	vm = &m.vm[0];
 	ASSERT_STREQ(string_data(&vm->debug_name), "primary_vm");
 	ASSERT_STREQ(string_data(&vm->kernel_filename), "primary_kernel");
+	ASSERT_STREQ(string_data(&vm->primary.ramdisk_filename),
+		     "primary_ramdisk");
 
 	vm = &m.vm[1];
 	ASSERT_STREQ(string_data(&vm->debug_name), "first_secondary_vm");

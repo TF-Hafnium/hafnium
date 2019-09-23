@@ -100,8 +100,8 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 			 struct mpool *ppool)
 {
 	paddr_t primary_begin = layout_primary_begin();
-	const struct manifest_vm *manifest_vm =
-		&manifest->vm[HF_PRIMARY_VM_ID - HF_VM_ID_OFFSET];
+	struct vm *vm;
+	struct vcpu_locked vcpu_locked;
 
 	/*
 	 * TODO: This bound is currently meaningless but will be addressed when
@@ -109,45 +109,40 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	 */
 	paddr_t primary_end = pa_add(primary_begin, 0x8000000);
 
-	if (!load_kernel(stage1_locked, primary_begin, primary_end, manifest_vm,
-			 cpio, ppool)) {
+	if (!load_kernel(stage1_locked, primary_begin, primary_end,
+			 &manifest->vm[HF_PRIMARY_VM_INDEX], cpio, ppool)) {
 		dlog("Unable to load primary kernel.");
 		return false;
 	}
 
-	{
-		struct vm *vm;
-		struct vcpu_locked vcpu_locked;
-
-		if (!vm_init(MAX_CPUS, ppool, &vm)) {
-			dlog("Unable to initialise primary vm\n");
-			return false;
-		}
-
-		if (vm->id != HF_PRIMARY_VM_ID) {
-			dlog("Primary vm was not given correct id\n");
-			return false;
-		}
-
-		/* Map the 1TB of memory. */
-		/* TODO: We should do a whitelist rather than a blacklist. */
-		if (!mm_vm_identity_map(
-			    &vm->ptable, pa_init(0),
-			    pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
-			    MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL, ppool)) {
-			dlog("Unable to initialise memory for primary vm\n");
-			return false;
-		}
-
-		if (!mm_vm_unmap_hypervisor(&vm->ptable, ppool)) {
-			dlog("Unable to unmap hypervisor from primary vm\n");
-			return false;
-		}
-
-		vcpu_locked = vcpu_lock(vm_get_vcpu(vm, 0));
-		vcpu_on(vcpu_locked, ipa_from_pa(primary_begin), kernel_arg);
-		vcpu_unlock(&vcpu_locked);
+	if (!vm_init(MAX_CPUS, ppool, &vm)) {
+		dlog("Unable to initialise primary vm\n");
+		return false;
 	}
+
+	if (vm->id != HF_PRIMARY_VM_ID) {
+		dlog("Primary vm was not given correct id\n");
+		return false;
+	}
+
+	/* Map the 1TB of memory. */
+	/* TODO: We should do a whitelist rather than a blacklist. */
+	if (!mm_vm_identity_map(&vm->ptable, pa_init(0),
+				pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
+				MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL,
+				ppool)) {
+		dlog("Unable to initialise memory for primary vm\n");
+		return false;
+	}
+
+	if (!mm_vm_unmap_hypervisor(&vm->ptable, ppool)) {
+		dlog("Unable to unmap hypervisor from primary vm\n");
+		return false;
+	}
+
+	vcpu_locked = vcpu_lock(vm_get_vcpu(vm, 0));
+	vcpu_on(vcpu_locked, ipa_from_pa(primary_begin), kernel_arg);
+	vcpu_unlock(&vcpu_locked);
 
 	return true;
 }

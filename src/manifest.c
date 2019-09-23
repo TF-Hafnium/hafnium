@@ -209,7 +209,10 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	TRY(read_string(node, "debug_name", &vm->debug_name));
 	TRY(read_optional_string(node, "kernel_filename",
 				 &vm->kernel_filename));
-	if (vm_id != HF_PRIMARY_VM_ID) {
+	if (vm_id == HF_PRIMARY_VM_ID) {
+		TRY(read_optional_string(node, "ramdisk_filename",
+					 &vm->primary.ramdisk_filename));
+	} else {
 		TRY(read_uint64(node, "mem_size", &vm->secondary.mem_size));
 		TRY(read_uint16(node, "vcpu_count", &vm->secondary.vcpu_count));
 	}

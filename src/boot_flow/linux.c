@@ -52,14 +52,19 @@ bool plat_boot_flow_get_initrd_range(const struct fdt_node *fdt_root,
 }
 
 bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,
+			   const struct manifest *manifest,
 			   struct boot_params_update *update,
 			   struct memiter *cpio, struct mpool *ppool)
 {
-	static struct string filename = STRING_INIT("initrd.img");
 	struct memiter primary_initrd;
+	const struct string *filename =
+		&manifest->vm[HF_PRIMARY_VM_INDEX].primary.ramdisk_filename;
 
-	if (!cpio_get_file(cpio, &filename, &primary_initrd)) {
-		dlog("Unable to find initrd.img\n");
+	if (string_is_empty(filename)) {
+		memiter_init(&primary_initrd, NULL, 0);
+	} else if (!cpio_get_file(cpio, filename, &primary_initrd)) {
+		dlog("Unable to find primary initrd \"%s\".\n",
+		     string_data(filename));
 		return false;
 	}
 

@@ -205,9 +205,8 @@ template("initrd") {
       invoker.primary_vm,
     ]
     args = [
-      "--primary_name",
+      "--file",
       invoker.primary_name,
-      "--primary_vm",
       rebase_path(primary_vm_image),
       "--staging",
       rebase_path(initrd_staging),
@@ -219,7 +218,8 @@ template("initrd") {
       deps += [ invoker.primary_initrd ]
       primary_initrd_outputs = get_target_outputs(invoker.primary_initrd)
       args += [
-        "--primary_vm_initrd",
+        "--file",
+        "initrd.img",
         rebase_path(primary_initrd_outputs[0]),
       ]
     }
@@ -233,7 +233,7 @@ template("initrd") {
       foreach(vm, invoker.secondary_vms) {
         deps += [ vm[1] ]
         args += [
-          "--secondary_vm",
+          "--file",
           vm[0],
           rebase_path(get_label_info(vm[1], "target_out_dir") + "/" +
                       get_label_info(vm[1], "name") + ".bin"),

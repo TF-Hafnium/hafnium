@@ -40,12 +40,13 @@ typedef uintptr_t hf_ipaddr_t;
 #define HF_VM_ID_OFFSET 1
 
 /**
- * The ID of the primary VM, which is responsible for scheduling.
+ * The index and ID of the primary VM, which is responsible for scheduling.
  *
- * Starts at the offset because ID 0 is reserved for the hypervisor itself.
- * All other VM IDs come after the primary.
+ * These are not equal because ID 0 is reserved for the hypervisor itself.
+ * Primary VM therefore gets ID 1 and all other VMs come after that.
  */
-#define HF_PRIMARY_VM_ID HF_VM_ID_OFFSET
+#define HF_PRIMARY_VM_INDEX 0
+#define HF_PRIMARY_VM_ID (HF_VM_ID_OFFSET + HF_PRIMARY_VM_INDEX)
 
 /** Sleep value for an indefinite period of time. */
 #define HF_SLEEP_INDEFINITE 0xffffffffffffff

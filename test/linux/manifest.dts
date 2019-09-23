@@ -23,6 +23,7 @@
 		vm1 {
 			debug_name = "linux_test";
 			kernel_filename = "vmlinuz";
+			ramdisk_filename = "initrd.img";
 		};
 
 		vm2 {

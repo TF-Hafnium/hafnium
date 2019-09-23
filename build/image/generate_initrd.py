@@ -26,41 +26,27 @@ import shutil
 import subprocess
 import sys
 
-
 def Main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--primary_name", required=True)
-    parser.add_argument("--primary_vm", required=True)
-    parser.add_argument("--primary_vm_initrd")
-    parser.add_argument(
-        "--secondary_vm",
-        action="append",
-        nargs=2,
-        metavar=("NAME", "IMAGE"))
-    parser.add_argument("--staging", required=True)
-    parser.add_argument("--output", required=True)
+    parser.add_argument("-f", "--file",
+        action="append", nargs=2,
+        metavar=("NAME", "PATH"),
+        help="File at host location PATH to be added to the RAM disk as NAME")
+    parser.add_argument("-s", "--staging", required=True)
+    parser.add_argument("-o", "--output", required=True)
     args = parser.parse_args()
-    staged_files = [args.primary_name, "initrd.img"]
 
     # Create staging folder if needed.
     if not os.path.isdir(args.staging):
         os.makedirs(args.staging)
 
-    # Prepare the primary VM image.
-    shutil.copyfile(args.primary_vm,
-                    os.path.join(args.staging, args.primary_name))
-    # Prepare the primary VM's initrd.
-    if args.primary_vm_initrd:
-        shutil.copyfile(args.primary_vm_initrd,
-                        os.path.join(args.staging, "initrd.img"))
-    else:
-        open(os.path.join(args.staging, "initrd.img"), "w").close()
-    # Prepare the secondary VMs.
-    if args.secondary_vm:
-        for vm in args.secondary_vm:
-            (vm_name, vm_image) = vm
-            staged_files.append(vm_name)
-            shutil.copy(vm_image, os.path.join(args.staging, vm_name))
+    # Copy files into the staging folder.
+    staged_files = []
+    for name, path in args.file:
+        shutil.copyfile(path, os.path.join(args.staging, name))
+        assert name not in staged_files
+        staged_files.append(name)
+
     # Package files into an initial RAM disk.
     with open(args.output, "w") as initrd:
         # Move into the staging directory so the file names taken by cpio don't
@@ -73,7 +59,6 @@ def Main():
             stderr=subprocess.PIPE)
         cpio.communicate(input="\n".join(staged_files).encode("utf-8"))
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(Main())

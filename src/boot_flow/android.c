@@ -51,10 +51,12 @@ bool plat_boot_flow_get_initrd_range(const struct fdt_node *fdt_root,
  * Android boot flow does not change based on the updates.
  */
 bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,
+			   const struct manifest *manifest,
 			   struct boot_params_update *p, struct memiter *cpio,
 			   struct mpool *ppool)
 {
 	(void)stage1_locked;
+	(void)manifest;
 	(void)p;
 	(void)cpio;
 	(void)ppool;

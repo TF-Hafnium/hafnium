@@ -19,6 +19,7 @@
 #include "hf/addr.h"
 #include "hf/boot_params.h"
 #include "hf/fdt.h"
+#include "hf/manifest.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
 
@@ -27,5 +28,6 @@ uintreg_t plat_boot_flow_get_kernel_arg(void);
 bool plat_boot_flow_get_initrd_range(const struct fdt_node *fdt_root,
 				     paddr_t *begin, paddr_t *end);
 bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,
+			   const struct manifest *manifest,
 			   struct boot_params_update *p, struct memiter *cpio,
 			   struct mpool *ppool);

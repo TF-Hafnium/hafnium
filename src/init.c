@@ -116,7 +116,8 @@ void one_time_init(void)
 		panic("Unable to load VMs.");
 	}
 
-	if (!boot_flow_update(mm_stage1_locked, &update, &cpio, &ppool)) {
+	if (!boot_flow_update(mm_stage1_locked, &manifest, &update, &cpio,
+			      &ppool)) {
 		panic("Unable to update boot flow.");
 	}
 
