@@ -197,40 +197,6 @@ system_register_access:
 	mrs x0, tpidr_el2
 	b vcpu_restore_nonvolatile_and_run
 
-sync_lower_switch:
-	/* Store new vcpu on stack temporarily so we can use x18 for the old one. */
-	str x18, [sp, #-16]!
-
-	/* We'll have to switch, so save volatile state before doing so. */
-	mrs x18, tpidr_el2
-
-	/* Store volatile registers. */
-	stp x0, x1, [x18, #VCPU_REGS + 8 * 0]
-	stp x2, x3, [x18, #VCPU_REGS + 8 * 2]
-	stp x4, x5, [x18, #VCPU_REGS + 8 * 4]
-	stp x6, x7, [x18, #VCPU_REGS + 8 * 6]
-	stp x8, x9, [x18, #VCPU_REGS + 8 * 8]
-	stp x10, x11, [x18, #VCPU_REGS + 8 * 10]
-	stp x12, x13, [x18, #VCPU_REGS + 8 * 12]
-	stp x14, x15, [x18, #VCPU_REGS + 8 * 14]
-	stp x16, x17, [x18, #VCPU_REGS + 8 * 16]
-	stp x29, x30, [x18, #VCPU_REGS + 8 * 29]
-
-	/* Now we can pop the new vcpu to a volatile register that is now available. */
-	ldr x0, [sp], #16
-
-	/* x18 was saved on the stack, so we move it to vcpu regs buffer. */
-	ldr x2, [sp], #16
-	str x2, [x18, #VCPU_REGS + 8 * 18]
-
-	/* Save return address & mode. */
-	mrs x2, elr_el2
-	mrs x3, spsr_el2
-	stp x2, x3, [x18, #VCPU_REGS + 8 * 31]
-
-	/* Save lazy state, then switch to new vcpu. */
-
-	/* Intentional fallthrough. */
 /**
  * Switch to a new vcpu.
  *
