@@ -27,15 +27,6 @@
 static struct vm vms[MAX_VMS];
 static spci_vm_count_t vm_count;
 
-/**
- * Returns the index of the VM within the VM array.
- */
-static uint16_t vm_get_vm_index(spci_vm_id_t vm_id)
-{
-	CHECK(vm_id >= HF_VM_ID_OFFSET);
-	return vm_id - HF_VM_ID_OFFSET;
-}
-
 bool vm_init(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
 	     struct vm **new_vm)
 {
@@ -89,14 +80,21 @@ spci_vm_count_t vm_get_count(void)
 
 struct vm *vm_find(spci_vm_id_t id)
 {
-	uint16_t vm_index = vm_get_vm_index(id);
+	uint16_t index;
 
-	/* Ensure the VM is initialized. */
-	if (vm_index >= vm_count) {
+	/* Check that this is not a reserved ID. */
+	if (id < HF_VM_ID_OFFSET) {
 		return NULL;
 	}
 
-	return &vms[vm_index];
+	index = id - HF_VM_ID_OFFSET;
+
+	/* Ensure the VM is initialized. */
+	if (index >= vm_count) {
+		return NULL;
+	}
+
+	return &vms[index];
 }
 
 /**

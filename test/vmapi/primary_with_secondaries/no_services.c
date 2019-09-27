@@ -59,10 +59,22 @@ TEST(hf_vcpu_get_count, secondary_has_one_vcpu)
 }
 
 /**
+ * Confirm an error is returned when getting the vcpu count for a reserved ID.
+ */
+TEST(hf_vcpu_get_count, reserved_vm_id)
+{
+	spci_vm_id_t id;
+
+	for (id = 0; id < HF_VM_ID_OFFSET; ++id) {
+		EXPECT_EQ(hf_vcpu_get_count(id), 0);
+	}
+}
+
+/**
  * Confirm it is an error to query how many VCPUs are assigned to a nonexistent
  * secondary VM.
  */
-TEST(hf_vcpu_get_count, large_invalid_vm_index)
+TEST(hf_vcpu_get_count, large_invalid_vm_id)
 {
 	EXPECT_EQ(hf_vcpu_get_count(0xffff), 0);
 }

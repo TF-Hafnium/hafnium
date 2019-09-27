@@ -24,6 +24,12 @@
 
 #include "hftest.h"
 
+/*
+ * TODO: Some of these tests are duplicated between 'primary_only' and
+ * 'primary_with_secondaries'. Move them to a common place consider running
+ * them inside secondary VMs too.
+ */
+
 /**
  * Confirms the primary VM has the primary ID.
  */
@@ -58,10 +64,22 @@ TEST(hf_vcpu_get_count, no_secondary_vms)
 }
 
 /**
+ * Confirm an error is returned when getting the vcpu count for a reserved ID.
+ */
+TEST(hf_vcpu_get_count, reserved_vm_id)
+{
+	spci_vm_id_t id;
+
+	for (id = 0; id < HF_VM_ID_OFFSET; ++id) {
+		EXPECT_EQ(hf_vcpu_get_count(id), 0);
+	}
+}
+
+/**
  * Confirm an error is returned when getting the vcpu count of a VM with an ID
  * that is likely to be far outside the resource limit.
  */
-TEST(hf_vcpu_get_count, large_invalid_vm_index)
+TEST(hf_vcpu_get_count, large_invalid_vm_id)
 {
 	EXPECT_EQ(hf_vcpu_get_count(0xffff), 0);
 }
