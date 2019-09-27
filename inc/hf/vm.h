@@ -142,8 +142,10 @@ struct two_vm_locked {
 	struct vm_locked vm2;
 };
 
-bool vm_init(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
-	     struct vm **new_vm);
+struct vm *vm_init(spci_vm_id_t id, spci_vcpu_count_t vcpu_count,
+		   struct mpool *ppool);
+bool vm_init_next(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
+		  struct vm **new_vm);
 spci_vm_count_t vm_get_count(void);
 struct vm *vm_find(spci_vm_id_t id);
 struct vm_locked vm_lock(struct vm *vm);

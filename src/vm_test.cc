@@ -67,7 +67,7 @@ TEST_F(vm, vm_unmap_hypervisor_not_mapped)
 	struct_vm *vm;
 	struct vm_locked vm_locked;
 
-	vm_init(1, &ppool, &vm);
+	EXPECT_TRUE(vm_init_next(1, &ppool, &vm));
 	vm_locked = vm_lock(vm);
 	ASSERT_TRUE(mm_vm_init(&vm->ptable, &ppool));
 	EXPECT_TRUE(vm_unmap_hypervisor(vm_locked, &ppool));

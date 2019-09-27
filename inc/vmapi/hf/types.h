@@ -50,6 +50,12 @@ typedef uintptr_t hf_ipaddr_t;
 #define HF_PRIMARY_VM_INDEX 0
 #define HF_PRIMARY_VM_ID (HF_VM_ID_OFFSET + HF_PRIMARY_VM_INDEX)
 
+/**
+ * The special VM ID reserved for the OS running in the trusted execution
+ * environment, e.g. secure EL1 on AArch64.
+ */
+#define HF_TEE_VM_ID 0x8000
+
 /** Sleep value for an indefinite period of time. */
 #define HF_SLEEP_INDEFINITE 0xffffffffffffffff
 

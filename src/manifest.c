@@ -33,6 +33,8 @@
 
 #define VM_NAME_BUF_SIZE (2 + 5 + 1) /* "vm" + number + null terminator */
 static_assert(MAX_VMS <= 99999, "Insufficient VM_NAME_BUF_SIZE");
+static_assert(HF_TEE_VM_ID > MAX_VMS,
+	      "TrustZone VM ID clashes with normal VM range.");
 
 /**
  * Generates a string with the two letters "vm" followed by an integer.

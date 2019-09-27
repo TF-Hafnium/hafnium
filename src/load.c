@@ -34,6 +34,9 @@
 
 #include "vmapi/hf/call.h"
 
+alignas(PAGE_SIZE) static uint8_t tee_send_buffer[HF_MAILBOX_SIZE];
+alignas(PAGE_SIZE) static uint8_t tee_recv_buffer[HF_MAILBOX_SIZE];
+
 /**
  * Copies data to an unmapped location by mapping it for write, copying the
  * data, then unmapping it.
@@ -134,7 +137,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
-	if (!vm_init(MAX_CPUS, ppool, &vm)) {
+	if (!vm_init_next(MAX_CPUS, ppool, &vm)) {
 		dlog("Unable to initialise primary vm\n");
 		return false;
 	}
@@ -214,7 +217,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
-	if (!vm_init(manifest_vm->secondary.vcpu_count, ppool, &vm)) {
+	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm)) {
 		dlog("Unable to initialise VM.\n");
 		return false;
 	}
@@ -333,6 +336,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	      struct boot_params_update *update, struct mpool *ppool)
 {
 	struct vm *primary;
+	struct vm *tee;
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	struct vm_locked primary_vm_locked;
 	size_t i;
@@ -343,6 +347,15 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 		dlog("Unable to load primary VM.\n");
 		return false;
 	}
+
+	/*
+	 * Initialise the dummy VM which represents TrustZone, and set up its
+	 * RX/TX buffers.
+	 */
+	tee = vm_init(HF_TEE_VM_ID, 0, ppool);
+	CHECK(tee != NULL);
+	tee->mailbox.send = &tee_send_buffer;
+	tee->mailbox.recv = &tee_recv_buffer;
 
 	static_assert(
 		sizeof(mem_ranges_available) == sizeof(params->mem_ranges),

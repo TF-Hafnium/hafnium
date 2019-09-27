@@ -27,19 +27,24 @@
 #include "vmapi/hf/call.h"
 
 static struct vm vms[MAX_VMS];
+static struct vm tee_vm;
 static spci_vm_count_t vm_count;
 
-bool vm_init(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
-	     struct vm **new_vm)
+struct vm *vm_init(spci_vm_id_t id, spci_vcpu_count_t vcpu_count,
+		   struct mpool *ppool)
 {
 	uint32_t i;
 	struct vm *vm;
 
-	if (vm_count >= MAX_VMS) {
-		return false;
-	}
+	if (id == HF_TEE_VM_ID) {
+		vm = &tee_vm;
+	} else {
+		uint16_t vm_index = id - HF_VM_ID_OFFSET;
 
-	vm = &vms[vm_count];
+		CHECK(id >= HF_VM_ID_OFFSET);
+		CHECK(vm_index < ARRAY_SIZE(vms));
+		vm = &vms[vm_index];
+	}
 
 	memset_s(vm, sizeof(*vm), 0, sizeof(*vm));
 
@@ -47,14 +52,13 @@ bool vm_init(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
 	list_init(&vm->mailbox.ready_list);
 	sl_init(&vm->lock);
 
-	/* Generate IDs based on an offset, as low IDs e.g., 0, are reserved */
-	vm->id = vm_count + HF_VM_ID_OFFSET;
+	vm->id = id;
 	vm->vcpu_count = vcpu_count;
 	vm->mailbox.state = MAILBOX_STATE_EMPTY;
 	atomic_init(&vm->aborting, false);
 
 	if (!mm_vm_init(&vm->ptable, ppool)) {
-		return false;
+		return NULL;
 	}
 
 	/* Initialise waiter entries. */
@@ -69,8 +73,22 @@ bool vm_init(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
 		vcpu_init(vm_get_vcpu(vm, i), vm);
 	}
 
+	return vm;
+}
+
+bool vm_init_next(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
+		  struct vm **new_vm)
+{
+	if (vm_count >= MAX_VMS) {
+		return false;
+	}
+
+	/* Generate IDs based on an offset, as low IDs e.g., 0, are reserved */
+	*new_vm = vm_init(vm_count + HF_VM_ID_OFFSET, vcpu_count, ppool);
+	if (*new_vm == NULL) {
+		return false;
+	}
 	++vm_count;
-	*new_vm = vm;
 
 	return true;
 }
@@ -86,6 +104,13 @@ struct vm *vm_find(spci_vm_id_t id)
 
 	/* Check that this is not a reserved ID. */
 	if (id < HF_VM_ID_OFFSET) {
+		return NULL;
+	}
+
+	if (id == HF_TEE_VM_ID) {
+		if (tee_vm.id == HF_TEE_VM_ID) {
+			return &tee_vm;
+		}
 		return NULL;
 	}
 
