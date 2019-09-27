@@ -109,8 +109,11 @@ void hftest_json(void)
 			 * It's easier to put the comma at the start of the line
 			 * than the end even though the JSON looks a bit funky.
 			 */
-			HFTEST_LOG("       %c\"%s\"",
-				   tests_in_suite ? ',' : ' ', test->name);
+			HFTEST_LOG("       %c{", tests_in_suite ? ',' : ' ');
+			HFTEST_LOG("          \"name\": \"%s\",", test->name);
+			HFTEST_LOG("          \"is_long_running\": %s",
+				   test->is_long_running ? "true" : "false");
+			HFTEST_LOG("       }");
 			++tests_in_suite;
 		}
 	}

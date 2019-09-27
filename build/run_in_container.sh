@@ -81,6 +81,21 @@ then
 	echo "WARNING: Docker seccomp profile is disabled!" 1>&2
 	ARGS+=(--cap-add=SYS_PTRACE --security-opt seccomp=unconfined)
 fi
+# Propagate "HAFNIUM_*" environment variables.
+# Note: Cannot use `env | while` because the loop would run inside a child
+# process and would not have any effect on variables in the parent.
+while read -r ENV_LINE
+do
+	VAR_NAME="$(echo ${ENV_LINE} | cut -d= -f1)"
+	case "${VAR_NAME}" in
+	HAFNIUM_HERMETIC_BUILD)
+		# Skip this one. It will be overridden below.
+		;;
+	HAFNIUM_*)
+		ARGS+=(-e "${ENV_LINE}")
+		;;
+	esac
+done <<< "$(env)"
 # Set environment variable informing the build that we are running inside
 # a container.
 ARGS+=(-e HAFNIUM_HERMETIC_BUILD=inside)

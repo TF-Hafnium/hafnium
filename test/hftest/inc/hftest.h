@@ -35,7 +35,12 @@
 /*
  * Define a test as part of a test suite.
  */
-#define TEST(suite, test) HFTEST_TEST(suite, test)
+#define TEST(suite, test) HFTEST_TEST(suite, test, false)
+
+/*
+ * Define a test as part of a test suite and mark it long-running.
+ */
+#define TEST_LONG_RUNNING(suite, test) HFTEST_TEST(suite, test, true)
 
 /*
  * Define a test service.

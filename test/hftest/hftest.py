@@ -197,10 +197,12 @@ class QemuDriver(Driver):
     def __init__(self, args):
         Driver.__init__(self, args)
 
-    def gen_exec_args(self, test_args, dtb_path=None, dumpdtb_path=None):
+    def gen_exec_args(self, test_args, is_long_running, dtb_path=None,
+            dumpdtb_path=None):
         """Generate command line arguments for QEMU."""
+        time_limit = "120s" if is_long_running else "10s"
         exec_args = [
-            "timeout", "--foreground", "10s",
+            "timeout", "--foreground", time_limit,
             "./prebuilts/linux-x64/qemu/qemu-system-aarch64",
             "-machine", "virt,virtualization=on,gic_version=3",
             "-cpu", "cortex-a57", "-smp", "4", "-m", "64M",
@@ -224,10 +226,10 @@ class QemuDriver(Driver):
         return exec_args
 
     def dump_dtb(self, run_state, test_args, path):
-        dumpdtb_args = self.gen_exec_args(test_args, dumpdtb_path=path)
+        dumpdtb_args = self.gen_exec_args(test_args, False, dumpdtb_path=path)
         self.exec_logged(run_state, dumpdtb_args)
 
-    def run(self, run_name, test_args):
+    def run(self, run_name, test_args, is_long_running):
         """Run test given by `test_args` in QEMU."""
         run_state = self.start_run(run_name)
 
@@ -244,7 +246,8 @@ class QemuDriver(Driver):
                     run_state, base_dtb_path, self.args.manifest, dtb_path)
 
             # Execute test in QEMU..
-            exec_args = self.gen_exec_args(test_args, dtb_path=dtb_path)
+            exec_args = self.gen_exec_args(test_args, is_long_running,
+                    dtb_path=dtb_path)
             self.exec_logged(run_state, exec_args)
         except DriverRunException:
             pass
@@ -319,7 +322,7 @@ class FvpDriver(Driver):
 
         return fvp_args
 
-    def run(self, run_name, test_args):
+    def run(self, run_name, test_args, is_long_running):
         run_state = self.start_run(run_name)
 
         base_dts_path = self.args.artifacts.create_file(run_name, ".base.dts")
@@ -374,10 +377,12 @@ class TestRunner:
     """Class which communicates with a test platform to obtain a list of
     available tests and driving their execution."""
 
-    def __init__(self, artifacts, driver, image_name, suite_regex, test_regex):
+    def __init__(self, artifacts, driver, image_name, suite_regex, test_regex,
+            skip_long_running_tests):
         self.artifacts = artifacts
         self.driver = driver
         self.image_name = image_name
+        self.skip_long_running_tests = skip_long_running_tests
 
         self.suite_re = re.compile(suite_regex or ".*")
         self.test_re = re.compile(test_regex or ".*")
@@ -396,7 +401,7 @@ class TestRunner:
     def get_test_json(self):
         """Invoke the test platform and request a JSON of available test and
         test suites."""
-        out = self.driver.run("json", "json")
+        out = self.driver.run("json", "json", False)
         hf_out = "\n".join(self.extract_hftest_lines(out))
         try:
             return json.loads(hf_out)
@@ -430,19 +435,24 @@ class TestRunner:
         """Invoke the test platform and request to run a given `test` in given
         `suite`. Create a new XML node with results under `suite_xml`.
         Test only invoked if it matches the regex given to constructor."""
-        if not self.test_re.match(test):
+        if not self.test_re.match(test["name"]):
             return TestRunnerResult(tests_run=0, tests_failed=0)
 
-        print("      RUN", test)
-        log_name = suite["name"] + "." + test
+        if self.skip_long_running_tests and test["is_long_running"]:
+            print("      SKIP", test["name"])
+            return TestRunnerResult(tests_run=0, tests_failed=0)
+
+        print("      RUN", test["name"])
+        log_name = suite["name"] + "." + test["name"]
 
         test_xml = ET.SubElement(suite_xml, "testcase")
-        test_xml.set("name", test)
-        test_xml.set("classname", suite['name'])
+        test_xml.set("name", test["name"])
+        test_xml.set("classname", suite["name"])
         test_xml.set("status", "run")
 
         out = self.extract_hftest_lines(self.driver.run(
-            log_name, "run {} {}".format(suite["name"], test)))
+            log_name, "run {} {}".format(suite["name"], test["name"]),
+            test["is_long_running"]))
 
         if self.is_passed_test(out):
             print("        PASS")
@@ -510,7 +520,8 @@ def Main():
     parser.add_argument("--suite")
     parser.add_argument("--test")
     parser.add_argument("--vm_args")
-    parser.add_argument("--fvp", type=bool)
+    parser.add_argument("--fvp", action="store_true")
+    parser.add_argument("--skip-long-running-tests", action="store_true")
     args = parser.parse_args()
 
     # Resolve some paths.
@@ -536,7 +547,8 @@ def Main():
         driver = QemuDriver(driver_args)
 
     # Create class which will drive test execution.
-    runner = TestRunner(artifacts, driver, image_name, args.suite, args.test)
+    runner = TestRunner(artifacts, driver, image_name, args.suite, args.test,
+        args.skip_long_running_tests)
 
     # Run tests.
     runner_result = runner.run_tests()

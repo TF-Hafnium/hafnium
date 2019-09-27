@@ -78,7 +78,7 @@ static void vm_cpu_entry(uintptr_t arg)
  * CPUs concurrently. The vCPU checks that the state is ok while it bounces
  * between the physical CPUs.
  */
-TEST(vcpu_state, concurrent_save_restore)
+TEST_LONG_RUNNING(vcpu_state, concurrent_save_restore)
 {
 	alignas(4096) static char stack[4096];
 	static struct mailbox_buffers mb;

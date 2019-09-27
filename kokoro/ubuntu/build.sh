@@ -41,41 +41,51 @@ function is_repo_dirty() {
 	return $?
 }
 
-# Default value of HAFNIUM_HERMETIC_BUILD is "true" for Kokoro builds.
-if [ -v KOKORO_JOB_NAME -a ! -v HAFNIUM_HERMETIC_BUILD ]
+# Assigns value (second arg) of a variable (first arg) if it is not set already.
+function default_value {
+	local var_name=$1
+	local value=$2
+	export ${var_name}=${!var_name:-${value}}
+}
+
+# Assign default values to variables.
+if [ -v KOKORO_JOB_NAME ]
 then
-	HAFNIUM_HERMETIC_BUILD=true
+	# Default config for Kokoro builds.
+	default_value HAFNIUM_HERMETIC_BUILD true
+	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS false
+else
+	# Default config for local builds.
+	default_value HAFNIUM_HERMETIC_BUILD false
+	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS true
 fi
 
-# If HAFNIUM_HERMETIC_BUILD is "true" (not default), relaunch this script inside
-# a container. The 'run_in_container.sh' script will set the variable value to
-# 'inside' to avoid recursion.
-if [ "${HAFNIUM_HERMETIC_BUILD:-}" == "true" ]
+# If HAFNIUM_HERMETIC_BUILD is "true", relaunch this script inside a container.
+# The 'run_in_container.sh' script will set the variable value to 'inside' to
+# avoid recursion.
+if [ "${HAFNIUM_HERMETIC_BUILD}" == "true" ]
 then
 	exec "${ROOT_DIR}/build/run_in_container.sh" ${SCRIPT_NAME} $@
 fi
 
-USE_FVP=0
+USE_FVP=false
 
 while test $# -gt 0
 do
-  case "$1" in
-    --fvp) USE_FVP=1
-      ;;
-    *) echo "Unexpected argument $1"
-      exit 1
-      ;;
-  esac
-  shift
+	case "$1" in
+	--fvp)
+		USE_FVP=true
+		;;
+	--skip-long-running-tests)
+		HAFNIUM_SKIP_LONG_RUNNING_TESTS=true
+		;;
+	*)
+		echo "Unexpected argument $1"
+		exit 1
+		;;
+	esac
+	shift
 done
-
-# Detect server vs local run. Local run should be from the project's root
-# directory.
-if [ -v KOKORO_JOB_NAME ]
-then
-	# Server
-	cd git/hafnium
-fi
 
 CLANG=${PWD}/prebuilts/linux-x64/clang/bin/clang
 
@@ -101,12 +111,16 @@ done
 # Step 2: make sure it works.
 #
 
-if [ $USE_FVP == 1 ]
+TEST_ARGS=()
+if [ $USE_FVP == true ]
 then
-  ./kokoro/ubuntu/test.sh --fvp
-else
-  ./kokoro/ubuntu/test.sh
+	TEST_ARGS+=(--fvp)
 fi
+if [ "${HAFNIUM_SKIP_LONG_RUNNING_TESTS}" == "true" ]
+then
+	TEST_ARGS+=(--skip-long-running-tests)
+fi
+./kokoro/ubuntu/test.sh ${TEST_ARGS[@]}
 
 #
 # Step 3: static analysis.

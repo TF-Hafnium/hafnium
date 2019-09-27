@@ -103,7 +103,7 @@
 	}                                                                      \
 	static void HFTEST_TEAR_DOWN_FN(suite_name)(void)
 
-#define HFTEST_TEST(suite_name, test_name)                                  \
+#define HFTEST_TEST(suite_name, test_name, long_running)                    \
 	static void HFTEST_TEST_FN(suite_name, test_name)(void);            \
 	const struct hftest_test __attribute__((used)) __attribute__(       \
 		(section(HFTEST_TEST_SECTION(suite_name, test_name))))      \
@@ -111,6 +111,7 @@
 			.suite = #suite_name,                               \
 			.kind = HFTEST_KIND_TEST,                           \
 			.name = #test_name,                                 \
+			.is_long_running = long_running,                    \
 			.fn = HFTEST_TEST_FN(suite_name, test_name),        \
 	};                                                                  \
 	static void __attribute__((constructor))                            \
@@ -166,6 +167,7 @@ struct hftest_test {
 	const char *suite;
 	enum hftest_kind kind;
 	const char *name;
+	bool is_long_running;
 	hftest_test_fn fn;
 };
 
