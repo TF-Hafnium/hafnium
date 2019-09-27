@@ -77,6 +77,9 @@ static void vm_cpu_entry(uintptr_t arg)
  * This test tries to run the same secondary vCPU from two different physical
  * CPUs concurrently. The vCPU checks that the state is ok while it bounces
  * between the physical CPUs.
+ *
+ * Test is marked long-running because our implementation of spin-locks does not
+ * perform well under QEMU.
  */
 TEST_LONG_RUNNING(vcpu_state, concurrent_save_restore)
 {
