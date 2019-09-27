@@ -120,11 +120,13 @@ DriverArgs = collections.namedtuple("DriverArgs", [
 
 # State shared between the common Driver class and its subclasses during
 # a single invocation of the target platform.
-DriverRunState = collections.namedtuple("DriverRunState", [
-        "log_path",
-        "ret_code",
-    ])
+class DriverRunState:
+    def __init__(self, log_path):
+        self.log_path = log_path
+        self.ret_code = 0
 
+    def set_ret_code(self, ret_code):
+        self.ret_code = ret_code
 
 class DriverRunException(Exception):
     """Exception thrown if subprocess invoked by a driver returned non-zero
@@ -145,8 +147,7 @@ class Driver:
     def start_run(self, run_name):
         """Hook called by Driver subclasses before they invoke the target
         platform."""
-        return DriverRunState(
-                self.args.artifacts.create_file(run_name, ".log"), 0)
+        return DriverRunState(self.args.artifacts.create_file(run_name, ".log"))
 
     def exec_logged(self, run_state, exec_args):
         """Run a subprocess on behalf of a Driver subclass and append its
@@ -157,7 +158,7 @@ class Driver:
             f.flush()
             ret_code = subprocess.call(exec_args, stdout=f, stderr=f)
             if ret_code != 0:
-                run_state = DriverRunState(run_state.log_path, ret_code)
+                run_state.set_ret_code(ret_code)
                 raise DriverRunException()
 
     def finish_run(self, run_state):
