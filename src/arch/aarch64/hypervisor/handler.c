@@ -582,7 +582,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 
 	case 0x17: /* EC = 010111, SMC instruction. */ {
 		uintreg_t smc_pc = vcpu->regs.pc;
-		smc_res_t ret;
+		smc_res_t ret = {0};
 		struct vcpu *next = NULL;
 
 		if (!smc_handler(vcpu, &ret, &next)) {
