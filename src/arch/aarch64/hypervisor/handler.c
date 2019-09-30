@@ -273,7 +273,7 @@ static bool smc_check_client_privileges(const struct vcpu *vcpu)
  * Forwards the call if access is granted.
  * Returns true if call is forwarded.
  */
-static bool smc_forwarder(const struct vcpu *vcpu, smc_res_t *ret)
+static bool smc_forwarder(const struct vcpu *vcpu, struct smc_result *ret)
 {
 	uint32_t func = vcpu->regs.r[0];
 	/* TODO(b/132421503): obtain vmid according to new scheme. */
@@ -362,7 +362,8 @@ static void update_vi(struct vcpu *next)
 /**
  * Processes SMC instruction calls.
  */
-static bool smc_handler(struct vcpu *vcpu, smc_res_t *ret, struct vcpu **next)
+static bool smc_handler(struct vcpu *vcpu, struct smc_result *ret,
+			struct vcpu **next)
 {
 	uint32_t func = vcpu->regs.r[0];
 
@@ -582,7 +583,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 
 	case 0x17: /* EC = 010111, SMC instruction. */ {
 		uintreg_t smc_pc = vcpu->regs.pc;
-		smc_res_t ret = {0};
+		struct smc_result ret = {0};
 		struct vcpu *next = NULL;
 
 		if (!smc_handler(vcpu, &ret, &next)) {

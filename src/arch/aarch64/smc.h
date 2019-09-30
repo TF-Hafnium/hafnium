@@ -47,7 +47,7 @@
 
 /* clang-format on */
 
-typedef struct smc_res {
+struct smc_result {
 	uint64_t res0;
 	uint64_t res1;
 	uint64_t res2;
@@ -56,16 +56,16 @@ typedef struct smc_res {
 	uint64_t res5;
 	uint64_t res6;
 	uint64_t res7;
-} smc_res_t;
+};
 
-smc_res_t smc32(uint32_t func, uint32_t arg0, uint32_t arg1, uint32_t arg2,
-		uint32_t arg3, uint32_t arg4, uint32_t arg5,
-		uint32_t caller_id);
+struct smc_result smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
+			uint32_t arg2, uint32_t arg3, uint32_t arg4,
+			uint32_t arg5, uint32_t caller_id);
 
-smc_res_t smc64(uint32_t func, uint64_t arg0, uint64_t arg1, uint64_t arg2,
-		uint64_t arg3, uint64_t arg4, uint64_t arg5,
-		uint32_t caller_id);
+struct smc_result smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
+			uint64_t arg2, uint64_t arg3, uint64_t arg4,
+			uint64_t arg5, uint32_t caller_id);
 
-smc_res_t smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
-		      uint64_t arg2, uint64_t arg3, uint64_t arg4,
-		      uint64_t arg5, uint32_t caller_id);
+struct smc_result smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
+			      uint64_t arg2, uint64_t arg3, uint64_t arg4,
+			      uint64_t arg5, uint32_t caller_id);

@@ -18,9 +18,10 @@
 
 #include <stdint.h>
 
-static smc_res_t smc_internal(uint32_t func, uint64_t arg0, uint64_t arg1,
-			      uint64_t arg2, uint64_t arg3, uint64_t arg4,
-			      uint64_t arg5, uint32_t caller_id)
+static struct smc_result smc_internal(uint32_t func, uint64_t arg0,
+				      uint64_t arg1, uint64_t arg2,
+				      uint64_t arg3, uint64_t arg4,
+				      uint64_t arg5, uint32_t caller_id)
 {
 	register uint64_t r0 __asm__("x0") = func;
 	register uint64_t r1 __asm__("x1") = arg0;
@@ -37,33 +38,35 @@ static smc_res_t smc_internal(uint32_t func, uint64_t arg0, uint64_t arg1,
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3), "+r"(r4), "+r"(r5),
 		"+r"(r6), "+r"(r7));
 
-	return (smc_res_t){.res0 = r0,
-			   .res1 = r1,
-			   .res2 = r2,
-			   .res3 = r3,
-			   .res4 = r4,
-			   .res5 = r5,
-			   .res6 = r6,
-			   .res7 = r7};
+	return (struct smc_result){.res0 = r0,
+				   .res1 = r1,
+				   .res2 = r2,
+				   .res3 = r3,
+				   .res4 = r4,
+				   .res5 = r5,
+				   .res6 = r6,
+				   .res7 = r7};
 }
 
-smc_res_t smc32(uint32_t func, uint32_t arg0, uint32_t arg1, uint32_t arg2,
-		uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t caller_id)
+struct smc_result smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
+			uint32_t arg2, uint32_t arg3, uint32_t arg4,
+			uint32_t arg5, uint32_t caller_id)
 {
 	return smc_internal(func | SMCCC_32_BIT, arg0, arg1, arg2, arg3, arg4,
 			    arg5, caller_id);
 }
 
-smc_res_t smc64(uint32_t func, uint64_t arg0, uint64_t arg1, uint64_t arg2,
-		uint64_t arg3, uint64_t arg4, uint64_t arg5, uint32_t caller_id)
+struct smc_result smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
+			uint64_t arg2, uint64_t arg3, uint64_t arg4,
+			uint64_t arg5, uint32_t caller_id)
 {
 	return smc_internal(func | SMCCC_64_BIT, arg0, arg1, arg2, arg3, arg4,
 			    arg5, caller_id);
 }
 
-smc_res_t smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
-		      uint64_t arg2, uint64_t arg3, uint64_t arg4,
-		      uint64_t arg5, uint32_t caller_id)
+struct smc_result smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
+			      uint64_t arg2, uint64_t arg3, uint64_t arg4,
+			      uint64_t arg5, uint32_t caller_id)
 {
 	return smc_internal(func, arg0, arg1, arg2, arg3, arg4, arg5,
 			    caller_id);

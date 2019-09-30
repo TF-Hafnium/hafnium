@@ -37,7 +37,7 @@ void cpu_entry(struct cpu *c);
 /* Performs arch specific boot time initialisation. */
 void arch_one_time_init(void)
 {
-	smc_res_t smc_res =
+	struct smc_result smc_res =
 		smc32(PSCI_VERSION, 0, 0, 0, 0, 0, 0, SMCCC_CALLER_HYPERVISOR);
 
 	el3_psci_version = smc_res.res0;
@@ -72,7 +72,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 			     uintreg_t arg1, uintreg_t arg2, uintreg_t *ret)
 {
 	struct cpu *c;
-	smc_res_t smc_res;
+	struct smc_result smc_res;
 
 	/*
 	 * If there's a problem with the EL3 PSCI, block standard secure service
