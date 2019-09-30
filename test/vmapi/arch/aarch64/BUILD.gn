@@ -1,4 +1,4 @@
-# Copyright 2018 The Hafnium Authors.
+# Copyright 2019 The Hafnium Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,33 @@
 # limitations under the License.
 
 import("//build/image/image.gni")
-import("//build/toolchain/platform.gni")
 
-group("vmapi") {
+group("arch") {
   testonly = true
 
   deps = [
-    "arch/${plat_arch}:arch",
-    "primary_only:primary_only_test",
-    "primary_with_secondaries:primary_with_secondaries_test",
+    ":aarch64_test",
   ]
+}
+
+# Tests specific to aarch64.
+vm_kernel("aarch64_test_vm") {
+  testonly = true
+
+  sources = [
+    "smccc.c",
+  ]
+
+  deps = [
+    "//src/arch/aarch64:arch",
+    "//test/hftest:hftest_primary_vm",
+  ]
+}
+
+initrd("aarch64_test") {
+  testonly = true
+
+  manifest = "manifest.dts"
+  primary_name = "aarch64_test"
+  primary_vm = ":aarch64_test_vm"
 }
