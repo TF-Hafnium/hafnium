@@ -17,6 +17,8 @@
 SCRIPT_NAME="$(realpath "${BASH_SOURCE[0]}")"
 ROOT_DIR="$(realpath $(dirname "${SCRIPT_NAME}")/../..)"
 
+REPO="${ROOT_DIR}/prebuilts/generic/repo/repo"
+
 # Fail on any error.
 set -e
 # Fail on any part of a pipeline failing.
@@ -25,6 +27,19 @@ set -o pipefail
 set -u
 # Display commands being run.
 set -x
+
+# Returns true if `git status` reports uncommitted changes in the source tree.
+function is_repo_dirty() {
+	local cmd=(git status --porcelain)
+	if [ -d ".repo" ]
+	then
+		# This source tree was checked out using `repo`. Check the
+		# status of all projects.
+		cmd=(${REPO} forall -c "${cmd[@]}")
+	fi
+	[[ $(${cmd[@]}) ]]
+	return $?
+}
 
 # Default value of HAFNIUM_HERMETIC_BUILD is "true" for Kokoro builds.
 if [ -v KOKORO_JOB_NAME -a ! -v HAFNIUM_HERMETIC_BUILD ]
@@ -98,7 +113,7 @@ fi
 #
 
 make check
-if [[ `git status --porcelain` ]]
+if is_repo_dirty
 then
 	echo "Run \`make check\' locally to fix this."
 	exit 1
@@ -109,7 +124,7 @@ fi
 #
 
 make format
-if [[ `git status --porcelain` ]]
+if is_repo_dirty
 then
 	echo "Run \`make format\' locally to fix this."
 	exit 1
@@ -122,7 +137,7 @@ make checkpatch
 #
 
 make tidy
-if [[ `git status --porcelain` ]]
+if is_repo_dirty
 then
 	echo "Run \`make tidy\' locally to fix this."
 	exit 1
@@ -133,7 +148,7 @@ fi
 #
 
 make license
-if [[ `git status --porcelain` ]]
+if is_repo_dirty
 then
 	echo "Run \`make license\' locally to fix this."
 	exit 1
