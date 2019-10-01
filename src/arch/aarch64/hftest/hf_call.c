@@ -42,10 +42,10 @@ struct spci_value spci_call(struct spci_value args)
 	register uint64_t r1 __asm__("x1") = args.arg1;
 	register uint64_t r2 __asm__("x2") = args.arg2;
 	register uint64_t r3 __asm__("x3") = args.arg3;
-	register uint64_t r4 __asm__("x4") = args.arg3;
-	register uint64_t r5 __asm__("x5") = args.arg3;
-	register uint64_t r6 __asm__("x6") = args.arg3;
-	register uint64_t r7 __asm__("x7") = args.arg3;
+	register uint64_t r4 __asm__("x4") = args.arg4;
+	register uint64_t r5 __asm__("x5") = args.arg5;
+	register uint64_t r6 __asm__("x6") = args.arg6;
+	register uint64_t r7 __asm__("x7") = args.arg7;
 
 	__asm__ volatile(
 		"hvc #0"
