@@ -320,10 +320,10 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 		args->func = api_spci_msg_send(args->arg1, current(), next);
 		return true;
 	case SPCI_MSG_WAIT_32:
-		args->func = api_spci_msg_recv(true, current(), next);
+		*args = api_spci_msg_recv(true, current(), next);
 		return true;
 	case SPCI_MSG_POLL_32:
-		args->func = api_spci_msg_recv(false, current(), next);
+		*args = api_spci_msg_recv(false, current(), next);
 		return true;
 	}
 

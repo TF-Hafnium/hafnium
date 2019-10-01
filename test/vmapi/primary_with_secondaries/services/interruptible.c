@@ -51,13 +51,14 @@ static void irq(void)
  * Try to receive a message from the mailbox, blocking if necessary, and
  * retrying if interrupted.
  */
-int32_t mailbox_receive_retry()
+struct spci_value mailbox_receive_retry()
 {
-	int32_t received;
+	struct spci_value received;
 
 	do {
 		received = spci_msg_wait();
-	} while (received == SPCI_INTERRUPTED);
+	} while (received.func == SPCI_ERROR_32 &&
+		 received.arg1 == SPCI_INTERRUPTED);
 
 	return received;
 }
@@ -77,22 +78,25 @@ TEST_SERVICE(interruptible)
 		const char ping_message[] = "Ping";
 		const char enable_message[] = "Enable interrupt C";
 
-		mailbox_receive_retry();
-		if (recv_buf->source_vm_id == HF_PRIMARY_VM_ID &&
-		    recv_buf->length == sizeof(ping_message) &&
+		struct spci_value ret = mailbox_receive_retry();
+
+		ASSERT_EQ(ret.func, SPCI_MSG_SEND_32);
+		if (spci_msg_send_sender(ret) == HF_PRIMARY_VM_ID &&
+		    spci_msg_send_size(ret) == sizeof(ping_message) &&
 		    memcmp(recv_buf->payload, ping_message,
 			   sizeof(ping_message)) == 0) {
 			/* Interrupt ourselves */
 			hf_interrupt_inject(this_vm_id, 0, SELF_INTERRUPT_ID);
-		} else if (recv_buf->source_vm_id == HF_PRIMARY_VM_ID &&
-			   recv_buf->length == sizeof(enable_message) &&
+		} else if (spci_msg_send_sender(ret) == HF_PRIMARY_VM_ID &&
+			   spci_msg_send_size(ret) == sizeof(enable_message) &&
 			   memcmp(recv_buf->payload, enable_message,
 				  sizeof(enable_message)) == 0) {
 			/* Enable interrupt ID C. */
 			hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_C, true);
 		} else {
 			dlog("Got unexpected message from VM %d, size %d.\n",
-			     recv_buf->source_vm_id, recv_buf->length);
+			     spci_msg_send_sender(ret),
+			     spci_msg_send_size(ret));
 			FAIL("Unexpected message");
 		}
 		hf_mailbox_clear();

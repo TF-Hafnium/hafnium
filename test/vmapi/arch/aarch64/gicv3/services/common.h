@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 
-#include "vmapi/hf/call.h"
+#include "vmapi/hf/spci.h"
 
-int32_t mailbox_receive_retry(void);
+struct spci_value mailbox_receive_retry(void);

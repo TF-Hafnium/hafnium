@@ -19,17 +19,19 @@
 #include "vmapi/hf/call.h"
 
 #include "hftest.h"
+
 /**
  * Try to receive a message from the mailbox, blocking if necessary, and
  * retrying if interrupted.
  */
-int32_t mailbox_receive_retry(void)
+struct spci_value mailbox_receive_retry(void)
 {
-	int32_t received;
+	struct spci_value received;
 
 	do {
 		received = spci_msg_wait();
-	} while (received == SPCI_INTERRUPTED);
+	} while (received.func == SPCI_ERROR_32 &&
+		 received.arg1 == SPCI_INTERRUPTED);
 
 	return received;
 }

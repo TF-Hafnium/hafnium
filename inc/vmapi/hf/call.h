@@ -138,14 +138,13 @@ static inline int64_t spci_msg_send(uint32_t attributes)
  * that a message becoming available is also treated like a wake-up event.
  *
  * Returns:
- *  - SPCI_SUCCESS if a message is successfully received.
- *  - SPCI_INTERRUPTED if the caller is the primary VM or an interrupt happened
- *    during the call.
- *  - SPCI_RETRY if there was no pending message, and `block` was false.
+ *  - SPCI_MSG_SEND if a message is successfully received.
+ *  - SPCI_ERROR SPCI_NOT_SUPPORTED if called from the primary VM.
+ *  - SPCI_ERROR SPCI_INTERRUPTED if an interrupt happened during the call.
  */
-static inline int32_t spci_msg_wait(void)
+static inline struct spci_value spci_msg_wait(void)
 {
-	return hf_call(SPCI_MSG_WAIT_32, 0, 0, 0);
+	return spci_call((struct spci_value){.func = SPCI_MSG_WAIT_32});
 }
 
 /**
@@ -155,14 +154,14 @@ static inline int32_t spci_msg_wait(void)
  * The mailbox must be cleared before a new message can be received.
  *
  * Returns:
- *  - SPCI_SUCCESS if a message is successfully received.
- *  - SPCI_INTERRUPTED if the caller is the primary VM or an interrupt happened
- *    during the call.
- *  - SPCI_RETRY if there was no pending message, and `block` was false.
+ *  - SPCI_MSG_SEND if a message is successfully received.
+ *  - SPCI_ERROR SPCI_NOT_SUPPORTED if called from the primary VM.
+ *  - SPCI_ERROR SPCI_INTERRUPTED if an interrupt happened during the call.
+ *  - SPCI_ERROR SPCI_RETRY if there was no pending message.
  */
-static inline int32_t spci_msg_poll(void)
+static inline struct spci_value spci_msg_poll(void)
 {
-	return hf_call(SPCI_MSG_POLL_32, 0, 0, 0);
+	return spci_call((struct spci_value){.func = SPCI_MSG_POLL_32});
 }
 
 /**

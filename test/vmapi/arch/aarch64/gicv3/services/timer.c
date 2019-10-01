@@ -49,7 +49,7 @@ static void irq_current(void)
 	memcpy_s(SERVICE_SEND_BUFFER()->payload, SPCI_MSG_PAYLOAD_MAX, buffer,
 		 size);
 	spci_message_init(SERVICE_SEND_BUFFER(), size, HF_PRIMARY_VM_ID,
-			  SERVICE_RECV_BUFFER()->target_vm_id);
+			  hf_vm_get_id());
 	spci_msg_send(0);
 	dlog("secondary IRQ %d ended\n", interrupt_id);
 	event_send_local();
@@ -68,13 +68,13 @@ TEST_SERVICE(timer)
 		bool wfi, wfe, receive;
 		bool disable_interrupts;
 		uint32_t ticks;
-		mailbox_receive_retry();
+		struct spci_value ret = mailbox_receive_retry();
 
-		if (message_header->source_vm_id != HF_PRIMARY_VM_ID ||
-		    message_header->length != sizeof(timer_wfi_message)) {
+		if (spci_msg_send_sender(ret) != HF_PRIMARY_VM_ID ||
+		    spci_msg_send_size(ret) != sizeof(timer_wfi_message)) {
 			FAIL("Got unexpected message from VM %d, size %d.\n",
-			     message_header->source_vm_id,
-			     message_header->length);
+			     spci_msg_send_sender(ret),
+			     spci_msg_send_size(ret));
 		}
 
 		message = message_header->payload;
@@ -113,9 +113,10 @@ TEST_SERVICE(timer)
 				event_wait();
 			}
 		} else if (receive) {
-			int32_t res = spci_msg_wait();
+			struct spci_value res = spci_msg_wait();
 
-			EXPECT_EQ(res, SPCI_INTERRUPTED);
+			EXPECT_EQ(res.func, SPCI_ERROR_32);
+			EXPECT_EQ(res.arg1, SPCI_INTERRUPTED);
 		} else {
 			/* Busy wait until the timer fires. */
 			while (!timer_fired) {

@@ -38,19 +38,21 @@ TEST_SERVICE(interruptible_echo)
 	arch_irq_enable();
 
 	for (;;) {
-		uint32_t res = spci_msg_wait();
+		struct spci_value res = spci_msg_wait();
 		struct spci_message *message = SERVICE_SEND_BUFFER();
 		struct spci_message *recv_message = SERVICE_RECV_BUFFER();
 
 		/* Retry if interrupted but made visible with the yield. */
-		while (res == SPCI_INTERRUPTED) {
+		while (res.func == SPCI_ERROR_32 &&
+		       res.arg1 == SPCI_INTERRUPTED) {
 			spci_yield();
 			res = spci_msg_wait();
 		}
 
+		ASSERT_EQ(res.func, SPCI_MSG_SEND_32);
 		memcpy_s(message->payload, SPCI_MSG_PAYLOAD_MAX,
-			 recv_message->payload, recv_message->length);
-		spci_message_init(message, recv_message->length,
+			 recv_message->payload, spci_msg_send_size(res));
+		spci_message_init(message, spci_msg_send_size(res),
 				  HF_PRIMARY_VM_ID, SERVICE_VM0);
 
 		hf_mailbox_clear();

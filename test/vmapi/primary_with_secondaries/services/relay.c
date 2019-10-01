@@ -36,17 +36,19 @@ TEST_SERVICE(relay)
 		uint32_t next_message_size;
 
 		/* Receive the message to relay. */
-		spci_msg_wait();
+		struct spci_value ret = spci_msg_wait();
+		ASSERT_EQ(ret.func, SPCI_MSG_SEND_32);
 
 		/* Prepare to relay the message. */
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
 		struct spci_message *send_buf = SERVICE_SEND_BUFFER();
-		ASSERT_GE(recv_buf->length, sizeof(spci_vm_id_t));
+		ASSERT_GE(spci_msg_send_size(ret), sizeof(spci_vm_id_t));
 
 		chain = (spci_vm_id_t *)recv_buf->payload;
 		next_vm_id = le16toh(*chain);
 		next_message = chain + 1;
-		next_message_size = recv_buf->length - sizeof(spci_vm_id_t);
+		next_message_size =
+			spci_msg_send_size(ret) - sizeof(spci_vm_id_t);
 
 		/* Send the message to the next stage. */
 		memcpy_s(send_buf->payload, SPCI_MSG_PAYLOAD_MAX, next_message,

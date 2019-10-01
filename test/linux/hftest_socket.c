@@ -79,26 +79,28 @@ noreturn void kmain(size_t memory_size)
 	ctx->memory_size = memory_size;
 
 	for (;;) {
+		struct spci_value ret;
 		struct spci_message *send_buf = (struct spci_message *)send;
 		struct spci_message *recv_buf = (struct spci_message *)recv;
 
 		/* Receive the packet. */
-		spci_msg_wait();
-		EXPECT_LE(recv_buf->length, SPCI_MSG_PAYLOAD_MAX);
+		ret = spci_msg_wait();
+		EXPECT_LE(spci_msg_send_size(ret), SPCI_MSG_PAYLOAD_MAX);
 
 		/* Echo the message back to the sender. */
 		memcpy_s(send_buf->payload, SPCI_MSG_PAYLOAD_MAX,
-			 recv_buf->payload, recv_buf->length);
+			 recv_buf->payload, spci_msg_send_size(ret));
 
 		/* Swap the socket's source and destination ports */
 		struct hf_msg_hdr *hdr = (struct hf_msg_hdr *)send_buf->payload;
 		swap(&(hdr->src_port), &(hdr->dst_port));
 
 		/* Swap the destination and source ids. */
-		spci_vm_id_t dst_id = recv_buf->source_vm_id;
-		spci_vm_id_t src_id = recv_buf->target_vm_id;
+		spci_vm_id_t dst_id = spci_msg_send_sender(ret);
+		spci_vm_id_t src_id = spci_msg_send_receiver(ret);
 
-		spci_message_init(send_buf, recv_buf->length, dst_id, src_id);
+		spci_message_init(send_buf, spci_msg_send_size(ret), dst_id,
+				  src_id);
 
 		hf_mailbox_clear();
 		EXPECT_EQ(spci_msg_send(0), SPCI_SUCCESS);

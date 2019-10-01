@@ -193,6 +193,21 @@ struct spci_value {
 	uint64_t arg7;
 };
 
+static inline spci_vm_id_t spci_msg_send_sender(struct spci_value args)
+{
+	return (args.arg1 >> 16) & 0xffff;
+}
+
+static inline spci_vm_id_t spci_msg_send_receiver(struct spci_value args)
+{
+	return args.arg1 & 0xffff;
+}
+
+static inline uint32_t spci_msg_send_size(struct spci_value args)
+{
+	return args.arg3;
+}
+
 /** SPCI common message header. */
 struct spci_message {
 	/*

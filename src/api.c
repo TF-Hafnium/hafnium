@@ -91,8 +91,10 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 	}
 
 	/* Set the return value for the primary VM's call to HF_VCPU_RUN. */
-	arch_regs_set_retval(&next->regs,
-			     hf_vcpu_run_return_encode(primary_ret));
+	arch_regs_set_retval(
+		&next->regs,
+		(struct spci_value){
+			.func = hf_vcpu_run_return_encode(primary_ret)});
 
 	/* Mark the current vcpu as waiting. */
 	sl_lock(&current->lock);
@@ -343,6 +345,19 @@ out:
 }
 
 /**
+ * Constructs an SPCI_MSG_SEND value to return from a successful SPCI_MSG_POLL
+ * or SPCI_MSG_WAIT call.
+ */
+static struct spci_value spci_msg_recv_return(const struct vm *receiver)
+{
+	return (struct spci_value){
+		.func = SPCI_MSG_SEND_32,
+		.arg1 = receiver->mailbox.recv->source_vm_id << 16 |
+			receiver->id,
+		.arg3 = receiver->mailbox.recv->length};
+}
+
+/**
  * Prepares the vcpu to run by updating its state and fetching whether a return
  * value needs to be forced onto the vCPU.
  */
@@ -422,7 +437,8 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 		 * be delivered directly.
 		 */
 		if (vcpu->vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
-			arch_regs_set_retval(&vcpu->regs, SPCI_SUCCESS);
+			arch_regs_set_retval(&vcpu->regs,
+					     spci_msg_recv_return(vcpu->vm));
 			vcpu->vm->mailbox.state = MAILBOX_STATE_READ;
 			break;
 		}
@@ -1037,17 +1053,18 @@ bool api_spci_msg_recv_block_interrupted(struct vcpu *current)
  *
  * No new messages can be received until the mailbox has been cleared.
  */
-int32_t api_spci_msg_recv(bool block, struct vcpu *current, struct vcpu **next)
+struct spci_value api_spci_msg_recv(bool block, struct vcpu *current,
+				    struct vcpu **next)
 {
 	struct vm *vm = current->vm;
-	int32_t return_code;
+	struct spci_value return_code;
 
 	/*
 	 * The primary VM will receive messages as a status code from running
 	 * vcpus and must not call this function.
 	 */
 	if (vm->id == HF_PRIMARY_VM_ID) {
-		return SPCI_INTERRUPTED;
+		return spci_error(SPCI_NOT_SUPPORTED);
 	}
 
 	sl_lock(&vm->lock);
@@ -1055,13 +1072,13 @@ int32_t api_spci_msg_recv(bool block, struct vcpu *current, struct vcpu **next)
 	/* Return pending messages without blocking. */
 	if (vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
 		vm->mailbox.state = MAILBOX_STATE_READ;
-		return_code = SPCI_SUCCESS;
+		return_code = spci_msg_recv_return(vm);
 		goto out;
 	}
 
 	/* No pending message so fail if not allowed to block. */
 	if (!block) {
-		return_code = SPCI_RETRY;
+		return_code = spci_error(SPCI_RETRY);
 		goto out;
 	}
 
@@ -1070,7 +1087,7 @@ int32_t api_spci_msg_recv(bool block, struct vcpu *current, struct vcpu **next)
 	 * received. If a message is received the return value will be set at
 	 * that time to SPCI_SUCCESS.
 	 */
-	return_code = SPCI_INTERRUPTED;
+	return_code = spci_error(SPCI_INTERRUPTED);
 	if (api_spci_msg_recv_block_interrupted(current)) {
 		goto out;
 	}

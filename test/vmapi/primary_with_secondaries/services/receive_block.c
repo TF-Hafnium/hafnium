@@ -46,8 +46,9 @@ TEST_SERVICE(receive_block)
 	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
 
 	for (i = 0; i < 10; ++i) {
-		int32_t res = spci_msg_wait();
-		EXPECT_EQ(res, SPCI_INTERRUPTED);
+		struct spci_value res = spci_msg_wait();
+		EXPECT_EQ(res.func, SPCI_ERROR_32);
+		EXPECT_EQ(res.arg1, SPCI_INTERRUPTED);
 	}
 
 	memcpy_s(SERVICE_SEND_BUFFER()->payload, SPCI_MSG_PAYLOAD_MAX, message,

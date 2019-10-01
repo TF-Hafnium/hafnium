@@ -29,7 +29,7 @@ TEST_SERVICE(spci_check)
 	struct spci_message expected_message = {
 		.flags = SPCI_MESSAGE_IMPDEF_MASK,
 		.length = sizeof(message),
-		.target_vm_id = SERVICE_VM0,
+		.target_vm_id = hf_vm_get_id(),
 		.source_vm_id = HF_PRIMARY_VM_ID,
 
 		/*
@@ -41,20 +41,14 @@ TEST_SERVICE(spci_check)
 	};
 
 	/* Wait for single message to be sent by the primary VM. */
-	spci_msg_wait();
+	struct spci_value ret = spci_msg_wait();
+
+	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 
 	/* Ensure message header has all fields correctly set. */
-	EXPECT_EQ(recv_buf->flags, expected_message.flags);
-	EXPECT_EQ(recv_buf->length, expected_message.length);
-	EXPECT_EQ(recv_buf->target_vm_id, expected_message.target_vm_id);
-	EXPECT_EQ(recv_buf->source_vm_id, expected_message.source_vm_id);
-
-	/* TODO: Padding fields may be set to MBZ in the next SPCI spec
-	 * versions. */
-	EXPECT_EQ(recv_buf->reserved_1, expected_message.reserved_1);
-	EXPECT_EQ(recv_buf->reserved_2, expected_message.reserved_2);
-
-	/* Ensure message header has all fields correctly set. */
+	EXPECT_EQ(spci_msg_send_size(ret), sizeof(message));
+	EXPECT_EQ(spci_msg_send_receiver(ret), hf_vm_get_id());
+	EXPECT_EQ(spci_msg_send_sender(ret), HF_PRIMARY_VM_ID);
 	EXPECT_EQ(memcmp(recv_buf, &expected_message, sizeof(expected_message)),
 		  0);
 
@@ -70,14 +64,17 @@ TEST_SERVICE(spci_length)
 	const char message[] = "this should be truncated";
 
 	/* Wait for single message to be sent by the primary VM. */
-	spci_msg_wait();
+	struct spci_value ret = spci_msg_wait();
+
+	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 
 	/* Verify the length is as expected. */
-	EXPECT_EQ(16, recv_buf->length);
+	EXPECT_EQ(16, spci_msg_send_size(ret));
 
 	/* Check only part of the message is sent correctly. */
 	EXPECT_NE(memcmp(recv_buf->payload, message, sizeof(message)), 0);
-	EXPECT_EQ(memcmp(recv_buf->payload, message, recv_buf->length), 0);
+	EXPECT_EQ(memcmp(recv_buf->payload, message, spci_msg_send_size(ret)),
+		  0);
 
 	spci_yield();
 }
@@ -85,7 +82,10 @@ TEST_SERVICE(spci_length)
 TEST_SERVICE(spci_recv_non_blocking)
 {
 	/* Wait for single message to be sent by the primary VM. */
-	EXPECT_EQ(spci_msg_poll(), SPCI_RETRY);
+	struct spci_value ret = spci_msg_poll();
+
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg1, SPCI_RETRY);
 
 	spci_yield();
 }

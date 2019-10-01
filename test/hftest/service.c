@@ -82,6 +82,7 @@ noreturn void kmain(size_t memory_size)
 	struct memiter args;
 	hftest_test_fn service;
 	struct hftest_context *ctx;
+	struct spci_value ret;
 
 	/*
 	 * Initialize the stage-1 MMU and identity-map the entire address space.
@@ -102,8 +103,8 @@ noreturn void kmain(size_t memory_size)
 	hf_vm_configure(send_addr, recv_addr);
 
 	/* Receive the name of the service to run. */
-	spci_msg_wait();
-	memiter_init(&args, recv_msg->payload, recv_msg->length);
+	ret = spci_msg_wait();
+	memiter_init(&args, recv_msg->payload, spci_msg_send_size(ret));
 	service = find_service(&args);
 	hf_mailbox_clear();
 

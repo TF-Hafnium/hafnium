@@ -53,19 +53,19 @@ TEST_SERVICE(echo_with_notification)
 
 	/* Loop, echo messages back to the sender. */
 	for (;;) {
-		spci_msg_wait();
-
 		struct spci_message *send_buf = SERVICE_SEND_BUFFER();
 		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
+		struct spci_value ret = spci_msg_wait();
+		spci_vm_id_t target_vm_id = spci_msg_send_receiver(ret);
+		spci_vm_id_t source_vm_id = spci_msg_send_sender(ret);
 
 		memcpy_s(send_buf->payload, SPCI_MSG_PAYLOAD_MAX,
-			 recv_buf->payload, recv_buf->length);
-		spci_message_init(send_buf, recv_buf->length,
-				  recv_buf->source_vm_id,
-				  recv_buf->target_vm_id);
+			 recv_buf->payload, spci_msg_send_size(ret));
+		spci_message_init(send_buf, spci_msg_send_size(ret),
+				  source_vm_id, target_vm_id);
 
 		while (spci_msg_send(SPCI_MSG_SEND_NOTIFY) != SPCI_SUCCESS) {
-			wait_for_vm(recv_buf->source_vm_id);
+			wait_for_vm(source_vm_id);
 		}
 
 		hf_mailbox_clear();
