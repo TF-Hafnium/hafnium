@@ -1,1 +1,9 @@
 out/
+.repo/
+
+# Ignore project/ subfolders which are not part of the public Hafnium tree.
+# When these are checked out using a `repo` manifest Git otherwise treats them
+# as untracked files and the repository as dirty.
+!project/
+project/*/
+!project/reference/
