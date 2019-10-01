@@ -48,9 +48,9 @@ enum hf_vcpu_run_code {
 	 * The vCPU is blocked waiting for a message. The scheduler MUST take it
 	 * off the run queue and not call `hf_vcpu_run` on the vCPU until it has
 	 * injected an interrupt, sent it a message, or received
-	 * `HF_VCPU_RUN_WAKE_UP` for it from another vCPU from another vCPU or
-	 * the timeout provided in `hf_vcpu_run_return.sleep` is not
-	 * `HF_SLEEP_INDEFINITE` and the specified duration has expired.
+	 * `HF_VCPU_RUN_WAKE_UP` for it from another vCPU, or the timeout
+	 * provided in `hf_vcpu_run_return.sleep` is not `HF_SLEEP_INDEFINITE`
+	 * and the specified duration has expired.
 	 */
 	HF_VCPU_RUN_WAIT_FOR_MESSAGE = 3,
 
