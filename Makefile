@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Select the project to build.
+PROJECT ?= reference
+
 # If HAFNIUM_HERMETIC_BUILD is "true" (not default), invoke `make` inside
 # a container. The 'run_in_container.sh' script will set the variable value to
 # 'inside' to avoid recursion.
@@ -23,11 +26,11 @@ ifeq ($(HAFNIUM_HERMETIC_BUILD),true)
 
 # Need to define at least one non-default target.
 all:
-	@$(PWD)/build/run_in_container.sh make $@
+	@$(PWD)/build/run_in_container.sh make PROJECT=$(PROJECT) $@
 
 # Catch-all target.
 .DEFAULT:
-	@$(PWD)/build/run_in_container.sh make $@
+	@$(PWD)/build/run_in_container.sh make PROJECT=$(PROJECT) $@
 
 else  # HAFNIUM_HERMETIC_BUILD
 
@@ -47,9 +50,6 @@ CHECKPATCH := $(PWD)/third_party/linux/scripts/checkpatch.pl \
 # debug_el1.c : uses XMACROS, which checkpatch doesn't understand.
 # perfmon.c : uses XMACROS, which checkpatch doesn't understand.
 CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c"
-
-# Select the project to build.
-PROJECT ?= reference
 
 OUT ?= out/$(PROJECT)
 OUT_DIR = out/$(PROJECT)

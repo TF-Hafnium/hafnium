@@ -77,8 +77,10 @@ CLANG=${PWD}/prebuilts/linux-x64/clang/bin/clang
 # Step 1: make sure it builds.
 #
 
-# Check the hypervisor builds.
-make
+for proj in $(cd project/ && ls)
+do
+  make PROJECT=${proj}
+done
 
 #
 # Step 2: make sure it works.
