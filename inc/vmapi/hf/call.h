@@ -20,27 +20,6 @@
 #include "hf/spci.h"
 #include "hf/types.h"
 
-/* Keep macro alignment */
-/* clang-format off */
-
-/* TODO: Define constants below according to spec. */
-#define HF_VM_GET_COUNT         0xff01
-#define HF_VCPU_GET_COUNT       0xff02
-#define HF_VCPU_RUN             0xff03
-#define HF_VM_CONFIGURE         0xff05
-#define HF_MAILBOX_CLEAR        0xff08
-#define HF_MAILBOX_WRITABLE_GET 0xff09
-#define HF_MAILBOX_WAITER_GET   0xff0a
-#define HF_INTERRUPT_ENABLE     0xff0b
-#define HF_INTERRUPT_GET        0xff0c
-#define HF_INTERRUPT_INJECT     0xff0d
-#define HF_SHARE_MEMORY         0xff0e
-
-/* This matches what Trusty and its ATF module currently use. */
-#define HF_DEBUG_LOG            0xbd000000
-
-/* clang-format on */
-
 /**
  * This function must be implemented to trigger the architecture specific
  * mechanism to call to the hypervisor.
@@ -88,8 +67,8 @@ static inline spci_vcpu_count_t hf_vcpu_get_count(spci_vm_id_t vm_id)
 static inline struct hf_vcpu_run_return hf_vcpu_run(spci_vm_id_t vm_id,
 						    spci_vcpu_index_t vcpu_idx)
 {
-	return hf_vcpu_run_return_decode(
-		hf_call(HF_VCPU_RUN, vm_id, vcpu_idx, 0));
+	return hf_vcpu_run_return_decode(spci_call((struct spci_value){
+		.func = SPCI_RUN_32, (uint32_t)vm_id << 16 | vcpu_idx}));
 }
 
 /**

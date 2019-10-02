@@ -52,6 +52,7 @@
 #define SPCI_INTERRUPTED        INT32_C(-5)
 #define SPCI_DENIED             INT32_C(-6)
 #define SPCI_RETRY              INT32_C(-7)
+#define SPCI_ABORTED            INT32_C(-8)
 
 /* Architected memory sharing message IDs. */
 enum spci_memory_share {
@@ -69,6 +70,8 @@ enum spci_memory_share {
 #define SPCI_MSG_SEND_NOTIFY_MASK 0x1
 #define SPCI_MSG_SEND_LEGACY_MEMORY      0x2
 #define SPCI_MSG_SEND_LEGACY_MEMORY_MASK 0x2
+
+#define SPCI_SLEEP_INDEFINITE 0
 
 /* The maximum length possible for a single message. */
 #define SPCI_MSG_PAYLOAD_MAX HF_MAILBOX_SIZE

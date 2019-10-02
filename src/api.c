@@ -62,8 +62,7 @@ void api_init(struct mpool *ppool)
  * Switches the physical CPU back to the corresponding vcpu of the primary VM.
  *
  * This triggers the scheduling logic to run. Run in the context of secondary VM
- * to cause HF_VCPU_RUN to return and the primary VM to regain control of the
- * cpu.
+ * to cause SPCI_RUN to return and the primary VM to regain control of the CPU.
  */
 static struct vcpu *api_switch_to_primary(struct vcpu *current,
 					  struct hf_vcpu_run_return primary_ret,
@@ -91,10 +90,9 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 	}
 
 	/* Set the return value for the primary VM's call to HF_VCPU_RUN. */
-	arch_regs_set_retval(
-		&next->regs,
-		(struct spci_value){
-			.func = hf_vcpu_run_return_encode(primary_ret)});
+	arch_regs_set_retval(&next->regs, hf_vcpu_run_return_encode(
+						  primary_ret, current->vm->id,
+						  vcpu_index(current)));
 
 	/* Mark the current vcpu as waiting. */
 	sl_lock(&current->lock);

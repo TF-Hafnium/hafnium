@@ -51,7 +51,7 @@ typedef uintptr_t hf_ipaddr_t;
 #define HF_PRIMARY_VM_ID (HF_VM_ID_OFFSET + HF_PRIMARY_VM_INDEX)
 
 /** Sleep value for an indefinite period of time. */
-#define HF_SLEEP_INDEFINITE 0xffffffffffffff
+#define HF_SLEEP_INDEFINITE 0xffffffffffffffff
 
 /** The amount of data that can be sent to a mailbox. */
 #define HF_MAILBOX_SIZE 4096

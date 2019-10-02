@@ -19,6 +19,30 @@
 #include "hf/spci.h"
 #include "hf/types.h"
 
+/* Keep macro alignment */
+/* clang-format off */
+
+/* TODO: Define constants below according to spec. */
+#define HF_VM_GET_COUNT                0xff01
+#define HF_VCPU_GET_COUNT              0xff02
+#define HF_VM_CONFIGURE                0xff03
+#define HF_MAILBOX_CLEAR               0xff04
+#define HF_MAILBOX_WRITABLE_GET        0xff05
+#define HF_MAILBOX_WAITER_GET          0xff06
+#define HF_INTERRUPT_ENABLE            0xff07
+#define HF_INTERRUPT_GET               0xff08
+#define HF_INTERRUPT_INJECT            0xff09
+#define HF_SHARE_MEMORY                0xff0a
+
+/* Custom SPCI-like calls returned from SPCI_RUN. */
+#define HF_SPCI_RUN_WAIT_FOR_INTERRUPT 0xff0b
+#define HF_SPCI_RUN_WAKE_UP            0xff0c
+
+/* This matches what Trusty and its ATF module currently use. */
+#define HF_DEBUG_LOG            0xbd000000
+
+/* clang-format on */
+
 enum hf_vcpu_run_code {
 	/**
 	 * The vCPU has been preempted but still has work to do. If the
@@ -123,56 +147,126 @@ enum hf_share {
 };
 
 /**
- * Encode an hf_vcpu_run_return struct in the 64-bit packing ABI.
+ * Encode an hf_vcpu_run_return struct in the SPCI ABI.
  */
-static inline uint64_t hf_vcpu_run_return_encode(struct hf_vcpu_run_return res)
+static inline struct spci_value hf_vcpu_run_return_encode(
+	struct hf_vcpu_run_return res, spci_vm_id_t vm_id,
+	spci_vcpu_index_t vcpu_index)
 {
-	uint64_t ret = res.code & 0xff;
+	struct spci_value ret = {0};
 
 	switch (res.code) {
-	case HF_VCPU_RUN_WAKE_UP:
-		ret |= (uint64_t)res.wake_up.vm_id << 32;
-		ret |= (uint64_t)res.wake_up.vcpu << 16;
+	case HF_VCPU_RUN_PREEMPTED:
+		ret.func = SPCI_INTERRUPT_32;
+		ret.arg1 = (uint32_t)vm_id << 16 | vcpu_index;
 		break;
-	case HF_VCPU_RUN_MESSAGE:
-		ret |= (uint64_t)res.message.size << 32;
-		ret |= res.message.vm_id << 8;
+	case HF_VCPU_RUN_YIELD:
+		ret.func = SPCI_YIELD_32;
+		ret.arg1 = (uint32_t)vcpu_index << 16 | vm_id;
 		break;
 	case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
-	case HF_VCPU_RUN_WAIT_FOR_MESSAGE:
-		ret |= res.sleep.ns << 8;
+		ret.func = HF_SPCI_RUN_WAIT_FOR_INTERRUPT;
+		ret.arg1 = (uint32_t)vcpu_index << 16 | vm_id;
+		if (res.sleep.ns == HF_SLEEP_INDEFINITE) {
+			ret.arg2 = SPCI_SLEEP_INDEFINITE;
+		} else if (res.sleep.ns == SPCI_SLEEP_INDEFINITE) {
+			ret.arg2 = 1;
+		} else {
+			ret.arg2 = res.sleep.ns;
+		}
 		break;
-	default:
+	case HF_VCPU_RUN_WAIT_FOR_MESSAGE:
+		ret.func = SPCI_MSG_WAIT_32;
+		ret.arg1 = (uint32_t)vcpu_index << 16 | vm_id;
+		if (res.sleep.ns == HF_SLEEP_INDEFINITE) {
+			ret.arg2 = SPCI_SLEEP_INDEFINITE;
+		} else if (res.sleep.ns == SPCI_SLEEP_INDEFINITE) {
+			ret.arg2 = 1;
+		} else {
+			ret.arg2 = res.sleep.ns;
+		}
+		break;
+	case HF_VCPU_RUN_WAKE_UP:
+		ret.func = HF_SPCI_RUN_WAKE_UP;
+		ret.arg1 = (uint32_t)res.wake_up.vcpu << 16 | res.wake_up.vm_id;
+		break;
+	case HF_VCPU_RUN_MESSAGE:
+		ret.func = SPCI_MSG_SEND_32;
+		ret.arg1 = (uint32_t)vm_id << 16 | res.message.vm_id;
+		ret.arg3 = res.message.size;
+		break;
+	case HF_VCPU_RUN_NOTIFY_WAITERS:
+		ret.func = SPCI_RX_RELEASE_32;
+		break;
+	case HF_VCPU_RUN_ABORTED:
+		ret.func = SPCI_ERROR_32;
+		ret.arg2 = SPCI_ABORTED;
 		break;
 	}
 
 	return ret;
 }
 
+static spci_vm_id_t wake_up_get_vm_id(struct spci_value v)
+{
+	return v.arg1 & 0xffff;
+}
+
+static spci_vcpu_index_t wake_up_get_vcpu(struct spci_value v)
+{
+	return (v.arg1 >> 16) & 0xffff;
+}
+
 /**
  * Decode an hf_vcpu_run_return struct from the 64-bit packing ABI.
  */
-static inline struct hf_vcpu_run_return hf_vcpu_run_return_decode(uint64_t res)
+static inline struct hf_vcpu_run_return hf_vcpu_run_return_decode(
+	struct spci_value res)
 {
-	struct hf_vcpu_run_return ret = {
-		.code = (enum hf_vcpu_run_code)(res & 0xff),
-	};
+	struct hf_vcpu_run_return ret = {.code = HF_VCPU_RUN_PREEMPTED};
 
 	/* Some codes include more data. */
-	switch (ret.code) {
-	case HF_VCPU_RUN_WAKE_UP:
-		ret.wake_up.vm_id = res >> 32;
-		ret.wake_up.vcpu = (res >> 16) & 0xffff;
+	switch (res.func) {
+	case SPCI_INTERRUPT_32:
+		ret.code = HF_VCPU_RUN_PREEMPTED;
 		break;
-	case HF_VCPU_RUN_MESSAGE:
-		ret.message.size = res >> 32;
-		ret.message.vm_id = (res >> 8) & 0xffff;
+	case SPCI_YIELD_32:
+		ret.code = HF_VCPU_RUN_YIELD;
 		break;
-	case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
-	case HF_VCPU_RUN_WAIT_FOR_MESSAGE:
-		ret.sleep.ns = res >> 8;
+	case HF_SPCI_RUN_WAIT_FOR_INTERRUPT:
+		ret.code = HF_VCPU_RUN_WAIT_FOR_INTERRUPT;
+		if (res.arg2 == SPCI_SLEEP_INDEFINITE) {
+			ret.sleep.ns = HF_SLEEP_INDEFINITE;
+		} else {
+			ret.sleep.ns = res.arg2;
+		}
+		break;
+	case SPCI_MSG_WAIT_32:
+		ret.code = HF_VCPU_RUN_WAIT_FOR_MESSAGE;
+		if (res.arg2 == SPCI_SLEEP_INDEFINITE) {
+			ret.sleep.ns = HF_SLEEP_INDEFINITE;
+		} else {
+			ret.sleep.ns = res.arg2;
+		}
+		break;
+	case HF_SPCI_RUN_WAKE_UP:
+		ret.code = HF_VCPU_RUN_WAKE_UP;
+		ret.wake_up.vcpu = wake_up_get_vcpu(res);
+		ret.wake_up.vm_id = wake_up_get_vm_id(res);
+		break;
+	case SPCI_MSG_SEND_32:
+		ret.code = HF_VCPU_RUN_MESSAGE;
+		ret.message.vm_id = res.arg1 & 0xffff;
+		ret.message.size = res.arg3;
+		break;
+	case SPCI_RX_RELEASE_32:
+		ret.code = HF_VCPU_RUN_NOTIFY_WAITERS;
+		break;
+	case SPCI_ERROR_32:
+		ret.code = HF_VCPU_RUN_ABORTED;
 		break;
 	default:
+		ret.code = HF_VCPU_RUN_ABORTED;
 		break;
 	}
 
