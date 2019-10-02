@@ -33,57 +33,57 @@
 
 TEST(debug_el1, secondary_mdccint_el1)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "debug_el1_secondary_mdccint_el1", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 TEST(debug_el1, secondary_dbgbcr0_el1)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "debug_el1_secondary_dbgbcr0_el1", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 TEST(debug_el1, secondary_dbgbvr0_el1)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "debug_el1_secondary_dbgbvr0_el1", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 TEST(debug_el1, secondary_dbgwcr0_el1)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "debug_el1_secondary_dbgwcr0_el1", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 TEST(debug_el1, secondary_dbgwvr0_el1)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "debug_el1_secondary_dbgwvr0_el1", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**

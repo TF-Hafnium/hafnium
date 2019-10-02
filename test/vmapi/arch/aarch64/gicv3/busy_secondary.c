@@ -45,7 +45,7 @@ SET_UP(busy_secondary)
 TEST(busy_secondary, virtual_timer)
 {
 	const char message[] = "loop";
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 
 	interrupt_enable(VIRTUAL_TIMER_IRQ, true);
 	interrupt_set_priority(VIRTUAL_TIMER_IRQ, 0x80);
@@ -62,9 +62,9 @@ TEST(busy_secondary, virtual_timer)
 	arch_irq_enable();
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Check that no interrupts are active or pending to start with. */
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
@@ -84,8 +84,8 @@ TEST(busy_secondary, virtual_timer)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_PREEMPTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_INTERRUPT_32);
 
 	dlog("Waiting for interrupt\n");
 	while (last_interrupt_id == 0) {
@@ -111,7 +111,7 @@ TEST(busy_secondary, virtual_timer)
 TEST(busy_secondary, physical_timer)
 {
 	const char message[] = "loop";
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 
 	interrupt_enable(PHYSICAL_TIMER_IRQ, true);
 	interrupt_set_priority(PHYSICAL_TIMER_IRQ, 0x80);
@@ -120,9 +120,9 @@ TEST(busy_secondary, physical_timer)
 	arch_irq_enable();
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Check that no interrupts are active or pending to start with. */
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
@@ -142,8 +142,8 @@ TEST(busy_secondary, physical_timer)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_PREEMPTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_INTERRUPT_32);
 
 	dlog("Waiting for interrupt\n");
 	while (last_interrupt_id == 0) {

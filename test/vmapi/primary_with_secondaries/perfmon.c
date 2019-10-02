@@ -30,36 +30,36 @@
 
 TEST(perfmon, secondary_pmccfiltr_el0)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "perfmon_secondary_pmccfiltr_el0", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 TEST(perfmon, secondary_pmcr_el0)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "perfmon_secondary_pmcr_el0", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 TEST(perfmon, secondary_pmintenset_el1)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "perfmon_secondary_pmintenset_el1",
 		       mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**

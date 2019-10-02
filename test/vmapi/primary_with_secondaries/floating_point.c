@@ -35,18 +35,18 @@ TEST(floating_point, fp_fill)
 {
 	const double first = 1.2;
 	const double second = -2.3;
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	fill_fp_registers(first);
 	SERVICE_SELECT(SERVICE_VM0, "fp_fill", mb.send);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 	EXPECT_EQ(check_fp_register(first), true);
 
 	fill_fp_registers(second);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 	EXPECT_EQ(check_fp_register(second), true);
 }
 
@@ -57,17 +57,17 @@ TEST(floating_point, fp_fill)
 TEST(floating_point, fp_fpcr)
 {
 	uintreg_t value = 0;
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	EXPECT_EQ(read_msr(fpcr), value);
 
 	SERVICE_SELECT(SERVICE_VM0, "fp_fpcr", mb.send);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 	EXPECT_EQ(read_msr(fpcr), value);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 	EXPECT_EQ(read_msr(fpcr), value);
 }
