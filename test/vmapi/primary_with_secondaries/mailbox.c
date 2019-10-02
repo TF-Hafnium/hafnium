@@ -79,14 +79,14 @@ TEST(mailbox, clear_empty)
 TEST(mailbox, echo)
 {
 	const char message[] = "Echo this back to me!";
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "echo", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Set the message, echo it and check it didn't change. */
 	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
@@ -94,10 +94,10 @@ TEST(mailbox, echo)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-	EXPECT_EQ(run_res.message.size, sizeof(message));
-	EXPECT_EQ(memcmp(mb.send, message, sizeof(message)), 0);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
+	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
 }
 
@@ -107,7 +107,7 @@ TEST(mailbox, echo)
 TEST(mailbox, repeated_echo)
 {
 	char message[] = "Echo this back to me!";
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	uint8_t i;
 	struct mailbox_buffers mb = set_up_mailbox();
 
@@ -115,9 +115,9 @@ TEST(mailbox, repeated_echo)
 
 	for (i = 0; i < 100; i++) {
 		/* Run secondary until it reaches the wait for messages. */
-		run_res = hf_vcpu_run(SERVICE_VM0, 0);
-		EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-		EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+		run_res = spci_run(SERVICE_VM0, 0);
+		EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+		EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 		/* Set the message, echo it and check it didn't change. */
 		next_permutation(message, sizeof(message) - 1);
@@ -127,9 +127,9 @@ TEST(mailbox, repeated_echo)
 					sizeof(message), 0)
 				  .func,
 			  SPCI_SUCCESS_32);
-		run_res = hf_vcpu_run(SERVICE_VM0, 0);
-		EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-		EXPECT_EQ(run_res.message.size, sizeof(message));
+		run_res = spci_run(SERVICE_VM0, 0);
+		EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+		EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 		EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
 		EXPECT_EQ(hf_mailbox_clear(), 0);
 	}
@@ -142,18 +142,18 @@ TEST(mailbox, repeated_echo)
 TEST(mailbox, relay)
 {
 	const char message[] = "Send this round the relay!";
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "relay", mb.send);
 	SERVICE_SELECT(SERVICE_VM1, "relay", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
-	run_res = hf_vcpu_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/*
 	 * Build the message chain so the message is sent from here to
@@ -176,18 +176,18 @@ TEST(mailbox, relay)
 	}
 
 	/* Let SERVICE_VM0 forward the message. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-	EXPECT_EQ(run_res.message.vm_id, SERVICE_VM1);
-	EXPECT_EQ(run_res.message.size, 0);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_receiver(run_res), SERVICE_VM1);
+	EXPECT_EQ(spci_msg_send_size(run_res), 0);
 
 	/* Let SERVICE_VM1 forward the message. */
-	run_res = hf_vcpu_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Ensure the message is intact. */
-	EXPECT_EQ(run_res.message.vm_id, HF_PRIMARY_VM_ID);
-	EXPECT_EQ(run_res.message.size, sizeof(message));
+	EXPECT_EQ(spci_msg_send_receiver(run_res), HF_PRIMARY_VM_ID);
+	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
 }
@@ -198,15 +198,16 @@ TEST(mailbox, relay)
  */
 TEST(mailbox, no_primary_to_secondary_notification_on_configure)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
+
 	set_up_mailbox();
 
 	EXPECT_SPCI_ERROR(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, 0, 0),
 			  SPCI_BUSY);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, 0, 0).func,
 		  SPCI_SUCCESS_32);
@@ -218,7 +219,8 @@ TEST(mailbox, no_primary_to_secondary_notification_on_configure)
  */
 TEST(mailbox, secondary_to_primary_notification_on_configure)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
+
 	set_up_mailbox();
 
 	EXPECT_SPCI_ERROR(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, 0,
@@ -229,8 +231,8 @@ TEST(mailbox, secondary_to_primary_notification_on_configure)
 	 * Run first VM for it to configure itself. It should result in
 	 * notifications having to be issued.
 	 */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_NOTIFY_WAITERS);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_RX_RELEASE_32);
 
 	/* A single waiter is returned. */
 	EXPECT_EQ(hf_mailbox_waiter_get(SERVICE_VM0), HF_PRIMARY_VM_ID);
@@ -249,14 +251,14 @@ TEST(mailbox, secondary_to_primary_notification_on_configure)
 TEST(mailbox, primary_to_secondary)
 {
 	char message[] = "not ready echo";
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "echo_with_notification", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Send a message to echo service, and get response back. */
 	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
@@ -264,15 +266,15 @@ TEST(mailbox, primary_to_secondary)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-	EXPECT_EQ(run_res.message.size, sizeof(message));
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
 
 	/* Let secondary VM continue running so that it will wait again. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Without clearing our mailbox, send message again. */
 	reverse(message, strnlen_s(message, sizeof(message)));
@@ -283,9 +285,9 @@ TEST(mailbox, primary_to_secondary)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, HF_SPCI_RUN_WAIT_FOR_INTERRUPT);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Clear the mailbox. We expect to be told there are pending waiters. */
 	EXPECT_EQ(hf_mailbox_clear(), 1);
@@ -301,9 +303,9 @@ TEST(mailbox, primary_to_secondary)
 	EXPECT_EQ(
 		hf_interrupt_inject(SERVICE_VM0, 0, HF_MAILBOX_WRITABLE_INTID),
 		1);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-	EXPECT_EQ(run_res.message.size, sizeof(message));
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
 }
 
@@ -315,14 +317,14 @@ TEST(mailbox, primary_to_secondary)
 TEST(mailbox, secondary_to_primary_notification)
 {
 	const char message[] = "not ready echo";
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "echo_with_notification", mb.send);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Send a message to echo service twice. The second should fail. */
 	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
@@ -335,14 +337,14 @@ TEST(mailbox, secondary_to_primary_notification)
 			  SPCI_BUSY);
 
 	/* Receive a reply for the first message. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-	EXPECT_EQ(run_res.message.size, sizeof(message));
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
 
 	/* Run VM again so that it clears its mailbox. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_NOTIFY_WAITERS);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_RX_RELEASE_32);
 
 	/* Retrieve a single waiter. */
 	EXPECT_EQ(hf_mailbox_waiter_get(SERVICE_VM0), HF_PRIMARY_VM_ID);

@@ -87,13 +87,14 @@ TEST(system, system_setup)
  */
 TEST(system, icc_ctlr_read_trapped_secondary)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 
 	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
 	SERVICE_SELECT(SERVICE_VM0, "read_systemreg_ctlr", send_buffer);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_ERROR_32);
+	EXPECT_EQ(run_res.arg2, SPCI_ABORTED);
 }
 
 /*
@@ -102,13 +103,14 @@ TEST(system, icc_ctlr_read_trapped_secondary)
  */
 TEST(system, icc_ctlr_write_trapped_secondary)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 
 	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
 	SERVICE_SELECT(SERVICE_VM0, "write_systemreg_ctlr", send_buffer);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_ERROR_32);
+	EXPECT_EQ(run_res.arg2, SPCI_ABORTED);
 }
 
 /*
@@ -117,12 +119,13 @@ TEST(system, icc_ctlr_write_trapped_secondary)
  */
 TEST(system, icc_sre_write_trapped_secondary)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 
 	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
 	SERVICE_SELECT(SERVICE_VM0, "write_systemreg_sre", send_buffer);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_TRUE(run_res.code == HF_VCPU_RUN_ABORTED ||
-		    run_res.code == HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_TRUE((run_res.func == SPCI_ERROR_32 &&
+		     run_res.arg2 == SPCI_ABORTED) ||
+		    run_res.func == SPCI_YIELD_32);
 }

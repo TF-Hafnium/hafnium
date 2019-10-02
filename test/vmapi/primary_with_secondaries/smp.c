@@ -32,22 +32,22 @@ TEST(smp, two_vcpus)
 {
 	const char expected_response_0[] = "vCPU 0";
 	const char expected_response_1[] = "vCPU 1";
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM2, "smp", mb.send);
 
 	/* Let the first vCPU start the second vCPU. */
-	run_res = hf_vcpu_run(SERVICE_VM2, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAKE_UP);
-	EXPECT_EQ(run_res.wake_up.vm_id, SERVICE_VM2);
-	EXPECT_EQ(run_res.wake_up.vcpu, 1);
+	run_res = spci_run(SERVICE_VM2, 0);
+	EXPECT_EQ(run_res.func, HF_SPCI_RUN_WAKE_UP);
+	EXPECT_EQ(wake_up_get_vm_id(run_res), SERVICE_VM2);
+	EXPECT_EQ(wake_up_get_vcpu(run_res), 1);
 
 	/* Run the second vCPU and wait for a message. */
 	dlog("Run second vCPU for message\n");
-	run_res = hf_vcpu_run(SERVICE_VM2, 1);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-	EXPECT_EQ(run_res.message.size, sizeof(expected_response_1));
+	run_res = spci_run(SERVICE_VM2, 1);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response_1));
 	EXPECT_EQ(memcmp(mb.recv, expected_response_1,
 			 sizeof(expected_response_1)),
 		  0);
@@ -55,9 +55,9 @@ TEST(smp, two_vcpus)
 
 	/* Run the first vCPU and wait for a different message. */
 	dlog("Run first vCPU for message\n");
-	run_res = hf_vcpu_run(SERVICE_VM2, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-	EXPECT_EQ(run_res.message.size, sizeof(expected_response_0));
+	run_res = spci_run(SERVICE_VM2, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response_0));
 	EXPECT_EQ(memcmp(mb.recv, expected_response_0,
 			 sizeof(expected_response_0)),
 		  0);
@@ -65,7 +65,7 @@ TEST(smp, two_vcpus)
 
 	/* Run the second vCPU again, and expect it to turn itself off. */
 	dlog("Run second vCPU for poweroff.\n");
-	run_res = hf_vcpu_run(SERVICE_VM2, 1);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM2, 1);
+	EXPECT_EQ(run_res.func, HF_SPCI_RUN_WAIT_FOR_INTERRUPT);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 }

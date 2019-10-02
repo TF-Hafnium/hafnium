@@ -34,19 +34,19 @@
  */
 static bool run_loop(struct mailbox_buffers *mb)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	bool ok = false;
 
 	for (;;) {
 		/* Run until it manages to schedule vCPU on this CPU. */
 		do {
-			run_res = hf_vcpu_run(SERVICE_VM0, 0);
-		} while (run_res.code == HF_VCPU_RUN_WAIT_FOR_INTERRUPT &&
-			 run_res.sleep.ns == HF_SLEEP_INDEFINITE);
+			run_res = spci_run(SERVICE_VM0, 0);
+		} while (run_res.func == HF_SPCI_RUN_WAIT_FOR_INTERRUPT &&
+			 run_res.arg2 == HF_SLEEP_INDEFINITE);
 
 		/* Break out if we received a message with non-zero length. */
-		if (run_res.code == HF_VCPU_RUN_MESSAGE &&
-		    run_res.message.size != 0) {
+		if (run_res.func == SPCI_MSG_SEND_32 &&
+		    spci_msg_send_size(run_res) != 0) {
 			break;
 		}
 
@@ -55,7 +55,7 @@ static bool run_loop(struct mailbox_buffers *mb)
 	}
 
 	/* Copies the contents of the received boolean to the return value. */
-	if (run_res.message.size == sizeof(ok)) {
+	if (spci_msg_send_size(run_res) == sizeof(ok)) {
 		ok = *(bool *)mb->recv;
 	}
 

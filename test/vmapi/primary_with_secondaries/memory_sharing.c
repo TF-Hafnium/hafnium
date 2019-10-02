@@ -286,7 +286,7 @@ TEST(memory_sharing, cannot_share_lent_memory_twice)
  */
 TEST(memory_sharing, concurrent)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 
@@ -307,15 +307,15 @@ TEST(memory_sharing, concurrent)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		page[i] = i;
 	}
 
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		uint8_t value = i + 1;
@@ -329,7 +329,7 @@ TEST(memory_sharing, concurrent)
  */
 TEST(memory_sharing, share_concurrently_and_get_back)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 
@@ -352,15 +352,15 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
 
 	/* Observe the service faulting when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -387,7 +387,7 @@ TEST(memory_sharing, spci_cannot_share_device_memory)
  */
 TEST(memory_sharing, spci_give_and_get_back)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -411,10 +411,10 @@ TEST(memory_sharing, spci_give_and_get_back)
 				SPCI_MSG_SEND_LEGACY_MEMORY)
 			  .func,
 		  SPCI_SUCCESS_32);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM0, 0);
 
 	/* Let the memory be returned. */
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Ensure that the secondary VM accessed the region. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
@@ -422,8 +422,8 @@ TEST(memory_sharing, spci_give_and_get_back)
 	}
 
 	/* Observe the service faulting when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -431,7 +431,7 @@ TEST(memory_sharing, spci_give_and_get_back)
  */
 TEST(memory_sharing, spci_lend_relinquish)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -454,10 +454,10 @@ TEST(memory_sharing, spci_lend_relinquish)
 				SPCI_MSG_SEND_LEGACY_MEMORY)
 			  .func,
 		  SPCI_SUCCESS_32);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM0, 0);
 
 	/* Let the memory be returned. */
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Ensure that the secondary VM accessed the region. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
@@ -465,8 +465,8 @@ TEST(memory_sharing, spci_lend_relinquish)
 	}
 
 	/* Observe the service faulting when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -474,7 +474,7 @@ TEST(memory_sharing, spci_lend_relinquish)
  */
 TEST(memory_sharing, give_and_get_back)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 
@@ -497,15 +497,15 @@ TEST(memory_sharing, give_and_get_back)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
 
 	/* Observe the service faulting when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -513,7 +513,7 @@ TEST(memory_sharing, give_and_get_back)
  */
 TEST(memory_sharing, lend_and_get_back)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 
@@ -536,15 +536,15 @@ TEST(memory_sharing, lend_and_get_back)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
 
 	/* Observe the service faulting when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -552,7 +552,7 @@ TEST(memory_sharing, lend_and_get_back)
  */
 TEST(memory_sharing, reshare_after_return)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 
@@ -574,8 +574,8 @@ TEST(memory_sharing, reshare_after_return)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Share the memory again after it has been returned. */
 	ASSERT_EQ(hf_share_memory(SERVICE_VM0, (hf_ipaddr_t)&page, PAGE_SIZE,
@@ -583,9 +583,9 @@ TEST(memory_sharing, reshare_after_return)
 		  0);
 
 	/* Observe the service doesn't fault when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
-	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 }
 
 /**
@@ -593,7 +593,7 @@ TEST(memory_sharing, reshare_after_return)
  */
 TEST(memory_sharing, share_elsewhere_after_return)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 
@@ -615,8 +615,8 @@ TEST(memory_sharing, share_elsewhere_after_return)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Share the memory with a differnt VM after it has been returned. */
 	ASSERT_EQ(hf_share_memory(SERVICE_VM1, (hf_ipaddr_t)&page, PAGE_SIZE,
@@ -624,8 +624,8 @@ TEST(memory_sharing, share_elsewhere_after_return)
 		  0);
 
 	/* Observe the service faulting when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -633,15 +633,15 @@ TEST(memory_sharing, share_elsewhere_after_return)
  */
 TEST(memory_sharing, give_memory_and_lose_access)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr;
 
 	SERVICE_SELECT(SERVICE_VM0, "give_memory_and_fault", mb.send);
 
 	/* Have the memory be given. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Check the memory was cleared. */
 	ptr = *(uint8_t **)mb.recv;
@@ -650,8 +650,8 @@ TEST(memory_sharing, give_memory_and_lose_access)
 	}
 
 	/* Observe the service fault when it tries to access it. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -659,15 +659,15 @@ TEST(memory_sharing, give_memory_and_lose_access)
  */
 TEST(memory_sharing, lend_memory_and_lose_access)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr;
 
 	SERVICE_SELECT(SERVICE_VM0, "lend_memory_and_fault", mb.send);
 
 	/* Have the memory be lent. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Check the memory was cleared. */
 	ptr = *(uint8_t **)mb.recv;
@@ -676,8 +676,8 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 	}
 
 	/* Observe the service fault when it tries to access it. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -685,7 +685,7 @@ TEST(memory_sharing, lend_memory_and_lose_access)
  */
 TEST(memory_sharing, spci_donate_check_upper_bounds)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -709,8 +709,8 @@ TEST(memory_sharing, spci_donate_check_upper_bounds)
 		  SPCI_SUCCESS_32);
 
 	/* Observe the service faulting when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -718,7 +718,7 @@ TEST(memory_sharing, spci_donate_check_upper_bounds)
  */
 TEST(memory_sharing, spci_donate_check_lower_bounds)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -742,8 +742,8 @@ TEST(memory_sharing, spci_donate_check_lower_bounds)
 		  SPCI_SUCCESS_32);
 
 	/* Observe the service faulting when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -752,7 +752,7 @@ TEST(memory_sharing, spci_donate_check_lower_bounds)
  */
 TEST(memory_sharing, spci_donate_elsewhere_after_return)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -776,10 +776,10 @@ TEST(memory_sharing, spci_donate_elsewhere_after_return)
 				SPCI_MSG_SEND_LEGACY_MEMORY)
 			  .func,
 		  SPCI_SUCCESS_32);
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM0, 0);
 
 	/* Let the memory be returned. */
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Share the memory with another VM. */
 	msg_size = spci_memory_donate_init(
@@ -792,8 +792,8 @@ TEST(memory_sharing, spci_donate_elsewhere_after_return)
 		  SPCI_SUCCESS_32);
 
 	/* Observe the original service faulting when accessing the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -802,7 +802,7 @@ TEST(memory_sharing, spci_donate_elsewhere_after_return)
  */
 TEST(memory_sharing, spci_donate_vms)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -818,8 +818,8 @@ TEST(memory_sharing, spci_donate_vms)
 	};
 
 	/* Set up VM1 to wait for message. */
-	run_res = hf_vcpu_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
 
 	/* Donate memory. */
 	msg_size = spci_memory_donate_init(
@@ -832,20 +832,20 @@ TEST(memory_sharing, spci_donate_vms)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be sent from VM0 to VM1. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Receive memory in VM1. */
-	run_res = hf_vcpu_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Try to access memory in VM0 and fail. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 
 	/* Ensure that memory in VM1 remains the same. */
-	run_res = hf_vcpu_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 }
 
 /**
@@ -853,7 +853,7 @@ TEST(memory_sharing, spci_donate_vms)
  */
 TEST(memory_sharing, spci_donate_twice)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -879,8 +879,8 @@ TEST(memory_sharing, spci_donate_twice)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be received. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Fail to share memory again with any VM. */
 	spci_check_cannot_donate_memory(mb, constituents, 1, -1);
@@ -888,15 +888,15 @@ TEST(memory_sharing, spci_donate_twice)
 	spci_check_cannot_relinquish_memory(mb, constituents, 1);
 
 	/* Let the memory be sent from VM0 to PRIMARY (returned). */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Check we have access again. */
 	ptr[0] = 'f';
 
 	/* Try and fail to donate memory from VM0 to VM1. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 }
 
 /**
@@ -977,7 +977,7 @@ TEST(memory_sharing, spci_share_to_self)
  */
 TEST(memory_sharing, spci_donate_invalid_source)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1027,12 +1027,12 @@ TEST(memory_sharing, spci_donate_invalid_source)
 		  SPCI_SUCCESS_32);
 
 	/* Receive and return memory from VM0. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Use VM0 to fail to donate memory from the primary to VM1. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 }
 
 /**
@@ -1074,7 +1074,7 @@ TEST(memory_sharing, spci_give_and_get_back_unaligned)
  */
 TEST(memory_sharing, spci_lend_invalid_source)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1107,12 +1107,12 @@ TEST(memory_sharing, spci_lend_invalid_source)
 		  SPCI_SUCCESS_32);
 
 	/* Receive and return memory from VM0. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Try to lend memory from primary in VM0. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 }
 
 /**
@@ -1121,7 +1121,7 @@ TEST(memory_sharing, spci_lend_invalid_source)
  */
 TEST(memory_sharing, spci_lend_relinquish_X_RW)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1146,12 +1146,12 @@ TEST(memory_sharing, spci_lend_relinquish_X_RW)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Let service write to and return memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Re-initialise the memory before giving it. */
 	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
@@ -1167,12 +1167,12 @@ TEST(memory_sharing, spci_lend_relinquish_X_RW)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Observe the service faulting when writing to the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -1181,7 +1181,7 @@ TEST(memory_sharing, spci_lend_relinquish_X_RW)
  */
 TEST(memory_sharing, spci_share_relinquish_X_RW)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1206,8 +1206,8 @@ TEST(memory_sharing, spci_share_relinquish_X_RW)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Ensure we still have access. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
@@ -1216,8 +1216,8 @@ TEST(memory_sharing, spci_share_relinquish_X_RW)
 	}
 
 	/* Let service write to and return memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Re-initialise the memory before giving it. */
 	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
@@ -1233,8 +1233,8 @@ TEST(memory_sharing, spci_share_relinquish_X_RW)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Ensure we still have access. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
@@ -1243,8 +1243,8 @@ TEST(memory_sharing, spci_share_relinquish_X_RW)
 	}
 
 	/* Observe the service faulting when writing to the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -1253,7 +1253,7 @@ TEST(memory_sharing, spci_share_relinquish_X_RW)
  */
 TEST(memory_sharing, spci_share_relinquish_NX_RW)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1278,8 +1278,8 @@ TEST(memory_sharing, spci_share_relinquish_NX_RW)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Ensure we still have access. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
@@ -1287,8 +1287,8 @@ TEST(memory_sharing, spci_share_relinquish_NX_RW)
 	}
 
 	/* Let service write to and return memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Re-initialise the memory before giving it. */
 	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
@@ -1304,8 +1304,8 @@ TEST(memory_sharing, spci_share_relinquish_NX_RW)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Ensure we still have access. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
@@ -1314,8 +1314,8 @@ TEST(memory_sharing, spci_share_relinquish_NX_RW)
 	}
 
 	/* Observe the service faulting when writing to the memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -1323,7 +1323,7 @@ TEST(memory_sharing, spci_share_relinquish_NX_RW)
  */
 TEST(memory_sharing, spci_lend_relinquish_RW_X)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1351,8 +1351,8 @@ TEST(memory_sharing, spci_lend_relinquish_RW_X)
 		  SPCI_SUCCESS_32);
 
 	/* Attempt to execute from memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	msg_size = spci_memory_lend_init(
 		mb.send, SERVICE_VM0, constituents, 1, 0, SPCI_MEMORY_RW_NX,
@@ -1364,8 +1364,8 @@ TEST(memory_sharing, spci_lend_relinquish_RW_X)
 		  SPCI_SUCCESS_32);
 
 	/* Try and fail to execute from the memory region. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -1373,7 +1373,7 @@ TEST(memory_sharing, spci_lend_relinquish_RW_X)
  */
 TEST(memory_sharing, spci_lend_relinquish_RO_X)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1401,8 +1401,8 @@ TEST(memory_sharing, spci_lend_relinquish_RO_X)
 		  SPCI_SUCCESS_32);
 
 	/* Attempt to execute from memory. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	msg_size = spci_memory_lend_init(
 		mb.send, SERVICE_VM0, constituents, 1, 0, SPCI_MEMORY_RO_NX,
@@ -1414,8 +1414,8 @@ TEST(memory_sharing, spci_lend_relinquish_RO_X)
 		  SPCI_SUCCESS_32);
 
 	/* Try and fail to execute from the memory region. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /**
@@ -1423,7 +1423,7 @@ TEST(memory_sharing, spci_lend_relinquish_RO_X)
  */
 TEST(memory_sharing, spci_lend_donate)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1449,8 +1449,8 @@ TEST(memory_sharing, spci_lend_donate)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Ensure we can't donate any sub section of memory to another VM. */
 	constituents[0].page_count = 1;
@@ -1483,7 +1483,7 @@ TEST(memory_sharing, spci_lend_donate)
  */
 TEST(memory_sharing, spci_share_donate)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1509,8 +1509,8 @@ TEST(memory_sharing, spci_share_donate)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Ensure we can't donate any sub section of memory to another VM. */
 	constituents[0].page_count = 1;
@@ -1543,7 +1543,7 @@ TEST(memory_sharing, spci_share_donate)
  */
 TEST(memory_sharing, spci_lend_twice)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1569,8 +1569,8 @@ TEST(memory_sharing, spci_lend_twice)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Attempt to lend the same area of memory. */
 	spci_check_cannot_lend_memory(mb, constituents);
@@ -1602,7 +1602,7 @@ TEST(memory_sharing, spci_lend_twice)
  */
 TEST(memory_sharing, spci_share_twice)
 {
-	struct hf_vcpu_run_return run_res;
+	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = page;
 	uint32_t msg_size;
@@ -1628,8 +1628,8 @@ TEST(memory_sharing, spci_share_twice)
 		  SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
-	run_res = hf_vcpu_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
+	run_res = spci_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Attempt to share the same area of memory. */
 	spci_check_cannot_share_memory(mb, constituents);

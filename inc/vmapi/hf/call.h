@@ -60,15 +60,24 @@ static inline spci_vcpu_count_t hf_vcpu_get_count(spci_vm_id_t vm_id)
 }
 
 /**
- * Runs the given vcpu of the given vm.
+ * Runs the given vCPU of the given VM.
+ */
+static inline struct spci_value spci_run(spci_vm_id_t vm_id,
+					 spci_vcpu_index_t vcpu_idx)
+{
+	return spci_call((struct spci_value){.func = SPCI_RUN_32,
+					     (uint32_t)vm_id << 16 | vcpu_idx});
+}
+
+/**
+ * Runs the given vCPU of the given VM.
  *
  * Returns an hf_vcpu_run_return struct telling the scheduler what to do next.
  */
 static inline struct hf_vcpu_run_return hf_vcpu_run(spci_vm_id_t vm_id,
 						    spci_vcpu_index_t vcpu_idx)
 {
-	return hf_vcpu_run_return_decode(spci_call((struct spci_value){
-		.func = SPCI_RUN_32, (uint32_t)vm_id << 16 | vcpu_idx}));
+	return hf_vcpu_run_return_decode(spci_run(vm_id, vcpu_idx));
 }
 
 /**
