@@ -561,8 +561,8 @@ out:
  */
 static bool api_mode_valid_owned_and_exclusive(int mode)
 {
-	return (mode & (MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED)) ==
-	       0;
+	return (mode & (MM_MODE_D | MM_MODE_INVALID | MM_MODE_UNOWNED |
+			MM_MODE_SHARED)) == 0;
 }
 
 /**
@@ -1575,6 +1575,11 @@ int64_t api_share_memory(spci_vm_id_t vm_id, ipaddr_t addr, size_t size,
 	 * changes can be reverted if the process fails.
 	 */
 	if (!mm_vm_get_mode(&from->ptable, begin, end, &orig_from_mode)) {
+		goto fail;
+	}
+
+	/* Ensure the address range is normal memory and not a device. */
+	if (orig_from_mode & MM_MODE_D) {
 		goto fail;
 	}
 

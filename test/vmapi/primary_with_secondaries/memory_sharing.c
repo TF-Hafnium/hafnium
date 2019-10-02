@@ -148,6 +148,14 @@ static void spci_check_cannot_relinquish_memory(
 }
 
 /**
+ * Device address space cannot be shared, only normal memory.
+ */
+TEST(memory_sharing, cannot_share_device_memory)
+{
+	check_cannot_share_memory((void *)PAGE_SIZE, PAGE_SIZE);
+}
+
+/**
  * After memory has been shared concurrently, it can't be shared again.
  */
 TEST(memory_sharing, cannot_share_concurrent_memory_twice)
@@ -259,6 +267,23 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 	/* Observe the service faulting when accessing the memory. */
 	run_res = hf_vcpu_run(SERVICE_VM0, 0);
 	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
+}
+
+/**
+ * Device address space cannot be shared, only normal memory.
+ */
+TEST(memory_sharing, spci_cannot_share_device_memory)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct spci_memory_region_constituent constituents[] = {
+		{.address = PAGE_SIZE, .page_count = 1},
+	};
+
+	SERVICE_SELECT(SERVICE_VM0, "spci_memory_return", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "spci_memory_return", mb.send);
+
+	spci_check_cannot_lend_memory(mb, constituents);
+	spci_check_cannot_donate_memory(mb, constituents, 1, -1);
 }
 
 /**

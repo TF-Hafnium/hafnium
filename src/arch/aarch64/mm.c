@@ -59,7 +59,6 @@
 #define STAGE2_AF         (UINT64_C(1) << 10)
 #define STAGE2_SH(x)      ((x) << 8)
 #define STAGE2_S2AP(x)    ((x) << 6)
-#define STAGE2_MEMATTR(x) ((x) << 2)
 
 #define STAGE2_EXECUTE_ALL  UINT64_C(0)
 #define STAGE2_EXECUTE_EL0  UINT64_C(1)
@@ -79,11 +78,20 @@
 #define STAGE2_SW_EXCLUSIVE (UINT64_C(1) << 56)
 
 /* The following are stage-2 memory attributes for normal memory. */
-#define STAGE2_NONCACHEABLE UINT64_C(1)
-#define STAGE2_WRITETHROUGH UINT64_C(2)
-#define STAGE2_WRITEBACK    UINT64_C(3)
+#define STAGE2_DEVICE_MEMORY UINT64_C(0)
+#define STAGE2_NONCACHEABLE  UINT64_C(1)
+#define STAGE2_WRITETHROUGH  UINT64_C(2)
+#define STAGE2_WRITEBACK     UINT64_C(3)
 
-#define STAGE2_MEMATTR_NORMAL(outer, inner) ((((outer) << 2) | (inner)) << 2)
+/* The following are stage-2 memory attributes for device memory. */
+#define STAGE2_MEMATTR_DEVICE_nGnRnE UINT64_C(0)
+#define STAGE2_MEMATTR_DEVICE_nGnRE  UINT64_C(1)
+#define STAGE2_MEMATTR_DEVICE_nGRE   UINT64_C(2)
+#define STAGE2_MEMATTR_DEVICE_GRE    UINT64_C(3)
+
+/* The following construct and destruct stage-2 memory attributes. */
+#define STAGE2_MEMATTR(outer, inner) ((((outer) << 2) | (inner)) << 2)
+#define STAGE2_MEMATTR_TYPE_MASK UINT64_C(3 << 4)
 
 #define STAGE2_ACCESS_READ  UINT64_C(1)
 #define STAGE2_ACCESS_WRITE UINT64_C(2)
@@ -433,9 +441,8 @@ uint64_t arch_mm_mode_to_stage2_attrs(int mode)
 	uint64_t access = 0;
 
 	/*
-	 * Non-shareable is the "neutral" share mode, i.e., the
-	 * shareability attribute of stage 1 will determine the actual
-	 * attribute.
+	 * Non-shareable is the "neutral" share mode, i.e., the shareability
+	 * attribute of stage 1 will determine the actual attribute.
 	 */
 	attrs |= STAGE2_AF | STAGE2_SH(NON_SHAREABLE);
 
@@ -458,11 +465,15 @@ uint64_t arch_mm_mode_to_stage2_attrs(int mode)
 	}
 
 	/*
-	 * Define the memory attribute bits, using the "neutral" values
-	 * which give the stage-1 attributes full control of the
-	 * attributes.
+	 * Define the memory attribute bits, using the "neutral" values which
+	 * give the stage-1 attributes full control of the attributes.
 	 */
-	attrs |= STAGE2_MEMATTR_NORMAL(STAGE2_WRITEBACK, STAGE2_WRITEBACK);
+	if (mode & MM_MODE_D) {
+		attrs |= STAGE2_MEMATTR(STAGE2_DEVICE_MEMORY,
+					STAGE2_MEMATTR_DEVICE_GRE);
+	} else {
+		attrs |= STAGE2_MEMATTR(STAGE2_WRITEBACK, STAGE2_WRITEBACK);
+	}
 
 	/* Define the ownership bit. */
 	if (!(mode & MM_MODE_UNOWNED)) {
@@ -497,6 +508,10 @@ int arch_mm_stage2_attrs_to_mode(uint64_t attrs)
 	if ((attrs & STAGE2_XN(STAGE2_EXECUTE_MASK)) ==
 	    STAGE2_XN(STAGE2_EXECUTE_ALL)) {
 		mode |= MM_MODE_X;
+	}
+
+	if ((attrs & STAGE2_MEMATTR_TYPE_MASK) == STAGE2_DEVICE_MEMORY) {
+		mode |= MM_MODE_D;
 	}
 
 	if (!(attrs & STAGE2_SW_OWNED)) {

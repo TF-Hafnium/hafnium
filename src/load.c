@@ -96,12 +96,13 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
  */
 static bool load_primary(struct mm_stage1_locked stage1_locked,
 			 const struct manifest *manifest,
-			 const struct memiter *cpio, uintreg_t kernel_arg,
-			 struct mpool *ppool)
+			 const struct memiter *cpio,
+			 const struct boot_params *params, struct mpool *ppool)
 {
 	paddr_t primary_begin = layout_primary_begin();
 	struct vm *vm;
 	struct vcpu_locked vcpu_locked;
+	size_t i;
 
 	/*
 	 * TODO: This bound is currently meaningless but will be addressed when
@@ -125,14 +126,29 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
-	/* Map the 1TB of memory. */
-	/* TODO: We should do a whitelist rather than a blacklist. */
+	/*
+	 * Map 1TB of address space as device memory to, most likely, make all
+	 * devices available to the primary VM.
+	 *
+	 * TODO: We should do a whitelist rather than a blacklist.
+	 */
 	if (!mm_vm_identity_map(&vm->ptable, pa_init(0),
 				pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
-				MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL,
+				MM_MODE_R | MM_MODE_W | MM_MODE_D, NULL,
 				ppool)) {
-		dlog("Unable to initialise memory for primary vm\n");
+		dlog("Unable to initialise address space for primary vm\n");
 		return false;
+	}
+
+	/* Map normal memory as such to permit caching, execution, etc. */
+	for (i = 0; i < params->mem_ranges_count; ++i) {
+		if (!mm_vm_identity_map(
+			    &vm->ptable, params->mem_ranges[i].begin,
+			    params->mem_ranges[i].end,
+			    MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL, ppool)) {
+			dlog("Unable to initialise memory for primary vm\n");
+			return false;
+		}
 	}
 
 	if (!mm_vm_unmap_hypervisor(&vm->ptable, ppool)) {
@@ -141,7 +157,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	}
 
 	vcpu_locked = vcpu_lock(vm_get_vcpu(vm, 0));
-	vcpu_on(vcpu_locked, ipa_from_pa(primary_begin), kernel_arg);
+	vcpu_on(vcpu_locked, ipa_from_pa(primary_begin), params->kernel_arg);
 	vcpu_unlock(&vcpu_locked);
 
 	return true;
@@ -276,8 +292,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	size_t i;
 
-	if (!load_primary(stage1_locked, manifest, cpio, params->kernel_arg,
-			  ppool)) {
+	if (!load_primary(stage1_locked, manifest, cpio, params, ppool)) {
 		dlog("Unable to load primary VM.\n");
 		return false;
 	}

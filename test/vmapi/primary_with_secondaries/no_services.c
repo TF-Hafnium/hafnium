@@ -110,6 +110,14 @@ TEST(hf_vcpu_run, cannot_run_absent_vcpu)
 }
 
 /**
+ * The configured send/receive addresses can't be device memory.
+ */
+TEST(hf_vm_configure, fails_with_device_memory)
+{
+	EXPECT_EQ(hf_vm_configure(PAGE_SIZE, PAGE_SIZE * 2), -1);
+}
+
+/**
  * The configured send/receive addresses can't be unaligned.
  */
 TEST(hf_vm_configure, fails_with_unaligned_pointer)

@@ -314,12 +314,14 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 		return false;
 	}
 
-	/*
-	 * Ensure that the memory range is mapped with the same
-	 * mode.
-	 */
+	/* Ensure that the memory range is mapped with the same mode. */
 	if (!mm_vm_get_mode(&from->ptable, begin, end, orig_from_mode) ||
 	    !mm_vm_get_mode(&to->ptable, begin, end, &orig_to_mode)) {
+		return false;
+	}
+
+	/* Ensure the address range is normal memory and not a device. */
+	if (*orig_from_mode & MM_MODE_D) {
 		return false;
 	}
 
