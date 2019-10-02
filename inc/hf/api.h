@@ -28,10 +28,6 @@ spci_vm_count_t api_vm_get_count(void);
 spci_vcpu_count_t api_vcpu_get_count(spci_vm_id_t vm_id,
 				     const struct vcpu *current);
 void api_regs_state_saved(struct vcpu *vcpu);
-struct hf_vcpu_run_return api_vcpu_run(spci_vm_id_t vm_id,
-				       spci_vcpu_index_t vcpu_idx,
-				       const struct vcpu *current,
-				       struct vcpu **next);
 int64_t api_vm_configure(ipaddr_t send, ipaddr_t recv, struct vcpu *current,
 			 struct vcpu **next);
 int64_t api_mailbox_clear(struct vcpu *current, struct vcpu **next);
@@ -67,3 +63,5 @@ struct spci_value api_spci_share_memory(
 	struct spci_memory_region *memory_region, uint32_t memory_to_attributes,
 	enum spci_memory_share share);
 struct spci_value api_spci_features(uint32_t function_id);
+struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
+			       const struct vcpu *current, struct vcpu **next);

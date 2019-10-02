@@ -65,7 +65,7 @@ void api_init(struct mpool *ppool)
  * to cause SPCI_RUN to return and the primary VM to regain control of the CPU.
  */
 static struct vcpu *api_switch_to_primary(struct vcpu *current,
-					  struct hf_vcpu_run_return primary_ret,
+					  struct spci_value primary_ret,
 					  enum vcpu_state secondary_state)
 {
 	struct vm *primary = vm_find(HF_PRIMARY_VM_ID);
@@ -75,14 +75,32 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 	 * If the secondary is blocked but has a timer running, sleep until the
 	 * timer fires rather than indefinitely.
 	 */
-	switch (primary_ret.code) {
-	case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
-	case HF_VCPU_RUN_WAIT_FOR_MESSAGE:
-		primary_ret.sleep.ns =
-			arch_timer_enabled_current()
-				? arch_timer_remaining_ns_current()
-				: HF_SLEEP_INDEFINITE;
+	switch (primary_ret.func) {
+	case HF_SPCI_RUN_WAIT_FOR_INTERRUPT:
+	case SPCI_MSG_WAIT_32: {
+		if (arch_timer_enabled_current()) {
+			uint64_t remaining_ns =
+				arch_timer_remaining_ns_current();
+
+			if (remaining_ns == 0) {
+				/*
+				 * Timer is pending, so the current vCPU should
+				 * be run again right away.
+				 */
+				primary_ret.func = SPCI_INTERRUPT_32;
+				/*
+				 * primary_ret.arg1 should already be set to the
+				 * current VM ID and vCPU ID.
+				 */
+				primary_ret.arg2 = 0;
+			} else {
+				primary_ret.arg2 = remaining_ns;
+			}
+		} else {
+			primary_ret.arg2 = SPCI_SLEEP_INDEFINITE;
+		}
 		break;
+	}
 
 	default:
 		/* Do nothing. */
@@ -90,9 +108,7 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 	}
 
 	/* Set the return value for the primary VM's call to HF_VCPU_RUN. */
-	arch_regs_set_retval(&next->regs, hf_vcpu_run_return_encode(
-						  primary_ret, current->vm->id,
-						  vcpu_index(current)));
+	arch_regs_set_retval(&next->regs, primary_ret);
 
 	/* Mark the current vcpu as waiting. */
 	sl_lock(&current->lock);
@@ -107,8 +123,9 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
  */
 struct vcpu *api_preempt(struct vcpu *current)
 {
-	struct hf_vcpu_run_return ret = {
-		.code = HF_VCPU_RUN_PREEMPTED,
+	struct spci_value ret = {
+		.func = SPCI_INTERRUPT_32,
+		.arg1 = ((uint32_t)current->vm->id << 16) | vcpu_index(current),
 	};
 
 	return api_switch_to_primary(current, ret, VCPU_STATE_READY);
@@ -120,8 +137,9 @@ struct vcpu *api_preempt(struct vcpu *current)
  */
 struct vcpu *api_wait_for_interrupt(struct vcpu *current)
 {
-	struct hf_vcpu_run_return ret = {
-		.code = HF_VCPU_RUN_WAIT_FOR_INTERRUPT,
+	struct spci_value ret = {
+		.func = HF_SPCI_RUN_WAIT_FOR_INTERRUPT,
+		.arg1 = ((uint32_t)vcpu_index(current) << 16) | current->vm->id,
 	};
 
 	return api_switch_to_primary(current, ret,
@@ -133,8 +151,9 @@ struct vcpu *api_wait_for_interrupt(struct vcpu *current)
  */
 struct vcpu *api_vcpu_off(struct vcpu *current)
 {
-	struct hf_vcpu_run_return ret = {
-		.code = HF_VCPU_RUN_WAIT_FOR_INTERRUPT,
+	struct spci_value ret = {
+		.func = HF_SPCI_RUN_WAIT_FOR_INTERRUPT,
+		.arg1 = ((uint32_t)vcpu_index(current) << 16) | current->vm->id,
 	};
 
 	/*
@@ -153,8 +172,9 @@ struct vcpu *api_vcpu_off(struct vcpu *current)
  */
 void api_yield(struct vcpu *current, struct vcpu **next)
 {
-	struct hf_vcpu_run_return primary_ret = {
-		.code = HF_VCPU_RUN_YIELD,
+	struct spci_value primary_ret = {
+		.func = SPCI_YIELD_32,
+		.arg1 = ((uint32_t)vcpu_index(current) << 16) | current->vm->id,
 	};
 
 	if (current->vm->id == HF_PRIMARY_VM_ID) {
@@ -171,10 +191,10 @@ void api_yield(struct vcpu *current, struct vcpu **next)
  */
 struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
 {
-	struct hf_vcpu_run_return ret = {
-		.code = HF_VCPU_RUN_WAKE_UP,
-		.wake_up.vm_id = target_vcpu->vm->id,
-		.wake_up.vcpu = vcpu_index(target_vcpu),
+	struct spci_value ret = {
+		.func = HF_SPCI_RUN_WAKE_UP,
+		.arg1 = ((uint32_t)vcpu_index(target_vcpu) << 16) |
+			target_vcpu->vm->id,
 	};
 	return api_switch_to_primary(current, ret, VCPU_STATE_READY);
 }
@@ -184,9 +204,7 @@ struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
  */
 struct vcpu *api_abort(struct vcpu *current)
 {
-	struct hf_vcpu_run_return ret = {
-		.code = HF_VCPU_RUN_ABORTED,
-	};
+	struct spci_value ret = spci_error(SPCI_ABORTED);
 
 	dlog("Aborting VM %u vCPU %u\n", current->vm->id, vcpu_index(current));
 
@@ -361,7 +379,7 @@ static struct spci_value spci_msg_recv_return(const struct vm *receiver)
  * value needs to be forced onto the vCPU.
  */
 static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
-				 struct hf_vcpu_run_return *run_ret)
+				 struct spci_value *run_ret)
 {
 	bool need_vm_lock;
 	bool ret;
@@ -396,13 +414,12 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 			/*
 			 * vCPU is running on another pCPU.
 			 *
-			 * It's ok not to return the sleep duration here because
-			 * the other physical CPU that is currently running this
-			 * vCPU will return the sleep duration if needed. The
-			 * default return value is
-			 * HF_VCPU_RUN_WAIT_FOR_INTERRUPT, so no need to set it
-			 * explicitly.
+			 * It's okay not to return the sleep duration here
+			 * because the other physical CPU that is currently
+			 * running this vCPU will return the sleep duration if
+			 * needed.
 			 */
+			*run_ret = spci_error(SPCI_BUSY);
 			ret = false;
 			goto out;
 		}
@@ -458,12 +475,18 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 		 * the primary which called vcpu_run.
 		 */
 		if (arch_timer_enabled(&vcpu->regs)) {
-			run_ret->code =
+			run_ret->func =
 				vcpu->state == VCPU_STATE_BLOCKED_MAILBOX
-					? HF_VCPU_RUN_WAIT_FOR_MESSAGE
-					: HF_VCPU_RUN_WAIT_FOR_INTERRUPT;
-			run_ret->sleep.ns =
-				arch_timer_remaining_ns(&vcpu->regs);
+					? SPCI_MSG_WAIT_32
+					: HF_SPCI_RUN_WAIT_FOR_INTERRUPT;
+			run_ret->arg1 = ((uint32_t)vcpu_index(vcpu) << 16) |
+					vcpu->vm->id;
+			/*
+			 * arch_timer_remaining_ns should never return 0,
+			 * because if it would then arch_timer_pending would
+			 * have returned true before and so we won't get here.
+			 */
+			run_ret->arg2 = arch_timer_remaining_ns(&vcpu->regs);
 		}
 
 		ret = false;
@@ -495,23 +518,16 @@ out:
 	return ret;
 }
 
-/**
- * Runs the given vcpu of the given vm.
- */
-struct hf_vcpu_run_return api_vcpu_run(spci_vm_id_t vm_id,
-				       spci_vcpu_index_t vcpu_idx,
-				       const struct vcpu *current,
-				       struct vcpu **next)
+struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
+			       const struct vcpu *current, struct vcpu **next)
 {
 	struct vm *vm;
 	struct vcpu *vcpu;
-	struct hf_vcpu_run_return ret = {
-		.code = HF_VCPU_RUN_WAIT_FOR_INTERRUPT,
-		.sleep.ns = HF_SLEEP_INDEFINITE,
-	};
+	struct spci_value ret = spci_error(SPCI_INVALID_PARAMETERS);
 
 	/* Only the primary VM can switch vcpus. */
 	if (current->vm->id != HF_PRIMARY_VM_ID) {
+		ret.arg2 = SPCI_DENIED;
 		goto out;
 	}
 
@@ -565,7 +581,9 @@ struct hf_vcpu_run_return api_vcpu_run(spci_vm_id_t vm_id,
 	 * Set a placeholder return code to the scheduler. This will be
 	 * overwritten when the switch back to the primary occurs.
 	 */
-	ret.code = HF_VCPU_RUN_PREEMPTED;
+	ret.func = SPCI_INTERRUPT_32;
+	ret.arg1 = ((uint32_t)vm_id << 16) | vcpu_idx;
+	ret.arg2 = 0;
 
 out:
 	return ret;
@@ -589,8 +607,8 @@ static int64_t api_waiter_result(struct vm_locked locked_vm,
 				 struct vcpu *current, struct vcpu **next)
 {
 	struct vm *vm = locked_vm.vm;
-	struct hf_vcpu_run_return ret = {
-		.code = HF_VCPU_RUN_NOTIFY_WAITERS,
+	struct spci_value ret = {
+		.func = SPCI_RX_RELEASE_32,
 	};
 
 	if (list_empty(&vm->mailbox.waiter_list)) {
@@ -876,11 +894,10 @@ static bool msg_receiver_busy(struct vm_locked to, struct vm_locked from,
 static void deliver_msg(struct vm_locked to, struct vm_locked from,
 			uint32_t size, struct vcpu *current, struct vcpu **next)
 {
-	struct hf_vcpu_run_return primary_ret = {
-		.code = HF_VCPU_RUN_MESSAGE,
+	struct spci_value primary_ret = {
+		.func = SPCI_MSG_SEND_32,
+		.arg1 = ((uint32_t)from.vm->id << 16) | to.vm->id,
 	};
-
-	primary_ret.message.vm_id = to.vm->id;
 
 	/* Messages for the primary VM are delivered directly. */
 	if (to.vm->id == HF_PRIMARY_VM_ID) {
@@ -888,7 +905,7 @@ static void deliver_msg(struct vm_locked to, struct vm_locked from,
 		 * Only tell the primary VM the size if the message is for it,
 		 * to avoid leaking data about messages for other VMs.
 		 */
-		primary_ret.message.size = size;
+		primary_ret.arg3 = size;
 
 		to.vm->mailbox.state = MAILBOX_STATE_READ;
 		*next = api_switch_to_primary(current, primary_ret,
@@ -1114,8 +1131,9 @@ struct spci_value api_spci_msg_recv(bool block, struct vcpu *current,
 
 	/* Switch back to primary vm to block. */
 	{
-		struct hf_vcpu_run_return run_return = {
-			.code = HF_VCPU_RUN_WAIT_FOR_MESSAGE,
+		struct spci_value run_return = {
+			.func = SPCI_MSG_WAIT_32,
+			.arg1 = ((uint32_t)vcpu_index(current) << 16) | vm->id,
 		};
 
 		*next = api_switch_to_primary(current, run_return,

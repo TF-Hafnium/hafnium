@@ -146,67 +146,6 @@ enum hf_share {
 	HF_MEMORY_SHARE,
 };
 
-/**
- * Encode an hf_vcpu_run_return struct in the SPCI ABI.
- */
-static inline struct spci_value hf_vcpu_run_return_encode(
-	struct hf_vcpu_run_return res, spci_vm_id_t vm_id,
-	spci_vcpu_index_t vcpu_index)
-{
-	struct spci_value ret = {0};
-
-	switch (res.code) {
-	case HF_VCPU_RUN_PREEMPTED:
-		ret.func = SPCI_INTERRUPT_32;
-		ret.arg1 = (uint32_t)vm_id << 16 | vcpu_index;
-		break;
-	case HF_VCPU_RUN_YIELD:
-		ret.func = SPCI_YIELD_32;
-		ret.arg1 = (uint32_t)vcpu_index << 16 | vm_id;
-		break;
-	case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
-		ret.func = HF_SPCI_RUN_WAIT_FOR_INTERRUPT;
-		ret.arg1 = (uint32_t)vcpu_index << 16 | vm_id;
-		if (res.sleep.ns == HF_SLEEP_INDEFINITE) {
-			ret.arg2 = SPCI_SLEEP_INDEFINITE;
-		} else if (res.sleep.ns == SPCI_SLEEP_INDEFINITE) {
-			ret.arg2 = 1;
-		} else {
-			ret.arg2 = res.sleep.ns;
-		}
-		break;
-	case HF_VCPU_RUN_WAIT_FOR_MESSAGE:
-		ret.func = SPCI_MSG_WAIT_32;
-		ret.arg1 = (uint32_t)vcpu_index << 16 | vm_id;
-		if (res.sleep.ns == HF_SLEEP_INDEFINITE) {
-			ret.arg2 = SPCI_SLEEP_INDEFINITE;
-		} else if (res.sleep.ns == SPCI_SLEEP_INDEFINITE) {
-			ret.arg2 = 1;
-		} else {
-			ret.arg2 = res.sleep.ns;
-		}
-		break;
-	case HF_VCPU_RUN_WAKE_UP:
-		ret.func = HF_SPCI_RUN_WAKE_UP;
-		ret.arg1 = (uint32_t)res.wake_up.vcpu << 16 | res.wake_up.vm_id;
-		break;
-	case HF_VCPU_RUN_MESSAGE:
-		ret.func = SPCI_MSG_SEND_32;
-		ret.arg1 = (uint32_t)vm_id << 16 | res.message.vm_id;
-		ret.arg3 = res.message.size;
-		break;
-	case HF_VCPU_RUN_NOTIFY_WAITERS:
-		ret.func = SPCI_RX_RELEASE_32;
-		break;
-	case HF_VCPU_RUN_ABORTED:
-		ret.func = SPCI_ERROR_32;
-		ret.arg2 = SPCI_ABORTED;
-		break;
-	}
-
-	return ret;
-}
-
 static spci_vm_id_t wake_up_get_vm_id(struct spci_value v)
 {
 	return v.arg1 & 0xffff;
@@ -263,7 +202,16 @@ static inline struct hf_vcpu_run_return hf_vcpu_run_return_decode(
 		ret.code = HF_VCPU_RUN_NOTIFY_WAITERS;
 		break;
 	case SPCI_ERROR_32:
-		ret.code = HF_VCPU_RUN_ABORTED;
+		if (res.arg2 == SPCI_ABORTED) {
+			ret.code = HF_VCPU_RUN_ABORTED;
+		} else {
+			/*
+			 * Treat other errors as suspending the vCPU
+			 * indefinitely, to maintain existing behaviour.
+			 */
+			ret.code = HF_VCPU_RUN_WAIT_FOR_INTERRUPT;
+			ret.sleep.ns = HF_SLEEP_INDEFINITE;
+		}
 		break;
 	default:
 		ret.code = HF_VCPU_RUN_ABORTED;
