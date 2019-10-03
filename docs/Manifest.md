@@ -51,6 +51,11 @@ number of CPUs as the hardware, a kernel image called `vmlinuz` and a ramdisk
 			debug_name = "primary VM";
 			kernel_filename = "vmlinuz";
 			ramdisk_filename = "initrd.img";
+
+			smc_whitelist = <
+				0x04000000
+				0x3200ffff
+				>;
 		};
 
 		vm2 {
@@ -58,6 +63,8 @@ number of CPUs as the hardware, a kernel image called `vmlinuz` and a ramdisk
 			kernel_filename = "kernel0";
 			vcpu_count = <2>;
 			mem_size = <0x100000>;
+
+			smc_whitelist_permissive = <1>;
 		};
 
 		vm3 {

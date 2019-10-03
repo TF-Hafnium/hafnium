@@ -27,6 +27,7 @@
 
 #include "vmapi/hf/spci.h"
 
+#define MAX_SMCS 32
 #define LOG_BUFFER_SIZE 256
 
 enum mailbox_state {
@@ -77,8 +78,16 @@ struct mailbox {
 	struct list_entry ready_list;
 };
 
+struct smc_whitelist {
+	uint32_t smcs[MAX_SMCS];
+	uint16_t smc_count;
+	bool permissive;
+};
+
 struct vm {
 	spci_vm_id_t id;
+	struct smc_whitelist smc_whitelist;
+
 	/** See api.c for the partial ordering on locks. */
 	struct spinlock lock;
 	spci_vcpu_count_t vcpu_count;
@@ -86,7 +95,7 @@ struct vm {
 	struct mm_ptable ptable;
 	struct mailbox mailbox;
 	char log_buffer[LOG_BUFFER_SIZE];
-	size_t log_buffer_length;
+	uint16_t log_buffer_length;
 
 	/** Wait entries to be used when waiting on other VM mailboxes. */
 	struct wait_entry wait_entries[MAX_VMS];

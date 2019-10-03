@@ -256,51 +256,58 @@ static void set_virtual_interrupt_current(bool enable)
 	write_msr(hcr_el2, hcr_el2);
 }
 
-static bool smc_check_client_privileges(const struct vcpu *vcpu)
+/**
+ * Checks whether to block an SMC being forwarded from a VM.
+ */
+static bool smc_is_blocked(const struct vm *vm, uint32_t func)
 {
-	(void)vcpu; /*UNUSED*/
+	bool block_by_default = !vm->smc_whitelist.permissive;
 
-	/*
-	 * TODO(b/132421503): Check for privileges based on manifest.
-	 * Currently returns false, which maintains existing behavior.
-	 */
+	for (size_t i = 0; i < vm->smc_whitelist.smc_count; ++i) {
+		if (func == vm->smc_whitelist.smcs[i]) {
+			return false;
+		}
+	}
 
-	return false;
+	dlog("SMC %#010x attempted from VM %d, blocked=%d\n", func, vm->id,
+	     block_by_default);
+
+	/* Access is still allowed in permissive mode. */
+	return block_by_default;
 }
 
 /**
- * Applies SMC access control according to manifest.
- * Forwards the call if access is granted.
- * Returns true if call is forwarded.
+ * Applies SMC access control according to manifest and forwards the call if
+ * access is granted.
  */
-static bool smc_forwarder(const struct vcpu *vcpu, struct smc_result *ret)
+static void smc_forwarder(const struct vcpu *vcpu, struct smc_result *ret)
 {
 	uint32_t func = vcpu->regs.r[0];
-	/* TODO(b/132421503): obtain vmid according to new scheme. */
 	uint32_t client_id = vcpu->vm->id;
+	uintreg_t arg7;
+
+	if (smc_is_blocked(vcpu->vm, func)) {
+		ret->res0 = SMCCC_ERROR_UNKNOWN;
+		return;
+	}
+
 	/*
 	 * Set the Client ID but keep the existing Secure OS ID and anything
 	 * else (currently unspecified) that the client may have passed in the
 	 * upper bits.
 	 */
-	uintreg_t arg7 = client_id | (vcpu->regs.r[7] & ~CLIENT_ID_MASK);
+	arg7 = client_id | (vcpu->regs.r[7] & ~CLIENT_ID_MASK);
+	*ret = smc_forward(func, vcpu->regs.r[1], vcpu->regs.r[2],
+			   vcpu->regs.r[3], vcpu->regs.r[4], vcpu->regs.r[5],
+			   vcpu->regs.r[6], arg7);
 
-	if (smc_check_client_privileges(vcpu)) {
-		*ret = smc_forward(func, vcpu->regs.r[1], vcpu->regs.r[2],
-				   vcpu->regs.r[3], vcpu->regs.r[4],
-				   vcpu->regs.r[5], vcpu->regs.r[6], arg7);
-		/*
-		 * Preserve the value passed by the caller, rather than the
-		 * client_id we generated. Note that this would also overwrite
-		 * any return value that may be in x7, but the SMCs that we are
-		 * forwarding are legacy calls from before SMCCC 1.2 so won't
-		 * have more than 4 return values anyway.
-		 */
-		ret->res7 = vcpu->regs.r[7];
-		return true;
-	}
-
-	return false;
+	/*
+	 * Preserve the value passed by the caller, rather than the client_id we
+	 * generated. Note that this would also overwrite any return value that
+	 * may be in x7, but the SMCs that we are forwarding are legacy calls
+	 * from before SMCCC 1.2 so won't have more than 4 return values anyway.
+	 */
+	ret->res7 = vcpu->regs.r[7];
 }
 
 static bool spci_handler(struct spci_value *args, struct vcpu **next)
@@ -362,25 +369,23 @@ static void update_vi(struct vcpu *next)
 /**
  * Processes SMC instruction calls.
  */
-static bool smc_handler(struct vcpu *vcpu, struct smc_result *ret,
+static void smc_handler(struct vcpu *vcpu, struct smc_result *ret,
 			struct vcpu **next)
 {
 	uint32_t func = vcpu->regs.r[0];
 
 	if (psci_handler(vcpu, func, vcpu->regs.r[1], vcpu->regs.r[2],
 			 vcpu->regs.r[3], &ret->res0, next)) {
-		/* SMC PSCI calls are processed by the PSCI handler. */
-		return true;
+		return;
 	}
 
 	switch (func & ~SMCCC_CONVENTION_MASK) {
 	case HF_DEBUG_LOG:
-		api_debug_log(vcpu->regs.r[1], vcpu);
-		return true;
+		ret->res0 = api_debug_log(vcpu->regs.r[1], vcpu);
+		return;
 	}
 
-	/* Remaining SMC calls need to be forwarded. */
-	return smc_forwarder(vcpu, ret);
+	smc_forwarder(vcpu, ret);
 }
 
 struct vcpu *hvc_handler(struct vcpu *vcpu)
@@ -583,17 +588,13 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 
 	case 0x17: /* EC = 010111, SMC instruction. */ {
 		uintreg_t smc_pc = vcpu->regs.pc;
+		struct vcpu *next = NULL;
 		struct smc_result ret = {.res4 = vcpu->regs.r[4],
 					 .res5 = vcpu->regs.r[5],
 					 .res6 = vcpu->regs.r[6],
 					 .res7 = vcpu->regs.r[7]};
-		struct vcpu *next = NULL;
 
-		if (!smc_handler(vcpu, &ret, &next)) {
-			/* TODO(b/132421503): handle SMC forward rejection  */
-			dlog("Unsupported SMC call: %#x\n", vcpu->regs.r[0]);
-			ret.res0 = SMCCC_ERROR_UNKNOWN;
-		}
+		smc_handler(vcpu, &ret, &next);
 
 		/* Skip the SMC instruction. */
 		vcpu->regs.pc = smc_pc + GET_NEXT_PC_INC(esr);

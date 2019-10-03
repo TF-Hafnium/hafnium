@@ -23,6 +23,13 @@
 		vm1 {
 			debug_name = "aarch64_test";
 			kernel_filename = "aarch64_test";
+
+			smc_whitelist = <
+				0x30000001
+				0x30000002
+				0x30000003
+				0x30000004
+				>;
 		};
 	};
 };

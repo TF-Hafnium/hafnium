@@ -19,14 +19,15 @@
 #include "hftest.h"
 #include "smc.h"
 
-TEST(smccc, hf_debug_log_zero_or_unchanged)
+TEST(smc_whitelist, not_whitelisted_unknown)
 {
-	struct smc_result smc_res =
-		smc_forward(HF_DEBUG_LOG, '\n', 0x2222222222222222,
-			    0x3333333333333333, 0x4444444444444444,
-			    0x5555555555555555, 0x6666666666666666, 0x77777777);
+	const uint32_t non_whitelisted_ta_call = 0x3000f00d;
+	struct smc_result smc_res = smc_forward(
+		non_whitelisted_ta_call, 0x1111111111111111, 0x2222222222222222,
+		0x3333333333333333, 0x4444444444444444, 0x5555555555555555,
+		0x6666666666666666, 0x77777777);
 
-	EXPECT_EQ(smc_res.res0, 0);
+	EXPECT_EQ(smc_res.res0, SMCCC_ERROR_UNKNOWN);
 	EXPECT_EQ(smc_res.res1, 0);
 	EXPECT_EQ(smc_res.res2, 0);
 	EXPECT_EQ(smc_res.res3, 0);

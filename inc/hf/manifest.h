@@ -20,6 +20,7 @@
 #include "hf/memiter.h"
 #include "hf/spci.h"
 #include "hf/string.h"
+#include "hf/vm.h"
 
 /**
  * Holds information about one of the VMs described in the manifest.
@@ -28,6 +29,7 @@ struct manifest_vm {
 	/* Properties defined for both primary and secondary VMs. */
 	struct string debug_name;
 	struct string kernel_filename;
+	struct smc_whitelist smc_whitelist;
 
 	union {
 		/* Properties specific to the primary VM. */
@@ -63,6 +65,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_MALFORMED_STRING_LIST,
 	MANIFEST_ERROR_MALFORMED_INTEGER,
 	MANIFEST_ERROR_INTEGER_OVERFLOW,
+	MANIFEST_ERROR_MALFORMED_INTEGER_LIST,
 };
 
 enum manifest_return_code manifest_init(struct manifest *manifest,

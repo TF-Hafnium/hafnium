@@ -92,10 +92,21 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 }
 
 /**
+ * Performs VM loading activities that are common between the primary and
+ * secondaries.
+ */
+static bool load_common(const struct manifest_vm *manifest_vm, struct vm *vm)
+{
+	vm->smc_whitelist = manifest_vm->smc_whitelist;
+
+	return true;
+}
+
+/**
  * Loads the primary VM.
  */
 static bool load_primary(struct mm_stage1_locked stage1_locked,
-			 const struct manifest *manifest,
+			 const struct manifest_vm *manifest_vm,
 			 const struct memiter *cpio,
 			 const struct boot_params *params, struct mpool *ppool)
 {
@@ -110,8 +121,8 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	 */
 	paddr_t primary_end = pa_add(primary_begin, 0x8000000);
 
-	if (!load_kernel(stage1_locked, primary_begin, primary_end,
-			 &manifest->vm[HF_PRIMARY_VM_INDEX], cpio, ppool)) {
+	if (!load_kernel(stage1_locked, primary_begin, primary_end, manifest_vm,
+			 cpio, ppool)) {
 		dlog("Unable to load primary kernel.");
 		return false;
 	}
@@ -123,6 +134,10 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 
 	if (vm->id != HF_PRIMARY_VM_ID) {
 		dlog("Primary vm was not given correct id\n");
+		return false;
+	}
+
+	if (!load_common(manifest_vm, vm)) {
 		return false;
 	}
 
@@ -183,6 +198,10 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	if (!vm_init(manifest_vm->secondary.vcpu_count, ppool, &vm)) {
 		dlog("Unable to initialise VM.\n");
+		return false;
+	}
+
+	if (!load_common(manifest_vm, vm)) {
 		return false;
 	}
 
@@ -292,7 +311,8 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	size_t i;
 
-	if (!load_primary(stage1_locked, manifest, cpio, params, ppool)) {
+	if (!load_primary(stage1_locked, &manifest->vm[HF_PRIMARY_VM_INDEX],
+			  cpio, params, ppool)) {
 		dlog("Unable to load primary VM.\n");
 		return false;
 	}

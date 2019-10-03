@@ -16,6 +16,7 @@
 
 #include <array>
 #include <cstdio>
+#include <span>
 #include <sstream>
 
 #include <gmock/gmock.h>
@@ -26,7 +27,9 @@ extern "C" {
 
 namespace
 {
+using ::testing::ElementsAre;
 using ::testing::Eq;
+using ::testing::IsEmpty;
 using ::testing::NotNull;
 
 template <typename T>
@@ -120,7 +123,7 @@ class ManifestDtBuilder
 		StartChild("/");
 	}
 
-	std::vector<char> Build()
+	std::vector<char> Build(bool dump = false)
 	{
 		const char *program = "./build/image/dtc.py";
 		const char *dtc_args[] = {program, "compile", NULL};
@@ -129,8 +132,17 @@ class ManifestDtBuilder
 		/* Finish root node. */
 		EndChild();
 
+		if (dump) {
+			Dump();
+		}
+
 		exec(program, dtc_args, dts_.str(), &dtc_stdout);
 		return dtc_stdout;
+	}
+
+	void Dump()
+	{
+		std::cerr << dts_.str() << std::endl;
 	}
 
 	ManifestDtBuilder &StartChild(const std::string_view &name)
@@ -166,14 +178,31 @@ class ManifestDtBuilder
 		return StringProperty("ramdisk_filename", value);
 	}
 
-	ManifestDtBuilder &VcpuCount(uint64_t value)
+	ManifestDtBuilder &VcpuCount(uint32_t value)
 	{
 		return IntegerProperty("vcpu_count", value);
 	}
 
-	ManifestDtBuilder &MemSize(uint64_t value)
+	ManifestDtBuilder &MemSize(uint32_t value)
 	{
 		return IntegerProperty("mem_size", value);
+	}
+
+	ManifestDtBuilder &SmcWhitelist(const std::vector<uint32_t> &value)
+	{
+		return IntegerListProperty("smc_whitelist", value);
+	}
+
+	ManifestDtBuilder &SmcWhitelistPermissive()
+	{
+		return BooleanProperty("smc_whitelist_permissive");
+	}
+
+	ManifestDtBuilder &Property(const std::string_view &name,
+				    const std::string_view &value)
+	{
+		dts_ << name << " = " << value << ";" << std::endl;
+		return *this;
 	}
 
        private:
@@ -204,10 +233,27 @@ class ManifestDtBuilder
 	}
 
 	ManifestDtBuilder &IntegerProperty(const std::string_view &name,
-					   uint64_t value)
+					   uint32_t value)
 	{
 		dts_ << name << " = <" << value << ">;" << std::endl;
 		return *this;
+	}
+
+	ManifestDtBuilder &IntegerListProperty(
+		const std::string_view &name,
+		const std::vector<uint32_t> &value)
+	{
+		dts_ << name << " = < ";
+		for (const uint32_t entry : value) {
+			dts_ << entry << " ";
+		}
+		dts_ << ">;" << std::endl;
+		return *this;
+	}
+
+	ManifestDtBuilder &BooleanProperty(const std::string_view &name)
+	{
+		return IntegerProperty(name, 1);
 	}
 
 	std::stringstream dts_;
@@ -365,7 +411,7 @@ TEST(manifest, reserved_vm_id)
 	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_ERROR_RESERVED_VM_ID);
 }
 
-static std::vector<char> gen_vcpu_count_limit_dtb(uint64_t vcpu_count)
+static std::vector<char> gen_vcpu_count_limit_dtb(uint32_t vcpu_count)
 {
 	/* clang-format off */
 	return ManifestDtBuilder()
@@ -426,6 +472,51 @@ TEST(manifest, no_ramdisk_primary)
 	ASSERT_STREQ(string_data(&m.vm[0].primary.ramdisk_filename), "");
 }
 
+TEST(manifest, valid_true_booleans)
+{
+	struct manifest m;
+	struct manifest_vm *vm;
+	struct fdt_node fdt_root;
+
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+			.StartChild("vm1")
+				.DebugName("primary_vm")
+				.Property("smc_whitelist_permissive", "\"false\"")
+			.EndChild()
+			.StartChild("vm2")
+				.DebugName("first_secondary_vm")
+				.VcpuCount(42)
+				.MemSize(12345)
+				.Property("smc_whitelist_permissive", "<0>")
+			.EndChild()
+			.StartChild("vm3")
+				.DebugName("second_secondary_vm")
+				.VcpuCount(43)
+				.MemSize(0x12345)
+				.Property("smc_whitelist_permissive", "\"true\"")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
+
+	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
+	ASSERT_EQ(m.vm_count, 3);
+
+	vm = &m.vm[0];
+	ASSERT_TRUE(vm->smc_whitelist.permissive);
+
+	vm = &m.vm[1];
+	ASSERT_TRUE(vm->smc_whitelist.permissive);
+
+	vm = &m.vm[2];
+	ASSERT_TRUE(vm->smc_whitelist.permissive);
+}
+
 TEST(manifest, valid)
 {
 	struct manifest m;
@@ -440,6 +531,7 @@ TEST(manifest, valid)
 				.DebugName("primary_vm")
 				.KernelFilename("primary_kernel")
 				.RamdiskFilename("primary_ramdisk")
+				.SmcWhitelist({0x32000000, 0x33001111})
 			.EndChild()
 			.StartChild("vm3")
 				.DebugName("second_secondary_vm")
@@ -451,6 +543,8 @@ TEST(manifest, valid)
 				.DebugName("first_secondary_vm")
 				.VcpuCount(42)
 				.MemSize(12345)
+				.SmcWhitelist({0x04000000, 0x30002222, 0x31445566})
+				.SmcWhitelistPermissive()
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -466,12 +560,20 @@ TEST(manifest, valid)
 	ASSERT_STREQ(string_data(&vm->kernel_filename), "primary_kernel");
 	ASSERT_STREQ(string_data(&vm->primary.ramdisk_filename),
 		     "primary_ramdisk");
+	ASSERT_THAT(
+		std::span(vm->smc_whitelist.smcs, vm->smc_whitelist.smc_count),
+		ElementsAre(0x32000000, 0x33001111));
+	ASSERT_FALSE(vm->smc_whitelist.permissive);
 
 	vm = &m.vm[1];
 	ASSERT_STREQ(string_data(&vm->debug_name), "first_secondary_vm");
 	ASSERT_STREQ(string_data(&vm->kernel_filename), "");
 	ASSERT_EQ(vm->secondary.vcpu_count, 42);
 	ASSERT_EQ(vm->secondary.mem_size, 12345);
+	ASSERT_THAT(
+		std::span(vm->smc_whitelist.smcs, vm->smc_whitelist.smc_count),
+		ElementsAre(0x04000000, 0x30002222, 0x31445566));
+	ASSERT_TRUE(vm->smc_whitelist.permissive);
 
 	vm = &m.vm[2];
 	ASSERT_STREQ(string_data(&vm->debug_name), "second_secondary_vm");
@@ -479,6 +581,10 @@ TEST(manifest, valid)
 		     "second_secondary_kernel");
 	ASSERT_EQ(vm->secondary.vcpu_count, 43);
 	ASSERT_EQ(vm->secondary.mem_size, 0x12345);
+	ASSERT_THAT(
+		std::span(vm->smc_whitelist.smcs, vm->smc_whitelist.smc_count),
+		IsEmpty());
+	ASSERT_FALSE(vm->smc_whitelist.permissive);
 }
 
 } /* namespace */

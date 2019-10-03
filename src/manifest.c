@@ -18,6 +18,7 @@
 
 #include "hf/addr.h"
 #include "hf/check.h"
+#include "hf/dlog.h"
 #include "hf/fdt.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
@@ -51,6 +52,24 @@ static const char *generate_vm_node_name(char *buf, spci_vm_id_t vm_id)
 	*(--ptr) = 'v';
 
 	return ptr;
+}
+
+/**
+ * Read a boolean property: true if present; false if not. The value of the
+ * property is ignored.
+ *
+ * This is the convention used by Linux but beware of things like the following
+ * that will actually be considered as `true`.
+ *
+ *     true-property0 = <0>;
+ *     true-property1 = "false";
+ */
+static bool read_bool(const struct fdt_node *node, const char *property)
+{
+	const char *data;
+	uint32_t size;
+
+	return fdt_read_property(node, property, &data, &size);
 }
 
 static enum manifest_return_code read_string(const struct fdt_node *node,
@@ -121,6 +140,30 @@ static enum manifest_return_code read_uint16(const struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
+struct uint32list_iter {
+	struct memiter mem_it;
+};
+
+static enum manifest_return_code read_optional_uint32list(
+	const struct fdt_node *node, const char *property,
+	struct uint32list_iter *out)
+{
+	const char *data;
+	uint32_t size;
+
+	if (!fdt_read_property(node, property, &data, &size)) {
+		memiter_init(&out->mem_it, NULL, 0);
+		return MANIFEST_SUCCESS;
+	}
+
+	if ((size % sizeof(uint32_t)) != 0) {
+		return MANIFEST_ERROR_MALFORMED_INTEGER_LIST;
+	}
+
+	memiter_init(&out->mem_it, data, size);
+	return MANIFEST_SUCCESS;
+}
+
 /**
  * Represents the value of property whose type is a list of strings. These are
  * encoded as one contiguous byte buffer with NULL-separated entries.
@@ -150,6 +193,26 @@ static enum manifest_return_code read_stringlist(const struct fdt_node *node,
 
 	memiter_init(&out->mem_it, data, size - 1);
 	return MANIFEST_SUCCESS;
+}
+
+static bool uint32list_has_next(const struct uint32list_iter *list)
+{
+	return memiter_size(&list->mem_it) > 0;
+}
+
+static uint32_t uint32list_get_next(struct uint32list_iter *list)
+{
+	const char *mem_base = memiter_base(&list->mem_it);
+	uint64_t num;
+
+	CHECK(uint32list_has_next(list));
+
+	if (!fdt_parse_number(mem_base, sizeof(uint32_t), &num)) {
+		return MANIFEST_ERROR_MALFORMED_INTEGER;
+	}
+
+	memiter_advance(&list->mem_it, sizeof(uint32_t));
+	return num;
 }
 
 static bool stringlist_has_next(const struct stringlist_iter *list)
@@ -206,9 +269,26 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 					  struct manifest_vm *vm,
 					  spci_vm_id_t vm_id)
 {
+	struct uint32list_iter smcs;
+
 	TRY(read_string(node, "debug_name", &vm->debug_name));
 	TRY(read_optional_string(node, "kernel_filename",
 				 &vm->kernel_filename));
+
+	TRY(read_optional_uint32list(node, "smc_whitelist", &smcs));
+	while (uint32list_has_next(&smcs) &&
+	       vm->smc_whitelist.smc_count < MAX_SMCS) {
+		vm->smc_whitelist.smcs[vm->smc_whitelist.smc_count++] =
+			uint32list_get_next(&smcs);
+	}
+
+	if (uint32list_has_next(&smcs)) {
+		dlog("%s SMC whitelist too long.\n", vm->debug_name);
+	}
+
+	vm->smc_whitelist.permissive =
+		read_bool(node, "smc_whitelist_permissive");
+
 	if (vm_id == HF_PRIMARY_VM_ID) {
 		TRY(read_optional_string(node, "ramdisk_filename",
 					 &vm->primary.ramdisk_filename));
@@ -314,6 +394,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Malformed integer property";
 	case MANIFEST_ERROR_INTEGER_OVERFLOW:
 		return "Integer overflow";
+	case MANIFEST_ERROR_MALFORMED_INTEGER_LIST:
+		return "Malformed integer list property";
 	}
 
 	panic("Unexpected manifest return code.");

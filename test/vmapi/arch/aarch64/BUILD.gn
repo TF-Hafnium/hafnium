@@ -25,8 +25,10 @@ group("arch") {
 # Tests specific to aarch64.
 vm_kernel("aarch64_test_vm") {
   testonly = true
+  public_configs = [ "//src/arch/aarch64:config" ]
 
   sources = [
+    "smc_whitelist.c",
     "smccc.c",
   ]
 
