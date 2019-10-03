@@ -176,7 +176,8 @@ TEST(abi, hf_vcpu_run_return_encode_message)
 	struct hf_vcpu_run_return res = dirty_vcpu_run_return();
 	res.code = HF_VCPU_RUN_MESSAGE;
 	res.message.vm_id = 0xf007;
-	EXPECT_THAT(hf_vcpu_run_return_encode(res), Eq(0x0000000000f00705));
+	res.message.size = 0xcafe1971;
+	EXPECT_THAT(hf_vcpu_run_return_encode(res), Eq(0xcafe197100f00705));
 }
 
 /**
@@ -188,6 +189,7 @@ TEST(abi, hf_vcpu_run_return_decode_message)
 		hf_vcpu_run_return_decode(0x1123581314916205);
 	EXPECT_THAT(res.code, Eq(HF_VCPU_RUN_MESSAGE));
 	EXPECT_THAT(res.message.vm_id, Eq(0x9162));
+	EXPECT_THAT(res.message.size, Eq(0x11235813));
 }
 
 /**

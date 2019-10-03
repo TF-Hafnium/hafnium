@@ -47,7 +47,7 @@ TEST(smp, two_vcpus)
 	dlog("Run second vCPU for message\n");
 	run_res = hf_vcpu_run(SERVICE_VM2, 1);
 	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-	EXPECT_EQ(mb.recv->length, sizeof(expected_response_1));
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response_1));
 	EXPECT_EQ(memcmp(mb.recv->payload, expected_response_1,
 			 sizeof(expected_response_1)),
 		  0);
@@ -57,7 +57,7 @@ TEST(smp, two_vcpus)
 	dlog("Run first vCPU for message\n");
 	run_res = hf_vcpu_run(SERVICE_VM2, 0);
 	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
-	EXPECT_EQ(mb.recv->length, sizeof(expected_response_0));
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response_0));
 	EXPECT_EQ(memcmp(mb.recv->payload, expected_response_0,
 			 sizeof(expected_response_0)),
 		  0);

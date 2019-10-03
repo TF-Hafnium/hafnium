@@ -85,6 +85,7 @@ noreturn void kmain(size_t memory_size)
 
 		/* Receive the packet. */
 		ret = spci_msg_wait();
+		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		EXPECT_LE(spci_msg_send_size(ret), SPCI_MSG_PAYLOAD_MAX);
 
 		/* Echo the message back to the sender. */

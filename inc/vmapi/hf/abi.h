@@ -94,6 +94,7 @@ struct hf_vcpu_run_return {
 		} wake_up;
 		struct {
 			spci_vm_id_t vm_id;
+			uint32_t size;
 		} message;
 		struct {
 			uint64_t ns;
@@ -134,6 +135,7 @@ static inline uint64_t hf_vcpu_run_return_encode(struct hf_vcpu_run_return res)
 		ret |= (uint64_t)res.wake_up.vcpu << 16;
 		break;
 	case HF_VCPU_RUN_MESSAGE:
+		ret |= (uint64_t)res.message.size << 32;
 		ret |= res.message.vm_id << 8;
 		break;
 	case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
@@ -163,7 +165,8 @@ static inline struct hf_vcpu_run_return hf_vcpu_run_return_decode(uint64_t res)
 		ret.wake_up.vcpu = (res >> 16) & 0xffff;
 		break;
 	case HF_VCPU_RUN_MESSAGE:
-		ret.message.vm_id = res >> 8;
+		ret.message.size = res >> 32;
+		ret.message.vm_id = (res >> 8) & 0xffff;
 		break;
 	case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
 	case HF_VCPU_RUN_WAIT_FOR_MESSAGE:

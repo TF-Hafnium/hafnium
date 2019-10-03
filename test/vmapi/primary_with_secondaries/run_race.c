@@ -46,7 +46,7 @@ static bool run_loop(struct mailbox_buffers *mb)
 
 		/* Break out if we received a message with non-zero length. */
 		if (run_res.code == HF_VCPU_RUN_MESSAGE &&
-		    mb->recv->length != 0) {
+		    run_res.message.size != 0) {
 			break;
 		}
 
@@ -55,7 +55,7 @@ static bool run_loop(struct mailbox_buffers *mb)
 	}
 
 	/* Copies the contents of the received boolean to the return value. */
-	if (mb->recv->length == sizeof(ok)) {
+	if (run_res.message.size == sizeof(ok)) {
 		ok = *(bool *)mb->recv->payload;
 	}
 

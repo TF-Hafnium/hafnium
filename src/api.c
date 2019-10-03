@@ -1005,6 +1005,12 @@ spci_return_t api_spci_msg_send(uint32_t attributes, struct vcpu *current,
 
 	/* Messages for the primary VM are delivered directly. */
 	if (to->id == HF_PRIMARY_VM_ID) {
+		/*
+		 * Only tell the primary VM the size if the message is for it,
+		 * to avoid leaking data about messages for other VMs.
+		 */
+		primary_ret.message.size = size;
+
 		to->mailbox.state = MAILBOX_STATE_READ;
 		*next = api_switch_to_primary(current, primary_ret,
 					      VCPU_STATE_READY);
