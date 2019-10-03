@@ -268,12 +268,11 @@ static void hf_deliver_message(spci_vm_id_t vm_id)
  * Handles a message delivered to this VM by validating that it's well-formed
  * and then queueing it for delivery to the appropriate socket.
  */
-static void hf_handle_message(struct hf_vm *sender,
+static void hf_handle_message(struct hf_vm *sender, size_t len,
 			      const struct spci_message *message)
 {
 	struct hf_sock *hsock;
 	const struct hf_msg_hdr *hdr = (struct hf_msg_hdr *)message->payload;
-	size_t len = message->length;
 	struct sk_buff *skb;
 	int err;
 
@@ -399,7 +398,7 @@ static int hf_vcpu_thread(void *data)
 		/* Response available. */
 		case HF_VCPU_RUN_MESSAGE:
 			if (ret.message.vm_id == HF_PRIMARY_VM_ID) {
-				hf_handle_message(vcpu->vm,
+				hf_handle_message(vcpu->vm, ret.message.size,
 						  page_address(hf_recv_page));
 			} else {
 				hf_deliver_message(ret.message.vm_id);
