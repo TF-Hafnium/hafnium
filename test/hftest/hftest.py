@@ -201,11 +201,10 @@ class QemuDriver(Driver):
         exec_args = [
             "timeout", "--foreground", "10s",
             "./prebuilts/linux-x64/qemu/qemu-system-aarch64",
-            "-M", "virt,gic_version=3",
+            "-machine", "virt,virtualization=on,gic_version=3",
             "-cpu", "cortex-a57", "-smp", "4", "-m", "64M",
-            "-machine", "virtualization=true",
             "-nographic", "-nodefaults", "-serial", "stdio",
-            "-kernel", self.args.kernel,
+            "-d", "unimp", "-kernel", self.args.kernel,
         ]
 
         if dtb_path:
