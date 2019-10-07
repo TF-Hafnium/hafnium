@@ -1419,7 +1419,7 @@ out:
  *  In case of error one of the following values is returned:
  *   1) SPCI_INVALID_PARAMETERS - The endpoint provided parameters were
  *     erroneous;
- *   2) SPCI_NO_MEMORY - Hf did not have sufficient memory to complete
+ *   2) SPCI_NO_MEMORY - Hafnium did not have sufficient memory to complete
  *     the request.
  *  Success is indicated by SPCI_SUCCESS.
  */
