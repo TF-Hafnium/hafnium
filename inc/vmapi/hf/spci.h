@@ -43,7 +43,6 @@
 #define SPCI_MSG_SEND_DIRECT_REQ_32   0x8400006E
 #define SPCI_MSG_SEND_DIRECT_RESP_32  0x8400006F
 
-#define SPCI_SUCCESS            INT32_C(0)
 /* SPCI error codes. */
 #define SPCI_NOT_SUPPORTED      INT32_C(-1)
 #define SPCI_INVALID_PARAMETERS INT32_C(-2)
@@ -172,9 +171,7 @@ typedef uint16_t spci_vcpu_index_t;
  */
 typedef spci_vcpu_index_t spci_vcpu_count_t;
 
-/** Return type of SPCI functions. */
-/* TODO: Reuse spci_return_t type on all SPCI functions declarations. */
-typedef int32_t spci_return_t;
+/** Parameter and return type of SPCI functions. */
 struct spci_value {
 	uint64_t func;
 	uint64_t arg1;
