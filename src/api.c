@@ -210,9 +210,10 @@ struct vcpu *api_abort(struct vcpu *current)
 /**
  * Returns the ID of the VM.
  */
-spci_vm_id_t api_vm_get_id(const struct vcpu *current)
+struct spci_value api_spci_id_get(const struct vcpu *current)
 {
-	return current->vm->id;
+	return (struct spci_value){.func = SPCI_SUCCESS_32,
+				   .arg2 = current->vm->id};
 }
 
 /**

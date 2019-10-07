@@ -316,6 +316,9 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 	case SPCI_VERSION_32:
 		*args = api_spci_version();
 		return true;
+	case SPCI_ID_GET_32:
+		*args = api_spci_id_get(current());
+		return true;
 	case SPCI_YIELD_32:
 		api_yield(current(), next);
 
@@ -425,10 +428,6 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 	}
 
 	switch (args.func) {
-	case HF_VM_GET_ID:
-		vcpu->regs.r[0] = api_vm_get_id(vcpu);
-		break;
-
 	case HF_VM_GET_COUNT:
 		vcpu->regs.r[0] = api_vm_get_count();
 		break;

@@ -24,7 +24,6 @@
 /* clang-format off */
 
 /* TODO: Define constants below according to spec. */
-#define HF_VM_GET_ID            0xff00
 #define HF_VM_GET_COUNT         0xff01
 #define HF_VCPU_GET_COUNT       0xff02
 #define HF_VCPU_RUN             0xff03
@@ -52,9 +51,17 @@ struct spci_value spci_call(struct spci_value args);
 /**
  * Returns the VM's own ID.
  */
+static inline struct spci_value spci_id_get(void)
+{
+	return spci_call((struct spci_value){.func = SPCI_ID_GET_32});
+}
+
+/**
+ * Returns the VM's own ID.
+ */
 static inline spci_vm_id_t hf_vm_get_id(void)
 {
-	return hf_call(HF_VM_GET_ID, 0, 0, 0);
+	return spci_id_get().arg2;
 }
 
 /**

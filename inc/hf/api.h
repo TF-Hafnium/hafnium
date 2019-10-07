@@ -24,7 +24,6 @@
 #include "vmapi/hf/spci.h"
 
 void api_init(struct mpool *ppool);
-spci_vm_id_t api_vm_get_id(const struct vcpu *current);
 spci_vm_count_t api_vm_get_count(void);
 spci_vcpu_count_t api_vcpu_get_count(spci_vm_id_t vm_id,
 				     const struct vcpu *current);
@@ -62,6 +61,7 @@ struct spci_value api_spci_msg_recv(bool block, struct vcpu *current,
 				    struct vcpu **next);
 void api_yield(struct vcpu *current, struct vcpu **next);
 struct spci_value api_spci_version(void);
+struct spci_value api_spci_id_get(const struct vcpu *current);
 struct spci_value api_spci_share_memory(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	struct spci_memory_region *memory_region, uint32_t memory_to_attributes,
