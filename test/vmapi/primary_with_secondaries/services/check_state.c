@@ -22,13 +22,14 @@
 
 #include "hftest.h"
 
-void send_with_retry()
+void send_with_retry(spci_vm_id_t sender_vm_id, spci_vm_id_t target_vm_id,
+		     uint32_t size)
 {
-	int64_t res;
+	struct spci_value res;
 
 	do {
-		res = spci_msg_send(0);
-	} while (res != SPCI_SUCCESS);
+		res = spci_msg_send(sender_vm_id, target_vm_id, size, 0);
+	} while (res.func != SPCI_SUCCESS_32);
 }
 
 /**
@@ -49,9 +50,6 @@ TEST_SERVICE(check_state)
 	static volatile uintptr_t expected;
 	static volatile uintptr_t actual;
 
-	spci_message_init(SERVICE_SEND_BUFFER(), 0, HF_PRIMARY_VM_ID,
-			  hf_vm_get_id());
-
 	for (i = 0; i < 100000; i++) {
 		/*
 		 * We store the expected/actual values in volatile static
@@ -60,16 +58,13 @@ TEST_SERVICE(check_state)
 		 */
 		expected = i;
 		per_cpu_ptr_set(expected);
-		send_with_retry();
+		send_with_retry(hf_vm_get_id(), HF_PRIMARY_VM_ID, 0);
 		actual = per_cpu_ptr_get();
 		ok &= expected == actual;
 	}
 
 	/* Send two replies, one for each physical CPU. */
-	memcpy_s(SERVICE_SEND_BUFFER()->payload, SPCI_MSG_PAYLOAD_MAX, &ok,
-		 sizeof(ok));
-	spci_message_init(SERVICE_SEND_BUFFER(), sizeof(ok), HF_PRIMARY_VM_ID,
-			  hf_vm_get_id());
-	send_with_retry();
-	send_with_retry();
+	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, &ok, sizeof(ok));
+	send_with_retry(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(ok));
+	send_with_retry(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(ok));
 }

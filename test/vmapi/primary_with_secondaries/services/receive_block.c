@@ -24,6 +24,7 @@
 
 #include "hftest.h"
 #include "primary_with_secondary.h"
+#include "util.h"
 
 /*
  * Secondary VM that enables an interrupt, disables interrupts globally, and
@@ -47,14 +48,11 @@ TEST_SERVICE(receive_block)
 
 	for (i = 0; i < 10; ++i) {
 		struct spci_value res = spci_msg_wait();
-		EXPECT_EQ(res.func, SPCI_ERROR_32);
-		EXPECT_EQ(res.arg1, SPCI_INTERRUPTED);
+		EXPECT_SPCI_ERROR(res, SPCI_INTERRUPTED);
 	}
 
-	memcpy_s(SERVICE_SEND_BUFFER()->payload, SPCI_MSG_PAYLOAD_MAX, message,
+	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, message,
 		 sizeof(message));
-	spci_message_init(SERVICE_SEND_BUFFER(), sizeof(message),
-			  HF_PRIMARY_VM_ID, hf_vm_get_id());
 
-	spci_msg_send(0);
+	spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(message), 0);
 }

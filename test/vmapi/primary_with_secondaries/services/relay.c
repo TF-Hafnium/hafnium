@@ -40,23 +40,21 @@ TEST_SERVICE(relay)
 		ASSERT_EQ(ret.func, SPCI_MSG_SEND_32);
 
 		/* Prepare to relay the message. */
-		struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
-		struct spci_message *send_buf = SERVICE_SEND_BUFFER();
+		void *recv_buf = SERVICE_RECV_BUFFER();
+		void *send_buf = SERVICE_SEND_BUFFER();
 		ASSERT_GE(spci_msg_send_size(ret), sizeof(spci_vm_id_t));
 
-		chain = (spci_vm_id_t *)recv_buf->payload;
+		chain = (spci_vm_id_t *)recv_buf;
 		next_vm_id = le16toh(*chain);
 		next_message = chain + 1;
 		next_message_size =
 			spci_msg_send_size(ret) - sizeof(spci_vm_id_t);
 
 		/* Send the message to the next stage. */
-		memcpy_s(send_buf->payload, SPCI_MSG_PAYLOAD_MAX, next_message,
+		memcpy_s(send_buf, SPCI_MSG_PAYLOAD_MAX, next_message,
 			 next_message_size);
-		spci_message_init(send_buf, next_message_size, next_vm_id,
-				  hf_vm_get_id());
 
 		hf_mailbox_clear();
-		spci_msg_send(0);
+		spci_msg_send(hf_vm_get_id(), next_vm_id, next_message_size, 0);
 	}
 }

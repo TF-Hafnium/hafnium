@@ -61,23 +61,16 @@ enum spci_memory_share {
 };
 
 /* SPCI function specific constants. */
+#define SPCI_MSG_RECV_BLOCK  0x1
 #define SPCI_MSG_RECV_BLOCK_MASK  0x1
-#define SPCI_MSG_SEND_NOTIFY_MASK 0x1
-
-#define SPCI_MESSAGE_ARCHITECTED 0x0
-#define SPCI_MESSAGE_IMPDEF      0x1
-#define SPCI_MESSAGE_IMPDEF_MASK 0x1
 
 #define SPCI_MSG_SEND_NOTIFY 0x1
-#define SPCI_MSG_RECV_BLOCK  0x1
+#define SPCI_MSG_SEND_NOTIFY_MASK 0x1
+#define SPCI_MSG_SEND_LEGACY_MEMORY      0x2
+#define SPCI_MSG_SEND_LEGACY_MEMORY_MASK 0x2
 
 /* The maximum length possible for a single message. */
-#define SPCI_MSG_PAYLOAD_MAX (HF_MAILBOX_SIZE - sizeof(struct spci_message))
-
-#define spci_get_lend_descriptor(message)\
-	((struct spci_memory_lend *)(((uint8_t *) message)\
-	+ sizeof(struct spci_message)\
-	+ sizeof(struct spci_architected_message_header)))
+#define SPCI_MSG_PAYLOAD_MAX HF_MAILBOX_SIZE
 
 enum spci_lend_access {
 	SPCI_LEND_RO_NX,
@@ -208,42 +201,10 @@ static inline uint32_t spci_msg_send_size(struct spci_value args)
 	return args.arg3;
 }
 
-/** SPCI common message header. */
-struct spci_message {
-	/*
-	 * TODO: version is part of SPCI alpha2 but will be
-	 * removed in the next spec revision hence we are not
-	 * including it in the header.
-	 */
-
-	/**
-	 * flags[0]:
-	 *     0: Architected message payload;
-	 *     1: Implementation defined message payload.
-	 * flags[15:1] reserved (MBZ).
-	 */
-	uint16_t flags;
-
-	/*
-	 * TODO: Padding is present to ensure controlled offset
-	 * of the length field. SPCI spec must be updated
-	 * to reflect this (TBD).
-	 */
-	uint16_t reserved_1;
-
-	uint32_t length;
-	spci_vm_id_t target_vm_id;
-	spci_vm_id_t source_vm_id;
-
-	/*
-	 * TODO: Padding is present to ensure that the field
-	 * payload alignment is 64B. SPCI spec must be updated
-	 * to reflect this.
-	 */
-	uint32_t reserved_2;
-
-	uint8_t payload[];
-};
+static inline uint32_t spci_msg_send_attributes(struct spci_value args)
+{
+	return args.arg4;
+}
 
 struct spci_architected_message_header {
 	uint16_t type;
@@ -281,73 +242,23 @@ struct spci_memory_lend {
 };
 
 /* TODO: Move all the functions below this line to a support library. */
-/**
- * Fill all the fields, except for the flags, in the SPCI message common header.
- */
-static inline void spci_common_header_init(struct spci_message *message,
-					   uint32_t message_length,
-					   spci_vm_id_t target_vm_id,
-					   spci_vm_id_t source_vm_id)
+
+static inline struct spci_memory_lend *spci_get_lend_descriptor(void *message)
 {
-	message->length = message_length;
-	message->target_vm_id = target_vm_id;
-	message->source_vm_id = source_vm_id;
-
-	/*
-	 * TODO: Reserved fields in the common message header will be
-	 * defined as MBZ in next SPCI spec updates.
-	 */
-	message->reserved_1 = 0;
-	message->reserved_2 = 0;
-}
-
-/**
- * Set the SPCI implementation defined message header fields.
- */
-static inline void spci_message_init(struct spci_message *message,
-				     uint32_t message_length,
-				     spci_vm_id_t target_vm_id,
-				     spci_vm_id_t source_vm_id)
-{
-	spci_common_header_init(message, message_length, target_vm_id,
-				source_vm_id);
-
-	message->flags = SPCI_MESSAGE_IMPDEF;
-}
-
-/**
- * Obtain a pointer to the architected header in the spci_message.
- *
- * Note: the argument "message" has const qualifier. This qualifier
- * is meant to forbid changes in information enclosed in the
- * struct spci_message. The spci_architected_message_header, for which
- * a pointer is returned in this function, is not part of spci_message.
- * Its information is meant to be changed and hence the returned pointer
- * does not have const type qualifier.
- */
-static inline struct spci_architected_message_header *
-spci_get_architected_message_header(const struct spci_message *message)
-{
-	return (struct spci_architected_message_header *)message->payload;
+	return (struct spci_memory_lend
+			*)((struct spci_architected_message_header *)message)
+		->payload;
 }
 
 /**
  * Helper method to fill in the information about the architected message.
  */
-static inline void spci_architected_message_init(struct spci_message *message,
-						 uint32_t message_length,
-						 spci_vm_id_t target_vm_id,
-						 spci_vm_id_t source_vm_id,
+static inline void spci_architected_message_init(void *message,
 						 enum spci_memory_share type)
 {
-	struct spci_architected_message_header *architected_header;
-
-	spci_common_header_init(message, message_length, target_vm_id,
-				source_vm_id);
-	message->flags = SPCI_MESSAGE_ARCHITECTED;
-
 	/* Fill the architected header. */
-	architected_header = spci_get_architected_message_header(message);
+	struct spci_architected_message_header *architected_header =
+		(struct spci_architected_message_header *)message;
 	architected_header->type = type;
 	architected_header->reserved[0] = 0;
 	architected_header->reserved[1] = 0;
@@ -356,10 +267,10 @@ static inline void spci_architected_message_init(struct spci_message *message,
 
 /** Obtain a pointer to the start of the memory region in the donate message. */
 static inline struct spci_memory_region *spci_get_donated_memory_region(
-	struct spci_message *message)
+	void *message)
 {
 	struct spci_architected_message_header *architected_header =
-		spci_get_architected_message_header(message);
+		(struct spci_architected_message_header *)message;
 	return (struct spci_memory_region *)architected_header->payload;
 }
 
@@ -396,64 +307,61 @@ static inline uint32_t spci_memory_region_add(
 }
 
 /** Construct the SPCI donate memory region message. */
-static inline void spci_memory_donate(
-	struct spci_message *message, spci_vm_id_t target_vm_id,
-	spci_vm_id_t source_vm_id,
+static inline uint32_t spci_memory_donate_init(
+	void *message,
 	struct spci_memory_region_constituent *region_constituents,
 	uint32_t num_elements, uint32_t handle)
 {
-	int32_t message_length;
+	uint32_t message_length;
 	struct spci_memory_region *memory_region =
 		spci_get_donated_memory_region(message);
 
 	message_length = sizeof(struct spci_architected_message_header);
 
 	/* Fill in the details on the common message header. */
-	spci_architected_message_init(message, message_length, target_vm_id,
-				      source_vm_id, SPCI_MEMORY_DONATE);
+	spci_architected_message_init(message, SPCI_MEMORY_DONATE);
 
 	/* Create single memory region. */
-	message->length += spci_memory_region_add(
+	message_length += spci_memory_region_add(
 		memory_region, handle, region_constituents, num_elements);
+	return message_length;
 }
 
 /**
  * Construct the SPCI memory region relinquish message.
  * A set of memory regions can be given back to the owner.
  */
-static inline void spci_memory_relinquish(
-	struct spci_message *message, spci_vm_id_t target_vm_id,
-	spci_vm_id_t source_vm_id,
+static inline uint32_t spci_memory_relinquish_init(
+	void *message,
 	struct spci_memory_region_constituent *region_constituents,
 	uint64_t num_elements, uint32_t handle)
 {
-	int32_t message_length;
+	uint32_t message_length;
 	struct spci_memory_region *memory_region =
 		spci_get_donated_memory_region(message);
 
 	message_length = sizeof(struct spci_architected_message_header);
 
 	/* Fill in the details on the common message header. */
-	spci_architected_message_init(message, message_length, target_vm_id,
-				      source_vm_id, SPCI_MEMORY_RELINQUISH);
+	spci_architected_message_init(message, SPCI_MEMORY_RELINQUISH);
 
 	/* Create single memory region. */
-	message->length += spci_memory_region_add(
+	message_length += spci_memory_region_add(
 		memory_region, handle, region_constituents, num_elements);
+	return message_length;
 }
 
 /**
  * Construct the SPCI memory region lend message.
  */
-static inline void spci_memory_lend(
-	struct spci_message *message, spci_vm_id_t target_vm_id,
-	spci_vm_id_t source_vm_id,
+static inline uint32_t spci_memory_lend_init(
+	void *message,
 	struct spci_memory_region_constituent *region_constituents,
 	uint64_t num_elements, uint32_t handle, enum spci_lend_access access,
 	enum spci_lend_type type, enum spci_lend_cacheability cacheability,
 	enum spci_lend_shareability shareability)
 {
-	int32_t message_length;
+	uint32_t message_length;
 	struct spci_memory_region *memory_region;
 
 	const struct spci_memory_lend lend_init = {0};
@@ -469,8 +377,7 @@ static inline void spci_memory_lend(
 			 sizeof(struct spci_memory_lend);
 
 	/* Fill in the details on the common message header. */
-	spci_architected_message_init(message, message_length, target_vm_id,
-				      source_vm_id, SPCI_MEMORY_LEND);
+	spci_architected_message_init(message, SPCI_MEMORY_LEND);
 
 	lend_descriptor->flags = SPCI_LEND_KEEP_MAPPED;
 
@@ -484,6 +391,7 @@ static inline void spci_memory_lend(
 					shareability);
 
 	/* Create single memory region. */
-	message->length += spci_memory_region_add(
+	message_length += spci_memory_region_add(
 		memory_region, handle, region_constituents, num_elements);
+	return message_length;
 }

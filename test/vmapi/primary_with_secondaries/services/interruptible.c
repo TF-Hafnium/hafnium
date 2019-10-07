@@ -39,11 +39,8 @@ static void irq(void)
 	dlog("secondary IRQ %d from current\n", interrupt_id);
 	buffer[8] = '0' + interrupt_id / 10;
 	buffer[9] = '0' + interrupt_id % 10;
-	memcpy_s(SERVICE_SEND_BUFFER()->payload, SPCI_MSG_PAYLOAD_MAX, buffer,
-		 size);
-	spci_message_init(SERVICE_SEND_BUFFER(), size, HF_PRIMARY_VM_ID,
-			  hf_vm_get_id());
-	spci_msg_send(0);
+	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, buffer, size);
+	spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, size, 0);
 	dlog("secondary IRQ %d ended\n", interrupt_id);
 }
 
@@ -66,7 +63,7 @@ struct spci_value mailbox_receive_retry()
 TEST_SERVICE(interruptible)
 {
 	spci_vm_id_t this_vm_id = hf_vm_get_id();
-	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
 
 	exception_setup(irq);
 	hf_interrupt_enable(SELF_INTERRUPT_ID, true);
@@ -83,13 +80,12 @@ TEST_SERVICE(interruptible)
 		ASSERT_EQ(ret.func, SPCI_MSG_SEND_32);
 		if (spci_msg_send_sender(ret) == HF_PRIMARY_VM_ID &&
 		    spci_msg_send_size(ret) == sizeof(ping_message) &&
-		    memcmp(recv_buf->payload, ping_message,
-			   sizeof(ping_message)) == 0) {
+		    memcmp(recv_buf, ping_message, sizeof(ping_message)) == 0) {
 			/* Interrupt ourselves */
 			hf_interrupt_inject(this_vm_id, 0, SELF_INTERRUPT_ID);
 		} else if (spci_msg_send_sender(ret) == HF_PRIMARY_VM_ID &&
 			   spci_msg_send_size(ret) == sizeof(enable_message) &&
-			   memcmp(recv_buf->payload, enable_message,
+			   memcmp(recv_buf, enable_message,
 				  sizeof(enable_message)) == 0) {
 			/* Enable interrupt ID C. */
 			hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_C, true);

@@ -21,6 +21,8 @@
 
 #include <linux/types.h>
 
+#define INT32_C(c) c
+
 typedef phys_addr_t hf_ipaddr_t;
 
 #else

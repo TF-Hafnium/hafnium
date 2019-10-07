@@ -15,7 +15,8 @@
         "spinlock.h": "c",
         "offsets.h": "c",
         "barriers.h": "c",
-        "spci.h": "c"
+        "spci.h": "c",
+        "spci_internal.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

@@ -46,11 +46,8 @@ static void irq_current(void)
 	}
 	buffer[8] = '0' + interrupt_id / 10;
 	buffer[9] = '0' + interrupt_id % 10;
-	memcpy_s(SERVICE_SEND_BUFFER()->payload, SPCI_MSG_PAYLOAD_MAX, buffer,
-		 size);
-	spci_message_init(SERVICE_SEND_BUFFER(), size, HF_PRIMARY_VM_ID,
-			  hf_vm_get_id());
-	spci_msg_send(0);
+	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, buffer, size);
+	spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, size, 0);
 	dlog("secondary IRQ %d ended\n", interrupt_id);
 	event_send_local();
 }
@@ -63,8 +60,7 @@ TEST_SERVICE(timer)
 
 	for (;;) {
 		const char timer_wfi_message[] = "**** xxxxxxx";
-		struct spci_message *message_header = SERVICE_RECV_BUFFER();
-		uint8_t *message;
+		uint8_t *message = (uint8_t *)SERVICE_RECV_BUFFER();
 		bool wfi, wfe, receive;
 		bool disable_interrupts;
 		uint32_t ticks;
@@ -76,8 +72,6 @@ TEST_SERVICE(timer)
 			     spci_msg_send_sender(ret),
 			     spci_msg_send_size(ret));
 		}
-
-		message = message_header->payload;
 
 		/*
 		 * Start a timer to send the message back: enable it and

@@ -352,9 +352,9 @@ static struct spci_value spci_msg_recv_return(const struct vm *receiver)
 {
 	return (struct spci_value){
 		.func = SPCI_MSG_SEND_32,
-		.arg1 = receiver->mailbox.recv->source_vm_id << 16 |
-			receiver->id,
-		.arg3 = receiver->mailbox.recv->length};
+		.arg1 = (receiver->mailbox.recv_sender << 16) | receiver->id,
+		.arg3 = receiver->mailbox.recv_size,
+		.arg4 = receiver->mailbox.recv_attributes};
 }
 
 /**
@@ -846,8 +846,10 @@ exit:
  * If the recipient's receive buffer is busy, it can optionally register the
  * caller to be notified when the recipient's receive buffer becomes available.
  */
-spci_return_t api_spci_msg_send(uint32_t attributes, struct vcpu *current,
-				struct vcpu **next)
+struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
+				    spci_vm_id_t receiver_vm_id, uint32_t size,
+				    uint32_t attributes, struct vcpu *current,
+				    struct vcpu **next)
 {
 	struct vm *from = current->vm;
 	struct vm *to;
@@ -857,59 +859,49 @@ spci_return_t api_spci_msg_send(uint32_t attributes, struct vcpu *current,
 	struct hf_vcpu_run_return primary_ret = {
 		.code = HF_VCPU_RUN_MESSAGE,
 	};
-	struct spci_message from_msg_replica;
-	struct spci_message *to_msg;
-	const struct spci_message *from_msg;
+	const void *from_msg;
 
-	uint32_t size;
-
-	int64_t ret;
+	struct spci_value ret;
 	bool notify = (attributes & SPCI_MSG_SEND_NOTIFY_MASK) ==
 		      SPCI_MSG_SEND_NOTIFY;
 
+	/* Ensure sender VM ID corresponds to the current VM. */
+	if (sender_vm_id != from->id) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/* Disallow reflexive requests as this suggests an error in the VM. */
+	if (receiver_vm_id == from->id) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/* Limit the size of transfer. */
+	if (size > SPCI_MSG_PAYLOAD_MAX) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
 	/*
-	 * Check that the sender has configured its send buffer. Copy the
-	 * message header. If the tx mailbox at from_msg is configured (i.e.
-	 * from_msg != NULL) then it can be safely accessed after releasing the
-	 * lock since the tx mailbox address can only be configured once.
+	 * Check that the sender has configured its send buffer. If the tx
+	 * mailbox at from_msg is configured (i.e. from_msg != NULL) then it can
+	 * be safely accessed after releasing the lock since the tx mailbox
+	 * address can only be configured once.
 	 */
 	sl_lock(&from->lock);
 	from_msg = from->mailbox.send;
 	sl_unlock(&from->lock);
 
 	if (from_msg == NULL) {
-		return SPCI_INVALID_PARAMETERS;
+		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	/*
-	 * Note that the payload is not copied when the message header is.
-	 */
-	from_msg_replica = *from_msg;
-
-	/* Ensure source VM id corresponds to the current VM. */
-	if (from_msg_replica.source_vm_id != from->id) {
-		return SPCI_INVALID_PARAMETERS;
-	}
-
-	size = from_msg_replica.length;
-	/* Limit the size of transfer. */
-	if (size > SPCI_MSG_PAYLOAD_MAX) {
-		return SPCI_INVALID_PARAMETERS;
-	}
-
-	/* Disallow reflexive requests as this suggests an error in the VM. */
-	if (from_msg_replica.target_vm_id == from->id) {
-		return SPCI_INVALID_PARAMETERS;
-	}
-
-	/* Ensure the target VM exists. */
-	to = vm_find(from_msg_replica.target_vm_id);
+	/* Ensure the receiver VM exists. */
+	to = vm_find(receiver_vm_id);
 	if (to == NULL) {
-		return SPCI_INVALID_PARAMETERS;
+		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
 	/*
-	 * Hf needs to hold the lock on <to> before the mailbox state is
+	 * Hafnium needs to hold the lock on <to> before the mailbox state is
 	 * checked. The lock on <to> must be held until the information is
 	 * copied to <to> Rx buffer. Since in
 	 * spci_msg_handle_architected_message we may call api_spci_share_memory
@@ -921,13 +913,12 @@ spci_return_t api_spci_msg_send(uint32_t attributes, struct vcpu *current,
 	if (to->mailbox.state != MAILBOX_STATE_EMPTY ||
 	    to->mailbox.recv == NULL) {
 		/*
-		 * Fail if the target isn't currently ready to receive data,
+		 * Fail if the receiver isn't currently ready to receive data,
 		 * setting up for notification if requested.
 		 */
 		if (notify) {
 			struct wait_entry *entry =
-				&current->vm->wait_entries
-					 [from_msg_replica.target_vm_id];
+				&from->wait_entries[receiver_vm_id];
 
 			/* Append waiter only if it's not there yet. */
 			if (list_empty(&entry->wait_links)) {
@@ -936,72 +927,68 @@ spci_return_t api_spci_msg_send(uint32_t attributes, struct vcpu *current,
 			}
 		}
 
-		ret = SPCI_BUSY;
+		ret = spci_error(SPCI_BUSY);
 		goto out;
 	}
 
-	to_msg = to->mailbox.recv;
-
-	/* Handle architected messages. */
-	if ((from_msg_replica.flags & SPCI_MESSAGE_IMPDEF_MASK) !=
-	    SPCI_MESSAGE_IMPDEF) {
+	/* Handle legacy memory sharing messages. */
+	if ((attributes & SPCI_MSG_SEND_LEGACY_MEMORY_MASK) ==
+	    SPCI_MSG_SEND_LEGACY_MEMORY) {
 		/*
 		 * Buffer holding the internal copy of the shared memory
 		 * regions.
 		 */
-		uint8_t *message_buffer = cpu_get_buffer(current->cpu->id);
+		struct spci_architected_message_header
+			*architected_message_replica =
+				(struct spci_architected_message_header *)
+					cpu_get_buffer(current->cpu->id);
 		uint32_t message_buffer_size =
 			cpu_get_buffer_size(current->cpu->id);
 
 		struct spci_architected_message_header *architected_header =
-			spci_get_architected_message_header(from->mailbox.send);
+			(struct spci_architected_message_header *)from_msg;
 
-		const struct spci_architected_message_header
-			*architected_message_replica;
-
-		if (from_msg_replica.length > message_buffer_size) {
-			ret = SPCI_INVALID_PARAMETERS;
+		if (size > message_buffer_size) {
+			ret = spci_error(SPCI_INVALID_PARAMETERS);
 			goto out;
 		}
 
-		if (from_msg_replica.length <
-		    sizeof(struct spci_architected_message_header)) {
-			ret = SPCI_INVALID_PARAMETERS;
+		if (size < sizeof(struct spci_architected_message_header)) {
+			ret = spci_error(SPCI_INVALID_PARAMETERS);
 			goto out;
 		}
 
-		/* Copy the architected message into an internal buffer. */
-		memcpy_s(message_buffer, message_buffer_size,
-			 architected_header, from_msg_replica.length);
-
-		architected_message_replica =
-			(struct spci_architected_message_header *)
-				message_buffer;
+		/* Copy the architected message into the internal buffer. */
+		memcpy_s(architected_message_replica, message_buffer_size,
+			 architected_header, size);
 
 		/*
-		 * Note that message_buffer is passed as the third parameter to
-		 * spci_msg_handle_architected_message. The execution flow
-		 * commencing at spci_msg_handle_architected_message will make
-		 * several accesses to fields in message_buffer. The memory area
-		 * message_buffer must be exclusively owned by Hf so that TOCTOU
-		 * issues do not arise.
+		 * Note that architected_message_replica is passed as the third
+		 * parameter to spci_msg_handle_architected_message. The
+		 * execution flow commencing at
+		 * spci_msg_handle_architected_message will make several
+		 * accesses to fields in architected_message_replica. The memory
+		 * area architected_message_replica must be exclusively owned by
+		 * Hafnium so that TOCTOU issues do not arise.
 		 */
 		ret = spci_msg_handle_architected_message(
 			vm_from_to_lock.vm1, vm_from_to_lock.vm2,
-			architected_message_replica, &from_msg_replica, to_msg);
+			architected_message_replica, size);
 
-		if (ret != SPCI_SUCCESS) {
+		if (ret.func != SPCI_SUCCESS_32) {
 			goto out;
 		}
 	} else {
 		/* Copy data. */
-		memcpy_s(to_msg->payload, SPCI_MSG_PAYLOAD_MAX,
-			 from->mailbox.send->payload, size);
-		*to_msg = from_msg_replica;
+		memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX, from_msg,
+			 size);
+		to->mailbox.recv_size = size;
+		to->mailbox.recv_sender = sender_vm_id;
+		to->mailbox.recv_attributes = 0;
+		ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 	}
 
 	primary_ret.message.vm_id = to->id;
-	ret = SPCI_SUCCESS;
 
 	/* Messages for the primary VM are delivered directly. */
 	if (to->id == HF_PRIMARY_VM_ID) {
@@ -1429,11 +1416,10 @@ out:
  *     the request.
  *  Success is indicated by SPCI_SUCCESS.
  */
-spci_return_t api_spci_share_memory(struct vm_locked to_locked,
-				    struct vm_locked from_locked,
-				    struct spci_memory_region *memory_region,
-				    uint32_t memory_to_attributes,
-				    enum spci_memory_share share)
+struct spci_value api_spci_share_memory(
+	struct vm_locked to_locked, struct vm_locked from_locked,
+	struct spci_memory_region *memory_region, uint32_t memory_to_attributes,
+	enum spci_memory_share share)
 {
 	struct vm *to = to_locked.vm;
 	struct vm *from = from_locked.vm;
@@ -1441,7 +1427,7 @@ spci_return_t api_spci_share_memory(struct vm_locked to_locked,
 	int from_mode;
 	int to_mode;
 	struct mpool local_page_pool;
-	int64_t ret;
+	struct spci_value ret;
 	paddr_t pa_begin;
 	paddr_t pa_end;
 	ipaddr_t begin;
@@ -1451,7 +1437,7 @@ spci_return_t api_spci_share_memory(struct vm_locked to_locked,
 
 	/* Disallow reflexive shares as this suggests an error in the VM. */
 	if (to == from) {
-		return SPCI_INVALID_PARAMETERS;
+		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -1475,7 +1461,7 @@ spci_return_t api_spci_share_memory(struct vm_locked to_locked,
 	if (!spci_msg_check_transition(to, from, share, &orig_from_mode, begin,
 				       end, memory_to_attributes, &from_mode,
 				       &to_mode)) {
-		return SPCI_INVALID_PARAMETERS;
+		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
 	pa_begin = pa_from_ipa(begin);
@@ -1487,7 +1473,7 @@ spci_return_t api_spci_share_memory(struct vm_locked to_locked,
 	 */
 	if (!mm_vm_identity_map(&from->ptable, pa_begin, pa_end, from_mode,
 				NULL, &local_page_pool)) {
-		ret = SPCI_NO_MEMORY;
+		ret = spci_error(SPCI_NO_MEMORY);
 		goto out;
 	}
 
@@ -1498,7 +1484,7 @@ spci_return_t api_spci_share_memory(struct vm_locked to_locked,
 		/* Recover any memory consumed in failed mapping. */
 		mm_vm_defrag(&from->ptable, &local_page_pool);
 
-		ret = SPCI_NO_MEMORY;
+		ret = spci_error(SPCI_NO_MEMORY);
 
 		CHECK(mm_vm_identity_map(&from->ptable, pa_begin, pa_end,
 					 orig_from_mode, NULL,
@@ -1507,10 +1493,9 @@ spci_return_t api_spci_share_memory(struct vm_locked to_locked,
 		goto out;
 	}
 
-	ret = SPCI_SUCCESS;
+	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 
 out:
-
 	mpool_fini(&local_page_pool);
 
 	return ret;

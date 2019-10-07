@@ -39,11 +39,11 @@ TEST(spci, msg_send)
 	SERVICE_SELECT(SERVICE_VM0, "spci_check", mb.send);
 
 	/* Set the payload, init the message header and send the message. */
-	memcpy_s(mb.send->payload, SPCI_MSG_PAYLOAD_MAX, message,
-		 sizeof(message));
-	spci_message_init(mb.send, sizeof(message), SERVICE_VM0,
-			  HF_PRIMARY_VM_ID);
-	EXPECT_EQ(spci_msg_send(0), 0);
+	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
+	EXPECT_EQ(
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
+			.func,
+		SPCI_SUCCESS_32);
 
 	run_res = hf_vcpu_run(SERVICE_VM0, 0);
 	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
@@ -60,10 +60,10 @@ TEST(spci, msg_send_spoof)
 	SERVICE_SELECT(SERVICE_VM0, "spci_check", mb.send);
 
 	/* Set the payload, init the message header and send the message. */
-	memcpy_s(mb.send->payload, SPCI_MSG_PAYLOAD_MAX, message,
-		 sizeof(message));
-	spci_message_init(mb.send, sizeof(message), SERVICE_VM0, SERVICE_VM1);
-	EXPECT_EQ(spci_msg_send(0), SPCI_INVALID_PARAMETERS);
+	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
+	EXPECT_SPCI_ERROR(
+		spci_msg_send(SERVICE_VM1, SERVICE_VM0, sizeof(message), 0),
+		SPCI_INVALID_PARAMETERS);
 }
 
 /**
@@ -76,10 +76,10 @@ TEST(spci, spci_invalid_destination_id)
 
 	SERVICE_SELECT(SERVICE_VM0, "spci_check", mb.send);
 	/* Set the payload, init the message header and send the message. */
-	memcpy_s(mb.send->payload, SPCI_MSG_PAYLOAD_MAX, message,
-		 sizeof(message));
-	spci_message_init(mb.send, sizeof(message), -1, HF_PRIMARY_VM_ID);
-	EXPECT_EQ(spci_msg_send(0), SPCI_INVALID_PARAMETERS);
+	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
+	EXPECT_SPCI_ERROR(
+		spci_msg_send(HF_PRIMARY_VM_ID, -1, sizeof(message), 0),
+		SPCI_INVALID_PARAMETERS);
 }
 
 /**
@@ -94,12 +94,10 @@ TEST(spci, spci_incorrect_length)
 	SERVICE_SELECT(SERVICE_VM0, "spci_length", mb.send);
 
 	/* Send the message and compare if truncated. */
-	memcpy_s(mb.send->payload, SPCI_MSG_PAYLOAD_MAX, message,
-		 sizeof(message));
+	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
 	/* Hard code incorrect length. */
-	spci_message_init(mb.send, 16, SERVICE_VM0, HF_PRIMARY_VM_ID);
-
-	EXPECT_EQ(spci_msg_send(0), SPCI_SUCCESS);
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, 16, 0).func,
+		  SPCI_SUCCESS_32);
 	run_res = hf_vcpu_run(SERVICE_VM0, 0);
 	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
 }
@@ -112,11 +110,11 @@ TEST(spci, spci_large_message)
 	const char message[] = "fail to send";
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	memcpy_s(mb.send->payload, SPCI_MSG_PAYLOAD_MAX, message,
-		 sizeof(message));
+	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
 	/* Send a message that is larger than the mailbox supports (4KB). */
-	spci_message_init(mb.send, 4 * 1024, SERVICE_VM0, HF_PRIMARY_VM_ID);
-	EXPECT_EQ(spci_msg_send(0), SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, 4 * 1024 + 1, 0),
+		SPCI_INVALID_PARAMETERS);
 }
 
 /**

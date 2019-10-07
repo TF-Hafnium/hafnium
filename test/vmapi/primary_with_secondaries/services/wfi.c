@@ -48,10 +48,8 @@ TEST_SERVICE(wfi)
 		interrupt_wait();
 	}
 
-	memcpy_s(SERVICE_SEND_BUFFER()->payload, SPCI_MSG_PAYLOAD_MAX, message,
+	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, message,
 		 sizeof(message));
-	spci_message_init(SERVICE_SEND_BUFFER(), sizeof(message),
-			  HF_PRIMARY_VM_ID, hf_vm_get_id());
 
-	spci_msg_send(0);
+	spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(message), 0);
 }

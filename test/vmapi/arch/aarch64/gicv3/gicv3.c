@@ -34,8 +34,8 @@ alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];
 hf_ipaddr_t send_page_addr = (hf_ipaddr_t)send_page;
 hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 
-struct spci_message *send_buffer = (struct spci_message *)send_page;
-struct spci_message *recv_buffer = (struct spci_message *)recv_page;
+void *send_buffer = send_page;
+void *recv_buffer = recv_page;
 
 volatile uint32_t last_interrupt_id = 0;
 

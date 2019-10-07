@@ -21,24 +21,12 @@
 
 #include "hftest.h"
 #include "primary_with_secondary.h"
+#include "util.h"
 
 TEST_SERVICE(spci_check)
 {
-	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
 	const char message[] = "spci_msg_send";
-	struct spci_message expected_message = {
-		.flags = SPCI_MESSAGE_IMPDEF_MASK,
-		.length = sizeof(message),
-		.target_vm_id = hf_vm_get_id(),
-		.source_vm_id = HF_PRIMARY_VM_ID,
-
-		/*
-		 * TODO: Padding fields may be set to MBZ in the next SPCI spec
-		 * versions.
-		 */
-		.reserved_1 = 0,
-		.reserved_2 = 0,
-	};
 
 	/* Wait for single message to be sent by the primary VM. */
 	struct spci_value ret = spci_msg_wait();
@@ -49,18 +37,16 @@ TEST_SERVICE(spci_check)
 	EXPECT_EQ(spci_msg_send_size(ret), sizeof(message));
 	EXPECT_EQ(spci_msg_send_receiver(ret), hf_vm_get_id());
 	EXPECT_EQ(spci_msg_send_sender(ret), HF_PRIMARY_VM_ID);
-	EXPECT_EQ(memcmp(recv_buf, &expected_message, sizeof(expected_message)),
-		  0);
 
 	/* Ensure that the payload was correctly transmitted. */
-	EXPECT_EQ(memcmp(recv_buf->payload, message, sizeof(message)), 0);
+	EXPECT_EQ(memcmp(recv_buf, message, sizeof(message)), 0);
 
 	spci_yield();
 }
 
 TEST_SERVICE(spci_length)
 {
-	struct spci_message *recv_buf = SERVICE_RECV_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
 	const char message[] = "this should be truncated";
 
 	/* Wait for single message to be sent by the primary VM. */
@@ -72,9 +58,8 @@ TEST_SERVICE(spci_length)
 	EXPECT_EQ(16, spci_msg_send_size(ret));
 
 	/* Check only part of the message is sent correctly. */
-	EXPECT_NE(memcmp(recv_buf->payload, message, sizeof(message)), 0);
-	EXPECT_EQ(memcmp(recv_buf->payload, message, spci_msg_send_size(ret)),
-		  0);
+	EXPECT_NE(memcmp(recv_buf, message, sizeof(message)), 0);
+	EXPECT_EQ(memcmp(recv_buf, message, spci_msg_send_size(ret)), 0);
 
 	spci_yield();
 }
@@ -84,8 +69,7 @@ TEST_SERVICE(spci_recv_non_blocking)
 	/* Wait for single message to be sent by the primary VM. */
 	struct spci_value ret = spci_msg_poll();
 
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg1, SPCI_RETRY);
+	EXPECT_SPCI_ERROR(ret, SPCI_RETRY);
 
 	spci_yield();
 }

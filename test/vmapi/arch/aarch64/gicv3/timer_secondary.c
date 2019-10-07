@@ -49,11 +49,11 @@ static void timer_busywait_secondary()
 	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
-	memcpy_s(send_buffer->payload, SPCI_MSG_PAYLOAD_MAX, message,
-		 sizeof(message));
-	spci_message_init(send_buffer, sizeof(message), SERVICE_VM0,
-			  HF_PRIMARY_VM_ID);
-	EXPECT_EQ(spci_msg_send(0), 0);
+	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
+	EXPECT_EQ(
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
+			.func,
+		SPCI_SUCCESS_32);
 
 	/*
 	 * Let the secondary handle the message and set the timer. It will loop
@@ -75,7 +75,7 @@ static void timer_busywait_secondary()
 	run_res = hf_vcpu_run(SERVICE_VM0, 0);
 	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
 	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
-	EXPECT_EQ(memcmp(recv_buffer->payload, expected_response,
+	EXPECT_EQ(memcmp(recv_buffer, expected_response,
 			 sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
@@ -108,11 +108,11 @@ static void timer_secondary(const char message[],
 	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
-	memcpy_s(send_buffer->payload, SPCI_MSG_PAYLOAD_MAX, message,
-		 message_length);
-	spci_message_init(send_buffer, message_length, SERVICE_VM0,
-			  HF_PRIMARY_VM_ID);
-	EXPECT_EQ(spci_msg_send(0), 0);
+	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, message_length);
+	EXPECT_EQ(
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, message_length, 0)
+			.func,
+		SPCI_SUCCESS_32);
 
 	/* Let the secondary handle the message and set the timer. */
 	last_interrupt_id = 0;
@@ -173,7 +173,7 @@ static void timer_secondary(const char message[],
 	/* Once we wake it up it should get the timer interrupt and respond. */
 	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
 	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
-	EXPECT_EQ(memcmp(recv_buffer->payload, expected_response,
+	EXPECT_EQ(memcmp(recv_buffer, expected_response,
 			 sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
@@ -261,11 +261,11 @@ TEST(timer_secondary, wfi_very_long)
 	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
-	memcpy_s(send_buffer->payload, SPCI_MSG_PAYLOAD_MAX, message,
-		 message_length);
-	spci_message_init(send_buffer, message_length, SERVICE_VM0,
-			  HF_PRIMARY_VM_ID);
-	EXPECT_EQ(spci_msg_send(0), 0);
+	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, message_length);
+	EXPECT_EQ(
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, message_length, 0)
+			.func,
+		SPCI_SUCCESS_32);
 
 	/*
 	 * Let the secondary handle the message and set the timer.

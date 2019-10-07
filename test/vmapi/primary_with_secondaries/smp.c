@@ -48,7 +48,7 @@ TEST(smp, two_vcpus)
 	run_res = hf_vcpu_run(SERVICE_VM2, 1);
 	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
 	EXPECT_EQ(run_res.message.size, sizeof(expected_response_1));
-	EXPECT_EQ(memcmp(mb.recv->payload, expected_response_1,
+	EXPECT_EQ(memcmp(mb.recv, expected_response_1,
 			 sizeof(expected_response_1)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
@@ -58,7 +58,7 @@ TEST(smp, two_vcpus)
 	run_res = hf_vcpu_run(SERVICE_VM2, 0);
 	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
 	EXPECT_EQ(run_res.message.size, sizeof(expected_response_0));
-	EXPECT_EQ(memcmp(mb.recv->payload, expected_response_0,
+	EXPECT_EQ(memcmp(mb.recv, expected_response_0,
 			 sizeof(expected_response_0)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);

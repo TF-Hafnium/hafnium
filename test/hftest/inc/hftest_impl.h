@@ -140,8 +140,8 @@ struct hftest_context {
 	const struct fdt_header *fdt;
 
 	/* These are used in services. */
-	struct spci_message *send;
-	struct spci_message *recv;
+	void *send;
+	void *recv;
 	size_t memory_size;
 };
 
@@ -291,12 +291,12 @@ union hftest_any {
 		ASSERT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);             \
                                                                               \
 		/* Send the selected service to run and let it be handled. */ \
-		memcpy_s(send_buffer->payload, SPCI_MSG_PAYLOAD_MAX, service, \
+		memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, service,          \
 			 msg_length);                                         \
-		spci_message_init(send_buffer, msg_length, vm_id,             \
-				  hf_vm_get_id());                            \
                                                                               \
-		ASSERT_EQ(spci_msg_send(0), 0);                               \
+		ASSERT_EQ(spci_msg_send(hf_vm_get_id(), vm_id, msg_length, 0) \
+				  .func,                                      \
+			  SPCI_SUCCESS_32);                                   \
 		run_res = hf_vcpu_run(vm_id, 0);                              \
 		ASSERT_EQ(run_res.code, HF_VCPU_RUN_YIELD);                   \
 	} while (0)

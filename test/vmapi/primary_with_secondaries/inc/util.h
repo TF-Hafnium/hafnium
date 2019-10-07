@@ -18,9 +18,15 @@
 
 #include "vmapi/hf/spci.h"
 
+#define EXPECT_SPCI_ERROR(value, spci_error)          \
+	do {                                          \
+		EXPECT_EQ(value.func, SPCI_ERROR_32); \
+		EXPECT_EQ(value.arg1, spci_error);    \
+	} while (0)
+
 struct mailbox_buffers {
-	struct spci_message *send;
-	struct spci_message *recv;
+	void *send;
+	void *recv;
 };
 
 struct mailbox_buffers set_up_mailbox(void);

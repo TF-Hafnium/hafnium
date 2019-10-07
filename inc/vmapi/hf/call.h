@@ -115,14 +115,26 @@ static inline int64_t hf_vm_configure(hf_ipaddr_t send, hf_ipaddr_t recv)
  * If the recipient's receive buffer is busy, it can optionally register the
  * caller to be notified when the recipient's receive buffer becomes available.
  *
- * Returns SPCI_SUCCESS if the message is sent, an error code otherwise:
- *  - INVALID_PARAMETER: one or more of the parameters do not conform.
+ * Attributes may include:
+ *  - SPCI_MSG_SEND_NOTIFY, to notify the caller when it should try again.
+ *  - SPCI_MSG_SEND_LEGACY_MEMORY, to send a legacy architected memory sharing
+ *    message.
+ *
+ * Returns SPCI_SUCCESS if the message is sent, or an error code otherwise:
+ *  - INVALID_PARAMETERS: one or more of the parameters do not conform.
  *  - BUSY: the message could not be delivered either because the mailbox
- *            was full or the target VM does not yet exist.
+ *    was full or the target VM is not yet set up.
  */
-static inline int64_t spci_msg_send(uint32_t attributes)
+static inline struct spci_value spci_msg_send(spci_vm_id_t sender_vm_id,
+					      spci_vm_id_t target_vm_id,
+					      uint32_t size,
+					      uint32_t attributes)
 {
-	return hf_call(SPCI_MSG_SEND_32, attributes, 0, 0);
+	return spci_call((struct spci_value){
+		.func = SPCI_MSG_SEND_32,
+		.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id,
+		.arg3 = size,
+		.arg4 = attributes});
 }
 
 /**

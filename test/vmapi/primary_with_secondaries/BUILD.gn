@@ -38,11 +38,21 @@ vm_kernel("primary_with_secondaries_test_vm") {
     "spci.c",
   ]
 
-  sources += [ "util.c" ]
-
   deps = [
+    ":util",
     "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
+  ]
+}
+
+source_set("util") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+  ]
+  sources = [
+    "util.c",
   ]
 }
 

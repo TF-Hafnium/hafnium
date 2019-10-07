@@ -158,7 +158,6 @@ executable("unit_tests") {
     "manifest_test.cc",
     "mm_test.cc",
     "mpool_test.cc",
-    "spci_test.cc",
     "string_test.cc",
   ]
   sources += [ "layout_fake.c" ]

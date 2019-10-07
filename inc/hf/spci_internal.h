@@ -68,11 +68,11 @@ static inline struct spci_value spci_error(uint64_t error_code)
 	return (struct spci_value){.func = SPCI_ERROR_32, .arg1 = error_code};
 }
 
-spci_return_t spci_msg_handle_architected_message(
+struct spci_value spci_msg_handle_architected_message(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	const struct spci_architected_message_header
 		*architected_message_replica,
-	struct spci_message *from_msg_replica, struct spci_message *to_msg);
+	uint32_t size);
 
 bool spci_msg_check_transition(struct vm *to, struct vm *from,
 			       enum spci_memory_share share,

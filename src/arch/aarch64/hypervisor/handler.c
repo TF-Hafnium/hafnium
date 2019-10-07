@@ -324,7 +324,11 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 
 		return true;
 	case SPCI_MSG_SEND_32:
-		args->func = api_spci_msg_send(args->arg1, current(), next);
+		*args = api_spci_msg_send(spci_msg_send_sender(*args),
+					  spci_msg_send_receiver(*args),
+					  spci_msg_send_size(*args),
+					  spci_msg_send_attributes(*args),
+					  current(), next);
 		return true;
 	case SPCI_MSG_WAIT_32:
 		*args = api_spci_msg_recv(true, current(), next);

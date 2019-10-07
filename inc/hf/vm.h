@@ -60,8 +60,17 @@ struct wait_entry {
 
 struct mailbox {
 	enum mailbox_state state;
-	struct spci_message *recv;
-	const struct spci_message *send;
+	void *recv;
+	const void *send;
+
+	/** The ID of the VM which sent the message currently in `recv`. */
+	spci_vm_id_t recv_sender;
+
+	/** The size of the message currently in `recv`. */
+	uint32_t recv_size;
+
+	/** The attributes of the message currently in `recv`. */
+	uint32_t recv_attributes;
 
 	/**
 	 * List of wait_entry structs representing VMs that want to be notified

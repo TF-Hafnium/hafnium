@@ -93,6 +93,9 @@ source_set("memory") {
     "..:config",
     "//test/hftest:hftest_config",
   ]
+  deps = [
+    "//test/vmapi/primary_with_secondaries:util",
+  ]
 
   sources = [
     "memory.c",
@@ -150,6 +153,7 @@ source_set("receive_block") {
   ]
   deps = [
     "//src/arch/aarch64:arch",
+    "//test/vmapi/primary_with_secondaries:util",
   ]
 }
 
@@ -193,6 +197,9 @@ source_set("spci_check") {
   public_configs = [
     "..:config",
     "//test/hftest:hftest_config",
+  ]
+  deps = [
+    "//test/vmapi/primary_with_secondaries:util",
   ]
 
   sources = [

@@ -95,8 +95,6 @@ noreturn void kmain(size_t memory_size)
 		}
 	}
 
-	struct spci_message *recv_msg = (struct spci_message *)recv;
-
 	/* Prepare the context. */
 
 	/* Set up the mailbox. */
@@ -104,7 +102,8 @@ noreturn void kmain(size_t memory_size)
 
 	/* Receive the name of the service to run. */
 	ret = spci_msg_wait();
-	memiter_init(&args, recv_msg->payload, spci_msg_send_size(ret));
+	ASSERT_EQ(ret.func, SPCI_MSG_SEND_32);
+	memiter_init(&args, recv, spci_msg_send_size(ret));
 	service = find_service(&args);
 	hf_mailbox_clear();
 
@@ -122,8 +121,8 @@ noreturn void kmain(size_t memory_size)
 	ctx = hftest_get_context();
 	memset_s(ctx, sizeof(*ctx), 0, sizeof(*ctx));
 	ctx->abort = abort;
-	ctx->send = (struct spci_message *)send;
-	ctx->recv = (struct spci_message *)recv;
+	ctx->send = send;
+	ctx->recv = recv;
 	ctx->memory_size = memory_size;
 
 	/* Pause so the next time cycles are given the service will be run. */

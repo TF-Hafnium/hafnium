@@ -41,12 +41,10 @@ alignas(4096) static char stack[4096];
 /** Send a message back to the primary. */
 void send_message(const char *message, uint32_t size)
 {
-	memcpy_s(SERVICE_SEND_BUFFER()->payload, SPCI_MSG_PAYLOAD_MAX, message,
-		 size);
-	spci_message_init(SERVICE_SEND_BUFFER(), size, HF_PRIMARY_VM_ID,
-			  hf_vm_get_id());
+	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, message, size);
 
-	ASSERT_EQ(spci_msg_send(0), SPCI_SUCCESS);
+	ASSERT_EQ(spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, size, 0).func,
+		  SPCI_SUCCESS_32);
 }
 
 /**

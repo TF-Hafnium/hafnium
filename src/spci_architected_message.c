@@ -23,7 +23,7 @@
  * Check if the message length and the number of memory region constituents
  * match, if the check is correct call the memory sharing routine.
  */
-static spci_return_t spci_validate_call_share_memory(
+static struct spci_value spci_validate_call_share_memory(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	struct spci_memory_region *memory_region, uint32_t memory_share_size,
 	uint32_t memory_to_attributes, enum spci_memory_share share)
@@ -38,7 +38,7 @@ static spci_return_t spci_validate_call_share_memory(
 	    sizeof(struct spci_memory_region) +
 		    (sizeof(struct spci_memory_region_constituent) *
 		     max_count)) {
-		return SPCI_INVALID_PARAMETERS;
+		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
 	return api_spci_share_memory(to_locked, from_locked, memory_region,
@@ -50,13 +50,13 @@ static spci_return_t spci_validate_call_share_memory(
  * corresponding api functions implementing the functionality requested
  * in the architected message.
  */
-spci_return_t spci_msg_handle_architected_message(
+struct spci_value spci_msg_handle_architected_message(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	const struct spci_architected_message_header
 		*architected_message_replica,
-	struct spci_message *from_msg_replica, struct spci_message *to_msg)
+	uint32_t size)
 {
-	int64_t ret;
+	struct spci_value ret;
 	struct spci_memory_region *memory_region;
 	uint32_t to_mode;
 	uint32_t message_type;
@@ -70,8 +70,7 @@ spci_return_t spci_msg_handle_architected_message(
 					architected_message_replica->payload;
 
 		memory_share_size =
-			from_msg_replica->length -
-			sizeof(struct spci_architected_message_header);
+			size - sizeof(struct spci_architected_message_header);
 
 		/* TODO: Add memory attributes. */
 		to_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
@@ -87,8 +86,7 @@ spci_return_t spci_msg_handle_architected_message(
 					architected_message_replica->payload;
 
 		memory_share_size =
-			from_msg_replica->length -
-			sizeof(struct spci_architected_message_header);
+			size - sizeof(struct spci_architected_message_header);
 
 		to_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 
@@ -111,8 +109,7 @@ spci_return_t spci_msg_handle_architected_message(
 		memory_region =
 			(struct spci_memory_region *)lend_descriptor->payload;
 		memory_share_size =
-			from_msg_replica->length -
-			sizeof(struct spci_architected_message_header) -
+			size - sizeof(struct spci_architected_message_header) -
 			sizeof(struct spci_memory_lend);
 
 		to_mode = spci_memory_attrs_to_mode(borrower_attributes);
@@ -126,7 +123,7 @@ spci_return_t spci_msg_handle_architected_message(
 
 	default:
 		dlog("Invalid memory sharing message.\n");
-		return SPCI_INVALID_PARAMETERS;
+		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
 	/* Copy data to the destination Rx. */
@@ -138,11 +135,14 @@ spci_return_t spci_msg_handle_architected_message(
 	 * in the destination Rx buffer. This mechanism will be defined at the
 	 * spec level.
 	 */
-	if (ret == SPCI_SUCCESS) {
-		memcpy_s(to_msg->payload, SPCI_MSG_PAYLOAD_MAX,
-			 architected_message_replica, from_msg_replica->length);
+	if (ret.func == SPCI_SUCCESS_32) {
+		memcpy_s(to_locked.vm->mailbox.recv, SPCI_MSG_PAYLOAD_MAX,
+			 architected_message_replica, size);
+		to_locked.vm->mailbox.recv_size = size;
+		to_locked.vm->mailbox.recv_sender = from_locked.vm->id;
+		to_locked.vm->mailbox.recv_attributes =
+			SPCI_MSG_SEND_LEGACY_MEMORY;
 	}
-	*to_msg = *from_msg_replica;
 
 	return ret;
 }
