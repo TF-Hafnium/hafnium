@@ -269,10 +269,10 @@ static void hf_deliver_message(spci_vm_id_t vm_id)
  * and then queueing it for delivery to the appropriate socket.
  */
 static void hf_handle_message(struct hf_vm *sender, size_t len,
-			      const struct spci_message *message)
+			      const void *message)
 {
 	struct hf_sock *hsock;
-	const struct hf_msg_hdr *hdr = (struct hf_msg_hdr *)message->payload;
+	const struct hf_msg_hdr *hdr = (struct hf_msg_hdr *)message;
 	struct sk_buff *skb;
 	int err;
 
@@ -557,25 +557,33 @@ exit:
 static int hf_send_skb(struct sk_buff *skb)
 {
 	unsigned long flags;
-	int64_t ret;
+	struct spci_value ret;
 	struct hf_sock *hsock = hsock_from_sk(skb->sk);
 	struct hf_vm *vm = hsock->peer_vm;
-	struct spci_message *message = page_address(hf_send_page);
+	void *message = page_address(hf_send_page);
 
 	/*
 	 * Call Hafnium under the send lock so that we serialize the use of the
 	 * global send buffer.
 	 */
 	spin_lock_irqsave(&hf_send_lock, flags);
-	memcpy(message->payload, skb->data, skb->len);
-	spci_message_init(message, skb->len,
-				    vm->id, current_vm_id);
+	memcpy(message, skb->data, skb->len);
 
-	ret = spci_msg_send(0);
+	ret = spci_msg_send(current_vm_id, vm->id, skb->len, 0);
 	spin_unlock_irqrestore(&hf_send_lock, flags);
 
-	if (ret < 0)
-		return -EAGAIN;
+	if (ret.func == SPCI_ERROR_32) {
+		switch (ret.arg1) {
+		case SPCI_INVALID_PARAMETERS:
+			return -ENXIO;
+		case SPCI_NOT_SUPPORTED:
+			return -EIO;
+		case SPCI_DENIED:
+		case SPCI_BUSY:
+		default:
+			return -EAGAIN;
+		}
+	}
 
 	/* Ensure the VM will run to pick up the message. */
 	hf_deliver_message(vm->id);
@@ -611,8 +619,7 @@ static int hf_sock_sendmsg(struct socket *sock, struct msghdr *m, size_t len)
 	int err;
 	struct hf_msg_hdr *hdr;
 	struct hf_sock *hsock = hsock_from_sk(sk);
-	size_t payload_max_len = HF_MAILBOX_SIZE - sizeof(struct spci_message)
-				 - sizeof(struct hf_msg_hdr);
+	size_t payload_max_len = HF_MAILBOX_SIZE - sizeof(struct hf_msg_hdr);
 
 	/* Check length. */
 	if (len > payload_max_len)
