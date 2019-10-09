@@ -312,12 +312,19 @@ static void smc_forwarder(const struct vcpu *vcpu, struct smc_result *ret)
 
 static bool spci_handler(struct spci_value *args, struct vcpu **next)
 {
+	/*
+	 * NOTE: When adding new methods to this handler update
+	 * api_spci_features accordingly.
+	 */
 	switch (args->func & ~SMCCC_CONVENTION_MASK) {
 	case SPCI_VERSION_32:
 		*args = api_spci_version();
 		return true;
 	case SPCI_ID_GET_32:
 		*args = api_spci_id_get(current());
+		return true;
+	case SPCI_FEATURES_32:
+		*args = api_spci_features(args->arg1);
 		return true;
 	case SPCI_YIELD_32:
 		api_yield(current(), next);

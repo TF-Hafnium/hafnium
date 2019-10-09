@@ -297,3 +297,19 @@ static inline struct spci_value spci_version(void)
 {
 	return spci_call((struct spci_value){.func = SPCI_VERSION_32});
 }
+
+/**
+ * Discovery function returning information about the implementation of optional
+ * SPCI interfaces.
+ *
+ * Returns:
+ *  - SPCI_SUCCESS in .func if the the optional interface with function_id is
+ * implemented.
+ *  - SPCI_ERROR in .func if the optional interface with function_id is not
+ * implemented.
+ */
+static inline struct spci_value spci_features(uint32_t function_id)
+{
+	return spci_call((struct spci_value){.func = SPCI_FEATURES_32,
+					     .arg1 = function_id});
+}

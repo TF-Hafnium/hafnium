@@ -66,3 +66,4 @@ struct spci_value api_spci_share_memory(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	struct spci_memory_region *memory_region, uint32_t memory_to_attributes,
 	enum spci_memory_share share);
+struct spci_value api_spci_features(uint32_t function_id);

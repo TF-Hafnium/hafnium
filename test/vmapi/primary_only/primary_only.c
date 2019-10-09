@@ -158,6 +158,99 @@ TEST(spci, spci_version)
 	EXPECT_EQ(ret.arg2, current_version);
 }
 
+/** Ensures that SPCI_FEATURES is reporting the expected interfaces. */
+TEST(spci, spci_features)
+{
+	struct spci_value ret;
+
+	ret = spci_features(SPCI_ERROR_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_SUCCESS_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_VERSION_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_FEATURES_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_ID_GET_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_YIELD_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MSG_SEND_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MSG_POLL_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MSG_WAIT_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_YIELD_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+}
+
+/**
+ * Ensures that SPCI_FEATURES returns not supported for a bogus FID or
+ * currently non-implemented interfaces.
+ */
+TEST(spci, spci_features_not_supported)
+{
+	struct spci_value ret;
+
+	ret = spci_features(0);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(0x84000000);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_INTERRUPT_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_RX_RELEASE_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_RXTX_MAP_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_RXTX_UNMAP_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_PARTITION_INFO_GET_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_RUN_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+
+	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+}
+
 /**
  * Test that floating-point operations work in the primary VM.
  */

@@ -1705,3 +1705,25 @@ int64_t api_debug_log(char c, struct vcpu *current)
 
 	return 0;
 }
+
+/**
+ * Discovery function returning information about the implementation of optional
+ * SPCI interfaces.
+ */
+struct spci_value api_spci_features(uint32_t function_id)
+{
+	switch (function_id) {
+	case SPCI_ERROR_32:
+	case SPCI_SUCCESS_32:
+	case SPCI_ID_GET_32:
+	case SPCI_YIELD_32:
+	case SPCI_VERSION_32:
+	case SPCI_FEATURES_32:
+	case SPCI_MSG_SEND_32:
+	case SPCI_MSG_POLL_32:
+	case SPCI_MSG_WAIT_32:
+		return (struct spci_value){.func = SPCI_SUCCESS_32};
+	default:
+		return spci_error(SPCI_NOT_SUPPORTED);
+	}
+}
