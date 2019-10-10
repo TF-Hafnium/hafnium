@@ -110,7 +110,7 @@ TEST_SERVICE(timer)
 			struct spci_value res = spci_msg_wait();
 
 			EXPECT_EQ(res.func, SPCI_ERROR_32);
-			EXPECT_EQ(res.arg1, SPCI_INTERRUPTED);
+			EXPECT_EQ(res.arg2, SPCI_INTERRUPTED);
 		} else {
 			/* Busy wait until the timer fires. */
 			while (!timer_fired) {

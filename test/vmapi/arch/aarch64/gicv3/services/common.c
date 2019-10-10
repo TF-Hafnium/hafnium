@@ -31,7 +31,7 @@ struct spci_value mailbox_receive_retry(void)
 	do {
 		received = spci_msg_wait();
 	} while (received.func == SPCI_ERROR_32 &&
-		 received.arg1 == SPCI_INTERRUPTED);
+		 received.arg2 == SPCI_INTERRUPTED);
 
 	return received;
 }

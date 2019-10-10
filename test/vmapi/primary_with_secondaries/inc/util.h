@@ -21,7 +21,7 @@
 #define EXPECT_SPCI_ERROR(value, spci_error)          \
 	do {                                          \
 		EXPECT_EQ(value.func, SPCI_ERROR_32); \
-		EXPECT_EQ(value.arg1, spci_error);    \
+		EXPECT_EQ(value.arg2, spci_error);    \
 	} while (0)
 
 struct mailbox_buffers {

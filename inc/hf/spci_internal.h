@@ -65,7 +65,7 @@ static inline uint32_t spci_memory_attrs_to_mode(uint32_t memory_attributes)
 
 static inline struct spci_value spci_error(uint64_t error_code)
 {
-	return (struct spci_value){.func = SPCI_ERROR_32, .arg1 = error_code};
+	return (struct spci_value){.func = SPCI_ERROR_32, .arg2 = error_code};
 }
 
 struct spci_value spci_msg_handle_architected_message(

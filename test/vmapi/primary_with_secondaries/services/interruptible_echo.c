@@ -44,7 +44,7 @@ TEST_SERVICE(interruptible_echo)
 
 		/* Retry if interrupted but made visible with the yield. */
 		while (res.func == SPCI_ERROR_32 &&
-		       res.arg1 == SPCI_INTERRUPTED) {
+		       res.arg2 == SPCI_INTERRUPTED) {
 			spci_yield();
 			res = spci_msg_wait();
 		}

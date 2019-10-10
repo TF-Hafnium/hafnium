@@ -329,10 +329,9 @@ TEST(mailbox, secondary_to_primary_notification)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message),
-				SPCI_MSG_SEND_NOTIFY)
-			  .arg1,
-		  SPCI_BUSY);
+	EXPECT_SPCI_ERROR(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0,
+					sizeof(message), SPCI_MSG_SEND_NOTIFY),
+			  SPCI_BUSY);
 
 	/* Receive a reply for the first message. */
 	run_res = hf_vcpu_run(SERVICE_VM0, 0);
