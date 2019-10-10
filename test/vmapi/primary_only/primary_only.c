@@ -155,7 +155,7 @@ TEST(spci, spci_version)
 
 	struct spci_value ret = spci_version();
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
-	EXPECT_EQ(ret.arg1, current_version);
+	EXPECT_EQ(ret.arg2, current_version);
 }
 
 /**

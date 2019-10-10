@@ -1677,7 +1677,7 @@ struct spci_value api_spci_version(void)
 
 	struct spci_value ret = {
 		.func = SPCI_SUCCESS_32,
-		.arg1 = (SPCI_VERSION_MAJOR << SPCI_VERSION_MAJOR_OFFSET) |
+		.arg2 = (SPCI_VERSION_MAJOR << SPCI_VERSION_MAJOR_OFFSET) |
 			SPCI_VERSION_MINOR};
 	return ret;
 }
