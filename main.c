@@ -573,7 +573,7 @@ static int hf_send_skb(struct sk_buff *skb)
 	spin_unlock_irqrestore(&hf_send_lock, flags);
 
 	if (ret.func == SPCI_ERROR_32) {
-		switch (ret.arg1) {
+		switch (ret.arg2) {
 		case SPCI_INVALID_PARAMETERS:
 			return -ENXIO;
 		case SPCI_NOT_SUPPORTED:
