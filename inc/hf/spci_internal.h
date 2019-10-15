@@ -34,32 +34,25 @@ struct spci_mem_transitions {
 };
 
 /* TODO: Add device attributes: GRE, cacheability, shareability. */
-static inline uint32_t spci_memory_attrs_to_mode(uint32_t memory_attributes)
+static inline uint32_t spci_memory_attrs_to_mode(uint16_t memory_attributes)
 {
 	uint32_t mode = 0;
-	uint32_t attr_value;
 
-	attr_value = spci_get_lend_access_attr(memory_attributes);
-	switch (attr_value) {
-	case SPCI_LEND_RO_NX:
-		mode |= MM_MODE_R;
+	switch (spci_get_memory_access_attr(memory_attributes)) {
+	case SPCI_MEMORY_RO_NX:
+		mode = MM_MODE_R;
 		break;
-
-	case SPCI_LEND_RO_X:
-		mode |= MM_MODE_R | MM_MODE_X;
+	case SPCI_MEMORY_RO_X:
+		mode = MM_MODE_R | MM_MODE_X;
 		break;
-
-	case SPCI_LEND_RW_NX:
-		mode |= MM_MODE_R | MM_MODE_W;
+	case SPCI_MEMORY_RW_NX:
+		mode = MM_MODE_R | MM_MODE_W;
 		break;
-
-	case SPCI_LEND_RW_X:
-		mode |= MM_MODE_R | MM_MODE_W | MM_MODE_X;
-		break;
-
-	default:
+	case SPCI_MEMORY_RW_X:
+		mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 		break;
 	}
+
 	return mode;
 }
 

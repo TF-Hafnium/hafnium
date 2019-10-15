@@ -1460,6 +1460,8 @@ struct spci_value api_spci_share_memory(
 	paddr_t pa_end;
 	ipaddr_t begin;
 	ipaddr_t end;
+	struct spci_memory_region_constituent *constituents =
+		spci_memory_region_get_constituents(memory_region);
 
 	size_t size;
 
@@ -1477,8 +1479,8 @@ struct spci_value api_spci_share_memory(
 
 	/* Obtain the single contiguous set of pages from the memory_region. */
 	/* TODO: Add support for multiple constituent regions. */
-	size = memory_region->constituents[0].page_count * PAGE_SIZE;
-	begin = ipa_init(memory_region->constituents[0].address);
+	size = constituents[0].page_count * PAGE_SIZE;
+	begin = ipa_init(constituents[0].address);
 	end = ipa_add(begin, size);
 
 	/*

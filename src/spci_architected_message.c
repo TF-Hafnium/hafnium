@@ -26,18 +26,43 @@
 static struct spci_value spci_validate_call_share_memory(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	struct spci_memory_region *memory_region, uint32_t memory_share_size,
-	uint32_t memory_to_attributes, enum spci_memory_share share)
+	enum spci_memory_share share)
 {
-	uint32_t max_count = memory_region->count;
+	uint32_t memory_to_attributes;
+	uint32_t attributes_size;
+	uint32_t constituents_size;
 
 	/*
 	 * Ensure the number of constituents are within the memory
 	 * bounds.
 	 */
-	if (memory_share_size !=
-	    sizeof(struct spci_memory_region) +
-		    (sizeof(struct spci_memory_region_constituent) *
-		     max_count)) {
+	attributes_size = sizeof(struct spci_memory_region_attributes) *
+			  memory_region->attribute_count;
+	constituents_size = sizeof(struct spci_memory_region_constituent) *
+			    memory_region->constituent_count;
+	if (memory_region->constituent_offset <
+		    sizeof(struct spci_memory_region) + attributes_size ||
+	    memory_share_size !=
+		    memory_region->constituent_offset + constituents_size) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/* We only support a single recipient. */
+	if (memory_region->attribute_count != 1) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	switch (share) {
+	case SPCI_MEMORY_DONATE:
+	case SPCI_MEMORY_LEND:
+		memory_to_attributes = spci_memory_attrs_to_mode(
+			memory_region->attributes[0].memory_attributes);
+		break;
+	case SPCI_MEMORY_RELINQUISH:
+		memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+		break;
+	default:
+		dlog("Invalid memory sharing message.\n");
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
@@ -57,74 +82,16 @@ struct spci_value spci_msg_handle_architected_message(
 	uint32_t size)
 {
 	struct spci_value ret;
-	struct spci_memory_region *memory_region;
-	uint32_t to_mode;
-	uint32_t message_type;
-	uint32_t memory_share_size;
+	struct spci_memory_region *memory_region =
+		(struct spci_memory_region *)
+			architected_message_replica->payload;
+	uint32_t message_type = architected_message_replica->type;
+	uint32_t memory_share_size =
+		size - sizeof(struct spci_architected_message_header);
 
-	message_type = architected_message_replica->type;
-
-	switch (message_type) {
-	case SPCI_MEMORY_DONATE:
-		memory_region = (struct spci_memory_region *)
-					architected_message_replica->payload;
-
-		memory_share_size =
-			size - sizeof(struct spci_architected_message_header);
-
-		/* TODO: Add memory attributes. */
-		to_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
-
-		ret = spci_validate_call_share_memory(
-			to_locked, from_locked, memory_region,
-			memory_share_size, to_mode, message_type);
-		break;
-
-	case SPCI_MEMORY_RELINQUISH:
-
-		memory_region = (struct spci_memory_region *)
-					architected_message_replica->payload;
-
-		memory_share_size =
-			size - sizeof(struct spci_architected_message_header);
-
-		to_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
-
-		ret = spci_validate_call_share_memory(
-			to_locked, from_locked, memory_region,
-			memory_share_size, to_mode, message_type);
-
-		break;
-
-	case SPCI_MEMORY_LEND: {
-		/* TODO: Add support for lend exclusive. */
-		struct spci_memory_lend *lend_descriptor;
-		uint32_t borrower_attributes;
-
-		lend_descriptor = (struct spci_memory_lend *)
-					  architected_message_replica->payload;
-
-		borrower_attributes = lend_descriptor->borrower_attributes;
-
-		memory_region =
-			(struct spci_memory_region *)lend_descriptor->payload;
-		memory_share_size =
-			size - sizeof(struct spci_architected_message_header) -
-			sizeof(struct spci_memory_lend);
-
-		to_mode = spci_memory_attrs_to_mode(borrower_attributes);
-
-		ret = spci_validate_call_share_memory(
-			to_locked, from_locked, memory_region,
-			memory_share_size, to_mode, message_type);
-
-		break;
-	}
-
-	default:
-		dlog("Invalid memory sharing message.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
-	}
+	ret = spci_validate_call_share_memory(to_locked, from_locked,
+					      memory_region, memory_share_size,
+					      message_type);
 
 	/* Copy data to the destination Rx. */
 	/*
