@@ -855,7 +855,7 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	struct vm *from = current->vm;
 	struct vm *to;
 
-	struct two_vm_locked vm_from_to_lock;
+	struct two_vm_locked vm_to_from_lock;
 
 	struct hf_vcpu_run_return primary_ret = {
 		.code = HF_VCPU_RUN_MESSAGE,
@@ -909,7 +909,7 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	 * which must hold the <from> lock, we must hold the <from> lock at this
 	 * point to prevent a deadlock scenario.
 	 */
-	vm_from_to_lock = vm_lock_both(to, from);
+	vm_to_from_lock = vm_lock_both(to, from);
 
 	if (to->mailbox.state != MAILBOX_STATE_EMPTY ||
 	    to->mailbox.recv == NULL) {
@@ -973,7 +973,7 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 		 * Hafnium so that TOCTOU issues do not arise.
 		 */
 		ret = spci_msg_handle_architected_message(
-			vm_from_to_lock.vm1, vm_from_to_lock.vm2,
+			vm_to_from_lock.vm1, vm_to_from_lock.vm2,
 			architected_message_replica, size);
 
 		if (ret.func != SPCI_SUCCESS_32) {
@@ -1014,8 +1014,8 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	}
 
 out:
-	vm_unlock(&vm_from_to_lock.vm1);
-	vm_unlock(&vm_from_to_lock.vm2);
+	vm_unlock(&vm_to_from_lock.vm1);
+	vm_unlock(&vm_to_from_lock.vm2);
 
 	return ret;
 }
