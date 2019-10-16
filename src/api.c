@@ -841,6 +841,72 @@ exit:
 }
 
 /**
+ * Checks whether the given `to` VM's mailbox is currently busy, and optionally
+ * registers the `from` VM to be notified when it becomes available.
+ */
+static bool msg_receiver_busy(struct vm_locked to, struct vm_locked from,
+			      bool notify)
+{
+	if (to.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
+	    to.vm->mailbox.recv == NULL) {
+		/*
+		 * Fail if the receiver isn't currently ready to receive data,
+		 * setting up for notification if requested.
+		 */
+		if (notify) {
+			struct wait_entry *entry =
+				&from.vm->wait_entries[to.vm->id];
+
+			/* Append waiter only if it's not there yet. */
+			if (list_empty(&entry->wait_links)) {
+				list_append(&to.vm->mailbox.waiter_list,
+					    &entry->wait_links);
+			}
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Notifies the `to` VM about the message currently in its mailbox, possibly
+ * with the help of the primary VM.
+ */
+static void deliver_msg(struct vm_locked to, struct vm_locked from,
+			uint32_t size, struct vcpu *current, struct vcpu **next)
+{
+	struct hf_vcpu_run_return primary_ret = {
+		.code = HF_VCPU_RUN_MESSAGE,
+	};
+
+	primary_ret.message.vm_id = to.vm->id;
+
+	/* Messages for the primary VM are delivered directly. */
+	if (to.vm->id == HF_PRIMARY_VM_ID) {
+		/*
+		 * Only tell the primary VM the size if the message is for it,
+		 * to avoid leaking data about messages for other VMs.
+		 */
+		primary_ret.message.size = size;
+
+		to.vm->mailbox.state = MAILBOX_STATE_READ;
+		*next = api_switch_to_primary(current, primary_ret,
+					      VCPU_STATE_READY);
+		return;
+	}
+
+	to.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+
+	/* Return to the primary VM directly or with a switch. */
+	if (from.vm->id != HF_PRIMARY_VM_ID) {
+		*next = api_switch_to_primary(current, primary_ret,
+					      VCPU_STATE_READY);
+	}
+}
+
+/**
  * Copies data from the sender's send buffer to the recipient's receive buffer
  * and notifies the recipient.
  *
@@ -857,9 +923,6 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 
 	struct two_vm_locked vm_to_from_lock;
 
-	struct hf_vcpu_run_return primary_ret = {
-		.code = HF_VCPU_RUN_MESSAGE,
-	};
 	const void *from_msg;
 
 	struct spci_value ret;
@@ -911,23 +974,8 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	 */
 	vm_to_from_lock = vm_lock_both(to, from);
 
-	if (to->mailbox.state != MAILBOX_STATE_EMPTY ||
-	    to->mailbox.recv == NULL) {
-		/*
-		 * Fail if the receiver isn't currently ready to receive data,
-		 * setting up for notification if requested.
-		 */
-		if (notify) {
-			struct wait_entry *entry =
-				&from->wait_entries[receiver_vm_id];
-
-			/* Append waiter only if it's not there yet. */
-			if (list_empty(&entry->wait_links)) {
-				list_append(&to->mailbox.waiter_list,
-					    &entry->wait_links);
-			}
-		}
-
+	if (msg_receiver_busy(vm_to_from_lock.vm1, vm_to_from_lock.vm2,
+			      notify)) {
 		ret = spci_error(SPCI_BUSY);
 		goto out;
 	}
@@ -989,29 +1037,8 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 		ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 	}
 
-	primary_ret.message.vm_id = to->id;
-
-	/* Messages for the primary VM are delivered directly. */
-	if (to->id == HF_PRIMARY_VM_ID) {
-		/*
-		 * Only tell the primary VM the size if the message is for it,
-		 * to avoid leaking data about messages for other VMs.
-		 */
-		primary_ret.message.size = size;
-
-		to->mailbox.state = MAILBOX_STATE_READ;
-		*next = api_switch_to_primary(current, primary_ret,
-					      VCPU_STATE_READY);
-		goto out;
-	}
-
-	to->mailbox.state = MAILBOX_STATE_RECEIVED;
-
-	/* Return to the primary VM directly or with a switch. */
-	if (from->id != HF_PRIMARY_VM_ID) {
-		*next = api_switch_to_primary(current, primary_ret,
-					      VCPU_STATE_READY);
-	}
+	deliver_msg(vm_to_from_lock.vm1, vm_to_from_lock.vm2, size, current,
+		    next);
 
 out:
 	vm_unlock(&vm_to_from_lock.vm1);
@@ -1402,7 +1429,7 @@ out:
 	return ret;
 }
 
-/** TODO: Move function to spci_architectted_message.c. */
+/** TODO: Move function to spci_architected_message.c. */
 /**
  * Shares memory from the calling VM with another. The memory can be shared in
  * different modes.
