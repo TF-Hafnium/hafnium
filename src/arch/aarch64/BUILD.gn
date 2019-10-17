@@ -4,8 +4,14 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/BSD-3-Clause.
 
+import("args.gni")
+
 config("config") {
   include_dirs = [ "." ]
+
+  assert(secure_world == "0" || secure_world == "1",
+         "secure world set to <${secure_world}>")
+  defines = [ "SECURE_WORLD=${secure_world}" ]
 }
 
 # Implementation of the arch interface for aarch64.
