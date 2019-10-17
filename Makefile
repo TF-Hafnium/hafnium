@@ -12,7 +12,7 @@
 # By default, assume this was checked out as a submodule of the Hafnium repo
 # and that Linux was checked out along side that checkout. These paths can be
 # overridden if that assumption is incorrect.
-HAFNIUM_PATH ?= $(PWD)/../..
+HAFNIUM_PATH ?= $(CURDIR)/../..
 
 ifneq ($(KERNELRELEASE),)
 
@@ -21,7 +21,7 @@ obj-m += hafnium.o
 hafnium-y += main.o
 hafnium-y += hf_call.o
 
-ccflags-y = -I$(HAFNIUM_PATH)/inc/vmapi -I$(PWD)/inc
+ccflags-y = -I$(HAFNIUM_PATH)/inc/vmapi -I$(M)/inc
 
 else
 
@@ -31,10 +31,10 @@ CROSS_COMPILE ?= aarch64-linux-gnu-
 CHECKPATCH ?= $(KERNEL_PATH)/scripts/checkpatch.pl -q
 
 all:
-	make -C $(KERNEL_PATH) M=$(PWD) O=$(O) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
+	make -C $(KERNEL_PATH) M=$(CURDIR) O=$(O) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
 
 clean:
-	make -C $(KERNEL_PATH) M=$(PWD) O=$(O) clean
+	make -C $(KERNEL_PATH) M=$(CURDIR) O=$(O) clean
 
 checkpatch:
 	$(CHECKPATCH) -f main.c hf_call.c
