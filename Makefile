@@ -26,23 +26,23 @@ ifeq ($(HAFNIUM_HERMETIC_BUILD),true)
 
 # Need to define at least one non-default target.
 all:
-	@$(PWD)/build/run_in_container.sh make PROJECT=$(PROJECT) $@
+	@$(CURDIR)/build/run_in_container.sh make PROJECT=$(PROJECT) $@
 
 # Catch-all target.
 .DEFAULT:
-	@$(PWD)/build/run_in_container.sh make PROJECT=$(PROJECT) $@
+	@$(CURDIR)/build/run_in_container.sh make PROJECT=$(PROJECT) $@
 
 else  # HAFNIUM_HERMETIC_BUILD
 
 # Set path to prebuilts used in the build.
 UNNAME_S := $(shell uname -s | tr '[:upper:]' '[:lower:]')
-PREBUILTS := $(PWD)/prebuilts/$(UNNAME_S)-x64
+PREBUILTS := $(CURDIR)/prebuilts/$(UNNAME_S)-x64
 GN ?= $(PREBUILTS)/gn/gn
 NINJA ?= $(PREBUILTS)/ninja/ninja
 export PATH := $(PREBUILTS)/clang/bin:$(PATH)
 
 
-CHECKPATCH := $(PWD)/third_party/linux/scripts/checkpatch.pl \
+CHECKPATCH := $(CURDIR)/third_party/linux/scripts/checkpatch.pl \
 	--ignore BRACES,SPDX_LICENSE_TAG,VOLATILE,SPLIT_STRING,AVOID_EXTERNS,USE_SPINLOCK_T,NEW_TYPEDEFS,INITIALISED_STATIC,FILE_PATH_CHANGES,EMBEDDED_FUNCTION_NAME,SINGLE_STATEMENT_DO_WHILE_MACRO,MACRO_WITH_FLOW_CONTROL --quiet
 
 # Specifies the grep pattern for ignoring specific files in checkpatch.
