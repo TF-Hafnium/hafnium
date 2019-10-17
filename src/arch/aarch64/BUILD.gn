@@ -12,12 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("args.gni")
+
 config("config") {
   include_dirs = [ "." ]
 }
 
+config("secure_world") {
+  assert(secure_world == "0" || secure_world == "1",
+         "secure world set to <${secure_world}>")
+  defines = [ "SECURE_WORLD=${secure_world}" ]
+}
+
 # Implementation of the arch interface for aarch64.
 source_set("arch") {
+  public_configs = [ "//src/arch/aarch64:secure_world" ]
   sources = [
     "irq.c",
     "mm.c",

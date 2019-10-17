@@ -24,7 +24,10 @@ offset_size_header("offsets") {
 
 # Hypervisor specific code.
 source_set("hypervisor") {
-  public_configs = [ "//src/arch/aarch64:config" ]
+  public_configs = [
+    "//src/arch/aarch64:config",
+    "//src/arch/aarch64:secure_world"
+  ]
   sources = [
     "exceptions.S",
     "hypervisor_entry.S",
