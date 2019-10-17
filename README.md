@@ -22,3 +22,4 @@ More documentation is available on:
 *   [How to build a RAM disk containing VMs for Hafnium to run](docs/HafniumRamDisk.md)
 *   [Building Hafnium hermetically with Docker](docs/HermeticBuild.md)
 *   [The interface Hafnium provides to VMs](docs/VmInterface.md)
+*   [Hafnium coding style](docs/StyleGuide.md)

@@ -15,6 +15,10 @@ You generally only need to submit a CLA once, so if you've already submitted one
 (even if it was for a different project), you probably don't need to do it
 again.
 
+## Style guide
+
+Submissions should follow the Hafnium [style guide](docs/StyleGuide.md).
+
 ## Code reviews
 
 All submissions, including submissions by project members, require review. We
