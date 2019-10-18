@@ -438,6 +438,10 @@ vcpu_restore_lazy_and_run:
 	msr cnthctl_el2, x26
 	msr vttbr_el2, x27
 
+.if SECURE_WORLD == 1
+	msr S3_4_C2_C6_0, x27	/* vsttbr_el2 */
+.endif
+
 	ldp x4, x5, [x28], #16
 	msr mdcr_el2, x4
 	msr mdscr_el1, x5
