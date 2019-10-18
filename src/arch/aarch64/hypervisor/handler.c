@@ -38,8 +38,6 @@
 #include "smc.h"
 #include "sysregs.h"
 
-#define HCR_EL2_VI (1u << 7)
-
 /**
  * Gets the Exception Class from the ESR.
  */

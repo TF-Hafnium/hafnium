@@ -62,7 +62,6 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 {
 	uintreg_t pc = r->pc;
 	uintreg_t arg = r->r[0];
-	uintreg_t hcr;
 	uintreg_t cptr;
 	uintreg_t cnthctl;
 
@@ -71,14 +70,6 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 	r->pc = pc;
 	r->r[0] = arg;
 
-	/* TODO: Determine if we need to set TSW. */
-	hcr = (1u << 31) | /* RW bit. */
-	      (1u << 21) | /* TACR, trap access to ACTRL_EL1. */
-	      (1u << 19) | /* TSC, trap SMC instructions. */
-	      (1u << 20) | /* TIDCP, trap impl-defined funct. */
-	      (1u << 2) |  /* PTW, Protected Table Walk. */
-	      (1u << 0);   /* VM: enable stage-2 translation. */
-
 	cptr = 0;
 	cnthctl = 0;
 
@@ -86,18 +77,9 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 		cnthctl |=
 			(1u << 0) | /* EL1PCTEN, don't trap phys cnt access. */
 			(1u << 1);  /* EL1PCEN, don't trap phys timer access. */
-	} else {
-		hcr |= (7u << 3) |  /* AMO, IMO, FMO bits. */
-		       (1u << 9) |  /* FB bit. */
-		       (1u << 10) | /* BSU bits set to inner-sh. */
-		       (3u << 13);  /* TWI, TWE bits. */
-
-		/* TODO: Trap fp access once handler logic is in place. */
-
-		/* TODO: Investigate fpexc32_el2 for 32bit EL0 support. */
 	}
 
-	r->lazy.hcr_el2 = hcr;
+	r->lazy.hcr_el2 = get_hcr_el2_value(vm_id);
 	r->lazy.cptr_el2 = cptr;
 	r->lazy.cnthctl_el2 = cnthctl;
 	r->lazy.vttbr_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);

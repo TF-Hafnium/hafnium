@@ -25,6 +25,31 @@
 #include "perfmon.h"
 
 /**
+ * Returns the value for HCR_EL2 for the particular VM.
+ * For now, the primary VM has one value and all secondary VMs share a value.
+ */
+uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id)
+{
+	uintreg_t hcr_el2_value = 0;
+
+	/* TODO: Determine if we need to set TSW. */
+	hcr_el2_value = HCR_EL2_RW | HCR_EL2_TACR | HCR_EL2_TIDCP |
+			HCR_EL2_TSC | HCR_EL2_PTW | HCR_EL2_VM;
+
+	if (vm_id != HF_PRIMARY_VM_ID) {
+		hcr_el2_value |= HCR_EL2_TWE | HCR_EL2_TWI |
+				 HCR_EL2_BSU_INNER_SHAREABLE | HCR_EL2_FB |
+				 HCR_EL2_AMO | HCR_EL2_IMO | HCR_EL2_FMO;
+
+		/* TODO: Trap fp access once handler logic is in place. */
+
+		/* TODO: Investigate fpexc32_el2 for 32bit EL0 support. */
+	}
+
+	return hcr_el2_value;
+}
+
+/**
  * Returns the value for MDCR_EL2 for the particular VM.
  * For now, the primary VM has one value and all secondary VMs share a value.
  */

@@ -167,4 +167,99 @@
 #define PMCR_EL0_N_SHIFT 11
 #define GET_PMCR_EL0_N(pmcr) ((PMCR_EL0_N_MASK & (pmcr)) >> PMCR_EL0_N_SHIFT)
 
+/*
+ * Define various configurations bits for the Hypervisor Configuration Register,
+ * HCR_EL2. See Arm Architecture Reference Manual, D13.2.46.
+ */
+
+/**
+ * Execution state control for lower exception levels.
+ * When set, the execution state for EL1 is AArch64.
+ */
+#define HCR_EL2_RW (1u << 31)
+
+/**
+ * Trap Auxiliary Control Registers.
+ * When set, traps ACTLR_EL1 accesses to EL2.
+ */
+#define HCR_EL2_TACR (1u << 21)
+
+/**
+ * Trap implementation defined functionality.
+ * When set, traps EL1 accesses to implementation defined encodings to EL2.
+ */
+#define HCR_EL2_TIDCP (1u << 20)
+
+/**
+ * Trap SMC instructions.
+ * When set, traps EL1 execution of SMC instructions to EL2.
+ */
+#define HCR_EL2_TSC (1u << 19)
+
+/**
+ * Trap WFE instructions.
+ * When set, traps EL0 and EL1 execution of WFE intstructions to EL2.
+ */
+#define HCR_EL2_TWE (1u << 14)
+
+/**
+ * Trap WFI instructions.
+ * When set, traps EL0 and EL1 execution of WFI intstructions to EL2.
+ */
+#define HCR_EL2_TWI (1u << 13)
+
+/**
+ * Barrier Shareability upgrade (2 bits).
+ * When set to 0b01, the minimum shareability domain to barrier instructions
+ * is inner shareable.
+ */
+#define HCR_EL2_BSU_INNER_SHAREABLE (1u << 10)
+
+/**
+ * Force Broadcast.
+ * When set certain instructions related to invalidating the TLB are broadcast
+ * within the Inner Shareable domain.
+ */
+#define HCR_EL2_FB (1u << 9)
+
+/**
+ * Virtual IRQ Interrupt.
+ * When set indicates that there is a virtual IRQ pending.
+ */
+#define HCR_EL2_VI (1u << 7)
+
+/**
+ * Physical Serror Routing.
+ * When set, physical SError interrupts are taken to EL2, unless routed to EL3.
+ */
+#define HCR_EL2_AMO (1u << 5)
+
+/**
+ * Physical IRQ Routing.
+ * When set, physical IRQ interrupts are taken to EL2, unless routed to EL3.
+ */
+#define HCR_EL2_IMO (1u << 4)
+
+/**
+ * Physical FIQ Routing.
+ * When set, physical FIQ interrupts are taken to EL2, unless routed to EL3.
+ */
+#define HCR_EL2_FMO (1u << 3)
+
+/**
+ * Protected Table Walk.
+ * When set a translation table access made as part of a stage 1 translation
+ * table walk is subject to a stage 2 translation.  The memory access generates
+ * a stage 2 permission fault.
+ */
+#define HCR_EL2_PTW (1u << 2)
+
+/**
+ * Virtulization enable.
+ * When set EL1 and EL0 stage 2 address translation is enabled.
+ */
+#define HCR_EL2_VM (1u << 0)
+
+uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id);
+
 uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id);
