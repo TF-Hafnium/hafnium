@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#ifndef __ASSEMBLER__
+
 #pragma once
 
 #include <stddef.h>
@@ -40,6 +42,8 @@
 				 : "rZ"((uintreg_t)(value))); \
 	})
 
+#endif /* __ASSEMBLER__ */
+
 /*
  * Encodings for registers supported after Armv8.0.
  * We aim to build one binary that supports a variety of platforms, therefore,
@@ -60,3 +64,17 @@
  * This register enables and disables LORegions (Armv8.1).
  */
 #define MSR_LORC_EL1 S3_0_C10_C4_3
+
+/*
+ * Registers supported from Armv8.4 onwards.
+ */
+
+/*
+ * VSTTBR_EL2, Virtualization Secure Translation Table Base Register
+ */
+#define MSR_VSTTBR_EL2 S3_4_C2_C6_0
+
+/*
+ * VSTCR_EL2, Virtualization Secure Translation Control Register
+ */
+#define MSR_VSTCR_EL2 S3_4_C2_C6_2

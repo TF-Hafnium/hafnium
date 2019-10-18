@@ -7,6 +7,7 @@
  */
 
 #include "hf/arch/offsets.h"
+#include "msr.h"
 
 /**
  * Called only on first boot after the image has been relocated and BSS zeroed.
@@ -120,6 +121,11 @@ mm_enable:
 
 	msr ttbr0_el2, x1
 	msr vtcr_el2, x2
+
+#if SECURE_WORLD == 1
+	msr MSR_VSTCR_EL2, x2
+#endif
+
 	msr mair_el2, x3
 	msr tcr_el2, x4
 

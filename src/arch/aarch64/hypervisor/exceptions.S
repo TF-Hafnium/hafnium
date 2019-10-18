@@ -7,6 +7,7 @@
  */
 
 #include "hf/arch/offsets.h"
+#include "msr.h"
 #include "exception_macros.S"
 
 /**
@@ -429,6 +430,10 @@ vcpu_restore_lazy_and_run:
 	ldp x26, x27, [x28], #16
 	msr cnthctl_el2, x26
 	msr vttbr_el2, x27
+
+#if SECURE_WORLD == 1
+	msr MSR_VSTTBR_EL2, x27
+#endif
 
 	ldp x4, x5, [x28], #16
 	msr mdcr_el2, x4
