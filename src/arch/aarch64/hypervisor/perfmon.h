@@ -23,13 +23,6 @@
 #include "vmapi/hf/spci.h"
 
 /**
- * PMCR_EL0.N: Indicates the number of event counters implemented.
- */
-#define PMCR_EL0_N_MASK 0xf800
-#define PMCR_EL0_N_SHIFT 11
-#define GET_PMCR_EL0_N(pmcr) ((PMCR_EL0_N_MASK & (pmcr)) >> PMCR_EL0_N_SHIFT)
-
-/**
  * Set to disable cycle counting when event counting is prohibited.
  */
 #define PMCR_EL0_DP 0x10
