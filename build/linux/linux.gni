@@ -63,6 +63,15 @@ template("linux_kernel") {
 
     # TODO: Build with toolchain cc instead of a hardcoded one.
     "CC=" + rebase_path("//prebuilts/linux-x64/clang/bin/clang"),
+    "LD=" +
+        rebase_path("//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-ld"),
+    "AR=" +
+        rebase_path("//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-ar"),
+    "NM=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-nm"),
+    "OBJCOPY=" + rebase_path(
+            "//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-objcopy"),
+    "OBJDUMP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-objdump"),
+    "STRIP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-strip"),
     "ARCH=arm64",
     "CROSS_COMPILE=aarch64-linux-gnu-",
 
@@ -150,6 +159,15 @@ template("linux_kernel_module") {
       "O=" +
           rebase_path(get_label_info(invoker.kernel_target, "target_out_dir")),
       "CC=" + rebase_path("//prebuilts/linux-x64/clang/bin/clang"),
+      "LD=" +
+          rebase_path("//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-ld"),
+      "AR=" +
+          rebase_path("//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-ar"),
+      "NM=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-nm"),
+      "OBJCOPY=" + rebase_path(
+              "//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-objcopy"),
+      "OBJDUMP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-objdump"),
+      "STRIP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-strip"),
       "ARCH=arm64",
       "CROSS_COMPILE=aarch64-linux-gnu-",
     ]

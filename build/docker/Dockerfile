@@ -26,7 +26,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN 	apt-get update \
 	&& apt-get install -y \
 		bc                             `# for Linux headers` \
-		binutils-aarch64-linux-gnu \
 		bison \
 		build-essential \
 		cpio \
