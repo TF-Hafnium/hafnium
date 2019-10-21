@@ -170,40 +170,7 @@ template("embedded_clang_bfd_toolchain") {
   }
 }
 
-# Specialize for gcc.
-template("embedded_gcc_toolchain") {
-  assert(defined(invoker.tool_prefix),
-         "\"tool_prefix\" must be defined for ${target_name}.")
-  assert(defined(invoker.extra_defines),
-         "\"extra_defines\" must be defined for ${target_name}.")
-  assert(defined(invoker.extra_cflags),
-         "\"extra_cflags\" must be defined for ${target_name}.")
-  assert(defined(invoker.extra_ldflags),
-         "\"extra_ldflags\" must be defined for ${target_name}.")
-
-  embedded_cc_toolchain(target_name) {
-    cc = "${invoker.tool_prefix}gcc"
-    ld = "${invoker.tool_prefix}ld"
-
-    forward_variables_from(invoker,
-                           [
-                             "extra_defines",
-                             "extra_cflags",
-                             "extra_ldflags",
-                           ])
-
-    extra_cflags += " -fdiagnostics-color=always"
-
-    toolchain_args = {
-      tool_prefix = invoker.tool_prefix
-      if (defined(invoker.toolchain_args)) {
-        forward_variables_from(invoker.toolchain_args, "*")
-      }
-    }
-  }
-}
-
-# Expand to clang and gcc variants.
+# Expand to clang variants.
 template("embedded_platform_toolchain") {
   assert(defined(invoker.arch), "\"arch\" must be defined for ${target_name}.")
   assert(defined(invoker.target),
@@ -244,7 +211,6 @@ template("embedded_platform_toolchain") {
       forward_variables_from(invoker.toolchain_args, "*")
     }
   }
-  tool_prefix = invoker.tool_prefix
 
   embedded_clang_toolchain("${target_name}_clang") {
     target = invoker.target
@@ -252,9 +218,7 @@ template("embedded_platform_toolchain") {
 
   embedded_clang_bfd_toolchain("${target_name}_clang_bfd") {
     target = invoker.target
-  }
-
-  embedded_gcc_toolchain("${target_name}_gcc") {
+    tool_prefix = invoker.tool_prefix
   }
 }
 

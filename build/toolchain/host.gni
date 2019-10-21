@@ -158,28 +158,4 @@ template("host_toolchain") {
       }
     }
   }
-
-  # Specialize for gcc.
-  host_cc_toolchain("${target_name}_gcc") {
-    ar = "ar"
-    cc = "gcc -fdiagnostics-color=always"
-    cxx = "g++ -fdiagnostics-color=always"
-
-    # TODO: remove the need for this
-    extra_defines = "-DPL011_BASE=0"
-
-    if (invoker.use_platform) {
-      toolchain_args = {
-        use_platform = true
-
-        # When building for the ${target_name}, use the fake architecture to make things
-        # testable.
-        plat_arch = "fake"
-        plat_console = "//src/arch/fake:console"
-        plat_heap_pages = invoker.heap_pages
-        plat_max_cpus = invoker.max_cpus
-        plat_max_vms = invoker.max_vms
-      }
-    }
-  }
 }
