@@ -62,8 +62,6 @@ template("image_binary") {
       ":${target_name}__elf",
     ]
     args = [
-      "--tool_prefix",
-      tool_prefix,
       "--input",
       rebase_path(elf_file),
       "--output",

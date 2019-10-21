@@ -98,8 +98,6 @@ template("embedded_cc_toolchain") {
 template("embedded_clang_toolchain") {
   assert(defined(invoker.target),
          "\"target\" must be defined for ${target_name}.")
-  assert(defined(invoker.tool_prefix),
-         "\"tool_prefix\" must be defined for ${target_name}.")
   assert(defined(invoker.extra_defines),
          "\"extra_defines\" must be defined for ${target_name}")
   assert(defined(invoker.extra_cflags),
@@ -128,7 +126,6 @@ template("embedded_clang_toolchain") {
         " -O2 -lto-O2 --icf=all --fatal-warnings --color-diagnostics"
 
     toolchain_args = {
-      tool_prefix = invoker.tool_prefix
       if (defined(invoker.toolchain_args)) {
         forward_variables_from(invoker.toolchain_args, "*")
       }
@@ -166,7 +163,6 @@ template("embedded_clang_bfd_toolchain") {
     }
 
     toolchain_args = {
-      tool_prefix = invoker.tool_prefix
       if (defined(invoker.toolchain_args)) {
         forward_variables_from(invoker.toolchain_args, "*")
       }

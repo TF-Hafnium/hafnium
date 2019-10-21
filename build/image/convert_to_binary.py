@@ -21,19 +21,21 @@ Calls objcopy to convert a file into raw binary format.
 """
 
 import argparse
+import os
 import subprocess
 import sys
 
+HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+CLANG_ROOT = os.path.join(HF_ROOT, "prebuilts", "linux-x64", "clang")
+OBJCOPY = os.path.join(CLANG_ROOT, "bin", "llvm-objcopy")
 
 def Main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tool_prefix", required=True)
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     subprocess.check_call([
-        "{}objcopy".format(args.tool_prefix), "-O", "binary", args.input,
-        args.output
+        OBJCOPY, "-O", "binary", args.input, args.output
     ])
     return 0
 
