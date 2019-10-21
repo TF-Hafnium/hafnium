@@ -30,7 +30,6 @@ RUN 	apt-get update \
 		bison \
 		build-essential \
 		cpio \
-		device-tree-compiler \
 		flex \
 		git \
 		libpixman-1-0                  `# for QEMU` \
