@@ -59,7 +59,7 @@ bool hftest_mm_init(void)
 	return true;
 }
 
-void hftest_mm_identity_map(const void *base, size_t size, int mode)
+void hftest_mm_identity_map(const void *base, size_t size, uint32_t mode)
 {
 	struct mm_stage1_locked stage1_locked = get_stage1_locked();
 	paddr_t start = pa_from_va(va_from_ptr(base));

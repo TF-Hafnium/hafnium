@@ -67,7 +67,7 @@ struct vcpu_fault_info {
 	ipaddr_t ipaddr;
 	vaddr_t vaddr;
 	vaddr_t pc;
-	int mode;
+	uint32_t mode;
 };
 
 struct vcpu {

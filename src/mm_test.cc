@@ -57,7 +57,7 @@ size_t mm_entry_size(int level)
  */
 bool mm_vm_is_mapped(struct mm_ptable *t, ipaddr_t ipa)
 {
-	int mode;
+	uint32_t mode;
 	return mm_vm_get_mode(t, ipa, ipa_add(ipa, 1), &mode) &&
 	       (mode & MM_MODE_INVALID) == 0;
 }
@@ -137,7 +137,7 @@ TEST_F(mm, ptable_init_concatenated_empty)
  */
 TEST_F(mm, map_first_page)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t page_begin = pa_init(0);
 	const paddr_t page_end = pa_add(page_begin, PAGE_SIZE);
 	struct mm_ptable ptable;
@@ -180,7 +180,7 @@ TEST_F(mm, map_first_page)
  */
 TEST_F(mm, map_round_to_page)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t map_begin = pa_init(0x200'0000'0000 - PAGE_SIZE + 23);
 	const paddr_t map_end = pa_add(map_begin, 268);
 	ipaddr_t ipa = ipa_init(-1);
@@ -226,7 +226,7 @@ TEST_F(mm, map_round_to_page)
  */
 TEST_F(mm, map_across_tables)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t map_begin = pa_init(0x80'0000'0000 - PAGE_SIZE);
 	const paddr_t map_end = pa_add(map_begin, 2 * PAGE_SIZE);
 	struct mm_ptable ptable;
@@ -289,7 +289,7 @@ TEST_F(mm, map_across_tables)
  */
 TEST_F(mm, map_all_at_top_level)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_init(0), VM_MEM_END, mode,
@@ -317,7 +317,7 @@ TEST_F(mm, map_all_at_top_level)
  */
 TEST_F(mm, map_already_mapped)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	ipaddr_t ipa = ipa_init(-1);
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
@@ -339,7 +339,7 @@ TEST_F(mm, map_already_mapped)
  */
 TEST_F(mm, map_reverse_range)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	ipaddr_t ipa = ipa_init(-1);
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
@@ -361,7 +361,7 @@ TEST_F(mm, map_reverse_range)
  */
 TEST_F(mm, map_reverse_range_quirk)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	ipaddr_t ipa = ipa_init(-1);
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
@@ -381,7 +381,7 @@ TEST_F(mm, map_reverse_range_quirk)
  */
 TEST_F(mm, map_last_address_quirk)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	ipaddr_t ipa = ipa_init(-1);
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
@@ -402,7 +402,7 @@ TEST_F(mm, map_last_address_quirk)
  */
 TEST_F(mm, map_clamp_to_range)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_init(0),
@@ -421,7 +421,7 @@ TEST_F(mm, map_clamp_to_range)
  */
 TEST_F(mm, map_ignore_out_of_range)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	ipaddr_t ipa = ipa_init(-1);
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
@@ -441,7 +441,7 @@ TEST_F(mm, map_ignore_out_of_range)
  */
 TEST_F(mm, map_block_replaces_table)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t page_begin = pa_init(34567 * PAGE_SIZE);
 	const paddr_t page_end = pa_add(page_begin, PAGE_SIZE);
 	struct mm_ptable ptable;
@@ -463,7 +463,7 @@ TEST_F(mm, map_block_replaces_table)
  */
 TEST_F(mm, map_does_not_defrag)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t page_begin = pa_init(12000 * PAGE_SIZE);
 	const paddr_t page_end = pa_add(page_begin, PAGE_SIZE);
 	struct mm_ptable ptable;
@@ -518,7 +518,7 @@ TEST_F(mm, unmap_not_mapped)
  */
 TEST_F(mm, unmap_all)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t l0_begin = pa_init(uintpaddr_t(524421) * PAGE_SIZE);
 	const paddr_t l0_end = pa_add(l0_begin, 17 * PAGE_SIZE);
 	const paddr_t l1_begin = pa_init(3 * mm_entry_size(1));
@@ -541,7 +541,7 @@ TEST_F(mm, unmap_all)
  */
 TEST_F(mm, unmap_round_to_page)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t map_begin = pa_init(0x160'0000'0000 + PAGE_SIZE);
 	const paddr_t map_end = pa_add(map_begin, PAGE_SIZE);
 	struct mm_ptable ptable;
@@ -561,7 +561,7 @@ TEST_F(mm, unmap_round_to_page)
  */
 TEST_F(mm, unmap_across_tables)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t map_begin = pa_init(0x180'0000'0000 - PAGE_SIZE);
 	const paddr_t map_end = pa_add(map_begin, 2 * PAGE_SIZE);
 	struct mm_ptable ptable;
@@ -580,7 +580,7 @@ TEST_F(mm, unmap_across_tables)
  */
 TEST_F(mm, unmap_out_of_range)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_init(0), VM_MEM_END, mode,
@@ -600,7 +600,7 @@ TEST_F(mm, unmap_out_of_range)
  */
 TEST_F(mm, unmap_reverse_range)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_init(0), VM_MEM_END, mode,
@@ -623,7 +623,7 @@ TEST_F(mm, unmap_reverse_range)
  */
 TEST_F(mm, unmap_reverse_range_quirk)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t page_begin = pa_init(0x180'0000'0000);
 	const paddr_t page_end = pa_add(page_begin, PAGE_SIZE);
 	struct mm_ptable ptable;
@@ -647,7 +647,7 @@ TEST_F(mm, unmap_reverse_range_quirk)
  */
 TEST_F(mm, unmap_last_address_quirk)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_init(0), VM_MEM_END, mode,
@@ -667,7 +667,7 @@ TEST_F(mm, unmap_last_address_quirk)
  */
 TEST_F(mm, unmap_does_not_defrag)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t l0_begin = pa_init(5555 * PAGE_SIZE);
 	const paddr_t l0_end = pa_add(l0_begin, 13 * PAGE_SIZE);
 	const paddr_t l1_begin = pa_init(666 * mm_entry_size(1));
@@ -704,7 +704,7 @@ TEST_F(mm, is_mapped_empty)
  */
 TEST_F(mm, is_mapped_all)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_init(0), VM_MEM_END, mode,
@@ -720,7 +720,7 @@ TEST_F(mm, is_mapped_all)
  */
 TEST_F(mm, is_mapped_page)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t page_begin = pa_init(0x100'0000'0000);
 	const paddr_t page_end = pa_add(page_begin, PAGE_SIZE);
 	struct mm_ptable ptable;
@@ -739,7 +739,7 @@ TEST_F(mm, is_mapped_page)
  */
 TEST_F(mm, is_mapped_out_of_range)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_init(0), VM_MEM_END, mode,
@@ -760,7 +760,7 @@ TEST_F(mm, get_mode_empty)
 	constexpr int default_mode =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 	struct mm_ptable ptable;
-	int read_mode;
+	uint32_t read_mode;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 
 	read_mode = 0;
@@ -787,11 +787,11 @@ TEST_F(mm, get_mode_empty)
  */
 TEST_F(mm, get_mode_pages_across_tables)
 {
-	constexpr int mode = MM_MODE_INVALID | MM_MODE_SHARED;
+	constexpr uint32_t mode = MM_MODE_INVALID | MM_MODE_SHARED;
 	const paddr_t map_begin = pa_init(0x180'0000'0000 - PAGE_SIZE);
 	const paddr_t map_end = pa_add(map_begin, 2 * PAGE_SIZE);
 	struct mm_ptable ptable;
-	int read_mode;
+	uint32_t read_mode;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, map_begin, map_end, mode,
 				       nullptr, &ppool));
@@ -818,9 +818,9 @@ TEST_F(mm, get_mode_pages_across_tables)
  */
 TEST_F(mm, get_mode_out_of_range)
 {
-	constexpr int mode = MM_MODE_UNOWNED;
+	constexpr uint32_t mode = MM_MODE_UNOWNED;
 	struct mm_ptable ptable;
-	int read_mode;
+	uint32_t read_mode;
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_init(0), VM_MEM_END, mode,
 				       nullptr, &ppool));
@@ -855,7 +855,7 @@ TEST_F(mm, defrag_empty)
  */
 TEST_F(mm, defrag_empty_subtables)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t l0_begin = pa_init(120000 * PAGE_SIZE);
 	const paddr_t l0_end = pa_add(l0_begin, PAGE_SIZE);
 	const paddr_t l1_begin = pa_init(3 * mm_entry_size(1));
@@ -881,7 +881,7 @@ TEST_F(mm, defrag_empty_subtables)
  */
 TEST_F(mm, defrag_block_subtables)
 {
-	constexpr int mode = 0;
+	constexpr uint32_t mode = 0;
 	const paddr_t begin = pa_init(39456 * mm_entry_size(1));
 	const paddr_t middle = pa_add(begin, 67 * PAGE_SIZE);
 	const paddr_t end = pa_add(begin, 4 * mm_entry_size(1));

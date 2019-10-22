@@ -99,7 +99,7 @@
 bool hftest_mm_init(void);
 
 /** Adds stage-1 identity mapping for pages covering bytes [base, base+size). */
-void hftest_mm_identity_map(const void *base, size_t size, int mode);
+void hftest_mm_identity_map(const void *base, size_t size, uint32_t mode);
 
 void hftest_mm_vcpu_init(void);
 

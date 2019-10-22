@@ -784,7 +784,7 @@ void mm_vm_fini(struct mm_ptable *t, struct mpool *ppool)
  * architecture-agnostic mode provided.
  */
 bool mm_vm_identity_map(struct mm_ptable *t, paddr_t begin, paddr_t end,
-			int mode, ipaddr_t *ipa, struct mpool *ppool)
+			uint32_t mode, ipaddr_t *ipa, struct mpool *ppool)
 {
 	int flags = 0;
 	bool success = mm_ptable_identity_update(
@@ -847,7 +847,7 @@ void mm_vm_defrag(struct mm_ptable *t, struct mpool *ppool)
  * Returns true if the range is mapped with the same mode and false otherwise.
  */
 bool mm_vm_get_mode(struct mm_ptable *t, ipaddr_t begin, ipaddr_t end,
-		    int *mode)
+		    uint32_t *mode)
 {
 	uint64_t attrs;
 	bool ret;
@@ -884,7 +884,7 @@ void mm_unlock_stage1(struct mm_stage1_locked *lock)
  * architecture-agnostic mode provided.
  */
 void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
-		      paddr_t end, int mode, struct mpool *ppool)
+		      paddr_t end, uint32_t mode, struct mpool *ppool)
 {
 	if (mm_ptable_identity_update(stage1_locked.ptable, begin, end,
 				      arch_mm_mode_to_stage1_attrs(mode),

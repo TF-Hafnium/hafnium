@@ -27,10 +27,10 @@
 #define SPCI_VERSION_MAJOR_OFFSET 16
 
 struct spci_mem_transitions {
-	int orig_from_mode;
-	int orig_to_mode;
-	int from_mode;
-	int to_mode;
+	uint32_t orig_from_mode;
+	uint32_t orig_to_mode;
+	uint32_t from_mode;
+	uint32_t to_mode;
 };
 
 /* TODO: Add device attributes: GRE, cacheability, shareability. */
@@ -69,6 +69,6 @@ struct spci_value spci_msg_handle_architected_message(
 
 bool spci_msg_check_transition(struct vm *to, struct vm *from,
 			       enum spci_memory_share share,
-			       int *orig_from_mode, ipaddr_t begin,
+			       uint32_t *orig_from_mode, ipaddr_t begin,
 			       ipaddr_t end, uint32_t memory_to_attributes,
-			       int *from_mode, int *to_mode);
+			       uint32_t *from_mode, uint32_t *to_mode);

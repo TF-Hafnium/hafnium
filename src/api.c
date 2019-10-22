@@ -576,7 +576,7 @@ out:
 /**
  * Check that the mode indicates memory that is valid, owned and exclusive.
  */
-static bool api_mode_valid_owned_and_exclusive(int mode)
+static bool api_mode_valid_owned_and_exclusive(uint32_t mode)
 {
 	return (mode & (MM_MODE_D | MM_MODE_INVALID | MM_MODE_UNOWNED |
 			MM_MODE_SHARED)) == 0;
@@ -682,8 +682,9 @@ out:
  */
 static bool api_vm_configure_pages(struct vm_locked vm_locked,
 				   paddr_t pa_send_begin, paddr_t pa_send_end,
-				   int orig_send_mode, paddr_t pa_recv_begin,
-				   paddr_t pa_recv_end, int orig_recv_mode)
+				   uint32_t orig_send_mode,
+				   paddr_t pa_recv_begin, paddr_t pa_recv_end,
+				   uint32_t orig_recv_mode)
 {
 	bool ret;
 	struct mpool local_page_pool;
@@ -765,8 +766,8 @@ int64_t api_vm_configure(ipaddr_t send, ipaddr_t recv, struct vcpu *current,
 	paddr_t pa_send_end;
 	paddr_t pa_recv_begin;
 	paddr_t pa_recv_end;
-	int orig_send_mode;
-	int orig_recv_mode;
+	uint32_t orig_send_mode;
+	uint32_t orig_recv_mode;
 	int64_t ret;
 
 	/* Fail if addresses are not page-aligned. */
@@ -1451,9 +1452,9 @@ struct spci_value api_spci_share_memory(
 {
 	struct vm *to = to_locked.vm;
 	struct vm *from = from_locked.vm;
-	int orig_from_mode;
-	int from_mode;
-	int to_mode;
+	uint32_t orig_from_mode;
+	uint32_t from_mode;
+	uint32_t to_mode;
 	struct mpool local_page_pool;
 	struct spci_value ret;
 	paddr_t pa_begin;
@@ -1546,9 +1547,9 @@ int64_t api_share_memory(spci_vm_id_t vm_id, ipaddr_t addr, size_t size,
 {
 	struct vm *from = current->vm;
 	struct vm *to;
-	int orig_from_mode;
-	int from_mode;
-	int to_mode;
+	uint32_t orig_from_mode;
+	uint32_t from_mode;
+	uint32_t to_mode;
 	ipaddr_t begin;
 	ipaddr_t end;
 	paddr_t pa_begin;
@@ -1636,7 +1637,7 @@ int64_t api_share_memory(spci_vm_id_t vm_id, ipaddr_t addr, size_t size,
 	 * owning VM.
 	 */
 	if (orig_from_mode & MM_MODE_UNOWNED) {
-		int orig_to_mode;
+		uint32_t orig_to_mode;
 
 		if (share != HF_MEMORY_GIVE ||
 		    !mm_vm_get_mode(&to->ptable, begin, end, &orig_to_mode) ||

@@ -146,17 +146,17 @@ uint8_t arch_mm_stage2_root_table_count(void);
 /**
  * Converts the mode into stage-1 attributes for a block PTE.
  */
-uint64_t arch_mm_mode_to_stage1_attrs(int mode);
+uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode);
 
 /**
  * Converts the mode into stage-2 attributes for a block PTE.
  */
-uint64_t arch_mm_mode_to_stage2_attrs(int mode);
+uint64_t arch_mm_mode_to_stage2_attrs(uint32_t mode);
 
 /**
  * Converts the stage-2 block attributes back to the corresponding mode.
  */
-int arch_mm_stage2_attrs_to_mode(uint64_t attrs);
+uint32_t arch_mm_stage2_attrs_to_mode(uint64_t attrs);
 
 /**
  * Initializes the arch specific memory management.

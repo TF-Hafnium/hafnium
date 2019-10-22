@@ -402,7 +402,7 @@ void arch_mm_flush_dcache(void *base, size_t size)
 	dsb(sy);
 }
 
-uint64_t arch_mm_mode_to_stage1_attrs(int mode)
+uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode)
 {
 	uint64_t attrs = 0;
 
@@ -435,7 +435,7 @@ uint64_t arch_mm_mode_to_stage1_attrs(int mode)
 	return attrs;
 }
 
-uint64_t arch_mm_mode_to_stage2_attrs(int mode)
+uint64_t arch_mm_mode_to_stage2_attrs(uint32_t mode)
 {
 	uint64_t attrs = 0;
 	uint64_t access = 0;
@@ -493,9 +493,9 @@ uint64_t arch_mm_mode_to_stage2_attrs(int mode)
 	return attrs;
 }
 
-int arch_mm_stage2_attrs_to_mode(uint64_t attrs)
+uint32_t arch_mm_stage2_attrs_to_mode(uint64_t attrs)
 {
-	int mode = 0;
+	uint32_t mode = 0;
 
 	if (attrs & STAGE2_S2AP(STAGE2_ACCESS_READ)) {
 		mode |= MM_MODE_R;

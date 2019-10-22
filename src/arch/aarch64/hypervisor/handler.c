@@ -528,7 +528,8 @@ struct vcpu *serr_lower(void)
  * instruction and data aborts, but not necessarily for other exception reasons.
  */
 static struct vcpu_fault_info fault_info_init(uintreg_t esr,
-					      const struct vcpu *vcpu, int mode)
+					      const struct vcpu *vcpu,
+					      uint32_t mode)
 {
 	uint32_t fsc = esr & 0x3f;
 	struct vcpu_fault_info r;

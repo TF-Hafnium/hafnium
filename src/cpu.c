@@ -299,8 +299,8 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 			    struct vcpu_fault_info *f)
 {
 	struct vm *vm = current->vm;
-	int mode;
-	int mask = f->mode | MM_MODE_INVALID;
+	uint32_t mode;
+	uint32_t mask = f->mode | MM_MODE_INVALID;
 	bool resume;
 
 	sl_lock(&vm->lock);

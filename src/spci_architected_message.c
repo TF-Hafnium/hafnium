@@ -124,7 +124,8 @@ struct spci_value spci_msg_handle_architected_message(
 static bool spci_msg_get_next_state(
 	const struct spci_mem_transitions *transitions,
 	uint32_t transition_count, uint32_t memory_to_attributes,
-	int orig_from_mode, int orig_to_mode, int *from_mode, int *to_mode)
+	uint32_t orig_from_mode, uint32_t orig_to_mode, uint32_t *from_mode,
+	uint32_t *to_mode)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
@@ -166,11 +167,11 @@ static bool spci_msg_get_next_state(
  */
 bool spci_msg_check_transition(struct vm *to, struct vm *from,
 			       enum spci_memory_share share,
-			       int *orig_from_mode, ipaddr_t begin,
+			       uint32_t *orig_from_mode, ipaddr_t begin,
 			       ipaddr_t end, uint32_t memory_to_attributes,
-			       int *from_mode, int *to_mode)
+			       uint32_t *from_mode, uint32_t *to_mode)
 {
-	int orig_to_mode;
+	uint32_t orig_to_mode;
 	const struct spci_mem_transitions *mem_transition_table;
 	uint32_t transition_table_size;
 

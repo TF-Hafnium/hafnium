@@ -33,10 +33,10 @@
 #define MM_PTE_PER_PAGE (PAGE_SIZE / sizeof(pte_t))
 
 /* The following are arch-independent page mapping modes. */
-#define MM_MODE_R 0x0001 /* read */
-#define MM_MODE_W 0x0002 /* write */
-#define MM_MODE_X 0x0004 /* execute */
-#define MM_MODE_D 0x0008 /* device */
+#define MM_MODE_R UINT32_C(0x0001) /* read */
+#define MM_MODE_W UINT32_C(0x0002) /* write */
+#define MM_MODE_X UINT32_C(0x0004) /* execute */
+#define MM_MODE_D UINT32_C(0x0008) /* device */
 
 /*
  * Memory in stage-1 is either valid (present) or invalid (absent).
@@ -66,9 +66,9 @@
  *
  *  Modes are selected so that owner of exclusive memory is the default.
  */
-#define MM_MODE_INVALID 0x0010
-#define MM_MODE_UNOWNED 0x0020
-#define MM_MODE_SHARED  0x0040
+#define MM_MODE_INVALID UINT32_C(0x0010)
+#define MM_MODE_UNOWNED UINT32_C(0x0020)
+#define MM_MODE_SHARED  UINT32_C(0x0040)
 
 #define MM_FLAG_COMMIT  0x01
 #define MM_FLAG_UNMAP   0x02
@@ -105,19 +105,19 @@ ptable_addr_t mm_ptable_addr_space_end(int flags);
 bool mm_vm_init(struct mm_ptable *t, struct mpool *ppool);
 void mm_vm_fini(struct mm_ptable *t, struct mpool *ppool);
 bool mm_vm_identity_map(struct mm_ptable *t, paddr_t begin, paddr_t end,
-			int mode, ipaddr_t *ipa, struct mpool *ppool);
+			uint32_t mode, ipaddr_t *ipa, struct mpool *ppool);
 bool mm_vm_unmap(struct mm_ptable *t, paddr_t begin, paddr_t end,
 		 struct mpool *ppool);
 bool mm_vm_unmap_hypervisor(struct mm_ptable *t, struct mpool *ppool);
 void mm_vm_defrag(struct mm_ptable *t, struct mpool *ppool);
 void mm_vm_dump(struct mm_ptable *t);
 bool mm_vm_get_mode(struct mm_ptable *t, ipaddr_t begin, ipaddr_t end,
-		    int *mode);
+		    uint32_t *mode);
 
 struct mm_stage1_locked mm_lock_stage1(void);
 void mm_unlock_stage1(struct mm_stage1_locked *lock);
 void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
-		      paddr_t end, int mode, struct mpool *ppool);
+		      paddr_t end, uint32_t mode, struct mpool *ppool);
 bool mm_unmap(struct mm_stage1_locked stage1_locked, paddr_t begin, paddr_t end,
 	      struct mpool *ppool);
 void mm_defrag(struct mm_stage1_locked stage1_locked, struct mpool *ppool);
