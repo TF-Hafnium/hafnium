@@ -64,9 +64,9 @@ TEST(system, system_registers_enabled)
 {
 	/* Check that system register interface to GICv3 is enabled. */
 	uint32_t expected_sre =
-		1u << 2 | /* Disable IRQ bypass. */
-		1u << 1 | /* Disable FIQ bypass. */
-		1u << 0;  /* Enable system register interface to GICv3. */
+		1U << 2 | /* Disable IRQ bypass. */
+		1U << 1 | /* Disable FIQ bypass. */
+		1U << 0;  /* Enable system register interface to GICv3. */
 	EXPECT_EQ(read_msr(ICC_SRE_EL1), expected_sre);
 }
 

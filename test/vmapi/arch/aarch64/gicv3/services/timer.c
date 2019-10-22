@@ -59,15 +59,16 @@ TEST_SERVICE(timer)
 	arch_irq_enable();
 
 	for (;;) {
-		const char timer_wfi_message[] = "**** xxxxxxx";
 		uint8_t *message = (uint8_t *)SERVICE_RECV_BUFFER();
-		bool wfi, wfe, receive;
+		bool wfi;
+		bool wfe;
+		bool receive;
 		bool disable_interrupts;
 		uint32_t ticks;
 		struct spci_value ret = mailbox_receive_retry();
 
 		if (spci_msg_send_sender(ret) != HF_PRIMARY_VM_ID ||
-		    spci_msg_send_size(ret) != sizeof(timer_wfi_message)) {
+		    spci_msg_send_size(ret) != sizeof("**** xxxxxxx")) {
 			FAIL("Got unexpected message from VM %d, size %d.\n",
 			     spci_msg_send_sender(ret),
 			     spci_msg_send_size(ret));

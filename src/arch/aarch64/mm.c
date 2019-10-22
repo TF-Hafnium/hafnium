@@ -650,7 +650,7 @@ bool arch_mm_init(paddr_t table)
 		.ttbr0_el2 = pa_addr(table),
 
 		.vtcr_el2 =
-			(1u << 31) |		   /* RES1. */
+			(1U << 31) |		   /* RES1. */
 			((features & 0xf) << 16) | /* PS, matching features. */
 			(0 << 14) |		   /* TG0: 4 KB granule. */
 			(3 << 12) |		   /* SH0: inner shareable. */

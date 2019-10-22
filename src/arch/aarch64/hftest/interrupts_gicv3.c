@@ -45,16 +45,16 @@ void exception_setup(void (*irq)(void))
 
 void interrupt_gic_setup(void)
 {
-	uint32_t ctlr = 1u << 4    /* Enable affinity routing. */
-			| 1u << 1; /* Enable group 1 non-secure interrupts. */
+	uint32_t ctlr = 1U << 4    /* Enable affinity routing. */
+			| 1U << 1; /* Enable group 1 non-secure interrupts. */
 
 	write_msr(ICC_CTLR_EL1, 0);
 
 	io_write32(GICD_CTLR, ctlr);
 
 	/* Mark CPU as awake. */
-	io_write32(GICR_WAKER, io_read32(GICR_WAKER) & ~(1u << 1));
-	while ((io_read32(GICR_WAKER) & (1u << 2)) != 0) {
+	io_write32(GICR_WAKER, io_read32(GICR_WAKER) & ~(1U << 1));
+	while ((io_read32(GICR_WAKER) & (1U << 2)) != 0) {
 		dlog("Waiting for ChildrenAsleep==0\n");
 	}
 
@@ -72,7 +72,7 @@ void interrupt_gic_setup(void)
 void interrupt_enable(uint32_t intid, bool enable)
 {
 	uint32_t index = intid / 32;
-	uint32_t bit = 1u << (intid % 32);
+	uint32_t bit = 1U << (intid % 32);
 
 	if (enable) {
 		io_write32_array(GICD_ISENABLER, index, bit);
@@ -117,7 +117,7 @@ void interrupt_set_priority(uint32_t intid, uint8_t priority)
 void interrupt_set_edge_triggered(uint32_t intid, bool edge_triggered)
 {
 	uint32_t index = intid / 16;
-	uint32_t bit = 1u << (((intid % 16) * 2) + 1);
+	uint32_t bit = 1U << (((intid % 16) * 2) + 1);
 
 	if (intid < 32) {
 		uint32_t v = io_read32_array(GICR_ICFGR, index);
@@ -166,7 +166,7 @@ void sync_current_exception(uintreg_t esr, uintreg_t elr)
 	case 0x25: /* EC = 100101, Data abort. */
 		dlog("Data abort: pc=%#x, esr=%#x, ec=%#x", elr, esr,
 		     esr >> 26);
-		if (!(esr & (1u << 10))) { /* Check FnV bit. */
+		if (!(esr & (1U << 10))) { /* Check FnV bit. */
 			dlog(", far=%#x", read_msr(far_el1));
 		} else {
 			dlog(", far=invalid");

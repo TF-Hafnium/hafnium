@@ -47,7 +47,16 @@ void *memmove(void *dst, const void *src, size_t n)
 	const char *y;
 
 	if (dst < src) {
+		/*
+		 * Clang analyzer doesn't like us calling unsafe memory
+		 * functions, so make it ignore this while still knowing that
+		 * the function returns.
+		 */
+#ifdef __clang_analyzer__
+		return dst;
+#else
 		return memcpy(dst, src, n);
+#endif
 	}
 
 	x = (char *)dst + n - 1;

@@ -36,8 +36,8 @@ void check_cannot_share_memory(void *ptr, size_t size)
 	uint32_t vms[] = {SERVICE_VM0, SERVICE_VM1};
 	enum hf_share modes[] = {HF_MEMORY_GIVE, HF_MEMORY_LEND,
 				 HF_MEMORY_SHARE};
-	int i;
-	int j;
+	size_t i;
+	size_t j;
 
 	for (i = 0; i < ARRAY_SIZE(vms); ++i) {
 		for (j = 0; j < ARRAY_SIZE(modes); ++j) {
@@ -71,10 +71,10 @@ static void spci_check_cannot_lend_memory(
 		SPCI_MEMORY_OUTER_SHAREABLE, SPCI_MEMORY_INNER_SHAREABLE};
 	uint32_t vms[] = {HF_PRIMARY_VM_ID, SERVICE_VM0, SERVICE_VM1};
 
-	int i = 0;
-	int j = 0;
-	int k = 0;
-	int l = 0;
+	size_t i = 0;
+	size_t j = 0;
+	size_t k = 0;
+	size_t l = 0;
 
 	for (i = 0; i < ARRAY_SIZE(vms); ++i) {
 		for (j = 0; j < ARRAY_SIZE(lend_access); ++j) {
@@ -129,7 +129,7 @@ static void spci_check_cannot_donate_memory(
 {
 	uint32_t vms[] = {HF_PRIMARY_VM_ID, SERVICE_VM0, SERVICE_VM1};
 
-	int i;
+	size_t i;
 	for (i = 0; i < ARRAY_SIZE(vms); ++i) {
 		uint32_t msg_size;
 		/* Optionally skip one VM as the donate would succeed. */
@@ -158,8 +158,8 @@ static void spci_check_cannot_relinquish_memory(
 {
 	uint32_t vms[] = {HF_PRIMARY_VM_ID, SERVICE_VM0, SERVICE_VM1};
 
-	int i;
-	int j;
+	size_t i;
+	size_t j;
 	for (i = 0; i < ARRAY_SIZE(vms); ++i) {
 		for (j = 0; j < ARRAY_SIZE(vms); ++j) {
 			uint32_t msg_size = spci_memory_relinquish_init(

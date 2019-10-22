@@ -296,7 +296,7 @@ static int64_t internal_interrupt_inject(struct vcpu *target_vcpu,
 					 struct vcpu **next)
 {
 	uint32_t intid_index = intid / INTERRUPT_REGISTER_BITS;
-	uint32_t intid_mask = 1u << (intid % INTERRUPT_REGISTER_BITS);
+	uint32_t intid_mask = 1U << (intid % INTERRUPT_REGISTER_BITS);
 	int64_t ret = 0;
 
 	sl_lock(&target_vcpu->lock);
@@ -1253,7 +1253,7 @@ int64_t api_mailbox_clear(struct vcpu *current, struct vcpu **next)
 int64_t api_interrupt_enable(uint32_t intid, bool enable, struct vcpu *current)
 {
 	uint32_t intid_index = intid / INTERRUPT_REGISTER_BITS;
-	uint32_t intid_mask = 1u << (intid % INTERRUPT_REGISTER_BITS);
+	uint32_t intid_mask = 1U << (intid % INTERRUPT_REGISTER_BITS);
 
 	if (intid >= HF_NUM_INTIDS) {
 		return -1;
@@ -1315,7 +1315,7 @@ uint32_t api_interrupt_get(struct vcpu *current)
 			 * Mark it as no longer pending and decrement the count.
 			 */
 			current->interrupts.interrupt_pending[i] &=
-				~(1u << bit_index);
+				~(1U << bit_index);
 			current->interrupts.enabled_and_pending_count--;
 			first_interrupt =
 				i * INTERRUPT_REGISTER_BITS + bit_index;

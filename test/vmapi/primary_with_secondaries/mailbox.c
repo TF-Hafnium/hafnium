@@ -44,7 +44,8 @@ static void reverse(char *s, size_t len)
  */
 static void next_permutation(char *s, size_t len)
 {
-	size_t i, j;
+	size_t i;
+	size_t j;
 
 	for (i = len - 2; i < len; i--) {
 		const char t = s[i];

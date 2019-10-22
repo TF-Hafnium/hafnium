@@ -49,7 +49,13 @@ void memset_s(void *dest, rsize_t destsz, int ch, rsize_t count)
 	CHECK_OR_FILL(destsz <= RSIZE_MAX, dest, destsz, ch);
 	CHECK_OR_FILL(count <= destsz, dest, destsz, ch);
 
+	/*
+	 * Clang analyzer doesn't like us calling unsafe memory functions, so
+	 * make it ignore this call.
+	 */
+#ifndef __clang_analyzer__
 	memset(dest, ch, count);
+#endif
 }
 
 void memcpy_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
@@ -73,7 +79,9 @@ void memcpy_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
 	CHECK_OR_ZERO_FILL(d < s || d >= (s + count), dest, destsz);
 	CHECK_OR_ZERO_FILL(d > s || s >= (d + count), dest, destsz);
 
+#ifndef __clang_analyzer__
 	memcpy(dest, src, count);
+#endif
 }
 
 void memmove_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
@@ -85,7 +93,9 @@ void memmove_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
 	CHECK_OR_ZERO_FILL(destsz <= RSIZE_MAX, dest, destsz);
 	CHECK_OR_ZERO_FILL(count <= destsz, dest, destsz);
 
+#ifndef __clang_analyzer__
 	memmove(dest, src, count);
+#endif
 }
 
 /**

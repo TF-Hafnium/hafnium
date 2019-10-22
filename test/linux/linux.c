@@ -34,12 +34,12 @@
 
 static int finit_module(int fd, const char *param_values, int flags)
 {
-	return syscall(SYS_finit_module, fd, param_values, flags);
+	return (int)syscall(SYS_finit_module, fd, param_values, flags);
 }
 
 static int delete_module(const char *name, int flags)
 {
-	return syscall(SYS_delete_module, name, flags);
+	return (int)syscall(SYS_delete_module, name, flags);
 }
 
 static void insmod_hafnium(void)

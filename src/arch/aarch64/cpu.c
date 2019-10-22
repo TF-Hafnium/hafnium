@@ -42,15 +42,15 @@ static void gic_regs_reset(struct arch_regs *r, bool is_primary)
 #if GIC_VERSION == 3 || GIC_VERSION == 4
 	uint32_t ich_hcr = 0;
 	uint32_t icc_sre_el2 =
-		(1u << 0) | /* SRE, enable ICH_* and ICC_* at EL2. */
+		(1U << 0) | /* SRE, enable ICH_* and ICC_* at EL2. */
 		(0x3 << 1); /* DIB and DFB, disable IRQ/FIQ bypass. */
 
 	if (is_primary) {
-		icc_sre_el2 |= 1u << 3; /* Enable EL1 access to ICC_SRE_EL1. */
+		icc_sre_el2 |= 1U << 3; /* Enable EL1 access to ICC_SRE_EL1. */
 	} else {
 		/* Trap EL1 access to GICv3 system registers. */
 		ich_hcr =
-			(0x1fu << 10); /* TDIR, TSEI, TALL1, TALL0, TC bits. */
+			(0x1fU << 10); /* TDIR, TSEI, TALL1, TALL0, TC bits. */
 	}
 	r->gic.ich_hcr_el2 = ich_hcr;
 	r->gic.icc_sre_el2 = icc_sre_el2;
@@ -75,8 +75,8 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 
 	if (is_primary) {
 		cnthctl |=
-			(1u << 0) | /* EL1PCTEN, don't trap phys cnt access. */
-			(1u << 1);  /* EL1PCEN, don't trap phys timer access. */
+			(1U << 0) | /* EL1PCTEN, don't trap phys cnt access. */
+			(1U << 1);  /* EL1PCEN, don't trap phys timer access. */
 	}
 
 	r->lazy.hcr_el2 = get_hcr_el2_value(vm_id);
@@ -98,7 +98,7 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 	 * save/restore EL1 debug register state that either might change, or
 	 * that needs to be protected.
 	 */
-	r->lazy.mdscr_el1 = 0x0u & ~(0x1u << 15);
+	r->lazy.mdscr_el1 = 0x0U & ~(0x1U << 15);
 
 	/* Disable cycle counting on initialization. */
 	r->lazy.pmccfiltr_el0 = perfmon_get_pmccfiltr_el0_init_value(vm_id);

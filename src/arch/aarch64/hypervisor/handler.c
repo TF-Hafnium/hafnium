@@ -207,7 +207,7 @@ noreturn void sync_current_exception(uintreg_t elr, uintreg_t spsr)
 	switch (ec) {
 	case 0x25: /* EC = 100101, Data abort. */
 		dlog("Data abort: pc=%#x, esr=%#x, ec=%#x", elr, esr, ec);
-		if (!(esr & (1u << 10))) { /* Check FnV bit. */
+		if (!(esr & (1U << 10))) { /* Check FnV bit. */
 			dlog(", far=%#x", read_msr(far_el2));
 		} else {
 			dlog(", far=invalid");
@@ -540,7 +540,7 @@ static struct vcpu_fault_info fault_info_init(uintreg_t esr,
 	 * Check the FnV bit, which is only valid if dfsc/ifsc is 010000. It
 	 * indicates that we cannot rely on far_el2.
 	 */
-	if (fsc == 0x10 && esr & (1u << 10)) {
+	if (fsc == 0x10 && esr & (1U << 10)) {
 		r.vaddr = va_init(0);
 		r.ipaddr = ipa_init(read_msr(hpfar_el2) << 8);
 	} else {
@@ -578,7 +578,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 
 	case 0x24: /* EC = 100100, Data abort. */
 		info = fault_info_init(
-			esr, vcpu, (esr & (1u << 6)) ? MM_MODE_W : MM_MODE_R);
+			esr, vcpu, (esr & (1U << 6)) ? MM_MODE_W : MM_MODE_R);
 		if (vcpu_handle_page_fault(vcpu, &info)) {
 			return NULL;
 		}
