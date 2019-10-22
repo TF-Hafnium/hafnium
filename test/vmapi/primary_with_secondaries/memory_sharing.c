@@ -138,10 +138,10 @@ static void spci_check_cannot_share_memory(
 		SPCI_MEMORY_OUTER_SHAREABLE, SPCI_MEMORY_INNER_SHAREABLE};
 	uint32_t vms[] = {HF_PRIMARY_VM_ID, SERVICE_VM0, SERVICE_VM1};
 
-	int i = 0;
-	int j = 0;
-	int k = 0;
-	int l = 0;
+	size_t i = 0;
+	size_t j = 0;
+	size_t k = 0;
+	size_t l = 0;
 
 	for (i = 0; i < ARRAY_SIZE(vms); ++i) {
 		for (j = 0; j < ARRAY_SIZE(lend_access); ++j) {
