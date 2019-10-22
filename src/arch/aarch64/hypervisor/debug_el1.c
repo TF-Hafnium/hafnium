@@ -18,7 +18,6 @@
 
 #include "hf/check.h"
 #include "hf/dlog.h"
-#include "hf/panic.h"
 #include "hf/types.h"
 
 #include "msr.h"
