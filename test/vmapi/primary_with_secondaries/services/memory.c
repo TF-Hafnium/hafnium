@@ -557,6 +557,17 @@ TEST_SERVICE(spci_lend_invalid_source)
 	EXPECT_SPCI_ERROR(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
 					SPCI_MSG_SEND_LEGACY_MEMORY),
 			  SPCI_INVALID_PARAMETERS);
+
+	/* Ensure we cannot share from the primary to another secondary. */
+	msg_size = spci_memory_share_init(
+		send_buf, SERVICE_VM1, constituents,
+		memory_region->constituent_count, 0, SPCI_MEMORY_RW_X,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_SPCI_ERROR(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
+					SPCI_MSG_SEND_LEGACY_MEMORY),
+			  SPCI_INVALID_PARAMETERS);
+
 	spci_yield();
 }
 
@@ -734,8 +745,17 @@ TEST_SERVICE(spci_memory_lend_twice)
 	for (int i = 1; i < PAGE_SIZE * 2; i++) {
 		constituents[0].address = (uint64_t)ptr + i;
 
-		/* Fail to lend the memory back to the primary. */
+		/* Fail to lend or share the memory back to the primary. */
 		msg_size = spci_memory_lend_init(
+			send_buf, SERVICE_VM1, constituents,
+			memory_region->constituent_count, 0, SPCI_MEMORY_RW_X,
+			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+			SPCI_MEMORY_OUTER_SHAREABLE);
+		EXPECT_SPCI_ERROR(
+			spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
+				      SPCI_MSG_SEND_LEGACY_MEMORY),
+			SPCI_INVALID_PARAMETERS);
+		msg_size = spci_memory_share_init(
 			send_buf, SERVICE_VM1, constituents,
 			memory_region->constituent_count, 0, SPCI_MEMORY_RW_X,
 			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,

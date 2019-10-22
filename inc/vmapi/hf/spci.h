@@ -55,9 +55,10 @@
 
 /* Architected memory sharing message IDs. */
 enum spci_memory_share {
-	SPCI_MEMORY_LEND = 0x0,
-	SPCI_MEMORY_RELINQUISH = 0x1,
-	SPCI_MEMORY_DONATE = 0x2,
+	SPCI_MEMORY_DONATE = 0x0,
+	SPCI_MEMORY_LEND = 0x1,
+	SPCI_MEMORY_SHARE = 0x2,
+	SPCI_MEMORY_RELINQUISH = 0x3,
 };
 
 /* SPCI function specific constants. */
@@ -366,9 +367,12 @@ static inline uint32_t spci_memory_region_init(
 	return memory_region->constituent_offset + constituents_length;
 }
 
-/** Constructs an SPCI donate memory region message. */
-static inline uint32_t spci_memory_donate_init(
-	void *message, spci_vm_id_t receiver,
+/**
+ * Constructs an 'architected message' for SPCI memory sharing of the given
+ * type.
+ */
+static inline uint32_t spci_memory_init(
+	void *message, enum spci_memory_share share_type, spci_vm_id_t receiver,
 	struct spci_memory_region_constituent *region_constituents,
 	uint32_t constituent_count, uint32_t tag,
 	enum spci_memory_access access, enum spci_memory_type type,
@@ -381,7 +385,7 @@ static inline uint32_t spci_memory_donate_init(
 		spci_get_memory_region(message);
 
 	/* Fill in the details on the common message header. */
-	spci_architected_message_init(message, SPCI_MEMORY_DONATE);
+	spci_architected_message_init(message, share_type);
 
 	/* Fill in memory region. */
 	message_length += spci_memory_region_init(
@@ -390,29 +394,18 @@ static inline uint32_t spci_memory_donate_init(
 	return message_length;
 }
 
-/**
- * Constructs an SPCI memory region relinquish message.
- * A set of memory regions can be given back to the owner.
- */
-static inline uint32_t spci_memory_relinquish_init(
+/** Constructs an SPCI donate memory region message. */
+static inline uint32_t spci_memory_donate_init(
 	void *message, spci_vm_id_t receiver,
 	struct spci_memory_region_constituent *region_constituents,
-	uint32_t constituent_count, uint32_t tag)
+	uint32_t constituent_count, uint32_t tag,
+	enum spci_memory_access access, enum spci_memory_type type,
+	enum spci_memory_cacheability cacheability,
+	enum spci_memory_shareability shareability)
 {
-	uint32_t message_length =
-		sizeof(struct spci_architected_message_header);
-	struct spci_memory_region *memory_region =
-		spci_get_memory_region(message);
-
-	/* Fill in the details on the common message header. */
-	spci_architected_message_init(message, SPCI_MEMORY_RELINQUISH);
-
-	/* Fill in memory region. */
-	message_length += spci_memory_region_init(
-		memory_region, receiver, region_constituents, constituent_count,
-		tag, SPCI_MEMORY_RW_X, SPCI_MEMORY_DEVICE_MEM,
-		SPCI_MEMORY_DEV_NGNRNE, SPCI_MEMORY_SHARE_NON_SHAREABLE);
-	return message_length;
+	return spci_memory_init(message, SPCI_MEMORY_DONATE, receiver,
+				region_constituents, constituent_count, tag,
+				access, type, cacheability, shareability);
 }
 
 /**
@@ -426,17 +419,39 @@ static inline uint32_t spci_memory_lend_init(
 	enum spci_memory_cacheability cacheability,
 	enum spci_memory_shareability shareability)
 {
-	uint32_t message_length =
-		sizeof(struct spci_architected_message_header);
-	struct spci_memory_region *memory_region =
-		spci_get_memory_region(message);
+	return spci_memory_init(message, SPCI_MEMORY_LEND, receiver,
+				region_constituents, constituent_count, tag,
+				access, type, cacheability, shareability);
+}
 
-	/* Fill in the details on the common message header. */
-	spci_architected_message_init(message, SPCI_MEMORY_LEND);
+/**
+ * Constructs an SPCI memory region share message.
+ */
+static inline uint32_t spci_memory_share_init(
+	void *message, spci_vm_id_t receiver,
+	struct spci_memory_region_constituent *region_constituents,
+	uint32_t constituent_count, uint32_t tag,
+	enum spci_memory_access access, enum spci_memory_type type,
+	enum spci_memory_cacheability cacheability,
+	enum spci_memory_shareability shareability)
+{
+	return spci_memory_init(message, SPCI_MEMORY_SHARE, receiver,
+				region_constituents, constituent_count, tag,
+				access, type, cacheability, shareability);
+}
 
-	/* Fill in memory region. */
-	message_length += spci_memory_region_init(
-		memory_region, receiver, region_constituents, constituent_count,
-		tag, access, type, cacheability, shareability);
-	return message_length;
+/**
+ * Constructs an SPCI memory region relinquish message.
+ * A set of memory regions can be given back to the owner.
+ */
+static inline uint32_t spci_memory_relinquish_init(
+	void *message, spci_vm_id_t receiver,
+	struct spci_memory_region_constituent *region_constituents,
+	uint32_t constituent_count, uint32_t tag)
+{
+	return spci_memory_init(message, SPCI_MEMORY_RELINQUISH, receiver,
+				region_constituents, constituent_count, tag,
+				SPCI_MEMORY_RW_X, SPCI_MEMORY_DEVICE_MEM,
+				SPCI_MEMORY_DEV_NGNRNE,
+				SPCI_MEMORY_SHARE_NON_SHAREABLE);
 }

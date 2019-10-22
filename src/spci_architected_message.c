@@ -55,6 +55,7 @@ static struct spci_value spci_validate_call_share_memory(
 	switch (share) {
 	case SPCI_MEMORY_DONATE:
 	case SPCI_MEMORY_LEND:
+	case SPCI_MEMORY_SHARE:
 		memory_to_attributes = spci_memory_attrs_to_mode(
 			memory_region->attributes[0].memory_attributes);
 		break;
@@ -221,35 +222,44 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 	static const uint32_t size_donate_transitions =
 		ARRAY_SIZE(donate_transitions);
 
-	static const struct spci_mem_transitions relinquish_transitions[] = {
+	/*
+	 * This data structure holds the allowed state transitions for the
+	 * "lend" state machine. In this state machine the owner keeps ownership
+	 * but loses access to the lent pages.
+	 */
+	static const struct spci_mem_transitions lend_transitions[] = {
 		{
-			/* 1) {!O-EA, O-NA} -> {!O-NA, O-EA} */
-			.orig_from_mode = MM_MODE_UNOWNED,
-			.orig_to_mode = MM_MODE_INVALID,
-			.from_mode = MM_MODE_INVALID | MM_MODE_UNOWNED |
-				     MM_MODE_SHARED,
-			.to_mode = 0,
+			/* 1) {O-EA, !O-NA} -> {O-NA, !O-EA} */
+			.orig_from_mode = 0,
+			.orig_to_mode = MM_MODE_INVALID | MM_MODE_UNOWNED |
+					MM_MODE_SHARED,
+			.from_mode = MM_MODE_INVALID,
+			.to_mode = MM_MODE_UNOWNED,
 		},
 		{
-			/* 2) {!O-SA, O-SA} -> {!O-NA, O-EA} */
-			.orig_from_mode = MM_MODE_UNOWNED | MM_MODE_SHARED,
-			.orig_to_mode = MM_MODE_SHARED,
-			.from_mode = MM_MODE_INVALID | MM_MODE_UNOWNED |
-				     MM_MODE_SHARED,
-			.to_mode = 0,
+			/*
+			 * Duplicate of 1) in order to cater for an alternative
+			 * representation of !O-NA:
+			 * (INVALID | UNOWNED | SHARED) and (INVALID | UNOWNED)
+			 * are both alternate representations of !O-NA.
+			 */
+			/* 2) {O-EA, !O-NA} -> {O-NA, !O-EA} */
+			.orig_from_mode = 0,
+			.orig_to_mode = MM_MODE_INVALID | MM_MODE_UNOWNED,
+			.from_mode = MM_MODE_INVALID,
+			.to_mode = MM_MODE_UNOWNED,
 		},
 	};
 
-	static const uint32_t size_relinquish_transitions =
-		ARRAY_SIZE(relinquish_transitions);
+	static const uint32_t size_lend_transitions =
+		ARRAY_SIZE(lend_transitions);
 
 	/*
-	 * This data structure holds the allowed state transitions for the "lend
-	 * with shared access" state machine. In this state machine the owner
-	 * keeps the lent pages mapped on its stage2 table and keeps access as
-	 * well.
+	 * This data structure holds the allowed state transitions for the
+	 * "share" state machine. In this state machine the owner keeps the
+	 * shared pages mapped on its stage2 table and keeps access as well.
 	 */
-	static const struct spci_mem_transitions shared_lend_transitions[] = {
+	static const struct spci_mem_transitions share_transitions[] = {
 		{
 			/* 1) {O-EA, !O-NA} -> {O-SA, !O-SA} */
 			.orig_from_mode = 0,
@@ -273,8 +283,30 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 		},
 	};
 
-	static const uint32_t size_shared_lend_transitions =
-		ARRAY_SIZE(shared_lend_transitions);
+	static const uint32_t size_share_transitions =
+		ARRAY_SIZE(share_transitions);
+
+	static const struct spci_mem_transitions relinquish_transitions[] = {
+		{
+			/* 1) {!O-EA, O-NA} -> {!O-NA, O-EA} */
+			.orig_from_mode = MM_MODE_UNOWNED,
+			.orig_to_mode = MM_MODE_INVALID,
+			.from_mode = MM_MODE_INVALID | MM_MODE_UNOWNED |
+				     MM_MODE_SHARED,
+			.to_mode = 0,
+		},
+		{
+			/* 2) {!O-SA, O-SA} -> {!O-NA, O-EA} */
+			.orig_from_mode = MM_MODE_UNOWNED | MM_MODE_SHARED,
+			.orig_to_mode = MM_MODE_SHARED,
+			.from_mode = MM_MODE_INVALID | MM_MODE_UNOWNED |
+				     MM_MODE_SHARED,
+			.to_mode = 0,
+		},
+	};
+
+	static const uint32_t size_relinquish_transitions =
+		ARRAY_SIZE(relinquish_transitions);
 
 	/* Fail if addresses are not page-aligned. */
 	if (!is_aligned(ipa_addr(begin), PAGE_SIZE) ||
@@ -299,14 +331,19 @@ bool spci_msg_check_transition(struct vm *to, struct vm *from,
 		transition_table_size = size_donate_transitions;
 		break;
 
+	case SPCI_MEMORY_LEND:
+		mem_transition_table = lend_transitions;
+		transition_table_size = size_lend_transitions;
+		break;
+
+	case SPCI_MEMORY_SHARE:
+		mem_transition_table = share_transitions;
+		transition_table_size = size_share_transitions;
+		break;
+
 	case SPCI_MEMORY_RELINQUISH:
 		mem_transition_table = relinquish_transitions;
 		transition_table_size = size_relinquish_transitions;
-		break;
-
-	case SPCI_MEMORY_LEND:
-		mem_transition_table = shared_lend_transitions;
-		transition_table_size = size_shared_lend_transitions;
 		break;
 
 	default:
