@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "offsets.h"
+#include "hf/arch/offsets.h"
 
 /**
  * Called only on first boot after the image has been relocated and BSS zeroed.

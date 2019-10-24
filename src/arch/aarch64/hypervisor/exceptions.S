@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "offsets.h"
+#include "hf/arch/offsets.h"
 #include "exception_macros.S"
 
 /**

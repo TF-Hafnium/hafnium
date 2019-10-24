@@ -39,6 +39,9 @@ config("platform") {
     "//inc",
     "//inc/vmapi",
     "//src/arch/${plat_arch}/inc",
+
+    # Auto-generated headers using the 'offset_size_header' build rule.
+    "${root_gen_dir}/offset_size_header",
   ]
 
   defines = [

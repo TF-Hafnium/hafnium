@@ -14,24 +14,15 @@
  * limitations under the License.
  */
 
-#include "offsets.h"
-
 #include "hf/cpu.h"
-#include "hf/static_assert.h"
+#include "hf/offset_size_header.h"
 
-#define CHECK_OFFSET(name, type, field) \
-	CHECK_OFFSET_1(#name, name, offsetof(type, field))
-#define CHECK_OFFSET_1(name, actual, expected)               \
-	static_assert((actual) == (expected),                \
-		      "Offset " name " should be " #expected \
-		      " and not " #actual)
+DEFINE_OFFSETOF(CPU_ID, struct cpu, id)
+DEFINE_OFFSETOF(CPU_STACK_BOTTOM, struct cpu, stack_bottom)
+DEFINE_OFFSETOF(VCPU_REGS, struct vcpu, regs)
+DEFINE_OFFSETOF(VCPU_LAZY, struct vcpu, regs.lazy)
+DEFINE_OFFSETOF(VCPU_FREGS, struct vcpu, regs.fp)
 
-CHECK_OFFSET(CPU_ID, struct cpu, id);
-CHECK_OFFSET(CPU_STACK_BOTTOM, struct cpu, stack_bottom);
-CHECK_OFFSET(VCPU_REGS, struct vcpu, regs);
-CHECK_OFFSET(VCPU_LAZY, struct vcpu, regs.lazy);
-CHECK_OFFSET(VCPU_FREGS, struct vcpu, regs.fp);
-
-#ifdef VCPU_GIC
-CHECK_OFFSET(VCPU_GIC, struct vcpu, regs.gic);
+#if GIC_VERSION == 3 || GIC_VERSION == 4
+DEFINE_OFFSETOF(VCPU_GIC, struct vcpu, regs.gic)
 #endif

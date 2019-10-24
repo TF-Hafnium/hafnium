@@ -78,6 +78,15 @@ template("embedded_cc_toolchain") {
       ]
     }
 
+    tool("alink") {
+      outfile = "{{target_out_dir}}/{{target_output_name}}.a"
+      command = "rm -f $outfile && ${invoker.ar} -rc $outfile {{inputs}}"
+      description = "ALINK $outfile"
+      outputs = [
+        outfile,
+      ]
+    }
+
     tool("stamp") {
       command = "touch {{output}}"
       description = "STAMP {{output}}"
@@ -108,6 +117,7 @@ template("embedded_clang_toolchain") {
   embedded_cc_toolchain(target_name) {
     cc = "clang"
     ld = "ld.lld"
+    ar = "llvm-ar"
 
     forward_variables_from(invoker,
                            [
@@ -149,6 +159,7 @@ template("embedded_clang_bfd_toolchain") {
   embedded_cc_toolchain(target_name) {
     cc = "clang"
     ld = "${invoker.tool_prefix}ld.bfd"
+    ar = "llvm-ar"
 
     forward_variables_from(invoker,
                            [

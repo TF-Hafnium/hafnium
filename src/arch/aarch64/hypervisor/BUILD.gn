@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("//build/toolchain/offset_size_header.gni")
+
+offset_size_header("offsets") {
+  sources = [
+    "offsets.c",
+  ]
+  path = "hf/arch/offsets.h"
+}
+
 # Hypervisor specific code.
 source_set("hypervisor") {
   public_configs = [ "//src/arch/aarch64:config" ]
@@ -24,13 +33,13 @@ source_set("hypervisor") {
   sources += [
     "debug_el1.c",
     "handler.c",
-    "offsets.c",
     "perfmon.c",
     "psci_handler.c",
     "sysregs.c",
   ]
 
   deps = [
+    ":offsets",
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64:entry",
     "//src/arch/aarch64:smc",
