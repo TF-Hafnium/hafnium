@@ -111,6 +111,12 @@ given page may be shared with at most 2 VMs at once (including the original
 owning VM). Memory which has been donated or shared may not be forcefully
 reclaimed, but the VM with which it was shared may choose to return it.
 
+## Cache
+
+VMs will be blocked from using cache maintenance instructions that operate by
+set/way. These operations are difficult to virtualize, and could expose the
+system to side-channel attacks.
+
 ## Logging
 
 VMs may send a character to a shared log by means of a hypercall or SMC call.
