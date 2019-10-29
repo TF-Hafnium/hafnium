@@ -32,13 +32,21 @@ uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id)
 {
 	uintreg_t hcr_el2_value = 0;
 
+	/*
+	 * TODO(b/132395845):  Access to RAS registers is not trapped at the
+	 * moment for the primary VM, only for the secondaries (TERR). RAS
+	 * register isn't needed now, but it might be required for debugging.
+	 * When Hafnium introduces debug vs release builds, trap accesses for
+	 * primary VMs in release builds, but do not trap them in debug builds.
+	 */
 	hcr_el2_value = HCR_EL2_RW | HCR_EL2_TACR | HCR_EL2_TIDCP |
 			HCR_EL2_TSC | HCR_EL2_PTW | HCR_EL2_VM | HCR_EL2_TSW;
 
 	if (vm_id != HF_PRIMARY_VM_ID) {
 		hcr_el2_value |= HCR_EL2_TWE | HCR_EL2_TWI |
 				 HCR_EL2_BSU_INNER_SHAREABLE | HCR_EL2_FB |
-				 HCR_EL2_AMO | HCR_EL2_IMO | HCR_EL2_FMO;
+				 HCR_EL2_AMO | HCR_EL2_IMO | HCR_EL2_FMO |
+				 HCR_EL2_TERR;
 	}
 
 	return hcr_el2_value;

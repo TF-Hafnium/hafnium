@@ -91,7 +91,8 @@ Hafnium may allow VMs to use these registers in debug builds.
 
 ## RAS Extension registers
 
-VMs will be blocked from using registers associated with the RAS Extension.
+Secondary VMs will be blocked from using registers associated with the RAS
+Extension.
 
 ## Asynchronous message passing
 
