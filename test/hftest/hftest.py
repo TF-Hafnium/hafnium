@@ -41,9 +41,11 @@ DTC_SCRIPT = os.path.join(HF_ROOT, "build", "image", "dtc.py")
 FVP_BINARY = os.path.join(
     os.path.dirname(HF_ROOT), "fvp", "Base_RevC_AEMv8A_pkg", "models",
     "Linux64_GCC-4.9", "FVP_Base_RevC-2xAEMv8A")
+FVP_PREBUILTS_ROOT = os.path.join(
+    HF_ROOT, "prebuilts", "linux-aarch64", "arm-trusted-firmware", "fvp")
 FVP_PREBUILT_DTS = os.path.join(
-    HF_ROOT, "prebuilts", "linux-aarch64", "arm-trusted-firmware",
-    "fvp-base-gicv3-psci-1t.dts")
+    FVP_PREBUILTS_ROOT, "fvp-base-gicv3-psci-1t.dts")
+FVP_PREBUILT_BL31 = os.path.join(FVP_PREBUILTS_ROOT, "bl31.bin")
 
 def read_file(path):
     with open(path, "r") as f:
@@ -306,7 +308,7 @@ class FvpDriver(Driver):
             "-C", "cluster1.cpu1.RVBAR=0x04020000",
             "-C", "cluster1.cpu2.RVBAR=0x04020000",
             "-C", "cluster1.cpu3.RVBAR=0x04020000",
-            "--data", "cluster0.cpu0=prebuilts/linux-aarch64/arm-trusted-firmware/bl31.bin@0x04020000",
+            "--data", "cluster0.cpu0=" + FVP_PREBUILT_BL31 + "@0x04020000",
             "--data", "cluster0.cpu0=" + dtb_path + "@0x82000000",
             "--data", "cluster0.cpu0=" + self.args.kernel + "@0x80000000",
             "-C", "bp.ve_sysregs.mmbSiteDefault=0",
