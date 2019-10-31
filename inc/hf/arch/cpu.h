@@ -59,3 +59,8 @@ void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg);
  * by any other physical CPU.
  */
 void arch_regs_set_retval(struct arch_regs *r, struct spci_value v);
+
+/**
+ * Initialize and reset CPU-wide register values.
+ */
+void arch_cpu_init(void);

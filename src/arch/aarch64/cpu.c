@@ -26,6 +26,12 @@
 
 #include "hypervisor/perfmon.h"
 #include "hypervisor/sysregs.h"
+#include "msr.h"
+
+/**
+ * The LO field indicates whether LORegions are supported.
+ */
+#define ID_AA64MMFR1_EL1_LO (UINT64_C(1) << 16)
 
 void arch_irq_disable(void)
 {
@@ -35,6 +41,16 @@ void arch_irq_disable(void)
 void arch_irq_enable(void)
 {
 	__asm__ volatile("msr DAIFClr, #0xf");
+}
+
+static void lor_disable(void)
+{
+	/*
+	 * Accesses to LORC_EL1 are undefined if LORegions are not supported.
+	 */
+	if (read_msr(ID_AA64MMFR1_EL1) & ID_AA64MMFR1_EL1_LO) {
+		write_msr(MSR_LORC_EL1, 0);
+	}
 }
 
 static void gic_regs_reset(struct arch_regs *r, bool is_primary)
@@ -122,4 +138,13 @@ void arch_regs_set_retval(struct arch_regs *r, struct spci_value v)
 	r->r[5] = v.arg5;
 	r->r[6] = v.arg6;
 	r->r[7] = v.arg7;
+}
+
+void arch_cpu_init(void)
+{
+	/*
+	 * Linux expects LORegions to be disabled, hence if the current system
+	 * supports them, Hafnium ensures that they are disabled.
+	 */
+	lor_disable();
 }

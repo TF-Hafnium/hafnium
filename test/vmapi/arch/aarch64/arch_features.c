@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Hafnium Authors.
+ * Copyright 2019 The Hafnium Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,26 +14,19 @@
  * limitations under the License.
  */
 
-#include "hf/cpu.h"
-#include "hf/vm.h"
+#include "vmapi/hf/call.h"
+
+#include "../msr.h"
+#include "hftest.h"
 
 /**
- * The entry point of CPUs when they are turned on. It is supposed to initialise
- * all state and return the first vCPU to run.
+ * Test that encoding a system register using the implementation defined syntax
+ * maps to the same register defined by name.
  */
-struct vcpu *cpu_main(struct cpu *c)
+TEST(arch_features, read_write_msr_impdef)
 {
-	struct vcpu *vcpu;
-	struct vm *vm;
-
-	vcpu = vm_get_vcpu(vm_find(HF_PRIMARY_VM_ID), cpu_index(c));
-	vm = vcpu->vm;
-	vcpu->cpu = c;
-
-	arch_cpu_init();
-
-	/* Reset the registers to give a clean start for the primary's vCPU. */
-	arch_regs_reset(&vcpu->regs, true, vm->id, c->id, vm->ptable.root);
-
-	return vcpu;
+	uintreg_t value = 0xa;
+	write_msr(S3_3_C9_C13_0, value);
+	EXPECT_EQ(read_msr(S3_3_C9_C13_0), value);
+	EXPECT_EQ(read_msr(PMCCNTR_EL0), value);
 }

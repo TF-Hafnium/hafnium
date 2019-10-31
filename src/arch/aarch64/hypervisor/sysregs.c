@@ -40,7 +40,8 @@ uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id)
 	 * primary VMs in release builds, but do not trap them in debug builds.
 	 */
 	hcr_el2_value = HCR_EL2_RW | HCR_EL2_TACR | HCR_EL2_TIDCP |
-			HCR_EL2_TSC | HCR_EL2_PTW | HCR_EL2_VM | HCR_EL2_TSW;
+			HCR_EL2_TSC | HCR_EL2_PTW | HCR_EL2_VM | HCR_EL2_TSW |
+			HCR_EL2_TLOR;
 
 	if (vm_id != HF_PRIMARY_VM_ID) {
 		hcr_el2_value |= HCR_EL2_TWE | HCR_EL2_TWI |

@@ -28,6 +28,7 @@ vm_kernel("aarch64_test_vm") {
   public_configs = [ "//src/arch/aarch64:config" ]
 
   sources = [
+    "arch_features.c",
     "smc_whitelist.c",
     "smccc.c",
   ]
