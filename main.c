@@ -337,7 +337,7 @@ exit:
 static int hf_vcpu_thread(void *data)
 {
 	struct hf_vcpu *vcpu = data;
-	struct hf_vcpu_run_return ret;
+	struct spci_value ret;
 
 	hrtimer_init(&vcpu->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	vcpu->timer.function = &hf_vcpu_timer_expired;
@@ -352,25 +352,25 @@ static int hf_vcpu_thread(void *data)
 		atomic_set(&vcpu->abort_sleep, 0);
 
 		/* Call into Hafnium to run vcpu. */
-		ret = hf_vcpu_run(vcpu->vm->id, vcpu->vcpu_index);
+		ret = spci_run(vcpu->vm->id, vcpu->vcpu_index);
 
-		switch (ret.code) {
+		switch (ret.func) {
 		/* Preempted. */
-		case HF_VCPU_RUN_PREEMPTED:
+		case SPCI_INTERRUPT_32:
 			if (need_resched())
 				schedule();
 			break;
 
 		/* Yield. */
-		case HF_VCPU_RUN_YIELD:
+		case SPCI_YIELD_32:
 			if (!kthread_should_stop())
 				schedule();
 			break;
 
 		/* WFI. */
-		case HF_VCPU_RUN_WAIT_FOR_INTERRUPT:
-			if (ret.sleep.ns != HF_SLEEP_INDEFINITE) {
-				hrtimer_start(&vcpu->timer, ret.sleep.ns,
+		case HF_SPCI_RUN_WAIT_FOR_INTERRUPT:
+			if (ret.arg2 != SPCI_SLEEP_INDEFINITE) {
+				hrtimer_start(&vcpu->timer, ret.arg2,
 					      HRTIMER_MODE_REL);
 			}
 			hf_vcpu_sleep(vcpu);
@@ -378,10 +378,10 @@ static int hf_vcpu_thread(void *data)
 			break;
 
 		/* Waiting for a message. */
-		case HF_VCPU_RUN_WAIT_FOR_MESSAGE:
+		case SPCI_MSG_WAIT_32:
 			atomic_set(&vcpu->waiting_for_message, 1);
-			if (ret.sleep.ns != HF_SLEEP_INDEFINITE) {
-				hrtimer_start(&vcpu->timer, ret.sleep.ns,
+			if (ret.arg2 != SPCI_SLEEP_INDEFINITE) {
+				hrtimer_start(&vcpu->timer, ret.arg2,
 					      HRTIMER_MODE_REL);
 			}
 			hf_vcpu_sleep(vcpu);
@@ -390,34 +390,40 @@ static int hf_vcpu_thread(void *data)
 			break;
 
 		/* Wake up another vcpu. */
-		case HF_VCPU_RUN_WAKE_UP:
-			hf_handle_wake_up_request(ret.wake_up.vm_id,
-						  ret.wake_up.vcpu);
+		case HF_SPCI_RUN_WAKE_UP:
+			hf_handle_wake_up_request(wake_up_get_vm_id(ret),
+						  wake_up_get_vcpu(ret));
 			break;
 
 		/* Response available. */
-		case HF_VCPU_RUN_MESSAGE:
-			if (ret.message.vm_id == HF_PRIMARY_VM_ID) {
-				hf_handle_message(vcpu->vm, ret.message.size,
+		case SPCI_MSG_SEND_32:
+			if (spci_msg_send_receiver(ret) == HF_PRIMARY_VM_ID) {
+				hf_handle_message(vcpu->vm,
+						  spci_msg_send_size(ret),
 						  page_address(hf_recv_page));
 			} else {
-				hf_deliver_message(ret.message.vm_id);
+				hf_deliver_message(spci_msg_send_receiver(ret));
 			}
 			break;
 
 		/* Notify all waiters. */
-		case HF_VCPU_RUN_NOTIFY_WAITERS:
+		case SPCI_RX_RELEASE_32:
 			hf_notify_waiters(vcpu->vm->id);
 			break;
 
 		/* Abort was triggered. */
-		case HF_VCPU_RUN_ABORTED:
-			for (i = 0; i < vcpu->vm->vcpu_count; i++) {
-				if (i == vcpu->vcpu_index)
-					continue;
-				hf_handle_wake_up_request(vcpu->vm->id, i);
+		case SPCI_ERROR_32:
+			switch (ret.arg2) {
+			case SPCI_ABORTED:
+				for (i = 0; i < vcpu->vm->vcpu_count; i++) {
+					if (i == vcpu->vcpu_index)
+						continue;
+					hf_handle_wake_up_request(vcpu->vm->id,
+								  i);
+				}
+				hf_vcpu_sleep(vcpu);
+				break;
 			}
-			hf_vcpu_sleep(vcpu);
 			break;
 		}
 	}
