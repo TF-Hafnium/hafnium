@@ -33,6 +33,7 @@ vm_kernel("gicv3_test_vm") {
 
   deps = [
     "//src/arch/aarch64:arch",
+    "//src/arch/aarch64/hftest:interrupts",
     "//src/arch/aarch64/hftest:interrupts_gicv3",
     "//test/hftest:hftest_primary_vm",
   ]

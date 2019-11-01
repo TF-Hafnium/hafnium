@@ -16,7 +16,9 @@
         "offsets.h": "c",
         "barriers.h": "c",
         "spci.h": "c",
-        "spci_internal.h": "c"
+        "spci_internal.h": "c",
+        "interrupts_gicv3.h": "c",
+        "interrupts.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

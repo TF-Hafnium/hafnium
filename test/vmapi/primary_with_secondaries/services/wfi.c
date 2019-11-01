@@ -15,7 +15,7 @@
  */
 
 #include "hf/arch/cpu.h"
-#include "hf/arch/vm/interrupts_gicv3.h"
+#include "hf/arch/vm/interrupts.h"
 
 #include "hf/dlog.h"
 

@@ -42,13 +42,22 @@ source_set("power_mgmt") {
   ]
 }
 
-# Exception handlers for interrupts and GICv3 el1 driver.
-source_set("interrupts_gicv3") {
+# Exception handlers for interrupts.
+source_set("interrupts") {
   testonly = true
   public_configs = [ "//src/arch/aarch64:config" ]
   sources = [
     "events.c",
     "exceptions.S",
+    "interrupts.c",
+  ]
+}
+
+# GICv3 EL1 driver.
+source_set("interrupts_gicv3") {
+  testonly = true
+  public_configs = [ "//src/arch/aarch64:config" ]
+  sources = [
     "interrupts_gicv3.c",
   ]
 }

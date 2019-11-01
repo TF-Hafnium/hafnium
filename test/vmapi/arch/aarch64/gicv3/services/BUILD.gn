@@ -33,7 +33,6 @@ source_set("busy") {
 
   deps = [
     ":common",
-    "//src/arch/aarch64/hftest:interrupts_gicv3",
   ]
 }
 
@@ -49,6 +48,7 @@ source_set("timer") {
   deps = [
     ":common",
     "//src/arch/aarch64:arch",
+    "//src/arch/aarch64/hftest:interrupts",
     "//src/arch/aarch64/hftest:interrupts_gicv3",
   ]
 }
@@ -65,7 +65,6 @@ source_set("systemreg") {
   deps = [
     ":common",
     "//src/arch/aarch64:arch",
-    "//src/arch/aarch64/hftest:interrupts_gicv3",
   ]
 }
 

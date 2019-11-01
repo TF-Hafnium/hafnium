@@ -27,7 +27,7 @@
 #include "vmapi/hf/spci.h"
 
 /**
- * Disables interrutps.
+ * Disables interrupts.
  */
 void arch_irq_disable(void);
 

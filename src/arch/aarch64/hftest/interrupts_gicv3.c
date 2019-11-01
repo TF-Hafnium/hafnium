@@ -19,29 +19,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "hf/arch/cpu.h"
-
 #include "hf/dlog.h"
 
 #include "msr.h"
-
-extern uint8_t vector_table_el1;
-static void (*irq_callback)(void);
-
-void irq_current(void)
-{
-	if (irq_callback != NULL) {
-		irq_callback();
-	}
-}
-
-void exception_setup(void (*irq)(void))
-{
-	irq_callback = irq;
-
-	/* Set exception vector table. */
-	write_msr(VBAR_EL1, &vector_table_el1);
-}
 
 void interrupt_gic_setup(void)
 {
@@ -158,35 +138,4 @@ uint32_t interrupt_get_and_acknowledge(void)
 void interrupt_end(uint32_t intid)
 {
 	write_msr(ICC_EOIR1_EL1, intid);
-}
-
-void sync_current_exception(uintreg_t esr, uintreg_t elr)
-{
-	switch (esr >> 26) {
-	case 0x25: /* EC = 100101, Data abort. */
-		dlog("Data abort: pc=%#x, esr=%#x, ec=%#x", elr, esr,
-		     esr >> 26);
-		if (!(esr & (1U << 10))) { /* Check FnV bit. */
-			dlog(", far=%#x", read_msr(far_el1));
-		} else {
-			dlog(", far=invalid");
-		}
-
-		dlog("\n");
-		break;
-
-	default:
-		dlog("Unknown current sync exception pc=%#x, esr=%#x, "
-		     "ec=%#x\n",
-		     elr, esr, esr >> 26);
-	}
-
-	for (;;) {
-		/* do nothing */
-	}
-}
-
-void interrupt_wait(void)
-{
-	__asm__ volatile("wfi");
 }

@@ -68,7 +68,7 @@ source_set("echo_with_notification") {
   ]
 
   deps = [
-    "//src/arch/aarch64/hftest:interrupts_gicv3",
+    "//src/arch/aarch64/hftest:interrupts",
   ]
 }
 
@@ -136,7 +136,7 @@ source_set("interruptible") {
   ]
 
   deps = [
-    "//src/arch/aarch64/hftest:interrupts_gicv3",
+    "//src/arch/aarch64/hftest:interrupts",
   ]
 }
 
@@ -153,6 +153,7 @@ source_set("receive_block") {
   ]
   deps = [
     "//src/arch/aarch64:arch",
+    "//src/arch/aarch64/hftest:interrupts",
     "//test/vmapi/primary_with_secondaries:util",
   ]
 }
@@ -188,6 +189,9 @@ source_set("wfi") {
   ]
   sources = [
     "wfi.c",
+  ]
+  deps = [
+    "//src/arch/aarch64/hftest:interrupts",
   ]
 }
 

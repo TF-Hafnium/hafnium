@@ -51,7 +51,6 @@
 
 /* clang-format on */
 
-void exception_setup(void (*irq)(void));
 void interrupt_gic_setup(void);
 void interrupt_enable(uint32_t intid, bool enable);
 void interrupt_enable_all(bool enable);
@@ -63,4 +62,3 @@ void interrupt_send_sgi(uint8_t intid, bool irm, uint8_t affinity3,
 			uint16_t target_list);
 uint32_t interrupt_get_and_acknowledge(void);
 void interrupt_end(uint32_t intid);
-void interrupt_wait(void);
