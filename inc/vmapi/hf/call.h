@@ -70,17 +70,6 @@ static inline struct spci_value spci_run(spci_vm_id_t vm_id,
 }
 
 /**
- * Runs the given vCPU of the given VM.
- *
- * Returns an hf_vcpu_run_return struct telling the scheduler what to do next.
- */
-static inline struct hf_vcpu_run_return hf_vcpu_run(spci_vm_id_t vm_id,
-						    spci_vcpu_index_t vcpu_idx)
-{
-	return hf_vcpu_run_return_decode(spci_run(vm_id, vcpu_idx));
-}
-
-/**
  * Hints that the vcpu is willing to yield its current use of the physical CPU.
  * This call always returns SPCI_SUCCESS.
  */
