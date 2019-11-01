@@ -156,15 +156,41 @@ template("device_tree") {
                            ])
     script = "//build/image/dtc.py"
 
+    if (defined(invoker.output_pattern)) {
+      output_pattern = invoker.output_pattern
+    } else {
+      output_pattern = "${target_out_dir}/{{source_name_part}}.dtb"
+    }
+
     outputs = [
-      invoker.output_pattern,
+      output_pattern,
     ]
     args = [
       "compile",
       "-i",
       "{{source}}",
       "-o",
-      rebase_path(invoker.output_pattern),
+      rebase_path(output_pattern),
+    ]
+  }
+}
+
+template("incbin") {
+  source_set(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "deps",
+                           ])
+
+    inc_files = invoker.sources
+
+    sources = [
+      "//build/image/incbin.S",
+    ]
+    defines = [
+      "SECTION_NAME=" + invoker.section,
+      "FILE_PATH=\"" + rebase_path(inc_files[0]) + "\"",
     ]
   }
 }
