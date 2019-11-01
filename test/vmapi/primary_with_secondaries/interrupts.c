@@ -32,14 +32,14 @@ TEST(interrupts, interrupt_self)
 {
 	const char message[] = "Ping";
 	const char expected_response[] = "Got IRQ 05.";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "interruptible", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Set the message, echo it and wait for a response. */
 	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
@@ -47,9 +47,9 @@ TEST(interrupts, interrupt_self)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
@@ -63,29 +63,29 @@ TEST(interrupts, interrupt_self)
 TEST(interrupts, inject_interrupt_twice)
 {
 	const char expected_response[] = "Got IRQ 07.";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "interruptible", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Inject the interrupt and wait for a message. */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_A);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
 
 	/* Inject the interrupt again, and wait for the same message. */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_A);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
@@ -99,29 +99,29 @@ TEST(interrupts, inject_two_interrupts)
 {
 	const char expected_response[] = "Got IRQ 07.";
 	const char expected_response_2[] = "Got IRQ 08.";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "interruptible", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Inject the interrupt and wait for a message. */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_A);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
 
 	/* Inject a different interrupt and wait for a different message. */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_B);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response_2));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response_2));
 	EXPECT_EQ(memcmp(mb.recv, expected_response_2,
 			 sizeof(expected_response_2)),
 		  0);
@@ -138,27 +138,27 @@ TEST(interrupts, inject_interrupt_message)
 	const char expected_response[] = "Got IRQ 07.";
 	const char message[] = "Ping";
 	const char expected_response_2[] = "Got IRQ 05.";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "interruptible", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Inject the interrupt and wait for a message. */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_A);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Now send a message to the secondary. */
 	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
@@ -166,9 +166,9 @@ TEST(interrupts, inject_interrupt_message)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response_2));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response_2));
 	EXPECT_EQ(memcmp(mb.recv, expected_response_2,
 			 sizeof(expected_response_2)),
 		  0);
@@ -184,16 +184,16 @@ TEST(interrupts, inject_interrupt_disabled)
 {
 	const char expected_response[] = "Got IRQ 09.";
 	const char message[] = "Enable interrupt C";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "interruptible", mb.send);
 
 	/* Inject the interrupt and expect not to get a message. */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_C);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/*
 	 * Now send a message to the secondary to enable the interrupt ID, and
@@ -204,9 +204,9 @@ TEST(interrupts, inject_interrupt_disabled)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
@@ -220,7 +220,7 @@ TEST(interrupts, inject_interrupt_disabled)
 TEST(interrupts, pending_interrupt_no_blocking_receive)
 {
 	const char expected_response[] = "Done waiting";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "receive_block", mb.send);
@@ -231,9 +231,9 @@ TEST(interrupts, pending_interrupt_no_blocking_receive)
 	 * back after failing to receive a message a few times.
 	 */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_A);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
@@ -247,7 +247,7 @@ TEST(interrupts, pending_interrupt_no_blocking_receive)
 TEST(interrupts, pending_interrupt_wfi_not_trapped)
 {
 	const char expected_response[] = "Done waiting";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "wfi", mb.send);
@@ -258,9 +258,9 @@ TEST(interrupts, pending_interrupt_wfi_not_trapped)
 	 * back after running WFI a few times.
 	 */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_A);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
@@ -273,14 +273,14 @@ TEST(interrupts, pending_interrupt_wfi_not_trapped)
 TEST(interrupts, deliver_interrupt_and_message)
 {
 	const char message[] = "I\'ll see you again.";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "interruptible_echo", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	memcpy_s(mb.send, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
 	EXPECT_EQ(
@@ -288,9 +288,9 @@ TEST(interrupts, deliver_interrupt_and_message)
 			.func,
 		SPCI_SUCCESS_32);
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_A);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
 	EXPECT_EQ(hf_mailbox_clear(), 0);
 }

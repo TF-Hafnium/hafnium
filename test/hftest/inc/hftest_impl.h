@@ -280,7 +280,7 @@ union hftest_any {
  */
 #define HFTEST_SERVICE_SELECT(vm_id, service, send_buffer)                    \
 	do {                                                                  \
-		struct spci_value run_res;                                    \
+		struct hf_vcpu_run_return run_res;                            \
 		uint32_t msg_length =                                         \
 			strnlen_s(service, SERVICE_NAME_MAX_LENGTH);          \
                                                                               \
@@ -288,9 +288,9 @@ union hftest_any {
 		 * Let the service configure its mailbox and wait for a       \
 		 * message.                                                   \
 		 */                                                           \
-		run_res = spci_run(vm_id, 0);                                 \
-		ASSERT_EQ(run_res.func, SPCI_MSG_WAIT_32);                    \
-		ASSERT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);               \
+		run_res = hf_vcpu_run(vm_id, 0);                              \
+		ASSERT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);        \
+		ASSERT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);             \
                                                                               \
 		/* Send the selected service to run and let it be handled. */ \
 		memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, service,          \
@@ -299,8 +299,8 @@ union hftest_any {
 		ASSERT_EQ(spci_msg_send(hf_vm_get_id(), vm_id, msg_length, 0) \
 				  .func,                                      \
 			  SPCI_SUCCESS_32);                                   \
-		run_res = spci_run(vm_id, 0);                                 \
-		ASSERT_EQ(run_res.func, SPCI_YIELD_32);                       \
+		run_res = hf_vcpu_run(vm_id, 0);                              \
+		ASSERT_EQ(run_res.code, HF_VCPU_RUN_YIELD);                   \
 	} while (0)
 
 #define HFTEST_SERVICE_SEND_BUFFER() hftest_get_context()->send

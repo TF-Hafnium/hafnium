@@ -33,7 +33,7 @@
 TEST(spci, msg_send)
 {
 	const char message[] = "spci_msg_send";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "spci_check", mb.send);
@@ -45,8 +45,8 @@ TEST(spci, msg_send)
 			.func,
 		SPCI_SUCCESS_32);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
 }
 
 /**
@@ -88,7 +88,7 @@ TEST(spci, spci_invalid_destination_id)
 TEST(spci, spci_incorrect_length)
 {
 	const char message[] = "this should be truncated";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "spci_length", mb.send);
@@ -98,8 +98,8 @@ TEST(spci, spci_incorrect_length)
 	/* Hard code incorrect length. */
 	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, 16, 0).func,
 		  SPCI_SUCCESS_32);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
 }
 
 /**
@@ -123,10 +123,10 @@ TEST(spci, spci_large_message)
 TEST(spci, spci_recv_non_blocking)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 
 	/* Check is performed in secondary vm. */
 	SERVICE_SELECT(SERVICE_VM0, "spci_recv_non_blocking", mb.send);
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
 }

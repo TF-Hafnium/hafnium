@@ -25,7 +25,6 @@
 
 #include "hftest.h"
 #include "primary_with_secondary.h"
-#include "util.h"
 
 static alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
 static alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];
@@ -83,28 +82,31 @@ TEST(hf_vcpu_get_count, large_invalid_vm_id)
 /**
  * The primary can't be run by the hypervisor.
  */
-TEST(spci_run, cannot_run_primary)
+TEST(hf_vcpu_run, cannot_run_primary)
 {
-	struct spci_value res = spci_run(HF_PRIMARY_VM_ID, 0);
-	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
+	struct hf_vcpu_run_return res = hf_vcpu_run(HF_PRIMARY_VM_ID, 0);
+	EXPECT_EQ(res.code, HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
+	EXPECT_EQ(res.sleep.ns, HF_SLEEP_INDEFINITE);
 }
 
 /**
  * Can only run a VM that exists.
  */
-TEST(spci_run, cannot_run_absent_secondary)
+TEST(hf_vcpu_run, cannot_run_absent_secondary)
 {
-	struct spci_value res = spci_run(1234, 0);
-	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
+	struct hf_vcpu_run_return res = hf_vcpu_run(1234, 0);
+	EXPECT_EQ(res.code, HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
+	EXPECT_EQ(res.sleep.ns, HF_SLEEP_INDEFINITE);
 }
 
 /**
  * Can only run a vcpu that exists.
  */
-TEST(spci_run, cannot_run_absent_vcpu)
+TEST(hf_vcpu_run, cannot_run_absent_vcpu)
 {
-	struct spci_value res = spci_run(SERVICE_VM0, 1234);
-	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
+	struct hf_vcpu_run_return res = hf_vcpu_run(SERVICE_VM0, 1234);
+	EXPECT_EQ(res.code, HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
+	EXPECT_EQ(res.sleep.ns, HF_SLEEP_INDEFINITE);
 }
 
 /**
@@ -160,7 +162,7 @@ TEST(hf_vm_configure, succeeds)
 }
 
 /**
- * The primary receives messages from spci_run().
+ * The primary receives messages from hf_vcpu_run().
  */
 TEST(hf_mailbox_receive, cannot_receive_from_primary_blocking)
 {
@@ -169,7 +171,7 @@ TEST(hf_mailbox_receive, cannot_receive_from_primary_blocking)
 }
 
 /**
- * The primary receives messages from spci_run().
+ * The primary receives messages from hf_vcpu_run().
  */
 TEST(hf_mailbox_receive, cannot_receive_from_primary_non_blocking)
 {

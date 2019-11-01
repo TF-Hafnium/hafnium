@@ -27,13 +27,13 @@
  */
 TEST(boot, memory_size)
 {
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "boot_memory", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_YIELD);
 }
 
 /**
@@ -41,13 +41,13 @@ TEST(boot, memory_size)
  */
 TEST(boot, beyond_memory_size)
 {
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "boot_memory_overrun", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
 }
 
 /**
@@ -55,11 +55,11 @@ TEST(boot, beyond_memory_size)
  */
 TEST(boot, memory_before_image)
 {
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM0, "boot_memory_underrun", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_ABORTED);
 }

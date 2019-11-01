@@ -41,12 +41,12 @@ static void timer_busywait_secondary()
 {
 	const char message[] = "loop 0099999";
 	const char expected_response[] = "Got IRQ 03.";
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
 	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
@@ -58,23 +58,23 @@ static void timer_busywait_secondary()
 	/*
 	 * Let the secondary handle the message and set the timer. It will loop
 	 * until the hardware interrupt fires, at which point we'll get and
-	 * ignore the interrupt, and see a SPCI_YIELD return code.
+	 * ignore the interrupt, and see a HF_VCPU_RUN_YIELD return code.
 	 */
 	dlog("running secondary after sending timer message.\n");
 	last_interrupt_id = 0;
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_INTERRUPT_32);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_PREEMPTED);
 	dlog("secondary yielded after receiving timer message\n");
 	EXPECT_EQ(last_interrupt_id, VIRTUAL_TIMER_IRQ);
 
 	/*
-	 * Now that the timer has expired, when we call spci_run again Hafnium
-	 * should inject a virtual timer interrupt into the secondary, which
-	 * should get it and respond.
+	 * Now that the timer has expired, when we call hf_vcpu_run again
+	 * Hafnium should inject a virtual timer interrupt into the secondary,
+	 * which should get it and respond.
 	 */
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(recv_buffer, expected_response,
 			 sizeof(expected_response)),
 		  0);
@@ -95,16 +95,17 @@ TEST(timer_secondary, busywait)
 	timer_busywait_secondary();
 }
 
-static void timer_secondary(const char message[], uint64_t expected_code)
+static void timer_secondary(const char message[],
+			    enum hf_vcpu_run_code expected_code)
 {
 	const char expected_response[] = "Got IRQ 03.";
 	size_t message_length = strnlen_s(message, 64) + 1;
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
 	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, message_length);
@@ -115,62 +116,63 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 
 	/* Let the secondary handle the message and set the timer. */
 	last_interrupt_id = 0;
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
 
 	/*
 	 * There's a race for whether the secondary manages to block and switch
 	 * to the primary before the hardware timer fires, so we need to handle
 	 * three cases:
-	 * 1. The (hardware) timer fires immediately, we get SPCI_INTERRUPT.
+	 * 1. The (hardware) timer fires immediately, we get
+	 *   HF_VCPU_RUN_PREEMPTED.
 	 * 2. The secondary blocks and switches back, we get expected_code until
 	 *   the timer fires.
 	 *  2a. The timer then expires while we are in the primary, so Hafnium
-	 *   can inject the timer interrupt the next time we call spci_run.
+	 *   can inject the timer interrupt the next time we call hf_vcpu_run.
 	 *  2b. The timer fires while the secondary is running, so we get
-	 *   SPCI_INTERRUPT as in case 1.
+	 *   HF_VCPU_RUN_PREEMPTED as in case 1.
 	 */
 
-	if (run_res.func != expected_code &&
-	    run_res.func != SPCI_INTERRUPT_32) {
-		FAIL("Expected run to return SPCI_INTERRUPT or %#x, but "
-		     "got %#x",
-		     expected_code, run_res.func);
+	if (run_res.code != expected_code &&
+	    run_res.code != HF_VCPU_RUN_PREEMPTED) {
+		FAIL("Expected run to return HF_VCPU_RUN_PREEMPTED or %d, but "
+		     "got %d",
+		     expected_code, run_res.code);
 	}
 
 	/* Loop until the timer fires. */
-	while (run_res.func == expected_code) {
+	while (run_res.code == expected_code) {
 		/*
 		 * This case happens if the secondary manages to block and
 		 * switch to the primary before the timer fires.
 		 */
 		dlog("Primary looping until timer fires\n");
-		if (expected_code == HF_SPCI_RUN_WAIT_FOR_INTERRUPT ||
-		    expected_code == SPCI_MSG_WAIT_32) {
-			EXPECT_NE(run_res.arg2, SPCI_SLEEP_INDEFINITE);
-			dlog("%d ns remaining\n", run_res.arg2);
+		if (expected_code == HF_VCPU_RUN_WAIT_FOR_INTERRUPT ||
+		    expected_code == HF_VCPU_RUN_WAIT_FOR_MESSAGE) {
+			EXPECT_NE(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
+			dlog("%d ns remaining\n", run_res.sleep.ns);
 		}
-		run_res = spci_run(SERVICE_VM0, 0);
+		run_res = hf_vcpu_run(SERVICE_VM0, 0);
 	}
 	dlog("Primary done looping\n");
 
-	if (run_res.func == SPCI_INTERRUPT_32) {
+	if (run_res.code == HF_VCPU_RUN_PREEMPTED) {
 		/*
 		 * This case happens if the (hardware) timer fires before the
 		 * secondary blocks and switches to the primary, either
 		 * immediately after setting the timer or during the loop above.
 		 * Then we get the interrupt to the primary, ignore it, and see
-		 * a SPCI_INTERRUPT code from the spci_run call, so we should
-		 * call it again for the timer interrupt to be injected
+		 * a HF_VCPU_RUN_PREEMPTED code from the hf_vcpu_run call, so we
+		 * should call it again for the timer interrupt to be injected
 		 * automatically by Hafnium.
 		 */
 		EXPECT_EQ(last_interrupt_id, VIRTUAL_TIMER_IRQ);
 		dlog("Preempted by timer interrupt, running again\n");
-		run_res = spci_run(SERVICE_VM0, 0);
+		run_res = hf_vcpu_run(SERVICE_VM0, 0);
 	}
 
 	/* Once we wake it up it should get the timer interrupt and respond. */
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_MESSAGE);
+	EXPECT_EQ(run_res.message.size, sizeof(expected_response));
 	EXPECT_EQ(memcmp(recv_buffer, expected_response,
 			 sizeof(expected_response)),
 		  0);
@@ -190,8 +192,8 @@ TEST(timer_secondary, wfi_short)
 	 * Run the test twice in a row, to check that the state doesn't get
 	 * messed up.
 	 */
-	timer_secondary("WFI  0000001", HF_SPCI_RUN_WAIT_FOR_INTERRUPT);
-	timer_secondary("WFI  0000001", HF_SPCI_RUN_WAIT_FOR_INTERRUPT);
+	timer_secondary("WFI  0000001", HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
+	timer_secondary("WFI  0000001", HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
 }
 
 TEST(timer_secondary, wfi_long)
@@ -200,8 +202,8 @@ TEST(timer_secondary, wfi_long)
 	 * Run the test twice in a row, to check that the state doesn't get
 	 * messed up.
 	 */
-	timer_secondary("WFI  0099999", HF_SPCI_RUN_WAIT_FOR_INTERRUPT);
-	timer_secondary("WFI  0099999", HF_SPCI_RUN_WAIT_FOR_INTERRUPT);
+	timer_secondary("WFI  0099999", HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
+	timer_secondary("WFI  0099999", HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
 }
 
 TEST(timer_secondary, wfe_short)
@@ -210,8 +212,8 @@ TEST(timer_secondary, wfe_short)
 	 * Run the test twice in a row, to check that the state doesn't get
 	 * messed up.
 	 */
-	timer_secondary("WFE  0000001", SPCI_YIELD_32);
-	timer_secondary("WFE  0000001", SPCI_YIELD_32);
+	timer_secondary("WFE  0000001", HF_VCPU_RUN_YIELD);
+	timer_secondary("WFE  0000001", HF_VCPU_RUN_YIELD);
 }
 
 TEST(timer_secondary, wfe_long)
@@ -220,8 +222,8 @@ TEST(timer_secondary, wfe_long)
 	 * Run the test twice in a row, to check that the state doesn't get
 	 * messed up.
 	 */
-	timer_secondary("WFE  0099999", SPCI_YIELD_32);
-	timer_secondary("WFE  0099999", SPCI_YIELD_32);
+	timer_secondary("WFE  0099999", HF_VCPU_RUN_YIELD);
+	timer_secondary("WFE  0099999", HF_VCPU_RUN_YIELD);
 }
 
 TEST(timer_secondary, receive_short)
@@ -230,8 +232,8 @@ TEST(timer_secondary, receive_short)
 	 * Run the test twice in a row, to check that the state doesn't get
 	 * messed up.
 	 */
-	timer_secondary("RECV 0000001", SPCI_MSG_WAIT_32);
-	timer_secondary("RECV 0000001", SPCI_MSG_WAIT_32);
+	timer_secondary("RECV 0000001", HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	timer_secondary("RECV 0000001", HF_VCPU_RUN_WAIT_FOR_MESSAGE);
 }
 
 TEST(timer_secondary, receive_long)
@@ -240,8 +242,8 @@ TEST(timer_secondary, receive_long)
 	 * Run the test twice in a row, to check that the state doesn't get
 	 * messed up.
 	 */
-	timer_secondary("RECV 0099999", SPCI_MSG_WAIT_32);
-	timer_secondary("RECV 0099999", SPCI_MSG_WAIT_32);
+	timer_secondary("RECV 0099999", HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	timer_secondary("RECV 0099999", HF_VCPU_RUN_WAIT_FOR_MESSAGE);
 }
 
 /**
@@ -251,12 +253,12 @@ TEST(timer_secondary, wfi_very_long)
 {
 	const char message[] = "WFI  9999999";
 	size_t message_length = strnlen_s(message, 64) + 1;
-	struct spci_value run_res;
+	struct hf_vcpu_run_return run_res;
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM0, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = hf_vcpu_run(SERVICE_VM0, 0);
+	EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_MESSAGE);
+	EXPECT_EQ(run_res.sleep.ns, HF_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
 	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, message_length);
@@ -270,10 +272,10 @@ TEST(timer_secondary, wfi_very_long)
 	 */
 	last_interrupt_id = 0;
 	for (int i = 0; i < 20; ++i) {
-		run_res = spci_run(SERVICE_VM0, 0);
-		EXPECT_EQ(run_res.func, HF_SPCI_RUN_WAIT_FOR_INTERRUPT);
+		run_res = hf_vcpu_run(SERVICE_VM0, 0);
+		EXPECT_EQ(run_res.code, HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
 		dlog("Primary looping until timer fires; %d ns "
 		     "remaining\n",
-		     run_res.arg2);
+		     run_res.sleep.ns);
 	}
 }

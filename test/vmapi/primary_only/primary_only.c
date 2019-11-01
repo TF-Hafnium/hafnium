@@ -85,23 +85,25 @@ TEST(hf_vcpu_get_count, large_invalid_vm_id)
 }
 
 /**
- * Confirm it is an error when running a vcpu from the primary VM.
+ * Confirm it is a no-op with a valid return code when running a vcpu from the
+ * primary VM.
  */
-TEST(spci_run, cannot_run_primary)
+TEST(hf_vcpu_run, cannot_run_primary)
 {
-	struct spci_value res = spci_run(HF_PRIMARY_VM_ID, 0);
-	EXPECT_EQ(res.func, SPCI_ERROR_32);
-	EXPECT_EQ(res.arg2, SPCI_INVALID_PARAMETERS);
+	struct hf_vcpu_run_return res = hf_vcpu_run(HF_PRIMARY_VM_ID, 0);
+	EXPECT_EQ(res.code, HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
+	EXPECT_EQ(res.sleep.ns, HF_SLEEP_INDEFINITE);
 }
 
 /**
- * Confirm it is an error when running a vcpu from a non-existant secondary VM.
+ * Confirm it is a no-op with a valid return code when running a vcpu from a
+ * non-existant secondary VM.
  */
-TEST(spci_run, cannot_run_absent_secondary)
+TEST(hf_vcpu_run, cannot_run_absent_secondary)
 {
-	struct spci_value res = spci_run(1, 0);
-	EXPECT_EQ(res.func, SPCI_ERROR_32);
-	EXPECT_EQ(res.arg2, SPCI_INVALID_PARAMETERS);
+	struct hf_vcpu_run_return res = hf_vcpu_run(1, 0);
+	EXPECT_EQ(res.code, HF_VCPU_RUN_WAIT_FOR_INTERRUPT);
+	EXPECT_EQ(res.sleep.ns, HF_SLEEP_INDEFINITE);
 }
 
 /**
