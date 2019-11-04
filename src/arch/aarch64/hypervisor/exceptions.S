@@ -271,24 +271,21 @@ vcpu_switch:
 	mrs x25, hcr_el2
 	stp x24, x25, [x28], #16
 
-	mrs x26, cptr_el2
-	mrs x27, cnthctl_el2
+	mrs x26, cnthctl_el2
+	mrs x27, vttbr_el2
 	stp x26, x27, [x28], #16
 
-	mrs x4, vttbr_el2
-	mrs x5, mdcr_el2
+	mrs x4, mdcr_el2
+	mrs x5, mdscr_el1
 	stp x4, x5, [x28], #16
 
-	mrs x6, mdscr_el1
-	mrs x7, pmccfiltr_el0
+	mrs x6, pmccfiltr_el0
+	mrs x7, pmcr_el0
 	stp x6, x7, [x28], #16
 
-	mrs x8, pmcr_el0
-	mrs x9, pmcntenset_el0
+	mrs x8, pmcntenset_el0
+	mrs x9, pmintenset_el1
 	stp x8, x9, [x28], #16
-
-	mrs x10, pmintenset_el1
-	str x10, [x28], #16
 
 	/* Save GIC registers. */
 #if GIC_VERSION == 3 || GIC_VERSION == 4
@@ -439,34 +436,32 @@ vcpu_restore_lazy_and_run:
 	msr hcr_el2, x25
 
 	ldp x26, x27, [x28], #16
-	msr cptr_el2, x26
-	msr cnthctl_el2, x27
+	msr cnthctl_el2, x26
+	msr vttbr_el2, x27
 
 	ldp x4, x5, [x28], #16
-	msr vttbr_el2, x4
-	msr mdcr_el2, x5
+	msr mdcr_el2, x4
+	msr mdscr_el1, x5
 
 	ldp x6, x7, [x28], #16
-	msr mdscr_el1, x6
-	msr pmccfiltr_el0, x7
+	msr pmccfiltr_el0, x6
+	msr pmcr_el0, x7
 
 	ldp x8, x9, [x28], #16
-	msr pmcr_el0, x8
 	/*
 	 * NOTE: Writing 0s to pmcntenset_el0's bits do not alter their values.
 	 * To reset them, clear the register by writing to pmcntenclr_el0.
 	 */
 	mov x27, #0xffffffff
 	msr pmcntenclr_el0, x27
-	msr pmcntenset_el0, x9
+	msr pmcntenset_el0, x8
 
-	ldr x10, [x28], #16
 	/*
 	 * NOTE: Writing 0s to pmintenset_el1's bits do not alter their values.
 	 * To reset them, clear the register by writing to pmintenclr_el1.
 	 */
 	msr pmintenclr_el1, x27
-	msr pmintenset_el1, x10
+	msr pmintenset_el1, x9
 
 	/* Restore GIC registers. */
 #if GIC_VERSION == 3 || GIC_VERSION == 4

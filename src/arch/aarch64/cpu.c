@@ -78,7 +78,6 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 {
 	uintreg_t pc = r->pc;
 	uintreg_t arg = r->r[0];
-	uintreg_t cptr;
 	uintreg_t cnthctl;
 
 	memset_s(r, sizeof(*r), 0, sizeof(*r));
@@ -86,7 +85,6 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 	r->pc = pc;
 	r->r[0] = arg;
 
-	cptr = 0;
 	cnthctl = 0;
 
 	if (is_primary) {
@@ -96,7 +94,6 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 	}
 
 	r->lazy.hcr_el2 = get_hcr_el2_value(vm_id);
-	r->lazy.cptr_el2 = cptr;
 	r->lazy.cnthctl_el2 = cnthctl;
 	r->lazy.vttbr_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
 	r->lazy.vmpidr_el2 = vcpu_id;
@@ -147,4 +144,6 @@ void arch_cpu_init(void)
 	 * supports them, Hafnium ensures that they are disabled.
 	 */
 	lor_disable();
+
+	write_msr(CPTR_EL2, get_cptr_el2_value());
 }

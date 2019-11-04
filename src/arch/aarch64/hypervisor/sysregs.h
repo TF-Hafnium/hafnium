@@ -370,6 +370,15 @@
  */
 #define HCR_EL2_VM (UINT64_C(0x1) << 0)
 
+/**
+ * Trap system register accesses to trace registers.
+ * Traps accesses to ETM registers using the register interface. Does not trap
+ * on accesses through the memory-mapped interface.
+ */
+#define CPTR_EL2_TTA (UINT64_C(0x1) << 28)
+
 uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id);
 
 uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id);
+
+uintreg_t get_cptr_el2_value(void);

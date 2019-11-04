@@ -110,3 +110,11 @@ uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id)
 
 	return mdcr_el2_value;
 }
+
+/**
+ * Returns the value for MDCR_EL2 for the CPU.
+ */
+uintreg_t get_cptr_el2_value(void)
+{
+	return CPTR_EL2_TTA;
+}

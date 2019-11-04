@@ -106,7 +106,6 @@ struct arch_regs {
 		uintreg_t spsr_el1;
 		uintreg_t par_el1;
 		uintreg_t hcr_el2;
-		uintreg_t cptr_el2;
 		uintreg_t cnthctl_el2;
 		uintreg_t vttbr_el2;
 		uintreg_t mdcr_el2;
