@@ -62,13 +62,3 @@ enum hf_share {
 	 */
 	HF_MEMORY_SHARE,
 };
-
-static inline spci_vm_id_t wake_up_get_vm_id(struct spci_value v)
-{
-	return v.arg1 & 0xffff;
-}
-
-static inline spci_vcpu_index_t wake_up_get_vcpu(struct spci_value v)
-{
-	return (v.arg1 >> 16) & 0xffff;
-}

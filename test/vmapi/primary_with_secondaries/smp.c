@@ -40,8 +40,8 @@ TEST(smp, two_vcpus)
 	/* Let the first vCPU start the second vCPU. */
 	run_res = spci_run(SERVICE_VM2, 0);
 	EXPECT_EQ(run_res.func, HF_SPCI_RUN_WAKE_UP);
-	EXPECT_EQ(wake_up_get_vm_id(run_res), SERVICE_VM2);
-	EXPECT_EQ(wake_up_get_vcpu(run_res), 1);
+	EXPECT_EQ(spci_vm_id(run_res), SERVICE_VM2);
+	EXPECT_EQ(spci_vcpu_index(run_res), 1);
 
 	/* Run the second vCPU and wait for a message. */
 	dlog("Run second vCPU for message\n");

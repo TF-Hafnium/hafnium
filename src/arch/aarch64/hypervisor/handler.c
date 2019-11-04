@@ -345,8 +345,8 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 		*args = api_spci_msg_recv(false, current(), next);
 		return true;
 	case SPCI_RUN_32:
-		*args = api_spci_run((args->arg1 >> 16) & 0xffff,
-				     args->arg1 & 0xffff, current(), next);
+		*args = api_spci_run(spci_vm_id(*args), spci_vcpu_index(*args),
+				     current(), next);
 		return true;
 	}
 

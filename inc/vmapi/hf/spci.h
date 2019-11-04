@@ -207,6 +207,22 @@ static inline uint32_t spci_msg_send_attributes(struct spci_value args)
 	return args.arg4;
 }
 
+static inline spci_vm_id_t spci_vm_id(struct spci_value args)
+{
+	return (args.arg1 >> 16) & 0xffff;
+}
+
+static inline spci_vcpu_index_t spci_vcpu_index(struct spci_value args)
+{
+	return args.arg1 & 0xffff;
+}
+
+static inline uint64_t spci_vm_vcpu(spci_vm_id_t vm_id,
+				    spci_vcpu_index_t vcpu_index)
+{
+	return ((uint32_t)vm_id << 16) | vcpu_index;
+}
+
 struct spci_architected_message_header {
 	uint16_t type;
 

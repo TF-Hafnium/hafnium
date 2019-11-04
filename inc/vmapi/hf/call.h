@@ -66,7 +66,7 @@ static inline struct spci_value spci_run(spci_vm_id_t vm_id,
 					 spci_vcpu_index_t vcpu_idx)
 {
 	return spci_call((struct spci_value){.func = SPCI_RUN_32,
-					     (uint32_t)vm_id << 16 | vcpu_idx});
+					     spci_vm_vcpu(vm_id, vcpu_idx)});
 }
 
 /**

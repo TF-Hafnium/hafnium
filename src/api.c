@@ -125,7 +125,7 @@ struct vcpu *api_preempt(struct vcpu *current)
 {
 	struct spci_value ret = {
 		.func = SPCI_INTERRUPT_32,
-		.arg1 = ((uint32_t)current->vm->id << 16) | vcpu_index(current),
+		.arg1 = spci_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	return api_switch_to_primary(current, ret, VCPU_STATE_READY);
@@ -139,7 +139,7 @@ struct vcpu *api_wait_for_interrupt(struct vcpu *current)
 {
 	struct spci_value ret = {
 		.func = HF_SPCI_RUN_WAIT_FOR_INTERRUPT,
-		.arg1 = ((uint32_t)vcpu_index(current) << 16) | current->vm->id,
+		.arg1 = spci_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	return api_switch_to_primary(current, ret,
@@ -153,7 +153,7 @@ struct vcpu *api_vcpu_off(struct vcpu *current)
 {
 	struct spci_value ret = {
 		.func = HF_SPCI_RUN_WAIT_FOR_INTERRUPT,
-		.arg1 = ((uint32_t)vcpu_index(current) << 16) | current->vm->id,
+		.arg1 = spci_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	/*
@@ -174,7 +174,7 @@ void api_yield(struct vcpu *current, struct vcpu **next)
 {
 	struct spci_value primary_ret = {
 		.func = SPCI_YIELD_32,
-		.arg1 = ((uint32_t)vcpu_index(current) << 16) | current->vm->id,
+		.arg1 = spci_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	if (current->vm->id == HF_PRIMARY_VM_ID) {
@@ -193,8 +193,8 @@ struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
 {
 	struct spci_value ret = {
 		.func = HF_SPCI_RUN_WAKE_UP,
-		.arg1 = ((uint32_t)vcpu_index(target_vcpu) << 16) |
-			target_vcpu->vm->id,
+		.arg1 = spci_vm_vcpu(target_vcpu->vm->id,
+				     vcpu_index(target_vcpu)),
 	};
 	return api_switch_to_primary(current, ret, VCPU_STATE_READY);
 }
@@ -485,8 +485,8 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 				vcpu->state == VCPU_STATE_BLOCKED_MAILBOX
 					? SPCI_MSG_WAIT_32
 					: HF_SPCI_RUN_WAIT_FOR_INTERRUPT;
-			run_ret->arg1 = ((uint32_t)vcpu_index(vcpu) << 16) |
-					vcpu->vm->id;
+			run_ret->arg1 =
+				spci_vm_vcpu(vcpu->vm->id, vcpu_index(vcpu));
 			run_ret->arg2 = timer_remaining_ns;
 		}
 
@@ -583,7 +583,7 @@ struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
 	 * overwritten when the switch back to the primary occurs.
 	 */
 	ret.func = SPCI_INTERRUPT_32;
-	ret.arg1 = ((uint32_t)vm_id << 16) | vcpu_idx;
+	ret.arg1 = spci_vm_vcpu(vm_id, vcpu_idx);
 	ret.arg2 = 0;
 
 out:
@@ -1134,7 +1134,7 @@ struct spci_value api_spci_msg_recv(bool block, struct vcpu *current,
 	{
 		struct spci_value run_return = {
 			.func = SPCI_MSG_WAIT_32,
-			.arg1 = ((uint32_t)vcpu_index(current) << 16) | vm->id,
+			.arg1 = spci_vm_vcpu(vm->id, vcpu_index(current)),
 		};
 
 		*next = api_switch_to_primary(current, run_return,
