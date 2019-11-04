@@ -28,6 +28,7 @@ set -x
 
 USE_FVP=false
 SKIP_LONG_RUNNING_TESTS=false
+RUN_ALL_QEMU_CPUS=false
 
 while test $# -gt 0
 do
@@ -35,6 +36,8 @@ do
     --fvp) USE_FVP=true
       ;;
     --skip-long-running-tests) SKIP_LONG_RUNNING_TESTS=true
+      ;;
+    --run-all-qemu-cpus) RUN_ALL_QEMU_CPUS=true
       ;;
     *) echo "Unexpected argument $1"
       exit 1
@@ -46,9 +49,10 @@ done
 TIMEOUT=(timeout --foreground)
 PROJECT="${PROJECT:-reference}"
 OUT="out/${PROJECT}"
+LOG_DIR_BASE="${OUT}/kokoro_log"
 
 # Run the tests with a timeout so they can't loop forever.
-HFTEST=(${TIMEOUT[@]} 300s ./test/hftest/hftest.py --log "$OUT/kokoro_log")
+HFTEST=(${TIMEOUT[@]} 300s ./test/hftest/hftest.py)
 if [ $USE_FVP == true ]
 then
   HFTEST+=(--fvp)
@@ -67,14 +71,32 @@ fi
 export LD_LIBRARY_PATH="$PWD/prebuilts/linux-x64/clang/lib64"
 
 # Run the host unit tests.
-mkdir -p "$OUT/kokoro_log/unit_tests"
+mkdir -p "${LOG_DIR_BASE}/unit_tests"
 ${TIMEOUT[@]} 30s "$OUT/host_fake_clang/unit_tests" \
-  --gtest_output="xml:$OUT/kokoro_log/unit_tests/sponge_log.xml" \
-  | tee "$OUT/kokoro_log/unit_tests/sponge_log.log"
+  --gtest_output="xml:${LOG_DIR_BASE}/unit_tests/sponge_log.xml" \
+  | tee "${LOG_DIR_BASE}/unit_tests/sponge_log.log"
 
-${HFTEST[@]} arch_test
-${HFTEST[@]} hafnium --initrd test/vmapi/arch/aarch64/aarch64_test
-${HFTEST[@]} hafnium --initrd test/vmapi/arch/aarch64/gicv3/gicv3_test
-${HFTEST[@]} hafnium --initrd test/vmapi/primary_only/primary_only_test
-${HFTEST[@]} hafnium --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_test
-${HFTEST[@]} hafnium --initrd test/linux/linux_test --vm_args "rdinit=/test_binary --"
+CPUS=("")
+
+if [ $RUN_ALL_QEMU_CPUS == true ]
+then
+  CPUS=("cortex-a53" "max")
+fi
+
+for CPU in "${CPUS[@]}"
+do
+  HFTEST_CPU=("${HFTEST[@]}")
+  if [ -n "$CPU" ]
+  then
+    # Per-CPU log directory to avoid filename conflicts.
+    HFTEST_CPU+=(--cpu "$CPU" --log "$LOG_DIR_BASE/$CPU")
+  else
+    HFTEST_CPU+=(--log "$LOG_DIR_BASE")
+  fi
+  "${HFTEST_CPU[@]}" arch_test
+  "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/aarch64_test
+  "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/gicv3/gicv3_test
+  "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_only/primary_only_test
+  "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_test
+  "${HFTEST_CPU[@]}" hafnium --initrd test/linux/linux_test --vm_args "rdinit=/test_binary --"
+done

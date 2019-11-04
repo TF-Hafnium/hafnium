@@ -54,10 +54,12 @@ then
 	# Default config for Kokoro builds.
 	default_value HAFNIUM_HERMETIC_BUILD true
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS false
+	default_value HAFNIUM_RUN_ALL_QEMU_CPUS true
 else
 	# Default config for local builds.
 	default_value HAFNIUM_HERMETIC_BUILD false
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS true
+	default_value HAFNIUM_RUN_ALL_QEMU_CPUS false
 fi
 
 # If HAFNIUM_HERMETIC_BUILD is "true", relaunch this script inside a container.
@@ -78,6 +80,9 @@ do
 		;;
 	--skip-long-running-tests)
 		HAFNIUM_SKIP_LONG_RUNNING_TESTS=true
+		;;
+	--run-all-qemu-cpus)
+		HAFNIUM_RUN_ALL_QEMU_CPUS=true
 		;;
 	*)
 		echo "Unexpected argument $1"
@@ -119,6 +124,10 @@ fi
 if [ "${HAFNIUM_SKIP_LONG_RUNNING_TESTS}" == "true" ]
 then
 	TEST_ARGS+=(--skip-long-running-tests)
+fi
+if [ "${HAFNIUM_RUN_ALL_QEMU_CPUS}" == "true" ]
+then
+	TEST_ARGS+=(--run-all-qemu-cpus)
 fi
 ./kokoro/ubuntu/test.sh ${TEST_ARGS[@]}
 

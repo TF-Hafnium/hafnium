@@ -117,6 +117,7 @@ DriverArgs = collections.namedtuple("DriverArgs", [
         "initrd",
         "manifest",
         "vm_args",
+        "cpu"
     ])
 
 
@@ -203,11 +204,14 @@ class QemuDriver(Driver):
             dumpdtb_path=None):
         """Generate command line arguments for QEMU."""
         time_limit = "120s" if is_long_running else "10s"
+        # If no CPU configuration is selected, then test against the maximum
+        # configuration, "max", supported by QEMU.
+        cpu = self.args.cpu or "max"
         exec_args = [
             "timeout", "--foreground", time_limit,
             "./prebuilts/linux-x64/qemu/qemu-system-aarch64",
             "-machine", "virt,virtualization=on,gic_version=3",
-            "-cpu", "cortex-a57", "-smp", "4", "-m", "64M",
+            "-cpu", cpu, "-smp", "4", "-m", "64M",
             "-nographic", "-nodefaults", "-serial", "stdio",
             "-d", "unimp", "-kernel", self.args.kernel,
         ]
@@ -261,6 +265,8 @@ class FvpDriver(Driver):
     """Driver which runs tests in ARM FVP emulator."""
 
     def __init__(self, args):
+        if args.cpu:
+            raise ValueError("FVP emulator does not support the --cpu option.")
         Driver.__init__(self, args)
 
     def gen_dts(self, dts_path, test_args, initrd_start, initrd_end):
@@ -433,6 +439,18 @@ class TestRunner:
             test_out[-1] == HFTEST_LOG_FINISHED and \
             not any(l.startswith(HFTEST_LOG_FAILURE_PREFIX) for l in test_out)
 
+    def get_log_name(self, suite, test):
+        """Returns a string with a generated log name for the test."""
+        log_name = ""
+
+        cpu = self.driver.args.cpu
+        if cpu:
+            log_name += cpu + "."
+
+        log_name += suite["name"] + "." + test["name"]
+
+        return log_name
+
     def run_test(self, suite, test, suite_xml):
         """Invoke the test platform and request to run a given `test` in given
         `suite`. Create a new XML node with results under `suite_xml`.
@@ -445,7 +463,7 @@ class TestRunner:
             return TestRunnerResult(tests_run=0, tests_failed=0)
 
         print("      RUN", test["name"])
-        log_name = suite["name"] + "." + test["name"]
+        log_name = self.get_log_name(suite, test)
 
         test_xml = ET.SubElement(suite_xml, "testcase")
         test_xml.set("name", test["name"])
@@ -524,6 +542,8 @@ def Main():
     parser.add_argument("--vm_args")
     parser.add_argument("--fvp", action="store_true")
     parser.add_argument("--skip-long-running-tests", action="store_true")
+    parser.add_argument("--cpu",
+        help="Selects the CPU configuration for the run environment.")
     args = parser.parse_args()
 
     # Resolve some paths.
@@ -542,7 +562,8 @@ def Main():
     artifacts = ArtifactsManager(os.path.join(args.log, image_name))
 
     # Create a driver for the platform we want to test on.
-    driver_args = DriverArgs(artifacts, image, initrd, manifest, vm_args)
+    driver_args = DriverArgs(artifacts, image, initrd, manifest, vm_args,
+        args.cpu)
     if args.fvp:
         driver = FvpDriver(driver_args)
     else:
