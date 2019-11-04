@@ -253,7 +253,8 @@ class ManifestDtBuilder
 
 	ManifestDtBuilder &BooleanProperty(const std::string_view &name)
 	{
-		return IntegerProperty(name, 1);
+		dts_ << name << ";" << std::endl;
+		return *this;
 	}
 
 	std::stringstream dts_;
@@ -472,10 +473,9 @@ TEST(manifest, no_ramdisk_primary)
 	ASSERT_STREQ(string_data(&m.vm[0].primary.ramdisk_filename), "");
 }
 
-TEST(manifest, valid_true_booleans)
+TEST(manifest, true_booleans_with_values)
 {
 	struct manifest m;
-	struct manifest_vm *vm;
 	struct fdt_node fdt_root;
 
 	/* clang-format off */
@@ -498,6 +498,12 @@ TEST(manifest, valid_true_booleans)
 				.MemSize(0x12345)
 				.Property("smc_whitelist_permissive", "\"true\"")
 			.EndChild()
+			.StartChild("vm4")
+				.DebugName("tertiary_secondary_vm")
+				.VcpuCount(44)
+				.MemSize(0x55)
+				.Property("smc_whitelist_permissive", "<1>")
+			.EndChild()
 		.EndChild()
 		.Build();
 	/* clang-format on */
@@ -505,16 +511,12 @@ TEST(manifest, valid_true_booleans)
 	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
 
 	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
-	ASSERT_EQ(m.vm_count, 3);
+	ASSERT_EQ(m.vm_count, 4);
 
-	vm = &m.vm[0];
-	ASSERT_TRUE(vm->smc_whitelist.permissive);
-
-	vm = &m.vm[1];
-	ASSERT_TRUE(vm->smc_whitelist.permissive);
-
-	vm = &m.vm[2];
-	ASSERT_TRUE(vm->smc_whitelist.permissive);
+	ASSERT_TRUE(m.vm[0].smc_whitelist.permissive);
+	ASSERT_TRUE(m.vm[1].smc_whitelist.permissive);
+	ASSERT_TRUE(m.vm[2].smc_whitelist.permissive);
+	ASSERT_TRUE(m.vm[3].smc_whitelist.permissive);
 }
 
 TEST(manifest, valid)

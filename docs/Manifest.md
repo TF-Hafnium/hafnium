@@ -64,7 +64,7 @@ number of CPUs as the hardware, a kernel image called `vmlinuz` and a ramdisk
 			vcpu_count = <2>;
 			mem_size = <0x100000>;
 
-			smc_whitelist_permissive = <1>;
+			smc_whitelist_permissive;
 		};
 
 		vm3 {
