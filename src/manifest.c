@@ -55,21 +55,22 @@ static const char *generate_vm_node_name(char *buf, spci_vm_id_t vm_id)
 }
 
 /**
- * Read a boolean property: true if present; false if not. The value of the
- * property is ignored.
- *
- * This is the convention used by Linux but beware of things like the following
- * that will actually be considered as `true`.
- *
- *     true-property0 = <0>;
- *     true-property1 = "false";
+ * Read a boolean property: true if present; false if not. If present, the value
+ * of the property must be empty else it is considered malformed.
  */
-static bool read_bool(const struct fdt_node *node, const char *property)
+static enum manifest_return_code read_bool(const struct fdt_node *node,
+					   const char *property, bool *out)
 {
 	const char *data;
 	uint32_t size;
+	bool present = fdt_read_property(node, property, &data, &size);
 
-	return fdt_read_property(node, property, &data, &size);
+	if (present && size != 0) {
+		return MANIFEST_ERROR_MALFORMED_BOOLEAN;
+	}
+
+	*out = present;
+	return MANIFEST_SUCCESS;
 }
 
 static enum manifest_return_code read_string(const struct fdt_node *node,
@@ -286,8 +287,8 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 		dlog("%s SMC whitelist too long.\n", vm->debug_name);
 	}
 
-	vm->smc_whitelist.permissive =
-		read_bool(node, "smc_whitelist_permissive");
+	TRY(read_bool(node, "smc_whitelist_permissive",
+		      &vm->smc_whitelist.permissive));
 
 	if (vm_id == HF_PRIMARY_VM_ID) {
 		TRY(read_optional_string(node, "ramdisk_filename",
@@ -396,6 +397,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Integer overflow";
 	case MANIFEST_ERROR_MALFORMED_INTEGER_LIST:
 		return "Malformed integer list property";
+	case MANIFEST_ERROR_MALFORMED_BOOLEAN:
+		return "Malformed boolean property";
 	}
 
 	panic("Unexpected manifest return code.");

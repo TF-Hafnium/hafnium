@@ -473,50 +473,47 @@ TEST(manifest, no_ramdisk_primary)
 	ASSERT_STREQ(string_data(&m.vm[0].primary.ramdisk_filename), "");
 }
 
-TEST(manifest, true_booleans_with_values)
+static std::vector<char> gen_malformed_boolean_dtb(
+	const std::string_view &value)
 {
-	struct manifest m;
-	struct fdt_node fdt_root;
-
 	/* clang-format off */
-	std::vector<char> dtb = ManifestDtBuilder()
+	return  ManifestDtBuilder()
 		.StartChild("hypervisor")
 			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
-				.Property("smc_whitelist_permissive", "\"false\"")
-			.EndChild()
-			.StartChild("vm2")
-				.DebugName("first_secondary_vm")
-				.VcpuCount(42)
-				.MemSize(12345)
-				.Property("smc_whitelist_permissive", "<0>")
-			.EndChild()
-			.StartChild("vm3")
-				.DebugName("second_secondary_vm")
-				.VcpuCount(43)
-				.MemSize(0x12345)
-				.Property("smc_whitelist_permissive", "\"true\"")
-			.EndChild()
-			.StartChild("vm4")
-				.DebugName("tertiary_secondary_vm")
-				.VcpuCount(44)
-				.MemSize(0x55)
-				.Property("smc_whitelist_permissive", "<1>")
+				.Property("smc_whitelist_permissive", value)
 			.EndChild()
 		.EndChild()
 		.Build();
 	/* clang-format on */
+}
 
-	ASSERT_TRUE(get_fdt_root(dtb, &fdt_root));
+TEST(manifest, malformed_booleans)
+{
+	struct manifest m;
+	struct fdt_node fdt_root;
 
-	ASSERT_EQ(manifest_init(&m, &fdt_root), MANIFEST_SUCCESS);
-	ASSERT_EQ(m.vm_count, 4);
+	std::vector<char> dtb_false = gen_malformed_boolean_dtb("\"false\"");
+	std::vector<char> dtb_true = gen_malformed_boolean_dtb("\"true\"");
+	std::vector<char> dtb_0 = gen_malformed_boolean_dtb("\"<0>\"");
+	std::vector<char> dtb_1 = gen_malformed_boolean_dtb("\"<1>\"");
 
-	ASSERT_TRUE(m.vm[0].smc_whitelist.permissive);
-	ASSERT_TRUE(m.vm[1].smc_whitelist.permissive);
-	ASSERT_TRUE(m.vm[2].smc_whitelist.permissive);
-	ASSERT_TRUE(m.vm[3].smc_whitelist.permissive);
+	ASSERT_TRUE(get_fdt_root(dtb_false, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root),
+		  MANIFEST_ERROR_MALFORMED_BOOLEAN);
+
+	ASSERT_TRUE(get_fdt_root(dtb_true, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root),
+		  MANIFEST_ERROR_MALFORMED_BOOLEAN);
+
+	ASSERT_TRUE(get_fdt_root(dtb_0, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root),
+		  MANIFEST_ERROR_MALFORMED_BOOLEAN);
+
+	ASSERT_TRUE(get_fdt_root(dtb_1, &fdt_root));
+	ASSERT_EQ(manifest_init(&m, &fdt_root),
+		  MANIFEST_ERROR_MALFORMED_BOOLEAN);
 }
 
 TEST(manifest, valid)

@@ -66,6 +66,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_MALFORMED_INTEGER,
 	MANIFEST_ERROR_INTEGER_OVERFLOW,
 	MANIFEST_ERROR_MALFORMED_INTEGER_LIST,
+	MANIFEST_ERROR_MALFORMED_BOOLEAN,
 };
 
 enum manifest_return_code manifest_init(struct manifest *manifest,
