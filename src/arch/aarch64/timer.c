@@ -64,7 +64,7 @@ static uint64_t ticks_to_ns(uint64_t ticks)
  * the given `arch_regs`, or 0 if it has already expired. This is undefined if
  * the timer is not enabled.
  */
-uint64_t arch_timer_remaining_ticks(struct arch_regs *regs)
+static uint64_t arch_timer_remaining_ticks(struct arch_regs *regs)
 {
 	/*
 	 * Calculate the value from the saved CompareValue (cntv_cval_el0) and
@@ -141,7 +141,7 @@ void arch_timer_disable_current(void)
  * active vCPU, or 0 if it has already expired. This is undefined if the timer
  * is not enabled.
  */
-uint64_t arch_timer_remaining_ticks_current(void)
+static uint64_t arch_timer_remaining_ticks_current(void)
 {
 	uintreg_t cntv_cval_el0 = read_msr(cntv_cval_el0);
 	uintreg_t cntvct_el0 = read_msr(cntvct_el0);

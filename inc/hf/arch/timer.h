@@ -32,13 +32,6 @@ void arch_timer_mask(struct arch_regs *regs);
 bool arch_timer_enabled(struct arch_regs *regs);
 
 /**
- * Returns the number of ticks remaining on the virtual timer as stored in
- * the given `arch_regs`, or 0 if it has already expired. This is undefined if
- * the timer is not enabled.
- */
-uint64_t arch_timer_remaining_ticks(struct arch_regs *regs);
-
-/**
  * Returns the number of nanoseconds remaining on the virtual timer as stored in
  * the given `arch_regs`, or 0 if it has already expired. This is undefined if
  * the timer is not enabled.
@@ -61,13 +54,6 @@ bool arch_timer_enabled_current(void);
  * Disable the virtual timer for the currently active vCPU.
  */
 void arch_timer_disable_current(void);
-
-/**
- * Returns the number of ticks remaining on the virtual timer of the currently
- * active vCPU, or 0 if it has already expired. This is undefined if the timer
- * is not enabled.
- */
-uint64_t arch_timer_remaining_ticks_current(void);
 
 /**
  * Returns the number of nanoseconds remaining on the virtual timer of the
