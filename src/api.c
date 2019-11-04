@@ -465,28 +465,29 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 			break;
 		}
 
-		/* The timer expired so allow the interrupt to be delivered. */
-		if (arch_timer_pending(&vcpu->regs)) {
-			break;
-		}
-
-		/*
-		 * The vCPU is not ready to run, return the appropriate code to
-		 * the primary which called vcpu_run.
-		 */
 		if (arch_timer_enabled(&vcpu->regs)) {
+			uint64_t timer_remaining_ns =
+				arch_timer_remaining_ns(&vcpu->regs);
+
+			/*
+			 * The timer expired so allow the interrupt to be
+			 * delivered.
+			 */
+			if (timer_remaining_ns == 0) {
+				break;
+			}
+
+			/*
+			 * The vCPU is not ready to run, return the appropriate
+			 * code to the primary which called vcpu_run.
+			 */
 			run_ret->func =
 				vcpu->state == VCPU_STATE_BLOCKED_MAILBOX
 					? SPCI_MSG_WAIT_32
 					: HF_SPCI_RUN_WAIT_FOR_INTERRUPT;
 			run_ret->arg1 = ((uint32_t)vcpu_index(vcpu) << 16) |
 					vcpu->vm->id;
-			/*
-			 * arch_timer_remaining_ns should never return 0,
-			 * because if it would then arch_timer_pending would
-			 * have returned true before and so we won't get here.
-			 */
-			run_ret->arg2 = arch_timer_remaining_ns(&vcpu->regs);
+			run_ret->arg2 = timer_remaining_ns;
 		}
 
 		ret = false;
