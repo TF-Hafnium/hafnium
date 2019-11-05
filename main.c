@@ -391,8 +391,8 @@ static int hf_vcpu_thread(void *data)
 
 		/* Wake up another vcpu. */
 		case HF_SPCI_RUN_WAKE_UP:
-			hf_handle_wake_up_request(wake_up_get_vm_id(ret),
-						  wake_up_get_vcpu(ret));
+			hf_handle_wake_up_request(spci_vm_id(ret),
+						  spci_vcpu_index(ret));
 			break;
 
 		/* Response available. */
