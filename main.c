@@ -943,6 +943,7 @@ static int __init hf_init(void)
 		.owner = THIS_MODULE,
 	};
 	int64_t ret;
+	struct spci_value spci_ret;
 	spci_vm_id_t i;
 	spci_vcpu_index_t j;
 	spci_vm_count_t secondary_vm_count;
@@ -967,16 +968,16 @@ static int __init hf_init(void)
 	 * because the hypervisor will use them, even if the module is
 	 * unloaded.
 	 */
-	ret = hf_vm_configure(page_to_phys(hf_send_page),
-			      page_to_phys(hf_recv_page));
-	if (ret) {
+	spci_ret = spci_rxtx_map(page_to_phys(hf_send_page),
+				 page_to_phys(hf_recv_page));
+	if (spci_ret.func != SPCI_SUCCESS_32) {
 		__free_page(hf_send_page);
 		__free_page(hf_recv_page);
-		/*
-		 * TODO: We may want to grab this information from hypervisor
-		 * and go from there.
-		 */
 		pr_err("Unable to configure VM\n");
+		if (spci_ret.func == SPCI_ERROR_32)
+			pr_err("SPCI error code %d\n", spci_ret.arg2);
+		else
+			pr_err("Unexpected SPCI function %#x\n", spci_ret.func);
 		return -EIO;
 	}
 
