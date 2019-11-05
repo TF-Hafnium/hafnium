@@ -48,6 +48,8 @@ uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id)
 				 HCR_EL2_BSU_INNER_SHAREABLE | HCR_EL2_FB |
 				 HCR_EL2_AMO | HCR_EL2_IMO | HCR_EL2_FMO |
 				 HCR_EL2_TERR;
+	} else {
+		hcr_el2_value |= HCR_EL2_APK | HCR_EL2_API;
 	}
 
 	return hcr_el2_value;

@@ -203,6 +203,18 @@
 #define HCR_EL2_TID4 (UINT64_C(0x1) << 49)
 
 /**
+ * When set disables traps on Pointer Authentication related instruction
+ * execution.
+ */
+#define HCR_EL2_API (UINT64_C(0x1) << 41)
+
+/**
+ * When set disables traps on access to Pointer Authentication's "key"
+ * registers.
+ */
+#define HCR_EL2_APK (UINT64_C(0x1) << 40)
+
+/**
  * Trap Error record accesses.
  */
 #define HCR_EL2_TERR (UINT64_C(0x1) << 36)
