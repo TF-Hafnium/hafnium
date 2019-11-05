@@ -327,7 +327,7 @@ static void hf_handle_message(struct hf_vm *sender, size_t len,
 exit:
 	sock_put(&hsock->sk);
 
-	if (hf_mailbox_clear() == 1)
+	if (spci_rx_release().func == SPCI_RX_RELEASE_32)
 		hf_notify_waiters(HF_PRIMARY_VM_ID);
 }
 
