@@ -38,7 +38,8 @@ static uint64_t ns_to_ticks(uint64_t ns)
 SET_UP(busy_secondary)
 {
 	system_setup();
-	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
+	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
+		  SPCI_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM0, "busy", send_buffer);
 }
 

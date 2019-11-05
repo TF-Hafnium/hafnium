@@ -83,14 +83,24 @@ static inline struct spci_value spci_yield(void)
  * shared.
  *
  * Returns:
- *  - -1 on failure.
- *  - 0 on success if no further action is needed.
- *  - 1 if it was called by the primary VM and the primary VM now needs to wake
- *    up or kick waiters.
+ *  - SPCI_ERROR SPCI_INVALID_PARAMETERS if the given addresses are not properly
+ *    aligned or are the same.
+ *  - SPCI_ERROR SPCI_NO_MEMORY if the hypervisor was unable to map the buffers
+ *    due to insuffient page table memory.
+ *  - SPCI_ERROR SPCI_DENIED if the pages are already mapped or are not owned by
+ *    the caller.
+ *  - SPCI_SUCCESS on success if no further action is needed.
+ *  - SPCI_RX_RELEASE if it was called by the primary VM and the primary VM now
+ *    needs to wake up or kick waiters.
  */
-static inline int64_t hf_vm_configure(hf_ipaddr_t send, hf_ipaddr_t recv)
+static inline struct spci_value spci_rxtx_map(hf_ipaddr_t send,
+					      hf_ipaddr_t recv)
 {
-	return hf_call(HF_VM_CONFIGURE, send, recv, 0);
+	return spci_call(
+		(struct spci_value){.func = SPCI_RXTX_MAP_32,
+				    .arg1 = send,
+				    .arg2 = recv,
+				    .arg3 = HF_MAILBOX_SIZE / SPCI_PAGE_SIZE});
 }
 
 /**

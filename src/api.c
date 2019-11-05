@@ -604,31 +604,31 @@ static bool api_mode_valid_owned_and_exclusive(uint32_t mode)
  * after they've succeeded. If a secondary VM is running and there are waiters,
  * it also switches back to the primary VM for it to wake waiters up.
  */
-static int64_t api_waiter_result(struct vm_locked locked_vm,
-				 struct vcpu *current, struct vcpu **next)
+static struct spci_value api_waiter_result(struct vm_locked locked_vm,
+					   struct vcpu *current,
+					   struct vcpu **next)
 {
 	struct vm *vm = locked_vm.vm;
-	struct spci_value ret = {
-		.func = SPCI_RX_RELEASE_32,
-	};
 
 	if (list_empty(&vm->mailbox.waiter_list)) {
 		/* No waiters, nothing else to do. */
-		return 0;
+		return (struct spci_value){.func = SPCI_SUCCESS_32};
 	}
 
 	if (vm->id == HF_PRIMARY_VM_ID) {
 		/* The caller is the primary VM. Tell it to wake up waiters. */
-		return 1;
+		return (struct spci_value){.func = SPCI_RX_RELEASE_32};
 	}
 
 	/*
 	 * Switch back to the primary VM, informing it that there are waiters
 	 * that need to be notified.
 	 */
-	*next = api_switch_to_primary(current, ret, VCPU_STATE_READY);
+	*next = api_switch_to_primary(
+		current, (struct spci_value){.func = SPCI_RX_RELEASE_32},
+		VCPU_STATE_READY);
 
-	return 0;
+	return (struct spci_value){.func = SPCI_SUCCESS_32};
 }
 
 /**
@@ -768,14 +768,19 @@ out:
  * must not be shared.
  *
  * Returns:
- *  - -1 on failure.
- *  - 0 on success if no further action is needed.
- *  - 1 if it was called by the primary VM and the primary VM now needs to wake
- *    up or kick waiters. Waiters should be retrieved by calling
- *    hf_mailbox_waiter_get.
+ *  - SPCI_ERROR SPCI_INVALID_PARAMETERS if the given addresses are not properly
+ *    aligned or are the same.
+ *  - SPCI_ERROR SPCI_NO_MEMORY if the hypervisor was unable to map the buffers
+ *    due to insuffient page table memory.
+ *  - SPCI_ERROR SPCI_DENIED if the pages are already mapped or are not owned by
+ *    the caller.
+ *  - SPCI_SUCCESS on success if no further action is needed.
+ *  - SPCI_RX_RELEASE if it was called by the primary VM and the primary VM now
+ *    needs to wake up or kick waiters.
  */
-int64_t api_vm_configure(ipaddr_t send, ipaddr_t recv, struct vcpu *current,
-			 struct vcpu **next)
+struct spci_value api_spci_rxtx_map(ipaddr_t send, ipaddr_t recv,
+				    uint32_t page_count, struct vcpu *current,
+				    struct vcpu **next)
 {
 	struct vm *vm = current->vm;
 	struct vm_locked vm_locked;
@@ -785,24 +790,29 @@ int64_t api_vm_configure(ipaddr_t send, ipaddr_t recv, struct vcpu *current,
 	paddr_t pa_recv_end;
 	uint32_t orig_send_mode;
 	uint32_t orig_recv_mode;
-	int64_t ret;
+	struct spci_value ret;
+
+	/* Hafnium only supports a fixed size of RX/TX buffers. */
+	if (page_count != HF_MAILBOX_SIZE / SPCI_PAGE_SIZE) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
 
 	/* Fail if addresses are not page-aligned. */
 	if (!is_aligned(ipa_addr(send), PAGE_SIZE) ||
 	    !is_aligned(ipa_addr(recv), PAGE_SIZE)) {
-		return -1;
+		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
 	/* Convert to physical addresses. */
 	pa_send_begin = pa_from_ipa(send);
-	pa_send_end = pa_add(pa_send_begin, PAGE_SIZE);
+	pa_send_end = pa_add(pa_send_begin, HF_MAILBOX_SIZE);
 
 	pa_recv_begin = pa_from_ipa(recv);
-	pa_recv_end = pa_add(pa_recv_begin, PAGE_SIZE);
+	pa_recv_end = pa_add(pa_recv_begin, HF_MAILBOX_SIZE);
 
 	/* Fail if the same page is used for the send and receive pages. */
 	if (pa_addr(pa_send_begin) == pa_addr(pa_recv_begin)) {
-		return -1;
+		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -817,7 +827,8 @@ int64_t api_vm_configure(ipaddr_t send, ipaddr_t recv, struct vcpu *current,
 
 	/* We only allow these to be setup once. */
 	if (vm->mailbox.send || vm->mailbox.recv) {
-		goto fail;
+		ret = spci_error(SPCI_DENIED);
+		goto exit;
 	}
 
 	/*
@@ -829,28 +840,27 @@ int64_t api_vm_configure(ipaddr_t send, ipaddr_t recv, struct vcpu *current,
 	    !api_mode_valid_owned_and_exclusive(orig_send_mode) ||
 	    (orig_send_mode & MM_MODE_R) == 0 ||
 	    (orig_send_mode & MM_MODE_W) == 0) {
-		goto fail;
+		ret = spci_error(SPCI_DENIED);
+		goto exit;
 	}
 
 	if (!mm_vm_get_mode(&vm->ptable, recv, ipa_add(recv, PAGE_SIZE),
 			    &orig_recv_mode) ||
 	    !api_mode_valid_owned_and_exclusive(orig_recv_mode) ||
 	    (orig_recv_mode & MM_MODE_R) == 0) {
-		goto fail;
+		ret = spci_error(SPCI_DENIED);
+		goto exit;
 	}
 
 	if (!api_vm_configure_pages(vm_locked, pa_send_begin, pa_send_end,
 				    orig_send_mode, pa_recv_begin, pa_recv_end,
 				    orig_recv_mode)) {
-		goto fail;
+		ret = spci_error(SPCI_NO_MEMORY);
+		goto exit;
 	}
 
 	/* Tell caller about waiters, if any. */
 	ret = api_waiter_result(vm_locked, current, next);
-	goto exit;
-
-fail:
-	ret = -1;
 
 exit:
 	vm_unlock(&vm_locked);
@@ -1254,11 +1264,7 @@ struct spci_value api_spci_rx_release(struct vcpu *current, struct vcpu **next)
 		break;
 
 	case MAILBOX_STATE_READ:
-		if (api_waiter_result(locked, current, next)) {
-			ret = (struct spci_value){.func = SPCI_RX_RELEASE_32};
-		} else {
-			ret = (struct spci_value){.func = SPCI_SUCCESS_32};
-		}
+		ret = api_waiter_result(locked, current, next);
 		vm->mailbox.state = MAILBOX_STATE_EMPTY;
 		break;
 	}

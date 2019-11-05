@@ -89,7 +89,8 @@ TEST(system, icc_ctlr_read_trapped_secondary)
 {
 	struct spci_value run_res;
 
-	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
+	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
+		  SPCI_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM0, "read_systemreg_ctlr", send_buffer);
 
 	run_res = spci_run(SERVICE_VM0, 0);
@@ -105,7 +106,8 @@ TEST(system, icc_ctlr_write_trapped_secondary)
 {
 	struct spci_value run_res;
 
-	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
+	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
+		  SPCI_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM0, "write_systemreg_ctlr", send_buffer);
 
 	run_res = spci_run(SERVICE_VM0, 0);
@@ -121,7 +123,8 @@ TEST(system, icc_sre_write_trapped_secondary)
 {
 	struct spci_value run_res;
 
-	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
+	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
+		  SPCI_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM0, "write_systemreg_sre", send_buffer);
 
 	run_res = spci_run(SERVICE_VM0, 0);

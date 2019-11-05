@@ -73,6 +73,13 @@ enum spci_memory_share {
 
 #define SPCI_SLEEP_INDEFINITE 0
 
+/**
+ * For use where the SPCI specification refers explicitly to '4K pages'. Not to
+ * be confused with PAGE_SIZE, which is the translation granule Hafnium is
+ * configured to use.
+ */
+#define SPCI_PAGE_SIZE 4096
+
 /* The maximum length possible for a single message. */
 #define SPCI_MSG_PAYLOAD_MAX HF_MAILBOX_SIZE
 

@@ -98,7 +98,7 @@ noreturn void kmain(size_t memory_size)
 	/* Prepare the context. */
 
 	/* Set up the mailbox. */
-	hf_vm_configure(send_addr, recv_addr);
+	spci_rxtx_map(send_addr, recv_addr);
 
 	/* Receive the name of the service to run. */
 	ret = spci_msg_wait();

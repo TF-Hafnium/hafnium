@@ -110,15 +110,15 @@ TEST(spci_run, cannot_run_absent_vcpu)
 /**
  * The configured send/receive addresses can't be device memory.
  */
-TEST(hf_vm_configure, fails_with_device_memory)
+TEST(spci_rxtx_map, fails_with_device_memory)
 {
-	EXPECT_EQ(hf_vm_configure(PAGE_SIZE, PAGE_SIZE * 2), -1);
+	EXPECT_SPCI_ERROR(spci_rxtx_map(PAGE_SIZE, PAGE_SIZE * 2), SPCI_DENIED);
 }
 
 /**
  * The configured send/receive addresses can't be unaligned.
  */
-TEST(hf_vm_configure, fails_with_unaligned_pointer)
+TEST(spci_rxtx_map, fails_with_unaligned_pointer)
 {
 	uint8_t maybe_aligned[2];
 	hf_ipaddr_t unaligned_addr = (hf_ipaddr_t)&maybe_aligned[1];
@@ -127,36 +127,44 @@ TEST(hf_vm_configure, fails_with_unaligned_pointer)
 	/* Check the the address is unaligned. */
 	ASSERT_EQ(unaligned_addr & 1, 1);
 
-	EXPECT_EQ(hf_vm_configure(aligned_addr, unaligned_addr), -1);
-	EXPECT_EQ(hf_vm_configure(unaligned_addr, aligned_addr), -1);
-	EXPECT_EQ(hf_vm_configure(unaligned_addr, unaligned_addr), -1);
+	EXPECT_SPCI_ERROR(spci_rxtx_map(aligned_addr, unaligned_addr),
+			  SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(spci_rxtx_map(unaligned_addr, aligned_addr),
+			  SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(spci_rxtx_map(unaligned_addr, unaligned_addr),
+			  SPCI_INVALID_PARAMETERS);
 }
 
 /**
  * The configured send/receive addresses can't be the same page.
  */
-TEST(hf_vm_configure, fails_with_same_page)
+TEST(spci_rxtx_map, fails_with_same_page)
 {
-	EXPECT_EQ(hf_vm_configure(send_page_addr, send_page_addr), -1);
-	EXPECT_EQ(hf_vm_configure(recv_page_addr, recv_page_addr), -1);
+	EXPECT_SPCI_ERROR(spci_rxtx_map(send_page_addr, send_page_addr),
+			  SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(spci_rxtx_map(recv_page_addr, recv_page_addr),
+			  SPCI_INVALID_PARAMETERS);
 }
 
 /**
  * The configuration of the send/receive addresses can only happen once.
  */
-TEST(hf_vm_configure, fails_if_already_succeeded)
+TEST(spci_rxtx_map, fails_if_already_succeeded)
 {
-	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
-	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), -1);
+	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
+		  SPCI_SUCCESS_32);
+	EXPECT_SPCI_ERROR(spci_rxtx_map(send_page_addr, recv_page_addr),
+			  SPCI_DENIED);
 }
 
 /**
  * The configuration of the send/receive address is successful with valid
  * arguments.
  */
-TEST(hf_vm_configure, succeeds)
+TEST(spci_rxtx_map, succeeds)
 {
-	EXPECT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
+	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
+		  SPCI_SUCCESS_32);
 }
 
 /**

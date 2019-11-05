@@ -70,7 +70,8 @@ TEST(faults, spurious_due_to_configure)
 	sl_lock(&s.lock);
 
 	/* Configure the VM's buffers. */
-	EXPECT_EQ(hf_vm_configure((hf_ipaddr_t)&tx[0], (hf_ipaddr_t)&rx[0]), 0);
+	EXPECT_EQ(spci_rxtx_map((hf_ipaddr_t)&tx[0], (hf_ipaddr_t)&rx[0]).func,
+		  SPCI_SUCCESS_32);
 
 	/* Tell other CPU to stop and wait for it. */
 	s.done = true;

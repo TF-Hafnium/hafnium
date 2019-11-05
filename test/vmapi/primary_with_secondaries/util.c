@@ -34,7 +34,8 @@ static hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 
 struct mailbox_buffers set_up_mailbox(void)
 {
-	ASSERT_EQ(hf_vm_configure(send_page_addr, recv_page_addr), 0);
+	ASSERT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
+		  SPCI_SUCCESS_32);
 	return (struct mailbox_buffers){
 		.send = send_page,
 		.recv = recv_page,
