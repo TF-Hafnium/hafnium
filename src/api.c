@@ -600,7 +600,7 @@ static bool api_mode_valid_owned_and_exclusive(uint32_t mode)
 }
 
 /**
- * Determines the value to be returned by api_vm_configure and api_mailbox_clear
+ * Determines the value to be returned by api_vm_configure and spci_rx_release
  * after they've succeeded. If a secondary VM is running and there are waiters,
  * it also switches back to the primary VM for it to wake waiters up.
  */
@@ -1226,35 +1226,39 @@ int64_t api_mailbox_waiter_get(spci_vm_id_t vm_id, const struct vcpu *current)
 }
 
 /**
- * Clears the caller's mailbox so that a new message can be received. The caller
- * must have copied out all data they wish to preserve as new messages will
- * overwrite the old and will arrive asynchronously.
+ * Releases the caller's mailbox so that a new message can be received. The
+ * caller must have copied out all data they wish to preserve as new messages
+ * will overwrite the old and will arrive asynchronously.
  *
  * Returns:
- *  - -1 on failure, if the mailbox hasn't been read.
- *  - 0 on success if no further action is needed.
- *  - 1 if it was called by the primary VM and the primary VM now needs to wake
- *    up or kick waiters. Waiters should be retrieved by calling
+ *  - SPCI_ERROR SPCI_DENIED on failure, if the mailbox hasn't been read.
+ *  - SPCI_SUCCESS on success if no further action is needed.
+ *  - SPCI_RX_RELEASE if it was called by the primary VM and the primary VM now
+ *    needs to wake up or kick waiters. Waiters should be retrieved by calling
  *    hf_mailbox_waiter_get.
  */
-int64_t api_mailbox_clear(struct vcpu *current, struct vcpu **next)
+struct spci_value api_spci_rx_release(struct vcpu *current, struct vcpu **next)
 {
 	struct vm *vm = current->vm;
 	struct vm_locked locked;
-	int64_t ret;
+	struct spci_value ret;
 
 	locked = vm_lock(vm);
 	switch (vm->mailbox.state) {
 	case MAILBOX_STATE_EMPTY:
-		ret = 0;
+		ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 		break;
 
 	case MAILBOX_STATE_RECEIVED:
-		ret = -1;
+		ret = spci_error(SPCI_DENIED);
 		break;
 
 	case MAILBOX_STATE_READ:
-		ret = api_waiter_result(locked, current, next);
+		if (api_waiter_result(locked, current, next)) {
+			ret = (struct spci_value){.func = SPCI_RX_RELEASE_32};
+		} else {
+			ret = (struct spci_value){.func = SPCI_SUCCESS_32};
+		}
 		vm->mailbox.state = MAILBOX_STATE_EMPTY;
 		break;
 	}

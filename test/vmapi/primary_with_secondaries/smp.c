@@ -51,7 +51,7 @@ TEST(smp, two_vcpus)
 	EXPECT_EQ(memcmp(mb.recv, expected_response_1,
 			 sizeof(expected_response_1)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Run the first vCPU and wait for a different message. */
 	dlog("Run first vCPU for message\n");
@@ -61,7 +61,7 @@ TEST(smp, two_vcpus)
 	EXPECT_EQ(memcmp(mb.recv, expected_response_0,
 			 sizeof(expected_response_0)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Run the second vCPU again, and expect it to turn itself off. */
 	dlog("Run second vCPU for poweroff.\n");

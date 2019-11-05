@@ -95,6 +95,6 @@ TEST_SERVICE(interruptible)
 			     spci_msg_send_size(ret));
 			FAIL("Unexpected message");
 		}
-		hf_mailbox_clear();
+		spci_rx_release();
 	}
 }

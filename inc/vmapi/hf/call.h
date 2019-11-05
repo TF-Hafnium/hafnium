@@ -161,18 +161,20 @@ static inline struct spci_value spci_msg_poll(void)
 }
 
 /**
- * Clears the caller's mailbox so a new message can be received.
+ * Releases the caller's mailbox so that a new message can be received. The
+ * caller must have copied out all data they wish to preserve as new messages
+ * will overwrite the old and will arrive asynchronously.
  *
  * Returns:
- *  - -1 on failure, if the mailbox hasn't been read.
- *  - 0 on success if no further action is needed.
- *  - 1 if it was called by the primary VM and the primary VM now needs to wake
- *    up or kick waiters. Waiters should be retrieved by calling
+ *  - SPCI_ERROR SPCI_DENIED on failure, if the mailbox hasn't been read.
+ *  - SPCI_SUCCESS on success if no further action is needed.
+ *  - SPCI_RX_RELEASE if it was called by the primary VM and the primary VM now
+ *    needs to wake up or kick waiters. Waiters should be retrieved by calling
  *    hf_mailbox_waiter_get.
  */
-static inline int64_t hf_mailbox_clear(void)
+static inline struct spci_value spci_rx_release(void)
 {
-	return hf_call(HF_MAILBOX_CLEAR, 0, 0, 0);
+	return spci_call((struct spci_value){.func = SPCI_RX_RELEASE_32});
 }
 
 /**

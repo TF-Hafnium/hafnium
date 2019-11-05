@@ -78,7 +78,7 @@ static void timer_busywait_secondary()
 	EXPECT_EQ(memcmp(recv_buffer, expected_response,
 			 sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -174,7 +174,7 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 	EXPECT_EQ(memcmp(recv_buffer, expected_response,
 			 sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**

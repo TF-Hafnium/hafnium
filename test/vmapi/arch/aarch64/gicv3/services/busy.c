@@ -32,7 +32,7 @@ TEST_SERVICE(busy)
 {
 	dlog("Secondary waiting for message...\n");
 	mailbox_receive_retry();
-	hf_mailbox_clear();
+	spci_rx_release();
 	dlog("Secondary received message, looping forever.\n");
 	for (;;) {
 	}

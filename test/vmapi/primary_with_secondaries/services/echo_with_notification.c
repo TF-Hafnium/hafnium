@@ -69,6 +69,6 @@ TEST_SERVICE(echo_with_notification)
 			wait_for_vm(source_vm_id);
 		}
 
-		hf_mailbox_clear();
+		spci_rx_release();
 	}
 }

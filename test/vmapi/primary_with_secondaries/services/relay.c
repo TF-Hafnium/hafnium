@@ -54,7 +54,7 @@ TEST_SERVICE(relay)
 		memcpy_s(send_buf, SPCI_MSG_PAYLOAD_MAX, next_message,
 			 next_message_size);
 
-		hf_mailbox_clear();
+		spci_rx_release();
 		spci_msg_send(hf_vm_get_id(), next_vm_id, next_message_size, 0);
 	}
 }

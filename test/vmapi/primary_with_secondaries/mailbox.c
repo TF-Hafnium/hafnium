@@ -68,9 +68,9 @@ static void next_permutation(char *s, size_t len)
  */
 TEST(mailbox, clear_empty)
 {
-	EXPECT_EQ(hf_mailbox_clear(), 0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -98,7 +98,7 @@ TEST(mailbox, echo)
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -131,7 +131,7 @@ TEST(mailbox, repeated_echo)
 		EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 		EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 		EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
-		EXPECT_EQ(hf_mailbox_clear(), 0);
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 	}
 }
 
@@ -189,7 +189,7 @@ TEST(mailbox, relay)
 	EXPECT_EQ(spci_msg_send_receiver(run_res), HF_PRIMARY_VM_ID);
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -290,7 +290,7 @@ TEST(mailbox, primary_to_secondary)
 	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Clear the mailbox. We expect to be told there are pending waiters. */
-	EXPECT_EQ(hf_mailbox_clear(), 1);
+	EXPECT_EQ(spci_rx_release().func, SPCI_RX_RELEASE_32);
 
 	/* Retrieve a single waiter. */
 	EXPECT_EQ(hf_mailbox_waiter_get(HF_PRIMARY_VM_ID), SERVICE_VM0);

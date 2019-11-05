@@ -324,6 +324,9 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 	case SPCI_FEATURES_32:
 		*args = api_spci_features(args->arg1);
 		return true;
+	case SPCI_RX_RELEASE_32:
+		*args = api_spci_rx_release(current(), next);
+		return true;
 	case SPCI_YIELD_32:
 		api_yield(current(), next);
 
@@ -448,10 +451,6 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 	case HF_VM_CONFIGURE:
 		vcpu->regs.r[0] = api_vm_configure(
 			ipa_init(args.arg1), ipa_init(args.arg2), vcpu, &next);
-		break;
-
-	case HF_MAILBOX_CLEAR:
-		vcpu->regs.r[0] = api_mailbox_clear(vcpu, &next);
 		break;
 
 	case HF_MAILBOX_WRITABLE_GET:

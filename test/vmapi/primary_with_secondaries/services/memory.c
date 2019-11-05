@@ -52,7 +52,7 @@ TEST_SERVICE(memory_increment)
 		}
 
 		/* Signal completion and reset. */
-		hf_mailbox_clear();
+		spci_rx_release();
 		spci_msg_send(hf_vm_get_id(), spci_msg_send_sender(ret),
 			      sizeof(ptr), 0);
 	}
@@ -79,14 +79,14 @@ TEST_SERVICE(memory_lend_relinquish_spci)
 
 		ptr = (uint8_t *)constituents[0].address;
 		/* Relevant information read, mailbox can be cleared. */
-		hf_mailbox_clear();
+		spci_rx_release();
 
 		/* Check that one has access to the shared region. */
 		for (int i = 0; i < PAGE_SIZE; ++i) {
 			ptr[i]++;
 		}
 
-		hf_mailbox_clear();
+		spci_rx_release();
 		/* Give the memory back and notify the sender. */
 		msg_size = spci_memory_relinquish_init(
 			send_buf, HF_PRIMARY_VM_ID, constituents,
@@ -124,7 +124,7 @@ TEST_SERVICE(memory_return)
 					  (hf_ipaddr_t)ptr, PAGE_SIZE,
 					  HF_MEMORY_GIVE),
 			  0);
-		hf_mailbox_clear();
+		spci_rx_release();
 		spci_msg_send(hf_vm_get_id(), spci_msg_send_sender(ret),
 			      sizeof(ptr), 0);
 
@@ -203,7 +203,7 @@ TEST_SERVICE(spci_memory_return)
 		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		EXPECT_EQ(spci_msg_send_attributes(ret),
 			  SPCI_MSG_SEND_LEGACY_MEMORY);
-		hf_mailbox_clear();
+		spci_rx_release();
 
 		ptr = (uint8_t *)constituents[0].address;
 
@@ -241,7 +241,7 @@ TEST_SERVICE(spci_donate_check_upper_bound)
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	ptr = (uint8_t *)constituents[0].address;
 
@@ -261,7 +261,7 @@ TEST_SERVICE(spci_donate_check_lower_bound)
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	ptr = (uint8_t *)constituents[0].address;
 
@@ -286,7 +286,7 @@ TEST_SERVICE(spci_donate_secondary_and_fault)
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	ptr = (uint8_t *)constituents[0].address;
 
@@ -323,7 +323,7 @@ TEST_SERVICE(spci_donate_twice)
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	/* Yield to allow attempt to re donate from primary. */
 	spci_yield();
@@ -371,7 +371,7 @@ TEST_SERVICE(spci_memory_receive)
 		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		EXPECT_EQ(spci_msg_send_attributes(ret),
 			  SPCI_MSG_SEND_LEGACY_MEMORY);
-		hf_mailbox_clear();
+		spci_rx_release();
 
 		ptr = (uint8_t *)constituents[0].address;
 		ptr[0] = 'd';
@@ -399,7 +399,7 @@ TEST_SERVICE(spci_donate_invalid_source)
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	/* Give the memory back and notify the sender. */
 	msg_size = spci_memory_donate_init(
@@ -444,14 +444,14 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 			  SPCI_MSG_SEND_LEGACY_MEMORY);
 		ptr = (uint8_t *)constituents[0].address;
 		/* Relevant information read, mailbox can be cleared. */
-		hf_mailbox_clear();
+		spci_rx_release();
 
 		/* Check that one has access to the shared region. */
 		for (int i = 0; i < PAGE_SIZE; ++i) {
 			ptr[i]++;
 		}
 
-		hf_mailbox_clear();
+		spci_rx_release();
 		/* Give the memory back and notify the sender. */
 		msg_size = spci_memory_relinquish_init(
 			send_buf, HF_PRIMARY_VM_ID, constituents,
@@ -487,7 +487,7 @@ TEST_SERVICE(spci_memory_donate_relinquish)
 		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		EXPECT_EQ(spci_msg_send_attributes(ret),
 			  SPCI_MSG_SEND_LEGACY_MEMORY);
-		hf_mailbox_clear();
+		spci_rx_release();
 
 		ptr = (uint8_t *)constituents[0].address;
 
@@ -528,7 +528,7 @@ TEST_SERVICE(spci_lend_invalid_source)
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	/* Attempt to relinquish from primary VM. */
 	msg_size = spci_memory_relinquish_init(
@@ -591,7 +591,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_X)
 		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		EXPECT_EQ(spci_msg_send_attributes(ret),
 			  SPCI_MSG_SEND_LEGACY_MEMORY);
-		hf_mailbox_clear();
+		spci_rx_release();
 
 		ptr = (uint64_t *)constituents[0].address;
 		/*
@@ -634,7 +634,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		EXPECT_EQ(spci_msg_send_attributes(ret),
 			  SPCI_MSG_SEND_LEGACY_MEMORY);
-		hf_mailbox_clear();
+		spci_rx_release();
 
 		ptr = (uint8_t *)constituents[0].address;
 
@@ -678,7 +678,7 @@ TEST_SERVICE(spci_lend_check_lower_bound)
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	ptr = (uint8_t *)constituents[0].address;
 
@@ -702,7 +702,7 @@ TEST_SERVICE(spci_lend_check_upper_bound)
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	ptr = (uint8_t *)constituents[0].address;
 
@@ -725,7 +725,7 @@ TEST_SERVICE(spci_memory_lend_twice)
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	ptr = (uint8_t *)constituents[0].address;
 

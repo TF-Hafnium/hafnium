@@ -53,7 +53,7 @@ TEST_SERVICE(interruptible_echo)
 		memcpy_s(message, SPCI_MSG_PAYLOAD_MAX, recv_message,
 			 spci_msg_send_size(res));
 
-		hf_mailbox_clear();
+		spci_rx_release();
 		spci_msg_send(SERVICE_VM0, HF_PRIMARY_VM_ID,
 			      spci_msg_send_size(res), 0);
 	}

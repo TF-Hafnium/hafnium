@@ -52,7 +52,7 @@ TEST(interrupts, interrupt_self)
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -79,7 +79,7 @@ TEST(interrupts, inject_interrupt_twice)
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Inject the interrupt again, and wait for the same message. */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_A);
@@ -88,7 +88,7 @@ TEST(interrupts, inject_interrupt_twice)
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -115,7 +115,7 @@ TEST(interrupts, inject_two_interrupts)
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Inject a different interrupt and wait for a different message. */
 	hf_interrupt_inject(SERVICE_VM0, 0, EXTERNAL_INTERRUPT_ID_B);
@@ -125,7 +125,7 @@ TEST(interrupts, inject_two_interrupts)
 	EXPECT_EQ(memcmp(mb.recv, expected_response_2,
 			 sizeof(expected_response_2)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -154,7 +154,7 @@ TEST(interrupts, inject_interrupt_message)
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM0, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
@@ -172,7 +172,7 @@ TEST(interrupts, inject_interrupt_message)
 	EXPECT_EQ(memcmp(mb.recv, expected_response_2,
 			 sizeof(expected_response_2)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -209,7 +209,7 @@ TEST(interrupts, inject_interrupt_disabled)
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -236,7 +236,7 @@ TEST(interrupts, pending_interrupt_no_blocking_receive)
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -263,7 +263,7 @@ TEST(interrupts, pending_interrupt_wfi_not_trapped)
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
 	EXPECT_EQ(memcmp(mb.recv, expected_response, sizeof(expected_response)),
 		  0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /*
@@ -292,5 +292,5 @@ TEST(interrupts, deliver_interrupt_and_message)
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
-	EXPECT_EQ(hf_mailbox_clear(), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }

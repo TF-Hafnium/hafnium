@@ -35,7 +35,7 @@ TEST_SERVICE(echo)
 		memcpy_s(send_buf, SPCI_MSG_PAYLOAD_MAX, recv_buf,
 			 spci_msg_send_size(ret));
 
-		hf_mailbox_clear();
+		spci_rx_release();
 		spci_msg_send(target_vm_id, source_vm_id,
 			      spci_msg_send_size(ret), 0);
 	}

@@ -51,7 +51,7 @@ static bool run_loop(struct mailbox_buffers *mb)
 		}
 
 		/* Clear mailbox so that next message can be received. */
-		hf_mailbox_clear();
+		spci_rx_release();
 	}
 
 	/* Copies the contents of the received boolean to the return value. */
@@ -59,7 +59,7 @@ static bool run_loop(struct mailbox_buffers *mb)
 		ok = *(bool *)mb->recv;
 	}
 
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	return ok;
 }

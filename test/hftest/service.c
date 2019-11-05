@@ -105,7 +105,7 @@ noreturn void kmain(size_t memory_size)
 	ASSERT_EQ(ret.func, SPCI_MSG_SEND_32);
 	memiter_init(&args, recv, spci_msg_send_size(ret));
 	service = find_service(&args);
-	hf_mailbox_clear();
+	spci_rx_release();
 
 	/* Check the service was found. */
 	if (service == NULL) {

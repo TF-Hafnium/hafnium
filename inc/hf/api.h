@@ -30,7 +30,6 @@ spci_vcpu_count_t api_vcpu_get_count(spci_vm_id_t vm_id,
 void api_regs_state_saved(struct vcpu *vcpu);
 int64_t api_vm_configure(ipaddr_t send, ipaddr_t recv, struct vcpu *current,
 			 struct vcpu **next);
-int64_t api_mailbox_clear(struct vcpu *current, struct vcpu **next);
 int64_t api_mailbox_writable_get(const struct vcpu *current);
 int64_t api_mailbox_waiter_get(spci_vm_id_t vm_id, const struct vcpu *current);
 int64_t api_share_memory(spci_vm_id_t vm_id, ipaddr_t addr, size_t size,
@@ -55,6 +54,7 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 				    struct vcpu **next);
 struct spci_value api_spci_msg_recv(bool block, struct vcpu *current,
 				    struct vcpu **next);
+struct spci_value api_spci_rx_release(struct vcpu *current, struct vcpu **next);
 void api_yield(struct vcpu *current, struct vcpu **next);
 struct spci_value api_spci_version(void);
 struct spci_value api_spci_id_get(const struct vcpu *current);

@@ -89,7 +89,7 @@ TEST_SERVICE(timer)
 			(message[9] - '0') * 100 + (message[10] - '0') * 10 +
 			(message[11] - '0');
 
-		hf_mailbox_clear();
+		spci_rx_release();
 
 		dlog("Starting timer for %d ticks.\n", ticks);
 
