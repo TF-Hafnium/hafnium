@@ -44,6 +44,13 @@
 #define MDCR_EL2_HPMD (UINT64_C(0x1) << 17)
 
 /**
+ * Trap Performance Monitor Sampling.
+ * Controls access to Statistical Profiling control registers from EL1. Depends
+ * on whether the Statistical Profiling Extention (SPE) is implemented.
+ */
+#define MDCR_EL2_TPMS (UINT64_C(0x1) << 14)
+
+/**
  * Controls the owning translation regime and access to Profiling Buffer control
  * registers from EL1. Depends on whether SPE is implemented.
  */

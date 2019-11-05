@@ -70,11 +70,16 @@ uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id)
 	 */
 
 	/*
-	 * Preserve E2PB for now, which depends on the SPE implementation.
-	 * TODO: Investigate how to detect whether SPE is implemented, and which
-	 * stage's translation regime is applicable, i.e., EL2 or EL1.
+	 * Trap all VM accesses to Statistical Profiling Extention (SPE)
+	 * registers.
 	 */
-	mdcr_el2_value &= MDCR_EL2_E2PB;
+	mdcr_el2_value |= MDCR_EL2_TPMS;
+
+	/*
+	 * Set E2PB to 0b00. This ensures that accesses to Profiling Buffer
+	 * controls at EL1 are trapped to EL2.
+	 */
+	mdcr_el2_value &= ~MDCR_EL2_E2PB;
 
 	/*
 	 * Trap all VM accesses to debug registers for fine-grained control.
