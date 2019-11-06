@@ -17,6 +17,8 @@
 #include <stdalign.h>
 #include <stdint.h>
 
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/fdt.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
@@ -44,6 +46,12 @@ void kmain(const struct fdt_header *fdt)
 		HFTEST_LOG("Memory initialization failed.");
 		return;
 	}
+
+	/*
+	 * Install the exception handler with no IRQ callback for now, so that
+	 * exceptions are logged.
+	 */
+	exception_setup(NULL);
 
 	hftest_use_list(hftest_begin, hftest_end - hftest_begin);
 

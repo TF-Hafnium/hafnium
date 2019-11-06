@@ -100,6 +100,7 @@ source_set("hftest_standalone") {
     "//src:memiter",
     "//src/arch/${plat_arch}:entry",
     "//src/arch/${plat_arch}/hftest:entry",
+    "//src/arch/${plat_arch}/hftest:interrupts",
     "//src/arch/${plat_arch}/hftest:power_mgmt",
   ]
 }

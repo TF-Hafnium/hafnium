@@ -20,6 +20,7 @@
 
 #include "hf/dlog.h"
 
+#include "hftest.h"
 #include "msr.h"
 
 extern uint8_t vector_table_el1;
@@ -29,6 +30,8 @@ void irq_current(void)
 {
 	if (irq_callback != NULL) {
 		irq_callback();
+	} else {
+		FAIL("Got unexpected interrupt.\n");
 	}
 }
 

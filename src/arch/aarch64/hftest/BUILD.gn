@@ -38,7 +38,10 @@ source_set("power_mgmt") {
 # Exception handlers for interrupts.
 source_set("interrupts") {
   testonly = true
-  public_configs = [ "//src/arch/aarch64:config" ]
+  public_configs = [
+    "//src/arch/aarch64:config",
+    "//test/hftest:hftest_config",
+  ]
   sources = [
     "events.c",
     "exceptions.S",
