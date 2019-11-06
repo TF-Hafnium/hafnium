@@ -10,6 +10,8 @@ The format of the manifest is a simple DeviceTree overlay:
 
 &{/} {
 	hypervisor {
+		compatible = "hafnium,hafnium";
+
 		vm1 {
 			debug_name = "name";
 			kernel_filename = "vmlinuz";
@@ -47,6 +49,8 @@ number of CPUs as the hardware, a kernel image called `vmlinuz` and a ramdisk
 
 &{/} {
 	hypervisor {
+		compatible = "hafnium,hafnium";
+
 		vm1 {
 			debug_name = "primary VM";
 			kernel_filename = "vmlinuz";
