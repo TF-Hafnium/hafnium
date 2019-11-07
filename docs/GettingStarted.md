@@ -59,9 +59,11 @@ Follow the [Manifest](Manifest.md) instructions and build a DTBO with:
 
 &{/} {
 	hypervisor {
+		compatible = "hafnium,hafnium";
 		vm1 {
 			debug_name = "Linux VM";
 			kernel_filename = "vmlinuz";
+			ramdisk_filename = "initrd.img";
 		};
 	};
 };
