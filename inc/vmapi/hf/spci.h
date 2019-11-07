@@ -18,6 +18,14 @@
 
 #include "hf/types.h"
 
+/*
+ * Copied from hf/arch/std.h because we can't include Hafnium internal headers
+ * here.
+ */
+#ifndef align_up
+#define align_up(v, a) (((uintptr_t)(v) + (a - 1)) & ~(a - 1))
+#endif
+
 /* clang-format off */
 
 #define SPCI_LOW_32_ID  0x84000060
@@ -372,10 +380,15 @@ static inline uint32_t spci_memory_region_init(
 	memory_region->attributes[0].receiver = receiver;
 	memory_region->attributes[0].memory_attributes = attributes;
 
-	memory_region->constituent_offset =
+	/*
+	 * Constituent offset must be aligned to a 64-bit boundary so that
+	 * 64-bit addresses can be copied without alignment faults.
+	 */
+	memory_region->constituent_offset = align_up(
 		sizeof(struct spci_memory_region) +
-		memory_region->attribute_count *
-			sizeof(struct spci_memory_region_attributes);
+			memory_region->attribute_count *
+				sizeof(struct spci_memory_region_attributes),
+		8);
 	region_constituents =
 		spci_memory_region_get_constituents(memory_region);
 

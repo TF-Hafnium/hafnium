@@ -1493,6 +1493,15 @@ struct spci_value api_spci_share_memory(
 
 	size_t size;
 
+	/*
+	 * Make sure constituents are properly aligned to a 64-bit boundary. If
+	 * not we would get alignment faults trying to read (64-bit) page
+	 * addresses.
+	 */
+	if (!is_aligned(constituents, 8)) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
 	/* Disallow reflexive shares as this suggests an error in the VM. */
 	if (to == from) {
 		return spci_error(SPCI_INVALID_PARAMETERS);
