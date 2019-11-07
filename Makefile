@@ -19,7 +19,8 @@ ifneq ($(KERNELRELEASE),)
 obj-m += hafnium.o
 
 hafnium-y += main.o
-hafnium-y += hf_call.o
+hafnium-y += vmlib/aarch64/call.o
+hafnium-y += vmlib/spci.o
 
 ccflags-y = -I$(HAFNIUM_PATH)/inc/vmapi -I$(M)/inc
 
@@ -31,12 +32,14 @@ CROSS_COMPILE ?= aarch64-linux-gnu-
 CHECKPATCH ?= $(KERNEL_PATH)/scripts/checkpatch.pl -q
 
 all:
+	cp -r $(HAFNIUM_PATH)/vmlib/ $(CURDIR)
 	make -C $(KERNEL_PATH) HAFNIUM_PATH=$(HAFNIUM_PATH) M=$(CURDIR) O=$(O) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
 
 clean:
 	make -C $(KERNEL_PATH) HAFNIUM_PATH=$(HAFNIUM_PATH) M=$(CURDIR) O=$(O) clean
+	rm -rf vmlib
 
 checkpatch:
-	$(CHECKPATCH) -f main.c hf_call.c
+	$(CHECKPATCH) -f main.c
 
 endif
