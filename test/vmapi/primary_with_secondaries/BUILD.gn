@@ -42,6 +42,7 @@ vm_kernel("primary_with_secondaries_test_vm") {
     ":util",
     "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
+    "//vmlib",
   ]
 }
 

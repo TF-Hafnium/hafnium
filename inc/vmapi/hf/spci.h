@@ -18,14 +18,6 @@
 
 #include "hf/types.h"
 
-/*
- * Copied from hf/arch/std.h because we can't include Hafnium internal headers
- * here.
- */
-#ifndef align_up
-#define align_up(v, a) (((uintptr_t)(v) + (a - 1)) & ~(a - 1))
-#endif
-
 /* clang-format off */
 
 #define SPCI_LOW_32_ID  0x84000060
@@ -310,8 +302,6 @@ struct spci_memory_region {
 	struct spci_memory_region_attributes attributes[];
 };
 
-/* TODO: Move all the functions below this line to a support library. */
-
 /**
  * Gets the constituent array for an `spci_memory_region`.
  */
@@ -323,20 +313,7 @@ spci_memory_region_get_constituents(struct spci_memory_region *memory_region)
 			   memory_region->constituent_offset);
 }
 
-/**
- * Helper method to fill in the information about the architected message.
- */
-static inline void spci_architected_message_init(void *message,
-						 enum spci_memory_share type)
-{
-	/* Fill the architected header. */
-	struct spci_architected_message_header *architected_header =
-		(struct spci_architected_message_header *)message;
-	architected_header->type = type;
-	architected_header->reserved[0] = 0;
-	architected_header->reserved[1] = 0;
-	architected_header->reserved[2] = 0;
-}
+void spci_architected_message_init(void *message, enum spci_memory_share type);
 
 /** Gets the spci_memory_region within an architected message. */
 static inline struct spci_memory_region *spci_get_memory_region(void *message)
@@ -346,92 +323,21 @@ static inline struct spci_memory_region *spci_get_memory_region(void *message)
 	return (struct spci_memory_region *)architected_header->payload;
 }
 
-/**
- * Initialises the given `spci_memory_region` and copies the constituent
- * information to it. Returns the length in bytes occupied by the data copied to
- * `memory_region` (attributes, constituents and memory region header size).
- */
-static inline uint32_t spci_memory_region_init(
+uint32_t spci_memory_region_init(
 	struct spci_memory_region *memory_region, spci_vm_id_t receiver,
 	const struct spci_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
 	enum spci_memory_access access, enum spci_memory_type type,
 	enum spci_memory_cacheability cacheability,
-	enum spci_memory_shareability shareability)
-{
-	uint32_t constituents_length =
-		constituent_count *
-		sizeof(struct spci_memory_region_constituent);
-	uint32_t index;
-	struct spci_memory_region_constituent *region_constituents;
-	uint16_t attributes = 0;
+	enum spci_memory_shareability shareability);
 
-	/* Set memory region's page attributes. */
-	spci_set_memory_access_attr(&attributes, access);
-	spci_set_memory_type_attr(&attributes, type);
-	spci_set_memory_cacheability_attr(&attributes, cacheability);
-	spci_set_memory_shareability_attr(&attributes, shareability);
-
-	memory_region->tag = tag;
-	memory_region->flags = 0;
-	memory_region->page_count = 0;
-	memory_region->constituent_count = constituent_count;
-	memory_region->attribute_count = 1;
-	memory_region->attributes[0].receiver = receiver;
-	memory_region->attributes[0].memory_attributes = attributes;
-
-	/*
-	 * Constituent offset must be aligned to a 64-bit boundary so that
-	 * 64-bit addresses can be copied without alignment faults.
-	 */
-	memory_region->constituent_offset = align_up(
-		sizeof(struct spci_memory_region) +
-			memory_region->attribute_count *
-				sizeof(struct spci_memory_region_attributes),
-		8);
-	region_constituents =
-		spci_memory_region_get_constituents(memory_region);
-
-	for (index = 0; index < constituent_count; index++) {
-		region_constituents[index] = constituents[index];
-		region_constituents[index].reserved = 0;
-		memory_region->page_count += constituents[index].page_count;
-	}
-
-	/*
-	 * TODO: Add assert ensuring that the specified message
-	 * length is not greater than SPCI_MSG_PAYLOAD_MAX.
-	 */
-
-	return memory_region->constituent_offset + constituents_length;
-}
-
-/**
- * Constructs an 'architected message' for SPCI memory sharing of the given
- * type.
- */
-static inline uint32_t spci_memory_init(
+uint32_t spci_memory_init(
 	void *message, enum spci_memory_share share_type, spci_vm_id_t receiver,
 	struct spci_memory_region_constituent *region_constituents,
 	uint32_t constituent_count, uint32_t tag,
 	enum spci_memory_access access, enum spci_memory_type type,
 	enum spci_memory_cacheability cacheability,
-	enum spci_memory_shareability shareability)
-{
-	uint32_t message_length =
-		sizeof(struct spci_architected_message_header);
-	struct spci_memory_region *memory_region =
-		spci_get_memory_region(message);
-
-	/* Fill in the details on the common message header. */
-	spci_architected_message_init(message, share_type);
-
-	/* Fill in memory region. */
-	message_length += spci_memory_region_init(
-		memory_region, receiver, region_constituents, constituent_count,
-		tag, access, type, cacheability, shareability);
-	return message_length;
-}
+	enum spci_memory_shareability shareability);
 
 /** Constructs an SPCI donate memory region message. */
 static inline uint32_t spci_memory_donate_init(

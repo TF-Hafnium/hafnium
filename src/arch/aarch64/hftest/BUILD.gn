@@ -21,13 +21,6 @@ source_set("entry") {
   ]
 }
 
-# Make a call to the hypervisor from a VM.
-source_set("hf_call") {
-  sources = [
-    "hf_call.c",
-  ]
-}
-
 # Shutdown the system or exit emulation, start/stop CPUs.
 source_set("power_mgmt") {
   testonly = true
@@ -85,7 +78,7 @@ source_set("console") {
   ]
 
   deps = [
-    "//src/arch/aarch64/hftest:hf_call",
+    "//vmlib/aarch64:call",
   ]
 }
 

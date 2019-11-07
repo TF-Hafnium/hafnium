@@ -95,6 +95,7 @@ source_set("memory") {
   ]
   deps = [
     "//test/vmapi/primary_with_secondaries:util",
+    "//vmlib",
   ]
 
   sources = [
