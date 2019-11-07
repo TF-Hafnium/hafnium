@@ -40,7 +40,7 @@ static bool run_loop(struct mailbox_buffers *mb)
 	for (;;) {
 		/* Run until it manages to schedule vCPU on this CPU. */
 		do {
-			run_res = spci_run(SERVICE_VM0, 0);
+			run_res = spci_run(SERVICE_VM1, 0);
 		} while (run_res.func == HF_SPCI_RUN_WAIT_FOR_INTERRUPT &&
 			 run_res.arg2 == HF_SLEEP_INDEFINITE);
 
@@ -88,7 +88,7 @@ TEST_LONG_RUNNING(vcpu_state, concurrent_save_restore)
 
 	mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM0, "check_state", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "check_state", mb.send);
 
 	/* Start second vCPU. */
 	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(1), stack, sizeof(stack),

@@ -70,7 +70,7 @@ source_set("systemreg") {
 
 # Group services together into VMs.
 
-vm_kernel("gicv3_service_vm0") {
+vm_kernel("gicv3_service_vm1") {
   testonly = true
 
   deps = [

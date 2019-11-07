@@ -31,7 +31,7 @@ executable("test_binary") {
   output_name = "test_binary"
 }
 
-vm_kernel("socket_vm0") {
+vm_kernel("socket_vm1") {
   testonly = true
 
   deps = [
@@ -63,7 +63,7 @@ initrd("linux_test") {
   primary_initrd = ":linux_test_initrd"
   secondary_vms = [ [
         "socket0",
-        ":socket_vm0",
+        ":socket_vm1",
       ] ]
 }
 

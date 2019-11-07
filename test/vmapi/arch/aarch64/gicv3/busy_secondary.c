@@ -40,7 +40,7 @@ SET_UP(busy_secondary)
 	system_setup();
 	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
 		  SPCI_SUCCESS_32);
-	SERVICE_SELECT(SERVICE_VM0, "busy", send_buffer);
+	SERVICE_SELECT(SERVICE_VM1, "busy", send_buffer);
 }
 
 TEST(busy_secondary, virtual_timer)
@@ -63,7 +63,7 @@ TEST(busy_secondary, virtual_timer)
 	arch_irq_enable();
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
 	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
@@ -82,10 +82,10 @@ TEST(busy_secondary, virtual_timer)
 	dlog("Telling secondary to loop.\n");
 	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
 	EXPECT_EQ(
-		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_INTERRUPT_32);
 
 	dlog("Waiting for interrupt\n");
@@ -121,7 +121,7 @@ TEST(busy_secondary, physical_timer)
 	arch_irq_enable();
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
 	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
@@ -140,10 +140,10 @@ TEST(busy_secondary, physical_timer)
 	dlog("Telling secondary to loop.\n");
 	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
 	EXPECT_EQ(
-		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_INTERRUPT_32);
 
 	dlog("Waiting for interrupt\n");

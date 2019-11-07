@@ -30,7 +30,7 @@ SET_UP(timer_secondary)
 
 	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
 		  SPCI_SUCCESS_32);
-	SERVICE_SELECT(SERVICE_VM0, "timer", send_buffer);
+	SERVICE_SELECT(SERVICE_VM1, "timer", send_buffer);
 
 	interrupt_enable(VIRTUAL_TIMER_IRQ, true);
 	interrupt_set_edge_triggered(VIRTUAL_TIMER_IRQ, true);
@@ -45,14 +45,14 @@ static void timer_busywait_secondary()
 	struct spci_value run_res;
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
 	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
 	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
 	EXPECT_EQ(
-		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, sizeof(message), 0)
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
 
@@ -63,7 +63,7 @@ static void timer_busywait_secondary()
 	 */
 	dlog("running secondary after sending timer message.\n");
 	last_interrupt_id = 0;
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_INTERRUPT_32);
 	dlog("secondary yielded after receiving timer message\n");
 	EXPECT_EQ(last_interrupt_id, VIRTUAL_TIMER_IRQ);
@@ -73,7 +73,7 @@ static void timer_busywait_secondary()
 	 * should inject a virtual timer interrupt into the secondary, which
 	 * should get it and respond.
 	 */
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response));
 	EXPECT_EQ(memcmp(recv_buffer, expected_response,
@@ -103,20 +103,20 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 	struct spci_value run_res;
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
 	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
 	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, message_length);
 	EXPECT_EQ(
-		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, message_length, 0)
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, message_length, 0)
 			.func,
 		SPCI_SUCCESS_32);
 
 	/* Let the secondary handle the message and set the timer. */
 	last_interrupt_id = 0;
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 
 	/*
 	 * There's a race for whether the secondary manages to block and switch
@@ -150,7 +150,7 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 			EXPECT_NE(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 			dlog("%d ns remaining\n", run_res.arg2);
 		}
-		run_res = spci_run(SERVICE_VM0, 0);
+		run_res = spci_run(SERVICE_VM1, 0);
 	}
 	dlog("Primary done looping\n");
 
@@ -166,7 +166,7 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 		 */
 		EXPECT_EQ(last_interrupt_id, VIRTUAL_TIMER_IRQ);
 		dlog("Preempted by timer interrupt, running again\n");
-		run_res = spci_run(SERVICE_VM0, 0);
+		run_res = spci_run(SERVICE_VM1, 0);
 	}
 
 	/* Once we wake it up it should get the timer interrupt and respond. */
@@ -255,14 +255,14 @@ TEST(timer_secondary, wfi_very_long)
 	struct spci_value run_res;
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
 	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
 	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, message_length);
 	EXPECT_EQ(
-		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM0, message_length, 0)
+		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, message_length, 0)
 			.func,
 		SPCI_SUCCESS_32);
 
@@ -271,7 +271,7 @@ TEST(timer_secondary, wfi_very_long)
 	 */
 	last_interrupt_id = 0;
 	for (int i = 0; i < 20; ++i) {
-		run_res = spci_run(SERVICE_VM0, 0);
+		run_res = spci_run(SERVICE_VM1, 0);
 		EXPECT_EQ(run_res.func, HF_SPCI_RUN_WAIT_FOR_INTERRUPT);
 		dlog("Primary looping until timer fires; %d ns "
 		     "remaining\n",

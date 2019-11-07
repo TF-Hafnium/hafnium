@@ -26,24 +26,24 @@
 		};
 
 		vm2 {
-			debug_name = "services0";
-			vcpu_count = <1>;
-			mem_size = <0x100000>;
-			kernel_filename = "services0";
-		};
-
-		vm3 {
 			debug_name = "services1";
 			vcpu_count = <1>;
 			mem_size = <0x100000>;
 			kernel_filename = "services1";
 		};
 
-		vm4 {
+		vm3 {
 			debug_name = "services2";
-			vcpu_count = <2>;
+			vcpu_count = <1>;
 			mem_size = <0x100000>;
 			kernel_filename = "services2";
+		};
+
+		vm4 {
+			debug_name = "services3";
+			vcpu_count = <2>;
+			mem_size = <0x100000>;
+			kernel_filename = "services3";
 		};
 	};
 };

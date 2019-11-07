@@ -35,17 +35,17 @@ TEST(smp, two_vcpus)
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM2, "smp", mb.send);
+	SERVICE_SELECT(SERVICE_VM3, "smp", mb.send);
 
 	/* Let the first vCPU start the second vCPU. */
-	run_res = spci_run(SERVICE_VM2, 0);
+	run_res = spci_run(SERVICE_VM3, 0);
 	EXPECT_EQ(run_res.func, HF_SPCI_RUN_WAKE_UP);
-	EXPECT_EQ(spci_vm_id(run_res), SERVICE_VM2);
+	EXPECT_EQ(spci_vm_id(run_res), SERVICE_VM3);
 	EXPECT_EQ(spci_vcpu_index(run_res), 1);
 
 	/* Run the second vCPU and wait for a message. */
 	dlog("Run second vCPU for message\n");
-	run_res = spci_run(SERVICE_VM2, 1);
+	run_res = spci_run(SERVICE_VM3, 1);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response_1));
 	EXPECT_EQ(memcmp(mb.recv, expected_response_1,
@@ -55,7 +55,7 @@ TEST(smp, two_vcpus)
 
 	/* Run the first vCPU and wait for a different message. */
 	dlog("Run first vCPU for message\n");
-	run_res = spci_run(SERVICE_VM2, 0);
+	run_res = spci_run(SERVICE_VM3, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(expected_response_0));
 	EXPECT_EQ(memcmp(mb.recv, expected_response_0,
@@ -65,7 +65,7 @@ TEST(smp, two_vcpus)
 
 	/* Run the second vCPU again, and expect it to turn itself off. */
 	dlog("Run second vCPU for poweroff.\n");
-	run_res = spci_run(SERVICE_VM2, 1);
+	run_res = spci_run(SERVICE_VM3, 1);
 	EXPECT_EQ(run_res.func, HF_SPCI_RUN_WAIT_FOR_INTERRUPT);
 	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
 }

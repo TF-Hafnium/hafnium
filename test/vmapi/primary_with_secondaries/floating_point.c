@@ -39,13 +39,13 @@ TEST(floating_point, fp_fill)
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	fill_fp_registers(first);
-	SERVICE_SELECT(SERVICE_VM0, "fp_fill", mb.send);
-	run_res = spci_run(SERVICE_VM0, 0);
+	SERVICE_SELECT(SERVICE_VM1, "fp_fill", mb.send);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 	EXPECT_EQ(check_fp_register(first), true);
 
 	fill_fp_registers(second);
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 	EXPECT_EQ(check_fp_register(second), true);
 }
@@ -62,12 +62,12 @@ TEST(floating_point, fp_fpcr)
 
 	EXPECT_EQ(read_msr(fpcr), value);
 
-	SERVICE_SELECT(SERVICE_VM0, "fp_fpcr", mb.send);
-	run_res = spci_run(SERVICE_VM0, 0);
+	SERVICE_SELECT(SERVICE_VM1, "fp_fpcr", mb.send);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 	EXPECT_EQ(read_msr(fpcr), value);
 
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 	EXPECT_EQ(read_msr(fpcr), value);
 }

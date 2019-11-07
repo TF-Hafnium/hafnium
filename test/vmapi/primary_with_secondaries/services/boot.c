@@ -22,7 +22,7 @@
 #include "hftest.h"
 
 /*
- * This must match the size specified for services0 in
+ * This must match the size specified for services1 in
  * //test/vmapi/primary_with_secondaries:primary_with_secondaries_test.
  */
 #define SECONDARY_MEMORY_SIZE 1048576

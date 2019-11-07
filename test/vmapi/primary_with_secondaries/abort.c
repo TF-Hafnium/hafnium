@@ -28,9 +28,9 @@ TEST(abort, data_abort)
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM0, "data_abort", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "data_abort", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
@@ -42,9 +42,9 @@ TEST(abort, straddling_data_abort)
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM0, "straddling_data_abort", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "straddling_data_abort", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
@@ -56,9 +56,9 @@ TEST(abort, instruction_abort)
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM0, "instruction_abort", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "instruction_abort", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
@@ -70,8 +70,8 @@ TEST(abort, straddling_instruction_abort)
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM0, "straddling_instruction_abort", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "straddling_instruction_abort", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }

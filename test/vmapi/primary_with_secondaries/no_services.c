@@ -56,7 +56,7 @@ TEST(hf_vm_get_count, three_secondary_vms)
  */
 TEST(hf_vcpu_get_count, secondary_has_one_vcpu)
 {
-	EXPECT_EQ(hf_vcpu_get_count(SERVICE_VM0), 1);
+	EXPECT_EQ(hf_vcpu_get_count(SERVICE_VM1), 1);
 }
 
 /**
@@ -103,7 +103,7 @@ TEST(spci_run, cannot_run_absent_secondary)
  */
 TEST(spci_run, cannot_run_absent_vcpu)
 {
-	struct spci_value res = spci_run(SERVICE_VM0, 1234);
+	struct spci_value res = spci_run(SERVICE_VM1, 1234);
 	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
 }
 

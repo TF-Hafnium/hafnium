@@ -33,9 +33,9 @@ TEST(perfmon, secondary_pmccfiltr_el0)
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM0, "perfmon_secondary_pmccfiltr_el0", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "perfmon_secondary_pmccfiltr_el0", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
@@ -44,9 +44,9 @@ TEST(perfmon, secondary_pmcr_el0)
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM0, "perfmon_secondary_pmcr_el0", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "perfmon_secondary_pmcr_el0", mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
@@ -55,10 +55,10 @@ TEST(perfmon, secondary_pmintenset_el1)
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM0, "perfmon_secondary_pmintenset_el1",
+	SERVICE_SELECT(SERVICE_VM1, "perfmon_secondary_pmintenset_el1",
 		       mb.send);
 
-	run_res = spci_run(SERVICE_VM0, 0);
+	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 

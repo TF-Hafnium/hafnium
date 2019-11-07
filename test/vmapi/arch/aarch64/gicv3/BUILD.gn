@@ -46,7 +46,7 @@ initrd("gicv3_test") {
   primary_name = "gicv3_test"
   primary_vm = ":gicv3_test_vm"
   secondary_vms = [ [
-        "services0",
-        "services:gicv3_service_vm0",
+        "services1",
+        "services:gicv3_service_vm1",
       ] ]
 }

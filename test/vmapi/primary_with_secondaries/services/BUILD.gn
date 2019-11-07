@@ -213,7 +213,7 @@ source_set("spci_check") {
 
 # Group services together into VMs.
 
-vm_kernel("service_vm0") {
+vm_kernel("service_vm1") {
   testonly = true
 
   deps = [
@@ -235,7 +235,7 @@ vm_kernel("service_vm0") {
   ]
 }
 
-vm_kernel("service_vm1") {
+vm_kernel("service_vm2") {
   testonly = true
 
   deps = [
@@ -245,7 +245,7 @@ vm_kernel("service_vm1") {
   ]
 }
 
-vm_kernel("service_vm2") {
+vm_kernel("service_vm3") {
   testonly = true
 
   deps = [

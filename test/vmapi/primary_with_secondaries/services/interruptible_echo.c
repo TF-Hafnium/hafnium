@@ -54,7 +54,7 @@ TEST_SERVICE(interruptible_echo)
 			 spci_msg_send_size(res));
 
 		spci_rx_release();
-		spci_msg_send(SERVICE_VM0, HF_PRIMARY_VM_ID,
+		spci_msg_send(SERVICE_VM1, HF_PRIMARY_VM_ID,
 			      spci_msg_send_size(res), 0);
 	}
 }
