@@ -277,8 +277,11 @@ static void hf_handle_message(struct hf_vm *sender, size_t len,
 	int err;
 
 	/* Ignore messages that are too small to hold a header. */
-	if (len < sizeof(struct hf_msg_hdr))
+	if (len < sizeof(struct hf_msg_hdr)) {
+		pr_err("Message received without header of length %d\n", len);
+		spci_rx_release();
 		return;
+	}
 
 	len -= sizeof(struct hf_msg_hdr);
 
@@ -295,8 +298,10 @@ static void hf_handle_message(struct hf_vm *sender, size_t len,
 	rcu_read_unlock();
 
 	/* Nothing to do if we couldn't find the target. */
-	if (!hsock)
+	if (!hsock) {
+		spci_rx_release();
 		return;
+	}
 
 	/*
 	 * TODO: From this point on, there are two failure paths: when we
