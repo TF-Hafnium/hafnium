@@ -31,12 +31,14 @@
 
 static void lor_disable(void)
 {
+#if SECURE_WORLD == 0
 	/*
 	 * Accesses to LORC_EL1 are undefined if LORegions are not supported.
 	 */
 	if (read_msr(ID_AA64MMFR1_EL1) & ID_AA64MMFR1_EL1_LO) {
 		write_msr(MSR_LORC_EL1, 0);
 	}
+#endif
 }
 
 static void gic_regs_reset(struct arch_regs *r, bool is_primary)
