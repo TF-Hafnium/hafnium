@@ -16,5 +16,7 @@
 
 #pragma once
 
-void exception_setup(void (*irq)(void));
+#include <stdbool.h>
+
+void exception_setup(void (*irq)(void), bool (*exception)(void));
 void interrupt_wait(void);

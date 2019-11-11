@@ -42,7 +42,7 @@ TEST_SERVICE(receive_block)
 	int32_t i;
 	const char message[] = "Done waiting";
 
-	exception_setup(irq);
+	exception_setup(irq, NULL);
 	arch_irq_disable();
 	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
 

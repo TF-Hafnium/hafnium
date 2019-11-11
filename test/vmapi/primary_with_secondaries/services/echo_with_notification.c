@@ -48,7 +48,7 @@ static void wait_for_vm(uint32_t vmid)
 
 TEST_SERVICE(echo_with_notification)
 {
-	exception_setup(irq);
+	exception_setup(irq, NULL);
 	hf_interrupt_enable(HF_MAILBOX_WRITABLE_INTID, true);
 
 	/* Loop, echo messages back to the sender. */

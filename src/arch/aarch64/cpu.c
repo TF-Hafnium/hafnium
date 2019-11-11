@@ -97,9 +97,8 @@ void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
 	r->lazy.cnthctl_el2 = cnthctl;
 	r->lazy.vttbr_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
 	r->lazy.vmpidr_el2 = vcpu_id;
-	/* TODO: Use constant here. */
-	r->spsr = 5 |	 /* M bits, set to EL1h. */
-		  (0xf << 6); /* DAIF bits set; disable interrupts. */
+	/* Mask (disable) interrupts and run in EL1h mode. */
+	r->spsr = PSR_D | PSR_A | PSR_I | PSR_F | PSR_PE_MODE_EL1H;
 
 	r->lazy.mdcr_el2 = get_mdcr_el2_value(vm_id);
 

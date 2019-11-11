@@ -51,7 +51,7 @@ void kmain(const struct fdt_header *fdt)
 	 * Install the exception handler with no IRQ callback for now, so that
 	 * exceptions are logged.
 	 */
-	exception_setup(NULL);
+	exception_setup(NULL, NULL);
 
 	hftest_use_list(hftest_begin, hftest_end - hftest_begin);
 

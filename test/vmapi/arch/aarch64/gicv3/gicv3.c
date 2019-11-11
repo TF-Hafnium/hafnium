@@ -56,7 +56,7 @@ void system_setup()
 	hftest_mm_identity_map((void *)GICR_BASE, PAGE_SIZE, mode);
 	hftest_mm_identity_map((void *)SGI_BASE, PAGE_SIZE, mode);
 
-	exception_setup(irq);
+	exception_setup(irq, NULL);
 	interrupt_gic_setup();
 }
 

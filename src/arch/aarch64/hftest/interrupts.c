@@ -25,6 +25,7 @@
 
 extern uint8_t vector_table_el1;
 static void (*irq_callback)(void);
+static bool (*exception_callback)(void);
 
 void irq_current(void)
 {
@@ -35,16 +36,11 @@ void irq_current(void)
 	}
 }
 
-void exception_setup(void (*irq)(void))
+noreturn static bool default_sync_current_exception(void)
 {
-	irq_callback = irq;
+	uintreg_t esr = read_msr(esr_el1);
+	uintreg_t elr = read_msr(elr_el1);
 
-	/* Set exception vector table. */
-	write_msr(VBAR_EL1, &vector_table_el1);
-}
-
-void sync_current_exception(uintreg_t esr, uintreg_t elr)
-{
 	switch (esr >> 26) {
 	case 0x25: /* EC = 100101, Data abort. */
 		dlog("Data abort: pc=%#x, esr=%#x, ec=%#x", elr, esr,
@@ -67,6 +63,23 @@ void sync_current_exception(uintreg_t esr, uintreg_t elr)
 	for (;;) {
 		/* do nothing */
 	}
+}
+
+bool sync_exception_current(void)
+{
+	if (exception_callback != NULL) {
+		return exception_callback();
+	}
+	return default_sync_current_exception();
+}
+
+void exception_setup(void (*irq)(void), bool (*exception)(void))
+{
+	irq_callback = irq;
+	exception_callback = exception;
+
+	/* Set exception vector table. */
+	write_msr(VBAR_EL1, &vector_table_el1);
 }
 
 void interrupt_wait(void)

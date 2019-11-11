@@ -33,7 +33,7 @@ static void irq(void)
 
 TEST_SERVICE(interruptible_echo)
 {
-	exception_setup(irq);
+	exception_setup(irq, NULL);
 	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
 	arch_irq_enable();
 

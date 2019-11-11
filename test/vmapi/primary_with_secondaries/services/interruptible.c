@@ -65,7 +65,7 @@ TEST_SERVICE(interruptible)
 	spci_vm_id_t this_vm_id = hf_vm_get_id();
 	void *recv_buf = SERVICE_RECV_BUFFER();
 
-	exception_setup(irq);
+	exception_setup(irq, NULL);
 	hf_interrupt_enable(SELF_INTERRUPT_ID, true);
 	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
 	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_B, true);

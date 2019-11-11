@@ -55,7 +55,7 @@ static void irq_current(void)
 
 TEST_SERVICE(timer)
 {
-	exception_setup(irq_current);
+	exception_setup(irq_current, NULL);
 	hf_interrupt_enable(HF_VIRTUAL_TIMER_INTID, true);
 	arch_irq_enable();
 

@@ -21,7 +21,10 @@ config("config") {
 # Tests with secondary VMs.
 vm_kernel("primary_with_secondaries_test_vm") {
   testonly = true
-  public_configs = [ ":config" ]
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:config",
+  ]
 
   sources = [
     "abort.c",
@@ -36,6 +39,7 @@ vm_kernel("primary_with_secondaries_test_vm") {
     "run_race.c",
     "smp.c",
     "spci.c",
+    "sysregs.c",
   ]
 
   deps = [

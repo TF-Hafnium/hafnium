@@ -396,6 +396,53 @@
  */
 #define CPTR_EL2_TTA (UINT64_C(0x1) << 28)
 
+/*
+ * Process State Bit definitions.
+ *
+ * These apply to the PSTATE, as well as registers that contain PSTATE fields,
+ * e.g., SPSR_EL1.
+ */
+
+/**
+ * Debug exception mask bit.
+ */
+#define PSR_D (UINT64_C(1) << 9)
+
+/**
+ * Asynchronos SError interrupt mask bit.
+ */
+#define PSR_A (UINT64_C(1) << 8)
+
+/**
+ * Asynchronos IRQ interrupt mask bit.
+ */
+#define PSR_I (UINT64_C(1) << 7)
+
+/**
+ * Asynchronos FIQ interrupt mask bit.
+ */
+#define PSR_F (UINT64_C(1) << 6)
+
+/**
+ * AArch32 State bit.
+ */
+#define PSR_ARCH_MODE_32 (UINT64_C(1) << 4)
+
+/**
+ * PE Mode bit mask.
+ */
+#define PSR_PE_MODE_MASK UINT64_C(0xf)
+
+/**
+ * PE Mode: EL0t.
+ */
+#define PSR_PE_MODE_EL0T UINT64_C(0x0)
+
+/**
+ * PE Mode: EL1h.
+ */
+#define PSR_PE_MODE_EL1H UINT64_C(0x5)
+
 uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id);
 
 uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id);
