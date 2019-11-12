@@ -5,9 +5,10 @@ makes a distinction between the 'primary VM', which controls scheduling and has
 more direct access to some hardware, and 'secondary VMs' which exist mostly to
 provide services to the primary VM, and have a more paravirtualised interface.
 The intention is that the primary VM can run a mostly unmodified operating
-system (such as Linux) with the addition of a Hafnium driver, while secondary
-VMs will run more specialised trusted OSes or bare-metal code which is designed
-with Hafnium in mind.
+system (such as Linux) with the addition of a Hafnium driver which
+[fulfils certain expectations](SchedulerExpectations.md), while secondary VMs
+will run more specialised trusted OSes or bare-metal code which is designed with
+Hafnium in mind.
 
 The interface documented here is what is planned for the first release of
 Hafnium, not necessarily what is currently implemented.
