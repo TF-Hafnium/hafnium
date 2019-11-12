@@ -183,14 +183,13 @@ template("incbin") {
                              "deps",
                            ])
 
-    inc_files = invoker.sources
-
     sources = [
       "//build/image/incbin.S",
     ]
+    inputs = invoker.sources
     defines = [
       "SECTION_NAME=" + invoker.section,
-      "FILE_PATH=\"" + rebase_path(inc_files[0]) + "\"",
+      "FILE_PATH=\"" + rebase_path(inputs[0]) + "\"",
     ]
   }
 }
