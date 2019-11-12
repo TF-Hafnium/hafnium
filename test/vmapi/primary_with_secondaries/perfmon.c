@@ -82,20 +82,35 @@ TEST(perfmon, primary_basic)
  */
 TEST(perfmon, primary_read_write)
 {
+	uintreg_t pmcr_el0 = read_msr(PMCR_EL0);
+	uintreg_t perf_mon_count = GET_PMCR_EL0_N(pmcr_el0);
+
 	EXPECT_EQ(hf_vm_get_id(), HF_PRIMARY_VM_ID);
+
+	/*
+	 * Ensure that there are enough performance counters in the underlying
+	 * uArch for this test to pass.
+	 */
+	EXPECT_GE(perf_mon_count, 4);
 
 	TRY_WRITE_READ(PMCCNTR_EL0, 0xaaaa);
 
 	write_msr(PMINTENCLR_EL1, 0xffff);
 	CHECK_READ(PMINTENSET_EL1, 0);
 
-	/* Bits set in PMINTENSET_EL1 can be read in PMINTENCLR_EL1. */
-	write_msr(PMINTENSET_EL1, 0xf);
-	CHECK_READ(PMINTENCLR_EL1, 0xf);
+	/*
+	 * Enable the first and second performance counters.
+	 * Bits set in PMINTENSET_EL1 can be read in PMINTENCLR_EL1.
+	 */
+	write_msr(PMINTENSET_EL1, 0x3);
+	CHECK_READ(PMINTENCLR_EL1, 0x3);
 
-	/* Writes to PMINTENSET_EL1 do not clear already set bits. */
-	write_msr(PMINTENSET_EL1, 0xf0);
-	CHECK_READ(PMINTENCLR_EL1, 0xff);
+	/*
+	 * Enable the third and fourth performance counters.
+	 * Writes to PMINTENSET_EL1 do not clear already set bits.
+	 */
+	write_msr(PMINTENSET_EL1, 0xc);
+	CHECK_READ(PMINTENCLR_EL1, 0xf);
 }
 
 /**
