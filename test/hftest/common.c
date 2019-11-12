@@ -175,53 +175,37 @@ void hftest_run(struct memiter suite_name, struct memiter test_name,
 		const struct fdt_header *fdt)
 {
 	size_t i;
-	bool found_suite = false;
-	const char *suite = NULL;
 	hftest_test_fn suite_set_up = NULL;
 	hftest_test_fn suite_tear_down = NULL;
 
 	for (i = 0; i < hftest_count; ++i) {
 		struct hftest_test *test = &hftest_list[i];
-		/* Find the test suite. */
-		if (found_suite) {
-			if (test->suite != suite) {
-				/* Test wasn't in the suite. */
+
+		/* Check if this test is part of the suite we want. */
+		if (memiter_iseq(&suite_name, test->suite)) {
+			switch (test->kind) {
+			/*
+			 * The first entries in the suite are the set up and
+			 * tear down functions.
+			 */
+			case HFTEST_KIND_SET_UP:
+				suite_set_up = test->fn;
+				break;
+			case HFTEST_KIND_TEAR_DOWN:
+				suite_tear_down = test->fn;
+				break;
+			/* Find the test. */
+			case HFTEST_KIND_TEST:
+				if (memiter_iseq(&test_name, test->name)) {
+					run_test(suite_set_up, test->fn,
+						 suite_tear_down, fdt);
+					return;
+				}
+				break;
+			default:
+				/* Ignore other kinds. */
 				break;
 			}
-		} else {
-			if (test->suite == suite) {
-				/* This isn't the right suite so keep going. */
-				continue;
-			}
-			/* Examine a new suite. */
-			suite = test->suite;
-			if (memiter_iseq(&suite_name, test->suite)) {
-				found_suite = true;
-			}
-		}
-
-		switch (test->kind) {
-		/*
-		 * The first entries in the suite are the set up and tear down
-		 * functions.
-		 */
-		case HFTEST_KIND_SET_UP:
-			suite_set_up = test->fn;
-			break;
-		case HFTEST_KIND_TEAR_DOWN:
-			suite_tear_down = test->fn;
-			break;
-		/* Find the test. */
-		case HFTEST_KIND_TEST:
-			if (memiter_iseq(&test_name, test->name)) {
-				run_test(suite_set_up, test->fn,
-					 suite_tear_down, fdt);
-				return;
-			}
-			break;
-		default:
-			/* Ignore other kinds. */
-			break;
 		}
 	}
 
