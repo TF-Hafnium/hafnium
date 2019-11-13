@@ -413,6 +413,8 @@ static int hf_vcpu_thread(void *data)
 
 		/* Abort was triggered. */
 		case SPCI_ERROR_32:
+			pr_warn("SPCI error %d running VM %d vCPU %d", ret.arg2,
+				vcpu->vm->id, vcpu->vcpu_index);
 			switch (ret.arg2) {
 			case SPCI_ABORTED:
 				for (i = 0; i < vcpu->vm->vcpu_count; i++) {
