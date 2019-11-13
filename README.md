@@ -17,6 +17,8 @@ If you want to contribute to the project, see details of
 
 More documentation is available on:
 
+*   [Hafnium architecture](docs/Architecture.md)
+*   [Code structure](docs/CodeStructure.md)
 *   [Hafnium test infrastructure](docs/Testing.md)
 *   [Running Hafnium under the Arm Fixed Virtual Platform](docs/FVP.md)
 *   [How to build a RAM disk containing VMs for Hafnium to run](docs/HafniumRamDisk.md)
