@@ -21,17 +21,17 @@
 
 TEST(smccc, hf_debug_log_zero_or_unchanged)
 {
-	struct smc_result smc_res =
+	struct spci_value smc_res =
 		smc_forward(HF_DEBUG_LOG, '\n', 0x2222222222222222,
 			    0x3333333333333333, 0x4444444444444444,
 			    0x5555555555555555, 0x6666666666666666, 0x77777777);
 
-	EXPECT_EQ(smc_res.res0, 0);
-	EXPECT_EQ(smc_res.res1, 0);
-	EXPECT_EQ(smc_res.res2, 0);
-	EXPECT_EQ(smc_res.res3, 0);
-	EXPECT_EQ(smc_res.res4, UINT64_C(0x4444444444444444));
-	EXPECT_EQ(smc_res.res5, UINT64_C(0x5555555555555555));
-	EXPECT_EQ(smc_res.res6, UINT64_C(0x6666666666666666));
-	EXPECT_EQ(smc_res.res7, UINT64_C(0x77777777));
+	EXPECT_EQ(smc_res.func, 0);
+	EXPECT_EQ(smc_res.arg1, 0);
+	EXPECT_EQ(smc_res.arg2, 0);
+	EXPECT_EQ(smc_res.arg3, 0);
+	EXPECT_EQ(smc_res.arg4, UINT64_C(0x4444444444444444));
+	EXPECT_EQ(smc_res.arg5, UINT64_C(0x5555555555555555));
+	EXPECT_EQ(smc_res.arg6, UINT64_C(0x6666666666666666));
+	EXPECT_EQ(smc_res.arg7, UINT64_C(0x77777777));
 }

@@ -18,7 +18,9 @@
 
 #include <stdint.h>
 
-static struct smc_result smc_internal(uint32_t func, uint64_t arg0,
+#include "vmapi/hf/spci.h"
+
+static struct spci_value smc_internal(uint32_t func, uint64_t arg0,
 				      uint64_t arg1, uint64_t arg2,
 				      uint64_t arg3, uint64_t arg4,
 				      uint64_t arg5, uint32_t caller_id)
@@ -38,17 +40,17 @@ static struct smc_result smc_internal(uint32_t func, uint64_t arg0,
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3), "+r"(r4), "+r"(r5),
 		"+r"(r6), "+r"(r7));
 
-	return (struct smc_result){.res0 = r0,
-				   .res1 = r1,
-				   .res2 = r2,
-				   .res3 = r3,
-				   .res4 = r4,
-				   .res5 = r5,
-				   .res6 = r6,
-				   .res7 = r7};
+	return (struct spci_value){.func = r0,
+				   .arg1 = r1,
+				   .arg2 = r2,
+				   .arg3 = r3,
+				   .arg4 = r4,
+				   .arg5 = r5,
+				   .arg6 = r6,
+				   .arg7 = r7};
 }
 
-struct smc_result smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
+struct spci_value smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
 			uint32_t arg2, uint32_t arg3, uint32_t arg4,
 			uint32_t arg5, uint32_t caller_id)
 {
@@ -56,7 +58,7 @@ struct smc_result smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
 			    arg5, caller_id);
 }
 
-struct smc_result smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
+struct spci_value smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
 			uint64_t arg2, uint64_t arg3, uint64_t arg4,
 			uint64_t arg5, uint32_t caller_id)
 {
@@ -64,7 +66,7 @@ struct smc_result smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
 			    arg5, caller_id);
 }
 
-struct smc_result smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
+struct spci_value smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
 			      uint64_t arg2, uint64_t arg3, uint64_t arg4,
 			      uint64_t arg5, uint32_t caller_id)
 {

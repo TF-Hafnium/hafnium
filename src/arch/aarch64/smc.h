@@ -18,6 +18,8 @@
 
 #include <stdint.h>
 
+#include "vmapi/hf/spci.h"
+
 /* clang-format off */
 
 #define SMCCC_CALL_TYPE_MASK  0x80000000
@@ -47,25 +49,14 @@
 
 /* clang-format on */
 
-struct smc_result {
-	uint64_t res0;
-	uint64_t res1;
-	uint64_t res2;
-	uint64_t res3;
-	uint64_t res4;
-	uint64_t res5;
-	uint64_t res6;
-	uint64_t res7;
-};
-
-struct smc_result smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
+struct spci_value smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
 			uint32_t arg2, uint32_t arg3, uint32_t arg4,
 			uint32_t arg5, uint32_t caller_id);
 
-struct smc_result smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
+struct spci_value smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
 			uint64_t arg2, uint64_t arg3, uint64_t arg4,
 			uint64_t arg5, uint32_t caller_id);
 
-struct smc_result smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
+struct spci_value smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
 			      uint64_t arg2, uint64_t arg3, uint64_t arg4,
 			      uint64_t arg5, uint32_t caller_id);

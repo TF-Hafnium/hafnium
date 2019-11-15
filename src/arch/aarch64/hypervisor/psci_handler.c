@@ -37,10 +37,10 @@ void cpu_entry(struct cpu *c);
 /* Performs arch specific boot time initialisation. */
 void arch_one_time_init(void)
 {
-	struct smc_result smc_res =
+	struct spci_value smc_res =
 		smc32(PSCI_VERSION, 0, 0, 0, 0, 0, 0, SMCCC_CALLER_HYPERVISOR);
 
-	el3_psci_version = smc_res.res0;
+	el3_psci_version = smc_res.func;
 
 	/* Check there's nothing unexpected about PSCI. */
 	switch (el3_psci_version) {
@@ -72,7 +72,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 			     uintreg_t arg1, uintreg_t arg2, uintreg_t *ret)
 {
 	struct cpu *c;
-	struct smc_result smc_res;
+	struct spci_value smc_res;
 
 	/*
 	 * If there's a problem with the EL3 PSCI, block standard secure service
@@ -106,7 +106,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 				/* PSCI 1.x only defines two feature bits. */
 				smc_res = smc32(func, arg0, 0, 0, 0, 0, 0,
 						SMCCC_CALLER_HYPERVISOR);
-				*ret = smc_res.res0 & 0x3;
+				*ret = smc_res.func & 0x3;
 			}
 			break;
 
@@ -172,7 +172,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		smc_res = smc64(PSCI_CPU_SUSPEND, arg0, (uintreg_t)&cpu_entry,
 				(uintreg_t)vcpu->cpu, 0, 0, 0,
 				SMCCC_CALLER_HYPERVISOR);
-		*ret = smc_res.res0;
+		*ret = smc_res.func;
 		break;
 	}
 
@@ -204,7 +204,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 			smc_res = smc64(PSCI_CPU_ON, arg0,
 					(uintreg_t)&cpu_entry, (uintreg_t)c, 0,
 					0, 0, SMCCC_CALLER_HYPERVISOR);
-			*ret = smc_res.res0;
+			*ret = smc_res.func;
 		} while (*ret == PSCI_ERROR_ALREADY_ON);
 
 		if (*ret != PSCI_RETURN_SUCCESS) {
