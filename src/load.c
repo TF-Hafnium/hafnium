@@ -18,6 +18,8 @@
 
 #include <stdbool.h>
 
+#include "hf/arch/vm.h"
+
 #include "hf/api.h"
 #include "hf/boot_params.h"
 #include "hf/check.h"
@@ -98,6 +100,9 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 static bool load_common(const struct manifest_vm *manifest_vm, struct vm *vm)
 {
 	vm->smc_whitelist = manifest_vm->smc_whitelist;
+
+	/* Initialize architecture-specific features.  */
+	arch_vm_features_set(vm);
 
 	return true;
 }

@@ -31,6 +31,7 @@
 #include "vmapi/hf/call.h"
 
 #include "debug_el1.h"
+#include "feature_id.h"
 #include "msr.h"
 #include "perfmon.h"
 #include "psci.h"
@@ -144,8 +145,8 @@ static void invalidate_vm_tlb(void)
 
 	/*
 	 * Ensure that no data reads or writes for the VM happen until after the
-	 * TLB invalidation has taken effect. Non-sharable is enough because the
-	 * TLB is local to the CPU.
+	 * TLB invalidation has taken effect. Non-shareable is enough because
+	 * the TLB is local to the CPU.
 	 */
 	dsb(nsh);
 }
@@ -751,6 +752,10 @@ struct vcpu *handle_system_register_access(uintreg_t esr_el2)
 		}
 	} else if (perfmon_is_register_access(esr_el2)) {
 		if (!perfmon_process_access(vcpu, vm_id, esr_el2)) {
+			return inject_el1_unknown_exception(vcpu, esr_el2);
+		}
+	} else if (feature_id_is_register_access(esr_el2)) {
+		if (!feature_id_process_access(vcpu, esr_el2)) {
 			return inject_el1_unknown_exception(vcpu, esr_el2);
 		}
 	} else {

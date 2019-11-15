@@ -264,7 +264,7 @@ paddr_t arch_mm_table_from_pte(pte_t pte, uint8_t level)
 }
 
 /**
- * Extracts the architecture specific attributes applies to the given page table
+ * Extracts the architecture-specific attributes applies to the given page table
  * entry.
  */
 uint64_t arch_mm_pte_attrs(pte_t pte, uint8_t level)

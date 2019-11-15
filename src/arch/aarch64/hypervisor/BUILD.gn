@@ -33,10 +33,12 @@ source_set("hypervisor") {
   sources += [
     "cpu.c",
     "debug_el1.c",
+    "feature_id.c",
     "handler.c",
     "perfmon.c",
     "psci_handler.c",
     "sysregs.c",
+    "vm.c",
   ]
 
   deps = [

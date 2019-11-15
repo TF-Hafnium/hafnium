@@ -25,6 +25,7 @@
 #include "hf/std.h"
 #include "hf/vm.h"
 
+#include "feature_id.h"
 #include "msr.h"
 #include "perfmon.h"
 #include "sysregs.h"
@@ -95,7 +96,7 @@ void arch_regs_reset(struct vcpu *vcpu)
 	/* Mask (disable) interrupts and run in EL1h mode. */
 	r->spsr = PSR_D | PSR_A | PSR_I | PSR_F | PSR_PE_MODE_EL1H;
 
-	r->lazy.mdcr_el2 = get_mdcr_el2_value(vm_id);
+	r->lazy.mdcr_el2 = get_mdcr_el2_value();
 
 	/*
 	 * NOTE: It is important that MDSCR_EL1.MDE (bit 15) is set to 0 for
@@ -109,6 +110,9 @@ void arch_regs_reset(struct vcpu *vcpu)
 
 	/* Disable cycle counting on initialization. */
 	r->lazy.pmccfiltr_el0 = perfmon_get_pmccfiltr_el0_init_value(vm_id);
+
+	/* Set feature-specific register values. */
+	feature_set_traps(vcpu->vm, r);
 
 	gic_regs_reset(r, is_primary);
 }

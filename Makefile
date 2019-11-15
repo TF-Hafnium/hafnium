@@ -49,7 +49,8 @@ CHECKPATCH := $(CURDIR)/third_party/linux/scripts/checkpatch.pl \
 # Separate the different items in the list with a grep or (\|).
 # debug_el1.c : uses XMACROS, which checkpatch doesn't understand.
 # perfmon.c : uses XMACROS, which checkpatch doesn't understand.
-CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c"
+# feature_id.c : uses XMACROS, which checkpatch doesn't understand.
+CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c\|src/arch/aarch64/hypervisor/feature_id.c"
 
 OUT ?= out/$(PROJECT)
 OUT_DIR = out/$(PROJECT)

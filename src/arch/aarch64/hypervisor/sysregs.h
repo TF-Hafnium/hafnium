@@ -34,7 +34,7 @@
 #define MDCR_EL2_HCCD (UINT64_C(0x1) << 23)
 
 /**
- * Controls traps for Trace Filter.
+ * Controls traps for Trace Filter when Self-hosted Trace is implemented.
  */
 #define MDCR_EL2_TTRF (UINT64_C(0x1) << 19)
 
@@ -45,8 +45,8 @@
 
 /**
  * Trap Performance Monitor Sampling.
- * Controls access to Statistical Profiling control registers from EL1. Depends
- * on whether the Statistical Profiling Extention (SPE) is implemented.
+ * Traps access to Statistical Profiling control registers from EL1 when
+ * the Statistical Profiling Extension (SPE) is implemented.
  */
 #define MDCR_EL2_TPMS (UINT64_C(0x1) << 14)
 
@@ -62,7 +62,8 @@
 #define MDCR_EL2_TDRA (UINT64_C(0x1) << 11)
 
 /**
- * Controls traps for OS-Related Register Access.
+ * Controls traps for debug OS-Related Register accesses when DoubleLock is
+ * implemented.
  */
 #define MDCR_EL2_TDOSA (UINT64_C(0x1) << 10)
 
@@ -210,24 +211,24 @@
 #define HCR_EL2_TID4 (UINT64_C(0x1) << 49)
 
 /**
- * When set disables traps on Pointer Authentication related instruction
+ * When set *disables* traps on Pointer Authentication related instruction
  * execution.
  */
 #define HCR_EL2_API (UINT64_C(0x1) << 41)
 
 /**
- * When set disables traps on access to Pointer Authentication's "key"
+ * When set *disables* traps on access to Pointer Authentication's "key"
  * registers.
  */
 #define HCR_EL2_APK (UINT64_C(0x1) << 40)
 
 /**
- * Trap Error record accesses.
+ * Trap Error record accesses when RAS is implemented.
  */
 #define HCR_EL2_TERR (UINT64_C(0x1) << 36)
 
 /**
- * Trap LOR registers.
+ * Trap LOR register accesses when LORegions is implemented.
  */
 #define HCR_EL2_TLOR (UINT64_C(0x1) << 35)
 
@@ -326,7 +327,7 @@
 
 /**
  * Trap WFI instructions.
- * When set, traps EL0 and EL1 execution of WFI intstructions to EL2.
+ * When set, traps EL0 and EL1 execution of WFI instructions to EL2.
  */
 #define HCR_EL2_TWI (UINT64_C(0x1) << 13)
 
@@ -351,7 +352,7 @@
 #define HCR_EL2_VI (UINT64_C(0x1) << 7)
 
 /**
- * Physical Serror Routing.
+ * Physical SError Routing.
  * When set, physical SError interrupts are taken to EL2, unless routed to EL3.
  */
 #define HCR_EL2_AMO (UINT64_C(0x1) << 5)
@@ -384,7 +385,7 @@
 #define HCR_EL2_SWIO (UINT64_C(0x1) << 1)
 
 /**
- * Virtulization enable.
+ * Virtualization enable.
  * When set EL1 and EL0 stage 2 address translation is enabled.
  */
 #define HCR_EL2_VM (UINT64_C(0x1) << 0)
@@ -409,17 +410,17 @@
 #define PSR_D (UINT64_C(1) << 9)
 
 /**
- * Asynchronos SError interrupt mask bit.
+ * Asynchronous SError interrupt mask bit.
  */
 #define PSR_A (UINT64_C(1) << 8)
 
 /**
- * Asynchronos IRQ interrupt mask bit.
+ * Asynchronous IRQ interrupt mask bit.
  */
 #define PSR_I (UINT64_C(1) << 7)
 
 /**
- * Asynchronos FIQ interrupt mask bit.
+ * Asynchronous FIQ interrupt mask bit.
  */
 #define PSR_F (UINT64_C(1) << 6)
 
@@ -445,6 +446,6 @@
 
 uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id);
 
-uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id);
+uintreg_t get_mdcr_el2_value(void);
 
 uintreg_t get_cptr_el2_value(void);

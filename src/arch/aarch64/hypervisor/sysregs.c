@@ -17,7 +17,6 @@
 #include "sysregs.h"
 
 #include "hf/check.h"
-#include "hf/dlog.h"
 #include "hf/panic.h"
 #include "hf/types.h"
 
@@ -32,82 +31,73 @@ uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id)
 {
 	uintreg_t hcr_el2_value = 0;
 
-	/*
-	 * TODO(b/132395845):  Access to RAS registers is not trapped at the
-	 * moment for the primary VM, only for the secondaries (TERR). RAS
-	 * register isn't needed now, but it might be required for debugging.
-	 * When Hafnium introduces debug vs release builds, trap accesses for
-	 * primary VMs in release builds, but do not trap them in debug builds.
-	 */
-	hcr_el2_value = HCR_EL2_RW | HCR_EL2_TACR | HCR_EL2_TIDCP |
-			HCR_EL2_TSC | HCR_EL2_PTW | HCR_EL2_VM | HCR_EL2_TSW |
-			HCR_EL2_TLOR;
+	/* Baseline values for all VMs. */
 
+	/*
+	 * Trap access to registers in ID group 3. These registers report on
+	 * the underlying support for CPU features. Because Hafnium restricts
+	 * certain features, e.g., RAS, it should emulate access to these
+	 * registers to report the correct set of features supported.
+	 */
+	hcr_el2_value |= HCR_EL2_TID3;
+
+	/* Execution state for EL1 is AArch64. */
+	hcr_el2_value |= HCR_EL2_RW;
+
+	/* Trap implementation registers and functionality. */
+	hcr_el2_value |= HCR_EL2_TACR | HCR_EL2_TIDCP;
+
+	/* Trap SMC instructions. */
+	hcr_el2_value |= HCR_EL2_TSC;
+
+	/*
+	 * Translation table access made as part of a stage 1 translation
+	 * table walk is subject to a stage 2 translation;
+	 */
+	hcr_el2_value |= HCR_EL2_PTW;
+
+	/* Enable stage 2 address translation;*/
+	hcr_el2_value |= HCR_EL2_VM;
+
+	/* Trap cache maintenance instructions that operate by Set/Way. */
+	hcr_el2_value |= HCR_EL2_TSW;
+
+	/* Do *not* trap PAuth. APK and API bits *disable* trapping when set. */
+	hcr_el2_value |= HCR_EL2_APK | HCR_EL2_API;
+
+	/* Baseline values for all secondary VMs. */
 	if (vm_id != HF_PRIMARY_VM_ID) {
-		hcr_el2_value |= HCR_EL2_TWE | HCR_EL2_TWI |
-				 HCR_EL2_BSU_INNER_SHAREABLE | HCR_EL2_FB |
-				 HCR_EL2_AMO | HCR_EL2_IMO | HCR_EL2_FMO |
-				 HCR_EL2_TERR;
-	} else {
-		hcr_el2_value |= HCR_EL2_APK | HCR_EL2_API;
+		/*
+		 * Set the minimum shareability domain to barrier instructions
+		 * as inner shareable.
+		 */
+		hcr_el2_value |= HCR_EL2_BSU_INNER_SHAREABLE;
+
+		/*
+		 * Broadcast instructions related to invalidating the TLB within
+		 * the Inner Shareable domain.
+		 */
+		hcr_el2_value |= HCR_EL2_FB;
+
+		/* Route physical SError/IRQ/FIQ interrupts to EL2. */
+		hcr_el2_value |= HCR_EL2_AMO | HCR_EL2_IMO | HCR_EL2_FMO;
+
+		/* Trap wait for event/interrupt instructions. */
+		hcr_el2_value |= HCR_EL2_TWE | HCR_EL2_TWI;
 	}
 
 	return hcr_el2_value;
 }
 
 /**
- * Returns the value for MDCR_EL2 for the particular VM.
- * For now, the primary VM has one value and all secondary VMs share a value.
+ * Returns the default value for MDCR_EL2.
  */
-uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id)
+uintreg_t get_mdcr_el2_value(void)
 {
 	uintreg_t mdcr_el2_value = read_msr(MDCR_EL2);
 	uintreg_t pmcr_el0 = read_msr(PMCR_EL0);
 
-	/*
-	 * TODO: Investigate gating settings these values depending on which
-	 * features are supported by the current CPU.
-	 */
-
-	/*
-	 * Trap all VM accesses to Statistical Profiling Extention (SPE)
-	 * registers.
-	 */
-	mdcr_el2_value |= MDCR_EL2_TPMS;
-
-	/*
-	 * Set E2PB to 0b00. This ensures that accesses to Profiling Buffer
-	 * controls at EL1 are trapped to EL2.
-	 */
-	mdcr_el2_value &= ~MDCR_EL2_E2PB;
-
-	/*
-	 * Trap all VM accesses to debug registers for fine-grained control.
-	 * Do not trap the Primary VM's debug events, e.g., watchpoint or
-	 * breakpoint events (!MDCR_EL2_TDE).
-	 */
-	mdcr_el2_value |=
-		MDCR_EL2_TTRF | MDCR_EL2_TDRA | MDCR_EL2_TDOSA | MDCR_EL2_TDA;
-
-	if (vm_id != HF_PRIMARY_VM_ID) {
-		/*
-		 * Debug event exceptions should be disabled in secondary VMs
-		 * but trap them for additional security.
-		 */
-		mdcr_el2_value |= MDCR_EL2_TDE;
-
-		/*
-		 * Trap secondary VM accesses to performance monitor registers
-		 * for fine-grained control.
-		 *
-		 * Do *not* trap primary VM accesses to performance monitor
-		 * registers. Sensitive registers are context switched, and
-		 * access to performance monitor registers is more common than
-		 * access to debug registers, therefore, trapping them all could
-		 * impose a non-trivial overhead.
-		 */
-		mdcr_el2_value |= MDCR_EL2_TPM | MDCR_EL2_TPMCR;
-	}
+	/* Baseline values for all VMs. */
 
 	/* Disable cycle and event counting at EL2. */
 	mdcr_el2_value |= MDCR_EL2_HCCD | MDCR_EL2_HPMD;
@@ -119,7 +109,7 @@ uintreg_t get_mdcr_el2_value(spci_vm_id_t vm_id)
 }
 
 /**
- * Returns the value for MDCR_EL2 for the CPU.
+ * Returns the value for CPTR_EL2 for the CPU.
  */
 uintreg_t get_cptr_el2_value(void)
 {

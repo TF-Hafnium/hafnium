@@ -21,7 +21,7 @@
 #include "hf/types.h"
 
 /**
- * This function must be implemented to trigger the architecture specific
+ * This function must be implemented to trigger the architecture-specific
  * mechanism to call to the hypervisor.
  */
 int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
