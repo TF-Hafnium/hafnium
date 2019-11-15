@@ -1,5 +1,7 @@
 # Getting started
 
+[TOC]
+
 ## Getting the source code
 
 ```shell

@@ -1,5 +1,7 @@
 # Testing
 
+[TOC]
+
 ## Overview
 
 Hafnium has 4 main kinds of tests:

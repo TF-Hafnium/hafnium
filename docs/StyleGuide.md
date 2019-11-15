@@ -15,6 +15,8 @@ doesn't capture everything we'd like today. Where the style enforced by this
 tooling conflicts with what is in this document we accept what the tooling
 requires, and try to improve it if possible.
 
+[TOC]
+
 ## Clarifications
 
 *   Yes, it does mean all variables are declared, C90-style, at the top of
