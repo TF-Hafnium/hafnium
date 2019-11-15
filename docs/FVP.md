@@ -1,4 +1,4 @@
-# FVP
+# Running Hafnium under Arm FVP
 
 Arm offers a series of emulators known as Fixed Virtual Platforms (FVPs), which
 simulate various processors. They are generally more accurate to the hardware
