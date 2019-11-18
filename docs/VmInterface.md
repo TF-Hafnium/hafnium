@@ -79,7 +79,7 @@ interrupts. Secondary VMs may also inject interrupts into their own vCPUs.
 ## Performance counters
 
 VMs will be blocked from accessing performance counter registers (for the
-performance monitor extensions described in chapter D5 of the ARMv8-A reference
+performance monitor extensions described in chapter D5 of the Armv8-A reference
 manual) in production, to prevent them from being used as a side channel to leak
 data between VMs.
 

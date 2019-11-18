@@ -17,7 +17,7 @@
 #pragma once
 
 /**
- * Spinlock implementation using ARMv8.0 LDXR/STXR pair and a WFE pause.
+ * Spinlock implementation using Armv8.0 LDXR/STXR pair and a WFE pause.
  *
  * Implementation using C11 atomics also generates a LDXR/STXR pair but no WFE.
  * Without it we observe that Cortex A72 can easily livelock and not make
@@ -25,7 +25,7 @@
  *
  * TODO(b/141087046): Forward progress is still not guaranteed as even with WFE
  * we see that A72 can livelock for extremely tight loops. We should investigate
- * the guarantees provided by atomic instructions introduced in ARMv8.1 LSE.
+ * the guarantees provided by atomic instructions introduced in Armv8.1 LSE.
  */
 
 #include <stdint.h>

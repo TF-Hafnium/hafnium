@@ -286,7 +286,7 @@ void arch_mm_invalidate_stage1_range(vaddr_t va_begin, vaddr_t va_end)
 	dsb(ishst);
 
 	/*
-	 * Revisions prior to ARMv8.4 do not support invalidating a range of
+	 * Revisions prior to Armv8.4 do not support invalidating a range of
 	 * addresses, which means we have to loop over individual pages. If
 	 * there are too many, it is quicker to invalidate all TLB entries.
 	 */
@@ -333,7 +333,7 @@ void arch_mm_invalidate_stage2_range(ipaddr_t va_begin, ipaddr_t va_end)
 	dsb(ishst);
 
 	/*
-	 * Revisions prior to ARMv8.4 do not support invalidating a range of
+	 * Revisions prior to Armv8.4 do not support invalidating a range of
 	 * addresses, which means we have to loop over individual pages. If
 	 * there are too many, it is quicker to invalidate all TLB entries.
 	 */

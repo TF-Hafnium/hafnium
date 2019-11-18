@@ -180,7 +180,7 @@
  */
 
 /**
- * Trap ID group 5 (ARMv8.5-MemTag related).
+ * Trap ID group 5 (Armv8.5-MemTag related).
  */
 #define HCR_EL2_TID5 (UINT64_C(0x1) << 58)
 

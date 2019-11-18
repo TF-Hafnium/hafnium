@@ -305,7 +305,7 @@ bool fdt_parse_number(const char *data, uint32_t size, uint64_t *value)
 		return true;
 	case sizeof(uint64_t):
 		/*
-		 * ARMv8 requires `data` to be realigned to 64-bit boundary
+		 * Armv8 requires `data` to be realigned to 64-bit boundary
 		 * to dereference as uint64_t. May not be needed on other
 		 * architectures.
 		 */

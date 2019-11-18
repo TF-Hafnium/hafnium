@@ -1,6 +1,6 @@
 # Hafnium
 
-Hafnium is a hypervisor, initially supporting aarch64 (64-bit ARMv8 CPUs).
+Hafnium is a hypervisor, initially supporting aarch64 (64-bit Armv8 CPUs).
 
 Get in touch and keep up-to-date at
 [hafnium-discuss@googlegroups.com](https://groups.google.com/forum/#!forum/hafnium-discuss).

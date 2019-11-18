@@ -262,7 +262,7 @@ class QemuDriver(Driver):
 
 
 class FvpDriver(Driver):
-    """Driver which runs tests in ARM FVP emulator."""
+    """Driver which runs tests in Arm FVP emulator."""
 
     def __init__(self, args):
         if args.cpu:
