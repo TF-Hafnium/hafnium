@@ -454,11 +454,11 @@ static bool mm_map_root(struct mm_ptable *t, ptable_addr_t begin,
 /**
  * Updates the given table such that the given physical address range is mapped
  * or not mapped into the address space with the architecture-agnostic mode
- * provided.
+ * provided. Only commits the change if MM_FLAG_COMMIT is set.
  */
-static bool mm_ptable_identity_update(struct mm_ptable *t, paddr_t pa_begin,
-				      paddr_t pa_end, uint64_t attrs, int flags,
-				      struct mpool *ppool)
+static bool mm_ptable_identity_map(struct mm_ptable *t, paddr_t pa_begin,
+				   paddr_t pa_end, uint64_t attrs, int flags,
+				   struct mpool *ppool)
 {
 	uint8_t root_level = mm_max_level(flags) + 1;
 	ptable_addr_t ptable_end = mm_ptable_addr_space_end(flags);
@@ -476,23 +476,46 @@ static bool mm_ptable_identity_update(struct mm_ptable *t, paddr_t pa_begin,
 		end = ptable_end;
 	}
 
+	if (!mm_map_root(t, begin, end, attrs, root_level, flags, ppool)) {
+		return false;
+	}
+
+	/* Invalidate the TLB. */
+	if ((flags & MM_FLAG_COMMIT) &&
+	    ((flags & MM_FLAG_STAGE1) || mm_stage2_invalidate)) {
+		mm_invalidate_tlb(begin, end, flags);
+	}
+
+	return true;
+}
+
+/**
+ * Updates the given table such that the given physical address range is mapped
+ * or not mapped into the address space with the architecture-agnostic mode
+ * provided. Tries first without committing, and then commits if that is
+ * successful.
+ */
+static bool mm_ptable_identity_update(struct mm_ptable *t, paddr_t pa_begin,
+				      paddr_t pa_end, uint64_t attrs, int flags,
+				      struct mpool *ppool)
+{
+	bool success;
+
+	CHECK(!(flags & MM_FLAG_COMMIT));
+
 	/*
 	 * Do it in two steps to prevent leaving the table in a halfway updated
 	 * state. In such a two-step implementation, the table may be left with
 	 * extra internal tables, but no different mapping on failure.
 	 */
-	if (!mm_map_root(t, begin, end, attrs, root_level, flags, ppool) ||
-	    !mm_map_root(t, begin, end, attrs, root_level,
-			 flags | MM_FLAG_COMMIT, ppool)) {
-		return false;
+	success = mm_ptable_identity_map(t, pa_begin, pa_end, attrs, flags,
+					 ppool);
+	if (success) {
+		CHECK(mm_ptable_identity_map(t, pa_begin, pa_end, attrs,
+					     flags | MM_FLAG_COMMIT, ppool));
 	}
 
-	/* Invalidate the tlb. */
-	if ((flags & MM_FLAG_STAGE1) || mm_stage2_invalidate) {
-		mm_invalidate_tlb(begin, end, flags);
-	}
-
-	return true;
+	return success;
 }
 
 /**
