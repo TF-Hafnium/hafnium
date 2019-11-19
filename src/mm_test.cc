@@ -864,7 +864,7 @@ TEST_F(mm, defrag_empty_subtables)
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, l0_begin, l0_end, mode, nullptr,
 				       &ppool));
-	ASSERT_TRUE(mm_vm_identity_map(&ptable, l0_begin, l0_end, mode, nullptr,
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, l1_begin, l1_end, mode, nullptr,
 				       &ppool));
 	ASSERT_TRUE(mm_vm_unmap(&ptable, l0_begin, l0_end, &ppool));
 	ASSERT_TRUE(mm_vm_unmap(&ptable, l1_begin, l1_end, &ppool));

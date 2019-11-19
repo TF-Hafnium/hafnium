@@ -616,7 +616,9 @@ static pte_t mm_ptable_defrag_entry(pte_t entry, uint8_t level,
 {
 	struct mm_page_table *table;
 	uint64_t i;
-	uint64_t attrs;
+	bool mergeable;
+	bool base_present;
+	uint64_t base_attrs;
 
 	if (!arch_mm_pte_is_table(entry, level)) {
 		return entry;
@@ -624,27 +626,53 @@ static pte_t mm_ptable_defrag_entry(pte_t entry, uint8_t level,
 
 	table = mm_page_table_from_pa(arch_mm_table_from_pte(entry, level));
 
+	/* Defrag the first entry in the table and use it as the base entry. */
+	static_assert(MM_PTE_PER_PAGE >= 1, "There must be at least one PTE.");
+	table->entries[0] =
+		mm_ptable_defrag_entry(table->entries[0], level - 1, ppool);
+	base_present = arch_mm_pte_is_present(table->entries[0], level - 1);
+	base_attrs = arch_mm_pte_attrs(table->entries[0], level - 1);
+
 	/*
-	 * Check if all entries are blocks with the same flags or are all
-	 * absent. It assumes addresses are contiguous due to identity mapping.
+	 * Defrag the remaining entries in the table and check whether they are
+	 * compatible with the base entry meaning the table can be merged into a
+	 * block entry. It assumes addresses are contiguous due to identity
+	 * mapping.
 	 */
-	attrs = arch_mm_pte_attrs(table->entries[0], level);
-	for (i = 0; i < MM_PTE_PER_PAGE; ++i) {
-		/* First try to defrag the entry, in case it is a subtable. */
+	mergeable = true;
+	for (i = 1; i < MM_PTE_PER_PAGE; ++i) {
+		bool present;
+
 		table->entries[i] = mm_ptable_defrag_entry(table->entries[i],
 							   level - 1, ppool);
+		present = arch_mm_pte_is_present(table->entries[i], level - 1);
 
-		/*
-		 * If the entry isn't a block or has different attributes then
-		 * it isn't possible to defragment it.
-		 */
-		if (!arch_mm_pte_is_block(table->entries[i], level - 1) ||
-		    arch_mm_pte_attrs(table->entries[i], level) != attrs) {
-			return entry;
+		if (present != base_present) {
+			mergeable = false;
+			continue;
+		}
+
+		if (!present) {
+			continue;
+		}
+
+		if (!arch_mm_pte_is_block(table->entries[i], level - 1)) {
+			mergeable = false;
+			continue;
+		}
+
+		if (arch_mm_pte_attrs(table->entries[i], level - 1) !=
+		    base_attrs) {
+			mergeable = false;
+			continue;
 		}
 	}
 
-	return mm_merge_table_pte(entry, level, ppool);
+	if (mergeable) {
+		return mm_merge_table_pte(entry, level, ppool);
+	}
+
+	return entry;
 }
 
 /**
