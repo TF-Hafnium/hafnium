@@ -25,7 +25,7 @@
 #include "primary_with_secondary.h"
 #include "util.h"
 
-alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];
+alignas(PAGE_SIZE) static uint8_t pages[4 * PAGE_SIZE];
 
 /**
  * Helper function to test sending memory in the different configurations.
@@ -187,15 +187,15 @@ TEST(memory_sharing, concurrent)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "memory_increment", mb.send);
 
-	memset_s(ptr, sizeof(page), 'a', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'a', PAGE_SIZE);
 
 	msg_size = spci_memory_init(
 		mb.send, SPCI_MEMORY_SHARE, SERVICE_VM1, constituents,
@@ -212,7 +212,7 @@ TEST(memory_sharing, concurrent)
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	for (int i = 0; i < PAGE_SIZE; ++i) {
-		page[i] = i;
+		pages[i] = i;
 	}
 
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -221,7 +221,7 @@ TEST(memory_sharing, concurrent)
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		uint8_t value = i + 1;
 
-		EXPECT_EQ(page[i], value);
+		EXPECT_EQ(pages[i], value);
 	}
 }
 
@@ -232,16 +232,16 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish", mb.send);
 
 	/* Dirty the memory before sharing it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	msg_size = spci_memory_share_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -292,16 +292,17 @@ TEST(memory_sharing, lend_relinquish)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
+		{.address = (uint64_t)pages + PAGE_SIZE, .page_count = 2},
 	};
 
 	msg_size = spci_memory_lend_init(
@@ -335,16 +336,16 @@ TEST(memory_sharing, give_and_get_back)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_return", mb.send);
 
 	/* Dirty the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	msg_size = spci_memory_donate_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -374,16 +375,16 @@ TEST(memory_sharing, lend_and_get_back)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish", mb.send);
 
 	/* Dirty the memory before lending it. */
-	memset_s(ptr, sizeof(page), 'c', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'c', PAGE_SIZE);
 
 	msg_size = spci_memory_lend_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -415,7 +416,7 @@ TEST(memory_sharing, reshare_after_return)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish", mb.send);
@@ -459,7 +460,7 @@ TEST(memory_sharing, share_elsewhere_after_return)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish", mb.send);
@@ -565,17 +566,26 @@ TEST(memory_sharing, donate_check_upper_bounds)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_check_upper_bound", mb.send);
+	SERVICE_SELECT(SERVICE_VM2, "spci_donate_check_upper_bound", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', 1 * PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', 4 * PAGE_SIZE);
 
+	/* Specify non-contiguous memory regions. */
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
+		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 1},
 	};
+
+	/*
+	 * Specify that we want to test the first constituent of the donated
+	 * memory region. This is utilised by the test service.
+	 */
+	pages[0] = 0;
 
 	msg_size = spci_memory_donate_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -586,8 +596,32 @@ TEST(memory_sharing, donate_check_upper_bounds)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing the memory. */
+	/* Observe the service faulting when accessing out of bounds. */
 	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+
+	/* Use different memory regions for verifying the second constituent. */
+	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
+	constituents[1].address = (uint64_t)pages + PAGE_SIZE * 3;
+
+	/*
+	 * Specify that we now want to test the second constituent of the
+	 * donated memory region.
+	 */
+	pages[PAGE_SIZE] = 1;
+
+	/* Use the secondary VM for this test as the first is now aborted. */
+	msg_size = spci_memory_donate_init(
+		mb.send, SERVICE_VM2, constituents, 2, 0, SPCI_MEMORY_RW_X,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
+
+	/* Observe the service faulting when accessing out of bounds. */
+	run_res = spci_run(SERVICE_VM2, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
@@ -598,17 +632,26 @@ TEST(memory_sharing, donate_check_lower_bounds)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_check_lower_bound", mb.send);
+	SERVICE_SELECT(SERVICE_VM2, "spci_donate_check_lower_bound", mb.send);
 
-	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', 1 * PAGE_SIZE);
+	/* Initialise the memory before donating it. */
+	memset_s(ptr, sizeof(pages), 'b', 4 * PAGE_SIZE);
 
+	/* Specify non-contiguous memory regions. */
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
+		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 1},
 	};
+
+	/*
+	 * Specify that we want to test the first constituent of the donated
+	 * memory region. This is utilised by the test service.
+	 */
+	pages[0] = 0;
 
 	msg_size = spci_memory_donate_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -619,8 +662,32 @@ TEST(memory_sharing, donate_check_lower_bounds)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing the memory. */
+	/* Observe the service faulting when accessing out of bounds. */
 	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+
+	/* Use different memory regions for verifying the second constituent. */
+	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
+	constituents[1].address = (uint64_t)pages + PAGE_SIZE * 3;
+
+	/*
+	 * Specify that we now want to test the second constituent of the
+	 * donated memory region.
+	 */
+	pages[PAGE_SIZE] = 1;
+
+	/* Use the secondary VM for this test as the first is now aborted. */
+	msg_size = spci_memory_donate_init(
+		mb.send, SERVICE_VM2, constituents, 2, 0, SPCI_MEMORY_RW_X,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
+
+	/* Observe the service faulting when accessing out of bounds. */
+	run_res = spci_run(SERVICE_VM2, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
@@ -632,17 +699,17 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_return", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_memory_return", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', 1 * PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	msg_size = spci_memory_donate_init(
@@ -682,17 +749,17 @@ TEST(memory_sharing, donate_vms)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_secondary_and_fault", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_memory_receive", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', 1 * PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	/* Set up VM2 to wait for message. */
@@ -733,17 +800,17 @@ TEST(memory_sharing, donate_twice)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_twice", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_memory_receive", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', 1 * PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	/* Donate memory to VM1. */
@@ -789,13 +856,13 @@ TEST(memory_sharing, donate_twice)
 TEST(memory_sharing, donate_to_self)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	msg_size = spci_memory_donate_init(
@@ -815,13 +882,13 @@ TEST(memory_sharing, donate_to_self)
 TEST(memory_sharing, lend_to_self)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	msg_size = spci_memory_lend_init(
@@ -840,13 +907,13 @@ TEST(memory_sharing, lend_to_self)
 TEST(memory_sharing, share_to_self)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	msg_size = spci_memory_share_init(
@@ -866,16 +933,16 @@ TEST(memory_sharing, donate_invalid_source)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_invalid_source", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_memory_receive", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	/* Try invalid configurations. */
@@ -932,28 +999,42 @@ TEST(memory_sharing, give_and_get_back_unaligned)
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_return", mb.send);
 
-	for (int i = 1; i < PAGE_SIZE; i++) {
-		struct spci_memory_region_constituent constituents[] = {
-			{.address = (uint64_t)page + i, .page_count = 1},
-		};
-		uint32_t msg_size = spci_memory_donate_init(
-			mb.send, SERVICE_VM1, constituents,
-			ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
-			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
-			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_SPCI_ERROR(
-			spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				      SPCI_MSG_SEND_LEGACY_MEMORY),
-			SPCI_INVALID_PARAMETERS);
-		msg_size = spci_memory_lend_init(
-			mb.send, SERVICE_VM1, constituents,
-			ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
-			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
-			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_SPCI_ERROR(
-			spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				      SPCI_MSG_SEND_LEGACY_MEMORY),
-			SPCI_INVALID_PARAMETERS);
+	/* Check for unaligned pages for either constituent. */
+	for (int i = 0; i < PAGE_SIZE; i++) {
+		for (int j = 0; i < PAGE_SIZE; i++) {
+			/* Skip the case they're both aligned. */
+			if (i == 0 && j == 0) {
+				continue;
+			}
+			struct spci_memory_region_constituent constituents[] = {
+				{.address = (uint64_t)pages + i,
+				 .page_count = 1},
+				{.address = (uint64_t)pages + PAGE_SIZE + j,
+				 .page_count = 1},
+			};
+			uint32_t msg_size = spci_memory_donate_init(
+				mb.send, SERVICE_VM1, constituents,
+				ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
+				SPCI_MEMORY_NORMAL_MEM,
+				SPCI_MEMORY_CACHE_WRITE_BACK,
+				SPCI_MEMORY_OUTER_SHAREABLE);
+			EXPECT_SPCI_ERROR(
+				spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1,
+					      msg_size,
+					      SPCI_MSG_SEND_LEGACY_MEMORY),
+				SPCI_INVALID_PARAMETERS);
+			msg_size = spci_memory_lend_init(
+				mb.send, SERVICE_VM1, constituents,
+				ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
+				SPCI_MEMORY_NORMAL_MEM,
+				SPCI_MEMORY_CACHE_WRITE_BACK,
+				SPCI_MEMORY_OUTER_SHAREABLE);
+			EXPECT_SPCI_ERROR(
+				spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1,
+					      msg_size,
+					      SPCI_MSG_SEND_LEGACY_MEMORY),
+				SPCI_INVALID_PARAMETERS);
+		}
 	}
 }
 
@@ -964,15 +1045,15 @@ TEST(memory_sharing, lend_invalid_source)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_lend_invalid_source", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	/* Check cannot swap VM IDs. */
@@ -1011,16 +1092,16 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish_RW", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	msg_size = spci_memory_lend_init(
@@ -1042,7 +1123,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Re-initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	msg_size = spci_memory_lend_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -1071,16 +1152,16 @@ TEST(memory_sharing, share_relinquish_X_RW)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish_RW", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	msg_size = spci_memory_share_init(
@@ -1108,7 +1189,7 @@ TEST(memory_sharing, share_relinquish_X_RW)
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Re-initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	msg_size = spci_memory_share_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -1143,16 +1224,16 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish_RW", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	msg_size = spci_memory_share_init(
@@ -1179,7 +1260,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 
 	/* Re-initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 'b', PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	msg_size = spci_memory_share_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -1213,20 +1294,20 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish_X", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 0, PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 0, PAGE_SIZE);
 
-	uint64_t *ptr2 = (uint64_t *)page;
+	uint64_t *ptr2 = (uint64_t *)pages;
 	/* Set memory to contain the RET instruction to attempt to execute. */
 	*ptr2 = 0xD65F03C0;
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	msg_size = spci_memory_lend_init(
@@ -1263,20 +1344,20 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish_X", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page), 0, PAGE_SIZE);
+	memset_s(ptr, sizeof(pages), 0, PAGE_SIZE);
 
-	uint64_t *ptr2 = (uint64_t *)page;
+	uint64_t *ptr2 = (uint64_t *)pages;
 	/* Set memory to contain the RET instruction to attempt to execute. */
 	*ptr2 = 0xD65F03C0;
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 1},
+		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
 	msg_size = spci_memory_lend_init(
@@ -1313,17 +1394,17 @@ TEST(memory_sharing, lend_donate)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish_RW", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_memory_lend_relinquish_RW", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page) * 2, 'b', PAGE_SIZE * 2);
+	memset_s(ptr, sizeof(pages) * 2, 'b', PAGE_SIZE * 2);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 2},
+		{.address = (uint64_t)pages, .page_count = 2},
 	};
 
 	msg_size = spci_memory_lend_init(
@@ -1343,7 +1424,7 @@ TEST(memory_sharing, lend_donate)
 	/* Ensure we can't donate any sub section of memory to another VM. */
 	constituents[0].page_count = 1;
 	for (int i = 1; i < PAGE_SIZE * 2; i++) {
-		constituents[0].address = (uint64_t)page + PAGE_SIZE;
+		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
 		msg_size = spci_memory_donate_init(
 			mb.send, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
@@ -1373,17 +1454,18 @@ TEST(memory_sharing, share_donate)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish_RW", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_memory_lend_relinquish_RW", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page) * 2, 'b', PAGE_SIZE * 2);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE * 4);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 2},
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 2},
 	};
 
 	msg_size = spci_memory_share_init(
@@ -1407,7 +1489,7 @@ TEST(memory_sharing, share_donate)
 	/* Ensure we can't donate any sub section of memory to another VM. */
 	constituents[0].page_count = 1;
 	for (int i = 1; i < PAGE_SIZE * 2; i++) {
-		constituents[0].address = (uint64_t)page + PAGE_SIZE;
+		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
 		msg_size = spci_memory_donate_init(
 			mb.send, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
@@ -1437,17 +1519,18 @@ TEST(memory_sharing, lend_twice)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_twice", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_memory_lend_twice", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page) * 2, 'b', PAGE_SIZE * 2);
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE * 4);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 2},
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 
 	msg_size = spci_memory_lend_init(
@@ -1477,10 +1560,22 @@ TEST(memory_sharing, lend_twice)
 	check_cannot_relinquish_memory(mb, constituents,
 				       ARRAY_SIZE(constituents));
 
+	/* Now attempt to share only a portion of the same area of memory. */
+	struct spci_memory_region_constituent constituents_subsection[] = {
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	check_cannot_lend_memory(mb, constituents_subsection,
+				 ARRAY_SIZE(constituents_subsection), -1);
+	check_cannot_donate_memory(mb, constituents_subsection,
+				   ARRAY_SIZE(constituents_subsection),
+				   SERVICE_VM1);
+	check_cannot_relinquish_memory(mb, constituents_subsection,
+				       ARRAY_SIZE(constituents_subsection));
+
 	/* Attempt to lend again with different permissions. */
 	constituents[0].page_count = 1;
 	for (int i = 0; i < 2; i++) {
-		constituents[0].address = (uint64_t)page + i * PAGE_SIZE;
+		constituents[0].address = (uint64_t)pages + i * PAGE_SIZE;
 		msg_size = spci_memory_lend_init(
 			mb.send, SERVICE_VM1, constituents,
 			ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RO_X,
@@ -1500,17 +1595,17 @@ TEST(memory_sharing, share_twice)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_twice", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_memory_lend_twice", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page) * 2, 'b', PAGE_SIZE * 2);
+	memset_s(ptr, sizeof(pages) * 2, 'b', PAGE_SIZE * 2);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 2},
+		{.address = (uint64_t)pages, .page_count = 2},
 	};
 
 	msg_size = spci_memory_share_init(
@@ -1545,7 +1640,7 @@ TEST(memory_sharing, share_twice)
 	/* Attempt to share again with different permissions. */
 	constituents[0].page_count = 1;
 	for (int i = 0; i < 2; i++) {
-		constituents[0].address = (uint64_t)page + i * PAGE_SIZE;
+		constituents[0].address = (uint64_t)pages + i * PAGE_SIZE;
 		msg_size = spci_memory_share_init(
 			mb.send, SERVICE_VM1, constituents,
 			ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RO_X,
@@ -1564,17 +1659,17 @@ TEST(memory_sharing, share_twice)
 TEST(memory_sharing, share_clear)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = page;
+	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	size_t i;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_return", mb.send);
 
 	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(page) * 2, 'b', PAGE_SIZE * 2);
+	memset_s(ptr, sizeof(pages) * 2, 'b', PAGE_SIZE * 2);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)page, .page_count = 2},
+		{.address = (uint64_t)pages, .page_count = 2},
 	};
 
 	msg_size = spci_memory_init(
@@ -1591,4 +1686,136 @@ TEST(memory_sharing, share_clear)
 	for (i = 0; i < PAGE_SIZE * 2; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	};
+}
+
+/**
+ * SPCI: Verify past the upper bound of the lent region cannot be accessed.
+ */
+TEST(memory_sharing, spci_lend_check_upper_bounds)
+{
+	struct spci_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	uint32_t msg_size;
+
+	SERVICE_SELECT(SERVICE_VM1, "spci_lend_check_upper_bound", mb.send);
+	SERVICE_SELECT(SERVICE_VM2, "spci_lend_check_upper_bound", mb.send);
+
+	/* Initialise the memory before lending it. */
+	memset_s(ptr, sizeof(pages), 'b', 4 * PAGE_SIZE);
+
+	/* Specify non-contiguous memory regions. */
+	struct spci_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 1},
+	};
+
+	/*
+	 * Specify that we want to test the first constituent of the donated
+	 * memory region. This is utilised by the test service.
+	 */
+	pages[0] = 0;
+
+	msg_size = spci_memory_lend_init(
+		mb.send, SERVICE_VM1, constituents, 2, 0, SPCI_MEMORY_RW_X,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
+
+	/* Observe the service faulting when accessing out of bounds. */
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+
+	/* Use different memory regions for verifying the second constituent. */
+	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
+	constituents[1].address = (uint64_t)pages + PAGE_SIZE * 3;
+
+	/*
+	 * Specify that we now want to test the second constituent of the
+	 * lent memory region.
+	 */
+	pages[PAGE_SIZE] = 1;
+
+	/* Use the secondary VM for this test as the first is now aborted. */
+	msg_size = spci_memory_lend_init(
+		mb.send, SERVICE_VM2, constituents, 2, 0, SPCI_MEMORY_RW_X,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
+
+	/* Observe the service faulting when accessing out of bounds. */
+	run_res = spci_run(SERVICE_VM2, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+}
+
+/**
+ * SPCI: Verify past the lower bound of the lent region cannot be accessed.
+ */
+TEST(memory_sharing, spci_lend_check_lower_bounds)
+{
+	struct spci_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	uint32_t msg_size;
+
+	SERVICE_SELECT(SERVICE_VM1, "spci_lend_check_lower_bound", mb.send);
+	SERVICE_SELECT(SERVICE_VM2, "spci_lend_check_lower_bound", mb.send);
+
+	/* Initialise the memory before lending it. */
+	memset_s(ptr, sizeof(pages), 'b', 4 * PAGE_SIZE);
+
+	/* Specify non-contiguous memory regions. */
+	struct spci_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 1},
+	};
+
+	/*
+	 * Specify that we want to test the first constituent of the lent
+	 * memory region. This is utilised by the test service.
+	 */
+	pages[0] = 0;
+
+	msg_size = spci_memory_lend_init(
+		mb.send, SERVICE_VM1, constituents, 2, 0, SPCI_MEMORY_RW_X,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
+
+	/* Observe the service faulting when accessing out of bounds. */
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+
+	/* Use different memory regions for verifying the second constituent. */
+	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
+	constituents[1].address = (uint64_t)pages + PAGE_SIZE * 3;
+
+	/*
+	 * Specify that we now want to test the second constituent of the
+	 * lent memory region.
+	 */
+	pages[PAGE_SIZE] = 1;
+
+	/* Use the secondary VM for this test as the first is now aborted. */
+	msg_size = spci_memory_lend_init(
+		mb.send, SERVICE_VM2, constituents, 2, 0, SPCI_MEMORY_RW_X,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
+
+	/* Observe the service faulting when accessing out of bounds. */
+	run_res = spci_run(SERVICE_VM2, 0);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }

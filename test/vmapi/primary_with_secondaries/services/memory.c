@@ -45,7 +45,7 @@ TEST_SERVICE(memory_increment)
 		ptr = (uint8_t *)constituents[0].address;
 
 		/* Check the memory was cleared. */
-		for (int i = 0; i < PAGE_SIZE; ++i) {
+		for (i = 0; i < PAGE_SIZE; ++i) {
 			ASSERT_EQ(ptr[i], 0);
 		}
 
@@ -71,6 +71,7 @@ TEST_SERVICE(memory_lend_relinquish_spci)
 		struct spci_value ret = spci_msg_wait();
 		uint8_t *ptr;
 		uint32_t msg_size;
+		size_t i;
 
 		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		EXPECT_EQ(spci_msg_send_attributes(ret),
@@ -86,7 +87,7 @@ TEST_SERVICE(memory_lend_relinquish_spci)
 		ptr = (uint8_t *)constituents[0].address;
 
 		/* Check that one has access to the shared region. */
-		for (int i = 0; i < PAGE_SIZE; ++i) {
+		for (i = 0; i < PAGE_SIZE; ++i) {
 			ptr[i]++;
 		}
 
@@ -158,6 +159,7 @@ TEST_SERVICE(spci_memory_return)
 		struct spci_value ret = spci_msg_wait();
 		uint8_t *ptr;
 		uint32_t msg_size;
+		size_t i;
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
 		struct spci_memory_region *memory_region;
@@ -173,7 +175,7 @@ TEST_SERVICE(spci_memory_return)
 		ptr = (uint8_t *)constituents[0].address;
 
 		/* Check that one has access to the shared region. */
-		for (int i = 0; i < PAGE_SIZE; ++i) {
+		for (i = 0; i < PAGE_SIZE; ++i) {
 			ptr[i]++;
 		}
 
@@ -202,6 +204,7 @@ TEST_SERVICE(spci_donate_check_upper_bound)
 {
 	struct spci_value ret = spci_msg_wait();
 	uint8_t *ptr;
+	uint8_t index;
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct spci_memory_region *memory_region;
 	struct spci_memory_region_constituent *constituents;
@@ -210,7 +213,10 @@ TEST_SERVICE(spci_donate_check_upper_bound)
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
 	memory_region = spci_get_memory_region(recv_buf);
 	constituents = spci_memory_region_get_constituents(memory_region);
-	ptr = (uint8_t *)constituents[0].address;
+
+	/* Choose which constituent we want to test. */
+	index = *(uint8_t *)constituents[0].address;
+	ptr = (uint8_t *)constituents[index].address;
 
 	spci_rx_release();
 
@@ -222,16 +228,19 @@ TEST_SERVICE(spci_donate_check_lower_bound)
 {
 	struct spci_value ret = spci_msg_wait();
 	uint8_t *ptr;
+	uint8_t index;
 	void *recv_buf = SERVICE_RECV_BUFFER();
-	struct spci_memory_region *memory_region;
-	struct spci_memory_region_constituent *constituents;
+	struct spci_memory_region *memory_region =
+		spci_get_memory_region(recv_buf);
+	struct spci_memory_region_constituent *constituents =
+		spci_memory_region_get_constituents(memory_region);
 
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-	memory_region = spci_get_memory_region(recv_buf);
-	constituents = spci_memory_region_get_constituents(memory_region);
-	ptr = (uint8_t *)constituents[0].address;
 
+	/* Choose which constituent we want to test. */
+	index = *(uint8_t *)constituents[0].address;
+	ptr = (uint8_t *)constituents[index].address;
 	spci_rx_release();
 
 	/* Check that one cannot access out of bounds before donated region. */
@@ -397,7 +406,11 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 	for (;;) {
 		struct spci_value ret = spci_msg_wait();
 		uint8_t *ptr;
+		uint8_t *ptr2;
+		uint32_t count;
+		uint32_t count2;
 		uint32_t msg_size;
+		size_t i;
 
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
@@ -410,10 +423,16 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 		EXPECT_EQ(spci_msg_send_attributes(ret),
 			  SPCI_MSG_SEND_LEGACY_MEMORY);
 		ptr = (uint8_t *)constituents[0].address;
+		count = constituents[0].page_count;
+		ptr2 = (uint8_t *)constituents[1].address;
+		count2 = constituents[1].page_count;
 
 		/* Check that one has access to the shared region. */
-		for (int i = 0; i < PAGE_SIZE; ++i) {
+		for (i = 0; i < PAGE_SIZE * count; ++i) {
 			ptr[i]++;
+		}
+		for (i = 0; i < PAGE_SIZE * count2; ++i) {
+			ptr2[i]++;
 		}
 
 		/* Give the memory back and notify the sender. */
@@ -445,6 +464,7 @@ TEST_SERVICE(spci_memory_donate_relinquish)
 		struct spci_value ret = spci_msg_wait();
 		uint8_t *ptr;
 		uint32_t msg_size;
+		size_t i;
 
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
@@ -460,7 +480,7 @@ TEST_SERVICE(spci_memory_donate_relinquish)
 		ptr = (uint8_t *)constituents[0].address;
 
 		/* Check that one has access to the shared region. */
-		for (int i = 0; i < PAGE_SIZE; ++i) {
+		for (i = 0; i < PAGE_SIZE; ++i) {
 			ptr[i]++;
 		}
 		/* Give the memory back and notify the sender. */
@@ -592,6 +612,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 		struct spci_value ret = spci_msg_wait();
 		uint8_t *ptr;
 		uint32_t msg_size;
+		size_t i;
 
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
@@ -610,7 +631,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 		ptr = (uint8_t *)constituent_copy.address;
 
 		/* Check that we have read access. */
-		for (int i = 0; i < PAGE_SIZE; ++i) {
+		for (i = 0; i < PAGE_SIZE; ++i) {
 			EXPECT_EQ(ptr[i], 'b');
 		}
 
@@ -618,7 +639,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 		spci_yield();
 
 		/* Attempt to modify the memory. */
-		for (int i = 0; i < PAGE_SIZE; ++i) {
+		for (i = 0; i < PAGE_SIZE; ++i) {
 			ptr[i]++;
 		}
 
@@ -633,36 +654,13 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 }
 
 /**
- * Attempt to modify below the lower bound for the lent memory.
- */
-TEST_SERVICE(spci_lend_check_lower_bound)
-{
-	struct spci_value ret = spci_msg_wait();
-	uint8_t *ptr;
-
-	void *recv_buf = SERVICE_RECV_BUFFER();
-	struct spci_memory_region *memory_region =
-		spci_get_memory_region(recv_buf);
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
-
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
-
-	ptr = (uint8_t *)constituents[0].address;
-	spci_rx_release();
-
-	/* Check that one cannot access before donated region. */
-	ptr[-1]++;
-}
-
-/**
  * Attempt to modify above the upper bound for the lent memory.
  */
 TEST_SERVICE(spci_lend_check_upper_bound)
 {
 	struct spci_value ret = spci_msg_wait();
 	uint8_t *ptr;
+	uint8_t index;
 
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct spci_memory_region *memory_region =
@@ -673,11 +671,41 @@ TEST_SERVICE(spci_lend_check_upper_bound)
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
 
-	ptr = (uint8_t *)constituents[0].address;
+	/* Choose which constituent we want to test. */
+	index = *(uint8_t *)constituents[0].address;
+	ptr = (uint8_t *)constituents[index].address;
 	spci_rx_release();
 
-	/* Check that one cannot access after donated region. */
-	ptr[PAGE_SIZE]++;
+	/* Check that one cannot access after lent region. */
+	ASSERT_EQ(ptr[PAGE_SIZE], 0);
+}
+
+/**
+ * Attempt to modify below the lower bound for the lent memory.
+ */
+TEST_SERVICE(spci_lend_check_lower_bound)
+{
+	struct spci_value ret = spci_msg_wait();
+	uint8_t *ptr;
+	uint8_t index;
+
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct spci_memory_region *memory_region =
+		spci_get_memory_region(recv_buf);
+	struct spci_memory_region_constituent *constituents =
+		spci_memory_region_get_constituents(memory_region);
+
+	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_attributes(ret), SPCI_MSG_SEND_LEGACY_MEMORY);
+
+	/* Choose which constituent we want to test. */
+	index = *(uint8_t *)constituents[0].address;
+	ptr = (uint8_t *)constituents[index].address;
+	spci_rx_release();
+
+	/* Check that one cannot access after lent region. */
+	ptr[-1]++;
+	spci_yield();
 }
 
 TEST_SERVICE(spci_memory_lend_twice)
@@ -685,6 +713,7 @@ TEST_SERVICE(spci_memory_lend_twice)
 	struct spci_value ret = spci_msg_wait();
 	uint8_t *ptr;
 	uint32_t msg_size;
+	size_t i;
 
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
@@ -702,16 +731,16 @@ TEST_SERVICE(spci_memory_lend_twice)
 	ptr = (uint8_t *)constituent_copy.address;
 
 	/* Check that we have read access. */
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (i = 0; i < PAGE_SIZE; ++i) {
 		EXPECT_EQ(ptr[i], 'b');
 	}
 
 	/* Attempt to modify the memory. */
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (i = 0; i < PAGE_SIZE; ++i) {
 		ptr[i]++;
 	}
 
-	for (int i = 1; i < PAGE_SIZE * 2; i++) {
+	for (i = 1; i < PAGE_SIZE * 2; i++) {
 		constituent_copy.address = (uint64_t)ptr + i;
 
 		/* Fail to lend or share the memory back to the primary. */
