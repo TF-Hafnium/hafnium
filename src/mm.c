@@ -348,22 +348,6 @@ static struct mm_page_table *mm_populate_table_pte(ptable_addr_t begin,
 }
 
 /**
- * Returns whether all entries in this table are absent.
- */
-static bool mm_page_table_is_empty(struct mm_page_table *table, uint8_t level)
-{
-	uint64_t i;
-
-	for (i = 0; i < MM_PTE_PER_PAGE; ++i) {
-		if (arch_mm_pte_is_present(table->entries[i], level)) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-/**
  * Updates the page table at the given level to map the given address range to a
  * physical range using the provided (architecture-specific) attributes. Or if
  * MM_FLAG_UNMAP is set, unmap the given range instead.
@@ -431,19 +415,6 @@ static bool mm_map_level(ptable_addr_t begin, ptable_addr_t end, paddr_t pa,
 			if (!mm_map_level(begin, end, pa, attrs, nt, level - 1,
 					  flags, ppool)) {
 				return false;
-			}
-
-			/*
-			 * If the subtable is now empty, replace it with an
-			 * absent entry at this level. We never need to do
-			 * break-before-makes here because we are assigning
-			 * an absent value.
-			 */
-			if (commit && unmap &&
-			    mm_page_table_is_empty(nt, level - 1)) {
-				pte_t v = *pte;
-				*pte = arch_mm_absent_pte(level);
-				mm_free_page_pte(v, level, ppool);
 			}
 		}
 

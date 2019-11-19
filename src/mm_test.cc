@@ -36,6 +36,7 @@ using ::testing::AllOf;
 using ::testing::Contains;
 using ::testing::Each;
 using ::testing::Eq;
+using ::testing::Not;
 using ::testing::SizeIs;
 using ::testing::Truly;
 
@@ -261,7 +262,7 @@ TEST_F(mm, map_across_tables)
 						   TOP_LEVEL - 2)),
 		    Eq(pa_addr(map_begin)));
 
-	/* Checl only the first page of the second table is mapped. */
+	/* Check only the first page of the second table is mapped. */
 	auto table1_l2 = tables[1];
 	EXPECT_THAT(table1_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
 	ASSERT_TRUE(arch_mm_pte_is_table(table1_l2[0], TOP_LEVEL));
@@ -545,14 +546,41 @@ TEST_F(mm, unmap_round_to_page)
 	const paddr_t map_begin = pa_init(0x160'0000'0000 + PAGE_SIZE);
 	const paddr_t map_end = pa_add(map_begin, PAGE_SIZE);
 	struct mm_ptable ptable;
+
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, map_begin, map_end, mode,
 				       nullptr, &ppool));
 	ASSERT_TRUE(mm_vm_unmap(&ptable, pa_add(map_begin, 93),
 				pa_add(map_begin, 99), &ppool));
-	EXPECT_THAT(
-		get_ptable(ptable),
-		AllOf(SizeIs(4), Each(Each(arch_mm_absent_pte(TOP_LEVEL)))));
+
+	auto tables = get_ptable(ptable);
+	constexpr auto l3_index = 2;
+
+	/* Check all other top level entries are empty... */
+	EXPECT_THAT(std::span(tables).first(l3_index),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+	EXPECT_THAT(std::span(tables).subspan(l3_index + 1),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	/* Except the mapped page which is absent. */
+	auto table_l2 = tables[l3_index];
+	constexpr auto l2_index = 384;
+	EXPECT_THAT(table_l2.first(l2_index),
+		    Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[l2_index], TOP_LEVEL));
+	EXPECT_THAT(table_l2.subspan(l2_index + 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL)));
+
+	auto table_l1 = get_table(
+		arch_mm_table_from_pte(table_l2[l2_index], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1.first(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+
+	auto table_l0 = get_table(
+		arch_mm_table_from_pte(table_l1.first(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table_l0, Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+
 	mm_vm_fini(&ptable, &ppool);
 }
 
@@ -565,13 +593,49 @@ TEST_F(mm, unmap_across_tables)
 	const paddr_t map_begin = pa_init(0x180'0000'0000 - PAGE_SIZE);
 	const paddr_t map_end = pa_add(map_begin, 2 * PAGE_SIZE);
 	struct mm_ptable ptable;
+
 	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, map_begin, map_end, mode,
 				       nullptr, &ppool));
 	ASSERT_TRUE(mm_vm_unmap(&ptable, map_begin, map_end, &ppool));
-	EXPECT_THAT(
-		get_ptable(ptable),
-		AllOf(SizeIs(4), Each(Each(arch_mm_absent_pte(TOP_LEVEL)))));
+
+	auto tables = get_ptable(ptable);
+
+	/* Check the untouched tables are empty. */
+	EXPECT_THAT(std::span(tables).first(2),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	/* Check the last page is explicity marked as absent. */
+	auto table2_l2 = tables[2];
+	EXPECT_THAT(table2_l2.first(table2_l2.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table2_l2.last(1)[0], TOP_LEVEL));
+
+	auto table2_l1 = get_table(
+		arch_mm_table_from_pte(table2_l2.last(1)[0], TOP_LEVEL));
+	EXPECT_THAT(table2_l1.first(table2_l1.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table2_l1.last(1)[0], TOP_LEVEL - 1));
+
+	auto table2_l0 = get_table(
+		arch_mm_table_from_pte(table2_l1.last(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table2_l0, Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+
+	/* Check the first page is explicitly marked as absent. */
+	auto table3_l2 = tables[3];
+	ASSERT_TRUE(arch_mm_pte_is_table(table3_l2.first(1)[0], TOP_LEVEL));
+	EXPECT_THAT(table3_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+
+	auto table3_l1 = get_table(
+		arch_mm_table_from_pte(table3_l2.first(1)[0], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_table(table3_l1.first(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table3_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+
+	auto table3_l0 = get_table(
+		arch_mm_table_from_pte(table3_l1.first(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table3_l0, Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+
 	mm_vm_fini(&ptable, &ppool);
 }
 
@@ -632,9 +696,29 @@ TEST_F(mm, unmap_reverse_range_quirk)
 				       nullptr, &ppool));
 	ASSERT_TRUE(mm_vm_unmap(&ptable, pa_add(page_begin, 100),
 				pa_add(page_begin, 50), &ppool));
-	EXPECT_THAT(
-		get_ptable(ptable),
-		AllOf(SizeIs(4), Each(Each(arch_mm_absent_pte(TOP_LEVEL)))));
+
+	auto tables = get_ptable(ptable);
+	constexpr auto l3_index = 3;
+
+	/* Check all other top level entries are empty... */
+	EXPECT_THAT(std::span(tables).first(l3_index),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	/* Except the mapped page which is absent. */
+	auto table_l2 = tables[l3_index];
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2.first(1)[0], TOP_LEVEL));
+	EXPECT_THAT(table_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+
+	auto table_l1 = get_table(
+		arch_mm_table_from_pte(table_l2.first(1)[0], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1.first(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+
+	auto table_l0 = get_table(
+		arch_mm_table_from_pte(table_l1.first(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table_l0, Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+
 	mm_vm_fini(&ptable, &ppool);
 }
 
@@ -680,9 +764,9 @@ TEST_F(mm, unmap_does_not_defrag)
 				       &ppool));
 	ASSERT_TRUE(mm_vm_unmap(&ptable, l0_begin, l0_end, &ppool));
 	ASSERT_TRUE(mm_vm_unmap(&ptable, l1_begin, l1_end, &ppool));
-	EXPECT_THAT(
-		get_ptable(ptable),
-		AllOf(SizeIs(4), Each(Each(arch_mm_absent_pte(TOP_LEVEL)))));
+	EXPECT_THAT(get_ptable(ptable),
+		    AllOf(SizeIs(4),
+			  Not(Each(Each(arch_mm_absent_pte(TOP_LEVEL))))));
 	mm_vm_fini(&ptable, &ppool);
 }
 
