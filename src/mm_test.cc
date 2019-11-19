@@ -510,6 +510,193 @@ TEST_F(mm, map_to_unmap)
 	mm_vm_fini(&ptable, &ppool);
 }
 
+/*
+ * Preparing and committing an address range works the same as mapping it.
+ */
+TEST_F(mm, prepare_and_commit_first_page)
+{
+	constexpr uint32_t mode = 0;
+	const paddr_t page_begin = pa_init(0);
+	const paddr_t page_end = pa_add(page_begin, PAGE_SIZE);
+	struct mm_ptable ptable;
+	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
+	ASSERT_TRUE(mm_vm_identity_prepare(&ptable, page_begin, page_end, mode,
+					   &ppool));
+	mm_vm_identity_commit(&ptable, page_begin, page_end, mode, nullptr,
+			      &ppool);
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	/* Check that the first page is mapped and nothing else. */
+	EXPECT_THAT(std::span(tables).last(3),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	auto table_l2 = tables.front();
+	EXPECT_THAT(table_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[0], TOP_LEVEL - 1));
+
+	auto table_l0 =
+		get_table(arch_mm_table_from_pte(table_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table_l0.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[0], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l0[0], TOP_LEVEL - 2)),
+		    Eq(pa_addr(page_begin)));
+
+	mm_vm_fini(&ptable, &ppool);
+}
+
+/**
+ * Disjoint address ranges can be prepared and committed together.
+ */
+TEST_F(mm, prepare_and_commit_disjoint_regions)
+{
+	constexpr uint32_t mode = 0;
+	const paddr_t first_begin = pa_init(0);
+	const paddr_t first_end = pa_add(first_begin, PAGE_SIZE);
+	const paddr_t last_begin = pa_init(pa_addr(VM_MEM_END) - PAGE_SIZE);
+	const paddr_t last_end = VM_MEM_END;
+	struct mm_ptable ptable;
+	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
+	ASSERT_TRUE(mm_vm_identity_prepare(&ptable, first_begin, first_end,
+					   mode, &ppool));
+	ASSERT_TRUE(mm_vm_identity_prepare(&ptable, last_begin, last_end, mode,
+					   &ppool));
+	mm_vm_identity_commit(&ptable, first_begin, first_end, mode, nullptr,
+			      &ppool);
+	mm_vm_identity_commit(&ptable, last_begin, last_end, mode, nullptr,
+			      &ppool);
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	/* Check that the first and last pages are mapped and nothing else. */
+	EXPECT_THAT(std::span(tables).subspan(1, 2),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	/* Check the first page. */
+	auto table0_l2 = tables.front();
+	EXPECT_THAT(table0_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table0_l2[0], TOP_LEVEL));
+
+	auto table0_l1 =
+		get_table(arch_mm_table_from_pte(table0_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table0_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table0_l1[0], TOP_LEVEL - 1));
+
+	auto table0_l0 =
+		get_table(arch_mm_table_from_pte(table0_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table0_l0.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table0_l0[0], TOP_LEVEL - 2));
+	EXPECT_THAT(
+		pa_addr(arch_mm_block_from_pte(table0_l0[0], TOP_LEVEL - 2)),
+		Eq(pa_addr(first_begin)));
+
+	/* Check the last page. */
+	auto table3_l2 = tables.back();
+	EXPECT_THAT(table3_l2.first(table3_l2.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table3_l2.last(1)[0], TOP_LEVEL));
+
+	auto table3_l1 = get_table(
+		arch_mm_table_from_pte(table3_l2.last(1)[0], TOP_LEVEL));
+	EXPECT_THAT(table3_l1.first(table3_l1.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table3_l1.last(1)[0], TOP_LEVEL - 1));
+
+	auto table3_l0 = get_table(
+		arch_mm_table_from_pte(table3_l1.last(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table3_l0.first(table3_l0.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table3_l0.last(1)[0], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table3_l0.last(1)[0],
+						   TOP_LEVEL - 2)),
+		    Eq(pa_addr(last_begin)));
+
+	mm_vm_fini(&ptable, &ppool);
+}
+
+/**
+ * Overlapping address ranges can be prepared and committed together.
+ */
+TEST_F(mm, prepare_and_commit_overlapping_regions)
+{
+	constexpr uint32_t mode = 0;
+	const paddr_t low_begin = pa_init(0x80'0000'0000 - PAGE_SIZE);
+	const paddr_t high_begin = pa_add(low_begin, PAGE_SIZE);
+	const paddr_t map_end = pa_add(high_begin, PAGE_SIZE);
+	struct mm_ptable ptable;
+	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
+	ASSERT_TRUE(mm_vm_identity_prepare(&ptable, high_begin, map_end, mode,
+					   &ppool));
+	ASSERT_TRUE(mm_vm_identity_prepare(&ptable, low_begin, map_end, mode,
+					   &ppool));
+	mm_vm_identity_commit(&ptable, high_begin, map_end, mode, nullptr,
+			      &ppool);
+	mm_vm_identity_commit(&ptable, low_begin, map_end, mode, nullptr,
+			      &ppool);
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	EXPECT_THAT(std::span(tables).last(2),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	/* Check only the last page of the first table is mapped. */
+	auto table0_l2 = tables.front();
+	EXPECT_THAT(table0_l2.first(table0_l2.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table0_l2.last(1)[0], TOP_LEVEL));
+
+	auto table0_l1 = get_table(
+		arch_mm_table_from_pte(table0_l2.last(1)[0], TOP_LEVEL));
+	EXPECT_THAT(table0_l1.first(table0_l1.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table0_l1.last(1)[0], TOP_LEVEL - 1));
+
+	auto table0_l0 = get_table(
+		arch_mm_table_from_pte(table0_l1.last(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table0_l0.first(table0_l0.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table0_l0.last(1)[0], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table0_l0.last(1)[0],
+						   TOP_LEVEL - 2)),
+		    Eq(pa_addr(low_begin)));
+
+	/* Check only the first page of the second table is mapped. */
+	auto table1_l2 = tables[1];
+	EXPECT_THAT(table1_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table1_l2[0], TOP_LEVEL));
+
+	auto table1_l1 =
+		get_table(arch_mm_table_from_pte(table1_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table1_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table1_l1[0], TOP_LEVEL - 1));
+
+	auto table1_l0 =
+		get_table(arch_mm_table_from_pte(table1_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table1_l0.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table1_l0[0], TOP_LEVEL - 2));
+	EXPECT_THAT(
+		pa_addr(arch_mm_block_from_pte(table1_l0[0], TOP_LEVEL - 2)),
+		Eq(pa_addr(high_begin)));
+
+	mm_vm_fini(&ptable, &ppool);
+}
+
 /**
  * If nothing is mapped, unmapping the hypervisor has no effect.
  */

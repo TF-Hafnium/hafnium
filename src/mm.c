@@ -489,33 +489,67 @@ static bool mm_ptable_identity_map(struct mm_ptable *t, paddr_t pa_begin,
 	return true;
 }
 
+/*
+ * Prepares the given page table for the given address mapping such that it
+ * will be able to commit the change without failure. It does so by ensuring
+ * the smallest granularity needed is available. This remains valid provided
+ * subsequent operations no not decrease the granularity.
+ *
+ * In particular, multiple calls to this function will result in the
+ * corresponding calls to commit the changes to succeed.
+ */
+static bool mm_ptable_identity_prepare(struct mm_ptable *t, paddr_t pa_begin,
+				       paddr_t pa_end, uint64_t attrs,
+				       int flags, struct mpool *ppool)
+{
+	flags &= ~MM_FLAG_COMMIT;
+	return mm_ptable_identity_map(t, pa_begin, pa_end, attrs, flags, ppool);
+}
+
+/**
+ * Commits the given address mapping to the page table assuming the operation
+ * cannot fail. `mm_ptable_identity_prepare` must used correctly before this to
+ * ensure this condition.
+ *
+ * Without the table being properly prepared, the commit may only partially
+ * complete if it runs out of memory resulting in an inconsistent state that
+ * isn't handled.
+ *
+ * Since the non-failure assumtion is used in the reasoning about the atomicity
+ * of higher level memory operations, any detected violations result in a panic.
+ *
+ * TODO: remove ppool argument to be sure no changes are made.
+ */
+static void mm_ptable_identity_commit(struct mm_ptable *t, paddr_t pa_begin,
+				      paddr_t pa_end, uint64_t attrs, int flags,
+				      struct mpool *ppool)
+{
+	CHECK(mm_ptable_identity_map(t, pa_begin, pa_end, attrs,
+				     flags | MM_FLAG_COMMIT, ppool));
+}
+
 /**
  * Updates the given table such that the given physical address range is mapped
  * or not mapped into the address space with the architecture-agnostic mode
- * provided. Tries first without committing, and then commits if that is
- * successful.
+ * provided.
+ *
+ * The page table is updated using the separate prepare and commit stages so
+ * that, on failure, a partial update of the address space cannot happen. The
+ * table may be left with extra internal tables but the address space is
+ * unchanged.
  */
 static bool mm_ptable_identity_update(struct mm_ptable *t, paddr_t pa_begin,
 				      paddr_t pa_end, uint64_t attrs, int flags,
 				      struct mpool *ppool)
 {
-	bool success;
-
-	CHECK(!(flags & MM_FLAG_COMMIT));
-
-	/*
-	 * Do it in two steps to prevent leaving the table in a halfway updated
-	 * state. In such a two-step implementation, the table may be left with
-	 * extra internal tables, but no different mapping on failure.
-	 */
-	success = mm_ptable_identity_map(t, pa_begin, pa_end, attrs, flags,
-					 ppool);
-	if (success) {
-		CHECK(mm_ptable_identity_map(t, pa_begin, pa_end, attrs,
-					     flags | MM_FLAG_COMMIT, ppool));
+	if (!mm_ptable_identity_prepare(t, pa_begin, pa_end, attrs, flags,
+					ppool)) {
+		return false;
 	}
 
-	return success;
+	mm_ptable_identity_commit(t, pa_begin, pa_end, attrs, flags, ppool);
+
+	return true;
 }
 
 /**
@@ -811,6 +845,40 @@ static int mm_mode_to_flags(uint32_t mode)
 	}
 
 	return 0;
+}
+
+/**
+ * See `mm_ptable_identity_prepare`.
+ *
+ * This must be called before `mm_vm_identity_commit` for the same mapping.
+ */
+bool mm_vm_identity_prepare(struct mm_ptable *t, paddr_t begin, paddr_t end,
+			    uint32_t mode, struct mpool *ppool)
+{
+	int flags = mm_mode_to_flags(mode);
+
+	return mm_ptable_identity_prepare(t, begin, end,
+					  arch_mm_mode_to_stage2_attrs(mode),
+					  flags, ppool);
+}
+
+/**
+ * See `mm_ptable_identity_commit`.
+ *
+ * `mm_vm_identity_prepare` must be called before this for the same mapping.
+ */
+void mm_vm_identity_commit(struct mm_ptable *t, paddr_t begin, paddr_t end,
+			   uint32_t mode, ipaddr_t *ipa, struct mpool *ppool)
+{
+	int flags = mm_mode_to_flags(mode);
+
+	mm_ptable_identity_commit(t, begin, end,
+				  arch_mm_mode_to_stage2_attrs(mode), flags,
+				  ppool);
+
+	if (ipa != NULL) {
+		*ipa = ipa_from_pa(begin);
+	}
 }
 
 /**
