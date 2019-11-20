@@ -801,6 +801,19 @@ void mm_vm_fini(struct mm_ptable *t, struct mpool *ppool)
 }
 
 /**
+ * Selects flags to pass to the page table manipulation operation based on the
+ * mapping mode.
+ */
+static int mm_mode_to_flags(uint32_t mode)
+{
+	if ((mode & MM_MODE_UNMAPPED_MASK) == MM_MODE_UNMAPPED_MASK) {
+		return MM_FLAG_UNMAP;
+	}
+
+	return 0;
+}
+
+/**
  * Updates a VM's page table such that the given physical address range is
  * mapped in the address space at the corresponding address range in the
  * architecture-agnostic mode provided.
@@ -808,7 +821,7 @@ void mm_vm_fini(struct mm_ptable *t, struct mpool *ppool)
 bool mm_vm_identity_map(struct mm_ptable *t, paddr_t begin, paddr_t end,
 			uint32_t mode, ipaddr_t *ipa, struct mpool *ppool)
 {
-	int flags = 0;
+	int flags = mm_mode_to_flags(mode);
 	bool success = mm_ptable_identity_update(
 		t, begin, end, arch_mm_mode_to_stage2_attrs(mode), flags,
 		ppool);
@@ -827,11 +840,9 @@ bool mm_vm_identity_map(struct mm_ptable *t, paddr_t begin, paddr_t end,
 bool mm_vm_unmap(struct mm_ptable *t, paddr_t begin, paddr_t end,
 		 struct mpool *ppool)
 {
-	return mm_ptable_identity_update(
-		t, begin, end,
-		arch_mm_mode_to_stage2_attrs(MM_MODE_UNOWNED | MM_MODE_INVALID |
-					     MM_MODE_SHARED),
-		MM_FLAG_UNMAP, ppool);
+	uint32_t mode = MM_MODE_UNMAPPED_MASK;
+
+	return mm_vm_identity_map(t, begin, end, mode, NULL, ppool);
 }
 
 /**
@@ -908,9 +919,11 @@ void mm_unlock_stage1(struct mm_stage1_locked *lock)
 void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
 		      paddr_t end, uint32_t mode, struct mpool *ppool)
 {
+	int flags = MM_FLAG_STAGE1 | mm_mode_to_flags(mode);
+
 	if (mm_ptable_identity_update(stage1_locked.ptable, begin, end,
-				      arch_mm_mode_to_stage1_attrs(mode),
-				      MM_FLAG_STAGE1, ppool)) {
+				      arch_mm_mode_to_stage1_attrs(mode), flags,
+				      ppool)) {
 		return ptr_from_va(va_from_pa(begin));
 	}
 
@@ -924,11 +937,9 @@ void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
 bool mm_unmap(struct mm_stage1_locked stage1_locked, paddr_t begin, paddr_t end,
 	      struct mpool *ppool)
 {
-	return mm_ptable_identity_update(
-		stage1_locked.ptable, begin, end,
-		arch_mm_mode_to_stage1_attrs(MM_MODE_UNOWNED | MM_MODE_INVALID |
-					     MM_MODE_SHARED),
-		MM_FLAG_STAGE1 | MM_FLAG_UNMAP, ppool);
+	uint32_t mode = MM_MODE_UNMAPPED_MASK;
+
+	return mm_identity_map(stage1_locked, begin, end, mode, ppool);
 }
 
 /**

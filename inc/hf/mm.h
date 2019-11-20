@@ -60,8 +60,8 @@
  *  - !V  O  X : Owner of memory lent to a VM that has exclusive access.
  *
  *  - !V  O !X : Unused. Owner of shared memory always has access.
+ *  - !V !O  X : Unused. Next entry is used for invalid memory.
  *
- *  - !V !O  X : Invalid memory. Memory is unrelated to the VM.
  *  - !V !O !X : Invalid memory. Memory is unrelated to the VM.
  *
  *  Modes are selected so that owner of exclusive memory is the default.
@@ -69,6 +69,9 @@
 #define MM_MODE_INVALID UINT32_C(0x0010)
 #define MM_MODE_UNOWNED UINT32_C(0x0020)
 #define MM_MODE_SHARED  UINT32_C(0x0040)
+
+/* The mask for a mode that is considered unmapped. */
+#define MM_MODE_UNMAPPED_MASK (MM_MODE_INVALID | MM_MODE_UNOWNED)
 
 #define MM_FLAG_COMMIT  0x01
 #define MM_FLAG_UNMAP   0x02

@@ -486,6 +486,31 @@ TEST_F(mm, map_does_not_defrag)
 }
 
 /**
+ * Mapping with a mode that indicates unmapping results in the addresses being
+ * unmapped with absent entries.
+ */
+TEST_F(mm, map_to_unmap)
+{
+	constexpr uint32_t mode = 0;
+	const paddr_t l0_begin = pa_init(uintpaddr_t(524421) * PAGE_SIZE);
+	const paddr_t l0_end = pa_add(l0_begin, 17 * PAGE_SIZE);
+	const paddr_t l1_begin = pa_init(3 * mm_entry_size(1));
+	const paddr_t l1_end = pa_add(l1_begin, 5 * mm_entry_size(1));
+	struct mm_ptable ptable;
+	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, l0_begin, l0_end, mode, nullptr,
+				       &ppool));
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, l1_begin, l1_end, mode, nullptr,
+				       &ppool));
+	EXPECT_TRUE(mm_vm_identity_map(&ptable, pa_init(0), VM_MEM_END,
+				       MM_MODE_UNMAPPED_MASK, nullptr, &ppool));
+	EXPECT_THAT(
+		get_ptable(ptable),
+		AllOf(SizeIs(4), Each(Each(arch_mm_absent_pte(TOP_LEVEL)))));
+	mm_vm_fini(&ptable, &ppool);
+}
+
+/**
  * If nothing is mapped, unmapping the hypervisor has no effect.
  */
 TEST_F(mm, vm_unmap_hypervisor_not_mapped)
