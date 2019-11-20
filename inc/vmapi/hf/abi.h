@@ -30,7 +30,6 @@
 #define HF_INTERRUPT_ENABLE            0xff05
 #define HF_INTERRUPT_GET               0xff06
 #define HF_INTERRUPT_INJECT            0xff07
-#define HF_SHARE_MEMORY                0xff08
 
 /* Custom SPCI-like calls returned from SPCI_RUN. */
 #define HF_SPCI_RUN_WAIT_FOR_INTERRUPT 0xff09
@@ -40,23 +39,3 @@
 #define HF_DEBUG_LOG            0xbd000000
 
 /* clang-format on */
-
-enum hf_share {
-	/**
-	 * Relinquish ownership and access to the memory and pass them to the
-	 * recipient.
-	 */
-	HF_MEMORY_GIVE,
-
-	/**
-	 * Retain ownership of the memory but relinquish access to the
-	 * recipient.
-	 */
-	HF_MEMORY_LEND,
-
-	/**
-	 * Retain ownership and access but additionally allow access to the
-	 * recipient.
-	 */
-	HF_MEMORY_SHARE,
-};

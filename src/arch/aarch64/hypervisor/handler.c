@@ -485,12 +485,6 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 						       args.arg3, vcpu, &next);
 		break;
 
-	case HF_SHARE_MEMORY:
-		vcpu->regs.r[0] = api_share_memory(
-			args.arg1 >> 32, ipa_init(args.arg2), args.arg3,
-			args.arg1 & 0xffffffff, vcpu);
-		break;
-
 	case HF_DEBUG_LOG:
 		vcpu->regs.r[0] = api_debug_log(args.arg1, vcpu);
 		break;

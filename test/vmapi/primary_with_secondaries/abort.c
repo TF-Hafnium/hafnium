@@ -44,6 +44,12 @@ TEST(abort, straddling_data_abort)
 
 	SERVICE_SELECT(SERVICE_VM1, "straddling_data_abort", mb.send);
 
+	/*
+	 * First we get a message about the memory being donated to us, then we
+	 * get the abort.
+	 */
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
@@ -72,6 +78,12 @@ TEST(abort, straddling_instruction_abort)
 
 	SERVICE_SELECT(SERVICE_VM1, "straddling_instruction_abort", mb.send);
 
+	/*
+	 * First we get a message about the memory being donated to us, then we
+	 * get the abort.
+	 */
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }

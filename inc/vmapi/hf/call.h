@@ -257,21 +257,6 @@ static inline int64_t hf_interrupt_inject(spci_vm_id_t target_vm_id,
 }
 
 /**
- * Shares a region of memory with another VM.
- *
- * Returns 0 on success or -1 if the sharing was not allowed or failed.
- *
- * TODO: replace this with a better API once we have decided what that should
- *       look like.
- */
-static inline int64_t hf_share_memory(spci_vm_id_t vm_id, hf_ipaddr_t addr,
-				      size_t size, enum hf_share share)
-{
-	return hf_call(HF_SHARE_MEMORY, (((uint64_t)vm_id) << 32) | share, addr,
-		       size);
-}
-
-/**
  * Sends a character to the debug log for the VM.
  *
  * Returns 0 on success, or -1 if it failed for some reason.

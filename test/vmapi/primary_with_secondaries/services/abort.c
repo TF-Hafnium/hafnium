@@ -32,11 +32,21 @@ TEST_SERVICE(data_abort)
 
 TEST_SERVICE(straddling_data_abort)
 {
+	void *send_buf = SERVICE_SEND_BUFFER();
 	/* Give some memory to the primary VM so that it's unmapped. */
-	ASSERT_EQ(hf_share_memory(HF_PRIMARY_VM_ID,
-				  (hf_ipaddr_t)(&pages[PAGE_SIZE]), PAGE_SIZE,
-				  HF_MEMORY_GIVE),
-		  0);
+	struct spci_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)(&pages[PAGE_SIZE]), .page_count = 1},
+	};
+	uint32_t msg_size = spci_memory_donate_init(
+		send_buf, HF_PRIMARY_VM_ID, constituents,
+		ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
+
 	*(volatile uint64_t *)(&pages[PAGE_SIZE - 6]);
 }
 
@@ -49,6 +59,8 @@ TEST_SERVICE(instruction_abort)
 
 TEST_SERVICE(straddling_instruction_abort)
 {
+	void *send_buf = SERVICE_SEND_BUFFER();
+
 	/*
 	 * Get a function pointer which, when branched to, will attempt to
 	 * execute a 4-byte instruction straddling two pages.
@@ -56,10 +68,18 @@ TEST_SERVICE(straddling_instruction_abort)
 	int (*f)(void) = (int (*)(void))(&pages[PAGE_SIZE - 2]);
 
 	/* Give second page to the primary VM so that it's unmapped. */
-	ASSERT_EQ(hf_share_memory(HF_PRIMARY_VM_ID,
-				  (hf_ipaddr_t)(&pages[PAGE_SIZE]), PAGE_SIZE,
-				  HF_MEMORY_GIVE),
-		  0);
+	struct spci_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)(&pages[PAGE_SIZE]), .page_count = 1},
+	};
+	uint32_t msg_size = spci_memory_donate_init(
+		send_buf, HF_PRIMARY_VM_ID, constituents,
+		ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
 
 	/* Branch to instruction whose 2 bytes are now in an unmapped page. */
 	f();
