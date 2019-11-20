@@ -1544,6 +1544,19 @@ struct spci_value api_spci_share_memory(
 		goto out;
 	}
 
+	/* Clear the memory so no VM or device can see the previous contents. */
+	if ((memory_region->flags & SPCI_MEMORY_REGION_FLAG_CLEAR) &&
+	    !api_clear_memory(pa_begin, pa_end, &local_page_pool)) {
+		ret = spci_error(SPCI_NO_MEMORY);
+
+		/* Return memory to the sender. */
+		CHECK(mm_vm_identity_map(&from->ptable, pa_begin, pa_end,
+					 orig_from_mode, NULL,
+					 &local_page_pool));
+
+		goto out;
+	}
+
 	/* Complete the transfer by mapping the memory into the recipient. */
 	if (!mm_vm_identity_map(&to->ptable, pa_begin, pa_end, to_mode, NULL,
 				&local_page_pool)) {

@@ -264,6 +264,15 @@ struct spci_memory_region_attributes {
 	uint16_t memory_attributes;
 };
 
+/** Flags to control the behaviour of a memory sharing transaction. */
+typedef uint32_t spci_memory_region_flags_t;
+
+/**
+ * Clear memory region contents after unmapping it from the sender and before
+ * mapping it for any receiver.
+ */
+#define SPCI_MEMORY_REGION_FLAG_CLEAR 0x1
+
 struct spci_memory_region {
 	/**
 	 * An implementation defined value associated with the receiver and the
@@ -271,7 +280,7 @@ struct spci_memory_region {
 	 */
 	uint32_t tag;
 	/** Flags to control behaviour of the transaction. */
-	uint32_t flags;
+	spci_memory_region_flags_t flags;
 	/**
 	 * The total number of 4 kiB pages included in this memory region. This
 	 * must be equal to the sum of page counts specified in each
@@ -327,16 +336,16 @@ uint32_t spci_memory_region_init(
 	struct spci_memory_region *memory_region, spci_vm_id_t receiver,
 	const struct spci_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
-	enum spci_memory_access access, enum spci_memory_type type,
-	enum spci_memory_cacheability cacheability,
+	spci_memory_region_flags_t flags, enum spci_memory_access access,
+	enum spci_memory_type type, enum spci_memory_cacheability cacheability,
 	enum spci_memory_shareability shareability);
 
 uint32_t spci_memory_init(
 	void *message, enum spci_memory_share share_type, spci_vm_id_t receiver,
 	struct spci_memory_region_constituent *region_constituents,
 	uint32_t constituent_count, uint32_t tag,
-	enum spci_memory_access access, enum spci_memory_type type,
-	enum spci_memory_cacheability cacheability,
+	spci_memory_region_flags_t flags, enum spci_memory_access access,
+	enum spci_memory_type type, enum spci_memory_cacheability cacheability,
 	enum spci_memory_shareability shareability);
 
 /** Constructs an SPCI donate memory region message. */
@@ -349,7 +358,7 @@ static inline uint32_t spci_memory_donate_init(
 	enum spci_memory_shareability shareability)
 {
 	return spci_memory_init(message, SPCI_MEMORY_DONATE, receiver,
-				region_constituents, constituent_count, tag,
+				region_constituents, constituent_count, tag, 0,
 				access, type, cacheability, shareability);
 }
 
@@ -365,7 +374,7 @@ static inline uint32_t spci_memory_lend_init(
 	enum spci_memory_shareability shareability)
 {
 	return spci_memory_init(message, SPCI_MEMORY_LEND, receiver,
-				region_constituents, constituent_count, tag,
+				region_constituents, constituent_count, tag, 0,
 				access, type, cacheability, shareability);
 }
 
@@ -381,7 +390,7 @@ static inline uint32_t spci_memory_share_init(
 	enum spci_memory_shareability shareability)
 {
 	return spci_memory_init(message, SPCI_MEMORY_SHARE, receiver,
-				region_constituents, constituent_count, tag,
+				region_constituents, constituent_count, tag, 0,
 				access, type, cacheability, shareability);
 }
 
@@ -395,7 +404,7 @@ static inline uint32_t spci_memory_relinquish_init(
 	uint32_t constituent_count, uint32_t tag)
 {
 	return spci_memory_init(message, SPCI_MEMORY_RELINQUISH, receiver,
-				region_constituents, constituent_count, tag,
+				region_constituents, constituent_count, tag, 0,
 				SPCI_MEMORY_RW_X, SPCI_MEMORY_DEVICE_MEM,
 				SPCI_MEMORY_DEV_NGNRNE,
 				SPCI_MEMORY_SHARE_NON_SHAREABLE);

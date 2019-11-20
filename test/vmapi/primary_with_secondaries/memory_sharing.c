@@ -1655,3 +1655,38 @@ TEST(memory_sharing, spci_share_twice)
 			SPCI_INVALID_PARAMETERS);
 	}
 }
+
+/**
+ * SPCI: Memory can be cleared while being shared.
+ */
+TEST(memory_sharing, spci_share_clear)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = page;
+	uint32_t msg_size;
+	size_t i;
+
+	SERVICE_SELECT(SERVICE_VM1, "spci_memory_return", mb.send);
+
+	/* Initialise the memory before giving it. */
+	memset_s(ptr, sizeof(page) * 2, 'b', PAGE_SIZE * 2);
+
+	struct spci_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)page, .page_count = 2},
+	};
+
+	msg_size = spci_memory_init(
+		mb.send, SPCI_MEMORY_SHARE, SERVICE_VM1, constituents,
+		ARRAY_SIZE(constituents), 0, SPCI_MEMORY_REGION_FLAG_CLEAR,
+		SPCI_MEMORY_RO_X, SPCI_MEMORY_NORMAL_MEM,
+		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
+
+	/* Check that it has been cleared. */
+	for (i = 0; i < PAGE_SIZE * 2; ++i) {
+		ASSERT_EQ(ptr[i], 0);
+	};
+}

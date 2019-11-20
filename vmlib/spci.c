@@ -48,7 +48,7 @@ void spci_architected_message_init(void *message, enum spci_memory_share type)
 uint32_t spci_memory_region_init(
 	struct spci_memory_region *memory_region, spci_vm_id_t receiver,
 	const struct spci_memory_region_constituent constituents[],
-	uint32_t constituent_count, uint32_t tag,
+	uint32_t constituent_count, uint32_t tag, spci_memory_region_flags_t flags,
 	enum spci_memory_access access, enum spci_memory_type type,
 	enum spci_memory_cacheability cacheability,
 	enum spci_memory_shareability shareability)
@@ -67,7 +67,7 @@ uint32_t spci_memory_region_init(
 	spci_set_memory_shareability_attr(&attributes, shareability);
 
 	memory_region->tag = tag;
-	memory_region->flags = 0;
+	memory_region->flags = flags;
 	memory_region->page_count = 0;
 	memory_region->constituent_count = constituent_count;
 	memory_region->attribute_count = 1;
@@ -107,7 +107,7 @@ uint32_t spci_memory_region_init(
 uint32_t spci_memory_init(
 	void *message, enum spci_memory_share share_type, spci_vm_id_t receiver,
 	struct spci_memory_region_constituent *region_constituents,
-	uint32_t constituent_count, uint32_t tag,
+	uint32_t constituent_count, uint32_t tag, spci_memory_region_flags_t flags,
 	enum spci_memory_access access, enum spci_memory_type type,
 	enum spci_memory_cacheability cacheability,
 	enum spci_memory_shareability shareability)
@@ -123,6 +123,6 @@ uint32_t spci_memory_init(
 	/* Fill in memory region. */
 	message_length += spci_memory_region_init(
 		memory_region, receiver, region_constituents, constituent_count,
-		tag, access, type, cacheability, shareability);
+		tag, flags, access, type, cacheability, shareability);
 	return message_length;
 }
