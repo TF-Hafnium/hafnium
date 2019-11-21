@@ -510,6 +510,8 @@ TEST(memory_sharing, give_memory_and_lose_access)
 	/* Have the memory be given. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_attributes(run_res),
+		  SPCI_MSG_SEND_LEGACY_MEMORY);
 
 	/* Check the memory was cleared. */
 	memory_region = spci_get_memory_region(mb.recv);
@@ -540,6 +542,8 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 	/* Have the memory be lent. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_msg_send_attributes(run_res),
+		  SPCI_MSG_SEND_LEGACY_MEMORY);
 
 	/* Check the memory was cleared. */
 	memory_region = spci_get_memory_region(mb.recv);

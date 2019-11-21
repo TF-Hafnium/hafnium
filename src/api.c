@@ -903,7 +903,7 @@ static bool msg_receiver_busy(struct vm_locked to, struct vm_locked from,
  * with the help of the primary VM.
  */
 static void deliver_msg(struct vm_locked to, struct vm_locked from,
-			uint32_t size, struct vcpu *current, struct vcpu **next)
+			struct vcpu *current, struct vcpu **next)
 {
 	struct spci_value primary_ret = {
 		.func = SPCI_MSG_SEND_32,
@@ -916,7 +916,8 @@ static void deliver_msg(struct vm_locked to, struct vm_locked from,
 		 * Only tell the primary VM the size if the message is for it,
 		 * to avoid leaking data about messages for other VMs.
 		 */
-		primary_ret.arg3 = size;
+		primary_ret.arg3 = to.vm->mailbox.recv_size;
+		primary_ret.arg4 = to.vm->mailbox.recv_attributes;
 
 		to.vm->mailbox.state = MAILBOX_STATE_READ;
 		*next = api_switch_to_primary(current, primary_ret,
@@ -1064,8 +1065,7 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 		ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 	}
 
-	deliver_msg(vm_to_from_lock.vm1, vm_to_from_lock.vm2, size, current,
-		    next);
+	deliver_msg(vm_to_from_lock.vm1, vm_to_from_lock.vm2, current, next);
 
 out:
 	vm_unlock(&vm_to_from_lock.vm1);
