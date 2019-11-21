@@ -1452,7 +1452,7 @@ TEST(memory_sharing, lend_twice)
 
 	msg_size = spci_memory_lend_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
-		SPCI_MEMORY_RO_X, SPCI_MEMORY_NORMAL_MEM,
+		SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
 
 	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
@@ -1479,8 +1479,8 @@ TEST(memory_sharing, lend_twice)
 
 	/* Attempt to lend again with different permissions. */
 	constituents[0].page_count = 1;
-	for (int i = 1; i < PAGE_SIZE * 2; i++) {
-		constituents[0].address = (uint64_t)page + PAGE_SIZE;
+	for (int i = 0; i < 2; i++) {
+		constituents[0].address = (uint64_t)page + i * PAGE_SIZE;
 		msg_size = spci_memory_lend_init(
 			mb.send, SERVICE_VM1, constituents,
 			ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RO_X,
@@ -1515,7 +1515,7 @@ TEST(memory_sharing, share_twice)
 
 	msg_size = spci_memory_share_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
-		SPCI_MEMORY_RO_X, SPCI_MEMORY_NORMAL_MEM,
+		SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
 
 	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
@@ -1544,8 +1544,8 @@ TEST(memory_sharing, share_twice)
 
 	/* Attempt to share again with different permissions. */
 	constituents[0].page_count = 1;
-	for (int i = 1; i < PAGE_SIZE * 2; i++) {
-		constituents[0].address = (uint64_t)page + PAGE_SIZE;
+	for (int i = 0; i < 2; i++) {
+		constituents[0].address = (uint64_t)page + i * PAGE_SIZE;
 		msg_size = spci_memory_share_init(
 			mb.send, SERVICE_VM1, constituents,
 			ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RO_X,
