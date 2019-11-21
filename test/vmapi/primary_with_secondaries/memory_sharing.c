@@ -847,6 +847,10 @@ TEST(memory_sharing, spci_donate_twice)
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	/* Fail to share memory again with any VM. */
+	spci_check_cannot_share_memory(mb, constituents,
+				       ARRAY_SIZE(constituents), -1);
+	spci_check_cannot_lend_memory(mb, constituents,
+				      ARRAY_SIZE(constituents), -1);
 	spci_check_cannot_donate_memory(mb, constituents,
 					ARRAY_SIZE(constituents), -1);
 	/* Fail to relinquish memory from any VM. */
@@ -1481,6 +1485,10 @@ TEST(memory_sharing, spci_share_donate)
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+
+	/* Attempt to share the same area of memory. */
+	spci_check_cannot_share_memory(mb, constituents,
+				       ARRAY_SIZE(constituents), SERVICE_VM1);
 
 	/* Ensure we can't donate any sub section of memory to another VM. */
 	constituents[0].page_count = 1;
