@@ -717,14 +717,14 @@ static bool api_vm_configure_pages(struct vm_locked vm_locked,
 	if (!mm_vm_identity_map(
 		    &vm_locked.vm->ptable, pa_send_begin, pa_send_end,
 		    MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R | MM_MODE_W,
-		    NULL, &local_page_pool)) {
+		    &local_page_pool, NULL)) {
 		goto fail;
 	}
 
 	if (!mm_vm_identity_map(&vm_locked.vm->ptable, pa_recv_begin,
 				pa_recv_end,
 				MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R,
-				NULL, &local_page_pool)) {
+				&local_page_pool, NULL)) {
 		/* TODO: partial defrag of failed range. */
 		/* Recover any memory consumed in failed mapping. */
 		mm_vm_defrag(&vm_locked.vm->ptable, &local_page_pool);
@@ -746,13 +746,13 @@ static bool api_vm_configure_pages(struct vm_locked vm_locked,
 	 */
 fail_undo_send_and_recv:
 	CHECK(mm_vm_identity_map(&vm_locked.vm->ptable, pa_recv_begin,
-				 pa_recv_end, orig_recv_mode, NULL,
-				 &local_page_pool));
+				 pa_recv_end, orig_recv_mode, &local_page_pool,
+				 NULL));
 
 fail_undo_send:
 	CHECK(mm_vm_identity_map(&vm_locked.vm->ptable, pa_send_begin,
-				 pa_send_end, orig_send_mode, NULL,
-				 &local_page_pool));
+				 pa_send_end, orig_send_mode, &local_page_pool,
+				 NULL));
 
 fail:
 	ret = false;
@@ -1539,7 +1539,7 @@ struct spci_value api_spci_share_memory(
 	 * the recipient.
 	 */
 	if (!mm_vm_identity_map(&from->ptable, pa_begin, pa_end, from_mode,
-				NULL, &local_page_pool)) {
+				&local_page_pool, NULL)) {
 		ret = spci_error(SPCI_NO_MEMORY);
 		goto out;
 	}
@@ -1551,15 +1551,15 @@ struct spci_value api_spci_share_memory(
 
 		/* Return memory to the sender. */
 		CHECK(mm_vm_identity_map(&from->ptable, pa_begin, pa_end,
-					 orig_from_mode, NULL,
-					 &local_page_pool));
+					 orig_from_mode, &local_page_pool,
+					 NULL));
 
 		goto out;
 	}
 
 	/* Complete the transfer by mapping the memory into the recipient. */
-	if (!mm_vm_identity_map(&to->ptable, pa_begin, pa_end, to_mode, NULL,
-				&local_page_pool)) {
+	if (!mm_vm_identity_map(&to->ptable, pa_begin, pa_end, to_mode,
+				&local_page_pool, NULL)) {
 		/* TODO: partial defrag of failed range. */
 		/* Recover any memory consumed in failed mapping. */
 		mm_vm_defrag(&from->ptable, &local_page_pool);
@@ -1567,8 +1567,8 @@ struct spci_value api_spci_share_memory(
 		ret = spci_error(SPCI_NO_MEMORY);
 
 		CHECK(mm_vm_identity_map(&from->ptable, pa_begin, pa_end,
-					 orig_from_mode, NULL,
-					 &local_page_pool));
+					 orig_from_mode, &local_page_pool,
+					 NULL));
 
 		goto out;
 	}

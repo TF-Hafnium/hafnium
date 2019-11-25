@@ -851,6 +851,8 @@ static int mm_mode_to_flags(uint32_t mode)
  * See `mm_ptable_identity_prepare`.
  *
  * This must be called before `mm_vm_identity_commit` for the same mapping.
+ *
+ * Returns true on success, or false if the update would fail.
  */
 bool mm_vm_identity_prepare(struct mm_ptable *t, paddr_t begin, paddr_t end,
 			    uint32_t mode, struct mpool *ppool)
@@ -868,7 +870,7 @@ bool mm_vm_identity_prepare(struct mm_ptable *t, paddr_t begin, paddr_t end,
  * `mm_vm_identity_prepare` must be called before this for the same mapping.
  */
 void mm_vm_identity_commit(struct mm_ptable *t, paddr_t begin, paddr_t end,
-			   uint32_t mode, ipaddr_t *ipa, struct mpool *ppool)
+			   uint32_t mode, struct mpool *ppool, ipaddr_t *ipa)
 {
 	int flags = mm_mode_to_flags(mode);
 
@@ -885,9 +887,17 @@ void mm_vm_identity_commit(struct mm_ptable *t, paddr_t begin, paddr_t end,
  * Updates a VM's page table such that the given physical address range is
  * mapped in the address space at the corresponding address range in the
  * architecture-agnostic mode provided.
+ *
+ * mm_vm_defrag should always be called after a series of page table updates,
+ * whether they succeed or fail. This is because on failure extra page table
+ * entries may have been allocated and then not used, while on success it may be
+ * possible to compact the page table by merging several entries into a block.
+ *
+ * Returns true on success, or false if the update failed and no changes were
+ * made.
  */
 bool mm_vm_identity_map(struct mm_ptable *t, paddr_t begin, paddr_t end,
-			uint32_t mode, ipaddr_t *ipa, struct mpool *ppool)
+			uint32_t mode, struct mpool *ppool, ipaddr_t *ipa)
 {
 	int flags = mm_mode_to_flags(mode);
 	bool success = mm_ptable_identity_update(
@@ -910,7 +920,7 @@ bool mm_vm_unmap(struct mm_ptable *t, paddr_t begin, paddr_t end,
 {
 	uint32_t mode = MM_MODE_UNMAPPED_MASK;
 
-	return mm_vm_identity_map(t, begin, end, mode, NULL, ppool);
+	return mm_vm_identity_map(t, begin, end, mode, ppool, NULL);
 }
 
 /**

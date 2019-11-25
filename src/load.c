@@ -149,8 +149,8 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	 */
 	if (!mm_vm_identity_map(&vm->ptable, pa_init(0),
 				pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
-				MM_MODE_R | MM_MODE_W | MM_MODE_D, NULL,
-				ppool)) {
+				MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool,
+				NULL)) {
 		dlog("Unable to initialise address space for primary vm\n");
 		return false;
 	}
@@ -160,7 +160,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		if (!mm_vm_identity_map(
 			    &vm->ptable, params->mem_ranges[i].begin,
 			    params->mem_ranges[i].end,
-			    MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL, ppool)) {
+			    MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool, NULL)) {
 			dlog("Unable to initialise memory for primary vm\n");
 			return false;
 		}
@@ -207,8 +207,8 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	/* Grant the VM access to the memory. */
 	if (!mm_vm_identity_map(&vm->ptable, mem_begin, mem_end,
-				MM_MODE_R | MM_MODE_W | MM_MODE_X,
-				&secondary_entry, ppool)) {
+				MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool,
+				&secondary_entry)) {
 		dlog("Unable to initialise memory.\n");
 		return false;
 	}
