@@ -85,7 +85,11 @@ TEST(busy_secondary, virtual_timer)
 		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
 			.func,
 		SPCI_SUCCESS_32);
+
+	//run_res = spci_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 0, 0,
+	//				   0, 0, 0);
 	run_res = spci_run(SERVICE_VM1, 0);
+
 	EXPECT_EQ(run_res.func, SPCI_INTERRUPT_32);
 
 	dlog("Waiting for interrupt\n");

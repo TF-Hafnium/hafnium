@@ -130,6 +130,19 @@ struct vcpu *api_preempt(struct vcpu *current)
 		.arg1 = spci_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
+	struct vcpu *direct_request_origin =
+		current->direct_request_origin_vcpu;
+
+	/*
+	 * The vCPU was executing in the context of a SPCI_MSG_SEND_DIRECT_REQ.
+	 */
+	if (direct_request_origin) {
+		/*
+		 * Record the termination of the SPCI_MSG_SEND_DIRECT_REQ.
+		 */
+		current->direct_request_origin_vcpu = NULL;
+	}
+
 	return api_switch_to_primary(current, ret, VCPU_STATE_READY);
 }
 
@@ -1438,10 +1451,135 @@ struct spci_value api_spci_features(uint32_t function_id)
 	case SPCI_MSG_SEND_32:
 	case SPCI_MSG_POLL_32:
 	case SPCI_MSG_WAIT_32:
+	case SPCI_MSG_SEND_DIRECT_RESP_32:
+	case SPCI_MSG_SEND_DIRECT_REQ_32:
 		return (struct spci_value){.func = SPCI_SUCCESS_32};
 	default:
 		return spci_error(SPCI_NOT_SUPPORTED);
 	}
+}
+
+/**
+ * Common body of spci_msg_send_direct_req/_resp functionality.
+ */
+static struct spci_value api_spci_msg_send_direct(struct spci_value *args,
+						  struct vcpu *current,
+						  struct vcpu **next)
+{
+	spci_vm_id_t sender_vm_id = current->vm->id;
+	spci_vm_id_t receiver_vm_id = spci_msg_send_receiver(*args);
+	spci_vm_id_t reported_sender_vm_id = spci_msg_send_sender(*args);
+
+	struct vm *receiver_vm;
+	struct vcpu *receiver_vcpu;
+
+	/* Prevent sender_vm_id spoofing. */
+	if (sender_vm_id != reported_sender_vm_id) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/* Prevent a VM from sending messages to itself. */
+	if (sender_vm_id == receiver_vm_id) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	receiver_vm = vm_find(receiver_vm_id);
+	if (!receiver_vm) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * SPCIv1.0 accepts UP or MP VP with a number of vCPUs matching the
+	 * number of PEs in the system. SPCIv1.0 further states that MP that
+	 * accept direct request messages cannot migrate.
+	 */
+	if (receiver_vm->vcpu_count > 1) {
+		receiver_vcpu =
+			vm_get_vcpu(receiver_vm, cpu_index(current->cpu));
+	} else {
+		receiver_vcpu = vm_get_vcpu(receiver_vm, 0);
+	}
+
+	sl_lock(&receiver_vcpu->lock);
+
+	/*
+	 * Only deliver direct message if the vCPU has called spci_msg_wait.
+	 */
+	if (receiver_vcpu->state != VCPU_STATE_BLOCKED_MAILBOX) {
+		sl_unlock(&receiver_vcpu->lock);
+		return spci_error(SPCI_BUSY);
+	}
+
+	/*
+	 * If the receiver has regs_available set to false then the vCPU is
+	 * currently executing.
+	 */
+	if (!receiver_vcpu->regs_available) {
+		sl_unlock(&receiver_vcpu->lock);
+		return spci_error(SPCI_BUSY);
+	}
+
+	current->state = VCPU_STATE_BLOCKED_MAILBOX;
+	receiver_vcpu->state = VCPU_STATE_RUNNING;
+
+	*next = receiver_vcpu;
+	receiver_vcpu->regs.r[0] = args->func;
+	receiver_vcpu->regs.r[1] = args->arg1;
+	receiver_vcpu->regs.r[2] = 0;
+	receiver_vcpu->regs.r[3] = args->arg3;
+	receiver_vcpu->regs.r[4] = args->arg4;
+	receiver_vcpu->regs.r[5] = args->arg5;
+	receiver_vcpu->regs.r[6] = args->arg6;
+	receiver_vcpu->regs.r[7] = args->arg7;
+
+	sl_unlock(&receiver_vcpu->lock);
+
+	/*
+	 * Since this flow will lead to a VM switch, this return value will not
+	 * be applied to the vCPU.
+	 */
+	return (struct spci_value){.func = SPCI_SUCCESS_32};
+}
+
+/**
+ * Send a direct message request.
+ */
+struct spci_value api_spci_msg_send_direct_req(struct spci_value *args,
+					       struct vcpu *current,
+					       struct vcpu **next)
+{
+	struct spci_value ret = api_spci_msg_send_direct(args, current, next);
+
+	if (ret.func == SPCI_SUCCESS_32) {
+		struct vcpu *receiver_vcpu = *next;
+
+		/* The receiver_vcpu must not have an ongoing direct_req. */
+		CHECK(!receiver_vcpu->direct_request_origin_vcpu);
+		receiver_vcpu->direct_request_origin_vcpu = current;
+	}
+
+	return ret;
+}
+
+/**
+ * Send a direct message response.
+ */
+struct spci_value api_spci_msg_send_direct_resp(struct spci_value *args,
+						struct vcpu *current,
+						struct vcpu **next)
+{
+	struct spci_value ret = api_spci_msg_send_direct(args, current, next);
+
+	if (ret.func == SPCI_SUCCESS_32) {
+		/*
+		 * Ensure the terminating SPCI_MSG_SEND_DIRECT_REQ had a
+		 * defined originator.
+		 */
+		CHECK(current->direct_request_origin_vcpu);
+		current->direct_request_origin_vcpu = NULL;
+	}
+
+	return ret;
 }
 
 struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,

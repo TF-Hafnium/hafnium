@@ -85,6 +85,14 @@ struct vcpu {
 	 * back to true when it is descheduled.
 	 */
 	bool regs_available;
+
+	/*
+	 * If the current vCPU is executing as a consequence of a
+	 * SPCI_MSG_SEND_DIRECT_REQ this member points to the vCPU where the
+	 * call originated. A NULL value implies the vCPU is not executing on
+	 * the context of a SPCI_MSG_SEND_DIRECT_REQ.
+	 */
+	struct vcpu *direct_request_origin_vcpu;
 };
 
 /** Encapsulates a vCPU whose lock is held. */

@@ -65,3 +65,9 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 				    uint32_t fragment_length, uint32_t length,
 				    uint32_t cookie, struct vcpu *current,
 				    struct vcpu **next);
+struct spci_value api_spci_msg_send_direct_req(struct spci_value *args,
+					       struct vcpu *current,
+					       struct vcpu **next);
+struct spci_value api_spci_msg_send_direct_resp(struct spci_value *args,
+						struct vcpu *current,
+						struct vcpu **next);

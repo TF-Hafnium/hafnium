@@ -18,6 +18,10 @@
 
 #include <stdint.h>
 
+#include "hf/arch/irq.h"
+#include "hf/arch/vm/interrupts.h"
+#include "hf/arch/vm/timer.h"
+
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
@@ -129,4 +133,64 @@ TEST(spci, spci_recv_non_blocking)
 	SERVICE_SELECT(SERVICE_VM1, "spci_recv_non_blocking", mb.send);
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+}
+
+/**
+ * Send direct message, verify that sent info is echoed back.
+ */
+TEST(spci, spci_send_direct_message_req_echo)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct spci_value res;
+
+	SERVICE_SELECT(SERVICE_VM1, "spci_direct_message_resp_echo", mb.send);
+	spci_run(SERVICE_VM1, 0);
+
+	res = spci_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, msg[0],
+				       msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_EQ(res.func, SPCI_MSG_SEND_DIRECT_RESP_32);
+
+	EXPECT_EQ(res.arg3, msg[0]);
+	EXPECT_EQ(res.arg4, msg[1]);
+	EXPECT_EQ(res.arg5, msg[2]);
+	EXPECT_EQ(res.arg6, msg[3]);
+	EXPECT_EQ(res.arg7, msg[4]);
+}
+
+/**
+ * Send direct message, secondary verifies unallowed smc invocations while
+ * spci_msg_send_direct_req is being serviced.
+ */
+TEST(spci, spci_send_direct_message_req_unallowed_smc)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct spci_value res;
+
+	SERVICE_SELECT(SERVICE_VM1, "spci_direct_unallowed_smc", mb.send);
+	spci_run(SERVICE_VM1, 0);
+
+	res = spci_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, msg[0],
+				       msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_EQ(res.func, SPCI_MSG_SEND_DIRECT_RESP_32);
+}
+
+/**
+ * Send direct message to invalid destination.
+ */
+TEST(spci, spci_send_direct_message_req_invalid_dst)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	struct spci_value res;
+
+	res = spci_msg_send_direct_req(HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID,
+				       msg[0], msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
 }

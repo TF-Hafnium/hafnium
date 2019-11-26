@@ -26,7 +26,7 @@
 #include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/panic.h"
-#include "hf/spci.h"
+#include "hf/spci_internal.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/call.h"
@@ -400,6 +400,12 @@ static bool spci_handler_internal(struct spci_value *args, struct vcpu **next)
 					  args->arg2, args->arg3, args->arg4,
 					  args->arg5, current(), next);
 		return true;
+	case SPCI_MSG_SEND_DIRECT_REQ_32:
+		*args = api_spci_msg_send_direct_req(args, current(), next);
+		return true;
+	case SPCI_MSG_SEND_DIRECT_RESP_32:
+		*args = api_spci_msg_send_direct_resp(args, current(), next);
+		return true;
 	}
 
 	return false;
@@ -454,6 +460,36 @@ static void update_vi(struct vcpu *next)
 	}
 }
 
+bool is_call_allowed(struct vcpu *vcpu, uint32_t func)
+{
+	if (vcpu->direct_request_origin_vcpu) {
+		/*
+		 * The vCPU is executing in a SPCI_MSG_SEND_DIRECT_REQ context,
+		 * there is a subset of calls that are not allowed to perform.
+		 * Strictly speaking any call that does not terminate at the Hv
+		 * is blocked. The exception to this is
+		 * SPCI_MSG_SEND_DIRECT_RESP which is signals the termination of
+		 * a SPCI_MSG_SEND_DIRECT_REQ.
+		 */
+		switch (func) {
+		case SPCI_RUN_32:
+		case SPCI_MSG_SEND_32:
+		case SPCI_MSG_SEND_DIRECT_REQ_32:
+		case SPCI_MSG_POLL_32:
+		case SPCI_YIELD_32:
+		case SPCI_MSG_WAIT_32:
+
+			dlog("Denied %X smc.\n", func);
+			return false;
+		default:
+
+			return true;
+		}
+	}
+
+	return true;
+}
+
 /**
  * Processes SMC instruction calls.
  */
@@ -470,6 +506,18 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
 		.arg7 = vcpu->regs.r[7],
 	};
 	struct vcpu *next = NULL;
+
+	if (!is_call_allowed(vcpu, args.func)) {
+		/*
+		 * Calls are not allowed when a SPCI_MSG_SEND_REQ is being
+		 * serviced in the curent vCPU. In general all the calls that
+		 * induce a vCPU switch are denied. Only calls defined in the
+		 * SPCIv1.0 spec induce a vCPU switch, and all such calls return
+		 * a DENIED error code when issued during an ongoing
+		 * SPCI_MSG_SEND_REQ.
+		 */
+		return NULL;
+	}
 
 	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
 			 &vcpu->regs.r[0], &next)) {
@@ -643,6 +691,20 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 		.arg7 = vcpu->regs.r[7],
 	};
 	struct vcpu *next = NULL;
+
+	if (!is_call_allowed(vcpu, args.func)) {
+		/*
+		 * Calls are not allowed when a SPCI_MSG_SEND_REQ is being
+		 * serviced in the curent vCPU. In general all the calls that
+		 * induce a vCPU switch are denied. Only calls defined in the
+		 * SPCIv1.0 spec induce a vCPU switch, and all such calls return
+		 * a DENIED error code when issued during an ongoing
+		 * SPCI_MSG_SEND_REQ.
+		 */
+		vcpu->regs.r[0] = SPCI_ERROR_32;
+		vcpu->regs.r[2] = SPCI_DENIED;
+		return next;
+	}
 
 	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
 			 &vcpu->regs.r[0], &next)) {

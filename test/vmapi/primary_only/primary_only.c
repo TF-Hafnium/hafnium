@@ -246,6 +246,12 @@ TEST(spci, spci_features)
 
 	ret = spci_features(SPCI_YIELD_32);
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -278,19 +284,8 @@ TEST(spci, spci_features_not_supported)
 	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_RUN_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
-
-	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
-
-	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
-
-	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
-
-	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
+	EXPECT_EQ(ret.func, SPCI_ERROR_32);
+	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
 }
 
 /**

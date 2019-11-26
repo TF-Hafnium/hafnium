@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#include "hf/arch/irq.h"
+#include "hf/arch/vm/interrupts.h"
+#include "hf/arch/vm/timer.h"
+
 #include "hf/spci.h"
 #include "hf/std.h"
 
@@ -72,4 +76,43 @@ TEST_SERVICE(spci_recv_non_blocking)
 	EXPECT_SPCI_ERROR(ret, SPCI_RETRY);
 
 	spci_yield();
+}
+
+TEST_SERVICE(spci_direct_message_resp_echo)
+{
+	struct spci_value args = spci_msg_wait();
+
+	EXPECT_EQ(args.func, SPCI_MSG_SEND_DIRECT_REQ_32);
+
+	spci_msg_send_direct_resp(spci_msg_send_receiver(args),
+				  spci_msg_send_sender(args), args.arg3,
+				  args.arg4, args.arg5, args.arg6, args.arg7);
+}
+
+TEST_SERVICE(spci_direct_unallowed_smc)
+{
+	struct spci_value args = spci_msg_wait();
+	struct spci_value ret;
+
+	EXPECT_EQ(args.func, SPCI_MSG_SEND_DIRECT_REQ_32);
+
+	ret = spci_yield();
+	EXPECT_SPCI_ERROR(ret, SPCI_DENIED);
+
+	ret = spci_msg_send(spci_msg_send_receiver(args),
+			    spci_msg_send_sender(args), 0, 0);
+	EXPECT_SPCI_ERROR(ret, SPCI_DENIED);
+
+	ret = spci_msg_wait();
+	EXPECT_SPCI_ERROR(ret, SPCI_DENIED);
+
+	ret = spci_msg_poll();
+	EXPECT_SPCI_ERROR(ret, SPCI_DENIED);
+
+	ret = spci_msg_send_direct_req(SERVICE_VM1, SERVICE_VM2, 0, 0, 0, 0, 0);
+	EXPECT_SPCI_ERROR(ret, SPCI_DENIED);
+
+	spci_msg_send_direct_resp(spci_msg_send_receiver(args),
+				  spci_msg_send_sender(args), args.arg3,
+				  args.arg4, args.arg5, args.arg6, args.arg7);
 }
