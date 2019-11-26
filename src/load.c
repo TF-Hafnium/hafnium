@@ -117,8 +117,10 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 {
 	paddr_t primary_begin = layout_primary_begin();
 	struct vm *vm;
+	struct vm_locked vm_locked;
 	struct vcpu_locked vcpu_locked;
 	size_t i;
+	bool ret;
 
 	/*
 	 * TODO: This bound is currently meaningless but will be addressed when
@@ -142,8 +144,11 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
+	vm_locked = vm_lock(vm);
+
 	if (!load_common(manifest_vm, vm)) {
-		return false;
+		ret = false;
+		goto out;
 	}
 
 	/*
@@ -152,35 +157,41 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	 *
 	 * TODO: We should do a whitelist rather than a blacklist.
 	 */
-	if (!mm_vm_identity_map(&vm->ptable, pa_init(0),
-				pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
-				MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool,
-				NULL)) {
+	if (!vm_identity_map(vm_locked, pa_init(0),
+			     pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
+			     MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
 		dlog("Unable to initialise address space for primary vm\n");
-		return false;
+		ret = false;
+		goto out;
 	}
 
 	/* Map normal memory as such to permit caching, execution, etc. */
 	for (i = 0; i < params->mem_ranges_count; ++i) {
-		if (!mm_vm_identity_map(
-			    &vm->ptable, params->mem_ranges[i].begin,
-			    params->mem_ranges[i].end,
-			    MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool, NULL)) {
+		if (!vm_identity_map(vm_locked, params->mem_ranges[i].begin,
+				     params->mem_ranges[i].end,
+				     MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool,
+				     NULL)) {
 			dlog("Unable to initialise memory for primary vm\n");
-			return false;
+			ret = false;
+			goto out;
 		}
 	}
 
-	if (!mm_vm_unmap_hypervisor(&vm->ptable, ppool)) {
+	if (!vm_unmap_hypervisor(vm_locked, ppool)) {
 		dlog("Unable to unmap hypervisor from primary vm\n");
-		return false;
+		ret = false;
+		goto out;
 	}
 
 	vcpu_locked = vcpu_lock(vm_get_vcpu(vm, 0));
 	vcpu_on(vcpu_locked, ipa_from_pa(primary_begin), params->kernel_arg);
 	vcpu_unlock(&vcpu_locked);
+	ret = true;
 
-	return true;
+out:
+	vm_unlock(&vm_locked);
+
+	return ret;
 }
 
 /*
@@ -192,8 +203,10 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			   const struct memiter *cpio, struct mpool *ppool)
 {
 	struct vm *vm;
+	struct vm_locked vm_locked;
 	struct vcpu *vcpu;
 	ipaddr_t secondary_entry;
+	bool ret;
 
 	if (!load_kernel(stage1_locked, mem_begin, mem_end, manifest_vm, cpio,
 			 ppool)) {
@@ -210,12 +223,15 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
+	vm_locked = vm_lock(vm);
+
 	/* Grant the VM access to the memory. */
-	if (!mm_vm_identity_map(&vm->ptable, mem_begin, mem_end,
-				MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool,
-				&secondary_entry)) {
+	if (!vm_identity_map(vm_locked, mem_begin, mem_end,
+			     MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool,
+			     &secondary_entry)) {
 		dlog("Unable to initialise memory.\n");
-		return false;
+		ret = false;
+		goto out;
 	}
 
 	dlog("Loaded with %u vcpus, entry at %#x.\n",
@@ -224,8 +240,12 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	vcpu = vm_get_vcpu(vm, 0);
 	vcpu_secondary_reset_and_start(vcpu, secondary_entry,
 				       pa_difference(mem_begin, mem_end));
+	ret = true;
 
-	return true;
+out:
+	vm_unlock(&vm_locked);
+
+	return ret;
 }
 
 /**
@@ -314,7 +334,9 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 {
 	struct vm *primary;
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
+	struct vm_locked primary_vm_locked;
 	size_t i;
+	bool success = true;
 
 	if (!load_primary(stage1_locked, &manifest->vm[HF_PRIMARY_VM_INDEX],
 			  cpio, params, ppool)) {
@@ -331,13 +353,14 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	memcpy_s(mem_ranges_available, sizeof(mem_ranges_available),
 		 params->mem_ranges, sizeof(params->mem_ranges));
 
-	primary = vm_find(HF_PRIMARY_VM_ID);
-
 	/* Round the last addresses down to the page size. */
 	for (i = 0; i < params->mem_ranges_count; ++i) {
 		mem_ranges_available[i].end = pa_init(align_down(
 			pa_addr(mem_ranges_available[i].end), PAGE_SIZE));
 	}
+
+	primary = vm_find(HF_PRIMARY_VM_ID);
+	primary_vm_locked = vm_lock(primary);
 
 	for (i = 0; i < manifest->vm_count; ++i) {
 		const struct manifest_vm *manifest_vm = &manifest->vm[i];
@@ -370,11 +393,18 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 		}
 
 		/* Deny the primary VM access to this memory. */
-		if (!mm_vm_unmap(&primary->ptable, secondary_mem_begin,
-				 secondary_mem_end, ppool)) {
+		if (!vm_unmap(primary_vm_locked, secondary_mem_begin,
+			      secondary_mem_end, ppool)) {
 			dlog("Unable to unmap secondary VM from primary VM.\n");
-			return false;
+			success = false;
+			break;
 		}
+	}
+
+	vm_unlock(&primary_vm_locked);
+
+	if (!success) {
+		return false;
 	}
 
 	/*

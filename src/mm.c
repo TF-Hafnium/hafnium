@@ -924,18 +924,6 @@ bool mm_vm_unmap(struct mm_ptable *t, paddr_t begin, paddr_t end,
 }
 
 /**
- * Unmaps the hypervisor pages from the given page table.
- */
-bool mm_vm_unmap_hypervisor(struct mm_ptable *t, struct mpool *ppool)
-{
-	/* TODO: If we add pages dynamically, they must be included here too. */
-	return mm_vm_unmap(t, layout_text_begin(), layout_text_end(), ppool) &&
-	       mm_vm_unmap(t, layout_rodata_begin(), layout_rodata_end(),
-			   ppool) &&
-	       mm_vm_unmap(t, layout_data_begin(), layout_data_end(), ppool);
-}
-
-/**
  * Write the given page table of a VM to the debug log.
  */
 void mm_vm_dump(struct mm_ptable *t)

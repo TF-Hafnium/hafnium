@@ -19,6 +19,7 @@
 #include "hf/dlog.h"
 #include "hf/spci_internal.h"
 #include "hf/std.h"
+#include "hf/vm.h"
 
 /**
  * Obtain the next mode to apply to the two VMs.
@@ -316,8 +317,8 @@ static bool spci_msg_check_transition(struct vm *to, struct vm *from,
  * made to memory mappings.
  */
 static bool spci_region_group_identity_map(
-	struct mm_ptable *t, struct spci_memory_region *memory_region, int mode,
-	struct mpool *ppool, bool commit)
+	struct vm_locked vm_locked, struct spci_memory_region *memory_region,
+	int mode, struct mpool *ppool, bool commit)
 {
 	struct spci_memory_region_constituent *constituents =
 		spci_memory_region_get_constituents(memory_region);
@@ -331,10 +332,10 @@ static bool spci_region_group_identity_map(
 		paddr_t pa_end = pa_add(pa_begin, size);
 
 		if (commit) {
-			mm_vm_identity_commit(t, pa_begin, pa_end, mode, ppool,
-					      NULL);
-		} else if (!mm_vm_identity_prepare(t, pa_begin, pa_end, mode,
-						   ppool)) {
+			vm_identity_commit(vm_locked, pa_begin, pa_end, mode,
+					   ppool, NULL);
+		} else if (!vm_identity_prepare(vm_locked, pa_begin, pa_end,
+						mode, ppool)) {
 			return false;
 		}
 	}
@@ -501,9 +502,9 @@ static struct spci_value spci_share_memory(
 	 * sure the entire operation will succeed without exhausting the page
 	 * pool.
 	 */
-	if (!spci_region_group_identity_map(&from->ptable, memory_region,
+	if (!spci_region_group_identity_map(from_locked, memory_region,
 					    from_mode, api_page_pool, false) ||
-	    !spci_region_group_identity_map(&to->ptable, memory_region, to_mode,
+	    !spci_region_group_identity_map(to_locked, memory_region, to_mode,
 					    api_page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
 		ret = spci_error(SPCI_NO_MEMORY);
@@ -516,9 +517,8 @@ static struct spci_value spci_share_memory(
 	 * already prepared above, but may free pages in the case that a whole
 	 * block is being unmapped that was previously partially mapped.
 	 */
-	CHECK(spci_region_group_identity_map(&from->ptable, memory_region,
-					     from_mode, &local_page_pool,
-					     true));
+	CHECK(spci_region_group_identity_map(
+		from_locked, memory_region, from_mode, &local_page_pool, true));
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if ((memory_region->flags & SPCI_MEMORY_REGION_FLAG_CLEAR) &&
@@ -529,9 +529,9 @@ static struct spci_value spci_share_memory(
 		 * `local_page_pool` by the call above, but will never allocate
 		 * more pages than that so can never fail.
 		 */
-		CHECK(spci_region_group_identity_map(
-			&from->ptable, memory_region, orig_from_mode,
-			&local_page_pool, true));
+		CHECK(spci_region_group_identity_map(from_locked, memory_region,
+						     orig_from_mode,
+						     &local_page_pool, true));
 
 		ret = spci_error(SPCI_NO_MEMORY);
 		goto out;
@@ -542,8 +542,8 @@ static struct spci_value spci_share_memory(
 	 * won't allocate because the transaction was already prepared above, so
 	 * it doesn't need to use the `local_page_pool`.
 	 */
-	CHECK(spci_region_group_identity_map(&to->ptable, memory_region,
-					     to_mode, api_page_pool, true));
+	CHECK(spci_region_group_identity_map(to_locked, memory_region, to_mode,
+					     api_page_pool, true));
 
 	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 

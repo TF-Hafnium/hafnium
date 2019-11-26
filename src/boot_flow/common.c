@@ -38,49 +38,26 @@ static bool boot_params_init(struct boot_params *p,
  * Parses information from FDT needed to initialize Hafnium.
  * FDT is mapped at the beginning and unmapped before exiting the function.
  */
-bool boot_flow_init(struct mm_stage1_locked stage1_locked,
-		    struct manifest *manifest, struct boot_params *boot_params,
-		    struct mpool *ppool)
+bool boot_flow_init(const struct fdt_node *fdt_root, struct manifest *manifest,
+		    struct boot_params *boot_params)
 {
-	bool ret = false;
-	struct fdt_header *fdt;
-	struct fdt_node fdt_root;
 	enum manifest_return_code manifest_ret;
 
 	/* Get the memory map from the FDT. */
-	fdt = fdt_map(stage1_locked, plat_boot_flow_get_fdt_addr(), &fdt_root,
-		      ppool);
-	if (fdt == NULL) {
-		dlog("Unable to map FDT.\n");
-		return false;
-	}
 
-	if (!fdt_find_child(&fdt_root, "")) {
-		dlog("Unable to find FDT root node.\n");
-		goto out_unmap_fdt;
-	}
-
-	manifest_ret = manifest_init(manifest, &fdt_root);
+	manifest_ret = manifest_init(manifest, fdt_root);
 	if (manifest_ret != MANIFEST_SUCCESS) {
 		dlog("Could not parse manifest: %s.\n",
 		     manifest_strerror(manifest_ret));
-		goto out_unmap_fdt;
+		return false;
 	}
 
-	if (!boot_params_init(boot_params, &fdt_root)) {
+	if (!boot_params_init(boot_params, fdt_root)) {
 		dlog("Could not parse boot params.\n");
-		goto out_unmap_fdt;
+		return false;
 	}
 
-	ret = true;
-
-out_unmap_fdt:
-	if (!fdt_unmap(stage1_locked, fdt, ppool)) {
-		dlog("Unable to unmap FDT.\n");
-		ret = false;
-	}
-
-	return ret;
+	return true;
 }
 
 /**

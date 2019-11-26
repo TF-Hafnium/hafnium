@@ -293,6 +293,7 @@ template("aarch64_common_toolchain") {
     toolchain_args = {
       plat_boot_flow = invoker.boot_flow
       plat_console = invoker.console
+      plat_iommu = invoker.iommu
       forward_variables_from(invoker.toolchain_args, "*")
     }
   }
@@ -314,6 +315,7 @@ template("aarch64_toolchains") {
                              "origin_address",
                              "boot_flow",
                              "console",
+                             "iommu",
                              "gic_version",
                              "gicd_base_address",
                              "gicr_base_address",
@@ -342,6 +344,7 @@ template("aarch64_toolchains") {
     cpu = "${invoker.cpu}+fp"
     boot_flow = "//src/arch/fake:boot_flow"
     console = "//src/arch/aarch64/hftest:console"
+    iommu = "//src/iommu:absent"
 
     # Nonsense values because they are required but shouldn't be used.
     heap_pages = 0

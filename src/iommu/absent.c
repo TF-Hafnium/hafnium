@@ -14,17 +14,23 @@
  * limitations under the License.
  */
 
-#pragma once
+#include "hf/plat/iommu.h"
 
-#include "hf/boot_params.h"
-#include "hf/manifest.h"
-#include "hf/memiter.h"
-#include "hf/mm.h"
+bool plat_iommu_init(const struct fdt_node *fdt_root,
+		     struct mm_stage1_locked stage1_locked, struct mpool *ppool)
+{
+	(void)fdt_root;
+	(void)stage1_locked;
+	(void)ppool;
 
-bool boot_flow_init(const struct fdt_node *fdt_root, struct manifest *manifest,
-		    struct boot_params *boot_params);
+	return true;
+}
 
-bool boot_flow_update(struct mm_stage1_locked stage1_locked,
-		      const struct manifest *manifest,
-		      struct boot_params_update *p, struct memiter *cpio,
-		      struct mpool *ppool);
+void plat_iommu_identity_map(struct vm_locked vm_locked, paddr_t begin,
+			     paddr_t end, uint32_t mode)
+{
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)mode;
+}

@@ -25,11 +25,14 @@
 #include "hf/cpio.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
+#include "hf/fdt_handler.h"
 #include "hf/load.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/panic.h"
+#include "hf/plat/boot_flow.h"
 #include "hf/plat/console.h"
+#include "hf/plat/iommu.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -68,6 +71,8 @@ void one_time_init_mm(void)
  */
 void one_time_init(void)
 {
+	struct fdt_header *fdt;
+	struct fdt_node fdt_root;
 	struct manifest manifest;
 	struct boot_params params;
 	struct boot_params_update update;
@@ -84,8 +89,26 @@ void one_time_init(void)
 
 	mm_stage1_locked = mm_lock_stage1();
 
-	if (!boot_flow_init(mm_stage1_locked, &manifest, &params, &ppool)) {
+	fdt = fdt_map(mm_stage1_locked, plat_boot_flow_get_fdt_addr(),
+		      &fdt_root, &ppool);
+	if (fdt == NULL) {
+		panic("Unable to map FDT.\n");
+	}
+
+	if (!fdt_find_child(&fdt_root, "")) {
+		panic("Unable to find FDT root node.\n");
+	}
+
+	if (!boot_flow_init(&fdt_root, &manifest, &params)) {
 		panic("Could not parse data from FDT.");
+	}
+
+	if (!plat_iommu_init(&fdt_root, mm_stage1_locked, &ppool)) {
+		panic("Could not initialize IOMMUs.");
+	}
+
+	if (!fdt_unmap(mm_stage1_locked, fdt, &ppool)) {
+		panic("Unable to unmap FDT.\n");
 	}
 
 	cpu_module_init(params.cpu_ids, params.cpu_count);

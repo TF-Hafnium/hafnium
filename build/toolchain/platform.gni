@@ -26,6 +26,9 @@ declare_args() {
   # Console driver to be used for the platform, specified as build target.
   plat_console = ""
 
+  # IOMMU driver to be used for the platform, specified as build target.
+  plat_iommu = ""
+
   # The number of pages to allocate for the hypervisor heap.
   plat_heap_pages = 0
 

@@ -46,6 +46,7 @@ CHECKPATCH := $(CURDIR)/third_party/linux/scripts/checkpatch.pl \
 	--ignore BRACES,SPDX_LICENSE_TAG,VOLATILE,SPLIT_STRING,AVOID_EXTERNS,USE_SPINLOCK_T,NEW_TYPEDEFS,INITIALISED_STATIC,FILE_PATH_CHANGES,EMBEDDED_FUNCTION_NAME,SINGLE_STATEMENT_DO_WHILE_MACRO,MACRO_WITH_FLOW_CONTROL --quiet
 
 # Specifies the grep pattern for ignoring specific files in checkpatch.
+# C++ headers, *.hh, are automatically excluded.
 # Separate the different items in the list with a grep or (\|).
 # debug_el1.c : uses XMACROS, which checkpatch doesn't understand.
 # perfmon.c : uses XMACROS, which checkpatch doesn't understand.

@@ -16,15 +16,12 @@
 
 #pragma once
 
-#include "hf/boot_params.h"
-#include "hf/manifest.h"
-#include "hf/memiter.h"
-#include "hf/mm.h"
+#include <span>
+#include <vector>
 
-bool boot_flow_init(const struct fdt_node *fdt_root, struct manifest *manifest,
-		    struct boot_params *boot_params);
+namespace mm_test
+{
+std::vector<std::span<pte_t, MM_PTE_PER_PAGE>> get_ptable(
+	const struct mm_ptable &ptable);
 
-bool boot_flow_update(struct mm_stage1_locked stage1_locked,
-		      const struct manifest *manifest,
-		      struct boot_params_update *p, struct memiter *cpio,
-		      struct mpool *ppool);
+} /* namespace mm_test */

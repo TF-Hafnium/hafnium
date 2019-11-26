@@ -19,6 +19,8 @@
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/cpu.h"
+#include "hf/layout.h"
+#include "hf/plat/iommu.h"
 #include "hf/spci.h"
 #include "hf/std.h"
 
@@ -144,4 +146,86 @@ struct vcpu *vm_get_vcpu(struct vm *vm, spci_vcpu_index_t vcpu_index)
 {
 	CHECK(vcpu_index < vm->vcpu_count);
 	return &vm->vcpus[vcpu_index];
+}
+
+/**
+ * Map a range of addresses to the VM in both the MMU and the IOMMU.
+ *
+ * mm_vm_defrag should always be called after a series of page table updates,
+ * whether they succeed or fail. This is because on failure extra page table
+ * entries may have been allocated and then not used, while on success it may be
+ * possible to compact the page table by merging several entries into a block.
+ *
+ * Returns true on success, or false if the update failed and no changes were
+ * made.
+ *
+ */
+bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
+		     uint32_t mode, struct mpool *ppool, ipaddr_t *ipa)
+{
+	if (!vm_identity_prepare(vm_locked, begin, end, mode, ppool)) {
+		return false;
+	}
+
+	vm_identity_commit(vm_locked, begin, end, mode, ppool, ipa);
+
+	return true;
+}
+
+/**
+ * Prepares the given VM for the given address mapping such that it will be able
+ * to commit the change without failure.
+ *
+ * In particular, multiple calls to this function will result in the
+ * corresponding calls to commit the changes to succeed.
+ *
+ * Returns true on success, or false if the update failed and no changes were
+ * made.
+ */
+bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
+			 uint32_t mode, struct mpool *ppool)
+{
+	return mm_vm_identity_prepare(&vm_locked.vm->ptable, begin, end, mode,
+				      ppool);
+}
+
+/**
+ * Commits the given address mapping to the VM assuming the operation cannot
+ * fail. `vm_identity_prepare` must used correctly before this to ensure
+ * this condition.
+ */
+void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
+			uint32_t mode, struct mpool *ppool, ipaddr_t *ipa)
+{
+	mm_vm_identity_commit(&vm_locked.vm->ptable, begin, end, mode, ppool,
+			      ipa);
+	plat_iommu_identity_map(vm_locked, begin, end, mode);
+}
+
+/**
+ * Unmap a range of addresses from the VM.
+ *
+ * Returns true on success, or false if the update failed and no changes were
+ * made.
+ */
+bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
+	      struct mpool *ppool)
+{
+	uint32_t mode = MM_MODE_UNMAPPED_MASK;
+
+	return vm_identity_map(vm_locked, begin, end, mode, ppool, NULL);
+}
+
+/**
+ * Unmaps the hypervisor pages from the given page table.
+ */
+bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool)
+{
+	/* TODO: If we add pages dynamically, they must be included here too. */
+	return vm_unmap(vm_locked, layout_text_begin(), layout_text_end(),
+			ppool) &&
+	       vm_unmap(vm_locked, layout_rodata_begin(), layout_rodata_end(),
+			ppool) &&
+	       vm_unmap(vm_locked, layout_data_begin(), layout_data_end(),
+			ppool);
 }

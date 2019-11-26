@@ -28,6 +28,8 @@ extern "C" {
 #include <span>
 #include <vector>
 
+#include "mm_test.hh"
+
 namespace
 {
 using namespace ::std::placeholders;
@@ -39,6 +41,8 @@ using ::testing::Eq;
 using ::testing::Not;
 using ::testing::SizeIs;
 using ::testing::Truly;
+
+using ::mm_test::get_ptable;
 
 constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 16;
 const int TOP_LEVEL = arch_mm_stage2_max_level();
@@ -71,21 +75,6 @@ std::span<pte_t, MM_PTE_PER_PAGE> get_table(paddr_t pa)
 	auto table = reinterpret_cast<struct mm_page_table *>(
 		ptr_from_va(va_from_pa(pa)));
 	return std::span<pte_t>(table->entries, std::end(table->entries));
-}
-
-/**
- * Get an STL representation of the ptable.
- */
-std::vector<std::span<pte_t, MM_PTE_PER_PAGE>> get_ptable(
-	const struct mm_ptable &ptable)
-{
-	std::vector<std::span<pte_t, MM_PTE_PER_PAGE>> all;
-	const uint8_t root_table_count = arch_mm_stage2_root_table_count();
-	for (uint8_t i = 0; i < root_table_count; ++i) {
-		all.push_back(get_table(
-			pa_add(ptable.root, i * sizeof(struct mm_page_table))));
-	}
-	return all;
 }
 
 class mm : public ::testing::Test
@@ -698,20 +687,6 @@ TEST_F(mm, prepare_and_commit_overlapping_regions)
 }
 
 /**
- * If nothing is mapped, unmapping the hypervisor has no effect.
- */
-TEST_F(mm, vm_unmap_hypervisor_not_mapped)
-{
-	struct mm_ptable ptable;
-	ASSERT_TRUE(mm_vm_init(&ptable, &ppool));
-	EXPECT_TRUE(mm_vm_unmap_hypervisor(&ptable, &ppool));
-	EXPECT_THAT(
-		get_ptable(ptable),
-		AllOf(SizeIs(4), Each(Each(arch_mm_absent_pte(TOP_LEVEL)))));
-	mm_vm_fini(&ptable, &ppool);
-}
-
-/**
  * If range is not mapped, unmapping has no effect.
  */
 TEST_F(mm, unmap_not_mapped)
@@ -1199,3 +1174,22 @@ TEST_F(mm, defrag_block_subtables)
 }
 
 } /* namespace */
+
+namespace mm_test
+{
+/**
+ * Get an STL representation of the ptable.
+ */
+std::vector<std::span<pte_t, MM_PTE_PER_PAGE>> get_ptable(
+	const struct mm_ptable &ptable)
+{
+	std::vector<std::span<pte_t, MM_PTE_PER_PAGE>> all;
+	const uint8_t root_table_count = arch_mm_stage2_root_table_count();
+	for (uint8_t i = 0; i < root_table_count; ++i) {
+		all.push_back(get_table(
+			pa_add(ptable.root, i * sizeof(struct mm_page_table))));
+	}
+	return all;
+}
+
+} /* namespace mm_test */

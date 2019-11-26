@@ -710,17 +710,16 @@ static bool api_vm_configure_pages(struct vm_locked vm_locked,
 	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
 
 	/* Take memory ownership away from the VM and mark as shared. */
-	if (!mm_vm_identity_map(
-		    &vm_locked.vm->ptable, pa_send_begin, pa_send_end,
+	if (!vm_identity_map(
+		    vm_locked, pa_send_begin, pa_send_end,
 		    MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R | MM_MODE_W,
 		    &local_page_pool, NULL)) {
 		goto fail;
 	}
 
-	if (!mm_vm_identity_map(&vm_locked.vm->ptable, pa_recv_begin,
-				pa_recv_end,
-				MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R,
-				&local_page_pool, NULL)) {
+	if (!vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
+			     MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R,
+			     &local_page_pool, NULL)) {
 		/* TODO: partial defrag of failed range. */
 		/* Recover any memory consumed in failed mapping. */
 		mm_vm_defrag(&vm_locked.vm->ptable, &local_page_pool);
@@ -741,14 +740,12 @@ static bool api_vm_configure_pages(struct vm_locked vm_locked,
 	 * in the local pool.
 	 */
 fail_undo_send_and_recv:
-	CHECK(mm_vm_identity_map(&vm_locked.vm->ptable, pa_recv_begin,
-				 pa_recv_end, orig_recv_mode, &local_page_pool,
-				 NULL));
+	CHECK(vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
+			      orig_recv_mode, &local_page_pool, NULL));
 
 fail_undo_send:
-	CHECK(mm_vm_identity_map(&vm_locked.vm->ptable, pa_send_begin,
-				 pa_send_end, orig_send_mode, &local_page_pool,
-				 NULL));
+	CHECK(vm_identity_map(vm_locked, pa_send_begin, pa_send_end,
+			      orig_send_mode, &local_page_pool, NULL));
 
 fail:
 	ret = false;
