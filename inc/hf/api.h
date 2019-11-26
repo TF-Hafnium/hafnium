@@ -43,7 +43,7 @@ struct ffa_value api_ffa_rx_release(struct vcpu *current, struct vcpu **next);
 struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 				  uint32_t page_count, struct vcpu *current,
 				  struct vcpu **next);
-void api_yield(struct vcpu *current, struct vcpu **next);
+struct ffa_value api_yield(struct vcpu *current, struct vcpu **next);
 struct ffa_value api_ffa_version(uint32_t requested_version);
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					    const struct ffa_uuid *uuid);
@@ -70,3 +70,13 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 				     uint32_t fragment_length,
 				     ffa_vm_id_t sender_vm_id,
 				     struct vcpu *current);
+struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
+					     ffa_vm_id_t receiver_vm_id,
+					     struct ffa_value args,
+					     struct vcpu *current,
+					     struct vcpu **next);
+struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
+					      ffa_vm_id_t receiver_vm_id,
+					      struct ffa_value args,
+					      struct vcpu *current,
+					      struct vcpu **next);

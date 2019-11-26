@@ -27,6 +27,8 @@ typedef uintptr_t hf_ipaddr_t;
 
 #endif
 
+#define HF_INVALID_VM_ID 0x7fff
+
 #define HF_HYPERVISOR_VM_ID 0
 
 /**

@@ -28,3 +28,16 @@ TEST_SERVICE(busy)
 	for (;;) {
 	}
 }
+
+TEST_SERVICE(busy_secondary_direct_message)
+{
+	struct ffa_value received;
+
+	dlog("Secondary waiting for message...\n");
+	received = ffa_msg_wait();
+	EXPECT_EQ(received.func, FFA_MSG_SEND_DIRECT_REQ_32);
+
+	dlog("Secondary received message, looping forever.\n");
+	for (;;) {
+	}
+}

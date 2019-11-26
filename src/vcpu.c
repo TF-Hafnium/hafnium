@@ -59,6 +59,7 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 	vcpu->regs_available = true;
 	vcpu->vm = vm;
 	vcpu->state = VCPU_STATE_OFF;
+	vcpu->direct_request_origin_vm_id = HF_INVALID_VM_ID;
 }
 
 /**

@@ -77,6 +77,15 @@ struct vcpu {
 	 * back to true when it is descheduled.
 	 */
 	bool regs_available;
+
+	/*
+	 * If the current vCPU is executing as a consequence of a
+	 * FFA_MSG_SEND_DIRECT_REQ invocation, then this member holds the
+	 * originating VM ID from which the call originated.
+	 * The value HF_INVALID_VM_ID implies the vCPU is not executing as
+	 * a result of a prior FFA_MSG_SEND_DIRECT_REQ invocation.
+	 */
+	ffa_vm_id_t direct_request_origin_vm_id;
 };
 
 /** Encapsulates a vCPU whose lock is held. */

@@ -10,6 +10,10 @@
 
 #include <stdint.h>
 
+#include "hf/arch/irq.h"
+#include "hf/arch/vm/interrupts.h"
+#include "hf/arch/vm/timer.h"
+
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
@@ -189,4 +193,134 @@ TEST(ffa, run_waiting)
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
 	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
+}
+
+/**
+ * Send direct message, verify that sent info is echoed back.
+ */
+TEST(ffa, ffa_send_direct_message_req_echo)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_direct_message_resp_echo", mb.send);
+	ffa_run(SERVICE_VM1, 0);
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	EXPECT_EQ(res.arg3, msg[0]);
+	EXPECT_EQ(res.arg4, msg[1]);
+	EXPECT_EQ(res.arg5, msg[2]);
+	EXPECT_EQ(res.arg6, msg[3]);
+	EXPECT_EQ(res.arg7, msg[4]);
+}
+
+/**
+ * Send direct message, secondary verifies disallowed SMC invocations while
+ * ffa_msg_send_direct_req is being serviced.
+ */
+TEST(ffa, ffa_send_direct_message_req_disallowed_smc)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_direct_msg_req_disallowed_smc",
+		       mb.send);
+	ffa_run(SERVICE_VM1, 0);
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+}
+
+/**
+ * Send direct message to invalid destination.
+ */
+TEST(ffa, ffa_send_direct_message_req_invalid_dst)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	struct ffa_value res;
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID,
+				      msg[0], msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Verify that the primary VM can't send direct message responses.
+ */
+TEST(ffa, ffa_send_direct_message_resp_invalid)
+{
+	struct ffa_value res;
+	struct mailbox_buffers mb = set_up_mailbox();
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_direct_message_resp_echo", mb.send);
+	ffa_run(SERVICE_VM1, 0);
+
+	res = ffa_msg_send_direct_resp(HF_PRIMARY_VM_ID, SERVICE_VM1, 0, 0, 0,
+				       0, 0);
+	EXPECT_FFA_ERROR(res, FFA_NOT_SUPPORTED);
+}
+
+/**
+ * Run secondary VM through ffa_run and check it cannot invoke
+ * a direct message request.
+ */
+TEST(ffa, ffa_secondary_direct_msg_req_invalid)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_disallowed_direct_msg_req", mb.send);
+	ffa_run(SERVICE_VM1, 0);
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 0, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+}
+
+/**
+ * Run secondary VM without sending a direct message request beforehand.
+ * Secondary VM must fail sending a direct message response.
+ */
+TEST(ffa, ffa_secondary_direct_msg_resp_invalid)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_disallowed_direct_msg_resp", mb.send);
+	ffa_run(SERVICE_VM1, 0);
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 0, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+}
+
+/**
+ * Run secondary VM and send a direct message request. Secondary VM attempts
+ * altering the sender and receiver in its direct message responses, and must
+ * fail to do so.
+ */
+TEST(ffa, ffa_secondary_spoofed_response)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+
+	SERVICE_SELECT(SERVICE_VM1,
+		       "ffa_direct_msg_resp_invalid_sender_receiver", mb.send);
+	ffa_run(SERVICE_VM1, 0);
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 0, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 }

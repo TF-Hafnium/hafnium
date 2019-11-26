@@ -350,11 +350,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu **next)
 					 current(), next);
 		return true;
 	case FFA_YIELD_32:
-		api_yield(current(), next);
-
-		/* FFA_YIELD always returns FFA_SUCCESS. */
-		*args = (struct ffa_value){.func = FFA_SUCCESS_32};
-
+		*args = api_yield(current(), next);
 		return true;
 	case FFA_MSG_SEND_32:
 		*args = api_ffa_msg_send(
@@ -401,6 +397,16 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu **next)
 		*args = api_ffa_mem_frag_tx(ffa_frag_handle(*args), args->arg3,
 					    (args->arg4 >> 16) & 0xffff,
 					    current());
+		return true;
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+		*args = api_ffa_msg_send_direct_req(
+			ffa_msg_send_sender(*args),
+			ffa_msg_send_receiver(*args), *args, current(), next);
+		return true;
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+		*args = api_ffa_msg_send_direct_resp(
+			ffa_msg_send_sender(*args),
+			ffa_msg_send_receiver(*args), *args, current(), next);
 		return true;
 	}
 

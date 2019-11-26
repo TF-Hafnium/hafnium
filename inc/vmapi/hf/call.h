@@ -354,3 +354,33 @@ static inline struct ffa_value ffa_features(uint32_t function_id)
 	return ffa_call((struct ffa_value){.func = FFA_FEATURES_32,
 					   .arg1 = function_id});
 }
+
+static inline struct ffa_value ffa_msg_send_direct_req(
+	ffa_vm_id_t sender_vm_id, ffa_vm_id_t target_vm_id, uint32_t arg3,
+	uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7)
+{
+	return ffa_call((struct ffa_value){
+		.func = FFA_MSG_SEND_DIRECT_REQ_32,
+		.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id,
+		.arg3 = arg3,
+		.arg4 = arg4,
+		.arg5 = arg5,
+		.arg6 = arg6,
+		.arg7 = arg7,
+	});
+}
+
+static inline struct ffa_value ffa_msg_send_direct_resp(
+	ffa_vm_id_t sender_vm_id, ffa_vm_id_t target_vm_id, uint32_t arg3,
+	uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7)
+{
+	return ffa_call((struct ffa_value){
+		.func = FFA_MSG_SEND_DIRECT_RESP_32,
+		.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id,
+		.arg3 = arg3,
+		.arg4 = arg4,
+		.arg5 = arg5,
+		.arg6 = arg6,
+		.arg7 = arg7,
+	});
+}

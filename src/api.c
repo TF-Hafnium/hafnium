@@ -151,6 +151,15 @@ static bool msg_receiver_busy(struct vm_locked to, struct vm *from, bool notify)
 }
 
 /**
+ * Returns true if the given vCPU is executing in context of an
+ * FFA_MSG_SEND_DIRECT_REQ invocation.
+ */
+static bool is_ffa_direct_msg_request_ongoing(struct vcpu_locked locked)
+{
+	return locked.vcpu->direct_request_origin_vm_id != HF_INVALID_VM_ID;
+}
+
+/**
  * Returns to the primary VM and signals that the vCPU still has work to do so.
  */
 struct vcpu *api_preempt(struct vcpu *current)
@@ -202,19 +211,34 @@ struct vcpu *api_vcpu_off(struct vcpu *current)
  * vCPU does not have work to do at this moment. The current vCPU is marked as
  * ready to be scheduled again.
  */
-void api_yield(struct vcpu *current, struct vcpu **next)
+struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
 {
-	struct ffa_value primary_ret = {
-		.func = FFA_YIELD_32,
-		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
-	};
+	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+	struct vcpu_locked current_locked;
+	bool is_direct_request_ongoing;
 
 	if (current->vm->id == HF_PRIMARY_VM_ID) {
 		/* NOOP on the primary as it makes the scheduling decisions. */
-		return;
+		return ret;
 	}
 
-	*next = api_switch_to_primary(current, primary_ret, VCPU_STATE_READY);
+	current_locked = vcpu_lock(current);
+	is_direct_request_ongoing =
+		is_ffa_direct_msg_request_ongoing(current_locked);
+	vcpu_unlock(&current_locked);
+
+	if (is_direct_request_ongoing) {
+		return ffa_error(FFA_DENIED);
+	}
+
+	*next = api_switch_to_primary(
+		current,
+		(struct ffa_value){.func = FFA_YIELD_32,
+				   .arg1 = ffa_vm_vcpu(current->vm->id,
+						       vcpu_index(current))},
+		VCPU_STATE_READY);
+
+	return ret;
 }
 
 /**
@@ -1034,6 +1058,8 @@ struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 	struct vm_locked to_locked;
 	const void *from_msg;
 	struct ffa_value ret;
+	struct vcpu_locked current_locked;
+	bool is_direct_request_ongoing;
 	bool notify =
 		(attributes & FFA_MSG_SEND_NOTIFY_MASK) == FFA_MSG_SEND_NOTIFY;
 
@@ -1050,6 +1076,19 @@ struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 	/* Limit the size of transfer. */
 	if (size > FFA_MSG_PAYLOAD_MAX) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Deny if vCPU is executing in context of an FFA_MSG_SEND_DIRECT_REQ
+	 * invocation.
+	 */
+	current_locked = vcpu_lock(current);
+	is_direct_request_ongoing =
+		is_ffa_direct_msg_request_ongoing(current_locked);
+	vcpu_unlock(&current_locked);
+
+	if (is_direct_request_ongoing) {
+		return ffa_error(FFA_DENIED);
 	}
 
 	/* Ensure the receiver VM exists. */
@@ -1122,6 +1161,8 @@ bool api_ffa_msg_recv_block_interrupted(struct vcpu *current)
 struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 				  struct vcpu **next)
 {
+	bool is_direct_request_ongoing;
+	struct vcpu_locked current_locked;
 	struct vm *vm = current->vm;
 	struct ffa_value return_code;
 
@@ -1131,6 +1172,19 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 	 */
 	if (vm->id == HF_PRIMARY_VM_ID) {
 		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	/*
+	 * Deny if vCPU is executing in context of an FFA_MSG_SEND_DIRECT_REQ
+	 * invocation.
+	 */
+	current_locked = vcpu_lock(current);
+	is_direct_request_ongoing =
+		is_ffa_direct_msg_request_ongoing(current_locked);
+	vcpu_unlock(&current_locked);
+
+	if (is_direct_request_ongoing) {
+		return ffa_error(FFA_DENIED);
 	}
 
 	sl_lock(&vm->lock);
@@ -1505,10 +1559,235 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 	case FFA_MEM_RETRIEVE_RESP_32:
 	case FFA_MEM_RELINQUISH_32:
 	case FFA_MEM_RECLAIM_32:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_REQ_32:
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	default:
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
+}
+
+/**
+ * Get target VM vCPU for direct messaging request.
+ * If VM is UP then return first vCPU.
+ * If VM is MP then return vCPU whose index matches current CPU index.
+ */
+static struct vcpu *api_ffa_msg_send_direct_get_receiver_vcpu(
+	struct vm *vm, struct vcpu *current)
+{
+	ffa_vcpu_index_t current_cpu_index = cpu_index(current->cpu);
+	struct vcpu *vcpu = NULL;
+
+	if (vm->vcpu_count == 1) {
+		vcpu = vm_get_vcpu(vm, 0);
+	} else if (current_cpu_index < vm->vcpu_count) {
+		vcpu = vm_get_vcpu(vm, current_cpu_index);
+	}
+
+	return vcpu;
+}
+
+/**
+ * Send an FF-A direct message request.
+ */
+struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
+					     ffa_vm_id_t receiver_vm_id,
+					     struct ffa_value args,
+					     struct vcpu *current,
+					     struct vcpu **next)
+{
+	struct ffa_value ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
+	ffa_vm_id_t current_vm_id = current->vm->id;
+	struct vm *receiver_vm;
+	struct vcpu *receiver_vcpu;
+	struct two_vcpu_locked vcpus_locked;
+
+	/* Only allow primary VM to send direct message requests. */
+	if (current_vm_id != HF_PRIMARY_VM_ID) {
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	/* Prevent sender_vm_id spoofing. */
+	if (current_vm_id != sender_vm_id) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Prevent a VM from sending messages to itself. */
+	if (current_vm_id == receiver_vm_id) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	receiver_vm = vm_find(receiver_vm_id);
+	if (receiver_vm == NULL) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Per PSA FF-A EAC spec section 4.4.1 the firmware framework supports
+	 * UP (migratable) or MP partitions with a number of vCPUs matching the
+	 * number of PEs in the system. It further states that MP partitions
+	 * accepting direct request messages cannot migrate.
+	 */
+	receiver_vcpu =
+		api_ffa_msg_send_direct_get_receiver_vcpu(receiver_vm, current);
+	if (receiver_vcpu == NULL) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	vcpus_locked = vcpu_lock_both(receiver_vcpu, current);
+
+	/*
+	 * If destination vCPU is executing or already received an
+	 * FFA_MSG_SEND_DIRECT_REQ then return to caller hinting recipient is
+	 * busy. There is a brief period of time where the vCPU state has
+	 * changed but regs_available is still false thus consider this case as
+	 * the vCPU not yet ready to receive a direct message request.
+	 */
+	if (is_ffa_direct_msg_request_ongoing(vcpus_locked.vcpu1) ||
+	    receiver_vcpu->state == VCPU_STATE_RUNNING ||
+	    !receiver_vcpu->regs_available) {
+		ret = ffa_error(FFA_BUSY);
+		goto out;
+	}
+
+	if (atomic_load_explicit(&receiver_vcpu->vm->aborting,
+				 memory_order_relaxed)) {
+		if (receiver_vcpu->state != VCPU_STATE_ABORTED) {
+			dlog_notice("Aborting VM %u vCPU %u\n",
+				    receiver_vcpu->vm->id,
+				    vcpu_index(receiver_vcpu));
+			receiver_vcpu->state = VCPU_STATE_ABORTED;
+		}
+
+		ret = ffa_error(FFA_ABORTED);
+		goto out;
+	}
+
+	switch (receiver_vcpu->state) {
+	case VCPU_STATE_OFF:
+	case VCPU_STATE_RUNNING:
+	case VCPU_STATE_ABORTED:
+	case VCPU_STATE_READY:
+	case VCPU_STATE_BLOCKED_INTERRUPT:
+		ret = ffa_error(FFA_BUSY);
+		goto out;
+	case VCPU_STATE_BLOCKED_MAILBOX:
+		/*
+		 * Expect target vCPU to be blocked after having called
+		 * ffa_msg_wait or sent a direct message response.
+		 */
+		break;
+	}
+
+	/* Inject timer interrupt if any pending */
+	if (arch_timer_pending(&receiver_vcpu->regs)) {
+		internal_interrupt_inject_locked(vcpus_locked.vcpu1,
+						 HF_VIRTUAL_TIMER_INTID,
+						 current, NULL);
+
+		arch_timer_mask(&receiver_vcpu->regs);
+	}
+
+	/* The receiver vCPU runs upon direct message invocation */
+	receiver_vcpu->cpu = current->cpu;
+	receiver_vcpu->state = VCPU_STATE_RUNNING;
+	receiver_vcpu->regs_available = false;
+	receiver_vcpu->direct_request_origin_vm_id = current_vm_id;
+
+	arch_regs_set_retval(&receiver_vcpu->regs, (struct ffa_value){
+							   .func = args.func,
+							   .arg1 = args.arg1,
+							   .arg2 = 0,
+							   .arg3 = args.arg3,
+							   .arg4 = args.arg4,
+							   .arg5 = args.arg5,
+							   .arg6 = args.arg6,
+							   .arg7 = args.arg7,
+						   });
+
+	current->state = VCPU_STATE_BLOCKED_MAILBOX;
+
+	/* Switch to receiver vCPU targeted to by direct msg request */
+	*next = receiver_vcpu;
+
+	/*
+	 * Since this flow will lead to a VM switch, the return value will not
+	 * be applied to current vCPU.
+	 */
+
+out:
+	sl_unlock(&receiver_vcpu->lock);
+	sl_unlock(&current->lock);
+
+	return ret;
+}
+
+/**
+ * Send an FF-A direct message response.
+ */
+struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
+					      ffa_vm_id_t receiver_vm_id,
+					      struct ffa_value args,
+					      struct vcpu *current,
+					      struct vcpu **next)
+{
+	ffa_vm_id_t current_vm_id = current->vm->id;
+	struct vcpu_locked vcpu_locked;
+
+	/* Only allow secondary VMs to send direct message responses. */
+	if (current_vm_id == HF_PRIMARY_VM_ID) {
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	/* Prevent sender_vm_id spoofing. */
+	if (current_vm_id != sender_vm_id) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Prevent a VM from sending messages to itself. */
+	if (current_vm_id == receiver_vm_id) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	vcpu_locked = vcpu_lock(current);
+
+	/*
+	 * Ensure the terminating FFA_MSG_SEND_DIRECT_REQ had a
+	 * defined originator.
+	 */
+	if (!is_ffa_direct_msg_request_ongoing(vcpu_locked)) {
+		/*
+		 * Sending direct response but direct request origin vCPU is
+		 * not set.
+		 */
+		vcpu_unlock(&vcpu_locked);
+		return ffa_error(FFA_DENIED);
+	}
+
+	if (current->direct_request_origin_vm_id != receiver_vm_id) {
+		vcpu_unlock(&vcpu_locked);
+		return ffa_error(FFA_DENIED);
+	}
+
+	/* Clear direct request origin for the caller. */
+	current->direct_request_origin_vm_id = HF_INVALID_VM_ID;
+
+	vcpu_unlock(&vcpu_locked);
+
+	*next = api_switch_to_primary(current,
+				      (struct ffa_value){
+					      .func = args.func,
+					      .arg1 = args.arg1,
+					      .arg2 = 0,
+					      .arg3 = args.arg3,
+					      .arg4 = args.arg4,
+					      .arg5 = args.arg5,
+					      .arg6 = args.arg6,
+					      .arg7 = args.arg7,
+				      },
+				      VCPU_STATE_BLOCKED_MAILBOX);
+
+	return (struct ffa_value){.func = FFA_INTERRUPT_32};
 }
 
 struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
