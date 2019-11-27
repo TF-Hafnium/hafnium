@@ -416,11 +416,11 @@ static int hf_vcpu_thread(void *data)
 			hf_notify_waiters(vcpu->vm->id);
 			break;
 
-		/* Abort was triggered. */
 		case SPCI_ERROR_32:
 			pr_warn("SPCI error %d running VM %d vCPU %d", ret.arg2,
 				vcpu->vm->id, vcpu->vcpu_index);
 			switch (ret.arg2) {
+			/* Abort was triggered. */
 			case SPCI_ABORTED:
 				for (i = 0; i < vcpu->vm->vcpu_count; i++) {
 					if (i == vcpu->vcpu_index)
@@ -429,6 +429,11 @@ static int hf_vcpu_thread(void *data)
 								  i);
 				}
 				hf_vcpu_sleep(vcpu);
+				break;
+			default:
+				/* Treat as a yield and try again later. */
+				if (!kthread_should_stop())
+					schedule();
 				break;
 			}
 			break;
