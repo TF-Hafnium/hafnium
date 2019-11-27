@@ -385,49 +385,45 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 	bool ret;
 
 	/*
-	 * Wait until the registers become available. All locks must be released
-	 * between iterations of this loop to avoid potential deadlocks if, on
-	 * any path, a lock needs to be taken after taking the decision to
-	 * switch context but before the registers have been saved.
+	 * Check that the registers are available so that the vCPU can be run.
 	 *
 	 * The VM lock is not needed in the common case so it must only be taken
 	 * when it is going to be needed. This ensures there are no inter-vCPU
 	 * dependencies in the common run case meaning the sensitive context
 	 * switch performance is consistent.
 	 */
-	for (;;) {
-		sl_lock(&vcpu->lock);
+	sl_lock(&vcpu->lock);
 
-		/* The VM needs to be locked to deliver mailbox messages. */
-		need_vm_lock = vcpu->state == VCPU_STATE_BLOCKED_MAILBOX;
-		if (need_vm_lock) {
-			sl_unlock(&vcpu->lock);
-			sl_lock(&vcpu->vm->lock);
-			sl_lock(&vcpu->lock);
-		}
-
-		if (vcpu->regs_available) {
-			break;
-		}
-
-		if (vcpu->state == VCPU_STATE_RUNNING) {
-			/*
-			 * vCPU is running on another pCPU.
-			 *
-			 * It's okay not to return the sleep duration here
-			 * because the other physical CPU that is currently
-			 * running this vCPU will return the sleep duration if
-			 * needed.
-			 */
-			*run_ret = spci_error(SPCI_BUSY);
-			ret = false;
-			goto out;
-		}
-
+	/* The VM needs to be locked to deliver mailbox messages. */
+	need_vm_lock = vcpu->state == VCPU_STATE_BLOCKED_MAILBOX;
+	if (need_vm_lock) {
 		sl_unlock(&vcpu->lock);
-		if (need_vm_lock) {
-			sl_unlock(&vcpu->vm->lock);
-		}
+		sl_lock(&vcpu->vm->lock);
+		sl_lock(&vcpu->lock);
+	}
+
+	/*
+	 * If the vCPU is already running somewhere then we can't run it here
+	 * simultaneously. While it is actually running then the state should be
+	 * `VCPU_STATE_RUNNING` and `regs_available` should be false. Once it
+	 * stops running but while Hafnium is in the process of switching back
+	 * to the primary there will be a brief period while the state has been
+	 * updated but `regs_available` is still false (until
+	 * `api_regs_state_saved` is called). We can't start running it again
+	 * until this has finished, so count this state as still running for the
+	 * purposes of this check.
+	 */
+	if (vcpu->state == VCPU_STATE_RUNNING || !vcpu->regs_available) {
+		/*
+		 * vCPU is running on another pCPU.
+		 *
+		 * It's okay not to return the sleep duration here because the
+		 * other physical CPU that is currently running this vCPU will
+		 * return the sleep duration if needed.
+		 */
+		*run_ret = spci_error(SPCI_BUSY);
+		ret = false;
+		goto out;
 	}
 
 	if (atomic_load_explicit(&vcpu->vm->aborting, memory_order_relaxed)) {
