@@ -81,7 +81,7 @@ The following command line will run Hafnium, with the RAM disk just created,
 which will then boot into the primary Linux VM:
 
 ```shell
-qemu-system-aarch64 -M virt,gic_version=3 -cpu cortex-a57 -nographic -machine virtualization=true -kernel out/reference/qemu_aarch64_clang/hafnium.bin -initrd initrd.img -append "rdinit=/sbin/init" -dtb=qemu_with_manifest.dtb
+qemu-system-aarch64 -M virt,gic_version=3 -cpu cortex-a57 -nographic -machine virtualization=true -kernel out/reference/qemu_aarch64_clang/hafnium.bin -initrd initrd.img -append "rdinit=/sbin/init" -dtb qemu_with_manifest.dtb
 ```
 
 ## Running tests
