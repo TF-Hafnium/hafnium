@@ -286,10 +286,12 @@ class FvpDriver(Driver):
             """.format(vm_args, initrd_start, initrd_end))
 
     def gen_fvp_args(
-            self, initrd_start, uart0_log_path, uart1_log_path, dtb_path):
+            self, is_long_running, initrd_start, uart0_log_path, uart1_log_path,
+            dtb_path):
         """Generate command line arguments for FVP."""
+        time_limit = "80s" if is_long_running else "40s"
         fvp_args = [
-            "timeout", "--foreground", "40s",
+            "timeout", "--foreground", time_limit,
             FVP_BINARY,
             "-C", "pctl.startup=0.0.0.0",
             "-C", "bp.secure_memory=0",
@@ -364,7 +366,8 @@ class FvpDriver(Driver):
 
             # Run FVP.
             fvp_args = self.gen_fvp_args(
-                initrd_start, uart0_log_path, uart1_log_path, dtb_path)
+                is_long_running, initrd_start, uart0_log_path, uart1_log_path,
+                dtb_path)
             self.exec_logged(run_state, fvp_args)
         except DriverRunException:
             pass
