@@ -27,16 +27,6 @@
 #include "vmapi/hf/spci.h"
 
 /**
- * Disables interrupts.
- */
-void arch_irq_disable(void);
-
-/**
- * Enables interrupts.
- */
-void arch_irq_enable(void);
-
-/**
  * Reset the register values other than the PC and argument which are set with
  * `arch_regs_set_pc_arg()`.
  */

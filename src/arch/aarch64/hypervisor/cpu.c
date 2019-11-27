@@ -24,24 +24,14 @@
 #include "hf/spci.h"
 #include "hf/std.h"
 
-#include "hypervisor/perfmon.h"
-#include "hypervisor/sysregs.h"
 #include "msr.h"
+#include "perfmon.h"
+#include "sysregs.h"
 
 /**
  * The LO field indicates whether LORegions are supported.
  */
 #define ID_AA64MMFR1_EL1_LO (UINT64_C(1) << 16)
-
-void arch_irq_disable(void)
-{
-	__asm__ volatile("msr DAIFSet, #0xf");
-}
-
-void arch_irq_enable(void)
-{
-	__asm__ volatile("msr DAIFClr, #0xf");
-}
 
 static void lor_disable(void)
 {

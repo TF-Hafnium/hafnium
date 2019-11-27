@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "hf/arch/cpu.h"
+#include "hf/arch/irq.h"
 #include "hf/arch/vm/interrupts.h"
 
 #include "hf/dlog.h"

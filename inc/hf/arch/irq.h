@@ -14,25 +14,14 @@
  * limitations under the License.
  */
 
-#include "hf/arch/vm/interrupts_gicv3.h"
+#pragma once
 
-#include "hf/dlog.h"
-
-#include "vmapi/hf/call.h"
-
-#include "common.h"
-#include "hftest.h"
-
-/*
- * Secondary VM that loops forever after receiving a message.
+/**
+ * Disables interrupts.
  */
+void arch_irq_disable(void);
 
-TEST_SERVICE(busy)
-{
-	dlog("Secondary waiting for message...\n");
-	mailbox_receive_retry();
-	spci_rx_release();
-	dlog("Secondary received message, looping forever.\n");
-	for (;;) {
-	}
-}
+/**
+ * Enables interrupts.
+ */
+void arch_irq_enable(void);

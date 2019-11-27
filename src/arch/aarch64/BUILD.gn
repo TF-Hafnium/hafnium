@@ -19,7 +19,7 @@ config("config") {
 # Implementation of the arch interface for aarch64.
 source_set("arch") {
   sources = [
-    "cpu.c",
+    "irq.c",
     "mm.c",
     "timer.c",
   ]

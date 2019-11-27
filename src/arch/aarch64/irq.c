@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2018 The Hafnium Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,25 +14,16 @@
  * limitations under the License.
  */
 
-#include "hf/arch/vm/interrupts_gicv3.h"
+#include "hf/arch/irq.h"
 
-#include "hf/dlog.h"
+#include "msr.h"
 
-#include "vmapi/hf/call.h"
-
-#include "common.h"
-#include "hftest.h"
-
-/*
- * Secondary VM that loops forever after receiving a message.
- */
-
-TEST_SERVICE(busy)
+void arch_irq_disable(void)
 {
-	dlog("Secondary waiting for message...\n");
-	mailbox_receive_retry();
-	spci_rx_release();
-	dlog("Secondary received message, looping forever.\n");
-	for (;;) {
-	}
+	__asm__ volatile("msr DAIFSet, #0xf");
+}
+
+void arch_irq_enable(void)
+{
+	__asm__ volatile("msr DAIFClr, #0xf");
 }

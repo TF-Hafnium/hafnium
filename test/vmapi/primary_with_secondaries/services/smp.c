@@ -17,7 +17,6 @@
 #include <stdalign.h>
 #include <stdint.h>
 
-#include "hf/arch/cpu.h"
 #include "hf/arch/vm/power_mgmt.h"
 
 #include "hf/dlog.h"
