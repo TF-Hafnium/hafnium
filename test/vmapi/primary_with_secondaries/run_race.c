@@ -41,8 +41,8 @@ static bool run_loop(struct mailbox_buffers *mb)
 		/* Run until it manages to schedule vCPU on this CPU. */
 		do {
 			run_res = spci_run(SERVICE_VM1, 0);
-		} while (run_res.func == HF_SPCI_RUN_WAIT_FOR_INTERRUPT &&
-			 run_res.arg2 == HF_SLEEP_INDEFINITE);
+		} while (run_res.func == SPCI_ERROR_32 &&
+			 run_res.arg2 == SPCI_BUSY);
 
 		/* Break out if we received a message with non-zero length. */
 		if (run_res.func == SPCI_MSG_SEND_32 &&
