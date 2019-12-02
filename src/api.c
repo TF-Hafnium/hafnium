@@ -1456,3 +1456,96 @@ struct spci_value api_spci_features(uint32_t function_id)
 		return spci_error(SPCI_NOT_SUPPORTED);
 	}
 }
+
+struct spci_value api_spci_mem_send(uint32_t share_type, ipaddr_t address,
+				    uint32_t page_count,
+				    uint32_t remaining_fragment_count,
+				    uint32_t length, uint32_t handle,
+				    struct vcpu *current, struct vcpu **next)
+{
+	struct vm *from = current->vm;
+	struct vm *to;
+	const void *from_msg;
+	uint32_t message_buffer_size;
+	struct spci_memory_region *memory_region;
+	struct two_vm_locked vm_to_from_lock;
+	struct spci_value ret;
+
+	if (ipa_addr(address) != 0 || page_count != 0) {
+		/*
+		 * Hafnium only supports passing the descriptor in the TX
+		 * mailbox.
+		 */
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	if (handle == 0 && remaining_fragment_count != 0) {
+		/* Handle is required if there are multiple fragments. */
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Check that the sender has configured its send buffer. If the TX
+	 * mailbox at from_msg is configured (i.e. from_msg != NULL) then it can
+	 * be safely accessed after releasing the lock since the TX mailbox
+	 * address can only be configured once.
+	 */
+	sl_lock(&from->lock);
+	from_msg = from->mailbox.send;
+	sl_unlock(&from->lock);
+
+	if (from_msg == NULL) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Copy the memory region descriptor to an internal buffer, so that the
+	 * sender can't change it underneath us.
+	 */
+	memory_region =
+		(struct spci_memory_region *)cpu_get_buffer(current->cpu->id);
+	message_buffer_size = cpu_get_buffer_size(current->cpu->id);
+	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+	memcpy_s(memory_region, message_buffer_size, from_msg, length);
+
+	/* The sender must match the caller. */
+	if (memory_region->sender != from->id) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	if (memory_region->attribute_count != 1) {
+		/* Hafnium doesn't support multi-way memory sharing for now. */
+		return spci_error(SPCI_NOT_SUPPORTED);
+	}
+
+	/*
+	 * Ensure that the receiver VM exists and isn't the same as the sender.
+	 */
+	to = vm_find(memory_region->attributes[0].receiver);
+	if (to == NULL || to == from) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	vm_to_from_lock = vm_lock_both(to, from);
+
+	if (msg_receiver_busy(vm_to_from_lock.vm1, from, false)) {
+		ret = spci_error(SPCI_BUSY);
+		goto out;
+	}
+
+	ret = spci_msg_handle_architected_message(
+		vm_to_from_lock.vm1, vm_to_from_lock.vm2, memory_region, length,
+		share_type, &api_page_pool);
+
+	if (ret.func == SPCI_SUCCESS_32) {
+		deliver_msg(vm_to_from_lock.vm1, from->id, current, next);
+	}
+
+out:
+	vm_unlock(&vm_to_from_lock.vm1);
+	vm_unlock(&vm_to_from_lock.vm2);
+
+	return ret;
+}

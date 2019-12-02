@@ -32,7 +32,8 @@ alignas(PAGE_SIZE) static uint8_t pages[4 * PAGE_SIZE];
  * Helper function to test sending memory in the different configurations.
  */
 static void check_cannot_send_memory(
-	struct mailbox_buffers mb, uint32_t mode,
+	struct mailbox_buffers mb,
+	struct spci_value (*send_function)(uint32_t, uint32_t, uint32_t),
 	struct spci_memory_region_constituent constituents[],
 	int constituent_count, int32_t avoid_vm)
 
@@ -75,9 +76,7 @@ static void check_cannot_send_memory(
 							cacheability[l],
 							shareability[k]);
 					EXPECT_SPCI_ERROR(
-						spci_msg_send(HF_PRIMARY_VM_ID,
-							      vms[i], msg_size,
-							      mode),
+						send_function(0, msg_size, 0),
 						SPCI_INVALID_PARAMETERS);
 				}
 				for (l = 0; l < ARRAY_SIZE(device); ++l) {
@@ -92,9 +91,7 @@ static void check_cannot_send_memory(
 							device[l],
 							shareability[k]);
 					EXPECT_SPCI_ERROR(
-						spci_msg_send(HF_PRIMARY_VM_ID,
-							      vms[i], msg_size,
-							      mode),
+						send_function(0, msg_size, 0),
 						SPCI_INVALID_PARAMETERS);
 				}
 			}
@@ -111,8 +108,8 @@ static void check_cannot_lend_memory(
 	int constituent_count, int32_t avoid_vm)
 
 {
-	check_cannot_send_memory(mb, SPCI_MSG_SEND_LEGACY_MEMORY_LEND,
-				 constituents, constituent_count, avoid_vm);
+	check_cannot_send_memory(mb, spci_mem_lend, constituents,
+				 constituent_count, avoid_vm);
 }
 
 /**
@@ -124,8 +121,8 @@ static void check_cannot_share_memory(
 	int constituent_count, int32_t avoid_vm)
 
 {
-	check_cannot_send_memory(mb, SPCI_MSG_SEND_LEGACY_MEMORY_SHARE,
-				 constituents, constituent_count, avoid_vm);
+	check_cannot_send_memory(mb, spci_mem_share, constituents,
+				 constituent_count, avoid_vm);
 }
 
 /**
@@ -152,10 +149,8 @@ static void check_cannot_donate_memory(
 			constituent_count, 0, 0, SPCI_MEMORY_RW_X,
 			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_SPCI_ERROR(
-			spci_msg_send(HF_PRIMARY_VM_ID, vms[i], msg_size,
-				      SPCI_MSG_SEND_LEGACY_MEMORY_DONATE),
-			SPCI_INVALID_PARAMETERS);
+		EXPECT_SPCI_ERROR(spci_mem_donate(0, msg_size, 0),
+				  SPCI_INVALID_PARAMETERS);
 	}
 }
 
@@ -218,10 +213,7 @@ TEST(memory_sharing, concurrent)
 		SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_SHARE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_share(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
@@ -264,10 +256,7 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_SHARE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_share(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -329,10 +318,7 @@ TEST(memory_sharing, lend_relinquish)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 	run_res = spci_run(SERVICE_VM1, 0);
 
 	/* Let the memory be returned. */
@@ -375,10 +361,7 @@ TEST(memory_sharing, donate_relinquish)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/*
 	 * Let the service access the memory, and try and fail to relinquish it.
@@ -410,10 +393,7 @@ TEST(memory_sharing, give_and_get_back)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -451,10 +431,7 @@ TEST(memory_sharing, lend_and_get_back)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -489,10 +466,7 @@ TEST(memory_sharing, reshare_after_return)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -505,10 +479,7 @@ TEST(memory_sharing, reshare_after_return)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Observe the service doesn't fault when accessing the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -537,10 +508,7 @@ TEST(memory_sharing, share_elsewhere_after_return)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -553,10 +521,7 @@ TEST(memory_sharing, share_elsewhere_after_return)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -661,10 +626,7 @@ TEST(memory_sharing, donate_check_upper_bounds)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -685,10 +647,7 @@ TEST(memory_sharing, donate_check_upper_bounds)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -727,10 +686,7 @@ TEST(memory_sharing, donate_check_lower_bounds)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -751,10 +707,7 @@ TEST(memory_sharing, donate_check_lower_bounds)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	/*
@@ -792,10 +745,7 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 	run_res = spci_run(SERVICE_VM1, 0);
 
 	/* Let the memory be returned. */
@@ -808,10 +758,7 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -849,10 +796,7 @@ TEST(memory_sharing, donate_vms)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be sent from VM1 to VM2. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -899,10 +843,7 @@ TEST(memory_sharing, donate_twice)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be received. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -953,10 +894,8 @@ TEST(memory_sharing, donate_to_self)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_SPCI_ERROR(
-		spci_msg_send(HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID, msg_size,
-			      SPCI_MSG_SEND_LEGACY_MEMORY_DONATE),
-		SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(spci_mem_donate(0, msg_size, 0),
+			  SPCI_INVALID_PARAMETERS);
 }
 
 /**
@@ -979,10 +918,8 @@ TEST(memory_sharing, lend_to_self)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_SPCI_ERROR(
-		spci_msg_send(HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID, msg_size,
-			      SPCI_MSG_SEND_LEGACY_MEMORY_LEND),
-		SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(spci_mem_lend(0, msg_size, 0),
+			  SPCI_INVALID_PARAMETERS);
 }
 
 /**
@@ -1005,10 +942,8 @@ TEST(memory_sharing, share_to_self)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_SPCI_ERROR(
-		spci_msg_send(HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID, msg_size,
-			      SPCI_MSG_SEND_LEGACY_MEMORY_SHARE),
-		SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(spci_mem_share(0, msg_size, 0),
+			  SPCI_INVALID_PARAMETERS);
 }
 
 /**
@@ -1036,8 +971,7 @@ TEST(memory_sharing, donate_invalid_source)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_SPCI_ERROR(spci_msg_send(SERVICE_VM1, HF_PRIMARY_VM_ID, msg_size,
-					SPCI_MSG_SEND_LEGACY_MEMORY_DONATE),
+	EXPECT_SPCI_ERROR(spci_mem_donate(0, msg_size, 0),
 			  SPCI_INVALID_PARAMETERS);
 
 	msg_size = spci_memory_region_init(
@@ -1045,8 +979,7 @@ TEST(memory_sharing, donate_invalid_source)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_SPCI_ERROR(spci_msg_send(SERVICE_VM1, SERVICE_VM1, msg_size,
-					SPCI_MSG_SEND_LEGACY_MEMORY_DONATE),
+	EXPECT_SPCI_ERROR(spci_mem_donate(0, msg_size, 0),
 			  SPCI_INVALID_PARAMETERS);
 
 	msg_size = spci_memory_region_init(
@@ -1054,8 +987,7 @@ TEST(memory_sharing, donate_invalid_source)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_SPCI_ERROR(spci_msg_send(SERVICE_VM2, SERVICE_VM1, msg_size,
-					SPCI_MSG_SEND_LEGACY_MEMORY_DONATE),
+	EXPECT_SPCI_ERROR(spci_mem_donate(0, msg_size, 0),
 			  SPCI_INVALID_PARAMETERS);
 
 	/* Successfully donate to VM1. */
@@ -1064,10 +996,7 @@ TEST(memory_sharing, donate_invalid_source)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Receive and return memory from VM1. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1107,22 +1036,16 @@ TEST(memory_sharing, give_and_get_back_unaligned)
 				SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 				SPCI_MEMORY_CACHE_WRITE_BACK,
 				SPCI_MEMORY_OUTER_SHAREABLE);
-			EXPECT_SPCI_ERROR(
-				spci_msg_send(
-					HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-					SPCI_MSG_SEND_LEGACY_MEMORY_DONATE),
-				SPCI_INVALID_PARAMETERS);
+			EXPECT_SPCI_ERROR(spci_mem_donate(0, msg_size, 0),
+					  SPCI_INVALID_PARAMETERS);
 			msg_size = spci_memory_region_init(
 				mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
 				constituents, ARRAY_SIZE(constituents), 0, 0,
 				SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 				SPCI_MEMORY_CACHE_WRITE_BACK,
 				SPCI_MEMORY_OUTER_SHAREABLE);
-			EXPECT_SPCI_ERROR(
-				spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1,
-					      msg_size,
-					      SPCI_MSG_SEND_LEGACY_MEMORY_LEND),
-				SPCI_INVALID_PARAMETERS);
+			EXPECT_SPCI_ERROR(spci_mem_lend(0, msg_size, 0),
+					  SPCI_INVALID_PARAMETERS);
 		}
 	}
 }
@@ -1151,8 +1074,7 @@ TEST(memory_sharing, lend_invalid_source)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_SPCI_ERROR(spci_msg_send(SERVICE_VM1, HF_PRIMARY_VM_ID, msg_size,
-					SPCI_MSG_SEND_LEGACY_MEMORY_LEND),
+	EXPECT_SPCI_ERROR(spci_mem_lend(0, msg_size, 0),
 			  SPCI_INVALID_PARAMETERS);
 
 	/* Lend memory to VM1. */
@@ -1161,10 +1083,7 @@ TEST(memory_sharing, lend_invalid_source)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Receive and return memory from VM1. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1202,10 +1121,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1225,10 +1141,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1265,10 +1178,7 @@ TEST(memory_sharing, share_relinquish_X_RW)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_SHARE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_share(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1294,10 +1204,7 @@ TEST(memory_sharing, share_relinquish_X_RW)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_SHARE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_share(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1340,10 +1247,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_SHARE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_share(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1368,10 +1272,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_SHARE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_share(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1416,10 +1317,7 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Attempt to execute from memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1431,10 +1329,7 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_NX,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -1469,10 +1364,7 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RO_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Attempt to execute from memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1484,10 +1376,7 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RO_NX,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -1520,10 +1409,7 @@ TEST(memory_sharing, lend_donate)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1538,10 +1424,8 @@ TEST(memory_sharing, lend_donate)
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_SPCI_ERROR(
-			spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
-				      SPCI_MSG_SEND_LEGACY_MEMORY_DONATE),
-			SPCI_INVALID_PARAMETERS);
+		EXPECT_SPCI_ERROR(spci_mem_donate(0, msg_size, 0),
+				  SPCI_INVALID_PARAMETERS);
 	}
 
 	/* Ensure we can donate to the only borrower. */
@@ -1550,10 +1434,7 @@ TEST(memory_sharing, lend_donate)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -1583,10 +1464,7 @@ TEST(memory_sharing, share_donate)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_SHARE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_share(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1605,10 +1483,8 @@ TEST(memory_sharing, share_donate)
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_SPCI_ERROR(
-			spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
-				      SPCI_MSG_SEND_LEGACY_MEMORY_DONATE),
-			SPCI_INVALID_PARAMETERS);
+		EXPECT_SPCI_ERROR(spci_mem_donate(0, msg_size, 0),
+				  SPCI_INVALID_PARAMETERS);
 	}
 
 	/* Ensure we can donate to the only borrower. */
@@ -1617,10 +1493,7 @@ TEST(memory_sharing, share_donate)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_donate(0, msg_size, 0).func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -1650,10 +1523,7 @@ TEST(memory_sharing, lend_twice)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1693,10 +1563,8 @@ TEST(memory_sharing, lend_twice)
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RO_X,
 			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_SPCI_ERROR(
-			spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
-				      SPCI_MSG_SEND_LEGACY_MEMORY_LEND),
-			SPCI_INVALID_PARAMETERS);
+		EXPECT_SPCI_ERROR(spci_mem_lend(0, msg_size, 0),
+				  SPCI_INVALID_PARAMETERS);
 	}
 }
 
@@ -1726,10 +1594,7 @@ TEST(memory_sharing, share_twice)
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_SHARE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_share(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Let the memory be accessed. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1759,10 +1624,8 @@ TEST(memory_sharing, share_twice)
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RO_X,
 			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_SPCI_ERROR(
-			spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
-				      SPCI_MSG_SEND_LEGACY_MEMORY_SHARE),
-			SPCI_INVALID_PARAMETERS);
+		EXPECT_SPCI_ERROR(spci_mem_share(0, msg_size, 0),
+				  SPCI_INVALID_PARAMETERS);
 	}
 }
 
@@ -1790,10 +1653,7 @@ TEST(memory_sharing, share_clear)
 		ARRAY_SIZE(constituents), 0, SPCI_MEMORY_REGION_FLAG_CLEAR,
 		SPCI_MEMORY_RO_X, SPCI_MEMORY_NORMAL_MEM,
 		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_SHARE)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_share(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Check that it has been cleared. */
 	for (i = 0; i < PAGE_SIZE * 2; ++i) {
@@ -1834,10 +1694,7 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -1859,10 +1716,7 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM2, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -1902,10 +1756,7 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -1927,10 +1778,7 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_LEND)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_mem_lend(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM2, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),

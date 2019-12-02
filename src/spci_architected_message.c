@@ -595,7 +595,7 @@ static struct spci_value spci_validate_call_share_memory(
 
 	/* We only support a single recipient. */
 	if (memory_region->attribute_count != 1) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return spci_error(SPCI_NOT_SUPPORTED);
 	}
 
 	/* The recipient must match the message recipient. */

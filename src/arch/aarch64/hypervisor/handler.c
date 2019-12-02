@@ -366,6 +366,24 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 		*args = api_spci_run(spci_vm_id(*args), spci_vcpu_index(*args),
 				     current(), next);
 		return true;
+	case SPCI_MEM_DONATE_32:
+		*args = api_spci_mem_send(SPCI_MSG_SEND_LEGACY_MEMORY_DONATE,
+					  ipa_init(args->arg1), args->arg2,
+					  args->arg3, args->arg4, args->arg5,
+					  current(), next);
+		return true;
+	case SPCI_MEM_LEND_32:
+		*args = api_spci_mem_send(SPCI_MSG_SEND_LEGACY_MEMORY_LEND,
+					  ipa_init(args->arg1), args->arg2,
+					  args->arg3, args->arg4, args->arg5,
+					  current(), next);
+		return true;
+	case SPCI_MEM_SHARE_32:
+		*args = api_spci_mem_send(SPCI_MSG_SEND_LEGACY_MEMORY_SHARE,
+					  ipa_init(args->arg1), args->arg2,
+					  args->arg3, args->arg4, args->arg5,
+					  current(), next);
+		return true;
 	}
 
 	return false;

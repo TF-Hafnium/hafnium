@@ -43,6 +43,9 @@
 #define SPCI_MSG_SEND_32              0x8400006E
 #define SPCI_MSG_SEND_DIRECT_REQ_32   0x8400006F
 #define SPCI_MSG_SEND_DIRECT_RESP_32  0x84000070
+#define SPCI_MEM_DONATE_32            0x84000071
+#define SPCI_MEM_LEND_32              0x84000072
+#define SPCI_MEM_SHARE_32             0x84000073
 
 /* SPCI error codes. */
 #define SPCI_NOT_SUPPORTED      INT32_C(-1)

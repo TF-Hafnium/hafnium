@@ -131,6 +131,33 @@ static inline struct spci_value spci_msg_send(spci_vm_id_t sender_vm_id,
 		.arg4 = attributes});
 }
 
+static inline struct spci_value spci_mem_donate(
+	uint32_t remaining_fragment_count, uint32_t length, uint32_t handle)
+{
+	return spci_call((struct spci_value){.func = SPCI_MEM_DONATE_32,
+					     .arg3 = remaining_fragment_count,
+					     .arg4 = length,
+					     .arg5 = handle});
+}
+
+static inline struct spci_value spci_mem_lend(uint32_t remaining_fragment_count,
+					      uint32_t length, uint32_t handle)
+{
+	return spci_call((struct spci_value){.func = SPCI_MEM_LEND_32,
+					     .arg3 = remaining_fragment_count,
+					     .arg4 = length,
+					     .arg5 = handle});
+}
+
+static inline struct spci_value spci_mem_share(
+	uint32_t remaining_fragment_count, uint32_t length, uint32_t handle)
+{
+	return spci_call((struct spci_value){.func = SPCI_MEM_SHARE_32,
+					     .arg3 = remaining_fragment_count,
+					     .arg4 = length,
+					     .arg5 = handle});
+}
+
 /**
  * Called by secondary VMs to receive a message. This will block until a message
  * is received.
