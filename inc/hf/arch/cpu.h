@@ -23,6 +23,7 @@
 #include "hf/arch/types.h"
 
 #include "hf/addr.h"
+#include "hf/vcpu.h"
 
 #include "vmapi/hf/spci.h"
 
@@ -30,8 +31,7 @@
  * Reset the register values other than the PC and argument which are set with
  * `arch_regs_set_pc_arg()`.
  */
-void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
-		     cpu_id_t vcpu_id, paddr_t table);
+void arch_regs_reset(struct vcpu *vcpu);
 
 /**
  * Updates the given registers so that when a vcpu runs, it starts off at the

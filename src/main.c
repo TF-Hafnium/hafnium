@@ -24,16 +24,14 @@
 struct vcpu *cpu_main(struct cpu *c)
 {
 	struct vcpu *vcpu;
-	struct vm *vm;
 
 	vcpu = vm_get_vcpu(vm_find(HF_PRIMARY_VM_ID), cpu_index(c));
-	vm = vcpu->vm;
 	vcpu->cpu = c;
 
 	arch_cpu_init();
 
 	/* Reset the registers to give a clean start for the primary's vCPU. */
-	arch_regs_reset(&vcpu->regs, true, vm->id, c->id, vm->ptable.root);
+	arch_regs_reset(vcpu);
 
 	return vcpu;
 }

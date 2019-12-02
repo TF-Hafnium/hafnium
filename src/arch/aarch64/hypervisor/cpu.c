@@ -23,6 +23,7 @@
 #include "hf/addr.h"
 #include "hf/spci.h"
 #include "hf/std.h"
+#include "hf/vm.h"
 
 #include "msr.h"
 #include "perfmon.h"
@@ -63,9 +64,13 @@ static void gic_regs_reset(struct arch_regs *r, bool is_primary)
 #endif
 }
 
-void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
-		     cpu_id_t vcpu_id, paddr_t table)
+void arch_regs_reset(struct vcpu *vcpu)
 {
+	spci_vm_id_t vm_id = vcpu->vm->id;
+	bool is_primary = vm_id == HF_PRIMARY_VM_ID;
+	cpu_id_t vcpu_id = vcpu_index(vcpu);
+	paddr_t table = vcpu->vm->ptable.root;
+	struct arch_regs *r = &vcpu->regs;
 	uintreg_t pc = r->pc;
 	uintreg_t arg = r->r[0];
 	uintreg_t cnthctl;

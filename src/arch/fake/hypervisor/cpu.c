@@ -16,6 +16,7 @@
 
 #include "hf/arch/cpu.h"
 
+#include "hf/cpu.h"
 #include "hf/spci.h"
 
 void arch_irq_disable(void)
@@ -28,14 +29,10 @@ void arch_irq_enable(void)
 	/* TODO */
 }
 
-void arch_regs_reset(struct arch_regs *r, bool is_primary, spci_vm_id_t vm_id,
-		     cpu_id_t vcpu_id, paddr_t table)
+void arch_regs_reset(struct vcpu *vcpu)
 {
 	/* TODO */
-	(void)is_primary;
-	(void)vm_id;
-	(void)table;
-	r->vcpu_id = vcpu_id;
+	(void)vcpu;
 }
 
 void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg)

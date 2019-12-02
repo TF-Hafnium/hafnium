@@ -53,6 +53,7 @@ source_set("src_testable") {
     "panic.c",
     "spci_architected_message.c",
     "string.c",
+    "vcpu.c",
     "vm.c",
   ]
 
