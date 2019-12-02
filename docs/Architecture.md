@@ -84,7 +84,7 @@ A [VM](../inc/hf/vm.h) in Hafnium consists of:
 *   Some internal state maintained by Hafnium (locks, mailbox wait lists,
     mailbox state, log buffer).
 
-Each [vCPU](../inc/hf/cpu.h) also has:
+Each [vCPU](../inc/hf/vcpu.h) also has:
 
 *   A set of saved registers, for when it isn't being run on a physical CPU.
 *   A current state (switched off, ready to run, running, waiting for a message
