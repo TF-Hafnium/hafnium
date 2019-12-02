@@ -593,6 +593,11 @@ static struct spci_value spci_validate_call_share_memory(
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
+	/* The recipient must match the message recipient. */
+	if (memory_region->attributes[0].receiver != to_locked.vm->id) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
 	switch (share) {
 	case SPCI_MEMORY_DONATE:
 	case SPCI_MEMORY_LEND:
