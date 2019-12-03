@@ -106,7 +106,10 @@ struct vm {
 	char log_buffer[LOG_BUFFER_SIZE];
 	uint16_t log_buffer_length;
 
-	/** Wait entries to be used when waiting on other VM mailboxes. */
+	/**
+	 * Wait entries to be used when waiting on other VM mailboxes. See
+	 * comments on `struct wait_entry` for the lock discipline of these.
+	 */
 	struct wait_entry wait_entries[MAX_VMS];
 
 	atomic_bool aborting;

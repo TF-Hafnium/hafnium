@@ -865,8 +865,7 @@ exit:
  * Checks whether the given `to` VM's mailbox is currently busy, and optionally
  * registers the `from` VM to be notified when it becomes available.
  */
-static bool msg_receiver_busy(struct vm_locked to, struct vm_locked from,
-			      bool notify)
+static bool msg_receiver_busy(struct vm_locked to, struct vm *from, bool notify)
 {
 	if (to.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
 	    to.vm->mailbox.recv == NULL) {
@@ -876,7 +875,7 @@ static bool msg_receiver_busy(struct vm_locked to, struct vm_locked from,
 		 */
 		if (notify) {
 			struct wait_entry *entry =
-				&from.vm->wait_entries[to.vm->id];
+				&from->wait_entries[to.vm->id];
 
 			/* Append waiter only if it's not there yet. */
 			if (list_empty(&entry->wait_links)) {
@@ -895,12 +894,12 @@ static bool msg_receiver_busy(struct vm_locked to, struct vm_locked from,
  * Notifies the `to` VM about the message currently in its mailbox, possibly
  * with the help of the primary VM.
  */
-static void deliver_msg(struct vm_locked to, struct vm_locked from,
+static void deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
 			struct vcpu *current, struct vcpu **next)
 {
 	struct spci_value primary_ret = {
 		.func = SPCI_MSG_SEND_32,
-		.arg1 = ((uint32_t)from.vm->id << 16) | to.vm->id,
+		.arg1 = ((uint32_t)from_id << 16) | to.vm->id,
 	};
 
 	/* Messages for the primary VM are delivered directly. */
@@ -921,7 +920,7 @@ static void deliver_msg(struct vm_locked to, struct vm_locked from,
 	to.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
 
 	/* Return to the primary VM directly or with a switch. */
-	if (from.vm->id != HF_PRIMARY_VM_ID) {
+	if (from_id != HF_PRIMARY_VM_ID) {
 		*next = api_switch_to_primary(current, primary_ret,
 					      VCPU_STATE_READY);
 	}
@@ -995,8 +994,7 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	 */
 	vm_to_from_lock = vm_lock_both(to, from);
 
-	if (msg_receiver_busy(vm_to_from_lock.vm1, vm_to_from_lock.vm2,
-			      notify)) {
+	if (msg_receiver_busy(vm_to_from_lock.vm1, from, notify)) {
 		ret = spci_error(SPCI_BUSY);
 		goto out;
 	}
@@ -1046,7 +1044,7 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 		ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 	}
 
-	deliver_msg(vm_to_from_lock.vm1, vm_to_from_lock.vm2, current, next);
+	deliver_msg(vm_to_from_lock.vm1, sender_vm_id, current, next);
 
 out:
 	vm_unlock(&vm_to_from_lock.vm1);
