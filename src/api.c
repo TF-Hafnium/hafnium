@@ -1002,35 +1002,22 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	}
 
 	/* Handle legacy memory sharing messages. */
-	if ((attributes & SPCI_MSG_SEND_LEGACY_MEMORY_MASK) ==
-	    SPCI_MSG_SEND_LEGACY_MEMORY) {
+	if ((attributes & SPCI_MSG_SEND_LEGACY_MEMORY_MASK) != 0) {
 		/*
 		 * Buffer holding the internal copy of the shared memory
 		 * regions.
 		 */
-		struct spci_architected_message_header
-			*architected_message_replica =
-				(struct spci_architected_message_header *)
-					cpu_get_buffer(current->cpu->id);
+		uint8_t *message_replica = cpu_get_buffer(current->cpu->id);
 		uint32_t message_buffer_size =
 			cpu_get_buffer_size(current->cpu->id);
-
-		struct spci_architected_message_header *architected_header =
-			(struct spci_architected_message_header *)from_msg;
 
 		if (size > message_buffer_size) {
 			ret = spci_error(SPCI_INVALID_PARAMETERS);
 			goto out;
 		}
 
-		if (size < sizeof(struct spci_architected_message_header)) {
-			ret = spci_error(SPCI_INVALID_PARAMETERS);
-			goto out;
-		}
-
 		/* Copy the architected message into the internal buffer. */
-		memcpy_s(architected_message_replica, message_buffer_size,
-			 architected_header, size);
+		memcpy_s(message_replica, message_buffer_size, from_msg, size);
 
 		/*
 		 * Note that architected_message_replica is passed as the third
@@ -1043,7 +1030,8 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 		 */
 		ret = spci_msg_handle_architected_message(
 			vm_to_from_lock.vm1, vm_to_from_lock.vm2,
-			architected_message_replica, size, &api_page_pool);
+			(struct spci_memory_region *)message_replica, size,
+			attributes, &api_page_pool);
 
 		if (ret.func != SPCI_SUCCESS_32) {
 			goto out;

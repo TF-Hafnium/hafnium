@@ -54,22 +54,17 @@
 #define SPCI_RETRY              INT32_C(-7)
 #define SPCI_ABORTED            INT32_C(-8)
 
-/* Architected memory sharing message IDs. */
-enum spci_memory_share {
-	SPCI_MEMORY_DONATE = 0x0,
-	SPCI_MEMORY_LEND = 0x1,
-	SPCI_MEMORY_SHARE = 0x2,
-	SPCI_MEMORY_RELINQUISH = 0x3,
-};
-
 /* SPCI function specific constants. */
 #define SPCI_MSG_RECV_BLOCK  0x1
 #define SPCI_MSG_RECV_BLOCK_MASK  0x1
 
 #define SPCI_MSG_SEND_NOTIFY 0x1
 #define SPCI_MSG_SEND_NOTIFY_MASK 0x1
-#define SPCI_MSG_SEND_LEGACY_MEMORY      0x2
-#define SPCI_MSG_SEND_LEGACY_MEMORY_MASK 0x2
+#define SPCI_MSG_SEND_LEGACY_MEMORY_DONATE 0x10
+#define SPCI_MSG_SEND_LEGACY_MEMORY_LEND 0x20
+#define SPCI_MSG_SEND_LEGACY_MEMORY_SHARE 0x30
+#define SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH 0x40
+#define SPCI_MSG_SEND_LEGACY_MEMORY_MASK 0x70
 
 #define SPCI_SLEEP_INDEFINITE 0
 
@@ -230,18 +225,6 @@ static inline uint64_t spci_vm_vcpu(spci_vm_id_t vm_id,
 	return ((uint32_t)vm_id << 16) | vcpu_index;
 }
 
-struct spci_architected_message_header {
-	uint16_t type;
-
-	/*
-	 * TODO: Padding is present to ensure that the field
-	 * payload is aligned on a 64B boundary. SPCI
-	 * spec must be updated to reflect this.
-	 */
-	uint16_t reserved[3];
-	uint8_t payload[];
-};
-
 struct spci_memory_region_constituent {
 	/**
 	 * The base IPA of the constituent memory region, aligned to 4 kiB page
@@ -322,16 +305,6 @@ spci_memory_region_get_constituents(struct spci_memory_region *memory_region)
 			   memory_region->constituent_offset);
 }
 
-void spci_architected_message_init(void *message, enum spci_memory_share type);
-
-/** Gets the spci_memory_region within an architected message. */
-static inline struct spci_memory_region *spci_get_memory_region(void *message)
-{
-	struct spci_architected_message_header *architected_header =
-		(struct spci_architected_message_header *)message;
-	return (struct spci_memory_region *)architected_header->payload;
-}
-
 uint32_t spci_memory_region_init(
 	struct spci_memory_region *memory_region, spci_vm_id_t receiver,
 	const struct spci_memory_region_constituent constituents[],
@@ -339,73 +312,3 @@ uint32_t spci_memory_region_init(
 	spci_memory_region_flags_t flags, enum spci_memory_access access,
 	enum spci_memory_type type, enum spci_memory_cacheability cacheability,
 	enum spci_memory_shareability shareability);
-
-uint32_t spci_memory_init(
-	void *message, enum spci_memory_share share_type, spci_vm_id_t receiver,
-	struct spci_memory_region_constituent *region_constituents,
-	uint32_t constituent_count, uint32_t tag,
-	spci_memory_region_flags_t flags, enum spci_memory_access access,
-	enum spci_memory_type type, enum spci_memory_cacheability cacheability,
-	enum spci_memory_shareability shareability);
-
-/** Constructs an SPCI donate memory region message. */
-static inline uint32_t spci_memory_donate_init(
-	void *message, spci_vm_id_t receiver,
-	struct spci_memory_region_constituent *region_constituents,
-	uint32_t constituent_count, uint32_t tag,
-	enum spci_memory_access access, enum spci_memory_type type,
-	enum spci_memory_cacheability cacheability,
-	enum spci_memory_shareability shareability)
-{
-	return spci_memory_init(message, SPCI_MEMORY_DONATE, receiver,
-				region_constituents, constituent_count, tag, 0,
-				access, type, cacheability, shareability);
-}
-
-/**
- * Constructs an SPCI memory region lend message.
- */
-static inline uint32_t spci_memory_lend_init(
-	void *message, spci_vm_id_t receiver,
-	struct spci_memory_region_constituent *region_constituents,
-	uint32_t constituent_count, uint32_t tag,
-	enum spci_memory_access access, enum spci_memory_type type,
-	enum spci_memory_cacheability cacheability,
-	enum spci_memory_shareability shareability)
-{
-	return spci_memory_init(message, SPCI_MEMORY_LEND, receiver,
-				region_constituents, constituent_count, tag, 0,
-				access, type, cacheability, shareability);
-}
-
-/**
- * Constructs an SPCI memory region share message.
- */
-static inline uint32_t spci_memory_share_init(
-	void *message, spci_vm_id_t receiver,
-	struct spci_memory_region_constituent *region_constituents,
-	uint32_t constituent_count, uint32_t tag,
-	enum spci_memory_access access, enum spci_memory_type type,
-	enum spci_memory_cacheability cacheability,
-	enum spci_memory_shareability shareability)
-{
-	return spci_memory_init(message, SPCI_MEMORY_SHARE, receiver,
-				region_constituents, constituent_count, tag, 0,
-				access, type, cacheability, shareability);
-}
-
-/**
- * Constructs an SPCI memory region relinquish message.
- * A set of memory regions can be given back to the owner.
- */
-static inline uint32_t spci_memory_relinquish_init(
-	void *message, spci_vm_id_t receiver,
-	struct spci_memory_region_constituent *region_constituents,
-	uint32_t constituent_count, uint32_t tag)
-{
-	return spci_memory_init(message, SPCI_MEMORY_RELINQUISH, receiver,
-				region_constituents, constituent_count, tag, 0,
-				SPCI_MEMORY_RW_X, SPCI_MEMORY_DEVICE_MEM,
-				SPCI_MEMORY_DEV_NGNRNE,
-				SPCI_MEMORY_SHARE_NON_SHAREABLE);
-}

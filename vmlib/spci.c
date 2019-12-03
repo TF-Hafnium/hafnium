@@ -27,20 +27,6 @@
 #endif
 
 /**
- * Helper method to fill in the information about the architected message.
- */
-void spci_architected_message_init(void *message, enum spci_memory_share type)
-{
-	/* Fill the architected header. */
-	struct spci_architected_message_header *architected_header =
-		(struct spci_architected_message_header *)message;
-	architected_header->type = type;
-	architected_header->reserved[0] = 0;
-	architected_header->reserved[1] = 0;
-	architected_header->reserved[2] = 0;
-}
-
-/**
  * Initialises the given `spci_memory_region` and copies the constituent
  * information to it. Returns the length in bytes occupied by the data copied to
  * `memory_region` (attributes, constituents and memory region header size).
@@ -98,31 +84,4 @@ uint32_t spci_memory_region_init(
 	 */
 
 	return memory_region->constituent_offset + constituents_length;
-}
-
-/**
- * Constructs an 'architected message' for SPCI memory sharing of the given
- * type.
- */
-uint32_t spci_memory_init(
-	void *message, enum spci_memory_share share_type, spci_vm_id_t receiver,
-	struct spci_memory_region_constituent *region_constituents,
-	uint32_t constituent_count, uint32_t tag, spci_memory_region_flags_t flags,
-	enum spci_memory_access access, enum spci_memory_type type,
-	enum spci_memory_cacheability cacheability,
-	enum spci_memory_shareability shareability)
-{
-	uint32_t message_length =
-		sizeof(struct spci_architected_message_header);
-	struct spci_memory_region *memory_region =
-		spci_get_memory_region(message);
-
-	/* Fill in the details on the common message header. */
-	spci_architected_message_init(message, share_type);
-
-	/* Fill in memory region. */
-	message_length += spci_memory_region_init(
-		memory_region, receiver, region_constituents, constituent_count,
-		tag, flags, access, type, cacheability, shareability);
-	return message_length;
 }

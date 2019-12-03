@@ -37,13 +37,13 @@ TEST_SERVICE(straddling_data_abort)
 	struct spci_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)(&pages[PAGE_SIZE]), .page_count = 1},
 	};
-	uint32_t msg_size = spci_memory_donate_init(
+	uint32_t msg_size = spci_memory_region_init(
 		send_buf, HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
+		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_EQ(spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY)
+				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
 			  .func,
 		  SPCI_SUCCESS_32);
 
@@ -71,13 +71,13 @@ TEST_SERVICE(straddling_instruction_abort)
 	struct spci_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)(&pages[PAGE_SIZE]), .page_count = 1},
 	};
-	uint32_t msg_size = spci_memory_donate_init(
+	uint32_t msg_size = spci_memory_region_init(
 		send_buf, HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, SPCI_MEMORY_RW_X,
+		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_EQ(spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY)
+				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
 			  .func,
 		  SPCI_SUCCESS_32);
 

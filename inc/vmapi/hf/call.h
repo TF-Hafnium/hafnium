@@ -111,7 +111,7 @@ static inline struct spci_value spci_rxtx_map(hf_ipaddr_t send,
  *
  * Attributes may include:
  *  - SPCI_MSG_SEND_NOTIFY, to notify the caller when it should try again.
- *  - SPCI_MSG_SEND_LEGACY_MEMORY, to send a legacy architected memory sharing
+ *  - SPCI_MSG_SEND_LEGACY_MEMORY_*, to send a legacy architected memory sharing
  *    message.
  *
  * Returns SPCI_SUCCESS if the message is sent, or an error code otherwise:
