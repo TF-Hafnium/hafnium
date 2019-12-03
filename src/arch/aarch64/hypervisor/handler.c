@@ -26,6 +26,7 @@
 #include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/panic.h"
+#include "hf/spci.h"
 #include "hf/spci_internal.h"
 #include "hf/vm.h"
 
@@ -39,7 +40,6 @@
 #include "psci_handler.h"
 #include "smc.h"
 #include "sysregs.h"
-
 /**
  * Gets the value to increment for the next PC.
  * The ESR encodes whether the instruction is 2 bytes or 4 bytes long.
@@ -50,6 +50,70 @@
  * The Client ID field within X7 for an SMC64 call.
  */
 #define CLIENT_ID_MASK UINT64_C(0xffff)
+
+alignas(PAGE_SIZE) uint8_t hv_rx[4096];
+alignas(PAGE_SIZE) uint8_t hv_tx[4096];
+
+#if SECURE_WORLD == 1
+
+struct hv_buffers_t hypervisor_buffers;
+
+extern struct mpool api_page_pool;
+
+bool handler_map_hv_buffers(uint8_t **rx, uint8_t **tx, paddr_t pa_send_begin,
+			    paddr_t pa_send_end, paddr_t pa_recv_begin,
+			    paddr_t pa_recv_end)
+{
+	struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
+	struct mpool local_page_pool;
+
+	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
+
+	/* Map the send page as read-only in the hypervisor address space. */
+	*tx = mm_identity_map(mm_stage1_locked, pa_send_begin, pa_send_end,
+			      MM_MODE_R, &local_page_pool);
+
+	*rx = mm_identity_map(mm_stage1_locked, pa_recv_begin, pa_recv_end,
+			      MM_MODE_W, &local_page_pool);
+
+	mm_unlock_stage1(&mm_stage1_locked);
+
+	return true;
+}
+uint8_t *get_hv_tx()
+{
+       return hypervisor_buffers.tx;
+}
+
+uint8_t *get_hv_rx()
+{
+       return hypervisor_buffers.rx;
+}
+
+#else
+
+uint8_t *get_hv_tx()
+{
+	return hv_tx;
+}
+
+uint8_t *get_hv_rx()
+{
+	return hv_rx;
+}
+
+void handler_register_normal_world_rxtx(void)
+{
+	smc32(SPCI_RXTX_MAP_64, (uintptr_t)hv_rx, (uintptr_t)hv_tx, 1, 0, 0, 0,
+	      0);
+
+	/* TODO: Hv ID must be architected in the SPCI. */
+	/* 	Set the rxtx origin ID to the Hv ID. */
+	*(uint16_t *)hv_tx = 0;
+
+	/* We should not care about the return from the secure world. */
+}
+#endif
 
 /**
  * Returns a reference to the currently executing vCPU.
@@ -757,7 +821,6 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 	}
 
 	update_vi(next);
-
 	return next;
 }
 

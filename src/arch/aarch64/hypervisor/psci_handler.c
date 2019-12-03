@@ -62,6 +62,13 @@ void arch_one_time_init(void)
 		el3_psci_version = 0;
 		break;
 	}
+
+#if SECURE_WORLD == 0
+	/* Register Rx Tx buffers from Hv. */
+	void handler_register_normal_world_rxtx(void);
+	handler_register_normal_world_rxtx();
+#endif
+
 }
 
 /**

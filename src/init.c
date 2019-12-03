@@ -172,5 +172,6 @@ void one_time_init(void)
 	/* Enable TLB invalidation for VM page table updates. */
 	mm_vm_enable_invalidation();
 
-	dlog_info("Hafnium initialisation completed\n");
+
+	dlog("Hafnium initialisation completed\n");
 }

@@ -48,6 +48,8 @@
 #define SPCI_MEM_LEND_32              0x84000072
 #define SPCI_MEM_SHARE_32             0x84000073
 
+#define SPCI_RXTX_MAP_64                 0xC4000066
+
 /* SPCI error codes. */
 #define SPCI_NOT_SUPPORTED      INT32_C(-1)
 #define SPCI_INVALID_PARAMETERS INT32_C(-2)

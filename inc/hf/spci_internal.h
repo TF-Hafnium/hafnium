@@ -25,6 +25,13 @@
 
 #define SPCI_VERSION_MAJOR_OFFSET 16
 
+typedef uint32_t handle_t;
+
+struct hv_buffers_t {
+	uint8_t *rx;
+	uint8_t *tx;
+};
+
 static inline struct spci_value spci_error(uint64_t error_code)
 {
 	return (struct spci_value){.func = SPCI_ERROR_32, .arg2 = error_code};
