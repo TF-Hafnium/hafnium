@@ -64,50 +64,6 @@ TEST_SERVICE(memory_increment)
 	}
 }
 
-TEST_SERVICE(memory_lend_relinquish_spci)
-{
-	/* Loop, giving memory back to the sender. */
-	for (;;) {
-		struct spci_value ret = spci_msg_wait();
-		uint8_t *ptr;
-		uint32_t msg_size;
-		size_t i;
-
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-		EXPECT_EQ(spci_msg_send_attributes(ret),
-			  SPCI_MSG_SEND_LEGACY_MEMORY);
-
-		void *recv_buf = SERVICE_RECV_BUFFER();
-		void *send_buf = SERVICE_SEND_BUFFER();
-		struct spci_memory_region *memory_region =
-			spci_get_memory_region(recv_buf);
-		struct spci_memory_region_constituent *constituents =
-			spci_memory_region_get_constituents(memory_region);
-
-		ptr = (uint8_t *)constituents[0].address;
-
-		/* Check that one has access to the shared region. */
-		for (i = 0; i < PAGE_SIZE; ++i) {
-			ptr[i]++;
-		}
-
-		/* Give the memory back and notify the sender. */
-		msg_size = spci_memory_relinquish_init(
-			send_buf, HF_PRIMARY_VM_ID, constituents,
-			memory_region->constituent_count, 0);
-		/* Relevant information read, RX mailbox can be cleared. */
-		spci_rx_release();
-		spci_msg_send(spci_msg_send_receiver(ret), HF_PRIMARY_VM_ID,
-			      msg_size, SPCI_MSG_SEND_LEGACY_MEMORY);
-
-		/*
-		 * Try and access the memory which will cause a fault unless the
-		 * memory has been shared back again.
-		 */
-		ptr[0] = 123;
-	}
-}
-
 TEST_SERVICE(give_memory_and_fault)
 {
 	void *send_buf = SERVICE_SEND_BUFFER();

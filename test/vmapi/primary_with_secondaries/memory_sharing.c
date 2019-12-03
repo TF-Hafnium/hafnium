@@ -330,6 +330,43 @@ TEST(memory_sharing, lend_relinquish)
 }
 
 /**
+ * Check that memory that is donated can't be relinquished.
+ */
+TEST(memory_sharing, donate_relinquish)
+{
+	struct spci_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	uint32_t msg_size;
+
+	SERVICE_SELECT(SERVICE_VM1, "spci_memory_donate_relinquish", mb.send);
+
+	/* Initialise the memory before giving it. */
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
+
+	struct spci_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+		{.address = (uint64_t)pages + PAGE_SIZE, .page_count = 2},
+	};
+
+	msg_size = spci_memory_donate_init(
+		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
+		SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
+		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
+
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
+				SPCI_MSG_SEND_LEGACY_MEMORY)
+			  .func,
+		  SPCI_SUCCESS_32);
+
+	/*
+	 * Let the service access the memory, and try and fail to relinquish it.
+	 */
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+}
+
+/**
  * Memory given away can be given back.
  */
 TEST(memory_sharing, give_and_get_back)
