@@ -875,7 +875,7 @@ static bool msg_receiver_busy(struct vm_locked to, struct vm *from, bool notify)
 		 */
 		if (notify) {
 			struct wait_entry *entry =
-				&from->wait_entries[to.vm->id];
+				vm_get_wait_entry(from, to.vm->id);
 
 			/* Append waiter only if it's not there yet. */
 			if (list_empty(&entry->wait_links)) {
@@ -1161,7 +1161,7 @@ int64_t api_mailbox_writable_get(const struct vcpu *current)
 	entry = CONTAINER_OF(vm->mailbox.ready_list.next, struct wait_entry,
 			     ready_links);
 	list_remove(&entry->ready_links);
-	ret = entry - vm->wait_entries;
+	ret = vm_id_for_wait_entry(vm, entry);
 
 exit:
 	sl_unlock(&vm->lock);

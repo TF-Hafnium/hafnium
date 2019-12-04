@@ -149,6 +149,30 @@ struct vcpu *vm_get_vcpu(struct vm *vm, spci_vcpu_index_t vcpu_index)
 }
 
 /**
+ * Gets `vm`'s wait entry for waiting on the `for_vm`.
+ */
+struct wait_entry *vm_get_wait_entry(struct vm *vm, spci_vm_id_t for_vm)
+{
+	uint16_t index;
+
+	CHECK(for_vm >= HF_VM_ID_OFFSET);
+	index = for_vm - HF_VM_ID_OFFSET;
+	CHECK(index < MAX_VMS);
+
+	return &vm->wait_entries[index];
+}
+
+/**
+ * Gets the ID of the VM which the given VM's wait entry is for.
+ */
+spci_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)
+{
+	uint16_t index = entry - vm->wait_entries;
+
+	return index + HF_VM_ID_OFFSET;
+}
+
+/**
  * Map a range of addresses to the VM in both the MMU and the IOMMU.
  *
  * mm_vm_defrag should always be called after a series of page table updates,
