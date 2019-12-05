@@ -30,14 +30,14 @@ set -x
 
 # Returns true if `git status` reports uncommitted changes in the source tree.
 function is_repo_dirty() {
-	local cmd=(git status --porcelain)
+	local cmd=(git status --porcelain=v1)
 	if [ -d ".repo" ]
 	then
 		# This source tree was checked out using `repo`. Check the
 		# status of all projects.
 		cmd=(${REPO} forall -c "${cmd[@]}")
 	fi
-	[[ $(${cmd[@]}) ]]
+	! (u="$(${cmd[@]})" && test -z "$u")
 	return $?
 }
 
