@@ -28,9 +28,9 @@ TEST(smc_whitelist, not_whitelisted_unknown)
 		0x6666666666666666, 0x77777777);
 
 	EXPECT_EQ(smc_res.func, SMCCC_ERROR_UNKNOWN);
-	EXPECT_EQ(smc_res.arg1, 0);
-	EXPECT_EQ(smc_res.arg2, 0);
-	EXPECT_EQ(smc_res.arg3, 0);
+	EXPECT_EQ(smc_res.arg1, UINT64_C(0x1111111111111111));
+	EXPECT_EQ(smc_res.arg2, UINT64_C(0x2222222222222222));
+	EXPECT_EQ(smc_res.arg3, UINT64_C(0x3333333333333333));
 	EXPECT_EQ(smc_res.arg4, UINT64_C(0x4444444444444444));
 	EXPECT_EQ(smc_res.arg5, UINT64_C(0x5555555555555555));
 	EXPECT_EQ(smc_res.arg6, UINT64_C(0x6666666666666666));

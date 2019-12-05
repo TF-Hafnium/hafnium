@@ -284,14 +284,13 @@ static bool smc_is_blocked(const struct vm *vm, uint32_t func)
  * Applies SMC access control according to manifest and forwards the call if
  * access is granted.
  */
-static void smc_forwarder(const struct vcpu *vcpu, struct spci_value *ret)
+static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 {
-	uint32_t func = vcpu->regs.r[0];
-	uint32_t client_id = vcpu->vm->id;
-	uintreg_t arg7;
+	uint32_t client_id = vm->id;
+	uintreg_t arg7 = args->arg7;
 
-	if (smc_is_blocked(vcpu->vm, func)) {
-		ret->func = SMCCC_ERROR_UNKNOWN;
+	if (smc_is_blocked(vm, args->func)) {
+		args->func = SMCCC_ERROR_UNKNOWN;
 		return;
 	}
 
@@ -300,10 +299,9 @@ static void smc_forwarder(const struct vcpu *vcpu, struct spci_value *ret)
 	 * else (currently unspecified) that the client may have passed in the
 	 * upper bits.
 	 */
-	arg7 = client_id | (vcpu->regs.r[7] & ~CLIENT_ID_MASK);
-	*ret = smc_forward(func, vcpu->regs.r[1], vcpu->regs.r[2],
-			   vcpu->regs.r[3], vcpu->regs.r[4], vcpu->regs.r[5],
-			   vcpu->regs.r[6], arg7);
+	args->arg7 = client_id | (arg7 & ~CLIENT_ID_MASK);
+	*args = smc_forward(args->func, args->arg1, args->arg2, args->arg3,
+			    args->arg4, args->arg5, args->arg6, args->arg7);
 
 	/*
 	 * Preserve the value passed by the caller, rather than the client_id we
@@ -311,7 +309,7 @@ static void smc_forwarder(const struct vcpu *vcpu, struct spci_value *ret)
 	 * may be in x7, but the SMCs that we are forwarding are legacy calls
 	 * from before SMCCC 1.2 so won't have more than 4 return values anyway.
 	 */
-	ret->arg7 = vcpu->regs.r[7];
+	args->arg7 = arg7;
 }
 
 static bool spci_handler(struct spci_value *args, struct vcpu **next)
@@ -399,8 +397,7 @@ static void update_vi(struct vcpu *next)
 /**
  * Processes SMC instruction calls.
  */
-static void smc_handler(struct vcpu *vcpu, struct spci_value *ret,
-			struct vcpu **next)
+static struct vcpu *smc_handler(struct vcpu *vcpu)
 {
 	struct spci_value args = {
 		.func = vcpu->regs.r[0],
@@ -412,25 +409,28 @@ static void smc_handler(struct vcpu *vcpu, struct spci_value *ret,
 		.arg6 = vcpu->regs.r[6],
 		.arg7 = vcpu->regs.r[7],
 	};
+	struct vcpu *next = NULL;
 
 	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
-			 &ret->func, next)) {
-		return;
+			 &vcpu->regs.r[0], &next)) {
+		return next;
 	}
 
-	if (spci_handler(&args, next)) {
-		*ret = args;
-		update_vi(*next);
-		return;
+	if (spci_handler(&args, &next)) {
+		arch_regs_set_retval(&vcpu->regs, args);
+		update_vi(next);
+		return next;
 	}
 
 	switch (args.func & ~SMCCC_CONVENTION_MASK) {
 	case HF_DEBUG_LOG:
-		ret->func = api_debug_log(args.arg1, vcpu);
-		return;
+		vcpu->regs.r[0] = api_debug_log(args.arg1, vcpu);
+		return next;
 	}
 
-	smc_forwarder(vcpu, ret);
+	smc_forwarder(vcpu->vm, &args);
+	arch_regs_set_retval(&vcpu->regs, args);
+	return next;
 }
 
 struct vcpu *hvc_handler(struct vcpu *vcpu)
@@ -603,17 +603,11 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 
 	case 0x17: /* EC = 010111, SMC instruction. */ {
 		uintreg_t smc_pc = vcpu->regs.pc;
-		struct vcpu *next = NULL;
-		struct spci_value ret = {.arg4 = vcpu->regs.r[4],
-					 .arg5 = vcpu->regs.r[5],
-					 .arg6 = vcpu->regs.r[6],
-					 .arg7 = vcpu->regs.r[7]};
-
-		smc_handler(vcpu, &ret, &next);
+		struct vcpu *next = smc_handler(vcpu);
 
 		/* Skip the SMC instruction. */
 		vcpu->regs.pc = smc_pc + GET_NEXT_PC_INC(esr);
-		arch_regs_set_retval(&vcpu->regs, ret);
+
 		return next;
 	}
 
