@@ -35,3 +35,22 @@ TEST(smccc, hf_debug_log_zero_or_unchanged)
 	EXPECT_EQ(smc_res.arg6, UINT64_C(0x6666666666666666));
 	EXPECT_EQ(smc_res.arg7, UINT64_C(0x77777777));
 }
+
+/**
+ * Checks that calling SPCI_FEATURES via an SMC works as expected.
+ * The spci_features helper function uses an HVC, but an SMC should also work.
+ */
+TEST(smccc, spci_features_smc)
+{
+	struct spci_value ret;
+
+	ret = smc32(SPCI_FEATURES_32, SPCI_VERSION_32, 0, 0, 0, 0, 0, 0);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	EXPECT_EQ(ret.arg1, 0);
+	EXPECT_EQ(ret.arg2, 0);
+	EXPECT_EQ(ret.arg3, 0);
+	EXPECT_EQ(ret.arg4, 0);
+	EXPECT_EQ(ret.arg5, 0);
+	EXPECT_EQ(ret.arg6, 0);
+	EXPECT_EQ(ret.arg7, 0);
+}

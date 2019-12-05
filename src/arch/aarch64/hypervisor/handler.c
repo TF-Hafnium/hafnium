@@ -402,21 +402,31 @@ static void update_vi(struct vcpu *next)
 static void smc_handler(struct vcpu *vcpu, struct spci_value *ret,
 			struct vcpu **next)
 {
-	uint32_t func = vcpu->regs.r[0];
+	struct spci_value args = {
+		.func = vcpu->regs.r[0],
+		.arg1 = vcpu->regs.r[1],
+		.arg2 = vcpu->regs.r[2],
+		.arg3 = vcpu->regs.r[3],
+		.arg4 = vcpu->regs.r[4],
+		.arg5 = vcpu->regs.r[5],
+		.arg6 = vcpu->regs.r[6],
+		.arg7 = vcpu->regs.r[7],
+	};
 
-	if (psci_handler(vcpu, func, vcpu->regs.r[1], vcpu->regs.r[2],
-			 vcpu->regs.r[3], &ret->func, next)) {
+	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
+			 &ret->func, next)) {
 		return;
 	}
 
-	if (spci_handler(ret, next)) {
+	if (spci_handler(&args, next)) {
+		*ret = args;
 		update_vi(*next);
 		return;
 	}
 
-	switch (func & ~SMCCC_CONVENTION_MASK) {
+	switch (args.func & ~SMCCC_CONVENTION_MASK) {
 	case HF_DEBUG_LOG:
-		ret->func = api_debug_log(vcpu->regs.r[1], vcpu);
+		ret->func = api_debug_log(args.arg1, vcpu);
 		return;
 	}
 
