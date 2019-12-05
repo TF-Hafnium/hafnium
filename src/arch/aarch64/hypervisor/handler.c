@@ -443,14 +443,7 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 	}
 
 	if (spci_handler(&args, &next)) {
-		vcpu->regs.r[0] = args.func;
-		vcpu->regs.r[1] = args.arg1;
-		vcpu->regs.r[2] = args.arg2;
-		vcpu->regs.r[3] = args.arg3;
-		vcpu->regs.r[4] = args.arg4;
-		vcpu->regs.r[5] = args.arg5;
-		vcpu->regs.r[6] = args.arg6;
-		vcpu->regs.r[7] = args.arg7;
+		arch_regs_set_retval(&vcpu->regs, args);
 		update_vi(next);
 		return next;
 	}
@@ -610,14 +603,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 
 		/* Skip the SMC instruction. */
 		vcpu->regs.pc = smc_pc + GET_NEXT_PC_INC(esr);
-		vcpu->regs.r[0] = ret.func;
-		vcpu->regs.r[1] = ret.arg1;
-		vcpu->regs.r[2] = ret.arg2;
-		vcpu->regs.r[3] = ret.arg3;
-		vcpu->regs.r[4] = ret.arg4;
-		vcpu->regs.r[5] = ret.arg5;
-		vcpu->regs.r[6] = ret.arg6;
-		vcpu->regs.r[7] = ret.arg7;
+		arch_regs_set_retval(&vcpu->regs, ret);
 		return next;
 	}
 
