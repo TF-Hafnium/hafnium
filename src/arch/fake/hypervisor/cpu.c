@@ -38,17 +38,17 @@ void arch_regs_reset(struct vcpu *vcpu)
 void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg)
 {
 	(void)pc;
-	r->r[0] = arg;
+	r->arg[0] = arg;
 }
 
 void arch_regs_set_retval(struct arch_regs *r, struct spci_value v)
 {
-	r->r[0] = v.func;
-	r->r[1] = v.arg1;
-	r->r[2] = v.arg2;
-	r->r[3] = v.arg3;
-	r->r[4] = v.arg4;
-	r->r[5] = v.arg5;
-	r->r[6] = v.arg6;
-	r->r[7] = v.arg7;
+	r->arg[0] = v.func;
+	r->arg[1] = v.arg1;
+	r->arg[2] = v.arg2;
+	r->arg[3] = v.arg3;
+	r->arg[4] = v.arg4;
+	r->arg[5] = v.arg5;
+	r->arg[6] = v.arg6;
+	r->arg[7] = v.arg7;
 }
