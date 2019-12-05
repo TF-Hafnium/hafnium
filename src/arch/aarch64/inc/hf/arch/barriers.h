@@ -62,9 +62,3 @@
  * before continuing.
  */
 #define data_sync_barrier() dsb(sy)
-
-/**
- * Flushes the instruction pipeline so that instructions are fetched from
- * memory.
- */
-#define insn_sync_barrier() isb()
