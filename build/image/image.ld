@@ -48,6 +48,8 @@ SECTIONS
 	.text : {
 		*(.text.*)
 	}
+	text_size = ABSOLUTE(. - text_begin);
+	. = ALIGN(4096);
 	text_end = .;
 
 	/*
@@ -97,6 +99,8 @@ SECTIONS
 	hftest_end = .;
 	ASSERT((SIZEOF(.hftest) == (DEFINED(hftest_enable) ? SIZEOF(.hftest) : 0)),
 	       "Error: Image includes .hftest section but not HFTEST_ENABLE().")
+	rodata_size = ABSOLUTE(. - rodata_begin);
+	. = ALIGN(4096);
 	rodata_end = .;
 
 	/*
@@ -157,6 +161,8 @@ SECTIONS
 	}
 	. = ALIGN(16);
 	bss_end = .;
+	data_size = ABSOLUTE(. - data_begin);
+	. = ALIGN(4096);
 	data_end = .;
 
 	/*
@@ -188,7 +194,4 @@ SECTIONS
 	 */
 	bin_size = ABSOLUTE(bin_end - ORIGIN_ADDRESS);
 	image_size = ABSOLUTE(image_end - ORIGIN_ADDRESS);
-	text_size = ABSOLUTE(text_end - text_begin);
-	rodata_size = ABSOLUTE(rodata_end - rodata_begin);
-	data_size = ABSOLUTE(data_end - data_begin);
 }
