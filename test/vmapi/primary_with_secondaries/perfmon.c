@@ -21,45 +21,15 @@
 #include "sysregs.h"
 #include "test/vmapi/spci.h"
 
-/*
- * TODO(b/132394973): Devise a way to test exhaustively read/write behavior to
- * all debug registers that does not involve a separate service per register,
- * because creating a new test/VM for every instance becomes too slow.
- * This needs proper trap support as a starting point.
- */
-
-TEST(perfmon, secondary_pmccfiltr_el0)
+TEST(perfmon, secondary_basic)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM1, "perfmon_secondary_pmccfiltr_el0", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "perfmon_secondary_basic", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
-}
-
-TEST(perfmon, secondary_pmcr_el0)
-{
-	struct spci_value run_res;
-	struct mailbox_buffers mb = set_up_mailbox();
-
-	SERVICE_SELECT(SERVICE_VM1, "perfmon_secondary_pmcr_el0", mb.send);
-
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
-}
-
-TEST(perfmon, secondary_pmintenset_el1)
-{
-	struct spci_value run_res;
-	struct mailbox_buffers mb = set_up_mailbox();
-
-	SERVICE_SELECT(SERVICE_VM1, "perfmon_secondary_pmintenset_el1",
-		       mb.send);
-
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 }
 
 /**

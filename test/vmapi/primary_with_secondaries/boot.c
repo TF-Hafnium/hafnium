@@ -20,6 +20,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
+#include "test/vmapi/exception_handler.h"
 #include "test/vmapi/spci.h"
 
 /**
@@ -37,7 +38,7 @@ TEST(boot, memory_size)
 }
 
 /**
- * Accessing memory outside the given range aborts the VM.
+ * Accessing memory outside the given range traps the VM and yields.
  */
 TEST(boot, beyond_memory_size)
 {
@@ -47,11 +48,12 @@ TEST(boot, beyond_memory_size)
 	SERVICE_SELECT(SERVICE_VM1, "boot_memory_overrun", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
- * Accessing memory before the start of the image aborts the VM.
+ * Accessing memory before the start of the image traps the VM and yields.
  */
 TEST(boot, memory_before_image)
 {
@@ -61,5 +63,6 @@ TEST(boot, memory_before_image)
 	SERVICE_SELECT(SERVICE_VM1, "boot_memory_underrun", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }

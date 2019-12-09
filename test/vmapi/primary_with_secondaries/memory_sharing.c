@@ -23,6 +23,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
+#include "test/vmapi/exception_handler.h"
 #include "test/vmapi/spci.h"
 
 alignas(PAGE_SIZE) static uint8_t pages[4 * PAGE_SIZE];
@@ -223,6 +224,7 @@ TEST(memory_sharing, concurrent)
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		uint8_t value = i + 1;
@@ -264,10 +266,11 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
+	spci_rx_release();
 
-	/* Observe the service faulting when accessing the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -324,15 +327,16 @@ TEST(memory_sharing, lend_relinquish)
 
 	/* Let the memory be returned. */
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	/* Ensure that the secondary VM accessed the region. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
 
-	/* Observe the service faulting when accessing the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -405,10 +409,11 @@ TEST(memory_sharing, give_and_get_back)
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
+	spci_rx_release();
 
-	/* Observe the service faulting when accessing the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -444,10 +449,11 @@ TEST(memory_sharing, lend_and_get_back)
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'd');
 	}
+	spci_rx_release();
 
-	/* Observe the service faulting when accessing the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -522,6 +528,7 @@ TEST(memory_sharing, share_elsewhere_after_return)
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	/* Share the memory with a different VM after it has been returned. */
 	msg_size = spci_memory_region_init(
@@ -533,9 +540,9 @@ TEST(memory_sharing, share_elsewhere_after_return)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -564,10 +571,11 @@ TEST(memory_sharing, give_memory_and_lose_access)
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
+	spci_rx_release();
 
-	/* Observe the service fault when it tries to access it. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -596,10 +604,11 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
+	spci_rx_release();
 
-	/* Observe the service fault when it tries to access it. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -613,7 +622,6 @@ TEST(memory_sharing, donate_check_upper_bounds)
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_check_upper_bound", mb.send);
-	SERVICE_SELECT(SERVICE_VM2, "spci_donate_check_upper_bound", mb.send);
 
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', 4 * PAGE_SIZE);
@@ -639,9 +647,9 @@ TEST(memory_sharing, donate_check_upper_bounds)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing out of bounds. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
 	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
@@ -653,19 +661,18 @@ TEST(memory_sharing, donate_check_upper_bounds)
 	 */
 	pages[PAGE_SIZE] = 1;
 
-	/* Use the secondary VM for this test as the first is now aborted. */
 	msg_size = spci_memory_region_init(
-		mb.send, SERVICE_VM2, constituents, ARRAY_SIZE(constituents), 0,
+		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
 		0, SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
 				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing out of bounds. */
-	run_res = spci_run(SERVICE_VM2, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	run_res = spci_run(SERVICE_VM1, 0);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -679,7 +686,6 @@ TEST(memory_sharing, donate_check_lower_bounds)
 	uint32_t msg_size;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_check_lower_bound", mb.send);
-	SERVICE_SELECT(SERVICE_VM2, "spci_donate_check_lower_bound", mb.send);
 
 	/* Initialise the memory before donating it. */
 	memset_s(ptr, sizeof(pages), 'b', 4 * PAGE_SIZE);
@@ -705,9 +711,9 @@ TEST(memory_sharing, donate_check_lower_bounds)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing out of bounds. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
 	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
@@ -719,19 +725,22 @@ TEST(memory_sharing, donate_check_lower_bounds)
 	 */
 	pages[PAGE_SIZE] = 1;
 
-	/* Use the secondary VM for this test as the first is now aborted. */
 	msg_size = spci_memory_region_init(
-		mb.send, SERVICE_VM2, constituents, ARRAY_SIZE(constituents), 0,
+		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
 		0, SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
+	EXPECT_EQ(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size,
 				SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing out of bounds. */
-	run_res = spci_run(SERVICE_VM2, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	run_res = spci_run(SERVICE_VM1, 0);
+	/*
+	 * NOTE: This generates two exceptions, one for the page fault, and one
+	 * for accessing a region past the lower bound.
+	 */
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  2);
 }
 
 /**
@@ -768,6 +777,7 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 
 	/* Let the memory be returned. */
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	/* Share the memory with another VM. */
 	msg_size = spci_memory_region_init(
@@ -779,9 +789,9 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the original service faulting when accessing the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -822,14 +832,16 @@ TEST(memory_sharing, donate_vms)
 	/* Let the memory be sent from VM1 to VM2. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	/* Receive memory in VM2. */
 	run_res = spci_run(SERVICE_VM2, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
-	/* Try to access memory in VM1 and fail. */
+	/* Try to access memory in VM1. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 
 	/* Ensure that memory in VM2 remains the same. */
 	run_res = spci_run(SERVICE_VM2, 0);
@@ -1167,6 +1179,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 	/* Let service write to and return memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	/* Re-initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
@@ -1185,9 +1198,9 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
-	/* Observe the service faulting when writing to the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -1233,6 +1246,7 @@ TEST(memory_sharing, share_relinquish_X_RW)
 	/* Let service write to and return memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	/* Re-initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
@@ -1257,9 +1271,9 @@ TEST(memory_sharing, share_relinquish_X_RW)
 		ptr[i]++;
 	}
 
-	/* Observe the service faulting when writing to the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -1304,6 +1318,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 	/* Let service write to and return memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	/* Re-initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
@@ -1328,9 +1343,9 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 		ptr[i]++;
 	}
 
-	/* Observe the service faulting when writing to the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -1368,6 +1383,7 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 	/* Attempt to execute from memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	msg_size = spci_memory_region_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -1378,9 +1394,9 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Try and fail to execute from the memory region. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -1418,6 +1434,7 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 	/* Attempt to execute from memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
 
 	msg_size = spci_memory_region_init(
 		mb.send, SERVICE_VM1, constituents, ARRAY_SIZE(constituents), 0,
@@ -1428,9 +1445,9 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Try and fail to execute from the memory region. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -1771,9 +1788,9 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing out of bounds. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
 	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
@@ -1795,9 +1812,9 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing out of bounds. */
 	run_res = spci_run(SERVICE_VM2, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
@@ -1837,9 +1854,9 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing out of bounds. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
 	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
@@ -1861,7 +1878,7 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 			  .func,
 		  SPCI_SUCCESS_32);
 
-	/* Observe the service faulting when accessing out of bounds. */
 	run_res = spci_run(SERVICE_VM2, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }

@@ -439,6 +439,94 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
 	return NULL;
 }
 
+/*
+ * Exception vector offsets.
+ * See Arm Architecture Reference Manual Armv8-A, D1.10.2.
+ */
+
+/**
+ * Offset for synchronous exceptions at current EL with SPx.
+ */
+#define OFFSET_CURRENT_SPX UINT64_C(0x200)
+
+/**
+ * Offset for synchronous exceptions at lower EL using AArch64.
+ */
+#define OFFSET_LOWER_EL_64 UINT64_C(0x400)
+
+/**
+ * Offset for synchronous exceptions at lower EL using AArch32.
+ */
+#define OFFSET_LOWER_EL_32 UINT64_C(0x600)
+
+/**
+ * Returns the address for the exception handler at EL1.
+ */
+static uintreg_t get_el1_exception_handler_addr(const struct vcpu *vcpu)
+{
+	uintreg_t base_addr = read_msr(vbar_el1);
+	uintreg_t pe_mode = vcpu->regs.spsr & PSR_PE_MODE_MASK;
+	bool is_arch32 = vcpu->regs.spsr & PSR_ARCH_MODE_32;
+
+	if (pe_mode == PSR_PE_MODE_EL0T) {
+		if (is_arch32) {
+			base_addr += OFFSET_LOWER_EL_32;
+		} else {
+			base_addr += OFFSET_LOWER_EL_64;
+		}
+	} else {
+		CHECK(!is_arch32);
+		base_addr += OFFSET_CURRENT_SPX;
+	}
+
+	return base_addr;
+}
+
+/**
+ * Injects an exception with an unknown reason (EC=0x0) to the EL1.
+ * See Arm Architecture Reference Manual Armv8-A, page D13-2924.
+ *
+ * NOTE: This function assumes that the lazy registers haven't been saved, and
+ * writes to the lazy registers of the CPU directly instead of the vCPU.
+ */
+static struct vcpu *inject_el1_unknown_exception(struct vcpu *vcpu,
+						 uintreg_t esr_el2)
+{
+	uintreg_t esr_el1_value = GET_ESR_IL(esr_el2);
+	uintreg_t handler_address = get_el1_exception_handler_addr(vcpu);
+	char *direction_str;
+
+	/* Update the CPU state to inject the exception. */
+	write_msr(esr_el1, esr_el1_value);
+	write_msr(elr_el1, vcpu->regs.pc);
+	write_msr(spsr_el1, vcpu->regs.spsr);
+
+	/*
+	 * Mask (disable) interrupts and run in EL1h mode.
+	 * EL1h mode is used because by default, taking an exception selects the
+	 * stack pointer for the target Exception level. The software can change
+	 * that later in the handler if needed.
+	 * See Arm Architecture Reference Manual Armv8-A, page D13-2924
+	 */
+	vcpu->regs.spsr = PSR_D | PSR_A | PSR_I | PSR_F | PSR_PE_MODE_EL1H;
+
+	/* Transfer control to the exception hander. */
+	vcpu->regs.pc = handler_address;
+
+	direction_str = ISS_IS_READ(esr_el2) ? "read" : "write";
+	dlog("Trapped access to system register %s: op0=%d, op1=%d, crn=%d, "
+	     "crm=%d, op2=%d, rt=%d.\n",
+	     direction_str, GET_ISS_OP0(esr_el2), GET_ISS_OP1(esr_el2),
+	     GET_ISS_CRN(esr_el2), GET_ISS_CRM(esr_el2), GET_ISS_OP2(esr_el2),
+	     GET_ISS_RT(esr_el2));
+
+	dlog("Injecting Unknown Reason exception into VM%d.\n", vcpu->vm->id);
+	dlog("Exception handler address 0x%x\n", handler_address);
+
+	/* Schedule the same VM to continue running. */
+	return NULL;
+}
+
 struct vcpu *hvc_handler(struct vcpu *vcpu)
 {
 	struct spci_value args = {
@@ -635,96 +723,11 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 		break;
 	}
 
-	/* The exception wasn't handled so abort the VM. */
-	return api_abort(vcpu);
-}
-
-/*
- * Exception vector offsets.
- * See Arm Architecture Reference Manual Armv8-A, D1.10.2.
- */
-
-/**
- * Offset for synchronous exceptions at current EL with SPx.
- */
-#define OFFSET_CURRENT_SPX UINT64_C(0x200)
-
-/**
- * Offset for synchronous exceptions at lower EL using AArch64.
- */
-#define OFFSET_LOWER_EL_64 UINT64_C(0x400)
-
-/**
- * Offset for synchronous exceptions at lower EL using AArch32.
- */
-#define OFFSET_LOWER_EL_32 UINT64_C(0x600)
-
-/**
- * Returns the address for the exception handler at EL1.
- */
-static uintreg_t get_el1_exception_handler_addr(const struct vcpu *vcpu)
-{
-	uintreg_t base_addr = read_msr(vbar_el1);
-	uintreg_t pe_mode = vcpu->regs.spsr & PSR_PE_MODE_MASK;
-	bool is_arch32 = vcpu->regs.spsr & PSR_ARCH_MODE_32;
-
-	if (pe_mode == PSR_PE_MODE_EL0T) {
-		if (is_arch32) {
-			base_addr += OFFSET_LOWER_EL_32;
-		} else {
-			base_addr += OFFSET_LOWER_EL_64;
-		}
-	} else {
-		CHECK(!is_arch32);
-		base_addr += OFFSET_CURRENT_SPX;
-	}
-
-	return base_addr;
-}
-
-/**
- * Injects an exception with an unknown reason (EC=0x0) to the EL1.
- * See Arm Architecture Reference Manual Armv8-A, page D13-2924.
- *
- * NOTE: This function assumes that the lazy registers haven't been saved, and
- * writes to the lazy registers of the CPU directly instead of the vCPU.
- */
-static struct vcpu *inject_el1_unknown_exception(struct vcpu *vcpu,
-						 uintreg_t esr_el2)
-{
-	uintreg_t esr_el1_value = GET_ESR_IL(esr_el2);
-	uintreg_t handler_address = get_el1_exception_handler_addr(vcpu);
-	char *direction_str;
-
-	/* Update the CPU state to inject the exception. */
-	write_msr(esr_el1, esr_el1_value);
-	write_msr(elr_el1, vcpu->regs.pc);
-	write_msr(spsr_el1, vcpu->regs.spsr);
-
 	/*
-	 * Mask (disable) interrupts and run in EL1h mode.
-	 * EL1h mode is used because by default, taking an exception selects the
-	 * stack pointer for the target Exception level. The software can change
-	 * that later in the handler if needed.
-	 * See Arm Architecture Reference Manual Armv8-A, page D13-2924
+	 * The exception wasn't handled. Inject to the VM to give it chance to
+	 * handle as an unknown exception.
 	 */
-	vcpu->regs.spsr = PSR_D | PSR_A | PSR_I | PSR_F | PSR_PE_MODE_EL1H;
-
-	/* Transfer control to the exception hander. */
-	vcpu->regs.pc = handler_address;
-
-	direction_str = ISS_IS_READ(esr_el2) ? "read" : "write";
-	dlog("Trapped access to system register %s: op0=%d, op1=%d, crn=%d, "
-	     "crm=%d, op2=%d, rt=%d.\n",
-	     direction_str, GET_ISS_OP0(esr_el2), GET_ISS_OP1(esr_el2),
-	     GET_ISS_CRN(esr_el2), GET_ISS_CRM(esr_el2), GET_ISS_OP2(esr_el2),
-	     GET_ISS_RT(esr_el2));
-
-	dlog("Injecting Unknown Reason exception into VM%d.\n", vcpu->vm->id);
-	dlog("Exception handler address 0x%x\n", handler_address);
-
-	/* Schedule the same VM to continue running. */
-	return NULL;
+	return inject_el1_unknown_exception(vcpu, esr);
 }
 
 /**

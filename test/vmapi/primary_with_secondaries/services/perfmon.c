@@ -14,27 +14,22 @@
  * limitations under the License.
  */
 
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/dlog.h"
 
 #include "../sysregs.h"
+#include "test/vmapi/exception_handler.h"
 
-TEST_SERVICE(perfmon_secondary_pmccfiltr_el0)
+TEST_SERVICE(perfmon_secondary_basic)
 {
+	exception_setup(NULL, exception_handler_skip_instruction);
+
 	EXPECT_GT(hf_vm_get_id(), HF_PRIMARY_VM_ID);
 	TRY_READ(PMCCFILTR_EL0);
-	FAIL("Accessing perfmon register in secondary VM didn't trap.");
-}
-
-TEST_SERVICE(perfmon_secondary_pmcr_el0)
-{
-	EXPECT_GT(hf_vm_get_id(), HF_PRIMARY_VM_ID);
 	TRY_READ(PMCR_EL0);
-	FAIL("Accessing perfmon register in secondary VM didn't trap.");
-}
-
-TEST_SERVICE(perfmon_secondary_pmintenset_el1)
-{
-	EXPECT_GT(hf_vm_get_id(), HF_PRIMARY_VM_ID);
 	write_msr(PMINTENSET_EL1, 0xf);
-	FAIL("Accessing perfmon register in secondary VM didn't trap.");
+
+	EXPECT_EQ(exception_handler_get_num(), 3);
+	spci_yield();
 }

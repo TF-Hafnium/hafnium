@@ -15,6 +15,7 @@
  */
 
 #include "hf/arch/vm/events.h"
+#include "hf/arch/vm/interrupts.h"
 #include "hf/arch/vm/interrupts_gicv3.h"
 #include "hf/arch/vm/timer.h"
 
@@ -25,32 +26,32 @@
 
 #include "common.h"
 #include "test/hftest.h"
+#include "test/vmapi/exception_handler.h"
 
 /*
  * Secondary VM that tries to access GICv3 system registers.
  */
 
-TEST_SERVICE(read_systemreg_ctlr)
+TEST_SERVICE(access_systemreg_ctlr)
 {
-	/* Reading ICC_CTLR_EL1 should trap and abort the VM. */
-	dlog("ICC_CTLR_EL1=%#x\n", read_msr(ICC_CTLR_EL1));
-	FAIL("Reading ICC_CTLR_EL1 didn't trap.");
-}
+	exception_setup(NULL, exception_handler_skip_instruction);
 
-TEST_SERVICE(write_systemreg_ctlr)
-{
-	/* Writing ICC_CTLR_EL1 should trap and abort the VM. */
+	/* Reading ICC_CTLR_EL1 should trap the VM. */
+	read_msr(ICC_CTLR_EL1);
+
+	/* Writing ICC_CTLR_EL1 should trap the VM. */
 	write_msr(ICC_CTLR_EL1, 0);
-	FAIL("Writing ICC_CTLR_EL1 didn't trap.");
+
+	EXPECT_EQ(exception_handler_get_num(), 2);
+
+	/* Yield after catching the exceptions. */
+	spci_yield();
 }
 
 TEST_SERVICE(write_systemreg_sre)
 {
 	ASSERT_EQ(read_msr(ICC_SRE_EL1), 0x7);
-	/*
-	 * Writing ICC_SRE_EL1 should either trap and abort the VM or be
-	 * ignored.
-	 */
+	/* Writing ICC_SRE_EL1 should trap the VM or be ignored. */
 	write_msr(ICC_SRE_EL1, 0x0);
 	ASSERT_EQ(read_msr(ICC_SRE_EL1), 0x7);
 	write_msr(ICC_SRE_EL1, 0xffffffff);

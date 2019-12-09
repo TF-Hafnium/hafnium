@@ -25,65 +25,15 @@
  */
 #define CUSTOM_QEMU_BUILD() 0
 
-/*
- * TODO(b/132422368): Devise a way to test exhaustively read/write behavior to
- * all debug registers that does not involve a separate service per register.
- * This needs proper trap support as a starting point.
- */
-
-TEST(debug_el1, secondary_mdccint_el1)
+TEST(debug_el1, secondary_basic)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM1, "debug_el1_secondary_mdccint_el1", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "debug_el1_secondary_basic", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
-}
-
-TEST(debug_el1, secondary_dbgbcr0_el1)
-{
-	struct spci_value run_res;
-	struct mailbox_buffers mb = set_up_mailbox();
-
-	SERVICE_SELECT(SERVICE_VM1, "debug_el1_secondary_dbgbcr0_el1", mb.send);
-
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
-}
-
-TEST(debug_el1, secondary_dbgbvr0_el1)
-{
-	struct spci_value run_res;
-	struct mailbox_buffers mb = set_up_mailbox();
-
-	SERVICE_SELECT(SERVICE_VM1, "debug_el1_secondary_dbgbvr0_el1", mb.send);
-
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
-}
-
-TEST(debug_el1, secondary_dbgwcr0_el1)
-{
-	struct spci_value run_res;
-	struct mailbox_buffers mb = set_up_mailbox();
-
-	SERVICE_SELECT(SERVICE_VM1, "debug_el1_secondary_dbgwcr0_el1", mb.send);
-
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
-}
-
-TEST(debug_el1, secondary_dbgwvr0_el1)
-{
-	struct spci_value run_res;
-	struct mailbox_buffers mb = set_up_mailbox();
-
-	SERVICE_SELECT(SERVICE_VM1, "debug_el1_secondary_dbgwvr0_el1", mb.send);
-
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 }
 
 /**

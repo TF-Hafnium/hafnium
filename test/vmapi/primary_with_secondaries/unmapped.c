@@ -18,72 +18,81 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
+#include "test/vmapi/exception_handler.h"
 #include "test/vmapi/spci.h"
 
 /**
- * Accessing unmapped memory aborts the VM.
+ * Accessing unmapped memory traps the VM.
  */
-TEST(abort, data_abort)
+TEST(unmapped, data_unmapped)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM1, "data_abort", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "data_unmapped", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
- * Accessing partially unmapped memory aborts the VM.
+ * Accessing partially unmapped memory traps the VM.
  */
-TEST(abort, straddling_data_abort)
+TEST(unmapped, straddling_data_unmapped)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM1, "straddling_data_abort", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "straddling_data_unmapped", mb.send);
 
 	/*
 	 * First we get a message about the memory being donated to us, then we
-	 * get the abort.
+	 * get the trap.
 	 */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
+
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
- * Executing unmapped memory aborts the VM.
+ * Executing unmapped memory traps the VM.
  */
-TEST(abort, instruction_abort)
+TEST(unmapped, instruction_unmapped)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM1, "instruction_abort", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "instruction_unmapped", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }
 
 /**
- * Executing partially unmapped memory aborts the VM.
+ * Executing partially unmapped memory traps the VM.
  */
-TEST(abort, straddling_instruction_abort)
+TEST(unmapped, straddling_instruction_unmapped)
 {
 	struct spci_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
-	SERVICE_SELECT(SERVICE_VM1, "straddling_instruction_abort", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "straddling_instruction_unmapped", mb.send);
 
 	/*
 	 * First we get a message about the memory being donated to us, then we
-	 * get the abort.
+	 * get the trap.
 	 */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	spci_rx_release();
+
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+		  1);
 }

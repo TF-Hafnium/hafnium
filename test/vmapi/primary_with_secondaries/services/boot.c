@@ -14,12 +14,15 @@
  * limitations under the License.
  */
 
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/mm.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
+#include "test/vmapi/exception_handler.h"
 
 /*
  * This must match the size specified for services1 in
@@ -52,9 +55,10 @@ TEST_SERVICE(boot_memory)
 
 TEST_SERVICE(boot_memory_underrun)
 {
+	exception_setup(NULL, exception_handler_yield);
 	/*
 	 * Try to read memory below the start of the image. This should result
-	 * in the VM being aborted.
+	 * in the VM trapping and yielding.
 	 */
 	dlog("Read memory below limit: %d\n", text_begin[-1]);
 	FAIL("Managed to read memory below limit");
@@ -62,9 +66,10 @@ TEST_SERVICE(boot_memory_underrun)
 
 TEST_SERVICE(boot_memory_overrun)
 {
+	exception_setup(NULL, exception_handler_yield);
 	/*
 	 * Try to read memory above the limit defined by memory_size. This
-	 * should result in the VM being aborted.
+	 * should result in the VM trapping and yielding.
 	 */
 	dlog("Read memory above limit: %d\n",
 	     text_begin[SERVICE_MEMORY_SIZE()]);

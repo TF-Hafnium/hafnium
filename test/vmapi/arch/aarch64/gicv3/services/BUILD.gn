@@ -65,6 +65,11 @@ source_set("systemreg") {
     ":common",
     "//src/arch/aarch64:arch",
   ]
+
+  include_dirs = [
+    "//test/vmapi/common",
+    "//inc/vmapi/hf",
+  ]
 }
 
 # Group services together into VMs.
@@ -77,5 +82,6 @@ vm_kernel("gicv3_service_vm1") {
     ":systemreg",
     ":timer",
     "//test/hftest:hftest_secondary_vm",
+    "//test/vmapi/common:common",
   ]
 }

@@ -20,6 +20,7 @@ group("vmapi") {
 
   deps = [
     "arch/${plat_arch}:arch",
+    "common:common",
     "primary_only:primary_only_test",
     "primary_with_secondaries:primary_with_secondaries_test",
   ]

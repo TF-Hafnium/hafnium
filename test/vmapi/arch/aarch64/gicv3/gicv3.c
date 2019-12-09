@@ -28,7 +28,6 @@
 
 #include "../msr.h"
 #include "test/hftest.h"
-#include "test/vmapi/spci.h"
 
 alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
 alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];
@@ -83,35 +82,19 @@ TEST(system, system_setup)
 }
 
 /*
- * Check that an attempt by a secondary VM to read a GICv3 system register is
+ * Check that an attempt by a secondary VM to access a GICv3 system register is
  * trapped.
  */
-TEST(system, icc_ctlr_read_trapped_secondary)
+TEST(system, icc_ctlr_access_trapped_secondary)
 {
 	struct spci_value run_res;
 
 	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
 		  SPCI_SUCCESS_32);
-	SERVICE_SELECT(SERVICE_VM1, "read_systemreg_ctlr", send_buffer);
+	SERVICE_SELECT(SERVICE_VM1, "access_systemreg_ctlr", send_buffer);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
-}
-
-/*
- * Check that an attempt by a secondary VM to write a GICv3 system register is
- * trapped.
- */
-TEST(system, icc_ctlr_write_trapped_secondary)
-{
-	struct spci_value run_res;
-
-	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
-		  SPCI_SUCCESS_32);
-	SERVICE_SELECT(SERVICE_VM1, "write_systemreg_ctlr", send_buffer);
-
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 }
 
 /*
@@ -127,7 +110,5 @@ TEST(system, icc_sre_write_trapped_secondary)
 	SERVICE_SELECT(SERVICE_VM1, "write_systemreg_sre", send_buffer);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_TRUE((run_res.func == SPCI_ERROR_32 &&
-		     run_res.arg2 == SPCI_ABORTED) ||
-		    run_res.func == SPCI_YIELD_32);
+	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 }
