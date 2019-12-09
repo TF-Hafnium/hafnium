@@ -16,12 +16,7 @@
 
 #include "sysregs.h"
 
-#include "hf/check.h"
-#include "hf/panic.h"
-#include "hf/types.h"
-
 #include "msr.h"
-#include "perfmon.h"
 
 /**
  * Returns the value for HCR_EL2 for the particular VM.
