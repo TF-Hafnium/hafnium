@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//build/linux/linux.gni")
-
 # TODO: Having all third_party targets defined in this file means they share
 # the same $target_out_dir folder. Ideally we would like to avoid that.
 
@@ -54,9 +52,4 @@ source_set("gtest_main") {
   deps = [
     ":gtest",
   ]
-}
-
-linux_kernel("linux") {
-  kernel_dir = "linux"
-  prebuilt = "//prebuilts/linux-aarch64/linux/vmlinuz"
 }

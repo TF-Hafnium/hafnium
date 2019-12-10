@@ -59,7 +59,7 @@ initrd("linux_test") {
 
   manifest = "manifest.dts"
   primary_name = "vmlinuz"
-  primary_vm = "//third_party:linux__prebuilt"
+  primary_vm = "//third_party/linux:linux__prebuilt"
   primary_initrd = ":linux_test_initrd"
   secondary_vms = [ [
         "socket0",

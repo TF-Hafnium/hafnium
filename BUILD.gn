@@ -33,7 +33,7 @@ group("test_root") {
 
 group("update_prebuilts") {
   deps = [
-    "//third_party:linux",
+    "//third_party/linux",
   ]
 }
 

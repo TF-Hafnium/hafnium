@@ -56,10 +56,12 @@ template("linux_kernel") {
   defconfig_target = "${target_name}__defconfig"
   prebuilt_target = "${target_name}__prebuilt"
 
+  kernel_dir = "./"
+
   # Args to build/make.py to start the Linux build.
   shared_args = [
     "--directory",
-    rebase_path(invoker.kernel_dir),
+    rebase_path(kernel_dir),
 
     # TODO: Build with toolchain cc instead of a hardcoded one.
     "CC=" + rebase_path("//prebuilts/linux-x64/clang/bin/clang"),
@@ -85,7 +87,7 @@ template("linux_kernel") {
   # Subtarget which generates a depfile with all files in the Linux tree
   # and gets invalidated if any of them change.
   source_dir(source_target) {
-    path = invoker.kernel_dir
+    path = kernel_dir
   }
 
   # Subtarget which runs `defconfig` and `modules_prepare`. Used by targets
