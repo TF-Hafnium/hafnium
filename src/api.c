@@ -964,6 +964,12 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
+	/* Ensure the receiver VM exists. */
+	to = vm_find(receiver_vm_id);
+	if (to == NULL) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
 	/*
 	 * Check that the sender has configured its send buffer. If the tx
 	 * mailbox at from_msg is configured (i.e. from_msg != NULL) then it can
@@ -975,12 +981,6 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	sl_unlock(&from->lock);
 
 	if (from_msg == NULL) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
-	}
-
-	/* Ensure the receiver VM exists. */
-	to = vm_find(receiver_vm_id);
-	if (to == NULL) {
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
