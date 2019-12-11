@@ -28,7 +28,7 @@ requires, and try to improve it if possible.
 
 *   Arch-specific functions should start with `arch_`.
 *   Platform-specific functions should start with `plat_`.
-*   Non-static functions should generally start with the same of the file they
+*   Non-static functions should generally start with the name of the file they
     are declared in (after the `arch_` or `plat_` prefix if appropriate), though
     there are quite a few exceptions to this rule.
 *   Prefer `x_count` over `num_x`.
