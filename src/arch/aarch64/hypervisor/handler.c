@@ -19,6 +19,7 @@
 #include "hf/arch/barriers.h"
 #include "hf/arch/init.h"
 #include "hf/arch/mm.h"
+#include "hf/arch/plat/smc.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
@@ -286,6 +287,7 @@ static bool smc_is_blocked(const struct vm *vm, uint32_t func)
  */
 static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 {
+	struct spci_value ret;
 	uint32_t client_id = vm->id;
 	uintreg_t arg7 = args->arg7;
 
@@ -300,8 +302,8 @@ static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 	 * upper bits.
 	 */
 	args->arg7 = client_id | (arg7 & ~CLIENT_ID_MASK);
-	*args = smc_forward(args->func, args->arg1, args->arg2, args->arg3,
-			    args->arg4, args->arg5, args->arg6, args->arg7);
+	ret = smc_forward(args->func, args->arg1, args->arg2, args->arg3,
+			  args->arg4, args->arg5, args->arg6, args->arg7);
 
 	/*
 	 * Preserve the value passed by the caller, rather than the client_id we
@@ -309,7 +311,11 @@ static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 	 * may be in x7, but the SMCs that we are forwarding are legacy calls
 	 * from before SMCCC 1.2 so won't have more than 4 return values anyway.
 	 */
-	args->arg7 = arg7;
+	ret.arg7 = arg7;
+
+	plat_smc_post_forward(*args, &ret);
+
+	*args = ret;
 }
 
 static bool spci_handler(struct spci_value *args, struct vcpu **next)
@@ -425,12 +431,12 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
 	switch (args.func & ~SMCCC_CONVENTION_MASK) {
 	case HF_DEBUG_LOG:
 		vcpu->regs.r[0] = api_debug_log(args.arg1, vcpu);
-		return next;
+		return NULL;
 	}
 
 	smc_forwarder(vcpu->vm, &args);
 	arch_regs_set_retval(&vcpu->regs, args);
-	return next;
+	return NULL;
 }
 
 struct vcpu *hvc_handler(struct vcpu *vcpu)
