@@ -25,6 +25,7 @@
 #include "vmapi/hf/transport.h"
 
 #include "test/hftest.h"
+#include "test/vmapi/spci.h"
 
 alignas(4096) uint8_t kstack[4096];
 
@@ -68,7 +69,7 @@ noreturn void kmain(size_t memory_size)
 	/* Set up the mailbox. */
 	spci_rxtx_map(send_addr, recv_addr);
 
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
 
 	/* Clean the context. */
 	ctx = hftest_get_context();

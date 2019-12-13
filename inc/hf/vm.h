@@ -30,6 +30,16 @@
 #define MAX_SMCS 32
 #define LOG_BUFFER_SIZE 256
 
+/**
+ * The state of an RX buffer.
+ *
+ * EMPTY is the initial state. The follow state transitions are possible:
+ * * EMPTY → RECEIVED: message sent to the VM.
+ * * RECEIVED → READ: secondary VM returns from SPCI_MSG_WAIT or
+ *   SPCI_MSG_POLL, or primary VM returns from SPCI_RUN with an SPCI_MSG_SEND
+ *   where the receiver is itself.
+ * * READ → EMPTY: VM called SPCI_RX_RELEASE.
+ */
 enum mailbox_state {
 	/** There is no message in the mailbox. */
 	MAILBOX_STATE_EMPTY,

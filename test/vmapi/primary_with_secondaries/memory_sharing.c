@@ -832,7 +832,7 @@ TEST(memory_sharing, donate_vms)
 	/* Let the memory be sent from VM1 to VM2. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_msg_send_receiver(run_res), SERVICE_VM2);
 
 	/* Receive memory in VM2. */
 	run_res = spci_run(SERVICE_VM2, 0);

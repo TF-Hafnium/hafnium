@@ -64,13 +64,13 @@ static void next_permutation(char *s, size_t len)
 }
 
 /**
- * Clearing an empty mailbox is a noop.
+ * Clearing an empty mailbox is an error.
  */
 TEST(mailbox, clear_empty)
 {
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
 }
 
 /**
