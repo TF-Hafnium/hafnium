@@ -31,7 +31,7 @@ TEST_SERVICE(busy)
 {
 	dlog("Secondary waiting for message...\n");
 	mailbox_receive_retry();
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 	dlog("Secondary received message, looping forever.\n");
 	for (;;) {
 	}

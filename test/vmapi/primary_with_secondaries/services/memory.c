@@ -61,7 +61,7 @@ TEST_SERVICE(memory_increment)
 		}
 
 		/* Signal completion and reset. */
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 		spci_msg_send(hf_vm_get_id(), spci_msg_send_sender(ret),
 			      sizeof(ptr), 0);
 	}
@@ -164,7 +164,7 @@ TEST_SERVICE(spci_memory_return)
 			SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 			SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 		EXPECT_EQ(spci_msg_send(spci_msg_send_receiver(ret),
 					spci_msg_send_sender(ret), msg_size,
 					SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
@@ -206,7 +206,7 @@ TEST_SERVICE(spci_donate_check_upper_bound)
 		/* Choose which constituent we want to test. */
 		index = *(uint8_t *)constituents[0].address;
 		ptr = (uint8_t *)constituents[index].address;
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 		/*
 		 * Check that one cannot access out of bounds after donated
@@ -241,7 +241,7 @@ TEST_SERVICE(spci_donate_check_lower_bound)
 		/* Choose which constituent we want to test. */
 		index = *(uint8_t *)constituents[0].address;
 		ptr = (uint8_t *)constituents[index].address;
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 		/*
 		 * Check that one cannot access out of bounds after donated
@@ -280,7 +280,7 @@ TEST_SERVICE(spci_donate_secondary_and_fault)
 		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 	EXPECT_EQ(spci_msg_send(spci_msg_send_receiver(ret), SERVICE_VM2,
 				msg_size, SPCI_MSG_SEND_LEGACY_MEMORY_DONATE)
 			  .func,
@@ -309,7 +309,7 @@ TEST_SERVICE(spci_donate_twice)
 	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_attributes(ret),
 		  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Yield to allow attempt to re donate from primary. */
 	spci_yield();
@@ -357,7 +357,7 @@ TEST_SERVICE(spci_memory_receive)
 			  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
 
 		ptr = (uint8_t *)constituents[0].address;
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 		ptr[0] = 'd';
 		spci_yield();
 
@@ -402,7 +402,7 @@ TEST_SERVICE(spci_donate_invalid_source)
 		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 	EXPECT_SPCI_ERROR(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
 					SPCI_MSG_SEND_LEGACY_MEMORY_DONATE),
 			  SPCI_INVALID_PARAMETERS);
@@ -464,7 +464,7 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 			SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
 		/* Relevant information read, mailbox can be cleared. */
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 		EXPECT_EQ(spci_msg_send(spci_msg_send_receiver(ret),
 					spci_msg_send_sender(ret), msg_size,
 					SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH)
@@ -514,7 +514,7 @@ TEST_SERVICE(spci_memory_donate_relinquish)
 			SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 			SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 		EXPECT_SPCI_ERROR(
 			spci_msg_send(spci_msg_send_receiver(ret),
 				      HF_PRIMARY_VM_ID, msg_size,
@@ -586,7 +586,7 @@ TEST_SERVICE(spci_lend_invalid_source)
 		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 	EXPECT_SPCI_ERROR(spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM2, msg_size,
 					SPCI_MSG_SEND_LEGACY_MEMORY_SHARE),
 			  SPCI_INVALID_PARAMETERS);
@@ -633,7 +633,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_X)
 			SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 			SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 		EXPECT_EQ(spci_msg_send(spci_msg_send_receiver(ret),
 					HF_PRIMARY_VM_ID, msg_size,
 					SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH)
@@ -677,7 +677,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 				  ~SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
 			  0);
 
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 		ptr = (uint8_t *)constituent_copy.address;
 
@@ -731,7 +731,7 @@ TEST_SERVICE(spci_lend_check_upper_bound)
 	/* Choose which constituent we want to test. */
 	index = *(uint8_t *)constituents[0].address;
 	ptr = (uint8_t *)constituents[index].address;
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Check that one cannot access after lent region. */
 	ASSERT_EQ(ptr[PAGE_SIZE], 0);
@@ -763,7 +763,7 @@ TEST_SERVICE(spci_lend_check_lower_bound)
 	/* Choose which constituent we want to test. */
 	index = *(uint8_t *)constituents[0].address;
 	ptr = (uint8_t *)constituents[index].address;
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Check that one cannot access after lent region. */
 	ptr[-1]++;
@@ -799,7 +799,7 @@ TEST_SERVICE(spci_memory_lend_twice)
 			  ~SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
 		  0);
 
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	ptr = (uint8_t *)constituent_copy.address;
 

@@ -95,6 +95,6 @@ TEST_SERVICE(interruptible)
 			     spci_msg_send_size(ret));
 			FAIL("Unexpected message");
 		}
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 	}
 }

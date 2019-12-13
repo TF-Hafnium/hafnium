@@ -90,7 +90,7 @@ TEST_SERVICE(timer)
 			(message[9] - '0') * 100 + (message[10] - '0') * 10 +
 			(message[11] - '0');
 
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 		dlog("Starting timer for %d ticks.\n", ticks);
 

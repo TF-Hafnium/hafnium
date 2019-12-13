@@ -52,7 +52,7 @@ TEST(unmapped, straddling_data_unmapped)
 	 */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
@@ -90,7 +90,7 @@ TEST(unmapped, straddling_instruction_unmapped)
 	 */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),

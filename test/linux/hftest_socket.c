@@ -68,7 +68,7 @@ noreturn void kmain(size_t memory_size)
 	/* Set up the mailbox. */
 	spci_rxtx_map(send_addr, recv_addr);
 
-	spci_rx_release();
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Clean the context. */
 	ctx = hftest_get_context();
@@ -98,7 +98,7 @@ noreturn void kmain(size_t memory_size)
 		spci_vm_id_t dst_id = spci_msg_send_sender(ret);
 		spci_vm_id_t src_id = spci_msg_send_receiver(ret);
 
-		spci_rx_release();
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 		EXPECT_EQ(spci_msg_send(src_id, dst_id, spci_msg_send_size(ret),
 					0)
 				  .func,
