@@ -16,7 +16,7 @@
 
 #include "primary_with_secondary.h"
 #include "sysregs.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 /**
  * QEMU does not properly handle the trapping of certain system register

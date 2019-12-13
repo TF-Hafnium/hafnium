@@ -24,7 +24,7 @@
 #include "../msr.h"
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 /**
  * Test that floating point registers are saved and restored by

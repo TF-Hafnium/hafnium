@@ -28,6 +28,7 @@
 
 #include "common.h"
 #include "test/hftest.h"
+#include "test/vmapi/spci.h"
 
 /*
  * Secondary VM that sets timers in response to messages, and sends messages
@@ -111,8 +112,7 @@ TEST_SERVICE(timer)
 		} else if (receive) {
 			struct spci_value res = spci_msg_wait();
 
-			EXPECT_EQ(res.func, SPCI_ERROR_32);
-			EXPECT_EQ(res.arg2, SPCI_INTERRUPTED);
+			EXPECT_SPCI_ERROR(res, SPCI_INTERRUPTED);
 		} else {
 			/* Busy wait until the timer fires. */
 			while (!timer_fired) {

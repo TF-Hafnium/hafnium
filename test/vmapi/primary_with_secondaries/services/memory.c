@@ -21,7 +21,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];
 

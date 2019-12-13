@@ -23,6 +23,7 @@
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
+#include "test/vmapi/spci.h"
 
 /*
  * TODO: Some of these tests are duplicated between 'primary_only' and
@@ -90,8 +91,7 @@ TEST(hf_vcpu_get_count, large_invalid_vm_id)
 TEST(spci_run, cannot_run_primary)
 {
 	struct spci_value res = spci_run(HF_PRIMARY_VM_ID, 0);
-	EXPECT_EQ(res.func, SPCI_ERROR_32);
-	EXPECT_EQ(res.arg2, SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
 }
 
 /**
@@ -100,8 +100,7 @@ TEST(spci_run, cannot_run_primary)
 TEST(spci_run, cannot_run_absent_secondary)
 {
 	struct spci_value res = spci_run(1, 0);
-	EXPECT_EQ(res.func, SPCI_ERROR_32);
-	EXPECT_EQ(res.arg2, SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
 }
 
 /**
@@ -201,52 +200,40 @@ TEST(spci, spci_features_not_supported)
 	struct spci_value ret;
 
 	ret = spci_features(0);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(0x84000000);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_INTERRUPT_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_RX_RELEASE_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_RXTX_MAP_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_RXTX_UNMAP_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_PARTITION_INFO_GET_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_RUN_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_EQ(ret.func, SPCI_ERROR_32);
-	EXPECT_EQ(ret.arg2, SPCI_NOT_SUPPORTED);
+	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 }
 
 /**

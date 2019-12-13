@@ -21,7 +21,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 TEST_SERVICE(spci_check)
 {

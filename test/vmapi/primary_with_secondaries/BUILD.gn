@@ -43,21 +43,10 @@ vm_kernel("primary_with_secondaries_test_vm") {
   ]
 
   deps = [
-    ":util",
     "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/common",
     "//vmlib",
-  ]
-}
-
-source_set("util") {
-  testonly = true
-  public_configs = [
-    ":config",
-    "//test/hftest:hftest_config",
-  ]
-  sources = [
-    "util.c",
   ]
 }
 

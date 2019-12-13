@@ -26,7 +26,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 /**
  * Iterates trying to run vCPU of the secondary VM. Returns when a message

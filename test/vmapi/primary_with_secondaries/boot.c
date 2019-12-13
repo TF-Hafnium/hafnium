@@ -20,7 +20,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 /**
  * The VM gets its memory size on boot, and can access it all.

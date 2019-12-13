@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#include "util.h"
+#include "hf/spci.h"
 
 #include "hf/mm.h"
-#include "hf/spci.h"
 #include "hf/static_assert.h"
 
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
+#include "test/vmapi/spci.h"
 
 static alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
 static alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];

@@ -22,7 +22,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 /**
  * Run a service that starts a second vCPU, and check that both the first and

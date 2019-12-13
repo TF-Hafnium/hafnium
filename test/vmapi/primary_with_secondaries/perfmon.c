@@ -19,7 +19,7 @@
 #include "../../src/arch/aarch64/hypervisor/sysregs.h"
 #include "primary_with_secondary.h"
 #include "sysregs.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 /*
  * TODO(b/132394973): Devise a way to test exhaustively read/write behavior to

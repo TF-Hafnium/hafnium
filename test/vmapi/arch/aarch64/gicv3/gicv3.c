@@ -28,6 +28,7 @@
 
 #include "../msr.h"
 #include "test/hftest.h"
+#include "test/vmapi/spci.h"
 
 alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
 alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];
@@ -94,8 +95,7 @@ TEST(system, icc_ctlr_read_trapped_secondary)
 	SERVICE_SELECT(SERVICE_VM1, "read_systemreg_ctlr", send_buffer);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_ERROR_32);
-	EXPECT_EQ(run_res.arg2, SPCI_ABORTED);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /*
@@ -111,8 +111,7 @@ TEST(system, icc_ctlr_write_trapped_secondary)
 	SERVICE_SELECT(SERVICE_VM1, "write_systemreg_ctlr", send_buffer);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_ERROR_32);
-	EXPECT_EQ(run_res.arg2, SPCI_ABORTED);
+	EXPECT_SPCI_ERROR(run_res, SPCI_ABORTED);
 }
 
 /*

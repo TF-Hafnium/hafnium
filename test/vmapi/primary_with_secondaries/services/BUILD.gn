@@ -94,7 +94,7 @@ source_set("memory") {
     "//test/hftest:hftest_config",
   ]
   deps = [
-    "//test/vmapi/primary_with_secondaries:util",
+    "//test/vmapi/common",
     "//vmlib",
   ]
 
@@ -155,7 +155,7 @@ source_set("receive_block") {
   deps = [
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64/hftest:interrupts",
-    "//test/vmapi/primary_with_secondaries:util",
+    "//test/vmapi/common",
   ]
 }
 
@@ -204,7 +204,7 @@ source_set("spci_check") {
     "//test/hftest:hftest_config",
   ]
   deps = [
-    "//test/vmapi/primary_with_secondaries:util",
+    "//test/vmapi/common",
   ]
 
   sources = [

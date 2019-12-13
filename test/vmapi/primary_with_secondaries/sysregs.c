@@ -19,7 +19,7 @@
 #include "hf/arch/vm/interrupts.h"
 
 #include "primary_with_secondary.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 /**
  * Tracks the number of times the exception handler has been invoked.

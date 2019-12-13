@@ -22,7 +22,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "util.h"
+#include "test/vmapi/spci.h"
 
 /**
  * Send a message to the interruptible VM, which will interrupt itself to send a
