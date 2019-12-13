@@ -17,7 +17,7 @@
 #include "hf/fdt.h"
 #include "hf/memiter.h"
 
-#include "hftest_impl.h"
+#include "test/hftest_impl.h"
 
 void hftest_use_registered_list(void);
 void hftest_use_list(struct hftest_test list[], size_t count);

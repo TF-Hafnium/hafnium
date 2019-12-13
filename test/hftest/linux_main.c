@@ -23,8 +23,8 @@
 
 #include "hf/memiter.h"
 
-#include "hftest.h"
 #include "hftest_common.h"
+#include "test/hftest.h"
 #include <sys/reboot.h>
 
 void test_main(int argc, const char *argv[])

@@ -23,8 +23,8 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
 #include "primary_with_secondary.h"
+#include "test/hftest.h"
 #include "util.h"
 
 static alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];

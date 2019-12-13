@@ -23,8 +23,8 @@
 #include "vmapi/hf/call.h"
 #include "vmapi/hf/spci.h"
 
-#include "hftest.h"
 #include "primary_with_secondary.h"
+#include "test/hftest.h"
 
 /*
  * Secondary VM that sends messages in response to interrupts, and interrupts

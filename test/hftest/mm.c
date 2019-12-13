@@ -16,7 +16,7 @@
 
 #include "hf/arch/vm/mm.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 /* Number of pages reserved for page tables. Increase if necessary. */
 #define PTABLE_PAGES 3

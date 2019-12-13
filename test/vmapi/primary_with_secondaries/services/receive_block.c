@@ -22,8 +22,8 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
 #include "primary_with_secondary.h"
+#include "test/hftest.h"
 #include "util.h"
 
 /*

@@ -24,7 +24,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 alignas(4096) uint8_t kstack[4096];
 

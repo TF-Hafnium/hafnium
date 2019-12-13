@@ -15,7 +15,7 @@
 import("//build/toolchain/platform.gni")
 
 config("hftest_config") {
-  include_dirs = [ "inc" ]
+  include_dirs = [ "//test/inc" ]
 }
 
 # Testing framework for a primary VM.

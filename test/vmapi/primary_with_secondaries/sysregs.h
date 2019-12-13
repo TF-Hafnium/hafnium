@@ -19,7 +19,7 @@
 #include "vmapi/hf/call.h"
 
 #include "../msr.h"
-#include "hftest.h"
+#include "test/hftest.h"
 
 #define TRY_READ(REG) dlog(#REG "=%#x\n", read_msr(REG))
 

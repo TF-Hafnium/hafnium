@@ -23,8 +23,8 @@
 #include "hf/memiter.h"
 #include "hf/mm.h"
 
-#include "hftest.h"
 #include "hftest_common.h"
+#include "test/hftest.h"
 
 alignas(4096) uint8_t kstack[4096];
 

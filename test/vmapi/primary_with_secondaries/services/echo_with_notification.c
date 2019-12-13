@@ -23,7 +23,7 @@
 #include "vmapi/hf/call.h"
 
 #include "../msr.h"
-#include "hftest.h"
+#include "test/hftest.h"
 
 static void irq(void)
 {

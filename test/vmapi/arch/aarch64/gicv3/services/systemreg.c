@@ -24,7 +24,7 @@
 #include "vmapi/hf/call.h"
 
 #include "common.h"
-#include "hftest.h"
+#include "test/hftest.h"
 
 /*
  * Secondary VM that tries to access GICv3 system registers.

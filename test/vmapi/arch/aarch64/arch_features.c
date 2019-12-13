@@ -17,7 +17,7 @@
 #include "vmapi/hf/call.h"
 
 #include "../msr.h"
-#include "hftest.h"
+#include "test/hftest.h"
 
 /**
  * Test that encoding a system register using the implementation defined syntax

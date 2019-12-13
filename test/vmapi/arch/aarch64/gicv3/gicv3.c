@@ -27,7 +27,7 @@
 #include "vmapi/hf/call.h"
 
 #include "../msr.h"
-#include "hftest.h"
+#include "test/hftest.h"
 
 alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
 alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];

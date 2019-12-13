@@ -22,7 +22,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 /*
  * TODO: Some of these tests are duplicated between 'primary_only' and

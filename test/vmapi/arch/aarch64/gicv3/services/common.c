@@ -18,7 +18,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 /**
  * Try to receive a message from the mailbox, blocking if necessary, and

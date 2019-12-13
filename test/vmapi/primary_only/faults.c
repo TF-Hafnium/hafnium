@@ -23,7 +23,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 alignas(PAGE_SIZE) static char tx[PAGE_SIZE];
 alignas(PAGE_SIZE) static char rx[PAGE_SIZE];

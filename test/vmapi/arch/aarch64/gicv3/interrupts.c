@@ -24,7 +24,7 @@
 
 #include "../msr.h"
 #include "gicv3.h"
-#include "hftest.h"
+#include "test/hftest.h"
 
 SET_UP(interrupts)
 {

@@ -22,7 +22,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 static alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
 static alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];

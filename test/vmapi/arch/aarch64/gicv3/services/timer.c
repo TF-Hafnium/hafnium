@@ -27,7 +27,7 @@
 #include "vmapi/hf/call.h"
 
 #include "common.h"
-#include "hftest.h"
+#include "test/hftest.h"
 
 /*
  * Secondary VM that sets timers in response to messages, and sends messages

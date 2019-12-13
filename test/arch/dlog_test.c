@@ -16,7 +16,7 @@
 
 #include "hf/dlog.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 /**
  * Test that logs are written to the buffer, and the rest is empty.

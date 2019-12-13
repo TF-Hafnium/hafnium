@@ -19,8 +19,8 @@
 #include "vmapi/hf/call.h"
 #include "vmapi/hf/spci.h"
 
-#include "hftest.h"
 #include "smc.h"
+#include "test/hftest.h"
 
 static struct spci_value hvc(uint32_t func, uint64_t arg0, uint64_t arg1,
 			     uint64_t arg2, uint64_t arg3, uint64_t arg4,

@@ -19,7 +19,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 /*
  * This must match the size specified for services1 in

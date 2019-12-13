@@ -19,7 +19,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 alignas(PAGE_SIZE) static uint8_t pages[2 * PAGE_SIZE];
 

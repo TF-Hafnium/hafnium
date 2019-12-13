@@ -16,8 +16,8 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
 #include "smc.h"
+#include "test/hftest.h"
 
 TEST(smc_whitelist, not_whitelisted_unknown)
 {

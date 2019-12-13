@@ -20,7 +20,7 @@
 
 #include "hf/spinlock.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 struct cpu_start_state {
 	void (*entry)(uintptr_t arg);

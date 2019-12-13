@@ -21,8 +21,8 @@
 #include "hf/memiter.h"
 #include "hf/std.h"
 
-#include "hftest.h"
 #include "hftest_common.h"
+#include "test/hftest.h"
 
 HFTEST_ENABLE();
 

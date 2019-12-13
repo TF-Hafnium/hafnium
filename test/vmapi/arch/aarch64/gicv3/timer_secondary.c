@@ -22,7 +22,7 @@
 #include "hf/spci.h"
 
 #include "gicv3.h"
-#include "hftest.h"
+#include "test/hftest.h"
 
 SET_UP(timer_secondary)
 {

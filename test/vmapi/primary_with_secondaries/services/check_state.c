@@ -20,7 +20,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 
 void send_with_retry(spci_vm_id_t sender_vm_id, spci_vm_id_t target_vm_id,
 		     uint32_t size)

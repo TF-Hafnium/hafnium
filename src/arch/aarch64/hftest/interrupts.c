@@ -20,8 +20,8 @@
 
 #include "hf/dlog.h"
 
-#include "hftest.h"
 #include "msr.h"
+#include "test/hftest.h"
 
 extern uint8_t vector_table_el1;
 static void (*irq_callback)(void);
