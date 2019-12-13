@@ -52,12 +52,12 @@ static inline void sl_lock(struct spinlock *l)
 		"	mov	%w2, #1\n"
 		"	sevl\n" /* set event bit */
 		"1:	wfe\n"  /* wait for event, clear event bit */
-		"2:	ldaxr	%w1, [%0]\n"      /* load lock value */
+		"2:	ldaxr	%w1, [%3]\n"      /* load lock value */
 		"	cbnz	%w1, 1b\n"	/* if lock taken, goto WFE */
-		"	stxr	%w1, %w2, [%0]\n" /* try to take lock */
+		"	stxr	%w1, %w2, [%3]\n" /* try to take lock */
 		"	cbnz	%w1, 2b\n"	/* loop if unsuccessful */
-		: "+r"(l), "=&r"(tmp1), "=&r"(tmp2)
-		:
+		: "+m"(*l), "=&r"(tmp1), "=&r"(tmp2)
+		: "r"(l)
 		: "cc");
 }
 
@@ -67,5 +67,5 @@ static inline void sl_unlock(struct spinlock *l)
 	 * Store zero to lock's value with release semantics. This triggers an
 	 * event which wakes up other threads waiting on a lock (no SEV needed).
 	 */
-	__asm__ volatile("stlr wzr, [%0]" : "+r"(l)::"cc");
+	__asm__ volatile("stlr wzr, [%1]" : "=m"(*l) : "r"(l) : "cc");
 }
