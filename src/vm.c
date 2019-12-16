@@ -39,7 +39,7 @@ struct vm *vm_init(spci_vm_id_t id, spci_vcpu_count_t vcpu_count,
 	if (id == HF_TEE_VM_ID) {
 		vm = &tee_vm;
 	} else {
-		uint16_t vm_index = id - HF_VM_ID_OFFSET;
+		uint16_t vm_index = id - HF_PRIMARY_VM_ID;
 
 		CHECK(id >= HF_VM_ID_OFFSET);
 		CHECK(vm_index < ARRAY_SIZE(vms));
@@ -84,7 +84,8 @@ bool vm_init_next(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
 	}
 
 	/* Generate IDs based on an offset, as low IDs e.g., 0, are reserved */
-	*new_vm = vm_init(vm_count + HF_VM_ID_OFFSET, vcpu_count, ppool);
+	//*new_vm = vm_init(vm_count + HF_VM_ID_OFFSET, vcpu_count, ppool);
+	*new_vm = vm_init(vm_count + HF_PRIMARY_VM_ID, vcpu_count, ppool);
 	if (*new_vm == NULL) {
 		return false;
 	}

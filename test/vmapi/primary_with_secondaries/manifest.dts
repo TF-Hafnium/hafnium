@@ -22,6 +22,8 @@
 		vm1 {
 			debug_name = "primary_with_secondaries_test";
 			kernel_filename = "primary_with_secondaries_test";
+			uuid = <0x0 0x0 0x0 0x1>;
+			messaging_method = <0x2>;
 		};
 
 		vm2 {
@@ -29,6 +31,8 @@
 			vcpu_count = <1>;
 			mem_size = <0x100000>;
 			kernel_filename = "services1";
+			uuid = <0x0 0x0 0x0 0x2>;
+			messaging_method = <0x2>;
 		};
 
 		vm3 {
@@ -36,6 +40,8 @@
 			vcpu_count = <1>;
 			mem_size = <0x100000>;
 			kernel_filename = "services2";
+			uuid = <0x0 0x0 0x0 0x3>;
+			messaging_method = <0x2>;
 		};
 
 		vm4 {
@@ -43,6 +49,8 @@
 			vcpu_count = <2>;
 			mem_size = <0x100000>;
 			kernel_filename = "services3";
+			uuid = <0x0 0x0 0x0 0x4>;
+			messaging_method = <0x2>;
 		};
 	};
 };

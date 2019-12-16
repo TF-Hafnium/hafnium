@@ -22,6 +22,8 @@
 		vm1 {
 			debug_name = "aarch64_test";
 			kernel_filename = "aarch64_test";
+			uuid = <0x0 0x0 0x0 0x1>;
+			messaging_method = <0x2>;
 
 			smc_whitelist = <
 				0x30000001

@@ -23,6 +23,8 @@
 			debug_name = "linux_test";
 			kernel_filename = "vmlinuz";
 			ramdisk_filename = "initrd.img";
+			uuid = <0x0 0x0 0x0 0x1>;
+			messaging_method = <0x2>;
 		};
 
 		vm2 {
@@ -30,6 +32,8 @@
 			vcpu_count = <1>;
 			mem_size = <0x100000>;
 			kernel_filename = "socket0";
+			uuid = <0x0 0x0 0x0 0x2>;
+			messaging_method = <0x2>;
 		};
 	};
 };

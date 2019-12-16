@@ -161,16 +161,16 @@ struct uint32list_iter {
 	struct memiter mem_it;
 };
 
-static enum manifest_return_code read_optional_uint32list(
-	const struct fdt_node *node, const char *property,
-	struct uint32list_iter *out)
+static enum manifest_return_code read_uint32list(const struct fdt_node *node,
+						 const char *property,
+						 struct uint32list_iter *out)
 {
 	const char *data;
 	uint32_t size;
 
 	if (!fdt_read_property(node, property, &data, &size)) {
 		memiter_init(&out->mem_it, NULL, 0);
-		return MANIFEST_SUCCESS;
+		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
 	}
 
 	if ((size % sizeof(uint32_t)) != 0) {
@@ -179,6 +179,20 @@ static enum manifest_return_code read_optional_uint32list(
 
 	memiter_init(&out->mem_it, data, size);
 	return MANIFEST_SUCCESS;
+}
+
+static enum manifest_return_code read_optional_uint32list(
+	const struct fdt_node *node, const char *property,
+	struct uint32list_iter *out)
+{
+	enum manifest_return_code ret;
+
+	ret = read_uint32list(node, property, out);
+
+	if (ret == MANIFEST_ERROR_PROPERTY_NOT_FOUND) {
+		ret = MANIFEST_SUCCESS;
+	}
+	return ret;
 }
 
 /**
@@ -287,6 +301,8 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 					  spci_vm_id_t vm_id)
 {
 	struct uint32list_iter smcs;
+	struct uint32list_iter uuid_elements;
+	uint8_t uuid_element = 0;
 
 	TRY(read_string(node, "debug_name", &vm->debug_name));
 	TRY(read_optional_string(node, "kernel_filename",
@@ -305,6 +321,18 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 
 	TRY(read_bool(node, "smc_whitelist_permissive",
 		      &vm->smc_whitelist.permissive));
+
+	read_uint64(node, "messaging_method", &vm->messaging_method);
+
+	TRY(read_uint32list(node, "uuid", &uuid_elements));
+	while (uint32list_has_next(&uuid_elements) &&
+	       (uuid_element < UUID_ELEMENTS)) {
+		 vm->uuid[uuid_element] = uint32list_get_next(&uuid_elements);
+		 uuid_element++;
+	}
+	if (uuid_element != UUID_ELEMENTS) {
+		return MANIFEST_ERROR_MALFORMED_INTEGER_LIST;
+	}
 
 	if (vm_id == HF_PRIMARY_VM_ID) {
 		TRY(read_optional_string(node, "ramdisk_filename",

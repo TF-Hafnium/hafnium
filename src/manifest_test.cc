@@ -193,6 +193,16 @@ class ManifestDtBuilder
 		return IntegerProperty("mem_size", value);
 	}
 
+	ManifestDtBuilder &MessagingMethod(uint32_t value)
+	{
+		return IntegerProperty("messaging_method", value);
+	}
+
+	ManifestDtBuilder &UUID(const std::vector<uint32_t> &value)
+	{
+		return IntegerListProperty("uuid", value);
+	}
+
 	ManifestDtBuilder &SmcWhitelist(const std::vector<uint32_t> &value)
 	{
 		return IntegerListProperty("smc_whitelist", value);
@@ -333,6 +343,8 @@ TEST(manifest, compatible_one_of_many)
 			.Compatible({ "foo,bar", "hafnium,hafnium" })
 			.StartChild("vm1")
 				.DebugName("primary")
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x1})
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -369,6 +381,8 @@ static std::vector<char> gen_long_string_dtb(bool valid)
 			.Compatible()
 			.StartChild("vm1")
 				.DebugName(valid ? last_valid : first_invalid)
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x1})
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -396,12 +410,16 @@ TEST(manifest, reserved_vm_id)
 			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x1})
 			.EndChild()
 			.StartChild("vm0")
 				.DebugName("reserved_vm")
 				.VcpuCount(1)
 				.MemSize(0x1000)
 				.KernelFilename("kernel")
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x2})
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -418,12 +436,16 @@ static std::vector<char> gen_vcpu_count_limit_dtb(uint32_t vcpu_count)
 			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x1})
 			.EndChild()
 			.StartChild("vm2")
 				.DebugName("secondary_vm")
 				.VcpuCount(vcpu_count)
 				.MemSize(0x1000)
 				.KernelFilename("kernel")
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x2})
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -455,6 +477,8 @@ TEST(manifest, no_ramdisk_primary)
 			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x1})
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -476,6 +500,8 @@ TEST(manifest, no_boot_address_primary)
 			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x1})
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -498,6 +524,8 @@ TEST(manifest, boot_address_primary)
 			.Compatible()
 			.StartChild("vm1")
 				.DebugName("primary_vm")
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x1})
 				.BootAddress(addr)
 			.EndChild()
 		.EndChild()
@@ -520,6 +548,8 @@ static std::vector<char> gen_malformed_boolean_dtb(
 			.StartChild("vm1")
 				.DebugName("primary_vm")
 				.Property("smc_whitelist_permissive", value)
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x1})
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -559,12 +589,16 @@ TEST(manifest, valid)
 				.KernelFilename("primary_kernel")
 				.RamdiskFilename("primary_ramdisk")
 				.SmcWhitelist({0x32000000, 0x33001111})
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x1})
 			.EndChild()
 			.StartChild("vm3")
 				.DebugName("second_secondary_vm")
 				.VcpuCount(43)
 				.MemSize(0x12345)
 				.KernelFilename("second_secondary_kernel")
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x3})
 			.EndChild()
 			.StartChild("vm2")
 				.DebugName("first_secondary_vm")
@@ -572,6 +606,8 @@ TEST(manifest, valid)
 				.MemSize(12345)
 				.SmcWhitelist({0x04000000, 0x30002222, 0x31445566})
 				.SmcWhitelistPermissive()
+				.MessagingMethod(0x2)
+				.UUID({0x0, 0x0, 0x0, 0x2})
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -588,6 +624,11 @@ TEST(manifest, valid)
 	ASSERT_THAT(
 		std::span(vm->smc_whitelist.smcs, vm->smc_whitelist.smc_count),
 		ElementsAre(0x32000000, 0x33001111));
+	ASSERT_EQ(vm->messaging_method, 0x2);
+	ASSERT_EQ(vm->uuid[0], 0);
+	ASSERT_EQ(vm->uuid[1], 0);
+	ASSERT_EQ(vm->uuid[2], 0);
+	ASSERT_EQ(vm->uuid[3], 0x1);
 	ASSERT_FALSE(vm->smc_whitelist.permissive);
 
 	vm = &m.vm[1];
@@ -598,6 +639,11 @@ TEST(manifest, valid)
 	ASSERT_THAT(
 		std::span(vm->smc_whitelist.smcs, vm->smc_whitelist.smc_count),
 		ElementsAre(0x04000000, 0x30002222, 0x31445566));
+	ASSERT_EQ(vm->messaging_method, 0x2);
+	ASSERT_EQ(vm->uuid[0], 0);
+	ASSERT_EQ(vm->uuid[1], 0);
+	ASSERT_EQ(vm->uuid[2], 0);
+	ASSERT_EQ(vm->uuid[3], 0x2);
 	ASSERT_TRUE(vm->smc_whitelist.permissive);
 
 	vm = &m.vm[2];
@@ -609,6 +655,11 @@ TEST(manifest, valid)
 	ASSERT_THAT(
 		std::span(vm->smc_whitelist.smcs, vm->smc_whitelist.smc_count),
 		IsEmpty());
+	ASSERT_EQ(vm->messaging_method, 0x2);
+	ASSERT_EQ(vm->uuid[0], 0);
+	ASSERT_EQ(vm->uuid[1], 0);
+	ASSERT_EQ(vm->uuid[2], 0);
+	ASSERT_EQ(vm->uuid[3], 0x3);
 	ASSERT_FALSE(vm->smc_whitelist.permissive);
 }
 

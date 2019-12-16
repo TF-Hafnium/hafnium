@@ -28,6 +28,7 @@
 #include "vmapi/hf/spci.h"
 
 #define MAX_SMCS 32
+#define UUID_ELEMENTS 4
 #define LOG_BUFFER_SIZE 256
 
 /**
@@ -108,6 +109,8 @@ struct smc_whitelist {
 
 struct vm {
 	spci_vm_id_t id;
+	uint32_t uuid[4];
+	enum spci_messaging_method messaging_method;
 	struct smc_whitelist smc_whitelist;
 
 	/** See api.c for the partial ordering on locks. */

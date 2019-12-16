@@ -31,6 +31,8 @@ struct manifest_vm {
 	struct string debug_name;
 	struct string kernel_filename;
 	struct smc_whitelist smc_whitelist;
+	uint32_t uuid[4];
+	uint64_t messaging_method;
 
 	union {
 		/* Properties specific to the primary VM. */

@@ -413,6 +413,20 @@ struct spci_retrieve_memory_descriptor
 };
 
 /* TODO: Move all the functions below this line to a support library. */
+enum spci_messaging_method {
+	SPCI_MESSAGING_METHOD_DIRECT = 1,
+	SPCI_MESSAGING_METHOD_INDIRECT,
+	SPCI_MESSAGING_METHOD_BOTH
+};
+
+struct spci_partition_info {
+	/** The ID of the VM the information is about. */
+	spci_vm_id_t id;
+	/* The number of execution contexts implemented by the partition. */
+	uint16_t execution_context;
+	/* The Partition's properties, e.g. supported messaging methods */
+	uint32_t partition_properties;
+};
 
 /**
  * Gets the constituent array for an `spci_memory_region`.
