@@ -24,6 +24,11 @@
 #include "test/hftest.h"
 #include "test/vmapi/spci.h"
 
+TEAR_DOWN(smp)
+{
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
+}
+
 /**
  * Run a service that starts a second vCPU, and check that both the first and
  * second vCPU send messages to us.

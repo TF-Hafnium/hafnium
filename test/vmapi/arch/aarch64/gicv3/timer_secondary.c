@@ -23,6 +23,7 @@
 
 #include "gicv3.h"
 #include "test/hftest.h"
+#include "test/vmapi/spci.h"
 
 SET_UP(timer_secondary)
 {
@@ -36,6 +37,11 @@ SET_UP(timer_secondary)
 	interrupt_set_edge_triggered(VIRTUAL_TIMER_IRQ, true);
 	interrupt_set_priority_mask(0xff);
 	arch_irq_enable();
+}
+
+TEAR_DOWN(timer_secondary)
+{
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
 }
 
 static void timer_busywait_secondary()

@@ -24,6 +24,11 @@
 #include "test/hftest.h"
 #include "test/vmapi/spci.h"
 
+TEAR_DOWN(interrupts)
+{
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
+}
+
 /**
  * Send a message to the interruptible VM, which will interrupt itself to send a
  * response back.

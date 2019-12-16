@@ -186,6 +186,11 @@ static void check_cannot_relinquish_memory(
 	}
 }
 
+TEAR_DOWN(memory_sharing)
+{
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
+}
+
 /**
  * Sharing memory concurrently gives both VMs access to the memory so it can be
  * used for communication.
@@ -498,6 +503,7 @@ TEST(memory_sharing, reshare_after_return)
 	/* Observe the service doesn't fault when accessing the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -896,6 +902,7 @@ TEST(memory_sharing, donate_twice)
 	/* Let the memory be sent from VM1 to PRIMARY (returned). */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Check we have access again. */
 	ptr[0] = 'f';
@@ -1042,6 +1049,7 @@ TEST(memory_sharing, donate_invalid_source)
 	/* Receive and return memory from VM1. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Use VM1 to fail to donate memory from the primary to VM2. */
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -1136,6 +1144,7 @@ TEST(memory_sharing, lend_invalid_source)
 	/* Receive and return memory from VM1. */
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Try to lend memory from primary in VM1. */
 	run_res = spci_run(SERVICE_VM1, 0);

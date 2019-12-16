@@ -73,6 +73,11 @@ static void vm_cpu_entry(uintptr_t arg)
 	run_loop((struct mailbox_buffers *)arg);
 }
 
+TEAR_DOWN(vcpu_state)
+{
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
+}
+
 /**
  * This test tries to run the same secondary vCPU from two different physical
  * CPUs concurrently. The vCPU checks that the state is ok while it bounces

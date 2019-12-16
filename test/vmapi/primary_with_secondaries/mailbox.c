@@ -63,6 +63,11 @@ static void next_permutation(char *s, size_t len)
 	}
 }
 
+TEAR_DOWN(mailbox)
+{
+	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
+}
+
 /**
  * Clearing an empty mailbox is an error.
  */
@@ -307,6 +312,7 @@ TEST(mailbox, primary_to_secondary)
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
 /**
@@ -341,6 +347,7 @@ TEST(mailbox, secondary_to_primary_notification)
 	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
 	EXPECT_EQ(spci_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
+	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Run VM again so that it clears its mailbox. */
 	run_res = spci_run(SERVICE_VM1, 0);
