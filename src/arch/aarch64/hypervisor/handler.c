@@ -29,6 +29,7 @@
 #include "hf/spci.h"
 #include "hf/spci_internal.h"
 #include "hf/vm.h"
+#include "hf/std.h"
 
 #include "vmapi/hf/call.h"
 
@@ -429,6 +430,145 @@ __attribute((unused))static inline bool is_opposite_world_vm_id(spci_vm_id_t id)
 
 struct spci_value spci_mem_op_resume_internal (uint32_t cookie,
 	struct vm* from_vm);
+
+
+/**
+ * Discovery function returning information about partitions instantiated
+ * in the system.
+ */
+struct spci_value api_spci_partition_info_get(struct vcpu *current,
+					      uint32_t arg1, uint32_t arg2,
+					      uint32_t arg3, uint32_t arg4, bool eret_origin)
+{
+	uint16_t index;
+	uint16_t count = 0;
+	#if !SECURE_WORLD
+	uint16_t s_count = 0;
+	#endif
+	uint16_t vm_count = vm_get_count();
+	struct vm *vm;
+	struct vm *current_vm;
+
+	uint32_t uuid[4] = {0};
+	/* Reconstruct UUID. */
+	uuid[0] = arg1;
+	uuid[1] = arg2;
+	uuid[2] = arg3;
+	uuid[3] = arg4;
+
+	/* Ensure we allocate enough storage space for both worlds. */
+	struct spci_partition_info info[vm_count + MAX_VMS];
+
+	for (index = 0; index < vm_count; index++) {
+		#if SECURE_WORLD == 0
+		vm = vm_find(index + HF_VM_ID_OFFSET);
+		#else
+		vm = vm_find((index + HF_VM_ID_OFFSET) | (SPMC_SECURE_ID_MASK << SPMC_SECURE_ID_SHIFT));
+		#endif
+		if (vm == NULL) {
+			continue;
+		}
+		/*
+		 * If NULL ID, return all partitions, otherwise only matching
+		 * UUIDs.
+		 */
+		if ((!(uuid[0] || uuid[1] || uuid[2] || uuid[3])) ||
+		    (uuid[0] == vm->uuid[0] && uuid[1] == vm->uuid[1] &&
+		     uuid[2] == vm->uuid[2] && uuid[3] == vm->uuid[3])) {
+
+			info[count].id = vm->id;
+			info[count].execution_context = vm->vcpu_count;
+			info[count].partition_properties = 0;
+
+			switch (vm->messaging_method) {
+			case SPCI_MESSAGING_METHOD_DIRECT:
+				info[count].partition_properties |= 2;
+				break;
+			case SPCI_MESSAGING_METHOD_INDIRECT:
+				info[count].partition_properties |= 4;
+				break;
+			case SPCI_MESSAGING_METHOD_BOTH:
+				info[count].partition_properties |= 7;
+				break;
+			}
+			count++;
+		}
+	}
+
+#if SECURE_WORLD != 1
+	bool secure_vms = false;
+
+	/* Only check secure world if null or not found in normal world */
+	if ((!(uuid[0] || uuid[1] || uuid[2] || uuid[3])) || !count){
+		struct spci_value res;
+		res = smc32(SPCI_PARTITION_INFO_GET_32, uuid[0], uuid[1], uuid[2],
+		      uuid[3], 0, 0, 0);
+		if (res.func == SPCI_SUCCESS_32){
+			s_count = res.arg2;
+			secure_vms = true;
+		}
+		else {
+			return res;
+		}
+
+		/* Populate hypervisors buffer if results from secure world. */
+		if (secure_vms) {
+			/* TODO: Find out way to sync mailbox. */
+			memcpy_s(&info[count],  sizeof(info), get_hv_rx(),
+				 sizeof(struct spci_partition_info) * s_count);
+			count = count + s_count;
+		 }
+		res = smc32(SPCI_RX_RELEASE_32, 0, 0, 0, 0, 0, 0, 0);
+		if (res.func != SPCI_SUCCESS_32){
+			panic("Could not release RX buffer\n");
+		}
+	}
+#endif
+	if (!count) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/* Check if the mailbox is large enough to accommodate structs. */
+	if (count * sizeof(struct spci_partition_info) > HF_MAILBOX_SIZE) {
+		return spci_error(SPCI_NO_MEMORY);
+	}
+
+	if (!eret_origin) {
+		if (current != NULL) {
+			current_vm = current->vm;
+		}
+		else {
+			return spci_error(SPCI_INVALID_PARAMETERS);
+		}
+		/* Call from partition. */
+		sl_lock(&current_vm->lock);
+
+		/* RX buffer is clear to populate. */
+		if (current_vm->mailbox.state == MAILBOX_STATE_EMPTY) {
+			current_vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+			memcpy_s(current_vm->mailbox.recv, HF_MAILBOX_SIZE, &info,
+				 sizeof(struct spci_partition_info) * count);
+			current_vm->mailbox.recv_size =
+				sizeof(struct spci_partition_info) * count;
+			current_vm->mailbox.recv_sender = 0;
+			//current_vm->mailbox.recv_attributes = 0;
+
+		} else {
+			sl_unlock(&current_vm->lock);
+			return spci_error(SPCI_BUSY);
+		}
+
+		sl_unlock(&current_vm->lock);
+	}
+	else {
+		/*Call from Hypervisor / SPM */
+		memcpy_s(get_hv_rx(), HF_MAILBOX_SIZE, &info,
+				 sizeof(struct spci_partition_info) * count);
+	}
+	struct spci_value ret = {.func = SPCI_SUCCESS_32, .arg2 = count};
+	return ret;
+}
+
 static bool spci_handler(struct spci_value *args, struct vcpu **next)
 {
 	__attribute((unused))struct spci_value smc_res;
@@ -510,6 +650,31 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 			*args = (struct spci_value){.func = SPCI_SUCCESS_32};
 
 			return true;
+	    case SPCI_PARTITION_INFO_GET_32:
+			*args = api_spci_partition_info_get(current(), args->arg1,
+							    args->arg2, args->arg3,
+							    args->arg4, eret_origin);
+			#if SECURE_WORLD == 1
+				if (eret_origin){
+			        /* Return to Normal world */
+			        smc_res = smc32(args->func, args->arg1,
+			                args->arg2, args->arg3,
+			                args->arg4, args->arg5,
+			                args->arg6, args->arg7);
+			        args->func = smc_res.func;
+			        args->arg1 = smc_res.arg1;
+			        args->arg2 = smc_res.arg2;
+			        args->arg3 = smc_res.arg3;
+			        args->arg4 = smc_res.arg4;
+			        args->arg5 = smc_res.arg5;
+			        args->arg6 = smc_res.arg6;
+			        args->arg7 = smc_res.arg7;
+			        eret_origin = true;
+			        break;
+				}
+	        #endif
+			return true;
+
 		case SPCI_MSG_SEND_32:
 			*args = api_spci_msg_send(
 				spci_msg_send_sender(*args),
@@ -546,6 +711,7 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 
 			if (is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
 			{
+				current()->state = VCPU_STATE_BLOCKED_MAILBOX;
 				spmd_exit(args);
 				eret_origin = true;
 				continue;
@@ -562,6 +728,7 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 
 			if (is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
 			{
+				current()->state = VCPU_STATE_BLOCKED_MAILBOX;
 				spmd_exit(args);
 				eret_origin = true;
 				continue;

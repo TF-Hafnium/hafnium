@@ -132,6 +132,10 @@ enum spci_memory_shareability {
 #define SPMC_SECURE_ID_SHIFT 15
 #endif
 
+/* Mask and shift to validate a secure SPCI partition ID. */
+#define SPMC_SECURE_UUID_MASK 0x1
+#define SPMC_SECURE_UUID_SHIFT 31
+
 #define SPCI_MEMORY_ACCESS_OFFSET (0x5U)
 #define SPCI_MEMORY_ACCESS_MASK ((0x3U) << SPCI_MEMORY_ACCESS_OFFSET)
 

@@ -1234,10 +1234,10 @@ struct spci_value api_spci_rx_release(struct vcpu *current, struct vcpu **next)
 	locked = vm_lock(vm);
 	switch (vm->mailbox.state) {
 	case MAILBOX_STATE_EMPTY:
-	case MAILBOX_STATE_RECEIVED:
 		ret = spci_error(SPCI_DENIED);
 		break;
 
+	case MAILBOX_STATE_RECEIVED:
 	case MAILBOX_STATE_READ:
 		ret = api_waiter_result(locked, current, next);
 		vm->mailbox.state = MAILBOX_STATE_EMPTY;

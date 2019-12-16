@@ -244,7 +244,7 @@ TEST(spci, spci_features)
 	ret = spci_features(SPCI_MSG_WAIT_32);
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 
-	ret = spci_features(SPCI_YIELD_32);
+	ret = spci_features(SPCI_PARTITION_INFO_GET_32);
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 
 	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);

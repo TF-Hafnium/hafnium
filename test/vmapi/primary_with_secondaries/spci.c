@@ -194,3 +194,86 @@ TEST(spci, spci_send_direct_message_req_invalid_dst)
 
 	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
 }
+
+/*
+ * Retrieve partition information for the primary VM.
+ */
+TEST(spci, spci_partition_info_get_primary)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t uuid[4] = {1};
+
+	struct spci_value ret = spci_partition_info_get(uuid);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	EXPECT_EQ(ret.arg2, 1);
+
+	/* Check our data structure in the RX buffer. */
+	struct spci_partition_info *info =
+		(struct spci_partition_info *)mb.recv;
+	EXPECT_EQ(info[0].id, HF_PRIMARY_VM_ID);
+	EXPECT_EQ(info[0].execution_context, 8);
+	EXPECT_EQ(info[0].partition_properties, 0x4);
+}
+
+/**
+ * Retrieve partition information for a secondary VM.
+ */
+TEST(spci, spci_partition_info_get_secondary)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t uuid[4] = {2};
+
+	struct spci_value ret = spci_partition_info_get(uuid);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	EXPECT_EQ(ret.arg2, 1);
+
+	/* Check our data structure in the RX buffer. */
+	struct spci_partition_info *info =
+		(struct spci_partition_info *)mb.recv;
+	EXPECT_EQ(info[0].id, SERVICE_VM1);
+	EXPECT_EQ(info[0].execution_context, 1);
+	EXPECT_EQ(info[0].partition_properties, 0x4);
+}
+
+/**
+ * Retrieve partition information for all VMs with the NULL UUID.
+ */
+TEST(spci, spci_partition_info_get_all)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t uuid[4] = {0};
+
+	struct spci_value ret = spci_partition_info_get(uuid);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	EXPECT_EQ(ret.arg2, 4);
+
+	/* Check our data structure in the RX buffer. */
+	struct spci_partition_info *info =
+		(struct spci_partition_info *)mb.recv;
+	EXPECT_EQ(info[0].id, HF_PRIMARY_VM_ID);
+	EXPECT_EQ(info[0].execution_context, 8);
+	EXPECT_EQ(info[0].partition_properties, 0x4);
+
+	EXPECT_EQ(info[1].id, SERVICE_VM1);
+	EXPECT_EQ(info[1].execution_context, 1);
+	EXPECT_EQ(info[1].partition_properties, 0x4);
+
+	EXPECT_EQ(info[2].id, SERVICE_VM2);
+	EXPECT_EQ(info[2].execution_context, 1);
+	EXPECT_EQ(info[2].partition_properties, 0x4);
+
+	EXPECT_EQ(info[3].id, SERVICE_VM3);
+	EXPECT_EQ(info[3].execution_context, 2);
+	EXPECT_EQ(info[3].partition_properties, 0x4);
+}
+
+/**
+ *Attempt to retrive information for a non present UUID.
+ */
+TEST(spci, spci_partition_info_get_none)
+{
+	uint32_t uuid[4] = {42};
+
+	EXPECT_SPCI_ERROR(spci_partition_info_get(uuid),
+			  SPCI_INVALID_PARAMETERS);
+}
