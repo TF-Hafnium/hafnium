@@ -48,7 +48,11 @@ typedef uintptr_t hf_ipaddr_t;
  * Primary VM therefore gets ID 1 and all other VMs come after that.
  */
 #define HF_PRIMARY_VM_INDEX 0
+#if SECURE_WORLD == 0
 #define HF_PRIMARY_VM_ID (HF_VM_ID_OFFSET + HF_PRIMARY_VM_INDEX)
+#else
+#define HF_PRIMARY_VM_ID ((HF_VM_ID_OFFSET + HF_PRIMARY_VM_INDEX) | (SPMC_SECURE_ID_MASK << SPMC_SECURE_ID_SHIFT))
+#endif
 
 /**
  * The special VM ID reserved for the OS running in the trusted execution

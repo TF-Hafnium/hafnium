@@ -126,6 +126,12 @@ enum spci_memory_shareability {
 	SPCI_MEMORY_INNER_SHAREABLE,
 };
 
+#if SECURE_WORLD == 1
+/* Mask and shift to generate a valid secure SPCI Endpoint ID. */
+#define SPMC_SECURE_ID_MASK 0x1
+#define SPMC_SECURE_ID_SHIFT 15
+#endif
+
 #define SPCI_MEMORY_ACCESS_OFFSET (0x5U)
 #define SPCI_MEMORY_ACCESS_MASK ((0x3U) << SPCI_MEMORY_ACCESS_OFFSET)
 

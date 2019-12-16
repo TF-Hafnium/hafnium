@@ -108,12 +108,18 @@ struct vm *vm_find(spci_vm_id_t id)
 		return NULL;
 	}
 
+/*
 	if (id == HF_TEE_VM_ID) {
 		if (tee_vm.id == HF_TEE_VM_ID) {
 			return &tee_vm;
 		}
 		return NULL;
 	}
+*/
+	/* Unset top bit. */
+	#if SECURE_WORLD == 1
+	id = id & ~(SPMC_SECURE_ID_MASK << SPMC_SECURE_ID_SHIFT);
+	#endif
 
 	index = id - HF_VM_ID_OFFSET;
 

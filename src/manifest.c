@@ -397,7 +397,11 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 
 	/* Iterate over VM nodes until we find one that does not exist. */
 	for (i = 0; i <= MAX_VMS; ++i) {
+#if SECURE_WORLD == 0
 		spci_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
+#else
+		spci_vm_id_t vm_id = (HF_VM_ID_OFFSET + i) | (SPMC_SECURE_ID_MASK << SPMC_SECURE_ID_SHIFT);
+#endif
 		struct fdt_node vm_node = hyp_node;
 		const char *vm_name = generate_vm_node_name(vm_name_buf, vm_id);
 
