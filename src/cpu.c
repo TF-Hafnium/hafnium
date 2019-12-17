@@ -50,7 +50,7 @@ static_assert((PAGE_SIZE % STACK_ALIGN) == 0,
  * spci_msg_send. The information stored in the buffer is only valid during the
  * spci_msg_send request is performed.
  */
-alignas(PAGE_SIZE) uint8_t cpu_message_buffer[MAX_CPUS][PAGE_SIZE];
+alignas(PAGE_SIZE) static uint8_t cpu_message_buffer[MAX_CPUS][PAGE_SIZE];
 
 uint8_t *cpu_get_buffer(cpu_id_t cpu_id)
 {
