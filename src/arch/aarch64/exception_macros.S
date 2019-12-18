@@ -15,6 +15,23 @@
  */
 
 /**
+ * From Linux commit 679db70801da9fda91d26caf13bf5b5ccc74e8e8:
+ * "Some CPUs can speculate past an ERET instruction and potentially perform
+ * speculative accesses to memory before processing the exception return.
+ * Since the register state is often controlled by a lower privilege level
+ * at the point of an ERET, this could potentially be used as part of a
+ * side-channel attack."
+ *
+ * This macro emits a speculation barrier after the ERET to prevent the CPU
+ * from speculating past the exception return.
+ */
+.macro eret_with_sb
+	eret
+	dsb	nsh
+	isb
+.endm
+
+/**
  * Saves the volatile registers onto the stack. This currently takes 14
  * instructions, so it can be used in exception handlers with 18 instructions
  * left, 2 of which in the same cache line (assuming a 16-byte cache line).
@@ -90,7 +107,7 @@
 	bl \handler
 	restore_volatile_from_stack \elx
 	msr spsel, #0
-	eret
+	eret_with_sb
 .endm
 
 /**

@@ -113,8 +113,8 @@ restore_from_stack_and_return:
 skip_elr:
 	/* Restore register spsr_el1 using x1 as scratch. */
 	ldr x1, [sp, #8 * 23]
-        msr spsr_el1, x1
+	msr spsr_el1, x1
 
 	/* Restore x0 & x1, and release stack space. */
 	ldp x0, x1, [sp], #8 * 24
-	eret
+	eret_with_sb
