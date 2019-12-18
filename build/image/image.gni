@@ -25,15 +25,8 @@ template("image_binary") {
   }
   output_root += invoker.image_name
 
-  file_root = "${root_out_dir}/${output_root}"
-  elf_file = "${file_root}.elf"
-  bin_file = "${file_root}.bin"
-
-  elf_target = "${target_name}__elf"
-  checked_elf_target = "${target_name}__checked_elf"
-
   # Link objects together
-  executable(elf_target) {
+  executable("${target_name}__elf") {
     forward_variables_from(invoker,
                            [
                              "cflags",
@@ -54,41 +47,20 @@ template("image_binary") {
       "-T",
       rebase_path("//build/image/image.ld"),
     ]
-    visibility = [ ":${checked_elf_target}", ":${invoker.target_name}" ]
-  }
-
-  action(checked_elf_target) {
-    forward_variables_from(invoker, [ "testonly" ])
-    stamp_file = elf_file + "_check.stamp"
-
-    script = "//build/image/check_elf.py"
-    deps = [
-        ":${elf_target}",
-    ]
-    args = [
-      rebase_path(elf_file),
-      rebase_path(stamp_file),
-    ]
-    outputs = [
-      stamp_file,
-    ]
     visibility = [ ":${invoker.target_name}" ]
   }
 
   action(target_name) {
     forward_variables_from(invoker, [ "testonly" ])
 
-    script = "//build/image/convert_to_binary.py"
+    file_root = "${root_out_dir}/${output_root}"
+    elf_file = "${file_root}.elf"
+    bin_file = "${file_root}.bin"
 
-    if (defined(invoker.check_binary) && invoker.check_binary == true) {
-      deps = [
-        ":${checked_elf_target}",
-      ]
-    } else {
-      deps = [
-        ":${elf_target}",
-      ]
-    }
+    script = "//build/image/convert_to_binary.py"
+    deps = [
+      ":${target_name}__elf",
+    ]
     args = [
       "--input",
       rebase_path(elf_file),
@@ -115,10 +87,6 @@ template("hypervisor") {
                              "testonly",
                            ])
     image_name = target_name
-
-    # Perform checks on the generated binary to prevent regressing on some
-    # classes of bugs, typically CPU erratas.
-    check_binary = true
   }
 }
 
