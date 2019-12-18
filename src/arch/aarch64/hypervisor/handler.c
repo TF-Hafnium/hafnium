@@ -313,7 +313,36 @@ static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 	*args = ret;
 }
 
-static bool spci_handler(struct spci_value *args, struct vcpu **next)
+#if SECURE_WORLD == 1
+
+static void spmd_exit(struct spci_value *args)
+{
+	struct spci_value smc_res;
+
+	/* Exit to SPMD */
+	smc_res = smc32(args->func,
+			args->arg1,
+			args->arg2,
+			args->arg3,
+			args->arg4,
+			args->arg5,
+			args->arg6,
+			args->arg7);
+
+	/* Return from SPMD */
+	args->func = smc_res.func;
+	args->arg1 = smc_res.arg1;
+	args->arg2 = smc_res.arg2;
+	args->arg3 = smc_res.arg3;
+	args->arg4 = smc_res.arg4;
+	args->arg5 = smc_res.arg5;
+	args->arg6 = smc_res.arg6;
+	args->arg7 = smc_res.arg7;
+}
+
+#endif /* SECURE_WORLD == 1 */
+
+static bool spci_handler_internal(struct spci_value *args, struct vcpu **next)
 {
 	uint32_t func = args->func & ~SMCCC_CONVENTION_MASK;
 
@@ -374,6 +403,26 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 	}
 
 	return false;
+}
+
+static bool spci_handler(struct spci_value *args, struct vcpu **next)
+{
+#if SECURE_WORLD == 1
+	/* from hvc_handler */
+
+	switch (args->func & ~SMCCC_CONVENTION_MASK) {
+	case SPCI_MSG_WAIT_32:
+		/* exit to SPMD */
+		spmd_exit(args);
+		break;
+	default:
+		break;
+	}
+
+	/* from nwd or hvc handler */
+#endif /* SECURE_WORLD */
+
+	return spci_handler_internal(args, next);
 }
 
 /**
