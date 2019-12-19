@@ -94,6 +94,15 @@
 .endm
 
 /**
+ * Variant of current_exception_sp0 which assumes the handler never returns.
+ */
+.macro noreturn_current_exception_sp0 elx:req handler:req
+	msr spsel, #1
+	save_volatile_to_stack \elx
+	b \handler
+.endm
+
+/**
  * This is a generic handler for exceptions taken at the current EL while using
  * SPx. It saves volatile registers, calls the C handler, restores volatile
  * registers, then returns.
@@ -106,4 +115,12 @@
 	save_volatile_to_stack \elx
 	bl \handler
 	b restore_from_stack_and_return
+.endm
+
+/**
+ * Variant of current_exception_spx which assumes the handler never returns.
+ */
+.macro noreturn_current_exception_spx elx:req handler:req
+	save_volatile_to_stack \elx
+	b \handler
 .endm

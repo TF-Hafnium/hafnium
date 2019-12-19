@@ -180,7 +180,7 @@ void maybe_invalidate_tlb(struct vcpu *vcpu)
 	}
 }
 
-noreturn void irq_current_exception(uintreg_t elr, uintreg_t spsr)
+noreturn void irq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 {
 	(void)elr;
 	(void)spsr;
@@ -188,7 +188,7 @@ noreturn void irq_current_exception(uintreg_t elr, uintreg_t spsr)
 	panic("IRQ from current");
 }
 
-noreturn void fiq_current_exception(uintreg_t elr, uintreg_t spsr)
+noreturn void fiq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 {
 	(void)elr;
 	(void)spsr;
@@ -196,7 +196,7 @@ noreturn void fiq_current_exception(uintreg_t elr, uintreg_t spsr)
 	panic("FIQ from current");
 }
 
-noreturn void serr_current_exception(uintreg_t elr, uintreg_t spsr)
+noreturn void serr_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 {
 	(void)elr;
 	(void)spsr;
@@ -204,7 +204,7 @@ noreturn void serr_current_exception(uintreg_t elr, uintreg_t spsr)
 	panic("SERR from current");
 }
 
-noreturn void sync_current_exception(uintreg_t elr, uintreg_t spsr)
+noreturn void sync_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 {
 	uintreg_t esr = read_msr(esr_el2);
 	uintreg_t ec = GET_ESR_EC(esr);

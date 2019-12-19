@@ -107,35 +107,35 @@
 .balign 0x800
 vector_table_el2:
 sync_cur_sp0:
-	current_exception_sp0 el2 sync_current_exception
+	noreturn_current_exception_sp0 el2 sync_current_exception_noreturn
 
 .balign 0x80
 irq_cur_sp0:
-	current_exception_sp0 el2 irq_current_exception
+	noreturn_current_exception_sp0 el2 irq_current_exception_noreturn
 
 .balign 0x80
 fiq_cur_sp0:
-	current_exception_sp0 el2 fiq_current_exception
+	noreturn_current_exception_sp0 el2 fiq_current_exception_noreturn
 
 .balign 0x80
 serr_cur_sp0:
-	current_exception_sp0 el2 serr_current_exception
+	noreturn_current_exception_sp0 el2 serr_current_exception_noreturn
 
 .balign 0x80
 sync_cur_spx:
-	current_exception_spx el2 sync_current_exception
+	noreturn_current_exception_spx el2 sync_current_exception_noreturn
 
 .balign 0x80
 irq_cur_spx:
-	current_exception_spx el2 irq_current_exception
+	noreturn_current_exception_spx el2 irq_current_exception_noreturn
 
 .balign 0x80
 fiq_cur_spx:
-	current_exception_spx el2 fiq_current_exception
+	noreturn_current_exception_spx el2 fiq_current_exception_noreturn
 
 .balign 0x80
 serr_cur_spx:
-	current_exception_spx el2 serr_current_exception
+	noreturn_current_exception_spx el2 serr_current_exception_noreturn
 
 .balign 0x80
 sync_lower_64:
