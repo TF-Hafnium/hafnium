@@ -25,7 +25,7 @@ sync_cur_sp0:
 
 .balign 0x80
 irq_cur_sp0:
-	current_exception_sp0 el1 irq_current
+	current_exception_sp0 el1 irq_current exception_handler_return
 
 .balign 0x80
 fiq_cur_sp0:
@@ -113,8 +113,10 @@ restore_from_stack_and_return:
 skip_elr:
 	/* Restore register spsr_el1 using x1 as scratch. */
 	ldr x1, [sp, #8 * 23]
-        msr spsr_el1, x1
+	msr spsr_el1, x1
 
 	/* Restore x0 & x1, and release stack space. */
 	ldp x0, x1, [sp], #8 * 24
-	eret
+
+exception_handler_return:
+	eret_with_sb

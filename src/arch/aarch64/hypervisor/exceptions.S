@@ -518,7 +518,7 @@ vcpu_restore_volatile_and_run:
 	/* Restore x0..x3, which we have used as scratch before. */
 	ldp x2, x3, [x0, #VCPU_REGS + 8 * 2]
 	ldp x0, x1, [x0, #VCPU_REGS + 8 * 0]
-	eret
+	eret_with_sb
 
 .balign 0x40
 /**
@@ -526,4 +526,4 @@ vcpu_restore_volatile_and_run:
  */
 restore_from_stack_and_return:
 	restore_volatile_from_stack el2
-	eret
+	eret_with_sb

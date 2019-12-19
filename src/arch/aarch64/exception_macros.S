@@ -15,6 +15,26 @@
  */
 
 /**
+ * From Linux commit 679db70801da9fda91d26caf13bf5b5ccc74e8e8:
+ * "Some CPUs can speculate past an ERET instruction and potentially perform
+ * speculative accesses to memory before processing the exception return.
+ * Since the register state is often controlled by a lower privilege level
+ * at the point of an ERET, this could potentially be used as part of a
+ * side-channel attack."
+ *
+ * This macro emits a speculation barrier after the ERET to prevent the CPU
+ * from speculating past the exception return.
+ *
+ * ARMv8.5 introduces a dedicated SB speculative barrier instruction.
+ * Use a DSB/ISB pair on older platforms.
+ */
+.macro eret_with_sb
+	eret
+	dsb	nsh
+	isb
+.endm
+
+/**
  * Saves the volatile registers onto the stack. This currently takes 14
  * instructions, so it can be used in exception handlers with 18 instructions
  * left, 2 of which in the same cache line (assuming a 16-byte cache line).
@@ -81,16 +101,18 @@
  * Switching to SPx and calling the C handler takes 16 instructions, so it's not
  * possible to add a branch to a common exit path without going into the next
  * cache line (assuming 16-byte cache lines). Additionally, to restore and
- * return we need an additional 16 instructions, so we implement the whole
- * handler within the allotted 32 instructions.
+ * return we need an additional 16 instructions, so we could implement the whole
+ * handler within the allotted 32 instructions. However, since we want to emit
+ * a speculation barrier after each ERET, we are forced to move the ERET to
+ * a shared exit path.
  */
-.macro current_exception_sp0 elx:req handler:req
+.macro current_exception_sp0 elx:req handler:req eret_label:req
 	msr spsel, #1
 	save_volatile_to_stack \elx
 	bl \handler
 	restore_volatile_from_stack \elx
 	msr spsel, #0
-	eret
+	b \eret_label
 .endm
 
 /**
