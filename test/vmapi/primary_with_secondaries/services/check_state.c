@@ -33,7 +33,7 @@ void send_with_retry(spci_vm_id_t sender_vm_id, spci_vm_id_t target_vm_id,
 }
 
 /**
- * This service repeatedly takes the following steps: sets the per-cpu pointer
+ * This service repeatedly takes the following steps: sets the per-CPU pointer
  * to some value, makes a hypervisor call, check that the value is still what it
  * was set to.
  *

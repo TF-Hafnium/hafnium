@@ -24,22 +24,22 @@
 /**
  * Tracks the number of times the exception handler has been invoked.
  */
-static int exception_handler_num_exceptions = 0;
+static int exception_handler_exception_count = 0;
 
 /**
  * Sends the number of exceptions handled to the Primary VM.
  */
-void exception_handler_send_num_exceptions(void)
+void exception_handler_send_exception_count(void)
 {
 	void *send_buf = SERVICE_SEND_BUFFER();
 
-	dlog("Sending num_exceptions %d to primary VM\n",
-	     exception_handler_num_exceptions);
+	dlog("Sending exception_count %d to primary VM\n",
+	     exception_handler_exception_count);
 	memcpy_s(send_buf, SPCI_MSG_PAYLOAD_MAX,
-		 (const void *)&exception_handler_num_exceptions,
-		 sizeof(exception_handler_num_exceptions));
+		 (const void *)&exception_handler_exception_count,
+		 sizeof(exception_handler_exception_count));
 	EXPECT_EQ(spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID,
-				sizeof(exception_handler_num_exceptions), 0)
+				sizeof(exception_handler_exception_count), 0)
 			  .func,
 		  SPCI_SUCCESS_32);
 }
@@ -47,16 +47,16 @@ void exception_handler_send_num_exceptions(void)
 /**
  * Receives the number of exceptions handled.
  */
-int exception_handler_receive_num_exceptions(
+int exception_handler_receive_exception_count(
 	const struct spci_value *send_res,
 	const struct spci_memory_region *recv_buf)
 {
-	int num_exceptions = *((const int *)recv_buf);
+	int exception_count = *((const int *)recv_buf);
 
 	EXPECT_EQ(send_res->func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(*send_res), sizeof(num_exceptions));
+	EXPECT_EQ(spci_msg_send_size(*send_res), sizeof(exception_count));
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-	return num_exceptions;
+	return exception_count;
 }
 
 /**
@@ -66,7 +66,7 @@ int exception_handler_receive_num_exceptions(
 bool exception_handler_skip_instruction(void)
 {
 	dlog("%s function is triggered!\n", __func__);
-	++exception_handler_num_exceptions;
+	++exception_handler_exception_count;
 
 	/* Skip instruction that triggered the exception. */
 	uint64_t next_pc = read_msr(elr_el1);
@@ -84,9 +84,9 @@ bool exception_handler_skip_instruction(void)
 bool exception_handler_yield(void)
 {
 	dlog("%s function is triggered!\n", __func__);
-	++exception_handler_num_exceptions;
+	++exception_handler_exception_count;
 
-	exception_handler_send_num_exceptions();
+	exception_handler_send_exception_count();
 
 	/* Indicate that elr_el1 should not be restored. */
 	return true;
@@ -97,7 +97,7 @@ bool exception_handler_yield(void)
  */
 int exception_handler_get_num(void)
 {
-	return exception_handler_num_exceptions;
+	return exception_handler_exception_count;
 }
 
 /**
@@ -105,5 +105,5 @@ int exception_handler_get_num(void)
  */
 void exception_handler_reset(void)
 {
-	exception_handler_num_exceptions = 0;
+	exception_handler_exception_count = 0;
 }

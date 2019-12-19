@@ -46,7 +46,7 @@ static_assert((PAGE_SIZE % STACK_ALIGN) == 0,
  * TOCTOU issues while Hafnium performs actions on information that would
  * otherwise be re-writable by the VM.
  *
- * Each buffer is owned by a single cpu. The buffer can only be used for
+ * Each buffer is owned by a single CPU. The buffer can only be used for
  * spci_msg_send. The information stored in the buffer is only valid during the
  * spci_msg_send request is performed.
  */
@@ -158,7 +158,7 @@ void cpu_off(struct cpu *c)
 }
 
 /**
- * Searches for a CPU based on its id.
+ * Searches for a CPU based on its ID.
  */
 struct cpu *cpu_find(cpu_id_t id)
 {

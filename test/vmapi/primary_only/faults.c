@@ -59,7 +59,7 @@ TEST(faults, spurious_due_to_configure)
 	sl_init(&s.lock);
 	s.done = false;
 
-	/* Start secondary cpu while holding lock. */
+	/* Start secondary CPU while holding lock. */
 	sl_lock(&s.lock);
 	EXPECT_EQ(
 		hftest_cpu_start(hftest_get_cpu_id(1), other_stack,

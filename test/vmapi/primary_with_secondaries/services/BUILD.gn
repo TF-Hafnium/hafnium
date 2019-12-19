@@ -14,7 +14,7 @@
 
 import("//build/image/image.gni")
 
-# Service to expose race conditions when running a vcpu.
+# Service to expose race conditions when running a vCPU.
 source_set("check_state") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]

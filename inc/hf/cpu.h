@@ -18,7 +18,7 @@
 
 #include "hf/arch/cpu.h"
 
-/* TODO: Update alignment such that cpus are in different cache lines. */
+/* TODO: Fix alignment such that `cpu` structs are in different cache lines. */
 struct cpu {
 	/** CPU identifier. Doesn't have to be contiguous. */
 	cpu_id_t id;
@@ -29,7 +29,7 @@ struct cpu {
 	/** See api.c for the partial ordering on locks. */
 	struct spinlock lock;
 
-	/** Determines whether or not the cpu is currently on. */
+	/** Determines whether the CPU is currently on. */
 	bool is_on;
 };
 

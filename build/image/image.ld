@@ -189,8 +189,8 @@ SECTIONS
 	image_end = .;
 
 	/*
-	 * Calculate sizes of the the binary file and image loaded into memory
-	 * as well as the text, read-only and read-write data sections.
+	 * Calculate sizes of the binary file and image loaded into memory as
+	 * well as the text, read-only and read-write data sections.
 	 */
 	bin_size = ABSOLUTE(bin_end - ORIGIN_ADDRESS);
 	image_size = ABSOLUTE(image_end - ORIGIN_ADDRESS);

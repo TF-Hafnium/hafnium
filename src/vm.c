@@ -64,7 +64,7 @@ bool vm_init(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
 		list_init(&vm->wait_entries[i].ready_links);
 	}
 
-	/* Do basic initialization of vcpus. */
+	/* Do basic initialization of vCPUs. */
 	for (i = 0; i < vcpu_count; i++) {
 		vcpu_init(vm_get_vcpu(vm, i), vm);
 	}

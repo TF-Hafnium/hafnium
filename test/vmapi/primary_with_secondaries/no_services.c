@@ -52,7 +52,7 @@ TEST(hf_vm_get_count, three_secondary_vms)
 }
 
 /**
- * Confirm that secondary VM has 1 VCPU.
+ * Confirm that secondary VM has 1 vCPU.
  */
 TEST(hf_vcpu_get_count, secondary_has_one_vcpu)
 {
@@ -60,7 +60,7 @@ TEST(hf_vcpu_get_count, secondary_has_one_vcpu)
 }
 
 /**
- * Confirm an error is returned when getting the vcpu count for a reserved ID.
+ * Confirm an error is returned when getting the vCPU count for a reserved ID.
  */
 TEST(hf_vcpu_get_count, reserved_vm_id)
 {
@@ -72,7 +72,7 @@ TEST(hf_vcpu_get_count, reserved_vm_id)
 }
 
 /**
- * Confirm it is an error to query how many VCPUs are assigned to a nonexistent
+ * Confirm it is an error to query how many vCPUs are assigned to a nonexistent
  * secondary VM.
  */
 TEST(hf_vcpu_get_count, large_invalid_vm_id)
@@ -99,7 +99,7 @@ TEST(spci_run, cannot_run_absent_secondary)
 }
 
 /**
- * Can only run a vcpu that exists.
+ * Can only run a vCPU that exists.
  */
 TEST(spci_run, cannot_run_absent_vcpu)
 {
@@ -124,7 +124,7 @@ TEST(spci_rxtx_map, fails_with_unaligned_pointer)
 	hf_ipaddr_t unaligned_addr = (hf_ipaddr_t)&maybe_aligned[1];
 	hf_ipaddr_t aligned_addr = (hf_ipaddr_t)send_page;
 
-	/* Check the the address is unaligned. */
+	/* Check that the address is unaligned. */
 	ASSERT_EQ(unaligned_addr & 1, 1);
 
 	EXPECT_SPCI_ERROR(spci_rxtx_map(aligned_addr, unaligned_addr),

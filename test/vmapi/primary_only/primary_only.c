@@ -48,7 +48,7 @@ TEST(hf_vm_get_count, no_secondary_vms)
 }
 
 /**
- * Confirm the primary has at least one vcpu.
+ * Confirm the primary has at least one vCPU.
  */
 TEST(hf_vcpu_get_count, primary_has_at_least_one)
 {
@@ -56,7 +56,7 @@ TEST(hf_vcpu_get_count, primary_has_at_least_one)
 }
 
 /**
- * Confirm an error is returned when getting the vcpu count of a non-existant
+ * Confirm an error is returned when getting the vCPU count of a non-existent
  * VM.
  */
 TEST(hf_vcpu_get_count, no_secondary_vms)
@@ -65,7 +65,7 @@ TEST(hf_vcpu_get_count, no_secondary_vms)
 }
 
 /**
- * Confirm an error is returned when getting the vcpu count for a reserved ID.
+ * Confirm an error is returned when getting the vCPU count for a reserved ID.
  */
 TEST(hf_vcpu_get_count, reserved_vm_id)
 {
@@ -77,7 +77,7 @@ TEST(hf_vcpu_get_count, reserved_vm_id)
 }
 
 /**
- * Confirm an error is returned when getting the vcpu count of a VM with an ID
+ * Confirm an error is returned when getting the vCPU count of a VM with an ID
  * that is likely to be far outside the resource limit.
  */
 TEST(hf_vcpu_get_count, large_invalid_vm_id)
@@ -86,7 +86,7 @@ TEST(hf_vcpu_get_count, large_invalid_vm_id)
 }
 
 /**
- * Confirm it is an error when running a vcpu from the primary VM.
+ * Confirm it is an error when running a vCPU from the primary VM.
  */
 TEST(spci_run, cannot_run_primary)
 {
@@ -95,7 +95,7 @@ TEST(spci_run, cannot_run_primary)
 }
 
 /**
- * Confirm it is an error when running a vcpu from a non-existant secondary VM.
+ * Confirm it is an error when running a vCPU from a non-existent secondary VM.
  */
 TEST(spci_run, cannot_run_absent_secondary)
 {
@@ -123,7 +123,7 @@ static void vm_cpu_entry(uintptr_t arg)
 }
 
 /**
- * Confirm a new cpu can be started to execute in parallel.
+ * Confirm a new CPU can be started to execute in parallel.
  */
 TEST(cpus, start)
 {

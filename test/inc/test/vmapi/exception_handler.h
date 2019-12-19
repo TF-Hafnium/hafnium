@@ -26,8 +26,8 @@ int exception_handler_get_num(void);
 
 void exception_handler_reset(void);
 
-void exception_handler_send_num_exceptions(void);
+void exception_handler_send_exception_count(void);
 
-int exception_handler_receive_num_exceptions(
+int exception_handler_receive_exception_count(
 	const struct spci_value *send_res,
 	const struct spci_memory_region *recv_buf);

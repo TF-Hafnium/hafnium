@@ -52,7 +52,7 @@ static inline spci_vm_count_t hf_vm_get_count(void)
 }
 
 /**
- * Returns the number of VCPUs configured in the given secondary VM.
+ * Returns the number of vCPUs configured in the given secondary VM.
  */
 static inline spci_vcpu_count_t hf_vcpu_get_count(spci_vm_id_t vm_id)
 {
@@ -70,7 +70,7 @@ static inline struct spci_value spci_run(spci_vm_id_t vm_id,
 }
 
 /**
- * Hints that the vcpu is willing to yield its current use of the physical CPU.
+ * Hints that the vCPU is willing to yield its current use of the physical CPU.
  * This call always returns SPCI_SUCCESS.
  */
 static inline struct spci_value spci_yield(void)
@@ -140,7 +140,7 @@ static inline struct spci_value spci_msg_send(spci_vm_id_t sender_vm_id,
  * If no message is immediately available and there are no enabled and pending
  * interrupts (irrespective of whether interrupts are enabled globally), then
  * this will block until a message is available or an enabled interrupt becomes
- * pending. This matches the behaviour of the WFI instruction on aarch64, except
+ * pending. This matches the behaviour of the WFI instruction on AArch64, except
  * that a message becoming available is also treated like a wake-up event.
  *
  * Returns:
@@ -277,7 +277,7 @@ static inline struct spci_value spci_version(void)
  * SPCI interfaces.
  *
  * Returns:
- *  - SPCI_SUCCESS in .func if the the optional interface with function_id is
+ *  - SPCI_SUCCESS in .func if the optional interface with function_id is
  * implemented.
  *  - SPCI_ERROR in .func if the optional interface with function_id is not
  * implemented.

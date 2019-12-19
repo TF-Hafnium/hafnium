@@ -34,7 +34,7 @@ alignas(PAGE_SIZE) static uint8_t pages[4 * PAGE_SIZE];
 static void check_cannot_send_memory(
 	struct mailbox_buffers mb, uint32_t mode,
 	struct spci_memory_region_constituent constituents[],
-	int num_constituents, int32_t avoid_vm)
+	int constituent_count, int32_t avoid_vm)
 
 {
 	enum spci_memory_access access[] = {SPCI_MEMORY_RO_NX, SPCI_MEMORY_RO_X,
@@ -68,7 +68,7 @@ static void check_cannot_send_memory(
 						spci_memory_region_init(
 							mb.send, vms[i],
 							constituents,
-							num_constituents, 0, 0,
+							constituent_count, 0, 0,
 							access[j],
 							SPCI_MEMORY_NORMAL_MEM,
 							cacheability[l],
@@ -84,7 +84,7 @@ static void check_cannot_send_memory(
 						spci_memory_region_init(
 							mb.send, vms[i],
 							constituents,
-							num_constituents, 0, 0,
+							constituent_count, 0, 0,
 							access[j],
 							SPCI_MEMORY_DEVICE_MEM,
 							device[l],
@@ -106,11 +106,11 @@ static void check_cannot_send_memory(
 static void check_cannot_lend_memory(
 	struct mailbox_buffers mb,
 	struct spci_memory_region_constituent constituents[],
-	int num_constituents, int32_t avoid_vm)
+	int constituent_count, int32_t avoid_vm)
 
 {
 	check_cannot_send_memory(mb, SPCI_MSG_SEND_LEGACY_MEMORY_LEND,
-				 constituents, num_constituents, avoid_vm);
+				 constituents, constituent_count, avoid_vm);
 }
 
 /**
@@ -119,11 +119,11 @@ static void check_cannot_lend_memory(
 static void check_cannot_share_memory(
 	struct mailbox_buffers mb,
 	struct spci_memory_region_constituent constituents[],
-	int num_constituents, int32_t avoid_vm)
+	int constituent_count, int32_t avoid_vm)
 
 {
 	check_cannot_send_memory(mb, SPCI_MSG_SEND_LEGACY_MEMORY_SHARE,
-				 constituents, num_constituents, avoid_vm);
+				 constituents, constituent_count, avoid_vm);
 }
 
 /**
@@ -134,7 +134,7 @@ static void check_cannot_share_memory(
 static void check_cannot_donate_memory(
 	struct mailbox_buffers mb,
 	struct spci_memory_region_constituent constituents[],
-	int num_constituents, int32_t avoid_vm)
+	int constituent_count, int32_t avoid_vm)
 {
 	uint32_t vms[] = {HF_PRIMARY_VM_ID, SERVICE_VM1, SERVICE_VM2};
 
@@ -146,7 +146,7 @@ static void check_cannot_donate_memory(
 			continue;
 		}
 		msg_size = spci_memory_region_init(
-			mb.send, vms[i], constituents, num_constituents, 0, 0,
+			mb.send, vms[i], constituents, constituent_count, 0, 0,
 			SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
 			SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
@@ -164,7 +164,7 @@ static void check_cannot_donate_memory(
 static void check_cannot_relinquish_memory(
 	struct mailbox_buffers mb,
 	struct spci_memory_region_constituent constituents[],
-	int num_constituents)
+	int constituent_count)
 {
 	uint32_t vms[] = {HF_PRIMARY_VM_ID, SERVICE_VM1, SERVICE_VM2};
 
@@ -173,8 +173,9 @@ static void check_cannot_relinquish_memory(
 	for (i = 0; i < ARRAY_SIZE(vms); ++i) {
 		for (j = 0; j < ARRAY_SIZE(vms); ++j) {
 			uint32_t msg_size = spci_memory_region_init(
-				mb.send, vms[i], constituents, num_constituents,
-				0, 0, SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
+				mb.send, vms[i], constituents,
+				constituent_count, 0, 0, SPCI_MEMORY_RW_X,
+				SPCI_MEMORY_NORMAL_MEM,
 				SPCI_MEMORY_CACHE_WRITE_BACK,
 				SPCI_MEMORY_OUTER_SHAREABLE);
 			EXPECT_SPCI_ERROR(
@@ -274,7 +275,7 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -340,7 +341,7 @@ TEST(memory_sharing, lend_relinquish)
 	}
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -417,7 +418,7 @@ TEST(memory_sharing, give_and_get_back)
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -457,7 +458,7 @@ TEST(memory_sharing, lend_and_get_back)
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -547,7 +548,7 @@ TEST(memory_sharing, share_elsewhere_after_return)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -580,7 +581,7 @@ TEST(memory_sharing, give_memory_and_lose_access)
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -613,7 +614,7 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -654,7 +655,7 @@ TEST(memory_sharing, donate_check_upper_bounds)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
@@ -677,7 +678,7 @@ TEST(memory_sharing, donate_check_upper_bounds)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -718,7 +719,7 @@ TEST(memory_sharing, donate_check_lower_bounds)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
@@ -745,7 +746,7 @@ TEST(memory_sharing, donate_check_lower_bounds)
 	 * NOTE: This generates two exceptions, one for the page fault, and one
 	 * for accessing a region past the lower bound.
 	 */
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  2);
 }
 
@@ -796,7 +797,7 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -846,7 +847,7 @@ TEST(memory_sharing, donate_vms)
 
 	/* Try to access memory in VM1. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 
 	/* Ensure that memory in VM2 remains the same. */
@@ -1208,7 +1209,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -1281,7 +1282,7 @@ TEST(memory_sharing, share_relinquish_X_RW)
 	}
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -1353,7 +1354,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 	}
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -1404,7 +1405,7 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -1455,7 +1456,7 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -1798,7 +1799,7 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
@@ -1822,7 +1823,7 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM2, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -1864,7 +1865,7 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
@@ -1888,6 +1889,6 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 		  SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM2, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }

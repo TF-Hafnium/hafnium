@@ -234,7 +234,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		goto out;
 	}
 
-	dlog("Loaded with %u vcpus, entry at %#x.\n",
+	dlog("Loaded with %u vCPUs, entry at %#x.\n",
 	     manifest_vm->secondary.vcpu_count, pa_addr(mem_begin));
 
 	vcpu = vm_get_vcpu(vm, 0);

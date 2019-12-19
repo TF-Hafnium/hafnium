@@ -32,7 +32,7 @@ TEST(unmapped, data_unmapped)
 	SERVICE_SELECT(SERVICE_VM1, "data_unmapped", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -55,7 +55,7 @@ TEST(unmapped, straddling_data_unmapped)
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -70,7 +70,7 @@ TEST(unmapped, instruction_unmapped)
 	SERVICE_SELECT(SERVICE_VM1, "instruction_unmapped", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -93,6 +93,6 @@ TEST(unmapped, straddling_instruction_unmapped)
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }

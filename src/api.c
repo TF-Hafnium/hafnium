@@ -59,7 +59,7 @@ void api_init(struct mpool *ppool)
 }
 
 /**
- * Switches the physical CPU back to the corresponding vcpu of the primary VM.
+ * Switches the physical CPU back to the corresponding vCPU of the primary VM.
  *
  * This triggers the scheduling logic to run. Run in the context of secondary VM
  * to cause SPCI_RUN to return and the primary VM to regain control of the CPU.
@@ -110,7 +110,7 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 	/* Set the return value for the primary VM's call to HF_VCPU_RUN. */
 	arch_regs_set_retval(&next->regs, primary_ret);
 
-	/* Mark the current vcpu as waiting. */
+	/* Mark the current vCPU as waiting. */
 	sl_lock(&current->lock);
 	current->state = secondary_state;
 	sl_unlock(&current->lock);
@@ -119,7 +119,7 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 }
 
 /**
- * Returns to the primary vm and signals that the vcpu still has work to do so.
+ * Returns to the primary VM and signals that the vCPU still has work to do so.
  */
 struct vcpu *api_preempt(struct vcpu *current)
 {
@@ -132,7 +132,7 @@ struct vcpu *api_preempt(struct vcpu *current)
 }
 
 /**
- * Puts the current vcpu in wait for interrupt mode, and returns to the primary
+ * Puts the current vCPU in wait for interrupt mode, and returns to the primary
  * vm.
  */
 struct vcpu *api_wait_for_interrupt(struct vcpu *current)
@@ -166,8 +166,8 @@ struct vcpu *api_vcpu_off(struct vcpu *current)
 }
 
 /**
- * Returns to the primary vm to allow this cpu to be used for other tasks as the
- * vcpu does not have work to do at this moment. The current vcpu is marked as
+ * Returns to the primary VM to allow this CPU to be used for other tasks as the
+ * vCPU does not have work to do at this moment. The current vCPU is marked as
  * ready to be scheduled again.
  */
 void api_yield(struct vcpu *current, struct vcpu **next)
@@ -178,7 +178,7 @@ void api_yield(struct vcpu *current, struct vcpu **next)
 	};
 
 	if (current->vm->id == HF_PRIMARY_VM_ID) {
-		/* Noop on the primary as it makes the scheduling decisions. */
+		/* NOOP on the primary as it makes the scheduling decisions. */
 		return;
 	}
 
@@ -249,7 +249,7 @@ spci_vcpu_count_t api_vcpu_get_count(spci_vm_id_t vm_id,
 {
 	struct vm *vm;
 
-	/* Only the primary VM needs to know about vcpus for scheduling. */
+	/* Only the primary VM needs to know about vCPUs for scheduling. */
 	if (current->vm->id != HF_PRIMARY_VM_ID) {
 		return 0;
 	}
@@ -264,8 +264,8 @@ spci_vcpu_count_t api_vcpu_get_count(spci_vm_id_t vm_id,
 
 /**
  * This function is called by the architecture-specific context switching
- * function to indicate that register state for the given vcpu has been saved
- * and can therefore be used by other pcpus.
+ * function to indicate that register state for the given vCPU has been saved
+ * and can therefore be used by other pCPUs.
  */
 void api_regs_state_saved(struct vcpu *vcpu)
 {
@@ -375,7 +375,7 @@ static struct spci_value spci_msg_recv_return(const struct vm *receiver)
 }
 
 /**
- * Prepares the vcpu to run by updating its state and fetching whether a return
+ * Prepares the vCPU to run by updating its state and fetching whether a return
  * value needs to be forced onto the vCPU.
  */
 static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
@@ -522,13 +522,13 @@ struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
 	struct vcpu *vcpu;
 	struct spci_value ret = spci_error(SPCI_INVALID_PARAMETERS);
 
-	/* Only the primary VM can switch vcpus. */
+	/* Only the primary VM can switch vCPUs. */
 	if (current->vm->id != HF_PRIMARY_VM_ID) {
 		ret.arg2 = SPCI_DENIED;
 		goto out;
 	}
 
-	/* Only secondary VM vcpus can be run. */
+	/* Only secondary VM vCPUs can be run. */
 	if (vm_id == HF_PRIMARY_VM_ID) {
 		goto out;
 	}
@@ -1088,7 +1088,7 @@ struct spci_value api_spci_msg_recv(bool block, struct vcpu *current,
 
 	/*
 	 * The primary VM will receive messages as a status code from running
-	 * vcpus and must not call this function.
+	 * vCPUs and must not call this function.
 	 */
 	if (vm->id == HF_PRIMARY_VM_ID) {
 		return spci_error(SPCI_NOT_SUPPORTED);
@@ -1377,7 +1377,7 @@ int64_t api_interrupt_inject(spci_vm_id_t target_vm_id,
 	}
 
 	if (target_vcpu_idx >= target_vm->vcpu_count) {
-		/* The requested vcpu must exist. */
+		/* The requested vCPU must exist. */
 		return -1;
 	}
 
@@ -1387,7 +1387,7 @@ int64_t api_interrupt_inject(spci_vm_id_t target_vm_id,
 
 	target_vcpu = vm_get_vcpu(target_vm, target_vcpu_idx);
 
-	dlog("Injecting IRQ %d for VM %d VCPU %d from VM %d VCPU %d\n", intid,
+	dlog("Injecting IRQ %d for VM %d vCPU %d from VM %d vCPU %d\n", intid,
 	     target_vm_id, target_vcpu_idx, current->vm->id, current->cpu->id);
 	return internal_interrupt_inject(target_vcpu, intid, current, next);
 }

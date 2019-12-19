@@ -25,22 +25,22 @@
 #define INTERRUPT_REGISTER_BITS 32
 
 enum vcpu_state {
-	/** The vcpu is switched off. */
+	/** The vCPU is switched off. */
 	VCPU_STATE_OFF,
 
-	/** The vcpu is ready to be run. */
+	/** The vCPU is ready to be run. */
 	VCPU_STATE_READY,
 
-	/** The vcpu is currently running. */
+	/** The vCPU is currently running. */
 	VCPU_STATE_RUNNING,
 
-	/** The vcpu is waiting for a message. */
+	/** The vCPU is waiting for a message. */
 	VCPU_STATE_BLOCKED_MAILBOX,
 
-	/** The vcpu is waiting for an interrupt. */
+	/** The vCPU is waiting for an interrupt. */
 	VCPU_STATE_BLOCKED_INTERRUPT,
 
-	/** The vcpu has aborted. */
+	/** The vCPU has aborted. */
 	VCPU_STATE_ABORTED,
 };
 

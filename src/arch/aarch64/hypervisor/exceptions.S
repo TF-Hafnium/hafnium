@@ -18,7 +18,7 @@
 #include "exception_macros.S"
 
 /**
- * Saves the volatile registers into the register buffer of the current vcpu.
+ * Saves the volatile registers into the register buffer of the current vCPU.
  */
 .macro save_volatile_to_vcpu
 	/*
@@ -27,7 +27,7 @@
 	 */
 	str x18, [sp, #-16]!
 
-	/* Get the current vcpu. */
+	/* Get the current vCPU. */
 	mrs x18, tpidr_el2
 	stp x0, x1, [x18, #VCPU_REGS + 8 * 0]
 	stp x2, x3, [x18, #VCPU_REGS + 8 * 2]
@@ -40,7 +40,7 @@
 	stp x16, x17, [x18, #VCPU_REGS + 8 * 16]
 	stp x29, x30, [x18, #VCPU_REGS + 8 * 29]
 
-	/* x18 was saved on the stack, so we move it to vcpu regs buffer. */
+	/* x18 was saved on the stack, so we move it to vCPU regs buffer. */
 	ldr x0, [sp], #16
 	str x0, [x18, #VCPU_REGS + 8 * 18]
 
@@ -52,11 +52,11 @@
 
 /**
  * This is a generic handler for exceptions taken at a lower EL. It saves the
- * volatile registers to the current vcpu and calls the C handler, which can
+ * volatile registers to the current vCPU and calls the C handler, which can
  * select one of two paths: (a) restore volatile registers and return, or
- * (b) switch to a different vcpu. In the latter case, the handler needs to save
+ * (b) switch to a different vCPU. In the latter case, the handler needs to save
  * all non-volatile registers (they haven't been saved yet), then restore all
- * registers from the new vcpu.
+ * registers from the new vCPU.
  */
 .macro lower_exception handler:req
 	save_volatile_to_vcpu
@@ -64,10 +64,10 @@
 	/* Call C handler. */
 	bl \handler
 
-	/* Switch vcpu if requested by handler. */
+	/* Switch vCPU if requested by handler. */
 	cbnz x0, vcpu_switch
 
-	/* vcpu is not changing. */
+	/* vCPU is not changing. */
 	mrs x0, tpidr_el2
 	b vcpu_restore_volatile_and_run
 .endm
@@ -90,10 +90,10 @@
 	mrs x0, esr_el2
 	bl sync_lower_exception
 
-	/* Switch vcpu if requested by handler. */
+	/* Switch vCPU if requested by handler. */
 	cbnz x0, vcpu_switch
 
-	/* vcpu is not changing. */
+	/* vCPU is not changing. */
 	mrs x0, tpidr_el2
 	b vcpu_restore_volatile_and_run
 .endm
@@ -180,7 +180,7 @@ system_register_access:
 	 * can clobber non-volatile registers that are used by the msr/mrs,
 	 * which results in the wrong value being read or written.
 	 */
-	/* Get the current vcpu. */
+	/* Get the current vCPU. */
 	mrs x18, tpidr_el2
 	stp x19, x20, [x18, #VCPU_REGS + 8 * 19]
 	stp x21, x22, [x18, #VCPU_REGS + 8 * 21]
@@ -193,18 +193,18 @@ system_register_access:
 	bl handle_system_register_access
 	cbnz x0, vcpu_switch
 
-	/* vcpu is not changing. */
+	/* vCPU is not changing. */
 	mrs x0, tpidr_el2
 	b vcpu_restore_nonvolatile_and_run
 
 /**
- * Switch to a new vcpu.
+ * Switch to a new vCPU.
  *
- * All volatile registers from the old vcpu have already been saved. We need
- * to save only non-volatile ones from the old vcpu, and restore all from the
+ * All volatile registers from the old vCPU have already been saved. We need
+ * to save only non-volatile ones from the old vCPU, and restore all from the
  * new one.
  *
- * x0 is a pointer to the new vcpu.
+ * x0 is a pointer to the new vCPU.
  */
 vcpu_switch:
 	/* Save non-volatile registers. */
@@ -320,7 +320,7 @@ vcpu_switch:
 	mrs x4, fpcr
 	stp x3, x4, [x28], #32
 
-	/* Save new vcpu pointer in non-volatile register. */
+	/* Save new vCPU pointer in non-volatile register. */
 	mov x19, x0
 
 	/*
@@ -334,7 +334,7 @@ vcpu_switch:
 	/* Intentional fallthrough. */
 .global vcpu_restore_all_and_run
 vcpu_restore_all_and_run:
-	/* Update pointer to current vcpu. */
+	/* Update pointer to current vCPU. */
 	msr tpidr_el2, x0
 
 	/* Restore peripheral registers. */
@@ -495,9 +495,9 @@ vcpu_restore_nonvolatile_and_run:
 
 	/* Intentional fallthrough. */
 /**
- * Restore volatile registers and run the given vcpu.
+ * Restore volatile registers and run the given vCPU.
  *
- * x0 is a pointer to the target vcpu.
+ * x0 is a pointer to the target vCPU.
  */
 vcpu_restore_volatile_and_run:
 	ldp x4, x5, [x0, #VCPU_REGS + 8 * 4]

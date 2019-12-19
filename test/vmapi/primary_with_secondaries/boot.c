@@ -48,7 +48,7 @@ TEST(boot, beyond_memory_size)
 	SERVICE_SELECT(SERVICE_VM1, "boot_memory_overrun", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
 
@@ -63,6 +63,6 @@ TEST(boot, memory_before_image)
 	SERVICE_SELECT(SERVICE_VM1, "boot_memory_underrun", mb.send);
 
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_num_exceptions(&run_res, mb.recv),
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }

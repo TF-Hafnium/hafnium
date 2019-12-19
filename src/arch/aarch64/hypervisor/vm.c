@@ -40,7 +40,7 @@ void arch_vm_features_set(struct vm *vm)
 		vm->arch.trapped_features |= HF_FEATURE_PERFMON;
 
 		/*
-		 * TODO(b/132395845):  Access to RAS registers is not trapped at
+		 * TODO(b/132395845): Access to RAS registers is not trapped at
 		 * the moment for the primary VM, only for the secondaries. RAS
 		 * register access isn't needed now, but it might be
 		 * required for debugging. When Hafnium introduces debug vs

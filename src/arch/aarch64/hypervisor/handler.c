@@ -306,8 +306,8 @@ static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 			  args->arg4, args->arg5, args->arg6, args->arg7);
 
 	/*
-	 * Preserve the value passed by the caller, rather than the client_id we
-	 * generated. Note that this would also overwrite any return value that
+	 * Preserve the value passed by the caller, rather than the generated
+	 * client_id. Note that this would also overwrite any return value that
 	 * may be in x7, but the SMCs that we are forwarding are legacy calls
 	 * from before SMCCC 1.2 so won't have more than 4 return values anyway.
 	 */
@@ -731,7 +731,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 }
 
 /**
- * Handles EC = 011000, msr, mrs instruction traps.
+ * Handles EC = 011000, MSR, MRS instruction traps.
  * Returns non-null ONLY if the access failed and the vcpu is changing.
  */
 struct vcpu *handle_system_register_access(uintreg_t esr_el2)
