@@ -134,7 +134,7 @@ bool vcpu_secondary_reset_and_start(struct vcpu *vcpu, ipaddr_t entry,
  * Handles a page fault. It does so by determining if it's a legitimate or
  * spurious fault, and recovering from the latter.
  *
- * Returns true if the caller should resume the current vcpu, or false if its VM
+ * Returns true if the caller should resume the current vCPU, or false if its VM
  * should be aborted.
  */
 bool vcpu_handle_page_fault(const struct vcpu *current,

@@ -34,7 +34,7 @@
 void arch_regs_reset(struct vcpu *vcpu);
 
 /**
- * Updates the given registers so that when a vcpu runs, it starts off at the
+ * Updates the given registers so that when a vCPU runs, it starts off at the
  * given address (pc) with the given argument.
  *
  * This function must only be called on an arch_regs that is known not be in use

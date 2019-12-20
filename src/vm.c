@@ -100,7 +100,7 @@ struct vm *vm_find(spci_vm_id_t id)
 }
 
 /**
- * Locks the given VM and updates `locked` to hold the newly locked vm.
+ * Locks the given VM and updates `locked` to hold the newly locked VM.
  */
 struct vm_locked vm_lock(struct vm *vm)
 {

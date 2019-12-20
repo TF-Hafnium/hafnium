@@ -133,7 +133,7 @@ struct vcpu *api_preempt(struct vcpu *current)
 
 /**
  * Puts the current vCPU in wait for interrupt mode, and returns to the primary
- * vm.
+ * VM.
  */
 struct vcpu *api_wait_for_interrupt(struct vcpu *current)
 {
@@ -539,7 +539,7 @@ struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
 		goto out;
 	}
 
-	/* The requested vcpu must exist. */
+	/* The requested vCPU must exist. */
 	if (vcpu_idx >= vm->vcpu_count) {
 		goto out;
 	}
@@ -571,7 +571,7 @@ struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
 		arch_timer_mask(&vcpu->regs);
 	}
 
-	/* Switch to the vcpu. */
+	/* Switch to the vCPU. */
 	*next = vcpu;
 
 	/*
@@ -1119,7 +1119,7 @@ struct spci_value api_spci_msg_recv(bool block, struct vcpu *current,
 		goto out;
 	}
 
-	/* Switch back to primary vm to block. */
+	/* Switch back to primary VM to block. */
 	{
 		struct spci_value run_return = {
 			.func = SPCI_MSG_WAIT_32,
@@ -1192,7 +1192,7 @@ int64_t api_mailbox_waiter_get(spci_vm_id_t vm_id, const struct vcpu *current)
 		return -1;
 	}
 
-	/* Check if there are outstanding notifications from given vm. */
+	/* Check if there are outstanding notifications from given VM. */
 	locked = vm_lock(vm);
 	entry = api_fetch_waiter(locked);
 	vm_unlock(&locked);

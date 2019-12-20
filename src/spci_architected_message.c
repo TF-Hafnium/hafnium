@@ -350,7 +350,7 @@ static bool spci_region_group_identity_map(
 static bool clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool)
 {
 	/*
-	 * TODO: change this to a cpu local single page window rather than a
+	 * TODO: change this to a CPU local single page window rather than a
 	 *       global mapping of the whole range. Such an approach will limit
 	 *       the changes to stage-1 tables and will allow only local
 	 *       invalidation.

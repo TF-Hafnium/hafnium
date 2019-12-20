@@ -163,10 +163,10 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 
 	case PSCI_CPU_SUSPEND: {
 		/*
-		 * Update vcpu state to wake from the provided entry point but
+		 * Update vCPU state to wake from the provided entry point but
 		 * if suspend returns, for example because it failed or was a
 		 * standby power state, the SMC will return and the updated
-		 * vcpu registers will be ignored.
+		 * vCPU registers will be ignored.
 		 */
 		arch_regs_set_pc_arg(&vcpu->regs, ipa_init(arg1), arg2);
 		smc_res = smc64(PSCI_CPU_SUSPEND, arg0, (uintreg_t)&cpu_entry,

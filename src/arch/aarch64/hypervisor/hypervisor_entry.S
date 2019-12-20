@@ -27,11 +27,11 @@ image_entry:
 	/* Interpret the registers passed from the loader. */
 	bl plat_boot_flow_hook
 
-	/* Get pointer to first cpu. */
+	/* Get pointer to first CPU. */
 	adrp x28, cpus
 	add x28, x28, :lo12:cpus
 
-	/* Set the ID of this cpu from the affinity bits of mpidr. */
+	/* Set the ID of this CPU from the affinity bits of mpidr. */
 	mrs x30, mpidr_el1
 	ubfx x29, x30, 0, 24
 	ubfx x30, x30, 32, 8
@@ -72,10 +72,10 @@ cpu_entry:
 	/* Intentional fallthrough. */
 
 cpu_init:
-	/* Call into C code, x0 holds the cpu pointer. */
+	/* Call into C code, x0 holds the CPU pointer. */
 	bl cpu_main
 
-	/* Run the vcpu returned by cpu_main. */
+	/* Run the vCPU returned by cpu_main. */
 	bl vcpu_restore_all_and_run
 
 	/* Loop forever waiting for interrupts. */

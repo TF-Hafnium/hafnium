@@ -66,7 +66,7 @@ static bool run_loop(struct mailbox_buffers *mb)
 
 /**
  * This is the entry point of the additional primary VM vCPU. It just calls
- * the run loop so that two cpus compete for the chance to run a secondary VM.
+ * the run loop so that two CPUs compete for the chance to run a secondary VM.
  */
 static void vm_cpu_entry(uintptr_t arg)
 {

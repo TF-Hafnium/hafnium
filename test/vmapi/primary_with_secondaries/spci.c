@@ -125,7 +125,7 @@ TEST(spci, spci_recv_non_blocking)
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct spci_value run_res;
 
-	/* Check is performed in secondary vm. */
+	/* Check is performed in secondary VM. */
 	SERVICE_SELECT(SERVICE_VM1, "spci_recv_non_blocking", mb.send);
 	run_res = spci_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, SPCI_YIELD_32);

@@ -732,7 +732,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 
 /**
  * Handles EC = 011000, MSR, MRS instruction traps.
- * Returns non-null ONLY if the access failed and the vcpu is changing.
+ * Returns non-null ONLY if the access failed and the vCPU is changing.
  */
 struct vcpu *handle_system_register_access(uintreg_t esr_el2)
 {
