@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCRIPT_NAME="$(realpath "${BASH_SOURCE[0]}")"
-ROOT_DIR="$(realpath $(dirname "${SCRIPT_NAME}")/../..)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
+ROOT_DIR="$(dirname $(dirname "${SCRIPT_DIR}"))"
 
 REPO="${ROOT_DIR}/prebuilts/generic/repo/repo"
 
@@ -67,7 +68,7 @@ fi
 # avoid recursion.
 if [ "${HAFNIUM_HERMETIC_BUILD}" == "true" ]
 then
-	exec "${ROOT_DIR}/build/run_in_container.sh" ${SCRIPT_NAME} $@
+	exec "${ROOT_DIR}/build/run_in_container.sh" ${SCRIPT_PATH} $@
 fi
 
 USE_FVP=false

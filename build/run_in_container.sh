@@ -14,8 +14,8 @@
 # limitations under the License.
 set -euo pipefail
 
-SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
-ROOT_DIR="$(realpath ${SCRIPT_DIR}/..)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname ${SCRIPT_DIR})"
 
 source "${SCRIPT_DIR}/docker/common.inc"
 

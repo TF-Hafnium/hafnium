@@ -16,13 +16,13 @@
 
 set -euxo pipefail
 
-SCRIPT_NAME="$(realpath "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
 ROOT_DIR="$(realpath ${SCRIPT_DIR}/..)"
 
 if [ "${HAFNIUM_HERMETIC_BUILD:-}" == "true" ]
 then
-	exec "${ROOT_DIR}/build/run_in_container.sh" -p ${SCRIPT_NAME} $@
+	exec "${ROOT_DIR}/build/run_in_container.sh" -p ${SCRIPT_PATH} $@
 fi
 
 if [ $# != 1 ]

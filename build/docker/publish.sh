@@ -14,7 +14,7 @@
 # limitations under the License.
 set -euo pipefail
 
-SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.inc"
 
 # Requires for the user to be an owner of the GCP 'hafnium-build' project and
