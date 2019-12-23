@@ -146,8 +146,10 @@ template("linux_kernel_module") {
 
   source_target = "${target_name}__source"
 
+  module_dir = "./"
+
   source_dir_copy(source_target) {
-    path = invoker.module_dir
+    path = module_dir
   }
 
   action(target_name) {

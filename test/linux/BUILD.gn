@@ -46,10 +46,10 @@ linux_initrd("linux_test_initrd") {
   test_binary_target = ":test_binary(//build/toolchain:aarch64_linux_clang)"
   sources = [
     get_label_info(test_binary_target, "root_out_dir") + "/test_binary",
-    get_label_info("//driver:linux", "target_out_dir") + "/hafnium.ko",
+    get_label_info("//driver/linux", "target_out_dir") + "/hafnium.ko",
   ]
   deps = [
-    "//driver:linux",
+    "//driver/linux",
     test_binary_target,
   ]
 }

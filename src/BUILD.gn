@@ -170,6 +170,6 @@ executable("unit_tests") {
   ]
   deps = [
     ":src_testable",
-    "//third_party:gtest_main",
+    "//third_party/googletest:gtest_main",
   ]
 }
