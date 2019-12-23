@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright 2019 The Hafnium Authors.
 #
@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/usr/bin/env python
 """Check ELF file for assembly-level regressions.
 
 Objdumps the given ELF file and detects known assembly patterns, checking for
@@ -79,7 +78,7 @@ def Main():
 
 	objdump_stdout = subprocess.check_output([
 		OBJDUMP, "-d", args.input_elf ])
-	objdump_stdout = objdump_stdout.splitlines()
+	objdump_stdout = objdump_stdout.decode("utf-8").splitlines()
 
 	check_eret_speculation_barrier(objdump_stdout)
 

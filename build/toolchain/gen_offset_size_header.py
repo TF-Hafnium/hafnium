@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright 2019 The Hafnium Authors.
 #
@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/usr/bin/env python
 """Generate a header file with definitions of constants parsed from a binary."""
 
 import argparse
@@ -41,7 +40,7 @@ def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("bin_file",
 		help="binary file to be parsed for definitions of constants")
-        parser.add_argument("out_file", help="output file");
+	parser.add_argument("out_file", help="output file");
 	args = parser.parse_args()
 
 	# Regex for finding definitions: <HAFNIUM_DEFINE name #value />
