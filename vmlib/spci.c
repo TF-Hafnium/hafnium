@@ -32,7 +32,7 @@
  * `memory_region` (attributes, constituents and memory region header size).
  */
 uint32_t spci_memory_region_init(
-	struct spci_memory_region *memory_region, spci_vm_id_t receiver,
+	struct spci_memory_region *memory_region, spci_vm_id_t sender, spci_vm_id_t receiver,
 	const struct spci_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag, spci_memory_region_flags_t flags,
 	enum spci_memory_access access, enum spci_memory_type type,
@@ -54,6 +54,8 @@ uint32_t spci_memory_region_init(
 
 	memory_region->tag = tag;
 	memory_region->flags = flags;
+	memory_region->sender = sender;
+	memory_region->reserved = 0;
 	memory_region->page_count = 0;
 	memory_region->constituent_count = constituent_count;
 	memory_region->attribute_count = 1;

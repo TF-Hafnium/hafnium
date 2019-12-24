@@ -588,6 +588,11 @@ static struct spci_value spci_validate_call_share_memory(
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
+	/* The sender must match the message sender. */
+	if (memory_region->sender != from_locked.vm->id) {
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
 	/* We only support a single recipient. */
 	if (memory_region->attribute_count != 1) {
 		return spci_error(SPCI_INVALID_PARAMETERS);

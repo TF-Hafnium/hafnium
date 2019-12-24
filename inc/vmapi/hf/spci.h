@@ -264,6 +264,10 @@ struct spci_memory_region {
 	uint32_t tag;
 	/** Flags to control behaviour of the transaction. */
 	spci_memory_region_flags_t flags;
+	/** Sender VM ID. */
+	spci_vm_id_t sender;
+	/** Reserved field, must be 0. */
+	uint16_t reserved;
 	/**
 	 * The total number of 4 kiB pages included in this memory region. This
 	 * must be equal to the sum of page counts specified in each
@@ -306,7 +310,8 @@ spci_memory_region_get_constituents(struct spci_memory_region *memory_region)
 }
 
 uint32_t spci_memory_region_init(
-	struct spci_memory_region *memory_region, spci_vm_id_t receiver,
+	struct spci_memory_region *memory_region, spci_vm_id_t sender,
+	spci_vm_id_t receiver,
 	const struct spci_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
 	spci_memory_region_flags_t flags, enum spci_memory_access access,
