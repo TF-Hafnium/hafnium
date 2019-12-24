@@ -384,6 +384,12 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 					  args->arg3, args->arg4, args->arg5,
 					  current(), next);
 		return true;
+	case HF_SPCI_MEM_RELINQUISH:
+		*args = api_spci_mem_send(
+			SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH,
+			ipa_init(args->arg1), args->arg2, args->arg3,
+			args->arg4, args->arg5, current(), next);
+		return true;
 	}
 
 	return false;

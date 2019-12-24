@@ -444,10 +444,7 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 			SPCI_MEMORY_OUTER_SHAREABLE);
 		/* Relevant information read, mailbox can be cleared. */
 		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-		EXPECT_EQ(spci_msg_send(spci_msg_send_receiver(ret),
-					spci_msg_send_sender(ret), msg_size,
-					SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH)
-				  .func,
+		EXPECT_EQ(hf_spci_mem_relinquish(0, msg_size, 0).func,
 			  SPCI_SUCCESS_32);
 
 		/*
@@ -482,11 +479,14 @@ TEST_SERVICE(spci_memory_donate_relinquish)
 
 		ptr = (uint8_t *)constituents[0].address;
 
-		/* Check that one has access to the shared region. */
+		/* Check that we have access to the shared region. */
 		for (i = 0; i < PAGE_SIZE; ++i) {
 			ptr[i]++;
 		}
-		/* Give the memory back and notify the sender. */
+		/*
+		 * Attempt to relinquish the memory, which should fail because
+		 * it was donated not lent.
+		 */
 		msg_size = spci_memory_region_init(
 			send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
 			constituents, memory_region->constituent_count, 0, 0,
@@ -494,11 +494,8 @@ TEST_SERVICE(spci_memory_donate_relinquish)
 			SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
 		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-		EXPECT_SPCI_ERROR(
-			spci_msg_send(spci_msg_send_receiver(ret),
-				      HF_PRIMARY_VM_ID, msg_size,
-				      SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH),
-			SPCI_INVALID_PARAMETERS);
+		EXPECT_SPCI_ERROR(hf_spci_mem_relinquish(0, msg_size, 0),
+				  SPCI_INVALID_PARAMETERS);
 
 		/* Ensure we still have access to the memory. */
 		ptr[0] = 123;
@@ -526,16 +523,14 @@ TEST_SERVICE(spci_lend_invalid_source)
 	EXPECT_EQ(spci_msg_send_attributes(ret),
 		  SPCI_MSG_SEND_LEGACY_MEMORY_LEND);
 
-	/* Attempt to relinquish from primary VM. */
+	/* Attempt to relinquish to this same VM. */
 	msg_size = spci_memory_region_init(
 		send_buf, HF_PRIMARY_VM_ID, hf_vm_get_id(), constituents,
 		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_SPCI_ERROR(
-		spci_msg_send(HF_PRIMARY_VM_ID, hf_vm_get_id(), msg_size,
-			      SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH),
-		SPCI_INVALID_PARAMETERS);
+	EXPECT_SPCI_ERROR(hf_spci_mem_relinquish(0, msg_size, 0),
+			  SPCI_INVALID_PARAMETERS);
 
 	/* Give the memory back and notify the sender. */
 	msg_size = spci_memory_region_init(
@@ -543,10 +538,7 @@ TEST_SERVICE(spci_lend_invalid_source)
 		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, msg_size,
-				SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH)
-			  .func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(hf_spci_mem_relinquish(0, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Ensure we cannot lend from the primary to another secondary. */
 	msg_size = spci_memory_region_init(
@@ -610,10 +602,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_X)
 			SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
 		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-		EXPECT_EQ(spci_msg_send(spci_msg_send_receiver(ret),
-					HF_PRIMARY_VM_ID, msg_size,
-					SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH)
-				  .func,
+		EXPECT_EQ(hf_spci_mem_relinquish(0, msg_size, 0).func,
 			  SPCI_SUCCESS_32);
 	}
 }
@@ -675,10 +664,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 			&constituent_copy, 1, 0, 0, SPCI_MEMORY_RW_X,
 			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_EQ(spci_msg_send(spci_msg_send_receiver(ret),
-					HF_PRIMARY_VM_ID, msg_size,
-					SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH)
-				  .func,
+		EXPECT_EQ(hf_spci_mem_relinquish(0, msg_size, 0).func,
 			  SPCI_SUCCESS_32);
 	}
 }

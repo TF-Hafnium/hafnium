@@ -176,9 +176,7 @@ static void check_cannot_relinquish_memory(
 				SPCI_MEMORY_CACHE_WRITE_BACK,
 				SPCI_MEMORY_OUTER_SHAREABLE);
 			EXPECT_SPCI_ERROR(
-				spci_msg_send(
-					vms[j], vms[i], msg_size,
-					SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH),
+				hf_spci_mem_relinquish(0, msg_size, 0),
 				SPCI_INVALID_PARAMETERS);
 		}
 	}

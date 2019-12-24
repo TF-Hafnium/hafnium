@@ -940,11 +940,8 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 {
 	struct vm *from = current->vm;
 	struct vm *to;
-
-	struct two_vm_locked vm_to_from_lock;
-
+	struct vm_locked to_locked;
 	const void *from_msg;
-
 	struct spci_value ret;
 	bool notify = (attributes & SPCI_MSG_SEND_NOTIFY_MASK) ==
 		      SPCI_MSG_SEND_NOTIFY;
@@ -984,71 +981,24 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	/*
-	 * Hafnium needs to hold the lock on <to> before the mailbox state is
-	 * checked. The lock on <to> must be held until the information is
-	 * copied to <to> Rx buffer. Since in
-	 * spci_msg_handle_architected_message we may call api_spci_share_memory
-	 * which must hold the <from> lock, we must hold the <from> lock at this
-	 * point to prevent a deadlock scenario.
-	 */
-	vm_to_from_lock = vm_lock_both(to, from);
+	to_locked = vm_lock(to);
 
-	if (msg_receiver_busy(vm_to_from_lock.vm1, from, notify)) {
+	if (msg_receiver_busy(to_locked, from, notify)) {
 		ret = spci_error(SPCI_BUSY);
 		goto out;
 	}
 
-	/* Handle legacy memory sharing messages. */
-	if ((attributes & SPCI_MSG_SEND_LEGACY_MEMORY_MASK) != 0) {
-		/*
-		 * Buffer holding the internal copy of the shared memory
-		 * regions.
-		 */
-		uint8_t *message_replica = cpu_get_buffer(current->cpu->id);
-		uint32_t message_buffer_size =
-			cpu_get_buffer_size(current->cpu->id);
+	/* Copy data. */
+	memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX, from_msg, size);
+	to->mailbox.recv_size = size;
+	to->mailbox.recv_sender = sender_vm_id;
+	to->mailbox.recv_attributes = 0;
+	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 
-		if (size > message_buffer_size) {
-			ret = spci_error(SPCI_INVALID_PARAMETERS);
-			goto out;
-		}
-
-		/* Copy the architected message into the internal buffer. */
-		memcpy_s(message_replica, message_buffer_size, from_msg, size);
-
-		/*
-		 * Note that architected_message_replica is passed as the third
-		 * parameter to spci_msg_handle_architected_message. The
-		 * execution flow commencing at
-		 * spci_msg_handle_architected_message will make several
-		 * accesses to fields in architected_message_replica. The memory
-		 * area architected_message_replica must be exclusively owned by
-		 * Hafnium so that TOCTOU issues do not arise.
-		 */
-		ret = spci_msg_handle_architected_message(
-			vm_to_from_lock.vm1, vm_to_from_lock.vm2,
-			(struct spci_memory_region *)message_replica, size,
-			attributes, &api_page_pool);
-
-		if (ret.func != SPCI_SUCCESS_32) {
-			goto out;
-		}
-	} else {
-		/* Copy data. */
-		memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX, from_msg,
-			 size);
-		to->mailbox.recv_size = size;
-		to->mailbox.recv_sender = sender_vm_id;
-		to->mailbox.recv_attributes = 0;
-		ret = (struct spci_value){.func = SPCI_SUCCESS_32};
-	}
-
-	deliver_msg(vm_to_from_lock.vm1, sender_vm_id, current, next);
+	deliver_msg(to_locked, sender_vm_id, current, next);
 
 out:
-	vm_unlock(&vm_to_from_lock.vm1);
-	vm_unlock(&vm_to_from_lock.vm2);
+	vm_unlock(&to_locked);
 
 	return ret;
 }

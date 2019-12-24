@@ -18,7 +18,8 @@
         "spci.h": "c",
         "spci_internal.h": "c",
         "interrupts_gicv3.h": "c",
-        "interrupts.h": "c"
+        "interrupts.h": "c",
+        "abi.h": "c"
     },
     "C_Cpp.errorSquiggles": "Disabled"
 }

@@ -35,6 +35,9 @@
 #define HF_SPCI_RUN_WAIT_FOR_INTERRUPT 0xff09
 #define HF_SPCI_RUN_WAKE_UP            0xff0a
 
+/* Custom SPCI-like call for relinquishing memory in the push model. */
+#define HF_SPCI_MEM_RELINQUISH         0xffab
+
 /* This matches what Trusty and its ATF module currently use. */
 #define HF_DEBUG_LOG            0xbd000000
 

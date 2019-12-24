@@ -158,6 +158,15 @@ static inline struct spci_value spci_mem_share(
 					     .arg5 = handle});
 }
 
+static inline struct spci_value hf_spci_mem_relinquish(
+	uint32_t remaining_fragment_count, uint32_t length, uint32_t handle)
+{
+	return spci_call((struct spci_value){.func = HF_SPCI_MEM_RELINQUISH,
+					     .arg3 = remaining_fragment_count,
+					     .arg4 = length,
+					     .arg5 = handle});
+}
+
 /**
  * Called by secondary VMs to receive a message. This will block until a message
  * is received.
