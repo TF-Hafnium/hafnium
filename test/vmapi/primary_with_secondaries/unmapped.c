@@ -51,7 +51,7 @@ TEST(unmapped, straddling_data_unmapped)
 	 * get the trap.
 	 */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, SPCI_MEM_DONATE_32);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);
@@ -89,7 +89,7 @@ TEST(unmapped, straddling_instruction_unmapped)
 	 * get the trap.
 	 */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, SPCI_MEM_DONATE_32);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	run_res = spci_run(SERVICE_VM1, 0);

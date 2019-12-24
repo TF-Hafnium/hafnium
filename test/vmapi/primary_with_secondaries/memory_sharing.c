@@ -258,7 +258,7 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
@@ -320,7 +320,7 @@ TEST(memory_sharing, lend_relinquish)
 	run_res = spci_run(SERVICE_VM1, 0);
 
 	/* Let the memory be returned. */
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Ensure that the secondary VM accessed the region. */
@@ -395,7 +395,7 @@ TEST(memory_sharing, give_and_get_back)
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, SPCI_MEM_DONATE_32);
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
@@ -433,7 +433,7 @@ TEST(memory_sharing, lend_and_get_back)
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'd');
 	}
@@ -468,7 +468,7 @@ TEST(memory_sharing, reshare_after_return)
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Share the memory again after it has been returned. */
@@ -481,7 +481,7 @@ TEST(memory_sharing, reshare_after_return)
 
 	/* Observe the service doesn't fault when accessing the memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 }
 
@@ -510,7 +510,7 @@ TEST(memory_sharing, share_elsewhere_after_return)
 
 	/* Let the memory be returned. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Share the memory with a different VM after it has been returned. */
@@ -541,9 +541,7 @@ TEST(memory_sharing, give_memory_and_lose_access)
 
 	/* Have the memory be given. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_attributes(run_res),
-		  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
+	EXPECT_EQ(run_res.func, SPCI_MEM_DONATE_32);
 
 	/* Check the memory was cleared. */
 	memory_region = (struct spci_memory_region *)mb.recv;
@@ -574,9 +572,7 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 
 	/* Have the memory be lent. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_attributes(run_res),
-		  SPCI_MSG_SEND_LEGACY_MEMORY_LEND);
+	EXPECT_EQ(run_res.func, SPCI_MEM_LEND_32);
 
 	/* Check the memory was cleared. */
 	memory_region = (struct spci_memory_region *)mb.recv;
@@ -747,7 +743,7 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 	run_res = spci_run(SERVICE_VM1, 0);
 
 	/* Let the memory be returned. */
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, SPCI_MEM_DONATE_32);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Share the memory with another VM. */
@@ -860,7 +856,7 @@ TEST(memory_sharing, donate_twice)
 
 	/* Let the memory be sent from VM1 to PRIMARY (returned). */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, SPCI_MEM_DONATE_32);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Check we have access again. */
@@ -998,7 +994,7 @@ TEST(memory_sharing, donate_invalid_source)
 
 	/* Receive and return memory from VM1. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, SPCI_MEM_DONATE_32);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Use VM1 to fail to donate memory from the primary to VM2. */
@@ -1085,7 +1081,7 @@ TEST(memory_sharing, lend_invalid_source)
 
 	/* Receive and return memory from VM1. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Try to lend memory from primary in VM1. */
@@ -1127,7 +1123,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 
 	/* Let service write to and return memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Re-initialise the memory before giving it. */
@@ -1190,7 +1186,7 @@ TEST(memory_sharing, share_relinquish_X_RW)
 
 	/* Let service write to and return memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Re-initialise the memory before giving it. */
@@ -1258,7 +1254,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 
 	/* Let service write to and return memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Re-initialise the memory before giving it. */
@@ -1319,7 +1315,7 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 
 	/* Attempt to execute from memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	msg_size = spci_memory_region_init(
@@ -1366,7 +1362,7 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 
 	/* Attempt to execute from memory. */
 	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(run_res.func, HF_SPCI_MEM_RELINQUISH);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	msg_size = spci_memory_region_init(

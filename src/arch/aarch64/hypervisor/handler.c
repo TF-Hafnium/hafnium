@@ -320,11 +320,13 @@ static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 
 static bool spci_handler(struct spci_value *args, struct vcpu **next)
 {
+	uint32_t func = args->func & ~SMCCC_CONVENTION_MASK;
+
 	/*
 	 * NOTE: When adding new methods to this handler update
 	 * api_spci_features accordingly.
 	 */
-	switch (args->func & ~SMCCC_CONVENTION_MASK) {
+	switch (func) {
 	case SPCI_VERSION_32:
 		*args = api_spci_version();
 		return true;
@@ -367,28 +369,12 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 				     current(), next);
 		return true;
 	case SPCI_MEM_DONATE_32:
-		*args = api_spci_mem_send(SPCI_MSG_SEND_LEGACY_MEMORY_DONATE,
-					  ipa_init(args->arg1), args->arg2,
-					  args->arg3, args->arg4, args->arg5,
-					  current(), next);
-		return true;
 	case SPCI_MEM_LEND_32:
-		*args = api_spci_mem_send(SPCI_MSG_SEND_LEGACY_MEMORY_LEND,
-					  ipa_init(args->arg1), args->arg2,
-					  args->arg3, args->arg4, args->arg5,
-					  current(), next);
-		return true;
 	case SPCI_MEM_SHARE_32:
-		*args = api_spci_mem_send(SPCI_MSG_SEND_LEGACY_MEMORY_SHARE,
-					  ipa_init(args->arg1), args->arg2,
-					  args->arg3, args->arg4, args->arg5,
-					  current(), next);
-		return true;
 	case HF_SPCI_MEM_RELINQUISH:
-		*args = api_spci_mem_send(
-			SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH,
-			ipa_init(args->arg1), args->arg2, args->arg3,
-			args->arg4, args->arg5, current(), next);
+		*args = api_spci_mem_send(func, ipa_init(args->arg1),
+					  args->arg2, args->arg3, args->arg4,
+					  args->arg5, current(), next);
 		return true;
 	}
 

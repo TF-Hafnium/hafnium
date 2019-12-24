@@ -71,7 +71,7 @@ static bool spci_msg_get_next_state(
  *
  */
 static bool spci_msg_check_transition(struct vm *to, struct vm *from,
-				      uint32_t share_type,
+				      uint32_t share_func,
 				      uint32_t *orig_from_mode,
 				      struct spci_memory_region *memory_region,
 				      uint32_t memory_to_attributes,
@@ -267,23 +267,23 @@ static bool spci_msg_check_transition(struct vm *to, struct vm *from,
 		return false;
 	}
 
-	switch (share_type) {
-	case SPCI_MSG_SEND_LEGACY_MEMORY_DONATE:
+	switch (share_func) {
+	case SPCI_MEM_DONATE_32:
 		mem_transition_table = donate_transitions;
 		transition_table_size = size_donate_transitions;
 		break;
 
-	case SPCI_MSG_SEND_LEGACY_MEMORY_LEND:
+	case SPCI_MEM_LEND_32:
 		mem_transition_table = lend_transitions;
 		transition_table_size = size_lend_transitions;
 		break;
 
-	case SPCI_MSG_SEND_LEGACY_MEMORY_SHARE:
+	case SPCI_MEM_SHARE_32:
 		mem_transition_table = share_transitions;
 		transition_table_size = size_share_transitions;
 		break;
 
-	case SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH:
+	case HF_SPCI_MEM_RELINQUISH:
 		mem_transition_table = relinquish_transitions;
 		transition_table_size = size_relinquish_transitions;
 		break;
@@ -452,7 +452,7 @@ out:
 static struct spci_value spci_share_memory(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	struct spci_memory_region *memory_region, uint32_t memory_to_attributes,
-	uint32_t share_type, struct mpool *api_page_pool)
+	uint32_t share_func, struct mpool *api_page_pool)
 {
 	struct vm *to = to_locked.vm;
 	struct vm *from = from_locked.vm;
@@ -483,7 +483,7 @@ static struct spci_value spci_share_memory(
 	 * in the memory exchange, ensure that all constituents of a memory
 	 * region being shared are at the same state.
 	 */
-	if (!spci_msg_check_transition(to, from, share_type, &orig_from_mode,
+	if (!spci_msg_check_transition(to, from, share_func, &orig_from_mode,
 				       memory_region, memory_to_attributes,
 				       &from_mode, &to_mode)) {
 		return spci_error(SPCI_INVALID_PARAMETERS);
@@ -567,7 +567,7 @@ out:
 static struct spci_value spci_validate_call_share_memory(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	struct spci_memory_region *memory_region, uint32_t memory_share_size,
-	uint32_t share_type, struct mpool *api_page_pool)
+	uint32_t share_func, struct mpool *api_page_pool)
 {
 	uint32_t memory_to_attributes;
 	uint32_t attributes_size;
@@ -603,14 +603,14 @@ static struct spci_value spci_validate_call_share_memory(
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	switch (share_type) {
-	case SPCI_MSG_SEND_LEGACY_MEMORY_DONATE:
-	case SPCI_MSG_SEND_LEGACY_MEMORY_LEND:
-	case SPCI_MSG_SEND_LEGACY_MEMORY_SHARE:
+	switch (share_func) {
+	case SPCI_MEM_DONATE_32:
+	case SPCI_MEM_LEND_32:
+	case SPCI_MEM_SHARE_32:
 		memory_to_attributes = spci_memory_attrs_to_mode(
 			memory_region->attributes[0].memory_attributes);
 		break;
-	case SPCI_MSG_SEND_LEGACY_MEMORY_RELINQUISH:
+	case HF_SPCI_MEM_RELINQUISH:
 		memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 		break;
 	default:
@@ -619,7 +619,7 @@ static struct spci_value spci_validate_call_share_memory(
 	}
 
 	return spci_share_memory(to_locked, from_locked, memory_region,
-				 memory_to_attributes, share_type,
+				 memory_to_attributes, share_func,
 				 api_page_pool);
 }
 
@@ -631,11 +631,10 @@ static struct spci_value spci_validate_call_share_memory(
 struct spci_value spci_msg_handle_architected_message(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	struct spci_memory_region *memory_region, uint32_t size,
-	uint32_t attributes, struct mpool *api_page_pool)
+	uint32_t share_func, struct mpool *api_page_pool)
 {
-	uint32_t share_type = attributes & SPCI_MSG_SEND_LEGACY_MEMORY_MASK;
 	struct spci_value ret = spci_validate_call_share_memory(
-		to_locked, from_locked, memory_region, size, share_type,
+		to_locked, from_locked, memory_region, size, share_func,
 		api_page_pool);
 
 	/* Copy data to the destination Rx. */
@@ -652,7 +651,7 @@ struct spci_value spci_msg_handle_architected_message(
 			 memory_region, size);
 		to_locked.vm->mailbox.recv_size = size;
 		to_locked.vm->mailbox.recv_sender = from_locked.vm->id;
-		to_locked.vm->mailbox.recv_attributes = share_type;
+		to_locked.vm->mailbox.recv_func = share_func;
 	}
 
 	return ret;

@@ -64,4 +64,4 @@ static inline struct spci_value spci_error(uint64_t error_code)
 struct spci_value spci_msg_handle_architected_message(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	struct spci_memory_region *memory_region, uint32_t size,
-	uint32_t attributes, struct mpool *api_page_pool);
+	uint32_t share_func, struct mpool *api_page_pool);

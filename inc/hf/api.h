@@ -60,7 +60,7 @@ struct spci_value api_spci_id_get(const struct vcpu *current);
 struct spci_value api_spci_features(uint32_t function_id);
 struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
 			       const struct vcpu *current, struct vcpu **next);
-struct spci_value api_spci_mem_send(uint32_t share_type, ipaddr_t address,
+struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 				    uint32_t page_count,
 				    uint32_t remaining_fragment_count,
 				    uint32_t length, uint32_t handle,

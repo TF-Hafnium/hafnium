@@ -42,9 +42,7 @@ TEST_SERVICE(memory_increment)
 			spci_memory_region_get_constituents(memory_region);
 		spci_vm_id_t sender = memory_region->sender;
 
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-		EXPECT_EQ(spci_msg_send_attributes(ret),
-			  SPCI_MSG_SEND_LEGACY_MEMORY_SHARE);
+		EXPECT_EQ(ret.func, SPCI_MEM_SHARE_32);
 
 		ptr = (uint8_t *)constituents[0].address;
 
@@ -128,18 +126,13 @@ TEST_SERVICE(spci_memory_return)
 		struct spci_memory_region *memory_region;
 		struct spci_memory_region_constituent *constituents;
 
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		/*
 		 * The memory may have been sent in one of several different
-		 * ways, but there shouldn't be any other attributes to the
-		 * message.
+		 * ways.
 		 */
-		EXPECT_NE(spci_msg_send_attributes(ret) &
-				  SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
-			  0);
-		EXPECT_EQ(spci_msg_send_attributes(ret) &
-				  ~SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
-			  0);
+		EXPECT_TRUE(ret.func == SPCI_MEM_DONATE_32 ||
+			    ret.func == SPCI_MEM_LEND_32 ||
+			    ret.func == SPCI_MEM_SHARE_32);
 
 		memory_region = (struct spci_memory_region *)recv_buf;
 		constituents =
@@ -186,9 +179,7 @@ TEST_SERVICE(spci_donate_check_upper_bound)
 
 		exception_handler_reset();
 
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-		EXPECT_EQ(spci_msg_send_attributes(ret),
-			  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
+		EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
 
 		memory_region = (struct spci_memory_region *)recv_buf;
 		constituents =
@@ -221,9 +212,7 @@ TEST_SERVICE(spci_donate_check_lower_bound)
 
 		exception_handler_reset();
 
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-		EXPECT_EQ(spci_msg_send_attributes(ret),
-			  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
+		EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
 
 		memory_region = (struct spci_memory_region *)recv_buf;
 		constituents =
@@ -257,9 +246,7 @@ TEST_SERVICE(spci_donate_secondary_and_fault)
 	struct spci_memory_region_constituent *constituents =
 		spci_memory_region_get_constituents(memory_region);
 
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_attributes(ret),
-		  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
+	EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
 
 	exception_setup(NULL, exception_handler_yield);
 
@@ -294,9 +281,7 @@ TEST_SERVICE(spci_donate_twice)
 	struct spci_memory_region_constituent constituent =
 		spci_memory_region_get_constituents(memory_region)[0];
 
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_attributes(ret),
-		  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
+	EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Yield to allow attempt to re donate from primary. */
@@ -335,9 +320,7 @@ TEST_SERVICE(spci_memory_receive)
 		struct spci_memory_region_constituent *constituents =
 			spci_memory_region_get_constituents(memory_region);
 
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-		EXPECT_EQ(spci_msg_send_attributes(ret),
-			  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
+		EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
 
 		ptr = (uint8_t *)constituents[0].address;
 		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
@@ -364,9 +347,7 @@ TEST_SERVICE(spci_donate_invalid_source)
 	struct spci_memory_region_constituent *constituents =
 		spci_memory_region_get_constituents(memory_region);
 
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_attributes(ret),
-		  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
+	EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
 
 	/* Give the memory back and notify the sender. */
 	msg_size = spci_memory_region_init(
@@ -409,18 +390,13 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 		struct spci_memory_region_constituent *constituents =
 			spci_memory_region_get_constituents(memory_region);
 
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		/*
 		 * The memory may have been sent in one of several different
-		 * ways, but there shouldn't be any other attributes to the
-		 * message.
+		 * ways.
 		 */
-		EXPECT_NE(spci_msg_send_attributes(ret) &
-				  SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
-			  0);
-		EXPECT_EQ(spci_msg_send_attributes(ret) &
-				  ~SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
-			  0);
+		EXPECT_TRUE(ret.func == SPCI_MEM_DONATE_32 ||
+			    ret.func == SPCI_MEM_LEND_32 ||
+			    ret.func == SPCI_MEM_SHARE_32);
 
 		ptr = (uint8_t *)constituents[0].address;
 		count = constituents[0].page_count;
@@ -473,9 +449,7 @@ TEST_SERVICE(spci_memory_donate_relinquish)
 		struct spci_memory_region_constituent *constituents =
 			spci_memory_region_get_constituents(memory_region);
 
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-		EXPECT_EQ(spci_msg_send_attributes(ret),
-			  SPCI_MSG_SEND_LEGACY_MEMORY_DONATE);
+		EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
 
 		ptr = (uint8_t *)constituents[0].address;
 
@@ -519,9 +493,7 @@ TEST_SERVICE(spci_lend_invalid_source)
 	struct spci_memory_region_constituent *constituents =
 		spci_memory_region_get_constituents(memory_region);
 
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_attributes(ret),
-		  SPCI_MSG_SEND_LEGACY_MEMORY_LEND);
+	EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
 
 	/* Attempt to relinquish to this same VM. */
 	msg_size = spci_memory_region_init(
@@ -581,9 +553,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_X)
 		struct spci_memory_region_constituent *constituents =
 			spci_memory_region_get_constituents(memory_region);
 
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-		EXPECT_EQ(spci_msg_send_attributes(ret),
-			  SPCI_MSG_SEND_LEGACY_MEMORY_LEND);
+		EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
 
 		ptr = (uint64_t *)constituents[0].address;
 		/*
@@ -629,18 +599,13 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 		struct spci_memory_region_constituent constituent_copy =
 			constituents[0];
 
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
 		/*
 		 * The memory may have been sent in one of several different
-		 * ways, but there shouldn't be any other attributes to the
-		 * message.
+		 * ways.
 		 */
-		EXPECT_NE(spci_msg_send_attributes(ret) &
-				  SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
-			  0);
-		EXPECT_EQ(spci_msg_send_attributes(ret) &
-				  ~SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
-			  0);
+		EXPECT_TRUE(ret.func == SPCI_MEM_DONATE_32 ||
+			    ret.func == SPCI_MEM_LEND_32 ||
+			    ret.func == SPCI_MEM_SHARE_32);
 
 		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
@@ -684,9 +649,7 @@ TEST_SERVICE(spci_lend_check_upper_bound)
 	struct spci_memory_region_constituent *constituents =
 		spci_memory_region_get_constituents(memory_region);
 
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_attributes(ret),
-		  SPCI_MSG_SEND_LEGACY_MEMORY_LEND);
+	EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
 
 	exception_setup(NULL, exception_handler_yield);
 
@@ -718,9 +681,7 @@ TEST_SERVICE(spci_lend_check_lower_bound)
 
 	exception_setup(NULL, exception_handler_yield);
 
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_attributes(ret),
-		  SPCI_MSG_SEND_LEGACY_MEMORY_LEND);
+	EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
 
 	/* Choose which constituent we want to test. */
 	index = *(uint8_t *)constituents[0].address;
@@ -749,17 +710,10 @@ TEST_SERVICE(spci_memory_lend_twice)
 	struct spci_memory_region_constituent constituent_copy =
 		constituents[0];
 
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-	/*
-	 * The memory may have been sent in one of several different ways, but
-	 * there shouldn't be any other attributes to the message.
-	 */
-	EXPECT_NE(spci_msg_send_attributes(ret) &
-			  SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
-		  0);
-	EXPECT_EQ(spci_msg_send_attributes(ret) &
-			  ~SPCI_MSG_SEND_LEGACY_MEMORY_MASK,
-		  0);
+	/* The memory may have been sent in one of several different ways. */
+	EXPECT_TRUE(ret.func == SPCI_MEM_DONATE_32 ||
+		    ret.func == SPCI_MEM_LEND_32 ||
+		    ret.func == SPCI_MEM_SHARE_32);
 
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 

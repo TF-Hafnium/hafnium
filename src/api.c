@@ -367,11 +367,25 @@ out:
  */
 static struct spci_value spci_msg_recv_return(const struct vm *receiver)
 {
-	return (struct spci_value){
-		.func = SPCI_MSG_SEND_32,
-		.arg1 = (receiver->mailbox.recv_sender << 16) | receiver->id,
-		.arg3 = receiver->mailbox.recv_size,
-		.arg4 = receiver->mailbox.recv_attributes};
+	switch (receiver->mailbox.recv_func) {
+	case SPCI_MSG_SEND_32:
+		return (struct spci_value){
+			.func = SPCI_MSG_SEND_32,
+			.arg1 = (receiver->mailbox.recv_sender << 16) |
+				receiver->id,
+			.arg3 = receiver->mailbox.recv_size};
+	case SPCI_MEM_DONATE_32:
+	case SPCI_MEM_LEND_32:
+	case SPCI_MEM_SHARE_32:
+	case HF_SPCI_MEM_RELINQUISH:
+		return (struct spci_value){.func = receiver->mailbox.recv_func,
+					   .arg4 = receiver->mailbox.recv_size};
+	default:
+		/* This should never be reached, but return an error in case. */
+		dlog("Tried to return an invalid message function %#x\n",
+		     receiver->mailbox.recv_func);
+		return spci_error(SPCI_DENIED);
+	}
 }
 
 /**
@@ -905,11 +919,11 @@ static void deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
 	/* Messages for the primary VM are delivered directly. */
 	if (to.vm->id == HF_PRIMARY_VM_ID) {
 		/*
-		 * Only tell the primary VM the size if the message is for it,
-		 * to avoid leaking data about messages for other VMs.
+		 * Only tell the primary VM the size and other details if the
+		 * message is for it, to avoid leaking data about messages for
+		 * other VMs.
 		 */
-		primary_ret.arg3 = to.vm->mailbox.recv_size;
-		primary_ret.arg4 = to.vm->mailbox.recv_attributes;
+		primary_ret = spci_msg_recv_return(to.vm);
 
 		to.vm->mailbox.state = MAILBOX_STATE_READ;
 		*next = api_switch_to_primary(current, primary_ret,
@@ -992,7 +1006,7 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX, from_msg, size);
 	to->mailbox.recv_size = size;
 	to->mailbox.recv_sender = sender_vm_id;
-	to->mailbox.recv_attributes = 0;
+	to->mailbox.recv_func = SPCI_MSG_SEND_32;
 	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 
 	deliver_msg(to_locked, sender_vm_id, current, next);
@@ -1407,7 +1421,7 @@ struct spci_value api_spci_features(uint32_t function_id)
 	}
 }
 
-struct spci_value api_spci_mem_send(uint32_t share_type, ipaddr_t address,
+struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 				    uint32_t page_count,
 				    uint32_t remaining_fragment_count,
 				    uint32_t length, uint32_t handle,
@@ -1487,7 +1501,7 @@ struct spci_value api_spci_mem_send(uint32_t share_type, ipaddr_t address,
 
 	ret = spci_msg_handle_architected_message(
 		vm_to_from_lock.vm1, vm_to_from_lock.vm2, memory_region, length,
-		share_type, &api_page_pool);
+		share_func, &api_page_pool);
 
 	if (ret.func == SPCI_SUCCESS_32) {
 		deliver_msg(vm_to_from_lock.vm1, from->id, current, next);

@@ -79,8 +79,11 @@ struct mailbox {
 	/** The size of the message currently in `recv`. */
 	uint32_t recv_size;
 
-	/** The attributes of the message currently in `recv`. */
-	uint32_t recv_attributes;
+	/**
+	 * The SPCI function ID to use to deliver the message currently in
+	 * `recv`.
+	 */
+	uint32_t recv_func;
 
 	/**
 	 * List of wait_entry structs representing VMs that want to be notified
