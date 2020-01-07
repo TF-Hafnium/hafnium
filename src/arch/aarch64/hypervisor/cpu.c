@@ -144,4 +144,7 @@ void arch_cpu_init(void)
 	lor_disable();
 
 	write_msr(CPTR_EL2, get_cptr_el2_value());
+
+	/* Initialize counter-timer virtual offset register to 0. */
+	write_msr(CNTVOFF_EL2, 0);
 }
