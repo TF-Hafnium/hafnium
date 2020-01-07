@@ -1467,8 +1467,8 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 	 * sender can't change it underneath us.
 	 */
 	memory_region =
-		(struct spci_memory_region *)cpu_get_buffer(current->cpu->id);
-	message_buffer_size = cpu_get_buffer_size(current->cpu->id);
+		(struct spci_memory_region *)cpu_get_buffer(current->cpu);
+	message_buffer_size = cpu_get_buffer_size(current->cpu);
 	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}

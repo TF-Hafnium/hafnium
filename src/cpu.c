@@ -52,18 +52,22 @@ static_assert((PAGE_SIZE % STACK_ALIGN) == 0,
  */
 alignas(PAGE_SIZE) static uint8_t cpu_message_buffer[MAX_CPUS][PAGE_SIZE];
 
-uint8_t *cpu_get_buffer(cpu_id_t cpu_id)
+uint8_t *cpu_get_buffer(struct cpu *c)
 {
-	CHECK(cpu_id < MAX_CPUS);
+	size_t cpu_indx = cpu_index(c);
 
-	return cpu_message_buffer[cpu_id];
+	CHECK(cpu_indx < MAX_CPUS);
+
+	return cpu_message_buffer[cpu_indx];
 }
 
-uint32_t cpu_get_buffer_size(cpu_id_t cpu_id)
+uint32_t cpu_get_buffer_size(struct cpu *c)
 {
-	CHECK(cpu_id < MAX_CPUS);
+	size_t cpu_indx = cpu_index(c);
 
-	return sizeof(cpu_message_buffer[cpu_id]);
+	CHECK(cpu_indx < MAX_CPUS);
+
+	return sizeof(cpu_message_buffer[cpu_indx]);
 }
 
 /* State of all supported CPUs. The stack of the first one is initialized. */
