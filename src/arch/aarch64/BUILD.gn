@@ -21,6 +21,7 @@ source_set("arch") {
   sources = [
     "irq.c",
     "mm.c",
+    "sysregs.c",
     "timer.c",
   ]
 }

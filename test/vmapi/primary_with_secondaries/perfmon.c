@@ -16,7 +16,7 @@
 
 #include "../../src/arch/aarch64/hypervisor/perfmon.h"
 
-#include "../../src/arch/aarch64/hypervisor/sysregs.h"
+#include "../../src/arch/aarch64/sysregs.h"
 #include "primary_with_secondary.h"
 #include "sysregs.h"
 #include "test/vmapi/spci.h"

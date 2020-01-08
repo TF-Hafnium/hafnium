@@ -19,6 +19,19 @@
 #include "msr.h"
 
 /**
+ * RAS Extension version.
+ */
+#define ID_AA64PFR0_EL1_RAS (UINT64_C(0xf) << 28)
+
+/**
+ * Returns true if the current processor supports the RAS extension.
+ */
+static bool has_ras_support(void)
+{
+	return read_msr(ID_AA64PFR0_EL1) & ID_AA64PFR0_EL1_RAS;
+}
+
+/**
  * Returns the value for HCR_EL2 for the particular VM.
  * For now, the primary VM has one value and all secondary VMs share a value.
  */
@@ -74,8 +87,25 @@ uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id)
 		 */
 		hcr_el2_value |= HCR_EL2_FB;
 
-		/* Route physical SError/IRQ/FIQ interrupts to EL2. */
-		hcr_el2_value |= HCR_EL2_AMO | HCR_EL2_IMO | HCR_EL2_FMO;
+		/*
+		 * Route physical IRQ/FIQ interrupts to EL2. Do not route
+		 * SError exceptions to EL2 (AMO). Instead let each VM handle
+		 * it. Not setting AMO requires explicit Error Synchronisation
+		 * Barrier instructions (esb) on hypervisor entry/exit, or
+		 * implicit barriers (SCTLR_EL2_IESB is set).
+		 */
+		hcr_el2_value |= HCR_EL2_IMO | HCR_EL2_FMO;
+
+		if (!has_ras_support()) {
+			/*
+			 * Trap SErrors into EL2 if the processor does not
+			 * support RAS, because without error synchronization
+			 * barriers, isolating SErrors could impose a high
+			 * overhead. RAS is mandatory from Armv8.2, so this
+			 * should not be common.
+			 */
+			hcr_el2_value |= HCR_EL2_AMO;
+		}
 
 		/* Trap wait for event/interrupt instructions. */
 		hcr_el2_value |= HCR_EL2_TWE | HCR_EL2_TWI;
@@ -109,4 +139,40 @@ uintreg_t get_mdcr_el2_value(void)
 uintreg_t get_cptr_el2_value(void)
 {
 	return CPTR_EL2_TTA;
+}
+
+/**
+ * Returns the value for SCTLR_EL2 for the CPU.
+ */
+uintreg_t get_sctlr_el2_value(void)
+{
+	uintreg_t sctlr_el2_value = 0;
+
+	/*
+	 * Implicit Error Synchronization Barrier (Armv8.2-IESB). This feature
+	 * is mandatory from Armv8.2 onwards.
+	 * Hafnium uses it to ensure that all SError exceptions are caught by
+	 * the VM responsible for it.
+	 */
+	sctlr_el2_value |= SCTLR_EL2_IESB;
+
+	/* MMU-related bits.  */
+	sctlr_el2_value |= SCTLR_EL2_M;
+	sctlr_el2_value |= SCTLR_EL2_A;
+	sctlr_el2_value |= SCTLR_EL2_C;
+	sctlr_el2_value |= SCTLR_EL2_SA;
+	sctlr_el2_value |= SCTLR_EL2_I;
+	sctlr_el2_value |= SCTLR_EL2_WXN;
+
+	/* RES1 Bits. */
+	sctlr_el2_value |= SCTLR_EL2_B4;
+	sctlr_el2_value |= SCTLR_EL2_B16;
+	sctlr_el2_value |= SCTLR_EL2_B18;
+	sctlr_el2_value |= SCTLR_EL2_B28;
+
+	/* Unsupported features that otherwise are RES1. */
+	sctlr_el2_value |= SCTLR_EL2_EOS;
+	sctlr_el2_value |= SCTLR_EL2_EIS;
+
+	return sctlr_el2_value;
 }

@@ -185,7 +185,7 @@ noreturn void irq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 	(void)elr;
 	(void)spsr;
 
-	panic("IRQ from current");
+	panic("IRQ from current exception level.");
 }
 
 noreturn void fiq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
@@ -193,7 +193,7 @@ noreturn void fiq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 	(void)elr;
 	(void)spsr;
 
-	panic("FIQ from current");
+	panic("FIQ from current exception level.");
 }
 
 noreturn void serr_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
@@ -201,7 +201,7 @@ noreturn void serr_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 	(void)elr;
 	(void)spsr;
 
-	panic("SERR from current");
+	panic("SError from current exception level.");
 }
 
 noreturn void sync_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
@@ -625,10 +625,15 @@ struct vcpu *fiq_lower(void)
 	return irq_lower();
 }
 
-struct vcpu *serr_lower(void)
+noreturn struct vcpu *serr_lower(void)
 {
-	dlog("SERR from lower\n");
-	return api_abort(current());
+	/*
+	 * SError exceptions should be isolated and handled by the responsible
+	 * VM/exception level. Getting here indicates a bug, that isolation is
+	 * not working, or a processor that does not support ARMv8.2-IESB, in
+	 * which case Hafnium routes SError exceptions to EL2 (here).
+	 */
+	panic("SError from a lower exception level.");
 }
 
 /**

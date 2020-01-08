@@ -444,8 +444,82 @@
  */
 #define PSR_PE_MODE_EL1H UINT64_C(0x5)
 
+/*
+ * Define configurations bits for the System Control Register (EL2), SCTLR_EL2.
+ * See Arm Architecture Reference Manual, D13.2.106.
+ */
+
+/**
+ * Reserved, RES1.
+ */
+#define SCTLR_EL2_B28 (UINT64_C(0x1) << 28)
+
+/**
+ * Exception entry is a context synchronization Event (Armv8.5-CSEH),
+ * otherwise RES1.
+ */
+#define SCTLR_EL2_EIS (UINT64_C(0x1) << 22)
+
+/**
+ * Implicit Error Synchronization event enable (ARMv8.2-IESB).
+ */
+#define SCTLR_EL2_IESB (UINT64_C(0x1) << 21)
+
+/**
+ * Write permission implies XN (Execute-never).
+ */
+#define SCTLR_EL2_WXN (UINT64_C(0x1) << 19)
+
+/**
+ * Reserved, RES1.
+ */
+#define SCTLR_EL2_B18 (UINT64_C(0x1) << 18)
+
+/**
+ * Reserved, RES1.
+ */
+#define SCTLR_EL2_B16 (UINT64_C(0x1) << 16)
+
+/**
+ * Instruction access Cacheability control.
+ */
+#define SCTLR_EL2_I (UINT64_C(0x1) << 12)
+
+/**
+ * Exception exit is a context synchronization Event (Armv8.5-CSEH),
+ * otherwise RES1.
+ */
+#define SCTLR_EL2_EOS (UINT64_C(0x1) << 11)
+
+/**
+ * Reserved, RES1.
+ */
+#define SCTLR_EL2_B4 (UINT64_C(0x3) << 4)
+
+/**
+ * SP Alignment check enable.
+ */
+#define SCTLR_EL2_SA (UINT64_C(0x1) << 3)
+
+/**
+ * Cacheability control, for data accesses.
+ */
+#define SCTLR_EL2_C (UINT64_C(0x1) << 2)
+
+/**
+ * Alignment check enable.
+ */
+#define SCTLR_EL2_A (UINT64_C(0x1) << 1)
+
+/**
+ * MMU enable for EL2 stage 1 address translation.
+ */
+#define SCTLR_EL2_M (UINT64_C(0x1) << 0)
+
 uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id);
 
 uintreg_t get_mdcr_el2_value(void);
 
 uintreg_t get_cptr_el2_value(void);
+
+uintreg_t get_sctlr_el2_value(void);

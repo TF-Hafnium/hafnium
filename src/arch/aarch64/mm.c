@@ -22,6 +22,7 @@
 #include "hf/dlog.h"
 
 #include "msr.h"
+#include "sysregs.h"
 
 /* Keep macro alignment */
 /* clang-format off */
@@ -681,19 +682,7 @@ bool arch_mm_init(paddr_t table)
 			(25 << 0) | /* T0SZ, input address is 2^39 bytes. */
 			0,
 
-		.sctlr_el2 = (1 << 0) |  /* M, enable stage 1 EL2 MMU. */
-			     (1 << 1) |  /* A, enable alignment check faults. */
-			     (1 << 2) |  /* C, data cache enable. */
-			     (1 << 3) |  /* SA, enable stack alignment check. */
-			     (3 << 4) |  /* RES1 bits. */
-			     (1 << 11) | /* RES1 bit. */
-			     (1 << 12) | /* I, instruction cache enable. */
-			     (1 << 16) | /* RES1 bit. */
-			     (1 << 18) | /* RES1 bit. */
-			     (1 << 19) | /* WXN bit, writable execute never. */
-			     (3 << 22) | /* RES1 bits. */
-			     (3 << 28) | /* RES1 bits. */
-			     0,
+		.sctlr_el2 = get_sctlr_el2_value(),
 	};
 
 	return true;

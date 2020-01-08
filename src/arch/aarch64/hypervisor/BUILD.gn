@@ -38,7 +38,6 @@ source_set("hypervisor") {
     "handler.c",
     "perfmon.c",
     "psci_handler.c",
-    "sysregs.c",
     "vm.c",
   ]
 
