@@ -16,7 +16,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
-ROOT_DIR="$(dirname $(dirname "${SCRIPT_DIR}"))"
+ROOT_DIR="$(dirname "${SCRIPT_DIR}")"
 
 REPO="${ROOT_DIR}/prebuilts/generic/repo/repo"
 
@@ -130,7 +130,7 @@ if [ "${HAFNIUM_RUN_ALL_QEMU_CPUS}" == "true" ]
 then
 	TEST_ARGS+=(--run-all-qemu-cpus)
 fi
-./kokoro/ubuntu/test.sh ${TEST_ARGS[@]}
+./kokoro/test.sh ${TEST_ARGS[@]}
 
 #
 # Step 3: static analysis.
