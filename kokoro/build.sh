@@ -14,43 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
-ROOT_DIR="$(dirname "${SCRIPT_DIR}")"
+source "$(dirname ${BASH_SOURCE[0]})/../build/bash/common.inc"
 
-REPO="${ROOT_DIR}/prebuilts/generic/repo/repo"
-
-# Fail on any error.
-set -e
-# Fail on any part of a pipeline failing.
-set -o pipefail
-# Treat unset variables as an error.
-set -u
-# Display commands being run.
-set -x
-
-# Returns true if `git status` reports uncommitted changes in the source tree.
-function is_repo_dirty() {
-	local cmd=(git status --porcelain=v1)
-	if [ -d ".repo" ]
-	then
-		# This source tree was checked out using `repo`. Check the
-		# status of all projects.
-		cmd=(${REPO} forall -c "${cmd[@]}")
-	fi
-	! (u="$(${cmd[@]})" && test -z "$u")
-	return $?
-}
-
-# Assigns value (second arg) of a variable (first arg) if it is not set already.
-function default_value {
-	local var_name=$1
-	local value=$2
-	export ${var_name}=${!var_name:-${value}}
-}
+# Initialize global variables, prepare repo for building.
+init_build
 
 # Assign default values to variables.
-if [ -v KOKORO_JOB_NAME ]
+if is_kokoro_build
 then
 	# Default config for Kokoro builds.
 	default_value HAFNIUM_HERMETIC_BUILD true
@@ -68,7 +38,7 @@ fi
 # avoid recursion.
 if [ "${HAFNIUM_HERMETIC_BUILD}" == "true" ]
 then
-	exec "${ROOT_DIR}/build/run_in_container.sh" ${SCRIPT_PATH} $@
+	exec "${ROOT_DIR}/build/run_in_container.sh" "$(get_script_path)" $@
 fi
 
 USE_FVP=false
@@ -92,8 +62,6 @@ do
 	esac
 	shift
 done
-
-CLANG=${PWD}/prebuilts/linux-x64/clang/bin/clang
 
 # Kokoro does something weird that makes all files look dirty to git diff-index;
 # this fixes it so that the Linux build doesn't think it has a dirty tree for
@@ -184,5 +152,5 @@ fi
 export ARCH=arm64 &&
 export CROSS_COMPILE=aarch64-linux-gnu- &&
 cd driver/linux &&
-make checkpatch
+make HAFNIUM_PATH="${ROOT_DIR}" checkpatch
 )
