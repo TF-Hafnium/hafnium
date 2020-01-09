@@ -73,11 +73,6 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 {
 	struct memiter kernel;
 
-	if (string_is_empty(&manifest_vm->kernel_filename)) {
-		/* This signals the kernel has been preloaded. */
-		return true;
-	}
-
 	if (!cpio_get_file(cpio, &manifest_vm->kernel_filename, &kernel)) {
 		dlog_error("Could not find kernel file \"%s\".\n",
 			   string_data(&manifest_vm->kernel_filename));
@@ -119,22 +114,41 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 			 const struct memiter *cpio,
 			 const struct boot_params *params, struct mpool *ppool)
 {
+	paddr_t primary_begin;
+	ipaddr_t primary_entry;
 	struct vm *vm;
 	struct vm_locked vm_locked;
 	struct vcpu_locked vcpu_locked;
 	size_t i;
 	bool ret;
 
-	paddr_t primary_begin =
-		(manifest_vm->primary.boot_address == MANIFEST_INVALID_ADDRESS)
-			? layout_primary_begin()
-			: pa_init(manifest_vm->primary.boot_address);
+	if (manifest_vm->is_ffa_partition) {
+		primary_begin = pa_init(manifest_vm->sp.load_addr);
+		primary_entry = ipa_add(ipa_from_pa(primary_begin),
+					manifest_vm->sp.ep_offset);
+	} else {
+		primary_begin =
+			(manifest_vm->primary.boot_address ==
+			 MANIFEST_INVALID_ADDRESS)
+				? layout_primary_begin()
+				: pa_init(manifest_vm->primary.boot_address);
+		primary_entry = ipa_from_pa(primary_begin);
+	}
+
 	paddr_t primary_end = pa_add(primary_begin, RSIZE_MAX);
 
-	if (!load_kernel(stage1_locked, primary_begin, primary_end, manifest_vm,
-			 cpio, ppool)) {
-		dlog_error("Unable to load primary kernel.\n");
-		return false;
+	/*
+	 * Load the kernel if a filename is specified in the VM manifest.
+	 * For an FF-A partition, kernel_filename is undefined indicating
+	 * the partition package has already been loaded prior to Hafnium
+	 * booting.
+	 */
+	if (!string_is_empty(&manifest_vm->kernel_filename)) {
+		if (!load_kernel(stage1_locked, primary_begin, primary_end,
+				 manifest_vm, cpio, ppool)) {
+			dlog_error("Unable to load primary kernel.\n");
+			return false;
+		}
 	}
 
 	if (!vm_init_next(MAX_CPUS, ppool, &vm)) {
@@ -219,7 +233,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		  vm->vcpu_count, pa_addr(primary_begin));
 
 	vcpu_locked = vcpu_lock(vm_get_vcpu(vm, 0));
-	vcpu_on(vcpu_locked, ipa_from_pa(primary_begin), params->kernel_arg);
+	vcpu_on(vcpu_locked, primary_entry, params->kernel_arg);
 	vcpu_unlock(&vcpu_locked);
 	ret = true;
 
@@ -243,10 +257,18 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	ipaddr_t secondary_entry;
 	bool ret;
 
-	if (!load_kernel(stage1_locked, mem_begin, mem_end, manifest_vm, cpio,
-			 ppool)) {
-		dlog_error("Unable to load kernel.\n");
-		return false;
+	/*
+	 * Load the kernel if a filename is specified in the VM manifest.
+	 * For an FF-A partition, kernel_filename is undefined indicating
+	 * the partition package has already been loaded prior to Hafnium
+	 * booting.
+	 */
+	if (!string_is_empty(&manifest_vm->kernel_filename)) {
+		if (!load_kernel(stage1_locked, mem_begin, mem_end, manifest_vm,
+				 cpio, ppool)) {
+			dlog_error("Unable to load kernel.\n");
+			return false;
+		}
 	}
 
 	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm)) {
@@ -271,6 +293,11 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	dlog_info("Loaded with %u vCPUs, entry at %#x.\n",
 		  manifest_vm->secondary.vcpu_count, pa_addr(mem_begin));
+
+	if (manifest_vm->is_ffa_partition) {
+		secondary_entry =
+			ipa_add(secondary_entry, manifest_vm->sp.ep_offset);
+	}
 
 	vcpu = vm_get_vcpu(vm, 0);
 	vcpu_secondary_reset_and_start(vcpu, secondary_entry,
@@ -424,10 +451,16 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 			  manifest_vm->debug_name);
 
 		mem_size = align_up(manifest_vm->secondary.mem_size, PAGE_SIZE);
-		if (!carve_out_mem_range(mem_ranges_available,
-					 params->mem_ranges_count, mem_size,
-					 &secondary_mem_begin,
-					 &secondary_mem_end)) {
+
+		if (manifest_vm->is_ffa_partition) {
+			secondary_mem_begin =
+				pa_init(manifest_vm->sp.load_addr);
+			secondary_mem_end =
+				pa_init(manifest_vm->sp.load_addr + mem_size);
+		} else if (!carve_out_mem_range(mem_ranges_available,
+						params->mem_ranges_count,
+						mem_size, &secondary_mem_begin,
+						&secondary_mem_end)) {
 			dlog_error("Not enough memory (%u bytes).\n", mem_size);
 			continue;
 		}

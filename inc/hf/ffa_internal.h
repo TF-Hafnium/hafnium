@@ -22,10 +22,6 @@
 
 #include "vmapi/hf/ffa.h"
 
-#define FFA_VERSION_MAJOR 0x1
-#define FFA_VERSION_MINOR 0x0
-
-#define FFA_VERSION_MAJOR_OFFSET 16
 #define FFA_VERSION_RESERVED_BIT UINT32_C(1U << 31)
 
 static inline struct ffa_value ffa_error(uint64_t error_code)

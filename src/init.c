@@ -106,24 +106,39 @@ void one_time_init(void)
 			  pa_addr(params.mem_ranges[i].end) - 1);
 	}
 
-	dlog_info("Ramdisk range: %#x - %#x\n", pa_addr(params.initrd_begin),
-		  pa_addr(params.initrd_end) - 1);
+	/*
+	 * Hafnium manifest is either gathered from the ramdisk or passed
+	 * directly to Hafnium entry point by the earlier bootloader stage.
+	 * If the ramdisk start address is non-zero it hints the manifest
+	 * shall be looked up from the ramdisk. If zero, assume the address
+	 * passed to Hafnium entry point is the manifest address.
+	 */
+	if (pa_addr(params.initrd_begin)) {
+		dlog_info("Ramdisk range: %#x - %#x\n",
+			  pa_addr(params.initrd_begin),
+			  pa_addr(params.initrd_end) - 1);
 
-	/* Map initrd in, and initialise cpio parser. */
-	initrd = mm_identity_map(mm_stage1_locked, params.initrd_begin,
-				 params.initrd_end, MM_MODE_R, &ppool);
-	if (!initrd) {
-		panic("Unable to map initrd.");
+		/* Map initrd in, and initialise cpio parser. */
+		initrd = mm_identity_map(mm_stage1_locked, params.initrd_begin,
+					 params.initrd_end, MM_MODE_R, &ppool);
+		if (!initrd) {
+			panic("Unable to map initrd.");
+		}
+
+		memiter_init(
+			&cpio, initrd,
+			pa_difference(params.initrd_begin, params.initrd_end));
+
+		if (!cpio_get_file(&cpio, &manifest_fname, &manifest_it)) {
+			panic("Could not find manifest in initrd.");
+		}
+	} else {
+		manifest_it = fdt.buf;
 	}
 
-	memiter_init(&cpio, initrd,
-		     pa_difference(params.initrd_begin, params.initrd_end));
+	manifest_ret = manifest_init(mm_stage1_locked, &manifest, &manifest_it,
+				     &ppool);
 
-	if (!cpio_get_file(&cpio, &manifest_fname, &manifest_it)) {
-		panic("Could not find manifest in initrd.");
-	}
-
-	manifest_ret = manifest_init(&manifest, &manifest_it);
 	if (manifest_ret != MANIFEST_SUCCESS) {
 		panic("Could not parse manifest: %s.",
 		      manifest_strerror(manifest_ret));

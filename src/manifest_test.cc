@@ -203,6 +203,16 @@ class ManifestDtBuilder
 		return BooleanProperty("smc_whitelist_permissive");
 	}
 
+	ManifestDtBuilder &LoadAddress(uint64_t value)
+	{
+		return Integer64Property("load_address", value);
+	}
+
+	ManifestDtBuilder &FfaPartition()
+	{
+		return BooleanProperty("is_ffa_partition");
+	}
+
 	ManifestDtBuilder &Property(const std::string_view &name,
 				    const std::string_view &value)
 	{
@@ -279,9 +289,11 @@ static enum manifest_return_code manifest_from_vec(struct manifest *m,
 						   const std::vector<char> &vec)
 {
 	struct memiter it;
+	struct mpool ppool;
+	struct mm_stage1_locked mm_stage1_locked;
 
 	memiter_init(&it, vec.data(), vec.size());
-	return manifest_init(m, &it);
+	return manifest_init(mm_stage1_locked, m, &it, &ppool);
 }
 
 TEST(manifest, no_hypervisor_node)
@@ -609,6 +621,221 @@ TEST(manifest, valid)
 		std::span(vm->smc_whitelist.smcs, vm->smc_whitelist.smc_count),
 		IsEmpty());
 	ASSERT_FALSE(vm->smc_whitelist.permissive);
+}
+
+/**
+ * Class for programatically building a Partition package.
+ */
+class Partition_package
+{
+       public:
+	__attribute__((aligned(PAGE_SIZE))) struct sp_pkg_header spkg;
+	char manifest_dtb[PAGE_SIZE] = {};
+
+	Partition_package(const std::vector<char> &vec)
+	{
+		// Initialise header field
+		spkg.magic = SP_PKG_HEADER_MAGIC;
+		spkg.version = SP_PKG_HEADER_VERSION;
+		spkg.pm_offset = sizeof(struct sp_pkg_header);
+		spkg.pm_size = vec.size();
+
+		// Copy dtb into package
+		std::copy(vec.begin(), vec.end(), manifest_dtb);
+	}
+};
+
+static enum manifest_return_code ffa_manifest_from_vec(
+	struct manifest *m, const std::vector<char> &vec)
+{
+	struct memiter it;
+	struct mpool ppool;
+	struct mm_stage1_locked mm_stage1_locked;
+
+	Partition_package spkg(vec);
+
+	/* clang-format off */
+	std::vector<char> core_dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+			.StartChild("vm1")
+				.DebugName("primary_vm")
+				.FfaPartition()
+				.LoadAddress((uint64_t)&spkg)
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	memiter_init(&it, core_dtb.data(), core_dtb.size());
+	return manifest_init(mm_stage1_locked, m, &it, &ppool);
+}
+
+TEST(manifest, ffa_not_compatible)
+{
+	struct manifest m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-2.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("load-address", "<0x7000000>")
+		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<1>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+}
+
+TEST(manifest, ffa_missing_property)
+{
+	struct manifest m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
+}
+
+TEST(manifest, ffa_validate_sanity_check)
+{
+	struct manifest m;
+
+	/* Incompatible version */
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0xa1>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("load-address", "<0x7000000>")
+		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+
+	/* Incompatible translation granule */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("load-address", "<0x7000000>")
+		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("xlat-granule", "<3>")
+		.Property("messaging-method", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+
+	/* Incompatible exeption level */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<6>")
+		.Property("execution-state", "<0>")
+		.Property("load-address", "<0x7000000>")
+		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+
+	/* Incompatible execution state */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<2>")
+		.Property("load-address", "<0x7000000>")
+		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+
+	/* Incompatible messaging method */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("load-address", "<0x7000000>")
+		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<3>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+}
+
+TEST(manifest, ffa_valid)
+{
+	struct manifest m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("load-address", "<0x7000000>")
+		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<1>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+
+	ASSERT_EQ(m.vm[0].sp.ffa_version, 0x10000);
+	ASSERT_THAT(
+		std::span(m.vm[0].sp.uuid, 4),
+		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
+	ASSERT_EQ(m.vm[0].sp.execution_ctx_count, 1);
+	ASSERT_EQ(m.vm[0].sp.run_time_el, S_EL1);
+	ASSERT_EQ(m.vm[0].sp.execution_state, AARCH64);
+	ASSERT_EQ(m.vm[0].sp.load_addr, 0x7000000);
+	ASSERT_EQ(m.vm[0].sp.ep_offset, 0x00001000);
+	ASSERT_EQ(m.vm[0].sp.xlat_granule, PAGE_4KB);
+	ASSERT_EQ(m.vm[0].sp.messaging_method, INDIRECT_MESSAGING);
 }
 
 } /* namespace */

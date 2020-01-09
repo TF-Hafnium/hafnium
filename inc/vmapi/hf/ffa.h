@@ -18,6 +18,11 @@
 
 #include "hf/types.h"
 
+#define FFA_VERSION_MAJOR 0x1
+#define FFA_VERSION_MINOR 0x0
+
+#define FFA_VERSION_MAJOR_OFFSET 16
+
 /* clang-format off */
 
 #define FFA_LOW_32_ID  0x84000060

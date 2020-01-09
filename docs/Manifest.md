@@ -81,6 +81,10 @@ TEE is enabled.
 };
 ```
 
+## PSA FF-A partition
+Partitions wishing to follow the PSA FF-A specification must respect the
+format specified by the [TF-A binding document](https://trustedfirmware-a.readthedocs.io/en/latest/components/psa-ffa-manifest-binding.html).
+
 ## Compiling
 
 Hafnium expects the manifest inside its [RAM disk](HafniumRamDisk.md),

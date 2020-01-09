@@ -156,6 +156,22 @@ static enum manifest_return_code read_optional_uint64(
 	return ret;
 }
 
+static enum manifest_return_code read_uint32(const struct fdt_node *node,
+					     const char *property,
+					     uint32_t *out)
+{
+	uint64_t value;
+
+	TRY(read_uint64(node, property, &value));
+
+	if (value > UINT32_MAX) {
+		return MANIFEST_ERROR_INTEGER_OVERFLOW;
+	}
+
+	*out = (uint32_t)value;
+	return MANIFEST_SUCCESS;
+}
+
 static enum manifest_return_code read_uint16(const struct fdt_node *node,
 					     const char *property,
 					     uint16_t *out)
@@ -169,6 +185,21 @@ static enum manifest_return_code read_uint16(const struct fdt_node *node,
 	}
 
 	*out = (uint16_t)value;
+	return MANIFEST_SUCCESS;
+}
+
+static enum manifest_return_code read_uint8(const struct fdt_node *node,
+					    const char *property, uint8_t *out)
+{
+	uint64_t value;
+
+	TRY(read_uint64(node, property, &value));
+
+	if (value > UINT8_MAX) {
+		return MANIFEST_ERROR_INTEGER_OVERFLOW;
+	}
+
+	*out = (uint8_t)value;
 	return MANIFEST_SUCCESS;
 }
 
@@ -214,16 +245,16 @@ static enum manifest_return_code uint32list_get_next(
 	return MANIFEST_SUCCESS;
 }
 
-static enum manifest_return_code parse_vm(const struct fdt_node *node,
-					  struct manifest_vm *vm,
-					  ffa_vm_id_t vm_id)
+static enum manifest_return_code parse_vm_common(const struct fdt_node *node,
+						 struct manifest_vm *vm,
+						 ffa_vm_id_t vm_id)
 {
 	struct uint32list_iter smcs;
 	size_t idx;
 
+	TRY(read_bool(node, "is_ffa_partition", &vm->is_ffa_partition));
+
 	TRY(read_string(node, "debug_name", &vm->debug_name));
-	TRY(read_optional_string(node, "kernel_filename",
-				 &vm->kernel_filename));
 
 	TRY(read_optional_uint32list(node, "smc_whitelist", &smcs));
 	while (uint32list_has_next(&smcs) &&
@@ -239,24 +270,256 @@ static enum manifest_return_code parse_vm(const struct fdt_node *node,
 	TRY(read_bool(node, "smc_whitelist_permissive",
 		      &vm->smc_whitelist.permissive));
 
+	if (vm_id != HF_PRIMARY_VM_ID) {
+		TRY(read_uint64(node, "mem_size", &vm->secondary.mem_size));
+		TRY(read_uint16(node, "vcpu_count", &vm->secondary.vcpu_count));
+	}
+
+	return MANIFEST_SUCCESS;
+}
+
+static enum manifest_return_code parse_vm(struct fdt_node *node,
+					  struct manifest_vm *vm,
+					  ffa_vm_id_t vm_id)
+{
+	TRY(read_optional_string(node, "kernel_filename",
+				 &vm->kernel_filename));
+
 	if (vm_id == HF_PRIMARY_VM_ID) {
 		TRY(read_optional_string(node, "ramdisk_filename",
 					 &vm->primary.ramdisk_filename));
 		TRY(read_optional_uint64(node, "boot_address",
 					 MANIFEST_INVALID_ADDRESS,
 					 &vm->primary.boot_address));
-	} else {
-		TRY(read_uint64(node, "mem_size", &vm->secondary.mem_size));
-		TRY(read_uint16(node, "vcpu_count", &vm->secondary.vcpu_count));
 	}
+
 	return MANIFEST_SUCCESS;
+}
+
+static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
+						    struct manifest_vm *vm)
+{
+	unsigned int i = 0;
+	struct uint32list_iter uuid;
+	uint32_t uuid_word;
+	struct fdt_node root;
+	struct fdt_node ffa_node;
+	struct string rxtx_node_name = STRING_INIT("rx_tx-info");
+
+	if (!fdt_find_node(fdt, "/", &root)) {
+		return MANIFEST_ERROR_NO_ROOT_NODE;
+	}
+
+	/* Check "compatible" property. */
+	if (!fdt_is_compatible(&root, "arm,ffa-manifest-1.0")) {
+		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	TRY(read_uint32(&root, "ffa-version", &vm->sp.ffa_version));
+	dlog_verbose("  SP expected FF-A version %d.%d\n",
+		     vm->sp.ffa_version >> 16, vm->sp.ffa_version & 0xffff);
+
+	TRY(read_optional_uint32list(&root, "uuid", &uuid));
+
+	while (uint32list_has_next(&uuid) && i < 4) {
+		TRY(uint32list_get_next(&uuid, &uuid_word));
+		vm->sp.uuid[i] = uuid_word;
+		i++;
+	}
+	dlog_verbose("  SP UUID %#x-%x-%x_%x\n", vm->sp.uuid[0], vm->sp.uuid[1],
+		     vm->sp.uuid[2], vm->sp.uuid[3]);
+
+	TRY(read_uint16(&root, "execution-ctx-count",
+			&vm->sp.execution_ctx_count));
+	dlog_verbose("  SP number of execution context %d\n",
+		     vm->sp.execution_ctx_count);
+
+	TRY(read_uint8(&root, "exception-level",
+		       (uint8_t *)&vm->sp.run_time_el));
+	dlog_verbose("  SP run-time EL %d\n", vm->sp.run_time_el);
+
+	TRY(read_uint8(&root, "execution-state",
+		       (uint8_t *)&vm->sp.execution_state));
+	dlog_verbose("  SP execution state %d\n", vm->sp.execution_state);
+
+	TRY(read_uint64(&root, "load-address", &vm->sp.load_addr));
+	dlog_verbose("  SP load address %#x\n", vm->sp.load_addr);
+
+	TRY(read_uint64(&root, "entrypoint-offset", &vm->sp.ep_offset));
+	dlog_verbose("  SP entry point offset %#x\n", vm->sp.ep_offset);
+
+	TRY(read_uint8(&root, "xlat-granule", (uint8_t *)&vm->sp.xlat_granule));
+	dlog_verbose("  SP translation granule %d\n", vm->sp.xlat_granule);
+
+	ffa_node = root;
+	if (fdt_find_child(&ffa_node, &rxtx_node_name)) {
+		if (!fdt_is_compatible(&ffa_node,
+				       "arm,ffa-manifest-rx_tx-buffer")) {
+			return MANIFEST_ERROR_NOT_COMPATIBLE;
+		}
+
+		TRY(read_uint64(&ffa_node, "base-address",
+				&vm->sp.rxtx.base_address));
+
+		TRY(read_uint16(&ffa_node, "pages-count",
+				&vm->sp.rxtx.pages_count));
+
+		TRY(read_uint16(&ffa_node, "attributes",
+				&vm->sp.rxtx.attributes));
+
+		vm->sp.rxtx.rxtx_found = true;
+	}
+
+	TRY(read_uint8(&root, "messaging-method",
+		       (uint8_t *)&vm->sp.messaging_method));
+	dlog_verbose("  SP messaging method %d\n", vm->sp.messaging_method);
+
+	return MANIFEST_SUCCESS;
+}
+
+static enum manifest_return_code sanity_check_ffa_manifest(
+	struct manifest_vm *vm)
+{
+	uint16_t ffa_version_major;
+	uint16_t ffa_version_minor;
+	enum manifest_return_code ret_code = MANIFEST_SUCCESS;
+	const char *error_string = "specified in manifest is unsupported";
+
+	/* ensure that the SPM version is compatible */
+	ffa_version_major =
+		(vm->sp.ffa_version & 0xffff0000) >> FFA_VERSION_MAJOR_OFFSET;
+	ffa_version_minor = vm->sp.ffa_version & 0xffff;
+
+	if (ffa_version_major != FFA_VERSION_MAJOR ||
+	    ffa_version_minor > FFA_VERSION_MINOR) {
+		dlog_error("FF-A partition manifest version %s: %d.%d\n",
+			   error_string, ffa_version_major, ffa_version_minor);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (vm->sp.xlat_granule != PAGE_4KB) {
+		dlog_error("Translation granule %s: %d\n", error_string,
+			   vm->sp.xlat_granule);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (vm->sp.execution_state != AARCH64) {
+		dlog_error("Execution state %s: %d\n", error_string,
+			   vm->sp.execution_state);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (vm->sp.run_time_el != EL1 && vm->sp.run_time_el != S_EL1) {
+		dlog_error("Exception level %s: %d\n", error_string,
+			   vm->sp.run_time_el);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (vm->sp.messaging_method != INDIRECT_MESSAGING) {
+		dlog_error("Messaging method %s: %x\n", error_string,
+			   vm->sp.messaging_method);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	return ret_code;
+}
+
+static enum manifest_return_code parse_ffa_partition_package(
+	struct mm_stage1_locked stage1_locked, struct fdt_node *node,
+	struct manifest_vm *vm, ffa_vm_id_t vm_id, struct mpool *ppool)
+{
+	enum manifest_return_code ret = MANIFEST_ERROR_NOT_COMPATIBLE;
+	uintpaddr_t sp_pkg_addr;
+	paddr_t sp_pkg_start;
+	paddr_t sp_pkg_end;
+	struct sp_pkg_header *sp_pkg;
+	size_t sp_header_dtb_size;
+	paddr_t sp_dtb_addr;
+	struct fdt sp_fdt;
+
+	/*
+	 * This must have been hinted as being an FF-A partition,
+	 * return straight with failure if this is not the case.
+	 */
+	if (!vm->is_ffa_partition) {
+		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	TRY(read_uint64(node, "load_address", &sp_pkg_addr));
+	if (!is_aligned(sp_pkg_addr, PAGE_SIZE)) {
+		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	/* Map top of SP package as a single page to extract the header */
+	sp_pkg_start = pa_init(sp_pkg_addr);
+	sp_pkg_end = pa_add(sp_pkg_start, PAGE_SIZE);
+	sp_pkg = mm_identity_map(stage1_locked, sp_pkg_start,
+				 pa_add(sp_pkg_start, PAGE_SIZE), MM_MODE_R,
+				 ppool);
+	CHECK(sp_pkg != NULL);
+
+	dlog_verbose("SP package load address %#x\n", sp_pkg_addr);
+
+	if (sp_pkg->magic != SP_PKG_HEADER_MAGIC) {
+		dlog_error("Invalid SP package magic.\n");
+		goto exit_unmap;
+	}
+
+	if (sp_pkg->version != SP_PKG_HEADER_VERSION) {
+		dlog_error("Invalid SP package version.\n");
+		goto exit_unmap;
+	}
+
+	/* Expect SP DTB to immediately follow header */
+	if (sp_pkg->pm_offset != sizeof(struct sp_pkg_header)) {
+		dlog_error("Invalid SP package manifest offset.\n");
+		goto exit_unmap;
+	}
+
+	sp_header_dtb_size = align_up(
+		sp_pkg->pm_size + sizeof(struct sp_pkg_header), PAGE_SIZE);
+	if ((vm_id != HF_PRIMARY_VM_ID) &&
+	    (sp_header_dtb_size >= vm->secondary.mem_size)) {
+		dlog_error("Invalid SP package header or DT size.\n");
+		goto exit_unmap;
+	}
+
+	if (sp_header_dtb_size > PAGE_SIZE) {
+		/* Map remainder of header + DTB  */
+		sp_pkg_end = pa_add(sp_pkg_start, sp_header_dtb_size);
+
+		sp_pkg = mm_identity_map(stage1_locked, sp_pkg_start,
+					 sp_pkg_end, MM_MODE_R, ppool);
+		CHECK(sp_pkg != NULL);
+	}
+
+	sp_dtb_addr = pa_add(sp_pkg_start, sp_pkg->pm_offset);
+	if (!fdt_init_from_ptr(&sp_fdt, (void *)sp_dtb_addr.pa,
+			       sp_pkg->pm_size)) {
+		dlog_error("FDT failed validation.\n");
+		goto exit_unmap;
+	}
+
+	ret = parse_ffa_manifest(&sp_fdt, vm);
+	if (ret != MANIFEST_SUCCESS) {
+		goto exit_unmap;
+	}
+
+	ret = sanity_check_ffa_manifest(vm);
+
+exit_unmap:
+	CHECK(mm_unmap(stage1_locked, sp_pkg_start, sp_pkg_end, ppool));
+
+	return ret;
 }
 
 /**
  * Parse manifest from FDT.
  */
-enum manifest_return_code manifest_init(struct manifest *manifest,
-					struct memiter *manifest_fdt)
+enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
+					struct manifest *manifest,
+					struct memiter *manifest_fdt,
+					struct mpool *ppool)
 {
 	struct string vm_name;
 	struct fdt fdt;
@@ -313,7 +576,16 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 		}
 
 		manifest->vm_count = i + 1;
-		TRY(parse_vm(&vm_node, &manifest->vm[i], vm_id));
+
+		TRY(parse_vm_common(&vm_node, &manifest->vm[i], vm_id));
+
+		if (manifest->vm[i].is_ffa_partition) {
+			TRY(parse_ffa_partition_package(stage1_locked, &vm_node,
+							&manifest->vm[i], vm_id,
+							ppool));
+		} else {
+			TRY(parse_vm(&vm_node, &manifest->vm[i], vm_id));
+		}
 	}
 
 	if (!found_primary_vm) {
@@ -330,6 +602,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Success";
 	case MANIFEST_ERROR_FILE_SIZE:
 		return "Total size in header does not match file size";
+	case MANIFEST_ERROR_MALFORMED_DTB:
+		return "Malformed device tree blob";
 	case MANIFEST_ERROR_NO_ROOT_NODE:
 		return "Could not find root node in manifest";
 	case MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE:
