@@ -128,7 +128,7 @@
  * Configuration information for memory management. Order is important as this
  * is read from assembly.
  *
- * It must only be written to from `arch_mm_one_time_init()` to avoid cache and
+ * It must only be written to from `arch_mm_init()` to avoid cache and
  * synchronization problems.
  */
 struct arch_mm_config {
