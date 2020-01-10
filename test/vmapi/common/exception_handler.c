@@ -19,6 +19,7 @@
 #include "vmapi/hf/call.h"
 
 #include "../msr.h"
+#include "sysregs.h"
 #include "test/hftest.h"
 
 /**
@@ -81,7 +82,7 @@ bool exception_handler_skip_instruction(void)
  * EL1 exception handler to use in unit test VMs.
  * Yields control back to the hypervisor and sends the number of exceptions.
  */
-bool exception_handler_yield(void)
+static bool exception_handler_yield(void)
 {
 	dlog("%s function is triggered!\n", __func__);
 	++exception_handler_exception_count;
@@ -90,6 +91,42 @@ bool exception_handler_yield(void)
 
 	/* Indicate that elr_el1 should not be restored. */
 	return true;
+}
+
+/**
+ * EL1 exception handler to use in unit test VMs.
+ * Yields control back to the hypervisor and sends the number of exceptions.
+ * Asserts that the Exception Class is Unknown.
+ */
+bool exception_handler_yield_unknown(void)
+{
+	uintreg_t esr_el1 = read_msr(ESR_EL1);
+	EXPECT_EQ(GET_ESR_EC(esr_el1), EC_UNKNOWN);
+	return exception_handler_yield();
+}
+
+/**
+ * EL1 exception handler to use in unit test VMs.
+ * Yields control back to the hypervisor and sends the number of exceptions.
+ * Asserts that the Exception Class is Data Abort (same EL).
+ */
+bool exception_handler_yield_data_abort(void)
+{
+	uintreg_t esr_el1 = read_msr(ESR_EL1);
+	EXPECT_EQ(GET_ESR_EC(esr_el1), EC_DATA_ABORT_SAME_EL);
+	return exception_handler_yield();
+}
+
+/**
+ * EL1 exception handler to use in unit test VMs.
+ * Yields control back to the hypervisor and sends the number of exceptions.
+ * Asserts that the Exception Class is Instruction Abort (same EL).
+ */
+bool exception_handler_yield_instruction_abort(void)
+{
+	uintreg_t esr_el1 = read_msr(ESR_EL1);
+	EXPECT_EQ(GET_ESR_EC(esr_el1), EC_INSTRUCTION_ABORT_SAME_EL);
+	return exception_handler_yield();
 }
 
 /**

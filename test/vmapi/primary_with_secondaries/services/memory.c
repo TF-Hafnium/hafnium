@@ -80,7 +80,7 @@ TEST_SERVICE(give_memory_and_fault)
 		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
 
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	/* Try using the memory that isn't valid unless it's been returned. */
 	page[16] = 123;
@@ -103,7 +103,7 @@ TEST_SERVICE(lend_memory_and_fault)
 		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_EQ(spci_mem_lend(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
 
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	/* Try using the memory that isn't valid unless it's been returned. */
 	page[633] = 180;
@@ -113,7 +113,7 @@ TEST_SERVICE(lend_memory_and_fault)
 
 TEST_SERVICE(spci_memory_return)
 {
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	/* Loop, giving memory back to the sender. */
 	for (;;) {
@@ -167,7 +167,7 @@ TEST_SERVICE(spci_memory_return)
 
 TEST_SERVICE(spci_donate_check_upper_bound)
 {
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	for (;;) {
 		struct spci_value ret = spci_msg_wait();
@@ -200,7 +200,7 @@ TEST_SERVICE(spci_donate_check_upper_bound)
 
 TEST_SERVICE(spci_donate_check_lower_bound)
 {
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	for (;;) {
 		struct spci_value ret = spci_msg_wait();
@@ -248,7 +248,7 @@ TEST_SERVICE(spci_donate_secondary_and_fault)
 
 	EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
 
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	ptr = (uint8_t *)constituents[0].address;
 
@@ -371,7 +371,7 @@ TEST_SERVICE(spci_donate_invalid_source)
 
 TEST_SERVICE(spci_memory_lend_relinquish)
 {
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	/* Loop, giving memory back to the sender. */
 	for (;;) {
@@ -540,7 +540,7 @@ TEST_SERVICE(spci_lend_invalid_source)
  */
 TEST_SERVICE(spci_memory_lend_relinquish_X)
 {
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_instruction_abort);
 
 	for (;;) {
 		struct spci_value ret = spci_msg_wait();
@@ -583,7 +583,7 @@ TEST_SERVICE(spci_memory_lend_relinquish_X)
  */
 TEST_SERVICE(spci_memory_lend_relinquish_RW)
 {
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	for (;;) {
 		struct spci_value ret = spci_msg_wait();
@@ -652,7 +652,7 @@ TEST_SERVICE(spci_lend_check_upper_bound)
 
 	EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
 
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	/* Choose which constituent we want to test. */
 	index = *(uint8_t *)constituents[0].address;
@@ -680,7 +680,7 @@ TEST_SERVICE(spci_lend_check_lower_bound)
 	struct spci_memory_region_constituent *constituents =
 		spci_memory_region_get_constituents(memory_region);
 
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
 

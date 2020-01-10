@@ -20,7 +20,11 @@
 
 bool exception_handler_skip_instruction(void);
 
-bool exception_handler_yield(void);
+bool exception_handler_yield_unknown(void);
+
+bool exception_handler_yield_data_abort(void);
+
+bool exception_handler_yield_instruction_abort(void);
 
 int exception_handler_get_num(void);
 

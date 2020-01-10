@@ -55,7 +55,7 @@ TEST_SERVICE(boot_memory)
 
 TEST_SERVICE(boot_memory_underrun)
 {
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 	/*
 	 * Try to read memory below the start of the image. This should result
 	 * in the VM trapping and yielding.
@@ -66,7 +66,7 @@ TEST_SERVICE(boot_memory_underrun)
 
 TEST_SERVICE(boot_memory_overrun)
 {
-	exception_setup(NULL, exception_handler_yield);
+	exception_setup(NULL, exception_handler_yield_data_abort);
 	/*
 	 * Try to read memory above the limit defined by memory_size. This
 	 * should result in the VM trapping and yielding.

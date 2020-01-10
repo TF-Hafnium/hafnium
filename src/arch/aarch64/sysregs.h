@@ -95,13 +95,85 @@
  */
 #define MDCR_EL2_HPMN (UINT64_C(0x1f) << 0)
 
+/*
+ * Definitions for interpreting the ESR_ELx registers.
+ * See Arm Architecture Reference Manual Armv8-A, D13.2.36 and D13.2.37.
+ */
+
+/**
+ * Offset for the Exception Class (EC) field in the ESR.
+ */
+#define ESR_EC_OFFSET UINT64_C(26)
+
+/**
+ * Gets the Exception Class from the ESR.
+ */
+#define GET_ESR_EC(esr) ((esr) >> ESR_EC_OFFSET)
+
+/**
+ * Gets the Instruction Length bit for the synchronous exception
+ */
+#define GET_ESR_IL(esr) ((esr) & (1 << 25))
+
+/**
+ * ESR code for an Unknown Reason exception.
+ */
+#define EC_UNKNOWN UINT64_C(0x0)
+
+/**
+ * ESR code for trapped WFI or WFE instruction execution.
+ */
+#define EC_WFI_WFE UINT64_C(0x1)
+
+/**
+ * ESR code for HVC instruction execution.
+ */
+#define EC_HVC UINT64_C(0x16)
+
+/**
+ * ESR code for SMC instruction execution.
+ */
+#define EC_SMC UINT64_C(0x17)
+
+/**
+ * ESR code for MSR, MRS, or System instruction execution.
+ */
+#define EC_MSR UINT64_C(0x18)
+
+/**
+ * ESR code for Instruction Abort from a lower Exception level.
+ */
+#define EC_INSTRUCTION_ABORT_LOWER_EL UINT64_C(0x20)
+
+/**
+ * ESR code for Instruction Abort without a change in Exception level.
+ */
+#define EC_INSTRUCTION_ABORT_SAME_EL UINT64_C(0x21)
+
+/**
+ * ESR code for Data Abort from a lower Exception level.
+ */
+#define EC_DATA_ABORT_LOWER_EL UINT64_C(0x24)
+
+/**
+ * ESR code for Data Abort without a change in Exception level.
+ */
+#define EC_DATA_ABORT_SAME_EL UINT64_C(0x25)
+
+/**
+ * Mask for ISS bits in ESR_ELx registers.
+ */
+#define ISS_MASK ((UINT64_C(0x1) << 22) - UINT64_C(0x1))
+
+#define GET_ESR_ISS(esr) (ISS_MASK & (esr))
+
 /**
  * System register are identified by op0, op2, op1, crn, crm. The ISS encoding
  * includes also rt and direction. Exclude them, @see D13.2.37 (D13-2977).
  */
-#define ISS_SYSREG_MASK                                                      \
-	(((UINT64_C(0x1) << 22) - UINT64_C(0x1)) & /* Select the ISS bits */ \
-	 ~(UINT64_C(0x1f) << 5) &		   /* exclude rt */          \
+#define ISS_SYSREG_MASK                                     \
+	(ISS_MASK &		  /* Select the ISS bits */ \
+	 ~(UINT64_C(0x1f) << 5) & /* exclude rt */          \
 	 ~UINT64_C(0x1) /* exclude direction */)
 
 #define GET_ISS_SYSREG(esr) (ISS_SYSREG_MASK & (esr))

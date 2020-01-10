@@ -41,16 +41,6 @@
 #include "sysregs.h"
 
 /**
- * Gets the Exception Class from the ESR.
- */
-#define GET_ESR_EC(esr) ((esr) >> 26)
-
-/**
- * Gets the Instruction Length bit for the synchronous exception
- */
-#define GET_ESR_IL(esr) ((esr) & (1 << 25))
-
-/**
  * Gets the value to increment for the next PC.
  * The ESR encodes whether the instruction is 2 bytes or 4 bytes long.
  */
@@ -212,7 +202,7 @@ noreturn void sync_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 	(void)spsr;
 
 	switch (ec) {
-	case 0x25: /* EC = 100101, Data abort. */
+	case EC_DATA_ABORT_SAME_EL:
 		dlog("Data abort: pc=%#x, esr=%#x, ec=%#x", elr, esr, ec);
 		if (!(esr & (1U << 10))) { /* Check FnV bit. */
 			dlog(", far=%#x", read_msr(far_el2));
@@ -493,18 +483,16 @@ static uintreg_t get_el1_exception_handler_addr(const struct vcpu *vcpu)
 }
 
 /**
- * Injects an exception with an unknown reason (EC=0x0) to the EL1.
+ * Injects an exception with the specified Exception Syndrom Register value into
+ * the EL1.
  * See Arm Architecture Reference Manual Armv8-A, page D13-2924.
  *
  * NOTE: This function assumes that the lazy registers haven't been saved, and
  * writes to the lazy registers of the CPU directly instead of the vCPU.
  */
-static struct vcpu *inject_el1_unknown_exception(struct vcpu *vcpu,
-						 uintreg_t esr_el2)
+static void inject_el1_exception(struct vcpu *vcpu, uintreg_t esr_el1_value)
 {
-	uintreg_t esr_el1_value = GET_ESR_IL(esr_el2);
 	uintreg_t handler_address = get_el1_exception_handler_addr(vcpu);
-	char *direction_str;
 
 	/* Update the CPU state to inject the exception. */
 	write_msr(esr_el1, esr_el1_value);
@@ -522,6 +510,56 @@ static struct vcpu *inject_el1_unknown_exception(struct vcpu *vcpu,
 
 	/* Transfer control to the exception hander. */
 	vcpu->regs.pc = handler_address;
+}
+
+/**
+ * Injects a Data Abort exception (same exception level).
+ */
+static void inject_el1_data_abort_exception(struct vcpu *vcpu,
+					    uintreg_t esr_el2)
+{
+	/*
+	 *  ISS encoding remains the same, but the EC is changed to reflect
+	 *  where the exception came from.
+	 *  See Arm Architecture Reference Manual Armv8-A, pages D13-2943/2982.
+	 */
+	uintreg_t esr_el1_value = GET_ESR_ISS(esr_el2) | GET_ESR_IL(esr_el2) |
+				  (EC_DATA_ABORT_SAME_EL << ESR_EC_OFFSET);
+
+	dlog("Injecting Data Abort exception into VM%d.\n", vcpu->vm->id);
+
+	inject_el1_exception(vcpu, esr_el1_value);
+}
+
+/**
+ * Injects a Data Abort exception (same exception level).
+ */
+static void inject_el1_instruction_abort_exception(struct vcpu *vcpu,
+						   uintreg_t esr_el2)
+{
+	/*
+	 *  ISS encoding remains the same, but the EC is changed to reflect
+	 *  where the exception came from.
+	 *  See Arm Architecture Reference Manual Armv8-A, pages D13-2941/2980.
+	 */
+	uintreg_t esr_el1_value =
+		GET_ESR_ISS(esr_el2) | GET_ESR_IL(esr_el2) |
+		(EC_INSTRUCTION_ABORT_SAME_EL << ESR_EC_OFFSET);
+
+	dlog("Injecting Instruction Abort exception into VM%d.\n",
+	     vcpu->vm->id);
+
+	inject_el1_exception(vcpu, esr_el1_value);
+}
+
+/**
+ * Injects an exception with an unknown reason into the EL1.
+ */
+static void inject_el1_unknown_exception(struct vcpu *vcpu, uintreg_t esr_el2)
+{
+	uintreg_t esr_el1_value =
+		GET_ESR_IL(esr_el2) | (EC_UNKNOWN << ESR_EC_OFFSET);
+	char *direction_str;
 
 	direction_str = ISS_IS_READ(esr_el2) ? "read" : "write";
 	dlog("Trapped access to system register %s: op0=%d, op1=%d, crn=%d, "
@@ -531,10 +569,8 @@ static struct vcpu *inject_el1_unknown_exception(struct vcpu *vcpu,
 	     GET_ISS_RT(esr_el2));
 
 	dlog("Injecting Unknown Reason exception into VM%d.\n", vcpu->vm->id);
-	dlog("Exception handler address 0x%x\n", handler_address);
 
-	/* Schedule the same VM to continue running. */
-	return NULL;
+	inject_el1_exception(vcpu, esr_el1_value);
 }
 
 struct vcpu *hvc_handler(struct vcpu *vcpu)
@@ -676,7 +712,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 	uintreg_t ec = GET_ESR_EC(esr);
 
 	switch (ec) {
-	case 0x01: /* EC = 000001, WFI or WFE. */
+	case EC_WFI_WFE:
 		/* Skip the instruction. */
 		vcpu->regs.pc += GET_NEXT_PC_INC(esr);
 		/* Check TI bit of ISS, 0 = WFI, 1 = WFE. */
@@ -692,25 +728,33 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 		/* WFI */
 		return api_wait_for_interrupt(vcpu);
 
-	case 0x24: /* EC = 100100, Data abort. */
+	case EC_DATA_ABORT_LOWER_EL:
 		info = fault_info_init(
 			esr, vcpu, (esr & (1U << 6)) ? MM_MODE_W : MM_MODE_R);
 		if (vcpu_handle_page_fault(vcpu, &info)) {
 			return NULL;
 		}
-		break;
+		/* Inform the EL1 of the data abort. */
+		inject_el1_data_abort_exception(vcpu, esr);
 
-	case 0x20: /* EC = 100000, Instruction abort. */
+		/* Schedule the same VM to continue running. */
+		return NULL;
+
+	case EC_INSTRUCTION_ABORT_LOWER_EL:
 		info = fault_info_init(esr, vcpu, MM_MODE_X);
 		if (vcpu_handle_page_fault(vcpu, &info)) {
 			return NULL;
 		}
-		break;
+		/* Inform the EL1 of the instruction abort. */
+		inject_el1_instruction_abort_exception(vcpu, esr);
 
-	case 0x16: /* EC = 010110, HVC instruction */
+		/* Schedule the same VM to continue running. */
+		return NULL;
+
+	case EC_HVC:
 		return hvc_handler(vcpu);
 
-	case 0x17: /* EC = 010111, SMC instruction. */ {
+	case EC_SMC: {
 		uintreg_t smc_pc = vcpu->regs.pc;
 		struct vcpu *next = smc_handler(vcpu);
 
@@ -720,11 +764,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 		return next;
 	}
 
-	/*
-	 * EC = 011000, MSR, MRS or System instruction execution that is not
-	 * reported using EC 000000, 000001 or 000111.
-	 */
-	case 0x18:
+	case EC_MSR:
 		/*
 		 * NOTE: This should never be reached because it goes through a
 		 * separate path handled by handle_system_register_access().
@@ -742,41 +782,47 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 	 * The exception wasn't handled. Inject to the VM to give it chance to
 	 * handle as an unknown exception.
 	 */
-	return inject_el1_unknown_exception(vcpu, esr);
+	inject_el1_unknown_exception(vcpu, esr);
+
+	/* Schedule the same VM to continue running. */
+	return NULL;
 }
 
 /**
  * Handles EC = 011000, MSR, MRS instruction traps.
  * Returns non-null ONLY if the access failed and the vCPU is changing.
  */
-struct vcpu *handle_system_register_access(uintreg_t esr_el2)
+void handle_system_register_access(uintreg_t esr_el2)
 {
 	struct vcpu *vcpu = current();
 	spci_vm_id_t vm_id = vcpu->vm->id;
 	uintreg_t ec = GET_ESR_EC(esr_el2);
 
-	CHECK(ec == 0x18);
+	CHECK(ec == EC_MSR);
 	/*
 	 * Handle accesses to debug and performance monitor registers.
 	 * Inject an exception for unhandled/unsupported registers.
 	 */
 	if (debug_el1_is_register_access(esr_el2)) {
 		if (!debug_el1_process_access(vcpu, vm_id, esr_el2)) {
-			return inject_el1_unknown_exception(vcpu, esr_el2);
+			inject_el1_unknown_exception(vcpu, esr_el2);
+			return;
 		}
 	} else if (perfmon_is_register_access(esr_el2)) {
 		if (!perfmon_process_access(vcpu, vm_id, esr_el2)) {
-			return inject_el1_unknown_exception(vcpu, esr_el2);
+			inject_el1_unknown_exception(vcpu, esr_el2);
+			return;
 		}
 	} else if (feature_id_is_register_access(esr_el2)) {
 		if (!feature_id_process_access(vcpu, esr_el2)) {
-			return inject_el1_unknown_exception(vcpu, esr_el2);
+			inject_el1_unknown_exception(vcpu, esr_el2);
+			return;
 		}
 	} else {
-		return inject_el1_unknown_exception(vcpu, esr_el2);
+		inject_el1_unknown_exception(vcpu, esr_el2);
+		return;
 	}
 
 	/* Instruction was fulfilled. Skip it and run the next one. */
 	vcpu->regs.pc += GET_NEXT_PC_INC(esr_el2);
-	return NULL;
 }

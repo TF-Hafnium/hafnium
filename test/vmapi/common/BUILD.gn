@@ -21,4 +21,5 @@ source_set("common") {
     "exception_handler.c",
     "spci.c",
   ]
+  include_dirs = [ "//src/arch/aarch64" ]
 }

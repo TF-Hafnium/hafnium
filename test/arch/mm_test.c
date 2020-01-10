@@ -20,7 +20,7 @@
 
 #include "test/hftest.h"
 
-/** There must be at least two levels in the page table.  */
+/** There must be at least two levels in the page table. */
 #define MAX_LEVEL_LOWER_BOUND 1
 
 /**

@@ -191,9 +191,8 @@ system_register_access:
 	/* Read syndrome register and call C handler. */
 	mrs x0, esr_el2
 	bl handle_system_register_access
-	cbnz x0, vcpu_switch
 
-	/* vCPU is not changing. */
+	/* Continue running the same vCPU. */
 	mrs x0, tpidr_el2
 	b vcpu_restore_nonvolatile_and_run
 
