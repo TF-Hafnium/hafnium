@@ -68,9 +68,9 @@ Running in container: make all
 
 An arbitrary command can be executed inside the container with
 `build/run_in_container.sh [-i] <command> ...`. This is done automatically
-inside `Makefile` and `kokoro/ubuntu/build.sh` which detect whether they are
-already running inside the container and respawn themselves using
-`run_in_container.sh` if not.
+inside `Makefile` and `kokoro/build.sh` which detect whether they are already
+running inside the container and respawn themselves using `run_in_container.sh`
+if not.
 
 For example, you can spawn a shell with:
 

@@ -19,7 +19,7 @@ To run tests with the FVP instead of QEMU, from the root directory of your
 Hafnium checkout:
 
 ```shell
-$ make && kokoro/ubuntu/test.sh --fvp
+$ make && kokoro/test.sh --fvp
 ```
 
 See the `fvp` function in

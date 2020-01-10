@@ -35,7 +35,7 @@ To submit a change:
 5.  Commit as usual. If you make a change in a submodule you will also need to
     commit a change in the main repository to update the submodule version.
 6.  Run the [tests](docs/Testing.md) and other presubmit checks with
-    `kokoro/ubuntu/build.sh`, ensure they all pass.
+    `kokoro/build.sh`, ensure they all pass.
 7.  Upload the change to Gerrit with `git push origin HEAD:refs/for/master`. If
     you have changed submodules then you'll need to push them as well.
 8.  If you changed submodules, then add a matching 'topic' from the Gerrit UI

@@ -28,18 +28,18 @@
         {
             "label": "build.sh",
             "type": "shell",
-            "command": "kokoro/ubuntu/build.sh",
+            "command": "kokoro/build.sh",
             "problemMatcher": []
         },
         {
             "label": "test",
             "type": "shell",
-            "command": "make && kokoro/ubuntu/test.sh"
+            "command": "make && kokoro/test.sh"
         },
         {
             "label": "test on FVP",
             "type": "shell",
-            "command": "make && kokoro/ubuntu/test.sh --fvp"
+            "command": "make && kokoro/test.sh --fvp"
         },
         {
             "label": "push",

@@ -42,13 +42,13 @@ Presubmit builds everything, runs all tests and checks the source for formatting
 and lint errors. This can be run locally with:
 
 ```shell
-./kokoro/ubuntu/build.sh
+./kokoro/build.sh
 ```
 
 Or to just run the tests after having built everything manually run:
 
 ```shell
-./kokoro/ubuntu/test.sh
+./kokoro/test.sh
 ```
 
 ## QEMU tests

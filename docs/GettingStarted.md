@@ -89,7 +89,7 @@ qemu-system-aarch64 -M virt,gic_version=3 -cpu cortex-a57 -nographic -machine vi
 After building, presubmit tests can be run with the following command line:
 
 ```shell
-./kokoro/ubuntu/test.sh
+./kokoro/test.sh
 ```
 
 Read about [testing](Testing.md) for more details about the tests.
