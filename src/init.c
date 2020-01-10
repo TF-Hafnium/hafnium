@@ -19,6 +19,8 @@
 #include <stdalign.h>
 #include <stddef.h>
 
+#include "hf/arch/tee.h"
+
 #include "hf/api.h"
 #include "hf/boot_flow.h"
 #include "hf/boot_params.h"
@@ -157,6 +159,11 @@ void one_time_init(void)
 
 	/* Enable TLB invalidation for VM page table updates. */
 	mm_vm_enable_invalidation();
+
+	if (manifest.spci_tee_enabled) {
+		/* Set up message buffers for TEE dispatcher. */
+		arch_tee_init();
+	}
 
 	dlog_info("Hafnium initialisation completed\n");
 }

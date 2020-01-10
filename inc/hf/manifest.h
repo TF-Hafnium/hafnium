@@ -50,6 +50,7 @@ struct manifest_vm {
  * Hafnium manifest parsed from FDT.
  */
 struct manifest {
+	bool spci_tee_enabled;
 	spci_vm_count_t vm_count;
 	struct manifest_vm vm[MAX_VMS];
 };

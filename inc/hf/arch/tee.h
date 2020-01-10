@@ -18,4 +18,5 @@
 
 #include "hf/spci.h"
 
+void arch_tee_init(void);
 struct spci_value arch_tee_call(struct spci_value args);

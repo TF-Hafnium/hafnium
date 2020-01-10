@@ -280,6 +280,8 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
+	TRY(read_bool(&hyp_node, "spci_tee", &manifest->spci_tee_enabled));
+
 	/* Iterate over reserved VM IDs and check no such nodes exist. */
 	for (i = 0; i < HF_VM_ID_OFFSET; i++) {
 		spci_vm_id_t vm_id = (spci_vm_id_t)i;

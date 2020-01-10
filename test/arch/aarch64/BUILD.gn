@@ -1,4 +1,4 @@
-# Copyright 2019 The Hafnium Authors.
+# Copyright 2020 The Hafnium Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("hypervisor") {
-  sources = [
-    "cpu.c",
-  ]
+import("//build/image/image.gni")
+import("//build/toolchain/platform.gni")
+
+group("aarch64") {
+  testonly = true
+
   deps = [
-    "//src/arch/fake",
+    ":aarch64_test",
   ]
 }
 
-source_set("tee") {
+hypervisor("aarch64_test") {
+  testonly = true
+
   sources = [
-    "tee.c",
+    "tee_test.c",
+  ]
+
+  deps = [
+    "//src:vm",
+    "//src/arch/${plat_arch}/hypervisor:tee",
+    "//test/hftest:hftest_hypervisor",
   ]
 }

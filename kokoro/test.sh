@@ -101,6 +101,10 @@ do
     HFTEST_CPU+=(--log "$LOG_DIR_BASE")
   fi
   "${HFTEST_CPU[@]}" arch_test
+  if [ $USE_TFA == true || $USE_FVP == true ]
+  then
+    "${HFTEST_CPU[@]}" aarch64_test
+  fi
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/aarch64_test
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/gicv3/gicv3_test
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_only/primary_only_test

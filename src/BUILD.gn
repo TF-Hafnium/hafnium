@@ -40,6 +40,7 @@ source_set("src_not_testable_yet") {
   deps = [
     ":src_testable",
     "//project/${project}/${plat_name}",
+    "//src/arch/${plat_arch}/hypervisor:tee",
     plat_boot_flow,
     plat_console,
     plat_iommu,
@@ -58,7 +59,6 @@ source_set("src_testable") {
     "panic.c",
     "spci_memory.c",
     "vcpu.c",
-    "vm.c",
   ]
 
   deps = [
@@ -69,8 +69,9 @@ source_set("src_testable") {
     ":memiter",
     ":mm",
     ":std",
-    ":string",
+    ":vm",
     "//src/arch/${plat_arch}/hypervisor",
+    "//src/arch/${plat_arch}/hypervisor:tee",
     "//vmlib",
     plat_boot_flow,
     plat_console,
@@ -88,6 +89,12 @@ source_set("mm") {
   sources = [
     "mm.c",
     "mpool.c",
+  ]
+}
+
+source_set("vm") {
+  sources = [
+    "vm.c",
   ]
 }
 
