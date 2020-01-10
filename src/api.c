@@ -379,6 +379,7 @@ static struct spci_value spci_msg_recv_return(const struct vm *receiver)
 	case SPCI_MEM_SHARE_32:
 	case HF_SPCI_MEM_RELINQUISH:
 		return (struct spci_value){.func = receiver->mailbox.recv_func,
+					   .arg3 = receiver->mailbox.recv_size,
 					   .arg4 = receiver->mailbox.recv_size};
 	default:
 		/* This should never be reached, but return an error in case. */
@@ -1423,9 +1424,9 @@ struct spci_value api_spci_features(uint32_t function_id)
 
 struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 				    uint32_t page_count,
-				    uint32_t remaining_fragment_count,
-				    uint32_t length, uint32_t handle,
-				    struct vcpu *current, struct vcpu **next)
+				    uint32_t fragment_length, uint32_t length,
+				    uint32_t cookie, struct vcpu *current,
+				    struct vcpu **next)
 {
 	struct vm *from = current->vm;
 	struct vm *to;
@@ -1443,8 +1444,8 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	if (handle == 0 && remaining_fragment_count != 0) {
-		/* Handle is required if there are multiple fragments. */
+	if ((cookie == 0) != (fragment_length == length)) {
+		/* Cookie is required iff there are multiple fragments. */
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 

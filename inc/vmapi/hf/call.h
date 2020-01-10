@@ -131,40 +131,42 @@ static inline struct spci_value spci_msg_send(spci_vm_id_t sender_vm_id,
 		.arg4 = attributes});
 }
 
-static inline struct spci_value spci_mem_donate(
-	uint32_t remaining_fragment_count, uint32_t length, uint32_t handle)
+static inline struct spci_value spci_mem_donate(uint32_t fragment_length,
+						uint32_t length,
+						uint32_t cookie)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_DONATE_32,
-					     .arg3 = remaining_fragment_count,
+					     .arg3 = fragment_length,
 					     .arg4 = length,
-					     .arg5 = handle});
+					     .arg5 = cookie});
 }
 
-static inline struct spci_value spci_mem_lend(uint32_t remaining_fragment_count,
-					      uint32_t length, uint32_t handle)
+static inline struct spci_value spci_mem_lend(uint32_t fragment_length,
+					      uint32_t length, uint32_t cookie)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_LEND_32,
-					     .arg3 = remaining_fragment_count,
+					     .arg3 = fragment_length,
 					     .arg4 = length,
-					     .arg5 = handle});
+					     .arg5 = cookie});
 }
 
-static inline struct spci_value spci_mem_share(
-	uint32_t remaining_fragment_count, uint32_t length, uint32_t handle)
+static inline struct spci_value spci_mem_share(uint32_t fragment_length,
+					       uint32_t length, uint32_t cookie)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_SHARE_32,
-					     .arg3 = remaining_fragment_count,
+					     .arg3 = fragment_length,
 					     .arg4 = length,
-					     .arg5 = handle});
+					     .arg5 = cookie});
 }
 
-static inline struct spci_value hf_spci_mem_relinquish(
-	uint32_t remaining_fragment_count, uint32_t length, uint32_t handle)
+static inline struct spci_value hf_spci_mem_relinquish(uint32_t fragment_length,
+						       uint32_t length,
+						       uint32_t cookie)
 {
 	return spci_call((struct spci_value){.func = HF_SPCI_MEM_RELINQUISH,
-					     .arg3 = remaining_fragment_count,
+					     .arg3 = fragment_length,
 					     .arg4 = length,
-					     .arg5 = handle});
+					     .arg5 = cookie});
 }
 
 /**
