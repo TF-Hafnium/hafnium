@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Hafnium Authors.
+ * Copyright 2020 The Hafnium Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,28 +14,15 @@
  * limitations under the License.
  */
 
-#pragma once
+#include <stdbool.h>
+#include <stdint.h>
 
-#include "hf/addr.h"
+#define FW_CFG_ID 0x01
+#define FW_CFG_KERNEL_SIZE 0x08
+#define FW_CFG_INITRD_SIZE 0x0b
+#define FW_CFG_KERNEL_DATA 0x11
+#define FW_CFG_INITRD_DATA 0x12
 
-#define LINUX_ALIGNMENT 0x200000
-#define LINUX_OFFSET 0x80000
-
-paddr_t layout_text_begin(void);
-paddr_t layout_text_end(void);
-
-paddr_t layout_rodata_begin(void);
-paddr_t layout_rodata_end(void);
-
-paddr_t layout_data_begin(void);
-paddr_t layout_data_end(void);
-
-paddr_t layout_initrd_begin(void);
-paddr_t layout_initrd_end(void);
-
-paddr_t layout_fdt_begin(void);
-paddr_t layout_fdt_end(void);
-
-paddr_t layout_image_end(void);
-
-paddr_t layout_primary_begin(void);
+uint32_t fw_cfg_read_uint32(uint16_t key);
+void fw_cfg_read_bytes(uint16_t key, uintptr_t destination, uint32_t length);
+bool fw_cfg_read_dma(uint16_t key, uintptr_t destination, uint32_t length);

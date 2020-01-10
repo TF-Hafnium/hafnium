@@ -1,0 +1,74 @@
+# Copyright 2020 The Hafnium Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import("//build/image/image.gni")
+import("//build/toolchain/platform.gni")
+
+# The bootloader image.
+image_binary("qemuloader") {
+  image_name = "qemuloader"
+  deps = [
+    ":loader",
+  ]
+}
+
+source_set("loader") {
+  public_configs = [
+    "//src/arch/aarch64:config",
+    "//third_party/dtc:libfdt_config",
+  ]
+  sources = [
+    "entry.S",
+    "fwcfg.c",
+    "loader.c",
+  ]
+
+  deps = [
+    "//src:abort",
+    "//src:dlog",
+    "//src:layout",
+    "//src:panic",
+    "//src/arch/${plat_arch}:entry",
+    "//third_party/dtc:libfdt",
+  ]
+}
+
+copy("tfa_copy") {
+  sources = [
+    "//prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl2.bin",
+    "//prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl31.bin",
+  ]
+  outputs = [
+    "$root_out_dir/{{source_file_part}}",
+  ]
+}
+
+copy("qemuloader_copy") {
+  sources = [
+    "$root_out_dir/qemuloader.bin",
+  ]
+  deps = [
+    ":qemuloader",
+  ]
+  outputs = [
+    "$root_out_dir/bl33.bin",
+  ]
+}
+
+group("bl") {
+  deps = [
+    ":qemuloader_copy",
+    ":tfa_copy",
+  ]
+}

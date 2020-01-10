@@ -158,14 +158,14 @@ class Driver:
         platform."""
         return DriverRunState(self.args.artifacts.create_file(run_name, ".log"))
 
-    def exec_logged(self, run_state, exec_args):
+    def exec_logged(self, run_state, exec_args, cwd=None):
         """Run a subprocess on behalf of a Driver subclass and append its
         stdout and stderr to the main log."""
         assert(run_state.ret_code == 0)
         with open(run_state.log_path, "a") as f:
             f.write("$ {}\r\n".format(" ".join(exec_args)))
             f.flush()
-            ret_code = subprocess.call(exec_args, stdout=f, stderr=f)
+            ret_code = subprocess.call(exec_args, stdout=f, stderr=f, cwd=cwd)
             if ret_code != 0:
                 run_state.set_ret_code(ret_code)
                 raise DriverRunException()
@@ -195,8 +195,10 @@ class Driver:
 class QemuDriver(Driver):
     """Driver which runs tests in QEMU."""
 
-    def __init__(self, args):
+    def __init__(self, args, qemu_wd, tfa):
         Driver.__init__(self, args)
+        self.qemu_wd = qemu_wd
+        self.tfa = tfa
 
     def gen_exec_args(self, test_args, is_long_running):
         """Generate command line arguments for QEMU."""
@@ -206,15 +208,22 @@ class QemuDriver(Driver):
         cpu = self.args.cpu or "max"
         exec_args = [
             "timeout", "--foreground", time_limit,
-            "./prebuilts/linux-x64/qemu/qemu-system-aarch64",
+            os.path.abspath("prebuilts/linux-x64/qemu/qemu-system-aarch64"),
             "-machine", "virt,virtualization=on,gic_version=3",
-            "-cpu", cpu, "-smp", "4", "-m", "64M",
+            "-cpu", cpu, "-smp", "4", "-m", "1G",
             "-nographic", "-nodefaults", "-serial", "stdio",
-            "-d", "unimp", "-kernel", self.args.kernel,
+            "-d", "unimp", "-kernel", os.path.abspath(self.args.kernel),
         ]
 
+        if self.tfa:
+            exec_args += ["-bios",
+                os.path.abspath(
+                    "prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl1.bin"
+                ), "-machine", "secure=on", "-semihosting-config",
+                "enable,target=native"]
+
         if self.args.initrd:
-            exec_args += ["-initrd", self.args.initrd]
+            exec_args += ["-initrd", os.path.abspath(self.args.initrd)]
 
         vm_args = join_if_not_None(self.args.vm_args, test_args)
         if vm_args:
@@ -229,7 +238,8 @@ class QemuDriver(Driver):
         try:
             # Execute test in QEMU..
             exec_args = self.gen_exec_args(test_args, is_long_running)
-            self.exec_logged(run_state, exec_args)
+            self.exec_logged(run_state, exec_args,
+                cwd=self.qemu_wd)
         except DriverRunException:
             pass
 
@@ -580,6 +590,7 @@ def Main():
     parser.add_argument("--skip-long-running-tests", action="store_true")
     parser.add_argument("--cpu",
         help="Selects the CPU configuration for the run environment.")
+    parser.add_argument("--tfa", action="store_true")
     args = parser.parse_args()
 
     # Resolve some paths.
@@ -600,7 +611,7 @@ def Main():
             args.serial_dev, args.serial_baudrate, not args.serial_no_init_wait)
 
     if args.driver == "qemu":
-        driver = QemuDriver(driver_args)
+        driver = QemuDriver(driver_args, args.out, args.tfa)
     elif args.driver == "fvp":
         driver = FvpDriver(driver_args)
     elif args.driver == "serial":

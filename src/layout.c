@@ -144,5 +144,6 @@ paddr_t layout_primary_begin(void)
 	 * the alignment from the header of the binary, or have a bootloader
 	 * within the VM do so.
 	 */
-	return pa_init(align_up(pa_addr(image_end), 0x200000) + 0x80000);
+	return pa_init(align_up(pa_addr(image_end), LINUX_ALIGNMENT) +
+		       LINUX_OFFSET);
 }

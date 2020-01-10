@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Hafnium Authors.
+ * Copyright 2020 The Hafnium Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,28 +14,16 @@
  * limitations under the License.
  */
 
-#pragma once
+.section .init.image_entry, "ax"
+.global image_entry
+image_entry:
+	/* Prepare the stack. */
+	adr x30, kstack + 4096
+	mov sp, x30
 
-#include "hf/addr.h"
+	/* Call into C code. */
+	bl kmain
 
-#define LINUX_ALIGNMENT 0x200000
-#define LINUX_OFFSET 0x80000
-
-paddr_t layout_text_begin(void);
-paddr_t layout_text_end(void);
-
-paddr_t layout_rodata_begin(void);
-paddr_t layout_rodata_end(void);
-
-paddr_t layout_data_begin(void);
-paddr_t layout_data_end(void);
-
-paddr_t layout_initrd_begin(void);
-paddr_t layout_initrd_end(void);
-
-paddr_t layout_fdt_begin(void);
-paddr_t layout_fdt_end(void);
-
-paddr_t layout_image_end(void);
-
-paddr_t layout_primary_begin(void);
+	/* Loop forever waiting for interrupts. */
+0:	wfi
+	b 0b

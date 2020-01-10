@@ -27,6 +27,7 @@ set -u
 set -x
 
 USE_FVP=false
+USE_TFA=false
 SKIP_LONG_RUNNING_TESTS=false
 RUN_ALL_QEMU_CPUS=false
 
@@ -34,6 +35,8 @@ while test $# -gt 0
 do
   case "$1" in
     --fvp) USE_FVP=true
+      ;;
+    --tfa) USE_TFA=true
       ;;
     --skip-long-running-tests) SKIP_LONG_RUNNING_TESTS=true
       ;;
@@ -61,6 +64,10 @@ then
 else
   HFTEST+=(--out "$OUT/qemu_aarch64_clang")
   HFTEST+=(--out_initrd "$OUT/qemu_aarch64_vm_clang")
+fi
+if [ $USE_TFA == true ]
+then
+  HFTEST+=(--tfa)
 fi
 if [ $SKIP_LONG_RUNNING_TESTS == true ]
 then
