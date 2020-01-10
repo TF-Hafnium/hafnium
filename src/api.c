@@ -17,6 +17,7 @@
 #include "hf/api.h"
 
 #include "hf/arch/cpu.h"
+#include "hf/arch/tee.h"
 #include "hf/arch/timer.h"
 
 #include "hf/check.h"
@@ -909,9 +910,10 @@ static bool msg_receiver_busy(struct vm_locked to, struct vm *from, bool notify)
  * Notifies the `to` VM about the message currently in its mailbox, possibly
  * with the help of the primary VM.
  */
-static void deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
-			struct vcpu *current, struct vcpu **next)
+static struct spci_value deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
+				     struct vcpu *current, struct vcpu **next)
 {
+	struct spci_value ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 	struct spci_value primary_ret = {
 		.func = SPCI_MSG_SEND_32,
 		.arg1 = ((uint32_t)from_id << 16) | to.vm->id,
@@ -929,16 +931,29 @@ static void deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
 		to.vm->mailbox.state = MAILBOX_STATE_READ;
 		*next = api_switch_to_primary(current, primary_ret,
 					      VCPU_STATE_READY);
-		return;
+		return ret;
 	}
 
 	to.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+
+	/* Messages for the TEE are sent on via the dispatcher. */
+	if (to.vm->id == HF_TEE_VM_ID) {
+		struct spci_value call = spci_msg_recv_return(to.vm);
+
+		return arch_tee_call(call);
+		/*
+		 * Don't return to the primary VM in this case, as the TEE is
+		 * not (yet) scheduled via SPCI.
+		 */
+	}
 
 	/* Return to the primary VM directly or with a switch. */
 	if (from_id != HF_PRIMARY_VM_ID) {
 		*next = api_switch_to_primary(current, primary_ret,
 					      VCPU_STATE_READY);
 	}
+
+	return ret;
 }
 
 /**
@@ -1008,9 +1023,7 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	to->mailbox.recv_size = size;
 	to->mailbox.recv_sender = sender_vm_id;
 	to->mailbox.recv_func = SPCI_MSG_SEND_32;
-	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
-
-	deliver_msg(to_locked, sender_vm_id, current, next);
+	ret = deliver_msg(to_locked, sender_vm_id, current, next);
 
 out:
 	vm_unlock(&to_locked);
@@ -1505,7 +1518,7 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 		share_func, &api_page_pool);
 
 	if (ret.func == SPCI_SUCCESS_32) {
-		deliver_msg(vm_to_from_lock.vm1, from->id, current, next);
+		ret = deliver_msg(vm_to_from_lock.vm1, from->id, current, next);
 	}
 
 out:

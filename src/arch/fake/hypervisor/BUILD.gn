@@ -15,6 +15,7 @@
 source_set("hypervisor") {
   sources = [
     "cpu.c",
+    "tee.c",
   ]
   deps = [
     "//src/arch/fake",
