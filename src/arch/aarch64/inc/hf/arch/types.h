@@ -81,7 +81,7 @@ struct arch_vm {
 	} tid3_masks;
 };
 
-/** Type to represent the register state of a vCPU.  */
+/** Type to represent the register state of a vCPU. */
 struct arch_regs {
 	/* General purpose registers. */
 	uintreg_t r[NUM_GP_REGS];

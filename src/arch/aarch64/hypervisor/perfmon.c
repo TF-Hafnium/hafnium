@@ -229,7 +229,7 @@ bool perfmon_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
 uintreg_t perfmon_get_pmccfiltr_el0_init_value(spci_vm_id_t vm_id)
 {
 	if (vm_id != HF_PRIMARY_VM_ID) {
-		/* Disable cycle counting for secondary VMs.  */
+		/* Disable cycle counting for secondary VMs. */
 		return PMCCFILTR_EL0_P | PMCCFILTR_EL0_U;
 	}
 

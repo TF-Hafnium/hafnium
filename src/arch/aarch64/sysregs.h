@@ -372,8 +372,8 @@
 /**
  * Protected Table Walk.
  * When set a translation table access made as part of a stage 1 translation
- * table walk is subject to a stage 2 translation.  The memory access generates
- * a stage 2 permission fault.
+ * table walk is subject to a stage 2 translation. The memory access generates a
+ * stage 2 permission fault.
  */
 #define HCR_EL2_PTW (UINT64_C(0x1) << 2)
 

@@ -54,7 +54,7 @@ SECTIONS
 
 	/*
 	 * Collect together read-only data including relocations at the end
-	 * which are applied by the entry code.  This is page aligned so it can
+	 * which are applied by the entry code. This is page aligned so it can
 	 * be mapped as read-only and non-executable.
 	 */
 	. = ALIGN(4096);

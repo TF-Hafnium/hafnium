@@ -101,7 +101,7 @@ static bool load_common(const struct manifest_vm *manifest_vm, struct vm *vm)
 {
 	vm->smc_whitelist = manifest_vm->smc_whitelist;
 
-	/* Initialize architecture-specific features.  */
+	/* Initialize architecture-specific features. */
 	arch_vm_features_set(vm);
 
 	return true;
