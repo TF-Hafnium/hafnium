@@ -74,6 +74,7 @@ template("linux_kernel") {
             "//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-objcopy"),
     "OBJDUMP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-objdump"),
     "STRIP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-strip"),
+    "GCC_TOOLCHAIN_DIR=" + rebase_path("//prebuilts/linux-x64/gcc/bin"),
     "ARCH=arm64",
     "CROSS_COMPILE=aarch64-linux-gnu-",
 
@@ -172,6 +173,7 @@ template("linux_kernel_module") {
               "//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-objcopy"),
       "OBJDUMP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-objdump"),
       "STRIP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-strip"),
+      "GCC_TOOLCHAIN_DIR=" + rebase_path("//prebuilts/linux-x64/gcc/bin"),
       "ARCH=arm64",
       "CROSS_COMPILE=aarch64-linux-gnu-",
     ]
