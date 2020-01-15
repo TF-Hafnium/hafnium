@@ -227,7 +227,9 @@ static bool spci_msg_check_transition(struct vm *to, struct vm *from,
 	}
 
 	for (i = 0; i < memory_region->constituent_count; ++i) {
-		ipaddr_t begin = ipa_init(constituents[i].address);
+		ipaddr_t begin =
+			ipa_init(spci_memory_region_constituent_get_address(
+				&constituents[i]));
 		size_t size = constituents[i].page_count * PAGE_SIZE;
 		ipaddr_t end = ipa_add(begin, size);
 		uint32_t current_from_mode;
@@ -327,8 +329,9 @@ static bool spci_region_group_identity_map(
 	/* Iterate over the memory region constituents. */
 	for (uint32_t index = 0; index < memory_constituent_count; index++) {
 		size_t size = constituents[index].page_count * PAGE_SIZE;
-		paddr_t pa_begin =
-			pa_from_ipa(ipa_init(constituents[index].address));
+		paddr_t pa_begin = pa_from_ipa(
+			ipa_init(spci_memory_region_constituent_get_address(
+				&constituents[index])));
 		paddr_t pa_end = pa_add(pa_begin, size);
 
 		if (commit) {
@@ -408,7 +411,9 @@ static bool spci_clear_memory_region(struct spci_memory_region *memory_region,
 	/* Iterate over the memory region constituents. */
 	for (uint32_t i = 0; i < memory_constituent_count; ++i) {
 		size_t size = constituents[i].page_count * PAGE_SIZE;
-		paddr_t begin = pa_from_ipa(ipa_init(constituents[i].address));
+		paddr_t begin = pa_from_ipa(
+			ipa_init(spci_memory_region_constituent_get_address(
+				&constituents[i])));
 		paddr_t end = pa_add(begin, size);
 
 		if (!clear_memory(begin, end, &local_page_pool)) {
@@ -465,11 +470,10 @@ static struct spci_value spci_share_memory(
 		spci_memory_region_get_constituents(memory_region);
 
 	/*
-	 * Make sure constituents are properly aligned to a 64-bit boundary. If
-	 * not we would get alignment faults trying to read (64-bit) page
-	 * addresses.
+	 * Make sure constituents are properly aligned to a 32-bit boundary. If
+	 * not we would get alignment faults trying to read (32-bit) values.
 	 */
-	if (!is_aligned(constituents, 8)) {
+	if (!is_aligned(constituents, 4)) {
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 

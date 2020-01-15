@@ -229,11 +229,10 @@ struct spci_memory_region_constituent {
 	 * The base IPA of the constituent memory region, aligned to 4 kiB page
 	 * size granularity.
 	 */
-	uint64_t address;
+	uint32_t address_low;
+	uint32_t address_high;
 	/** The number of 4 kiB pages in the constituent memory region. */
 	uint32_t page_count;
-
-	uint32_t reserved;
 };
 
 struct spci_memory_region_attributes {
@@ -296,6 +295,23 @@ struct spci_memory_region {
 	 */
 	struct spci_memory_region_attributes attributes[];
 };
+
+static inline struct spci_memory_region_constituent
+spci_memory_region_constituent_init(uint64_t address, uint32_t pc)
+{
+	return (struct spci_memory_region_constituent){
+		.address_high = (uint32_t)(address >> 32),
+		.address_low = (uint32_t)address,
+		.page_count = pc,
+	};
+}
+
+static inline uint64_t spci_memory_region_constituent_get_address(
+	struct spci_memory_region_constituent *constituent)
+{
+	return (uint64_t)constituent->address_high << 32 |
+	       constituent->address_low;
+}
 
 /**
  * Gets the constituent array for an `spci_memory_region`.

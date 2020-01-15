@@ -63,20 +63,19 @@ uint32_t spci_memory_region_init(
 	memory_region->attributes[0].memory_attributes = attributes;
 
 	/*
-	 * Constituent offset must be aligned to a 64-bit boundary so that
-	 * 64-bit addresses can be copied without alignment faults.
+	 * Constituent offset must be aligned to a 32-bit boundary so that
+	 * 32-bit values can be copied without alignment faults.
 	 */
 	memory_region->constituent_offset = align_up(
 		sizeof(struct spci_memory_region) +
 			memory_region->attribute_count *
 				sizeof(struct spci_memory_region_attributes),
-		8);
+		4);
 	region_constituents =
 		spci_memory_region_get_constituents(memory_region);
 
 	for (index = 0; index < constituent_count; index++) {
 		region_constituents[index] = constituents[index];
-		region_constituents[index].reserved = 0;
 		memory_region->page_count += constituents[index].page_count;
 	}
 

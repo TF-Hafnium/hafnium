@@ -200,7 +200,7 @@ TEST(memory_sharing, concurrent)
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "memory_increment", mb.send);
@@ -243,7 +243,7 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish", mb.send);
@@ -278,7 +278,7 @@ TEST(memory_sharing, cannot_share_device_memory)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = PAGE_SIZE, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)PAGE_SIZE, 1),
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_return", mb.send);
@@ -308,8 +308,9 @@ TEST(memory_sharing, lend_relinquish)
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
-		{.address = (uint64_t)pages + PAGE_SIZE, .page_count = 2},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
+		spci_memory_region_constituent_init((uint64_t)pages + PAGE_SIZE,
+						    2),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -351,8 +352,9 @@ TEST(memory_sharing, donate_relinquish)
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
-		{.address = (uint64_t)pages + PAGE_SIZE, .page_count = 2},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
+		spci_memory_region_constituent_init((uint64_t)pages + PAGE_SIZE,
+						    2),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -380,7 +382,7 @@ TEST(memory_sharing, give_and_get_back)
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_return", mb.send);
@@ -418,7 +420,7 @@ TEST(memory_sharing, lend_and_get_back)
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish", mb.send);
@@ -455,7 +457,7 @@ TEST(memory_sharing, reshare_after_return)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish", mb.send);
@@ -496,7 +498,7 @@ TEST(memory_sharing, share_elsewhere_after_return)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_memory_lend_relinquish", mb.send);
@@ -548,7 +550,8 @@ TEST(memory_sharing, give_memory_and_lose_access)
 	/* Check the memory was cleared. */
 	memory_region = (struct spci_memory_region *)mb.recv;
 	constituents = spci_memory_region_get_constituents(memory_region);
-	ptr = (uint8_t *)constituents[0].address;
+	ptr = (uint8_t *)spci_memory_region_constituent_get_address(
+		&constituents[0]);
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
@@ -579,7 +582,8 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 	/* Check the memory was cleared. */
 	memory_region = (struct spci_memory_region *)mb.recv;
 	constituents = spci_memory_region_get_constituents(memory_region);
-	ptr = (uint8_t *)constituents[0].address;
+	ptr = (uint8_t *)spci_memory_region_constituent_get_address(
+		&constituents[0]);
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
@@ -599,6 +603,7 @@ TEST(memory_sharing, donate_check_upper_bounds)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
+	uint64_t address;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_check_upper_bound", mb.send);
 
@@ -607,8 +612,9 @@ TEST(memory_sharing, donate_check_upper_bounds)
 
 	/* Specify non-contiguous memory regions. */
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
-		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
+		spci_memory_region_constituent_init(
+			(uint64_t)pages + PAGE_SIZE * 2, 1),
 	};
 
 	/*
@@ -629,8 +635,12 @@ TEST(memory_sharing, donate_check_upper_bounds)
 		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
-	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
-	constituents[1].address = (uint64_t)pages + PAGE_SIZE * 3;
+	address = (uint64_t)pages + PAGE_SIZE * 1;
+	constituents[0].address_high = address << 32;
+	constituents[0].address_low = (uint32_t)address;
+	address = (uint64_t)pages + PAGE_SIZE * 3;
+	constituents[1].address_high = address << 32;
+	constituents[1].address_low = (uint32_t)address;
 
 	/*
 	 * Specify that we now want to test the second constituent of the
@@ -659,6 +669,7 @@ TEST(memory_sharing, donate_check_lower_bounds)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
+	uint64_t address;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_check_lower_bound", mb.send);
 
@@ -667,8 +678,9 @@ TEST(memory_sharing, donate_check_lower_bounds)
 
 	/* Specify non-contiguous memory regions. */
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
-		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
+		spci_memory_region_constituent_init(
+			(uint64_t)pages + PAGE_SIZE * 2, 1),
 	};
 
 	/*
@@ -689,8 +701,12 @@ TEST(memory_sharing, donate_check_lower_bounds)
 		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
-	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
-	constituents[1].address = (uint64_t)pages + PAGE_SIZE * 3;
+	address = (uint64_t)pages + PAGE_SIZE * 1;
+	constituents[0].address_high = address << 32;
+	constituents[0].address_low = (uint32_t)address;
+	address = (uint64_t)pages + PAGE_SIZE * 3;
+	constituents[1].address_high = address << 32;
+	constituents[1].address_low = (uint32_t)address;
 
 	/*
 	 * Specify that we now want to test the second constituent of the
@@ -732,7 +748,7 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -779,7 +795,7 @@ TEST(memory_sharing, donate_vms)
 	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	/* Set up VM2 to wait for message. */
@@ -830,7 +846,7 @@ TEST(memory_sharing, donate_twice)
 	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	/* Donate memory to VM1. */
@@ -881,7 +897,7 @@ TEST(memory_sharing, donate_to_self)
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -906,7 +922,7 @@ TEST(memory_sharing, lend_to_self)
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -930,7 +946,7 @@ TEST(memory_sharing, share_to_self)
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -958,7 +974,7 @@ TEST(memory_sharing, donate_invalid_source)
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	/* Try invalid configurations. */
@@ -1021,10 +1037,10 @@ TEST(memory_sharing, give_and_get_back_unaligned)
 				continue;
 			}
 			struct spci_memory_region_constituent constituents[] = {
-				{.address = (uint64_t)pages + i,
-				 .page_count = 1},
-				{.address = (uint64_t)pages + PAGE_SIZE + j,
-				 .page_count = 1},
+				spci_memory_region_constituent_init(
+					(uint64_t)pages + i, 1),
+				spci_memory_region_constituent_init(
+					(uint64_t)pages + PAGE_SIZE + j, 1),
 			};
 			uint32_t msg_size = spci_memory_region_init(
 				mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
@@ -1062,7 +1078,7 @@ TEST(memory_sharing, lend_invalid_source)
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	/* Check cannot swap VM IDs. */
@@ -1109,7 +1125,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1166,7 +1182,7 @@ TEST(memory_sharing, share_relinquish_X_RW)
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1235,7 +1251,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1306,7 +1322,7 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 	*ptr2 = 0xD65F03C0;
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1353,7 +1369,7 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 	*ptr2 = 0xD65F03C0;
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1397,7 +1413,7 @@ TEST(memory_sharing, lend_donate)
 	memset_s(ptr, sizeof(pages) * 2, 'b', PAGE_SIZE * 2);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 2},
+		spci_memory_region_constituent_init((uint64_t)pages, 2),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1415,7 +1431,9 @@ TEST(memory_sharing, lend_donate)
 	/* Ensure we can't donate any sub section of memory to another VM. */
 	constituents[0].page_count = 1;
 	for (int i = 1; i < PAGE_SIZE * 2; i++) {
-		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
+		uint64_t address = (uint64_t)pages + PAGE_SIZE;
+		constituents[0].address_high = address << 32;
+		constituents[0].address_low = (uint32_t)address;
 		msg_size = spci_memory_region_init(
 			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
@@ -1451,8 +1469,9 @@ TEST(memory_sharing, share_donate)
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE * 4);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 2},
-		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 2},
+		spci_memory_region_constituent_init((uint64_t)pages, 2),
+		spci_memory_region_constituent_init(
+			(uint64_t)pages + PAGE_SIZE * 2, 2),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1474,7 +1493,9 @@ TEST(memory_sharing, share_donate)
 	/* Ensure we can't donate any sub section of memory to another VM. */
 	constituents[0].page_count = 1;
 	for (int i = 1; i < PAGE_SIZE * 2; i++) {
-		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
+		uint64_t address = (uint64_t)pages + PAGE_SIZE;
+		constituents[0].address_high = address << 32;
+		constituents[0].address_low = (uint32_t)address;
 		msg_size = spci_memory_region_init(
 			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
@@ -1510,8 +1531,9 @@ TEST(memory_sharing, lend_twice)
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE * 4);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 2},
-		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 2),
+		spci_memory_region_constituent_init(
+			(uint64_t)pages + PAGE_SIZE * 3, 1),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1541,7 +1563,8 @@ TEST(memory_sharing, lend_twice)
 
 	/* Now attempt to share only a portion of the same area of memory. */
 	struct spci_memory_region_constituent constituents_subsection[] = {
-		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+		spci_memory_region_constituent_init(
+			(uint64_t)pages + PAGE_SIZE * 3, 1),
 	};
 	check_cannot_lend_memory(mb, constituents_subsection,
 				 ARRAY_SIZE(constituents_subsection), -1);
@@ -1554,7 +1577,9 @@ TEST(memory_sharing, lend_twice)
 	/* Attempt to lend again with different permissions. */
 	constituents[0].page_count = 1;
 	for (int i = 0; i < 2; i++) {
-		constituents[0].address = (uint64_t)pages + i * PAGE_SIZE;
+		uint64_t address = (uint64_t)pages + i * PAGE_SIZE;
+		constituents[0].address_high = address << 32;
+		constituents[0].address_low = (uint32_t)address;
 		msg_size = spci_memory_region_init(
 			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RO_X,
@@ -1582,7 +1607,7 @@ TEST(memory_sharing, share_twice)
 	memset_s(ptr, sizeof(pages) * 2, 'b', PAGE_SIZE * 2);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 2},
+		spci_memory_region_constituent_init((uint64_t)pages, 2),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1615,7 +1640,9 @@ TEST(memory_sharing, share_twice)
 	/* Attempt to share again with different permissions. */
 	constituents[0].page_count = 1;
 	for (int i = 0; i < 2; i++) {
-		constituents[0].address = (uint64_t)pages + i * PAGE_SIZE;
+		uint64_t address = (uint64_t)pages + i * PAGE_SIZE;
+		constituents[0].address_high = address << 32;
+		constituents[0].address_low = (uint32_t)address;
 		msg_size = spci_memory_region_init(
 			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RO_X,
@@ -1642,7 +1669,7 @@ TEST(memory_sharing, share_clear)
 	memset_s(ptr, sizeof(pages) * 2, 'b', PAGE_SIZE * 2);
 
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 2},
+		spci_memory_region_constituent_init((uint64_t)pages, 2),
 	};
 
 	msg_size = spci_memory_region_init(
@@ -1667,6 +1694,7 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
+	uint64_t address;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_lend_check_upper_bound", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_lend_check_upper_bound", mb.send);
@@ -1676,8 +1704,9 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 
 	/* Specify non-contiguous memory regions. */
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
-		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
+		spci_memory_region_constituent_init(
+			(uint64_t)pages + PAGE_SIZE * 2, 1),
 	};
 
 	/*
@@ -1698,8 +1727,12 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
-	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
-	constituents[1].address = (uint64_t)pages + PAGE_SIZE * 3;
+	address = (uint64_t)pages + PAGE_SIZE * 1;
+	constituents[0].address_high = address << 32;
+	constituents[0].address_low = (uint32_t)address;
+	address = (uint64_t)pages + PAGE_SIZE * 3;
+	constituents[1].address_high = address << 32;
+	constituents[1].address_low = (uint32_t)address;
 
 	/*
 	 * Specify that we now want to test the second constituent of the
@@ -1729,6 +1762,7 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
+	uint64_t address;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_lend_check_lower_bound", mb.send);
 	SERVICE_SELECT(SERVICE_VM2, "spci_lend_check_lower_bound", mb.send);
@@ -1738,8 +1772,9 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 
 	/* Specify non-contiguous memory regions. */
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
-		{.address = (uint64_t)pages + PAGE_SIZE * 2, .page_count = 1},
+		spci_memory_region_constituent_init((uint64_t)pages, 1),
+		spci_memory_region_constituent_init(
+			(uint64_t)pages + PAGE_SIZE * 2, 1),
 	};
 
 	/*
@@ -1760,8 +1795,12 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 		  1);
 
 	/* Use different memory regions for verifying the second constituent. */
-	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
-	constituents[1].address = (uint64_t)pages + PAGE_SIZE * 3;
+	address = (uint64_t)pages + PAGE_SIZE * 1;
+	constituents[0].address_high = address << 32;
+	constituents[0].address_low = (uint32_t)address;
+	address = (uint64_t)pages + PAGE_SIZE * 3;
+	constituents[1].address_high = address << 32;
+	constituents[1].address_low = (uint32_t)address;
 
 	/*
 	 * Specify that we now want to test the second constituent of the

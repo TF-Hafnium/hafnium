@@ -41,7 +41,8 @@ TEST_SERVICE(straddling_data_unmapped)
 	void *send_buf = SERVICE_SEND_BUFFER();
 	/* Give some memory to the primary VM so that it's unmapped. */
 	struct spci_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)(&pages[PAGE_SIZE]), .page_count = 1},
+		spci_memory_region_constituent_init(
+			(uint64_t)(&pages[PAGE_SIZE]), 1),
 	};
 	uint32_t msg_size = spci_memory_region_init(
 		send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID, constituents,
