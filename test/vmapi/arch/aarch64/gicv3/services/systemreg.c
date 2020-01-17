@@ -50,11 +50,24 @@ TEST_SERVICE(access_systemreg_ctlr)
 
 TEST_SERVICE(write_systemreg_sre)
 {
-	ASSERT_EQ(read_msr(ICC_SRE_EL1), 0x7);
-	/* Writing ICC_SRE_EL1 should trap the VM or be ignored. */
-	write_msr(ICC_SRE_EL1, 0x0);
-	ASSERT_EQ(read_msr(ICC_SRE_EL1), 0x7);
-	write_msr(ICC_SRE_EL1, 0xffffffff);
-	ASSERT_EQ(read_msr(ICC_SRE_EL1), 0x7);
+	uintreg_t read;
+
+	exception_setup(NULL, exception_handler_skip_instruction);
+
+	read = read_msr(ICC_SRE_EL1);
+	if (exception_handler_get_num() != 0) {
+		/* If reads are trapped then writes should also be trapped. */
+		ASSERT_EQ(exception_handler_get_num(), 1);
+		write_msr(ICC_SRE_EL1, 0x0);
+		ASSERT_EQ(exception_handler_get_num(), 2);
+	} else {
+		ASSERT_EQ(read, 0x7);
+		/* Writing ICC_SRE_EL1 should be ignored. */
+		write_msr(ICC_SRE_EL1, 0x0);
+		ASSERT_EQ(read_msr(ICC_SRE_EL1), 0x7);
+		write_msr(ICC_SRE_EL1, 0xffffffff);
+		ASSERT_EQ(read_msr(ICC_SRE_EL1), 0x7);
+	}
+
 	spci_yield();
 }
