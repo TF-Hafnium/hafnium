@@ -6,6 +6,10 @@
 	path = project/reference
 	url = https://hafnium.googlesource.com/hafnium/project/reference
 	shallow = true
+[submodule "third_party/dtc"]
+	path = third_party/dtc
+	url = https://hafnium.googlesource.com/hafnium/third_party/dtc
+	shallow = true
 [submodule "third_party/googletest"]
 	path = third_party/googletest
 	url = https://hafnium.googlesource.com/hafnium/third_party/googletest
