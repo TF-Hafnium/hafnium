@@ -30,12 +30,19 @@ import sys
 HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 CLANG_ROOT = os.path.join(HF_ROOT, "prebuilts", "linux-x64", "clang")
 OBJDUMP = os.path.join(CLANG_ROOT, "bin", "llvm-objdump")
+NM = os.path.join(CLANG_ROOT, "bin", "llvm-nm")
 
-def check_eret_speculation_barrier(objdump_stdout):
+def check_eret_speculation_barrier(args):
 	"""
 	Some ARM64 CPUs speculatively execute instructions after ERET.
 	Check that every ERET is followed by DSB NSH and ISB.
 	"""
+
+	objdump_stdout = subprocess\
+		.check_output([ OBJDUMP, "-d", args.input_elf ])\
+		.decode("utf-8")\
+		.splitlines()
+
 	found_eret = False
 
 	STATE_DEFAULT = 1
@@ -68,19 +75,59 @@ def check_eret_speculation_barrier(objdump_stdout):
 	if not found_eret:
 		raise Exception("Could not find any ERET instructions")
 
+def check_max_image_size(args):
+	"""
+	Check that the ELF's effective image size does not exceed maximum
+	allowed image size, if specified in command-line arguments.
+	"""
+
+	if args.max_image_size <= 0:
+		return
+
+	nm_stdout = subprocess\
+		.check_output([ NM, args.input_elf ])\
+		.decode("utf-8")\
+		.splitlines()
+
+	COLUMN_COUNT = 3
+	COLUMN_IDX_VALUE = 0
+	COLUMN_IDX_TYPE = 1
+	COLUMN_IDX_NAME = 2
+
+	image_size = None
+	for line in nm_stdout:
+		line = line.split()
+		if len(line) != COLUMN_COUNT:
+			raise Exception(
+				"Unexpected number of columns in NM output")
+
+		if line[COLUMN_IDX_NAME] == "image_size":
+			if line[COLUMN_IDX_TYPE] != "A":
+				raise Exception(
+					"Unexpected type of image_size symbol")
+			image_size = int(line[COLUMN_IDX_VALUE], 16)
+			break
+
+	if image_size is None:
+		raise Exception("Could not find value of image_size symbol")
+	elif image_size > args.max_image_size:
+		raise Exception(
+			"Image size exceeds maximum allowed image size " +
+			"({}B > {}B)".format(image_size, args.max_image_size))
+
 def Main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("input_elf",
 		help="ELF file to analyze")
 	parser.add_argument("stamp_file",
 		help="file to be touched if successful")
+	parser.add_argument("--max-image-size",
+		required=False, type=int, default=0,
+		help="maximum allowed image size in bytes")
 	args = parser.parse_args()
 
-	objdump_stdout = subprocess.check_output([
-		OBJDUMP, "-d", args.input_elf ])
-	objdump_stdout = objdump_stdout.decode("utf-8").splitlines()
-
-	check_eret_speculation_barrier(objdump_stdout)
+	check_eret_speculation_barrier(args)
+	check_max_image_size(args)
 
 	# Touch `stamp_file`.
 	with open(args.stamp_file, "w"):

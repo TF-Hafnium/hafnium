@@ -35,6 +35,9 @@ declare_args() {
   # The maximum number of CPUs available on the platform.
   plat_max_cpus = 1
 
+  # The maximum allowed size of Hafnium's image in memory. Zero if don't care.
+  plat_max_image_size = 0
+
   # The maximum number of VMs required for the platform.
   plat_max_vms = 0
 }

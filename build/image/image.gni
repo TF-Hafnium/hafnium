@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("//build/toolchain/embedded.gni")
+import("//build/toolchain/platform.gni")
 
 # Build image, link to an ELF file then convert to plain binary.
 template("image_binary") {
@@ -73,6 +74,8 @@ template("image_binary") {
     args = [
       rebase_path(elf_file),
       rebase_path(stamp_file),
+      "--max-image-size",
+      "$plat_max_image_size",
     ]
     outputs = [
       stamp_file,

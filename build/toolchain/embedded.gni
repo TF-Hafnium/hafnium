@@ -294,6 +294,9 @@ template("aarch64_common_toolchain") {
       plat_boot_flow = invoker.boot_flow
       plat_console = invoker.console
       plat_iommu = invoker.iommu
+      if (defined(invoker.max_image_size)) {
+        plat_max_image_size = invoker.max_image_size
+      }
       forward_variables_from(invoker.toolchain_args, "*")
     }
   }
@@ -321,6 +324,7 @@ template("aarch64_toolchains") {
                              "gicr_base_address",
                              "heap_pages",
                              "max_cpus",
+                             "max_image_size",
                              "max_vms",
                              "toolchain_args",
                            ])
