@@ -97,7 +97,7 @@ static inline struct spci_value spci_rxtx_map(hf_ipaddr_t send,
 					      hf_ipaddr_t recv)
 {
 	return spci_call(
-		(struct spci_value){.func = SPCI_RXTX_MAP_32,
+		(struct spci_value){.func = SPCI_RXTX_MAP_64,
 				    .arg1 = send,
 				    .arg2 = recv,
 				    .arg3 = HF_MAILBOX_SIZE / SPCI_PAGE_SIZE});

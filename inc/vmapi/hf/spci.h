@@ -33,6 +33,7 @@
 #define SPCI_FEATURES_32              0x84000064
 #define SPCI_RX_RELEASE_32            0x84000065
 #define SPCI_RXTX_MAP_32              0x84000066
+#define SPCI_RXTX_MAP_64              0xC4000066
 #define SPCI_RXTX_UNMAP_32            0x84000067
 #define SPCI_PARTITION_INFO_GET_32    0x84000068
 #define SPCI_ID_GET_32                0x84000069
