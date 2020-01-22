@@ -92,15 +92,22 @@ do
   else
     HFTEST_CPU+=(--log "$LOG_DIR_BASE")
   fi
+
   "${HFTEST_CPU[@]}" arch_test
   if [ $USE_TFA == true -o $USE_FVP == true ]
   then
     "${HFTEST_CPU[@]}" aarch64_test
   fi
+
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/aarch64_test
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/gicv3/gicv3_test
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_only/primary_only_test
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_test
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_no_fdt
   "${HFTEST_CPU[@]}" hafnium --initrd test/linux/linux_test --force-long-running --vm_args "rdinit=/test_binary --"
+  # TODO: Get Trusty tests working on FVP too.
+  if [ $USE_TFA == true ]
+  then
+    "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/trusty/trusty_test
+  fi
 done
