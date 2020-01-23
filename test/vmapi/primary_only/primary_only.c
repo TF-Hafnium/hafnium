@@ -141,6 +141,63 @@ TEST(cpus, start)
 	sl_lock(&lock);
 }
 
+/**
+ * Releases the lock passed in and then stops the CPU.
+ */
+static void vm_cpu_entry_stop(uintptr_t arg)
+{
+	struct spinlock *lock = (struct spinlock *)arg;
+
+	dlog("Second CPU started.\n");
+	sl_unlock(lock);
+
+	dlog("Second CPU stopping.\n");
+	arch_cpu_stop();
+
+	FAIL("arch_cpu_stop() returned.");
+}
+
+/**
+ * Confirm a secondary CPU can be stopped again.
+ */
+TEST(cpus, stop)
+{
+	struct spinlock lock = SPINLOCK_INIT;
+	alignas(4096) static uint8_t other_stack[4096];
+
+	/* Start secondary while holding lock. */
+	sl_lock(&lock);
+	dlog("Starting second CPU.\n");
+	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(1), other_stack,
+				   sizeof(other_stack), vm_cpu_entry_stop,
+				   (uintptr_t)&lock),
+		  true);
+
+	/* Wait for CPU to release the lock after starting. */
+	sl_lock(&lock);
+
+	dlog("Waiting for second CPU to stop.\n");
+	/* Wait a while for CPU to stop. */
+	while (arch_cpu_status(hftest_get_cpu_id(1)) != POWER_STATUS_OFF) {
+	}
+	dlog("Second CPU stopped.\n");
+
+	dlog("Starting second CPU again.\n");
+	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(1), other_stack,
+				   sizeof(other_stack), vm_cpu_entry_stop,
+				   (uintptr_t)&lock),
+		  true);
+
+	/* Wait for CPU to release the lock after starting. */
+	sl_lock(&lock);
+
+	dlog("Waiting for second CPU to stop.\n");
+	/* Wait a while for CPU to stop. */
+	while (arch_cpu_status(hftest_get_cpu_id(1)) != POWER_STATUS_OFF) {
+	}
+	dlog("Second CPU stopped.\n");
+}
+
 /** Ensures that the Hafnium SPCI version is reported as expected. */
 TEST(spci, spci_version)
 {
