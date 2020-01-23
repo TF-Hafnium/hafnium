@@ -73,26 +73,3 @@ TEST(unmapped, instruction_unmapped)
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
-
-/**
- * Executing partially unmapped memory traps the VM.
- */
-TEST(unmapped, straddling_instruction_unmapped)
-{
-	struct spci_value run_res;
-	struct mailbox_buffers mb = set_up_mailbox();
-
-	SERVICE_SELECT(SERVICE_VM1, "straddling_instruction_unmapped", mb.send);
-
-	/*
-	 * First we get a message about the memory being donated to us, then we
-	 * get the trap.
-	 */
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MEM_DONATE_32);
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
-		  1);
-}
