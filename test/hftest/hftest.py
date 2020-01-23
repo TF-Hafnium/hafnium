@@ -199,7 +199,7 @@ class QemuDriver(Driver):
         exec_args = [
             "timeout", "--foreground", time_limit,
             os.path.abspath("prebuilts/linux-x64/qemu/qemu-system-aarch64"),
-            "-machine", "virt,virtualization=on,gic_version=3",
+            "-machine", "virt,virtualization=on,gic-version=3",
             "-cpu", cpu, "-smp", "4", "-m", "1G",
             "-nographic", "-nodefaults", "-serial", "stdio",
             "-d", "unimp", "-kernel", os.path.abspath(self.args.kernel),

@@ -40,6 +40,7 @@ copy("tfa_copy") {
   sources = [
     "//prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl2.bin",
     "//prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl31.bin",
+    "//prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl32.bin",
   ]
   outputs = [
     "$root_out_dir/{{source_file_part}}",
