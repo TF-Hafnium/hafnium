@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright 2018 The Hafnium Authors.
 #
@@ -521,8 +521,8 @@ class TestRunner:
             xml)
 
         # Write XML to file.
-        with open(self.artifacts.sponge_xml_path, "w") as f:
-            ET.ElementTree(xml).write(f, encoding='utf-8', xml_declaration=True)
+        ET.ElementTree(xml).write(self.artifacts.sponge_xml_path,
+            encoding='utf-8', xml_declaration=True)
 
         if result.tests_failed > 0:
             print("[x] FAIL:", result.tests_failed, "of", result.tests_run,
