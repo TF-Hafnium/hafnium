@@ -168,7 +168,10 @@ bool fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
 	return true;
 }
 
-bool fdt_find_memory_ranges(const struct fdt_node *root, struct boot_params *p)
+bool fdt_find_memory_ranges(const struct fdt_node *root,
+			    struct string *device_type,
+			    struct mem_range *mem_ranges,
+			    size_t *mem_ranges_count, size_t mem_range_limit)
 {
 	struct fdt_node n = *root;
 	const char *name;
@@ -202,8 +205,8 @@ bool fdt_find_memory_ranges(const struct fdt_node *root, struct boot_params *p)
 		uint32_t size;
 
 		if (!fdt_read_property(&n, "device_type", &data, &size) ||
-		    size != sizeof("memory") ||
-		    memcmp(data, "memory", sizeof("memory")) != 0 ||
+		    strncmp(data, string_data(device_type), STRING_MAX_SIZE) !=
+			    0 ||
 		    !fdt_read_property(&n, "reg", &data, &size)) {
 			continue;
 		}
@@ -217,27 +220,26 @@ bool fdt_find_memory_ranges(const struct fdt_node *root, struct boot_params *p)
 			CHECK(fdt_parse_number(data + address_size, size_size,
 					       &len));
 
-			if (mem_range_index < MAX_MEM_RANGES) {
-				p->mem_ranges[mem_range_index].begin =
+			if (mem_range_index < mem_range_limit) {
+				mem_ranges[mem_range_index].begin =
 					pa_init(addr);
-				p->mem_ranges[mem_range_index].end =
+				mem_ranges[mem_range_index].end =
 					pa_init(addr + len);
 				++mem_range_index;
 			} else {
 				dlog_error(
-					"Found memory range %u in FDT but only "
-					"%u supported, ignoring additional "
-					"range of size %u.\n",
-					mem_range_index, MAX_MEM_RANGES, len);
+					"Found %s range %u in FDT but only %u "
+					"supported, ignoring additional range "
+					"of size %u.\n",
+					string_data(device_type),
+					mem_range_index, mem_range_limit, len);
 			}
 
 			size -= entry_size;
 			data += entry_size;
 		}
 	} while (fdt_next_sibling(&n, &name));
-	p->mem_ranges_count = mem_range_index;
-
-	/* TODO: Check for "reserved-memory" nodes. */
+	*mem_ranges_count = mem_range_index;
 
 	return true;
 }

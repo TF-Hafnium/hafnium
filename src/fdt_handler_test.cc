@@ -106,11 +106,13 @@ TEST(fdt, find_memory_ranges)
 	struct boot_params params = {};
 
 	struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
+	struct string memory = STRING_INIT("memory");
 	fdt = fdt_map(mm_stage1_locked, pa_init((uintpaddr_t)&test_dtb), &n,
 		      &ppool);
 	ASSERT_THAT(fdt, NotNull());
 	ASSERT_TRUE(fdt_find_child(&n, ""));
-	fdt_find_memory_ranges(&n, &params);
+	fdt_find_memory_ranges(&n, &memory, params.mem_ranges,
+			       &params.mem_ranges_count, MAX_MEM_RANGES);
 	ASSERT_TRUE(fdt_unmap(mm_stage1_locked, fdt, &ppool));
 	mm_unlock_stage1(&mm_stage1_locked);
 
