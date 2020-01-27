@@ -76,10 +76,7 @@ done
 # Step 1: make sure it builds.
 #
 
-for proj in $(cd project/ && ls)
-do
-  make PROJECT=${proj}
-done
+make PROJECT=reference
 
 #
 # Step 2: make sure it works.
