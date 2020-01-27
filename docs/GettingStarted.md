@@ -50,16 +50,14 @@ qemu-system-aarch64 -M virt,gic_version=3 -cpu cortex-a57 -nographic -machine vi
 ```
 
 Though it is admittedly not very useful because it doesn't have any virtual
-machines to run. Follow the [Hafnium RAM disk](HafniumRamDisk.md) instructions
-to create an initial RAM disk for Hafnium with Linux as the primary VM.
+machines to run.
 
 Next, you need to create a manifest which will describe the VM to Hafnium.
-Follow the [Manifest](Manifest.md) instructions and build a DTBO with:
+Follow the [Manifest](Manifest.md) instructions and build a DTB with:
 ```
 /dts-v1/;
-/plugin/;
 
-&{/} {
+/ {
 	hypervisor {
 		compatible = "hafnium,hafnium";
 		vm1 {
@@ -71,17 +69,14 @@ Follow the [Manifest](Manifest.md) instructions and build a DTBO with:
 };
 ```
 
-Dump the DTB used by QEMU:
-```shell
-qemu-system-aarch64 -M virt,gic_version=3 -cpu cortex-a57 -nographic -machine virtualization=true -kernel out/reference/qemu_aarch64_clang/hafnium.bin -initrd initrd.img -append "rdinit=/sbin/init" -machine dumpdtb=qemu.dtb
-```
-and follow instructions in [Manifest](Manifest.md) to overlay it with the manifest.
+Follow the [Hafnium RAM disk](HafniumRamDisk.md) instructions
+to create an initial RAM disk for Hafnium with Linux as the primary VM.
 
 The following command line will run Hafnium, with the RAM disk just created,
 which will then boot into the primary Linux VM:
 
 ```shell
-qemu-system-aarch64 -M virt,gic_version=3 -cpu cortex-a57 -nographic -machine virtualization=true -kernel out/reference/qemu_aarch64_clang/hafnium.bin -initrd initrd.img -append "rdinit=/sbin/init" -dtb qemu_with_manifest.dtb
+qemu-system-aarch64 -M virt,gic_version=3 -cpu cortex-a57 -nographic -machine virtualization=true -kernel out/reference/qemu_aarch64_clang/hafnium.bin -initrd initrd.img -append "rdinit=/sbin/init"
 ```
 
 ## Running tests

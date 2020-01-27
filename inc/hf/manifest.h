@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "hf/fdt.h"
 #include "hf/memiter.h"
 #include "hf/spci.h"
 #include "hf/string.h"
@@ -54,6 +53,8 @@ struct manifest {
 
 enum manifest_return_code {
 	MANIFEST_SUCCESS = 0,
+	MANIFEST_ERROR_FILE_SIZE,
+	MANIFEST_ERROR_NO_ROOT_NODE,
 	MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE,
 	MANIFEST_ERROR_NOT_COMPATIBLE,
 	MANIFEST_ERROR_RESERVED_VM_ID,
@@ -70,6 +71,6 @@ enum manifest_return_code {
 };
 
 enum manifest_return_code manifest_init(struct manifest *manifest,
-					const struct fdt_node *fdt_root);
+					struct memiter *manifest_fdt);
 
 const char *manifest_strerror(enum manifest_return_code ret_code);

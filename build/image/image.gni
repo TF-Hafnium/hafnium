@@ -187,30 +187,26 @@ template("linux_initrd") {
 }
 
 template("device_tree") {
-  action_foreach(target_name) {
+  action(target_name) {
     forward_variables_from(invoker,
                            [
                              "testonly",
-                             "sources",
                              "deps",
                            ])
     script = "//build/image/dtc.py"
 
-    if (defined(invoker.output_pattern)) {
-      output_pattern = invoker.output_pattern
-    } else {
-      output_pattern = "${target_out_dir}/{{source_name_part}}.dtb"
-    }
-
+    sources = [
+      invoker.source,
+    ]
     outputs = [
-      output_pattern,
+      invoker.output,
     ]
     args = [
       "compile",
       "-i",
-      "{{source}}",
+      rebase_path(sources[0]),
       "-o",
-      rebase_path(output_pattern),
+      rebase_path(outputs[0]),
     ]
   }
 }
@@ -236,20 +232,14 @@ template("incbin") {
 
 # Build the initial RAM disk for the hypervisor.
 template("initrd") {
-  assert(defined(invoker.primary_name),
-         "initrd() must specify a \"primary_name\" value")
-  assert(defined(invoker.primary_vm),
-         "initrd() must specify a \"primary_vm\" value")
-
-  manifest_target = "${target_name}__manifest"
   base_out_dir = "${target_out_dir}/${target_name}"
+  manifest_target = "${target_name}__manifest"
+  manifest_file = "${base_out_dir}/manifest.dtb"
 
   # Generate manifest.dtbo
   device_tree(manifest_target) {
-    sources = [
-      invoker.manifest,
-    ]
-    output_pattern = "${base_out_dir}/{{source_name_part}}.dtbo"
+    source = invoker.manifest
+    output = manifest_file
   }
 
   action(target_name) {
@@ -259,32 +249,41 @@ template("initrd") {
     initrd_file = "${base_out_dir}/initrd.img"
     initrd_staging = "${base_out_dir}/initrd"
 
-    # Cannot get target outputs here as they are defined in a different file.
-    primary_vm_image = get_label_info(invoker.primary_vm, "target_out_dir") +
-                       "/" + get_label_info(invoker.primary_vm, "name") + ".bin"
-
     deps = [
       ":${manifest_target}",
-      invoker.primary_vm,
     ]
     args = [
-      "--file",
-      invoker.primary_name,
-      rebase_path(primary_vm_image),
       "--staging",
       rebase_path(initrd_staging),
       "--output",
       rebase_path(initrd_file),
+      "--file",
+      "manifest.dtb",
+      rebase_path(manifest_file),
     ]
 
-    if (defined(invoker.primary_initrd)) {
-      deps += [ invoker.primary_initrd ]
-      primary_initrd_outputs = get_target_outputs(invoker.primary_initrd)
+    if (defined(invoker.primary_vm)) {
+      # Cannot get target outputs here as they are defined in a different file.
+      primary_vm_image =
+          get_label_info(invoker.primary_vm, "target_out_dir") + "/" +
+          get_label_info(invoker.primary_vm, "name") + ".bin"
+
+      deps += [ invoker.primary_vm ]
       args += [
         "--file",
-        "initrd.img",
-        rebase_path(primary_initrd_outputs[0]),
+        invoker.primary_name,
+        rebase_path(primary_vm_image),
       ]
+
+      if (defined(invoker.primary_initrd)) {
+        deps += [ invoker.primary_initrd ]
+        primary_initrd_outputs = get_target_outputs(invoker.primary_initrd)
+        args += [
+          "--file",
+          "initrd.img",
+          rebase_path(primary_initrd_outputs[0]),
+        ]
+      }
     }
 
     # Add the info about the secondary VMs. The information about the VMs is

@@ -306,9 +306,10 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
  * Parse manifest from FDT.
  */
 enum manifest_return_code manifest_init(struct manifest *manifest,
-					const struct fdt_node *fdt_root)
+					struct memiter *manifest_fdt)
 {
 	char vm_name_buf[VM_NAME_BUF_SIZE];
+	const struct fdt_header *fdt;
 	struct fdt_node hyp_node;
 	struct stringlist_iter compatible_list;
 	size_t i = 0;
@@ -316,8 +317,18 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 
 	memset_s(manifest, sizeof(*manifest), 0, sizeof(*manifest));
 
+	fdt = (const struct fdt_header *)memiter_base(manifest_fdt);
+	if (memiter_size(manifest_fdt) != fdt_total_size(fdt)) {
+		return MANIFEST_ERROR_FILE_SIZE;
+	}
+
 	/* Find hypervisor node. */
-	hyp_node = *fdt_root;
+	if (!fdt_root_node(&hyp_node, fdt)) {
+		return MANIFEST_ERROR_NO_ROOT_NODE;
+	}
+	if (!fdt_find_child(&hyp_node, "")) {
+		return MANIFEST_ERROR_NO_ROOT_NODE;
+	}
 	if (!fdt_find_child(&hyp_node, "hypervisor")) {
 		return MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE;
 	}
@@ -374,6 +385,10 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	switch (ret_code) {
 	case MANIFEST_SUCCESS:
 		return "Success";
+	case MANIFEST_ERROR_FILE_SIZE:
+		return "Total size in header does not match file size";
+	case MANIFEST_ERROR_NO_ROOT_NODE:
+		return "Could not find root node in manifest";
 	case MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE:
 		return "Could not find \"hypervisor\" node in manifest";
 	case MANIFEST_ERROR_NOT_COMPATIBLE:

@@ -115,7 +115,6 @@ DriverArgs = collections.namedtuple("DriverArgs", [
         "artifacts",
         "kernel",
         "initrd",
-        "manifest",
         "vm_args",
         "cpu"
     ])
@@ -185,14 +184,6 @@ class Driver:
             log_content + "\r\n\r\n")
         return log_content
 
-    def overlay_dtb(self, run_state, base_dtb, overlay_dtb, out_dtb):
-        """Overlay `overlay_dtb` over `base_dtb` into `out_dtb`."""
-        dtc_args = [
-            DTC_SCRIPT, "overlay",
-            out_dtb, base_dtb, overlay_dtb,
-        ]
-        self.exec_logged(run_state, dtc_args)
-
 
 class QemuDriver(Driver):
     """Driver which runs tests in QEMU."""
@@ -200,8 +191,7 @@ class QemuDriver(Driver):
     def __init__(self, args):
         Driver.__init__(self, args)
 
-    def gen_exec_args(self, test_args, is_long_running, dtb_path=None,
-            dumpdtb_path=None):
+    def gen_exec_args(self, test_args, is_long_running):
         """Generate command line arguments for QEMU."""
         time_limit = "120s" if is_long_running else "10s"
         # If no CPU configuration is selected, then test against the maximum
@@ -216,12 +206,6 @@ class QemuDriver(Driver):
             "-d", "unimp", "-kernel", self.args.kernel,
         ]
 
-        if dtb_path:
-            exec_args += ["-dtb", dtb_path]
-
-        if dumpdtb_path:
-            exec_args += ["-machine", "dumpdtb=" + dumpdtb_path]
-
         if self.args.initrd:
             exec_args += ["-initrd", self.args.initrd]
 
@@ -231,29 +215,13 @@ class QemuDriver(Driver):
 
         return exec_args
 
-    def dump_dtb(self, run_state, test_args, path):
-        dumpdtb_args = self.gen_exec_args(test_args, False, dumpdtb_path=path)
-        self.exec_logged(run_state, dumpdtb_args)
-
     def run(self, run_name, test_args, is_long_running):
         """Run test given by `test_args` in QEMU."""
         run_state = self.start_run(run_name)
 
         try:
-            dtb_path = None
-
-            # If manifest DTBO specified, dump DTB from QEMU and overlay them.
-            if self.args.manifest:
-                base_dtb_path = self.args.artifacts.create_file(
-                    run_name, ".base.dtb")
-                dtb_path = self.args.artifacts.create_file(run_name, ".dtb")
-                self.dump_dtb(run_state, test_args, base_dtb_path)
-                self.overlay_dtb(
-                    run_state, base_dtb_path, self.args.manifest, dtb_path)
-
             # Execute test in QEMU..
-            exec_args = self.gen_exec_args(test_args, is_long_running,
-                    dtb_path=dtb_path)
+            exec_args = self.gen_exec_args(test_args, is_long_running)
             self.exec_logged(run_state, exec_args)
         except DriverRunException:
             pass
@@ -335,8 +303,7 @@ class FvpDriver(Driver):
     def run(self, run_name, test_args, is_long_running):
         run_state = self.start_run(run_name)
 
-        base_dts_path = self.args.artifacts.create_file(run_name, ".base.dts")
-        base_dtb_path = self.args.artifacts.create_file(run_name, ".base.dtb")
+        dts_path = self.args.artifacts.create_file(run_name, ".dts")
         dtb_path = self.args.artifacts.create_file(run_name, ".dtb")
         uart0_log_path = self.args.artifacts.create_file(run_name, ".uart0.log")
         uart1_log_path = self.args.artifacts.create_file(run_name, ".uart1.log")
@@ -349,20 +316,13 @@ class FvpDriver(Driver):
 
         try:
             # Create a DT to pass to FVP.
-            self.gen_dts(base_dts_path, test_args, initrd_start, initrd_end)
+            self.gen_dts(dts_path, test_args, initrd_start, initrd_end)
 
             # Compile DTS to DTB.
             dtc_args = [
-                DTC_SCRIPT, "compile", "-i", base_dts_path, "-o", base_dtb_path,
+                DTC_SCRIPT, "compile", "-i", dts_path, "-o", dtb_path,
             ]
             self.exec_logged(run_state, dtc_args)
-
-            # If manifest DTBO specified, overlay it.
-            if self.args.manifest:
-                self.overlay_dtb(
-                    run_state, base_dtb_path, self.args.manifest, dtb_path)
-            else:
-                dtb_path = base_dtb_path
 
             # Run FVP.
             fvp_args = self.gen_fvp_args(
@@ -552,12 +512,10 @@ def Main():
     # Resolve some paths.
     image = os.path.join(args.out, args.image + ".bin")
     initrd = None
-    manifest = None
     image_name = args.image
     if args.initrd:
         initrd_dir = os.path.join(args.out_initrd, "obj", args.initrd)
         initrd = os.path.join(initrd_dir, "initrd.img")
-        manifest = os.path.join(initrd_dir, "manifest.dtbo")
         image_name += "_" + args.initrd
     vm_args = args.vm_args or ""
 
@@ -565,7 +523,7 @@ def Main():
     artifacts = ArtifactsManager(os.path.join(args.log, image_name))
 
     # Create a driver for the platform we want to test on.
-    driver_args = DriverArgs(artifacts, image, initrd, manifest, vm_args,
+    driver_args = DriverArgs(artifacts, image, initrd, vm_args,
         args.cpu)
     if args.fvp:
         driver = FvpDriver(driver_args)

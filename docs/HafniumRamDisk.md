@@ -3,9 +3,9 @@
 Hafnium expects to find the following files in the root directory of its RAM
 disk:
 
-*   `vmlinuz` -- the kernel of the primary VM.
-*   `initrd.img` -- the initial ramdisk of the primary VM.
-*   kernels for the secondary VMs, whose names are described in the manifest.
+*   `manifest.dtb` -- configuration file in DeviceTree format (required)
+*   kernels for the VMs, whose names are described in the manifest (optional)
+*   initrd of the primary VM, whose name is described in the manifest (optional)
 
 Follow the [preparing Linux](PreparingLinux.md) instructions to produce
 `vmlinuz` and `initrd.img` for a basic Linux primary VM.

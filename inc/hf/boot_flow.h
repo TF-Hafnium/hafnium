@@ -21,8 +21,8 @@
 #include "hf/memiter.h"
 #include "hf/mm.h"
 
-bool boot_flow_init(const struct fdt_node *fdt_root, struct manifest *manifest,
-		    struct boot_params *boot_params);
+bool boot_flow_get_params(struct boot_params *p,
+			  const struct fdt_node *fdt_root);
 
 bool boot_flow_update(struct mm_stage1_locked stage1_locked,
 		      const struct manifest *manifest,

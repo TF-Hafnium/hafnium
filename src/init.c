@@ -71,12 +71,15 @@ void one_time_init_mm(void)
  */
 void one_time_init(void)
 {
+	struct string manifest_fname = STRING_INIT("manifest.dtb");
 	struct fdt_header *fdt;
 	struct fdt_node fdt_root;
 	struct manifest manifest;
+	enum manifest_return_code manifest_ret;
 	struct boot_params params;
 	struct boot_params_update update;
 	struct memiter cpio;
+	struct memiter manifest_it;
 	void *initrd;
 	size_t i;
 	struct mm_stage1_locked mm_stage1_locked;
@@ -92,26 +95,16 @@ void one_time_init(void)
 	fdt = fdt_map(mm_stage1_locked, plat_boot_flow_get_fdt_addr(),
 		      &fdt_root, &ppool);
 	if (fdt == NULL) {
-		panic("Unable to map FDT.\n");
+		panic("Unable to map FDT.");
 	}
 
 	if (!fdt_find_child(&fdt_root, "")) {
-		panic("Unable to find FDT root node.\n");
+		panic("Unable to find FDT root node.");
 	}
 
-	if (!boot_flow_init(&fdt_root, &manifest, &params)) {
-		panic("Could not parse data from FDT.");
+	if (!boot_flow_get_params(&params, &fdt_root)) {
+		panic("Could not parse boot params.");
 	}
-
-	if (!plat_iommu_init(&fdt_root, mm_stage1_locked, &ppool)) {
-		panic("Could not initialize IOMMUs.");
-	}
-
-	if (!fdt_unmap(mm_stage1_locked, fdt, &ppool)) {
-		panic("Unable to unmap FDT.\n");
-	}
-
-	cpu_module_init(params.cpu_ids, params.cpu_count);
 
 	for (i = 0; i < params.mem_ranges_count; ++i) {
 		dlog("Memory range:  %#x - %#x\n",
@@ -131,6 +124,26 @@ void one_time_init(void)
 
 	memiter_init(&cpio, initrd,
 		     pa_difference(params.initrd_begin, params.initrd_end));
+
+	if (!cpio_get_file(&cpio, &manifest_fname, &manifest_it)) {
+		panic("Could not find manifest in initrd.");
+	}
+
+	manifest_ret = manifest_init(&manifest, &manifest_it);
+	if (manifest_ret != MANIFEST_SUCCESS) {
+		panic("Could not parse manifest: %s.",
+		      manifest_strerror(manifest_ret));
+	}
+
+	if (!plat_iommu_init(&fdt_root, mm_stage1_locked, &ppool)) {
+		panic("Could not initialize IOMMUs.");
+	}
+
+	if (!fdt_unmap(mm_stage1_locked, fdt, &ppool)) {
+		panic("Unable to unmap FDT.");
+	}
+
+	cpu_module_init(params.cpu_ids, params.cpu_count);
 
 	/* Load all VMs. */
 	update.reserved_ranges_count = 0;

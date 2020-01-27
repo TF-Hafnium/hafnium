@@ -8,9 +8,8 @@ The format of the manifest is a simple DeviceTree overlay:
 
 ```
 /dts-v1/;
-/plugin/;
 
-&{/} {
+/ {
 	hypervisor {
 		compatible = "hafnium,hafnium";
 
@@ -31,10 +30,6 @@ The format of the manifest is a simple DeviceTree overlay:
 };
 ```
 
-Note: `&{/}` is a syntactic sugar expanded by the DTC compiler. Make sure to
-use the DTC in `prebuilts/` as the version packaged with your OS may not support
-it yet.
-
 ## Example
 
 The following manifest defines a primary VM with two secondary VMs. The first
@@ -47,9 +42,8 @@ number of CPUs as the hardware, a kernel image called `vmlinuz` and a ramdisk
 
 ```
 /dts-v1/;
-/plugin/;
 
-&{/} {
+/ {
 	hypervisor {
 		compatible = "hafnium,hafnium";
 
@@ -84,15 +78,10 @@ number of CPUs as the hardware, a kernel image called `vmlinuz` and a ramdisk
 
 ## Compiling
 
-Hafnium expects the manifest as part of the board FDT, i.e. DeviceTree in binary
-format (DTB).
+Hafnium expects the manifest inside its [RAM disk](HafniumRamDisk.md),
+in DeviceTree's binary format (DTB).
 
-First, compile the manifest into a DTBO (binary overlay):
+Compile the manifest's source file into a DTB with:
 ```shell
-prebuilts/linux-x64/dtc/dtc -I dts -O dtb --out-version 17 -o manifest.dtbo <manifest_source_file>
-```
-
-Then overlay it with the DTB of your board:
-```shell
-prebuilts/linux-x64/dtc/fdtoverlay -i <board DTB> -o <output DTB> manifest.dtbo
+prebuilts/linux-x64/dtc/dtc -I dts -O dtb --out-version 17 -o manifest.dtb <manifest_source_file>
 ```

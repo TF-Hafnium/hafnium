@@ -463,7 +463,7 @@ size_t fdt_header_size(void)
 	return sizeof(struct fdt_header);
 }
 
-uint32_t fdt_total_size(struct fdt_header *hdr)
+uint32_t fdt_total_size(const struct fdt_header *hdr)
 {
 	return be32toh(hdr->totalsize);
 }
