@@ -294,6 +294,9 @@ template("aarch64_common_toolchain") {
       plat_boot_flow = invoker.boot_flow
       plat_console = invoker.console
       plat_iommu = invoker.iommu
+      if (defined(invoker.stdout)) {
+        stdout = invoker.stdout
+      }
       if (defined(invoker.max_image_size)) {
         plat_max_image_size = invoker.max_image_size
       }
@@ -344,11 +347,12 @@ template("aarch64_toolchains") {
                              "gicr_base_address",
                              "max_cpus",
                              "toolchain_args",
+                             "console",
                            ])
     cpu = "${invoker.cpu}+fp"
     boot_flow = "//src/arch/fake:boot_flow"
-    console = "//src/arch/aarch64/hftest:console"
     iommu = "//src/iommu:absent"
+    stdout = "//src/arch/aarch64/hftest:stdout"
 
     # Nonsense values because they are required but shouldn't be used.
     heap_pages = 0

@@ -75,9 +75,9 @@ source_set("registers") {
   ]
 }
 
-source_set("console") {
+source_set("stdout") {
   sources = [
-    "console.c",
+    "stdout.c",
   ]
 
   deps = [

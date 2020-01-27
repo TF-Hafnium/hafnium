@@ -19,10 +19,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "hf/plat/console.h"
 #include "hf/spci.h"
 #include "hf/spinlock.h"
 #include "hf/std.h"
+#include "hf/stdout.h"
 
 /* Keep macro alignment */
 /* clang-format off */
@@ -81,7 +81,7 @@ static void dlog_putchar(char c)
 {
 	dlog_buffer[dlog_buffer_offset] = c;
 	dlog_buffer_offset = (dlog_buffer_offset + 1) % DLOG_BUFFER_SIZE;
-	plat_console_putchar(c);
+	stdout_putchar(c);
 }
 
 /**

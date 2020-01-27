@@ -15,6 +15,11 @@
 import("//build/image/image.gni")
 import("//build/toolchain/platform.gni")
 
+declare_args() {
+  # Target which implements the standard output interface.
+  stdout = ":stdout"
+}
+
 # The hypervisor image.
 hypervisor("hafnium") {
   deps = [
@@ -99,6 +104,17 @@ source_set("std") {
   ]
 }
 
+# Default implementation of stdout which sends the character to the
+# 'plat_console' driver.
+source_set("stdout") {
+  sources = [
+    "stdout.c",
+  ]
+  deps = [
+    plat_console,
+  ]
+}
+
 # Debug code that is not specific to a certain image so can be shared.
 source_set("dlog") {
   sources = [
@@ -107,7 +123,7 @@ source_set("dlog") {
 
   deps = [
     ":std",
-    plat_console,
+    stdout,
   ]
 }
 
