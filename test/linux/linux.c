@@ -78,7 +78,7 @@ TEST(linux, socket_echo_hafnium)
 	int socket_id;
 	struct hf_sockaddr addr;
 	const char send_buf[] = "The quick brown fox jumps over the lazy dogs.";
-	size_t send_len = strlen(send_buf);
+	size_t send_len = sizeof(send_buf);
 	char resp_buf[MAX_BUF_SIZE];
 	ssize_t recv_len;
 

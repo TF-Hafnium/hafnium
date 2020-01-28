@@ -29,6 +29,8 @@
 
 void test_main(int argc, const char *argv[])
 {
+	static const char json_command[] = "json";
+	static const char run_command[] = "run";
 	const char *command;
 
 	if (argc < 2) {
@@ -39,12 +41,12 @@ void test_main(int argc, const char *argv[])
 
 	hftest_use_registered_list();
 
-	if (strcmp(command, "json") == 0) {
+	if (strncmp(command, json_command, sizeof(json_command)) == 0) {
 		hftest_json();
 		return;
 	}
 
-	if (strcmp(command, "run") == 0) {
+	if (strncmp(command, run_command, sizeof(run_command)) == 0) {
 		struct memiter suite_name;
 		struct memiter test_name;
 

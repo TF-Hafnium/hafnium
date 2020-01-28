@@ -87,18 +87,19 @@ int memcmp(const void *a, const void *b, size_t n)
 	return 0;
 }
 
-int strcmp(const char *a, const char *b)
+int strncmp(const char *a, const char *b, size_t n)
 {
-	const char *x = a;
-	const char *y = b;
+	char x = 0;
+	char y = 0;
 
-	while (*x != 0 && *y != 0) {
-		if (*x != *y) {
-			return *x - *y;
+	while (n > 0) {
+		x = *a++;
+		y = *b++;
+		if (x == 0 || x != y) {
+			break;
 		}
-		x++;
-		y++;
+		--n;
 	}
 
-	return *x - *y;
+	return x - y;
 }

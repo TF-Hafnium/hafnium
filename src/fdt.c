@@ -58,6 +58,8 @@ struct fdt_tokenizer {
 #define FDT_VERSION 17
 #define FDT_MAGIC 0xd00dfeed
 
+#define FDT_PROPERTY_NAME_MAX_SIZE 32
+
 #define FDT_TOKEN_ALIGNMENT sizeof(uint32_t)
 
 static void fdt_tokenizer_init(struct fdt_tokenizer *t, const char *strs,
@@ -272,7 +274,7 @@ bool fdt_read_property(const struct fdt_node *node, const char *name,
 	fdt_tokenizer_init(&t, node->strs, node->begin, node->end);
 
 	while (fdt_next_property(&t, &prop_name, buf, size)) {
-		if (!strcmp(prop_name, name)) {
+		if (!strncmp(prop_name, name, FDT_PROPERTY_NAME_MAX_SIZE)) {
 			return true;
 		}
 	}
@@ -363,7 +365,7 @@ bool fdt_find_child(struct fdt_node *node, const char *child)
 	fdt_skip_properties(&t);
 
 	while (fdt_next_subnode(&t, &name)) {
-		if (!strcmp(name, child)) {
+		if (!strncmp(name, child, FDT_PROPERTY_NAME_MAX_SIZE)) {
 			node->begin = t.cur;
 			return true;
 		}

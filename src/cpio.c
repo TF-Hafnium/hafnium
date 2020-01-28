@@ -44,6 +44,7 @@ struct cpio_header {
 static bool cpio_next(struct memiter *iter, const char **name,
 		      const void **contents, size_t *size)
 {
+	static const char trailer[] = "TRAILER!!!";
 	size_t len;
 	struct memiter lit = *iter;
 	const struct cpio_header *h = (const struct cpio_header *)lit.next;
@@ -71,7 +72,7 @@ static bool cpio_next(struct memiter *iter, const char **name,
 	/* TODO: Check that string is null-terminated. */
 
 	/* Stop enumerating files when we hit the end marker. */
-	if (!strcmp(*name, "TRAILER!!!")) {
+	if (!strncmp(*name, trailer, sizeof(trailer))) {
 		return false;
 	}
 
@@ -94,7 +95,7 @@ bool cpio_get_file(const struct memiter *cpio, const struct string *name,
 	struct memiter iter = *cpio;
 
 	while (cpio_next(&iter, &fname, &fcontents, &fsize)) {
-		if (!strcmp(fname, string_data(name))) {
+		if (!strncmp(fname, string_data(name), STRING_MAX_SIZE)) {
 			memiter_init(it, fcontents, fsize);
 			return true;
 		}
