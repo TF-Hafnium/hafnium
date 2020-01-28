@@ -26,6 +26,7 @@ bool boot_flow_get_params(struct boot_params *p,
 			  const struct fdt_node *fdt_root)
 {
 	struct string memory = STRING_INIT("memory");
+	struct string device_memory = STRING_INIT("device-memory");
 
 	p->mem_ranges_count = 0;
 	p->kernel_arg = plat_boot_flow_get_kernel_arg();
@@ -34,7 +35,10 @@ bool boot_flow_get_params(struct boot_params *p,
 					       &p->initrd_end) &&
 	       fdt_find_cpus(fdt_root, p->cpu_ids, &p->cpu_count) &&
 	       fdt_find_memory_ranges(fdt_root, &memory, p->mem_ranges,
-				      &p->mem_ranges_count, MAX_MEM_RANGES);
+				      &p->mem_ranges_count, MAX_MEM_RANGES) &&
+	       fdt_find_memory_ranges(
+		       fdt_root, &device_memory, p->device_mem_ranges,
+		       &p->device_mem_ranges_count, MAX_DEVICE_MEM_RANGES);
 }
 
 /**

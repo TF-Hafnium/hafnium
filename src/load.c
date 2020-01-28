@@ -155,19 +155,25 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		goto out;
 	}
 
-	/*
-	 * Map 1TB of address space as device memory to, most likely, make all
-	 * devices available to the primary VM.
-	 *
-	 * TODO: We should do a whitelist rather than a blacklist.
-	 */
-	if (!vm_identity_map(vm_locked, pa_init(0),
-			     pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
-			     MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
-		dlog_error(
-			"Unable to initialise address space for primary vm\n");
-		ret = false;
-		goto out;
+	if (params->device_mem_ranges_count == 0) {
+		/*
+		 * Map 1TB of address space as device memory to, most likely,
+		 * make all devices available to the primary VM.
+		 *
+		 * TODO: remove this once all targets provide valid ranges.
+		 */
+		dlog_warning("Device memory not provided, defaulting to 1 TB.");
+
+		if (!vm_identity_map(
+			    vm_locked, pa_init(0),
+			    pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
+			    MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
+			dlog_error(
+				"Unable to initialise address space for "
+				"primary vm\n");
+			ret = false;
+			goto out;
+		}
 	}
 
 	/* Map normal memory as such to permit caching, execution, etc. */
@@ -178,6 +184,19 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 				     NULL)) {
 			dlog_error(
 				"Unable to initialise memory for primary vm\n");
+			ret = false;
+			goto out;
+		}
+	}
+
+	/* Map device memory as such to prevent execution, speculation etc. */
+	for (i = 0; i < params->device_mem_ranges_count; ++i) {
+		if (!vm_identity_map(
+			    vm_locked, params->device_mem_ranges[i].begin,
+			    params->device_mem_ranges[i].end,
+			    MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
+			dlog("Unable to initialise device memory for primary "
+			     "vm\n");
 			ret = false;
 			goto out;
 		}

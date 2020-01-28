@@ -25,6 +25,7 @@
 #include "hf/mpool.h"
 
 #define MAX_MEM_RANGES 20
+#define MAX_DEVICE_MEM_RANGES 10
 
 struct mem_range {
 	paddr_t begin;
@@ -36,6 +37,8 @@ struct boot_params {
 	size_t cpu_count;
 	struct mem_range mem_ranges[MAX_MEM_RANGES];
 	size_t mem_ranges_count;
+	struct mem_range device_mem_ranges[MAX_DEVICE_MEM_RANGES];
+	size_t device_mem_ranges_count;
 	paddr_t initrd_begin;
 	paddr_t initrd_end;
 	uintreg_t kernel_arg;
