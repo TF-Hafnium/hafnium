@@ -230,6 +230,25 @@ template("incbin") {
   }
 }
 
+template("incbin_target") {
+  incbin(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "deps",
+                             "section",
+                           ])
+    target_outputs = get_target_outputs(invoker.target)
+    target_file = target_outputs[0]
+    sources = [
+      target_file,
+    ]
+    deps = [
+      invoker.target,
+    ]
+  }
+}
+
 # Build the initial RAM disk for the hypervisor.
 template("initrd") {
   base_out_dir = "${target_out_dir}/${target_name}"
