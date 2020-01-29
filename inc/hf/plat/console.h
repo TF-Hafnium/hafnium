@@ -26,5 +26,8 @@ void plat_console_init(void);
 void plat_console_mm_init(struct mm_stage1_locked stage1_locked,
 			  struct mpool *ppool);
 
-/** Puts a single character on the console. */
+/** Puts a single character on the console. This is a blocking call. */
 void plat_console_putchar(char c);
+
+/** Gets a single character from the console. This is a blocking call. */
+char plat_console_getchar(void);

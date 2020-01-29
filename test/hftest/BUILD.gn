@@ -14,6 +14,11 @@
 
 import("//build/toolchain/platform.gni")
 
+declare_args() {
+  hftest_ctrl = ":ctrl_fdt"
+  hftest_device = ""
+}
+
 config("hftest_config") {
   include_dirs = [ "//test/inc" ]
 }
@@ -96,12 +101,12 @@ source_set("hftest_standalone") {
     ":mm",
     ":power_mgmt",
     "//src:dlog",
-    "//src:fdt",
     "//src:memiter",
     "//src/arch/${plat_arch}:entry",
     "//src/arch/${plat_arch}/hftest:entry",
     "//src/arch/${plat_arch}/hftest:interrupts",
     "//src/arch/${plat_arch}/hftest:power_mgmt",
+    hftest_ctrl,
   ]
 }
 
@@ -152,4 +157,40 @@ source_set("power_mgmt") {
     ":mm",
     "//src/arch/${plat_arch}/hftest:power_mgmt",
   ]
+}
+
+source_set("ctrl_fdt") {
+  testonly = true
+
+  public_configs = [ ":hftest_config" ]
+
+  sources = [
+    "ctrl_fdt.c",
+  ]
+
+  deps = [
+    "//src:dlog",
+    "//src:fdt",
+    "//src:memiter",
+  ]
+}
+
+source_set("ctrl_uart") {
+  testonly = true
+
+  public_configs = [ ":hftest_config" ]
+
+  sources = [
+    "ctrl_uart.c",
+  ]
+
+  deps = [
+    "//src:dlog",
+    "//src:memiter",
+    plat_console,
+  ]
+
+  if (hftest_device != "") {
+    deps += [ hftest_device ]
+  }
 }

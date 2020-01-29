@@ -19,8 +19,6 @@
 
 #include "hf/arch/vm/interrupts.h"
 
-#include "hf/fdt.h"
-#include "hf/memiter.h"
 #include "hf/mm.h"
 
 #include "hftest_common.h"
@@ -33,10 +31,7 @@ extern struct hftest_test hftest_end[];
 
 void kmain(const struct fdt_header *fdt)
 {
-	struct fdt_node n;
-	const char *bootargs;
-	uint32_t bootargs_size;
-	struct memiter bootargs_iter;
+	struct memiter command_line;
 	struct memiter command;
 
 	/*
@@ -44,7 +39,7 @@ void kmain(const struct fdt_header *fdt)
 	 */
 	if ((VM_TOOLCHAIN == 1) && !hftest_mm_init()) {
 		HFTEST_LOG("Memory initialization failed.");
-		return;
+		goto out;
 	}
 
 	/*
@@ -55,55 +50,40 @@ void kmain(const struct fdt_header *fdt)
 
 	hftest_use_list(hftest_begin, hftest_end - hftest_begin);
 
-	if (!fdt_root_node(&n, fdt)) {
-		HFTEST_LOG("FDT failed validation.");
-		return;
+	if (!hftest_ctrl_start(fdt, &command_line)) {
+		HFTEST_LOG("Unable to read the command line.");
+		goto out;
 	}
 
-	if (!fdt_find_child(&n, "")) {
-		HFTEST_LOG("Unable to find root node in FDT.");
-		return;
-	}
-
-	if (!fdt_find_child(&n, "chosen")) {
-		HFTEST_LOG("Unable to find 'chosen' node in FDT.");
-		return;
-	}
-
-	if (!fdt_read_property(&n, "bootargs", &bootargs, &bootargs_size)) {
-		HFTEST_LOG("Unable to read bootargs.");
-		return;
-	}
-
-	/* Remove null terminator. */
-	memiter_init(&bootargs_iter, bootargs, bootargs_size - 1);
-
-	if (!memiter_parse_str(&bootargs_iter, &command)) {
+	if (!memiter_parse_str(&command_line, &command)) {
 		HFTEST_LOG("Unable to parse command.");
-		return;
+		goto out;
 	}
 
 	if (memiter_iseq(&command, "json")) {
 		hftest_json();
-		return;
+		goto out;
 	}
 
 	if (memiter_iseq(&command, "run")) {
 		struct memiter suite_name;
 		struct memiter test_name;
 
-		if (!memiter_parse_str(&bootargs_iter, &suite_name)) {
+		if (!memiter_parse_str(&command_line, &suite_name)) {
 			HFTEST_LOG("Unable to parse test suite.");
-			return;
+			goto out;
 		}
 
-		if (!memiter_parse_str(&bootargs_iter, &test_name)) {
+		if (!memiter_parse_str(&command_line, &test_name)) {
 			HFTEST_LOG("Unable to parse test.");
-			return;
+			goto out;
 		}
 		hftest_run(suite_name, test_name, fdt);
-		return;
+		goto out;
 	}
 
 	hftest_help();
+
+out:
+	hftest_ctrl_finish();
 }

@@ -28,12 +28,16 @@ import datetime
 import json
 import os
 import re
+import serial
 import subprocess
 import sys
 
 HFTEST_LOG_PREFIX = "[hftest] "
 HFTEST_LOG_FAILURE_PREFIX = "Failure:"
 HFTEST_LOG_FINISHED = "FINISHED"
+
+HFTEST_CTRL_GET_COMMAND_LINE = "[hftest_ctrl:get_command_line]"
+HFTEST_CTRL_FINISHED = "[hftest_ctrl:finished]"
 
 HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
@@ -116,7 +120,9 @@ DriverArgs = collections.namedtuple("DriverArgs", [
         "kernel",
         "initrd",
         "vm_args",
-        "cpu"
+        "cpu",
+        "serial_dev",
+        "serial_baudrate",
     ])
 
 
@@ -337,6 +343,42 @@ class FvpDriver(Driver):
         return self.finish_run(run_state)
 
 
+class SerialDriver(Driver):
+    """Driver which communicates with a device over the serial port."""
+
+    def __init__(self, args):
+        Driver.__init__(self, args)
+        self.tty_file = self.args.serial_dev
+        self.baudrate = self.args.serial_baudrate
+        input("Press ENTER and then reset the device...")
+
+    def run(self, run_name, test_args, is_long_running):
+        """Communicate `test_args` to the device over the serial port."""
+        run_state = self.start_run(run_name)
+
+        with serial.Serial(self.tty_file, self.baudrate, timeout=10) as ser:
+            with open(run_state.log_path, "a") as f:
+                while True:
+                    # Read one line from the serial port.
+                    line = ser.readline().decode('utf-8')
+                    if len(line) == 0:
+                        # Timeout
+                        run_state.set_ret_code(124)
+                        input("Timeout. " +
+                            "Press ENTER and then reset the device...")
+                        break
+                    # Write the line to the log file.
+                    f.write(line)
+                    if HFTEST_CTRL_GET_COMMAND_LINE in line:
+                        # Device is waiting for `test_args`.
+                        ser.write(test_args.encode('ascii'))
+                        ser.write(b'\r')
+                    elif HFTEST_CTRL_FINISHED in line:
+                        # Device has finished running this test and will reboot.
+                        break
+        return self.finish_run(run_state)
+
+
 # Tuple used to return information about the results of running a set of tests.
 TestRunnerResult = collections.namedtuple("TestRunnerResult", [
         "tests_run",
@@ -503,7 +545,9 @@ def Main():
     parser.add_argument("--suite")
     parser.add_argument("--test")
     parser.add_argument("--vm_args")
-    parser.add_argument("--fvp", action="store_true")
+    parser.add_argument("--driver", default="qemu")
+    parser.add_argument("--serial-dev", default="/dev/ttyUSB0")
+    parser.add_argument("--serial-baudrate", type=int, default=115200)
     parser.add_argument("--skip-long-running-tests", action="store_true")
     parser.add_argument("--cpu",
         help="Selects the CPU configuration for the run environment.")
@@ -523,12 +567,17 @@ def Main():
     artifacts = ArtifactsManager(os.path.join(args.log, image_name))
 
     # Create a driver for the platform we want to test on.
-    driver_args = DriverArgs(artifacts, image, initrd, vm_args,
-        args.cpu)
-    if args.fvp:
-        driver = FvpDriver(driver_args)
-    else:
+    driver_args = DriverArgs(artifacts, image, initrd, vm_args, args.cpu,
+            args.serial_dev, args.serial_baudrate)
+
+    if args.driver == "qemu":
         driver = QemuDriver(driver_args)
+    elif args.driver == "fvp":
+        driver = FvpDriver(driver_args)
+    elif args.driver == "serial":
+        driver = SerialDriver(driver_args)
+    else:
+        raise Exception("Unknown driver name: {}".format(args.driver))
 
     # Create class which will drive test execution.
     runner = TestRunner(artifacts, driver, image_name, args.suite, args.test,

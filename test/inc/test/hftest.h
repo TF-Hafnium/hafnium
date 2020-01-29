@@ -19,8 +19,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdnoreturn.h>
 
 #include "hf/dlog.h"
+#include "hf/fdt.h"
+#include "hf/memiter.h"
 
 /*
  * Define a set up function to be run before every test in a test suite.
@@ -102,6 +105,18 @@ bool hftest_mm_init(void);
 void hftest_mm_identity_map(const void *base, size_t size, uint32_t mode);
 
 void hftest_mm_vcpu_init(void);
+
+/**
+ * Inform a host that this is the start of a test run and obtain the command
+ * line arguments for it.
+ */
+bool hftest_ctrl_start(const struct fdt_header *fdt, struct memiter *cmd);
+
+/** Inform a host that this test run has finished and clean up. */
+void hftest_ctrl_finish(void);
+
+/** Reboot the device. */
+noreturn void hftest_device_reboot(void);
 
 /**
  * Starts the CPU with the given ID. It will start at the provided entry point
