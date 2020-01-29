@@ -28,6 +28,11 @@
 #include "test/hftest.h"
 #include "test/vmapi/spci.h"
 
+struct cpu_state {
+	struct mailbox_buffers *mb;
+	struct spinlock run_lock;
+};
+
 /**
  * Iterates trying to run vCPU of the secondary VM. Returns when a message
  * of non-zero length is received.
@@ -70,7 +75,10 @@ static bool run_loop(struct mailbox_buffers *mb)
  */
 static void vm_cpu_entry(uintptr_t arg)
 {
-	run_loop((struct mailbox_buffers *)arg);
+	struct cpu_state *state = (struct cpu_state *)arg;
+
+	run_loop(state->mb);
+	sl_unlock(&state->run_lock);
 }
 
 TEAR_DOWN(vcpu_state)
@@ -90,15 +98,25 @@ TEST_LONG_RUNNING(vcpu_state, concurrent_save_restore)
 {
 	alignas(4096) static char stack[4096];
 	static struct mailbox_buffers mb;
+	struct cpu_state state;
 
 	mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM1, "check_state", mb.send);
 
-	/* Start second vCPU. */
+	/* Start second CPU. */
+	state.mb = &mb;
+	state.run_lock = SPINLOCK_INIT;
+	sl_lock(&state.run_lock);
 	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(1), stack, sizeof(stack),
-				     vm_cpu_entry, (uintptr_t)&mb));
+				     vm_cpu_entry, (uintptr_t)&state));
 
 	/* Run on a loop until the secondary VM is done. */
 	EXPECT_TRUE(run_loop(&mb));
+
+	/*
+	 * Wait for the second CPU to release its runlock to show it has
+	 * finished handling messages so the RX buffer is not idle.
+	 */
+	sl_lock(&state.run_lock);
 }
