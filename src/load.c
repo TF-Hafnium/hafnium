@@ -28,6 +28,7 @@
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
+#include "hf/plat/iommu.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
 #include "hf/vm.h"
@@ -182,6 +183,12 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 
 	if (!vm_unmap_hypervisor(vm_locked, ppool)) {
 		dlog("Unable to unmap hypervisor from primary vm\n");
+		ret = false;
+		goto out;
+	}
+
+	if (!plat_iommu_unmap_iommus(vm_locked, ppool)) {
+		dlog("Unable to unmap IOMMUs from primary VM\n");
 		ret = false;
 		goto out;
 	}

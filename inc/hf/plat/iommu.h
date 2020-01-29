@@ -30,6 +30,16 @@ bool plat_iommu_init(const struct fdt_node *fdt_root,
 		     struct mpool *ppool);
 
 /**
+ * Unmaps the address space used by the platform IOMMU driver from the VM so
+ * that VM cannot program these devices.
+ *
+ * Note that any calls to unmap an address range will result in
+ * `plat_iommu_identity_map` being invoked to apply the change to the IOMMU
+ * mapping as well. The module must ensure it can handle this reentrancy.
+ */
+bool plat_iommu_unmap_iommus(struct vm_locked vm_locked, struct mpool *ppool);
+
+/**
  * Maps the address range with the given mode for the given VM in the IOMMU.
  *
  * Assumes the identity map cannot fail. This may not always be true and if it

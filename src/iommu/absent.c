@@ -26,6 +26,14 @@ bool plat_iommu_init(const struct fdt_node *fdt_root,
 	return true;
 }
 
+bool plat_iommu_unmap_iommus(struct vm_locked vm_locked, struct mpool *ppool)
+{
+	(void)vm_locked;
+	(void)ppool;
+
+	return true;
+}
+
 void plat_iommu_identity_map(struct vm_locked vm_locked, paddr_t begin,
 			     paddr_t end, uint32_t mode)
 {
