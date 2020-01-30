@@ -55,7 +55,7 @@ LOG_DIR_BASE="${OUT}/kokoro_log"
 HFTEST=(${TIMEOUT[@]} 300s ./test/hftest/hftest.py)
 if [ $USE_FVP == true ]
 then
-  HFTEST+=(--fvp)
+  HFTEST+=(--driver=fvp)
   HFTEST+=(--out "$OUT/aem_v8a_fvp_clang")
   HFTEST+=(--out_initrd "$OUT/aem_v8a_fvp_vm_clang")
 else
