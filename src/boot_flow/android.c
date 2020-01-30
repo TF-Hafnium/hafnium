@@ -35,15 +35,27 @@ uintreg_t plat_boot_flow_get_kernel_arg(void)
 }
 
 /**
- * Initrd was compiled into Hafnium. Return range of the '.plat.initrd' section.
+ * Return the memory range of the RAM disk. This can be either:
+ * (a) the range of the '.plat.initrd' section, if it was compiled into the
+ *     Hafnium image (INITRD_ADDR and INITRD_SIZE are zero), or
+ * (b) a fixed address range known at build time (INITRD_ADDR and INITRD_SIZE
+ *     are not zero).
  */
 bool plat_boot_flow_get_initrd_range(const struct fdt_node *fdt_root,
 				     paddr_t *begin, paddr_t *end)
 {
 	(void)fdt_root;
 
-	*begin = layout_initrd_begin();
-	*end = layout_initrd_end();
+	uintpaddr_t initrd_addr = (uintpaddr_t)(INITRD_ADDR);
+	size_t initrd_size = (size_t)(INITRD_SIZE);
+
+	if (initrd_addr == 0 || initrd_size == 0) {
+		*begin = layout_initrd_begin();
+		*end = layout_initrd_end();
+	} else {
+		*begin = pa_init(initrd_addr);
+		*end = pa_add(*begin, initrd_size);
+	}
 	return true;
 }
 
