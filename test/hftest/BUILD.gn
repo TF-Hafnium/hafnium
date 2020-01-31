@@ -16,7 +16,7 @@ import("//build/toolchain/platform.gni")
 
 declare_args() {
   hftest_ctrl = ":ctrl_fdt"
-  hftest_device = ""
+  hftest_device = ":device_psci"
 }
 
 config("hftest_config") {
@@ -127,6 +127,20 @@ source_set("common") {
   ]
 }
 
+source_set("device_psci") {
+  testonly = true
+
+  public_configs = [ ":hftest_config" ]
+
+  sources = [
+    "device_psci.c",
+  ]
+
+  deps = [
+    "//src/arch/${plat_arch}/hftest:power_mgmt",
+  ]
+}
+
 source_set("mm") {
   testonly = true
 
@@ -187,10 +201,7 @@ source_set("ctrl_uart") {
   deps = [
     "//src:dlog",
     "//src:memiter",
+    hftest_device,
     plat_console,
   ]
-
-  if (hftest_device != "") {
-    deps += [ hftest_device ]
-  }
 }

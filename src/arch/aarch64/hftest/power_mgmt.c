@@ -91,3 +91,14 @@ noreturn void arch_power_off(void)
 		/* This should never be reached. */
 	}
 }
+
+/**
+ * Restarts the system.
+ */
+noreturn void arch_reboot(void)
+{
+	smc32(PSCI_SYSTEM_RESET, 0, 0, 0, 0, 0, 0, SMCCC_CALLER_HYPERVISOR);
+	for (;;) {
+		/* This should never be reached. */
+	}
+}

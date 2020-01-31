@@ -47,3 +47,4 @@ noreturn void arch_cpu_stop(void);
 enum power_status arch_cpu_status(cpu_id_t cpu_id);
 
 noreturn void arch_power_off(void);
+noreturn void arch_reboot(void);
