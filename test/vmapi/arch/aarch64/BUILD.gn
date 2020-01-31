@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("//build/image/image.gni")
+import("//test/hftest/args.gni")
 
 group("arch") {
   testonly = true
@@ -43,6 +44,7 @@ initrd("aarch64_test") {
   testonly = true
 
   manifest = "manifest.dts"
+  manifest_overlay = hftest_manifest_overlay
   primary_name = "aarch64_test"
   primary_vm = ":aarch64_test_vm"
 }

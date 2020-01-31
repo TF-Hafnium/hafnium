@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("//build/image/image.gni")
+import("//test/hftest/args.gni")
 
 config("config") {
   include_dirs = [ "inc" ]
@@ -54,6 +55,7 @@ initrd("primary_with_secondaries_test") {
   testonly = true
 
   manifest = "manifest.dts"
+  manifest_overlay = hftest_manifest_overlay
 
   primary_name = "primary_with_secondaries_test"
   primary_vm = ":primary_with_secondaries_test_vm"

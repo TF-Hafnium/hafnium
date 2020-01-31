@@ -13,11 +13,7 @@
 # limitations under the License.
 
 import("//build/toolchain/platform.gni")
-
-declare_args() {
-  hftest_ctrl = ":ctrl_fdt"
-  hftest_device = ":device_psci"
-}
+import("//test/hftest/args.gni")
 
 config("hftest_config") {
   include_dirs = [ "//test/inc" ]

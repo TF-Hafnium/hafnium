@@ -14,6 +14,7 @@
 
 import("//build/image/image.gni")
 import("//build/toolchain/platform.gni")
+import("//test/hftest/args.gni")
 
 config("config") {
   include_dirs = [ "inc" ]
@@ -43,6 +44,7 @@ initrd("gicv3_test") {
   testonly = true
 
   manifest = "manifest.dts"
+  manifest_overlay = hftest_manifest_overlay
   primary_name = "gicv3_test"
   primary_vm = ":gicv3_test_vm"
   secondary_vms = [ [

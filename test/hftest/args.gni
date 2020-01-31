@@ -1,4 +1,4 @@
-# Copyright 2018 The Hafnium Authors.
+# Copyright 2020 The Hafnium Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,27 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//build/image/image.gni")
-import("//test/hftest/args.gni")
-
-# Tests with no secondary VMs.
-vm_kernel("primary_only_test_vm") {
-  testonly = true
-
-  sources = [
-    "faults.c",
-    "primary_only.c",
-  ]
-
-  deps = [
-    "//test/hftest:hftest_primary_vm",
-  ]
-}
-
-initrd("primary_only_test") {
-  testonly = true
-  manifest = "manifest.dts"
-  manifest_overlay = hftest_manifest_overlay
-  primary_name = "primary_only_test"
-  primary_vm = ":primary_only_test_vm"
+declare_args() {
+  hftest_ctrl = ":ctrl_fdt"
+  hftest_device = ":device_psci"
+  hftest_manifest_overlay = ""
 }

@@ -14,6 +14,7 @@
 
 import("//build/image/image.gni")
 import("//build/toolchain/platform.gni")
+import("//test/hftest/args.gni")
 
 executable("test_binary") {
   include_dirs = [
@@ -58,6 +59,7 @@ initrd("linux_test") {
   testonly = true
 
   manifest = "manifest.dts"
+  manifest_overlay = hftest_manifest_overlay
   primary_name = "vmlinuz"
   primary_vm = "//third_party/linux:linux__prebuilt"
   primary_initrd = ":linux_test_initrd"

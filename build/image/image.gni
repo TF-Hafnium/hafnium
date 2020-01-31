@@ -211,6 +211,31 @@ template("device_tree") {
   }
 }
 
+template("fdt_overlay") {
+  action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "deps",
+                           ])
+    script = "//build/image/dtc.py"
+
+    sources = [
+      invoker.base,
+      invoker.overlay,
+    ]
+    outputs = [
+      invoker.output,
+    ]
+    args = [
+      "overlay",
+      rebase_path(outputs[0]),
+      rebase_path(sources[0]),
+      rebase_path(sources[1]),
+    ]
+  }
+}
+
 template("incbin") {
   source_set(target_name) {
     forward_variables_from(invoker,
@@ -255,10 +280,41 @@ template("initrd") {
   manifest_target = "${target_name}__manifest"
   manifest_file = "${base_out_dir}/manifest.dtb"
 
-  # Generate manifest.dtbo
-  device_tree(manifest_target) {
-    source = invoker.manifest
-    output = manifest_file
+  # Check if the invoker specified an overlay for the manifest.
+  if (defined(invoker.manifest_overlay) && invoker.manifest_overlay != "") {
+    manifest_base_target = "${target_name}__manifest_base"
+    manifest_base_file = "${base_out_dir}/manifest_base.dtb"
+    manifest_overlay_target = "${target_name}__manifest_overlay"
+    manifest_overlay_file = "${base_out_dir}/manifest_overlay.dtbo"
+
+    # Compile the base manifest.
+    device_tree(manifest_base_target) {
+      source = invoker.manifest
+      output = manifest_base_file
+    }
+
+    # Compile the manifest overlay.
+    device_tree(manifest_overlay_target) {
+      source = invoker.manifest_overlay
+      output = manifest_overlay_file
+    }
+
+    # Merge the base manifest and the overlay, producing the final manifest.
+    fdt_overlay(manifest_target) {
+      base = manifest_base_file
+      overlay = manifest_overlay_file
+      output = manifest_file
+      deps = [
+        ":$manifest_base_target",
+        ":$manifest_overlay_target",
+      ]
+    }
+  } else {
+    # No overlay specified. Compile the manifest to DTB.
+    device_tree(manifest_target) {
+      source = invoker.manifest
+      output = manifest_file
+    }
   }
 
   action(target_name) {
