@@ -27,9 +27,14 @@ alignas(alignof(struct mm_page_table)) static char ptable_buf
 static struct mpool ppool;
 static struct mm_ptable ptable;
 
-static struct mm_stage1_locked get_stage1_locked(void)
+struct mm_stage1_locked hftest_mm_get_stage1(void)
 {
 	return (struct mm_stage1_locked){.ptable = &ptable};
+}
+
+struct mpool *hftest_mm_get_ppool(void)
+{
+	return &ppool;
 }
 
 bool hftest_mm_init(void)
@@ -45,7 +50,7 @@ bool hftest_mm_init(void)
 		HFTEST_FAIL(true, "Unable to allocate memory for page table.");
 	}
 
-	stage1_locked = get_stage1_locked();
+	stage1_locked = hftest_mm_get_stage1();
 	mm_identity_map(stage1_locked, pa_init(0),
 			pa_init(mm_ptable_addr_space_end(MM_FLAG_STAGE1)),
 			MM_MODE_R | MM_MODE_W | MM_MODE_X, &ppool);
@@ -61,7 +66,7 @@ bool hftest_mm_init(void)
 
 void hftest_mm_identity_map(const void *base, size_t size, uint32_t mode)
 {
-	struct mm_stage1_locked stage1_locked = get_stage1_locked();
+	struct mm_stage1_locked stage1_locked = hftest_mm_get_stage1();
 	paddr_t start = pa_from_va(va_from_ptr(base));
 	paddr_t end = pa_add(start, size);
 

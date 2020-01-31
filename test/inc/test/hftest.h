@@ -107,6 +107,15 @@ void hftest_mm_identity_map(const void *base, size_t size, uint32_t mode);
 void hftest_mm_vcpu_init(void);
 
 /**
+ * Returns a pointer to stage-1 mappings.
+ * Note: There is no locking as all existing users are on the same vCPU.
+ */
+struct mm_stage1_locked hftest_mm_get_stage1(void);
+
+/** Returns a pointer to the page-table pool. */
+struct mpool *hftest_mm_get_ppool(void);
+
+/**
  * Inform a host that this is the start of a test run and obtain the command
  * line arguments for it.
  */

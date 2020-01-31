@@ -57,6 +57,9 @@ bool hftest_ctrl_start(const struct fdt_header *fdt, struct memiter *cmd)
 {
 	(void)fdt;
 
+	/* Let the console driver map its memory as device memory. */
+	plat_console_mm_init(hftest_mm_get_stage1(), hftest_mm_get_ppool());
+
 	/* Initialize the console */
 	plat_console_init();
 
