@@ -22,3 +22,8 @@ noreturn void hftest_device_reboot(void)
 {
 	arch_reboot();
 }
+
+void hftest_device_exit_test_environment(void)
+{
+	HFTEST_LOG("%s not supported", __func__);
+}

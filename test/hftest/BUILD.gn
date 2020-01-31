@@ -107,6 +107,7 @@ source_set("hftest_standalone") {
     "//src/arch/${plat_arch}/hftest:interrupts",
     "//src/arch/${plat_arch}/hftest:power_mgmt",
     hftest_ctrl,
+    hftest_device,
   ]
 }
 

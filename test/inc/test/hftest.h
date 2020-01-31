@@ -128,6 +128,17 @@ void hftest_ctrl_finish(void);
 noreturn void hftest_device_reboot(void);
 
 /**
+ * Device-specific operation to escape from the test environment.
+ * For example, an Android device with UART test controller will reboot after
+ * every test run back into hftest. So as to flash the device with a different
+ * system image, the device must escape this loop and boot into the Android
+ * bootloader.
+ * If successful, this function will not return.
+ * It may not be supported on all devices.
+ */
+void hftest_device_exit_test_environment(void);
+
+/**
  * Starts the CPU with the given ID. It will start at the provided entry point
  * with the provided argument. It is a wrapper around the generic cpu_start()
  * and takes care of MMU initialization.

@@ -60,6 +60,11 @@ void kmain(const struct fdt_header *fdt)
 		goto out;
 	}
 
+	if (memiter_iseq(&command, "exit")) {
+		hftest_device_exit_test_environment();
+		goto out;
+	}
+
 	if (memiter_iseq(&command, "json")) {
 		hftest_json();
 		goto out;
