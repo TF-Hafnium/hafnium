@@ -30,6 +30,11 @@ static uintreg_t mm_mair_el1;
 static uintreg_t mm_tcr_el1;
 static uintreg_t mm_sctlr_el1;
 
+static uintreg_t mm_reset_ttbr0_el1;
+static uintreg_t mm_reset_mair_el1;
+static uintreg_t mm_reset_tcr_el1;
+static uintreg_t mm_reset_sctlr_el1;
+
 /**
  * Initialize MMU for a test running in EL1.
  */
@@ -51,6 +56,15 @@ bool arch_vm_mm_init(void)
 		     features & 0xf);
 		return false;
 	}
+
+	/*
+	 * Preserve initial values of the system registers in case we want to
+	 * reset them.
+	 */
+	mm_reset_ttbr0_el1 = read_msr(ttbr0_el1);
+	mm_reset_mair_el1 = read_msr(mair_el1);
+	mm_reset_tcr_el1 = read_msr(tcr_el1);
+	mm_reset_sctlr_el1 = read_msr(sctlr_el1);
 
 	/*
 	 * 0    -> Device-nGnRnE memory
@@ -97,5 +111,18 @@ void arch_vm_mm_enable(paddr_t table)
 	dsb(sy);
 	isb();
 	write_msr(sctlr_el1, mm_sctlr_el1);
+	isb();
+}
+
+void arch_vm_mm_reset(void)
+{
+	/* Set system registers to their reset values. */
+	write_msr(ttbr0_el1, mm_reset_ttbr0_el1);
+	write_msr(mair_el1, mm_reset_mair_el1);
+	write_msr(tcr_el1, mm_reset_tcr_el1);
+
+	dsb(sy);
+	isb();
+	write_msr(sctlr_el1, mm_reset_sctlr_el1);
 	isb();
 }
