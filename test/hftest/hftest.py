@@ -123,6 +123,7 @@ DriverArgs = collections.namedtuple("DriverArgs", [
         "cpu",
         "serial_dev",
         "serial_baudrate",
+        "serial_init_wait",
     ])
 
 
@@ -350,7 +351,9 @@ class SerialDriver(Driver):
         Driver.__init__(self, args)
         self.tty_file = self.args.serial_dev
         self.baudrate = self.args.serial_baudrate
-        input("Press ENTER and then reset the device...")
+
+        if self.args.serial_init_wait:
+            input("Press ENTER and then reset the device...")
 
     def run(self, run_name, test_args, is_long_running):
         """Communicate `test_args` to the device over the serial port."""
@@ -548,6 +551,7 @@ def Main():
     parser.add_argument("--driver", default="qemu")
     parser.add_argument("--serial-dev", default="/dev/ttyUSB0")
     parser.add_argument("--serial-baudrate", type=int, default=115200)
+    parser.add_argument("--serial-no-init-wait", action="store_true")
     parser.add_argument("--skip-long-running-tests", action="store_true")
     parser.add_argument("--cpu",
         help="Selects the CPU configuration for the run environment.")
@@ -568,7 +572,7 @@ def Main():
 
     # Create a driver for the platform we want to test on.
     driver_args = DriverArgs(artifacts, image, initrd, vm_args, args.cpu,
-            args.serial_dev, args.serial_baudrate)
+            args.serial_dev, args.serial_baudrate, not args.serial_no_init_wait)
 
     if args.driver == "qemu":
         driver = QemuDriver(driver_args)
