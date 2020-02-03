@@ -16,4 +16,8 @@ declare_args() {
   hftest_ctrl = ":ctrl_fdt"
   hftest_device = ":device_psci"
   hftest_manifest_overlay = ""
+
+  # If set to true, will strip non-critical code, such as verbose failure
+  # logging.
+  hftest_optimize_for_size = false
 }

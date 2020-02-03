@@ -237,6 +237,18 @@ union hftest_any {
 #define HFTEST_LOG_FAILURE() \
 	dlog(HFTEST_LOG_PREFIX "Failure: %s:%u\n", __FILE__, __LINE__);
 
+#ifdef HFTEST_OPTIMIZE_FOR_SIZE
+#define HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op)
+#else /* HFTEST_OPTIMIZE_FOR_SIZE */
+#define HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op)                              \
+	dlog(HFTEST_LOG_PREFIX HFTEST_LOG_INDENT "%s %s %s (%s=", #lhs, #op, \
+	     #rhs, #lhs);                                                    \
+	dlog(hftest_dlog_format(lhs), hftest_any_get(lhs_value, lhs));       \
+	dlog(", %s=", #rhs);                                                 \
+	dlog(hftest_dlog_format(rhs), hftest_any_get(rhs_value, rhs));       \
+	dlog(")\n");
+#endif /* HFTEST_OPTIMIZE_FOR_SIZE */
+
 #define HFTEST_ASSERT_OP(lhs, rhs, op, fatal)                              \
 	do {                                                               \
 		union hftest_any lhs_value;                                \
@@ -248,15 +260,7 @@ union hftest_any {
 			struct hftest_context *ctx = hftest_get_context(); \
 			++ctx->failures;                                   \
 			HFTEST_LOG_FAILURE();                              \
-			dlog(HFTEST_LOG_PREFIX HFTEST_LOG_INDENT           \
-			     "%s %s %s (%s=",                              \
-			     #lhs, #op, #rhs, #lhs);                       \
-			dlog(hftest_dlog_format(lhs),                      \
-			     hftest_any_get(lhs_value, lhs));              \
-			dlog(", %s=", #rhs);                               \
-			dlog(hftest_dlog_format(rhs),                      \
-			     hftest_any_get(rhs_value, rhs));              \
-			dlog(")\n");                                       \
+			HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op);           \
 			if (fatal) {                                       \
 				ctx->abort();                              \
 			}                                                  \

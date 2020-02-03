@@ -17,6 +17,10 @@ import("//test/hftest/args.gni")
 
 config("hftest_config") {
   include_dirs = [ "//test/inc" ]
+
+  if (hftest_optimize_for_size == true) {
+    defines = [ "HFTEST_OPTIMIZE_FOR_SIZE" ]
+  }
 }
 
 # Testing framework for a primary VM.
