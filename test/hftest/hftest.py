@@ -235,6 +235,10 @@ class QemuDriver(Driver):
 
         return self.finish_run(run_state)
 
+    def finish(self):
+        """Clean up after running tests."""
+        pass
+
 
 class FvpDriver(Driver):
     """Driver which runs tests in Arm FVP emulator."""
@@ -343,6 +347,10 @@ class FvpDriver(Driver):
         append_file(run_state.log_path, read_file(uart0_log_path))
         return self.finish_run(run_state)
 
+    def finish(self):
+        """Clean up after running tests."""
+        pass
+
 
 class SerialDriver(Driver):
     """Driver which communicates with a device over the serial port."""
@@ -380,6 +388,20 @@ class SerialDriver(Driver):
                         # Device has finished running this test and will reboot.
                         break
         return self.finish_run(run_state)
+
+    def finish(self):
+        """Clean up after running tests."""
+        with serial.Serial(self.tty_file, self.baudrate, timeout=10) as ser:
+            while True:
+                line = ser.readline().decode('utf-8')
+                if len(line) == 0:
+                    input("Timeout. Press ENTER and then reset the device...")
+                elif HFTEST_CTRL_GET_COMMAND_LINE in line:
+                    # Device is waiting for a command. Instruct it to exit
+                    # the test environment.
+                    ser.write("exit".encode('ascii'))
+                    ser.write(b'\r')
+                    break
 
 
 # Tuple used to return information about the results of running a set of tests.
@@ -534,6 +556,9 @@ class TestRunner:
                     "tests failed")
         elif result.tests_run > 0:
             print("    PASS: all", result.tests_run, "tests passed")
+
+        # Let the driver clean up.
+        self.driver.finish()
 
         return result
 
