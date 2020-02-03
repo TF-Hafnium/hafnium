@@ -70,12 +70,12 @@ static bool spci_msg_get_next_state(
  *  Success is indicated by true.
  *
  */
-static bool spci_msg_check_transition(struct vm *to, struct vm *from,
-				      uint32_t share_func,
-				      uint32_t *orig_from_mode,
-				      struct spci_memory_region *memory_region,
-				      uint32_t memory_to_attributes,
-				      uint32_t *from_mode, uint32_t *to_mode)
+static bool spci_msg_check_transition(
+	struct vm *to, struct vm *from, uint32_t share_func,
+	uint32_t *orig_from_mode,
+	struct spci_memory_region_constituent *constituents,
+	uint32_t constituent_count, uint32_t memory_to_attributes,
+	uint32_t *from_mode, uint32_t *to_mode)
 {
 	uint32_t orig_to_mode;
 	const struct spci_mem_transitions *mem_transition_table;
@@ -214,10 +214,7 @@ static bool spci_msg_check_transition(struct vm *to, struct vm *from,
 	static const uint32_t size_relinquish_transitions =
 		ARRAY_SIZE(relinquish_transitions);
 
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
-
-	if (memory_region->constituent_count == 0) {
+	if (constituent_count == 0) {
 		/*
 		 * Fail if there are no constituents. Otherwise
 		 * spci_msg_get_next_state would get an unitialised
@@ -226,7 +223,7 @@ static bool spci_msg_check_transition(struct vm *to, struct vm *from,
 		return false;
 	}
 
-	for (i = 0; i < memory_region->constituent_count; ++i) {
+	for (i = 0; i < constituent_count; ++i) {
 		ipaddr_t begin =
 			ipa_init(spci_memory_region_constituent_get_address(
 				&constituents[i]));
@@ -319,15 +316,12 @@ static bool spci_msg_check_transition(struct vm *to, struct vm *from,
  * made to memory mappings.
  */
 static bool spci_region_group_identity_map(
-	struct vm_locked vm_locked, struct spci_memory_region *memory_region,
-	int mode, struct mpool *ppool, bool commit)
+	struct vm_locked vm_locked,
+	struct spci_memory_region_constituent *constituents,
+	uint32_t constituent_count, int mode, struct mpool *ppool, bool commit)
 {
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
-	uint32_t memory_constituent_count = memory_region->constituent_count;
-
 	/* Iterate over the memory region constituents. */
-	for (uint32_t index = 0; index < memory_constituent_count; index++) {
+	for (uint32_t index = 0; index < constituent_count; index++) {
 		size_t size = constituents[index].page_count * PAGE_SIZE;
 		paddr_t pa_begin = pa_from_ipa(
 			ipa_init(spci_memory_region_constituent_get_address(
@@ -391,13 +385,11 @@ out:
  * Clears a region of physical memory by overwriting it with zeros. The data is
  * flushed from the cache so the memory has been cleared across the system.
  */
-static bool spci_clear_memory_region(struct spci_memory_region *memory_region,
-				     struct mpool *api_page_pool)
+static bool spci_clear_memory_constituents(
+	struct spci_memory_region_constituent *constituents,
+	uint32_t constituent_count, struct mpool *api_page_pool)
 {
 	struct mpool local_page_pool;
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
-	uint32_t memory_constituent_count = memory_region->constituent_count;
 	struct mm_stage1_locked stage1_locked;
 	bool ret = false;
 
@@ -409,7 +401,7 @@ static bool spci_clear_memory_region(struct spci_memory_region *memory_region,
 	mpool_init_with_fallback(&local_page_pool, api_page_pool);
 
 	/* Iterate over the memory region constituents. */
-	for (uint32_t i = 0; i < memory_constituent_count; ++i) {
+	for (uint32_t i = 0; i < constituent_count; ++i) {
 		size_t size = constituents[i].page_count * PAGE_SIZE;
 		paddr_t begin = pa_from_ipa(
 			ipa_init(spci_memory_region_constituent_get_address(
@@ -456,8 +448,9 @@ out:
  */
 static struct spci_value spci_share_memory(
 	struct vm_locked to_locked, struct vm_locked from_locked,
-	struct spci_memory_region *memory_region, uint32_t memory_to_attributes,
-	uint32_t share_func, struct mpool *api_page_pool)
+	struct spci_memory_region_constituent *constituents,
+	uint32_t constituent_count, uint32_t memory_to_attributes,
+	uint32_t share_func, struct mpool *api_page_pool, bool clear)
 {
 	struct vm *to = to_locked.vm;
 	struct vm *from = from_locked.vm;
@@ -466,8 +459,6 @@ static struct spci_value spci_share_memory(
 	uint32_t to_mode;
 	struct mpool local_page_pool;
 	struct spci_value ret;
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
 
 	/*
 	 * Make sure constituents are properly aligned to a 32-bit boundary. If
@@ -488,8 +479,9 @@ static struct spci_value spci_share_memory(
 	 * region being shared are at the same state.
 	 */
 	if (!spci_msg_check_transition(to, from, share_func, &orig_from_mode,
-				       memory_region, memory_to_attributes,
-				       &from_mode, &to_mode)) {
+				       constituents, constituent_count,
+				       memory_to_attributes, &from_mode,
+				       &to_mode)) {
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
@@ -506,9 +498,11 @@ static struct spci_value spci_share_memory(
 	 * sure the entire operation will succeed without exhausting the page
 	 * pool.
 	 */
-	if (!spci_region_group_identity_map(from_locked, memory_region,
-					    from_mode, api_page_pool, false) ||
-	    !spci_region_group_identity_map(to_locked, memory_region, to_mode,
+	if (!spci_region_group_identity_map(from_locked, constituents,
+					    constituent_count, from_mode,
+					    api_page_pool, false) ||
+	    !spci_region_group_identity_map(to_locked, constituents,
+					    constituent_count, to_mode,
 					    api_page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
 		ret = spci_error(SPCI_NO_MEMORY);
@@ -521,21 +515,22 @@ static struct spci_value spci_share_memory(
 	 * already prepared above, but may free pages in the case that a whole
 	 * block is being unmapped that was previously partially mapped.
 	 */
-	CHECK(spci_region_group_identity_map(
-		from_locked, memory_region, from_mode, &local_page_pool, true));
+	CHECK(spci_region_group_identity_map(from_locked, constituents,
+					     constituent_count, from_mode,
+					     &local_page_pool, true));
 
 	/* Clear the memory so no VM or device can see the previous contents. */
-	if ((memory_region->flags & SPCI_MEMORY_REGION_FLAG_CLEAR) &&
-	    !spci_clear_memory_region(memory_region, api_page_pool)) {
+	if (clear && !spci_clear_memory_constituents(
+			     constituents, constituent_count, api_page_pool)) {
 		/*
 		 * On failure, roll back by returning memory to the sender. This
 		 * may allocate pages which were previously freed into
 		 * `local_page_pool` by the call above, but will never allocate
 		 * more pages than that so can never fail.
 		 */
-		CHECK(spci_region_group_identity_map(from_locked, memory_region,
-						     orig_from_mode,
-						     &local_page_pool, true));
+		CHECK(spci_region_group_identity_map(
+			from_locked, constituents, constituent_count,
+			orig_from_mode, &local_page_pool, true));
 
 		ret = spci_error(SPCI_NO_MEMORY);
 		goto out;
@@ -546,7 +541,8 @@ static struct spci_value spci_share_memory(
 	 * won't allocate because the transaction was already prepared above, so
 	 * it doesn't need to use the `local_page_pool`.
 	 */
-	CHECK(spci_region_group_identity_map(to_locked, memory_region, to_mode,
+	CHECK(spci_region_group_identity_map(to_locked, constituents,
+					     constituent_count, to_mode,
 					     api_page_pool, true));
 
 	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
@@ -576,6 +572,8 @@ static struct spci_value spci_validate_call_share_memory(
 	uint32_t memory_to_attributes;
 	uint32_t attributes_size;
 	uint32_t constituents_size;
+	struct spci_memory_region_constituent *constituents;
+	uint32_t constituent_count = memory_region->constituent_count;
 
 	/*
 	 * Ensure the number of constituents are within the memory
@@ -584,7 +582,7 @@ static struct spci_value spci_validate_call_share_memory(
 	attributes_size = sizeof(struct spci_memory_region_attributes) *
 			  memory_region->attribute_count;
 	constituents_size = sizeof(struct spci_memory_region_constituent) *
-			    memory_region->constituent_count;
+			    constituent_count;
 	if (memory_region->constituent_offset <
 		    sizeof(struct spci_memory_region) + attributes_size ||
 	    memory_share_size !=
@@ -622,9 +620,11 @@ static struct spci_value spci_validate_call_share_memory(
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	return spci_share_memory(to_locked, from_locked, memory_region,
-				 memory_to_attributes, share_func,
-				 api_page_pool);
+	constituents = spci_memory_region_get_constituents(memory_region);
+	return spci_share_memory(
+		to_locked, from_locked, constituents, constituent_count,
+		memory_to_attributes, share_func, api_page_pool,
+		memory_region->flags & SPCI_MEMORY_REGION_FLAG_CLEAR);
 }
 
 /**
