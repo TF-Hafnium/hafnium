@@ -173,6 +173,22 @@ uint32_t spci_memory_retrieve_request_init(
 		       sizeof(struct spci_memory_access);
 }
 
+uint32_t spci_memory_lender_retrieve_request_init(
+	struct spci_memory_region *memory_region, spci_memory_handle_t handle,
+	spci_vm_id_t sender)
+{
+	memory_region->sender = sender;
+	memory_region->attributes = 0;
+	memory_region->reserved_0 = 0;
+	memory_region->flags = 0;
+	memory_region->reserved_1 = 0;
+	memory_region->handle = handle;
+	memory_region->tag = 0;
+	memory_region->receiver_count = 0;
+
+	return sizeof(struct spci_memory_region);
+}
+
 uint32_t spci_retrieved_memory_region_init(
 	struct spci_memory_region *response, size_t response_max_size,
 	spci_vm_id_t sender, spci_memory_attributes_t attributes,

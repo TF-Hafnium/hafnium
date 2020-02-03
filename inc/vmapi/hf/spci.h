@@ -475,6 +475,9 @@ uint32_t spci_memory_retrieve_request_init(
 	enum spci_instruction_access instruction_access,
 	enum spci_memory_type type, enum spci_memory_cacheability cacheability,
 	enum spci_memory_shareability shareability);
+uint32_t spci_memory_lender_retrieve_request_init(
+	struct spci_memory_region *memory_region, spci_memory_handle_t handle,
+	spci_vm_id_t sender);
 uint32_t spci_retrieved_memory_region_init(
 	struct spci_memory_region *response, size_t response_max_size,
 	spci_vm_id_t sender, spci_memory_attributes_t attributes,

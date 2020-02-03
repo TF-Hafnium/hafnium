@@ -16,6 +16,8 @@
 
 #include "hf/spci_memory.h"
 
+#include "hf/arch/tee.h"
+
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
@@ -884,6 +886,124 @@ out:
 	return ret;
 }
 
+/**
+ * Reclaims the given memory from the TEE. To do this space is first reserved in
+ * the <to> VM's page table, then the reclaim request is sent on to the TEE,
+ * then (if that is successful) the memory is mapped back into the <to> VM's
+ * page table.
+ *
+ * This function requires the calling context to hold the <to> lock.
+ *
+ * Returns:
+ *  In case of error, one of the following values is returned:
+ *   1) SPCI_INVALID_PARAMETERS - The endpoint provided parameters were
+ *     erroneous;
+ *   2) SPCI_NO_MEMORY - Hafnium did not have sufficient memory to complete
+ *     the request.
+ *  Success is indicated by SPCI_SUCCESS.
+ */
+static struct spci_value spci_tee_reclaim_memory(
+	struct vm_locked to_locked, spci_memory_handle_t handle,
+	struct spci_memory_region_constituent *constituents,
+	uint32_t constituent_count, uint32_t memory_to_attributes, bool clear,
+	struct mpool *page_pool)
+{
+	struct vm *to = to_locked.vm;
+	uint32_t to_mode;
+	struct mpool local_page_pool;
+	struct spci_value ret;
+	spci_memory_region_flags_t tee_flags;
+
+	/*
+	 * Make sure constituents are properly aligned to a 32-bit boundary. If
+	 * not we would get alignment faults trying to read (32-bit) values.
+	 */
+	if (!is_aligned(constituents, 4)) {
+		dlog_verbose("Constituents not aligned.\n");
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Check if the state transition is lawful for the recipient, and ensure
+	 * that all constituents of the memory region being retrieved are at the
+	 * same state.
+	 */
+	ret = spci_retrieve_check_transition(to_locked, SPCI_MEM_RECLAIM_32,
+					     constituents, constituent_count,
+					     memory_to_attributes, &to_mode);
+	if (ret.func != SPCI_SUCCESS_32) {
+		dlog_verbose("Invalid transition.\n");
+		return ret;
+	}
+
+	/*
+	 * Create a local pool so any freed memory can't be used by another
+	 * thread. This is to ensure the original mapping can be restored if the
+	 * clear fails.
+	 */
+	mpool_init_with_fallback(&local_page_pool, page_pool);
+
+	/*
+	 * First reserve all required memory for the new page table entries in
+	 * the recipient page tables without committing, to make sure the entire
+	 * operation will succeed without exhausting the page pool.
+	 */
+	if (!spci_region_group_identity_map(to_locked, constituents,
+					    constituent_count, to_mode,
+					    page_pool, false)) {
+		/* TODO: partial defrag of failed range. */
+		dlog_verbose(
+			"Insufficient memory to update recipient page "
+			"table.\n");
+		ret = spci_error(SPCI_NO_MEMORY);
+		goto out;
+	}
+
+	/*
+	 * Forward the request to the TEE and see what happens.
+	 */
+	tee_flags = 0;
+	if (clear) {
+		tee_flags |= SPCI_MEMORY_REGION_FLAG_CLEAR;
+	}
+	ret = arch_tee_call(
+		(struct spci_value){.func = SPCI_MEM_RECLAIM_32,
+				    .arg1 = (uint32_t)handle,
+				    .arg2 = (uint32_t)(handle >> 32),
+				    .arg3 = tee_flags});
+
+	if (ret.func != SPCI_SUCCESS_32) {
+		dlog_verbose(
+			"Got %#x (%d) from EL3 in response to "
+			"SPCI_MEM_RECLAIM_32, expected SPCI_SUCCESS_32.\n",
+			ret.func, ret.arg2);
+		goto out;
+	}
+
+	/*
+	 * The TEE was happy with it, so complete the reclaim by mapping the
+	 * memory into the recipient. This won't allocate because the
+	 * transaction was already prepared above, so it doesn't need to use the
+	 * `local_page_pool`.
+	 */
+	CHECK(spci_region_group_identity_map(to_locked, constituents,
+					     constituent_count, to_mode,
+					     page_pool, true));
+
+	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
+
+out:
+	mpool_fini(&local_page_pool);
+
+	/*
+	 * Tidy up the page table by reclaiming failed mappings (if there was
+	 * an error) or merging entries into blocks where possible (on success).
+	 */
+	mm_vm_defrag(&to->ptable, page_pool);
+
+	return ret;
+}
+
 static struct spci_value spci_relinquish_memory(
 	struct vm_locked from_locked,
 	struct spci_memory_region_constituent *constituents,
@@ -1617,4 +1737,54 @@ struct spci_value spci_memory_reclaim(struct vm_locked to_locked,
 out:
 	share_states_unlock(&share_states);
 	return ret;
+}
+
+/**
+ * Validates that the reclaim transition is allowed for the given memory region
+ * and updates the page table of the reclaiming VM.
+ */
+struct spci_value spci_memory_tee_reclaim(
+	struct vm_locked to_locked, spci_memory_handle_t handle,
+	struct spci_memory_region *memory_region, bool clear,
+	struct mpool *page_pool)
+{
+	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+	struct spci_composite_memory_region *composite;
+
+	if (memory_region->receiver_count != 1) {
+		/* Only one receiver supported by Hafnium for now. */
+		dlog_verbose(
+			"Multiple recipients not supported (got %d, expected "
+			"1).\n",
+			memory_region->receiver_count);
+		return spci_error(SPCI_NOT_SUPPORTED);
+	}
+
+	if (memory_region->handle != handle) {
+		dlog_verbose(
+			"Got memory region handle %#x from TEE but requested "
+			"handle %#x.\n",
+			memory_region->handle, handle);
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/* The original sender must match the caller. */
+	if (to_locked.vm->id != memory_region->sender) {
+		dlog_verbose(
+			"VM %d attempted to reclaim memory handle %#x "
+			"originally sent by VM %d.\n",
+			to_locked.vm->id, handle, memory_region->sender);
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	composite = spci_memory_region_get_composite(memory_region, 0);
+
+	/*
+	 * Forward the request to the TEE and then map the memory back into the
+	 * caller's stage-2 page table.
+	 */
+	return spci_tee_reclaim_memory(to_locked, handle,
+				       composite->constituents,
+				       composite->constituent_count,
+				       memory_to_attributes, clear, page_pool);
 }

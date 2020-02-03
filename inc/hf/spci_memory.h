@@ -36,3 +36,7 @@ struct spci_value spci_memory_relinquish(
 struct spci_value spci_memory_reclaim(struct vm_locked to_locked,
 				      spci_memory_handle_t handle, bool clear,
 				      struct mpool *page_pool);
+struct spci_value spci_memory_tee_reclaim(
+	struct vm_locked to_locked, spci_memory_handle_t handle,
+	struct spci_memory_region *memory_region, bool clear,
+	struct mpool *page_pool);

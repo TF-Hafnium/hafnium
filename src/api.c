@@ -1717,30 +1717,101 @@ out:
 	return ret;
 }
 
+static struct spci_value spci_mem_reclaim_tee(struct vm_locked to_locked,
+					      struct vm_locked from_locked,
+					      spci_memory_handle_t handle,
+					      spci_memory_region_flags_t flags,
+					      struct cpu *cpu)
+{
+	uint32_t fragment_length;
+	uint32_t length;
+	uint32_t request_length;
+	struct spci_memory_region *memory_region =
+		(struct spci_memory_region *)cpu_get_buffer(cpu);
+	uint32_t message_buffer_size = cpu_get_buffer_size(cpu);
+	struct spci_value tee_ret;
+
+	request_length = spci_memory_lender_retrieve_request_init(
+		from_locked.vm->mailbox.recv, handle, to_locked.vm->id);
+
+	/* Retrieve memory region information from the TEE. */
+	tee_ret = arch_tee_call(
+		(struct spci_value){.func = SPCI_MEM_RETRIEVE_REQ_32,
+				    .arg1 = request_length,
+				    .arg2 = request_length});
+	if (tee_ret.func == SPCI_ERROR_32) {
+		dlog_verbose("Got error %d from EL3.\n", tee_ret.arg2);
+		return tee_ret;
+	}
+	if (tee_ret.func != SPCI_MEM_RETRIEVE_RESP_32) {
+		dlog_verbose(
+			"Got %#x from EL3, expected SPCI_MEM_RETRIEVE_RESP.\n",
+			tee_ret.func);
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	length = tee_ret.arg1;
+	fragment_length = tee_ret.arg2;
+
+	if (fragment_length > HF_MAILBOX_SIZE ||
+	    fragment_length > message_buffer_size) {
+		dlog_verbose("Invalid fragment length %d (max %d).\n", length,
+			     HF_MAILBOX_SIZE);
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/* TODO: Support fragmentation. */
+	if (fragment_length != length) {
+		dlog_verbose(
+			"Message fragmentation not yet supported (fragment "
+			"length %d but length %d).\n",
+			fragment_length, length);
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Copy the memory region descriptor to an internal buffer, so that the
+	 * sender can't change it underneath us.
+	 */
+	memcpy_s(memory_region, message_buffer_size,
+		 from_locked.vm->mailbox.send, fragment_length);
+
+	/*
+	 * Validate that transition is allowed (e.g. that caller is owner),
+	 * forward the reclaim request to the TEE, and update page tables.
+	 */
+	return spci_memory_tee_reclaim(to_locked, handle, memory_region,
+				       flags & SPCI_MEM_RECLAIM_CLEAR,
+				       &api_page_pool);
+}
+
 struct spci_value api_spci_mem_reclaim(spci_memory_handle_t handle,
 				       spci_memory_region_flags_t flags,
 				       struct vcpu *current)
 {
 	struct vm *to = current->vm;
-	struct vm_locked to_locked;
 	struct spci_value ret;
-
-	to_locked = vm_lock(to);
 
 	if ((handle & SPCI_MEMORY_HANDLE_ALLOCATOR_MASK) ==
 	    SPCI_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
+		struct vm_locked to_locked = vm_lock(to);
+
 		ret = spci_memory_reclaim(to_locked, handle,
 					  flags & SPCI_MEM_RECLAIM_CLEAR,
 					  &api_page_pool);
-	} else {
-		dlog_verbose(
-			"Tried to reclaim handle %#x not allocated by "
-			"hypervisor.\n",
-			handle);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
-	}
 
-	vm_unlock(&to_locked);
+		vm_unlock(&to_locked);
+	} else {
+		struct vm *from = vm_find(HF_TEE_VM_ID);
+		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
+
+		ret = spci_mem_reclaim_tee(vm_to_from_lock.vm1,
+					   vm_to_from_lock.vm2, handle, flags,
+					   current->cpu);
+
+		vm_unlock(&vm_to_from_lock.vm1);
+		vm_unlock(&vm_to_from_lock.vm2);
+	}
 
 	return ret;
 }
