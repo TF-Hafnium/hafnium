@@ -30,12 +30,20 @@
 		EXPECT_EQ(x, VALUE); \
 	} while (0)
 
-#define TRY_WRITE_READ(REG, VALUE)     \
-	do {                           \
-		uintreg_t x;           \
-		x = read_msr(REG);     \
-		EXPECT_NE(x, VALUE);   \
-		write_msr(REG, VALUE); \
-		x = read_msr(REG);     \
-		EXPECT_EQ(x, VALUE);   \
+/*
+ * Checks that the register can be updated. The first value is written and read
+ * back and then the second value is written and read back. The values must be
+ * different so that success means the register value has been changed and
+ * updated as expected without relying on the initial value of the register.
+ */
+#define CHECK_UPDATE(REG, FROM, TO)   \
+	do {                          \
+		uintreg_t x;          \
+		EXPECT_NE(FROM, TO);  \
+		write_msr(REG, FROM); \
+		x = read_msr(REG);    \
+		EXPECT_EQ(x, FROM);   \
+		write_msr(REG, TO);   \
+		x = read_msr(REG);    \
+		EXPECT_EQ(x, TO);     \
 	} while (0)
