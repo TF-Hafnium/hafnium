@@ -26,11 +26,13 @@ then
 	default_value HAFNIUM_HERMETIC_BUILD true
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS false
 	default_value HAFNIUM_RUN_ALL_QEMU_CPUS true
+	default_value USE_TFA true
 else
 	# Default config for local builds.
 	default_value HAFNIUM_HERMETIC_BUILD false
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS true
 	default_value HAFNIUM_RUN_ALL_QEMU_CPUS false
+	default_value USE_TFA false
 fi
 
 # If HAFNIUM_HERMETIC_BUILD is "true", relaunch this script inside a container.
@@ -77,6 +79,9 @@ TEST_ARGS=()
 if [ $USE_FVP == true ]
 then
 	TEST_ARGS+=(--fvp)
+elif [ $USE_TFA == true ]
+then
+	TEST_ARGS+=(--tfa)
 fi
 if [ "${HAFNIUM_SKIP_LONG_RUNNING_TESTS}" == "true" ]
 then
