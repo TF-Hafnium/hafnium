@@ -92,5 +92,5 @@ TEST(debug_el1, primary_read_write)
 	EXPECT_EQ(hf_vm_get_id(), HF_PRIMARY_VM_ID);
 
 	CHECK_UPDATE(DBGBCR0_EL1, 0x0, 0x2);
-	CHECK_UPDATE(DBGBVR0_EL1, 0x7, 0xf0);
+	CHECK_UPDATE(DBGBVR0_EL1, 0xc4, 0xf0);
 }
