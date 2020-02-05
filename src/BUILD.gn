@@ -64,6 +64,7 @@ source_set("src_testable") {
 
   deps = [
     ":abort",
+    ":dlog",
     ":fdt",
     ":fdt_handler",
     ":memiter",
@@ -74,10 +75,6 @@ source_set("src_testable") {
     plat_console,
     plat_iommu,
   ]
-
-  if (is_debug) {
-    deps += [ ":dlog" ]
-  }
 }
 
 source_set("layout") {
@@ -132,12 +129,9 @@ source_set("fdt_handler") {
     "fdt_handler.c",
   ]
   deps = [
+    ":dlog",
     ":fdt",
   ]
-
-  if (is_debug) {
-    deps += [ ":dlog" ]
-  }
 }
 
 # Flattened Device Tree (FDT) utilities.
@@ -147,12 +141,9 @@ source_set("fdt") {
   ]
 
   deps = [
+    ":dlog",
     ":std",
   ]
-
-  if (is_debug) {
-    deps += [ ":dlog" ]
-  }
 }
 
 source_set("memiter") {

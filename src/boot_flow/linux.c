@@ -63,8 +63,8 @@ bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,
 	if (string_is_empty(filename)) {
 		memiter_init(&primary_initrd, NULL, 0);
 	} else if (!cpio_get_file(cpio, filename, &primary_initrd)) {
-		dlog("Unable to find primary initrd \"%s\".\n",
-		     string_data(filename));
+		dlog_error("Unable to find primary initrd \"%s\".\n",
+			   string_data(filename));
 		return false;
 	}
 

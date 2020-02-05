@@ -386,7 +386,7 @@ void fdt_dump(const struct fdt_header *hdr)
 
 	/* Traverse the whole thing. */
 	if (!fdt_root_node(&node, hdr)) {
-		dlog("FDT failed validation.\n");
+		dlog_error("FDT failed validation.\n");
 		return;
 	}
 

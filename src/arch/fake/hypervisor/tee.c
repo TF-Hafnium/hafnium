@@ -22,6 +22,6 @@
 
 struct spci_value arch_tee_call(struct spci_value args)
 {
-	dlog("Attempted to call TEE function %#x\n", args.func);
+	dlog_error("Attempted to call TEE function %#x\n", args.func);
 	return spci_error(SPCI_NOT_SUPPORTED);
 }

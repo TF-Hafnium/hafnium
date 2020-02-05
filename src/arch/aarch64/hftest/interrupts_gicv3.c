@@ -35,18 +35,19 @@ void interrupt_gic_setup(void)
 	/* Mark CPU as awake. */
 	io_write32(GICR_WAKER, io_read32(GICR_WAKER) & ~(1U << 1));
 	while ((io_read32(GICR_WAKER) & (1U << 2)) != 0) {
-		dlog("Waiting for ChildrenAsleep==0\n");
+		dlog_info("Waiting for ChildrenAsleep==0\n");
 	}
 
 	/* Put interrupts into non-secure group 1. */
-	dlog("GICR_IGROUPR0 was %x\n", 0xffffffff, io_read32(GICR_IGROUPR0));
+	dlog_info("GICR_IGROUPR0 was %x\n", 0xffffffff,
+		  io_read32(GICR_IGROUPR0));
 	io_write32(GICR_IGROUPR0, 0xffffffff);
-	dlog("wrote %x to GICR_IGROUPR0, got back %x\n", 0xffffffff,
-	     io_read32(GICR_IGROUPR0));
+	dlog_info("wrote %x to GICR_IGROUPR0, got back %x\n", 0xffffffff,
+		  io_read32(GICR_IGROUPR0));
 	/* Enable non-secure group 1. */
 	write_msr(ICC_IGRPEN1_EL1, 0x00000001);
-	dlog("wrote %x to ICC_IGRPEN1_EL1, got back %x\n", 0x00000001,
-	     read_msr(ICC_IGRPEN1_EL1));
+	dlog_info("wrote %x to ICC_IGRPEN1_EL1, got back %x\n", 0x00000001,
+		  read_msr(ICC_IGRPEN1_EL1));
 }
 
 void interrupt_enable(uint32_t intid, bool enable)

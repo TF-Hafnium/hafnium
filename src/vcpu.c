@@ -164,10 +164,11 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 	sl_unlock(&vm->lock);
 
 	if (!resume) {
-		dlog("Stage-2 page fault: pc=%#x, vmid=%u, vcpu=%u, "
-		     "vaddr=%#x, ipaddr=%#x, mode=%#x\n",
-		     f->pc, vm->id, vcpu_index(current), f->vaddr, f->ipaddr,
-		     f->mode);
+		dlog_warning(
+			"Stage-2 page fault: pc=%#x, vmid=%u, vcpu=%u, "
+			"vaddr=%#x, ipaddr=%#x, mode=%#x\n",
+			f->pc, vm->id, vcpu_index(current), f->vaddr, f->ipaddr,
+			f->mode);
 	}
 
 	return resume;

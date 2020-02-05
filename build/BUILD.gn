@@ -48,11 +48,6 @@ config("platform") {
     "HEAP_PAGES=${plat_heap_pages}",
     "MAX_CPUS=${plat_max_cpus}",
     "MAX_VMS=${plat_max_vms}",
+    "LOG_LEVEL=${log_level}",
   ]
-
-  if (is_debug) {
-    defines += [ "DEBUG=1" ]
-  } else {
-    defines += [ "DEBUG=0" ]
-  }
 }

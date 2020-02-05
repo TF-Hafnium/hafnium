@@ -17,13 +17,14 @@ declare_args() {
   # The name of the project being built.
   project = "reference"
 
-  # Enable extra debugging.
-  is_debug = true
-
   # Whether to build against the platform for embedded images consisting of
   # include paths and defines. This is also used for host targets that simulate
   # an embedded image.
   use_platform = false
+
+  # The level of debug logs to include. This should match one of the levels
+  # defined in dlog.h.
+  log_level = "LOG_LEVEL_INFO"
 }
 
 # Check that we support the attempted build.

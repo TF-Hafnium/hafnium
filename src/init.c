@@ -56,7 +56,7 @@ void one_time_init_mm(void)
 	/* Make sure the console is initialised before calling dlog. */
 	plat_console_init();
 
-	dlog("Initialising hafnium\n");
+	dlog_notice("Initialising hafnium\n");
 
 	mpool_init(&ppool, sizeof(struct mm_page_table));
 	mpool_add_chunk(&ppool, ptable_buf, sizeof(ptable_buf));
@@ -107,13 +107,13 @@ void one_time_init(void)
 	}
 
 	for (i = 0; i < params.mem_ranges_count; ++i) {
-		dlog("Memory range:  %#x - %#x\n",
-		     pa_addr(params.mem_ranges[i].begin),
-		     pa_addr(params.mem_ranges[i].end) - 1);
+		dlog_info("Memory range:  %#x - %#x\n",
+			  pa_addr(params.mem_ranges[i].begin),
+			  pa_addr(params.mem_ranges[i].end) - 1);
 	}
 
-	dlog("Ramdisk range: %#x - %#x\n", pa_addr(params.initrd_begin),
-	     pa_addr(params.initrd_end) - 1);
+	dlog_info("Ramdisk range: %#x - %#x\n", pa_addr(params.initrd_begin),
+		  pa_addr(params.initrd_end) - 1);
 
 	/* Map initrd in, and initialise cpio parser. */
 	initrd = mm_identity_map(mm_stage1_locked, params.initrd_begin,
@@ -166,5 +166,5 @@ void one_time_init(void)
 	/* Enable TLB invalidation for VM page table updates. */
 	mm_vm_enable_invalidation();
 
-	dlog("Hafnium initialisation completed\n");
+	dlog_info("Hafnium initialisation completed\n");
 }

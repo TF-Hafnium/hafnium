@@ -81,3 +81,45 @@ These rules apply to comments and other natural language text.
 *   No self-modifying code.
 *   Build targets should include all the direct dependencies for their sources,
     where possible, rather than relying on transitive dependencies.
+
+## Logging
+
+Hafnium uses the same log levels as Arm Trusted Firmware. There are 5 log
+levels, in order of severity:
+
+1.  `ERROR`
+
+    Use this only for cases that there is an error in the hypervisor itself,
+    perhaps caused by a coding error, bad configuration, unexpected hardware
+    behaviour or a malformed manifest. Errors should not be logged during normal
+    operation, even in case of a buggy or malicious VM.
+
+2.  `NOTICE`
+
+    Use this sparingly for important messages which should be logged even in
+    production builds because they will be useful for debugging. This is a
+    suitable level to use for events which may indicate a bug in a VM.
+
+3.  `WARNING`
+
+    Use this for warnings which are important to developers but can generally be
+    ignored in production.
+
+4.  `INFO`
+
+    Use this to provide extra information that is helpful for developers.
+
+5.  `VERBOSE`
+
+    Use this to provide even more information which may be helpful when tracing
+    through execution in detail, such as when debugging test failures. This is
+    the only level which should include any sensitive data.
+
+Logging is done with the `dlog_*` macros, e.g. `dlog_info`. These accept
+printf-style format strings and arguments.
+
+The log level of a build is controlled by the `log_level` argument defined in
+[`BUILDCONFIG.gn`](../build/BUILDCONFIG.gn). This defaults to `INFO` for debug
+builds and tests, meaning that all levels except `VERBOSE` will be logged. It is
+recommended to set the log level to `NOTICE` for production builds, to reduce
+binary size and log spam.

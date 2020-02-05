@@ -203,20 +203,25 @@ noreturn void sync_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 
 	switch (ec) {
 	case EC_DATA_ABORT_SAME_EL:
-		dlog("Data abort: pc=%#x, esr=%#x, ec=%#x", elr, esr, ec);
 		if (!(esr & (1U << 10))) { /* Check FnV bit. */
-			dlog(", far=%#x", read_msr(far_el2));
+			dlog_error(
+				"Data abort: pc=%#x, esr=%#x, ec=%#x, "
+				"far=%#x\n",
+				elr, esr, ec, read_msr(far_el2));
 		} else {
-			dlog(", far=invalid");
+			dlog_error(
+				"Data abort: pc=%#x, esr=%#x, ec=%#x, "
+				"far=invalid\n",
+				elr, esr, ec);
 		}
 
-		dlog("\n");
 		break;
 
 	default:
-		dlog("Unknown current sync exception pc=%#x, esr=%#x, "
-		     "ec=%#x\n",
-		     elr, esr, ec);
+		dlog_error(
+			"Unknown current sync exception pc=%#x, esr=%#x, "
+			"ec=%#x\n",
+			elr, esr, ec);
 		break;
 	}
 
@@ -264,8 +269,8 @@ static bool smc_is_blocked(const struct vm *vm, uint32_t func)
 		}
 	}
 
-	dlog("SMC %#010x attempted from VM %d, blocked=%d\n", func, vm->id,
-	     block_by_default);
+	dlog_notice("SMC %#010x attempted from VM %d, blocked=%d\n", func,
+		    vm->id, block_by_default);
 
 	/* Access is still allowed in permissive mode. */
 	return block_by_default;
@@ -526,7 +531,8 @@ static void inject_el1_data_abort_exception(struct vcpu *vcpu,
 	uintreg_t esr_el1_value = GET_ESR_ISS(esr_el2) | GET_ESR_IL(esr_el2) |
 				  (EC_DATA_ABORT_SAME_EL << ESR_EC_OFFSET);
 
-	dlog("Injecting Data Abort exception into VM%d.\n", vcpu->vm->id);
+	dlog_notice("Injecting Data Abort exception into VM%d.\n",
+		    vcpu->vm->id);
 
 	inject_el1_exception(vcpu, esr_el1_value);
 }
@@ -546,8 +552,8 @@ static void inject_el1_instruction_abort_exception(struct vcpu *vcpu,
 		GET_ESR_ISS(esr_el2) | GET_ESR_IL(esr_el2) |
 		(EC_INSTRUCTION_ABORT_SAME_EL << ESR_EC_OFFSET);
 
-	dlog("Injecting Instruction Abort exception into VM%d.\n",
-	     vcpu->vm->id);
+	dlog_notice("Injecting Instruction Abort exception into VM%d.\n",
+		    vcpu->vm->id);
 
 	inject_el1_exception(vcpu, esr_el1_value);
 }
@@ -562,13 +568,15 @@ static void inject_el1_unknown_exception(struct vcpu *vcpu, uintreg_t esr_el2)
 	char *direction_str;
 
 	direction_str = ISS_IS_READ(esr_el2) ? "read" : "write";
-	dlog("Trapped access to system register %s: op0=%d, op1=%d, crn=%d, "
-	     "crm=%d, op2=%d, rt=%d.\n",
-	     direction_str, GET_ISS_OP0(esr_el2), GET_ISS_OP1(esr_el2),
-	     GET_ISS_CRN(esr_el2), GET_ISS_CRM(esr_el2), GET_ISS_OP2(esr_el2),
-	     GET_ISS_RT(esr_el2));
+	dlog_notice(
+		"Trapped access to system register %s: op0=%d, op1=%d, crn=%d, "
+		"crm=%d, op2=%d, rt=%d.\n",
+		direction_str, GET_ISS_OP0(esr_el2), GET_ISS_OP1(esr_el2),
+		GET_ISS_CRN(esr_el2), GET_ISS_CRM(esr_el2),
+		GET_ISS_OP2(esr_el2), GET_ISS_RT(esr_el2));
 
-	dlog("Injecting Unknown Reason exception into VM%d.\n", vcpu->vm->id);
+	dlog_notice("Injecting Unknown Reason exception into VM%d.\n",
+		    vcpu->vm->id);
 
 	inject_el1_exception(vcpu, esr_el1_value);
 }
@@ -772,9 +780,10 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 		panic("Handled by handle_system_register_access().");
 
 	default:
-		dlog("Unknown lower sync exception pc=%#x, esr=%#x, "
-		     "ec=%#x\n",
-		     vcpu->regs.pc, esr, ec);
+		dlog_notice(
+			"Unknown lower sync exception pc=%#x, esr=%#x, "
+			"ec=%#x\n",
+			vcpu->regs.pc, esr, ec);
 		break;
 	}
 

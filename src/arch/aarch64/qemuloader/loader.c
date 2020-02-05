@@ -55,18 +55,18 @@ static bool update_fdt(struct fdt_header *fdt, uintptr_t initrd_start,
 
 	ret = fdt_check_header(fdt);
 	if (ret != 0) {
-		dlog("FDT failed validation: %d\n", ret);
+		dlog_error("FDT failed validation: %d\n", ret);
 		return false;
 	}
 	ret = fdt_open_into(fdt, fdt, FDT_MAX_SIZE);
 	if (ret != 0) {
-		dlog("FDT failed to open: %d\n", ret);
+		dlog_error("FDT failed to open: %d\n", ret);
 		return false;
 	}
 
 	chosen_offset = fdt_path_offset(fdt, "/chosen");
 	if (chosen_offset <= 0) {
-		dlog("Unable to find '/chosen'\n");
+		dlog_error("Unable to find '/chosen'\n");
 		return false;
 	}
 
@@ -74,20 +74,20 @@ static bool update_fdt(struct fdt_header *fdt, uintptr_t initrd_start,
 	ret = fdt_setprop_u64(fdt, chosen_offset, "linux,initrd-start",
 			      initrd_start);
 	if (ret != 0) {
-		dlog("Unable to write linux,initrd-start: %d\n", ret);
+		dlog_error("Unable to write linux,initrd-start: %d\n", ret);
 		return false;
 	}
 
 	ret = fdt_setprop_u64(fdt, chosen_offset, "linux,initrd-end",
 			      initrd_end);
 	if (ret != 0) {
-		dlog("Unable to write linux,initrd-end\n");
+		dlog_error("Unable to write linux,initrd-end\n");
 		return false;
 	}
 
 	ret = fdt_pack(fdt);
 	if (ret != 0) {
-		dlog("Failed to pack FDT.\n");
+		dlog_error("Failed to pack FDT.\n");
 		return false;
 	}
 
@@ -104,7 +104,7 @@ noreturn void kmain(struct fdt_header *fdt)
 	uintptr_t initrd_start = align_up(pa_addr(image_end), LINUX_ALIGNMENT);
 	uint32_t initrd_size = fw_cfg_read_uint32(FW_CFG_INITRD_SIZE);
 
-	dlog("Initrd start %#x, size %#x\n", initrd_start, initrd_size);
+	dlog_info("Initrd start %#x, size %#x\n", initrd_start, initrd_size);
 	fw_cfg_read_bytes(FW_CFG_INITRD_DATA, initrd_start, initrd_size);
 
 	/*
@@ -114,13 +114,13 @@ noreturn void kmain(struct fdt_header *fdt)
 	kernel_start = align_up(initrd_start + initrd_size, LINUX_ALIGNMENT) +
 		       LINUX_OFFSET;
 	kernel_size = fw_cfg_read_uint32(FW_CFG_KERNEL_SIZE);
-	dlog("Kernel start %#x, size %#x\n", kernel_start, kernel_size);
+	dlog_info("Kernel start %#x, size %#x\n", kernel_start, kernel_size);
 	fw_cfg_read_bytes(FW_CFG_KERNEL_DATA, kernel_start, kernel_size);
 
 	/* Update FDT to point to initrd. */
 	if (initrd_size > 0) {
 		if (update_fdt(fdt, initrd_start, initrd_size)) {
-			dlog("Updated FDT with initrd.\n");
+			dlog_info("Updated FDT with initrd.\n");
 		} else {
 			panic("Failed to update FDT.");
 		}

@@ -170,11 +170,13 @@ bool debug_el1_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
 #undef X
 		default:
 			value = vcpu->regs.r[rt_register];
-			dlog("Unsupported debug system register read: "
-			     "op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, rt=%d.\n",
-			     GET_ISS_OP0(esr), GET_ISS_OP1(esr),
-			     GET_ISS_CRN(esr), GET_ISS_CRM(esr),
-			     GET_ISS_OP2(esr), GET_ISS_RT(esr));
+			dlog_notice(
+				"Unsupported debug system register read: "
+				"op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, "
+				"rt=%d.\n",
+				GET_ISS_OP0(esr), GET_ISS_OP1(esr),
+				GET_ISS_CRN(esr), GET_ISS_CRM(esr),
+				GET_ISS_OP2(esr), GET_ISS_RT(esr));
 			break;
 		}
 		if (rt_register != RT_REG_XZR) {
@@ -195,11 +197,13 @@ bool debug_el1_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
 			EL1_DEBUG_REGISTERS_READ_WRITE
 #undef X
 		default:
-			dlog("Unsupported debug system register write: "
-			     "op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, rt=%d.\n",
-			     GET_ISS_OP0(esr), GET_ISS_OP1(esr),
-			     GET_ISS_CRN(esr), GET_ISS_CRM(esr),
-			     GET_ISS_OP2(esr), GET_ISS_RT(esr));
+			dlog_notice(
+				"Unsupported debug system register write: "
+				"op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, "
+				"rt=%d.\n",
+				GET_ISS_OP0(esr), GET_ISS_OP1(esr),
+				GET_ISS_CRN(esr), GET_ISS_CRM(esr),
+				GET_ISS_OP2(esr), GET_ISS_RT(esr));
 			break;
 		}
 	}

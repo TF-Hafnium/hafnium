@@ -599,18 +599,19 @@ bool arch_mm_init(paddr_t table)
 
 	/* Check that 4KB granules are supported. */
 	if ((features >> 28) & 0xf) {
-		dlog("4KB granules are not supported\n");
+		dlog_error("4KB granules are not supported\n");
 		return false;
 	}
 
 	/* Check the physical address range. */
 	if (!pa_bits) {
-		dlog("Unsupported value of id_aa64mmfr0_el1.PARange: %x\n",
-		     features & 0xf);
+		dlog_error(
+			"Unsupported value of id_aa64mmfr0_el1.PARange: %x\n",
+			features & 0xf);
 		return false;
 	}
 
-	dlog("Supported bits in physical address: %d\n", pa_bits);
+	dlog_info("Supported bits in physical address: %d\n", pa_bits);
 
 	/*
 	 * Determine sl0, starting level of the page table, based on the number
@@ -644,8 +645,9 @@ bool arch_mm_init(paddr_t table)
 	}
 	mm_s2_root_table_count = 1 << extend_bits;
 
-	dlog("Stage 2 has %d page table levels with %d pages at the root.\n",
-	     mm_s2_max_level + 1, mm_s2_root_table_count);
+	dlog_info(
+		"Stage 2 has %d page table levels with %d pages at the root.\n",
+		mm_s2_max_level + 1, mm_s2_root_table_count);
 
 	arch_mm_config = (struct arch_mm_config){
 		.ttbr0_el2 = pa_addr(table),

@@ -616,7 +616,7 @@ static struct spci_value spci_validate_call_share_memory(
 		memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 		break;
 	default:
-		dlog("Invalid memory sharing message.\n");
+		dlog_error("Invalid memory sharing message.\n");
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 

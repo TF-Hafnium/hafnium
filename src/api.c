@@ -207,7 +207,8 @@ struct vcpu *api_abort(struct vcpu *current)
 {
 	struct spci_value ret = spci_error(SPCI_ABORTED);
 
-	dlog("Aborting VM %u vCPU %u\n", current->vm->id, vcpu_index(current));
+	dlog_notice("Aborting VM %u vCPU %u\n", current->vm->id,
+		    vcpu_index(current));
 
 	if (current->vm->id == HF_PRIMARY_VM_ID) {
 		/* TODO: what to do when the primary aborts? */
@@ -384,8 +385,8 @@ static struct spci_value spci_msg_recv_return(const struct vm *receiver)
 					   .arg4 = receiver->mailbox.recv_size};
 	default:
 		/* This should never be reached, but return an error in case. */
-		dlog("Tried to return an invalid message function %#x\n",
-		     receiver->mailbox.recv_func);
+		dlog_error("Tried to return an invalid message function %#x\n",
+			   receiver->mailbox.recv_func);
 		return spci_error(SPCI_DENIED);
 	}
 }
@@ -444,8 +445,8 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 
 	if (atomic_load_explicit(&vcpu->vm->aborting, memory_order_relaxed)) {
 		if (vcpu->state != VCPU_STATE_ABORTED) {
-			dlog("Aborting VM %u vCPU %u\n", vcpu->vm->id,
-			     vcpu_index(vcpu));
+			dlog_notice("Aborting VM %u vCPU %u\n", vcpu->vm->id,
+				    vcpu_index(vcpu));
 			vcpu->state = VCPU_STATE_ABORTED;
 		}
 		ret = false;
@@ -1365,8 +1366,9 @@ int64_t api_interrupt_inject(spci_vm_id_t target_vm_id,
 
 	target_vcpu = vm_get_vcpu(target_vm, target_vcpu_idx);
 
-	dlog("Injecting IRQ %d for VM %d vCPU %d from VM %d vCPU %d\n", intid,
-	     target_vm_id, target_vcpu_idx, current->vm->id, current->cpu->id);
+	dlog_info("Injecting IRQ %d for VM %d vCPU %d from VM %d vCPU %d\n",
+		  intid, target_vm_id, target_vcpu_idx, current->vm->id,
+		  current->cpu->id);
 	return internal_interrupt_inject(target_vcpu, intid, current, next);
 }
 

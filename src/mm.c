@@ -315,7 +315,7 @@ static struct mm_page_table *mm_populate_table_pte(ptable_addr_t begin,
 	/* Allocate a new table. */
 	ntable = mm_alloc_page_tables(1, ppool);
 	if (ntable == NULL) {
-		dlog("Failed to allocate memory for page table\n");
+		dlog_error("Failed to allocate memory for page table\n");
 		return NULL;
 	}
 
@@ -1024,15 +1024,15 @@ bool mm_init(struct mpool *ppool)
 	/* Locking is not enabled yet so fake it, */
 	struct mm_stage1_locked stage1_locked = mm_stage1_lock_unsafe();
 
-	dlog("text: %#x - %#x\n", pa_addr(layout_text_begin()),
-	     pa_addr(layout_text_end()));
-	dlog("rodata: %#x - %#x\n", pa_addr(layout_rodata_begin()),
-	     pa_addr(layout_rodata_end()));
-	dlog("data: %#x - %#x\n", pa_addr(layout_data_begin()),
-	     pa_addr(layout_data_end()));
+	dlog_info("text: %#x - %#x\n", pa_addr(layout_text_begin()),
+		  pa_addr(layout_text_end()));
+	dlog_info("rodata: %#x - %#x\n", pa_addr(layout_rodata_begin()),
+		  pa_addr(layout_rodata_end()));
+	dlog_info("data: %#x - %#x\n", pa_addr(layout_data_begin()),
+		  pa_addr(layout_data_end()));
 
 	if (!mm_ptable_init(&ptable, MM_FLAG_STAGE1, ppool)) {
-		dlog("Unable to allocate memory for page table.\n");
+		dlog_error("Unable to allocate memory for page table.\n");
 		return false;
 	}
 

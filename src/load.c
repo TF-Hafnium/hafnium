@@ -79,18 +79,18 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 	}
 
 	if (!cpio_get_file(cpio, &manifest_vm->kernel_filename, &kernel)) {
-		dlog("Could not find kernel file \"%s\".\n",
-		     string_data(&manifest_vm->kernel_filename));
+		dlog_error("Could not find kernel file \"%s\".\n",
+			   string_data(&manifest_vm->kernel_filename));
 		return false;
 	}
 
 	if (pa_difference(begin, end) < memiter_size(&kernel)) {
-		dlog("Kernel is larger than available memory.\n");
+		dlog_error("Kernel is larger than available memory.\n");
 		return false;
 	}
 
 	if (!copy_to_unmapped(stage1_locked, begin, &kernel, ppool)) {
-		dlog("Unable to copy kernel.\n");
+		dlog_error("Unable to copy kernel.\n");
 		return false;
 	}
 
@@ -134,17 +134,17 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 
 	if (!load_kernel(stage1_locked, primary_begin, primary_end, manifest_vm,
 			 cpio, ppool)) {
-		dlog("Unable to load primary kernel.");
+		dlog_error("Unable to load primary kernel.");
 		return false;
 	}
 
 	if (!vm_init_next(MAX_CPUS, ppool, &vm)) {
-		dlog("Unable to initialise primary vm\n");
+		dlog_error("Unable to initialise primary vm\n");
 		return false;
 	}
 
 	if (vm->id != HF_PRIMARY_VM_ID) {
-		dlog("Primary vm was not given correct id\n");
+		dlog_error("Primary vm was not given correct id\n");
 		return false;
 	}
 
@@ -164,7 +164,8 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	if (!vm_identity_map(vm_locked, pa_init(0),
 			     pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
 			     MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
-		dlog("Unable to initialise address space for primary vm\n");
+		dlog_error(
+			"Unable to initialise address space for primary vm\n");
 		ret = false;
 		goto out;
 	}
@@ -175,20 +176,21 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 				     params->mem_ranges[i].end,
 				     MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool,
 				     NULL)) {
-			dlog("Unable to initialise memory for primary vm\n");
+			dlog_error(
+				"Unable to initialise memory for primary vm\n");
 			ret = false;
 			goto out;
 		}
 	}
 
 	if (!vm_unmap_hypervisor(vm_locked, ppool)) {
-		dlog("Unable to unmap hypervisor from primary vm\n");
+		dlog_error("Unable to unmap hypervisor from primary vm\n");
 		ret = false;
 		goto out;
 	}
 
 	if (!plat_iommu_unmap_iommus(vm_locked, ppool)) {
-		dlog("Unable to unmap IOMMUs from primary VM\n");
+		dlog_error("Unable to unmap IOMMUs from primary VM\n");
 		ret = false;
 		goto out;
 	}
@@ -220,12 +222,12 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	if (!load_kernel(stage1_locked, mem_begin, mem_end, manifest_vm, cpio,
 			 ppool)) {
-		dlog("Unable to load kernel.\n");
+		dlog_error("Unable to load kernel.\n");
 		return false;
 	}
 
 	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm)) {
-		dlog("Unable to initialise VM.\n");
+		dlog_error("Unable to initialise VM.\n");
 		return false;
 	}
 
@@ -239,13 +241,13 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	if (!vm_identity_map(vm_locked, mem_begin, mem_end,
 			     MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool,
 			     &secondary_entry)) {
-		dlog("Unable to initialise memory.\n");
+		dlog_error("Unable to initialise memory.\n");
 		ret = false;
 		goto out;
 	}
 
-	dlog("Loaded with %u vCPUs, entry at %#x.\n",
-	     manifest_vm->secondary.vcpu_count, pa_addr(mem_begin));
+	dlog_info("Loaded with %u vCPUs, entry at %#x.\n",
+		  manifest_vm->secondary.vcpu_count, pa_addr(mem_begin));
 
 	vcpu = vm_get_vcpu(vm, 0);
 	vcpu_secondary_reset_and_start(vcpu, secondary_entry,
@@ -307,8 +309,9 @@ static bool update_reserved_ranges(struct boot_params_update *update,
 	for (i = 0; i < mem_ranges_count; ++i) {
 		if (pa_addr(after[i].begin) > pa_addr(before[i].begin)) {
 			if (update->reserved_ranges_count >= MAX_MEM_RANGES) {
-				dlog("Too many reserved ranges after loading "
-				     "secondary VMs.\n");
+				dlog_error(
+					"Too many reserved ranges after "
+					"loading secondary VMs.\n");
 				return false;
 			}
 			update->reserved_ranges[update->reserved_ranges_count]
@@ -319,8 +322,9 @@ static bool update_reserved_ranges(struct boot_params_update *update,
 		}
 		if (pa_addr(after[i].end) < pa_addr(before[i].end)) {
 			if (update->reserved_ranges_count >= MAX_MEM_RANGES) {
-				dlog("Too many reserved ranges after loading "
-				     "secondary VMs.\n");
+				dlog_error(
+					"Too many reserved ranges after "
+					"loading secondary VMs.\n");
 				return false;
 			}
 			update->reserved_ranges[update->reserved_ranges_count]
@@ -351,7 +355,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 
 	if (!load_primary(stage1_locked, &manifest->vm[HF_PRIMARY_VM_INDEX],
 			  cpio, params, ppool)) {
-		dlog("Unable to load primary VM.\n");
+		dlog_error("Unable to load primary VM.\n");
 		return false;
 	}
 
@@ -393,29 +397,31 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 			continue;
 		}
 
-		dlog("Loading VM%d: %s.\n", (int)vm_id,
-		     manifest_vm->debug_name);
+		dlog_info("Loading VM%d: %s.\n", (int)vm_id,
+			  manifest_vm->debug_name);
 
 		mem_size = align_up(manifest_vm->secondary.mem_size, PAGE_SIZE);
 		if (!carve_out_mem_range(mem_ranges_available,
 					 params->mem_ranges_count, mem_size,
 					 &secondary_mem_begin,
 					 &secondary_mem_end)) {
-			dlog("Not enough memory (%u bytes).\n", mem_size);
+			dlog_error("Not enough memory (%u bytes).\n", mem_size);
 			continue;
 		}
 
 		if (!load_secondary(stage1_locked, secondary_mem_begin,
 				    secondary_mem_end, manifest_vm, cpio,
 				    ppool)) {
-			dlog("Unable to load VM.\n");
+			dlog_error("Unable to load VM.\n");
 			continue;
 		}
 
 		/* Deny the primary VM access to this memory. */
 		if (!vm_unmap(primary_vm_locked, secondary_mem_begin,
 			      secondary_mem_end, ppool)) {
-			dlog("Unable to unmap secondary VM from primary VM.\n");
+			dlog_error(
+				"Unable to unmap secondary VM from primary "
+				"VM.\n");
 			success = false;
 			break;
 		}

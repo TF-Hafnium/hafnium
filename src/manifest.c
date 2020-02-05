@@ -286,7 +286,7 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	}
 
 	if (uint32list_has_next(&smcs)) {
-		dlog("%s SMC whitelist too long.\n", vm->debug_name);
+		dlog_warning("%s SMC whitelist too long.\n", vm->debug_name);
 	}
 
 	TRY(read_bool(node, "smc_whitelist_permissive",

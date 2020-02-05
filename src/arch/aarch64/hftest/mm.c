@@ -46,14 +46,15 @@ bool arch_vm_mm_init(void)
 
 	/* Check that 4KB granules are supported. */
 	if ((features >> 28) & 0xf) {
-		dlog("4KB granules are not supported\n");
+		dlog_error("4KB granules are not supported\n");
 		return false;
 	}
 
 	/* Check the physical address range. */
 	if (!pa_bits) {
-		dlog("Unsupported value of id_aa64mmfr0_el1.PARange: %x\n",
-		     features & 0xf);
+		dlog_error(
+			"Unsupported value of id_aa64mmfr0_el1.PARange: %x\n",
+			features & 0xf);
 		return false;
 	}
 

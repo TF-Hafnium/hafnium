@@ -89,17 +89,17 @@ bool fdt_find_initrd(const struct fdt_node *root, paddr_t *begin, paddr_t *end)
 	uint64_t initrd_end;
 
 	if (!fdt_find_child(&n, "chosen")) {
-		dlog("Unable to find 'chosen'\n");
+		dlog_error("Unable to find 'chosen'\n");
 		return false;
 	}
 
 	if (!fdt_read_number(&n, "linux,initrd-start", &initrd_begin)) {
-		dlog("Unable to read linux,initrd-start\n");
+		dlog_error("Unable to read linux,initrd-start\n");
 		return false;
 	}
 
 	if (!fdt_read_number(&n, "linux,initrd-end", &initrd_end)) {
-		dlog("Unable to read linux,initrd-end\n");
+		dlog_error("Unable to read linux,initrd-end\n");
 		return false;
 	}
 
@@ -119,7 +119,7 @@ bool fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
 	*cpu_count = 0;
 
 	if (!fdt_find_child(&n, "cpus")) {
-		dlog("Unable to find 'cpus'\n");
+		dlog_error("Unable to find 'cpus'\n");
 		return false;
 	}
 
@@ -149,12 +149,13 @@ bool fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
 			uint64_t value;
 
 			if (*cpu_count >= MAX_CPUS) {
-				dlog("Found more than %d CPUs\n", MAX_CPUS);
+				dlog_error("Found more than %d CPUs\n",
+					   MAX_CPUS);
 				return false;
 			}
 
 			if (!fdt_parse_number(data, address_size, &value)) {
-				dlog("Could not parse CPU id\n");
+				dlog_error("Could not parse CPU id\n");
 				return false;
 			}
 			cpu_ids[(*cpu_count)++] = value;
@@ -223,10 +224,11 @@ bool fdt_find_memory_ranges(const struct fdt_node *root, struct boot_params *p)
 					pa_init(addr + len);
 				++mem_range_index;
 			} else {
-				dlog("Found memory range %u in FDT but only "
-				     "%u supported, ignoring additional range "
-				     "of size %u.\n",
-				     mem_range_index, MAX_MEM_RANGES, len);
+				dlog_error(
+					"Found memory range %u in FDT but only "
+					"%u supported, ignoring additional "
+					"range of size %u.\n",
+					mem_range_index, MAX_MEM_RANGES, len);
 			}
 
 			size -= entry_size;
@@ -251,12 +253,12 @@ struct fdt_header *fdt_map(struct mm_stage1_locked stage1_locked,
 			      pa_add(fdt_addr, fdt_header_size()), MM_MODE_R,
 			      ppool);
 	if (!fdt) {
-		dlog("Unable to map FDT header.\n");
+		dlog_error("Unable to map FDT header.\n");
 		return NULL;
 	}
 
 	if (!fdt_root_node(n, fdt)) {
-		dlog("FDT failed validation.\n");
+		dlog_error("FDT failed validation.\n");
 		goto fail;
 	}
 
@@ -265,7 +267,7 @@ struct fdt_header *fdt_map(struct mm_stage1_locked stage1_locked,
 			      pa_add(fdt_addr, fdt_total_size(fdt)), MM_MODE_R,
 			      ppool);
 	if (!fdt) {
-		dlog("Unable to map full FDT.\n");
+		dlog_error("Unable to map full FDT.\n");
 		goto fail;
 	}
 
@@ -299,12 +301,12 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 			      pa_add(fdt_addr, fdt_header_size()), MM_MODE_R,
 			      ppool);
 	if (!fdt) {
-		dlog("Unable to map FDT header.\n");
+		dlog_error("Unable to map FDT header.\n");
 		return false;
 	}
 
 	if (!fdt_root_node(&n, fdt)) {
-		dlog("FDT failed validation.\n");
+		dlog_error("FDT failed validation.\n");
 		goto err_unmap_fdt_header;
 	}
 
@@ -313,29 +315,29 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 			      pa_add(fdt_addr, fdt_total_size(fdt) + PAGE_SIZE),
 			      MM_MODE_R | MM_MODE_W, ppool);
 	if (!fdt) {
-		dlog("Unable to map FDT in r/w mode.\n");
+		dlog_error("Unable to map FDT in r/w mode.\n");
 		goto err_unmap_fdt_header;
 	}
 
 	if (!fdt_find_child(&n, "")) {
-		dlog("Unable to find FDT root node.\n");
+		dlog_error("Unable to find FDT root node.\n");
 		goto out_unmap_fdt;
 	}
 
 	if (!fdt_find_child(&n, "chosen")) {
-		dlog("Unable to find 'chosen'\n");
+		dlog_error("Unable to find 'chosen'\n");
 		goto out_unmap_fdt;
 	}
 
 	/* Patch FDT to point to new ramdisk. */
 	if (!fdt_write_number(&n, "linux,initrd-start",
 			      pa_addr(p->initrd_begin))) {
-		dlog("Unable to write linux,initrd-start\n");
+		dlog_error("Unable to write linux,initrd-start\n");
 		goto out_unmap_fdt;
 	}
 
 	if (!fdt_write_number(&n, "linux,initrd-end", pa_addr(p->initrd_end))) {
-		dlog("Unable to write linux,initrd-end\n");
+		dlog_error("Unable to write linux,initrd-end\n");
 		goto out_unmap_fdt;
 	}
 
@@ -368,7 +370,7 @@ out_unmap_fdt:
 	if (!mm_unmap(stage1_locked, fdt_addr,
 		      pa_add(fdt_addr, fdt_total_size(fdt) + PAGE_SIZE),
 		      ppool)) {
-		dlog("Unable to unmap writable FDT.\n");
+		dlog_error("Unable to unmap writable FDT.\n");
 		return false;
 	}
 	return ret;
