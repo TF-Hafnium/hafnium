@@ -93,3 +93,44 @@ TEST(trusty, share_twice)
 	constituents[0].address = (uint64_t)pages + PAGE_SIZE;
 	init_and_send(mb, constituents, ARRAY_SIZE(constituents));
 }
+
+/*
+ * Memory which wasn't shared can't be reclaimed.
+ */
+TEST(trusty, memory_reclaim_invalid)
+{
+	ffa_memory_handle_t invalid_handle = 42;
+	struct ffa_value ret;
+
+	ret = ffa_mem_reclaim(invalid_handle, 0);
+
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Memory which was shared can be immediately reclaimed.
+ */
+TEST(trusty, memory_reclaim)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	ffa_memory_handle_t handle;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+	};
+
+	/* Dirty the memory before sharing it. */
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
+
+	handle = init_and_send(mb, constituents, ARRAY_SIZE(constituents));
+
+	/* Make sure we can still write to it. */
+	for (int i = 0; i < PAGE_SIZE; ++i) {
+		pages[i] = i;
+	}
+
+	dlog("Reclaiming handle %#x.\n", handle);
+	ret = ffa_mem_reclaim(handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
