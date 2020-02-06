@@ -121,9 +121,6 @@ DriverArgs = collections.namedtuple("DriverArgs", [
         "initrd",
         "vm_args",
         "cpu",
-        "serial_dev",
-        "serial_baudrate",
-        "serial_init_wait",
     ])
 
 
@@ -365,19 +362,22 @@ class FvpDriver(Driver):
 class SerialDriver(Driver):
     """Driver which communicates with a device over the serial port."""
 
-    def __init__(self, args):
+    def __init__(self, args, tty_file, baudrate, init_wait):
         Driver.__init__(self, args)
-        self.tty_file = self.args.serial_dev
-        self.baudrate = self.args.serial_baudrate
+        self.tty_file = tty_file
+        self.baudrate = baudrate
 
-        if self.args.serial_init_wait:
+        if init_wait:
             input("Press ENTER and then reset the device...")
+
+    def connect(self):
+        return serial.Serial(self.tty_file, self.baudrate, timeout=10)
 
     def run(self, run_name, test_args, is_long_running):
         """Communicate `test_args` to the device over the serial port."""
         run_state = self.start_run(run_name)
 
-        with serial.Serial(self.tty_file, self.baudrate, timeout=10) as ser:
+        with self.connect() as ser:
             with open(run_state.log_path, "a") as f:
                 while True:
                     # Read one line from the serial port.
@@ -401,7 +401,7 @@ class SerialDriver(Driver):
 
     def finish(self):
         """Clean up after running tests."""
-        with serial.Serial(self.tty_file, self.baudrate, timeout=10) as ser:
+        with self.connect() as ser:
             while True:
                 line = ser.readline().decode('utf-8')
                 if len(line) == 0:
@@ -607,15 +607,15 @@ def Main():
     artifacts = ArtifactsManager(os.path.join(args.log, image_name))
 
     # Create a driver for the platform we want to test on.
-    driver_args = DriverArgs(artifacts, image, initrd, vm_args, args.cpu,
-            args.serial_dev, args.serial_baudrate, not args.serial_no_init_wait)
+    driver_args = DriverArgs(artifacts, image, initrd, vm_args, args.cpu)
 
     if args.driver == "qemu":
         driver = QemuDriver(driver_args, args.out, args.tfa)
     elif args.driver == "fvp":
         driver = FvpDriver(driver_args)
     elif args.driver == "serial":
-        driver = SerialDriver(driver_args)
+        driver = SerialDriver(driver_args, args.serial_dev,
+                args.serial_baudrate, not args.serial_no_init_wait)
     else:
         raise Exception("Unknown driver name: {}".format(args.driver))
 
