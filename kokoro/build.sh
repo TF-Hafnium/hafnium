@@ -63,15 +63,6 @@ do
 	shift
 done
 
-# Kokoro does something weird that makes all files look dirty to git diff-index;
-# this fixes it so that the Linux build doesn't think it has a dirty tree for
-# building the Hafnium kernel module (and so end up with a version magic string
-# that doesn't match the prebuilt kernel).
-(
-	cd third_party/linux &&
-	git status
-)
-
 #
 # Step 1: make sure it builds.
 #
