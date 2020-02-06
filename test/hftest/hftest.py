@@ -25,10 +25,10 @@ import xml.etree.ElementTree as ET
 import argparse
 import collections
 import datetime
+import importlib
 import json
 import os
 import re
-import serial
 import subprocess
 import sys
 
@@ -366,12 +366,13 @@ class SerialDriver(Driver):
         Driver.__init__(self, args)
         self.tty_file = tty_file
         self.baudrate = baudrate
+        self.pyserial = importlib.import_module("serial")
 
         if init_wait:
             input("Press ENTER and then reset the device...")
 
     def connect(self):
-        return serial.Serial(self.tty_file, self.baudrate, timeout=10)
+        return self.pyserial.Serial(self.tty_file, self.baudrate, timeout=10)
 
     def run(self, run_name, test_args, is_long_running):
         """Communicate `test_args` to the device over the serial port."""
