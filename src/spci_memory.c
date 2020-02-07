@@ -14,12 +14,45 @@
  * limitations under the License.
  */
 
+#include "hf/spci_memory.h"
+
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/mpool.h"
 #include "hf/spci_internal.h"
 #include "hf/std.h"
 #include "hf/vm.h"
+
+struct spci_mem_transitions {
+	uint32_t orig_from_mode;
+	uint32_t orig_to_mode;
+	uint32_t from_mode;
+	uint32_t to_mode;
+};
+
+/* TODO: Add device attributes: GRE, cacheability, shareability. */
+static inline uint32_t spci_memory_attrs_to_mode(uint16_t memory_attributes)
+{
+	uint32_t mode = 0;
+
+	switch (spci_get_memory_access_attr(memory_attributes)) {
+	case SPCI_MEMORY_RO_NX:
+		mode = MM_MODE_R;
+		break;
+	case SPCI_MEMORY_RO_X:
+		mode = MM_MODE_R | MM_MODE_X;
+		break;
+	case SPCI_MEMORY_RW_NX:
+		mode = MM_MODE_R | MM_MODE_W;
+		break;
+	case SPCI_MEMORY_RW_X:
+		mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+		break;
+	}
+
+	return mode;
+}
 
 /**
  * Obtain the next mode to apply to the two VMs.
@@ -64,11 +97,10 @@ static bool spci_msg_get_next_state(
  *  The error code false indicates that:
  *   1) a state transition was not found;
  *   2) the pages being shared do not have the same mode within the <to>
- *     or <form> VMs;
+ *     or <from> VMs;
  *   3) The beginning and end IPAs are not page aligned;
  *   4) The requested share type was not handled.
  *  Success is indicated by true.
- *
  */
 static bool spci_msg_check_transition(
 	struct vm *to, struct vm *from, uint32_t share_func,
@@ -387,7 +419,7 @@ out:
  */
 static bool spci_clear_memory_constituents(
 	struct spci_memory_region_constituent *constituents,
-	uint32_t constituent_count, struct mpool *api_page_pool)
+	uint32_t constituent_count, struct mpool *page_pool)
 {
 	struct mpool local_page_pool;
 	struct mm_stage1_locked stage1_locked;
@@ -398,7 +430,7 @@ static bool spci_clear_memory_constituents(
 	 * thread. This is to ensure each constituent that is mapped can be
 	 * unmapped again afterwards.
 	 */
-	mpool_init_with_fallback(&local_page_pool, api_page_pool);
+	mpool_init_with_fallback(&local_page_pool, page_pool);
 
 	/* Iterate over the memory region constituents. */
 	for (uint32_t i = 0; i < constituent_count; ++i) {
@@ -450,7 +482,7 @@ static struct spci_value spci_share_memory(
 	struct vm_locked to_locked, struct vm_locked from_locked,
 	struct spci_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t memory_to_attributes,
-	uint32_t share_func, struct mpool *api_page_pool, bool clear)
+	uint32_t share_func, struct mpool *page_pool, bool clear)
 {
 	struct vm *to = to_locked.vm;
 	struct vm *from = from_locked.vm;
@@ -490,7 +522,7 @@ static struct spci_value spci_share_memory(
 	 * thread. This is to ensure the original mapping can be restored if the
 	 * clear fails.
 	 */
-	mpool_init_with_fallback(&local_page_pool, api_page_pool);
+	mpool_init_with_fallback(&local_page_pool, page_pool);
 
 	/*
 	 * First reserve all required memory for the new page table entries in
@@ -500,10 +532,10 @@ static struct spci_value spci_share_memory(
 	 */
 	if (!spci_region_group_identity_map(from_locked, constituents,
 					    constituent_count, from_mode,
-					    api_page_pool, false) ||
+					    page_pool, false) ||
 	    !spci_region_group_identity_map(to_locked, constituents,
 					    constituent_count, to_mode,
-					    api_page_pool, false)) {
+					    page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
 		ret = spci_error(SPCI_NO_MEMORY);
 		goto out;
@@ -521,7 +553,7 @@ static struct spci_value spci_share_memory(
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear && !spci_clear_memory_constituents(
-			     constituents, constituent_count, api_page_pool)) {
+			     constituents, constituent_count, page_pool)) {
 		/*
 		 * On failure, roll back by returning memory to the sender. This
 		 * may allocate pages which were previously freed into
@@ -543,7 +575,7 @@ static struct spci_value spci_share_memory(
 	 */
 	CHECK(spci_region_group_identity_map(to_locked, constituents,
 					     constituent_count, to_mode,
-					     api_page_pool, true));
+					     page_pool, true));
 
 	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
 
@@ -554,20 +586,27 @@ out:
 	 * Tidy up the page tables by reclaiming failed mappings (if there was
 	 * an error) or merging entries into blocks where possible (on success).
 	 */
-	mm_vm_defrag(&to->ptable, api_page_pool);
-	mm_vm_defrag(&from->ptable, api_page_pool);
+	mm_vm_defrag(&to->ptable, page_pool);
+	mm_vm_defrag(&from->ptable, page_pool);
 
 	return ret;
 }
 
 /**
- * Check if the message length and the number of memory region constituents
- * match, if the check is correct call the memory sharing routine.
+ * Validates a call to donate, lend or share memory and then updates the stage-2
+ * page tables. Specifically, check if the message length and number of memory
+ * region constituents match, and if the transition is valid for the type of
+ * memory sending operation.
+ *
+ * Assumes that the caller has already found and locked both VMs and ensured
+ * that the destination RX buffer is available, and copied the memory region
+ * descriptor from the sender's TX buffer to a trusted internal buffer.
  */
-static struct spci_value spci_validate_call_share_memory(
-	struct vm_locked to_locked, struct vm_locked from_locked,
-	struct spci_memory_region *memory_region, uint32_t memory_share_size,
-	uint32_t share_func, struct mpool *api_page_pool)
+struct spci_value spci_memory_send(struct vm_locked to_locked,
+				   struct vm_locked from_locked,
+				   struct spci_memory_region *memory_region,
+				   uint32_t memory_share_size,
+				   uint32_t share_func, struct mpool *page_pool)
 {
 	uint32_t memory_to_attributes;
 	uint32_t attributes_size;
@@ -623,40 +662,6 @@ static struct spci_value spci_validate_call_share_memory(
 	constituents = spci_memory_region_get_constituents(memory_region);
 	return spci_share_memory(
 		to_locked, from_locked, constituents, constituent_count,
-		memory_to_attributes, share_func, api_page_pool,
+		memory_to_attributes, share_func, page_pool,
 		memory_region->flags & SPCI_MEMORY_REGION_FLAG_CLEAR);
-}
-
-/**
- * Performs initial architected message information parsing. Calls the
- * corresponding api functions implementing the functionality requested
- * in the architected message.
- */
-struct spci_value spci_msg_handle_architected_message(
-	struct vm_locked to_locked, struct vm_locked from_locked,
-	struct spci_memory_region *memory_region, uint32_t size,
-	uint32_t share_func, struct mpool *api_page_pool)
-{
-	struct spci_value ret = spci_validate_call_share_memory(
-		to_locked, from_locked, memory_region, size, share_func,
-		api_page_pool);
-
-	/* Copy data to the destination Rx. */
-	/*
-	 * TODO: Translate the <from> IPA addresses to <to> IPA addresses.
-	 * Currently we assume identity mapping of the stage 2 translation.
-	 * Removing this assumption relies on a mechanism to handle scenarios
-	 * where the memory region fits in the source Tx buffer but cannot fit
-	 * in the destination Rx buffer. This mechanism will be defined at the
-	 * spec level.
-	 */
-	if (ret.func == SPCI_SUCCESS_32) {
-		memcpy_s(to_locked.vm->mailbox.recv, SPCI_MSG_PAYLOAD_MAX,
-			 memory_region, size);
-		to_locked.vm->mailbox.recv_size = size;
-		to_locked.vm->mailbox.recv_sender = from_locked.vm->id;
-		to_locked.vm->mailbox.recv_func = share_func;
-	}
-
-	return ret;
 }

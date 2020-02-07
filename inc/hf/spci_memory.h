@@ -16,16 +16,14 @@
 
 #pragma once
 
-#include <stdint.h>
+#include "hf/mpool.h"
+#include "hf/vm.h"
 
 #include "vmapi/hf/spci.h"
 
-#define SPCI_VERSION_MAJOR 0x0
-#define SPCI_VERSION_MINOR 0x9
-
-#define SPCI_VERSION_MAJOR_OFFSET 16
-
-static inline struct spci_value spci_error(uint64_t error_code)
-{
-	return (struct spci_value){.func = SPCI_ERROR_32, .arg2 = error_code};
-}
+struct spci_value spci_memory_send(struct vm_locked to_locked,
+				   struct vm_locked from_locked,
+				   struct spci_memory_region *memory_region,
+				   uint32_t memory_share_size,
+				   uint32_t share_func,
+				   struct mpool *page_pool);

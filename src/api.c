@@ -25,6 +25,7 @@
 #include "hf/mm.h"
 #include "hf/plat/console.h"
 #include "hf/spci_internal.h"
+#include "hf/spci_memory.h"
 #include "hf/spinlock.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
@@ -1515,11 +1516,25 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 		goto out;
 	}
 
-	ret = spci_msg_handle_architected_message(
-		vm_to_from_lock.vm1, vm_to_from_lock.vm2, memory_region, length,
-		share_func, &api_page_pool);
+	ret = spci_memory_send(vm_to_from_lock.vm1, vm_to_from_lock.vm2,
+			       memory_region, length, share_func,
+			       &api_page_pool);
 
 	if (ret.func == SPCI_SUCCESS_32) {
+		/* Copy data to the destination Rx. */
+		/*
+		 * TODO: Translate the <from> IPA addresses to <to> IPA
+		 * addresses. Currently we assume identity mapping of the stage
+		 * 2 translation. Removing this assumption relies on a mechanism
+		 * to handle scenarios where the memory region fits in the
+		 * source Tx buffer but cannot fit in the destination Rx buffer.
+		 * This mechanism will be defined at the spec level.
+		 */
+		memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX, memory_region,
+			 length);
+		to->mailbox.recv_size = length;
+		to->mailbox.recv_sender = from->id;
+		to->mailbox.recv_func = share_func;
 		ret = deliver_msg(vm_to_from_lock.vm1, from->id, current, next);
 	}
 
