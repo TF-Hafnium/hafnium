@@ -1443,13 +1443,14 @@ TEST(memory_sharing, lend_donate)
 				  SPCI_INVALID_PARAMETERS);
 	}
 
-	/* Ensure we can donate to the only borrower. */
+	/* Ensure we can't donate to the only borrower. */
 	msg_size = spci_memory_region_init(
 		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1, constituents,
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
+	EXPECT_SPCI_ERROR(spci_mem_donate(msg_size, msg_size, 0),
+			  SPCI_INVALID_PARAMETERS);
 }
 
 /**
@@ -1505,13 +1506,14 @@ TEST(memory_sharing, share_donate)
 				  SPCI_INVALID_PARAMETERS);
 	}
 
-	/* Ensure we can donate to the only borrower. */
+	/* Ensure we can't donate to the only borrower. */
 	msg_size = spci_memory_region_init(
 		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1, constituents,
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
+	EXPECT_SPCI_ERROR(spci_mem_donate(msg_size, msg_size, 0),
+			  SPCI_INVALID_PARAMETERS);
 }
 
 /**

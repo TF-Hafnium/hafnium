@@ -127,20 +127,6 @@ static bool spci_msg_check_transition(
 			.to_mode = 0,
 		},
 		{
-			/* 2) {O-NA, !O-EA} -> {!O-NA, O-EA} */
-			.orig_from_mode = MM_MODE_INVALID,
-			.orig_to_mode = MM_MODE_UNOWNED,
-			.from_mode = MM_MODE_INVALID | MM_MODE_UNOWNED,
-			.to_mode = 0,
-		},
-		{
-			/* 3) {O-SA, !O-SA} -> {!O-NA, O-EA} */
-			.orig_from_mode = MM_MODE_SHARED,
-			.orig_to_mode = MM_MODE_UNOWNED | MM_MODE_SHARED,
-			.from_mode = MM_MODE_INVALID | MM_MODE_UNOWNED,
-			.to_mode = 0,
-		},
-		{
 			/*
 			 * Duplicate of 1) in order to cater for an alternative
 			 * representation of !O-NA:
