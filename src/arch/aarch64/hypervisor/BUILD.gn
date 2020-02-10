@@ -47,6 +47,7 @@ source_set("hypervisor") {
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64:entry",
     "//src/arch/aarch64:smc",
+    plat_psci,
     plat_smc,
   ]
 }

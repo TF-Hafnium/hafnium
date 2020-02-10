@@ -20,6 +20,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "hf/arch/plat/psci.h"
+
 #include "hf/addr.h"
 #include "hf/spci.h"
 #include "hf/std.h"
@@ -137,6 +139,8 @@ void arch_regs_set_retval(struct arch_regs *r, struct spci_value v)
 
 void arch_cpu_init(void)
 {
+	plat_psci_cpu_resume();
+
 	/*
 	 * Linux expects LORegions to be disabled, hence if the current system
 	 * supports them, Hafnium ensures that they are disabled.

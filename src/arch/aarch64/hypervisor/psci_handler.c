@@ -18,6 +18,7 @@
 
 #include <stdint.h>
 
+#include "hf/arch/plat/psci.h"
 #include "hf/arch/types.h"
 
 #include "hf/api.h"
@@ -162,6 +163,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		break;
 
 	case PSCI_CPU_SUSPEND: {
+		plat_psci_cpu_suspend(arg0);
 		/*
 		 * Update vCPU state to wake from the provided entry point but
 		 * if suspend returns, for example because it failed or was a
