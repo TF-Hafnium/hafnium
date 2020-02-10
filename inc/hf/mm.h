@@ -79,6 +79,8 @@
 
 /* clang-format on */
 
+#define MM_PPOOL_ENTRY_SIZE sizeof(struct mm_page_table)
+
 struct mm_page_table {
 	alignas(PAGE_SIZE) pte_t entries[MM_PTE_PER_PAGE];
 };

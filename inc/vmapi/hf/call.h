@@ -159,14 +159,26 @@ static inline struct spci_value spci_mem_share(uint32_t fragment_length,
 					     .arg5 = cookie});
 }
 
-static inline struct spci_value hf_spci_mem_relinquish(uint32_t fragment_length,
-						       uint32_t length,
-						       uint32_t cookie)
+static inline struct spci_value spci_mem_retrieve_req(uint32_t fragment_length,
+						      uint32_t length,
+						      uint32_t cookie)
 {
-	return spci_call((struct spci_value){.func = HF_SPCI_MEM_RELINQUISH,
+	return spci_call((struct spci_value){.func = SPCI_MEM_RETRIEVE_REQ_32,
 					     .arg3 = fragment_length,
 					     .arg4 = length,
 					     .arg5 = cookie});
+}
+
+static inline struct spci_value spci_mem_relinquish(void)
+{
+	return spci_call((struct spci_value){.func = SPCI_MEM_RELINQUISH_32});
+}
+
+static inline struct spci_value spci_mem_reclaim(uint32_t handle,
+						 uint32_t flags)
+{
+	return spci_call((struct spci_value){
+		.func = SPCI_MEM_RECLAIM_32, .arg1 = handle, .arg2 = flags});
 }
 
 /**

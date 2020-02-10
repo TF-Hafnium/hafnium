@@ -366,10 +366,20 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 	case SPCI_MEM_DONATE_32:
 	case SPCI_MEM_LEND_32:
 	case SPCI_MEM_SHARE_32:
-	case HF_SPCI_MEM_RELINQUISH:
 		*args = api_spci_mem_send(func, ipa_init(args->arg1),
 					  args->arg2, args->arg3, args->arg4,
 					  args->arg5, current(), next);
+		return true;
+	case SPCI_MEM_RETRIEVE_REQ_32:
+		*args = api_spci_mem_retrieve_req(
+			ipa_init(args->arg1), args->arg2, args->arg3,
+			args->arg4, args->arg5, current());
+		return true;
+	case SPCI_MEM_RELINQUISH_32:
+		*args = api_spci_mem_relinquish(current());
+		return true;
+	case SPCI_MEM_RECLAIM_32:
+		*args = api_spci_mem_reclaim(args->arg1, args->arg2, current());
 		return true;
 	}
 

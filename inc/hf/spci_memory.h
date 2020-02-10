@@ -21,9 +21,19 @@
 
 #include "vmapi/hf/spci.h"
 
-struct spci_value spci_memory_send(struct vm_locked to_locked,
-				   struct vm_locked from_locked,
+struct spci_value spci_memory_send(struct vm *to, struct vm_locked from_locked,
 				   struct spci_memory_region *memory_region,
 				   uint32_t memory_share_size,
 				   uint32_t share_func,
 				   struct mpool *page_pool);
+struct spci_value spci_memory_retrieve(
+	struct vm_locked to_locked,
+	struct spci_memory_retrieve_request *retrieve_request,
+	uint32_t retrieve_request_size, struct mpool *page_pool);
+struct spci_value spci_memory_relinquish(
+	struct vm_locked from_locked,
+	struct spci_mem_relinquish *relinquish_request,
+	struct mpool *page_pool);
+struct spci_value spci_memory_reclaim(struct vm_locked to_locked,
+				      spci_memory_handle_t handle, bool clear,
+				      struct mpool *page_pool);

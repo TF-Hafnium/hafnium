@@ -49,6 +49,11 @@ static_assert(HF_MAILBOX_SIZE == PAGE_SIZE,
 	      "Currently, a page is mapped for the send and receive buffers so "
 	      "the maximum request is the size of a page.");
 
+static_assert(MM_PPOOL_ENTRY_SIZE >= HF_MAILBOX_SIZE,
+	      "The page pool entry size must be at least as big as the mailbox "
+	      "size, so that memory region descriptors can be copied from the "
+	      "mailbox for memory sharing.");
+
 static struct mpool api_page_pool;
 
 /**
@@ -380,7 +385,6 @@ static struct spci_value spci_msg_recv_return(const struct vm *receiver)
 	case SPCI_MEM_DONATE_32:
 	case SPCI_MEM_LEND_32:
 	case SPCI_MEM_SHARE_32:
-	case HF_SPCI_MEM_RELINQUISH:
 		return (struct spci_value){.func = receiver->mailbox.recv_func,
 					   .arg3 = receiver->mailbox.recv_size,
 					   .arg4 = receiver->mailbox.recv_size};
@@ -1453,9 +1457,7 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 	struct vm *from = current->vm;
 	struct vm *to;
 	const void *from_msg;
-	uint32_t message_buffer_size;
 	struct spci_memory_region *memory_region;
-	struct two_vm_locked vm_to_from_lock;
 	struct spci_value ret;
 
 	if (ipa_addr(address) != 0 || page_count != 0) {
@@ -1486,25 +1488,36 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 	}
 
 	/*
-	 * Copy the memory region descriptor to an internal buffer, so that the
-	 * sender can't change it underneath us.
+	 * Copy the memory region descriptor to a fresh page from the memory
+	 * pool. This prevents the sender from changing it underneath us, and
+	 * also lets us keep it around in the share state table if needed.
 	 */
-	memory_region =
-		(struct spci_memory_region *)cpu_get_buffer(current->cpu);
-	message_buffer_size = cpu_get_buffer_size(current->cpu);
-	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
+	if (length > HF_MAILBOX_SIZE || length > MM_PPOOL_ENTRY_SIZE) {
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
-	memcpy_s(memory_region, message_buffer_size, from_msg, length);
+	memory_region =
+		(struct spci_memory_region *)mpool_alloc(&api_page_pool);
+	if (memory_region == NULL) {
+		dlog_verbose("Failed to allocate memory region copy.\n");
+		return spci_error(SPCI_NO_MEMORY);
+	}
+	memcpy_s(memory_region, MM_PPOOL_ENTRY_SIZE, from_msg, length);
 
 	/* The sender must match the caller. */
 	if (memory_region->sender != from->id) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		dlog_verbose("Memory region sender doesn't match caller.\n");
+		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		goto out;
 	}
 
 	if (memory_region->attribute_count != 1) {
 		/* Hafnium doesn't support multi-way memory sharing for now. */
-		return spci_error(SPCI_NOT_SUPPORTED);
+		dlog_verbose(
+			"Multi-way memory sharing not supported (got %d "
+			"attribute descriptors, expected 0).\n",
+			memory_region->attribute_count);
+		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		goto out;
 	}
 
 	/*
@@ -1512,41 +1525,219 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 	 */
 	to = vm_find(memory_region->attributes[0].receiver);
 	if (to == NULL || to == from) {
+		dlog_verbose("Invalid receiver.\n");
+		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (to->id == HF_TEE_VM_ID) {
+		/*
+		 * The 'to' VM lock is only needed in the case that it is the
+		 * TEE VM.
+		 */
+		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
+
+		if (msg_receiver_busy(vm_to_from_lock.vm1, from, false)) {
+			ret = spci_error(SPCI_BUSY);
+			goto out_unlock;
+		}
+
+		ret = spci_memory_send(to, vm_to_from_lock.vm2, memory_region,
+				       length, share_func, &api_page_pool);
+		/*
+		 * spci_memory_send takes ownership of the memory_region, so
+		 * make sure we don't free it.
+		 */
+		memory_region = NULL;
+
+		if (ret.func == SPCI_SUCCESS_32 && to->id == HF_TEE_VM_ID) {
+			/* Forward memory send message on to TEE. */
+			memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX,
+				 memory_region, length);
+			mpool_free(&api_page_pool, memory_region);
+			memory_region = NULL;
+			to->mailbox.recv_size = length;
+			to->mailbox.recv_sender = from->id;
+			to->mailbox.recv_func = share_func;
+			ret = deliver_msg(vm_to_from_lock.vm1, from->id,
+					  current, next);
+		}
+
+	out_unlock:
+		vm_unlock(&vm_to_from_lock.vm1);
+		vm_unlock(&vm_to_from_lock.vm2);
+	} else {
+		struct vm_locked from_locked = vm_lock(from);
+
+		ret = spci_memory_send(to, from_locked, memory_region, length,
+				       share_func, &api_page_pool);
+		/*
+		 * spci_memory_send takes ownership of the memory_region, so
+		 * make sure we don't free it.
+		 */
+		memory_region = NULL;
+
+		vm_unlock(&from_locked);
+	}
+
+out:
+	if (memory_region != NULL) {
+		mpool_free(&api_page_pool, memory_region);
+	}
+
+	return ret;
+}
+
+struct spci_value api_spci_mem_retrieve_req(ipaddr_t address,
+					    uint32_t page_count,
+					    uint32_t fragment_length,
+					    uint32_t length, uint32_t cookie,
+					    struct vcpu *current)
+{
+	struct vm *to = current->vm;
+	struct vm_locked to_locked;
+	const void *to_msg;
+	struct spci_memory_retrieve_request *retrieve_request;
+	uint32_t message_buffer_size;
+	struct spci_value ret;
+
+	if (ipa_addr(address) != 0 || page_count != 0) {
+		/*
+		 * Hafnium only supports passing the descriptor in the TX
+		 * mailbox.
+		 */
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	vm_to_from_lock = vm_lock_both(to, from);
+	if (fragment_length == length && cookie != 0) {
+		/* Cookie is only allowed if there are multiple fragments. */
+		dlog_verbose("Unexpected cookie %d.\n", cookie);
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
 
-	if (msg_receiver_busy(vm_to_from_lock.vm1, from, false)) {
+	retrieve_request =
+		(struct spci_memory_retrieve_request *)cpu_get_buffer(
+			current->cpu);
+	message_buffer_size = cpu_get_buffer_size(current->cpu);
+	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
+		dlog_verbose("Retrieve request too long.\n");
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	to_locked = vm_lock(to);
+	to_msg = to->mailbox.send;
+
+	if (to_msg == NULL) {
+		dlog_verbose("TX buffer not setup.\n");
+		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/*
+	 * Copy the retrieve request descriptor to an internal buffer, so that
+	 * the caller can't change it underneath us.
+	 */
+	memcpy_s(retrieve_request, message_buffer_size, to_msg, length);
+
+	if (msg_receiver_busy(to_locked, NULL, false)) {
+		/*
+		 * Can't retrieve memory information if the mailbox is not
+		 * available.
+		 */
+		dlog_verbose("RX buffer not ready.\n");
 		ret = spci_error(SPCI_BUSY);
 		goto out;
 	}
 
-	ret = spci_memory_send(vm_to_from_lock.vm1, vm_to_from_lock.vm2,
-			       memory_region, length, share_func,
-			       &api_page_pool);
-
-	if (ret.func == SPCI_SUCCESS_32) {
-		/* Copy data to the destination Rx. */
-		/*
-		 * TODO: Translate the <from> IPA addresses to <to> IPA
-		 * addresses. Currently we assume identity mapping of the stage
-		 * 2 translation. Removing this assumption relies on a mechanism
-		 * to handle scenarios where the memory region fits in the
-		 * source Tx buffer but cannot fit in the destination Rx buffer.
-		 * This mechanism will be defined at the spec level.
-		 */
-		memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX, memory_region,
-			 length);
-		to->mailbox.recv_size = length;
-		to->mailbox.recv_sender = from->id;
-		to->mailbox.recv_func = share_func;
-		ret = deliver_msg(vm_to_from_lock.vm1, from->id, current, next);
-	}
+	ret = spci_memory_retrieve(to_locked, retrieve_request, length,
+				   &api_page_pool);
 
 out:
-	vm_unlock(&vm_to_from_lock.vm1);
-	vm_unlock(&vm_to_from_lock.vm2);
+	vm_unlock(&to_locked);
+	return ret;
+}
+
+struct spci_value api_spci_mem_relinquish(struct vcpu *current)
+{
+	struct vm *from = current->vm;
+	struct vm_locked from_locked;
+	const void *from_msg;
+	struct spci_mem_relinquish *relinquish_request;
+	uint32_t message_buffer_size;
+	struct spci_value ret;
+	uint32_t length;
+
+	from_locked = vm_lock(from);
+	from_msg = from->mailbox.send;
+
+	if (from_msg == NULL) {
+		dlog_verbose("TX buffer not setup.\n");
+		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/*
+	 * Calculate length from relinquish descriptor before copying. We will
+	 * check again later to make sure it hasn't changed.
+	 */
+	length = sizeof(struct spci_mem_relinquish) +
+		 ((struct spci_mem_relinquish *)from_msg)->endpoint_count *
+			 sizeof(spci_vm_id_t);
+	/*
+	 * Copy the relinquish descriptor to an internal buffer, so that the
+	 * caller can't change it underneath us.
+	 */
+	relinquish_request =
+		(struct spci_mem_relinquish *)cpu_get_buffer(current->cpu);
+	message_buffer_size = cpu_get_buffer_size(current->cpu);
+	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
+		dlog_verbose("Relinquish message too long.\n");
+		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		goto out;
+	}
+	memcpy_s(relinquish_request, message_buffer_size, from_msg, length);
+
+	if (sizeof(struct spci_mem_relinquish) +
+		    relinquish_request->endpoint_count * sizeof(spci_vm_id_t) !=
+	    length) {
+		dlog_verbose(
+			"Endpoint count changed while copying to internal "
+			"buffer.\n");
+		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	ret = spci_memory_relinquish(from_locked, relinquish_request,
+				     &api_page_pool);
+
+out:
+	vm_unlock(&from_locked);
+	return ret;
+}
+
+struct spci_value api_spci_mem_reclaim(uint32_t handle, uint32_t flags,
+				       struct vcpu *current)
+{
+	struct vm *to = current->vm;
+	struct vm_locked to_locked;
+	struct spci_value ret;
+
+	to_locked = vm_lock(to);
+
+	if ((handle & SPCI_MEMORY_HANDLE_ALLOCATOR_MASK) ==
+	    SPCI_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
+		ret = spci_memory_reclaim(to_locked, handle,
+					  flags & SPCI_MEM_RECLAIM_CLEAR,
+					  &api_page_pool);
+	} else {
+		dlog_verbose(
+			"Tried to reclaim handle %#x not allocated by "
+			"hypervisor.\n",
+			handle);
+		ret = spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+	vm_unlock(&to_locked);
 
 	return ret;
 }

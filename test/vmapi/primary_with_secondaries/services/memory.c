@@ -32,25 +32,21 @@ TEST_SERVICE(memory_increment)
 {
 	/* Loop, writing message to the shared memory. */
 	for (;;) {
-		struct spci_value ret = spci_msg_wait();
-		uint8_t *ptr;
 		size_t i;
 		void *recv_buf = SERVICE_RECV_BUFFER();
-		struct spci_memory_region *memory_region =
-			(struct spci_memory_region *)recv_buf;
-		struct spci_memory_region_constituent *constituents =
-			spci_memory_region_get_constituents(memory_region);
-		spci_vm_id_t sender = memory_region->sender;
+		void *send_buf = SERVICE_SEND_BUFFER();
 
-		EXPECT_EQ(ret.func, SPCI_MEM_SHARE_32);
-
-		ptr = (uint8_t *)spci_memory_region_constituent_get_address(
-			&constituents[0]);
-
-		/* Check the memory was cleared. */
-		for (i = 0; i < PAGE_SIZE; ++i) {
-			ASSERT_EQ(ptr[i], 0);
-		}
+		struct spci_value ret = spci_msg_wait();
+		spci_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, NULL);
+		struct spci_retrieved_memory_region *memory_region =
+			(struct spci_retrieved_memory_region *)recv_buf;
+		struct spci_receiver_address_range *range =
+			spci_retrieved_memory_region_first_receiver_range(
+				memory_region);
+		uint8_t *ptr =
+			(uint8_t *)spci_memory_region_constituent_get_address(
+				&range->constituents[0]);
 
 		/* Allow the memory to be populated. */
 		EXPECT_EQ(spci_yield().func, SPCI_SUCCESS_32);
@@ -69,17 +65,15 @@ TEST_SERVICE(memory_increment)
 TEST_SERVICE(give_memory_and_fault)
 {
 	void *send_buf = SERVICE_SEND_BUFFER();
-
-	/* Give memory to the primary. */
 	struct spci_memory_region_constituent constituents[] = {
 		spci_memory_region_constituent_init((uint64_t)&page, 1),
 	};
-	uint32_t msg_size = spci_memory_region_init(
-		send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, SPCI_MEMORY_REGION_FLAG_CLEAR,
-		SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
-		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
+
+	/* Give memory to the primary. */
+	send_memory_and_retrieve_request(
+		SPCI_MEM_DONATE_32, send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
+		constituents, ARRAY_SIZE(constituents),
+		SPCI_MEMORY_REGION_FLAG_CLEAR, SPCI_MEMORY_RW_X);
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
@@ -92,17 +86,15 @@ TEST_SERVICE(give_memory_and_fault)
 TEST_SERVICE(lend_memory_and_fault)
 {
 	void *send_buf = SERVICE_SEND_BUFFER();
-
-	/* Lend memory to the primary. */
 	struct spci_memory_region_constituent constituents[] = {
 		spci_memory_region_constituent_init((uint64_t)&page, 1),
 	};
-	uint32_t msg_size = spci_memory_region_init(
-		send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, SPCI_MEMORY_REGION_FLAG_CLEAR,
-		SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
-		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_mem_lend(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
+
+	/* Lend memory to the primary. */
+	send_memory_and_retrieve_request(
+		SPCI_MEM_LEND_32, send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
+		constituents, ARRAY_SIZE(constituents),
+		SPCI_MEMORY_REGION_FLAG_CLEAR, SPCI_MEMORY_RW_X);
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
@@ -116,24 +108,21 @@ TEST_SERVICE(spci_memory_return)
 {
 	struct spci_value ret = spci_msg_wait();
 	uint8_t *ptr;
-	uint32_t msg_size;
 	size_t i;
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct spci_memory_region *memory_region;
-	struct spci_memory_region_constituent *constituents;
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
-	/* The memory may have been sent in one of several different ways. */
-	EXPECT_TRUE(ret.func == SPCI_MEM_DONATE_32 ||
-		    ret.func == SPCI_MEM_LEND_32 ||
-		    ret.func == SPCI_MEM_SHARE_32);
-
-	memory_region = (struct spci_memory_region *)recv_buf;
-	constituents = spci_memory_region_get_constituents(memory_region);
+	spci_vm_id_t sender =
+		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
+	struct spci_retrieved_memory_region *memory_region =
+		(struct spci_retrieved_memory_region *)recv_buf;
+	struct spci_receiver_address_range *range =
+		spci_retrieved_memory_region_first_receiver_range(
+			memory_region);
 	ptr = (uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[0]);
+		&range->constituents[0]);
 
 	/* Check that one has access to the shared region. */
 	for (i = 0; i < PAGE_SIZE; ++i) {
@@ -141,13 +130,11 @@ TEST_SERVICE(spci_memory_return)
 	}
 
 	/* Give the memory back and notify the sender. */
-	msg_size = spci_memory_region_init(
-		send_buf, hf_vm_get_id(), memory_region->sender, constituents,
-		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
-		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
-		SPCI_MEMORY_OUTER_SHAREABLE);
+	send_memory_and_retrieve_request(
+		SPCI_MEM_DONATE_32, send_buf, hf_vm_get_id(), sender,
+		range->constituents, range->constituent_count, 0,
+		SPCI_MEMORY_RW_X);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/*
 	 * Try and access the memory which will cause a fault unless the memory
@@ -158,66 +145,77 @@ TEST_SERVICE(spci_memory_return)
 	FAIL("Exception not generated by invalid access.");
 }
 
-TEST_SERVICE(spci_donate_check_upper_bound)
+/**
+ * Attempt to modify above the upper bound of a memory region sent to us.
+ */
+TEST_SERVICE(spci_check_upper_bound)
 {
-	struct spci_value ret = spci_msg_wait();
+	struct spci_retrieved_memory_region *memory_region;
+	struct spci_receiver_address_range *range;
 	uint8_t *ptr;
 	uint8_t index;
+
 	void *recv_buf = SERVICE_RECV_BUFFER();
-	struct spci_memory_region *memory_region;
-	struct spci_memory_region_constituent *constituents;
+	void *send_buf = SERVICE_SEND_BUFFER();
+	struct spci_value ret = spci_msg_wait();
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
-	EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
-
-	memory_region = (struct spci_memory_region *)recv_buf;
-	constituents = spci_memory_region_get_constituents(memory_region);
+	retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
+	memory_region = (struct spci_retrieved_memory_region *)recv_buf;
+	range = spci_retrieved_memory_region_first_receiver_range(
+		memory_region);
 
 	/* Choose which constituent we want to test. */
 	index = *(uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[0]);
+		&range->constituents[0]);
 	ptr = (uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[index]);
+		&range->constituents[index]);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/*
-	 * Check that one cannot access out of bounds after donated
-	 * region. This should trigger the exception handler.
+	 * Check that we can't access out of bounds after the region sent to us.
+	 * This should trigger the exception handler.
 	 */
 	ptr[PAGE_SIZE]++;
 
 	FAIL("Exception not generated by access out of bounds.");
 }
 
-TEST_SERVICE(spci_donate_check_lower_bound)
+/**
+ * Attempt to modify below the lower bound of a memory region sent to us.
+ */
+TEST_SERVICE(spci_check_lower_bound)
 {
-	struct spci_value ret = spci_msg_wait();
+	struct spci_retrieved_memory_region *memory_region;
+	struct spci_receiver_address_range *range;
 	uint8_t *ptr;
 	uint8_t index;
+
 	void *recv_buf = SERVICE_RECV_BUFFER();
-	struct spci_memory_region *memory_region;
-	struct spci_memory_region_constituent *constituents;
+	void *send_buf = SERVICE_SEND_BUFFER();
+	struct spci_value ret = spci_msg_wait();
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
-	EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
-
-	memory_region = (struct spci_memory_region *)recv_buf;
-	constituents = spci_memory_region_get_constituents(memory_region);
+	retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
+	memory_region = (struct spci_retrieved_memory_region *)recv_buf;
+	range = spci_retrieved_memory_region_first_receiver_range(
+		memory_region);
 
 	/* Choose which constituent we want to test. */
 	index = *(uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[0]);
+		&range->constituents[0]);
 	ptr = (uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[index]);
+		&range->constituents[index]);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/*
-	 * Check that one cannot access out of bounds after donated
-	 * region. This should trigger the exception handler.
+	 * Check that we can't access out of bounds before the region sent to
+	 * us. This should trigger the exception handler.
 	 */
 	ptr[-1]++;
+
 	FAIL("Exception not generated by access out of bounds.");
 }
 
@@ -226,31 +224,31 @@ TEST_SERVICE(spci_donate_check_lower_bound)
  */
 TEST_SERVICE(spci_donate_secondary_and_fault)
 {
-	struct spci_value ret = spci_msg_wait();
 	uint8_t *ptr;
-	uint32_t msg_size;
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct spci_memory_region *memory_region =
-		(struct spci_memory_region *)recv_buf;
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
 
-	EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
+	struct spci_value ret = spci_msg_wait();
+	spci_vm_id_t sender =
+		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
+	struct spci_retrieved_memory_region *memory_region =
+		(struct spci_retrieved_memory_region *)recv_buf;
+	struct spci_receiver_address_range *range =
+		spci_retrieved_memory_region_first_receiver_range(
+			memory_region);
 
+	ASSERT_EQ(sender, HF_PRIMARY_VM_ID);
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	ptr = (uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[0]);
+		&range->constituents[0]);
 
 	/* Donate memory to next VM. */
-	msg_size = spci_memory_region_init(
-		send_buf, hf_vm_get_id(), SERVICE_VM2, constituents,
-		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
-		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
-		SPCI_MEMORY_OUTER_SHAREABLE);
+	send_memory_and_retrieve_request(
+		SPCI_MEM_DONATE_32, send_buf, hf_vm_get_id(), SERVICE_VM2,
+		range->constituents, range->constituent_count, 0,
+		SPCI_MEMORY_RW_X);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
 
 	/* Ensure that we are unable to modify memory any more. */
 	ptr[0] = 'c';
@@ -264,26 +262,29 @@ TEST_SERVICE(spci_donate_secondary_and_fault)
 TEST_SERVICE(spci_donate_twice)
 {
 	uint32_t msg_size;
-	struct spci_value ret = spci_msg_wait();
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct spci_memory_region *memory_region =
-		(struct spci_memory_region *)recv_buf;
-	struct spci_memory_region_constituent constituent =
-		spci_memory_region_get_constituents(memory_region)[0];
 
-	EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
+	struct spci_value ret = spci_msg_wait();
+	spci_vm_id_t sender =
+		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
+	struct spci_retrieved_memory_region *memory_region =
+		(struct spci_retrieved_memory_region *)recv_buf;
+	struct spci_receiver_address_range *range =
+		spci_retrieved_memory_region_first_receiver_range(
+			memory_region);
+	struct spci_memory_region_constituent constituent =
+		range->constituents[0];
+
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 	/* Yield to allow attempt to re donate from primary. */
 	spci_yield();
 
 	/* Give the memory back and notify the sender. */
-	msg_size = spci_memory_region_init(
-		send_buf, SERVICE_VM1, HF_PRIMARY_VM_ID, &constituent, 1, 0, 0,
-		SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
-		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
+	send_memory_and_retrieve_request(SPCI_MEM_DONATE_32, send_buf,
+					 hf_vm_get_id(), sender, &constituent,
+					 1, 0, SPCI_MEMORY_RW_X);
 
 	/* Attempt to donate the memory to another VM. */
 	msg_size = spci_memory_region_init(
@@ -302,19 +303,22 @@ TEST_SERVICE(spci_donate_twice)
  */
 TEST_SERVICE(spci_memory_receive)
 {
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	void *send_buf = SERVICE_SEND_BUFFER();
+
 	for (;;) {
 		struct spci_value ret = spci_msg_wait();
+		struct spci_retrieved_memory_region *memory_region;
+		struct spci_receiver_address_range *range;
 		uint8_t *ptr;
-		void *recv_buf = SERVICE_RECV_BUFFER();
-		struct spci_memory_region *memory_region =
-			(struct spci_memory_region *)recv_buf;
-		struct spci_memory_region_constituent *constituents =
-			spci_memory_region_get_constituents(memory_region);
 
-		EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
-
+		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
+		memory_region = (struct spci_retrieved_memory_region *)recv_buf;
+		range = spci_retrieved_memory_region_first_receiver_range(
+			memory_region);
 		ptr = (uint8_t *)spci_memory_region_constituent_get_address(
-			&constituents[0]);
+			&range->constituents[0]);
+
 		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 		ptr[0] = 'd';
 		spci_yield();
@@ -331,28 +335,28 @@ TEST_SERVICE(spci_memory_receive)
 TEST_SERVICE(spci_donate_invalid_source)
 {
 	uint32_t msg_size;
-	struct spci_value ret = spci_msg_wait();
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct spci_memory_region *memory_region =
-		(struct spci_memory_region *)recv_buf;
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
 
-	EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
+	struct spci_value ret = spci_msg_wait();
+	spci_vm_id_t sender =
+		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
+	struct spci_retrieved_memory_region *memory_region =
+		(struct spci_retrieved_memory_region *)recv_buf;
+	struct spci_receiver_address_range *range =
+		spci_retrieved_memory_region_first_receiver_range(
+			memory_region);
 
 	/* Give the memory back and notify the sender. */
-	msg_size = spci_memory_region_init(
-		send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID, constituents,
-		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
-		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
-		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
+	send_memory_and_retrieve_request(
+		SPCI_MEM_DONATE_32, send_buf, hf_vm_get_id(), sender,
+		range->constituents, range->constituent_count, 0,
+		SPCI_MEMORY_RW_X);
 
 	/* Fail to donate the memory from the primary to VM2. */
 	msg_size = spci_memory_region_init(
-		send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
-		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
+		send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2, range->constituents,
+		range->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
@@ -367,28 +371,26 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 
 	/* Loop, giving memory back to the sender. */
 	for (;;) {
-		struct spci_value ret = spci_msg_wait();
 		uint8_t *ptr;
 		uint8_t *ptr2;
 		uint32_t count;
 		uint32_t count2;
-		uint32_t msg_size;
 		size_t i;
+		spci_memory_handle_t handle;
 
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		struct spci_memory_region *memory_region =
-			(struct spci_memory_region *)recv_buf;
-		struct spci_memory_region_constituent *constituents =
-			spci_memory_region_get_constituents(memory_region);
 
-		/*
-		 * The memory may have been sent in one of several different
-		 * ways.
-		 */
-		EXPECT_TRUE(ret.func == SPCI_MEM_DONATE_32 ||
-			    ret.func == SPCI_MEM_LEND_32 ||
-			    ret.func == SPCI_MEM_SHARE_32);
+		struct spci_value ret = spci_msg_wait();
+		spci_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, &handle);
+		struct spci_retrieved_memory_region *memory_region =
+			(struct spci_retrieved_memory_region *)recv_buf;
+		struct spci_receiver_address_range *range =
+			spci_retrieved_memory_region_first_receiver_range(
+				memory_region);
+		struct spci_memory_region_constituent *constituents =
+			range->constituents;
 
 		ptr = (uint8_t *)spci_memory_region_constituent_get_address(
 			&constituents[0]);
@@ -396,6 +398,8 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 		ptr2 = (uint8_t *)spci_memory_region_constituent_get_address(
 			&constituents[1]);
 		count2 = constituents[1].page_count;
+		/* Relevant information read, mailbox can be cleared. */
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
 		/* Check that one has access to the shared region. */
 		for (i = 0; i < PAGE_SIZE * count; ++i) {
@@ -406,15 +410,11 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 		}
 
 		/* Give the memory back and notify the sender. */
-		msg_size = spci_memory_region_init(
-			send_buf, hf_vm_get_id(), memory_region->sender,
-			constituents, memory_region->constituent_count, 0, 0,
-			SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
-			SPCI_MEMORY_CACHE_WRITE_BACK,
-			SPCI_MEMORY_OUTER_SHAREABLE);
-		/* Relevant information read, mailbox can be cleared. */
-		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-		EXPECT_EQ(hf_spci_mem_relinquish(msg_size, msg_size, 0).func,
+		*(struct spci_mem_relinquish *)send_buf =
+			(struct spci_mem_relinquish){.handle = handle,
+						     .sender = hf_vm_get_id()};
+		EXPECT_EQ(spci_mem_relinquish().func, SPCI_SUCCESS_32);
+		EXPECT_EQ(spci_msg_send(hf_vm_get_id(), sender, 0, 0).func,
 			  SPCI_SUCCESS_32);
 
 		/*
@@ -431,39 +431,38 @@ TEST_SERVICE(spci_memory_lend_relinquish)
 TEST_SERVICE(spci_memory_donate_relinquish)
 {
 	for (;;) {
-		struct spci_value ret = spci_msg_wait();
-		uint8_t *ptr;
-		uint32_t msg_size;
 		size_t i;
+		spci_memory_handle_t handle;
+		struct spci_retrieved_memory_region *memory_region;
+		struct spci_receiver_address_range *range;
+		uint8_t *ptr;
 
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		struct spci_memory_region *memory_region =
-			(struct spci_memory_region *)recv_buf;
-		struct spci_memory_region_constituent *constituents =
-			spci_memory_region_get_constituents(memory_region);
+		struct spci_value ret = spci_msg_wait();
 
-		EXPECT_EQ(ret.func, SPCI_MEM_DONATE_32);
+		retrieve_memory_from_message(recv_buf, send_buf, ret, &handle);
+		memory_region = (struct spci_retrieved_memory_region *)recv_buf;
+		range = spci_retrieved_memory_region_first_receiver_range(
+			memory_region);
 
 		ptr = (uint8_t *)spci_memory_region_constituent_get_address(
-			&constituents[0]);
+			&range->constituents[0]);
 
 		/* Check that we have access to the shared region. */
 		for (i = 0; i < PAGE_SIZE; ++i) {
 			ptr[i]++;
 		}
+
 		/*
 		 * Attempt to relinquish the memory, which should fail because
 		 * it was donated not lent.
 		 */
-		msg_size = spci_memory_region_init(
-			send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
-			constituents, memory_region->constituent_count, 0, 0,
-			SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
-			SPCI_MEMORY_CACHE_WRITE_BACK,
-			SPCI_MEMORY_OUTER_SHAREABLE);
+		*(struct spci_mem_relinquish *)send_buf =
+			(struct spci_mem_relinquish){.handle = handle,
+						     .sender = hf_vm_get_id()};
 		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-		EXPECT_SPCI_ERROR(hf_spci_mem_relinquish(msg_size, msg_size, 0),
+		EXPECT_SPCI_ERROR(spci_mem_relinquish(),
 				  SPCI_INVALID_PARAMETERS);
 
 		/* Ensure we still have access to the memory. */
@@ -474,44 +473,79 @@ TEST_SERVICE(spci_memory_donate_relinquish)
 }
 
 /**
+ * Receive memory that has been shared, try to relinquish it with the clear flag
+ * set (and expect to fail), and then relinquish without any flags.
+ */
+TEST_SERVICE(spci_memory_share_relinquish_clear)
+{
+	exception_setup(NULL, exception_handler_yield_data_abort);
+
+	/* Loop, receiving memory and relinquishing it. */
+	for (;;) {
+		spci_memory_handle_t handle;
+
+		void *recv_buf = SERVICE_RECV_BUFFER();
+		void *send_buf = SERVICE_SEND_BUFFER();
+
+		struct spci_value ret = spci_msg_wait();
+		spci_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, &handle);
+
+		/*
+		 * Mailbox can be cleared, we don't actually care what the
+		 * memory region is.
+		 */
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+
+		/* Trying to relinquish the memory and clear it should fail. */
+		*(struct spci_mem_relinquish *)send_buf =
+			(struct spci_mem_relinquish){
+				.handle = handle,
+				.sender = hf_vm_get_id(),
+				.flags = SPCI_MEMORY_REGION_FLAG_CLEAR};
+		EXPECT_SPCI_ERROR(spci_mem_relinquish(),
+				  SPCI_INVALID_PARAMETERS);
+
+		/* Give the memory back and notify the sender. */
+		*(struct spci_mem_relinquish *)send_buf =
+			(struct spci_mem_relinquish){.handle = handle,
+						     .sender = hf_vm_get_id()};
+		EXPECT_EQ(spci_mem_relinquish().func, SPCI_SUCCESS_32);
+		EXPECT_EQ(spci_msg_send(hf_vm_get_id(), sender, 0, 0).func,
+			  SPCI_SUCCESS_32);
+	}
+}
+
+/**
  * Receive memory and attempt to donate from primary VM.
  */
 TEST_SERVICE(spci_lend_invalid_source)
 {
+	spci_memory_handle_t handle;
 	uint32_t msg_size;
-	struct spci_value ret = spci_msg_wait();
 
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct spci_memory_region *memory_region =
-		(struct spci_memory_region *)recv_buf;
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
-
-	EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
-
-	/* Attempt to relinquish to this same VM. */
-	msg_size = spci_memory_region_init(
-		send_buf, HF_PRIMARY_VM_ID, hf_vm_get_id(), constituents,
-		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
-		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
-		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_SPCI_ERROR(hf_spci_mem_relinquish(msg_size, msg_size, 0),
-			  SPCI_INVALID_PARAMETERS);
+	struct spci_value ret = spci_msg_wait();
+	spci_vm_id_t sender =
+		retrieve_memory_from_message(recv_buf, send_buf, ret, &handle);
+	struct spci_retrieved_memory_region *memory_region =
+		(struct spci_retrieved_memory_region *)recv_buf;
+	struct spci_receiver_address_range *range =
+		spci_retrieved_memory_region_first_receiver_range(
+			memory_region);
 
 	/* Give the memory back and notify the sender. */
-	msg_size = spci_memory_region_init(
-		send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID, constituents,
-		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
-		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
-		SPCI_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(hf_spci_mem_relinquish(msg_size, msg_size, 0).func,
+	*(struct spci_mem_relinquish *)send_buf = (struct spci_mem_relinquish){
+		.handle = handle, .sender = hf_vm_get_id()};
+	EXPECT_EQ(spci_mem_relinquish().func, SPCI_SUCCESS_32);
+	EXPECT_EQ(spci_msg_send(hf_vm_get_id(), sender, 0, 0).func,
 		  SPCI_SUCCESS_32);
 
 	/* Ensure we cannot lend from the primary to another secondary. */
 	msg_size = spci_memory_region_init(
-		send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
-		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
+		send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2, range->constituents,
+		range->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_SPCI_ERROR(spci_mem_lend(msg_size, msg_size, 0),
@@ -519,8 +553,8 @@ TEST_SERVICE(spci_lend_invalid_source)
 
 	/* Ensure we cannot share from the primary to another secondary. */
 	msg_size = spci_memory_region_init(
-		send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
-		memory_region->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
+		send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2, range->constituents,
+		range->constituent_count, 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
@@ -538,21 +572,25 @@ TEST_SERVICE(spci_memory_lend_relinquish_X)
 	exception_setup(NULL, exception_handler_yield_instruction_abort);
 
 	for (;;) {
-		struct spci_value ret = spci_msg_wait();
-		uint64_t *ptr;
-		uint32_t msg_size;
-
+		spci_memory_handle_t handle;
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		struct spci_memory_region *memory_region =
-			(struct spci_memory_region *)recv_buf;
+		struct spci_value ret = spci_msg_wait();
+		spci_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, &handle);
+		struct spci_retrieved_memory_region *memory_region =
+			(struct spci_retrieved_memory_region *)recv_buf;
+		struct spci_receiver_address_range *range =
+			spci_retrieved_memory_region_first_receiver_range(
+				memory_region);
 		struct spci_memory_region_constituent *constituents =
-			spci_memory_region_get_constituents(memory_region);
+			range->constituents;
+		uint64_t *ptr =
+			(uint64_t *)spci_memory_region_constituent_get_address(
+				&constituents[0]);
 
-		EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
+		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
-		ptr = (uint64_t *)spci_memory_region_constituent_get_address(
-			&constituents[0]);
 		/*
 		 * Verify that the instruction in memory is the encoded RET
 		 * instruction.
@@ -562,14 +600,11 @@ TEST_SERVICE(spci_memory_lend_relinquish_X)
 		__asm__ volatile("blr %0" ::"r"(ptr));
 
 		/* Release the memory again. */
-		msg_size = spci_memory_region_init(
-			send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
-			constituents, memory_region->constituent_count, 0, 0,
-			SPCI_MEMORY_RW_X, SPCI_MEMORY_NORMAL_MEM,
-			SPCI_MEMORY_CACHE_WRITE_BACK,
-			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-		EXPECT_EQ(hf_spci_mem_relinquish(msg_size, msg_size, 0).func,
+		*(struct spci_mem_relinquish *)send_buf =
+			(struct spci_mem_relinquish){.handle = handle,
+						     .sender = hf_vm_get_id()};
+		EXPECT_EQ(spci_mem_relinquish().func, SPCI_SUCCESS_32);
+		EXPECT_EQ(spci_msg_send(hf_vm_get_id(), sender, 0, 0).func,
 			  SPCI_SUCCESS_32);
 	}
 }
@@ -582,27 +617,22 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	for (;;) {
-		struct spci_value ret = spci_msg_wait();
+		spci_memory_handle_t handle;
 		uint8_t *ptr;
-		uint32_t msg_size;
 		size_t i;
 
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		struct spci_memory_region *memory_region =
-			(struct spci_memory_region *)recv_buf;
-		struct spci_memory_region_constituent *constituents =
-			spci_memory_region_get_constituents(memory_region);
+		struct spci_value ret = spci_msg_wait();
+		spci_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, &handle);
+		struct spci_retrieved_memory_region *memory_region =
+			(struct spci_retrieved_memory_region *)recv_buf;
+		struct spci_receiver_address_range *range =
+			spci_retrieved_memory_region_first_receiver_range(
+				memory_region);
 		struct spci_memory_region_constituent constituent_copy =
-			constituents[0];
-
-		/*
-		 * The memory may have been sent in one of several different
-		 * ways.
-		 */
-		EXPECT_TRUE(ret.func == SPCI_MEM_DONATE_32 ||
-			    ret.func == SPCI_MEM_LEND_32 ||
-			    ret.func == SPCI_MEM_SHARE_32);
+			range->constituents[0];
 
 		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 
@@ -622,78 +652,14 @@ TEST_SERVICE(spci_memory_lend_relinquish_RW)
 			ptr[i]++;
 		}
 
-		msg_size = spci_memory_region_init(
-			send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
-			&constituent_copy, 1, 0, 0, SPCI_MEMORY_RW_X,
-			SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
-			SPCI_MEMORY_OUTER_SHAREABLE);
-		EXPECT_EQ(hf_spci_mem_relinquish(msg_size, msg_size, 0).func,
+		/* Give the memory back and notify the sender. */
+		*(struct spci_mem_relinquish *)send_buf =
+			(struct spci_mem_relinquish){.handle = handle,
+						     .sender = hf_vm_get_id()};
+		EXPECT_EQ(spci_mem_relinquish().func, SPCI_SUCCESS_32);
+		EXPECT_EQ(spci_msg_send(hf_vm_get_id(), sender, 0, 0).func,
 			  SPCI_SUCCESS_32);
 	}
-}
-
-/**
- * Attempt to modify above the upper bound for the lent memory.
- */
-TEST_SERVICE(spci_lend_check_upper_bound)
-{
-	struct spci_value ret = spci_msg_wait();
-	uint8_t *ptr;
-	uint8_t index;
-
-	void *recv_buf = SERVICE_RECV_BUFFER();
-	struct spci_memory_region *memory_region =
-		(struct spci_memory_region *)recv_buf;
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
-
-	EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
-
-	exception_setup(NULL, exception_handler_yield_data_abort);
-
-	/* Choose which constituent we want to test. */
-	index = *(uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[0]);
-	ptr = (uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[index]);
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-
-	/* Check that one cannot access after lent region. */
-	ASSERT_EQ(ptr[PAGE_SIZE], 0);
-
-	FAIL("Exception not generated by invalid access.");
-}
-
-/**
- * Attempt to modify below the lower bound for the lent memory.
- */
-TEST_SERVICE(spci_lend_check_lower_bound)
-{
-	struct spci_value ret = spci_msg_wait();
-	uint8_t *ptr;
-	uint8_t index;
-
-	void *recv_buf = SERVICE_RECV_BUFFER();
-	struct spci_memory_region *memory_region =
-		(struct spci_memory_region *)recv_buf;
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
-
-	exception_setup(NULL, exception_handler_yield_data_abort);
-
-	EXPECT_EQ(ret.func, SPCI_MEM_LEND_32);
-
-	/* Choose which constituent we want to test. */
-	index = *(uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[0]);
-	ptr = (uint8_t *)spci_memory_region_constituent_get_address(
-		&constituents[index]);
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-
-	/* Check that one cannot access after lent region. */
-	ptr[-1]++;
-
-	FAIL("Exception not generated by invalid access.");
 }
 
 TEST_SERVICE(spci_memory_lend_twice)
@@ -705,17 +671,15 @@ TEST_SERVICE(spci_memory_lend_twice)
 
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct spci_memory_region *memory_region =
-		(struct spci_memory_region *)recv_buf;
-	struct spci_memory_region_constituent *constituents =
-		spci_memory_region_get_constituents(memory_region);
-	struct spci_memory_region_constituent constituent_copy =
-		constituents[0];
+	struct spci_retrieved_memory_region *memory_region;
+	struct spci_receiver_address_range *range;
+	struct spci_memory_region_constituent constituent_copy;
 
-	/* The memory may have been sent in one of several different ways. */
-	EXPECT_TRUE(ret.func == SPCI_MEM_DONATE_32 ||
-		    ret.func == SPCI_MEM_LEND_32 ||
-		    ret.func == SPCI_MEM_SHARE_32);
+	retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
+	memory_region = (struct spci_retrieved_memory_region *)recv_buf;
+	range = spci_retrieved_memory_region_first_receiver_range(
+		memory_region);
+	constituent_copy = range->constituents[0];
 
 	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
 

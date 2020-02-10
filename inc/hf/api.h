@@ -65,3 +65,11 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 				    uint32_t fragment_length, uint32_t length,
 				    uint32_t cookie, struct vcpu *current,
 				    struct vcpu **next);
+struct spci_value api_spci_mem_retrieve_req(ipaddr_t address,
+					    uint32_t page_count,
+					    uint32_t fragment_length,
+					    uint32_t length, uint32_t cookie,
+					    struct vcpu *current);
+struct spci_value api_spci_mem_relinquish(struct vcpu *current);
+struct spci_value api_spci_mem_reclaim(uint32_t handle, uint32_t flags,
+				       struct vcpu *current);

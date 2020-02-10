@@ -31,3 +31,12 @@ struct mailbox_buffers {
 };
 
 struct mailbox_buffers set_up_mailbox(void);
+spci_memory_handle_t send_memory_and_retrieve_request(
+	uint32_t share_func, void *tx_buffer, spci_vm_id_t sender,
+	spci_vm_id_t recipient,
+	struct spci_memory_region_constituent constituents[],
+	uint32_t constituent_count, spci_memory_region_flags_t flags,
+	enum spci_memory_access access);
+spci_vm_id_t retrieve_memory_from_message(void *recv_buf, void *send_buf,
+					  struct spci_value msg_ret,
+					  spci_memory_handle_t *handle);

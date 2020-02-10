@@ -38,9 +38,7 @@
 
 #include "vmapi/hf/call.h"
 
-alignas(alignof(
-	struct mm_page_table)) char ptable_buf[sizeof(struct mm_page_table) *
-					       HEAP_PAGES];
+alignas(MM_PPOOL_ENTRY_SIZE) char ptable_buf[MM_PPOOL_ENTRY_SIZE * HEAP_PAGES];
 
 static struct mpool ppool;
 
@@ -58,7 +56,7 @@ void one_time_init_mm(void)
 
 	dlog_notice("Initialising hafnium\n");
 
-	mpool_init(&ppool, sizeof(struct mm_page_table));
+	mpool_init(&ppool, MM_PPOOL_ENTRY_SIZE);
 	mpool_add_chunk(&ppool, ptable_buf, sizeof(ptable_buf));
 
 	if (!mm_init(&ppool)) {

@@ -71,6 +71,7 @@ source_set("src_testable") {
     ":std",
     ":string",
     "//src/arch/${plat_arch}/hypervisor",
+    "//vmlib",
     plat_boot_flow,
     plat_console,
     plat_iommu,

@@ -35,6 +35,8 @@ typedef uintptr_t hf_ipaddr_t;
 
 #endif
 
+#define HF_HYPERVISOR_VM_ID 0
+
 /**
  * An offset to use when assigning VM IDs.
  * The offset is needed because VM ID 0 is reserved.
