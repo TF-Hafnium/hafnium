@@ -66,18 +66,18 @@ These rules apply to comments and other natural language text.
 ## Coding practices
 
 *   Function macros should be functions instead, that way you get types.
-*   Lock ordering is described at the top of *api.c*.
+*   Lock ordering is described at the top of [`api.c`](../src/api.c).
 *   Use opaque types to avoid implicit casts when it will help avoid mistakes.
-    e.g. *addr.h*
+    e.g. [`addr.h`](../inc/hf/addr.h)
 *   Avoid inline casting. C doesn't give much protection so be formal about the
-    transformations. e.g. *addr.h*
+    transformations. e.g. [`addr.h`](../inc/hf/addr.h)
 *   If a function acquires a resource, there must be a single exit path to free
     the resource. Tracking down multiple exit points is hard and requires
     duplicated code which is harder. This may require splitting functions into
     subfunctions. Early exit is okay if there aren't any clean up tasks.
 *   Don't use function pointers. It makes analysis hard and is often a target of
     attacks.
-*   Be liberal with CHECK. Use it to assert pre-/post- conditions.
+*   Be liberal with `CHECK`. Use it to assert pre-/post- conditions.
 *   No self-modifying code.
 *   Build targets should include all the direct dependencies for their sources,
     where possible, rather than relying on transitive dependencies.
