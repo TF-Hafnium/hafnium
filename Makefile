@@ -79,6 +79,7 @@ format:
 	@find inc/ -name \*.c -o -name \*.cc -o -name \*.h | xargs -r clang-format -style file -i
 	@find test/ -name \*.c -o -name \*.cc -o -name \*.h | xargs -r clang-format -style file -i
 	@find project/ -name \*.c -o -name \*.cc -o -name \*.h | xargs -r clang-format -style file -i
+	@find vmlib/ -name \*.c -o -name \*.cc -o -name \*.h | xargs -r clang-format -style file -i
 	@find . \( -name \*.gn -o -name \*.gni \) | xargs -n1 $(GN) format
 
 .PHONY: checkpatch
