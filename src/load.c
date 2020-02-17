@@ -170,8 +170,9 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		dlog_warning(
 			"Device memory not provided, defaulting to 1 TB.\n");
 
+#if SECURE_WORLD == 0
 		if (!vm_identity_map(
-			    vm_locked, pa_init(0),
+			    vm_locked, pa_init(0x8000000),
 			    pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
 			    MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
 			dlog_error(
@@ -180,6 +181,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 			ret = false;
 			goto out;
 		}
+#endif
 	}
 
 	/* Map normal memory as such to permit caching, execution, etc. */
