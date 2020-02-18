@@ -139,12 +139,12 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	}
 
 	if (!vm_init_next(MAX_CPUS, ppool, &vm)) {
-		dlog_error("Unable to initialise primary vm\n");
+		dlog_error("Unable to initialise primary VM.\n");
 		return false;
 	}
 
 	if (vm->id != HF_PRIMARY_VM_ID) {
-		dlog_error("Primary vm was not given correct id\n");
+		dlog_error("Primary VM was not given correct ID.\n");
 		return false;
 	}
 
@@ -194,6 +194,9 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		ret = false;
 		goto out;
 	}
+
+	dlog_info("Loaded primary VM with %u vCPUs, entry at %#x.\n",
+		  vm->vcpu_count, pa_addr(primary_begin));
 
 	vcpu_locked = vcpu_lock(vm_get_vcpu(vm, 0));
 	vcpu_on(vcpu_locked, ipa_from_pa(primary_begin), params->kernel_arg);
