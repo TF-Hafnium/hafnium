@@ -936,18 +936,19 @@ static struct spci_value deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
 		return ret;
 	}
 
-	to.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
-
 	/* Messages for the TEE are sent on via the dispatcher. */
 	if (to.vm->id == HF_TEE_VM_ID) {
 		struct spci_value call = spci_msg_recv_return(to.vm);
 
+		to.vm->mailbox.state = MAILBOX_STATE_READ;
 		return arch_tee_call(call);
 		/*
 		 * Don't return to the primary VM in this case, as the TEE is
 		 * not (yet) scheduled via SPCI.
 		 */
 	}
+
+	to.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
 
 	/* Return to the primary VM directly or with a switch. */
 	if (from_id != HF_PRIMARY_VM_ID) {
