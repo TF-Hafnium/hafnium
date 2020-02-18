@@ -606,6 +606,7 @@ TEST(memory_sharing, donate_check_upper_bounds)
 	uint64_t address;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_check_upper_bound", mb.send);
+	SERVICE_SELECT(SERVICE_VM2, "spci_donate_check_upper_bound", mb.send);
 
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', 4 * PAGE_SIZE);
@@ -648,14 +649,18 @@ TEST(memory_sharing, donate_check_upper_bounds)
 	 */
 	pages[PAGE_SIZE] = 1;
 
+	/*
+	 * Use the second secondary VM for this test as the first is now in an
+	 * exception loop.
+	 */
 	msg_size = spci_memory_region_init(
-		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1, constituents,
+		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
 
-	run_res = spci_run(SERVICE_VM1, 0);
+	run_res = spci_run(SERVICE_VM2, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
 }
@@ -672,6 +677,7 @@ TEST(memory_sharing, donate_check_lower_bounds)
 	uint64_t address;
 
 	SERVICE_SELECT(SERVICE_VM1, "spci_donate_check_lower_bound", mb.send);
+	SERVICE_SELECT(SERVICE_VM2, "spci_donate_check_lower_bound", mb.send);
 
 	/* Initialise the memory before donating it. */
 	memset_s(ptr, sizeof(pages), 'b', 4 * PAGE_SIZE);
@@ -714,20 +720,20 @@ TEST(memory_sharing, donate_check_lower_bounds)
 	 */
 	pages[PAGE_SIZE] = 1;
 
+	/*
+	 * Use the second secondary VM for this test as the first is now in an
+	 * exception loop.
+	 */
 	msg_size = spci_memory_region_init(
-		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1, constituents,
+		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
 		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_EQ(spci_mem_donate(msg_size, msg_size, 0).func, SPCI_SUCCESS_32);
 
-	run_res = spci_run(SERVICE_VM1, 0);
-	/*
-	 * NOTE: This generates two exceptions, one for the page fault, and one
-	 * for accessing a region past the lower bound.
-	 */
+	run_res = spci_run(SERVICE_VM2, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
-		  2);
+		  1);
 }
 
 /**
@@ -1742,7 +1748,10 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 	 */
 	pages[PAGE_SIZE] = 1;
 
-	/* Use the secondary VM for this test as the first is now aborted. */
+	/*
+	 * Use the second secondary VM for this test as the first is now in an
+	 * exception loop.
+	 */
 	msg_size = spci_memory_region_init(
 		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
@@ -1810,7 +1819,10 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 	 */
 	pages[PAGE_SIZE] = 1;
 
-	/* Use the secondary VM for this test as the first is now aborted. */
+	/*
+	 * Use the second secondary VM for this test as the first is now in an
+	 * exception loop.
+	 */
 	msg_size = spci_memory_region_init(
 		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 		ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
