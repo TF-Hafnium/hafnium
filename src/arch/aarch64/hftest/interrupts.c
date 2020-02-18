@@ -65,6 +65,14 @@ noreturn static bool default_sync_current_exception(void)
 	}
 }
 
+/**
+ * Handles a synchronous exception at the current exception level.
+ *
+ * Returns true if the value of elr_el1 should be kept as-is rather than
+ * restored from the stack. This enables exception handlers to indicate whether
+ * they have changed the value of elr_el1 (e.g., to skip the faulting
+ * instruction).
+ */
 bool sync_exception_current(void)
 {
 	if (exception_callback != NULL) {
