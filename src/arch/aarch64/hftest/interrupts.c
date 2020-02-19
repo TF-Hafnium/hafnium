@@ -27,13 +27,21 @@ extern uint8_t vector_table_el1;
 static void (*irq_callback)(void);
 static bool (*exception_callback)(void);
 
-void irq_current(void)
+/**
+ * Handles an IRQ at the current exception level.
+ *
+ * Returns false so that the value of elr_el1 is restored from the stack, in
+ * case there are nested exceptions.
+ */
+bool irq_current(void)
 {
 	if (irq_callback != NULL) {
 		irq_callback();
 	} else {
 		FAIL("Got unexpected interrupt.\n");
 	}
+
+	return false;
 }
 
 noreturn static bool default_sync_current_exception(void)
