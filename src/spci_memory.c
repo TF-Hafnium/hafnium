@@ -483,11 +483,13 @@ static struct spci_value spci_share_memory(
 	 * not we would get alignment faults trying to read (32-bit) values.
 	 */
 	if (!is_aligned(constituents, 4)) {
+		dlog_verbose("Constituents not aligned.\n");
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
 	/* Disallow reflexive shares as this suggests an error in the VM. */
 	if (to == from) {
+		dlog_verbose("Reflexive share.\n");
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
@@ -500,6 +502,7 @@ static struct spci_value spci_share_memory(
 				       constituents, constituent_count,
 				       memory_to_attributes, &from_mode,
 				       &to_mode)) {
+		dlog_verbose("Invalid transition.\n");
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
