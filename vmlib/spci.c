@@ -56,12 +56,15 @@ uint32_t spci_memory_region_init(
 	memory_region->tag = tag;
 	memory_region->flags = flags;
 	memory_region->sender = sender;
-	memory_region->reserved = 0;
+	memory_region->reserved_0 = 0;
+	memory_region->reserved_1 = 0;
 	memory_region->page_count = 0;
 	memory_region->constituent_count = constituent_count;
 	memory_region->attribute_count = 1;
 	memory_region->attributes[0].receiver = receiver;
 	memory_region->attributes[0].memory_attributes = attributes;
+	memory_region->attributes[0].reserved_0 = 0;
+	memory_region->attributes[0].reserved_1 = 0;
 
 	/*
 	 * Constituent offset must be aligned to a 32-bit boundary so that

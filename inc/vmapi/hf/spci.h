@@ -233,6 +233,8 @@ struct spci_memory_region_constituent {
 	uint32_t address_high;
 	/** The number of 4 kiB pages in the constituent memory region. */
 	uint32_t page_count;
+	/** Reserved field, must be 0. */
+	uint32_t reserved;
 };
 
 struct spci_memory_region_attributes {
@@ -243,6 +245,10 @@ struct spci_memory_region_attributes {
 	 * receiver's page table.
 	 */
 	uint16_t memory_attributes;
+	/** Reserved field, must be 0. */
+	uint32_t reserved_0;
+	/** Reserved field, must be 0. */
+	uint64_t reserved_1;
 };
 
 /** Flags to control the behaviour of a memory sharing transaction. */
@@ -265,7 +271,7 @@ struct spci_memory_region {
 	/** Sender VM ID. */
 	spci_vm_id_t sender;
 	/** Reserved field, must be 0. */
-	uint16_t reserved;
+	uint16_t reserved_0;
 	/**
 	 * The total number of 4 kiB pages included in this memory region. This
 	 * must be equal to the sum of page counts specified in each
@@ -288,6 +294,8 @@ struct spci_memory_region {
 	 * this memory region.
 	 */
 	uint32_t attribute_count;
+	/** Reserved field, must be 0. */
+	uint16_t reserved_1;
 	/**
 	 * An array of `attribute_count` memory region attribute descriptors.
 	 * Each one specifies an endpoint and the attributes with which this
