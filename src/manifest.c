@@ -127,6 +127,20 @@ static enum manifest_return_code read_uint64(const struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
+static enum manifest_return_code read_optional_uint64(
+	const struct fdt_node *node, const char *property,
+	uint64_t default_value, uint64_t *out)
+{
+	enum manifest_return_code ret;
+
+	ret = read_uint64(node, property, out);
+	if (ret == MANIFEST_ERROR_PROPERTY_NOT_FOUND) {
+		*out = default_value;
+		return MANIFEST_SUCCESS;
+	}
+	return ret;
+}
+
 static enum manifest_return_code read_uint16(const struct fdt_node *node,
 					     const char *property,
 					     uint16_t *out)
@@ -295,6 +309,9 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	if (vm_id == HF_PRIMARY_VM_ID) {
 		TRY(read_optional_string(node, "ramdisk_filename",
 					 &vm->primary.ramdisk_filename));
+		TRY(read_optional_uint64(node, "boot_address",
+					 MANIFEST_INVALID_ADDRESS,
+					 &vm->primary.boot_address));
 	} else {
 		TRY(read_uint64(node, "mem_size", &vm->secondary.mem_size));
 		TRY(read_uint16(node, "vcpu_count", &vm->secondary.vcpu_count));

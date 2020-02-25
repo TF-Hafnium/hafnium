@@ -178,6 +178,11 @@ class ManifestDtBuilder
 		return StringProperty("ramdisk_filename", value);
 	}
 
+	ManifestDtBuilder &BootAddress(uint64_t value)
+	{
+		return Integer64Property("boot_address", value);
+	}
+
 	ManifestDtBuilder &VcpuCount(uint32_t value)
 	{
 		return IntegerProperty("vcpu_count", value);
@@ -236,6 +241,16 @@ class ManifestDtBuilder
 					   uint32_t value)
 	{
 		dts_ << name << " = <" << value << ">;" << std::endl;
+		return *this;
+	}
+
+	ManifestDtBuilder &Integer64Property(const std::string_view &name,
+					     uint64_t value)
+	{
+		uint32_t high = value >> 32;
+		uint32_t low = (uint32_t)value;
+		dts_ << name << " = <" << high << " " << low << ">;"
+		     << std::endl;
 		return *this;
 	}
 
@@ -449,6 +464,50 @@ TEST(manifest, no_ramdisk_primary)
 	ASSERT_EQ(m.vm_count, 1);
 	ASSERT_STREQ(string_data(&m.vm[0].debug_name), "primary_vm");
 	ASSERT_STREQ(string_data(&m.vm[0].primary.ramdisk_filename), "");
+}
+
+TEST(manifest, no_boot_address_primary)
+{
+	struct manifest m;
+
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+			.StartChild("vm1")
+				.DebugName("primary_vm")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	ASSERT_EQ(m.vm_count, 1);
+	ASSERT_STREQ(string_data(&m.vm[0].debug_name), "primary_vm");
+	ASSERT_EQ(m.vm[0].primary.boot_address, MANIFEST_INVALID_ADDRESS);
+}
+
+TEST(manifest, boot_address_primary)
+{
+	struct manifest m;
+	const uint64_t addr = UINT64_C(0x12345678ABCDEFEF);
+
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+			.StartChild("vm1")
+				.DebugName("primary_vm")
+				.BootAddress(addr)
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	ASSERT_EQ(m.vm_count, 1);
+	ASSERT_STREQ(string_data(&m.vm[0].debug_name), "primary_vm");
+	ASSERT_EQ(m.vm[0].primary.boot_address, addr);
 }
 
 static std::vector<char> gen_malformed_boolean_dtb(

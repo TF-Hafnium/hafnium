@@ -119,18 +119,17 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 			 const struct memiter *cpio,
 			 const struct boot_params *params, struct mpool *ppool)
 {
-	paddr_t primary_begin = layout_primary_begin();
 	struct vm *vm;
 	struct vm_locked vm_locked;
 	struct vcpu_locked vcpu_locked;
 	size_t i;
 	bool ret;
 
-	/*
-	 * TODO: This bound is currently meaningless but will be addressed when
-	 * the manifest specifies the load address.
-	 */
-	paddr_t primary_end = pa_add(primary_begin, 0x8000000);
+	paddr_t primary_begin =
+		(manifest_vm->primary.boot_address == MANIFEST_INVALID_ADDRESS)
+			? layout_primary_begin()
+			: pa_init(manifest_vm->primary.boot_address);
+	paddr_t primary_end = pa_add(primary_begin, RSIZE_MAX);
 
 	if (!load_kernel(stage1_locked, primary_begin, primary_end, manifest_vm,
 			 cpio, ppool)) {

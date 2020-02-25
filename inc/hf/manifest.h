@@ -21,6 +21,8 @@
 #include "hf/string.h"
 #include "hf/vm.h"
 
+#define MANIFEST_INVALID_ADDRESS UINT64_MAX
+
 /**
  * Holds information about one of the VMs described in the manifest.
  */
@@ -33,6 +35,7 @@ struct manifest_vm {
 	union {
 		/* Properties specific to the primary VM. */
 		struct {
+			uint64_t boot_address;
 			struct string ramdisk_filename;
 		} primary;
 		/* Properties specific to secondary VMs. */
