@@ -518,11 +518,3 @@ vcpu_restore_volatile_and_run:
 	ldp x2, x3, [x0, #VCPU_REGS + 8 * 2]
 	ldp x0, x1, [x0, #VCPU_REGS + 8 * 0]
 	eret_with_sb
-
-.balign 0x40
-/**
- * Restore volatile registers from stack and return to original caller.
- */
-restore_from_stack_and_return:
-	restore_volatile_from_stack el2
-	eret_with_sb
