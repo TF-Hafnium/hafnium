@@ -133,7 +133,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 
 	if (!load_kernel(stage1_locked, primary_begin, primary_end, manifest_vm,
 			 cpio, ppool)) {
-		dlog_error("Unable to load primary kernel.");
+		dlog_error("Unable to load primary kernel.\n");
 		return false;
 	}
 
@@ -161,7 +161,8 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		 *
 		 * TODO: remove this once all targets provide valid ranges.
 		 */
-		dlog_warning("Device memory not provided, defaulting to 1 TB.");
+		dlog_warning(
+			"Device memory not provided, defaulting to 1 TB.\n");
 
 		if (!vm_identity_map(
 			    vm_locked, pa_init(0),
@@ -169,7 +170,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 			    MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
 			dlog_error(
 				"Unable to initialise address space for "
-				"primary vm\n");
+				"primary VM.\n");
 			ret = false;
 			goto out;
 		}
@@ -182,7 +183,8 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 				     MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool,
 				     NULL)) {
 			dlog_error(
-				"Unable to initialise memory for primary vm\n");
+				"Unable to initialise memory for primary "
+				"VM.\n");
 			ret = false;
 			goto out;
 		}
@@ -195,20 +197,20 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 			    params->device_mem_ranges[i].end,
 			    MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
 			dlog("Unable to initialise device memory for primary "
-			     "vm\n");
+			     "VM.\n");
 			ret = false;
 			goto out;
 		}
 	}
 
 	if (!vm_unmap_hypervisor(vm_locked, ppool)) {
-		dlog_error("Unable to unmap hypervisor from primary vm\n");
+		dlog_error("Unable to unmap hypervisor from primary VM.\n");
 		ret = false;
 		goto out;
 	}
 
 	if (!plat_iommu_unmap_iommus(vm_locked, ppool)) {
-		dlog_error("Unable to unmap IOMMUs from primary VM\n");
+		dlog_error("Unable to unmap IOMMUs from primary VM.\n");
 		ret = false;
 		goto out;
 	}
