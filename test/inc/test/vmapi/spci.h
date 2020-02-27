@@ -18,10 +18,11 @@
 
 #include "vmapi/hf/spci.h"
 
-#define EXPECT_SPCI_ERROR(value, spci_error)          \
-	do {                                          \
-		EXPECT_EQ(value.func, SPCI_ERROR_32); \
-		EXPECT_EQ(value.arg2, spci_error);    \
+#define EXPECT_SPCI_ERROR(value, spci_error)      \
+	do {                                      \
+		struct spci_value v = (value);    \
+		EXPECT_EQ(v.func, SPCI_ERROR_32); \
+		EXPECT_EQ(v.arg2, (spci_error));  \
 	} while (0)
 
 struct mailbox_buffers {
