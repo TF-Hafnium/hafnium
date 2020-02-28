@@ -24,6 +24,15 @@
 #include "hf/std.h"
 #include "hf/vm.h"
 
+static_assert(sizeof(struct spci_memory_region_constituent) % 16 == 0,
+	      "struct spci_memory_region_constituent must be a multiple of 16 "
+	      "bytes long.");
+static_assert(sizeof(struct spci_memory_region_attributes) % 16 == 0,
+	      "struct spci_memory_region_attributes must be a multiple of 16 "
+	      "bytes long.");
+static_assert(sizeof(struct spci_memory_region) % 16 == 0,
+	      "struct spci_memory_region must be a multiple of 16 bytes long.");
+
 struct spci_mem_transitions {
 	uint32_t orig_from_mode;
 	uint32_t orig_to_mode;

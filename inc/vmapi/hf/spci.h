@@ -295,7 +295,7 @@ struct spci_memory_region {
 	 */
 	uint32_t attribute_count;
 	/** Reserved field, must be 0. */
-	uint16_t reserved_1;
+	uint32_t reserved_1;
 	/**
 	 * An array of `attribute_count` memory region attribute descriptors.
 	 * Each one specifies an endpoint and the attributes with which this
