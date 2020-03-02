@@ -24,7 +24,7 @@
 
 #include "vmapi/hf/call.h"
 
-#define STACK_SIZE PAGE_SIZE
+#define STACK_SIZE 8*PAGE_SIZE
 
 /**
  * The stacks to be used by the CPUs.
@@ -84,6 +84,14 @@ void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 {
 	uint32_t i;
 	uint32_t j;
+#if SECURE_WORLD == 1
+// XXX XXX
+// HACK, set boot_cpu_id to 0x80000000
+#if SECURE_WORLD
+cpus[0].id = 0x81000000;
+#endif
+// XXX XXX
+#endif
 	cpu_id_t boot_cpu_id = cpus[0].id;
 	bool found_boot_cpu = false;
 
@@ -175,4 +183,10 @@ struct cpu *cpu_find(cpu_id_t id)
 	}
 
 	return NULL;
+}
+
+struct cpu *get_cpu_linear(uint32_t id)
+{
+	CHECK(id < MAX_CPUS);
+	return &cpus[id];
 }

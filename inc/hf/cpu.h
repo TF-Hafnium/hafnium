@@ -41,3 +41,5 @@ void cpu_off(struct cpu *c);
 struct cpu *cpu_find(cpu_id_t id);
 uint8_t *cpu_get_buffer(struct cpu *c);
 uint32_t cpu_get_buffer_size(struct cpu *c);
+
+struct cpu *get_cpu_linear(uint32_t id);

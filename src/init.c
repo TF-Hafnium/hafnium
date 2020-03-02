@@ -84,7 +84,7 @@ void one_time_init(void)
 	size_t i;
 	struct mm_stage1_locked mm_stage1_locked;
 
-	arch_one_time_init();
+	//arch_one_time_init();
 
 	/* Enable locks now that mm is initialised. */
 	dlog_enable_lock();
@@ -105,6 +105,29 @@ void one_time_init(void)
 	if (!boot_flow_get_params(&params, &fdt_root)) {
 		panic("Could not parse boot params.");
 	}
+
+	/* 
+	 * XXX: Hack to get CPU_ON working correctly from OPTEE.  Incrementing the
+	 * plat/arm/board/fvp/fdts/fvp_spmc_manifest.dts in the arm-TF codebase
+	 * with cpu nodes does not seem to be correctly handled by the SPMD.
+	 *
+	 * This code must be removed.
+	 */
+#if SECURE_WORLD == 1
+	params.cpu_ids[0] = 0x81000000;
+	params.cpu_ids[1] = 0x81000100;
+	params.cpu_ids[2] = 0x81000200;
+	params.cpu_ids[3] = 0x81000300;
+	params.cpu_ids[4] = 0x81010000;
+	params.cpu_ids[5] = 0x81010100;
+	params.cpu_ids[6] = 0x81010200;
+	params.cpu_ids[7] = 0x81010300;
+	params.cpu_count = 8;
+#endif
+
+	cpu_module_init(params.cpu_ids, params.cpu_count);
+
+	arch_one_time_init();
 
 	for (i = 0; i < params.mem_ranges_count; ++i) {
 		dlog_info("Memory range:  %#x - %#x\n",

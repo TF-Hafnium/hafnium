@@ -28,8 +28,11 @@
 #include "hf/spci.h"
 #include "hf/vm.h"
 
+#include "hf/check.h"
+
 #include "psci.h"
 #include "smc.h"
+#include "msr.h"
 
 static uint32_t el3_psci_version;
 
@@ -67,6 +70,27 @@ void arch_one_time_init(void)
 	/* Register Rx Tx buffers from Hv. */
 	void handler_register_normal_world_rxtx(void);
 	handler_register_normal_world_rxtx();
+#endif
+#if SECURE_WORLD == 1
+	/* Hack: call PSCI_CPU_ON on the secondary cpus */
+	/* Set entry point for CPU_ON when later called from the secure world. */
+	for (uint32_t index=0; index<8; index++ )
+	{
+		struct spci_value smc_res;
+		struct cpu *cur_cpu = get_cpu_linear(index);
+		uint64_t mpidr = read_msr(mpidr_el1);
+
+		if ((mpidr & 0xffffff)== (cur_cpu->id & 0xffffff))
+		{
+			continue;
+		}
+
+		smc_res = smc64(PSCI_CPU_ON, cur_cpu->id,
+					(uintreg_t)&cpu_entry, (uintptr_t)cur_cpu, 0,
+					0, 0, 0);
+
+		CHECK(smc_res.func == PSCI_RETURN_SUCCESS);
+	}
 #endif
 
 }
@@ -207,6 +231,12 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 			break;
 		}
 
+		*ret = PSCI_RETURN_SUCCESS;
+/*
+ * for secure world PSCI_CPU_ON is called from the hack
+ * in arch_one_time_int (above)
+ */
+#if !SECURE_WORLD
 		/*
 		 * There's a race when turning a CPU on when it's in the
 		 * process of turning off. We need to loop here while it is
@@ -223,6 +253,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		if (*ret != PSCI_RETURN_SUCCESS) {
 			cpu_off(c);
 		}
+#endif
 		break;
 
 	case PSCI_MIGRATE:
@@ -417,6 +448,7 @@ bool psci_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		  uintreg_t arg1, uintreg_t arg2, uintreg_t *ret,
 		  struct vcpu **next)
 {
+
 	if (vcpu->vm->id == HF_PRIMARY_VM_ID) {
 		return psci_primary_vm_handler(vcpu, func, arg0, arg1, arg2,
 					       ret);
