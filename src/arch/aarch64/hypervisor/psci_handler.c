@@ -38,10 +38,14 @@ void cpu_entry(struct cpu *c);
 /* Performs arch specific boot time initialisation. */
 void arch_one_time_init(void)
 {
+#if SECURE_WORLD == 0
 	struct spci_value smc_res =
 		smc32(PSCI_VERSION, 0, 0, 0, 0, 0, 0, SMCCC_CALLER_HYPERVISOR);
 
 	el3_psci_version = smc_res.func;
+#else
+	el3_psci_version = PSCI_VERSION_1_1;
+#endif
 
 	/* Check there's nothing unexpected about PSCI. */
 	switch (el3_psci_version) {
