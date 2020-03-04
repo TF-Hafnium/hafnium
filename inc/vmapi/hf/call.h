@@ -133,7 +133,7 @@ static inline struct spci_value spci_msg_send(spci_vm_id_t sender_vm_id,
 
 static inline struct spci_value spci_mem_donate(uint32_t fragment_length,
 						uint32_t length,
-						uint32_t cookie)
+						spci_cookie_t cookie)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_DONATE_32,
 					     .arg3 = fragment_length,
@@ -142,7 +142,8 @@ static inline struct spci_value spci_mem_donate(uint32_t fragment_length,
 }
 
 static inline struct spci_value spci_mem_lend(uint32_t fragment_length,
-					      uint32_t length, uint32_t cookie)
+					      uint32_t length,
+					      spci_cookie_t cookie)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_LEND_32,
 					     .arg3 = fragment_length,
@@ -151,7 +152,8 @@ static inline struct spci_value spci_mem_lend(uint32_t fragment_length,
 }
 
 static inline struct spci_value spci_mem_share(uint32_t fragment_length,
-					       uint32_t length, uint32_t cookie)
+					       uint32_t length,
+					       spci_cookie_t cookie)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_SHARE_32,
 					     .arg3 = fragment_length,
@@ -161,7 +163,7 @@ static inline struct spci_value spci_mem_share(uint32_t fragment_length,
 
 static inline struct spci_value spci_mem_retrieve_req(uint32_t fragment_length,
 						      uint32_t length,
-						      uint32_t cookie)
+						      spci_cookie_t cookie)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_RETRIEVE_REQ_32,
 					     .arg3 = fragment_length,

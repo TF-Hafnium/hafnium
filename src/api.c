@@ -1451,7 +1451,7 @@ struct spci_value api_spci_features(uint32_t function_id)
 struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 				    uint32_t page_count,
 				    uint32_t fragment_length, uint32_t length,
-				    uint32_t cookie, struct vcpu *current,
+				    spci_cookie_t cookie, struct vcpu *current,
 				    struct vcpu **next)
 {
 	struct vm *from = current->vm;
@@ -1588,11 +1588,9 @@ out:
 	return ret;
 }
 
-struct spci_value api_spci_mem_retrieve_req(ipaddr_t address,
-					    uint32_t page_count,
-					    uint32_t fragment_length,
-					    uint32_t length, uint32_t cookie,
-					    struct vcpu *current)
+struct spci_value api_spci_mem_retrieve_req(
+	ipaddr_t address, uint32_t page_count, uint32_t fragment_length,
+	uint32_t length, spci_cookie_t cookie, struct vcpu *current)
 {
 	struct vm *to = current->vm;
 	struct vm_locked to_locked;

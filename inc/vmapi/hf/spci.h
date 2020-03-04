@@ -169,7 +169,18 @@ LEND_ATTR_FUNCTION_GET(shareability, SPCI_MEMORY_SHAREABILITY_OFFSET,
 
 /** The ID of a VM. These are assigned sequentially starting with an offset. */
 typedef uint16_t spci_vm_id_t;
+
+/**
+ * A globally-unique ID assigned by the hypervisor for a region of memory being
+ * sent between VMs.
+ */
 typedef uint32_t spci_memory_handle_t;
+
+/**
+ * A unique-per-VM ID used to associate fragments of a memory sharing message,
+ * assigned by the sender of the message.
+ */
+typedef uint32_t spci_cookie_t;
 
 /**
  * A count of VMs. This has the same range as the VM IDs but we give it a
