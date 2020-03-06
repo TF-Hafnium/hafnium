@@ -29,7 +29,7 @@ alignas(4096) uint8_t kstack[4096];
 extern struct hftest_test hftest_begin[];
 extern struct hftest_test hftest_end[];
 
-void kmain(const struct fdt_header *fdt)
+__attribute__((weak)) void kmain(const struct fdt_header *fdt)
 {
 	struct memiter command_line;
 	struct memiter command;
