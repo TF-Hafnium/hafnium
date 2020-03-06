@@ -56,7 +56,6 @@ source_set("src_testable") {
     "api.c",
     "cpu.c",
     "manifest.c",
-    "panic.c",
     "spci_memory.c",
     "vcpu.c",
   ]
@@ -68,6 +67,7 @@ source_set("src_testable") {
     ":fdt_handler",
     ":memiter",
     ":mm",
+    ":panic",
     ":std",
     ":vm",
     "//src/arch/${plat_arch}/hypervisor",
