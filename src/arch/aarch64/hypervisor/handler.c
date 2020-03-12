@@ -587,8 +587,39 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 			*args = api_spci_id_get(current());
 			return true;
 		case SPCI_FEATURES_32:
+		{
+			struct spci_value orig_args;
+			orig_args.func = args->func;
+			orig_args.arg1 = args->arg1;
+
 			*args = api_spci_features(args->arg1);
+			/* If call originated in the current world. */
+			if (!eret_origin) {
+				/* If supported in this wld check if other supports. */
+				if (args->func == SPCI_SUCCESS_32){
+					smc_res = smc32(orig_args.func, orig_args.arg1,
+									0, 0, 0, 0, 0, 0);
+
+					/* TODO: Make this less restrictive. */
+					/* If current wld supports but not other, return Unsupported. */
+					if (smc_res.func == SPCI_NOT_SUPPORTED) {
+						args->func = smc_res.func;
+						args->arg2 = 0;
+					}
+					else {
+						/* If feature is supported take LCD of sub features. */
+						args->arg2 &= smc_res.arg2;
+					}
+				}
+			}
+			else {
+				/* Return to other world */
+				spmd_exit(args);
+				eret_origin = true;
+				break;
+			}
 			return true;
+		}
 		case SPCI_RX_RELEASE_32:
 			*args = api_spci_rx_release(current(), next);
 			return true;

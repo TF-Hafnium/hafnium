@@ -1677,6 +1677,7 @@ out:
 	return ret;
 }
 
+
 struct spci_value spci_mem_share_internal(
 	uint64_t base_addr, uint32_t page_count, uint32_t fragment_count,
 	uint32_t length, uint32_t fragment_handle, struct vm *from_vm,
