@@ -654,13 +654,10 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 					pa_recv_end);
 
 				/* Return to Normal world */
-				smc_res = smc32(SPCI_SUCCESS_32, args->arg1,
-						args->arg2, args->arg3,
-						args->arg4, args->arg5,
-						args->arg6, args->arg7);
+				*args = (struct spci_value){.func = SPCI_SUCCESS_32};
+				spmd_exit(args);
 
-				*args = smc_res;
-
+				eret_origin = true;
 				break;
 			}
 #else
