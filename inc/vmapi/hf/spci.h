@@ -305,12 +305,12 @@ struct spci_memory_region {
 };
 
 static inline struct spci_memory_region_constituent
-spci_memory_region_constituent_init(uint64_t address, uint32_t pc)
+spci_memory_region_constituent_init(uint64_t address, uint32_t page_count)
 {
 	return (struct spci_memory_region_constituent){
 		.address_high = (uint32_t)(address >> 32),
 		.address_low = (uint32_t)address,
-		.page_count = pc,
+		.page_count = page_count,
 	};
 }
 
