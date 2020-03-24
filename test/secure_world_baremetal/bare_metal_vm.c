@@ -24,7 +24,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "hftest.h"
+#include "test/hftest.h"
 #include "spci_test_protocol.h"
 
 alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];
@@ -46,6 +46,13 @@ static hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 
 static struct mailbox_buffers mb;
 
+static uint16_t sp_id;
+
+static inline uint64_t get_constituent_addr(struct spci_memory_region_constituent *constituent)
+{
+	return ((uint64_t)constituent->address_high<<32) | constituent->address_low; 
+}
+
 struct mailbox_buffers set_up_mailbox(void)
 {
 	ASSERT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
@@ -66,7 +73,7 @@ uint32_t get_status(struct spci_value* value)
 	return 0;
 }
 
-static char mem_region_buffer[4096 * 3];
+static alignas(PAGE_SIZE) char mem_region_buffer[4096 * 3];
 #define REGION_BUF_SIZE sizeof(mem_region_buffer)
 
 static void test_memory_share(uint32_t handle)
@@ -76,6 +83,7 @@ static void test_memory_share(uint32_t handle)
 	uint32_t total_length;
 	uint32_t increment_length;
 	uint32_t cookie;
+	uint32_t constituent_count;
 
 	if (!mb.send)
 	{
@@ -85,10 +93,10 @@ static void test_memory_share(uint32_t handle)
 	((struct mem_retrieve_descriptor *)mb.send)->handle = handle;
 
 	retrieve_desc = (struct spci_retrieve_descriptor *)mem_region_buffer;
-	
+
 	/*address, page_count, fragment_count, length, handle*/
 	spci_return = spci_mem_retrieve_req(0, 0, 0, 0, handle);
-	
+
 	if(spci_return.func == SPCI_ERROR_32)
 	{
 		dlog("--bare metal test VM: failed to retrieve mem %d\n", handle);
@@ -120,33 +128,39 @@ static void test_memory_share(uint32_t handle)
 		CHECK(increment_length <= total_length);
 		dlog("--bare metal test VM: inc_len %d, total_len %d\n", increment_length, total_length);
 	}
+	constituent_count = retrieve_desc->constituent_count;
 
-	
-	for (uint32_t index = 0; index < retrieve_desc->constituent_count; index++)
+	for (uint32_t index = 0; index < constituent_count; index++)
 	{
-		dlog("--bare metal test VM: address %#x --\n", retrieve_desc->constituents[index].address);
-		*((uint8_t *)retrieve_desc->constituents[index].address) = 0xde;
+		dlog("--bare metal test VM: address %#x --\n", get_constituent_addr(&retrieve_desc->constituents[index]));
+		*((uint8_t *)get_constituent_addr(&retrieve_desc->constituents[index])) = 0xde;
 	}
 
-	return;	
+	return;
 }
 
 void noreturn kmain(const struct fdt_header *fdt)
 {
 	struct spci_value spci_return;
+	uint32_t src_dst;
 
 	/* set_up_mailbox calls rxtx_map. */
 	mb = set_up_mailbox();
+	sp_id = hf_vm_get_id();
 
 	dlog("--bare metal test VM: start--\n");
 
 	// TODO: enable stage-1 mappings
-	/* 
+
+	/*
 	 * Receive direct message.
 	 *
 	 * This is an impdef message where w1 states the type of request.
 	 */
-	spci_return = spci_msg_wait();
+	// FIXME: hardcoding Secure world VM_ID as 1.
+	src_dst = ((sp_id << 16) | 1);
+	spci_return = spci_direct_msg_resp(src_dst, 0, 0, 0, 0, 0);
+
 	if(get_status(&spci_return))
 	{
 		panic("--bare metal test VM: Error receiving message--\n");
@@ -156,8 +170,7 @@ void noreturn kmain(const struct fdt_header *fdt)
 	{
 
 		(void) page;
-		uint32_t src_dst;
-	
+
 		switch (spci_return.arg3)
 		{
 			case FF_A_MEMORY_SHARE:
@@ -167,13 +180,13 @@ void noreturn kmain(const struct fdt_header *fdt)
 				test_memory_share(handle);
 
 				break;
-				
+
 			default:
-				dlog("--bare metal test VM: Unknown request ID--\n");
+				dlog("--bare metal test VM: Unknown request ID %d--\n", spci_return.arg3);
 		}
 		dlog("--bare metal test VM: iteration--\n");
 
-		/* 
+		/*
 		 * Receive direct message.
 		 *
 		 * This is an impdef message where w1 states the type of request.

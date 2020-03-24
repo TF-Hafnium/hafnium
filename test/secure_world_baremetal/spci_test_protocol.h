@@ -42,6 +42,7 @@ enum message_t
 	 * w4 -- handle
 	 * w5 -- attributes
 	 */
-	FF_A_MEMORY_SHARE = 1,
+	FF_A_INIT_SP = 1,
+	FF_A_MEMORY_SHARE,
 	FF_A_UNDEFINED
 };
