@@ -31,20 +31,39 @@
 		}                                            \
 	} while (0)
 
-#define VM_NAME_BUF_SIZE (2 + 5 + 1) /* "vm" + number + null terminator */
-static_assert(MAX_VMS <= 99999, "Insufficient VM_NAME_BUF_SIZE");
-static_assert(HF_TEE_VM_ID > MAX_VMS,
+#define VM_ID_MAX (HF_VM_ID_OFFSET + MAX_VMS - 1)
+#define VM_ID_MAX_DIGITS (5)
+#define VM_NAME_EXTRA_CHARS (3) /* "vm" + number + '\0' */
+#define VM_NAME_MAX_SIZE (VM_ID_MAX_DIGITS + VM_NAME_EXTRA_CHARS)
+static_assert(VM_NAME_MAX_SIZE <= STRING_MAX_SIZE,
+	      "VM name does not fit into a struct string.");
+static_assert(VM_ID_MAX <= 99999, "Insufficient VM_NAME_BUF_SIZE");
+static_assert(HF_TEE_VM_ID > VM_ID_MAX,
 	      "TrustZone VM ID clashes with normal VM range.");
+
+static inline size_t count_digits(spci_vm_id_t vm_id)
+{
+	size_t digits = 0;
+
+	do {
+		digits++;
+		vm_id /= 10;
+	} while (vm_id);
+	return digits;
+}
 
 /**
  * Generates a string with the two letters "vm" followed by an integer.
  * Assumes `buf` is of size VM_NAME_BUF_SIZE.
  */
-static const char *generate_vm_node_name(char *buf, spci_vm_id_t vm_id)
+static void generate_vm_node_name(struct string *str, spci_vm_id_t vm_id)
 {
 	static const char *digits = "0123456789";
-	char *ptr = buf + VM_NAME_BUF_SIZE;
+	size_t vm_id_digits = count_digits(vm_id);
+	char *base = str->data;
+	char *ptr = base + (VM_NAME_EXTRA_CHARS + vm_id_digits);
 
+	CHECK(vm_id_digits <= VM_ID_MAX_DIGITS);
 	*(--ptr) = '\0';
 	do {
 		*(--ptr) = digits[vm_id % 10];
@@ -52,8 +71,7 @@ static const char *generate_vm_node_name(char *buf, spci_vm_id_t vm_id)
 	} while (vm_id);
 	*(--ptr) = 'm';
 	*(--ptr) = 'v';
-
-	return ptr;
+	CHECK(ptr == base);
 }
 
 /**
@@ -63,11 +81,10 @@ static const char *generate_vm_node_name(char *buf, spci_vm_id_t vm_id)
 static enum manifest_return_code read_bool(const struct fdt_node *node,
 					   const char *property, bool *out)
 {
-	const char *data;
-	uint32_t size;
-	bool present = fdt_read_property(node, property, &data, &size);
+	struct memiter data;
+	bool present = fdt_read_property(node, property, &data);
 
-	if (present && size != 0) {
+	if (present && memiter_size(&data) != 0) {
 		return MANIFEST_ERROR_MALFORMED_BOOLEAN;
 	}
 
@@ -79,14 +96,13 @@ static enum manifest_return_code read_string(const struct fdt_node *node,
 					     const char *property,
 					     struct string *out)
 {
-	const char *data;
-	uint32_t size;
+	struct memiter data;
 
-	if (!fdt_read_property(node, property, &data, &size)) {
+	if (!fdt_read_property(node, property, &data)) {
 		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
 	}
 
-	switch (string_init(out, data, size)) {
+	switch (string_init(out, &data)) {
 	case STRING_SUCCESS:
 		return MANIFEST_SUCCESS;
 	case STRING_ERROR_INVALID_INPUT:
@@ -113,14 +129,13 @@ static enum manifest_return_code read_uint64(const struct fdt_node *node,
 					     const char *property,
 					     uint64_t *out)
 {
-	const char *data;
-	uint32_t size;
+	struct memiter data;
 
-	if (!fdt_read_property(node, property, &data, &size)) {
+	if (!fdt_read_property(node, property, &data)) {
 		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
 	}
 
-	if (!fdt_parse_number(data, size, out)) {
+	if (!fdt_parse_number(&data, memiter_size(&data), out)) {
 		return MANIFEST_ERROR_MALFORMED_INTEGER;
 	}
 
@@ -165,19 +180,18 @@ static enum manifest_return_code read_optional_uint32list(
 	const struct fdt_node *node, const char *property,
 	struct uint32list_iter *out)
 {
-	const char *data;
-	uint32_t size;
+	struct memiter data;
 
-	if (!fdt_read_property(node, property, &data, &size)) {
+	if (!fdt_read_property(node, property, &data)) {
 		memiter_init(&out->mem_it, NULL, 0);
 		return MANIFEST_SUCCESS;
 	}
 
-	if ((size % sizeof(uint32_t)) != 0) {
+	if ((memiter_size(&data) % sizeof(uint32_t)) != 0) {
 		return MANIFEST_ERROR_MALFORMED_INTEGER_LIST;
 	}
 
-	memiter_init(&out->mem_it, data, size);
+	out->mem_it = data;
 	return MANIFEST_SUCCESS;
 }
 
@@ -193,22 +207,27 @@ static enum manifest_return_code read_stringlist(const struct fdt_node *node,
 						 const char *property,
 						 struct stringlist_iter *out)
 {
-	const char *data;
-	uint32_t size;
+	struct memiter data;
+	const char *str;
+	size_t size;
 
-	if (!fdt_read_property(node, property, &data, &size)) {
+	if (!fdt_read_property(node, property, &data)) {
 		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
 	}
+
+	str = memiter_base(&data);
+	size = memiter_size(&data);
 
 	/*
 	 * Require that the value ends with a NULL terminator. Other NULL
 	 * characters separate the string list entries.
 	 */
-	if (data[size - 1] != '\0') {
+	if ((size < 1) || (str[size - 1] != '\0')) {
 		return MANIFEST_ERROR_MALFORMED_STRING_LIST;
 	}
 
-	memiter_init(&out->mem_it, data, size - 1);
+	CHECK(memiter_restrict(&data, 1));
+	out->mem_it = data;
 	return MANIFEST_SUCCESS;
 }
 
@@ -220,16 +239,13 @@ static bool uint32list_has_next(const struct uint32list_iter *list)
 static enum manifest_return_code uint32list_get_next(
 	struct uint32list_iter *list, uint32_t *out)
 {
-	const char *mem_base = memiter_base(&list->mem_it);
 	uint64_t num;
 
 	CHECK(uint32list_has_next(list));
-
-	if (!fdt_parse_number(mem_base, sizeof(uint32_t), &num)) {
+	if (!fdt_parse_number(&list->mem_it, sizeof(uint32_t), &num)) {
 		return MANIFEST_ERROR_MALFORMED_INTEGER;
 	}
 
-	memiter_advance(&list->mem_it, sizeof(uint32_t));
 	*out = (uint32_t)num;
 	return MANIFEST_SUCCESS;
 }
@@ -284,7 +300,7 @@ static bool stringlist_contains(const struct stringlist_iter *list,
 	return false;
 }
 
-static enum manifest_return_code parse_vm(struct fdt_node *node,
+static enum manifest_return_code parse_vm(const struct fdt_node *node,
 					  struct manifest_vm *vm,
 					  spci_vm_id_t vm_id)
 {
@@ -328,8 +344,8 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 enum manifest_return_code manifest_init(struct manifest *manifest,
 					struct memiter *manifest_fdt)
 {
-	char vm_name_buf[VM_NAME_BUF_SIZE];
-	const struct fdt_header *fdt;
+	struct string vm_name;
+	struct fdt fdt;
 	struct fdt_node hyp_node;
 	struct stringlist_iter compatible_list;
 	size_t i = 0;
@@ -337,19 +353,12 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 
 	memset_s(manifest, sizeof(*manifest), 0, sizeof(*manifest));
 
-	fdt = (const struct fdt_header *)memiter_base(manifest_fdt);
-	if (memiter_size(manifest_fdt) != fdt_total_size(fdt)) {
-		return MANIFEST_ERROR_FILE_SIZE;
+	if (!fdt_init_from_memiter(&fdt, manifest_fdt)) {
+		return MANIFEST_ERROR_FILE_SIZE; /* TODO */
 	}
 
 	/* Find hypervisor node. */
-	if (!fdt_root_node(&hyp_node, fdt)) {
-		return MANIFEST_ERROR_NO_ROOT_NODE;
-	}
-	if (!fdt_find_child(&hyp_node, "")) {
-		return MANIFEST_ERROR_NO_ROOT_NODE;
-	}
-	if (!fdt_find_child(&hyp_node, "hypervisor")) {
+	if (!fdt_find_node(&fdt, "/hypervisor", &hyp_node)) {
 		return MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE;
 	}
 
@@ -363,9 +372,9 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 	for (i = 0; i < HF_VM_ID_OFFSET; i++) {
 		spci_vm_id_t vm_id = (spci_vm_id_t)i;
 		struct fdt_node vm_node = hyp_node;
-		const char *vm_name = generate_vm_node_name(vm_name_buf, vm_id);
 
-		if (fdt_find_child(&vm_node, vm_name)) {
+		generate_vm_node_name(&vm_name, vm_id);
+		if (fdt_find_child(&vm_node, &vm_name)) {
 			return MANIFEST_ERROR_RESERVED_VM_ID;
 		}
 	}
@@ -374,9 +383,9 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 	for (i = 0; i <= MAX_VMS; ++i) {
 		spci_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
 		struct fdt_node vm_node = hyp_node;
-		const char *vm_name = generate_vm_node_name(vm_name_buf, vm_id);
 
-		if (!fdt_find_child(&vm_node, vm_name)) {
+		generate_vm_node_name(&vm_name, vm_id);
+		if (!fdt_find_child(&vm_node, &vm_name)) {
 			break;
 		}
 

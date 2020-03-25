@@ -16,10 +16,10 @@
 
 #include "hf/plat/iommu.h"
 
-bool plat_iommu_init(const struct fdt_node *fdt_root,
+bool plat_iommu_init(const struct fdt *fdt,
 		     struct mm_stage1_locked stage1_locked, struct mpool *ppool)
 {
-	(void)fdt_root;
+	(void)fdt;
 	(void)stage1_locked;
 	(void)ppool;
 

@@ -135,7 +135,7 @@ noreturn void abort(void)
 }
 
 static void run_test(hftest_test_fn set_up, hftest_test_fn test,
-		     hftest_test_fn tear_down, const struct fdt_header *fdt)
+		     hftest_test_fn tear_down, const struct fdt *fdt)
 {
 	/* Prepare the context. */
 	struct hftest_context *ctx = hftest_get_context();
@@ -172,7 +172,7 @@ static void run_test(hftest_test_fn set_up, hftest_test_fn test,
  * Runs the given test case.
  */
 void hftest_run(struct memiter suite_name, struct memiter test_name,
-		const struct fdt_header *fdt)
+		const struct fdt *fdt)
 {
 	size_t i;
 	hftest_test_fn suite_set_up = NULL;
@@ -247,8 +247,7 @@ static uintptr_t vcpu_index_to_id(size_t index)
 uintptr_t hftest_get_cpu_id(size_t index)
 {
 	struct boot_params params;
-	struct fdt_node n;
-	const struct fdt_header *fdt = hftest_get_context()->fdt;
+	const struct fdt *fdt = hftest_get_context()->fdt;
 
 	if (fdt == NULL) {
 		/*
@@ -259,13 +258,7 @@ uintptr_t hftest_get_cpu_id(size_t index)
 	}
 
 	/* Find physical CPU ID from FDT. */
-	if (!fdt_root_node(&n, fdt)) {
-		FAIL("FDT failed validation.");
-	}
-	if (!fdt_find_child(&n, "")) {
-		FAIL("Unable to find FDT root node.");
-	}
-	fdt_find_cpus(&n, params.cpu_ids, &params.cpu_count);
+	fdt_find_cpus(fdt, params.cpu_ids, &params.cpu_count);
 
 	return params.cpu_ids[index];
 }

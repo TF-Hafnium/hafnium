@@ -81,8 +81,10 @@ const uint8_t test_dtb[] = {
 
 TEST(fdt, total_size)
 {
-	EXPECT_THAT(fdt_total_size((struct fdt_header *)&test_dtb[0]),
-		    Eq(sizeof(test_dtb)));
+	size_t size;
+
+	EXPECT_TRUE(fdt_size_from_header(&test_dtb[0], &size));
+	EXPECT_THAT(size, Eq(sizeof(test_dtb)));
 }
 
 } /* namespace */

@@ -25,13 +25,15 @@ namespace
 TEST(string, valid)
 {
 	struct string str;
+	struct memiter it;
 	constexpr const char data[] = "test";
 
 	string_init_empty(&str);
 	ASSERT_TRUE(string_is_empty(&str));
 	ASSERT_STREQ(string_data(&str), "");
 
-	ASSERT_EQ(string_init(&str, data, sizeof(data)), STRING_SUCCESS);
+	memiter_init(&it, data, sizeof(data));
+	ASSERT_EQ(string_init(&str, &it), STRING_SUCCESS);
 	ASSERT_FALSE(string_is_empty(&str));
 	ASSERT_STRNE(string_data(&str), "");
 	ASSERT_STREQ(string_data(&str), "test");
@@ -40,27 +42,31 @@ TEST(string, valid)
 TEST(string, data_zero_size)
 {
 	struct string str;
+	struct memiter it;
 	constexpr const char data[] = "test";
 
-	ASSERT_EQ(string_init(&str, data, 0), STRING_ERROR_INVALID_INPUT);
+	memiter_init(&it, data, 0);
+	ASSERT_EQ(string_init(&str, &it), STRING_ERROR_INVALID_INPUT);
 }
 
 TEST(string, data_no_null_terminator)
 {
 	struct string str;
+	struct memiter it;
 	constexpr const char data[] = {'t', 'e', 's', 't'};
 
-	ASSERT_EQ(string_init(&str, data, sizeof(data)),
-		  STRING_ERROR_INVALID_INPUT);
+	memiter_init(&it, data, sizeof(data));
+	ASSERT_EQ(string_init(&str, &it), STRING_ERROR_INVALID_INPUT);
 }
 
 TEST(string, data_two_null_terminators)
 {
 	struct string str;
+	struct memiter it;
 	constexpr const char data[] = {'\0', 't', 'e', 's', 't', '\0'};
 
-	ASSERT_EQ(string_init(&str, data, sizeof(data)),
-		  STRING_ERROR_INVALID_INPUT);
+	memiter_init(&it, data, sizeof(data));
+	ASSERT_EQ(string_init(&str, &it), STRING_ERROR_INVALID_INPUT);
 }
 
 } /* namespace */

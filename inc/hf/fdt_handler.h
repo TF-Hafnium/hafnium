@@ -22,19 +22,15 @@
 #include "hf/mpool.h"
 #include "hf/string.h"
 
-struct fdt_header *fdt_map(struct mm_stage1_locked stage1_locked,
-			   paddr_t fdt_addr, struct fdt_node *n,
-			   struct mpool *ppool);
-bool fdt_unmap(struct mm_stage1_locked stage1_locked, struct fdt_header *fdt,
+#define FDT_PROP_INITRD_START "linux,initrd-start"
+#define FDT_PROP_INITRD_END "linux,initrd-end"
+
+bool fdt_map(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
+	     paddr_t fdt_addr, struct mpool *ppool);
+bool fdt_unmap(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
 	       struct mpool *ppool);
-bool fdt_find_cpus(const struct fdt_node *root, cpu_id_t *cpu_ids,
-		   size_t *cpu_count);
-bool fdt_find_memory_ranges(const struct fdt_node *root,
-			    struct string *device_type,
+bool fdt_find_cpus(const struct fdt *fdt, cpu_id_t *cpu_ids, size_t *cpu_count);
+bool fdt_find_memory_ranges(const struct fdt *fdt, struct string *device_type,
 			    struct mem_range *mem_ranges,
 			    size_t *mem_ranges_count, size_t mem_range_limit);
-bool fdt_find_initrd(const struct fdt_node *root, paddr_t *begin, paddr_t *end);
-
-/** Apply an update to the FDT. */
-bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
-	       struct boot_params_update *p, struct mpool *ppool);
+bool fdt_find_initrd(const struct fdt *fdt, paddr_t *begin, paddr_t *end);

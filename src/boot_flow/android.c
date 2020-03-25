@@ -41,10 +41,10 @@ uintreg_t plat_boot_flow_get_kernel_arg(void)
  * (b) a fixed address range known at build time (INITRD_ADDR and INITRD_SIZE
  *     are not zero).
  */
-bool plat_boot_flow_get_initrd_range(const struct fdt_node *fdt_root,
-				     paddr_t *begin, paddr_t *end)
+bool plat_boot_flow_get_initrd_range(const struct fdt *fdt, paddr_t *begin,
+				     paddr_t *end)
 {
-	(void)fdt_root;
+	(void)fdt;
 
 	uintpaddr_t initrd_addr = (uintpaddr_t)(INITRD_ADDR);
 	size_t initrd_size = (size_t)(INITRD_SIZE);

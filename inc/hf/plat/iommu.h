@@ -25,7 +25,7 @@
  * so that the driver can read from it. This can be used to map IOMMU devices
  * into the hypervisor's address space so they are accessible by the driver.
  */
-bool plat_iommu_init(const struct fdt_node *fdt_root,
+bool plat_iommu_init(const struct fdt *fdt,
 		     struct mm_stage1_locked stage1_locked,
 		     struct mpool *ppool);
 

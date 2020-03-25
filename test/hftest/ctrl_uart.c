@@ -53,7 +53,7 @@ static bool read(char *buf, size_t max_len, struct memiter *str)
 	}
 }
 
-bool hftest_ctrl_start(const struct fdt_header *fdt, struct memiter *cmd)
+bool hftest_ctrl_start(const struct fdt *fdt, struct memiter *cmd)
 {
 	(void)fdt;
 

@@ -14,36 +14,28 @@
  * limitations under the License.
  */
 
+#include "hf/check.h"
+
 #include "test/hftest.h"
 
-bool hftest_ctrl_start(const struct fdt_header *fdt, struct memiter *cmd)
+bool hftest_ctrl_start(const struct fdt *fdt, struct memiter *cmd)
 {
 	struct fdt_node n;
-	const char *bootargs;
-	uint32_t bootargs_size;
+	struct memiter bootargs;
 
-	if (!fdt_root_node(&n, fdt)) {
-		HFTEST_LOG("FDT failed validation.");
+	if (!fdt_find_node(fdt, "/chosen", &n)) {
+		HFTEST_LOG("Could not find '/chosen' node.");
 		return false;
 	}
 
-	if (!fdt_find_child(&n, "")) {
-		HFTEST_LOG("Unable to find root node in FDT.");
-		return false;
-	}
-
-	if (!fdt_find_child(&n, "chosen")) {
-		HFTEST_LOG("Unable to find 'chosen' node in FDT.");
-		return false;
-	}
-
-	if (!fdt_read_property(&n, "bootargs", &bootargs, &bootargs_size)) {
+	if (!fdt_read_property(&n, "bootargs", &bootargs)) {
 		HFTEST_LOG("Unable to read bootargs.");
 		return false;
 	}
 
 	/* Remove null terminator. */
-	memiter_init(cmd, bootargs, bootargs_size - 1);
+	CHECK(memiter_restrict(&bootargs, 1));
+	*cmd = bootargs;
 	return true;
 }
 

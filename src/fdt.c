@@ -16,454 +16,261 @@
 
 #include "hf/fdt.h"
 
-#include <stdalign.h>
-#include <stdint.h>
+#include <libfdt.h>
 
-#include "hf/check.h"
-#include "hf/dlog.h"
-#include "hf/std.h"
+#include "hf/static_assert.h"
 
-struct fdt_header {
-	uint32_t magic;
-	uint32_t totalsize;
-	uint32_t off_dt_struct;
-	uint32_t off_dt_strings;
-	uint32_t off_mem_rsvmap;
-	uint32_t version;
-	uint32_t last_comp_version;
-	uint32_t boot_cpuid_phys;
-	uint32_t size_dt_strings;
-	uint32_t size_dt_struct;
-};
-
-struct fdt_reserve_entry {
-	uint64_t address;
-	uint64_t size;
-};
-
-enum fdt_token {
-	FDT_BEGIN_NODE = 1,
-	FDT_END_NODE = 2,
-	FDT_PROP = 3,
-	FDT_NOP = 4,
-	FDT_END = 9,
-};
-
-struct fdt_tokenizer {
-	const char *cur;
-	const char *end;
-	const char *strs;
-};
-
-#define FDT_VERSION 17
-#define FDT_MAGIC 0xd00dfeed
-
-#define FDT_PROPERTY_NAME_MAX_SIZE 32
-
-#define FDT_TOKEN_ALIGNMENT sizeof(uint32_t)
-
-static void fdt_tokenizer_init(struct fdt_tokenizer *t, const char *strs,
-			       const char *begin, const char *end)
+/** Returns pointer to the FDT buffer. */
+const void *fdt_base(const struct fdt *fdt)
 {
-	t->strs = strs;
-	t->cur = begin;
-	t->end = end;
+	return memiter_base(&fdt->buf);
 }
 
-static void fdt_tokenizer_align(struct fdt_tokenizer *t)
+/** Returns size of the FDT buffer. */
+size_t fdt_size(const struct fdt *fdt)
 {
-	t->cur = (char *)align_up(t->cur, FDT_TOKEN_ALIGNMENT);
-}
-
-static bool fdt_tokenizer_uint32(struct fdt_tokenizer *t, uint32_t *res)
-{
-	const char *next = t->cur + sizeof(*res);
-
-	if (next > t->end) {
-		return false;
-	}
-
-	*res = be32toh(*(uint32_t *)t->cur);
-	t->cur = next;
-
-	return true;
-}
-
-static bool fdt_tokenizer_token(struct fdt_tokenizer *t, uint32_t *res)
-{
-	uint32_t v;
-
-	while (fdt_tokenizer_uint32(t, &v)) {
-		if (v != FDT_NOP) {
-			*res = v;
-			return true;
-		}
-	}
-	return false;
-}
-
-static bool fdt_tokenizer_bytes(struct fdt_tokenizer *t, const char **res,
-				size_t size)
-{
-	const char *next = t->cur + size;
-
-	if (next > t->end) {
-		return false;
-	}
-
-	*res = t->cur;
-	t->cur = next;
-	fdt_tokenizer_align(t);
-
-	return true;
-}
-
-static bool fdt_tokenizer_str(struct fdt_tokenizer *t, const char **res)
-{
-	const char *p;
-
-	for (p = t->cur; p < t->end; p++) {
-		if (!*p) {
-			/* Found the end of the string. */
-			*res = t->cur;
-			t->cur = p + 1;
-			fdt_tokenizer_align(t);
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool fdt_root_node(struct fdt_node *node, const struct fdt_header *hdr)
-{
-	uint32_t max_ver;
-	uint32_t min_ver;
-	uint32_t begin = be32toh(hdr->off_dt_struct);
-	uint32_t size = be32toh(hdr->size_dt_struct);
-
-	memset_s(node, sizeof(*node), 0, sizeof(*node));
-
-	/* Check the magic number before anything else. */
-	if (hdr->magic != be32toh(FDT_MAGIC)) {
-		return false;
-	}
-
-	/* Check the version. */
-	max_ver = be32toh(hdr->version);
-	min_ver = be32toh(hdr->last_comp_version);
-	if (FDT_VERSION < min_ver || FDT_VERSION > max_ver) {
-		return false;
-	}
-
-	/* TODO: Verify that it is all within the fdt. */
-	node->begin = (const char *)hdr + begin;
-	node->end = node->begin + size;
-
-	/* TODO: Verify strings as well. */
-	node->strs = (char *)hdr + be32toh(hdr->off_dt_strings);
-
-	return true;
-}
-
-static bool fdt_next_property(struct fdt_tokenizer *t, const char **name,
-			      const char **buf, uint32_t *size)
-{
-	uint32_t token;
-	uint32_t nameoff;
-
-	if (!fdt_tokenizer_token(t, &token)) {
-		return false;
-	}
-
-	if (token != FDT_PROP) {
-		/* Rewind so that caller will get the same token. */
-		t->cur -= sizeof(uint32_t);
-		return false;
-	}
-
-	if (!fdt_tokenizer_uint32(t, size) ||
-	    !fdt_tokenizer_uint32(t, &nameoff) ||
-	    !fdt_tokenizer_bytes(t, buf, *size)) {
-		/*
-		 * Move cursor to the end so that caller won't get any new
-		 * tokens.
-		 */
-		t->cur = t->end;
-		return false;
-	}
-
-	/* TODO: Need to verify the strings. */
-	*name = t->strs + nameoff;
-
-	return true;
-}
-
-static bool fdt_next_subnode(struct fdt_tokenizer *t, const char **name)
-{
-	uint32_t token;
-
-	if (!fdt_tokenizer_token(t, &token)) {
-		return false;
-	}
-
-	if (token != FDT_BEGIN_NODE) {
-		/* Rewind so that caller will get the same token. */
-		t->cur -= sizeof(uint32_t);
-		return false;
-	}
-
-	if (!fdt_tokenizer_str(t, name)) {
-		/*
-		 * Move cursor to the end so that caller won't get any new
-		 * tokens.
-		 */
-		t->cur = t->end;
-		return false;
-	}
-
-	return true;
-}
-
-static void fdt_skip_properties(struct fdt_tokenizer *t)
-{
-	const char *name;
-	const char *buf;
-	uint32_t size;
-
-	while (fdt_next_property(t, &name, &buf, &size)) {
-		/* do nothing */
-	}
-}
-
-static bool fdt_skip_node(struct fdt_tokenizer *t)
-{
-	const char *name;
-	uint32_t token;
-	size_t pending = 1;
-
-	fdt_skip_properties(t);
-
-	do {
-		while (fdt_next_subnode(t, &name)) {
-			fdt_skip_properties(t);
-			pending++;
-		}
-
-		if (!fdt_tokenizer_token(t, &token)) {
-			return false;
-		}
-
-		if (token != FDT_END_NODE) {
-			t->cur = t->end;
-			return false;
-		}
-
-		pending--;
-	} while (pending);
-
-	return true;
-}
-
-bool fdt_read_property(const struct fdt_node *node, const char *name,
-		       const char **buf, uint32_t *size)
-{
-	struct fdt_tokenizer t;
-	const char *prop_name;
-
-	fdt_tokenizer_init(&t, node->strs, node->begin, node->end);
-
-	while (fdt_next_property(&t, &prop_name, buf, size)) {
-		if (!strncmp(prop_name, name, FDT_PROPERTY_NAME_MAX_SIZE)) {
-			return true;
-		}
-	}
-
-	return false;
+	return memiter_size(&fdt->buf);
 }
 
 /**
- * Helper method for parsing 32/64-bit uints from FDT data.
+ * Extracts total size of the FDT structure from its FDT header.
+ * Returns true on success, false if header validation failed.
  */
-bool fdt_parse_number(const char *data, uint32_t size, uint64_t *value)
+bool fdt_size_from_header(const void *ptr, size_t *val)
 {
-	union {
-		volatile uint64_t v;
-		char a[8];
-	} t;
+	if (fdt_check_header(ptr) != 0) {
+		return false;
+	}
 
-	/* FDT values should be aligned to 32-bit boundary. */
-	CHECK(is_aligned(data, FDT_TOKEN_ALIGNMENT));
+	*val = fdt_totalsize(ptr);
+	return true;
+}
+
+/**
+ * Initializes `struct fdt` to point to a given buffer.
+ * Returns true on success, false if FDT validation failed.
+ */
+bool fdt_init_from_ptr(struct fdt *fdt, const void *ptr, size_t len)
+{
+	if (fdt_check_full(ptr, len) != 0) {
+		return false;
+	}
+
+	memiter_init(&fdt->buf, ptr, len);
+	return true;
+}
+
+/**
+ * Initializes `struct fdt` to point to a given buffer.
+ * Returns true on success, false if FDT validation failed.
+ */
+bool fdt_init_from_memiter(struct fdt *fdt, const struct memiter *it)
+{
+	return fdt_init_from_ptr(fdt, memiter_base(it), memiter_size(it));
+}
+
+/**
+ * Invalidates the internal pointer to FDT buffer.
+ * This is meant to prevent use-after-free bugs.
+ */
+void fdt_fini(struct fdt *fdt)
+{
+	memiter_init(&fdt->buf, NULL, 0);
+}
+
+/**
+ * Finds a node of a given path in the device tree.
+ * Unit addresses of components may be omitted but result is undefined if
+ * the path is not unique.
+ * Returns true on success, false if not found or an error occurred.
+ */
+bool fdt_find_node(const struct fdt *fdt, const char *path,
+		   struct fdt_node *node)
+{
+	int offset = fdt_path_offset(fdt_base(fdt), path);
+
+	if (offset < 0) {
+		return false;
+	}
+
+	*node = (struct fdt_node){.fdt = *fdt, .offset = offset};
+	return true;
+}
+
+/**
+ * Retrieves address size for a bus represented in the device tree.
+ * Result is value of '#address-cells' at `node` multiplied by cell size.
+ * If '#address-cells' is not found, the default value is 2 cells.
+ * Returns true on success, false if an error occurred.
+ */
+bool fdt_address_size(const struct fdt_node *node, size_t *size)
+{
+	int s = fdt_address_cells(fdt_base(&node->fdt), node->offset);
+
+	if (s < 0) {
+		return false;
+	}
+
+	*size = (size_t)s * sizeof(uint32_t);
+	return true;
+}
+
+/**
+ * Retrieves address range size for a bus represented in the device tree.
+ * Result is value of '#size-cells' at `node` multiplied by cell size.
+ * If '#size-cells' is not found, the default value is 1 cell.
+ * Returns true on success, false if an error occurred.
+ */
+bool fdt_size_size(const struct fdt_node *node, size_t *size)
+{
+	int s = fdt_size_cells(fdt_base(&node->fdt), node->offset);
+
+	if (s < 0) {
+		return false;
+	}
+
+	*size = (size_t)s * sizeof(uint32_t);
+	return true;
+}
+
+/**
+ * Retrieves the buffer with value of property `name` at `node`.
+ * Returns true on success, false if not found or an error occurred.
+ */
+bool fdt_read_property(const struct fdt_node *node, const char *name,
+		       struct memiter *data)
+{
+	const void *ptr;
+	int lenp;
+
+	ptr = fdt_getprop(fdt_base(&node->fdt), node->offset, name, &lenp);
+	if (ptr == NULL) {
+		return false;
+	}
+
+	CHECK(lenp >= 0);
+	memiter_init(data, ptr, (size_t)lenp);
+	return true;
+}
+
+/**
+ * Reads the value of property `name` at `node` as a uint.
+ * The size of the uint is inferred from the size of the property's value.
+ * Returns true on success, false if property not found or an error occurred.
+ */
+bool fdt_read_number(const struct fdt_node *node, const char *name,
+		     uint64_t *val)
+{
+	struct memiter data;
+
+	return fdt_read_property(node, name, &data) &&
+	       fdt_parse_number(&data, memiter_size(&data), val) &&
+	       (memiter_size(&data) == 0);
+}
+
+/**
+ * Parses a uint of given `size` from the beginning of `data`.
+ * On success returns true and advances `data` by `size` bytes.
+ * Returns false if `data` is too short or uints of `size` are not supported.
+ */
+bool fdt_parse_number(struct memiter *data, size_t size, uint64_t *val)
+{
+	struct memiter data_int;
+	struct memiter data_rem;
+
+	data_rem = *data;
+	if (!memiter_consume(&data_rem, size, &data_int)) {
+		return false;
+	}
 
 	switch (size) {
-	case sizeof(uint32_t):
-		/*
-		 * Assert that `data` is already sufficiently aligned to
-		 * dereference as uint32_t. We cannot use static_assert()
-		 * because alignof() is not an expression under ISO C11.
-		 */
-		CHECK(alignof(uint32_t) <= FDT_TOKEN_ALIGNMENT);
-		*value = be32toh(*(uint32_t *)data);
-		return true;
-	case sizeof(uint64_t):
-		/*
-		 * Armv8 requires `data` to be realigned to 64-bit boundary
-		 * to dereference as uint64_t. May not be needed on other
-		 * architectures.
-		 */
-		memcpy_s(t.a, sizeof(t.a), data, sizeof(uint64_t));
-		*value = be64toh(t.v);
-		return true;
-	default:
+	case sizeof(uint32_t): {
+		static_assert(sizeof(uint32_t) == sizeof(fdt32_t),
+			      "Size mismatch");
+		*val = fdt32_ld((const fdt32_t *)memiter_base(&data_int));
+		break;
+	}
+	case sizeof(uint64_t): {
+		static_assert(sizeof(uint64_t) == sizeof(fdt64_t),
+			      "Size mismatch");
+		*val = fdt64_ld((const fdt64_t *)memiter_base(&data_int));
+		break;
+	}
+	default: {
 		return false;
 	}
-}
-
-bool fdt_first_child(struct fdt_node *node, const char **child_name)
-{
-	struct fdt_tokenizer t;
-
-	fdt_tokenizer_init(&t, node->strs, node->begin, node->end);
-
-	fdt_skip_properties(&t);
-
-	if (!fdt_next_subnode(&t, child_name)) {
-		return false;
 	}
 
-	node->begin = t.cur;
-
+	*data = data_rem;
 	return true;
 }
 
-bool fdt_next_sibling(struct fdt_node *node, const char **sibling_name)
+/**
+ * Finds first direct subnode of `node`.
+ * If found, makes `node` point to the subnode and returns true.
+ * Returns false if no subnode is found.
+ */
+bool fdt_first_child(struct fdt_node *node)
 {
-	struct fdt_tokenizer t;
+	int child_off = fdt_first_subnode(fdt_base(&node->fdt), node->offset);
 
-	fdt_tokenizer_init(&t, node->strs, node->begin, node->end);
-
-	if (!fdt_skip_node(&t)) {
+	if (child_off < 0) {
 		return false;
 	}
 
-	if (!fdt_next_subnode(&t, sibling_name)) {
-		return false;
-	}
-
-	node->begin = t.cur;
-
+	node->offset = child_off;
 	return true;
 }
 
-bool fdt_find_child(struct fdt_node *node, const char *child)
+/**
+ * Finds next sibling node of `node`. Call repeatedly to discover all siblings.
+ * If found, makes `node` point to the next sibling node and returns true.
+ * Returns false if no next sibling node is found.
+ */
+bool fdt_next_sibling(struct fdt_node *node)
 {
-	struct fdt_tokenizer t;
-	const char *name;
+	int sib_off = fdt_next_subnode(fdt_base(&node->fdt), node->offset);
 
-	fdt_tokenizer_init(&t, node->strs, node->begin, node->end);
-
-	fdt_skip_properties(&t);
-
-	while (fdt_next_subnode(&t, &name)) {
-		if (!strncmp(name, child, FDT_PROPERTY_NAME_MAX_SIZE)) {
-			node->begin = t.cur;
-			return true;
-		}
-
-		fdt_skip_node(&t);
+	if (sib_off < 0) {
+		return false;
 	}
 
-	return false;
+	node->offset = sib_off;
+	return true;
 }
 
-void fdt_dump(const struct fdt_header *hdr)
+/**
+ * Finds a node named `name` among subnodes of `node`.
+ * Returns true if found, false if not found or an error occurred.
+ */
+bool fdt_find_child(struct fdt_node *node, const struct string *name)
 {
-	uint32_t token;
-	size_t depth = 0;
-	const char *name;
-	struct fdt_tokenizer t;
-	struct fdt_node node;
+	struct fdt_node child = *node;
+	const void *base = fdt_base(&node->fdt);
 
-	/* Traverse the whole thing. */
-	if (!fdt_root_node(&node, hdr)) {
-		dlog_error("FDT failed validation.\n");
-		return;
+	if (!fdt_first_child(&child)) {
+		return false;
 	}
-
-	fdt_tokenizer_init(&t, node.strs, node.begin, node.end);
 
 	do {
-		while (fdt_next_subnode(&t, &name)) {
-			const char *buf;
-			uint32_t size;
+		const char *child_name;
+		int lenp;
+		struct memiter it;
 
-			dlog("%*sNew node: \"%s\"\n", 2 * depth, "", name);
-			depth++;
-			while (fdt_next_property(&t, &name, &buf, &size)) {
-				uint32_t i;
-
-				dlog("%*sproperty: \"%s\" (", 2 * depth, "",
-				     name);
-				for (i = 0; i < size; i++) {
-					dlog("%s%02x", i == 0 ? "" : " ",
-					     buf[i]);
-				}
-				dlog(")\n");
-			}
+		child_name = fdt_get_name(base, child.offset, &lenp);
+		if (child_name == NULL) {
+			/* Error */
+			return false;
 		}
 
-		if (!fdt_tokenizer_token(&t, &token)) {
-			return;
+		CHECK(lenp >= 0);
+		memiter_init(&it, child_name, (size_t)lenp);
+		if (string_eq(name, &it)) {
+			node->offset = child.offset;
+			return true;
 		}
+	} while (fdt_next_sibling(&child));
 
-		if (token != FDT_END_NODE) {
-			return;
-		}
-
-		depth--;
-	} while (depth);
-
-	dlog("fdt: off_mem_rsvmap=%u\n", be32toh(hdr->off_mem_rsvmap));
-	{
-		struct fdt_reserve_entry *e =
-			(struct fdt_reserve_entry
-				 *)((uintptr_t)hdr +
-				    be32toh(hdr->off_mem_rsvmap));
-		while (e->address || e->size) {
-			dlog("Entry: %p (%#x bytes)\n", be64toh(e->address),
-			     be64toh(e->size));
-			e++;
-		}
-	}
-}
-
-void fdt_add_mem_reservation(struct fdt_header *hdr, uint64_t addr,
-			     uint64_t len)
-{
-	/* TODO: Clean this up. */
-	uint8_t *begin = (uint8_t *)hdr + be32toh(hdr->off_mem_rsvmap);
-	struct fdt_reserve_entry *e = (struct fdt_reserve_entry *)begin;
-	size_t old_size =
-		be32toh(hdr->totalsize) - be32toh(hdr->off_mem_rsvmap);
-
-	hdr->totalsize = htobe32(be32toh(hdr->totalsize) +
-				 sizeof(struct fdt_reserve_entry));
-	hdr->off_dt_struct = htobe32(be32toh(hdr->off_dt_struct) +
-				     sizeof(struct fdt_reserve_entry));
-	hdr->off_dt_strings = htobe32(be32toh(hdr->off_dt_strings) +
-				      sizeof(struct fdt_reserve_entry));
-	memmove_s(begin + sizeof(struct fdt_reserve_entry), old_size, begin,
-		  old_size);
-	e->address = htobe64(addr);
-	e->size = htobe64(len);
-}
-
-size_t fdt_header_size(void)
-{
-	return sizeof(struct fdt_header);
-}
-
-uint32_t fdt_total_size(const struct fdt_header *hdr)
-{
-	return be32toh(hdr->totalsize);
+	/* Not found */
+	return false;
 }

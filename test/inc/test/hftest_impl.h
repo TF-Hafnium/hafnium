@@ -138,7 +138,7 @@ struct hftest_context {
 	noreturn void (*abort)(void);
 
 	/* These are used in primary VMs. */
-	const struct fdt_header *fdt;
+	const struct fdt *fdt;
 
 	/* These are used in services. */
 	void *send;

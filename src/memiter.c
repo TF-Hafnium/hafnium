@@ -16,6 +16,7 @@
 
 #include "hf/memiter.h"
 
+#include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/std.h"
 
@@ -136,7 +137,41 @@ bool memiter_advance(struct memiter *it, size_t v)
 	}
 
 	it->next = p;
+	return true;
+}
 
+/**
+ * Decrements the limit of iterator by the given number of bytes. Returns true
+ * if the limit was reduced without going over the base; returns false and
+ * leaves the iterator unmodified otherwise.
+ */
+bool memiter_restrict(struct memiter *it, size_t v)
+{
+	size_t s = memiter_size(it);
+
+	if (v > s) {
+		return false;
+	}
+
+	it->limit = it->next + (s - v);
+	return true;
+}
+
+/**
+ * Initializes `newit` with the first `v` bytes of `it` and advances `it` by
+ * the same number of bytes. This splits the original range into two iterators
+ * after `v` bytes.
+ * Returns true on success; returns false and leaves `it` unmodified and `newit`
+ * uninitialized otherwise.
+ */
+bool memiter_consume(struct memiter *it, size_t v, struct memiter *newit)
+{
+	if (v > memiter_size(it)) {
+		return false;
+	}
+
+	memiter_init(newit, memiter_base(it), v);
+	CHECK(memiter_advance(it, v));
 	return true;
 }
 

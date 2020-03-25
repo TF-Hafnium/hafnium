@@ -101,19 +101,16 @@ TEST(fdt, find_memory_ranges)
 	mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
 	mm_init(&ppool);
 
-	struct fdt_header *fdt;
-	struct fdt_node n;
+	struct fdt fdt;
 	struct boot_params params = {};
 
 	struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
 	struct string memory = STRING_INIT("memory");
-	fdt = fdt_map(mm_stage1_locked, pa_init((uintpaddr_t)&test_dtb), &n,
-		      &ppool);
-	ASSERT_THAT(fdt, NotNull());
-	ASSERT_TRUE(fdt_find_child(&n, ""));
-	fdt_find_memory_ranges(&n, &memory, params.mem_ranges,
+	ASSERT_TRUE(fdt_map(&fdt, mm_stage1_locked,
+			    pa_init((uintpaddr_t)&test_dtb), &ppool));
+	fdt_find_memory_ranges(&fdt, &memory, params.mem_ranges,
 			       &params.mem_ranges_count, MAX_MEM_RANGES);
-	ASSERT_TRUE(fdt_unmap(mm_stage1_locked, fdt, &ppool));
+	ASSERT_TRUE(fdt_unmap(&fdt, mm_stage1_locked, &ppool));
 	mm_unlock_stage1(&mm_stage1_locked);
 
 	EXPECT_THAT(params.mem_ranges_count, Eq(3));

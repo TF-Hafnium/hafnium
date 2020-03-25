@@ -22,8 +22,7 @@
 /**
  * Extract the boot parameters from the FDT and the boot-flow driver.
  */
-bool boot_flow_get_params(struct boot_params *p,
-			  const struct fdt_node *fdt_root)
+bool boot_flow_get_params(struct boot_params *p, const struct fdt *fdt)
 {
 	struct string memory = STRING_INIT("memory");
 	struct string device_memory = STRING_INIT("device-memory");
@@ -31,14 +30,14 @@ bool boot_flow_get_params(struct boot_params *p,
 	p->mem_ranges_count = 0;
 	p->kernel_arg = plat_boot_flow_get_kernel_arg();
 
-	return plat_boot_flow_get_initrd_range(fdt_root, &p->initrd_begin,
+	return plat_boot_flow_get_initrd_range(fdt, &p->initrd_begin,
 					       &p->initrd_end) &&
-	       fdt_find_cpus(fdt_root, p->cpu_ids, &p->cpu_count) &&
-	       fdt_find_memory_ranges(fdt_root, &memory, p->mem_ranges,
+	       fdt_find_cpus(fdt, p->cpu_ids, &p->cpu_count) &&
+	       fdt_find_memory_ranges(fdt, &memory, p->mem_ranges,
 				      &p->mem_ranges_count, MAX_MEM_RANGES) &&
-	       fdt_find_memory_ranges(
-		       fdt_root, &device_memory, p->device_mem_ranges,
-		       &p->device_mem_ranges_count, MAX_DEVICE_MEM_RANGES);
+	       fdt_find_memory_ranges(fdt, &device_memory, p->device_mem_ranges,
+				      &p->device_mem_ranges_count,
+				      MAX_DEVICE_MEM_RANGES);
 }
 
 /**

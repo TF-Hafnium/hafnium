@@ -72,8 +72,7 @@ void one_time_init_mm(void)
 void one_time_init(void)
 {
 	struct string manifest_fname = STRING_INIT("manifest.dtb");
-	struct fdt_header *fdt;
-	struct fdt_node fdt_root;
+	struct fdt fdt;
 	struct manifest manifest;
 	enum manifest_return_code manifest_ret;
 	struct boot_params params;
@@ -92,17 +91,12 @@ void one_time_init(void)
 
 	mm_stage1_locked = mm_lock_stage1();
 
-	fdt = fdt_map(mm_stage1_locked, plat_boot_flow_get_fdt_addr(),
-		      &fdt_root, &ppool);
-	if (fdt == NULL) {
+	if (!fdt_map(&fdt, mm_stage1_locked, plat_boot_flow_get_fdt_addr(),
+		     &ppool)) {
 		panic("Unable to map FDT.");
 	}
 
-	if (!fdt_find_child(&fdt_root, "")) {
-		panic("Unable to find FDT root node.");
-	}
-
-	if (!boot_flow_get_params(&params, &fdt_root)) {
+	if (!boot_flow_get_params(&params, &fdt)) {
 		panic("Could not parse boot params.");
 	}
 
@@ -141,11 +135,11 @@ void one_time_init(void)
 		      manifest_strerror(manifest_ret));
 	}
 
-	if (!plat_iommu_init(&fdt_root, mm_stage1_locked, &ppool)) {
+	if (!plat_iommu_init(&fdt, mm_stage1_locked, &ppool)) {
 		panic("Could not initialize IOMMUs.");
 	}
 
-	if (!fdt_unmap(mm_stage1_locked, fdt, &ppool)) {
+	if (!fdt_unmap(&fdt, mm_stage1_locked, &ppool)) {
 		panic("Unable to unmap FDT.");
 	}
 

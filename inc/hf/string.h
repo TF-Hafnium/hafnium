@@ -19,6 +19,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "hf/memiter.h"
+
 /**
  * Maximum length of a string including the NULL terminator.
  * This is an arbitrary number and can be adjusted to fit use cases.
@@ -48,8 +50,9 @@ struct string {
  */
 #define STRING_INIT(str) ((struct string){.data = str})
 
-enum string_return_code string_init(struct string *str, const char *data,
-				    size_t size);
+enum string_return_code string_init(struct string *str,
+				    const struct memiter *data);
 void string_init_empty(struct string *str);
 bool string_is_empty(const struct string *str);
 const char *string_data(const struct string *str);
+bool string_eq(const struct string *str, const struct memiter *data);

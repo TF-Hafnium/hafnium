@@ -29,8 +29,10 @@ alignas(4096) uint8_t kstack[4096];
 extern struct hftest_test hftest_begin[];
 extern struct hftest_test hftest_end[];
 
-void kmain(const struct fdt_header *fdt)
+void kmain(const void *fdt_ptr)
 {
+	struct fdt fdt;
+	size_t fdt_len;
 	struct memiter command_line;
 	struct memiter command;
 
@@ -50,7 +52,13 @@ void kmain(const struct fdt_header *fdt)
 
 	hftest_use_list(hftest_begin, hftest_end - hftest_begin);
 
-	if (!hftest_ctrl_start(fdt, &command_line)) {
+	if (!fdt_size_from_header(fdt_ptr, &fdt_len) ||
+	    !fdt_init_from_ptr(&fdt, fdt_ptr, fdt_len)) {
+		HFTEST_LOG("Unable to init FDT.");
+		goto out;
+	}
+
+	if (!hftest_ctrl_start(&fdt, &command_line)) {
 		HFTEST_LOG("Unable to read the command line.");
 		goto out;
 	}
@@ -83,7 +91,7 @@ void kmain(const struct fdt_header *fdt)
 			HFTEST_LOG("Unable to parse test.");
 			goto out;
 		}
-		hftest_run(suite_name, test_name, fdt);
+		hftest_run(suite_name, test_name, &fdt);
 		goto out;
 	}
 

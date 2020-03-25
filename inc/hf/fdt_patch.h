@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2020 The Hafnium Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,9 @@
 #pragma once
 
 #include "hf/boot_params.h"
-#include "hf/manifest.h"
-#include "hf/memiter.h"
 #include "hf/mm.h"
+#include "hf/mpool.h"
 
-bool boot_flow_get_params(struct boot_params *p, const struct fdt *fdt);
-
-bool boot_flow_update(struct mm_stage1_locked stage1_locked,
-		      const struct manifest *manifest,
-		      struct boot_params_update *p, struct memiter *cpio,
-		      struct mpool *ppool);
+/** Apply an update to the FDT. */
+bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
+	       struct boot_params_update *p, struct mpool *ppool);

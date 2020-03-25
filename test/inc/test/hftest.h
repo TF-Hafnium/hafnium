@@ -119,7 +119,7 @@ struct mpool *hftest_mm_get_ppool(void);
  * Inform a host that this is the start of a test run and obtain the command
  * line arguments for it.
  */
-bool hftest_ctrl_start(const struct fdt_header *fdt, struct memiter *cmd);
+bool hftest_ctrl_start(const struct fdt *fdt, struct memiter *cmd);
 
 /** Inform a host that this test run has finished and clean up. */
 void hftest_ctrl_finish(void);

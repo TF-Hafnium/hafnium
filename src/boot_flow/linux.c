@@ -18,6 +18,7 @@
 #include "hf/cpio.h"
 #include "hf/dlog.h"
 #include "hf/fdt_handler.h"
+#include "hf/fdt_patch.h"
 #include "hf/plat/boot_flow.h"
 #include "hf/std.h"
 
@@ -45,10 +46,10 @@ uintreg_t plat_boot_flow_get_kernel_arg(void)
 /**
  * Load initrd range from the board FDT.
  */
-bool plat_boot_flow_get_initrd_range(const struct fdt_node *fdt_root,
-				     paddr_t *begin, paddr_t *end)
+bool plat_boot_flow_get_initrd_range(const struct fdt *fdt, paddr_t *begin,
+				     paddr_t *end)
 {
-	return fdt_find_initrd(fdt_root, begin, end);
+	return fdt_find_initrd(fdt, begin, end);
 }
 
 bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,

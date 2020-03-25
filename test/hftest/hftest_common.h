@@ -24,5 +24,5 @@ void hftest_use_list(struct hftest_test list[], size_t count);
 
 void hftest_json(void);
 void hftest_run(struct memiter suite_name, struct memiter test_name,
-		const struct fdt_header *fdt);
+		const struct fdt *fdt);
 void hftest_help(void);

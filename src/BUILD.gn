@@ -57,7 +57,6 @@ source_set("src_testable") {
     "manifest.c",
     "panic.c",
     "spci_memory.c",
-    "string.c",
     "vcpu.c",
     "vm.c",
   ]
@@ -70,6 +69,7 @@ source_set("src_testable") {
     ":memiter",
     ":mm",
     ":std",
+    ":string",
     "//src/arch/${plat_arch}/hypervisor",
     plat_boot_flow,
     plat_console,
@@ -124,6 +124,16 @@ source_set("dlog") {
   ]
 }
 
+source_set("string") {
+  sources = [
+    "string.c",
+  ]
+  deps = [
+    ":memiter",
+    ":std",
+  ]
+}
+
 source_set("fdt_handler") {
   sources = [
     "fdt_handler.c",
@@ -131,6 +141,7 @@ source_set("fdt_handler") {
   deps = [
     ":dlog",
     ":fdt",
+    ":fdt_patch",
   ]
 }
 
@@ -141,8 +152,20 @@ source_set("fdt") {
   ]
 
   deps = [
+    ":memiter",
+    ":string",
+    "//third_party/dtc:libfdt",
+  ]
+}
+
+source_set("fdt_patch") {
+  sources = [
+    "fdt_patch.c",
+  ]
+  deps = [
     ":dlog",
-    ":std",
+    ":fdt",
+    "//third_party/dtc:libfdt",
   ]
 }
 
