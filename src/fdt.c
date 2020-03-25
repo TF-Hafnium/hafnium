@@ -274,3 +274,13 @@ bool fdt_find_child(struct fdt_node *node, const struct string *name)
 	/* Not found */
 	return false;
 }
+
+/**
+ * Returns true if `node` has property "compatible" containing a `compat` entry.
+ * Returns false if node not compatible or an error occurred.
+ */
+bool fdt_is_compatible(struct fdt_node *node, const char *compat)
+{
+	return fdt_node_check_compatible(fdt_base(&node->fdt), node->offset,
+					 compat) == 0;
+}

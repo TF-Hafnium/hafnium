@@ -195,42 +195,6 @@ static enum manifest_return_code read_optional_uint32list(
 	return MANIFEST_SUCCESS;
 }
 
-/**
- * Represents the value of property whose type is a list of strings. These are
- * encoded as one contiguous byte buffer with NULL-separated entries.
- */
-struct stringlist_iter {
-	struct memiter mem_it;
-};
-
-static enum manifest_return_code read_stringlist(const struct fdt_node *node,
-						 const char *property,
-						 struct stringlist_iter *out)
-{
-	struct memiter data;
-	const char *str;
-	size_t size;
-
-	if (!fdt_read_property(node, property, &data)) {
-		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
-	}
-
-	str = memiter_base(&data);
-	size = memiter_size(&data);
-
-	/*
-	 * Require that the value ends with a NULL terminator. Other NULL
-	 * characters separate the string list entries.
-	 */
-	if ((size < 1) || (str[size - 1] != '\0')) {
-		return MANIFEST_ERROR_MALFORMED_STRING_LIST;
-	}
-
-	CHECK(memiter_restrict(&data, 1));
-	out->mem_it = data;
-	return MANIFEST_SUCCESS;
-}
-
 static bool uint32list_has_next(const struct uint32list_iter *list)
 {
 	return memiter_size(&list->mem_it) > 0;
@@ -248,56 +212,6 @@ static enum manifest_return_code uint32list_get_next(
 
 	*out = (uint32_t)num;
 	return MANIFEST_SUCCESS;
-}
-
-static bool stringlist_has_next(const struct stringlist_iter *list)
-{
-	return memiter_size(&list->mem_it) > 0;
-}
-
-static void stringlist_get_next(struct stringlist_iter *list,
-				struct memiter *out)
-{
-	const char *mem_base = memiter_base(&list->mem_it);
-	size_t mem_size = memiter_size(&list->mem_it);
-	const char *null_term;
-
-	CHECK(stringlist_has_next(list));
-
-	null_term = memchr(mem_base, '\0', mem_size);
-	if (null_term == NULL) {
-		/*
-		 * NULL terminator not found, this is the last entry.
-		 * Set entry memiter to the entire byte range and advance list
-		 * memiter to the end of the byte range.
-		 */
-		memiter_init(out, mem_base, mem_size);
-		memiter_advance(&list->mem_it, mem_size);
-	} else {
-		/*
-		 * Found NULL terminator. Set entry memiter to byte range
-		 * [base, null) and move list memiter past the terminator.
-		 */
-		size_t entry_size = null_term - mem_base;
-
-		memiter_init(out, mem_base, entry_size);
-		memiter_advance(&list->mem_it, entry_size + 1);
-	}
-}
-
-static bool stringlist_contains(const struct stringlist_iter *list,
-				const char *str)
-{
-	struct stringlist_iter it = *list;
-	struct memiter entry;
-
-	while (stringlist_has_next(&it)) {
-		stringlist_get_next(&it, &entry);
-		if (memiter_iseq(&entry, str)) {
-			return true;
-		}
-	}
-	return false;
 }
 
 static enum manifest_return_code parse_vm(const struct fdt_node *node,
@@ -347,7 +261,6 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 	struct string vm_name;
 	struct fdt fdt;
 	struct fdt_node hyp_node;
-	struct stringlist_iter compatible_list;
 	size_t i = 0;
 	bool found_primary_vm = false;
 
@@ -363,8 +276,7 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 	}
 
 	/* Check "compatible" property. */
-	TRY(read_stringlist(&hyp_node, "compatible", &compatible_list));
-	if (!stringlist_contains(&compatible_list, "hafnium,hafnium")) {
+	if (!fdt_is_compatible(&hyp_node, "hafnium,hafnium")) {
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
@@ -435,8 +347,6 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Malformed string property";
 	case MANIFEST_ERROR_STRING_TOO_LONG:
 		return "String too long";
-	case MANIFEST_ERROR_MALFORMED_STRING_LIST:
-		return "Malformed string list property";
 	case MANIFEST_ERROR_MALFORMED_INTEGER:
 		return "Malformed integer property";
 	case MANIFEST_ERROR_INTEGER_OVERFLOW:

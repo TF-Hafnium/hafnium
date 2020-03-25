@@ -50,6 +50,7 @@ size_t fdt_size(const struct fdt *fdt);
 
 bool fdt_find_node(const struct fdt *fdt, const char *path,
 		   struct fdt_node *node);
+bool fdt_is_compatible(struct fdt_node *node, const char *compat);
 bool fdt_address_size(const struct fdt_node *node, size_t *addr_size);
 bool fdt_size_size(const struct fdt_node *node, size_t *size);
 

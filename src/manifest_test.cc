@@ -304,8 +304,7 @@ TEST(manifest, no_compatible_property)
 		.Build();
 	/* clang-format on */
 
-	ASSERT_EQ(manifest_from_vec(&m, dtb),
-		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
+	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_ERROR_NOT_COMPATIBLE);
 }
 
 TEST(manifest, not_compatible)
