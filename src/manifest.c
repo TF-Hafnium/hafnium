@@ -217,7 +217,8 @@ static bool uint32list_has_next(const struct uint32list_iter *list)
 	return memiter_size(&list->mem_it) > 0;
 }
 
-static uint32_t uint32list_get_next(struct uint32list_iter *list)
+static enum manifest_return_code uint32list_get_next(
+	struct uint32list_iter *list, uint32_t *out)
 {
 	const char *mem_base = memiter_base(&list->mem_it);
 	uint64_t num;
@@ -229,7 +230,8 @@ static uint32_t uint32list_get_next(struct uint32list_iter *list)
 	}
 
 	memiter_advance(&list->mem_it, sizeof(uint32_t));
-	return num;
+	*out = (uint32_t)num;
+	return MANIFEST_SUCCESS;
 }
 
 static bool stringlist_has_next(const struct stringlist_iter *list)
@@ -287,6 +289,7 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 					  spci_vm_id_t vm_id)
 {
 	struct uint32list_iter smcs;
+	size_t idx;
 
 	TRY(read_string(node, "debug_name", &vm->debug_name));
 	TRY(read_optional_string(node, "kernel_filename",
@@ -295,8 +298,8 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	TRY(read_optional_uint32list(node, "smc_whitelist", &smcs));
 	while (uint32list_has_next(&smcs) &&
 	       vm->smc_whitelist.smc_count < MAX_SMCS) {
-		vm->smc_whitelist.smcs[vm->smc_whitelist.smc_count++] =
-			uint32list_get_next(&smcs);
+		idx = vm->smc_whitelist.smc_count++;
+		TRY(uint32list_get_next(&smcs, &vm->smc_whitelist.smcs[idx]));
 	}
 
 	if (uint32list_has_next(&smcs)) {
