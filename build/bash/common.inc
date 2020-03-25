@@ -81,6 +81,14 @@ function default_value {
 # Runs on all projects if Repo is detected.
 function is_repo_dirty() {
 	local cmd=(git status --porcelain=v1)
+
+	# Temporary workaround for b/152398137 (all symlinks dirty on Kokoro).
+	# All affected files are in submodules, skip them.
+	if [ "${HAFNIUM_IGNORE_SUBMODULE_STATUS:-false}" == "true" ]
+	then
+		cmd+=(--ignore-submodules)
+	fi
+
 	if is_repo_build
 	then
 		# This source tree was checked out using `repo`. Check the
@@ -126,5 +134,16 @@ function init_build() {
 		# Kokoro does not support '<linkfile>' manifest tags. Parse the
 		# manifest and symlink files here.
 		"$(get_script_dir)/symlink_repo.py" "${ROOT_DIR}"
+	fi
+
+	##
+	## Temporary workaround for b/152398137 (all symlinks dirty on Kokoro).
+	## The `is_kokoro_build` check does not work inside container builds.
+	## Use an environment variable with HAFNIUM_ prefix to pass that
+	## information into the container (run_in_container.sh propagates them).
+	##
+	if is_kokoro_build
+	then
+		export HAFNIUM_IGNORE_SUBMODULE_STATUS=true
 	fi
 }
