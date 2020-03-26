@@ -123,12 +123,6 @@ void one_time_init(void)
 		panic("Could not find manifest in initrd.");
 	}
 
-	dlog_verbose("Manifest range: %#x - %#x (%d bytes)\n", manifest_it.next,
-		     manifest_it.limit, manifest_it.limit - manifest_it.next);
-	if (!is_aligned(manifest_it.next, 4)) {
-		panic("Manifest not aligned.");
-	}
-
 	manifest_ret = manifest_init(&manifest, &manifest_it);
 	if (manifest_ret != MANIFEST_SUCCESS) {
 		panic("Could not parse manifest: %s.",
