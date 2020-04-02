@@ -779,6 +779,54 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 			// 	spci_msg_send_sender(*args),spci_msg_send_receiver(*args),
 			// 	args->arg3, args->arg4, args->arg5, args->arg6, args->arg7);
 
+#if SECURE_WORLD == 1
+			/* Check if we're returning from a managed exit. */
+			if (current()->cpu->managed_exit){
+			         /* Clear the LR that was used to pend the managed exit. */
+				switch(current()->cpu->managed_exit){
+					case 1:
+						write_msr(ICH_LR0_EL2, 0x0);
+						break;
+					case 2:
+						write_msr(ICH_LR1_EL2, 0x0);
+						break;
+					case 3:
+						write_msr(ICH_LR2_EL2, 0x0);
+						break;
+					case 4:
+						write_msr(ICH_LR3_EL2, 0x0);
+						break;
+					case 5:
+						write_msr(ICH_LR4_EL2, 0x0);
+						break;
+					case 6:
+						write_msr(ICH_LR5_EL2, 0x0);
+						break;
+					case 7:
+						write_msr(ICH_LR6_EL2, 0x0);
+						break;
+					case 8:
+						write_msr(ICH_LR7_EL2, 0x0);
+						break;
+					case 9:
+						write_msr(ICH_LR8_EL2, 0x0);
+						break;
+					case 10:
+						write_msr(ICH_LR9_EL2, 0x0);
+						break;
+					default:
+						panic("Unexpected M Exit register: %d\n",
+								current()->cpu->managed_exit);
+				}
+
+				/* Lower interrupt priority mask. */
+				write_msr(ICC_PMR_EL1, 0xFF);
+
+				/* Clear the pending managed exit. */
+				current()->cpu->managed_exit = 0;
+			}
+#endif
+
 
 			if (is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
 			{
@@ -1237,7 +1285,63 @@ struct vcpu *irq_lower(void)
 
 struct vcpu *fiq_lower(void)
 {
-	return irq_lower();
+	/* Program the list register. */
+	uint64_t value =  (uint64_t) 1 << 62	// Pending
+			| (uint64_t) 0 << 60 	// Group 0
+			| (uint64_t) 0x8 << 48	// Priority
+			| (uint64_t) 0xA << 0	// intid
+		;
+
+	/* Find and Empty List register to use. */
+	if (read_msr(ICH_LR0_EL2) == 0) {
+		write_msr(ICH_LR0_EL2, value);
+		current()->cpu->managed_exit = 1;
+	}
+	else if (read_msr(ICH_LR1_EL2) == 0) {
+		write_msr(ICH_LR1_EL2, value);
+		current()->cpu->managed_exit = 2;
+	}
+	else if (read_msr(ICH_LR2_EL2) == 0) {
+		write_msr(ICH_LR2_EL2, value);
+		current()->cpu->managed_exit = 3;
+	}
+	else if (read_msr(ICH_LR3_EL2) == 0) {
+		write_msr(ICH_LR3_EL2, value);
+		current()->cpu->managed_exit = 4;
+	}
+	else if (read_msr(ICH_LR4_EL2) == 0) {
+		write_msr(ICH_LR4_EL2, value);
+		current()->cpu->managed_exit = 5;
+	}
+	else if (read_msr(ICH_LR5_EL2) == 0) {
+		write_msr(ICH_LR5_EL2, value);
+		current()->cpu->managed_exit = 6;
+	}
+	else if (read_msr(ICH_LR6_EL2) == 0) {
+		write_msr(ICH_LR6_EL2, value);
+		current()->cpu->managed_exit = 7;
+	}
+	else if (read_msr(ICH_LR7_EL2) == 0) {
+		write_msr(ICH_LR7_EL2, value);
+		current()->cpu->managed_exit = 8;
+	}
+	else if (read_msr(ICH_LR8_EL2) == 0) {
+		write_msr(ICH_LR8_EL2, value);
+		current()->cpu->managed_exit = 9;
+	}
+	else if (read_msr(ICH_LR9_EL2) == 0) {
+		write_msr(ICH_LR9_EL2, value);
+		current()->cpu->managed_exit = 10;
+	}
+	else {
+		panic("No Free List Registers\n");
+	}
+
+	/* Raise minimum priority to prevent interrupt re triggering
+	 into SPM and allow servicing of SGI */
+	write_msr(ICC_PMR_EL1, 0x10);
+
+	return current();
 }
 
 noreturn struct vcpu *serr_lower(void)

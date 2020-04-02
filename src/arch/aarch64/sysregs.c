@@ -73,6 +73,11 @@ uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id)
 	/* Do *not* trap PAuth. APK and API bits *disable* trapping when set. */
 	hcr_el2_value |= HCR_EL2_APK | HCR_EL2_API;
 
+#if SECURE_WORLD
+	/* Secure world should route all FIQs to S-EL2. */
+	hcr_el2_value |= HCR_EL2_FMO;
+#endif
+
 	/* Baseline values for all secondary VMs. */
 	if (vm_id != HF_PRIMARY_VM_ID) {
 		/*

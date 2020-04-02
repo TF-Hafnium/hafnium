@@ -64,7 +64,11 @@ static void gic_regs_reset(struct arch_regs *r, bool is_primary)
 		ich_hcr =
 			(0x1fU << 10); /* TDIR, TSEI, TALL1, TALL0, TC bits. */
 	}
-	r->gic.ich_hcr_el2 = ich_hcr;
+	#if SECURE_WORLD
+		r->gic.ich_hcr_el2 = ich_hcr | 0x1; // Enable vGic interface.
+	#else
+		r->gic.ich_hcr_el2 = ich_hcr;
+	#endif
 	r->gic.icc_sre_el2 = icc_sre_el2;
 #endif
 }

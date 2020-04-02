@@ -31,6 +31,12 @@ struct cpu {
 
 	/** Determines whether the CPU is currently on. */
 	bool is_on;
+
+	/*
+	 * Indicate whether a managed exit is pending
+	 * for this cpu and which LR was used.
+	 */
+	uint16_t managed_exit;
 };
 
 void cpu_module_init(const cpu_id_t *cpu_ids, size_t count);
