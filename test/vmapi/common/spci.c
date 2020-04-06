@@ -51,28 +51,30 @@ spci_memory_handle_t send_memory_and_retrieve_request(
 	spci_vm_id_t recipient,
 	struct spci_memory_region_constituent constituents[],
 	uint32_t constituent_count, spci_memory_region_flags_t flags,
-	enum spci_memory_access access)
+	enum spci_data_access send_data_access,
+	enum spci_data_access retrieve_data_access,
+	enum spci_instruction_access send_instruction_access,
+	enum spci_instruction_access retrieve_instruction_access)
 {
 	uint32_t msg_size;
 	struct spci_value ret;
-	uint32_t page_count = 0;
-	uint32_t handle;
-	uint32_t i;
+	spci_memory_handle_t handle;
 
 	/* Send the memory. */
 	msg_size = spci_memory_region_init(
 		tx_buffer, sender, recipient, constituents, constituent_count,
-		0, flags, access, SPCI_MEMORY_NORMAL_MEM,
-		SPCI_MEMORY_CACHE_WRITE_BACK, SPCI_MEMORY_OUTER_SHAREABLE);
+		0, flags, send_data_access, send_instruction_access,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		SPCI_MEMORY_OUTER_SHAREABLE);
 	switch (share_func) {
 	case SPCI_MEM_DONATE_32:
-		ret = spci_mem_donate(msg_size, msg_size, 0);
+		ret = spci_mem_donate(msg_size, msg_size);
 		break;
 	case SPCI_MEM_LEND_32:
-		ret = spci_mem_lend(msg_size, msg_size, 0);
+		ret = spci_mem_lend(msg_size, msg_size);
 		break;
 	case SPCI_MEM_SHARE_32:
-		ret = spci_mem_share(msg_size, msg_size, 0);
+		ret = spci_mem_share(msg_size, msg_size);
 		break;
 	default:
 		FAIL("Invalid share_func %#x.\n", share_func);
@@ -82,18 +84,14 @@ spci_memory_handle_t send_memory_and_retrieve_request(
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 	handle = spci_mem_success_handle(ret);
 
-	/* Count pages. */
-	for (i = 0; i < constituent_count; ++i) {
-		page_count += constituents[i].page_count;
-	}
-
 	/*
 	 * Send the appropriate retrieve request to the VM so that it can use it
 	 * to retrieve the memory.
 	 */
 	msg_size = spci_memory_retrieve_request_init(
-		tx_buffer, handle, sender, recipient, share_func, 0, page_count,
-		access, SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
+		tx_buffer, handle, sender, recipient, 0, 0,
+		retrieve_data_access, retrieve_instruction_access,
+		SPCI_MEMORY_NORMAL_MEM, SPCI_MEMORY_CACHE_WRITE_BACK,
 		SPCI_MEMORY_OUTER_SHAREABLE);
 	EXPECT_EQ(spci_msg_send(sender, recipient, msg_size, 0).func,
 		  SPCI_SUCCESS_32);
@@ -102,7 +100,7 @@ spci_memory_handle_t send_memory_and_retrieve_request(
 }
 
 /*
- * Use the retrieve request from the recieve buffer to retrieve a memory region
+ * Use the retrieve request from the receive buffer to retrieve a memory region
  * which has been sent to us. Returns the sender, and the handle via a return
  * parameter.
  */
@@ -112,7 +110,7 @@ spci_vm_id_t retrieve_memory_from_message(void *recv_buf, void *send_buf,
 {
 	uint32_t msg_size;
 	struct spci_value ret;
-	struct spci_retrieved_memory_region *memory_region;
+	struct spci_memory_region *memory_region;
 	spci_vm_id_t sender;
 
 	EXPECT_EQ(msg_ret.func, SPCI_MSG_SEND_32);
@@ -120,16 +118,44 @@ spci_vm_id_t retrieve_memory_from_message(void *recv_buf, void *send_buf,
 	sender = spci_msg_send_sender(msg_ret);
 
 	if (handle != NULL) {
-		struct spci_memory_retrieve_request *retrieve_request =
-			(struct spci_memory_retrieve_request *)recv_buf;
+		struct spci_memory_region *retrieve_request =
+			(struct spci_memory_region *)recv_buf;
 		*handle = retrieve_request->handle;
 	}
 	memcpy_s(send_buf, HF_MAILBOX_SIZE, recv_buf, msg_size);
 	spci_rx_release();
-	ret = spci_mem_retrieve_req(msg_size, msg_size, 0);
+	ret = spci_mem_retrieve_req(msg_size, msg_size);
 	EXPECT_EQ(ret.func, SPCI_MEM_RETRIEVE_RESP_32);
-	memory_region = (struct spci_retrieved_memory_region *)recv_buf;
+	memory_region = (struct spci_memory_region *)recv_buf;
 	EXPECT_EQ(memory_region->receiver_count, 1);
+	EXPECT_EQ(memory_region->receivers[0].receiver_permissions.receiver,
+		  hf_vm_get_id());
+
+	return sender;
+}
+
+/*
+ * Use the retrieve request from the receive buffer to retrieve a memory region
+ * which has been sent to us, expecting it to fail with the given error code.
+ * Returns the sender.
+ */
+spci_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
+						      void *send_buf,
+						      struct spci_value msg_ret,
+						      int32_t expected_error)
+{
+	uint32_t msg_size;
+	struct spci_value ret;
+	spci_vm_id_t sender;
+
+	EXPECT_EQ(msg_ret.func, SPCI_MSG_SEND_32);
+	msg_size = spci_msg_send_size(msg_ret);
+	sender = spci_msg_send_sender(msg_ret);
+
+	memcpy_s(send_buf, HF_MAILBOX_SIZE, recv_buf, msg_size);
+	spci_rx_release();
+	ret = spci_mem_retrieve_req(msg_size, msg_size);
+	EXPECT_SPCI_ERROR(ret, expected_error);
 
 	return sender;
 }

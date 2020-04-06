@@ -27,8 +27,7 @@ struct spci_value spci_memory_send(struct vm *to, struct vm_locked from_locked,
 				   uint32_t share_func,
 				   struct mpool *page_pool);
 struct spci_value spci_memory_retrieve(
-	struct vm_locked to_locked,
-	struct spci_memory_retrieve_request *retrieve_request,
+	struct vm_locked to_locked, struct spci_memory_region *retrieve_request,
 	uint32_t retrieve_request_size, struct mpool *page_pool);
 struct spci_value spci_memory_relinquish(
 	struct vm_locked from_locked,

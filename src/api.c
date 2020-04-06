@@ -386,8 +386,8 @@ static struct spci_value spci_msg_recv_return(const struct vm *receiver)
 	case SPCI_MEM_LEND_32:
 	case SPCI_MEM_SHARE_32:
 		return (struct spci_value){.func = receiver->mailbox.recv_func,
-					   .arg3 = receiver->mailbox.recv_size,
-					   .arg4 = receiver->mailbox.recv_size};
+					   .arg1 = receiver->mailbox.recv_size,
+					   .arg2 = receiver->mailbox.recv_size};
 	default:
 		/* This should never be reached, but return an error in case. */
 		dlog_error("Tried to return an invalid message function %#x\n",
@@ -1461,10 +1461,9 @@ struct spci_value api_spci_features(uint32_t function_id)
 	}
 }
 
-struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
-				    uint32_t page_count,
-				    uint32_t fragment_length, uint32_t length,
-				    spci_cookie_t cookie, struct vcpu *current,
+struct spci_value api_spci_mem_send(uint32_t share_func, uint32_t length,
+				    uint32_t fragment_length, ipaddr_t address,
+				    uint32_t page_count, struct vcpu *current,
 				    struct vcpu **next)
 {
 	struct vm *from = current->vm;
@@ -1481,8 +1480,8 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	if ((cookie == 0) != (fragment_length == length)) {
-		/* Cookie is required iff there are multiple fragments. */
+	if (fragment_length != length) {
+		dlog_verbose("Fragmentation not yet supported.\n");
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
@@ -1523,12 +1522,12 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 		goto out;
 	}
 
-	if (memory_region->attribute_count != 1) {
+	if (memory_region->receiver_count != 1) {
 		/* Hafnium doesn't support multi-way memory sharing for now. */
 		dlog_verbose(
 			"Multi-way memory sharing not supported (got %d "
-			"attribute descriptors, expected 0).\n",
-			memory_region->attribute_count);
+			"endpoint memory access descriptors, expected 1).\n",
+			memory_region->receiver_count);
 		ret = spci_error(SPCI_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -1536,7 +1535,7 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 	/*
 	 * Ensure that the receiver VM exists and isn't the same as the sender.
 	 */
-	to = vm_find(memory_region->attributes[0].receiver);
+	to = vm_find(memory_region->receivers[0].receiver_permissions.receiver);
 	if (to == NULL || to == from) {
 		dlog_verbose("Invalid receiver.\n");
 		ret = spci_error(SPCI_INVALID_PARAMETERS);
@@ -1593,14 +1592,16 @@ out:
 	return ret;
 }
 
-struct spci_value api_spci_mem_retrieve_req(
-	ipaddr_t address, uint32_t page_count, uint32_t fragment_length,
-	uint32_t length, spci_cookie_t cookie, struct vcpu *current)
+struct spci_value api_spci_mem_retrieve_req(uint32_t length,
+					    uint32_t fragment_length,
+					    ipaddr_t address,
+					    uint32_t page_count,
+					    struct vcpu *current)
 {
 	struct vm *to = current->vm;
 	struct vm_locked to_locked;
 	const void *to_msg;
-	struct spci_memory_retrieve_request *retrieve_request;
+	struct spci_memory_region *retrieve_request;
 	uint32_t message_buffer_size;
 	struct spci_value ret;
 
@@ -1612,15 +1613,13 @@ struct spci_value api_spci_mem_retrieve_req(
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	if (fragment_length == length && cookie != 0) {
-		/* Cookie is only allowed if there are multiple fragments. */
-		dlog_verbose("Unexpected cookie %d.\n", cookie);
+	if (fragment_length != length) {
+		dlog_verbose("Fragmentation not yet supported.\n");
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
 	retrieve_request =
-		(struct spci_memory_retrieve_request *)cpu_get_buffer(
-			current->cpu);
+		(struct spci_memory_region *)cpu_get_buffer(current->cpu);
 	message_buffer_size = cpu_get_buffer_size(current->cpu);
 	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
 		dlog_verbose("Retrieve request too long.\n");
@@ -1718,7 +1717,8 @@ out:
 	return ret;
 }
 
-struct spci_value api_spci_mem_reclaim(uint32_t handle, uint32_t flags,
+struct spci_value api_spci_mem_reclaim(spci_memory_handle_t handle,
+				       spci_memory_region_flags_t flags,
 				       struct vcpu *current)
 {
 	struct vm *to = current->vm;

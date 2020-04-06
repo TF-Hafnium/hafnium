@@ -60,14 +60,16 @@ struct spci_value api_spci_id_get(const struct vcpu *current);
 struct spci_value api_spci_features(uint32_t function_id);
 struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
 			       const struct vcpu *current, struct vcpu **next);
-struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
-				    uint32_t page_count,
-				    uint32_t fragment_length, uint32_t length,
-				    spci_cookie_t cookie, struct vcpu *current,
+struct spci_value api_spci_mem_send(uint32_t share_func, uint32_t length,
+				    uint32_t fragment_length, ipaddr_t address,
+				    uint32_t page_count, struct vcpu *current,
 				    struct vcpu **next);
-struct spci_value api_spci_mem_retrieve_req(
-	ipaddr_t address, uint32_t page_count, uint32_t fragment_length,
-	uint32_t length, spci_cookie_t cookie, struct vcpu *current);
+struct spci_value api_spci_mem_retrieve_req(uint32_t length,
+					    uint32_t fragment_length,
+					    ipaddr_t address,
+					    uint32_t page_count,
+					    struct vcpu *current);
 struct spci_value api_spci_mem_relinquish(struct vcpu *current);
-struct spci_value api_spci_mem_reclaim(uint32_t handle, uint32_t flags,
+struct spci_value api_spci_mem_reclaim(spci_memory_handle_t handle,
+				       spci_memory_region_flags_t flags,
 				       struct vcpu *current);

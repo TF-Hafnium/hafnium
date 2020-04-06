@@ -62,9 +62,11 @@
 #define SPCI_RETRY              INT32_C(-7)
 #define SPCI_ABORTED            INT32_C(-8)
 
+/* clang-format on */
+
 /* SPCI function specific constants. */
-#define SPCI_MSG_RECV_BLOCK  0x1
-#define SPCI_MSG_RECV_BLOCK_MASK  0x1
+#define SPCI_MSG_RECV_BLOCK 0x1
+#define SPCI_MSG_RECV_BLOCK_MASK 0x1
 
 #define SPCI_MSG_SEND_NOTIFY 0x1
 #define SPCI_MSG_SEND_NOTIFY_MASK 0x1
@@ -83,14 +85,22 @@
 /* The maximum length possible for a single message. */
 #define SPCI_MSG_PAYLOAD_MAX HF_MAILBOX_SIZE
 
-enum spci_memory_access {
-	SPCI_MEMORY_RO_NX,
-	SPCI_MEMORY_RO_X,
-	SPCI_MEMORY_RW_NX,
-	SPCI_MEMORY_RW_X,
+enum spci_data_access {
+	SPCI_DATA_ACCESS_NOT_SPECIFIED,
+	SPCI_DATA_ACCESS_RO,
+	SPCI_DATA_ACCESS_RW,
+	SPCI_DATA_ACCESS_RESERVED,
+};
+
+enum spci_instruction_access {
+	SPCI_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+	SPCI_INSTRUCTION_ACCESS_NX,
+	SPCI_INSTRUCTION_ACCESS_X,
+	SPCI_INSTRUCTION_ACCESS_RESERVED,
 };
 
 enum spci_memory_type {
+	SPCI_MEMORY_NOT_SPECIFIED_MEM,
 	SPCI_MEMORY_DEVICE_MEM,
 	SPCI_MEMORY_NORMAL_MEM,
 };
@@ -98,8 +108,8 @@ enum spci_memory_type {
 enum spci_memory_cacheability {
 	SPCI_MEMORY_CACHE_RESERVED = 0x0,
 	SPCI_MEMORY_CACHE_NON_CACHEABLE = 0x1,
-	SPCI_MEMORY_CACHE_WRITE_THROUGH = 0x2,
-	SPCI_MEMORY_CACHE_WRITE_BACK = 0x4,
+	SPCI_MEMORY_CACHE_RESERVED_1 = 0x2,
+	SPCI_MEMORY_CACHE_WRITE_BACK = 0x3,
 	SPCI_MEMORY_DEV_NGNRNE = 0x0,
 	SPCI_MEMORY_DEV_NGNRE = 0x1,
 	SPCI_MEMORY_DEV_NGRE = 0x2,
@@ -108,64 +118,83 @@ enum spci_memory_cacheability {
 
 enum spci_memory_shareability {
 	SPCI_MEMORY_SHARE_NON_SHAREABLE,
-	SPCI_MEMORY_RESERVED,
+	SPCI_MEMORY_SHARE_RESERVED,
 	SPCI_MEMORY_OUTER_SHAREABLE,
 	SPCI_MEMORY_INNER_SHAREABLE,
 };
 
-#define SPCI_MEMORY_ACCESS_OFFSET (0x5U)
-#define SPCI_MEMORY_ACCESS_MASK ((0x3U) << SPCI_MEMORY_ACCESS_OFFSET)
+typedef uint8_t spci_memory_access_permissions_t;
+
+/**
+ * This corresponds to table 44 of the FF-A 1.0 EAC specification, "Memory
+ * region attributes descriptor".
+ */
+typedef uint8_t spci_memory_attributes_t;
+
+#define SPCI_DATA_ACCESS_OFFSET (0x0U)
+#define SPCI_DATA_ACCESS_MASK ((0x3U) << SPCI_DATA_ACCESS_OFFSET)
+
+#define SPCI_INSTRUCTION_ACCESS_OFFSET (0x2U)
+#define SPCI_INSTRUCTION_ACCESS_MASK ((0x3U) << SPCI_INSTRUCTION_ACCESS_OFFSET)
 
 #define SPCI_MEMORY_TYPE_OFFSET (0x4U)
-#define SPCI_MEMORY_TYPE_MASK ((0x1U) << SPCI_MEMORY_TYPE_OFFSET)
+#define SPCI_MEMORY_TYPE_MASK ((0x3U) << SPCI_MEMORY_TYPE_OFFSET)
 
 #define SPCI_MEMORY_CACHEABILITY_OFFSET (0x2U)
-#define SPCI_MEMORY_CACHEABILITY_MASK ((0x3U) <<\
-	SPCI_MEMORY_CACHEABILITY_OFFSET)
+#define SPCI_MEMORY_CACHEABILITY_MASK \
+	((0x3U) << SPCI_MEMORY_CACHEABILITY_OFFSET)
 
 #define SPCI_MEMORY_SHAREABILITY_OFFSET (0x0U)
-#define SPCI_MEMORY_SHAREABILITY_MASK ((0x3U) <<\
-	SPCI_MEMORY_SHAREABILITY_OFFSET)
+#define SPCI_MEMORY_SHAREABILITY_MASK \
+	((0x3U) << SPCI_MEMORY_SHAREABILITY_OFFSET)
 
-#define LEND_ATTR_FUNCTION_SET(name, offset, mask) \
-static inline void spci_set_memory_##name##_attr(uint16_t *attr,\
-	const enum spci_memory_##name perm)\
-{\
-	*attr = (*attr & ~(mask)) | ((perm  << offset) & mask);\
-}
+#define ATTR_FUNCTION_SET(name, container_type, offset, mask)                  \
+	static inline void spci_set_##name##_attr(container_type *attr,        \
+						  const enum spci_##name perm) \
+	{                                                                      \
+		*attr = (*attr & ~(mask)) | ((perm << offset) & mask);         \
+	}
 
-#define LEND_ATTR_FUNCTION_GET(name, offset, mask) \
-static inline enum spci_memory_##name spci_get_memory_##name##_attr(\
-	uint16_t attr)\
-{\
-	return (enum spci_memory_##name)((attr & mask) >> offset);\
-}
+#define ATTR_FUNCTION_GET(name, container_type, offset, mask)       \
+	static inline enum spci_##name spci_get_##name##_attr(      \
+		container_type attr)                                \
+	{                                                           \
+		return (enum spci_##name)((attr & mask) >> offset); \
+	}
 
-LEND_ATTR_FUNCTION_SET(access, SPCI_MEMORY_ACCESS_OFFSET,
-	SPCI_MEMORY_ACCESS_MASK)
-LEND_ATTR_FUNCTION_GET(access, SPCI_MEMORY_ACCESS_OFFSET,
-	SPCI_MEMORY_ACCESS_MASK)
+ATTR_FUNCTION_SET(data_access, spci_memory_access_permissions_t,
+		  SPCI_DATA_ACCESS_OFFSET, SPCI_DATA_ACCESS_MASK)
+ATTR_FUNCTION_GET(data_access, spci_memory_access_permissions_t,
+		  SPCI_DATA_ACCESS_OFFSET, SPCI_DATA_ACCESS_MASK)
 
-LEND_ATTR_FUNCTION_SET(type, SPCI_MEMORY_TYPE_OFFSET, SPCI_MEMORY_TYPE_MASK)
-LEND_ATTR_FUNCTION_GET(type, SPCI_MEMORY_TYPE_OFFSET, SPCI_MEMORY_TYPE_MASK)
+ATTR_FUNCTION_SET(instruction_access, spci_memory_access_permissions_t,
+		  SPCI_INSTRUCTION_ACCESS_OFFSET, SPCI_INSTRUCTION_ACCESS_MASK)
+ATTR_FUNCTION_GET(instruction_access, spci_memory_access_permissions_t,
+		  SPCI_INSTRUCTION_ACCESS_OFFSET, SPCI_INSTRUCTION_ACCESS_MASK)
 
-LEND_ATTR_FUNCTION_SET(cacheability, SPCI_MEMORY_CACHEABILITY_OFFSET,
-	SPCI_MEMORY_CACHEABILITY_MASK)
+ATTR_FUNCTION_SET(memory_type, spci_memory_attributes_t,
+		  SPCI_MEMORY_TYPE_OFFSET, SPCI_MEMORY_TYPE_MASK)
+ATTR_FUNCTION_GET(memory_type, spci_memory_attributes_t,
+		  SPCI_MEMORY_TYPE_OFFSET, SPCI_MEMORY_TYPE_MASK)
 
-LEND_ATTR_FUNCTION_GET(cacheability, SPCI_MEMORY_CACHEABILITY_OFFSET,
-	SPCI_MEMORY_CACHEABILITY_MASK)
+ATTR_FUNCTION_SET(memory_cacheability, spci_memory_attributes_t,
+		  SPCI_MEMORY_CACHEABILITY_OFFSET,
+		  SPCI_MEMORY_CACHEABILITY_MASK)
+ATTR_FUNCTION_GET(memory_cacheability, spci_memory_attributes_t,
+		  SPCI_MEMORY_CACHEABILITY_OFFSET,
+		  SPCI_MEMORY_CACHEABILITY_MASK)
 
-LEND_ATTR_FUNCTION_SET(shareability, SPCI_MEMORY_SHAREABILITY_OFFSET,
-	SPCI_MEMORY_SHAREABILITY_MASK)
+ATTR_FUNCTION_SET(memory_shareability, spci_memory_attributes_t,
+		  SPCI_MEMORY_SHAREABILITY_OFFSET,
+		  SPCI_MEMORY_SHAREABILITY_MASK)
+ATTR_FUNCTION_GET(memory_shareability, spci_memory_attributes_t,
+		  SPCI_MEMORY_SHAREABILITY_OFFSET,
+		  SPCI_MEMORY_SHAREABILITY_MASK)
 
-LEND_ATTR_FUNCTION_GET(shareability, SPCI_MEMORY_SHAREABILITY_OFFSET,
-	SPCI_MEMORY_SHAREABILITY_MASK)
-
-/* clang-format on */
-
-#define SPCI_MEMORY_HANDLE_ALLOCATOR_MASK ((spci_memory_handle_t)(1U << 31))
+#define SPCI_MEMORY_HANDLE_ALLOCATOR_MASK \
+	((spci_memory_handle_t)(UINT64_C(1) << 63))
 #define SPCI_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR \
-	((spci_memory_handle_t)(1U << 31))
+	((spci_memory_handle_t)(UINT64_C(1) << 63))
 
 /** The ID of a VM. These are assigned sequentially starting with an offset. */
 typedef uint16_t spci_vm_id_t;
@@ -174,13 +203,7 @@ typedef uint16_t spci_vm_id_t;
  * A globally-unique ID assigned by the hypervisor for a region of memory being
  * sent between VMs.
  */
-typedef uint32_t spci_memory_handle_t;
-
-/**
- * A unique-per-VM ID used to associate fragments of a memory sharing message,
- * assigned by the sender of the message.
- */
-typedef uint32_t spci_cookie_t;
+typedef uint64_t spci_memory_handle_t;
 
 /**
  * A count of VMs. This has the same range as the VM IDs but we give it a
@@ -251,158 +274,28 @@ static inline uint64_t spci_vm_vcpu(spci_vm_id_t vm_id,
 	return ((uint32_t)vm_id << 16) | vcpu_index;
 }
 
+/**
+ * A set of contiguous pages which is part of a memory region. This corresponds
+ * to table 40 of the FF-A 1.0 EAC specification, "Constituent memory region
+ * descriptor".
+ */
 struct spci_memory_region_constituent {
 	/**
 	 * The base IPA of the constituent memory region, aligned to 4 kiB page
 	 * size granularity.
 	 */
-	uint32_t address_low;
-	uint32_t address_high;
+	uint64_t address;
 	/** The number of 4 kiB pages in the constituent memory region. */
 	uint32_t page_count;
 	/** Reserved field, must be 0. */
 	uint32_t reserved;
 };
 
-struct spci_memory_region_attributes {
-	/** The ID of the VM to which the memory is being given or shared. */
-	spci_vm_id_t receiver;
-	/**
-	 * The attributes with which the memory region should be mapped in the
-	 * receiver's page table.
-	 */
-	uint16_t memory_attributes;
-	/** Reserved field, must be 0. */
-	uint32_t reserved_0;
-	/** Reserved field, must be 0. */
-	uint64_t reserved_1;
-};
-
-/** Flags to control the behaviour of a memory sharing transaction. */
-typedef uint32_t spci_memory_region_flags_t;
-
 /**
- * Clear memory region contents after unmapping it from the sender and before
- * mapping it for any receiver.
+ * A set of pages comprising a memory region. This corresponds to table 39 of
+ * the FF-A 1.0 EAC specification, "Composite memory region descriptor".
  */
-#define SPCI_MEMORY_REGION_FLAG_CLEAR 0x1
-
-struct spci_memory_region {
-	/**
-	 * An implementation defined value associated with the receiver and the
-	 * memory region.
-	 */
-	uint32_t tag;
-	/** Flags to control behaviour of the transaction. */
-	spci_memory_region_flags_t flags;
-	/** Sender VM ID. */
-	spci_vm_id_t sender;
-	/** Reserved field, must be 0. */
-	uint16_t reserved_0;
-	/**
-	 * The total number of 4 kiB pages included in this memory region. This
-	 * must be equal to the sum of page counts specified in each
-	 * `spci_memory_region_constituent`.
-	 */
-	uint32_t page_count;
-	/**
-	 * The number of constituents (`spci_memory_region_constituent`)
-	 * included in this memory region.
-	 */
-	uint32_t constituent_count;
-	/**
-	 * The offset in bytes from the base address of this
-	 * `spci_memory_region` to the start of the first
-	 * `spci_memory_region_constituent`.
-	 */
-	uint32_t constituent_offset;
-	/**
-	 * The number of `spci_memory_region_attributes` entries included in
-	 * this memory region.
-	 */
-	uint32_t attribute_count;
-	/** Reserved field, must be 0. */
-	uint32_t reserved_1;
-	/**
-	 * An array of `attribute_count` memory region attribute descriptors.
-	 * Each one specifies an endpoint and the attributes with which this
-	 * memory region should be mapped in that endpoint's page table.
-	 */
-	struct spci_memory_region_attributes attributes[];
-};
-
-/**
- * Retrieval attributes for a single receiver. This corresponds to table 138 of
- * the SPCI beta specification, "Descriptor with properties to retrieve a memory
- * region".
- */
-struct spci_memory_retrieve_properties {
-	struct spci_memory_region_attributes attributes;
-	uint32_t page_count;
-	uint32_t constituent_count;
-	/** Reserved field, must be 0. */
-	uint32_t reserved;
-	struct spci_memory_region_constituent constituents[];
-};
-
-/**
- * Descriptor used for SPCI_MEM_RETRIEVE_REQ. This corresponds to table 137 of
- * the SPCI beta specification, "Descriptor to retrieve a donated, lent or
- * shared memory region".
- */
-struct spci_memory_retrieve_request {
-	/** Globally unique handle to identify the memory transaction. */
-	spci_memory_handle_t handle;
-	/** ID of the VM which sent the memory. */
-	spci_vm_id_t sender;
-	/** Reserved field, must be 0. */
-	uint16_t reserved_0;
-	/** Function ID of the memory sharing operation. */
-	uint32_t share_func;
-	/**
-	 * An implementation defined value associated with the receiver and the
-	 * memory region.
-	 */
-	uint32_t tag;
-	/**
-	 * The number of descriptors to specify the attributes with which the
-	 * memory region will be mapped in the other recipients. Hafnium doesn't
-	 * support multi-way memory sharing so this should always be 0.
-	 */
-	uint32_t attribute_count;
-	/**
-	 * The offset in bytes from the base address of this
-	 * `spci_memory_retrieve_request` to the start of the first attribute
-	 * descriptor.
-	 */
-	uint32_t attribute_offset;
-	/**
-	 * The number of `spci_memory_retrieve_properties` entries included
-	 * in this retrieve request, i.e. the number of receivers including the
-	 * caller and any stream endpoints for which the caller is a proxy.
-	 * Hafnium doesn't support stream endpoints, so this should always be 1.
-	 */
-	uint32_t retrieve_properties_count;
-	/** Reserved field, must be 0. */
-	uint32_t reserved_1;
-	/*
-	 * 'Array' of `struct spci_memory_retrieve_properties` goes here, but it
-	 * is not included in the struct as the entries are variable length. Use
-	 * `spci_memory_retrieve_request_first_retrieve_properties` to get the
-	 * first one.
-	 */
-};
-
-/**
- * Receiver address range descriptor. This corresponds to table 144 of the SPCI
- * beta specification, "Descriptor with address ranges of retrieved memory
- * region", and is included as part of the `spci_retrieved_memory_region`.
- */
-struct spci_receiver_address_range {
-	/** Receiver VM ID. */
-	spci_vm_id_t receiver;
-	/** Reserved field, must be 0. */
-	uint16_t reserved_0;
+struct spci_composite_memory_region {
 	/**
 	 * The total number of 4 kiB pages included in this memory region. This
 	 * must be equal to the sum of page counts specified in each
@@ -415,101 +308,155 @@ struct spci_receiver_address_range {
 	 */
 	uint32_t constituent_count;
 	/** Reserved field, must be 0. */
-	uint32_t reserved_1;
+	uint64_t reserved_0;
 	/** An array of `constituent_count` memory region constituents. */
 	struct spci_memory_region_constituent constituents[];
 };
 
+/** Flags to indicate properties of receivers during memory region retrieval. */
+typedef uint8_t spci_memory_receiver_flags_t;
+
 /**
- * Descriptor used for SPCI_MEM_RETRIEVE_RESP. This corresponds to table 143 of
- * the SPCI beta specification, "Encoding of mapped address ranges of retrieved
- * memory region".
+ * This corresponds to table 41 of the FF-A 1.0 EAC specification, "Memory
+ * access permissions descriptor".
  */
-struct spci_retrieved_memory_region {
+struct spci_memory_region_attributes {
+	/** The ID of the VM to which the memory is being given or shared. */
+	spci_vm_id_t receiver;
 	/**
-	 * The number of `spci_receiver_address_range` entries included
-	 * in this memory region.
+	 * The permissions with which the memory region should be mapped in the
+	 * receiver's page table.
+	 */
+	spci_memory_access_permissions_t permissions;
+	/**
+	 * Flags used during SPCI_MEM_RETRIEVE_REQ and SPCI_MEM_RETRIEVE_RESP
+	 * for memory regions with multiple borrowers.
+	 */
+	spci_memory_receiver_flags_t flags;
+};
+
+/** Flags to control the behaviour of a memory sharing transaction. */
+typedef uint32_t spci_memory_region_flags_t;
+
+/**
+ * Clear memory region contents after unmapping it from the sender and before
+ * mapping it for any receiver.
+ */
+#define SPCI_MEMORY_REGION_FLAG_CLEAR 0x1
+
+/**
+ * Whether the hypervisor may time slice the memory sharing or retrieval
+ * operation.
+ */
+#define SPCI_MEMORY_REGION_FLAG_TIME_SLICE 0x2
+
+/**
+ * Whether the hypervisor should clear the memory region after the receiver
+ * relinquishes it or is aborted.
+ */
+#define SPCI_MEMORY_REGION_FLAG_CLEAR_RELINQUISH 0x4
+
+#define SPCI_MEMORY_REGION_TRANSACTION_TYPE_MASK ((0x3U) << 3)
+#define SPCI_MEMORY_REGION_TRANSACTION_TYPE_UNSPECIFIED ((0x0U) << 3)
+#define SPCI_MEMORY_REGION_TRANSACTION_TYPE_SHARE ((0x1U) << 3)
+#define SPCI_MEMORY_REGION_TRANSACTION_TYPE_LEND ((0x2U) << 3)
+#define SPCI_MEMORY_REGION_TRANSACTION_TYPE_DONATE ((0x3U) << 3)
+
+/**
+ * This corresponds to table 42 of the FF-A 1.0 EAC specification, "Endpoint
+ * memory access descriptor".
+ */
+struct spci_memory_access {
+	struct spci_memory_region_attributes receiver_permissions;
+	/**
+	 * Offset in bytes from the start of the outer `spci_memory_region` to
+	 * an `spci_composite_memory_region` struct.
+	 */
+	uint32_t composite_memory_region_offset;
+	uint64_t reserved_0;
+};
+
+/**
+ * Information about a set of pages which are being shared. This corresponds to
+ * table 45 of the FF-A 1.0 EAC specification, "Lend, donate or share memory
+ * transaction descriptor". Note that it is also used for retrieve requests and
+ * responses.
+ */
+struct spci_memory_region {
+	/**
+	 * The ID of the VM which originally sent the memory region, i.e. the
+	 * owner.
+	 */
+	spci_vm_id_t sender;
+	spci_memory_attributes_t attributes;
+	/** Reserved field, must be 0. */
+	uint8_t reserved_0;
+	/** Flags to control behaviour of the transaction. */
+	spci_memory_region_flags_t flags;
+	spci_memory_handle_t handle;
+	/**
+	 * An implementation defined value associated with the receiver and the
+	 * memory region.
+	 */
+	uint64_t tag;
+	/** Reserved field, must be 0. */
+	uint32_t reserved_1;
+	/**
+	 * The number of `spci_memory_access` entries included in this
+	 * transaction.
 	 */
 	uint32_t receiver_count;
-	/** Reserved field, must be 0. */
-	uint32_t reserved_0;
-	/** Reserved field, must be 0. */
-	uint64_t reserved_1;
-	/*
-	 * 'Array' of `struct spci_receiver_address_range` goes here, but it is
-	 * not included in the struct as the entries are variable length. Use
-	 * `spci_retrieved_memory_region_first_receiver_range` to get the first
-	 * one.
+	/**
+	 * An array of `attribute_count` endpoint memory access descriptors.
+	 * Each one specifies a memory region offset, an endpoint and the
+	 * attributes with which this memory region should be mapped in that
+	 * endpoint's page table.
 	 */
+	struct spci_memory_access receivers[];
 };
 
 /**
  * Descriptor used for SPCI_MEM_RELINQUISH requests. This corresponds to table
- * 146 of the SPCI beta specification, "Descriptor to relinquish a memory
+ * 150 of the FF-A 1.0 EAC specification, "Descriptor to relinquish a memory
  * region".
  */
 struct spci_mem_relinquish {
 	spci_memory_handle_t handle;
-	uint32_t flags;
-	spci_vm_id_t sender;
-	uint16_t reserved;
+	spci_memory_region_flags_t flags;
 	uint32_t endpoint_count;
 	spci_vm_id_t endpoints[];
 };
 
-static inline struct spci_memory_region_constituent
-spci_memory_region_constituent_init(uint64_t address, uint32_t page_count)
-{
-	return (struct spci_memory_region_constituent){
-		.address_high = (uint32_t)(address >> 32),
-		.address_low = (uint32_t)address,
-		.page_count = page_count,
-	};
-}
-
-static inline uint64_t spci_memory_region_constituent_get_address(
-	struct spci_memory_region_constituent *constituent)
-{
-	return (uint64_t)constituent->address_high << 32 |
-	       constituent->address_low;
-}
-
 /**
- * Gets the constituent array for an `spci_memory_region`.
+ * Gets the `spci_composite_memory_region` for the given receiver from an
+ * `spci_memory_region`, or NULL if it is not valid.
  */
-static inline struct spci_memory_region_constituent *
-spci_memory_region_get_constituents(struct spci_memory_region *memory_region)
+static inline struct spci_composite_memory_region *
+spci_memory_region_get_composite(struct spci_memory_region *memory_region,
+				 uint32_t receiver_index)
 {
-	return (struct spci_memory_region_constituent
-			*)((uint8_t *)memory_region +
-			   memory_region->constituent_offset);
+	uint32_t offset = memory_region->receivers[receiver_index]
+				  .composite_memory_region_offset;
+
+	if (offset == 0) {
+		return NULL;
+	}
+
+	return (struct spci_composite_memory_region *)((uint8_t *)
+							       memory_region +
+						       offset);
 }
 
-/**
- * Gets the first descriptor with address ranges of a retrieved memory region.
- *
- * Note that getting the second requires parsing the first, as they are variable
- * length due to the variable number of constituents.
- */
-static inline struct spci_receiver_address_range *
-spci_retrieved_memory_region_first_receiver_range(
-	struct spci_retrieved_memory_region *memory_region)
+static inline uint32_t spci_mem_relinquish_init(
+	struct spci_mem_relinquish *relinquish_request,
+	spci_memory_handle_t handle, spci_memory_region_flags_t flags,
+	spci_vm_id_t sender)
 {
-	return (struct spci_receiver_address_range *)(memory_region + 1);
-}
-
-/**
- * Gets the first retrieval attributes descriptor of a memory region retrieval
- * request.
- *
- * Note that getting the second requires parsing the first, as they are variable
- * length due to the variable number of constituents.
- */
-static inline struct spci_memory_retrieve_properties *
-spci_memory_retrieve_request_first_retrieve_properties(
-	struct spci_memory_retrieve_request *retrieve_request)
-{
-	return (struct spci_memory_retrieve_properties *)(retrieve_request + 1);
+	relinquish_request->handle = handle;
+	relinquish_request->flags = flags;
+	relinquish_request->endpoint_count = 1;
+	relinquish_request->endpoints[0] = sender;
+	return sizeof(struct spci_mem_relinquish) + sizeof(spci_vm_id_t);
 }
 
 uint32_t spci_memory_region_init(
@@ -517,18 +464,21 @@ uint32_t spci_memory_region_init(
 	spci_vm_id_t receiver,
 	const struct spci_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
-	spci_memory_region_flags_t flags, enum spci_memory_access access,
+	spci_memory_region_flags_t flags, enum spci_data_access data_access,
+	enum spci_instruction_access instruction_access,
 	enum spci_memory_type type, enum spci_memory_cacheability cacheability,
 	enum spci_memory_shareability shareability);
 uint32_t spci_memory_retrieve_request_init(
-	struct spci_memory_retrieve_request *request,
-	spci_memory_handle_t handle, spci_vm_id_t sender, spci_vm_id_t receiver,
-	uint32_t share_func, uint32_t tag, uint32_t page_count,
-	enum spci_memory_access access, enum spci_memory_type type,
-	enum spci_memory_cacheability cacheability,
+	struct spci_memory_region *memory_region, spci_memory_handle_t handle,
+	spci_vm_id_t sender, spci_vm_id_t receiver, uint32_t tag,
+	spci_memory_region_flags_t flags, enum spci_data_access data_access,
+	enum spci_instruction_access instruction_access,
+	enum spci_memory_type type, enum spci_memory_cacheability cacheability,
 	enum spci_memory_shareability shareability);
 uint32_t spci_retrieved_memory_region_init(
-	struct spci_retrieved_memory_region *response, size_t response_max_size,
-	spci_vm_id_t receiver,
+	struct spci_memory_region *response, size_t response_max_size,
+	spci_vm_id_t sender, spci_memory_attributes_t attributes,
+	spci_memory_region_flags_t flags, spci_memory_handle_t handle,
+	spci_vm_id_t receiver, spci_memory_access_permissions_t permissions,
 	const struct spci_memory_region_constituent constituents[],
-	uint32_t constituent_count, uint32_t page_count);
+	uint32_t constituent_count);

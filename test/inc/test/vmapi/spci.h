@@ -36,7 +36,14 @@ spci_memory_handle_t send_memory_and_retrieve_request(
 	spci_vm_id_t recipient,
 	struct spci_memory_region_constituent constituents[],
 	uint32_t constituent_count, spci_memory_region_flags_t flags,
-	enum spci_memory_access access);
+	enum spci_data_access send_data_access,
+	enum spci_data_access retrieve_data_access,
+	enum spci_instruction_access send_instruction_access,
+	enum spci_instruction_access retrieve_instruction_access);
 spci_vm_id_t retrieve_memory_from_message(void *recv_buf, void *send_buf,
 					  struct spci_value msg_ret,
 					  spci_memory_handle_t *handle);
+spci_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
+						      void *send_buf,
+						      struct spci_value msg_ret,
+						      int32_t expected_error);

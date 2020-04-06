@@ -131,44 +131,36 @@ static inline struct spci_value spci_msg_send(spci_vm_id_t sender_vm_id,
 		.arg4 = attributes});
 }
 
-static inline struct spci_value spci_mem_donate(uint32_t fragment_length,
-						uint32_t length,
-						spci_cookie_t cookie)
+static inline struct spci_value spci_mem_donate(uint32_t length,
+						uint32_t fragment_length)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_DONATE_32,
-					     .arg3 = fragment_length,
-					     .arg4 = length,
-					     .arg5 = cookie});
+					     .arg1 = length,
+					     .arg2 = fragment_length});
 }
 
-static inline struct spci_value spci_mem_lend(uint32_t fragment_length,
-					      uint32_t length,
-					      spci_cookie_t cookie)
+static inline struct spci_value spci_mem_lend(uint32_t length,
+					      uint32_t fragment_length)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_LEND_32,
-					     .arg3 = fragment_length,
-					     .arg4 = length,
-					     .arg5 = cookie});
+					     .arg1 = length,
+					     .arg2 = fragment_length});
 }
 
-static inline struct spci_value spci_mem_share(uint32_t fragment_length,
-					       uint32_t length,
-					       spci_cookie_t cookie)
+static inline struct spci_value spci_mem_share(uint32_t length,
+					       uint32_t fragment_length)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_SHARE_32,
-					     .arg3 = fragment_length,
-					     .arg4 = length,
-					     .arg5 = cookie});
+					     .arg1 = length,
+					     .arg2 = fragment_length});
 }
 
-static inline struct spci_value spci_mem_retrieve_req(uint32_t fragment_length,
-						      uint32_t length,
-						      spci_cookie_t cookie)
+static inline struct spci_value spci_mem_retrieve_req(uint32_t length,
+						      uint32_t fragment_length)
 {
 	return spci_call((struct spci_value){.func = SPCI_MEM_RETRIEVE_REQ_32,
-					     .arg3 = fragment_length,
-					     .arg4 = length,
-					     .arg5 = cookie});
+					     .arg1 = length,
+					     .arg2 = fragment_length});
 }
 
 static inline struct spci_value spci_mem_relinquish(void)
@@ -176,11 +168,13 @@ static inline struct spci_value spci_mem_relinquish(void)
 	return spci_call((struct spci_value){.func = SPCI_MEM_RELINQUISH_32});
 }
 
-static inline struct spci_value spci_mem_reclaim(uint32_t handle,
-						 uint32_t flags)
+static inline struct spci_value spci_mem_reclaim(
+	spci_memory_handle_t handle, spci_memory_region_flags_t flags)
 {
-	return spci_call((struct spci_value){
-		.func = SPCI_MEM_RECLAIM_32, .arg1 = handle, .arg2 = flags});
+	return spci_call((struct spci_value){.func = SPCI_MEM_RECLAIM_32,
+					     .arg1 = (uint32_t)handle,
+					     .arg2 = (uint32_t)(handle >> 32),
+					     .arg3 = flags});
 }
 
 /**
