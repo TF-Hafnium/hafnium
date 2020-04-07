@@ -51,11 +51,11 @@ static inline void sl_lock(struct spinlock *l)
 	__asm__ volatile(
 		"	mov	%w2, #1\n"
 		"	sevl\n" /* set event bit */
-		"1:	wfe\n"  /* wait for event, clear event bit */
-		"2:	ldaxr	%w1, [%3]\n"      /* load lock value */
-		"	cbnz	%w1, 1b\n"	/* if lock taken, goto WFE */
+		"1:	wfe\n"	/* wait for event, clear event bit */
+		"2:	ldaxr	%w1, [%3]\n"	  /* load lock value */
+		"	cbnz	%w1, 1b\n"	  /* if lock taken, goto WFE */
 		"	stxr	%w1, %w2, [%3]\n" /* try to take lock */
-		"	cbnz	%w1, 2b\n"	/* loop if unsuccessful */
+		"	cbnz	%w1, 2b\n"	  /* loop if unsuccessful */
 		: "+m"(*l), "=&r"(tmp1), "=&r"(tmp2)
 		: "r"(l)
 		: "cc");

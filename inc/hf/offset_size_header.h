@@ -32,7 +32,7 @@
 
 /**
  * Emit a function with an embedded string in the format:
- *     <HAFNIUM_DEFINE name #value />
+ *     <HAFNIUM_DEFINE name value />
  * These will be recognized by a script that generates the header file.
  */
 #define DEFINE(sym, val)                                    \

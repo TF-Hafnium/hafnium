@@ -43,12 +43,12 @@ def main():
 	parser.add_argument("out_file", help="output file");
 	args = parser.parse_args()
 
-	# Regex for finding definitions: <HAFNIUM_DEFINE name #value />
-	regex = re.compile(r'<HAFNIUM_DEFINE\s([A-Za-z0-9_]+)\s#([0-9]+) />')
+	# Regex for finding definitions: <HAFNIUM_DEFINE name value />
+	regex = re.compile(r'<HAFNIUM_DEFINE\s([A-Za-z0-9_]+)\s([0-9]+) />')
 
 	# Extract strings from the input binary file.
 	stdout = subprocess.check_output([ STRINGS, args.bin_file ])
-	stdout = str(stdout).split(os.linesep)
+	stdout = stdout.decode('utf-8').split(os.linesep)
 
 	with open(args.out_file, "w") as f:
 		f.write(PROLOGUE)

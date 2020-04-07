@@ -80,7 +80,7 @@ bool arch_vm_mm_init(void)
 		     (0 << 14) |		/* TG0, granule size, 4KB. */
 		     (3 << 12) |		/* SH0, inner shareable. */
 		     (1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
-		     (1 << 8) |  /* IRGN0, normal mem, WB RA WA Cacheable. */
+		     (1 << 8) |	 /* IRGN0, normal mem, WB RA WA Cacheable. */
 		     (25 << 0) | /* T0SZ, input address is 2^39 bytes. */
 		     0;
 

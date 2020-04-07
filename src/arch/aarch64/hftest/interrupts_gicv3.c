@@ -25,7 +25,7 @@
 
 void interrupt_gic_setup(void)
 {
-	uint32_t ctlr = 1U << 4    /* Enable affinity routing. */
+	uint32_t ctlr = 1U << 4	   /* Enable affinity routing. */
 			| 1U << 1; /* Enable group 1 non-secure interrupts. */
 
 	write_msr(ICC_CTLR_EL1, 0);
