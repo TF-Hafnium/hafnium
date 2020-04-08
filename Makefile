@@ -96,16 +96,16 @@ tidy: $(OUT_DIR)/build.ninja
 	@echo "Tidying..."
 	# TODO: enable readability-magic-numbers once there are fewer violations.
 	# TODO: enable for c++ tests as it currently gives spurious errors.
-	@find src/ \( -name \*.c \) | xargs clang-tidy -p $(OUT_DIR) -fix
-	@find test/ \( -name \*.c \) | xargs clang-tidy -p $(OUT_DIR) -fix
+	@find src/ \( -name \*.c \) | xargs prebuilts/linux-x64/clang/bin/clang-tidy -p $(OUT_DIR) -fix
+	@find test/ \( -name \*.c \) | xargs prebuilts/linux-x64/clang/bin/clang-tidy -p $(OUT_DIR) -fix
 
 .PHONY: check
 check: $(OUT_DIR)/build.ninja
 	@$(NINJA) -C $(OUT_DIR)
 	@echo "Checking..."
 	# TODO: enable for c++ tests as it currently gives spurious errors.
-	@find src/ \( -name \*.c \) | xargs clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
-	@find test/ \( -name \*.c \) | xargs clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
+	@find src/ \( -name \*.c \) | xargs prebuilts/linux-x64/clang/bin/clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
+	@find test/ \( -name \*.c \) | xargs prebuilts/linux-x64/clang/bin/clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
 
 .PHONY: license
 license:
