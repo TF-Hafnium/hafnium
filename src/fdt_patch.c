@@ -95,6 +95,12 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 		goto out_unmap_fdt;
 	}
 
+	/* Allow some extra room for the modifications to the FDT. */
+	if (fdt_open_into(fdt, fdt, buf_size) != 0) {
+		dlog_error("FDT failed to open_into.\n");
+		goto out_unmap_fdt;
+	}
+
 	off = fdt_path_offset(fdt, "/chosen");
 	if (off < 0) {
 		dlog_error("Unable to find FDT '/chosen' node.\n");
@@ -133,6 +139,11 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 
 	if (!rsv) {
 		dlog_error("Unable to add memory reservations to FDT.\n");
+		goto out_unmap_fdt;
+	}
+
+	if (fdt_pack(fdt) != 0) {
+		dlog_error("Failed to pack FDT.\n");
 		goto out_unmap_fdt;
 	}
 
