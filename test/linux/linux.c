@@ -55,7 +55,13 @@ static void insmod_hafnium(void)
 
 static void rmmod_hafnium(void)
 {
-	EXPECT_EQ(delete_module("hafnium", 0), 0);
+	int ret = delete_module("hafnium", 0);
+
+	EXPECT_EQ(ret, 0);
+	if (ret != 0) {
+		HFTEST_LOG("Error %d (%s) removing hafnium kernel module.",
+			   errno, strerror(errno));
+	}
 }
 
 /**
@@ -65,6 +71,10 @@ TEST(linux, load_hafnium)
 {
 	insmod_hafnium();
 	rmmod_hafnium();
+
+	/* Removing a second time should fail. */
+	EXPECT_EQ(delete_module("hafnium", 0), -1);
+	EXPECT_EQ(errno, ENOENT);
 }
 
 /**
