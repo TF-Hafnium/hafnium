@@ -1557,18 +1557,10 @@ struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 
 		ret = spci_memory_send(to, vm_to_from_lock.vm2, memory_region,
 				       length, share_func, &api_page_pool);
-		/*
-		 * spci_memory_send takes ownership of the memory_region, so
-		 * make sure we don't free it.
-		 */
-		memory_region = NULL;
-
-		if (ret.func == SPCI_SUCCESS_32 && to->id == HF_TEE_VM_ID) {
+		if (ret.func == SPCI_SUCCESS_32) {
 			/* Forward memory send message on to TEE. */
 			memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX,
 				 memory_region, length);
-			mpool_free(&api_page_pool, memory_region);
-			memory_region = NULL;
 			to->mailbox.recv_size = length;
 			to->mailbox.recv_sender = from->id;
 			to->mailbox.recv_func = share_func;
