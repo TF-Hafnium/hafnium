@@ -48,7 +48,24 @@
 #define SPCI_MEM_LEND_32              0x84000072
 #define SPCI_MEM_SHARE_32             0x84000073
 
+#define SPCI_MEM_DONATE_32               0x84000071
+#define SPCI_MEM_LEND_32                 0x84000072
+#define SPCI_MEM_SHARE_32                0x84000073
+#define SPCI_MEM_RETRIEVE_REQ_32         0x84000074
+#define SPCI_MEM_RETRIEVE_RESP_32        0x84000075
+#define SPCI_MEM_RELINQUISH_32  0x84000076
+#define SPCI_MEM_RECLAIM_32     0x84000077
+
+#define SPCI_MEM_OP_RESUME      0x84000079
+
 #define SPCI_RXTX_MAP_64                 0xC4000066
+#define SPCI_MEM_DONATE_64               0xC4000071
+#define SPCI_MEM_LEND_64                 0xC4000072
+#define SPCI_MEM_SHARE_64                0xC4000073
+#define SPCI_MEM_RETRIEVE_REQ_64         0xC4000074
+#define SPCI_MEM_RETRIEVE_RESP_64        0xC4000075
+#define SPCI_MEM_RELINQUISH_64  0xC4000076
+#define SPCI_MEM_RECLAIM_64     0xC4000077
 
 /* SPCI error codes. */
 #define SPCI_NOT_SUPPORTED      INT32_C(-1)
@@ -322,6 +339,80 @@ static inline uint64_t spci_memory_region_constituent_get_address(
 	return (uint64_t)constituent->address_high << 32 |
 	       constituent->address_low;
 }
+
+struct mem_retrieve_descriptor {
+	/*
+	 *
+	 */
+	uint32_t handle;
+
+	/**
+	 *
+	 */
+	uint32_t transaction_type;
+
+	/**
+	 *
+	 */
+	uint32_t tag;
+
+	/**
+	 *
+	 */
+	uint32_t count_attribute_descriptors;
+
+	uint32_t memory_region_attributes_descriptor;
+
+	uint32_t count_retrieve_descriptors;
+
+};
+
+struct mem_relinquish_descriptor {
+
+	uint32_t handle;
+
+	uint32_t flags;
+
+	uint16_t borrower_id;
+
+	uint16_t reserved;
+
+	uint32_t endpoint_count;
+
+	uint16_t endpoint_array[];
+};
+
+struct spci_retrieve_req_descriptor
+{
+	uint32_t handle;
+    uint32_t transaction_type;
+    uint32_t tag;
+    uint32_t count_memory_region_attributes;
+    uint32_t offset_memory_region_attributes;
+    uint32_t properties_description_count;
+
+    /* TODO: Add retrieve properties descriptors. */
+};
+
+/* Table 140: */
+struct spci_retrieve_descriptor
+{
+	uint16_t receiver_id;
+
+	uint16_t reserved[3]; //XXX
+	uint32_t page_count;
+
+	uint32_t constituent_count;
+	struct spci_memory_region_constituent constituents[];
+};
+
+/* Table 139: Returned by SPCI_MEM_RETRIEVE_RESP. */
+struct spci_retrieve_memory_descriptor
+{
+	uint32_t count_receiver_address_ranges;
+};
+
+/* TODO: Move all the functions below this line to a support library. */
 
 /**
  * Gets the constituent array for an `spci_memory_region`.

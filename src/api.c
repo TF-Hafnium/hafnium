@@ -49,7 +49,7 @@ static_assert(HF_MAILBOX_SIZE == PAGE_SIZE,
 	      "Currently, a page is mapped for the send and receive buffers so "
 	      "the maximum request is the size of a page.");
 
-static struct mpool api_page_pool;
+struct mpool api_page_pool;
 
 /**
  * Initialises the API page pool by taking ownership of the contents of the
@@ -1675,4 +1675,45 @@ out:
 	vm_unlock(&vm_to_from_lock.vm2);
 
 	return ret;
+}
+
+struct spci_value spci_mem_share_internal(
+	uint64_t base_addr, uint32_t page_count, uint32_t fragment_count,
+	uint32_t length, uint32_t fragment_handle, struct vm *from_vm,
+	struct mpool *page_pool, bool world_switched);
+
+struct spci_value spci_mem_retrieve_req_internal(
+	uint64_t base_addr, uint32_t page_count, uint32_t fragment_count,
+	uint32_t length, uint32_t fragment_handle, struct vm *from_vm,
+	struct mpool *page_pool);
+
+struct spci_value spci_memory_relinquish(struct mem_relinquish_descriptor *relinquish_desc, struct mpool *page_pool, struct vm *vm);
+
+struct spci_value spci_memory_reclaim(handle_t handle, uint32_t flags, struct vm* current_vm, struct mpool *mpool);
+
+struct spci_value api_spci_mem_share(uint64_t base_addr, uint32_t page_count,
+				     uint32_t fragment_count, uint32_t length,
+				     uint32_t handle, struct vm *from_vm, bool world_switched)
+{
+	return spci_mem_share_internal(base_addr, page_count, fragment_count,
+				       length, handle, from_vm, &api_page_pool, world_switched);
+}
+
+struct spci_value api_spci_mem_retrieve_req(uint64_t base_addr, uint32_t page_count,
+				     uint32_t fragment_count, uint32_t length,
+				     uint32_t handle, struct vm *from_vm)
+{
+	return spci_mem_retrieve_req_internal(base_addr, page_count, fragment_count,
+				       length, handle, from_vm, &api_page_pool);
+}
+
+struct spci_value api_spci_mem_relinquish(struct mem_relinquish_descriptor *relinquish_desc, struct vm *vm)
+{
+	return spci_memory_relinquish(relinquish_desc, &api_page_pool, vm);
+}
+
+struct spci_value api_spci_memory_reclaim(handle_t handle, uint32_t flags,
+	struct vm* current_vm)
+{
+	return spci_memory_reclaim(handle, flags, current_vm, &api_page_pool);
 }

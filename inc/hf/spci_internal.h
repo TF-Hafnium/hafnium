@@ -36,3 +36,11 @@ static inline struct spci_value spci_error(uint64_t error_code)
 {
 	return (struct spci_value){.func = SPCI_ERROR_32, .arg2 = error_code};
 }
+
+struct vm;
+struct mpool;
+//struct spci_value spci_memory_relinquish(struct mem_relinquish_descriptor *relinquish_desc, struct mpool *page_pool, struct vm *from_vm);
+
+struct spci_value spci_memory_reclaim(handle_t handle, uint32_t flags, struct vm* current_vm, struct mpool *mpool);
+
+struct spci_value spci_mem_op_resume_internal (uint32_t cookie, struct vm* from_vm);

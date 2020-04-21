@@ -43,6 +43,7 @@ source_set("hypervisor") {
     "psci_handler.c",
     "tee.c",
     "vm.c",
+    "spci_memory_management.c",
   ]
 
   deps = [

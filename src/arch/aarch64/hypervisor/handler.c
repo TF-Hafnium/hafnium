@@ -40,6 +40,8 @@
 #include "psci_handler.h"
 #include "smc.h"
 #include "sysregs.h"
+
+#include "hf/std.h"
 /**
  * Gets the value to increment for the next PC.
  * The ESR encodes whether the instruction is 2 bytes or 4 bytes long.
@@ -60,7 +62,7 @@ struct hv_buffers_t hypervisor_buffers;
 
 extern struct mpool api_page_pool;
 
-bool handler_map_hv_buffers(uint8_t **rx, uint8_t **tx, paddr_t pa_send_begin,
+bool handler_map_hv_buffers(uint8_t **tx, uint8_t **rx, paddr_t pa_send_begin,
 			    paddr_t pa_send_end, paddr_t pa_recv_begin,
 			    paddr_t pa_recv_end)
 {
@@ -104,12 +106,8 @@ uint8_t *get_hv_rx()
 
 void handler_register_normal_world_rxtx(void)
 {
-	smc32(SPCI_RXTX_MAP_64, (uintptr_t)hv_rx, (uintptr_t)hv_tx, 1, 0, 0, 0,
+	smc32(SPCI_RXTX_MAP_64, (uintptr_t)hv_tx, (uintptr_t)hv_rx, 1, 0, 0, 0,
 	      0);
-
-	/* TODO: Hv ID must be architected in the SPCI. */
-	/* 	Set the rxtx origin ID to the Hv ID. */
-	*(uint16_t *)hv_tx = 0;
 
 	/* We should not care about the return from the secure world. */
 }
@@ -377,6 +375,23 @@ static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 	*args = ret;
 }
 
+void spmd_exit64(struct spci_value *args)
+{
+	struct spci_value smc_res;
+
+	/* Exit to SPMD */
+	smc_res = smc64(args->func,
+			args->arg1,
+			args->arg2,
+			args->arg3,
+			args->arg4,
+			args->arg5,
+			args->arg6,
+			args->arg7);
+
+	/* Return from SPMD */
+	*args = smc_res;
+}
 void spmd_exit(struct spci_value *args)
 {
 	struct spci_value smc_res;
@@ -402,114 +417,241 @@ void spmd_exit(struct spci_value *args)
 	args->arg7 = smc_res.arg7;
 }
 
-static bool spci_handler_internal(struct spci_value *args, struct vcpu **next)
+/* Helper function must be in arch/aarch64 because SECURE_WORLD is only defined for aarch64. */
+__attribute((unused))static inline bool is_opposite_world_vm_id(spci_vm_id_t id)
 {
-	uint32_t func = args->func & ~SMCCC_CONVENTION_MASK;
-	bool smc_origin = true;
-
-	/*
-	 * NOTE: When adding new methods to this handler update
-	 * api_spci_features accordingly.
-	 */
-	do{
-	switch (func) {
-	case SPCI_VERSION_32:
-		*args = api_spci_version();
-		return true;
-	case SPCI_ID_GET_32:
-		*args = api_spci_id_get(current());
-		return true;
-	case SPCI_FEATURES_32:
-		*args = api_spci_features(args->arg1);
-		return true;
-	case SPCI_RX_RELEASE_32:
-		*args = api_spci_rx_release(current(), next);
-		return true;
-	case SPCI_RXTX_MAP_32:
-		*args = api_spci_rxtx_map(ipa_init(args->arg1),
-					  ipa_init(args->arg2), args->arg3,
-					  current(), next);
-		return true;
-	case SPCI_YIELD_32:
-		api_yield(current(), next);
-
-		/* SPCI_YIELD always returns SPCI_SUCCESS. */
-		*args = (struct spci_value){.func = SPCI_SUCCESS_32};
-
-		return true;
-	case SPCI_MSG_SEND_32:
-		*args = api_spci_msg_send(spci_msg_send_sender(*args),
-					  spci_msg_send_receiver(*args),
-					  spci_msg_send_size(*args),
-					  spci_msg_send_attributes(*args),
-					  current(), next);
-		return true;
-	case SPCI_MSG_WAIT_32:
-		*args = api_spci_msg_recv(true, current(), next);
-		return true;
-	case SPCI_MSG_POLL_32:
-		*args = api_spci_msg_recv(false, current(), next);
-		return true;
-	case SPCI_RUN_32:
-		*args = api_spci_run(spci_vm_id(*args), spci_vcpu_index(*args),
-				     current(), next);
-		return true;
-	case SPCI_MEM_DONATE_32:
-	case SPCI_MEM_LEND_32:
-	case SPCI_MEM_SHARE_32:
-	case HF_SPCI_MEM_RELINQUISH:
-		*args = api_spci_mem_send(func, ipa_init(args->arg1),
-					  args->arg2, args->arg3, args->arg4,
-					  args->arg5, current(), next);
-		return true;
-	case SPCI_MSG_SEND_DIRECT_REQ_32:
-
-		if(is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
-		{
-			/* XXX: Jump to the opposite world. */
-			spmd_exit(args);
-			smc_origin = false;
-			continue;
-		}
-
-		*args = api_spci_msg_send_direct_req(args, current(), next);
-		return true;
-	case SPCI_MSG_SEND_DIRECT_RESP_32:
-
-		if(is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
-		{
-			/* XXX: Jump to the opposite world. */
-			spmd_exit(args);
-			smc_origin = false;
-			continue;
-		}
-
-		*args = api_spci_msg_send_direct_resp(args, current(), next);
-		return true;
-	}
-	}while (!smc_origin);
-
-	return false;
+#if SECURE_WORLD==1
+	return (id & 0x8000)==0;
+#else
+	return (id & 0x8000)!=0;
+#endif
 }
 
+struct spci_value spci_mem_op_resume_internal (uint32_t cookie,
+	struct vm* from_vm);
 static bool spci_handler(struct spci_value *args, struct vcpu **next)
 {
+	__attribute((unused))struct spci_value smc_res;
+	bool eret_origin = false;
+
+	while (true) {
+		/*
+		 * NOTE: When adding new methods to this handler update
+		 * api_spci_features accordingly.
+		 */
+		switch (args->func & ~SMCCC_CONVENTION_MASK) {
+		case SPCI_VERSION_32:
+			*args = api_spci_version();
+			return true;
+		case SPCI_ID_GET_32:
+			*args = api_spci_id_get(current());
+			return true;
+		case SPCI_FEATURES_32:
+			*args = api_spci_features(args->arg1);
+			return true;
+		case SPCI_RX_RELEASE_32:
+			*args = api_spci_rx_release(current(), next);
+			return true;
+		case SPCI_RXTX_MAP_32:
+		case SPCI_RXTX_MAP_64:
+
 #if SECURE_WORLD == 1
-	/* from hvc_handler */
+			if (eret_origin) {
+				paddr_t pa_send_begin = pa_init(args->arg1);
+				paddr_t pa_send_end =
+					pa_init(args->arg1 + 4096);
 
-	switch (args->func & ~SMCCC_CONVENTION_MASK) {
-	case SPCI_MSG_WAIT_32:
-		/* exit to SPMD */
-		spmd_exit(args);
-		break;
-	default:
-		break;
-	}
+				paddr_t pa_recv_begin = pa_init(args->arg2);
+				paddr_t pa_recv_end =
+					pa_init(args->arg2 + 4096);
 
-	/* from nwd or hvc handler */
-#endif /* SECURE_WORLD */
+				/*
+				 * SPCI_RXTX_MAP originated in the normal world
+				 * and hence must be from the Hypervisor.
+				 */
 
-	return spci_handler_internal(args, next);
+				/*
+				 * TODO: Remove assumption on this being a call
+				 * from the Normal world Hv to register its own
+				 * Rx Tx buffers.
+				 */
+
+				handler_map_hv_buffers(
+					&hypervisor_buffers.tx,
+					&hypervisor_buffers.rx, pa_send_begin,
+					pa_send_end, pa_recv_begin,
+					pa_recv_end);
+
+				/* Return to Normal world */
+				smc_res = smc32(SPCI_SUCCESS_32, args->arg1,
+						args->arg2, args->arg3,
+						args->arg4, args->arg5,
+						args->arg6, args->arg7);
+
+				*args = smc_res;
+
+				break;
+			}
+#else
+			/*
+			 * TODO: The Normal World Hv must forward the
+			 * SPCI_RXTX_MAP calls from its managed VMs to the
+			 * Secure World.
+			 */
+#endif
+			*args = api_spci_rxtx_map(ipa_init(args->arg1),
+						  ipa_init(args->arg2),
+						  args->arg3, current(), next);
+			return true;
+		case SPCI_YIELD_32:
+			api_yield(current(), next);
+
+			/* SPCI_YIELD always returns SPCI_SUCCESS. */
+			*args = (struct spci_value){.func = SPCI_SUCCESS_32};
+
+			return true;
+		case SPCI_MSG_SEND_32:
+			*args = api_spci_msg_send(
+				spci_msg_send_sender(*args),
+				spci_msg_send_receiver(*args),
+				spci_msg_send_size(*args),
+				spci_msg_send_attributes(*args), current(),
+				next);
+			return true;
+		case SPCI_MSG_WAIT_32:
+
+#if SECURE_WORLD == 1
+
+			spmd_exit(args);
+			eret_origin = true;
+			break;
+
+#endif
+
+			*args = api_spci_msg_recv(true, current(), next);
+			return true;
+		case SPCI_MSG_POLL_32:
+			*args = api_spci_msg_recv(false, current(), next);
+			return true;
+		case SPCI_RUN_32:
+			*args = api_spci_run(spci_vm_id(*args),
+					     spci_vcpu_index(*args), current(),
+					     next);
+			return true;
+		case SPCI_MSG_SEND_DIRECT_REQ_32:
+
+			dlog("dir req src %#x dest %#X: %#x %#x %#x %#x %#x\n",
+				spci_msg_send_sender(*args),spci_msg_send_receiver(*args),
+				args->arg3, args->arg4, args->arg5, args->arg6, args->arg7);
+
+			if (is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
+			{
+				spmd_exit(args);
+				eret_origin = true;
+				continue;
+			}
+
+			*args = api_spci_msg_send_direct_req(args, current(), next);
+			return true;
+		case SPCI_MSG_SEND_DIRECT_RESP_32:
+
+			dlog("dir resp src %#x dest %#X: %#x %#x %#x %#x %#x\n",
+				spci_msg_send_sender(*args),spci_msg_send_receiver(*args),
+				args->arg3, args->arg4, args->arg5, args->arg6, args->arg7);
+
+
+			if (is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
+			{
+				spmd_exit(args);
+				eret_origin = true;
+				continue;
+			}
+
+			*args = api_spci_msg_send_direct_resp(args, current(), next);
+			return true;
+
+
+		case SPCI_MEM_SHARE_64:
+		case SPCI_MEM_SHARE_32:
+
+			*args = api_spci_mem_share(
+				args->arg1, args->arg2, args->arg3, args->arg4,
+				args->arg5, current()->vm, eret_origin);
+
+			if (eret_origin)
+			{
+				/* SPCI_MEM_SHARE originated on the other world, hence move back. */
+				spmd_exit(args);
+				break;  // XXX: re-check if needed
+			}
+
+			return true;
+
+		case SPCI_MEM_RETRIEVE_REQ_32:
+		case SPCI_MEM_RETRIEVE_REQ_64:
+			*args = api_spci_mem_retrieve_req(
+				args->arg1, args->arg2, args->arg3, args->arg4,
+				args->arg5, current()->vm);
+
+			return true;
+
+		case SPCI_MEM_RECLAIM_32:
+		case SPCI_MEM_RECLAIM_64:
+		{
+			if (eret_origin)
+			{
+				api_spci_memory_reclaim(args->arg1, args->arg2, current()->vm);
+
+				/* FWD call back to the other world. */
+				spmd_exit(args);
+				eret_origin = true;
+				break;
+			}
+
+			api_spci_memory_reclaim(args->arg1, args->arg2, current()->vm);
+			spmd_exit(args);
+			eret_origin = true;
+
+
+			args->func = SPCI_SUCCESS_32;
+
+			return true;
+
+		}
+		case SPCI_MEM_RELINQUISH_32:
+		case SPCI_MEM_RELINQUISH_64:
+			{
+				struct mem_relinquish_descriptor *relinquish_desc;
+
+				if (eret_origin)
+				{
+					#if SECURE_WORLD
+						relinquish_desc = (struct mem_relinquish_descriptor *)hv_rx;
+					#else
+						panic("Relinquish should not be forwared from the secure world.\n");
+					#endif
+				}
+				else
+				{
+					#if SECURE_WORLD
+						relinquish_desc = (struct mem_relinquish_descriptor *)current()->vm->mailbox.send;
+					#else
+						panic("relinquish is only supported in this proto from S to NS\n");
+					#endif
+				}
+				*args = api_spci_mem_relinquish(relinquish_desc, current()->vm);
+				return true;
+			}
+		case SPCI_MEM_OP_RESUME:
+			*args = spci_mem_op_resume_internal(args->arg1, current()->vm);
+			return true;
+
+		default:
+			return false;
+		} // switch()
+	}  // while(true)
+
+	return false;
 }
 
 /**

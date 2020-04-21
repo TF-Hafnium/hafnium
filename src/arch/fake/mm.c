@@ -168,3 +168,34 @@ bool arch_mm_init(paddr_t table)
 	(void)table;
 	return true;
 }
+
+/* */
+#include "hf/spci.h"
+struct vm;
+struct spci_value spci_mem_share_internal(uint64_t base_addr,
+					  uint32_t page_count,
+					  uint32_t fragment_count,
+					  uint32_t length, uint32_t handle,
+					  struct vm *from_vm,
+					  struct mpool *page_pool)
+{
+	return (struct spci_value){0};
+}
+
+struct spci_value spci_mem_retrieve_req_internal(
+	uint64_t base_addr, uint32_t page_count, uint32_t fragment_count,
+	uint32_t length, uint32_t fragment_handle, struct vm *from_vm,
+	struct mpool *page_pool, bool world_changed)
+{
+	return (struct spci_value){0};
+}
+
+struct spci_value spci_memory_relinquish(struct vm* current_vm, struct mpool *page_pool)
+{
+	return (struct spci_value){0};
+}
+
+struct spci_value spci_memory_reclaim(uint32_t handle, uint32_t flags, struct vm* current_vm, struct mpool *mpool)
+{
+	return (struct spci_value){0};
+}

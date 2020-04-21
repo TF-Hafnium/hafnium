@@ -355,3 +355,95 @@ static inline struct spci_value spci_msg_send_direct_resp(
 		.arg7 = arg7,
 	});
 }
+
+/* SPCI_MEM_SHARE. */
+/*static inline struct spci_value spci_mem_share(uintptr_t address,
+					       uint32_t page_count,
+					       uint32_t fragment_count,
+					       uint32_t length, uint32_t handle)
+{
+	return spci_call((struct spci_value){.func = SPCI_MEM_SHARE_64,
+					     .arg1 = address,
+					     .arg2 = page_count,
+					     .arg3 = fragment_count,
+					     .arg4 = length,
+					     .arg5 = handle});
+}
+*/
+
+/* SPCI_MEM_RETRIEVE_REQ. */
+static inline struct spci_value spci_mem_retrieve_req(uintptr_t address,
+						      uint32_t page_count,
+						      uint32_t fragment_count,
+						      uint32_t length,
+						      uint32_t handle)
+{
+	return spci_call((struct spci_value){.func = SPCI_MEM_RETRIEVE_REQ_64,
+					     .arg1 = address,
+					     .arg2 = page_count,
+					     .arg3 = fragment_count,
+					     .arg4 = length,
+					     .arg5 = handle});
+}
+
+/* SPCI_MEM_RETRIEVE_RESP. */
+static inline struct spci_value spci_mem_retrieve_resp(uintptr_t address,
+						       uint32_t page_count,
+						       uint32_t fragment_count,
+						       uint32_t length,
+						       uint32_t handle)
+{
+	return spci_call((struct spci_value){.func = SPCI_MEM_RETRIEVE_RESP_64,
+					     .arg1 = 0,
+					     .arg2 = 0,
+					     .arg3 = fragment_count,
+					     .arg4 = length,
+					     .arg5 = handle});
+}
+/**
+ * Discovery function returning information about partitions instantiated
+ * in the system.
+ *
+ * Returns:
+ *  - SPCI_SUCCESS in .func if the UUID is valid. The resultant information is
+ *    passed via the RX buffer.
+ *  - SPCI_ERROR in .func if the UUID could not be found.
+ */
+static inline struct spci_value spci_partition_info_get(uint32_t *uuid)
+{
+	return spci_call((struct spci_value){
+		.func = SPCI_PARTITION_INFO_GET_32,
+		.arg1 = uuid[0],
+		.arg2 = uuid[1],
+		.arg3 = uuid[2],
+		.arg4 = uuid[3],
+	});
+}
+
+static inline struct spci_value spci_direct_msg_resp(uint32_t src_dst, uint32_t param1, uint32_t param2, uint32_t param3, uint32_t param4, uint32_t param5)
+{
+	return spci_call((struct spci_value){
+		.func = SPCI_MSG_SEND_DIRECT_RESP_32,
+		.arg1 = src_dst,
+		.arg2 = 0,
+		.arg3 = param1,
+		.arg4 = param2,
+		.arg5 = param3,
+		.arg6 = param4,
+		.arg7 = param5,
+	});
+}
+
+static inline struct spci_value spci_mem_op_resume(uint32_t cookie)
+{
+	return spci_call((struct spci_value){
+		.func = SPCI_MEM_OP_RESUME,
+		.arg1 = cookie,
+		.arg2 = 0,
+		.arg3 = 0,
+		.arg4 = 0,
+		.arg5 = 0,
+		.arg6 = 0,
+		.arg7 = 0,
+	});
+}
