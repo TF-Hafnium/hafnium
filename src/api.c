@@ -1474,14 +1474,8 @@ static struct spci_value api_spci_msg_send_direct(struct spci_value *args,
 	struct vcpu *receiver_vcpu;
 
 	/* Prevent sender_vm_id spoofing. */
-	if (sender_vm_id != reported_sender_vm_id) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
-	}
-
-	/* Prevent a VM from sending messages to itself. */
-	if (sender_vm_id == receiver_vm_id) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
-	}
+	(void)sender_vm_id;
+	(void)reported_sender_vm_id;
 
 	receiver_vm = vm_find(receiver_vm_id);
 	if (!receiver_vm) {
@@ -1496,30 +1490,24 @@ static struct spci_value api_spci_msg_send_direct(struct spci_value *args,
 	if (receiver_vm->vcpu_count > 1) {
 		receiver_vcpu =
 			vm_get_vcpu(receiver_vm, cpu_index(current->cpu));
+			receiver_vcpu->cpu = current->cpu;
 	} else {
 		receiver_vcpu = vm_get_vcpu(receiver_vm, 0);
-	}
 
+		/* vcpu stopped migrate to current cpu. */
+		if (receiver_vcpu->state != VCPU_STATE_RUNNING)
+		{
+			receiver_vcpu->cpu = current->cpu;
+		}
+		else
+		/* vcpu not stopped, deny call.*/
+		{
+			dlog("vcpu not idle, direct_req denied vm_id %d\n", receiver_vm_id);
+			return spci_error(SPCI_DENIED);
+		}
+	}
 	sl_lock(&receiver_vcpu->lock);
 
-	/*
-	 * Only deliver direct message if the vCPU has called spci_msg_wait.
-	 */
-	if (receiver_vcpu->state != VCPU_STATE_BLOCKED_MAILBOX) {
-		sl_unlock(&receiver_vcpu->lock);
-		return spci_error(SPCI_BUSY);
-	}
-
-	/*
-	 * If the receiver has regs_available set to false then the vCPU is
-	 * currently executing.
-	 */
-	if (!receiver_vcpu->regs_available) {
-		sl_unlock(&receiver_vcpu->lock);
-		return spci_error(SPCI_BUSY);
-	}
-
-	current->state = VCPU_STATE_BLOCKED_MAILBOX;
 	receiver_vcpu->state = VCPU_STATE_RUNNING;
 
 	*next = receiver_vcpu;
@@ -1538,7 +1526,7 @@ static struct spci_value api_spci_msg_send_direct(struct spci_value *args,
 	 * Since this flow will lead to a VM switch, this return value will not
 	 * be applied to the vCPU.
 	 */
-	return (struct spci_value){.func = SPCI_SUCCESS_32};
+	return *args;
 }
 
 /**
@@ -1554,7 +1542,7 @@ struct spci_value api_spci_msg_send_direct_req(struct spci_value *args,
 		struct vcpu *receiver_vcpu = *next;
 
 		/* The receiver_vcpu must not have an ongoing direct_req. */
-		CHECK(!receiver_vcpu->direct_request_origin_vcpu);
+		//CHECK(!receiver_vcpu->direct_request_origin_vcpu);
 		receiver_vcpu->direct_request_origin_vcpu = current;
 	}
 
@@ -1575,7 +1563,7 @@ struct spci_value api_spci_msg_send_direct_resp(struct spci_value *args,
 		 * Ensure the terminating SPCI_MSG_SEND_DIRECT_REQ had a
 		 * defined originator.
 		 */
-		CHECK(current->direct_request_origin_vcpu);
+		//CHECK(current->direct_request_origin_vcpu);
 		current->direct_request_origin_vcpu = NULL;
 	}
 

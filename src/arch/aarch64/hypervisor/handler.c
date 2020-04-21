@@ -377,9 +377,7 @@ static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 	*args = ret;
 }
 
-#if SECURE_WORLD == 1
-
-static void spmd_exit(struct spci_value *args)
+void spmd_exit(struct spci_value *args)
 {
 	struct spci_value smc_res;
 
@@ -404,16 +402,16 @@ static void spmd_exit(struct spci_value *args)
 	args->arg7 = smc_res.arg7;
 }
 
-#endif /* SECURE_WORLD == 1 */
-
 static bool spci_handler_internal(struct spci_value *args, struct vcpu **next)
 {
 	uint32_t func = args->func & ~SMCCC_CONVENTION_MASK;
+	bool smc_origin = true;
 
 	/*
 	 * NOTE: When adding new methods to this handler update
 	 * api_spci_features accordingly.
 	 */
+	do{
 	switch (func) {
 	case SPCI_VERSION_32:
 		*args = api_spci_version();
@@ -465,12 +463,31 @@ static bool spci_handler_internal(struct spci_value *args, struct vcpu **next)
 					  args->arg5, current(), next);
 		return true;
 	case SPCI_MSG_SEND_DIRECT_REQ_32:
+
+		if(is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
+		{
+			/* XXX: Jump to the opposite world. */
+			spmd_exit(args);
+			smc_origin = false;
+			continue;
+		}
+
 		*args = api_spci_msg_send_direct_req(args, current(), next);
 		return true;
 	case SPCI_MSG_SEND_DIRECT_RESP_32:
+
+		if(is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
+		{
+			/* XXX: Jump to the opposite world. */
+			spmd_exit(args);
+			smc_origin = false;
+			continue;
+		}
+
 		*args = api_spci_msg_send_direct_resp(args, current(), next);
 		return true;
 	}
+	}while (!smc_origin);
 
 	return false;
 }
