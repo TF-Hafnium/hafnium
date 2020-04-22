@@ -201,15 +201,26 @@ TEST(cpus, stop)
 /** Ensures that the Hafnium SPCI version is reported as expected. */
 TEST(spci, spci_version)
 {
-	const int32_t major_revision = 0;
+	const int32_t major_revision = 1;
 	const int32_t major_revision_offset = 16;
-	const int32_t minor_revision = 9;
+	const int32_t minor_revision = 0;
 	const int32_t current_version =
 		(major_revision << major_revision_offset) | minor_revision;
 
-	struct spci_value ret = spci_version();
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
-	EXPECT_EQ(ret.arg2, current_version);
+	EXPECT_EQ(spci_version(current_version), current_version);
+	EXPECT_EQ(spci_version(0x0), current_version);
+	EXPECT_EQ(spci_version(0x1), current_version);
+	EXPECT_EQ(spci_version(0x10003), current_version);
+	EXPECT_EQ(spci_version(0xffff), current_version);
+	EXPECT_EQ(spci_version(0xfffffff), current_version);
+}
+
+/** Ensures that an invalid call to SPCI_VERSION gets an error back. */
+TEST(spci, spci_version_invalid)
+{
+	int32_t ret = spci_version(0x80000000);
+
+	EXPECT_EQ(ret, SPCI_NOT_SUPPORTED);
 }
 
 /** Ensures that SPCI_FEATURES is reporting the expected interfaces. */

@@ -55,7 +55,7 @@ struct spci_value api_spci_rxtx_map(ipaddr_t send, ipaddr_t recv,
 				    uint32_t page_count, struct vcpu *current,
 				    struct vcpu **next);
 void api_yield(struct vcpu *current, struct vcpu **next);
-struct spci_value api_spci_version(void);
+struct spci_value api_spci_version(uint32_t requested_version);
 struct spci_value api_spci_id_get(const struct vcpu *current);
 struct spci_value api_spci_features(uint32_t function_id);
 struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,

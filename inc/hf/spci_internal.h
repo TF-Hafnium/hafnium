@@ -20,10 +20,11 @@
 
 #include "vmapi/hf/spci.h"
 
-#define SPCI_VERSION_MAJOR 0x0
-#define SPCI_VERSION_MINOR 0x9
+#define SPCI_VERSION_MAJOR 0x1
+#define SPCI_VERSION_MINOR 0x0
 
 #define SPCI_VERSION_MAJOR_OFFSET 16
+#define SPCI_VERSION_RESERVED_BIT UINT32_C(1U << 31)
 
 static inline struct spci_value spci_error(uint64_t error_code)
 {

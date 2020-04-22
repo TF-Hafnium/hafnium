@@ -323,7 +323,7 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 	 */
 	switch (func) {
 	case SPCI_VERSION_32:
-		*args = api_spci_version();
+		*args = api_spci_version(args->arg1);
 		return true;
 	case SPCI_ID_GET_32:
 		*args = api_spci_id_get(current());

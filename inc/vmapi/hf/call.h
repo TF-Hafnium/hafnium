@@ -319,9 +319,11 @@ static inline int64_t hf_debug_log(char c)
 }
 
 /** Obtains the Hafnium's version of the implemented SPCI specification. */
-static inline struct spci_value spci_version(void)
+static inline int32_t spci_version(uint32_t requested_version)
 {
-	return spci_call((struct spci_value){.func = SPCI_VERSION_32});
+	return spci_call((struct spci_value){.func = SPCI_VERSION_32,
+					     .arg1 = requested_version})
+		.func;
 }
 
 /**
