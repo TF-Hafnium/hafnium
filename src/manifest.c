@@ -164,6 +164,20 @@ static enum manifest_return_code read_uint32(const struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
+static enum manifest_return_code read_optional_uint32(
+	const struct fdt_node *node, const char *property,
+	uint32_t default_value, uint32_t *out)
+{
+	enum manifest_return_code ret;
+
+	ret = read_uint32(node, property, out);
+	if (ret == MANIFEST_ERROR_PROPERTY_NOT_FOUND) {
+		*out = default_value;
+		return MANIFEST_SUCCESS;
+	}
+	return ret;
+}
+
 static enum manifest_return_code read_uint16(const struct fdt_node *node,
 					     const char *property,
 					     uint16_t *out)
@@ -337,6 +351,107 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 	return MANIFEST_SUCCESS;
 }
 
+static enum manifest_return_code parse_ffa_device_region_node(
+	struct fdt_node *dev_node, struct device_region *dev_regions)
+{
+	struct uint32list_iter list;
+	unsigned int i = 0;
+	unsigned int j = 0;
+
+	dlog_verbose("  Partition Device Regions\n");
+
+	if (!fdt_is_compatible(dev_node, "arm,ffa-manifest-device-regions")) {
+		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (!fdt_first_child(dev_node)) {
+		return MANIFEST_ERROR_DEVICE_REGION_NODE_EMPTY;
+	}
+
+	do {
+		dlog_verbose("    Device Region[%u]\n", i);
+
+		TRY(read_optional_string(dev_node, "description",
+					 &dev_regions[i].name));
+		dlog_verbose("      Name: %s\n",
+			     string_data(&dev_regions[i].name));
+
+		TRY(read_uint64(dev_node, "base-address",
+				&dev_regions[i].base_address));
+		dlog_verbose("      Base address:  %#x\n",
+			     dev_regions[i].base_address);
+
+		TRY(read_uint32(dev_node, "pages-count",
+				&dev_regions[i].page_count));
+		dlog_verbose("      Pages_count:  %u\n",
+			     dev_regions[i].page_count);
+
+		TRY(read_uint32(dev_node, "attributes",
+				&dev_regions[i].attributes));
+		dev_regions[i].attributes =
+			(dev_regions[i].attributes & MM_PERM_MASK) | MM_MODE_D;
+		dlog_verbose("      Attributes:  %u\n",
+			     dev_regions[i].attributes);
+
+		TRY(read_optional_uint32list(dev_node, "interrupts", &list));
+		dlog_verbose("      Interrupt List:\n");
+		j = 0;
+		while (uint32list_has_next(&list) &&
+		       j < SP_MAX_INTERRUPTS_PER_DEVICE) {
+			TRY(uint32list_get_next(
+				&list, &dev_regions[i].interrupts[j].id));
+			if (uint32list_has_next(&list)) {
+				TRY(uint32list_get_next(&list,
+							&dev_regions[i]
+								 .interrupts[j]
+								 .attributes));
+			} else {
+				return MANIFEST_ERROR_MALFORMED_INTEGER_LIST;
+			}
+
+			dlog_verbose("        ID = %u, attributes = %u\n",
+				     dev_regions[i].interrupts[j].id,
+				     dev_regions[i].interrupts[j].attributes);
+			j++;
+		}
+		if (j == 0) {
+			dlog_verbose("        Empty\n");
+		}
+
+		TRY(read_optional_uint32(dev_node, "smmu-id",
+					 (uint32_t)MANIFEST_INVALID_ADDRESS,
+					 &dev_regions[i].smmu_id));
+		dlog_verbose("      smmu-id:  %u\n", dev_regions[i].smmu_id);
+
+		TRY(read_optional_uint32list(dev_node, "stream-ids", &list));
+		dlog_verbose("      Stream IDs assigned:\n");
+
+		j = 0;
+		while (uint32list_has_next(&list) &&
+		       j < SP_MAX_STREAMS_PER_DEVICE) {
+			TRY(uint32list_get_next(&list,
+						&dev_regions[i].stream_ids[j]));
+			dlog_verbose("        %u\n",
+				     dev_regions[i].stream_ids[j]);
+			j++;
+		}
+		if (j == 0) {
+			dlog_verbose("        None\n");
+		}
+
+		TRY(read_bool(dev_node, "exclusive-access",
+			      &dev_regions[i].exclusive_access));
+		dlog_verbose("      Exclusive_access: %d\n",
+			     dev_regions[i].exclusive_access);
+
+		i++;
+	} while (fdt_next_sibling(dev_node) && (i < SP_MAX_DEVICE_REGIONS));
+
+	dlog_verbose("    Total %u device regions found\n", i);
+
+	return MANIFEST_SUCCESS;
+}
+
 static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 						    struct manifest_vm *vm)
 {
@@ -347,6 +462,7 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	struct fdt_node ffa_node;
 	struct string rxtx_node_name = STRING_INIT("rx_tx-info");
 	struct string mem_region_node_name = STRING_INIT("memory-regions");
+	struct string dev_region_node_name = STRING_INIT("device-regions");
 
 	if (!fdt_find_node(fdt, "/", &root)) {
 		return MANIFEST_ERROR_NO_ROOT_NODE;
@@ -422,6 +538,13 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
 		TRY(parse_ffa_memory_region_node(&ffa_node,
 						 vm->sp.mem_regions));
+	}
+
+	/* Parse Device-regions */
+	ffa_node = root;
+	if (fdt_find_child(&ffa_node, &dev_region_node_name)) {
+		TRY(parse_ffa_device_region_node(&ffa_node,
+						 vm->sp.dev_regions));
 	}
 
 	return MANIFEST_SUCCESS;
@@ -683,6 +806,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Malformed boolean property";
 	case MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY:
 		return "Memory-region node should have at least one entry";
+	case MANIFEST_ERROR_DEVICE_REGION_NODE_EMPTY:
+		return "Device-region node should have at least one entry";
 	}
 
 	panic("Unexpected manifest return code.");

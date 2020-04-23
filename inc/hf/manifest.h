@@ -22,6 +22,9 @@
 #define SP_RTX_BUF_NAME_SIZE 10
 
 #define SP_MAX_MEMORY_REGIONS 8
+#define SP_MAX_DEVICE_REGIONS 8
+#define SP_MAX_INTERRUPTS_PER_DEVICE 4
+#define SP_MAX_STREAMS_PER_DEVICE 4
 
 /** Mask for getting read/write/execute permission */
 #define MM_PERM_MASK 0x7
@@ -59,6 +62,33 @@ struct memory_region {
 	/** Memory attributes - mandatory */
 	uint32_t attributes;
 	/** Name of memory region - optional */
+	struct string name;
+};
+
+struct interrupt {
+	uint32_t id;
+	uint32_t attributes;
+};
+
+/**
+ * Partition Device region as described in PSA FFA v1.0 spec, Table 11
+ */
+struct device_region {
+	/** Device base PA - mandatory */
+	uintptr_t base_address;
+	/** Page count - mandatory */
+	uint32_t page_count;
+	/** Memory attributes - mandatory */
+	uint32_t attributes;
+	/** List of physical interrupt ID's and their attributes - optional */
+	struct interrupt interrupts[SP_MAX_INTERRUPTS_PER_DEVICE];
+	/** SMMU ID - optional */
+	uint32_t smmu_id;
+	/** List of Stream IDs assigned to device - optional */
+	uint32_t stream_ids[SP_MAX_STREAMS_PER_DEVICE];
+	/** Exclusive access to an endpoint - optional */
+	bool exclusive_access;
+	/** Name of Device region - optional */
 	struct string name;
 };
 
@@ -118,6 +148,8 @@ struct sp_manifest {
 
 	/** Memory regions */
 	struct memory_region mem_regions[SP_MAX_MEMORY_REGIONS];
+	/** Device regions */
+	struct device_region dev_regions[SP_MAX_DEVICE_REGIONS];
 };
 
 /**
@@ -191,6 +223,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_MALFORMED_INTEGER_LIST,
 	MANIFEST_ERROR_MALFORMED_BOOLEAN,
 	MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY,
+	MANIFEST_ERROR_DEVICE_REGION_NODE_EMPTY,
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,

@@ -861,6 +861,71 @@ TEST(manifest, ffa_validate_mem_regions)
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 }
 
+TEST(manifest, ffa_validate_dev_regions)
+{
+	struct manifest m;
+
+	/* Not Compatible */
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("device-regions")
+			.Compatible({ "foo,bar" })
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+
+	/* Memory regions unavailable  */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_DEVICE_REGION_NODE_EMPTY);
+
+	/* Missing Properties */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device")
+				.Description("test-device")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
+
+	/* Malformed interrupt list pair */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device")
+				.Description("test-device")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<0 1>")
+				.Property("interrupts", "<2 3>, <4>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MALFORMED_INTEGER_LIST);
+}
+
 TEST(manifest, ffa_valid)
 {
 	struct manifest m;
@@ -875,6 +940,18 @@ TEST(manifest, ffa_valid)
 				.Property("base-address", "<0x7100000>")
 				.Property("pages-count", "<4>")
 				.Property("attributes", "<7>")
+			.EndChild()
+		.EndChild()
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device")
+				.Description("test-device")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<0 1>")
+				.Property("interrupts", "<2 3>, <4 5>")
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -896,6 +973,17 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].base_address, 0x7100000);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].page_count, 4);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].attributes, 7);
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].base_address, 0x7200000);
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].page_count, 16);
+	/* Attribute is ORed with MM_MODE_D */
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].attributes, (3 | 8));
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].smmu_id, 1);
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].stream_ids[0], 0);
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].stream_ids[1], 1);
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].interrupts[0].id, 2);
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].interrupts[0].attributes, 3);
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].interrupts[1].id, 4);
+	ASSERT_EQ(m.vm[0].sp.dev_regions[0].interrupts[1].attributes, 5);
 }
 
 } /* namespace */
