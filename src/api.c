@@ -1437,13 +1437,24 @@ struct spci_value api_spci_features(uint32_t function_id)
 	switch (function_id) {
 	case SPCI_ERROR_32:
 	case SPCI_SUCCESS_32:
-	case SPCI_ID_GET_32:
-	case SPCI_YIELD_32:
+	case SPCI_INTERRUPT_32:
 	case SPCI_VERSION_32:
 	case SPCI_FEATURES_32:
-	case SPCI_MSG_SEND_32:
+	case SPCI_RX_RELEASE_32:
+	case SPCI_RXTX_MAP_64:
+	case SPCI_ID_GET_32:
 	case SPCI_MSG_POLL_32:
 	case SPCI_MSG_WAIT_32:
+	case SPCI_YIELD_32:
+	case SPCI_RUN_32:
+	case SPCI_MSG_SEND_32:
+	case SPCI_MEM_DONATE_32:
+	case SPCI_MEM_LEND_32:
+	case SPCI_MEM_SHARE_32:
+	case SPCI_MEM_RETRIEVE_REQ_32:
+	case SPCI_MEM_RETRIEVE_RESP_32:
+	case SPCI_MEM_RELINQUISH_32:
+	case SPCI_MEM_RECLAIM_32:
 		return (struct spci_value){.func = SPCI_SUCCESS_32};
 	default:
 		return spci_error(SPCI_NOT_SUPPORTED);

@@ -234,19 +234,22 @@ TEST(spci, spci_features)
 	ret = spci_features(SPCI_SUCCESS_32);
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 
+	ret = spci_features(SPCI_INTERRUPT_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
 	ret = spci_features(SPCI_VERSION_32);
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 
 	ret = spci_features(SPCI_FEATURES_32);
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 
+	ret = spci_features(SPCI_RX_RELEASE_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_RXTX_MAP_64);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
 	ret = spci_features(SPCI_ID_GET_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
-
-	ret = spci_features(SPCI_YIELD_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
-
-	ret = spci_features(SPCI_MSG_SEND_32);
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 
 	ret = spci_features(SPCI_MSG_POLL_32);
@@ -256,6 +259,33 @@ TEST(spci, spci_features)
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 
 	ret = spci_features(SPCI_YIELD_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_RUN_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MSG_SEND_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MEM_DONATE_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MEM_LEND_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MEM_SHARE_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MEM_RETRIEVE_REQ_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MEM_RETRIEVE_RESP_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MEM_RELINQUISH_32);
+	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+
+	ret = spci_features(SPCI_MEM_RECLAIM_32);
 	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
 }
 
@@ -273,22 +303,10 @@ TEST(spci, spci_features_not_supported)
 	ret = spci_features(0x84000000);
 	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
-	ret = spci_features(SPCI_INTERRUPT_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
-
-	ret = spci_features(SPCI_RX_RELEASE_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
-
-	ret = spci_features(SPCI_RXTX_MAP_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
-
 	ret = spci_features(SPCI_RXTX_UNMAP_32);
 	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_PARTITION_INFO_GET_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
-
-	ret = spci_features(SPCI_RUN_32);
 	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
 
 	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
