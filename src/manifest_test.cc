@@ -160,6 +160,11 @@ class ManifestDtBuilder
 		return StringProperty("debug_name", value);
 	}
 
+	ManifestDtBuilder &Description(const std::string_view &value)
+	{
+		return StringProperty("description", value);
+	}
+
 	ManifestDtBuilder &KernelFilename(const std::string_view &value)
 	{
 		return StringProperty("kernel_filename", value);
@@ -812,6 +817,50 @@ TEST(manifest, ffa_validate_sanity_check)
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
 }
 
+TEST(manifest, ffa_validate_mem_regions)
+{
+	struct manifest m;
+
+	/* Not Compatible */
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "foo,bar" })
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+
+	/* Memory regions unavailable  */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY);
+
+	/* Missing Properties */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
+}
+
 TEST(manifest, ffa_valid)
 {
 	struct manifest m;
@@ -819,6 +868,15 @@ TEST(manifest, ffa_valid)
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
 		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<4>")
+				.Property("attributes", "<7>")
+			.EndChild()
+		.EndChild()
 		.Build();
 	/* clang-format on */
 
@@ -835,6 +893,9 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].sp.ep_offset, 0x00001000);
 	ASSERT_EQ(m.vm[0].sp.xlat_granule, PAGE_4KB);
 	ASSERT_EQ(m.vm[0].sp.messaging_method, INDIRECT_MESSAGING);
+	ASSERT_EQ(m.vm[0].sp.mem_regions[0].base_address, 0x7100000);
+	ASSERT_EQ(m.vm[0].sp.mem_regions[0].page_count, 4);
+	ASSERT_EQ(m.vm[0].sp.mem_regions[0].attributes, 7);
 }
 
 } /* namespace */

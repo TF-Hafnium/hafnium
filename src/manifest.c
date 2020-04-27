@@ -290,6 +290,53 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
+static enum manifest_return_code parse_ffa_memory_region_node(
+	struct fdt_node *mem_node, struct memory_region *mem_regions)
+{
+	unsigned int i = 0;
+
+	dlog_verbose("  Partition memory regions\n");
+
+	if (!fdt_is_compatible(mem_node, "arm,ffa-manifest-memory-regions")) {
+		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (!fdt_first_child(mem_node)) {
+		return MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY;
+	}
+
+	do {
+		dlog_verbose("    Memory Region[%u]\n", i);
+
+		TRY(read_optional_string(mem_node, "description",
+					 &mem_regions[i].name));
+		dlog_verbose("      Name: %s\n",
+			     string_data(&mem_regions[i].name));
+
+		TRY(read_optional_uint64(mem_node, "base-address",
+					 MANIFEST_INVALID_ADDRESS,
+					 &mem_regions[i].base_address));
+		dlog_verbose("      Base address:  %#x\n",
+			     mem_regions[i].base_address);
+
+		TRY(read_uint32(mem_node, "pages-count",
+				&mem_regions[i].page_count));
+		dlog_verbose("      Pages_count:  %u\n",
+			     mem_regions[i].page_count);
+
+		TRY(read_uint32(mem_node, "attributes",
+				&mem_regions[i].attributes));
+		mem_regions[i].attributes &= MM_PERM_MASK;
+		dlog_verbose("      Attributes:  %u\n",
+			     mem_regions[i].attributes);
+		i++;
+	} while (fdt_next_sibling(mem_node) && (i < SP_MAX_MEMORY_REGIONS));
+
+	dlog_verbose("    Total %u memory regions found\n", i);
+
+	return MANIFEST_SUCCESS;
+}
+
 static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 						    struct manifest_vm *vm)
 {
@@ -299,6 +346,7 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	struct fdt_node root;
 	struct fdt_node ffa_node;
 	struct string rxtx_node_name = STRING_INIT("rx_tx-info");
+	struct string mem_region_node_name = STRING_INIT("memory-regions");
 
 	if (!fdt_find_node(fdt, "/", &root)) {
 		return MANIFEST_ERROR_NO_ROOT_NODE;
@@ -368,6 +416,13 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	TRY(read_uint8(&root, "messaging-method",
 		       (uint8_t *)&vm->sp.messaging_method));
 	dlog_verbose("  SP messaging method %d\n", vm->sp.messaging_method);
+
+	/* Parse memory-regions */
+	ffa_node = root;
+	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
+		TRY(parse_ffa_memory_region_node(&ffa_node,
+						 vm->sp.mem_regions));
+	}
 
 	return MANIFEST_SUCCESS;
 }
@@ -626,6 +681,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Malformed integer list property";
 	case MANIFEST_ERROR_MALFORMED_BOOLEAN:
 		return "Malformed boolean property";
+	case MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY:
+		return "Memory-region node should have at least one entry";
 	}
 
 	panic("Unexpected manifest return code.");

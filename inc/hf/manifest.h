@@ -21,6 +21,11 @@
 
 #define SP_RTX_BUF_NAME_SIZE 10
 
+#define SP_MAX_MEMORY_REGIONS 8
+
+/** Mask for getting read/write/execute permission */
+#define MM_PERM_MASK 0x7
+
 enum run_time_el {
 	EL1 = 0,
 	S_EL0,
@@ -38,6 +43,23 @@ enum messaging_method {
 	DIRECT_MESSAGING = 0,
 	INDIRECT_MESSAGING,
 	BOTH_MESSAGING
+};
+
+/**
+ * Partition Memory region as described in PSA FFA v1.0 spec, Table 10
+ */
+struct memory_region {
+	/**
+	 * Specify PA, VA for S-EL0 partitions or IPA
+	 * for S-EL1 partitions - optional.
+	 */
+	uintptr_t base_address;
+	/** Page count - mandatory */
+	uint32_t page_count;
+	/** Memory attributes - mandatory */
+	uint32_t attributes;
+	/** Name of memory region - optional */
+	struct string name;
 };
 
 /**
@@ -93,6 +115,9 @@ struct sp_manifest {
 	bool time_slice_mem;
 	/** optional - tuples SEPID/SMMUID/streamId */
 	uint32_t stream_ep_ids[1];
+
+	/** Memory regions */
+	struct memory_region mem_regions[SP_MAX_MEMORY_REGIONS];
 };
 
 /**
@@ -165,6 +190,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_INTEGER_OVERFLOW,
 	MANIFEST_ERROR_MALFORMED_INTEGER_LIST,
 	MANIFEST_ERROR_MALFORMED_BOOLEAN,
+	MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY,
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
