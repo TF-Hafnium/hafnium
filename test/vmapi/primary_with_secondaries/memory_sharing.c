@@ -637,11 +637,9 @@ TEST(memory_sharing, donate_check_upper_bounds)
 
 	/* Use different memory regions for verifying the second constituent. */
 	address = (uint64_t)pages + PAGE_SIZE * 1;
-	constituents[0].address_high = address << 32;
-	constituents[0].address_low = (uint32_t)address;
+	constituents[0].address = address;
 	address = (uint64_t)pages + PAGE_SIZE * 3;
-	constituents[1].address_high = address << 32;
-	constituents[1].address_low = (uint32_t)address;
+	constituents[1].address = address;
 
 	/*
 	 * Specify that we now want to test the second constituent of the
@@ -708,11 +706,9 @@ TEST(memory_sharing, donate_check_lower_bounds)
 
 	/* Use different memory regions for verifying the second constituent. */
 	address = (uint64_t)pages + PAGE_SIZE * 1;
-	constituents[0].address_high = address << 32;
-	constituents[0].address_low = (uint32_t)address;
+	constituents[0].address = address;
 	address = (uint64_t)pages + PAGE_SIZE * 3;
-	constituents[1].address_high = address << 32;
-	constituents[1].address_low = (uint32_t)address;
+	constituents[1].address = address;
 
 	/*
 	 * Specify that we now want to test the second constituent of the
@@ -1438,8 +1434,7 @@ TEST(memory_sharing, lend_donate)
 	constituents[0].page_count = 1;
 	for (int i = 1; i < PAGE_SIZE * 2; i++) {
 		uint64_t address = (uint64_t)pages + PAGE_SIZE;
-		constituents[0].address_high = address << 32;
-		constituents[0].address_low = (uint32_t)address;
+		constituents[0].address = address;
 		msg_size = spci_memory_region_init(
 			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
@@ -1501,8 +1496,7 @@ TEST(memory_sharing, share_donate)
 	constituents[0].page_count = 1;
 	for (int i = 1; i < PAGE_SIZE * 2; i++) {
 		uint64_t address = (uint64_t)pages + PAGE_SIZE;
-		constituents[0].address_high = address << 32;
-		constituents[0].address_low = (uint32_t)address;
+		constituents[0].address = address;
 		msg_size = spci_memory_region_init(
 			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RW_X,
@@ -1586,8 +1580,7 @@ TEST(memory_sharing, lend_twice)
 	constituents[0].page_count = 1;
 	for (int i = 0; i < 2; i++) {
 		uint64_t address = (uint64_t)pages + i * PAGE_SIZE;
-		constituents[0].address_high = address << 32;
-		constituents[0].address_low = (uint32_t)address;
+		constituents[0].address = address;
 		msg_size = spci_memory_region_init(
 			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RO_X,
@@ -1649,8 +1642,7 @@ TEST(memory_sharing, share_twice)
 	constituents[0].page_count = 1;
 	for (int i = 0; i < 2; i++) {
 		uint64_t address = (uint64_t)pages + i * PAGE_SIZE;
-		constituents[0].address_high = address << 32;
-		constituents[0].address_low = (uint32_t)address;
+		constituents[0].address = address;
 		msg_size = spci_memory_region_init(
 			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
 			ARRAY_SIZE(constituents), 0, 0, SPCI_MEMORY_RO_X,
@@ -1736,11 +1728,9 @@ TEST(memory_sharing, spci_lend_check_upper_bounds)
 
 	/* Use different memory regions for verifying the second constituent. */
 	address = (uint64_t)pages + PAGE_SIZE * 1;
-	constituents[0].address_high = address << 32;
-	constituents[0].address_low = (uint32_t)address;
+	constituents[0].address = address;
 	address = (uint64_t)pages + PAGE_SIZE * 3;
-	constituents[1].address_high = address << 32;
-	constituents[1].address_low = (uint32_t)address;
+	constituents[1].address = address;
 
 	/*
 	 * Specify that we now want to test the second constituent of the
@@ -1807,11 +1797,9 @@ TEST(memory_sharing, spci_lend_check_lower_bounds)
 
 	/* Use different memory regions for verifying the second constituent. */
 	address = (uint64_t)pages + PAGE_SIZE * 1;
-	constituents[0].address_high = address << 32;
-	constituents[0].address_low = (uint32_t)address;
+	constituents[0].address = address;
 	address = (uint64_t)pages + PAGE_SIZE * 3;
-	constituents[1].address_high = address << 32;
-	constituents[1].address_low = (uint32_t)address;
+	constituents[1].address = address;
 
 	/*
 	 * Specify that we now want to test the second constituent of the

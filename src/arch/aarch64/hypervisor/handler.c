@@ -797,7 +797,7 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 
 			*args = api_spci_mem_share(
 				args->arg1, args->arg2, args->arg3, args->arg4,
-				args->arg5, current()->vm, eret_origin);
+				current()->vm, eret_origin);
 
 			if (eret_origin)
 			{
@@ -865,6 +865,21 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 			}
 		case SPCI_MEM_OP_RESUME:
 			*args = spci_mem_op_resume_internal(args->arg1, current()->vm);
+			return true;
+
+		case SPCI_MEM_FRAG_RX_32:
+
+			return true;
+
+		case SPCI_MEM_FRAG_TX_32:
+			*args = spci_mem_frag_tx(args->arg1, args->arg2,
+				args->arg3,	args->arg4, current()->vm);
+			if(eret_origin)
+			{
+				spmd_exit(args);
+				break;
+			}
+
 			return true;
 
 		default:

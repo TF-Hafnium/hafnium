@@ -71,14 +71,14 @@ struct spci_value api_spci_msg_send_direct_req(struct spci_value *args,
 struct spci_value api_spci_msg_send_direct_resp(struct spci_value *args,
 						struct vcpu *current,
 						struct vcpu **next);
-struct spci_value api_spci_mem_share(uint64_t base_addr, uint32_t page_count,
-				     uint32_t fragment_count, uint32_t length,
-				     uint32_t handle, struct vm *from_vm, bool world_switched);
+struct spci_value api_spci_mem_share(uint32_t length, uint32_t frag_length,
+					 uint64_t base_addr, uint32_t page_count,
+				     struct vm *from_vm, bool world_switched);
 struct spci_value api_spci_mem_retrieve_req(uint64_t base_addr, uint32_t page_count,
 				     uint32_t fragment_count, uint32_t length,
 				     uint32_t handle, struct vm *from_vm);
 struct spci_value api_spci_mem_relinquish(struct mem_relinquish_descriptor *relinquish_desc, struct vm *vm);
-struct spci_value api_spci_memory_reclaim(uint32_t handle, uint32_t flags, struct vm* current_vm);
+struct spci_value api_spci_memory_reclaim(uint64_t handle, uint32_t flags, struct vm* current_vm);
 struct spci_value api_spci_partition_info_get(struct vcpu *current,
 					      uint32_t arg1, uint32_t arg2,
 					      uint32_t arg3, uint32_t arg4, bool eret_origin);

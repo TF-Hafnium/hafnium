@@ -23,7 +23,7 @@
 #include "hf/spci_internal.h"
 #include "hf/std.h"
 #include "hf/vm.h"
-
+#if 0
 static_assert(sizeof(struct spci_memory_region_constituent) % 16 == 0,
 	      "struct spci_memory_region_constituent must be a multiple of 16 "
 	      "bytes long.");
@@ -618,8 +618,10 @@ struct spci_value spci_memory_send(struct vm_locked to_locked,
 	 */
 	attributes_size = sizeof(struct spci_memory_region_attributes) *
 			  memory_region->attribute_count;
+
 	constituents_size = sizeof(struct spci_memory_region_constituent) *
 			    constituent_count;
+
 	if (memory_region->constituent_offset <
 		    sizeof(struct spci_memory_region) + attributes_size ||
 	    memory_share_size !=
@@ -663,3 +665,4 @@ struct spci_value spci_memory_send(struct vm_locked to_locked,
 		memory_to_attributes, share_func, page_pool,
 		memory_region->flags & SPCI_MEMORY_REGION_FLAG_CLEAR);
 }
+#endif

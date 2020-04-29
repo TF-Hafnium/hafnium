@@ -17,7 +17,6 @@
 #include "hf/spci.h"
 
 #include "hf/types.h"
-
 /*
  * Copied from hf/arch/std.h because we can't include Hafnium internal headers
  * here.
@@ -43,7 +42,7 @@ uint32_t spci_memory_region_init(
 	uint32_t constituents_length =
 		constituent_count *
 		sizeof(struct spci_memory_region_constituent);
-	uint32_t index;
+	//uint32_t index;
 	struct spci_memory_region_constituent *region_constituents;
 	uint16_t attributes = 0;
 
@@ -58,35 +57,36 @@ uint32_t spci_memory_region_init(
 	memory_region->sender = sender;
 	memory_region->reserved_0 = 0;
 	memory_region->reserved_1 = 0;
-	memory_region->page_count = 0;
-	memory_region->constituent_count = constituent_count;
-	memory_region->attribute_count = 1;
-	memory_region->attributes[0].receiver = receiver;
-	memory_region->attributes[0].memory_attributes = attributes;
-	memory_region->attributes[0].reserved_0 = 0;
-	memory_region->attributes[0].reserved_1 = 0;
+	spci_memory_region_get_composite(memory_region)->total_page_count = 0;
+	spci_memory_region_get_composite(memory_region)->constituent_count = constituent_count;
+	memory_region->endpoint_count = 1;
+	memory_region->endpoint_access[0].receiver = receiver;
+	memory_region->endpoint_access[0].memory_permission = attributes;
+	memory_region->endpoint_access[0].reserved_0 = 0;
 
 	/*
 	 * Constituent offset must be aligned to a 32-bit boundary so that
 	 * 32-bit values can be copied without alignment faults.
 	 */
-	memory_region->constituent_offset = align_up(
+/*	memory_region->constituent_offset = align_up(
 		sizeof(struct spci_memory_region) +
 			memory_region->attribute_count *
 				sizeof(struct spci_memory_region_attributes),
 		4);
+*/
 	region_constituents =
 		spci_memory_region_get_constituents(memory_region);
 
-	for (index = 0; index < constituent_count; index++) {
+/*	for (index = 0; index < constituent_count; index++) {
 		region_constituents[index] = constituents[index];
 		memory_region->page_count += constituents[index].page_count;
 	}
-
+*/
 	/*
 	 * TODO: Add assert ensuring that the specified message
 	 * length is not greater than SPCI_MSG_PAYLOAD_MAX.
 	 */
 
-	return memory_region->constituent_offset + constituents_length;
+//	return memory_region->constituent_offset + constituents_length;
+	return constituents_length;
 }

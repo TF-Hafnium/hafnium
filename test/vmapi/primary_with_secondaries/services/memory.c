@@ -25,7 +25,7 @@
 #include "test/hftest.h"
 #include "test/vmapi/exception_handler.h"
 #include "test/vmapi/spci.h"
-
+#if 0
 alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];
 
 TEST_SERVICE(memory_increment)
@@ -734,8 +734,7 @@ TEST_SERVICE(spci_memory_lend_twice)
 
 	for (i = 1; i < PAGE_SIZE * 2; i++) {
 		uint64_t address = (uint64_t)ptr + i;
-		constituent_copy.address_high = address << 32;
-		constituent_copy.address_low = (uint32_t)address;
+		constituent_copy.address = address;
 
 		/* Fail to lend or share the memory from the primary. */
 		msg_size = spci_memory_region_init(
@@ -757,3 +756,4 @@ TEST_SERVICE(spci_memory_lend_twice)
 	/* Return control to primary. */
 	spci_yield();
 }
+#endif

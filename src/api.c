@@ -1570,6 +1570,7 @@ struct spci_value api_spci_msg_send_direct_resp(struct spci_value *args,
 	return ret;
 }
 
+#if 0
 struct spci_value api_spci_mem_send(uint32_t share_func, ipaddr_t address,
 				    uint32_t page_count,
 				    uint32_t fragment_length, uint32_t length,
@@ -1676,11 +1677,11 @@ out:
 
 	return ret;
 }
-
+#endif
 
 struct spci_value spci_mem_share_internal(
-	uint64_t base_addr, uint32_t page_count, uint32_t fragment_count,
-	uint32_t length, uint32_t fragment_handle, struct vm *from_vm,
+	uint32_t length, uint32_t frag_length,
+	uint64_t base_addr, uint32_t page_count, struct vm *from_vm,
 	struct mpool *page_pool, bool world_switched);
 
 struct spci_value spci_mem_retrieve_req_internal(
@@ -1692,12 +1693,13 @@ struct spci_value spci_memory_relinquish(struct mem_relinquish_descriptor *relin
 
 struct spci_value spci_memory_reclaim(handle_t handle, uint32_t flags, struct vm* current_vm, struct mpool *mpool);
 
-struct spci_value api_spci_mem_share(uint64_t base_addr, uint32_t page_count,
-				     uint32_t fragment_count, uint32_t length,
-				     uint32_t handle, struct vm *from_vm, bool world_switched)
+struct spci_value api_spci_mem_share(
+				     uint32_t length, uint32_t frag_length,
+					 uint64_t base_addr, uint32_t page_count,
+				     struct vm *from_vm, bool world_switched)
 {
-	return spci_mem_share_internal(base_addr, page_count, fragment_count,
-				       length, handle, from_vm, &api_page_pool, world_switched);
+	return spci_mem_share_internal(length, frag_length,
+		 base_addr, page_count, from_vm, &api_page_pool, world_switched);
 }
 
 struct spci_value api_spci_mem_retrieve_req(uint64_t base_addr, uint32_t page_count,

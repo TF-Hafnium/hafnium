@@ -50,7 +50,7 @@ static uint16_t sp_id;
 
 static inline uint64_t get_constituent_addr(struct spci_memory_region_constituent *constituent)
 {
-	return ((uint64_t)constituent->address_high<<32) | constituent->address_low; 
+	return constituent->address;
 }
 
 struct mailbox_buffers set_up_mailbox(void)
@@ -82,7 +82,6 @@ static void test_memory_share(uint32_t handle)
 	struct spci_retrieve_descriptor  *retrieve_desc;
 	uint32_t total_length;
 	uint32_t increment_length;
-	uint32_t cookie;
 	uint32_t constituent_count;
 
 	if (!mb.send)
@@ -105,17 +104,16 @@ static void test_memory_share(uint32_t handle)
 
 	total_length = spci_return.arg4;
 	increment_length = spci_return.arg3;
-	cookie = spci_return.arg5;
 
 	memcpy_s(mem_region_buffer, REGION_BUF_SIZE, mb.recv, increment_length);
 
 	while (total_length != increment_length) {
 		uint32_t fragment_len;
-		spci_return = spci_mem_op_resume(cookie);
+		spci_return = spci_mem_op_resume(handle);
 
 		if (spci_return.func == SPCI_ERROR_32)
 		{
-			dlog("--bare metal test VM: failed to resume mem with handle %d and cookie\n", handle, cookie);
+			dlog("--bare metal test VM: failed to resume mem with handle %d\n", handle);
 			return;
 		}
 		fragment_len = spci_return.arg3;

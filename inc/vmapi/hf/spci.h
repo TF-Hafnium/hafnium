@@ -67,6 +67,9 @@
 #define SPCI_MEM_RELINQUISH_64  0xC4000076
 #define SPCI_MEM_RECLAIM_64     0xC4000077
 
+#define SPCI_MEM_FRAG_RX_32     0x8400007A
+#define SPCI_MEM_FRAG_TX_32     0x8400007B
+
 /* SPCI error codes. */
 #define SPCI_NOT_SUPPORTED      INT32_C(-1)
 #define SPCI_INVALID_PARAMETERS INT32_C(-2)
@@ -252,21 +255,39 @@ static inline uint64_t spci_vm_vcpu(spci_vm_id_t vm_id,
 {
 	return ((uint32_t)vm_id << 16) | vcpu_index;
 }
-
+/* Table 38 in EAC */
 struct spci_memory_region_constituent {
 	/**
 	 * The base IPA of the constituent memory region, aligned to 4 kiB page
 	 * size granularity.
 	 */
-	uint32_t address_low;
-	uint32_t address_high;
+	uint64_t address;
 	/** The number of 4 kiB pages in the constituent memory region. */
 	uint32_t page_count;
 	/** Reserved field, must be 0. */
 	uint32_t reserved;
 };
 
-struct spci_memory_region_attributes {
+/* Table 41 of EAC with table 40 embedded. */
+struct spci_endpoint_memory_access {
+	/** The ID of the VM to which the memory is being given or shared. */
+	spci_vm_id_t receiver;
+	/**
+	 * The attributes with which the memory region should be mapped in the
+	 * receiver's page table.
+	 */
+	uint8_t memory_permission;
+
+	uint8_t flags;
+
+	uint32_t composite_off;
+
+	/** Reserved field, must be 0. */
+	uint64_t reserved_0;
+};
+
+#if 0
+struct spci_endpoint_memory_access {
 	/** The ID of the VM to which the memory is being given or shared. */
 	spci_vm_id_t receiver;
 	/**
@@ -279,6 +300,22 @@ struct spci_memory_region_attributes {
 	/** Reserved field, must be 0. */
 	uint64_t reserved_1;
 };
+#endif
+
+struct spci_composite_memory_region {
+
+	uint32_t total_page_count;
+	uint32_t constituent_count;
+
+	uint64_t reserved_0;
+
+	struct spci_memory_region_constituent constituents[];
+};
+
+/* Table 43 */
+struct spci_memory_region_attribute {
+	uint8_t attribute;
+};
 
 /** Flags to control the behaviour of a memory sharing transaction. */
 typedef uint32_t spci_memory_region_flags_t;
@@ -289,6 +326,28 @@ typedef uint32_t spci_memory_region_flags_t;
  */
 #define SPCI_MEMORY_REGION_FLAG_CLEAR 0x1
 
+struct spci_memory_region {
+
+	/** Sender VM ID. */
+	spci_vm_id_t sender;
+
+	struct spci_memory_region_attribute region_attr;
+
+	uint8_t reserved_0;
+
+	spci_memory_region_flags_t flags;
+
+	uint64_t handle;
+
+	uint64_t tag;
+
+	uint32_t reserved_1;
+
+	uint32_t endpoint_count;
+
+	struct spci_endpoint_memory_access endpoint_access[];
+};
+#if 0
 struct spci_memory_region {
 	/**
 	 * An implementation defined value associated with the receiver and the
@@ -317,9 +376,10 @@ struct spci_memory_region {
 	 * `spci_memory_region` to the start of the first
 	 * `spci_memory_region_constituent`.
 	 */
-	uint32_t constituent_offset;
+	//uint32_t constituent_offset;
+	uint32_t reserved_3;
 	/**
-	 * The number of `spci_memory_region_attributes` entries included in
+	 * The number of `spci_memory_access` entries included in
 	 * this memory region.
 	 */
 	uint32_t attribute_count;
@@ -330,15 +390,15 @@ struct spci_memory_region {
 	 * Each one specifies an endpoint and the attributes with which this
 	 * memory region should be mapped in that endpoint's page table.
 	 */
-	struct spci_memory_region_attributes attributes[];
+	struct spci_memory_access attributes[];
 };
+#endif
 
 static inline struct spci_memory_region_constituent
 spci_memory_region_constituent_init(uint64_t address, uint32_t pc)
 {
 	return (struct spci_memory_region_constituent){
-		.address_high = (uint32_t)(address >> 32),
-		.address_low = (uint32_t)address,
+		.address = address,
 		.page_count = pc,
 	};
 }
@@ -346,8 +406,7 @@ spci_memory_region_constituent_init(uint64_t address, uint32_t pc)
 static inline uint64_t spci_memory_region_constituent_get_address(
 	struct spci_memory_region_constituent *constituent)
 {
-	return (uint64_t)constituent->address_high << 32 |
-	       constituent->address_low;
+	return constituent->address;
 }
 
 struct mem_retrieve_descriptor {
@@ -441,12 +500,21 @@ struct spci_partition_info {
 /**
  * Gets the constituent array for an `spci_memory_region`.
  */
+static inline struct spci_composite_memory_region *
+spci_memory_region_get_composite(const struct spci_memory_region *memory_region)
+{
+	return (struct spci_composite_memory_region
+			*)((uint8_t *)memory_region +
+			   memory_region->endpoint_access[0].composite_off);
+}
+
+/**
+ * Gets the constituent array for an `spci_memory_region`.
+ */
 static inline struct spci_memory_region_constituent *
 spci_memory_region_get_constituents(struct spci_memory_region *memory_region)
 {
-	return (struct spci_memory_region_constituent
-			*)((uint8_t *)memory_region +
-			   memory_region->constituent_offset);
+	return spci_memory_region_get_composite(memory_region)->constituents;
 }
 
 uint32_t spci_memory_region_init(
