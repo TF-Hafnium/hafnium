@@ -160,7 +160,7 @@ void one_time_init(void)
 	/* Enable TLB invalidation for VM page table updates. */
 	mm_vm_enable_invalidation();
 
-	if (manifest.spci_tee_enabled) {
+	if (manifest.ffa_tee_enabled) {
 		/* Set up message buffers for TEE dispatcher. */
 		arch_tee_init();
 	}

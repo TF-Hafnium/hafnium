@@ -17,7 +17,7 @@ would allow them to escape this containment. It also provides:
 
 *   Means for VMs to communicate with each other through message passing and
     memory sharing, according to the Arm
-    [Secure Partition Communication Interface (SPCI)](https://developer.arm.com/docs/den0077/a).
+    [Platform Security Architecture Firmware Framework for Arm v8-A (PSA FF-A)](https://developer.arm.com/docs/den0077/a).
 *   Emulation of some basic hardware features such as timers.
 *   A simple paravirtualised interrupt controller for secondary VMs, as they
     don't have access to hardware interrupts.
@@ -156,7 +156,7 @@ access to use them however it wishes.
 Hafnium maintains state of which VM **owns** each page, and which VMs have
 **access** to it. It does this using the stage 2 page tables of the VMs, with
 some extra application-defined bits in the page table entries. A VM may share,
-lend or donate memory pages to another VM using the appropriate SPCI requests. A
+lend or donate memory pages to another VM using the appropriate FF-A requests. A
 given page of memory may never be shared with more than two VMs, either in terms
 of ownership or access. Thus, the following states are possible for each page,
 for some values of X and Y:

@@ -19,32 +19,32 @@
 #include <stdint.h>
 
 #include "hf/addr.h"
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/types.h"
 
 #include "smc.h"
 #include "test/hftest.h"
 
-alignas(SPCI_PAGE_SIZE) static uint8_t tee_send_buffer[HF_MAILBOX_SIZE];
-alignas(SPCI_PAGE_SIZE) static uint8_t tee_recv_buffer[HF_MAILBOX_SIZE];
+alignas(FFA_PAGE_SIZE) static uint8_t tee_send_buffer[HF_MAILBOX_SIZE];
+alignas(FFA_PAGE_SIZE) static uint8_t tee_recv_buffer[HF_MAILBOX_SIZE];
 
 /**
- * Make sure SPCI_RXTX_MAP to EL3 works.
+ * Make sure FFA_RXTX_MAP to EL3 works.
  */
 TEST(arch_tee, init)
 {
-	struct spci_value ret = arch_tee_call((struct spci_value){
-		.func = SPCI_RXTX_MAP_64,
+	struct ffa_value ret = arch_tee_call((struct ffa_value){
+		.func = FFA_RXTX_MAP_64,
 		.arg1 = pa_addr(pa_from_va(va_from_ptr(tee_recv_buffer))),
 		.arg2 = pa_addr(pa_from_va(va_from_ptr(tee_send_buffer))),
-		.arg3 = HF_MAILBOX_SIZE / SPCI_PAGE_SIZE});
+		.arg3 = HF_MAILBOX_SIZE / FFA_PAGE_SIZE});
 	uint32_t func = ret.func & ~SMCCC_CONVENTION_MASK;
 
 	/*
 	 * TODO(qwandor): Remove this UNKNOWN check once we have a build of TF-A
-	 * which supports SPCI memory sharing.
+	 * which supports FF-A memory sharing.
 	 */
 	if (ret.func != SMCCC_ERROR_UNKNOWN) {
-		ASSERT_EQ(func, SPCI_SUCCESS_32);
+		ASSERT_EQ(func, FFA_SUCCESS_32);
 	}
 }

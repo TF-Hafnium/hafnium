@@ -23,7 +23,7 @@
 #include "hf/arch/plat/psci.h"
 
 #include "hf/addr.h"
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -69,7 +69,7 @@ static void gic_regs_reset(struct arch_regs *r, bool is_primary)
 
 void arch_regs_reset(struct vcpu *vcpu)
 {
-	spci_vm_id_t vm_id = vcpu->vm->id;
+	ffa_vm_id_t vm_id = vcpu->vm->id;
 	bool is_primary = vm_id == HF_PRIMARY_VM_ID;
 	cpu_id_t vcpu_id = is_primary ? vcpu->cpu->id : vcpu_index(vcpu);
 	paddr_t table = vcpu->vm->ptable.root;
@@ -125,7 +125,7 @@ void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg)
 	r->r[0] = arg;
 }
 
-void arch_regs_set_retval(struct arch_regs *r, struct spci_value v)
+void arch_regs_set_retval(struct arch_regs *r, struct ffa_value v)
 {
 	r->r[0] = v.func;
 	r->r[1] = v.arg1;

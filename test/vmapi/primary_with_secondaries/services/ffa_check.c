@@ -14,62 +14,62 @@
  * limitations under the License.
  */
 
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
-TEST_SERVICE(spci_check)
+TEST_SERVICE(ffa_check)
 {
 	void *recv_buf = SERVICE_RECV_BUFFER();
-	const char message[] = "spci_msg_send";
+	const char message[] = "ffa_msg_send";
 
 	/* Wait for single message to be sent by the primary VM. */
-	struct spci_value ret = spci_msg_wait();
+	struct ffa_value ret = ffa_msg_wait();
 
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_32);
 
 	/* Ensure message header has all fields correctly set. */
-	EXPECT_EQ(spci_msg_send_size(ret), sizeof(message));
-	EXPECT_EQ(spci_msg_send_receiver(ret), hf_vm_get_id());
-	EXPECT_EQ(spci_msg_send_sender(ret), HF_PRIMARY_VM_ID);
+	EXPECT_EQ(ffa_msg_send_size(ret), sizeof(message));
+	EXPECT_EQ(ffa_msg_send_receiver(ret), hf_vm_get_id());
+	EXPECT_EQ(ffa_msg_send_sender(ret), HF_PRIMARY_VM_ID);
 
 	/* Ensure that the payload was correctly transmitted. */
 	EXPECT_EQ(memcmp(recv_buf, message, sizeof(message)), 0);
 
-	spci_yield();
+	ffa_yield();
 }
 
-TEST_SERVICE(spci_length)
+TEST_SERVICE(ffa_length)
 {
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	const char message[] = "this should be truncated";
 
 	/* Wait for single message to be sent by the primary VM. */
-	struct spci_value ret = spci_msg_wait();
+	struct ffa_value ret = ffa_msg_wait();
 
-	EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_32);
 
 	/* Verify the length is as expected. */
-	EXPECT_EQ(16, spci_msg_send_size(ret));
+	EXPECT_EQ(16, ffa_msg_send_size(ret));
 
 	/* Check only part of the message is sent correctly. */
 	EXPECT_NE(memcmp(recv_buf, message, sizeof(message)), 0);
-	EXPECT_EQ(memcmp(recv_buf, message, spci_msg_send_size(ret)), 0);
+	EXPECT_EQ(memcmp(recv_buf, message, ffa_msg_send_size(ret)), 0);
 
-	spci_yield();
+	ffa_yield();
 }
 
-TEST_SERVICE(spci_recv_non_blocking)
+TEST_SERVICE(ffa_recv_non_blocking)
 {
 	/* Wait for single message to be sent by the primary VM. */
-	struct spci_value ret = spci_msg_poll();
+	struct ffa_value ret = ffa_msg_poll();
 
-	EXPECT_SPCI_ERROR(ret, SPCI_RETRY);
+	EXPECT_FFA_ERROR(ret, FFA_RETRY);
 
-	spci_yield();
+	ffa_yield();
 }

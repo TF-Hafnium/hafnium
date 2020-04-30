@@ -28,7 +28,7 @@
 
 #include "common.h"
 #include "test/hftest.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
 /*
  * Secondary VM that sets timers in response to messages, and sends messages
@@ -48,8 +48,8 @@ static void irq_current(void)
 	}
 	buffer[8] = '0' + interrupt_id / 10;
 	buffer[9] = '0' + interrupt_id % 10;
-	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, buffer, size);
-	spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, size, 0);
+	memcpy_s(SERVICE_SEND_BUFFER(), FFA_MSG_PAYLOAD_MAX, buffer, size);
+	ffa_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, size, 0);
 	dlog("secondary IRQ %d ended\n", interrupt_id);
 	event_send_local();
 }
@@ -67,13 +67,12 @@ TEST_SERVICE(timer)
 		bool receive;
 		bool disable_interrupts;
 		uint32_t ticks;
-		struct spci_value ret = mailbox_receive_retry();
+		struct ffa_value ret = mailbox_receive_retry();
 
-		if (spci_msg_send_sender(ret) != HF_PRIMARY_VM_ID ||
-		    spci_msg_send_size(ret) != sizeof("**** xxxxxxx")) {
+		if (ffa_msg_send_sender(ret) != HF_PRIMARY_VM_ID ||
+		    ffa_msg_send_size(ret) != sizeof("**** xxxxxxx")) {
 			FAIL("Got unexpected message from VM %d, size %d.\n",
-			     spci_msg_send_sender(ret),
-			     spci_msg_send_size(ret));
+			     ffa_msg_send_sender(ret), ffa_msg_send_size(ret));
 		}
 
 		/*
@@ -90,7 +89,7 @@ TEST_SERVICE(timer)
 			(message[9] - '0') * 100 + (message[10] - '0') * 10 +
 			(message[11] - '0');
 
-		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 		dlog("Starting timer for %d ticks.\n", ticks);
 
@@ -110,9 +109,9 @@ TEST_SERVICE(timer)
 				event_wait();
 			}
 		} else if (receive) {
-			struct spci_value res = spci_msg_wait();
+			struct ffa_value res = ffa_msg_wait();
 
-			EXPECT_SPCI_ERROR(res, SPCI_INTERRUPTED);
+			EXPECT_FFA_ERROR(res, FFA_INTERRUPTED);
 		} else {
 			/* Busy wait until the timer fires. */
 			while (!timer_fired) {

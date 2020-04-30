@@ -18,12 +18,12 @@
 
 #include <stdint.h>
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
-static struct spci_value smc_internal(uint32_t func, uint64_t arg0,
-				      uint64_t arg1, uint64_t arg2,
-				      uint64_t arg3, uint64_t arg4,
-				      uint64_t arg5, uint32_t caller_id)
+static struct ffa_value smc_internal(uint32_t func, uint64_t arg0,
+				     uint64_t arg1, uint64_t arg2,
+				     uint64_t arg3, uint64_t arg4,
+				     uint64_t arg5, uint32_t caller_id)
 {
 	register uint64_t r0 __asm__("x0") = func;
 	register uint64_t r1 __asm__("x1") = arg0;
@@ -40,35 +40,35 @@ static struct spci_value smc_internal(uint32_t func, uint64_t arg0,
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3), "+r"(r4), "+r"(r5),
 		"+r"(r6), "+r"(r7));
 
-	return (struct spci_value){.func = r0,
-				   .arg1 = r1,
-				   .arg2 = r2,
-				   .arg3 = r3,
-				   .arg4 = r4,
-				   .arg5 = r5,
-				   .arg6 = r6,
-				   .arg7 = r7};
+	return (struct ffa_value){.func = r0,
+				  .arg1 = r1,
+				  .arg2 = r2,
+				  .arg3 = r3,
+				  .arg4 = r4,
+				  .arg5 = r5,
+				  .arg6 = r6,
+				  .arg7 = r7};
 }
 
-struct spci_value smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
-			uint32_t arg2, uint32_t arg3, uint32_t arg4,
-			uint32_t arg5, uint32_t caller_id)
+struct ffa_value smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
+		       uint32_t arg2, uint32_t arg3, uint32_t arg4,
+		       uint32_t arg5, uint32_t caller_id)
 {
 	return smc_internal(func | SMCCC_32_BIT, arg0, arg1, arg2, arg3, arg4,
 			    arg5, caller_id);
 }
 
-struct spci_value smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
-			uint64_t arg2, uint64_t arg3, uint64_t arg4,
-			uint64_t arg5, uint32_t caller_id)
+struct ffa_value smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
+		       uint64_t arg2, uint64_t arg3, uint64_t arg4,
+		       uint64_t arg5, uint32_t caller_id)
 {
 	return smc_internal(func | SMCCC_64_BIT, arg0, arg1, arg2, arg3, arg4,
 			    arg5, caller_id);
 }
 
-struct spci_value smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
-			      uint64_t arg2, uint64_t arg3, uint64_t arg4,
-			      uint64_t arg5, uint32_t caller_id)
+struct ffa_value smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
+			     uint64_t arg2, uint64_t arg3, uint64_t arg4,
+			     uint64_t arg5, uint32_t caller_id)
 {
 	return smc_internal(func, arg0, arg1, arg2, arg3, arg4, arg5,
 			    caller_id);

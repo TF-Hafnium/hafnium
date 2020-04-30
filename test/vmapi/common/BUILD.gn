@@ -19,7 +19,7 @@ source_set("common") {
   public_configs = [ "//test/hftest:hftest_config" ]
   sources = [
     "exception_handler.c",
-    "spci.c",
+    "ffa.c",
   ]
   include_dirs = [ "//src/arch/aarch64" ]
 }

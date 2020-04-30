@@ -18,7 +18,7 @@
 #include "hf/arch/vm/interrupts_gicv3.h"
 
 #include "hf/dlog.h"
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
@@ -38,15 +38,15 @@ static uint64_t ns_to_ticks(uint64_t ns)
 SET_UP(busy_secondary)
 {
 	system_setup();
-	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM1, "busy", send_buffer);
 }
 
 TEST(busy_secondary, virtual_timer)
 {
 	const char message[] = "loop";
-	struct spci_value run_res;
+	struct ffa_value run_res;
 
 	interrupt_enable(VIRTUAL_TIMER_IRQ, true);
 	interrupt_set_priority(VIRTUAL_TIMER_IRQ, 0x80);
@@ -63,9 +63,9 @@ TEST(busy_secondary, virtual_timer)
 	arch_irq_enable();
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
 
 	/* Check that no interrupts are active or pending to start with. */
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
@@ -80,13 +80,13 @@ TEST(busy_secondary, virtual_timer)
 
 	/* Let secondary start looping. */
 	dlog("Telling secondary to loop.\n");
-	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
+	memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, message, sizeof(message));
 	EXPECT_EQ(
-		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
+		ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
 			.func,
-		SPCI_SUCCESS_32);
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_INTERRUPT_32);
+		FFA_SUCCESS_32);
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_INTERRUPT_32);
 
 	dlog("Waiting for interrupt\n");
 	while (last_interrupt_id == 0) {
@@ -112,7 +112,7 @@ TEST(busy_secondary, virtual_timer)
 TEST(busy_secondary, physical_timer)
 {
 	const char message[] = "loop";
-	struct spci_value run_res;
+	struct ffa_value run_res;
 
 	interrupt_enable(PHYSICAL_TIMER_IRQ, true);
 	interrupt_set_priority(PHYSICAL_TIMER_IRQ, 0x80);
@@ -121,9 +121,9 @@ TEST(busy_secondary, physical_timer)
 	arch_irq_enable();
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
 
 	/* Check that no interrupts are active or pending to start with. */
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
@@ -138,13 +138,13 @@ TEST(busy_secondary, physical_timer)
 
 	/* Let secondary start looping. */
 	dlog("Telling secondary to loop.\n");
-	memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, message, sizeof(message));
+	memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, message, sizeof(message));
 	EXPECT_EQ(
-		spci_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
+		ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
 			.func,
-		SPCI_SUCCESS_32);
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_INTERRUPT_32);
+		FFA_SUCCESS_32);
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_INTERRUPT_32);
 
 	dlog("Waiting for interrupt\n");
 	while (last_interrupt_id == 0) {

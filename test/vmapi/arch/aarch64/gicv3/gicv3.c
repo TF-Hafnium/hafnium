@@ -87,14 +87,14 @@ TEST(system, system_setup)
  */
 TEST(system, icc_ctlr_access_trapped_secondary)
 {
-	struct spci_value run_res;
+	struct ffa_value run_res;
 
-	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM1, "access_systemreg_ctlr", send_buffer);
 
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }
 
 /*
@@ -103,12 +103,12 @@ TEST(system, icc_ctlr_access_trapped_secondary)
  */
 TEST(system, icc_sre_write_trapped_secondary)
 {
-	struct spci_value run_res;
+	struct ffa_value run_res;
 
-	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM1, "write_systemreg_sre", send_buffer);
 
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }

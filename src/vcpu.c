@@ -64,7 +64,7 @@ void vcpu_on(struct vcpu_locked vcpu, ipaddr_t entry, uintreg_t arg)
 	vcpu.vcpu->state = VCPU_STATE_READY;
 }
 
-spci_vcpu_index_t vcpu_index(const struct vcpu *vcpu)
+ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu)
 {
 	size_t index = vcpu - vcpu->vm->vcpus;
 

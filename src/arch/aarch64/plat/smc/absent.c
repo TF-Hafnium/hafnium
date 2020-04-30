@@ -16,7 +16,7 @@
 
 #include "hf/arch/plat/smc.h"
 
-void plat_smc_post_forward(struct spci_value args, struct spci_value *ret)
+void plat_smc_post_forward(struct ffa_value args, struct ffa_value *ret)
 {
 	(void)args;
 	(void)ret;

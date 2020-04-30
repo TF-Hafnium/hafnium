@@ -22,7 +22,7 @@
 TEST(smc_whitelist, not_whitelisted_unknown)
 {
 	const uint32_t non_whitelisted_ta_call = 0x3000f00d;
-	struct spci_value smc_res = smc_forward(
+	struct ffa_value smc_res = smc_forward(
 		non_whitelisted_ta_call, 0x1111111111111111, 0x2222222222222222,
 		0x3333333333333333, 0x4444444444444444, 0x5555555555555555,
 		0x6666666666666666, 0x77777777);

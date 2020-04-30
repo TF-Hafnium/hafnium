@@ -15,8 +15,8 @@
         "spinlock.h": "c",
         "offsets.h": "c",
         "barriers.h": "c",
-        "spci.h": "c",
-        "spci_internal.h": "c",
+        "ffa.h": "c",
+        "ffa_internal.h": "c",
         "interrupts_gicv3.h": "c",
         "interrupts.h": "c",
         "abi.h": "c"

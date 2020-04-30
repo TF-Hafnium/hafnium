@@ -23,7 +23,7 @@
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 #include "../psci.h"
 #include "primary_with_secondary.h"
@@ -40,10 +40,10 @@ alignas(4096) static char stack[4096];
 /** Send a message back to the primary. */
 void send_message(const char *message, uint32_t size)
 {
-	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, message, size);
+	memcpy_s(SERVICE_SEND_BUFFER(), FFA_MSG_PAYLOAD_MAX, message, size);
 
-	ASSERT_EQ(spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, size, 0).func,
-		  SPCI_SUCCESS_32);
+	ASSERT_EQ(ffa_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, size, 0).func,
+		  FFA_SUCCESS_32);
 }
 
 /**

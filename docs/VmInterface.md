@@ -100,7 +100,7 @@ Extension.
 ## Asynchronous message passing
 
 VMs will be able to send messages of up to 4 KiB to each other asynchronously,
-with no queueing, as specified by SPCI.
+with no queueing, as specified by FF-A.
 
 ## Memory
 
@@ -164,7 +164,7 @@ a fault or restart the system.
 ## TrustZone communication
 
 The primary VM will be able to communicate with a TEE running in TrustZone
-either through SPCI messages or through whitelisted SMC calls, and through
+either through FF-A messages or through whitelisted SMC calls, and through
 shared memory.
 
 ## Other SMC calls

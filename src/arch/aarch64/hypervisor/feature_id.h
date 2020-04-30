@@ -20,7 +20,7 @@
 
 #include "hf/cpu.h"
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 #define HF_FEATURE_NONE UINT64_C(0)
 

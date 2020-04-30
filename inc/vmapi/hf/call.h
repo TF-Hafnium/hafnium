@@ -17,7 +17,7 @@
 #pragma once
 
 #include "hf/abi.h"
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/types.h"
 
 /**
@@ -25,28 +25,28 @@
  * mechanism to call to the hypervisor.
  */
 int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
-struct spci_value spci_call(struct spci_value args);
+struct ffa_value ffa_call(struct ffa_value args);
 
 /**
  * Returns the VM's own ID.
  */
-static inline struct spci_value spci_id_get(void)
+static inline struct ffa_value ffa_id_get(void)
 {
-	return spci_call((struct spci_value){.func = SPCI_ID_GET_32});
+	return ffa_call((struct ffa_value){.func = FFA_ID_GET_32});
 }
 
 /**
  * Returns the VM's own ID.
  */
-static inline spci_vm_id_t hf_vm_get_id(void)
+static inline ffa_vm_id_t hf_vm_get_id(void)
 {
-	return spci_id_get().arg2;
+	return ffa_id_get().arg2;
 }
 
 /**
  * Returns the number of secondary VMs.
  */
-static inline spci_vm_count_t hf_vm_get_count(void)
+static inline ffa_vm_count_t hf_vm_get_count(void)
 {
 	return hf_call(HF_VM_GET_COUNT, 0, 0, 0);
 }
@@ -54,7 +54,7 @@ static inline spci_vm_count_t hf_vm_get_count(void)
 /**
  * Returns the number of vCPUs configured in the given secondary VM.
  */
-static inline spci_vcpu_count_t hf_vcpu_get_count(spci_vm_id_t vm_id)
+static inline ffa_vcpu_count_t hf_vcpu_get_count(ffa_vm_id_t vm_id)
 {
 	return hf_call(HF_VCPU_GET_COUNT, vm_id, 0, 0);
 }
@@ -62,20 +62,20 @@ static inline spci_vcpu_count_t hf_vcpu_get_count(spci_vm_id_t vm_id)
 /**
  * Runs the given vCPU of the given VM.
  */
-static inline struct spci_value spci_run(spci_vm_id_t vm_id,
-					 spci_vcpu_index_t vcpu_idx)
+static inline struct ffa_value ffa_run(ffa_vm_id_t vm_id,
+				       ffa_vcpu_index_t vcpu_idx)
 {
-	return spci_call((struct spci_value){.func = SPCI_RUN_32,
-					     spci_vm_vcpu(vm_id, vcpu_idx)});
+	return ffa_call((struct ffa_value){.func = FFA_RUN_32,
+					   ffa_vm_vcpu(vm_id, vcpu_idx)});
 }
 
 /**
  * Hints that the vCPU is willing to yield its current use of the physical CPU.
- * This call always returns SPCI_SUCCESS.
+ * This call always returns FFA_SUCCESS.
  */
-static inline struct spci_value spci_yield(void)
+static inline struct ffa_value ffa_yield(void)
 {
-	return spci_call((struct spci_value){.func = SPCI_YIELD_32});
+	return ffa_call((struct ffa_value){.func = FFA_YIELD_32});
 }
 
 /**
@@ -83,24 +83,23 @@ static inline struct spci_value spci_yield(void)
  * shared.
  *
  * Returns:
- *  - SPCI_ERROR SPCI_INVALID_PARAMETERS if the given addresses are not properly
+ *  - FFA_ERROR FFA_INVALID_PARAMETERS if the given addresses are not properly
  *    aligned or are the same.
- *  - SPCI_ERROR SPCI_NO_MEMORY if the hypervisor was unable to map the buffers
+ *  - FFA_ERROR FFA_NO_MEMORY if the hypervisor was unable to map the buffers
  *    due to insuffient page table memory.
- *  - SPCI_ERROR SPCI_DENIED if the pages are already mapped or are not owned by
+ *  - FFA_ERROR FFA_DENIED if the pages are already mapped or are not owned by
  *    the caller.
- *  - SPCI_SUCCESS on success if no further action is needed.
- *  - SPCI_RX_RELEASE if it was called by the primary VM and the primary VM now
+ *  - FFA_SUCCESS on success if no further action is needed.
+ *  - FFA_RX_RELEASE if it was called by the primary VM and the primary VM now
  *    needs to wake up or kick waiters.
  */
-static inline struct spci_value spci_rxtx_map(hf_ipaddr_t send,
-					      hf_ipaddr_t recv)
+static inline struct ffa_value ffa_rxtx_map(hf_ipaddr_t send, hf_ipaddr_t recv)
 {
-	return spci_call(
-		(struct spci_value){.func = SPCI_RXTX_MAP_64,
-				    .arg1 = send,
-				    .arg2 = recv,
-				    .arg3 = HF_MAILBOX_SIZE / SPCI_PAGE_SIZE});
+	return ffa_call(
+		(struct ffa_value){.func = FFA_RXTX_MAP_64,
+				   .arg1 = send,
+				   .arg2 = recv,
+				   .arg3 = HF_MAILBOX_SIZE / FFA_PAGE_SIZE});
 }
 
 /**
@@ -110,71 +109,70 @@ static inline struct spci_value spci_rxtx_map(hf_ipaddr_t send,
  * caller to be notified when the recipient's receive buffer becomes available.
  *
  * Attributes may include:
- *  - SPCI_MSG_SEND_NOTIFY, to notify the caller when it should try again.
- *  - SPCI_MSG_SEND_LEGACY_MEMORY_*, to send a legacy architected memory sharing
+ *  - FFA_MSG_SEND_NOTIFY, to notify the caller when it should try again.
+ *  - FFA_MSG_SEND_LEGACY_MEMORY_*, to send a legacy architected memory sharing
  *    message.
  *
- * Returns SPCI_SUCCESS if the message is sent, or an error code otherwise:
+ * Returns FFA_SUCCESS if the message is sent, or an error code otherwise:
  *  - INVALID_PARAMETERS: one or more of the parameters do not conform.
  *  - BUSY: the message could not be delivered either because the mailbox
  *    was full or the target VM is not yet set up.
  */
-static inline struct spci_value spci_msg_send(spci_vm_id_t sender_vm_id,
-					      spci_vm_id_t target_vm_id,
-					      uint32_t size,
-					      uint32_t attributes)
+static inline struct ffa_value ffa_msg_send(ffa_vm_id_t sender_vm_id,
+					    ffa_vm_id_t target_vm_id,
+					    uint32_t size, uint32_t attributes)
 {
-	return spci_call((struct spci_value){
-		.func = SPCI_MSG_SEND_32,
+	return ffa_call((struct ffa_value){
+		.func = FFA_MSG_SEND_32,
 		.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id,
 		.arg3 = size,
 		.arg4 = attributes});
 }
 
-static inline struct spci_value spci_mem_donate(uint32_t length,
-						uint32_t fragment_length)
-{
-	return spci_call((struct spci_value){.func = SPCI_MEM_DONATE_32,
-					     .arg1 = length,
-					     .arg2 = fragment_length});
-}
-
-static inline struct spci_value spci_mem_lend(uint32_t length,
+static inline struct ffa_value ffa_mem_donate(uint32_t length,
 					      uint32_t fragment_length)
 {
-	return spci_call((struct spci_value){.func = SPCI_MEM_LEND_32,
-					     .arg1 = length,
-					     .arg2 = fragment_length});
+	return ffa_call((struct ffa_value){.func = FFA_MEM_DONATE_32,
+					   .arg1 = length,
+					   .arg2 = fragment_length});
 }
 
-static inline struct spci_value spci_mem_share(uint32_t length,
-					       uint32_t fragment_length)
+static inline struct ffa_value ffa_mem_lend(uint32_t length,
+					    uint32_t fragment_length)
 {
-	return spci_call((struct spci_value){.func = SPCI_MEM_SHARE_32,
-					     .arg1 = length,
-					     .arg2 = fragment_length});
+	return ffa_call((struct ffa_value){.func = FFA_MEM_LEND_32,
+					   .arg1 = length,
+					   .arg2 = fragment_length});
 }
 
-static inline struct spci_value spci_mem_retrieve_req(uint32_t length,
-						      uint32_t fragment_length)
+static inline struct ffa_value ffa_mem_share(uint32_t length,
+					     uint32_t fragment_length)
 {
-	return spci_call((struct spci_value){.func = SPCI_MEM_RETRIEVE_REQ_32,
-					     .arg1 = length,
-					     .arg2 = fragment_length});
+	return ffa_call((struct ffa_value){.func = FFA_MEM_SHARE_32,
+					   .arg1 = length,
+					   .arg2 = fragment_length});
 }
 
-static inline struct spci_value spci_mem_relinquish(void)
+static inline struct ffa_value ffa_mem_retrieve_req(uint32_t length,
+						    uint32_t fragment_length)
 {
-	return spci_call((struct spci_value){.func = SPCI_MEM_RELINQUISH_32});
+	return ffa_call((struct ffa_value){.func = FFA_MEM_RETRIEVE_REQ_32,
+					   .arg1 = length,
+					   .arg2 = fragment_length});
 }
 
-static inline struct spci_value spci_mem_reclaim(
-	spci_memory_handle_t handle, spci_memory_region_flags_t flags)
+static inline struct ffa_value ffa_mem_relinquish(void)
 {
-	return spci_call((struct spci_value){.func = SPCI_MEM_RECLAIM_32,
-					     .arg1 = (uint32_t)handle,
-					     .arg2 = (uint32_t)(handle >> 32),
-					     .arg3 = flags});
+	return ffa_call((struct ffa_value){.func = FFA_MEM_RELINQUISH_32});
+}
+
+static inline struct ffa_value ffa_mem_reclaim(ffa_memory_handle_t handle,
+					       ffa_memory_region_flags_t flags)
+{
+	return ffa_call((struct ffa_value){.func = FFA_MEM_RECLAIM_32,
+					   .arg1 = (uint32_t)handle,
+					   .arg2 = (uint32_t)(handle >> 32),
+					   .arg3 = flags});
 }
 
 /**
@@ -190,13 +188,13 @@ static inline struct spci_value spci_mem_reclaim(
  * that a message becoming available is also treated like a wake-up event.
  *
  * Returns:
- *  - SPCI_MSG_SEND if a message is successfully received.
- *  - SPCI_ERROR SPCI_NOT_SUPPORTED if called from the primary VM.
- *  - SPCI_ERROR SPCI_INTERRUPTED if an interrupt happened during the call.
+ *  - FFA_MSG_SEND if a message is successfully received.
+ *  - FFA_ERROR FFA_NOT_SUPPORTED if called from the primary VM.
+ *  - FFA_ERROR FFA_INTERRUPTED if an interrupt happened during the call.
  */
-static inline struct spci_value spci_msg_wait(void)
+static inline struct ffa_value ffa_msg_wait(void)
 {
-	return spci_call((struct spci_value){.func = SPCI_MSG_WAIT_32});
+	return ffa_call((struct ffa_value){.func = FFA_MSG_WAIT_32});
 }
 
 /**
@@ -206,14 +204,14 @@ static inline struct spci_value spci_msg_wait(void)
  * The mailbox must be cleared before a new message can be received.
  *
  * Returns:
- *  - SPCI_MSG_SEND if a message is successfully received.
- *  - SPCI_ERROR SPCI_NOT_SUPPORTED if called from the primary VM.
- *  - SPCI_ERROR SPCI_INTERRUPTED if an interrupt happened during the call.
- *  - SPCI_ERROR SPCI_RETRY if there was no pending message.
+ *  - FFA_MSG_SEND if a message is successfully received.
+ *  - FFA_ERROR FFA_NOT_SUPPORTED if called from the primary VM.
+ *  - FFA_ERROR FFA_INTERRUPTED if an interrupt happened during the call.
+ *  - FFA_ERROR FFA_RETRY if there was no pending message.
  */
-static inline struct spci_value spci_msg_poll(void)
+static inline struct ffa_value ffa_msg_poll(void)
 {
-	return spci_call((struct spci_value){.func = SPCI_MSG_POLL_32});
+	return ffa_call((struct ffa_value){.func = FFA_MSG_POLL_32});
 }
 
 /**
@@ -222,15 +220,15 @@ static inline struct spci_value spci_msg_poll(void)
  * will overwrite the old and will arrive asynchronously.
  *
  * Returns:
- *  - SPCI_ERROR SPCI_DENIED on failure, if the mailbox hasn't been read.
- *  - SPCI_SUCCESS on success if no further action is needed.
- *  - SPCI_RX_RELEASE if it was called by the primary VM and the primary VM now
+ *  - FFA_ERROR FFA_DENIED on failure, if the mailbox hasn't been read.
+ *  - FFA_SUCCESS on success if no further action is needed.
+ *  - FFA_RX_RELEASE if it was called by the primary VM and the primary VM now
  *    needs to wake up or kick waiters. Waiters should be retrieved by calling
  *    hf_mailbox_waiter_get.
  */
-static inline struct spci_value spci_rx_release(void)
+static inline struct ffa_value ffa_rx_release(void)
 {
-	return spci_call((struct spci_value){.func = SPCI_RX_RELEASE_32});
+	return ffa_call((struct ffa_value){.func = FFA_RX_RELEASE_32});
 }
 
 /**
@@ -256,7 +254,7 @@ static inline int64_t hf_mailbox_writable_get(void)
  * Returns -1 on failure or if there are no waiters; the VM id of the next
  * waiter otherwise.
  */
-static inline int64_t hf_mailbox_waiter_get(spci_vm_id_t vm_id)
+static inline int64_t hf_mailbox_waiter_get(ffa_vm_id_t vm_id)
 {
 	return hf_call(HF_MAILBOX_WAITER_GET, vm_id, 0, 0);
 }
@@ -294,8 +292,8 @@ static inline uint32_t hf_interrupt_get(void)
  *  - 1 if it was called by the primary VM and the primary VM now needs to wake
  *    up or kick the target vCPU.
  */
-static inline int64_t hf_interrupt_inject(spci_vm_id_t target_vm_id,
-					  spci_vcpu_index_t target_vcpu_idx,
+static inline int64_t hf_interrupt_inject(ffa_vm_id_t target_vm_id,
+					  ffa_vcpu_index_t target_vcpu_idx,
 					  uint32_t intid)
 {
 	return hf_call(HF_INTERRUPT_INJECT, target_vm_id, target_vcpu_idx,
@@ -312,26 +310,26 @@ static inline int64_t hf_debug_log(char c)
 	return hf_call(HF_DEBUG_LOG, c, 0, 0);
 }
 
-/** Obtains the Hafnium's version of the implemented SPCI specification. */
-static inline int32_t spci_version(uint32_t requested_version)
+/** Obtains the Hafnium's version of the implemented FF-A specification. */
+static inline int32_t ffa_version(uint32_t requested_version)
 {
-	return spci_call((struct spci_value){.func = SPCI_VERSION_32,
-					     .arg1 = requested_version})
+	return ffa_call((struct ffa_value){.func = FFA_VERSION_32,
+					   .arg1 = requested_version})
 		.func;
 }
 
 /**
  * Discovery function returning information about the implementation of optional
- * SPCI interfaces.
+ * FF-A interfaces.
  *
  * Returns:
- *  - SPCI_SUCCESS in .func if the optional interface with function_id is
+ *  - FFA_SUCCESS in .func if the optional interface with function_id is
  * implemented.
- *  - SPCI_ERROR in .func if the optional interface with function_id is not
+ *  - FFA_ERROR in .func if the optional interface with function_id is not
  * implemented.
  */
-static inline struct spci_value spci_features(uint32_t function_id)
+static inline struct ffa_value ffa_features(uint32_t function_id)
 {
-	return spci_call((struct spci_value){.func = SPCI_FEATURES_32,
-					     .arg1 = function_id});
+	return ffa_call((struct ffa_value){.func = FFA_FEATURES_32,
+					   .arg1 = function_id});
 }

@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
-struct spci_value mailbox_receive_retry(void);
+struct ffa_value mailbox_receive_retry(void);

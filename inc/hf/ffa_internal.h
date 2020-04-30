@@ -18,15 +18,15 @@
 
 #include <stdint.h>
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
-#define SPCI_VERSION_MAJOR 0x1
-#define SPCI_VERSION_MINOR 0x0
+#define FFA_VERSION_MAJOR 0x1
+#define FFA_VERSION_MINOR 0x0
 
-#define SPCI_VERSION_MAJOR_OFFSET 16
-#define SPCI_VERSION_RESERVED_BIT UINT32_C(1U << 31)
+#define FFA_VERSION_MAJOR_OFFSET 16
+#define FFA_VERSION_RESERVED_BIT UINT32_C(1U << 31)
 
-static inline struct spci_value spci_error(uint64_t error_code)
+static inline struct ffa_value ffa_error(uint64_t error_code)
 {
-	return (struct spci_value){.func = SPCI_ERROR_32, .arg2 = error_code};
+	return (struct ffa_value){.func = FFA_ERROR_32, .arg2 = error_code};
 }

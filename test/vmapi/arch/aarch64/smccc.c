@@ -17,14 +17,14 @@
 #include <stdint.h>
 
 #include "vmapi/hf/call.h"
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 #include "smc.h"
 #include "test/hftest.h"
 
-static struct spci_value hvc(uint32_t func, uint64_t arg0, uint64_t arg1,
-			     uint64_t arg2, uint64_t arg3, uint64_t arg4,
-			     uint64_t arg5, uint32_t caller_id)
+static struct ffa_value hvc(uint32_t func, uint64_t arg0, uint64_t arg1,
+			    uint64_t arg2, uint64_t arg3, uint64_t arg4,
+			    uint64_t arg5, uint32_t caller_id)
 {
 	register uint64_t r0 __asm__("x0") = func;
 	register uint64_t r1 __asm__("x1") = arg0;
@@ -41,19 +41,19 @@ static struct spci_value hvc(uint32_t func, uint64_t arg0, uint64_t arg1,
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3), "+r"(r4), "+r"(r5),
 		"+r"(r6), "+r"(r7));
 
-	return (struct spci_value){.func = r0,
-				   .arg1 = r1,
-				   .arg2 = r2,
-				   .arg3 = r3,
-				   .arg4 = r4,
-				   .arg5 = r5,
-				   .arg6 = r6,
-				   .arg7 = r7};
+	return (struct ffa_value){.func = r0,
+				  .arg1 = r1,
+				  .arg2 = r2,
+				  .arg3 = r3,
+				  .arg4 = r4,
+				  .arg5 = r5,
+				  .arg6 = r6,
+				  .arg7 = r7};
 }
 
 TEST(smccc, hf_debug_log_smc_zero_or_unchanged)
 {
-	struct spci_value smc_res =
+	struct ffa_value smc_res =
 		smc_forward(HF_DEBUG_LOG, '\n', 0x2222222222222222,
 			    0x3333333333333333, 0x4444444444444444,
 			    0x5555555555555555, 0x6666666666666666, 0x77777777);
@@ -70,7 +70,7 @@ TEST(smccc, hf_debug_log_smc_zero_or_unchanged)
 
 TEST(smccc, hf_debug_log_hvc_zero_or_unchanged)
 {
-	struct spci_value smc_res =
+	struct ffa_value smc_res =
 		hvc(HF_DEBUG_LOG, '\n', 0x2222222222222222, 0x3333333333333333,
 		    0x4444444444444444, 0x5555555555555555, 0x6666666666666666,
 		    0x77777777);
@@ -86,15 +86,15 @@ TEST(smccc, hf_debug_log_hvc_zero_or_unchanged)
 }
 
 /**
- * Checks that calling SPCI_FEATURES via an SMC works as expected.
- * The spci_features helper function uses an HVC, but an SMC should also work.
+ * Checks that calling FFA_FEATURES via an SMC works as expected.
+ * The ffa_features helper function uses an HVC, but an SMC should also work.
  */
-TEST(smccc, spci_features_smc)
+TEST(smccc, ffa_features_smc)
 {
-	struct spci_value ret;
+	struct ffa_value ret;
 
-	ret = smc32(SPCI_FEATURES_32, SPCI_VERSION_32, 0, 0, 0, 0, 0, 0);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = smc32(FFA_FEATURES_32, FFA_VERSION_32, 0, 0, 0, 0, 0, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	EXPECT_EQ(ret.arg1, 0);
 	EXPECT_EQ(ret.arg2, 0);
 	EXPECT_EQ(ret.arg3, 0);

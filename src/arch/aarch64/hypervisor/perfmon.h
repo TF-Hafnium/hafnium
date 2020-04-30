@@ -20,7 +20,7 @@
 
 #include "hf/cpu.h"
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 /**
  * Set to disable cycle counting when event counting is prohibited.
@@ -74,7 +74,7 @@
 
 bool perfmon_is_register_access(uintreg_t esr_el2);
 
-bool perfmon_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
+bool perfmon_process_access(struct vcpu *vcpu, ffa_vm_id_t vm_id,
 			    uintreg_t esr_el2);
 
-uintreg_t perfmon_get_pmccfiltr_el0_init_value(spci_vm_id_t vm_id);
+uintreg_t perfmon_get_pmccfiltr_el0_init_value(ffa_vm_id_t vm_id);

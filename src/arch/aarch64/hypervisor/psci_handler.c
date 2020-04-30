@@ -24,8 +24,8 @@
 #include "hf/api.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
+#include "hf/ffa.h"
 #include "hf/panic.h"
-#include "hf/spci.h"
 #include "hf/vm.h"
 
 #include "psci.h"
@@ -38,7 +38,7 @@ void cpu_entry(struct cpu *c);
 /* Performs arch specific boot time initialisation. */
 void arch_one_time_init(void)
 {
-	struct spci_value smc_res =
+	struct ffa_value smc_res =
 		smc32(PSCI_VERSION, 0, 0, 0, 0, 0, 0, SMCCC_CALLER_HYPERVISOR);
 
 	el3_psci_version = smc_res.func;
@@ -73,7 +73,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 			     uintreg_t arg1, uintreg_t arg2, uintreg_t *ret)
 {
 	struct cpu *c;
-	struct spci_value smc_res;
+	struct ffa_value smc_res;
 
 	/*
 	 * If there's a problem with the EL3 PSCI, block standard secure service
@@ -242,7 +242,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
  * Convert a PSCI CPU / affinity ID for a secondary VM to the corresponding vCPU
  * index.
  */
-spci_vcpu_index_t vcpu_id_to_index(cpu_id_t vcpu_id)
+ffa_vcpu_index_t vcpu_id_to_index(cpu_id_t vcpu_id)
 {
 	/* For now we use indices as IDs for the purposes of PSCI. */
 	return vcpu_id;
@@ -297,7 +297,7 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		uint32_t lowest_affinity_level = arg1;
 		struct vm *vm = vcpu->vm;
 		struct vcpu_locked target_vcpu;
-		spci_vcpu_index_t target_vcpu_index =
+		ffa_vcpu_index_t target_vcpu_index =
 			vcpu_id_to_index(target_affinity);
 
 		if (lowest_affinity_level != 0) {
@@ -343,7 +343,7 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		cpu_id_t target_cpu = arg0;
 		ipaddr_t entry_point_address = ipa_init(arg1);
 		uint64_t context_id = arg2;
-		spci_vcpu_index_t target_vcpu_index =
+		ffa_vcpu_index_t target_vcpu_index =
 			vcpu_id_to_index(target_cpu);
 		struct vm *vm = vcpu->vm;
 		struct vcpu *target_vcpu;

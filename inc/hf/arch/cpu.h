@@ -25,7 +25,7 @@
 #include "hf/addr.h"
 #include "hf/vcpu.h"
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 /**
  * Reset the register values other than the PC and argument which are set with
@@ -48,7 +48,7 @@ void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg);
  * This function must only be called on an arch_regs that is known not be in use
  * by any other physical CPU.
  */
-void arch_regs_set_retval(struct arch_regs *r, struct spci_value v);
+void arch_regs_set_retval(struct arch_regs *r, struct ffa_value v);
 
 /**
  * Initialize and reset CPU-wide register values.

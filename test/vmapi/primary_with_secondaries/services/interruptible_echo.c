@@ -38,23 +38,23 @@ TEST_SERVICE(interruptible_echo)
 	arch_irq_enable();
 
 	for (;;) {
-		struct spci_value res = spci_msg_wait();
+		struct ffa_value res = ffa_msg_wait();
 		void *message = SERVICE_SEND_BUFFER();
 		void *recv_message = SERVICE_RECV_BUFFER();
 
 		/* Retry if interrupted but made visible with the yield. */
-		while (res.func == SPCI_ERROR_32 &&
-		       res.arg2 == SPCI_INTERRUPTED) {
-			spci_yield();
-			res = spci_msg_wait();
+		while (res.func == FFA_ERROR_32 &&
+		       res.arg2 == FFA_INTERRUPTED) {
+			ffa_yield();
+			res = ffa_msg_wait();
 		}
 
-		ASSERT_EQ(res.func, SPCI_MSG_SEND_32);
-		memcpy_s(message, SPCI_MSG_PAYLOAD_MAX, recv_message,
-			 spci_msg_send_size(res));
+		ASSERT_EQ(res.func, FFA_MSG_SEND_32);
+		memcpy_s(message, FFA_MSG_PAYLOAD_MAX, recv_message,
+			 ffa_msg_send_size(res));
 
-		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-		spci_msg_send(SERVICE_VM1, HF_PRIMARY_VM_ID,
-			      spci_msg_send_size(res), 0);
+		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+		ffa_msg_send(SERVICE_VM1, HF_PRIMARY_VM_ID,
+			     ffa_msg_send_size(res), 0);
 	}
 }

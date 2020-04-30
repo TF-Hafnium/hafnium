@@ -36,7 +36,7 @@
 bool arch_cpu_start(uintptr_t id, struct arch_cpu_start_state *state)
 {
 	void vm_cpu_entry(uintptr_t arg);
-	struct spci_value smc_res;
+	struct ffa_value smc_res;
 
 	/* Try to start the CPU. */
 	smc_res = smc64(PSCI_CPU_ON, id, (uintptr_t)&vm_cpu_entry,
@@ -69,7 +69,7 @@ static_assert(POWER_STATUS_ON_PENDING == PSCI_RETURN_ON_PENDING,
 enum power_status arch_cpu_status(cpu_id_t cpu_id)
 {
 	uint32_t lowest_affinity_level = 0;
-	struct spci_value smc_res;
+	struct ffa_value smc_res;
 
 	/*
 	 * This works because the power_status enum values happen to be the same

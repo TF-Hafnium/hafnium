@@ -17,7 +17,7 @@
 #include "hf/arch/irq.h"
 #include "hf/arch/vm/interrupts.h"
 
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
@@ -55,20 +55,19 @@ TEST_SERVICE(echo_with_notification)
 	for (;;) {
 		void *send_buf = SERVICE_SEND_BUFFER();
 		void *recv_buf = SERVICE_RECV_BUFFER();
-		struct spci_value ret = spci_msg_wait();
-		spci_vm_id_t target_vm_id = spci_msg_send_receiver(ret);
-		spci_vm_id_t source_vm_id = spci_msg_send_sender(ret);
+		struct ffa_value ret = ffa_msg_wait();
+		ffa_vm_id_t target_vm_id = ffa_msg_send_receiver(ret);
+		ffa_vm_id_t source_vm_id = ffa_msg_send_sender(ret);
 
-		memcpy_s(send_buf, SPCI_MSG_PAYLOAD_MAX, recv_buf,
-			 spci_msg_send_size(ret));
+		memcpy_s(send_buf, FFA_MSG_PAYLOAD_MAX, recv_buf,
+			 ffa_msg_send_size(ret));
 
-		while (spci_msg_send(target_vm_id, source_vm_id,
-				     spci_msg_send_size(ret),
-				     SPCI_MSG_SEND_NOTIFY)
-			       .func != SPCI_SUCCESS_32) {
+		while (ffa_msg_send(target_vm_id, source_vm_id,
+				    ffa_msg_send_size(ret), FFA_MSG_SEND_NOTIFY)
+			       .func != FFA_SUCCESS_32) {
 			wait_for_vm(source_vm_id);
 		}
 
-		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	}
 }

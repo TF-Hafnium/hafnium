@@ -19,17 +19,17 @@
 #include "../../src/arch/aarch64/sysregs.h"
 #include "primary_with_secondary.h"
 #include "sysregs.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
 TEST(perfmon, secondary_basic)
 {
-	struct spci_value run_res;
+	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM1, "perfmon_secondary_basic", mb.send);
 
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }
 
 /**

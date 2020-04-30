@@ -205,7 +205,7 @@ source_set("wfi") {
 }
 
 # Service to receive messages in a secondary VM and ensure that the header fields are correctly set.
-source_set("spci_check") {
+source_set("ffa_check") {
   testonly = true
   public_configs = [
     "..:config",
@@ -216,7 +216,7 @@ source_set("spci_check") {
   ]
 
   sources = [
-    "spci_check.c",
+    "ffa_check.c",
   ]
 }
 
@@ -231,13 +231,13 @@ vm_kernel("service_vm1") {
     ":debug_el1",
     ":echo",
     ":echo_with_notification",
+    ":ffa_check",
     ":floating_point",
     ":interruptible",
     ":memory",
     ":perfmon",
     ":receive_block",
     ":relay",
-    ":spci_check",
     ":unmapped",
     ":wfi",
     "//test/hftest:hftest_secondary_vm",

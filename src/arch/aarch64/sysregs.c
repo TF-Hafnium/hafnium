@@ -35,7 +35,7 @@ static bool has_ras_support(void)
  * Returns the value for HCR_EL2 for the particular VM.
  * For now, the primary VM has one value and all secondary VMs share a value.
  */
-uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id)
+uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id)
 {
 	uintreg_t hcr_el2_value = 0;
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "hf/spci.h"
+#include "hf/ffa.h"
 
 #include <stddef.h>
 
@@ -29,23 +29,23 @@
 #endif
 
 /**
- * Initialises the given `spci_memory_region` and copies the constituent
+ * Initialises the given `ffa_memory_region` and copies the constituent
  * information to it. Returns the length in bytes occupied by the data copied to
  * `memory_region` (attributes, constituents and memory region header size).
  */
-static uint32_t spci_memory_region_init_internal(
-	struct spci_memory_region *memory_region, spci_vm_id_t sender,
-	spci_memory_attributes_t attributes, spci_memory_region_flags_t flags,
-	spci_memory_handle_t handle, uint32_t tag, spci_vm_id_t receiver,
-	spci_memory_access_permissions_t permissions,
-	const struct spci_memory_region_constituent constituents[],
+static uint32_t ffa_memory_region_init_internal(
+	struct ffa_memory_region *memory_region, ffa_vm_id_t sender,
+	ffa_memory_attributes_t attributes, ffa_memory_region_flags_t flags,
+	ffa_memory_handle_t handle, uint32_t tag, ffa_vm_id_t receiver,
+	ffa_memory_access_permissions_t permissions,
+	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count)
 {
-	struct spci_composite_memory_region *composite_memory_region;
+	struct ffa_composite_memory_region *composite_memory_region;
 	uint32_t index;
 	uint32_t constituents_length =
 		constituent_count *
-		sizeof(struct spci_memory_region_constituent);
+		sizeof(struct ffa_memory_region_constituent);
 
 	memory_region->sender = sender;
 	memory_region->attributes = attributes;
@@ -60,20 +60,20 @@ static uint32_t spci_memory_region_init_internal(
 		permissions;
 	memory_region->receivers[0].receiver_permissions.flags = 0;
 	/*
-	 * Note that `sizeof(struct_spci_memory_region)` and `sizeof(struct
-	 * spci_memory_access)` must both be multiples of 16 (as verified by the
-	 * asserts in `spci_memory.c`, so it is guaranteed that the offset we
+	 * Note that `sizeof(struct_ffa_memory_region)` and `sizeof(struct
+	 * ffa_memory_access)` must both be multiples of 16 (as verified by the
+	 * asserts in `ffa_memory.c`, so it is guaranteed that the offset we
 	 * calculate here is aligned to a 64-bit boundary and so 64-bit values
 	 * can be copied without alignment faults.
 	 */
 	memory_region->receivers[0].composite_memory_region_offset =
-		sizeof(struct spci_memory_region) +
+		sizeof(struct ffa_memory_region) +
 		memory_region->receiver_count *
-			sizeof(struct spci_memory_access);
+			sizeof(struct ffa_memory_access);
 	memory_region->receivers[0].reserved_0 = 0;
 
 	composite_memory_region =
-		spci_memory_region_get_composite(memory_region, 0);
+		ffa_memory_region_get_composite(memory_region, 0);
 
 	composite_memory_region->page_count = 0;
 	composite_memory_region->constituent_count = constituent_count;
@@ -88,65 +88,64 @@ static uint32_t spci_memory_region_init_internal(
 
 	/*
 	 * TODO: Add assert ensuring that the specified message
-	 * length is not greater than SPCI_MSG_PAYLOAD_MAX.
+	 * length is not greater than FFA_MSG_PAYLOAD_MAX.
 	 */
 
 	return memory_region->receivers[0].composite_memory_region_offset +
-	       sizeof(struct spci_composite_memory_region) +
-	       constituents_length;
+	       sizeof(struct ffa_composite_memory_region) + constituents_length;
 }
 
 /**
- * Initialises the given `spci_memory_region` and copies the constituent
+ * Initialises the given `ffa_memory_region` and copies the constituent
  * information to it. Returns the length in bytes occupied by the data copied to
  * `memory_region` (attributes, constituents and memory region header size).
  */
-uint32_t spci_memory_region_init(
-	struct spci_memory_region *memory_region, spci_vm_id_t sender,
-	spci_vm_id_t receiver,
-	const struct spci_memory_region_constituent constituents[],
+uint32_t ffa_memory_region_init(
+	struct ffa_memory_region *memory_region, ffa_vm_id_t sender,
+	ffa_vm_id_t receiver,
+	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
-	spci_memory_region_flags_t flags, enum spci_data_access data_access,
-	enum spci_instruction_access instruction_access,
-	enum spci_memory_type type, enum spci_memory_cacheability cacheability,
-	enum spci_memory_shareability shareability)
+	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
+	enum ffa_instruction_access instruction_access,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability)
 {
-	spci_memory_access_permissions_t permissions = 0;
-	spci_memory_attributes_t attributes = 0;
+	ffa_memory_access_permissions_t permissions = 0;
+	ffa_memory_attributes_t attributes = 0;
 
 	/* Set memory region's permissions. */
-	spci_set_data_access_attr(&permissions, data_access);
-	spci_set_instruction_access_attr(&permissions, instruction_access);
+	ffa_set_data_access_attr(&permissions, data_access);
+	ffa_set_instruction_access_attr(&permissions, instruction_access);
 
 	/* Set memory region's page attributes. */
-	spci_set_memory_type_attr(&attributes, type);
-	spci_set_memory_cacheability_attr(&attributes, cacheability);
-	spci_set_memory_shareability_attr(&attributes, shareability);
+	ffa_set_memory_type_attr(&attributes, type);
+	ffa_set_memory_cacheability_attr(&attributes, cacheability);
+	ffa_set_memory_shareability_attr(&attributes, shareability);
 
-	return spci_memory_region_init_internal(
+	return ffa_memory_region_init_internal(
 		memory_region, sender, attributes, flags, 0, tag, receiver,
 		permissions, constituents, constituent_count);
 }
 
-uint32_t spci_memory_retrieve_request_init(
-	struct spci_memory_region *memory_region, spci_memory_handle_t handle,
-	spci_vm_id_t sender, spci_vm_id_t receiver, uint32_t tag,
-	spci_memory_region_flags_t flags, enum spci_data_access data_access,
-	enum spci_instruction_access instruction_access,
-	enum spci_memory_type type, enum spci_memory_cacheability cacheability,
-	enum spci_memory_shareability shareability)
+uint32_t ffa_memory_retrieve_request_init(
+	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
+	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t tag,
+	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
+	enum ffa_instruction_access instruction_access,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability)
 {
-	spci_memory_access_permissions_t permissions = 0;
-	spci_memory_attributes_t attributes = 0;
+	ffa_memory_access_permissions_t permissions = 0;
+	ffa_memory_attributes_t attributes = 0;
 
 	/* Set memory region's permissions. */
-	spci_set_data_access_attr(&permissions, data_access);
-	spci_set_instruction_access_attr(&permissions, instruction_access);
+	ffa_set_data_access_attr(&permissions, data_access);
+	ffa_set_instruction_access_attr(&permissions, instruction_access);
 
 	/* Set memory region's page attributes. */
-	spci_set_memory_type_attr(&attributes, type);
-	spci_set_memory_cacheability_attr(&attributes, cacheability);
-	spci_set_memory_shareability_attr(&attributes, shareability);
+	ffa_set_memory_type_attr(&attributes, type);
+	ffa_set_memory_cacheability_attr(&attributes, cacheability);
+	ffa_set_memory_shareability_attr(&attributes, shareability);
 
 	memory_region->sender = sender;
 	memory_region->attributes = attributes;
@@ -168,14 +167,13 @@ uint32_t spci_memory_retrieve_request_init(
 	memory_region->receivers[0].composite_memory_region_offset = 0;
 	memory_region->receivers[0].reserved_0 = 0;
 
-	return sizeof(struct spci_memory_region) +
-	       memory_region->receiver_count *
-		       sizeof(struct spci_memory_access);
+	return sizeof(struct ffa_memory_region) +
+	       memory_region->receiver_count * sizeof(struct ffa_memory_access);
 }
 
-uint32_t spci_memory_lender_retrieve_request_init(
-	struct spci_memory_region *memory_region, spci_memory_handle_t handle,
-	spci_vm_id_t sender)
+uint32_t ffa_memory_lender_retrieve_request_init(
+	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
+	ffa_vm_id_t sender)
 {
 	memory_region->sender = sender;
 	memory_region->attributes = 0;
@@ -186,19 +184,19 @@ uint32_t spci_memory_lender_retrieve_request_init(
 	memory_region->tag = 0;
 	memory_region->receiver_count = 0;
 
-	return sizeof(struct spci_memory_region);
+	return sizeof(struct ffa_memory_region);
 }
 
-uint32_t spci_retrieved_memory_region_init(
-	struct spci_memory_region *response, size_t response_max_size,
-	spci_vm_id_t sender, spci_memory_attributes_t attributes,
-	spci_memory_region_flags_t flags, spci_memory_handle_t handle,
-	spci_vm_id_t receiver, spci_memory_access_permissions_t permissions,
-	const struct spci_memory_region_constituent constituents[],
+uint32_t ffa_retrieved_memory_region_init(
+	struct ffa_memory_region *response, size_t response_max_size,
+	ffa_vm_id_t sender, ffa_memory_attributes_t attributes,
+	ffa_memory_region_flags_t flags, ffa_memory_handle_t handle,
+	ffa_vm_id_t receiver, ffa_memory_access_permissions_t permissions,
+	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count)
 {
 	/* TODO: Check against response_max_size first. */
-	return spci_memory_region_init_internal(
+	return ffa_memory_region_init_internal(
 		response, sender, attributes, flags, handle, 0, receiver,
 		permissions, constituents, constituent_count);
 }

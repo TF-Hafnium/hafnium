@@ -24,14 +24,14 @@
  * Try to receive a message from the mailbox, blocking if necessary, and
  * retrying if interrupted.
  */
-struct spci_value mailbox_receive_retry(void)
+struct ffa_value mailbox_receive_retry(void)
 {
-	struct spci_value received;
+	struct ffa_value received;
 
 	do {
-		received = spci_msg_wait();
-	} while (received.func == SPCI_ERROR_32 &&
-		 received.arg2 == SPCI_INTERRUPTED);
+		received = ffa_msg_wait();
+	} while (received.func == FFA_ERROR_32 &&
+		 received.arg2 == FFA_INTERRUPTED);
 
 	return received;
 }

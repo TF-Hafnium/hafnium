@@ -18,7 +18,7 @@
 
 #include <stdint.h>
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 /* clang-format off */
 
@@ -49,14 +49,14 @@
 
 /* clang-format on */
 
-struct spci_value smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
-			uint32_t arg2, uint32_t arg3, uint32_t arg4,
-			uint32_t arg5, uint32_t caller_id);
+struct ffa_value smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
+		       uint32_t arg2, uint32_t arg3, uint32_t arg4,
+		       uint32_t arg5, uint32_t caller_id);
 
-struct spci_value smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
-			uint64_t arg2, uint64_t arg3, uint64_t arg4,
-			uint64_t arg5, uint32_t caller_id);
+struct ffa_value smc64(uint32_t func, uint64_t arg0, uint64_t arg1,
+		       uint64_t arg2, uint64_t arg3, uint64_t arg4,
+		       uint64_t arg5, uint32_t caller_id);
 
-struct spci_value smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
-			      uint64_t arg2, uint64_t arg3, uint64_t arg4,
-			      uint64_t arg5, uint32_t caller_id);
+struct ffa_value smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
+			     uint64_t arg2, uint64_t arg3, uint64_t arg4,
+			     uint64_t arg5, uint32_t caller_id);

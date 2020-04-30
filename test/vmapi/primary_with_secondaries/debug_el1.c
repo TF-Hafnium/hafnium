@@ -16,7 +16,7 @@
 
 #include "primary_with_secondary.h"
 #include "sysregs.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
 /**
  * QEMU does not properly handle the trapping of certain system register
@@ -27,13 +27,13 @@
 
 TEST(debug_el1, secondary_basic)
 {
-	struct spci_value run_res;
+	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM1, "debug_el1_secondary_basic", mb.send);
 
-	run_res = spci_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, SPCI_YIELD_32);
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }
 
 /**

@@ -23,7 +23,7 @@
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
 /*
  * TODO: Some of these tests are duplicated between 'primary_only' and
@@ -69,7 +69,7 @@ TEST(hf_vcpu_get_count, no_secondary_vms)
  */
 TEST(hf_vcpu_get_count, reserved_vm_id)
 {
-	spci_vm_id_t id;
+	ffa_vm_id_t id;
 
 	for (id = 0; id < HF_VM_ID_OFFSET; ++id) {
 		EXPECT_EQ(hf_vcpu_get_count(id), 0);
@@ -88,27 +88,27 @@ TEST(hf_vcpu_get_count, large_invalid_vm_id)
 /**
  * Confirm it is an error when running a vCPU from the primary VM.
  */
-TEST(spci_run, cannot_run_primary)
+TEST(ffa_run, cannot_run_primary)
 {
-	struct spci_value res = spci_run(HF_PRIMARY_VM_ID, 0);
-	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
+	struct ffa_value res = ffa_run(HF_PRIMARY_VM_ID, 0);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
 /**
  * Confirm it is an error when running a vCPU from a non-existent secondary VM.
  */
-TEST(spci_run, cannot_run_absent_secondary)
+TEST(ffa_run, cannot_run_absent_secondary)
 {
-	struct spci_value res = spci_run(1, 0);
-	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
+	struct ffa_value res = ffa_run(1, 0);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
 /**
  * Yielding from the primary is a noop.
  */
-TEST(spci_yield, yield_is_noop_for_primary)
+TEST(ffa_yield, yield_is_noop_for_primary)
 {
-	EXPECT_EQ(spci_yield().func, SPCI_SUCCESS_32);
+	EXPECT_EQ(ffa_yield().func, FFA_SUCCESS_32);
 }
 
 /**
@@ -198,8 +198,8 @@ TEST(cpus, stop)
 	dlog("Second CPU stopped.\n");
 }
 
-/** Ensures that the Hafnium SPCI version is reported as expected. */
-TEST(spci, spci_version)
+/** Ensures that the Hafnium FF-A version is reported as expected. */
+TEST(ffa, ffa_version)
 {
 	const int32_t major_revision = 1;
 	const int32_t major_revision_offset = 16;
@@ -207,119 +207,119 @@ TEST(spci, spci_version)
 	const int32_t current_version =
 		(major_revision << major_revision_offset) | minor_revision;
 
-	EXPECT_EQ(spci_version(current_version), current_version);
-	EXPECT_EQ(spci_version(0x0), current_version);
-	EXPECT_EQ(spci_version(0x1), current_version);
-	EXPECT_EQ(spci_version(0x10003), current_version);
-	EXPECT_EQ(spci_version(0xffff), current_version);
-	EXPECT_EQ(spci_version(0xfffffff), current_version);
+	EXPECT_EQ(ffa_version(current_version), current_version);
+	EXPECT_EQ(ffa_version(0x0), current_version);
+	EXPECT_EQ(ffa_version(0x1), current_version);
+	EXPECT_EQ(ffa_version(0x10003), current_version);
+	EXPECT_EQ(ffa_version(0xffff), current_version);
+	EXPECT_EQ(ffa_version(0xfffffff), current_version);
 }
 
-/** Ensures that an invalid call to SPCI_VERSION gets an error back. */
-TEST(spci, spci_version_invalid)
+/** Ensures that an invalid call to FFA_VERSION gets an error back. */
+TEST(ffa, ffa_version_invalid)
 {
-	int32_t ret = spci_version(0x80000000);
+	int32_t ret = ffa_version(0x80000000);
 
-	EXPECT_EQ(ret, SPCI_NOT_SUPPORTED);
+	EXPECT_EQ(ret, FFA_NOT_SUPPORTED);
 }
 
-/** Ensures that SPCI_FEATURES is reporting the expected interfaces. */
-TEST(spci, spci_features)
+/** Ensures that FFA_FEATURES is reporting the expected interfaces. */
+TEST(ffa, ffa_features)
 {
-	struct spci_value ret;
+	struct ffa_value ret;
 
-	ret = spci_features(SPCI_ERROR_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_ERROR_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_SUCCESS_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_SUCCESS_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_INTERRUPT_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_INTERRUPT_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_VERSION_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_VERSION_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_FEATURES_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_FEATURES_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_RX_RELEASE_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_RX_RELEASE_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_RXTX_MAP_64);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_RXTX_MAP_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_ID_GET_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_ID_GET_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MSG_POLL_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MSG_POLL_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MSG_WAIT_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MSG_WAIT_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_YIELD_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_YIELD_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_RUN_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_RUN_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MSG_SEND_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MSG_SEND_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MEM_DONATE_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MEM_DONATE_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MEM_LEND_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MEM_LEND_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MEM_SHARE_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MEM_SHARE_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MEM_RETRIEVE_REQ_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MEM_RETRIEVE_REQ_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MEM_RETRIEVE_RESP_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MEM_RETRIEVE_RESP_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MEM_RELINQUISH_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MEM_RELINQUISH_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = spci_features(SPCI_MEM_RECLAIM_32);
-	EXPECT_EQ(ret.func, SPCI_SUCCESS_32);
+	ret = ffa_features(FFA_MEM_RECLAIM_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
 /**
- * Ensures that SPCI_FEATURES returns not supported for a bogus FID or
+ * Ensures that FFA_FEATURES returns not supported for a bogus FID or
  * currently non-implemented interfaces.
  */
-TEST(spci, spci_features_not_supported)
+TEST(ffa, ffa_features_not_supported)
 {
-	struct spci_value ret;
+	struct ffa_value ret;
 
-	ret = spci_features(0);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
+	ret = ffa_features(0);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
-	ret = spci_features(0x84000000);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
+	ret = ffa_features(0x84000000);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
-	ret = spci_features(SPCI_RXTX_UNMAP_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
+	ret = ffa_features(FFA_RXTX_UNMAP_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
-	ret = spci_features(SPCI_PARTITION_INFO_GET_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
+	ret = ffa_features(FFA_PARTITION_INFO_GET_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
-	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
-	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
-	ret = spci_features(SPCI_MSG_SEND_DIRECT_REQ_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
-	ret = spci_features(SPCI_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_SPCI_ERROR(ret, SPCI_NOT_SUPPORTED);
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 }
 
 /**

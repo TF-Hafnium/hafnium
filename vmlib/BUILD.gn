@@ -16,6 +16,6 @@ import("//build/toolchain/platform.gni")
 
 source_set("vmlib") {
   sources = [
-    "spci.c",
+    "ffa.c",
   ]
 }

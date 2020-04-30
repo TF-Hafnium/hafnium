@@ -17,9 +17,9 @@
 #include <stdalign.h>
 #include <stdint.h>
 
+#include "hf/ffa.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
-#include "hf/spci.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
@@ -82,7 +82,7 @@ noreturn void kmain(size_t memory_size)
 	struct memiter args;
 	hftest_test_fn service;
 	struct hftest_context *ctx;
-	struct spci_value ret;
+	struct ffa_value ret;
 
 	/*
 	 * Initialize the stage-1 MMU and identity-map the entire address space.
@@ -98,14 +98,14 @@ noreturn void kmain(size_t memory_size)
 	/* Prepare the context. */
 
 	/* Set up the mailbox. */
-	spci_rxtx_map(send_addr, recv_addr);
+	ffa_rxtx_map(send_addr, recv_addr);
 
 	/* Receive the name of the service to run. */
-	ret = spci_msg_wait();
-	ASSERT_EQ(ret.func, SPCI_MSG_SEND_32);
-	memiter_init(&args, recv, spci_msg_send_size(ret));
+	ret = ffa_msg_wait();
+	ASSERT_EQ(ret.func, FFA_MSG_SEND_32);
+	memiter_init(&args, recv, ffa_msg_send_size(ret));
 	service = find_service(&args);
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/* Check the service was found. */
 	if (service == NULL) {
@@ -126,7 +126,7 @@ noreturn void kmain(size_t memory_size)
 	ctx->memory_size = memory_size;
 
 	/* Pause so the next time cycles are given the service will be run. */
-	spci_yield();
+	ffa_yield();
 
 	/* Let the service run. */
 	service();

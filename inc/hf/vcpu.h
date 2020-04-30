@@ -19,7 +19,7 @@
 #include "hf/addr.h"
 #include "hf/spinlock.h"
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 /** The number of bits in each element of the interrupt bitfields. */
 #define INTERRUPT_REGISTER_BITS 32
@@ -96,7 +96,7 @@ struct vcpu_locked vcpu_lock(struct vcpu *vcpu);
 void vcpu_unlock(struct vcpu_locked *locked);
 void vcpu_init(struct vcpu *vcpu, struct vm *vm);
 void vcpu_on(struct vcpu_locked vcpu, ipaddr_t entry, uintreg_t arg);
-spci_vcpu_index_t vcpu_index(const struct vcpu *vcpu);
+ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu);
 bool vcpu_is_off(struct vcpu_locked vcpu);
 bool vcpu_secondary_reset_and_start(struct vcpu *vcpu, ipaddr_t entry,
 				    uintreg_t arg);

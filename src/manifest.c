@@ -41,7 +41,7 @@ static_assert(VM_ID_MAX <= 99999, "Insufficient VM_NAME_BUF_SIZE");
 static_assert(HF_TEE_VM_ID > VM_ID_MAX,
 	      "TrustZone VM ID clashes with normal VM range.");
 
-static inline size_t count_digits(spci_vm_id_t vm_id)
+static inline size_t count_digits(ffa_vm_id_t vm_id)
 {
 	size_t digits = 0;
 
@@ -56,7 +56,7 @@ static inline size_t count_digits(spci_vm_id_t vm_id)
  * Generates a string with the two letters "vm" followed by an integer.
  * Assumes `buf` is of size VM_NAME_BUF_SIZE.
  */
-static void generate_vm_node_name(struct string *str, spci_vm_id_t vm_id)
+static void generate_vm_node_name(struct string *str, ffa_vm_id_t vm_id)
 {
 	static const char *digits = "0123456789";
 	size_t vm_id_digits = count_digits(vm_id);
@@ -216,7 +216,7 @@ static enum manifest_return_code uint32list_get_next(
 
 static enum manifest_return_code parse_vm(const struct fdt_node *node,
 					  struct manifest_vm *vm,
-					  spci_vm_id_t vm_id)
+					  ffa_vm_id_t vm_id)
 {
 	struct uint32list_iter smcs;
 	size_t idx;
@@ -280,11 +280,11 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	TRY(read_bool(&hyp_node, "spci_tee", &manifest->spci_tee_enabled));
+	TRY(read_bool(&hyp_node, "ffa_tee", &manifest->ffa_tee_enabled));
 
 	/* Iterate over reserved VM IDs and check no such nodes exist. */
 	for (i = 0; i < HF_VM_ID_OFFSET; i++) {
-		spci_vm_id_t vm_id = (spci_vm_id_t)i;
+		ffa_vm_id_t vm_id = (ffa_vm_id_t)i;
 		struct fdt_node vm_node = hyp_node;
 
 		generate_vm_node_name(&vm_name, vm_id);
@@ -295,7 +295,7 @@ enum manifest_return_code manifest_init(struct manifest *manifest,
 
 	/* Iterate over VM nodes until we find one that does not exist. */
 	for (i = 0; i <= MAX_VMS; ++i) {
-		spci_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
+		ffa_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
 		struct fdt_node vm_node = hyp_node;
 
 		generate_vm_node_name(&vm_name, vm_id);

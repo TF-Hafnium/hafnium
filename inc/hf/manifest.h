@@ -16,8 +16,8 @@
 
 #pragma once
 
+#include "hf/ffa.h"
 #include "hf/memiter.h"
-#include "hf/spci.h"
 #include "hf/string.h"
 #include "hf/vm.h"
 
@@ -41,7 +41,7 @@ struct manifest_vm {
 		/* Properties specific to secondary VMs. */
 		struct {
 			uint64_t mem_size;
-			spci_vcpu_count_t vcpu_count;
+			ffa_vcpu_count_t vcpu_count;
 		} secondary;
 	};
 };
@@ -50,8 +50,8 @@ struct manifest_vm {
  * Hafnium manifest parsed from FDT.
  */
 struct manifest {
-	bool spci_tee_enabled;
-	spci_vm_count_t vm_count;
+	bool ffa_tee_enabled;
+	ffa_vm_count_t vm_count;
 	struct manifest_vm vm[MAX_VMS];
 };
 

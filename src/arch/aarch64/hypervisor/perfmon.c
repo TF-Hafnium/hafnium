@@ -157,8 +157,7 @@ bool perfmon_is_register_access(uintreg_t esr)
  * Processes an access (msr, mrs) to a performance monitor register.
  * Returns true if the access was allowed and performed, false otherwise.
  */
-bool perfmon_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
-			    uintreg_t esr)
+bool perfmon_process_access(struct vcpu *vcpu, ffa_vm_id_t vm_id, uintreg_t esr)
 {
 	/*
 	 * For now, performance monitor registers are not supported by secondary
@@ -232,7 +231,7 @@ bool perfmon_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
 /**
  * Returns the value register PMCCFILTR_EL0 should have at initialization.
  */
-uintreg_t perfmon_get_pmccfiltr_el0_init_value(spci_vm_id_t vm_id)
+uintreg_t perfmon_get_pmccfiltr_el0_init_value(ffa_vm_id_t vm_id)
 {
 	if (vm_id != HF_PRIMARY_VM_ID) {
 		/* Disable cycle counting for secondary VMs. */

@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#include "hf/spci_memory.h"
+#include "hf/ffa_memory.h"
 
 #include "hf/arch/tee.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/ffa_internal.h"
 #include "hf/mpool.h"
-#include "hf/spci_internal.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -36,32 +36,32 @@
  */
 #define MAX_MEM_SHARES 100
 
-static_assert(sizeof(struct spci_memory_region_constituent) % 16 == 0,
-	      "struct spci_memory_region_constituent must be a multiple of 16 "
+static_assert(sizeof(struct ffa_memory_region_constituent) % 16 == 0,
+	      "struct ffa_memory_region_constituent must be a multiple of 16 "
 	      "bytes long.");
-static_assert(sizeof(struct spci_composite_memory_region) % 16 == 0,
-	      "struct spci_composite_memory_region must be a multiple of 16 "
+static_assert(sizeof(struct ffa_composite_memory_region) % 16 == 0,
+	      "struct ffa_composite_memory_region must be a multiple of 16 "
 	      "bytes long.");
-static_assert(sizeof(struct spci_memory_region_attributes) == 4,
-	      "struct spci_memory_region_attributes must be 4bytes long.");
-static_assert(sizeof(struct spci_memory_access) % 16 == 0,
-	      "struct spci_memory_access must be a multiple of 16 bytes long.");
-static_assert(sizeof(struct spci_memory_region) % 16 == 0,
-	      "struct spci_memory_region must be a multiple of 16 bytes long.");
-static_assert(sizeof(struct spci_mem_relinquish) % 16 == 0,
-	      "struct spci_mem_relinquish must be a multiple of 16 "
+static_assert(sizeof(struct ffa_memory_region_attributes) == 4,
+	      "struct ffa_memory_region_attributes must be 4bytes long.");
+static_assert(sizeof(struct ffa_memory_access) % 16 == 0,
+	      "struct ffa_memory_access must be a multiple of 16 bytes long.");
+static_assert(sizeof(struct ffa_memory_region) % 16 == 0,
+	      "struct ffa_memory_region must be a multiple of 16 bytes long.");
+static_assert(sizeof(struct ffa_mem_relinquish) % 16 == 0,
+	      "struct ffa_mem_relinquish must be a multiple of 16 "
 	      "bytes long.");
 
-struct spci_memory_share_state {
+struct ffa_memory_share_state {
 	/**
 	 * The memory region being shared, or NULL if this share state is
 	 * unallocated.
 	 */
-	struct spci_memory_region *memory_region;
+	struct ffa_memory_region *memory_region;
 
 	/**
-	 * The SPCI function used for sharing the memory. Must be one of
-	 * SPCI_MEM_DONATE_32, SPCI_MEM_LEND_32 or SPCI_MEM_SHARE_32 if the
+	 * The FF-A function used for sharing the memory. Must be one of
+	 * FFA_MEM_DONATE_32, FFA_MEM_LEND_32 or FFA_MEM_SHARE_32 if the
 	 * share state is allocated, or 0.
 	 */
 	uint32_t share_func;
@@ -79,24 +79,24 @@ struct spci_memory_share_state {
  * Encapsulates the set of share states while the `share_states_lock` is held.
  */
 struct share_states_locked {
-	struct spci_memory_share_state *share_states;
+	struct ffa_memory_share_state *share_states;
 };
 
 /**
- * All access to members of a `struct spci_memory_share_state` must be guarded
+ * All access to members of a `struct ffa_memory_share_state` must be guarded
  * by this lock.
  */
 static struct spinlock share_states_lock_instance = SPINLOCK_INIT;
-static struct spci_memory_share_state share_states[MAX_MEM_SHARES];
+static struct ffa_memory_share_state share_states[MAX_MEM_SHARES];
 
 /**
- * Initialises the next available `struct spci_memory_share_state` and sets
+ * Initialises the next available `struct ffa_memory_share_state` and sets
  * `handle` to its handle. Returns true on succes or false if none are
  * available.
  */
 static bool allocate_share_state(uint32_t share_func,
-				 struct spci_memory_region *memory_region,
-				 spci_memory_handle_t *handle)
+				 struct ffa_memory_region *memory_region,
+				 ffa_memory_handle_t *handle)
 {
 	uint64_t i;
 
@@ -106,14 +106,14 @@ static bool allocate_share_state(uint32_t share_func,
 	for (i = 0; i < MAX_MEM_SHARES; ++i) {
 		if (share_states[i].share_func == 0) {
 			uint32_t j;
-			struct spci_memory_share_state *allocated_state =
+			struct ffa_memory_share_state *allocated_state =
 				&share_states[i];
 			allocated_state->share_func = share_func;
 			allocated_state->memory_region = memory_region;
 			for (j = 0; j < MAX_MEM_SHARE_RECIPIENTS; ++j) {
 				allocated_state->retrieved[j] = false;
 			}
-			*handle = i | SPCI_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
+			*handle = i | FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
 			sl_unlock(&share_states_lock_instance);
 			return true;
 		}
@@ -145,11 +145,11 @@ static void share_states_unlock(struct share_states_locked *share_states)
  * returns true. Otherwise returns false and doesn't take the lock.
  */
 static bool get_share_state(struct share_states_locked share_states,
-			    spci_memory_handle_t handle,
-			    struct spci_memory_share_state **share_state_ret)
+			    ffa_memory_handle_t handle,
+			    struct ffa_memory_share_state **share_state_ret)
 {
-	struct spci_memory_share_state *share_state;
-	uint32_t index = handle & ~SPCI_MEMORY_HANDLE_ALLOCATOR_MASK;
+	struct ffa_memory_share_state *share_state;
+	uint32_t index = handle & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK;
 
 	if (index >= MAX_MEM_SHARES) {
 		return false;
@@ -167,7 +167,7 @@ static bool get_share_state(struct share_states_locked share_states,
 
 /** Marks a share state as unallocated. */
 static void share_state_free(struct share_states_locked share_states,
-			     struct spci_memory_share_state *share_state,
+			     struct ffa_memory_share_state *share_state,
 			     struct mpool *page_pool)
 {
 	CHECK(share_states.share_states != NULL);
@@ -180,11 +180,11 @@ static void share_state_free(struct share_states_locked share_states,
  * Marks the share state with the given handle as unallocated, or returns false
  * if the handle was invalid.
  */
-static bool share_state_free_handle(spci_memory_handle_t handle,
+static bool share_state_free_handle(ffa_memory_handle_t handle,
 				    struct mpool *page_pool)
 {
 	struct share_states_locked share_states = share_states_lock();
-	struct spci_memory_share_state *share_state;
+	struct ffa_memory_share_state *share_state;
 
 	if (!get_share_state(share_states, handle, &share_state)) {
 		share_states_unlock(&share_states);
@@ -197,7 +197,7 @@ static bool share_state_free_handle(spci_memory_handle_t handle,
 	return true;
 }
 
-static void dump_memory_region(struct spci_memory_region *memory_region)
+static void dump_memory_region(struct ffa_memory_region *memory_region)
 {
 	uint32_t i;
 
@@ -238,13 +238,13 @@ static void dump_share_states(void)
 		if (share_states[i].share_func != 0) {
 			dlog("%d: ", i);
 			switch (share_states[i].share_func) {
-			case SPCI_MEM_SHARE_32:
+			case FFA_MEM_SHARE_32:
 				dlog("SHARE");
 				break;
-			case SPCI_MEM_LEND_32:
+			case FFA_MEM_LEND_32:
 				dlog("LEND");
 				break;
-			case SPCI_MEM_DONATE_32:
+			case FFA_MEM_DONATE_32:
 				dlog("DONATE");
 				break;
 			default:
@@ -265,32 +265,32 @@ static void dump_share_states(void)
 }
 
 /* TODO: Add device attributes: GRE, cacheability, shareability. */
-static inline uint32_t spci_memory_permissions_to_mode(
-	spci_memory_access_permissions_t permissions)
+static inline uint32_t ffa_memory_permissions_to_mode(
+	ffa_memory_access_permissions_t permissions)
 {
 	uint32_t mode = 0;
 
-	switch (spci_get_data_access_attr(permissions)) {
-	case SPCI_DATA_ACCESS_RO:
+	switch (ffa_get_data_access_attr(permissions)) {
+	case FFA_DATA_ACCESS_RO:
 		mode = MM_MODE_R;
 		break;
-	case SPCI_DATA_ACCESS_RW:
-	case SPCI_DATA_ACCESS_NOT_SPECIFIED:
+	case FFA_DATA_ACCESS_RW:
+	case FFA_DATA_ACCESS_NOT_SPECIFIED:
 		mode = MM_MODE_R | MM_MODE_W;
 		break;
-	case SPCI_DATA_ACCESS_RESERVED:
-		panic("Tried to convert SPCI_DATA_ACCESS_RESERVED.");
+	case FFA_DATA_ACCESS_RESERVED:
+		panic("Tried to convert FFA_DATA_ACCESS_RESERVED.");
 	}
 
-	switch (spci_get_instruction_access_attr(permissions)) {
-	case SPCI_INSTRUCTION_ACCESS_NX:
+	switch (ffa_get_instruction_access_attr(permissions)) {
+	case FFA_INSTRUCTION_ACCESS_NX:
 		break;
-	case SPCI_INSTRUCTION_ACCESS_X:
-	case SPCI_INSTRUCTION_ACCESS_NOT_SPECIFIED:
+	case FFA_INSTRUCTION_ACCESS_X:
+	case FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED:
 		mode |= MM_MODE_X;
 		break;
-	case SPCI_INSTRUCTION_ACCESS_RESERVED:
-		panic("Tried to convert SPCI_INSTRUCTION_ACCESS_RESVERVED.");
+	case FFA_INSTRUCTION_ACCESS_RESERVED:
+		panic("Tried to convert FFA_INSTRUCTION_ACCESS_RESVERVED.");
 	}
 
 	return mode;
@@ -299,11 +299,11 @@ static inline uint32_t spci_memory_permissions_to_mode(
 /**
  * Get the current mode in the stage-2 page table of the given vm of all the
  * pages in the given constituents, if they all have the same mode, or return
- * an appropriate SPCI error if not.
+ * an appropriate FF-A error if not.
  */
-static struct spci_value constituents_get_mode(
+static struct ffa_value constituents_get_mode(
 	struct vm_locked vm, uint32_t *orig_mode,
-	struct spci_memory_region_constituent *constituents,
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count)
 {
 	uint32_t i;
@@ -313,7 +313,7 @@ static struct spci_value constituents_get_mode(
 		 * Fail if there are no constituents. Otherwise we would get an
 		 * uninitialised *orig_mode.
 		 */
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	for (i = 0; i < constituent_count; ++i) {
@@ -325,7 +325,7 @@ static struct spci_value constituents_get_mode(
 		/* Fail if addresses are not page-aligned. */
 		if (!is_aligned(ipa_addr(begin), PAGE_SIZE) ||
 		    !is_aligned(ipa_addr(end), PAGE_SIZE)) {
-			return spci_error(SPCI_INVALID_PARAMETERS);
+			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
 		/*
@@ -334,7 +334,7 @@ static struct spci_value constituents_get_mode(
 		 */
 		if (!mm_vm_get_mode(&vm.vm->ptable, begin, end,
 				    &current_mode)) {
-			return spci_error(SPCI_DENIED);
+			return ffa_error(FFA_DENIED);
 		}
 
 		/*
@@ -343,11 +343,11 @@ static struct spci_value constituents_get_mode(
 		if (i == 0) {
 			*orig_mode = current_mode;
 		} else if (current_mode != *orig_mode) {
-			return spci_error(SPCI_DENIED);
+			return ffa_error(FFA_DENIED);
 		}
 	}
 
-	return (struct spci_value){.func = SPCI_SUCCESS_32};
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
 /**
@@ -356,29 +356,29 @@ static struct spci_value constituents_get_mode(
  * to the sending VM.
  *
  * Returns:
- *   1) SPCI_DENIED if a state transition was not found;
- *   2) SPCI_DENIED if the pages being shared do not have the same mode within
+ *   1) FFA_DENIED if a state transition was not found;
+ *   2) FFA_DENIED if the pages being shared do not have the same mode within
  *     the <from> VM;
- *   3) SPCI_INVALID_PARAMETERS if the beginning and end IPAs are not page
+ *   3) FFA_INVALID_PARAMETERS if the beginning and end IPAs are not page
  *     aligned;
- *   4) SPCI_INVALID_PARAMETERS if the requested share type was not handled.
- *  Or SPCI_SUCCESS on success.
+ *   4) FFA_INVALID_PARAMETERS if the requested share type was not handled.
+ *  Or FFA_SUCCESS on success.
  */
-static struct spci_value spci_send_check_transition(
+static struct ffa_value ffa_send_check_transition(
 	struct vm_locked from, uint32_t share_func,
-	spci_memory_access_permissions_t permissions, uint32_t *orig_from_mode,
-	struct spci_memory_region_constituent *constituents,
+	ffa_memory_access_permissions_t permissions, uint32_t *orig_from_mode,
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t *from_mode)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 	const uint32_t required_from_mode =
-		spci_memory_permissions_to_mode(permissions);
-	struct spci_value ret;
+		ffa_memory_permissions_to_mode(permissions);
+	struct ffa_value ret;
 
 	ret = constituents_get_mode(from, orig_from_mode, constituents,
 				    constituent_count);
-	if (ret.func != SPCI_SUCCESS_32) {
+	if (ret.func != FFA_SUCCESS_32) {
 		return ret;
 	}
 
@@ -386,7 +386,7 @@ static struct spci_value spci_send_check_transition(
 	if (*orig_from_mode & MM_MODE_D) {
 		dlog_verbose("Can't share device memory (mode is %#x).\n",
 			     *orig_from_mode);
-		return spci_error(SPCI_DENIED);
+		return ffa_error(FFA_DENIED);
 	}
 
 	/*
@@ -394,7 +394,7 @@ static struct spci_value spci_send_check_transition(
 	 * memory.
 	 */
 	if ((*orig_from_mode & state_mask) != 0) {
-		return spci_error(SPCI_DENIED);
+		return ffa_error(FFA_DENIED);
 	}
 
 	if ((*orig_from_mode & required_from_mode) != required_from_mode) {
@@ -402,44 +402,44 @@ static struct spci_value spci_send_check_transition(
 			"Sender tried to send memory with permissions which "
 			"required mode %#x but only had %#x itself.\n",
 			required_from_mode, *orig_from_mode);
-		return spci_error(SPCI_DENIED);
+		return ffa_error(FFA_DENIED);
 	}
 
 	/* Find the appropriate new mode. */
 	*from_mode = ~state_mask & *orig_from_mode;
 	switch (share_func) {
-	case SPCI_MEM_DONATE_32:
+	case FFA_MEM_DONATE_32:
 		*from_mode |= MM_MODE_INVALID | MM_MODE_UNOWNED;
 		break;
 
-	case SPCI_MEM_LEND_32:
+	case FFA_MEM_LEND_32:
 		*from_mode |= MM_MODE_INVALID;
 		break;
 
-	case SPCI_MEM_SHARE_32:
+	case FFA_MEM_SHARE_32:
 		*from_mode |= MM_MODE_SHARED;
 		break;
 
 	default:
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	return (struct spci_value){.func = SPCI_SUCCESS_32};
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-static struct spci_value spci_relinquish_check_transition(
+static struct ffa_value ffa_relinquish_check_transition(
 	struct vm_locked from, uint32_t *orig_from_mode,
-	struct spci_memory_region_constituent *constituents,
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t *from_mode)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 	uint32_t orig_from_state;
-	struct spci_value ret;
+	struct ffa_value ret;
 
 	ret = constituents_get_mode(from, orig_from_mode, constituents,
 				    constituent_count);
-	if (ret.func != SPCI_SUCCESS_32) {
+	if (ret.func != FFA_SUCCESS_32) {
 		return ret;
 	}
 
@@ -447,7 +447,7 @@ static struct spci_value spci_relinquish_check_transition(
 	if (*orig_from_mode & MM_MODE_D) {
 		dlog_verbose("Can't relinquish device memory (mode is %#x).\n",
 			     *orig_from_mode);
-		return spci_error(SPCI_DENIED);
+		return ffa_error(FFA_DENIED);
 	}
 
 	/*
@@ -461,13 +461,13 @@ static struct spci_value spci_relinquish_check_transition(
 			"but "
 			"should be %#x).\n",
 			*orig_from_mode, orig_from_state, MM_MODE_UNOWNED);
-		return spci_error(SPCI_DENIED);
+		return ffa_error(FFA_DENIED);
 	}
 
 	/* Find the appropriate new mode. */
 	*from_mode = (~state_mask & *orig_from_mode) | MM_MODE_UNMAPPED_MASK;
 
-	return (struct spci_value){.func = SPCI_SUCCESS_32};
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
 /**
@@ -476,37 +476,37 @@ static struct spci_value spci_relinquish_check_transition(
  * to the retrieving VM.
  *
  * Returns:
- *   1) SPCI_DENIED if a state transition was not found;
- *   2) SPCI_DENIED if the pages being shared do not have the same mode within
+ *   1) FFA_DENIED if a state transition was not found;
+ *   2) FFA_DENIED if the pages being shared do not have the same mode within
  *     the <to> VM;
- *   3) SPCI_INVALID_PARAMETERS if the beginning and end IPAs are not page
+ *   3) FFA_INVALID_PARAMETERS if the beginning and end IPAs are not page
  *     aligned;
- *   4) SPCI_INVALID_PARAMETERS if the requested share type was not handled.
- *  Or SPCI_SUCCESS on success.
+ *   4) FFA_INVALID_PARAMETERS if the requested share type was not handled.
+ *  Or FFA_SUCCESS on success.
  */
-static struct spci_value spci_retrieve_check_transition(
+static struct ffa_value ffa_retrieve_check_transition(
 	struct vm_locked to, uint32_t share_func,
-	struct spci_memory_region_constituent *constituents,
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t memory_to_attributes,
 	uint32_t *to_mode)
 {
 	uint32_t orig_to_mode;
-	struct spci_value ret;
+	struct ffa_value ret;
 
 	ret = constituents_get_mode(to, &orig_to_mode, constituents,
 				    constituent_count);
-	if (ret.func != SPCI_SUCCESS_32) {
+	if (ret.func != FFA_SUCCESS_32) {
 		return ret;
 	}
 
-	if (share_func == SPCI_MEM_RECLAIM_32) {
+	if (share_func == FFA_MEM_RECLAIM_32) {
 		const uint32_t state_mask =
 			MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 		uint32_t orig_to_state = orig_to_mode & state_mask;
 
 		if (orig_to_state != MM_MODE_INVALID &&
 		    orig_to_state != MM_MODE_SHARED) {
-			return spci_error(SPCI_DENIED);
+			return ffa_error(FFA_DENIED);
 		}
 	} else {
 		/*
@@ -516,34 +516,34 @@ static struct spci_value spci_retrieve_check_transition(
 		 */
 		if ((orig_to_mode & MM_MODE_UNMAPPED_MASK) !=
 		    MM_MODE_UNMAPPED_MASK) {
-			return spci_error(SPCI_DENIED);
+			return ffa_error(FFA_DENIED);
 		}
 	}
 
 	/* Find the appropriate new mode. */
 	*to_mode = memory_to_attributes;
 	switch (share_func) {
-	case SPCI_MEM_DONATE_32:
+	case FFA_MEM_DONATE_32:
 		*to_mode |= 0;
 		break;
 
-	case SPCI_MEM_LEND_32:
+	case FFA_MEM_LEND_32:
 		*to_mode |= MM_MODE_UNOWNED;
 		break;
 
-	case SPCI_MEM_SHARE_32:
+	case FFA_MEM_SHARE_32:
 		*to_mode |= MM_MODE_UNOWNED | MM_MODE_SHARED;
 		break;
 
-	case SPCI_MEM_RECLAIM_32:
+	case FFA_MEM_RECLAIM_32:
 		*to_mode |= 0;
 		break;
 
 	default:
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	return (struct spci_value){.func = SPCI_SUCCESS_32};
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
 /**
@@ -564,9 +564,9 @@ static struct spci_value spci_retrieve_check_transition(
  * Returns true on success, or false if the update failed and no changes were
  * made to memory mappings.
  */
-static bool spci_region_group_identity_map(
+static bool ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
-	struct spci_memory_region_constituent *constituents,
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, int mode, struct mpool *ppool, bool commit)
 {
 	/* Iterate over the memory region constituents. */
@@ -633,8 +633,8 @@ out:
  * Clears a region of physical memory by overwriting it with zeros. The data is
  * flushed from the cache so the memory has been cleared across the system.
  */
-static bool spci_clear_memory_constituents(
-	struct spci_memory_region_constituent *constituents,
+static bool ffa_clear_memory_constituents(
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, struct mpool *page_pool)
 {
 	struct mpool local_page_pool;
@@ -685,33 +685,33 @@ out:
  *
  * Returns:
  *  In case of error, one of the following values is returned:
- *   1) SPCI_INVALID_PARAMETERS - The endpoint provided parameters were
+ *   1) FFA_INVALID_PARAMETERS - The endpoint provided parameters were
  *     erroneous;
- *   2) SPCI_NO_MEMORY - Hafnium did not have sufficient memory to complete
+ *   2) FFA_NO_MEMORY - Hafnium did not have sufficient memory to complete
  *     the request.
- *   3) SPCI_DENIED - The sender doesn't have sufficient access to send the
+ *   3) FFA_DENIED - The sender doesn't have sufficient access to send the
  *     memory with the given permissions.
- *  Success is indicated by SPCI_SUCCESS.
+ *  Success is indicated by FFA_SUCCESS.
  */
-static struct spci_value spci_send_memory(
+static struct ffa_value ffa_send_memory(
 	struct vm_locked from_locked,
-	struct spci_memory_region_constituent *constituents,
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t share_func,
-	spci_memory_access_permissions_t permissions, struct mpool *page_pool,
+	ffa_memory_access_permissions_t permissions, struct mpool *page_pool,
 	bool clear)
 {
 	struct vm *from = from_locked.vm;
 	uint32_t orig_from_mode;
 	uint32_t from_mode;
 	struct mpool local_page_pool;
-	struct spci_value ret;
+	struct ffa_value ret;
 
 	/*
 	 * Make sure constituents are properly aligned to a 64-bit boundary. If
 	 * not we would get alignment faults trying to read (64-bit) values.
 	 */
 	if (!is_aligned(constituents, 8)) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -719,10 +719,10 @@ static struct spci_value spci_send_memory(
 	 * all constituents of a memory region being shared are at the same
 	 * state.
 	 */
-	ret = spci_send_check_transition(from_locked, share_func, permissions,
-					 &orig_from_mode, constituents,
-					 constituent_count, &from_mode);
-	if (ret.func != SPCI_SUCCESS_32) {
+	ret = ffa_send_check_transition(from_locked, share_func, permissions,
+					&orig_from_mode, constituents,
+					constituent_count, &from_mode);
+	if (ret.func != FFA_SUCCESS_32) {
 		return ret;
 	}
 
@@ -738,11 +738,11 @@ static struct spci_value spci_send_memory(
 	 * without committing, to make sure the entire operation will succeed
 	 * without exhausting the page pool.
 	 */
-	if (!spci_region_group_identity_map(from_locked, constituents,
-					    constituent_count, from_mode,
-					    page_pool, false)) {
+	if (!ffa_region_group_identity_map(from_locked, constituents,
+					   constituent_count, from_mode,
+					   page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
-		ret = spci_error(SPCI_NO_MEMORY);
+		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
@@ -752,12 +752,12 @@ static struct spci_value spci_send_memory(
 	 * case that a whole block is being unmapped that was previously
 	 * partially mapped.
 	 */
-	CHECK(spci_region_group_identity_map(from_locked, constituents,
-					     constituent_count, from_mode,
-					     &local_page_pool, true));
+	CHECK(ffa_region_group_identity_map(from_locked, constituents,
+					    constituent_count, from_mode,
+					    &local_page_pool, true));
 
 	/* Clear the memory so no VM or device can see the previous contents. */
-	if (clear && !spci_clear_memory_constituents(
+	if (clear && !ffa_clear_memory_constituents(
 			     constituents, constituent_count, page_pool)) {
 		/*
 		 * On failure, roll back by returning memory to the sender. This
@@ -765,15 +765,15 @@ static struct spci_value spci_send_memory(
 		 * `local_page_pool` by the call above, but will never allocate
 		 * more pages than that so can never fail.
 		 */
-		CHECK(spci_region_group_identity_map(
+		CHECK(ffa_region_group_identity_map(
 			from_locked, constituents, constituent_count,
 			orig_from_mode, &local_page_pool, true));
 
-		ret = spci_error(SPCI_NO_MEMORY);
+		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
-	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
 	mpool_fini(&local_page_pool);
@@ -794,22 +794,22 @@ out:
  *
  * Returns:
  *  In case of error, one of the following values is returned:
- *   1) SPCI_INVALID_PARAMETERS - The endpoint provided parameters were
+ *   1) FFA_INVALID_PARAMETERS - The endpoint provided parameters were
  *     erroneous;
- *   2) SPCI_NO_MEMORY - Hafnium did not have sufficient memory to complete
+ *   2) FFA_NO_MEMORY - Hafnium did not have sufficient memory to complete
  *     the request.
- *  Success is indicated by SPCI_SUCCESS.
+ *  Success is indicated by FFA_SUCCESS.
  */
-static struct spci_value spci_retrieve_memory(
+static struct ffa_value ffa_retrieve_memory(
 	struct vm_locked to_locked,
-	struct spci_memory_region_constituent *constituents,
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t memory_to_attributes,
 	uint32_t share_func, bool clear, struct mpool *page_pool)
 {
 	struct vm *to = to_locked.vm;
 	uint32_t to_mode;
 	struct mpool local_page_pool;
-	struct spci_value ret;
+	struct ffa_value ret;
 
 	/*
 	 * Make sure constituents are properly aligned to a 32-bit boundary. If
@@ -817,7 +817,7 @@ static struct spci_value spci_retrieve_memory(
 	 */
 	if (!is_aligned(constituents, 4)) {
 		dlog_verbose("Constituents not aligned.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -825,10 +825,10 @@ static struct spci_value spci_retrieve_memory(
 	 * that all constituents of the memory region being retrieved are at the
 	 * same state.
 	 */
-	ret = spci_retrieve_check_transition(to_locked, share_func,
-					     constituents, constituent_count,
-					     memory_to_attributes, &to_mode);
-	if (ret.func != SPCI_SUCCESS_32) {
+	ret = ffa_retrieve_check_transition(to_locked, share_func, constituents,
+					    constituent_count,
+					    memory_to_attributes, &to_mode);
+	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition.\n");
 		return ret;
 	}
@@ -845,21 +845,21 @@ static struct spci_value spci_retrieve_memory(
 	 * the recipient page tables without committing, to make sure the entire
 	 * operation will succeed without exhausting the page pool.
 	 */
-	if (!spci_region_group_identity_map(to_locked, constituents,
-					    constituent_count, to_mode,
-					    page_pool, false)) {
+	if (!ffa_region_group_identity_map(to_locked, constituents,
+					   constituent_count, to_mode,
+					   page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
 		dlog_verbose(
 			"Insufficient memory to update recipient page "
 			"table.\n");
-		ret = spci_error(SPCI_NO_MEMORY);
+		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
 	/* Clear the memory so no VM or device can see the previous contents. */
-	if (clear && !spci_clear_memory_constituents(
+	if (clear && !ffa_clear_memory_constituents(
 			     constituents, constituent_count, page_pool)) {
-		ret = spci_error(SPCI_NO_MEMORY);
+		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
@@ -868,11 +868,11 @@ static struct spci_value spci_retrieve_memory(
 	 * won't allocate because the transaction was already prepared above, so
 	 * it doesn't need to use the `local_page_pool`.
 	 */
-	CHECK(spci_region_group_identity_map(to_locked, constituents,
-					     constituent_count, to_mode,
-					     page_pool, true));
+	CHECK(ffa_region_group_identity_map(to_locked, constituents,
+					    constituent_count, to_mode,
+					    page_pool, true));
 
-	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
 	mpool_fini(&local_page_pool);
@@ -896,23 +896,23 @@ out:
  *
  * Returns:
  *  In case of error, one of the following values is returned:
- *   1) SPCI_INVALID_PARAMETERS - The endpoint provided parameters were
+ *   1) FFA_INVALID_PARAMETERS - The endpoint provided parameters were
  *     erroneous;
- *   2) SPCI_NO_MEMORY - Hafnium did not have sufficient memory to complete
+ *   2) FFA_NO_MEMORY - Hafnium did not have sufficient memory to complete
  *     the request.
- *  Success is indicated by SPCI_SUCCESS.
+ *  Success is indicated by FFA_SUCCESS.
  */
-static struct spci_value spci_tee_reclaim_memory(
-	struct vm_locked to_locked, spci_memory_handle_t handle,
-	struct spci_memory_region_constituent *constituents,
+static struct ffa_value ffa_tee_reclaim_memory(
+	struct vm_locked to_locked, ffa_memory_handle_t handle,
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t memory_to_attributes, bool clear,
 	struct mpool *page_pool)
 {
 	struct vm *to = to_locked.vm;
 	uint32_t to_mode;
 	struct mpool local_page_pool;
-	struct spci_value ret;
-	spci_memory_region_flags_t tee_flags;
+	struct ffa_value ret;
+	ffa_memory_region_flags_t tee_flags;
 
 	/*
 	 * Make sure constituents are properly aligned to a 32-bit boundary. If
@@ -920,7 +920,7 @@ static struct spci_value spci_tee_reclaim_memory(
 	 */
 	if (!is_aligned(constituents, 4)) {
 		dlog_verbose("Constituents not aligned.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -928,10 +928,10 @@ static struct spci_value spci_tee_reclaim_memory(
 	 * that all constituents of the memory region being retrieved are at the
 	 * same state.
 	 */
-	ret = spci_retrieve_check_transition(to_locked, SPCI_MEM_RECLAIM_32,
-					     constituents, constituent_count,
-					     memory_to_attributes, &to_mode);
-	if (ret.func != SPCI_SUCCESS_32) {
+	ret = ffa_retrieve_check_transition(to_locked, FFA_MEM_RECLAIM_32,
+					    constituents, constituent_count,
+					    memory_to_attributes, &to_mode);
+	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition.\n");
 		return ret;
 	}
@@ -948,14 +948,14 @@ static struct spci_value spci_tee_reclaim_memory(
 	 * the recipient page tables without committing, to make sure the entire
 	 * operation will succeed without exhausting the page pool.
 	 */
-	if (!spci_region_group_identity_map(to_locked, constituents,
-					    constituent_count, to_mode,
-					    page_pool, false)) {
+	if (!ffa_region_group_identity_map(to_locked, constituents,
+					   constituent_count, to_mode,
+					   page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
 		dlog_verbose(
 			"Insufficient memory to update recipient page "
 			"table.\n");
-		ret = spci_error(SPCI_NO_MEMORY);
+		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
@@ -964,18 +964,17 @@ static struct spci_value spci_tee_reclaim_memory(
 	 */
 	tee_flags = 0;
 	if (clear) {
-		tee_flags |= SPCI_MEMORY_REGION_FLAG_CLEAR;
+		tee_flags |= FFA_MEMORY_REGION_FLAG_CLEAR;
 	}
-	ret = arch_tee_call(
-		(struct spci_value){.func = SPCI_MEM_RECLAIM_32,
-				    .arg1 = (uint32_t)handle,
-				    .arg2 = (uint32_t)(handle >> 32),
-				    .arg3 = tee_flags});
+	ret = arch_tee_call((struct ffa_value){.func = FFA_MEM_RECLAIM_32,
+					       .arg1 = (uint32_t)handle,
+					       .arg2 = (uint32_t)(handle >> 32),
+					       .arg3 = tee_flags});
 
-	if (ret.func != SPCI_SUCCESS_32) {
+	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose(
 			"Got %#x (%d) from EL3 in response to "
-			"SPCI_MEM_RECLAIM_32, expected SPCI_SUCCESS_32.\n",
+			"FFA_MEM_RECLAIM_32, expected FFA_SUCCESS_32.\n",
 			ret.func, ret.arg2);
 		goto out;
 	}
@@ -986,11 +985,11 @@ static struct spci_value spci_tee_reclaim_memory(
 	 * transaction was already prepared above, so it doesn't need to use the
 	 * `local_page_pool`.
 	 */
-	CHECK(spci_region_group_identity_map(to_locked, constituents,
-					     constituent_count, to_mode,
-					     page_pool, true));
+	CHECK(ffa_region_group_identity_map(to_locked, constituents,
+					    constituent_count, to_mode,
+					    page_pool, true));
 
-	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
 	mpool_fini(&local_page_pool);
@@ -1004,20 +1003,20 @@ out:
 	return ret;
 }
 
-static struct spci_value spci_relinquish_memory(
+static struct ffa_value ffa_relinquish_memory(
 	struct vm_locked from_locked,
-	struct spci_memory_region_constituent *constituents,
+	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, struct mpool *page_pool, bool clear)
 {
 	uint32_t orig_from_mode;
 	uint32_t from_mode;
 	struct mpool local_page_pool;
-	struct spci_value ret;
+	struct ffa_value ret;
 
-	ret = spci_relinquish_check_transition(from_locked, &orig_from_mode,
-					       constituents, constituent_count,
-					       &from_mode);
-	if (ret.func != SPCI_SUCCESS_32) {
+	ret = ffa_relinquish_check_transition(from_locked, &orig_from_mode,
+					      constituents, constituent_count,
+					      &from_mode);
+	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition.\n");
 		return ret;
 	}
@@ -1034,11 +1033,11 @@ static struct spci_value spci_relinquish_memory(
 	 * without committing, to make sure the entire operation will succeed
 	 * without exhausting the page pool.
 	 */
-	if (!spci_region_group_identity_map(from_locked, constituents,
-					    constituent_count, from_mode,
-					    page_pool, false)) {
+	if (!ffa_region_group_identity_map(from_locked, constituents,
+					   constituent_count, from_mode,
+					   page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
-		ret = spci_error(SPCI_NO_MEMORY);
+		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
@@ -1048,12 +1047,12 @@ static struct spci_value spci_relinquish_memory(
 	 * case that a whole block is being unmapped that was previously
 	 * partially mapped.
 	 */
-	CHECK(spci_region_group_identity_map(from_locked, constituents,
-					     constituent_count, from_mode,
-					     &local_page_pool, true));
+	CHECK(ffa_region_group_identity_map(from_locked, constituents,
+					    constituent_count, from_mode,
+					    &local_page_pool, true));
 
 	/* Clear the memory so no VM or device can see the previous contents. */
-	if (clear && !spci_clear_memory_constituents(
+	if (clear && !ffa_clear_memory_constituents(
 			     constituents, constituent_count, page_pool)) {
 		/*
 		 * On failure, roll back by returning memory to the sender. This
@@ -1061,15 +1060,15 @@ static struct spci_value spci_relinquish_memory(
 		 * `local_page_pool` by the call above, but will never allocate
 		 * more pages than that so can never fail.
 		 */
-		CHECK(spci_region_group_identity_map(
+		CHECK(ffa_region_group_identity_map(
 			from_locked, constituents, constituent_count,
 			orig_from_mode, &local_page_pool, true));
 
-		ret = spci_error(SPCI_NO_MEMORY);
+		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
-	ret = (struct spci_value){.func = SPCI_SUCCESS_32};
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
 	mpool_fini(&local_page_pool);
@@ -1087,20 +1086,20 @@ out:
  * Check that the given `memory_region` represents a valid memory send request
  * of the given `share_func` type, return the clear flag and permissions via the
  * respective output parameters, and update the permissions if necessary.
- * Returns SPCI_SUCCESS if the request was valid, or the relevant SPCI_ERROR if
+ * Returns FFA_SUCCESS if the request was valid, or the relevant FFA_ERROR if
  * not.
  */
-static struct spci_value spci_memory_send_validate(
+static struct ffa_value ffa_memory_send_validate(
 	struct vm *to, struct vm_locked from_locked,
-	struct spci_memory_region *memory_region, uint32_t memory_share_size,
+	struct ffa_memory_region *memory_region, uint32_t memory_share_size,
 	uint32_t share_func, bool *clear,
-	spci_memory_access_permissions_t *permissions)
+	ffa_memory_access_permissions_t *permissions)
 {
-	struct spci_composite_memory_region *composite;
+	struct ffa_composite_memory_region *composite;
 	uint32_t receivers_size;
 	uint32_t constituents_size;
-	enum spci_data_access data_access;
-	enum spci_instruction_access instruction_access;
+	enum ffa_data_access data_access;
+	enum ffa_instruction_access instruction_access;
 
 	CHECK(clear != NULL);
 	CHECK(permissions != NULL);
@@ -1108,97 +1107,97 @@ static struct spci_value spci_memory_send_validate(
 	/* The sender must match the message sender. */
 	if (memory_region->sender != from_locked.vm->id) {
 		dlog_verbose("Invalid sender %d.\n", memory_region->sender);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* We only support a single recipient. */
 	if (memory_region->receiver_count != 1) {
 		dlog_verbose("Multiple recipients not supported.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
 	 * Ensure that the composite header is within the memory bounds and
 	 * doesn't overlap the first part of the message.
 	 */
-	receivers_size = sizeof(struct spci_memory_access) *
+	receivers_size = sizeof(struct ffa_memory_access) *
 			 memory_region->receiver_count;
 	if (memory_region->receivers[0].composite_memory_region_offset <
-		    sizeof(struct spci_memory_region) + receivers_size ||
+		    sizeof(struct ffa_memory_region) + receivers_size ||
 	    memory_region->receivers[0].composite_memory_region_offset +
-			    sizeof(struct spci_composite_memory_region) >=
+			    sizeof(struct ffa_composite_memory_region) >=
 		    memory_share_size) {
 		dlog_verbose(
 			"Invalid composite memory region descriptor offset.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	composite = spci_memory_region_get_composite(memory_region, 0);
+	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/*
 	 * Ensure the number of constituents are within the memory
 	 * bounds.
 	 */
-	constituents_size = sizeof(struct spci_memory_region_constituent) *
+	constituents_size = sizeof(struct ffa_memory_region_constituent) *
 			    composite->constituent_count;
 	if (memory_share_size !=
 	    memory_region->receivers[0].composite_memory_region_offset +
-		    sizeof(struct spci_composite_memory_region) +
+		    sizeof(struct ffa_composite_memory_region) +
 		    constituents_size) {
 		dlog_verbose("Invalid size %d or constituent offset %d.\n",
 			     memory_share_size,
 			     memory_region->receivers[0]
 				     .composite_memory_region_offset);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* The recipient must match the message recipient. */
 	if (memory_region->receivers[0].receiver_permissions.receiver !=
 	    to->id) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	*clear = memory_region->flags & SPCI_MEMORY_REGION_FLAG_CLEAR;
+	*clear = memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR;
 	/*
 	 * Clear is not allowed for memory sharing, as the sender still has
 	 * access to the memory.
 	 */
-	if (*clear && share_func == SPCI_MEM_SHARE_32) {
+	if (*clear && share_func == FFA_MEM_SHARE_32) {
 		dlog_verbose("Memory can't be cleared while being shared.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* No other flags are allowed/supported here. */
-	if (memory_region->flags & ~SPCI_MEMORY_REGION_FLAG_CLEAR) {
+	if (memory_region->flags & ~FFA_MEMORY_REGION_FLAG_CLEAR) {
 		dlog_verbose("Invalid flags %#x.\n", memory_region->flags);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* Check that the permissions are valid. */
 	*permissions =
 		memory_region->receivers[0].receiver_permissions.permissions;
-	data_access = spci_get_data_access_attr(*permissions);
-	instruction_access = spci_get_instruction_access_attr(*permissions);
-	if (data_access == SPCI_DATA_ACCESS_RESERVED ||
-	    instruction_access == SPCI_INSTRUCTION_ACCESS_RESERVED) {
+	data_access = ffa_get_data_access_attr(*permissions);
+	instruction_access = ffa_get_instruction_access_attr(*permissions);
+	if (data_access == FFA_DATA_ACCESS_RESERVED ||
+	    instruction_access == FFA_INSTRUCTION_ACCESS_RESERVED) {
 		dlog_verbose("Reserved value for receiver permissions %#x.\n",
 			     *permissions);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
-	if (instruction_access != SPCI_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
+	if (instruction_access != FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
 		dlog_verbose(
 			"Invalid instruction access permissions %#x for "
 			"sending memory.\n",
 			*permissions);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
-	if (share_func == SPCI_MEM_SHARE_32) {
-		if (data_access == SPCI_DATA_ACCESS_NOT_SPECIFIED) {
+	if (share_func == FFA_MEM_SHARE_32) {
+		if (data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
 			dlog_verbose(
 				"Invalid data access permissions %#x for "
 				"sharing memory.\n",
 				*permissions);
-			return spci_error(SPCI_INVALID_PARAMETERS);
+			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 		/*
 		 * According to section 6.11.3 of the FF-A spec NX is required
@@ -1206,29 +1205,29 @@ static struct spci_value spci_memory_send_validate(
 		 * sender) so set it in the copy that we store, ready to be
 		 * returned to the retriever.
 		 */
-		spci_set_instruction_access_attr(permissions,
-						 SPCI_INSTRUCTION_ACCESS_NX);
+		ffa_set_instruction_access_attr(permissions,
+						FFA_INSTRUCTION_ACCESS_NX);
 		memory_region->receivers[0].receiver_permissions.permissions =
 			*permissions;
 	}
-	if (share_func == SPCI_MEM_LEND_32 &&
-	    data_access == SPCI_DATA_ACCESS_NOT_SPECIFIED) {
+	if (share_func == FFA_MEM_LEND_32 &&
+	    data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
 		dlog_verbose(
 			"Invalid data access permissions %#x for lending "
 			"memory.\n",
 			*permissions);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
-	if (share_func == SPCI_MEM_DONATE_32 &&
-	    data_access != SPCI_DATA_ACCESS_NOT_SPECIFIED) {
+	if (share_func == FFA_MEM_DONATE_32 &&
+	    data_access != FFA_DATA_ACCESS_NOT_SPECIFIED) {
 		dlog_verbose(
 			"Invalid data access permissions %#x for donating "
 			"memory.\n",
 			*permissions);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	return (struct spci_value){.func = SPCI_SUCCESS_32};
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
 /**
@@ -1245,43 +1244,42 @@ static struct spci_value spci_memory_send_validate(
  * This function takes ownership of the `memory_region` passed in; it must not
  * be freed by the caller.
  */
-struct spci_value spci_memory_send(struct vm *to, struct vm_locked from_locked,
-				   struct spci_memory_region *memory_region,
-				   uint32_t memory_share_size,
-				   uint32_t share_func, struct mpool *page_pool)
+struct ffa_value ffa_memory_send(struct vm *to, struct vm_locked from_locked,
+				 struct ffa_memory_region *memory_region,
+				 uint32_t memory_share_size,
+				 uint32_t share_func, struct mpool *page_pool)
 {
-	struct spci_composite_memory_region *composite;
+	struct ffa_composite_memory_region *composite;
 	bool clear;
-	spci_memory_access_permissions_t permissions;
-	struct spci_value ret;
-	spci_memory_handle_t handle;
+	ffa_memory_access_permissions_t permissions;
+	struct ffa_value ret;
+	ffa_memory_handle_t handle;
 
 	/*
 	 * If there is an error validating the `memory_region` then we need to
 	 * free it because we own it but we won't be storing it in a share state
 	 * after all.
 	 */
-	ret = spci_memory_send_validate(to, from_locked, memory_region,
-					memory_share_size, share_func, &clear,
-					&permissions);
-	if (ret.func != SPCI_SUCCESS_32) {
+	ret = ffa_memory_send_validate(to, from_locked, memory_region,
+				       memory_share_size, share_func, &clear,
+				       &permissions);
+	if (ret.func != FFA_SUCCESS_32) {
 		mpool_free(page_pool, memory_region);
 		return ret;
 	}
 
 	/* Set flag for share function, ready to be retrieved later. */
 	switch (share_func) {
-	case SPCI_MEM_SHARE_32:
+	case FFA_MEM_SHARE_32:
 		memory_region->flags |=
-			SPCI_MEMORY_REGION_TRANSACTION_TYPE_SHARE;
+			FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE;
 		break;
-	case SPCI_MEM_LEND_32:
-		memory_region->flags |=
-			SPCI_MEMORY_REGION_TRANSACTION_TYPE_LEND;
+	case FFA_MEM_LEND_32:
+		memory_region->flags |= FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND;
 		break;
-	case SPCI_MEM_DONATE_32:
+	case FFA_MEM_DONATE_32:
 		memory_region->flags |=
-			SPCI_MEMORY_REGION_TRANSACTION_TYPE_DONATE;
+			FFA_MEMORY_REGION_TRANSACTION_TYPE_DONATE;
 		break;
 	}
 
@@ -1295,17 +1293,17 @@ struct spci_value spci_memory_send(struct vm *to, struct vm_locked from_locked,
 	    !allocate_share_state(share_func, memory_region, &handle)) {
 		dlog_verbose("Failed to allocate share state.\n");
 		mpool_free(page_pool, memory_region);
-		return spci_error(SPCI_NO_MEMORY);
+		return ffa_error(FFA_NO_MEMORY);
 	}
 
 	dump_share_states();
 
 	/* Check that state is valid in sender page table and update. */
-	composite = spci_memory_region_get_composite(memory_region, 0);
-	ret = spci_send_memory(from_locked, composite->constituents,
-			       composite->constituent_count, share_func,
-			       permissions, page_pool, clear);
-	if (ret.func != SPCI_SUCCESS_32) {
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+	ret = ffa_send_memory(from_locked, composite->constituents,
+			      composite->constituent_count, share_func,
+			      permissions, page_pool, clear);
+	if (ret.func != FFA_SUCCESS_32) {
 		if (to->id != HF_TEE_VM_ID) {
 			/* Free share state. */
 			bool freed = share_state_free_handle(handle, page_pool);
@@ -1318,63 +1316,64 @@ struct spci_value spci_memory_send(struct vm *to, struct vm_locked from_locked,
 
 	if (to->id == HF_TEE_VM_ID) {
 		/* No share state allocated here so no handle to return. */
-		return (struct spci_value){.func = SPCI_SUCCESS_32};
+		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	}
 
-	return (struct spci_value){.func = SPCI_SUCCESS_32, .arg2 = handle};
+	return (struct ffa_value){.func = FFA_SUCCESS_32, .arg2 = handle};
 }
 
-struct spci_value spci_memory_retrieve(
-	struct vm_locked to_locked, struct spci_memory_region *retrieve_request,
-	uint32_t retrieve_request_size, struct mpool *page_pool)
+struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
+				     struct ffa_memory_region *retrieve_request,
+				     uint32_t retrieve_request_size,
+				     struct mpool *page_pool)
 {
 	uint32_t expected_retrieve_request_size =
-		sizeof(struct spci_memory_region) +
+		sizeof(struct ffa_memory_region) +
 		retrieve_request->receiver_count *
-			sizeof(struct spci_memory_access);
-	spci_memory_handle_t handle = retrieve_request->handle;
-	spci_memory_region_flags_t transaction_type =
+			sizeof(struct ffa_memory_access);
+	ffa_memory_handle_t handle = retrieve_request->handle;
+	ffa_memory_region_flags_t transaction_type =
 		retrieve_request->flags &
-		SPCI_MEMORY_REGION_TRANSACTION_TYPE_MASK;
-	struct spci_memory_region *memory_region;
-	spci_memory_access_permissions_t sent_permissions;
-	enum spci_data_access sent_data_access;
-	enum spci_instruction_access sent_instruction_access;
-	spci_memory_access_permissions_t requested_permissions;
-	enum spci_data_access requested_data_access;
-	enum spci_instruction_access requested_instruction_access;
-	spci_memory_access_permissions_t permissions;
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK;
+	struct ffa_memory_region *memory_region;
+	ffa_memory_access_permissions_t sent_permissions;
+	enum ffa_data_access sent_data_access;
+	enum ffa_instruction_access sent_instruction_access;
+	ffa_memory_access_permissions_t requested_permissions;
+	enum ffa_data_access requested_data_access;
+	enum ffa_instruction_access requested_instruction_access;
+	ffa_memory_access_permissions_t permissions;
 	uint32_t memory_to_attributes;
-	struct spci_composite_memory_region *composite;
+	struct ffa_composite_memory_region *composite;
 	struct share_states_locked share_states;
-	struct spci_memory_share_state *share_state;
-	struct spci_value ret;
+	struct ffa_memory_share_state *share_state;
+	struct ffa_value ret;
 	uint32_t response_size;
 
 	dump_share_states();
 
 	if (retrieve_request_size != expected_retrieve_request_size) {
 		dlog_verbose(
-			"Invalid length for SPCI_MEM_RETRIEVE_REQ, expected %d "
+			"Invalid length for FFA_MEM_RETRIEVE_REQ, expected %d "
 			"but was %d.\n",
 			expected_retrieve_request_size, retrieve_request_size);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	if (retrieve_request->receiver_count != 1) {
 		dlog_verbose(
 			"Multi-way memory sharing not supported (got %d "
-			"receivers descriptors on SPCI_MEM_RETRIEVE_REQ, "
+			"receivers descriptors on FFA_MEM_RETRIEVE_REQ, "
 			"expected 1).\n",
 			retrieve_request->receiver_count);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	share_states = share_states_lock();
 	if (!get_share_state(share_states, handle, &share_state)) {
-		dlog_verbose("Invalid handle %#x for SPCI_MEM_RETRIEVE_REQ.\n",
+		dlog_verbose("Invalid handle %#x for FFA_MEM_RETRIEVE_REQ.\n",
 			     handle);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1386,36 +1385,36 @@ struct spci_value spci_memory_retrieve(
 	 * if it has been specified.
 	 */
 	if (transaction_type !=
-		    SPCI_MEMORY_REGION_TRANSACTION_TYPE_UNSPECIFIED &&
+		    FFA_MEMORY_REGION_TRANSACTION_TYPE_UNSPECIFIED &&
 	    transaction_type != (memory_region->flags &
-				 SPCI_MEMORY_REGION_TRANSACTION_TYPE_MASK)) {
+				 FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK)) {
 		dlog_verbose(
 			"Incorrect transaction type %#x for "
-			"SPCI_MEM_RETRIEVE_REQ, expected %#x for handle %#x.\n",
+			"FFA_MEM_RETRIEVE_REQ, expected %#x for handle %#x.\n",
 			transaction_type,
 			memory_region->flags &
-				SPCI_MEMORY_REGION_TRANSACTION_TYPE_MASK,
+				FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK,
 			handle);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
 	if (retrieve_request->sender != memory_region->sender) {
 		dlog_verbose(
-			"Incorrect sender ID %d for SPCI_MEM_RETRIEVE_REQ, "
+			"Incorrect sender ID %d for FFA_MEM_RETRIEVE_REQ, "
 			"expected %d for handle %#x.\n",
 			retrieve_request->sender, memory_region->sender,
 			handle);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
 	if (retrieve_request->tag != memory_region->tag) {
 		dlog_verbose(
-			"Incorrect tag %d for SPCI_MEM_RETRIEVE_REQ, expected "
+			"Incorrect tag %d for FFA_MEM_RETRIEVE_REQ, expected "
 			"%d for handle %#x.\n",
 			retrieve_request->tag, memory_region->tag, handle);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1423,10 +1422,10 @@ struct spci_value spci_memory_retrieve(
 	    to_locked.vm->id) {
 		dlog_verbose(
 			"Retrieve request receiver VM ID %d didn't match "
-			"caller of SPCI_MEM_RETRIEVE_REQ.\n",
+			"caller of FFA_MEM_RETRIEVE_REQ.\n",
 			retrieve_request->receivers[0]
 				.receiver_permissions.receiver);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1434,19 +1433,19 @@ struct spci_value spci_memory_retrieve(
 	    to_locked.vm->id) {
 		dlog_verbose(
 			"Incorrect receiver VM ID %d for "
-			"SPCI_MEM_RETRIEVE_REQ, expected %d for handle %#x.\n",
+			"FFA_MEM_RETRIEVE_REQ, expected %d for handle %#x.\n",
 			to_locked.vm->id,
 			memory_region->receivers[0]
 				.receiver_permissions.receiver,
 			handle);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
 	if (share_state->retrieved[0]) {
 		dlog_verbose("Memory with handle %#x already retrieved.\n",
 			     handle);
-		ret = spci_error(SPCI_DENIED);
+		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
 
@@ -1458,7 +1457,7 @@ struct spci_value spci_memory_retrieve(
 			"%d).\n",
 			retrieve_request->receivers[0]
 				.composite_memory_region_offset);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1469,60 +1468,58 @@ struct spci_value spci_memory_retrieve(
 	/* TODO: Check attributes too. */
 	sent_permissions =
 		memory_region->receivers[0].receiver_permissions.permissions;
-	sent_data_access = spci_get_data_access_attr(sent_permissions);
+	sent_data_access = ffa_get_data_access_attr(sent_permissions);
 	sent_instruction_access =
-		spci_get_instruction_access_attr(sent_permissions);
+		ffa_get_instruction_access_attr(sent_permissions);
 	requested_permissions =
 		retrieve_request->receivers[0].receiver_permissions.permissions;
-	requested_data_access =
-		spci_get_data_access_attr(requested_permissions);
+	requested_data_access = ffa_get_data_access_attr(requested_permissions);
 	requested_instruction_access =
-		spci_get_instruction_access_attr(requested_permissions);
+		ffa_get_instruction_access_attr(requested_permissions);
 	permissions = 0;
 	switch (sent_data_access) {
-	case SPCI_DATA_ACCESS_NOT_SPECIFIED:
-	case SPCI_DATA_ACCESS_RW:
-		if (requested_data_access == SPCI_DATA_ACCESS_NOT_SPECIFIED ||
-		    requested_data_access == SPCI_DATA_ACCESS_RW) {
-			spci_set_data_access_attr(&permissions,
-						  SPCI_DATA_ACCESS_RW);
+	case FFA_DATA_ACCESS_NOT_SPECIFIED:
+	case FFA_DATA_ACCESS_RW:
+		if (requested_data_access == FFA_DATA_ACCESS_NOT_SPECIFIED ||
+		    requested_data_access == FFA_DATA_ACCESS_RW) {
+			ffa_set_data_access_attr(&permissions,
+						 FFA_DATA_ACCESS_RW);
 			break;
 		}
 		/* Intentional fall-through. */
-	case SPCI_DATA_ACCESS_RO:
-		if (requested_data_access == SPCI_DATA_ACCESS_NOT_SPECIFIED ||
-		    requested_data_access == SPCI_DATA_ACCESS_RO) {
-			spci_set_data_access_attr(&permissions,
-						  SPCI_DATA_ACCESS_RO);
+	case FFA_DATA_ACCESS_RO:
+		if (requested_data_access == FFA_DATA_ACCESS_NOT_SPECIFIED ||
+		    requested_data_access == FFA_DATA_ACCESS_RO) {
+			ffa_set_data_access_attr(&permissions,
+						 FFA_DATA_ACCESS_RO);
 			break;
 		}
 		dlog_verbose(
 			"Invalid data access requested; sender specified "
 			"permissions %#x but receiver requested %#x.\n",
 			sent_permissions, requested_permissions);
-		ret = spci_error(SPCI_DENIED);
+		ret = ffa_error(FFA_DENIED);
 		goto out;
-	case SPCI_DATA_ACCESS_RESERVED:
-		panic("Got unexpected SPCI_DATA_ACCESS_RESERVED. Should be "
+	case FFA_DATA_ACCESS_RESERVED:
+		panic("Got unexpected FFA_DATA_ACCESS_RESERVED. Should be "
 		      "checked before this point.");
 	}
 	switch (sent_instruction_access) {
-	case SPCI_INSTRUCTION_ACCESS_NOT_SPECIFIED:
-	case SPCI_INSTRUCTION_ACCESS_X:
+	case FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED:
+	case FFA_INSTRUCTION_ACCESS_X:
 		if (requested_instruction_access ==
-			    SPCI_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
-		    requested_instruction_access == SPCI_INSTRUCTION_ACCESS_X) {
-			spci_set_instruction_access_attr(
-				&permissions, SPCI_INSTRUCTION_ACCESS_X);
+			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
+		    requested_instruction_access == FFA_INSTRUCTION_ACCESS_X) {
+			ffa_set_instruction_access_attr(
+				&permissions, FFA_INSTRUCTION_ACCESS_X);
 			break;
 		}
-	case SPCI_INSTRUCTION_ACCESS_NX:
+	case FFA_INSTRUCTION_ACCESS_NX:
 		if (requested_instruction_access ==
-			    SPCI_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
-		    requested_instruction_access ==
-			    SPCI_INSTRUCTION_ACCESS_NX) {
-			spci_set_instruction_access_attr(
-				&permissions, SPCI_INSTRUCTION_ACCESS_NX);
+			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
+		    requested_instruction_access == FFA_INSTRUCTION_ACCESS_NX) {
+			ffa_set_instruction_access_attr(
+				&permissions, FFA_INSTRUCTION_ACCESS_NX);
 			break;
 		}
 		dlog_verbose(
@@ -1530,20 +1527,20 @@ struct spci_value spci_memory_retrieve(
 			"specified "
 			"permissions %#x but receiver requested %#x.\n",
 			sent_permissions, requested_permissions);
-		ret = spci_error(SPCI_DENIED);
+		ret = ffa_error(FFA_DENIED);
 		goto out;
-	case SPCI_INSTRUCTION_ACCESS_RESERVED:
-		panic("Got unexpected SPCI_INSTRUCTION_ACCESS_RESERVED. Should "
+	case FFA_INSTRUCTION_ACCESS_RESERVED:
+		panic("Got unexpected FFA_INSTRUCTION_ACCESS_RESERVED. Should "
 		      "be checked before this point.");
 	}
-	memory_to_attributes = spci_memory_permissions_to_mode(permissions);
+	memory_to_attributes = ffa_memory_permissions_to_mode(permissions);
 
-	composite = spci_memory_region_get_composite(memory_region, 0);
-	ret = spci_retrieve_memory(to_locked, composite->constituents,
-				   composite->constituent_count,
-				   memory_to_attributes,
-				   share_state->share_func, false, page_pool);
-	if (ret.func != SPCI_SUCCESS_32) {
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+	ret = ffa_retrieve_memory(to_locked, composite->constituents,
+				  composite->constituent_count,
+				  memory_to_attributes, share_state->share_func,
+				  false, page_pool);
+	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
 
@@ -1552,17 +1549,17 @@ struct spci_value spci_memory_retrieve(
 	 * must be done before the share_state is (possibly) freed.
 	 */
 	/* TODO: combine attributes from sender and request. */
-	response_size = spci_retrieved_memory_region_init(
+	response_size = ffa_retrieved_memory_region_init(
 		to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
 		memory_region->sender, memory_region->attributes,
 		memory_region->flags, handle, to_locked.vm->id, permissions,
 		composite->constituents, composite->constituent_count);
 	to_locked.vm->mailbox.recv_size = response_size;
 	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
-	to_locked.vm->mailbox.recv_func = SPCI_MEM_RETRIEVE_RESP_32;
+	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
 
-	if (share_state->share_func == SPCI_MEM_DONATE_32) {
+	if (share_state->share_func == FFA_MEM_DONATE_32) {
 		/*
 		 * Memory that has been donated can't be relinquished, so no
 		 * need to keep the share state around.
@@ -1573,9 +1570,9 @@ struct spci_value spci_memory_retrieve(
 		share_state->retrieved[0] = true;
 	}
 
-	ret = (struct spci_value){.func = SPCI_MEM_RETRIEVE_RESP_32,
-				  .arg1 = response_size,
-				  .arg2 = response_size};
+	ret = (struct ffa_value){.func = FFA_MEM_RETRIEVE_RESP_32,
+				 .arg1 = response_size,
+				 .arg2 = response_size};
 
 out:
 	share_states_unlock(&share_states);
@@ -1583,24 +1580,24 @@ out:
 	return ret;
 }
 
-struct spci_value spci_memory_relinquish(
+struct ffa_value ffa_memory_relinquish(
 	struct vm_locked from_locked,
-	struct spci_mem_relinquish *relinquish_request, struct mpool *page_pool)
+	struct ffa_mem_relinquish *relinquish_request, struct mpool *page_pool)
 {
-	spci_memory_handle_t handle = relinquish_request->handle;
+	ffa_memory_handle_t handle = relinquish_request->handle;
 	struct share_states_locked share_states;
-	struct spci_memory_share_state *share_state;
-	struct spci_memory_region *memory_region;
+	struct ffa_memory_share_state *share_state;
+	struct ffa_memory_region *memory_region;
 	bool clear;
-	struct spci_composite_memory_region *composite;
-	struct spci_value ret;
+	struct ffa_composite_memory_region *composite;
+	struct ffa_value ret;
 
 	if (relinquish_request->endpoint_count != 1) {
 		dlog_verbose(
 			"Stream endpoints not supported (got %d endpoints on "
-			"SPCI_MEM_RELINQUISH, expected 1).\n",
+			"FFA_MEM_RELINQUISH, expected 1).\n",
 			relinquish_request->endpoint_count);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	if (relinquish_request->endpoints[0] != from_locked.vm->id) {
@@ -1608,16 +1605,16 @@ struct spci_value spci_memory_relinquish(
 			"VM ID %d in relinquish message doesn't match calling "
 			"VM ID %d.\n",
 			relinquish_request->endpoints[0], from_locked.vm->id);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	dump_share_states();
 
 	share_states = share_states_lock();
 	if (!get_share_state(share_states, handle, &share_state)) {
-		dlog_verbose("Invalid handle %#x for SPCI_MEM_RELINQUISH.\n",
+		dlog_verbose("Invalid handle %#x for FFA_MEM_RELINQUISH.\n",
 			     handle);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1632,7 +1629,7 @@ struct spci_value spci_memory_relinquish(
 			from_locked.vm->id, handle,
 			memory_region->receivers[0]
 				.receiver_permissions.receiver);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1641,28 +1638,28 @@ struct spci_value spci_memory_relinquish(
 			"Memory with handle %#x not yet retrieved, can't "
 			"relinquish.\n",
 			handle);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
-	clear = relinquish_request->flags & SPCI_MEMORY_REGION_FLAG_CLEAR;
+	clear = relinquish_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR;
 
 	/*
 	 * Clear is not allowed for memory that was shared, as the original
 	 * sender still has access to the memory.
 	 */
-	if (clear && share_state->share_func == SPCI_MEM_SHARE_32) {
+	if (clear && share_state->share_func == FFA_MEM_SHARE_32) {
 		dlog_verbose("Memory which was shared can't be cleared.\n");
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
-	composite = spci_memory_region_get_composite(memory_region, 0);
-	ret = spci_relinquish_memory(from_locked, composite->constituents,
-				     composite->constituent_count, page_pool,
-				     clear);
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+	ret = ffa_relinquish_memory(from_locked, composite->constituents,
+				    composite->constituent_count, page_pool,
+				    clear);
 
-	if (ret.func == SPCI_SUCCESS_32) {
+	if (ret.func == FFA_SUCCESS_32) {
 		/*
 		 * Mark memory handle as not retrieved, so it can be reclaimed
 		 * (or retrieved again).
@@ -1681,24 +1678,24 @@ out:
  * updates the page table of the reclaiming VM, and frees the internal state
  * associated with the handle.
  */
-struct spci_value spci_memory_reclaim(struct vm_locked to_locked,
-				      spci_memory_handle_t handle, bool clear,
-				      struct mpool *page_pool)
+struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
+				    ffa_memory_handle_t handle, bool clear,
+				    struct mpool *page_pool)
 {
 	struct share_states_locked share_states;
-	struct spci_memory_share_state *share_state;
-	struct spci_memory_region *memory_region;
-	struct spci_composite_memory_region *composite;
+	struct ffa_memory_share_state *share_state;
+	struct ffa_memory_region *memory_region;
+	struct ffa_composite_memory_region *composite;
 	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
-	struct spci_value ret;
+	struct ffa_value ret;
 
 	dump_share_states();
 
 	share_states = share_states_lock();
 	if (!get_share_state(share_states, handle, &share_state)) {
-		dlog_verbose("Invalid handle %#x for SPCI_MEM_RECLAIM.\n",
+		dlog_verbose("Invalid handle %#x for FFA_MEM_RECLAIM.\n",
 			     handle);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1710,7 +1707,7 @@ struct spci_value spci_memory_reclaim(struct vm_locked to_locked,
 			"VM %d attempted to reclaim memory handle %#x "
 			"originally sent by VM %d.\n",
 			to_locked.vm->id, handle, memory_region->sender);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1719,17 +1716,17 @@ struct spci_value spci_memory_reclaim(struct vm_locked to_locked,
 			"Tried to reclaim memory handle %#x that has not been "
 			"relinquished.\n",
 			handle);
-		ret = spci_error(SPCI_DENIED);
+		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
 
-	composite = spci_memory_region_get_composite(memory_region, 0);
-	ret = spci_retrieve_memory(to_locked, composite->constituents,
-				   composite->constituent_count,
-				   memory_to_attributes, SPCI_MEM_RECLAIM_32,
-				   clear, page_pool);
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+	ret = ffa_retrieve_memory(to_locked, composite->constituents,
+				  composite->constituent_count,
+				  memory_to_attributes, FFA_MEM_RECLAIM_32,
+				  clear, page_pool);
 
-	if (ret.func == SPCI_SUCCESS_32) {
+	if (ret.func == FFA_SUCCESS_32) {
 		share_state_free(share_states, share_state, page_pool);
 		dlog_verbose("Freed share state after successful reclaim.\n");
 	}
@@ -1743,13 +1740,13 @@ out:
  * Validates that the reclaim transition is allowed for the given memory region
  * and updates the page table of the reclaiming VM.
  */
-struct spci_value spci_memory_tee_reclaim(
-	struct vm_locked to_locked, spci_memory_handle_t handle,
-	struct spci_memory_region *memory_region, bool clear,
-	struct mpool *page_pool)
+struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
+					ffa_memory_handle_t handle,
+					struct ffa_memory_region *memory_region,
+					bool clear, struct mpool *page_pool)
 {
 	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
-	struct spci_composite_memory_region *composite;
+	struct ffa_composite_memory_region *composite;
 
 	if (memory_region->receiver_count != 1) {
 		/* Only one receiver supported by Hafnium for now. */
@@ -1757,7 +1754,7 @@ struct spci_value spci_memory_tee_reclaim(
 			"Multiple recipients not supported (got %d, expected "
 			"1).\n",
 			memory_region->receiver_count);
-		return spci_error(SPCI_NOT_SUPPORTED);
+		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
 	if (memory_region->handle != handle) {
@@ -1765,7 +1762,7 @@ struct spci_value spci_memory_tee_reclaim(
 			"Got memory region handle %#x from TEE but requested "
 			"handle %#x.\n",
 			memory_region->handle, handle);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* The original sender must match the caller. */
@@ -1774,17 +1771,17 @@ struct spci_value spci_memory_tee_reclaim(
 			"VM %d attempted to reclaim memory handle %#x "
 			"originally sent by VM %d.\n",
 			to_locked.vm->id, handle, memory_region->sender);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	composite = spci_memory_region_get_composite(memory_region, 0);
+	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/*
 	 * Forward the request to the TEE and then map the memory back into the
 	 * caller's stage-2 page table.
 	 */
-	return spci_tee_reclaim_memory(to_locked, handle,
-				       composite->constituents,
-				       composite->constituent_count,
-				       memory_to_attributes, clear, page_pool);
+	return ffa_tee_reclaim_memory(to_locked, handle,
+				      composite->constituents,
+				      composite->constituent_count,
+				      memory_to_attributes, clear, page_pool);
 }

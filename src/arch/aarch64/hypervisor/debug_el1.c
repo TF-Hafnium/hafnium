@@ -141,7 +141,7 @@ bool debug_el1_is_register_access(uintreg_t esr)
  * Processes an access (msr, mrs) to an EL1 debug register.
  * Returns true if the access was allowed and performed, false otherwise.
  */
-bool debug_el1_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
+bool debug_el1_process_access(struct vcpu *vcpu, ffa_vm_id_t vm_id,
 			      uintreg_t esr)
 {
 	/*

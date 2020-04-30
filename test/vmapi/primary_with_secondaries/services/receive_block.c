@@ -18,13 +18,13 @@
 #include "hf/arch/vm/interrupts.h"
 
 #include "hf/dlog.h"
-#include "hf/spci.h"
+#include "hf/ffa.h"
 
 #include "vmapi/hf/call.h"
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
 /*
  * Secondary VM that enables an interrupt, disables interrupts globally, and
@@ -47,12 +47,12 @@ TEST_SERVICE(receive_block)
 	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
 
 	for (i = 0; i < 10; ++i) {
-		struct spci_value res = spci_msg_wait();
-		EXPECT_SPCI_ERROR(res, SPCI_INTERRUPTED);
+		struct ffa_value res = ffa_msg_wait();
+		EXPECT_FFA_ERROR(res, FFA_INTERRUPTED);
 	}
 
-	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, message,
+	memcpy_s(SERVICE_SEND_BUFFER(), FFA_MSG_PAYLOAD_MAX, message,
 		 sizeof(message));
 
-	spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(message), 0);
+	ffa_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(message), 0);
 }

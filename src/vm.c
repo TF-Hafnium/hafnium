@@ -19,18 +19,18 @@
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/cpu.h"
+#include "hf/ffa.h"
 #include "hf/layout.h"
 #include "hf/plat/iommu.h"
-#include "hf/spci.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
 
 static struct vm vms[MAX_VMS];
 static struct vm tee_vm;
-static spci_vm_count_t vm_count;
+static ffa_vm_count_t vm_count;
 
-struct vm *vm_init(spci_vm_id_t id, spci_vcpu_count_t vcpu_count,
+struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 		   struct mpool *ppool)
 {
 	uint32_t i;
@@ -76,7 +76,7 @@ struct vm *vm_init(spci_vm_id_t id, spci_vcpu_count_t vcpu_count,
 	return vm;
 }
 
-bool vm_init_next(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
+bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
 		  struct vm **new_vm)
 {
 	if (vm_count >= MAX_VMS) {
@@ -93,12 +93,12 @@ bool vm_init_next(spci_vcpu_count_t vcpu_count, struct mpool *ppool,
 	return true;
 }
 
-spci_vm_count_t vm_get_count(void)
+ffa_vm_count_t vm_get_count(void)
 {
 	return vm_count;
 }
 
-struct vm *vm_find(spci_vm_id_t id)
+struct vm *vm_find(ffa_vm_id_t id)
 {
 	uint16_t index;
 
@@ -167,7 +167,7 @@ void vm_unlock(struct vm_locked *locked)
  * Get the vCPU with the given index from the given VM.
  * This assumes the index is valid, i.e. less than vm->vcpu_count.
  */
-struct vcpu *vm_get_vcpu(struct vm *vm, spci_vcpu_index_t vcpu_index)
+struct vcpu *vm_get_vcpu(struct vm *vm, ffa_vcpu_index_t vcpu_index)
 {
 	CHECK(vcpu_index < vm->vcpu_count);
 	return &vm->vcpus[vcpu_index];
@@ -176,7 +176,7 @@ struct vcpu *vm_get_vcpu(struct vm *vm, spci_vcpu_index_t vcpu_index)
 /**
  * Gets `vm`'s wait entry for waiting on the `for_vm`.
  */
-struct wait_entry *vm_get_wait_entry(struct vm *vm, spci_vm_id_t for_vm)
+struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_vm_id_t for_vm)
 {
 	uint16_t index;
 
@@ -190,7 +190,7 @@ struct wait_entry *vm_get_wait_entry(struct vm *vm, spci_vm_id_t for_vm)
 /**
  * Gets the ID of the VM which the given VM's wait entry is for.
  */
-spci_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)
+ffa_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)
 {
 	uint16_t index = entry - vm->wait_entries;
 

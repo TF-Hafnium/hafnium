@@ -55,8 +55,8 @@ source_set("src_testable") {
   sources = [
     "api.c",
     "cpu.c",
+    "ffa_memory.c",
     "manifest.c",
-    "spci_memory.c",
     "vcpu.c",
   ]
 

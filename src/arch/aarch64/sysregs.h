@@ -20,7 +20,7 @@
 
 #include "hf/cpu.h"
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 /**
  * RT value that indicates an access to register XZR (always 0).
@@ -588,7 +588,7 @@
  */
 #define SCTLR_EL2_M (UINT64_C(0x1) << 0)
 
-uintreg_t get_hcr_el2_value(spci_vm_id_t vm_id);
+uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id);
 
 uintreg_t get_mdcr_el2_value(void);
 

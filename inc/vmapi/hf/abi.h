@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/types.h"
 
 /* Keep macro alignment */
@@ -31,9 +31,9 @@
 #define HF_INTERRUPT_GET               0xff06
 #define HF_INTERRUPT_INJECT            0xff07
 
-/* Custom SPCI-like calls returned from SPCI_RUN. */
-#define HF_SPCI_RUN_WAIT_FOR_INTERRUPT 0xff09
-#define HF_SPCI_RUN_WAKE_UP            0xff0a
+/* Custom FF-A-like calls returned from FFA_RUN. */
+#define HF_FFA_RUN_WAIT_FOR_INTERRUPT 0xff09
+#define HF_FFA_RUN_WAKE_UP            0xff0a
 
 /* This matches what Trusty and its ATF module currently use. */
 #define HF_DEBUG_LOG            0xbd000000

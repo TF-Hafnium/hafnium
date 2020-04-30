@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "hf/spci.h"
+#include "hf/ffa.h"
 
 void arch_tee_init(void);
-struct spci_value arch_tee_call(struct spci_value args);
+struct ffa_value arch_tee_call(struct ffa_value args);

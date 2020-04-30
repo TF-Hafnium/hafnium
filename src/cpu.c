@@ -42,13 +42,13 @@ static_assert((PAGE_SIZE % STACK_ALIGN) == 0,
 	      "Page alignment is too weak for the stack.");
 
 /**
- * Internal buffer used to store SPCI messages from a VM Tx. Its usage prevents
+ * Internal buffer used to store FF-A messages from a VM Tx. Its usage prevents
  * TOCTOU issues while Hafnium performs actions on information that would
  * otherwise be re-writable by the VM.
  *
  * Each buffer is owned by a single CPU. The buffer can only be used for
- * spci_msg_send. The information stored in the buffer is only valid during the
- * spci_msg_send request is performed.
+ * ffa_msg_send. The information stored in the buffer is only valid during the
+ * ffa_msg_send request is performed.
  */
 alignas(PAGE_SIZE) static uint8_t cpu_message_buffer[MAX_CPUS][PAGE_SIZE];
 

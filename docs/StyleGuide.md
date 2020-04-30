@@ -38,7 +38,7 @@ requires, and try to improve it if possible.
 These rules apply to comments and other natural language text.
 
 *   Capitalize acronyms.
-    *   CPU, vCPU, VM, EL2, SPCI, QEMU
+    *   CPU, vCPU, VM, EL2, FF-A, QEMU
 *   Spell out Hafnium in full, not Hf.
 *   Use single spaces.
 *   Sentences end with full stops.

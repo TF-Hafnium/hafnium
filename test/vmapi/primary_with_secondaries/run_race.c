@@ -26,7 +26,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
 struct cpu_state {
 	struct mailbox_buffers *mb;
@@ -39,32 +39,32 @@ struct cpu_state {
  */
 static bool run_loop(struct mailbox_buffers *mb)
 {
-	struct spci_value run_res;
+	struct ffa_value run_res;
 	bool ok = false;
 
 	for (;;) {
 		/* Run until it manages to schedule vCPU on this CPU. */
 		do {
-			run_res = spci_run(SERVICE_VM1, 0);
-		} while (run_res.func == SPCI_ERROR_32 &&
-			 run_res.arg2 == SPCI_BUSY);
+			run_res = ffa_run(SERVICE_VM1, 0);
+		} while (run_res.func == FFA_ERROR_32 &&
+			 run_res.arg2 == FFA_BUSY);
 
 		/* Break out if we received a message with non-zero length. */
-		if (run_res.func == SPCI_MSG_SEND_32 &&
-		    spci_msg_send_size(run_res) != 0) {
+		if (run_res.func == FFA_MSG_SEND_32 &&
+		    ffa_msg_send_size(run_res) != 0) {
 			break;
 		}
 
 		/* Clear mailbox so that next message can be received. */
-		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	}
 
 	/* Copies the contents of the received boolean to the return value. */
-	if (spci_msg_send_size(run_res) == sizeof(ok)) {
+	if (ffa_msg_send_size(run_res) == sizeof(ok)) {
 		ok = *(bool *)mb->recv;
 	}
 
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	return ok;
 }
@@ -83,7 +83,7 @@ static void vm_cpu_entry(uintptr_t arg)
 
 TEAR_DOWN(vcpu_state)
 {
-	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
 /**

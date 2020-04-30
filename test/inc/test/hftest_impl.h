@@ -19,10 +19,10 @@
 #include <stdnoreturn.h>
 
 #include "hf/fdt.h"
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/std.h"
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 #define HFTEST_MAX_TESTS 50
 
@@ -284,7 +284,7 @@ union hftest_any {
  */
 #define HFTEST_SERVICE_SELECT(vm_id, service, send_buffer)                    \
 	do {                                                                  \
-		struct spci_value run_res;                                    \
+		struct ffa_value run_res;                                     \
 		uint32_t msg_length =                                         \
 			strnlen_s(service, SERVICE_NAME_MAX_LENGTH);          \
                                                                               \
@@ -292,19 +292,19 @@ union hftest_any {
 		 * Let the service configure its mailbox and wait for a       \
 		 * message.                                                   \
 		 */                                                           \
-		run_res = spci_run(vm_id, 0);                                 \
-		ASSERT_EQ(run_res.func, SPCI_MSG_WAIT_32);                    \
-		ASSERT_EQ(run_res.arg2, SPCI_SLEEP_INDEFINITE);               \
+		run_res = ffa_run(vm_id, 0);                                  \
+		ASSERT_EQ(run_res.func, FFA_MSG_WAIT_32);                     \
+		ASSERT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);                \
                                                                               \
 		/* Send the selected service to run and let it be handled. */ \
-		memcpy_s(send_buffer, SPCI_MSG_PAYLOAD_MAX, service,          \
+		memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, service,           \
 			 msg_length);                                         \
                                                                               \
-		ASSERT_EQ(spci_msg_send(hf_vm_get_id(), vm_id, msg_length, 0) \
+		ASSERT_EQ(ffa_msg_send(hf_vm_get_id(), vm_id, msg_length, 0)  \
 				  .func,                                      \
-			  SPCI_SUCCESS_32);                                   \
-		run_res = spci_run(vm_id, 0);                                 \
-		ASSERT_EQ(run_res.func, SPCI_YIELD_32);                       \
+			  FFA_SUCCESS_32);                                    \
+		run_res = ffa_run(vm_id, 0);                                  \
+		ASSERT_EQ(run_res.func, FFA_YIELD_32);                        \
 	} while (0)
 
 #define HFTEST_SERVICE_SEND_BUFFER() hftest_get_context()->send

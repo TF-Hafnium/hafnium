@@ -20,9 +20,9 @@
 
 #include "hf/cpu.h"
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 bool debug_el1_is_register_access(uintreg_t esr_el2);
 
-bool debug_el1_process_access(struct vcpu *vcpu, spci_vm_id_t vm_id,
+bool debug_el1_process_access(struct vcpu *vcpu, ffa_vm_id_t vm_id,
 			      uintreg_t esr_el2);

@@ -45,7 +45,7 @@ TEST_SERVICE(access_systemreg_ctlr)
 	EXPECT_EQ(exception_handler_get_num(), 2);
 
 	/* Yield after catching the exceptions. */
-	spci_yield();
+	ffa_yield();
 }
 
 TEST_SERVICE(write_systemreg_sre)
@@ -69,5 +69,5 @@ TEST_SERVICE(write_systemreg_sre)
 		ASSERT_EQ(read_msr(ICC_SRE_EL1), 0x7);
 	}
 
-	spci_yield();
+	ffa_yield();
 }

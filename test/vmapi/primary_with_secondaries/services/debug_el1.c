@@ -33,5 +33,5 @@ TEST_SERVICE(debug_el1_secondary_basic)
 	TRY_READ(DBGWVR0_EL1);
 
 	EXPECT_EQ(exception_handler_get_num(), 5);
-	spci_yield();
+	ffa_yield();
 }

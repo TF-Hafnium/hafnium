@@ -25,7 +25,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
 static alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
 static alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];
@@ -64,7 +64,7 @@ TEST(hf_vcpu_get_count, secondary_has_one_vcpu)
  */
 TEST(hf_vcpu_get_count, reserved_vm_id)
 {
-	spci_vm_id_t id;
+	ffa_vm_id_t id;
 
 	for (id = 0; id < HF_VM_ID_OFFSET; ++id) {
 		EXPECT_EQ(hf_vcpu_get_count(id), 0);
@@ -83,42 +83,42 @@ TEST(hf_vcpu_get_count, large_invalid_vm_id)
 /**
  * The primary can't be run by the hypervisor.
  */
-TEST(spci_run, cannot_run_primary)
+TEST(ffa_run, cannot_run_primary)
 {
-	struct spci_value res = spci_run(HF_PRIMARY_VM_ID, 0);
-	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
+	struct ffa_value res = ffa_run(HF_PRIMARY_VM_ID, 0);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
 /**
  * Can only run a VM that exists.
  */
-TEST(spci_run, cannot_run_absent_secondary)
+TEST(ffa_run, cannot_run_absent_secondary)
 {
-	struct spci_value res = spci_run(1234, 0);
-	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
+	struct ffa_value res = ffa_run(1234, 0);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
 /**
  * Can only run a vCPU that exists.
  */
-TEST(spci_run, cannot_run_absent_vcpu)
+TEST(ffa_run, cannot_run_absent_vcpu)
 {
-	struct spci_value res = spci_run(SERVICE_VM1, 1234);
-	EXPECT_SPCI_ERROR(res, SPCI_INVALID_PARAMETERS);
+	struct ffa_value res = ffa_run(SERVICE_VM1, 1234);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
 /**
  * The configured send/receive addresses can't be device memory.
  */
-TEST(spci_rxtx_map, fails_with_device_memory)
+TEST(ffa_rxtx_map, fails_with_device_memory)
 {
-	EXPECT_SPCI_ERROR(spci_rxtx_map(PAGE_SIZE, PAGE_SIZE * 2), SPCI_DENIED);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(PAGE_SIZE, PAGE_SIZE * 2), FFA_DENIED);
 }
 
 /**
  * The configured send/receive addresses can't be unaligned.
  */
-TEST(spci_rxtx_map, fails_with_unaligned_pointer)
+TEST(ffa_rxtx_map, fails_with_unaligned_pointer)
 {
 	uint8_t maybe_aligned[2];
 	hf_ipaddr_t unaligned_addr = (hf_ipaddr_t)&maybe_aligned[1];
@@ -127,60 +127,60 @@ TEST(spci_rxtx_map, fails_with_unaligned_pointer)
 	/* Check that the address is unaligned. */
 	ASSERT_EQ(unaligned_addr & 1, 1);
 
-	EXPECT_SPCI_ERROR(spci_rxtx_map(aligned_addr, unaligned_addr),
-			  SPCI_INVALID_PARAMETERS);
-	EXPECT_SPCI_ERROR(spci_rxtx_map(unaligned_addr, aligned_addr),
-			  SPCI_INVALID_PARAMETERS);
-	EXPECT_SPCI_ERROR(spci_rxtx_map(unaligned_addr, unaligned_addr),
-			  SPCI_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(aligned_addr, unaligned_addr),
+			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(unaligned_addr, aligned_addr),
+			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(unaligned_addr, unaligned_addr),
+			 FFA_INVALID_PARAMETERS);
 }
 
 /**
  * The configured send/receive addresses can't be the same page.
  */
-TEST(spci_rxtx_map, fails_with_same_page)
+TEST(ffa_rxtx_map, fails_with_same_page)
 {
-	EXPECT_SPCI_ERROR(spci_rxtx_map(send_page_addr, send_page_addr),
-			  SPCI_INVALID_PARAMETERS);
-	EXPECT_SPCI_ERROR(spci_rxtx_map(recv_page_addr, recv_page_addr),
-			  SPCI_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(send_page_addr, send_page_addr),
+			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(recv_page_addr, recv_page_addr),
+			 FFA_INVALID_PARAMETERS);
 }
 
 /**
  * The configuration of the send/receive addresses can only happen once.
  */
-TEST(spci_rxtx_map, fails_if_already_succeeded)
+TEST(ffa_rxtx_map, fails_if_already_succeeded)
 {
-	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
-		  SPCI_SUCCESS_32);
-	EXPECT_SPCI_ERROR(spci_rxtx_map(send_page_addr, recv_page_addr),
-			  SPCI_DENIED);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(send_page_addr, recv_page_addr),
+			 FFA_DENIED);
 }
 
 /**
  * The configuration of the send/receive address is successful with valid
  * arguments.
  */
-TEST(spci_rxtx_map, succeeds)
+TEST(ffa_rxtx_map, succeeds)
 {
-	EXPECT_EQ(spci_rxtx_map(send_page_addr, recv_page_addr).func,
-		  SPCI_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
 }
 
 /**
- * The primary receives messages from spci_run().
+ * The primary receives messages from ffa_run().
  */
 TEST(hf_mailbox_receive, cannot_receive_from_primary_blocking)
 {
-	struct spci_value res = spci_msg_wait();
-	EXPECT_NE(res.func, SPCI_SUCCESS_32);
+	struct ffa_value res = ffa_msg_wait();
+	EXPECT_NE(res.func, FFA_SUCCESS_32);
 }
 
 /**
- * The primary receives messages from spci_run().
+ * The primary receives messages from ffa_run().
  */
 TEST(hf_mailbox_receive, cannot_receive_from_primary_non_blocking)
 {
-	struct spci_value res = spci_msg_poll();
-	EXPECT_NE(res.func, SPCI_SUCCESS_32);
+	struct ffa_value res = ffa_msg_poll();
+	EXPECT_NE(res.func, FFA_SUCCESS_32);
 }

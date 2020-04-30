@@ -16,11 +16,11 @@
 
 #pragma once
 
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 /**
  * Called after an SMC has been forwarded. `args` contains the arguments passed
  * to the SMC and `ret` contains the return values that will be set in the vCPU
  * registers after this call returns.
  */
-void plat_smc_post_forward(struct spci_value args, struct spci_value *ret);
+void plat_smc_post_forward(struct ffa_value args, struct ffa_value *ret);

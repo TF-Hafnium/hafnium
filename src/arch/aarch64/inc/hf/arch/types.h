@@ -19,7 +19,7 @@
 #include <stdalign.h>
 #include <stdint.h>
 
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/static_assert.h"
 
 #define PAGE_BITS 12
@@ -67,7 +67,7 @@ struct arch_vm {
 	 * on that CPU, which avoids contention and so no lock is needed to
 	 * access this field.
 	 */
-	spci_vcpu_index_t last_vcpu_on_cpu[MAX_CPUS];
+	ffa_vcpu_index_t last_vcpu_on_cpu[MAX_CPUS];
 	arch_features_t trapped_features;
 
 	/*

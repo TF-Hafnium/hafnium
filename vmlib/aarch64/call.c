@@ -16,7 +16,7 @@
 
 #include "hf/call.h"
 
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/types.h"
 
 int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3)
@@ -37,7 +37,7 @@ int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	return r0;
 }
 
-struct spci_value spci_call(struct spci_value args)
+struct ffa_value ffa_call(struct ffa_value args)
 {
 	register uint64_t r0 __asm__("x0") = args.func;
 	register uint64_t r1 __asm__("x1") = args.arg1;
@@ -54,12 +54,12 @@ struct spci_value spci_call(struct spci_value args)
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3), "+r"(r4), "+r"(r5),
 		"+r"(r6), "+r"(r7));
 
-	return (struct spci_value){.func = r0,
-				   .arg1 = r1,
-				   .arg2 = r2,
-				   .arg3 = r3,
-				   .arg4 = r4,
-				   .arg5 = r5,
-				   .arg6 = r6,
-				   .arg7 = r7};
+	return (struct ffa_value){.func = r0,
+				  .arg1 = r1,
+				  .arg2 = r2,
+				  .arg3 = r3,
+				  .arg4 = r4,
+				  .arg5 = r5,
+				  .arg6 = r6,
+				  .arg7 = r7};
 }

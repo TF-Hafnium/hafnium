@@ -25,8 +25,8 @@
 #include "hf/check.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
+#include "hf/ffa.h"
 #include "hf/panic.h"
-#include "hf/spci.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/call.h"
@@ -154,7 +154,7 @@ static void invalidate_vm_tlb(void)
 void maybe_invalidate_tlb(struct vcpu *vcpu)
 {
 	size_t current_cpu_index = cpu_index(vcpu->cpu);
-	spci_vcpu_index_t new_vcpu_index = vcpu_index(vcpu);
+	ffa_vcpu_index_t new_vcpu_index = vcpu_index(vcpu);
 
 	if (vcpu->vm->arch.last_vcpu_on_cpu[current_cpu_index] !=
 	    new_vcpu_index) {
@@ -280,9 +280,9 @@ static bool smc_is_blocked(const struct vm *vm, uint32_t func)
  * Applies SMC access control according to manifest and forwards the call if
  * access is granted.
  */
-static void smc_forwarder(const struct vm *vm, struct spci_value *args)
+static void smc_forwarder(const struct vm *vm, struct ffa_value *args)
 {
-	struct spci_value ret;
+	struct ffa_value ret;
 	uint32_t client_id = vm->id;
 	uintreg_t arg7 = args->arg7;
 
@@ -313,73 +313,72 @@ static void smc_forwarder(const struct vm *vm, struct spci_value *args)
 	*args = ret;
 }
 
-static bool spci_handler(struct spci_value *args, struct vcpu **next)
+static bool ffa_handler(struct ffa_value *args, struct vcpu **next)
 {
 	uint32_t func = args->func & ~SMCCC_CONVENTION_MASK;
 
 	/*
 	 * NOTE: When adding new methods to this handler update
-	 * api_spci_features accordingly.
+	 * api_ffa_features accordingly.
 	 */
 	switch (func) {
-	case SPCI_VERSION_32:
-		*args = api_spci_version(args->arg1);
+	case FFA_VERSION_32:
+		*args = api_ffa_version(args->arg1);
 		return true;
-	case SPCI_ID_GET_32:
-		*args = api_spci_id_get(current());
+	case FFA_ID_GET_32:
+		*args = api_ffa_id_get(current());
 		return true;
-	case SPCI_FEATURES_32:
-		*args = api_spci_features(args->arg1);
+	case FFA_FEATURES_32:
+		*args = api_ffa_features(args->arg1);
 		return true;
-	case SPCI_RX_RELEASE_32:
-		*args = api_spci_rx_release(current(), next);
+	case FFA_RX_RELEASE_32:
+		*args = api_ffa_rx_release(current(), next);
 		return true;
-	case SPCI_RXTX_MAP_32:
-		*args = api_spci_rxtx_map(ipa_init(args->arg1),
-					  ipa_init(args->arg2), args->arg3,
-					  current(), next);
+	case FFA_RXTX_MAP_32:
+		*args = api_ffa_rxtx_map(ipa_init(args->arg1),
+					 ipa_init(args->arg2), args->arg3,
+					 current(), next);
 		return true;
-	case SPCI_YIELD_32:
+	case FFA_YIELD_32:
 		api_yield(current(), next);
 
-		/* SPCI_YIELD always returns SPCI_SUCCESS. */
-		*args = (struct spci_value){.func = SPCI_SUCCESS_32};
+		/* FFA_YIELD always returns FFA_SUCCESS. */
+		*args = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 		return true;
-	case SPCI_MSG_SEND_32:
-		*args = api_spci_msg_send(spci_msg_send_sender(*args),
-					  spci_msg_send_receiver(*args),
-					  spci_msg_send_size(*args),
-					  spci_msg_send_attributes(*args),
-					  current(), next);
+	case FFA_MSG_SEND_32:
+		*args = api_ffa_msg_send(
+			ffa_msg_send_sender(*args),
+			ffa_msg_send_receiver(*args), ffa_msg_send_size(*args),
+			ffa_msg_send_attributes(*args), current(), next);
 		return true;
-	case SPCI_MSG_WAIT_32:
-		*args = api_spci_msg_recv(true, current(), next);
+	case FFA_MSG_WAIT_32:
+		*args = api_ffa_msg_recv(true, current(), next);
 		return true;
-	case SPCI_MSG_POLL_32:
-		*args = api_spci_msg_recv(false, current(), next);
+	case FFA_MSG_POLL_32:
+		*args = api_ffa_msg_recv(false, current(), next);
 		return true;
-	case SPCI_RUN_32:
-		*args = api_spci_run(spci_vm_id(*args), spci_vcpu_index(*args),
-				     current(), next);
+	case FFA_RUN_32:
+		*args = api_ffa_run(ffa_vm_id(*args), ffa_vcpu_index(*args),
+				    current(), next);
 		return true;
-	case SPCI_MEM_DONATE_32:
-	case SPCI_MEM_LEND_32:
-	case SPCI_MEM_SHARE_32:
-		*args = api_spci_mem_send(func, args->arg1, args->arg2,
-					  ipa_init(args->arg3), args->arg4,
-					  current(), next);
+	case FFA_MEM_DONATE_32:
+	case FFA_MEM_LEND_32:
+	case FFA_MEM_SHARE_32:
+		*args = api_ffa_mem_send(func, args->arg1, args->arg2,
+					 ipa_init(args->arg3), args->arg4,
+					 current(), next);
 		return true;
-	case SPCI_MEM_RETRIEVE_REQ_32:
-		*args = api_spci_mem_retrieve_req(args->arg1, args->arg2,
-						  ipa_init(args->arg3),
-						  args->arg4, current());
+	case FFA_MEM_RETRIEVE_REQ_32:
+		*args = api_ffa_mem_retrieve_req(args->arg1, args->arg2,
+						 ipa_init(args->arg3),
+						 args->arg4, current());
 		return true;
-	case SPCI_MEM_RELINQUISH_32:
-		*args = api_spci_mem_relinquish(current());
+	case FFA_MEM_RELINQUISH_32:
+		*args = api_ffa_mem_relinquish(current());
 		return true;
-	case SPCI_MEM_RECLAIM_32:
-		*args = api_spci_mem_reclaim(
+	case FFA_MEM_RECLAIM_32:
+		*args = api_ffa_mem_reclaim(
 			(args->arg1 & 0xffffffff) | args->arg2 << 32,
 			args->arg3, current());
 		return true;
@@ -422,7 +421,7 @@ static void update_vi(struct vcpu *next)
  */
 static struct vcpu *smc_handler(struct vcpu *vcpu)
 {
-	struct spci_value args = {
+	struct ffa_value args = {
 		.func = vcpu->regs.r[0],
 		.arg1 = vcpu->regs.r[1],
 		.arg2 = vcpu->regs.r[2],
@@ -439,7 +438,7 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
 		return next;
 	}
 
-	if (spci_handler(&args, &next)) {
+	if (ffa_handler(&args, &next)) {
 		arch_regs_set_retval(&vcpu->regs, args);
 		update_vi(next);
 		return next;
@@ -595,7 +594,7 @@ static void inject_el1_unknown_exception(struct vcpu *vcpu, uintreg_t esr_el2)
 
 struct vcpu *hvc_handler(struct vcpu *vcpu)
 {
-	struct spci_value args = {
+	struct ffa_value args = {
 		.func = vcpu->regs.r[0],
 		.arg1 = vcpu->regs.r[1],
 		.arg2 = vcpu->regs.r[2],
@@ -612,7 +611,7 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 		return next;
 	}
 
-	if (spci_handler(&args, &next)) {
+	if (ffa_handler(&args, &next)) {
 		arch_regs_set_retval(&vcpu->regs, args);
 		update_vi(next);
 		return next;
@@ -816,7 +815,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 void handle_system_register_access(uintreg_t esr_el2)
 {
 	struct vcpu *vcpu = current();
-	spci_vm_id_t vm_id = vcpu->vm->id;
+	ffa_vm_id_t vm_id = vcpu->vm->id;
 	uintreg_t ec = GET_ESR_EC(esr_el2);
 
 	CHECK(ec == EC_MSR);

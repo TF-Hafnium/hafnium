@@ -30,6 +30,7 @@ vm_kernel("primary_with_secondaries_test_vm") {
   sources = [
     "boot.c",
     "debug_el1.c",
+    "ffa.c",
     "floating_point.c",
     "interrupts.c",
     "mailbox.c",
@@ -38,7 +39,6 @@ vm_kernel("primary_with_secondaries_test_vm") {
     "perfmon.c",
     "run_race.c",
     "smp.c",
-    "spci.c",
     "sysregs.c",
     "unmapped.c",
   ]

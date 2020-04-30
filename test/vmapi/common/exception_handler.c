@@ -36,27 +36,27 @@ void exception_handler_send_exception_count(void)
 
 	dlog("Sending exception_count %d to primary VM\n",
 	     exception_handler_exception_count);
-	memcpy_s(send_buf, SPCI_MSG_PAYLOAD_MAX,
+	memcpy_s(send_buf, FFA_MSG_PAYLOAD_MAX,
 		 (const void *)&exception_handler_exception_count,
 		 sizeof(exception_handler_exception_count));
-	EXPECT_EQ(spci_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID,
-				sizeof(exception_handler_exception_count), 0)
+	EXPECT_EQ(ffa_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID,
+			       sizeof(exception_handler_exception_count), 0)
 			  .func,
-		  SPCI_SUCCESS_32);
+		  FFA_SUCCESS_32);
 }
 
 /**
  * Receives the number of exceptions handled.
  */
 int exception_handler_receive_exception_count(
-	const struct spci_value *send_res,
-	const struct spci_memory_region *recv_buf)
+	const struct ffa_value *send_res,
+	const struct ffa_memory_region *recv_buf)
 {
 	int exception_count = *((const int *)recv_buf);
 
-	EXPECT_EQ(send_res->func, SPCI_MSG_SEND_32);
-	EXPECT_EQ(spci_msg_send_size(*send_res), sizeof(exception_count));
-	EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
+	EXPECT_EQ(send_res->func, FFA_MSG_SEND_32);
+	EXPECT_EQ(ffa_msg_send_size(*send_res), sizeof(exception_count));
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	return exception_count;
 }
 

@@ -20,7 +20,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/vmapi/exception_handler.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
 SET_UP(sysregs)
 {

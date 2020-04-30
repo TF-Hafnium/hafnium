@@ -22,17 +22,17 @@
 
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/ffa_internal.h"
+#include "hf/ffa_memory.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
-#include "hf/spci_internal.h"
-#include "hf/spci_memory.h"
 #include "hf/spinlock.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/call.h"
-#include "vmapi/hf/spci.h"
+#include "vmapi/hf/ffa.h"
 
 /*
  * To eliminate the risk of deadlocks, we define a partial order for the
@@ -69,10 +69,10 @@ void api_init(struct mpool *ppool)
  * Switches the physical CPU back to the corresponding vCPU of the primary VM.
  *
  * This triggers the scheduling logic to run. Run in the context of secondary VM
- * to cause SPCI_RUN to return and the primary VM to regain control of the CPU.
+ * to cause FFA_RUN to return and the primary VM to regain control of the CPU.
  */
 static struct vcpu *api_switch_to_primary(struct vcpu *current,
-					  struct spci_value primary_ret,
+					  struct ffa_value primary_ret,
 					  enum vcpu_state secondary_state)
 {
 	struct vm *primary = vm_find(HF_PRIMARY_VM_ID);
@@ -83,8 +83,8 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 	 * timer fires rather than indefinitely.
 	 */
 	switch (primary_ret.func) {
-	case HF_SPCI_RUN_WAIT_FOR_INTERRUPT:
-	case SPCI_MSG_WAIT_32: {
+	case HF_FFA_RUN_WAIT_FOR_INTERRUPT:
+	case FFA_MSG_WAIT_32: {
 		if (arch_timer_enabled_current()) {
 			uint64_t remaining_ns =
 				arch_timer_remaining_ns_current();
@@ -94,7 +94,7 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 				 * Timer is pending, so the current vCPU should
 				 * be run again right away.
 				 */
-				primary_ret.func = SPCI_INTERRUPT_32;
+				primary_ret.func = FFA_INTERRUPT_32;
 				/*
 				 * primary_ret.arg1 should already be set to the
 				 * current VM ID and vCPU ID.
@@ -104,7 +104,7 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 				primary_ret.arg2 = remaining_ns;
 			}
 		} else {
-			primary_ret.arg2 = SPCI_SLEEP_INDEFINITE;
+			primary_ret.arg2 = FFA_SLEEP_INDEFINITE;
 		}
 		break;
 	}
@@ -130,9 +130,9 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
  */
 struct vcpu *api_preempt(struct vcpu *current)
 {
-	struct spci_value ret = {
-		.func = SPCI_INTERRUPT_32,
-		.arg1 = spci_vm_vcpu(current->vm->id, vcpu_index(current)),
+	struct ffa_value ret = {
+		.func = FFA_INTERRUPT_32,
+		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	return api_switch_to_primary(current, ret, VCPU_STATE_READY);
@@ -144,9 +144,9 @@ struct vcpu *api_preempt(struct vcpu *current)
  */
 struct vcpu *api_wait_for_interrupt(struct vcpu *current)
 {
-	struct spci_value ret = {
-		.func = HF_SPCI_RUN_WAIT_FOR_INTERRUPT,
-		.arg1 = spci_vm_vcpu(current->vm->id, vcpu_index(current)),
+	struct ffa_value ret = {
+		.func = HF_FFA_RUN_WAIT_FOR_INTERRUPT,
+		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	return api_switch_to_primary(current, ret,
@@ -158,9 +158,9 @@ struct vcpu *api_wait_for_interrupt(struct vcpu *current)
  */
 struct vcpu *api_vcpu_off(struct vcpu *current)
 {
-	struct spci_value ret = {
-		.func = HF_SPCI_RUN_WAIT_FOR_INTERRUPT,
-		.arg1 = spci_vm_vcpu(current->vm->id, vcpu_index(current)),
+	struct ffa_value ret = {
+		.func = HF_FFA_RUN_WAIT_FOR_INTERRUPT,
+		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	/*
@@ -179,9 +179,9 @@ struct vcpu *api_vcpu_off(struct vcpu *current)
  */
 void api_yield(struct vcpu *current, struct vcpu **next)
 {
-	struct spci_value primary_ret = {
-		.func = SPCI_YIELD_32,
-		.arg1 = spci_vm_vcpu(current->vm->id, vcpu_index(current)),
+	struct ffa_value primary_ret = {
+		.func = FFA_YIELD_32,
+		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	if (current->vm->id == HF_PRIMARY_VM_ID) {
@@ -198,10 +198,10 @@ void api_yield(struct vcpu *current, struct vcpu **next)
  */
 struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
 {
-	struct spci_value ret = {
-		.func = HF_SPCI_RUN_WAKE_UP,
-		.arg1 = spci_vm_vcpu(target_vcpu->vm->id,
-				     vcpu_index(target_vcpu)),
+	struct ffa_value ret = {
+		.func = HF_FFA_RUN_WAKE_UP,
+		.arg1 = ffa_vm_vcpu(target_vcpu->vm->id,
+				    vcpu_index(target_vcpu)),
 	};
 	return api_switch_to_primary(current, ret, VCPU_STATE_READY);
 }
@@ -211,7 +211,7 @@ struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
  */
 struct vcpu *api_abort(struct vcpu *current)
 {
-	struct spci_value ret = spci_error(SPCI_ABORTED);
+	struct ffa_value ret = ffa_error(FFA_ABORTED);
 
 	dlog_notice("Aborting VM %u vCPU %u\n", current->vm->id,
 		    vcpu_index(current));
@@ -234,16 +234,16 @@ struct vcpu *api_abort(struct vcpu *current)
 /**
  * Returns the ID of the VM.
  */
-struct spci_value api_spci_id_get(const struct vcpu *current)
+struct ffa_value api_ffa_id_get(const struct vcpu *current)
 {
-	return (struct spci_value){.func = SPCI_SUCCESS_32,
-				   .arg2 = current->vm->id};
+	return (struct ffa_value){.func = FFA_SUCCESS_32,
+				  .arg2 = current->vm->id};
 }
 
 /**
  * Returns the number of VMs configured to run.
  */
-spci_vm_count_t api_vm_get_count(void)
+ffa_vm_count_t api_vm_get_count(void)
 {
 	return vm_get_count();
 }
@@ -252,8 +252,8 @@ spci_vm_count_t api_vm_get_count(void)
  * Returns the number of vCPUs configured in the given VM, or 0 if there is no
  * such VM or the caller is not the primary VM.
  */
-spci_vcpu_count_t api_vcpu_get_count(spci_vm_id_t vm_id,
-				     const struct vcpu *current)
+ffa_vcpu_count_t api_vcpu_get_count(ffa_vm_id_t vm_id,
+				    const struct vcpu *current)
 {
 	struct vm *vm;
 
@@ -370,29 +370,29 @@ out:
 }
 
 /**
- * Constructs an SPCI_MSG_SEND value to return from a successful SPCI_MSG_POLL
- * or SPCI_MSG_WAIT call.
+ * Constructs an FFA_MSG_SEND value to return from a successful FFA_MSG_POLL
+ * or FFA_MSG_WAIT call.
  */
-static struct spci_value spci_msg_recv_return(const struct vm *receiver)
+static struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 {
 	switch (receiver->mailbox.recv_func) {
-	case SPCI_MSG_SEND_32:
-		return (struct spci_value){
-			.func = SPCI_MSG_SEND_32,
+	case FFA_MSG_SEND_32:
+		return (struct ffa_value){
+			.func = FFA_MSG_SEND_32,
 			.arg1 = (receiver->mailbox.recv_sender << 16) |
 				receiver->id,
 			.arg3 = receiver->mailbox.recv_size};
-	case SPCI_MEM_DONATE_32:
-	case SPCI_MEM_LEND_32:
-	case SPCI_MEM_SHARE_32:
-		return (struct spci_value){.func = receiver->mailbox.recv_func,
-					   .arg1 = receiver->mailbox.recv_size,
-					   .arg2 = receiver->mailbox.recv_size};
+	case FFA_MEM_DONATE_32:
+	case FFA_MEM_LEND_32:
+	case FFA_MEM_SHARE_32:
+		return (struct ffa_value){.func = receiver->mailbox.recv_func,
+					  .arg1 = receiver->mailbox.recv_size,
+					  .arg2 = receiver->mailbox.recv_size};
 	default:
 		/* This should never be reached, but return an error in case. */
 		dlog_error("Tried to return an invalid message function %#x\n",
 			   receiver->mailbox.recv_func);
-		return spci_error(SPCI_DENIED);
+		return ffa_error(FFA_DENIED);
 	}
 }
 
@@ -401,7 +401,7 @@ static struct spci_value spci_msg_recv_return(const struct vm *receiver)
  * value needs to be forced onto the vCPU.
  */
 static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
-				 struct spci_value *run_ret)
+				 struct ffa_value *run_ret)
 {
 	bool need_vm_lock;
 	bool ret;
@@ -443,7 +443,7 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 		 * other physical CPU that is currently running this vCPU will
 		 * return the sleep duration if needed.
 		 */
-		*run_ret = spci_error(SPCI_BUSY);
+		*run_ret = ffa_error(FFA_BUSY);
 		ret = false;
 		goto out;
 	}
@@ -472,7 +472,7 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 		 */
 		if (vcpu->vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
 			arch_regs_set_retval(&vcpu->regs,
-					     spci_msg_recv_return(vcpu->vm));
+					     ffa_msg_recv_return(vcpu->vm));
 			vcpu->vm->mailbox.state = MAILBOX_STATE_READ;
 			break;
 		}
@@ -501,10 +501,10 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 			 */
 			run_ret->func =
 				vcpu->state == VCPU_STATE_BLOCKED_MAILBOX
-					? SPCI_MSG_WAIT_32
-					: HF_SPCI_RUN_WAIT_FOR_INTERRUPT;
+					? FFA_MSG_WAIT_32
+					: HF_FFA_RUN_WAIT_FOR_INTERRUPT;
 			run_ret->arg1 =
-				spci_vm_vcpu(vcpu->vm->id, vcpu_index(vcpu));
+				ffa_vm_vcpu(vcpu->vm->id, vcpu_index(vcpu));
 			run_ret->arg2 = timer_remaining_ns;
 		}
 
@@ -537,16 +537,16 @@ out:
 	return ret;
 }
 
-struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
-			       const struct vcpu *current, struct vcpu **next)
+struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+			     const struct vcpu *current, struct vcpu **next)
 {
 	struct vm *vm;
 	struct vcpu *vcpu;
-	struct spci_value ret = spci_error(SPCI_INVALID_PARAMETERS);
+	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
 
 	/* Only the primary VM can switch vCPUs. */
 	if (current->vm->id != HF_PRIMARY_VM_ID) {
-		ret.arg2 = SPCI_DENIED;
+		ret.arg2 = FFA_DENIED;
 		goto out;
 	}
 
@@ -600,8 +600,8 @@ struct spci_value api_spci_run(spci_vm_id_t vm_id, spci_vcpu_index_t vcpu_idx,
 	 * Set a placeholder return code to the scheduler. This will be
 	 * overwritten when the switch back to the primary occurs.
 	 */
-	ret.func = SPCI_INTERRUPT_32;
-	ret.arg1 = spci_vm_vcpu(vm_id, vcpu_idx);
+	ret.func = FFA_INTERRUPT_32;
+	ret.arg1 = ffa_vm_vcpu(vm_id, vcpu_idx);
 	ret.arg2 = 0;
 
 out:
@@ -618,24 +618,24 @@ static bool api_mode_valid_owned_and_exclusive(uint32_t mode)
 }
 
 /**
- * Determines the value to be returned by api_vm_configure and spci_rx_release
+ * Determines the value to be returned by api_vm_configure and ffa_rx_release
  * after they've succeeded. If a secondary VM is running and there are waiters,
  * it also switches back to the primary VM for it to wake waiters up.
  */
-static struct spci_value api_waiter_result(struct vm_locked locked_vm,
-					   struct vcpu *current,
-					   struct vcpu **next)
+static struct ffa_value api_waiter_result(struct vm_locked locked_vm,
+					  struct vcpu *current,
+					  struct vcpu **next)
 {
 	struct vm *vm = locked_vm.vm;
 
 	if (list_empty(&vm->mailbox.waiter_list)) {
 		/* No waiters, nothing else to do. */
-		return (struct spci_value){.func = SPCI_SUCCESS_32};
+		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	}
 
 	if (vm->id == HF_PRIMARY_VM_ID) {
 		/* The caller is the primary VM. Tell it to wake up waiters. */
-		return (struct spci_value){.func = SPCI_RX_RELEASE_32};
+		return (struct ffa_value){.func = FFA_RX_RELEASE_32};
 	}
 
 	/*
@@ -643,10 +643,10 @@ static struct spci_value api_waiter_result(struct vm_locked locked_vm,
 	 * that need to be notified.
 	 */
 	*next = api_switch_to_primary(
-		current, (struct spci_value){.func = SPCI_RX_RELEASE_32},
+		current, (struct ffa_value){.func = FFA_RX_RELEASE_32},
 		VCPU_STATE_READY);
 
-	return (struct spci_value){.func = SPCI_SUCCESS_32};
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
 /**
@@ -783,19 +783,19 @@ out:
  * must not be shared.
  *
  * Returns:
- *  - SPCI_ERROR SPCI_INVALID_PARAMETERS if the given addresses are not properly
+ *  - FFA_ERROR FFA_INVALID_PARAMETERS if the given addresses are not properly
  *    aligned or are the same.
- *  - SPCI_ERROR SPCI_NO_MEMORY if the hypervisor was unable to map the buffers
+ *  - FFA_ERROR FFA_NO_MEMORY if the hypervisor was unable to map the buffers
  *    due to insuffient page table memory.
- *  - SPCI_ERROR SPCI_DENIED if the pages are already mapped or are not owned by
+ *  - FFA_ERROR FFA_DENIED if the pages are already mapped or are not owned by
  *    the caller.
- *  - SPCI_SUCCESS on success if no further action is needed.
- *  - SPCI_RX_RELEASE if it was called by the primary VM and the primary VM now
+ *  - FFA_SUCCESS on success if no further action is needed.
+ *  - FFA_RX_RELEASE if it was called by the primary VM and the primary VM now
  *    needs to wake up or kick waiters.
  */
-struct spci_value api_spci_rxtx_map(ipaddr_t send, ipaddr_t recv,
-				    uint32_t page_count, struct vcpu *current,
-				    struct vcpu **next)
+struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
+				  uint32_t page_count, struct vcpu *current,
+				  struct vcpu **next)
 {
 	struct vm *vm = current->vm;
 	struct vm_locked vm_locked;
@@ -805,17 +805,17 @@ struct spci_value api_spci_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	paddr_t pa_recv_end;
 	uint32_t orig_send_mode;
 	uint32_t orig_recv_mode;
-	struct spci_value ret;
+	struct ffa_value ret;
 
 	/* Hafnium only supports a fixed size of RX/TX buffers. */
-	if (page_count != HF_MAILBOX_SIZE / SPCI_PAGE_SIZE) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+	if (page_count != HF_MAILBOX_SIZE / FFA_PAGE_SIZE) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* Fail if addresses are not page-aligned. */
 	if (!is_aligned(ipa_addr(send), PAGE_SIZE) ||
 	    !is_aligned(ipa_addr(recv), PAGE_SIZE)) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* Convert to physical addresses. */
@@ -827,7 +827,7 @@ struct spci_value api_spci_rxtx_map(ipaddr_t send, ipaddr_t recv,
 
 	/* Fail if the same page is used for the send and receive pages. */
 	if (pa_addr(pa_send_begin) == pa_addr(pa_recv_begin)) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -842,7 +842,7 @@ struct spci_value api_spci_rxtx_map(ipaddr_t send, ipaddr_t recv,
 
 	/* We only allow these to be setup once. */
 	if (vm->mailbox.send || vm->mailbox.recv) {
-		ret = spci_error(SPCI_DENIED);
+		ret = ffa_error(FFA_DENIED);
 		goto exit;
 	}
 
@@ -855,7 +855,7 @@ struct spci_value api_spci_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	    !api_mode_valid_owned_and_exclusive(orig_send_mode) ||
 	    (orig_send_mode & MM_MODE_R) == 0 ||
 	    (orig_send_mode & MM_MODE_W) == 0) {
-		ret = spci_error(SPCI_DENIED);
+		ret = ffa_error(FFA_DENIED);
 		goto exit;
 	}
 
@@ -863,14 +863,14 @@ struct spci_value api_spci_rxtx_map(ipaddr_t send, ipaddr_t recv,
 			    &orig_recv_mode) ||
 	    !api_mode_valid_owned_and_exclusive(orig_recv_mode) ||
 	    (orig_recv_mode & MM_MODE_R) == 0) {
-		ret = spci_error(SPCI_DENIED);
+		ret = ffa_error(FFA_DENIED);
 		goto exit;
 	}
 
 	if (!api_vm_configure_pages(vm_locked, pa_send_begin, pa_send_end,
 				    orig_send_mode, pa_recv_begin, pa_recv_end,
 				    orig_recv_mode)) {
-		ret = spci_error(SPCI_NO_MEMORY);
+		ret = ffa_error(FFA_NO_MEMORY);
 		goto exit;
 	}
 
@@ -916,12 +916,12 @@ static bool msg_receiver_busy(struct vm_locked to, struct vm *from, bool notify)
  * Notifies the `to` VM about the message currently in its mailbox, possibly
  * with the help of the primary VM.
  */
-static struct spci_value deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
-				     struct vcpu *current, struct vcpu **next)
+static struct ffa_value deliver_msg(struct vm_locked to, ffa_vm_id_t from_id,
+				    struct vcpu *current, struct vcpu **next)
 {
-	struct spci_value ret = (struct spci_value){.func = SPCI_SUCCESS_32};
-	struct spci_value primary_ret = {
-		.func = SPCI_MSG_SEND_32,
+	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+	struct ffa_value primary_ret = {
+		.func = FFA_MSG_SEND_32,
 		.arg1 = ((uint32_t)from_id << 16) | to.vm->id,
 	};
 
@@ -932,7 +932,7 @@ static struct spci_value deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
 		 * message is for it, to avoid leaking data about messages for
 		 * other VMs.
 		 */
-		primary_ret = spci_msg_recv_return(to.vm);
+		primary_ret = ffa_msg_recv_return(to.vm);
 
 		to.vm->mailbox.state = MAILBOX_STATE_READ;
 		*next = api_switch_to_primary(current, primary_ret,
@@ -944,7 +944,7 @@ static struct spci_value deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
 
 	/* Messages for the TEE are sent on via the dispatcher. */
 	if (to.vm->id == HF_TEE_VM_ID) {
-		struct spci_value call = spci_msg_recv_return(to.vm);
+		struct ffa_value call = ffa_msg_recv_return(to.vm);
 
 		ret = arch_tee_call(call);
 		/*
@@ -954,7 +954,7 @@ static struct spci_value deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
 		to.vm->mailbox.state = MAILBOX_STATE_EMPTY;
 		/*
 		 * Don't return to the primary VM in this case, as the TEE is
-		 * not (yet) scheduled via SPCI.
+		 * not (yet) scheduled via FF-A.
 		 */
 		return ret;
 	}
@@ -975,38 +975,38 @@ static struct spci_value deliver_msg(struct vm_locked to, spci_vm_id_t from_id,
  * If the recipient's receive buffer is busy, it can optionally register the
  * caller to be notified when the recipient's receive buffer becomes available.
  */
-struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
-				    spci_vm_id_t receiver_vm_id, uint32_t size,
-				    uint32_t attributes, struct vcpu *current,
-				    struct vcpu **next)
+struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
+				  ffa_vm_id_t receiver_vm_id, uint32_t size,
+				  uint32_t attributes, struct vcpu *current,
+				  struct vcpu **next)
 {
 	struct vm *from = current->vm;
 	struct vm *to;
 	struct vm_locked to_locked;
 	const void *from_msg;
-	struct spci_value ret;
-	bool notify = (attributes & SPCI_MSG_SEND_NOTIFY_MASK) ==
-		      SPCI_MSG_SEND_NOTIFY;
+	struct ffa_value ret;
+	bool notify =
+		(attributes & FFA_MSG_SEND_NOTIFY_MASK) == FFA_MSG_SEND_NOTIFY;
 
 	/* Ensure sender VM ID corresponds to the current VM. */
 	if (sender_vm_id != from->id) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* Disallow reflexive requests as this suggests an error in the VM. */
 	if (receiver_vm_id == from->id) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* Limit the size of transfer. */
-	if (size > SPCI_MSG_PAYLOAD_MAX) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+	if (size > FFA_MSG_PAYLOAD_MAX) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* Ensure the receiver VM exists. */
 	to = vm_find(receiver_vm_id);
 	if (to == NULL) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -1020,21 +1020,21 @@ struct spci_value api_spci_msg_send(spci_vm_id_t sender_vm_id,
 	sl_unlock(&from->lock);
 
 	if (from_msg == NULL) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	to_locked = vm_lock(to);
 
 	if (msg_receiver_busy(to_locked, from, notify)) {
-		ret = spci_error(SPCI_BUSY);
+		ret = ffa_error(FFA_BUSY);
 		goto out;
 	}
 
 	/* Copy data. */
-	memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX, from_msg, size);
+	memcpy_s(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX, from_msg, size);
 	to->mailbox.recv_size = size;
 	to->mailbox.recv_sender = sender_vm_id;
-	to->mailbox.recv_func = SPCI_MSG_SEND_32;
+	to->mailbox.recv_func = FFA_MSG_SEND_32;
 	ret = deliver_msg(to_locked, sender_vm_id, current, next);
 
 out:
@@ -1047,7 +1047,7 @@ out:
  * Checks whether the vCPU's attempt to block for a message has already been
  * interrupted or whether it is allowed to block.
  */
-bool api_spci_msg_recv_block_interrupted(struct vcpu *current)
+bool api_ffa_msg_recv_block_interrupted(struct vcpu *current)
 {
 	bool interrupted;
 
@@ -1070,18 +1070,18 @@ bool api_spci_msg_recv_block_interrupted(struct vcpu *current)
  *
  * No new messages can be received until the mailbox has been cleared.
  */
-struct spci_value api_spci_msg_recv(bool block, struct vcpu *current,
-				    struct vcpu **next)
+struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
+				  struct vcpu **next)
 {
 	struct vm *vm = current->vm;
-	struct spci_value return_code;
+	struct ffa_value return_code;
 
 	/*
 	 * The primary VM will receive messages as a status code from running
 	 * vCPUs and must not call this function.
 	 */
 	if (vm->id == HF_PRIMARY_VM_ID) {
-		return spci_error(SPCI_NOT_SUPPORTED);
+		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
 	sl_lock(&vm->lock);
@@ -1089,31 +1089,31 @@ struct spci_value api_spci_msg_recv(bool block, struct vcpu *current,
 	/* Return pending messages without blocking. */
 	if (vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
 		vm->mailbox.state = MAILBOX_STATE_READ;
-		return_code = spci_msg_recv_return(vm);
+		return_code = ffa_msg_recv_return(vm);
 		goto out;
 	}
 
 	/* No pending message so fail if not allowed to block. */
 	if (!block) {
-		return_code = spci_error(SPCI_RETRY);
+		return_code = ffa_error(FFA_RETRY);
 		goto out;
 	}
 
 	/*
 	 * From this point onward this call can only be interrupted or a message
 	 * received. If a message is received the return value will be set at
-	 * that time to SPCI_SUCCESS.
+	 * that time to FFA_SUCCESS.
 	 */
-	return_code = spci_error(SPCI_INTERRUPTED);
-	if (api_spci_msg_recv_block_interrupted(current)) {
+	return_code = ffa_error(FFA_INTERRUPTED);
+	if (api_ffa_msg_recv_block_interrupted(current)) {
 		goto out;
 	}
 
 	/* Switch back to primary VM to block. */
 	{
-		struct spci_value run_return = {
-			.func = SPCI_MSG_WAIT_32,
-			.arg1 = spci_vm_vcpu(vm->id, vcpu_index(current)),
+		struct ffa_value run_return = {
+			.func = FFA_MSG_WAIT_32,
+			.arg1 = ffa_vm_vcpu(vm->id, vcpu_index(current)),
 		};
 
 		*next = api_switch_to_primary(current, run_return,
@@ -1165,7 +1165,7 @@ exit:
  * Returns -1 on failure or if there are no waiters; the VM id of the next
  * waiter otherwise.
  */
-int64_t api_mailbox_waiter_get(spci_vm_id_t vm_id, const struct vcpu *current)
+int64_t api_mailbox_waiter_get(ffa_vm_id_t vm_id, const struct vcpu *current)
 {
 	struct vm *vm;
 	struct vm_locked locked;
@@ -1210,23 +1210,23 @@ int64_t api_mailbox_waiter_get(spci_vm_id_t vm_id, const struct vcpu *current)
  * will overwrite the old and will arrive asynchronously.
  *
  * Returns:
- *  - SPCI_ERROR SPCI_DENIED on failure, if the mailbox hasn't been read.
- *  - SPCI_SUCCESS on success if no further action is needed.
- *  - SPCI_RX_RELEASE if it was called by the primary VM and the primary VM now
+ *  - FFA_ERROR FFA_DENIED on failure, if the mailbox hasn't been read.
+ *  - FFA_SUCCESS on success if no further action is needed.
+ *  - FFA_RX_RELEASE if it was called by the primary VM and the primary VM now
  *    needs to wake up or kick waiters. Waiters should be retrieved by calling
  *    hf_mailbox_waiter_get.
  */
-struct spci_value api_spci_rx_release(struct vcpu *current, struct vcpu **next)
+struct ffa_value api_ffa_rx_release(struct vcpu *current, struct vcpu **next)
 {
 	struct vm *vm = current->vm;
 	struct vm_locked locked;
-	struct spci_value ret;
+	struct ffa_value ret;
 
 	locked = vm_lock(vm);
 	switch (vm->mailbox.state) {
 	case MAILBOX_STATE_EMPTY:
 	case MAILBOX_STATE_RECEIVED:
-		ret = spci_error(SPCI_DENIED);
+		ret = ffa_error(FFA_DENIED);
 		break;
 
 	case MAILBOX_STATE_READ:
@@ -1351,8 +1351,8 @@ static inline bool is_injection_allowed(uint32_t target_vm_id,
  *  - 1 if it was called by the primary VM and the primary VM now needs to wake
  *    up or kick the target vCPU.
  */
-int64_t api_interrupt_inject(spci_vm_id_t target_vm_id,
-			     spci_vcpu_index_t target_vcpu_idx, uint32_t intid,
+int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
+			     ffa_vcpu_index_t target_vcpu_idx, uint32_t intid,
 			     struct vcpu *current, struct vcpu **next)
 {
 	struct vcpu *target_vcpu;
@@ -1383,25 +1383,25 @@ int64_t api_interrupt_inject(spci_vm_id_t target_vm_id,
 	return internal_interrupt_inject(target_vcpu, intid, current, next);
 }
 
-/** Returns the version of the implemented SPCI specification. */
-struct spci_value api_spci_version(uint32_t requested_version)
+/** Returns the version of the implemented FF-A specification. */
+struct ffa_value api_ffa_version(uint32_t requested_version)
 {
 	/*
 	 * Ensure that both major and minor revision representation occupies at
 	 * most 15 bits.
 	 */
-	static_assert(0x8000 > SPCI_VERSION_MAJOR,
+	static_assert(0x8000 > FFA_VERSION_MAJOR,
 		      "Major revision representation takes more than 15 bits.");
-	static_assert(0x10000 > SPCI_VERSION_MINOR,
+	static_assert(0x10000 > FFA_VERSION_MINOR,
 		      "Minor revision representation takes more than 16 bits.");
-	if (requested_version & SPCI_VERSION_RESERVED_BIT) {
+	if (requested_version & FFA_VERSION_RESERVED_BIT) {
 		/* Invalid encoding, return an error. */
-		return (struct spci_value){.func = SPCI_NOT_SUPPORTED};
+		return (struct ffa_value){.func = FFA_NOT_SUPPORTED};
 	}
 
-	return (struct spci_value){
-		.func = (SPCI_VERSION_MAJOR << SPCI_VERSION_MAJOR_OFFSET) |
-			SPCI_VERSION_MINOR};
+	return (struct ffa_value){
+		.func = (FFA_VERSION_MAJOR << FFA_VERSION_MAJOR_OFFSET) |
+			FFA_VERSION_MINOR};
 }
 
 int64_t api_debug_log(char c, struct vcpu *current)
@@ -1430,59 +1430,59 @@ int64_t api_debug_log(char c, struct vcpu *current)
 
 /**
  * Discovery function returning information about the implementation of optional
- * SPCI interfaces.
+ * FF-A interfaces.
  */
-struct spci_value api_spci_features(uint32_t function_id)
+struct ffa_value api_ffa_features(uint32_t function_id)
 {
 	switch (function_id) {
-	case SPCI_ERROR_32:
-	case SPCI_SUCCESS_32:
-	case SPCI_INTERRUPT_32:
-	case SPCI_VERSION_32:
-	case SPCI_FEATURES_32:
-	case SPCI_RX_RELEASE_32:
-	case SPCI_RXTX_MAP_64:
-	case SPCI_ID_GET_32:
-	case SPCI_MSG_POLL_32:
-	case SPCI_MSG_WAIT_32:
-	case SPCI_YIELD_32:
-	case SPCI_RUN_32:
-	case SPCI_MSG_SEND_32:
-	case SPCI_MEM_DONATE_32:
-	case SPCI_MEM_LEND_32:
-	case SPCI_MEM_SHARE_32:
-	case SPCI_MEM_RETRIEVE_REQ_32:
-	case SPCI_MEM_RETRIEVE_RESP_32:
-	case SPCI_MEM_RELINQUISH_32:
-	case SPCI_MEM_RECLAIM_32:
-		return (struct spci_value){.func = SPCI_SUCCESS_32};
+	case FFA_ERROR_32:
+	case FFA_SUCCESS_32:
+	case FFA_INTERRUPT_32:
+	case FFA_VERSION_32:
+	case FFA_FEATURES_32:
+	case FFA_RX_RELEASE_32:
+	case FFA_RXTX_MAP_64:
+	case FFA_ID_GET_32:
+	case FFA_MSG_POLL_32:
+	case FFA_MSG_WAIT_32:
+	case FFA_YIELD_32:
+	case FFA_RUN_32:
+	case FFA_MSG_SEND_32:
+	case FFA_MEM_DONATE_32:
+	case FFA_MEM_LEND_32:
+	case FFA_MEM_SHARE_32:
+	case FFA_MEM_RETRIEVE_REQ_32:
+	case FFA_MEM_RETRIEVE_RESP_32:
+	case FFA_MEM_RELINQUISH_32:
+	case FFA_MEM_RECLAIM_32:
+		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	default:
-		return spci_error(SPCI_NOT_SUPPORTED);
+		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 }
 
-struct spci_value api_spci_mem_send(uint32_t share_func, uint32_t length,
-				    uint32_t fragment_length, ipaddr_t address,
-				    uint32_t page_count, struct vcpu *current,
-				    struct vcpu **next)
+struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
+				  uint32_t fragment_length, ipaddr_t address,
+				  uint32_t page_count, struct vcpu *current,
+				  struct vcpu **next)
 {
 	struct vm *from = current->vm;
 	struct vm *to;
 	const void *from_msg;
-	struct spci_memory_region *memory_region;
-	struct spci_value ret;
+	struct ffa_memory_region *memory_region;
+	struct ffa_value ret;
 
 	if (ipa_addr(address) != 0 || page_count != 0) {
 		/*
 		 * Hafnium only supports passing the descriptor in the TX
 		 * mailbox.
 		 */
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	if (fragment_length != length) {
 		dlog_verbose("Fragmentation not yet supported.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -1496,7 +1496,7 @@ struct spci_value api_spci_mem_send(uint32_t share_func, uint32_t length,
 	sl_unlock(&from->lock);
 
 	if (from_msg == NULL) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -1505,20 +1505,19 @@ struct spci_value api_spci_mem_send(uint32_t share_func, uint32_t length,
 	 * also lets us keep it around in the share state table if needed.
 	 */
 	if (length > HF_MAILBOX_SIZE || length > MM_PPOOL_ENTRY_SIZE) {
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
-	memory_region =
-		(struct spci_memory_region *)mpool_alloc(&api_page_pool);
+	memory_region = (struct ffa_memory_region *)mpool_alloc(&api_page_pool);
 	if (memory_region == NULL) {
 		dlog_verbose("Failed to allocate memory region copy.\n");
-		return spci_error(SPCI_NO_MEMORY);
+		return ffa_error(FFA_NO_MEMORY);
 	}
 	memcpy_s(memory_region, MM_PPOOL_ENTRY_SIZE, from_msg, length);
 
 	/* The sender must match the caller. */
 	if (memory_region->sender != from->id) {
 		dlog_verbose("Memory region sender doesn't match caller.\n");
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1528,7 +1527,7 @@ struct spci_value api_spci_mem_send(uint32_t share_func, uint32_t length,
 			"Multi-way memory sharing not supported (got %d "
 			"endpoint memory access descriptors, expected 1).\n",
 			memory_region->receiver_count);
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1538,7 +1537,7 @@ struct spci_value api_spci_mem_send(uint32_t share_func, uint32_t length,
 	to = vm_find(memory_region->receivers[0].receiver_permissions.receiver);
 	if (to == NULL || to == from) {
 		dlog_verbose("Invalid receiver.\n");
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1550,15 +1549,15 @@ struct spci_value api_spci_mem_send(uint32_t share_func, uint32_t length,
 		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
 
 		if (msg_receiver_busy(vm_to_from_lock.vm1, from, false)) {
-			ret = spci_error(SPCI_BUSY);
+			ret = ffa_error(FFA_BUSY);
 			goto out_unlock;
 		}
 
-		ret = spci_memory_send(to, vm_to_from_lock.vm2, memory_region,
-				       length, share_func, &api_page_pool);
-		if (ret.func == SPCI_SUCCESS_32) {
+		ret = ffa_memory_send(to, vm_to_from_lock.vm2, memory_region,
+				      length, share_func, &api_page_pool);
+		if (ret.func == FFA_SUCCESS_32) {
 			/* Forward memory send message on to TEE. */
-			memcpy_s(to->mailbox.recv, SPCI_MSG_PAYLOAD_MAX,
+			memcpy_s(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
 				 memory_region, length);
 			to->mailbox.recv_size = length;
 			to->mailbox.recv_sender = from->id;
@@ -1573,10 +1572,10 @@ struct spci_value api_spci_mem_send(uint32_t share_func, uint32_t length,
 	} else {
 		struct vm_locked from_locked = vm_lock(from);
 
-		ret = spci_memory_send(to, from_locked, memory_region, length,
-				       share_func, &api_page_pool);
+		ret = ffa_memory_send(to, from_locked, memory_region, length,
+				      share_func, &api_page_pool);
 		/*
-		 * spci_memory_send takes ownership of the memory_region, so
+		 * ffa_memory_send takes ownership of the memory_region, so
 		 * make sure we don't free it.
 		 */
 		memory_region = NULL;
@@ -1592,38 +1591,37 @@ out:
 	return ret;
 }
 
-struct spci_value api_spci_mem_retrieve_req(uint32_t length,
-					    uint32_t fragment_length,
-					    ipaddr_t address,
-					    uint32_t page_count,
-					    struct vcpu *current)
+struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
+					  uint32_t fragment_length,
+					  ipaddr_t address, uint32_t page_count,
+					  struct vcpu *current)
 {
 	struct vm *to = current->vm;
 	struct vm_locked to_locked;
 	const void *to_msg;
-	struct spci_memory_region *retrieve_request;
+	struct ffa_memory_region *retrieve_request;
 	uint32_t message_buffer_size;
-	struct spci_value ret;
+	struct ffa_value ret;
 
 	if (ipa_addr(address) != 0 || page_count != 0) {
 		/*
 		 * Hafnium only supports passing the descriptor in the TX
 		 * mailbox.
 		 */
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	if (fragment_length != length) {
 		dlog_verbose("Fragmentation not yet supported.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	retrieve_request =
-		(struct spci_memory_region *)cpu_get_buffer(current->cpu);
+		(struct ffa_memory_region *)cpu_get_buffer(current->cpu);
 	message_buffer_size = cpu_get_buffer_size(current->cpu);
 	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
 		dlog_verbose("Retrieve request too long.\n");
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	to_locked = vm_lock(to);
@@ -1631,7 +1629,7 @@ struct spci_value api_spci_mem_retrieve_req(uint32_t length,
 
 	if (to_msg == NULL) {
 		dlog_verbose("TX buffer not setup.\n");
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1647,26 +1645,26 @@ struct spci_value api_spci_mem_retrieve_req(uint32_t length,
 		 * available.
 		 */
 		dlog_verbose("RX buffer not ready.\n");
-		ret = spci_error(SPCI_BUSY);
+		ret = ffa_error(FFA_BUSY);
 		goto out;
 	}
 
-	ret = spci_memory_retrieve(to_locked, retrieve_request, length,
-				   &api_page_pool);
+	ret = ffa_memory_retrieve(to_locked, retrieve_request, length,
+				  &api_page_pool);
 
 out:
 	vm_unlock(&to_locked);
 	return ret;
 }
 
-struct spci_value api_spci_mem_relinquish(struct vcpu *current)
+struct ffa_value api_ffa_mem_relinquish(struct vcpu *current)
 {
 	struct vm *from = current->vm;
 	struct vm_locked from_locked;
 	const void *from_msg;
-	struct spci_mem_relinquish *relinquish_request;
+	struct ffa_mem_relinquish *relinquish_request;
 	uint32_t message_buffer_size;
-	struct spci_value ret;
+	struct ffa_value ret;
 	uint32_t length;
 
 	from_locked = vm_lock(from);
@@ -1674,7 +1672,7 @@ struct spci_value api_spci_mem_relinquish(struct vcpu *current)
 
 	if (from_msg == NULL) {
 		dlog_verbose("TX buffer not setup.\n");
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1682,72 +1680,72 @@ struct spci_value api_spci_mem_relinquish(struct vcpu *current)
 	 * Calculate length from relinquish descriptor before copying. We will
 	 * check again later to make sure it hasn't changed.
 	 */
-	length = sizeof(struct spci_mem_relinquish) +
-		 ((struct spci_mem_relinquish *)from_msg)->endpoint_count *
-			 sizeof(spci_vm_id_t);
+	length = sizeof(struct ffa_mem_relinquish) +
+		 ((struct ffa_mem_relinquish *)from_msg)->endpoint_count *
+			 sizeof(ffa_vm_id_t);
 	/*
 	 * Copy the relinquish descriptor to an internal buffer, so that the
 	 * caller can't change it underneath us.
 	 */
 	relinquish_request =
-		(struct spci_mem_relinquish *)cpu_get_buffer(current->cpu);
+		(struct ffa_mem_relinquish *)cpu_get_buffer(current->cpu);
 	message_buffer_size = cpu_get_buffer_size(current->cpu);
 	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
 		dlog_verbose("Relinquish message too long.\n");
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 	memcpy_s(relinquish_request, message_buffer_size, from_msg, length);
 
-	if (sizeof(struct spci_mem_relinquish) +
-		    relinquish_request->endpoint_count * sizeof(spci_vm_id_t) !=
+	if (sizeof(struct ffa_mem_relinquish) +
+		    relinquish_request->endpoint_count * sizeof(ffa_vm_id_t) !=
 	    length) {
 		dlog_verbose(
 			"Endpoint count changed while copying to internal "
 			"buffer.\n");
-		ret = spci_error(SPCI_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
-	ret = spci_memory_relinquish(from_locked, relinquish_request,
-				     &api_page_pool);
+	ret = ffa_memory_relinquish(from_locked, relinquish_request,
+				    &api_page_pool);
 
 out:
 	vm_unlock(&from_locked);
 	return ret;
 }
 
-static struct spci_value spci_mem_reclaim_tee(struct vm_locked to_locked,
-					      struct vm_locked from_locked,
-					      spci_memory_handle_t handle,
-					      spci_memory_region_flags_t flags,
-					      struct cpu *cpu)
+static struct ffa_value ffa_mem_reclaim_tee(struct vm_locked to_locked,
+					    struct vm_locked from_locked,
+					    ffa_memory_handle_t handle,
+					    ffa_memory_region_flags_t flags,
+					    struct cpu *cpu)
 {
 	uint32_t fragment_length;
 	uint32_t length;
 	uint32_t request_length;
-	struct spci_memory_region *memory_region =
-		(struct spci_memory_region *)cpu_get_buffer(cpu);
+	struct ffa_memory_region *memory_region =
+		(struct ffa_memory_region *)cpu_get_buffer(cpu);
 	uint32_t message_buffer_size = cpu_get_buffer_size(cpu);
-	struct spci_value tee_ret;
+	struct ffa_value tee_ret;
 
-	request_length = spci_memory_lender_retrieve_request_init(
+	request_length = ffa_memory_lender_retrieve_request_init(
 		from_locked.vm->mailbox.recv, handle, to_locked.vm->id);
 
 	/* Retrieve memory region information from the TEE. */
 	tee_ret = arch_tee_call(
-		(struct spci_value){.func = SPCI_MEM_RETRIEVE_REQ_32,
-				    .arg1 = request_length,
-				    .arg2 = request_length});
-	if (tee_ret.func == SPCI_ERROR_32) {
+		(struct ffa_value){.func = FFA_MEM_RETRIEVE_REQ_32,
+				   .arg1 = request_length,
+				   .arg2 = request_length});
+	if (tee_ret.func == FFA_ERROR_32) {
 		dlog_verbose("Got error %d from EL3.\n", tee_ret.arg2);
 		return tee_ret;
 	}
-	if (tee_ret.func != SPCI_MEM_RETRIEVE_RESP_32) {
+	if (tee_ret.func != FFA_MEM_RETRIEVE_RESP_32) {
 		dlog_verbose(
-			"Got %#x from EL3, expected SPCI_MEM_RETRIEVE_RESP.\n",
+			"Got %#x from EL3, expected FFA_MEM_RETRIEVE_RESP.\n",
 			tee_ret.func);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	length = tee_ret.arg1;
@@ -1757,7 +1755,7 @@ static struct spci_value spci_mem_reclaim_tee(struct vm_locked to_locked,
 	    fragment_length > message_buffer_size) {
 		dlog_verbose("Invalid fragment length %d (max %d).\n", length,
 			     HF_MAILBOX_SIZE);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* TODO: Support fragmentation. */
@@ -1766,7 +1764,7 @@ static struct spci_value spci_mem_reclaim_tee(struct vm_locked to_locked,
 			"Message fragmentation not yet supported (fragment "
 			"length %d but length %d).\n",
 			fragment_length, length);
-		return spci_error(SPCI_INVALID_PARAMETERS);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -1780,34 +1778,34 @@ static struct spci_value spci_mem_reclaim_tee(struct vm_locked to_locked,
 	 * Validate that transition is allowed (e.g. that caller is owner),
 	 * forward the reclaim request to the TEE, and update page tables.
 	 */
-	return spci_memory_tee_reclaim(to_locked, handle, memory_region,
-				       flags & SPCI_MEM_RECLAIM_CLEAR,
-				       &api_page_pool);
+	return ffa_memory_tee_reclaim(to_locked, handle, memory_region,
+				      flags & FFA_MEM_RECLAIM_CLEAR,
+				      &api_page_pool);
 }
 
-struct spci_value api_spci_mem_reclaim(spci_memory_handle_t handle,
-				       spci_memory_region_flags_t flags,
-				       struct vcpu *current)
+struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
+				     ffa_memory_region_flags_t flags,
+				     struct vcpu *current)
 {
 	struct vm *to = current->vm;
-	struct spci_value ret;
+	struct ffa_value ret;
 
-	if ((handle & SPCI_MEMORY_HANDLE_ALLOCATOR_MASK) ==
-	    SPCI_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
+	if ((handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK) ==
+	    FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
 		struct vm_locked to_locked = vm_lock(to);
 
-		ret = spci_memory_reclaim(to_locked, handle,
-					  flags & SPCI_MEM_RECLAIM_CLEAR,
-					  &api_page_pool);
+		ret = ffa_memory_reclaim(to_locked, handle,
+					 flags & FFA_MEM_RECLAIM_CLEAR,
+					 &api_page_pool);
 
 		vm_unlock(&to_locked);
 	} else {
 		struct vm *from = vm_find(HF_TEE_VM_ID);
 		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
 
-		ret = spci_mem_reclaim_tee(vm_to_from_lock.vm1,
-					   vm_to_from_lock.vm2, handle, flags,
-					   current->cpu);
+		ret = ffa_mem_reclaim_tee(vm_to_from_lock.vm1,
+					  vm_to_from_lock.vm2, handle, flags,
+					  current->cpu);
 
 		vm_unlock(&vm_to_from_lock.vm1);
 		vm_unlock(&vm_to_from_lock.vm2);

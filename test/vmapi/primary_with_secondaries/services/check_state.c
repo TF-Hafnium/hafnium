@@ -22,14 +22,14 @@
 
 #include "test/hftest.h"
 
-void send_with_retry(spci_vm_id_t sender_vm_id, spci_vm_id_t target_vm_id,
+void send_with_retry(ffa_vm_id_t sender_vm_id, ffa_vm_id_t target_vm_id,
 		     uint32_t size)
 {
-	struct spci_value res;
+	struct ffa_value res;
 
 	do {
-		res = spci_msg_send(sender_vm_id, target_vm_id, size, 0);
-	} while (res.func != SPCI_SUCCESS_32);
+		res = ffa_msg_send(sender_vm_id, target_vm_id, size, 0);
+	} while (res.func != FFA_SUCCESS_32);
 }
 
 /**
@@ -64,7 +64,7 @@ TEST_SERVICE(check_state)
 	}
 
 	/* Send two replies, one for each physical CPU. */
-	memcpy_s(SERVICE_SEND_BUFFER(), SPCI_MSG_PAYLOAD_MAX, &ok, sizeof(ok));
+	memcpy_s(SERVICE_SEND_BUFFER(), FFA_MSG_PAYLOAD_MAX, &ok, sizeof(ok));
 	send_with_retry(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(ok));
 	send_with_retry(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(ok));
 }

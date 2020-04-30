@@ -13,7 +13,7 @@ The format of the manifest is a simple DeviceTree overlay:
 	hypervisor {
 		compatible = "hafnium,hafnium";
 
-		spci_tee;
+		ffa_tee;
 
 		vm1 {
 			debug_name = "name";
@@ -40,7 +40,7 @@ secondary VM has 1MB of memory, 2 CPUs and kernel image called `kernel0`
 of memory, 4 CPUs and, by omitting the `kernel_filename` property, a kernel
 preloaded into memory. The primary VM is given all remaining memory, the same
 number of CPUs as the hardware, a kernel image called `vmlinuz` and a ramdisk
-`initrd.img`. Secondaries cannot have a ramdisk. SPCI memory sharing with the
+`initrd.img`. Secondaries cannot have a ramdisk. FF-A memory sharing with the
 TEE is enabled.
 
 ```
@@ -50,7 +50,7 @@ TEE is enabled.
 	hypervisor {
 		compatible = "hafnium,hafnium";
 
-		spci_tee;
+		ffa_tee;
 
 		vm1 {
 			debug_name = "primary VM";

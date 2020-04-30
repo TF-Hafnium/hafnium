@@ -17,15 +17,15 @@
 #include <stdalign.h>
 #include <stdint.h>
 
+#include "hf/ffa.h"
 #include "hf/memiter.h"
-#include "hf/spci.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
 #include "vmapi/hf/transport.h"
 
 #include "test/hftest.h"
-#include "test/vmapi/spci.h"
+#include "test/vmapi/ffa.h"
 
 alignas(4096) uint8_t kstack[4096];
 
@@ -67,9 +67,9 @@ noreturn void kmain(size_t memory_size)
 	/* Prepare the context. */
 
 	/* Set up the mailbox. */
-	spci_rxtx_map(send_addr, recv_addr);
+	ffa_rxtx_map(send_addr, recv_addr);
 
-	EXPECT_SPCI_ERROR(spci_rx_release(), SPCI_DENIED);
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 
 	/* Clean the context. */
 	ctx = hftest_get_context();
@@ -80,29 +80,29 @@ noreturn void kmain(size_t memory_size)
 	ctx->memory_size = memory_size;
 
 	for (;;) {
-		struct spci_value ret;
+		struct ffa_value ret;
 
 		/* Receive the packet. */
-		ret = spci_msg_wait();
-		EXPECT_EQ(ret.func, SPCI_MSG_SEND_32);
-		EXPECT_LE(spci_msg_send_size(ret), SPCI_MSG_PAYLOAD_MAX);
+		ret = ffa_msg_wait();
+		EXPECT_EQ(ret.func, FFA_MSG_SEND_32);
+		EXPECT_LE(ffa_msg_send_size(ret), FFA_MSG_PAYLOAD_MAX);
 
 		/* Echo the message back to the sender. */
-		memcpy_s(send, SPCI_MSG_PAYLOAD_MAX, recv,
-			 spci_msg_send_size(ret));
+		memcpy_s(send, FFA_MSG_PAYLOAD_MAX, recv,
+			 ffa_msg_send_size(ret));
 
 		/* Swap the socket's source and destination ports */
 		struct hf_msg_hdr *hdr = (struct hf_msg_hdr *)send;
 		swap(&(hdr->src_port), &(hdr->dst_port));
 
 		/* Swap the destination and source ids. */
-		spci_vm_id_t dst_id = spci_msg_send_sender(ret);
-		spci_vm_id_t src_id = spci_msg_send_receiver(ret);
+		ffa_vm_id_t dst_id = ffa_msg_send_sender(ret);
+		ffa_vm_id_t src_id = ffa_msg_send_receiver(ret);
 
-		EXPECT_EQ(spci_rx_release().func, SPCI_SUCCESS_32);
-		EXPECT_EQ(spci_msg_send(src_id, dst_id, spci_msg_send_size(ret),
-					0)
-				  .func,
-			  SPCI_SUCCESS_32);
+		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+		EXPECT_EQ(
+			ffa_msg_send(src_id, dst_id, ffa_msg_send_size(ret), 0)
+				.func,
+			FFA_SUCCESS_32);
 	}
 }

@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "hf/spci.h"
+#include "hf/ffa.h"
 #include "hf/spinlock.h"
 #include "hf/std.h"
 #include "hf/stdout.h"
@@ -229,7 +229,7 @@ static const char *parse_flags(const char *p, int *flags)
  * Send the contents of the given VM's log buffer to the log, preceded by the VM
  * ID and followed by a newline.
  */
-void dlog_flush_vm_buffer(spci_vm_id_t id, char buffer[], size_t length)
+void dlog_flush_vm_buffer(ffa_vm_id_t id, char buffer[], size_t length)
 {
 	lock();
 

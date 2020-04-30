@@ -31,5 +31,5 @@ TEST_SERVICE(perfmon_secondary_basic)
 	write_msr(PMINTENSET_EL1, 0xf);
 
 	EXPECT_EQ(exception_handler_get_num(), 3);
-	spci_yield();
+	ffa_yield();
 }

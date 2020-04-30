@@ -17,11 +17,11 @@
 #include "hf/arch/tee.h"
 
 #include "hf/dlog.h"
-#include "hf/spci.h"
-#include "hf/spci_internal.h"
+#include "hf/ffa.h"
+#include "hf/ffa_internal.h"
 
-struct spci_value arch_tee_call(struct spci_value args)
+struct ffa_value arch_tee_call(struct ffa_value args)
 {
 	dlog_error("Attempted to call TEE function %#x\n", args.func);
-	return spci_error(SPCI_NOT_SUPPORTED);
+	return ffa_error(FFA_NOT_SUPPORTED);
 }
