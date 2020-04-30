@@ -49,6 +49,12 @@ function is_kokoro_build() {
 	return $?
 }
 
+# Returns true if the environment contains Jenkins build variables.
+function is_jenkins_build() {
+	[ -v JENKINS_HOME ]
+	return $?
+}
+
 # Returns true if the `.repo_manifest` folder exists. The folder should contain
 # the manifest and be present in all Repo builds. Eventually this should be
 # obsolete as we switch exclusively to Repo.

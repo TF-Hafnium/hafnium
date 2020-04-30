@@ -20,7 +20,7 @@ source "$(dirname ${BASH_SOURCE[0]})/../build/bash/common.inc"
 init_build
 
 # Assign default values to variables.
-if is_kokoro_build
+if is_kokoro_build || is_jenkins_build
 then
 	# Default config for Kokoro builds.
 	default_value HAFNIUM_HERMETIC_BUILD true
