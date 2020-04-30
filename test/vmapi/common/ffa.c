@@ -83,6 +83,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	}
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	handle = ffa_mem_success_handle(ret);
+	EXPECT_EQ(handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK,
+		  FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR);
 
 	/*
 	 * Send the appropriate retrieve request to the VM so that it can use it

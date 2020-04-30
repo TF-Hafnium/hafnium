@@ -379,8 +379,8 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu **next)
 		return true;
 	case FFA_MEM_RECLAIM_32:
 		*args = api_ffa_mem_reclaim(
-			(args->arg1 & 0xffffffff) | args->arg2 << 32,
-			args->arg3, current());
+			ffa_assemble_handle(args->arg1, args->arg2), args->arg3,
+			current());
 		return true;
 	}
 

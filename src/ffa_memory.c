@@ -1319,7 +1319,7 @@ struct ffa_value ffa_memory_send(struct vm *to, struct vm_locked from_locked,
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	}
 
-	return (struct ffa_value){.func = FFA_SUCCESS_32, .arg2 = handle};
+	return ffa_mem_success(handle);
 }
 
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,

@@ -246,9 +246,21 @@ static inline uint32_t ffa_msg_send_attributes(struct ffa_value args)
 	return args.arg4;
 }
 
+static inline ffa_memory_handle_t ffa_assemble_handle(uint32_t a1, uint32_t a2)
+{
+	return (uint64_t)a1 | (uint64_t)a2 << 32;
+}
+
 static inline ffa_memory_handle_t ffa_mem_success_handle(struct ffa_value args)
 {
-	return args.arg2;
+	return ffa_assemble_handle(args.arg2, args.arg3);
+}
+
+static inline struct ffa_value ffa_mem_success(ffa_memory_handle_t handle)
+{
+	return (struct ffa_value){.func = FFA_SUCCESS_32,
+				  .arg2 = (uint32_t)handle,
+				  .arg3 = (uint32_t)(handle >> 32)};
 }
 
 static inline ffa_vm_id_t ffa_vm_id(struct ffa_value args)
