@@ -1097,6 +1097,7 @@ static struct ffa_value ffa_memory_send_validate(
 {
 	struct ffa_composite_memory_region *composite;
 	uint32_t receivers_length;
+	uint32_t constituents_offset;
 	uint32_t constituents_length;
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
@@ -1122,13 +1123,16 @@ static struct ffa_value ffa_memory_send_validate(
 	 */
 	receivers_length = sizeof(struct ffa_memory_access) *
 			   memory_region->receiver_count;
+	constituents_offset =
+		ffa_composite_constituent_offset(memory_region, 0);
 	if (memory_region->receivers[0].composite_memory_region_offset <
 		    sizeof(struct ffa_memory_region) + receivers_length ||
-	    memory_region->receivers[0].composite_memory_region_offset +
-			    sizeof(struct ffa_composite_memory_region) >=
-		    memory_share_length) {
+	    constituents_offset >= memory_share_length) {
 		dlog_verbose(
-			"Invalid composite memory region descriptor offset.\n");
+			"Invalid composite memory region descriptor offset "
+			"%d.\n",
+			memory_region->receivers[0]
+				.composite_memory_region_offset);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -1139,11 +1143,8 @@ static struct ffa_value ffa_memory_send_validate(
 	 */
 	constituents_length = sizeof(struct ffa_memory_region_constituent) *
 			      composite->constituent_count;
-	if (memory_share_length !=
-	    memory_region->receivers[0].composite_memory_region_offset +
-		    sizeof(struct ffa_composite_memory_region) +
-		    constituents_length) {
-		dlog_verbose("Invalid length %d or constituent offset %d.\n",
+	if (memory_share_length != constituents_offset + constituents_length) {
+		dlog_verbose("Invalid length %d or composite offset %d.\n",
 			     memory_share_length,
 			     memory_region->receivers[0]
 				     .composite_memory_region_offset);
