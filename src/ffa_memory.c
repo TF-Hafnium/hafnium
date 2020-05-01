@@ -687,8 +687,8 @@ out:
  *  In case of error, one of the following values is returned:
  *   1) FFA_INVALID_PARAMETERS - The endpoint provided parameters were
  *     erroneous;
- *   2) FFA_NO_MEMORY - Hafnium did not have sufficient memory to complete
- *     the request.
+ *   2) FFA_NO_MEMORY - Hafnium did not have sufficient memory to complete the
+ *     request.
  *   3) FFA_DENIED - The sender doesn't have sufficient access to send the
  *     memory with the given permissions.
  *  Success is indicated by FFA_SUCCESS.
@@ -878,8 +878,8 @@ out:
 	mpool_fini(&local_page_pool);
 
 	/*
-	 * Tidy up the page table by reclaiming failed mappings (if there was
-	 * an error) or merging entries into blocks where possible (on success).
+	 * Tidy up the page table by reclaiming failed mappings (if there was an
+	 * error) or merging entries into blocks where possible (on success).
 	 */
 	mm_vm_defrag(&to->ptable, page_pool);
 
@@ -995,8 +995,8 @@ out:
 	mpool_fini(&local_page_pool);
 
 	/*
-	 * Tidy up the page table by reclaiming failed mappings (if there was
-	 * an error) or merging entries into blocks where possible (on success).
+	 * Tidy up the page table by reclaiming failed mappings (if there was an
+	 * error) or merging entries into blocks where possible (on success).
 	 */
 	mm_vm_defrag(&to->ptable, page_pool);
 
@@ -1135,8 +1135,7 @@ static struct ffa_value ffa_memory_send_validate(
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/*
-	 * Ensure the number of constituents are within the memory
-	 * bounds.
+	 * Ensure the number of constituents are within the memory bounds.
 	 */
 	constituents_size = sizeof(struct ffa_memory_region_constituent) *
 			    composite->constituent_count;
@@ -1432,8 +1431,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	if (memory_region->receivers[0].receiver_permissions.receiver !=
 	    to_locked.vm->id) {
 		dlog_verbose(
-			"Incorrect receiver VM ID %d for "
-			"FFA_MEM_RETRIEVE_REQ, expected %d for handle %#x.\n",
+			"Incorrect receiver VM ID %d for FFA_MEM_RETRIEVE_REQ, "
+			"expected %d for handle %#x.\n",
 			to_locked.vm->id,
 			memory_region->receivers[0]
 				.receiver_permissions.receiver,
@@ -1453,8 +1452,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	    0) {
 		dlog_verbose(
 			"Retriever specified address ranges not supported (got "
-			"offset"
-			"%d).\n",
+			"offset %d).\n",
 			retrieve_request->receivers[0]
 				.composite_memory_region_offset);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -1524,8 +1522,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		}
 		dlog_verbose(
 			"Invalid instruction access requested; sender "
-			"specified "
-			"permissions %#x but receiver requested %#x.\n",
+			"specified permissions %#x but receiver requested "
+			"%#x.\n",
 			sent_permissions, requested_permissions);
 		ret = ffa_error(FFA_DENIED);
 		goto out;
