@@ -55,6 +55,14 @@ static inline paddr_t pa_add(paddr_t pa, size_t n)
 }
 
 /**
+ * Move backward physical address.
+ */
+static inline paddr_t pa_subtract(paddr_t pa, size_t n)
+{
+	return pa_init(pa_addr(pa) - n);
+}
+
+/**
  * Returns the difference between two physical addresses.
  */
 static inline size_t pa_difference(paddr_t start, paddr_t end)

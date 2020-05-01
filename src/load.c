@@ -307,6 +307,7 @@ static bool load_secondary_fdt(struct mm_stage1_locked stage1_locked,
  * Loads a secondary VM.
  */
 static bool load_secondary(struct mm_stage1_locked stage1_locked,
+			   struct vm_locked primary_vm_locked,
 			   paddr_t mem_begin, paddr_t mem_end,
 			   const struct manifest_vm *manifest_vm,
 			   const struct memiter *cpio, struct mpool *ppool)
@@ -380,13 +381,131 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		goto out;
 	}
 
-	dlog_info("Loaded with %u vCPUs, entry at %#x.\n",
-		  manifest_vm->secondary.vcpu_count, pa_addr(mem_begin));
-
 	if (manifest_vm->is_ffa_partition) {
+		int j = 0;
+		paddr_t region_begin;
+		paddr_t region_end;
+		paddr_t alloc_base = mem_end;
+		size_t size;
+		size_t total_alloc = 0;
+
+		/* Map memory-regions */
+		while (j < manifest_vm->sp.mem_region_count) {
+			size = manifest_vm->sp.mem_regions[j].page_count *
+			       PAGE_SIZE;
+			/*
+			 * For memory-regions without base-address, memory
+			 * should be allocated inside partition's page table.
+			 * Start allocating memory regions in partition's
+			 * page table, starting from the end.
+			 * TODO: Add mechanism to let partition know of these
+			 * memory regions
+			 */
+			if (manifest_vm->sp.mem_regions[j].base_address ==
+			    MANIFEST_INVALID_ADDRESS) {
+				total_alloc += size;
+				/* Don't go beyond half the VM's memory space */
+				if (total_alloc >
+				    (manifest_vm->secondary.mem_size / 2)) {
+					dlog_error(
+						"Not enough space for memory-"
+						"region allocation");
+					ret = false;
+					goto out;
+				}
+
+				region_end = alloc_base;
+				region_begin = pa_subtract(alloc_base, size);
+				alloc_base = region_begin;
+
+				if (!vm_identity_map(
+					    vm_locked, region_begin, region_end,
+					    manifest_vm->sp.mem_regions[j]
+						    .attributes,
+					    ppool, NULL)) {
+					dlog_error(
+						"Unable to map secondary VM "
+						"memory-region.\n");
+					ret = false;
+					goto out;
+				}
+
+				dlog_info(
+					"  Memory region %#x - %#x allocated\n",
+					region_begin, region_end);
+			} else {
+				/*
+				 * Identity map memory region for both case,
+				 * VA(S-EL0) or IPA(S-EL1).
+				 */
+				region_begin =
+					pa_init(manifest_vm->sp.mem_regions[j]
+							.base_address);
+				region_end = pa_add(region_begin, size);
+
+				if (!vm_identity_map(
+					    vm_locked, region_begin, region_end,
+					    manifest_vm->sp.mem_regions[j]
+						    .attributes,
+					    ppool, NULL)) {
+					dlog_error(
+						"Unable to map secondary VM "
+						"memory-region.\n");
+					ret = false;
+					goto out;
+				}
+			}
+
+			/* Deny the primary VM access to this memory */
+			if (!vm_unmap(primary_vm_locked, region_begin,
+				      region_end, ppool)) {
+				dlog_error(
+					"Unable to unmap secondary VM memory-"
+					"region from primary VM.\n");
+				ret = false;
+				goto out;
+			}
+
+			j++;
+		}
+
+		/* Map device-regions */
+		j = 0;
+		while (j < manifest_vm->sp.dev_region_count) {
+			region_begin = pa_init(
+				manifest_vm->sp.dev_regions[j].base_address);
+			size = manifest_vm->sp.dev_regions[j].page_count *
+			       PAGE_SIZE;
+			region_end = pa_add(region_begin, size);
+
+			if (!vm_identity_map(
+				    vm_locked, region_begin, region_end,
+				    manifest_vm->sp.dev_regions[j].attributes,
+				    ppool, NULL)) {
+				dlog_error(
+					"Unable to map secondary VM "
+					"device-region.\n");
+				ret = false;
+				goto out;
+			}
+			/* Deny primary VM access to this region */
+			if (!vm_unmap(primary_vm_locked, region_begin,
+				      region_end, ppool)) {
+				dlog_error(
+					"Unable to unmap secondary VM device-"
+					"region from primary VM.\n");
+				ret = false;
+				goto out;
+			}
+			j++;
+		}
+
 		secondary_entry =
 			ipa_add(secondary_entry, manifest_vm->sp.ep_offset);
 	}
+
+	dlog_info("Loaded with %u vCPUs, entry at %#x.\n",
+		  manifest_vm->secondary.vcpu_count, pa_addr(mem_begin));
 
 	vcpu = vm_get_vcpu(vm, 0);
 
@@ -565,9 +684,9 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 			continue;
 		}
 
-		if (!load_secondary(stage1_locked, secondary_mem_begin,
-				    secondary_mem_end, manifest_vm, cpio,
-				    ppool)) {
+		if (!load_secondary(stage1_locked, primary_vm_locked,
+				    secondary_mem_begin, secondary_mem_end,
+				    manifest_vm, cpio, ppool)) {
 			dlog_error("Unable to load VM.\n");
 			continue;
 		}

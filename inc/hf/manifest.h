@@ -149,8 +149,10 @@ struct sp_manifest {
 	uint32_t stream_ep_ids[1];
 
 	/** Memory regions */
+	uint8_t mem_region_count;
 	struct memory_region mem_regions[SP_MAX_MEMORY_REGIONS];
 	/** Device regions */
+	uint8_t dev_region_count;
 	struct device_region dev_regions[SP_MAX_DEVICE_REGIONS];
 };
 

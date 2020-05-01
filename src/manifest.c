@@ -306,10 +306,10 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 
 static enum manifest_return_code parse_ffa_memory_region_node(
 	struct fdt_node *mem_node, struct memory_region *mem_regions,
-	struct rx_tx *rxtx)
+	uint8_t *count, struct rx_tx *rxtx)
 {
 	uint32_t phandle;
-	unsigned int i = 0;
+	uint8_t i = 0;
 
 	dlog_verbose("  Partition memory regions\n");
 
@@ -360,17 +360,18 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		i++;
 	} while (fdt_next_sibling(mem_node) && (i < SP_MAX_MEMORY_REGIONS));
 
-	dlog_verbose("    Total %u memory regions found\n", i);
+	*count = i;
 
 	return MANIFEST_SUCCESS;
 }
 
 static enum manifest_return_code parse_ffa_device_region_node(
-	struct fdt_node *dev_node, struct device_region *dev_regions)
+	struct fdt_node *dev_node, struct device_region *dev_regions,
+	uint8_t *count)
 {
 	struct uint32list_iter list;
-	unsigned int i = 0;
-	unsigned int j = 0;
+	uint8_t i = 0;
+	uint8_t j = 0;
 
 	dlog_verbose("  Partition Device Regions\n");
 
@@ -461,7 +462,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		i++;
 	} while (fdt_next_sibling(dev_node) && (i < SP_MAX_DEVICE_REGIONS));
 
-	dlog_verbose("    Total %u device regions found\n", i);
+	*count = i;
 
 	return MANIFEST_SUCCESS;
 }
@@ -552,15 +553,20 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
 		TRY(parse_ffa_memory_region_node(&ffa_node, vm->sp.mem_regions,
+						 &vm->sp.mem_region_count,
 						 &vm->sp.rxtx));
 	}
+	dlog_verbose("  Total %u memory regions found\n",
+		     vm->sp.mem_region_count);
 
 	/* Parse Device-regions */
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &dev_region_node_name)) {
-		TRY(parse_ffa_device_region_node(&ffa_node,
-						 vm->sp.dev_regions));
+		TRY(parse_ffa_device_region_node(&ffa_node, vm->sp.dev_regions,
+						 &vm->sp.dev_region_count));
 	}
+	dlog_verbose("  Total %u device regions found\n",
+		     vm->sp.dev_region_count);
 
 	return MANIFEST_SUCCESS;
 }
