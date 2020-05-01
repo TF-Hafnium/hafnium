@@ -42,6 +42,11 @@
             "command": "make && kokoro/test.sh --fvp"
         },
         {
+            "label": "test with TF-A",
+            "type": "shell",
+            "command": "make && kokoro/test.sh --tfa"
+        },
+        {
             "label": "push",
             "type": "shell",
             "command": "git push origin HEAD:refs/for/master",
