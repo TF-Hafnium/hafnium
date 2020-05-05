@@ -305,8 +305,10 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 }
 
 static enum manifest_return_code parse_ffa_memory_region_node(
-	struct fdt_node *mem_node, struct memory_region *mem_regions)
+	struct fdt_node *mem_node, struct memory_region *mem_regions,
+	struct rx_tx *rxtx)
 {
+	uint32_t phandle;
 	unsigned int i = 0;
 
 	dlog_verbose("  Partition memory regions\n");
@@ -343,6 +345,18 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		mem_regions[i].attributes &= MM_PERM_MASK;
 		dlog_verbose("      Attributes:  %u\n",
 			     mem_regions[i].attributes);
+
+		TRY(read_optional_uint32(mem_node, "phandle",
+					 (uint32_t)MANIFEST_INVALID_ADDRESS,
+					 &phandle));
+		if (phandle == rxtx->rx_phandle) {
+			dlog_verbose("      Assigned as RX buffer\n");
+			rxtx->rx_buffer = &mem_regions[i];
+		} else if (phandle == rxtx->tx_phandle) {
+			dlog_verbose("      Assigned as TX buffer\n");
+			rxtx->tx_buffer = &mem_regions[i];
+		}
+
 		i++;
 	} while (fdt_next_sibling(mem_node) && (i < SP_MAX_MEMORY_REGIONS));
 
@@ -517,16 +531,17 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 			return MANIFEST_ERROR_NOT_COMPATIBLE;
 		}
 
-		TRY(read_uint64(&ffa_node, "base-address",
-				&vm->sp.rxtx.base_address));
+		/*
+		 * Read only phandles for now, it will be used to update buffers
+		 * while parsing memory regions.
+		 */
+		TRY(read_uint32(&ffa_node, "rx-buffer",
+				&vm->sp.rxtx.rx_phandle));
 
-		TRY(read_uint16(&ffa_node, "pages-count",
-				&vm->sp.rxtx.pages_count));
+		TRY(read_uint32(&ffa_node, "tx-buffer",
+				&vm->sp.rxtx.tx_phandle));
 
-		TRY(read_uint16(&ffa_node, "attributes",
-				&vm->sp.rxtx.attributes));
-
-		vm->sp.rxtx.rxtx_found = true;
+		vm->sp.rxtx.available = true;
 	}
 
 	TRY(read_uint8(&root, "messaging-method",
@@ -536,8 +551,8 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	/* Parse memory-regions */
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
-		TRY(parse_ffa_memory_region_node(&ffa_node,
-						 vm->sp.mem_regions));
+		TRY(parse_ffa_memory_region_node(&ffa_node, vm->sp.mem_regions,
+						 &vm->sp.rxtx));
 	}
 
 	/* Parse Device-regions */

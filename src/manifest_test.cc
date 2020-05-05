@@ -217,6 +217,12 @@ class ManifestDtBuilder
 		return *this;
 	}
 
+	ManifestDtBuilder &Label(const std::string_view &name)
+	{
+		dts_ << name << ": ";
+		return *this;
+	}
+
 	ManifestDtBuilder &FfaValidManifest()
 	{
 		Compatible({"arm,ffa-manifest-1.0"});
@@ -817,6 +823,35 @@ TEST(manifest, ffa_validate_sanity_check)
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
 }
 
+TEST(manifest, ffa_validate_rxtx_info)
+{
+	struct manifest m;
+
+	/* Not Compatible */
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("rx_tx-info")
+			.Compatible({ "foo,bar" })
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+
+	/* Missing Properties */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("rx_tx-info")
+			.Compatible({ "arm,ffa-manifest-rx_tx-buffer" })
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
+}
+
 TEST(manifest, ffa_validate_mem_regions)
 {
 	struct manifest m;
@@ -933,6 +968,11 @@ TEST(manifest, ffa_valid)
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
 		.FfaValidManifest()
+		.StartChild("rx_tx-info")
+			.Compatible({ "arm,ffa-manifest-rx_tx-buffer" })
+			.Property("rx-buffer", "<&rx>")
+			.Property("tx-buffer", "<&tx>")
+		.EndChild()
 		.StartChild("memory-regions")
 			.Compatible({ "arm,ffa-manifest-memory-regions" })
 			.StartChild("test-memory")
@@ -940,6 +980,20 @@ TEST(manifest, ffa_valid)
 				.Property("base-address", "<0x7100000>")
 				.Property("pages-count", "<4>")
 				.Property("attributes", "<7>")
+			.EndChild()
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("base-address", "<0x7310000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<3>")
 			.EndChild()
 		.EndChild()
 		.StartChild("device-regions")
@@ -973,6 +1027,13 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].base_address, 0x7100000);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].page_count, 4);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].attributes, 7);
+	ASSERT_EQ(m.vm[0].sp.rxtx.available, true);
+	ASSERT_EQ(m.vm[0].sp.rxtx.rx_buffer->base_address, 0x7300000);
+	ASSERT_EQ(m.vm[0].sp.rxtx.rx_buffer->page_count, 1);
+	ASSERT_EQ(m.vm[0].sp.rxtx.rx_buffer->attributes, 1);
+	ASSERT_EQ(m.vm[0].sp.rxtx.tx_buffer->base_address, 0x7310000);
+	ASSERT_EQ(m.vm[0].sp.rxtx.tx_buffer->page_count, 1);
+	ASSERT_EQ(m.vm[0].sp.rxtx.tx_buffer->attributes, 3);
 	ASSERT_EQ(m.vm[0].sp.dev_regions[0].base_address, 0x7200000);
 	ASSERT_EQ(m.vm[0].sp.dev_regions[0].page_count, 16);
 	/* Attribute is ORed with MM_MODE_D */

@@ -93,6 +93,18 @@ struct device_region {
 };
 
 /**
+ * RX/TX buffer, reference to memory-region entries that describe RX/TX
+ * buffers in partition manifest.
+ */
+struct rx_tx {
+	bool available;
+	uint32_t rx_phandle;
+	uint32_t tx_phandle;
+	struct memory_region *rx_buffer;
+	struct memory_region *tx_buffer;
+};
+
+/**
  * Partition manifest as described in PSA FF-A v1.0 spec section 3.1
  */
 struct sp_manifest {
@@ -123,17 +135,7 @@ struct sp_manifest {
 	uint16_t boot_order;
 
 	/** Optional RX/TX buffers */
-	struct {
-		bool rxtx_found;
-		/** optional */
-		uint64_t base_address;
-		/** optional */
-		uint16_t pages_count;
-		/** mandatory */
-		uint16_t attributes;
-		/** Optional */
-		char name[SP_RTX_BUF_NAME_SIZE];
-	} rxtx;
+	struct rx_tx rxtx;
 
 	/** mandatory - direct/indirect msg or both */
 	enum messaging_method messaging_method;
