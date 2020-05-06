@@ -759,9 +759,9 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 			return true;
 		case SPCI_MSG_SEND_DIRECT_REQ_32:
 
-			dlog("dir req src %#x dest %#X: %#x %#x %#x %#x %#x\n",
-				spci_msg_send_sender(*args),spci_msg_send_receiver(*args),
-				args->arg3, args->arg4, args->arg5, args->arg6, args->arg7);
+			// dlog("dir req src %#x dest %#X: %#x %#x %#x %#x %#x\n",
+			// 	spci_msg_send_sender(*args),spci_msg_send_receiver(*args),
+			// 	args->arg3, args->arg4, args->arg5, args->arg6, args->arg7);
 
 			if (is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
 			{
@@ -775,9 +775,9 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 			return true;
 		case SPCI_MSG_SEND_DIRECT_RESP_32:
 
-			dlog("dir resp src %#x dest %#X: %#x %#x %#x %#x %#x\n",
-				spci_msg_send_sender(*args),spci_msg_send_receiver(*args),
-				args->arg3, args->arg4, args->arg5, args->arg6, args->arg7);
+			// dlog("dir resp src %#x dest %#X: %#x %#x %#x %#x %#x\n",
+			// 	spci_msg_send_sender(*args),spci_msg_send_receiver(*args),
+			// 	args->arg3, args->arg4, args->arg5, args->arg6, args->arg7);
 
 
 			if (is_opposite_world_vm_id(spci_msg_send_receiver(*args)))
