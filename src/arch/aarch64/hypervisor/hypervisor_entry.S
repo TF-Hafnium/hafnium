@@ -127,11 +127,14 @@ mm_enable:
 	ldr x5, [x6, #32]
 
 	msr ttbr0_el2, x1
-	msr vtcr_el2, x2
 
 .if SECURE_WORLD == 1
 	msr S3_4_C2_C6_2, x2	/* vstcr_el2 */
 .endif
+
+	/* Set the NSA bit to use non-secure PA */
+	eor x2, x2, #0x40000000
+	msr vtcr_el2, x2
 
 	msr mair_el2, x3
 	msr tcr_el2, x4
