@@ -414,6 +414,11 @@ uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode)
 		attrs |= STAGE1_XN;
 	}
 
+	/* Allow mapping as non secure memory. */
+	if ((mode & MM_MODE_NS)) {
+		attrs |= STAGE1_NS;
+	}
+
 	/* Define the read/write bits. */
 	if (mode & MM_MODE_W) {
 		attrs |= STAGE1_AP(STAGE1_READWRITE);

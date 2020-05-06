@@ -70,6 +70,10 @@
 #define MM_MODE_UNOWNED UINT32_C(0x0020)
 #define MM_MODE_SHARED  UINT32_C(0x0040)
 
+/* Add mode to indicate mapping NS memory. */
+#define MM_MODE_NS  UINT32_C(0x0080)
+
+
 /* The mask for a mode that is considered unmapped. */
 #define MM_MODE_UNMAPPED_MASK (MM_MODE_INVALID | MM_MODE_UNOWNED)
 

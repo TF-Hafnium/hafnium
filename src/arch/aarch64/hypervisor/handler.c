@@ -79,10 +79,10 @@ bool handler_map_hv_buffers(uint8_t **tx, uint8_t **rx, paddr_t pa_send_begin,
 
 	/* Map the send page as read-only in the hypervisor address space. */
 	*tx = mm_identity_map(mm_stage1_locked, pa_send_begin, pa_send_end,
-			      MM_MODE_R, &local_page_pool);
+			      MM_MODE_R | MM_MODE_NS, &local_page_pool);
 
 	*rx = mm_identity_map(mm_stage1_locked, pa_recv_begin, pa_recv_end,
-			      MM_MODE_W, &local_page_pool);
+			      MM_MODE_W | MM_MODE_NS, &local_page_pool);
 
 	mm_unlock_stage1(&mm_stage1_locked);
 
