@@ -71,3 +71,11 @@ struct ffa_value api_ffa_mem_relinquish(struct vcpu *current);
 struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 				     ffa_memory_region_flags_t flags,
 				     struct vcpu *current);
+struct ffa_value api_ffa_mem_frag_rx(ffa_memory_handle_t handle,
+				     uint32_t fragment_offset,
+				     ffa_vm_id_t sender_vm_id,
+				     struct vcpu *current);
+struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
+				     uint32_t fragment_length,
+				     ffa_vm_id_t sender_vm_id,
+				     struct vcpu *current);

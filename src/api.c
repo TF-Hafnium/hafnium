@@ -1473,8 +1473,20 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (fragment_length != length) {
-		dlog_verbose("Fragmentation not yet supported.\n");
+	if (fragment_length > length) {
+		dlog_verbose(
+			"Fragment length %d greater than total length %d.\n",
+			fragment_length, length);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if (fragment_length < sizeof(struct ffa_memory_region) +
+				      sizeof(struct ffa_memory_access)) {
+		dlog_verbose(
+			"Initial fragment length %d smaller than header size "
+			"%d.\n",
+			fragment_length,
+			sizeof(struct ffa_memory_region) +
+				sizeof(struct ffa_memory_access));
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -1706,74 +1718,6 @@ out:
 	return ret;
 }
 
-static struct ffa_value ffa_mem_reclaim_tee(struct vm_locked to_locked,
-					    struct vm_locked from_locked,
-					    ffa_memory_handle_t handle,
-					    ffa_memory_region_flags_t flags,
-					    struct cpu *cpu)
-{
-	struct ffa_value tee_ret;
-	uint32_t length;
-	uint32_t fragment_length;
-	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)cpu_get_buffer(cpu);
-	uint32_t message_buffer_size = cpu_get_buffer_size(cpu);
-	uint32_t request_length = ffa_memory_lender_retrieve_request_init(
-		from_locked.vm->mailbox.recv, handle, to_locked.vm->id);
-
-	CHECK(request_length <= HF_MAILBOX_SIZE);
-
-	/* Retrieve memory region information from the TEE. */
-	tee_ret = arch_tee_call(
-		(struct ffa_value){.func = FFA_MEM_RETRIEVE_REQ_32,
-				   .arg1 = request_length,
-				   .arg2 = request_length});
-	if (tee_ret.func == FFA_ERROR_32) {
-		dlog_verbose("Got error %d from EL3.\n", tee_ret.arg2);
-		return tee_ret;
-	}
-	if (tee_ret.func != FFA_MEM_RETRIEVE_RESP_32) {
-		dlog_verbose(
-			"Got %#x from EL3, expected FFA_MEM_RETRIEVE_RESP.\n",
-			tee_ret.func);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	length = tee_ret.arg1;
-	fragment_length = tee_ret.arg2;
-
-	if (fragment_length > HF_MAILBOX_SIZE ||
-	    fragment_length > message_buffer_size) {
-		dlog_verbose("Invalid fragment length %d (max %d).\n", length,
-			     HF_MAILBOX_SIZE);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* TODO: Support fragmentation. */
-	if (fragment_length != length) {
-		dlog_verbose(
-			"Message fragmentation not yet supported (fragment "
-			"length %d but length %d).\n",
-			fragment_length, length);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/*
-	 * Copy the memory region descriptor to an internal buffer, so that the
-	 * sender can't change it underneath us.
-	 */
-	memcpy_s(memory_region, message_buffer_size,
-		 from_locked.vm->mailbox.send, fragment_length);
-
-	/*
-	 * Validate that transition is allowed (e.g. that caller is owner),
-	 * forward the reclaim request to the TEE, and update page tables.
-	 */
-	return ffa_memory_tee_reclaim(to_locked, handle, memory_region,
-				      flags & FFA_MEM_RECLAIM_CLEAR,
-				      &api_page_pool);
-}
-
 struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 				     ffa_memory_region_flags_t flags,
 				     struct vcpu *current)
@@ -1785,8 +1729,7 @@ struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 	    FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
 		struct vm_locked to_locked = vm_lock(to);
 
-		ret = ffa_memory_reclaim(to_locked, handle,
-					 flags & FFA_MEM_RECLAIM_CLEAR,
+		ret = ffa_memory_reclaim(to_locked, handle, flags,
 					 &api_page_pool);
 
 		vm_unlock(&to_locked);
@@ -1794,9 +1737,144 @@ struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 		struct vm *from = vm_find(HF_TEE_VM_ID);
 		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
 
-		ret = ffa_mem_reclaim_tee(vm_to_from_lock.vm1,
-					  vm_to_from_lock.vm2, handle, flags,
-					  current->cpu);
+		ret = ffa_memory_tee_reclaim(vm_to_from_lock.vm1,
+					     vm_to_from_lock.vm2, handle, flags,
+					     &api_page_pool);
+
+		vm_unlock(&vm_to_from_lock.vm1);
+		vm_unlock(&vm_to_from_lock.vm2);
+	}
+
+	return ret;
+}
+
+struct ffa_value api_ffa_mem_frag_rx(ffa_memory_handle_t handle,
+				     uint32_t fragment_offset,
+				     ffa_vm_id_t sender_vm_id,
+				     struct vcpu *current)
+{
+	struct vm *to = current->vm;
+	struct vm_locked to_locked;
+	struct ffa_value ret;
+
+	/* Sender ID MBZ at virtual instance. */
+	if (sender_vm_id != 0) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	to_locked = vm_lock(to);
+
+	if (msg_receiver_busy(to_locked, NULL, false)) {
+		/*
+		 * Can't retrieve memory information if the mailbox is not
+		 * available.
+		 */
+		dlog_verbose("RX buffer not ready.\n");
+		ret = ffa_error(FFA_BUSY);
+		goto out;
+	}
+
+	ret = ffa_memory_retrieve_continue(to_locked, handle, fragment_offset,
+					   &api_page_pool);
+
+out:
+	vm_unlock(&to_locked);
+	return ret;
+}
+
+struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
+				     uint32_t fragment_length,
+				     ffa_vm_id_t sender_vm_id,
+				     struct vcpu *current)
+{
+	struct vm *from = current->vm;
+	const void *from_msg;
+	void *fragment_copy;
+	struct ffa_value ret;
+
+	/* Sender ID MBZ at virtual instance. */
+	if (sender_vm_id != 0) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Check that the sender has configured its send buffer. If the TX
+	 * mailbox at from_msg is configured (i.e. from_msg != NULL) then it can
+	 * be safely accessed after releasing the lock since the TX mailbox
+	 * address can only be configured once.
+	 */
+	sl_lock(&from->lock);
+	from_msg = from->mailbox.send;
+	sl_unlock(&from->lock);
+
+	if (from_msg == NULL) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Copy the fragment to a fresh page from the memory pool. This prevents
+	 * the sender from changing it underneath us, and also lets us keep it
+	 * around in the share state table if needed.
+	 */
+	if (fragment_length > HF_MAILBOX_SIZE ||
+	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
+		dlog_verbose(
+			"Fragment length %d larger than mailbox size %d.\n",
+			fragment_length, HF_MAILBOX_SIZE);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if (fragment_length < sizeof(struct ffa_memory_region_constituent) ||
+	    fragment_length % sizeof(struct ffa_memory_region_constituent) !=
+		    0) {
+		dlog_verbose("Invalid fragment length %d.\n", fragment_length);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	fragment_copy = mpool_alloc(&api_page_pool);
+	if (fragment_copy == NULL) {
+		dlog_verbose("Failed to allocate fragment copy.\n");
+		return ffa_error(FFA_NO_MEMORY);
+	}
+	memcpy_s(fragment_copy, MM_PPOOL_ENTRY_SIZE, from_msg, fragment_length);
+
+	/*
+	 * Hafnium doesn't support fragmentation of memory retrieve requests
+	 * (because it doesn't support caller-specified mappings, so a request
+	 * will never be larger than a single page), so this must be part of a
+	 * memory send (i.e. donate, lend or share) request.
+	 *
+	 * We can tell from the handle whether the memory transaction is for the
+	 * TEE or not.
+	 */
+	if ((handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK) ==
+	    FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
+		struct vm_locked from_locked = vm_lock(from);
+
+		ret = ffa_memory_send_continue(from_locked, fragment_copy,
+					       fragment_length, handle,
+					       &api_page_pool);
+		/*
+		 * `ffa_memory_send_continue` takes ownership of the
+		 * fragment_copy, so we don't need to free it here.
+		 */
+		vm_unlock(&from_locked);
+	} else {
+		struct vm *to = vm_find(HF_TEE_VM_ID);
+		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
+
+		/*
+		 * The TEE RX buffer state is checked in
+		 * `ffa_memory_tee_send_continue` rather than here, as we need
+		 * to return `FFA_MEM_FRAG_RX` with the current offset rather
+		 * than FFA_ERROR FFA_BUSY in case it is busy.
+		 */
+
+		ret = ffa_memory_tee_send_continue(
+			vm_to_from_lock.vm2, vm_to_from_lock.vm1, fragment_copy,
+			fragment_length, handle, &api_page_pool);
+		/*
+		 * `ffa_memory_tee_send_continue` takes ownership of the
+		 * fragment_copy, so we don't need to free it here.
+		 */
 
 		vm_unlock(&vm_to_from_lock.vm1);
 		vm_unlock(&vm_to_from_lock.vm2);

@@ -26,7 +26,16 @@
 #include "test/vmapi/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
-alignas(PAGE_SIZE) static uint8_t pages[4 * PAGE_SIZE];
+/*
+ * A number of pages that is large enough that it must take two fragments to
+ * share.
+ */
+#define FRAGMENTED_SHARE_PAGE_COUNT \
+	(PAGE_SIZE / sizeof(struct ffa_memory_region_constituent))
+
+alignas(PAGE_SIZE) static uint8_t
+	pages[FRAGMENTED_SHARE_PAGE_COUNT * PAGE_SIZE];
+static uint8_t retrieve_buffer[HF_MAILBOX_SIZE];
 
 /**
  * Helper function to test sending memory in the different configurations.
@@ -72,9 +81,11 @@ static void check_cannot_send_memory(
 					for (m = 0;
 					     m < ARRAY_SIZE(cacheability);
 					     ++m) {
-						uint32_t msg_size =
+						uint32_t msg_size;
+						EXPECT_EQ(
 							ffa_memory_region_init(
 								mb.send,
+								HF_MAILBOX_SIZE,
 								HF_PRIMARY_VM_ID,
 								vms[i],
 								constituents,
@@ -85,8 +96,10 @@ static void check_cannot_send_memory(
 									[k],
 								FFA_MEMORY_NORMAL_MEM,
 								cacheability[m],
-								shareability
-									[l]);
+								shareability[l],
+								NULL,
+								&msg_size),
+							0);
 						struct ffa_value ret =
 							send_function(msg_size,
 								      msg_size);
@@ -101,9 +114,11 @@ static void check_cannot_send_memory(
 					}
 					for (m = 0; m < ARRAY_SIZE(device);
 					     ++m) {
-						uint32_t msg_size =
+						uint32_t msg_size;
+						EXPECT_EQ(
 							ffa_memory_region_init(
 								mb.send,
+								HF_MAILBOX_SIZE,
 								HF_PRIMARY_VM_ID,
 								vms[i],
 								constituents,
@@ -114,8 +129,10 @@ static void check_cannot_send_memory(
 									[k],
 								FFA_MEMORY_DEVICE_MEM,
 								device[m],
-								shareability
-									[l]);
+								shareability[l],
+								NULL,
+								&msg_size),
+							0);
 						struct ffa_value ret =
 							send_function(msg_size,
 								      msg_size);
@@ -180,12 +197,15 @@ static void check_cannot_donate_memory(
 		if (vms[i] == avoid_vm) {
 			continue;
 		}
-		msg_size = ffa_memory_region_init(
-			mb.send, HF_PRIMARY_VM_ID, vms[i], constituents,
-			constituent_count, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
-			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_OUTER_SHAREABLE);
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  vms[i], constituents, constituent_count, 0, 0,
+				  FFA_DATA_ACCESS_NOT_SPECIFIED,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  0);
 		ret = ffa_mem_donate(msg_size, msg_size);
 		EXPECT_EQ(ret.func, FFA_ERROR_32);
 		EXPECT_TRUE(ret.arg2 == FFA_DENIED ||
@@ -363,6 +383,98 @@ TEST(memory_sharing, lend_relinquish)
 }
 
 /**
+ * Check that memory can be lent and retrieved with multiple fragments.
+ */
+TEST(memory_sharing, lend_fragmented_relinquish)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	uint32_t i;
+	ffa_memory_handle_t handle;
+	struct ffa_memory_region_constituent
+		constituents[FRAGMENTED_SHARE_PAGE_COUNT];
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_lend_relinquish", mb.send);
+
+	/* Initialise the memory before giving it. */
+	memset_s(ptr, sizeof(pages), 'b',
+		 PAGE_SIZE * FRAGMENTED_SHARE_PAGE_COUNT);
+
+	for (i = 0; i < ARRAY_SIZE(constituents); ++i) {
+		constituents[i].address = (uint64_t)pages + i * PAGE_SIZE;
+		constituents[i].page_count = 1;
+		constituents[i].reserved = 0;
+	}
+
+	handle = send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
+		constituents, ARRAY_SIZE(constituents), 0, FFA_DATA_ACCESS_RW,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_INSTRUCTION_ACCESS_X);
+
+	run_res = ffa_run(SERVICE_VM1, 0);
+
+	/* Let the memory be returned. */
+	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	/* Ensure that the secondary VM accessed the region. */
+	for (int i = 0; i < PAGE_SIZE * FRAGMENTED_SHARE_PAGE_COUNT; ++i) {
+		ASSERT_EQ(ptr[i], 'c');
+	}
+
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
+		  1);
+}
+
+/**
+ * Check that memory can be lent with multiple fragments even though it could
+ * fit in one.
+ */
+TEST(memory_sharing, lend_force_fragmented_relinquish)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	ffa_memory_handle_t handle;
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_lend_relinquish", mb.send);
+
+	/* Initialise the memory before giving it. */
+	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+		{.address = (uint64_t)pages + PAGE_SIZE, .page_count = 2},
+	};
+
+	handle = send_memory_and_retrieve_request_force_fragmented(
+		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
+		constituents, ARRAY_SIZE(constituents), 0, FFA_DATA_ACCESS_RW,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_INSTRUCTION_ACCESS_X);
+
+	run_res = ffa_run(SERVICE_VM1, 0);
+
+	/* Let the memory be returned. */
+	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	/* Ensure that the secondary VM accessed the region. */
+	for (int i = 0; i < PAGE_SIZE; ++i) {
+		ASSERT_EQ(ptr[i], 'c');
+	}
+
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
+		  1);
+}
+
+/**
  * Check that memory that is donated can't be relinquished.
  */
 TEST(memory_sharing, donate_relinquish)
@@ -419,13 +531,13 @@ TEST(memory_sharing, give_and_get_back)
 
 	/* Let the memory be returned, and retrieve it. */
 	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL),
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
+					       NULL, HF_MAILBOX_SIZE),
 		  SERVICE_VM1);
 
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -566,11 +678,12 @@ TEST(memory_sharing, give_memory_and_lose_access)
 
 	/* Have the memory be given. */
 	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL),
+	memory_region = (struct ffa_memory_region *)retrieve_buffer;
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
+					       memory_region, HF_MAILBOX_SIZE),
 		  SERVICE_VM1);
 
 	/* Check the memory was cleared. */
-	memory_region = (struct ffa_memory_region *)mb.recv;
 	ASSERT_EQ(memory_region->receiver_count, 1);
 	ASSERT_NE(memory_region->receivers[0].composite_memory_region_offset,
 		  0);
@@ -579,7 +692,6 @@ TEST(memory_sharing, give_memory_and_lose_access)
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -601,11 +713,12 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 
 	/* Have the memory be lent. */
 	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL),
+	memory_region = (struct ffa_memory_region *)retrieve_buffer;
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
+					       memory_region, HF_MAILBOX_SIZE),
 		  SERVICE_VM1);
 
 	/* Check the memory was cleared. */
-	memory_region = (struct ffa_memory_region *)mb.recv;
 	ASSERT_EQ(memory_region->receiver_count, 1);
 	ASSERT_NE(memory_region->receivers[0].composite_memory_region_offset,
 		  0);
@@ -614,7 +727,6 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
@@ -774,9 +886,9 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 	run_res = ffa_run(SERVICE_VM1, 0);
 
 	/* Let the memory be returned. */
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL),
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
+					       NULL, HF_MAILBOX_SIZE),
 		  SERVICE_VM1);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/* Share the memory with another VM. */
 	send_memory_and_retrieve_request(
@@ -883,9 +995,9 @@ TEST(memory_sharing, donate_twice)
 
 	/* Let the memory be sent from VM1 to PRIMARY (returned). */
 	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL),
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
+					       NULL, HF_MAILBOX_SIZE),
 		  SERVICE_VM1);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/* Check we have access again. */
 	ptr[0] = 'f';
@@ -910,11 +1022,15 @@ TEST(memory_sharing, donate_to_self)
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
-	msg_size = ffa_memory_region_init(
-		mb.send, HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  HF_PRIMARY_VM_ID, constituents,
+			  ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
@@ -935,11 +1051,14 @@ TEST(memory_sharing, lend_to_self)
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
-	msg_size = ffa_memory_region_init(
-		mb.send, HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  HF_PRIMARY_VM_ID, constituents,
+			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 }
@@ -959,11 +1078,14 @@ TEST(memory_sharing, share_to_self)
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
-	msg_size = ffa_memory_region_init(
-		mb.send, HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  HF_PRIMARY_VM_ID, constituents,
+			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 }
@@ -988,27 +1110,37 @@ TEST(memory_sharing, donate_invalid_source)
 	};
 
 	/* Try invalid configurations. */
-	msg_size = ffa_memory_region_init(
-		mb.send, SERVICE_VM1, HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(
+		ffa_memory_region_init(
+			mb.send, HF_MAILBOX_SIZE, SERVICE_VM1, HF_PRIMARY_VM_ID,
+			constituents, ARRAY_SIZE(constituents), 0, 0,
+			FFA_DATA_ACCESS_NOT_SPECIFIED,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 
-	msg_size = ffa_memory_region_init(
-		mb.send, SERVICE_VM1, SERVICE_VM1, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, SERVICE_VM1, SERVICE_VM1,
+			  constituents, ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 
-	msg_size = ffa_memory_region_init(
-		mb.send, SERVICE_VM2, SERVICE_VM1, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, SERVICE_VM2, SERVICE_VM1,
+			  constituents, ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 
@@ -1021,9 +1153,9 @@ TEST(memory_sharing, donate_invalid_source)
 
 	/* Receive and return memory from VM1. */
 	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL),
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
+					       NULL, HF_MAILBOX_SIZE),
 		  SERVICE_VM1);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/* Use VM1 to fail to donate memory from the primary to VM2. */
 	run_res = ffa_run(SERVICE_VM1, 0);
@@ -1052,24 +1184,33 @@ TEST(memory_sharing, give_and_get_back_unaligned)
 				{.address = (uint64_t)pages + PAGE_SIZE + j,
 				 .page_count = 1},
 			};
-			uint32_t msg_size = ffa_memory_region_init(
-				mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
-				constituents, ARRAY_SIZE(constituents), 0, 0,
-				FFA_DATA_ACCESS_NOT_SPECIFIED,
-				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				FFA_MEMORY_NORMAL_MEM,
-				FFA_MEMORY_CACHE_WRITE_BACK,
-				FFA_MEMORY_OUTER_SHAREABLE);
+			uint32_t msg_size;
+			EXPECT_EQ(
+				ffa_memory_region_init(
+					mb.send, HF_MAILBOX_SIZE,
+					HF_PRIMARY_VM_ID, SERVICE_VM1,
+					constituents, ARRAY_SIZE(constituents),
+					0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
+					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+					FFA_MEMORY_NORMAL_MEM,
+					FFA_MEMORY_CACHE_WRITE_BACK,
+					FFA_MEMORY_OUTER_SHAREABLE, NULL,
+					&msg_size),
+				0);
 			EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 					 FFA_INVALID_PARAMETERS);
-			msg_size = ffa_memory_region_init(
-				mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
-				constituents, ARRAY_SIZE(constituents), 0, 0,
-				FFA_DATA_ACCESS_RW,
-				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				FFA_MEMORY_NORMAL_MEM,
-				FFA_MEMORY_CACHE_WRITE_BACK,
-				FFA_MEMORY_OUTER_SHAREABLE);
+			EXPECT_EQ(
+				ffa_memory_region_init(
+					mb.send, HF_MAILBOX_SIZE,
+					HF_PRIMARY_VM_ID, SERVICE_VM1,
+					constituents, ARRAY_SIZE(constituents),
+					0, 0, FFA_DATA_ACCESS_RW,
+					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+					FFA_MEMORY_NORMAL_MEM,
+					FFA_MEMORY_CACHE_WRITE_BACK,
+					FFA_MEMORY_OUTER_SHAREABLE, NULL,
+					&msg_size),
+				0);
 			EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
 					 FFA_INVALID_PARAMETERS);
 		}
@@ -1096,11 +1237,14 @@ TEST(memory_sharing, lend_invalid_source)
 	};
 
 	/* Check cannot swap VM IDs. */
-	msg_size = ffa_memory_region_init(
-		mb.send, SERVICE_VM1, HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, SERVICE_VM1,
+			  HF_PRIMARY_VM_ID, constituents,
+			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 
@@ -1471,23 +1615,29 @@ TEST(memory_sharing, lend_donate)
 	constituents[0].page_count = 1;
 	for (int i = 1; i < PAGE_SIZE * 2; i++) {
 		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
-		msg_size = ffa_memory_region_init(
-			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
-			ARRAY_SIZE(constituents), 0, 0,
-			FFA_DATA_ACCESS_NOT_SPECIFIED,
-			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_OUTER_SHAREABLE);
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM2, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  FFA_DATA_ACCESS_NOT_SPECIFIED,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  0);
 		EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 				 FFA_DENIED);
 	}
 
 	/* Ensure we can't donate to the only borrower. */
-	msg_size = ffa_memory_region_init(
-		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 }
 
@@ -1530,23 +1680,29 @@ TEST(memory_sharing, share_donate)
 	constituents[0].page_count = 1;
 	for (int i = 1; i < PAGE_SIZE * 2; i++) {
 		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
-		msg_size = ffa_memory_region_init(
-			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
-			ARRAY_SIZE(constituents), 0, 0,
-			FFA_DATA_ACCESS_NOT_SPECIFIED,
-			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_OUTER_SHAREABLE);
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM2, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  FFA_DATA_ACCESS_NOT_SPECIFIED,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  0);
 		EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 				 FFA_DENIED);
 	}
 
 	/* Ensure we can't donate to the only borrower. */
-	msg_size = ffa_memory_region_init(
-		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 }
 
@@ -1609,12 +1765,16 @@ TEST(memory_sharing, lend_twice)
 	constituents[0].page_count = 1;
 	for (int i = 0; i < 2; i++) {
 		constituents[0].address = (uint64_t)pages + i * PAGE_SIZE;
-		msg_size = ffa_memory_region_init(
-			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
-			ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RO,
-			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_OUTER_SHAREABLE);
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM2, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  FFA_DATA_ACCESS_RO,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  0);
 		EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
 	}
 }
@@ -1668,12 +1828,16 @@ TEST(memory_sharing, share_twice)
 	constituents[0].page_count = 1;
 	for (int i = 0; i < 2; i++) {
 		constituents[0].address = (uint64_t)pages + i * PAGE_SIZE;
-		msg_size = ffa_memory_region_init(
-			mb.send, HF_PRIMARY_VM_ID, SERVICE_VM2, constituents,
-			ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RO,
-			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_OUTER_SHAREABLE);
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM2, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  FFA_DATA_ACCESS_RO,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  0);
 		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size), FFA_DENIED);
 	}
 }
@@ -1732,12 +1896,14 @@ TEST(memory_sharing, share_clear)
 		{.address = (uint64_t)pages, .page_count = 2},
 	};
 
-	msg_size = ffa_memory_region_init(
-		mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1, constituents,
-		ARRAY_SIZE(constituents), 0, FFA_MEMORY_REGION_FLAG_CLEAR,
-		FFA_DATA_ACCESS_RO, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RO,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 

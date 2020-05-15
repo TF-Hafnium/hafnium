@@ -28,6 +28,7 @@
 #include "test/vmapi/ffa.h"
 
 alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];
+static uint8_t retrieve_buffer[PAGE_SIZE * 2];
 
 TEST_SERVICE(memory_increment)
 {
@@ -38,10 +39,11 @@ TEST_SERVICE(memory_increment)
 		void *send_buf = SERVICE_SEND_BUFFER();
 
 		struct ffa_value ret = ffa_msg_wait();
-		ffa_vm_id_t sender = retrieve_memory_from_message(
-			recv_buf, send_buf, ret, NULL);
 		struct ffa_memory_region *memory_region =
-			(struct ffa_memory_region *)recv_buf;
+			(struct ffa_memory_region *)retrieve_buffer;
+		ffa_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, NULL, memory_region,
+			HF_MAILBOX_SIZE);
 		struct ffa_composite_memory_region *composite =
 			ffa_memory_region_get_composite(memory_region, 0);
 		uint8_t *ptr = (uint8_t *)composite->constituents[0].address;
@@ -60,7 +62,6 @@ TEST_SERVICE(memory_increment)
 		}
 
 		/* Signal completion and reset. */
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 		ffa_msg_send(hf_vm_get_id(), sender, sizeof(ptr), 0);
 	}
 }
@@ -121,10 +122,10 @@ TEST_SERVICE(ffa_memory_return)
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
-	ffa_vm_id_t sender =
-		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
 	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)recv_buf;
+		(struct ffa_memory_region *)retrieve_buffer;
+	ffa_vm_id_t sender = retrieve_memory_from_message(
+		recv_buf, send_buf, ret, NULL, memory_region, HF_MAILBOX_SIZE);
 	struct ffa_composite_memory_region *composite =
 		ffa_memory_region_get_composite(memory_region, 0);
 
@@ -141,7 +142,6 @@ TEST_SERVICE(ffa_memory_return)
 		composite->constituents, composite->constituent_count, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/*
 	 * Try and access the memory which will cause a fault unless the memory
@@ -168,14 +168,14 @@ TEST_SERVICE(ffa_check_upper_bound)
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
-	retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
-	memory_region = (struct ffa_memory_region *)recv_buf;
+	memory_region = (struct ffa_memory_region *)retrieve_buffer;
+	retrieve_memory_from_message(recv_buf, send_buf, ret, NULL,
+				     memory_region, HF_MAILBOX_SIZE);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/* Choose which constituent we want to test. */
 	index = *(uint8_t *)composite->constituents[0].address;
 	ptr = (uint8_t *)composite->constituents[index].address;
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/*
 	 * Check that we can't access out of bounds after the region sent to us.
@@ -202,14 +202,14 @@ TEST_SERVICE(ffa_check_lower_bound)
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
-	retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
-	memory_region = (struct ffa_memory_region *)recv_buf;
+	memory_region = (struct ffa_memory_region *)retrieve_buffer;
+	retrieve_memory_from_message(recv_buf, send_buf, ret, NULL,
+				     memory_region, HF_MAILBOX_SIZE);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/* Choose which constituent we want to test. */
 	index = *(uint8_t *)composite->constituents[0].address;
 	ptr = (uint8_t *)composite->constituents[index].address;
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/*
 	 * Check that we can't access out of bounds before the region sent to
@@ -230,10 +230,10 @@ TEST_SERVICE(ffa_donate_secondary_and_fault)
 	void *send_buf = SERVICE_SEND_BUFFER();
 
 	struct ffa_value ret = ffa_msg_wait();
-	ffa_vm_id_t sender =
-		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
 	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)recv_buf;
+		(struct ffa_memory_region *)retrieve_buffer;
+	ffa_vm_id_t sender = retrieve_memory_from_message(
+		recv_buf, send_buf, ret, NULL, memory_region, HF_MAILBOX_SIZE);
 	struct ffa_composite_memory_region *composite =
 		ffa_memory_region_get_composite(memory_region, 0);
 
@@ -248,7 +248,6 @@ TEST_SERVICE(ffa_donate_secondary_and_fault)
 		composite->constituents, composite->constituent_count, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/* Ensure that we are unable to modify memory any more. */
 	ptr[0] = 'c';
@@ -266,16 +265,14 @@ TEST_SERVICE(ffa_donate_twice)
 	void *send_buf = SERVICE_SEND_BUFFER();
 
 	struct ffa_value ret = ffa_msg_wait();
-	ffa_vm_id_t sender =
-		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
 	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)recv_buf;
+		(struct ffa_memory_region *)retrieve_buffer;
+	ffa_vm_id_t sender = retrieve_memory_from_message(
+		recv_buf, send_buf, ret, NULL, memory_region, HF_MAILBOX_SIZE);
 	struct ffa_composite_memory_region *composite =
 		ffa_memory_region_get_composite(memory_region, 0);
 	struct ffa_memory_region_constituent constituent =
 		composite->constituents[0];
-
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/* Yield to allow attempt to re donate from primary. */
 	ffa_yield();
@@ -288,11 +285,14 @@ TEST_SERVICE(ffa_donate_twice)
 		FFA_INSTRUCTION_ACCESS_X);
 
 	/* Attempt to donate the memory to another VM. */
-	msg_size = ffa_memory_region_init(
-		send_buf, hf_vm_get_id(), SERVICE_VM2, &constituent, 1, 0, 0,
-		FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(
+		ffa_memory_region_init(
+			send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(), SERVICE_VM2,
+			&constituent, 1, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 
 	ffa_yield();
@@ -309,16 +309,16 @@ TEST_SERVICE(ffa_memory_receive)
 
 	for (;;) {
 		struct ffa_value ret = ffa_msg_wait();
-		struct ffa_memory_region *memory_region;
+		struct ffa_memory_region *memory_region =
+			(struct ffa_memory_region *)retrieve_buffer;
 		struct ffa_composite_memory_region *composite;
 		uint8_t *ptr;
 
-		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
-		memory_region = (struct ffa_memory_region *)recv_buf;
+		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL,
+					     memory_region, HF_MAILBOX_SIZE);
 		composite = ffa_memory_region_get_composite(memory_region, 0);
 		ptr = (uint8_t *)composite->constituents[0].address;
 
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 		ptr[0] = 'd';
 		ffa_yield();
 
@@ -338,10 +338,10 @@ TEST_SERVICE(ffa_donate_invalid_source)
 	void *send_buf = SERVICE_SEND_BUFFER();
 
 	struct ffa_value ret = ffa_msg_wait();
-	ffa_vm_id_t sender =
-		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
 	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)recv_buf;
+		(struct ffa_memory_region *)retrieve_buffer;
+	ffa_vm_id_t sender = retrieve_memory_from_message(
+		recv_buf, send_buf, ret, NULL, memory_region, HF_MAILBOX_SIZE);
 	struct ffa_composite_memory_region *composite =
 		ffa_memory_region_get_composite(memory_region, 0);
 
@@ -353,13 +353,15 @@ TEST_SERVICE(ffa_donate_invalid_source)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	/* Fail to donate the memory from the primary to VM2. */
-	msg_size = ffa_memory_region_init(
-		send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2,
-		composite->constituents, composite->constituent_count, 0, 0,
-		FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_memory_region_init(
+			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM2, composite->constituents,
+			  composite->constituent_count, 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 	ffa_yield();
@@ -371,10 +373,6 @@ TEST_SERVICE(ffa_memory_lend_relinquish)
 
 	/* Loop, giving memory back to the sender. */
 	for (;;) {
-		uint8_t *ptr;
-		uint8_t *ptr2;
-		uint32_t count;
-		uint32_t count2;
 		size_t i;
 		ffa_memory_handle_t handle;
 
@@ -382,31 +380,32 @@ TEST_SERVICE(ffa_memory_lend_relinquish)
 		void *send_buf = SERVICE_SEND_BUFFER();
 
 		struct ffa_value ret = ffa_msg_wait();
-		ffa_vm_id_t sender = retrieve_memory_from_message(
-			recv_buf, send_buf, ret, &handle);
 		struct ffa_memory_region *memory_region =
-			(struct ffa_memory_region *)recv_buf;
+			(struct ffa_memory_region *)retrieve_buffer;
+		ffa_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, &handle, memory_region,
+			sizeof(retrieve_buffer));
 		struct ffa_composite_memory_region *composite =
 			ffa_memory_region_get_composite(memory_region, 0);
-		struct ffa_memory_region_constituent *constituents =
-			composite->constituents;
+		struct ffa_memory_region_constituent *constituents;
+		uint8_t *first_ptr;
 
 		/* ASSERT_TRUE isn't enough for clang-analyze. */
 		CHECK(composite != NULL);
+		constituents = composite->constituents;
+		first_ptr = (uint8_t *)constituents[0].address;
 
-		ptr = (uint8_t *)constituents[0].address;
-		count = constituents[0].page_count;
-		ptr2 = (uint8_t *)constituents[1].address;
-		count2 = constituents[1].page_count;
-		/* Relevant information read, mailbox can be cleared. */
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+		/*
+		 * Check that we can read and write every page that was shared.
+		 */
+		for (i = 0; i < composite->constituent_count; ++i) {
+			uint8_t *ptr = (uint8_t *)constituents[i].address;
+			uint32_t count = constituents[i].page_count;
+			size_t j;
 
-		/* Check that one has access to the shared region. */
-		for (i = 0; i < PAGE_SIZE * count; ++i) {
-			ptr[i]++;
-		}
-		for (i = 0; i < PAGE_SIZE * count2; ++i) {
-			ptr2[i]++;
+			for (j = 0; j < PAGE_SIZE * count; ++j) {
+				ptr[j]++;
+			}
 		}
 
 		/* Give the memory back and notify the sender. */
@@ -416,10 +415,10 @@ TEST_SERVICE(ffa_memory_lend_relinquish)
 			  FFA_SUCCESS_32);
 
 		/*
-		 * Try and access the memory which will cause a fault unless the
+		 * Try to access the memory, which will cause a fault unless the
 		 * memory has been shared back again.
 		 */
-		ptr[0] = 123;
+		first_ptr[0] = 123;
 	}
 }
 
@@ -439,8 +438,9 @@ TEST_SERVICE(ffa_memory_donate_relinquish)
 		void *send_buf = SERVICE_SEND_BUFFER();
 		struct ffa_value ret = ffa_msg_wait();
 
-		retrieve_memory_from_message(recv_buf, send_buf, ret, &handle);
-		memory_region = (struct ffa_memory_region *)recv_buf;
+		memory_region = (struct ffa_memory_region *)retrieve_buffer;
+		retrieve_memory_from_message(recv_buf, send_buf, ret, &handle,
+					     memory_region, HF_MAILBOX_SIZE);
 		composite = ffa_memory_region_get_composite(memory_region, 0);
 
 		ptr = (uint8_t *)composite->constituents[0].address;
@@ -455,7 +455,6 @@ TEST_SERVICE(ffa_memory_donate_relinquish)
 		 * it was donated not lent.
 		 */
 		ffa_mem_relinquish_init(send_buf, handle, 0, hf_vm_get_id());
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 		EXPECT_FFA_ERROR(ffa_mem_relinquish(), FFA_INVALID_PARAMETERS);
 
 		/* Ensure we still have access to the memory. */
@@ -482,13 +481,8 @@ TEST_SERVICE(ffa_memory_share_relinquish_clear)
 
 		struct ffa_value ret = ffa_msg_wait();
 		ffa_vm_id_t sender = retrieve_memory_from_message(
-			recv_buf, send_buf, ret, &handle);
-
-		/*
-		 * Mailbox can be cleared, we don't actually care what the
-		 * memory region is.
-		 */
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+			recv_buf, send_buf, ret, &handle, NULL,
+			HF_MAILBOX_SIZE);
 
 		/* Trying to relinquish the memory and clear it should fail. */
 		ffa_mem_relinquish_init(send_buf, handle,
@@ -515,10 +509,11 @@ TEST_SERVICE(ffa_lend_invalid_source)
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
 	struct ffa_value ret = ffa_msg_wait();
-	ffa_vm_id_t sender =
-		retrieve_memory_from_message(recv_buf, send_buf, ret, &handle);
 	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)recv_buf;
+		(struct ffa_memory_region *)retrieve_buffer;
+	ffa_vm_id_t sender =
+		retrieve_memory_from_message(recv_buf, send_buf, ret, &handle,
+					     memory_region, HF_MAILBOX_SIZE);
 	struct ffa_composite_memory_region *composite =
 		ffa_memory_region_get_composite(memory_region, 0);
 
@@ -529,23 +524,26 @@ TEST_SERVICE(ffa_lend_invalid_source)
 		  FFA_SUCCESS_32);
 
 	/* Ensure we cannot lend from the primary to another secondary. */
-	msg_size = ffa_memory_region_init(
-		send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2,
-		composite->constituents, composite->constituent_count, 0, 0,
-		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
-		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_OUTER_SHAREABLE);
+	EXPECT_EQ(ffa_memory_region_init(
+			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM2, composite->constituents,
+			  composite->constituent_count, 0, 0,
+			  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 
 	/* Ensure we cannot share from the primary to another secondary. */
-	msg_size = ffa_memory_region_init(
-		send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2,
-		composite->constituents, composite->constituent_count, 0, 0,
-		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
-		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_OUTER_SHAREABLE);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_memory_region_init(
+			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM2, composite->constituents,
+			  composite->constituent_count, 0, 0,
+			  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 
@@ -564,10 +562,11 @@ TEST_SERVICE(ffa_memory_lend_relinquish_X)
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
 		struct ffa_value ret = ffa_msg_wait();
-		ffa_vm_id_t sender = retrieve_memory_from_message(
-			recv_buf, send_buf, ret, &handle);
 		struct ffa_memory_region *memory_region =
-			(struct ffa_memory_region *)recv_buf;
+			(struct ffa_memory_region *)retrieve_buffer;
+		ffa_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, &handle, memory_region,
+			HF_MAILBOX_SIZE);
 		struct ffa_composite_memory_region *composite =
 			ffa_memory_region_get_composite(memory_region, 0);
 		struct ffa_memory_region_constituent *constituents;
@@ -578,8 +577,6 @@ TEST_SERVICE(ffa_memory_lend_relinquish_X)
 
 		constituents = composite->constituents;
 		ptr = (uint64_t *)constituents[0].address;
-
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 		/*
 		 * Verify that the instruction in memory is the encoded RET
@@ -630,16 +627,15 @@ TEST_SERVICE(ffa_memory_lend_relinquish_RW)
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
 		struct ffa_value ret = ffa_msg_wait();
-		ffa_vm_id_t sender = retrieve_memory_from_message(
-			recv_buf, send_buf, ret, &handle);
 		struct ffa_memory_region *memory_region =
-			(struct ffa_memory_region *)recv_buf;
+			(struct ffa_memory_region *)retrieve_buffer;
+		ffa_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, &handle, memory_region,
+			HF_MAILBOX_SIZE);
 		struct ffa_composite_memory_region *composite =
 			ffa_memory_region_get_composite(memory_region, 0);
 		struct ffa_memory_region_constituent constituent_copy =
 			composite->constituents[0];
-
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 		ptr = (uint8_t *)constituent_copy.address;
 
@@ -677,12 +673,11 @@ TEST_SERVICE(ffa_memory_lend_twice)
 	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region_constituent constituent_copy;
 
-	retrieve_memory_from_message(recv_buf, send_buf, ret, NULL);
-	memory_region = (struct ffa_memory_region *)recv_buf;
+	memory_region = (struct ffa_memory_region *)retrieve_buffer;
+	retrieve_memory_from_message(recv_buf, send_buf, ret, NULL,
+				     memory_region, HF_MAILBOX_SIZE);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	constituent_copy = composite->constituents[0];
-
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	ptr = (uint8_t *)constituent_copy.address;
 
@@ -700,20 +695,24 @@ TEST_SERVICE(ffa_memory_lend_twice)
 		constituent_copy.address = (uint64_t)ptr + i;
 
 		/* Fail to lend or share the memory from the primary. */
-		msg_size = ffa_memory_region_init(
-			send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2,
-			&constituent_copy, 1, 0, 0, FFA_DATA_ACCESS_RW,
-			FFA_INSTRUCTION_ACCESS_X, FFA_MEMORY_NORMAL_MEM,
-			FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_OUTER_SHAREABLE);
+		EXPECT_EQ(ffa_memory_region_init(
+				  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM2, &constituent_copy, 1, 0, 0,
+				  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  0);
 		EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
 				 FFA_INVALID_PARAMETERS);
-		msg_size = ffa_memory_region_init(
-			send_buf, HF_PRIMARY_VM_ID, SERVICE_VM2,
-			&constituent_copy, 1, 0, 0, FFA_DATA_ACCESS_RW,
-			FFA_INSTRUCTION_ACCESS_X, FFA_MEMORY_NORMAL_MEM,
-			FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_OUTER_SHAREABLE);
+		EXPECT_EQ(ffa_memory_region_init(
+				  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM2, &constituent_copy, 1, 0, 0,
+				  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  0);
 		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 				 FFA_INVALID_PARAMETERS);
 	}

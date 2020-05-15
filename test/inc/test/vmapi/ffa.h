@@ -40,9 +40,20 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	enum ffa_data_access retrieve_data_access,
 	enum ffa_instruction_access send_instruction_access,
 	enum ffa_instruction_access retrieve_instruction_access);
-ffa_vm_id_t retrieve_memory_from_message(void *recv_buf, void *send_buf,
-					 struct ffa_value msg_ret,
-					 ffa_memory_handle_t *handle);
+ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
+	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
+	ffa_vm_id_t recipient,
+	struct ffa_memory_region_constituent constituents[],
+	uint32_t constituent_count, ffa_memory_region_flags_t flags,
+	enum ffa_data_access send_data_access,
+	enum ffa_data_access retrieve_data_access,
+	enum ffa_instruction_access send_instruction_access,
+	enum ffa_instruction_access retrieve_instruction_access);
+ffa_vm_id_t retrieve_memory_from_message(
+	void *recv_buf, void *send_buf, struct ffa_value msg_ret,
+	ffa_memory_handle_t *handle,
+	struct ffa_memory_region *memory_region_ret,
+	size_t memory_region_max_size);
 ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 						     void *send_buf,
 						     struct ffa_value msg_ret,

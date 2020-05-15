@@ -36,6 +36,12 @@
  */
 #define MAX_MEM_SHARES 100
 
+/**
+ * The maximum number of fragments into which a memory sharing message may be
+ * broken.
+ */
+#define MAX_FRAGMENTS 20
+
 static_assert(sizeof(struct ffa_memory_region_constituent) % 16 == 0,
 	      "struct ffa_memory_region_constituent must be a multiple of 16 "
 	      "bytes long.");
@@ -53,11 +59,24 @@ static_assert(sizeof(struct ffa_mem_relinquish) % 16 == 0,
 	      "bytes long.");
 
 struct ffa_memory_share_state {
+	ffa_memory_handle_t handle;
+
 	/**
 	 * The memory region being shared, or NULL if this share state is
 	 * unallocated.
 	 */
 	struct ffa_memory_region *memory_region;
+
+	struct ffa_memory_region_constituent *fragments[MAX_FRAGMENTS];
+
+	/** The number of constituents in each fragment. */
+	uint32_t fragment_constituent_counts[MAX_FRAGMENTS];
+
+	/**
+	 * The number of valid elements in the `fragments` and
+	 * `fragment_constituent_counts` arrays.
+	 */
+	uint32_t fragment_count;
 
 	/**
 	 * The FF-A function used for sharing the memory. Must be one of
@@ -67,12 +86,18 @@ struct ffa_memory_share_state {
 	uint32_t share_func;
 
 	/**
-	 * Whether each recipient has retrieved the memory region yet. The order
-	 * of this array matches the order of the attribute descriptors in the
-	 * memory region descriptor. Any entries beyond the attribute_count will
-	 * always be false.
+	 * True if all the fragments of this sharing request have been sent and
+	 * Hafnium has updated the sender page table accordingly.
 	 */
-	bool retrieved[MAX_MEM_SHARE_RECIPIENTS];
+	bool sending_complete;
+
+	/**
+	 * How many fragments of the memory region each recipient has retrieved
+	 * so far. The order of this array matches the order of the endpoint
+	 * memory access descriptors in the memory region descriptor. Any
+	 * entries beyond the receiver_count will always be 0.
+	 */
+	uint32_t retrieved_fragment_count[MAX_MEM_SHARE_RECIPIENTS];
 };
 
 /**
@@ -90,36 +115,69 @@ static struct spinlock share_states_lock_instance = SPINLOCK_INIT;
 static struct ffa_memory_share_state share_states[MAX_MEM_SHARES];
 
 /**
- * Initialises the next available `struct ffa_memory_share_state` and sets
- * `handle` to its handle. Returns true on succes or false if none are
- * available.
+ * Buffer for retrieving memory region information from the TEE for when a
+ * region is reclaimed by a VM. Access to this buffer must be guarded by the VM
+ * lock of the TEE VM.
  */
-static bool allocate_share_state(uint32_t share_func,
-				 struct ffa_memory_region *memory_region,
-				 ffa_memory_handle_t *handle)
+alignas(PAGE_SIZE) static uint8_t
+	tee_retrieve_buffer[HF_MAILBOX_SIZE * MAX_FRAGMENTS];
+
+/**
+ * Initialises the next available `struct ffa_memory_share_state` and sets
+ * `share_state_ret` to a pointer to it. If `handle` is
+ * `FFA_MEMORY_HANDLE_INVALID` then allocates an appropriate handle, otherwise
+ * uses the provided handle which is assumed to be globally unique.
+ *
+ * Returns true on success or false if none are available.
+ */
+static bool allocate_share_state(
+	struct share_states_locked share_states, uint32_t share_func,
+	struct ffa_memory_region *memory_region, uint32_t fragment_length,
+	ffa_memory_handle_t handle,
+	struct ffa_memory_share_state **share_state_ret)
 {
 	uint64_t i;
 
+	CHECK(share_states.share_states != NULL);
 	CHECK(memory_region != NULL);
 
-	sl_lock(&share_states_lock_instance);
 	for (i = 0; i < MAX_MEM_SHARES; ++i) {
-		if (share_states[i].share_func == 0) {
+		if (share_states.share_states[i].share_func == 0) {
 			uint32_t j;
 			struct ffa_memory_share_state *allocated_state =
-				&share_states[i];
+				&share_states.share_states[i];
+			struct ffa_composite_memory_region *composite =
+				ffa_memory_region_get_composite(memory_region,
+								0);
+
+			if (handle == FFA_MEMORY_HANDLE_INVALID) {
+				allocated_state->handle =
+					i |
+					FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
+			} else {
+				allocated_state->handle = handle;
+			}
 			allocated_state->share_func = share_func;
 			allocated_state->memory_region = memory_region;
+			allocated_state->fragment_count = 1;
+			allocated_state->fragments[0] = composite->constituents;
+			allocated_state->fragment_constituent_counts[0] =
+				(fragment_length -
+				 ffa_composite_constituent_offset(memory_region,
+								  0)) /
+				sizeof(struct ffa_memory_region_constituent);
+			allocated_state->sending_complete = false;
 			for (j = 0; j < MAX_MEM_SHARE_RECIPIENTS; ++j) {
-				allocated_state->retrieved[j] = false;
+				allocated_state->retrieved_fragment_count[j] =
+					0;
 			}
-			*handle = i | FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
-			sl_unlock(&share_states_lock_instance);
+			if (share_state_ret != NULL) {
+				*share_state_ret = allocated_state;
+			}
 			return true;
 		}
 	}
 
-	sl_unlock(&share_states_lock_instance);
 	return false;
 }
 
@@ -140,29 +198,47 @@ static void share_states_unlock(struct share_states_locked *share_states)
 }
 
 /**
- * If the given handle is a valid handle for an allocated share state then takes
- * the lock, initialises `share_state_locked` to point to the share state and
- * returns true. Otherwise returns false and doesn't take the lock.
+ * If the given handle is a valid handle for an allocated share state then
+ * initialises `share_state_ret` to point to the share state and returns true.
+ * Otherwise returns false.
  */
 static bool get_share_state(struct share_states_locked share_states,
 			    ffa_memory_handle_t handle,
 			    struct ffa_memory_share_state **share_state_ret)
 {
 	struct ffa_memory_share_state *share_state;
-	uint32_t index = handle & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK;
+	uint32_t index;
 
-	if (index >= MAX_MEM_SHARES) {
-		return false;
+	CHECK(share_states.share_states != NULL);
+	CHECK(share_state_ret != NULL);
+
+	/*
+	 * First look for a share_state allocated by us, in which case the
+	 * handle is based on the index.
+	 */
+	if ((handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK) ==
+	    FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
+		index = handle & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK;
+		if (index < MAX_MEM_SHARES) {
+			share_state = &share_states.share_states[index];
+			if (share_state->share_func != 0) {
+				*share_state_ret = share_state;
+				return true;
+			}
+		}
 	}
 
-	share_state = &share_states.share_states[index];
-
-	if (share_state->share_func == 0) {
-		return false;
+	/* Fall back to a linear scan. */
+	for (index = 0; index < MAX_MEM_SHARES; ++index) {
+		share_state = &share_states.share_states[index];
+		if (share_state->handle == handle &&
+		    share_state->share_func != 0) {
+			*share_state_ret = share_state;
+			return true;
+		}
 	}
 
-	*share_state_ret = share_state;
-	return true;
+	return false;
 }
 
 /** Marks a share state as unallocated. */
@@ -170,31 +246,86 @@ static void share_state_free(struct share_states_locked share_states,
 			     struct ffa_memory_share_state *share_state,
 			     struct mpool *page_pool)
 {
+	uint32_t i;
+
 	CHECK(share_states.share_states != NULL);
 	share_state->share_func = 0;
+	share_state->sending_complete = false;
 	mpool_free(page_pool, share_state->memory_region);
+	/*
+	 * First fragment is part of the same page as the `memory_region`, so it
+	 * doesn't need to be freed separately.
+	 */
+	share_state->fragments[0] = NULL;
+	share_state->fragment_constituent_counts[0] = 0;
+	for (i = 1; i < share_state->fragment_count; ++i) {
+		mpool_free(page_pool, share_state->fragments[i]);
+		share_state->fragments[i] = NULL;
+		share_state->fragment_constituent_counts[i] = 0;
+	}
+	share_state->fragment_count = 0;
 	share_state->memory_region = NULL;
 }
 
-/**
- * Marks the share state with the given handle as unallocated, or returns false
- * if the handle was invalid.
- */
-static bool share_state_free_handle(ffa_memory_handle_t handle,
-				    struct mpool *page_pool)
+/** Checks whether the given share state has been fully sent. */
+static bool share_state_sending_complete(
+	struct share_states_locked share_states,
+	struct ffa_memory_share_state *share_state)
 {
-	struct share_states_locked share_states = share_states_lock();
-	struct ffa_memory_share_state *share_state;
+	struct ffa_composite_memory_region *composite;
+	uint32_t expected_constituent_count;
+	uint32_t fragment_constituent_count_total = 0;
+	uint32_t i;
 
-	if (!get_share_state(share_states, handle, &share_state)) {
-		share_states_unlock(&share_states);
-		return false;
+	/* Lock must be held. */
+	CHECK(share_states.share_states != NULL);
+
+	/*
+	 * Share state must already be valid, or it's not possible to get hold
+	 * of it.
+	 */
+	CHECK(share_state->memory_region != NULL &&
+	      share_state->share_func != 0);
+
+	composite =
+		ffa_memory_region_get_composite(share_state->memory_region, 0);
+	expected_constituent_count = composite->constituent_count;
+	for (i = 0; i < share_state->fragment_count; ++i) {
+		fragment_constituent_count_total +=
+			share_state->fragment_constituent_counts[i];
+	}
+	dlog_verbose(
+		"Checking completion: constituent count %d/%d from %d "
+		"fragments.\n",
+		fragment_constituent_count_total, expected_constituent_count,
+		share_state->fragment_count);
+
+	return fragment_constituent_count_total == expected_constituent_count;
+}
+
+/**
+ * Calculates the offset of the next fragment expected for the given share
+ * state.
+ */
+static uint32_t share_state_next_fragment_offset(
+	struct share_states_locked share_states,
+	struct ffa_memory_share_state *share_state)
+{
+	uint32_t next_fragment_offset;
+	uint32_t i;
+
+	/* Lock must be held. */
+	CHECK(share_states.share_states != NULL);
+
+	next_fragment_offset =
+		ffa_composite_constituent_offset(share_state->memory_region, 0);
+	for (i = 0; i < share_state->fragment_count; ++i) {
+		next_fragment_offset +=
+			share_state->fragment_constituent_counts[i] *
+			sizeof(struct ffa_memory_region_constituent);
 	}
 
-	share_state_free(share_states, share_state, page_pool);
-	share_states_unlock(&share_states);
-
-	return true;
+	return next_fragment_offset;
 }
 
 static void dump_memory_region(struct ffa_memory_region *memory_region)
@@ -236,7 +367,7 @@ static void dump_share_states(void)
 	sl_lock(&share_states_lock_instance);
 	for (i = 0; i < MAX_MEM_SHARES; ++i) {
 		if (share_states[i].share_func != 0) {
-			dlog("%d: ", i);
+			dlog("%#x: ", share_states[i].handle);
 			switch (share_states[i].share_func) {
 			case FFA_MEM_SHARE_32:
 				dlog("SHARE");
@@ -253,11 +384,14 @@ static void dump_share_states(void)
 			}
 			dlog(" (");
 			dump_memory_region(share_states[i].memory_region);
-			if (share_states[i].retrieved[0]) {
-				dlog("): retrieved\n");
+			if (share_states[i].sending_complete) {
+				dlog("): fully sent");
 			} else {
-				dlog("): not retrieved\n");
+				dlog("): partially sent");
 			}
+			dlog(" with %d fragments, %d retrieved\n",
+			     share_states[i].fragment_count,
+			     share_states[i].retrieved_fragment_count[0]);
 			break;
 		}
 	}
@@ -303,12 +437,13 @@ static inline uint32_t ffa_memory_permissions_to_mode(
  */
 static struct ffa_value constituents_get_mode(
 	struct vm_locked vm, uint32_t *orig_mode,
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count)
+	struct ffa_memory_region_constituent **fragments,
+	const uint32_t *fragment_constituent_counts, uint32_t fragment_count)
 {
 	uint32_t i;
+	uint32_t j;
 
-	if (constituent_count == 0) {
+	if (fragment_count == 0 || fragment_constituent_counts[0] == 0) {
 		/*
 		 * Fail if there are no constituents. Otherwise we would get an
 		 * uninitialised *orig_mode.
@@ -316,34 +451,43 @@ static struct ffa_value constituents_get_mode(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	for (i = 0; i < constituent_count; ++i) {
-		ipaddr_t begin = ipa_init(constituents[i].address);
-		size_t size = constituents[i].page_count * PAGE_SIZE;
-		ipaddr_t end = ipa_add(begin, size);
-		uint32_t current_mode;
+	for (i = 0; i < fragment_count; ++i) {
+		for (j = 0; j < fragment_constituent_counts[i]; ++j) {
+			ipaddr_t begin = ipa_init(fragments[i][j].address);
+			size_t size = fragments[i][j].page_count * PAGE_SIZE;
+			ipaddr_t end = ipa_add(begin, size);
+			uint32_t current_mode;
 
-		/* Fail if addresses are not page-aligned. */
-		if (!is_aligned(ipa_addr(begin), PAGE_SIZE) ||
-		    !is_aligned(ipa_addr(end), PAGE_SIZE)) {
-			return ffa_error(FFA_INVALID_PARAMETERS);
-		}
+			/* Fail if addresses are not page-aligned. */
+			if (!is_aligned(ipa_addr(begin), PAGE_SIZE) ||
+			    !is_aligned(ipa_addr(end), PAGE_SIZE)) {
+				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
 
-		/*
-		 * Ensure that this constituent memory range is all mapped with
-		 * the same mode.
-		 */
-		if (!mm_vm_get_mode(&vm.vm->ptable, begin, end,
-				    &current_mode)) {
-			return ffa_error(FFA_DENIED);
-		}
+			/*
+			 * Ensure that this constituent memory range is all
+			 * mapped with the same mode.
+			 */
+			if (!mm_vm_get_mode(&vm.vm->ptable, begin, end,
+					    &current_mode)) {
+				return ffa_error(FFA_DENIED);
+			}
 
-		/*
-		 * Ensure that all constituents are mapped with the same mode.
-		 */
-		if (i == 0) {
-			*orig_mode = current_mode;
-		} else if (current_mode != *orig_mode) {
-			return ffa_error(FFA_DENIED);
+			/*
+			 * Ensure that all constituents are mapped with the same
+			 * mode.
+			 */
+			if (i == 0) {
+				*orig_mode = current_mode;
+			} else if (current_mode != *orig_mode) {
+				dlog_verbose(
+					"Expected mode %#x but was %#x for %d "
+					"pages at %#x.\n",
+					*orig_mode, current_mode,
+					fragments[i][j].page_count,
+					ipa_addr(begin));
+				return ffa_error(FFA_DENIED);
+			}
 		}
 	}
 
@@ -367,8 +511,9 @@ static struct ffa_value constituents_get_mode(
 static struct ffa_value ffa_send_check_transition(
 	struct vm_locked from, uint32_t share_func,
 	ffa_memory_access_permissions_t permissions, uint32_t *orig_from_mode,
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count, uint32_t *from_mode)
+	struct ffa_memory_region_constituent **fragments,
+	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t *from_mode)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
@@ -376,9 +521,11 @@ static struct ffa_value ffa_send_check_transition(
 		ffa_memory_permissions_to_mode(permissions);
 	struct ffa_value ret;
 
-	ret = constituents_get_mode(from, orig_from_mode, constituents,
-				    constituent_count);
+	ret = constituents_get_mode(from, orig_from_mode, fragments,
+				    fragment_constituent_counts,
+				    fragment_count);
 	if (ret.func != FFA_SUCCESS_32) {
+		dlog_verbose("Inconsistent modes.\n", fragment_count);
 		return ret;
 	}
 
@@ -429,16 +576,18 @@ static struct ffa_value ffa_send_check_transition(
 
 static struct ffa_value ffa_relinquish_check_transition(
 	struct vm_locked from, uint32_t *orig_from_mode,
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count, uint32_t *from_mode)
+	struct ffa_memory_region_constituent **fragments,
+	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t *from_mode)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 	uint32_t orig_from_state;
 	struct ffa_value ret;
 
-	ret = constituents_get_mode(from, orig_from_mode, constituents,
-				    constituent_count);
+	ret = constituents_get_mode(from, orig_from_mode, fragments,
+				    fragment_constituent_counts,
+				    fragment_count);
 	if (ret.func != FFA_SUCCESS_32) {
 		return ret;
 	}
@@ -458,8 +607,7 @@ static struct ffa_value ffa_relinquish_check_transition(
 	if ((orig_from_state & ~MM_MODE_SHARED) != MM_MODE_UNOWNED) {
 		dlog_verbose(
 			"Tried to relinquish memory in state %#x (masked %#x "
-			"but "
-			"should be %#x).\n",
+			"but should be %#x).\n",
 			*orig_from_mode, orig_from_state, MM_MODE_UNOWNED);
 		return ffa_error(FFA_DENIED);
 	}
@@ -486,16 +634,18 @@ static struct ffa_value ffa_relinquish_check_transition(
  */
 static struct ffa_value ffa_retrieve_check_transition(
 	struct vm_locked to, uint32_t share_func,
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count, uint32_t memory_to_attributes,
-	uint32_t *to_mode)
+	struct ffa_memory_region_constituent **fragments,
+	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t memory_to_attributes, uint32_t *to_mode)
 {
 	uint32_t orig_to_mode;
 	struct ffa_value ret;
 
-	ret = constituents_get_mode(to, &orig_to_mode, constituents,
-				    constituent_count);
+	ret = constituents_get_mode(to, &orig_to_mode, fragments,
+				    fragment_constituent_counts,
+				    fragment_count);
 	if (ret.func != FFA_SUCCESS_32) {
+		dlog_verbose("Inconsistent modes.\n");
 		return ret;
 	}
 
@@ -540,6 +690,7 @@ static struct ffa_value ffa_retrieve_check_transition(
 		break;
 
 	default:
+		dlog_error("Invalid share_func %#x.\n", share_func);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -566,22 +717,28 @@ static struct ffa_value ffa_retrieve_check_transition(
  */
 static bool ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count, int mode, struct mpool *ppool, bool commit)
+	struct ffa_memory_region_constituent **fragments,
+	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	int mode, struct mpool *ppool, bool commit)
 {
-	/* Iterate over the memory region constituents. */
-	for (uint32_t index = 0; index < constituent_count; index++) {
-		size_t size = constituents[index].page_count * PAGE_SIZE;
-		paddr_t pa_begin =
-			pa_from_ipa(ipa_init(constituents[index].address));
-		paddr_t pa_end = pa_add(pa_begin, size);
+	uint32_t i;
+	uint32_t j;
 
-		if (commit) {
-			vm_identity_commit(vm_locked, pa_begin, pa_end, mode,
-					   ppool, NULL);
-		} else if (!vm_identity_prepare(vm_locked, pa_begin, pa_end,
-						mode, ppool)) {
-			return false;
+	/* Iterate over the memory region constituents within each fragment. */
+	for (i = 0; i < fragment_count; ++i) {
+		for (j = 0; j < fragment_constituent_counts[i]; ++j) {
+			size_t size = fragments[i][j].page_count * PAGE_SIZE;
+			paddr_t pa_begin =
+				pa_from_ipa(ipa_init(fragments[i][j].address));
+			paddr_t pa_end = pa_add(pa_begin, size);
+
+			if (commit) {
+				vm_identity_commit(vm_locked, pa_begin, pa_end,
+						   mode, ppool, NULL);
+			} else if (!vm_identity_prepare(vm_locked, pa_begin,
+							pa_end, mode, ppool)) {
+				return false;
+			}
 		}
 	}
 
@@ -634,10 +791,12 @@ out:
  * flushed from the cache so the memory has been cleared across the system.
  */
 static bool ffa_clear_memory_constituents(
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count, struct mpool *page_pool)
+	struct ffa_memory_region_constituent **fragments,
+	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	struct mpool *page_pool)
 {
 	struct mpool local_page_pool;
+	uint32_t i;
 	struct mm_stage1_locked stage1_locked;
 	bool ret = false;
 
@@ -648,18 +807,23 @@ static bool ffa_clear_memory_constituents(
 	 */
 	mpool_init_with_fallback(&local_page_pool, page_pool);
 
-	/* Iterate over the memory region constituents. */
-	for (uint32_t i = 0; i < constituent_count; ++i) {
-		size_t size = constituents[i].page_count * PAGE_SIZE;
-		paddr_t begin = pa_from_ipa(ipa_init(constituents[i].address));
-		paddr_t end = pa_add(begin, size);
+	/* Iterate over the memory region constituents within each fragment. */
+	for (i = 0; i < fragment_count; ++i) {
+		uint32_t j;
 
-		if (!clear_memory(begin, end, &local_page_pool)) {
-			/*
-			 * api_clear_memory will defrag on failure, so no need
-			 * to do it here.
-			 */
-			goto out;
+		for (j = 0; j < fragment_constituent_counts[j]; ++j) {
+			size_t size = fragments[i][j].page_count * PAGE_SIZE;
+			paddr_t begin =
+				pa_from_ipa(ipa_init(fragments[i][j].address));
+			paddr_t end = pa_add(begin, size);
+
+			if (!clear_memory(begin, end, &local_page_pool)) {
+				/*
+				 * api_clear_memory will defrag on failure, so
+				 * no need to do it here.
+				 */
+				goto out;
+			}
 		}
 	}
 
@@ -695,12 +859,13 @@ out:
  */
 static struct ffa_value ffa_send_check_update(
 	struct vm_locked from_locked,
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count, uint32_t share_func,
-	ffa_memory_access_permissions_t permissions, struct mpool *page_pool,
-	bool clear)
+	struct ffa_memory_region_constituent **fragments,
+	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t share_func, ffa_memory_access_permissions_t permissions,
+	struct mpool *page_pool, bool clear)
 {
 	struct vm *from = from_locked.vm;
+	uint32_t i;
 	uint32_t orig_from_mode;
 	uint32_t from_mode;
 	struct mpool local_page_pool;
@@ -710,8 +875,11 @@ static struct ffa_value ffa_send_check_update(
 	 * Make sure constituents are properly aligned to a 64-bit boundary. If
 	 * not we would get alignment faults trying to read (64-bit) values.
 	 */
-	if (!is_aligned(constituents, 8)) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
+	for (i = 0; i < fragment_count; ++i) {
+		if (!is_aligned(fragments[i], 8)) {
+			dlog_verbose("Constituents not aligned.\n");
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
 	}
 
 	/*
@@ -720,9 +888,11 @@ static struct ffa_value ffa_send_check_update(
 	 * state.
 	 */
 	ret = ffa_send_check_transition(from_locked, share_func, permissions,
-					&orig_from_mode, constituents,
-					constituent_count, &from_mode);
+					&orig_from_mode, fragments,
+					fragment_constituent_counts,
+					fragment_count, &from_mode);
 	if (ret.func != FFA_SUCCESS_32) {
+		dlog_verbose("Invalid transition for send.\n");
 		return ret;
 	}
 
@@ -738,9 +908,9 @@ static struct ffa_value ffa_send_check_update(
 	 * without committing, to make sure the entire operation will succeed
 	 * without exhausting the page pool.
 	 */
-	if (!ffa_region_group_identity_map(from_locked, constituents,
-					   constituent_count, from_mode,
-					   page_pool, false)) {
+	if (!ffa_region_group_identity_map(
+		    from_locked, fragments, fragment_constituent_counts,
+		    fragment_count, from_mode, page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -752,13 +922,14 @@ static struct ffa_value ffa_send_check_update(
 	 * case that a whole block is being unmapped that was previously
 	 * partially mapped.
 	 */
-	CHECK(ffa_region_group_identity_map(from_locked, constituents,
-					    constituent_count, from_mode,
-					    &local_page_pool, true));
+	CHECK(ffa_region_group_identity_map(
+		from_locked, fragments, fragment_constituent_counts,
+		fragment_count, from_mode, &local_page_pool, true));
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear && !ffa_clear_memory_constituents(
-			     constituents, constituent_count, page_pool)) {
+			     fragments, fragment_constituent_counts,
+			     fragment_count, page_pool)) {
 		/*
 		 * On failure, roll back by returning memory to the sender. This
 		 * may allocate pages which were previously freed into
@@ -766,8 +937,9 @@ static struct ffa_value ffa_send_check_update(
 		 * more pages than that so can never fail.
 		 */
 		CHECK(ffa_region_group_identity_map(
-			from_locked, constituents, constituent_count,
-			orig_from_mode, &local_page_pool, true));
+			from_locked, fragments, fragment_constituent_counts,
+			fragment_count, orig_from_mode, &local_page_pool,
+			true));
 
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -802,22 +974,25 @@ out:
  */
 static struct ffa_value ffa_retrieve_check_update(
 	struct vm_locked to_locked,
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count, uint32_t memory_to_attributes,
-	uint32_t share_func, bool clear, struct mpool *page_pool)
+	struct ffa_memory_region_constituent **fragments,
+	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t memory_to_attributes, uint32_t share_func, bool clear,
+	struct mpool *page_pool)
 {
 	struct vm *to = to_locked.vm;
+	uint32_t i;
 	uint32_t to_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
 
 	/*
-	 * Make sure constituents are properly aligned to a 32-bit boundary. If
-	 * not we would get alignment faults trying to read (32-bit) values.
+	 * Make sure constituents are properly aligned to a 64-bit boundary. If
+	 * not we would get alignment faults trying to read (64-bit) values.
 	 */
-	if (!is_aligned(constituents, 4)) {
-		dlog_verbose("Constituents not aligned.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
+	for (i = 0; i < fragment_count; ++i) {
+		if (!is_aligned(fragments[i], 8)) {
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
 	}
 
 	/*
@@ -825,11 +1000,11 @@ static struct ffa_value ffa_retrieve_check_update(
 	 * that all constituents of the memory region being retrieved are at the
 	 * same state.
 	 */
-	ret = ffa_retrieve_check_transition(to_locked, share_func, constituents,
-					    constituent_count,
-					    memory_to_attributes, &to_mode);
+	ret = ffa_retrieve_check_transition(
+		to_locked, share_func, fragments, fragment_constituent_counts,
+		fragment_count, memory_to_attributes, &to_mode);
 	if (ret.func != FFA_SUCCESS_32) {
-		dlog_verbose("Invalid transition.\n");
+		dlog_verbose("Invalid transition for retrieve.\n");
 		return ret;
 	}
 
@@ -845,9 +1020,9 @@ static struct ffa_value ffa_retrieve_check_update(
 	 * the recipient page tables without committing, to make sure the entire
 	 * operation will succeed without exhausting the page pool.
 	 */
-	if (!ffa_region_group_identity_map(to_locked, constituents,
-					   constituent_count, to_mode,
-					   page_pool, false)) {
+	if (!ffa_region_group_identity_map(
+		    to_locked, fragments, fragment_constituent_counts,
+		    fragment_count, to_mode, page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
 		dlog_verbose(
 			"Insufficient memory to update recipient page "
@@ -858,7 +1033,8 @@ static struct ffa_value ffa_retrieve_check_update(
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear && !ffa_clear_memory_constituents(
-			     constituents, constituent_count, page_pool)) {
+			     fragments, fragment_constituent_counts,
+			     fragment_count, page_pool)) {
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
@@ -868,9 +1044,9 @@ static struct ffa_value ffa_retrieve_check_update(
 	 * won't allocate because the transaction was already prepared above, so
 	 * it doesn't need to use the `local_page_pool`.
 	 */
-	CHECK(ffa_region_group_identity_map(to_locked, constituents,
-					    constituent_count, to_mode,
-					    page_pool, true));
+	CHECK(ffa_region_group_identity_map(
+		to_locked, fragments, fragment_constituent_counts,
+		fragment_count, to_mode, page_pool, true));
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
@@ -915,10 +1091,10 @@ static struct ffa_value ffa_tee_reclaim_check_update(
 	ffa_memory_region_flags_t tee_flags;
 
 	/*
-	 * Make sure constituents are properly aligned to a 32-bit boundary. If
-	 * not we would get alignment faults trying to read (32-bit) values.
+	 * Make sure constituents are properly aligned to a 64-bit boundary. If
+	 * not we would get alignment faults trying to read (64-bit) values.
 	 */
-	if (!is_aligned(constituents, 4)) {
+	if (!is_aligned(constituents, 8)) {
 		dlog_verbose("Constituents not aligned.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -929,8 +1105,8 @@ static struct ffa_value ffa_tee_reclaim_check_update(
 	 * same state.
 	 */
 	ret = ffa_retrieve_check_transition(to_locked, FFA_MEM_RECLAIM_32,
-					    constituents, constituent_count,
-					    memory_to_attributes, &to_mode);
+					    &constituents, &constituent_count,
+					    1, memory_to_attributes, &to_mode);
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition.\n");
 		return ret;
@@ -948,8 +1124,8 @@ static struct ffa_value ffa_tee_reclaim_check_update(
 	 * the recipient page tables without committing, to make sure the entire
 	 * operation will succeed without exhausting the page pool.
 	 */
-	if (!ffa_region_group_identity_map(to_locked, constituents,
-					   constituent_count, to_mode,
+	if (!ffa_region_group_identity_map(to_locked, &constituents,
+					   &constituent_count, 1, to_mode,
 					   page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
 		dlog_verbose(
@@ -973,8 +1149,8 @@ static struct ffa_value ffa_tee_reclaim_check_update(
 
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose(
-			"Got %#x (%d) from TEE in response to "
-			"FFA_MEM_RECLAIM_32, expected FFA_SUCCESS_32.\n",
+			"Got %#x (%d) from TEE in response to FFA_MEM_RECLAIM, "
+			"expected FFA_SUCCESS.\n",
 			ret.func, ret.arg2);
 		goto out;
 	}
@@ -985,8 +1161,8 @@ static struct ffa_value ffa_tee_reclaim_check_update(
 	 * transaction was already prepared above, so it doesn't need to use the
 	 * `local_page_pool`.
 	 */
-	CHECK(ffa_region_group_identity_map(to_locked, constituents,
-					    constituent_count, to_mode,
+	CHECK(ffa_region_group_identity_map(to_locked, &constituents,
+					    &constituent_count, 1, to_mode,
 					    page_pool, true));
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
@@ -1005,19 +1181,20 @@ out:
 
 static struct ffa_value ffa_relinquish_check_update(
 	struct vm_locked from_locked,
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count, struct mpool *page_pool, bool clear)
+	struct ffa_memory_region_constituent **fragments,
+	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	struct mpool *page_pool, bool clear)
 {
 	uint32_t orig_from_mode;
 	uint32_t from_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
 
-	ret = ffa_relinquish_check_transition(from_locked, &orig_from_mode,
-					      constituents, constituent_count,
-					      &from_mode);
+	ret = ffa_relinquish_check_transition(
+		from_locked, &orig_from_mode, fragments,
+		fragment_constituent_counts, fragment_count, &from_mode);
 	if (ret.func != FFA_SUCCESS_32) {
-		dlog_verbose("Invalid transition.\n");
+		dlog_verbose("Invalid transition for relinquish.\n");
 		return ret;
 	}
 
@@ -1033,9 +1210,9 @@ static struct ffa_value ffa_relinquish_check_update(
 	 * without committing, to make sure the entire operation will succeed
 	 * without exhausting the page pool.
 	 */
-	if (!ffa_region_group_identity_map(from_locked, constituents,
-					   constituent_count, from_mode,
-					   page_pool, false)) {
+	if (!ffa_region_group_identity_map(
+		    from_locked, fragments, fragment_constituent_counts,
+		    fragment_count, from_mode, page_pool, false)) {
 		/* TODO: partial defrag of failed range. */
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1047,13 +1224,14 @@ static struct ffa_value ffa_relinquish_check_update(
 	 * case that a whole block is being unmapped that was previously
 	 * partially mapped.
 	 */
-	CHECK(ffa_region_group_identity_map(from_locked, constituents,
-					    constituent_count, from_mode,
-					    &local_page_pool, true));
+	CHECK(ffa_region_group_identity_map(
+		from_locked, fragments, fragment_constituent_counts,
+		fragment_count, from_mode, &local_page_pool, true));
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear && !ffa_clear_memory_constituents(
-			     constituents, constituent_count, page_pool)) {
+			     fragments, fragment_constituent_counts,
+			     fragment_count, page_pool)) {
 		/*
 		 * On failure, roll back by returning memory to the sender. This
 		 * may allocate pages which were previously freed into
@@ -1061,8 +1239,9 @@ static struct ffa_value ffa_relinquish_check_update(
 		 * more pages than that so can never fail.
 		 */
 		CHECK(ffa_region_group_identity_map(
-			from_locked, constituents, constituent_count,
-			orig_from_mode, &local_page_pool, true));
+			from_locked, fragments, fragment_constituent_counts,
+			fragment_count, orig_from_mode, &local_page_pool,
+			true));
 
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1080,6 +1259,45 @@ out:
 	mm_vm_defrag(&from_locked.vm->ptable, page_pool);
 
 	return ret;
+}
+
+/**
+ * Complete a memory sending operation by checking that it is valid, updating
+ * the sender page table, and then either marking the share state as having
+ * completed sending (on success) or freeing it (on failure).
+ *
+ * Returns FFA_SUCCESS with the handle encoded, or the relevant FFA_ERROR.
+ */
+static struct ffa_value ffa_memory_send_complete(
+	struct vm_locked from_locked, struct share_states_locked share_states,
+	struct ffa_memory_share_state *share_state, struct mpool *page_pool)
+{
+	struct ffa_memory_region *memory_region = share_state->memory_region;
+	struct ffa_value ret;
+
+	/* Lock must be held. */
+	CHECK(share_states.share_states != NULL);
+
+	/* Check that state is valid in sender page table and update. */
+	ret = ffa_send_check_update(
+		from_locked, share_state->fragments,
+		share_state->fragment_constituent_counts,
+		share_state->fragment_count, share_state->share_func,
+		memory_region->receivers[0].receiver_permissions.permissions,
+		page_pool, memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR);
+	if (ret.func != FFA_SUCCESS_32) {
+		/*
+		 * Free share state, it failed to send so it can't be retrieved.
+		 */
+		dlog_verbose("Complete failed, freeing share state.\n");
+		share_state_free(share_states, share_state, page_pool);
+		return ret;
+	}
+
+	share_state->sending_complete = true;
+	dlog_verbose("Marked sending complete.\n");
+
+	return ffa_mem_success(share_state->handle);
 }
 
 /**
@@ -1148,6 +1366,13 @@ static struct ffa_value ffa_memory_send_validate(
 			     memory_region->receivers[0]
 				     .composite_memory_region_offset);
 		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if (fragment_length < memory_share_length &&
+	    fragment_length < HF_MAILBOX_SIZE) {
+		dlog_warning(
+			"Initial fragment length %d smaller than mailbox "
+			"size.\n",
+			fragment_length);
 	}
 
 	/*
@@ -1250,6 +1475,96 @@ static struct ffa_value memory_send_tee_forward(
 }
 
 /**
+ * Gets the share state for continuing an operation to donate, lend or share
+ * memory, and checks that it is a valid request.
+ *
+ * Returns FFA_SUCCESS if the request was valid, or the relevant FFA_ERROR if
+ * not.
+ */
+static struct ffa_value ffa_memory_send_continue_validate(
+	struct share_states_locked share_states, ffa_memory_handle_t handle,
+	struct ffa_memory_share_state **share_state_ret, ffa_vm_id_t from_vm_id,
+	struct mpool *page_pool)
+{
+	struct ffa_memory_share_state *share_state;
+	struct ffa_memory_region *memory_region;
+
+	CHECK(share_state_ret != NULL);
+
+	/*
+	 * Look up the share state by handle and make sure that the VM ID
+	 * matches.
+	 */
+	if (!get_share_state(share_states, handle, &share_state)) {
+		dlog_verbose(
+			"Invalid handle %#x for memory send continuation.\n",
+			handle);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	memory_region = share_state->memory_region;
+
+	if (memory_region->sender != from_vm_id) {
+		dlog_verbose("Invalid sender %d.\n", memory_region->sender);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (share_state->sending_complete) {
+		dlog_verbose(
+			"Sending of memory handle %#x is already complete.\n",
+			handle);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (share_state->fragment_count == MAX_FRAGMENTS) {
+		/*
+		 * Log a warning as this is a sign that MAX_FRAGMENTS should
+		 * probably be increased.
+		 */
+		dlog_warning(
+			"Too many fragments for memory share with handle %#x; "
+			"only %d supported.\n",
+			handle, MAX_FRAGMENTS);
+		/* Free share state, as it's not possible to complete it. */
+		share_state_free(share_states, share_state, page_pool);
+		return ffa_error(FFA_NO_MEMORY);
+	}
+
+	*share_state_ret = share_state;
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
+/**
+ * Forwards a memory send continuation message on to the TEE.
+ */
+static struct ffa_value memory_send_continue_tee_forward(
+	struct vm_locked tee_locked, ffa_vm_id_t sender_vm_id, void *fragment,
+	uint32_t fragment_length, ffa_memory_handle_t handle)
+{
+	struct ffa_value ret;
+
+	memcpy_s(tee_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX, fragment,
+		 fragment_length);
+	tee_locked.vm->mailbox.recv_size = fragment_length;
+	tee_locked.vm->mailbox.recv_sender = sender_vm_id;
+	tee_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
+	tee_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+	ret = arch_tee_call(
+		(struct ffa_value){.func = FFA_MEM_FRAG_TX_32,
+				   .arg1 = (uint32_t)handle,
+				   .arg2 = (uint32_t)(handle >> 32),
+				   .arg3 = fragment_length,
+				   .arg4 = (uint64_t)sender_vm_id << 16});
+	/*
+	 * After the call to the TEE completes it must have finished reading its
+	 * RX buffer, so it is ready for another message.
+	 */
+	tee_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
+
+	return ret;
+}
+
+/**
  * Validates a call to donate, lend or share memory to a non-TEE VM and then
  * updates the stage-2 page tables. Specifically, check if the message length
  * and number of memory region constituents match, and if the transition is
@@ -1271,8 +1586,8 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 {
 	ffa_memory_access_permissions_t permissions;
 	struct ffa_value ret;
-	ffa_memory_handle_t handle;
-	struct ffa_composite_memory_region *composite;
+	struct share_states_locked share_states;
+	struct ffa_memory_share_state *share_state;
 
 	/*
 	 * If there is an error validating the `memory_region` then we need to
@@ -1302,33 +1617,38 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 		break;
 	}
 
+	share_states = share_states_lock();
 	/*
 	 * Allocate a share state before updating the page table. Otherwise if
 	 * updating the page table succeeded but allocating the share state
 	 * failed then it would leave the memory in a state where nobody could
 	 * get it back.
 	 */
-	if (!allocate_share_state(share_func, memory_region, &handle)) {
+	if (!allocate_share_state(share_states, share_func, memory_region,
+				  fragment_length, FFA_MEMORY_HANDLE_INVALID,
+				  &share_state)) {
 		dlog_verbose("Failed to allocate share state.\n");
 		mpool_free(page_pool, memory_region);
-		return ffa_error(FFA_NO_MEMORY);
+		ret = ffa_error(FFA_NO_MEMORY);
+		goto out;
 	}
 
+	if (fragment_length == memory_share_length) {
+		/* No more fragments to come, everything fit in one message. */
+		ret = ffa_memory_send_complete(from_locked, share_states,
+					       share_state, page_pool);
+	} else {
+		ret = (struct ffa_value){
+			.func = FFA_MEM_FRAG_RX_32,
+			.arg1 = (uint32_t)share_state->handle,
+			.arg2 = (uint32_t)(share_state->handle >> 32),
+			.arg3 = fragment_length};
+	}
+
+out:
+	share_states_unlock(&share_states);
 	dump_share_states();
-
-	/* Check that state is valid in sender page table and update. */
-	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_send_check_update(
-		from_locked, composite->constituents,
-		composite->constituent_count, share_func, permissions,
-		page_pool, memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR);
-	if (ret.func != FFA_SUCCESS_32) {
-		/* Free share state. */
-		CHECK(share_state_free_handle(handle, page_pool));
-		return ret;
-	}
-
-	return ffa_mem_success(handle);
+	return ret;
 }
 
 /**
@@ -1352,7 +1672,6 @@ struct ffa_value ffa_memory_tee_send(
 {
 	ffa_memory_access_permissions_t permissions;
 	struct ffa_value ret;
-	struct ffa_composite_memory_region *composite;
 
 	/*
 	 * If there is an error validating the `memory_region` then we need to
@@ -1366,24 +1685,334 @@ struct ffa_value ffa_memory_tee_send(
 		goto out;
 	}
 
-	/* Check that state is valid in sender page table and update. */
-	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_send_check_update(
-		from_locked, composite->constituents,
-		composite->constituent_count, share_func, permissions,
-		page_pool, memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR);
-	if (ret.func != FFA_SUCCESS_32) {
-		goto out;
+	if (fragment_length == memory_share_length) {
+		/* No more fragments to come, everything fit in one message. */
+		struct ffa_composite_memory_region *composite =
+			ffa_memory_region_get_composite(memory_region, 0);
+		struct ffa_memory_region_constituent *constituents =
+			composite->constituents;
+
+		ret = ffa_send_check_update(
+			from_locked, &constituents,
+			&composite->constituent_count, 1, share_func,
+			permissions, page_pool,
+			memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR);
+		if (ret.func != FFA_SUCCESS_32) {
+			goto out;
+		}
+
+		/* Forward memory send message on to TEE. */
+		ret = memory_send_tee_forward(
+			to_locked, from_locked.vm->id, share_func,
+			memory_region, memory_share_length, fragment_length);
+	} else {
+		struct share_states_locked share_states = share_states_lock();
+		ffa_memory_handle_t handle;
+
+		/*
+		 * We need to wait for the rest of the fragments before we can
+		 * check whether the transaction is valid and unmap the memory.
+		 * Call the TEE so it can do its initial validation and assign a
+		 * handle, and allocate a share state to keep what we have so
+		 * far.
+		 */
+		ret = memory_send_tee_forward(
+			to_locked, from_locked.vm->id, share_func,
+			memory_region, memory_share_length, fragment_length);
+		if (ret.func == FFA_ERROR_32) {
+			goto out_unlock;
+		} else if (ret.func != FFA_MEM_FRAG_RX_32) {
+			dlog_warning(
+				"Got %#x from TEE in response to %#x for "
+				"fragment with with %d/%d, expected "
+				"FFA_MEM_FRAG_RX.\n",
+				ret.func, share_func, fragment_length,
+				memory_share_length);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out_unlock;
+		}
+		handle = ffa_frag_handle(ret);
+		if (ret.arg3 != fragment_length) {
+			dlog_warning(
+				"Got unexpected fragment offset %d for "
+				"FFA_MEM_FRAG_RX from TEE (expected %d).\n",
+				ret.arg3, fragment_length);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out_unlock;
+		}
+		if (ffa_frag_sender(ret) != from_locked.vm->id) {
+			dlog_warning(
+				"Got unexpected sender ID %d for "
+				"FFA_MEM_FRAG_RX from TEE (expected %d).\n",
+				ffa_frag_sender(ret), from_locked.vm->id);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out_unlock;
+		}
+
+		if (!allocate_share_state(share_states, share_func,
+					  memory_region, fragment_length,
+					  handle, NULL)) {
+			dlog_verbose("Failed to allocate share state.\n");
+			ret = ffa_error(FFA_NO_MEMORY);
+			goto out_unlock;
+		}
+		/*
+		 * Don't free the memory region fragment, as it has been stored
+		 * in the share state.
+		 */
+		memory_region = NULL;
+	out_unlock:
+		share_states_unlock(&share_states);
 	}
 
-	/* Forward memory send message on to TEE. */
-	ret = memory_send_tee_forward(to_locked, from_locked.vm->id, share_func,
-				      memory_region, memory_share_length,
-				      fragment_length);
+out:
+	if (memory_region != NULL) {
+		mpool_free(page_pool, memory_region);
+	}
+	dump_share_states();
+	return ret;
+}
+
+/**
+ * Continues an operation to donate, lend or share memory to a non-TEE VM. If
+ * this is the last fragment then checks that the transition is valid for the
+ * type of memory sending operation and updates the stage-2 page tables of the
+ * sender.
+ *
+ * Assumes that the caller has already found and locked the sender VM and copied
+ * the memory region descriptor from the sender's TX buffer to a freshly
+ * allocated page from Hafnium's internal pool.
+ *
+ * This function takes ownership of the `fragment` passed in; it must not be
+ * freed by the caller.
+ */
+struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
+					  void *fragment,
+					  uint32_t fragment_length,
+					  ffa_memory_handle_t handle,
+					  struct mpool *page_pool)
+{
+	struct share_states_locked share_states = share_states_lock();
+	struct ffa_memory_share_state *share_state;
+	struct ffa_value ret;
+	struct ffa_memory_region *memory_region;
+
+	ret = ffa_memory_send_continue_validate(share_states, handle,
+						&share_state,
+						from_locked.vm->id, page_pool);
+	if (ret.func != FFA_SUCCESS_32) {
+		goto out_free_fragment;
+	}
+	memory_region = share_state->memory_region;
+
+	if (memory_region->receivers[0].receiver_permissions.receiver ==
+	    HF_TEE_VM_ID) {
+		dlog_error(
+			"Got hypervisor-allocated handle for memory send to "
+			"TEE. This should never happen, and indicates a bug in "
+			"EL3 code.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out_free_fragment;
+	}
+
+	/* Add this fragment. */
+	share_state->fragments[share_state->fragment_count] = fragment;
+	share_state->fragment_constituent_counts[share_state->fragment_count] =
+		fragment_length / sizeof(struct ffa_memory_region_constituent);
+	share_state->fragment_count++;
+
+	/* Check whether the memory send operation is now ready to complete. */
+	if (share_state_sending_complete(share_states, share_state)) {
+		ret = ffa_memory_send_complete(from_locked, share_states,
+					       share_state, page_pool);
+	} else {
+		ret = (struct ffa_value){
+			.func = FFA_MEM_FRAG_RX_32,
+			.arg1 = (uint32_t)handle,
+			.arg2 = (uint32_t)(handle >> 32),
+			.arg3 = share_state_next_fragment_offset(share_states,
+								 share_state)};
+	}
+	goto out;
+
+out_free_fragment:
+	mpool_free(page_pool, fragment);
 
 out:
-	mpool_free(page_pool, memory_region);
+	share_states_unlock(&share_states);
 	return ret;
+}
+
+/**
+ * Continues an operation to donate, lend or share memory to the TEE VM. If this
+ * is the last fragment then checks that the transition is valid for the type of
+ * memory sending operation and updates the stage-2 page tables of the sender.
+ *
+ * Assumes that the caller has already found and locked the sender VM and copied
+ * the memory region descriptor from the sender's TX buffer to a freshly
+ * allocated page from Hafnium's internal pool.
+ *
+ * This function takes ownership of the `memory_region` passed in and will free
+ * it when necessary; it must not be freed by the caller.
+ */
+struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
+					      struct vm_locked to_locked,
+					      void *fragment,
+					      uint32_t fragment_length,
+					      ffa_memory_handle_t handle,
+					      struct mpool *page_pool)
+{
+	struct share_states_locked share_states = share_states_lock();
+	struct ffa_memory_share_state *share_state;
+	struct ffa_value ret;
+	struct ffa_memory_region *memory_region;
+
+	ret = ffa_memory_send_continue_validate(share_states, handle,
+						&share_state,
+						from_locked.vm->id, page_pool);
+	if (ret.func != FFA_SUCCESS_32) {
+		goto out_free_fragment;
+	}
+	memory_region = share_state->memory_region;
+
+	if (memory_region->receivers[0].receiver_permissions.receiver !=
+	    HF_TEE_VM_ID) {
+		dlog_error(
+			"Got SPM-allocated handle for memory send to non-TEE "
+			"VM. This should never happen, and indicates a bug.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out_free_fragment;
+	}
+
+	if (to_locked.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
+	    to_locked.vm->mailbox.recv == NULL) {
+		/*
+		 * If the TEE RX buffer is not available, tell the sender to
+		 * retry by returning the current offset again.
+		 */
+		ret = (struct ffa_value){
+			.func = FFA_MEM_FRAG_RX_32,
+			.arg1 = (uint32_t)handle,
+			.arg2 = (uint32_t)(handle >> 32),
+			.arg3 = share_state_next_fragment_offset(share_states,
+								 share_state),
+		};
+		goto out_free_fragment;
+	}
+
+	/* Add this fragment. */
+	share_state->fragments[share_state->fragment_count] = fragment;
+	share_state->fragment_constituent_counts[share_state->fragment_count] =
+		fragment_length / sizeof(struct ffa_memory_region_constituent);
+	share_state->fragment_count++;
+
+	/* Check whether the memory send operation is now ready to complete. */
+	if (share_state_sending_complete(share_states, share_state)) {
+		ret = ffa_memory_send_complete(from_locked, share_states,
+					       share_state, page_pool);
+
+		if (ret.func == FFA_SUCCESS_32) {
+			/*
+			 * Forward final fragment on to the TEE so that
+			 * it can complete the memory sending operation.
+			 */
+			ret = memory_send_continue_tee_forward(
+				to_locked, from_locked.vm->id, fragment,
+				fragment_length, handle);
+
+			if (ret.func != FFA_SUCCESS_32) {
+				/*
+				 * The error will be passed on to the caller,
+				 * but log it here too.
+				 */
+				dlog_verbose(
+					"TEE didn't successfully complete "
+					"memory send operation; returned %#x "
+					"(%d).\n",
+					ret.func, ret.arg2);
+			}
+			/* Free share state. */
+			share_state_free(share_states, share_state, page_pool);
+		} else {
+			/* Abort sending to TEE. */
+			struct ffa_value tee_ret =
+				arch_tee_call((struct ffa_value){
+					.func = FFA_MEM_RECLAIM_32,
+					.arg1 = (uint32_t)handle,
+					.arg2 = (uint32_t)(handle >> 32)});
+
+			if (tee_ret.func != FFA_SUCCESS_32) {
+				/*
+				 * Nothing we can do if TEE doesn't abort
+				 * properly, just log it.
+				 */
+				dlog_verbose(
+					"TEE didn't successfully abort failed "
+					"memory send operation; returned %#x "
+					"(%d).\n",
+					tee_ret.func, tee_ret.arg2);
+			}
+			/*
+			 * We don't need to free the share state in this case
+			 * because ffa_memory_send_complete does that already.
+			 */
+		}
+	} else {
+		uint32_t next_fragment_offset =
+			share_state_next_fragment_offset(share_states,
+							 share_state);
+
+		ret = memory_send_continue_tee_forward(
+			to_locked, from_locked.vm->id, fragment,
+			fragment_length, handle);
+
+		if (ret.func != FFA_MEM_FRAG_RX_32 ||
+		    ffa_frag_handle(ret) != handle ||
+		    ret.arg3 != next_fragment_offset ||
+		    ffa_frag_sender(ret) != from_locked.vm->id) {
+			dlog_verbose(
+				"Got unexpected result from forwarding "
+				"FFA_MEM_FRAG_TX to TEE: %#x (handle %#x, "
+				"offset %d, sender %d); expected "
+				"FFA_MEM_FRAG_RX (handle %#x, offset %d, "
+				"sender %d).\n",
+				ret.func, ffa_frag_handle(ret), ret.arg3,
+				ffa_frag_sender(ret), handle,
+				next_fragment_offset, from_locked.vm->id);
+			/* Free share state. */
+			share_state_free(share_states, share_state, page_pool);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		ret = (struct ffa_value){.func = FFA_MEM_FRAG_RX_32,
+					 .arg1 = (uint32_t)handle,
+					 .arg2 = (uint32_t)(handle >> 32),
+					 .arg3 = next_fragment_offset};
+	}
+	goto out;
+
+out_free_fragment:
+	mpool_free(page_pool, fragment);
+
+out:
+	share_states_unlock(&share_states);
+	return ret;
+}
+
+/** Clean up after the receiver has finished retrieving a memory region. */
+static void ffa_memory_retrieve_complete(
+	struct share_states_locked share_states,
+	struct ffa_memory_share_state *share_state, struct mpool *page_pool)
+{
+	if (share_state->share_func == FFA_MEM_DONATE_32) {
+		/*
+		 * Memory that has been donated can't be relinquished,
+		 * so no need to keep the share state around.
+		 */
+		share_state_free(share_states, share_state, page_pool);
+		dlog_verbose("Freed share state for donate.\n");
+	}
 }
 
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
@@ -1408,11 +2037,12 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	enum ffa_instruction_access requested_instruction_access;
 	ffa_memory_access_permissions_t permissions;
 	uint32_t memory_to_attributes;
-	struct ffa_composite_memory_region *composite;
 	struct share_states_locked share_states;
 	struct ffa_memory_share_state *share_state;
 	struct ffa_value ret;
-	uint32_t response_length;
+	struct ffa_composite_memory_region *composite;
+	uint32_t total_length;
+	uint32_t fragment_length;
 
 	dump_share_states();
 
@@ -1507,7 +2137,16 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		goto out;
 	}
 
-	if (share_state->retrieved[0]) {
+	if (!share_state->sending_complete) {
+		dlog_verbose(
+			"Memory with handle %#x not fully sent, can't "
+			"retrieve.\n",
+			handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (share_state->retrieved_fragment_count[0] != 0) {
 		dlog_verbose("Memory with handle %#x already retrieved.\n",
 			     handle);
 		ret = ffa_error(FFA_DENIED);
@@ -1599,10 +2238,10 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	}
 	memory_to_attributes = ffa_memory_permissions_to_mode(permissions);
 
-	composite = ffa_memory_region_get_composite(memory_region, 0);
 	ret = ffa_retrieve_check_update(
-		to_locked, composite->constituents,
-		composite->constituent_count, memory_to_attributes,
+		to_locked, share_state->fragments,
+		share_state->fragment_constituent_counts,
+		share_state->fragment_count, memory_to_attributes,
 		share_state->share_func, false, page_pool);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
@@ -1613,30 +2252,149 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	 * must be done before the share_state is (possibly) freed.
 	 */
 	/* TODO: combine attributes from sender and request. */
-	response_length = ffa_retrieved_memory_region_init(
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+	/*
+	 * Constituents which we received in the first fragment should always
+	 * fit in the first fragment we are sending, because the header is the
+	 * same size in both cases and we have a fixed message buffer size. So
+	 * `ffa_retrieved_memory_region_init` should never fail.
+	 */
+	CHECK(ffa_retrieved_memory_region_init(
 		to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
 		memory_region->sender, memory_region->attributes,
 		memory_region->flags, handle, to_locked.vm->id, permissions,
-		composite->constituents, composite->constituent_count);
-	to_locked.vm->mailbox.recv_size = response_length;
+		composite->page_count, composite->constituent_count,
+		share_state->fragments[0],
+		share_state->fragment_constituent_counts[0], &total_length,
+		&fragment_length));
+	to_locked.vm->mailbox.recv_size = fragment_length;
 	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
 	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
 
-	if (share_state->share_func == FFA_MEM_DONATE_32) {
-		/*
-		 * Memory that has been donated can't be relinquished, so no
-		 * need to keep the share state around.
-		 */
-		share_state_free(share_states, share_state, page_pool);
-		dlog_verbose("Freed share state for donate.\n");
-	} else {
-		share_state->retrieved[0] = true;
+	share_state->retrieved_fragment_count[0] = 1;
+	if (share_state->retrieved_fragment_count[0] ==
+	    share_state->fragment_count) {
+		ffa_memory_retrieve_complete(share_states, share_state,
+					     page_pool);
 	}
 
 	ret = (struct ffa_value){.func = FFA_MEM_RETRIEVE_RESP_32,
-				 .arg1 = response_length,
-				 .arg2 = response_length};
+				 .arg1 = total_length,
+				 .arg2 = fragment_length};
+
+out:
+	share_states_unlock(&share_states);
+	dump_share_states();
+	return ret;
+}
+
+struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
+					      ffa_memory_handle_t handle,
+					      uint32_t fragment_offset,
+					      struct mpool *page_pool)
+{
+	struct ffa_memory_region *memory_region;
+	struct share_states_locked share_states;
+	struct ffa_memory_share_state *share_state;
+	struct ffa_value ret;
+	uint32_t fragment_index;
+	uint32_t retrieved_constituents_count;
+	uint32_t i;
+	uint32_t expected_fragment_offset;
+	uint32_t remaining_constituent_count;
+	uint32_t fragment_length;
+
+	dump_share_states();
+
+	share_states = share_states_lock();
+	if (!get_share_state(share_states, handle, &share_state)) {
+		dlog_verbose("Invalid handle %#x for FFA_MEM_FRAG_RX.\n",
+			     handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	memory_region = share_state->memory_region;
+	CHECK(memory_region != NULL);
+
+	if (memory_region->receivers[0].receiver_permissions.receiver !=
+	    to_locked.vm->id) {
+		dlog_verbose(
+			"Caller of FFA_MEM_FRAG_RX (%d) is not receiver (%d) "
+			"of handle %#x.\n",
+			to_locked.vm->id,
+			memory_region->receivers[0]
+				.receiver_permissions.receiver,
+			handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (!share_state->sending_complete) {
+		dlog_verbose(
+			"Memory with handle %#x not fully sent, can't "
+			"retrieve.\n",
+			handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (share_state->retrieved_fragment_count[0] == 0 ||
+	    share_state->retrieved_fragment_count[0] >=
+		    share_state->fragment_count) {
+		dlog_verbose(
+			"Retrieval of memory with handle %#x not yet started "
+			"or already completed (%d/%d fragments retrieved).\n",
+			handle, share_state->retrieved_fragment_count[0],
+			share_state->fragment_count);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	fragment_index = share_state->retrieved_fragment_count[0];
+
+	/*
+	 * Check that the given fragment offset is correct by counting how many
+	 * constituents were in the fragments previously sent.
+	 */
+	retrieved_constituents_count = 0;
+	for (i = 0; i < fragment_index; ++i) {
+		retrieved_constituents_count +=
+			share_state->fragment_constituent_counts[i];
+	}
+	expected_fragment_offset =
+		ffa_composite_constituent_offset(memory_region, 0) +
+		retrieved_constituents_count *
+			sizeof(struct ffa_memory_region_constituent);
+	if (fragment_offset != expected_fragment_offset) {
+		dlog_verbose("Fragment offset was %d but expected %d.\n",
+			     fragment_offset, expected_fragment_offset);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	remaining_constituent_count = ffa_memory_fragment_init(
+		to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
+		share_state->fragments[fragment_index],
+		share_state->fragment_constituent_counts[fragment_index],
+		&fragment_length);
+	CHECK(remaining_constituent_count == 0);
+	to_locked.vm->mailbox.recv_size = fragment_length;
+	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
+	to_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
+	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
+	share_state->retrieved_fragment_count[0]++;
+	if (share_state->retrieved_fragment_count[0] ==
+	    share_state->fragment_count) {
+		ffa_memory_retrieve_complete(share_states, share_state,
+					     page_pool);
+	}
+
+	ret = (struct ffa_value){.func = FFA_MEM_FRAG_TX_32,
+				 .arg1 = (uint32_t)handle,
+				 .arg2 = (uint32_t)(handle >> 32),
+				 .arg3 = fragment_length};
 
 out:
 	share_states_unlock(&share_states);
@@ -1653,7 +2411,6 @@ struct ffa_value ffa_memory_relinquish(
 	struct ffa_memory_share_state *share_state;
 	struct ffa_memory_region *memory_region;
 	bool clear;
-	struct ffa_composite_memory_region *composite;
 	struct ffa_value ret;
 
 	if (relinquish_request->endpoint_count != 1) {
@@ -1682,6 +2439,15 @@ struct ffa_value ffa_memory_relinquish(
 		goto out;
 	}
 
+	if (!share_state->sending_complete) {
+		dlog_verbose(
+			"Memory with handle %#x not fully sent, can't "
+			"relinquish.\n",
+			handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
 	memory_region = share_state->memory_region;
 	CHECK(memory_region != NULL);
 
@@ -1697,9 +2463,10 @@ struct ffa_value ffa_memory_relinquish(
 		goto out;
 	}
 
-	if (!share_state->retrieved[0]) {
+	if (share_state->retrieved_fragment_count[0] !=
+	    share_state->fragment_count) {
 		dlog_verbose(
-			"Memory with handle %#x not yet retrieved, can't "
+			"Memory with handle %#x not yet fully retrieved, can't "
 			"relinquish.\n",
 			handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -1718,17 +2485,17 @@ struct ffa_value ffa_memory_relinquish(
 		goto out;
 	}
 
-	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_relinquish_check_update(from_locked, composite->constituents,
-					  composite->constituent_count,
-					  page_pool, clear);
+	ret = ffa_relinquish_check_update(
+		from_locked, share_state->fragments,
+		share_state->fragment_constituent_counts,
+		share_state->fragment_count, page_pool, clear);
 
 	if (ret.func == FFA_SUCCESS_32) {
 		/*
 		 * Mark memory handle as not retrieved, so it can be reclaimed
 		 * (or retrieved again).
 		 */
-		share_state->retrieved[0] = false;
+		share_state->retrieved_fragment_count[0] = 0;
 	}
 
 out:
@@ -1743,13 +2510,13 @@ out:
  * associated with the handle.
  */
 struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
-				    ffa_memory_handle_t handle, bool clear,
+				    ffa_memory_handle_t handle,
+				    ffa_memory_region_flags_t flags,
 				    struct mpool *page_pool)
 {
 	struct share_states_locked share_states;
 	struct ffa_memory_share_state *share_state;
 	struct ffa_memory_region *memory_region;
-	struct ffa_composite_memory_region *composite;
 	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 	struct ffa_value ret;
 
@@ -1775,7 +2542,16 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 		goto out;
 	}
 
-	if (share_state->retrieved[0]) {
+	if (!share_state->sending_complete) {
+		dlog_verbose(
+			"Memory with handle %#x not fully sent, can't "
+			"reclaim.\n",
+			handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (share_state->retrieved_fragment_count[0] != 0) {
 		dlog_verbose(
 			"Tried to reclaim memory handle %#x that has not been "
 			"relinquished.\n",
@@ -1784,11 +2560,11 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 		goto out;
 	}
 
-	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_retrieve_check_update(to_locked, composite->constituents,
-					composite->constituent_count,
-					memory_to_attributes,
-					FFA_MEM_RECLAIM_32, clear, page_pool);
+	ret = ffa_retrieve_check_update(
+		to_locked, share_state->fragments,
+		share_state->fragment_constituent_counts,
+		share_state->fragment_count, memory_to_attributes,
+		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool);
 
 	if (ret.func == FFA_SUCCESS_32) {
 		share_state_free(share_states, share_state, page_pool);
@@ -1801,16 +2577,113 @@ out:
 }
 
 /**
- * Validates that the reclaim transition is allowed for the given memory region
- * and updates the page table of the reclaiming VM.
+ * Validates that the reclaim transition is allowed for the memory region with
+ * the given handle which was previously shared with the TEE, tells the TEE to
+ * mark it as reclaimed, and updates the page table of the reclaiming VM.
+ *
+ * To do this information about the memory region is first fetched from the TEE.
  */
 struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
+					struct vm_locked from_locked,
 					ffa_memory_handle_t handle,
-					struct ffa_memory_region *memory_region,
-					bool clear, struct mpool *page_pool)
+					ffa_memory_region_flags_t flags,
+					struct mpool *page_pool)
 {
-	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+	uint32_t request_length = ffa_memory_lender_retrieve_request_init(
+		from_locked.vm->mailbox.recv, handle, to_locked.vm->id);
+	struct ffa_value tee_ret;
+	uint32_t length;
+	uint32_t fragment_length;
+	uint32_t fragment_offset;
+	struct ffa_memory_region *memory_region;
 	struct ffa_composite_memory_region *composite;
+	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+
+	CHECK(request_length <= HF_MAILBOX_SIZE);
+	CHECK(from_locked.vm->id == HF_TEE_VM_ID);
+
+	/* Retrieve memory region information from the TEE. */
+	tee_ret = arch_tee_call(
+		(struct ffa_value){.func = FFA_MEM_RETRIEVE_REQ_32,
+				   .arg1 = request_length,
+				   .arg2 = request_length});
+	if (tee_ret.func == FFA_ERROR_32) {
+		dlog_verbose("Got error %d from EL3.\n", tee_ret.arg2);
+		return tee_ret;
+	}
+	if (tee_ret.func != FFA_MEM_RETRIEVE_RESP_32) {
+		dlog_verbose(
+			"Got %#x from EL3, expected FFA_MEM_RETRIEVE_RESP.\n",
+			tee_ret.func);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	length = tee_ret.arg1;
+	fragment_length = tee_ret.arg2;
+
+	if (fragment_length > HF_MAILBOX_SIZE || fragment_length > length ||
+	    length > sizeof(tee_retrieve_buffer)) {
+		dlog_verbose("Invalid fragment length %d/%d (max %d/%d).\n",
+			     fragment_length, length, HF_MAILBOX_SIZE,
+			     sizeof(tee_retrieve_buffer));
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Copy the first fragment of the memory region descriptor to an
+	 * internal buffer.
+	 */
+	memcpy_s(tee_retrieve_buffer, sizeof(tee_retrieve_buffer),
+		 from_locked.vm->mailbox.send, fragment_length);
+
+	/* Fetch the remaining fragments into the same buffer. */
+	fragment_offset = fragment_length;
+	while (fragment_offset < length) {
+		tee_ret = arch_tee_call(
+			(struct ffa_value){.func = FFA_MEM_FRAG_RX_32,
+					   .arg1 = (uint32_t)handle,
+					   .arg2 = (uint32_t)(handle >> 32),
+					   .arg3 = fragment_offset});
+		if (tee_ret.func != FFA_MEM_FRAG_TX_32) {
+			dlog_verbose(
+				"Got %#x (%d) from TEE in response to "
+				"FFA_MEM_FRAG_RX, expected FFA_MEM_FRAG_TX.\n",
+				tee_ret.func, tee_ret.arg2);
+			return tee_ret;
+		}
+		if (ffa_frag_handle(tee_ret) != handle) {
+			dlog_verbose(
+				"Got FFA_MEM_FRAG_TX for unexpected handle %#x "
+				"in response to FFA_MEM_FRAG_RX for handle "
+				"%#x.\n",
+				ffa_frag_handle(tee_ret), handle);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+		if (ffa_frag_sender(tee_ret) != 0) {
+			dlog_verbose(
+				"Got FFA_MEM_FRAG_TX with unexpected sender %d "
+				"(expected 0).\n",
+				ffa_frag_sender(tee_ret));
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+		fragment_length = tee_ret.arg3;
+		if (fragment_length > HF_MAILBOX_SIZE ||
+		    fragment_offset + fragment_length > length) {
+			dlog_verbose(
+				"Invalid fragment length %d at offset %d (max "
+				"%d).\n",
+				fragment_length, fragment_offset,
+				HF_MAILBOX_SIZE);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+		memcpy_s(tee_retrieve_buffer + fragment_offset,
+			 sizeof(tee_retrieve_buffer) - fragment_offset,
+			 from_locked.vm->mailbox.send, fragment_length);
+
+		fragment_offset += fragment_length;
+	}
+
+	memory_region = (struct ffa_memory_region *)tee_retrieve_buffer;
 
 	if (memory_region->receiver_count != 1) {
 		/* Only one receiver supported by Hafnium for now. */
@@ -1818,7 +2691,7 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 			"Multiple recipients not supported (got %d, expected "
 			"1).\n",
 			memory_region->receiver_count);
-		return ffa_error(FFA_NOT_SUPPORTED);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	if (memory_region->handle != handle) {
@@ -1841,11 +2714,12 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/*
-	 * Forward the request to the TEE and then map the memory back into the
-	 * caller's stage-2 page table.
+	 * Validate that the reclaim transition is allowed for the given memory
+	 * region, forward the request to the TEE and then map the memory back
+	 * into the caller's stage-2 page table.
 	 */
 	return ffa_tee_reclaim_check_update(
 		to_locked, handle, composite->constituents,
-		composite->constituent_count, memory_to_attributes, clear,
-		page_pool);
+		composite->constituent_count, memory_to_attributes,
+		flags & FFA_MEM_RECLAIM_CLEAR, page_pool);
 }

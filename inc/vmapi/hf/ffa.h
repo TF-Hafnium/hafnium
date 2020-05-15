@@ -56,6 +56,8 @@
 #define FFA_MEM_RETRIEVE_RESP_32     0x84000075
 #define FFA_MEM_RELINQUISH_32        0x84000076
 #define FFA_MEM_RECLAIM_32           0x84000077
+#define FFA_MEM_FRAG_RX_32           0x8400007A
+#define FFA_MEM_FRAG_TX_32           0x8400007B
 
 /* FF-A error codes. */
 #define FFA_NOT_SUPPORTED      INT32_C(-1)
@@ -194,6 +196,7 @@ ATTR_FUNCTION_GET(memory_shareability, ffa_memory_attributes_t,
 	((ffa_memory_handle_t)(UINT64_C(1) << 63))
 #define FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR \
 	((ffa_memory_handle_t)(UINT64_C(1) << 63))
+#define FFA_MEMORY_HANDLE_INVALID (~UINT64_C(0))
 
 /** The ID of a VM. These are assigned sequentially starting with an offset. */
 typedef uint16_t ffa_vm_id_t;
@@ -261,6 +264,11 @@ static inline ffa_memory_handle_t ffa_mem_success_handle(struct ffa_value args)
 	return ffa_assemble_handle(args.arg2, args.arg3);
 }
 
+static inline ffa_memory_handle_t ffa_frag_handle(struct ffa_value args)
+{
+	return ffa_assemble_handle(args.arg1, args.arg2);
+}
+
 static inline struct ffa_value ffa_mem_success(ffa_memory_handle_t handle)
 {
 	return (struct ffa_value){.func = FFA_SUCCESS_32,
@@ -282,6 +290,11 @@ static inline uint64_t ffa_vm_vcpu(ffa_vm_id_t vm_id,
 				   ffa_vcpu_index_t vcpu_index)
 {
 	return ((uint32_t)vm_id << 16) | vcpu_index;
+}
+
+static inline ffa_vm_id_t ffa_frag_sender(struct ffa_value args)
+{
+	return (args.arg4 >> 16) & 0xffff;
 }
 
 /**
@@ -469,14 +482,15 @@ static inline uint32_t ffa_mem_relinquish_init(
 }
 
 uint32_t ffa_memory_region_init(
-	struct ffa_memory_region *memory_region, ffa_vm_id_t sender,
-	ffa_vm_id_t receiver,
+	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
+	ffa_vm_id_t sender, ffa_vm_id_t receiver,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability);
+	enum ffa_memory_shareability shareability, uint32_t *fragment_length,
+	uint32_t *total_length);
 uint32_t ffa_memory_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
 	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t tag,
@@ -487,10 +501,17 @@ uint32_t ffa_memory_retrieve_request_init(
 uint32_t ffa_memory_lender_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
 	ffa_vm_id_t sender);
-uint32_t ffa_retrieved_memory_region_init(
+bool ffa_retrieved_memory_region_init(
 	struct ffa_memory_region *response, size_t response_max_size,
 	ffa_vm_id_t sender, ffa_memory_attributes_t attributes,
 	ffa_memory_region_flags_t flags, ffa_memory_handle_t handle,
 	ffa_vm_id_t receiver, ffa_memory_access_permissions_t permissions,
+	uint32_t page_count, uint32_t total_constituent_count,
 	const struct ffa_memory_region_constituent constituents[],
-	uint32_t constituent_count);
+	uint32_t fragment_constituent_count, uint32_t *total_length,
+	uint32_t *fragment_length);
+uint32_t ffa_memory_fragment_init(
+	struct ffa_memory_region_constituent *fragment,
+	size_t fragment_max_size,
+	const struct ffa_memory_region_constituent constituents[],
+	uint32_t constituent_count, uint32_t *fragment_length);

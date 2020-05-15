@@ -175,6 +175,26 @@ static inline struct ffa_value ffa_mem_reclaim(ffa_memory_handle_t handle,
 					   .arg3 = flags});
 }
 
+static inline struct ffa_value ffa_mem_frag_rx(ffa_memory_handle_t handle,
+					       uint32_t fragment_offset)
+{
+	/* Note that sender MBZ at virtual instance. */
+	return ffa_call((struct ffa_value){.func = FFA_MEM_FRAG_RX_32,
+					   .arg1 = (uint32_t)handle,
+					   .arg2 = (uint32_t)(handle >> 32),
+					   .arg3 = fragment_offset});
+}
+
+static inline struct ffa_value ffa_mem_frag_tx(ffa_memory_handle_t handle,
+					       uint32_t fragment_length)
+{
+	/* Note that sender MBZ at virtual instance. */
+	return ffa_call((struct ffa_value){.func = FFA_MEM_FRAG_TX_32,
+					   .arg1 = (uint32_t)handle,
+					   .arg2 = (uint32_t)(handle >> 32),
+					   .arg3 = fragment_length});
+}
+
 /**
  * Called by secondary VMs to receive a message. This will block until a message
  * is received.

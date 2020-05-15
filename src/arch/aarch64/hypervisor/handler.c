@@ -382,6 +382,16 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu **next)
 			ffa_assemble_handle(args->arg1, args->arg2), args->arg3,
 			current());
 		return true;
+	case FFA_MEM_FRAG_RX_32:
+		*args = api_ffa_mem_frag_rx(ffa_frag_handle(*args), args->arg3,
+					    (args->arg4 >> 16) & 0xffff,
+					    current());
+		return true;
+	case FFA_MEM_FRAG_TX_32:
+		*args = api_ffa_mem_frag_tx(ffa_frag_handle(*args), args->arg3,
+					    (args->arg4 >> 16) & 0xffff,
+					    current());
+		return true;
 	}
 
 	return false;

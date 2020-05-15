@@ -43,11 +43,16 @@ TEST_SERVICE(straddling_data_unmapped)
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)(&pages[PAGE_SIZE]), .page_count = 1},
 	};
-	uint32_t msg_size = ffa_memory_region_init(
-		send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE);
+	uint32_t msg_size;
+	EXPECT_EQ(ffa_memory_region_init(
+			  send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  HF_PRIMARY_VM_ID, constituents,
+			  ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+		  0);
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	EXPECT_EQ(ffa_mem_donate(msg_size, msg_size).func, FFA_SUCCESS_32);
