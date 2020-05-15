@@ -1091,13 +1091,13 @@ out:
  */
 static struct ffa_value ffa_memory_send_validate(
 	struct vm *to, struct vm_locked from_locked,
-	struct ffa_memory_region *memory_region, uint32_t memory_share_size,
+	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
 	uint32_t share_func, bool *clear,
 	ffa_memory_access_permissions_t *permissions)
 {
 	struct ffa_composite_memory_region *composite;
-	uint32_t receivers_size;
-	uint32_t constituents_size;
+	uint32_t receivers_length;
+	uint32_t constituents_length;
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
 
@@ -1120,13 +1120,13 @@ static struct ffa_value ffa_memory_send_validate(
 	 * Ensure that the composite header is within the memory bounds and
 	 * doesn't overlap the first part of the message.
 	 */
-	receivers_size = sizeof(struct ffa_memory_access) *
-			 memory_region->receiver_count;
+	receivers_length = sizeof(struct ffa_memory_access) *
+			   memory_region->receiver_count;
 	if (memory_region->receivers[0].composite_memory_region_offset <
-		    sizeof(struct ffa_memory_region) + receivers_size ||
+		    sizeof(struct ffa_memory_region) + receivers_length ||
 	    memory_region->receivers[0].composite_memory_region_offset +
 			    sizeof(struct ffa_composite_memory_region) >=
-		    memory_share_size) {
+		    memory_share_length) {
 		dlog_verbose(
 			"Invalid composite memory region descriptor offset.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -1137,14 +1137,14 @@ static struct ffa_value ffa_memory_send_validate(
 	/*
 	 * Ensure the number of constituents are within the memory bounds.
 	 */
-	constituents_size = sizeof(struct ffa_memory_region_constituent) *
-			    composite->constituent_count;
-	if (memory_share_size !=
+	constituents_length = sizeof(struct ffa_memory_region_constituent) *
+			      composite->constituent_count;
+	if (memory_share_length !=
 	    memory_region->receivers[0].composite_memory_region_offset +
 		    sizeof(struct ffa_composite_memory_region) +
-		    constituents_size) {
-		dlog_verbose("Invalid size %d or constituent offset %d.\n",
-			     memory_share_size,
+		    constituents_length) {
+		dlog_verbose("Invalid length %d or constituent offset %d.\n",
+			     memory_share_length,
 			     memory_region->receivers[0]
 				     .composite_memory_region_offset);
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -1245,7 +1245,7 @@ static struct ffa_value ffa_memory_send_validate(
  */
 struct ffa_value ffa_memory_send(struct vm *to, struct vm_locked from_locked,
 				 struct ffa_memory_region *memory_region,
-				 uint32_t memory_share_size,
+				 uint32_t memory_share_length,
 				 uint32_t share_func, struct mpool *page_pool)
 {
 	struct ffa_composite_memory_region *composite;
@@ -1260,7 +1260,7 @@ struct ffa_value ffa_memory_send(struct vm *to, struct vm_locked from_locked,
 	 * after all.
 	 */
 	ret = ffa_memory_send_validate(to, from_locked, memory_region,
-				       memory_share_size, share_func, &clear,
+				       memory_share_length, share_func, &clear,
 				       &permissions);
 	if (ret.func != FFA_SUCCESS_32) {
 		mpool_free(page_pool, memory_region);
@@ -1323,10 +1323,10 @@ struct ffa_value ffa_memory_send(struct vm *to, struct vm_locked from_locked,
 
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
-				     uint32_t retrieve_request_size,
+				     uint32_t retrieve_request_length,
 				     struct mpool *page_pool)
 {
-	uint32_t expected_retrieve_request_size =
+	uint32_t expected_retrieve_request_length =
 		sizeof(struct ffa_memory_region) +
 		retrieve_request->receiver_count *
 			sizeof(struct ffa_memory_access);
@@ -1347,15 +1347,16 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	struct share_states_locked share_states;
 	struct ffa_memory_share_state *share_state;
 	struct ffa_value ret;
-	uint32_t response_size;
+	uint32_t response_length;
 
 	dump_share_states();
 
-	if (retrieve_request_size != expected_retrieve_request_size) {
+	if (retrieve_request_length != expected_retrieve_request_length) {
 		dlog_verbose(
 			"Invalid length for FFA_MEM_RETRIEVE_REQ, expected %d "
 			"but was %d.\n",
-			expected_retrieve_request_size, retrieve_request_size);
+			expected_retrieve_request_length,
+			retrieve_request_length);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -1547,12 +1548,12 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	 * must be done before the share_state is (possibly) freed.
 	 */
 	/* TODO: combine attributes from sender and request. */
-	response_size = ffa_retrieved_memory_region_init(
+	response_length = ffa_retrieved_memory_region_init(
 		to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
 		memory_region->sender, memory_region->attributes,
 		memory_region->flags, handle, to_locked.vm->id, permissions,
 		composite->constituents, composite->constituent_count);
-	to_locked.vm->mailbox.recv_size = response_size;
+	to_locked.vm->mailbox.recv_size = response_length;
 	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
 	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
@@ -1569,8 +1570,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	}
 
 	ret = (struct ffa_value){.func = FFA_MEM_RETRIEVE_RESP_32,
-				 .arg1 = response_size,
-				 .arg2 = response_size};
+				 .arg1 = response_length,
+				 .arg2 = response_length};
 
 out:
 	share_states_unlock(&share_states);

@@ -23,11 +23,11 @@
 
 struct ffa_value ffa_memory_send(struct vm *to, struct vm_locked from_locked,
 				 struct ffa_memory_region *memory_region,
-				 uint32_t memory_share_size,
+				 uint32_t memory_share_length,
 				 uint32_t share_func, struct mpool *page_pool);
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
-				     uint32_t retrieve_request_size,
+				     uint32_t retrieve_request_length,
 				     struct mpool *page_pool);
 struct ffa_value ffa_memory_relinquish(
 	struct vm_locked from_locked,
