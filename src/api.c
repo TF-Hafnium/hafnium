@@ -382,12 +382,6 @@ static struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 			.arg1 = (receiver->mailbox.recv_sender << 16) |
 				receiver->id,
 			.arg3 = receiver->mailbox.recv_size};
-	case FFA_MEM_DONATE_32:
-	case FFA_MEM_LEND_32:
-	case FFA_MEM_SHARE_32:
-		return (struct ffa_value){.func = receiver->mailbox.recv_func,
-					  .arg1 = receiver->mailbox.recv_size,
-					  .arg2 = receiver->mailbox.recv_size};
 	default:
 		/* This should never be reached, but return an error in case. */
 		dlog_error("Tried to return an invalid message function %#x\n",
@@ -1463,8 +1457,7 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 
 struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 				  uint32_t fragment_length, ipaddr_t address,
-				  uint32_t page_count, struct vcpu *current,
-				  struct vcpu **next)
+				  uint32_t page_count, struct vcpu *current)
 {
 	struct vm *from = current->vm;
 	struct vm *to;
@@ -1504,7 +1497,8 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	 * pool. This prevents the sender from changing it underneath us, and
 	 * also lets us keep it around in the share state table if needed.
 	 */
-	if (length > HF_MAILBOX_SIZE || length > MM_PPOOL_ENTRY_SIZE) {
+	if (fragment_length > HF_MAILBOX_SIZE ||
+	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 	memory_region = (struct ffa_memory_region *)mpool_alloc(&api_page_pool);
@@ -1512,7 +1506,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		dlog_verbose("Failed to allocate memory region copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
 	}
-	memcpy_s(memory_region, MM_PPOOL_ENTRY_SIZE, from_msg, length);
+	memcpy_s(memory_region, MM_PPOOL_ENTRY_SIZE, from_msg, fragment_length);
 
 	/* The sender must match the caller. */
 	if (memory_region->sender != from->id) {
@@ -1553,18 +1547,14 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 			goto out_unlock;
 		}
 
-		ret = ffa_memory_send(to, vm_to_from_lock.vm2, memory_region,
-				      length, share_func, &api_page_pool);
-		if (ret.func == FFA_SUCCESS_32) {
-			/* Forward memory send message on to TEE. */
-			memcpy_s(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
-				 memory_region, length);
-			to->mailbox.recv_size = length;
-			to->mailbox.recv_sender = from->id;
-			to->mailbox.recv_func = share_func;
-			ret = deliver_msg(vm_to_from_lock.vm1, from->id,
-					  current, next);
-		}
+		ret = ffa_memory_tee_send(
+			vm_to_from_lock.vm2, vm_to_from_lock.vm1, memory_region,
+			length, fragment_length, share_func, &api_page_pool);
+		/*
+		 * ffa_tee_memory_send takes ownership of the memory_region, so
+		 * make sure we don't free it.
+		 */
+		memory_region = NULL;
 
 	out_unlock:
 		vm_unlock(&vm_to_from_lock.vm1);
@@ -1572,8 +1562,9 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	} else {
 		struct vm_locked from_locked = vm_lock(from);
 
-		ret = ffa_memory_send(to, from_locked, memory_region, length,
-				      share_func, &api_page_pool);
+		ret = ffa_memory_send(from_locked, memory_region, length,
+				      fragment_length, share_func,
+				      &api_page_pool);
 		/*
 		 * ffa_memory_send takes ownership of the memory_region, so
 		 * make sure we don't free it.
@@ -1721,16 +1712,16 @@ static struct ffa_value ffa_mem_reclaim_tee(struct vm_locked to_locked,
 					    ffa_memory_region_flags_t flags,
 					    struct cpu *cpu)
 {
-	uint32_t fragment_length;
+	struct ffa_value tee_ret;
 	uint32_t length;
-	uint32_t request_length;
+	uint32_t fragment_length;
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)cpu_get_buffer(cpu);
 	uint32_t message_buffer_size = cpu_get_buffer_size(cpu);
-	struct ffa_value tee_ret;
-
-	request_length = ffa_memory_lender_retrieve_request_init(
+	uint32_t request_length = ffa_memory_lender_retrieve_request_init(
 		from_locked.vm->mailbox.recv, handle, to_locked.vm->id);
+
+	CHECK(request_length <= HF_MAILBOX_SIZE);
 
 	/* Retrieve memory region information from the TEE. */
 	tee_ret = arch_tee_call(

@@ -62,8 +62,7 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 			     const struct vcpu *current, struct vcpu **next);
 struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 				  uint32_t fragment_length, ipaddr_t address,
-				  uint32_t page_count, struct vcpu *current,
-				  struct vcpu **next);
+				  uint32_t page_count, struct vcpu *current);
 struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 					  uint32_t fragment_length,
 					  ipaddr_t address, uint32_t page_count,

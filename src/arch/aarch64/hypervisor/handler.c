@@ -367,7 +367,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu **next)
 	case FFA_MEM_SHARE_32:
 		*args = api_ffa_mem_send(func, args->arg1, args->arg2,
 					 ipa_init(args->arg3), args->arg4,
-					 current(), next);
+					 current());
 		return true;
 	case FFA_MEM_RETRIEVE_REQ_32:
 		*args = api_ffa_mem_retrieve_req(args->arg1, args->arg2,

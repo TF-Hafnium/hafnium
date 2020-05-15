@@ -973,7 +973,7 @@ static struct ffa_value ffa_tee_reclaim_memory(
 
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose(
-			"Got %#x (%d) from EL3 in response to "
+			"Got %#x (%d) from TEE in response to "
 			"FFA_MEM_RECLAIM_32, expected FFA_SUCCESS_32.\n",
 			ret.func, ret.arg2);
 		goto out;
@@ -1086,14 +1086,14 @@ out:
  * Check that the given `memory_region` represents a valid memory send request
  * of the given `share_func` type, return the clear flag and permissions via the
  * respective output parameters, and update the permissions if necessary.
+ *
  * Returns FFA_SUCCESS if the request was valid, or the relevant FFA_ERROR if
  * not.
  */
 static struct ffa_value ffa_memory_send_validate(
-	struct vm *to, struct vm_locked from_locked,
-	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
-	uint32_t share_func, bool *clear,
-	ffa_memory_access_permissions_t *permissions)
+	struct vm_locked from_locked, struct ffa_memory_region *memory_region,
+	uint32_t memory_share_length, uint32_t fragment_length,
+	uint32_t share_func, ffa_memory_access_permissions_t *permissions)
 {
 	struct ffa_composite_memory_region *composite;
 	uint32_t receivers_length;
@@ -1102,18 +1102,17 @@ static struct ffa_value ffa_memory_send_validate(
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
 
-	CHECK(clear != NULL);
 	CHECK(permissions != NULL);
+
+	/*
+	 * This should already be checked by the caller, just making the
+	 * assumption clear here.
+	 */
+	CHECK(memory_region->receiver_count == 1);
 
 	/* The sender must match the message sender. */
 	if (memory_region->sender != from_locked.vm->id) {
 		dlog_verbose("Invalid sender %d.\n", memory_region->sender);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* We only support a single recipient. */
-	if (memory_region->receiver_count != 1) {
-		dlog_verbose("Multiple recipients not supported.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -1127,7 +1126,7 @@ static struct ffa_value ffa_memory_send_validate(
 		ffa_composite_constituent_offset(memory_region, 0);
 	if (memory_region->receivers[0].composite_memory_region_offset <
 		    sizeof(struct ffa_memory_region) + receivers_length ||
-	    constituents_offset >= memory_share_length) {
+	    constituents_offset > fragment_length) {
 		dlog_verbose(
 			"Invalid composite memory region descriptor offset "
 			"%d.\n",
@@ -1151,18 +1150,12 @@ static struct ffa_value ffa_memory_send_validate(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	/* The recipient must match the message recipient. */
-	if (memory_region->receivers[0].receiver_permissions.receiver !=
-	    to->id) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	*clear = memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR;
 	/*
 	 * Clear is not allowed for memory sharing, as the sender still has
 	 * access to the memory.
 	 */
-	if (*clear && share_func == FFA_MEM_SHARE_32) {
+	if ((memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR) &&
+	    share_func == FFA_MEM_SHARE_32) {
 		dlog_verbose("Memory can't be cleared while being shared.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -1230,39 +1223,65 @@ static struct ffa_value ffa_memory_send_validate(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
+/** Forwards a memory send message on to the TEE. */
+static struct ffa_value memory_send_tee_forward(
+	struct vm_locked tee_locked, ffa_vm_id_t sender_vm_id,
+	uint32_t share_func, struct ffa_memory_region *memory_region,
+	uint32_t memory_share_length, uint32_t fragment_length)
+{
+	struct ffa_value ret;
+
+	memcpy_s(tee_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
+		 memory_region, fragment_length);
+	tee_locked.vm->mailbox.recv_size = fragment_length;
+	tee_locked.vm->mailbox.recv_sender = sender_vm_id;
+	tee_locked.vm->mailbox.recv_func = share_func;
+	tee_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+	ret = arch_tee_call((struct ffa_value){.func = share_func,
+					       .arg1 = memory_share_length,
+					       .arg2 = fragment_length});
+	/*
+	 * After the call to the TEE completes it must have finished reading its
+	 * RX buffer, so it is ready for another message.
+	 */
+	tee_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
+
+	return ret;
+}
+
 /**
- * Validates a call to donate, lend or share memory and then updates the stage-2
- * page tables. Specifically, check if the message length and number of memory
- * region constituents match, and if the transition is valid for the type of
- * memory sending operation.
+ * Validates a call to donate, lend or share memory to a non-TEE VM and then
+ * updates the stage-2 page tables. Specifically, check if the message length
+ * and number of memory region constituents match, and if the transition is
+ * valid for the type of memory sending operation.
  *
- * Assumes that the caller has already found and locked both VMs and ensured
- * that the destination RX buffer is available, and copied the memory region
- * descriptor from the sender's TX buffer to a freshly allocated page from
- * Hafnium's internal pool.
+ * Assumes that the caller has already found and locked the sender VM and copied
+ * the memory region descriptor from the sender's TX buffer to a freshly
+ * allocated page from Hafnium's internal pool. The caller must have also
+ * validated that the receiver VM ID is valid.
  *
- * This function takes ownership of the `memory_region` passed in; it must not
- * be freed by the caller.
+ * This function takes ownership of the `memory_region` passed in and will free
+ * it when necessary; it must not be freed by the caller.
  */
-struct ffa_value ffa_memory_send(struct vm *to, struct vm_locked from_locked,
+struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				 struct ffa_memory_region *memory_region,
 				 uint32_t memory_share_length,
-				 uint32_t share_func, struct mpool *page_pool)
+				 uint32_t fragment_length, uint32_t share_func,
+				 struct mpool *page_pool)
 {
-	struct ffa_composite_memory_region *composite;
-	bool clear;
 	ffa_memory_access_permissions_t permissions;
 	struct ffa_value ret;
 	ffa_memory_handle_t handle;
+	struct ffa_composite_memory_region *composite;
 
 	/*
 	 * If there is an error validating the `memory_region` then we need to
 	 * free it because we own it but we won't be storing it in a share state
 	 * after all.
 	 */
-	ret = ffa_memory_send_validate(to, from_locked, memory_region,
-				       memory_share_length, share_func, &clear,
-				       &permissions);
+	ret = ffa_memory_send_validate(from_locked, memory_region,
+				       memory_share_length, fragment_length,
+				       share_func, &permissions);
 	if (ret.func != FFA_SUCCESS_32) {
 		mpool_free(page_pool, memory_region);
 		return ret;
@@ -1289,8 +1308,7 @@ struct ffa_value ffa_memory_send(struct vm *to, struct vm_locked from_locked,
 	 * failed then it would leave the memory in a state where nobody could
 	 * get it back.
 	 */
-	if (to->id != HF_TEE_VM_ID &&
-	    !allocate_share_state(share_func, memory_region, &handle)) {
+	if (!allocate_share_state(share_func, memory_region, &handle)) {
 		dlog_verbose("Failed to allocate share state.\n");
 		mpool_free(page_pool, memory_region);
 		return ffa_error(FFA_NO_MEMORY);
@@ -1300,26 +1318,72 @@ struct ffa_value ffa_memory_send(struct vm *to, struct vm_locked from_locked,
 
 	/* Check that state is valid in sender page table and update. */
 	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_send_memory(from_locked, composite->constituents,
-			      composite->constituent_count, share_func,
-			      permissions, page_pool, clear);
+	ret = ffa_send_memory(
+		from_locked, composite->constituents,
+		composite->constituent_count, share_func, permissions,
+		page_pool, memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR);
 	if (ret.func != FFA_SUCCESS_32) {
-		if (to->id != HF_TEE_VM_ID) {
-			/* Free share state. */
-			bool freed = share_state_free_handle(handle, page_pool);
-
-			CHECK(freed);
-		}
-
+		/* Free share state. */
+		CHECK(share_state_free_handle(handle, page_pool));
 		return ret;
 	}
 
-	if (to->id == HF_TEE_VM_ID) {
-		/* No share state allocated here so no handle to return. */
-		return (struct ffa_value){.func = FFA_SUCCESS_32};
+	return ffa_mem_success(handle);
+}
+
+/**
+ * Validates a call to donate, lend or share memory to the TEE and then updates
+ * the stage-2 page tables. Specifically, check if the message length and number
+ * of memory region constituents match, and if the transition is valid for the
+ * type of memory sending operation.
+ *
+ * Assumes that the caller has already found and locked the sender VM and the
+ * TEE VM, and copied the memory region descriptor from the sender's TX buffer
+ * to a freshly allocated page from Hafnium's internal pool. The caller must
+ * have also validated that the receiver VM ID is valid.
+ *
+ * This function takes ownership of the `memory_region` passed in and will free
+ * it when necessary; it must not be freed by the caller.
+ */
+struct ffa_value ffa_memory_tee_send(
+	struct vm_locked from_locked, struct vm_locked to_locked,
+	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
+	uint32_t fragment_length, uint32_t share_func, struct mpool *page_pool)
+{
+	ffa_memory_access_permissions_t permissions;
+	struct ffa_value ret;
+	struct ffa_composite_memory_region *composite;
+
+	/*
+	 * If there is an error validating the `memory_region` then we need to
+	 * free it because we own it but we won't be storing it in a share state
+	 * after all.
+	 */
+	ret = ffa_memory_send_validate(from_locked, memory_region,
+				       memory_share_length, fragment_length,
+				       share_func, &permissions);
+	if (ret.func != FFA_SUCCESS_32) {
+		goto out;
 	}
 
-	return ffa_mem_success(handle);
+	/* Check that state is valid in sender page table and update. */
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+	ret = ffa_send_memory(
+		from_locked, composite->constituents,
+		composite->constituent_count, share_func, permissions,
+		page_pool, memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR);
+	if (ret.func != FFA_SUCCESS_32) {
+		goto out;
+	}
+
+	/* Forward memory send message on to TEE. */
+	ret = memory_send_tee_forward(to_locked, from_locked.vm->id, share_func,
+				      memory_region, memory_share_length,
+				      fragment_length);
+
+out:
+	mpool_free(page_pool, memory_region);
+	return ret;
 }
 
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
