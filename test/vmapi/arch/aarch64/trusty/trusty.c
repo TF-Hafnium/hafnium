@@ -16,7 +16,8 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
-alignas(PAGE_SIZE) static uint8_t pages[4 * PAGE_SIZE];
+alignas(PAGE_SIZE) static uint8_t
+	pages[FRAGMENTED_SHARE_PAGE_COUNT * PAGE_SIZE];
 
 static ffa_memory_handle_t init_and_send(
 	struct mailbox_buffers mb,
@@ -78,6 +79,59 @@ TEST(trusty, memory_share)
 }
 
 /**
+ * Memory can be shared to Trusty SPD in multiple fragments.
+ */
+TEST(trusty, memory_share_fragmented)
+{
+	struct ffa_value ret;
+	ffa_memory_handle_t handle;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t total_length;
+	uint32_t fragment_length;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+		{.address = (uint64_t)pages + PAGE_SIZE, .page_count = 1},
+	};
+
+	/* Dirty the memory before sharing it. */
+	memset_s(pages, sizeof(pages), 'b', PAGE_SIZE * 2);
+
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  HF_TEE_VM_ID, constituents, ARRAY_SIZE(constituents),
+			  0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_OUTER_SHAREABLE, &total_length,
+			  &fragment_length),
+		  0);
+	/* Send the first fragment without the last constituent. */
+	fragment_length -= sizeof(struct ffa_memory_region_constituent);
+	ret = ffa_mem_share(total_length, fragment_length);
+	EXPECT_EQ(ret.func, FFA_MEM_FRAG_RX_32);
+	EXPECT_EQ(ret.arg3, fragment_length);
+	handle = ffa_frag_handle(ret);
+
+	/* Send second fragment. */
+	EXPECT_EQ(
+		ffa_memory_fragment_init(mb.send, HF_MAILBOX_SIZE,
+					 constituents + 1, 1, &fragment_length),
+		0);
+	ret = ffa_mem_frag_tx(handle, fragment_length);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_mem_success_handle(ret), handle);
+	dlog("Got handle %#x.\n", handle);
+	EXPECT_NE(handle, 0);
+	EXPECT_NE(handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK,
+		  FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR);
+
+	/* Make sure we can still write to it. */
+	for (int i = 0; i < PAGE_SIZE * 2; ++i) {
+		pages[i] = i;
+	}
+}
+
+/**
  * Multiple memory regions can be sent without blocking.
  */
 TEST(trusty, share_twice)
@@ -133,4 +187,101 @@ TEST(trusty, memory_reclaim)
 	dlog("Reclaiming handle %#x.\n", handle);
 	ret = ffa_mem_reclaim(handle, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
+/**
+ * Memory which was shared in multiple fragments can be reclaimed and sent
+ * again.
+ */
+TEST(trusty, memory_reclaim_reshare_fragmented)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	uint32_t i;
+	struct ffa_memory_region_constituent
+		constituents[FRAGMENTED_SHARE_PAGE_COUNT];
+	uint32_t remaining_constituent_count;
+	uint32_t total_length;
+	uint32_t fragment_length;
+	struct ffa_value ret;
+	ffa_memory_handle_t handle;
+
+	/* Initialise the memory before giving it. */
+	memset_s(ptr, sizeof(pages), 'b',
+		 PAGE_SIZE * FRAGMENTED_SHARE_PAGE_COUNT);
+
+	for (i = 0; i < ARRAY_SIZE(constituents); ++i) {
+		constituents[i].address = (uint64_t)pages + i * PAGE_SIZE;
+		constituents[i].page_count = 1;
+		constituents[i].reserved = 0;
+	}
+
+	remaining_constituent_count = ffa_memory_region_init(
+		mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, HF_TEE_VM_ID,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_OUTER_SHAREABLE, &total_length, &fragment_length);
+	EXPECT_GT(remaining_constituent_count, 0);
+	EXPECT_GT(total_length, fragment_length);
+	/* Send the first fragment. */
+	ret = ffa_mem_share(total_length, fragment_length);
+	EXPECT_EQ(ret.func, FFA_MEM_FRAG_RX_32);
+	EXPECT_EQ(ret.arg3, fragment_length);
+	handle = ffa_frag_handle(ret);
+	dlog("Got handle %#x.\n", handle);
+	EXPECT_NE(handle, 0);
+	EXPECT_NE(handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK,
+		  FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR);
+
+	/* Send the second fragment. */
+	EXPECT_EQ(ffa_memory_fragment_init(
+			  mb.send, HF_MAILBOX_SIZE,
+			  constituents + ARRAY_SIZE(constituents) -
+				  remaining_constituent_count,
+			  remaining_constituent_count, &fragment_length),
+		  0);
+	ret = ffa_mem_frag_tx(handle, fragment_length);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_mem_success_handle(ret), handle);
+
+	/* Make sure we can still write to it. */
+	for (i = 0; i < PAGE_SIZE; ++i) {
+		pages[i] = i;
+	}
+
+	dlog("Reclaiming handle %#x.\n", handle);
+	ret = ffa_mem_reclaim(handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Share it again. */
+	remaining_constituent_count = ffa_memory_region_init(
+		mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, HF_TEE_VM_ID,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_OUTER_SHAREABLE, &total_length, &fragment_length);
+	EXPECT_GT(remaining_constituent_count, 0);
+	EXPECT_GT(total_length, fragment_length);
+
+	/* Send the first fragment. */
+	ret = ffa_mem_share(total_length, fragment_length);
+	EXPECT_EQ(ret.func, FFA_MEM_FRAG_RX_32);
+	EXPECT_EQ(ret.arg3, fragment_length);
+	handle = ffa_frag_handle(ret);
+	dlog("Got handle %#x.\n", handle);
+	EXPECT_NE(handle, 0);
+	EXPECT_NE(handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK,
+		  FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR);
+
+	/* Send the second fragment. */
+	EXPECT_EQ(ffa_memory_fragment_init(
+			  mb.send, HF_MAILBOX_SIZE,
+			  constituents + ARRAY_SIZE(constituents) -
+				  remaining_constituent_count,
+			  remaining_constituent_count, &fragment_length),
+		  0);
+	ret = ffa_mem_frag_tx(handle, fragment_length);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_mem_success_handle(ret), handle);
 }

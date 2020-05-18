@@ -10,6 +10,13 @@
 
 #include "vmapi/hf/ffa.h"
 
+/*
+ * A number of pages that is large enough that it must take two fragments to
+ * share.
+ */
+#define FRAGMENTED_SHARE_PAGE_COUNT \
+	(PAGE_SIZE / sizeof(struct ffa_memory_region_constituent))
+
 #define EXPECT_FFA_ERROR(value, ffa_error)       \
 	do {                                     \
 		struct ffa_value v = (value);    \

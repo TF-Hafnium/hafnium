@@ -18,13 +18,6 @@
 #include "test/vmapi/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
-/*
- * A number of pages that is large enough that it must take two fragments to
- * share.
- */
-#define FRAGMENTED_SHARE_PAGE_COUNT \
-	(PAGE_SIZE / sizeof(struct ffa_memory_region_constituent))
-
 alignas(PAGE_SIZE) static uint8_t
 	pages[FRAGMENTED_SHARE_PAGE_COUNT * PAGE_SIZE];
 static uint8_t retrieve_buffer[HF_MAILBOX_SIZE];
