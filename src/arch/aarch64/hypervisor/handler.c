@@ -10,7 +10,7 @@
 
 #include "hf/arch/barriers.h"
 #include "hf/arch/init.h"
-#include "hf/arch/mm.h"
+#include "hf/arch/mmu.h"
 #include "hf/arch/plat/smc.h"
 
 #include "hf/api.h"
@@ -31,6 +31,16 @@
 #include "psci_handler.h"
 #include "smc.h"
 #include "sysregs.h"
+
+/**
+ * Hypervisor Fault Address Register Non-Secure.
+ */
+#define HPFAR_EL2_NS (UINT64_C(0x1) << 63)
+
+/**
+ * Hypervisor Fault Address Register Faulting IPA.
+ */
+#define HPFAR_EL2_FIPA (UINT64_C(0xFFFFFFFFFF0))
 
 /**
  * Gets the value to increment for the next PC.
@@ -713,9 +723,30 @@ static struct vcpu_fault_info fault_info_init(uintreg_t esr,
 {
 	uint32_t fsc = esr & 0x3f;
 	struct vcpu_fault_info r;
+	uint64_t hpfar_el2_val;
+	uint64_t hpfar_el2_fipa;
 
 	r.mode = mode;
 	r.pc = va_init(vcpu->regs.pc);
+
+	/* Get Hypervisor IPA Fault Address value. */
+	hpfar_el2_val = read_msr(hpfar_el2);
+
+	/* Extract Faulting IPA. */
+	hpfar_el2_fipa = (hpfar_el2_val & HPFAR_EL2_FIPA) << 8;
+
+#if SECURE_WORLD == 1
+
+	/**
+	 * Determine if faulting IPA targets NS space.
+	 * At NS-EL2 hpfar_el2 bit 63 is RES0. At S-EL2, this bit determines if
+	 * the faulting Stage-1 address output is a secure or non-secure IPA.
+	 */
+	if ((hpfar_el2_val & HPFAR_EL2_NS) != 0) {
+		r.mode |= MM_MODE_NS;
+	}
+
+#endif
 
 	/*
 	 * Check the FnV bit, which is only valid if dfsc/ifsc is 010000. It
@@ -723,10 +754,10 @@ static struct vcpu_fault_info fault_info_init(uintreg_t esr,
 	 */
 	if (fsc == 0x10 && esr & (1U << 10)) {
 		r.vaddr = va_init(0);
-		r.ipaddr = ipa_init(read_msr(hpfar_el2) << 8);
+		r.ipaddr = ipa_init(hpfar_el2_fipa);
 	} else {
 		r.vaddr = va_init(read_msr(far_el2));
-		r.ipaddr = ipa_init((read_msr(hpfar_el2) << 8) |
+		r.ipaddr = ipa_init(hpfar_el2_fipa |
 				    (read_msr(far_el2) & (PAGE_SIZE - 1)));
 	}
 
