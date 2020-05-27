@@ -1405,8 +1405,7 @@ struct spci_value api_spci_version(void)
 		      "Minor revision representation take more than 16 bits.");
 
 	struct spci_value ret = {
-		.func = SPCI_SUCCESS_32,
-		.arg2 = (SPCI_VERSION_MAJOR << SPCI_VERSION_MAJOR_OFFSET) |
+		.func = (SPCI_VERSION_MAJOR << SPCI_VERSION_MAJOR_OFFSET) |
 			SPCI_VERSION_MINOR};
 	return ret;
 }
