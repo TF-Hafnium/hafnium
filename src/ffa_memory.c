@@ -693,7 +693,7 @@ out:
  *     memory with the given permissions.
  *  Success is indicated by FFA_SUCCESS.
  */
-static struct ffa_value ffa_send_memory(
+static struct ffa_value ffa_send_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t share_func,
@@ -800,7 +800,7 @@ out:
  *     the request.
  *  Success is indicated by FFA_SUCCESS.
  */
-static struct ffa_value ffa_retrieve_memory(
+static struct ffa_value ffa_retrieve_check_update(
 	struct vm_locked to_locked,
 	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t memory_to_attributes,
@@ -902,7 +902,7 @@ out:
  *     the request.
  *  Success is indicated by FFA_SUCCESS.
  */
-static struct ffa_value ffa_tee_reclaim_memory(
+static struct ffa_value ffa_tee_reclaim_check_update(
 	struct vm_locked to_locked, ffa_memory_handle_t handle,
 	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t memory_to_attributes, bool clear,
@@ -1003,7 +1003,7 @@ out:
 	return ret;
 }
 
-static struct ffa_value ffa_relinquish_memory(
+static struct ffa_value ffa_relinquish_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, struct mpool *page_pool, bool clear)
@@ -1318,7 +1318,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 
 	/* Check that state is valid in sender page table and update. */
 	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_send_memory(
+	ret = ffa_send_check_update(
 		from_locked, composite->constituents,
 		composite->constituent_count, share_func, permissions,
 		page_pool, memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR);
@@ -1368,7 +1368,7 @@ struct ffa_value ffa_memory_tee_send(
 
 	/* Check that state is valid in sender page table and update. */
 	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_send_memory(
+	ret = ffa_send_check_update(
 		from_locked, composite->constituents,
 		composite->constituent_count, share_func, permissions,
 		page_pool, memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR);
@@ -1600,10 +1600,10 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	memory_to_attributes = ffa_memory_permissions_to_mode(permissions);
 
 	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_retrieve_memory(to_locked, composite->constituents,
-				  composite->constituent_count,
-				  memory_to_attributes, share_state->share_func,
-				  false, page_pool);
+	ret = ffa_retrieve_check_update(
+		to_locked, composite->constituents,
+		composite->constituent_count, memory_to_attributes,
+		share_state->share_func, false, page_pool);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
@@ -1719,9 +1719,9 @@ struct ffa_value ffa_memory_relinquish(
 	}
 
 	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_relinquish_memory(from_locked, composite->constituents,
-				    composite->constituent_count, page_pool,
-				    clear);
+	ret = ffa_relinquish_check_update(from_locked, composite->constituents,
+					  composite->constituent_count,
+					  page_pool, clear);
 
 	if (ret.func == FFA_SUCCESS_32) {
 		/*
@@ -1785,10 +1785,10 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	}
 
 	composite = ffa_memory_region_get_composite(memory_region, 0);
-	ret = ffa_retrieve_memory(to_locked, composite->constituents,
-				  composite->constituent_count,
-				  memory_to_attributes, FFA_MEM_RECLAIM_32,
-				  clear, page_pool);
+	ret = ffa_retrieve_check_update(to_locked, composite->constituents,
+					composite->constituent_count,
+					memory_to_attributes,
+					FFA_MEM_RECLAIM_32, clear, page_pool);
 
 	if (ret.func == FFA_SUCCESS_32) {
 		share_state_free(share_states, share_state, page_pool);
@@ -1844,8 +1844,8 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 	 * Forward the request to the TEE and then map the memory back into the
 	 * caller's stage-2 page table.
 	 */
-	return ffa_tee_reclaim_memory(to_locked, handle,
-				      composite->constituents,
-				      composite->constituent_count,
-				      memory_to_attributes, clear, page_pool);
+	return ffa_tee_reclaim_check_update(
+		to_locked, handle, composite->constituents,
+		composite->constituent_count, memory_to_attributes, clear,
+		page_pool);
 }
