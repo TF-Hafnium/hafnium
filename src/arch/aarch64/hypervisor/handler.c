@@ -819,9 +819,10 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 		case SPCI_MEM_RECLAIM_32:
 		case SPCI_MEM_RECLAIM_64:
 		{
+			uint64_t handle = args->arg1<<32 | args->arg2;
 			if (eret_origin)
 			{
-				api_spci_memory_reclaim(args->arg1, args->arg2, current()->vm);
+				api_spci_memory_reclaim(handle, args->arg3, current()->vm);
 
 				/* FWD call back to the other world. */
 				spmd_exit(args);
@@ -829,7 +830,7 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 				break;
 			}
 
-			api_spci_memory_reclaim(args->arg1, args->arg2, current()->vm);
+			api_spci_memory_reclaim(handle, args->arg3, current()->vm);
 			spmd_exit(args);
 			eret_origin = true;
 
