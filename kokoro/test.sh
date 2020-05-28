@@ -109,5 +109,5 @@ do
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/gicv3/gicv3_test
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_only/primary_only_test
   "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_test
-  "${HFTEST_CPU[@]}" hafnium --initrd test/linux/linux_test --vm_args "rdinit=/test_binary --"
+  "${HFTEST_CPU[@]}" hafnium --initrd test/linux/linux_test --force-long-running --vm_args "rdinit=/test_binary --"
 done

@@ -427,11 +427,12 @@ class TestRunner:
     available tests and driving their execution."""
 
     def __init__(self, artifacts, driver, image_name, suite_regex, test_regex,
-            skip_long_running_tests):
+            skip_long_running_tests, force_long_running):
         self.artifacts = artifacts
         self.driver = driver
         self.image_name = image_name
         self.skip_long_running_tests = skip_long_running_tests
+        self.force_long_running = force_long_running
 
         self.suite_re = re.compile(suite_regex or ".*")
         self.test_re = re.compile(test_regex or ".*")
@@ -450,7 +451,7 @@ class TestRunner:
     def get_test_json(self):
         """Invoke the test platform and request a JSON of available test and
         test suites."""
-        out = self.driver.run("json", "json", False)
+        out = self.driver.run("json", "json", self.force_long_running)
         hf_out = "\n".join(self.extract_hftest_lines(out))
         try:
             return json.loads(hf_out)
@@ -513,7 +514,7 @@ class TestRunner:
 
         out = self.extract_hftest_lines(self.driver.run(
             log_name, "run {} {}".format(suite["name"], test["name"]),
-            test["is_long_running"]))
+            test["is_long_running"] or self.force_long_running))
 
         if self.is_passed_test(out):
             print("        PASS")
@@ -589,6 +590,7 @@ def Main():
     parser.add_argument("--serial-baudrate", type=int, default=115200)
     parser.add_argument("--serial-no-init-wait", action="store_true")
     parser.add_argument("--skip-long-running-tests", action="store_true")
+    parser.add_argument("--force-long-running", action="store_true")
     parser.add_argument("--cpu",
         help="Selects the CPU configuration for the run environment.")
     parser.add_argument("--tfa", action="store_true")
@@ -622,7 +624,7 @@ def Main():
 
     # Create class which will drive test execution.
     runner = TestRunner(artifacts, driver, image_name, args.suite, args.test,
-        args.skip_long_running_tests)
+        args.skip_long_running_tests, args.force_long_running)
 
     # Run tests.
     runner_result = runner.run_tests()
