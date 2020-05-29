@@ -819,7 +819,7 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 		case SPCI_MEM_RECLAIM_32:
 		case SPCI_MEM_RECLAIM_64:
 		{
-			uint64_t handle = args->arg1<<32 | args->arg2;
+			uint64_t handle = args->arg2<<32 | args->arg1;
 			if (eret_origin)
 			{
 				api_spci_memory_reclaim(handle, args->arg3, current()->vm);

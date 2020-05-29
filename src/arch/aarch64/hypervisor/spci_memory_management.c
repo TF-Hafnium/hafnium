@@ -323,7 +323,7 @@ struct spci_value spci_mem_share_internal(
 			mpool_fini(&local_page_pool);
 			return smc_res;
 		}
-		handle = smc_res.arg2<<32 | smc_res.arg3;
+		handle = smc_res.arg3<<32 | smc_res.arg2;
 
 		store_handle(handle, memory_region_copy, length, frag_len);
 #endif
@@ -356,11 +356,11 @@ struct spci_value spci_mem_share_internal(
 
 	mpool_fini(&local_page_pool);
 
-	return (struct spci_value){SPCI_SUCCESS_32, 0, handle>>32, handle & 0xffffffff , 0, 0, 0, 0};
+	return (struct spci_value){SPCI_SUCCESS_32, 0, handle & 0xffffffff , handle>>32, 0, 0, 0, 0};
 }
 
-struct spci_value spci_mem_frag_tx(uint32_t handle_high,
-	uint32_t handle_low, uint32_t frag_len, uint32_t agg_sender_id,
+struct spci_value spci_mem_frag_tx(uint32_t handle_low,
+	uint32_t handle_high, uint32_t frag_len, uint32_t agg_sender_id,
 	struct vm *from_vm)
 {
 	const struct spci_memory_region *rx_memory_region;
@@ -406,16 +406,16 @@ struct spci_value spci_mem_frag_tx(uint32_t handle_high,
 
 	dlog("-----frag_tx----\n");
 
-	return smc32(SPCI_MEM_FRAG_TX_32, handle_high,
-		handle_low, frag_len, agg_sender_id, 0, 0, 0);
+	return smc32(SPCI_MEM_FRAG_TX_32, handle_low,
+		handle_high, frag_len, agg_sender_id, 0, 0, 0);
 #endif
 
-	return (struct spci_value){SPCI_MEM_FRAG_RX_32, handle_high,
-		handle_low, h_to_p->filled_offset, agg_sender_id, 0, 0, 0};
+	return (struct spci_value){SPCI_MEM_FRAG_RX_32, handle_low,
+		handle_high, h_to_p->filled_offset, agg_sender_id, 0, 0, 0};
 }
 /*
-struct spci_value spci_mem_frag_rx(uint32_t handle_high,
-	uint32_t handle_low, uint32_t frag_offset, uint32_t agg_sender_id)
+struct spci_value spci_mem_frag_rx(uint32_t handle_low,
+	uint32_t handle_high, uint32_t frag_offset, uint32_t agg_sender_id)
 {
 	handle_t handle = handle_high<<32 | handle_low;
 
