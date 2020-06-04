@@ -466,8 +466,9 @@
  * Trap system register accesses to trace registers.
  * Traps accesses to ETM registers using the register interface. Does not trap
  * on accesses through the memory-mapped interface.
+ * CPTR_EL2.TTA is register bit 20 when HCR_EL2.E2H=0 (ARMv8.1-VHE disabled).
  */
-#define CPTR_EL2_TTA (UINT64_C(0x1) << 28)
+#define CPTR_EL2_TTA (UINT64_C(0x1) << 20)
 
 /*
  * Process State Bit definitions.
