@@ -31,6 +31,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 HFTEST_LOG_PREFIX = "[hftest] "
 HFTEST_LOG_FAILURE_PREFIX = "Failure:"
@@ -466,16 +467,19 @@ class TestRunner:
         tests_run = 0
         tests_failed = 0
         tests_skipped = 0
+        start_time = time.perf_counter()
         for i in it:
             sub_result = fn(i)
             assert(sub_result.tests_run >= sub_result.tests_failed)
             tests_run += sub_result.tests_run
             tests_failed += sub_result.tests_failed
             tests_skipped += sub_result.tests_skipped
+        elapsed_time = time.perf_counter() - start_time
 
         xml_node.set("tests", str(tests_run + tests_skipped))
         xml_node.set("failures", str(tests_failed))
         xml_node.set("skipped", str(tests_skipped))
+        xml_node.set("time", str(elapsed_time))
         return TestRunnerResult(tests_run, tests_failed, tests_skipped)
 
     def is_passed_test(self, test_out):
@@ -530,10 +534,14 @@ class TestRunner:
 
         test_xml.set("status", "run")
 
+        start_time = time.perf_counter()
         out = self.driver.run(
             log_name, "run {} {}".format(suite["name"], test["name"]),
             test["is_long_running"] or self.force_long_running)
         hftest_out = self.extract_hftest_lines(out)
+        elapsed_time = time.perf_counter() - start_time
+
+        test_xml.set("time", str(elapsed_time))
 
         system_out_xml = ET.SubElement(test_xml, "system-out")
         system_out_xml.text = out
