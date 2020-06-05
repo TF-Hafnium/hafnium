@@ -419,6 +419,7 @@ class SerialDriver(Driver):
 TestRunnerResult = collections.namedtuple("TestRunnerResult", [
         "tests_run",
         "tests_failed",
+        "tests_skipped",
     ])
 
 
@@ -464,15 +465,18 @@ class TestRunner:
         Insert "tests" and "failures" nodes to `xml_node`."""
         tests_run = 0
         tests_failed = 0
+        tests_skipped = 0
         for i in it:
             sub_result = fn(i)
             assert(sub_result.tests_run >= sub_result.tests_failed)
             tests_run += sub_result.tests_run
             tests_failed += sub_result.tests_failed
+            tests_skipped += sub_result.tests_skipped
 
-        xml_node.set("tests", str(tests_run))
+        xml_node.set("tests", str(tests_run + tests_skipped))
         xml_node.set("failures", str(tests_failed))
-        return TestRunnerResult(tests_run, tests_failed)
+        xml_node.set("skipped", str(tests_skipped))
+        return TestRunnerResult(tests_run, tests_failed, tests_skipped)
 
     def is_passed_test(self, test_out):
         """Parse the output of a test and return True if it passed."""
@@ -480,6 +484,16 @@ class TestRunner:
             len(test_out) > 0 and \
             test_out[-1] == HFTEST_LOG_FINISHED and \
             not any(l.startswith(HFTEST_LOG_FAILURE_PREFIX) for l in test_out)
+
+    def get_failure_message(self, test_out):
+        """Parse the output of a test and return the message of the first
+        assertion failure."""
+        for i, line in enumerate(test_out):
+            if line.startswith(HFTEST_LOG_FAILURE_PREFIX) and i + 1 < len(test_out):
+                # The assertion message is on the line after the 'Failure:'
+                return test_out[i + 1].strip()
+
+        return None
 
     def get_log_name(self, suite, test):
         """Returns a string with a generated log name for the test."""
@@ -498,40 +512,49 @@ class TestRunner:
         `suite`. Create a new XML node with results under `suite_xml`.
         Test only invoked if it matches the regex given to constructor."""
         if not self.test_re.match(test["name"]):
-            return TestRunnerResult(tests_run=0, tests_failed=0)
-
-        if self.skip_long_running_tests and test["is_long_running"]:
-            print("      SKIP", test["name"])
-            return TestRunnerResult(tests_run=0, tests_failed=0)
-
-        print("      RUN", test["name"])
-        log_name = self.get_log_name(suite, test)
+            return TestRunnerResult(tests_run=0, tests_failed=0, tests_skipped=0)
 
         test_xml = ET.SubElement(suite_xml, "testcase")
         test_xml.set("name", test["name"])
         test_xml.set("classname", suite["name"])
+
+        if self.skip_long_running_tests and test["is_long_running"]:
+            print("      SKIP", test["name"])
+            test_xml.set("status", "notrun")
+            skipped_xml = ET.SubElement(test_xml, "skipped")
+            skipped_xml.set("message", "Long running")
+            return TestRunnerResult(tests_run=0, tests_failed=0, tests_skipped=1)
+
+        print("      RUN", test["name"])
+        log_name = self.get_log_name(suite, test)
+
         test_xml.set("status", "run")
 
-        out = self.extract_hftest_lines(self.driver.run(
+        out = self.driver.run(
             log_name, "run {} {}".format(suite["name"], test["name"]),
-            test["is_long_running"] or self.force_long_running))
+            test["is_long_running"] or self.force_long_running)
+        hftest_out = self.extract_hftest_lines(out)
 
-        if self.is_passed_test(out):
+        system_out_xml = ET.SubElement(test_xml, "system-out")
+        system_out_xml.text = out
+
+        if self.is_passed_test(hftest_out):
             print("        PASS")
-            return TestRunnerResult(tests_run=1, tests_failed=0)
+            return TestRunnerResult(tests_run=1, tests_failed=0, tests_skipped=0)
         else:
             print("[x]     FAIL --", self.driver.get_run_log(log_name))
             failure_xml = ET.SubElement(test_xml, "failure")
-            # TODO: set a meaningful message and put log in CDATA
-            failure_xml.set("message", "Test failed")
-            return TestRunnerResult(tests_run=1, tests_failed=1)
+            failure_message = self.get_failure_message(hftest_out) or "Test failed"
+            failure_xml.set("message", failure_message)
+            failure_xml.text = '\n'.join(hftest_out)
+            return TestRunnerResult(tests_run=1, tests_failed=1, tests_skipped=0)
 
     def run_suite(self, suite, xml):
         """Invoke the test platform and request to run all matching tests in
         `suite`. Create new XML nodes with results under `xml`.
         Suite skipped if it does not match the regex given to constructor."""
         if not self.suite_re.match(suite["name"]):
-            return TestRunnerResult(tests_run=0, tests_failed=0)
+            return TestRunnerResult(tests_run=0, tests_failed=0, tests_skipped=0)
 
         print("    SUITE", suite["name"])
         suite_xml = ET.SubElement(xml, "testsuite")
