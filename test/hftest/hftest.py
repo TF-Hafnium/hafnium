@@ -559,6 +559,16 @@ class TestRunner:
         print("    SUITE", suite["name"])
         suite_xml = ET.SubElement(xml, "testsuite")
         suite_xml.set("name", suite["name"])
+        properties_xml = ET.SubElement(suite_xml, "properties")
+
+        property_xml = ET.SubElement(properties_xml, "property")
+        property_xml.set("name", "driver")
+        property_xml.set("value", type(self.driver).__name__)
+
+        if self.driver.args.cpu:
+            property_xml = ET.SubElement(properties_xml, "property")
+            property_xml.set("name", "cpu")
+            property_xml.set("value", self.driver.args.cpu)
 
         return self.collect_results(
             lambda test: self.run_test(suite, test, suite_xml),
