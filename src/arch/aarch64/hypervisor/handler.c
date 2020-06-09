@@ -12,6 +12,7 @@
 #include "hf/arch/init.h"
 #include "hf/arch/mmu.h"
 #include "hf/arch/plat/smc.h"
+#include "hf/arch/tee.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
@@ -315,7 +316,16 @@ static void smc_forwarder(const struct vm *vm, struct ffa_value *args)
 	*args = ret;
 }
 
-static bool ffa_handler(struct ffa_value *args, struct vcpu **next)
+/**
+ * In the normal world, ffa_handler is always called from the virtual FF-A
+ * instance (from a VM). In the secure world, ffa_handler may be called from
+ * virtual (a secure partition) or physical FF-A instance (from the normal
+ * world). The function returns true when the call is handled. The *next
+ * pointer is updated to the next vCPU to run or NULL when the call originated
+ * from the virtual FF-A instance and has to be forwarded down to EL3.
+ */
+static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
+			struct vcpu **next)
 {
 	uint32_t func = args->func & ~SMCCC_CONVENTION_MASK;
 
@@ -332,86 +342,144 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu **next)
 
 		ffa_uuid_init(args->arg1, args->arg2, args->arg3, args->arg4,
 			      &uuid);
-		*args = api_ffa_partition_info_get(current(), &uuid);
+		*args = api_ffa_partition_info_get(current, &uuid);
 		return true;
 	}
 	case FFA_ID_GET_32:
-		*args = api_ffa_id_get(current());
+		*args = api_ffa_id_get(current);
 		return true;
 	case FFA_FEATURES_32:
 		*args = api_ffa_features(args->arg1);
 		return true;
 	case FFA_RX_RELEASE_32:
-		*args = api_ffa_rx_release(current(), next);
+		*args = api_ffa_rx_release(current, next);
 		return true;
 	case FFA_RXTX_MAP_32:
 		*args = api_ffa_rxtx_map(ipa_init(args->arg1),
 					 ipa_init(args->arg2), args->arg3,
-					 current(), next);
+					 current, next);
 		return true;
 	case FFA_YIELD_32:
-		*args = api_yield(current(), next);
+		*args = api_yield(current, next);
 		return true;
 	case FFA_MSG_SEND_32:
 		*args = api_ffa_msg_send(
 			ffa_msg_send_sender(*args),
 			ffa_msg_send_receiver(*args), ffa_msg_send_size(*args),
-			ffa_msg_send_attributes(*args), current(), next);
+			ffa_msg_send_attributes(*args), current, next);
 		return true;
 	case FFA_MSG_WAIT_32:
-		*args = api_ffa_msg_recv(true, current(), next);
+		*args = api_ffa_msg_recv(true, current, next);
 		return true;
 	case FFA_MSG_POLL_32:
-		*args = api_ffa_msg_recv(false, current(), next);
+		*args = api_ffa_msg_recv(false, current, next);
 		return true;
 	case FFA_RUN_32:
 		*args = api_ffa_run(ffa_vm_id(*args), ffa_vcpu_index(*args),
-				    current(), next);
+				    current, next);
 		return true;
 	case FFA_MEM_DONATE_32:
 	case FFA_MEM_LEND_32:
 	case FFA_MEM_SHARE_32:
 		*args = api_ffa_mem_send(func, args->arg1, args->arg2,
 					 ipa_init(args->arg3), args->arg4,
-					 current());
+					 current);
 		return true;
 	case FFA_MEM_RETRIEVE_REQ_32:
 		*args = api_ffa_mem_retrieve_req(args->arg1, args->arg2,
 						 ipa_init(args->arg3),
-						 args->arg4, current());
+						 args->arg4, current);
 		return true;
 	case FFA_MEM_RELINQUISH_32:
-		*args = api_ffa_mem_relinquish(current());
+		*args = api_ffa_mem_relinquish(current);
 		return true;
 	case FFA_MEM_RECLAIM_32:
 		*args = api_ffa_mem_reclaim(
 			ffa_assemble_handle(args->arg1, args->arg2), args->arg3,
-			current());
+			current);
 		return true;
 	case FFA_MEM_FRAG_RX_32:
 		*args = api_ffa_mem_frag_rx(ffa_frag_handle(*args), args->arg3,
 					    (args->arg4 >> 16) & 0xffff,
-					    current());
+					    current);
 		return true;
 	case FFA_MEM_FRAG_TX_32:
 		*args = api_ffa_mem_frag_tx(ffa_frag_handle(*args), args->arg3,
 					    (args->arg4 >> 16) & 0xffff,
-					    current());
+					    current);
 		return true;
 	case FFA_MSG_SEND_DIRECT_REQ_32:
 		*args = api_ffa_msg_send_direct_req(
 			ffa_msg_send_sender(*args),
-			ffa_msg_send_receiver(*args), *args, current(), next);
+			ffa_msg_send_receiver(*args), *args, current, next);
 		return true;
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 		*args = api_ffa_msg_send_direct_resp(
 			ffa_msg_send_sender(*args),
-			ffa_msg_send_receiver(*args), *args, current(), next);
+			ffa_msg_send_receiver(*args), *args, current, next);
 		return true;
 	}
 
 	return false;
 }
+
+#if SECURE_WORLD == 1
+
+static struct vcpu *get_other_world_vcpu(struct vcpu *current)
+{
+	struct vm *vm = vm_find(HF_OTHER_WORLD_ID);
+	ffa_vcpu_index_t current_cpu_index = cpu_index(current->cpu);
+
+	return vm_get_vcpu(vm, current_cpu_index);
+}
+
+/**
+ * Initially called from virtual FF-A instance (smc_handler and hvc_handler).
+ * Handles an FF-A function from a secure partition, and if necessary returns
+ * to the normal world and handles one or more FF-A functions from the normal
+ * world. Returns when it is ready to run a secure partition again.
+ */
+static bool ffa_handler_loop(struct ffa_value *ret, struct vcpu **next)
+{
+	struct vcpu *ffa_next = current();
+	struct vcpu *other_world_vcpu = get_other_world_vcpu(current());
+	bool handled = false;
+
+	/* The FF-A call originates from a partition in current world. */
+	handled = ffa_handler(ret, current(), &ffa_next);
+
+	while (handled) {
+		if (ffa_next != NULL) {
+			/*
+			 * The FF-A call was handled and ffa_next is not null
+			 * which means this vCPU can be resumed.
+			 */
+			if (ffa_next != current()) {
+				*next = ffa_next;
+			}
+
+			/* Resume current or next EL1 partition. */
+			return true;
+		}
+
+		/*
+		 * The FF-A call is handled and ffa_next is null which hints
+		 * the result shall be passed to the other world.
+		 */
+		*ret = smc_forward(ret->func, ret->arg1, ret->arg2, ret->arg3,
+				   ret->arg4, ret->arg5, ret->arg6, ret->arg7);
+
+		/*
+		 * Returned from EL3 thus next FF-A call is from
+		 * physical FF-A instance.
+		 */
+		handled = ffa_handler(ret, other_world_vcpu, &ffa_next);
+	}
+
+	return false;
+}
+
+#endif
 
 /**
  * Set or clear VI bit according to pending interrupts.
@@ -464,7 +532,11 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
 		return next;
 	}
 
-	if (ffa_handler(&args, &next)) {
+#if SECURE_WORLD == 1
+	if (ffa_handler_loop(&args, &next)) {
+#else
+	if (ffa_handler(&args, current(), &next)) {
+#endif
 		arch_regs_set_retval(&vcpu->regs, args);
 		update_vi(next);
 		return next;
@@ -645,7 +717,11 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 		return next;
 	}
 
-	if (ffa_handler(&args, &next)) {
+#if SECURE_WORLD == 1
+	if (ffa_handler_loop(&args, &next)) {
+#else
+	if (ffa_handler(&args, current(), &next)) {
+#endif
 		arch_regs_set_retval(&vcpu->regs, args);
 		update_vi(next);
 		return next;
