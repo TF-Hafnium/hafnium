@@ -555,3 +555,61 @@ void plat_ffa_inject_notification_pending_interrupt_context_switch(
 	(void)next;
 	(void)current;
 }
+
+/*
+ * Forward helper for FFA_PARTITION_INFO_GET.
+ * Emits FFA_PARTITION_INFO_GET from Hypervisor to SPMC if allowed.
+ */
+void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
+					 struct ffa_partition_info *partitions,
+					 ffa_vm_count_t *ret_count)
+{
+	const struct vm *tee = vm_find(HF_TEE_VM_ID);
+	struct ffa_partition_info *tee_partitions;
+	ffa_vm_count_t tee_partitions_count;
+	ffa_vm_count_t vm_count = *ret_count;
+	struct ffa_value ret;
+
+	CHECK(tee != NULL);
+	CHECK(vm_count < MAX_VMS);
+
+	/*
+	 * Allow forwarding from the Hypervisor if TEE or SPMC exists and
+	 * declared as such in the Hypervisor manifest.
+	 */
+	if (!ffa_tee_enabled) {
+		return;
+	}
+
+	ret = arch_other_world_call(
+		(struct ffa_value){.func = FFA_PARTITION_INFO_GET_32,
+				   .arg1 = uuid->uuid[0],
+				   .arg2 = uuid->uuid[1],
+				   .arg3 = uuid->uuid[2],
+				   .arg4 = uuid->uuid[3]});
+	if (ffa_func_id(ret) != FFA_SUCCESS_32) {
+		dlog_verbose(
+			"Failed forwarding FFA_PARTITION_INFO_GET to "
+			"the SPMC.\n");
+		return;
+	}
+
+	tee_partitions_count = ffa_partition_info_get_count(ret);
+	if (tee_partitions_count == 0 || tee_partitions_count > MAX_VMS) {
+		dlog_verbose("Invalid number of SPs returned by the SPMC.\n");
+		return;
+	}
+
+	tee_partitions = (struct ffa_partition_info *)tee->mailbox.send;
+	for (ffa_vm_count_t index = 0; index < tee_partitions_count; index++) {
+		partitions[vm_count] = tee_partitions[index];
+		++vm_count;
+	}
+
+	/* Release the RX buffer. */
+	ret = arch_other_world_call(
+		(struct ffa_value){.func = FFA_RX_RELEASE_32});
+	CHECK(ret.func == FFA_SUCCESS_32);
+
+	*ret_count = vm_count;
+}

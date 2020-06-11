@@ -220,3 +220,7 @@ struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
 
 void plat_ffa_inject_notification_pending_interrupt_context_switch(
 	struct vcpu *next, struct vcpu *current);
+
+void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
+					 struct ffa_partition_info *partitions,
+					 ffa_vm_count_t *ret_count);

@@ -280,6 +280,11 @@ struct ffa_value {
 	uint64_t arg7;
 };
 
+static inline uint32_t ffa_func_id(struct ffa_value args)
+{
+	return args.func;
+}
+
 static inline int32_t ffa_error_code(struct ffa_value val)
 {
 	return (int32_t)val.arg2;
@@ -303,6 +308,11 @@ static inline uint32_t ffa_msg_send_size(struct ffa_value args)
 static inline uint32_t ffa_msg_send_attributes(struct ffa_value args)
 {
 	return args.arg4;
+}
+
+static inline uint32_t ffa_partition_info_get_count(struct ffa_value args)
+{
+	return args.arg2;
 }
 
 static inline ffa_memory_handle_t ffa_assemble_handle(uint32_t a1, uint32_t a2)

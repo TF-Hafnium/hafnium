@@ -364,7 +364,7 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	bool uuid_is_null = ffa_uuid_is_null(uuid);
 	struct ffa_value ret;
 	uint32_t size;
-	struct ffa_partition_info partitions[MAX_VMS];
+	struct ffa_partition_info partitions[2 * MAX_VMS];
 
 	/*
 	 * Iterate through the VMs to find the ones with a matching UUID.
@@ -388,7 +388,25 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 		}
 	}
 
-	/* Unrecognized UUID: does not match any of the VMs and is not Null. */
+	/* If UUID is Null vm_count must not be zero at this stage. */
+	CHECK(!uuid_is_null || vm_count != 0);
+
+	/*
+	 * When running the Hypervisor:
+	 * - If UUID is Null the Hypervisor forwards the query to the SPMC for
+	 * it to fill with secure partitions information.
+	 * - If UUID is non-Null vm_count may be zero because the UUID  matches
+	 * a secure partition and the query is forwarded to the SPMC.
+	 * When running the SPMC:
+	 * - If UUID is non-Null and vm_count is zero it means there is no such
+	 * partition identified in the system.
+	 */
+	plat_ffa_partition_info_get_forward(uuid, partitions, &vm_count);
+
+	/*
+	 * Unrecognized UUID: does not match any of the VMs (or SPs)
+	 * and is not Null.
+	 */
 	if (vm_count == 0) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -421,7 +439,9 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	memcpy_s(current_vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX, partitions,
 		 size);
 	current_vm->mailbox.recv_size = size;
-	current_vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
+
+	/* Sender is Hypervisor in the normal world (TEE in secure world). */
+	current_vm->mailbox.recv_sender = HF_VM_ID_BASE;
 	current_vm->mailbox.recv_func = FFA_PARTITION_INFO_GET_32;
 	current_vm->mailbox.state = MAILBOX_STATE_READ;
 

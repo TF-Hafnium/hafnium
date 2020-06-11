@@ -14,7 +14,7 @@
 
 	/* Properties */
 	ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
-	uuid = <0xa609f132 0x6b4f 0x4c14 0x9489 0x798457>;
+	uuid = <0xa609f132 0x6b4f 0x4c14 0x9489>;
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
