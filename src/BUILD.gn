@@ -64,6 +64,7 @@ source_set("src_testable") {
     ":panic",
     ":std",
     ":vm",
+    "//src/arch/${plat_arch}:arch",
     "//src/arch/${plat_arch}/hypervisor",
     "//src/arch/${plat_arch}/hypervisor:tee",
     "//vmlib",

@@ -9,7 +9,7 @@ source_set("hypervisor") {
     "cpu.c",
   ]
   deps = [
-    "//src/arch/fake",
+    "//src/arch/fake:arch",
   ]
 }
 

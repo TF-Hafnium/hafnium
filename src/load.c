@@ -29,9 +29,6 @@
 #include "vmapi/hf/call.h"
 #include "vmapi/hf/ffa.h"
 
-alignas(PAGE_SIZE) static uint8_t tee_send_buffer[HF_MAILBOX_SIZE];
-alignas(PAGE_SIZE) static uint8_t tee_recv_buffer[HF_MAILBOX_SIZE];
-
 /**
  * Copies data to an unmapped location by mapping it for write, copying the
  * data, then unmapping it.
@@ -662,7 +659,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	      struct boot_params_update *update, struct mpool *ppool)
 {
 	struct vm *primary;
-	struct vm *tee;
+	struct vm *other_world_vm;
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	struct vm_locked primary_vm_locked;
 	size_t i;
@@ -675,13 +672,19 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	}
 
 	/*
-	 * Initialise the dummy VM which represents TrustZone, and set up its
-	 * RX/TX buffers.
+	 * Initialise the dummy VM which represents the opposite world:
+	 * -TrustZone (or the SPMC) when running the Hypervisor
+	 * -the Hypervisor when running TZ/SPMC
 	 */
-	tee = vm_init(HF_TEE_VM_ID, 0, ppool);
-	CHECK(tee != NULL);
-	tee->mailbox.send = &tee_send_buffer;
-	tee->mailbox.recv = &tee_recv_buffer;
+	other_world_vm = vm_init(HF_OTHER_WORLD_ID, MAX_CPUS, ppool);
+	CHECK(other_world_vm != NULL);
+
+	for (i = 0; i < MAX_CPUS; i++) {
+		struct vcpu *vcpu = vm_get_vcpu(other_world_vm, i);
+		struct cpu *cpu = cpu_find_index(i);
+
+		vcpu->cpu = cpu;
+	}
 
 	static_assert(
 		sizeof(mem_ranges_available) == sizeof(params->mem_ranges),

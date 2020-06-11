@@ -13,6 +13,8 @@
 
 #include "hf/addr.h"
 
+#include "vmapi/hf/ffa.h"
+
 /*
  * A page table entry (PTE) will take one of the following forms:
  *
@@ -154,3 +156,8 @@ uint32_t arch_mm_stage2_attrs_to_mode(uint64_t attrs);
  * Initializes the arch specific memory management.
  */
 bool arch_mm_init(paddr_t table);
+
+/**
+ * Return the arch specific mm mode for send/recv pages of given VM ID.
+ */
+uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id);

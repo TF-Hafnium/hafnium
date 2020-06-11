@@ -16,13 +16,27 @@
 
 #include "smc.h"
 
+#if SECURE_WORLD == 0
+
+alignas(PAGE_SIZE) static uint8_t tee_send_buffer[HF_MAILBOX_SIZE];
+alignas(PAGE_SIZE) static uint8_t tee_recv_buffer[HF_MAILBOX_SIZE];
+
+#endif
+
 void arch_tee_init(void)
 {
-	struct vm *tee_vm = vm_find(HF_TEE_VM_ID);
+#if SECURE_WORLD == 0
+
+	struct vm *tee_vm = vm_find(HF_OTHER_WORLD_ID);
 	struct ffa_value ret;
 	uint32_t func;
 
 	CHECK(tee_vm != NULL);
+
+	/* Setup TEE VM RX/TX buffers */
+	tee_vm->mailbox.send = &tee_send_buffer;
+	tee_vm->mailbox.recv = &tee_recv_buffer;
+
 	/*
 	 * Note that send and recv are swapped around, as the send buffer from
 	 * Hafnium's perspective is the recv buffer from the EL3 dispatcher's
@@ -49,6 +63,7 @@ void arch_tee_init(void)
 		      ret.func);
 	}
 	dlog_verbose("TEE finished setting up buffers.\n");
+#endif
 }
 
 struct ffa_value arch_tee_call(struct ffa_value args)

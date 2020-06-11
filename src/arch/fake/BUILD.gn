@@ -7,7 +7,7 @@
 config("arch_config") {
 }
 
-source_set("fake") {
+source_set("arch") {
   sources = [
     "mm.c",
     "timer.c",

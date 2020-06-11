@@ -695,3 +695,11 @@ bool arch_mm_init(paddr_t table)
 
 	return true;
 }
+
+/**
+ * Return the arch specific mm mode for send/recv pages of given VM ID.
+ */
+uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id)
+{
+	return (id == HF_HYPERVISOR_VM_ID) ? MM_MODE_NS : 0;
+}

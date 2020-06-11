@@ -19,7 +19,7 @@
 #include "vmapi/hf/call.h"
 
 static struct vm vms[MAX_VMS];
-static struct vm tee_vm;
+static struct vm other_world;
 static ffa_vm_count_t vm_count;
 
 struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
@@ -28,8 +28,8 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 	uint32_t i;
 	struct vm *vm;
 
-	if (id == HF_TEE_VM_ID) {
-		vm = &tee_vm;
+	if (id == HF_OTHER_WORLD_ID) {
+		vm = &other_world;
 	} else {
 		uint16_t vm_index = id - HF_VM_ID_OFFSET;
 
@@ -97,15 +97,15 @@ struct vm *vm_find(ffa_vm_id_t id)
 {
 	uint16_t index;
 
-	/* Check that this is not a reserved ID. */
-	if (id < HF_VM_ID_OFFSET) {
+	if (id == HF_OTHER_WORLD_ID) {
+		if (other_world.id == HF_OTHER_WORLD_ID) {
+			return &other_world;
+		}
 		return NULL;
 	}
 
-	if (id == HF_TEE_VM_ID) {
-		if (tee_vm.id == HF_TEE_VM_ID) {
-			return &tee_vm;
-		}
+	/* Check that this is not a reserved ID. */
+	if (id < HF_VM_ID_OFFSET) {
 		return NULL;
 	}
 

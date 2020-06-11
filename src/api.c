@@ -9,6 +9,7 @@
 #include "hf/api.h"
 
 #include "hf/arch/cpu.h"
+#include "hf/arch/mm.h"
 #include "hf/arch/tee.h"
 #include "hf/arch/timer.h"
 
@@ -759,6 +760,7 @@ static bool api_vm_configure_stage1(struct mm_stage1_locked mm_stage1_locked,
 				    struct vm_locked vm_locked,
 				    paddr_t pa_send_begin, paddr_t pa_send_end,
 				    paddr_t pa_recv_begin, paddr_t pa_recv_end,
+				    uint32_t extra_attributes,
 				    struct mpool *local_page_pool)
 {
 	bool ret;
@@ -766,7 +768,7 @@ static bool api_vm_configure_stage1(struct mm_stage1_locked mm_stage1_locked,
 	/* Map the send page as read-only in the hypervisor address space. */
 	vm_locked.vm->mailbox.send =
 		mm_identity_map(mm_stage1_locked, pa_send_begin, pa_send_end,
-				MM_MODE_R, local_page_pool);
+				MM_MODE_R | extra_attributes, local_page_pool);
 	if (!vm_locked.vm->mailbox.send) {
 		/* TODO: partial defrag of failed range. */
 		/* Recover any memory consumed in failed mapping. */
@@ -780,7 +782,7 @@ static bool api_vm_configure_stage1(struct mm_stage1_locked mm_stage1_locked,
 	 */
 	vm_locked.vm->mailbox.recv =
 		mm_identity_map(mm_stage1_locked, pa_recv_begin, pa_recv_end,
-				MM_MODE_W, local_page_pool);
+				MM_MODE_W | extra_attributes, local_page_pool);
 	if (!vm_locked.vm->mailbox.recv) {
 		/* TODO: partial defrag of failed range. */
 		/* Recover any memory consumed in failed mapping. */
@@ -833,6 +835,7 @@ struct ffa_value api_vm_configure_pages(
 	paddr_t pa_recv_end;
 	uint32_t orig_send_mode;
 	uint32_t orig_recv_mode;
+	uint32_t extra_attributes;
 
 	/* We only allow these to be setup once. */
 	if (vm_locked.vm->mailbox.send || vm_locked.vm->mailbox.recv) {
@@ -904,9 +907,12 @@ struct ffa_value api_vm_configure_pages(
 		goto fail_undo_send;
 	}
 
+	/* Get extra send/recv pages mapping attributes for the given VM ID. */
+	extra_attributes = arch_mm_extra_attributes_from_vm(vm_locked.vm->id);
+
 	if (!api_vm_configure_stage1(mm_stage1_locked, vm_locked, pa_send_begin,
 				     pa_send_end, pa_recv_begin, pa_recv_end,
-				     local_page_pool)) {
+				     extra_attributes, local_page_pool)) {
 		goto fail_undo_send_and_recv;
 	}
 
