@@ -224,7 +224,7 @@ class QemuDriver(Driver):
         exec_args = [
             "timeout", "--foreground", time_limit,
             os.path.abspath("prebuilts/linux-x64/qemu/qemu-system-aarch64"),
-            "-machine", "virt,virtualization=on,gic-version=3",
+            "-no-reboot", "-machine", "virt,virtualization=on,gic-version=3",
             "-cpu", cpu, "-smp", "4", "-m", "1G",
             "-nographic", "-nodefaults", "-serial", "stdio",
             "-d", "unimp", "-kernel", os.path.abspath(self.args.hypervisor),
@@ -237,7 +237,7 @@ class QemuDriver(Driver):
             exec_args += ["-bios",
                 os.path.abspath(bl1_path),
                 "-machine", "secure=on", "-semihosting-config",
-                "enable,target=native"]
+                "enable=on,target=native"]
 
         if self.args.initrd:
             exec_args += ["-initrd", os.path.abspath(self.args.initrd)]
