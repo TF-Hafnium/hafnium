@@ -107,6 +107,77 @@ out:
 #endif
 }
 
+/**
+ * Check validity of a FF-A direct message request.
+ */
+bool arch_other_world_is_direct_request_valid(struct vcpu *current,
+					      ffa_vm_id_t sender_vm_id,
+					      ffa_vm_id_t receiver_vm_id)
+{
+	ffa_vm_id_t current_vm_id = current->vm->id;
+
+#if SECURE_WORLD == 1
+
+	/*
+	 * The normal world can send direct message requests
+	 * via the Hypervisor to any SP.
+	 */
+	return sender_vm_id != receiver_vm_id &&
+	       current_vm_id == HF_HYPERVISOR_VM_ID &&
+	       vm_id_is_current_world(receiver_vm_id) &&
+	       !vm_id_is_current_world(sender_vm_id);
+
+#else
+
+	/*
+	 * The primary VM can send direct message request to
+	 * any other VM (but itself) or SP, but can't spoof
+	 * a different sender.
+	 */
+	return sender_vm_id != receiver_vm_id &&
+	       sender_vm_id == current_vm_id &&
+	       current_vm_id == HF_PRIMARY_VM_ID;
+
+#endif
+
+	return false;
+}
+
+/**
+ * Check validity of a FF-A direct message response.
+ */
+bool arch_other_world_is_direct_response_valid(struct vcpu *current,
+					       ffa_vm_id_t sender_vm_id,
+					       ffa_vm_id_t receiver_vm_id)
+{
+	ffa_vm_id_t current_vm_id = current->vm->id;
+
+#if SECURE_WORLD == 1
+
+	/*
+	 * Direct message responses emitted from a SP
+	 * target a VM in NWd.
+	 */
+	return sender_vm_id != receiver_vm_id &&
+	       sender_vm_id == current_vm_id &&
+	       vm_id_is_current_world(sender_vm_id) &&
+	       !vm_id_is_current_world(receiver_vm_id);
+
+#else
+
+	/*
+	 * Secondary VMs can send direct message responses to
+	 * the PVM, but can't spoof a different sender.
+	 */
+	return sender_vm_id != receiver_vm_id &&
+	       sender_vm_id == current_vm_id &&
+	       receiver_vm_id == HF_PRIMARY_VM_ID;
+
+#endif
+
+	return false;
+}
+
 struct ffa_value arch_other_world_call(struct ffa_value args)
 {
 	return smc_ffa_call(args);

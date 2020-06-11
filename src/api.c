@@ -123,6 +123,34 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 }
 
 /**
+ * Choose next vCPU to run to be the counterpart vCPU in the other
+ * world (run the normal world if currently running in the secure
+ * world). Set current vCPU state to the given vcpu_state parameter.
+ * Set FF-A return values to the target vCPU in the other world.
+ *
+ * Called in context of a direct message response from a secure
+ * partition to a VM.
+ */
+static struct vcpu *api_switch_to_other_world(struct vcpu *current,
+					      struct ffa_value other_world_ret,
+					      enum vcpu_state vcpu_state)
+{
+	struct vcpu *next = vcpu_get_other_world_counterpart(current);
+
+	CHECK(next != NULL);
+
+	/* Set the return value for the other world's VM. */
+	arch_regs_set_retval(&next->regs, other_world_ret);
+
+	/* Set the current vCPU state. */
+	sl_lock(&current->lock);
+	current->state = vcpu_state;
+	sl_unlock(&current->lock);
+
+	return next;
+}
+
+/**
  * Checks whether the given `to` VM's mailbox is currently busy, and optionally
  * registers the `from` VM to be notified when it becomes available.
  */
@@ -1601,24 +1629,13 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 					     struct vcpu **next)
 {
 	struct ffa_value ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
-	ffa_vm_id_t current_vm_id = current->vm->id;
 	struct vm *receiver_vm;
 	struct vcpu *receiver_vcpu;
 	struct two_vcpu_locked vcpus_locked;
 
-	/* Only allow primary VM to send direct message requests. */
-	if (current_vm_id != HF_PRIMARY_VM_ID) {
+	if (!arch_other_world_is_direct_request_valid(current, sender_vm_id,
+						      receiver_vm_id)) {
 		return ffa_error(FFA_NOT_SUPPORTED);
-	}
-
-	/* Prevent sender_vm_id spoofing. */
-	if (current_vm_id != sender_vm_id) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Prevent a VM from sending messages to itself. */
-	if (current_vm_id == receiver_vm_id) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	receiver_vm = vm_find(receiver_vm_id);
@@ -1696,7 +1713,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	receiver_vcpu->cpu = current->cpu;
 	receiver_vcpu->state = VCPU_STATE_RUNNING;
 	receiver_vcpu->regs_available = false;
-	receiver_vcpu->direct_request_origin_vm_id = current_vm_id;
+	receiver_vcpu->direct_request_origin_vm_id = sender_vm_id;
 
 	arch_regs_set_retval(&receiver_vcpu->regs, (struct ffa_value){
 							   .func = args.func,
@@ -1735,61 +1752,67 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 					      struct vcpu *current,
 					      struct vcpu **next)
 {
-	ffa_vm_id_t current_vm_id = current->vm->id;
-	struct vcpu_locked vcpu_locked;
+	struct vcpu_locked current_locked;
 
-	/* Only allow secondary VMs to send direct message responses. */
-	if (current_vm_id == HF_PRIMARY_VM_ID) {
+	if (!arch_other_world_is_direct_response_valid(current, sender_vm_id,
+						       receiver_vm_id)) {
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
-	/* Prevent sender_vm_id spoofing. */
-	if (current_vm_id != sender_vm_id) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Prevent a VM from sending messages to itself. */
-	if (current_vm_id == receiver_vm_id) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	vcpu_locked = vcpu_lock(current);
+	current_locked = vcpu_lock(current);
 
 	/*
 	 * Ensure the terminating FFA_MSG_SEND_DIRECT_REQ had a
 	 * defined originator.
 	 */
-	if (!is_ffa_direct_msg_request_ongoing(vcpu_locked)) {
+	if (!is_ffa_direct_msg_request_ongoing(current_locked)) {
 		/*
 		 * Sending direct response but direct request origin vCPU is
 		 * not set.
 		 */
-		vcpu_unlock(&vcpu_locked);
+		vcpu_unlock(&current_locked);
 		return ffa_error(FFA_DENIED);
 	}
 
 	if (current->direct_request_origin_vm_id != receiver_vm_id) {
-		vcpu_unlock(&vcpu_locked);
+		vcpu_unlock(&current_locked);
 		return ffa_error(FFA_DENIED);
 	}
 
 	/* Clear direct request origin for the caller. */
 	current->direct_request_origin_vm_id = HF_INVALID_VM_ID;
 
-	vcpu_unlock(&vcpu_locked);
+	vcpu_unlock(&current_locked);
 
-	*next = api_switch_to_primary(current,
-				      (struct ffa_value){
-					      .func = args.func,
-					      .arg1 = args.arg1,
-					      .arg2 = 0,
-					      .arg3 = args.arg3,
-					      .arg4 = args.arg4,
-					      .arg5 = args.arg5,
-					      .arg6 = args.arg6,
-					      .arg7 = args.arg7,
-				      },
-				      VCPU_STATE_BLOCKED_MAILBOX);
+	if (!vm_id_is_current_world(receiver_vm_id)) {
+		*next = api_switch_to_other_world(current,
+						  (struct ffa_value){
+							  .func = args.func,
+							  .arg1 = args.arg1,
+							  .arg2 = 0,
+							  .arg3 = args.arg3,
+							  .arg4 = args.arg4,
+							  .arg5 = args.arg5,
+							  .arg6 = args.arg6,
+							  .arg7 = args.arg7,
+						  },
+						  VCPU_STATE_BLOCKED_MAILBOX);
+	} else if (receiver_vm_id == HF_PRIMARY_VM_ID) {
+		*next = api_switch_to_primary(current,
+					      (struct ffa_value){
+						      .func = args.func,
+						      .arg1 = args.arg1,
+						      .arg2 = 0,
+						      .arg3 = args.arg3,
+						      .arg4 = args.arg4,
+						      .arg5 = args.arg5,
+						      .arg6 = args.arg6,
+						      .arg7 = args.arg7,
+					      },
+					      VCPU_STATE_BLOCKED_MAILBOX);
+	} else {
+		panic("Invalid direct message response invocation");
+	}
 
 	return (struct ffa_value){.func = FFA_INTERRUPT_32};
 }

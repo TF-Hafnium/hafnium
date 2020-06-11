@@ -427,14 +427,6 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 
 #if SECURE_WORLD == 1
 
-static struct vcpu *get_other_world_vcpu(struct vcpu *current)
-{
-	struct vm *vm = vm_find(HF_OTHER_WORLD_ID);
-	ffa_vcpu_index_t current_cpu_index = cpu_index(current->cpu);
-
-	return vm_get_vcpu(vm, current_cpu_index);
-}
-
 /**
  * Called to switch to the other world and handle FF-A calls from it. Returns
  * when it is ready to run a secure partition again.
@@ -539,7 +531,8 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 		arch_regs_set_retval(&vcpu->regs, args);
 
 #if SECURE_WORLD == 1
-		struct vcpu *other_world_vcpu = get_other_world_vcpu(current());
+		struct vcpu *other_world_vcpu =
+			vcpu_get_other_world_counterpart(current());
 
 		if (*next == other_world_vcpu) {
 			/*

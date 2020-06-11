@@ -167,10 +167,10 @@ TEST_SERVICE(ffa_direct_msg_resp_invalid_sender_receiver)
 	ffa_vm_id_t receiver = ffa_msg_send_receiver(args);
 
 	res = ffa_msg_send_direct_resp(receiver, SERVICE_VM2, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(res, FFA_DENIED);
+	EXPECT_FFA_ERROR(res, FFA_NOT_SUPPORTED);
 
 	res = ffa_msg_send_direct_resp(SERVICE_VM2, sender, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(res, FFA_NOT_SUPPORTED);
 
 	ffa_msg_send_direct_resp(receiver, sender, 0, 0, 0, 0, 0);
 }
