@@ -101,7 +101,7 @@ do
     HFTEST_CPU+=(--log "$LOG_DIR_BASE")
   fi
   "${HFTEST_CPU[@]}" arch_test
-  if [ $USE_TFA == true || $USE_FVP == true ]
+  if [ $USE_TFA == true -o $USE_FVP == true ]
   then
     "${HFTEST_CPU[@]}" aarch64_test
   fi
