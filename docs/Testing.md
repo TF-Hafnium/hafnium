@@ -23,7 +23,7 @@ Hafnium has 4 main kinds of tests:
         hypervisor, possibly communicating with a helper service in one or more
         secondary VMs.
     *   Using our own _hftest_ framework, with `standalone_main.c` for the
-        primary VM and `hftest_service.c` for secondary VMs.
+        primary VM and `service.c` for secondary VMs.
     *   Build own primary and secondary VMs, run in EL1 under actual Hafnium
         image.
 1.  Linux tests
