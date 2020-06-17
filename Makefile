@@ -109,12 +109,15 @@ check: $(OUT_DIR)/build.ninja
 
 .PHONY: license
 license:
-	@find src/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python build/license.py --style c
+	@find build/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts -o -name \*.ld | xargs -n1 python build/license.py --style c
 	@find inc/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python build/license.py --style c
+	@find src/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python build/license.py --style c
 	@find test/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python build/license.py --style c
-	@find build/ -name \*.py| xargs -n1 python build/license.py --style hash
+	@find vmlib/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python build/license.py --style c
+	@find build/ -name \*.py -o -name \*.sh -o -name \*.inc -o -name Dockerfile* | xargs -n1 python build/license.py --style hash
+	@find kokoro/ -name \*.sh -o -name \*.cfg | xargs -n1 python build/license.py --style hash
 	@find test/ -name \*.py| xargs -n1 python build/license.py --style hash
-	@find . \( -name \*.gn -o -name \*.gni \) | xargs -n1 python build/license.py --style hash
+	@find . \( -path ./driver/linux -o -path ./third_party \) -prune -o \( -name \*.gn -o -name \*.gni \) -print | xargs -n1 python build/license.py --style hash
 
 .PHONY: update-prebuilts
 update-prebuilts: prebuilts/linux-aarch64/linux/vmlinuz
