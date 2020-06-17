@@ -10,7 +10,7 @@ Submissions should follow the Hafnium [style guide](docs/StyleGuide.md).
 ## Code reviews
 
 All submissions, including submissions by project members, require review. We
-use [Gerrit](https://hafnium-review.googlesource.com) for this purpose.
+use [Gerrit](https://review.trustedfirmware.org/) for this purpose.
 
 To submit a change:
 
@@ -36,12 +36,12 @@ To submit a change:
 9.  If you changed submodules, then add a matching 'topic' from the Gerrit UI
     for all your changes (submodules and the main repository) so that they can
     be reviewed and submitted together.
-10. Wait 10-15 minutes for our presubmit tests to run, and make sure a 'Kokoro
+10. Wait 20-30 minutes for the presubmit tests to run, and make sure a 'Verified
     +1' comment shows up in Gerrit indicating that they have passed. If not,
     follow the links to find the errors, fix them and try again.
 11. From the Gerrit UI add one or more reviewers. Looking at who has modified
     the same files frequently recently is usually a good way to pick a reviewer,
-    but if you're not sure then you can add hafnium-team@google.com.
+    but if you're not sure then you can add hafnium@lists.trustedfirmware.org.
 
 ## Community Guidelines
 

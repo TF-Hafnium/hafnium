@@ -22,19 +22,18 @@ Hafnium checkout:
 $ make && kokoro/test.sh --fvp
 ```
 
-See the `fvp` function in
-[`hftest.py`](http://cs/hafnium/test/hftest/hftest.py?q=symbol:fvp) for details
+See the `FvpDriver` class in [`hftest.py`](../test/hftest/hftest.py) for details
 on how this works.
 
 ## Other resources
 
 When running tests under the FVP we also use a prebuilt version of TF-A, which
 is checked in under
-[`prebuilts/linux-aarch64/arm-trusted-firmware/`](https://hafnium.googlesource.com/hafnium/prebuilts/+/refs/heads/master/linux-aarch64/arm-trusted-firmware/).
+[`prebuilts/linux-aarch64/arm-trusted-firmware/`](https://review.trustedfirmware.org/plugins/gitiles/hafnium/prebuilts/+/refs/heads/master/linux-aarch64/arm-trusted-firmware/).
 The
-[README](https://hafnium.googlesource.com/hafnium/prebuilts/+/refs/heads/master/linux-aarch64/arm-trusted-firmware/README.md)
+[README](https://review.trustedfirmware.org/plugins/gitiles/hafnium/prebuilts/+/refs/heads/master/linux-aarch64/arm-trusted-firmware/README.md)
 there has details on how it was built. The source code is available from the
-[Arm Trusted Firmware site](https://developer.trustedfirmware.org/dashboard/view/6/).
+[Arm Trusted Firmware site](https://git.trustedfirmware.org/TF-A/trusted-firmware-a.git).
 
 Documentation of the FVP (including memory maps) is
-[available from Arm](https://static.docs.arm.com/100966/1101/fast_models_fvp_rg_100966_1101_00_en.pdf).
+[available from Arm](https://developer.arm.com/docs/100966/latest).

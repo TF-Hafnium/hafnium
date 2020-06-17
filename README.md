@@ -3,7 +3,9 @@
 Hafnium is a hypervisor, initially supporting aarch64 (64-bit Armv8 CPUs).
 
 Get in touch and keep up-to-date at
-[hafnium-discuss@googlegroups.com](https://groups.google.com/forum/#!forum/hafnium-discuss).
+[hafnium@lists.trustedfirmware.org](https://lists.trustedfirmware.org/mailman/listinfo/hafnium).
+See feature requests and bugs on our
+[bug dashboard](https://developer.trustedfirmware.org/project/21/item/view/67/).
 
 ## Getting started
 

@@ -5,7 +5,7 @@
 ## Getting the source code
 
 ```shell
-git clone --recurse-submodules https://hafnium.googlesource.com/hafnium && (cd hafnium && f=`git rev-parse --git-dir`/hooks/commit-msg ; curl -Lo $f https://gerrit-review.googlesource.com/tools/hooks/commit-msg ; chmod +x $f)
+git clone --recurse-submodules https://git.trustedfirmware.org/hafnium/hafnium.git && (cd hafnium && f=`git rev-parse --git-dir`/hooks/commit-msg ; curl -Lo $f https://review.trustedfirmware.org/tools/hooks/commit-msg ; chmod +x $f ; for m in `git rev-parse --git-dir`/modules/*; do cp $f $m/hooks/commit-msg; done)
 ```
 
 To upload a commit for review:
@@ -14,8 +14,8 @@ To upload a commit for review:
 git push origin HEAD:refs/for/master
 ```
 
-Browse source at https://hafnium.googlesource.com/hafnium. Review CLs at
-https://hafnium-review.googlesource.com/.
+Browse source at https://review.trustedfirmware.org/plugins/gitiles/. Review CLs
+at https://review.trustedfirmware.org/.
 
 See details of [how to contribute](../CONTRIBUTING.md).
 
@@ -54,6 +54,7 @@ machines to run.
 
 Next, you need to create a manifest which will describe the VM to Hafnium.
 Follow the [Manifest](Manifest.md) instructions and build a DTB with:
+
 ```
 /dts-v1/;
 
@@ -69,8 +70,8 @@ Follow the [Manifest](Manifest.md) instructions and build a DTB with:
 };
 ```
 
-Follow the [Hafnium RAM disk](HafniumRamDisk.md) instructions
-to create an initial RAM disk for Hafnium with Linux as the primary VM.
+Follow the [Hafnium RAM disk](HafniumRamDisk.md) instructions to create an
+initial RAM disk for Hafnium with Linux as the primary VM.
 
 The following command line will run Hafnium, with the RAM disk just created,
 which will then boot into the primary Linux VM:
