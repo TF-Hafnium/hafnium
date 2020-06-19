@@ -753,18 +753,15 @@ static struct ffa_value api_waiter_result(struct vm_locked locked_vm,
 }
 
 /**
- * Configures the hypervisor's stage-1 view of the send and receive pages. The
- * stage-1 page tables must be locked so memory cannot be taken by another core
- * which could result in this transaction being unable to roll back in the case
- * of an error.
+ * Configures the hypervisor's stage-1 view of the send and receive pages.
  */
-static bool api_vm_configure_stage1(struct vm_locked vm_locked,
+static bool api_vm_configure_stage1(struct mm_stage1_locked mm_stage1_locked,
+				    struct vm_locked vm_locked,
 				    paddr_t pa_send_begin, paddr_t pa_send_end,
 				    paddr_t pa_recv_begin, paddr_t pa_recv_end,
 				    struct mpool *local_page_pool)
 {
 	bool ret;
-	struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
 
 	/* Map the send page as read-only in the hypervisor address space. */
 	vm_locked.vm->mailbox.send =
@@ -807,83 +804,135 @@ fail:
 	ret = false;
 
 out:
-	mm_unlock_stage1(&mm_stage1_locked);
-
 	return ret;
 }
 
 /**
- * Configures the send and receive pages in the VM stage-2 and hypervisor
- * stage-1 page tables. Locking of the page tables combined with a local memory
- * pool ensures there will always be enough memory to recover from any errors
- * that arise.
+ * Sanity checks and configures the send and receive pages in the VM stage-2
+ * and hypervisor stage-1 page tables.
+ *
+ * Returns:
+ *  - FFA_ERROR FFA_INVALID_PARAMETERS if the given addresses are not properly
+ *    aligned or are the same.
+ *  - FFA_ERROR FFA_NO_MEMORY if the hypervisor was unable to map the buffers
+ *    due to insuffient page table memory.
+ *  - FFA_ERROR FFA_DENIED if the pages are already mapped or are not owned by
+ *    the caller.
+ *  - FFA_SUCCESS on success if no further action is needed.
  */
-static bool api_vm_configure_pages(struct vm_locked vm_locked,
-				   paddr_t pa_send_begin, paddr_t pa_send_end,
-				   uint32_t orig_send_mode,
-				   paddr_t pa_recv_begin, paddr_t pa_recv_end,
-				   uint32_t orig_recv_mode)
+
+struct ffa_value api_vm_configure_pages(
+	struct mm_stage1_locked mm_stage1_locked, struct vm_locked vm_locked,
+	ipaddr_t send, ipaddr_t recv, uint32_t page_count,
+	struct mpool *local_page_pool)
 {
-	bool ret;
-	struct mpool local_page_pool;
+	struct ffa_value ret;
+	paddr_t pa_send_begin;
+	paddr_t pa_send_end;
+	paddr_t pa_recv_begin;
+	paddr_t pa_recv_end;
+	uint32_t orig_send_mode;
+	uint32_t orig_recv_mode;
+
+	/* We only allow these to be setup once. */
+	if (vm_locked.vm->mailbox.send || vm_locked.vm->mailbox.recv) {
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	/* Hafnium only supports a fixed size of RX/TX buffers. */
+	if (page_count != HF_MAILBOX_SIZE / FFA_PAGE_SIZE) {
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/* Fail if addresses are not page-aligned. */
+	if (!is_aligned(ipa_addr(send), PAGE_SIZE) ||
+	    !is_aligned(ipa_addr(recv), PAGE_SIZE)) {
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/* Convert to physical addresses. */
+	pa_send_begin = pa_from_ipa(send);
+	pa_send_end = pa_add(pa_send_begin, HF_MAILBOX_SIZE);
+	pa_recv_begin = pa_from_ipa(recv);
+	pa_recv_end = pa_add(pa_recv_begin, HF_MAILBOX_SIZE);
+
+	/* Fail if the same page is used for the send and receive pages. */
+	if (pa_addr(pa_send_begin) == pa_addr(pa_recv_begin)) {
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
 
 	/*
-	 * Create a local pool so any freed memory can't be used by another
-	 * thread. This is to ensure the original mapping can be restored if any
-	 * stage of the process fails.
+	 * Ensure the pages are valid, owned and exclusive to the VM and that
+	 * the VM has the required access to the memory.
 	 */
-	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
+	if (!mm_vm_get_mode(&vm_locked.vm->ptable, send,
+			    ipa_add(send, PAGE_SIZE), &orig_send_mode) ||
+	    !api_mode_valid_owned_and_exclusive(orig_send_mode) ||
+	    (orig_send_mode & MM_MODE_R) == 0 ||
+	    (orig_send_mode & MM_MODE_W) == 0) {
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	if (!mm_vm_get_mode(&vm_locked.vm->ptable, recv,
+			    ipa_add(recv, PAGE_SIZE), &orig_recv_mode) ||
+	    !api_mode_valid_owned_and_exclusive(orig_recv_mode) ||
+	    (orig_recv_mode & MM_MODE_R) == 0) {
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
 
 	/* Take memory ownership away from the VM and mark as shared. */
 	if (!vm_identity_map(
 		    vm_locked, pa_send_begin, pa_send_end,
 		    MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R | MM_MODE_W,
-		    &local_page_pool, NULL)) {
-		goto fail;
+		    local_page_pool, NULL)) {
+		ret = ffa_error(FFA_NO_MEMORY);
+		goto out;
 	}
 
 	if (!vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
 			     MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R,
-			     &local_page_pool, NULL)) {
+			     local_page_pool, NULL)) {
 		/* TODO: partial defrag of failed range. */
 		/* Recover any memory consumed in failed mapping. */
-		mm_vm_defrag(&vm_locked.vm->ptable, &local_page_pool);
+		mm_vm_defrag(&vm_locked.vm->ptable, local_page_pool);
 		goto fail_undo_send;
 	}
 
-	if (!api_vm_configure_stage1(vm_locked, pa_send_begin, pa_send_end,
-				     pa_recv_begin, pa_recv_end,
-				     &local_page_pool)) {
+	if (!api_vm_configure_stage1(mm_stage1_locked, vm_locked, pa_send_begin,
+				     pa_send_end, pa_recv_begin, pa_recv_end,
+				     local_page_pool)) {
 		goto fail_undo_send_and_recv;
 	}
 
-	ret = true;
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 	goto out;
 
-	/*
-	 * The following mappings will not require more memory than is available
-	 * in the local pool.
-	 */
 fail_undo_send_and_recv:
 	CHECK(vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
-			      orig_recv_mode, &local_page_pool, NULL));
+			      orig_send_mode, local_page_pool, NULL));
 
 fail_undo_send:
 	CHECK(vm_identity_map(vm_locked, pa_send_begin, pa_send_end,
-			      orig_send_mode, &local_page_pool, NULL));
-
-fail:
-	ret = false;
+			      orig_send_mode, local_page_pool, NULL));
+	ret = ffa_error(FFA_NO_MEMORY);
 
 out:
-	mpool_fini(&local_page_pool);
-
 	return ret;
 }
 
 /**
  * Configures the VM to send/receive data through the specified pages. The pages
- * must not be shared.
+ * must not be shared. Locking of the page tables combined with a local memory
+ * pool ensures there will always be enough memory to recover from any errors
+ * that arise. The stage-1 page tables must be locked so memory cannot be taken
+ * by another core which could result in this transaction being unable to roll
+ * back in the case of an error.
  *
  * Returns:
  *  - FFA_ERROR FFA_INVALID_PARAMETERS if the given addresses are not properly
@@ -901,79 +950,24 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 				  struct vcpu **next)
 {
 	struct vm *vm = current->vm;
-	struct vm_locked vm_locked;
-	paddr_t pa_send_begin;
-	paddr_t pa_send_end;
-	paddr_t pa_recv_begin;
-	paddr_t pa_recv_end;
-	uint32_t orig_send_mode;
-	uint32_t orig_recv_mode;
 	struct ffa_value ret;
-
-	/* Hafnium only supports a fixed size of RX/TX buffers. */
-	if (page_count != HF_MAILBOX_SIZE / FFA_PAGE_SIZE) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Fail if addresses are not page-aligned. */
-	if (!is_aligned(ipa_addr(send), PAGE_SIZE) ||
-	    !is_aligned(ipa_addr(recv), PAGE_SIZE)) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Convert to physical addresses. */
-	pa_send_begin = pa_from_ipa(send);
-	pa_send_end = pa_add(pa_send_begin, HF_MAILBOX_SIZE);
-
-	pa_recv_begin = pa_from_ipa(recv);
-	pa_recv_end = pa_add(pa_recv_begin, HF_MAILBOX_SIZE);
-
-	/* Fail if the same page is used for the send and receive pages. */
-	if (pa_addr(pa_send_begin) == pa_addr(pa_recv_begin)) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
+	struct vm_locked vm_locked;
+	struct mm_stage1_locked mm_stage1_locked;
+	struct mpool local_page_pool;
 
 	/*
-	 * The hypervisor's memory map must be locked for the duration of this
-	 * operation to ensure there will be sufficient memory to recover from
-	 * any failures.
-	 *
-	 * TODO: the scope can be reduced but will require restructuring to
-	 *       keep a single unlock point.
+	 * Create a local pool so any freed memory can't be used by another
+	 * thread. This is to ensure the original mapping can be restored if any
+	 * stage of the process fails.
 	 */
+	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
+
 	vm_locked = vm_lock(vm);
+	mm_stage1_locked = mm_lock_stage1();
 
-	/* We only allow these to be setup once. */
-	if (vm->mailbox.send || vm->mailbox.recv) {
-		ret = ffa_error(FFA_DENIED);
-		goto exit;
-	}
-
-	/*
-	 * Ensure the pages are valid, owned and exclusive to the VM and that
-	 * the VM has the required access to the memory.
-	 */
-	if (!mm_vm_get_mode(&vm->ptable, send, ipa_add(send, PAGE_SIZE),
-			    &orig_send_mode) ||
-	    !api_mode_valid_owned_and_exclusive(orig_send_mode) ||
-	    (orig_send_mode & MM_MODE_R) == 0 ||
-	    (orig_send_mode & MM_MODE_W) == 0) {
-		ret = ffa_error(FFA_DENIED);
-		goto exit;
-	}
-
-	if (!mm_vm_get_mode(&vm->ptable, recv, ipa_add(recv, PAGE_SIZE),
-			    &orig_recv_mode) ||
-	    !api_mode_valid_owned_and_exclusive(orig_recv_mode) ||
-	    (orig_recv_mode & MM_MODE_R) == 0) {
-		ret = ffa_error(FFA_DENIED);
-		goto exit;
-	}
-
-	if (!api_vm_configure_pages(vm_locked, pa_send_begin, pa_send_end,
-				    orig_send_mode, pa_recv_begin, pa_recv_end,
-				    orig_recv_mode)) {
-		ret = ffa_error(FFA_NO_MEMORY);
+	ret = api_vm_configure_pages(mm_stage1_locked, vm_locked, send, recv,
+				     page_count, &local_page_pool);
+	if (ret.func != FFA_SUCCESS_32) {
 		goto exit;
 	}
 
@@ -981,6 +975,9 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	ret = api_waiter_result(vm_locked, current, next);
 
 exit:
+	mpool_fini(&local_page_pool);
+
+	mm_unlock_stage1(&mm_stage1_locked);
 	vm_unlock(&vm_locked);
 
 	return ret;

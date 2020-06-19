@@ -27,6 +27,7 @@
 #include "hf/vm.h"
 
 #include "vmapi/hf/call.h"
+#include "vmapi/hf/ffa.h"
 
 alignas(PAGE_SIZE) static uint8_t tee_send_buffer[HF_MAILBOX_SIZE];
 alignas(PAGE_SIZE) static uint8_t tee_recv_buffer[HF_MAILBOX_SIZE];
@@ -97,17 +98,61 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 	return true;
 }
 
+/*
+ * Link RX/TX buffers provided in partition manifest to mailbox
+ */
+static bool link_rxtx_to_mailbox(struct mm_stage1_locked stage1_locked,
+				 struct vm_locked vm_locked, struct rx_tx rxtx,
+				 struct mpool *ppool)
+{
+	struct ffa_value ret;
+	ipaddr_t send;
+	ipaddr_t recv;
+	uint32_t page_count;
+
+	send = ipa_init(rxtx.tx_buffer->base_address);
+	recv = ipa_init(rxtx.rx_buffer->base_address);
+	page_count = rxtx.tx_buffer->page_count;
+
+	ret = api_vm_configure_pages(stage1_locked, vm_locked, send, recv,
+				     page_count, ppool);
+	if (ret.func != FFA_SUCCESS_32) {
+		return false;
+	}
+
+	dlog_verbose("  mailbox: send = %#x, recv = %#x\n",
+		     vm_locked.vm->mailbox.send, vm_locked.vm->mailbox.recv);
+
+	return true;
+}
+
 /**
  * Performs VM loading activities that are common between the primary and
  * secondaries.
  */
-static bool load_common(const struct manifest_vm *manifest_vm, struct vm *vm)
+static bool load_common(struct mm_stage1_locked stage1_locked,
+			struct vm_locked vm_locked,
+			const struct manifest_vm *manifest_vm,
+			struct mpool *ppool)
 {
-	vm->smc_whitelist = manifest_vm->smc_whitelist;
-	vm->uuid = manifest_vm->sp.uuid;
+	vm_locked.vm->smc_whitelist = manifest_vm->smc_whitelist;
+	vm_locked.vm->uuid = manifest_vm->sp.uuid;
 
+	if (manifest_vm->is_ffa_partition) {
+		/* Link rxtx buffers to mailbox */
+		if (manifest_vm->sp.rxtx.available) {
+			if (!link_rxtx_to_mailbox(stage1_locked, vm_locked,
+						  manifest_vm->sp.rxtx,
+						  ppool)) {
+				dlog_error(
+					"Unable to Link RX/TX buffer with "
+					"mailbox.\n");
+				return false;
+			}
+		}
+	}
 	/* Initialize architecture-specific features. */
-	arch_vm_features_set(vm);
+	arch_vm_features_set(vm_locked.vm);
 
 	return true;
 }
@@ -169,11 +214,6 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 
 	vm_locked = vm_lock(vm);
 
-	if (!load_common(manifest_vm, vm)) {
-		ret = false;
-		goto out;
-	}
-
 	if (params->device_mem_ranges_count == 0) {
 		/*
 		 * Map 1TB of address space as device memory to, most likely,
@@ -221,6 +261,11 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 			ret = false;
 			goto out;
 		}
+	}
+
+	if (!load_common(stage1_locked, vm_locked, manifest_vm, ppool)) {
+		ret = false;
+		goto out;
 	}
 
 	if (!vm_unmap_hypervisor(vm_locked, ppool)) {
@@ -366,10 +411,6 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
-	if (!load_common(manifest_vm, vm)) {
-		return false;
-	}
-
 	vm_locked = vm_lock(vm);
 
 	/* Grant the VM access to the memory. */
@@ -502,6 +543,11 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 		secondary_entry =
 			ipa_add(secondary_entry, manifest_vm->sp.ep_offset);
+	}
+
+	if (!load_common(stage1_locked, vm_locked, manifest_vm, ppool)) {
+		ret = false;
+		goto out;
 	}
 
 	dlog_info("Loaded with %u vCPUs, entry at %#x.\n",
