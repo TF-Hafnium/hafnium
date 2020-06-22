@@ -1416,9 +1416,9 @@ static struct ffa_value ffa_memory_send_validate(
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 		/*
-		 * According to section 6.11.3 of the FF-A spec NX is required
-		 * for share operations (but must not be specified by the
-		 * sender) so set it in the copy that we store, ready to be
+		 * According to section 5.11.3 of the FF-A 1.0 spec NX is
+		 * required for share operations (but must not be specified by
+		 * the sender) so set it in the copy that we store, ready to be
 		 * returned to the retriever.
 		 */
 		ffa_set_instruction_access_attr(permissions,
