@@ -34,7 +34,13 @@ vm_kernel("gicv3_test_vm") {
 
 manifest("gicv3_test_manifest") {
   source = "manifest.dts"
+  output = "manifest.dtb"
   overlay = hftest_manifest_overlay
+}
+
+device_tree("secondary_dtb") {
+  source = "secondary.dts"
+  output = "$target_out_dir/secondary.dtb"
 }
 
 initrd("gicv3_test") {
@@ -55,6 +61,11 @@ initrd("gicv3_test") {
       "services1",
       "services:gicv3_service_vm1",
       "gicv3_service_vm1.bin",
+    ],
+    [
+      "secondary.dtb",
+      ":secondary_dtb",
+      "secondary.dtb",
     ],
   ]
 }

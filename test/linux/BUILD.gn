@@ -52,6 +52,7 @@ linux_initrd("linux_test_initrd") {
 
 manifest("linux_test_manifest") {
   source = "manifest.dts"
+  output = "manifest.dtb"
   overlay = hftest_manifest_overlay
 }
 

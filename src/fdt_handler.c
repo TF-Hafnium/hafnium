@@ -16,6 +16,22 @@
 #include "hf/std.h"
 
 /**
+ * Initializes the FDT struct with the pointer to the FDT data (header) in
+ * fdt_ptr.
+ */
+bool fdt_struct_from_ptr(const void *fdt_ptr, struct fdt *fdt)
+{
+	size_t fdt_size;
+
+	if (!fdt_ptr || !fdt) {
+		return false;
+	}
+
+	return fdt_size_from_header(fdt_ptr, &fdt_size) &&
+	       fdt_init_from_ptr(fdt, fdt_ptr, fdt_size);
+}
+
+/**
  * Finds the memory region where initrd is stored.
  */
 bool fdt_find_initrd(const struct fdt *fdt, paddr_t *begin, paddr_t *end)
@@ -96,7 +112,8 @@ bool fdt_find_cpus(const struct fdt *fdt, cpu_id_t *cpu_ids, size_t *cpu_count)
 	return true;
 }
 
-bool fdt_find_memory_ranges(const struct fdt *fdt, struct string *device_type,
+bool fdt_find_memory_ranges(const struct fdt *fdt,
+			    const struct string *device_type,
 			    struct mem_range *mem_ranges,
 			    size_t *mem_ranges_count, size_t mem_range_limit)
 {
@@ -210,5 +227,32 @@ bool fdt_unmap(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
 
 	/* Invalidate pointer to the buffer. */
 	fdt_fini(fdt);
+	return true;
+}
+
+/**
+ * Gets the size of the first memory range from the FDT into size.
+ *
+ * The test framework expects the address space to be contiguous, therefore
+ * gets the size of the first memory range, if there is more than one range.
+ */
+bool fdt_get_memory_size(const struct fdt *fdt, size_t *size)
+{
+	const struct string memory_device_type = STRING_INIT("memory");
+	struct mem_range mem_range;
+	size_t mem_ranges_count;
+
+	if (!fdt || !size ||
+	    !fdt_find_memory_ranges(fdt, &memory_device_type, &mem_range,
+				    &mem_ranges_count, 1)) {
+		return false;
+	}
+
+	if (mem_ranges_count < 1) {
+		return false;
+	}
+
+	*size = pa_difference(mem_range.begin, mem_range.end);
+
 	return true;
 }

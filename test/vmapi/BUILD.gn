@@ -14,6 +14,7 @@ group("vmapi") {
     "arch/${plat_arch}:arch",
     "common:common",
     "primary_only:primary_only_test",
+    "primary_with_secondaries:primary_with_secondaries_no_fdt",
     "primary_with_secondaries:primary_with_secondaries_test",
   ]
 }

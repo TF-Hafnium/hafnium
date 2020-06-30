@@ -134,6 +134,7 @@ struct manifest_vm {
 		struct {
 			uint64_t mem_size;
 			ffa_vcpu_count_t vcpu_count;
+			struct string fdt_filename;
 		} secondary;
 	};
 };

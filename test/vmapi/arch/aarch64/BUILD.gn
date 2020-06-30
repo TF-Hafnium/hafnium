@@ -34,6 +34,7 @@ vm_kernel("aarch64_test_vm") {
 
 manifest("aarch64_test_manifest") {
   source = "manifest.dts"
+  output = "manifest.dtb"
   overlay = hftest_manifest_overlay
 }
 

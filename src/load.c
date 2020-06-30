@@ -16,6 +16,7 @@
 #include "hf/boot_params.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/fdt_patch.h"
 #include "hf/layout.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
@@ -59,11 +60,18 @@ static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
 	return true;
 }
 
+/**
+ * Loads the secondary VM's kernel.
+ * Stores the kernel size in kernel_size (if kernel_size is not NULL).
+ * Returns false if it cannot load the kernel.
+ */
 static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 			paddr_t end, const struct manifest_vm *manifest_vm,
-			const struct memiter *cpio, struct mpool *ppool)
+			const struct memiter *cpio, struct mpool *ppool,
+			size_t *kernel_size)
 {
 	struct memiter kernel;
+	size_t size;
 
 	if (!cpio_get_file(cpio, &manifest_vm->kernel_filename, &kernel)) {
 		dlog_error("Could not find kernel file \"%s\".\n",
@@ -71,7 +79,8 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 		return false;
 	}
 
-	if (pa_difference(begin, end) < memiter_size(&kernel)) {
+	size = memiter_size(&kernel);
+	if (pa_difference(begin, end) < size) {
 		dlog_error("Kernel is larger than available memory.\n");
 		return false;
 	}
@@ -79,6 +88,10 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 	if (!copy_to_unmapped(stage1_locked, begin, &kernel, ppool)) {
 		dlog_error("Unable to copy kernel.\n");
 		return false;
+	}
+
+	if (kernel_size) {
+		*kernel_size = size;
 	}
 
 	return true;
@@ -137,7 +150,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	 */
 	if (!string_is_empty(&manifest_vm->kernel_filename)) {
 		if (!load_kernel(stage1_locked, primary_begin, primary_end,
-				 manifest_vm, cpio, ppool)) {
+				 manifest_vm, cpio, ppool, NULL)) {
 			dlog_error("Unable to load primary kernel.\n");
 			return false;
 		}
@@ -235,6 +248,60 @@ out:
 	return ret;
 }
 
+/**
+ * Loads the secondary VM's FDT.
+ * Stores the total allocated size for the FDT in fdt_allocated_size (if
+ * fdt_allocated_size is not NULL). The allocated size includes additional space
+ * for potential patching.
+ */
+static bool load_secondary_fdt(struct mm_stage1_locked stage1_locked,
+			       paddr_t end, size_t fdt_max_size,
+			       const struct manifest_vm *manifest_vm,
+			       const struct memiter *cpio, struct mpool *ppool,
+			       paddr_t *fdt_addr, size_t *fdt_allocated_size)
+{
+	struct memiter fdt;
+	size_t allocated_size;
+
+	CHECK(!string_is_empty(&manifest_vm->secondary.fdt_filename));
+
+	if (!cpio_get_file(cpio, &manifest_vm->secondary.fdt_filename, &fdt)) {
+		dlog_error("Cannot open the secondary VM's FDT.\n");
+		return false;
+	}
+
+	/*
+	 * Ensure the FDT has one additional page at the end for patching, and
+	 * and align it to the page boundary.
+	 */
+	allocated_size = align_up(memiter_size(&fdt), PAGE_SIZE) + PAGE_SIZE;
+
+	if (allocated_size > fdt_max_size) {
+		dlog_error(
+			"FDT allocated space (%u) is more than the specified "
+			"maximum to use (%u).\n",
+			allocated_size, fdt_max_size);
+		return false;
+	}
+
+	/* Load the FDT to the end of the VM's allocated memory space. */
+	*fdt_addr = pa_init(pa_addr(pa_sub(end, allocated_size)));
+
+	dlog_info("Loading secondary FDT of allocated size %u at 0x%x.\n",
+		  allocated_size, pa_addr(*fdt_addr));
+
+	if (!copy_to_unmapped(stage1_locked, *fdt_addr, &fdt, ppool)) {
+		dlog_error("Unable to copy FDT.\n");
+		return false;
+	}
+
+	if (fdt_allocated_size) {
+		*fdt_allocated_size = allocated_size;
+	}
+
+	return true;
+}
+
 /*
  * Loads a secondary VM.
  */
@@ -248,6 +315,10 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	struct vcpu *vcpu;
 	ipaddr_t secondary_entry;
 	bool ret;
+	paddr_t fdt_addr;
+	bool has_fdt;
+	size_t kernel_size = 0;
+	const size_t mem_size = pa_difference(mem_begin, mem_end);
 
 	/*
 	 * Load the kernel if a filename is specified in the VM manifest.
@@ -257,8 +328,33 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	 */
 	if (!string_is_empty(&manifest_vm->kernel_filename)) {
 		if (!load_kernel(stage1_locked, mem_begin, mem_end, manifest_vm,
-				 cpio, ppool)) {
+				 cpio, ppool, &kernel_size)) {
 			dlog_error("Unable to load kernel.\n");
+			return false;
+		}
+	}
+
+	has_fdt = !string_is_empty(&manifest_vm->secondary.fdt_filename);
+	if (has_fdt) {
+		/*
+		 * Ensure that the FDT does not overwrite the kernel or overlap
+		 * its page, for the FDT to start at a page boundary.
+		 */
+		const size_t fdt_max_size =
+			mem_size - align_up(kernel_size, PAGE_SIZE);
+
+		size_t fdt_allocated_size;
+
+		if (!load_secondary_fdt(stage1_locked, mem_end, fdt_max_size,
+					manifest_vm, cpio, ppool, &fdt_addr,
+					&fdt_allocated_size)) {
+			dlog_error("Unable to load FDT.\n");
+			return false;
+		}
+
+		if (!fdt_patch_mem(stage1_locked, fdt_addr, fdt_allocated_size,
+				   mem_begin, mem_end, ppool)) {
+			dlog_error("Unable to patch FDT.\n");
 			return false;
 		}
 	}
@@ -292,8 +388,19 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	}
 
 	vcpu = vm_get_vcpu(vm, 0);
-	vcpu_secondary_reset_and_start(vcpu, secondary_entry,
-				       pa_difference(mem_begin, mem_end));
+
+	if (has_fdt) {
+		vcpu_secondary_reset_and_start(vcpu, secondary_entry,
+					       pa_addr(fdt_addr));
+	} else {
+		/*
+		 * Without an FDT, secondary VMs expect the memory size to be
+		 * passed in register x0, which is what
+		 * vcpu_secondary_reset_and_start does in this case.
+		 */
+		vcpu_secondary_reset_and_start(vcpu, secondary_entry, mem_size);
+	}
+
 	ret = true;
 
 out:

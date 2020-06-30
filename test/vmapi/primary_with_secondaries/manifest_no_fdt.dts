@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2020 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -12,16 +12,15 @@
 	hypervisor {
 		compatible = "hafnium,hafnium";
 		vm1 {
-			debug_name = "gicv3_test";
-			kernel_filename = "gicv3_test";
+			debug_name = "primary_with_secondaries_no_fdt";
+			kernel_filename = "primary_with_secondaries_no_fdt";
 		};
 
 		vm2 {
-			debug_name = "services1";
+			debug_name = "secondary_vm_no_fdt";
 			vcpu_count = <1>;
 			mem_size = <0x100000>;
-			kernel_filename = "services1";
-			fdt_filename = "secondary.dtb";
+			kernel_filename = "secondary_vm_no_fdt";
 		};
 	};
 };

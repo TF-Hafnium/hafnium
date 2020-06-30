@@ -303,7 +303,7 @@ template("manifest") {
     fdt_overlay(target_name) {
       base = base_file
       overlay = overlay_file
-      output = "${target_out_dir}/manifest.dtb"
+      output = "${target_out_dir}" + "/" + invoker.output
       deps = [
         ":$base_target",
         ":$overlay_target",
@@ -313,7 +313,7 @@ template("manifest") {
     # No overlay specified. Compile the manifest to DTB.
     device_tree(target_name) {
       source = invoker.source
-      output = "${target_out_dir}/manifest.dtb"
+      output = "${target_out_dir}" + "/" + invoker.output
     }
   }
 }

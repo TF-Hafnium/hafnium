@@ -156,3 +156,89 @@ err_unmap_fdt_header:
 		 ppool);
 	return false;
 }
+
+bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
+		   size_t fdt_max_size, paddr_t mem_begin, paddr_t mem_end,
+		   struct mpool *ppool)
+{
+	int ret = 0;
+	uint64_t mem_start_addr = pa_addr(mem_begin);
+	size_t mem_size = pa_difference(mem_begin, mem_end);
+	struct fdt_header *fdt;
+	int fdt_memory_node;
+	int root_offset;
+
+	/* Map the fdt in r/w mode in preparation for updating it. */
+	fdt = mm_identity_map(stage1_locked, fdt_addr,
+			      pa_add(fdt_addr, fdt_max_size),
+			      MM_MODE_R | MM_MODE_W, ppool);
+
+	if (!fdt) {
+		dlog_error("Unable to map FDT in r/w mode.\n");
+		return false;
+	}
+
+	ret = fdt_check_full(fdt, fdt_max_size);
+	if (ret != 0) {
+		dlog_error("FDT failed validation. Error: %d\n", ret);
+		goto out_unmap_fdt;
+	}
+
+	/* Allow some extra room for patches to the FDT. */
+	ret = fdt_open_into(fdt, fdt, fdt_max_size);
+	if (ret != 0) {
+		dlog_error("FDT failed to open_into. Error: %d\n", ret);
+		goto out_unmap_fdt;
+	}
+
+	root_offset = fdt_path_offset(fdt, "/");
+	if (ret < 0) {
+		dlog_error("FDT cannot find root offset. Error: %d\n", ret);
+		goto out_unmap_fdt;
+	}
+
+	/* Add a node to hold the memory information. */
+	fdt_memory_node = fdt_add_subnode(fdt, root_offset, "memory");
+	if (fdt_memory_node < 0) {
+		ret = fdt_memory_node;
+		dlog_error("FDT cannot add memory node. Error: %d\n", ret);
+		goto out_unmap_fdt;
+	}
+
+	/* Set the values for the VM's memory in the FDT. */
+	ret = fdt_appendprop_addrrange(fdt, root_offset, fdt_memory_node, "reg",
+				       mem_start_addr, mem_size);
+	if (ret != 0) {
+		dlog_error(
+			"FDT failed to append address range property for "
+			"memory. Error: %d\n",
+			ret);
+		goto out_unmap_fdt;
+	}
+
+	ret = fdt_appendprop_string(fdt, fdt_memory_node, "device_type",
+				    "memory");
+	if (ret != 0) {
+		dlog_error(
+			"FDT failed to append device_type property for memory. "
+			"Error: %d\n",
+			ret);
+		goto out_unmap_fdt;
+	}
+
+	ret = fdt_pack(fdt);
+	if (ret != 0) {
+		dlog_error("Failed to pack FDT. Error: %d\n", ret);
+		goto out_unmap_fdt;
+	}
+
+out_unmap_fdt:
+	/* Unmap FDT. */
+	if (!mm_unmap(stage1_locked, fdt_addr, pa_add(fdt_addr, fdt_max_size),
+		      ppool)) {
+		dlog_error("Unable to unmap writable FDT.\n");
+		return false;
+	}
+
+	return ret == 0;
+}

@@ -15,3 +15,8 @@
 /** Apply an update to the FDT. */
 bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	       struct boot_params_update *p, struct mpool *ppool);
+
+/** Patches a secondary VM's FDT with the location of its memory range. */
+bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
+		   size_t fdt_max_size, paddr_t mem_begin, paddr_t mem_end,
+		   struct mpool *ppool);

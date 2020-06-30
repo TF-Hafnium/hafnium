@@ -23,6 +23,7 @@ vm_kernel("primary_only_test_vm") {
 
 manifest("primary_only_test_manifest") {
   source = "manifest.dts"
+  output = "manifest.dtb"
   overlay = hftest_manifest_overlay
 }
 

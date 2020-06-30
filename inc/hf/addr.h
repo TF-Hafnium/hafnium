@@ -13,6 +13,8 @@
 
 #include "hf/arch/types.h"
 
+#include "hf/check.h"
+
 /** An opaque type for a physical address. */
 typedef struct {
 	uintpaddr_t pa;
@@ -66,6 +68,15 @@ static inline size_t pa_difference(paddr_t start, paddr_t end)
 static inline ipaddr_t ipa_init(uintpaddr_t ipa)
 {
 	return (ipaddr_t){.ipa = ipa};
+}
+
+/**
+ * Subtract from a physical address.
+ */
+static inline paddr_t pa_sub(paddr_t pa, size_t n)
+{
+	CHECK((uintptr_t)pa_addr(pa) >= n);
+	return pa_init(pa_addr(pa) - n);
 }
 
 /**

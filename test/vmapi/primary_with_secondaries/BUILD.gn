@@ -12,6 +12,65 @@ config("config") {
 }
 
 # Tests with secondary VMs.
+vm_kernel("primary_with_secondaries_no_fdt_vm") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:config",
+  ]
+
+  sources = [
+    "no_fdt.c",
+  ]
+
+  deps = [
+    "//src/arch/aarch64/hftest:registers",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/common",
+    "//vmlib",
+  ]
+}
+
+vm_kernel("secondary_vm_no_fdt") {
+  testonly = true
+
+  sources = [
+    "no_fdt_secondary.c",
+  ]
+
+  deps = [
+    "//test/hftest:hftest_secondary_vm_no_fdt",
+  ]
+}
+
+manifest("primary_with_secondaries_no_fdt_manifest") {
+  source = "manifest_no_fdt.dts"
+  output = "manifest_no_fdt.dtb"
+  overlay = hftest_manifest_overlay
+}
+
+initrd("primary_with_secondaries_no_fdt") {
+  testonly = true
+
+  files = [
+    [
+      "manifest.dtb",
+      ":primary_with_secondaries_no_fdt_manifest",
+      "manifest_no_fdt.dtb",
+    ],
+    [
+      "primary_with_secondaries_no_fdt",
+      ":primary_with_secondaries_no_fdt_vm",
+      "primary_with_secondaries_no_fdt_vm.bin",
+    ],
+    [
+      "secondary_vm_no_fdt",
+      ":secondary_vm_no_fdt",
+      "secondary_vm_no_fdt.bin",
+    ],
+  ]
+}
+
 vm_kernel("primary_with_secondaries_test_vm") {
   testonly = true
   public_configs = [
@@ -45,7 +104,13 @@ vm_kernel("primary_with_secondaries_test_vm") {
 
 manifest("primary_with_secondaries_test_manifest") {
   source = "manifest.dts"
+  output = "manifest.dtb"
   overlay = hftest_manifest_overlay
+}
+
+device_tree("secondary_dtb") {
+  source = "secondary.dts"
+  output = "$target_out_dir/secondary.dtb"
 }
 
 initrd("primary_with_secondaries_test") {
@@ -76,6 +141,11 @@ initrd("primary_with_secondaries_test") {
       "services3",
       "services:service_vm3",
       "service_vm3.bin",
+    ],
+    [
+      "secondary.dtb",
+      ":secondary_dtb",
+      "secondary.dtb",
     ],
   ]
 }

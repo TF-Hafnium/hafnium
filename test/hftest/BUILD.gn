@@ -42,7 +42,32 @@ source_set("hftest_secondary_vm") {
     ":mm",
     ":power_mgmt",
     "//src:dlog",
+    "//src:fdt_handler",
     "//src:memiter",
+    "//src:panic",
+    "//src:std",
+    "//src/arch/${plat_arch}:entry",
+    "//src/arch/${plat_arch}/hftest:entry",
+    "//src/arch/${plat_arch}/hftest:power_mgmt",
+    "//vmlib/${plat_arch}:call",
+  ]
+}
+
+# Testing framework for a secondary VM. This framework doesn't provide services
+# and expects that secondary VMs will be passed the memory size in register x0
+# instead of a pointer to the FDT.
+source_set("hftest_secondary_vm_no_fdt") {
+  testonly = true
+
+  public_configs = [ ":hftest_config" ]
+
+  sources = [
+    "secondary_no_fdt.c",
+  ]
+
+  deps = [
+    ":mm",
+    "//src:dlog",
     "//src:panic",
     "//src:std",
     "//src/arch/${plat_arch}:entry",

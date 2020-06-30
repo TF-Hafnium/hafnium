@@ -9,6 +9,7 @@
 #include <stdalign.h>
 #include <stdint.h>
 
+#include "hf/fdt_handler.h"
 #include "hf/ffa.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
@@ -69,12 +70,13 @@ noreturn void abort(void)
 	}
 }
 
-noreturn void kmain(size_t memory_size)
+noreturn void kmain(const void *fdt_ptr)
 {
 	struct memiter args;
 	hftest_test_fn service;
 	struct hftest_context *ctx;
 	struct ffa_value ret;
+	struct fdt fdt;
 
 	/*
 	 * Initialize the stage-1 MMU and identity-map the entire address space.
@@ -82,9 +84,7 @@ noreturn void kmain(size_t memory_size)
 	if (!hftest_mm_init()) {
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT "Memory initialization failed");
-		for (;;) {
-			/* Hang if memory init failed. */
-		}
+		abort();
 	}
 
 	/* Prepare the context. */
@@ -104,9 +104,12 @@ noreturn void kmain(size_t memory_size)
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
 			   "Unable to find requested service");
-		for (;;) {
-			/* Hang if the service was unknown. */
-		}
+		abort();
+	}
+
+	if (!fdt_struct_from_ptr(fdt_ptr, &fdt)) {
+		HFTEST_LOG(HFTEST_LOG_INDENT "Unable to access the FDT");
+		abort();
 	}
 
 	/* Clean the context. */
@@ -115,7 +118,12 @@ noreturn void kmain(size_t memory_size)
 	ctx->abort = abort;
 	ctx->send = send;
 	ctx->recv = recv;
-	ctx->memory_size = memory_size;
+	if (!fdt_get_memory_size(&fdt, &ctx->memory_size)) {
+		HFTEST_LOG_FAILURE();
+		HFTEST_LOG(HFTEST_LOG_INDENT
+			   "No entry in the FDT on memory size details");
+		abort();
+	}
 
 	/* Pause so the next time cycles are given the service will be run. */
 	ffa_yield();
