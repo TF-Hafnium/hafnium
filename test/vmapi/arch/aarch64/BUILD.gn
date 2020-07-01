@@ -32,11 +32,24 @@ vm_kernel("aarch64_test_vm") {
   ]
 }
 
+manifest("aarch64_test_manifest") {
+  source = "manifest.dts"
+  overlay = hftest_manifest_overlay
+}
+
 initrd("aarch64_test") {
   testonly = true
 
-  manifest = "manifest.dts"
-  manifest_overlay = hftest_manifest_overlay
-  primary_name = "aarch64_test"
-  primary_vm = ":aarch64_test_vm"
+  files = [
+    [
+      "manifest.dtb",
+      ":aarch64_test_manifest",
+      "manifest.dtb",
+    ],
+    [
+      "aarch64_test",
+      ":aarch64_test_vm",
+      "aarch64_test_vm.bin",
+    ],
+  ]
 }

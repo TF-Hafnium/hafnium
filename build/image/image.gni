@@ -148,13 +148,23 @@ template("linux_initrd") {
   initrd_file = "${initrd_base}.img"
   initrd_staging = "${initrd_base}"
 
+  copy_sources = []
+  copy_deps = []
+
+  # Add the files that need to be packaged into the RAM disk. The information
+  # about these files is encoded in lists with the following elements:
+  #
+  # - Source file: the target will have the same name as the source file.
+  # - Build target for the file (dependency)
+  foreach(file, invoker.files) {
+    copy_sources += [ file[0] ]
+    copy_deps += [ file[1] ]
+  }
+
   copy("${target_name}__staging") {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "sources",
-                             "deps",
-                           ])
+    forward_variables_from(invoker, [ "testonly" ])
+    sources = copy_sources
+    deps = copy_deps
     outputs = [
       "${initrd_staging}/{{source_file_part}}",
     ]
@@ -266,48 +276,51 @@ template("incbin_target") {
   }
 }
 
-# Build the initial RAM disk for the hypervisor.
-template("initrd") {
-  base_out_dir = "${target_out_dir}/${target_name}"
-  manifest_target = "${target_name}__manifest"
-  manifest_file = "${base_out_dir}/manifest.dtb"
-
+# Generate the manifest for the hypervisor and apply overlay if specified.
+template("manifest") {
   # Check if the invoker specified an overlay for the manifest.
-  if (defined(invoker.manifest_overlay) && invoker.manifest_overlay != "") {
-    manifest_base_target = "${target_name}__manifest_base"
-    manifest_base_file = "${base_out_dir}/manifest_base.dtb"
-    manifest_overlay_target = "${target_name}__manifest_overlay"
-    manifest_overlay_file = "${base_out_dir}/manifest_overlay.dtbo"
+  if (defined(invoker.overlay) && invoker.overlay != "") {
+    base_out_dir = invoker.base_out_dir
+
+    base_target = "${target_name}__manifest_base"
+    base_file = "${base_out_dir}/manifest_base.dtb"
+    overlay_target = "${target_name}__manifest_overlay"
+    overlay_file = "${base_out_dir}/manifest_overlay.dtbo"
 
     # Compile the base manifest.
-    device_tree(manifest_base_target) {
-      source = invoker.manifest
-      output = manifest_base_file
+    device_tree(base_target) {
+      source = invoker.source
+      output = base_file
     }
 
     # Compile the manifest overlay.
-    device_tree(manifest_overlay_target) {
-      source = invoker.manifest_overlay
-      output = manifest_overlay_file
+    device_tree(overlay_target) {
+      source = invoker.overlay
+      output = overlay_file
     }
 
     # Merge the base manifest and the overlay, producing the final manifest.
-    fdt_overlay(manifest_target) {
-      base = manifest_base_file
-      overlay = manifest_overlay_file
-      output = manifest_file
+    fdt_overlay(target_name) {
+      base = base_file
+      overlay = overlay_file
+      output = "${target_out_dir}/manifest.dtb"
       deps = [
-        ":$manifest_base_target",
-        ":$manifest_overlay_target",
+        ":$base_target",
+        ":$overlay_target",
       ]
     }
   } else {
     # No overlay specified. Compile the manifest to DTB.
-    device_tree(manifest_target) {
-      source = invoker.manifest
-      output = manifest_file
+    device_tree(target_name) {
+      source = invoker.source
+      output = "${target_out_dir}/manifest.dtb"
     }
   }
+}
+
+# Build the initial RAM disk for the hypervisor.
+template("initrd") {
+  base_out_dir = "${target_out_dir}/${target_name}"
 
   action(target_name) {
     forward_variables_from(invoker, [ "testonly" ])
@@ -316,58 +329,27 @@ template("initrd") {
     initrd_file = "${base_out_dir}/initrd.img"
     initrd_staging = "${base_out_dir}/initrd"
 
-    deps = [
-      ":${manifest_target}",
-    ]
+    deps = []
     args = [
       "--staging",
       rebase_path(initrd_staging),
       "--output",
       rebase_path(initrd_file),
-      "--file",
-      "manifest.dtb",
-      rebase_path(manifest_file),
     ]
 
-    if (defined(invoker.primary_vm)) {
-      # Cannot get target outputs here as they are defined in a different file.
-      primary_vm_image =
-          get_label_info(invoker.primary_vm, "target_out_dir") + "/" +
-          get_label_info(invoker.primary_vm, "name") + ".bin"
-
-      deps += [ invoker.primary_vm ]
+    # Add the files that need to be packaged into the RAM disk. The information
+    # about these files is encoded in lists with the following elements:
+    #
+    # - Target file name in the RAM disk
+    # - Build target for the file
+    # - File name to use as source (generated as output of the build)
+    foreach(file, invoker.files) {
+      deps += [ file[1] ]
       args += [
         "--file",
-        invoker.primary_name,
-        rebase_path(primary_vm_image),
+        file[0],
+        rebase_path(get_label_info(file[1], "target_out_dir") + "/" + file[2]),
       ]
-
-      if (defined(invoker.primary_initrd)) {
-        deps += [ invoker.primary_initrd ]
-        primary_initrd_outputs = get_target_outputs(invoker.primary_initrd)
-        args += [
-          "--file",
-          "initrd.img",
-          rebase_path(primary_initrd_outputs[0]),
-        ]
-      }
-    }
-
-    # Add the info about the secondary VMs. The information about the VMs is
-    # encoded in lists with the following elements:
-    #
-    #    1. File name for the VM image.
-    #    2. Build target for the VM.
-    if (defined(invoker.secondary_vms)) {
-      foreach(vm, invoker.secondary_vms) {
-        deps += [ vm[1] ]
-        args += [
-          "--file",
-          vm[0],
-          rebase_path(get_label_info(vm[1], "target_out_dir") + "/" +
-                      get_label_info(vm[1], "name") + ".bin"),
-        ]
-      }
     }
 
     outputs = [

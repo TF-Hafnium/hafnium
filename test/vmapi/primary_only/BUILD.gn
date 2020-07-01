@@ -21,10 +21,23 @@ vm_kernel("primary_only_test_vm") {
   ]
 }
 
+manifest("primary_only_test_manifest") {
+  source = "manifest.dts"
+  overlay = hftest_manifest_overlay
+}
+
 initrd("primary_only_test") {
   testonly = true
-  manifest = "manifest.dts"
-  manifest_overlay = hftest_manifest_overlay
-  primary_name = "primary_only_test"
-  primary_vm = ":primary_only_test_vm"
+  files = [
+    [
+      "manifest.dtb",
+      ":primary_only_test_manifest",
+      "manifest.dtb",
+    ],
+    [
+      "primary_only_test",
+      ":primary_only_test_vm",
+      "primary_only_test_vm.bin",
+    ],
+  ]
 }

@@ -37,28 +37,49 @@ linux_initrd("linux_test_initrd") {
 
   # Always use the aarch64_linux_clang toolchain to build test_binary
   test_binary_target = ":test_binary(//build/toolchain:aarch64_linux_clang)"
-  sources = [
-    get_label_info(test_binary_target, "root_out_dir") + "/test_binary",
-    get_label_info("//driver/linux", "target_out_dir") + "/hafnium.ko",
+
+  files = [
+    [
+      get_label_info(test_binary_target, "root_out_dir") + "/test_binary",
+      test_binary_target,
+    ],
+    [
+      get_label_info("//driver/linux", "target_out_dir") + "/hafnium.ko",
+      "//driver/linux",
+    ],
   ]
-  deps = [
-    "//driver/linux",
-    test_binary_target,
-  ]
+}
+
+manifest("linux_test_manifest") {
+  source = "manifest.dts"
+  overlay = hftest_manifest_overlay
 }
 
 initrd("linux_test") {
   testonly = true
 
-  manifest = "manifest.dts"
-  manifest_overlay = hftest_manifest_overlay
-  primary_name = "vmlinuz"
-  primary_vm = "//third_party/linux:linux__prebuilt"
-  primary_initrd = ":linux_test_initrd"
-  secondary_vms = [ [
-        "socket0",
-        ":socket_vm1",
-      ] ]
+  files = [
+    [
+      "manifest.dtb",
+      ":linux_test_manifest",
+      "manifest.dtb",
+    ],
+    [
+      "vmlinuz",
+      "//third_party/linux:linux__prebuilt",
+      "linux__prebuilt.bin",
+    ],
+    [
+      "initrd.img",
+      ":linux_test_initrd",
+      "linux_test_initrd/initrd.img",
+    ],
+    [
+      "socket0",
+      ":socket_vm1",
+      "socket_vm1.bin",
+    ],
+  ]
 }
 
 group("linux") {

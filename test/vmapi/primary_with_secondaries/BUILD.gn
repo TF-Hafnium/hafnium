@@ -43,26 +43,39 @@ vm_kernel("primary_with_secondaries_test_vm") {
   ]
 }
 
+manifest("primary_with_secondaries_test_manifest") {
+  source = "manifest.dts"
+  overlay = hftest_manifest_overlay
+}
+
 initrd("primary_with_secondaries_test") {
   testonly = true
 
-  manifest = "manifest.dts"
-  manifest_overlay = hftest_manifest_overlay
-
-  primary_name = "primary_with_secondaries_test"
-  primary_vm = ":primary_with_secondaries_test_vm"
-  secondary_vms = [
+  files = [
+    [
+      "manifest.dtb",
+      ":primary_with_secondaries_test_manifest",
+      "manifest.dtb",
+    ],
+    [
+      "primary_with_secondaries_test",
+      ":primary_with_secondaries_test_vm",
+      "primary_with_secondaries_test_vm.bin",
+    ],
     [
       "services1",
       "services:service_vm1",
+      "service_vm1.bin",
     ],
     [
       "services2",
       "services:service_vm2",
+      "service_vm2.bin",
     ],
     [
       "services3",
       "services:service_vm3",
+      "service_vm3.bin",
     ],
   ]
 }

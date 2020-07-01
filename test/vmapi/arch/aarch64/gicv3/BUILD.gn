@@ -32,15 +32,29 @@ vm_kernel("gicv3_test_vm") {
   ]
 }
 
+manifest("gicv3_test_manifest") {
+  source = "manifest.dts"
+  overlay = hftest_manifest_overlay
+}
+
 initrd("gicv3_test") {
   testonly = true
 
-  manifest = "manifest.dts"
-  manifest_overlay = hftest_manifest_overlay
-  primary_name = "gicv3_test"
-  primary_vm = ":gicv3_test_vm"
-  secondary_vms = [ [
-        "services1",
-        "services:gicv3_service_vm1",
-      ] ]
+  files = [
+    [
+      "manifest.dtb",
+      ":gicv3_test_manifest",
+      "manifest.dtb",
+    ],
+    [
+      "gicv3_test",
+      ":gicv3_test_vm",
+      "gicv3_test_vm.bin",
+    ],
+    [
+      "services1",
+      "services:gicv3_service_vm1",
+      "gicv3_service_vm1.bin",
+    ],
+  ]
 }
