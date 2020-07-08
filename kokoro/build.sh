@@ -141,6 +141,7 @@ fi
 # Step 7: make sure the Linux driver maintains style. It's already built as part
 # of the tests.
 (
+unset CHECKPATCH &&
 export ARCH=arm64 &&
 export CROSS_COMPILE=aarch64-linux-gnu- &&
 cd driver/linux &&
