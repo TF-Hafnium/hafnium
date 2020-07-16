@@ -28,6 +28,31 @@ static inline struct ffa_value ffa_id_get(void)
 }
 
 /**
+ * Requests information for partitions instantiated in the system. The
+ * information is returned in the RX buffer of the caller as an array of
+ * partition information descriptors (struct ffa_partition_info).
+ *
+ * A Null UUID (UUID that is all zeros) returns information for all partitions,
+ * whereas a non-Null UUID returns information only for partitions that match.
+ *
+ * Returns:
+ *  - FFA_SUCCESS on success. The count of partition information descriptors
+ *    populated in the RX buffer is returned in arg2 (register w2).
+ *  - FFA_BUSY if the caller's RX buffer is not free.
+ *  - FFA_NO_MEMORY if the results do not fit in the callers RX buffer.
+ *  - FFA_INVALID_PARAMETERS for an unrecognized UUID.
+ */
+static inline struct ffa_value ffa_partition_info_get(
+	const struct ffa_uuid *uuid)
+{
+	return ffa_call((struct ffa_value){.func = FFA_PARTITION_INFO_GET_32,
+					   .arg1 = uuid->uuid[0],
+					   .arg2 = uuid->uuid[1],
+					   .arg3 = uuid->uuid[2],
+					   .arg4 = uuid->uuid[3]});
+}
+
+/**
  * Returns the VM's own ID.
  */
 static inline ffa_vm_id_t hf_vm_get_id(void)

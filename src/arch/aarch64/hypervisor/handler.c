@@ -317,6 +317,14 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu **next)
 	case FFA_VERSION_32:
 		*args = api_ffa_version(args->arg1);
 		return true;
+	case FFA_PARTITION_INFO_GET_32: {
+		struct ffa_uuid uuid;
+
+		ffa_uuid_init(args->arg1, args->arg2, args->arg3, args->arg4,
+			      &uuid);
+		*args = api_ffa_partition_info_get(current(), &uuid);
+		return true;
+	}
 	case FFA_ID_GET_32:
 		*args = api_ffa_id_get(current());
 		return true;

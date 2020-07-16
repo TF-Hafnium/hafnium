@@ -104,6 +104,7 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 static bool load_common(const struct manifest_vm *manifest_vm, struct vm *vm)
 {
 	vm->smc_whitelist = manifest_vm->smc_whitelist;
+	vm->uuid = manifest_vm->sp.uuid;
 
 	/* Initialize architecture-specific features. */
 	arch_vm_features_set(vm);

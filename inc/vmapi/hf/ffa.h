@@ -290,6 +290,71 @@ static inline ffa_vm_id_t ffa_frag_sender(struct ffa_value args)
 }
 
 /**
+ * Holds the UUID in a struct that is mappable directly to the SMCC calling
+ * convention, which is used for FF-A calls.
+ *
+ * Refer to table 84 of the FF-A 1.0 EAC specification as well as section 5.3
+ * of the SMCC Spec 1.2.
+ */
+struct ffa_uuid {
+	uint32_t uuid[4];
+};
+
+static inline void ffa_uuid_init(uint32_t w0, uint32_t w1, uint32_t w2,
+				 uint32_t w3, struct ffa_uuid *uuid)
+{
+	uuid->uuid[0] = w0;
+	uuid->uuid[1] = w1;
+	uuid->uuid[2] = w2;
+	uuid->uuid[3] = w3;
+}
+
+static inline bool ffa_uuid_equal(const struct ffa_uuid *uuid1,
+				  const struct ffa_uuid *uuid2)
+{
+	return (uuid1->uuid[0] == uuid2->uuid[0]) &&
+	       (uuid1->uuid[1] == uuid2->uuid[1]) &&
+	       (uuid1->uuid[2] == uuid2->uuid[2]) &&
+	       (uuid1->uuid[3] == uuid2->uuid[3]);
+}
+
+static inline bool ffa_uuid_is_null(const struct ffa_uuid *uuid)
+{
+	return (uuid->uuid[0] == 0) && (uuid->uuid[1] == 0) &&
+	       (uuid->uuid[2] == 0) && (uuid->uuid[3] == 0);
+}
+
+/**
+ * Flags to determine the partition properties, as required by
+ * FFA_PARTITION_INFO_GET.
+ *
+ * The values of the flags are specified in table 82 of the FF-A 1.0 EAC
+ * specification, "Partition information descriptor, partition properties".
+ */
+typedef uint32_t ffa_partition_properties_t;
+
+/** Partition property: partition supports receipt of direct requests. */
+#define FFA_PARTITION_DIRECT_RECV 0x1
+
+/** Partition property: partition can send direct requests. */
+#define FFA_PARTITION_DIRECT_SEND 0x2
+
+/** Partition property: partition can send and receive indirect messages. */
+#define FFA_PARTITION_INDIRECT_MSG 0x4
+
+/**
+ * Holds information returned for each partition by the FFA_PARTITION_INFO_GET
+ * interface.
+ * This corresponds to table 82 of the FF-A 1.0 EAC specification, "Partition
+ * information descriptor".
+ */
+struct ffa_partition_info {
+	ffa_vm_id_t vm_id;
+	ffa_vcpu_count_t vcpu_count;
+	ffa_partition_properties_t properties;
+};
+
+/**
  * A set of contiguous pages which is part of a memory region. This corresponds
  * to table 40 of the FF-A 1.0 EAC specification, "Constituent memory region
  * descriptor".

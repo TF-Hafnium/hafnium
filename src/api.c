@@ -26,6 +26,10 @@
 #include "vmapi/hf/call.h"
 #include "vmapi/hf/ffa.h"
 
+static_assert(sizeof(struct ffa_partition_info) == 8,
+	      "Partition information descriptor size doesn't match the one in "
+	      "the FF-A 1.0 EAC specification, Table 82.");
+
 /*
  * To eliminate the risk of deadlocks, we define a partial order for the
  * acquisition of locks held concurrently by the same physical CPU. Our current
@@ -115,6 +119,35 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 	sl_unlock(&current->lock);
 
 	return next;
+}
+
+/**
+ * Checks whether the given `to` VM's mailbox is currently busy, and optionally
+ * registers the `from` VM to be notified when it becomes available.
+ */
+static bool msg_receiver_busy(struct vm_locked to, struct vm *from, bool notify)
+{
+	if (to.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
+	    to.vm->mailbox.recv == NULL) {
+		/*
+		 * Fail if the receiver isn't currently ready to receive data,
+		 * setting up for notification if requested.
+		 */
+		if (notify) {
+			struct wait_entry *entry =
+				vm_get_wait_entry(from, to.vm->id);
+
+			/* Append waiter only if it's not there yet. */
+			if (list_empty(&entry->wait_links)) {
+				list_append(&to.vm->mailbox.waiter_list,
+					    &entry->wait_links);
+			}
+		}
+
+		return true;
+	}
+
+	return false;
 }
 
 /**
@@ -221,6 +254,82 @@ struct vcpu *api_abort(struct vcpu *current)
 	/* TODO: free resources once all vCPUs abort. */
 
 	return api_switch_to_primary(current, ret, VCPU_STATE_ABORTED);
+}
+
+struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
+					    const struct ffa_uuid *uuid)
+{
+	struct vm *current_vm = current->vm;
+	struct vm_locked current_vm_locked;
+	ffa_vm_count_t vm_count = 0;
+	bool uuid_is_null = ffa_uuid_is_null(uuid);
+	struct ffa_value ret;
+	uint32_t size;
+	struct ffa_partition_info partitions[MAX_VMS];
+
+	/*
+	 * Iterate through the VMs to find the ones with a matching UUID.
+	 * A Null UUID retrieves information for all VMs.
+	 */
+	for (uint16_t index = 0; index < vm_get_count(); ++index) {
+		const struct vm *vm = vm_find_index(index);
+
+		if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuid)) {
+			partitions[vm_count].vm_id = vm->id;
+			partitions[vm_count].vcpu_count = vm->vcpu_count;
+
+			/* Hafnium only supports indirect messaging. */
+			partitions[vm_count].properties =
+				FFA_PARTITION_INDIRECT_MSG;
+
+			++vm_count;
+		}
+	}
+
+	/* Unrecognized UUID: does not match any of the VMs and is not Null. */
+	if (vm_count == 0) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	size = vm_count * sizeof(partitions[0]);
+	if (size > FFA_MSG_PAYLOAD_MAX) {
+		dlog_error(
+			"Partition information does not fit in the VM's RX "
+			"buffer.\n");
+		return ffa_error(FFA_NO_MEMORY);
+	}
+
+	/*
+	 * Partition information is returned in the VM's RX buffer, which is why
+	 * the lock is needed.
+	 */
+	current_vm_locked = vm_lock(current_vm);
+
+	if (msg_receiver_busy(current_vm_locked, NULL, false)) {
+		/*
+		 * Can't retrieve memory information if the mailbox is not
+		 * available.
+		 */
+		dlog_verbose("RX buffer not ready.\n");
+		ret = ffa_error(FFA_BUSY);
+		goto out_unlock;
+	}
+
+	/* Populate the VM's RX buffer with the partition information. */
+	memcpy_s(current_vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX, partitions,
+		 size);
+	current_vm->mailbox.recv_size = size;
+	current_vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
+	current_vm->mailbox.recv_func = FFA_PARTITION_INFO_GET_32;
+	current_vm->mailbox.state = MAILBOX_STATE_READ;
+
+	/* Return the count of partition information descriptors in w2. */
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32, .arg2 = vm_count};
+
+out_unlock:
+	vm_unlock(&current_vm_locked);
+
+	return ret;
 }
 
 /**
@@ -870,35 +979,6 @@ exit:
 }
 
 /**
- * Checks whether the given `to` VM's mailbox is currently busy, and optionally
- * registers the `from` VM to be notified when it becomes available.
- */
-static bool msg_receiver_busy(struct vm_locked to, struct vm *from, bool notify)
-{
-	if (to.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
-	    to.vm->mailbox.recv == NULL) {
-		/*
-		 * Fail if the receiver isn't currently ready to receive data,
-		 * setting up for notification if requested.
-		 */
-		if (notify) {
-			struct wait_entry *entry =
-				vm_get_wait_entry(from, to.vm->id);
-
-			/* Append waiter only if it's not there yet. */
-			if (list_empty(&entry->wait_links)) {
-				list_append(&to.vm->mailbox.waiter_list,
-					    &entry->wait_links);
-			}
-		}
-
-		return true;
-	}
-
-	return false;
-}
-
-/**
  * Notifies the `to` VM about the message currently in its mailbox, possibly
  * with the help of the primary VM.
  */
@@ -1428,6 +1508,7 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 	case FFA_FEATURES_32:
 	case FFA_RX_RELEASE_32:
 	case FFA_RXTX_MAP_64:
+	case FFA_PARTITION_INFO_GET_32:
 	case FFA_ID_GET_32:
 	case FFA_MSG_POLL_32:
 	case FFA_MSG_WAIT_32:

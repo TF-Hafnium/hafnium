@@ -121,3 +121,41 @@ TEST(ffa, ffa_recv_non_blocking)
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }
+
+/**
+ * Verify that partition discovery via the FFA_PARTITION_INFO interface
+ * returns the expected information on the VMs in the system.
+ */
+TEST(ffa, ffa_partition_info)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value ret;
+	const struct ffa_partition_info *partitions = mb.recv;
+	struct ffa_uuid uuid;
+
+	/* A Null UUID requests information for all partitions. */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+
+	ret = ffa_partition_info_get(&uuid);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ret.arg2, hf_vm_get_count());
+
+	for (uint16_t index = 0; index < hf_vm_get_count(); ++index) {
+		ffa_vm_id_t vm_id = partitions[index].vm_id;
+		EXPECT_GE(vm_id, (ffa_vm_id_t)HF_PRIMARY_VM_ID);
+		EXPECT_LE(vm_id, (ffa_vm_id_t)SERVICE_VM3);
+
+		/*
+		 * NOTE: The ordering is NOT specified by the spec, but is an
+		 * artifact of how it's implemented in Hafnium. If that changes
+		 * the following EXPECT could fail.
+		 */
+		EXPECT_EQ(vm_id, index + 1);
+
+		EXPECT_EQ(partitions[index].vcpu_count,
+			  hf_vcpu_get_count(vm_id));
+	}
+
+	ret = ffa_rx_release();
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}

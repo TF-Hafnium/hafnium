@@ -317,7 +317,7 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 
 	while (uint32list_has_next(&uuid) && i < 4) {
 		TRY(uint32list_get_next(&uuid, &uuid_word));
-		vm->sp.uuid[i] = uuid_word;
+		vm->sp.uuid.uuid[i] = uuid_word;
 		i++;
 	}
 	dlog_verbose("  SP UUID %#x-%x-%x_%x\n", vm->sp.uuid[0], vm->sp.uuid[1],

@@ -47,7 +47,7 @@ struct sp_manifest {
 	/** PSA-FF-A expected version - mandatory */
 	uint32_t ffa_version;
 	/** UUID - mandatory */
-	uint32_t uuid[4];
+	struct ffa_uuid uuid;
 	/** Partition id - optional */
 	ffa_vm_id_t id;
 	/** Aux ids for mem transactions - optional */

@@ -90,6 +90,9 @@ ffa_vm_count_t vm_get_count(void)
 	return vm_count;
 }
 
+/**
+ * Returns a pointer to the VM with the corresponding id.
+ */
 struct vm *vm_find(ffa_vm_id_t id)
 {
 	uint16_t index;
@@ -108,6 +111,14 @@ struct vm *vm_find(ffa_vm_id_t id)
 
 	index = id - HF_VM_ID_OFFSET;
 
+	return vm_find_index(index);
+}
+
+/**
+ * Returns a pointer to the VM at the specified index.
+ */
+struct vm *vm_find_index(uint16_t index)
+{
 	/* Ensure the VM is initialized. */
 	if (index >= vm_count) {
 		return NULL;

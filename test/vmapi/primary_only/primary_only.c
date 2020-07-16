@@ -241,6 +241,9 @@ TEST(ffa, ffa_features)
 	ret = ffa_features(FFA_RXTX_MAP_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
+	ret = ffa_features(FFA_PARTITION_INFO_GET_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
 	ret = ffa_features(FFA_ID_GET_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
@@ -298,9 +301,6 @@ TEST(ffa, ffa_features_not_supported)
 	ret = ffa_features(FFA_RXTX_UNMAP_32);
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
-	ret = ffa_features(FFA_PARTITION_INFO_GET_32);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
-
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
@@ -312,6 +312,63 @@ TEST(ffa, ffa_features_not_supported)
 
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+}
+
+/**
+ * Verify that partition discovery via the FFA_PARTITION_INFO interface
+ * returns the expected information on the VMs in the system, which in this
+ * case is only one primary VM.
+ *
+ * Verify also that calls to the FFA_PARTITION_INFO interface fail when
+ * expected, e.g., if the mailbox isn't setup or the RX buffer is busy.
+ */
+TEST(ffa, ffa_partition_info)
+{
+	struct mailbox_buffers mb;
+	struct ffa_value ret;
+	const struct ffa_partition_info *partitions;
+	struct ffa_uuid uuid;
+
+	/* A Null UUID requests information for all partitions. */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+
+	/* Try to get partition information before the RX buffer is setup. */
+	ret = ffa_partition_info_get(&uuid);
+	EXPECT_FFA_ERROR(ret, FFA_BUSY);
+
+	/* Setup the mailbox (which holds the RX buffer). */
+	mb = set_up_mailbox();
+	partitions = mb.recv;
+
+	/* Check that the expected partition information is returned. */
+	ret = ffa_partition_info_get(&uuid);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ret.arg2, hf_vm_get_count());
+	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
+	EXPECT_EQ(partitions[0].vcpu_count, hf_vcpu_get_count(hf_vm_get_id()));
+
+	/*
+	 * Check that the partition information cannot be requested if the RX
+	 * buffer is busy.
+	 */
+	ret = ffa_partition_info_get(&uuid);
+	EXPECT_FFA_ERROR(ret, FFA_BUSY);
+
+	/* Release the buffer and try again. */
+	ret = ffa_rx_release();
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_partition_info_get(&uuid);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_rx_release();
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Try to get partition information for an unrecognized UUID. */
+	ffa_uuid_init(0, 0, 0, 1, &uuid);
+
+	ret = ffa_partition_info_get(&uuid);
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 }
 
 /**

@@ -819,7 +819,7 @@ TEST(manifest, ffa_valid)
 
 	ASSERT_EQ(m.vm[0].sp.ffa_version, 0x10000);
 	ASSERT_THAT(
-		std::span(m.vm[0].sp.uuid, 4),
+		std::span(m.vm[0].sp.uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
 	ASSERT_EQ(m.vm[0].sp.execution_ctx_count, 1);
 	ASSERT_EQ(m.vm[0].sp.run_time_el, S_EL1);
