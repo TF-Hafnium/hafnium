@@ -78,7 +78,7 @@ static inline struct ffa_value ffa_yield(void)
  *  - FFA_ERROR FFA_INVALID_PARAMETERS if the given addresses are not properly
  *    aligned or are the same.
  *  - FFA_ERROR FFA_NO_MEMORY if the hypervisor was unable to map the buffers
- *    due to insuffient page table memory.
+ *    due to insufficient page table memory.
  *  - FFA_ERROR FFA_DENIED if the pages are already mapped or are not owned by
  *    the caller.
  *  - FFA_SUCCESS on success if no further action is needed.

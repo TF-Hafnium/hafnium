@@ -821,8 +821,8 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	 * operation to ensure there will be sufficient memory to recover from
 	 * any failures.
 	 *
-	 * TODO: the scope of the can be reduced but will require restructuring
-	 *       to keep a single unlock point.
+	 * TODO: the scope can be reduced but will require restructuring to
+	 *       keep a single unlock point.
 	 */
 	vm_locked = vm_lock(vm);
 

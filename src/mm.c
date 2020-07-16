@@ -485,7 +485,7 @@ static bool mm_ptable_identity_map(struct mm_ptable *t, paddr_t pa_begin,
  * Prepares the given page table for the given address mapping such that it
  * will be able to commit the change without failure. It does so by ensuring
  * the smallest granularity needed is available. This remains valid provided
- * subsequent operations no not decrease the granularity.
+ * subsequent operations do not decrease the granularity.
  *
  * In particular, multiple calls to this function will result in the
  * corresponding calls to commit the changes to succeed.
@@ -932,7 +932,7 @@ void mm_vm_defrag(struct mm_ptable *t, struct mpool *ppool)
 }
 
 /**
- * Gets the mode of the give range of intermediate physical addresses if they
+ * Gets the mode of the given range of intermediate physical addresses if they
  * are mapped with the same mode.
  *
  * Returns true if the range is mapped with the same mode and false otherwise.
