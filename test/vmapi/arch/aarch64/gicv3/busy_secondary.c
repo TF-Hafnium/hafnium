@@ -65,11 +65,6 @@ TEST(busy_secondary, virtual_timer)
 	EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
 	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
 
-	dlog("Starting timer\n");
-	/* Set virtual timer for 1 mS and enable. */
-	write_msr(CNTV_TVAL_EL0, ns_to_ticks(1000000));
-	write_msr(CNTV_CTL_EL0, 0x00000001);
-
 	/* Let secondary start looping. */
 	dlog("Telling secondary to loop.\n");
 	memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, message, sizeof(message));
@@ -77,6 +72,12 @@ TEST(busy_secondary, virtual_timer)
 		ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
 			.func,
 		FFA_SUCCESS_32);
+
+	dlog("Starting timer\n");
+	/* Set virtual timer for 3 mS and enable. */
+	write_msr(CNTV_TVAL_EL0, ns_to_ticks(3000000));
+	write_msr(CNTV_CTL_EL0, 0x00000001);
+
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, FFA_INTERRUPT_32);
 
@@ -123,11 +124,6 @@ TEST(busy_secondary, physical_timer)
 	EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
 	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
 
-	dlog("Starting timer\n");
-	/* Set physical timer for 1 ms and enable. */
-	write_msr(CNTP_TVAL_EL0, ns_to_ticks(1000000));
-	write_msr(CNTP_CTL_EL0, 0x00000001);
-
 	/* Let secondary start looping. */
 	dlog("Telling secondary to loop.\n");
 	memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, message, sizeof(message));
@@ -135,6 +131,12 @@ TEST(busy_secondary, physical_timer)
 		ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
 			.func,
 		FFA_SUCCESS_32);
+
+	dlog("Starting timer\n");
+	/* Set physical timer for 3 ms and enable. */
+	write_msr(CNTP_TVAL_EL0, ns_to_ticks(3000000));
+	write_msr(CNTP_CTL_EL0, 0x00000001);
+
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, FFA_INTERRUPT_32);
 
