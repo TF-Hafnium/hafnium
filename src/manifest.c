@@ -320,8 +320,9 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 		vm->sp.uuid.uuid[i] = uuid_word;
 		i++;
 	}
-	dlog_verbose("  SP UUID %#x-%x-%x_%x\n", vm->sp.uuid[0], vm->sp.uuid[1],
-		     vm->sp.uuid[2], vm->sp.uuid[3]);
+	dlog_verbose("  SP UUID %#x-%x-%x_%x\n", vm->sp.uuid.uuid[0],
+		     vm->sp.uuid.uuid[1], vm->sp.uuid.uuid[2],
+		     vm->sp.uuid.uuid[3]);
 
 	TRY(read_uint16(&root, "execution-ctx-count",
 			&vm->sp.execution_ctx_count));
