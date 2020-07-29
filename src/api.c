@@ -12,6 +12,7 @@
 #include "hf/arch/mm.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/timer.h"
+#include "hf/arch/vm.h"
 
 #include "hf/check.h"
 #include "hf/dlog.h"
@@ -330,10 +331,8 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 		if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuid)) {
 			partitions[vm_count].vm_id = vm->id;
 			partitions[vm_count].vcpu_count = vm->vcpu_count;
-
-			/* Hafnium only supports indirect messaging. */
 			partitions[vm_count].properties =
-				FFA_PARTITION_INDIRECT_MSG;
+				arch_vm_partition_properties(vm->id);
 
 			++vm_count;
 		}

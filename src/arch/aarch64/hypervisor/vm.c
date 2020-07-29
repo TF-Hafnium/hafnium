@@ -50,3 +50,24 @@ void arch_vm_features_set(struct vm *vm)
 		vm->arch.trapped_features |= HF_FEATURE_PAUTH;
 	}
 }
+
+ffa_partition_properties_t arch_vm_partition_properties(ffa_vm_id_t id)
+{
+#if SECURE_WORLD == 0
+	/*
+	 * VMs supports indirect messaging.
+	 * PVM supports sending direct messages.
+	 * Secondary VMs support receiving direct messages.
+	 */
+	return FFA_PARTITION_INDIRECT_MSG | (id == HF_PRIMARY_VM_ID)
+		       ? FFA_PARTITION_DIRECT_SEND
+		       : FFA_PARTITION_DIRECT_RECV;
+#else
+	(void)id;
+
+	/*
+	 * SPs only support receiving direct messages.
+	 */
+	return FFA_PARTITION_DIRECT_RECV;
+#endif
+}
