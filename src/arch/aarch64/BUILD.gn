@@ -16,6 +16,7 @@ config("config") {
 
 # Implementation of the arch interface for aarch64.
 source_set("arch") {
+  public_configs = [ "//src/arch/aarch64:config" ]
   sources = [
     "irq.c",
     "mm.c",

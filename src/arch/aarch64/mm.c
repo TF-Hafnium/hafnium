@@ -10,6 +10,7 @@
 
 #include "hf/arch/barriers.h"
 #include "hf/arch/cpu.h"
+#include "hf/arch/mmu.h"
 
 #include "hf/dlog.h"
 
@@ -400,6 +401,19 @@ uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode)
 	uint64_t attrs = 0;
 
 	attrs |= STAGE1_AF | STAGE1_SH(OUTER_SHAREABLE);
+
+#if SECURE_WORLD == 1
+
+	/**
+	 * Define the non-secure bit.
+	 * At NS-EL2 the Stage-1 MMU NS bit is RES0. At S-EL1/2, this bit
+	 * defines the Stage-1 security attribute for the block or page.
+	 */
+	if (mode & MM_MODE_NS) {
+		attrs |= STAGE1_NS;
+	}
+
+#endif
 
 	/* Define the execute bits. */
 	if (!(mode & MM_MODE_X)) {
