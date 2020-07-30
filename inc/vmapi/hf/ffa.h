@@ -20,7 +20,7 @@
 #define FFA_LOW_32_ID  0x84000060
 #define FFA_HIGH_32_ID 0x8400007F
 #define FFA_LOW_64_ID  0xC4000060
-#define FFA_HIGH_32_ID 0x8400007F
+#define FFA_HIGH_64_ID 0xC400007F
 
 /* FF-A function identifiers. */
 #define FFA_ERROR_32                 0x84000060
