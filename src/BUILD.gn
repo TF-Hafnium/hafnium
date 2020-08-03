@@ -23,6 +23,7 @@ hypervisor("hafnium") {
 # Hypervisor specific code that isn't. One day it will be testable and both the
 # src targets will merge!
 source_set("src_not_testable_yet") {
+  public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
   sources = [
     "cpio.c",
     "init.c",
@@ -44,6 +45,7 @@ source_set("src_not_testable_yet") {
 # e.g. with VM used in the VM tests have their own targets to facilitate
 # sharing.
 source_set("src_testable") {
+  public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
   sources = [
     "api.c",
     "cpu.c",
@@ -85,6 +87,7 @@ source_set("mm") {
 }
 
 source_set("vm") {
+  public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
   sources = [
     "vm.c",
   ]

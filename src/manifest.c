@@ -30,7 +30,8 @@
 static_assert(VM_NAME_MAX_SIZE <= STRING_MAX_SIZE,
 	      "VM name does not fit into a struct string.");
 static_assert(VM_ID_MAX <= 99999, "Insufficient VM_NAME_BUF_SIZE");
-static_assert(HF_TEE_VM_ID > VM_ID_MAX,
+static_assert((HF_OTHER_WORLD_ID > VM_ID_MAX) ||
+		      (HF_OTHER_WORLD_ID < HF_VM_ID_BASE),
 	      "TrustZone VM ID clashes with normal VM range.");
 
 static inline size_t count_digits(ffa_vm_id_t vm_id)
@@ -740,8 +741,8 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 	TRY(read_bool(&hyp_node, "ffa_tee", &manifest->ffa_tee_enabled));
 
 	/* Iterate over reserved VM IDs and check no such nodes exist. */
-	for (i = 0; i < HF_VM_ID_OFFSET; i++) {
-		ffa_vm_id_t vm_id = (ffa_vm_id_t)i;
+	for (i = HF_VM_ID_BASE; i < HF_VM_ID_OFFSET; i++) {
+		ffa_vm_id_t vm_id = (ffa_vm_id_t)i - HF_VM_ID_BASE;
 		struct fdt_node vm_node = hyp_node;
 
 		generate_vm_node_name(&vm_name, vm_id);
@@ -755,7 +756,7 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 		ffa_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
 		struct fdt_node vm_node = hyp_node;
 
-		generate_vm_node_name(&vm_name, vm_id);
+		generate_vm_node_name(&vm_name, vm_id - HF_VM_ID_BASE);
 		if (!fdt_find_child(&vm_node, &vm_name)) {
 			break;
 		}

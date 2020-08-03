@@ -4,6 +4,9 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/BSD-3-Clause.
 
+config("arch_config") {
+}
+
 source_set("fake") {
   sources = [
     "mm.c",

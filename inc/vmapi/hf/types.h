@@ -23,6 +23,8 @@ typedef phys_addr_t hf_ipaddr_t;
 #include <stddef.h>
 #include <stdint.h>
 
+#include "hf/arch/vmid_base.h"
+
 typedef uintptr_t hf_ipaddr_t;
 
 #endif
@@ -35,7 +37,7 @@ typedef uintptr_t hf_ipaddr_t;
  * An offset to use when assigning VM IDs.
  * The offset is needed because VM ID 0 is reserved.
  */
-#define HF_VM_ID_OFFSET 1
+#define HF_VM_ID_OFFSET (HF_VM_ID_BASE + 1)
 
 /**
  * The index and ID of the primary VM, which is responsible for scheduling.

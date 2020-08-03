@@ -666,7 +666,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 			continue;
 		}
 
-		dlog_info("Loading VM%d: %s.\n", (int)vm_id,
+		dlog_info("Loading VM id %#x: %s.\n", vm_id,
 			  manifest_vm->debug_name);
 
 		mem_size = align_up(manifest_vm->secondary.mem_size, PAGE_SIZE);

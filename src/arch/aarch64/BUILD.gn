@@ -8,7 +8,9 @@ import("args.gni")
 
 config("config") {
   include_dirs = [ "." ]
+}
 
+config("arch_config") {
   assert(secure_world == "0" || secure_world == "1",
          "secure world set to <${secure_world}>")
   defines = [ "SECURE_WORLD=${secure_world}" ]
@@ -16,7 +18,7 @@ config("config") {
 
 # Implementation of the arch interface for aarch64.
 source_set("arch") {
-  public_configs = [ "//src/arch/aarch64:config" ]
+  public_configs = [ "//src/arch/aarch64:arch_config" ]
   sources = [
     "irq.c",
     "mm.c",

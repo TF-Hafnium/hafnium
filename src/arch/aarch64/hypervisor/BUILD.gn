@@ -26,7 +26,10 @@ source_set("tee") {
 
 # Hypervisor specific code.
 source_set("hypervisor") {
-  public_configs = [ "//src/arch/aarch64:config" ]
+  public_configs = [
+    "//src/arch/aarch64:config",
+    "//src/arch/aarch64:arch_config",
+  ]
   sources = [
     "exceptions.S",
     "hypervisor_entry.S",

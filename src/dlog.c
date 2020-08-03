@@ -226,7 +226,7 @@ void dlog_flush_vm_buffer(ffa_vm_id_t id, char buffer[], size_t length)
 	lock();
 
 	print_raw_string("VM ");
-	print_num(id, 10, 0, 0);
+	print_num(id, 16, 0, 0);
 	print_raw_string(": ");
 
 	for (size_t i = 0; i < length; ++i) {
