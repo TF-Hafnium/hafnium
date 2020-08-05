@@ -28,6 +28,21 @@ struct vcpu_locked vcpu_lock(struct vcpu *vcpu)
 }
 
 /**
+ * Locks two vCPUs ensuring that the locking order is according to the locks'
+ * addresses.
+ */
+struct two_vcpu_locked vcpu_lock_both(struct vcpu *vcpu1, struct vcpu *vcpu2)
+{
+	struct two_vcpu_locked dual_lock;
+
+	sl_lock_both(&vcpu1->lock, &vcpu2->lock);
+	dual_lock.vcpu1.vcpu = vcpu1;
+	dual_lock.vcpu2.vcpu = vcpu2;
+
+	return dual_lock;
+}
+
+/**
  * Unlocks a vCPU previously locked with vpu_lock, and updates `locked` to
  * reflect the fact that the vCPU is no longer locked.
  */

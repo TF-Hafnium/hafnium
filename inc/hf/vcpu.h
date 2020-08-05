@@ -84,7 +84,14 @@ struct vcpu_locked {
 	struct vcpu *vcpu;
 };
 
+/** Container for two vcpu_locked structures. */
+struct two_vcpu_locked {
+	struct vcpu_locked vcpu1;
+	struct vcpu_locked vcpu2;
+};
+
 struct vcpu_locked vcpu_lock(struct vcpu *vcpu);
+struct two_vcpu_locked vcpu_lock_both(struct vcpu *vcpu1, struct vcpu *vcpu2);
 void vcpu_unlock(struct vcpu_locked *locked);
 void vcpu_init(struct vcpu *vcpu, struct vm *vm);
 void vcpu_on(struct vcpu_locked vcpu, ipaddr_t entry, uintreg_t arg);
