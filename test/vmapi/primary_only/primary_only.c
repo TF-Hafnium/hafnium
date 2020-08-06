@@ -190,6 +190,11 @@ TEST(cpus, stop)
 	dlog("Second CPU stopped.\n");
 }
 
+TEAR_DOWN(ffa)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
 /** Ensures that the Hafnium FF-A version is reported as expected. */
 TEST(ffa, ffa_version)
 {

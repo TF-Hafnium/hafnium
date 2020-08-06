@@ -18,6 +18,11 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+TEAR_DOWN(floating_point)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
 /**
  * Test that floating point registers are saved and restored by
  * filling them with one value here and a different value in the

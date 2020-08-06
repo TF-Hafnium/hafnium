@@ -16,6 +16,7 @@
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
+#include "test/vmapi/ffa.h"
 
 alignas(PAGE_SIZE) static char tx[PAGE_SIZE];
 alignas(PAGE_SIZE) static char rx[PAGE_SIZE];
@@ -38,6 +39,11 @@ static void rx_reader(uintptr_t arg)
 	}
 
 	sl_unlock(&s->lock);
+}
+
+TEAR_DOWN(faults)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
 /**

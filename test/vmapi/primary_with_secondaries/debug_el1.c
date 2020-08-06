@@ -17,6 +17,11 @@
  */
 #define CUSTOM_QEMU_BUILD() 0
 
+TEAR_DOWN(debug_el1)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
 TEST(debug_el1, secondary_basic)
 {
 	struct ffa_value run_res;

@@ -13,6 +13,11 @@
 #include "sysregs.h"
 #include "test/vmapi/ffa.h"
 
+TEAR_DOWN(perfmon)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
 TEST(perfmon, secondary_basic)
 {
 	struct ffa_value run_res;

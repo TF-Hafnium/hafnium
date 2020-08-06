@@ -18,6 +18,11 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+TEAR_DOWN(ffa)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
 /**
  * Send a message to a secondary VM which checks the validity of the received
  * header.

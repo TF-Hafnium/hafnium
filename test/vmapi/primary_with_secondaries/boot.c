@@ -15,6 +15,11 @@
 #include "test/vmapi/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
+TEAR_DOWN(boot)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
 /**
  * The VM gets its memory size on boot, and can access it all.
  */

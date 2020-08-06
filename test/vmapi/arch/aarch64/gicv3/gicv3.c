@@ -20,6 +20,7 @@
 
 #include "../msr.h"
 #include "test/hftest.h"
+#include "test/vmapi/ffa.h"
 
 alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
 alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];
@@ -50,6 +51,11 @@ void system_setup()
 
 	exception_setup(irq, NULL);
 	interrupt_gic_setup();
+}
+
+TEAR_DOWN(system)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
 /* Check that system registers are configured as we expect on startup. */

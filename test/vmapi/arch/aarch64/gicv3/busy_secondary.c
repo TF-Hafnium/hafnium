@@ -18,6 +18,7 @@
 #include "gicv3.h"
 #include "msr.h"
 #include "test/hftest.h"
+#include "test/vmapi/ffa.h"
 
 /**
  * Converts a number of nanoseconds to the equivalent number of timer ticks.
@@ -33,6 +34,11 @@ SET_UP(busy_secondary)
 	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
 		  FFA_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM1, "busy", send_buffer);
+}
+
+TEAR_DOWN(busy_secondary)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
 TEST(busy_secondary, virtual_timer)

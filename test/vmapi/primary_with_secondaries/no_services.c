@@ -99,6 +99,11 @@ TEST(ffa_run, cannot_run_absent_vcpu)
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
+TEAR_DOWN(ffa_rxtx_map)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
 /**
  * The configured send/receive addresses can't be device memory.
  */
