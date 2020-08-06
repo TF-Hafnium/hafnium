@@ -35,41 +35,61 @@ TEST(hf_vm_get_id, primary_has_primary_id)
 	EXPECT_EQ(hf_vm_get_id(), HF_PRIMARY_VM_ID);
 }
 
-/**
- * Confirm there are 3 secondary VMs as well as this primary VM.
- */
-TEST(hf_vm_get_count, three_secondary_vms)
+TEAR_DOWN(ffa_partition_info_get)
 {
-	EXPECT_EQ(hf_vm_get_count(), 4);
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
 /**
- * Confirm that secondary VM has 1 vCPU.
+ * Confirm there are 3 secondary VMs as well as this primary VM, and that they
+ * have the expected number of vCPUs.
  */
-TEST(hf_vcpu_get_count, secondary_has_one_vcpu)
+TEST(ffa_partition_info_get, three_secondary_vms)
 {
-	EXPECT_EQ(hf_vcpu_get_count(SERVICE_VM1), 1);
+	struct mailbox_buffers mb;
+	struct ffa_value ret;
+	const struct ffa_partition_info *partitions;
+	struct ffa_uuid uuid;
+
+	/* A Null UUID requests information for all partitions. */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+
+	/* Try to get partition information before the RX buffer is setup. */
+	ret = ffa_partition_info_get(&uuid);
+	EXPECT_FFA_ERROR(ret, FFA_BUSY);
+
+	/* Setup the mailbox (which holds the RX buffer). */
+	mb = set_up_mailbox();
+	partitions = mb.recv;
+
+	/* Check that the expected partition information is returned. */
+	ret = ffa_partition_info_get(&uuid);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	/* Confirm there are 3 secondary VMs as well as this primary VM. */
+	EXPECT_EQ(ret.arg2, 4);
+	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
+
+	/* The first two secondary VMs should have 1 vCPU, the other one 2. */
+	EXPECT_EQ(partitions[1].vcpu_count, 1);
+	EXPECT_EQ(partitions[2].vcpu_count, 1);
+	EXPECT_EQ(partitions[3].vcpu_count, 2);
+
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
 
 /**
- * Confirm an error is returned when getting the vCPU count for a reserved ID.
+ * Confirm that it is an error to get partition info for a nonexistent VM.
  */
-TEST(hf_vcpu_get_count, reserved_vm_id)
+TEST(ffa_partition_info_get, invalid_vm_uuid)
 {
-	ffa_vm_id_t id;
+	struct ffa_value ret;
+	struct ffa_uuid uuid;
 
-	for (id = 0; id < HF_VM_ID_OFFSET; ++id) {
-		EXPECT_EQ(hf_vcpu_get_count(id), 0);
-	}
-}
+	/* Try to get partition information for an unrecognized UUID. */
+	ffa_uuid_init(0, 0, 0, 1, &uuid);
 
-/**
- * Confirm it is an error to query how many vCPUs are assigned to a nonexistent
- * secondary VM.
- */
-TEST(hf_vcpu_get_count, large_invalid_vm_id)
-{
-	EXPECT_EQ(hf_vcpu_get_count(0xffff), 0);
+	ret = ffa_partition_info_get(&uuid);
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 }
 
 /**

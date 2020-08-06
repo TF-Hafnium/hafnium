@@ -342,36 +342,6 @@ struct ffa_value api_ffa_id_get(const struct vcpu *current)
 }
 
 /**
- * Returns the number of VMs configured to run.
- */
-ffa_vm_count_t api_vm_get_count(void)
-{
-	return vm_get_count();
-}
-
-/**
- * Returns the number of vCPUs configured in the given VM, or 0 if there is no
- * such VM or the caller is not the primary VM.
- */
-ffa_vcpu_count_t api_vcpu_get_count(ffa_vm_id_t vm_id,
-				    const struct vcpu *current)
-{
-	struct vm *vm;
-
-	/* Only the primary VM needs to know about vCPUs for scheduling. */
-	if (current->vm->id != HF_PRIMARY_VM_ID) {
-		return 0;
-	}
-
-	vm = vm_find(vm_id);
-	if (vm == NULL) {
-		return 0;
-	}
-
-	return vm->vcpu_count;
-}
-
-/**
  * This function is called by the architecture-specific context switching
  * function to indicate that register state for the given vCPU has been saved
  * and can therefore be used by other pCPUs.

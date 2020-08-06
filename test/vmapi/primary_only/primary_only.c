@@ -32,52 +32,6 @@ TEST(hf_vm_get_id, primary_has_primary_id)
 }
 
 /**
- * Confirm there is only the primary VM.
- */
-TEST(hf_vm_get_count, no_secondary_vms)
-{
-	EXPECT_EQ(hf_vm_get_count(), 1);
-}
-
-/**
- * Confirm the primary has at least one vCPU.
- */
-TEST(hf_vcpu_get_count, primary_has_at_least_one)
-{
-	EXPECT_GE(hf_vcpu_get_count(HF_PRIMARY_VM_ID), 0);
-}
-
-/**
- * Confirm an error is returned when getting the vCPU count of a non-existent
- * VM.
- */
-TEST(hf_vcpu_get_count, no_secondary_vms)
-{
-	EXPECT_EQ(hf_vcpu_get_count(HF_VM_ID_OFFSET + 1), 0);
-}
-
-/**
- * Confirm an error is returned when getting the vCPU count for a reserved ID.
- */
-TEST(hf_vcpu_get_count, reserved_vm_id)
-{
-	ffa_vm_id_t id;
-
-	for (id = 0; id < HF_VM_ID_OFFSET; ++id) {
-		EXPECT_EQ(hf_vcpu_get_count(id), 0);
-	}
-}
-
-/**
- * Confirm an error is returned when getting the vCPU count of a VM with an ID
- * that is likely to be far outside the resource limit.
- */
-TEST(hf_vcpu_get_count, large_invalid_vm_id)
-{
-	EXPECT_EQ(hf_vcpu_get_count(0xffff), 0);
-}
-
-/**
  * Confirm it is an error when running a vCPU from the primary VM.
  */
 TEST(ffa_run, cannot_run_primary)
@@ -348,9 +302,11 @@ TEST(ffa, ffa_partition_info)
 	/* Check that the expected partition information is returned. */
 	ret = ffa_partition_info_get(&uuid);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-	EXPECT_EQ(ret.arg2, hf_vm_get_count());
+	/* There should only be the primary VM in this test. */
+	EXPECT_EQ(ret.arg2, 1);
 	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
-	EXPECT_EQ(partitions[0].vcpu_count, hf_vcpu_get_count(hf_vm_get_id()));
+	/* The primary should have at least one vCPU. */
+	EXPECT_GE(partitions[0].vcpu_count, 1);
 
 	/*
 	 * Check that the partition information cannot be requested if the RX
@@ -385,13 +341,15 @@ TEST(fp, fp)
 	 * Get some numbers that the compiler can't tell are constants, so it
 	 * can't optimise them away.
 	 */
-	double a = hf_vm_get_count();
-	double b = hf_vcpu_get_count(HF_PRIMARY_VM_ID);
-	double result = a * b;
-	dlog("VM count: %d\n", hf_vm_get_count());
-	dlog("vCPU count: %d\n", hf_vcpu_get_count(HF_PRIMARY_VM_ID));
-	dlog("result: %d\n", (int)result);
+	ffa_vm_id_t ai = hf_vm_get_id();
+	ffa_vm_id_t bi = hf_vm_get_id();
+	double a = ai;
+	double b = bi;
+	double result = a * b * 8.0;
+	dlog("a: %d\n", ai);
+	dlog("b: %d\n", bi);
+	dlog("a * b * 1.0: %d\n", (int)result);
 	EXPECT_TRUE(a == 1.0);
-	EXPECT_TRUE(b == 8.0);
+	EXPECT_TRUE(b == 1.0);
 	EXPECT_TRUE(result == 8.0);
 }

@@ -137,15 +137,17 @@ TEST(ffa, ffa_partition_info)
 	struct ffa_value ret;
 	const struct ffa_partition_info *partitions = mb.recv;
 	struct ffa_uuid uuid;
+	ffa_vm_count_t vm_count;
 
 	/* A Null UUID requests information for all partitions. */
 	ffa_uuid_init(0, 0, 0, 0, &uuid);
 
 	ret = ffa_partition_info_get(&uuid);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-	EXPECT_EQ(ret.arg2, hf_vm_get_count());
+	vm_count = ret.arg2;
+	EXPECT_EQ(vm_count, 4);
 
-	for (uint16_t index = 0; index < hf_vm_get_count(); ++index) {
+	for (uint16_t index = 0; index < vm_count; ++index) {
 		ffa_vm_id_t vm_id = partitions[index].vm_id;
 		EXPECT_GE(vm_id, (ffa_vm_id_t)HF_PRIMARY_VM_ID);
 		EXPECT_LE(vm_id, (ffa_vm_id_t)SERVICE_VM3);
@@ -157,8 +159,7 @@ TEST(ffa, ffa_partition_info)
 		 */
 		EXPECT_EQ(vm_id, index + 1);
 
-		EXPECT_EQ(partitions[index].vcpu_count,
-			  hf_vcpu_get_count(vm_id));
+		EXPECT_GE(partitions[index].vcpu_count, 1);
 	}
 
 	ret = ffa_rx_release();

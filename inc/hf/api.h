@@ -16,9 +16,6 @@
 #include "vmapi/hf/ffa.h"
 
 void api_init(struct mpool *ppool);
-ffa_vm_count_t api_vm_get_count(void);
-ffa_vcpu_count_t api_vcpu_get_count(ffa_vm_id_t vm_id,
-				    const struct vcpu *current);
 void api_regs_state_saved(struct vcpu *vcpu);
 int64_t api_mailbox_writable_get(const struct vcpu *current);
 int64_t api_mailbox_waiter_get(ffa_vm_id_t vm_id, const struct vcpu *current);

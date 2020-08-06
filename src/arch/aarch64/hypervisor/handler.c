@@ -646,14 +646,6 @@ struct vcpu *hvc_handler(struct vcpu *vcpu)
 	}
 
 	switch (args.func) {
-	case HF_VM_GET_COUNT:
-		vcpu->regs.r[0] = api_vm_get_count();
-		break;
-
-	case HF_VCPU_GET_COUNT:
-		vcpu->regs.r[0] = api_vcpu_get_count(args.arg1, vcpu);
-		break;
-
 	case HF_MAILBOX_WRITABLE_GET:
 		vcpu->regs.r[0] = api_mailbox_writable_get(vcpu);
 		break;

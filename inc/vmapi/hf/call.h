@@ -61,22 +61,6 @@ static inline ffa_vm_id_t hf_vm_get_id(void)
 }
 
 /**
- * Returns the number of secondary VMs.
- */
-static inline ffa_vm_count_t hf_vm_get_count(void)
-{
-	return hf_call(HF_VM_GET_COUNT, 0, 0, 0);
-}
-
-/**
- * Returns the number of vCPUs configured in the given secondary VM.
- */
-static inline ffa_vcpu_count_t hf_vcpu_get_count(ffa_vm_id_t vm_id)
-{
-	return hf_call(HF_VCPU_GET_COUNT, vm_id, 0, 0);
-}
-
-/**
  * Runs the given vCPU of the given VM.
  */
 static inline struct ffa_value ffa_run(ffa_vm_id_t vm_id,
