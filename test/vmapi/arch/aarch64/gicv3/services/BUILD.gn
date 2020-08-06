@@ -28,6 +28,20 @@ source_set("busy") {
   ]
 }
 
+# Service waiting for a direct message request.
+source_set("interrupts") {
+  testonly = true
+  public_configs = [ "//test/hftest:hftest_config" ]
+
+  sources = [
+    "interrupts.c",
+  ]
+
+  deps = [
+    ":common",
+  ]
+}
+
 # Service which uses timers.
 source_set("timer") {
   testonly = true
@@ -71,6 +85,7 @@ vm_kernel("gicv3_service_vm1") {
 
   deps = [
     ":busy",
+    ":interrupts",
     ":systemreg",
     ":timer",
     "//test/hftest:hftest_secondary_vm",

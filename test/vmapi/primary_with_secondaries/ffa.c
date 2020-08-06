@@ -324,3 +324,33 @@ TEST(ffa, ffa_secondary_spoofed_response)
 				      0);
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 }
+
+/*
+ * The secondary vCPU is waiting for a direct request, but the primary instead
+ * calls `FFA_RUN`. This should return immediately to the primary without the
+ * secondary ever actually being run.
+ */
+TEST(ffa, ffa_secondary_run)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_direct_msg_run", mb.send);
+	res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 1, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, 2);
+
+	res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 3, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, 4);
+}

@@ -291,3 +291,71 @@ TEST(interrupts, deliver_interrupt_and_message)
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
+
+/**
+ * The secondary vCPU is waiting for a direct msg request, but the primary
+ * instead injects an interrupt into it and calls FFA_RUN. The secondary
+ * should get FFA_INTERRUPT_32 returned, as well as the interrupt itself.
+ */
+TEST(interrupts_direct_msg, direct_msg_request_interrupted)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+
+	SERVICE_SELECT(SERVICE_VM1, "interruptible_echo_direct_msg", mb.send);
+
+	/* Let the secondary get started and wait for a message. */
+	res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);
+
+	/* Send an initial direct message request */
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 1, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, 2);
+
+	/* Inject an interrupt to the secondary VM */
+	hf_interrupt_inject(SERVICE_VM1, 0, EXTERNAL_INTERRUPT_ID_A);
+
+	/* Let the secondary VM run */
+	res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 3, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, 4);
+}
+
+/**
+ * The secondary vCPU is waiting for a direct request. The primary injects
+ * an interrupt into it and then calls FFA_MSG_SEND_DIRECT_REQ. The secondary
+ * shall get both the direct request and the interrupt.
+ */
+TEST(interrupts_direct_msg, direct_msg_request_with_interrupt)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+
+	SERVICE_SELECT(SERVICE_VM1,
+		       "interruptible_echo_direct_msg_with_interrupt", mb.send);
+
+	/* Let the secondary get started and wait for a message. */
+	res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);
+
+	/* Inject an interrupt to the secondary VM */
+	hf_interrupt_inject(SERVICE_VM1, 0, EXTERNAL_INTERRUPT_ID_A);
+
+	/*
+	 * Send a direct message request. Expect the secondary VM to receive
+	 * the message and the interrupt together. The secondary VM then
+	 * replies with a direct message response.
+	 */
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 1, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, 2);
+}

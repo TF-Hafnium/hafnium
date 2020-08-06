@@ -174,3 +174,23 @@ TEST_SERVICE(ffa_direct_msg_resp_invalid_sender_receiver)
 
 	ffa_msg_send_direct_resp(receiver, sender, 0, 0, 0, 0, 0);
 }
+
+/**
+ * Secondary VM waits for a direct message request but primary VM
+ * calls ffa_run instead. Verify the secondary VM does not run.
+ */
+TEST_SERVICE(ffa_direct_msg_run)
+{
+	struct ffa_value res = ffa_msg_wait();
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_EQ(res.arg3, 1);
+
+	res = ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
+				       ffa_msg_send_sender(res), 2, 0, 0, 0, 0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_EQ(res.arg3, 3);
+
+	ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
+				 ffa_msg_send_sender(res), 4, 0, 0, 0, 0);
+}

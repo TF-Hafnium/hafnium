@@ -36,6 +36,25 @@ TEAR_DOWN(timer_secondary)
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
+SET_UP(timer_secondary_ffa)
+{
+	system_setup();
+
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	SERVICE_SELECT(SERVICE_VM1, "timer_ffa_direct_msg", send_buffer);
+
+	interrupt_enable(VIRTUAL_TIMER_IRQ, true);
+	interrupt_set_edge_triggered(VIRTUAL_TIMER_IRQ, true);
+	interrupt_set_priority_mask(0xff);
+	arch_irq_enable();
+}
+
+TEAR_DOWN(timer_secondary_ffa)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
 static void timer_busywait_secondary()
 {
 	const char message[] = "loop 0099999";
@@ -272,4 +291,29 @@ TEST(timer_secondary, wfi_very_long)
 		     "remaining\n",
 		     run_res.arg2);
 	}
+}
+
+/**
+ * While handling a direct message, the secondary vCPU sets a timer to expire
+ * far in the future. The primary should get the direct response, then call
+ * FFA_RUN and get back an FFA_MSG_WAIT with arg2 != FFA_SLEEP_INDEFINITE.
+ */
+TEST(timer_secondary_ffa, timer_ffa_direct_msg_timeout)
+{
+	struct ffa_value res;
+
+	/* Let the secondary get started and wait for a message. */
+	res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);
+
+	/* Unblock secondary VM so it starts a long timer */
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 1, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, 2);
+
+	res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+	EXPECT_NE(res.arg2, FFA_SLEEP_INDEFINITE);
 }

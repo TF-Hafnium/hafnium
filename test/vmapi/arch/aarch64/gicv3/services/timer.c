@@ -14,6 +14,7 @@
 #include "hf/arch/vm/interrupts_gicv3.h"
 
 #include "hf/dlog.h"
+#include "hf/ffa.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
@@ -118,4 +119,28 @@ TEST_SERVICE(timer)
 		timer_fired = false;
 		dlog("Done waiting.\n");
 	}
+}
+
+/**
+ * Secondary VM handles a direct message request, starts a long timer,
+ * and sends a direct message response.
+ */
+TEST_SERVICE(timer_ffa_direct_msg)
+{
+	struct ffa_value res;
+
+	exception_setup(irq_current, NULL);
+	hf_interrupt_enable(HF_VIRTUAL_TIMER_INTID, true);
+	arch_irq_enable();
+
+	res = ffa_msg_wait();
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_EQ(res.arg3, 1);
+
+	dlog("Starting long timer\n");
+	timer_set(9999999);
+	timer_start();
+
+	ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
+				 ffa_msg_send_sender(res), 2, 0, 0, 0, 0);
 }
