@@ -416,15 +416,13 @@ static struct wait_entry *api_fetch_waiter(struct vm_locked locked_vm)
  *  - 1 if it was called by the primary VM and the primary VM now needs to wake
  *    up or kick the target vCPU.
  */
-static int64_t internal_interrupt_inject(struct vcpu *target_vcpu,
-					 uint32_t intid, struct vcpu *current,
-					 struct vcpu **next)
+static int64_t internal_interrupt_inject_locked(
+	struct vcpu_locked target_locked, uint32_t intid, struct vcpu *current,
+	struct vcpu **next)
 {
 	uint32_t intid_index = intid / INTERRUPT_REGISTER_BITS;
 	uint32_t intid_mask = 1U << (intid % INTERRUPT_REGISTER_BITS);
 	int64_t ret = 0;
-
-	sl_lock(&target_vcpu->lock);
 
 	/*
 	 * We only need to change state and (maybe) trigger a virtual IRQ if it
@@ -434,20 +432,20 @@ static int64_t internal_interrupt_inject(struct vcpu *target_vcpu,
 	 * If you change this logic make sure to update the need_vm_lock logic
 	 * above to match.
 	 */
-	if (!(target_vcpu->interrupts.interrupt_enabled[intid_index] &
-	      ~target_vcpu->interrupts.interrupt_pending[intid_index] &
+	if (!(target_locked.vcpu->interrupts.interrupt_enabled[intid_index] &
+	      ~target_locked.vcpu->interrupts.interrupt_pending[intid_index] &
 	      intid_mask)) {
 		goto out;
 	}
 
 	/* Increment the count. */
-	target_vcpu->interrupts.enabled_and_pending_count++;
+	target_locked.vcpu->interrupts.enabled_and_pending_count++;
 
 	/*
 	 * Only need to update state if there was not already an
 	 * interrupt enabled and pending.
 	 */
-	if (target_vcpu->interrupts.enabled_and_pending_count != 1) {
+	if (target_locked.vcpu->interrupts.enabled_and_pending_count != 1) {
 		goto out;
 	}
 
@@ -457,15 +455,30 @@ static int64_t internal_interrupt_inject(struct vcpu *target_vcpu,
 		 * should run or kick the target vCPU.
 		 */
 		ret = 1;
-	} else if (current != target_vcpu && next != NULL) {
-		*next = api_wake_up(current, target_vcpu);
+	} else if (current != target_locked.vcpu && next != NULL) {
+		*next = api_wake_up(current, target_locked.vcpu);
 	}
 
 out:
 	/* Either way, make it pending. */
-	target_vcpu->interrupts.interrupt_pending[intid_index] |= intid_mask;
+	target_locked.vcpu->interrupts.interrupt_pending[intid_index] |=
+		intid_mask;
 
-	sl_unlock(&target_vcpu->lock);
+	return ret;
+}
+
+/* Wrapper to internal_interrupt_inject with locking of target vCPU */
+static int64_t internal_interrupt_inject(struct vcpu *target_vcpu,
+					 uint32_t intid, struct vcpu *current,
+					 struct vcpu **next)
+{
+	int64_t ret;
+	struct vcpu_locked target_locked;
+
+	target_locked = vcpu_lock(target_vcpu);
+	ret = internal_interrupt_inject_locked(target_locked, intid, current,
+					       next);
+	vcpu_unlock(&target_locked);
 
 	return ret;
 }
