@@ -225,19 +225,34 @@ static enum manifest_return_code read_uint8(const struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
+static enum manifest_return_code read_optional_uint8(
+	const struct fdt_node *node, const char *property,
+	uint8_t default_value, uint8_t *out)
+{
+	enum manifest_return_code ret;
+
+	ret = read_uint8(node, property, out);
+	if (ret == MANIFEST_ERROR_PROPERTY_NOT_FOUND) {
+		*out = default_value;
+		return MANIFEST_SUCCESS;
+	}
+
+	return MANIFEST_SUCCESS;
+}
+
 struct uint32list_iter {
 	struct memiter mem_it;
 };
 
-static enum manifest_return_code read_optional_uint32list(
-	const struct fdt_node *node, const char *property,
-	struct uint32list_iter *out)
+static enum manifest_return_code read_uint32list(const struct fdt_node *node,
+						 const char *property,
+						 struct uint32list_iter *out)
 {
 	struct memiter data;
 
 	if (!fdt_read_property(node, property, &data)) {
 		memiter_init(&out->mem_it, NULL, 0);
-		return MANIFEST_SUCCESS;
+		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
 	}
 
 	if ((memiter_size(&data) % sizeof(uint32_t)) != 0) {
@@ -246,6 +261,18 @@ static enum manifest_return_code read_optional_uint32list(
 
 	out->mem_it = data;
 	return MANIFEST_SUCCESS;
+}
+
+static enum manifest_return_code read_optional_uint32list(
+	const struct fdt_node *node, const char *property,
+	struct uint32list_iter *out)
+{
+	enum manifest_return_code ret = read_uint32list(node, property, out);
+
+	if (ret == MANIFEST_ERROR_PROPERTY_NOT_FOUND) {
+		return MANIFEST_SUCCESS;
+	}
+	return ret;
 }
 
 static bool uint32list_has_next(const struct uint32list_iter *list)
@@ -479,7 +506,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 		TRY(read_bool(dev_node, "exclusive-access",
 			      &dev_regions[i].exclusive_access));
-		dlog_verbose("      Exclusive_access: %d\n",
+		dlog_verbose("      Exclusive_access: %u\n",
 			     dev_regions[i].exclusive_access);
 
 		i++;
@@ -512,45 +539,47 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	}
 
 	TRY(read_uint32(&root, "ffa-version", &vm->sp.ffa_version));
-	dlog_verbose("  SP expected FF-A version %d.%d\n",
+	dlog_verbose("  Expected FF-A version %u.%u\n",
 		     vm->sp.ffa_version >> 16, vm->sp.ffa_version & 0xffff);
 
-	TRY(read_optional_uint32list(&root, "uuid", &uuid));
+	TRY(read_uint32list(&root, "uuid", &uuid));
 
 	while (uint32list_has_next(&uuid) && i < 4) {
 		TRY(uint32list_get_next(&uuid, &uuid_word));
 		vm->sp.uuid.uuid[i] = uuid_word;
 		i++;
 	}
-	dlog_verbose("  SP UUID %#x-%x-%x_%x\n", vm->sp.uuid.uuid[0],
+	dlog_verbose("  UUID %#x-%x-%x-%x\n", vm->sp.uuid.uuid[0],
 		     vm->sp.uuid.uuid[1], vm->sp.uuid.uuid[2],
 		     vm->sp.uuid.uuid[3]);
 
 	TRY(read_uint16(&root, "execution-ctx-count",
 			&vm->sp.execution_ctx_count));
-	dlog_verbose("  SP number of execution context %d\n",
+	dlog_verbose("  Number of execution context %u\n",
 		     vm->sp.execution_ctx_count);
 
 	TRY(read_uint8(&root, "exception-level",
 		       (uint8_t *)&vm->sp.run_time_el));
-	dlog_verbose("  SP run-time EL %d\n", vm->sp.run_time_el);
+	dlog_verbose("  Run-time EL %u\n", vm->sp.run_time_el);
 
 	TRY(read_uint8(&root, "execution-state",
 		       (uint8_t *)&vm->sp.execution_state));
-	dlog_verbose("  SP execution state %d\n", vm->sp.execution_state);
+	dlog_verbose("  Execution state %u\n", vm->sp.execution_state);
 
-	TRY(read_uint64(&root, "load-address", &vm->sp.load_addr));
-	dlog_verbose("  SP load address %#x\n", vm->sp.load_addr);
+	TRY(read_optional_uint64(&root, "load-address", 0, &vm->sp.load_addr));
+	dlog_verbose("  Load address %#x\n", vm->sp.load_addr);
 
-	TRY(read_uint64(&root, "entrypoint-offset", &vm->sp.ep_offset));
-	dlog_verbose("  SP entry point offset %#x\n", vm->sp.ep_offset);
+	TRY(read_optional_uint64(&root, "entrypoint-offset", 0,
+				 &vm->sp.ep_offset));
+	dlog_verbose("  Entry point offset %#x\n", vm->sp.ep_offset);
 
 	TRY(read_optional_uint16(&root, "boot-order", DEFAULT_BOOT_ORDER,
 				 &vm->sp.boot_order));
-	dlog_verbose(" SP boot order %#u\n", vm->sp.boot_order);
+	dlog_verbose("  Boot order %#u\n", vm->sp.boot_order);
 
-	TRY(read_uint8(&root, "xlat-granule", (uint8_t *)&vm->sp.xlat_granule));
-	dlog_verbose("  SP translation granule %d\n", vm->sp.xlat_granule);
+	TRY(read_optional_uint8(&root, "xlat-granule", 0,
+				(uint8_t *)&vm->sp.xlat_granule));
+	dlog_verbose("  Translation granule %u\n", vm->sp.xlat_granule);
 
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &rxtx_node_name)) {
@@ -574,7 +603,7 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 
 	TRY(read_uint8(&root, "messaging-method",
 		       (uint8_t *)&vm->sp.messaging_method));
-	dlog_verbose("  SP messaging method %d\n", vm->sp.messaging_method);
+	dlog_verbose("  Messaging method %u\n", vm->sp.messaging_method);
 
 	/* Parse memory-regions */
 	ffa_node = root;
@@ -613,25 +642,25 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 
 	if (ffa_version_major != FFA_VERSION_MAJOR ||
 	    ffa_version_minor > FFA_VERSION_MINOR) {
-		dlog_error("FF-A partition manifest version %s: %d.%d\n",
+		dlog_error("FF-A partition manifest version %s: %u.%u\n",
 			   error_string, ffa_version_major, ffa_version_minor);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
 	if (vm->sp.xlat_granule != PAGE_4KB) {
-		dlog_error("Translation granule %s: %d\n", error_string,
+		dlog_error("Translation granule %s: %u\n", error_string,
 			   vm->sp.xlat_granule);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
 	if (vm->sp.execution_state != AARCH64) {
-		dlog_error("Execution state %s: %d\n", error_string,
+		dlog_error("Execution state %s: %u\n", error_string,
 			   vm->sp.execution_state);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
 	if (vm->sp.run_time_el != EL1 && vm->sp.run_time_el != S_EL1) {
-		dlog_error("Exception level %s: %d\n", error_string,
+		dlog_error("Exception level %s: %u\n", error_string,
 			   vm->sp.run_time_el);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
@@ -672,7 +701,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	/* Map top of SP package as a single page to extract the header */
+	/* Map top of package as a single page to extract the header */
 	sp_pkg_start = pa_init(sp_pkg_addr);
 	sp_pkg_end = pa_add(sp_pkg_start, PAGE_SIZE);
 	sp_pkg = mm_identity_map(stage1_locked, sp_pkg_start,
@@ -680,21 +709,21 @@ static enum manifest_return_code parse_ffa_partition_package(
 				 ppool);
 	CHECK(sp_pkg != NULL);
 
-	dlog_verbose("SP package load address %#x\n", sp_pkg_addr);
+	dlog_verbose("Package load address %#x\n", sp_pkg_addr);
 
 	if (sp_pkg->magic != SP_PKG_HEADER_MAGIC) {
-		dlog_error("Invalid SP package magic.\n");
+		dlog_error("Invalid package magic.\n");
 		goto exit_unmap;
 	}
 
 	if (sp_pkg->version != SP_PKG_HEADER_VERSION) {
-		dlog_error("Invalid SP package version.\n");
+		dlog_error("Invalid package version.\n");
 		goto exit_unmap;
 	}
 
-	/* Expect SP DTB to immediately follow header */
+	/* Expect DTB to immediately follow header */
 	if (sp_pkg->pm_offset != sizeof(struct sp_pkg_header)) {
-		dlog_error("Invalid SP package manifest offset.\n");
+		dlog_error("Invalid package manifest offset.\n");
 		goto exit_unmap;
 	}
 
@@ -702,7 +731,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 		sp_pkg->pm_size + sizeof(struct sp_pkg_header), PAGE_SIZE);
 	if ((vm_id != HF_PRIMARY_VM_ID) &&
 	    (sp_header_dtb_size >= vm->secondary.mem_size)) {
-		dlog_error("Invalid SP package header or DT size.\n");
+		dlog_error("Invalid package header or DT size.\n");
 		goto exit_unmap;
 	}
 
@@ -716,7 +745,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 	}
 
 	sp_dtb_addr = pa_add(sp_pkg_start, sp_pkg->pm_offset);
-	if (!fdt_init_from_ptr(&sp_fdt, (void *)sp_dtb_addr.pa,
+	if (!fdt_init_from_ptr(&sp_fdt, (void *)pa_addr(sp_dtb_addr),
 			       sp_pkg->pm_size)) {
 		dlog_error("FDT failed validation.\n");
 		goto exit_unmap;

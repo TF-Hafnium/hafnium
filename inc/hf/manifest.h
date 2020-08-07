@@ -131,7 +131,7 @@ struct sp_manifest {
 	uintpaddr_t load_addr;
 	/** optional */
 	size_t ep_offset;
-	/**  4/16/64KB - mandatory */
+	/**  4/16/64KB - optional */
 	enum xlat_granule xlat_granule;
 	/** optional */
 	uint16_t boot_order;
@@ -145,8 +145,6 @@ struct sp_manifest {
 	bool has_primary_scheduler;
 	/** optional - preemptible / run to completion */
 	uint8_t runtime_model;
-	/** optional */
-	bool time_slice_mem;
 	/** optional - tuples SEPID/SMMUID/streamId */
 	uint32_t stream_ep_ids[1];
 
