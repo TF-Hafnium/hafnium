@@ -165,3 +165,28 @@ TEST(ffa, ffa_partition_info)
 	ret = ffa_rx_release();
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
+
+/**
+ * Trying to run a partition which is waiting for a message should not actually
+ * run it, but return FFA_MSG_WAIT again.
+ */
+TEST(ffa, run_waiting)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value run_res;
+
+	SERVICE_SELECT(SERVICE_VM1, "run_waiting", mb.send);
+
+	/* Let the secondary get started and wait for a message. */
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
+
+	/*
+	 * Trying to run it again should return the same value, and not actually
+	 * run it.
+	 */
+	run_res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
+}

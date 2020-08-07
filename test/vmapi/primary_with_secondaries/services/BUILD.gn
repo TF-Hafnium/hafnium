@@ -169,6 +169,16 @@ source_set("relay") {
   ]
 }
 
+# Service to wait for a message but expect never to get one.
+source_set("run_waiting") {
+  testonly = true
+  public_configs = [ "//test/hftest:hftest_config" ]
+
+  sources = [
+    "run_waiting.c",
+  ]
+}
+
 # Service to start a second vCPU and send messages from both.
 source_set("smp") {
   testonly = true
@@ -230,6 +240,7 @@ vm_kernel("service_vm1") {
     ":perfmon",
     ":receive_block",
     ":relay",
+    ":run_waiting",
     ":unmapped",
     ":wfi",
     "//test/hftest:hftest_secondary_vm",

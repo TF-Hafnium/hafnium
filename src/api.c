@@ -561,8 +561,10 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 			break;
 		}
 
+		uint64_t timer_remaining_ns = FFA_SLEEP_INDEFINITE;
+
 		if (arch_timer_enabled(&vcpu->regs)) {
-			uint64_t timer_remaining_ns =
+			timer_remaining_ns =
 				arch_timer_remaining_ns(&vcpu->regs);
 
 			/*
@@ -572,19 +574,17 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 			if (timer_remaining_ns == 0) {
 				break;
 			}
+		}
 
-			/*
-			 * The vCPU is not ready to run, return the appropriate
-			 * code to the primary which called vcpu_run.
-			 */
-			run_ret->func =
-				vcpu->state == VCPU_STATE_BLOCKED_MAILBOX
+		/*
+		 * The vCPU is not ready to run, return the appropriate code to
+		 * the primary which called vcpu_run.
+		 */
+		run_ret->func = vcpu->state == VCPU_STATE_BLOCKED_MAILBOX
 					? FFA_MSG_WAIT_32
 					: HF_FFA_RUN_WAIT_FOR_INTERRUPT;
-			run_ret->arg1 =
-				ffa_vm_vcpu(vcpu->vm->id, vcpu_index(vcpu));
-			run_ret->arg2 = timer_remaining_ns;
-		}
+		run_ret->arg1 = ffa_vm_vcpu(vcpu->vm->id, vcpu_index(vcpu));
+		run_ret->arg2 = timer_remaining_ns;
 
 		ret = false;
 		goto out;
