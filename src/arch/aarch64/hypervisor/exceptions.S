@@ -79,8 +79,9 @@
 	sub x18, x18, #0x18
 	cbz x18, system_register_access
 
-	/* Read syndrome register and call C handler. */
+	/* Call C handler passing the syndrome and fault address registers. */
 	mrs x0, esr_el2
+	mrs x1, far_el2
 	bl sync_lower_exception
 
 	/* Switch vCPU if requested by handler. */

@@ -521,17 +521,18 @@ static uintreg_t get_el1_exception_handler_addr(const struct vcpu *vcpu)
 /**
  * Injects an exception with the specified Exception Syndrom Register value into
  * the EL1.
- * See Arm Architecture Reference Manual Armv8-A, page D13-2924.
  *
  * NOTE: This function assumes that the lazy registers haven't been saved, and
  * writes to the lazy registers of the CPU directly instead of the vCPU.
  */
-static void inject_el1_exception(struct vcpu *vcpu, uintreg_t esr_el1_value)
+static void inject_el1_exception(struct vcpu *vcpu, uintreg_t esr_el1_value,
+				 uintreg_t far_el1_value)
 {
 	uintreg_t handler_address = get_el1_exception_handler_addr(vcpu);
 
 	/* Update the CPU state to inject the exception. */
 	write_msr(esr_el1, esr_el1_value);
+	write_msr(far_el1, far_el1_value);
 	write_msr(elr_el1, vcpu->regs.pc);
 	write_msr(spsr_el1, vcpu->regs.spsr);
 
@@ -540,7 +541,6 @@ static void inject_el1_exception(struct vcpu *vcpu, uintreg_t esr_el1_value)
 	 * EL1h mode is used because by default, taking an exception selects the
 	 * stack pointer for the target Exception level. The software can change
 	 * that later in the handler if needed.
-	 * See Arm Architecture Reference Manual Armv8-A, page D13-2924
 	 */
 	vcpu->regs.spsr = PSR_D | PSR_A | PSR_I | PSR_F | PSR_PE_MODE_EL1H;
 
@@ -552,7 +552,8 @@ static void inject_el1_exception(struct vcpu *vcpu, uintreg_t esr_el1_value)
  * Injects a Data Abort exception (same exception level).
  */
 static void inject_el1_data_abort_exception(struct vcpu *vcpu,
-					    uintreg_t esr_el2)
+					    uintreg_t esr_el2,
+					    uintreg_t far_el2)
 {
 	/*
 	 *  ISS encoding remains the same, but the EC is changed to reflect
@@ -565,14 +566,15 @@ static void inject_el1_data_abort_exception(struct vcpu *vcpu,
 	dlog_notice("Injecting Data Abort exception into VM%d.\n",
 		    vcpu->vm->id);
 
-	inject_el1_exception(vcpu, esr_el1_value);
+	inject_el1_exception(vcpu, esr_el1_value, far_el2);
 }
 
 /**
  * Injects a Data Abort exception (same exception level).
  */
 static void inject_el1_instruction_abort_exception(struct vcpu *vcpu,
-						   uintreg_t esr_el2)
+						   uintreg_t esr_el2,
+						   uintreg_t far_el2)
 {
 	/*
 	 *  ISS encoding remains the same, but the EC is changed to reflect
@@ -586,7 +588,7 @@ static void inject_el1_instruction_abort_exception(struct vcpu *vcpu,
 	dlog_notice("Injecting Instruction Abort exception into VM%d.\n",
 		    vcpu->vm->id);
 
-	inject_el1_exception(vcpu, esr_el1_value);
+	inject_el1_exception(vcpu, esr_el1_value, far_el2);
 }
 
 /**
@@ -596,6 +598,12 @@ static void inject_el1_unknown_exception(struct vcpu *vcpu, uintreg_t esr_el2)
 {
 	uintreg_t esr_el1_value =
 		GET_ESR_IL(esr_el2) | (EC_UNKNOWN << ESR_EC_OFFSET);
+
+	/*
+	 * The value of the far_el2 register is UNKNOWN in this case,
+	 * therefore, don't propagate it to avoid leaking sensitive information.
+	 */
+	uintreg_t far_el1_value = 0;
 	char *direction_str;
 
 	direction_str = ISS_IS_READ(esr_el2) ? "read" : "write";
@@ -609,7 +617,7 @@ static void inject_el1_unknown_exception(struct vcpu *vcpu, uintreg_t esr_el2)
 	dlog_notice("Injecting Unknown Reason exception into VM%d.\n",
 		    vcpu->vm->id);
 
-	inject_el1_exception(vcpu, esr_el1_value);
+	inject_el1_exception(vcpu, esr_el1_value, far_el1_value);
 }
 
 struct vcpu *hvc_handler(struct vcpu *vcpu)
@@ -764,7 +772,7 @@ static struct vcpu_fault_info fault_info_init(uintreg_t esr,
 	return r;
 }
 
-struct vcpu *sync_lower_exception(uintreg_t esr)
+struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 {
 	struct vcpu *vcpu = current();
 	struct vcpu_fault_info info;
@@ -795,7 +803,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 			return NULL;
 		}
 		/* Inform the EL1 of the data abort. */
-		inject_el1_data_abort_exception(vcpu, esr);
+		inject_el1_data_abort_exception(vcpu, esr, far);
 
 		/* Schedule the same VM to continue running. */
 		return NULL;
@@ -806,7 +814,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr)
 			return NULL;
 		}
 		/* Inform the EL1 of the instruction abort. */
-		inject_el1_instruction_abort_exception(vcpu, esr);
+		inject_el1_instruction_abort_exception(vcpu, esr, far);
 
 		/* Schedule the same VM to continue running. */
 		return NULL;

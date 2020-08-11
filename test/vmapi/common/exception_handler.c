@@ -93,7 +93,16 @@ static bool exception_handler_yield(void)
 bool exception_handler_yield_unknown(void)
 {
 	uintreg_t esr_el1 = read_msr(ESR_EL1);
+	uintreg_t far_el1 = read_msr(FAR_EL1);
+
 	EXPECT_EQ(GET_ESR_EC(esr_el1), EC_UNKNOWN);
+
+	/*
+	 * For unknown exceptions, the value of far_el1 is UNKNOWN.
+	 * Hafnium sets it to 0.
+	 */
+	EXPECT_EQ(far_el1, 0);
+
 	return exception_handler_yield();
 }
 
@@ -105,7 +114,11 @@ bool exception_handler_yield_unknown(void)
 bool exception_handler_yield_data_abort(void)
 {
 	uintreg_t esr_el1 = read_msr(ESR_EL1);
+	uintreg_t far_el1 = read_msr(FAR_EL1);
+
 	EXPECT_EQ(GET_ESR_EC(esr_el1), EC_DATA_ABORT_SAME_EL);
+	EXPECT_NE(far_el1, 0);
+
 	return exception_handler_yield();
 }
 
@@ -117,7 +130,11 @@ bool exception_handler_yield_data_abort(void)
 bool exception_handler_yield_instruction_abort(void)
 {
 	uintreg_t esr_el1 = read_msr(ESR_EL1);
+	uintreg_t far_el1 = read_msr(FAR_EL1);
+
 	EXPECT_EQ(GET_ESR_EC(esr_el1), EC_INSTRUCTION_ABORT_SAME_EL);
+	EXPECT_NE(far_el1, 0);
+
 	return exception_handler_yield();
 }
 
