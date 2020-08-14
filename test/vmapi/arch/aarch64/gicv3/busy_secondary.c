@@ -80,8 +80,8 @@ TEST(busy_secondary, virtual_timer)
 		FFA_SUCCESS_32);
 
 	dlog("Starting timer\n");
-	/* Set virtual timer for 3 mS and enable. */
-	write_msr(CNTV_TVAL_EL0, ns_to_ticks(3000000));
+	/* Set virtual timer for 20 mS and enable. */
+	write_msr(CNTV_TVAL_EL0, ns_to_ticks(20000000));
 	write_msr(CNTV_CTL_EL0, 0x00000001);
 
 	run_res = ffa_run(SERVICE_VM1, 0);
@@ -139,8 +139,8 @@ TEST(busy_secondary, physical_timer)
 		FFA_SUCCESS_32);
 
 	dlog("Starting timer\n");
-	/* Set physical timer for 3 ms and enable. */
-	write_msr(CNTP_TVAL_EL0, ns_to_ticks(3000000));
+	/* Set physical timer for 20 ms and enable. */
+	write_msr(CNTP_TVAL_EL0, ns_to_ticks(20000000));
 	write_msr(CNTP_CTL_EL0, 0x00000001);
 
 	run_res = ffa_run(SERVICE_VM1, 0);
