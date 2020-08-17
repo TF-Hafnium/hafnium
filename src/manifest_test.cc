@@ -212,6 +212,22 @@ class ManifestDtBuilder
 		return *this;
 	}
 
+	ManifestDtBuilder &FfaValidManifest()
+	{
+		Compatible({"arm,ffa-manifest-1.0"});
+		Property("ffa-version", "<0x10000>");
+		Property("uuid",
+			 "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>");
+		Property("execution-ctx-count", "<1>");
+		Property("exception-level", "<2>");
+		Property("execution-state", "<0>");
+		Property("load-address", "<0x7000000>");
+		Property("entrypoint-offset", "<0x00001000>");
+		Property("xlat-granule", "<0>");
+		Property("messaging-method", "<1>");
+		return *this;
+	}
+
        private:
 	ManifestDtBuilder &StringProperty(const std::string_view &name,
 					  const std::string_view &value)
@@ -802,16 +818,7 @@ TEST(manifest, ffa_valid)
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
-		.Compatible({ "arm,ffa-manifest-1.0" })
-		.Property("ffa-version", "<0x10000>")
-		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
-		.Property("execution-ctx-count", "<1>")
-		.Property("exception-level", "<2>")
-		.Property("execution-state", "<0>")
-		.Property("load-address", "<0x7000000>")
-		.Property("entrypoint-offset", "<0x00001000>")
-		.Property("xlat-granule", "<0>")
-		.Property("messaging-method", "<1>")
+		.FfaValidManifest()
 		.Build();
 	/* clang-format on */
 
