@@ -56,6 +56,11 @@
 
 alignas(PAGE_SIZE) uint8_t hv_rx[4096];
 alignas(PAGE_SIZE) uint8_t hv_tx[4096];
+#if SECURE_WORLD == 1
+struct spinlock rx_lock;
+#else
+struct spinlock tx_lock;
+#endif
 
 #if SECURE_WORLD == 1
 
@@ -543,7 +548,7 @@ struct spci_value api_spci_partition_info_get(struct vcpu *current,
 		/* Call from partition. */
 		sl_lock(&current_vm->lock);
 
-		/* RX buffer is clear to populate. */
+		/* RX buffer is clear to populate. Reuse hafnium framework. */
 		if (current_vm->mailbox.state == MAILBOX_STATE_EMPTY) {
 			current_vm->mailbox.state = MAILBOX_STATE_RECEIVED;
 			memcpy_s(current_vm->mailbox.recv, HF_MAILBOX_SIZE, &info,
@@ -561,9 +566,14 @@ struct spci_value api_spci_partition_info_get(struct vcpu *current,
 		sl_unlock(&current_vm->lock);
 	}
 	else {
-		/*Call from Hypervisor / SPM */
+		#if SECURE_WORLD == 0
+		/*Call from Hypervisor */
+		panic("Invocation of PARTITION_INFO_GET not supported from HYP!\n");
+		#else
+		sl_lock(&rx_lock);
 		memcpy_s(get_hv_rx(), HF_MAILBOX_SIZE, &info,
 				 sizeof(struct spci_partition_info) * count);
+		#endif
 	}
 	struct spci_value ret = {.func = SPCI_SUCCESS_32, .arg2 = count};
 	return ret;
@@ -621,8 +631,24 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 			return true;
 		}
 		case SPCI_RX_RELEASE_32:
+		#if SECURE_WORLD == 1
+			if (eret_origin) {
+				/* TODO: Check if we have lock? */
+				sl_unlock(&rx_lock);
+				/* Return to Normal world */
+				*args = (struct spci_value){.func = SPCI_SUCCESS_32};
+				spmd_exit(args);
+				eret_origin = true;
+				break;
+			}
+			else {
+				*args = api_spci_rx_release(current(), next);
+				return true;
+			}
+		#else
 			*args = api_spci_rx_release(current(), next);
 			return true;
+		#endif
 		case SPCI_RXTX_MAP_32:
 		case SPCI_RXTX_MAP_64:
 

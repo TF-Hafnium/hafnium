@@ -27,6 +27,9 @@
 extern uint8_t hv_rx[4096];
 extern uint8_t hv_tx[4096];
 
+#if SECURE_WORLD == 0
+extern struct spinlock tx_lock;
+#endif
 
 struct handle_to_pointer {
 	/* Owner vm_id. */
@@ -80,6 +83,7 @@ static struct spci_memory_region *get_memory_region(struct handle_to_pointer
 	return NULL;
 }
 
+#if SECURE_WORLD == 0
 /* Store the handler in the internal data structure. */
 static void store_handle(struct handle_to_pointer *map, handle_t handle,
 			 struct spci_memory_region *memory_region)
@@ -90,6 +94,7 @@ static void store_handle(struct handle_to_pointer *map, handle_t handle,
 	map[map_index].handle = handle;
 	map[map_index].memory_region = memory_region;
 }
+#endif
 
 bool allocate_handle(struct spci_memory_region *memory_region, handle_t *handle)
 {
@@ -171,9 +176,12 @@ struct spci_value spci_mem_share_internal(
 	uint32_t constituent_count;
 	uint32_t memory_region_size;
 	bool world_change_required = false;
-	struct spci_value smc_res;
 
 	handle_t handle;
+
+#if SECURE_WORLD == 0
+	struct spci_value smc_res;
+#endif
 
 	const struct spci_memory_region *rx_memory_region;
 	struct spci_memory_region *memory_region_copy = NULL;
@@ -203,7 +211,7 @@ struct spci_value spci_mem_share_internal(
 		      "page\n");
 	}
 
-	
+
 	dlog("---Mem_share_invocation-- page_count %d, fragment_len %d, length %d, cookie %d\n", page_count, fragment_len, length, cookie);
 	// first invocation of a multi-fragment mem-copy has length != 0.
 	if(length != 0)
@@ -301,14 +309,15 @@ struct spci_value spci_mem_share_internal(
 	if (world_change_required && (!world_switched)) {
 # if SECURE_WORLD
 	panic("We should not be here in the secure_world.\n");
-#endif
+#else
 		/* Write the region descriptor onto Hf's Tx buffer. */
+		sl_lock(&tx_lock);
 		memcpy_s(hv_tx, 4096, offsetted_region_copy, fragment_len);
 
 		/* This receiver is in the Secure side. */
 		smc_res = smc64(SPCI_MEM_SHARE_64, base_addr, page_count,
 				fragment_len, length, cookie, 0, 0);
-
+		sl_unlock(&tx_lock);
 		if (smc_res.func == SPCI_ERROR_32) {
 			mpool_add_chunk(&local_page_pool, memory_region_copy,
 					memory_region_size);
@@ -326,7 +335,7 @@ struct spci_value spci_mem_share_internal(
 			store_handle(handle_map_opposite_world, handle,
 					 memory_region_copy);
 		}
-
+#endif
 	} else {
 		/*
 		 * Either the memory is only shared within the same world or we are
@@ -455,9 +464,9 @@ static bool spci_map_region_s2(struct spci_memory_region *memory_region,
 #define MAX_COOKIE 10
 static bool cookie_tracker[MAX_COOKIE] = {0};
 
-/** 
+/**
  * Obtain a unique cookie to be used in the retrieve operations.
- * Must only be called with tx_lock acquired.
+ * Must only be called with retrieve_lock acquired.
  *
  * A 0 return signals failure.
  */
@@ -479,7 +488,7 @@ static inline uint32_t get_retrieve_cookie()
 
 /**
  * Put a unique cookie used for retrieve operations.
- */ 
+ */
 static inline bool put_retrieve_cookie(uint32_t cookie)
 {
 
