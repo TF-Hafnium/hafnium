@@ -109,8 +109,8 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm);
 void vcpu_on(struct vcpu_locked vcpu, ipaddr_t entry, uintreg_t arg);
 ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu);
 bool vcpu_is_off(struct vcpu_locked vcpu);
-bool vcpu_secondary_reset_and_start(struct vcpu *vcpu, ipaddr_t entry,
-				    uintreg_t arg);
+bool vcpu_secondary_reset_and_start(struct vcpu_locked vcpu_locked,
+				    ipaddr_t entry, uintreg_t arg);
 
 bool vcpu_handle_page_fault(const struct vcpu *current,
 			    struct vcpu_fault_info *f);

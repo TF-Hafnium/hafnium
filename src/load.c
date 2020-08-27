@@ -365,6 +365,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 {
 	struct vm *vm;
 	struct vm_locked vm_locked;
+	struct vcpu_locked vcpu_locked;
 	struct vcpu *vcpu;
 	ipaddr_t secondary_entry;
 	bool ret;
@@ -561,8 +562,9 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	vcpu = vm_get_vcpu(vm, 0);
 
+	vcpu_locked = vcpu_lock(vcpu);
 	if (has_fdt) {
-		vcpu_secondary_reset_and_start(vcpu, secondary_entry,
+		vcpu_secondary_reset_and_start(vcpu_locked, secondary_entry,
 					       pa_addr(fdt_addr));
 	} else {
 		/*
@@ -570,8 +572,11 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		 * passed in register x0, which is what
 		 * vcpu_secondary_reset_and_start does in this case.
 		 */
-		vcpu_secondary_reset_and_start(vcpu, secondary_entry, mem_size);
+		vcpu_secondary_reset_and_start(vcpu_locked, secondary_entry,
+					       mem_size);
 	}
+
+	vcpu_unlock(&vcpu_locked);
 
 	ret = true;
 

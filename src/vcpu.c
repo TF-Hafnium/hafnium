@@ -114,16 +114,14 @@ bool vcpu_is_off(struct vcpu_locked vcpu)
  * Returns true if the secondary was reset and started, or false if it was
  * already on and so nothing was done.
  */
-bool vcpu_secondary_reset_and_start(struct vcpu *vcpu, ipaddr_t entry,
-				    uintreg_t arg)
+bool vcpu_secondary_reset_and_start(struct vcpu_locked vcpu_locked,
+				    ipaddr_t entry, uintreg_t arg)
 {
-	struct vcpu_locked vcpu_locked;
-	struct vm *vm = vcpu->vm;
+	struct vm *vm = vcpu_locked.vcpu->vm;
 	bool vcpu_was_off;
 
 	CHECK(vm->id != HF_PRIMARY_VM_ID);
 
-	vcpu_locked = vcpu_lock(vcpu);
 	vcpu_was_off = vcpu_is_off(vcpu_locked);
 	if (vcpu_was_off) {
 		/*
@@ -132,10 +130,9 @@ bool vcpu_secondary_reset_and_start(struct vcpu *vcpu, ipaddr_t entry,
 		 * vCPU is defined as the index and does not match the ID of the
 		 * pCPU it is running on.
 		 */
-		arch_regs_reset(vcpu);
+		arch_regs_reset(vcpu_locked.vcpu);
 		vcpu_on(vcpu_locked, entry, arg);
 	}
-	vcpu_unlock(&vcpu_locked);
 
 	return vcpu_was_off;
 }
@@ -186,7 +183,7 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 
 void vcpu_reset(struct vcpu *vcpu)
 {
-	arch_cpu_init(vcpu->cpu, ipa_init(0));
+	arch_cpu_init(vcpu->cpu, vcpu->vm->secondary_ep);
 
 	/* Reset the registers to give a clean start for vCPU. */
 	arch_regs_reset(vcpu);

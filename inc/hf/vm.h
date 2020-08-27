@@ -121,11 +121,17 @@ struct vm {
 	atomic_bool aborting;
 
 	/**
-	 * Booting parameters.
+	 * Booting parameters (FF-A SP partitions).
 	 */
 	bool initialized;
 	uint16_t boot_order;
 	struct vm *next_boot;
+
+	/**
+	 * Secondary entry point supplied by FFA_SECONDARY_EP_REGISTER used
+	 * for cold and warm boot of SP execution contexts.
+	 */
+	ipaddr_t secondary_ep;
 
 	/** Arch-specific VM information. */
 	struct arch_vm arch;

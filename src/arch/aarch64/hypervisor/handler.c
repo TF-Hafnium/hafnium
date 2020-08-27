@@ -470,6 +470,10 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			ffa_msg_send_sender(*args),
 			ffa_msg_send_receiver(*args), *args, current, next);
 		return true;
+	case FFA_SECONDARY_EP_REGISTER_32:
+		*args = api_ffa_secondary_ep_register(ipa_init(args->arg1),
+						      current);
+		return true;
 	}
 
 	return false;

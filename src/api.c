@@ -545,6 +545,8 @@ static struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 				 struct ffa_value *run_ret)
 {
+	struct vcpu_locked vcpu_locked;
+	struct vm_locked vm_locked;
 	bool need_vm_lock;
 	bool ret;
 
@@ -556,14 +558,24 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 	 * dependencies in the common run case meaning the sensitive context
 	 * switch performance is consistent.
 	 */
-	sl_lock(&vcpu->lock);
+	vcpu_locked = vcpu_lock(vcpu);
+
+#if SECURE_WORLD == 1
+
+	if (vcpu_secondary_reset_and_start(vcpu_locked, vcpu->vm->secondary_ep,
+					   0)) {
+		dlog_verbose("%s secondary cold boot vmid %#x vcpu id %#x\n",
+			     __func__, vcpu->vm->id, current->cpu->id);
+	}
+
+#endif
 
 	/* The VM needs to be locked to deliver mailbox messages. */
 	need_vm_lock = vcpu->state == VCPU_STATE_BLOCKED_MAILBOX;
 	if (need_vm_lock) {
-		sl_unlock(&vcpu->lock);
-		sl_lock(&vcpu->vm->lock);
-		sl_lock(&vcpu->lock);
+		vcpu_unlock(&vcpu_locked);
+		vm_locked = vm_lock(vcpu->vm);
+		vcpu_locked = vcpu_lock(vcpu);
 	}
 
 	/*
@@ -671,9 +683,9 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 	ret = true;
 
 out:
-	sl_unlock(&vcpu->lock);
+	vcpu_unlock(&vcpu_locked);
 	if (need_vm_lock) {
-		sl_unlock(&vcpu->vm->lock);
+		vm_unlock(&vm_locked);
 	}
 
 	return ret;
@@ -2277,4 +2289,16 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	}
 
 	return ret;
+}
+
+struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
+					       struct vcpu *current)
+{
+	struct vm_locked vm_locked;
+
+	vm_locked = vm_lock(current->vm);
+	vm_locked.vm->secondary_ep = entry_point;
+	vm_unlock(&vm_locked);
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }

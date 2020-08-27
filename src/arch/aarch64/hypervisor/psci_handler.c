@@ -317,6 +317,8 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 			vcpu_id_to_index(target_cpu);
 		struct vm *vm = vcpu->vm;
 		struct vcpu *target_vcpu;
+		struct vcpu_locked vcpu_locked;
+		bool vcpu_was_off;
 
 		if (target_vcpu_index >= vm->vcpu_count) {
 			*ret = PSCI_ERROR_INVALID_PARAMETERS;
@@ -324,9 +326,12 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		}
 
 		target_vcpu = vm_get_vcpu(vm, target_vcpu_index);
+		vcpu_locked = vcpu_lock(target_vcpu);
+		vcpu_was_off = vcpu_secondary_reset_and_start(
+			vcpu_locked, entry_point_address, context_id);
+		vcpu_unlock(&vcpu_locked);
 
-		if (vcpu_secondary_reset_and_start(
-			    target_vcpu, entry_point_address, context_id)) {
+		if (vcpu_was_off) {
 			/*
 			 * Tell the scheduler that it can start running the new
 			 * vCPU now.
