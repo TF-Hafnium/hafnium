@@ -71,7 +71,7 @@ static inline size_t pa_difference(paddr_t start, paddr_t end)
 }
 
 /**
- * Initializes an intermeditate physical address.
+ * Initializes an intermediate physical address.
  */
 static inline ipaddr_t ipa_init(uintpaddr_t ipa)
 {

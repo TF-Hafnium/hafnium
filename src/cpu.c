@@ -10,6 +10,8 @@
 
 #include <stdalign.h>
 
+#include "hf/arch/cache.h"
+
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
@@ -70,7 +72,7 @@ struct cpu cpus[MAX_CPUS] = {
 	},
 };
 
-static uint32_t cpu_count = 1;
+uint32_t cpu_count = 1;
 
 void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 {
@@ -111,6 +113,15 @@ void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 		dlog_warning("Boot CPU's ID not found in config.\n");
 		cpus[0].id = boot_cpu_id;
 	}
+
+	/*
+	 * Clean the cache for the cpus array such that secondary cores
+	 * hitting the entry point can read the cpus array consistently
+	 * with MMU off (hence data cache off).
+	 */
+	arch_cache_clean_range(va_from_ptr(cpus), sizeof(cpus));
+
+	arch_cache_clean_range(va_from_ptr(&cpu_count), sizeof(cpu_count));
 }
 
 size_t cpu_index(struct cpu *c)

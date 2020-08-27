@@ -25,6 +25,7 @@
 /* FF-A function identifiers. */
 #define FFA_ERROR_32                 0x84000060
 #define FFA_SUCCESS_32               0x84000061
+#define FFA_SUCCESS_64               0xC4000061
 #define FFA_INTERRUPT_32             0x84000062
 #define FFA_VERSION_32               0x84000063
 #define FFA_FEATURES_32              0x84000064
@@ -50,6 +51,8 @@
 #define FFA_MEM_RECLAIM_32           0x84000077
 #define FFA_MEM_FRAG_RX_32           0x8400007A
 #define FFA_MEM_FRAG_TX_32           0x8400007B
+#define FFA_SECONDARY_EP_REGISTER_32 0x84000084
+#define FFA_SECONDARY_EP_REGISTER_64 0xC4000084
 
 /* FF-A error codes. */
 #define FFA_NOT_SUPPORTED      INT32_C(-1)

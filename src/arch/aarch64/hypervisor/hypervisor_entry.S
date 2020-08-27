@@ -9,6 +9,13 @@
 #include "hf/arch/offsets.h"
 #include "msr.h"
 
+.macro get_core_affinity reg1 reg2
+	mrs \reg1, mpidr_el1
+	ubfx \reg2, \reg1, 0, 24
+	ubfx \reg1, \reg1, 32, 8
+	orr \reg1, \reg2, \reg1, lsl #32
+.endm
+
 /**
  * Called only on first boot after the image has been relocated and BSS zeroed.
  *
@@ -25,10 +32,7 @@ image_entry:
 	add x28, x28, :lo12:cpus
 
 	/* Set the ID of this CPU from the affinity bits of mpidr. */
-	mrs x30, mpidr_el1
-	ubfx x29, x30, 0, 24
-	ubfx x30, x30, 32, 8
-	orr x30, x29, x30, lsl #32
+	get_core_affinity x30, x29
 	str x30, [x28, CPU_ID]
 
 	mov x0, x28
@@ -59,6 +63,44 @@ image_entry:
 .section .text.entry, "ax"
 .global cpu_entry
 cpu_entry:
+#if SECURE_WORLD == 1
+
+	/* Get number of cpus gathered from DT. */
+	adrp x3, cpu_count
+	add x3, x3, :lo12:cpu_count
+	ldr w3, [x3]
+
+	/* Prevent number of CPUs to be higher than supported by platform. */
+	cmp w3, #MAX_CPUS
+	bhi .
+
+	/* x0 points to first cpu in cpus array. */
+	adrp x0, cpus
+	add x0, x0, :lo12:cpus
+
+	/* Get current core affinity. */
+	get_core_affinity x1, x2
+
+	/* Dead stop here if no more cpu. */
+0:	cbz w3, 0b
+
+	sub w3, w3, #1
+
+	/* Get cpu id pointed to by x0 in cpu array. */
+	ldr x2, [x0, CPU_ID]
+
+	/* Exit if current core id matches cpu id. */
+	cmp x1, x2
+	beq 1f
+
+	/* Point to next cpu in cpus array and loop. */
+	add x0, x0, #CPU_SIZE
+	b 0b
+
+1:	/* x0 points to current cpu in cpus array */
+
+#endif
+
 	bl mm_enable
 	bl prepare_for_c
 

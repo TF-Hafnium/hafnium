@@ -10,6 +10,8 @@
 #include "hf/offset_size_header.h"
 #include "hf/vm.h"
 
+DEFINE_SIZEOF(CPU_SIZE, struct cpu)
+
 DEFINE_OFFSETOF(CPU_ID, struct cpu, id)
 DEFINE_OFFSETOF(CPU_STACK_BOTTOM, struct cpu, stack_bottom)
 DEFINE_OFFSETOF(VCPU_VM, struct vcpu, vm)
