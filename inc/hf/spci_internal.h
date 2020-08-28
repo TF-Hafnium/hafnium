@@ -48,3 +48,6 @@ struct spci_value spci_mem_op_resume_internal (uint32_t cookie, struct vm* from_
 struct spci_value spci_mem_frag_tx(uint32_t handle_high,
 	uint32_t handle_low, uint32_t frag_len, uint32_t agg_sender_id,
 	struct vm *from_vm);
+
+struct spci_value spci_mem_frag_rx(uint32_t handle_low,
+	uint32_t handle_high, uint32_t frag_offset, uint32_t agg_sender_id, struct vm *from_vm);

@@ -413,6 +413,61 @@ struct spci_value spci_mem_frag_tx(uint32_t handle_low,
 		handle_high, h_to_p->filled_offset, agg_sender_id, 0, 0, 0};
 }
 
+struct spci_value spci_mem_frag_rx(uint32_t handle_low,
+	uint32_t handle_high, uint32_t frag_offset, uint32_t agg_sender_id, struct vm *from_vm)
+{
+	const struct spci_memory_region *tx_memory_region;
+	handle_t handle = (handle_t)handle_high<<32 | handle_low;
+
+	struct spci_memory_region *memory_region;
+	struct handle_to_pointer *h_to_p;
+	void *region_offset;
+
+	sl_lock(&mem_region_lock);
+	h_to_p = fetch_handle_entry(handle);
+
+	memory_region = h_to_p->memory_region;
+
+	if (frag_offset > h_to_p->size - h_to_p->transmitted_offset)
+	{
+		dlog("frag_rx failed\n");
+		sl_unlock(&mem_region_lock);
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
+
+#if !SECURE_WORLD
+	tx_memory_region = from_vm->mailbox.recv;
+#else
+	tx_memory_region = (struct spci_memory_region *)hypervisor_buffers.rx;
+#endif
+
+	region_offset = (void*)((uintptr_t)memory_region + (uintptr_t)h_to_p->transmitted_offset);
+	memcpy_s((void *) tx_memory_region, frag_offset, region_offset,
+		 frag_offset);
+
+	h_to_p->transmitted_offset += frag_offset;
+
+	sl_unlock(&mem_region_lock);
+
+#if !SECURE_WORLD
+
+	/* Fill in the information in the Hv Rx buffer. */
+	memcpy_s(hv_rx, frag_offset, tx_memory_region, frag_offset);
+
+	if (false) {
+		dlog("begin frag_rx\n");
+		spci_dbg_print_memory_region(memory_region, handle);
+		dlog("end frag_rx\n");
+	}
+
+	return smc32(SPCI_MEM_FRAG_TX_32, handle_low,
+		handle_high, frag_offset, agg_sender_id, 0, 0, 0);
+#endif
+
+	return (struct spci_value){SPCI_MEM_FRAG_TX_32, handle_low,
+		handle_high, h_to_p->transmitted_offset, agg_sender_id, 0, 0, 0};
+}
+
 /**
  * Create the S2 mappings.
  */

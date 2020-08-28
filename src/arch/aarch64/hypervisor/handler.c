@@ -869,7 +869,8 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 			return true;
 
 		case SPCI_MEM_FRAG_RX_32:
-
+			*args = spci_mem_frag_rx(args->arg1, args->arg2,
+				args->arg3,	args->arg4, current()->vm);
 			return true;
 
 		case SPCI_MEM_FRAG_TX_32:
