@@ -255,7 +255,9 @@ static inline uint64_t spci_vm_vcpu(spci_vm_id_t vm_id,
 {
 	return ((uint32_t)vm_id << 16) | vcpu_index;
 }
-/* Table 38 in EAC */
+
+
+/* Table 39 in EAC */
 struct spci_memory_region_constituent {
 	/**
 	 * The base IPA of the constituent memory region, aligned to 4 kiB page
@@ -268,8 +270,17 @@ struct spci_memory_region_constituent {
 	uint32_t reserved;
 };
 
+/* Table 38: Composite memory region descriptor */
+struct spci_mem_region_descr {
+	uint32_t total_page_count;
+	uint32_t address_range_count;
+	uint64_t reserved;
+	struct spci_memory_region_constituent address_range_array[];
+};
+
 /* Table 41 of EAC with table 40 embedded. */
 struct spci_endpoint_memory_access {
+	/* EAC: Table 40 */
 	/** The ID of the VM to which the memory is being given or shared. */
 	spci_vm_id_t receiver;
 	/**
@@ -279,11 +290,13 @@ struct spci_endpoint_memory_access {
 	uint8_t memory_permission;
 
 	uint8_t flags;
-
+	/* End of Table 40*/
+	/* EAC: Table 41 */
 	uint32_t composite_off;
 
 	/** Reserved field, must be 0. */
 	uint64_t reserved_0;
+	/* End of Table 41 */
 };
 
 #if 0
@@ -326,6 +339,7 @@ typedef uint32_t spci_memory_region_flags_t;
  */
 #define SPCI_MEMORY_REGION_FLAG_CLEAR 0x1
 
+/* EAC: Table 44 */
 struct spci_memory_region {
 
 	/** Sender VM ID. */

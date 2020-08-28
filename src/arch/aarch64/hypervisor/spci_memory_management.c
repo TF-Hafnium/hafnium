@@ -44,6 +44,7 @@ struct handle_to_pointer {
 	struct spci_memory_region *memory_region;
 
 	uint32_t filled_offset;
+	uint32_t transmitted_offset;
 	uint32_t size;
 	bool is_fully_described;
 };
