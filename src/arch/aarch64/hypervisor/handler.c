@@ -812,7 +812,7 @@ static bool spci_handler(struct spci_value *args, struct vcpu **next)
 		case SPCI_MEM_RETRIEVE_REQ_64:
 			*args = api_spci_mem_retrieve_req(
 				args->arg1, args->arg2, args->arg3, args->arg4,
-				args->arg5, current()->vm);
+				current()->vm, eret_origin);
 
 			return true;
 

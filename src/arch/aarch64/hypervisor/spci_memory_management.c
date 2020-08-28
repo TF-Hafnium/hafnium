@@ -154,9 +154,11 @@ static bool erase_region(handle_t handle, struct mpool *local_page_pool)
 	h_to_p = fetch_handle_entry(handle);
 	memory_region = h_to_p->memory_region;
 
-	dlog("reclaim start\n");
-	spci_dbg_print_memory_region(memory_region, handle);
-	dlog("reclaim end\n");
+	if (false){
+		dlog("begin erasing memory region %d\n", handle);
+		spci_dbg_print_memory_region(memory_region, handle);
+		dlog("end erasing memory region\n");
+	}
 
 	if (!mpool_add_chunk(local_page_pool, memory_region,
 		((get_memory_region_size(memory_region) / SPCI_PAGE_SIZE) + 1) * SPCI_PAGE_SIZE))
@@ -263,10 +265,6 @@ struct spci_value spci_mem_share_internal(
 		      "page\n");
 	}
 
-
-	dlog("---Mem_share_invocation-- length %d, frag_len %d, addr %#x, page_count %d\n", length, frag_len,
-	base_addr, page_count);
-
 	memory_region_copy = mpool_alloc_contiguous(
 		&local_page_pool, ((length - 1)/ SPCI_PAGE_SIZE) + 1, 1);
 
@@ -277,7 +275,6 @@ struct spci_value spci_mem_share_internal(
 			SPCI_ERROR_32, 0, SPCI_NO_MEMORY, 0, 0, 0, 0, 0};
 	}
 
-	dlog("---Mem_share_invocation-- region address %#X \n", memory_region_copy);
 	offsetted_region_copy = memory_region_copy;
 	memory_region_size = (((length  -1) / SPCI_PAGE_SIZE) + 1)*SPCI_PAGE_SIZE;
 
@@ -350,7 +347,9 @@ struct spci_value spci_mem_share_internal(
 						   0};
 		}
 
-		spci_dbg_print_memory_region(memory_region_copy, handle);
+		if (false) {
+			spci_dbg_print_memory_region(memory_region_copy, handle);
+		}
 
 		store_handle(handle, memory_region_copy, length, frag_len);
 	}
@@ -402,10 +401,9 @@ struct spci_value spci_mem_frag_tx(uint32_t handle_low,
 	/* Fill in the information in the Hv Tx buffer. */
 	memcpy_s(hv_tx, frag_len, rx_memory_region, frag_len);
 
-	dlog("-----frag_tx----\n");
-	spci_dbg_print_memory_region(memory_region, handle);
-
-	dlog("-----frag_tx----\n");
+	if (false) {
+		spci_dbg_print_memory_region(memory_region, handle);
+	}
 
 	return smc32(SPCI_MEM_FRAG_TX_32, handle_low,
 		handle_high, frag_len, agg_sender_id, 0, 0, 0);
@@ -414,14 +412,7 @@ struct spci_value spci_mem_frag_tx(uint32_t handle_low,
 	return (struct spci_value){SPCI_MEM_FRAG_RX_32, handle_low,
 		handle_high, h_to_p->filled_offset, agg_sender_id, 0, 0, 0};
 }
-/*
-struct spci_value spci_mem_frag_rx(uint32_t handle_low,
-	uint32_t handle_high, uint32_t frag_offset, uint32_t agg_sender_id)
-{
-	handle_t handle = handle_high<<32 | handle_low;
 
-}
-*/
 /**
  * Create the S2 mappings.
  */
@@ -485,7 +476,6 @@ static bool spci_map_region_s2(struct spci_memory_region *memory_region,
 		}
 	}
 
-	dlog("\nset S2 start\n");
 	for (uint32_t index = 0; index < constituent_count; index++)
 	{
 		uint32_t page_count = constituents[index].page_count;
@@ -494,8 +484,6 @@ static bool spci_map_region_s2(struct spci_memory_region *memory_region,
 		{
 			uintptr_t address = get_constituent_addr(&constituents[index]) + SPCI_PAGE_SIZE
 				* page_num;
-
-			dlog("set S2 %#x address %#x\n", from_vm->id, address);
 
 			/* Map page on the pages on the retrieve caller. */
 			if(!mm_vm_identity_map(&vm_locked.vm->ptable, pa_init(address),
@@ -535,84 +523,131 @@ static inline bool put_retrieve_cookie(uint32_t cookie)
 	return true;
 }
 
-struct spci_value spci_mem_retrieve_req_internal(
-	uint64_t base_addr, uint32_t page_count, uint32_t fragment_count,
-	uint32_t length, uint32_t cookie, struct vm *from_vm,
-	struct mpool *page_pool, bool world_changed)
+struct spci_value spci_mem_retrieve_req_internal (
+	uint64_t total_length, uint32_t frag_length, uint64_t base_addr,
+	uint32_t page_count, struct vm *from_vm, bool world_switched,
+	struct mpool *page_pool)
 {
-	uint32_t handle;
+	uint64_t handle;
+	uint32_t endpoint_count;
+	uint32_t flags;
+	uint32_t total_page_count;
 	uint32_t constituent_count;
-	struct spci_memory_region *mem_region;
+	bool zero_memory;
+	struct spci_memory_region_constituent *constituents;
+	struct spci_memory_region *src_mem_descriptor;
+	struct spci_memory_region *dst_mem_region;
 	struct spci_memory_region_constituent *constituent_dst;
-	struct spci_memory_region_constituent *constituent_src;
-	uint32_t total_length;
-	uint32_t fragment_length;
-	uint32_t index;
-
-	struct spci_retrieve_descriptor *retrieve_mem_descriptor;
+	struct spci_memory_region *retrieve_mem_descriptor;
 
 	/* Obtain the handle from the Rx buffer of the caller VM. */
-	handle = ((struct mem_retrieve_descriptor *)from_vm->mailbox.send)->handle;
 
-	mem_region = fetch_region(handle);
-
-	if (mem_region)
-	{
-		/* TODO: Acquire vm lock. */
-		/* Found the handle, implement the the S-2 mappings. */
-		if(!spci_map_region_s2(mem_region, from_vm, page_pool))
-		{
-			return spci_error(SPCI_NO_MEMORY);
-		}
-
-		/* TODO: Release vm lock. */
+	/* If NULL use TX buffer. */
+	if (base_addr){
+		panic("TODO: Add support for using separate buffer\n");
 	}
-	else
-	{
+
+	src_mem_descriptor = (struct spci_memory_region *)from_vm->mailbox.send;
+	handle = src_mem_descriptor->handle;
+
+	/* Flag checking. */
+	flags = src_mem_descriptor->flags;
+	// TODO: Add support for zeroing memory
+	zero_memory = flags & 0x1; //Bit[0]
+	/* Check time slicing (Bit[1]) */
+	if (flags & 0x2) {
+		/* Not currently supported */
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
 
-	constituent_src = spci_memory_region_get_constituents(mem_region);
+	dst_mem_region = fetch_region(handle);
+	if (!dst_mem_region) {
+		dlog("Failed to fetch Handle: %d\n", handle);
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
 
-	constituent_count = spci_memory_region_get_composite(mem_region)->constituent_count;
-	total_length = constituent_count * sizeof(struct spci_memory_region_constituent)
-		 + sizeof(struct spci_retrieve_descriptor);
+	/* Check if request if fragmented */
+	/* TODO: Add support for fragments. */
+	if (total_length != frag_length){
+		dlog("Fragment support is not added yet\n");
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
 
-	retrieve_mem_descriptor =
-		(struct spci_retrieve_descriptor *)from_vm->mailbox.recv;
+	/* Check tag matches */
+	if (src_mem_descriptor->tag != dst_mem_region->tag){
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
 
-	retrieve_mem_descriptor->constituent_count = constituent_count;
-
-	constituent_dst = retrieve_mem_descriptor->constituents;
-
-	retrieve_mem_descriptor->page_count = 0;
-	for (index = 0; index < constituent_count; index++)
+	/* Check memory permissions do not specify instruction access */
+	for (uint32_t index = 0; index < dst_mem_region->endpoint_count; index++)
 	{
-		uint32_t pcount = constituent_src[index].page_count;
+		uint8_t* src_memory_permissions =
+			&dst_mem_region->endpoint_access[index].memory_permission;
 
-		constituent_dst[index].address = constituent_src[index].address;
-		constituent_dst[index].page_count = pcount;
-
-		retrieve_mem_descriptor->page_count += pcount;
-
-		if (((uintptr_t)&constituent_dst[index+1]) -
-			(uintptr_t)retrieve_mem_descriptor >= SPCI_PAGE_SIZE) {
-
-			retrieve_state[handle].handle = handle;
-			retrieve_state[handle].memory_region = mem_region;
-			retrieve_state[handle].filled_constituent = index+1;
-
-			return (struct spci_value)
-				{SPCI_MEM_RETRIEVE_RESP_32, 0, 0, SPCI_PAGE_SIZE, total_length, handle, 0, 0};
-			break;
+		if (((*src_memory_permissions >> 2) & 3)  != 0x0) {
+			return spci_error(SPCI_INVALID_PARAMETERS);
 		}
 	}
-	fragment_length = index * sizeof(struct spci_memory_region_constituent)
-		 + sizeof(struct spci_retrieve_descriptor);
 
-	dlog("end retrieve\n");
-	return (struct spci_value)
-		{SPCI_MEM_RETRIEVE_RESP_32, 0, 0, fragment_length, total_length, cookie, 0, 0};
+	/* Descriptor to populate. */
+	retrieve_mem_descriptor = (struct spci_memory_region *)from_vm->mailbox.recv;
+
+	/* Populate fields in receiver RX. Table 44. */
+	retrieve_mem_descriptor->handle = src_mem_descriptor->handle;
+	retrieve_mem_descriptor->flags = src_mem_descriptor->flags;
+	retrieve_mem_descriptor->tag = src_mem_descriptor->tag;
+	/* Copy endpoint accesses */
+	endpoint_count = dst_mem_region->endpoint_count;
+	retrieve_mem_descriptor->endpoint_count = endpoint_count;
+
+
+	/* Populate Table 40 / 41 */
+	for (uint32_t index = 0; index < endpoint_count; index++) {
+		/* Table 40. */
+		retrieve_mem_descriptor->endpoint_access[index].receiver = dst_mem_region->endpoint_access[index].receiver;
+		retrieve_mem_descriptor->endpoint_access[index].memory_permission = dst_mem_region->endpoint_access[index].memory_permission;
+		retrieve_mem_descriptor->endpoint_access[index].flags = dst_mem_region->endpoint_access[index].flags;
+		/* Table 41.*/
+		retrieve_mem_descriptor->endpoint_access[index].composite_off = dst_mem_region->endpoint_access[index].composite_off;
+	}
+
+	/* Copy the end points descriptors to the receiver */
+	constituents = spci_memory_region_get_constituents(dst_mem_region);
+	constituent_count = spci_memory_region_get_composite(dst_mem_region)->constituent_count;
+	total_page_count = spci_memory_region_get_composite(dst_mem_region)->total_page_count;
+
+	/* Populate fields in Table 38 for receiver.*/
+	spci_memory_region_get_composite(retrieve_mem_descriptor)->constituent_count = constituent_count;
+	spci_memory_region_get_composite(retrieve_mem_descriptor)->total_page_count = total_page_count;
+
+	constituent_dst = spci_memory_region_get_constituents(retrieve_mem_descriptor);
+
+	/* Populate table 39's */
+	for (uint32_t index = 0; index < constituent_count; index++)
+	{
+		constituent_dst[index].address = constituents[index].address;
+		constituent_dst[index].page_count = constituents[index].page_count;
+	}
+
+	/* Set the memory access permissions to XN */
+	for (uint32_t index = 0; index < dst_mem_region->endpoint_count; index++)
+	{
+		uint8_t* ret_memory_permissions =
+			&retrieve_mem_descriptor->endpoint_access[index].memory_permission;
+		/* Set permission to XN. */
+		*ret_memory_permissions |= (0x1 << 2);
+	}
+
+	/* TODO: Acquire vm lock. */
+	/* Implement the the S-2 mappings. */
+	if(!spci_map_region_s2(retrieve_mem_descriptor, from_vm, page_pool))
+	{
+		return spci_error(SPCI_NO_MEMORY);
+	}
+	/* TODO: Release vm lock. */
+
+
+	return (struct spci_value){SPCI_MEM_RETRIEVE_RESP_32, total_length, frag_length, 0, 0, 0, 0, 0};
 }
 
 struct spci_value spci_mem_op_resume_internal (uint32_t cookie, struct vm* from_vm)
@@ -635,7 +670,6 @@ struct spci_value spci_mem_op_resume_internal (uint32_t cookie, struct vm* from_
 	uint32_t max_frag_c_count = SPCI_PAGE_SIZE/sizeof(struct spci_memory_region_constituent);
 	uint32_t frag_size;
 
-	dlog("mem op resume\n");
 	constituent_count = constituent_count < max_frag_c_count ? constituent_count: max_frag_c_count;
 	frag_size = constituent_count * sizeof(struct spci_memory_region_constituent);
 
@@ -659,7 +693,6 @@ struct spci_value spci_mem_op_resume_internal (uint32_t cookie, struct vm* from_
 		sl_unlock(&retrieve_lock);
 	}
 
-	dlog("mem op resume end\n");
 	return (struct spci_value)
 		{SPCI_MEM_RETRIEVE_RESP_32, 0, 0, frag_size, 0, cookie, 0, 0};
 }
@@ -669,6 +702,8 @@ struct spci_value spci_memory_relinquish(struct mem_relinquish_descriptor *relin
 	struct mpool *page_pool, struct vm *from_vm)
 {
 	uint32_t handle;
+	uint32_t flags;
+	bool zero_memory;
 	struct mpool local_page_pool;
 	struct spci_memory_region_constituent *constituents;
 	uint32_t constituent_count;
@@ -681,12 +716,20 @@ struct spci_value spci_memory_relinquish(struct mem_relinquish_descriptor *relin
 	/* Obtain the handle from the Rx buffer of the caller VM. */
 	handle = relinquish_desc->handle;
 
-	memory_region = fetch_region(handle);
+	/* Flag checking. */
+	flags = relinquish_desc->flags;
+	// TODO: Add support for zeroing memory
+	zero_memory = flags & 0x1; //Bit[0]
+	/* Check time slicing (Bit[1]) */
+	if (flags & 0x2) {
+		/* Not currently supported */
+		return spci_error(SPCI_INVALID_PARAMETERS);
+	}
 
+	memory_region = fetch_region(handle);
 	constituents = spci_memory_region_get_constituents(memory_region);
 	constituent_count = spci_memory_region_get_composite(memory_region)->constituent_count;
 
-	dlog("\nrelinquish S2 relinquish handle %d\n", handle);
 	for (uint32_t index = 0; index < constituent_count; index++)
 	{
 		uint32_t page_count = constituents[index].page_count;
@@ -694,17 +737,16 @@ struct spci_value spci_memory_relinquish(struct mem_relinquish_descriptor *relin
 		for (uint32_t page_num = 0; page_num < page_count; page_num++)
 		{
 #if SECURE_WORLD == 1
-			uintptr_t address = get_constituent_addr(&constituents[index]) + SPCI_PAGE_SIZE
-				* page_num;
+			uintptr_t address = get_constituent_addr(&constituents[index])
+				+ SPCI_PAGE_SIZE * page_num;
 
-			dlog("relinquish S2 %#X address %#x\n", from_vm->id, address);
 			/* Map page on the pages on the retrieve caller. */
 			mm_vm_unmap(&vm_locked.vm->ptable, pa_init(address),
 				pa_init(address + SPCI_PAGE_SIZE), &local_page_pool);
 #endif
 		}
 	}
-	dlog("relinquish S2 end\n\n");
+
 
 	mpool_fini(&local_page_pool);
 	vm_unlock(&vm_locked);
