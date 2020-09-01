@@ -36,7 +36,7 @@ static uint64_t handle_counter = 0;
 
 struct handle_to_pointer {
 	/* Owner vm_id. */
-	/* exclusive or shared: at retrievve toggle to shared. at relinquish toggle to exclusive. */
+	/* exclusive or shared: at retrieve toggle to shared. at relinquish toggle to exclusive. */
 
 	/* who was this shared with: to be checked int he retrieve. */
 
@@ -71,8 +71,10 @@ static void spci_dbg_print_memory_region(struct spci_memory_region
 
 	for (int index = 0; index < constituent_count; index++)
 	{
-		dlog("handle %d constituent %#x\n", handle, get_constituent_addr(&constituent[index]));
+		dlog("Handle(%d), Constituent(%d): %#x\n", handle, index, get_constituent_addr(&constituent[index]));
 	}
+	dlog("----\n");
+
 }
 
 uint32_t get_memory_region_size(const struct spci_memory_region *memory_region)
@@ -198,7 +200,7 @@ struct mem_share_state {
 	/* The size of the region pointer to by memory_region. */
 	uint32_t full_region_size;
 
-	/* Keeps track of the ammount of data filled in the memory region. */
+	/* Keeps track of the amount of data filled in the memory region. */
 	uint32_t filled_data_size;
 
 	/* globally unique handle un-ambiguously referring to the memory region. */
@@ -348,6 +350,7 @@ struct spci_value spci_mem_share_internal(
 		}
 
 		if (false) {
+			dlog("Sharing memory - ");
 			spci_dbg_print_memory_region(memory_region_copy, handle);
 		}
 
@@ -377,7 +380,7 @@ struct spci_value spci_mem_frag_tx(uint32_t handle_low,
 
 	if (frag_len > h_to_p->size - h_to_p->filled_offset)
 	{
-		dlog("--------frag_tx failed\n");
+		dlog("frag_tx failed\n");
 		sl_unlock(&mem_region_lock);
 		return spci_error(SPCI_INVALID_PARAMETERS);
 	}
@@ -551,7 +554,6 @@ static bool spci_map_region_s2(struct spci_memory_region *memory_region,
 			}
 		}
 	}
-	dlog("set S2 end\n\n");
 
 	mpool_fini(&local_page_pool);
 	vm_unlock(&vm_locked);
