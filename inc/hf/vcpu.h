@@ -93,6 +93,9 @@ struct vcpu {
 	 * a result of a prior FFA_MSG_SEND_DIRECT_REQ invocation.
 	 */
 	ffa_vm_id_t direct_request_origin_vm_id;
+
+	/* Determine whether partition is currently handling managed exit. */
+	bool processing_managed_exit;
 };
 
 /** Encapsulates a vCPU whose lock is held. */

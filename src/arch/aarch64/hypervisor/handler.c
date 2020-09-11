@@ -20,6 +20,7 @@
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
 #include "hf/panic.h"
+#include "hf/plat/interrupts.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/call.h"
@@ -882,6 +883,47 @@ struct vcpu *irq_lower(void)
 
 struct vcpu *fiq_lower(void)
 {
+#if SECURE_WORLD == 1
+	struct vcpu_locked current_locked;
+	struct vcpu *current_vcpu = current();
+	int ret;
+
+	if (current_vcpu->vm->supports_managed_exit) {
+		/* Mask all interrupts */
+		plat_interrupts_set_priority_mask(0x0);
+
+		current_locked = vcpu_lock(current_vcpu);
+		ret = api_interrupt_inject_locked(current_locked,
+						  HF_MANAGED_EXIT_INTID,
+						  current_vcpu, NULL);
+		if (ret != 0) {
+			panic("Failed to inject managed exit interrupt\n");
+		}
+
+		/* Entering managed exit sequence. */
+		current_vcpu->processing_managed_exit = true;
+
+		vcpu_unlock(&current_locked);
+
+		/*
+		 * Since we are in interrupt context, set the bit for the
+		 * current vCPU directly in the register.
+		 */
+		vcpu_update_virtual_interrupts(NULL);
+
+		/* Resume current vCPU. */
+		return NULL;
+	}
+
+	/*
+	 * SP does not support managed exit. It is pre-empted and execution
+	 * handed back to the normal world through the FFA_INTERRUPT ABI.
+	 * The SP can be resumed later by ffa_run. The call to irq_lower
+	 * and api_preempt is equivalent to calling api_switch_to_other_world
+	 * for current vCPU passing FFA_INTERRUPT_32.
+	 */
+#endif
+
 	return irq_lower();
 }
 

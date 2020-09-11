@@ -33,6 +33,9 @@ uint32_t api_interrupt_get(struct vcpu *current);
 int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
 			     ffa_vcpu_index_t target_vcpu_idx, uint32_t intid,
 			     struct vcpu *current, struct vcpu **next);
+int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
+				    uint32_t intid, struct vcpu *current,
+				    struct vcpu **next);
 
 struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 				  ffa_vm_id_t receiver_vm_id, uint32_t size,
@@ -87,3 +90,6 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 					      struct vcpu **next);
 struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 					       struct vcpu *current);
+struct vcpu *api_switch_to_other_world(struct vcpu *current,
+				       struct ffa_value other_world_ret,
+				       enum vcpu_state vcpu_state);

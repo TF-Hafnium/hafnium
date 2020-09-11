@@ -52,6 +52,9 @@ typedef uintptr_t hf_ipaddr_t;
 /** The virtual interrupt ID used for the virtual timer. */
 #define HF_VIRTUAL_TIMER_INTID 3
 
+/** The virtual interrupt ID used for managed exit. */
+#define HF_MANAGED_EXIT_INTID 4
+
 /** Type of interrupts */
 enum interrupt_type {
 	INTERRUPT_TYPE_IRQ,

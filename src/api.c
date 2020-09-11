@@ -21,6 +21,7 @@
 #include "hf/ffa_memory.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
+#include "hf/plat/interrupts.h"
 #include "hf/spinlock.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
@@ -174,9 +175,9 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
  * Called in context of a direct message response from a secure
  * partition to a VM.
  */
-static struct vcpu *api_switch_to_other_world(struct vcpu *current,
-					      struct ffa_value other_world_ret,
-					      enum vcpu_state vcpu_state)
+struct vcpu *api_switch_to_other_world(struct vcpu *current,
+				       struct ffa_value other_world_ret,
+				       enum vcpu_state vcpu_state)
 {
 	return api_switch_to_vm(current, other_world_ret, vcpu_state,
 				HF_OTHER_WORLD_ID);
@@ -218,6 +219,16 @@ static bool msg_receiver_busy(struct vm_locked to, struct vm *from, bool notify)
 static bool is_ffa_direct_msg_request_ongoing(struct vcpu_locked locked)
 {
 	return locked.vcpu->direct_request_origin_vm_id != HF_INVALID_VM_ID;
+}
+
+/**
+ * Returns true if the VM owning the given vCPU is supporting managed exit and
+ * the vCPU is currently processing a managed exit.
+ */
+static bool api_ffa_is_managed_exit_ongoing(struct vcpu_locked vcpu_locked)
+{
+	return (vcpu_locked.vcpu->vm->supports_managed_exit &&
+		vcpu_locked.vcpu->processing_managed_exit);
 }
 
 /**
@@ -469,9 +480,9 @@ static struct wait_entry *api_fetch_waiter(struct vm_locked locked_vm)
  *  - 1 if it was called by the primary VM and the primary VM now needs to wake
  *    up or kick the target vCPU.
  */
-static int64_t internal_interrupt_inject_locked(
-	struct vcpu_locked target_locked, uint32_t intid, struct vcpu *current,
-	struct vcpu **next)
+int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
+				    uint32_t intid, struct vcpu *current,
+				    struct vcpu **next)
 {
 	struct vcpu *target_vcpu = target_locked.vcpu;
 	uint32_t intid_index = intid / INTERRUPT_REGISTER_BITS;
@@ -532,8 +543,7 @@ static int64_t internal_interrupt_inject(struct vcpu *target_vcpu,
 	struct vcpu_locked target_locked;
 
 	target_locked = vcpu_lock(target_vcpu);
-	ret = internal_interrupt_inject_locked(target_locked, intid, current,
-					       next);
+	ret = api_interrupt_inject_locked(target_locked, intid, current, next);
 	vcpu_unlock(&target_locked);
 
 	return ret;
@@ -1824,9 +1834,9 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 
 	/* Inject timer interrupt if any pending */
 	if (arch_timer_pending(&receiver_vcpu->regs)) {
-		internal_interrupt_inject_locked(vcpus_locked.vcpu1,
-						 HF_VIRTUAL_TIMER_INTID,
-						 current, NULL);
+		api_interrupt_inject_locked(vcpus_locked.vcpu1,
+					    HF_VIRTUAL_TIMER_INTID, current,
+					    NULL);
 
 		arch_timer_mask(&receiver_vcpu->regs);
 	}
@@ -1879,23 +1889,36 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 	}
 
 	current_locked = vcpu_lock(current);
-
-	/*
-	 * Ensure the terminating FFA_MSG_SEND_DIRECT_REQ had a
-	 * defined originator.
-	 */
-	if (!is_ffa_direct_msg_request_ongoing(current_locked)) {
+	if (api_ffa_is_managed_exit_ongoing(current_locked)) {
 		/*
-		 * Sending direct response but direct request origin vCPU is
-		 * not set.
+		 * No need for REQ/RESP state management as managed exit does
+		 * not have corresponding REQ pair.
 		 */
-		vcpu_unlock(&current_locked);
-		return ffa_error(FFA_DENIED);
-	}
+		if (receiver_vm_id != HF_PRIMARY_VM_ID) {
+			vcpu_unlock(&current_locked);
+			return ffa_error(FFA_DENIED);
+		}
 
-	if (current->direct_request_origin_vm_id != receiver_vm_id) {
-		vcpu_unlock(&current_locked);
-		return ffa_error(FFA_DENIED);
+		plat_interrupts_set_priority_mask(0xff);
+		current->processing_managed_exit = false;
+	} else {
+		/*
+		 * Ensure the terminating FFA_MSG_SEND_DIRECT_REQ had a
+		 * defined originator.
+		 */
+		if (!is_ffa_direct_msg_request_ongoing(current_locked)) {
+			/*
+			 * Sending direct response but direct request origin
+			 * vCPU is not set.
+			 */
+			vcpu_unlock(&current_locked);
+			return ffa_error(FFA_DENIED);
+		}
+
+		if (current->direct_request_origin_vm_id != receiver_vm_id) {
+			vcpu_unlock(&current_locked);
+			return ffa_error(FFA_DENIED);
+		}
 	}
 
 	/* Clear direct request origin for the caller. */
