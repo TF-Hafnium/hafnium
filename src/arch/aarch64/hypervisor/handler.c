@@ -466,12 +466,14 @@ static bool ffa_handler_loop(struct ffa_value *ret, struct vcpu **next)
 		 * The FF-A call is handled and ffa_next is null which hints
 		 * the result shall be passed to the other world.
 		 */
-		*ret = smc_forward(ret->func, ret->arg1, ret->arg2, ret->arg3,
-				   ret->arg4, ret->arg5, ret->arg6, ret->arg7);
+		*ret = smc_ffa_call(*ret);
 
 		/*
-		 * Returned from EL3 thus next FF-A call is from
-		 * physical FF-A instance.
+		 * Returned from EL3, thus *ret contains an FF-A call from the
+		 * physical FF-A instance. Handle it. At this point ffa_next is
+		 * NULL, which means that we will return the result of the call
+		 * back to EL3 unless the API handler sets ffa_next to something
+		 * different.
 		 */
 		handled = ffa_handler(ret, other_world_vcpu, &ffa_next);
 	}

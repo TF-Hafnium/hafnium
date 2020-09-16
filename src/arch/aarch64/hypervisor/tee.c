@@ -53,6 +53,5 @@ void arch_tee_init(void)
 
 struct ffa_value arch_tee_call(struct ffa_value args)
 {
-	return smc_forward(args.func, args.arg1, args.arg2, args.arg3,
-			   args.arg4, args.arg5, args.arg6, args.arg7);
+	return smc_ffa_call(args);
 }
