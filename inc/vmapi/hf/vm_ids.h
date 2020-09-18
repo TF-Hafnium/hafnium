@@ -34,3 +34,16 @@
  * execution environment, e.g. secure EL1 or EL2 on AArch64.
  */
 #define HF_TEE_VM_ID 0x8000
+
+/**
+ * The SPMC VM ID used to reference the SPMC by a SP (at secure virtual FF-A
+ * instance), or by the SPMD at secure physical FF-A instance.
+ */
+#define HF_SPMC_VM_ID 0x8000
+
+/**
+ * The SPMD VM ID used to reference the SPMD by the SPMC at secure physical
+ * FF-A instance. It may be used to exchange special messages with the SPMC
+ * like power management events.
+ */
+#define HF_SPMD_VM_ID 0xFFFF
