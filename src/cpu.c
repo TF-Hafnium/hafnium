@@ -118,6 +118,14 @@ size_t cpu_index(struct cpu *c)
 	return c - cpus;
 }
 
+/*
+ * Return cpu with the given index.
+ */
+struct cpu *cpu_find_index(size_t index)
+{
+	return (index < MAX_CPUS) ? &cpus[index] : NULL;
+}
+
 /**
  * Turns CPU on and returns the previous state.
  */

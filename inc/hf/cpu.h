@@ -28,6 +28,7 @@ struct cpu {
 void cpu_module_init(const cpu_id_t *cpu_ids, size_t count);
 
 size_t cpu_index(struct cpu *c);
+struct cpu *cpu_find_index(size_t index);
 bool cpu_on(struct cpu *c, ipaddr_t entry, uintreg_t arg);
 void cpu_off(struct cpu *c);
 struct cpu *cpu_find(cpu_id_t id);
