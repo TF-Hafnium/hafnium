@@ -720,9 +720,10 @@ static bool api_mode_valid_owned_and_exclusive(uint32_t mode)
 }
 
 /**
- * Determines the value to be returned by api_vm_configure and ffa_rx_release
- * after they've succeeded. If a secondary VM is running and there are waiters,
- * it also switches back to the primary VM for it to wake waiters up.
+ * Determines the value to be returned by api_ffa_rxtx_map and
+ * api_ffa_rx_release after they've succeeded. If a secondary VM is running and
+ * there are waiters, it also switches back to the primary VM for it to wake
+ * waiters up.
  */
 static struct ffa_value api_waiter_result(struct vm_locked locked_vm,
 					  struct vcpu *current,
