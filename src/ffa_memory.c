@@ -41,7 +41,7 @@ static_assert(sizeof(struct ffa_composite_memory_region) % 16 == 0,
 	      "struct ffa_composite_memory_region must be a multiple of 16 "
 	      "bytes long.");
 static_assert(sizeof(struct ffa_memory_region_attributes) == 4,
-	      "struct ffa_memory_region_attributes must be 4bytes long.");
+	      "struct ffa_memory_region_attributes must be 4 bytes long.");
 static_assert(sizeof(struct ffa_memory_access) % 16 == 0,
 	      "struct ffa_memory_access must be a multiple of 16 bytes long.");
 static_assert(sizeof(struct ffa_memory_region) % 16 == 0,
