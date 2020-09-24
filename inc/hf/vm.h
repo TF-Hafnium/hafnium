@@ -125,6 +125,7 @@ struct vm {
 	 */
 	bool initialized;
 	uint16_t boot_order;
+	bool supports_managed_exit;
 	struct vm *next_boot;
 
 	/**

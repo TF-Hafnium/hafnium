@@ -666,7 +666,8 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	}
 
 	if (vm->sp.messaging_method != INDIRECT_MESSAGING &&
-	    vm->sp.messaging_method != DIRECT_MESSAGING) {
+	    vm->sp.messaging_method != DIRECT_MESSAGING &&
+	    vm->sp.messaging_method != DIRECT_MESSAGING_MANAGED_EXIT) {
 		dlog_error("Messaging method %s: %x\n", error_string,
 			   vm->sp.messaging_method);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;

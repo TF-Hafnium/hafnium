@@ -818,7 +818,7 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("entrypoint-offset", "<0x00001000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
-		.Property("messaging-method", "<3>")
+		.Property("messaging-method", "<5>")
 		.Build();
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),

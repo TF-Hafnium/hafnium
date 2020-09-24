@@ -149,6 +149,13 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 			}
 		}
 
+		if (manifest_vm->sp.messaging_method ==
+			    DIRECT_MESSAGING_MANAGED_EXIT ||
+		    manifest_vm->sp.messaging_method ==
+			    BOTH_MESSAGING_MANAGED_EXIT) {
+			vm_locked.vm->supports_managed_exit = true;
+		}
+
 		vm_locked.vm->boot_order = manifest_vm->sp.boot_order;
 		/* Updating boot list according to boot_order */
 		vm_update_boot(vm_locked.vm);
