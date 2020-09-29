@@ -361,6 +361,10 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		i++;
 	} while (fdt_next_sibling(mem_node) && (i < SP_MAX_MEMORY_REGIONS));
 
+	if (rxtx->rx_buffer->page_count != rxtx->tx_buffer->page_count) {
+		return MANIFEST_ERROR_RXTX_SIZE_MISMATCH;
+	}
+
 	*count = i;
 
 	return MANIFEST_SUCCESS;
@@ -830,6 +834,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Memory-region node should have at least one entry";
 	case MANIFEST_ERROR_DEVICE_REGION_NODE_EMPTY:
 		return "Device-region node should have at least one entry";
+	case MANIFEST_ERROR_RXTX_SIZE_MISMATCH:
+		return "RX and TX buffers should be of same size";
 	}
 
 	panic("Unexpected manifest return code.");
