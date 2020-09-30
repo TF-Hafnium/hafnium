@@ -384,7 +384,6 @@ static void dump_share_states(void)
 			dlog(" with %d fragments, %d retrieved\n",
 			     share_states[i].fragment_count,
 			     share_states[i].retrieved_fragment_count[0]);
-			break;
 		}
 	}
 	sl_unlock(&share_states_lock_instance);
