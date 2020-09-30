@@ -13,8 +13,8 @@ source_set("hypervisor") {
   ]
 }
 
-source_set("tee") {
+source_set("other_world") {
   sources = [
-    "tee.c",
+    "other_world.c",
   ]
 }

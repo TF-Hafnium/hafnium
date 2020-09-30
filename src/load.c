@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 
+#include "hf/arch/other_world.h"
 #include "hf/arch/vm.h"
 
 #include "hf/api.h"
@@ -650,26 +651,10 @@ static bool update_reserved_ranges(struct boot_params_update *update,
 	return true;
 }
 
-/*
- * Loads alls VMs from the manifest.
- */
-bool load_vms(struct mm_stage1_locked stage1_locked,
-	      const struct manifest *manifest, const struct memiter *cpio,
-	      const struct boot_params *params,
-	      struct boot_params_update *update, struct mpool *ppool)
+static bool init_other_world_vm(struct mpool *ppool)
 {
-	struct vm *primary;
 	struct vm *other_world_vm;
-	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
-	struct vm_locked primary_vm_locked;
 	size_t i;
-	bool success = true;
-
-	if (!load_primary(stage1_locked, &manifest->vm[HF_PRIMARY_VM_INDEX],
-			  cpio, params, ppool)) {
-		dlog_error("Unable to load primary VM.\n");
-		return false;
-	}
 
 	/*
 	 * Initialise the dummy VM which represents the opposite world:
@@ -684,6 +669,33 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 		struct cpu *cpu = cpu_find_index(i);
 
 		vcpu->cpu = cpu;
+	}
+
+	return arch_other_world_vm_init(other_world_vm, ppool);
+}
+
+/*
+ * Loads alls VMs from the manifest.
+ */
+bool load_vms(struct mm_stage1_locked stage1_locked,
+	      const struct manifest *manifest, const struct memiter *cpio,
+	      const struct boot_params *params,
+	      struct boot_params_update *update, struct mpool *ppool)
+{
+	struct vm *primary;
+	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
+	struct vm_locked primary_vm_locked;
+	size_t i;
+	bool success = true;
+
+	if (!load_primary(stage1_locked, &manifest->vm[HF_PRIMARY_VM_INDEX],
+			  cpio, params, ppool)) {
+		dlog_error("Unable to load primary VM.\n");
+		return false;
+	}
+
+	if (!init_other_world_vm(ppool)) {
+		return false;
 	}
 
 	static_assert(

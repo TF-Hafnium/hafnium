@@ -11,8 +11,8 @@
 #include "hf/arch/barriers.h"
 #include "hf/arch/init.h"
 #include "hf/arch/mmu.h"
+#include "hf/arch/other_world.h"
 #include "hf/arch/plat/smc.h"
-#include "hf/arch/tee.h"
 
 #include "hf/api.h"
 #include "hf/check.h"

@@ -14,10 +14,10 @@ offset_size_header("offsets") {
   path = "hf/arch/offsets.h"
 }
 
-source_set("tee") {
+source_set("other_world") {
   public_configs = [ "//src/arch/aarch64:config" ]
   sources = [
-    "tee.c",
+    "other_world.c",
   ]
   deps = [
     "//src:vm",

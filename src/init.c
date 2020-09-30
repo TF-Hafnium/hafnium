@@ -11,7 +11,7 @@
 #include <stdalign.h>
 #include <stddef.h>
 
-#include "hf/arch/tee.h"
+#include "hf/arch/other_world.h"
 
 #include "hf/api.h"
 #include "hf/boot_flow.h"
@@ -169,7 +169,7 @@ void one_time_init(void)
 
 	if (manifest.ffa_tee_enabled) {
 		/* Set up message buffers for TEE dispatcher. */
-		arch_tee_init();
+		arch_other_world_init();
 	}
 
 	dlog_info("Hafnium initialisation completed\n");

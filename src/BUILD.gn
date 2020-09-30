@@ -33,7 +33,7 @@ source_set("src_not_testable_yet") {
   deps = [
     ":src_testable",
     "//project/${project}/${plat_name}",
-    "//src/arch/${plat_arch}/hypervisor:tee",
+    "//src/arch/${plat_arch}/hypervisor:other_world",
     plat_boot_flow,
     plat_console,
     plat_iommu,
@@ -66,7 +66,7 @@ source_set("src_testable") {
     ":vm",
     "//src/arch/${plat_arch}:arch",
     "//src/arch/${plat_arch}/hypervisor",
-    "//src/arch/${plat_arch}/hypervisor:tee",
+    "//src/arch/${plat_arch}/hypervisor:other_world",
     "//vmlib",
     plat_boot_flow,
     plat_console,

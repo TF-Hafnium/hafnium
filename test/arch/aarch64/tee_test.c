@@ -6,9 +6,9 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/tee.h"
-
 #include <stdint.h>
+
+#include "hf/arch/other_world.h"
 
 #include "hf/addr.h"
 #include "hf/ffa.h"
@@ -25,7 +25,7 @@ alignas(FFA_PAGE_SIZE) static uint8_t tee_recv_buffer[HF_MAILBOX_SIZE];
  */
 TEST(arch_tee, init)
 {
-	struct ffa_value ret = arch_tee_call((struct ffa_value){
+	struct ffa_value ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_RXTX_MAP_64,
 		.arg1 = pa_addr(pa_from_va(va_from_ptr(tee_recv_buffer))),
 		.arg2 = pa_addr(pa_from_va(va_from_ptr(tee_send_buffer))),

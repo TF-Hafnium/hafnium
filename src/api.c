@@ -10,7 +10,7 @@
 
 #include "hf/arch/cpu.h"
 #include "hf/arch/mm.h"
-#include "hf/arch/tee.h"
+#include "hf/arch/other_world.h"
 #include "hf/arch/timer.h"
 
 #include "hf/check.h"
@@ -1023,7 +1023,7 @@ static struct ffa_value deliver_msg(struct vm_locked to, ffa_vm_id_t from_id,
 	if (to.vm->id == HF_TEE_VM_ID) {
 		struct ffa_value call = ffa_msg_recv_return(to.vm);
 
-		ret = arch_tee_call(call);
+		ret = arch_other_world_call(call);
 		/*
 		 * After the call to the TEE completes it must have finished
 		 * reading its RX buffer, so it is ready for another message.

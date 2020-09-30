@@ -24,7 +24,7 @@ hypervisor("aarch64_test") {
 
   deps = [
     "//src:vm",
-    "//src/arch/${plat_arch}/hypervisor:tee",
+    "//src/arch/${plat_arch}/hypervisor:other_world",
     "//test/hftest:hftest_hypervisor",
   ]
 }

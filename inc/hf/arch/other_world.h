@@ -9,6 +9,8 @@
 #pragma once
 
 #include "hf/ffa.h"
+#include "hf/vm.h"
 
-void arch_tee_init(void);
-struct ffa_value arch_tee_call(struct ffa_value args);
+void arch_other_world_init(void);
+bool arch_other_world_vm_init(struct vm *other_world_vm, struct mpool *ppool);
+struct ffa_value arch_other_world_call(struct ffa_value args);

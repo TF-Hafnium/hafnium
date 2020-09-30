@@ -8,7 +8,7 @@
 
 #include "hf/ffa_memory.h"
 
-#include "hf/arch/tee.h"
+#include "hf/arch/other_world.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
@@ -1137,10 +1137,11 @@ static struct ffa_value ffa_tee_reclaim_check_update(
 	if (clear) {
 		tee_flags |= FFA_MEMORY_REGION_FLAG_CLEAR;
 	}
-	ret = arch_tee_call((struct ffa_value){.func = FFA_MEM_RECLAIM_32,
-					       .arg1 = (uint32_t)handle,
-					       .arg2 = (uint32_t)(handle >> 32),
-					       .arg3 = tee_flags});
+	ret = arch_other_world_call(
+		(struct ffa_value){.func = FFA_MEM_RECLAIM_32,
+				   .arg1 = (uint32_t)handle,
+				   .arg2 = (uint32_t)(handle >> 32),
+				   .arg3 = tee_flags});
 
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose(
@@ -1459,9 +1460,10 @@ static struct ffa_value memory_send_tee_forward(
 	tee_locked.vm->mailbox.recv_sender = sender_vm_id;
 	tee_locked.vm->mailbox.recv_func = share_func;
 	tee_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
-	ret = arch_tee_call((struct ffa_value){.func = share_func,
-					       .arg1 = memory_share_length,
-					       .arg2 = fragment_length});
+	ret = arch_other_world_call(
+		(struct ffa_value){.func = share_func,
+				   .arg1 = memory_share_length,
+				   .arg2 = fragment_length});
 	/*
 	 * After the call to the TEE completes it must have finished reading its
 	 * RX buffer, so it is ready for another message.
@@ -1546,7 +1548,7 @@ static struct ffa_value memory_send_continue_tee_forward(
 	tee_locked.vm->mailbox.recv_sender = sender_vm_id;
 	tee_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
 	tee_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
-	ret = arch_tee_call(
+	ret = arch_other_world_call(
 		(struct ffa_value){.func = FFA_MEM_FRAG_TX_32,
 				   .arg1 = (uint32_t)handle,
 				   .arg2 = (uint32_t)(handle >> 32),
@@ -1990,7 +1992,7 @@ struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
 		} else {
 			/* Abort sending to TEE. */
 			struct ffa_value tee_ret =
-				arch_tee_call((struct ffa_value){
+				arch_other_world_call((struct ffa_value){
 					.func = FFA_MEM_RECLAIM_32,
 					.arg1 = (uint32_t)handle,
 					.arg2 = (uint32_t)(handle >> 32)});
@@ -2659,7 +2661,7 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 	CHECK(from_locked.vm->id == HF_TEE_VM_ID);
 
 	/* Retrieve memory region information from the TEE. */
-	tee_ret = arch_tee_call(
+	tee_ret = arch_other_world_call(
 		(struct ffa_value){.func = FFA_MEM_RETRIEVE_REQ_32,
 				   .arg1 = request_length,
 				   .arg2 = request_length});
@@ -2695,7 +2697,7 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 	/* Fetch the remaining fragments into the same buffer. */
 	fragment_offset = fragment_length;
 	while (fragment_offset < length) {
-		tee_ret = arch_tee_call(
+		tee_ret = arch_other_world_call(
 			(struct ffa_value){.func = FFA_MEM_FRAG_RX_32,
 					   .arg1 = (uint32_t)handle,
 					   .arg2 = (uint32_t)(handle >> 32),
