@@ -357,3 +357,37 @@ template("initrd") {
     ]
   }
 }
+
+# Generate Secure Partition package
+template("partition_package") {
+  base_out_dir = "${target_out_dir}/${target_name}"
+
+  action(target_name) {
+    forward_variables_from(invoker, [ "testonly" ])
+    script = "//build/image/generate_partition_image.py"
+
+    output_package = "${base_out_dir}/${invoker.output}"
+
+    deps = []
+    args = []
+
+    foreach(file, invoker.files) {
+      deps += [
+        file[2],
+        file[3],
+      ]
+      partition_dtb = rebase_path(get_label_info(file[0], "target_out_dir"))
+      partition_img = rebase_path(get_label_info(file[1], "target_out_dir"))
+      args += [
+        "-i",
+        "${partition_img}:${partition_dtb}",
+        "-o",
+        rebase_path(output_package),
+      ]
+    }
+
+    outputs = [
+      output_package,
+    ]
+  }
+}
