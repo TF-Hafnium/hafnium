@@ -37,7 +37,7 @@ HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
 DTC_SCRIPT = os.path.join(HF_ROOT, "build", "image", "dtc.py")
 FVP_BINARY = os.path.join(
     os.path.dirname(HF_ROOT), "fvp", "Base_RevC_AEMv8A_pkg", "models",
-    "Linux64_GCC-4.9", "FVP_Base_RevC-2xAEMv8A")
+    "Linux64_GCC-6.4", "FVP_Base_RevC-2xAEMv8A")
 FVP_PREBUILTS_ROOT = os.path.join(
     HF_ROOT, "prebuilts", "linux-aarch64", "trusted-firmware-a-trusty", "fvp")
 FVP_PREBUILT_DTS = os.path.join(
