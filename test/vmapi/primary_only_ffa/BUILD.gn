@@ -1,0 +1,51 @@
+# Copyright 2021 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+import("//test/hftest/args.gni")
+
+# Tests with no secondary VMs.
+vm_kernel("primary_only_test_vm") {
+  testonly = true
+
+  sources = [
+    "primary_only_ffa.c",
+  ]
+
+  deps = [
+    "//test/hftest:hftest_primary_vm",
+  ]
+}
+
+manifest("primary_only_ffa_partition_manifest") {
+  source = "partition-manifest.dts"
+  output = "partition-manifest.dtb"
+  overlay = hftest_manifest_overlay
+}
+
+partition_package("primary_only_ffa_test_package") {
+  testonly = true
+  files = [ [
+        "partition-manifest.dtb",
+        "primary_only_test_vm.bin",
+        ":primary_only_ffa_partition_manifest",
+        ":primary_only_test_vm",
+      ] ]
+  output = "primary_only_ffa_test_package.img"
+}
+
+partitions_json("primary_only_ffa_test") {
+  testonly = true
+
+  sps = []
+  vms = [ [
+        "primary_only_ffa_test_package.img",
+        "manifest.dts",
+        ":primary_only_ffa_test_package",
+        ":primary_only_ffa_partition_manifest",
+      ] ]
+  json_file = "primary_only_ffa_test.json"
+}

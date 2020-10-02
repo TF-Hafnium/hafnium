@@ -53,6 +53,7 @@ then
   HFTEST+=(--driver=fvp)
   HFTEST+=(--out "$OUT/aem_v8a_fvp_clang")
   HFTEST+=(--out_initrd "$OUT/aem_v8a_fvp_vm_clang")
+  HFTEST+=(--out_partitions "$OUT/aem_v8a_fvp_vm_clang")
 else
   HFTEST+=(--out "$OUT/qemu_aarch64_clang")
   HFTEST+=(--out_initrd "$OUT/qemu_aarch64_vm_clang")
@@ -109,5 +110,10 @@ do
   if [ $USE_TFA == true ]
   then
     "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/trusty/trusty_test
+  fi
+
+  if [ $USE_TFA == true ] && [ $USE_FVP == true ]
+  then
+     "${HFTEST_CPU[@]}" hafnium --partitions_json test/vmapi/primary_only_ffa/primary_only_ffa_test.json
   fi
 done
