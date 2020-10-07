@@ -318,11 +318,13 @@ static void smc_forwarder(const struct vm *vm, struct ffa_value *args)
 
 /**
  * In the normal world, ffa_handler is always called from the virtual FF-A
- * instance (from a VM). In the secure world, ffa_handler may be called from
- * virtual (a secure partition) or physical FF-A instance (from the normal
- * world). The function returns true when the call is handled. The *next
- * pointer is updated to the next vCPU to run or NULL when the call originated
- * from the virtual FF-A instance and has to be forwarded down to EL3.
+ * instance (from a VM in EL1). In the secure world, ffa_handler may be called
+ * from the virtual (a secure partition in S-EL1) or physical FF-A instance
+ * (from the normal world via EL3). The function returns true when the call is
+ * handled. The *next pointer is updated to the next vCPU to run, which might be
+ * the 'other world' vCPU if the call originated from the virtual FF-A instance
+ * and has to be forwarded down to EL3, or left as is to resume the current
+ * vCPU.
  */
 static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			struct vcpu **next)
@@ -434,51 +436,47 @@ static struct vcpu *get_other_world_vcpu(struct vcpu *current)
 }
 
 /**
- * Initially called from virtual FF-A instance (smc_handler and hvc_handler).
- * Handles an FF-A function from a secure partition, and if necessary returns
- * to the normal world and handles one or more FF-A functions from the normal
- * world. Returns when it is ready to run a secure partition again.
+ * Called to switch to the other world and handle FF-A calls from it. Returns
+ * when it is ready to run a secure partition again.
+ *
+ * Expects that `other_world_vcpu` points to the vCPU of the 'other world VM'
+ * which corresponds to this physical CPU, and that `*next` is `NULL`.
  */
-static bool ffa_handler_loop(struct ffa_value *ret, struct vcpu **next)
+static void other_world_switch_loop(struct vcpu *other_world_vcpu,
+				    struct vcpu **next)
 {
-	struct vcpu *ffa_next = current();
-	struct vcpu *other_world_vcpu = get_other_world_vcpu(current());
-	bool handled = false;
+	struct ffa_value other_world_args =
+		arch_regs_get_args(&other_world_vcpu->regs);
 
-	/* The FF-A call originates from a partition in current world. */
-	handled = ffa_handler(ret, current(), &ffa_next);
+	CHECK(*next == NULL);
 
-	while (handled) {
-		if (ffa_next != NULL) {
-			/*
-			 * The FF-A call was handled and ffa_next is not null
-			 * which means this vCPU can be resumed.
-			 */
-			if (ffa_next != current()) {
-				*next = ffa_next;
-			}
+	while (*next == NULL) {
+		/*
+		 * Either we just entered the function or the last FF-A call
+		 * from the other world was handled and next is still NULL,
+		 * which means that the result should be passed back to the
+		 * other world.
+		 */
+		other_world_args = smc_ffa_call(other_world_args);
 
-			/* Resume current or next EL1 partition. */
-			return true;
+		/*
+		 * The call to EL3 returned, thus other_world_args contains an
+		 * FF-A call from the physical FF-A instance. Handle it. At this
+		 * point *next is still NULL, which means that we will return
+		 * the result of the call back to EL3 unless the API handler
+		 * sets *next to something different.
+		 */
+		if (!ffa_handler(&other_world_args, other_world_vcpu, next)) {
+			other_world_args.func = SMCCC_ERROR_UNKNOWN;
 		}
-
-		/*
-		 * The FF-A call is handled and ffa_next is null which hints
-		 * the result shall be passed to the other world.
-		 */
-		*ret = smc_ffa_call(*ret);
-
-		/*
-		 * Returned from EL3, thus *ret contains an FF-A call from the
-		 * physical FF-A instance. Handle it. At this point ffa_next is
-		 * NULL, which means that we will return the result of the call
-		 * back to EL3 unless the API handler sets ffa_next to something
-		 * different.
-		 */
-		handled = ffa_handler(ret, other_world_vcpu, &ffa_next);
 	}
 
-	return false;
+	/*
+	 * Store the return value on the other world vCPU, ready for next time
+	 * we switch to it (in case they aren't overwritten at that point by
+	 * whatever API function decides to make the switch).
+	 */
+	arch_regs_set_retval(&other_world_vcpu->regs, other_world_args);
 }
 
 #endif
@@ -526,12 +524,18 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 		return true;
 	}
 
-#if SECURE_WORLD == 1
-	if (ffa_handler_loop(&args, next)) {
-#else
 	if (ffa_handler(&args, vcpu, next)) {
-#endif
 		arch_regs_set_retval(&vcpu->regs, args);
+
+#if SECURE_WORLD == 1
+		struct vcpu *other_world_vcpu = get_other_world_vcpu(current());
+
+		if (*next == other_world_vcpu) {
+			*next = NULL;
+			other_world_switch_loop(other_world_vcpu, next);
+		}
+#endif
+
 		update_vi(*next);
 		return true;
 	}
