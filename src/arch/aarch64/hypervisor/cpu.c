@@ -131,6 +131,20 @@ void arch_regs_set_retval(struct arch_regs *r, struct ffa_value v)
 	r->r[7] = v.arg7;
 }
 
+struct ffa_value arch_regs_get_args(struct arch_regs *regs)
+{
+	return (struct ffa_value){
+		.func = regs->r[0],
+		.arg1 = regs->r[1],
+		.arg2 = regs->r[2],
+		.arg3 = regs->r[3],
+		.arg4 = regs->r[4],
+		.arg5 = regs->r[5],
+		.arg6 = regs->r[6],
+		.arg7 = regs->r[7],
+	};
+}
+
 void arch_cpu_init(void)
 {
 	plat_psci_cpu_resume();

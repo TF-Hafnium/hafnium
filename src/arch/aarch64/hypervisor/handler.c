@@ -513,34 +513,41 @@ static void update_vi(struct vcpu *next)
 }
 
 /**
+ * Handles PSCI and FF-A calls and writes the return value back to the registers
+ * of the vCPU. This is shared between smc_handler and hvc_handler.
+ *
+ * Returns true if the call was handled.
+ */
+static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
+			    struct vcpu **next)
+{
+	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
+			 &vcpu->regs.r[0], next)) {
+		return true;
+	}
+
+#if SECURE_WORLD == 1
+	if (ffa_handler_loop(&args, next)) {
+#else
+	if (ffa_handler(&args, vcpu, next)) {
+#endif
+		arch_regs_set_retval(&vcpu->regs, args);
+		update_vi(*next);
+		return true;
+	}
+
+	return false;
+}
+
+/**
  * Processes SMC instruction calls.
  */
 static struct vcpu *smc_handler(struct vcpu *vcpu)
 {
-	struct ffa_value args = {
-		.func = vcpu->regs.r[0],
-		.arg1 = vcpu->regs.r[1],
-		.arg2 = vcpu->regs.r[2],
-		.arg3 = vcpu->regs.r[3],
-		.arg4 = vcpu->regs.r[4],
-		.arg5 = vcpu->regs.r[5],
-		.arg6 = vcpu->regs.r[6],
-		.arg7 = vcpu->regs.r[7],
-	};
+	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
 	struct vcpu *next = NULL;
 
-	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
-			 &vcpu->regs.r[0], &next)) {
-		return next;
-	}
-
-#if SECURE_WORLD == 1
-	if (ffa_handler_loop(&args, &next)) {
-#else
-	if (ffa_handler(&args, current(), &next)) {
-#endif
-		arch_regs_set_retval(&vcpu->regs, args);
-		update_vi(next);
+	if (hvc_smc_handler(args, vcpu, &next)) {
 		return next;
 	}
 
@@ -700,32 +707,12 @@ static void inject_el1_unknown_exception(struct vcpu *vcpu, uintreg_t esr_el2)
 	inject_el1_exception(vcpu, esr_el1_value, far_el1_value);
 }
 
-struct vcpu *hvc_handler(struct vcpu *vcpu)
+static struct vcpu *hvc_handler(struct vcpu *vcpu)
 {
-	struct ffa_value args = {
-		.func = vcpu->regs.r[0],
-		.arg1 = vcpu->regs.r[1],
-		.arg2 = vcpu->regs.r[2],
-		.arg3 = vcpu->regs.r[3],
-		.arg4 = vcpu->regs.r[4],
-		.arg5 = vcpu->regs.r[5],
-		.arg6 = vcpu->regs.r[6],
-		.arg7 = vcpu->regs.r[7],
-	};
+	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
 	struct vcpu *next = NULL;
 
-	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
-			 &vcpu->regs.r[0], &next)) {
-		return next;
-	}
-
-#if SECURE_WORLD == 1
-	if (ffa_handler_loop(&args, &next)) {
-#else
-	if (ffa_handler(&args, current(), &next)) {
-#endif
-		arch_regs_set_retval(&vcpu->regs, args);
-		update_vi(next);
+	if (hvc_smc_handler(args, vcpu, &next)) {
 		return next;
 	}
 

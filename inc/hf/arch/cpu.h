@@ -43,6 +43,14 @@ void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg);
 void arch_regs_set_retval(struct arch_regs *r, struct ffa_value v);
 
 /**
+ * Extracts SMC or HVC arguments from the registers of a vCPU.
+ *
+ * This function must only be called on an arch_regs that is known not be in use
+ * by any other physical CPU.
+ */
+struct ffa_value arch_regs_get_args(struct arch_regs *regs);
+
+/**
  * Initialize and reset CPU-wide register values.
  */
 void arch_cpu_init(void);
