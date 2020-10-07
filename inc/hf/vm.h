@@ -148,6 +148,7 @@ void vm_unlock(struct vm_locked *locked);
 struct vcpu *vm_get_vcpu(struct vm *vm, ffa_vcpu_index_t vcpu_index);
 struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_vm_id_t for_vm);
 ffa_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry);
+bool vm_id_is_current_world(ffa_vm_id_t vm_id);
 
 bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 		     uint32_t mode, struct mpool *ppool, ipaddr_t *ipa);

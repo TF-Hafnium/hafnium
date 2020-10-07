@@ -448,6 +448,7 @@ static void other_world_switch_loop(struct vcpu *other_world_vcpu,
 	struct ffa_value other_world_args =
 		arch_regs_get_args(&other_world_vcpu->regs);
 
+	CHECK(!vm_id_is_current_world(other_world_vcpu->vm->id));
 	CHECK(*next == NULL);
 
 	while (*next == NULL) {
@@ -470,6 +471,14 @@ static void other_world_switch_loop(struct vcpu *other_world_vcpu,
 			other_world_args.func = SMCCC_ERROR_UNKNOWN;
 		}
 	}
+
+	/*
+	 * ffa_handler set *next to something, which means it wants to switch
+	 * back to an SP in EL1. It must be something in this world though, as
+	 * if it wanted to return back to the other world (where the last FF-A
+	 * call came from) it wouldn't have set *next at all.
+	 */
+	CHECK(vm_id_is_current_world((*next)->vm->id));
 
 	/*
 	 * Store the return value on the other world vCPU, ready for next time
@@ -498,6 +507,8 @@ static void update_vi(struct vcpu *next)
 			vcpu->interrupts.enabled_and_pending_count > 0);
 		sl_unlock(&vcpu->lock);
 	} else {
+		CHECK(vm_id_is_current_world(next->vm->id));
+
 		/*
 		 * About to switch vCPUs, set the bit for the vCPU to which we
 		 * are switching in the saved copy of the register.

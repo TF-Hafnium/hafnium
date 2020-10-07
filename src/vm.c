@@ -201,6 +201,17 @@ ffa_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)
 }
 
 /**
+ * Return whether the given VM ID represents an entity in the current world:
+ * i.e. the hypervisor or a normal world VM when running in the normal world, or
+ * the SPM or an SP when running in the secure world.
+ */
+bool vm_id_is_current_world(ffa_vm_id_t vm_id)
+{
+	return (vm_id & HF_VM_ID_WORLD_MASK) !=
+	       (HF_OTHER_WORLD_ID & HF_VM_ID_WORLD_MASK);
+}
+
+/**
  * Map a range of addresses to the VM in both the MMU and the IOMMU.
  *
  * mm_vm_defrag should always be called after a series of page table updates,
