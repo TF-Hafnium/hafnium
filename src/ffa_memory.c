@@ -402,7 +402,7 @@ static void dump_share_states(void)
 
 /* TODO: Add device attributes: GRE, cacheability, shareability. */
 static inline uint32_t ffa_memory_permissions_to_mode(
-	ffa_memory_access_permissions_t permissions)
+	ffa_memory_access_permissions_t permissions, uint32_t default_mode)
 {
 	uint32_t mode = 0;
 
@@ -411,8 +411,10 @@ static inline uint32_t ffa_memory_permissions_to_mode(
 		mode = MM_MODE_R;
 		break;
 	case FFA_DATA_ACCESS_RW:
-	case FFA_DATA_ACCESS_NOT_SPECIFIED:
 		mode = MM_MODE_R | MM_MODE_W;
+		break;
+	case FFA_DATA_ACCESS_NOT_SPECIFIED:
+		mode = (default_mode & (MM_MODE_R | MM_MODE_W));
 		break;
 	case FFA_DATA_ACCESS_RESERVED:
 		panic("Tried to convert FFA_DATA_ACCESS_RESERVED.");
@@ -422,8 +424,10 @@ static inline uint32_t ffa_memory_permissions_to_mode(
 	case FFA_INSTRUCTION_ACCESS_NX:
 		break;
 	case FFA_INSTRUCTION_ACCESS_X:
-	case FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED:
 		mode |= MM_MODE_X;
+		break;
+	case FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED:
+		mode |= (default_mode & MM_MODE_X);
 		break;
 	case FFA_INSTRUCTION_ACCESS_RESERVED:
 		panic("Tried to convert FFA_INSTRUCTION_ACCESS_RESVERVED.");
@@ -519,8 +523,7 @@ static struct ffa_value ffa_send_check_transition(
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
-	const uint32_t required_from_mode =
-		ffa_memory_permissions_to_mode(permissions);
+	uint32_t required_from_mode;
 	struct ffa_value ret;
 
 	ret = constituents_get_mode(from, orig_from_mode, fragments,
@@ -545,6 +548,9 @@ static struct ffa_value ffa_send_check_transition(
 	if ((*orig_from_mode & state_mask) != 0) {
 		return ffa_error(FFA_DENIED);
 	}
+
+	required_from_mode =
+		ffa_memory_permissions_to_mode(permissions, *orig_from_mode);
 
 	if ((*orig_from_mode & required_from_mode) != required_from_mode) {
 		dlog_verbose(
@@ -2307,8 +2313,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		panic("Got unexpected FFA_INSTRUCTION_ACCESS_RESERVED. Should "
 		      "be checked before this point.");
 	}
-	memory_to_attributes = ffa_memory_permissions_to_mode(permissions);
-
+	memory_to_attributes = ffa_memory_permissions_to_mode(
+		permissions, share_state->sender_orig_mode);
 	ret = ffa_retrieve_check_update(
 		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
