@@ -130,6 +130,7 @@ struct arch_mm_config {
 	uintreg_t mair_el2;
 	uintreg_t tcr_el2;
 	uintreg_t sctlr_el2;
+	uintreg_t vstcr_el2;
 } arch_mm_config;
 
 static uint8_t mm_s2_max_level;
@@ -599,6 +600,8 @@ bool arch_mm_init(paddr_t table)
 {
 	static const int pa_bits_table[16] = {32, 36, 40, 42, 44, 48};
 	uint64_t features = read_msr(id_aa64mmfr0_el1);
+	uint64_t pe_features = read_msr(id_aa64pfr0_el1);
+	unsigned int nsa_nsw;
 	int pa_bits = pa_bits_table[features & 0xf];
 	int extend_bits;
 	int sl0;
@@ -655,11 +658,29 @@ bool arch_mm_init(paddr_t table)
 		"Stage 2 has %d page table levels with %d pages at the root.\n",
 		mm_s2_max_level + 1, mm_s2_root_table_count);
 
+	/*
+	 * If the PE implements S-EL2 then VTCR_EL2.NSA/NSW bits are significant
+	 * in secure state. In non-secure state, NSA/NSW behave as if set to
+	 * 11b. If S-EL2 is not implemented NSA/NSW bits are RES0.
+	 */
+	if (((pe_features >> 36) & 0xF) == 1) {
+		/*
+		 * NSA/NSW=10b: in secure state,
+		 * S2 translations for the NS IPA space access the NS PA space.
+		 * S2 translation table walks for the NS IPA space are to the
+		 * secure PA space.
+		 */
+		nsa_nsw = 2;
+	} else {
+		nsa_nsw = 0;
+	}
+
 	arch_mm_config = (struct arch_mm_config){
 		.ttbr0_el2 = pa_addr(table),
 
 		.vtcr_el2 =
 			(1U << 31) |		   /* RES1. */
+			(nsa_nsw << 29) |	   /* NSA/NSW. */
 			((features & 0xf) << 16) | /* PS, matching features. */
 			(0 << 14) |		   /* TG0: 4 KB granule. */
 			(3 << 12) |		   /* SH0: inner shareable. */
@@ -691,6 +712,12 @@ bool arch_mm_init(paddr_t table)
 			0,
 
 		.sctlr_el2 = get_sctlr_el2_value(),
+		.vstcr_el2 = (1U << 31) |	    /* RES1. */
+			     (0 << 30) |	    /* SA. */
+			     (0 << 29) |	    /* SW. */
+			     (0 << 14) |	    /* TG0: 4 KB granule. */
+			     (sl0 << 6) |	    /* SL0. */
+			     ((64 - pa_bits) << 0), /* T0SZ: dependent on PS. */
 	};
 
 	return true;

@@ -117,13 +117,13 @@ mm_enable:
 
 	ldp x1, x2, [x6]
 	ldp x3, x4, [x6, #16]
-	ldr x5, [x6, #32]
+	ldp x5, x6, [x6, #32]
 
 	msr ttbr0_el2, x1
 	msr vtcr_el2, x2
 
 #if SECURE_WORLD == 1
-	msr MSR_VSTCR_EL2, x2
+	msr MSR_VSTCR_EL2, x6
 #endif
 
 	msr mair_el2, x3
