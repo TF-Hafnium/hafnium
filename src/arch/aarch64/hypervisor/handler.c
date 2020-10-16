@@ -542,8 +542,29 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 		struct vcpu *other_world_vcpu = get_other_world_vcpu(current());
 
 		if (*next == other_world_vcpu) {
+			/*
+			 * TODO: Save non-volatile registers of current SP vCPU
+			 * before switching to normal world.
+			 * For now we rely on the SPMD in TF-A to do this at
+			 * EL3:
+			 * https://git.trustedfirmware.org/TF-A/trusted-firmware-a.git/tree/services/std_svc/spmd/spmd_main.c#n121
+			 * This requires that the CTX_INCLUDE_FP_REGS option is
+			 * enabled in the TF-A build.
+			 */
+			api_regs_state_saved(vcpu);
+
 			*next = NULL;
 			other_world_switch_loop(other_world_vcpu, next);
+
+			/*
+			 * Whatever API function has requested a switch back to
+			 * the vCPU of an SP should have set regs_available to
+			 * false already. It must also have explicitly set a
+			 * next vCPU rather than leaving it NULL, because NULL
+			 * would have meant returning to the normal world.
+			 */
+			CHECK(next != NULL);
+			CHECK(!(*next)->regs_available);
 		}
 #endif
 
