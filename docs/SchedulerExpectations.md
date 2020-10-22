@@ -23,6 +23,12 @@ The vCPU has been preempted but still has work to do. If the scheduling quantum
 has not expired, the scheduler MUST call `FFA_RUN` on the vCPU to allow it to
 continue.
 
+If `w1` is non-zero, then Hafnium would like `FFA_RUN` to be called on the vCPU
+specified there. The scheduler MUST either wake the vCPU in question up if it is
+blocked, or preempt and re-run it if it is already running somewhere. This gives
+Hafnium a chance to update any CPU state which might have changed. The scheduler
+should call `FFA_RUN` again on the sending VM as usual.
+
 ### `FFA_YIELD`
 
 The vCPU has voluntarily yielded the CPU. The scheduler SHOULD take a scheduling
@@ -36,7 +42,7 @@ run queue and not call `FFA_RUN` on the vCPU until it has either:
 
 *   injected an interrupt
 *   sent it a message
-*   received `HF_FFA_RUN_WAKE_UP` for it from another vCPU
+*   received `FFA_INTERRUPT` for it from another vCPU
 *   the timeout provided in `w2` is not `FFA_SLEEP_INDEFINITE` and the
     specified duration has expired.
 
@@ -63,28 +69,18 @@ The vCPU is blocked waiting for an interrupt. The scheduler MUST take it off the
 run queue and not call `FFA_RUN` on the vCPU until it has either:
 
 *   injected an interrupt
-*   received `HF_FFA_RUN_WAKE_UP` for it from another vCPU
+*   received `FFA_INTERRUPT` for it from another vCPU
 *   the timeout provided in `w2` is not `FFA_SLEEP_INDEFINITE` and the
     specified duration has expired.
-
-### `HF_FFA_RUN_WAKE_UP`
-
-_This is a Hafnium-specific function not part of the FF-A standard._
-
-Hafnium would like `hf_vcpu_run` to be called on another vCPU, specified by
-`hf_vcpu_run_return.wake_up`. The scheduler MUST either wake the vCPU in
-question up if it is blocked, or preempt and re-run it if it is already running
-somewhere. This gives Hafnium a chance to update any CPU state which might have
-changed. The scheduler should call FFA_RUN again on the sending VM as usual.
 
 ### `FFA_ERROR`
 
 #### `FFA_ABORTED`
 
 The vCPU has aborted triggering the whole VM to abort. The scheduler MUST treat
-this the same as `HF_FFA_RUN_WAKE_UP` for all the other vCPUs of the VM. For
-this vCPU the scheduler SHOULD either never call FFA_RUN on the vCPU again, or
-treat it the same as `HF_FFA_RUN_WAIT_FOR_INTERRUPT`.
+this the same as `FFA_INTERRUPT` for all the other vCPUs of the VM. For this
+vCPU the scheduler SHOULD either never call FFA_RUN on the vCPU again, or treat
+it the same as `HF_FFA_RUN_WAIT_FOR_INTERRUPT`.
 
 #### Any other error code
 

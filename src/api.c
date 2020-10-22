@@ -148,12 +148,9 @@ struct vcpu *api_switch_to_primary(struct vcpu *current,
 				 * Timer is pending, so the current vCPU should
 				 * be run again right away.
 				 */
-				primary_ret.func = FFA_INTERRUPT_32;
-				/*
-				 * primary_ret.arg1 should already be set to the
-				 * current VM ID and vCPU ID.
-				 */
-				primary_ret.arg2 = 0;
+				primary_ret = (struct ffa_value){
+					.func = FFA_INTERRUPT_32};
+
 			} else {
 				primary_ret.arg2 = remaining_ns;
 			}
@@ -244,7 +241,6 @@ struct vcpu *api_preempt(struct vcpu *current)
 {
 	struct ffa_value ret = {
 		.func = FFA_INTERRUPT_32,
-		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	return api_switch_to_primary(current, ret, VCPU_STATE_PREEMPTED);
@@ -326,7 +322,7 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
 struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
 {
 	struct ffa_value ret = {
-		.func = HF_FFA_RUN_WAKE_UP,
+		.func = FFA_INTERRUPT_32,
 		.arg1 = ffa_vm_vcpu(target_vcpu->vm->id,
 				    vcpu_index(target_vcpu)),
 	};
@@ -979,7 +975,7 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	 * overwritten when the switch back to the primary occurs.
 	 */
 	ret.func = FFA_INTERRUPT_32;
-	ret.arg1 = ffa_vm_vcpu(vm_id, vcpu_idx);
+	ret.arg1 = 0;
 	ret.arg2 = 0;
 
 out:

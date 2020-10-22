@@ -36,7 +36,7 @@ TEST(smp, two_vcpus)
 
 	/* Let the first vCPU start the second vCPU. */
 	run_res = ffa_run(SERVICE_VM3, 0);
-	EXPECT_EQ(run_res.func, HF_FFA_RUN_WAKE_UP);
+	EXPECT_EQ(run_res.func, FFA_INTERRUPT_32);
 	EXPECT_EQ(ffa_vm_id(run_res), SERVICE_VM3);
 	EXPECT_EQ(ffa_vcpu_index(run_res), 1);
 
