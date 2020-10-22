@@ -1196,12 +1196,14 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 	struct vcpu_locked current_locked;
 	struct vm *vm = current->vm;
 	struct ffa_value return_code;
+	bool is_from_secure_world =
+		(current->vm->id & HF_VM_ID_WORLD_MASK) != 0;
 
 	/*
 	 * The primary VM will receive messages as a status code from running
 	 * vCPUs and must not call this function.
 	 */
-	if (vm->id == HF_PRIMARY_VM_ID) {
+	if (!is_from_secure_world && vm->id == HF_PRIMARY_VM_ID) {
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
@@ -1243,8 +1245,13 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 		goto out;
 	}
 
-	/* Switch back to primary VM to block. */
-	{
+	if (is_from_secure_world) {
+		/* Return to other world if caller is a SP. */
+		*next = api_switch_to_other_world(
+			current, (struct ffa_value){.func = FFA_MSG_WAIT_32},
+			VCPU_STATE_BLOCKED_MAILBOX);
+	} else {
+		/* Switch back to primary VM to block. */
 		struct ffa_value run_return = {
 			.func = FFA_MSG_WAIT_32,
 			.arg1 = ffa_vm_vcpu(vm->id, vcpu_index(current)),

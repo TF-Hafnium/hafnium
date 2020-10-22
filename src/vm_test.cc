@@ -13,6 +13,7 @@ extern "C" {
 #include "hf/vm.h"
 }
 
+#include <list>
 #include <memory>
 #include <span>
 #include <vector>
@@ -29,7 +30,7 @@ using ::testing::SizeIs;
 
 using struct_vm = struct vm;
 
-constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 16;
+constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 32;
 const int TOP_LEVEL = arch_mm_stage2_max_level();
 
 class vm : public ::testing::Test
@@ -49,6 +50,12 @@ class vm : public ::testing::Test
 
        protected:
 	struct mpool ppool;
+
+       public:
+	static bool BootOrderBiggerThan(struct_vm *vm1, struct_vm *vm2)
+	{
+		return vm1->boot_order > vm2->boot_order;
+	}
 };
 
 /**
@@ -70,4 +77,70 @@ TEST_F(vm, vm_unmap_hypervisor_not_mapped)
 	vm_unlock(&vm_locked);
 }
 
+/**
+ * Validate the "boot_list" is created properly, according to vm's "boot_order"
+ * field.
+ */
+TEST_F(vm, vm_boot_order)
+{
+	struct_vm *vm_cur;
+	std::list<struct_vm *> expected_final_order;
+
+	EXPECT_FALSE(vm_get_first_boot());
+
+	/*
+	 * Insertion when no call to "vm_update_boot" has been made yet.
+	 * The "boot_list" is expected to be empty.
+	 */
+	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur));
+	vm_cur->boot_order = 1;
+	vm_update_boot(vm_cur);
+	expected_final_order.push_back(vm_cur);
+
+	EXPECT_EQ(vm_get_first_boot()->id, vm_cur->id);
+
+	/* Insertion at the head of the boot list */
+	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur));
+	vm_cur->boot_order = 3;
+	vm_update_boot(vm_cur);
+	expected_final_order.push_back(vm_cur);
+
+	EXPECT_EQ(vm_get_first_boot()->id, vm_cur->id);
+
+	/* Insertion of two in the middle of the boot list */
+	for (int i = 0; i < 2; i++) {
+		EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur));
+		vm_cur->boot_order = 2;
+		vm_update_boot(vm_cur);
+		expected_final_order.push_back(vm_cur);
+	}
+
+	/*
+	 * Insertion in the end of the list.
+	 * This tests shares the data with "vm_unmap_hypervisor_not_mapped".
+	 * As such, a VM is expected to have been initialized before this
+	 * test, with ID 1 and boot_order 0.
+	 */
+	vm_cur = vm_find(1);
+	EXPECT_FALSE(vm_cur == NULL);
+	vm_update_boot(vm_cur);
+	expected_final_order.push_back(vm_cur);
+
+	/*
+	 * Number of VMs initialized should be the same as in the
+	 * "expected_final_order", before the final verification.
+	 */
+	EXPECT_EQ(expected_final_order.size(), vm_get_count())
+		<< "Something went wrong with the test itself...\n";
+
+	/* Sort "expected_final_order" by "boot_order" field */
+	expected_final_order.sort(vm::BootOrderBiggerThan);
+
+	std::list<struct_vm *>::iterator it;
+	for (it = expected_final_order.begin(), vm_cur = vm_get_first_boot();
+	     it != expected_final_order.end() && vm_cur != NULL;
+	     it++, vm_cur = vm_cur->next_boot) {
+		EXPECT_EQ((*it)->id, vm_cur->id);
+	}
+}
 } /* namespace */

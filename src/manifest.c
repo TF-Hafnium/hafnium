@@ -195,6 +195,21 @@ static enum manifest_return_code read_uint16(const struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
+static enum manifest_return_code read_optional_uint16(
+	const struct fdt_node *node, const char *property,
+	uint16_t default_value, uint16_t *out)
+{
+	enum manifest_return_code ret;
+
+	ret = read_uint16(node, property, out);
+	if (ret == MANIFEST_ERROR_PROPERTY_NOT_FOUND) {
+		*out = default_value;
+		return MANIFEST_SUCCESS;
+	}
+
+	return MANIFEST_SUCCESS;
+}
+
 static enum manifest_return_code read_uint8(const struct fdt_node *node,
 					    const char *property, uint8_t *out)
 {
@@ -529,6 +544,10 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 
 	TRY(read_uint64(&root, "entrypoint-offset", &vm->sp.ep_offset));
 	dlog_verbose("  SP entry point offset %#x\n", vm->sp.ep_offset);
+
+	TRY(read_optional_uint16(&root, "boot-order", DEFAULT_BOOT_ORDER,
+				 &vm->sp.boot_order));
+	dlog_verbose(" SP boot order %#u\n", vm->sp.boot_order);
 
 	TRY(read_uint8(&root, "xlat-granule", (uint8_t *)&vm->sp.xlat_granule));
 	dlog_verbose("  SP translation granule %d\n", vm->sp.xlat_granule);

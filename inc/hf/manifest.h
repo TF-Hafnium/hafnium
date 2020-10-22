@@ -29,6 +29,8 @@
 /** Mask for getting read/write/execute permission */
 #define MM_PERM_MASK 0x7
 
+#define DEFAULT_BOOT_ORDER 0x0
+
 enum run_time_el {
 	EL1 = 0,
 	S_EL0,

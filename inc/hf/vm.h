@@ -120,6 +120,13 @@ struct vm {
 
 	atomic_bool aborting;
 
+	/**
+	 * Booting parameters.
+	 */
+	bool initialized;
+	uint16_t boot_order;
+	struct vm *next_boot;
+
 	/** Arch-specific VM information. */
 	struct arch_vm arch;
 };
@@ -159,3 +166,6 @@ void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 	      struct mpool *ppool);
 bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool);
+
+void vm_update_boot(struct vm *vm);
+struct vm *vm_get_first_boot(void);

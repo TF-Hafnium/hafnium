@@ -19,6 +19,7 @@
 #include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
+#include "hf/ffa_internal.h"
 #include "hf/panic.h"
 #include "hf/vm.h"
 
@@ -259,6 +260,51 @@ static void set_virtual_interrupt_current(bool enable)
 	write_msr(hcr_el2, hcr_el2);
 }
 
+#if SECURE_WORLD == 1
+static bool sp_boot_next(struct vcpu *current, struct vcpu **next,
+			 struct ffa_value *ffa_ret)
+{
+	struct vm_locked current_vm_locked;
+	struct vm *vm_next = NULL;
+	bool ret = false;
+
+	/*
+	 * If VM hasn't been initialized, initialize it and traverse
+	 * booting list following "next_boot" field in the VM structure.
+	 * Once all the SPs have been booted (when "next_boot" is NULL),
+	 * return execution to the NWd.
+	 */
+	current_vm_locked = vm_lock(current->vm);
+	if (current_vm_locked.vm->initialized == false) {
+		current_vm_locked.vm->initialized = true;
+		dlog_verbose("Initialized VM: %#x, boot_order: %u\n",
+			     current_vm_locked.vm->id,
+			     current_vm_locked.vm->boot_order);
+
+		if (current_vm_locked.vm->next_boot != NULL) {
+			current->state = VCPU_STATE_BLOCKED_MAILBOX;
+			vm_next = current_vm_locked.vm->next_boot;
+			CHECK(vm_next->initialized == false);
+			*next = vm_get_vcpu(vm_next, vcpu_index(current));
+			arch_regs_reset(*next);
+			(*next)->cpu = current->cpu;
+			(*next)->state = VCPU_STATE_RUNNING;
+			(*next)->regs_available = false;
+
+			*ffa_ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
+			ret = true;
+			goto out;
+		}
+
+		dlog_verbose("Finished initializing all VMs.\n");
+	}
+
+out:
+	vm_unlock(&current_vm_locked);
+	return ret;
+}
+#endif
+
 /**
  * Checks whether to block an SMC being forwarded from a VM.
  */
@@ -371,6 +417,11 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			ffa_msg_send_attributes(*args), current, next);
 		return true;
 	case FFA_MSG_WAIT_32:
+#if SECURE_WORLD == 1
+		if (sp_boot_next(current, next, args)) {
+			return true;
+		}
+#endif
 		*args = api_ffa_msg_recv(true, current, next);
 		return true;
 	case FFA_MSG_POLL_32:

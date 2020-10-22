@@ -21,6 +21,7 @@
 static struct vm vms[MAX_VMS];
 static struct vm other_world;
 static ffa_vm_count_t vm_count;
+static struct vm *first_boot_vm;
 
 struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 		   struct mpool *ppool)
@@ -291,4 +292,42 @@ bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool)
 			ppool) &&
 	       vm_unmap(vm_locked, layout_data_begin(), layout_data_end(),
 			ppool);
+}
+
+/**
+ * Gets the first partition to boot, according to Boot Protocol from FFA spec.
+ */
+struct vm *vm_get_first_boot(void)
+{
+	return first_boot_vm;
+}
+
+/**
+ * Insert in boot list, sorted by `boot_order` parameter in the vm structure
+ * and rooted in `first_boot_vm`.
+ */
+void vm_update_boot(struct vm *vm)
+{
+	struct vm *current = NULL;
+	struct vm *previous = NULL;
+
+	if (first_boot_vm == NULL) {
+		first_boot_vm = vm;
+		return;
+	}
+
+	current = first_boot_vm;
+
+	while (current != NULL && current->boot_order >= vm->boot_order) {
+		previous = current;
+		current = current->next_boot;
+	}
+
+	if (previous != NULL) {
+		previous->next_boot = vm;
+	} else {
+		first_boot_vm = vm;
+	}
+
+	vm->next_boot = current;
 }

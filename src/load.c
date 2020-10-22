@@ -148,7 +148,12 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 				return false;
 			}
 		}
+
+		vm_locked.vm->boot_order = manifest_vm->sp.boot_order;
+		/* Updating boot list according to boot_order */
+		vm_update_boot(vm_locked.vm);
 	}
+
 	/* Initialize architecture-specific features. */
 	arch_vm_features_set(vm_locked.vm);
 
