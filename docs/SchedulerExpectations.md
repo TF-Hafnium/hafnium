@@ -20,14 +20,14 @@ as follows:
 ### `FFA_INTERRUPT`
 
 The vCPU has been preempted but still has work to do. If the scheduling quantum
-has not expired, the scheduler MUST call `hf_vcpu_run` on the vCPU to allow it
-to continue.
+has not expired, the scheduler MUST call `FFA_RUN` on the vCPU to allow it to
+continue.
 
 ### `FFA_YIELD`
 
 The vCPU has voluntarily yielded the CPU. The scheduler SHOULD take a scheduling
-decision to give cycles to those that need them but MUST call `hf_vcpu_run` on
-the vCPU at a later point.
+decision to give cycles to those that need them but MUST call `FFA_RUN` on the
+vCPU at a later point.
 
 ### `FFA_MSG_WAIT`
 

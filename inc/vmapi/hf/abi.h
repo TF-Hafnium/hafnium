@@ -25,7 +25,7 @@
 #define HF_FFA_RUN_WAIT_FOR_INTERRUPT 0xff06
 #define HF_FFA_RUN_WAKE_UP            0xff07
 
-/* This matches what Trusty and its ATF module currently use. */
+/* This matches what Trusty and its TF-A module currently use. */
 #define HF_DEBUG_LOG            0xbd000000
 
 /* clang-format on */

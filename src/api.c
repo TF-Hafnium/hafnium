@@ -111,7 +111,7 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 		break;
 	}
 
-	/* Set the return value for the primary VM's call to HF_VCPU_RUN. */
+	/* Set the return value for the primary VM's call to FFA_RUN. */
 	arch_regs_set_retval(&next->regs, primary_ret);
 
 	/* Mark the current vCPU as waiting. */
