@@ -34,3 +34,16 @@ void plat_iommu_identity_map(struct vm_locked vm_locked, paddr_t begin,
 	(void)end;
 	(void)mode;
 }
+
+bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
+				  struct vm_locked vm_locked,
+				  const struct manifest_vm *manifest_vm,
+				  struct mpool *ppool)
+{
+	(void)stage1_locked;
+	(void)vm_locked;
+	(void)manifest_vm;
+	(void)ppool;
+
+	return true;
+}

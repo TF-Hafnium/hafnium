@@ -484,7 +484,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		}
 
 		TRY(read_optional_uint32(dev_node, "smmu-id",
-					 (uint32_t)MANIFEST_INVALID_ADDRESS,
+					 MANIFEST_INVALID_ID,
 					 &dev_regions[i].smmu_id));
 		dlog_verbose("      smmu-id:  %u\n", dev_regions[i].smmu_id);
 
@@ -503,6 +503,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		if (j == 0) {
 			dlog_verbose("        None\n");
 		}
+		dev_regions[i].stream_count = j;
 
 		TRY(read_bool(dev_node, "exclusive-access",
 			      &dev_regions[i].exclusive_access));

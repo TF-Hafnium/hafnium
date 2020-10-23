@@ -1,0 +1,25 @@
+# Copyright 2021 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("args.gni")
+
+# Arm SMMUv3 driver for stage2 translation of streams.
+source_set("arm_smmuv3") {
+  public_configs = [ "//src/arch/aarch64:arch_config" ]
+  sources = [
+    "arm_smmuv3.c",
+  ]
+
+  assert(defined(smmu_base_address),
+         "\"smmu_base_address\" must be defined for ${target_name}.")
+  assert(defined(smmu_memory_size),
+         "\"smmu_memory_size\" must be defined for ${target_name}.")
+
+  defines = [
+    "SMMUv3_BASE=${smmu_base_address}",
+    "SMMUv3_MEM_SIZE=${smmu_memory_size}",
+  ]
+}

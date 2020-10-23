@@ -15,6 +15,7 @@
 #include "hf/vm.h"
 
 #define MANIFEST_INVALID_ADDRESS UINT64_MAX
+#define MANIFEST_INVALID_ID UINT32_MAX
 
 #define SP_PKG_HEADER_MAGIC (0x474b5053)
 #define SP_PKG_HEADER_VERSION (0x1)
@@ -88,6 +89,8 @@ struct device_region {
 	struct interrupt interrupts[SP_MAX_INTERRUPTS_PER_DEVICE];
 	/** SMMU ID - optional */
 	uint32_t smmu_id;
+	/** Count of Stream IDs assigned to device - optional */
+	uint8_t stream_count;
 	/** List of Stream IDs assigned to device - optional */
 	uint32_t stream_ids[SP_MAX_STREAMS_PER_DEVICE];
 	/** Exclusive access to an endpoint - optional */
