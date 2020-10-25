@@ -35,7 +35,7 @@ static ffa_memory_handle_t init_and_send(
 			  FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_OUTER_SHAREABLE, &total_length,
+			  FFA_MEMORY_INNER_SHAREABLE, &total_length,
 			  &fragment_length),
 		  0);
 	EXPECT_EQ(total_length, fragment_length);
@@ -102,7 +102,7 @@ TEST(trusty, memory_share_fragmented)
 			  0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_OUTER_SHAREABLE, &total_length,
+			  FFA_MEMORY_INNER_SHAREABLE, &total_length,
 			  &fragment_length),
 		  0);
 	/* Send the first fragment without the last constituent. */
@@ -221,7 +221,7 @@ TEST(trusty, memory_reclaim_reshare_fragmented)
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_OUTER_SHAREABLE, &total_length, &fragment_length);
+		FFA_MEMORY_INNER_SHAREABLE, &total_length, &fragment_length);
 	EXPECT_GT(remaining_constituent_count, 0);
 	EXPECT_GT(total_length, fragment_length);
 	/* Send the first fragment. */
@@ -260,7 +260,7 @@ TEST(trusty, memory_reclaim_reshare_fragmented)
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_OUTER_SHAREABLE, &total_length, &fragment_length);
+		FFA_MEMORY_INNER_SHAREABLE, &total_length, &fragment_length);
 	EXPECT_GT(remaining_constituent_count, 0);
 	EXPECT_GT(total_length, fragment_length);
 

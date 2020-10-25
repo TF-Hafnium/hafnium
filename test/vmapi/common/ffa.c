@@ -63,7 +63,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 		tx_buffer, HF_MAILBOX_SIZE, sender, recipient, constituents,
 		constituent_count, 0, flags, send_data_access,
 		send_instruction_access, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
 		&total_length, &fragment_length);
 	if (remaining_constituent_count == 0) {
 		EXPECT_EQ(total_length, fragment_length);
@@ -126,7 +126,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 		tx_buffer, handle, sender, recipient, 0, 0,
 		retrieve_data_access, retrieve_instruction_access,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_OUTER_SHAREABLE);
+		FFA_MEMORY_INNER_SHAREABLE);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 	EXPECT_EQ(ffa_msg_send(sender, recipient, msg_size, 0).func,
 		  FFA_SUCCESS_32);
@@ -161,7 +161,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 		tx_buffer, HF_MAILBOX_SIZE, sender, recipient, constituents,
 		constituent_count, 0, flags, send_data_access,
 		send_instruction_access, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_OUTER_SHAREABLE,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
 		&total_length, &fragment_length);
 	EXPECT_EQ(remaining_constituent_count, 0);
 	EXPECT_EQ(total_length, fragment_length);
@@ -206,7 +206,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 		tx_buffer, handle, sender, recipient, 0, 0,
 		retrieve_data_access, retrieve_instruction_access,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_OUTER_SHAREABLE);
+		FFA_MEMORY_INNER_SHAREABLE);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 	EXPECT_EQ(ffa_msg_send(sender, recipient, msg_size, 0).func,
 		  FFA_SUCCESS_32);

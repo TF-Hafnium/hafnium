@@ -283,7 +283,7 @@ TEST_SERVICE(ffa_donate_twice)
 			&constituent, 1, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 
@@ -352,7 +352,7 @@ TEST_SERVICE(ffa_donate_invalid_source)
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
@@ -522,7 +522,7 @@ TEST_SERVICE(ffa_lend_invalid_source)
 			  composite->constituent_count, 0, 0,
 			  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
@@ -534,7 +534,7 @@ TEST_SERVICE(ffa_lend_invalid_source)
 			  composite->constituent_count, 0, 0,
 			  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
@@ -693,7 +693,7 @@ TEST_SERVICE(ffa_memory_lend_twice)
 				  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
 				  FFA_MEMORY_NORMAL_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
 				 FFA_INVALID_PARAMETERS);
@@ -703,7 +703,7 @@ TEST_SERVICE(ffa_memory_lend_twice)
 				  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
 				  FFA_MEMORY_NORMAL_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_OUTER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 				 FFA_INVALID_PARAMETERS);

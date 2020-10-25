@@ -401,7 +401,7 @@ uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode)
 {
 	uint64_t attrs = 0;
 
-	attrs |= STAGE1_AF | STAGE1_SH(OUTER_SHAREABLE);
+	attrs |= STAGE1_AF | STAGE1_SH(INNER_SHAREABLE);
 
 #if SECURE_WORLD == 1
 
