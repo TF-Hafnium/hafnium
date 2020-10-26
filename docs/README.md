@@ -3,6 +3,7 @@
 *   [README](../README.md)
 *   [Contributing](../CONTRIBUTING.md)
 *   [Style guide](StyleGuide.md)
+*   [Change log](ChangeLog.md)
 
 ## Building and running Hafnium
 *   [Getting started](GettingStarted.md)
