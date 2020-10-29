@@ -47,14 +47,8 @@ typedef uintptr_t hf_ipaddr_t;
  */
 #define HF_VM_ID_OFFSET (HF_VM_ID_BASE + 1)
 
-/**
- * The index and ID of the primary VM, which is responsible for scheduling.
- *
- * These are not equal because ID 0 is reserved for the hypervisor itself.
- * Primary VM therefore gets ID 1 and all other VMs come after that.
- */
+/** The index of the primary VM, if it exists in this world. */
 #define HF_PRIMARY_VM_INDEX 0
-#define HF_PRIMARY_VM_ID (HF_VM_ID_OFFSET + HF_PRIMARY_VM_INDEX)
 
 /**
  * The special VM ID reserved for the OS or SPMC running in the trusted

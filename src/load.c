@@ -693,10 +693,17 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	size_t i;
 	bool success = true;
 
-	if (!load_primary(stage1_locked, &manifest->vm[HF_PRIMARY_VM_INDEX],
-			  cpio, params, ppool)) {
-		dlog_error("Unable to load primary VM.\n");
-		return false;
+	/**
+	 * Only try to load the primary VM if it is supposed to be in this
+	 * world.
+	 */
+	if (vm_id_is_current_world(HF_PRIMARY_VM_ID)) {
+		if (!load_primary(stage1_locked,
+				  &manifest->vm[HF_PRIMARY_VM_INDEX], cpio,
+				  params, ppool)) {
+			dlog_error("Unable to load primary VM.\n");
+			return false;
+		}
 	}
 
 	if (!init_other_world_vm(ppool)) {
