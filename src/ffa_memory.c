@@ -51,8 +51,6 @@ static_assert(sizeof(struct ffa_mem_relinquish) % 16 == 0,
 	      "bytes long.");
 
 struct ffa_memory_share_state {
-	ffa_memory_handle_t handle;
-
 	/**
 	 * The memory region being shared, or NULL if this share state is
 	 * unallocated.
@@ -151,11 +149,11 @@ static bool allocate_share_state(
 								0);
 
 			if (handle == FFA_MEMORY_HANDLE_INVALID) {
-				allocated_state->handle =
+				memory_region->handle =
 					i |
 					FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
 			} else {
-				allocated_state->handle = handle;
+				memory_region->handle = handle;
 			}
 			allocated_state->share_func = share_func;
 			allocated_state->memory_region = memory_region;
@@ -231,7 +229,8 @@ static bool get_share_state(struct share_states_locked share_states,
 	/* Fall back to a linear scan. */
 	for (index = 0; index < MAX_MEM_SHARES; ++index) {
 		share_state = &share_states.share_states[index];
-		if (share_state->handle == handle &&
+		if (share_state->memory_region != NULL &&
+		    share_state->memory_region->handle == handle &&
 		    share_state->share_func != 0) {
 			*share_state_ret = share_state;
 			return true;
@@ -368,7 +367,6 @@ static void dump_share_states(void)
 	sl_lock(&share_states_lock_instance);
 	for (i = 0; i < MAX_MEM_SHARES; ++i) {
 		if (share_states[i].share_func != 0) {
-			dlog("%#x: ", share_states[i].handle);
 			switch (share_states[i].share_func) {
 			case FFA_MEM_SHARE_32:
 				dlog("SHARE");
@@ -1312,7 +1310,7 @@ static struct ffa_value ffa_memory_send_complete(
 	share_state->sending_complete = true;
 	dlog_verbose("Marked sending complete.\n");
 
-	return ffa_mem_success(share_state->handle);
+	return ffa_mem_success(share_state->memory_region->handle);
 }
 
 /**
@@ -1657,8 +1655,8 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	} else {
 		ret = (struct ffa_value){
 			.func = FFA_MEM_FRAG_RX_32,
-			.arg1 = (uint32_t)share_state->handle,
-			.arg2 = (uint32_t)(share_state->handle >> 32),
+			.arg1 = (uint32_t)memory_region->handle,
+			.arg2 = (uint32_t)(memory_region->handle >> 32),
 			.arg3 = fragment_length};
 	}
 
