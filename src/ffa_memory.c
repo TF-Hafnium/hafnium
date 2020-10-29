@@ -78,6 +78,14 @@ struct ffa_memory_share_state {
 	uint32_t share_func;
 
 	/**
+	 * The sender's original mode before invoking the FF-A function for
+	 * sharing the memory.
+	 * This is used to reset the original configuration when sender invokes
+	 * FFA_MEM_RECLAIM_32.
+	 */
+	uint32_t sender_orig_mode;
+
+	/**
 	 * True if all the fragments of this sharing request have been sent and
 	 * Hafnium has updated the sender page table accordingly.
 	 */
@@ -382,9 +390,11 @@ static void dump_share_states(void)
 			} else {
 				dlog("): partially sent");
 			}
-			dlog(" with %d fragments, %d retrieved\n",
+			dlog(" with %d fragments, %d retrieved, "
+			     " sender's original mode: %#x\n",
 			     share_states[i].fragment_count,
-			     share_states[i].retrieved_fragment_count[0]);
+			     share_states[i].retrieved_fragment_count[0],
+			     share_states[i].sender_orig_mode);
 		}
 	}
 	sl_unlock(&share_states_lock_instance);
@@ -1635,8 +1645,9 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 
 	if (fragment_length == memory_share_length) {
 		/* No more fragments to come, everything fit in one message. */
-		ret = ffa_memory_send_complete(from_locked, share_states,
-					       share_state, page_pool, NULL);
+		ret = ffa_memory_send_complete(
+			from_locked, share_states, share_state, page_pool,
+			&(share_state->sender_orig_mode));
 	} else {
 		ret = (struct ffa_value){
 			.func = FFA_MEM_FRAG_RX_32,
@@ -1853,8 +1864,9 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 
 	/* Check whether the memory send operation is now ready to complete. */
 	if (share_state_sending_complete(share_states, share_state)) {
-		ret = ffa_memory_send_complete(from_locked, share_states,
-					       share_state, page_pool, NULL);
+		ret = ffa_memory_send_complete(
+			from_locked, share_states, share_state, page_pool,
+			&(share_state->sender_orig_mode));
 	} else {
 		ret = (struct ffa_value){
 			.func = FFA_MEM_FRAG_RX_32,
@@ -2576,7 +2588,6 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	struct share_states_locked share_states;
 	struct ffa_memory_share_state *share_state;
 	struct ffa_memory_region *memory_region;
-	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 	struct ffa_value ret;
 
 	dump_share_states();
@@ -2622,7 +2633,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	ret = ffa_retrieve_check_update(
 		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
-		share_state->fragment_count, memory_to_attributes,
+		share_state->fragment_count, share_state->sender_orig_mode,
 		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool);
 
 	if (ret.func == FFA_SUCCESS_32) {
