@@ -8,6 +8,7 @@
 
 #include "hf/ffa_memory.h"
 
+#include "hf/arch/ffa_memory_handle.h"
 #include "hf/arch/other_world.h"
 
 #include "hf/api.h"
@@ -121,6 +122,14 @@ alignas(PAGE_SIZE) static uint8_t
 	tee_retrieve_buffer[HF_MAILBOX_SIZE * MAX_FRAGMENTS];
 
 /**
+ * Extracts the index from a memory handle allocated by Hafnium's current world.
+ */
+uint64_t ffa_memory_handle_get_index(ffa_memory_handle_t handle)
+{
+	return handle & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK;
+}
+
+/**
  * Initialises the next available `struct ffa_memory_share_state` and sets
  * `share_state_ret` to a pointer to it. If `handle` is
  * `FFA_MEMORY_HANDLE_INVALID` then allocates an appropriate handle, otherwise
@@ -150,8 +159,7 @@ static bool allocate_share_state(
 
 			if (handle == FFA_MEMORY_HANDLE_INVALID) {
 				memory_region->handle =
-					i |
-					FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
+					ffa_memory_handle_make(i);
 			} else {
 				memory_region->handle = handle;
 			}
@@ -205,7 +213,7 @@ static bool get_share_state(struct share_states_locked share_states,
 			    struct ffa_memory_share_state **share_state_ret)
 {
 	struct ffa_memory_share_state *share_state;
-	uint32_t index;
+	uint64_t index;
 
 	CHECK(share_states.share_states != NULL);
 	CHECK(share_state_ret != NULL);
@@ -214,9 +222,8 @@ static bool get_share_state(struct share_states_locked share_states,
 	 * First look for a share_state allocated by us, in which case the
 	 * handle is based on the index.
 	 */
-	if ((handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK) ==
-	    FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
-		index = handle & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK;
+	if (ffa_memory_handle_allocated_by_current_world(handle)) {
+		index = ffa_memory_handle_get_index(handle);
 		if (index < MAX_MEM_SHARES) {
 			share_state = &share_states.share_states[index];
 			if (share_state->share_func != 0) {

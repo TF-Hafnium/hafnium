@@ -184,20 +184,22 @@ ATTR_FUNCTION_SET(memory_shareability, ffa_memory_attributes_t,
 ATTR_FUNCTION_GET(memory_shareability, ffa_memory_attributes_t,
 		  FFA_MEMORY_SHAREABILITY_OFFSET, FFA_MEMORY_SHAREABILITY_MASK)
 
-#define FFA_MEMORY_HANDLE_ALLOCATOR_MASK \
-	((ffa_memory_handle_t)(UINT64_C(1) << 63))
-#define FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR \
-	((ffa_memory_handle_t)(UINT64_C(1) << 63))
-#define FFA_MEMORY_HANDLE_INVALID (~UINT64_C(0))
-
-/** The ID of a VM. These are assigned sequentially starting with an offset. */
-typedef uint16_t ffa_vm_id_t;
-
 /**
  * A globally-unique ID assigned by the hypervisor for a region of memory being
  * sent between VMs.
  */
 typedef uint64_t ffa_memory_handle_t;
+
+#define FFA_MEMORY_HANDLE_ALLOCATOR_MASK \
+	((ffa_memory_handle_t)(UINT64_C(1) << 63))
+#define FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR \
+	((ffa_memory_handle_t)(UINT64_C(1) << 63))
+
+#define FFA_MEMORY_HANDLE_ALLOCATOR_SPMC (UINT64_C(0) << 63)
+#define FFA_MEMORY_HANDLE_INVALID (~UINT64_C(0))
+
+/** The ID of a VM. These are assigned sequentially starting with an offset. */
+typedef uint16_t ffa_vm_id_t;
 
 /**
  * A count of VMs. This has the same range as the VM IDs but we give it a

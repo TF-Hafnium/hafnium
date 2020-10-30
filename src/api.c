@@ -9,6 +9,7 @@
 #include "hf/api.h"
 
 #include "hf/arch/cpu.h"
+#include "hf/arch/ffa_memory_handle.h"
 #include "hf/arch/mm.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/timer.h"
@@ -2103,8 +2104,7 @@ struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 	struct vm *to = current->vm;
 	struct ffa_value ret;
 
-	if ((handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK) ==
-	    FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
+	if (ffa_memory_handle_allocated_by_current_world(handle)) {
 		struct vm_locked to_locked = vm_lock(to);
 
 		ret = ffa_memory_reclaim(to_locked, handle, flags,

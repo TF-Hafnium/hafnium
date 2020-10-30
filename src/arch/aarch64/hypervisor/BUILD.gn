@@ -17,6 +17,7 @@ offset_size_header("offsets") {
 source_set("other_world") {
   public_configs = [ "//src/arch/aarch64:config" ]
   sources = [
+    "ffa_memory_handle.c",
     "other_world.c",
   ]
   deps = [
