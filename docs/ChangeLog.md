@@ -3,7 +3,7 @@
 ## v2.4
 
 This is the first drop to implement the TrustZone secure side S-EL2 firmware
-(SPMC Core component) complying with FF-A v1.0.
+(SPM Core component) complying with FF-A v1.0.
 It is a companion to the broader TF-A v2.4 release.
 The normal world Hypervisor is maintained functional along with the
 Hafnium CI test suite.
@@ -37,6 +37,10 @@ Hafnium CI test suite.
       or OS kernel) memory pages in an abstract "Hypervisor VM" and tracks
       memory sharing permissions from incoming normal world requests.
 * Secure world enablement
+    * Secure Partitions booted in sequence on their primary execution context,
+      according to the boot order field in their partition manifest.
+      This happens during the secure boot process before the normal world
+      actually runs.
     * The SPMC implements the logic to receive FF-A messages through the EL3
       SPMD, process them, and either return to the SPMD (and normal world) or
       resume a Secure Partition.
@@ -57,8 +61,8 @@ Hafnium CI test suite.
       device-tree parser.
     * SP to SP communication not supported.
     * SP to SP memory sharing not supported.
-    * vCPU S-EL1 and SIMD context shall be saved/restored by EL3.
-    * One-to-many memory sharing not supported.
+    * S-EL1 and SIMD contexts shall be saved/restored by EL3.
+    * Multi-endpoint memory sharing not supported.
     * Interrupt management limited to trapping physical interrupts to
       the first S-EL1 SP. Physical interrupt trapping at S-EL2 planned as
       next release improvement.
