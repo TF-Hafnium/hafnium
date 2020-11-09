@@ -64,6 +64,38 @@ void api_init(struct mpool *ppool)
 }
 
 /**
+ * Switches the physical CPU back to the corresponding vCPU of the VM whose ID
+ * is given as argument of the function.
+ *
+ * Called to change the context between SPs for direct messaging (when Hafnium
+ * is SPMC), and on the context of the remaining 'api_switch_to_*' functions.
+ *
+ * This function works for partitions that are:
+ * - UP non-migratable.
+ * - MP with pinned Execution Contexts.
+ */
+static struct vcpu *api_switch_to_vm(struct vcpu *current,
+				     struct ffa_value to_ret,
+				     enum vcpu_state vcpu_state,
+				     ffa_vm_id_t to_id)
+{
+	struct vm *to_vm = vm_find(to_id);
+	struct vcpu *next = vm_get_vcpu(to_vm, cpu_index(current->cpu));
+
+	CHECK(next != NULL);
+
+	/* Set the return value for the target VM. */
+	arch_regs_set_retval(&next->regs, to_ret);
+
+	/* Set the current vCPU state. */
+	sl_lock(&current->lock);
+	current->state = vcpu_state;
+	sl_unlock(&current->lock);
+
+	return next;
+}
+
+/**
  * Switches the physical CPU back to the corresponding vCPU of the primary VM.
  *
  * This triggers the scheduling logic to run. Run in the context of secondary VM
@@ -73,9 +105,6 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 					  struct ffa_value primary_ret,
 					  enum vcpu_state secondary_state)
 {
-	struct vm *primary = vm_find(HF_PRIMARY_VM_ID);
-	struct vcpu *next = vm_get_vcpu(primary, cpu_index(current->cpu));
-
 	/*
 	 * If the secondary is blocked but has a timer running, sleep until the
 	 * timer fires rather than indefinitely.
@@ -112,15 +141,8 @@ static struct vcpu *api_switch_to_primary(struct vcpu *current,
 		break;
 	}
 
-	/* Set the return value for the primary VM's call to FFA_RUN. */
-	arch_regs_set_retval(&next->regs, primary_ret);
-
-	/* Mark the current vCPU as waiting. */
-	sl_lock(&current->lock);
-	current->state = secondary_state;
-	sl_unlock(&current->lock);
-
-	return next;
+	return api_switch_to_vm(current, primary_ret, secondary_state,
+				HF_PRIMARY_VM_ID);
 }
 
 /**
@@ -136,19 +158,8 @@ static struct vcpu *api_switch_to_other_world(struct vcpu *current,
 					      struct ffa_value other_world_ret,
 					      enum vcpu_state vcpu_state)
 {
-	struct vcpu *next = vcpu_get_other_world_counterpart(current);
-
-	CHECK(next != NULL);
-
-	/* Set the return value for the other world's VM. */
-	arch_regs_set_retval(&next->regs, other_world_ret);
-
-	/* Set the current vCPU state. */
-	sl_lock(&current->lock);
-	current->state = vcpu_state;
-	sl_unlock(&current->lock);
-
-	return next;
+	return api_switch_to_vm(current, other_world_ret, vcpu_state,
+				HF_OTHER_WORLD_ID);
 }
 
 /**
@@ -1759,6 +1770,16 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 					      struct vcpu **next)
 {
 	struct vcpu_locked current_locked;
+	struct ffa_value to_ret = {
+		.func = args.func,
+		.arg1 = args.arg1,
+		.arg2 = 0,
+		.arg3 = args.arg3,
+		.arg4 = args.arg4,
+		.arg5 = args.arg5,
+		.arg6 = args.arg6,
+		.arg7 = args.arg7,
+	};
 
 	if (!arch_other_world_is_direct_response_valid(current, sender_vm_id,
 						       receiver_vm_id)) {
@@ -1791,31 +1812,20 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 	vcpu_unlock(&current_locked);
 
 	if (!vm_id_is_current_world(receiver_vm_id)) {
-		*next = api_switch_to_other_world(current,
-						  (struct ffa_value){
-							  .func = args.func,
-							  .arg1 = args.arg1,
-							  .arg2 = 0,
-							  .arg3 = args.arg3,
-							  .arg4 = args.arg4,
-							  .arg5 = args.arg5,
-							  .arg6 = args.arg6,
-							  .arg7 = args.arg7,
-						  },
+		*next = api_switch_to_other_world(current, to_ret,
 						  VCPU_STATE_BLOCKED_MAILBOX);
 	} else if (receiver_vm_id == HF_PRIMARY_VM_ID) {
-		*next = api_switch_to_primary(current,
-					      (struct ffa_value){
-						      .func = args.func,
-						      .arg1 = args.arg1,
-						      .arg2 = 0,
-						      .arg3 = args.arg3,
-						      .arg4 = args.arg4,
-						      .arg5 = args.arg5,
-						      .arg6 = args.arg6,
-						      .arg7 = args.arg7,
-					      },
+		*next = api_switch_to_primary(current, to_ret,
 					      VCPU_STATE_BLOCKED_MAILBOX);
+	} else if (vm_id_is_current_world(receiver_vm_id)) {
+		/*
+		 * It is expected the receiver_vm_id to be from an SP, otherwise
+		 * 'arch_other_world_is_direct_response_valid' should have
+		 * made function return error before getting to this point.
+		 */
+		*next = api_switch_to_vm(current, to_ret,
+					 VCPU_STATE_BLOCKED_MAILBOX,
+					 receiver_vm_id);
 	} else {
 		panic("Invalid direct message response invocation");
 	}

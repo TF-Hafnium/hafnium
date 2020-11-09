@@ -120,13 +120,13 @@ bool arch_other_world_is_direct_request_valid(struct vcpu *current,
 
 	/*
 	 * The normal world can send direct message requests
-	 * via the Hypervisor to any SP.
+	 * via the Hypervisor to any SP. SPs can also send direct messages
+	 * to each other.
 	 */
 	return sender_vm_id != receiver_vm_id &&
-	       current_vm_id == HF_HYPERVISOR_VM_ID &&
-	       vm_id_is_current_world(receiver_vm_id) &&
-	       !vm_id_is_current_world(sender_vm_id);
-
+	       (sender_vm_id == current_vm_id ||
+		(current_vm_id == HF_HYPERVISOR_VM_ID &&
+		 !vm_id_is_current_world(sender_vm_id)));
 #else
 
 	/*
@@ -155,13 +155,12 @@ bool arch_other_world_is_direct_response_valid(struct vcpu *current,
 #if SECURE_WORLD == 1
 
 	/*
-	 * Direct message responses emitted from a SP
-	 * target a VM in NWd.
+	 * Direct message responses emitted from a SP target either the NWd
+	 * or another SP.
 	 */
 	return sender_vm_id != receiver_vm_id &&
 	       sender_vm_id == current_vm_id &&
-	       vm_id_is_current_world(sender_vm_id) &&
-	       !vm_id_is_current_world(receiver_vm_id);
+	       vm_id_is_current_world(sender_vm_id);
 
 #else
 
