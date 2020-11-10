@@ -810,7 +810,7 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 		}
 	}
 
-	if (!found_primary_vm) {
+	if (!found_primary_vm && vm_id_is_current_world(HF_PRIMARY_VM_ID)) {
 		return MANIFEST_ERROR_NO_PRIMARY_VM;
 	}
 

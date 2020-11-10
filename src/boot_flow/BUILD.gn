@@ -40,3 +40,13 @@ source_set("linux") {
     "//src/arch/${plat_arch}/boot_flow:linux",
   ]
 }
+
+source_set("spmc") {
+  sources = [
+    "spmc.c",
+  ]
+  deps = [
+    ":common",
+    "//src/arch/${plat_arch}/boot_flow:linux",
+  ]
+}
