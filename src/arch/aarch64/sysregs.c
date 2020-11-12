@@ -79,15 +79,6 @@ uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id)
 		 */
 		hcr_el2_value |= HCR_EL2_FB;
 
-		/*
-		 * Route physical IRQ/FIQ interrupts to EL2. Do not route
-		 * SError exceptions to EL2 (AMO). Instead let each VM handle
-		 * it. Not setting AMO requires explicit Error Synchronisation
-		 * Barrier instructions (esb) on hypervisor entry/exit, or
-		 * implicit barriers (SCTLR_EL2_IESB is set).
-		 */
-		hcr_el2_value |= HCR_EL2_IMO | HCR_EL2_FMO;
-
 		if (!has_ras_support()) {
 			/*
 			 * Trap SErrors into EL2 if the processor does not
@@ -99,8 +90,28 @@ uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id)
 			hcr_el2_value |= HCR_EL2_AMO;
 		}
 
+		/*
+		 * TODO: physical interrupts are routed to Secure Partitions.
+		 * This is temporary in waiting the GIC para-virtualized
+		 * interface is ready for SP usage. Then, the intent will be
+		 * to route all physical interrupts to the SPMC and hence
+		 * the setting of HCR_EL2.IMO/FMO will be restored.
+		 */
+
+#if SECURE_WORLD == 0
+		/*
+		 * Route physical IRQ/FIQ interrupts to EL2. Do not route
+		 * SError exceptions to EL2 (AMO). Instead let each VM handle
+		 * it. Not setting AMO requires explicit Error Synchronisation
+		 * Barrier instructions (esb) on hypervisor entry/exit, or
+		 * implicit barriers (SCTLR_EL2_IESB is set).
+		 */
+		hcr_el2_value |= HCR_EL2_IMO | HCR_EL2_FMO;
+
 		/* Trap wait for event/interrupt instructions. */
 		hcr_el2_value |= HCR_EL2_TWE | HCR_EL2_TWI;
+
+#endif
 	}
 
 	return hcr_el2_value;
