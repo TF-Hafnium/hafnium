@@ -318,7 +318,7 @@ static bool smc_is_blocked(const struct vm *vm, uint32_t func)
 		}
 	}
 
-	dlog_notice("SMC %#010x attempted from VM %d, blocked=%d\n", func,
+	dlog_notice("SMC %#010x attempted from VM %#x, blocked=%u\n", func,
 		    vm->id, block_by_default);
 
 	/* Access is still allowed in permissive mode. */
@@ -730,7 +730,7 @@ static void inject_el1_data_abort_exception(struct vcpu *vcpu,
 	uintreg_t esr_el1_value = GET_ESR_ISS(esr_el2) | GET_ESR_IL(esr_el2) |
 				  (EC_DATA_ABORT_SAME_EL << ESR_EC_OFFSET);
 
-	dlog_notice("Injecting Data Abort exception into VM%d.\n",
+	dlog_notice("Injecting Data Abort exception into VM %#x.\n",
 		    vcpu->vm->id);
 
 	inject_el1_exception(vcpu, esr_el1_value, far_el2);
@@ -752,7 +752,7 @@ static void inject_el1_instruction_abort_exception(struct vcpu *vcpu,
 		GET_ESR_ISS(esr_el2) | GET_ESR_IL(esr_el2) |
 		(EC_INSTRUCTION_ABORT_SAME_EL << ESR_EC_OFFSET);
 
-	dlog_notice("Injecting Instruction Abort exception into VM%d.\n",
+	dlog_notice("Injecting Instruction Abort exception into VM %#x.\n",
 		    vcpu->vm->id);
 
 	inject_el1_exception(vcpu, esr_el1_value, far_el2);
@@ -781,7 +781,7 @@ static void inject_el1_unknown_exception(struct vcpu *vcpu, uintreg_t esr_el2)
 		GET_ISS_CRN(esr_el2), GET_ISS_CRM(esr_el2),
 		GET_ISS_OP2(esr_el2), GET_ISS_RT(esr_el2));
 
-	dlog_notice("Injecting Unknown Reason exception into VM%d.\n",
+	dlog_notice("Injecting Unknown Reason exception into VM %#x.\n",
 		    vcpu->vm->id);
 
 	inject_el1_exception(vcpu, esr_el1_value, far_el1_value);

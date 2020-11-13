@@ -328,7 +328,8 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 		return;
 	}
 
-	dlog("from VM %d, attributes %#x, flags %#x, handle %#x, tag %d, to %d "
+	dlog("from VM %#x, attributes %#x, flags %#x, handle %#x, tag %u, to "
+	     "%u "
 	     "recipients [",
 	     memory_region->sender, memory_region->attributes,
 	     memory_region->flags, memory_region->handle, memory_region->tag,
@@ -337,7 +338,7 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 		if (i != 0) {
 			dlog(", ");
 		}
-		dlog("VM %d: %#x (offset %d)",
+		dlog("VM %#x: %#x (offset %u)",
 		     memory_region->receivers[i].receiver_permissions.receiver,
 		     memory_region->receivers[i]
 			     .receiver_permissions.permissions,
@@ -2593,8 +2594,8 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 
 	if (to_locked.vm->id != memory_region->sender) {
 		dlog_verbose(
-			"VM %d attempted to reclaim memory handle %#x "
-			"originally sent by VM %d.\n",
+			"VM %#x attempted to reclaim memory handle %#x "
+			"originally sent by VM %#x.\n",
 			to_locked.vm->id, handle, memory_region->sender);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -2763,8 +2764,8 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 	/* The original sender must match the caller. */
 	if (to_locked.vm->id != memory_region->sender) {
 		dlog_verbose(
-			"VM %d attempted to reclaim memory handle %#x "
-			"originally sent by VM %d.\n",
+			"VM %#x attempted to reclaim memory handle %#x "
+			"originally sent by VM %#x.\n",
 			to_locked.vm->id, handle, memory_region->sender);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}

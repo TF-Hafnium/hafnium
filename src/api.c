@@ -292,7 +292,7 @@ struct vcpu *api_abort(struct vcpu *current)
 {
 	struct ffa_value ret = ffa_error(FFA_ABORTED);
 
-	dlog_notice("Aborting VM %u vCPU %u\n", current->vm->id,
+	dlog_notice("Aborting VM %#x vCPU %u\n", current->vm->id,
 		    vcpu_index(current));
 
 	if (current->vm->id == HF_PRIMARY_VM_ID) {
@@ -580,7 +580,7 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 
 	if (atomic_load_explicit(&vcpu->vm->aborting, memory_order_relaxed)) {
 		if (vcpu->state != VCPU_STATE_ABORTED) {
-			dlog_notice("Aborting VM %u vCPU %u\n", vcpu->vm->id,
+			dlog_notice("Aborting VM %#x vCPU %u\n", vcpu->vm->id,
 				    vcpu_index(vcpu));
 			vcpu->state = VCPU_STATE_ABORTED;
 		}
@@ -1518,9 +1518,9 @@ int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
 
 	target_vcpu = vm_get_vcpu(target_vm, target_vcpu_idx);
 
-	dlog_info("Injecting IRQ %d for VM %d vCPU %d from VM %d vCPU %d\n",
+	dlog_info("Injecting IRQ %u for VM %#x vCPU %u from VM %#x vCPU %u\n",
 		  intid, target_vm_id, target_vcpu_idx, current->vm->id,
-		  current->cpu->id);
+		  vcpu_index(current));
 	return internal_interrupt_inject(target_vcpu, intid, current, next);
 }
 
@@ -1680,7 +1680,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	if (atomic_load_explicit(&receiver_vcpu->vm->aborting,
 				 memory_order_relaxed)) {
 		if (receiver_vcpu->state != VCPU_STATE_ABORTED) {
-			dlog_notice("Aborting VM %u vCPU %u\n",
+			dlog_notice("Aborting VM %#x vCPU %u\n",
 				    receiver_vcpu->vm->id,
 				    vcpu_index(receiver_vcpu));
 			receiver_vcpu->state = VCPU_STATE_ABORTED;
