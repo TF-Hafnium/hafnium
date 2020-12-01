@@ -9,14 +9,9 @@
 # Note: this assumes that the images have all been built and the current working
 # directory is the root of the repo.
 
-# Fail on any error.
-set -e
-# Fail on any part of a pipeline failing.
-set -o pipefail
-# Treat unset variables as an error.
-set -u
-# Display commands being run.
-set -x
+# TIMEOUT, PROJECT, OUT, LOG_DIR_BASE set in:
+KOKORO_DIR="$(dirname "$0")"
+source $KOKORO_DIR/test_common.sh
 
 USE_FVP=false
 USE_TFA=false
@@ -41,11 +36,6 @@ do
   shift
 done
 
-TIMEOUT=(timeout --foreground)
-PROJECT="${PROJECT:-reference}"
-OUT="out/${PROJECT}"
-LOG_DIR_BASE="${OUT}/kokoro_log"
-
 # Run the tests with a timeout so they can't loop forever.
 HFTEST=(${TIMEOUT[@]} 300s ./test/hftest/hftest.py)
 if [ $USE_FVP == true ]
@@ -66,9 +56,6 @@ if [ $SKIP_LONG_RUNNING_TESTS == true ]
 then
   HFTEST+=(--skip-long-running-tests)
 fi
-
-# Add prebuilt libc++ to the path.
-export LD_LIBRARY_PATH="$PWD/prebuilts/linux-x64/clang/lib64"
 
 # Run the host unit tests.
 mkdir -p "${LOG_DIR_BASE}/unit_tests"
