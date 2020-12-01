@@ -594,8 +594,9 @@ class TestRunner:
         of the test platform."""
         lines = []
         for line in raw.splitlines():
-            if line.startswith("VM "):
-                line = line[len("VM 0: "):]
+            match = re.search(f"^VM \d+: ", line)
+            if match is not None:
+                line = line[match.end():]
             if line.startswith(HFTEST_LOG_PREFIX):
                 lines.append(line[len(HFTEST_LOG_PREFIX):])
         return lines
