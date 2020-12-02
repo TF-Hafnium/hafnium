@@ -129,6 +129,34 @@ source_set("hftest_standalone") {
   ]
 }
 
+source_set("hftest_standalone_secure") {
+  testonly = true
+
+  public_configs = [
+    "//src/arch/aarch64:arch_config",
+    ":hftest_config",
+  ]
+
+  sources = [
+    "standalone_main_secure.c",
+  ]
+
+  deps = [
+    ":common",
+    ":mm",
+    ":power_mgmt",
+    "//src:dlog",
+    "//src:memiter",
+    "//src/arch/${plat_arch}:entry",
+    "//src/arch/${plat_arch}/hftest:entry",
+    "//src/arch/${plat_arch}/hftest:interrupts",
+    "//src/arch/${plat_arch}/hftest:power_mgmt",
+    "//vmlib/${plat_arch}:call",
+    hftest_ctrl,
+    hftest_device,
+  ]
+}
+
 # Common code for hftest, whether it is running under Linux, under Hafnium in
 # the primary VM, or directly on the hardware.
 source_set("common") {
