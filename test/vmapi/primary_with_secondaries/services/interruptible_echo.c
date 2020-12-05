@@ -40,15 +40,8 @@ TEST_SERVICE(interruptible_echo)
 		void *message = SERVICE_SEND_BUFFER();
 		void *recv_message = SERVICE_RECV_BUFFER();
 
-		/* Retry if interrupted but made visible with the yield. */
-		while (res.func == FFA_ERROR_32 &&
-		       res.arg2 == FFA_INTERRUPTED) {
-			EXPECT_GT(irq_counter, 0);
-			ffa_yield();
-			res = ffa_msg_wait();
-		}
-
 		ASSERT_EQ(res.func, FFA_MSG_SEND_32);
+		EXPECT_EQ(irq_counter, 1);
 		memcpy_s(message, FFA_MSG_PAYLOAD_MAX, recv_message,
 			 ffa_msg_send_size(res));
 
