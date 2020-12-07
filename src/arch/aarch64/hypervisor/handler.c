@@ -423,7 +423,7 @@ static void smc_forwarder(const struct vm *vm, struct ffa_value *args)
 static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			struct vcpu **next)
 {
-	uint32_t func = args->func & ~SMCCC_CONVENTION_MASK;
+	uint32_t func = args->func;
 
 	/*
 	 * NOTE: When adding new methods to this handler update
@@ -450,7 +450,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_RX_RELEASE_32:
 		*args = api_ffa_rx_release(current, next);
 		return true;
-	case FFA_RXTX_MAP_32:
+	case FFA_RXTX_MAP_64:
 		*args = api_ffa_rxtx_map(ipa_init(args->arg1),
 					 ipa_init(args->arg2), args->arg3,
 					 current, next);
@@ -509,6 +509,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 					    (args->arg4 >> 16) & 0xffff,
 					    current);
 		return true;
+	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32: {
 #if SECURE_WORLD == 1
 		if (spmd_handler(args, current)) {
@@ -520,12 +521,13 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			ffa_msg_send_receiver(*args), *args, current, next);
 		return true;
 	}
+	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 		*args = api_ffa_msg_send_direct_resp(
 			ffa_msg_send_sender(*args),
 			ffa_msg_send_receiver(*args), *args, current, next);
 		return true;
-	case FFA_SECONDARY_EP_REGISTER_32:
+	case FFA_SECONDARY_EP_REGISTER_64:
 		*args = api_ffa_secondary_ep_register(ipa_init(args->arg1),
 						      current);
 		return true;

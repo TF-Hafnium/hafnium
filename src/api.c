@@ -1621,7 +1621,9 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 	case FFA_MEM_RETRIEVE_RESP_32:
 	case FFA_MEM_RELINQUISH_32:
 	case FFA_MEM_RECLAIM_32:
+	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	default:
