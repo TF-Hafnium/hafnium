@@ -48,6 +48,7 @@ source_set("hftest_secondary_vm") {
     "//src:std",
     "//src/arch/${plat_arch}:entry",
     "//src/arch/${plat_arch}/hftest:entry",
+    "//src/arch/${plat_arch}/hftest:interrupts",
     "//src/arch/${plat_arch}/hftest:power_mgmt",
     "//vmlib/${plat_arch}:call",
   ]

@@ -9,6 +9,8 @@
 #include <stdalign.h>
 #include <stdint.h>
 
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/fdt_handler.h"
 #include "hf/ffa.h"
 #include "hf/memiter.h"
@@ -17,6 +19,7 @@
 
 #include "vmapi/hf/call.h"
 
+#include "msr.h"
 #include "test/hftest.h"
 
 alignas(4096) uint8_t kstack[4096];
@@ -86,6 +89,9 @@ noreturn void kmain(const void *fdt_ptr)
 		HFTEST_LOG(HFTEST_LOG_INDENT "Memory initialization failed");
 		abort();
 	}
+
+	/* Setup basic exception handling. */
+	exception_setup(NULL, NULL);
 
 	/* Prepare the context. */
 
