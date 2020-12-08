@@ -39,7 +39,7 @@ FVP_BINARY = os.path.join(
     os.path.dirname(HF_ROOT), "fvp", "Base_RevC_AEMv8A_pkg", "models",
     "Linux64_GCC-4.9", "FVP_Base_RevC-2xAEMv8A")
 FVP_PREBUILTS_ROOT = os.path.join(
-    HF_ROOT, "prebuilts", "linux-aarch64", "arm-trusted-firmware", "fvp")
+    HF_ROOT, "prebuilts", "linux-aarch64", "trusted-firmware-a-trusty", "fvp")
 FVP_PREBUILT_DTS = os.path.join(
     FVP_PREBUILTS_ROOT, "fvp-base-gicv3-psci-1t.dts")
 FVP_PREBUILT_BL31 = os.path.join(FVP_PREBUILTS_ROOT, "bl31.bin")
@@ -208,7 +208,7 @@ class QemuDriver(Driver):
         if self.tfa:
             exec_args += ["-bios",
                 os.path.abspath(
-                    "prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl1.bin"
+                    "prebuilts/linux-aarch64/trusted-firmware-a-trusty/qemu/bl1.bin"
                 ), "-machine", "secure=on", "-semihosting-config",
                 "enable,target=native"]
 

@@ -36,11 +36,11 @@ source_set("loader") {
   ]
 }
 
-copy("tfa_copy") {
+copy("tfa_trusty_copy") {
   sources = [
-    "//prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl2.bin",
-    "//prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl31.bin",
-    "//prebuilts/linux-aarch64/arm-trusted-firmware/qemu/bl32.bin",
+    "//prebuilts/linux-aarch64/trusted-firmware-a-trusty/qemu/bl2.bin",
+    "//prebuilts/linux-aarch64/trusted-firmware-a-trusty/qemu/bl31.bin",
+    "//prebuilts/linux-aarch64/trusted-firmware-a-trusty/qemu/bl32.bin",
   ]
   outputs = [
     "$root_out_dir/{{source_file_part}}",
@@ -62,6 +62,6 @@ copy("qemuloader_copy") {
 group("bl") {
   deps = [
     ":qemuloader_copy",
-    ":tfa_copy",
+    ":tfa_trusty_copy",
   ]
 }
