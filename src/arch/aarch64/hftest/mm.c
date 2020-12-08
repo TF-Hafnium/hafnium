@@ -77,7 +77,6 @@ bool arch_vm_mm_init(void)
 		     0;
 
 	mm_sctlr_el1 = (1 << 0) |  /* M, enable stage 1 EL2 MMU. */
-		       (1 << 1) |  /* A, enable alignment check faults. */
 		       (1 << 2) |  /* C, data cache enable. */
 		       (1 << 3) |  /* SA, enable stack alignment check. */
 		       (3 << 4) |  /* RES1 bits. */
