@@ -14,6 +14,8 @@
 
 #include "vmapi/hf/ffa.h"
 
+#include "msr.h"
+
 /**
  * RT value that indicates an access to register XZR (always 0).
  * See Arm Architecture Reference Manual Armv8-A, C1.2.5
@@ -600,6 +602,13 @@
  */
 #define SCTLR_EL2_M (UINT64_C(0x1) << 0)
 
+/**
+ * VHE feature bit
+ */
+#define ID_AA64MMFR1_EL1_VH_SHIFT 8
+#define ID_AA64MMFR1_EL1_VH_MASK UINT64_C(0xf)
+#define ID_AA64MMFR1_EL1_VH_SUPPORTED UINT64_C(0x1)
+
 uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id);
 
 uintreg_t get_mdcr_el2_value(void);
@@ -614,3 +623,16 @@ uintreg_t get_sctlr_el2_value(void);
 #define ID_AA64PFR1_EL1_BT (UINT64_C(0xf) << 0)
 
 bool is_arch_feat_bti_supported(void);
+
+/**
+ * Returns true if the processor supports ARMv8.1 VHE.
+ */
+static inline bool has_vhe_support(void)
+{
+#if ENABLE_VHE == 1
+	return (((read_msr(ID_AA64MMFR1_EL1) >> ID_AA64MMFR1_EL1_VH_SHIFT) &
+		 ID_AA64MMFR1_EL1_VH_MASK) == ID_AA64MMFR1_EL1_VH_SUPPORTED);
+#else
+	return false;
+#endif
+}
