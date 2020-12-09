@@ -13,7 +13,12 @@ config("config") {
 config("arch_config") {
   assert(secure_world == "0" || secure_world == "1",
          "secure world set to <${secure_world}>")
-  defines = [ "SECURE_WORLD=${secure_world}" ]
+  assert(enable_vhe == "0" || enable_vhe == "1",
+         "enable_vhe is set to <${enable_vhe}>")
+  defines = [
+    "SECURE_WORLD=${secure_world}",
+    "ENABLE_VHE=${enable_vhe}",
+  ]
 }
 
 # Implementation of the arch interface for aarch64.

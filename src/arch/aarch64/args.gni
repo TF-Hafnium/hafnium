@@ -20,4 +20,6 @@ declare_args() {
   plat_prng = "//src/arch/aarch64/plat/prng:absent"
 
   secure_world = "0"
+
+  enable_vhe = "0"
 }
