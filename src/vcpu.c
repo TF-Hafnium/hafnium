@@ -173,7 +173,7 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 
 	if (!resume) {
 		dlog_warning(
-			"Stage-2 page fault: pc=%#x, vmid=%u, vcpu=%u, "
+			"Stage-2 page fault: pc=%#x, vmid=%#x, vcpu=%u, "
 			"vaddr=%#x, ipaddr=%#x, mode=%#x\n",
 			f->pc, vm->id, vcpu_index(current), f->vaddr, f->ipaddr,
 			f->mode);
