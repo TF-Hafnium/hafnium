@@ -167,6 +167,13 @@ void feature_set_traps(struct vm *vm, struct arch_regs *regs)
 	vm->arch.tid3_masks.id_aa64dfr0_el1 = ~0ULL;
 	vm->arch.tid3_masks.id_aa64isar1_el1 = ~0ULL;
 
+	/*
+	 * Always mask VHE feature. No nested virualization support at this
+	 * point so there is no need to expose VHE to guests.
+	 */
+	vm->arch.tid3_masks.id_aa64mmfr1_el1 &=
+		~(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT);
+
 	if (features & HF_FEATURE_RAS) {
 		regs->lazy.hcr_el2 |= HCR_EL2_TERR;
 		vm->arch.tid3_masks.id_aa64mmfr1_el1 &=
