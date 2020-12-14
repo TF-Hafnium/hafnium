@@ -327,6 +327,11 @@ template("aarch64_toolchains") {
 
     # Add a macro so files can tell whether they are not being built for a VM.
     extra_defines = " -DVM_TOOLCHAIN=0"
+
+    if (defined(invoker.branch_protection)) {
+      extra_cflags = " -mbranch-protection=${invoker.branch_protection}"
+      extra_defines += " -DBRANCH_PROTECTION=1"
+    }
   }
 
   # Toolchain for building test VMs which run under Hafnium.

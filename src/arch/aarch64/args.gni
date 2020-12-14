@@ -13,5 +13,8 @@ declare_args() {
 
   plat_interrupts = "//src/arch/aarch64/plat/interrupts:absent"
 
+  # Pseudo random numbers source. Used for pointer authentication.
+  plat_prng = "//src/arch/aarch64/plat/prng:absent"
+
   secure_world = "0"
 }

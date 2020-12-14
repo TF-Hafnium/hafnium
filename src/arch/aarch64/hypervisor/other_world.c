@@ -16,6 +16,7 @@
 #include "hf/panic.h"
 #include "hf/vm.h"
 
+#include "msr.h"
 #include "smc.h"
 
 #if SECURE_WORLD == 0

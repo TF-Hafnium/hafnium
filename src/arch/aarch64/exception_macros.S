@@ -138,3 +138,14 @@
 	save_volatile_to_stack \elx
 	b \handler
 .endm
+
+/**
+ * Restore Hypervisor pointer authentication APIA key.
+ */
+.macro pauth_restore_hypervisor_key reg1 reg2
+	adrp	\reg1, pauth_apia_key
+	add	\reg1, \reg1, :lo12: pauth_apia_key
+	ldp	\reg1, \reg2, [\reg1]
+	msr     APIAKEYLO_EL1, \reg1
+	msr     APIAKEYHI_EL1, \reg2
+.endm

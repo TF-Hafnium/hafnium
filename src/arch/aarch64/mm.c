@@ -32,6 +32,7 @@
 #define STAGE1_PXN         (UINT64_C(1) << 53)
 #define STAGE1_CONTIGUOUS  (UINT64_C(1) << 52)
 #define STAGE1_DBM         (UINT64_C(1) << 51)
+#define STAGE1_GP          (UINT64_C(1) << 50)
 #define STAGE1_NG          (UINT64_C(1) << 11)
 #define STAGE1_AF          (UINT64_C(1) << 10)
 #define STAGE1_SH(x)       ((x) << 8)
@@ -432,6 +433,14 @@ uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode)
 	if (!(mode & MM_MODE_X)) {
 		attrs |= STAGE1_XN;
 	}
+#if BRANCH_PROTECTION
+	else {
+		/* Mark code pages as Guarded Pages if BTI is supported. */
+		if (is_arch_feat_bti_supported()) {
+			attrs |= STAGE1_GP;
+		}
+	}
+#endif
 
 	/* Define the read/write bits. */
 	if (mode & MM_MODE_W) {

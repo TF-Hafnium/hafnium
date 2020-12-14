@@ -78,3 +78,18 @@
  * VSTCR_EL2, Virtualization Secure Translation Control Register
  */
 #define MSR_VSTCR_EL2 S3_4_C2_C6_2
+
+#if BRANCH_PROTECTION
+
+#define APIAKEYLO_EL1 S3_0_C2_C1_0
+#define APIAKEYHI_EL1 S3_0_C2_C1_1
+#define APIBKEYLO_EL1 S3_0_C2_C1_2
+#define APIBKEYHI_EL1 S3_0_C2_C1_3
+#define APDAKEYLO_EL1 S3_0_C2_C2_0
+#define APDAKEYHI_EL1 S3_0_C2_C2_1
+#define APDBKEYLO_EL1 S3_0_C2_C2_2
+#define APDBKEYHI_EL1 S3_0_C2_C2_3
+#define APGAKEYLO_EL1 S3_0_C2_C3_0
+#define APGAKEYHI_EL1 S3_0_C2_C3_1
+
+#endif

@@ -58,6 +58,19 @@ image_entry:
 	 */
 	bl one_time_init_mm
 
+#if BRANCH_PROTECTION
+	/* Expect pointer authentication is implemented. */
+	mrs	x1, id_aa64isar1_el1
+	ands	x1, x1, #0xff0		/* API / APA */
+	beq	.
+
+	/* Gather a random number to use as pointer authentication key. */
+	bl	plat_prng_get_number
+	adrp	x3, pauth_apia_key
+	add	x2, x3, :lo12: pauth_apia_key
+	stp	x0, x1, [x2]
+#endif
+
 	/* Enable MMU and caches before running the rest of initialization. */
 	bl mm_enable
 	bl one_time_init
@@ -113,6 +126,13 @@ cpu_entry:
 
 1:	/* x0 points to current cpu in cpus array */
 
+#endif
+
+#if BRANCH_PROTECTION
+	/* Expect pointer authentication is implemented. */
+	mrs	x1, id_aa64isar1_el1
+	ands	x1, x1, #0xff0		/* API / APA */
+	beq	.
 #endif
 
 	bl mm_enable
@@ -188,6 +208,15 @@ mm_enable:
 	/* Ensure everything before this point has completed. */
 	dsb sy
 	isb
+
+#if BRANCH_PROTECTION
+	/* Load EL2 APIA Key. */
+	adrp	x1, pauth_apia_key
+	add	x1, x1, :lo12: pauth_apia_key
+	ldp	x1, x2, [x1]
+	msr     APIAKEYLO_EL1, x1
+	msr     APIAKEYHI_EL1, x2
+#endif
 
 	/*
 	 * Configure sctlr_el2 to enable MMU and cache and don't proceed until

@@ -141,4 +141,20 @@ struct arch_regs {
 		uintreg_t cntv_cval_el0;
 		uintreg_t cntv_ctl_el0;
 	} peripherals;
+
+#if BRANCH_PROTECTION
+	/* Pointer authentication keys */
+	struct {
+		uintreg_t apiakeylo_el1;
+		uintreg_t apiakeyhi_el1;
+		uintreg_t apibkeylo_el1;
+		uintreg_t apibkeyhi_el1;
+		uintreg_t apdakeylo_el1;
+		uintreg_t apdakeyhi_el1;
+		uintreg_t apdbkeylo_el1;
+		uintreg_t apdbkeyhi_el1;
+		uintreg_t apgakeylo_el1;
+		uintreg_t apgakeyhi_el1;
+	} pac;
+#endif
 };

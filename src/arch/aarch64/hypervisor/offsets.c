@@ -18,6 +18,9 @@ DEFINE_OFFSETOF(VCPU_VM, struct vcpu, vm)
 DEFINE_OFFSETOF(VCPU_REGS, struct vcpu, regs)
 DEFINE_OFFSETOF(VCPU_LAZY, struct vcpu, regs.lazy)
 DEFINE_OFFSETOF(VCPU_FREGS, struct vcpu, regs.fp)
+#if BRANCH_PROTECTION
+DEFINE_OFFSETOF(VCPU_PAC, struct vcpu, regs.pac)
+#endif
 
 DEFINE_OFFSETOF(VM_ID, struct vm, id)
 

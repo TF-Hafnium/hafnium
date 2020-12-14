@@ -159,6 +159,14 @@ uintreg_t get_sctlr_el2_value(void)
 	sctlr_el2_value |= SCTLR_EL2_I;
 	sctlr_el2_value |= SCTLR_EL2_WXN;
 
+#if BRANCH_PROTECTION
+	/* Enable pointer authentication for instructions. */
+	sctlr_el2_value |= SCTLR_EL2_ENIA;
+
+	/* PACIASP/PACIBSP are compatible with PSTATE.BTYPE==11b. */
+	sctlr_el2_value &= ~SCTLR_EL2_BT;
+#endif
+
 	/* RES1 Bits. */
 	sctlr_el2_value |= SCTLR_EL2_B4;
 	sctlr_el2_value |= SCTLR_EL2_B16;
@@ -170,4 +178,14 @@ uintreg_t get_sctlr_el2_value(void)
 	sctlr_el2_value |= SCTLR_EL2_EIS;
 
 	return sctlr_el2_value;
+}
+
+/*
+ * Returns true if FEAT_BTI is supported.
+ */
+bool is_arch_feat_bti_supported(void)
+{
+	uint64_t id_aa64pfr1_el1 = read_msr(ID_AA64PFR1_EL1);
+
+	return (id_aa64pfr1_el1 & ID_AA64PFR1_EL1_BT) == 1ULL;
 }

@@ -521,6 +521,19 @@
  */
 
 /**
+ * When FEAT_BTI is implemented, BT bit set, and PE executing at EL2
+ * PACIASP/PACIBSP are not compatible with PSTATE.BTYPE==11.
+ */
+#define SCTLR_EL2_BT (UINT64_C(0x1) << 36)
+
+/**
+ * When FEAT_PAUTH is implemented, controls enabling of pointer authentication
+ * using APIAKey_EL1 of instructions addresses in EL2 or EL2&0 translation
+ * regimes.
+ */
+#define SCTLR_EL2_ENIA (UINT64_C(0x1) << 31)
+
+/**
  * Reserved, RES1.
  */
 #define SCTLR_EL2_B28 (UINT64_C(0x1) << 28)
@@ -594,3 +607,10 @@ uintreg_t get_mdcr_el2_value(void);
 uintreg_t get_cptr_el2_value(void);
 
 uintreg_t get_sctlr_el2_value(void);
+
+/**
+ * Branch Target Identification mechanism support in AArch64 state.
+ */
+#define ID_AA64PFR1_EL1_BT (UINT64_C(0xf) << 0)
+
+bool is_arch_feat_bti_supported(void);

@@ -57,6 +57,11 @@
 .macro lower_exception handler:req
 	save_volatile_to_vcpu
 
+#if BRANCH_PROTECTION
+	/* NOTE: x18 still holds pointer to current vCPU. */
+	bl pauth_save_vcpu_and_restore_hyp_key
+#endif
+
 	/* Call C handler. */
 	bl \handler
 
@@ -73,6 +78,11 @@
  */
 .macro lower_sync_exception
 	save_volatile_to_vcpu
+
+#if BRANCH_PROTECTION
+	/* NOTE: x18 still holds pointer to current vCPU. */
+	bl pauth_save_vcpu_and_restore_hyp_key
+#endif
 
 	/* Extract the exception class (EC) from exception syndrome register. */
 	mrs x18, esr_el2
@@ -191,6 +201,27 @@ serr_lower_32:
 .balign 0x40
 
 /**
+ * pauth_save_vcpu_and_restore_hyp_key
+ *
+ * NOTE: expect x18 holds pointer to current vCPU.
+ */
+#if BRANCH_PROTECTION
+pauth_save_vcpu_and_restore_hyp_key:
+	/*
+	 * Save APIA key for the vCPU as Hypervisor replaces it with its
+	 * own key. Other vCPU PAuth keys are taken care in vcpu_switch.
+	 */
+	mrs     x0, APIAKEYLO_EL1
+	mrs     x1, APIAKEYHI_EL1
+	add	x18, x18, #VCPU_PAC
+	stp	x0, x1, [x18]
+
+	/* Restore Hypervisor APIA key. */
+	pauth_restore_hypervisor_key x0 x1
+	ret
+#endif
+
+/**
  * Handle accesses to system registers (EC=0x18) and return to original caller.
  */
 system_register_access:
@@ -305,6 +336,22 @@ vcpu_switch:
 	mrs x9, pmintenset_el1
 	stp x8, x9, [x28], #16
 
+#if BRANCH_PROTECTION
+	add x2, x1, #(VCPU_PAC + 16)
+	mrs x10, APIBKEYLO_EL1
+	mrs x11, APIBKEYHI_EL1
+	stp x10, x11, [x2], #16
+	mrs x12, APDAKEYLO_EL1
+	mrs x13, APDAKEYHI_EL1
+	stp x12, x13, [x2], #16
+	mrs x14, APDBKEYLO_EL1
+	mrs x15, APDBKEYHI_EL1
+	stp x14, x15, [x2], #16
+	mrs x16, APGAKEYLO_EL1
+	mrs x17, APGAKEYHI_EL1
+	stp x16, x17, [x2], #16
+#endif
+
 	/* Save GIC registers. */
 #if GIC_VERSION == 3 || GIC_VERSION == 4
 	/* Offset is too large, so start from a new base. */
@@ -366,6 +413,23 @@ other_world_loop:
 	ldp x4, x5, [x19, #VCPU_REGS + 8 * 4]
 	ldp x6, x7, [x19, #VCPU_REGS + 8 * 6]
 
+#if BRANCH_PROTECTION
+	/*
+	 * EL3 saves pointer authentication keys when entering by SMC.
+	 * Although prefer clearing the keys to be on the safe side.
+	 */
+	msr APIAKEYLO_EL1, xzr
+	msr APIAKEYHI_EL1, xzr
+	msr APIBKEYLO_EL1, xzr
+	msr APIBKEYHI_EL1, xzr
+	msr APDAKEYLO_EL1, xzr
+	msr APDAKEYHI_EL1, xzr
+	msr APDBKEYLO_EL1, xzr
+	msr APDBKEYHI_EL1, xzr
+	msr APGAKEYLO_EL1, xzr
+	msr APGAKEYHI_EL1, xzr
+#endif
+
 	smc #0
 
 	/*
@@ -385,6 +449,10 @@ other_world_loop:
 	mrs x0, fpsr
 	mrs x1, fpcr
 	stp x0, x1, [x18]
+
+#if BRANCH_PROTECTION
+	pauth_restore_hypervisor_key x0 x1
+#endif
 
 	/*
 	 * Stack is at top and execution can restart straight into C code.
@@ -521,6 +589,22 @@ vcpu_restore_lazy_and_run:
 	msr pmintenclr_el1, x27
 	msr pmintenset_el1, x9
 
+#if BRANCH_PROTECTION
+	add x2, x0, #(VCPU_PAC + 16)
+	ldp x10, x11, [x2], #16
+	msr APIBKEYLO_EL1, x10
+	msr APIBKEYHI_EL1, x11
+	ldp x12, x13, [x2], #16
+	msr APDAKEYLO_EL1, x12
+	msr APDAKEYHI_EL1, x13
+	ldp x14, x15, [x2], #16
+	msr APDBKEYLO_EL1, x14
+	msr APDBKEYHI_EL1, x15
+	ldp x16, x17, [x2], #16
+	msr APGAKEYLO_EL1, x16
+	msr APGAKEYHI_EL1, x17
+#endif
+
 	/* Restore GIC registers. */
 #if GIC_VERSION == 3 || GIC_VERSION == 4
 	/* Offset is too large, so start from a new base. */
@@ -558,6 +642,15 @@ vcpu_restore_nonvolatile_and_run:
  * x0 is a pointer to the target vCPU.
  */
 vcpu_restore_volatile_and_run:
+#if BRANCH_PROTECTION
+	add	x1, x0, #VCPU_PAC
+	ldp	x1, x2, [x1]
+
+	/* Restore vCPU APIA key. */
+	msr     APIAKEYLO_EL1, x1
+	msr     APIAKEYHI_EL1, x2
+#endif
+
 	ldp x4, x5, [x0, #VCPU_REGS + 8 * 4]
 	ldp x6, x7, [x0, #VCPU_REGS + 8 * 6]
 	ldp x8, x9, [x0, #VCPU_REGS + 8 * 8]

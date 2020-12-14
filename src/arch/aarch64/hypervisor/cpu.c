@@ -24,6 +24,12 @@
 #include "perfmon.h"
 #include "sysregs.h"
 
+#if BRANCH_PROTECTION
+
+__uint128_t pauth_apia_key;
+
+#endif
+
 /**
  * The LO field indicates whether LORegions are supported.
  */
