@@ -59,3 +59,12 @@ void plat_console_putchar(char c)
 		/* do nothing */
 	}
 }
+
+char plat_console_getchar(void)
+{
+	/* Wait until the UART is no longer busy. */
+	while (io_read32_mb(UARTFR) & UARTFR_BUSY) {
+		/* do nothing */
+	}
+	return (char)(io_read32(UARTDR) & 0xFF);
+}
