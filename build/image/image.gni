@@ -391,3 +391,68 @@ template("partition_package") {
     ]
   }
 }
+
+# Generate a JSON file containing the path to the necessary artifacts to run
+# an FVP driver, and adequately populate its arguments.
+template("partitions_json") {
+  base_out_dir = "${target_out_dir}"
+  action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "sps",
+                             "vms",
+                           ])
+
+    script = "//build/image/generate_partitions_json.py"
+
+    json_file = "${base_out_dir}/" + invoker.json_file
+
+    args = []
+    deps = []
+
+    foreach(sp, sps) {
+      deps += [
+        sp[2],
+        sp[3],
+      ]
+
+      package_dir = get_label_info(sp[2], "name")
+      img = rebase_path(
+              get_label_info(package_dir + "/" + sp[0], "target_out_dir"))
+
+      dts = rebase_path(sp[1])
+
+      args += [
+        "--sp",
+        "${img},${dts}",
+      ]
+    }
+
+    foreach(vm, vms) {
+      deps += [
+        vm[2],
+        vm[3],
+      ]
+
+      package_dir = get_label_info(vm[2], "name")
+      img = rebase_path(
+              get_label_info(package_dir + "/" + vm[0], "target_out_dir"))
+
+      dts = rebase_path(vm[1])
+      args += [
+        "--vm",
+        "${img},${dts}",
+      ]
+    }
+
+    args += [
+      "--out",
+      rebase_path(json_file),
+    ]
+
+    outputs = [
+      json_file,
+    ]
+  }
+}
