@@ -335,11 +335,11 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 		return;
 	}
 
-	dlog("from VM %#x, attributes %#x, flags %#x, handle %#x, tag %u, to "
+	dlog("from VM %#x, attributes %#x, flags %#x, tag %u, to "
 	     "%u "
 	     "recipients [",
 	     memory_region->sender, memory_region->attributes,
-	     memory_region->flags, memory_region->handle, memory_region->tag,
+	     memory_region->flags, memory_region->tag,
 	     memory_region->receiver_count);
 	for (i = 0; i < memory_region->receiver_count; ++i) {
 		if (i != 0) {
@@ -381,7 +381,7 @@ static void dump_share_states(void)
 				dlog("invalid share_func %#x",
 				     share_states[i].share_func);
 			}
-			dlog(" (");
+			dlog(" %#x (", share_states[i].memory_region->handle);
 			dump_memory_region(share_states[i].memory_region);
 			if (share_states[i].sending_complete) {
 				dlog("): fully sent");
