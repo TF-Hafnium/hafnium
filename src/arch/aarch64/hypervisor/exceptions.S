@@ -66,6 +66,10 @@
 .macro lower_exception handler:req
 	save_volatile_to_vcpu
 
+#if ENABLE_VHE
+	bl enable_vhe_tge
+#endif
+
 #if BRANCH_PROTECTION
 	/* NOTE: x18 still holds pointer to current vCPU. */
 	bl pauth_save_vcpu_and_restore_hyp_key
@@ -87,6 +91,10 @@
  */
 .macro lower_sync_exception
 	save_volatile_to_vcpu
+
+#if ENABLE_VHE
+	bl enable_vhe_tge
+#endif
 
 #if BRANCH_PROTECTION
 	/* NOTE: x18 still holds pointer to current vCPU. */
@@ -800,3 +808,19 @@ vcpu_restore_volatile_and_run:
 	ldp x2, x3, [x0, #VCPU_REGS + 8 * 2]
 	ldp x0, x1, [x0, #VCPU_REGS + 8 * 0]
 	eret_with_sb
+
+#if ENABLE_VHE
+enable_vhe_tge:
+	/**
+	 * Switch to host mode ({E2H, TGE} = {1,1}) when VHE is enabled.
+	 * Note that E2H is always set when VHE is enabled.
+	 */
+	mrs x0, id_aa64mmfr1_el1
+	tst x0, #0xf00
+	b.eq 1f
+	orr x1, x1, #(1 << 27)
+	msr hcr_el2, x1
+	isb
+1:
+	ret
+#endif

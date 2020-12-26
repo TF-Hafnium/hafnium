@@ -746,7 +746,7 @@ bool arch_mm_init(paddr_t table)
 	 */
 	arch_mm_config.hcr_el2 = 0;
 	if (has_vhe_support()) {
-		arch_mm_config.hcr_el2 |= HCR_EL2_E2H;
+		arch_mm_config.hcr_el2 |= (HCR_EL2_E2H | HCR_EL2_TGE);
 		arch_mm_config.tcr_el2 =
 			(1UL << 38) | /* TBI1, top byte ignored. */
 			(1UL << 37) | /* TBI0, top byte ignored. */
