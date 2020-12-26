@@ -79,6 +79,7 @@ struct arch_regs {
 	uintreg_t r[NUM_GP_REGS];
 	uintreg_t pc;
 	uintreg_t spsr;
+	uintreg_t hcr_el2;
 
 	/*
 	 * System registers.
@@ -114,8 +115,6 @@ struct arch_regs {
 		uintreg_t tpidr_el1;
 		uintreg_t sp_el0;
 		uintreg_t sp_el1;
-		uintreg_t par_el1;
-		uintreg_t hcr_el2;
 		uintreg_t cnthctl_el2;
 		uintreg_t vttbr_el2;
 		uintreg_t mdcr_el2;
@@ -124,6 +123,7 @@ struct arch_regs {
 		uintreg_t pmcr_el0;
 		uintreg_t pmcntenset_el0;
 		uintreg_t pmintenset_el1;
+		uintreg_t par_el1;
 	} lazy;
 
 	/* Floating point registers. */

@@ -99,7 +99,7 @@ void arch_regs_reset(struct vcpu *vcpu)
 		}
 	}
 
-	r->lazy.hcr_el2 = get_hcr_el2_value(vm_id);
+	r->hcr_el2 = get_hcr_el2_value(vm_id);
 	r->lazy.cnthctl_el2 = cnthctl;
 	r->lazy.vttbr_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
 	r->lazy.vmpidr_el2 = vcpu_id;

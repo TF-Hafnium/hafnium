@@ -175,7 +175,7 @@ void feature_set_traps(struct vm *vm, struct arch_regs *regs)
 		~(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT);
 
 	if (features & HF_FEATURE_RAS) {
-		regs->lazy.hcr_el2 |= HCR_EL2_TERR;
+		regs->hcr_el2 |= HCR_EL2_TERR;
 		vm->arch.tid3_masks.id_aa64mmfr1_el1 &=
 			~ID_AA64MMFR1_EL1_SPEC_SEI;
 		vm->arch.tid3_masks.id_aa64pfr0_el1 &= ~ID_AA64PFR0_EL1_RAS;
@@ -221,14 +221,14 @@ void feature_set_traps(struct vm *vm, struct arch_regs *regs)
 	}
 
 	if (features & HF_FEATURE_LOR) {
-		regs->lazy.hcr_el2 |= HCR_EL2_TLOR;
+		regs->hcr_el2 |= HCR_EL2_TLOR;
 
 		vm->arch.tid3_masks.id_aa64mmfr1_el1 &= ~ID_AA64MMFR1_EL1_LO;
 	}
 
 	if (features & HF_FEATURE_PAUTH) {
 		/* APK and API bits *enable* trapping when cleared. */
-		regs->lazy.hcr_el2 &= ~(HCR_EL2_APK | HCR_EL2_API);
+		regs->hcr_el2 &= ~(HCR_EL2_APK | HCR_EL2_API);
 
 		vm->arch.tid3_masks.id_aa64isar1_el1 &= ~ID_AA64ISAR1_EL1_GPI;
 		vm->arch.tid3_masks.id_aa64isar1_el1 &= ~ID_AA64ISAR1_EL1_GPA;

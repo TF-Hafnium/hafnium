@@ -51,6 +51,8 @@
 	mrs x1, elr_el2
 	mrs x2, spsr_el2
 	stp x1, x2, [x18, #VCPU_REGS + 8 * 31]
+	mrs x1, hcr_el2
+	str x1, [x18, #VCPU_REGS + 8 * 33]
 .endm
 
 /**
@@ -346,10 +348,6 @@ skip_vhe_save:
 	mrs x23, sp_el1
 	stp x22, x23, [x28], #16
 
-	mrs x24, par_el1
-	mrs x25, hcr_el2
-	stp x24, x25, [x28], #16
-
 	mrs x26, cnthctl_el2
 	mrs x27, vttbr_el2
 	stp x26, x27, [x28], #16
@@ -365,6 +363,9 @@ skip_vhe_save:
 	mrs x8, pmcntenset_el0
 	mrs x9, pmintenset_el1
 	stp x8, x9, [x28], #16
+
+	mrs x8, par_el1
+	str x8, [x28], #8
 
 #if BRANCH_PROTECTION
 	add x2, x1, #(VCPU_PAC + 16)
@@ -680,10 +681,6 @@ skip_vhe_restore:
 	msr sp_el0, x22
 	msr sp_el1, x23
 
-	ldp x24, x25, [x28], #16
-	msr par_el1, x24
-	msr hcr_el2, x25
-
 	ldp x26, x27, [x28], #16
 	msr cnthctl_el2, x26
 	msr vttbr_el2, x27
@@ -715,6 +712,9 @@ skip_vhe_restore:
 	 */
 	msr pmintenclr_el1, x27
 	msr pmintenset_el1, x9
+
+	ldr x8, [x28], #8
+	msr par_el1, x8
 
 #if BRANCH_PROTECTION
 	add x2, x0, #(VCPU_PAC + 16)
@@ -792,6 +792,9 @@ vcpu_restore_volatile_and_run:
 	ldp x1, x2, [x0, #VCPU_REGS + 8 * 31]
 	msr elr_el2, x1
 	msr spsr_el2, x2
+
+	ldr x1, [x0, #VCPU_REGS + 8 * 33]
+	msr hcr_el2, x1
 
 	/* Restore x0..x3, which we have used as scratch before. */
 	ldp x2, x3, [x0, #VCPU_REGS + 8 * 2]
