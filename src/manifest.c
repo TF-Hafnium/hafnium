@@ -660,8 +660,9 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if (vm->sp.run_time_el != EL1 && vm->sp.run_time_el != S_EL1) {
-		dlog_error("Exception level %s: %u\n", error_string,
+	if (vm->sp.run_time_el != EL1 && vm->sp.run_time_el != S_EL1 &&
+	    vm->sp.run_time_el != S_EL0) {
+		dlog_error("Exception level %s: %d\n", error_string,
 			   vm->sp.run_time_el);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
