@@ -676,6 +676,15 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
+	if (vm->sp.run_time_el == S_EL0 && vm->sp.execution_ctx_count != 1) {
+		dlog_error(
+			"Exception level and execution context count %s: %d "
+			"%d\n",
+			error_string, vm->sp.run_time_el,
+			vm->sp.execution_ctx_count);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
 	return ret_code;
 }
 

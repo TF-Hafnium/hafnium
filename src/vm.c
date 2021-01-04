@@ -24,12 +24,13 @@ static ffa_vm_count_t vm_count;
 static struct vm *first_boot_vm;
 
 struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
-		   struct mpool *ppool)
+		   struct mpool *ppool, bool el0_partition)
 {
 	uint32_t i;
 	struct vm *vm;
 
 	if (id == HF_OTHER_WORLD_ID) {
+		CHECK(el0_partition == false);
 		vm = &other_world;
 	} else {
 		uint16_t vm_index = id - HF_VM_ID_OFFSET;
@@ -49,6 +50,7 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 	vm->vcpu_count = vcpu_count;
 	vm->mailbox.state = MAILBOX_STATE_EMPTY;
 	atomic_init(&vm->aborting, false);
+	vm->el0_partition = el0_partition;
 
 	if (!mm_vm_init(&vm->ptable, ppool)) {
 		return NULL;
@@ -70,14 +72,15 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 }
 
 bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
-		  struct vm **new_vm)
+		  struct vm **new_vm, bool el0_partition)
 {
 	if (vm_count >= MAX_VMS) {
 		return false;
 	}
 
 	/* Generate IDs based on an offset, as low IDs e.g., 0, are reserved */
-	*new_vm = vm_init(vm_count + HF_VM_ID_OFFSET, vcpu_count, ppool);
+	*new_vm = vm_init(vm_count + HF_VM_ID_OFFSET, vcpu_count, ppool,
+			  el0_partition);
 	if (*new_vm == NULL) {
 		return false;
 	}

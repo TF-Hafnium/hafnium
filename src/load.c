@@ -200,6 +200,9 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 
 	paddr_t primary_end = pa_add(primary_begin, RSIZE_MAX);
 
+	/* Primary VM must be a VM */
+	CHECK(manifest_vm->sp.run_time_el == EL1);
+
 	/*
 	 * Load the kernel if a filename is specified in the VM manifest.
 	 * For an FF-A partition, kernel_filename is undefined indicating
@@ -214,7 +217,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		}
 	}
 
-	if (!vm_init_next(MAX_CPUS, ppool, &vm)) {
+	if (!vm_init_next(MAX_CPUS, ppool, &vm, false)) {
 		dlog_error("Unable to initialise primary VM.\n");
 		return false;
 	}
@@ -421,8 +424,15 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			return false;
 		}
 	}
+	/*
+	 * An S-EL0 partition must contain only 1 vCPU (UP migratable) per the
+	 * FF-A 1.0 spec.
+	 */
+	CHECK(manifest_vm->sp.run_time_el != S_EL0 ||
+	      manifest_vm->secondary.vcpu_count == 1);
 
-	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm)) {
+	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm,
+			  (manifest_vm->sp.run_time_el == S_EL0))) {
 		dlog_error("Unable to initialise VM.\n");
 		return false;
 	}
@@ -683,7 +693,7 @@ static bool init_other_world_vm(struct mpool *ppool)
 	 * -TrustZone (or the SPMC) when running the Hypervisor
 	 * -the Hypervisor when running TZ/SPMC
 	 */
-	other_world_vm = vm_init(HF_OTHER_WORLD_ID, MAX_CPUS, ppool);
+	other_world_vm = vm_init(HF_OTHER_WORLD_ID, MAX_CPUS, ppool, false);
 	CHECK(other_world_vm != NULL);
 
 	for (i = 0; i < MAX_CPUS; i++) {

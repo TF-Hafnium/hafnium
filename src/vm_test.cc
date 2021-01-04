@@ -66,7 +66,7 @@ TEST_F(vm, vm_unmap_hypervisor_not_mapped)
 	struct_vm *vm;
 	struct vm_locked vm_locked;
 
-	EXPECT_TRUE(vm_init_next(1, &ppool, &vm));
+	EXPECT_TRUE(vm_init_next(1, &ppool, &vm, false));
 	vm_locked = vm_lock(vm);
 	ASSERT_TRUE(mm_vm_init(&vm->ptable, &ppool));
 	EXPECT_TRUE(vm_unmap_hypervisor(vm_locked, &ppool));
@@ -92,7 +92,7 @@ TEST_F(vm, vm_boot_order)
 	 * Insertion when no call to "vm_update_boot" has been made yet.
 	 * The "boot_list" is expected to be empty.
 	 */
-	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur));
+	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
 	vm_cur->boot_order = 1;
 	vm_update_boot(vm_cur);
 	expected_final_order.push_back(vm_cur);
@@ -100,7 +100,7 @@ TEST_F(vm, vm_boot_order)
 	EXPECT_EQ(vm_get_first_boot()->id, vm_cur->id);
 
 	/* Insertion at the head of the boot list */
-	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur));
+	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
 	vm_cur->boot_order = 3;
 	vm_update_boot(vm_cur);
 	expected_final_order.push_back(vm_cur);
@@ -109,7 +109,7 @@ TEST_F(vm, vm_boot_order)
 
 	/* Insertion of two in the middle of the boot list */
 	for (int i = 0; i < 2; i++) {
-		EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur));
+		EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
 		vm_cur->boot_order = 2;
 		vm_update_boot(vm_cur);
 		expected_final_order.push_back(vm_cur);

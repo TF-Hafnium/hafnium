@@ -136,6 +136,7 @@ struct vm {
 
 	/** Arch-specific VM information. */
 	struct arch_vm arch;
+	bool el0_partition;
 };
 
 /** Encapsulates a VM whose lock is held. */
@@ -150,9 +151,9 @@ struct two_vm_locked {
 };
 
 struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
-		   struct mpool *ppool);
+		   struct mpool *ppool, bool el0_partition);
 bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
-		  struct vm **new_vm);
+		  struct vm **new_vm, bool el0_partition);
 ffa_vm_count_t vm_get_count(void);
 struct vm *vm_find(ffa_vm_id_t id);
 struct vm *vm_find_index(uint16_t index);
