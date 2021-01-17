@@ -69,8 +69,15 @@ static struct vcpu *current(void)
  */
 void complete_saving_state(struct vcpu *vcpu)
 {
-	vcpu->regs.peripherals.cntv_cval_el0 = read_msr(cntv_cval_el0);
-	vcpu->regs.peripherals.cntv_ctl_el0 = read_msr(cntv_ctl_el0);
+	if (has_vhe_support()) {
+		vcpu->regs.peripherals.cntv_cval_el0 =
+			read_msr(MSR_CNTV_CVAL_EL02);
+		vcpu->regs.peripherals.cntv_ctl_el0 =
+			read_msr(MSR_CNTV_CTL_EL02);
+	} else {
+		vcpu->regs.peripherals.cntv_cval_el0 = read_msr(cntv_cval_el0);
+		vcpu->regs.peripherals.cntv_ctl_el0 = read_msr(cntv_ctl_el0);
+	}
 
 	api_regs_state_saved(vcpu);
 
@@ -88,8 +95,14 @@ void complete_saving_state(struct vcpu *vcpu)
 		 * then be latched in.
 		 */
 		write_msr(cnthp_ctl_el2, 0);
-		write_msr(cnthp_cval_el2, read_msr(cntv_cval_el0));
-		write_msr(cnthp_ctl_el2, read_msr(cntv_ctl_el0));
+
+		if (has_vhe_support()) {
+			write_msr(cnthp_cval_el2, read_msr(MSR_CNTV_CVAL_EL02));
+			write_msr(cnthp_ctl_el2, read_msr(MSR_CNTV_CTL_EL02));
+		} else {
+			write_msr(cnthp_cval_el2, read_msr(cntv_cval_el0));
+			write_msr(cnthp_ctl_el2, read_msr(cntv_ctl_el0));
+		}
 	}
 }
 
@@ -103,9 +116,17 @@ void begin_restoring_state(struct vcpu *vcpu)
 	 * a spurious timer interrupt. This could be a problem if the interrupt
 	 * is configured as edge-triggered, as it would then be latched in.
 	 */
-	write_msr(cntv_ctl_el0, 0);
-	write_msr(cntv_cval_el0, vcpu->regs.peripherals.cntv_cval_el0);
-	write_msr(cntv_ctl_el0, vcpu->regs.peripherals.cntv_ctl_el0);
+	if (has_vhe_support()) {
+		write_msr(MSR_CNTV_CTL_EL02, 0);
+		write_msr(MSR_CNTV_CVAL_EL02,
+			  vcpu->regs.peripherals.cntv_cval_el0);
+		write_msr(MSR_CNTV_CTL_EL02,
+			  vcpu->regs.peripherals.cntv_ctl_el0);
+	} else {
+		write_msr(cntv_ctl_el0, 0);
+		write_msr(cntv_cval_el0, vcpu->regs.peripherals.cntv_cval_el0);
+		write_msr(cntv_ctl_el0, vcpu->regs.peripherals.cntv_ctl_el0);
+	}
 
 	/*
 	 * If we are switching (back) to the primary, disable the EL2 physical
@@ -705,7 +726,8 @@ struct vcpu *smc_handler_from_nwd(struct vcpu *vcpu)
  */
 static uintreg_t get_el1_exception_handler_addr(const struct vcpu *vcpu)
 {
-	uintreg_t base_addr = read_msr(vbar_el1);
+	uintreg_t base_addr = has_vhe_support() ? read_msr(MSR_VBAR_EL12)
+						: read_msr(vbar_el1);
 	uintreg_t pe_mode = vcpu->regs.spsr & PSR_PE_MODE_MASK;
 	bool is_arch32 = vcpu->regs.spsr & PSR_ARCH_MODE_32;
 
@@ -736,10 +758,17 @@ static void inject_el1_exception(struct vcpu *vcpu, uintreg_t esr_el1_value,
 	uintreg_t handler_address = get_el1_exception_handler_addr(vcpu);
 
 	/* Update the CPU state to inject the exception. */
-	write_msr(esr_el1, esr_el1_value);
-	write_msr(far_el1, far_el1_value);
-	write_msr(elr_el1, vcpu->regs.pc);
-	write_msr(spsr_el1, vcpu->regs.spsr);
+	if (has_vhe_support()) {
+		write_msr(MSR_ESR_EL12, esr_el1_value);
+		write_msr(MSR_FAR_EL12, far_el1_value);
+		write_msr(MSR_ELR_EL12, vcpu->regs.pc);
+		write_msr(MSR_SPSR_EL12, vcpu->regs.spsr);
+	} else {
+		write_msr(esr_el1, esr_el1_value);
+		write_msr(far_el1, far_el1_value);
+		write_msr(elr_el1, vcpu->regs.pc);
+		write_msr(spsr_el1, vcpu->regs.spsr);
+	}
 
 	/*
 	 * Mask (disable) interrupts and run in EL1h mode.

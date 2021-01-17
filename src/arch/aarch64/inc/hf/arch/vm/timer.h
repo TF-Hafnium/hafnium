@@ -11,13 +11,16 @@
 #include <stdint.h>
 
 #include "../msr.h"
+#include "../sysregs.h"
 
 static inline void timer_set(uint32_t ticks)
 {
-	write_msr(CNTV_TVAL_EL0, ticks);
+	has_vhe_support() ? write_msr(MSR_CNTV_TVAL_EL02, ticks)
+			  : write_msr(cntv_tval_el0, ticks);
 }
 
 static inline void timer_start(void)
 {
-	write_msr(CNTV_CTL_EL0, 0x00000001);
+	has_vhe_support() ? write_msr(MSR_CNTV_CTL_EL02, 0x00000001)
+			  : write_msr(cntv_ctl_el0, 0x00000001);
 }

@@ -17,6 +17,7 @@
 #include "hf/addr.h"
 
 #include "msr.h"
+#include "sysregs.h"
 
 #define CNTV_CTL_EL0_ENABLE (1u << 0)
 #define CNTV_CTL_EL0_IMASK (1u << 1)
@@ -114,7 +115,8 @@ bool arch_timer_pending(struct arch_regs *regs)
  */
 bool arch_timer_enabled_current(void)
 {
-	uintreg_t cntv_ctl_el0 = read_msr(cntv_ctl_el0);
+	uintreg_t cntv_ctl_el0 = has_vhe_support() ? read_msr(MSR_CNTV_CTL_EL02)
+						   : read_msr(cntv_ctl_el0);
 
 	return (cntv_ctl_el0 & CNTV_CTL_EL0_ENABLE) &&
 	       !(cntv_ctl_el0 & CNTV_CTL_EL0_IMASK);
@@ -125,7 +127,8 @@ bool arch_timer_enabled_current(void)
  */
 void arch_timer_disable_current(void)
 {
-	write_msr(cntv_ctl_el0, 0x0);
+	has_vhe_support() ? write_msr(MSR_CNTV_CTL_EL02, 0x0)
+			  : write_msr(cntv_ctl_el0, 0x0);
 }
 
 /**
@@ -135,7 +138,9 @@ void arch_timer_disable_current(void)
  */
 static uint64_t arch_timer_remaining_ticks_current(void)
 {
-	uintreg_t cntv_cval_el0 = read_msr(cntv_cval_el0);
+	uintreg_t cntv_cval_el0 = has_vhe_support()
+					  ? read_msr(MSR_CNTV_CVAL_EL02)
+					  : read_msr(cntv_cval_el0);
 	uintreg_t cntvct_el0 = read_msr(cntvct_el0);
 
 	if (cntv_cval_el0 >= cntvct_el0) {
