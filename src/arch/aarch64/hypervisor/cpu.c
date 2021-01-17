@@ -87,9 +87,16 @@ void arch_regs_reset(struct vcpu *vcpu)
 	cnthctl = 0;
 
 	if (is_primary) {
-		cnthctl |=
-			(1U << 0) | /* EL1PCTEN, don't trap phys cnt access. */
-			(1U << 1);  /* EL1PCEN, don't trap phys timer access. */
+		/*
+		 * cnthctl_el2 is redefined when VHE is enabled.
+		 * EL1PCTEN, don't trap phys cnt access.
+		 * EL1PCEN, don't trap phys timer access.
+		 */
+		if (has_vhe_support()) {
+			cnthctl |= (1U << 10) | (1U << 11);
+		} else {
+			cnthctl |= (1U << 0) | (1U << 1);
+		}
 	}
 
 	r->lazy.hcr_el2 = get_hcr_el2_value(vm_id);

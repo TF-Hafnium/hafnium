@@ -106,6 +106,11 @@ uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id)
 #endif
 	}
 
+	/* Enable VHE, if enabled by build and if HW supports it. */
+	if (has_vhe_support()) {
+		hcr_el2_value |= HCR_EL2_E2H;
+	}
+
 	return hcr_el2_value;
 }
 
@@ -133,6 +138,10 @@ uintreg_t get_mdcr_el2_value(void)
  */
 uintreg_t get_cptr_el2_value(void)
 {
+	if (has_vhe_support()) {
+		return CPTR_EL2_VHE_FPEN | CPTR_EL2_VHE_TTA;
+	}
+
 	return CPTR_EL2_TTA;
 }
 

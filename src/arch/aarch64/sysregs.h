@@ -472,9 +472,19 @@
  * Trap system register accesses to trace registers.
  * Traps accesses to ETM registers using the register interface. Does not trap
  * on accesses through the memory-mapped interface.
- * CPTR_EL2.TTA is register bit 20 when HCR_EL2.E2H=0 (ARMv8.1-VHE disabled).
+ * CPTR_EL2.TTA is register bit 20 when HCR_EL2.E2H=0 (ARMv8.1-VHE disabled)
+ * and is register bit 28 with HCR_EL2.E2H=1 (ARMv8.1-VHE enabled)
  */
 #define CPTR_EL2_TTA (UINT64_C(0x1) << 20)
+#define CPTR_EL2_VHE_TTA (UINT64_C(0x1) << 28)
+
+/**
+ * When HCR_EL2.E2H=1 (ARMv8.1-VHE enabled), CPTR_EL2 contains control bits to
+ * enable and disable access to floating point, SVE and advanced SIMD
+ * instructions. This define enables FP instruction when executing in EL0 with
+ * HCR_EL2.TGE=1.
+ */
+#define CPTR_EL2_VHE_FPEN (UINT64_C(0x3) << 20)
 
 /*
  * Process State Bit definitions.
