@@ -463,6 +463,12 @@
 #define HCR_EL2_VM (UINT64_C(0x1) << 0)
 
 /**
+ * EL2 Host. Enables a configuration where a Host Operating System is running
+ * in EL2, and the Host Operating System's applications are running in EL0.
+ */
+#define HCR_EL2_E2H (UINT64_C(0x1) << 34)
+
+/**
  * Trap system register accesses to trace registers.
  * Traps accesses to ETM registers using the register interface. Does not trap
  * on accesses through the memory-mapped interface.

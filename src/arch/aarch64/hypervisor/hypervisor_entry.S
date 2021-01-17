@@ -188,12 +188,20 @@ mm_enable:
 	 * Load and apply the memory management configuration. Order depends on
 	 * `struct arch_mm_config.
 	 */
-	adrp x6, arch_mm_config
-	add x6, x6, :lo12:arch_mm_config
+	adrp x7, arch_mm_config
+	add x7, x7, :lo12:arch_mm_config
 
-	ldp x1, x2, [x6]
-	ldp x3, x4, [x6, #16]
-	ldp x5, x6, [x6, #32]
+	ldp x1, x2, [x7]
+	ldp x3, x4, [x7, #16]
+	ldp x5, x6, [x7, #32]
+	ldr x7, [x7, #48]
+
+	/*
+	 * Set hcr_el2 before tcr_el2, since hcr_el2.e2h may be set, which changes
+	 * the definition of tcr_el2.
+	 */
+	msr hcr_el2, x7
+	isb
 
 	msr ttbr0_el2, x1
 	msr vtcr_el2, x2

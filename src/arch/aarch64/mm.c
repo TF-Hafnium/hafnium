@@ -132,6 +132,7 @@ struct arch_mm_config {
 	uintreg_t tcr_el2;
 	uintreg_t sctlr_el2;
 	uintreg_t vstcr_el2;
+	uintreg_t hcr_el2;
 } arch_mm_config;
 
 static uint8_t mm_s2_max_level;
@@ -719,19 +720,6 @@ bool arch_mm_init(paddr_t table)
 		.mair_el2 = (0 << (8 * STAGE1_DEVICEINDX)) |
 			    (0xff << (8 * STAGE1_NORMALINDX)),
 
-		/*
-		 * Configure tcr_el2.
-		 */
-		.tcr_el2 =
-			(1 << 20) |		   /* TBI, top byte ignored. */
-			((features & 0xf) << 16) | /* PS. */
-			(0 << 14) |		   /* TG0, granule size, 4KB. */
-			(3 << 12) |		   /* SH0, inner shareable. */
-			(1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
-			(1 << 8) |  /* IRGN0, normal mem, WB RA WA Cacheable. */
-			(25 << 0) | /* T0SZ, input address is 2^39 bytes. */
-			0,
-
 		.sctlr_el2 = get_sctlr_el2_value(),
 		.vstcr_el2 = (1U << 31) |	    /* RES1. */
 			     (0 << 30) |	    /* SA. */
@@ -741,6 +729,56 @@ bool arch_mm_init(paddr_t table)
 			     ((64 - pa_bits) << 0), /* T0SZ: dependent on PS. */
 	};
 
+	/*
+	 * Configure tcr_el2 and hcr_el2. The configuration depends on whether
+	 * VHE support is enabled by the build and is available in HW. If VHE is
+	 * enabled and available, hcr_el2.e2h is set during boot, before the MMU
+	 * is turned on. This is because setting e2h redefines registers, can be
+	 * cached in the TLBs and enables the use of ttbr1_el2, among other
+	 * things, which makes enabling it at run time much more complicated.
+	 * The bit is set once during boot and is not expected to change for the
+	 * boot cycle. When VHE is enabled, currently, only the lower virtual
+	 * address range (ttbr0_el2) is used and the upper address
+	 * range(ttbr0_el1) is disabled. This keeps hafnium simple and
+	 * consistent with its behavior when VHE is not enabled. When VHE is
+	 * not enabled, hcr_el2 will default to 0 and will be set up during vCPU
+	 * initialization.
+	 */
+	arch_mm_config.hcr_el2 = 0;
+	if (has_vhe_support()) {
+		arch_mm_config.hcr_el2 |= HCR_EL2_E2H;
+		arch_mm_config.tcr_el2 =
+			(1UL << 38) | /* TBI1, top byte ignored. */
+			(1UL << 37) | /* TBI0, top byte ignored. */
+			(2UL << 32) | /* IPS, IPA size */
+			(2UL << 30) | /* TG1, granule size, 4KB. */
+			(3UL << 28) | /* SH1, inner shareable. */
+			(1UL
+			 << 26) | /* ORGN1, normal mem, WB RA WA Cacheable. */
+			(1UL
+			 << 24) | /* IRGN1, normal mem, WB RA WA Cacheable. */
+			(1UL << 23) | /* EPD1 - Disable TTBR1_EL2 translation */
+			(0UL << 22) | /* TTBR0_EL2.ASID defines ASID */
+			(25UL << 16) | /* T1SZ, input address is 2^39 bytes. */
+			(0UL << 14) |  /* TG0, granule size, 4KB. */
+			(3UL << 12) |  /* SH0, inner shareable. */
+			(1UL
+			 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
+			(1UL
+			 << 8) | /* IRGN0, normal mem, WB RA WA Cacheable. */
+			(25UL << 0) | /* T0SZ, input address is 2^39 bytes. */
+			0;
+	} else {
+		arch_mm_config.tcr_el2 =
+			(1 << 20) |		   /* TBI, top byte ignored. */
+			((features & 0xf) << 16) | /* PS. */
+			(0 << 14) |		   /* TG0, granule size, 4KB. */
+			(3 << 12) |		   /* SH0, inner shareable. */
+			(1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
+			(1 << 8) |  /* IRGN0, normal mem, WB RA WA Cacheable. */
+			(25 << 0) | /* T0SZ, input address is 2^39 bytes. */
+			0;
+	}
 	return true;
 }
 
