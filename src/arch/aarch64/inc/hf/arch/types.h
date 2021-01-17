@@ -84,12 +84,12 @@ struct arch_regs {
 	 * System registers.
 	 * NOTE: Ordering is important. If adding to or reordering registers
 	 * below, make sure to update src/arch/aarch64/hypervisor/exceptions.S.
+	 * Registers affected by VHE are grouped together followed by other
+	 * registers.
+	 *
 	 */
 	struct {
-		uintreg_t vmpidr_el2;
-		uintreg_t csselr_el1;
-		uintreg_t sctlr_el1;
-		uintreg_t actlr_el1;
+		uintreg_t sctlr_el1; /* Start VHE affected registers */
 		uintreg_t cpacr_el1;
 		uintreg_t ttbr0_el1;
 		uintreg_t ttbr1_el1;
@@ -101,15 +101,19 @@ struct arch_regs {
 		uintreg_t mair_el1;
 		uintreg_t vbar_el1;
 		uintreg_t contextidr_el1;
+		uintreg_t amair_el1;
+		uintreg_t cntkctl_el1;
+		uintreg_t elr_el1;
+		uintreg_t spsr_el1; /* End VHE affected registers */
+
+		uintreg_t vmpidr_el2;
+		uintreg_t csselr_el1;
+		uintreg_t actlr_el1;
 		uintreg_t tpidr_el0;
 		uintreg_t tpidrro_el0;
 		uintreg_t tpidr_el1;
-		uintreg_t amair_el1;
-		uintreg_t cntkctl_el1;
 		uintreg_t sp_el0;
 		uintreg_t sp_el1;
-		uintreg_t elr_el1;
-		uintreg_t spsr_el1;
 		uintreg_t par_el1;
 		uintreg_t hcr_el2;
 		uintreg_t cnthctl_el2;

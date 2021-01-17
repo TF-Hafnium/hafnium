@@ -253,52 +253,97 @@ vcpu_switch:
 	/* Use x28 as the base */
 	add x28, x1, #VCPU_LAZY
 
-	mrs x24, vmpidr_el2
-	mrs x25, csselr_el1
+#if ENABLE_VHE
+	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
+	mrs x19, id_aa64mmfr1_el1
+	tst x19, #0xf00
+	b.ne vhe_save
+#endif
+
+	mrs x24, sctlr_el1
+	mrs x25, cpacr_el1
 	stp x24, x25, [x28], #16
 
-	mrs x2, sctlr_el1
-	mrs x3, actlr_el1
+	mrs x2, ttbr0_el1
+	mrs x3, ttbr1_el1
 	stp x2, x3, [x28], #16
 
-	mrs x4, cpacr_el1
-	mrs x5, ttbr0_el1
+	mrs x4, tcr_el1
+	mrs x5, esr_el1
 	stp x4, x5, [x28], #16
 
-	mrs x6, ttbr1_el1
-	mrs x7, tcr_el1
+	mrs x6, afsr0_el1
+	mrs x7, afsr1_el1
 	stp x6, x7, [x28], #16
 
-	mrs x8, esr_el1
-	mrs x9, afsr0_el1
+	mrs x8, far_el1
+	mrs x9, mair_el1
 	stp x8, x9, [x28], #16
 
-	mrs x10, afsr1_el1
-	mrs x11, far_el1
+	mrs x10, vbar_el1
+	mrs x11, contextidr_el1
 	stp x10, x11, [x28], #16
 
-	mrs x12, mair_el1
-	mrs x13, vbar_el1
+	mrs x12, amair_el1
+	mrs x13, cntkctl_el1
 	stp x12, x13, [x28], #16
 
-	mrs x14, contextidr_el1
-	mrs x15, tpidr_el0
+	mrs x14, elr_el1
+	mrs x15, spsr_el1
 	stp x14, x15, [x28], #16
 
-	mrs x16, tpidrro_el0
-	mrs x17, tpidr_el1
+#if ENABLE_VHE
+	b skip_vhe_save
+
+vhe_save:
+	mrs x24, MSR_SCTLR_EL12
+	mrs x25, MSR_CPACR_EL12
+	stp x24, x25, [x28], #16
+
+	mrs x2, MSR_TTBR0_EL12
+	mrs x3, MSR_TTBR1_EL12
+	stp x2, x3, [x28], #16
+
+	mrs x4, MSR_TCR_EL12
+	mrs x5, MSR_ESR_EL12
+	stp x4, x5, [x28], #16
+
+	mrs x6, MSR_AFSR0_EL12
+	mrs x7, MSR_AFSR1_EL12
+	stp x6, x7, [x28], #16
+
+	mrs x8, MSR_FAR_EL12
+	mrs x9, MSR_MAIR_EL12
+	stp x8, x9, [x28], #16
+
+	mrs x10, MSR_VBAR_EL12
+	mrs x11, MSR_CONTEXTIDR_EL12
+	stp x10, x11, [x28], #16
+
+	mrs x12, MSR_AMAIR_EL12
+	mrs x13, MSR_CNTKCTL_EL12
+	stp x12, x13, [x28], #16
+
+	mrs x14, MSR_ELR_EL12
+	mrs x15, MSR_SPSR_EL12
+	stp x14, x15, [x28], #16
+
+skip_vhe_save:
+#endif
+	mrs x16, vmpidr_el2
+	mrs x17, csselr_el1
 	stp x16, x17, [x28], #16
 
-	mrs x18, amair_el1
-	mrs x19, cntkctl_el1
+	mrs x18, actlr_el1
+	mrs x19, tpidr_el0
 	stp x18, x19, [x28], #16
 
-	mrs x20, sp_el0
-	mrs x21, sp_el1
+	mrs x20, tpidrro_el0
+	mrs x21, tpidr_el1
 	stp x20, x21, [x28], #16
 
-	mrs x22, elr_el1
-	mrs x23, spsr_el1
+	mrs x22, sp_el0
+	mrs x23, sp_el1
 	stp x22, x23, [x28], #16
 
 	mrs x24, par_el1
@@ -542,53 +587,98 @@ vcpu_restore_lazy_and_run:
 	/* Use x28 as the base. */
 	add x28, x0, #VCPU_LAZY
 
+#if ENABLE_VHE
+	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
+	mrs x19, id_aa64mmfr1_el1
+	tst x19, #0xf00
+	b.ne vhe_restore
+#endif
+
 	ldp x24, x25, [x28], #16
-	msr vmpidr_el2, x24
-	msr csselr_el1, x25
+	msr sctlr_el1, x24
+	msr cpacr_el1, x25
 
 	ldp x2, x3, [x28], #16
-	msr sctlr_el1, x2
-	msr actlr_el1, x3
+	msr ttbr0_el1, x2
+	msr ttbr1_el1, x3
 
 	ldp x4, x5, [x28], #16
-	msr cpacr_el1, x4
-	msr ttbr0_el1, x5
+	msr tcr_el1, x4
+	msr esr_el1, x5
 
 	ldp x6, x7, [x28], #16
-	msr ttbr1_el1, x6
-	msr tcr_el1, x7
+	msr afsr0_el1, x6
+	msr afsr1_el1, x7
 
 	ldp x8, x9, [x28], #16
-	msr esr_el1, x8
-	msr afsr0_el1, x9
+	msr far_el1, x8
+	msr mair_el1, x9
 
 	ldp x10, x11, [x28], #16
-	msr afsr1_el1, x10
-	msr far_el1, x11
+	msr vbar_el1, x10
+	msr contextidr_el1, x11
 
 	ldp x12, x13, [x28], #16
-	msr mair_el1, x12
-	msr vbar_el1, x13
+	msr amair_el1, x12
+	msr cntkctl_el1, x13
 
 	ldp x14, x15, [x28], #16
-	msr contextidr_el1, x14
-	msr tpidr_el0, x15
+	msr elr_el1, x14
+	msr spsr_el1, x15
 
+#if ENABLE_VHE
+	b skip_vhe_restore
+
+vhe_restore:
+	ldp x24, x25, [x28], #16
+	msr MSR_SCTLR_EL12, x24
+	msr MSR_CPACR_EL12, x25
+
+	ldp x2, x3, [x28], #16
+	msr MSR_TTBR0_EL12, x2
+	msr MSR_TTBR1_EL12, x3
+
+	ldp x4, x5, [x28], #16
+	msr MSR_TCR_EL12, x4
+	msr MSR_ESR_EL12, x5
+
+	ldp x6, x7, [x28], #16
+	msr MSR_AFSR0_EL12, x6
+	msr MSR_AFSR1_EL12, x7
+
+	ldp x8, x9, [x28], #16
+	msr MSR_FAR_EL12, x8
+	msr MSR_MAIR_EL12, x9
+
+	ldp x10, x11, [x28], #16
+	msr MSR_VBAR_EL12, x10
+	msr MSR_CONTEXTIDR_EL12, x11
+
+	ldp x12, x13, [x28], #16
+	msr MSR_AMAIR_EL12, x12
+	msr MSR_CNTKCTL_EL12, x13
+
+	ldp x14, x15, [x28], #16
+	msr MSR_ELR_EL12, x14
+	msr MSR_SPSR_EL12, x15
+
+skip_vhe_restore:
+#endif
 	ldp x16, x17, [x28], #16
-	msr tpidrro_el0, x16
-	msr tpidr_el1, x17
+	msr vmpidr_el2, x16
+	msr csselr_el1, x17
 
 	ldp x18, x19, [x28], #16
-	msr amair_el1, x18
-	msr cntkctl_el1, x19
+	msr actlr_el1, x18
+	msr tpidr_el0, x19
 
 	ldp x20, x21, [x28], #16
-	msr sp_el0, x20
-	msr sp_el1, x21
+	msr tpidrro_el0, x20
+	msr tpidr_el1, x21
 
 	ldp x22, x23, [x28], #16
-	msr elr_el1, x22
-	msr spsr_el1, x23
+	msr sp_el0, x22
+	msr sp_el1, x23
 
 	ldp x24, x25, [x28], #16
 	msr par_el1, x24
