@@ -35,8 +35,13 @@ def Main():
     header += "\n */" if args.style == "c" else ""
     header += "\n\n"
     header_regex = re.escape(header).replace(year, r"\d\d\d\d")
-    with open(args.file, "r") as f:
-        contents = f.read()
+    with open(args.file, "rb") as f:
+        try:
+            contents = f.read().decode('utf-8', 'strict')
+        except Exception as ex:
+            print("Failed reading: " + args.file +
+                " (" + ex.__class__.__name__ + ")")
+            return
         if re.search(header_regex, contents):
             return
     with open(args.file, "w") as f:
