@@ -227,6 +227,51 @@ void hftest_help(void)
 	HFTEST_LOG("    Run the named test from the named test suite.");
 }
 
+void hftest_command(struct fdt *fdt)
+{
+	struct memiter command_line;
+	struct memiter command;
+
+	if (!hftest_ctrl_start(fdt, &command_line)) {
+		HFTEST_LOG("Unable to read the command line.");
+		return;
+	}
+
+	if (!memiter_parse_str(&command_line, &command)) {
+		HFTEST_LOG("Unable to parse command.");
+		return;
+	}
+
+	if (memiter_iseq(&command, "exit")) {
+		hftest_device_exit_test_environment();
+		return;
+	}
+
+	if (memiter_iseq(&command, "json")) {
+		hftest_json();
+		return;
+	}
+
+	if (memiter_iseq(&command, "run")) {
+		struct memiter suite_name;
+		struct memiter test_name;
+
+		if (!memiter_parse_str(&command_line, &suite_name)) {
+			HFTEST_LOG("Unable to parse test suite.");
+			return;
+		}
+
+		if (!memiter_parse_str(&command_line, &test_name)) {
+			HFTEST_LOG("Unable to parse test.");
+			return;
+		}
+		hftest_run(suite_name, test_name, fdt);
+		return;
+	}
+
+	hftest_help();
+}
+
 static uintptr_t vcpu_index_to_id(size_t index)
 {
 	/* For now we use indices as IDs for vCPUs. */

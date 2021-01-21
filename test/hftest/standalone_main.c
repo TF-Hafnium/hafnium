@@ -25,8 +25,6 @@ void kmain(const void *fdt_ptr)
 {
 	struct fdt fdt;
 	size_t fdt_len;
-	struct memiter command_line;
-	struct memiter command;
 
 	/*
 	 * Initialize the stage-1 MMU and identity-map the entire address space.
@@ -50,44 +48,7 @@ void kmain(const void *fdt_ptr)
 		goto out;
 	}
 
-	if (!hftest_ctrl_start(&fdt, &command_line)) {
-		HFTEST_LOG("Unable to read the command line.");
-		goto out;
-	}
-
-	if (!memiter_parse_str(&command_line, &command)) {
-		HFTEST_LOG("Unable to parse command.");
-		goto out;
-	}
-
-	if (memiter_iseq(&command, "exit")) {
-		hftest_device_exit_test_environment();
-		goto out;
-	}
-
-	if (memiter_iseq(&command, "json")) {
-		hftest_json();
-		goto out;
-	}
-
-	if (memiter_iseq(&command, "run")) {
-		struct memiter suite_name;
-		struct memiter test_name;
-
-		if (!memiter_parse_str(&command_line, &suite_name)) {
-			HFTEST_LOG("Unable to parse test suite.");
-			goto out;
-		}
-
-		if (!memiter_parse_str(&command_line, &test_name)) {
-			HFTEST_LOG("Unable to parse test.");
-			goto out;
-		}
-		hftest_run(suite_name, test_name, &fdt);
-		goto out;
-	}
-
-	hftest_help();
+	hftest_command(&fdt);
 
 out:
 	hftest_ctrl_finish();
