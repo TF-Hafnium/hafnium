@@ -167,3 +167,7 @@ uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id)
 
 	return 0;
 }
+
+void arch_mm_sync_table_writes(void)
+{
+}

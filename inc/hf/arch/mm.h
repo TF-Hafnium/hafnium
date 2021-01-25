@@ -161,3 +161,9 @@ bool arch_mm_init(paddr_t table);
  * Return the arch specific mm mode for send/recv pages of given VM ID.
  */
 uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id);
+
+/**
+ * Execute any barriers or synchronization that is required
+ * by a given architecture, after page table writes.
+ */
+void arch_mm_sync_table_writes(void);

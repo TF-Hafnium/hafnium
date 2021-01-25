@@ -268,8 +268,7 @@ static void mm_replace_entry(ptable_addr_t begin, pte_t *pte, pte_t new_pte,
 	 * present and the TLB is being invalidated.
 	 */
 	if (((flags & MM_FLAG_STAGE1) || mm_stage2_invalidate) &&
-	    arch_mm_pte_is_valid(v, level) &&
-	    arch_mm_pte_is_valid(new_pte, level)) {
+	    arch_mm_pte_is_valid(v, level)) {
 		*pte = arch_mm_absent_pte(level);
 		mm_invalidate_tlb(begin, begin + mm_entry_size(level), flags);
 	}
@@ -472,11 +471,12 @@ static bool mm_ptable_identity_map(struct mm_ptable *t, paddr_t pa_begin,
 		return false;
 	}
 
-	/* Invalidate the TLB. */
-	if ((flags & MM_FLAG_COMMIT) &&
-	    ((flags & MM_FLAG_STAGE1) || mm_stage2_invalidate)) {
-		mm_invalidate_tlb(begin, end, flags);
-	}
+	/*
+	 * All TLB invalidations must be complete already if any entries were
+	 * replaced by mm_replace_entry. Sync all page table writes so that code
+	 * following this can use them.
+	 */
+	arch_mm_sync_table_writes();
 
 	return true;
 }
@@ -587,14 +587,9 @@ static void mm_ptable_dump(struct mm_ptable *t, int flags)
 
 /**
  * Given the table PTE entries all have identical attributes, returns the single
- * entry with which it can be replaced. Note that the table PTE will no longer
- * be valid after calling this function as the table may have been freed.
- *
- * If the table is freed, the memory is freed directly rather than calling
- * `mm_free_page_pte()` as it is known to not have subtables.
+ * entry with which it can be replaced.
  */
-static pte_t mm_merge_table_pte(pte_t table_pte, uint8_t level,
-				struct mpool *ppool)
+static pte_t mm_merge_table_pte(pte_t table_pte, uint8_t level)
 {
 	struct mm_page_table *table;
 	uint64_t block_attrs;
@@ -605,8 +600,6 @@ static pte_t mm_merge_table_pte(pte_t table_pte, uint8_t level,
 	table = mm_page_table_from_pa(arch_mm_table_from_pte(table_pte, level));
 
 	if (!arch_mm_pte_is_present(table->entries[0], level - 1)) {
-		/* Free the table and return an absent entry. */
-		mpool_free(ppool, table);
 		return arch_mm_absent_pte(level);
 	}
 
@@ -622,8 +615,6 @@ static pte_t mm_merge_table_pte(pte_t table_pte, uint8_t level,
 		arch_mm_combine_table_entry_attrs(table_attrs, block_attrs);
 	block_address = arch_mm_block_from_pte(table->entries[0], level - 1);
 
-	/* Free the table and return a block. */
-	mpool_free(ppool, table);
 	return arch_mm_block_pte(level, block_address, combined_attrs);
 }
 
@@ -631,25 +622,29 @@ static pte_t mm_merge_table_pte(pte_t table_pte, uint8_t level,
  * Defragments the given PTE by recursively replacing any tables with blocks or
  * absent entries where possible.
  */
-static pte_t mm_ptable_defrag_entry(pte_t entry, uint8_t level,
-				    struct mpool *ppool)
+static void mm_ptable_defrag_entry(ptable_addr_t base_addr, pte_t *entry,
+				   uint8_t level, int flags,
+				   struct mpool *ppool)
 {
 	struct mm_page_table *table;
 	uint64_t i;
 	bool mergeable;
 	bool base_present;
 	uint64_t base_attrs;
+	pte_t new_entry;
 
-	if (!arch_mm_pte_is_table(entry, level)) {
-		return entry;
+	if (!arch_mm_pte_is_table(*entry, level)) {
+		return;
 	}
 
-	table = mm_page_table_from_pa(arch_mm_table_from_pte(entry, level));
+	table = mm_page_table_from_pa(arch_mm_table_from_pte(*entry, level));
 
 	/* Defrag the first entry in the table and use it as the base entry. */
 	static_assert(MM_PTE_PER_PAGE >= 1, "There must be at least one PTE.");
-	table->entries[0] =
-		mm_ptable_defrag_entry(table->entries[0], level - 1, ppool);
+
+	mm_ptable_defrag_entry(base_addr, &(table->entries[0]), level - 1,
+			       flags, ppool);
+
 	base_present = arch_mm_pte_is_present(table->entries[0], level - 1);
 	base_attrs = arch_mm_pte_attrs(table->entries[0], level - 1);
 
@@ -662,9 +657,12 @@ static pte_t mm_ptable_defrag_entry(pte_t entry, uint8_t level,
 	mergeable = true;
 	for (i = 1; i < MM_PTE_PER_PAGE; ++i) {
 		bool present;
+		ptable_addr_t block_addr =
+			base_addr + (i * mm_entry_size(level - 1));
 
-		table->entries[i] = mm_ptable_defrag_entry(table->entries[i],
-							   level - 1, ppool);
+		mm_ptable_defrag_entry(block_addr, &(table->entries[i]),
+				       level - 1, flags, ppool);
+
 		present = arch_mm_pte_is_present(table->entries[i], level - 1);
 
 		if (present != base_present) {
@@ -688,11 +686,15 @@ static pte_t mm_ptable_defrag_entry(pte_t entry, uint8_t level,
 		}
 	}
 
-	if (mergeable) {
-		return mm_merge_table_pte(entry, level, ppool);
+	if (!mergeable) {
+		return;
 	}
 
-	return entry;
+	new_entry = mm_merge_table_pte(*entry, level);
+	if (*entry != new_entry) {
+		mm_replace_entry(base_addr, entry, new_entry, level, flags,
+				 ppool);
+	}
 }
 
 /**
@@ -707,6 +709,7 @@ static void mm_ptable_defrag(struct mm_ptable *t, int flags,
 	uint8_t root_table_count = mm_root_table_count(flags);
 	uint8_t i;
 	uint64_t j;
+	ptable_addr_t block_addr = 0;
 
 	/*
 	 * Loop through each entry in the table. If it points to another table,
@@ -714,10 +717,15 @@ static void mm_ptable_defrag(struct mm_ptable *t, int flags,
 	 */
 	for (i = 0; i < root_table_count; ++i) {
 		for (j = 0; j < MM_PTE_PER_PAGE; ++j) {
-			tables[i].entries[j] = mm_ptable_defrag_entry(
-				tables[i].entries[j], level, ppool);
+			mm_ptable_defrag_entry(block_addr,
+					       &(tables[i].entries[j]), level,
+					       flags, ppool);
+			block_addr = mm_start_of_next_block(
+				block_addr, mm_entry_size(level));
 		}
 	}
+
+	arch_mm_sync_table_writes();
 }
 
 /**

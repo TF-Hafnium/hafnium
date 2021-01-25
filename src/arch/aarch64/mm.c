@@ -269,6 +269,18 @@ uint64_t arch_mm_pte_attrs(pte_t pte, uint8_t level)
 }
 
 /**
+ * Execute any barriers or synchronization that is required
+ * by a given architecture, after page table writes.
+ */
+void arch_mm_sync_table_writes(void)
+{
+	/*
+	 * Ensure visibility of table updates to translation table walks.
+	 */
+	dsb(ish);
+}
+
+/**
  * Invalidates stage-1 TLB entries referring to the given virtual address range.
  */
 void arch_mm_invalidate_stage1_range(vaddr_t va_begin, vaddr_t va_end)
@@ -278,7 +290,7 @@ void arch_mm_invalidate_stage1_range(vaddr_t va_begin, vaddr_t va_end)
 	uintvaddr_t it;
 
 	/* Sync with page table updates. */
-	dsb(ishst);
+	arch_mm_sync_table_writes();
 
 	/*
 	 * Revisions prior to Armv8.4 do not support invalidating a range of
@@ -325,7 +337,7 @@ void arch_mm_invalidate_stage2_range(ipaddr_t va_begin, ipaddr_t va_end)
 	/* TODO: This only applies to the current VMID. */
 
 	/* Sync with page table updates. */
-	dsb(ishst);
+	arch_mm_sync_table_writes();
 
 	/*
 	 * Revisions prior to Armv8.4 do not support invalidating a range of
