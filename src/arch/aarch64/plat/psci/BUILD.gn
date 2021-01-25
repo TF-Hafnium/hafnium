@@ -4,8 +4,18 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/BSD-3-Clause.
 
-source_set("absent") {
+import("//build/toolchain/platform.gni")
+
+source_set("hypervisor") {
+  public_configs = [ "//src/arch/${plat_arch}:config" ]
   sources = [
-    "absent.c",
+    "hypervisor.c",
+  ]
+}
+
+source_set("spmc") {
+  public_configs = [ "//src/arch/${plat_arch}:config" ]
+  sources = [
+    "spmc.c",
   ]
 }

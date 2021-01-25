@@ -6,7 +6,7 @@
 
 declare_args() {
   # PSCI hooks to be used for the platform, specified as build target.
-  plat_psci = "//src/arch/aarch64/plat/psci:absent"
+  plat_psci = "//src/arch/aarch64/plat/psci:hypervisor"
 
   # SMC hooks to be used for the platform, specified as build target.
   plat_smc = "//src/arch/aarch64/plat/smc:absent"

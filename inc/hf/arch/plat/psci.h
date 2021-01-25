@@ -11,6 +11,16 @@
 #include "hf/vcpu.h"
 
 /**
+ * Returns the platform specific PSCI version value.
+ */
+uint32_t plat_psci_version_get(void);
+
+/**
+ * Called once at boot time to initialize the platform power management module.
+ */
+void plat_psci_init(void);
+
+/**
  * Called before the PSCI_CPU_SUSPEND SMC is forwarded. The power state is
  * provided to allow actions to be taken based on the implementation defined
  * meaning of this field.

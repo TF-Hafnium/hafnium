@@ -21,35 +21,13 @@
 #include "hf/vm.h"
 
 #include "psci.h"
-#include "smc.h"
-
-static uint32_t el3_psci_version;
 
 void cpu_entry(struct cpu *c);
 
 /* Performs arch specific boot time initialisation. */
 void arch_one_time_init(void)
 {
-	struct ffa_value smc_res =
-		smc32(PSCI_VERSION, 0, 0, 0, 0, 0, 0, SMCCC_CALLER_HYPERVISOR);
-
-	el3_psci_version = smc_res.func;
-
-	/* Check there's nothing unexpected about PSCI. */
-	switch (el3_psci_version) {
-	case PSCI_VERSION_0_2:
-	case PSCI_VERSION_1_0:
-	case PSCI_VERSION_1_1:
-		/* Supported EL3 PSCI version. */
-		dlog_info("Found PSCI version: %#x\n", el3_psci_version);
-		break;
-
-	default:
-		/* Unsupported EL3 PSCI version. Log a warning but continue. */
-		dlog_warning("Unknown PSCI version: %#x\n", el3_psci_version);
-		el3_psci_version = 0;
-		break;
-	}
+	plat_psci_init();
 }
 
 /**
@@ -75,7 +53,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 	 * This blocks more calls than just PSCI so it may need to be made more
 	 * lenient in future.
 	 */
-	if (el3_psci_version == 0) {
+	if (plat_psci_version_get() == 0) {
 		*ret = SMCCC_ERROR_UNKNOWN;
 		return (func & SMCCC_SERVICE_CALL_MASK) ==
 		       SMCCC_STANDARD_SECURE_SERVICE_CALL;
@@ -89,7 +67,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 	case PSCI_FEATURES:
 		switch (arg0 & ~SMCCC_CONVENTION_MASK) {
 		case PSCI_CPU_SUSPEND:
-			if (el3_psci_version == PSCI_VERSION_0_2) {
+			if (plat_psci_version_get() == PSCI_VERSION_0_2) {
 				/*
 				 * PSCI 0.2 doesn't support PSCI_FEATURES so
 				 * report PSCI 0.2 compatible features.
