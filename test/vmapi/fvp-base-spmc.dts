@@ -1,0 +1,75 @@
+/*
+ * Copyright 2020 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "arm,ffa-core-manifest-1.0";
+	#address-cells = <2>;
+	#size-cells = <1>;
+
+	attribute {
+		spmc_id = <0x8000>;
+		maj_ver = <0x1>;
+		min_ver = <0x0>;
+		exec_state = <0x0>;
+		load_address = <0x0 0x6000000>;
+		entrypoint = <0x0 0x6000000>;
+		binary_size = <0x80000>;
+	};
+
+	cpus {
+		#address-cells = <0x02>;
+		#size-cells = <0x00>;
+
+		cpu@0 {
+			device_type = "cpu";
+			reg = <0x00 0x00>;
+		};
+
+		cpu@103 {
+			device_type = "cpu";
+			reg = <0x00 0x10300>;
+		};
+
+		cpu@102 {
+			device_type = "cpu";
+			reg = <0x00 0x10200>;
+		};
+
+		cpu@101 {
+			device_type = "cpu";
+			reg = <0x00 0x10100>;
+		};
+
+		cpu@100 {
+			device_type = "cpu";
+			reg = <0x00 0x10000>;
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			reg = <0x00 0x300>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			reg = <0x00 0x200>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			reg = <0x00 0x100>;
+		};
+	};
+
+	memory@6000000 {
+		device_type = "memory";
+		reg = <0x0 0x6000000 0x2000000>;
+	};
+};
