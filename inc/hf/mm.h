@@ -101,6 +101,12 @@ ptable_addr_t mm_ptable_addr_space_end(int flags);
 
 bool mm_vm_init(struct mm_ptable *t, struct mpool *ppool);
 void mm_vm_fini(struct mm_ptable *t, struct mpool *ppool);
+
+bool mm_identity_prepare(struct mm_ptable *t, paddr_t begin, paddr_t end,
+			 uint32_t mode, struct mpool *ppool);
+void *mm_identity_commit(struct mm_ptable *t, paddr_t begin, paddr_t end,
+			 uint32_t mode, struct mpool *ppool);
+
 bool mm_vm_identity_map(struct mm_ptable *t, paddr_t begin, paddr_t end,
 			uint32_t mode, struct mpool *ppool, ipaddr_t *ipa);
 bool mm_vm_identity_prepare(struct mm_ptable *t, paddr_t begin, paddr_t end,

@@ -850,6 +850,39 @@ static int mm_mode_to_flags(uint32_t mode)
 /**
  * See `mm_ptable_identity_prepare`.
  *
+ * This must be called before `mm_identity_commit` for the same mapping.
+ *
+ * Returns true on success, or false if the update would fail.
+ */
+bool mm_identity_prepare(struct mm_ptable *t, paddr_t begin, paddr_t end,
+			 uint32_t mode, struct mpool *ppool)
+{
+	int flags = MM_FLAG_STAGE1 | mm_mode_to_flags(mode);
+
+	return mm_ptable_identity_prepare(t, begin, end,
+					  arch_mm_mode_to_stage1_attrs(mode),
+					  flags, ppool);
+}
+
+/**
+ * See `mm_ptable_identity_commit`.
+ *
+ * `mm_identity_prepare` must be called before this for the same mapping.
+ */
+void *mm_identity_commit(struct mm_ptable *t, paddr_t begin, paddr_t end,
+			 uint32_t mode, struct mpool *ppool)
+{
+	int flags = MM_FLAG_STAGE1 | mm_mode_to_flags(mode);
+
+	mm_ptable_identity_commit(t, begin, end,
+				  arch_mm_mode_to_stage1_attrs(mode), flags,
+				  ppool);
+	return ptr_from_va(va_from_pa(begin));
+}
+
+/**
+ * See `mm_ptable_identity_prepare`.
+ *
  * This must be called before `mm_vm_identity_commit` for the same mapping.
  *
  * Returns true on success, or false if the update would fail.
