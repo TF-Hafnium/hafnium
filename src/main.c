@@ -26,10 +26,8 @@ struct vcpu *cpu_main(struct cpu *c)
 
 	vcpu->cpu = c;
 
-	arch_cpu_init();
-
 	/* Reset the registers to give a clean start for vCPU. */
-	arch_regs_reset(vcpu);
+	vcpu_reset(vcpu);
 
 	return vcpu;
 }

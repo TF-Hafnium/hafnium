@@ -53,4 +53,4 @@ struct ffa_value arch_regs_get_args(struct arch_regs *regs);
 /**
  * Initialize and reset CPU-wide register values.
  */
-void arch_cpu_init(void);
+void arch_cpu_init(struct cpu *c, ipaddr_t entry_point);

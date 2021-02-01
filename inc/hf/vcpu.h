@@ -113,3 +113,4 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 			    struct vcpu_fault_info *f);
 
 struct vcpu *vcpu_get_other_world_counterpart(struct vcpu *current);
+void vcpu_reset(struct vcpu *vcpu);

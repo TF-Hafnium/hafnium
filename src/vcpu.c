@@ -8,6 +8,8 @@
 
 #include "hf/vcpu.h"
 
+#include "hf/arch/cpu.h"
+
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/std.h"
@@ -192,4 +194,12 @@ struct vcpu *vcpu_get_other_world_counterpart(struct vcpu *current)
 	ffa_vcpu_index_t current_cpu_index = cpu_index(current->cpu);
 
 	return vm_get_vcpu(vm, current_cpu_index);
+}
+
+void vcpu_reset(struct vcpu *vcpu)
+{
+	arch_cpu_init(vcpu->cpu, ipa_init(0));
+
+	/* Reset the registers to give a clean start for vCPU. */
+	arch_regs_reset(vcpu);
 }
