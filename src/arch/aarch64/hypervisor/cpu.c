@@ -158,7 +158,7 @@ struct ffa_value arch_regs_get_args(struct arch_regs *regs)
 
 void arch_cpu_init(void)
 {
-	plat_psci_cpu_resume();
+	plat_psci_cpu_resume(NULL, ipa_init(0));
 
 	/*
 	 * Linux expects LORegions to be disabled, hence if the current system

@@ -33,6 +33,8 @@ void plat_psci_cpu_suspend(uint32_t power_state)
 	(void)power_state;
 }
 
-void plat_psci_cpu_resume(void)
+void plat_psci_cpu_resume(struct cpu *c, ipaddr_t entry_point)
 {
+	(void)c;
+	(void)entry_point;
 }

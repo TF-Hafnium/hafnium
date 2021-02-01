@@ -28,4 +28,4 @@ void plat_psci_init(void);
 void plat_psci_cpu_suspend(uint32_t power_state);
 
 /** Called when a CPU resumes from being off or suspended. */
-void plat_psci_cpu_resume(void);
+void plat_psci_cpu_resume(struct cpu *c, ipaddr_t entry_point);
