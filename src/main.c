@@ -15,14 +15,16 @@
  */
 struct vcpu *cpu_main(struct cpu *c)
 {
+	struct vm *first_boot;
 	struct vcpu *vcpu;
-#if SECURE_WORLD == 1
-	struct vm *first_boot = vm_get_first_boot();
+
+	/*
+	 * This returns the PVM in the normal world and the first
+	 * booted Secure Partition in the secure world.
+	 */
+	first_boot = vm_get_first_boot();
 
 	vcpu = vm_get_vcpu(first_boot, cpu_index(c));
-#else
-	vcpu = vm_get_vcpu(vm_find(HF_PRIMARY_VM_ID), cpu_index(c));
-#endif
 
 	vcpu->cpu = c;
 

@@ -139,7 +139,8 @@ bool cpu_on(struct cpu *c, ipaddr_t entry, uintreg_t arg)
 	sl_unlock(&c->lock);
 
 	if (!prev) {
-		struct vm *vm = vm_find(HF_PRIMARY_VM_ID);
+		/* This returns the first booted VM (e.g. primary in the NWd) */
+		struct vm *vm = vm_get_first_boot();
 		struct vcpu *vcpu = vm_get_vcpu(vm, cpu_index(c));
 		struct vcpu_locked vcpu_locked;
 
