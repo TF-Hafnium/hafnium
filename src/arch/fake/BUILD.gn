@@ -9,6 +9,7 @@ config("arch_config") {
 
 source_set("arch") {
   sources = [
+    "cache.c",
     "mm.c",
     "timer.c",
   ]
