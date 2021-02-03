@@ -9,6 +9,7 @@
 #include "hf/api.h"
 
 #include "hf/arch/cpu.h"
+#include "hf/arch/ffa.h"
 #include "hf/arch/ffa_memory_handle.h"
 #include "hf/arch/mm.h"
 #include "hf/arch/other_world.h"
@@ -433,6 +434,24 @@ struct ffa_value api_ffa_id_get(const struct vcpu *current)
 {
 	return (struct ffa_value){.func = FFA_SUCCESS_32,
 				  .arg2 = current->vm->id};
+}
+
+/**
+ * Returns the ID of the SPMC.
+ */
+struct ffa_value api_ffa_spm_id_get(void)
+{
+	struct ffa_value ret = ffa_error(FFA_NOT_SUPPORTED);
+
+	if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED) {
+		/*
+		 * Return the SPMC ID that was fetched during FF-A
+		 * initialization.
+		 */
+		ret = (struct ffa_value){.func = FFA_SUCCESS_32,
+					 .arg2 = arch_ffa_spmc_id_get()};
+	}
+	return ret;
 }
 
 /**
@@ -1692,6 +1711,11 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
+	/* FF-A v1.1 features. */
+	case FFA_SPM_ID_GET_32:
+		if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED) {
+			return (struct ffa_value){.func = FFA_SUCCESS_32};
+		}
 	default:
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}

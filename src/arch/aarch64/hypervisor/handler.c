@@ -473,6 +473,9 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_ID_GET_32:
 		*args = api_ffa_id_get(current);
 		return true;
+	case FFA_SPM_ID_GET_32:
+		*args = api_ffa_spm_id_get();
+		return true;
 	case FFA_FEATURES_32:
 		*args = api_ffa_features(args->arg1);
 		return true;

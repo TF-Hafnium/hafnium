@@ -56,6 +56,7 @@ struct ffa_value api_ffa_version(uint32_t requested_version);
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					    const struct ffa_uuid *uuid);
 struct ffa_value api_ffa_id_get(const struct vcpu *current);
+struct ffa_value api_ffa_spm_id_get(void);
 struct ffa_value api_ffa_features(uint32_t function_id);
 struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 			     const struct vcpu *current, struct vcpu **next);
