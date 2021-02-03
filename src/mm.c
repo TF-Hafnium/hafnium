@@ -202,7 +202,8 @@ ptable_addr_t mm_ptable_addr_space_end(int flags)
 /**
  * Initialises the given page table.
  */
-bool mm_ptable_init(struct mm_ptable *t, int flags, struct mpool *ppool)
+bool mm_ptable_init(struct mm_ptable *t, uint16_t id, int flags,
+		    struct mpool *ppool)
 {
 	uint8_t i;
 	size_t j;
@@ -226,7 +227,7 @@ bool mm_ptable_init(struct mm_ptable *t, int flags, struct mpool *ppool)
 	 * enabled?
 	 */
 	t->root = pa_init((uintpaddr_t)tables);
-
+	t->id = id;
 	return true;
 }
 
@@ -824,9 +825,9 @@ static bool mm_vm_get_attrs(struct mm_ptable *t, ptable_addr_t begin,
 	return got_attrs;
 }
 
-bool mm_vm_init(struct mm_ptable *t, struct mpool *ppool)
+bool mm_vm_init(struct mm_ptable *t, uint16_t id, struct mpool *ppool)
 {
-	return mm_ptable_init(t, 0, ppool);
+	return mm_ptable_init(t, id, 0, ppool);
 }
 
 void mm_vm_fini(struct mm_ptable *t, struct mpool *ppool)
@@ -1064,7 +1065,8 @@ bool mm_init(struct mpool *ppool)
 	dlog_info("data: %#x - %#x\n", pa_addr(layout_data_begin()),
 		  pa_addr(layout_data_end()));
 
-	if (!mm_ptable_init(&ptable, MM_FLAG_STAGE1, ppool)) {
+	/* ASID 0 is reserved for use by the hypervisor. */
+	if (!mm_ptable_init(&ptable, 0, MM_FLAG_STAGE1, ppool)) {
 		dlog_error("Unable to allocate memory for page table.\n");
 		return false;
 	}

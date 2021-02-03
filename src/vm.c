@@ -52,7 +52,7 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 	atomic_init(&vm->aborting, false);
 	vm->el0_partition = el0_partition;
 
-	if (!mm_vm_init(&vm->ptable, ppool)) {
+	if (!mm_vm_init(&vm->ptable, id, ppool)) {
 		return NULL;
 	}
 

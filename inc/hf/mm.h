@@ -82,6 +82,11 @@ static_assert(alignof(struct mm_page_table) == PAGE_SIZE,
 	      "A page table must be page aligned.");
 
 struct mm_ptable {
+	/**
+	 * VMID/ASID associated with a page table. ASID 0 is reserved for use by
+	 * the hypervisor.
+	 */
+	uint16_t id;
 	/** Address of the root of the page table. */
 	paddr_t root;
 };
@@ -96,10 +101,11 @@ struct mm_stage1_locked {
 
 void mm_vm_enable_invalidation(void);
 
-bool mm_ptable_init(struct mm_ptable *t, int flags, struct mpool *ppool);
+bool mm_ptable_init(struct mm_ptable *t, uint16_t id, int flags,
+		    struct mpool *ppool);
 ptable_addr_t mm_ptable_addr_space_end(int flags);
 
-bool mm_vm_init(struct mm_ptable *t, struct mpool *ppool);
+bool mm_vm_init(struct mm_ptable *t, uint16_t id, struct mpool *ppool);
 void mm_vm_fini(struct mm_ptable *t, struct mpool *ppool);
 
 bool mm_identity_prepare(struct mm_ptable *t, paddr_t begin, paddr_t end,

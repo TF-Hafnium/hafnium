@@ -68,7 +68,7 @@ TEST_F(vm, vm_unmap_hypervisor_not_mapped)
 
 	EXPECT_TRUE(vm_init_next(1, &ppool, &vm, false));
 	vm_locked = vm_lock(vm);
-	ASSERT_TRUE(mm_vm_init(&vm->ptable, &ppool));
+	ASSERT_TRUE(mm_vm_init(&vm->ptable, vm->id, &ppool));
 	EXPECT_TRUE(vm_unmap_hypervisor(vm_locked, &ppool));
 	EXPECT_THAT(
 		mm_test::get_ptable(vm->ptable),

@@ -48,7 +48,7 @@ bool hftest_mm_init(void)
 		HFTEST_FAIL(true, "Failed to add buffer to page-table pool.");
 	}
 
-	if (!mm_ptable_init(&ptable, MM_FLAG_STAGE1, &ppool)) {
+	if (!mm_ptable_init(&ptable, 0, MM_FLAG_STAGE1, &ppool)) {
 		HFTEST_FAIL(true, "Unable to allocate memory for page table.");
 	}
 
