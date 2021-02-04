@@ -285,7 +285,8 @@ void arch_mm_sync_table_writes(void)
 /**
  * Invalidates stage-1 TLB entries referring to the given virtual address range.
  */
-void arch_mm_invalidate_stage1_range(vaddr_t va_begin, vaddr_t va_end)
+void arch_mm_invalidate_stage1_range(uint16_t asid, vaddr_t va_begin,
+				     vaddr_t va_end)
 {
 	uintvaddr_t begin = va_addr(va_begin);
 	uintvaddr_t end = va_addr(va_end);
@@ -311,6 +312,15 @@ void arch_mm_invalidate_stage1_range(vaddr_t va_begin, vaddr_t va_end)
 		/* Invalidate stage-1 TLB, one page from the range at a time. */
 		for (it = begin; it < end;
 		     it += (UINT64_C(1) << (PAGE_BITS - 12))) {
+			/*
+			 * Mask upper 8 bits of asid passed in. Hafnium on
+			 * aarch64 currently only uses 8 bit asids.TCR_EL2.AS is
+			 * set to 0 on implementations which support 16 bit
+			 * asids and is res0 on implementations that dont
+			 * support 16 bit asids.
+			 */
+			asid &= 0xff;
+			it |= (uint64_t)asid << 48;
 			if (VM_TOOLCHAIN == 1) {
 				tlbi_reg(vae1is, it);
 			} else {
@@ -330,11 +340,14 @@ void arch_mm_invalidate_stage1_range(vaddr_t va_begin, vaddr_t va_end)
  * Invalidates stage-2 TLB entries referring to the given intermediate physical
  * address range.
  */
-void arch_mm_invalidate_stage2_range(ipaddr_t va_begin, ipaddr_t va_end)
+void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
+				     ipaddr_t va_end)
 {
 	uintpaddr_t begin = ipa_addr(va_begin);
 	uintpaddr_t end = ipa_addr(va_end);
 	uintpaddr_t it;
+
+	(void)vmid;
 
 	/* TODO: This only applies to the current VMID. */
 
