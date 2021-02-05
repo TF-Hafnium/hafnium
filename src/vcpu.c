@@ -184,18 +184,6 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 	return resume;
 }
 
-/**
- * Return the vCPU corresponding to the other world vCPU whose index
- * matches current vCPU index.
- */
-struct vcpu *vcpu_get_other_world_counterpart(struct vcpu *current)
-{
-	struct vm *vm = vm_find(HF_OTHER_WORLD_ID);
-	ffa_vcpu_index_t current_cpu_index = cpu_index(current->cpu);
-
-	return vm_get_vcpu(vm, current_cpu_index);
-}
-
 void vcpu_reset(struct vcpu *vcpu)
 {
 	arch_cpu_init(vcpu->cpu, ipa_init(0));

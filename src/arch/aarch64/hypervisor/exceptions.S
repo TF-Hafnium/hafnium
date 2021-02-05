@@ -7,6 +7,9 @@
  */
 
 #include "hf/arch/offsets.h"
+
+#include "hf/arch/vmid_base.h"
+
 #include "msr.h"
 #include "exception_macros.S"
 
@@ -323,6 +326,60 @@ vcpu_switch:
 	mov x0, x1
 	bl complete_saving_state
 	mov x0, x19
+
+#if SECURE_WORLD == 1
+
+	ldr x1, [x0, #VCPU_VM]
+	ldrh w1, [x1, #VM_ID]
+
+	/* Exit to normal world if VM is HF_OTHER_WORLD_ID. */
+	cmp w1, #HF_OTHER_WORLD_ID
+	bne vcpu_restore_all_and_run
+
+	/*
+	 * The current vCPU state is saved so it's now safe to switch to the
+	 * normal world.
+	 */
+
+other_world_loop:
+	/*
+	 * Prepare arguments from other world VM vCPU.
+	 * x19 holds the other world VM vCPU pointer.
+	 */
+	ldp x0, x1, [x19, #VCPU_REGS + 8 * 0]
+	ldp x2, x3, [x19, #VCPU_REGS + 8 * 2]
+	ldp x4, x5, [x19, #VCPU_REGS + 8 * 4]
+	ldp x6, x7, [x19, #VCPU_REGS + 8 * 6]
+
+	smc #0
+
+	/*
+	 * The call to EL3 returned, First eight GP registers contain an FF-A
+	 * call from the physical FF-A instance. Save those arguments to the
+	 * other world VM vCPU.
+	 * x19 is restored with the other world VM vCPU pointer.
+	 */
+	stp x0, x1, [x19, #VCPU_REGS + 8 * 0]
+	stp x2, x3, [x19, #VCPU_REGS + 8 * 2]
+	stp x4, x5, [x19, #VCPU_REGS + 8 * 4]
+	stp x6, x7, [x19, #VCPU_REGS + 8 * 6]
+
+	/*
+	 * Stack is at top and execution can restart straight into C code.
+	 * Handle the FF-A call from other world.
+	 */
+	mov x0, x19
+	bl smc_handler_from_nwd
+
+	/*
+	 * If the smc handler returns null this indicates no vCPU has to be
+	 * resumed and GP registers contain a fresh FF-A response or call
+	 * directed to the normal world. Hence loop back and emit SMC again.
+	 * Otherwise restore the vCPU pointed to by the handler return value.
+	 */
+	cbz x0, other_world_loop
+
+#endif
 
 	/* Intentional fallthrough. */
 .global vcpu_restore_all_and_run

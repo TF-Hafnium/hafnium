@@ -11,7 +11,6 @@
 #include "hf/arch/barriers.h"
 #include "hf/arch/init.h"
 #include "hf/arch/mmu.h"
-#include "hf/arch/other_world.h"
 #include "hf/arch/plat/smc.h"
 
 #include "hf/api.h"
@@ -476,63 +475,6 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	return false;
 }
 
-#if SECURE_WORLD == 1
-
-/**
- * Called to switch to the other world and handle FF-A calls from it. Returns
- * when it is ready to run a secure partition again.
- *
- * Expects that `other_world_vcpu` points to the vCPU of the 'other world VM'
- * which corresponds to this physical CPU, and that `*next` is `NULL`.
- */
-static void other_world_switch_loop(struct vcpu *other_world_vcpu,
-				    struct vcpu **next)
-{
-	struct ffa_value other_world_args =
-		arch_regs_get_args(&other_world_vcpu->regs);
-
-	CHECK(!vm_id_is_current_world(other_world_vcpu->vm->id));
-	CHECK(*next == NULL);
-
-	while (*next == NULL) {
-		/*
-		 * Either we just entered the function or the last FF-A call
-		 * from the other world was handled and next is still NULL,
-		 * which means that the result should be passed back to the
-		 * other world.
-		 */
-		other_world_args = smc_ffa_call(other_world_args);
-
-		/*
-		 * The call to EL3 returned, thus other_world_args contains an
-		 * FF-A call from the physical FF-A instance. Handle it. At this
-		 * point *next is still NULL, which means that we will return
-		 * the result of the call back to EL3 unless the API handler
-		 * sets *next to something different.
-		 */
-		if (!ffa_handler(&other_world_args, other_world_vcpu, next)) {
-			other_world_args.func = SMCCC_ERROR_UNKNOWN;
-		}
-	}
-
-	/*
-	 * ffa_handler set *next to something, which means it wants to switch
-	 * back to an SP in EL1. It must be something in this world though, as
-	 * if it wanted to return back to the other world (where the last FF-A
-	 * call came from) it wouldn't have set *next at all.
-	 */
-	CHECK(vm_id_is_current_world((*next)->vm->id));
-
-	/*
-	 * Store the return value on the other world vCPU, ready for next time
-	 * we switch to it (in case they aren't overwritten at that point by
-	 * whatever API function decides to make the switch).
-	 */
-	arch_regs_set_retval(&other_world_vcpu->regs, other_world_args);
-}
-
-#endif
-
 /**
  * Set or clear VI bit according to pending interrupts.
  */
@@ -549,9 +491,7 @@ static void update_vi(struct vcpu *next)
 		set_virtual_interrupt_current(
 			vcpu->interrupts.enabled_and_pending_count > 0);
 		sl_unlock(&vcpu->lock);
-	} else {
-		CHECK(vm_id_is_current_world(next->vm->id));
-
+	} else if (vm_id_is_current_world(next->vm->id)) {
 		/*
 		 * About to switch vCPUs, set the bit for the vCPU to which we
 		 * are switching in the saved copy of the register.
@@ -573,45 +513,16 @@ static void update_vi(struct vcpu *next)
 static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 			    struct vcpu **next)
 {
+	/* Do not expect PSCI calls emitted from within the secure world. */
+#if SECURE_WORLD == 0
 	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
 			 &vcpu->regs.r[0], next)) {
 		return true;
 	}
+#endif
 
 	if (ffa_handler(&args, vcpu, next)) {
 		arch_regs_set_retval(&vcpu->regs, args);
-
-#if SECURE_WORLD == 1
-		struct vcpu *other_world_vcpu =
-			vcpu_get_other_world_counterpart(current());
-
-		if (*next == other_world_vcpu) {
-			/*
-			 * TODO: Save non-volatile registers of current SP vCPU
-			 * before switching to normal world.
-			 * For now we rely on the SPMD in TF-A to do this at
-			 * EL3:
-			 * https://git.trustedfirmware.org/TF-A/trusted-firmware-a.git/tree/services/std_svc/spmd/spmd_main.c#n121
-			 * This requires that the CTX_INCLUDE_FP_REGS option is
-			 * enabled in the TF-A build.
-			 */
-			api_regs_state_saved(vcpu);
-
-			*next = NULL;
-			other_world_switch_loop(other_world_vcpu, next);
-
-			/*
-			 * Whatever API function has requested a switch back to
-			 * the vCPU of an SP should have set regs_available to
-			 * false already. It must also have explicitly set a
-			 * next vCPU rather than leaving it NULL, because NULL
-			 * would have meant returning to the normal world.
-			 */
-			CHECK(next != NULL);
-			CHECK(!(*next)->regs_available);
-		}
-#endif
-
 		update_vi(*next);
 		return true;
 	}
@@ -641,6 +552,35 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
 	arch_regs_set_retval(&vcpu->regs, args);
 	return NULL;
 }
+
+#if SECURE_WORLD == 1
+
+/**
+ * Called from other_world_loop return from SMC.
+ * Processes SMC calls originating from the NWd.
+ */
+struct vcpu *smc_handler_from_nwd(struct vcpu *vcpu)
+{
+	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
+	struct vcpu *next = NULL;
+
+	if (hvc_smc_handler(args, vcpu, &next)) {
+		return next;
+	}
+
+	/*
+	 * If the SMC emitted by the normal world is not handled in the secure
+	 * world then return an error stating such ABI is not supported. Only
+	 * FF-A calls are supported. We cannot return SMCCC_ERROR_UNKNOWN
+	 * directly because the SPMD smc handler would not recognize it as a
+	 * standard FF-A call returning from the SPMC.
+	 */
+	arch_regs_set_retval(&vcpu->regs, ffa_error(FFA_NOT_SUPPORTED));
+
+	return NULL;
+}
+
+#endif
 
 /*
  * Exception vector offsets.

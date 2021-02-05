@@ -74,7 +74,10 @@ struct vcpu {
 	/*
 	 * Determine whether the 'regs' field is available for use. This is set
 	 * to false when a vCPU is about to run on a physical CPU, and is set
-	 * back to true when it is descheduled.
+	 * back to true when it is descheduled. This is not relevant for the
+	 * primary VM vCPUs in the normal world (or the "other world VM" vCPUs
+	 * in the secure world) as they are pinned to physical CPUs and there
+	 * is no contention to take care of.
 	 */
 	bool regs_available;
 
@@ -112,5 +115,4 @@ bool vcpu_secondary_reset_and_start(struct vcpu *vcpu, ipaddr_t entry,
 bool vcpu_handle_page_fault(const struct vcpu *current,
 			    struct vcpu_fault_info *f);
 
-struct vcpu *vcpu_get_other_world_counterpart(struct vcpu *current);
 void vcpu_reset(struct vcpu *vcpu);
