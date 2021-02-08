@@ -96,6 +96,28 @@
 .endm
 
 /**
+ * Helper macro for SIMD vectors save/restore operations.
+ */
+.macro simd_op_vectors op reg
+	\op q0, q1, [\reg], #32
+	\op q2, q3, [\reg], #32
+	\op q4, q5, [\reg], #32
+	\op q6, q7, [\reg], #32
+	\op q8, q9, [\reg], #32
+	\op q10, q11, [\reg], #32
+	\op q12, q13, [\reg], #32
+	\op q14, q15, [\reg], #32
+	\op q16, q17, [\reg], #32
+	\op q18, q19, [\reg], #32
+	\op q20, q21, [\reg], #32
+	\op q22, q23, [\reg], #32
+	\op q24, q25, [\reg], #32
+	\op q26, q27, [\reg], #32
+	\op q28, q29, [\reg], #32
+	\op q30, q31, [\reg], #32
+.endm
+
+/**
  * The following is the exception table. A pointer to it will be stored in
  * register vbar_el2.
  */
@@ -296,25 +318,10 @@ vcpu_switch:
 	/* Save floating point registers. */
 	/* Use x28 as the base. */
 	add x28, x1, #VCPU_FREGS
-	stp q0, q1, [x28], #32
-	stp q2, q3, [x28], #32
-	stp q4, q5, [x28], #32
-	stp q6, q7, [x28], #32
-	stp q8, q9, [x28], #32
-	stp q10, q11, [x28], #32
-	stp q12, q13, [x28], #32
-	stp q14, q15, [x28], #32
-	stp q16, q17, [x28], #32
-	stp q18, q19, [x28], #32
-	stp q20, q21, [x28], #32
-	stp q22, q23, [x28], #32
-	stp q24, q25, [x28], #32
-	stp q26, q27, [x28], #32
-	stp q28, q29, [x28], #32
-	stp q30, q31, [x28], #32
+	simd_op_vectors stp, x28
 	mrs x3, fpsr
 	mrs x4, fpcr
-	stp x3, x4, [x28], #32
+	stp x3, x4, [x28]
 
 	/* Save new vCPU pointer in non-volatile register. */
 	mov x19, x0
@@ -343,9 +350,17 @@ vcpu_switch:
 
 other_world_loop:
 	/*
-	 * Prepare arguments from other world VM vCPU.
 	 * x19 holds the other world VM vCPU pointer.
 	 */
+
+	/* Restore the other world SIMD context to the other world VM vCPU. */
+	add x18, x19, #VCPU_FREGS
+	simd_op_vectors ldp, x18
+	ldp x0, x1, [x18]
+	msr fpsr, x0
+	msr fpcr, x1
+
+	/* Prepare arguments from other world VM vCPU. */
 	ldp x0, x1, [x19, #VCPU_REGS + 8 * 0]
 	ldp x2, x3, [x19, #VCPU_REGS + 8 * 2]
 	ldp x4, x5, [x19, #VCPU_REGS + 8 * 4]
@@ -363,6 +378,13 @@ other_world_loop:
 	stp x2, x3, [x19, #VCPU_REGS + 8 * 2]
 	stp x4, x5, [x19, #VCPU_REGS + 8 * 4]
 	stp x6, x7, [x19, #VCPU_REGS + 8 * 6]
+
+	/* Save the other world SIMD context to the other world VM vCPU. */
+	add x18, x19, #VCPU_FREGS
+	simd_op_vectors stp, x18
+	mrs x0, fpsr
+	mrs x1, fpcr
+	stp x0, x1, [x18]
 
 	/*
 	 * Stack is at top and execution can restart straight into C code.
@@ -394,28 +416,10 @@ vcpu_restore_all_and_run:
 
 	/*
 	 * Restore floating point registers.
-	 *
-	 * Offset is too large, so start from a new base.
 	 */
 	add x2, x0, #VCPU_FREGS
-	ldp q0, q1, [x2, #32 * 0]
-	ldp q2, q3, [x2, #32 * 1]
-	ldp q4, q5, [x2, #32 * 2]
-	ldp q6, q7, [x2, #32 * 3]
-	ldp q8, q9, [x2, #32 * 4]
-	ldp q10, q11, [x2, #32 * 5]
-	ldp q12, q13, [x2, #32 * 6]
-	ldp q14, q15, [x2, #32 * 7]
-	ldp q16, q17, [x2, #32 * 8]
-	ldp q18, q19, [x2, #32 * 9]
-	ldp q20, q21, [x2, #32 * 10]
-	ldp q22, q23, [x2, #32 * 11]
-	ldp q24, q25, [x2, #32 * 12]
-	ldp q26, q27, [x2, #32 * 13]
-	ldp q28, q29, [x2, #32 * 14]
-	/* Offset becomes too large, so move the base. */
-	ldp q30, q31, [x2, #32 * 15]!
-	ldp x3, x4, [x2, #32 * 1]
+	simd_op_vectors ldp, x2
+	ldp x3, x4, [x2]
 	msr fpsr, x3
 
 	/*
