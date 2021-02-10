@@ -62,6 +62,12 @@
 #define MM_MODE_UNOWNED UINT32_C(0x0020)
 #define MM_MODE_SHARED  UINT32_C(0x0040)
 
+/* Specifies if a mapping will be a user mapping(EL0). */
+#define MM_MODE_USER    UINT32_C(0x0200)
+
+/* Map page as non-global. */
+#define MM_MODE_NG UINT32_C(0x0100) /* non-global */
+
 /* The mask for a mode that is considered unmapped. */
 #define MM_MODE_UNMAPPED_MASK (MM_MODE_INVALID | MM_MODE_UNOWNED)
 

@@ -29,6 +29,7 @@
 #define PTE_TABLE        (UINT64_C(1) << 1)
 
 #define STAGE1_XN          (UINT64_C(1) << 54)
+#define STAGE1_UXN         (UINT64_C(1) << 54)
 #define STAGE1_PXN         (UINT64_C(1) << 53)
 #define STAGE1_CONTIGUOUS  (UINT64_C(1) << 52)
 #define STAGE1_DBM         (UINT64_C(1) << 51)
@@ -44,6 +45,7 @@
 
 #define STAGE1_READONLY  UINT64_C(2)
 #define STAGE1_READWRITE UINT64_C(0)
+#define STAGE1_AP_USER_RW UINT64_C(1)
 
 #define STAGE1_DEVICEINDX UINT64_C(0)
 #define STAGE1_NORMALINDX UINT64_C(1)
@@ -442,25 +444,45 @@ uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode)
 	}
 
 #endif
+	/*
+	 * STAGE1_XN can be XN or UXN depending on if the EL2
+	 * translation regime uses one VA range or two VA ranges(VHE).
+	 * PXN is res0 when the translation regime does not support two
+	 * VA ranges.
+	 */
+	if (mode & MM_MODE_X) {
+		if (has_vhe_support()) {
+			attrs |=
+				(mode & MM_MODE_USER) ? STAGE1_PXN : STAGE1_UXN;
+		}
 
-	/* Define the execute bits. */
-	if (!(mode & MM_MODE_X)) {
-		attrs |= STAGE1_XN;
-	}
 #if BRANCH_PROTECTION
-	else {
 		/* Mark code pages as Guarded Pages if BTI is supported. */
 		if (is_arch_feat_bti_supported()) {
 			attrs |= STAGE1_GP;
 		}
-	}
 #endif
+	} else {
+		if (has_vhe_support()) {
+			attrs |= (STAGE1_UXN | STAGE1_PXN);
+		} else {
+			attrs |= STAGE1_XN;
+		}
+	}
 
 	/* Define the read/write bits. */
 	if (mode & MM_MODE_W) {
 		attrs |= STAGE1_AP(STAGE1_READWRITE);
 	} else {
 		attrs |= STAGE1_AP(STAGE1_READONLY);
+	}
+
+	if (has_vhe_support()) {
+		attrs |= (mode & MM_MODE_USER) ? STAGE1_AP(STAGE1_AP_USER_RW)
+					       : 0;
+		if (mode & MM_MODE_NG) {
+			attrs |= STAGE1_NG;
+		}
 	}
 
 	/* Define the memory attribute bits. */
@@ -617,7 +639,12 @@ uint64_t arch_mm_combine_table_entry_attrs(uint64_t table_attrs,
 		block_attrs |= STAGE1_AP2;
 	}
 	if (table_attrs & TABLE_APTABLE0) {
-		block_attrs &= ~STAGE1_AP1;
+		/* When two VA ranges are supported, AP1 is valid */
+		if (has_vhe_support()) {
+			block_attrs |= STAGE1_AP1;
+		} else {
+			block_attrs &= ~STAGE1_AP1;
+		}
 	}
 	if (table_attrs & TABLE_XNTABLE) {
 		block_attrs |= STAGE1_XN;
