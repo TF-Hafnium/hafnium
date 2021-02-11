@@ -387,6 +387,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	bool has_fdt;
 	size_t kernel_size = 0;
 	const size_t mem_size = pa_difference(mem_begin, mem_end);
+	uint32_t map_mode;
 
 	/*
 	 * Load the kernel if a filename is specified in the VM manifest.
@@ -441,9 +442,17 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	vm_locked = vm_lock(vm);
 
-	/* Grant the VM access to the memory. */
-	if (!vm_identity_map(vm_locked, mem_begin, mem_end,
-			     MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool,
+	/*
+	 * Grant the VM access to the memory. TODO: For S-EL0 partitions,
+	 * mapping all of its memory as RWX is bad from a security standpoint.
+	 * Should just skip this and expect this to be present in the memory
+	 * regions?
+	 */
+	map_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+	if (vm->el0_partition) {
+		map_mode |= MM_MODE_USER | MM_MODE_NG;
+	}
+	if (!vm_identity_map(vm_locked, mem_begin, mem_end, map_mode, ppool,
 			     &secondary_entry)) {
 		dlog_error("Unable to initialise memory.\n");
 		ret = false;
@@ -487,11 +496,15 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 				region_begin = pa_subtract(alloc_base, size);
 				alloc_base = region_begin;
 
-				if (!vm_identity_map(
-					    vm_locked, region_begin, region_end,
-					    manifest_vm->sp.mem_regions[j]
-						    .attributes,
-					    ppool, NULL)) {
+				map_mode = manifest_vm->sp.mem_regions[j]
+						   .attributes;
+				if (vm->el0_partition) {
+					map_mode |= MM_MODE_USER | MM_MODE_NG;
+				}
+
+				if (!vm_identity_map(vm_locked, region_begin,
+						     region_end, map_mode,
+						     ppool, NULL)) {
 					dlog_error(
 						"Unable to map secondary VM "
 						"memory-region.\n");
@@ -512,11 +525,15 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 							.base_address);
 				region_end = pa_add(region_begin, size);
 
-				if (!vm_identity_map(
-					    vm_locked, region_begin, region_end,
-					    manifest_vm->sp.mem_regions[j]
-						    .attributes,
-					    ppool, NULL)) {
+				map_mode = manifest_vm->sp.mem_regions[j]
+						   .attributes;
+				if (vm->el0_partition) {
+					map_mode |= MM_MODE_USER | MM_MODE_NG;
+				}
+
+				if (!vm_identity_map(vm_locked, region_begin,
+						     region_end, map_mode,
+						     ppool, NULL)) {
 					dlog_error(
 						"Unable to map secondary VM "
 						"memory-region.\n");
@@ -547,10 +564,14 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			       PAGE_SIZE;
 			region_end = pa_add(region_begin, size);
 
-			if (!vm_identity_map(
-				    vm_locked, region_begin, region_end,
-				    manifest_vm->sp.dev_regions[j].attributes,
-				    ppool, NULL)) {
+			map_mode = manifest_vm->sp.dev_regions[j].attributes;
+			if (vm->el0_partition) {
+				map_mode |= MM_MODE_USER | MM_MODE_NG;
+			}
+
+			if (!vm_identity_map(vm_locked, region_begin,
+					     region_end, map_mode, ppool,
+					     NULL)) {
 				dlog_error(
 					"Unable to map secondary VM "
 					"device-region.\n");
@@ -571,6 +592,29 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 		secondary_entry =
 			ipa_add(secondary_entry, manifest_vm->sp.ep_offset);
+	}
+
+	/*
+	 * Map hypervisor into the VM's page table. The hypervisor pages will
+	 * not be accessible from EL0 since it will not be marked for user
+	 * access.
+	 * TODO: Map only the exception vectors and data that exception vectors
+	 * require and not the entire hypervisor. This helps with speculative
+	 * side-channel attacks.
+	 */
+	if (vm->el0_partition) {
+		CHECK(vm_identity_map(vm_locked, layout_text_begin(),
+				      layout_text_end(), MM_MODE_X, ppool,
+				      NULL));
+
+		CHECK(vm_identity_map(vm_locked, layout_rodata_begin(),
+				      layout_rodata_end(), MM_MODE_R, ppool,
+				      NULL));
+
+		CHECK(vm_identity_map(vm_locked, layout_data_begin(),
+				      layout_data_end(), MM_MODE_R | MM_MODE_W,
+				      ppool, NULL));
+		plat_console_mm_init(mm_lock_ptable_unsafe(&vm->ptable), ppool);
 	}
 
 	if (!load_common(stage1_locked, vm_locked, manifest_vm, ppool)) {

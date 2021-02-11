@@ -132,6 +132,7 @@ void mm_vm_dump(struct mm_ptable *t);
 bool mm_vm_get_mode(struct mm_ptable *t, ipaddr_t begin, ipaddr_t end,
 		    uint32_t *mode);
 
+struct mm_stage1_locked mm_lock_ptable_unsafe(struct mm_ptable *ptable);
 struct mm_stage1_locked mm_lock_stage1(void);
 void mm_unlock_stage1(struct mm_stage1_locked *lock);
 void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,

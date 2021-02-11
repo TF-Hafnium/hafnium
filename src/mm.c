@@ -1005,6 +1005,11 @@ static struct mm_stage1_locked mm_stage1_lock_unsafe(void)
 	return (struct mm_stage1_locked){.ptable = &ptable};
 }
 
+struct mm_stage1_locked mm_lock_ptable_unsafe(struct mm_ptable *ptable)
+{
+	return (struct mm_stage1_locked){.ptable = ptable};
+}
+
 struct mm_stage1_locked mm_lock_stage1(void)
 {
 	sl_lock(&ptable_lock);
