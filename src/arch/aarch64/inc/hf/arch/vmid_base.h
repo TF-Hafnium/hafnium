@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "hf/vm_ids.h"
+
 #if SECURE_WORLD == 1
 #define HF_VM_ID_BASE 0x8000
 #define HF_OTHER_WORLD_ID HF_HYPERVISOR_VM_ID
