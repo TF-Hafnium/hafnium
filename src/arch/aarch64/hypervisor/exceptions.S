@@ -823,6 +823,15 @@ enable_vhe_tge:
 	orr x1, x1, #(1 << 27)
 	msr hcr_el2, x1
 	isb
+
+	/**
+	 * Switch to host page tables(ASID 0 tables).
+	 */
+	adrp x0, arch_mm_config
+	add x0, x0, :lo12:arch_mm_config
+	ldr x0, [x0]
+	msr ttbr0_el2, x0
+	isb
 1:
 	ret
 #endif
