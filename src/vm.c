@@ -23,6 +23,15 @@ static struct vm other_world;
 static ffa_vm_count_t vm_count;
 static struct vm *first_boot_vm;
 
+static bool vm_init_mm(struct vm *vm, struct mpool *ppool)
+{
+	if (vm->el0_partition) {
+		return mm_ptable_init(&vm->ptable, vm->id, MM_FLAG_STAGE1,
+				      ppool);
+	}
+	return mm_vm_init(&vm->ptable, vm->id, ppool);
+}
+
 struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 		   struct mpool *ppool, bool el0_partition)
 {
@@ -52,7 +61,7 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 	atomic_init(&vm->aborting, false);
 	vm->el0_partition = el0_partition;
 
-	if (!mm_vm_init(&vm->ptable, id, ppool)) {
+	if (!vm_init_mm(vm, ppool)) {
 		return NULL;
 	}
 
@@ -252,6 +261,10 @@ bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			 uint32_t mode, struct mpool *ppool)
 {
+	if (vm_locked.vm->el0_partition) {
+		return mm_identity_prepare(&vm_locked.vm->ptable, begin, end,
+					   mode, ppool);
+	}
 	return mm_vm_identity_prepare(&vm_locked.vm->ptable, begin, end, mode,
 				      ppool);
 }
@@ -264,8 +277,22 @@ bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			uint32_t mode, struct mpool *ppool, ipaddr_t *ipa)
 {
-	mm_vm_identity_commit(&vm_locked.vm->ptable, begin, end, mode, ppool,
-			      ipa);
+	if (vm_locked.vm->el0_partition) {
+		mm_identity_commit(&vm_locked.vm->ptable, begin, end, mode,
+				   ppool);
+		if (ipa != NULL) {
+			/*
+			 * EL0 partitions are modeled as lightweight VM's, to
+			 * promote code reuse. The below statement returns the
+			 * mapped PA as an IPA, however, for an EL0 partition,
+			 * this is really a VA.
+			 */
+			*ipa = ipa_from_pa(begin);
+		}
+	} else {
+		mm_vm_identity_commit(&vm_locked.vm->ptable, begin, end, mode,
+				      ppool, ipa);
+	}
 	plat_iommu_identity_map(vm_locked, begin, end, mode);
 }
 
