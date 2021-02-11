@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "hf/arch/barriers.h"
 #include "hf/arch/types.h"
 
 #include "hf/cpu.h"
@@ -656,4 +657,19 @@ static inline bool has_vhe_support(void)
 #else
 	return false;
 #endif
+}
+
+static inline void vhe_switch_to_host_or_guest(bool guest)
+{
+	if (has_vhe_support()) {
+		uint64_t hcr_el2 = read_msr(hcr_el2);
+
+		if (guest) {
+			hcr_el2 &= ~HCR_EL2_TGE;
+		} else {
+			hcr_el2 |= HCR_EL2_TGE;
+		}
+		write_msr(hcr_el2, hcr_el2);
+		isb();
+	}
 }

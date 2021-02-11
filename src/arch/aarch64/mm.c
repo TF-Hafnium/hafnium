@@ -357,6 +357,16 @@ void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
 	arch_mm_sync_table_writes();
 
 	/*
+	 * Switch to guest mode when VHE is enabled. This ensures that the TLB
+	 * invalidates apply to the current VMID as opposed to the EL2&0
+	 * translation regime. Note that in the following code snippet, only
+	 * tlbi vmalle1is is affected by HCR_EL2.TGE bit. Bracketing all of the
+	 * invalidate code inside guest mode will ensure changing any code below
+	 * will apply to the guest VM as opposed to EL2&0 translation regime.
+	 */
+	vhe_switch_to_host_or_guest(true);
+
+	/*
 	 * Revisions prior to Armv8.4 do not support invalidating a range of
 	 * addresses, which means we have to loop over individual pages. If
 	 * there are too many, it is quicker to invalidate all TLB entries.
@@ -401,6 +411,8 @@ void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
 
 	/* Sync instruction fetches with TLB invalidation completion. */
 	isb();
+
+	vhe_switch_to_host_or_guest(false);
 }
 
 /**
