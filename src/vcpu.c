@@ -151,9 +151,9 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 	uint32_t mode;
 	uint32_t mask = f->mode | MM_MODE_INVALID;
 	bool resume;
+	struct vm_locked locked_vm;
 
-	sl_lock(&vm->lock);
-
+	locked_vm = vm_lock(vm);
 	/*
 	 * Check if this is a legitimate fault, i.e., if the page table doesn't
 	 * allow the access attempted by the VM.
@@ -164,11 +164,11 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 	 * anything else to recover from it. (Acquiring/releasing the lock
 	 * ensured that the invalidations have completed.)
 	 */
-	resume = mm_vm_get_mode(&vm->ptable, f->ipaddr, ipa_add(f->ipaddr, 1),
-				&mode) &&
+	resume = vm_mem_get_mode(locked_vm, f->ipaddr, ipa_add(f->ipaddr, 1),
+				 &mode) &&
 		 (mode & mask) == f->mode;
 
-	sl_unlock(&vm->lock);
+	vm_unlock(&locked_vm);
 
 	if (!resume) {
 		dlog_warning(

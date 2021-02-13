@@ -479,8 +479,7 @@ static struct ffa_value constituents_get_mode(
 			 * Ensure that this constituent memory range is all
 			 * mapped with the same mode.
 			 */
-			if (!mm_vm_get_mode(&vm.vm->ptable, begin, end,
-					    &current_mode)) {
+			if (!vm_mem_get_mode(vm, begin, end, &current_mode)) {
 				return ffa_error(FFA_DENIED);
 			}
 

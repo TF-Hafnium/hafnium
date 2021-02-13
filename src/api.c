@@ -973,8 +973,8 @@ struct ffa_value api_vm_configure_pages(
 	 * Ensure the pages are valid, owned and exclusive to the VM and that
 	 * the VM has the required access to the memory.
 	 */
-	if (!mm_vm_get_mode(&vm_locked.vm->ptable, send,
-			    ipa_add(send, PAGE_SIZE), &orig_send_mode) ||
+	if (!vm_mem_get_mode(vm_locked, send, ipa_add(send, PAGE_SIZE),
+			     &orig_send_mode) ||
 	    !api_mode_valid_owned_and_exclusive(orig_send_mode) ||
 	    (orig_send_mode & MM_MODE_R) == 0 ||
 	    (orig_send_mode & MM_MODE_W) == 0) {
@@ -982,8 +982,8 @@ struct ffa_value api_vm_configure_pages(
 		goto out;
 	}
 
-	if (!mm_vm_get_mode(&vm_locked.vm->ptable, recv,
-			    ipa_add(recv, PAGE_SIZE), &orig_recv_mode) ||
+	if (!vm_mem_get_mode(vm_locked, recv, ipa_add(recv, PAGE_SIZE),
+			     &orig_recv_mode) ||
 	    !api_mode_valid_owned_and_exclusive(orig_recv_mode) ||
 	    (orig_recv_mode & MM_MODE_R) == 0) {
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
