@@ -393,3 +393,22 @@ void vm_notifications_init_bindings(struct notifications *notifications)
 		notifications->bindings_sender_id[i] = HF_INVALID_VM_ID;
 	}
 }
+
+/**
+ * Gets the mode of the given range of ipa or va if they are mapped with the
+ * same mode.
+ *
+ * Returns true if the range is mapped with the same mode and false otherwise.
+ * The wrapper calls the appropriate mm function depending on if the partition
+ * is a vm or a el0 partition.
+ */
+bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+		     uint32_t *mode)
+{
+	if (vm_locked.vm->el0_partition) {
+		return mm_get_mode(&vm_locked.vm->ptable,
+				   va_from_pa(pa_from_ipa(begin)),
+				   va_from_pa(pa_from_ipa(end)), mode);
+	}
+	return mm_vm_get_mode(&vm_locked.vm->ptable, begin, end, mode);
+}

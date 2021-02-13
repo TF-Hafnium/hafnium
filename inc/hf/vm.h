@@ -226,3 +226,5 @@ void vm_update_boot(struct vm *vm);
 struct vm *vm_get_first_boot(void);
 
 void vm_notifications_init_bindings(struct notifications *n);
+bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+		     uint32_t *mode);
