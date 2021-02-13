@@ -99,30 +99,45 @@ void arch_regs_reset(struct vcpu *vcpu)
 		}
 	}
 
-	r->hcr_el2 = get_hcr_el2_value(vm_id);
+	r->hcr_el2 = get_hcr_el2_value(vm_id, vcpu->vm->el0_partition);
 	r->lazy.cnthctl_el2 = cnthctl;
-	r->lazy.vttbr_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
-	r->lazy.vmpidr_el2 = vcpu_id;
-	/* Mask (disable) interrupts and run in EL1h mode. */
-	r->spsr = PSR_D | PSR_A | PSR_I | PSR_F | PSR_PE_MODE_EL1H;
+	if (vcpu->vm->el0_partition) {
+		CHECK(has_vhe_support());
+		/*
+		 * AArch64 hafnium only uses 8 bit ASIDs at the moment.
+		 * TCR_EL2.AS is set to 0, and per the Arm ARM, the upper 8 bits
+		 * are ignored and treated as 0. There is no need to mask the
+		 * VMID (used as asid) to only 8 bits.
+		 */
+		r->ttbr0_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
+		r->spsr = PSR_PE_MODE_EL0T;
+	} else {
+		r->ttbr0_el2 = read_msr(ttbr0_el2);
+		r->lazy.vttbr_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
+		r->lazy.vmpidr_el2 = vcpu_id;
+		/* Mask (disable) interrupts and run in EL1h mode. */
+		r->spsr = PSR_D | PSR_A | PSR_I | PSR_F | PSR_PE_MODE_EL1H;
 
-	r->lazy.mdcr_el2 = get_mdcr_el2_value();
+		r->lazy.mdcr_el2 = get_mdcr_el2_value();
 
-	/*
-	 * NOTE: It is important that MDSCR_EL1.MDE (bit 15) is set to 0 for
-	 * secondary VMs as long as Hafnium does not support debug register
-	 * access for secondary VMs. If adding Hafnium support for secondary VM
-	 * debug register accesses, then on context switches Hafnium needs to
-	 * save/restore EL1 debug register state that either might change, or
-	 * that needs to be protected.
-	 */
-	r->lazy.mdscr_el1 = 0x0U & ~(0x1U << 15);
+		/*
+		 * NOTE: It is important that MDSCR_EL1.MDE (bit 15) is set to 0
+		 * for secondary VMs as long as Hafnium does not support debug
+		 * register access for secondary VMs. If adding Hafnium support
+		 * for secondary VM debug register accesses, then on context
+		 * switches Hafnium needs to save/restore EL1 debug register
+		 * state that either might change, or that needs to be
+		 * protected.
+		 */
+		r->lazy.mdscr_el1 = 0x0U & ~(0x1U << 15);
 
-	/* Disable cycle counting on initialization. */
-	r->lazy.pmccfiltr_el0 = perfmon_get_pmccfiltr_el0_init_value(vm_id);
+		/* Disable cycle counting on initialization. */
+		r->lazy.pmccfiltr_el0 =
+			perfmon_get_pmccfiltr_el0_init_value(vm_id);
 
-	/* Set feature-specific register values. */
-	feature_set_traps(vcpu->vm, r);
+		/* Set feature-specific register values. */
+		feature_set_traps(vcpu->vm, r);
+	}
 
 #if SECURE_WORLD == 1
 	/*

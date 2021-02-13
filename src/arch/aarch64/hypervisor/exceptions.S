@@ -805,6 +805,11 @@ vcpu_restore_volatile_and_run:
 
 	ldr x1, [x0, #VCPU_REGS + 8 * 33]
 	msr hcr_el2, x1
+	isb
+
+	ldr x1, [x0, #VCPU_REGS + 8 * 34]
+	msr ttbr0_el2, x1
+	isb
 
 	/* Restore x0..x3, which we have used as scratch before. */
 	ldp x2, x3, [x0, #VCPU_REGS + 8 * 2]

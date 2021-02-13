@@ -631,7 +631,7 @@
 #define ID_AA64MMFR1_EL1_VH_MASK UINT64_C(0xf)
 #define ID_AA64MMFR1_EL1_VH_SUPPORTED UINT64_C(0x1)
 
-uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id);
+uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id, bool is_el0_partition);
 
 uintreg_t get_mdcr_el2_value(void);
 

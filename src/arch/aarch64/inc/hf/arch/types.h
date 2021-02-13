@@ -80,6 +80,7 @@ struct arch_regs {
 	uintreg_t pc;
 	uintreg_t spsr;
 	uintreg_t hcr_el2;
+	uintreg_t ttbr0_el2;
 
 	/*
 	 * System registers.

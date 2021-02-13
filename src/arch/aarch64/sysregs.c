@@ -27,7 +27,7 @@ static bool has_ras_support(void)
  * Returns the value for HCR_EL2 for the particular VM.
  * For now, the primary VM has one value and all secondary VMs share a value.
  */
-uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id)
+uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id, bool is_el0_partition)
 {
 	uintreg_t hcr_el2_value = 0;
 
@@ -109,6 +109,9 @@ uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id)
 	/* Enable VHE, if enabled by build and if HW supports it. */
 	if (has_vhe_support()) {
 		hcr_el2_value |= HCR_EL2_E2H;
+		if (is_el0_partition) {
+			hcr_el2_value |= HCR_EL2_TGE;
+		}
 	}
 
 	return hcr_el2_value;
