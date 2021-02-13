@@ -131,6 +131,8 @@ void mm_vm_defrag(struct mm_ptable *t, struct mpool *ppool);
 void mm_vm_dump(struct mm_ptable *t);
 bool mm_vm_get_mode(struct mm_ptable *t, ipaddr_t begin, ipaddr_t end,
 		    uint32_t *mode);
+bool mm_get_mode(struct mm_ptable *t, vaddr_t begin, vaddr_t end,
+		 uint32_t *mode);
 
 struct mm_stage1_locked mm_lock_ptable_unsafe(struct mm_ptable *ptable);
 struct mm_stage1_locked mm_lock_stage1(void);

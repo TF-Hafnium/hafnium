@@ -790,17 +790,16 @@ static bool mm_ptable_get_attrs_level(struct mm_page_table *table,
 }
 
 /**
- * Gets the attributes applies to the given range of addresses in the stage-2
- * table.
+ * Gets the attributes applied to the given range of addresses in the page
+ * tables.
  *
  * The value returned in `attrs` is only valid if the function returns true.
  *
  * Returns true if the whole range has the same attributes and false otherwise.
  */
-static bool mm_vm_get_attrs(struct mm_ptable *t, ptable_addr_t begin,
-			    ptable_addr_t end, uint64_t *attrs)
+static bool mm_get_attrs(struct mm_ptable *t, ptable_addr_t begin,
+			 ptable_addr_t end, uint64_t *attrs, int flags)
 {
-	int flags = 0;
 	uint8_t max_level = mm_max_level(flags);
 	uint8_t root_level = max_level + 1;
 	size_t root_table_size = mm_entry_size(root_level);
@@ -992,9 +991,30 @@ bool mm_vm_get_mode(struct mm_ptable *t, ipaddr_t begin, ipaddr_t end,
 	uint64_t attrs;
 	bool ret;
 
-	ret = mm_vm_get_attrs(t, ipa_addr(begin), ipa_addr(end), &attrs);
+	ret = mm_get_attrs(t, ipa_addr(begin), ipa_addr(end), &attrs, 0);
 	if (ret) {
 		*mode = arch_mm_stage2_attrs_to_mode(attrs);
+	}
+
+	return ret;
+}
+
+/**
+ * Gets the mode of the given range of virtual addresses if they
+ * are mapped with the same mode.
+ *
+ * Returns true if the range is mapped with the same mode and false otherwise.
+ */
+bool mm_get_mode(struct mm_ptable *t, vaddr_t begin, vaddr_t end,
+		 uint32_t *mode)
+{
+	uint64_t attrs;
+	bool ret;
+
+	ret = mm_get_attrs(t, va_addr(begin), va_addr(end), &attrs,
+			   MM_FLAG_STAGE1);
+	if (ret) {
+		*mode = arch_mm_stage1_attrs_to_mode(attrs);
 	}
 
 	return ret;

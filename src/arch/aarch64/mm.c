@@ -70,6 +70,10 @@
 #define TABLE_XNTABLE  (UINT64_C(1) << 60)
 #define TABLE_PXNTABLE (UINT64_C(1) << 59)
 
+/* The following are stage-1 software defined attributes. */
+#define STAGE1_SW_OWNED     (UINT64_C(1) << 55)
+#define STAGE1_SW_EXCLUSIVE (UINT64_C(1) << 56)
+
 /* The following are stage-2 software defined attributes. */
 #define STAGE2_SW_OWNED     (UINT64_C(1) << 55)
 #define STAGE2_SW_EXCLUSIVE (UINT64_C(1) << 56)
@@ -504,12 +508,76 @@ uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode)
 		attrs |= STAGE1_ATTRINDX(STAGE1_NORMALINDX);
 	}
 
+	/* Define the ownership bit. */
+	if (!(mode & MM_MODE_UNOWNED)) {
+		attrs |= STAGE1_SW_OWNED;
+	}
+
+	/* Define the exclusivity bit. */
+	if (!(mode & MM_MODE_SHARED)) {
+		attrs |= STAGE1_SW_EXCLUSIVE;
+	}
+
 	/* Define the valid bit. */
 	if (!(mode & MM_MODE_INVALID)) {
 		attrs |= PTE_VALID;
 	}
 
 	return attrs;
+}
+
+uint32_t arch_mm_stage1_attrs_to_mode(uint64_t attrs)
+{
+	uint32_t mode = 0;
+
+#if SECURE_WORLD == 1
+	if (attrs & STAGE1_NS) {
+		mode |= MM_MODE_NS;
+	}
+#endif
+
+	if ((attrs & STAGE1_AP(STAGE1_READONLY)) ==
+	    STAGE1_AP(STAGE1_READONLY)) {
+		mode |= MM_MODE_R;
+	} else {
+		CHECK((attrs & STAGE1_AP(STAGE1_READWRITE)) ==
+		      STAGE1_AP(STAGE1_READWRITE));
+		mode |= MM_MODE_W | MM_MODE_R;
+	}
+
+	if (has_vhe_support() && (attrs & STAGE1_AP(STAGE1_AP_USER_RW))) {
+		mode |= MM_MODE_USER;
+	}
+
+	if (!(attrs & STAGE1_XN) || !(attrs & STAGE1_PXN)) {
+		mode |= MM_MODE_X;
+	}
+
+	if (has_vhe_support() && (attrs & STAGE1_NG)) {
+		mode |= MM_MODE_NG;
+	}
+
+	if (!((attrs & STAGE1_ATTRINDX(STAGE1_NORMALINDX)) ==
+	      STAGE1_ATTRINDX(STAGE1_NORMALINDX))) {
+		mode |= MM_MODE_D;
+	} else {
+		CHECK((attrs & STAGE1_ATTRINDX(STAGE1_NORMALINDX)) ==
+		      STAGE1_ATTRINDX(STAGE1_NORMALINDX));
+	}
+
+	if (!(attrs & STAGE1_SW_OWNED)) {
+		mode |= MM_MODE_UNOWNED;
+	}
+
+	if (!(attrs & STAGE1_SW_EXCLUSIVE)) {
+		mode |= MM_MODE_SHARED;
+	}
+
+	if (!(attrs & PTE_VALID)) {
+		mode |= MM_MODE_INVALID;
+	}
+
+	return mode;
 }
 
 uint64_t arch_mm_mode_to_stage2_attrs(uint32_t mode)

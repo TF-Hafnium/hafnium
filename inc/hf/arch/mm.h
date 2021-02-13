@@ -155,6 +155,11 @@ uint64_t arch_mm_mode_to_stage2_attrs(uint32_t mode);
 uint32_t arch_mm_stage2_attrs_to_mode(uint64_t attrs);
 
 /**
+ * Converts the stage-1 block attributes back to the corresponding mode.
+ */
+uint32_t arch_mm_stage1_attrs_to_mode(uint64_t attrs);
+
+/**
  * Initializes the arch specific memory management.
  */
 bool arch_mm_init(paddr_t table);
