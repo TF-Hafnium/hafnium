@@ -40,8 +40,9 @@ To submit a change:
     +1' comment shows up in Gerrit indicating that they have passed. If not,
     follow the links to find the errors, fix them and try again.
 11. From the Gerrit UI add one or more reviewers. Looking at who has modified
-    the same files frequently recently is usually a good way to pick a reviewer,
-    but if you're not sure then you can add hafnium@lists.trustedfirmware.org.
+    the same files frequently recently is usually a good way to pick a reviewer.
+    Add a maintainer listed in the [maintainers](docs/Maintainers.md) page, who
+    will perform a final review and eventually approve the change.
 
 ## Community Guidelines
 
