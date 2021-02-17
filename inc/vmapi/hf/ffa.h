@@ -11,9 +11,17 @@
 #include "hf/types.h"
 
 #define FFA_VERSION_MAJOR 0x1
-#define FFA_VERSION_MINOR 0x0
-
 #define FFA_VERSION_MAJOR_OFFSET 16
+#define FFA_VERSION_MAJOR_MASK 0x7FFF
+#define FFA_VERSION_MINOR 0x0
+#define FFA_VERSION_MINOR_OFFSET 0
+#define FFA_VERSION_MINOR_MASK 0xFFFF
+
+#define MAKE_FFA_VERSION(major, minor)                                    \
+	((((major)&FFA_VERSION_MAJOR_MASK) << FFA_VERSION_MAJOR_OFFSET) | \
+	 (((minor)&FFA_VERSION_MINOR_MASK) << FFA_VERSION_MINOR_OFFSET))
+#define FFA_VERSION_COMPILED \
+	MAKE_FFA_VERSION(FFA_VERSION_MAJOR, FFA_VERSION_MINOR)
 
 /* clang-format off */
 

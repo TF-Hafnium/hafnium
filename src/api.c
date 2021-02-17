@@ -1632,9 +1632,7 @@ struct ffa_value api_ffa_version(uint32_t requested_version)
 		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
 	}
 
-	return (struct ffa_value){
-		.func = (FFA_VERSION_MAJOR << FFA_VERSION_MAJOR_OFFSET) |
-			FFA_VERSION_MINOR};
+	return ((struct ffa_value){.func = FFA_VERSION_COMPILED});
 }
 
 int64_t api_debug_log(char c, struct vcpu *current)
