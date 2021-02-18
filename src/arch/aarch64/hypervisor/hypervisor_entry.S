@@ -28,7 +28,7 @@ image_entry:
 	mrs x30, mpidr_el1
 	ubfx x29, x30, 0, 24
 	ubfx x30, x30, 32, 8
-	orr x30, x29, x30
+	orr x30, x29, x30, lsl #32
 	str x30, [x28, CPU_ID]
 
 	mov x0, x28
