@@ -58,9 +58,9 @@ TEST_SERVICE(interruptible)
 	void *recv_buf = SERVICE_RECV_BUFFER();
 
 	exception_setup(irq, NULL);
-	hf_interrupt_enable(SELF_INTERRUPT_ID, true);
-	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
-	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_B, true);
+	hf_interrupt_enable(SELF_INTERRUPT_ID, true, INTERRUPT_TYPE_IRQ);
+	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true, INTERRUPT_TYPE_IRQ);
+	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_B, true, INTERRUPT_TYPE_IRQ);
 	arch_irq_enable();
 
 	for (;;) {
@@ -80,7 +80,8 @@ TEST_SERVICE(interruptible)
 			   memcmp(recv_buf, enable_message,
 				  sizeof(enable_message)) == 0) {
 			/* Enable interrupt ID C. */
-			hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_C, true);
+			hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_C, true,
+					    INTERRUPT_TYPE_IRQ);
 		} else {
 			dlog("Got unexpected message from VM %d, size %d.\n",
 			     ffa_msg_send_sender(ret), ffa_msg_send_size(ret));

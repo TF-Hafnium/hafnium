@@ -416,6 +416,12 @@
 #define HCR_EL2_VI (UINT64_C(0x1) << 7)
 
 /**
+ * Virtual FIQ Interrupt.
+ * When set indicates that there is a virtual FIQ pending.
+ */
+#define HCR_EL2_VF (UINT64_C(0x1) << 6)
+
+/**
  * Physical SError Routing.
  * When set, physical SError interrupts are taken to EL2, unless routed to EL3.
  */

@@ -34,7 +34,7 @@ TEST_SERVICE(wfi)
 
 	exception_setup(irq, NULL);
 	arch_irq_disable();
-	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
+	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true, INTERRUPT_TYPE_IRQ);
 
 	for (i = 0; i < 10; ++i) {
 		interrupt_wait();

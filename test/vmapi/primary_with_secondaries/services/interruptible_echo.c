@@ -31,7 +31,7 @@ static void irq(void)
 TEST_SERVICE(interruptible_echo)
 {
 	exception_setup(irq, NULL);
-	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
+	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true, INTERRUPT_TYPE_IRQ);
 	arch_irq_enable();
 
 	EXPECT_EQ(irq_counter, 0);
@@ -60,7 +60,7 @@ TEST_SERVICE(interruptible_echo_direct_msg)
 	struct ffa_value res;
 
 	exception_setup(irq, NULL);
-	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
+	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true, INTERRUPT_TYPE_IRQ);
 	arch_irq_enable();
 
 	res = ffa_msg_wait();
@@ -93,7 +93,7 @@ TEST_SERVICE(interruptible_echo_direct_msg_with_interrupt)
 	struct ffa_value res;
 
 	exception_setup(irq, NULL);
-	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true);
+	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true, INTERRUPT_TYPE_IRQ);
 	arch_irq_enable();
 
 	EXPECT_EQ(irq_counter, 0);

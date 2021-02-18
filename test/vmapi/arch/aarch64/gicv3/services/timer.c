@@ -50,7 +50,7 @@ static void irq_current(void)
 TEST_SERVICE(timer)
 {
 	exception_setup(irq_current, NULL);
-	hf_interrupt_enable(HF_VIRTUAL_TIMER_INTID, true);
+	hf_interrupt_enable(HF_VIRTUAL_TIMER_INTID, true, INTERRUPT_TYPE_IRQ);
 	arch_irq_enable();
 
 	for (;;) {
@@ -130,7 +130,7 @@ TEST_SERVICE(timer_ffa_direct_msg)
 	struct ffa_value res;
 
 	exception_setup(irq_current, NULL);
-	hf_interrupt_enable(HF_VIRTUAL_TIMER_INTID, true);
+	hf_interrupt_enable(HF_VIRTUAL_TIMER_INTID, true, INTERRUPT_TYPE_IRQ);
 	arch_irq_enable();
 
 	res = ffa_msg_wait();

@@ -473,32 +473,36 @@ static int64_t internal_interrupt_inject_locked(
 	struct vcpu_locked target_locked, uint32_t intid, struct vcpu *current,
 	struct vcpu **next)
 {
+	struct vcpu *target_vcpu = target_locked.vcpu;
 	uint32_t intid_index = intid / INTERRUPT_REGISTER_BITS;
-	uint32_t intid_mask = 1U << (intid % INTERRUPT_REGISTER_BITS);
+	uint32_t intid_shift = intid % INTERRUPT_REGISTER_BITS;
+	uint32_t intid_mask = 1U << intid_shift;
 	int64_t ret = 0;
 
 	/*
-	 * We only need to change state and (maybe) trigger a virtual IRQ if it
-	 * is enabled and was not previously pending. Otherwise we can skip
-	 * everything except setting the pending bit.
-	 *
-	 * If you change this logic make sure to update the need_vm_lock logic
-	 * above to match.
+	 * We only need to change state and (maybe) trigger a virtual interrupt
+	 * if it is enabled and was not previously pending. Otherwise we can
+	 * skip everything except setting the pending bit.
 	 */
-	if (!(target_locked.vcpu->interrupts.interrupt_enabled[intid_index] &
-	      ~target_locked.vcpu->interrupts.interrupt_pending[intid_index] &
+	if (!(target_vcpu->interrupts.interrupt_enabled[intid_index] &
+	      ~target_vcpu->interrupts.interrupt_pending[intid_index] &
 	      intid_mask)) {
 		goto out;
 	}
 
 	/* Increment the count. */
-	target_locked.vcpu->interrupts.enabled_and_pending_count++;
+	if ((target_vcpu->interrupts.interrupt_type[intid_index] &
+	     intid_mask) == (INTERRUPT_TYPE_IRQ << intid_shift)) {
+		vcpu_irq_count_increment(target_locked);
+	} else {
+		vcpu_fiq_count_increment(target_locked);
+	}
 
 	/*
 	 * Only need to update state if there was not already an
 	 * interrupt enabled and pending.
 	 */
-	if (target_locked.vcpu->interrupts.enabled_and_pending_count != 1) {
+	if (vcpu_interrupt_count_get(target_locked) != 1) {
 		goto out;
 	}
 
@@ -508,14 +512,13 @@ static int64_t internal_interrupt_inject_locked(
 		 * should run or kick the target vCPU.
 		 */
 		ret = 1;
-	} else if (current != target_locked.vcpu && next != NULL) {
-		*next = api_wake_up(current, target_locked.vcpu);
+	} else if (current != target_vcpu && next != NULL) {
+		*next = api_wake_up(current, target_vcpu);
 	}
 
 out:
 	/* Either way, make it pending. */
-	target_locked.vcpu->interrupts.interrupt_pending[intid_index] |=
-		intid_mask;
+	target_vcpu->interrupts.interrupt_pending[intid_index] |= intid_mask;
 
 	return ret;
 }
@@ -652,7 +655,7 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 		/* Fall through. */
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 		/* Allow virtual interrupts to be delivered. */
-		if (vcpu->interrupts.enabled_and_pending_count > 0) {
+		if (vcpu_interrupt_count_get(vcpu_locked) > 0) {
 			break;
 		}
 
@@ -1211,17 +1214,18 @@ out:
  */
 bool api_ffa_msg_recv_block_interrupted(struct vcpu *current)
 {
+	struct vcpu_locked current_locked;
 	bool interrupted;
 
-	sl_lock(&current->lock);
+	current_locked = vcpu_lock(current);
 
 	/*
 	 * Don't block if there are enabled and pending interrupts, to match
 	 * behaviour of wait_for_interrupt.
 	 */
-	interrupted = (current->interrupts.enabled_and_pending_count > 0);
+	interrupted = (vcpu_interrupt_count_get(current_locked) > 0);
 
-	sl_unlock(&current->lock);
+	vcpu_unlock(&current_locked);
 
 	return interrupted;
 }
@@ -1428,16 +1432,19 @@ struct ffa_value api_ffa_rx_release(struct vcpu *current, struct vcpu **next)
  *
  * Returns 0 on success, or -1 if the intid is invalid.
  */
-int64_t api_interrupt_enable(uint32_t intid, bool enable, struct vcpu *current)
+int64_t api_interrupt_enable(uint32_t intid, bool enable,
+			     enum interrupt_type type, struct vcpu *current)
 {
+	struct vcpu_locked current_locked;
 	uint32_t intid_index = intid / INTERRUPT_REGISTER_BITS;
-	uint32_t intid_mask = 1U << (intid % INTERRUPT_REGISTER_BITS);
+	uint32_t intid_shift = intid % INTERRUPT_REGISTER_BITS;
+	uint32_t intid_mask = 1U << intid_shift;
 
 	if (intid >= HF_NUM_INTIDS) {
 		return -1;
 	}
 
-	sl_lock(&current->lock);
+	current_locked = vcpu_lock(current);
 	if (enable) {
 		/*
 		 * If it is pending and was not enabled before, increment the
@@ -1446,10 +1453,24 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable, struct vcpu *current)
 		if (current->interrupts.interrupt_pending[intid_index] &
 		    ~current->interrupts.interrupt_enabled[intid_index] &
 		    intid_mask) {
-			current->interrupts.enabled_and_pending_count++;
+			if ((current->interrupts.interrupt_type[intid_index] &
+			     intid_mask) ==
+			    (INTERRUPT_TYPE_IRQ << intid_shift)) {
+				vcpu_irq_count_increment(current_locked);
+			} else {
+				vcpu_fiq_count_increment(current_locked);
+			}
 		}
 		current->interrupts.interrupt_enabled[intid_index] |=
 			intid_mask;
+
+		if (type == INTERRUPT_TYPE_IRQ) {
+			current->interrupts.interrupt_type[intid_index] &=
+				~intid_mask;
+		} else if (type == INTERRUPT_TYPE_FIQ) {
+			current->interrupts.interrupt_type[intid_index] |=
+				intid_mask;
+		}
 	} else {
 		/*
 		 * If it is pending and was enabled before, decrement the count.
@@ -1457,13 +1478,20 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable, struct vcpu *current)
 		if (current->interrupts.interrupt_pending[intid_index] &
 		    current->interrupts.interrupt_enabled[intid_index] &
 		    intid_mask) {
-			current->interrupts.enabled_and_pending_count--;
+			if ((current->interrupts.interrupt_type[intid_index] &
+			     intid_mask) ==
+			    (INTERRUPT_TYPE_IRQ << intid_shift)) {
+				vcpu_irq_count_decrement(current_locked);
+			} else {
+				vcpu_fiq_count_decrement(current_locked);
+			}
 		}
 		current->interrupts.interrupt_enabled[intid_index] &=
 			~intid_mask;
+		current->interrupts.interrupt_type[intid_index] &= ~intid_mask;
 	}
 
-	sl_unlock(&current->lock);
+	vcpu_unlock(&current_locked);
 	return 0;
 }
 
@@ -1476,12 +1504,13 @@ uint32_t api_interrupt_get(struct vcpu *current)
 {
 	uint8_t i;
 	uint32_t first_interrupt = HF_INVALID_INTID;
+	struct vcpu_locked current_locked;
 
 	/*
 	 * Find the first enabled and pending interrupt ID, return it, and
 	 * deactivate it.
 	 */
-	sl_lock(&current->lock);
+	current_locked = vcpu_lock(current);
 	for (i = 0; i < HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS; ++i) {
 		uint32_t enabled_and_pending =
 			current->interrupts.interrupt_enabled[i] &
@@ -1489,19 +1518,27 @@ uint32_t api_interrupt_get(struct vcpu *current)
 
 		if (enabled_and_pending != 0) {
 			uint8_t bit_index = ctz(enabled_and_pending);
+			uint32_t intid_mask = 1U << bit_index;
+
 			/*
 			 * Mark it as no longer pending and decrement the count.
 			 */
-			current->interrupts.interrupt_pending[i] &=
-				~(1U << bit_index);
-			current->interrupts.enabled_and_pending_count--;
+			current->interrupts.interrupt_pending[i] &= ~intid_mask;
+
+			if ((current->interrupts.interrupt_type[i] &
+			     intid_mask) == (INTERRUPT_TYPE_IRQ << bit_index)) {
+				vcpu_irq_count_decrement(current_locked);
+			} else {
+				vcpu_fiq_count_decrement(current_locked);
+			}
+
 			first_interrupt =
 				i * INTERRUPT_REGISTER_BITS + bit_index;
 			break;
 		}
 	}
 
-	sl_unlock(&current->lock);
+	vcpu_unlock(&current_locked);
 	return first_interrupt;
 }
 
@@ -1561,9 +1598,11 @@ int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
 
 	target_vcpu = vm_get_vcpu(target_vm, target_vcpu_idx);
 
-	dlog_info("Injecting IRQ %u for VM %#x vCPU %u from VM %#x vCPU %u\n",
-		  intid, target_vm_id, target_vcpu_idx, current->vm->id,
-		  vcpu_index(current));
+	dlog_verbose(
+		"Injecting interrupt %u for VM %#x vCPU %u from VM %#x vCPU "
+		"%u\n",
+		intid, target_vm_id, target_vcpu_idx, current->vm->id,
+		vcpu_index(current));
 	return internal_interrupt_inject(target_vcpu, intid, current, next);
 }
 

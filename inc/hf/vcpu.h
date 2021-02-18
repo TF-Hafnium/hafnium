@@ -41,12 +41,16 @@ struct interrupts {
 	uint32_t interrupt_enabled[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
 	/** Bitfield keeping track of which interrupts are pending. */
 	uint32_t interrupt_pending[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
+	/** Bitfield recording the interrupt pin configuration. */
+	uint32_t interrupt_type[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
 	/**
 	 * The number of interrupts which are currently both enabled and
-	 * pending. i.e. the number of bits set in interrupt_enable &
-	 * interrupt_pending.
+	 * pending. Count independently virtual IRQ and FIQ interrupt types
+	 * i.e. the sum of the two counters is the number of bits set in
+	 * interrupt_enable & interrupt_pending.
 	 */
-	uint32_t enabled_and_pending_count;
+	uint32_t enabled_and_pending_irq_count;
+	uint32_t enabled_and_pending_fiq_count;
 };
 
 struct vcpu_fault_info {
@@ -116,3 +120,41 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 			    struct vcpu_fault_info *f);
 
 void vcpu_reset(struct vcpu *vcpu);
+
+static inline void vcpu_irq_count_increment(struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count++;
+}
+
+static inline void vcpu_irq_count_decrement(struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count--;
+}
+
+static inline void vcpu_fiq_count_increment(struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count++;
+}
+
+static inline void vcpu_fiq_count_decrement(struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count--;
+}
+
+static inline uint32_t vcpu_interrupt_irq_count_get(
+	struct vcpu_locked vcpu_locked)
+{
+	return vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count;
+}
+
+static inline uint32_t vcpu_interrupt_fiq_count_get(
+	struct vcpu_locked vcpu_locked)
+{
+	return vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count;
+}
+
+static inline uint32_t vcpu_interrupt_count_get(struct vcpu_locked vcpu_locked)
+{
+	return vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count +
+	       vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count;
+}
