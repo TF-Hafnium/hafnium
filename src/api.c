@@ -1638,6 +1638,15 @@ static struct vcpu *api_ffa_msg_send_direct_get_receiver_vcpu(
 }
 
 /**
+ * FF-A specification states that x2/w2 Must Be Zero for direct messaging
+ * interfaces.
+ */
+static inline bool api_ffa_dir_msg_is_arg2_zero(struct ffa_value args)
+{
+	return args.arg2 == 0U;
+}
+
+/**
  * Send an FF-A direct message request.
  */
 struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
@@ -1650,6 +1659,10 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	struct vm *receiver_vm;
 	struct vcpu *receiver_vcpu;
 	struct two_vcpu_locked vcpus_locked;
+
+	if (!api_ffa_dir_msg_is_arg2_zero(args)) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	if (!arch_other_world_is_direct_request_valid(current, sender_vm_id,
 						      receiver_vm_id)) {
@@ -1771,6 +1784,11 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 					      struct vcpu **next)
 {
 	struct vcpu_locked current_locked;
+
+	if (!api_ffa_dir_msg_is_arg2_zero(args)) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
 	struct ffa_value to_ret = {
 		.func = args.func,
 		.arg1 = args.arg1,
