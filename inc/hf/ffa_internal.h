@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -15,10 +15,10 @@
 #include "vmapi/hf/ffa.h"
 
 #define FFA_VERSION_RESERVED_BIT UINT32_C(1U << 31)
-
-static inline struct ffa_value ffa_error(uint64_t error_code)
+static inline struct ffa_value ffa_error(int32_t error_code)
 {
-	return (struct ffa_value){.func = FFA_ERROR_32, .arg2 = error_code};
+	return (struct ffa_value){.func = FFA_ERROR_32,
+				  .arg2 = (uint32_t)error_code};
 }
 
 /**

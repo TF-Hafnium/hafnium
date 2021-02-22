@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -227,6 +227,11 @@ struct ffa_value {
 	uint64_t arg6;
 	uint64_t arg7;
 };
+
+static inline int32_t ffa_error_code(struct ffa_value val)
+{
+	return (int32_t)val.arg2;
+}
 
 static inline ffa_vm_id_t ffa_msg_send_sender(struct ffa_value args)
 {

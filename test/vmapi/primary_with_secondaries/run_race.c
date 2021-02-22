@@ -39,7 +39,7 @@ static bool run_loop(struct mailbox_buffers *mb)
 		do {
 			run_res = ffa_run(SERVICE_VM1, 0);
 		} while (run_res.func == FFA_ERROR_32 &&
-			 run_res.arg2 == FFA_BUSY);
+			 ffa_error_code(run_res) == FFA_BUSY);
 
 		/* Break out if we received a message with non-zero length. */
 		if (run_res.func == FFA_MSG_SEND_32 &&

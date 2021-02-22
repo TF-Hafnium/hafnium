@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -1549,7 +1549,7 @@ struct ffa_value api_ffa_version(uint32_t requested_version)
 		      "Minor revision representation takes more than 16 bits.");
 	if (requested_version & FFA_VERSION_RESERVED_BIT) {
 		/* Invalid encoding, return an error. */
-		return (struct ffa_value){.func = FFA_NOT_SUPPORTED};
+		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
 	}
 
 	return (struct ffa_value){

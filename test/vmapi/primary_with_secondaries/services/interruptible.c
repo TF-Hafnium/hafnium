@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -47,7 +47,7 @@ struct ffa_value mailbox_receive_retry()
 	do {
 		received = ffa_msg_wait();
 	} while (received.func == FFA_ERROR_32 &&
-		 received.arg2 == FFA_INTERRUPTED);
+		 ffa_error_code(received) == FFA_INTERRUPTED);
 
 	return received;
 }

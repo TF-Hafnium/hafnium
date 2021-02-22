@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -17,11 +17,11 @@
 #define FRAGMENTED_SHARE_PAGE_COUNT \
 	(PAGE_SIZE / sizeof(struct ffa_memory_region_constituent))
 
-#define EXPECT_FFA_ERROR(value, ffa_error)       \
-	do {                                     \
-		struct ffa_value v = (value);    \
-		EXPECT_EQ(v.func, FFA_ERROR_32); \
-		EXPECT_EQ(v.arg2, (ffa_error));  \
+#define EXPECT_FFA_ERROR(value, ffa_error)                 \
+	do {                                               \
+		struct ffa_value v = (value);              \
+		EXPECT_EQ(v.func, FFA_ERROR_32);           \
+		EXPECT_EQ(ffa_error_code(v), (ffa_error)); \
 	} while (0)
 
 struct mailbox_buffers {

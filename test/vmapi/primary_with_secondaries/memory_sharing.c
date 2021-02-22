@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -92,9 +92,9 @@ static void check_cannot_send_memory(
 						EXPECT_EQ(ret.func,
 							  FFA_ERROR_32);
 						EXPECT_TRUE(
-							ret.arg2 ==
+							ffa_error_code(ret) ==
 								FFA_DENIED ||
-							ret.arg2 ==
+							ffa_error_code(ret) ==
 								FFA_INVALID_PARAMETERS);
 					}
 					for (m = 0; m < ARRAY_SIZE(device);
@@ -125,9 +125,9 @@ static void check_cannot_send_memory(
 						EXPECT_EQ(ret.func,
 							  FFA_ERROR_32);
 						EXPECT_TRUE(
-							ret.arg2 ==
+							ffa_error_code(ret) ==
 								FFA_DENIED ||
-							ret.arg2 ==
+							ffa_error_code(ret) ==
 								FFA_INVALID_PARAMETERS);
 					}
 				}
@@ -193,8 +193,8 @@ static void check_cannot_donate_memory(
 			  0);
 		ret = ffa_mem_donate(msg_size, msg_size);
 		EXPECT_EQ(ret.func, FFA_ERROR_32);
-		EXPECT_TRUE(ret.arg2 == FFA_DENIED ||
-			    ret.arg2 == FFA_INVALID_PARAMETERS);
+		EXPECT_TRUE((ffa_error_code(ret) == FFA_DENIED) ||
+			    (ffa_error_code(ret) == FFA_INVALID_PARAMETERS));
 	}
 }
 
