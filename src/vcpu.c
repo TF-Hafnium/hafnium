@@ -164,18 +164,31 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 	 * anything else to recover from it. (Acquiring/releasing the lock
 	 * ensured that the invalidations have completed.)
 	 */
-	resume = vm_mem_get_mode(locked_vm, f->ipaddr, ipa_add(f->ipaddr, 1),
-				 &mode) &&
-		 (mode & mask) == f->mode;
+	if (!locked_vm.vm->el0_partition) {
+		resume = vm_mem_get_mode(locked_vm, f->ipaddr,
+					 ipa_add(f->ipaddr, 1), &mode) &&
+			 (mode & mask) == f->mode;
+	} else {
+		/*
+		 * For EL0 partitions we need to get the mode for the faulting
+		 * vaddr.
+		 */
+		resume =
+			vm_mem_get_mode(locked_vm, ipa_init(va_addr(f->vaddr)),
+					ipa_add(ipa_init(va_addr(f->vaddr)), 1),
+					&mode) &&
+			(mode & mask) == f->mode;
+	}
 
 	vm_unlock(&locked_vm);
 
 	if (!resume) {
 		dlog_warning(
-			"Stage-2 page fault: pc=%#x, vmid=%#x, vcpu=%u, "
-			"vaddr=%#x, ipaddr=%#x, mode=%#x\n",
-			f->pc, vm->id, vcpu_index(current), f->vaddr, f->ipaddr,
-			f->mode);
+			"Stage-%d page fault: pc=%#x, vmid=%#x, vcpu=%u, "
+			"vaddr=%#x, ipaddr=%#x, mode=%#x %#x\n",
+			current->vm->el0_partition ? 1 : 2, f->pc, vm->id,
+			vcpu_index(current), f->vaddr, f->ipaddr, f->mode,
+			mode);
 	}
 
 	return resume;

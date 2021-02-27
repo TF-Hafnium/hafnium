@@ -1064,13 +1064,27 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 {
 	struct vcpu *vcpu = current();
 	struct vcpu_fault_info info;
-	struct vcpu *new_vcpu;
+	struct vcpu *new_vcpu = NULL;
 	uintreg_t ec = GET_ESR_EC(esr);
+	bool is_el0_partition = vcpu->vm->el0_partition;
 
 	switch (ec) {
 	case EC_WFI_WFE:
 		/* Skip the instruction. */
 		vcpu->regs.pc += GET_NEXT_PC_INC(esr);
+
+		/*
+		 * For EL0 partitions, treat both WFI and WFE the same way so
+		 * that FFA_RUN can be called on the partition to resume it. If
+		 * we treat WFI using api_wait_for_interrupt, the VCPU will be
+		 * in blocked waiting for interrupt but we cannot inject
+		 * interrupts into EL0 partitions.
+		 */
+		if (is_el0_partition) {
+			api_yield(vcpu, &new_vcpu);
+			return new_vcpu;
+		}
+
 		/* Check TI bit of ISS, 0 = WFI, 1 = WFE. */
 		if (esr & 1) {
 			/* WFE */
@@ -1090,6 +1104,12 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 		if (vcpu_handle_page_fault(vcpu, &info)) {
 			return NULL;
 		}
+
+		if (is_el0_partition) {
+			dlog_warning("Data abort on EL0 partition\n");
+			return api_abort(vcpu);
+		}
+
 		/* Inform the EL1 of the data abort. */
 		inject_el1_data_abort_exception(vcpu, esr, far);
 
@@ -1101,13 +1121,25 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 		if (vcpu_handle_page_fault(vcpu, &info)) {
 			return NULL;
 		}
+
+		if (is_el0_partition) {
+			dlog_warning("Instruction abort on EL0 partition\n");
+			return api_abort(vcpu);
+		}
+
 		/* Inform the EL1 of the instruction abort. */
 		inject_el1_instruction_abort_exception(vcpu, esr, far);
 
 		/* Schedule the same VM to continue running. */
 		return NULL;
-
+	case EC_SVC:
+		CHECK(is_el0_partition);
+		return hvc_handler(vcpu);
 	case EC_HVC:
+		if (is_el0_partition) {
+			dlog_warning("Unexpected HVC Trap on EL0 partition\n");
+			return api_abort(vcpu);
+		}
 		return hvc_handler(vcpu);
 
 	case EC_SMC: {
@@ -1133,6 +1165,10 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 			"ec=%#x\n",
 			vcpu->regs.pc, esr, ec);
 		break;
+	}
+
+	if (is_el0_partition) {
+		return api_abort(vcpu);
 	}
 
 	/*

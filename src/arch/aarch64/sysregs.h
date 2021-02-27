@@ -121,6 +121,11 @@
 #define EC_WFI_WFE UINT64_C(0x1)
 
 /**
+ * ESR code for SVC instruction execution.
+ */
+#define EC_SVC UINT64_C(0x15)
+
+/**
  * ESR code for HVC instruction execution.
  */
 #define EC_HVC UINT64_C(0x16)
