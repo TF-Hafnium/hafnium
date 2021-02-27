@@ -991,16 +991,24 @@ struct ffa_value api_vm_configure_pages(
 	}
 
 	/* Take memory ownership away from the VM and mark as shared. */
-	if (!vm_identity_map(
-		    vm_locked, pa_send_begin, pa_send_end,
-		    MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R | MM_MODE_W,
-		    local_page_pool, NULL)) {
+	uint32_t mode =
+		MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R | MM_MODE_W;
+	if (vm_locked.vm->el0_partition) {
+		mode |= MM_MODE_USER | MM_MODE_NG;
+	}
+
+	if (!vm_identity_map(vm_locked, pa_send_begin, pa_send_end, mode,
+			     local_page_pool, NULL)) {
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
-	if (!vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
-			     MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R,
+	mode = MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R;
+	if (vm_locked.vm->el0_partition) {
+		mode |= MM_MODE_USER | MM_MODE_NG;
+	}
+
+	if (!vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end, mode,
 			     local_page_pool, NULL)) {
 		/* TODO: partial defrag of failed range. */
 		/* Recover any memory consumed in failed mapping. */
@@ -1010,6 +1018,21 @@ struct ffa_value api_vm_configure_pages(
 
 	/* Get extra send/recv pages mapping attributes for the given VM ID. */
 	extra_attributes = arch_mm_extra_attributes_from_vm(vm_locked.vm->id);
+
+	/*
+	 * For EL0 partitions, since both the partition and the hypervisor code
+	 * use the EL2&0 translation regime, it is critical to mark the mappings
+	 * of the send and recv buffers as non-global in the TLB. For one, if we
+	 * dont mark it as non-global, it would cause TLB conflicts since there
+	 * would be an identity mapping with non-global attribute in the
+	 * partitions page tables, but another identity mapping in the
+	 * hypervisor page tables with the global attribute. The other issue is
+	 * one of security, we dont want other partitions to be able to access
+	 * other partitions buffers through cached translations.
+	 */
+	if (vm_locked.vm->el0_partition) {
+		extra_attributes |= MM_MODE_NG;
+	}
 
 	if (!api_vm_configure_stage1(mm_stage1_locked, vm_locked, pa_send_begin,
 				     pa_send_end, pa_recv_begin, pa_recv_end,
