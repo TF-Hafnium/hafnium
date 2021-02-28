@@ -343,6 +343,8 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 					 MANIFEST_INVALID_ADDRESS,
 					 &vm->primary.boot_address));
 	}
+	TRY(read_optional_uint8(node, "exception-level", (uint8_t)EL1,
+				(uint8_t *)&vm->sp.run_time_el));
 
 	return MANIFEST_SUCCESS;
 }
