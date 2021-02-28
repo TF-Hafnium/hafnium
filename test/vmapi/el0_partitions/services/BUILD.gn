@@ -63,10 +63,13 @@ vm_kernel("service_vm1") {
   ]
   sources = [
     "boot.c",
+    "echo_with_notification.c",
   ]
   deps = [
     ":hftest_secondary_el0_partition",
+    "//test/vmapi/primary_with_secondaries/services:echo",
     "//test/vmapi/primary_with_secondaries/services:ffa_check",
+    "//test/vmapi/primary_with_secondaries/services:relay",
     "//test/vmapi/primary_with_secondaries/services:run_waiting",
   ]
 }
@@ -75,6 +78,7 @@ vm_kernel("service_vm2") {
   testonly = true
   deps = [
     ":hftest_secondary_el0_partition",
+    "//test/vmapi/primary_with_secondaries/services:relay",
   ]
 }
 

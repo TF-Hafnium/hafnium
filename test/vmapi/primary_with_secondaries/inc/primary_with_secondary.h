@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <stddef.h>
+
 #define SERVICE_VM1 (HF_VM_ID_OFFSET + 1)
 #define SERVICE_VM2 (HF_VM_ID_OFFSET + 2)
 #define SERVICE_VM3 (HF_VM_ID_OFFSET + 3)
@@ -16,3 +18,5 @@
 #define EXTERNAL_INTERRUPT_ID_A 7
 #define EXTERNAL_INTERRUPT_ID_B 8
 #define EXTERNAL_INTERRUPT_ID_C 9
+
+void reverse(char *s, size_t len);

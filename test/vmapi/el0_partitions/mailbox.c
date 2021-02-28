@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -60,7 +60,7 @@ TEST(mailbox, primary_to_secondary)
 			.func,
 		FFA_SUCCESS_32);
 	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, HF_FFA_RUN_WAIT_FOR_INTERRUPT);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
 
 	/* Clear the mailbox. We expect to be told there are pending waiters. */
@@ -70,13 +70,6 @@ TEST(mailbox, primary_to_secondary)
 	EXPECT_EQ(hf_mailbox_waiter_get(HF_PRIMARY_VM_ID), SERVICE_VM1);
 	EXPECT_EQ(hf_mailbox_waiter_get(HF_PRIMARY_VM_ID), -1);
 
-	/*
-	 * Inject interrupt into VM and let it run again. We should receive
-	 * the echoed message.
-	 */
-	EXPECT_EQ(
-		hf_interrupt_inject(SERVICE_VM1, 0, HF_MAILBOX_WRITABLE_INTID),
-		1);
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
 	EXPECT_EQ(ffa_msg_send_size(run_res), sizeof(message));

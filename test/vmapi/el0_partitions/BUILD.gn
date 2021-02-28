@@ -21,6 +21,7 @@ source_set("ffa") {
     "//test/vmapi/primary_with_secondaries/ffa.c",
   ]
 }
+
 vm_kernel("el0_partition_test_vm") {
   testonly = true
   public_configs = [
@@ -29,7 +30,9 @@ vm_kernel("el0_partition_test_vm") {
   ]
 
   sources = [
+    "//test/vmapi/primary_with_secondaries/mailbox_common.c",
     "boot.c",
+    "mailbox.c",
   ]
 
   deps = [
