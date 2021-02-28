@@ -8,6 +8,12 @@ import("//build/toolchain/platform.gni")
 
 source_set("call") {
   sources = [
-    "call.c",
+    "hvc_call.c",
+  ]
+}
+
+source_set("svc_call") {
+  sources = [
+    "svc_call.c",
   ]
 }

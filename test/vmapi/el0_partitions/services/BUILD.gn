@@ -1,0 +1,61 @@
+# Copyright 2021 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+
+config("el0_partition_config") {
+  include_dirs = [ "//test/inc" ]
+}
+
+#dlog for el0 partition that uses SVCs for debug logging
+source_set("el0_dlog") {
+  testonly = true
+  sources = [
+    "//src/dlog.c",
+  ]
+  deps = [
+    "//src/arch/aarch64/hftest:el0_stdout",
+  ]
+}
+
+source_set("el0_fdt_handler") {
+  testonly = true
+  sources = [
+    "//src/fdt_handler.c",
+  ]
+  deps = [
+    "//src:fdt",
+  ]
+}
+
+# Testing framework for a secondary EL0 partition.
+# It's currently just a secondary partition and can't affect the tests directly.
+source_set("hftest_secondary_el0_partition") {
+  testonly = true
+
+  public_configs = [ ":el0_partition_config" ]
+
+  sources = [
+    "//test/hftest/service.c",
+    "boot.c",
+    "el0_service.c",
+  ]
+
+  deps = [
+    ":el0_dlog",
+    ":el0_fdt_handler",
+    "//src:panic",
+    "//src/arch/${plat_arch}:entry",
+    "//src/arch/${plat_arch}/hftest:el0_entry",
+  ]
+}
+
+vm_kernel("service_vm1") {
+  testonly = true
+  deps = [
+    ":hftest_secondary_el0_partition",
+  ]
+}

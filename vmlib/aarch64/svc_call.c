@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -7,7 +7,6 @@
  */
 
 #include "hf/call.h"
-
 #include "hf/ffa.h"
 #include "hf/types.h"
 
@@ -19,7 +18,7 @@ int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 	register uint64_t r3 __asm__("x3") = arg3;
 
 	__asm__ volatile(
-		"hvc #0"
+		"svc #0"
 		: /* Output registers, also used as inputs ('+' constraint). */
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3)
 		:
@@ -41,7 +40,7 @@ struct ffa_value ffa_call(struct ffa_value args)
 	register uint64_t r7 __asm__("x7") = args.arg7;
 
 	__asm__ volatile(
-		"hvc #0"
+		"svc #0"
 		: /* Output registers, also used as inputs ('+' constraint). */
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3), "+r"(r4), "+r"(r5),
 		"+r"(r6), "+r"(r7));

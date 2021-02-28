@@ -13,6 +13,13 @@ source_set("entry") {
   ]
 }
 
+# Implements image_entry for a simple EL0 partition.
+source_set("el0_entry") {
+  sources = [
+    "el0_entry.S",
+  ]
+}
+
 # Shutdown the system or exit emulation, start/stop CPUs.
 source_set("power_mgmt") {
   testonly = true
@@ -64,6 +71,16 @@ source_set("registers") {
   testonly = true
   sources = [
     "registers.c",
+  ]
+}
+
+source_set("el0_stdout") {
+  sources = [
+    "stdout.c",
+  ]
+
+  deps = [
+    "//vmlib/aarch64:svc_call",
   ]
 }
 
