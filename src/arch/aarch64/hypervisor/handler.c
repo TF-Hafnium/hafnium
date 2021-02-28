@@ -607,11 +607,14 @@ static void vcpu_update_virtual_interrupts(struct vcpu *next)
 	struct vcpu_locked vcpu_locked;
 
 	if (next == NULL) {
+		if (current()->vm->el0_partition) {
+			return;
+		}
+
 		/*
 		 * Not switching vCPUs, set the bit for the current vCPU
 		 * directly in the register.
 		 */
-
 		vcpu_locked = vcpu_lock(current());
 		set_virtual_irq_current(
 			vcpu_interrupt_irq_count_get(vcpu_locked) > 0);
@@ -619,6 +622,9 @@ static void vcpu_update_virtual_interrupts(struct vcpu *next)
 			vcpu_interrupt_fiq_count_get(vcpu_locked) > 0);
 		vcpu_unlock(&vcpu_locked);
 	} else if (vm_id_is_current_world(next->vm->id)) {
+		if (next->vm->el0_partition) {
+			return;
+		}
 		/*
 		 * About to switch vCPUs, set the bit for the vCPU to which we
 		 * are switching in the saved copy of the register.
