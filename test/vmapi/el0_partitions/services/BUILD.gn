@@ -64,6 +64,9 @@ vm_kernel("service_vm1") {
   sources = [
     "boot.c",
     "echo_with_notification.c",
+    "interruptible.c",
+    "interruptible_echo.c",
+    "receive_block.c",
   ]
   deps = [
     ":hftest_secondary_el0_partition",
