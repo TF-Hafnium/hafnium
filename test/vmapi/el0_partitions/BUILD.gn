@@ -11,6 +11,16 @@ config("config") {
   include_dirs = [ "inc" ]
 }
 
+source_set("ffa") {
+  public_configs = [
+    "//test/vmapi/primary_with_secondaries:config",
+    "//src/arch/aarch64:config",
+    "//test/hftest:hftest_config",
+  ]
+  sources = [
+    "//test/vmapi/primary_with_secondaries/ffa.c",
+  ]
+}
 vm_kernel("el0_partition_test_vm") {
   testonly = true
   public_configs = [
@@ -23,6 +33,7 @@ vm_kernel("el0_partition_test_vm") {
   ]
 
   deps = [
+    ":ffa",
     "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
     "//test/vmapi/common",
@@ -59,6 +70,16 @@ initrd("el0_partitions_test") {
       "services1",
       "services:service_vm1",
       "service_vm1.bin",
+    ],
+    [
+      "services2",
+      "services:service_vm2",
+      "service_vm2.bin",
+    ],
+    [
+      "services3",
+      "services:service_vm3",
+      "service_vm3.bin",
     ],
     [
       "secondary.dtb",

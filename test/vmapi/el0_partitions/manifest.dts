@@ -24,5 +24,23 @@
 			fdt_filename = "secondary.dtb";
 			exception-level = <1>;
 		};
+
+		vm3 {
+			debug_name = "services2";
+			vcpu_count = <1>;
+			mem_size = <0x100000>;
+			kernel_filename = "services2";
+			fdt_filename = "secondary.dtb";
+			exception-level = <1>;
+		};
+
+		vm4 {
+			debug_name = "services3";
+			vcpu_count = <1>;
+			mem_size = <0x100000>;
+			kernel_filename = "services2";
+			fdt_filename = "secondary.dtb";
+			exception-level = <1>;
+		};
 	};
 };

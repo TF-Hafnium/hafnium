@@ -9,3 +9,4 @@
 #pragma once
 
 #define SERVICE_VM1 (HF_VM_ID_OFFSET + 1)
+#define SERVICE_VM2 (HF_VM_ID_OFFSET + 2)

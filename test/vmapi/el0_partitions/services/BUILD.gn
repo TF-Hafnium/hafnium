@@ -36,11 +36,13 @@ source_set("el0_fdt_handler") {
 source_set("hftest_secondary_el0_partition") {
   testonly = true
 
-  public_configs = [ ":el0_partition_config" ]
+  public_configs = [
+    ":el0_partition_config",
+    "..:config",
+  ]
 
   sources = [
     "//test/hftest/service.c",
-    "boot.c",
     "el0_service.c",
   ]
 
@@ -55,7 +57,32 @@ source_set("hftest_secondary_el0_partition") {
 
 vm_kernel("service_vm1") {
   testonly = true
+  public_configs = [
+    ":el0_partition_config",
+    "..:config",
+  ]
+  sources = [
+    "boot.c",
+  ]
   deps = [
     ":hftest_secondary_el0_partition",
+    "//test/vmapi/primary_with_secondaries/services:ffa_check",
+    "//test/vmapi/primary_with_secondaries/services:run_waiting",
+  ]
+}
+
+vm_kernel("service_vm2") {
+  testonly = true
+  deps = [
+    ":hftest_secondary_el0_partition",
+  ]
+}
+
+vm_kernel("service_vm3") {
+  testonly = true
+  deps = [
+    ":hftest_secondary_el0_partition",
+    "//test/vmapi/common:common",
+    "//vmlib",
   ]
 }
