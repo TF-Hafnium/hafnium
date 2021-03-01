@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -95,7 +95,7 @@ TEST_SERVICE(ffa_direct_msg_req_disallowed_smc)
 	EXPECT_FFA_ERROR(ret, FFA_DENIED);
 
 	ret = ffa_msg_send_direct_req(SERVICE_VM1, SERVICE_VM2, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 
 	ret = ffa_msg_poll();
 	EXPECT_FFA_ERROR(ret, FFA_DENIED);
@@ -116,10 +116,10 @@ TEST_SERVICE(ffa_disallowed_direct_msg_req)
 
 	ret = ffa_msg_send_direct_req(SERVICE_VM1, HF_PRIMARY_VM_ID, 0, 0, 0, 0,
 				      0);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 
 	ret = ffa_msg_send_direct_req(SERVICE_VM1, SERVICE_VM2, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 
 	args = ffa_msg_wait();
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
@@ -167,10 +167,10 @@ TEST_SERVICE(ffa_direct_msg_resp_invalid_sender_receiver)
 	ffa_vm_id_t receiver = ffa_msg_send_receiver(args);
 
 	res = ffa_msg_send_direct_resp(receiver, SERVICE_VM2, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(res, FFA_NOT_SUPPORTED);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 
 	res = ffa_msg_send_direct_resp(SERVICE_VM2, sender, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(res, FFA_NOT_SUPPORTED);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 
 	ffa_msg_send_direct_resp(receiver, sender, 0, 0, 0, 0, 0);
 }

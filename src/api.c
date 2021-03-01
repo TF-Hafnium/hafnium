@@ -1666,7 +1666,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 
 	if (!arch_other_world_is_direct_request_valid(current, sender_vm_id,
 						      receiver_vm_id)) {
-		return ffa_error(FFA_NOT_SUPPORTED);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	receiver_vm = vm_find(receiver_vm_id);
@@ -1802,7 +1802,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 
 	if (!arch_other_world_is_direct_response_valid(current, sender_vm_id,
 						       receiver_vm_id)) {
-		return ffa_error(FFA_NOT_SUPPORTED);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	current_locked = vcpu_lock(current);

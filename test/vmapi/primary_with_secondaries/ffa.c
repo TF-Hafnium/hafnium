@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -253,7 +253,7 @@ TEST(ffa, ffa_send_direct_message_req_invalid_dst)
 	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID,
 				      msg[0], msg[1], msg[2], msg[3], msg[4]);
 
-	EXPECT_FFA_ERROR(res, FFA_NOT_SUPPORTED);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
 /**
@@ -269,7 +269,7 @@ TEST(ffa, ffa_send_direct_message_resp_invalid)
 
 	res = ffa_msg_send_direct_resp(HF_PRIMARY_VM_ID, SERVICE_VM1, 0, 0, 0,
 				       0, 0);
-	EXPECT_FFA_ERROR(res, FFA_NOT_SUPPORTED);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
 /**
