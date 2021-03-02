@@ -39,12 +39,12 @@ static size_t arch_cache_line_size_get(void)
  * Clean the cache to the point of coherency for the range qualified by the
  * start address and size arguments.
  */
-void arch_cache_clean_range(paddr_t start, size_t size)
+void arch_cache_clean_range(vaddr_t start, size_t size)
 {
 	size_t cache_line_size = arch_cache_line_size_get();
-	uintpaddr_t begin = pa_addr(start);
-	uintpaddr_t end = begin + size;
-	uintpaddr_t address;
+	uintvaddr_t begin = va_addr(start);
+	uintvaddr_t end = begin + size;
+	uintvaddr_t address;
 
 	for (address = begin; address < end; address += cache_line_size) {
 		/* Cache clean by VA to PoC */

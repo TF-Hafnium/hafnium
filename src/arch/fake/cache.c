@@ -8,7 +8,7 @@
 
 #include "hf/arch/cache.h"
 
-void arch_cache_clean_range(paddr_t start, size_t size)
+void arch_cache_clean_range(vaddr_t start, size_t size)
 {
 	(void)start;
 	(void)size;
