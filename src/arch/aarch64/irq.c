@@ -8,8 +8,6 @@
 
 #include "hf/arch/irq.h"
 
-#include "msr.h"
-
 void arch_irq_disable(void)
 {
 	__asm__ volatile("msr DAIFSet, #0xf");

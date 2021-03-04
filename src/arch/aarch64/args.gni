@@ -11,5 +11,7 @@ declare_args() {
   # SMC hooks to be used for the platform, specified as build target.
   plat_smc = "//src/arch/aarch64/plat/smc:absent"
 
+  plat_interrupts = "//src/arch/aarch64/plat/interrupts:absent"
+
   secure_world = "0"
 }
