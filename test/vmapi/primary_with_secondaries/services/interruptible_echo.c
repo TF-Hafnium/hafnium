@@ -68,8 +68,8 @@ TEST_SERVICE(interruptible_echo_direct_msg)
 	EXPECT_EQ(res.arg3, 1);
 
 	EXPECT_EQ(irq_counter, 0);
-	res = ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
-				       ffa_msg_send_sender(res), 2, 0, 0, 0, 0);
+	res = ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res), 2, 0,
+				       0, 0, 0);
 	EXPECT_EQ(res.func, FFA_INTERRUPT_32);
 
 	EXPECT_EQ(irq_counter, 1);
@@ -79,8 +79,8 @@ TEST_SERVICE(interruptible_echo_direct_msg)
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
 	EXPECT_EQ(res.arg3, 3);
 
-	ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
-				 ffa_msg_send_sender(res), 4, 0, 0, 0, 0);
+	ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res), 4, 0, 0, 0,
+				 0);
 }
 
 /**
@@ -107,6 +107,6 @@ TEST_SERVICE(interruptible_echo_direct_msg_with_interrupt)
 
 	dlog("Secondary VM received direct message request and interrupt.\n");
 
-	ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
-				 ffa_msg_send_sender(res), 2, 0, 0, 0, 0);
+	ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res), 2, 0, 0, 0,
+				 0);
 }

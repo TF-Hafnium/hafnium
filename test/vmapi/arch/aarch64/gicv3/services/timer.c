@@ -62,10 +62,10 @@ TEST_SERVICE(timer)
 		uint32_t ticks;
 		struct ffa_value ret = mailbox_receive_retry();
 
-		if (ffa_msg_send_sender(ret) != HF_PRIMARY_VM_ID ||
+		if (ffa_sender(ret) != HF_PRIMARY_VM_ID ||
 		    ffa_msg_send_size(ret) != sizeof("**** xxxxxxx")) {
 			FAIL("Got unexpected message from VM %d, size %d.\n",
-			     ffa_msg_send_sender(ret), ffa_msg_send_size(ret));
+			     ffa_sender(ret), ffa_msg_send_size(ret));
 		}
 
 		/*
@@ -141,6 +141,6 @@ TEST_SERVICE(timer_ffa_direct_msg)
 	timer_set(9999999);
 	timer_start();
 
-	ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
-				 ffa_msg_send_sender(res), 2, 0, 0, 0, 0);
+	ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res), 2, 0, 0, 0,
+				 0);
 }

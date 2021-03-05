@@ -174,7 +174,7 @@ TEST(mailbox, relay)
 	/* Let SERVICE_VM1 forward the message. */
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_msg_send_receiver(run_res), SERVICE_VM2);
+	EXPECT_EQ(ffa_receiver(run_res), SERVICE_VM2);
 	EXPECT_EQ(ffa_msg_send_size(run_res), 0);
 
 	/* Let SERVICE_VM2 forward the message. */
@@ -182,7 +182,7 @@ TEST(mailbox, relay)
 	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
 
 	/* Ensure the message is intact. */
-	EXPECT_EQ(ffa_msg_send_receiver(run_res), HF_PRIMARY_VM_ID);
+	EXPECT_EQ(ffa_receiver(run_res), HF_PRIMARY_VM_ID);
 	EXPECT_EQ(ffa_msg_send_size(run_res), sizeof(message));
 	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);

@@ -360,8 +360,8 @@ out:
  */
 static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 {
-	ffa_vm_id_t sender = ffa_msg_send_sender(*args);
-	ffa_vm_id_t receiver = ffa_msg_send_receiver(*args);
+	ffa_vm_id_t sender = ffa_sender(*args);
+	ffa_vm_id_t receiver = ffa_receiver(*args);
 	ffa_vm_id_t current_vm_id = current->vm->id;
 
 	/*
@@ -512,10 +512,10 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_yield(current, next);
 		return true;
 	case FFA_MSG_SEND_32:
-		*args = api_ffa_msg_send(
-			ffa_msg_send_sender(*args),
-			ffa_msg_send_receiver(*args), ffa_msg_send_size(*args),
-			ffa_msg_send_attributes(*args), current, next);
+		*args = api_ffa_msg_send(ffa_sender(*args), ffa_receiver(*args),
+					 ffa_msg_send_size(*args),
+					 ffa_msg_send_attributes(*args),
+					 current, next);
 		return true;
 	case FFA_MSG_WAIT_32:
 #if SECURE_WORLD == 1
@@ -569,16 +569,16 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			return true;
 		}
 #endif
-		*args = api_ffa_msg_send_direct_req(
-			ffa_msg_send_sender(*args),
-			ffa_msg_send_receiver(*args), *args, current, next);
+		*args = api_ffa_msg_send_direct_req(ffa_sender(*args),
+						    ffa_receiver(*args), *args,
+						    current, next);
 		return true;
 	}
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
-		*args = api_ffa_msg_send_direct_resp(
-			ffa_msg_send_sender(*args),
-			ffa_msg_send_receiver(*args), *args, current, next);
+		*args = api_ffa_msg_send_direct_resp(ffa_sender(*args),
+						     ffa_receiver(*args), *args,
+						     current, next);
 		return true;
 	case FFA_SECONDARY_EP_REGISTER_64:
 		*args = api_ffa_secondary_ep_register(ipa_init(args->arg1),

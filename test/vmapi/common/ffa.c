@@ -239,7 +239,7 @@ ffa_vm_id_t retrieve_memory_from_message(
 
 	EXPECT_EQ(msg_ret.func, FFA_MSG_SEND_32);
 	msg_size = ffa_msg_send_size(msg_ret);
-	sender = ffa_msg_send_sender(msg_ret);
+	sender = ffa_sender(msg_ret);
 
 	retrieve_request = (struct ffa_memory_region *)recv_buf;
 	handle_ = retrieve_request->handle;
@@ -317,7 +317,7 @@ ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 
 	EXPECT_EQ(msg_ret.func, FFA_MSG_SEND_32);
 	msg_size = ffa_msg_send_size(msg_ret);
-	sender = ffa_msg_send_sender(msg_ret);
+	sender = ffa_sender(msg_ret);
 
 	memcpy_s(send_buf, HF_MAILBOX_SIZE, recv_buf, msg_size);
 	ffa_rx_release();

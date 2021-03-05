@@ -18,8 +18,8 @@ TEST_SERVICE(echo)
 	/* Loop, echo messages back to the sender. */
 	for (;;) {
 		struct ffa_value ret = ffa_msg_wait();
-		ffa_vm_id_t target_vm_id = ffa_msg_send_receiver(ret);
-		ffa_vm_id_t source_vm_id = ffa_msg_send_sender(ret);
+		ffa_vm_id_t target_vm_id = ffa_receiver(ret);
+		ffa_vm_id_t source_vm_id = ffa_sender(ret);
 		void *send_buf = SERVICE_SEND_BUFFER();
 		void *recv_buf = SERVICE_RECV_BUFFER();
 

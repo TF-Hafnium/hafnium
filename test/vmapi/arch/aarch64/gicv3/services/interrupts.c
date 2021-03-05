@@ -37,6 +37,6 @@ TEST_SERVICE(interrupts_secondary_direct_message)
 	 */
 
 	dlog("Secondary VM sends a direct message response.\n");
-	ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
-				 ffa_msg_send_sender(res), 2, 0, 0, 0, 0);
+	ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res), 2, 0, 0, 0,
+				 0);
 }

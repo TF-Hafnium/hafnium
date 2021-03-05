@@ -26,8 +26,8 @@ noreturn void test_main_sp(void)
 		HFTEST_LOG("Received direct message request");
 		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
 
-		ffa_msg_send_direct_resp(
-			ffa_msg_send_receiver(res), ffa_msg_send_sender(res),
-			res.arg3, res.arg4, res.arg5, res.arg6, res.arg7);
+		ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res),
+					 res.arg3, res.arg4, res.arg5, res.arg6,
+					 res.arg7);
 	}
 }

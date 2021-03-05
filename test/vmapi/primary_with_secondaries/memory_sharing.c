@@ -926,7 +926,7 @@ TEST(memory_sharing, donate_vms)
 	/* Let the memory be sent from VM1 to VM2. */
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_msg_send_receiver(run_res), SERVICE_VM2);
+	EXPECT_EQ(ffa_receiver(run_res), SERVICE_VM2);
 
 	/* Receive memory in VM2. */
 	run_res = ffa_run(SERVICE_VM2, 0);

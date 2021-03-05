@@ -247,12 +247,12 @@ static inline int32_t ffa_error_code(struct ffa_value val)
 	return (int32_t)val.arg2;
 }
 
-static inline ffa_vm_id_t ffa_msg_send_sender(struct ffa_value args)
+static inline ffa_vm_id_t ffa_sender(struct ffa_value args)
 {
 	return (args.arg1 >> 16) & 0xffff;
 }
 
-static inline ffa_vm_id_t ffa_msg_send_receiver(struct ffa_value args)
+static inline ffa_vm_id_t ffa_receiver(struct ffa_value args)
 {
 	return args.arg1 & 0xffff;
 }

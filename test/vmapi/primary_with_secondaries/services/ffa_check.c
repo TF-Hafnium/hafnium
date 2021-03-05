@@ -27,8 +27,8 @@ TEST_SERVICE(ffa_check)
 
 	/* Ensure message header has all fields correctly set. */
 	EXPECT_EQ(ffa_msg_send_size(ret), sizeof(message));
-	EXPECT_EQ(ffa_msg_send_receiver(ret), hf_vm_get_id());
-	EXPECT_EQ(ffa_msg_send_sender(ret), HF_PRIMARY_VM_ID);
+	EXPECT_EQ(ffa_receiver(ret), hf_vm_get_id());
+	EXPECT_EQ(ffa_sender(ret), HF_PRIMARY_VM_ID);
 
 	/* Ensure that the payload was correctly transmitted. */
 	EXPECT_EQ(memcmp(recv_buf, message, sizeof(message)), 0);
@@ -72,9 +72,9 @@ TEST_SERVICE(ffa_direct_message_resp_echo)
 
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
 
-	ffa_msg_send_direct_resp(ffa_msg_send_receiver(args),
-				 ffa_msg_send_sender(args), args.arg3,
-				 args.arg4, args.arg5, args.arg6, args.arg7);
+	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
+				 args.arg3, args.arg4, args.arg5, args.arg6,
+				 args.arg7);
 }
 
 TEST_SERVICE(ffa_direct_msg_req_disallowed_smc)
@@ -87,8 +87,7 @@ TEST_SERVICE(ffa_direct_msg_req_disallowed_smc)
 	ret = ffa_yield();
 	EXPECT_FFA_ERROR(ret, FFA_DENIED);
 
-	ret = ffa_msg_send(ffa_msg_send_receiver(args),
-			   ffa_msg_send_sender(args), 0, 0);
+	ret = ffa_msg_send(ffa_receiver(args), ffa_sender(args), 0, 0);
 	EXPECT_FFA_ERROR(ret, FFA_DENIED);
 
 	ret = ffa_msg_wait();
@@ -100,9 +99,9 @@ TEST_SERVICE(ffa_direct_msg_req_disallowed_smc)
 	ret = ffa_msg_poll();
 	EXPECT_FFA_ERROR(ret, FFA_DENIED);
 
-	ffa_msg_send_direct_resp(ffa_msg_send_receiver(args),
-				 ffa_msg_send_sender(args), args.arg3,
-				 args.arg4, args.arg5, args.arg6, args.arg7);
+	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
+				 args.arg3, args.arg4, args.arg5, args.arg6,
+				 args.arg7);
 }
 
 /**
@@ -124,9 +123,9 @@ TEST_SERVICE(ffa_disallowed_direct_msg_req)
 	args = ffa_msg_wait();
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
 
-	ffa_msg_send_direct_resp(ffa_msg_send_receiver(args),
-				 ffa_msg_send_sender(args), args.arg3,
-				 args.arg4, args.arg5, args.arg6, args.arg7);
+	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
+				 args.arg3, args.arg4, args.arg5, args.arg6,
+				 args.arg7);
 }
 
 /**
@@ -145,9 +144,9 @@ TEST_SERVICE(ffa_disallowed_direct_msg_resp)
 	args = ffa_msg_wait();
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
 
-	ffa_msg_send_direct_resp(ffa_msg_send_receiver(args),
-				 ffa_msg_send_sender(args), args.arg3,
-				 args.arg4, args.arg5, args.arg6, args.arg7);
+	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
+				 args.arg3, args.arg4, args.arg5, args.arg6,
+				 args.arg7);
 }
 
 /**
@@ -163,8 +162,8 @@ TEST_SERVICE(ffa_direct_msg_resp_invalid_sender_receiver)
 
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
 
-	ffa_vm_id_t sender = ffa_msg_send_sender(args);
-	ffa_vm_id_t receiver = ffa_msg_send_receiver(args);
+	ffa_vm_id_t sender = ffa_sender(args);
+	ffa_vm_id_t receiver = ffa_receiver(args);
 
 	res = ffa_msg_send_direct_resp(receiver, SERVICE_VM2, 0, 0, 0, 0, 0);
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
@@ -186,11 +185,11 @@ TEST_SERVICE(ffa_direct_msg_run)
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
 	EXPECT_EQ(res.arg3, 1);
 
-	res = ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
-				       ffa_msg_send_sender(res), 2, 0, 0, 0, 0);
+	res = ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res), 2, 0,
+				       0, 0, 0);
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
 	EXPECT_EQ(res.arg3, 3);
 
-	ffa_msg_send_direct_resp(ffa_msg_send_receiver(res),
-				 ffa_msg_send_sender(res), 4, 0, 0, 0, 0);
+	ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res), 4, 0, 0, 0,
+				 0);
 }

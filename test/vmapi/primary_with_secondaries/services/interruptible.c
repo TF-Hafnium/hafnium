@@ -70,12 +70,12 @@ TEST_SERVICE(interruptible)
 		struct ffa_value ret = mailbox_receive_retry();
 
 		ASSERT_EQ(ret.func, FFA_MSG_SEND_32);
-		if (ffa_msg_send_sender(ret) == HF_PRIMARY_VM_ID &&
+		if (ffa_sender(ret) == HF_PRIMARY_VM_ID &&
 		    ffa_msg_send_size(ret) == sizeof(ping_message) &&
 		    memcmp(recv_buf, ping_message, sizeof(ping_message)) == 0) {
 			/* Interrupt ourselves */
 			hf_interrupt_inject(this_vm_id, 0, SELF_INTERRUPT_ID);
-		} else if (ffa_msg_send_sender(ret) == HF_PRIMARY_VM_ID &&
+		} else if (ffa_sender(ret) == HF_PRIMARY_VM_ID &&
 			   ffa_msg_send_size(ret) == sizeof(enable_message) &&
 			   memcmp(recv_buf, enable_message,
 				  sizeof(enable_message)) == 0) {
@@ -84,7 +84,7 @@ TEST_SERVICE(interruptible)
 					    INTERRUPT_TYPE_IRQ);
 		} else {
 			dlog("Got unexpected message from VM %d, size %d.\n",
-			     ffa_msg_send_sender(ret), ffa_msg_send_size(ret));
+			     ffa_sender(ret), ffa_msg_send_size(ret));
 			FAIL("Unexpected message");
 		}
 		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
