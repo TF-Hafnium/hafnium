@@ -1661,6 +1661,46 @@ static inline bool api_ffa_dir_msg_is_arg2_zero(struct ffa_value args)
 }
 
 /**
+ * Limits size of arguments in ffa_value structure to 32-bit.
+ */
+static struct ffa_value api_ffa_value_copy32(struct ffa_value args)
+{
+	return (struct ffa_value){
+		.func = (uint32_t)args.func,
+		.arg1 = (uint32_t)args.arg1,
+		.arg2 = (uint32_t)0,
+		.arg3 = (uint32_t)args.arg3,
+		.arg4 = (uint32_t)args.arg4,
+		.arg5 = (uint32_t)args.arg5,
+		.arg6 = (uint32_t)args.arg6,
+		.arg7 = (uint32_t)args.arg7,
+	};
+}
+
+/**
+ * Helper to copy direct message payload, depending on SMC used and expected
+ * registers size.
+ */
+static struct ffa_value api_ffa_dir_msg_value(struct ffa_value args)
+{
+	if (args.func == FFA_MSG_SEND_DIRECT_REQ_32 ||
+	    args.func == FFA_MSG_SEND_DIRECT_RESP_32) {
+		return api_ffa_value_copy32(args);
+	}
+
+	return (struct ffa_value){
+		.func = args.func,
+		.arg1 = args.arg1,
+		.arg2 = 0,
+		.arg3 = args.arg3,
+		.arg4 = args.arg4,
+		.arg5 = args.arg5,
+		.arg6 = args.arg6,
+		.arg7 = args.arg7,
+	};
+}
+
+/**
  * Send an FF-A direct message request.
  */
 struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
@@ -1760,16 +1800,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	receiver_vcpu->regs_available = false;
 	receiver_vcpu->direct_request_origin_vm_id = sender_vm_id;
 
-	arch_regs_set_retval(&receiver_vcpu->regs, (struct ffa_value){
-							   .func = args.func,
-							   .arg1 = args.arg1,
-							   .arg2 = 0,
-							   .arg3 = args.arg3,
-							   .arg4 = args.arg4,
-							   .arg5 = args.arg5,
-							   .arg6 = args.arg6,
-							   .arg7 = args.arg7,
-						   });
+	arch_regs_set_retval(&receiver_vcpu->regs, api_ffa_dir_msg_value(args));
 
 	current->state = VCPU_STATE_BLOCKED_MAILBOX;
 
@@ -1803,16 +1834,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	struct ffa_value to_ret = {
-		.func = args.func,
-		.arg1 = args.arg1,
-		.arg2 = 0,
-		.arg3 = args.arg3,
-		.arg4 = args.arg4,
-		.arg5 = args.arg5,
-		.arg6 = args.arg6,
-		.arg7 = args.arg7,
-	};
+	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
 
 	if (!arch_other_world_is_direct_response_valid(current, sender_vm_id,
 						       receiver_vm_id)) {
