@@ -6,4 +6,6 @@
 
 declare_args() {
   pl011_base_address = ""
+  pl011_clock = 0
+  pl011_baudrate = 115200
 }

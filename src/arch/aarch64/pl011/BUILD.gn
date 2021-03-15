@@ -17,5 +17,16 @@ source_set("pl011") {
 
   assert(defined(pl011_base_address),
          "\"pl011_base_address\" must be defined for ${target_name}.")
-  defines = [ "PL011_BASE=${pl011_base_address}" ]
+
+  assert(defined(pl011_clock),
+         "\"pl011_clock\" must be defined for ${target_name}.")
+
+  assert(defined(pl011_baudrate),
+         "\"pl011_baudrate\" must be defined for ${target_name}.")
+
+  defines = [
+    "PL011_BASE=${pl011_base_address}",
+    "PL011_CLOCK=${pl011_clock}",
+    "PL011_BAUDRATE=${pl011_baudrate}",
+  ]
 }
