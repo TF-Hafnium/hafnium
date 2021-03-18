@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Hafnium Authors.
+ * Copyright 2021 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -152,11 +152,10 @@ TEAR_DOWN(ffa)
 /** Ensures that the Hafnium FF-A version is reported as expected. */
 TEST(ffa, ffa_version)
 {
-	const int32_t major_revision = 1;
-	const int32_t major_revision_offset = 16;
-	const int32_t minor_revision = 0;
+	const uint16_t major_revision = 1;
+	const uint16_t minor_revision = 1;
 	const int32_t current_version =
-		(major_revision << major_revision_offset) | minor_revision;
+		(int32_t)MAKE_FFA_VERSION(major_revision, minor_revision);
 
 	EXPECT_EQ(ffa_version(current_version), current_version);
 	EXPECT_EQ(ffa_version(0x0), current_version);

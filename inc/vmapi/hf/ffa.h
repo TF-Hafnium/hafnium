@@ -13,7 +13,7 @@
 #define FFA_VERSION_MAJOR 0x1
 #define FFA_VERSION_MAJOR_OFFSET 16
 #define FFA_VERSION_MAJOR_MASK 0x7FFF
-#define FFA_VERSION_MINOR 0x0
+#define FFA_VERSION_MINOR 0x1
 #define FFA_VERSION_MINOR_OFFSET 0
 #define FFA_VERSION_MINOR_MASK 0xFFFF
 
@@ -31,39 +31,52 @@
 #define FFA_HIGH_64_ID 0xC400007F
 
 /* FF-A function identifiers. */
-#define FFA_ERROR_32                 0x84000060
-#define FFA_SUCCESS_32               0x84000061
-#define FFA_SUCCESS_64               0xC4000061
-#define FFA_INTERRUPT_32             0x84000062
-#define FFA_VERSION_32               0x84000063
-#define FFA_FEATURES_32              0x84000064
-#define FFA_RX_RELEASE_32            0x84000065
-#define FFA_RXTX_MAP_32              0x84000066
-#define FFA_RXTX_MAP_64              0xC4000066
-#define FFA_RXTX_UNMAP_32            0x84000067
-#define FFA_PARTITION_INFO_GET_32    0x84000068
-#define FFA_ID_GET_32                0x84000069
-#define FFA_MSG_POLL_32              0x8400006A
-#define FFA_MSG_WAIT_32              0x8400006B
-#define FFA_YIELD_32                 0x8400006C
-#define FFA_RUN_32                   0x8400006D
-#define FFA_MSG_SEND_32              0x8400006E
-#define FFA_MSG_SEND_DIRECT_REQ_32   0x8400006F
-#define FFA_MSG_SEND_DIRECT_REQ_64   0xC400006F
-#define FFA_MSG_SEND_DIRECT_RESP_64  0xC4000070
-#define FFA_MSG_SEND_DIRECT_RESP_32  0x84000070
-#define FFA_MEM_DONATE_32            0x84000071
-#define FFA_MEM_LEND_32              0x84000072
-#define FFA_MEM_SHARE_32             0x84000073
-#define FFA_MEM_RETRIEVE_REQ_32      0x84000074
-#define FFA_MEM_RETRIEVE_RESP_32     0x84000075
-#define FFA_MEM_RELINQUISH_32        0x84000076
-#define FFA_MEM_RECLAIM_32           0x84000077
-#define FFA_MEM_FRAG_RX_32           0x8400007A
-#define FFA_MEM_FRAG_TX_32           0x8400007B
-#define FFA_SECONDARY_EP_REGISTER_32 0x84000084
-#define FFA_SECONDARY_EP_REGISTER_64 0xC4000084
-#define FFA_SPM_ID_GET_32	     0x84000085
+#define FFA_ERROR_32                        0x84000060
+#define FFA_SUCCESS_32                      0x84000061
+#define FFA_SUCCESS_64                      0xC4000061
+#define FFA_INTERRUPT_32                    0x84000062
+#define FFA_VERSION_32                      0x84000063
+#define FFA_FEATURES_32                     0x84000064
+#define FFA_RX_RELEASE_32                   0x84000065
+#define FFA_RXTX_MAP_32                     0x84000066
+#define FFA_RXTX_MAP_64                     0xC4000066
+#define FFA_RXTX_UNMAP_32                   0x84000067
+#define FFA_PARTITION_INFO_GET_32           0x84000068
+#define FFA_ID_GET_32                       0x84000069
+#define FFA_MSG_POLL_32                     0x8400006A /* Legacy FF-A v1.0 */
+#define FFA_MSG_WAIT_32                     0x8400006B
+#define FFA_YIELD_32                        0x8400006C
+#define FFA_RUN_32                          0x8400006D
+#define FFA_MSG_SEND_32                     0x8400006E /* Legacy FF-A v1.0 */
+#define FFA_MSG_SEND_DIRECT_REQ_32          0x8400006F
+#define FFA_MSG_SEND_DIRECT_REQ_64          0xC400006F
+#define FFA_MSG_SEND_DIRECT_RESP_32         0x84000070
+#define FFA_MSG_SEND_DIRECT_RESP_64         0xC4000070
+#define FFA_MEM_DONATE_32                   0x84000071
+#define FFA_MEM_LEND_32                     0x84000072
+#define FFA_MEM_SHARE_32                    0x84000073
+#define FFA_MEM_RETRIEVE_REQ_32             0x84000074
+#define FFA_MEM_RETRIEVE_RESP_32            0x84000075
+#define FFA_MEM_RELINQUISH_32               0x84000076
+#define FFA_MEM_RECLAIM_32                  0x84000077
+#define FFA_MEM_FRAG_RX_32                  0x8400007A
+#define FFA_MEM_FRAG_TX_32                  0x8400007B
+#define FFA_NORMAL_WORLD_RESUME             0x8400007C
+
+/* FF-A v1.1 */
+#define FFA_NOTIFICATION_BITMAP_CREATE_32   0x8400007D
+#define FFA_NOTIFICATION_BITMAP_DESTROY_32  0x8400007E
+#define FFA_NOTIFICATION_BIND_32            0x8400007F
+#define FFA_NOTIFICATION_UNBIND_32          0x84000080
+#define FFA_NOTIFICATION_SET_32             0x84000081
+#define FFA_NOTIFICATION_GET_32             0x84000082
+#define FFA_NOTIFICATION_INFO_GET_64        0xC4000083
+#define FFA_RX_ACQUIRE_32                   0x84000084
+#define FFA_SPM_ID_GET_32                   0x84000085
+#define FFA_MSG_SEND2_32                    0x84000086
+#define FFA_SECONDARY_EP_REGISTER_64        0xC4000087
+#define FFA_MEM_PERM_GET_32                 0x84000088
+#define FFA_MEM_PERM_SET_32                 0x84000089
 
 /* FF-A error codes. */
 #define FFA_NOT_SUPPORTED      INT32_C(-1)
