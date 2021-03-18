@@ -11,6 +11,7 @@
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/cpu.h"
+#include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/layout.h"
 #include "hf/plat/iommu.h"
@@ -76,6 +77,13 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 	for (i = 0; i < vcpu_count; i++) {
 		vcpu_init(vm_get_vcpu(vm, i), vm);
 	}
+
+	/* Basic initialization of the notifications structure. */
+	vm_notifications_init_bindings(&vm->notifications.from_sp);
+	vm_notifications_init_bindings(&vm->notifications.from_vm);
+
+	/* TODO: Enable in accordance to VM's manifest. */
+	vm->notifications.enabled = true;
 
 	return vm;
 }
@@ -360,4 +368,14 @@ void vm_update_boot(struct vm *vm)
 	}
 
 	vm->next_boot = current;
+}
+
+/*
+ * Initializes the notifications structure.
+ */
+void vm_notifications_init_bindings(struct notifications *notifications)
+{
+	for (uint32_t i = 0U; i < MAX_FFA_NOTIFICATIONS; i++) {
+		notifications->bindings_sender_id[i] = HF_INVALID_VM_ID;
+	}
 }

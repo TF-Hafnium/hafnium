@@ -184,3 +184,7 @@ bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 
 	return false;
 }
+
+void plat_ffa_vm_init(void)
+{
+}

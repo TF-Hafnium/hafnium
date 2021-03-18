@@ -11,12 +11,24 @@
 
 #include "hf/dlog.h"
 #include "hf/ffa.h"
+#include "hf/std.h"
 #include "hf/vm.h"
 
 #include "smc.h"
 
 /** Other world SVE context (accessed from other_world_loop). */
 struct sve_context_t sve_context[MAX_CPUS];
+
+/**
+ * The SPMC needs to keep track of some information about NWd VMs.
+ * For the time being, only the notifications state structures.
+ * Allocation and deallocation of a slot in 'nwd_vms' to and from a given VM
+ * will happen upon calls to FFA_NOTIFICATION_BITMAP_CREATE and
+ * FFA_NOTIFICATION_BITMAP_DESTROY.
+ */
+static struct vm nwd_vms[MAX_VMS];
+
+const uint32_t nwd_vms_size = ARRAY_SIZE(nwd_vms);
 
 void plat_ffa_log_init(void)
 {
@@ -32,11 +44,26 @@ struct ffa_value plat_ffa_spmc_id_get(void)
 	return smc_ffa_call((struct ffa_value){.func = FFA_ID_GET_32});
 }
 
+static void plat_ffa_vm_init(void)
+{
+	/* Init NWd VMs structures for use of Notifications interfaces. */
+	for (uint32_t i = 0; i < nwd_vms_size; i++) {
+		/*
+		 * A slot in 'nwd_vms' is considered available if its id
+		 * is HF_INVALID_VM_ID.
+		 */
+		nwd_vms[i].id = HF_INVALID_VM_ID;
+		vm_notifications_init_bindings(
+			&nwd_vms[i].notifications.from_sp);
+	}
+}
+
 void plat_ffa_init(bool tee_enabled)
 {
 	(void)tee_enabled;
 
 	arch_ffa_init();
+	plat_ffa_vm_init();
 }
 
 /**

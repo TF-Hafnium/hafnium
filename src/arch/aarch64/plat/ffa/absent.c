@@ -84,3 +84,7 @@ bool plat_ffa_memory_handle_allocated_by_current_world(
 
 	return false;
 }
+
+void plat_ffa_vm_init(void)
+{
+}

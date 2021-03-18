@@ -92,6 +92,37 @@ struct mailbox {
 	struct list_entry ready_list;
 };
 
+struct notifications_state {
+	/**
+	 * To keep track of the notifications pending.
+	 * Set on call to FFA_NOTIFICATION_SET, and cleared on call to
+	 * FFA_NOTIFICATION_GET.
+	 */
+	ffa_notifications_bitmap_t pending;
+
+	/**
+	 * Set on FFA_NOTIFICATION_INFO_GET to keep track of the notifications
+	 * whose information has been retrieved by the referred ABI.
+	 * Cleared on call to FFA_NOTIFICATION_GET.
+	 */
+	ffa_notifications_bitmap_t info_get_retrieved;
+};
+
+struct notifications {
+	/**
+	 * The following array maps the notifications to the bound FF-A
+	 * endpoint.
+	 * The index in the bindings array relates to the notification
+	 * ID, and bit position in 'ffa_notifications_bitmap_t'.
+	 */
+	ffa_vm_id_t bindings_sender_id[MAX_FFA_NOTIFICATIONS];
+	ffa_notifications_bitmap_t bindings_per_vcpu;
+
+	/* The index of the array below relates to the ID of the VCPU. */
+	struct notifications_state per_vcpu[MAX_CPUS];
+	struct notifications_state global;
+};
+
 struct smc_whitelist {
 	uint32_t smcs[MAX_SMCS];
 	uint16_t smc_count;
@@ -109,6 +140,20 @@ struct vm {
 	struct vcpu vcpus[MAX_CPUS];
 	struct mm_ptable ptable;
 	struct mailbox mailbox;
+
+	struct {
+		/**
+		 * State structures for notifications coming from VMs or coming
+		 * from SPs. Both fields are maintained by the SPMC.
+		 * The hypervisor ignores the 'from_sp' field, given VM
+		 * notifications from SPs are managed by the SPMC.
+		 */
+		struct notifications from_vm;
+		struct notifications from_sp;
+		/* TODO: include framework notifications */
+		bool enabled;
+	} notifications;
+
 	char log_buffer[LOG_BUFFER_SIZE];
 	uint16_t log_buffer_length;
 
@@ -178,3 +223,5 @@ bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool);
 
 void vm_update_boot(struct vm *vm);
 struct vm *vm_get_first_boot(void);
+
+void vm_notifications_init_bindings(struct notifications *n);

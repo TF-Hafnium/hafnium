@@ -48,3 +48,8 @@ bool plat_ffa_memory_handle_allocated_by_current_world(
  */
 ffa_partition_properties_t plat_ffa_partition_properties(
 	ffa_vm_id_t current_id, const struct vm *target);
+
+/**
+ * Initializes the NWd VM structures for Notifications support.
+ */
+void plat_ffa_vm_init(void);
