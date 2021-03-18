@@ -2578,3 +2578,85 @@ struct ffa_value api_ffa_notification_bitmap_destroy(ffa_vm_id_t vm_id,
 
 	return plat_ffa_notifications_bitmap_destroy(vm_id);
 }
+
+struct ffa_value api_ffa_notification_update_bindings(
+	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id, uint32_t flags,
+	ffa_notifications_bitmap_t notifications, bool is_bind,
+	struct vcpu *current)
+{
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
+	struct vm_locked receiver_locked;
+	const bool is_per_vcpu = (flags & FFA_NOTIFICATION_FLAG_PER_VCPU) != 0U;
+	const ffa_vm_id_t id_to_update =
+		is_bind ? sender_vm_id : HF_INVALID_VM_ID;
+	const ffa_vm_id_t id_to_validate =
+		is_bind ? HF_INVALID_VM_ID : sender_vm_id;
+
+	if (!plat_ffa_is_notifications_bind_valid(current, sender_vm_id,
+						  receiver_vm_id)) {
+		dlog_verbose("Invalid use of notifications bind interface.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (notifications == 0U) {
+		dlog_verbose("No notifications have been specified.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/**
+	 * This check assumes receiver is the current VM, and has been enforced
+	 * by 'plat_ffa_is_notifications_bind_valid'.
+	 */
+	receiver_locked = plat_ffa_vm_find_locked(receiver_vm_id);
+
+	if (receiver_locked.vm == NULL) {
+		dlog_verbose("Receiver doesn't exist!\n");
+		return ffa_error(FFA_DENIED);
+	}
+
+	if (!vm_are_notifications_enabled(receiver_locked)) {
+		dlog_verbose("Notifications are not enabled.\n");
+		ret = ffa_error(FFA_NOT_SUPPORTED);
+		goto out;
+	}
+
+	if (is_bind && vm_id_is_current_world(sender_vm_id) &&
+	    vm_find(sender_vm_id) == NULL) {
+		dlog_verbose("Sender VM does not exist!\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/*
+	 * Can't bind/unbind notifications if at least one is bound to a
+	 * different sender.
+	 */
+	if (!vm_notifications_validate_bound_sender(
+		    receiver_locked, plat_ffa_is_vm_id(sender_vm_id),
+		    id_to_validate, notifications)) {
+		dlog_verbose("Notifications are bound to other sender.\n");
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	/**
+	 * Check if there is a pending notification within those specified in
+	 * the bitmap.
+	 */
+	if (vm_are_notifications_pending(receiver_locked,
+					 plat_ffa_is_vm_id(sender_vm_id),
+					 notifications)) {
+		dlog_verbose("Notifications within '%x' pending.\n",
+			     notifications);
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	vm_notifications_update_bindings(
+		receiver_locked, plat_ffa_is_vm_id(sender_vm_id), id_to_update,
+		notifications, is_per_vcpu && is_bind);
+
+out:
+	vm_unlock(&receiver_locked);
+	return ret;
+}

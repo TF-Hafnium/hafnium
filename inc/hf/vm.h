@@ -231,3 +231,18 @@ bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 void vm_notifications_init_bindings(struct notifications *n);
 bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 				  ffa_notifications_bitmap_t notifications);
+bool vm_are_notifications_enabled(struct vm_locked vm_locked);
+bool vm_notifications_validate_per_vcpu(struct vm_locked vm_locked,
+					bool is_from_vm, bool is_per_vcpu,
+					ffa_notifications_bitmap_t notif);
+bool vm_notifications_validate_bound_sender(
+	struct vm_locked vm_locked, bool is_from_vm, ffa_vm_id_t sender_id,
+	ffa_notifications_bitmap_t notifications);
+bool vm_notifications_validate_binding(struct vm_locked vm_locked,
+				       bool is_from_vm, ffa_vm_id_t sender_id,
+				       ffa_notifications_bitmap_t notifications,
+				       bool is_per_vcpu);
+void vm_notifications_update_bindings(struct vm_locked vm_locked,
+				      bool is_from_vm, ffa_vm_id_t sender_id,
+				      ffa_notifications_bitmap_t notifications,
+				      bool is_per_vcpu);

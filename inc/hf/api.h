@@ -101,3 +101,8 @@ struct ffa_value api_ffa_notification_bitmap_create(ffa_vm_id_t vm_id,
 						    struct vcpu *current);
 struct ffa_value api_ffa_notification_bitmap_destroy(ffa_vm_id_t vm_id,
 						     struct vcpu *current);
+
+struct ffa_value api_ffa_notification_update_bindings(
+	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id, uint32_t flags,
+	ffa_notifications_bitmap_t notifications, bool is_bind,
+	struct vcpu *current);

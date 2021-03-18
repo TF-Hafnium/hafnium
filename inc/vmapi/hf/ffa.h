@@ -399,6 +399,12 @@ typedef uint64_t ffa_notifications_bitmap_t;
 #define MAX_FFA_NOTIFICATIONS 64U
 
 /**
+ * Flag for notification bind and set, to specify call is about per-vCPU
+ * notifications.
+ */
+#define FFA_NOTIFICATION_FLAG_PER_VCPU UINT32_C(1 << 0)
+
+/**
  * Helper function to assemble a 64-bit sized bitmap, from the 32-bit sized lo
  * and hi.
  * Helpful as FF-A specification defines that the notifications interfaces

@@ -160,6 +160,25 @@ bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
 	       !vm_id_is_current_world(vm_id);
 }
 
+bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
+					  ffa_vm_id_t sender_id,
+					  ffa_vm_id_t receiver_id)
+{
+	ffa_vm_id_t current_vm_id = current->vm->id;
+
+	/**
+	 * SPMC:
+	 * - If bind call from SP, receiver's ID must be same as current VM ID.
+	 * - If bind call from NWd, current VM ID must be same as Hypervisor ID,
+	 * receiver's ID must be from NWd, and sender's ID from SWd.
+	 */
+	return sender_id != receiver_id &&
+	       (current_vm_id == receiver_id ||
+		(current_vm_id == HF_HYPERVISOR_VM_ID &&
+		 !vm_id_is_current_world(receiver_id) &&
+		 vm_id_is_current_world(sender_id)));
+}
+
 ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
 {
 	return (index & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK) |
@@ -234,6 +253,10 @@ static struct vm_locked plat_ffa_nwd_vm_find_locked(
 struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
 {
 	struct vm_locked to_ret_locked;
+
+	if (vm_id_is_current_world(vm_id) || vm_id == HF_OTHER_WORLD_ID) {
+		return vm_find_locked(vm_id);
+	}
 
 	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
 
@@ -365,4 +388,9 @@ struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 out:
 	vm_unlock(&to_destroy_locked);
 	return ret;
+}
+
+bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
+{
+	return !vm_id_is_current_world(vm_id);
 }

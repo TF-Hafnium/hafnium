@@ -10,6 +10,7 @@
 
 #include "hf/ffa.h"
 #include "hf/vcpu.h"
+#include "hf/vm.h"
 
 /** Returns the SPMC ID. */
 struct ffa_value plat_ffa_spmc_id_get(void);
@@ -27,6 +28,11 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value *ret);
 bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
 					    ffa_vm_id_t vm_id);
+
+bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
+					  ffa_vm_id_t sender_id,
+					  ffa_vm_id_t receiver_id);
+
 /**
  * Checks whether managed exit is supported by given SP.
  */
@@ -70,3 +76,14 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
  * Destroys the notifications bitmap for the given VM ID.
  */
 struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id);
+
+/**
+ * Helper to get the struct notifications, depending on the sender's id.
+ */
+struct notifications *plat_ffa_vm_get_notifications_senders_world(
+	struct vm_locked vm_locked, ffa_vm_id_t sender_id);
+
+/**
+ * Helper to check if FF-A ID is a VM ID.
+ */
+bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id);

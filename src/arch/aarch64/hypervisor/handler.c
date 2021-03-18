@@ -603,6 +603,18 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_notification_bitmap_destroy(
 			(ffa_vm_id_t)args->arg1, current);
 		return true;
+	case FFA_NOTIFICATION_BIND_32:
+		*args = api_ffa_notification_update_bindings(
+			ffa_sender(*args), ffa_receiver(*args), args->arg2,
+			ffa_notifications_bitmap(args->arg3, args->arg4), true,
+			current);
+		return true;
+	case FFA_NOTIFICATION_UNBIND_32:
+		*args = api_ffa_notification_update_bindings(
+			ffa_sender(*args), ffa_receiver(*args), 0,
+			ffa_notifications_bitmap(args->arg3, args->arg4), false,
+			current);
+		return true;
 	}
 
 	return false;

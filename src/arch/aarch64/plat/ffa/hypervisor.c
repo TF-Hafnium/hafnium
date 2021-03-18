@@ -203,8 +203,13 @@ bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 	return false;
 }
 
-void plat_ffa_vm_init(void)
+bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
+					  ffa_vm_id_t sender_id,
+					  ffa_vm_id_t receiver_id)
 {
+	ffa_vm_id_t current_vm_id = current->vm->id;
+	/** If Hafnium is hypervisor, receiver needs to be current vm. */
+	return sender_id != receiver_id && current_vm_id == receiver_id;
 }
 
 struct ffa_value plat_ffa_notifications_bitmap_create(
@@ -223,4 +228,18 @@ struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 	(void)vm_id;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
+{
+	if (vm_id_is_current_world(vm_id) || vm_id == HF_OTHER_WORLD_ID) {
+		return vm_find_locked(vm_id);
+	}
+
+	return (struct vm_locked){.vm = NULL};
+}
+
+bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
+{
+	return vm_id_is_current_world(vm_id);
 }
