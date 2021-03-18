@@ -389,6 +389,28 @@ struct ffa_partition_info {
 };
 
 /**
+ * FF-A v1.1 specification restricts the number of notifications to a maximum
+ * of 64. Following all possible bitmaps.
+ */
+#define FFA_NOTIFICATION_MASK(ID) (UINT64_C(1) << ID)
+
+typedef uint64_t ffa_notifications_bitmap_t;
+
+#define MAX_FFA_NOTIFICATIONS 64U
+
+/**
+ * Helper function to assemble a 64-bit sized bitmap, from the 32-bit sized lo
+ * and hi.
+ * Helpful as FF-A specification defines that the notifications interfaces
+ * arguments are 32-bit registers.
+ */
+static inline ffa_notifications_bitmap_t ffa_notifications_bitmap(uint32_t lo,
+								  uint32_t hi)
+{
+	return (ffa_notifications_bitmap_t)hi << 32U | lo;
+}
+
+/**
  * A set of contiguous pages which is part of a memory region. This corresponds
  * to table 40 of the FF-A 1.0 EAC specification, "Constituent memory region
  * descriptor".
