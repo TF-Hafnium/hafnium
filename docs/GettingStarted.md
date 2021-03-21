@@ -24,7 +24,8 @@ See details of [how to contribute](../CONTRIBUTING.md).
 Install prerequisites:
 
 ```shell
-sudo apt install make libssl-dev flex bison python3 python3-serial
+sudo apt install make libssl-dev flex bison python3 python3-serial python3-pip
+pip3 install fdt
 ```
 
 By default, the hypervisor is built with clang for a few target platforms along

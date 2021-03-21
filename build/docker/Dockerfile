@@ -32,5 +32,6 @@ RUN 	apt-get update \
 		python-ply                     `# for Linux checkpatch` \
 		python3                        `# for all build scripts` \
 		python3-serial                 `# for hftest.py` \
+		python3-pip                    `# for hftest.py` \
 		strace                         `# for strace_open.sh` \
-	&& rm -rf /var/lib/apt/lists/*
+	&& pip3 install fdt && rm -rf /var/lib/apt/lists/*
