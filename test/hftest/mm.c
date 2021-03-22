@@ -11,7 +11,17 @@
 #include "test/hftest.h"
 
 /* Number of pages reserved for page tables. Increase if necessary. */
-#define PTABLE_PAGES 3
+#define PTABLE_PAGES 4
+
+/**
+ * Start address space mapping at 0x1000 for the mm to create a L2 table to
+ * which the first L1 descriptor points to.
+ * Provided SPMC and SP images reside below 1GB, same as peripherals, this
+ * prevents a case in which the mm library has to break down the first
+ * L1 block descriptor, while currently executing from a region within
+ * the same L1 descriptor. This is not architecturally possible.
+ */
+#define HFTEST_STAGE1_START_ADDRESS (0x1000)
 
 alignas(alignof(struct mm_page_table)) static char ptable_buf
 	[sizeof(struct mm_page_table) * PTABLE_PAGES];
@@ -43,7 +53,8 @@ bool hftest_mm_init(void)
 	}
 
 	stage1_locked = hftest_mm_get_stage1();
-	mm_identity_map(stage1_locked, pa_init(0),
+	mm_identity_map(stage1_locked,
+			pa_init((uintptr_t)HFTEST_STAGE1_START_ADDRESS),
 			pa_init(mm_ptable_addr_space_end(MM_FLAG_STAGE1)),
 			MM_MODE_R | MM_MODE_W | MM_MODE_X, &ppool);
 
