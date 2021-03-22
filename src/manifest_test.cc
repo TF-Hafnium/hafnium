@@ -232,7 +232,6 @@ class ManifestDtBuilder
 		Property("execution-ctx-count", "<1>");
 		Property("exception-level", "<2>");
 		Property("execution-state", "<0>");
-		Property("load-address", "<0x7000000>");
 		Property("entrypoint-offset", "<0x00001000>");
 		Property("xlat-granule", "<0>");
 		Property("boot-order", "<0>");
@@ -686,7 +685,6 @@ static enum manifest_return_code ffa_manifest_from_vec(
 		.EndChild()
 		.Build();
 	/* clang-format on */
-
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
 	return manifest_init(mm_stage1_locked, m, &it, &ppool);
 }
@@ -703,7 +701,6 @@ TEST(manifest, ffa_not_compatible)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<0>")
-		.Property("load-address", "<0x7000000>")
 		.Property("entrypoint-offset", "<0x00001000>")
 		.Property("xlat-granule", "<0>")
 		.Property("messaging-method", "<1>")
@@ -746,7 +743,6 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<0>")
-		.Property("load-address", "<0x7000000>")
 		.Property("entrypoint-offset", "<0x00001000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
@@ -765,7 +761,6 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<0>")
-		.Property("load-address", "<0x7000000>")
 		.Property("entrypoint-offset", "<0x00001000>")
 		.Property("xlat-granule", "<3>")
 		.Property("boot-order", "<0>")
@@ -784,7 +779,6 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<6>")
 		.Property("execution-state", "<0>")
-		.Property("load-address", "<0x7000000>")
 		.Property("entrypoint-offset", "<0x00001000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
@@ -803,7 +797,6 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<2>")
-		.Property("load-address", "<0x7000000>")
 		.Property("entrypoint-offset", "<0x00001000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
@@ -822,7 +815,6 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<0>")
-		.Property("load-address", "<0x7000000>")
 		.Property("entrypoint-offset", "<0x00001000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
@@ -1061,7 +1053,6 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].sp.execution_ctx_count, 1);
 	ASSERT_EQ(m.vm[0].sp.run_time_el, S_EL1);
 	ASSERT_EQ(m.vm[0].sp.execution_state, AARCH64);
-	ASSERT_EQ(m.vm[0].sp.load_addr, 0x7000000);
 	ASSERT_EQ(m.vm[0].sp.ep_offset, 0x00001000);
 	ASSERT_EQ(m.vm[0].sp.xlat_granule, PAGE_4KB);
 	ASSERT_EQ(m.vm[0].sp.boot_order, 0);

@@ -756,6 +756,13 @@ static enum manifest_return_code parse_ffa_partition_package(
 		goto exit_unmap;
 	}
 
+	if (vm->sp.load_addr != sp_pkg_addr) {
+		dlog_warning(
+			"Partition's load address at its manifest differs"
+			" from specified in partition's package.\n");
+		vm->sp.load_addr = sp_pkg_addr;
+	}
+
 	ret = sanity_check_ffa_manifest(vm);
 
 exit_unmap:
