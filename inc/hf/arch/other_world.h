@@ -11,6 +11,15 @@
 #include "hf/ffa.h"
 #include "hf/vm.h"
 
+struct sve_other_world_context_t {
+	uint8_t vectors[32][HF_SVE_VECTOR_LENGTH / 8];
+
+	/* FFR and predicates are one-eigth of the SVE vector length */
+	uint8_t ffr[HF_SVE_VECTOR_LENGTH / 64];
+
+	uint8_t predicates[16][HF_SVE_VECTOR_LENGTH / 64];
+} __attribute__((aligned(16)));
+
 void arch_other_world_init(void);
 bool arch_other_world_vm_init(struct vm *other_world_vm, struct mpool *ppool);
 struct ffa_value arch_other_world_call(struct ffa_value args);

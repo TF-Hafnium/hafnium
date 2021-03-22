@@ -13,6 +13,13 @@
 #include "msr.h"
 #include "exception_macros.S"
 
+
+/**
+ * PE feature information about SVE implementation in AArch64 state.
+ */
+#define ID_AA64PFR0_SVE_SHIFT (32)
+#define ID_AA64PFR0_SVE_LENGTH (4)
+
 /**
  * Saves the volatile registers into the register buffer of the current vCPU.
  */
@@ -103,28 +110,6 @@
 	/* vCPU is not changing. */
 	mrs x0, tpidr_el2
 	b vcpu_restore_volatile_and_run
-.endm
-
-/**
- * Helper macro for SIMD vectors save/restore operations.
- */
-.macro simd_op_vectors op reg
-	\op q0, q1, [\reg], #32
-	\op q2, q3, [\reg], #32
-	\op q4, q5, [\reg], #32
-	\op q6, q7, [\reg], #32
-	\op q8, q9, [\reg], #32
-	\op q10, q11, [\reg], #32
-	\op q12, q13, [\reg], #32
-	\op q14, q15, [\reg], #32
-	\op q16, q17, [\reg], #32
-	\op q18, q19, [\reg], #32
-	\op q20, q21, [\reg], #32
-	\op q22, q23, [\reg], #32
-	\op q24, q25, [\reg], #32
-	\op q26, q27, [\reg], #32
-	\op q28, q29, [\reg], #32
-	\op q30, q31, [\reg], #32
 .endm
 
 /**
@@ -396,9 +381,10 @@ vcpu_switch:
 	 */
 
 other_world_loop:
-	/*
-	 * x19 holds the other world VM vCPU pointer.
-	 */
+	/* Check if SVE is implemented. */
+	mrs x0, id_aa64pfr0_el1
+	ubfx x0, x0, ID_AA64PFR0_SVE_SHIFT, ID_AA64PFR0_SVE_LENGTH
+	cbnz x0, sve_context_restore
 
 	/* Restore the other world SIMD context to the other world VM vCPU. */
 	add x18, x19, #VCPU_FREGS
@@ -406,8 +392,32 @@ other_world_loop:
 	ldp x0, x1, [x18]
 	msr fpsr, x0
 	msr fpcr, x1
+	b sve_skip_context_restore
 
-	/* Prepare arguments from other world VM vCPU. */
+	/* Restore the other world SVE context from internal buffer. */
+sve_context_restore:
+	adrp x18, sve_other_world_context
+	add x18, x18, :lo12: sve_other_world_context
+	ldr x0, [x19, #VCPU_CPU]
+	bl cpu_index
+	mov x20, #SVE_CTX_SIZE
+	madd x18, x0, x20, x18
+
+	/* Restore vector registers. */
+	sve_op_vectors ldr, x18
+	/* Restore FFR register before predicates. */
+	add x20, x18, #SVE_CTX_FFR
+	ldr p0, [x20]
+	wrffr p0.b
+	/* Restore predicate registers. */
+	add x20, x18, #SVE_CTX_PREDICATES
+	sve_predicate_op ldr, x20
+
+	/*
+	 * Prepare arguments from other world VM vCPU.
+	 * x19 holds the other world VM vCPU pointer.
+	 */
+sve_skip_context_restore:
 	ldp x0, x1, [x19, #VCPU_REGS + 8 * 0]
 	ldp x2, x3, [x19, #VCPU_REGS + 8 * 2]
 	ldp x4, x5, [x19, #VCPU_REGS + 8 * 4]
@@ -443,12 +453,39 @@ other_world_loop:
 	stp x4, x5, [x19, #VCPU_REGS + 8 * 4]
 	stp x6, x7, [x19, #VCPU_REGS + 8 * 6]
 
+	/* Check if SVE is implemented. */
+	mrs x0, id_aa64pfr0_el1
+	ubfx x0, x0, ID_AA64PFR0_SVE_SHIFT, ID_AA64PFR0_SVE_LENGTH
+	cbnz x0, sve_context_save
+
 	/* Save the other world SIMD context to the other world VM vCPU. */
 	add x18, x19, #VCPU_FREGS
 	simd_op_vectors stp, x18
 	mrs x0, fpsr
 	mrs x1, fpcr
 	stp x0, x1, [x18]
+	b sve_skip_context_save
+
+	/* Save the other world SVE context to internal buffer. */
+sve_context_save:
+	adrp x18, sve_other_world_context
+	add x18, x18, :lo12: sve_other_world_context
+	ldr x0, [x19, #VCPU_CPU]
+	bl cpu_index
+	mov x20, #SVE_CTX_SIZE
+	madd x18, x0, x20, x18
+
+	/* Save vector registers. */
+	sve_op_vectors str, x18
+	/* Save predicate registers. */
+	add x20, x18, #SVE_CTX_PREDICATES
+	sve_predicate_op str, x20
+	/* Save FFR register after predicates. */
+	add x20, x18, #SVE_CTX_FFR
+	rdffr p0.b
+	str p0, [x20]
+
+sve_skip_context_save:
 
 #if BRANCH_PROTECTION
 	pauth_restore_hypervisor_key x0 x1

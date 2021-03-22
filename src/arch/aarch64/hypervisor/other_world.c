@@ -25,6 +25,12 @@ alignas(PAGE_SIZE) static uint8_t other_world_send_buffer[HF_MAILBOX_SIZE];
 alignas(PAGE_SIZE) static uint8_t other_world_recv_buffer[HF_MAILBOX_SIZE];
 
 #endif
+#if SECURE_WORLD == 1
+
+/** Other world SVE context (accessed from other_world_loop). */
+struct sve_other_world_context_t sve_other_world_context[MAX_CPUS];
+
+#endif
 
 void arch_other_world_init(void)
 {
