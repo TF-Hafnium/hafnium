@@ -35,6 +35,20 @@ image_entry:
 	get_core_affinity x30, x29
 	str x30, [x28, CPU_ID]
 
+#if SECURE_WORLD == 1
+
+	/*
+	 * Invalidate the data cache for the whole image.
+	 * This prevents re-use of stale data cache entries from
+	 * prior bootloader stages.
+	 */
+	adrp x0, ORIGIN_ADDRESS
+	adrp x1, image_end
+	sub x1, x1, x0
+	bl arch_cache_data_invalidate_range
+
+#endif
+
 	mov x0, x28
 	bl prepare_for_c
 
