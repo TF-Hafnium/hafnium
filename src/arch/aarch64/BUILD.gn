@@ -20,7 +20,7 @@ config("arch_config") {
 source_set("arch") {
   public_configs = [ "//src/arch/aarch64:arch_config" ]
   sources = [
-    "cache.c",
+    "cache_helpers.S",
     "irq.c",
     "mm.c",
     "sysregs.c",

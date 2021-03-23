@@ -119,9 +119,9 @@ void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 	 * hitting the entry point can read the cpus array consistently
 	 * with MMU off (hence data cache off).
 	 */
-	arch_cache_clean_range(va_from_ptr(cpus), sizeof(cpus));
+	arch_cache_data_clean_range(va_from_ptr(cpus), sizeof(cpus));
 
-	arch_cache_clean_range(va_from_ptr(&cpu_count), sizeof(cpu_count));
+	arch_cache_data_clean_range(va_from_ptr(&cpu_count), sizeof(cpu_count));
 }
 
 size_t cpu_index(struct cpu *c)
