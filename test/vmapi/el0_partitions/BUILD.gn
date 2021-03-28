@@ -22,6 +22,17 @@ source_set("ffa") {
   ]
 }
 
+source_set("memory_sharing") {
+  public_configs = [
+    "//test/vmapi/primary_with_secondaries:config",
+    "//src/arch/aarch64:config",
+    "//test/hftest:hftest_config",
+  ]
+  sources = [
+    "memory_sharing.c",
+  ]
+}
+
 vm_kernel("el0_partition_test_vm") {
   testonly = true
   public_configs = [
@@ -38,6 +49,7 @@ vm_kernel("el0_partition_test_vm") {
 
   deps = [
     ":ffa",
+    ":memory_sharing",
     "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
     "//test/vmapi/common",
