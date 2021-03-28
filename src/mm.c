@@ -972,6 +972,14 @@ void mm_vm_dump(struct mm_ptable *t)
 }
 
 /**
+ * Defragments a stage1 page table.
+ */
+void mm_stage1_defrag(struct mm_ptable *t, struct mpool *ppool)
+{
+	mm_ptable_defrag(t, MM_FLAG_STAGE1, ppool);
+}
+
+/**
  * Defragments the VM page table.
  */
 void mm_vm_defrag(struct mm_ptable *t, struct mpool *ppool)

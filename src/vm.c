@@ -330,6 +330,18 @@ bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 }
 
 /**
+ * Defrag page tables for an EL0 partition or for a VM.
+ */
+void vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
+{
+	if (vm_locked.vm->el0_partition) {
+		mm_stage1_defrag(&vm_locked.vm->ptable, ppool);
+	} else {
+		mm_vm_defrag(&vm_locked.vm->ptable, ppool);
+	}
+}
+
+/**
  * Unmaps the hypervisor pages from the given page table.
  */
 bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool)

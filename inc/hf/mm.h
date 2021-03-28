@@ -127,6 +127,7 @@ void mm_vm_identity_commit(struct mm_ptable *t, paddr_t begin, paddr_t end,
 			   uint32_t mode, struct mpool *ppool, ipaddr_t *ipa);
 bool mm_vm_unmap(struct mm_ptable *t, paddr_t begin, paddr_t end,
 		 struct mpool *ppool);
+void mm_stage1_defrag(struct mm_ptable *t, struct mpool *ppool);
 void mm_vm_defrag(struct mm_ptable *t, struct mpool *ppool);
 void mm_vm_dump(struct mm_ptable *t);
 bool mm_vm_get_mode(struct mm_ptable *t, ipaddr_t begin, ipaddr_t end,

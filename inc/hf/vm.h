@@ -220,6 +220,7 @@ void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			uint32_t mode, struct mpool *ppool, ipaddr_t *ipa);
 bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 	      struct mpool *ppool);
+void vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool);
 bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool);
 
 void vm_update_boot(struct vm *vm);

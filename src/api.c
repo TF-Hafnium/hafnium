@@ -1016,7 +1016,7 @@ struct ffa_value api_vm_configure_pages(
 			     local_page_pool, NULL)) {
 		/* TODO: partial defrag of failed range. */
 		/* Recover any memory consumed in failed mapping. */
-		mm_vm_defrag(&vm_locked.vm->ptable, local_page_pool);
+		vm_ptable_defrag(vm_locked, local_page_pool);
 		goto fail_undo_send;
 	}
 

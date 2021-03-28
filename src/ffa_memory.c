@@ -721,8 +721,8 @@ static struct ffa_value ffa_retrieve_check_transition(
  * series of changes atomically you can call them all with commit false before
  * calling them all with commit true.
  *
- * mm_vm_defrag should always be called after a series of page table updates,
- * whether they succeed or fail.
+ * vm_ptable_defrag should always be called after a series of page table
+ * updates, whether they succeed or fail.
  *
  * Returns true on success, or false if the update failed and no changes were
  * made to memory mappings.
@@ -735,6 +735,10 @@ static bool ffa_region_group_identity_map(
 {
 	uint32_t i;
 	uint32_t j;
+
+	if (vm_locked.vm->el0_partition) {
+		mode |= MM_MODE_USER | MM_MODE_NG;
+	}
 
 	/* Iterate over the memory region constituents within each fragment. */
 	for (i = 0; i < fragment_count; ++i) {
@@ -876,7 +880,6 @@ static struct ffa_value ffa_send_check_update(
 	uint32_t share_func, ffa_memory_access_permissions_t permissions,
 	struct mpool *page_pool, bool clear, uint32_t *orig_from_mode_ret)
 {
-	struct vm *from = from_locked.vm;
 	uint32_t i;
 	uint32_t orig_from_mode;
 	uint32_t from_mode;
@@ -970,7 +973,7 @@ out:
 	 * Tidy up the page table by reclaiming failed mappings (if there was an
 	 * error) or merging entries into blocks where possible (on success).
 	 */
-	mm_vm_defrag(&from->ptable, page_pool);
+	vm_ptable_defrag(from_locked, page_pool);
 
 	return ret;
 }
@@ -995,7 +998,6 @@ static struct ffa_value ffa_retrieve_check_update(
 	uint32_t memory_to_attributes, uint32_t share_func, bool clear,
 	struct mpool *page_pool)
 {
-	struct vm *to = to_locked.vm;
 	uint32_t i;
 	uint32_t to_mode;
 	struct mpool local_page_pool;
@@ -1073,7 +1075,7 @@ out:
 	 * Tidy up the page table by reclaiming failed mappings (if there was an
 	 * error) or merging entries into blocks where possible (on success).
 	 */
-	mm_vm_defrag(&to->ptable, page_pool);
+	vm_ptable_defrag(to_locked, page_pool);
 
 	return ret;
 }
@@ -1100,7 +1102,6 @@ static struct ffa_value ffa_tee_reclaim_check_update(
 	uint32_t constituent_count, uint32_t memory_to_attributes, bool clear,
 	struct mpool *page_pool)
 {
-	struct vm *to = to_locked.vm;
 	uint32_t to_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
@@ -1191,7 +1192,7 @@ out:
 	 * Tidy up the page table by reclaiming failed mappings (if there was an
 	 * error) or merging entries into blocks where possible (on success).
 	 */
-	mm_vm_defrag(&to->ptable, page_pool);
+	vm_ptable_defrag(to_locked, page_pool);
 
 	return ret;
 }
@@ -1273,7 +1274,7 @@ out:
 	 * Tidy up the page table by reclaiming failed mappings (if there was an
 	 * error) or merging entries into blocks where possible (on success).
 	 */
-	mm_vm_defrag(&from_locked.vm->ptable, page_pool);
+	vm_ptable_defrag(from_locked, page_pool);
 
 	return ret;
 }
