@@ -579,7 +579,8 @@ TEST(memory_sharing, relend_after_return)
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
-	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_lend_relinquish", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_lend_relinquish_relend",
+		       mb.send);
 
 	/* Lend the memory initially. */
 	handle = send_memory_and_retrieve_request(
@@ -591,6 +592,8 @@ TEST(memory_sharing, relend_after_return)
 	/* Let the memory be returned. */
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
+	EXPECT_EQ(run_res.arg2, 0);
+	EXPECT_EQ(run_res.arg3, 0);
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
@@ -604,6 +607,8 @@ TEST(memory_sharing, relend_after_return)
 	/* Observe the service doesn't fault when accessing the memory. */
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
+	EXPECT_EQ(run_res.arg2, 0);
+	EXPECT_EQ(run_res.arg3, 0);
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 }

@@ -359,6 +359,53 @@ TEST_SERVICE(ffa_donate_invalid_source)
 	ffa_yield();
 }
 
+TEST_SERVICE(ffa_memory_lend_relinquish_relend)
+{
+	exception_setup(NULL, exception_handler_yield_data_abort);
+
+	/* Loop, giving memory back to the sender. */
+	for (;;) {
+		size_t i;
+		ffa_memory_handle_t handle;
+
+		void *recv_buf = SERVICE_RECV_BUFFER();
+		void *send_buf = SERVICE_SEND_BUFFER();
+
+		struct ffa_value ret = ffa_msg_wait();
+		struct ffa_memory_region *memory_region =
+			(struct ffa_memory_region *)retrieve_buffer;
+		ffa_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, &handle, memory_region,
+			sizeof(retrieve_buffer));
+		struct ffa_composite_memory_region *composite =
+			ffa_memory_region_get_composite(memory_region, 0);
+		struct ffa_memory_region_constituent *constituents;
+
+		/* ASSERT_TRUE isn't enough for clang-analyze. */
+		CHECK(composite != NULL);
+		constituents = composite->constituents;
+
+		/*
+		 * Check that we can read and write every page that was shared.
+		 */
+		for (i = 0; i < composite->constituent_count; ++i) {
+			uint8_t *ptr = (uint8_t *)constituents[i].address;
+			uint32_t count = constituents[i].page_count;
+			size_t j;
+
+			for (j = 0; j < PAGE_SIZE * count; ++j) {
+				ptr[j]++;
+			}
+		}
+
+		/* Give the memory back and notify the sender. */
+		ffa_mem_relinquish_init(send_buf, handle, 0, hf_vm_get_id());
+		EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
+		EXPECT_EQ(ffa_msg_send(hf_vm_get_id(), sender, 0, 0).func,
+			  FFA_SUCCESS_32);
+	}
+}
+
 TEST_SERVICE(ffa_memory_lend_relinquish)
 {
 	exception_setup(NULL, exception_handler_yield_data_abort);
