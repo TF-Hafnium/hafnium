@@ -65,6 +65,25 @@ void api_init(struct mpool *ppool)
 }
 
 /**
+ * Get target VM vCPU:
+ * If VM is UP then return first vCPU.
+ * If VM is MP then return vCPU whose index matches current CPU index.
+ */
+static struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current)
+{
+	ffa_vcpu_index_t current_cpu_index = cpu_index(current->cpu);
+	struct vcpu *vcpu = NULL;
+
+	if (vm->vcpu_count == 1) {
+		vcpu = vm_get_vcpu(vm, 0);
+	} else if (current_cpu_index < vm->vcpu_count) {
+		vcpu = vm_get_vcpu(vm, current_cpu_index);
+	}
+
+	return vcpu;
+}
+
+/**
  * Switches the physical CPU back to the corresponding vCPU of the VM whose ID
  * is given as argument of the function.
  *
@@ -72,7 +91,7 @@ void api_init(struct mpool *ppool)
  * is SPMC), and on the context of the remaining 'api_switch_to_*' functions.
  *
  * This function works for partitions that are:
- * - UP non-migratable.
+ * - UP migratable.
  * - MP with pinned Execution Contexts.
  */
 static struct vcpu *api_switch_to_vm(struct vcpu *current,
@@ -81,7 +100,7 @@ static struct vcpu *api_switch_to_vm(struct vcpu *current,
 				     ffa_vm_id_t to_id)
 {
 	struct vm *to_vm = vm_find(to_id);
-	struct vcpu *next = vm_get_vcpu(to_vm, cpu_index(current->cpu));
+	struct vcpu *next = api_ffa_get_vm_vcpu(to_vm, current);
 
 	CHECK(next != NULL);
 
@@ -1632,26 +1651,6 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 }
 
 /**
- * Get target VM vCPU for direct messaging request.
- * If VM is UP then return first vCPU.
- * If VM is MP then return vCPU whose index matches current CPU index.
- */
-static struct vcpu *api_ffa_msg_send_direct_get_receiver_vcpu(
-	struct vm *vm, struct vcpu *current)
-{
-	ffa_vcpu_index_t current_cpu_index = cpu_index(current->cpu);
-	struct vcpu *vcpu = NULL;
-
-	if (vm->vcpu_count == 1) {
-		vcpu = vm_get_vcpu(vm, 0);
-	} else if (current_cpu_index < vm->vcpu_count) {
-		vcpu = vm_get_vcpu(vm, current_cpu_index);
-	}
-
-	return vcpu;
-}
-
-/**
  * FF-A specification states that x2/w2 Must Be Zero for direct messaging
  * interfaces.
  */
@@ -1734,8 +1733,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	 * number of PEs in the system. It further states that MP partitions
 	 * accepting direct request messages cannot migrate.
 	 */
-	receiver_vcpu =
-		api_ffa_msg_send_direct_get_receiver_vcpu(receiver_vm, current);
+	receiver_vcpu = api_ffa_get_vm_vcpu(receiver_vm, current);
 	if (receiver_vcpu == NULL) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
