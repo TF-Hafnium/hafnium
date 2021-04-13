@@ -605,7 +605,21 @@ class TestRunner:
         """Extract hftest-specific lines from a raw output from an invocation
         of the test platform."""
         lines = []
-        for line in raw.splitlines():
+        lines_to_process = raw.splitlines()
+
+        try:
+            # If logs have logs of more than one VM, the loop below to extract
+            # lines won't work. Thus, extracting between starting and ending
+            # logs: HFTEST_CTRL_GET_COMMAND_LINE and HFTEST_CTRL_FINISHED.
+            hftest_start = lines_to_process.index(HFTEST_CTRL_GET_COMMAND_LINE) + 1
+            hftest_end = lines_to_process.index(HFTEST_CTRL_FINISHED)
+        except ValueError:
+            hftest_start = 0
+            hftest_end = len(lines_to_process)
+
+        lines_to_process = lines_to_process[hftest_start : hftest_end]
+
+        for line in lines_to_process:
             match = re.search(f"^VM \d+: ", line)
             if match is not None:
                 line = line[match.end():]
