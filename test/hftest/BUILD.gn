@@ -54,6 +54,30 @@ source_set("hftest_secondary_vm") {
   ]
 }
 
+source_set("hftest_secure_service") {
+  testonly = true
+
+  public_configs = [
+    "//src/arch/aarch64:arch_config",
+    ":hftest_config",
+  ]
+
+  sources = [
+    "secure_service.c",
+  ]
+
+  deps = [
+    ":mm",
+    "//src:dlog",
+    "//src:panic",
+    "//src:std",
+    "//src/arch/${plat_arch}:entry",
+    "//src/arch/${plat_arch}/hftest:entry",
+    "//src/arch/${plat_arch}/hftest:power_mgmt",
+    "//vmlib/${plat_arch}:call",
+  ]
+}
+
 # Testing framework for a secondary VM. This framework doesn't provide services
 # and expects that secondary VMs will be passed the memory size in register x0
 # instead of a pointer to the FDT.

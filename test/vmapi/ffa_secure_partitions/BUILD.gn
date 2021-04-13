@@ -1,0 +1,88 @@
+# Copyright 2021 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+import("//test/hftest/args.gni")
+
+# SP that will control execution of tests
+vm_kernel("secure_partitions_control") {
+  testonly = true
+
+  sources = [
+    "secure_partition_control.c",
+  ]
+
+  deps = [
+    "//test/hftest:hftest_standalone_secure",
+  ]
+}
+
+# SP that will be controlled via communication/scheduling primitives by the
+# former SP
+vm_kernel("secure_partitions_services") {
+  testonly = true
+
+  sources = [
+    "secure_partition_services.c",
+  ]
+
+  deps = [
+    "//test/hftest:hftest_secure_service",
+  ]
+}
+
+manifest("partition_manifest_control_sp") {
+  source = "partition_manifest_control_sp.dts"
+  output = "partition_manifest_control_sp.dtb"
+}
+
+manifest("secure_partition_services_manifest") {
+  source = "partition_manifest_services_sp.dts"
+  output = "partition_manifest_services_sp.dtb"
+}
+
+partition_package("secure_partition_control_test_package") {
+  testonly = true
+  files = [ [
+        "partition_manifest_control_sp.dtb",
+        "secure_partitions_control.bin",
+        ":partition_manifest_control_sp",
+        ":secure_partitions_control",
+      ] ]
+  output = "secure_partition_control_test_package.img"
+}
+
+partition_package("secure_partition_services_test_package") {
+  testonly = true
+  files = [ [
+        "partition_manifest_services_sp.dtb",
+        "secure_partitions_services.bin",
+        ":secure_partition_services_manifest",
+        ":secure_partitions_services",
+      ] ]
+  output = "secure_partition_services_test_package.img"
+}
+
+partitions_json("ffa_secure_partitions_test") {
+  testonly = true
+
+  sps = [
+    [
+      "secure_partition_control_test_package.img",
+      "manifest_control_sp.dts",
+      ":secure_partition_control_test_package",
+      ":partition_manifest_control_sp",
+    ],
+    [
+      "secure_partition_services_test_package.img",
+      "manifest_services_sp.dts",
+      ":secure_partition_services_test_package",
+      ":secure_partition_services_manifest",
+    ],
+  ]
+  vms = []
+  json_file = "ffa_secure_partitions_test.json"
+}

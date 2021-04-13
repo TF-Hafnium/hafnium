@@ -18,3 +18,4 @@ HFTEST+=(--out_partitions "$OUT/secure_aem_v8a_fvp_vm_clang")
 HFTEST+=(--log "$LOG_DIR_BASE")
 
 ${HFTEST[@]} hafnium --secure --driver=fvp --partitions_json test/vmapi/ffa_secure_partition_only/ffa_secure_partition_only_test.json
+${HFTEST[@]} hafnium --secure --driver=fvp --partitions_json test/vmapi/ffa_secure_partitions/ffa_secure_partitions_test.json
