@@ -2776,3 +2776,20 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 
 	return ret_args;
 }
+
+/**
+ * Update the memory region attributes with the security state bit based on the
+ * supplied mode.
+ */
+ffa_memory_attributes_t plat_ffa_memory_security_mode(
+	ffa_memory_attributes_t attributes, uint32_t mode)
+{
+	ffa_memory_attributes_t ret = attributes;
+
+	if ((mode & MM_MODE_NS) != 0) {
+		ffa_set_memory_security_attr(&ret,
+					     FFA_MEMORY_SECURITY_NON_SECURE);
+	}
+
+	return ret;
+}

@@ -365,3 +365,6 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 					struct vcpu **next,
 					uint32_t timeout_low,
 					uint32_t timeout_high);
+
+ffa_memory_attributes_t plat_ffa_memory_security_mode(
+	ffa_memory_attributes_t attributes, uint32_t mode);

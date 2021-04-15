@@ -637,3 +637,11 @@ bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 
 	return true;
 }
+
+ffa_memory_attributes_t plat_ffa_memory_security_mode(
+	ffa_memory_attributes_t attributes, uint32_t mode)
+{
+	(void)mode;
+
+	return attributes;
+}

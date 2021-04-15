@@ -2301,3 +2301,11 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
+
+ffa_memory_attributes_t plat_ffa_memory_security_mode(
+	ffa_memory_attributes_t attributes, uint32_t mode)
+{
+	(void)mode;
+
+	return attributes;
+}

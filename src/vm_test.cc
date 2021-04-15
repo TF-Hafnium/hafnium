@@ -74,6 +74,7 @@ TEST_F(vm, vm_unmap_hypervisor_not_mapped)
 	struct_vm *vm;
 	struct vm_locked vm_locked;
 
+	/* TODO: check ptable usage (security state?) */
 	EXPECT_TRUE(vm_init_next(1, &ppool, &vm, false));
 	vm_locked = vm_lock(vm);
 	ASSERT_TRUE(mm_vm_init(&vm->ptable, vm->id, &ppool));

@@ -352,6 +352,11 @@ static inline uint32_t ffa_memory_permissions_to_mode(
 		panic("Tried to convert FFA_INSTRUCTION_ACCESS_RESVERVED.");
 	}
 
+	/* Set the security state bit if necessary. */
+	if ((default_mode & plat_ffa_other_world_mode()) != 0) {
+		mode |= plat_ffa_other_world_mode();
+	}
+
 	return mode;
 }
 
@@ -2359,7 +2364,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	ffa_memory_handle_t handle = retrieve_request->handle;
 	struct ffa_memory_region *memory_region;
 	ffa_memory_access_permissions_t permissions = 0;
-	uint32_t memory_to_attributes;
+	uint32_t memory_to_mode;
 	struct share_states_locked share_states;
 	struct ffa_memory_share_state *share_state;
 	struct ffa_value ret;
@@ -2368,6 +2373,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	uint32_t fragment_length;
 	ffa_vm_id_t receiver_id = to_locked.vm->id;
 	bool is_send_complete = false;
+	ffa_memory_attributes_t attributes;
 
 	dump_share_states();
 
@@ -2474,7 +2480,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 			goto out;
 		}
 
-		memory_to_attributes = ffa_memory_permissions_to_mode(
+		memory_to_mode = ffa_memory_permissions_to_mode(
 			permissions, share_state->sender_orig_mode);
 
 		if (to_locked.vm->el0_partition) {
@@ -2484,16 +2490,15 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 			 * secure world, attribute MM_MODE_NS has to be set
 			 * while mapping that in a SP executing in secure world.
 			 */
-			memory_to_attributes |=
-				arch_mm_extra_attributes_from_vm(
-					retrieve_request->sender);
+			memory_to_mode |= arch_mm_extra_attributes_from_vm(
+				retrieve_request->sender);
 		}
 
 		ret = ffa_retrieve_check_update(
 			to_locked, memory_region->sender,
 			share_state->fragments,
 			share_state->fragment_constituent_counts,
-			share_state->fragment_count, memory_to_attributes,
+			share_state->fragment_count, memory_to_mode,
 			share_state->share_func, false, page_pool);
 
 		if (ret.func != FFA_SUCCESS_32) {
@@ -2540,12 +2545,20 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	 * message buffer size. So `ffa_retrieved_memory_region_init`
 	 * should never fail.
 	 */
+
+	/*
+	 * Set the security state in the memory retrieve response attributes
+	 * if specified by the target mode.
+	 */
+	attributes = plat_ffa_memory_security_mode(
+		memory_region->attributes, share_state->sender_orig_mode);
+
 	CHECK(ffa_retrieved_memory_region_init(
 		to_locked.vm->mailbox.recv, to_locked.vm->ffa_version,
-		HF_MAILBOX_SIZE, memory_region->sender,
-		memory_region->attributes, memory_region->flags, handle,
-		receiver_id, permissions, composite->page_count,
-		composite->constituent_count, share_state->fragments[0],
+		HF_MAILBOX_SIZE, memory_region->sender, attributes,
+		memory_region->flags, handle, receiver_id, permissions,
+		composite->page_count, composite->constituent_count,
+		share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
 		&fragment_length));
 
