@@ -11,11 +11,14 @@ KOKORO_DIR="$(dirname "$0")"
 source $KOKORO_DIR/test_common.sh
 
 HFTEST=(${TIMEOUT[@]} 300s ./test/hftest/hftest.py)
+SPMC_PATH="$OUT/secure_aem_v8a_fvp_clang/"
 
-HFTEST+=(--out "$OUT/secure_aem_v8a_fvp_clang")
 HFTEST+=(--out_partitions "$OUT/secure_aem_v8a_fvp_vm_clang")
-
 HFTEST+=(--log "$LOG_DIR_BASE")
+HFTEST+=(--spmc "$SPMC_PATH/hafnium.bin")
 
-${HFTEST[@]} hafnium --secure --driver=fvp --partitions_json test/vmapi/ffa_secure_partition_only/ffa_secure_partition_only_test.json
-${HFTEST[@]} hafnium --secure --driver=fvp --partitions_json test/vmapi/ffa_secure_partitions/ffa_secure_partitions_test.json
+${HFTEST[@]} --driver=fvp \
+             --partitions_json test/vmapi/ffa_secure_partition_only/ffa_secure_partition_only_test.json
+
+${HFTEST[@]} --driver=fvp \
+             --partitions_json test/vmapi/ffa_secure_partitions/ffa_secure_partitions_test.json

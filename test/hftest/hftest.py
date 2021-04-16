@@ -63,6 +63,8 @@ def append_file(path, to_write):
 def join_if_not_None(*args):
     return " ".join(filter(lambda x: x, args))
 
+DT = collections.namedtuple("DT", ["dts", "dtb"])
+
 class ArtifactsManager:
     """Class which manages folder with test artifacts."""
 
@@ -115,7 +117,8 @@ class ArtifactsManager:
 # This is to avoid having to pass arguments from subclasses to superclasses.
 DriverArgs = collections.namedtuple("DriverArgs", [
         "artifacts",
-        "kernel",
+        "hypervisor",
+        "spmc",
         "initrd",
         "vm_args",
         "cpu",
@@ -208,7 +211,7 @@ class QemuDriver(Driver):
             "-machine", "virt,virtualization=on,gic-version=3",
             "-cpu", cpu, "-smp", "4", "-m", "1G",
             "-nographic", "-nodefaults", "-serial", "stdio",
-            "-d", "unimp", "-kernel", os.path.abspath(self.args.kernel),
+            "-d", "unimp", "-kernel", os.path.abspath(self.args.hypervisor),
         ]
 
         if self.tfa:
@@ -278,13 +281,13 @@ class FvpDriver(Driver, ABC):
     def create_dt(self, run_name : str):
         """Create DT related files, and return respective paths in a tuple
            (dts,dtb)"""
-        return self.args.artifacts.create_file(run_name, ".dts"), \
-               self.args.artifacts.create_file(run_name, ".dtb")
+        return DT(self.args.artifacts.create_file(run_name, ".dts"),
+                  self.args.artifacts.create_file(run_name, ".dtb"))
 
-    def compile_dt(self, run_state, dts_path, dtb_path):
+    def compile_dt(self, run_state, dt : DT):
         """Compile DT calling dtc."""
         dtc_args = [
-            DTC_SCRIPT, "compile", "-i", dts_path, "-o", dtb_path,
+            DTC_SCRIPT, "compile", "-i", dt.dts, "-o", dt.dtb,
         ]
         self.exec_logged(run_state, dtc_args)
 
@@ -310,14 +313,14 @@ class FvpDriver(Driver, ABC):
         return manifests
 
     @abstractmethod
-    def gen_dts(self, dts_path, test_args):
+    def gen_dts(self, dt, test_args):
         """Abstract method to generate dts file. This specific to the use case
            so should be implemented within derived driver"""
         pass
 
     @abstractmethod
     def gen_fvp_args(
-            self, is_long_running, uart0_log_path, uart1_log_path, dtb_path):
+            self, is_long_running, uart0_log_path, uart1_log_path, dt):
         """Generate command line arguments for FVP."""
         time_limit = "80s" if is_long_running else "40s"
         fvp_args = [
@@ -356,8 +359,6 @@ class FvpDriver(Driver, ABC):
             "-C", f"cluster1.cpu3.RVBAR={self.CPU_START_ADDRESS}",
             "--data",
             f"cluster0.cpu0={self.FVP_PREBUILT_BL31}@{self.CPU_START_ADDRESS}",
-            "--data", f"cluster0.cpu0={dtb_path}@{self.DTB_ADDRESS}",
-            "--data", f"cluster0.cpu0={self.args.kernel}@{self.KERNEL_ADDRESS}",
             "-C", "bp.ve_sysregs.mmbSiteDefault=0",
             "-C", "bp.ve_sysregs.exit_on_shutdown=1",
         ]
@@ -366,15 +367,15 @@ class FvpDriver(Driver, ABC):
     def run(self, run_name, test_args, is_long_running):
         """ Run test """
         run_state = self.start_run(run_name)
-        dts_path, dtb_path = self.create_dt(run_name)
+        dt = self.create_dt(run_name)
         uart0_log_path = self.create_uart_log(run_name, ".uart0.log")
         uart1_log_path = self.create_uart_log(run_name, ".uart1.log")
 
         try:
-            self.gen_dts(dts_path, test_args)
-            self.compile_dt(run_state, dts_path, dtb_path)
+            self.gen_dts(dt, test_args)
+            self.compile_dt(run_state, dt)
             fvp_args = self.gen_fvp_args(is_long_running, uart0_log_path,
-                                         uart1_log_path, dtb_path)
+                                         uart1_log_path, dt)
             self.exec_logged(run_state, fvp_args)
         except DriverRunException:
             pass
@@ -414,12 +415,12 @@ class FvpDriverHypervisor(FvpDriver):
     def KERNEL_ADDRESS(self):
         return "0x80000000"
 
-    def gen_dts(self, dts_path, test_args):
+    def gen_dts(self, dt, test_args):
         """Create a DeviceTree source which will be compiled into a DTB and
         passed to FVP for a test run."""
 
         vm_args = join_if_not_None(self.args.vm_args, test_args)
-        write_file(dts_path, read_file(FVP_PREBUILT_DTS))
+        write_file(dt.dts, read_file(FVP_PREBUILT_DTS))
 
         # Write the vm arguments to the partition manifest
         to_append = f"""
@@ -434,14 +435,18 @@ class FvpDriverHypervisor(FvpDriver):
         if self.vms_in_partitions_json:
             to_append += self.get_manifests_from_json(self.args.partitions["VMs"])
 
-        append_file(dts_path, to_append)
+        append_file(dt.dts, to_append)
 
     def gen_fvp_args(
-            self, is_long_running, uart0_log_path, uart1_log_path, dtb_path):
+            self, is_long_running, uart0_log_path, uart1_log_path, dt, call_super = True):
         """Generate command line arguments for FVP."""
+        common_args = (is_long_running, uart0_log_path, uart1_log_path, dt)
+        fvp_args = super().gen_fvp_args(*common_args) if call_super else []
 
-        fvp_args = super().gen_fvp_args(
-            is_long_running, uart0_log_path, uart1_log_path, dtb_path)
+        fvp_args += [
+            "--data", f"cluster0.cpu0={dt.dtb}@{self.DTB_ADDRESS}",
+            "--data", f"cluster0.cpu0={self.args.hypervisor}@{self.KERNEL_ADDRESS}",
+        ]
 
         if self.vms_in_partitions_json:
             img_ldadd = self.get_img_and_ldadd(self.args.partitions["VMs"])
@@ -484,19 +489,27 @@ class FvpDriverSPMC(FvpDriver):
     def KERNEL_ADDRESS(self):
         return "0x6000000"
 
-    def gen_dts(self, dts_path, test_args):
+    def gen_dts(self, dt, test_args):
         """Create a DeviceTree source which will be compiled into a DTB and
         passed to FVP for a test run."""
         to_append = self.get_manifests_from_json(self.args.partitions["SPs"])
-        write_file(dts_path, read_file(FvpDriverSPMC.FVP_PREBUILT_SECURE_DTS))
-        append_file(dts_path, to_append)
+        write_file(dt.dts, read_file(FvpDriverSPMC.FVP_PREBUILT_SECURE_DTS))
+        append_file(dt.dts, to_append)
 
     def gen_fvp_args(
-        self, is_long_running, uart0_log_path, uart1_log_path, dtb_path):
+        self, is_long_running, uart0_log_path, uart1_log_path, dt,
+        call_super = True, secure_hfctrl = True):
         """Generate command line arguments for FVP."""
-        fvp_args = super().gen_fvp_args(
-            is_long_running, uart0_log_path, uart1_log_path, dtb_path)
+        common_args = (is_long_running, uart0_log_path, uart1_log_path, dt.dtb)
+        fvp_args = super().gen_fvp_args(*common_args) if call_super else []
+
         fvp_args += [
+            "--data", f"cluster0.cpu0={dt.dtb}@{self.DTB_ADDRESS}",
+            "--data", f"cluster0.cpu0={self.args.spmc}@{self.KERNEL_ADDRESS}",
+        ]
+
+        if secure_hfctrl:
+            fvp_args += [
                 "-C", f"bp.pl011_uart0.in_file={FvpDriverSPMC.HFTEST_CMD_FILE}",
                 "-C", f"bp.pl011_uart0.shutdown_tag=\"{HFTEST_CTRL_FINISHED}\"",
                 "-C", "cluster0.has_arm_v8-5=1",
@@ -506,6 +519,7 @@ class FvpDriverSPMC(FvpDriver):
                 "-C", "cluster0.restriction_on_speculative_execution=2",
                 "-C", "cluster1.restriction_on_speculative_execution=2",
             ]
+
         img_ldadd = self.get_img_and_ldadd(self.args.partitions["SPs"])
         for img, ldadd in img_ldadd:
             fvp_args += ["--data", f"cluster0.cpu0={img}@{hex(ldadd)}"]
@@ -577,7 +591,6 @@ class SerialDriver(Driver):
                     ser.write(b'\r')
                     break
 
-
 # Tuple used to return information about the results of running a set of tests.
 TestRunnerResult = collections.namedtuple("TestRunnerResult", [
         "tests_run",
@@ -590,11 +603,11 @@ class TestRunner:
     """Class which communicates with a test platform to obtain a list of
     available tests and driving their execution."""
 
-    def __init__(self, artifacts, driver, image_name, suite_regex, test_regex,
+    def __init__(self, artifacts, driver, test_set_up, suite_regex, test_regex,
             skip_long_running_tests, force_long_running):
         self.artifacts = artifacts
         self.driver = driver
-        self.image_name = image_name
+        self.test_set_up = test_set_up
         self.skip_long_running_tests = skip_long_running_tests
         self.force_long_running = force_long_running
 
@@ -769,7 +782,7 @@ class TestRunner:
         timestamp = datetime.datetime.now().replace(microsecond=0).isoformat()
 
         xml = ET.Element("testsuites")
-        xml.set("name", self.image_name)
+        xml.set("name", self.test_set_up)
         xml.set("timestamp", timestamp)
 
         result = self.collect_results(
@@ -794,8 +807,8 @@ class TestRunner:
 
 def Main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("image")
-    parser.add_argument("--out", required=True)
+    parser.add_argument("--hypervisor")
+    parser.add_argument("--spmc")
     parser.add_argument("--log", required=True)
     parser.add_argument("--out_initrd")
     parser.add_argument("--out_partitions")
@@ -813,18 +826,23 @@ def Main():
     parser.add_argument("--cpu",
         help="Selects the CPU configuration for the run environment.")
     parser.add_argument("--tfa", action="store_true")
-    parser.add_argument("--secure", action="store_true")
     args = parser.parse_args()
 
-    # Resolve some paths.
-    image = os.path.join(args.out, args.image + ".bin")
-    initrd = None
-    image_name = args.image
+    # Create class which will manage all test artifacts.
+    if args.hypervisor and args.spmc:
+        test_set_up = "hypervisor_and_spmc"
+    elif args.hypervisor:
+        test_set_up = "hypervisor"
+    elif args.spmc:
+        test_set_up = "spmc"
+    else:
+        raise Exception("No Hafnium image provided!\n")
 
-    if not args.secure and args.initrd:
+    initrd = None
+    if args.hypervisor and args.initrd:
         initrd_dir = os.path.join(args.out_initrd, "obj", args.initrd)
         initrd = os.path.join(initrd_dir, "initrd.img")
-        image_name += "_" + args.initrd
+        test_set_up += "_" + args.initrd
     vm_args = args.vm_args or ""
 
     partitions = None
@@ -833,20 +851,21 @@ def Main():
         partitions = json.load(open(partitions_dir, "r"))
 
     # Create class which will manage all test artifacts.
-    log_dir = os.path.join(args.log, "hafnium" if not args.secure else "spmc")
+    log_dir = os.path.join(args.log, test_set_up)
     artifacts = ArtifactsManager(log_dir)
 
     # Create a driver for the platform we want to test on.
-    driver_args = DriverArgs(artifacts, image, initrd, vm_args, args.cpu,
-                             partitions)
+    driver_args = DriverArgs(artifacts, args.hypervisor, args.spmc, initrd,
+                             vm_args, args.cpu, partitions)
 
-    if args.secure:
+    if args.spmc:
         if args.driver != "fvp":
             raise Exception("Secure tests can only run with fvp driver")
         driver = FvpDriverSPMC(driver_args)
-    else:
+    elif args.hypervisor:
         if args.driver == "qemu":
-            driver = QemuDriver(driver_args, args.out, args.tfa)
+            out = os.path.dirname(args.hypervisor)
+            driver = QemuDriver(driver_args, out, args.tfa)
         elif args.driver == "fvp":
             driver = FvpDriverHypervisor(driver_args)
         elif args.driver == "serial":
@@ -854,9 +873,11 @@ def Main():
                     args.serial_baudrate, not args.serial_no_init_wait)
         else:
             raise Exception("Unknown driver name: {}".format(args.driver))
+    else:
+        raise Exception("No Hafnium image provided!\n")
 
     # Create class which will drive test execution.
-    runner = TestRunner(artifacts, driver, image_name, args.suite, args.test,
+    runner = TestRunner(artifacts, driver, test_set_up, args.suite, args.test,
         args.skip_long_running_tests, args.force_long_running)
 
     # Run tests.

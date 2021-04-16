@@ -38,14 +38,15 @@ done
 
 # Run the tests with a timeout so they can't loop forever.
 HFTEST=(${TIMEOUT[@]} 300s ./test/hftest/hftest.py)
+HYPERVISOR_PATH="$OUT/"
 if [ $USE_FVP == true ]
 then
+  HYPERVISOR_PATH+="aem_v8a_fvp_clang"
   HFTEST+=(--driver=fvp)
-  HFTEST+=(--out "$OUT/aem_v8a_fvp_clang")
   HFTEST+=(--out_initrd "$OUT/aem_v8a_fvp_vm_clang")
   HFTEST+=(--out_partitions "$OUT/aem_v8a_fvp_vm_clang")
 else
-  HFTEST+=(--out "$OUT/qemu_aarch64_clang")
+  HYPERVISOR_PATH+="qemu_aarch64_clang"
   HFTEST+=(--out_initrd "$OUT/qemu_aarch64_vm_clang")
 fi
 if [ $USE_TFA == true ]
@@ -81,26 +82,41 @@ do
     HFTEST_CPU+=(--log "$LOG_DIR_BASE")
   fi
 
-  "${HFTEST_CPU[@]}" arch_test
+  "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/arch_test.bin"
   if [ $USE_TFA == true -o $USE_FVP == true ]
   then
-    "${HFTEST_CPU[@]}" aarch64_test
+    "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/aarch64_test.bin"
   fi
 
-  "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/aarch64_test
-  "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/gicv3/gicv3_test
-  "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_only/primary_only_test
-  "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_test
-  "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_no_fdt
-  "${HFTEST_CPU[@]}" hafnium --initrd test/linux/linux_test --force-long-running --vm_args "rdinit=/test_binary --"
+  "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                     --initrd test/vmapi/arch/aarch64/aarch64_test
+
+  "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                     --initrd test/vmapi/arch/aarch64/gicv3/gicv3_test
+
+  "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                     --initrd test/vmapi/primary_only/primary_only_test
+
+  "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                     --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_test
+
+  "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                     --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_no_fdt
+
+  "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                     --initrd test/linux/linux_test \
+                     --force-long-running --vm_args "rdinit=/test_binary --"
+
   # TODO: Get Trusty tests working on FVP too.
   if [ $USE_TFA == true ]
   then
-    "${HFTEST_CPU[@]}" hafnium --initrd test/vmapi/arch/aarch64/trusty/trusty_test
+    "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                       --initrd test/vmapi/arch/aarch64/trusty/trusty_test
   fi
 
   if [ $USE_TFA == true ] && [ $USE_FVP == true ]
   then
-     "${HFTEST_CPU[@]}" hafnium --partitions_json test/vmapi/primary_only_ffa/primary_only_ffa_test.json
+     "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                        --partitions_json test/vmapi/primary_only_ffa/primary_only_ffa_test.json
   fi
 done
