@@ -125,7 +125,6 @@ DriverArgs = collections.namedtuple("DriverArgs", [
         "partitions"
     ])
 
-
 # State shared between the common Driver class and its subclasses during
 # a single invocation of the target platform.
 class DriverRunState:
@@ -265,17 +264,7 @@ class FvpDriver(Driver, ABC):
 
     @property
     @abstractmethod
-    def DTB_ADDRESS(self):
-        pass
-
-    @property
-    @abstractmethod
     def FVP_PREBUILT_BL31(self):
-        pass
-
-    @property
-    @abstractmethod
-    def KERNEL_ADDRESS(self):
         pass
 
     def create_dt(self, run_name : str):
@@ -404,16 +393,16 @@ class FvpDriverHypervisor(FvpDriver):
         return "0x04020000"
 
     @property
-    def DTB_ADDRESS(self):
-        return "0x82000000"
-
-    @property
     def FVP_PREBUILT_BL31(self):
         return os.path.join(FVP_PREBUILTS_TFA_TRUSTY_ROOT, "bl31.bin")
 
     @property
-    def KERNEL_ADDRESS(self):
+    def HYPERVISOR_ADDRESS(self):
         return "0x80000000"
+
+    @property
+    def HYPERVISOR_DTB_ADDRESS(self):
+        return "0x82000000"
 
     def gen_dts(self, dt, test_args):
         """Create a DeviceTree source which will be compiled into a DTB and
@@ -440,12 +429,12 @@ class FvpDriverHypervisor(FvpDriver):
     def gen_fvp_args(
             self, is_long_running, uart0_log_path, uart1_log_path, dt, call_super = True):
         """Generate command line arguments for FVP."""
-        common_args = (is_long_running, uart0_log_path, uart1_log_path, dt)
-        fvp_args = super().gen_fvp_args(*common_args) if call_super else []
+        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt)
+        fvp_args = FvpDriver.gen_fvp_args(*common_args) if call_super else []
 
         fvp_args += [
-            "--data", f"cluster0.cpu0={dt.dtb}@{self.DTB_ADDRESS}",
-            "--data", f"cluster0.cpu0={self.args.hypervisor}@{self.KERNEL_ADDRESS}",
+            "--data", f"cluster0.cpu0={dt.dtb}@{self.HYPERVISOR_DTB_ADDRESS}",
+            "--data", f"cluster0.cpu0={self.args.hypervisor}@{self.HYPERVISOR_ADDRESS}",
         ]
 
         if self.vms_in_partitions_json:
@@ -478,16 +467,16 @@ class FvpDriverSPMC(FvpDriver):
         return "0x04010000"
 
     @property
-    def DTB_ADDRESS(self):
-        return "0x0403f000"
-
-    @property
     def FVP_PREBUILT_BL31(self):
         return os.path.join(FVP_PREBUILT_TFA_ROOT, "bl31_spmd.bin")
 
     @property
-    def KERNEL_ADDRESS(self):
+    def SPMC_ADDRESS(self):
         return "0x6000000"
+
+    @property
+    def SPMC_DTB_ADDRESS(self):
+        return "0x0403f000"
 
     def gen_dts(self, dt, test_args):
         """Create a DeviceTree source which will be compiled into a DTB and
@@ -498,27 +487,23 @@ class FvpDriverSPMC(FvpDriver):
 
     def gen_fvp_args(
         self, is_long_running, uart0_log_path, uart1_log_path, dt,
-        call_super = True, secure_hfctrl = True):
+        call_super = True):
         """Generate command line arguments for FVP."""
-        common_args = (is_long_running, uart0_log_path, uart1_log_path, dt.dtb)
-        fvp_args = super().gen_fvp_args(*common_args) if call_super else []
+        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt.dtb)
+        fvp_args = FvpDriver.gen_fvp_args(*common_args) if call_super else []
 
         fvp_args += [
-            "--data", f"cluster0.cpu0={dt.dtb}@{self.DTB_ADDRESS}",
-            "--data", f"cluster0.cpu0={self.args.spmc}@{self.KERNEL_ADDRESS}",
+            "--data", f"cluster0.cpu0={dt.dtb}@{self.SPMC_DTB_ADDRESS}",
+            "--data", f"cluster0.cpu0={self.args.spmc}@{self.SPMC_ADDRESS}",
+            "-C", "cluster0.has_arm_v8-5=1",
+            "-C", "cluster1.has_arm_v8-5=1",
+            "-C", "cluster0.has_branch_target_exception=1",
+            "-C", "cluster1.has_branch_target_exception=1",
+            "-C", "cluster0.restriction_on_speculative_execution=2",
+            "-C", "cluster1.restriction_on_speculative_execution=2",
+            "-C", f"bp.pl011_uart0.in_file={FvpDriverSPMC.HFTEST_CMD_FILE}",
+            "-C", f"bp.pl011_uart0.shutdown_tag=\"{HFTEST_CTRL_FINISHED}\"",
         ]
-
-        if secure_hfctrl:
-            fvp_args += [
-                "-C", f"bp.pl011_uart0.in_file={FvpDriverSPMC.HFTEST_CMD_FILE}",
-                "-C", f"bp.pl011_uart0.shutdown_tag=\"{HFTEST_CTRL_FINISHED}\"",
-                "-C", "cluster0.has_arm_v8-5=1",
-                "-C", "cluster1.has_arm_v8-5=1",
-                "-C", "cluster0.has_branch_target_exception=1",
-                "-C", "cluster1.has_branch_target_exception=1",
-                "-C", "cluster0.restriction_on_speculative_execution=2",
-                "-C", "cluster1.restriction_on_speculative_execution=2",
-            ]
 
         img_ldadd = self.get_img_and_ldadd(self.args.partitions["SPs"])
         for img, ldadd in img_ldadd:
@@ -535,6 +520,53 @@ class FvpDriverSPMC(FvpDriver):
     def finish(self):
         """Clean up after running tests."""
         os.remove(FvpDriverSPMC.HFTEST_CMD_FILE)
+
+class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
+    def __init__(self, args):
+        FvpDriverHypervisor.__init__(self, args)
+        FvpDriverSPMC.__init__(self, args)
+
+    @property
+    def CPU_START_ADDRESS(self):
+        return str(0x04010000)
+
+    @property
+    def FVP_PREBUILT_BL31(self):
+        return str(os.path.join(FVP_PREBUILT_TFA_ROOT, "bl31_spmd.bin"))
+
+    def create_dt(self, run_name):
+        dt = dict()
+        dt["hypervisor"] = FvpDriver.create_dt(self, run_name + "_hypervisor")
+        dt["spmc"] = FvpDriver.create_dt(self, run_name + "_spmc")
+        return dt
+
+    @property
+    def HYPERVISOR_ADDRESS(self):
+        return "0x88000000"
+
+    @property
+    def HYPERVISOR_DTB_ADDRESS(self):
+        return "0x80000000"
+
+    def compile_dt(self, run_state, dt):
+        FvpDriver.compile_dt(self, run_state, dt["hypervisor"])
+        FvpDriver.compile_dt(self, run_state, dt["spmc"])
+
+    def gen_dts(self, dt, test_args):
+        FvpDriverHypervisor.gen_dts(self, dt["hypervisor"], test_args)
+        FvpDriverSPMC.gen_dts(self, dt["spmc"], test_args)
+
+    def gen_fvp_args(
+        self, is_long_running, uart0_log_path, uart1_log_path, dt):
+        """Generate command line arguments for FVP."""
+        common_args = (self, is_long_running, uart0_log_path, uart1_log_path)
+        fvp_args = FvpDriverSPMC.gen_fvp_args(*common_args, dt["spmc"])
+        fvp_args += FvpDriverHypervisor.gen_fvp_args(*common_args, dt["hypervisor"], False)
+        return fvp_args
+
+    def finish(self):
+        """Clean up after running tests."""
+        pass
 
 class SerialDriver(Driver):
     """Driver which communicates with a device over the serial port."""
@@ -597,7 +629,6 @@ TestRunnerResult = collections.namedtuple("TestRunnerResult", [
         "tests_failed",
         "tests_skipped",
     ])
-
 
 class TestRunner:
     """Class which communicates with a test platform to obtain a list of
@@ -859,9 +890,14 @@ def Main():
                              vm_args, args.cpu, partitions)
 
     if args.spmc:
+        # So far only FVP supports tests for SPMC.
         if args.driver != "fvp":
             raise Exception("Secure tests can only run with fvp driver")
-        driver = FvpDriverSPMC(driver_args)
+
+        if args.hypervisor:
+            driver = FvpDriverBothWorlds(driver_args)
+        else:
+            driver = FvpDriverSPMC(driver_args)
     elif args.hypervisor:
         if args.driver == "qemu":
             out = os.path.dirname(args.hypervisor)
