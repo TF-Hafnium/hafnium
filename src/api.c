@@ -1757,7 +1757,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 					     struct vcpu *current,
 					     struct vcpu **next)
 {
-	struct ffa_value ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
+	struct ffa_value ret;
 	struct vm *receiver_vm;
 	struct vcpu *receiver_vcpu;
 	struct two_vcpu_locked vcpus_locked;
@@ -1770,6 +1770,13 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 						      receiver_vm_id)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
+
+	if (arch_other_world_direct_request_forward(receiver_vm_id, args,
+						    &ret)) {
+		return ret;
+	}
+
+	ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
 
 	receiver_vm = vm_find(receiver_vm_id);
 	if (receiver_vm == NULL) {

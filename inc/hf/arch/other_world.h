@@ -30,3 +30,6 @@ bool arch_other_world_is_direct_request_valid(struct vcpu *current,
 bool arch_other_world_is_direct_response_valid(struct vcpu *current,
 					       ffa_vm_id_t sender_vm_id,
 					       ffa_vm_id_t receiver_vm_id);
+bool arch_other_world_direct_request_forward(ffa_vm_id_t receiver_vm_id,
+					     struct ffa_value args,
+					     struct ffa_value *ret);

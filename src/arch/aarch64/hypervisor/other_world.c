@@ -193,6 +193,31 @@ bool arch_other_world_is_direct_response_valid(struct vcpu *current,
 	return false;
 }
 
+bool arch_other_world_direct_request_forward(ffa_vm_id_t receiver_vm_id,
+					     struct ffa_value args,
+					     struct ffa_value *ret)
+{
+#if SECURE_WORLD == 1
+	/*
+	 * SPs are not supposed to issue requests to VMs.
+	 */
+	(void)receiver_vm_id;
+	(void)args;
+	(void)ret;
+
+#else
+	/*
+	 * VM's requests should be forwarded to the SPMC, if receiver is an SP.
+	 */
+	if (!vm_id_is_current_world(receiver_vm_id)) {
+		*ret = arch_other_world_call(args);
+		return true;
+	}
+#endif
+
+	return false;
+}
+
 struct ffa_value arch_other_world_call(struct ffa_value args)
 {
 	return smc_ffa_call(args);

@@ -44,3 +44,13 @@ bool arch_other_world_is_direct_response_valid(struct vcpu *current,
 
 	return true;
 }
+
+bool arch_other_world_direct_request_forward(ffa_vm_id_t receiver_vm_id,
+					     struct ffa_value args,
+					     struct ffa_value *ret)
+{
+	(void)receiver_vm_id;
+	(void)args;
+	(void)ret;
+	return false;
+}
