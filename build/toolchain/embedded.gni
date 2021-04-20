@@ -124,8 +124,7 @@ template("embedded_clang_toolchain") {
         " -target ${invoker.target} -fcolor-diagnostics -nostdinc -isystem" +
         rebase_path("//prebuilts/linux-x64/clang/lib64/clang/9.0.8/include") +
         " -isystem" + rebase_path("//inc/system")
-    extra_ldflags +=
-        " -O2 -lto-O2 --icf=all --fatal-warnings --color-diagnostics"
+    extra_ldflags += " -O2 --icf=all --fatal-warnings --color-diagnostics"
 
     toolchain_args = {
       if (defined(invoker.toolchain_args)) {
@@ -162,7 +161,7 @@ template("embedded_clang_bfd_toolchain") {
     extra_cflags += " -target ${invoker.target} -fcolor-diagnostics"
     extra_ldflags += " --fatal-warnings"
     if (use_lto) {
-      extra_ldflags += " -O2 -lto-O2 --icf=all"
+      extra_ldflags += " -O2 --icf=all"
     }
 
     toolchain_args = {
