@@ -66,7 +66,8 @@ std::span<pte_t, MM_PTE_PER_PAGE> get_table(paddr_t pa)
 {
 	auto table = reinterpret_cast<struct mm_page_table *>(
 		ptr_from_va(va_from_pa(pa)));
-	return std::span<pte_t>(table->entries, std::end(table->entries));
+	return std::span<pte_t, MM_PTE_PER_PAGE>(table->entries,
+						 std::end(table->entries));
 }
 
 class mm : public ::testing::Test
