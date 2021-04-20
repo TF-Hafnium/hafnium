@@ -20,6 +20,7 @@ struct sve_other_world_context_t {
 	uint8_t predicates[16][HF_SVE_VECTOR_LENGTH / 64];
 } __attribute__((aligned(16)));
 
+void arch_other_world_log_init(void);
 void arch_other_world_init(void);
 bool arch_other_world_vm_init(struct vm *other_world_vm, struct mpool *ppool);
 struct ffa_value arch_other_world_call(struct ffa_value args);

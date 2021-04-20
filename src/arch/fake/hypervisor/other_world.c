@@ -12,6 +12,11 @@
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
 
+void arch_other_world_log_init(void)
+{
+	dlog_info("Initializing Hafnium\n");
+}
+
 struct ffa_value arch_other_world_call(struct ffa_value args)
 {
 	dlog_error("Attempted to call TEE function %#x\n", args.func);

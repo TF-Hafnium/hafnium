@@ -48,7 +48,7 @@ void one_time_init_mm(void)
 	/* Make sure the console is initialised before calling dlog. */
 	plat_console_init();
 
-	dlog_notice("Initialising hafnium\n");
+	arch_other_world_log_init();
 
 	mpool_init(&ppool, MM_PPOOL_ENTRY_SIZE);
 	mpool_add_chunk(&ppool, ptable_buf, sizeof(ptable_buf));

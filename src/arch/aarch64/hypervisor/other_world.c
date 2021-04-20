@@ -32,6 +32,15 @@ struct sve_other_world_context_t sve_other_world_context[MAX_CPUS];
 
 #endif
 
+void arch_other_world_log_init(void)
+{
+#if SECURE_WORLD == 0
+	dlog_info("Initializing Hafnium (Hypervisor)\n");
+#else
+	dlog_info("Initializing Hafnium (SPMC)\n");
+#endif
+}
+
 void arch_other_world_init(void)
 {
 #if SECURE_WORLD == 0
