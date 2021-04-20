@@ -148,7 +148,7 @@ SECTIONS
 	. = ALIGN(16);
 	bss_begin = .;
 	.bss : {
-		*(.bss)
+		*(.bss*)
 		*(COMMON)
 	}
 	. = ALIGN(16);
