@@ -10,8 +10,8 @@
 .global image_entry
 image_entry:
 	/* Prepare the stack. */
-	adr x30, kstack + 4096
-	mov sp, x30
+	adrp x30, kstack
+	add sp, x30, #4096
 
 	/* Disable trapping floating point access in EL1. */
 	mov x30, #(0x3 << 20)

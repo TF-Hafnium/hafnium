@@ -21,6 +21,8 @@
 alignas(PAGE_SIZE) static uint8_t
 	pages[FRAGMENTED_SHARE_PAGE_COUNT * PAGE_SIZE];
 static uint8_t retrieve_buffer[HF_MAILBOX_SIZE];
+static struct ffa_memory_region_constituent
+	constituents_lend_fragmented_relinquish[FRAGMENTED_SHARE_PAGE_COUNT];
 
 /**
  * Helper function to test sending memory in the different configurations.
@@ -377,8 +379,6 @@ TEST(memory_sharing, lend_fragmented_relinquish)
 	uint8_t *ptr = pages;
 	uint32_t i;
 	ffa_memory_handle_t handle;
-	struct ffa_memory_region_constituent
-		constituents[FRAGMENTED_SHARE_PAGE_COUNT];
 
 	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_lend_relinquish", mb.send);
 
@@ -386,17 +386,20 @@ TEST(memory_sharing, lend_fragmented_relinquish)
 	memset_s(ptr, sizeof(pages), 'b',
 		 PAGE_SIZE * FRAGMENTED_SHARE_PAGE_COUNT);
 
-	for (i = 0; i < ARRAY_SIZE(constituents); ++i) {
-		constituents[i].address = (uint64_t)pages + i * PAGE_SIZE;
-		constituents[i].page_count = 1;
-		constituents[i].reserved = 0;
+	for (i = 0; i < ARRAY_SIZE(constituents_lend_fragmented_relinquish);
+	     ++i) {
+		constituents_lend_fragmented_relinquish[i].address =
+			(uint64_t)pages + i * PAGE_SIZE;
+		constituents_lend_fragmented_relinquish[i].page_count = 1;
+		constituents_lend_fragmented_relinquish[i].reserved = 0;
 	}
 
 	handle = send_memory_and_retrieve_request(
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
-		constituents, ARRAY_SIZE(constituents), 0, FFA_DATA_ACCESS_RW,
-		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_X);
+		constituents_lend_fragmented_relinquish,
+		ARRAY_SIZE(constituents_lend_fragmented_relinquish), 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(SERVICE_VM1, 0);
 
