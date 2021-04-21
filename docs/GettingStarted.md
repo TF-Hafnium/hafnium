@@ -5,7 +5,7 @@
 ## Getting the source code
 
 ```shell
-git clone --recurse-submodules https://git.trustedfirmware.org/hafnium/hafnium.git && (cd hafnium && f=`git rev-parse --git-dir`/hooks/commit-msg ; curl -Lo $f https://review.trustedfirmware.org/tools/hooks/commit-msg ; chmod +x $f ; for m in `git rev-parse --git-dir`/modules/*; do cp $f $m/hooks/commit-msg; done)
+git clone --recurse-submodules https://git.trustedfirmware.org/hafnium/hafnium.git && { cd hafnium && f="$(git rev-parse --git-dir)"; curl -Lo "$f/hooks/commit-msg" https://review.trustedfirmware.org/tools/hooks/commit-msg && { chmod +x "$f/hooks/commit-msg"; git submodule --quiet foreach "cp \"\$toplevel/$f/hooks/commit-msg\" \"\$toplevel/$f/modules/\$path/hooks/commit-msg\""; }; }
 ```
 
 To upload a commit for review:
