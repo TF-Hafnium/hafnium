@@ -49,6 +49,8 @@ FVP_PREBUILT_DTS = os.path.join(
 FVP_PREBUILT_TFA_ROOT = os.path.join(
     HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a", "fvp")
 
+VM_NODE_REGEX = "vm[1-9]"
+
 def read_file(path):
     with open(path, "r") as f:
         return f.read()
@@ -62,6 +64,19 @@ def append_file(path, to_write):
 
 def join_if_not_None(*args):
     return " ".join(filter(lambda x: x, args))
+
+def get_vm_node_from_manifest(dts : str):
+    """ Get VM node string from Partition's extension to Partition Manager's
+    manifest."""
+    match = re.search(VM_NODE_REGEX, dts)
+    if not match:
+        raise Exception("Partition's node is not defined in its manifest.")
+    return match.group()
+
+def correct_vm_node(dts: str, node_index : int):
+    """ The vm node is being appended to the Partition Manager manifests.
+    Ideally, these files would be reused accross various test set-ups."""
+    return dts.replace(get_vm_node_from_manifest(dts), f"vm{node_index}")
 
 DT = collections.namedtuple("DT", ["dts", "dtb"])
 
@@ -287,18 +302,20 @@ class FvpDriver(Driver, ABC):
     def get_img_and_ldadd(self, partitions : dict):
         ret = []
         for i, p in enumerate(partitions):
-            with open(p["dts"], "r") as dts:
-                manifest = fdt.parse_dts(dts.read())
+            with open(p["dts"], "r") as dt:
+                dts = dt.read()
+                manifest = fdt.parse_dts(dts)
+                vm_node = get_vm_node_from_manifest(dts)
                 load_address = manifest.get_property("load_address",
-                                          f"/hypervisor/vm{str(i+1)}").value
+                                          f"/hypervisor/{vm_node}").value
                 ret.append((p["img"], load_address))
         return ret
 
     def get_manifests_from_json(self, partitions : list):
         manifests = ""
         if partitions is not None:
-            for p in partitions:
-                manifests += read_file(p["dts"])
+            for i, p in enumerate(partitions):
+                manifests += correct_vm_node(read_file(p["dts"]), i + 1)
         return manifests
 
     @abstractmethod
