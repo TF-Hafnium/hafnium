@@ -13,13 +13,22 @@
 
 #include "test/hftest.h"
 
-#define RECEIVER (HF_VM_ID_BASE + 2)
+/*
+ * Using the SECURE_WORLD macro below should be temporary. To comply
+ * with uses of this test source code.
+ * TODO: Place code dependent on SECURE_WORLD macro in a arch specific file.
+ */
+#if SECURE_WORLD == 1
+#define RECEIVER_ID 0x8002
+#else
+#define RECEIVER_ID 0x8001
+#endif
 
 /**
  * Communicates with partition via direct messaging to validate functioning of
  * Direct Message interfaces.
  */
-TEST(ffa_sp_to_sp_comm, dir_msg_req)
+TEST(ffa_partition_to_partition_comm, dir_msg_req)
 {
 	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
 				0x88889999};
@@ -28,8 +37,8 @@ TEST(ffa_sp_to_sp_comm, dir_msg_req)
 
 	dlog_verbose("HF_VM_ID_BASE: %x\n", HF_VM_ID_BASE);
 
-	res = ffa_msg_send_direct_req(own_id, RECEIVER, msg[0], msg[1], msg[2],
-				      msg[3], msg[4]);
+	res = ffa_msg_send_direct_req(own_id, RECEIVER_ID, msg[0], msg[1],
+				      msg[2], msg[3], msg[4]);
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 

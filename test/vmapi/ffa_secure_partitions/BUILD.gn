@@ -12,11 +12,26 @@ vm_kernel("secure_partitions_control") {
   testonly = true
 
   sources = [
-    "secure_partition_control.c",
+    "partition_control.c",
   ]
 
   deps = [
     "//test/hftest:hftest_standalone_secure",
+    "//test/vmapi/common:common",
+  ]
+}
+
+# VM that will control execution of tests in a VM-to-SP set-up
+vm_kernel("vm_primary") {
+  testonly = true
+
+  sources = [
+    "partition_control.c",
+  ]
+
+  deps = [
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/common:common",
   ]
 }
 
@@ -85,4 +100,39 @@ partitions_json("ffa_secure_partitions_test") {
   ]
   vms = []
   json_file = "ffa_secure_partitions_test.json"
+}
+
+manifest("vm_primary_manifest") {
+  source = "partition-manifest-nwd-primary.dts"
+  output = "partition-manifest-nwd-primary.dtb"
+}
+
+partition_package("vm_primary_test_package") {
+  testonly = true
+  files = [ [
+        "partition-manifest-nwd-primary.dtb",
+        "vm_primary.bin",
+        ":vm_primary_manifest",
+        ":vm_primary",
+      ] ]
+  output = "vm_primary_test_package.img"
+}
+
+partitions_json("ffa_both_world_partitions_test") {
+  testonly = true
+
+  sps = [ [
+        "secure_partition_services_test_package.img",
+        "manifest_services_sp.dts",
+        ":secure_partition_services_test_package",
+        ":secure_partition_services_manifest",
+      ] ]
+  vms = [ [
+        "vm_primary_test_package.img",
+        "manifest.dts",
+        ":vm_primary_test_package",
+        ":vm_primary_test_package",
+      ] ]
+
+  json_file = "ffa_both_world_partitions_test.json"
 }
