@@ -228,7 +228,7 @@ static bool is_ffa_direct_msg_request_ongoing(struct vcpu_locked locked)
  */
 static bool api_ffa_is_managed_exit_ongoing(struct vcpu_locked vcpu_locked)
 {
-	return (vcpu_locked.vcpu->vm->supports_managed_exit &&
+	return (vm_managed_exit_supported(vcpu_locked.vcpu->vm) &&
 		vcpu_locked.vcpu->processing_managed_exit);
 }
 
@@ -375,7 +375,8 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 			partitions[vm_count].vm_id = vm->id;
 			partitions[vm_count].vcpu_count = vm->vcpu_count;
 			partitions[vm_count].properties =
-				arch_vm_partition_properties(vm->id);
+				plat_ffa_partition_properties(current_vm->id,
+							      vm);
 
 			++vm_count;
 		}

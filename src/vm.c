@@ -331,3 +331,11 @@ void vm_update_boot(struct vm *vm)
 
 	vm->next_boot = current;
 }
+
+/**
+ * Returns true if VM supports a managed exit.
+ */
+bool vm_managed_exit_supported(struct vm *vm)
+{
+	return (vm->messaging_method & FFA_PARTITION_MANAGED_EXIT) != 0U;
+}

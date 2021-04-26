@@ -62,3 +62,11 @@ bool plat_ffa_memory_handle_allocated_by_current_world(
 	(void)handle;
 	return false;
 }
+
+ffa_partition_properties_t plat_ffa_partition_properties(
+	ffa_vm_id_t current_id, const struct vm *target)
+{
+	(void)current_id;
+	(void)target;
+	return 0;
+}

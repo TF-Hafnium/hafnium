@@ -920,7 +920,7 @@ struct vcpu *fiq_lower(void)
 	struct vcpu *current_vcpu = current();
 	int ret;
 
-	if (current_vcpu->vm->supports_managed_exit) {
+	if (vm_managed_exit_supported(current_vcpu->vm)) {
 		/* Mask all interrupts */
 		plat_interrupts_set_priority_mask(0x0);
 

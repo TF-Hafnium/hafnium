@@ -235,7 +235,7 @@ class ManifestDtBuilder
 		Property("entrypoint-offset", "<0x00001000>");
 		Property("xlat-granule", "<0>");
 		Property("boot-order", "<0>");
-		Property("messaging-method", "<1>");
+		Property("messaging-method", "<4>");
 		return *this;
 	}
 
@@ -818,7 +818,7 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("entrypoint-offset", "<0x00001000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
-		.Property("messaging-method", "<5>")
+		.Property("messaging-method", "<16>")
 		.Build();
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
@@ -1056,7 +1056,7 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].sp.ep_offset, 0x00001000);
 	ASSERT_EQ(m.vm[0].sp.xlat_granule, PAGE_4KB);
 	ASSERT_EQ(m.vm[0].sp.boot_order, 0);
-	ASSERT_EQ(m.vm[0].sp.messaging_method, INDIRECT_MESSAGING);
+	ASSERT_EQ(m.vm[0].sp.messaging_method, FFA_PARTITION_INDIRECT_MSG);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].base_address, 0x7100000);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].page_count, 4);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].attributes, 7);

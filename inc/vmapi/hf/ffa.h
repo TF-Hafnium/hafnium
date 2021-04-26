@@ -355,13 +355,16 @@ static inline bool ffa_uuid_is_null(const struct ffa_uuid *uuid)
 typedef uint32_t ffa_partition_properties_t;
 
 /** Partition property: partition supports receipt of direct requests. */
-#define FFA_PARTITION_DIRECT_RECV 0x1
+#define FFA_PARTITION_DIRECT_REQ_RECV 0x1
 
 /** Partition property: partition can send direct requests. */
-#define FFA_PARTITION_DIRECT_SEND 0x2
+#define FFA_PARTITION_DIRECT_REQ_SEND 0x2
 
 /** Partition property: partition can send and receive indirect messages. */
 #define FFA_PARTITION_INDIRECT_MSG 0x4
+
+/** Partition property: supports managed exit. */
+#define FFA_PARTITION_MANAGED_EXIT 0x8
 
 /**
  * Holds information returned for each partition by the FFA_PARTITION_INFO_GET

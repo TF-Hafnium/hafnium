@@ -45,14 +45,6 @@ enum execution_state { AARCH64 = 0, AARCH32 };
 
 enum xlat_granule { PAGE_4KB = 0, PAGE_16KB, PAGE_64KB };
 
-enum messaging_method {
-	DIRECT_MESSAGING = 0,
-	INDIRECT_MESSAGING,
-	BOTH_MESSAGING,
-	DIRECT_MESSAGING_MANAGED_EXIT,
-	BOTH_MESSAGING_MANAGED_EXIT
-};
-
 /**
  * Partition Memory region as described in PSA FFA v1.0 spec, Table 10
  */
@@ -145,7 +137,7 @@ struct sp_manifest {
 	struct rx_tx rxtx;
 
 	/** mandatory - direct/indirect msg or both */
-	enum messaging_method messaging_method;
+	uint8_t messaging_method;
 	/** optional */
 	bool has_primary_scheduler;
 	/** optional - preemptible / run to completion */

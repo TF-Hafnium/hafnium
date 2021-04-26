@@ -667,9 +667,10 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if (vm->sp.messaging_method != INDIRECT_MESSAGING &&
-	    vm->sp.messaging_method != DIRECT_MESSAGING &&
-	    vm->sp.messaging_method != DIRECT_MESSAGING_MANAGED_EXIT) {
+	if ((vm->sp.messaging_method &
+	     ~(FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND |
+	       FFA_PARTITION_INDIRECT_MSG | FFA_PARTITION_MANAGED_EXIT)) !=
+	    0U) {
 		dlog_error("Messaging method %s: %x\n", error_string,
 			   vm->sp.messaging_method);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
