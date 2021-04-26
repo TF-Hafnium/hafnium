@@ -323,6 +323,14 @@ class FvpDriver(Driver, ABC):
         fvp_args = [
             "timeout", "--foreground", time_limit,
             FVP_BINARY,
+            "-C", "pci.pci_smmuv3.mmu.SMMU_AIDR=2",
+            "-C", "pci.pci_smmuv3.mmu.SMMU_IDR0=0x0046123B",
+            "-C", "pci.pci_smmuv3.mmu.SMMU_IDR1=0x00600002",
+            "-C", "pci.pci_smmuv3.mmu.SMMU_IDR3=0x1714",
+            "-C", "pci.pci_smmuv3.mmu.SMMU_IDR5=0xFFFF0472",
+            "-C", "pci.pci_smmuv3.mmu.SMMU_S_IDR1=0xA0000002",
+            "-C", "pci.pci_smmuv3.mmu.SMMU_S_IDR2=0",
+            "-C", "pci.pci_smmuv3.mmu.SMMU_S_IDR3=0",
             "-C", "pctl.startup=0.0.0.0",
             "-C", "bp.secure_memory=0",
             "-C", "cluster0.NUM_CORES=4",
@@ -457,7 +465,7 @@ class FvpDriverSPMC(FvpDriver):
 
     def __init__(self, args):
         if args.partitions is None or args.partitions["SPs"] is None:
-            raise Exception("Need to specify provide SPs in partitions_json")
+            raise Exception("Need to provide SPs in partitions_json")
         super().__init__(args)
 
     @property
