@@ -38,6 +38,9 @@
 /* UART Flag Register bit: transmit fifo is full. */
 #define UART_FR_TXFF (1 << 5)
 
+/* UART Flag Register bit: receive fifo is empty */
+#define UART_FR_RXFE (1 << 4)
+
 /* UART Flag Register bit: UART is busy. */
 #define UART_FR_BUSY (1 << 3)
 
@@ -117,9 +120,11 @@ void plat_console_putchar(char c)
 
 char plat_console_getchar(void)
 {
-	/* Wait until the UART is no longer busy. */
-	while (io_read32_mb(UART_FR) & UART_FR_BUSY) {
+	/* Wait until the UART is no longer busy and has data to read. */
+	while (io_read32_mb(UART_FR) & UART_FR_BUSY ||
+	       io_read32_mb(UART_FR) & UART_FR_RXFE) {
 		/* do nothing */
 	}
+
 	return (char)(io_read32(UART_DR) & 0xFF);
 }
