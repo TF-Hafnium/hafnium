@@ -141,17 +141,7 @@ void arch_regs_reset(struct vcpu *vcpu)
 		feature_set_traps(vcpu->vm, r);
 	}
 
-#if SECURE_WORLD == 1
-	/*
-	 * TODO: Secure Partitions are granted access to the GIC system
-	 * registers. This is temporary in waiting the GIC para-virtualized
-	 * interface is ready for SP usage. This conditional code here will
-	 * then be removed.
-	 */
-	gic_regs_reset(r, true);
-#else
 	gic_regs_reset(r, is_primary);
-#endif
 }
 
 void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg)
