@@ -499,8 +499,12 @@ class FvpDriverSPMC(FvpDriver):
         fvp_args += [
                 "-C", f"bp.pl011_uart0.in_file={FvpDriverSPMC.HFTEST_CMD_FILE}",
                 "-C", f"bp.pl011_uart0.shutdown_tag=\"{HFTEST_CTRL_FINISHED}\"",
-                "-C", "cluster0.has_arm_v8-4=1",
-                "-C", "cluster1.has_arm_v8-4=1",
+                "-C", "cluster0.has_arm_v8-5=1",
+                "-C", "cluster1.has_arm_v8-5=1",
+                "-C", "cluster0.has_branch_target_exception=1",
+                "-C", "cluster1.has_branch_target_exception=1",
+                "-C", "cluster0.restriction_on_speculative_execution=2",
+                "-C", "cluster1.restriction_on_speculative_execution=2",
             ]
         img_ldadd = self.get_img_and_ldadd(self.args.partitions["SPs"])
         for img, ldadd in img_ldadd:
