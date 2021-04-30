@@ -392,7 +392,7 @@ class FvpDriverHypervisor(FvpDriver):
     Driver which runs tests in Arm FVP emulator, with hafnium as hypervisor
     """
     INITRD_START= 0x84000000
-    INITRD_END = 0x85000000 #Default value, however may change if initrd in args
+    INITRD_END = 0x86000000 #Default value, however may change if initrd in args
 
     def __init__(self, args):
         self.vms_in_partitions_json = args.partitions and args.partitions["VMs"]
