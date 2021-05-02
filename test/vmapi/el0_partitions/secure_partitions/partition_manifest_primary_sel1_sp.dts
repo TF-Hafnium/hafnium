@@ -1,0 +1,26 @@
+/*
+ * Copyright 2021 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/dts-v1/;
+
+/ {
+  compatible = "arm,ffa-manifest-1.0";
+  debug_name = "partition-manifest";
+
+  /* Properties */
+  ffa-version = <0x00010000>; /* 31:16 - Major, 15:0 - Minor */
+  uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>;
+  execution-ctx-count = <8>;
+  exception-level = <2>; /* S-EL1 */
+  execution-state = <0>; /* AARCH64 */
+  load-address = <0x6280000>;
+  entrypoint-offset = <0x1000>;
+  xlat-granule = <0>; /* 4KiB */
+  messaging-method = <0>; /* Direct messaging only */
+  boot-order = <1>;
+};

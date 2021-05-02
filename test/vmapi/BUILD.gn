@@ -14,6 +14,7 @@ group("vmapi") {
     "arch/${plat_arch}:arch",
     "common:common",
     "el0_partitions:el0_partitions_test",
+    "el0_partitions/secure_partitions:el0_sp_test",
     "ffa_secure_partition_only:ffa_secure_partition_only_test",
     "ffa_secure_partitions:ffa_both_world_partitions_test",
     "primary_only:primary_only_test",
