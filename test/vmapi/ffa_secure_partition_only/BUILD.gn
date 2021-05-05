@@ -20,32 +20,32 @@ vm_kernel("secure_partition_test_vm") {
   ]
 }
 
-manifest("ffa_secure_partition_partition_manifest") {
+manifest("ffa_secure_partition_only_partition_manifest") {
   source = "partition-manifest.dts"
   output = "partition-manifest.dtb"
   overlay = hftest_manifest_overlay
 }
 
-partition_package("ffa_secure_partition_test_package") {
+partition_package("ffa_secure_partition_only_test_package") {
   testonly = true
   files = [ [
         "partition-manifest.dtb",
         "secure_partition_test_vm.bin",
-        ":ffa_secure_partition_partition_manifest",
+        ":ffa_secure_partition_only_partition_manifest",
         ":secure_partition_test_vm",
       ] ]
-  output = "ffa_secure_partition_test_package.img"
+  output = "ffa_secure_partition_only_test_package.img"
 }
 
-partitions_json("ffa_secure_partition_test") {
+partitions_json("ffa_secure_partition_only_test") {
   testonly = true
 
   sps = [ [
-        "ffa_secure_partition_test_package.img",
+        "ffa_secure_partition_only_test_package.img",
         "manifest.dts",
-        ":ffa_secure_partition_test_package",
-        ":ffa_secure_partition_partition_manifest",
+        ":ffa_secure_partition_only_test_package",
+        ":ffa_secure_partition_only_partition_manifest",
       ] ]
   vms = []
-  json_file = "ffa_secure_partition_test.json"
+  json_file = "ffa_secure_partition_only_test.json"
 }
