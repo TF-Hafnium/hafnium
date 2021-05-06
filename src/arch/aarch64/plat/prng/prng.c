@@ -10,8 +10,6 @@
 
 #include "msr.h"
 
-__uint128_t pauth_apia_key;
-
 /**
  * plat_prng_get_number
  *
