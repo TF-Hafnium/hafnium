@@ -15,6 +15,7 @@
 
 #include "vmapi/hf/call.h"
 
+#include "test/abort.h"
 #include "test/hftest.h"
 
 alignas(4096) uint8_t kstack[4096];
@@ -24,25 +25,7 @@ HFTEST_ENABLE();
 extern struct hftest_test hftest_begin[];
 extern struct hftest_test hftest_end[];
 
-static struct hftest_context global_context;
-
 void test_main_secondary(size_t mem_size);
-
-struct hftest_context *hftest_get_context(void)
-{
-	return &global_context;
-}
-
-noreturn void abort(void)
-{
-	HFTEST_LOG("Service contained failures.");
-	/* Cause a fault, as a secondary can't power down the machine. */
-	*((volatile uint8_t *)1) = 1;
-
-	/* This should never be reached, but to make the compiler happy... */
-	for (;;) {
-	}
-}
 
 noreturn void kmain(size_t mem_size)
 {

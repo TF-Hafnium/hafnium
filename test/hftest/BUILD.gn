@@ -68,6 +68,7 @@ source_set("hftest_secure_service") {
 
   deps = [
     ":mm",
+    ":service_common",
     "//src:dlog",
     "//src:panic",
     "//src:std",
@@ -92,6 +93,7 @@ source_set("hftest_secondary_vm_no_fdt") {
 
   deps = [
     ":mm",
+    ":service_common",
     "//src:dlog",
     "//src:panic",
     "//src:std",
@@ -192,6 +194,20 @@ source_set("common") {
   ]
   deps = [
     "//src:fdt_handler",
+    "//src:memiter",
+    "//src:panic",
+    "//src:std",
+  ]
+}
+
+source_set("service_common") {
+  visibility = [ ":*" ]
+  testonly = true
+  public_configs = [ ":hftest_config" ]
+  sources = [
+    "service_common.c",
+  ]
+  deps = [
     "//src:memiter",
     "//src:panic",
     "//src:std",
