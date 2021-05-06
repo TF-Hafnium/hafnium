@@ -70,3 +70,9 @@ ffa_partition_properties_t plat_ffa_partition_properties(
 	(void)target;
 	return 0;
 }
+
+bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
+{
+	(void)vm;
+	return false;
+}

@@ -161,8 +161,7 @@ bool plat_ffa_memory_handle_allocated_by_current_world(
 ffa_partition_properties_t plat_ffa_partition_properties(
 	ffa_vm_id_t vm_id, const struct vm *target)
 {
-	ffa_partition_properties_t result =
-		target->messaging_method | ~FFA_PARTITION_MANAGED_EXIT;
+	ffa_partition_properties_t result = target->messaging_method;
 	/*
 	 * VMs support indirect messaging only in the Normal World.
 	 * Primary VM cannot receive direct requests.
@@ -177,4 +176,11 @@ ffa_partition_properties_t plat_ffa_partition_properties(
 		result &= ~FFA_PARTITION_DIRECT_REQ_SEND;
 	}
 	return result;
+}
+
+bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
+{
+	(void)vm;
+
+	return false;
 }

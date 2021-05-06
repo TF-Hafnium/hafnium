@@ -376,9 +376,6 @@ typedef uint32_t ffa_partition_properties_t;
 /** Partition property: partition can send and receive indirect messages. */
 #define FFA_PARTITION_INDIRECT_MSG 0x4
 
-/** Partition property: supports managed exit. */
-#define FFA_PARTITION_MANAGED_EXIT 0x8
-
 /**
  * Holds information returned for each partition by the FFA_PARTITION_INFO_GET
  * interface.

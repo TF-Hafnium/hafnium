@@ -11,6 +11,7 @@
 #include "hf/arch/barriers.h"
 #include "hf/arch/init.h"
 #include "hf/arch/mmu.h"
+#include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/smc.h"
 
 #include "hf/api.h"
@@ -929,7 +930,7 @@ struct vcpu *fiq_lower(void)
 	struct vcpu *current_vcpu = current();
 	int ret;
 
-	if (vm_managed_exit_supported(current_vcpu->vm)) {
+	if (plat_ffa_vm_managed_exit_supported(current_vcpu->vm)) {
 		/* Mask all interrupts */
 		plat_interrupts_set_priority_mask(0x0);
 

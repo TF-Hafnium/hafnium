@@ -27,6 +27,11 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value *ret);
 
 /**
+ * Checks whether managed exit is supported by given SP.
+ */
+bool plat_ffa_vm_managed_exit_supported(struct vm *vm);
+
+/**
  * Encodes memory handle according to section 5.10.2 of the FF-A v1.0 spec.
  */
 ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index);

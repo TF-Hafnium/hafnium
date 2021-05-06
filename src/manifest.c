@@ -606,6 +606,8 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 		       (uint8_t *)&vm->sp.messaging_method));
 	dlog_verbose("  Messaging method %u\n", vm->sp.messaging_method);
 
+	TRY(read_bool(&root, "managed-exit", &vm->sp.managed_exit));
+
 	/* Parse memory-regions */
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
@@ -669,8 +671,7 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 
 	if ((vm->sp.messaging_method &
 	     ~(FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND |
-	       FFA_PARTITION_INDIRECT_MSG | FFA_PARTITION_MANAGED_EXIT)) !=
-	    0U) {
+	       FFA_PARTITION_INDIRECT_MSG)) != 0U) {
 		dlog_error("Messaging method %s: %x\n", error_string,
 			   vm->sp.messaging_method);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;

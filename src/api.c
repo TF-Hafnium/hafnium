@@ -228,7 +228,7 @@ static bool is_ffa_direct_msg_request_ongoing(struct vcpu_locked locked)
  */
 static bool api_ffa_is_managed_exit_ongoing(struct vcpu_locked vcpu_locked)
 {
-	return (vm_managed_exit_supported(vcpu_locked.vcpu->vm) &&
+	return (plat_ffa_vm_managed_exit_supported(vcpu_locked.vcpu->vm) &&
 		vcpu_locked.vcpu->processing_managed_exit);
 }
 

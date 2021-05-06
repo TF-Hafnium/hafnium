@@ -139,6 +139,8 @@ struct sp_manifest {
 	/** mandatory - direct/indirect msg or both */
 	uint8_t messaging_method;
 	/** optional */
+	bool managed_exit;
+	/** optional */
 	bool has_primary_scheduler;
 	/** optional - preemptible / run to completion */
 	uint8_t runtime_model;

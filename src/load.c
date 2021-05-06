@@ -152,6 +152,8 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->messaging_method =
 			manifest_vm->sp.messaging_method;
 
+		vm_locked.vm->managed_exit = manifest_vm->sp.managed_exit;
+
 		vm_locked.vm->boot_order = manifest_vm->sp.boot_order;
 		/* Updating boot list according to boot_order */
 		vm_update_boot(vm_locked.vm);

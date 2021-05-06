@@ -236,6 +236,7 @@ class ManifestDtBuilder
 		Property("xlat-granule", "<0>");
 		Property("boot-order", "<0>");
 		Property("messaging-method", "<4>");
+		BooleanProperty("managed-exit");
 		return *this;
 	}
 
@@ -1057,6 +1058,7 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].sp.xlat_granule, PAGE_4KB);
 	ASSERT_EQ(m.vm[0].sp.boot_order, 0);
 	ASSERT_EQ(m.vm[0].sp.messaging_method, FFA_PARTITION_INDIRECT_MSG);
+	ASSERT_EQ(m.vm[0].sp.managed_exit, true);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].base_address, 0x7100000);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].page_count, 4);
 	ASSERT_EQ(m.vm[0].sp.mem_regions[0].attributes, 7);

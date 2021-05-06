@@ -107,8 +107,7 @@ bool plat_ffa_memory_handle_allocated_by_current_world(
 ffa_partition_properties_t plat_ffa_partition_properties(
 	ffa_vm_id_t vm_id, const struct vm *target)
 {
-	ffa_partition_properties_t result =
-		(target->messaging_method | ~(FFA_PARTITION_MANAGED_EXIT));
+	ffa_partition_properties_t result = target->messaging_method;
 	/*
 	 * SPs support full direct messaging communication with other SPs,
 	 * and are allowed to only receive direct requests from the other world.
@@ -119,4 +118,9 @@ ffa_partition_properties_t plat_ffa_partition_properties(
 				 FFA_PARTITION_DIRECT_REQ_SEND);
 	}
 	return result & FFA_PARTITION_DIRECT_REQ_RECV;
+}
+
+bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
+{
+	return vm->managed_exit;
 }

@@ -126,6 +126,7 @@ struct vm {
 	bool initialized;
 	uint16_t boot_order;
 	uint8_t messaging_method;
+	bool managed_exit;
 	struct vm *next_boot;
 
 	/**
@@ -177,4 +178,3 @@ bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool);
 
 void vm_update_boot(struct vm *vm);
 struct vm *vm_get_first_boot(void);
-bool vm_managed_exit_supported(struct vm *vm);
