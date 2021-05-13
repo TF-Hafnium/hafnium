@@ -8,24 +8,41 @@
 
 #include "hf/arch/plat/ffa.h"
 
+#include "hf/check.h"
 #include "hf/ffa.h"
 #include "hf/panic.h"
 #include "hf/vm_ids.h"
+
+static ffa_vm_id_t spmc_id = HF_INVALID_VM_ID;
 
 /**
  * Returns the SPMC ID returned from the SPMD.
  */
 ffa_vm_id_t arch_ffa_spmc_id_get(void)
 {
+	return spmc_id;
+}
+
+/**
+ * Initialize the platform FF-A module in the context of running the SPMC.
+ * In particular it fetches the SPMC ID to prevent SMC calls everytime
+ * FFA_SPM_ID_GET is invoked.
+ */
+void arch_ffa_init(void)
+{
 	struct ffa_value ret = plat_ffa_spmc_id_get();
 
 	if (ret.func == FFA_SUCCESS_32) {
-		return (ffa_vm_id_t)ret.arg2;
-	}
-	if (ret.func == FFA_ERROR_32 &&
-	    ffa_error_code(ret) != FFA_NOT_SUPPORTED) {
+		spmc_id = ret.arg2;
+	} else if (ret.func == FFA_ERROR_32 &&
+		   ffa_error_code(ret) == FFA_NOT_SUPPORTED) {
+		spmc_id = HF_SPMC_VM_ID;
+	} else {
 		panic("Failed to get SPMC ID\n");
 	}
 
-	return HF_SPMC_VM_ID;
+	/*
+	 * Check that spmc_id is equal to HF_SPMC_VM_ID.
+	 */
+	CHECK(spmc_id == HF_SPMC_VM_ID);
 }

@@ -24,12 +24,6 @@
 
 void cpu_entry(struct cpu *c);
 
-/* Performs arch specific boot time initialisation. */
-void arch_one_time_init(void)
-{
-	plat_psci_init();
-}
-
 /**
  * Handles PSCI requests received via HVC or SMC instructions from the primary
  * VM.

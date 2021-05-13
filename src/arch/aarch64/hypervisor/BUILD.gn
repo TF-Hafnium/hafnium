@@ -38,6 +38,7 @@ source_set("hypervisor") {
   ]
 
   sources += [
+    "arch_init.c",
     "cpu.c",
     "debug_el1.c",
     "feature_id.c",

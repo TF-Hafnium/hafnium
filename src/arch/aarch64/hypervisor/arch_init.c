@@ -6,12 +6,14 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#pragma once
+#include "hf/arch/ffa.h"
+#include "hf/arch/plat/psci.h"
 
-#include "hf/ffa.h"
-
-/** Returns the SPMC ID. */
-ffa_vm_id_t arch_ffa_spmc_id_get(void);
-
-/** Called once at boot time to initialize the platform ffa module. */
-void arch_ffa_init(void);
+/**
+ * Performs arch specific boot time initialization.
+ */
+void arch_one_time_init(void)
+{
+	plat_psci_init();
+	arch_ffa_init();
+}
