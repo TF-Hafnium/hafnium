@@ -143,4 +143,130 @@ TEST_F(vm, vm_boot_order)
 		EXPECT_EQ((*it)->id, vm_cur->id);
 	}
 }
+
+/**
+ * Validates updates and check functions for binding notifications to endpoints.
+ */
+TEST_F(vm, vm_notifications_bind_diff_senders)
+{
+	struct_vm *cur_vm = nullptr;
+	struct vm_locked cur_vm_locked;
+	std::vector<struct_vm *> dummy_senders;
+	ffa_notifications_bitmap_t bitmaps[] = {
+		0x00000000FFFFFFFFU, 0xFFFFFFFF00000000U, 0x0000FFFFFFFF0000U};
+	bool is_from_vm = true;
+
+	/* For the subsequent tests three VMs are used. */
+	CHECK(vm_get_count() >= 3);
+
+	cur_vm = vm_find_index(0);
+
+	dummy_senders.push_back(vm_find_index(1));
+	dummy_senders.push_back(vm_find_index(2));
+
+	cur_vm_locked = vm_lock(cur_vm);
+
+	for (unsigned int i = 0; i < 2; i++) {
+		/* Validate bindings condition after initialization. */
+		EXPECT_TRUE(vm_notifications_validate_binding(
+			cur_vm_locked, is_from_vm, HF_INVALID_VM_ID, bitmaps[i],
+			false));
+
+		/*
+		 * Validate bind related operations. For this test considering
+		 * only global notifications.
+		 */
+		vm_notifications_update_bindings(cur_vm_locked, is_from_vm,
+						 dummy_senders[i]->id,
+						 bitmaps[i], false);
+
+		EXPECT_TRUE(vm_notifications_validate_binding(
+			cur_vm_locked, is_from_vm, dummy_senders[i]->id,
+			bitmaps[i], false));
+
+		EXPECT_FALSE(vm_notifications_validate_binding(
+			cur_vm_locked, is_from_vm, dummy_senders[1 - i]->id,
+			bitmaps[i], false));
+
+		EXPECT_FALSE(vm_notifications_validate_binding(
+			cur_vm_locked, is_from_vm, dummy_senders[i]->id,
+			bitmaps[1 - i], false));
+
+		EXPECT_FALSE(vm_notifications_validate_binding(
+			cur_vm_locked, is_from_vm, dummy_senders[i]->id,
+			bitmaps[2], false));
+	}
+
+	/** Clean up bind for other tests. */
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm, 0,
+					 bitmaps[0], false);
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm, 0,
+					 bitmaps[1], false);
+
+	vm_unlock(&cur_vm_locked);
+}
+
+/**
+ * Validates updates and check functions for binding notifications, namely the
+ * configuration of bindings of global and per VCPU notifications.
+ */
+TEST_F(vm, vm_notification_bind_per_vcpu_vs_global)
+{
+	struct_vm *cur_vm;
+	struct vm_locked cur_vm_locked;
+	struct_vm *dummy_sender;
+	ffa_notifications_bitmap_t global = 0x00000000FFFFFFFFU;
+	ffa_notifications_bitmap_t per_vcpu = ~global;
+	bool is_from_vm = true;
+
+	CHECK(vm_get_count() >= 2);
+
+	cur_vm = vm_find_index(0);
+
+	dummy_sender = vm_find_index(1);
+
+	cur_vm_locked = vm_lock(cur_vm);
+
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm,
+					 dummy_sender->id, global, false);
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm,
+					 dummy_sender->id, per_vcpu, true);
+
+	/* Check validation of global notifications bindings. */
+	EXPECT_TRUE(vm_notifications_validate_binding(
+		cur_vm_locked, is_from_vm, dummy_sender->id, global, false));
+
+	/* Check validation of per vcpu notifications bindings. */
+	EXPECT_TRUE(vm_notifications_validate_binding(
+		cur_vm_locked, is_from_vm, dummy_sender->id, per_vcpu, true));
+
+	/**
+	 * Check that global notifications are not validated as per VCPU, and
+	 * vice-versa.
+	 */
+	EXPECT_FALSE(vm_notifications_validate_binding(
+		cur_vm_locked, is_from_vm, dummy_sender->id, global, true));
+	EXPECT_FALSE(vm_notifications_validate_binding(
+		cur_vm_locked, is_from_vm, dummy_sender->id, per_vcpu, false));
+	EXPECT_FALSE(vm_notifications_validate_binding(
+		cur_vm_locked, is_from_vm, dummy_sender->id, global | per_vcpu,
+		true));
+	EXPECT_FALSE(vm_notifications_validate_binding(
+		cur_vm_locked, is_from_vm, dummy_sender->id, global | per_vcpu,
+		false));
+
+	/** Undo the bindings */
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm, 0, global,
+					 false);
+	EXPECT_TRUE(vm_notifications_validate_binding(cur_vm_locked, is_from_vm,
+						      0, global, false));
+
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm, 0, per_vcpu,
+					 false);
+	EXPECT_TRUE(vm_notifications_validate_binding(cur_vm_locked, is_from_vm,
+						      0, per_vcpu, false));
+
+	vm_unlock(&cur_vm_locked);
+}
+
 } /* namespace */
