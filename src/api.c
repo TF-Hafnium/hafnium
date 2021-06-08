@@ -2823,3 +2823,96 @@ out:
 
 	return ret;
 }
+
+/**
+ * Prepares successful return for FFA_NOTIFICATION_INFO_GET, as described by
+ * the section 17.7.1 of the FF-A v1.1 Beta0 specification.
+ */
+static struct ffa_value api_ffa_notification_info_get_success_return(
+	const uint16_t *ids, uint32_t ids_count, const uint32_t *lists_sizes,
+	uint32_t lists_count, bool list_is_full)
+{
+	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_64};
+
+	/*
+	 * Copying content of ids into ret structure. Use 5 registers (x3-x7) to
+	 * hold the list of ids.
+	 */
+	memcpy_s(&ret.arg3,
+		 sizeof(ret.arg3) * FFA_NOTIFICATIONS_INFO_GET_REGS_RET, ids,
+		 sizeof(ids[0]) * ids_count);
+
+	/*
+	 * According to the spec x2 should have:
+	 * - Bit flagging if there are more notifications pending;
+	 * - The total number of elements (i.e. total list size);
+	 * - The number of VCPU IDs within each VM specific list.
+	 */
+	ret.arg2 =
+		list_is_full ? FFA_NOTIFICATIONS_INFO_GET_FLAG_MORE_PENDING : 0;
+
+	ret.arg2 |= (lists_count & FFA_NOTIFICATIONS_LISTS_COUNT_MASK)
+		    << FFA_NOTIFICATIONS_LISTS_COUNT_SHIFT;
+
+	for (unsigned int i = 0; i < lists_count; i++) {
+		ret.arg2 |= (lists_sizes[i] & FFA_NOTIFICATIONS_LIST_SIZE_MASK)
+			    << FFA_NOTIFICATIONS_LIST_SHIFT(i + 1);
+	}
+
+	return ret;
+}
+
+struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
+{
+	/*
+	 * Following set of variables should be populated with the return info.
+	 * At a successfull handling of this interface, they should be used
+	 * to populate the 'ret' structure in accordance to the table 17.29
+	 * of the FF-A v1.1 Beta0 specification.
+	 */
+	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS];
+	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t lists_count = 0;
+	uint32_t ids_count = 0;
+	bool list_is_full = false;
+
+	/*
+	 * This interface can only be called at NS virtual/physical FF-A
+	 * instance by the endpoint implementing the primary scheduler and the
+	 * Hypervisor/OS kernel.
+	 * In the SPM, following check passes if call has been forwarded from
+	 * the hypervisor.
+	 */
+	if (current->vm->id != HF_PRIMARY_VM_ID) {
+		dlog_verbose(
+			"Only the receiver's scheduler can use this "
+			"interface\n");
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	/* Get notifications' info from this world */
+	for (ffa_vm_count_t index = 0; index < vm_get_count() && !list_is_full;
+	     ++index) {
+		struct vm_locked vm_locked = vm_lock(vm_find_index(index));
+
+		list_is_full = vm_notifications_info_get(
+			vm_locked, ids, &ids_count, lists_sizes, &lists_count,
+			FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
+
+		vm_unlock(&vm_locked);
+	}
+
+	if (!list_is_full) {
+		/* Grab notifications info from other world */
+		list_is_full = plat_ffa_vm_notifications_info_get(
+			ids, &ids_count, lists_sizes, &lists_count,
+			FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
+	}
+
+	if (ids_count == 0) {
+		return ffa_error(FFA_NO_DATA);
+	}
+
+	return api_ffa_notification_info_get_success_return(
+		ids, ids_count, lists_sizes, lists_count, list_is_full);
+}

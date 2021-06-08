@@ -87,6 +87,7 @@
 #define FFA_DENIED             INT32_C(-6)
 #define FFA_RETRY              INT32_C(-7)
 #define FFA_ABORTED            INT32_C(-8)
+#define FFA_NO_DATA            INT32_C(-9)
 
 /* clang-format on */
 
@@ -432,6 +433,47 @@ static inline ffa_vm_id_t ffa_notifications_get_receiver(struct ffa_value args)
 static inline ffa_vm_id_t ffa_notifications_get_vcpu(struct ffa_value args)
 {
 	return args.arg1 & 0xffffU;
+}
+
+/**
+ * The max number of IDs for return of FFA_NOTIFICATION_INFO_GET.
+ */
+#define FFA_NOTIFICATIONS_INFO_GET_MAX_IDS 20U
+
+/**
+ * Number of registers to use in successfull return of interface
+ * FFA_NOTIFICATION_INFO_GET.
+ */
+#define FFA_NOTIFICATIONS_INFO_GET_REGS_RET 5U
+
+#define FFA_NOTIFICATIONS_INFO_GET_FLAG_MORE_PENDING 0x1U
+
+/**
+ * Helper macros for return parameter encoding as described in section 17.7.1
+ * of the FF-A v1.1 Beta0 specification.
+ */
+#define FFA_NOTIFICATIONS_LISTS_COUNT_SHIFT 0x7U
+#define FFA_NOTIFICATIONS_LISTS_COUNT_MASK 0x1fU
+#define FFA_NOTIFICATIONS_LIST_SHIFT(l) (2 * (l - 1) + 12)
+#define FFA_NOTIFICATIONS_LIST_SIZE_MASK 0x3U
+
+static inline uint32_t ffa_notification_info_get_lists_count(
+	struct ffa_value args)
+{
+	return (uint32_t)(args.arg2 >> FFA_NOTIFICATIONS_LISTS_COUNT_SHIFT) &
+	       FFA_NOTIFICATIONS_LISTS_COUNT_MASK;
+}
+
+static inline uint32_t ffa_notification_info_get_list_size(
+	struct ffa_value args, unsigned int list_idx)
+{
+	return ((uint32_t)args.arg2 >> FFA_NOTIFICATIONS_LIST_SHIFT(list_idx)) &
+	       FFA_NOTIFICATIONS_LIST_SIZE_MASK;
+}
+
+static inline bool ffa_notification_info_get_more_pending(struct ffa_value args)
+{
+	return (args.arg2 & FFA_NOTIFICATIONS_INFO_GET_FLAG_MORE_PENDING) != 0U;
 }
 
 /**

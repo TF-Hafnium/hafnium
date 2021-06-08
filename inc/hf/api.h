@@ -114,3 +114,5 @@ struct ffa_value api_ffa_notification_set(
 struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 					  uint16_t vcpu_id, uint32_t flags,
 					  struct vcpu *current);
+
+struct ffa_value api_ffa_notification_info_get(struct vcpu *current);

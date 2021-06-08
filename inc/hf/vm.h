@@ -123,6 +123,40 @@ struct notifications {
 	struct notifications_state global;
 };
 
+/**
+ * The following enum relates to a state machine to guide the insertion of
+ * IDs in the respective list as a result of a FFA_NOTIFICATION_INFO_GET call.
+ * As per the FF-A v1.1 specification, the return of the interface
+ * FFA_NOTIFICATION_INFO_GET, is a list of 16-bit values, regarding the VM ID
+ * and VCPU IDs of those with pending notifications.
+ * The overall list, is composed of "sub-lists", that starts with the VM ID, and
+ * can follow with up to 3 more VCPU IDs. A VM can have multiple 'sub-lists'.
+ * The states are traversed on a per VM basis, and should help with filling the
+ * list of IDs.
+ *
+ * INIT is the initial state. The following state transitions are possible:
+ * * INIT => INSERTING: no list has been created for the VM prior. There are
+ * notifications pending and VM ID should be inserted first. If it regards to
+ * a per VCPU notification the VCPU ID should follow. Only VCPU IDs should be
+ * inserted from this point, until reaching "sub-list" size limit.
+ * * INIT => FULL: There is no space in the ID list to insert IDs.
+ * * INSERTING => STARTING_NEW: list has been created. Adding only VCPU IDs,
+ * however "sub-list" limit has been reached. If there are more pending per VCPU
+ * notifications pending for the VM, a new list should be created starting with
+ * VM ID.
+ * * INSERTING => FULL: There is no space in the ID list to insert IDs.
+ * * STARTING_NEW => INSERTING: Started a new 'sub-list' for the given VM, for
+ * the remaining pending per VCPU notifications, only the VCPU ID should be
+ * inserted.
+ * * STARTING_NEW => FULL: There is no space in the ID list to insert IDs.
+ */
+enum notifications_info_get_state {
+	INIT,
+	INSERTING,
+	STARTING_NEW,
+	FULL,
+};
+
 struct smc_whitelist {
 	uint32_t smcs[MAX_SMCS];
 	uint16_t smc_count;
@@ -253,3 +287,12 @@ void vm_notifications_set(struct vm_locked vm_locked, bool is_from_vm,
 ffa_notifications_bitmap_t vm_notifications_get_pending_and_clear(
 	struct vm_locked vm_locked, bool is_from_vm,
 	ffa_vcpu_index_t cur_vcpu_id);
+void vm_notifications_info_get_pending(
+	struct vm_locked vm_locked, bool is_from_vm, uint16_t *ids,
+	uint32_t *ids_count, uint32_t *lists_sizes, uint32_t *lists_count,
+	const uint32_t ids_max_count,
+	enum notifications_info_get_state *info_get_state);
+bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
+			       uint32_t *ids_count, uint32_t *lists_sizes,
+			       uint32_t *lists_count,
+			       const uint32_t ids_max_count);

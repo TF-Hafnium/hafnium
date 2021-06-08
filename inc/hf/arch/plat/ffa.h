@@ -105,3 +105,10 @@ bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id);
  */
 bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 			  struct ffa_value *ret);
+
+bool plat_ffa_notification_info_get_call(struct ffa_value *ret);
+
+bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
+					uint32_t *lists_sizes,
+					uint32_t *lists_count,
+					const uint32_t ids_count_max);

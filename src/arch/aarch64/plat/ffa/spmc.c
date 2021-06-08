@@ -446,3 +446,47 @@ bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
 {
 	return !vm_id_is_current_world(vm_id);
 }
+
+bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
+					uint32_t *lists_sizes,
+					uint32_t *lists_count,
+					const uint32_t ids_count_max)
+{
+	enum notifications_info_get_state info_get_state = INIT;
+	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
+	struct vm_locked other_world_locked = vm_find_locked(HF_OTHER_WORLD_ID);
+
+	CHECK(other_world_locked.vm != NULL);
+
+	vm_notifications_info_get_pending(other_world_locked, false, ids,
+					  ids_count, lists_sizes, lists_count,
+					  ids_count_max, &info_get_state);
+
+	if (info_get_state == FULL) {
+		goto out;
+	}
+
+	vm_unlock(&other_world_locked);
+
+	for (unsigned int i = 0; i < nwd_vms_size; i++) {
+		info_get_state = INIT;
+
+		if (nwd_vms[i].id != HF_INVALID_VM_ID) {
+			struct vm_locked vm_locked = vm_lock(&nwd_vms[i]);
+
+			vm_notifications_info_get_pending(
+				vm_locked, false, ids, ids_count, lists_sizes,
+				lists_count, ids_count_max, &info_get_state);
+
+			if (info_get_state == FULL) {
+				goto out;
+			}
+
+			vm_unlock(&vm_locked);
+		}
+	}
+out:
+	nwd_vms_unlock(&nwd_vms_locked);
+
+	return info_get_state == FULL;
+}

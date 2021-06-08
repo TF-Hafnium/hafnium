@@ -159,3 +159,18 @@ bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
 	(void)vm_id;
 	return false;
 }
+
+bool plat_ffa_vm_notifications_info_get(const uint16_t *ids,
+					const uint32_t *ids_count,
+					const uint32_t *lists_sizes,
+					const uint32_t *lists_count,
+					const uint32_t ids_count_max)
+{
+	(void)ids;
+	(void)ids_count;
+	(void)lists_sizes;
+	(void)lists_count;
+	(void)ids_count_max;
+
+	return false;
+}
