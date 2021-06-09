@@ -96,3 +96,8 @@ struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 struct vcpu *api_switch_to_other_world(struct vcpu *current,
 				       struct ffa_value other_world_ret,
 				       enum vcpu_state vcpu_state);
+struct ffa_value api_ffa_notification_bitmap_create(ffa_vm_id_t vm_id,
+						    ffa_vcpu_count_t vcpu_count,
+						    struct vcpu *current);
+struct ffa_value api_ffa_notification_bitmap_destroy(ffa_vm_id_t vm_id,
+						     struct vcpu *current);

@@ -7,6 +7,7 @@
  */
 
 #include "hf/ffa.h"
+#include "hf/ffa_internal.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
@@ -61,6 +62,15 @@ bool plat_ffa_is_direct_response_valid(struct vcpu *current,
 	return false;
 }
 
+bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
+					    ffa_vm_id_t vm_id)
+{
+	(void)current;
+	(void)vm_id;
+
+	return false;
+}
+
 bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret)
@@ -87,4 +97,20 @@ bool plat_ffa_memory_handle_allocated_by_current_world(
 
 void plat_ffa_vm_init(void)
 {
+}
+
+struct ffa_value plat_ffa_notifications_bitmap_create(
+	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
+{
+	(void)vm_id;
+	(void)vcpu_count;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
+{
+	(void)vm_id;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
 }

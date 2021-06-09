@@ -225,6 +225,9 @@ bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool);
 void vm_update_boot(struct vm *vm);
 struct vm *vm_get_first_boot(void);
 
-void vm_notifications_init_bindings(struct notifications *n);
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     uint32_t *mode);
+
+void vm_notifications_init_bindings(struct notifications *n);
+bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
+				  ffa_notifications_bitmap_t notifications);

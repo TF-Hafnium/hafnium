@@ -82,9 +82,6 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 	vm_notifications_init_bindings(&vm->notifications.from_sp);
 	vm_notifications_init_bindings(&vm->notifications.from_vm);
 
-	/* TODO: Enable in accordance to VM's manifest. */
-	vm->notifications.enabled = true;
-
 	return vm;
 }
 
@@ -384,16 +381,6 @@ void vm_update_boot(struct vm *vm)
 	vm->next_boot = current;
 }
 
-/*
- * Initializes the notifications structure.
- */
-void vm_notifications_init_bindings(struct notifications *notifications)
-{
-	for (uint32_t i = 0U; i < MAX_FFA_NOTIFICATIONS; i++) {
-		notifications->bindings_sender_id[i] = HF_INVALID_VM_ID;
-	}
-}
-
 /**
  * Gets the mode of the given range of ipa or va if they are mapped with the
  * same mode.
@@ -411,4 +398,38 @@ bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 				   va_from_pa(pa_from_ipa(end)), mode);
 	}
 	return mm_vm_get_mode(&vm_locked.vm->ptable, begin, end, mode);
+}
+
+/*
+ * Initializes the notifications structure.
+ */
+void vm_notifications_init_bindings(struct notifications *notifications)
+{
+	for (uint32_t i = 0U; i < MAX_FFA_NOTIFICATIONS; i++) {
+		notifications->bindings_sender_id[i] = HF_INVALID_VM_ID;
+	}
+}
+
+/**
+ * Checks if there are pending notifications.
+ */
+bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
+				  ffa_notifications_bitmap_t notifications)
+{
+	struct notifications *to_check;
+
+	CHECK(vm_locked.vm != NULL);
+
+	to_check = from_vm ? &vm_locked.vm->notifications.from_vm
+			   : &vm_locked.vm->notifications.from_sp;
+
+	/* Check if there are pending per vcpu notifications */
+	for (uint32_t i = 0U; i < MAX_CPUS; i++) {
+		if ((to_check->per_vcpu[i].pending & notifications) != 0U) {
+			return true;
+		}
+	}
+
+	/* Check if there are global pending notifications */
+	return (to_check->global.pending & notifications) != 0U;
 }

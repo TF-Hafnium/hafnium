@@ -157,6 +157,9 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->boot_order = manifest_vm->sp.boot_order;
 		/* Updating boot list according to boot_order */
 		vm_update_boot(vm_locked.vm);
+
+		/* TODO: Enable in accordance to VM's manifest. */
+		vm_locked.vm->notifications.enabled = true;
 	}
 
 	/* Initialize architecture-specific features. */

@@ -11,6 +11,8 @@
 
 #include "hf/dlog.h"
 #include "hf/ffa.h"
+#include "hf/ffa_internal.h"
+#include "hf/vcpu.h"
 #include "hf/vm.h"
 
 #include "smc.h"
@@ -108,6 +110,22 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 }
 
 /**
+ * Check validity of a FF-A notifications bitmap create.
+ */
+bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
+					    ffa_vm_id_t vm_id)
+{
+	/*
+	 * Call should only be used by the Hypervisor, so any attempt of
+	 * invocation from NWd FF-A endpoints should fail.
+	 */
+	(void)current;
+	(void)vm_id;
+
+	return false;
+}
+
+/**
  * Check validity of a FF-A direct message response.
  */
 bool plat_ffa_is_direct_response_valid(struct vcpu *current,
@@ -187,4 +205,22 @@ bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 
 void plat_ffa_vm_init(void)
 {
+}
+
+struct ffa_value plat_ffa_notifications_bitmap_create(
+	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
+{
+	/* TODO: Forward call to the SPMC */
+	(void)vm_id;
+	(void)vcpu_count;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
+{
+	/* TODO: Forward call to the SPMC */
+	(void)vm_id;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
 }

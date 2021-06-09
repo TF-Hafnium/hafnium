@@ -8,6 +8,7 @@
 
 #include "hf/ffa.h"
 
+#include "hf/ffa_internal.h"
 #include "hf/vcpu.h"
 
 ffa_vm_id_t arch_ffa_spmc_id_get(void)
@@ -75,4 +76,29 @@ bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 {
 	(void)vm;
 	return false;
+}
+
+bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
+					    ffa_vm_id_t vm_id)
+{
+	(void)current;
+	(void)vm_id;
+
+	return false;
+}
+
+struct ffa_value plat_ffa_notifications_bitmap_create(
+	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
+{
+	(void)vm_id;
+	(void)vcpu_count;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
+{
+	(void)vm_id;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
 }

@@ -594,6 +594,15 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_secondary_ep_register(ipa_init(args->arg1),
 						      current);
 		return true;
+	case FFA_NOTIFICATION_BITMAP_CREATE_32:
+		*args = api_ffa_notification_bitmap_create(
+			(ffa_vm_id_t)args->arg1, (ffa_vcpu_count_t)args->arg2,
+			current);
+		return true;
+	case FFA_NOTIFICATION_BITMAP_DESTROY_32:
+		*args = api_ffa_notification_bitmap_destroy(
+			(ffa_vm_id_t)args->arg1, current);
+		return true;
 	}
 
 	return false;

@@ -25,7 +25,8 @@ bool plat_ffa_is_direct_response_valid(struct vcpu *current,
 bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret);
-
+bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
+					    ffa_vm_id_t vm_id);
 /**
  * Checks whether managed exit is supported by given SP.
  */
@@ -53,3 +54,19 @@ ffa_partition_properties_t plat_ffa_partition_properties(
  * Initializes the NWd VM structures for Notifications support.
  */
 void plat_ffa_vm_init(void);
+
+/**
+ * Get NWd VM's structure.
+ */
+struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id);
+
+/**
+ * Creates a bitmap for the VM of the given ID.
+ */
+struct ffa_value plat_ffa_notifications_bitmap_create(
+	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count);
+
+/**
+ * Destroys the notifications bitmap for the given VM ID.
+ */
+struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id);

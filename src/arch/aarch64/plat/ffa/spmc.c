@@ -11,6 +11,7 @@
 
 #include "hf/dlog.h"
 #include "hf/ffa.h"
+#include "hf/ffa_internal.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -28,7 +29,36 @@ struct sve_context_t sve_context[MAX_CPUS];
  */
 static struct vm nwd_vms[MAX_VMS];
 
+/**
+ * All accesses to `nwd_vms` needs to be guarded by this lock.
+ */
+static struct spinlock nwd_vms_lock_instance = SPINLOCK_INIT;
+
+/**
+ * Encapsulates the set of share states while the `nwd_vms_lock_instance` is
+ * held.
+ */
+struct nwd_vms_locked {
+	struct vm *nwd_vms;
+};
+
 const uint32_t nwd_vms_size = ARRAY_SIZE(nwd_vms);
+
+/** Locks the normal world vms guarding lock. */
+static struct nwd_vms_locked nwd_vms_lock(void)
+{
+	sl_lock(&nwd_vms_lock_instance);
+
+	return (struct nwd_vms_locked){.nwd_vms = nwd_vms};
+}
+
+/** Unlocks the normal world vms guarding lock. */
+static void nwd_vms_unlock(struct nwd_vms_locked *vms)
+{
+	CHECK(vms->nwd_vms == nwd_vms);
+	vms->nwd_vms = NULL;
+	sl_unlock(&nwd_vms_lock_instance);
+}
 
 void plat_ffa_log_init(void)
 {
@@ -119,6 +149,17 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 	return false;
 }
 
+bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
+					    ffa_vm_id_t vm_id)
+{
+	/**
+	 * Create/Destroy interfaces to be called by the hypervisor, into the
+	 * SPMC.
+	 */
+	return current->vm->id == HF_HYPERVISOR_VM_ID &&
+	       !vm_id_is_current_world(vm_id);
+}
+
 ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
 {
 	return (index & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK) |
@@ -151,4 +192,177 @@ ffa_partition_properties_t plat_ffa_partition_properties(
 bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 {
 	return vm->managed_exit;
+}
+
+/** Allocates a NWd VM structure to the VM of given ID. */
+static void plat_ffa_vm_create(struct nwd_vms_locked nwd_vms_locked,
+			       struct vm_locked to_create_locked,
+			       ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
+{
+	CHECK(nwd_vms_locked.nwd_vms != NULL);
+	CHECK(to_create_locked.vm != NULL &&
+	      to_create_locked.vm->id == HF_INVALID_VM_ID);
+
+	to_create_locked.vm->id = vm_id;
+	to_create_locked.vm->vcpu_count = vcpu_count;
+	to_create_locked.vm->notifications.enabled = true;
+}
+
+static void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
+{
+	to_destroy_locked.vm->id = HF_INVALID_VM_ID;
+	to_destroy_locked.vm->vcpu_count = 0U;
+	vm_notifications_init_bindings(
+		&to_destroy_locked.vm->notifications.from_sp);
+	to_destroy_locked.vm->notifications.enabled = false;
+}
+
+static struct vm_locked plat_ffa_nwd_vm_find_locked(
+	struct nwd_vms_locked nwd_vms_locked, ffa_vm_id_t vm_id)
+{
+	CHECK(nwd_vms_locked.nwd_vms != NULL);
+
+	for (unsigned int i = 0U; i < nwd_vms_size; i++) {
+		if (nwd_vms[i].id == vm_id) {
+			return vm_lock(&nwd_vms[i]);
+		}
+	}
+
+	return (struct vm_locked){.vm = NULL};
+}
+
+struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
+{
+	struct vm_locked to_ret_locked;
+
+	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
+
+	to_ret_locked = plat_ffa_nwd_vm_find_locked(nwd_vms_locked, vm_id);
+
+	nwd_vms_unlock(&nwd_vms_locked);
+
+	return to_ret_locked;
+}
+
+struct ffa_value plat_ffa_notifications_bitmap_create(
+	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
+{
+	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+	struct vm_locked vm_locked;
+	const char *error_string = "Notification bitmap already created.";
+	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
+
+	if (vm_id == HF_OTHER_WORLD_ID) {
+		/*
+		 * If the provided VM ID regards to the Hypervisor, represented
+		 * by the other world VM with ID HF_OTHER_WORLD_ID, check if the
+		 * notifications have been enabled.
+		 */
+
+		vm_locked = vm_find_locked(vm_id);
+
+		CHECK(vm_locked.vm != NULL);
+
+		/* Call has been used for the other world vm already */
+		if (vm_locked.vm->notifications.enabled != false) {
+			dlog_error("%s\n", error_string);
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		/* Enable notifications for `other_world_vm`. */
+		vm_locked.vm->notifications.enabled = true;
+
+	} else {
+		/* Else should regard with NWd VM ID. */
+
+		/* If vm already exists bitmap has been created as well. */
+		vm_locked = plat_ffa_nwd_vm_find_locked(nwd_vms_locked, vm_id);
+		if (vm_locked.vm != NULL) {
+			dlog_error("%s\n", error_string);
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		/* Get first empty slot in `nwd_vms` to create VM. */
+		vm_locked = plat_ffa_nwd_vm_find_locked(nwd_vms_locked,
+							HF_INVALID_VM_ID);
+
+		/*
+		 * If received NULL, means there are no slots in `nwd_vms` for
+		 * VM creation.
+		 */
+		if (vm_locked.vm == NULL) {
+			dlog_error("No memory to create.\n");
+			ret = ffa_error(FFA_NO_MEMORY);
+			goto out;
+		}
+
+		plat_ffa_vm_create(nwd_vms_locked, vm_locked, vm_id,
+				   vcpu_count);
+	}
+
+out:
+	vm_unlock(&vm_locked);
+	nwd_vms_unlock(&nwd_vms_locked);
+
+	return ret;
+}
+
+struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
+{
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
+	struct vm_locked to_destroy_locked;
+	const char *error_not_created_string = "Bitmap not created for vm:";
+
+	if (vm_id == HF_OTHER_WORLD_ID) {
+		/*
+		 * Bitmap is part of `other_world_vm`, destroy will reset
+		 * bindings and will disable notifications.
+		 */
+
+		to_destroy_locked = vm_find_locked(vm_id);
+
+		CHECK(to_destroy_locked.vm != NULL);
+
+		if (to_destroy_locked.vm->notifications.enabled == false) {
+			dlog_error("%s %u\n", error_not_created_string, vm_id);
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		/* Check if there is any notification pending. */
+		if (vm_are_notifications_pending(to_destroy_locked, false,
+						 ~0x0U)) {
+			dlog_verbose("VM has notifications pending.\n");
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		to_destroy_locked.vm->notifications.enabled = false;
+		vm_notifications_init_bindings(
+			&to_destroy_locked.vm->notifications.from_sp);
+	} else {
+		to_destroy_locked = plat_ffa_vm_find_locked(vm_id);
+
+		/* If VM doesn't exist, bitmap hasn't been created. */
+		if (to_destroy_locked.vm == NULL) {
+			dlog_verbose("%s: %u.\n", error_not_created_string,
+				     vm_id);
+			return ffa_error(FFA_DENIED);
+		}
+
+		/* Check if there is any notification pending. */
+		if (vm_are_notifications_pending(to_destroy_locked, false,
+						 ~0x0U)) {
+			dlog_verbose("VM has notifications pending.\n");
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		plat_ffa_vm_destroy(to_destroy_locked);
+	}
+out:
+	vm_unlock(&to_destroy_locked);
+	return ret;
 }

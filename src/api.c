@@ -2550,3 +2550,31 @@ struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
+
+struct ffa_value api_ffa_notification_bitmap_create(ffa_vm_id_t vm_id,
+						    ffa_vcpu_count_t vcpu_count,
+						    struct vcpu *current)
+{
+	if (!plat_ffa_is_notifications_create_valid(current, vm_id)) {
+		dlog_verbose("Bitmap create for NWd VM IDs only (%x).\n",
+			     vm_id);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	return plat_ffa_notifications_bitmap_create(vm_id, vcpu_count);
+}
+
+struct ffa_value api_ffa_notification_bitmap_destroy(ffa_vm_id_t vm_id,
+						     struct vcpu *current)
+{
+	/*
+	 * Validity of use of this interface is the same as for bitmap create.
+	 */
+	if (!plat_ffa_is_notifications_create_valid(current, vm_id)) {
+		dlog_verbose("Bitmap destroy for NWd VM IDs only (%x).\n",
+			     vm_id);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	return plat_ffa_notifications_bitmap_destroy(vm_id);
+}
