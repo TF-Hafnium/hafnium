@@ -55,9 +55,6 @@ typedef uintptr_t hf_ipaddr_t;
 /** The virtual interrupt ID used for managed exit. */
 #define HF_MANAGED_EXIT_INTID 4
 
-/** SVE vector size supported. */
-#define HF_SVE_VECTOR_LENGTH 512
-
 /** Type of interrupts */
 enum interrupt_type {
 	INTERRUPT_TYPE_IRQ,

@@ -7,8 +7,10 @@
 import("//build/toolchain/platform.gni")
 
 source_set("absent") {
+  public_configs = [ "//src/arch/${plat_arch}:config" ]
   sources = [
     "absent.c",
+    "hypervisor_common.c",
   ]
 }
 
@@ -16,6 +18,7 @@ source_set("hypervisor") {
   public_configs = [ "//src/arch/${plat_arch}:config" ]
   sources = [
     "hypervisor.c",
+    "hypervisor_common.c",
   ]
 }
 

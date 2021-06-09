@@ -17,7 +17,6 @@ source_set("hypervisor") {
 
 source_set("other_world") {
   sources = [
-    "ffa_memory_handle.c",
     "other_world.c",
   ]
 }

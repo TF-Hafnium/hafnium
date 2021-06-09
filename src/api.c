@@ -10,9 +10,9 @@
 
 #include "hf/arch/cpu.h"
 #include "hf/arch/ffa.h"
-#include "hf/arch/ffa_memory_handle.h"
 #include "hf/arch/mm.h"
 #include "hf/arch/other_world.h"
+#include "hf/arch/plat/ffa.h"
 #include "hf/arch/timer.h"
 #include "hf/arch/vm.h"
 
@@ -1788,13 +1788,12 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (!arch_other_world_is_direct_request_valid(current, sender_vm_id,
-						      receiver_vm_id)) {
+	if (!plat_ffa_is_direct_request_valid(current, sender_vm_id,
+					      receiver_vm_id)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (arch_other_world_direct_request_forward(receiver_vm_id, args,
-						    &ret)) {
+	if (plat_ffa_direct_request_forward(receiver_vm_id, args, &ret)) {
 		return ret;
 	}
 
@@ -1912,8 +1911,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 
 	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
 
-	if (!arch_other_world_is_direct_response_valid(current, sender_vm_id,
-						       receiver_vm_id)) {
+	if (!plat_ffa_is_direct_response_valid(current, sender_vm_id,
+					       receiver_vm_id)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2247,7 +2246,7 @@ struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 	struct vm *to = current->vm;
 	struct ffa_value ret;
 
-	if (ffa_memory_handle_allocated_by_current_world(handle)) {
+	if (plat_ffa_memory_handle_allocated_by_current_world(handle)) {
 		struct vm_locked to_locked = vm_lock(to);
 
 		ret = ffa_memory_reclaim(to_locked, handle, flags,

@@ -12,6 +12,7 @@
 #include <stddef.h>
 
 #include "hf/arch/other_world.h"
+#include "hf/arch/plat/ffa.h"
 
 #include "hf/api.h"
 #include "hf/boot_flow.h"
@@ -48,7 +49,7 @@ void one_time_init_mm(void)
 	/* Make sure the console is initialised before calling dlog. */
 	plat_console_init();
 
-	arch_other_world_log_init();
+	plat_ffa_log_init();
 
 	mpool_init(&ppool, MM_PPOOL_ENTRY_SIZE);
 	mpool_add_chunk(&ppool, ptable_buf, sizeof(ptable_buf));
@@ -167,10 +168,8 @@ void one_time_init(void)
 	/* Enable TLB invalidation for VM page table updates. */
 	mm_vm_enable_invalidation();
 
-	if (manifest.ffa_tee_enabled) {
-		/* Set up message buffers for TEE dispatcher. */
-		arch_other_world_init();
-	}
+	/* Set up message buffers for TEE dispatcher. */
+	plat_ffa_init(manifest.ffa_tee_enabled);
 
 	dlog_info("Hafnium initialisation completed\n");
 }

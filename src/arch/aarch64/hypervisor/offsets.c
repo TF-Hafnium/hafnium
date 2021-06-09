@@ -6,7 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/other_world.h"
+#include "hf/arch/sve.h"
 
 #include "hf/cpu.h"
 #include "hf/offset_size_header.h"
@@ -31,7 +31,6 @@ DEFINE_OFFSETOF(VM_ID, struct vm, id)
 DEFINE_OFFSETOF(VCPU_GIC, struct vcpu, regs.gic)
 #endif
 
-DEFINE_SIZEOF(SVE_CTX_SIZE, struct sve_other_world_context_t)
-DEFINE_OFFSETOF(SVE_CTX_FFR, struct sve_other_world_context_t, ffr)
-DEFINE_OFFSETOF(SVE_CTX_PREDICATES, struct sve_other_world_context_t,
-		predicates)
+DEFINE_SIZEOF(SVE_CTX_SIZE, struct sve_context_t)
+DEFINE_OFFSETOF(SVE_CTX_FFR, struct sve_context_t, ffr)
+DEFINE_OFFSETOF(SVE_CTX_PREDICATES, struct sve_context_t, predicates)

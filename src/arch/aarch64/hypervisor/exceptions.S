@@ -450,8 +450,8 @@ other_world_loop:
 
 	/* Restore the other world SVE context from internal buffer. */
 sve_context_restore:
-	adrp x18, sve_other_world_context
-	add x18, x18, :lo12: sve_other_world_context
+	adrp x18, sve_context
+	add x18, x18, :lo12: sve_context
 	ldr x0, [x19, #VCPU_CPU]
 	bl cpu_index
 	mov x20, #SVE_CTX_SIZE
@@ -522,8 +522,8 @@ sve_skip_context_restore:
 
 	/* Save the other world SVE context to internal buffer. */
 sve_context_save:
-	adrp x18, sve_other_world_context
-	add x18, x18, :lo12: sve_other_world_context
+	adrp x18, sve_context
+	add x18, x18, :lo12: sve_context
 	ldr x0, [x19, #VCPU_CPU]
 	bl cpu_index
 	mov x20, #SVE_CTX_SIZE

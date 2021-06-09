@@ -8,8 +8,8 @@
 
 #include "hf/ffa_memory.h"
 
-#include "hf/arch/ffa_memory_handle.h"
 #include "hf/arch/other_world.h"
+#include "hf/arch/plat/ffa.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
@@ -159,7 +159,7 @@ static bool allocate_share_state(
 
 			if (handle == FFA_MEMORY_HANDLE_INVALID) {
 				memory_region->handle =
-					ffa_memory_handle_make(i);
+					plat_ffa_memory_handle_make(i);
 			} else {
 				memory_region->handle = handle;
 			}
@@ -222,7 +222,7 @@ static bool get_share_state(struct share_states_locked share_states,
 	 * First look for a share_state allocated by us, in which case the
 	 * handle is based on the index.
 	 */
-	if (ffa_memory_handle_allocated_by_current_world(handle)) {
+	if (plat_ffa_memory_handle_allocated_by_current_world(handle)) {
 		index = ffa_memory_handle_get_index(handle);
 		if (index < MAX_MEM_SHARES) {
 			share_state = &share_states.share_states[index];

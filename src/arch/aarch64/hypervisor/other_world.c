@@ -10,93 +10,15 @@
 
 #include "hf/arch/mmu.h"
 
-#include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
-#include "hf/panic.h"
+#include "hf/vcpu.h"
 #include "hf/vm.h"
 
-#include "msr.h"
 #include "smc.h"
-
-#if SECURE_WORLD == 0
-
-alignas(PAGE_SIZE) static uint8_t other_world_send_buffer[HF_MAILBOX_SIZE];
-alignas(PAGE_SIZE) static uint8_t other_world_recv_buffer[HF_MAILBOX_SIZE];
-
-#endif
-#if SECURE_WORLD == 1
-
-/** Other world SVE context (accessed from other_world_loop). */
-struct sve_other_world_context_t sve_other_world_context[MAX_CPUS];
-
-#endif
-
-void arch_other_world_log_init(void)
-{
-#if SECURE_WORLD == 0
-	dlog_info("Initializing Hafnium (Hypervisor)\n");
-#else
-	dlog_info("Initializing Hafnium (SPMC)\n");
-#endif
-}
-
-void arch_other_world_init(void)
-{
-#if SECURE_WORLD == 0
-
-	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
-	struct ffa_value ret;
-	uint32_t func;
-
-	CHECK(other_world_vm != NULL);
-
-	/* Setup TEE VM RX/TX buffers */
-	other_world_vm->mailbox.send = &other_world_send_buffer;
-	other_world_vm->mailbox.recv = &other_world_recv_buffer;
-
-	/*
-	 * Note that send and recv are swapped around, as the send buffer from
-	 * Hafnium's perspective is the recv buffer from the EL3 dispatcher's
-	 * perspective and vice-versa.
-	 */
-	dlog_verbose("Setting up buffers for TEE.\n");
-	ret = arch_other_world_call((struct ffa_value){
-		.func = FFA_RXTX_MAP_64,
-		.arg1 = pa_addr(
-			pa_from_va(va_from_ptr(other_world_vm->mailbox.recv))),
-		.arg2 = pa_addr(
-			pa_from_va(va_from_ptr(other_world_vm->mailbox.send))),
-		.arg3 = HF_MAILBOX_SIZE / FFA_PAGE_SIZE});
-	func = ret.func & ~SMCCC_CONVENTION_MASK;
-	if (ret.func == SMCCC_ERROR_UNKNOWN) {
-		dlog_error(
-			"Unknown function setting up TEE message buffers. "
-			"Memory sharing with TEE will not work.\n");
-		return;
-	}
-	if (func == FFA_ERROR_32) {
-		panic("Error %d setting up TEE message buffers.", ret.arg2);
-	} else if (func != FFA_SUCCESS_32) {
-		panic("Unexpected function %#x returned setting up TEE message "
-		      "buffers.",
-		      ret.func);
-	}
-	dlog_verbose("TEE finished setting up buffers.\n");
-#endif
-}
 
 bool arch_other_world_vm_init(struct vm *other_world_vm, struct mpool *ppool)
 {
-#if SECURE_WORLD == 0
-
-	(void)other_world_vm;
-	(void)ppool;
-
-	return true;
-
-#else
-
 	struct vm_locked other_world_vm_locked;
 	bool ret = false;
 
@@ -119,103 +41,6 @@ out:
 	vm_unlock(&other_world_vm_locked);
 
 	return ret;
-
-#endif
-}
-
-/**
- * Check validity of a FF-A direct message request.
- */
-bool arch_other_world_is_direct_request_valid(struct vcpu *current,
-					      ffa_vm_id_t sender_vm_id,
-					      ffa_vm_id_t receiver_vm_id)
-{
-	ffa_vm_id_t current_vm_id = current->vm->id;
-
-#if SECURE_WORLD == 1
-
-	/*
-	 * The normal world can send direct message requests
-	 * via the Hypervisor to any SP. SPs can also send direct messages
-	 * to each other.
-	 */
-	return sender_vm_id != receiver_vm_id &&
-	       (sender_vm_id == current_vm_id ||
-		(current_vm_id == HF_HYPERVISOR_VM_ID &&
-		 !vm_id_is_current_world(sender_vm_id)));
-#else
-
-	/*
-	 * The primary VM can send direct message request to
-	 * any other VM (but itself) or SP, but can't spoof
-	 * a different sender.
-	 */
-	return sender_vm_id != receiver_vm_id &&
-	       sender_vm_id == current_vm_id &&
-	       current_vm_id == HF_PRIMARY_VM_ID;
-
-#endif
-
-	return false;
-}
-
-/**
- * Check validity of a FF-A direct message response.
- */
-bool arch_other_world_is_direct_response_valid(struct vcpu *current,
-					       ffa_vm_id_t sender_vm_id,
-					       ffa_vm_id_t receiver_vm_id)
-{
-	ffa_vm_id_t current_vm_id = current->vm->id;
-
-#if SECURE_WORLD == 1
-
-	/*
-	 * Direct message responses emitted from a SP target either the NWd
-	 * or another SP.
-	 */
-	return sender_vm_id != receiver_vm_id &&
-	       sender_vm_id == current_vm_id &&
-	       vm_id_is_current_world(sender_vm_id);
-
-#else
-
-	/*
-	 * Secondary VMs can send direct message responses to
-	 * the PVM, but can't spoof a different sender.
-	 */
-	return sender_vm_id != receiver_vm_id &&
-	       sender_vm_id == current_vm_id &&
-	       receiver_vm_id == HF_PRIMARY_VM_ID;
-
-#endif
-
-	return false;
-}
-
-bool arch_other_world_direct_request_forward(ffa_vm_id_t receiver_vm_id,
-					     struct ffa_value args,
-					     struct ffa_value *ret)
-{
-#if SECURE_WORLD == 1
-	/*
-	 * SPs are not supposed to issue requests to VMs.
-	 */
-	(void)receiver_vm_id;
-	(void)args;
-	(void)ret;
-
-#else
-	/*
-	 * VM's requests should be forwarded to the SPMC, if receiver is an SP.
-	 */
-	if (!vm_id_is_current_world(receiver_vm_id)) {
-		*ret = arch_other_world_call(args);
-		return true;
-	}
-#endif
-
-	return false;
 }
 
 struct ffa_value arch_other_world_call(struct ffa_value args)
