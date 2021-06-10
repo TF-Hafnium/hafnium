@@ -269,4 +269,75 @@ TEST_F(vm, vm_notification_bind_per_vcpu_vs_global)
 	vm_unlock(&cur_vm_locked);
 }
 
+/**
+ * Validates accesses to notifications bitmaps.
+ */
+TEST_F(vm, vm_notifications_set_and_get)
+{
+	struct_vm *cur_vm;
+	struct vm_locked cur_vm_locked;
+	struct_vm *dummy_sender;
+	ffa_notifications_bitmap_t global = 0x00000000FFFFFFFFU;
+	ffa_notifications_bitmap_t per_vcpu = ~global;
+	ffa_notifications_bitmap_t ret;
+	const unsigned int vcpu_idx = 1;
+	struct notifications *notifications;
+	const bool is_from_vm = true;
+
+	CHECK(vm_get_count() >= 2);
+
+	cur_vm = vm_find_index(0);
+	dummy_sender = vm_find_index(1);
+
+	notifications = &cur_vm->notifications.from_vm;
+	cur_vm_locked = vm_lock(cur_vm);
+
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm,
+					 dummy_sender->id, global, false);
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm,
+					 dummy_sender->id, per_vcpu, true);
+
+	/*
+	 * Validate get notifications bitmap for per_vcpu notifications.
+	 */
+	vm_notifications_set(cur_vm_locked, is_from_vm, global, 0u, false);
+
+	ret = vm_notifications_get_pending_and_clear(cur_vm_locked, is_from_vm,
+						     0u);
+	EXPECT_EQ(ret, global);
+	EXPECT_EQ(notifications->global.pending, 0u);
+
+	/*
+	 * Validate get notifications bitmap for per_vcpu notifications.
+	 */
+	vm_notifications_set(cur_vm_locked, is_from_vm, per_vcpu, vcpu_idx,
+			     true);
+
+	ret = vm_notifications_get_pending_and_clear(cur_vm_locked, is_from_vm,
+						     vcpu_idx);
+	EXPECT_EQ(ret, per_vcpu);
+	EXPECT_EQ(notifications->per_vcpu[vcpu_idx].pending, 0u);
+
+	/*
+	 * Validate that getting for a specific VCPU also returns global
+	 * notifications.
+	 */
+	vm_notifications_set(cur_vm_locked, is_from_vm, per_vcpu, vcpu_idx,
+			     true);
+	vm_notifications_set(cur_vm_locked, is_from_vm, global, 0, false);
+
+	ret = vm_notifications_get_pending_and_clear(cur_vm_locked, is_from_vm,
+						     vcpu_idx);
+	EXPECT_EQ(ret, per_vcpu | global);
+	EXPECT_EQ(notifications->per_vcpu[vcpu_idx].pending, 0u);
+	EXPECT_EQ(notifications->global.pending, 0u);
+
+	/** Undo the binding */
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm, 0, global,
+					 false);
+	vm_notifications_update_bindings(cur_vm_locked, is_from_vm, 0, per_vcpu,
+					 true);
+	vm_unlock(&cur_vm_locked);
+}
+
 } /* namespace */
