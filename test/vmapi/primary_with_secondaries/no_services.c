@@ -129,7 +129,8 @@ TEAR_DOWN(ffa_rxtx_map)
  */
 TEST(ffa_rxtx_map, fails_with_device_memory)
 {
-	EXPECT_FFA_ERROR(ffa_rxtx_map(PAGE_SIZE, PAGE_SIZE * 2), FFA_DENIED);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(PAGE_SIZE, PAGE_SIZE * 2),
+			 FFA_INVALID_PARAMETERS);
 }
 
 /**

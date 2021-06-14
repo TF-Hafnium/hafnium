@@ -917,11 +917,10 @@ out:
  *
  * Returns:
  *  - FFA_ERROR FFA_INVALID_PARAMETERS if the given addresses are not properly
- *    aligned or are the same.
+ *    aligned, are the same or have invalid attributes.
  *  - FFA_ERROR FFA_NO_MEMORY if the hypervisor was unable to map the buffers
  *    due to insuffient page table memory.
- *  - FFA_ERROR FFA_DENIED if the pages are already mapped or are not owned by
- *    the caller.
+ *  - FFA_ERROR FFA_DENIED if the pages are already mapped.
  *  - FFA_SUCCESS on success if no further action is needed.
  */
 
@@ -979,7 +978,7 @@ struct ffa_value api_vm_configure_pages(
 	    !api_mode_valid_owned_and_exclusive(orig_send_mode) ||
 	    (orig_send_mode & MM_MODE_R) == 0 ||
 	    (orig_send_mode & MM_MODE_W) == 0) {
-		ret = ffa_error(FFA_DENIED);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -987,7 +986,7 @@ struct ffa_value api_vm_configure_pages(
 			    ipa_add(recv, PAGE_SIZE), &orig_recv_mode) ||
 	    !api_mode_valid_owned_and_exclusive(orig_recv_mode) ||
 	    (orig_recv_mode & MM_MODE_R) == 0) {
-		ret = ffa_error(FFA_DENIED);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
@@ -1044,11 +1043,10 @@ out:
  *
  * Returns:
  *  - FFA_ERROR FFA_INVALID_PARAMETERS if the given addresses are not properly
- *    aligned or are the same.
+ *    aligned, are the same or have invalid attributes.
  *  - FFA_ERROR FFA_NO_MEMORY if the hypervisor was unable to map the buffers
  *    due to insuffient page table memory.
- *  - FFA_ERROR FFA_DENIED if the pages are already mapped or are not owned by
- *    the caller.
+ *  - FFA_ERROR FFA_DENIED if the pages are already mapped.
  *  - FFA_SUCCESS on success if no further action is needed.
  *  - FFA_RX_RELEASE if it was called by the primary VM and the primary VM now
  *    needs to wake up or kick waiters.
