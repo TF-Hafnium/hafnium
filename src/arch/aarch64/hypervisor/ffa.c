@@ -13,6 +13,8 @@
 #include "hf/panic.h"
 #include "hf/vm_ids.h"
 
+#include "smc.h"
+
 static ffa_vm_id_t spmc_id = HF_INVALID_VM_ID;
 
 /**
@@ -34,8 +36,9 @@ void arch_ffa_init(void)
 
 	if (ret.func == FFA_SUCCESS_32) {
 		spmc_id = ret.arg2;
-	} else if (ret.func == FFA_ERROR_32 &&
-		   ffa_error_code(ret) == FFA_NOT_SUPPORTED) {
+	} else if (ret.func == SMCCC_ERROR_UNKNOWN ||
+		   (ret.func == FFA_ERROR_32 &&
+		    ffa_error_code(ret) == FFA_NOT_SUPPORTED)) {
 		spmc_id = HF_SPMC_VM_ID;
 	} else {
 		panic("Failed to get SPMC ID\n");
