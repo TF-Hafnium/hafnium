@@ -367,6 +367,8 @@ class FvpDriver(Driver, ABC):
             f"cluster0.cpu0={self.FVP_PREBUILT_BL31}@{self.CPU_START_ADDRESS}",
             "-C", "bp.ve_sysregs.mmbSiteDefault=0",
             "-C", "bp.ve_sysregs.exit_on_shutdown=1",
+            "-C", "cluster0.has_arm_v8-1=1",
+            "-C", "cluster1.has_arm_v8-1=1",
         ]
 
         if uart0_log_path and uart1_log_path:
