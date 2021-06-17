@@ -14,6 +14,8 @@
 
 #include "smc.h"
 
+static bool ffa_tee_enabled;
+
 alignas(FFA_PAGE_SIZE) static uint8_t other_world_send_buffer[HF_MAILBOX_SIZE];
 alignas(FFA_PAGE_SIZE) static uint8_t other_world_recv_buffer[HF_MAILBOX_SIZE];
 
@@ -65,6 +67,9 @@ void plat_ffa_init(bool tee_enabled)
 		      "buffers.",
 		      ret.func);
 	}
+
+	ffa_tee_enabled = true;
+
 	dlog_verbose("TEE finished setting up buffers.\n");
 }
 
@@ -109,6 +114,10 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret)
 {
+	if (!ffa_tee_enabled) {
+		return false;
+	}
+
 	/*
 	 * VM's requests should be forwarded to the SPMC, if receiver is an SP.
 	 */
