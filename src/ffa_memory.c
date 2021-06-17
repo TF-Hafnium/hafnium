@@ -2246,6 +2246,24 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		goto out;
 	}
 
+	if ((retrieve_request->flags & ~0x7FF) != 0U) {
+		dlog_verbose(
+			"Bits 31-10 must be zero in memory region's flags.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (share_state->share_func == FFA_MEM_SHARE_32 &&
+	    (retrieve_request->flags &
+	     (FFA_MEMORY_REGION_FLAG_CLEAR |
+	      FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH)) != 0U) {
+		dlog_verbose(
+			"Memory Share operation can't clean after relinquish "
+			"memory region.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
 	/*
 	 * Check permissions from sender against permissions requested by
 	 * receiver.
@@ -2262,6 +2280,16 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	requested_instruction_access =
 		ffa_get_instruction_access_attr(requested_permissions);
 	permissions = 0;
+
+	if ((sent_data_access == FFA_DATA_ACCESS_RO ||
+	     requested_permissions == FFA_DATA_ACCESS_RO) &&
+	    (retrieve_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) != 0U) {
+		dlog_verbose(
+			"Receiver has RO permissions can not request clear.\n");
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
 	switch (sent_data_access) {
 	case FFA_DATA_ACCESS_NOT_SPECIFIED:
 	case FFA_DATA_ACCESS_RW:

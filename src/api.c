@@ -2052,6 +2052,36 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 	return (struct ffa_value){.func = FFA_INTERRUPT_32};
 }
 
+static bool api_memory_region_check_flags(
+	struct ffa_memory_region *memory_region, uint32_t share_func)
+{
+	switch (share_func) {
+	case FFA_MEM_SHARE_32:
+		if ((memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR) !=
+		    0U) {
+			return false;
+		}
+		/* Intentional fall-through */
+	case FFA_MEM_LEND_32:
+	case FFA_MEM_DONATE_32: {
+		/* Bits 31:2 Must Be Zero. */
+		ffa_memory_receiver_flags_t to_mask =
+			~(FFA_MEMORY_REGION_FLAG_CLEAR |
+			  FFA_MEMORY_REGION_FLAG_TIME_SLICE);
+
+		if ((memory_region->flags & to_mask) != 0U) {
+			return false;
+		}
+		break;
+	}
+	default:
+		panic("Check for mem send calls only.\n");
+	}
+
+	/* Last check reserved values are 0 */
+	return true;
+}
+
 struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 				  uint32_t fragment_length, ipaddr_t address,
 				  uint32_t page_count, struct vcpu *current)
@@ -2120,6 +2150,13 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	/* The sender must match the caller. */
 	if (memory_region->sender != from->id) {
 		dlog_verbose("Memory region sender doesn't match caller.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (!api_memory_region_check_flags(memory_region, share_func)) {
+		dlog_verbose(
+			"Memory region reserved arguments must be zero.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}

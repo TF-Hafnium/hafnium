@@ -1317,9 +1317,9 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 TEST(memory_sharing, share_X_RW)
 {
 	ffa_memory_handle_t handle;
-	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
+	struct ffa_value run_res;
 
 	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail", mb.send);
 
@@ -1338,8 +1338,7 @@ TEST(memory_sharing, share_X_RW)
 
 	/* Let the secondary VM fail to retrieve the memory. */
 	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Ensure we still have access. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
@@ -1361,8 +1360,7 @@ TEST(memory_sharing, share_X_RW)
 
 	/* Let the secondary VM fail to retrieve the memory. */
 	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Ensure we still have access. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
@@ -2025,4 +2023,229 @@ TEST(memory_sharing, ffa_lend_check_lower_bounds)
 	run_res = ffa_run(SERVICE_VM2, 0);
 	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
 		  1);
+}
+
+/**
+ * Memory can't be shared if flags in the memory transaction description that
+ * Must Be Zero, are not.
+ */
+TEST(memory_sharing, ffa_validate_mbz)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_share,
+		ffa_mem_lend,
+		ffa_mem_donate,
+	};
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	/* Prepare memory region, and set all flags */
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, 0xffffffff, FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	/* Using the same region, call the various mem send functions. */
+	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_ERROR_32);
+		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
+	}
+}
+
+/**
+ * Memory can't be shared if flags in the memory transaction description that
+ * Must Be Zero, are not.
+ */
+TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_share,
+		ffa_mem_lend,
+	};
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail_invalid_parameters",
+		       mb.send);
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
+		/* Prepare memory region, and set all flags */
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM1, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  FFA_DATA_ACCESS_RW,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  0);
+
+		ret = send_function[0](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+		handle = ffa_mem_success_handle(ret);
+
+		msg_size = ffa_memory_retrieve_request_init(
+			mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
+			0xFFFFFFFF, FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE);
+
+		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+		EXPECT_EQ(
+			ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size, 0)
+				.func,
+			FFA_SUCCESS_32);
+
+		ffa_run(SERVICE_VM1, 0);
+
+		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+	}
+}
+
+/**
+ * If memory is shared can't request zeroing of memory at both send and
+ * relinquish.
+ */
+TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_mem_share)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail_invalid_parameters",
+		       mb.send);
+
+	/* If mem share can't clear memory before sharing. */
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_ERROR_32);
+	EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
+
+	/*
+	 * Same should happen when using FFA_MEM_RETRIEVE interface.
+	 * Attempt to successfully share, and validate error return in the
+	 * receiver.
+	 */
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	handle = ffa_mem_success_handle(ret);
+
+	/* Prepare retrieve request setting clear memory flags. */
+	msg_size = ffa_memory_retrieve_request_init(
+		mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
+		FFA_MEMORY_REGION_FLAG_CLEAR |
+			FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE);
+
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+	EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size, 0).func,
+		  FFA_SUCCESS_32);
+
+	ffa_run(SERVICE_VM1, 0);
+
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+}
+
+/**
+ * If memory is lent with RO permissions, receiver can't request zeroing of
+ * memory at relinquish.
+ */
+TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail", mb.send);
+
+	/* Call FFA_MEM_SEND, setting FFA_DATA_ACCESS_RO. */
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, 0, FFA_DATA_ACCESS_RO,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	ret = ffa_mem_lend(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	handle = ffa_mem_success_handle(ret);
+
+	/*
+	 * Prepare retrieve request with RO, and setting flag to clear memory.
+	 * Should fail at the receiver's FFA_MEM_RETRIEVE call.
+	 */
+	msg_size = ffa_memory_retrieve_request_init(
+		mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
+		FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RO,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+	EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size, 0).func,
+		  FFA_SUCCESS_32);
+
+	ffa_run(SERVICE_VM1, 0);
+
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 }

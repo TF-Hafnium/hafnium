@@ -634,7 +634,7 @@ TEST_SERVICE(ffa_memory_lend_relinquish_X)
 }
 
 /**
- * Attempt to retrieve a shared page but expect to fail.
+ * Attempt to retrieve a shared page but expect to fail with FFA_DENIED.
  */
 TEST_SERVICE(ffa_memory_share_fail)
 {
@@ -642,12 +642,29 @@ TEST_SERVICE(ffa_memory_share_fail)
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
 		struct ffa_value ret = ffa_msg_wait();
-		ffa_vm_id_t sender = retrieve_memory_from_message_expect_fail(
-			recv_buf, send_buf, ret, FFA_DENIED);
+		retrieve_memory_from_message_expect_fail(recv_buf, send_buf,
+							 ret, FFA_DENIED);
 
 		/* Return control to primary. */
-		EXPECT_EQ(ffa_msg_send(hf_vm_get_id(), sender, 0, 0).func,
-			  FFA_SUCCESS_32);
+		ffa_yield();
+	}
+}
+
+/**
+ * Attempt to retrieve a shared page but expect to fail with
+ * FFA_INVALID_PARAMETERS.
+ */
+TEST_SERVICE(ffa_memory_share_fail_invalid_parameters)
+{
+	for (;;) {
+		void *recv_buf = SERVICE_RECV_BUFFER();
+		void *send_buf = SERVICE_SEND_BUFFER();
+		struct ffa_value ret = ffa_msg_wait();
+		retrieve_memory_from_message_expect_fail(
+			recv_buf, send_buf, ret, FFA_INVALID_PARAMETERS);
+
+		/* Return control to primary. */
+		ffa_yield();
 	}
 }
 
