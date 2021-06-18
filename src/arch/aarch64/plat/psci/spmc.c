@@ -30,7 +30,11 @@ void plat_psci_init(void)
 {
 	struct ffa_value res;
 
-	/* Register SPMC secondary cold boot entry point */
+	/*
+	 * DEN0077A FF-A v1.1 Beta0 section 18.3.2.1.1
+	 * Register the SPMC secondary cold boot entry point at the secure
+	 * physical FF-A instance (to the SPMD).
+	 */
 	res = smc_ffa_call(
 		(struct ffa_value){.func = FFA_SECONDARY_EP_REGISTER_64,
 				   .arg1 = (uintreg_t)&cpu_entry});

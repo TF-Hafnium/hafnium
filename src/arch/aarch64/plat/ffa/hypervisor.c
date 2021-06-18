@@ -717,3 +717,12 @@ void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 	CHECK(mm_unmap(stage1_locked, fdt_addr,
 		       pa_add(fdt_addr, fdt_allocated_size), ppool) == true);
 }
+
+/**
+ * Returns FFA_ERROR as FFA_SECONDARY_EP_REGISTER is not supported at the
+ * non-secure FF-A instances.
+ */
+bool plat_ffa_is_secondary_ep_register_supported(void)
+{
+	return false;
+}

@@ -250,3 +250,9 @@ void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 				       size_t fdt_allocated_size,
 				       const struct manifest_vm *manifest_vm,
 				       struct mpool *ppool);
+
+/**
+ * Returns true if the FFA_SECONDARY_EP_REGISTER interface is supported at
+ * the virtual FF-A instance.
+ */
+bool plat_ffa_is_secondary_ep_register_supported(void);

@@ -2812,16 +2812,50 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	return ret;
 }
 
+/**
+ * Register an entry point for a vCPU in warm boot cases.
+ * DEN0077A FF-A v1.1 Beta0 section 18.3.2.1 FFA_SECONDARY_EP_REGISTER.
+ */
 struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 					       struct vcpu *current)
 {
 	struct vm_locked vm_locked;
+	struct ffa_value ret = ffa_error(FFA_DENIED);
 
+	/*
+	 * Reject if interface is not supported at this FF-A instance
+	 * (DEN0077A FF-A v1.1 Beta0 Table 18.29) or the VM is UP.
+	 */
+	if (!plat_ffa_is_secondary_ep_register_supported() ||
+	    current->vm->vcpu_count == 1) {
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	/*
+	 * No further check is made on the address validity
+	 * (FF-A v1.1 Beta0 Table 18.29) as the VM boundaries are not known
+	 * from the VM or vCPU structure.
+	 * DEN0077A FF-A v1.1 Beta0 section 18.3.2.1.1:
+	 * For each SP [...] the Framework assumes that the same entry point
+	 * address is used for initializing any execution context during a
+	 * secondary cold boot.
+	 * If this function is invoked multiple times, then the entry point
+	 * address specified in the last valid invocation must be used by the
+	 * callee.
+	 */
 	vm_locked = vm_lock(current->vm);
+	if (vm_locked.vm->initialized) {
+		goto out;
+	}
+
 	vm_locked.vm->secondary_ep = entry_point;
+
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+
+out:
 	vm_unlock(&vm_locked);
 
-	return (struct ffa_value){.func = FFA_SUCCESS_32};
+	return ret;
 }
 
 struct ffa_value api_ffa_notification_bitmap_create(ffa_vm_id_t vm_id,

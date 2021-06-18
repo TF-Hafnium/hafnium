@@ -650,6 +650,12 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 						     current, next);
 		return true;
 	case FFA_SECONDARY_EP_REGISTER_64:
+		/*
+		 * DEN0077A FF-A v1.1 Beta0 section 18.3.2.1.1
+		 * The callee must return NOT_SUPPORTED if this function is
+		 * invoked by a caller that implements version v1.0 of
+		 * the Framework.
+		 */
 		*args = api_ffa_secondary_ep_register(ipa_init(args->arg1),
 						      current);
 		return true;

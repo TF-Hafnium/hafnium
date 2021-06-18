@@ -328,3 +328,8 @@ void plat_ffa_partition_info_get_forward(  // NOLINTNEXTLINE
 	(void)partitions;
 	(void)ret_count;
 }
+
+bool plat_ffa_is_secondary_ep_register_supported(void)
+{
+	return false;
+}

@@ -113,6 +113,9 @@ struct ffa_value plat_ffa_features(uint32_t function_feature_id)
 
 	switch (function_feature_id) {
 #if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
+	case FFA_SECONDARY_EP_REGISTER_64:
+		ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+		break;
 	case FFA_FEATURE_MEI:
 		ret = api_ffa_feature_success(HF_MANAGED_EXIT_INTID);
 		break;
@@ -1316,4 +1319,13 @@ void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 	(void)ppool;
 	/* should never be called in SPMC */
 	CHECK(false);
+}
+
+/**
+ * Returns FFA_SUCCESS as FFA_SECONDARY_EP_REGISTER is supported at the
+ * secure virtual FF-A instance.
+ */
+bool plat_ffa_is_secondary_ep_register_supported(void)
+{
+	return true;
 }
