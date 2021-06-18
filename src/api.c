@@ -464,7 +464,9 @@ struct ffa_value api_ffa_id_get(const struct vcpu *current)
 }
 
 /**
- * Returns the ID of the SPMC.
+ * Returns the SPMC FF-A ID at NS virtual/physical and secure virtual
+ * FF-A instances.
+ * DEN0077A FF-A v1.1 Beta0 section 13.9 FFA_SPM_ID_GET.
  */
 struct ffa_value api_ffa_spm_id_get(void)
 {

@@ -22,7 +22,7 @@ TEAR_DOWN(ffa)
 
 /**
  * Communicates with partition via direct messaging to validate functioning of
- * Direct Message interfaces.
+ * direct message interfaces.
  */
 TEST(ffa_msg_send_direct_req, succeeds_nwd_to_sp_echo)
 {
@@ -193,4 +193,18 @@ TEST(ffa, ffa_partition_info_get_uuid_unknown)
 	/* Expect no partition is found with such UUID. */
 	ret = ffa_partition_info_get(&uuid);
 	EXPECT_EQ(ret.func, FFA_ERROR_32);
+}
+
+/*
+ * Check FFA_SPM_ID_GET response.
+ * DEN0077A FF-A v1.1 Beta0 section 13.9 FFA_SPM_ID_GET.
+ */
+TEST(ffa, ffa_spm_id_get)
+{
+	struct ffa_value ret = ffa_spm_id_get();
+
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Expect the SPMC FF-A ID at NS virtual FF-A instance. */
+	EXPECT_EQ(ret.arg2, HF_SPMC_VM_ID);
 }

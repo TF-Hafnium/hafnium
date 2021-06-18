@@ -28,6 +28,16 @@ static inline struct ffa_value ffa_id_get(void)
 }
 
 /**
+ * Returns the SPMC FF-A ID at NS virtual/physical and secure virtual
+ * FF-A instances.
+ * DEN0077A FF-A v1.1 Beta0 section 13.9 FFA_SPM_ID_GET.
+ */
+static inline struct ffa_value ffa_spm_id_get(void)
+{
+	return ffa_call((struct ffa_value){.func = FFA_SPM_ID_GET_32});
+}
+
+/**
  * Requests information for partitions instantiated in the system. The
  * information is returned in the RX buffer of the caller as an array of
  * partition information descriptors (struct ffa_partition_info).

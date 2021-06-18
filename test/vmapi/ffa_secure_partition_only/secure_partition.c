@@ -176,6 +176,17 @@ TEST(ffa_features, fails_func_id_not_supported)
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 }
 
+/**
+ * Check FFA_SPM_ID_GET can be called at secure virtual FF-A instance.
+ */
+TEST(ffa, ffa_spm_id_get)
+{
+	struct ffa_value ret = ffa_spm_id_get();
+
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ret.arg2, HF_SPMC_VM_ID);
+}
+
 TEAR_DOWN(ffa_rxtx_map)
 {
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);

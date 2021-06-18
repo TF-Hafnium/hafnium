@@ -43,7 +43,12 @@ struct ffa_value plat_ffa_features(uint32_t function_feature_id)
 struct ffa_value plat_ffa_spmc_id_get(void)
 {
 	if (ffa_tee_enabled) {
-		/* Fetch the SPMC ID from the SPMD using FFA_SPM_ID_GET. */
+		/*
+		 * Fetch the SPMC ID from the SPMD using FFA_SPM_ID_GET.
+		 * DEN0077A FF-A v1.1 Beta0 section 13.9.2
+		 * "FFA_SPM_ID_GET invocation at a non-secure physical FF-A
+		 * instance returns the ID of the SPMC."
+		 */
 		return smc_ffa_call(
 			(struct ffa_value){.func = FFA_SPM_ID_GET_32});
 	}
