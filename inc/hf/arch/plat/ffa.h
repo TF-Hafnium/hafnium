@@ -12,6 +12,44 @@
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
+/**
+ * The following enum relates to a state machine to guide the handling of the
+ * Scheduler Receiver Interrupt.
+ * The SRI is used to signal the receiver scheduler that there are pending
+ * notifications for the receiver, and it is sent when there is a valid call to
+ * FFA_NOTIFICATION_SET.
+ * The FFA_NOTIFICATION_INFO_GET interface must be called in the SRI handler,
+ * after which the FF-A driver should process the returned list, and request
+ * the receiver scheduler to give the receiver CPU cycles to process the
+ * notification.
+ * The use of the following state machine allows for synchronized sending
+ * and handling of the SRI, as well as avoiding the occurrence of spurious
+ * SRI. A spurious SRI would be one such that upon handling a call to
+ * FFA_NOTIFICATION_INFO_GET would return error FFA_NO_DATA, which is plausible
+ * in an MP system.
+ * The state machine also aims at resolving the delay of the SRI by setting
+ * flag FFA_NOTIFICATIONS_FLAG_DELAY_SRI in the arguments of the set call. By
+ * delaying, the SRI is sent in context switching to the primary endpoint.
+ * The SPMC is implemented under the assumption the receiver scheduler is a
+ * NWd endpoint, hence the SRI is triggered at the world switch.
+ * If concurrently another notification is set that requires immediate action,
+ * the SRI is triggered immediately within that same execution context.
+ *
+ * HANDLED is the initial state, and means a new SRI can be sent. The following
+ * state transitions are possible:
+ * * HANDLED => DELAYED: Setting notification, and requesting SRI delay.
+ * * HANDLED => TRIGGERED: Setting notification, and not requesting SRI delay.
+ * * DELAYED => TRIGGERED: SRI was delayed, and the context switch to the
+ * receiver scheduler is being done.
+ * * DELAYED => HANDLED: the scheduler called FFA_NOTIFICATION_INFO_GET.
+ * * TRIGGERED => HANDLED: the scheduler called FFA_NOTIFICATION_INFO_GET.
+ */
+enum plat_ffa_sri_state {
+	HANDLED = 0,
+	DELAYED,
+	TRIGGERED,
+};
+
 /** Returns information on features that are specific to the platform. */
 struct ffa_value plat_ffa_features(uint32_t function_id);
 /** Returns the SPMC ID. */
@@ -128,6 +166,28 @@ bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 					uint32_t *lists_sizes,
 					uint32_t *lists_count,
 					const uint32_t ids_count_max);
+
+/** Helper to set SRI current state. */
+void plat_ffa_sri_state_set(enum plat_ffa_sri_state state);
+
+/**
+ * Helper to send SRI and safely update `ffa_sri_state`, if there has been
+ * a call to FFA_NOTIFICATION_SET, and the SRI has been delayed.
+ * To be called at a context switch to the NWd.
+ */
+void plat_ffa_sri_trigger_if_delayed(struct cpu *cpu);
+
+/**
+ * Helper to send SRI and safely update `ffa_sri_state`, if it hasn't been
+ * delayed in call to FFA_NOTIFICATION_SET.
+ */
+void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu);
+
+/**
+ * Initialize Schedule Receiver Interrupts needed in the context of
+ * notifications support.
+ */
+void plat_ffa_sri_init(struct cpu *cpu);
 
 void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
 					    uint32_t *lists_sizes,

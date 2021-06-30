@@ -37,6 +37,7 @@ int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
 int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
 				    uint32_t intid, struct vcpu *current,
 				    struct vcpu **next);
+void api_sri_send_if_delayed(struct vcpu *current);
 
 struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 				  ffa_vm_id_t receiver_vm_id, uint32_t size,

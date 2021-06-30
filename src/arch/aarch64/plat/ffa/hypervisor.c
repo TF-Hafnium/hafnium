@@ -6,6 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/barriers.h"
 #include "hf/arch/ffa.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
@@ -17,6 +18,7 @@
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
+#include "msr.h"
 #include "smc.h"
 #include "sysregs.h"
 
@@ -512,4 +514,30 @@ struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
 	CHECK(false);
 
 	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+void plat_ffa_sri_state_set(enum plat_ffa_sri_state state)
+{
+	(void)state;
+}
+
+/**
+ * An Hypervisor should send the SRI to the Primary Endpoint. Not implemented
+ * as Hypervisor is only interesting for us for the sake of having a test
+ * intrastructure that encompasses the NWd, and we are not interested on
+ * in testing the flow of notifications between VMs only.
+ */
+void plat_ffa_sri_trigger_if_delayed(struct cpu *cpu)
+{
+	(void)cpu;
+}
+
+void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
+{
+	(void)cpu;
+}
+
+void plat_ffa_sri_init(struct cpu *cpu)
+{
+	(void)cpu;
 }

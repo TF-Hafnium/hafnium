@@ -7,6 +7,8 @@
  */
 
 #include "hf/arch/ffa.h"
+#include "hf/arch/mmu.h"
+#include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/sve.h"
 
@@ -14,14 +16,47 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
+#include "hf/interrupt_desc.h"
 #include "hf/plat/interrupts.h"
 #include "hf/std.h"
+#include "hf/vcpu.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/ffa.h"
 
+#include "msr.h"
 #include "smc.h"
 #include "sysregs.h"
+
+/** Interrupt priority for the Schedule Receiver Interrupt. */
+#define SRI_PRIORITY 0x10U
+
+/** Encapsulates `sri_state` while the `sri_state_lock` is held. */
+struct sri_state_locked {
+	enum plat_ffa_sri_state *sri_state;
+};
+
+/** To globally keep track of the SRI handling. */
+static enum plat_ffa_sri_state sri_state = HANDLED;
+
+/** Lock to guard access to `sri_state`. */
+static struct spinlock sri_state_lock_instance = SPINLOCK_INIT;
+
+/** Locks `sri_state` guarding lock. */
+static struct sri_state_locked sri_state_lock(void)
+{
+	sl_lock(&sri_state_lock_instance);
+
+	return (struct sri_state_locked){.sri_state = &sri_state};
+}
+
+/** Unlocks `sri_state` guarding lock. */
+void sri_state_unlock(struct sri_state_locked sri_state_locked)
+{
+	CHECK(sri_state_locked.sri_state == &sri_state);
+	sri_state_locked.sri_state = NULL;
+	sl_unlock(&sri_state_lock_instance);
+}
 
 /** Other world SVE context (accessed from other_world_loop). */
 struct sve_context_t sve_context[MAX_CPUS];
@@ -1045,4 +1080,94 @@ struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
 	*next = target_vcpu;
 
 	return ffa_ret;
+}
+
+static void sri_state_set(struct sri_state_locked sri_state_locked,
+			  enum plat_ffa_sri_state state)
+{
+	CHECK(sri_state_locked.sri_state != NULL &&
+	      sri_state_locked.sri_state == &sri_state);
+
+	switch (*(sri_state_locked.sri_state)) {
+	case TRIGGERED:
+		/*
+		 * If flag to delay SRI is set, and SRI hasn't been
+		 * triggered state to delayed such that it is triggered
+		 * at context switch to the receiver scheduler.
+		 */
+		if (state == DELAYED) {
+			break;
+		}
+	case HANDLED:
+	case DELAYED:
+		*(sri_state_locked.sri_state) = state;
+		break;
+	default:
+		panic("Invalid SRI state\n");
+	}
+}
+
+void plat_ffa_sri_state_set(enum plat_ffa_sri_state state)
+{
+	struct sri_state_locked sri_state_locked = sri_state_lock();
+
+	sri_state_set(sri_state_locked, state);
+	sri_state_unlock(sri_state_locked);
+}
+
+static void plat_ffa_send_schedule_receiver_interrupt(struct cpu *cpu)
+{
+	dlog_verbose("Setting Schedule Receiver SGI %d on core: %d\n",
+		     FFA_SCHEDULE_RECEIVER_INTERRUPT_ID, cpu_index(cpu));
+
+	plat_interrupts_send_sgi(FFA_SCHEDULE_RECEIVER_INTERRUPT_ID, false,
+				 (1 << cpu_index(cpu)), false);
+}
+
+void plat_ffa_sri_trigger_if_delayed(struct cpu *cpu)
+{
+	struct sri_state_locked sri_state_locked = sri_state_lock();
+
+	if (*(sri_state_locked.sri_state) == DELAYED) {
+		dlog_verbose("Triggering delayed SRI!\n");
+		plat_ffa_send_schedule_receiver_interrupt(cpu);
+		sri_state_set(sri_state_locked, TRIGGERED);
+	}
+
+	sri_state_unlock(sri_state_locked);
+}
+
+void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
+{
+	struct sri_state_locked sri_state_locked = sri_state_lock();
+
+	if (*(sri_state_locked.sri_state) == HANDLED) {
+		/*
+		 * If flag to delay SRI isn't set, trigger SRI such that the
+		 * receiver scheduler is aware there are pending notifications.
+		 */
+		dlog_verbose("Triggering not delayed SRI!\n");
+		plat_ffa_send_schedule_receiver_interrupt(cpu);
+		sri_state_set(sri_state_locked, TRIGGERED);
+	}
+
+	sri_state_unlock(sri_state_locked);
+}
+
+void plat_ffa_sri_init(struct cpu *cpu)
+{
+	struct interrupt_descriptor sri_desc;
+
+	/* TODO: when supported, make the interrupt driver use cpu structure. */
+	(void)cpu;
+
+	interrupt_desc_set_id(&sri_desc, FFA_SCHEDULE_RECEIVER_INTERRUPT_ID);
+	interrupt_desc_set_priority(&sri_desc, SRI_PRIORITY);
+	interrupt_desc_set_valid(&sri_desc, true);
+
+	/* Configure Interrupt as Non-Secure. */
+	interrupt_desc_set_type_config_sec_state(&sri_desc,
+						 INT_DESC_TYPE_SGI << 2);
+
+	plat_interrupts_configure_interrupt(sri_desc);
 }

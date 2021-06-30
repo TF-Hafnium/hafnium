@@ -726,6 +726,16 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 #endif
 
 	if (ffa_handler(&args, vcpu, next)) {
+#if SECURE_WORLD == 1
+		/*
+		 * If giving back execution to the NWd, check if the Schedule
+		 * Receiver Interrupt has been delayed, and trigger it if so.
+		 */
+		if ((*next != NULL && (*next)->vm->id == HF_OTHER_WORLD_ID) ||
+		    (*next == NULL && vcpu->vm->id == HF_OTHER_WORLD_ID)) {
+			plat_ffa_sri_trigger_if_delayed(vcpu->cpu);
+		}
+#endif
 		arch_regs_set_retval(&vcpu->regs, args);
 		vcpu_update_virtual_interrupts(*next);
 		return true;

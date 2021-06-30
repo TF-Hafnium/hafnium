@@ -256,3 +256,23 @@ void plat_ffa_notification_info_get_forward(  // NOLINTNEXTLINE
 	(void)lists_count;
 	(void)ids_count_max;
 }
+
+void plat_ffa_sri_state_set(enum plat_ffa_sri_state state)
+{
+	(void)state;
+}
+
+void plat_ffa_sri_trigger_if_delayed(struct cpu *cpu)
+{
+	(void)cpu;
+}
+
+void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
+{
+	(void)cpu;
+}
+
+void plat_ffa_sri_init(struct cpu *cpu)
+{
+	(void)cpu;
+}

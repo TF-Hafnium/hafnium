@@ -405,6 +405,8 @@ typedef uint64_t ffa_notifications_bitmap_t;
 
 #define MAX_FFA_NOTIFICATIONS 64U
 
+#define FFA_SCHEDULE_RECEIVER_INTERRUPT_ID 8
+
 /**
  * Flag for notification bind and set, to specify call is about per-vCPU
  * notifications.
@@ -442,6 +444,9 @@ static inline ffa_notifications_bitmap_t ffa_notification_get_from_vm(
 #define FFA_NOTIFICATION_FLAG_BITMAP_VM UINT32_C(0x1 << 1)
 #define FFA_NOTIFICATION_FLAG_BITMAP_SPM UINT32_C(0x1 << 2)
 #define FFA_NOTIFICATION_FLAG_BITMAP_HYP UINT32_C(0x1 << 3)
+
+/** Flag for FFA_NOTIFICATION_SET to delay Schedule Receiver Interrupt */
+#define FFA_NOTIFICATIONS_FLAG_DELAY_SRI UINT32_C(0x1 << 1)
 
 static inline ffa_vm_id_t ffa_notifications_get_receiver(struct ffa_value args)
 {

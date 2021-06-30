@@ -2758,11 +2758,6 @@ struct ffa_value api_ffa_notification_set(
 	bool is_per_vcpu = (flags & FFA_NOTIFICATION_FLAG_PER_VCPU) != 0U;
 	ffa_vcpu_index_t vcpu_id = (uint16_t)(flags >> 16);
 
-	/*
-	 * TODO: cater for the delay_schedule_receiver flag when dealing with
-	 * schedule receiver interrupt.
-	 */
-
 	if (!plat_ffa_is_notification_set_valid(current, sender_vm_id,
 						receiver_vm_id)) {
 		dlog_verbose("Invalid use of notifications set interface.\n");
@@ -2819,8 +2814,15 @@ struct ffa_value api_ffa_notification_set(
 			     notifications, vcpu_id, is_per_vcpu);
 	dlog_verbose("Set the notifications: %x.\n", notifications);
 
-	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+	if ((FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) == 0) {
+		dlog_verbose("SRI was NOT delayed. vcpu: %u!\n",
+			     vcpu_index(current));
+		plat_ffa_sri_trigger_not_delayed(current->cpu);
+	} else {
+		plat_ffa_sri_state_set(DELAYED);
+	}
 
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 out:
 	vm_unlock(&receiver_locked);
 
@@ -2957,6 +2959,7 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 	uint32_t lists_count = 0;
 	uint32_t ids_count = 0;
 	bool list_is_full = false;
+	struct ffa_value result;
 
 	/*
 	 * This interface can only be called at NS virtual/physical FF-A
@@ -3004,11 +3007,14 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 	if (ids_count == 0) {
 		dlog_verbose(
 			"Notification info get has no data to retrieve.\n");
-		return ffa_error(FFA_NO_DATA);
+		result = ffa_error(FFA_NO_DATA);
+	} else {
+		result = api_ffa_notification_info_get_success_return(
+			ids, ids_count, lists_sizes, lists_count, list_is_full);
+		plat_ffa_sri_state_set(HANDLED);
 	}
 
-	return api_ffa_notification_info_get_success_return(
-		ids, ids_count, lists_sizes, lists_count, list_is_full);
+	return result;
 }
 
 struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)

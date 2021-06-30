@@ -285,3 +285,7 @@ void plat_ffa_notification_info_get_forward(const uint16_t *ids,
 	(void)lists_count;
 	(void)ids_count_max;
 }
+
+void plat_ffa_sri_init(void)
+{
+}

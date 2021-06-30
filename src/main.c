@@ -6,8 +6,13 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/plat/ffa.h"
+
 #include "hf/cpu.h"
+#include "hf/dlog.h"
 #include "hf/vm.h"
+
+#include "vmapi/hf/ffa.h"
 
 /**
  * The entry point of CPUs when they are turned on. It is supposed to initialise
@@ -30,6 +35,9 @@ struct vcpu *cpu_main(struct cpu *c)
 
 	/* Reset the registers to give a clean start for vCPU. */
 	vcpu_reset(vcpu);
+
+	/* Initialize SRI for running core. */
+	plat_ffa_sri_init(c);
 
 	return vcpu;
 }
