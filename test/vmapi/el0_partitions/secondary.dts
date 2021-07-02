@@ -6,9 +6,20 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-/* A minimal FDT for the unit tests to work. */
-
 /dts-v1/;
 
 / {
+	compatible = "arm,ffa-manifest-1.0";
+	debug_name = "partition-manifest";
+
+	/* Properties */
+	ffa-version = <0x00010000>; /* 31:16 - Major, 15:0 - Minor */
+	uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>;
+	execution-ctx-count = <1>;
+	exception-level = <1>; /* S-EL0 */
+	execution-state = <0>; /* AARCH64 */
+	load-address = <0x90000000>;
+	entrypoint-offset = <0x0>;
+	xlat-granule = <0>; /* 4KiB */
+	messaging-method = <7>; /* Direct and indirect messaging */
 };

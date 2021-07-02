@@ -249,7 +249,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	size_t i;
 	bool ret;
 
-	if (manifest_vm->is_ffa_partition) {
+	if (manifest_vm->is_ffa_partition && !manifest_vm->is_hyp_loaded) {
 		primary_begin = pa_init(manifest_vm->partition.load_addr);
 		primary_entry = ipa_add(ipa_from_pa(primary_begin),
 					manifest_vm->partition.ep_offset);
@@ -481,6 +481,12 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 					&fdt_allocated_size)) {
 			dlog_error("Unable to load FDT.\n");
 			return false;
+		}
+
+		if (manifest_vm->is_ffa_partition) {
+			plat_ffa_parse_partition_manifest(
+				stage1_locked, fdt_addr, fdt_allocated_size,
+				manifest_vm, ppool);
 		}
 
 		if (!fdt_patch_mem(stage1_locked, fdt_addr, fdt_allocated_size,
@@ -887,7 +893,8 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 
 		mem_size = align_up(manifest_vm->secondary.mem_size, PAGE_SIZE);
 
-		if (manifest_vm->is_ffa_partition) {
+		if (manifest_vm->is_ffa_partition &&
+		    !manifest->vm[i].is_hyp_loaded) {
 			secondary_mem_begin =
 				pa_init(manifest_vm->partition.load_addr);
 			secondary_mem_end = pa_init(

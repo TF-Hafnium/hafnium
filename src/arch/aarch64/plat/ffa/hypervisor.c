@@ -642,3 +642,33 @@ void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
 
 	*ret_count = vm_count;
 }
+
+void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
+				       paddr_t fdt_addr,
+				       size_t fdt_allocated_size,
+				       const struct manifest_vm *manifest_vm,
+				       struct mpool *ppool)
+{
+	struct fdt partition_fdt;
+
+	/*
+	 * If the partition is an FF-A partition and is not
+	 * hypervisor loaded, the manifest is passed in the
+	 * partition package and is parsed during
+	 * manifest_init() and secondary fdt should be empty.
+	 */
+	CHECK(manifest_vm->is_hyp_loaded);
+	CHECK(mm_identity_map(stage1_locked, fdt_addr,
+			      pa_add(fdt_addr, fdt_allocated_size), MM_MODE_R,
+			      ppool) != NULL);
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	CHECK(fdt_init_from_ptr(&partition_fdt, (void *)pa_addr(fdt_addr),
+				fdt_allocated_size) == true);
+	CHECK(parse_ffa_manifest(&partition_fdt,
+				 (struct manifest_vm *)manifest_vm) ==
+	      MANIFEST_SUCCESS);
+	CHECK(sanity_check_ffa_manifest((struct manifest_vm *)manifest_vm) ==
+	      MANIFEST_SUCCESS);
+	CHECK(mm_unmap(stage1_locked, fdt_addr,
+		       pa_add(fdt_addr, fdt_allocated_size), ppool) == true);
+}

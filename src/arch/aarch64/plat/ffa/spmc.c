@@ -1237,3 +1237,18 @@ void plat_ffa_partition_info_get_forward(  // NOLINTNEXTLINE
 	(void)partitions;
 	(void)ret_count;
 }
+
+void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
+				       paddr_t fdt_addr,
+				       size_t fdt_allocated_size,
+				       const struct manifest_vm *manifest_vm,
+				       struct mpool *ppool)
+{
+	(void)stage1_locked;
+	(void)fdt_addr;
+	(void)fdt_allocated_size;
+	(void)manifest_vm;
+	(void)ppool;
+	/* should never be called in SPMC */
+	CHECK(false);
+}

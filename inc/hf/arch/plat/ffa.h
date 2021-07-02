@@ -9,6 +9,7 @@
 #pragma once
 
 #include "hf/ffa.h"
+#include "hf/manifest.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
@@ -226,3 +227,9 @@ void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
 					 const uint32_t flags,
 					 struct ffa_partition_info *partitions,
 					 ffa_vm_count_t *ret_count);
+
+void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
+				       paddr_t fdt_addr,
+				       size_t fdt_allocated_size,
+				       const struct manifest_vm *manifest_vm,
+				       struct mpool *ppool);

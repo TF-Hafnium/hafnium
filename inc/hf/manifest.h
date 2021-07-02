@@ -9,6 +9,7 @@
 #pragma once
 
 #include "hf/addr.h"
+#include "hf/fdt.h"
 #include "hf/ffa.h"
 #include "hf/memiter.h"
 #include "hf/string.h"
@@ -187,6 +188,7 @@ struct manifest_vm {
 	struct string kernel_filename;
 	struct smc_whitelist smc_whitelist;
 	bool is_ffa_partition;
+	bool is_hyp_loaded;
 	struct partition_manifest partition;
 
 	union {
@@ -241,6 +243,9 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 					struct memiter *manifest_fdt,
 					struct mpool *ppool);
 
+enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
+					     struct manifest_vm *vm);
+enum manifest_return_code sanity_check_ffa_manifest(struct manifest_vm *vm);
 void manifest_dump(struct manifest_vm *vm);
 
 const char *manifest_strerror(enum manifest_return_code ret_code);

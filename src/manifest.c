@@ -12,7 +12,6 @@
 #include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
-#include "hf/fdt.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
 
@@ -304,6 +303,8 @@ static enum manifest_return_code parse_vm_common(const struct fdt_node *node,
 
 	TRY(read_bool(node, "is_ffa_partition", &vm->is_ffa_partition));
 
+	TRY(read_bool(node, "hyp_loaded", &vm->is_hyp_loaded));
+
 	TRY(read_string(node, "debug_name", &vm->debug_name));
 
 	TRY(read_optional_uint32list(node, "smc_whitelist", &smcs));
@@ -540,8 +541,8 @@ static enum manifest_return_code parse_ffa_device_region_node(
 	return MANIFEST_SUCCESS;
 }
 
-static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
-						    struct manifest_vm *vm)
+enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
+					     struct manifest_vm *vm)
 {
 	unsigned int i = 0;
 	struct uint32list_iter uuid;
@@ -664,8 +665,7 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	return MANIFEST_SUCCESS;
 }
 
-static enum manifest_return_code sanity_check_ffa_manifest(
-	struct manifest_vm *vm)
+enum manifest_return_code sanity_check_ffa_manifest(struct manifest_vm *vm)
 {
 	uint16_t ffa_version_major;
 	uint16_t ffa_version_minor;
@@ -917,7 +917,11 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 
 		TRY(parse_vm_common(&vm_node, &manifest->vm[i], vm_id));
 
-		if (manifest->vm[i].is_ffa_partition) {
+		CHECK(!manifest->vm[i].is_hyp_loaded ||
+		      manifest->vm[i].is_ffa_partition);
+
+		if (manifest->vm[i].is_ffa_partition &&
+		    !manifest->vm[i].is_hyp_loaded) {
 			TRY(parse_ffa_partition_package(stage1_locked, &vm_node,
 							&manifest->vm[i], vm_id,
 							ppool));
