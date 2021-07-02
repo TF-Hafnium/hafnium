@@ -1047,39 +1047,41 @@ TEST(manifest, ffa_valid)
 
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
 
-	ASSERT_EQ(m.vm[0].sp.ffa_version, 0x10000);
+	ASSERT_EQ(m.vm[0].partition.ffa_version, 0x10000);
 	ASSERT_THAT(
-		std::span(m.vm[0].sp.uuid.uuid, 4),
+		std::span(m.vm[0].partition.uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
-	ASSERT_EQ(m.vm[0].sp.execution_ctx_count, 1);
-	ASSERT_EQ(m.vm[0].sp.run_time_el, S_EL1);
-	ASSERT_EQ(m.vm[0].sp.execution_state, AARCH64);
-	ASSERT_EQ(m.vm[0].sp.ep_offset, 0x00001000);
-	ASSERT_EQ(m.vm[0].sp.xlat_granule, PAGE_4KB);
-	ASSERT_EQ(m.vm[0].sp.boot_order, 0);
-	ASSERT_EQ(m.vm[0].sp.messaging_method, FFA_PARTITION_INDIRECT_MSG);
-	ASSERT_EQ(m.vm[0].sp.managed_exit, true);
-	ASSERT_EQ(m.vm[0].sp.mem_regions[0].base_address, 0x7100000);
-	ASSERT_EQ(m.vm[0].sp.mem_regions[0].page_count, 4);
-	ASSERT_EQ(m.vm[0].sp.mem_regions[0].attributes, 7);
-	ASSERT_EQ(m.vm[0].sp.rxtx.available, true);
-	ASSERT_EQ(m.vm[0].sp.rxtx.rx_buffer->base_address, 0x7300000);
-	ASSERT_EQ(m.vm[0].sp.rxtx.rx_buffer->page_count, 1);
-	ASSERT_EQ(m.vm[0].sp.rxtx.rx_buffer->attributes, 1);
-	ASSERT_EQ(m.vm[0].sp.rxtx.tx_buffer->base_address, 0x7310000);
-	ASSERT_EQ(m.vm[0].sp.rxtx.tx_buffer->page_count, 1);
-	ASSERT_EQ(m.vm[0].sp.rxtx.tx_buffer->attributes, 3);
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].base_address, 0x7200000);
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].page_count, 16);
+	ASSERT_EQ(m.vm[0].partition.execution_ctx_count, 1);
+	ASSERT_EQ(m.vm[0].partition.run_time_el, S_EL1);
+	ASSERT_EQ(m.vm[0].partition.execution_state, AARCH64);
+	ASSERT_EQ(m.vm[0].partition.ep_offset, 0x00001000);
+	ASSERT_EQ(m.vm[0].partition.xlat_granule, PAGE_4KB);
+	ASSERT_EQ(m.vm[0].partition.boot_order, 0);
+	ASSERT_EQ(m.vm[0].partition.messaging_method,
+		  FFA_PARTITION_INDIRECT_MSG);
+	ASSERT_EQ(m.vm[0].partition.managed_exit, true);
+	ASSERT_EQ(m.vm[0].partition.mem_regions[0].base_address, 0x7100000);
+	ASSERT_EQ(m.vm[0].partition.mem_regions[0].page_count, 4);
+	ASSERT_EQ(m.vm[0].partition.mem_regions[0].attributes, 7);
+	ASSERT_EQ(m.vm[0].partition.rxtx.available, true);
+	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->base_address, 0x7300000);
+	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->page_count, 1);
+	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->attributes, 1);
+	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->base_address, 0x7310000);
+	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->page_count, 1);
+	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->attributes, 3);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].base_address, 0x7200000);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].page_count, 16);
+
 	/* Attribute is ORed with MM_MODE_D */
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].attributes, (3 | 8));
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].smmu_id, 1);
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].stream_ids[0], 0);
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].stream_ids[1], 1);
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].interrupts[0].id, 2);
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].interrupts[0].attributes, 3);
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].interrupts[1].id, 4);
-	ASSERT_EQ(m.vm[0].sp.dev_regions[0].interrupts[1].attributes, 5);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].attributes, (3 | 8));
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].smmu_id, 1);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].stream_ids[0], 0);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].stream_ids[1], 1);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[0].id, 2);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[0].attributes, 3);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[1].id, 4);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[1].attributes, 5);
 }
 
 } /* namespace */

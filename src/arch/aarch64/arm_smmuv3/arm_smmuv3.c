@@ -1388,8 +1388,8 @@ bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
 	struct device_region upstream_peripheral;
 
 	/* Iterate through device region nodes described in vm manifest */
-	for (i = 0; i < manifest_vm->sp.dev_region_count; i++) {
-		upstream_peripheral = manifest_vm->sp.dev_regions[i];
+	for (i = 0; i < manifest_vm->partition.dev_region_count; i++) {
+		upstream_peripheral = manifest_vm->partition.dev_regions[i];
 
 		if (upstream_peripheral.smmu_id != arm_smmuv3.smmu_id) {
 			dlog_warning(

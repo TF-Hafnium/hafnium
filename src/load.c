@@ -134,13 +134,13 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 			struct mpool *ppool)
 {
 	vm_locked.vm->smc_whitelist = manifest_vm->smc_whitelist;
-	vm_locked.vm->uuid = manifest_vm->sp.uuid;
+	vm_locked.vm->uuid = manifest_vm->partition.uuid;
 
 	if (manifest_vm->is_ffa_partition) {
 		/* Link rxtx buffers to mailbox */
-		if (manifest_vm->sp.rxtx.available) {
+		if (manifest_vm->partition.rxtx.available) {
 			if (!link_rxtx_to_mailbox(stage1_locked, vm_locked,
-						  manifest_vm->sp.rxtx,
+						  manifest_vm->partition.rxtx,
 						  ppool)) {
 				dlog_error(
 					"Unable to Link RX/TX buffer with "
@@ -150,11 +150,13 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		}
 
 		vm_locked.vm->messaging_method =
-			manifest_vm->sp.messaging_method;
+			manifest_vm->partition.messaging_method;
 
-		vm_locked.vm->managed_exit = manifest_vm->sp.managed_exit;
+		vm_locked.vm->managed_exit =
+			manifest_vm->partition.managed_exit;
 
-		vm_locked.vm->boot_order = manifest_vm->sp.boot_order;
+		vm_locked.vm->boot_order = manifest_vm->partition.boot_order;
+
 		/* Updating boot list according to boot_order */
 		vm_update_boot(vm_locked.vm);
 
@@ -191,9 +193,9 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	bool ret;
 
 	if (manifest_vm->is_ffa_partition) {
-		primary_begin = pa_init(manifest_vm->sp.load_addr);
+		primary_begin = pa_init(manifest_vm->partition.load_addr);
 		primary_entry = ipa_add(ipa_from_pa(primary_begin),
-					manifest_vm->sp.ep_offset);
+					manifest_vm->partition.ep_offset);
 	} else {
 		primary_begin =
 			(manifest_vm->primary.boot_address ==
@@ -206,7 +208,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	paddr_t primary_end = pa_add(primary_begin, RSIZE_MAX);
 
 	/* Primary VM must be a VM */
-	CHECK(manifest_vm->sp.run_time_el == EL1);
+	CHECK(manifest_vm->partition.run_time_el == EL1);
 
 	/*
 	 * Load the kernel if a filename is specified in the VM manifest.
@@ -434,11 +436,11 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	 * An S-EL0 partition must contain only 1 vCPU (UP migratable) per the
 	 * FF-A 1.0 spec.
 	 */
-	CHECK(manifest_vm->sp.run_time_el != S_EL0 ||
+	CHECK(manifest_vm->partition.run_time_el != S_EL0 ||
 	      manifest_vm->secondary.vcpu_count == 1);
 
 	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm,
-			  (manifest_vm->sp.run_time_el == S_EL0))) {
+			  (manifest_vm->partition.run_time_el == S_EL0))) {
 		dlog_error("Unable to initialise VM.\n");
 		return false;
 	}
@@ -471,8 +473,9 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		size_t total_alloc = 0;
 
 		/* Map memory-regions */
-		while (j < manifest_vm->sp.mem_region_count) {
-			size = manifest_vm->sp.mem_regions[j].page_count *
+		while (j < manifest_vm->partition.mem_region_count) {
+			size = manifest_vm->partition.mem_regions[j]
+				       .page_count *
 			       PAGE_SIZE;
 			/*
 			 * For memory-regions without base-address, memory
@@ -482,8 +485,8 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			 * TODO: Add mechanism to let partition know of these
 			 * memory regions
 			 */
-			if (manifest_vm->sp.mem_regions[j].base_address ==
-			    MANIFEST_INVALID_ADDRESS) {
+			if (manifest_vm->partition.mem_regions[j]
+				    .base_address == MANIFEST_INVALID_ADDRESS) {
 				total_alloc += size;
 				/* Don't go beyond half the VM's memory space */
 				if (total_alloc >
@@ -499,7 +502,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 				region_begin = pa_subtract(alloc_base, size);
 				alloc_base = region_begin;
 
-				map_mode = manifest_vm->sp.mem_regions[j]
+				map_mode = manifest_vm->partition.mem_regions[j]
 						   .attributes;
 				if (vm->el0_partition) {
 					map_mode |= MM_MODE_USER | MM_MODE_NG;
@@ -523,12 +526,12 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 				 * Identity map memory region for both case,
 				 * VA(S-EL0) or IPA(S-EL1).
 				 */
-				region_begin =
-					pa_init(manifest_vm->sp.mem_regions[j]
-							.base_address);
+				region_begin = pa_init(
+					manifest_vm->partition.mem_regions[j]
+						.base_address);
 				region_end = pa_add(region_begin, size);
 
-				map_mode = manifest_vm->sp.mem_regions[j]
+				map_mode = manifest_vm->partition.mem_regions[j]
 						   .attributes;
 				if (vm->el0_partition) {
 					map_mode |= MM_MODE_USER | MM_MODE_NG;
@@ -560,14 +563,17 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 		/* Map device-regions */
 		j = 0;
-		while (j < manifest_vm->sp.dev_region_count) {
-			region_begin = pa_init(
-				manifest_vm->sp.dev_regions[j].base_address);
-			size = manifest_vm->sp.dev_regions[j].page_count *
+		while (j < manifest_vm->partition.dev_region_count) {
+			region_begin =
+				pa_init(manifest_vm->partition.dev_regions[j]
+						.base_address);
+			size = manifest_vm->partition.dev_regions[j]
+				       .page_count *
 			       PAGE_SIZE;
 			region_end = pa_add(region_begin, size);
 
-			map_mode = manifest_vm->sp.dev_regions[j].attributes;
+			map_mode = manifest_vm->partition.dev_regions[j]
+					   .attributes;
 			if (vm->el0_partition) {
 				map_mode |= MM_MODE_USER | MM_MODE_NG;
 			}
@@ -593,8 +599,8 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			j++;
 		}
 
-		secondary_entry =
-			ipa_add(secondary_entry, manifest_vm->sp.ep_offset);
+		secondary_entry = ipa_add(secondary_entry,
+					  manifest_vm->partition.ep_offset);
 	}
 
 	/*
@@ -822,9 +828,9 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 
 		if (manifest_vm->is_ffa_partition) {
 			secondary_mem_begin =
-				pa_init(manifest_vm->sp.load_addr);
-			secondary_mem_end =
-				pa_init(manifest_vm->sp.load_addr + mem_size);
+				pa_init(manifest_vm->partition.load_addr);
+			secondary_mem_end = pa_init(
+				manifest_vm->partition.load_addr + mem_size);
 		} else if (!carve_out_mem_range(mem_ranges_available,
 						params->mem_ranges_count,
 						mem_size, &secondary_mem_begin,

@@ -106,7 +106,7 @@ struct rx_tx {
 /**
  * Partition manifest as described in PSA FF-A v1.0 spec section 3.1
  */
-struct sp_manifest {
+struct partition_manifest {
 	/** PSA-FF-A expected version - mandatory */
 	uint32_t ffa_version;
 	/** UUID - mandatory */
@@ -182,7 +182,7 @@ struct manifest_vm {
 	struct string kernel_filename;
 	struct smc_whitelist smc_whitelist;
 	bool is_ffa_partition;
-	struct sp_manifest sp;
+	struct partition_manifest partition;
 
 	union {
 		/* Properties specific to the primary VM. */

@@ -344,7 +344,7 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 					 &vm->primary.boot_address));
 	}
 	TRY(read_optional_uint8(node, "exception-level", (uint8_t)EL1,
-				(uint8_t *)&vm->sp.run_time_el));
+				(uint8_t *)&vm->partition.run_time_el));
 
 	return MANIFEST_SUCCESS;
 }
@@ -541,48 +541,50 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	TRY(read_uint32(&root, "ffa-version", &vm->sp.ffa_version));
+	TRY(read_uint32(&root, "ffa-version", &vm->partition.ffa_version));
 	dlog_verbose("  Expected FF-A version %u.%u\n",
-		     vm->sp.ffa_version >> 16, vm->sp.ffa_version & 0xffff);
+		     vm->partition.ffa_version >> 16,
+		     vm->partition.ffa_version & 0xffff);
 
 	TRY(read_uint32list(&root, "uuid", &uuid));
 
 	while (uint32list_has_next(&uuid) && i < 4) {
 		TRY(uint32list_get_next(&uuid, &uuid_word));
-		vm->sp.uuid.uuid[i] = uuid_word;
+		vm->partition.uuid.uuid[i] = uuid_word;
 		i++;
 	}
-	dlog_verbose("  UUID %#x-%x-%x-%x\n", vm->sp.uuid.uuid[0],
-		     vm->sp.uuid.uuid[1], vm->sp.uuid.uuid[2],
-		     vm->sp.uuid.uuid[3]);
+	dlog_verbose("  UUID %#x-%x-%x-%x\n", vm->partition.uuid.uuid[0],
+		     vm->partition.uuid.uuid[1], vm->partition.uuid.uuid[2],
+		     vm->partition.uuid.uuid[3]);
 
 	TRY(read_uint16(&root, "execution-ctx-count",
-			&vm->sp.execution_ctx_count));
+			&vm->partition.execution_ctx_count));
 	dlog_verbose("  Number of execution context %u\n",
-		     vm->sp.execution_ctx_count);
+		     vm->partition.execution_ctx_count);
 
 	TRY(read_uint8(&root, "exception-level",
-		       (uint8_t *)&vm->sp.run_time_el));
-	dlog_verbose("  Run-time EL %u\n", vm->sp.run_time_el);
+		       (uint8_t *)&vm->partition.run_time_el));
+	dlog_verbose("  Run-time EL %u\n", vm->partition.run_time_el);
 
 	TRY(read_uint8(&root, "execution-state",
-		       (uint8_t *)&vm->sp.execution_state));
-	dlog_verbose("  Execution state %u\n", vm->sp.execution_state);
+		       (uint8_t *)&vm->partition.execution_state));
+	dlog_verbose("  Execution state %u\n", vm->partition.execution_state);
 
-	TRY(read_optional_uint64(&root, "load-address", 0, &vm->sp.load_addr));
-	dlog_verbose("  Load address %#x\n", vm->sp.load_addr);
+	TRY(read_optional_uint64(&root, "load-address", 0,
+				 &vm->partition.load_addr));
+	dlog_verbose("  Load address %#x\n", vm->partition.load_addr);
 
 	TRY(read_optional_uint64(&root, "entrypoint-offset", 0,
-				 &vm->sp.ep_offset));
-	dlog_verbose("  Entry point offset %#x\n", vm->sp.ep_offset);
+				 &vm->partition.ep_offset));
+	dlog_verbose("  Entry point offset %#x\n", vm->partition.ep_offset);
 
 	TRY(read_optional_uint16(&root, "boot-order", DEFAULT_BOOT_ORDER,
-				 &vm->sp.boot_order));
-	dlog_verbose("  Boot order %#u\n", vm->sp.boot_order);
+				 &vm->partition.boot_order));
+	dlog_verbose("  Boot order %#u\n", vm->partition.boot_order);
 
 	TRY(read_optional_uint8(&root, "xlat-granule", 0,
-				(uint8_t *)&vm->sp.xlat_granule));
-	dlog_verbose("  Translation granule %u\n", vm->sp.xlat_granule);
+				(uint8_t *)&vm->partition.xlat_granule));
+	dlog_verbose("  Translation granule %u\n", vm->partition.xlat_granule);
 
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &rxtx_node_name)) {
@@ -596,38 +598,39 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 		 * while parsing memory regions.
 		 */
 		TRY(read_uint32(&ffa_node, "rx-buffer",
-				&vm->sp.rxtx.rx_phandle));
+				&vm->partition.rxtx.rx_phandle));
 
 		TRY(read_uint32(&ffa_node, "tx-buffer",
-				&vm->sp.rxtx.tx_phandle));
+				&vm->partition.rxtx.tx_phandle));
 
-		vm->sp.rxtx.available = true;
+		vm->partition.rxtx.available = true;
 	}
 
 	TRY(read_uint8(&root, "messaging-method",
-		       (uint8_t *)&vm->sp.messaging_method));
-	dlog_verbose("  Messaging method %u\n", vm->sp.messaging_method);
+		       (uint8_t *)&vm->partition.messaging_method));
+	dlog_verbose("  Messaging method %u\n", vm->partition.messaging_method);
 
-	TRY(read_bool(&root, "managed-exit", &vm->sp.managed_exit));
+	TRY(read_bool(&root, "managed-exit", &vm->partition.managed_exit));
 
 	/* Parse memory-regions */
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
-		TRY(parse_ffa_memory_region_node(&ffa_node, vm->sp.mem_regions,
-						 &vm->sp.mem_region_count,
-						 &vm->sp.rxtx));
+		TRY(parse_ffa_memory_region_node(
+			&ffa_node, vm->partition.mem_regions,
+			&vm->partition.mem_region_count, &vm->partition.rxtx));
 	}
 	dlog_verbose("  Total %u memory regions found\n",
-		     vm->sp.mem_region_count);
+		     vm->partition.mem_region_count);
 
 	/* Parse Device-regions */
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &dev_region_node_name)) {
-		TRY(parse_ffa_device_region_node(&ffa_node, vm->sp.dev_regions,
-						 &vm->sp.dev_region_count));
+		TRY(parse_ffa_device_region_node(
+			&ffa_node, vm->partition.dev_regions,
+			&vm->partition.dev_region_count));
 	}
 	dlog_verbose("  Total %u device regions found\n",
-		     vm->sp.dev_region_count);
+		     vm->partition.dev_region_count);
 
 	return MANIFEST_SUCCESS;
 }
@@ -641,9 +644,9 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	const char *error_string = "specified in manifest is unsupported";
 
 	/* ensure that the SPM version is compatible */
-	ffa_version_major =
-		(vm->sp.ffa_version & 0xffff0000) >> FFA_VERSION_MAJOR_OFFSET;
-	ffa_version_minor = vm->sp.ffa_version & 0xffff;
+	ffa_version_major = (vm->partition.ffa_version & 0xffff0000) >>
+			    FFA_VERSION_MAJOR_OFFSET;
+	ffa_version_minor = vm->partition.ffa_version & 0xffff;
 
 	if (ffa_version_major != FFA_VERSION_MAJOR ||
 	    ffa_version_minor > FFA_VERSION_MINOR) {
@@ -652,39 +655,41 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if (vm->sp.xlat_granule != PAGE_4KB) {
+	if (vm->partition.xlat_granule != PAGE_4KB) {
 		dlog_error("Translation granule %s: %u\n", error_string,
-			   vm->sp.xlat_granule);
+			   vm->partition.xlat_granule);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if (vm->sp.execution_state != AARCH64) {
+	if (vm->partition.execution_state != AARCH64) {
 		dlog_error("Execution state %s: %u\n", error_string,
-			   vm->sp.execution_state);
+			   vm->partition.execution_state);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if (vm->sp.run_time_el != EL1 && vm->sp.run_time_el != S_EL1 &&
-	    vm->sp.run_time_el != S_EL0) {
+	if (vm->partition.run_time_el != EL1 &&
+	    vm->partition.run_time_el != S_EL1 &&
+	    vm->partition.run_time_el != S_EL0) {
 		dlog_error("Exception level %s: %d\n", error_string,
-			   vm->sp.run_time_el);
+			   vm->partition.run_time_el);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if ((vm->sp.messaging_method &
+	if ((vm->partition.messaging_method &
 	     ~(FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND |
 	       FFA_PARTITION_INDIRECT_MSG)) != 0U) {
 		dlog_error("Messaging method %s: %x\n", error_string,
-			   vm->sp.messaging_method);
+			   vm->partition.messaging_method);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if (vm->sp.run_time_el == S_EL0 && vm->sp.execution_ctx_count != 1) {
+	if (vm->partition.run_time_el == S_EL0 &&
+	    vm->partition.execution_ctx_count != 1) {
 		dlog_error(
 			"Exception level and execution context count %s: %d "
 			"%d\n",
-			error_string, vm->sp.run_time_el,
-			vm->sp.execution_ctx_count);
+			error_string, vm->partition.run_time_el,
+			vm->partition.execution_ctx_count);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
@@ -772,11 +777,11 @@ static enum manifest_return_code parse_ffa_partition_package(
 		goto exit_unmap;
 	}
 
-	if (vm->sp.load_addr != sp_pkg_addr) {
+	if (vm->partition.load_addr != sp_pkg_addr) {
 		dlog_warning(
 			"Partition's load address at its manifest differs"
 			" from specified in partition's package.\n");
-		vm->sp.load_addr = sp_pkg_addr;
+		vm->partition.load_addr = sp_pkg_addr;
 	}
 
 	ret = sanity_check_ffa_manifest(vm);
