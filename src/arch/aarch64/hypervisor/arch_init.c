@@ -15,5 +15,4 @@
 void arch_one_time_init(void)
 {
 	plat_psci_init();
-	arch_ffa_init();
 }

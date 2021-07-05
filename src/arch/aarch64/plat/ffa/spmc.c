@@ -6,8 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/mmu.h"
-#include "hf/arch/other_world.h"
+#include "hf/arch/ffa.h"
 #include "hf/arch/sve.h"
 
 #include "hf/dlog.h"
@@ -36,6 +35,8 @@ struct ffa_value plat_ffa_spmc_id_get(void)
 void plat_ffa_init(bool tee_enabled)
 {
 	(void)tee_enabled;
+
+	arch_ffa_init();
 }
 
 /**
