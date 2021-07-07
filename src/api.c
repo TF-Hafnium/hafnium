@@ -1091,6 +1091,84 @@ exit:
 }
 
 /**
+ * Unmaps the RX/TX buffer pair with a partition or partition manager from the
+ * translation regime of the caller. Unmap the region for the hypervisor and
+ * set the memory region to owned and exclusive for the component. Since the
+ * memory region mapped in the page table, when the buffers were originally
+ * created we can safely remap it.
+ *
+ * Returns:
+ *   - FFA_ERROR FFA_INVALID_PARAMETERS if there is no buffer pair registered on
+ *     behalf of the caller.
+ *   - FFA_SUCCESS on success if no further action is needed.
+ */
+struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
+				    struct vcpu *current)
+{
+	struct vm *vm = current->vm;
+	struct vm_locked vm_locked;
+	struct mm_stage1_locked mm_stage1_locked;
+	paddr_t send_pa_begin;
+	paddr_t send_pa_end;
+	paddr_t recv_pa_begin;
+	paddr_t recv_pa_end;
+
+	/*
+	 * Check there is a buffer pair registered on behalf of the caller.
+	 * Since forwarding is not yet supported the allocator ID MBZ.
+	 */
+	if (allocator_id != 0) {
+		dlog_error(
+			"Forwarding MAP/UNMAP from the hypervisor is not yet "
+			"supported so vm id must be zero.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Get send and receive buffers. */
+	if (vm->mailbox.send == NULL || vm->mailbox.recv == NULL) {
+		dlog_error(
+			"No buffer pair registered on behalf of the caller.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Currently a mailbox size of 1 page is assumed. */
+	send_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.send));
+	send_pa_end = pa_add(send_pa_begin, HF_MAILBOX_SIZE);
+	recv_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.recv));
+	recv_pa_end = pa_add(recv_pa_begin, HF_MAILBOX_SIZE);
+
+	vm_locked = vm_lock(vm);
+	mm_stage1_locked = mm_lock_stage1();
+
+	/*
+	 * Set the memory region of the buffers back to the default mode
+	 * for the VM. Since this memory region was already mapped for the
+	 * RXTX buffers we can safely remap them.
+	 */
+	CHECK(vm_identity_map(vm_locked, send_pa_begin, send_pa_end,
+			      MM_MODE_R | MM_MODE_W | MM_MODE_X, &api_page_pool,
+			      NULL));
+
+	CHECK(vm_identity_map(vm_locked, recv_pa_begin, recv_pa_end,
+			      MM_MODE_R | MM_MODE_W | MM_MODE_X, &api_page_pool,
+			      NULL));
+
+	/* Unmap the buffers in the partition manager. */
+	CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end,
+		       &api_page_pool));
+	CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end,
+		       &api_page_pool));
+
+	vm->mailbox.send = NULL;
+	vm->mailbox.recv = NULL;
+
+	mm_unlock_stage1(&mm_stage1_locked);
+	vm_unlock(&vm_locked);
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
+/**
  * Notifies the `to` VM about the message currently in its mailbox, possibly
  * with the help of the primary VM.
  */
@@ -1691,6 +1769,7 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 	case FFA_FEATURES_32:
 	case FFA_RX_RELEASE_32:
 	case FFA_RXTX_MAP_64:
+	case FFA_RXTX_UNMAP_32:
 	case FFA_PARTITION_INFO_GET_32:
 	case FFA_ID_GET_32:
 	case FFA_MSG_POLL_32:

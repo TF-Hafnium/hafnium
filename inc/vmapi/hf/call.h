@@ -104,6 +104,21 @@ static inline struct ffa_value ffa_rxtx_map(hf_ipaddr_t send, hf_ipaddr_t recv)
 }
 
 /**
+ * Unmaps the RX/TX buffer pair of an endpoint or Hypervisor from the
+ * translation regime of the callee.
+ *
+ * Returns:
+ *   - FFA_ERROR FFA_INVALID_PARAMETERS if there is no buffer pair registered on
+ *     behalf of the caller.
+ *   - FFA_SUCCESS on success if no further action is needed.
+ */
+static inline struct ffa_value ffa_rxtx_unmap(void)
+{
+	/* Note that allocator ID MBZ at virtual instance. */
+	return ffa_call((struct ffa_value){.func = FFA_RXTX_UNMAP_32});
+}
+
+/**
  * Copies data from the sender's send buffer to the recipient's receive buffer.
  *
  * If the recipient's receive buffer is busy, it can optionally register the

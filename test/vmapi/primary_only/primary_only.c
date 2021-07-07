@@ -200,6 +200,9 @@ TEST(ffa, ffa_features)
 	ret = ffa_features(FFA_RXTX_MAP_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
+	ret = ffa_features(FFA_RXTX_UNMAP_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
 	ret = ffa_features(FFA_PARTITION_INFO_GET_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
@@ -261,9 +264,6 @@ TEST(ffa, ffa_features_not_supported)
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(0x84000000);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
-
-	ret = ffa_features(FFA_RXTX_UNMAP_32);
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 }
 

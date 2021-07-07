@@ -202,3 +202,45 @@ TEST(hf_mailbox_receive, cannot_receive_from_primary_non_blocking)
 	struct ffa_value res = ffa_msg_poll();
 	EXPECT_NE(res.func, FFA_SUCCESS_32);
 }
+
+/**
+ * The buffer pair can be successfully unmapped from a VM that has
+ * just created the mapping.
+ */
+TEST(ffa_rxtx_unmap, succeeds)
+{
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+}
+
+/**
+ * Unmap will fail if no mapping exists for the VM.
+ */
+TEST(ffa_rxtx_unmap, fails_if_no_mapping)
+{
+	EXPECT_FFA_ERROR(ffa_rxtx_unmap(), FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * A buffer pair cannot be unmapped multiple times.
+ */
+TEST(ffa_rxtx_unmap, fails_if_already_unmapped)
+{
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ffa_rxtx_unmap(), FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Test we can remap a region after it has been unmapped.
+ */
+TEST(ffa_rxtx_unmap, succeeds_in_remapping_region)
+{
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+}
