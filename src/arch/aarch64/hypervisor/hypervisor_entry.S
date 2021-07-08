@@ -224,6 +224,12 @@ mm_enable:
 	ldp	x1, x2, [x1]
 	msr     APIAKEYLO_EL1, x1
 	msr     APIAKEYHI_EL1, x2
+
+	/*
+	 * Emit ISB to ensure the pointer authentication key change takes
+	 * effect before any pauth instruction is executed.
+	 */
+	isb
 #endif
 
 	/*

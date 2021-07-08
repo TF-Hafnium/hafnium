@@ -225,6 +225,8 @@
 
 /**
  * Restore Hypervisor pointer authentication APIA key.
+ * Emit isb to ensure the pointer authentication key change takes
+ * effect before any pauth instruction is executed.
  */
 .macro pauth_restore_hypervisor_key reg1 reg2
 	adrp	\reg1, pauth_apia_key
@@ -232,4 +234,5 @@
 	ldp	\reg1, \reg2, [\reg1]
 	msr     APIAKEYLO_EL1, \reg1
 	msr     APIAKEYHI_EL1, \reg2
+	isb
 .endm

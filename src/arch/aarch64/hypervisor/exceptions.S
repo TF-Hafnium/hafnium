@@ -492,6 +492,7 @@ sve_skip_context_restore:
 	msr APDBKEYHI_EL1, xzr
 	msr APGAKEYLO_EL1, xzr
 	msr APGAKEYHI_EL1, xzr
+	/* Omit ISB as SMC following is a context synchronizing event. */
 #endif
 
 	smc #0
@@ -784,6 +785,7 @@ vcpu_restore_volatile_and_run:
 	/* Restore vCPU APIA key. */
 	msr     APIAKEYLO_EL1, x1
 	msr     APIAKEYHI_EL1, x2
+	/* Omit ISB as ERET following is a context synchronizing event. */
 #endif
 
 	ldp x4, x5, [x0, #VCPU_REGS + 8 * 4]
