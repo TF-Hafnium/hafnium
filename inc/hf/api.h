@@ -106,3 +106,11 @@ struct ffa_value api_ffa_notification_update_bindings(
 	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t notifications, bool is_bind,
 	struct vcpu *current);
+
+struct ffa_value api_ffa_notification_set(
+	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id, uint32_t flags,
+	ffa_notifications_bitmap_t notifications, struct vcpu *current);
+
+struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
+					  uint16_t vcpu_id, uint32_t flags,
+					  struct vcpu *current);

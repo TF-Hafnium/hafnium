@@ -197,6 +197,40 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 		 vm_id_is_current_world(sender_id)));
 }
 
+bool plat_ffa_is_notification_set_valid(struct vcpu *current,
+					ffa_vm_id_t sender_id,
+					ffa_vm_id_t receiver_id)
+{
+	ffa_vm_id_t current_vm_id = current->vm->id;
+
+	/*
+	 * SPMC:
+	 * - If set call from SP, sender's ID must be the same as current.
+	 * - If set call from NWd, current VM ID must be same as Hypervisor ID,
+	 * and receiver must be an SP.
+	 */
+	return sender_id != receiver_id &&
+	       (sender_id == current_vm_id ||
+		(current_vm_id == HF_HYPERVISOR_VM_ID &&
+		 !vm_id_is_current_world(sender_id) &&
+		 vm_id_is_current_world(receiver_id)));
+}
+
+bool plat_ffa_is_notification_get_valid(struct vcpu *current,
+					ffa_vm_id_t receiver_id)
+{
+	ffa_vm_id_t current_vm_id = current->vm->id;
+
+	/*
+	 * SPMC:
+	 * - An SP can ask for its notifications, or the hypervisor can get
+	 *  notifications target to a VM.
+	 */
+	return (current_vm_id == receiver_id) ||
+	       (current_vm_id == HF_HYPERVISOR_VM_ID &&
+		!vm_id_is_current_world(receiver_id));
+}
+
 ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
 {
 	return (index & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK) |

@@ -615,6 +615,17 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			ffa_notifications_bitmap(args->arg3, args->arg4), false,
 			current);
 		return true;
+	case FFA_NOTIFICATION_SET_32:
+		*args = api_ffa_notification_set(
+			ffa_sender(*args), ffa_receiver(*args), args->arg2,
+			ffa_notifications_bitmap(args->arg3, args->arg4),
+			current);
+		return true;
+	case FFA_NOTIFICATION_GET_32:
+		*args = api_ffa_notification_get(
+			ffa_notifications_get_receiver(*args),
+			ffa_notifications_get_vcpu(*args), args->arg2, current);
+		return true;
 	}
 
 	return false;

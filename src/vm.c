@@ -538,3 +538,44 @@ bool vm_notifications_validate_per_vcpu(struct vm_locked vm_locked,
 	return is_per_vcpu ? (~to_check->bindings_per_vcpu & notif) == 0U
 			   : (to_check->bindings_per_vcpu & notif) == 0U;
 }
+
+void vm_notifications_set(struct vm_locked vm_locked, bool is_from_vm,
+			  ffa_notifications_bitmap_t notifications,
+			  ffa_vcpu_index_t vcpu_id, bool is_per_vcpu)
+{
+	CHECK(vm_locked.vm != NULL);
+	struct notifications *to_set =
+		vm_get_notifications(vm_locked, is_from_vm);
+	CHECK(vcpu_id < MAX_CPUS);
+
+	if (is_per_vcpu) {
+		to_set->per_vcpu[vcpu_id].pending |= notifications;
+	} else {
+		to_set->global.pending |= notifications;
+	}
+}
+
+/**
+ * Get Global notifications and per CPU only of the current VCPU.
+ */
+ffa_notifications_bitmap_t vm_notifications_get_pending_and_clear(
+	struct vm_locked vm_locked, bool is_from_vm,
+	ffa_vcpu_index_t cur_vcpu_id)
+{
+	ffa_notifications_bitmap_t to_ret = 0;
+
+	CHECK(vm_locked.vm != NULL);
+	struct notifications *to_get =
+		vm_get_notifications(vm_locked, is_from_vm);
+	CHECK(cur_vcpu_id < MAX_CPUS);
+
+	to_ret |= to_get->global.pending;
+	to_get->global.pending = 0U;
+	to_get->global.info_get_retrieved = 0U;
+
+	to_ret |= to_get->per_vcpu[cur_vcpu_id].pending;
+	to_get->per_vcpu[cur_vcpu_id].pending = 0U;
+	to_get->per_vcpu[cur_vcpu_id].info_get_retrieved = 0U;
+
+	return to_ret;
+}

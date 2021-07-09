@@ -2063,7 +2063,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 	} else if (vm_id_is_current_world(receiver_vm_id)) {
 		/*
 		 * It is expected the receiver_vm_id to be from an SP, otherwise
-		 * 'arch_other_world_is_direct_response_valid' should have
+		 * 'plat_ffa_is_direct_response_valid' should have
 		 * made function return error before getting to this point.
 		 */
 		*next = api_switch_to_vm(current, to_ret,
@@ -2659,5 +2659,167 @@ struct ffa_value api_ffa_notification_update_bindings(
 
 out:
 	vm_unlock(&receiver_locked);
+	return ret;
+}
+
+struct ffa_value api_ffa_notification_set(
+	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id, uint32_t flags,
+	ffa_notifications_bitmap_t notifications, struct vcpu *current)
+{
+	struct ffa_value ret;
+	struct vm_locked receiver_locked;
+
+	/*
+	 * Check if is per-vCPU or global, and extracting vCPU ID according
+	 * to table 17.19 of the FF-A v1.1 Beta 0 spec.
+	 */
+	bool is_per_vcpu = (flags & FFA_NOTIFICATION_FLAG_PER_VCPU) != 0U;
+	ffa_vcpu_index_t vcpu_id = (uint16_t)(flags >> 16);
+
+	/*
+	 * TODO: cater for the delay_schedule_receiver flag when dealing with
+	 * schedule receiver interrupt.
+	 */
+
+	if (!plat_ffa_is_notification_set_valid(current, sender_vm_id,
+						receiver_vm_id)) {
+		dlog_verbose("Invalid use of notifications set interface.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (notifications == 0U) {
+		dlog_verbose("No notifications have been specified.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * This check assumes receiver is the current VM, and has been enforced
+	 * by 'plat_ffa_is_notification_set_valid'.
+	 */
+	receiver_locked = plat_ffa_vm_find_locked(receiver_vm_id);
+
+	if (receiver_locked.vm == NULL) {
+		dlog_verbose("Receiver ID is not valid.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * TODO: Forward Hypervisor's call to SWd if setting SP's notifications
+	 * from VMs.
+	 */
+
+	if (!vm_are_notifications_enabled(receiver_locked)) {
+		dlog_verbose("Receiver's notifications not enabled.\n");
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	/*
+	 * If notifications are not bound to the sender, they wouldn't be
+	 * enabled either for the receiver.
+	 */
+	if (!vm_notifications_validate_binding(
+		    receiver_locked, plat_ffa_is_vm_id(sender_vm_id),
+		    sender_vm_id, notifications, is_per_vcpu)) {
+		dlog_verbose("Notifications bindings not valid.\n");
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	if (is_per_vcpu && vcpu_id >= receiver_locked.vm->vcpu_count) {
+		dlog_verbose("Invalid VCPU ID!\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/* Set notifications pending */
+	vm_notifications_set(receiver_locked, plat_ffa_is_vm_id(sender_vm_id),
+			     notifications, vcpu_id, is_per_vcpu);
+	dlog_verbose("Set the notifications: %x.\n", notifications);
+
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+
+out:
+	vm_unlock(&receiver_locked);
+
+	return ret;
+}
+
+static struct ffa_value api_ffa_notification_get_success_return(
+	ffa_notifications_bitmap_t from_sp, ffa_notifications_bitmap_t from_vm,
+	ffa_notifications_bitmap_t from_framework)
+{
+	return (struct ffa_value){
+		.func = FFA_SUCCESS_32,
+		.arg1 = 0U,
+		.arg2 = (uint32_t)from_sp,
+		.arg3 = (uint32_t)(from_sp >> 32),
+		.arg4 = (uint32_t)from_vm,
+		.arg5 = (uint32_t)(from_vm >> 32),
+		.arg6 = (uint32_t)from_framework,
+		.arg7 = (uint32_t)(from_framework >> 32),
+	};
+}
+
+struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
+					  ffa_vcpu_index_t vcpu_id,
+					  uint32_t flags, struct vcpu *current)
+{
+	/* TODO: get framework notifications, when these are supported. */
+	ffa_notifications_bitmap_t sp_notifications = 0;
+	ffa_notifications_bitmap_t vm_notifications = 0;
+	struct vm_locked receiver_locked;
+	struct ffa_value ret;
+
+	/*
+	 * Following check should capture wrong uses of the interface, depending
+	 * on whether Hafnium is SPMC or hypervisor.
+	 * On the rest of the function it is assumed this condition is met.
+	 */
+	if (!plat_ffa_is_notification_get_valid(current, receiver_vm_id)) {
+		dlog_verbose("Invalid use of notifications get interface.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * This check assumes receiver is the current VM, and has been enforced
+	 * by `plat_ffa_is_notifications_get_valid`.
+	 */
+	receiver_locked = plat_ffa_vm_find_locked(receiver_vm_id);
+
+	/*
+	 * `plat_ffa_is_notifications_get_valid` ensures following is never
+	 * true.
+	 */
+	CHECK(receiver_locked.vm != NULL);
+
+	if (receiver_locked.vm->vcpu_count <= vcpu_id ||
+	    (receiver_locked.vm->vcpu_count != 1 &&
+	     cpu_index(current->cpu) != vcpu_id)) {
+		dlog_verbose("Invalid VCPU ID!\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_SP) != 0U) {
+		/*
+		 * TODO: For hypervisor, forward call to SPMC to get VM's
+		 * notifications from SPs.
+		 */
+		sp_notifications = vm_notifications_get_pending_and_clear(
+			receiver_locked, false, vcpu_id);
+	}
+
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_VM) != 0U) {
+		vm_notifications = vm_notifications_get_pending_and_clear(
+			receiver_locked, true, vcpu_id);
+	}
+
+	ret = api_ffa_notification_get_success_return(sp_notifications,
+						      vm_notifications, 0);
+
+out:
+	vm_unlock(&receiver_locked);
+
 	return ret;
 }

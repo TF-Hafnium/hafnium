@@ -240,6 +240,25 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 	return sender_id != receiver_id && current_vm_id == receiver_id;
 }
 
+bool plat_ffa_is_notification_set_valid(struct vcpu *current,
+					ffa_vm_id_t sender_id,
+					ffa_vm_id_t receiver_id)
+{
+	ffa_vm_id_t current_vm_id = current->vm->id;
+
+	/* If Hafnium is hypervisor, sender needs to be current vm. */
+	return sender_id == current_vm_id && sender_id != receiver_id;
+}
+
+bool plat_ffa_is_notification_get_valid(struct vcpu *current,
+					ffa_vm_id_t receiver_id)
+{
+	ffa_vm_id_t current_vm_id = current->vm->id;
+
+	/* If Hafnium is hypervisor, receiver needs to be current vm. */
+	return (current_vm_id == receiver_id);
+}
+
 struct ffa_value plat_ffa_notifications_bitmap_create(
 	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
 {

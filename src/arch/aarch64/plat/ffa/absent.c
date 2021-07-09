@@ -111,6 +111,24 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 	return false;
 }
 
+bool plat_ffa_is_notification_set_valid(struct vcpu *current,
+					ffa_vm_id_t sender_id,
+					ffa_vm_id_t receiver_id)
+{
+	(void)current;
+	(void)sender_id;
+	(void)receiver_id;
+	return false;
+}
+
+bool plat_ffa_is_notification_get_valid(struct vcpu *current,
+					ffa_vm_id_t receiver_id)
+{
+	(void)current;
+	(void)receiver_id;
+	return false;
+}
+
 struct ffa_value plat_ffa_notifications_bitmap_create(
 	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
 {

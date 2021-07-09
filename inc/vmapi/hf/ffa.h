@@ -417,6 +417,24 @@ static inline ffa_notifications_bitmap_t ffa_notifications_bitmap(uint32_t lo,
 }
 
 /**
+ * Flags used in calls to FFA_NOTIFICATION_GET interface.
+ */
+#define FFA_NOTIFICATION_FLAG_BITMAP_SP UINT32_C(0x1 << 0)
+#define FFA_NOTIFICATION_FLAG_BITMAP_VM UINT32_C(0x1 << 1)
+#define FFA_NOTIFICATION_FLAG_BITMAP_SPM UINT32_C(0x1 << 2)
+#define FFA_NOTIFICATION_FLAG_BITMAP_HYP UINT32_C(0x1 << 3)
+
+static inline ffa_vm_id_t ffa_notifications_get_receiver(struct ffa_value args)
+{
+	return (args.arg1 >> 16) & 0xffffU;
+}
+
+static inline ffa_vm_id_t ffa_notifications_get_vcpu(struct ffa_value args)
+{
+	return args.arg1 & 0xffffU;
+}
+
+/**
  * A set of contiguous pages which is part of a memory region. This corresponds
  * to table 40 of the FF-A 1.0 EAC specification, "Constituent memory region
  * descriptor".

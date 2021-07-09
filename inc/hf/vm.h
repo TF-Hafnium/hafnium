@@ -247,3 +247,9 @@ void vm_notifications_update_bindings(struct vm_locked vm_locked,
 				      bool is_from_vm, ffa_vm_id_t sender_id,
 				      ffa_notifications_bitmap_t notifications,
 				      bool is_per_vcpu);
+void vm_notifications_set(struct vm_locked vm_locked, bool is_from_vm,
+			  ffa_notifications_bitmap_t notifications,
+			  ffa_vcpu_index_t vcpu_id, bool is_per_vcpu);
+ffa_notifications_bitmap_t vm_notifications_get_pending_and_clear(
+	struct vm_locked vm_locked, bool is_from_vm,
+	ffa_vcpu_index_t cur_vcpu_id);
