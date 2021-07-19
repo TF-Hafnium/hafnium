@@ -465,15 +465,19 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	vm_locked = vm_lock(vm);
 
 	/*
-	 * Grant the VM access to the memory. TODO: For S-EL0 partitions,
-	 * mapping all of its memory as RWX is bad from a security standpoint.
-	 * Should just skip this and expect this to be present in the memory
-	 * regions?
+	 * Grant the VM access to the memory. For VM's we mark all memory in
+	 * stage-2 tables as RWX and the VM can control permissions using
+	 * stage-1 translations. For S-EL0 partitions, hafnium maps the entire
+	 * region of memory for the partition as RX. The partition is then
+	 * expected to perform its owns relocations and call the FFA_MEM_PERM_*
+	 * API's to change permissions on its image layout.
 	 */
-	map_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 	if (vm->el0_partition) {
-		map_mode |= MM_MODE_USER | MM_MODE_NG;
+		map_mode = MM_MODE_R | MM_MODE_X | MM_MODE_USER | MM_MODE_NG;
+	} else {
+		map_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 	}
+
 	if (!vm_identity_map(vm_locked, mem_begin, mem_end, map_mode, ppool,
 			     &secondary_entry)) {
 		dlog_error("Unable to initialise memory.\n");
