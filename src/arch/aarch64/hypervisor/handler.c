@@ -521,6 +521,12 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 					 current, next);
 		return true;
 	case FFA_MSG_WAIT_32:
+		if (args->arg1 != 0U || args->arg2 != 0U || args->arg3 != 0U ||
+		    args->arg4 != 0U || args->arg5 != 0U || args->arg6 != 0U ||
+		    args->arg7 != 0U) {
+			*args = ffa_error(FFA_INVALID_PARAMETERS);
+			return true;
+		}
 #if SECURE_WORLD == 1
 		if (sp_boot_next(current, next, args)) {
 			return true;

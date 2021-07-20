@@ -132,6 +132,23 @@ TEST(ffa, ffa_recv_non_blocking)
 }
 
 /**
+ * Verify that FFA_MSG_WAIT responds correctly to wrong parameters.
+ */
+TEST(ffa, ffa_msg_wait_fail)
+{
+	struct ffa_value ret;
+	ret = ffa_call((struct ffa_value){.func = FFA_MSG_WAIT_32,
+					  .arg1 = 1,
+					  .arg2 = 2,
+					  .arg3 = 3,
+					  .arg4 = 4,
+					  .arg5 = 5,
+					  .arg6 = 6,
+					  .arg7 = 7});
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
+}
+
+/**
  * Verify that partition discovery via the FFA_PARTITION_INFO interface
  * returns the expected information on the VMs in the system.
  */
