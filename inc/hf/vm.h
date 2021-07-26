@@ -202,6 +202,7 @@ bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
 		  struct vm **new_vm, bool el0_partition);
 ffa_vm_count_t vm_get_count(void);
 struct vm *vm_find(ffa_vm_id_t id);
+struct vm_locked vm_find_locked(ffa_vm_id_t id);
 struct vm *vm_find_index(uint16_t index);
 struct vm_locked vm_lock(struct vm *vm);
 struct two_vm_locked vm_lock_both(struct vm *vm1, struct vm *vm2);

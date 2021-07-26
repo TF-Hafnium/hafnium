@@ -136,6 +136,20 @@ struct vm *vm_find(ffa_vm_id_t id)
 }
 
 /**
+ * Returns a locked instance of the VM with the corresponding id.
+ */
+struct vm_locked vm_find_locked(ffa_vm_id_t id)
+{
+	struct vm *vm = vm_find(id);
+
+	if (vm != NULL) {
+		return vm_lock(vm);
+	}
+
+	return (struct vm_locked){.vm = NULL};
+}
+
+/**
  * Returns a pointer to the VM at the specified index.
  */
 struct vm *vm_find_index(uint16_t index)
