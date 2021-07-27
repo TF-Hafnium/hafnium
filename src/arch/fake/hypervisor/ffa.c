@@ -43,6 +43,16 @@ bool plat_ffa_is_direct_response_valid(struct vcpu *current,
 	return true;
 }
 
+bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+			  struct ffa_value *ret)
+{
+	(void)vm_id;
+	(void)vcpu_idx;
+	(void)ret;
+
+	return false;
+}
+
 bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret)

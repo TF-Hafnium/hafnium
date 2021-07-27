@@ -87,3 +87,9 @@ struct notifications *plat_ffa_vm_get_notifications_senders_world(
  * Helper to check if FF-A ID is a VM ID.
  */
 bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id);
+
+/**
+ * Forward normal world calls of FFA_RUN ABI to other world.
+ */
+bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+			  struct ffa_value *ret);

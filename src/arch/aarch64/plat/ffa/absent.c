@@ -132,3 +132,13 @@ bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
 	(void)vm_id;
 	return false;
 }
+
+bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+			  struct ffa_value *ret)
+{
+	(void)vm_id;
+	(void)vcpu_idx;
+	(void)ret;
+
+	return false;
+}

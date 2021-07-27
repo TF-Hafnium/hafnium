@@ -90,6 +90,21 @@ void plat_ffa_init(bool tee_enabled)
 	dlog_verbose("TEE finished setting up buffers.\n");
 }
 
+bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+			  struct ffa_value *ret)
+{
+	/*
+	 * VM's requests should be forwarded to the SPMC, if target is an SP.
+	 */
+	if (!vm_id_is_current_world(vm_id)) {
+		*ret = arch_other_world_call((struct ffa_value){
+			.func = FFA_RUN_32, ffa_vm_vcpu(vm_id, vcpu_idx)});
+		return true;
+	}
+
+	return false;
+}
+
 /**
  * Check validity of a FF-A direct message request.
  */

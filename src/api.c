@@ -760,6 +760,10 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 		goto out;
 	}
 
+	if (plat_ffa_run_forward(vm_id, vcpu_idx, &ret)) {
+		return ret;
+	}
+
 	/* The requested VM must exist. */
 	vm = vm_find(vm_id);
 	if (vm == NULL) {
