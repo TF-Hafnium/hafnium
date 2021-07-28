@@ -1109,8 +1109,7 @@ TEST(memory_sharing, donate_invalid_source)
 			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		0);
-	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
-			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 
 	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, SERVICE_VM1, SERVICE_VM1,
@@ -1120,8 +1119,7 @@ TEST(memory_sharing, donate_invalid_source)
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
-	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
-			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 
 	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, SERVICE_VM2, SERVICE_VM1,
@@ -1131,8 +1129,7 @@ TEST(memory_sharing, donate_invalid_source)
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
-	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
-			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 
 	/* Successfully donate to VM1. */
 	send_memory_and_retrieve_request(
@@ -1235,8 +1232,7 @@ TEST(memory_sharing, lend_invalid_source)
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
-	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
-			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
 
 	/* Lend memory to VM1. */
 	handle = send_memory_and_retrieve_request(

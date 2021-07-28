@@ -2150,7 +2150,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	/* The sender must match the caller. */
 	if (memory_region->sender != from->id) {
 		dlog_verbose("Memory region sender doesn't match caller.\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
 

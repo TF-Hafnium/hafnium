@@ -354,8 +354,7 @@ TEST_SERVICE(ffa_donate_invalid_source)
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
-	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
-			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 	ffa_yield();
 }
 
@@ -571,8 +570,7 @@ TEST_SERVICE(ffa_lend_invalid_source)
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
-	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
-			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
 
 	/* Ensure we cannot share from the primary to another secondary. */
 	EXPECT_EQ(ffa_memory_region_init(
@@ -583,8 +581,7 @@ TEST_SERVICE(ffa_lend_invalid_source)
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
-	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
-			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size), FFA_DENIED);
 
 	ffa_yield();
 }
@@ -759,8 +756,7 @@ TEST_SERVICE(ffa_memory_lend_twice)
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
-		EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
-				 FFA_INVALID_PARAMETERS);
+		EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
 		EXPECT_EQ(ffa_memory_region_init(
 				  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
 				  SERVICE_VM2, &constituent_copy, 1, 0, 0,
@@ -769,8 +765,7 @@ TEST_SERVICE(ffa_memory_lend_twice)
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
-		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
-				 FFA_INVALID_PARAMETERS);
+		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size), FFA_DENIED);
 	}
 
 	/* Return control to primary. */
