@@ -11,7 +11,7 @@
 / {
 	hypervisor {
 		compatible = "hafnium,hafnium";
-		ffa_tee;
+		ffa_tee_enabled;
 		vm1 {
 			debug_name = "trusty_test";
 			kernel_filename = "trusty_test";

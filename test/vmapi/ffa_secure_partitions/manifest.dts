@@ -9,7 +9,7 @@
 / {
 	hypervisor {
 		compatible = "hafnium,hafnium";
-		ffa_tee;
+		ffa_tee_enabled;
 		vm1 {
 			is_ffa_partition;
 			debug_name = "primary_ffa_test";

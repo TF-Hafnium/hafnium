@@ -13,7 +13,7 @@ The format of the manifest is a simple DeviceTree overlay:
 	hypervisor {
 		compatible = "hafnium,hafnium";
 
-		ffa_tee;
+		ffa_tee_enabled;
 
 		vm1 {
 			debug_name = "name";
@@ -50,7 +50,7 @@ TEE is enabled.
 	hypervisor {
 		compatible = "hafnium,hafnium";
 
-		ffa_tee;
+		ffa_tee_enabled;
 
 		vm1 {
 			debug_name = "primary VM";

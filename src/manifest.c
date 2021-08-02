@@ -814,7 +814,8 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	TRY(read_bool(&hyp_node, "ffa_tee", &manifest->ffa_tee_enabled));
+	TRY(read_bool(&hyp_node, "ffa_tee_enabled",
+		      &manifest->ffa_tee_enabled));
 
 	/* Iterate over reserved VM IDs and check no such nodes exist. */
 	for (i = HF_VM_ID_BASE; i < HF_VM_ID_OFFSET; i++) {
