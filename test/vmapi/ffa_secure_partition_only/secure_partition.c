@@ -6,9 +6,20 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/mm.h"
+
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
+#include "test/vmapi/ffa.h"
+
+static alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
+static alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];
+static_assert(sizeof(send_page) == PAGE_SIZE, "Send page is not a page.");
+static_assert(sizeof(recv_page) == PAGE_SIZE, "Recv page is not a page.");
+
+static hf_ipaddr_t send_page_addr = (hf_ipaddr_t)send_page;
+static hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 
 /**
  * Confirms that SP has expected ID.
@@ -16,4 +27,112 @@
 TEST(hf_vm_get_id, secure_partition_id)
 {
 	EXPECT_EQ(hf_vm_get_id(), HF_VM_ID_BASE + 1);
+}
+
+TEAR_DOWN(ffa_rxtx_map)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
+/**
+ * The configured send/receive addresses can't be device memory.
+ */
+TEST(ffa_rxtx_map, fails_with_device_memory)
+{
+	EXPECT_FFA_ERROR(ffa_rxtx_map(PAGE_SIZE, PAGE_SIZE * 2),
+			 FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * The configured send/receive addresses can't be unaligned.
+ */
+TEST(ffa_rxtx_map, fails_with_unaligned_pointer)
+{
+	uint8_t maybe_aligned[2];
+	hf_ipaddr_t unaligned_addr = (hf_ipaddr_t)&maybe_aligned[1];
+	hf_ipaddr_t aligned_addr = (hf_ipaddr_t)send_page;
+
+	/* Check that the address is unaligned. */
+	ASSERT_EQ(unaligned_addr & 1, 1);
+
+	EXPECT_FFA_ERROR(ffa_rxtx_map(aligned_addr, unaligned_addr),
+			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(unaligned_addr, aligned_addr),
+			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(unaligned_addr, unaligned_addr),
+			 FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * The configured send/receive addresses can't be the same page.
+ */
+TEST(ffa_rxtx_map, fails_with_same_page)
+{
+	EXPECT_FFA_ERROR(ffa_rxtx_map(send_page_addr, send_page_addr),
+			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(recv_page_addr, recv_page_addr),
+			 FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * The configuration of the send/receive addresses can only happen once.
+ */
+TEST(ffa_rxtx_map, fails_if_already_succeeded)
+{
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ffa_rxtx_map(send_page_addr, recv_page_addr),
+			 FFA_DENIED);
+}
+
+/**
+ * The configuration of the send/receive address is successful with valid
+ * arguments.
+ */
+TEST(ffa_rxtx_map, succeeds)
+{
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+}
+
+/**
+ * The buffer pair can be successfully unmapped from a VM that has
+ * just created the mapping.
+ */
+TEST(ffa_rxtx_unmap, succeeds)
+{
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+}
+
+/**
+ * Unmap will fail if no mapping exists for the VM.
+ */
+TEST(ffa_rxtx_unmap, fails_if_no_mapping)
+{
+	EXPECT_FFA_ERROR(ffa_rxtx_unmap(), FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * A buffer pair cannot be unmapped multiple times.
+ */
+TEST(ffa_rxtx_unmap, fails_if_already_unmapped)
+{
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ffa_rxtx_unmap(), FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Test we can remap a region after it has been unmapped.
+ */
+TEST(ffa_rxtx_unmap, succeeds_in_remapping_region)
+{
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
 }
