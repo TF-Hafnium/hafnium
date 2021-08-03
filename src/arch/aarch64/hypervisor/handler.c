@@ -535,6 +535,25 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		if (sp_boot_next(current, next, args)) {
 			return true;
 		}
+
+		/* Refer FF-A v1.1 Beta0 section 7.4 bullet 2. */
+		if (current->processing_secure_interrupt) {
+			CHECK(current->state = VCPU_STATE_WAITING);
+
+			/* Secure interrupt pre-empted normal world. */
+			if (current->preempted_vcpu->vm->id ==
+			    HF_OTHER_WORLD_ID) {
+				*args = plat_ffa_normal_world_resume(current,
+								     next);
+			} else {
+				/*
+				 * Secure interrupt pre-empted an SP. Resume it.
+				 */
+				*args = plat_ffa_preempted_vcpu_resume(current,
+								       next);
+			}
+			return true;
+		}
 #endif
 		*args = api_ffa_msg_recv(true, current, next);
 		return true;

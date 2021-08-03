@@ -2057,6 +2057,14 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 			return ffa_error(FFA_DENIED);
 		}
 
+		/*
+		 * Per FF-A v1.1 Beta section 8.4.1.2 bullet 6, SPMC can signal
+		 * a secure interrupt to a SP that is performing managed exit.
+		 * We have taken a implementation defined choice to not allow
+		 * Managed exit while a SP is processing a secure interrupt.
+		 */
+		CHECK(!current->processing_secure_interrupt);
+
 		plat_interrupts_set_priority_mask(0xff);
 		current->processing_managed_exit = false;
 	} else {
@@ -2073,9 +2081,33 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 			return ffa_error(FFA_DENIED);
 		}
 
+		/* Refer to FF-A v1.1 Beta0 section 7.3 bulet 3. */
 		if (current->direct_request_origin_vm_id != receiver_vm_id) {
 			vcpu_unlock(&current_locked);
 			return ffa_error(FFA_DENIED);
+		}
+
+		/*
+		 * Per FF-A v1.1 Beta0 section 7.4, if a secure interrupt is
+		 * handled by an SP in RUNNING state the existing runtime model
+		 * is preserved. Hence, per section 7.3 bullet 3, SP can use
+		 * FFA_MSG_SEND_DIRECT_RESP to return a response after
+		 * interrupt completion.
+		 */
+		if (current->processing_secure_interrupt) {
+			/* There is no preempted vCPU to resume. */
+			CHECK(current->preempted_vcpu == NULL);
+
+			/* Unmask interrupts. */
+			plat_interrupts_set_priority_mask(0xff);
+
+			/*
+			 * Clear fields corresponding to secure interrupt
+			 * handling.
+			 */
+			current->processing_secure_interrupt = false;
+			current->secure_interrupt_deactivated = false;
+			current->current_sec_interrupt_id = 0;
 		}
 	}
 

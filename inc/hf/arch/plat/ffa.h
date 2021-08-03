@@ -152,3 +152,7 @@ int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 void plat_ffa_secure_interrupt(struct vcpu *current, struct vcpu **next);
 struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
 						 struct vcpu **next);
+struct ffa_value plat_ffa_normal_world_resume(struct vcpu *current,
+					      struct vcpu **next);
+struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
+						struct vcpu **next);
