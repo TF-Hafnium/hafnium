@@ -641,6 +641,9 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_NOTIFICATION_INFO_GET_64:
 		*args = api_ffa_notification_info_get(current);
 		return true;
+	case FFA_INTERRUPT_32:
+		*args = plat_ffa_delegate_ffa_interrupt(current, next);
+		return true;
 	}
 
 	return false;

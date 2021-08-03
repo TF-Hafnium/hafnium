@@ -863,3 +863,50 @@ void plat_ffa_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	target_vcpu_locked.vcpu->current_sec_interrupt_id = id;
 	vcpu_unlock(&target_vcpu_locked);
 }
+
+/**
+ * Secure interrupts in the normal world are trapped to EL3. SPMD then routes
+ * the interrupt to SPMC through FFA_INTERRUPT_32 ABI synchronously using eret
+ * conduit.
+ */
+struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
+						 struct vcpu **next)
+{
+	struct ffa_value ffa_ret = ffa_error(FFA_NOT_SUPPORTED);
+	uint32_t id;
+	struct vcpu_locked target_vcpu_locked;
+
+	/*
+	 * A malicious SP could invoke a HVC call with FFA_INTERRUPT_32 as
+	 * the function argument. Return error to avoid DoS.
+	 */
+	if (current->vm->id != HF_OTHER_WORLD_ID) {
+		return ffa_error(FFA_DENIED);
+	}
+
+	target_vcpu_locked = plat_ffa_secure_interrupt_prepare(current, &id);
+	plat_ffa_signal_secure_interrupt(target_vcpu_locked, id, next);
+
+	/*
+	 * current refers to other world. target must be a vCPU in the secure
+	 * world.
+	 */
+	CHECK(*next != current);
+
+	target_vcpu_locked.vcpu->processing_secure_interrupt = true;
+	target_vcpu_locked.vcpu->current_sec_interrupt_id = id;
+
+	/*
+	 * next==NULL represents a scenario where SPMC cannot resume target SP.
+	 * Resume normal world using FFA_NORMAL_WORLD_RESUME.
+	 */
+	if (*next == NULL) {
+		ffa_ret = (struct ffa_value){.func = FFA_NORMAL_WORLD_RESUME};
+		target_vcpu_locked.vcpu->preempted_vcpu = NULL;
+	} else {
+		target_vcpu_locked.vcpu->preempted_vcpu = current;
+	}
+	vcpu_unlock(&target_vcpu_locked);
+
+	return ffa_ret;
+}

@@ -425,3 +425,18 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 
 	return true;
 }
+
+struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
+						 struct vcpu **next)
+{
+	(void)current;
+	(void)next;
+
+	/*
+	 * SPMD uses FFA_INTERRUPT ABI to convey secure interrupt to SPMC.
+	 * Execution should not reach hypervisor with this ABI.
+	 */
+	CHECK(false);
+
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
