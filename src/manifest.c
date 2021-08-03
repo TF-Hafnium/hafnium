@@ -430,7 +430,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 {
 	struct uint32list_iter list;
 	uint8_t i = 0;
-	uint8_t j = 0;
+	uint32_t j = 0;
 
 	dlog_verbose("  Partition Device Regions\n");
 
@@ -495,6 +495,8 @@ static enum manifest_return_code parse_ffa_device_region_node(
 				     dev_regions[i].interrupts[j].attributes);
 			j++;
 		}
+
+		dev_regions[i].interrupt_count = j;
 		if (j == 0) {
 			dlog_verbose("        Empty\n");
 		}
@@ -659,6 +661,7 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	uint16_t ffa_version_minor;
 	enum manifest_return_code ret_code = MANIFEST_SUCCESS;
 	const char *error_string = "specified in manifest is unsupported";
+	uint32_t k = 0;
 
 	/* ensure that the SPM version is compatible */
 	ffa_version_major = (vm->partition.ffa_version & 0xffff0000) >>
@@ -708,6 +711,31 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 			error_string, vm->partition.run_time_el,
 			vm->partition.execution_ctx_count);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	for (uint8_t i = 0; i < vm->partition.dev_region_count; i++) {
+		struct device_region dev_region;
+
+		dev_region = vm->partition.dev_regions[i];
+
+		if (dev_region.interrupt_count > SP_MAX_INTERRUPTS_PER_DEVICE) {
+			dlog_error(
+				"Interrupt count for device region exceeds "
+				"limit.\n");
+			ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+			continue;
+		}
+
+		for (uint8_t j = 0; j < dev_region.interrupt_count; j++) {
+			k++;
+			if (k > VM_MANIFEST_MAX_INTERRUPTS) {
+				dlog_error(
+					"Interrupt count for VM exceeds "
+					"limit.\n");
+				ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+				continue;
+			}
+		}
 	}
 
 	return ret_code;

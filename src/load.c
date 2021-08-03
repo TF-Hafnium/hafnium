@@ -23,6 +23,7 @@
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
+#include "hf/plat/interrupts.h"
 #include "hf/plat/iommu.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
@@ -125,6 +126,25 @@ static bool link_rxtx_to_mailbox(struct mm_stage1_locked stage1_locked,
 	return true;
 }
 
+static void infer_interrupt(struct interrupt interrupt,
+			    struct interrupt_descriptor *int_desc)
+{
+	uint32_t attr = interrupt.attributes;
+
+	interrupt_desc_set_id(int_desc, interrupt.id);
+	interrupt_desc_set_priority(int_desc,
+				    (attr >> INT_DESC_PRIORITY_SHIFT) & 0xff);
+
+	/* Refer to the comments in interrupt_descriptor struct definition. */
+	interrupt_desc_set_type_config_sec_state(
+		int_desc,
+		(((attr >> INT_DESC_TYPE_SHIFT) & 0x3) << 2) |
+			(((attr >> INT_DESC_CONFIG_SHIFT) & 0x1) << 1) |
+			((attr >> INT_DESC_SEC_STATE_SHIFT) & 0x1));
+
+	interrupt_desc_set_valid(int_desc, true);
+}
+
 /**
  * Performs VM loading activities that are common between the primary and
  * secondaries.
@@ -134,8 +154,32 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 			const struct manifest_vm *manifest_vm,
 			struct mpool *ppool)
 {
+	struct device_region dev_region;
+	struct interrupt interrupt;
+	uint32_t k = 0;
+
 	vm_locked.vm->smc_whitelist = manifest_vm->smc_whitelist;
 	vm_locked.vm->uuid = manifest_vm->partition.uuid;
+
+	/* Populate the interrupt descriptor for current VM. */
+	for (uint8_t i = 0; i < SP_MAX_DEVICE_REGIONS; i++) {
+		dev_region = manifest_vm->partition.dev_regions[i];
+
+		CHECK(dev_region.interrupt_count <=
+		      SP_MAX_INTERRUPTS_PER_DEVICE);
+
+		for (uint8_t j = 0; j < dev_region.interrupt_count; j++) {
+			struct interrupt_descriptor int_desc;
+
+			interrupt = dev_region.interrupts[j];
+			infer_interrupt(interrupt, &int_desc);
+			vm_locked.vm->interrupt_desc[k] = int_desc;
+
+			k++;
+			CHECK(k <= VM_MANIFEST_MAX_INTERRUPTS);
+		}
+	}
+	dlog_verbose("VM has %d physical interrupts defined in manifest.\n", k);
 
 	if (manifest_vm->is_ffa_partition) {
 		struct ffa_value bitmap_create_res;

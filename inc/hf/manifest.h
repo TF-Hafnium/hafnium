@@ -79,6 +79,8 @@ struct device_region {
 	uint32_t attributes;
 	/** List of physical interrupt ID's and their attributes - optional */
 	struct interrupt interrupts[SP_MAX_INTERRUPTS_PER_DEVICE];
+	/** Count of physical interrupts - optional */
+	uint8_t interrupt_count;
 	/** SMMU ID - optional */
 	uint32_t smmu_id;
 	/** Count of Stream IDs assigned to device - optional */
