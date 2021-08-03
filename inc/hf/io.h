@@ -207,6 +207,21 @@ static inline void io_write64(io64_t io, uint64_t v)
 	*io.ptr = v;
 }
 
+static inline void io_clrbits32(io32_t io, uint32_t clear)
+{
+	io_write32(io, io_read32(io) & ~clear);
+}
+
+static inline void io_setbits32(io32_t io, uint32_t set)
+{
+	io_write32(io, io_read32(io) | set);
+}
+
+static inline void io_clrsetbits32(io32_t io, uint32_t clear, uint32_t set)
+{
+	io_write32(io, (io_read32(io) & ~clear) | set);
+}
+
 static inline void io_write8_array(io8_array_t io, size_t n, uint8_t v)
 {
 	CHECK(n < io.count);
