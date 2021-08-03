@@ -10,6 +10,7 @@
 
 #include "hf/cpu.h"
 #include "hf/ffa.h"
+#include "hf/plat/interrupts.h"
 
 void arch_irq_disable(void)
 {
@@ -19,11 +20,6 @@ void arch_irq_disable(void)
 void arch_irq_enable(void)
 {
 	/* TODO */
-}
-
-void plat_interrupts_set_priority_mask(uint8_t min_priority)
-{
-	(void)min_priority;
 }
 
 void arch_regs_reset(struct vcpu *vcpu)

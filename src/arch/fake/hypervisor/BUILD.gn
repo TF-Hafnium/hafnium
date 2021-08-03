@@ -8,6 +8,7 @@ source_set("hypervisor") {
   sources = [
     "cpu.c",
     "ffa.c",
+    "interrupts.c",
   ]
   deps = [
     "//src/arch/fake:arch",
