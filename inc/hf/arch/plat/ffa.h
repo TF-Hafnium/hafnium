@@ -148,3 +148,5 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
  */
 int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 				      struct vcpu *current);
+
+void plat_ffa_secure_interrupt(struct vcpu *current, struct vcpu **next);

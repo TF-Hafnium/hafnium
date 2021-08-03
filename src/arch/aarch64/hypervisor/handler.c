@@ -971,6 +971,19 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 
 struct vcpu *irq_lower(void)
 {
+#if SECURE_WORLD == 1
+	struct vcpu *next = NULL;
+
+	plat_ffa_secure_interrupt(current(), &next);
+
+	/*
+	 * Since we are in interrupt context, set the bit for the
+	 * next vCPU directly in the register.
+	 */
+	vcpu_update_virtual_interrupts(next);
+
+	return next;
+#else
 	/*
 	 * Switch back to primary VM, interrupts will be handled there.
 	 *
@@ -981,6 +994,7 @@ struct vcpu *irq_lower(void)
 	 * TODO: Only switch when the interrupt isn't for the current VM.
 	 */
 	return api_preempt(current());
+#endif
 }
 
 struct vcpu *fiq_lower(void)
@@ -1016,17 +1030,18 @@ struct vcpu *fiq_lower(void)
 		/* Resume current vCPU. */
 		return NULL;
 	}
-
 	/*
 	 * SP does not support managed exit. It is pre-empted and execution
-	 * handed back to the normal world through the FFA_INTERRUPT ABI.
-	 * The SP can be resumed later by ffa_run. The call to irq_lower
-	 * and api_preempt is equivalent to calling api_switch_to_other_world
-	 * for current vCPU passing FFA_INTERRUPT_32.
+	 * handed back to the normal world through the FFA_INTERRUPT ABI. The
+	 * api_preempt() call is equivalent to calling api_switch_to_other_world
+	 * for current vCPU passing FFA_INTERRUPT. The SP can be resumed later
+	 * by FFA_RUN.
 	 */
-#endif
+	return api_preempt(current_vcpu);
 
+#else
 	return irq_lower();
+#endif
 }
 
 noreturn struct vcpu *serr_lower(void)
