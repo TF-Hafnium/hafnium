@@ -16,6 +16,7 @@
 #include "vmapi/hf/ffa.h"
 
 void api_init(struct mpool *ppool);
+struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current);
 void api_regs_state_saved(struct vcpu *vcpu);
 int64_t api_mailbox_writable_get(const struct vcpu *current);
 int64_t api_mailbox_waiter_get(ffa_vm_id_t vm_id, const struct vcpu *current);
@@ -61,7 +62,7 @@ struct ffa_value api_ffa_id_get(const struct vcpu *current);
 struct ffa_value api_ffa_spm_id_get(void);
 struct ffa_value api_ffa_features(uint32_t function_id);
 struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
-			     const struct vcpu *current, struct vcpu **next);
+			     struct vcpu *current, struct vcpu **next);
 struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 				  uint32_t fragment_length, ipaddr_t address,
 				  uint32_t page_count, struct vcpu *current);
@@ -93,6 +94,9 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 					      struct vcpu **next);
 struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 					       struct vcpu *current);
+struct vcpu *api_switch_to_primary(struct vcpu *current,
+				   struct ffa_value primary_ret,
+				   enum vcpu_state secondary_state);
 struct vcpu *api_switch_to_other_world(struct vcpu *current,
 				       struct ffa_value other_world_ret,
 				       enum vcpu_state vcpu_state);

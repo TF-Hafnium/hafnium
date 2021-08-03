@@ -9,6 +9,7 @@
 #include "hf/arch/ffa.h"
 #include "hf/arch/sve.h"
 
+#include "hf/api.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
@@ -554,4 +555,50 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
 {
 	/* FFA_MEM_PERM_SET/GET is only valid before SPs are initialized */
 	return has_vhe_support() && (current->vm->initialized == false);
+}
+
+/**
+ * Check if current VM can resume target VM using FFA_RUN ABI.
+ */
+bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
+			 struct ffa_value *run_ret, struct vcpu **next)
+{
+	(void)next;
+	/*
+	 * Under the Partition runtime model specified in FF-A v1.1-Beta0 spec,
+	 * SP can invoke FFA_RUN to resume target SP.
+	 */
+	struct vcpu *target_vcpu;
+	struct vcpu_locked target_locked;
+	bool ret = true;
+	struct vm *vm;
+
+	vm = vm_find(target_vm_id);
+	if (vm == NULL) {
+		return false;
+	}
+
+	target_vcpu = api_ffa_get_vm_vcpu(vm_find(target_vm_id), current);
+
+	/* Lock target vCPU before accessing its state. */
+	target_locked = vcpu_lock(target_vcpu);
+
+	/* Only the primary VM can turn ON a vCPU that is currently OFF. */
+	if (current->vm->id != HF_PRIMARY_VM_ID &&
+	    target_vcpu->state == VCPU_STATE_OFF) {
+		run_ret->arg2 = FFA_DENIED;
+		ret = false;
+		goto out;
+	}
+
+	/* A SP cannot invoke FFA_RUN to resume a normal world VM. */
+	if (!vm_id_is_current_world(target_vm_id)) {
+		run_ret->arg2 = FFA_DENIED;
+		ret = false;
+		goto out;
+	}
+out:
+	vcpu_unlock(&target_locked);
+
+	return ret;
 }

@@ -403,3 +403,25 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
 	(void)current;
 	return has_vhe_support();
 }
+
+/**
+ * Check if current VM can resume target VM/SP using FFA_RUN ABI.
+ */
+bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
+			 struct ffa_value *run_ret, struct vcpu **next)
+{
+	(void)next;
+
+	/* Only the primary VM can switch vCPUs. */
+	if (current->vm->id != HF_PRIMARY_VM_ID) {
+		run_ret->arg2 = FFA_DENIED;
+		return false;
+	}
+
+	/* Only secondary VM vCPUs can be run. */
+	if (target_vm_id == HF_PRIMARY_VM_ID) {
+		return false;
+	}
+
+	return true;
+}

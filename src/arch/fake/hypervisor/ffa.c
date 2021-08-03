@@ -228,3 +228,17 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
 	(void)current;
 	return false;
 }
+
+/**
+ * Check if current VM can resume target VM/SP using FFA_RUN ABI.
+ */
+bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
+			 struct ffa_value *run_ret, struct vcpu **next)
+{
+	(void)current;
+	(void)target_vm_id;
+	(void)run_ret;
+	(void)next;
+
+	return true;
+}

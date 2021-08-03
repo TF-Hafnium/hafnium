@@ -226,3 +226,11 @@ TEST(ffa_rxtx_unmap, succeeds_in_remapping_region)
 	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
 		  FFA_SUCCESS_32);
 }
+
+/**
+ * A SP cannot resume a normal world VM with FFA_RUN.
+ */
+TEST(ffa_run, fails_to_resume_hypervisor)
+{
+	EXPECT_FFA_ERROR(ffa_run(HF_HYPERVISOR_VM_ID, 0), FFA_DENIED);
+}

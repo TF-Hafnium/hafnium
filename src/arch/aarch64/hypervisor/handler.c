@@ -328,12 +328,14 @@ static bool sp_boot_next(struct vcpu *current, struct vcpu **next,
 	current_vm_locked = vm_lock(current->vm);
 	if (current_vm_locked.vm->initialized == false) {
 		current_vm_locked.vm->initialized = true;
+		current->is_bootstrapped = true;
 		dlog_verbose("Initialized VM: %#x, boot_order: %u\n",
 			     current_vm_locked.vm->id,
 			     current_vm_locked.vm->boot_order);
 
 		if (current_vm_locked.vm->next_boot != NULL) {
-			current->state = VCPU_STATE_BLOCKED_MAILBOX;
+			/* Refer FF-A v1.1 Beta0 section 7.5 Rule 2. */
+			current->state = VCPU_STATE_WAITING;
 			vm_next = current_vm_locked.vm->next_boot;
 			CHECK(vm_next->initialized == false);
 			*next = vm_get_vcpu(vm_next, vcpu_index(current));

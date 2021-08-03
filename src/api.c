@@ -71,10 +71,12 @@ void api_init(struct mpool *ppool)
  * If VM is UP then return first vCPU.
  * If VM is MP then return vCPU whose index matches current CPU index.
  */
-static struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current)
+struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current)
 {
 	ffa_vcpu_index_t current_cpu_index = cpu_index(current->cpu);
 	struct vcpu *vcpu = NULL;
+
+	CHECK((vm != NULL) && (current != NULL));
 
 	if (vm->vcpu_count == 1) {
 		vcpu = vm_get_vcpu(vm, 0);
@@ -123,9 +125,9 @@ static struct vcpu *api_switch_to_vm(struct vcpu *current,
  * This triggers the scheduling logic to run. Run in the context of secondary VM
  * to cause FFA_RUN to return and the primary VM to regain control of the CPU.
  */
-static struct vcpu *api_switch_to_primary(struct vcpu *current,
-					  struct ffa_value primary_ret,
-					  enum vcpu_state secondary_state)
+struct vcpu *api_switch_to_primary(struct vcpu *current,
+				   struct ffa_value primary_ret,
+				   enum vcpu_state secondary_state)
 {
 	/*
 	 * If the secondary is blocked but has a timer running, sleep until the
@@ -242,7 +244,7 @@ struct vcpu *api_preempt(struct vcpu *current)
 		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
-	return api_switch_to_primary(current, ret, VCPU_STATE_READY);
+	return api_switch_to_primary(current, ret, VCPU_STATE_PREEMPTED);
 }
 
 /**
@@ -280,9 +282,9 @@ struct vcpu *api_vcpu_off(struct vcpu *current)
 }
 
 /**
- * Returns to the primary VM to allow this CPU to be used for other tasks as the
- * vCPU does not have work to do at this moment. The current vCPU is marked as
- * ready to be scheduled again.
+ * The current vCPU is blocked on some resource and needs to relinquish
+ * control back to the execution context of the endpoint that originally
+ * allocated cycles to it.
  */
 struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
 {
@@ -309,7 +311,7 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
 		(struct ffa_value){.func = FFA_YIELD_32,
 				   .arg1 = ffa_vm_vcpu(current->vm->id,
 						       vcpu_index(current))},
-		VCPU_STATE_READY);
+		VCPU_STATE_BLOCKED);
 
 	return ret;
 }
@@ -325,7 +327,7 @@ struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
 		.arg1 = ffa_vm_vcpu(target_vcpu->vm->id,
 				    vcpu_index(target_vcpu)),
 	};
-	return api_switch_to_primary(current, ret, VCPU_STATE_READY);
+	return api_switch_to_primary(current, ret, VCPU_STATE_BLOCKED);
 }
 
 /**
@@ -600,6 +602,7 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 	struct vm_locked vm_locked;
 	bool need_vm_lock;
 	bool ret;
+	uint64_t timer_remaining_ns = FFA_SLEEP_INDEFINITE;
 
 	/*
 	 * Check that the registers are available so that the vCPU can be run.
@@ -622,7 +625,7 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 #endif
 
 	/* The VM needs to be locked to deliver mailbox messages. */
-	need_vm_lock = vcpu->state == VCPU_STATE_BLOCKED_MAILBOX;
+	need_vm_lock = vcpu->state == VCPU_STATE_WAITING;
 	if (need_vm_lock) {
 		vcpu_unlock(&vcpu_locked);
 		vm_locked = vm_lock(vcpu->vm);
@@ -670,7 +673,16 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 		ret = false;
 		goto out;
 
-	case VCPU_STATE_BLOCKED_MAILBOX:
+	case VCPU_STATE_WAITING:
+		/*
+		 * An initial FFA_RUN is necessary for secondary VM/SP to reach
+		 * the message wait loop.
+		 */
+		if (!vcpu->is_bootstrapped) {
+			vcpu->is_bootstrapped = true;
+			break;
+		}
+
 		/*
 		 * A pending message allows the vCPU to run so the message can
 		 * be delivered directly.
@@ -681,14 +693,30 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 			vcpu->vm->mailbox.state = MAILBOX_STATE_READ;
 			break;
 		}
-		/* Fall through. */
+
+		if (vcpu_interrupt_count_get(vcpu_locked) > 0) {
+			break;
+		}
+
+		if (arch_timer_enabled(&vcpu->regs)) {
+			timer_remaining_ns =
+				arch_timer_remaining_ns(&vcpu->regs);
+			if (timer_remaining_ns == 0) {
+				break;
+			}
+		} else {
+			dlog_verbose("Timer disabled\n");
+		}
+		run_ret->func = FFA_MSG_WAIT_32;
+		run_ret->arg1 = ffa_vm_vcpu(vcpu->vm->id, vcpu_index(vcpu));
+		run_ret->arg2 = timer_remaining_ns;
+		ret = false;
+		goto out;
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 		/* Allow virtual interrupts to be delivered. */
 		if (vcpu_interrupt_count_get(vcpu_locked) > 0) {
 			break;
 		}
-
-		uint64_t timer_remaining_ns = FFA_SLEEP_INDEFINITE;
 
 		if (arch_timer_enabled(&vcpu->regs)) {
 			timer_remaining_ns =
@@ -707,17 +735,25 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 		 * The vCPU is not ready to run, return the appropriate code to
 		 * the primary which called vcpu_run.
 		 */
-		run_ret->func = vcpu->state == VCPU_STATE_BLOCKED_MAILBOX
-					? FFA_MSG_WAIT_32
-					: HF_FFA_RUN_WAIT_FOR_INTERRUPT;
+		run_ret->func = HF_FFA_RUN_WAIT_FOR_INTERRUPT;
 		run_ret->arg1 = ffa_vm_vcpu(vcpu->vm->id, vcpu_index(vcpu));
 		run_ret->arg2 = timer_remaining_ns;
 
 		ret = false;
 		goto out;
 
-	case VCPU_STATE_READY:
+	case VCPU_STATE_BLOCKED:
+		/* A blocked vCPU is run unconditionally. Fall through. */
+	case VCPU_STATE_PREEMPTED:
 		break;
+	default:
+		/*
+		 * Execution not expected to reach here. Deny the request
+		 * gracefully.
+		 */
+		*run_ret = ffa_error(FFA_DENIED);
+		ret = false;
+		goto out;
 	}
 
 	/* It has been decided that the vCPU should be run. */
@@ -743,21 +779,14 @@ out:
 }
 
 struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
-			     const struct vcpu *current, struct vcpu **next)
+			     struct vcpu *current, struct vcpu **next)
 {
 	struct vm *vm;
 	struct vcpu *vcpu;
 	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
 
-	/* Only the primary VM can switch vCPUs. */
-	if (current->vm->id != HF_PRIMARY_VM_ID) {
-		ret.arg2 = FFA_DENIED;
-		goto out;
-	}
-
-	/* Only secondary VM vCPUs can be run. */
-	if (vm_id == HF_PRIMARY_VM_ID) {
-		goto out;
+	if (!plat_ffa_run_checks(current, vm_id, &ret, next)) {
+		return ret;
 	}
 
 	if (plat_ffa_run_forward(vm_id, vcpu_idx, &ret)) {
@@ -854,7 +883,7 @@ static struct ffa_value api_waiter_result(struct vm_locked locked_vm,
 	 */
 	*next = api_switch_to_primary(
 		current, (struct ffa_value){.func = FFA_RX_RELEASE_32},
-		VCPU_STATE_READY);
+		VCPU_STATE_WAITING);
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
@@ -1218,7 +1247,7 @@ static struct ffa_value deliver_msg(struct vm_locked to, ffa_vm_id_t from_id,
 
 		to.vm->mailbox.state = MAILBOX_STATE_READ;
 		*next = api_switch_to_primary(current, primary_ret,
-					      VCPU_STATE_READY);
+					      VCPU_STATE_BLOCKED);
 		return ret;
 	}
 
@@ -1244,7 +1273,7 @@ static struct ffa_value deliver_msg(struct vm_locked to, ffa_vm_id_t from_id,
 	/* Return to the primary VM directly or with a switch. */
 	if (from_id != HF_PRIMARY_VM_ID) {
 		*next = api_switch_to_primary(current, primary_ret,
-					      VCPU_STATE_READY);
+					      VCPU_STATE_BLOCKED);
 	}
 
 	return ret;
@@ -1428,7 +1457,7 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 		/* Return to other world if caller is a SP. */
 		*next = api_switch_to_other_world(
 			current, (struct ffa_value){.func = FFA_MSG_WAIT_32},
-			VCPU_STATE_BLOCKED_MAILBOX);
+			VCPU_STATE_WAITING);
 	} else {
 		/* Switch back to primary VM to block. */
 		struct ffa_value run_return = {
@@ -1437,7 +1466,7 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 		};
 
 		*next = api_switch_to_primary(current, run_return,
-					      VCPU_STATE_BLOCKED_MAILBOX);
+					      VCPU_STATE_WAITING);
 	}
 out:
 	sl_unlock(&vm->lock);
@@ -1948,14 +1977,15 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	case VCPU_STATE_OFF:
 	case VCPU_STATE_RUNNING:
 	case VCPU_STATE_ABORTED:
-	case VCPU_STATE_READY:
 	case VCPU_STATE_BLOCKED_INTERRUPT:
+	case VCPU_STATE_BLOCKED:
+	case VCPU_STATE_PREEMPTED:
 		ret = ffa_error(FFA_BUSY);
 		goto out;
-	case VCPU_STATE_BLOCKED_MAILBOX:
+	case VCPU_STATE_WAITING:
 		/*
-		 * Expect target vCPU to be blocked after having called
-		 * ffa_msg_wait or sent a direct message response.
+		 * We expect target vCPU to be in WAITING state after either
+		 * having called ffa_msg_wait or sent a direct message response.
 		 */
 		break;
 	}
@@ -1977,7 +2007,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 
 	arch_regs_set_retval(&receiver_vcpu->regs, api_ffa_dir_msg_value(args));
 
-	current->state = VCPU_STATE_BLOCKED_MAILBOX;
+	current->state = VCPU_STATE_BLOCKED;
 
 	/* Switch to receiver vCPU targeted to by direct msg request */
 	*next = receiver_vcpu;
@@ -2055,11 +2085,21 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 	vcpu_unlock(&current_locked);
 
 	if (!vm_id_is_current_world(receiver_vm_id)) {
-		*next = api_switch_to_other_world(current, to_ret,
-						  VCPU_STATE_BLOCKED_MAILBOX);
+		*next = api_switch_to_other_world(
+			current, to_ret,
+			/*
+			 * Current vcpu sent a direct response. It moves to
+			 * waiting state.
+			 */
+			VCPU_STATE_WAITING);
 	} else if (receiver_vm_id == HF_PRIMARY_VM_ID) {
-		*next = api_switch_to_primary(current, to_ret,
-					      VCPU_STATE_BLOCKED_MAILBOX);
+		*next = api_switch_to_primary(
+			current, to_ret,
+			/*
+			 * Current vcpu sent a direct response. It moves to
+			 * waiting state.
+			 */
+			VCPU_STATE_WAITING);
 	} else if (vm_id_is_current_world(receiver_vm_id)) {
 		/*
 		 * It is expected the receiver_vm_id to be from an SP, otherwise
@@ -2067,8 +2107,11 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		 * made function return error before getting to this point.
 		 */
 		*next = api_switch_to_vm(current, to_ret,
-					 VCPU_STATE_BLOCKED_MAILBOX,
-					 receiver_vm_id);
+					 /*
+					  * current vcpu sent a direct response.
+					  * It moves to waiting state.
+					  */
+					 VCPU_STATE_WAITING, receiver_vm_id);
 	} else {
 		panic("Invalid direct message response invocation");
 	}

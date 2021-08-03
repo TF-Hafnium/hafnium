@@ -136,3 +136,9 @@ bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 
 bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current);
 bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current);
+
+/**
+ * Check if current SP can resume target VM/SP using FFA_RUN ABI.
+ */
+bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
+			 struct ffa_value *run_ret, struct vcpu **next);

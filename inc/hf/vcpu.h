@@ -20,14 +20,20 @@ enum vcpu_state {
 	/** The vCPU is switched off. */
 	VCPU_STATE_OFF,
 
-	/** The vCPU is ready to be run. */
-	VCPU_STATE_READY,
-
 	/** The vCPU is currently running. */
 	VCPU_STATE_RUNNING,
 
-	/** The vCPU is waiting for a message. */
-	VCPU_STATE_BLOCKED_MAILBOX,
+	/** The vCPU is waiting to be allocated CPU cycles to do work. */
+	VCPU_STATE_WAITING,
+
+	/**
+	 * The vCPU is blocked and waiting for some work to complete on
+	 * its behalf.
+	 */
+	VCPU_STATE_BLOCKED,
+
+	/** The vCPU has been preempted by an interrupt. */
+	VCPU_STATE_PREEMPTED,
 
 	/** The vCPU is waiting for an interrupt. */
 	VCPU_STATE_BLOCKED_INTERRUPT,
@@ -70,6 +76,7 @@ struct vcpu {
 	 */
 	enum vcpu_state state;
 
+	bool is_bootstrapped;
 	struct cpu *cpu;
 	struct vm *vm;
 	struct arch_regs regs;
@@ -94,7 +101,7 @@ struct vcpu {
 	 */
 	ffa_vm_id_t direct_request_origin_vm_id;
 
-	/* Determine whether partition is currently handling managed exit. */
+	/** Determine whether partition is currently handling managed exit. */
 	bool processing_managed_exit;
 };
 

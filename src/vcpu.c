@@ -66,12 +66,12 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 
 /**
  * Initialise the registers for the given vCPU and set the state to
- * VCPU_STATE_READY. The caller must hold the vCPU lock while calling this.
+ * VCPU_STATE_WAITING. The caller must hold the vCPU lock while calling this.
  */
 void vcpu_on(struct vcpu_locked vcpu, ipaddr_t entry, uintreg_t arg)
 {
 	arch_regs_set_pc_arg(&vcpu.vcpu->regs, entry, arg);
-	vcpu.vcpu->state = VCPU_STATE_READY;
+	vcpu.vcpu->state = VCPU_STATE_WAITING;
 }
 
 ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu)
@@ -84,28 +84,14 @@ ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu)
 
 /**
  * Check whether the given vcpu_state is an off state, for the purpose of
- * turning vCPUs on and off. Note that aborted still counts as on in this
- * context.
+ * turning vCPUs on and off. Note that Aborted still counts as ON for the
+ * purposes of PSCI, because according to the PSCI specification (section
+ * 5.7.1) a core is only considered to be off if it has  been turned off
+ * with a CPU_OFF call or hasn't yet  been turned on with a CPU_ON call.
  */
 bool vcpu_is_off(struct vcpu_locked vcpu)
 {
-	switch (vcpu.vcpu->state) {
-	case VCPU_STATE_OFF:
-		return true;
-	case VCPU_STATE_READY:
-	case VCPU_STATE_RUNNING:
-	case VCPU_STATE_BLOCKED_MAILBOX:
-	case VCPU_STATE_BLOCKED_INTERRUPT:
-	case VCPU_STATE_ABORTED:
-		/*
-		 * Aborted still counts as ON for the purposes of PSCI,
-		 * because according to the PSCI specification (section
-		 * 5.7.1) a core is only considered to be off if it has
-		 * been turned off with a CPU_OFF call or hasn't yet
-		 * been turned on with a CPU_ON call.
-		 */
-		return false;
-	}
+	return (vcpu.vcpu->state == VCPU_STATE_OFF);
 }
 
 /**
