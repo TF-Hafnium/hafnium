@@ -27,6 +27,7 @@
 #include "hf/panic.h"
 #include "hf/plat/boot_flow.h"
 #include "hf/plat/console.h"
+#include "hf/plat/interrupts.h"
 #include "hf/plat/iommu.h"
 #include "hf/std.h"
 #include "hf/vm.h"
@@ -146,6 +147,11 @@ void one_time_init(void)
 	}
 
 	cpu_module_init(params.cpu_ids, params.cpu_count);
+
+	if (!plat_interrupts_controller_driver_init(&fdt, mm_stage1_locked,
+						    &ppool)) {
+		panic("Could not initialize Interrupt Controller driver.");
+	}
 
 	/* Load all VMs. */
 	update.reserved_ranges_count = 0;

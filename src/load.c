@@ -175,6 +175,11 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 			infer_interrupt(interrupt, &int_desc);
 			vm_locked.vm->interrupt_desc[k] = int_desc;
 
+			/*
+			 * Configure the physical interrupts allocated for this
+			 * VM in its partition manifest.
+			 */
+			plat_interrupts_configure_interrupt(int_desc);
 			k++;
 			CHECK(k <= VM_MANIFEST_MAX_INTERRUPTS);
 		}

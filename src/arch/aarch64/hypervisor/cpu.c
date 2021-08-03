@@ -16,6 +16,7 @@
 
 #include "hf/addr.h"
 #include "hf/ffa.h"
+#include "hf/plat/interrupts.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -198,4 +199,6 @@ void arch_cpu_init(struct cpu *c, ipaddr_t entry_point)
 
 	/* Initialize counter-timer virtual offset register to 0. */
 	write_msr(CNTVOFF_EL2, 0);
+
+	plat_interrupts_controller_hw_init(c);
 }

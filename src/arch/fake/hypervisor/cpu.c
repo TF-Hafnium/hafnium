@@ -50,4 +50,6 @@ void arch_cpu_init(struct cpu *c, ipaddr_t entry_point)
 {
 	(void)c;
 	(void)entry_point;
+
+	plat_interrupts_controller_hw_init(c);
 }
