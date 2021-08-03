@@ -13,6 +13,7 @@
 #include "hf/arch/types.h"
 
 #include "hf/cpu.h"
+#include "hf/interrupt_desc.h"
 #include "hf/list.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
@@ -21,6 +22,7 @@
 
 #define MAX_SMCS 32
 #define LOG_BUFFER_SIZE 256
+#define VM_MANIFEST_MAX_INTERRUPTS 32
 
 /**
  * The state of an RX buffer.
@@ -217,6 +219,9 @@ struct vm {
 	/** Arch-specific VM information. */
 	struct arch_vm arch;
 	bool el0_partition;
+
+	/** Interrupt descriptor */
+	struct interrupt_descriptor interrupt_desc[VM_MANIFEST_MAX_INTERRUPTS];
 };
 
 /** Encapsulates a VM whose lock is held. */
