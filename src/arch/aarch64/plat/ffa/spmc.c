@@ -13,6 +13,7 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
+#include "hf/plat/interrupts.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -601,4 +602,50 @@ out:
 	vcpu_unlock(&target_locked);
 
 	return ret;
+}
+
+/**
+ * Drops the current interrupt priority and deactivate the given interrupt ID
+ * for the calling vCPU.
+ *
+ * Returns 0 on success, or -1 otherwise.
+ */
+int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
+				      struct vcpu *current)
+{
+	if (vint_id >= HF_NUM_INTIDS) {
+		return -1;
+	}
+
+	/*
+	 * Current implementation maps virtual interrupt to physical interrupt.
+	 */
+	if (pint_id != vint_id) {
+		return -1;
+	}
+
+	/*
+	 * Deny the de-activation request if not currently processing a
+	 * secure interrupt. panic() is not appropriate as it could be
+	 * abused by a rogue SP to create Denial-of-service.
+	 */
+	if (!current->processing_secure_interrupt) {
+		dlog_error("Cannot deactivate secure interrupt: %d\n", pint_id);
+		return -1;
+	}
+
+	/*
+	 * A malicious SP could de-activate an interrupt that does not belong to
+	 * it. Return error to indicate failure.
+	 */
+	if (current->current_sec_interrupt_id != pint_id) {
+		return -1;
+	}
+
+	if (!current->secure_interrupt_deactivated) {
+		plat_interrupts_end_of_interrupt(pint_id);
+		current->secure_interrupt_deactivated = true;
+	}
+
+	return 0;
 }

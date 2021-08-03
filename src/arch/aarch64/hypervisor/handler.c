@@ -952,6 +952,13 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 		vcpu->regs.r[0] = api_debug_log(args.arg1, vcpu);
 		break;
 
+#if SECURE_WORLD == 1
+	case HF_INTERRUPT_DEACTIVATE:
+		vcpu->regs.r[0] = plat_ffa_interrupt_deactivate(
+			args.arg1, args.arg2, vcpu);
+		break;
+#endif
+
 	default:
 		vcpu->regs.r[0] = SMCCC_ERROR_UNKNOWN;
 	}

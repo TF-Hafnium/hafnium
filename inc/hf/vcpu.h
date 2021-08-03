@@ -103,6 +103,23 @@ struct vcpu {
 
 	/** Determine whether partition is currently handling managed exit. */
 	bool processing_managed_exit;
+
+	/**
+	 * Determine whether vCPU is currently handling secure interrupt.
+	 */
+	bool processing_secure_interrupt;
+	bool secure_interrupt_deactivated;
+
+	/**
+	 * INTID of the current secure interrupt being processed by this vCPU.
+	 */
+	uint32_t current_sec_interrupt_id;
+
+	/**
+	 * Track current vCPU which got pre-empted when secure interrupt
+	 * triggered.
+	 */
+	struct vcpu *preempted_vcpu;
 };
 
 /** Encapsulates a vCPU whose lock is held. */

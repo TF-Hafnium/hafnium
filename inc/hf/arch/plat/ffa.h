@@ -142,3 +142,9 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current);
  */
 bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 			 struct ffa_value *run_ret, struct vcpu **next);
+
+/**
+ * Deactivate interrupt.
+ */
+int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
+				      struct vcpu *current);
