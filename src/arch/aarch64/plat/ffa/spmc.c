@@ -65,6 +65,14 @@ void plat_ffa_log_init(void)
 	dlog_info("Initializing Hafnium (SPMC)\n");
 }
 
+/** Returns information on features specific to the SWd. */
+struct ffa_value plat_ffa_features(uint32_t function_id)
+{
+	(void)function_id;
+	/* There are no features only supported in the SWd */
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
 struct ffa_value plat_ffa_spmc_id_get(void)
 {
 	/*

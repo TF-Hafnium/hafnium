@@ -12,6 +12,8 @@
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
+/** Returns information on features that are specific to the platform. */
+struct ffa_value plat_ffa_features(uint32_t function_id);
 /** Returns the SPMC ID. */
 struct ffa_value plat_ffa_spmc_id_get(void);
 

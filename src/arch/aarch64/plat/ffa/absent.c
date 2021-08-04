@@ -11,6 +11,12 @@
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
+struct ffa_value plat_ffa_features(uint32_t function_id)
+{
+	(void)function_id;
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
 struct ffa_value plat_ffa_spmc_id_get(void)
 {
 	return (struct ffa_value){.func = FFA_ERROR_32,

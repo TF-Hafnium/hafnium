@@ -1798,11 +1798,8 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 	case FFA_RXTX_UNMAP_32:
 	case FFA_PARTITION_INFO_GET_32:
 	case FFA_ID_GET_32:
-	case FFA_MSG_POLL_32:
 	case FFA_MSG_WAIT_32:
-	case FFA_YIELD_32:
 	case FFA_RUN_32:
-	case FFA_MSG_SEND_32:
 	case FFA_MEM_DONATE_32:
 	case FFA_MEM_LEND_32:
 	case FFA_MEM_SHARE_32:
@@ -1820,7 +1817,7 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	default:
-		return ffa_error(FFA_NOT_SUPPORTED);
+		return arch_ffa_features(function_id);
 	}
 }
 

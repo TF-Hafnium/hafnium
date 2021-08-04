@@ -29,6 +29,96 @@ TEST(hf_vm_get_id, secure_partition_id)
 	EXPECT_EQ(hf_vm_get_id(), HF_VM_ID_BASE + 1);
 }
 
+/** Ensures that FFA_FEATURES is reporting the expected interfaces. */
+TEST(ffa, ffa_features)
+{
+	struct ffa_value ret;
+
+	ret = ffa_features(FFA_ERROR_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_SUCCESS_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_INTERRUPT_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_VERSION_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_FEATURES_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_RX_RELEASE_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_RXTX_MAP_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_RXTX_UNMAP_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_PARTITION_INFO_GET_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_ID_GET_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MSG_WAIT_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_RUN_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_DONATE_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_LEND_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_SHARE_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_RETRIEVE_REQ_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_RETRIEVE_RESP_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_RELINQUISH_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_RECLAIM_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
+/**
+ * Ensures that FFA_FEATURES returns not supported for a bogus FID or
+ * currently non-implemented interfaces.
+ */
+TEST(ffa, ffa_features_not_supported)
+{
+	struct ffa_value ret;
+
+	ret = ffa_features(0);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+
+	ret = ffa_features(FFA_MSG_POLL_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+
+	ret = ffa_features(FFA_YIELD_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+
+	ret = ffa_features(FFA_MSG_SEND_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+}
+
 TEAR_DOWN(ffa_rxtx_map)
 {
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
