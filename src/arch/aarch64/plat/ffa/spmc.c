@@ -50,10 +50,11 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 
 	/*
 	 * The normal world can send direct message requests
-	 * via the Hypervisor to any SP. SPs can also send direct messages
-	 * to each other.
+	 * via the Hypervisor to any SP. Currently SPs can only send
+	 * direct messages to each other and not to the NWd.
 	 */
 	return sender_vm_id != receiver_vm_id &&
+	       vm_id_is_current_world(receiver_vm_id) &&
 	       (sender_vm_id == current_vm_id ||
 		(current_vm_id == HF_HYPERVISOR_VM_ID &&
 		 !vm_id_is_current_world(sender_vm_id)));
