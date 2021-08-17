@@ -12,6 +12,8 @@
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
+#include "test/vmapi/ffa.h"
+#include "test/vmapi/partition_services.h"
 
 /*
  * Using the SECURE_WORLD macro below should be temporary. To comply
@@ -28,9 +30,9 @@
  * Communicates with partition via direct messaging to validate functioning of
  * Direct Message interfaces.
  */
-TEST(ffa_partition_to_partition_comm, dir_msg_req)
+TEST(ffa_partition_to_partition_comm, dir_msg_req_echo)
 {
-	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+	const uint32_t msg[] = {SP_ECHO_CMD, 0x22223333, 0x44445555, 0x66667777,
 				0x88889999};
 	struct ffa_value res;
 	ffa_vm_id_t own_id = hf_vm_get_id();
