@@ -1152,7 +1152,7 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 
 	/* Get send and receive buffers. */
 	if (vm->mailbox.send == NULL || vm->mailbox.recv == NULL) {
-		dlog_error(
+		dlog_verbose(
 			"No buffer pair registered on behalf of the caller.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}

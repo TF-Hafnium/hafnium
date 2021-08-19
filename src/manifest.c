@@ -488,7 +488,10 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		TRY(read_optional_uint32(dev_node, "smmu-id",
 					 MANIFEST_INVALID_ID,
 					 &dev_regions[i].smmu_id));
-		dlog_verbose("      smmu-id:  %u\n", dev_regions[i].smmu_id);
+		if (dev_regions[i].smmu_id != MANIFEST_INVALID_ID) {
+			dlog_verbose("      smmu-id:  %u\n",
+				     dev_regions[i].smmu_id);
+		}
 
 		TRY(read_optional_uint32list(dev_node, "stream-ids", &list));
 		dlog_verbose("      Stream IDs assigned:\n");

@@ -1391,7 +1391,8 @@ bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
 	for (i = 0; i < manifest_vm->partition.dev_region_count; i++) {
 		upstream_peripheral = manifest_vm->partition.dev_regions[i];
 
-		if (upstream_peripheral.smmu_id != arm_smmuv3.smmu_id) {
+		if (upstream_peripheral.smmu_id != MANIFEST_INVALID_ID &&
+		    upstream_peripheral.smmu_id != arm_smmuv3.smmu_id) {
 			dlog_warning(
 				"SMMUv3: Unexpected smmu-id:%u specified "
 				"in manifest\n",

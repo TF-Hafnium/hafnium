@@ -518,7 +518,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 					goto out;
 				}
 
-				dlog_info(
+				dlog_verbose(
 					"  Memory region %#x - %#x allocated\n",
 					region_begin, region_end);
 			} else {
