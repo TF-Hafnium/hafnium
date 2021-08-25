@@ -262,7 +262,6 @@ bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 struct ffa_value plat_ffa_notifications_bitmap_create(
 	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
 {
-	/* TODO: Forward call to the SPMC */
 	(void)vm_id;
 	(void)vcpu_count;
 
@@ -271,10 +270,23 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 
 struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 {
-	/* TODO: Forward call to the SPMC */
 	(void)vm_id;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+bool plat_ffa_notifications_bitmap_create_call(ffa_vm_id_t vm_id,
+					       ffa_vcpu_count_t vcpu_count,
+					       struct ffa_value *ret)
+{
+	CHECK(ret != NULL);
+	*ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_NOTIFICATION_BITMAP_CREATE_32,
+		.arg1 = vm_id,
+		.arg2 = vcpu_count,
+	});
+
+	return true;
 }
 
 struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)

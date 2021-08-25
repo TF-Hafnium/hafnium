@@ -85,6 +85,13 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count);
 
 /**
+ * Issues a FFA_NOTIFICATION_BITMAP_CREATE.
+ */
+bool plat_ffa_notifications_bitmap_create_call(ffa_vm_id_t vm_id,
+					       ffa_vcpu_count_t vcpu_count,
+					       struct ffa_value *ret);
+
+/**
  * Destroys the notifications bitmap for the given VM ID.
  */
 struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id);

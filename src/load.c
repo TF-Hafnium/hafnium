@@ -11,6 +11,7 @@
 #include <stdbool.h>
 
 #include "hf/arch/other_world.h"
+#include "hf/arch/plat/ffa.h"
 #include "hf/arch/vm.h"
 
 #include "hf/api.h"
@@ -137,6 +138,8 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	vm_locked.vm->uuid = manifest_vm->partition.uuid;
 
 	if (manifest_vm->is_ffa_partition) {
+		struct ffa_value bitmap_create_res;
+
 		/* Link rxtx buffers to mailbox */
 		if (manifest_vm->partition.rxtx.available) {
 			if (!link_rxtx_to_mailbox(stage1_locked, vm_locked,
@@ -162,6 +165,20 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 
 		/* TODO: Enable in accordance to VM's manifest. */
 		vm_locked.vm->notifications.enabled = true;
+
+		/* TODO: check if notifications is enabled for the given vm */
+		if (plat_ffa_notifications_bitmap_create_call(
+			    vm_locked.vm->id, vm_locked.vm->vcpu_count,
+			    &bitmap_create_res)) {
+			if (bitmap_create_res.func == FFA_ERROR_32) {
+				dlog_verbose(
+					"Failed to create notifications bitmap "
+					"to VM: %#x; error: %#x.\n",
+					vm_locked.vm->id,
+					ffa_error_code(bitmap_create_res));
+				return false;
+			}
+		}
 	}
 
 	/* Initialize architecture-specific features. */
