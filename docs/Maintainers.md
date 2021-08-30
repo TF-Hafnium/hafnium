@@ -10,6 +10,10 @@ design decisions.
 
 *   Olivier Deprez <olivier.deprez@arm.com>
 
+*   João Alves <joao.alves@arm.com>
+
+*   Raghupathy Krishnamurthy <raghupathyk@nvidia.com>
+
 *   Andrew Walbran <qwandor@google.com>
 
 *   Benjamin Copeland <ben.copeland@linaro.org>
