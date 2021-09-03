@@ -435,6 +435,12 @@ skip_vhe_save:
 	 */
 
 other_world_loop:
+	/* Restore FP status and control registers. */
+	add x18, x19, #VCPU_FPSR
+	ldp x0, x1, [x18]
+	msr fpsr, x0
+	msr fpcr, x1
+
 	/* Check if SVE is implemented. */
 	mrs x0, id_aa64pfr0_el1
 	ubfx x0, x0, ID_AA64PFR0_SVE_SHIFT, ID_AA64PFR0_SVE_LENGTH
@@ -443,9 +449,6 @@ other_world_loop:
 	/* Restore the other world SIMD context to the other world VM vCPU. */
 	add x18, x19, #VCPU_FREGS
 	simd_op_vectors ldp, x18
-	ldp x0, x1, [x18]
-	msr fpsr, x0
-	msr fpcr, x1
 	b sve_skip_context_restore
 
 	/* Restore the other world SVE context from internal buffer. */
@@ -467,11 +470,11 @@ sve_context_restore:
 	add x20, x18, #SVE_CTX_PREDICATES
 	sve_predicate_op ldr, x20
 
+sve_skip_context_restore:
 	/*
 	 * Prepare arguments from other world VM vCPU.
 	 * x19 holds the other world VM vCPU pointer.
 	 */
-sve_skip_context_restore:
 	ldp x0, x1, [x19, #VCPU_REGS + 8 * 0]
 	ldp x2, x3, [x19, #VCPU_REGS + 8 * 2]
 	ldp x4, x5, [x19, #VCPU_REGS + 8 * 4]
@@ -508,6 +511,12 @@ sve_skip_context_restore:
 	stp x4, x5, [x19, #VCPU_REGS + 8 * 4]
 	stp x6, x7, [x19, #VCPU_REGS + 8 * 6]
 
+	/* Save FP status and control registers. */
+	mrs x0, fpsr
+	mrs x1, fpcr
+	add x18, x19, #VCPU_FPSR
+	stp x0, x1, [x18]
+
 	/* Check if SVE is implemented. */
 	mrs x0, id_aa64pfr0_el1
 	ubfx x0, x0, ID_AA64PFR0_SVE_SHIFT, ID_AA64PFR0_SVE_LENGTH
@@ -516,9 +525,6 @@ sve_skip_context_restore:
 	/* Save the other world SIMD context to the other world VM vCPU. */
 	add x18, x19, #VCPU_FREGS
 	simd_op_vectors stp, x18
-	mrs x0, fpsr
-	mrs x1, fpcr
-	stp x0, x1, [x18]
 	b sve_skip_context_save
 
 	/* Save the other world SVE context to internal buffer. */
