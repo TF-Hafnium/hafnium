@@ -17,7 +17,7 @@ would allow them to escape this containment. It also provides:
 
 *   Means for VMs to communicate with each other through message passing and
     memory sharing, according to the Arm
-    [Arm Firmware Framework for Armv8-A (FF-A)](https://developer.arm.com/documentation/den0077/latest/).
+    [Arm Firmware Framework for Arm A-profile (FF-A)](https://developer.arm.com/documentation/den0077/latest/).
 *   Emulation of some basic hardware features such as timers.
 *   A simple paravirtualised interrupt controller for secondary VMs, as they
     don't have access to hardware interrupts.
