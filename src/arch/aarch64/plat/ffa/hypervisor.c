@@ -240,6 +240,27 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 	return sender_id != receiver_id && current_vm_id == receiver_id;
 }
 
+bool plat_ffa_notifications_update_bindings_forward(
+	ffa_vm_id_t receiver_id, ffa_vm_id_t sender_id, uint32_t flags,
+	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret)
+{
+	CHECK(ret != NULL);
+
+	if (vm_id_is_current_world(receiver_id) &&
+	    !vm_id_is_current_world(sender_id)) {
+		*ret = arch_other_world_call((struct ffa_value){
+			.func = is_bind ? FFA_NOTIFICATION_BIND_32
+					: FFA_NOTIFICATION_UNBIND_32,
+			.arg1 = (sender_id << 16) | (receiver_id),
+			.arg2 = is_bind ? flags : 0U,
+			.arg3 = (uint32_t)(bitmap),
+			.arg4 = (uint32_t)(bitmap >> 32),
+		});
+		return true;
+	}
+	return false;
+}
+
 bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 					ffa_vm_id_t sender_id,
 					ffa_vm_id_t receiver_id)

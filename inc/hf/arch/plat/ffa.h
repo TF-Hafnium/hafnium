@@ -34,6 +34,9 @@ bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
 bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 					  ffa_vm_id_t sender_id,
 					  ffa_vm_id_t receiver_id);
+bool plat_ffa_notifications_update_bindings_forward(
+	ffa_vm_id_t receiver_id, ffa_vm_id_t sender_id, uint32_t flags,
+	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret);
 
 bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 					ffa_vm_id_t sender_id,

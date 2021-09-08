@@ -2599,6 +2599,13 @@ struct ffa_value api_ffa_notification_update_bindings(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	if (plat_ffa_notifications_update_bindings_forward(
+		    receiver_vm_id, sender_vm_id, flags, notifications, is_bind,
+		    &ret)) {
+		dlog_verbose("Forwarding call to other world.\n");
+		return ret;
+	}
+
 	if (notifications == 0U) {
 		dlog_verbose("No notifications have been specified.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);

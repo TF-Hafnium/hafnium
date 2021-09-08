@@ -91,6 +91,21 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 	return false;
 }
 
+bool plat_ffa_notifications_update_bindings_forward(
+	ffa_vm_id_t receiver_id, ffa_vm_id_t sender_id, uint32_t flags,
+	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret)
+{
+	(void)ret;
+	(void)receiver_id;
+	(void)sender_id;
+	(void)flags;
+	(void)bitmap;
+	(void)is_bind;
+	(void)ret;
+
+	return false;
+}
+
 ffa_partition_properties_t plat_ffa_partition_properties(
 	ffa_vm_id_t current_id, const struct vm *target)
 {
