@@ -45,6 +45,11 @@ bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 					ffa_vm_id_t receiver_id);
 
+bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
+					ffa_vcpu_index_t vcpu_id,
+					ffa_notifications_bitmap_t *from_sp,
+					struct ffa_value *ret);
+
 bool plat_ffa_notifications_get_call(ffa_vm_id_t receiver_id, uint32_t vcpu_id,
 				     uint32_t flags, struct ffa_value *ret);
 

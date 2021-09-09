@@ -471,6 +471,19 @@ bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
 	return !vm_id_is_current_world(vm_id);
 }
 
+bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
+					ffa_vcpu_index_t vcpu_id,
+					ffa_notifications_bitmap_t *from_sp,
+					struct ffa_value *ret)
+{
+	(void)ret;
+
+	*from_sp = vm_notifications_get_pending_and_clear(receiver_locked,
+							  false, vcpu_id);
+
+	return true;
+}
+
 bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 					uint32_t *lists_sizes,
 					uint32_t *lists_count,

@@ -2809,12 +2809,12 @@ struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 	}
 
 	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_SP) != 0U) {
-		/*
-		 * TODO: For hypervisor, forward call to SPMC to get VM's
-		 * notifications from SPs.
-		 */
-		sp_notifications = vm_notifications_get_pending_and_clear(
-			receiver_locked, false, vcpu_id);
+		if (!plat_ffa_notifications_get_from_sp(
+			    receiver_locked, vcpu_id, &sp_notifications,
+			    &ret)) {
+			dlog_verbose("Failed to get notifications from sps.");
+			goto out;
+		}
 	}
 
 	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_VM) != 0U) {

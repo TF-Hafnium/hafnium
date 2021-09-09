@@ -417,6 +417,18 @@ static inline ffa_notifications_bitmap_t ffa_notifications_bitmap(uint32_t lo,
 	return (ffa_notifications_bitmap_t)hi << 32U | lo;
 }
 
+static inline ffa_notifications_bitmap_t ffa_notification_get_from_sp(
+	struct ffa_value val)
+{
+	return ffa_notifications_bitmap((uint32_t)val.arg2, (uint32_t)val.arg3);
+}
+
+static inline ffa_notifications_bitmap_t ffa_notification_get_from_vm(
+	struct ffa_value val)
+{
+	return ffa_notifications_bitmap((uint32_t)val.arg4, (uint32_t)val.arg5);
+}
+
 /**
  * Flags used in calls to FFA_NOTIFICATION_GET interface.
  */
