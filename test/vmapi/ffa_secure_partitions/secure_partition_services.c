@@ -21,13 +21,17 @@ noreturn void test_main_sp(void)
 	struct ffa_value res = ffa_msg_wait();
 
 	while (1) {
-		HFTEST_LOG("Received direct message request");
 		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
 
 		switch (res.arg3) {
 		case SP_ECHO_CMD:
 			res = sp_echo_cmd(ffa_sender(res), res.arg3, res.arg4,
 					  res.arg5, res.arg6, res.arg7);
+			break;
+		case SP_NOTIF_SET_CMD:
+			res = sp_notif_set_cmd(
+				ffa_sender(res), sp_notif_receiver(res),
+				sp_notif_flags(res), sp_notif_bitmap(res));
 			break;
 		default:
 			HFTEST_LOG_FAILURE();

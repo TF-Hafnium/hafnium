@@ -8,7 +8,21 @@
 
 #include "partition_services.h"
 
+#include "hf/dlog.h"
+
 #include "vmapi/hf/call.h"
+
+static struct ffa_value sp_check_ffa_return_resp(ffa_vm_id_t test_source,
+						 ffa_vm_id_t own_id,
+						 struct ffa_value res)
+{
+	if (res.func == FFA_ERROR_32) {
+		dlog_error("FF-A error returned %x", ffa_error_code(res));
+		return sp_error(own_id, test_source, ffa_error_code(res));
+	}
+
+	return sp_success(own_id, test_source);
+}
 
 struct ffa_value sp_echo_cmd(ffa_vm_id_t receiver, uint32_t val1, uint32_t val2,
 			     uint32_t val3, uint32_t val4, uint32_t val5)
@@ -16,4 +30,15 @@ struct ffa_value sp_echo_cmd(ffa_vm_id_t receiver, uint32_t val1, uint32_t val2,
 	ffa_vm_id_t own_id = hf_vm_get_id();
 	return ffa_msg_send_direct_resp(own_id, receiver, val1, val2, val3,
 					val4, val5);
+}
+
+struct ffa_value sp_notif_set_cmd(ffa_vm_id_t test_source,
+				  ffa_vm_id_t notif_receiver, uint32_t flags,
+				  ffa_notifications_bitmap_t bitmap)
+{
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	res = ffa_notification_set(own_id, notif_receiver, flags, bitmap);
+	return sp_check_ffa_return_resp(test_source, own_id, res);
 }

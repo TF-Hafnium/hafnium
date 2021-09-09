@@ -36,3 +36,42 @@ TEST(ffa_msg_send_direct_req, succeeds_nwd_to_sp_echo)
 	EXPECT_EQ(res.arg6, msg[2]);
 	EXPECT_EQ(res.arg7, msg[3]);
 }
+
+/**
+ * Test to validate notifications signaling from an SP to a VM.
+ */
+TEST(ffa_notifications, signaling_from_sp_to_vm)
+{
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_vm_id_t notification_sender = HF_OTHER_WORLD_ID + 1;
+	const ffa_notifications_bitmap_t bitmap = FFA_NOTIFICATION_MASK(20);
+
+	/* Arbitrarily bind notification 20 */
+	res = ffa_notification_bind(notification_sender, own_id, 0, bitmap);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Requesting sender to set notification. */
+	res = sp_notif_set_cmd_send(own_id, notification_sender, own_id,
+				    FFA_NOTIFICATIONS_FLAG_DELAY_SRI, bitmap);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/* Retrieve FF-A endpoints with pending notifications. */
+	res = ffa_notification_info_get();
+	EXPECT_EQ(res.func, FFA_SUCCESS_64);
+
+	/* Retrieving pending notification */
+	res = ffa_notification_get(own_id, 0, FFA_NOTIFICATION_FLAG_BITMAP_SP);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	EXPECT_EQ(ffa_notification_get_from_sp(res), bitmap);
+	EXPECT_EQ(res.arg4, 0);
+	EXPECT_EQ(res.arg5, 0);
+	EXPECT_EQ(res.arg6, 0);
+	EXPECT_EQ(res.arg7, 0);
+
+	res = ffa_notification_unbind(notification_sender, own_id, bitmap);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+}
