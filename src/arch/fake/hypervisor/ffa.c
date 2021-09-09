@@ -159,6 +159,21 @@ bool plat_ffa_notifications_get_from_sp(
 	return false;
 }
 
+bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
+				       ffa_vm_id_t receiver_vm_id,
+				       uint32_t flags,
+				       ffa_notifications_bitmap_t bitmap,
+				       struct ffa_value *ret)
+{
+	(void)sender_vm_id;
+	(void)receiver_vm_id;
+	(void)flags;
+	(void)bitmap;
+	(void)ret;
+
+	return false;
+}
+
 struct ffa_value plat_ffa_notifications_bitmap_create(
 	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
 {

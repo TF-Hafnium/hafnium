@@ -2699,6 +2699,11 @@ struct ffa_value api_ffa_notification_set(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	if (plat_ffa_notification_set_forward(sender_vm_id, receiver_vm_id,
+					      flags, notifications, &ret)) {
+		return ret;
+	}
+
 	/*
 	 * This check assumes receiver is the current VM, and has been enforced
 	 * by 'plat_ffa_is_notification_set_valid'.
@@ -2709,11 +2714,6 @@ struct ffa_value api_ffa_notification_set(
 		dlog_verbose("Receiver ID is not valid.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
-
-	/*
-	 * TODO: Forward Hypervisor's call to SWd if setting SP's notifications
-	 * from VMs.
-	 */
 
 	if (!vm_are_notifications_enabled(receiver_locked)) {
 		dlog_verbose("Receiver's notifications not enabled.\n");

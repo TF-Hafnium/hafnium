@@ -271,6 +271,34 @@ bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 	return sender_id == current_vm_id && sender_id != receiver_id;
 }
 
+bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
+				       ffa_vm_id_t receiver_vm_id,
+				       uint32_t flags,
+				       ffa_notifications_bitmap_t bitmap,
+				       struct ffa_value *ret)
+{
+	/* Forward only if receiver is an SP. */
+	if (vm_id_is_current_world(receiver_vm_id)) {
+		return false;
+	}
+
+	dlog_verbose("Forwarding notification set to SPMC.\n");
+
+	*ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_NOTIFICATION_SET_32,
+		.arg1 = (sender_vm_id << 16) | receiver_vm_id,
+		.arg2 = flags,
+		.arg3 = (uint32_t)(bitmap),
+		.arg4 = (uint32_t)(bitmap >> 32),
+	});
+
+	if (ret->func == FFA_ERROR_32) {
+		dlog_verbose("Failed to set notifications from SPMC.\n");
+	}
+
+	return true;
+}
+
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 					ffa_vm_id_t receiver_id)
 {

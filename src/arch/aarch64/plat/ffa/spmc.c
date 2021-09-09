@@ -231,6 +231,21 @@ bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 		 vm_id_is_current_world(receiver_id)));
 }
 
+bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
+				       ffa_vm_id_t receiver_vm_id,
+				       uint32_t flags,
+				       ffa_notifications_bitmap_t bitmap,
+				       struct ffa_value *ret)
+{
+	(void)sender_vm_id;
+	(void)receiver_vm_id;
+	(void)flags;
+	(void)bitmap;
+	(void)ret;
+
+	return false;
+}
+
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 					ffa_vm_id_t receiver_id)
 {
