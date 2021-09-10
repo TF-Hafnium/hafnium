@@ -13,6 +13,7 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
+#include "hf/std.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
@@ -352,6 +353,78 @@ struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
 bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
 {
 	return vm_id_is_current_world(vm_id);
+}
+
+void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
+					    uint32_t *lists_sizes,
+					    uint32_t *lists_count,
+					    const uint32_t ids_count_max)
+{
+	CHECK(ids != NULL);
+	CHECK(ids_count != NULL);
+	CHECK(lists_sizes != NULL);
+	CHECK(lists_count != NULL);
+	CHECK(ids_count_max == FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
+
+	uint32_t local_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS];
+	struct ffa_value ret;
+
+	dlog_verbose("Forwarding notification info get to SPMC.\n");
+
+	ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_NOTIFICATION_INFO_GET_64,
+	});
+
+	if (ret.func == FFA_ERROR_32) {
+		dlog_verbose("No notifications returned by SPMC.\n");
+		return;
+	}
+
+	*lists_count = ffa_notification_info_get_lists_count(ret);
+
+	if (*lists_count > ids_count_max) {
+		*lists_count = 0;
+		return;
+	}
+
+	/*
+	 * The count of ids should be at least the number of lists, to encompass
+	 * for at least the ids of the FF-A endpoints.
+	 * List sizes will be between 0 and 3, and relates to the counting of
+	 * vCPU of the endpoint that have pending notifications.
+	 * If `lists_count` is already ids_count_max, each list size must be 0.
+	 */
+	*ids_count = *lists_count;
+
+	for (uint32_t i = 0; i < *lists_count; i++) {
+		local_lists_sizes[i] =
+			ffa_notification_info_get_list_size(ret, i + 1);
+
+		/*
+		 * ... sum the counting of each list size that are part of the
+		 * main list.
+		 */
+		*ids_count += local_lists_sizes[i];
+	}
+
+	/*
+	 * Sanity check returned `lists_count` and determined `ids_count`.
+	 * If something wrong, reset arguments to 0 such that hypervisor's
+	 * handling of FFA_NOTIFICATION_INFO_GET can proceed without SPMC's
+	 * values.
+	 */
+	if (*ids_count > ids_count_max) {
+		*ids_count = 0;
+		return;
+	}
+
+	/* Copy now lists sizes, as return sizes have been validated. */
+	memcpy_s(lists_sizes, sizeof(lists_sizes[0]) * ids_count_max,
+		 local_lists_sizes, FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
+
+	/* Unpack the notifications info from the return. */
+	memcpy_s(ids, sizeof(ids[0]) * ids_count_max, &ret.arg3,
+		 sizeof(ret.arg3) * FFA_NOTIFICATIONS_INFO_GET_REGS_RET);
 }
 
 bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,

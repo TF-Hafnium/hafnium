@@ -2972,6 +2972,16 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
+	/*
+	 * Forward call to the other world, and fill the arrays used to assemble
+	 * return.
+	 */
+	plat_ffa_notification_info_get_forward(
+		ids, &ids_count, lists_sizes, &lists_count,
+		FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
+
+	list_is_full = ids_count == FFA_NOTIFICATIONS_INFO_GET_MAX_IDS;
+
 	/* Get notifications' info from this world */
 	for (ffa_vm_count_t index = 0; index < vm_get_count() && !list_is_full;
 	     ++index) {
@@ -2992,6 +3002,8 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 	}
 
 	if (ids_count == 0) {
+		dlog_verbose(
+			"Notification info get has no data to retrieve.\n");
 		return ffa_error(FFA_NO_DATA);
 	}
 

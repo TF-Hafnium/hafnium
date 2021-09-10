@@ -267,6 +267,18 @@ bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 		!vm_id_is_current_world(receiver_id));
 }
 
+void plat_ffa_notification_info_get_forward(  // NOLINTNEXTLINE
+	uint16_t *ids, uint32_t *ids_count,   // NOLINTNEXTLINE
+	uint32_t *lists_sizes, uint32_t *lists_count,
+	const uint32_t ids_count_max)
+{
+	(void)ids;
+	(void)ids_count;
+	(void)lists_sizes;
+	(void)lists_count;
+	(void)ids_count_max;
+}
+
 ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
 {
 	return (index & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK) |

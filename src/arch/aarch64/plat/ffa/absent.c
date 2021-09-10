@@ -272,3 +272,16 @@ struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
+
+void plat_ffa_notification_info_get_forward(const uint16_t *ids,
+					    const uint32_t *ids_count,
+					    const uint32_t *lists_sizes,
+					    const uint32_t *lists_count,
+					    const uint32_t ids_count_max)
+{
+	(void)ids;
+	(void)ids_count;
+	(void)lists_sizes;
+	(void)lists_count;
+	(void)ids_count_max;
+}

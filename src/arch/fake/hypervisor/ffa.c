@@ -244,3 +244,15 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 
 	return true;
 }
+
+void plat_ffa_notification_info_get_forward(  // NOLINTNEXTLINE
+	uint16_t *ids, uint32_t *ids_count,   // NOLINTNEXTLINE
+	uint32_t *lists_sizes, uint32_t *lists_count,
+	const uint32_t ids_count_max)
+{
+	(void)ids;
+	(void)ids_count;
+	(void)lists_sizes;
+	(void)lists_count;
+	(void)ids_count_max;
+}
