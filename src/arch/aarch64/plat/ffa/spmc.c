@@ -16,6 +16,7 @@
 #include "hf/vm.h"
 
 #include "smc.h"
+#include "sysregs.h"
 
 /** Other world SVE context (accessed from other_world_loop). */
 struct sve_context_t sve_context[MAX_CPUS];
@@ -541,4 +542,16 @@ out:
 	nwd_vms_unlock(&nwd_vms_locked);
 
 	return info_get_state == FULL;
+}
+
+bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current)
+{
+	/* FFA_MEM_PERM_SET/GET is only valid before SPs are initialized */
+	return has_vhe_support() && (current->vm->initialized == false);
+}
+
+bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
+{
+	/* FFA_MEM_PERM_SET/GET is only valid before SPs are initialized */
+	return has_vhe_support() && (current->vm->initialized == false);
 }

@@ -16,6 +16,7 @@
 #include "hf/vm.h"
 
 #include "smc.h"
+#include "sysregs.h"
 
 static bool ffa_tee_enabled;
 
@@ -389,4 +390,16 @@ bool plat_ffa_vm_notifications_info_get(const uint16_t *ids,
 	(void)ids_count_max;
 
 	return false;
+}
+
+bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current)
+{
+	(void)current;
+	return has_vhe_support();
+}
+
+bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
+{
+	(void)current;
+	return has_vhe_support();
 }

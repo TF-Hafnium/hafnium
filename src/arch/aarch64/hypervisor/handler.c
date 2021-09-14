@@ -615,6 +615,15 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			ffa_notifications_bitmap(args->arg3, args->arg4), false,
 			current);
 		return true;
+	case FFA_MEM_PERM_SET_32:
+	case FFA_MEM_PERM_SET_64:
+		*args = api_ffa_mem_perm_set(va_init(args->arg1), args->arg2,
+					     args->arg3, current);
+		return true;
+	case FFA_MEM_PERM_GET_32:
+	case FFA_MEM_PERM_GET_64:
+		*args = api_ffa_mem_perm_get(va_init(args->arg1), current);
+		return true;
 	case FFA_NOTIFICATION_SET_32:
 		*args = api_ffa_notification_set(
 			ffa_sender(*args), ffa_receiver(*args), args->arg2,

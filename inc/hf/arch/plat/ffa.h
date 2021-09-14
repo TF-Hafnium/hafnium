@@ -133,3 +133,6 @@ bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 					uint32_t *lists_sizes,
 					uint32_t *lists_count,
 					const uint32_t ids_count_max);
+
+bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current);
+bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current);

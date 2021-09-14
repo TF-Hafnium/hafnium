@@ -456,3 +456,19 @@ static inline struct ffa_value ffa_notification_info_get(void)
 		.func = FFA_NOTIFICATION_INFO_GET_64,
 	});
 }
+
+static inline struct ffa_value ffa_mem_perm_get(uint64_t base_va)
+{
+	return ffa_call((struct ffa_value){.func = FFA_MEM_PERM_GET_32,
+					   .arg1 = base_va});
+}
+
+static inline struct ffa_value ffa_mem_perm_set(uint64_t base_va,
+						uint32_t page_count,
+						uint32_t mem_perm)
+{
+	return ffa_call((struct ffa_value){.func = FFA_MEM_PERM_SET_32,
+					   .arg1 = base_va,
+					   .arg2 = page_count,
+					   .arg3 = mem_perm});
+}

@@ -77,6 +77,8 @@
 #define FFA_SECONDARY_EP_REGISTER_64        0xC4000087
 #define FFA_MEM_PERM_GET_32                 0x84000088
 #define FFA_MEM_PERM_SET_32                 0x84000089
+#define FFA_MEM_PERM_GET_64                 0xC4000088
+#define FFA_MEM_PERM_SET_64                 0xC4000089
 
 /* FF-A error codes. */
 #define FFA_NOT_SUPPORTED      INT32_C(-1)
@@ -101,6 +103,10 @@
 #define FFA_MEM_RECLAIM_CLEAR 0x1
 
 #define FFA_SLEEP_INDEFINITE 0
+
+#define FFA_MEM_PERM_RO UINT32_C(0x7)
+#define FFA_MEM_PERM_RW UINT32_C(0x5)
+#define FFA_MEM_PERM_RX UINT32_C(0x3)
 
 /**
  * For use where the FF-A specification refers explicitly to '4K pages'. Not to

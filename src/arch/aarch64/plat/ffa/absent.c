@@ -232,3 +232,15 @@ bool plat_ffa_vm_notifications_info_get(const uint16_t *ids,
 
 	return false;
 }
+
+bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current)
+{
+	(void)current;
+	return false;
+}
+
+bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
+{
+	(void)current;
+	return false;
+}

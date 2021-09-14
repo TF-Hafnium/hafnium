@@ -2923,3 +2923,188 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 	return api_ffa_notification_info_get_success_return(
 		ids, ids_count, lists_sizes, lists_count, list_is_full);
 }
+
+struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)
+{
+	struct vm_locked vm_locked;
+	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
+	bool mode_ret = false;
+	uint32_t mode = 0;
+
+	if (!plat_ffa_is_mem_perm_get_valid(current)) {
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	if (!(current->vm->el0_partition)) {
+		return ffa_error(FFA_DENIED);
+	}
+
+	vm_locked = vm_lock(current->vm);
+
+	/*
+	 * mm_get_mode is used to check if the given base_addr page is already
+	 * mapped. If the page is unmapped, return error. If the page is mapped
+	 * appropriate attributes are returned to the caller. Note that
+	 * mm_get_mode returns true if the address is in the valid VA range as
+	 * supported by the architecture and MMU configurations, as opposed to
+	 * whether a page is mapped or not. For a page to be known as mapped,
+	 * the API must return true AND the returned mode must not have
+	 * MM_MODE_INVALID set.
+	 */
+	mode_ret = mm_get_mode(&vm_locked.vm->ptable, base_addr,
+			       va_add(base_addr, PAGE_SIZE), &mode);
+	if (!mode_ret || (mode & MM_MODE_INVALID)) {
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/* No memory should be marked RWX */
+	CHECK((mode & (MM_MODE_R | MM_MODE_W | MM_MODE_X)) !=
+	      (MM_MODE_R | MM_MODE_W | MM_MODE_X));
+
+	/*
+	 * S-EL0 partitions are expected to have all their pages marked as
+	 * non-global.
+	 */
+	CHECK((mode & (MM_MODE_NG | MM_MODE_USER)) ==
+	      (MM_MODE_NG | MM_MODE_USER));
+
+	if (mode & MM_MODE_W) {
+		/* No memory should be writeable but not readable. */
+		CHECK(mode & MM_MODE_R);
+		ret = (struct ffa_value){.func = FFA_SUCCESS_32,
+					 .arg2 = (uint32_t)(FFA_MEM_PERM_RW)};
+	} else if (mode & MM_MODE_R) {
+		ret = (struct ffa_value){.func = FFA_SUCCESS_32,
+					 .arg2 = (uint32_t)(FFA_MEM_PERM_RX)};
+		if (!(mode & MM_MODE_X)) {
+			ret.arg2 = (uint32_t)(FFA_MEM_PERM_RO);
+		}
+	}
+out:
+	vm_unlock(&vm_locked);
+	return ret;
+}
+
+struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
+				      uint32_t mem_perm, struct vcpu *current)
+{
+	struct vm_locked vm_locked;
+	struct ffa_value ret;
+	bool mode_ret = false;
+	uint32_t original_mode;
+	uint32_t new_mode;
+	struct mpool local_page_pool;
+
+	if (!plat_ffa_is_mem_perm_set_valid(current)) {
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	if (!(current->vm->el0_partition)) {
+		return ffa_error(FFA_DENIED);
+	}
+
+	if (!is_aligned(va_addr(base_addr), PAGE_SIZE)) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if ((mem_perm != FFA_MEM_PERM_RW) && (mem_perm != FFA_MEM_PERM_RO) &&
+	    (mem_perm != FFA_MEM_PERM_RX)) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Create a local pool so any freed memory can't be used by another
+	 * thread. This is to ensure the original mapping can be restored if any
+	 * stage of the process fails.
+	 */
+	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
+
+	vm_locked = vm_lock(current->vm);
+
+	/*
+	 * All regions accessible by the partition are mapped during boot. If we
+	 * cannot get a successful translation for the page range, the request
+	 * to change permissions is rejected.
+	 * mm_get_mode is used to check if the given address range is already
+	 * mapped. If the range is unmapped, return error. If the range is
+	 * mapped appropriate attributes are returned to the caller. Note that
+	 * mm_get_mode returns true if the address is in the valid VA range as
+	 * supported by the architecture and MMU configurations, as opposed to
+	 * whether a page is mapped or not. For a page to be known as mapped,
+	 * the API must return true AND the returned mode must not have
+	 * MM_MODE_INVALID set.
+	 */
+
+	mode_ret = mm_get_mode(&vm_locked.vm->ptable, base_addr,
+			       va_add(base_addr, page_count * PAGE_SIZE),
+			       &original_mode);
+	if (!mode_ret || (original_mode & MM_MODE_INVALID)) {
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/* Device memory cannot be marked as executable */
+	if ((original_mode & MM_MODE_D) && (mem_perm == FFA_MEM_PERM_RX)) {
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	new_mode = MM_MODE_USER | MM_MODE_NG;
+
+	if (mem_perm == FFA_MEM_PERM_RW) {
+		new_mode |= MM_MODE_R | MM_MODE_W;
+	} else if (mem_perm == FFA_MEM_PERM_RX) {
+		new_mode |= MM_MODE_R | MM_MODE_X;
+	} else if (mem_perm == FFA_MEM_PERM_RO) {
+		new_mode |= MM_MODE_R;
+	}
+
+	/*
+	 * Safe to re-map memory, since we know the requested permissions are
+	 * valid, and the memory requested to be re-mapped is also valid.
+	 */
+	if (!mm_identity_prepare(
+		    &vm_locked.vm->ptable, pa_from_va(base_addr),
+		    pa_from_va(va_add(base_addr, page_count * PAGE_SIZE)),
+		    new_mode, &local_page_pool)) {
+		/*
+		 * Defrag the table into the local page pool.
+		 * mm_identity_prepare could have allocated or freed pages to
+		 * split blocks or tables etc.
+		 */
+		mm_stage1_defrag(&vm_locked.vm->ptable, &local_page_pool);
+
+		/*
+		 * Guaranteed to succeed mapping with old mode since the mapping
+		 * with old mode already existed and we have a local page pool
+		 * that should have sufficient memory to go back to the original
+		 * state.
+		 */
+		CHECK(mm_identity_prepare(
+			&vm_locked.vm->ptable, pa_from_va(base_addr),
+			pa_from_va(va_add(base_addr, page_count * PAGE_SIZE)),
+			original_mode, &local_page_pool));
+		mm_identity_commit(
+			&vm_locked.vm->ptable, pa_from_va(base_addr),
+			pa_from_va(va_add(base_addr, page_count * PAGE_SIZE)),
+			original_mode, &local_page_pool);
+
+		mm_stage1_defrag(&vm_locked.vm->ptable, &api_page_pool);
+		ret = ffa_error(FFA_NO_MEMORY);
+		goto out;
+	}
+
+	mm_identity_commit(
+		&vm_locked.vm->ptable, pa_from_va(base_addr),
+		pa_from_va(va_add(base_addr, page_count * PAGE_SIZE)), new_mode,
+		&local_page_pool);
+
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+
+out:
+	mpool_fini(&local_page_pool);
+	vm_unlock(&vm_locked);
+
+	return ret;
+}

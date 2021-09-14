@@ -116,3 +116,7 @@ struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 					  struct vcpu *current);
 
 struct ffa_value api_ffa_notification_info_get(struct vcpu *current);
+
+struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current);
+struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
+				      uint32_t mem_perm, struct vcpu *current);
