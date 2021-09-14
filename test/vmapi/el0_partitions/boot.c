@@ -61,3 +61,48 @@ TEST(boot, memory_before_image)
 	run_res = ffa_run(SERVICE_VM1, 0);
 	EXPECT_FFA_ERROR(run_res, FFA_ABORTED);
 }
+
+TEST(mem_permission, ffa_mem_get_test)
+{
+	struct ffa_value res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	SERVICE_SELECT(SERVICE_VM1, "ffa_mem_perm_get", mb.send);
+
+	/* Let the secondary get started and wait for a message. */
+	res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);
+
+	/*
+	 * Send direct message to tell service VM to do FFA_MEM_PERM_GET tests.
+	 */
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 1, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	/* Check that VM's cannot use this ABI */
+	res = ffa_mem_perm_get(0xDEADBEEF);
+	EXPECT_EQ(res.func, FFA_ERROR_32);
+	EXPECT_EQ(ffa_error_code(res), FFA_DENIED);
+}
+
+TEST(mem_permission, ffa_mem_set_test)
+{
+	struct ffa_value res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	SERVICE_SELECT(SERVICE_VM1, "ffa_mem_perm_set", mb.send);
+
+	/* Let the secondary get started and wait for a message. */
+	res = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);
+
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, SERVICE_VM1, 1, 0, 0, 0,
+				      0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	/* Check that VM's cannot use this ABI */
+	res = ffa_mem_perm_set(0xDEADBEEF, 0x1000, 0xf);
+	EXPECT_EQ(res.func, FFA_ERROR_32);
+	EXPECT_EQ(ffa_error_code(res), FFA_DENIED);
+}

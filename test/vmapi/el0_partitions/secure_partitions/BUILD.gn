@@ -49,7 +49,6 @@ source_set("sel0_partition_base_src") {
     "../services:el0_dlog",
     "../services:el0_fdt_handler",
     "//src:panic",
-    "//src/arch/${plat_arch}:entry",
     "//src/arch/${plat_arch}/hftest:el0_entry",
   ]
 }

@@ -50,7 +50,6 @@ source_set("hftest_secondary_el0_partition") {
     ":el0_dlog",
     ":el0_fdt_handler",
     "//src:panic",
-    "//src/arch/${plat_arch}:entry",
     "//src/arch/${plat_arch}/hftest:el0_entry",
   ]
 }
