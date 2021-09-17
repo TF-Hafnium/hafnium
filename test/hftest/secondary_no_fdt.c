@@ -20,8 +20,6 @@
 
 alignas(4096) uint8_t kstack[4096];
 
-HFTEST_ENABLE();
-
 extern struct hftest_test hftest_begin[];
 extern struct hftest_test hftest_end[];
 
