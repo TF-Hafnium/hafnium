@@ -115,6 +115,8 @@ function init_build() {
 	##
 	## Paths to tools
 	##
+
+	#TODO: CLANG definition may require update based on build host.
 	CLANG="${ROOT_DIR}/prebuilts/linux-x64/clang/bin/clang"
 	REPO="${ROOT_DIR}/prebuilts/generic/repo/repo"
 

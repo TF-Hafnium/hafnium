@@ -11,6 +11,8 @@ source "$(dirname ${BASH_SOURCE[0]})/../build/bash/common.inc"
 # Initialize global variables, prepare repo for building.
 init_build
 
+export PATH=$(dirname $CLANG):$PWD/prebuilts/linux-x64/dtc:$PATH
+
 # Assign default values to variables.
 if is_kokoro_build
 then

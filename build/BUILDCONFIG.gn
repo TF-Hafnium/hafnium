@@ -9,6 +9,11 @@ declare_args() {
   # The name of the project being built.
   project = "reference"
 
+  # This default path is overriden from the Makefile based on
+  # the toolchain_lib arg passed through gn.
+  toolchain_lib =
+      rebase_path("//prebuilts/linux-x64/clang/lib64/clang/12.0.5/include")
+
   # Whether to build against the platform for embedded images consisting of
   # include paths and defines. This is also used for host targets that simulate
   # an embedded image.

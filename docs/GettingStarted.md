@@ -28,6 +28,14 @@ sudo apt install make libssl-dev flex bison python3 python3-serial python3-pip
 pip3 install fdt
 ```
 
+Before building, provide the LLVM/clang toolchain and dtc tool in the PATH
+environment variable. To use the default prebuilt toolchain (used by the
+Hafnium CI):
+
+```shell
+PATH=$PWD/prebuilts/linux-x64/clang/bin:$PWD/prebuilts/linux-x64/dtc:$PATH
+```
+
 By default, the hypervisor is built with clang for a few target platforms along
 with tests. Each project in the `project` directory specifies a root
 configurations of the build. Adding a project is the preferred way to extend

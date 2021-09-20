@@ -14,9 +14,7 @@ import re
 import subprocess
 import sys
 
-HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-BINUTILS_ROOT = os.path.join(HF_ROOT, "prebuilts", "linux-x64", "gcc", "bin")
-STRINGS = os.path.join(BINUTILS_ROOT, "aarch64-linux-android-strings")
+STRINGS = "llvm-strings"
 
 PROLOGUE = """
 /**

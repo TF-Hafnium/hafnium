@@ -19,10 +19,8 @@ import re
 import subprocess
 import sys
 
-HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-CLANG_ROOT = os.path.join(HF_ROOT, "prebuilts", "linux-x64", "clang")
-OBJDUMP = os.path.join(CLANG_ROOT, "bin", "llvm-objdump")
-NM = os.path.join(CLANG_ROOT, "bin", "llvm-nm")
+OBJDUMP = "llvm-objdump"
+NM = "llvm-nm"
 
 def check_eret_speculation_barrier(args):
 	"""

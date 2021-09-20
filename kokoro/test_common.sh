@@ -20,5 +20,15 @@ PROJECT="${PROJECT:-reference}"
 OUT="out/${PROJECT}"
 LOG_DIR_BASE="${OUT}/kokoro_log"
 
-export LD_LIBRARY_PATH="$PWD/prebuilts/linux-x64/clang/lib64"
+# Set path to prebuilts used in the build.
+UNAME_S=$(uname -s | tr '[:upper:]' '[:lower:]')
+UNAME_M=$(uname -m)
+
+if [ $UNAME_M == "x86_64" ]
+then
+        UNAME_M=x64
+fi
+
+export PREBUILTS="$PWD/prebuilts/${UNAME_S}-${UNAME_M}"
+export LD_LIBRARY_PATH="$(clang --print-resource-dir)/../.."
 

@@ -6,7 +6,12 @@
 
 # Select the project to build.
 PROJECT ?= reference
+
+TOOLCHAIN_LIB := $(shell clang --print-resource-dir)
+
 GN_ARGS := project="$(PROJECT)"
+GN_ARGS += toolchain_lib="$(TOOLCHAIN_LIB)"
+
 # Include assertions in the build
 ifneq (${ENABLE_ASSERTIONS},)
 	GN_ARGS += enable_assertions="$(ENABLE_ASSERTIONS)"
@@ -34,12 +39,16 @@ all:
 else  # HAFNIUM_HERMETIC_BUILD
 
 # Set path to prebuilts used in the build.
-UNNAME_S := $(shell uname -s | tr '[:upper:]' '[:lower:]')
-PREBUILTS := $(CURDIR)/prebuilts/$(UNNAME_S)-x64
+UNAME_S := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+UNAME_M := $(shell uname -m)
+
+ifeq ($(UNAME_M),x86_64)
+UNAME_M := x64
+endif
+
+PREBUILTS := $(CURDIR)/prebuilts/$(UNAME_S)-$(UNAME_M)
 GN ?= $(PREBUILTS)/gn/gn
 NINJA ?= $(PREBUILTS)/ninja/ninja
-export PATH := $(PREBUILTS)/clang/bin:$(PATH)
-
 
 CHECKPATCH := $(CURDIR)/third_party/linux/scripts/checkpatch.pl \
 	--ignore BRACES,SPDX_LICENSE_TAG,VOLATILE,SPLIT_STRING,AVOID_EXTERNS,USE_SPINLOCK_T,NEW_TYPEDEFS,INITIALISED_STATIC,FILE_PATH_CHANGES,EMBEDDED_FUNCTION_NAME,SINGLE_STATEMENT_DO_WHILE_MACRO,MACRO_WITH_FLOW_CONTROL,PREFER_PACKED,PREFER_ALIGNED,INDENTED_LABEL,SPACING --quiet
@@ -95,16 +104,16 @@ tidy: $(OUT_DIR)/build.ninja
 	@echo "Tidying..."
 	# TODO: enable readability-magic-numbers once there are fewer violations.
 	# TODO: enable for c++ tests as it currently gives spurious errors.
-	@find src/ \( -name \*.c \) | xargs prebuilts/linux-x64/clang/bin/clang-tidy -p $(OUT_DIR) -fix
-	@find test/ \( -name \*.c \) | xargs prebuilts/linux-x64/clang/bin/clang-tidy -p $(OUT_DIR) -fix
+	@find src/ \( -name \*.c \) | xargs clang-tidy -p $(OUT_DIR) -fix
+	@find test/ \( -name \*.c \) | xargs clang-tidy -p $(OUT_DIR) -fix
 
 .PHONY: check
 check: $(OUT_DIR)/build.ninja
 	@$(NINJA) -C $(OUT_DIR)
 	@echo "Checking..."
 	# TODO: enable for c++ tests as it currently gives spurious errors.
-	@find src/ \( -name \*.c \) | xargs prebuilts/linux-x64/clang/bin/clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
-	@find test/ \( -name \*.c \) | xargs prebuilts/linux-x64/clang/bin/clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
+	@find src/ \( -name \*.c \) | xargs clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
+	@find test/ \( -name \*.c \) | xargs clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
 
 .PHONY: license
 license:

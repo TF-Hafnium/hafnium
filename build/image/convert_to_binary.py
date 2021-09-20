@@ -16,9 +16,7 @@ import os
 import subprocess
 import sys
 
-HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-CLANG_ROOT = os.path.join(HF_ROOT, "prebuilts", "linux-x64", "clang")
-OBJCOPY = os.path.join(CLANG_ROOT, "bin", "llvm-objcopy")
+OBJCOPY = "llvm-objcopy"
 
 def Main():
     parser = argparse.ArgumentParser()

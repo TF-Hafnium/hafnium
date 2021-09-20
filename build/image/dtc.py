@@ -13,10 +13,8 @@ import os
 import subprocess
 import sys
 
-HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-DTC_ROOT = os.path.join(HF_ROOT, "prebuilts", "linux-x64", "dtc")
-DTC = os.path.join(DTC_ROOT, "dtc")
-FDTOVERLAY = os.path.join(DTC_ROOT, "fdtoverlay")
+DTC = "dtc"
+FDTOVERLAY = "fdtoverlay"
 
 def cmd_compile(args):
     exec_args = [
