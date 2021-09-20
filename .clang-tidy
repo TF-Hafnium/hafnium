@@ -2,3 +2,6 @@ Checks: 'readability-*,portability-*,performance-*,misc-*,bugprone-*,modernize-*
 HeaderFilterRegex: '^(?!third_party).+'
 FormatStyle: file
 WarningsAsErrors: '*'
+CheckOptions:
+  - key: bugprone-reserved-identifier.AllowedIdentifiers
+    value: "__stack_chk_guard;__stack_chk_fail"
