@@ -969,7 +969,7 @@ struct vcpu *fiq_lower(void)
 #if SECURE_WORLD == 1
 	struct vcpu_locked current_locked;
 	struct vcpu *current_vcpu = current();
-	int ret;
+	int64_t ret;
 
 	if (plat_ffa_vm_managed_exit_supported(current_vcpu->vm)) {
 		/* Mask all interrupts */

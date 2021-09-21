@@ -52,7 +52,7 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	       struct boot_params_update *p, struct mpool *ppool)
 {
 	void *fdt;
-	size_t buf_size;
+	int buf_size;
 	int off;
 	bool ret = false;
 	bool rsv;
@@ -185,7 +185,7 @@ bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	}
 
 	/* Allow some extra room for patches to the FDT. */
-	ret = fdt_open_into(fdt, fdt, fdt_max_size);
+	ret = fdt_open_into(fdt, fdt, (int)fdt_max_size);
 	if (ret != 0) {
 		dlog_error("FDT failed to open_into. Error: %d\n", ret);
 		goto out_unmap_fdt;

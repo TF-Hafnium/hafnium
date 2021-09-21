@@ -731,7 +731,7 @@ static bool ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	int mode, struct mpool *ppool, bool commit)
+	uint32_t mode, struct mpool *ppool, bool commit)
 {
 	uint32_t i;
 	uint32_t j;
