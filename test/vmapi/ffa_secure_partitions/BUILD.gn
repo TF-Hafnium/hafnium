@@ -7,20 +7,6 @@
 import("//build/image/image.gni")
 import("//test/hftest/args.gni")
 
-# SP that will control execution of tests
-vm_kernel("secure_partitions_control") {
-  testonly = true
-
-  sources = [
-    "partition_control.c",
-  ]
-
-  deps = [
-    "//test/hftest:hftest_standalone_secure",
-    "//test/vmapi/common:common",
-  ]
-}
-
 # VM that will control execution of tests in a VM-to-SP set-up
 vm_kernel("vm_primary") {
   testonly = true
@@ -49,11 +35,6 @@ vm_kernel("secure_partitions_services") {
   ]
 }
 
-manifest("partition_manifest_control_sp") {
-  source = "partition_manifest_control_sp.dts"
-  output = "partition_manifest_control_sp.dtb"
-}
-
 manifest("secure_partition_services_manifest") {
   source = "partition_manifest_services_sp.dts"
   output = "partition_manifest_services_sp.dtb"
@@ -79,27 +60,6 @@ partition_package("secure_partition_services_test_package") {
         ":secure_partitions_services",
       ] ]
   output = "secure_partition_services_test_package.img"
-}
-
-partitions_json("ffa_secure_partitions_test") {
-  testonly = true
-
-  sps = [
-    [
-      "secure_partition_control_test_package.img",
-      "manifest_control_sp.dts",
-      ":secure_partition_control_test_package",
-      ":partition_manifest_control_sp",
-    ],
-    [
-      "secure_partition_services_test_package.img",
-      "manifest_services_sp.dts",
-      ":secure_partition_services_test_package",
-      ":secure_partition_services_manifest",
-    ],
-  ]
-  vms = []
-  json_file = "ffa_secure_partitions_test.json"
 }
 
 manifest("vm_primary_manifest") {

@@ -20,7 +20,5 @@ HFTEST+=(--spmc "$SPMC_PATH/hafnium.bin" --driver=fvp)
 
 ${HFTEST[@]} --partitions_json test/vmapi/ffa_secure_partition_only/ffa_secure_partition_only_test.json
 
-${HFTEST[@]} --partitions_json test/vmapi/ffa_secure_partitions/ffa_secure_partitions_test.json
-
 ${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
              --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_test.json
