@@ -95,6 +95,10 @@ void plat_console_mm_init(struct mm_stage1_locked stage1_locked,
 			MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool);
 }
 
+/*
+ * Since the recursion is only one level disable the clang tidy recursion check
+ */
+// NOLINTNEXTLINE(misc-no-recursion)
 void plat_console_putchar(char c)
 {
 	/* Print a carriage-return as well. */

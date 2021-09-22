@@ -173,6 +173,7 @@ static void mm_invalidate_tlb(ptable_addr_t begin, ptable_addr_t end, int flags,
  * Frees all page-table-related memory associated with the given pte at the
  * given level, including any subtables recursively.
  */
+// NOLINTNEXTLINE(misc-no-recursion)
 static void mm_free_page_pte(pte_t pte, uint8_t level, struct mpool *ppool)
 {
 	struct mm_page_table *table;
@@ -354,6 +355,7 @@ static struct mm_page_table *mm_populate_table_pte(ptable_addr_t begin,
  * levels, but the recursion is bound by the maximum number of levels in a page
  * table.
  */
+// NOLINTNEXTLINE(misc-no-recursion)
 static bool mm_map_level(ptable_addr_t begin, ptable_addr_t end, paddr_t pa,
 			 uint64_t attrs, struct mm_page_table *table,
 			 uint8_t level, int flags, struct mpool *ppool,
@@ -556,6 +558,7 @@ static bool mm_ptable_identity_update(struct mm_ptable *t, paddr_t pa_begin,
  * Writes the given table to the debug log, calling itself recursively to
  * write sub-tables.
  */
+// NOLINTNEXTLINE(misc-no-recursion)
 static void mm_dump_table_recursive(struct mm_page_table *table, uint8_t level,
 				    int max_level)
 {
@@ -630,6 +633,7 @@ static pte_t mm_merge_table_pte(pte_t table_pte, uint8_t level)
  * Defragments the given PTE by recursively replacing any tables with blocks or
  * absent entries where possible.
  */
+// NOLINTNEXTLINE(misc-no-recursion)
 static void mm_ptable_defrag_entry(ptable_addr_t base_addr, pte_t *entry,
 				   uint8_t level, int flags,
 				   struct mpool *ppool, uint16_t id)
@@ -747,6 +751,7 @@ static void mm_ptable_defrag(struct mm_ptable *t, int flags,
  *
  * Returns true if the whole range has the same attributes and false otherwise.
  */
+// NOLINTNEXTLINE(misc-no-recursion)
 static bool mm_ptable_get_attrs_level(struct mm_page_table *table,
 				      ptable_addr_t begin, ptable_addr_t end,
 				      uint8_t level, bool got_attrs,
