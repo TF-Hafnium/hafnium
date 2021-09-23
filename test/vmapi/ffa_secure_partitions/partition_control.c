@@ -50,21 +50,3 @@ TEST(ffa_partition_to_partition_comm, dir_msg_req_echo)
 	EXPECT_EQ(res.arg6, msg[3]);
 	EXPECT_EQ(res.arg7, msg[4]);
 }
-
-/**
- * Currently sending a direct message request from the SWd to the NWd is not
- * supported check that if this attempted an FFA_ERROR with the NOT_SUPPORTED
- * error code is returned.
- */
-TEST(ffa_partition_to_partition_comm, dir_msg_req_to_nwd_fail)
-{
-	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
-				0x88889999};
-	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
-
-	res = ffa_msg_send_direct_req(own_id, HF_HYPERVISOR_VM_ID + 1, msg[0],
-				      msg[1], msg[2], msg[3], msg[4]);
-
-	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
-}

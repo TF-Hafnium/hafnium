@@ -234,3 +234,21 @@ TEST(ffa_run, fails_to_resume_hypervisor)
 {
 	EXPECT_FFA_ERROR(ffa_run(HF_HYPERVISOR_VM_ID, 0), FFA_DENIED);
 }
+
+/**
+ * Currently sending a direct message request from the SWd to the NWd is not
+ * supported check that if this attempted an FFA_ERROR with the
+ * FFA_INVALID_PARAMETERS error code is returned.
+ */
+TEST(ffa_msg_send_direct_req, fails_if_sp_to_nwd)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	res = ffa_msg_send_direct_req(own_id, HF_HYPERVISOR_VM_ID + 1, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
