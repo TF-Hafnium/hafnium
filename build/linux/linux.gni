@@ -56,24 +56,16 @@ template("linux_kernel") {
     rebase_path(kernel_dir),
 
     # TODO: Build with toolchain cc instead of a hardcoded one.
-    "CC=" + rebase_path("//prebuilts/linux-x64/clang/bin/clang"),
-    "LD=" +
-        rebase_path("//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-ld"),
-    "AR=" +
-        rebase_path("//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-ar"),
-    "NM=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-nm"),
-    "OBJCOPY=" + rebase_path(
-            "//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-objcopy"),
-    "OBJDUMP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-objdump"),
-    "STRIP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-strip"),
-    "GCC_TOOLCHAIN_DIR=" + rebase_path("//prebuilts/linux-x64/gcc/bin"),
     "ARCH=arm64",
+    "LLVM=1",
+    "LLVM_IAS=1",
     "CROSS_COMPILE=aarch64-linux-gnu-",
 
     # Build out-of-tree in `target_out_dir`.
     "O=" + rebase_path(target_out_dir),
 
-    # TODO: Remove/replace.
+    # TODO: assess if this setting is really required because the ninja
+    # top level invocation already cares about parallel build.
     "-j24",
   ]
 
@@ -155,18 +147,9 @@ template("linux_kernel_module") {
       "KERNEL_PATH=" + rebase_path(invoker.kernel_dir),
       "O=" +
           rebase_path(get_label_info(invoker.kernel_target, "target_out_dir")),
-      "CC=" + rebase_path("//prebuilts/linux-x64/clang/bin/clang"),
-      "LD=" +
-          rebase_path("//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-ld"),
-      "AR=" +
-          rebase_path("//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-ar"),
-      "NM=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-nm"),
-      "OBJCOPY=" + rebase_path(
-              "//prebuilts/linux-x64/gcc/bin/aarch64-linux-android-objcopy"),
-      "OBJDUMP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-objdump"),
-      "STRIP=" + rebase_path("//prebuilts/linux-x64/clang/bin/llvm-strip"),
-      "GCC_TOOLCHAIN_DIR=" + rebase_path("//prebuilts/linux-x64/gcc/bin"),
       "ARCH=arm64",
+      "LLVM=1",
+      "LLVM_IAS=1",
       "CROSS_COMPILE=aarch64-linux-gnu-",
     ]
     outputs = [
