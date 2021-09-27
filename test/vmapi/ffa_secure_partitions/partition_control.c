@@ -75,3 +75,41 @@ TEST(ffa_notifications, signaling_from_sp_to_vm)
 	res = ffa_notification_unbind(notification_sender, own_id, bitmap);
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
 }
+
+/**
+ * Validate notifications signaling from VM to an SP.
+ */
+TEST(ffa_notifications, signaling_from_vm_to_sp)
+{
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_vm_id_t notification_receiver = HF_OTHER_WORLD_ID + 1;
+	const ffa_notifications_bitmap_t bitmap = FFA_NOTIFICATION_MASK(35);
+
+	/* Request receiver to bind notifications. */
+	res = sp_notif_bind_cmd_send(own_id, notification_receiver, own_id, 0,
+				     bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	res = ffa_notification_set(own_id, notification_receiver,
+				   FFA_NOTIFICATIONS_FLAG_DELAY_SRI, bitmap);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	res = ffa_notification_info_get();
+	EXPECT_EQ(res.func, FFA_SUCCESS_64);
+
+	/* Request to get notifications pending */
+	res = sp_notif_get_cmd_send(own_id, notification_receiver, 0,
+				    FFA_NOTIFICATION_FLAG_BITMAP_VM);
+
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+	EXPECT_EQ(sp_notif_get_from_sp(res), 0);
+	EXPECT_EQ(sp_notif_get_from_vm(res), bitmap);
+
+	/* Request to unbind notifications */
+	res = sp_notif_unbind_cmd_send(own_id, notification_receiver, own_id,
+				       bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+}

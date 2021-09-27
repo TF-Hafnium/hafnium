@@ -33,6 +33,20 @@ noreturn void test_main_sp(void)
 				ffa_sender(res), sp_notif_receiver(res),
 				sp_notif_flags(res), sp_notif_bitmap(res));
 			break;
+		case SP_NOTIF_GET_CMD:
+			res = sp_notif_get_cmd(ffa_sender(res), 0,
+					       sp_notif_flags(res));
+			break;
+		case SP_NOTIF_BIND_CMD:
+			res = sp_notif_bind_cmd(
+				ffa_sender(res), sp_notif_bind_sender(res),
+				sp_notif_flags(res), sp_notif_bitmap(res));
+			break;
+		case SP_NOTIF_UNBIND_CMD:
+			res = sp_notif_unbind_cmd(ffa_sender(res),
+						  sp_notif_bind_sender(res),
+						  sp_notif_bitmap(res));
+			break;
 		default:
 			HFTEST_LOG_FAILURE();
 			HFTEST_LOG(HFTEST_LOG_INDENT
