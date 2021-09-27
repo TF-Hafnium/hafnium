@@ -16,5 +16,5 @@
 #define FW_CFG_INITRD_DATA 0x12
 
 uint32_t fw_cfg_read_uint32(uint16_t key);
-void fw_cfg_read_bytes(uint16_t key, uintptr_t destination, uint32_t length);
+void fw_cfg_read_bytes(uint16_t key, uint8_t *destination, uint32_t length);
 bool fw_cfg_read_dma(uint16_t key, uintptr_t destination, uint32_t length);

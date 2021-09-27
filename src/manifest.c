@@ -811,6 +811,9 @@ static enum manifest_return_code parse_ffa_partition_package(
 	}
 
 	sp_dtb_addr = pa_add(sp_pkg_start, sp_pkg->pm_offset);
+
+	/* Since the address is from pa_addr allow the cast */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	if (!fdt_init_from_ptr(&sp_fdt, (void *)pa_addr(sp_dtb_addr),
 			       sp_pkg->pm_size)) {
 		dlog_error("FDT failed validation.\n");

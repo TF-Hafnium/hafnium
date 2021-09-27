@@ -27,10 +27,8 @@ alignas(4096) uint8_t kstack[4096];
 typedef void entry_point(struct fdt_header *, uint64_t, uint64_t, uint64_t);
 
 static noreturn void jump_to_kernel(struct fdt_header *fdt,
-				    uintptr_t kernel_start)
+				    entry_point *kernel_entry)
 {
-	entry_point *kernel_entry = (entry_point *)kernel_start;
-
 	kernel_entry(fdt, 0, 0, 0);
 
 	/* This should never be reached. */
@@ -97,7 +95,10 @@ noreturn void kmain(struct fdt_header *fdt)
 	uint32_t initrd_size = fw_cfg_read_uint32(FW_CFG_INITRD_SIZE);
 
 	dlog_info("Initrd start %#x, size %#x\n", initrd_start, initrd_size);
-	fw_cfg_read_bytes(FW_CFG_INITRD_DATA, initrd_start, initrd_size);
+	/* Since the address was calculated from pa_addr above allow the cast */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	fw_cfg_read_bytes(FW_CFG_INITRD_DATA, (uint8_t *)initrd_start,
+			  initrd_size);
 
 	/*
 	 * Load the kernel after the initrd. Follow Linux alignment conventions
@@ -107,7 +108,10 @@ noreturn void kmain(struct fdt_header *fdt)
 		       LINUX_OFFSET;
 	kernel_size = fw_cfg_read_uint32(FW_CFG_KERNEL_SIZE);
 	dlog_info("Kernel start %#x, size %#x\n", kernel_start, kernel_size);
-	fw_cfg_read_bytes(FW_CFG_KERNEL_DATA, kernel_start, kernel_size);
+	/* Since the address was calculated from pa_addr above allow the cast */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	fw_cfg_read_bytes(FW_CFG_KERNEL_DATA, (uint8_t *)kernel_start,
+			  kernel_size);
 
 	/* Update FDT to point to initrd. */
 	if (initrd_size > 0) {
@@ -119,5 +123,7 @@ noreturn void kmain(struct fdt_header *fdt)
 	}
 
 	/* Jump to the kernel. */
-	jump_to_kernel(fdt, kernel_start);
+	/* Since the address was calculated from pa_addr above allow the cast */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	jump_to_kernel(fdt, (entry_point *)kernel_start);
 }

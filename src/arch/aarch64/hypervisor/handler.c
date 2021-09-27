@@ -61,6 +61,7 @@
  */
 static struct vcpu *current(void)
 {
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	return (struct vcpu *)read_msr(tpidr_el2);
 }
 

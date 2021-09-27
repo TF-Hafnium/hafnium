@@ -10,6 +10,8 @@
 
 #include <stdbool.h>
 
+#include "hf/arch/std.h"
+
 struct mpool_chunk {
 	struct mpool_chunk *next_chunk;
 	struct mpool_chunk *limit;
@@ -149,13 +151,12 @@ void mpool_fini(struct mpool *p)
 bool mpool_add_chunk(struct mpool *p, void *begin, size_t size)
 {
 	struct mpool_chunk *chunk;
-	uintptr_t new_begin;
-	uintptr_t new_end;
+	char *new_begin;
+	char *new_end;
 
 	/* Round begin address up, and end address down. */
-	new_begin = ((uintptr_t)begin + p->entry_size - 1) / p->entry_size *
-		    p->entry_size;
-	new_end = ((uintptr_t)begin + size) / p->entry_size * p->entry_size;
+	new_begin = (void *)align_up((char *)begin, p->entry_size);
+	new_end = (void *)align_down((char *)begin + size, p->entry_size);
 
 	/* Nothing to do if there isn't enough room for an entry. */
 	if (new_begin >= new_end || new_end - new_begin < p->entry_size) {
@@ -201,7 +202,7 @@ static void *mpool_alloc_no_fallback(struct mpool *p)
 		goto exit;
 	}
 
-	new_chunk = (struct mpool_chunk *)((uintptr_t)chunk + p->entry_size);
+	new_chunk = (struct mpool_chunk *)((char *)chunk + p->entry_size);
 	if (new_chunk >= chunk->limit) {
 		p->chunk_list = chunk->next_chunk;
 	} else {
@@ -274,12 +275,12 @@ void *mpool_alloc_contiguous_no_fallback(struct mpool *p, size_t count,
 	 */
 	prev = &p->chunk_list;
 	while (*prev != NULL) {
-		uintptr_t start;
+		char *start;
 		struct mpool_chunk *new_chunk;
 		struct mpool_chunk *chunk = *prev;
 
 		/* Round start address up to the required alignment. */
-		start = (((uintptr_t)chunk + align - 1) / align) * align;
+		start = (void *)align_up((char *)chunk, align);
 
 		/*
 		 * Calculate where the new chunk would be if we consume the
@@ -301,7 +302,7 @@ void *mpool_alloc_contiguous_no_fallback(struct mpool *p, size_t count,
 			 * Add back the space consumed by the alignment
 			 * requirement, if it's big enough to fit an entry.
 			 */
-			if (start - (uintptr_t)chunk >= p->entry_size) {
+			if (start - (char *)chunk >= p->entry_size) {
 				chunk->next_chunk = *prev;
 				*prev = chunk;
 				chunk->limit = (struct mpool_chunk *)start;

@@ -39,14 +39,13 @@ uint32_t fw_cfg_read_uint32(uint16_t key)
 	return io_read32(FW_CFG_DATA32);
 }
 
-void fw_cfg_read_bytes(uint16_t key, uintptr_t destination, uint32_t length)
+void fw_cfg_read_bytes(uint16_t key, uint8_t *destination, uint32_t length)
 {
-	uint8_t *dest = (uint8_t *)destination;
 	size_t i;
 
 	io_write16(FW_CFG_SELECTOR, htobe16(key));
 	for (i = 0; i < length; ++i) {
-		dest[i] = io_read8(FW_CFG_DATA8);
+		destination[i] = io_read8(FW_CFG_DATA8);
 	}
 }
 
