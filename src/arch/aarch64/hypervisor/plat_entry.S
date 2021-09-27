@@ -7,7 +7,6 @@
  */
 
 .section .init.image_entry, "ax"
-.global plat_entry
 .weak plat_entry
 plat_entry:
 	/* Do nothing. */
