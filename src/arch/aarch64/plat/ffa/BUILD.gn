@@ -14,14 +14,20 @@ source_set("absent") {
 }
 
 source_set("hypervisor") {
-  public_configs = [ "//src/arch/${plat_arch}:config" ]
+  public_configs = [
+    "//src/arch/${plat_arch}:config",
+    "//src/arch/${plat_arch}:arch_config",
+  ]
   sources = [
     "hypervisor.c",
   ]
 }
 
 source_set("spmc") {
-  public_configs = [ "//src/arch/${plat_arch}:config" ]
+  public_configs = [
+    "//src/arch/${plat_arch}:config",
+    "//src/arch/${plat_arch}:arch_config",
+  ]
   sources = [
     "spmc.c",
   ]
