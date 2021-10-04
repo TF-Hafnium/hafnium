@@ -38,6 +38,7 @@ TEST_SERVICE(memory_increment)
 			HF_MAILBOX_SIZE);
 		struct ffa_composite_memory_region *composite =
 			ffa_memory_region_get_composite(memory_region, 0);
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		uint8_t *ptr = (uint8_t *)composite->constituents[0].address;
 
 		ASSERT_EQ(memory_region->receiver_count, 1);
@@ -121,6 +122,7 @@ TEST_SERVICE(ffa_memory_return)
 	struct ffa_composite_memory_region *composite =
 		ffa_memory_region_get_composite(memory_region, 0);
 
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
 
 	/* Check that one has access to the shared region. */
@@ -166,7 +168,9 @@ TEST_SERVICE(ffa_check_upper_bound)
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/* Choose which constituent we want to test. */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	index = *(uint8_t *)composite->constituents[0].address;
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[index].address;
 
 	/*
@@ -200,7 +204,9 @@ TEST_SERVICE(ffa_check_lower_bound)
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/* Choose which constituent we want to test. */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	index = *(uint8_t *)composite->constituents[0].address;
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[index].address;
 
 	/*
@@ -232,6 +238,7 @@ TEST_SERVICE(ffa_donate_secondary_and_fault)
 	ASSERT_EQ(sender, HF_PRIMARY_VM_ID);
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
 
 	/* Donate memory to next VM. */
@@ -309,6 +316,7 @@ TEST_SERVICE(ffa_memory_receive)
 		retrieve_memory_from_message(recv_buf, send_buf, ret, NULL,
 					     memory_region, HF_MAILBOX_SIZE);
 		composite = ffa_memory_region_get_composite(memory_region, 0);
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint8_t *)composite->constituents[0].address;
 
 		ptr[0] = 'd';
@@ -388,6 +396,7 @@ TEST_SERVICE(ffa_memory_lend_relinquish_relend)
 		 * Check that we can read and write every page that was shared.
 		 */
 		for (i = 0; i < composite->constituent_count; ++i) {
+			// NOLINTNEXTLINE(performance-no-int-to-ptr)
 			uint8_t *ptr = (uint8_t *)constituents[i].address;
 			uint32_t count = constituents[i].page_count;
 			size_t j;
@@ -431,12 +440,14 @@ TEST_SERVICE(ffa_memory_lend_relinquish)
 		/* ASSERT_TRUE isn't enough for clang-analyze. */
 		CHECK(composite != NULL);
 		constituents = composite->constituents;
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		first_ptr = (uint8_t *)constituents[0].address;
 
 		/*
 		 * Check that we can read and write every page that was shared.
 		 */
 		for (i = 0; i < composite->constituent_count; ++i) {
+			// NOLINTNEXTLINE(performance-no-int-to-ptr)
 			uint8_t *ptr = (uint8_t *)constituents[i].address;
 			uint32_t count = constituents[i].page_count;
 			size_t j;
@@ -481,6 +492,7 @@ TEST_SERVICE(ffa_memory_donate_relinquish)
 					     memory_region, HF_MAILBOX_SIZE);
 		composite = ffa_memory_region_get_composite(memory_region, 0);
 
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint8_t *)composite->constituents[0].address;
 
 		/* Check that we have access to the shared region. */
@@ -612,6 +624,7 @@ TEST_SERVICE(ffa_memory_lend_relinquish_X)
 		CHECK(composite != NULL);
 
 		constituents = composite->constituents;
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint64_t *)constituents[0].address;
 
 		/*
@@ -690,6 +703,7 @@ TEST_SERVICE(ffa_memory_lend_relinquish_RW)
 		struct ffa_memory_region_constituent constituent_copy =
 			composite->constituents[0];
 
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint8_t *)constituent_copy.address;
 
 		/* Check that we have read access. */
@@ -732,6 +746,7 @@ TEST_SERVICE(ffa_memory_lend_twice)
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	constituent_copy = composite->constituents[0];
 
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)constituent_copy.address;
 
 	/* Check that we have read access. */

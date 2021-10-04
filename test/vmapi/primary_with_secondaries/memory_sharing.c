@@ -681,6 +681,7 @@ TEST(memory_sharing, give_memory_and_lose_access)
 	ASSERT_NE(memory_region->receivers[0].composite_memory_region_offset,
 		  0);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
@@ -716,6 +717,7 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 	ASSERT_NE(memory_region->receivers[0].composite_memory_region_offset,
 		  0);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);

@@ -31,6 +31,11 @@ struct state {
  */
 static void rx_reader(uintptr_t arg)
 {
+	/*
+	 * The function prototype must match the entry function so we permit the
+	 * int to pointer conversion.
+	 */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	struct state *s = (struct state *)arg;
 	sl_unlock(&s->lock);
 

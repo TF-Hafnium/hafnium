@@ -67,6 +67,11 @@ static bool run_loop(struct mailbox_buffers *mb)
  */
 static void vm_cpu_entry(uintptr_t arg)
 {
+	/*
+	 * The function prototype must match the entry function so we permit the
+	 * int to pointer conversion.
+	 */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	struct cpu_state *state = (struct cpu_state *)arg;
 
 	run_loop(state->mb);

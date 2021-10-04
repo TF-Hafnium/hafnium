@@ -62,6 +62,11 @@ TEST(ffa_yield, yield_is_noop_for_primary)
  */
 static void vm_cpu_entry(uintptr_t arg)
 {
+	/*
+	 * The function prototype must match the entry function so we permit the
+	 * int to pointer conversion.
+	 */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	struct spinlock *lock = (struct spinlock *)arg;
 
 	dlog("Second CPU started.\n");
@@ -92,6 +97,11 @@ TEST(cpus, start)
  */
 static void vm_cpu_entry_stop(uintptr_t arg)
 {
+	/*
+	 * The function prototype must match the entry function so we permit the
+	 * int to pointer conversion.
+	 */
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	struct spinlock *lock = (struct spinlock *)arg;
 
 	dlog("Second CPU started.\n");
