@@ -63,65 +63,65 @@
 	hftest_test_ctor_##suite_name##_##test_name
 
 /* Register test functions. */
-#define HFTEST_SET_UP(suite_name)                                           \
-	static void HFTEST_SET_UP_FN(suite_name)(void);                     \
-	const struct hftest_test __attribute__((used))                      \
-		__attribute__((section(HFTEST_SET_UP_SECTION(suite_name)))) \
-			HFTEST_SET_UP_STRUCT(suite_name) = {                \
-				.suite = #suite_name,                       \
-				.kind = HFTEST_KIND_SET_UP,                 \
-				.fn = HFTEST_SET_UP_FN(suite_name),         \
-	};                                                                  \
-	static void __attribute__((constructor))                            \
-		HFTEST_SET_UP_CONSTRUCTOR(suite_name)(void)                 \
-	{                                                                   \
-		hftest_register(HFTEST_SET_UP_STRUCT(suite_name));          \
-	}                                                                   \
+#define HFTEST_SET_UP(suite_name)                                   \
+	static void HFTEST_SET_UP_FN(suite_name)(void);             \
+	const struct hftest_test __attribute__((used))              \
+	__attribute__((section(HFTEST_SET_UP_SECTION(suite_name)))) \
+	HFTEST_SET_UP_STRUCT(suite_name) = {                        \
+		.suite = #suite_name,                               \
+		.kind = HFTEST_KIND_SET_UP,                         \
+		.fn = HFTEST_SET_UP_FN(suite_name),                 \
+	};                                                          \
+	static void __attribute__((constructor))                    \
+	HFTEST_SET_UP_CONSTRUCTOR(suite_name)(void)                 \
+	{                                                           \
+		hftest_register(HFTEST_SET_UP_STRUCT(suite_name));  \
+	}                                                           \
 	static void HFTEST_SET_UP_FN(suite_name)(void)
 
-#define HFTEST_TEAR_DOWN(suite_name)                                           \
-	static void HFTEST_TEAR_DOWN_FN(suite_name)(void);                     \
-	const struct hftest_test __attribute__((used))                         \
-		__attribute__((section(HFTEST_TEAR_DOWN_SECTION(suite_name)))) \
-			HFTEST_TEAR_DOWN_STRUCT(suite_name) = {                \
-				.suite = #suite_name,                          \
-				.kind = HFTEST_KIND_TEAR_DOWN,                 \
-				.fn = HFTEST_TEAR_DOWN_FN(suite_name),         \
-	};                                                                     \
-	static void __attribute__((constructor))                               \
-		HFTEST_TEAR_DOWN_CONSTRUCTOR(suite_name)(void)                 \
-	{                                                                      \
-		hftest_register(HFTEST_TEAR_DOWN_STRUCT(suite_name));          \
-	}                                                                      \
+#define HFTEST_TEAR_DOWN(suite_name)                                   \
+	static void HFTEST_TEAR_DOWN_FN(suite_name)(void);             \
+	const struct hftest_test __attribute__((used))                 \
+	__attribute__((section(HFTEST_TEAR_DOWN_SECTION(suite_name)))) \
+	HFTEST_TEAR_DOWN_STRUCT(suite_name) = {                        \
+		.suite = #suite_name,                                  \
+		.kind = HFTEST_KIND_TEAR_DOWN,                         \
+		.fn = HFTEST_TEAR_DOWN_FN(suite_name),                 \
+	};                                                             \
+	static void __attribute__((constructor))                       \
+	HFTEST_TEAR_DOWN_CONSTRUCTOR(suite_name)(void)                 \
+	{                                                              \
+		hftest_register(HFTEST_TEAR_DOWN_STRUCT(suite_name));  \
+	}                                                              \
 	static void HFTEST_TEAR_DOWN_FN(suite_name)(void)
 
-#define HFTEST_TEST(suite_name, test_name, long_running)                    \
-	static void HFTEST_TEST_FN(suite_name, test_name)(void);            \
-	const struct hftest_test __attribute__((used)) __attribute__(       \
-		(section(HFTEST_TEST_SECTION(suite_name, test_name))))      \
-		HFTEST_TEST_STRUCT(suite_name, test_name) = {               \
-			.suite = #suite_name,                               \
-			.kind = HFTEST_KIND_TEST,                           \
-			.name = #test_name,                                 \
-			.is_long_running = long_running,                    \
-			.fn = HFTEST_TEST_FN(suite_name, test_name),        \
-	};                                                                  \
-	static void __attribute__((constructor))                            \
-		HFTEST_TEST_CONSTRUCTOR(suite_name, test_name)(void)        \
-	{                                                                   \
-		hftest_register(HFTEST_TEST_STRUCT(suite_name, test_name)); \
-	}                                                                   \
+#define HFTEST_TEST(suite_name, test_name, long_running)                     \
+	static void HFTEST_TEST_FN(suite_name, test_name)(void);             \
+	const struct hftest_test __attribute__((used))                       \
+	__attribute__((section(HFTEST_TEST_SECTION(suite_name, test_name)))) \
+	HFTEST_TEST_STRUCT(suite_name, test_name) = {                        \
+		.suite = #suite_name,                                        \
+		.kind = HFTEST_KIND_TEST,                                    \
+		.name = #test_name,                                          \
+		.is_long_running = long_running,                             \
+		.fn = HFTEST_TEST_FN(suite_name, test_name),                 \
+	};                                                                   \
+	static void __attribute__((constructor))                             \
+	HFTEST_TEST_CONSTRUCTOR(suite_name, test_name)(void)                 \
+	{                                                                    \
+		hftest_register(HFTEST_TEST_STRUCT(suite_name, test_name));  \
+	}                                                                    \
 	static void HFTEST_TEST_FN(suite_name, test_name)(void)
 
-#define HFTEST_TEST_SERVICE(service_name)                                      \
-	static void HFTEST_SERVICE_FN(service_name)(void);                     \
-	const struct hftest_test __attribute__((used))                         \
-		__attribute__((section(HFTEST_SERVICE_SECTION(service_name)))) \
-			HFTEST_SERVICE_STRUCT(service_name) = {                \
-				.kind = HFTEST_KIND_SERVICE,                   \
-				.name = #service_name,                         \
-				.fn = HFTEST_SERVICE_FN(service_name),         \
-	};                                                                     \
+#define HFTEST_TEST_SERVICE(service_name)                              \
+	static void HFTEST_SERVICE_FN(service_name)(void);             \
+	const struct hftest_test __attribute__((used))                 \
+	__attribute__((section(HFTEST_SERVICE_SECTION(service_name)))) \
+	HFTEST_SERVICE_STRUCT(service_name) = {                        \
+		.kind = HFTEST_KIND_SERVICE,                           \
+		.name = #service_name,                                 \
+		.fn = HFTEST_SERVICE_FN(service_name),                 \
+	};                                                             \
 	static void HFTEST_SERVICE_FN(service_name)(void)
 
 /* Context for tests. */
