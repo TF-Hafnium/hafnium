@@ -994,6 +994,101 @@ TEST(manifest, ffa_validate_dev_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MALFORMED_INTEGER_LIST);
 }
+TEST(manifest, ffa_invalid_memory_region_attributes)
+{
+	struct manifest m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("rx_tx-info")
+			.Compatible({ "arm,ffa-manifest-rx_tx-buffer" })
+			.Property("rx-buffer", "<&rx>")
+			.Property("tx-buffer", "<&tx>")
+		.EndChild()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<4>")
+				.Property("attributes", "<7>")
+			.EndChild()
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("base-address", "<0x7310000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_INVALID_MEM_PERM);
+}
+
+TEST(manifest, ffa_invalid_device_region_attributes)
+{
+	struct manifest m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("rx_tx-info")
+			.Compatible({ "arm,ffa-manifest-rx_tx-buffer" })
+			.Property("rx-buffer", "<&rx>")
+			.Property("tx-buffer", "<&tx>")
+		.EndChild()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<4>")
+				.Property("attributes", "<3>")
+			.EndChild()
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("base-address", "<0x7310000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device")
+				.Description("test-device")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<5>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<0 1>")
+				.Property("interrupts", "<2 3>, <4 5>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_INVALID_MEM_PERM);
+}
 
 TEST(manifest, ffa_valid)
 {
@@ -1013,7 +1108,7 @@ TEST(manifest, ffa_valid)
 				.Description("test-memory")
 				.Property("base-address", "<0x7100000>")
 				.Property("pages-count", "<4>")
-				.Property("attributes", "<7>")
+				.Property("attributes", "<3>")
 			.EndChild()
 			.Label("rx")
 			.StartChild("rx")
@@ -1062,7 +1157,7 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].partition.managed_exit, true);
 	ASSERT_EQ(m.vm[0].partition.mem_regions[0].base_address, 0x7100000);
 	ASSERT_EQ(m.vm[0].partition.mem_regions[0].page_count, 4);
-	ASSERT_EQ(m.vm[0].partition.mem_regions[0].attributes, 7);
+	ASSERT_EQ(m.vm[0].partition.mem_regions[0].attributes, 3);
 	ASSERT_EQ(m.vm[0].partition.rxtx.available, true);
 	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->base_address, 0x7300000);
 	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->page_count, 1);

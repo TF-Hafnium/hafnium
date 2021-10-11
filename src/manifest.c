@@ -388,6 +388,13 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		TRY(read_uint32(mem_node, "attributes",
 				&mem_regions[i].attributes));
 		mem_regions[i].attributes &= MM_PERM_MASK;
+
+		if (mem_regions[i].attributes != (MM_MODE_R) &&
+		    mem_regions[i].attributes != (MM_MODE_R | MM_MODE_W) &&
+		    mem_regions[i].attributes != (MM_MODE_R | MM_MODE_X)) {
+			return MANIFEST_ERROR_INVALID_MEM_PERM;
+		}
+
 		dlog_verbose("      Attributes:  %u\n",
 			     mem_regions[i].attributes);
 
@@ -457,6 +464,13 @@ static enum manifest_return_code parse_ffa_device_region_node(
 				&dev_regions[i].attributes));
 		dev_regions[i].attributes =
 			(dev_regions[i].attributes & MM_PERM_MASK) | MM_MODE_D;
+
+		if (dev_regions[i].attributes != (MM_MODE_R | MM_MODE_D) &&
+		    dev_regions[i].attributes !=
+			    (MM_MODE_R | MM_MODE_W | MM_MODE_D)) {
+			return MANIFEST_ERROR_INVALID_MEM_PERM;
+		}
+
 		dlog_verbose("      Attributes:  %u\n",
 			     dev_regions[i].attributes);
 
@@ -920,6 +934,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Device-region node should have at least one entry";
 	case MANIFEST_ERROR_RXTX_SIZE_MISMATCH:
 		return "RX and TX buffers should be of same size";
+	case MANIFEST_ERROR_INVALID_MEM_PERM:
+		return "Memory permission should be RO, RW or RX";
 	}
 
 	panic("Unexpected manifest return code.");

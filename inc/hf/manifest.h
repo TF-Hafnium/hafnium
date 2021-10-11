@@ -228,6 +228,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY,
 	MANIFEST_ERROR_DEVICE_REGION_NODE_EMPTY,
 	MANIFEST_ERROR_RXTX_SIZE_MISMATCH,
+	MANIFEST_ERROR_INVALID_MEM_PERM,
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
