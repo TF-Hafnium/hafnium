@@ -30,6 +30,11 @@ struct spinlock {
 
 #define SPINLOCK_INIT ((struct spinlock){.v = 0})
 
+static inline void sl_init(struct spinlock *l)
+{
+	*l = SPINLOCK_INIT;
+}
+
 static inline void sl_lock(struct spinlock *l)
 {
 	register uintreg_t tmp1;

@@ -15,11 +15,22 @@
 
 #include <stdatomic.h>
 
+#ifdef _STDATOMIC_HAVE_ATOMIC
+using std::atomic_flag;
+#endif
+
 struct spinlock {
 	atomic_flag v;
 };
 
 #define SPINLOCK_INIT ((struct spinlock){.v = ATOMIC_FLAG_INIT})
+
+static inline void sl_init(struct spinlock *l)
+{
+#if !defined(__cplusplus)
+	*l = SPINLOCK_INIT;
+#endif
+}
 
 static inline void sl_lock(struct spinlock *l)
 {

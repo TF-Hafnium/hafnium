@@ -17,11 +17,6 @@
  */
 #include "hf/arch/spinlock.h"
 
-static inline void sl_init(struct spinlock *l)
-{
-	*l = SPINLOCK_INIT;
-}
-
 /**
  * Locks both locks, enforcing the lowest address first ordering for locks of
  * the same kind.
