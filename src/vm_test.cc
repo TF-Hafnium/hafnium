@@ -676,6 +676,8 @@ TEST_F(vm, vm_notifications_info_get_full_global)
 
 	got = vm_notifications_get_pending_and_clear(current_vm_locked,
 						     is_from_vm, 0);
+	EXPECT_EQ(got, FFA_NOTIFICATION_MASK(10));
+
 	vm_unlock(&current_vm_locked);
 }
 
