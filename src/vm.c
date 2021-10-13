@@ -24,6 +24,21 @@ static struct vm other_world;
 static ffa_vm_count_t vm_count;
 static struct vm *first_boot_vm;
 
+/**
+ * Counters on the status of notifications in the system. It helps to improve
+ * the information retrieved by the receiver scheduler.
+ */
+static struct {
+	/** Counts notifications pending. */
+	uint32_t pending_count;
+	/**
+	 * Counts notifications pending, that have been retrieved by the
+	 * receiver scheduler.
+	 */
+	uint32_t info_get_retrieved_count;
+	struct spinlock lock;
+} all_notifications_state;
+
 static bool vm_init_mm(struct vm *vm, struct mpool *ppool)
 {
 	if (vm->el0_partition) {
@@ -464,6 +479,101 @@ static struct notifications *vm_get_notifications(struct vm_locked vm_locked,
 			  : &vm_locked.vm->notifications.from_sp;
 }
 
+static void vm_notifications_global_state_count_update(
+	ffa_notifications_bitmap_t bitmap, uint32_t *counter, int inc)
+{
+	/*
+	 * Helper to increment counters from global notifications
+	 * state. Count update by increments or decrements of 1 or -1,
+	 * respectively.
+	 */
+	CHECK(inc == 1 || inc == -1);
+
+	sl_lock(&all_notifications_state.lock);
+
+	for (uint32_t i = 0; i < MAX_FFA_NOTIFICATIONS; i++) {
+		if (vm_is_notification_bit_set(bitmap, i)) {
+			CHECK((inc > 0 && *counter < UINT32_MAX) ||
+			      (inc < 0 && *counter > 0));
+			*counter += inc;
+		}
+	}
+
+	sl_unlock(&all_notifications_state.lock);
+}
+
+/**
+ * Helper function to increment the pending notifications based on a bitmap
+ * passed as argument.
+ * Function to be used at setting notifications for a given VM.
+ */
+static void vm_notifications_pending_count_add(
+	ffa_notifications_bitmap_t to_add)
+{
+	vm_notifications_global_state_count_update(
+		to_add, &all_notifications_state.pending_count, 1);
+}
+
+/**
+ * Helper function to decrement the pending notifications count.
+ * Function to be used when getting the receiver's pending notifications.
+ */
+static void vm_notifications_pending_count_sub(
+	ffa_notifications_bitmap_t to_sub)
+{
+	vm_notifications_global_state_count_update(
+		to_sub, &all_notifications_state.pending_count, -1);
+}
+
+/**
+ * Helper function to count the notifications whose information has been
+ * retrieved by the scheduler of the system, and are still pending.
+ */
+static void vm_notifications_info_get_retrieved_count_add(
+	ffa_notifications_bitmap_t to_add)
+{
+	vm_notifications_global_state_count_update(
+		to_add, &all_notifications_state.info_get_retrieved_count, 1);
+}
+
+/**
+ * Helper function to subtract the notifications that the receiver is getting
+ * and whose information has been retrieved by the receiver scheduler.
+ */
+static void vm_notifications_info_get_retrieved_count_sub(
+	ffa_notifications_bitmap_t to_sub)
+{
+	vm_notifications_global_state_count_update(
+		to_sub, &all_notifications_state.info_get_retrieved_count, -1);
+}
+
+/**
+ * Helper function to determine if there are notifications pending whose info
+ * hasn't been retrieved by the receiver scheduler.
+ */
+bool vm_notifications_pending_not_retrieved_by_scheduler(void)
+{
+	bool ret;
+
+	sl_lock(&all_notifications_state.lock);
+	ret = all_notifications_state.pending_count >
+	      all_notifications_state.info_get_retrieved_count;
+	sl_unlock(&all_notifications_state.lock);
+
+	return ret;
+}
+
+bool vm_is_notifications_pending_count_zero(void)
+{
+	bool ret;
+
+	sl_lock(&all_notifications_state.lock);
+	ret = all_notifications_state.pending_count == 0;
+	sl_unlock(&all_notifications_state.lock);
+
+	return ret;
+}
+
 /**
  * Checks that all provided notifications are bound to the specified sender, and
  * are per VCPU or global, as specified.
@@ -553,6 +663,9 @@ void vm_notifications_set(struct vm_locked vm_locked, bool is_from_vm,
 	} else {
 		to_set->global.pending |= notifications;
 	}
+
+	/* Update count of notifications pending. */
+	vm_notifications_pending_count_add(notifications);
 }
 
 /**
@@ -563,6 +676,7 @@ ffa_notifications_bitmap_t vm_notifications_get_pending_and_clear(
 	ffa_vcpu_index_t cur_vcpu_id)
 {
 	ffa_notifications_bitmap_t to_ret = 0;
+	ffa_notifications_bitmap_t pending_and_info_get_retrieved;
 
 	CHECK(vm_locked.vm != NULL);
 	struct notifications *to_get =
@@ -570,10 +684,42 @@ ffa_notifications_bitmap_t vm_notifications_get_pending_and_clear(
 	CHECK(cur_vcpu_id < MAX_CPUS);
 
 	to_ret |= to_get->global.pending;
+
+	/* Update count of currently pending notifications in the system. */
+	vm_notifications_pending_count_sub(to_get->global.pending);
+
+	/*
+	 * If notifications receiver is getting have been retrieved by the
+	 * receiver scheduler, decrement those from respective count.
+	 */
+	pending_and_info_get_retrieved =
+		to_get->global.pending & to_get->global.info_get_retrieved;
+
+	if (pending_and_info_get_retrieved != 0) {
+		vm_notifications_info_get_retrieved_count_sub(
+			pending_and_info_get_retrieved);
+	}
+
 	to_get->global.pending = 0U;
 	to_get->global.info_get_retrieved = 0U;
 
 	to_ret |= to_get->per_vcpu[cur_vcpu_id].pending;
+
+	/*
+	 * Update counts of notifications, this time for per-vCPU notifications.
+	 */
+	vm_notifications_pending_count_sub(
+		to_get->per_vcpu[cur_vcpu_id].pending);
+
+	pending_and_info_get_retrieved =
+		to_get->per_vcpu[cur_vcpu_id].pending &
+		to_get->per_vcpu[cur_vcpu_id].info_get_retrieved;
+
+	if (pending_and_info_get_retrieved != 0) {
+		vm_notifications_info_get_retrieved_count_sub(
+			pending_and_info_get_retrieved);
+	}
+
 	to_get->per_vcpu[cur_vcpu_id].pending = 0U;
 	to_get->per_vcpu[cur_vcpu_id].info_get_retrieved = 0U;
 
@@ -624,6 +770,8 @@ void vm_notifications_info_get_pending(
 	}
 
 	notifications->global.info_get_retrieved |= pending_not_retrieved;
+
+	vm_notifications_info_get_retrieved_count_add(pending_not_retrieved);
 
 	for (ffa_vcpu_count_t i = 0; i < vm_locked.vm->vcpu_count; i++) {
 		/*
@@ -685,6 +833,9 @@ void vm_notifications_info_get_pending(
 
 		notifications->per_vcpu[i].info_get_retrieved |=
 			pending_not_retrieved;
+
+		vm_notifications_info_get_retrieved_count_add(
+			pending_not_retrieved);
 	}
 }
 

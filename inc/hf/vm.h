@@ -297,6 +297,8 @@ void vm_notifications_info_get_pending(
 	uint32_t *ids_count, uint32_t *lists_sizes, uint32_t *lists_count,
 	const uint32_t ids_max_count,
 	enum notifications_info_get_state *info_get_state);
+bool vm_notifications_pending_not_retrieved_by_scheduler(void);
+bool vm_is_notifications_pending_count_zero(void);
 bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 			       uint32_t *ids_count, uint32_t *lists_sizes,
 			       uint32_t *lists_count,

@@ -2902,6 +2902,14 @@ struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 	ret = api_ffa_notification_get_success_return(sp_notifications,
 						      vm_notifications, 0);
 
+	/*
+	 * If there are no more pending notifications, change `sri_state` to
+	 * handled.
+	 */
+	if (vm_is_notifications_pending_count_zero()) {
+		plat_ffa_sri_state_set(HANDLED);
+	}
+
 out:
 	vm_unlock(&receiver_locked);
 
@@ -2914,7 +2922,7 @@ out:
  */
 static struct ffa_value api_ffa_notification_info_get_success_return(
 	const uint16_t *ids, uint32_t ids_count, const uint32_t *lists_sizes,
-	uint32_t lists_count, bool list_is_full)
+	uint32_t lists_count)
 {
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_64};
 
@@ -2932,8 +2940,9 @@ static struct ffa_value api_ffa_notification_info_get_success_return(
 	 * - The total number of elements (i.e. total list size);
 	 * - The number of VCPU IDs within each VM specific list.
 	 */
-	ret.arg2 =
-		list_is_full ? FFA_NOTIFICATIONS_INFO_GET_FLAG_MORE_PENDING : 0;
+	ret.arg2 = vm_notifications_pending_not_retrieved_by_scheduler()
+			   ? FFA_NOTIFICATIONS_INFO_GET_FLAG_MORE_PENDING
+			   : 0;
 
 	ret.arg2 |= (lists_count & FFA_NOTIFICATIONS_LISTS_COUNT_MASK)
 		    << FFA_NOTIFICATIONS_LISTS_COUNT_SHIFT;
@@ -2999,7 +3008,7 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 
 	if (!list_is_full) {
 		/* Grab notifications info from other world */
-		list_is_full = plat_ffa_vm_notifications_info_get(
+		plat_ffa_vm_notifications_info_get(
 			ids, &ids_count, lists_sizes, &lists_count,
 			FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
 	}
@@ -3010,9 +3019,10 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 		result = ffa_error(FFA_NO_DATA);
 	} else {
 		result = api_ffa_notification_info_get_success_return(
-			ids, ids_count, lists_sizes, lists_count, list_is_full);
-		plat_ffa_sri_state_set(HANDLED);
+			ids, ids_count, lists_sizes, lists_count);
 	}
+
+	plat_ffa_sri_state_set(HANDLED);
 
 	return result;
 }
