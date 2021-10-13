@@ -24,9 +24,9 @@ struct ffa_value plat_ffa_spmc_id_get(void)
 }
 
 ffa_partition_properties_t plat_ffa_partition_properties(
-	ffa_vm_id_t current_id, const struct vm *target)
+	ffa_vm_id_t vm_id, const struct vm *target)
 {
-	(void)current_id;
+	(void)vm_id;
 	(void)target;
 	return 0;
 }

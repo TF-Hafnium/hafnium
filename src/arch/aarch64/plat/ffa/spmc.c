@@ -7,6 +7,7 @@
  */
 
 #include "hf/arch/ffa.h"
+#include "hf/arch/plat/ffa.h"
 #include "hf/arch/sve.h"
 
 #include "hf/api.h"
@@ -420,10 +421,12 @@ out:
 }
 
 bool plat_ffa_notifications_bitmap_create_call(ffa_vm_id_t vm_id,
-					       ffa_vcpu_count_t vcpu_count)
+					       ffa_vcpu_count_t vcpu_count,
+					       struct ffa_value *ret)
 {
 	(void)vm_id;
 	(void)vcpu_count;
+	(void)ret;
 
 	return false;
 }

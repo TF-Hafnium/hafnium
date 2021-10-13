@@ -8,6 +8,8 @@
 
 #include "hf/ffa.h"
 
+#include "hf/arch/plat/ffa.h"
+
 #include "hf/ffa_internal.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
@@ -107,9 +109,9 @@ bool plat_ffa_notifications_update_bindings_forward(
 }
 
 ffa_partition_properties_t plat_ffa_partition_properties(
-	ffa_vm_id_t current_id, const struct vm *target)
+	ffa_vm_id_t vm_id, const struct vm *target)
 {
-	(void)current_id;
+	(void)vm_id;
 	(void)target;
 	return 0;
 }
@@ -149,7 +151,8 @@ bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 
 bool plat_ffa_notifications_get_from_sp(
 	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
-	const ffa_notifications_bitmap_t *from_sp, struct ffa_value *ret)
+	ffa_notifications_bitmap_t *from_sp,  // NOLINT
+	struct ffa_value *ret)		      // NOLINT
 {
 	(void)receiver_locked;
 	(void)vcpu_id;
@@ -202,11 +205,10 @@ bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
 	return false;
 }
 
-bool plat_ffa_vm_notifications_info_get(const uint16_t *ids,
-					const uint32_t *ids_count,
-					const uint32_t *lists_sizes,
-					const uint32_t *lists_count,
-					const uint32_t ids_count_max)
+bool plat_ffa_vm_notifications_info_get(     // NOLINTNEXTLINE
+	uint16_t *ids, uint32_t *ids_count,  // NOLINTNEXTLINE
+	uint32_t *lists_sizes,		     // NOLINTNEXTLINE
+	uint32_t *lists_count, const uint32_t ids_count_max)
 {
 	(void)ids;
 	(void)ids_count;

@@ -8,6 +8,7 @@
 
 #include "hf/arch/ffa.h"
 #include "hf/arch/other_world.h"
+#include "hf/arch/plat/ffa.h"
 
 #include "hf/dlog.h"
 #include "hf/ffa.h"
@@ -377,11 +378,10 @@ bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 	return true;
 }
 
-bool plat_ffa_vm_notifications_info_get(const uint16_t *ids,
-					const uint32_t *ids_count,
-					const uint32_t *lists_sizes,
-					const uint32_t *lists_count,
-					const uint32_t ids_count_max)
+bool plat_ffa_vm_notifications_info_get(     // NOLINTNEXTLINE
+	uint16_t *ids, uint32_t *ids_count,  // NOLINTNEXTLINE
+	uint32_t *lists_sizes,		     // NOLINTNEXTLINE
+	uint32_t *lists_count, const uint32_t ids_count_max)
 {
 	(void)ids;
 	(void)ids_count;
