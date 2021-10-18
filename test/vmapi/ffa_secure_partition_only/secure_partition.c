@@ -117,6 +117,20 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 
 	ret = ffa_features(FFA_NOTIFICATION_INFO_GET_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+#if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
+	ret = ffa_features(FFA_MEM_PERM_GET_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_PERM_SET_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_PERM_GET_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_PERM_SET_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+#endif
 }
 
 /** Validates return for FFA_FEATURES provided a valid feature ID. */

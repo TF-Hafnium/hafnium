@@ -1894,6 +1894,10 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id)
 	case FFA_NOTIFICATION_SET_32:
 	case FFA_NOTIFICATION_GET_32:
 	case FFA_NOTIFICATION_INFO_GET_64:
+	case FFA_MEM_PERM_GET_32:
+	case FFA_MEM_PERM_SET_32:
+	case FFA_MEM_PERM_GET_64:
+	case FFA_MEM_PERM_SET_64:
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 
