@@ -2809,7 +2809,7 @@ struct ffa_value api_ffa_notification_set(
 		goto out;
 	}
 
-	/* Set notifications pending */
+	/* Set notifications pending. */
 	vm_notifications_set(receiver_locked, plat_ffa_is_vm_id(sender_vm_id),
 			     notifications, vcpu_id, is_per_vcpu);
 	dlog_verbose("Set the notifications: %x.\n", notifications);
@@ -2820,6 +2820,22 @@ struct ffa_value api_ffa_notification_set(
 		plat_ffa_sri_trigger_not_delayed(current->cpu);
 	} else {
 		plat_ffa_sri_state_set(DELAYED);
+	}
+
+	/*
+	 * If notifications set are per-vCPU and the receiver is SP, the
+	 * Notifications Pending Interrupt can be injected now.
+	 * If not, it should be injected when the scheduler gives it CPU cycles
+	 * in a specific vCPU.
+	 */
+	if (is_per_vcpu && vm_id_is_current_world(receiver_vm_id)) {
+		struct vcpu *target_vcpu =
+			vm_get_vcpu(receiver_locked.vm, vcpu_id);
+
+		dlog_verbose("Per-vCPU notification, pending NPI.\n");
+		internal_interrupt_inject(
+			target_vcpu, HF_NOTIFICATION_PENDING_INTERRUPT_INTID,
+			current, NULL);
 	}
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};

@@ -427,6 +427,13 @@ bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 	return mm_vm_get_mode(&vm_locked.vm->ptable, begin, end, mode);
 }
 
+static struct notifications *vm_get_notifications(struct vm_locked vm_locked,
+						  bool is_from_vm)
+{
+	return is_from_vm ? &vm_locked.vm->notifications.from_vm
+			  : &vm_locked.vm->notifications.from_sp;
+}
+
 /*
  * Initializes the notifications structure.
  */
@@ -447,8 +454,7 @@ bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 
 	CHECK(vm_locked.vm != NULL);
 
-	to_check = from_vm ? &vm_locked.vm->notifications.from_vm
-			   : &vm_locked.vm->notifications.from_sp;
+	to_check = vm_get_notifications(vm_locked, from_vm);
 
 	/* Check if there are pending per vcpu notifications */
 	for (uint32_t i = 0U; i < MAX_CPUS; i++) {
@@ -461,6 +467,33 @@ bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 	return (to_check->global.pending & notifications) != 0U;
 }
 
+/**
+ * Checks if there are pending global notifications, either from SPs or from
+ * VMs.
+ */
+bool vm_are_global_notifications_pending(struct vm_locked vm_locked)
+{
+	return vm_get_notifications(vm_locked, true)->global.pending != 0ULL ||
+	       vm_get_notifications(vm_locked, false)->global.pending != 0ULL;
+}
+
+/**
+ * Checks if there are pending per-vCPU notifications, in a specific vCPU either
+ * from SPs or from VMs.
+ */
+bool vm_are_per_vcpu_notifications_pending(struct vm_locked vm_locked,
+					   ffa_vcpu_index_t vcpu_id)
+{
+	CHECK(vcpu_id < MAX_CPUS);
+
+	return vm_get_notifications(vm_locked, true)
+			       ->per_vcpu[vcpu_id]
+			       .pending != 0ULL ||
+	       vm_get_notifications(vm_locked, false)
+			       ->per_vcpu[vcpu_id]
+			       .pending != 0ULL;
+}
+
 bool vm_are_notifications_enabled(struct vm_locked vm_locked)
 {
 	return vm_locked.vm->notifications.enabled == true;
@@ -470,13 +503,6 @@ static bool vm_is_notification_bit_set(ffa_notifications_bitmap_t notifications,
 				       uint32_t i)
 {
 	return (notifications & FFA_NOTIFICATION_MASK(i)) != 0U;
-}
-
-static struct notifications *vm_get_notifications(struct vm_locked vm_locked,
-						  bool is_from_vm)
-{
-	return is_from_vm ? &vm_locked.vm->notifications.from_vm
-			  : &vm_locked.vm->notifications.from_sp;
 }
 
 static void vm_notifications_global_state_count_update(

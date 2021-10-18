@@ -541,3 +541,10 @@ void plat_ffa_sri_init(struct cpu *cpu)
 {
 	(void)cpu;
 }
+
+void plat_ffa_inject_notification_pending_interrupt_context_switch(
+	struct vcpu *next, struct vcpu *current)
+{
+	(void)next;
+	(void)current;
+}

@@ -1171,3 +1171,39 @@ void plat_ffa_sri_init(struct cpu *cpu)
 
 	plat_interrupts_configure_interrupt(sri_desc);
 }
+
+void plat_ffa_inject_notification_pending_interrupt_context_switch(
+	struct vcpu *next, struct vcpu *current)
+{
+	CHECK(current != NULL);
+	/*
+	 * If NWd is giving CPU cycles to SP, check if it is necessary
+	 * to inject VI Notifications Pending Interrupt.
+	 */
+	if (current->vm->id == HF_OTHER_WORLD_ID && next != NULL &&
+	    vm_id_is_current_world(next->vm->id)) {
+		struct vm_locked target_vm_locked =
+			vm_find_locked(next->vm->id);
+		/*
+		 * If per-vCPU notifications are pending, NPI has been
+		 * injected at FFA_NOTIFICATION_SET handling in the
+		 * targeted vCPU. If next SP has pending global
+		 * notifications, only inject if there are no pending
+		 * per-vCPU notifications, to avoid injecting spurious
+		 * interrupt.
+		 */
+		if (!vm_are_per_vcpu_notifications_pending(target_vm_locked,
+							   vcpu_index(next)) &&
+		    vm_are_global_notifications_pending(target_vm_locked)) {
+			struct vcpu_locked next_locked = vcpu_lock(next);
+
+			api_interrupt_inject_locked(
+				next_locked,
+				HF_NOTIFICATION_PENDING_INTERRUPT_INTID,
+				current, NULL);
+
+			vcpu_unlock(&next_locked);
+		}
+		vm_unlock(&target_vm_locked);
+	}
+}

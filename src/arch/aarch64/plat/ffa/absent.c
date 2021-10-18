@@ -289,3 +289,10 @@ void plat_ffa_notification_info_get_forward(const uint16_t *ids,
 void plat_ffa_sri_init(void)
 {
 }
+
+void plat_ffa_inject_notification_pending_interrupt_context_switch(
+	struct vcpu *next, struct vcpu *current)
+{
+	(void)next;
+	(void)current;
+}
