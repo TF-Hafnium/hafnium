@@ -332,32 +332,32 @@ struct smmuv3_driver {
 
 static inline uint32_t mmio_read32(void *addr)
 {
-	return io_read32(IO32_C(addr));
+	return io_read32(IO32_C((uintpaddr_t)addr));
 }
 
-static inline uint32_t mmio_read32_offset(void *addr, uint32_t byte_off)
+static inline uint32_t mmio_read32_offset(void *addr, uint32_t offset)
 {
-	return io_read32(IO32_C((uint8_t *)addr + byte_off));
+	return io_read32(io32_c((uintpaddr_t)addr, offset));
 }
 
 static inline void mmio_write32(void *addr, uint32_t data)
 {
-	io_write32(IO32_C(addr), data);
+	io_write32(IO32_C((uintpaddr_t)addr), data);
 }
 
-static inline void mmio_write32_offset(void *addr, uint32_t byte_off,
+static inline void mmio_write32_offset(void *addr, uint32_t offset,
 				       uint32_t data)
 {
-	io_write32(IO32_C((uint8_t *)addr + byte_off), data);
+	io_write32(io32_c((uintpaddr_t)addr, offset), data);
 }
 
 static inline void mmio_write64(void *addr, uint64_t data)
 {
-	io_write64(IO64_C(addr), data);
+	io_write64(IO64_C((uintpaddr_t)addr), data);
 }
 
-static inline void mmio_write64_offset(void *addr, uint32_t byte_off,
+static inline void mmio_write64_offset(void *addr, uint32_t offset,
 				       uint64_t data)
 {
-	io_write64(IO64_C((uint8_t *)addr + byte_off), data);
+	io_write64(io64_c((uintpaddr_t)addr, offset), data);
 }

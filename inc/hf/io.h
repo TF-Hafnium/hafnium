@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include "hf/arch/barriers.h"
+#include "hf/arch/types.h"
 
 #include "hf/check.h"
 
@@ -55,19 +56,62 @@ typedef struct {
 
 /* Contructors for literals. */
 
-#define IO8_C(addr) ((io8_t){.ptr = (volatile uint8_t *)(addr)})
-#define IO16_C(addr) ((io16_t){.ptr = (volatile uint16_t *)(addr)})
-#define IO32_C(addr) ((io32_t){.ptr = (volatile uint32_t *)(addr)})
-#define IO64_C(addr) ((io64_t){.ptr = (volatile uint64_t *)(addr)})
+static inline io8_t io8_c(uintpaddr_t addr, uintpaddr_t offset)
+{
+	return (io8_t){.ptr = (volatile uint8_t *)(addr + offset)};
+}
 
-#define IO8_ARRAY_C(addr, cnt) \
-	((io8_array_t){.base = (volatile uint8_t *)(addr), .count = (cnt)})
-#define IO16_ARRAY_C(addr, cnt) \
-	((io16_array_t){.base = (volatile uint16_t *)(addr), .count = (cnt)})
-#define IO32_ARRAY_C(addr, cnt) \
-	((io32_array_t){.base = (volatile uint32_t *)(addr), .count = (cnt)})
-#define IO64_ARRAY_C(addr, cnt) \
-	((io64_array_t){.base = (volatile uint64_t *)(addr), .count = (cnt)})
+static inline io8_array_t io8_array_c(uintpaddr_t addr, uintpaddr_t offset,
+				      uint32_t count)
+{
+	return (io8_array_t){.base = (volatile uint8_t *)addr, .count = count};
+}
+
+static inline io16_t io16_c(uintpaddr_t addr, uintpaddr_t offset)
+{
+	return (io16_t){.ptr = (volatile uint16_t *)(addr + offset)};
+}
+
+static inline io16_array_t io16_array_c(uintpaddr_t addr, uintpaddr_t offset,
+					uint32_t count)
+{
+	return (io16_array_t){.base = (volatile uint16_t *)addr,
+			      .count = count};
+}
+
+static inline io32_t io32_c(uintpaddr_t addr, uintpaddr_t offset)
+{
+	return (io32_t){.ptr = (volatile uint32_t *)(addr + offset)};
+}
+
+static inline io32_array_t io32_array_c(uintpaddr_t addr, uintpaddr_t offset,
+					uint32_t count)
+{
+	return (io32_array_t){.base = (volatile uint32_t *)addr,
+			      .count = count};
+}
+
+static inline io64_t io64_c(uintpaddr_t addr, uintpaddr_t offset)
+{
+	return (io64_t){.ptr = (volatile uint64_t *)(addr + offset)};
+}
+
+static inline io64_array_t io64_array_c(uintpaddr_t addr, uintpaddr_t offset,
+					uint32_t count)
+{
+	return (io64_array_t){.base = (volatile uint64_t *)addr,
+			      .count = count};
+}
+
+#define IO8_C(addr) io8_c((addr), 0)
+#define IO16_C(addr) io16_c((addr), 0)
+#define IO32_C(addr) io32_c((addr), 0)
+#define IO64_C(addr) io64_c((addr), 0)
+
+#define IO8_ARRAY_C(addr, cnt) io8_array_c((addr), 0, cnt)
+#define IO16_ARRAY_C(addr, cnt) io16_array_c((addr), 0, cnt)
+#define IO32_ARRAY_C(addr, cnt) io32_array_c((addr), 0, cnt)
+#define IO64_ARRAY_C(addr, cnt) io64_array_c((addr), 0, cnt)
 
 /** Read from memory-mapped IO. */
 
