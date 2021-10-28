@@ -54,6 +54,14 @@
 #define CTLR_ENABLE_G0_MASK (0x1)
 #define CTLR_ENABLE_G0_BIT BIT_32(CTLR_ENABLE_G0_SHIFT)
 
+/* Common GIC Distributor interface register constants. */
+#define PIDR2_ARCH_REV_SHIFT 4
+#define PIDR2_ARCH_REV_MASK 0xf
+
+/* GIC revision as reported by PIDR2.ArchRev register field */
+#define ARCH_REV_GICV3 3
+#define ARCH_REV_GICV4 4
+
 #define IGROUPR_SHIFT 5
 #define ISENABLER_SHIFT 5
 #define ICENABLER_SHIFT ISENABLER_SHIFT
@@ -410,6 +418,11 @@ static inline void gicd_wait_for_pending_write(uintptr_t gicd_base)
 {
 	while ((gicd_read_ctlr(gicd_base) & GICD_CTLR_RWP_BIT) != 0U) {
 	}
+}
+
+static inline uint32_t gicd_read_pidr2(uintptr_t base)
+{
+	return io_read32(IO32_C(base + GICD_PIDR2_GICV3));
 }
 
 static inline void gicd_write_irouter(uintptr_t base, unsigned int id,

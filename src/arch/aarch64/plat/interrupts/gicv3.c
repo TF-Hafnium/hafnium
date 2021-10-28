@@ -19,10 +19,29 @@
 #include "msr.h"
 
 #define GICD_SIZE (0x10000)
+
+/**
+ * In GICv3, each Redistributor has two 64KB frames:
+ * 1. RD_base
+ * 2. SGI_base
+ */
 #define GICV3_REDIST_SIZE_PER_PE (0x20000) /* 128 KB */
 
+/**
+ * In GICv4, each Redistributor has two additional 64KB frames:
+ * 3. VLPI_base
+ * 4. Reserved
+ */
+#define GICV4_REDIST_SIZE_PER_PE (0x40000) /* 256 KB */
+
+#if GIC_VERSION == 3
+#define GIC_REDIST_SIZE_PER_PE GICV3_REDIST_SIZE_PER_PE
+#elif GIC_VERSION == 4
+#define GIC_REDIST_SIZE_PER_PE GICV4_REDIST_SIZE_PER_PE
+#endif
+
+#define GIC_REDIST_FRAMES_OFFSET GIC_REDIST_SIZE_PER_PE
 #define REDIST_LAST_FRAME_MASK (1 << 4)
-#define GICV3_REDIST_FRAMES_OFFSET GICV3_REDIST_SIZE_PER_PE
 
 struct gicv3_driver {
 	uintptr_t dist_base;
@@ -327,7 +346,7 @@ static inline void populate_redist_base_addrs(void)
 			return;
 		}
 
-		current_rdist_frame += GICV3_REDIST_FRAMES_OFFSET;
+		current_rdist_frame += GIC_REDIST_FRAMES_OFFSET;
 	}
 }
 
@@ -431,6 +450,8 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 		       struct mpool *ppool)
 {
 	void *base_addr;
+	uint32_t gic_version;
+	uint32_t reg_pidr;
 
 	base_addr = mm_identity_map(stage1_locked, pa_init(GICD_BASE),
 				    pa_init(GICD_BASE + GICD_SIZE),
@@ -444,7 +465,7 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 
 	base_addr = mm_identity_map(
 		stage1_locked, pa_init(GICR_BASE),
-		pa_init(GICR_BASE + MAX_CPUS * GICV3_REDIST_SIZE_PER_PE),
+		pa_init(GICR_BASE + MAX_CPUS * GIC_REDIST_SIZE_PER_PE),
 		MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool);
 
 	if (base_addr == NULL) {
@@ -454,6 +475,15 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 
 	plat_gicv3_driver.base_redist_frame = (uintptr_t)base_addr;
 
+	/* Check GIC version reported by the Peripheral register. */
+	reg_pidr = gicd_read_pidr2(plat_gicv3_driver.dist_base);
+	gic_version = (reg_pidr >> PIDR2_ARCH_REV_SHIFT) & PIDR2_ARCH_REV_MASK;
+
+#if GIC_VERSION == 3
+	CHECK(gic_version == ARCH_REV_GICV3);
+#elif GIC_VERSION == 4
+	CHECK(gic_version == ARCH_REV_GICV4);
+#endif
 	populate_redist_base_addrs();
 
 	return true;
