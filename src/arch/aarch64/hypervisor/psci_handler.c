@@ -47,6 +47,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 	 * This blocks more calls than just PSCI so it may need to be made more
 	 * lenient in future.
 	 */
+
 	if (plat_psci_version_get() == 0) {
 		*ret = SMCCC_ERROR_UNKNOWN;
 		return (func & SMCCC_SERVICE_CALL_MASK) ==
@@ -60,6 +61,10 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 
 	case PSCI_FEATURES:
 		switch (arg0 & ~SMCCC_CONVENTION_MASK) {
+		case SMCCC_VERSION_FUNC_ID:
+			*ret = SMCCC_VERSION_1_2;
+			break;
+
 		case PSCI_CPU_SUSPEND:
 			if (plat_psci_version_get() == PSCI_VERSION_0_2) {
 				/*

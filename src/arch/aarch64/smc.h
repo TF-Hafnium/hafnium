@@ -39,6 +39,9 @@
 
 #define SMCCC_ERROR_UNKNOWN  (-1)
 
+#define SMCCC_VERSION_FUNC_ID	0x80000000
+#define SMCCC_VERSION_1_2	0x10002
+
 /* clang-format on */
 
 struct ffa_value smc32(uint32_t func, uint32_t arg0, uint32_t arg1,
