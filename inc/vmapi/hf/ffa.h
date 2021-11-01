@@ -93,6 +93,24 @@
 
 /* clang-format on */
 
+/**
+ * FF-A Feature ID, to be used with interface FFA_FEATURES.
+ * As defined in the FF-A v1.1 Beta specification, table 13.10, in section
+ * 13.2.
+ */
+
+#define FFA_FEATURES_FUNC_ID_MASK UINT32_C(0x1 << 31)
+#define FFA_FEATURES_FEATURE_ID_MASK UINT32_C(0x7F)
+
+/* Query interrupt ID of Notification Pending Interrupt. */
+#define FFA_FEATURE_NPI 0x1U
+
+/* Query interrupt ID of Schedule Receiver Interrupt. */
+#define FFA_FEATURE_SRI 0x2U
+
+/* Query interrupt ID of the Managed Exit Interrupt. */
+#define FFA_FEATURE_MEI 0x3U
+
 /* FF-A function specific constants. */
 #define FFA_MSG_RECV_BLOCK 0x1
 #define FFA_MSG_RECV_BLOCK_MASK 0x1
@@ -330,6 +348,11 @@ static inline ffa_vm_id_t ffa_frag_sender(struct ffa_value args)
 	return (args.arg4 >> 16) & 0xffff;
 }
 
+static inline uint32_t ffa_feature_intid(struct ffa_value args)
+{
+	return (uint32_t)args.arg2;
+}
+
 /**
  * Holds the UUID in a struct that is mappable directly to the SMCC calling
  * convention, which is used for FF-A calls.
@@ -404,8 +427,6 @@ struct ffa_partition_info {
 typedef uint64_t ffa_notifications_bitmap_t;
 
 #define MAX_FFA_NOTIFICATIONS 64U
-
-#define FFA_SCHEDULE_RECEIVER_INTERRUPT_ID 8
 
 /**
  * Flag for notification bind and set, to specify call is about per-vCPU

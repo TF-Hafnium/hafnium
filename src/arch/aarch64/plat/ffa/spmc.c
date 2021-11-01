@@ -107,11 +107,23 @@ void plat_ffa_log_init(void)
 }
 
 /** Returns information on features specific to the SWd. */
-struct ffa_value plat_ffa_features(uint32_t function_id)
+struct ffa_value plat_ffa_features(uint32_t function_feature_id)
 {
-	(void)function_id;
+	struct ffa_value ret;
+
+	switch (function_feature_id) {
+#if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
+	case FFA_FEATURE_MEI:
+		ret = api_ffa_feature_success(HF_MANAGED_EXIT_INTID);
+		break;
+#endif
+	default:
+		ret = ffa_error(FFA_NOT_SUPPORTED);
+		break;
+	}
+
 	/* There are no features only supported in the SWd */
-	return ffa_error(FFA_NOT_SUPPORTED);
+	return ret;
 }
 
 struct ffa_value plat_ffa_spmc_id_get(void)
@@ -1118,9 +1130,9 @@ void plat_ffa_sri_state_set(enum plat_ffa_sri_state state)
 static void plat_ffa_send_schedule_receiver_interrupt(struct cpu *cpu)
 {
 	dlog_verbose("Setting Schedule Receiver SGI %d on core: %d\n",
-		     FFA_SCHEDULE_RECEIVER_INTERRUPT_ID, cpu_index(cpu));
+		     HF_SCHEDULE_RECEIVER_INTID, cpu_index(cpu));
 
-	plat_interrupts_send_sgi(FFA_SCHEDULE_RECEIVER_INTERRUPT_ID, false,
+	plat_interrupts_send_sgi(HF_SCHEDULE_RECEIVER_INTID, false,
 				 (1 << cpu_index(cpu)), false);
 }
 
@@ -1161,7 +1173,7 @@ void plat_ffa_sri_init(struct cpu *cpu)
 	/* TODO: when supported, make the interrupt driver use cpu structure. */
 	(void)cpu;
 
-	interrupt_desc_set_id(&sri_desc, FFA_SCHEDULE_RECEIVER_INTERRUPT_ID);
+	interrupt_desc_set_id(&sri_desc, HF_SCHEDULE_RECEIVER_INTID);
 	interrupt_desc_set_priority(&sri_desc, SRI_PRIORITY);
 	interrupt_desc_set_valid(&sri_desc, true);
 
@@ -1198,8 +1210,7 @@ void plat_ffa_inject_notification_pending_interrupt_context_switch(
 			struct vcpu_locked next_locked = vcpu_lock(next);
 
 			api_interrupt_inject_locked(
-				next_locked,
-				HF_NOTIFICATION_PENDING_INTERRUPT_INTID,
+				next_locked, HF_NOTIFICATION_PENDING_INTID,
 				current, NULL);
 
 			vcpu_unlock(&next_locked);

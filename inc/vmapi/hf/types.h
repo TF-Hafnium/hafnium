@@ -55,8 +55,11 @@ typedef uintptr_t hf_ipaddr_t;
 /** The virtual interrupt ID used for managed exit. */
 #define HF_MANAGED_EXIT_INTID 4
 
-/** The virtual interrupt ID used for notification pending interrupt */
-#define HF_NOTIFICATION_PENDING_INTERRUPT_INTID 5
+/** The virtual interrupt ID used for notification pending interrupt. */
+#define HF_NOTIFICATION_PENDING_INTID 5
+
+/** The physical interrupt ID use for the schedule receiver interrupt. */
+#define HF_SCHEDULE_RECEIVER_INTID 8
 
 /** Type of interrupts */
 enum interrupt_type {

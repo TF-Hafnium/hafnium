@@ -30,7 +30,7 @@ TEST(hf_vm_get_id, secure_partition_id)
 }
 
 /** Ensures that FFA_FEATURES is reporting the expected interfaces. */
-TEST(ffa, ffa_features)
+TEST(ffa_features, succeeds_ffa_call_ids)
 {
 	struct ffa_value ret;
 
@@ -96,13 +96,56 @@ TEST(ffa, ffa_features)
 
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_BITMAP_DESTROY_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_BITMAP_DESTROY_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_SET_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_GET_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_BIND_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_UNBIND_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_NOTIFICATION_INFO_GET_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
+/** Validates return for FFA_FEATURES provided a valid feature ID. */
+TEST(ffa_features, succeeds_feature_ids)
+{
+	struct ffa_value ret = ffa_features(FFA_FEATURE_NPI);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_feature_intid(ret), HF_NOTIFICATION_PENDING_INTID);
+
+	ret = ffa_features(FFA_FEATURE_SRI);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_feature_intid(ret), HF_SCHEDULE_RECEIVER_INTID);
+
+	ret = ffa_features(FFA_FEATURE_MEI);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_feature_intid(ret), HF_MANAGED_EXIT_INTID);
+}
+
+/** Validates error return for FFA_FEATURES provided a wrongful feature ID. */
+TEST(ffa_features, fails_if_feature_id_wrong)
+{
+	EXPECT_FFA_ERROR(ffa_features(0x0FFFFF), FFA_NOT_SUPPORTED);
 }
 
 /**
  * Ensures that FFA_FEATURES returns not supported for a bogus FID or
  * currently non-implemented interfaces.
  */
-TEST(ffa, ffa_features_not_supported)
+TEST(ffa_features, fails_func_id_not_supported)
 {
 	struct ffa_value ret;
 

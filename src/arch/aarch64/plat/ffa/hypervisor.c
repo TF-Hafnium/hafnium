@@ -28,9 +28,9 @@ alignas(FFA_PAGE_SIZE) static uint8_t other_world_send_buffer[HF_MAILBOX_SIZE];
 alignas(FFA_PAGE_SIZE) static uint8_t other_world_recv_buffer[HF_MAILBOX_SIZE];
 
 /** Returns information on features specific to the NWd. */
-struct ffa_value plat_ffa_features(uint32_t function_id)
+struct ffa_value plat_ffa_features(uint32_t function_feature_id)
 {
-	switch (function_id) {
+	switch (function_feature_id) {
 	case FFA_MSG_POLL_32:
 	case FFA_YIELD_32:
 	case FFA_MSG_SEND_32:

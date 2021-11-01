@@ -1811,12 +1811,32 @@ int64_t api_debug_log(char c, struct vcpu *current)
 }
 
 /**
+ * Helper for success return of FFA_FEATURES, for when it is used to query
+ * an interrupt ID.
+ */
+struct ffa_value api_ffa_feature_success(uint32_t arg2)
+{
+	return (struct ffa_value){
+		.func = FFA_SUCCESS_32, .arg1 = 0U, .arg2 = arg2};
+}
+
+/**
  * Discovery function returning information about the implementation of optional
  * FF-A interfaces.
  */
-struct ffa_value api_ffa_features(uint32_t function_id)
+struct ffa_value api_ffa_features(uint32_t feature_function_id)
 {
-	switch (function_id) {
+	/*
+	 * According to table 13.8 of FF-A v1.1 Beta 0 spec, bits [30:8] MBZ
+	 * if using a feature ID.
+	 */
+	if ((feature_function_id & FFA_FEATURES_FUNC_ID_MASK) == 0U &&
+	    (feature_function_id & ~FFA_FEATURES_FEATURE_ID_MASK) != 0) {
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	switch (feature_function_id) {
+	/* Check support of the given Function ID. */
 	case FFA_ERROR_32:
 	case FFA_SUCCESS_32:
 	case FFA_INTERRUPT_32:
@@ -1843,10 +1863,26 @@ struct ffa_value api_ffa_features(uint32_t function_id)
 #if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
 	/* FF-A v1.1 features. */
 	case FFA_SPM_ID_GET_32:
+	case FFA_NOTIFICATION_BITMAP_CREATE_32:
+	case FFA_NOTIFICATION_BITMAP_DESTROY_32:
+	case FFA_NOTIFICATION_BIND_32:
+	case FFA_NOTIFICATION_UNBIND_32:
+	case FFA_NOTIFICATION_SET_32:
+	case FFA_NOTIFICATION_GET_32:
+	case FFA_NOTIFICATION_INFO_GET_64:
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
+
+#if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
+	/* Check support of a feature provided respective feature ID. */
+	case FFA_FEATURE_NPI:
+		return api_ffa_feature_success(HF_NOTIFICATION_PENDING_INTID);
+	case FFA_FEATURE_SRI:
+		return api_ffa_feature_success(HF_SCHEDULE_RECEIVER_INTID);
+#endif
+	/* Platform specific feature support. */
 	default:
-		return arch_ffa_features(function_id);
+		return arch_ffa_features(feature_function_id);
 	}
 }
 
@@ -2833,9 +2869,9 @@ struct ffa_value api_ffa_notification_set(
 			vm_get_vcpu(receiver_locked.vm, vcpu_id);
 
 		dlog_verbose("Per-vCPU notification, pending NPI.\n");
-		internal_interrupt_inject(
-			target_vcpu, HF_NOTIFICATION_PENDING_INTERRUPT_INTID,
-			current, NULL);
+		internal_interrupt_inject(target_vcpu,
+					  HF_NOTIFICATION_PENDING_INTID,
+					  current, NULL);
 	}
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
