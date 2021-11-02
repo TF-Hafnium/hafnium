@@ -274,7 +274,8 @@ bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 bool vm_are_global_notifications_pending(struct vm_locked vm_locked);
 bool vm_are_per_vcpu_notifications_pending(struct vm_locked vm_locked,
 					   ffa_vcpu_index_t vcpu_id);
-bool vm_are_notifications_enabled(struct vm_locked vm_locked);
+bool vm_are_notifications_enabled(struct vm *vm);
+bool vm_locked_are_notifications_enabled(struct vm_locked vm_locked);
 bool vm_notifications_validate_per_vcpu(struct vm_locked vm_locked,
 					bool is_from_vm, bool is_per_vcpu,
 					ffa_notifications_bitmap_t notif);

@@ -213,7 +213,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		/* Updating boot list according to boot_order */
 		vm_update_boot(vm_locked.vm);
 
-		if (vm_are_notifications_enabled(vm_locked) &&
+		if (vm_locked_are_notifications_enabled(vm_locked) &&
 		    !plat_ffa_notifications_bitmap_create_call(
 			    vm_locked.vm->id, vm_locked.vm->vcpu_count)) {
 			return false;

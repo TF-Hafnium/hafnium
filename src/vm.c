@@ -494,9 +494,14 @@ bool vm_are_per_vcpu_notifications_pending(struct vm_locked vm_locked,
 			       .pending != 0ULL;
 }
 
-bool vm_are_notifications_enabled(struct vm_locked vm_locked)
+bool vm_are_notifications_enabled(struct vm *vm)
 {
-	return vm_locked.vm->notifications.enabled == true;
+	return vm->notifications.enabled == true;
+}
+
+bool vm_locked_are_notifications_enabled(struct vm_locked vm_locked)
+{
+	return vm_are_notifications_enabled(vm_locked.vm);
 }
 
 static bool vm_is_notification_bit_set(ffa_notifications_bitmap_t notifications,

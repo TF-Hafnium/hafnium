@@ -371,7 +371,7 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	 * A Null UUID retrieves information for all VMs.
 	 */
 	for (uint16_t index = 0; index < vm_get_count(); ++index) {
-		const struct vm *vm = vm_find_index(index);
+		struct vm *vm = vm_find_index(index);
 
 		if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuid)) {
 			partitions[vm_count].vm_id = vm->id;
@@ -379,6 +379,10 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 			partitions[vm_count].properties =
 				plat_ffa_partition_properties(current_vm->id,
 							      vm);
+			partitions[vm_count].properties |=
+				vm_are_notifications_enabled(vm)
+					? FFA_PARTITION_NOTIFICATION
+					: 0;
 
 			++vm_count;
 		}
@@ -2733,7 +2737,7 @@ struct ffa_value api_ffa_notification_update_bindings(
 		return ffa_error(FFA_DENIED);
 	}
 
-	if (!vm_are_notifications_enabled(receiver_locked)) {
+	if (!vm_locked_are_notifications_enabled(receiver_locked)) {
 		dlog_verbose("Notifications are not enabled.\n");
 		ret = ffa_error(FFA_NOT_SUPPORTED);
 		goto out;
@@ -2821,7 +2825,7 @@ struct ffa_value api_ffa_notification_set(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (!vm_are_notifications_enabled(receiver_locked)) {
+	if (!vm_locked_are_notifications_enabled(receiver_locked)) {
 		dlog_verbose("Receiver's notifications not enabled.\n");
 		ret = ffa_error(FFA_DENIED);
 		goto out;
