@@ -1137,6 +1137,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 	struct vcpu *new_vcpu = NULL;
 	uintreg_t ec = GET_ESR_EC(esr);
 	bool is_el0_partition = vcpu->vm->el0_partition;
+	bool resume = false;
 
 	switch (ec) {
 	case EC_WFI_WFE:
@@ -1171,13 +1172,25 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 	case EC_DATA_ABORT_LOWER_EL:
 		info = fault_info_init(
 			esr, vcpu, (esr & (1U << 6)) ? MM_MODE_W : MM_MODE_R);
-		if (vcpu_handle_page_fault(vcpu, &info)) {
-			return NULL;
-		}
 
+		resume = vcpu_handle_page_fault(vcpu, &info);
 		if (is_el0_partition) {
 			dlog_warning("Data abort on EL0 partition\n");
-			return api_abort(vcpu);
+			/*
+			 * Abort EL0 context if we should not resume the
+			 * context, or it is an alignment fault.
+			 * vcpu_handle_page_fault() only checks the mode of the
+			 * page in an architecture agnostic way but alignment
+			 * faults on aarch64 can happen on a correctly mapped
+			 * page.
+			 */
+			if (!resume || ((esr & 0x3f) == 0x21)) {
+				return api_abort(vcpu);
+			}
+		}
+
+		if (resume) {
+			return NULL;
 		}
 
 		/* Inform the EL1 of the data abort. */
@@ -1188,6 +1201,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 
 	case EC_INSTRUCTION_ABORT_LOWER_EL:
 		info = fault_info_init(esr, vcpu, MM_MODE_X);
+
 		if (vcpu_handle_page_fault(vcpu, &info)) {
 			return NULL;
 		}

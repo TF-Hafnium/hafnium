@@ -164,6 +164,16 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 					ipa_add(ipa_init(va_addr(f->vaddr)), 1),
 					&mode) &&
 			(mode & mask) == f->mode;
+
+		/*
+		 * For EL0 partitions, if there is an instruction abort and the
+		 * mode of the page is RWX, we don't resume since Hafnium does
+		 * not allow write and executable pages.
+		 */
+		if ((f->mode == MM_MODE_X) &&
+		    ((mode & MM_MODE_W) == MM_MODE_W)) {
+			resume = false;
+		}
 	}
 
 	vm_unlock(&locked_vm);
