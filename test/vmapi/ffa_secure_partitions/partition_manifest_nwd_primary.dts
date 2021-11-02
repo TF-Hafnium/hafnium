@@ -22,4 +22,5 @@
 	entrypoint-offset = <0x1000>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0>; /* Direct messaging only */
+	notification-support; /* Receipt of notifications. */
 };

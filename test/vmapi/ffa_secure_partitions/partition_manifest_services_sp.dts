@@ -23,4 +23,5 @@
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0>; /* Direct messaging only */
 	boot-order = <2>; /* This should be the highest priority partition */
+	notification-support; /* Receipt of notifications. */
 };

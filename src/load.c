@@ -187,8 +187,6 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	dlog_verbose("VM has %d physical interrupts defined in manifest.\n", k);
 
 	if (manifest_vm->is_ffa_partition) {
-		struct ffa_value bitmap_create_res;
-
 		/* Link rxtx buffers to mailbox */
 		if (manifest_vm->partition.rxtx.available) {
 			if (!link_rxtx_to_mailbox(stage1_locked, vm_locked,
@@ -207,26 +205,18 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->managed_exit =
 			manifest_vm->partition.managed_exit;
 
+		vm_locked.vm->notifications.enabled =
+			manifest_vm->partition.notification_support;
+
 		vm_locked.vm->boot_order = manifest_vm->partition.boot_order;
 
 		/* Updating boot list according to boot_order */
 		vm_update_boot(vm_locked.vm);
 
-		/* TODO: Enable in accordance to VM's manifest. */
-		vm_locked.vm->notifications.enabled = true;
-
-		/* TODO: check if notifications is enabled for the given vm */
-		if (plat_ffa_notifications_bitmap_create_call(
-			    vm_locked.vm->id, vm_locked.vm->vcpu_count,
-			    &bitmap_create_res)) {
-			if (bitmap_create_res.func == FFA_ERROR_32) {
-				dlog_verbose(
-					"Failed to create notifications bitmap "
-					"to VM: %#x; error: %#x.\n",
-					vm_locked.vm->id,
-					ffa_error_code(bitmap_create_res));
-				return false;
-			}
+		if (vm_are_notifications_enabled(vm_locked) &&
+		    !plat_ffa_notifications_bitmap_create_call(
+			    vm_locked.vm->id, vm_locked.vm->vcpu_count)) {
+			return false;
 		}
 	}
 

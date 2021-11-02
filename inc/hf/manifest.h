@@ -142,6 +142,8 @@ struct partition_manifest {
 	uint8_t messaging_method;
 	/** optional */
 	bool managed_exit;
+	/** optional - receipt of notifications. */
+	bool notification_support;
 	/** optional */
 	bool has_primary_scheduler;
 	/** optional - preemptible / run to completion */

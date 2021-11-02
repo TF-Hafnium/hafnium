@@ -630,6 +630,15 @@ static enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	dlog_verbose("  Messaging method %u\n", vm->partition.messaging_method);
 
 	TRY(read_bool(&root, "managed-exit", &vm->partition.managed_exit));
+	if (vm->partition.managed_exit) {
+		dlog_verbose("  Managed Exit Supported\n");
+	}
+
+	TRY(read_bool(&root, "notification-support",
+		      &vm->partition.notification_support));
+	if (vm->partition.notification_support) {
+		dlog_verbose("  Notifications Receipt Supported\n");
+	}
 
 	/* Parse memory-regions */
 	ffa_node = root;

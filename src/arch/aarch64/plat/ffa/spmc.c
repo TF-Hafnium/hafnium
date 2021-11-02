@@ -480,14 +480,12 @@ out:
 }
 
 bool plat_ffa_notifications_bitmap_create_call(ffa_vm_id_t vm_id,
-					       ffa_vcpu_count_t vcpu_count,
-					       struct ffa_value *ret)
+					       ffa_vcpu_count_t vcpu_count)
 {
 	(void)vm_id;
 	(void)vcpu_count;
-	(void)ret;
 
-	return false;
+	return true;
 }
 
 struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)

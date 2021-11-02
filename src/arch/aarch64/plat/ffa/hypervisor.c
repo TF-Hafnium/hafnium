@@ -330,15 +330,21 @@ struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 }
 
 bool plat_ffa_notifications_bitmap_create_call(ffa_vm_id_t vm_id,
-					       ffa_vcpu_count_t vcpu_count,
-					       struct ffa_value *ret)
+					       ffa_vcpu_count_t vcpu_count)
 {
-	CHECK(ret != NULL);
-	*ret = arch_other_world_call((struct ffa_value){
+	struct ffa_value ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_NOTIFICATION_BITMAP_CREATE_32,
 		.arg1 = vm_id,
 		.arg2 = vcpu_count,
 	});
+
+	if (ret.func == FFA_ERROR_32) {
+		dlog_error(
+			"Failed to create notifications bitmap "
+			"to VM: %#x; error: %#x.\n",
+			vm_id, ffa_error_code(ret));
+		return false;
+	}
 
 	return true;
 }
@@ -390,11 +396,12 @@ void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
 	}
 
 	/*
-	 * The count of ids should be at least the number of lists, to encompass
-	 * for at least the ids of the FF-A endpoints.
-	 * List sizes will be between 0 and 3, and relates to the counting of
+	 * The count of ids should be at least the number of lists, to
+	 * encompass for at least the ids of the FF-A endpoints. List
+	 * sizes will be between 0 and 3, and relates to the counting of
 	 * vCPU of the endpoint that have pending notifications.
-	 * If `lists_count` is already ids_count_max, each list size must be 0.
+	 * If `lists_count` is already ids_count_max, each list size
+	 * must be 0.
 	 */
 	*ids_count = *lists_count;
 
@@ -403,17 +410,17 @@ void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
 			ffa_notification_info_get_list_size(ret, i + 1);
 
 		/*
-		 * ... sum the counting of each list size that are part of the
-		 * main list.
+		 * ... sum the counting of each list size that are part
+		 * of the main list.
 		 */
 		*ids_count += local_lists_sizes[i];
 	}
 
 	/*
-	 * Sanity check returned `lists_count` and determined `ids_count`.
-	 * If something wrong, reset arguments to 0 such that hypervisor's
-	 * handling of FFA_NOTIFICATION_INFO_GET can proceed without SPMC's
-	 * values.
+	 * Sanity check returned `lists_count` and determined
+	 * `ids_count`. If something wrong, reset arguments to 0 such
+	 * that hypervisor's handling of FFA_NOTIFICATION_INFO_GET can
+	 * proceed without SPMC's values.
 	 */
 	if (*ids_count > ids_count_max) {
 		*ids_count = 0;
@@ -508,8 +515,8 @@ struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
 	(void)next;
 
 	/*
-	 * SPMD uses FFA_INTERRUPT ABI to convey secure interrupt to SPMC.
-	 * Execution should not reach hypervisor with this ABI.
+	 * SPMD uses FFA_INTERRUPT ABI to convey secure interrupt to
+	 * SPMC. Execution should not reach hypervisor with this ABI.
 	 */
 	CHECK(false);
 

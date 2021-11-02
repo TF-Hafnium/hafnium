@@ -133,10 +133,11 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 
 /**
  * Issues a FFA_NOTIFICATION_BITMAP_CREATE.
+ * Returns true if the call goes well, and false if call returns with
+ * FFA_ERROR_32.
  */
 bool plat_ffa_notifications_bitmap_create_call(ffa_vm_id_t vm_id,
-					       ffa_vcpu_count_t vcpu_count,
-					       struct ffa_value *ret);
+					       ffa_vcpu_count_t vcpu_count);
 
 /**
  * Destroys the notifications bitmap for the given VM ID.
