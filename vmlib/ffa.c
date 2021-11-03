@@ -20,6 +20,15 @@
 #include "hf/std.h"
 #endif
 
+static void ffa_copy_memory_region_constituents(
+	struct ffa_memory_region_constituent *dest,
+	const struct ffa_memory_region_constituent *src)
+{
+	dest->address = src->address;
+	dest->page_count = src->page_count;
+	dest->reserved = 0;
+}
+
 /**
  * Initialises the header of the given `ffa_memory_region`, not including the
  * composite memory region offset.
@@ -116,8 +125,9 @@ uint32_t ffa_memory_region_init(
 
 	for (i = 0; i < constituent_count; ++i) {
 		if (i < count_to_copy) {
-			composite_memory_region->constituents[i] =
-				constituents[i];
+			ffa_copy_memory_region_constituents(
+				&composite_memory_region->constituents[i],
+				&constituents[i]);
 		}
 		composite_memory_region->page_count +=
 			constituents[i].page_count;
@@ -288,7 +298,8 @@ uint32_t ffa_memory_fragment_init(
 	}
 
 	for (i = 0; i < count_to_copy; ++i) {
-		fragment[i] = constituents[i];
+		ffa_copy_memory_region_constituents(&fragment[i],
+						    &constituents[i]);
 	}
 
 	if (fragment_length != NULL) {
