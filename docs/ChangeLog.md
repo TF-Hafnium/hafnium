@@ -1,4 +1,92 @@
-﻿# Change log
+# Change log
+
+## v2.6
+#### Highlights
+* FF-A Setup and discovery
+    * FF-A build time version updated to v1.1.
+    * Managed exit and notifications feature support enabled in SP manifests.
+    * Updated FFA_FEATURES to permit discovery of managed exit, schedule receiver,
+      and notification pending interrupt IDs.
+    * FFA_PARTITION_INFO_GET updated to permit managed exit and notification
+      support discovery.
+    * FFA_SPM_ID_GET added to permit discovering the SPMC endpoint ID (or the
+      SPMD ID at the secure physical FF-A instance).
+    * FFA_RXTX_UNMAP implementation added.
+* FF-A v1.1 notifications
+    * Added ABIs permitting VM (or OS kernel) to SP, and SP to SP asynchronous
+      signaling.
+    * Added generation of scheduler receiver (NS physical) and notification
+      pending (secure virtual) interrupts.
+    * The schedule receiver interrupt is donated from the secure world SGI
+      interrupt ID range.
+* FF-A v1.1 interrupt handling
+    * Added a GIC driver at S-EL2 permitting to trap and handle non-secure and
+      secure interrupts while the secure world runs.
+    * Added forwarding and handling of a secure interrupt while the normal world
+      runs.
+    * Added secure interrupt forwarding to the secure partition that had the
+      interrupt registered in its partition manifest.
+    * The interrupt deactivation happens through the Hafnium para-virtualized
+      interrupt controller interface.
+    * vCPU states, run time models and SP scheduling model are revisited as per
+      FF-A v1.1 Beta0 specification (see 'Known limitations' section below).
+* S-EL0 partitions support
+    * Added support for VHE architecture extension in the secure world (through
+      a build option).
+    * A partition bootstraps as an S-EL0 partition based on the exception-level
+      field in the FF-A manifest.
+    * It permits the implementation of applications on top of Hafnium without
+      relying on an operating system at S-EL1.
+    * It leverages the EL2&0 Stage-1 translation regime. Apps use FF-A
+      ABIs through the SVC conduit.
+    * Added FF-A v1.1 FFA_MEM_PERM_GET/SET ABIs permitting run-time update of
+      memory region permissions.
+    * It supersedes the existing S-EL1 shim architecture (without removing its
+      support).
+    * S-EL1 SP, S-EL0 SP or former S-EL0 SP+shim can all co-exist in the same
+      system.
+* SVE
+    * Support for saving/restoring the SVE live state such that S-EL2/Hafnium
+      preserves the normal world state on world switches.
+    * Secure partitions are permitted to use FP/SIMD while normal world uses
+      SVE/SIMD/FP on the same core.
+    * The SVE NS live state comprises FPCR/FPSR/FFR/p[16]/Z[32] registers.
+* LLVM/Clang 12
+    * The toolchain stored in prebuilts submodule is updated to LLVM 12.0.5.
+    * Build/static analyzer fixes done in the top and third party projects.
+    * Linux sources (used by the test infrastructure) are updated to 5.4.148.
+      The linux test kernel module build is updated to only depend on LLVM
+      toolchain.
+* Hafnium CI improvements
+    * Added two configurations permitting Hafnium testing in the secure world.
+    * First configuration launches both the Hypervisor in the normal world
+      and the SPMC in the secure world. This permits thorough FF-A ABI testing
+      among normal and secure world endpoints.
+    * The second configuration launches the SPMC alone for component testing
+      or SP to SP ABI testing.
+    * Hafnium CI Qemu version updated to v6.0.0 (implements VHE and FEAT_SEL2
+      extensions).
+* FF-A compliance fixes
+    * Added checks for valid memory permissions values in manifest memory and
+      device regions declarations.
+    * FFA_FEATURES fixed to state indirect messages are not supported by
+      the SPMC.
+    * Limit an SP to emit a direct request to another SP only.
+    * Memory sharing: fixed input validation and return values.
+    * FFA_RXTX_MAP fixed returned error codes.
+    * FFA_MSG_WAIT input parameters check hardened.
+
+#### Known limitations:
+* S-EL0 partitions/VHE: the feature is in an experimental stage and not all use
+  cases have been implemented or tested. Normal world to SP and SP to SP memory
+  sharing is not tested. Interrupt handling is not tested.
+* The current implementation does not support handling a secure interrupt that
+  is triggered while currently handling a secure interrupt. This restricts to
+  scenarios described in Table 8.13 and Table 8.14 of the FF-A v1.1 Beta0
+  specification. Priority Mask Register is not saved/restored during context
+  switching while handling secure interrupt.
+* Hafnium CI: scenarios involving the Hypervisor are left as test harness
+  purposes only, not meant for production use cases.
 
 ## v2.5
 #### Highlights
