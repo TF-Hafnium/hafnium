@@ -562,8 +562,9 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
         self.compile_dt(run_state, dt)
 
         # Create file to capture model stdout and stderr
-        fvp_out = args.artifacts.create_file(args.global_run_name, ".model.log")
-        self.fvp_out_f = open(fvp_out, "a")
+        self.fvp_out_filename = args.artifacts.create_file(
+            args.global_run_name, ".model.log")
+        self.fvp_out_f = open(self.fvp_out_filename, "a")
 
         # Generate the FVP model arguments
         self.fvp_args = self.gen_fvp_args(None, None, dt)
@@ -612,6 +613,14 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
         # APIs. Therefore, removing from list of command arguments:
         return fvp_args[3:]
 
+    def get_telnet_port(self):
+        # Get telnet port by parsing log file, default to 5000
+        self.fvp_out_f.flush()
+        log = read_file(self.fvp_out_filename)
+        port = re.match(
+            'terminal_0: Listening for serial connection on port ([0-9]+)', log)
+        return port.group(1) if port else 5000
+
     def process_start(self):
         self.process = subprocess.Popen(self.fvp_args,
                                         stdout = self.fvp_out_f,
@@ -620,7 +629,7 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
         time.sleep(1.0)
         # Start telnet session
         try:
-            self.comm = Telnet("localhost", 5000)
+            self.comm = Telnet("localhost", self.get_telnet_port())
         except ConnectionError as e:
             self.finish()
             raise e
