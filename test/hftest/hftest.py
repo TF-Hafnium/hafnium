@@ -618,9 +618,17 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
                                         stderr = self.fvp_out_f)
         # Sleep 1 sec so connect to model via telnet doesn't fail
         time.sleep(1.0)
+        # Start telnet session
+        try:
+            self.comm = Telnet("localhost", 5000)
+        except ConnectionError as e:
+            self.finish()
+            raise e
+
 
     def process_terminate(self):
         """ Terminate fvp model's process, and reset internal field """
+        self.comm.close() # Close telnet connection
         self.process.terminate()
         # To give the system time to terminate the process
         time.sleep(1.0)
@@ -636,25 +644,20 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
 
         test_log = f"{' '.join(self.fvp_args)}\n"
 
-        try:
-            with Telnet("localhost", 5000) as comm:
-                # Obtaining HFTEST_CTRL_GET_COMMAND_LINE in logs should be quick
-                test_log += comm.read_until(
-                    HFTEST_CTRL_GET_COMMAND_LINE.encode("ascii"),
-                    timeout=5.0).decode("ascii")
+        # Obtaining HFTEST_CTRL_GET_COMMAND_LINE in logs should be quick
+        test_log += self.comm.read_until(
+            HFTEST_CTRL_GET_COMMAND_LINE.encode("ascii"),
+            timeout=5.0).decode("ascii")
 
-                if HFTEST_CTRL_GET_COMMAND_LINE in test_log:
-                    # Send command to instruct partition to execute test
-                    comm.write(f"{test_args}\n".encode("ascii"))
+        if HFTEST_CTRL_GET_COMMAND_LINE in test_log:
+            # Send self.command to instruct partition to execute test
+            self.comm.write(f"{test_args}\n".encode("ascii"))
 
-                    timeout = 80.0 if is_long_running else 10.0
-                    test_log += comm.read_until(HFTEST_CTRL_FINISHED.encode("ascii"),
-                                                timeout=timeout).decode("ascii")
-                else:
-                    print("VM not ready to fetch test command")
-        except ConnectionError as e:
-            self.finish()
-            raise e
+            timeout = 80.0 if is_long_running else 10.0
+            test_log += self.comm.read_until(HFTEST_CTRL_FINISHED.encode("ascii"),
+                                        timeout=timeout).decode("ascii")
+        else:
+            print("VM not ready to fetch test command")
 
         # Check wether test went well:
         if HFTEST_CTRL_FINISHED not in test_log:
