@@ -372,3 +372,11 @@ TEST(ffa_boot_info, parse_fdt)
 	HFTEST_LOG("FF-A Version: %x", ffa_version);
 	ASSERT_EQ(ffa_version, MAKE_FFA_VERSION(1, 1));
 }
+
+/*
+ * Validate a SP is not meant to use the FFA_NOTIFICATION_INFO_GET interface.
+ */
+TEST(ffa_notifications, fails_info_get_from_sp)
+{
+	EXPECT_FFA_ERROR(ffa_notification_info_get(), FFA_NOT_SUPPORTED);
+}
