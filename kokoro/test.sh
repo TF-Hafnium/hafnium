@@ -18,6 +18,7 @@ USE_TFA=false
 USE_VHE=false
 EL0_TEST_ONLY=false
 SKIP_LONG_RUNNING_TESTS=false
+SKIP_UNIT_TESTS=false
 RUN_ALL_QEMU_CPUS=false
 
 while test $# -gt 0
@@ -30,6 +31,8 @@ do
     --vhe) USE_VHE=true
       ;;
     --el0) EL0_TEST_ONLY=true
+      ;;
+    --skip-unit-tests) SKIP_UNIT_TESTS=true
       ;;
     --skip-long-running-tests) SKIP_LONG_RUNNING_TESTS=true
       ;;
@@ -78,17 +81,22 @@ then
   HFTEST+=(--skip-long-running-tests)
 fi
 
+if [ $SKIP_UNIT_TESTS == false ]
+then
 # Run the host unit tests.
 mkdir -p "${LOG_DIR_BASE}/unit_tests"
-${TIMEOUT[@]} 30s "$OUT/host_fake_clang/unit_tests" \
-  --gtest_output="xml:${LOG_DIR_BASE}/unit_tests/sponge_log.xml" \
-  | tee "${LOG_DIR_BASE}/unit_tests/sponge_log.log"
+  ${TIMEOUT[@]} 30s "$OUT/host_fake_clang/unit_tests" \
+    --gtest_output="xml:${LOG_DIR_BASE}/unit_tests/sponge_log.xml" \
+    | tee "${LOG_DIR_BASE}/unit_tests/sponge_log.log"
+fi
 
 CPUS=("")
 
 if [ $RUN_ALL_QEMU_CPUS == true ]
 then
   CPUS=("cortex-a53" "max")
+  # cortext-a53 does not have support for ARMv8.1
+  USE_VHE=false
 fi
 
 for CPU in "${CPUS[@]}"

@@ -94,6 +94,11 @@ then
 fi
 ./kokoro/test.sh ${TEST_ARGS[@]}
 
+# Run again the test suite with VHE option.
+TEST_ARGS+=(--vhe)
+TEST_ARGS+=(--skip-unit-tests)
+./kokoro/test.sh ${TEST_ARGS[@]}
+
 #
 # Step 3: static analysis.
 #
