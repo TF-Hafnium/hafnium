@@ -40,6 +40,15 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 	return true;
 }
 
+bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
+					  struct vm *receiver_vm)
+{
+	(void)sender_vm;
+	(void)receiver_vm;
+
+	return false;
+}
+
 bool plat_ffa_is_direct_response_valid(struct vcpu *current,
 				       ffa_vm_id_t sender_vm_id,
 				       ffa_vm_id_t receiver_vm_id)

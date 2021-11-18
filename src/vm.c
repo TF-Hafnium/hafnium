@@ -899,3 +899,11 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 	 */
 	return current_state == FULL;
 }
+
+/**
+ * Checks VM's messaging method support.
+ */
+bool vm_supports_messaging_method(struct vm *vm, uint8_t msg_method)
+{
+	return (vm->messaging_method & msg_method) != 0;
+}

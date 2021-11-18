@@ -308,3 +308,4 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 			       uint32_t *ids_count, uint32_t *lists_sizes,
 			       uint32_t *lists_count,
 			       const uint32_t ids_max_count);
+bool vm_supports_messaging_method(struct vm *vm, uint8_t messaging_method);

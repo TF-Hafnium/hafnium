@@ -35,6 +35,10 @@ bool arch_other_world_vm_init(struct vm *other_world_vm, struct mpool *ppool)
 		goto out;
 	}
 
+	/* Enabling all communication methods for the other world. */
+	other_world_vm->messaging_method =
+		FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND;
+
 	ret = true;
 
 out:

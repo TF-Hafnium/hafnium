@@ -55,6 +55,15 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 	return false;
 }
 
+bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
+					  struct vm *receiver_vm)
+{
+	(void)sender_vm;
+	(void)receiver_vm;
+
+	return false;
+}
+
 /**
  * Check validity of a FF-A direct message response.
  */

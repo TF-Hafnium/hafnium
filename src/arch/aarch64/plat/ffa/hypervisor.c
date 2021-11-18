@@ -174,6 +174,19 @@ bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
 	return false;
 }
 
+bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
+					  struct vm *receiver_vm)
+{
+	(void)sender_vm;
+	(void)receiver_vm;
+
+	/*
+	 * As Hypervisor is only meant to be used as a test artifact, allow
+	 * direct messaging for all VMs.
+	 */
+	return true;
+}
+
 /**
  * Check validity of a FF-A direct message response.
  */

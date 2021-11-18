@@ -189,6 +189,30 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 }
 
 /**
+ * Check that the receiver supports receipt of direct requests, and that the
+ * sender supports sending direct messaging requests, in accordance to their
+ * respective configurations at the partition's FF-A manifest.
+ */
+bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
+					  struct vm *receiver_vm)
+{
+	if (!vm_supports_messaging_method(sender_vm,
+					  FFA_PARTITION_DIRECT_REQ_SEND)) {
+		dlog_verbose("Sender can't send direct message requests.\n");
+		return false;
+	}
+
+	if (!vm_supports_messaging_method(receiver_vm,
+					  FFA_PARTITION_DIRECT_REQ_RECV)) {
+		dlog_verbose(
+			"Receiver can't receive direct message requests.\n");
+		return false;
+	}
+
+	return true;
+}
+
+/**
  * Check validity of a FF-A direct message response.
  */
 bool plat_ffa_is_direct_response_valid(struct vcpu *current,
