@@ -13,6 +13,12 @@ source_set("entry") {
   ]
 }
 
+source_set("sp_secondary_entry") {
+  sources = [
+    "sp_secondary_entry.S",
+  ]
+}
+
 # Implements image_entry for a simple EL0 partition.
 source_set("el0_entry") {
   sources = [

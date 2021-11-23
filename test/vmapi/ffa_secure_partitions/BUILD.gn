@@ -15,10 +15,12 @@ vm_kernel("vm_primary") {
   sources = [
     "dir_msg.c",
     "notifications.c",
+    "power_mgt.c",
     "setup_and_discovery.c",
   ]
 
   deps = [
+    "//src/arch/${plat_arch}/hftest:power_mgmt",
     "//test/hftest:hftest_primary_vm",
     "//test/vmapi/common:common",
   ]

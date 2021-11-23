@@ -18,12 +18,15 @@
 #include "test/abort.h"
 #include "test/hftest.h"
 
-alignas(4096) uint8_t kstack[4096];
+alignas(4096) uint8_t kstack[MAX_CPUS][4096];
 
-void test_main_sp(void);
+void test_main_sp(bool);
 
 noreturn void kmain(void)
 {
+	extern void secondary_ep_entry(void);
+	struct ffa_value res;
+
 	/*
 	 * Initialize the stage-1 MMU and identity-map the entire address space.
 	 */
@@ -33,7 +36,11 @@ noreturn void kmain(void)
 		abort();
 	}
 
-	test_main_sp();
+	/* Register entry point for secondary vCPUs. */
+	res = ffa_secondary_ep_register((uintptr_t)secondary_ep_entry);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	test_main_sp(true);
 
 	/* Do not expect to get to this point, so abort. */
 	abort();

@@ -63,6 +63,17 @@ static inline struct ffa_value ffa_partition_info_get(
 }
 
 /**
+ * DEN0077A FF-A v1.1 Beta0 section 18.3.2.1
+ * Registers vCPU secondary entry point for the caller VM.
+ * Called from secure virtual FF-A instance.
+ */
+static inline struct ffa_value ffa_secondary_ep_register(uintptr_t address)
+{
+	return ffa_call((struct ffa_value){.func = FFA_SECONDARY_EP_REGISTER_64,
+					   .arg1 = address});
+}
+
+/**
  * Returns the VM's own ID.
  */
 static inline ffa_vm_id_t hf_vm_get_id(void)

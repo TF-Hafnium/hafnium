@@ -16,12 +16,17 @@
  * Message loop to add tests to be controlled by the control partition(depends
  * on the test set-up).
  */
-noreturn void test_main_sp(void)
+noreturn void test_main_sp(bool is_boot_vcpu)
 {
 	struct ffa_value res = ffa_msg_wait();
 
 	while (1) {
 		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
+
+		if (is_boot_vcpu) {
+			/* TODO: can only print from boot vCPU. */
+			HFTEST_LOG("Received direct message request");
+		}
 
 		switch (res.arg3) {
 		case SP_ECHO_CMD:
@@ -50,7 +55,8 @@ noreturn void test_main_sp(void)
 		default:
 			HFTEST_LOG_FAILURE();
 			HFTEST_LOG(HFTEST_LOG_INDENT
-				   "0x%x is not a valid command id\n");
+				   "0x%x is not a valid command id\n",
+				   res.arg3);
 			abort();
 		}
 	}
