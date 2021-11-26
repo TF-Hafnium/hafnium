@@ -9,6 +9,7 @@
 #include "hf/vm.h"
 
 #include "hf/api.h"
+#include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
@@ -518,7 +519,7 @@ static void vm_notifications_global_state_count_update(
 	 * state. Count update by increments or decrements of 1 or -1,
 	 * respectively.
 	 */
-	CHECK(inc == 1 || inc == -1);
+	assert(inc == 1 || inc == -1);
 
 	sl_lock(&all_notifications_state.lock);
 

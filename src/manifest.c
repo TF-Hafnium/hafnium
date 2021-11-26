@@ -9,6 +9,7 @@
 #include "hf/manifest.h"
 
 #include "hf/addr.h"
+#include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/fdt.h"
@@ -56,7 +57,7 @@ static void generate_vm_node_name(struct string *str, ffa_vm_id_t vm_id)
 	char *base = str->data;
 	char *ptr = base + (VM_NAME_EXTRA_CHARS + vm_id_digits);
 
-	CHECK(vm_id_digits <= VM_ID_MAX_DIGITS);
+	assert(vm_id_digits <= VM_ID_MAX_DIGITS);
 	*(--ptr) = '\0';
 	do {
 		*(--ptr) = digits[vm_id % 10];
@@ -64,7 +65,7 @@ static void generate_vm_node_name(struct string *str, ffa_vm_id_t vm_id)
 	} while (vm_id);
 	*(--ptr) = 'm';
 	*(--ptr) = 'v';
-	CHECK(ptr == base);
+	assert(ptr == base);
 }
 
 /**

@@ -11,6 +11,7 @@
 #include <stdatomic.h>
 #include <stdint.h>
 
+#include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/layout.h"
@@ -470,7 +471,7 @@ static bool mm_ptable_identity_map(struct mm_ptable *t, paddr_t pa_begin,
 	 * Assert condition to communicate the API constraint of mm_max_level(),
 	 * that isn't encoded in the types, to the static analyzer.
 	 */
-	CHECK(root_level >= 2);
+	assert(root_level >= 2);
 
 	/* Cap end to stay within the bounds of the page table. */
 	if (end > ptable_end) {

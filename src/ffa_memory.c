@@ -12,6 +12,7 @@
 #include "hf/arch/plat/ffa.h"
 
 #include "hf/api.h"
+#include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa_internal.h"
@@ -145,8 +146,8 @@ static bool allocate_share_state(
 {
 	uint64_t i;
 
-	CHECK(share_states.share_states != NULL);
-	CHECK(memory_region != NULL);
+	assert(share_states.share_states != NULL);
+	assert(memory_region != NULL);
 
 	for (i = 0; i < MAX_MEM_SHARES; ++i) {
 		if (share_states.share_states[i].share_func == 0) {
@@ -198,7 +199,7 @@ struct share_states_locked share_states_lock(void)
 /** Unlocks the share states lock. */
 static void share_states_unlock(struct share_states_locked *share_states)
 {
-	CHECK(share_states->share_states != NULL);
+	assert(share_states->share_states != NULL);
 	share_states->share_states = NULL;
 	sl_unlock(&share_states_lock_instance);
 }
@@ -215,8 +216,8 @@ static bool get_share_state(struct share_states_locked share_states,
 	struct ffa_memory_share_state *share_state;
 	uint64_t index;
 
-	CHECK(share_states.share_states != NULL);
-	CHECK(share_state_ret != NULL);
+	assert(share_states.share_states != NULL);
+	assert(share_state_ret != NULL);
 
 	/*
 	 * First look for a share_state allocated by us, in which case the
@@ -254,7 +255,7 @@ static void share_state_free(struct share_states_locked share_states,
 {
 	uint32_t i;
 
-	CHECK(share_states.share_states != NULL);
+	assert(share_states.share_states != NULL);
 	share_state->share_func = 0;
 	share_state->sending_complete = false;
 	mpool_free(page_pool, share_state->memory_region);
@@ -284,7 +285,7 @@ static bool share_state_sending_complete(
 	uint32_t i;
 
 	/* Lock must be held. */
-	CHECK(share_states.share_states != NULL);
+	assert(share_states.share_states != NULL);
 
 	/*
 	 * Share state must already be valid, or it's not possible to get hold
@@ -321,7 +322,7 @@ static uint32_t share_state_next_fragment_offset(
 	uint32_t i;
 
 	/* Lock must be held. */
-	CHECK(share_states.share_states != NULL);
+	assert(share_states.share_states != NULL);
 
 	next_fragment_offset =
 		ffa_composite_constituent_offset(share_state->memory_region, 0);
@@ -1295,7 +1296,7 @@ static struct ffa_value ffa_memory_send_complete(
 	struct ffa_value ret;
 
 	/* Lock must be held. */
-	CHECK(share_states.share_states != NULL);
+	assert(share_states.share_states != NULL);
 
 	/* Check that state is valid in sender page table and update. */
 	ret = ffa_send_check_update(
@@ -1340,13 +1341,13 @@ static struct ffa_value ffa_memory_send_validate(
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
 
-	CHECK(permissions != NULL);
+	assert(permissions != NULL);
 
 	/*
 	 * This should already be checked by the caller, just making the
 	 * assumption clear here.
 	 */
-	CHECK(memory_region->receiver_count == 1);
+	assert(memory_region->receiver_count == 1);
 
 	/* The sender must match the message sender. */
 	if (memory_region->sender != from_locked.vm->id) {
@@ -1510,7 +1511,7 @@ static struct ffa_value ffa_memory_send_continue_validate(
 	struct ffa_memory_share_state *share_state;
 	struct ffa_memory_region *memory_region;
 
-	CHECK(share_state_ret != NULL);
+	assert(share_state_ret != NULL);
 
 	/*
 	 * Look up the share state by handle and make sure that the VM ID
