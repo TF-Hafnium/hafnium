@@ -6,6 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/check.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/interrupt_desc.h"

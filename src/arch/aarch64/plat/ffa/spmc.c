@@ -53,7 +53,7 @@ static struct sri_state_locked sri_state_lock(void)
 /** Unlocks `sri_state` guarding lock. */
 void sri_state_unlock(struct sri_state_locked sri_state_locked)
 {
-	CHECK(sri_state_locked.sri_state == &sri_state);
+	assert(sri_state_locked.sri_state == &sri_state);
 	sri_state_locked.sri_state = NULL;
 	sl_unlock(&sri_state_lock_instance);
 }
@@ -386,7 +386,7 @@ static void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
 static struct vm_locked plat_ffa_nwd_vm_find_locked(
 	struct nwd_vms_locked nwd_vms_locked, ffa_vm_id_t vm_id)
 {
-	CHECK(nwd_vms_locked.nwd_vms != NULL);
+	assert(nwd_vms_locked.nwd_vms != NULL);
 
 	for (unsigned int i = 0U; i < nwd_vms_size; i++) {
 		if (nwd_vms[i].id == vm_id) {
@@ -1095,8 +1095,8 @@ struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
 static void sri_state_set(struct sri_state_locked sri_state_locked,
 			  enum plat_ffa_sri_state state)
 {
-	CHECK(sri_state_locked.sri_state != NULL &&
-	      sri_state_locked.sri_state == &sri_state);
+	assert(sri_state_locked.sri_state != NULL &&
+	       sri_state_locked.sri_state == &sri_state);
 
 	switch (*(sri_state_locked.sri_state)) {
 	case TRIGGERED:
