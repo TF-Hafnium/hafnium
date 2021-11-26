@@ -41,6 +41,19 @@ make PROJECT=<project_name>
 The compiled image can be found under `out/<project>`, for example the QEMU
 image is at `out/reference/qemu_aarch64_clang/hafnium.bin`.
 
+The presence of assertions in the final build can be set using the `ENABLE_ASSERTIONS`
+make variable, by default this is set to `true`, meaning asserts are included in the build.
+
+```shell
+make ENABLE_ASSERTIONS=<true|false>
+```
+If you wish to change the value of the make variables you may need to first use:
+
+```shell
+make clobber
+```
+So the `args.gn` file will be regenerated with the new values.
+
 ## Running on QEMU
 
 You will need at least version 2.9 for QEMU. The following command line can be

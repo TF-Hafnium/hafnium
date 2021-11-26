@@ -17,6 +17,9 @@ declare_args() {
   # The level of debug logs to include. This should match one of the levels
   # defined in dlog.h.
   log_level = "LOG_LEVEL_INFO"
+
+  # Whether assertions are included in the build
+  enable_assertions = true
 }
 
 # Check that we support the attempted build.

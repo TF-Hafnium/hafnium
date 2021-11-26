@@ -17,10 +17,10 @@
  * Do not use if the condition could ever be legitimately false e.g. when
  * processing external inputs.
  */
-#define CHECK(x)                                                              \
-	do {                                                                  \
-		if (!(x)) {                                                   \
-			panic("assertion failed (%s) at %s:%d", #x, __FILE__, \
-			      __LINE__);                                      \
-		}                                                             \
+#define CHECK(x)                                                          \
+	do {                                                              \
+		if (!(x)) {                                               \
+			panic("check failed (%s) at %s:%d", #x, __FILE__, \
+			      __LINE__);                                  \
+		}                                                         \
 	} while (0)

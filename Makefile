@@ -6,6 +6,11 @@
 
 # Select the project to build.
 PROJECT ?= reference
+GN_ARGS := project="$(PROJECT)"
+# Include assertions in the build
+ifneq (${ENABLE_ASSERTIONS},)
+	GN_ARGS += enable_assertions="$(ENABLE_ASSERTIONS)"
+endif
 
 # If HAFNIUM_HERMETIC_BUILD is "true" (not default), invoke `make` inside
 # a container. The 'run_in_container.sh' script will set the variable value to
@@ -18,11 +23,13 @@ ifeq ($(HAFNIUM_HERMETIC_BUILD),true)
 
 # Need to define at least one non-default target.
 all:
-	@$(CURDIR)/build/run_in_container.sh make PROJECT=$(PROJECT) $@
+	@$(CURDIR)/build/run_in_container.sh make PROJECT=$(PROJECT) \
+		ENABLE_ASSERTIONS=$(ENABLE_ASSERTIONS) $@
 
 # Catch-all target.
 .DEFAULT:
-	@$(CURDIR)/build/run_in_container.sh make PROJECT=$(PROJECT) $@
+	@$(CURDIR)/build/run_in_container.sh make PROJECT=$(PROJECT) \
+		ENABLE_ASSERTIONS=$(ENABLE_ASSERTIONS) $@
 
 else  # HAFNIUM_HERMETIC_BUILD
 
@@ -53,7 +60,7 @@ all: $(OUT_DIR)/build.ninja
 	@$(NINJA) -C $(OUT_DIR)
 
 $(OUT_DIR)/build.ninja:
-	@$(GN) --export-compile-commands gen --args='project="$(PROJECT)"' $(OUT_DIR)
+	@$(GN) --export-compile-commands gen --args='$(GN_ARGS)' $(OUT_DIR)
 
 .PHONY: clean
 clean:

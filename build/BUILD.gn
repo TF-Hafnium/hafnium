@@ -41,5 +41,6 @@ config("platform") {
     "MAX_CPUS=${plat_max_cpus}",
     "MAX_VMS=${plat_max_vms}",
     "LOG_LEVEL=${log_level}",
+    "ENABLE_ASSERTIONS=${enable_assertions}",
   ]
 }
