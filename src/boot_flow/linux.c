@@ -6,7 +6,6 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/check.h"
 #include "hf/cpio.h"
 #include "hf/dlog.h"
 #include "hf/fdt_handler.h"
