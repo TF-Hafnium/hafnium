@@ -12,6 +12,7 @@
 #include "hf/arch/cpu.h"
 #include "hf/arch/mmu.h"
 
+#include "hf/check.h"
 #include "hf/dlog.h"
 
 #include "msr.h"

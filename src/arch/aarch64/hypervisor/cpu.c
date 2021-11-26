@@ -15,6 +15,7 @@
 #include "hf/arch/plat/psci.h"
 
 #include "hf/addr.h"
+#include "hf/check.h"
 #include "hf/ffa.h"
 #include "hf/plat/interrupts.h"
 #include "hf/std.h"

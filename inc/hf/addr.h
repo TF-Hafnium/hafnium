@@ -13,7 +13,7 @@
 
 #include "hf/arch/types.h"
 
-#include "hf/check.h"
+#include "hf/assert.h"
 
 /** An opaque type for a physical address. */
 typedef struct {
@@ -83,7 +83,7 @@ static inline ipaddr_t ipa_init(uintpaddr_t ipa)
  */
 static inline paddr_t pa_sub(paddr_t pa, size_t n)
 {
-	CHECK((uintptr_t)pa_addr(pa) >= n);
+	assert((uintptr_t)pa_addr(pa) >= n);
 	return pa_init(pa_addr(pa) - n);
 }
 

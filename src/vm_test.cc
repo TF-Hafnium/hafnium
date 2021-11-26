@@ -9,6 +9,7 @@
 #include <gmock/gmock.h>
 
 extern "C" {
+#include "hf/check.h"
 #include "hf/mpool.h"
 #include "hf/vm.h"
 }
