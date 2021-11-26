@@ -506,8 +506,12 @@ static inline ffa_notifications_bitmap_t ffa_notification_get_from_vm(
 #define FFA_NOTIFICATION_FLAG_BITMAP_SPM UINT32_C(0x1 << 2)
 #define FFA_NOTIFICATION_FLAG_BITMAP_HYP UINT32_C(0x1 << 3)
 
+/* Flag to configure notification as being per vCPU. */
+#define FFA_NOTIFICATIONS_FLAG_PER_VCPU UINT32_C(0x1 << 0)
+
 /** Flag for FFA_NOTIFICATION_SET to delay Schedule Receiver Interrupt */
 #define FFA_NOTIFICATIONS_FLAG_DELAY_SRI UINT32_C(0x1 << 1)
+#define FFA_NOTIFICATIONS_FLAGS_VCPU_ID(id) UINT32_C((id & 0xFFFF) << 16)
 
 static inline ffa_vcpu_index_t ffa_notifications_get_vcpu(struct ffa_value args)
 {

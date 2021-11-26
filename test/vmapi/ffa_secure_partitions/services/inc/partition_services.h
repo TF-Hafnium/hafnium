@@ -130,6 +130,11 @@ static inline struct ffa_value sp_notif_get_cmd_send(ffa_vm_id_t test_source,
 				       vcpu_id, flags, 0, 0);
 }
 
+static inline uint16_t sp_notif_vcpu(struct ffa_value cmd)
+{
+	return (uint16_t)cmd.arg4;
+}
+
 struct ffa_value sp_notif_get_cmd(ffa_vm_id_t test_source, uint16_t vcpu_id,
 				  uint32_t flags);
 

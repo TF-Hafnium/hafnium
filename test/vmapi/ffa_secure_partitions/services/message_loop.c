@@ -46,7 +46,8 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 				sp_notif_flags(res), sp_notif_bitmap(res));
 			break;
 		case SP_NOTIF_GET_CMD:
-			res = sp_notif_get_cmd(ffa_sender(res), 0,
+			res = sp_notif_get_cmd(ffa_sender(res),
+					       sp_notif_vcpu(res),
 					       sp_notif_flags(res));
 			break;
 		case SP_NOTIF_BIND_CMD:
