@@ -538,7 +538,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 
 		/* Refer FF-A v1.1 Beta0 section 7.4 bullet 2. */
 		if (current->processing_secure_interrupt) {
-			CHECK(current->state = VCPU_STATE_WAITING);
+			CHECK(current->state == VCPU_STATE_WAITING);
 
 			/* Secure interrupt pre-empted normal world. */
 			if (current->preempted_vcpu->vm->id ==
