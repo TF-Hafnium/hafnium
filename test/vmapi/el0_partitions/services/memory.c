@@ -20,7 +20,7 @@
 #include "test/vmapi/ffa.h"
 
 alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];
-static uint8_t retrieve_buffer[PAGE_SIZE * 2];
+alignas(PAGE_SIZE) static uint8_t retrieve_buffer[PAGE_SIZE * 2];
 
 TEST_SERVICE(memory_increment)
 {
