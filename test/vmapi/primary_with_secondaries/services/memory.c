@@ -618,20 +618,22 @@ TEST_SERVICE(ffa_memory_lend_relinquish_X)
 		struct ffa_composite_memory_region *composite =
 			ffa_memory_region_get_composite(memory_region, 0);
 		struct ffa_memory_region_constituent *constituents;
-		uint64_t *ptr;
+		uint32_t *ptr;
 
 		/* ASSERT_TRUE isn't enough for clang-analyze. */
 		CHECK(composite != NULL);
 
 		constituents = composite->constituents;
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
-		ptr = (uint64_t *)constituents[0].address;
+		ptr = (uint32_t *)constituents[0].address;
 
 		/*
 		 * Verify that the instruction in memory is the encoded RET
 		 * instruction.
 		 */
-		EXPECT_EQ(*ptr, 0xD65F03C0);
+		EXPECT_EQ(*ptr, 0xD50324DF);
+		EXPECT_EQ(*(ptr + 1), 0xD65F03C0);
+
 		/* Try to execute instruction from the shared memory region. */
 		__asm__ volatile("blr %0" ::"r"(ptr));
 

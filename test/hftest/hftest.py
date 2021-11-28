@@ -367,8 +367,14 @@ class FvpDriver(Driver, ABC):
             f"cluster0.cpu0={self.FVP_PREBUILT_BL31}@{self.CPU_START_ADDRESS}",
             "-C", "bp.ve_sysregs.mmbSiteDefault=0",
             "-C", "bp.ve_sysregs.exit_on_shutdown=1",
-            "-C", "cluster0.has_arm_v8-1=1",
-            "-C", "cluster1.has_arm_v8-1=1",
+            "-C", "cluster0.has_arm_v8-5=1",
+            "-C", "cluster1.has_arm_v8-5=1",
+            "-C", "cluster0.has_branch_target_exception=1",
+            "-C", "cluster1.has_branch_target_exception=1",
+            "-C", "cluster0.restriction_on_speculative_execution=2",
+            "-C", "cluster1.restriction_on_speculative_execution=2",
+            "-C", "cluster0.restriction_on_speculative_execution_aarch32=2",
+            "-C", "cluster1.restriction_on_speculative_execution_aarch32=2",
         ]
 
         if uart0_log_path and uart1_log_path:
@@ -520,12 +526,6 @@ class FvpDriverSPMC(FvpDriver):
         fvp_args += [
             "--data", f"cluster0.cpu0={dt.dtb}@{self.SPMC_DTB_ADDRESS}",
             "--data", f"cluster0.cpu0={self.args.spmc}@{self.SPMC_ADDRESS}",
-            "-C", "cluster0.has_arm_v8-5=1",
-            "-C", "cluster1.has_arm_v8-5=1",
-            "-C", "cluster0.has_branch_target_exception=1",
-            "-C", "cluster1.has_branch_target_exception=1",
-            "-C", "cluster0.restriction_on_speculative_execution=2",
-            "-C", "cluster1.restriction_on_speculative_execution=2",
         ]
 
         if secure_ctrl:

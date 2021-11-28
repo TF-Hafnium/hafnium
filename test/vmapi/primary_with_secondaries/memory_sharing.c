@@ -1595,9 +1595,13 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 0, PAGE_SIZE);
 
-	uint64_t *ptr2 = (uint64_t *)pages;
-	/* Set memory to contain the RET instruction to attempt to execute. */
+	uint32_t *ptr2 = (uint32_t *)pages;
+	/* Set memory to contain the BTI+RET instruction to attempt to execute.
+	 */
+	*ptr2 = 0xD50324DF; /* BTI jc */
+	ptr2++;
 	*ptr2 = 0xD65F03C0;
+	;
 
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
@@ -1641,8 +1645,11 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 0, PAGE_SIZE);
 
-	uint64_t *ptr2 = (uint64_t *)pages;
-	/* Set memory to contain the RET instruction to attempt to execute. */
+	uint32_t *ptr2 = (uint32_t *)pages;
+	/* Set memory to contain the BTI+RET instructions to attempt to execute.
+	 */
+	*ptr2 = 0xD50324DF; /* BTI jc */
+	ptr2++;
 	*ptr2 = 0xD65F03C0;
 
 	struct ffa_memory_region_constituent constituents[] = {

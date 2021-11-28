@@ -280,6 +280,11 @@ template("aarch64_common_toolchain") {
       extra_defines += " -DGICD_BASE=${invoker.gicd_base_address} -DGICR_BASE=${invoker.gicr_base_address}"
     }
 
+    if (defined(invoker.branch_protection)) {
+      extra_cflags += " -mbranch-protection=${invoker.branch_protection}"
+      extra_defines += " -DBRANCH_PROTECTION=1"
+    }
+
     toolchain_args = {
       plat_boot_flow = invoker.boot_flow
       plat_console = invoker.console
@@ -320,16 +325,12 @@ template("aarch64_toolchains") {
                              "max_image_size",
                              "max_vms",
                              "toolchain_args",
+                             "branch_protection",
                            ])
     cpu = "${invoker.cpu}+nofp"
 
     # Add a macro so files can tell whether they are not being built for a VM.
     extra_defines = " -DVM_TOOLCHAIN=0"
-
-    if (defined(invoker.branch_protection)) {
-      extra_cflags = " -mbranch-protection=${invoker.branch_protection}"
-      extra_defines += " -DBRANCH_PROTECTION=1"
-    }
   }
 
   # Toolchain for building test VMs which run under Hafnium.
@@ -343,6 +344,7 @@ template("aarch64_toolchains") {
                              "max_cpus",
                              "toolchain_args",
                              "console",
+                             "branch_protection",
                            ])
     cpu = "${invoker.cpu}+fp"
     boot_flow = "//src/arch/fake:boot_flow"
