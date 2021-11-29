@@ -7,26 +7,15 @@
 import("//build/image/image.gni")
 import("//test/hftest/args.gni")
 
-config("config") {
-  include_dirs = [ "inc" ]
-}
-
-source_set("partition_services") {
-  testonly = true
-  public_configs = [ ":config" ]
-
-  sources = [
-    "partition_services.c",
-  ]
-}
-
 # VM that will control execution of tests in a VM-to-SP set-up
 vm_kernel("vm_primary") {
   testonly = true
-  public_configs = [ ":config" ]
+  public_configs = [ "services:config" ]
 
   sources = [
-    "partition_control.c",
+    "dir_msg.c",
+    "notifications.c",
+    "setup_and_discovery.c",
   ]
 
   deps = [
@@ -39,14 +28,12 @@ vm_kernel("vm_primary") {
 # former SP
 vm_kernel("secure_partitions_services") {
   testonly = true
-  public_configs = [ ":config" ]
-
-  sources = [
-    "secure_partition_services.c",
-  ]
+  public_configs = [ "services:config" ]
 
   deps = [
-    ":partition_services",
+    "services:message_loop",
+    "services:notifications",
+    "services:partition_services",
     "//test/hftest:hftest_secure_service",
   ]
 }

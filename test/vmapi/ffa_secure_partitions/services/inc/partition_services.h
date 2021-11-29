@@ -168,3 +168,7 @@ static inline struct ffa_value sp_notif_unbind_cmd_send(
 struct ffa_value sp_notif_unbind_cmd(ffa_vm_id_t test_source,
 				     ffa_vm_id_t notif_sender,
 				     ffa_notifications_bitmap_t bitmap);
+
+struct ffa_value sp_check_ffa_return_resp(ffa_vm_id_t test_source,
+					  ffa_vm_id_t own_id,
+					  struct ffa_value res);

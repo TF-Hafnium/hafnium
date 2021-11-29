@@ -1,0 +1,52 @@
+# Copyright 2021 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+config("config") {
+  include_dirs = [ "inc" ]
+}
+
+source_set("common") {
+  testonly = true
+  public_configs = [ ":config" ]
+  sources = [
+    "common.c",
+  ]
+}
+
+source_set("partition_services") {
+  testonly = true
+  public_configs = [ ":config" ]
+  sources = [
+    "partition_services.c",
+  ]
+
+  deps = [
+    ":common",
+  ]
+}
+
+source_set("notifications") {
+  testonly = true
+  public_configs = [ ":config" ]
+  sources = [
+    "notifications.c",
+  ]
+
+  deps = [
+    ":common",
+  ]
+}
+
+source_set("message_loop") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+  ]
+  sources = [
+    "message_loop.c",
+  ]
+}
