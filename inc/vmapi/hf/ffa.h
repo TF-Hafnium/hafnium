@@ -482,14 +482,9 @@ static inline ffa_notifications_bitmap_t ffa_notification_get_from_vm(
 /** Flag for FFA_NOTIFICATION_SET to delay Schedule Receiver Interrupt */
 #define FFA_NOTIFICATIONS_FLAG_DELAY_SRI UINT32_C(0x1 << 1)
 
-static inline ffa_vm_id_t ffa_notifications_get_receiver(struct ffa_value args)
+static inline ffa_vcpu_index_t ffa_notifications_get_vcpu(struct ffa_value args)
 {
-	return (args.arg1 >> 16) & 0xffffU;
-}
-
-static inline ffa_vm_id_t ffa_notifications_get_vcpu(struct ffa_value args)
-{
-	return args.arg1 & 0xffffU;
+	return (ffa_vcpu_index_t)(args.arg1 >> 16 & 0xffffU);
 }
 
 /**

@@ -447,7 +447,7 @@ bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 
 	*ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_NOTIFICATION_GET_32,
-		.arg1 = (receiver_id << 16) | (vcpu_id),
+		.arg1 = (vcpu_id << 16) | receiver_id,
 		.arg2 = FFA_NOTIFICATION_FLAG_BITMAP_SP,
 	});
 

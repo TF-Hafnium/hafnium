@@ -445,7 +445,7 @@ static inline struct ffa_value ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 {
 	return ffa_call((struct ffa_value){
 		.func = FFA_NOTIFICATION_GET_32,
-		.arg1 = (receiver_vm_id << 16) | (vcpu_id),
+		.arg1 = (vcpu_id << 16) | (receiver_vm_id),
 		.arg2 = flags,
 	});
 }
