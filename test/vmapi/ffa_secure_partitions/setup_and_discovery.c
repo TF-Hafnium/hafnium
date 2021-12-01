@@ -49,7 +49,7 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	EXPECT_EQ(partitions[0].vcpu_count, 8);
 
 	/* Expect a SP as second partition. */
-	EXPECT_EQ(partitions[1].vm_id, HF_SPMC_VM_ID + 1);
+	EXPECT_EQ(partitions[1].vm_id, SP_ID(1));
 	EXPECT_EQ(partitions[1].vcpu_count, 8);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);

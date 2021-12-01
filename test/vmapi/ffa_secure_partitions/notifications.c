@@ -22,7 +22,7 @@ TEST(ffa_notifications, signaling_from_sp_to_vm)
 {
 	struct ffa_value res;
 	ffa_vm_id_t own_id = hf_vm_get_id();
-	const ffa_vm_id_t notification_sender = HF_OTHER_WORLD_ID + 1;
+	const ffa_vm_id_t notification_sender = SP_ID(1);
 	const ffa_notifications_bitmap_t bitmap = FFA_NOTIFICATION_MASK(20);
 
 	/* Arbitrarily bind notification 20 */
@@ -61,7 +61,7 @@ TEST(ffa_notifications, signaling_from_vm_to_sp)
 {
 	struct ffa_value res;
 	ffa_vm_id_t own_id = hf_vm_get_id();
-	const ffa_vm_id_t notification_receiver = HF_OTHER_WORLD_ID + 1;
+	const ffa_vm_id_t notification_receiver = SP_ID(1);
 	const ffa_notifications_bitmap_t bitmap = FFA_NOTIFICATION_MASK(35);
 
 	/* Request receiver to bind notifications. */

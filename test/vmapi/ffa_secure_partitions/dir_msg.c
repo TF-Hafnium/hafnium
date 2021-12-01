@@ -22,7 +22,7 @@
 TEST(ffa_msg_send_direct_req, succeeds_nwd_to_sp_echo)
 {
 	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
-	const ffa_vm_id_t receiver_id = HF_OTHER_WORLD_ID + 1;
+	const ffa_vm_id_t receiver_id = SP_ID(1);
 	struct ffa_value res;
 	ffa_vm_id_t own_id = hf_vm_get_id();
 

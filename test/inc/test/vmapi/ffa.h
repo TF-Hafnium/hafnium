@@ -24,6 +24,19 @@
 		EXPECT_EQ(ffa_error_code(v), (ffa_error)); \
 	} while (0)
 
+/*
+ * The bit 15 of the FF-A ID indicates whether the partition is executing
+ * in the normal world, in case it is a Virtual Machine (VM); or in the
+ * secure world, in case it is a Secure Partition (SP).
+ *
+ * If bit 15 is set partition is an SP; if bit 15 is clear partition is
+ * a VM.
+ */
+#define SP_ID_MASK 1 << 15
+#define SP_ID(x) ((x) | SP_ID_MASK)
+#define VM_ID(x) (x & ~SP_ID_MASK)
+#define IS_SP_ID(x) ((x & SP_ID_MASK) != 0U)
+
 struct mailbox_buffers {
 	void *send;
 	void *recv;
