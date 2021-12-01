@@ -5,7 +5,10 @@
 # https://opensource.org/licenses/BSD-3-Clause.
 
 config("config") {
-  include_dirs = [ "inc" ]
+  include_dirs = [
+    "inc",
+    "//test/inc",
+  ]
 }
 
 source_set("common") {

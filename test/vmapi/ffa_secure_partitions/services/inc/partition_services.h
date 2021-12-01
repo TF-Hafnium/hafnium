@@ -53,6 +53,36 @@ struct ffa_value sp_echo_cmd(ffa_vm_id_t receiver, uint32_t val1, uint32_t val2,
 			     uint32_t val3, uint32_t val4, uint32_t val5);
 
 /**
+ * Command to request SP to run echo test with second SP.
+ */
+#define SP_REQ_ECHO_CMD 0x65636870
+
+static inline struct ffa_value sp_req_echo_cmd_send(
+	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t val1, uint32_t val2,
+	uint32_t val3, uint32_t val4)
+{
+	return ffa_msg_send_direct_req(sender, receiver, SP_REQ_ECHO_CMD, val1,
+				       val2, val3, val4);
+}
+
+struct ffa_value sp_req_echo_cmd(ffa_vm_id_t test_source, uint32_t val1,
+				 uint32_t val2, uint32_t val3, uint32_t val4);
+
+/**
+ * Command to request SP to run echo busy test with second SP.
+ */
+#define SP_REQ_ECHO_BUSY_CMD 0x65636871
+
+static inline struct ffa_value sp_req_echo_busy_cmd_send(ffa_vm_id_t sender,
+							 ffa_vm_id_t receiver)
+{
+	return ffa_msg_send_direct_req(sender, receiver, SP_REQ_ECHO_BUSY_CMD,
+				       0, 0, 0, 0);
+}
+
+struct ffa_value sp_req_echo_busy_cmd(ffa_vm_id_t test_source);
+
+/**
  * Command to request SP to set notifications.
  */
 #define SP_NOTIF_SET_CMD 0x736574U

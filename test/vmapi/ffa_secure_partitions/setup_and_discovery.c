@@ -41,8 +41,8 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	ret = ffa_partition_info_get(&uuid);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	/* Expect two partitions. */
-	EXPECT_EQ(ret.arg2, 2);
+	/* Expect three partitions. */
+	EXPECT_EQ(ret.arg2, 3);
 
 	/* Expect the PVM as first partition. */
 	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
@@ -51,6 +51,10 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	/* Expect a SP as second partition. */
 	EXPECT_EQ(partitions[1].vm_id, SP_ID(1));
 	EXPECT_EQ(partitions[1].vcpu_count, 8);
+
+	/* Expect secondary SP as third partition */
+	EXPECT_EQ(partitions[2].vm_id, SP_ID(2));
+	EXPECT_EQ(partitions[2].vcpu_count, 8);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
