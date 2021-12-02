@@ -236,8 +236,9 @@ struct ffa_value plat_ffa_normal_world_resume(struct vcpu *current,
 struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
 						struct vcpu **next);
 
-void plat_ffa_inject_notification_pending_interrupt_context_switch(
-	struct vcpu *next, struct vcpu *current);
+bool plat_ffa_inject_notification_pending_interrupt(
+	struct vcpu_locked next_locked, struct vcpu *current,
+	struct vm_locked receiver_locked);
 
 void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
 					 const uint32_t flags,

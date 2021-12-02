@@ -324,11 +324,15 @@ void plat_ffa_sri_init(void)
 {
 }
 
-void plat_ffa_inject_notification_pending_interrupt_context_switch(
-	struct vcpu *next, struct vcpu *current)
+bool plat_ffa_inject_notification_pending_interrupt(
+	struct vcpu_locked target_locked, struct vcpu *current,
+	struct vm_locked receiver_locked)
 {
-	(void)next;
+	(void)target_locked;
 	(void)current;
+	(void)receiver_locked;
+
+	return false;
 }
 
 bool plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,

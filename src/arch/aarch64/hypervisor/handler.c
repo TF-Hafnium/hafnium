@@ -736,8 +736,6 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 			plat_ffa_sri_trigger_if_delayed(vcpu->cpu);
 		}
 #endif
-		plat_ffa_inject_notification_pending_interrupt_context_switch(
-			*next, vcpu);
 		arch_regs_set_retval(&vcpu->regs, args);
 		vcpu_update_virtual_interrupts(*next);
 		return true;

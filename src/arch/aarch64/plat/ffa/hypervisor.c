@@ -611,11 +611,15 @@ void plat_ffa_sri_init(struct cpu *cpu)
 	(void)cpu;
 }
 
-void plat_ffa_inject_notification_pending_interrupt_context_switch(
-	struct vcpu *next, struct vcpu *current)
+bool plat_ffa_inject_notification_pending_interrupt(
+	struct vcpu_locked target_locked, struct vcpu *current,
+	struct vm_locked receiver_locked)
 {
-	(void)next;
+	(void)target_locked;
 	(void)current;
+	(void)receiver_locked;
+
+	return false;
 }
 
 /*

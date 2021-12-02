@@ -1260,39 +1260,33 @@ void plat_ffa_sri_init(struct cpu *cpu)
 	plat_interrupts_configure_interrupt(sri_desc);
 }
 
-void plat_ffa_inject_notification_pending_interrupt_context_switch(
-	struct vcpu *next, struct vcpu *current)
+bool plat_ffa_inject_notification_pending_interrupt(
+	struct vcpu_locked target_locked, struct vcpu *current,
+	struct vm_locked receiver_locked)
 {
-	CHECK(current != NULL);
+	struct vm *next_vm = target_locked.vcpu->vm;
+	bool ret = false;
+
 	/*
-	 * If NWd is giving CPU cycles to SP, check if it is necessary
-	 * to inject VI Notifications Pending Interrupt.
+	 * Inject the NPI if:
+	 * - The targeted VM ID is from this world (i.e. if it is an SP).
+	 * - The partition has global pending notifications and an NPI hasn't
+	 * been injected yet.
+	 * - There are pending per-vCPU notifications in the next vCPU.
 	 */
-	if (current->vm->id == HF_OTHER_WORLD_ID && next != NULL &&
-	    vm_id_is_current_world(next->vm->id)) {
-		struct vm_locked target_vm_locked =
-			vm_find_locked(next->vm->id);
-		/*
-		 * If per-vCPU notifications are pending, NPI has been
-		 * injected at FFA_NOTIFICATION_SET handling in the
-		 * targeted vCPU. If next SP has pending global
-		 * notifications, only inject if there are no pending
-		 * per-vCPU notifications, to avoid injecting spurious
-		 * interrupt.
-		 */
-		if (!vm_are_per_vcpu_notifications_pending(target_vm_locked,
-							   vcpu_index(next)) &&
-		    vm_are_global_notifications_pending(target_vm_locked)) {
-			struct vcpu_locked next_locked = vcpu_lock(next);
-
-			api_interrupt_inject_locked(
-				next_locked, HF_NOTIFICATION_PENDING_INTID,
-				current, NULL);
-
-			vcpu_unlock(&next_locked);
-		}
-		vm_unlock(&target_vm_locked);
+	if (vm_id_is_current_world(next_vm->id) &&
+	    (vm_are_per_vcpu_notifications_pending(
+		     receiver_locked, vcpu_index(target_locked.vcpu)) ||
+	     (vm_are_global_notifications_pending(receiver_locked) &&
+	      !vm_notifications_is_npi_injected(receiver_locked)))) {
+		api_interrupt_inject_locked(target_locked,
+					    HF_NOTIFICATION_PENDING_INTID,
+					    current, NULL);
+		vm_notifications_set_npi_injected(receiver_locked, true);
+		ret = true;
 	}
+
+	return ret;
 }
 
 /** Forward helper for FFA_PARTITION_INFO_GET. */

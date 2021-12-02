@@ -687,14 +687,14 @@ static struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
  * Prepares the vCPU to run by updating its state and fetching whether a return
  * value needs to be forced onto the vCPU.
  */
-static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
+static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 				 struct ffa_value *run_ret)
 {
 	struct vcpu_locked vcpu_locked;
 	struct vm_locked vm_locked;
-	bool need_vm_lock;
 	bool ret;
 	uint64_t timer_remaining_ns = FFA_SLEEP_INDEFINITE;
+	bool need_vm_lock;
 
 	/*
 	 * Check that the registers are available so that the vCPU can be run.
@@ -715,9 +715,13 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 	}
 
 #endif
-
 	/* The VM needs to be locked to deliver mailbox messages. */
-	need_vm_lock = vcpu->state == VCPU_STATE_WAITING;
+	need_vm_lock = vcpu->state == VCPU_STATE_WAITING ||
+		       (!vcpu->vm->el0_partition &&
+			(vcpu->state == VCPU_STATE_BLOCKED_INTERRUPT ||
+			 vcpu->state == VCPU_STATE_BLOCKED ||
+			 vcpu->state == VCPU_STATE_PREEMPTED));
+
 	if (need_vm_lock) {
 		vcpu_unlock(&vcpu_locked);
 		vm_locked = vm_lock(vcpu->vm);
@@ -775,6 +779,13 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 			break;
 		}
 
+		assert(need_vm_lock == true);
+		if (!vm_locked.vm->el0_partition &&
+		    plat_ffa_inject_notification_pending_interrupt(
+			    vcpu_locked, current, vm_locked)) {
+			break;
+		}
+
 		/*
 		 * A pending message allows the vCPU to run so the message can
 		 * be delivered directly.
@@ -805,6 +816,13 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 		ret = false;
 		goto out;
 	case VCPU_STATE_BLOCKED_INTERRUPT:
+		if (need_vm_lock &&
+		    plat_ffa_inject_notification_pending_interrupt(
+			    vcpu_locked, current, vm_locked)) {
+			assert(vcpu_interrupt_count_get(vcpu_locked) > 0);
+			break;
+		}
+
 		/* Allow virtual interrupts to be delivered. */
 		if (vcpu_interrupt_count_get(vcpu_locked) > 0) {
 			break;
@@ -837,6 +855,11 @@ static bool api_vcpu_prepare_run(const struct vcpu *current, struct vcpu *vcpu,
 	case VCPU_STATE_BLOCKED:
 		/* A blocked vCPU is run unconditionally. Fall through. */
 	case VCPU_STATE_PREEMPTED:
+		/* Check NPI is to be injected here. */
+		if (need_vm_lock) {
+			plat_ffa_inject_notification_pending_interrupt(
+				vcpu_locked, current, vm_locked);
+		}
 		break;
 	default:
 		/*
@@ -866,7 +889,6 @@ out:
 	if (need_vm_lock) {
 		vm_unlock(&vm_locked);
 	}
-
 	return ret;
 }
 
@@ -2049,6 +2071,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 {
 	struct ffa_value ret;
 	struct vm *receiver_vm;
+	struct vm_locked receiver_locked;
 	struct vcpu *receiver_vcpu;
 	struct two_vcpu_locked vcpus_locked;
 
@@ -2093,6 +2116,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	receiver_locked = vm_lock(receiver_vm);
 	vcpus_locked = vcpu_lock_both(receiver_vcpu, current);
 
 	/*
@@ -2164,6 +2188,20 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	/* Switch to receiver vCPU targeted to by direct msg request */
 	*next = receiver_vcpu;
 
+	if (!receiver_locked.vm->el0_partition) {
+		/*
+		 * If the scheduler in the system is giving CPU cycles to the
+		 * receiver, due to pending notifications, inject the NPI
+		 * interrupt. Following call assumes that '*next' has been set
+		 * to receiver_vcpu.
+		 */
+		plat_ffa_inject_notification_pending_interrupt(
+			vcpus_locked.vcpu1.vcpu == receiver_vcpu
+				? vcpus_locked.vcpu1
+				: vcpus_locked.vcpu2,
+			current, receiver_locked);
+	}
+
 	/*
 	 * Since this flow will lead to a VM switch, the return value will not
 	 * be applied to current vCPU.
@@ -2172,6 +2210,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 out:
 	sl_unlock(&receiver_vcpu->lock);
 	sl_unlock(&current->lock);
+	vm_unlock(&receiver_locked);
 
 	return ret;
 }
@@ -2978,22 +3017,6 @@ struct ffa_value api_ffa_notification_set(
 		plat_ffa_sri_state_set(DELAYED);
 	}
 
-	/*
-	 * If notifications set are per-vCPU and the receiver is SP, the
-	 * Notifications Pending Interrupt can be injected now.
-	 * If not, it should be injected when the scheduler gives it CPU cycles
-	 * in a specific vCPU.
-	 */
-	if (is_per_vcpu && vm_id_is_current_world(receiver_vm_id)) {
-		struct vcpu *target_vcpu =
-			vm_get_vcpu(receiver_locked.vm, vcpu_id);
-
-		dlog_verbose("Per-vCPU notification, pending NPI.\n");
-		internal_interrupt_inject(target_vcpu,
-					  HF_NOTIFICATION_PENDING_INTID,
-					  current, NULL);
-	}
-
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 out:
 	vm_unlock(&receiver_locked);
@@ -3083,6 +3106,11 @@ struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 	 */
 	if (vm_is_notifications_pending_count_zero()) {
 		plat_ffa_sri_state_set(HANDLED);
+	}
+
+	if (!receiver_locked.vm->el0_partition &&
+	    !vm_are_global_notifications_pending(receiver_locked)) {
+		vm_notifications_set_npi_injected(receiver_locked, false);
 	}
 
 out:
