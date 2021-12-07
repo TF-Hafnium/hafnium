@@ -2269,6 +2269,21 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	}
 
 	/*
+	 * If the borrower needs the memory to be cleared before mapping to its
+	 * address space, the sender should have set the flag when calling
+	 * FFA_MEM_LEND/FFA_MEM_DONATE, else return FFA_DENIED.
+	 */
+	if ((retrieve_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) != 0U &&
+	    (share_state->memory_region->flags &
+	     FFA_MEMORY_REGION_FLAG_CLEAR) == 0U) {
+		dlog_verbose(
+			"Borrower needs memory cleared. Sender needs to set "
+			"flag for clearing memory.\n");
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	/*
 	 * Check permissions from sender against permissions requested by
 	 * receiver.
 	 */

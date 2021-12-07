@@ -646,7 +646,7 @@ TEST_SERVICE(ffa_memory_lend_relinquish_X)
 /**
  * Attempt to retrieve a shared page but expect to fail with FFA_DENIED.
  */
-TEST_SERVICE(ffa_memory_share_fail)
+TEST_SERVICE(ffa_memory_share_fail_denied)
 {
 	for (;;) {
 		void *recv_buf = SERVICE_RECV_BUFFER();

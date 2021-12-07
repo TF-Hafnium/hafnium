@@ -1425,7 +1425,7 @@ TEST(memory_sharing, share_X_RW)
 	uint8_t *ptr = pages;
 	struct ffa_value run_res;
 
-	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail_denied", mb.send);
 
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
@@ -2317,7 +2317,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 
-	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail", mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail_denied", mb.send);
 
 	/* Call FFA_MEM_SEND, setting FFA_DATA_ACCESS_RO. */
 	EXPECT_EQ(ffa_memory_region_init(
@@ -2352,4 +2352,79 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 	ffa_run(SERVICE_VM1, 0);
 
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+}
+
+/**
+ * A borrower can only request a memory region to be cleared on his end, if
+ * the sender has set the FFA_MEMORY_REGION_FLAG_CLEAR flag in the transaction
+ * descriptor. If the sender flag is clear, expect FFA_DENIED error.
+ */
+TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_sender_not_clear)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_lend,
+		ffa_mem_donate,
+	};
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail_denied", mb.send);
+
+	for (uint32_t i = 0; i < ARRAY_SIZE(send_function); i++) {
+		/*
+		 * Call FF-A memory send interface, not setting the
+		 * FFA_MEMORY_REGION_FLAG_CLEAR.
+		 */
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM1, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  /* Different args for lend and donate. */
+				  send_function[i] == ffa_mem_lend
+					  ? FFA_DATA_ACCESS_RW
+					  : FFA_DATA_ACCESS_NOT_SPECIFIED,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  0);
+
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+		handle = ffa_mem_success_handle(ret);
+
+		/*
+		 * Prepare retrieve request with RW, and setting flag to clear
+		 * memory. Should fail at the receiver's FFA_MEM_RETRIEVE_REQ
+		 * call with FFA_DENIED.
+		 */
+		msg_size = ffa_memory_retrieve_request_init(
+			mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
+			FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RW,
+			/* Different args for lend and donate. */
+			send_function[i] == ffa_mem_lend
+				? FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED
+				: FFA_INSTRUCTION_ACCESS_NX,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE);
+
+		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+		EXPECT_EQ(
+			ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size, 0)
+				.func,
+			FFA_SUCCESS_32);
+
+		ffa_run(SERVICE_VM1, 0);
+
+		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+	}
 }
