@@ -30,7 +30,8 @@
 /** Mask for getting read/write/execute permission */
 #define MM_PERM_MASK 0x7
 
-#define DEFAULT_BOOT_ORDER 0x0
+/* Highest possible value for the boot-order field. */
+#define DEFAULT_BOOT_ORDER 0xFFFF
 
 enum run_time_el {
 	EL1 = 0,

@@ -395,7 +395,7 @@ void vm_update_boot(struct vm *vm)
 
 	current = first_boot_vm;
 
-	while (current != NULL && current->boot_order >= vm->boot_order) {
+	while (current != NULL && current->boot_order <= vm->boot_order) {
 		previous = current;
 		current = current->next_boot;
 	}

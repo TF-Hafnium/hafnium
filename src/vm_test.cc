@@ -54,9 +54,9 @@ class vm : public ::testing::Test
 	struct mpool ppool;
 
        public:
-	static bool BootOrderBiggerThan(struct_vm *vm1, struct_vm *vm2)
+	static bool BootOrderSmallerThan(struct_vm *vm1, struct_vm *vm2)
 	{
-		return vm1->boot_order > vm2->boot_order;
+		return vm1->boot_order < vm2->boot_order;
 	}
 };
 
@@ -95,7 +95,7 @@ TEST_F(vm, vm_boot_order)
 	 * The "boot_list" is expected to be empty.
 	 */
 	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
-	vm_cur->boot_order = 1;
+	vm_cur->boot_order = 3;
 	vm_update_boot(vm_cur);
 	expected_final_order.push_back(vm_cur);
 
@@ -103,7 +103,7 @@ TEST_F(vm, vm_boot_order)
 
 	/* Insertion at the head of the boot list */
 	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
-	vm_cur->boot_order = 3;
+	vm_cur->boot_order = 1;
 	vm_update_boot(vm_cur);
 	expected_final_order.push_back(vm_cur);
 
@@ -135,8 +135,8 @@ TEST_F(vm, vm_boot_order)
 	EXPECT_EQ(expected_final_order.size(), vm_get_count())
 		<< "Something went wrong with the test itself...\n";
 
-	/* Sort "expected_final_order" by "boot_order" field */
-	expected_final_order.sort(vm::BootOrderBiggerThan);
+	/* Sort VMs from lower to higher "boot_order" field.*/
+	expected_final_order.sort(vm::BootOrderSmallerThan);
 
 	std::list<struct_vm *>::iterator it;
 	for (it = expected_final_order.begin(), vm_cur = vm_get_first_boot();
