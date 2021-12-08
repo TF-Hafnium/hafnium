@@ -258,6 +258,8 @@ bool plat_ffa_notifications_update_bindings_forward(
 
 	if (vm_id_is_current_world(receiver_id) &&
 	    !vm_id_is_current_world(sender_id)) {
+		dlog_verbose(
+			"Forward notifications bind/unbind to other world.\n");
 		*ret = arch_other_world_call((struct ffa_value){
 			.func = is_bind ? FFA_NOTIFICATION_BIND_32
 					: FFA_NOTIFICATION_UNBIND_32,

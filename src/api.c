@@ -2743,7 +2743,6 @@ struct ffa_value api_ffa_notification_update_bindings(
 	if (plat_ffa_notifications_update_bindings_forward(
 		    receiver_vm_id, sender_vm_id, flags, notifications, is_bind,
 		    &ret)) {
-		dlog_verbose("Forwarding call to other world.\n");
 		return ret;
 	}
 
