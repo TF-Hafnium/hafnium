@@ -140,6 +140,23 @@ bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 }
 
 /**
+ * Check validity of the FF-A memory send function attempt.
+ */
+bool plat_ffa_is_memory_send_valid(ffa_vm_id_t receiver_vm_id,
+				   uint32_t share_func)
+{
+	/*
+	 * Currently memory interfaces are not forwarded from hypervisor to
+	 * SPMC. However, in absence of SPMC this function should allow
+	 * NS-endpoint to SP memory send in order for trusty tests to work.
+	 */
+
+	(void)share_func;
+	(void)receiver_vm_id;
+	return true;
+}
+
+/**
  * Check validity of a FF-A direct message request.
  */
 bool plat_ffa_is_direct_request_valid(struct vcpu *current,

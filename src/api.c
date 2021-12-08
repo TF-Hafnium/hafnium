@@ -2432,6 +2432,11 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		goto out;
 	}
 
+	if (!plat_ffa_is_memory_send_valid(to->id, share_func)) {
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
 	if (to->id == HF_TEE_VM_ID) {
 		/*
 		 * The 'to' VM lock is only needed in the case that it is the

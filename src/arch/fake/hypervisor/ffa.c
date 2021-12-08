@@ -29,6 +29,15 @@ void plat_ffa_log_init(void)
 {
 }
 
+bool plat_ffa_is_memory_send_valid(ffa_vm_id_t receiver_vm_id,
+				   uint32_t share_func)
+{
+	(void)receiver_vm_id;
+	(void)share_func;
+
+	return true;
+}
+
 bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 				      ffa_vm_id_t sender_vm_id,
 				      ffa_vm_id_t receiver_vm_id)

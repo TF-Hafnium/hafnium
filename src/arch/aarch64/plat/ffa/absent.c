@@ -42,6 +42,18 @@ void plat_ffa_init(bool tee_enabled)
 }
 
 /**
+ * Check validity of the FF-A memory send function attempt.
+ */
+bool plat_ffa_is_memory_send_valid(ffa_vm_id_t receiver_vm_id,
+				   uint32_t share_func)
+{
+	(void)receiver_vm_id;
+	(void)share_func;
+
+	return false;
+}
+
+/**
  * Check validity of a FF-A direct message request.
  */
 bool plat_ffa_is_direct_request_valid(struct vcpu *current,
