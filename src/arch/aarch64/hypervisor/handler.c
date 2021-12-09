@@ -485,7 +485,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	 */
 	switch (func) {
 	case FFA_VERSION_32:
-		*args = api_ffa_version(args->arg1);
+		*args = api_ffa_version(current, args->arg1);
 		return true;
 	case FFA_PARTITION_INFO_GET_32: {
 		struct ffa_uuid uuid;

@@ -1794,8 +1794,11 @@ int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
 }
 
 /** Returns the version of the implemented FF-A specification. */
-struct ffa_value api_ffa_version(uint32_t requested_version)
+struct ffa_value api_ffa_version(struct vcpu *current,
+				 uint32_t requested_version)
 {
+	struct vm_locked current_vm_locked;
+
 	/*
 	 * Ensure that both major and minor revision representation occupies at
 	 * most 15 bits.
@@ -1808,6 +1811,10 @@ struct ffa_value api_ffa_version(uint32_t requested_version)
 		/* Invalid encoding, return an error. */
 		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
 	}
+
+	current_vm_locked = vm_lock(current->vm);
+	current_vm_locked.vm->ffa_version = requested_version;
+	vm_unlock(&current_vm_locked);
 
 	return ((struct ffa_value){.func = FFA_VERSION_COMPILED});
 }

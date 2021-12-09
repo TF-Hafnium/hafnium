@@ -76,6 +76,17 @@ void plat_ffa_init(bool tee_enabled)
 
 	arch_ffa_init();
 
+	/*
+	 * Call FFA_VERSION so the SPMC can store the hypervisor's
+	 * version. This may be useful if there is a mismatch of
+	 * versions.
+	 */
+	ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_VERSION_32, .arg1 = FFA_VERSION_COMPILED});
+	if (ret.func == (uint32_t)FFA_NOT_SUPPORTED) {
+		panic("Hypervisor and SPMC versions are not compatible.\n");
+	}
+
 	/* Setup TEE VM RX/TX buffers */
 	other_world_vm->mailbox.send = &other_world_send_buffer;
 	other_world_vm->mailbox.recv = &other_world_recv_buffer;

@@ -174,7 +174,7 @@ void one_time_init(void)
 	/* Enable TLB invalidation for VM page table updates. */
 	mm_vm_enable_invalidation();
 
-	/* Set up message buffers for TEE dispatcher. */
+	/* Perform platform specfic FF-A initialization. */
 	plat_ffa_init(manifest.ffa_tee_enabled);
 
 	dlog_info("Hafnium initialisation completed\n");

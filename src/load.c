@@ -187,6 +187,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	dlog_verbose("VM has %d physical interrupts defined in manifest.\n", k);
 
 	if (manifest_vm->is_ffa_partition) {
+		vm_locked.vm->ffa_version = manifest_vm->partition.ffa_version;
 		/* Link rxtx buffers to mailbox */
 		if (manifest_vm->partition.rxtx.available) {
 			if (!link_rxtx_to_mailbox(stage1_locked, vm_locked,
