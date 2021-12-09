@@ -667,10 +667,13 @@ static struct ffa_value ffa_retrieve_check_transition(
 			MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 		uint32_t orig_to_state = orig_to_mode & state_mask;
 
-		if (orig_to_state != MM_MODE_INVALID &&
-		    orig_to_state != MM_MODE_SHARED) {
-			return ffa_error(FFA_DENIED);
-		}
+		/*
+		 * If the original ffa memory send call has been processed
+		 * successfully, it is expected the orig_to_mode would overlay
+		 * with `state_mask`, as a result of the function
+		 * `ffa_send_check_transition`.
+		 */
+		assert(orig_to_state != 0U);
 	} else {
 		/*
 		 * Ensure the retriever has the expected state. We don't care
