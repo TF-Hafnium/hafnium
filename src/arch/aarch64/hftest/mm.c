@@ -32,12 +32,12 @@ static uintreg_t mm_reset_sctlr_el1;
  */
 bool arch_vm_mm_init(void)
 {
-	static const int pa_bits_table[16] = {32, 36, 40, 42, 44, 48};
+	static const int pa_bits_table[16] = {32, 36, 40, 42, 44, 48, 52};
 	uint64_t features = read_msr(id_aa64mmfr0_el1);
 	int pa_bits = pa_bits_table[features & 0xf];
 
 	/* Check that 4KB granules are supported. */
-	if ((features >> 28) & 0xf) {
+	if (((features >> 28) & 0xf) == 0xf) {
 		dlog_error("4KB granules are not supported\n");
 		return false;
 	}

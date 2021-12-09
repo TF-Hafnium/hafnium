@@ -741,7 +741,7 @@ uint64_t arch_mm_combine_table_entry_attrs(uint64_t table_attrs,
  */
 bool arch_mm_init(paddr_t table)
 {
-	static const int pa_bits_table[16] = {32, 36, 40, 42, 44, 48};
+	static const int pa_bits_table[16] = {32, 36, 40, 42, 44, 48, 52};
 	uint64_t features = read_msr(id_aa64mmfr0_el1);
 	uint64_t pe_features = read_msr(id_aa64pfr0_el1);
 	unsigned int nsa_nsw;
@@ -750,7 +750,7 @@ bool arch_mm_init(paddr_t table)
 	int sl0;
 
 	/* Check that 4KB granules are supported. */
-	if ((features >> 28) & 0xf) {
+	if (((features >> 28) & 0xf) == 0xf) {
 		dlog_error("4KB granules are not supported\n");
 		return false;
 	}
@@ -761,6 +761,14 @@ bool arch_mm_init(paddr_t table)
 			"Unsupported value of id_aa64mmfr0_el1.PARange: %x\n",
 			features & 0xf);
 		return false;
+	}
+
+	/* Downgrade PA size from 52 to 48 bits (FEAT_LPA workaround). */
+	if (pa_bits == 52) {
+		dlog_verbose(
+			"52-bit PA size not supported,"
+			" falling back to 48-bit\n");
+		pa_bits = 48;
 	}
 
 	dlog_info("Supported bits in physical address: %d\n", pa_bits);
