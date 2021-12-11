@@ -877,7 +877,7 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	struct vcpu *vcpu;
 	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
 
-	if (!plat_ffa_run_checks(current, vm_id, &ret, next)) {
+	if (!plat_ffa_run_checks(current, vm_id, vcpu_idx, &ret, next)) {
 		return ret;
 	}
 

@@ -509,9 +509,11 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
  * Check if current VM can resume target VM/SP using FFA_RUN ABI.
  */
 bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
-			 struct ffa_value *run_ret, struct vcpu **next)
+			 ffa_vcpu_index_t vcpu_idx, struct ffa_value *run_ret,
+			 struct vcpu **next)
 {
 	(void)next;
+	(void)vcpu_idx;
 
 	/* Only the primary VM can switch vCPUs. */
 	if (current->vm->id != HF_PRIMARY_VM_ID) {
