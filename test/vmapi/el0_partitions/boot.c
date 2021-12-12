@@ -10,7 +10,7 @@
 
 #include "vmapi/hf/call.h"
 
-#include "el0_partitions.h"
+#include "primary_with_secondary.h"
 #include "test/hftest.h"
 #include "test/vmapi/exception_handler.h"
 #include "test/vmapi/ffa.h"

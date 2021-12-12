@@ -15,6 +15,47 @@ config("hftest_config") {
   }
 }
 
+#dlog for el0 partition that uses SVCs for debug logging
+source_set("el0_dlog") {
+  testonly = true
+  sources = [
+    "//src/dlog.c",
+  ]
+  deps = [
+    "//src/arch/aarch64/hftest:el0_stdout",
+  ]
+}
+
+source_set("el0_fdt_handler") {
+  testonly = true
+  sources = [
+    "//src/fdt_handler.c",
+  ]
+  deps = [
+    "//src:fdt",
+  ]
+}
+
+# Testing framework for a secondary EL0 partition.
+# It's currently just a secondary partition and can't affect the tests directly.
+source_set("hftest_secondary_el0_partition") {
+  testonly = true
+
+  public_configs = [ ":hftest_config" ]
+
+  sources = [
+    "nwd_el0_service.c",
+    "service.c",
+  ]
+
+  deps = [
+    ":el0_dlog",
+    ":el0_fdt_handler",
+    "//src:panic",
+    "//src/arch/${plat_arch}/hftest:el0_entry",
+  ]
+}
+
 # Testing framework for a primary VM.
 source_set("hftest_primary_vm") {
   testonly = true

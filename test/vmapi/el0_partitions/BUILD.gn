@@ -36,7 +36,7 @@ source_set("memory_sharing") {
 vm_kernel("el0_partition_test_vm") {
   testonly = true
   public_configs = [
-    ":config",
+    "//test/vmapi/primary_with_secondaries:config",
     "//src/arch/aarch64:config",
   ]
 

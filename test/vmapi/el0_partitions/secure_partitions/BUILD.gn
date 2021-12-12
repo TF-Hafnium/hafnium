@@ -37,7 +37,7 @@ source_set("sel0_partition_base_src") {
   testonly = true
 
   public_configs = [
-    "../services:el0_partition_config",
+    "//test/hftest:hftest_config",
     "..:config",
   ]
 
@@ -46,10 +46,10 @@ source_set("sel0_partition_base_src") {
   ]
 
   deps = [
-    "../services:el0_dlog",
-    "../services:el0_fdt_handler",
     "//src:panic",
     "//src/arch/${plat_arch}/hftest:el0_entry",
+    "//test/hftest:el0_dlog",
+    "//test/hftest:el0_fdt_handler",
   ]
 }
 

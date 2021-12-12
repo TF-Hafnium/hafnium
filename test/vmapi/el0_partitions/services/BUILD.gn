@@ -6,60 +6,9 @@
 
 import("//build/image/image.gni")
 
-config("el0_partition_config") {
-  include_dirs = [ "//test/inc" ]
-}
-
-#dlog for el0 partition that uses SVCs for debug logging
-source_set("el0_dlog") {
-  testonly = true
-  sources = [
-    "//src/dlog.c",
-  ]
-  deps = [
-    "//src/arch/aarch64/hftest:el0_stdout",
-  ]
-}
-
-source_set("el0_fdt_handler") {
-  testonly = true
-  sources = [
-    "//src/fdt_handler.c",
-  ]
-  deps = [
-    "//src:fdt",
-  ]
-}
-
-# Testing framework for a secondary EL0 partition.
-# It's currently just a secondary partition and can't affect the tests directly.
-source_set("hftest_secondary_el0_partition") {
-  testonly = true
-
-  public_configs = [
-    ":el0_partition_config",
-    "..:config",
-  ]
-
-  sources = [
-    "//test/hftest/service.c",
-    "el0_service.c",
-  ]
-
-  deps = [
-    ":el0_dlog",
-    ":el0_fdt_handler",
-    "//src:panic",
-    "//src/arch/${plat_arch}/hftest:el0_entry",
-  ]
-}
-
 vm_kernel("service_vm1") {
   testonly = true
-  public_configs = [
-    ":el0_partition_config",
-    "..:config",
-  ]
+  public_configs = [ "//test/hftest:hftest_config" ]
   sources = [
     "boot.c",
     "echo_with_notification.c",
@@ -69,7 +18,7 @@ vm_kernel("service_vm1") {
     "receive_block.c",
   ]
   deps = [
-    ":hftest_secondary_el0_partition",
+    "//test/hftest:hftest_secondary_el0_partition",
     "//test/vmapi/common:common",
     "//test/vmapi/primary_with_secondaries/services:echo",
     "//test/vmapi/primary_with_secondaries/services:ffa_check",
@@ -81,11 +30,12 @@ vm_kernel("service_vm1") {
 
 vm_kernel("service_vm2") {
   testonly = true
+  public_configs = [ "//test/vmapi/primary_with_secondaries:config" ]
   sources = [
     "memory.c",
   ]
   deps = [
-    ":hftest_secondary_el0_partition",
+    "//test/hftest:hftest_secondary_el0_partition",
     "//test/vmapi/common:common",
     "//test/vmapi/primary_with_secondaries/services:relay",
     "//vmlib",
@@ -95,7 +45,7 @@ vm_kernel("service_vm2") {
 vm_kernel("service_vm3") {
   testonly = true
   deps = [
-    ":hftest_secondary_el0_partition",
+    "//test/hftest:hftest_secondary_el0_partition",
     "//test/vmapi/common:common",
     "//vmlib",
   ]
