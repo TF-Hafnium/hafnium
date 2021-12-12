@@ -28,7 +28,7 @@ struct hftest_context *hftest_get_context(void)
 	return &global_context;
 }
 
-extern void secure_partition_msg_loop(void);
+void test_main_sp(bool);
 
 noreturn void abort(void)
 {
@@ -43,16 +43,7 @@ noreturn void abort(void)
 
 noreturn void kmain(void)
 {
-	/*
-	 * Initialize the stage-1 MMU and identity-map the entire address space.
-	 */
-	if (!hftest_mm_init()) {
-		HFTEST_LOG_FAILURE();
-		HFTEST_LOG(HFTEST_LOG_INDENT "Memory initialization failed");
-		abort();
-	}
-
-	secure_partition_msg_loop();
+	test_main_sp(true);
 
 	/* Do not expect to get to this point, so abort. */
 	abort();

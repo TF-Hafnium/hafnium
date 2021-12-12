@@ -6,9 +6,14 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include <stdalign.h>
+#include <stdint.h>
+
 #include "test/hftest.h"
 
-noreturn void el0_main(const void *fdt_ptr)
+alignas(4096) uint8_t kstack[4096];
+
+noreturn void kmain(const void *fdt_ptr)
 {
 	hftest_service_main(fdt_ptr);
 }

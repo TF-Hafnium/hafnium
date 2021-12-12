@@ -121,7 +121,7 @@ image_entry:
 	mov sp, x30
 
 	/* Call into C code. */
-	bl el0_main
+	bl kmain
 
 	/* Loop forever waiting for interrupts. */
 0:	wfi
