@@ -555,23 +555,6 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
         FvpDriverHypervisor.__init__(self, args)
         FvpDriverSPMC.__init__(self, args)
 
-        # Create and build dt
-        dt = self.create_dt(args.global_run_name)
-        self.gen_dts(dt, "")
-        run_state = self.start_run(args.global_run_name + "_dt_compile")
-        self.compile_dt(run_state, dt)
-
-        # Create file to capture model stdout and stderr
-        self.fvp_out_filename = args.artifacts.create_file(
-            args.global_run_name, ".model.log")
-        self.fvp_out_f = open(self.fvp_out_filename, "a")
-
-        # Generate the FVP model arguments
-        self.fvp_args = self.gen_fvp_args(None, None, dt)
-
-        self.process = None
-
-
     @property
     def CPU_START_ADDRESS(self):
         return str(0x04010000)
@@ -602,90 +585,20 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
         FvpDriverHypervisor.gen_dts(self, dt["hypervisor"], test_args)
         FvpDriverSPMC.gen_dts(self, dt["spmc"], test_args)
 
-    def gen_fvp_args(self, uart0_log_path, uart1_log_path, dt):
+    def gen_fvp_args(self, is_long_running, uart0_log_path, uart1_log_path, dt):
         """Generate command line arguments for FVP."""
-        common_args = (self, None, uart0_log_path, uart1_log_path)
+        common_args = (self, is_long_running, uart0_log_path, uart1_log_path)
         fvp_args = FvpDriverHypervisor.gen_fvp_args(*common_args, dt["hypervisor"])
         fvp_args += FvpDriverSPMC.gen_fvp_args(*common_args, dt["spmc"], False,
                                                False)
-        # Timeout arguments are expected to be at the beggining of fvp args.
-        # With this driver, the timeouts are going to be managed via the telnet
-        # APIs. Therefore, removing from list of command arguments:
-        return fvp_args[3:]
-
-    def get_telnet_port(self):
-        # Get telnet port by parsing log file, default to 5000
-        self.fvp_out_f.flush()
-        log = read_file(self.fvp_out_filename)
-        port = re.match(
-            'terminal_0: Listening for serial connection on port ([0-9]+)', log)
-        return port.group(1) if port else 5000
-
-    def process_start(self):
-        self.process = subprocess.Popen(self.fvp_args,
-                                        stdout = self.fvp_out_f,
-                                        stderr = self.fvp_out_f)
-        # Sleep 1 sec so connect to model via telnet doesn't fail
-        time.sleep(1.0)
-        # Start telnet session
-        try:
-            self.comm = Telnet("localhost", self.get_telnet_port())
-        except ConnectionError as e:
-            self.finish()
-            raise e
-
-
-    def process_terminate(self):
-        """ Terminate fvp model's process, and reset internal field """
-        self.comm.close() # Close telnet connection
-        self.process.terminate()
-        # To give the system time to terminate the process
-        time.sleep(1.0)
-        self.process = None
+        return fvp_args
 
     def run(self, run_name, test_args, is_long_running):
-        """ Run test """
-        run_state = self.start_run(run_name)
-        assert(run_state.ret_code == 0)
-
-        if self.process is None:
-            self.process_start()
-
-        test_log = f"{' '.join(self.fvp_args)}\n"
-
-        # Obtaining HFTEST_CTRL_GET_COMMAND_LINE in logs should be quick
-        test_log += self.comm.read_until(
-            HFTEST_CTRL_GET_COMMAND_LINE.encode("ascii"),
-            timeout=5.0).decode("ascii")
-
-        if HFTEST_CTRL_GET_COMMAND_LINE in test_log:
-            # Send self.command to instruct partition to execute test
-            self.comm.write(f"{test_args}\n".encode("ascii"))
-
-            timeout = 80.0 if is_long_running else 10.0
-            test_log += self.comm.read_until(HFTEST_CTRL_FINISHED.encode("ascii"),
-                                        timeout=timeout).decode("ascii")
-        else:
-            print("VM not ready to fetch test command")
-
-        # Check wether test went well:
-        if HFTEST_CTRL_FINISHED not in test_log:
-            # Terminate process, so it is restarted on the next call to this
-            # function. In this case, the test binaries didn't reset/reboot the
-            # system for the execution of the next test.
-            self.process_terminate()
-            run_state.set_ret_code(124)
-
-        with open(run_state.log_path, "a") as f:
-            f.write(test_log)
-
-        return self.finish_run(run_state)
+        return FvpDriver.run(self, run_name, test_args, is_long_running)
 
     def finish(self):
         """Clean up after running tests."""
-        if self.process is not None:
-            self.process_terminate()
-        self.fvp_out_f.close()
+        FvpDriver.finish(self)
 
 class SerialDriver(Driver):
     """Driver which communicates with a device over the serial port."""

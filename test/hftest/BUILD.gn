@@ -178,8 +178,8 @@ source_set("hftest_standalone_secure") {
     "//src/arch/${plat_arch}/hftest:entry",
     "//src/arch/${plat_arch}/hftest:interrupts",
     "//src/arch/${plat_arch}/hftest:power_mgmt",
+    "//test/hftest:ctrl_uart",
     "//vmlib/${plat_arch}:call",
-    hftest_ctrl,
     hftest_device,
   ]
 }
