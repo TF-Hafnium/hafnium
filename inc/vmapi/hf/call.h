@@ -38,12 +38,19 @@ static inline struct ffa_value ffa_spm_id_get(void)
 }
 
 /**
- * Requests information for partitions instantiated in the system. The
- * information is returned in the RX buffer of the caller as an array of
- * partition information descriptors (struct ffa_partition_info).
+ * Requests information for partitions instantiated in the system. If the
+ * FFA_PARTITION_COUNT_FLAG is not set, the information is returned
+ * in the RX buffer of the caller as an array of partition information
+ * descriptors (struct ffa_partition_info).
  *
  * A Null UUID (UUID that is all zeros) returns information for all partitions,
  * whereas a non-Null UUID returns information only for partitions that match.
+ *
+ * Flags may include:
+ *  - FFA_PARTITION_COUNT_FLAG, which specifes if the partition info descriptors
+ *    are returned in RX buffer or just the count in arg2.
+ *    1 returns just the count.
+ *    0 returns the count with the partition info descriptors.
  *
  * Returns:
  *  - FFA_SUCCESS on success. The count of partition information descriptors
@@ -53,15 +60,15 @@ static inline struct ffa_value ffa_spm_id_get(void)
  *  - FFA_INVALID_PARAMETERS for an unrecognized UUID.
  */
 static inline struct ffa_value ffa_partition_info_get(
-	const struct ffa_uuid *uuid)
+	const struct ffa_uuid *uuid, const uint32_t flags)
 {
 	return ffa_call((struct ffa_value){.func = FFA_PARTITION_INFO_GET_32,
 					   .arg1 = uuid->uuid[0],
 					   .arg2 = uuid->uuid[1],
 					   .arg3 = uuid->uuid[2],
-					   .arg4 = uuid->uuid[3]});
+					   .arg4 = uuid->uuid[3],
+					   .arg5 = flags});
 }
-
 /**
  * DEN0077A FF-A v1.1 Beta0 section 18.3.2.1
  * Registers vCPU secondary entry point for the caller VM.

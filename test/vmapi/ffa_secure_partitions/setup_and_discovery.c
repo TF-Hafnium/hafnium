@@ -38,7 +38,7 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	ffa_uuid_init(0, 0, 0, 0, &uuid);
 
 	/* Check that expected partition information is returned. */
-	ret = ffa_partition_info_get(&uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	/* Expect three partitions. */
@@ -59,6 +59,31 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
 
+TEST(ffa, ffa_partition_info_get_count_flag)
+{
+	struct ffa_value ret;
+	struct ffa_uuid uuid;
+
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+
+	ret = ffa_partition_info_get(&uuid, FFA_PARTITION_COUNT_FLAG);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Expect three partitions. */
+	EXPECT_EQ(ret.arg2, 3);
+}
+
+TEST(ffa, ffa_partition_info_get_flags_mbz_fail)
+{
+	struct ffa_value ret;
+	struct ffa_uuid uuid;
+
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+
+	ret = ffa_partition_info_get(&uuid, 0xffff);
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
+}
+
 TEST(ffa, ffa_partition_info_get_uuid_fixed)
 {
 	struct mailbox_buffers mb;
@@ -73,8 +98,19 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 	/* Search for a known secure partition UUID. */
 	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
 
+	/* Check that a partition count of 1 is returned. */
+	ret = ffa_partition_info_get(&uuid, FFA_PARTITION_COUNT_FLAG);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Expect one partition. */
+	EXPECT_EQ(ret.arg2, 1);
+
+	/* And that the buffer is zero */
+	EXPECT_EQ(partitions[0].vm_id, 0);
+	EXPECT_EQ(partitions[0].vcpu_count, 0);
+
 	/* Check that the expected partition information is returned. */
-	ret = ffa_partition_info_get(&uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	/* Expect one partition. */
@@ -96,7 +132,7 @@ TEST(ffa, ffa_partition_info_get_uuid_unknown)
 	ffa_uuid_init(1, 1, 1, 1, &uuid);
 
 	/* Expect no partition is found with such UUID. */
-	ret = ffa_partition_info_get(&uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_ERROR_32);
 }
 

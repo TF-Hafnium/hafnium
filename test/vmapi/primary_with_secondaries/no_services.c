@@ -55,15 +55,20 @@ TEST(ffa_partition_info_get, three_secondary_vms)
 	ffa_uuid_init(0, 0, 0, 0, &uuid);
 
 	/* Try to get partition information before the RX buffer is setup. */
-	ret = ffa_partition_info_get(&uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_FFA_ERROR(ret, FFA_BUSY);
+
+	/* Only getting the partition count should succeed however. */
+	ret = ffa_partition_info_get(&uuid, FFA_PARTITION_COUNT_FLAG);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ret.arg2, 4);
 
 	/* Setup the mailbox (which holds the RX buffer). */
 	mb = set_up_mailbox();
 	partitions = mb.recv;
 
 	/* Check that the expected partition information is returned. */
-	ret = ffa_partition_info_get(&uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	/* Confirm there are 3 secondary VMs as well as this primary VM. */
 	EXPECT_EQ(ret.arg2, 4);
@@ -88,7 +93,7 @@ TEST(ffa_partition_info_get, invalid_vm_uuid)
 	/* Try to get partition information for an unrecognized UUID. */
 	ffa_uuid_init(0, 0, 0, 1, &uuid);
 
-	ret = ffa_partition_info_get(&uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 }
 

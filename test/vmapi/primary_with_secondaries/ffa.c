@@ -163,7 +163,7 @@ TEST(ffa, ffa_partition_info)
 	/* A Null UUID requests information for all partitions. */
 	ffa_uuid_init(0, 0, 0, 0, &uuid);
 
-	ret = ffa_partition_info_get(&uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	vm_count = ret.arg2;
 	EXPECT_EQ(vm_count, 4);
