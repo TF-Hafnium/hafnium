@@ -174,3 +174,8 @@ uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id);
  * by a given architecture, after page table writes.
  */
 void arch_mm_sync_table_writes(void);
+
+/**
+ * Returns the maximum supported PA Range in bits.
+ */
+uint32_t arch_mm_get_pa_range(void);

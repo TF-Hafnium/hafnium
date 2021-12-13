@@ -741,13 +741,12 @@ uint64_t arch_mm_combine_table_entry_attrs(uint64_t table_attrs,
  */
 bool arch_mm_init(paddr_t table)
 {
-	static const int pa_bits_table[16] = {32, 36, 40, 42, 44, 48, 52};
 	uint64_t features = read_msr(id_aa64mmfr0_el1);
 	uint64_t pe_features = read_msr(id_aa64pfr0_el1);
 	unsigned int nsa_nsw;
-	int pa_bits = pa_bits_table[features & 0xf];
-	int extend_bits;
-	int sl0;
+	uint32_t pa_bits = arch_mm_get_pa_range();
+	uint32_t extend_bits;
+	uint32_t sl0;
 
 	/* Check that 4KB granules are supported. */
 	if (((features >> 28) & 0xf) == 0xf) {
@@ -917,4 +916,14 @@ bool arch_mm_init(paddr_t table)
 uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id)
 {
 	return (id == HF_HYPERVISOR_VM_ID) ? MM_MODE_NS : 0;
+}
+
+/**
+ * Returns the maximum supported PA Range in bits.
+ */
+uint32_t arch_mm_get_pa_range(void)
+{
+	static const uint32_t pa_bits_table[16] = {32, 36, 40, 42, 44, 48, 52};
+	uint64_t features = read_msr(id_aa64mmfr0_el1);
+	return pa_bits_table[features & 0xf];
 }
