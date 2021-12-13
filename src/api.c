@@ -356,35 +356,57 @@ struct vcpu *api_abort(struct vcpu *current)
 }
 
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
-					    const struct ffa_uuid *uuid)
+					    const struct ffa_uuid *uuid,
+					    const uint32_t flags)
 {
 	struct vm *current_vm = current->vm;
 	struct vm_locked current_vm_locked;
 	ffa_vm_count_t vm_count = 0;
+	bool count_flag = (flags && FFA_PARTITION_COUNT_FLAG_MASK) ==
+			  FFA_PARTITION_COUNT_FLAG;
 	bool uuid_is_null = ffa_uuid_is_null(uuid);
 	struct ffa_value ret;
 	uint32_t size;
 	struct ffa_partition_info partitions[2 * MAX_VMS];
 
+	/* Bits 31:1 Must Be Zero */
+	if ((flags & ~FFA_PARTITION_COUNT_FLAG) != 0) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
 	/*
-	 * Iterate through the VMs to find the ones with a matching UUID.
-	 * A Null UUID retrieves information for all VMs.
+	 * No need to count if we are returning the number of paritions as we
+	 * already know this.
 	 */
-	for (uint16_t index = 0; index < vm_get_count(); ++index) {
-		struct vm *vm = vm_find_index(index);
+	if (uuid_is_null && count_flag) {
+		vm_count = vm_get_count();
+	} else {
+		/*
+		 * Iterate through the VMs to find the ones with a matching
+		 * UUID. A Null UUID retrieves information for all VMs.
+		 */
+		for (uint16_t index = 0; index < vm_get_count(); ++index) {
+			struct vm *vm = vm_find_index(index);
 
-		if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuid)) {
-			partitions[vm_count].vm_id = vm->id;
-			partitions[vm_count].vcpu_count = vm->vcpu_count;
-			partitions[vm_count].properties =
-				plat_ffa_partition_properties(current_vm->id,
-							      vm);
-			partitions[vm_count].properties |=
-				vm_are_notifications_enabled(vm)
-					? FFA_PARTITION_NOTIFICATION
-					: 0;
+			if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuid)) {
+				uint16_t array_index = vm_count;
 
-			++vm_count;
+				++vm_count;
+				if (count_flag) {
+					continue;
+				}
+
+				partitions[array_index].vm_id = vm->id;
+				partitions[array_index].vcpu_count =
+					vm->vcpu_count;
+				partitions[array_index].properties =
+					plat_ffa_partition_properties(
+						current_vm->id, vm);
+				partitions[array_index].properties |=
+					vm_are_notifications_enabled(vm)
+						? FFA_PARTITION_NOTIFICATION
+						: 0;
+			}
 		}
 	}
 
@@ -395,13 +417,13 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	 * When running the Hypervisor:
 	 * - If UUID is Null the Hypervisor forwards the query to the SPMC for
 	 * it to fill with secure partitions information.
-	 * - If UUID is non-Null vm_count may be zero because the UUID  matches
+	 * - If UUID is non-Null vm_count may be zero because the UUID matches
 	 * a secure partition and the query is forwarded to the SPMC.
 	 * When running the SPMC:
 	 * - If UUID is non-Null and vm_count is zero it means there is no such
 	 * partition identified in the system.
 	 */
-	plat_ffa_partition_info_get_forward(uuid, partitions, &vm_count);
+	plat_ffa_partition_info_get_forward(uuid, flags, partitions, &vm_count);
 
 	/*
 	 * Unrecognized UUID: does not match any of the VMs (or SPs)
@@ -409,6 +431,15 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	 */
 	if (vm_count == 0) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * If the count flag is set we don't need to return the partition info
+	 * descriptors.
+	 */
+	if (count_flag) {
+		return (struct ffa_value){.func = FFA_SUCCESS_32,
+					  .arg2 = vm_count};
 	}
 
 	size = vm_count * sizeof(partitions[0]);

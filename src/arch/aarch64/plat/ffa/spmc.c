@@ -1220,11 +1220,13 @@ void plat_ffa_inject_notification_pending_interrupt_context_switch(
 /** Forward helper for FFA_PARTITION_INFO_GET. */
 void plat_ffa_partition_info_get_forward(  // NOLINTNEXTLINE
 	const struct ffa_uuid *uuid,	   // NOLINTNEXTLINE
+	const uint32_t flags,		   // NOLINTNEXTLINE
 	struct ffa_partition_info *partitions, ffa_vm_count_t *ret_count)
 {
 	/* The SPMC does not forward FFA_PARTITION_INFO_GET. */
 
 	(void)uuid;
+	(void)flags;
 	(void)partitions;
 	(void)ret_count;
 }

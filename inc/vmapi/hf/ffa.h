@@ -126,6 +126,14 @@
 #define FFA_MEM_PERM_RW UINT32_C(0x5)
 #define FFA_MEM_PERM_RX UINT32_C(0x3)
 
+/*
+ * Defined in Table 13.31 in the FF-A v1.1 BETA0 specification.
+ * The Partition count flag is used by FFA_PARTITION_INFO_GET to specify
+ * if partition info descriptors should be returned or just the count.
+ */
+#define FFA_PARTITION_COUNT_FLAG 0x1
+#define FFA_PARTITION_COUNT_FLAG_MASK 0x1
+
 /**
  * For use where the FF-A specification refers explicitly to '4K pages'. Not to
  * be confused with PAGE_SIZE, which is the translation granule Hafnium is
