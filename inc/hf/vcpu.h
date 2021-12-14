@@ -120,6 +120,12 @@ struct vcpu {
 	 * triggered.
 	 */
 	struct vcpu *preempted_vcpu;
+
+	/**
+	 * Current value of the Priority Mask register which is saved/restored
+	 * during secure interrupt handling.
+	 */
+	uint8_t priority_mask;
 };
 
 /** Encapsulates a vCPU whose lock is held. */

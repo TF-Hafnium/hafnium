@@ -759,8 +759,9 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 
 			CHECK(target_vcpu == current->preempted_vcpu);
 
-			/* Unmask interrupts. */
-			plat_interrupts_set_priority_mask(0xff);
+			/* Restore interrupt priority mask. */
+			plat_interrupts_set_priority_mask(
+				current->priority_mask);
 
 			/*
 			 * Clear fields corresponding to secure interrupt
@@ -879,6 +880,12 @@ out:
  Message Processing	Signalable with ME	Signalable	Signalable
  Interrupt Handling	Queued			Queued		Queued
  --------------------------------------------------------------------------
+
+ * Note 1: TODO: The current design makes the assumption that the target vCPU
+ * of a secure interrupt is pinned to the same physical CPU on which the
+ * secure interrupt triggered. The target vCPU has to be resumed on the current
+ * CPU in order for it to service the virtual interrupt. This design limitation
+ * simplifies the interrupt management implementation in SPMC.
  */
 static struct vcpu_locked plat_ffa_secure_interrupt_prepare(
 	struct vcpu *current, uint32_t *int_id)
@@ -887,6 +894,7 @@ static struct vcpu_locked plat_ffa_secure_interrupt_prepare(
 	struct vcpu_locked target_vcpu_locked;
 	struct vcpu *target_vcpu;
 	uint32_t id;
+	uint8_t priority_mask;
 
 	/* Find pending interrupt id. This also activates the interrupt. */
 	id = plat_interrupts_get_pending_interrupt_id();
@@ -902,9 +910,13 @@ static struct vcpu_locked plat_ffa_secure_interrupt_prepare(
 	 * TODO: Temporarily mask all interrupts to disallow high priority
 	 * interrupts from pre-empting current interrupt processing.
 	 */
+	priority_mask = plat_interrupts_get_priority_mask();
 	plat_interrupts_set_priority_mask(0x0);
 
 	target_vcpu_locked = vcpu_lock(target_vcpu);
+
+	/* Save current value of priority mask. */
+	target_vcpu->priority_mask = priority_mask;
 
 	/*
 	 * TODO: Design limitation. Current implementation does not support
@@ -1112,8 +1124,8 @@ struct ffa_value plat_ffa_normal_world_resume(struct vcpu *current,
 	current->current_sec_interrupt_id = 0;
 	vcpu_unlock(&current_locked);
 
-	/* Unmask interrupts. */
-	plat_interrupts_set_priority_mask(0xff);
+	/* Restore interrupt priority mask. */
+	plat_interrupts_set_priority_mask(current->priority_mask);
 
 	*next = api_switch_to_other_world(current, other_world_ret,
 					  VCPU_STATE_WAITING);
@@ -1164,8 +1176,8 @@ struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
 	sl_unlock(&target_vcpu->lock);
 	sl_unlock(&current->lock);
 
-	/* Unmask interrupts. */
-	plat_interrupts_set_priority_mask(0xff);
+	/* Restore interrupt priority mask. */
+	plat_interrupts_set_priority_mask(current->priority_mask);
 
 	/* The pre-empted vCPU should be run. */
 	*next = target_vcpu;

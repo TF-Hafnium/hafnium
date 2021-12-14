@@ -2264,7 +2264,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		 */
 		CHECK(!current->processing_secure_interrupt);
 
-		plat_interrupts_set_priority_mask(0xff);
+		plat_interrupts_set_priority_mask(current->priority_mask);
 		current->processing_managed_exit = false;
 	} else {
 		/*
@@ -2297,8 +2297,9 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 			/* There is no preempted vCPU to resume. */
 			CHECK(current->preempted_vcpu == NULL);
 
-			/* Unmask interrupts. */
-			plat_interrupts_set_priority_mask(0xff);
+			/* Restore interrupt priority mask. */
+			plat_interrupts_set_priority_mask(
+				current->priority_mask);
 
 			/*
 			 * Clear fields corresponding to secure interrupt

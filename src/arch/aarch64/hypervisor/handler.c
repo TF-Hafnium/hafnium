@@ -1083,10 +1083,13 @@ struct vcpu *fiq_lower(void)
 	int64_t ret;
 
 	if (plat_ffa_vm_managed_exit_supported(current_vcpu->vm)) {
+		uint8_t pmr = plat_interrupts_get_priority_mask();
+
 		/* Mask all interrupts */
 		plat_interrupts_set_priority_mask(0x0);
 
 		current_locked = vcpu_lock(current_vcpu);
+		current_vcpu->priority_mask = pmr;
 		ret = api_interrupt_inject_locked(current_locked,
 						  HF_MANAGED_EXIT_INTID,
 						  current_vcpu, NULL);
