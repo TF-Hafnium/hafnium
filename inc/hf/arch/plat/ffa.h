@@ -121,6 +121,20 @@ bool plat_ffa_memory_handle_allocated_by_current_world(
 	ffa_memory_handle_t handle);
 
 /**
+ * For non-secure memory, retrieve the NS mode if the partition manager supports
+ * it. The SPMC will return MM_MODE_NS, and the hypervisor 0 as it only deals
+ * with NS accesses by default.
+ */
+uint32_t plat_ffa_other_world_mode(void);
+
+/**
+ * For memory management operations between SWd and NWd, the SPMC might need
+ * to operate NS-memory. The function below returns the mode to use in the mm.h
+ * library, depending on the memory ownder's id.
+ */
+uint32_t plat_ffa_owner_world_mode(ffa_vm_id_t owner_id);
+
+/**
  * Return the FF-A partition info VM/SP properties given the VM id.
  */
 ffa_partition_properties_t plat_ffa_partition_properties(
