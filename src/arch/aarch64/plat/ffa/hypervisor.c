@@ -192,9 +192,10 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 	/*
 	 * VM's requests should be forwarded to the SPMC, if receiver is an SP.
 	 */
-	dlog_verbose("%s calling SPMC %#x %#x %#x %#x %#x\n", __func__,
-		     args.func, args.arg1, args.arg2, args.arg3, args.arg4);
 	if (!vm_id_is_current_world(receiver_vm_id)) {
+		dlog_verbose("%s calling SPMC %#x %#x %#x %#x %#x\n", __func__,
+			     args.func, args.arg1, args.arg2, args.arg3,
+			     args.arg4);
 		*ret = arch_other_world_call(args);
 		return true;
 	}

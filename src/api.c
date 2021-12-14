@@ -1996,6 +1996,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 
 	receiver_vm = vm_find(receiver_vm_id);
 	if (receiver_vm == NULL) {
+		dlog_verbose("Invalid Receiver!\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2007,6 +2008,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	 */
 	receiver_vcpu = api_ffa_get_vm_vcpu(receiver_vm, current);
 	if (receiver_vcpu == NULL) {
+		dlog_verbose("Invalid vCPU!\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2022,6 +2024,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	if (is_ffa_direct_msg_request_ongoing(vcpus_locked.vcpu1) ||
 	    receiver_vcpu->state == VCPU_STATE_RUNNING ||
 	    !receiver_vcpu->regs_available) {
+		dlog_verbose("Receiver is busy with another request.\n");
 		ret = ffa_error(FFA_BUSY);
 		goto out;
 	}
@@ -2046,6 +2049,8 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 	case VCPU_STATE_BLOCKED:
 	case VCPU_STATE_PREEMPTED:
+		dlog_verbose("Receiver's vCPU can't receive request (%u)!\n",
+			     vcpu_index(receiver_vcpu));
 		ret = ffa_error(FFA_BUSY);
 		goto out;
 	case VCPU_STATE_WAITING:
