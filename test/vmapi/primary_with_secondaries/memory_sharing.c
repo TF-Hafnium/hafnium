@@ -2205,7 +2205,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
 
-		ret = send_function[0](msg_size, msg_size);
+		ret = send_function[i](msg_size, msg_size);
 		EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 		handle = ffa_mem_success_handle(ret);
