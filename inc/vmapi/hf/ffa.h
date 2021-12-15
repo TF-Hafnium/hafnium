@@ -616,6 +616,9 @@ typedef uint32_t ffa_memory_region_flags_t;
 #define FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND ((0x2U) << 3)
 #define FFA_MEMORY_REGION_TRANSACTION_TYPE_DONATE ((0x3U) << 3)
 
+#define FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_VALID ((0x1U) << 9)
+#define FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_MASK ((0xFU) << 5)
+
 /**
  * This corresponds to table 42 of the FF-A 1.0 EAC specification, "Endpoint
  * memory access descriptor".

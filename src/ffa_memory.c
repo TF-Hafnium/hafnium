@@ -1460,6 +1460,7 @@ static struct ffa_value ffa_memory_send_validate(
 			*permissions);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
+
 	if (share_func == FFA_MEM_DONATE_32 &&
 	    data_access != FFA_DATA_ACCESS_NOT_SPECIFIED) {
 		dlog_verbose(
@@ -2246,6 +2247,23 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 			"offset %d).\n",
 			retrieve_request->receivers[0]
 				.composite_memory_region_offset);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if ((retrieve_request->flags &
+	     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_VALID) != 0) {
+		dlog_verbose(
+			"Retriever specified 'address range alignment hint'"
+			" not supported.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+	if ((retrieve_request->flags &
+	     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_MASK) != 0) {
+		dlog_verbose(
+			"Bits 8-5 must be zero in memory region's flags "
+			"(address range alignment hint not supported).\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}

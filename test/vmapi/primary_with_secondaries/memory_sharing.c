@@ -2192,6 +2192,13 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail_invalid_parameters",
 		       mb.send);
 
+	unsigned invalid_flags[] = {
+		0xFFFFFFFF, /* Incorrect transaction type [4:3]*/
+		0xFFFFFFE0, /* Unsupported address range limit hint [9] */
+		0xFFFFFDE0, /* [8:5] MBZ when not asking for address range */
+		0xFFFFFC00  /* [31:10] MBZ */
+	};
+
 	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
 		/* Prepare memory region, and set all flags */
 		EXPECT_EQ(ffa_memory_region_init(
@@ -2210,21 +2217,24 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 
 		handle = ffa_mem_success_handle(ret);
 
-		msg_size = ffa_memory_retrieve_request_init(
-			mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
-			0xFFFFFFFF, FFA_DATA_ACCESS_RW,
-			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_INNER_SHAREABLE);
+		for (unsigned int j = 0; j < ARRAY_SIZE(invalid_flags); ++j) {
+			msg_size = ffa_memory_retrieve_request_init(
+				mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1,
+				0, invalid_flags[j], FFA_DATA_ACCESS_RW,
+				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				FFA_MEMORY_NORMAL_MEM,
+				FFA_MEMORY_CACHE_WRITE_BACK,
+				FFA_MEMORY_INNER_SHAREABLE);
 
-		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+			EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
-		EXPECT_EQ(
-			ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size, 0)
-				.func,
-			FFA_SUCCESS_32);
+			EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1,
+					       msg_size, 0)
+					  .func,
+				  FFA_SUCCESS_32);
 
-		ffa_run(SERVICE_VM1, 0);
+			ffa_run(SERVICE_VM1, 0);
+		}
 
 		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 	}
