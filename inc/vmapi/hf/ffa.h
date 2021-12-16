@@ -430,10 +430,24 @@ typedef uint32_t ffa_partition_properties_t;
 /**
  * Holds information returned for each partition by the FFA_PARTITION_INFO_GET
  * interface.
+ * This corresponds to table 13.34 of the FF-A 1.1 BETA0 EAC specification,
+ * "Partition information descriptor".
+ */
+struct ffa_partition_info {
+	ffa_vm_id_t vm_id;
+	ffa_vcpu_count_t vcpu_count;
+	ffa_partition_properties_t properties;
+	struct ffa_uuid uuid;
+};
+
+/**
+ * Create a struct for the "Partition information descriptor" defined for v1.0
+ * which can be returned to v1.0 endpoints.
  * This corresponds to table 82 of the FF-A 1.0 EAC specification, "Partition
  * information descriptor".
  */
-struct ffa_partition_info {
+
+struct ffa_partition_info_v1_0 {
 	ffa_vm_id_t vm_id;
 	ffa_vcpu_count_t vcpu_count;
 	ffa_partition_properties_t properties;
