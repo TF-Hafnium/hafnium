@@ -20,6 +20,39 @@ TEAR_DOWN(ffa)
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
+static void check_v1_1_partition_info_descriptors(
+	const struct ffa_partition_info *partitions)
+{
+	struct ffa_uuid uuid;
+
+	/* Expect the PVM as first partition. */
+	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
+	EXPECT_EQ(partitions[0].vcpu_count, 8);
+	ffa_uuid_init(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb, &uuid);
+	EXPECT_EQ(partitions[0].uuid.uuid[0], uuid.uuid[0]);
+	EXPECT_EQ(partitions[0].uuid.uuid[1], uuid.uuid[1]);
+	EXPECT_EQ(partitions[0].uuid.uuid[2], uuid.uuid[2]);
+	EXPECT_EQ(partitions[0].uuid.uuid[3], uuid.uuid[3]);
+
+	/* Expect a SP as second partition. */
+	EXPECT_EQ(partitions[1].vm_id, SP_ID(1));
+	EXPECT_EQ(partitions[1].vcpu_count, 8);
+	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
+	EXPECT_EQ(partitions[1].uuid.uuid[0], uuid.uuid[0]);
+	EXPECT_EQ(partitions[1].uuid.uuid[1], uuid.uuid[1]);
+	EXPECT_EQ(partitions[1].uuid.uuid[2], uuid.uuid[2]);
+	EXPECT_EQ(partitions[1].uuid.uuid[3], uuid.uuid[3]);
+
+	/* Expect secondary SP as third partition */
+	EXPECT_EQ(partitions[2].vm_id, SP_ID(2));
+	EXPECT_EQ(partitions[2].vcpu_count, 8);
+	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
+	EXPECT_EQ(partitions[2].uuid.uuid[0], uuid.uuid[0]);
+	EXPECT_EQ(partitions[2].uuid.uuid[1], uuid.uuid[1]);
+	EXPECT_EQ(partitions[2].uuid.uuid[2], uuid.uuid[2]);
+	EXPECT_EQ(partitions[2].uuid.uuid[3], uuid.uuid[3]);
+}
+
 TEST(ffa, ffa_partition_info_get_uuid_null)
 {
 	struct mailbox_buffers mb;
@@ -45,16 +78,7 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	EXPECT_EQ(ret.arg2, 3);
 
 	/* Expect the PVM as first partition. */
-	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
-	EXPECT_EQ(partitions[0].vcpu_count, 8);
-
-	/* Expect a SP as second partition. */
-	EXPECT_EQ(partitions[1].vm_id, SP_ID(1));
-	EXPECT_EQ(partitions[1].vcpu_count, 8);
-
-	/* Expect secondary SP as third partition */
-	EXPECT_EQ(partitions[2].vm_id, SP_ID(2));
-	EXPECT_EQ(partitions[2].vcpu_count, 8);
+	check_v1_1_partition_info_descriptors(partitions);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
@@ -119,6 +143,10 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 	/* Expect a secure partition. */
 	EXPECT_EQ(partitions[0].vm_id, HF_SPMC_VM_ID + 1);
 	EXPECT_EQ(partitions[0].vcpu_count, 8);
+	EXPECT_EQ(partitions[0].uuid.uuid[0], uuid.uuid[0]);
+	EXPECT_EQ(partitions[0].uuid.uuid[1], uuid.uuid[1]);
+	EXPECT_EQ(partitions[0].uuid.uuid[2], uuid.uuid[2]);
+	EXPECT_EQ(partitions[0].uuid.uuid[3], uuid.uuid[3]);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
@@ -134,6 +162,71 @@ TEST(ffa, ffa_partition_info_get_uuid_unknown)
 	/* Expect no partition is found with such UUID. */
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_ERROR_32);
+}
+
+TEST(ffa, ffa_partition_info_get_versioned_descriptors)
+{
+	struct mailbox_buffers mb;
+	struct ffa_value ret;
+	const struct ffa_partition_info_v1_0 *partitions_v1_0;
+	const struct ffa_partition_info *partitions_v1_1;
+	struct ffa_uuid uuid;
+	uint32_t version;
+
+	/*
+	 * First call FF-A version to tell the SPMC our version
+	 * is v1.0.
+	 */
+	version = ffa_version(MAKE_FFA_VERSION(1, 0));
+	EXPECT_EQ(version, FFA_VERSION_COMPILED);
+
+	/* Setup the mailbox (which holds the RX buffer). */
+	mb = set_up_mailbox();
+	partitions_v1_0 = mb.recv;
+
+	/*
+	 * A Null UUID requests information for all partitions
+	 * including VMs and SPs.
+	 */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+
+	/* Check that expected partition information is returned. */
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Expect three partitions. */
+	EXPECT_EQ(ret.arg2, 3);
+
+	/* Expect the PVM as first partition. */
+	EXPECT_EQ(partitions_v1_0[0].vm_id, hf_vm_get_id());
+	EXPECT_EQ(partitions_v1_0[0].vcpu_count, 8);
+
+	/* Expect a SP as second partition. */
+	EXPECT_EQ(partitions_v1_0[1].vm_id, SP_ID(1));
+	EXPECT_EQ(partitions_v1_0[1].vcpu_count, 8);
+
+	/* Expect secondary SP as third partition. */
+	EXPECT_EQ(partitions_v1_0[2].vm_id, SP_ID(2));
+	EXPECT_EQ(partitions_v1_0[2].vcpu_count, 8);
+
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
+	/* Set version to v1.1 to see if uuid is now returned. */
+	version = ffa_version(MAKE_FFA_VERSION(1, 1));
+	EXPECT_EQ(version, FFA_VERSION_COMPILED);
+
+	partitions_v1_1 = mb.recv;
+
+	/* Check that expected partition information is returned. */
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Expect three partitions. */
+	EXPECT_EQ(ret.arg2, 3);
+
+	check_v1_1_partition_info_descriptors(partitions_v1_1);
+
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
 
 /*

@@ -97,6 +97,46 @@ TEST(ffa_partition_info_get, invalid_vm_uuid)
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 }
 
+TEST(ffa_partition_info_get, get_v1_0_descriptor)
+{
+	struct mailbox_buffers mb;
+	struct ffa_value ret;
+	const struct ffa_partition_info_v1_0 *partitions;
+	struct ffa_uuid uuid;
+
+	/* Set ffa_version to v1.0. */
+	ffa_version(MAKE_FFA_VERSION(1, 0));
+
+	/* A Null UUID requests information for all partitions. */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+
+	/* Try to get partition information before the RX buffer is setup. */
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_FFA_ERROR(ret, FFA_BUSY);
+
+	/* Only getting the partition count should succeed however. */
+	ret = ffa_partition_info_get(&uuid, FFA_PARTITION_COUNT_FLAG);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Setup the mailbox (which holds the RX buffer). */
+	mb = set_up_mailbox();
+	partitions = mb.recv;
+
+	/* Check that the expected partition information is returned. */
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	/* Confirm there are 3 secondary VMs as well as this primary VM. */
+	EXPECT_EQ(ret.arg2, 4);
+	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
+
+	/* The first two secondary VMs should have 1 vCPU, the other one 2. */
+	EXPECT_EQ(partitions[1].vcpu_count, 1);
+	EXPECT_EQ(partitions[2].vcpu_count, 1);
+	EXPECT_EQ(partitions[3].vcpu_count, 2);
+
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+}
+
 /**
  * The primary can't be run by the hypervisor.
  */

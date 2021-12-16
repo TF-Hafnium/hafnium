@@ -347,6 +347,22 @@ TEST(ffa, ffa_partition_info)
 	ret = ffa_rx_release();
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
+	/*
+	 * Set ffa_version to v1.0 and test the correct descriptor is
+	 * returned
+	 */
+	ffa_version(MAKE_FFA_VERSION(1, 0));
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	/* There should only be the primary VM in this test. */
+	EXPECT_EQ(ret.arg2, 1);
+	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
+	/* The primary should have at least one vCPU. */
+	EXPECT_GE(partitions[0].vcpu_count, 1);
+
+	ret = ffa_rx_release();
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
 	/* Try to get partition information for an unrecognized UUID. */
 	ffa_uuid_init(0, 0, 0, 1, &uuid);
 
