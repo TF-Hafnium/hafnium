@@ -580,6 +580,14 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		if (current->processing_secure_interrupt) {
 			CHECK(current->state == VCPU_STATE_WAITING);
 
+			/*
+			 * This flag should not have been set by SPMC when it
+			 * signaled the virtual interrupt to the SP while SP was
+			 * in WAITING or BLOCKED states. Refer the embedded
+			 * comment in vcpu.h file for further description.
+			 */
+			assert(!current->implicit_completion_signal);
+
 			/* Secure interrupt pre-empted normal world. */
 			if (current->preempted_vcpu->vm->id ==
 			    HF_OTHER_WORLD_ID) {

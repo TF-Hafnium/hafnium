@@ -2285,30 +2285,6 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 			vcpu_unlock(&current_locked);
 			return ffa_error(FFA_DENIED);
 		}
-
-		/*
-		 * Per FF-A v1.1 Beta0 section 7.4, if a secure interrupt is
-		 * handled by an SP in RUNNING state the existing runtime model
-		 * is preserved. Hence, per section 7.3 bullet 3, SP can use
-		 * FFA_MSG_SEND_DIRECT_RESP to return a response after
-		 * interrupt completion.
-		 */
-		if (current->processing_secure_interrupt) {
-			/* There is no preempted vCPU to resume. */
-			CHECK(current->preempted_vcpu == NULL);
-
-			/* Restore interrupt priority mask. */
-			plat_interrupts_set_priority_mask(
-				current->priority_mask);
-
-			/*
-			 * Clear fields corresponding to secure interrupt
-			 * handling.
-			 */
-			current->processing_secure_interrupt = false;
-			current->secure_interrupt_deactivated = false;
-			current->current_sec_interrupt_id = 0;
-		}
 	}
 
 	/* Clear direct request origin for the caller. */
