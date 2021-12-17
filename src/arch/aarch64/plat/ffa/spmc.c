@@ -1389,3 +1389,80 @@ bool plat_ffa_is_secondary_ep_register_supported(void)
 {
 	return true;
 }
+
+static bool sp_boot_next(struct vcpu *current, struct vcpu **next)
+{
+	struct vm_locked current_vm_locked;
+	struct vm *vm_next = NULL;
+	bool ret = false;
+
+	/*
+	 * If VM hasn't been initialized, initialize it and traverse
+	 * booting list following "next_boot" field in the VM structure.
+	 * Once all the SPs have been booted (when "next_boot" is NULL),
+	 * return execution to the NWd.
+	 */
+	current_vm_locked = vm_lock(current->vm);
+	if (current_vm_locked.vm->initialized == false) {
+		current_vm_locked.vm->initialized = true;
+		current->is_bootstrapped = true;
+		dlog_verbose("Initialized VM: %#x, boot_order: %u\n",
+			     current_vm_locked.vm->id,
+			     current_vm_locked.vm->boot_order);
+
+		if (current_vm_locked.vm->next_boot != NULL) {
+			/* Refer FF-A v1.1 Beta0 section 7.5 Rule 2. */
+			current->state = VCPU_STATE_WAITING;
+			vm_next = current_vm_locked.vm->next_boot;
+			CHECK(vm_next->initialized == false);
+			*next = vm_get_vcpu(vm_next, vcpu_index(current));
+			arch_regs_reset(*next);
+			(*next)->cpu = current->cpu;
+			(*next)->state = VCPU_STATE_RUNNING;
+			(*next)->regs_available = false;
+
+			ret = true;
+			goto out;
+		}
+
+		dlog_verbose("Finished initializing all VMs.\n");
+	}
+
+out:
+	vm_unlock(&current_vm_locked);
+	return ret;
+}
+
+bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
+			       struct ffa_value *ret_args)
+{
+	if (sp_boot_next(current, next)) {
+		*ret_args = (struct ffa_value){.func = FFA_INTERRUPT_32};
+		return true;
+	}
+
+	/* Refer FF-A v1.1 Beta0 section 7.4 bullet 2. */
+	if (current->processing_secure_interrupt) {
+		CHECK(current->state == VCPU_STATE_WAITING);
+
+		/*
+		 * This flag should not have been set by SPMC when it signaled
+		 * the virtual interrupt to the SP while SP was in WAITING or
+		 * BLOCKED states. Refer the embedded comment in vcpu.h file
+		 * for further description.
+		 */
+		assert(!current->implicit_completion_signal);
+
+		/* Secure interrupt pre-empted normal world. */
+		if (current->preempted_vcpu->vm->id == HF_OTHER_WORLD_ID) {
+			*ret_args = plat_ffa_normal_world_resume(current, next);
+			return true;
+		}
+
+		/* Secure interrupt pre-empted an SP. Resume it. */
+		*ret_args = plat_ffa_preempted_vcpu_resume(current, next);
+		return true;
+	}
+
+	return false;
+}

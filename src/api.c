@@ -684,6 +684,24 @@ static struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 	}
 }
 
+struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
+				  struct ffa_value *args)
+{
+	struct ffa_value ret;
+
+	if (args->arg1 != 0U || args->arg2 != 0U || args->arg3 != 0U ||
+	    args->arg4 != 0U || args->arg5 != 0U || args->arg6 != 0U ||
+	    args->arg7 != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (plat_ffa_msg_wait_prepare(current, next, &ret)) {
+		return ret;
+	}
+
+	return api_ffa_msg_recv(true, current, next);
+}
+
 /**
  * Prepares the vCPU to run by updating its state and fetching whether a return
  * value needs to be forced onto the vCPU.

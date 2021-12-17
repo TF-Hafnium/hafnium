@@ -333,3 +333,12 @@ bool plat_ffa_is_secondary_ep_register_supported(void)
 {
 	return false;
 }
+bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
+			       struct ffa_value *ret_args)
+{
+	(void)current;
+	(void)next;
+	(void)ret_args;
+
+	return false;
+}

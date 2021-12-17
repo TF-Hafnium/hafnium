@@ -358,3 +358,13 @@ void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 	(void)manifest_vm;
 	(void)ppool;
 }
+
+bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
+			       struct ffa_value *ret_args)
+{
+	(void)current;
+	(void)next;
+	(void)ret_args;
+
+	return false;
+}
