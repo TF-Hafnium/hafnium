@@ -664,7 +664,7 @@ struct ffa_memory_region {
 	 */
 	uint32_t receiver_count;
 	/**
-	 * An array of `attribute_count` endpoint memory access descriptors.
+	 * An array of `receiver_count` endpoint memory access descriptors.
 	 * Each one specifies a memory region offset, an endpoint and the
 	 * attributes with which this memory region should be mapped in that
 	 * endpoint's page table.
