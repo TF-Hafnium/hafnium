@@ -1345,6 +1345,42 @@ static struct ffa_value ffa_memory_send_complete(
 }
 
 /**
+ * Check that the memory attributes match Hafnium expectations:
+ * Normal Memory, Inner shareable, Write-Back Read-Allocate
+ * Write-Allocate Cacheable.
+ */
+static struct ffa_value ffa_memory_attributes_validate(
+	ffa_memory_access_permissions_t attributes)
+{
+	enum ffa_memory_type memory_type;
+	enum ffa_memory_cacheability cacheability;
+	enum ffa_memory_shareability shareability;
+
+	memory_type = ffa_get_memory_type_attr(attributes);
+	if (memory_type != FFA_MEMORY_NORMAL_MEM) {
+		dlog_verbose("Invalid memory type %#x, expected %#x.\n",
+			     memory_type, FFA_MEMORY_NORMAL_MEM);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	cacheability = ffa_get_memory_cacheability_attr(attributes);
+	if (cacheability != FFA_MEMORY_CACHE_WRITE_BACK) {
+		dlog_verbose("Invalid cacheability %#x, expected %#x.\n",
+			     cacheability, FFA_MEMORY_CACHE_WRITE_BACK);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	shareability = ffa_get_memory_shareability_attr(attributes);
+	if (shareability != FFA_MEMORY_INNER_SHAREABLE) {
+		dlog_verbose("Invalid shareability %#x, expected #%x.\n",
+			     shareability, FFA_MEMORY_INNER_SHAREABLE);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
+/**
  * Check that the given `memory_region` represents a valid memory send request
  * of the given `share_func` type, return the clear flag and permissions via the
  * respective output parameters, and update the permissions if necessary.
@@ -1363,10 +1399,7 @@ static struct ffa_value ffa_memory_send_validate(
 	uint32_t constituents_length;
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
-	ffa_memory_access_permissions_t attributes;
-	enum ffa_memory_type memory_type;
-	enum ffa_memory_cacheability memory_cacheability;
-	enum ffa_memory_shareability memory_shareability;
+	struct ffa_value ret;
 
 	assert(permissions != NULL);
 
@@ -1499,26 +1532,9 @@ static struct ffa_value ffa_memory_send_validate(
 	 * Normal Memory, Inner shareable, Write-Back Read-Allocate
 	 * Write-Allocate Cacheable.
 	 */
-	attributes = memory_region->attributes;
-	memory_type = ffa_get_memory_type_attr(attributes);
-	if (memory_type != FFA_MEMORY_NORMAL_MEM) {
-		dlog_verbose("Invalid memory type %#x, expected %#x.\n",
-			     memory_type, FFA_MEMORY_NORMAL_MEM);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	memory_cacheability = ffa_get_memory_cacheability_attr(attributes);
-	if (memory_cacheability != FFA_MEMORY_CACHE_WRITE_BACK) {
-		dlog_verbose("Invalid cacheability %#x, expected %#x.\n",
-			     memory_cacheability, FFA_MEMORY_CACHE_WRITE_BACK);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	memory_shareability = ffa_get_memory_shareability_attr(attributes);
-	if (memory_shareability != FFA_MEMORY_INNER_SHAREABLE) {
-		dlog_verbose("Invalid shareability %#x, expected %#x.\n",
-			     memory_shareability, FFA_MEMORY_INNER_SHAREABLE);
-		return ffa_error(FFA_INVALID_PARAMETERS);
+	ret = ffa_memory_attributes_validate(memory_region->attributes);
+	if (ret.func != FFA_SUCCESS_32) {
+		return ret;
 	}
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
@@ -2356,7 +2372,6 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	 * Check permissions from sender against permissions requested by
 	 * receiver.
 	 */
-	/* TODO: Check attributes too. */
 	sent_permissions =
 		memory_region->receivers[0].receiver_permissions.permissions;
 	sent_data_access = ffa_get_data_access_attr(sent_permissions);
@@ -2434,6 +2449,17 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		panic("Got unexpected FFA_INSTRUCTION_ACCESS_RESERVED. Should "
 		      "be checked before this point.");
 	}
+
+	/*
+	 * Ensure receiver's attributes are compatible with how Hafnium maps
+	 * memory: Normal Memory, Inner shareable, Write-Back Read-Allocate
+	 * Write-Allocate Cacheable.
+	 */
+	ret = ffa_memory_attributes_validate(retrieve_request->attributes);
+	if (ret.func != FFA_SUCCESS_32) {
+		goto out;
+	}
+
 	memory_to_attributes = ffa_memory_permissions_to_mode(
 		permissions, share_state->sender_orig_mode);
 	ret = ffa_retrieve_check_update(

@@ -2302,6 +2302,88 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 }
 
 /**
+ * Memory can't be shared with arbitrary attributes because Hafnium maps pages
+ * with hardcoded values and doesn't support custom mappings.
+ */
+TEST(memory_sharing, ffa_validate_retrieve_req_attributes)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_share,
+		ffa_mem_lend,
+	};
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail_invalid_parameters",
+		       mb.send);
+
+	struct {
+		enum ffa_memory_type memory_type;
+		enum ffa_memory_cacheability memory_cacheability;
+		enum ffa_memory_shareability memory_shareability;
+	} invalid_attributes[] = {
+		/* Invalid memory type */
+		{FFA_MEMORY_DEVICE_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		 FFA_MEMORY_INNER_SHAREABLE},
+		/* Invalid cacheability */
+		{FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_NON_CACHEABLE,
+		 FFA_MEMORY_INNER_SHAREABLE},
+		/* Invalid shareability */
+		{FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		 FFA_MEMORY_SHARE_NON_SHAREABLE},
+		{FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		 FFA_MEMORY_OUTER_SHAREABLE}};
+
+	for (uint32_t i = 0; i < ARRAY_SIZE(send_function); i++) {
+		/* Prepare memory region, and set all flags */
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM1, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  FFA_DATA_ACCESS_RW,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  0);
+
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+		handle = ffa_mem_success_handle(ret);
+
+		for (uint32_t j = 0; j < ARRAY_SIZE(invalid_attributes); ++j) {
+			msg_size = ffa_memory_retrieve_request_init(
+				mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1,
+				0, 0, FFA_DATA_ACCESS_RW,
+				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				invalid_attributes[j].memory_type,
+				invalid_attributes[j].memory_cacheability,
+				invalid_attributes[j].memory_shareability);
+
+			EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+			EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1,
+					       msg_size, 0)
+					  .func,
+				  FFA_SUCCESS_32);
+
+			ffa_run(SERVICE_VM1, 0);
+		}
+
+		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+	}
+}
+
+/**
  * If memory is shared can't request zeroing of memory at both send and
  * relinquish.
  */
