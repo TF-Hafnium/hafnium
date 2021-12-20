@@ -2169,6 +2169,67 @@ TEST(memory_sharing, ffa_validate_mbz)
 }
 
 /**
+ * Memory can't be shared with arbitrary attributes because Hafnium maps pages
+ * with hardcoded values and doesn't support custom mappings.
+ */
+TEST(memory_sharing, ffa_validate_attributes)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_share,
+		ffa_mem_lend,
+	};
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	struct {
+		enum ffa_memory_type memory_type;
+		enum ffa_memory_cacheability memory_cacheability;
+		enum ffa_memory_shareability memory_shareability;
+	} invalid_attributes[] = {
+		/* Invalid memory type */
+		{FFA_MEMORY_DEVICE_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		 FFA_MEMORY_INNER_SHAREABLE},
+		/* Invalid cacheability */
+		{FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_NON_CACHEABLE,
+		 FFA_MEMORY_INNER_SHAREABLE},
+		/* Invalid shareability */
+		{FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		 FFA_MEMORY_SHARE_NON_SHAREABLE},
+		{FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		 FFA_MEMORY_OUTER_SHAREABLE}};
+
+	for (uint32_t i = 0; i < ARRAY_SIZE(invalid_attributes); ++i) {
+		/* Prepare memory region, and set all flags */
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM1, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  FFA_DATA_ACCESS_RO,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  invalid_attributes[i].memory_type,
+				  invalid_attributes[i].memory_cacheability,
+				  invalid_attributes[i].memory_shareability,
+				  NULL, &msg_size),
+			  0);
+
+		/* Call the various mem send functions on the same region. */
+		for (uint32_t j = 0; j < ARRAY_SIZE(send_function); j++) {
+			ret = send_function[j](msg_size, msg_size);
+			EXPECT_EQ(ret.func, FFA_ERROR_32);
+			EXPECT_TRUE(ffa_error_code(ret) ==
+				    FFA_INVALID_PARAMETERS);
+		}
+	}
+}
+
+/**
  * Memory can't be shared if flags in the memory transaction description that
  * Must Be Zero, are not.
  */

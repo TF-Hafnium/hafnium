@@ -1363,6 +1363,10 @@ static struct ffa_value ffa_memory_send_validate(
 	uint32_t constituents_length;
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
+	ffa_memory_access_permissions_t attributes;
+	enum ffa_memory_type memory_type;
+	enum ffa_memory_cacheability memory_cacheability;
+	enum ffa_memory_shareability memory_shareability;
 
 	assert(permissions != NULL);
 
@@ -1487,6 +1491,33 @@ static struct ffa_value ffa_memory_send_validate(
 			"Invalid data access permissions %#x for donating "
 			"memory.\n",
 			*permissions);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Check that sender's memory attributes match Hafnium expectations:
+	 * Normal Memory, Inner shareable, Write-Back Read-Allocate
+	 * Write-Allocate Cacheable.
+	 */
+	attributes = memory_region->attributes;
+	memory_type = ffa_get_memory_type_attr(attributes);
+	if (memory_type != FFA_MEMORY_NORMAL_MEM) {
+		dlog_verbose("Invalid memory type %#x, expected %#x.\n",
+			     memory_type, FFA_MEMORY_NORMAL_MEM);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	memory_cacheability = ffa_get_memory_cacheability_attr(attributes);
+	if (memory_cacheability != FFA_MEMORY_CACHE_WRITE_BACK) {
+		dlog_verbose("Invalid cacheability %#x, expected %#x.\n",
+			     memory_cacheability, FFA_MEMORY_CACHE_WRITE_BACK);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	memory_shareability = ffa_get_memory_shareability_attr(attributes);
+	if (memory_shareability != FFA_MEMORY_INNER_SHAREABLE) {
+		dlog_verbose("Invalid shareability %#x, expected %#x.\n",
+			     memory_shareability, FFA_MEMORY_INNER_SHAREABLE);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
