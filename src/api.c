@@ -3047,7 +3047,10 @@ struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 	if (receiver_locked.vm->vcpu_count <= vcpu_id ||
 	    (receiver_locked.vm->vcpu_count != 1 &&
 	     cpu_index(current->cpu) != vcpu_id)) {
-		dlog_verbose("Invalid VCPU ID!\n");
+		dlog_verbose(
+			"Invalid VCPU ID %u. vcpu count %u current core: %u!\n",
+			vcpu_id, receiver_locked.vm->vcpu_count,
+			cpu_index(current->cpu));
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
