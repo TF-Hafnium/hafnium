@@ -1395,6 +1395,7 @@ static struct ffa_value ffa_memory_send_validate(
 {
 	struct ffa_composite_memory_region *composite;
 	uint32_t receivers_length;
+	uint32_t composite_memory_region_offset;
 	uint32_t constituents_offset;
 	uint32_t constituents_length;
 	enum ffa_data_access data_access;
@@ -1423,8 +1424,11 @@ static struct ffa_value ffa_memory_send_validate(
 			   memory_region->receiver_count;
 	constituents_offset =
 		ffa_composite_constituent_offset(memory_region, 0);
-	if (memory_region->receivers[0].composite_memory_region_offset <
-		    sizeof(struct ffa_memory_region) + receivers_length ||
+	composite_memory_region_offset =
+		memory_region->receivers[0].composite_memory_region_offset;
+	if ((composite_memory_region_offset == 0) ||
+	    (composite_memory_region_offset <
+	     sizeof(struct ffa_memory_region) + receivers_length) ||
 	    constituents_offset > fragment_length) {
 		dlog_verbose(
 			"Invalid composite memory region descriptor offset "
