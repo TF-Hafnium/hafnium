@@ -2706,6 +2706,10 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		return ffa_error(FFA_DENIED);
 	}
 
+	if (plat_ffa_is_direct_response_interrupted(current)) {
+		return ffa_error(FFA_INTERRUPTED);
+	}
+
 	assert(next_state == VCPU_STATE_WAITING);
 	current_locked = vcpu_lock(current);
 
