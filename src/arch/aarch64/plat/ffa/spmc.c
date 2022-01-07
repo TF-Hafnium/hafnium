@@ -709,6 +709,8 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 	struct vcpu *target_vcpu;
 	bool ret = true;
 	struct vm *vm;
+	struct two_vcpu_locked vcpus_locked;
+	uint8_t priority_mask;
 
 	vm = vm_find(target_vm_id);
 	if (vm == NULL) {
@@ -724,7 +726,7 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 	target_vcpu = api_ffa_get_vm_vcpu(vm, current);
 
 	/* Lock both vCPUs at once. */
-	vcpu_lock_both(current, target_vcpu);
+	vcpus_locked = vcpu_lock_both(current, target_vcpu);
 
 	/* Only the primary VM can turn ON a vCPU that is currently OFF. */
 	if (current->vm->id != HF_PRIMARY_VM_ID &&
@@ -780,6 +782,35 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 			current->current_sec_interrupt_id = 0;
 		}
 	}
+
+	/* Check if a vCPU of SP is being resumed. */
+	if ((target_vm_id & HF_VM_ID_WORLD_MASK) != 0) {
+		/* Check if the target vCPU is processing secure interrupt. */
+		if (target_vcpu->processing_secure_interrupt) {
+			/*
+			 * When the target vCPU of a SP is in preempted state,
+			 * SPMC would have injected a virtual interrupt and set
+			 * the appropriate flags after de-activating the secure
+			 * physical interrupt.
+			 */
+			assert(target_vcpu->state == VCPU_STATE_PREEMPTED);
+			assert(vcpu_interrupt_count_get(vcpus_locked.vcpu2) >
+			       0);
+			assert(target_vcpu->secure_interrupt_deactivated);
+
+			/* Save current value of priority mask. */
+			priority_mask = plat_interrupts_get_priority_mask();
+			target_vcpu->priority_mask = priority_mask;
+
+			/*
+			 * Mask all interrupts to disallow high priority
+			 * interrupts from pre-empting current interrupt
+			 * processing.
+			 */
+			plat_interrupts_set_priority_mask(0x0);
+		}
+	}
+
 out:
 	sl_unlock(&target_vcpu->lock);
 	sl_unlock(&current->lock);
