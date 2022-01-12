@@ -6,16 +6,22 @@
 
 import("//build/image/image.gni")
 import("//test/hftest/args.gni")
+import("//src/arch/aarch64/args.gni")
 
 # VM that will control execution of tests in a VM-to-SP set-up
 vm_kernel("vm_primary") {
   testonly = true
-  public_configs = [ "services:config" ]
+  public_configs = [
+    "services:config",
+    "//src/arch/aarch64:arch_config",
+  ]
 
   sources = [
     "dir_msg.c",
     "notifications.c",
-    "power_mgt.c",
+
+    #TODO: Make changes to this patch, work with power_mgt.c
+    #"power_mgt.c",
     "setup_and_discovery.c",
   ]
 
@@ -99,6 +105,61 @@ partition_package("vm_primary_test_package") {
   output = "vm_primary_test_package.img"
 }
 
+vm_kernel("sel0_partition") {
+  testonly = true
+
+  deps = [
+    "services:message_loop",
+    "services:notifications",
+    "services:partition_services",
+    "//test/hftest:hftest_sel0_partition_base",
+  ]
+}
+
+manifest("partition_manifest_services_tertiary_sel0_sp") {
+  source = "partition_manifest_services_tertiary_sel0_sp.dts"
+  output = "partition_manifest_services_tertiary_sel0_sp.dtb"
+}
+
+partition_package("sel0_sp_test_package") {
+  testonly = true
+  files = [ [
+        "partition_manifest_services_tertiary_sel0_sp.dtb",
+        "sel0_partition.bin",
+        ":partition_manifest_services_tertiary_sel0_sp",
+        ":sel0_partition",
+      ] ]
+  output = "sel0_sp_test_package.img"
+}
+
+partitions_json("ffa_both_world_partitions_vhe_test") {
+  testonly = true
+
+  sps = [
+    [
+      "sel0_sp_test_package.img",
+      "manifest_services_tertiary_sel0_sp.dts",
+      ":sel0_sp_test_package",
+      ":partition_manifest_services_tertiary_sel0_sp",
+    ],
+    [
+      "secure_partition_services_secondary_test_package.img",
+      "manifest_services_secondary_sp.dts",
+      ":secure_partition_services_secondary_test_package",
+      ":secure_partition_services_secondary_manifest",
+    ],
+  ]
+
+  vms = [ [
+        "vm_primary_test_package.img",
+        "manifest.dts",
+        ":vm_primary_test_package",
+        ":vm_primary_test_package",
+      ] ]
+
+  json_file = "ffa_both_world_partitions_vhe_test.json"
+}
+
 partitions_json("ffa_both_world_partitions_test") {
   testonly = true
 
@@ -116,6 +177,7 @@ partitions_json("ffa_both_world_partitions_test") {
       ":secure_partition_services_secondary_manifest",
     ],
   ]
+
   vms = [ [
         "vm_primary_test_package.img",
         "manifest.dts",

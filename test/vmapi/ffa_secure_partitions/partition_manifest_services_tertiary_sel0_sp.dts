@@ -14,7 +14,7 @@
 
   /* Properties */
   ffa-version = <0x00010000>; /* 31:16 - Major, 15:0 - Minor */
-  uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>;
+  uuid = <0xa609f132 0x6b4f 0x4c14 0x9489>;
   execution-ctx-count = <1>;
   exception-level = <1>; /* S-EL0 */
   execution-state = <0>; /* AARCH64 */
@@ -23,4 +23,5 @@
   xlat-granule = <0>; /* 4KiB */
   messaging-method = <0x3>; /* Direct messaging only */
   boot-order = <1>;
+  notification-support; /* Receipt of notifications. */
 };

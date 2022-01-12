@@ -13,7 +13,10 @@ config("config") {
 
 source_set("common") {
   testonly = true
-  public_configs = [ ":config" ]
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
   sources = [
     "common.c",
   ]
@@ -21,7 +24,10 @@ source_set("common") {
 
 source_set("partition_services") {
   testonly = true
-  public_configs = [ ":config" ]
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
   sources = [
     "partition_services.c",
   ]
@@ -33,7 +39,10 @@ source_set("partition_services") {
 
 source_set("notifications") {
   testonly = true
-  public_configs = [ ":config" ]
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
   sources = [
     "notifications.c",
   ]
@@ -48,6 +57,7 @@ source_set("message_loop") {
   public_configs = [
     ":config",
     "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
   ]
   sources = [
     "message_loop.c",
