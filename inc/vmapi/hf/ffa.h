@@ -371,6 +371,11 @@ static inline uint32_t ffa_feature_intid(struct ffa_value args)
 	return (uint32_t)args.arg2;
 }
 
+static inline uint32_t ffa_fwk_msg(struct ffa_value args)
+{
+	return (uint32_t)args.arg2;
+}
+
 /**
  * Holds the UUID in a struct that is mappable directly to the SMCC calling
  * convention, which is used for FF-A calls.

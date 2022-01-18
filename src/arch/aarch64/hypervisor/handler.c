@@ -56,6 +56,15 @@
  */
 #define CLIENT_ID_MASK UINT64_C(0xffff)
 
+/*
+ * Target function IDs for framework messages from the SPMD.
+ */
+#define SPMD_FWK_MSG_BIT UINT64_C(1 << 31)
+#define SPMD_FWK_MSG_FUNC_MASK UINT64_C(0xFF)
+#define SPMD_FWK_MSG_PSCI UINT8_C(0)
+#define SPMD_FWK_MSG_FFA_VERSION_REQ UINT8_C(0x8)
+#define SPMD_FWK_MSG_FFA_VERSION_RESP UINT8_C(0x9)
+
 /**
  * Returns a reference to the currently executing vCPU.
  */
@@ -367,39 +376,67 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 	ffa_vm_id_t sender = ffa_sender(*args);
 	ffa_vm_id_t receiver = ffa_receiver(*args);
 	ffa_vm_id_t current_vm_id = current->vm->id;
+	uint32_t fwk_msg = ffa_fwk_msg(*args);
+	uint8_t fwk_msg_func_id = fwk_msg & SPMD_FWK_MSG_FUNC_MASK;
 
 	/*
-	 * Check if direct message request is originating from the SPMD and
-	 * directed to the SPMC.
+	 * Check if direct message request is originating from the SPMD,
+	 * directed to the SPMC and the message is a framework message.
 	 */
 	if (!(sender == HF_SPMD_VM_ID && receiver == HF_SPMC_VM_ID &&
-	      current_vm_id == HF_OTHER_WORLD_ID)) {
+	      current_vm_id == HF_OTHER_WORLD_ID) ||
+	    (fwk_msg & SPMD_FWK_MSG_BIT) == 0) {
 		return false;
 	}
 
-	switch (args->arg3) {
-	case PSCI_CPU_OFF: {
-		struct vm *vm = vm_get_first_boot();
-		struct vcpu *vcpu = vm_get_vcpu(vm, vcpu_index(current));
+	switch (fwk_msg_func_id) {
+	case SPMD_FWK_MSG_PSCI: {
+		switch (args->arg3) {
+		case PSCI_CPU_OFF: {
+			struct vm *vm = vm_get_first_boot();
+			struct vcpu *vcpu =
+				vm_get_vcpu(vm, vcpu_index(current));
 
-		/*
-		 * TODO: the PM event reached the SPMC. In a later iteration,
-		 * the PM event can be passed to the SP by resuming it.
-		 */
+			/*
+			 * TODO: the PM event reached the SPMC. In a later
+			 * iteration, the PM event can be passed to the SP by
+			 * resuming it.
+			 */
+			*args = (struct ffa_value){
+				.func = FFA_MSG_SEND_DIRECT_RESP_32,
+				.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) |
+					HF_SPMD_VM_ID,
+				.arg2 = 0U};
+
+			dlog_verbose("%s cpu off notification cpuid %#x\n",
+				     __func__, vcpu->cpu->id);
+			cpu_off(vcpu->cpu);
+			break;
+		}
+		default:
+			dlog_verbose("%s PSCI message not handled %#x\n",
+				     __func__, args->arg3);
+			return false;
+		}
+	}
+	case SPMD_FWK_MSG_FFA_VERSION_REQ: {
+		struct ffa_value ret = api_ffa_version(current, args->arg3);
 		*args = (struct ffa_value){
 			.func = FFA_MSG_SEND_DIRECT_RESP_32,
 			.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) | HF_SPMD_VM_ID,
-			.arg2 = 0U};
-
-		dlog_verbose("%s cpu off notification cpuid %#x\n", __func__,
-			     vcpu->cpu->id);
-		cpu_off(vcpu->cpu);
+			/* Set bit 31 since this is a framework message. */
+			.arg2 = SPMD_FWK_MSG_BIT |
+				SPMD_FWK_MSG_FFA_VERSION_RESP,
+			.arg3 = ret.func};
 		break;
 	}
 	default:
-		dlog_verbose("%s message not handled %#x\n", __func__,
-			     args->arg3);
-		return false;
+		dlog_verbose("%s message not handled %#x\n", __func__, fwk_msg);
+		*args = (struct ffa_value){
+			.func = FFA_MSG_SEND_DIRECT_RESP_32,
+			.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) | HF_SPMD_VM_ID,
+			/* Set bit 31 since this is a framework message. */
+			.arg2 = SPMD_FWK_MSG_BIT | fwk_msg_func_id};
 	}
 
 	return true;
