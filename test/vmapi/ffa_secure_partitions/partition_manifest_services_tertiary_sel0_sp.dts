@@ -22,6 +22,6 @@
   entrypoint-offset = <0x1000>;
   xlat-granule = <0>; /* 4KiB */
   messaging-method = <0x3>; /* Direct messaging only */
-  boot-order = <1>;
+  boot-order = <4>;
   notification-support; /* Receipt of notifications. */
 };

@@ -70,3 +70,7 @@ ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 						     void *send_buf,
 						     struct ffa_value msg_ret,
 						     int32_t expected_error);
+
+ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
+				      struct ffa_partition_info *info,
+				      size_t info_size);

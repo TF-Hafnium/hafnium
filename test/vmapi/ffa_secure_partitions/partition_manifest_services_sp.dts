@@ -22,6 +22,6 @@
 	entrypoint-offset = <0x1000>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0x3>; /* Supports sending/receiving direct requests. */
-	boot-order = <1>; /* This should be the highest priority partition */
+	boot-order = <4>;
 	notification-support; /* Receipt of notifications. */
 };

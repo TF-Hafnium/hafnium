@@ -8,6 +8,7 @@
 
 #include "hf/ffa.h"
 
+#include "hf/check.h"
 #include "hf/mm.h"
 #include "hf/static_assert.h"
 
@@ -325,4 +326,35 @@ ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 	EXPECT_FFA_ERROR(ret, expected_error);
 
 	return sender;
+}
+
+ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
+				      struct ffa_partition_info *info,
+				      size_t info_size)
+{
+	struct ffa_value ret;
+	struct ffa_partition_info *ret_info = set_up_mailbox().recv;
+
+	CHECK(uuid != NULL);
+	CHECK(info != NULL);
+
+	ffa_version(MAKE_FFA_VERSION(1, 1));
+
+	ret = ffa_partition_info_get(uuid, 0);
+
+	if (ffa_func_id(ret) != FFA_SUCCESS_32) {
+		return 0;
+	}
+
+	if (ret.arg2 != 0) {
+		size_t src_size = ret.arg2 * sizeof(struct ffa_partition_info);
+		size_t dest_size =
+			info_size * sizeof(struct ffa_partition_info);
+
+		memcpy_s(info, dest_size, ret_info, src_size);
+	}
+
+	ffa_rx_release();
+
+	return ret.arg2;
 }

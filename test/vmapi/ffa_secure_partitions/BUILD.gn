@@ -19,9 +19,7 @@ vm_kernel("vm_primary") {
   sources = [
     "dir_msg.c",
     "notifications.c",
-
-    #TODO: Make changes to this patch, work with power_mgt.c
-    #"power_mgt.c",
+    "power_mgt.c",
     "setup_and_discovery.c",
   ]
 
