@@ -710,8 +710,8 @@ void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 	CHECK(fdt_init_from_ptr(&partition_fdt, (void *)pa_addr(fdt_addr),
 				fdt_allocated_size) == true);
 	CHECK(parse_ffa_manifest(&partition_fdt,
-				 (struct manifest_vm *)manifest_vm) ==
-	      MANIFEST_SUCCESS);
+				 (struct manifest_vm *)manifest_vm,
+				 NULL) == MANIFEST_SUCCESS);
 	CHECK(sanity_check_ffa_manifest((struct manifest_vm *)manifest_vm) ==
 	      MANIFEST_SUCCESS);
 	CHECK(mm_unmap(stage1_locked, fdt_addr,

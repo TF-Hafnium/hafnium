@@ -30,6 +30,7 @@
 
 /* Highest possible value for the boot-order field. */
 #define DEFAULT_BOOT_ORDER 0xFFFF
+#define DEFAULT_BOOT_GP_REGISTER UINT32_C(-1)
 
 enum run_time_el {
 	EL1 = 0,
@@ -131,6 +132,13 @@ struct partition_manifest {
 	size_t ep_offset;
 	/**  4/16/64KB - optional */
 	enum xlat_granule xlat_granule;
+	/** Register id from w0/x0-w3/x3 - optional. */
+	uint32_t gp_register_num;
+	/**
+	 *  Flags the presence of the optional IMPDEF node to define Partition's
+	 *  Boot Info.
+	 */
+	bool boot_info;
 	/** optional */
 	uint16_t boot_order;
 
@@ -211,6 +219,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_INTEGER_OVERFLOW,
 	MANIFEST_ERROR_MALFORMED_INTEGER_LIST,
 	MANIFEST_ERROR_MALFORMED_BOOLEAN,
+	MANIFEST_ERROR_ARGUMENTS_LIST_EMPTY,
 	MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY,
 	MANIFEST_ERROR_DEVICE_REGION_NODE_EMPTY,
 	MANIFEST_ERROR_RXTX_SIZE_MISMATCH,
@@ -223,7 +232,9 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 					struct mpool *ppool);
 
 enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
-					     struct manifest_vm *vm);
+					     struct manifest_vm *vm,
+					     struct fdt_node *boot_info);
+
 enum manifest_return_code sanity_check_ffa_manifest(struct manifest_vm *vm);
 void manifest_dump(struct manifest_vm *vm);
 

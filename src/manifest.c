@@ -8,8 +8,11 @@
 
 #include "hf/manifest.h"
 
+#include "hf/arch/types.h"
+
 #include "hf/addr.h"
 #include "hf/assert.h"
+#include "hf/boot_info.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/sp_pkg.h"
@@ -543,7 +546,8 @@ static enum manifest_return_code parse_ffa_device_region_node(
 }
 
 enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
-					     struct manifest_vm *vm)
+					     struct manifest_vm *vm,
+					     struct fdt_node *boot_info_node)
 {
 	unsigned int i = 0;
 	struct uint32list_iter uuid;
@@ -553,6 +557,7 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	struct string rxtx_node_name = STRING_INIT("rx_tx-info");
 	struct string mem_region_node_name = STRING_INIT("memory-regions");
 	struct string dev_region_node_name = STRING_INIT("device-regions");
+	struct string boot_info_node_name = STRING_INIT("boot-info");
 
 	if (!fdt_find_node(fdt, "/", &root)) {
 		return MANIFEST_ERROR_NO_ROOT_NODE;
@@ -600,6 +605,12 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 				 &vm->partition.ep_offset));
 	dlog_verbose("  Entry point offset %#x\n", vm->partition.ep_offset);
 
+	TRY(read_optional_uint32(&root, "gp-register-num",
+				 DEFAULT_BOOT_GP_REGISTER,
+				 &vm->partition.gp_register_num));
+	dlog_verbose("  Boot GP register: %#x\n",
+		     vm->partition.gp_register_num);
+
 	TRY(read_optional_uint16(&root, "boot-order", DEFAULT_BOOT_ORDER,
 				 &vm->partition.boot_order));
 	dlog_verbose("  Boot order %#u\n", vm->partition.boot_order);
@@ -641,6 +652,18 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 		      &vm->partition.notification_support));
 	if (vm->partition.notification_support) {
 		dlog_verbose("  Notifications Receipt Supported\n");
+	}
+
+	/* Parse boot info node. */
+	if (boot_info_node != NULL) {
+		ffa_node = root;
+		vm->partition.boot_info =
+			fdt_find_child(&ffa_node, &boot_info_node_name);
+		if (vm->partition.boot_info) {
+			*boot_info_node = ffa_node;
+		}
+	} else {
+		vm->partition.boot_info = false;
 	}
 
 	/* Parse memory-regions */
@@ -749,6 +772,14 @@ enum manifest_return_code sanity_check_ffa_manifest(struct manifest_vm *vm)
 		}
 	}
 
+	/* GP register is restricted to one of x0 - x3. */
+	if (vm->partition.gp_register_num != -1 &&
+	    vm->partition.gp_register_num > 3) {
+		dlog_error("GP register number %s: %u\n", error_string,
+			   vm->partition.gp_register_num);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
 	return ret_code;
 }
 
@@ -762,6 +793,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 	struct fdt sp_fdt;
 	vaddr_t pkg_start;
 	vaddr_t manifest_address;
+	struct fdt_node boot_info_node;
 
 	/*
 	 * This must have been hinted as being an FF-A partition,
@@ -798,7 +830,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 		goto out;
 	}
 
-	ret = parse_ffa_manifest(&sp_fdt, vm);
+	ret = parse_ffa_manifest(&sp_fdt, vm, &boot_info_node);
 	if (ret != MANIFEST_SUCCESS) {
 		dlog_error("Error parsing partition manifest: %s.\n",
 			   manifest_strerror(ret));
@@ -810,6 +842,11 @@ static enum manifest_return_code parse_ffa_partition_package(
 			"Partition's load address at its manifest differs"
 			" from specified in partition's package.\n");
 		vm->partition.load_addr = load_address;
+	}
+
+	if (vm->partition.boot_info &&
+	    !ffa_boot_info_node(&boot_info_node, pkg_start, &header)) {
+		dlog_error("Failed to process boot information.\n");
 	}
 
 out:
@@ -948,6 +985,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "RX and TX buffers should be of same size";
 	case MANIFEST_ERROR_INVALID_MEM_PERM:
 		return "Memory permission should be RO, RW or RX";
+	case MANIFEST_ERROR_ARGUMENTS_LIST_EMPTY:
+		return "Arguments-list node should have at least one argument";
 	}
 
 	panic("Unexpected manifest return code.");

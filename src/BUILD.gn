@@ -48,6 +48,7 @@ source_set("src_testable") {
   public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
   sources = [
     "api.c",
+    "boot_info.c",
     "cpu.c",
     "ffa_memory.c",
     "manifest.c",
