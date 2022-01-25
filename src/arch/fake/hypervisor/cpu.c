@@ -34,6 +34,20 @@ void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg)
 	r->arg[0] = arg;
 }
 
+bool arch_regs_reg_num_valid(const unsigned int gp_reg_num)
+{
+	(void)gp_reg_num;
+	return false;
+}
+
+void arch_regs_set_gp_reg(struct arch_regs *r, uintreg_t value,
+			  const unsigned int gp_reg_num)
+{
+	(void)r;
+	(void)value;
+	(void)gp_reg_num;
+}
+
 void arch_regs_set_retval(struct arch_regs *r, struct ffa_value v)
 {
 	r->arg[0] = v.func;

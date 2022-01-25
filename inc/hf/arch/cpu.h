@@ -35,6 +35,18 @@ void arch_regs_reset(struct vcpu *vcpu);
 void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg);
 
 /**
+ * Verifies the `gp_reg_num` complies with the number of registers available in
+ * the architecture.
+ */
+bool arch_regs_reg_num_valid(const uint32_t gp_reg_num);
+
+/**
+ * Sets the value of a general purpose register.
+ */
+void arch_regs_set_gp_reg(struct arch_regs *r, uintreg_t value,
+			  const uint32_t gp_reg_num);
+
+/**
  * Updates the register holding the return value of a function.
  *
  * This function must only be called on an arch_regs that is known not be in use

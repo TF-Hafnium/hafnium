@@ -150,6 +150,18 @@ void arch_regs_set_pc_arg(struct arch_regs *r, ipaddr_t pc, uintreg_t arg)
 	r->r[0] = arg;
 }
 
+bool arch_regs_reg_num_valid(const unsigned int gp_reg_num)
+{
+	return gp_reg_num < NUM_GP_REGS;
+}
+
+void arch_regs_set_gp_reg(struct arch_regs *r, const uintreg_t value,
+			  const unsigned int gp_reg_num)
+{
+	assert(arch_regs_reg_num_valid(gp_reg_num));
+	r->r[gp_reg_num] = value;
+}
+
 void arch_regs_set_retval(struct arch_regs *r, struct ffa_value v)
 {
 	r->r[0] = v.func;
