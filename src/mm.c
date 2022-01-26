@@ -1117,6 +1117,11 @@ bool mm_init(struct mpool *ppool)
 		return false;
 	}
 
+	/* Initialize arch_mm before calling below mapping routines */
+	if (!arch_mm_init(ptable.root)) {
+		return false;
+	}
+
 	/* Let console driver map pages for itself. */
 	plat_console_mm_init(stage1_locked, ppool);
 
@@ -1130,5 +1135,5 @@ bool mm_init(struct mpool *ppool)
 	mm_identity_map(stage1_locked, layout_data_begin(), layout_data_end(),
 			MM_MODE_R | MM_MODE_W, ppool);
 
-	return arch_mm_init(ptable.root);
+	return true;
 }

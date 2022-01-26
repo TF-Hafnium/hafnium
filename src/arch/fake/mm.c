@@ -120,6 +120,12 @@ void arch_mm_flush_dcache(void *base, size_t size)
 	/* There's no modelling of the cache. */
 }
 
+void arch_mm_stage1_max_level_set(uint32_t pa_bits)
+{
+	/* Not required to set this value as its hardcoded to 2 */
+	(void)pa_bits;
+}
+
 uint8_t arch_mm_stage1_max_level(void)
 {
 	return 2;

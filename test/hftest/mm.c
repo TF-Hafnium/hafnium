@@ -43,6 +43,11 @@ bool hftest_mm_init(void)
 {
 	struct mm_stage1_locked stage1_locked;
 
+	/* Call arch init before calling below mapping routines */
+	if (!arch_vm_mm_init()) {
+		return false;
+	}
+
 	mpool_init(&ppool, sizeof(struct mm_page_table));
 	if (!mpool_add_chunk(&ppool, ptable_buf, sizeof(ptable_buf))) {
 		HFTEST_FAIL(true, "Failed to add buffer to page-table pool.");
@@ -57,10 +62,6 @@ bool hftest_mm_init(void)
 			pa_init((uintptr_t)HFTEST_STAGE1_START_ADDRESS),
 			pa_init(mm_ptable_addr_space_end(MM_FLAG_STAGE1)),
 			MM_MODE_R | MM_MODE_W | MM_MODE_X, &ppool);
-
-	if (!arch_vm_mm_init()) {
-		return false;
-	}
 
 	arch_vm_mm_enable(ptable.root);
 

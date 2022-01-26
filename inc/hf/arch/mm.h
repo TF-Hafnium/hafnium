@@ -115,6 +115,11 @@ void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
 void arch_mm_flush_dcache(void *base, size_t size);
 
 /**
+ * Sets the maximum level allowed in the page table for stage-1.
+ */
+void arch_mm_stage1_max_level_set(uint32_t pa_bits);
+
+/**
  * Gets the maximum level allowed in the page table for stage-1.
  */
 uint8_t arch_mm_stage1_max_level(void);

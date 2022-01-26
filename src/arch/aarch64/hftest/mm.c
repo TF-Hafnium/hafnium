@@ -27,6 +27,9 @@ static uintreg_t mm_reset_mair_el1;
 static uintreg_t mm_reset_tcr_el1;
 static uintreg_t mm_reset_sctlr_el1;
 
+/* For hftest, limit Stage1 PA range to 512GB (1 << 39) */
+#define HFTEST_S1_PA_BITS (39)
+
 /**
  * Initialize MMU for a test running in EL1.
  */
@@ -48,6 +51,12 @@ bool arch_vm_mm_init(void)
 			features & 0xf);
 		return false;
 	}
+
+	/*
+	 * Limit PA bits to HFTEST_S1_PA_BITS. Using the pa_bits reported by
+	 * arch_mm_get_pa_range requires an increase in page pool size.
+	 */
+	arch_mm_stage1_max_level_set(HFTEST_S1_PA_BITS);
 
 	/*
 	 * Preserve initial values of the system registers in case we want to
@@ -72,7 +81,7 @@ bool arch_vm_mm_init(void)
 		     (3 << 12) |		/* SH0, inner shareable. */
 		     (1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
 		     (1 << 8) |	 /* IRGN0, normal mem, WB RA WA Cacheable. */
-		     (25 << 0) | /* T0SZ, input address is 2^39 bytes. */
+		     (64 - HFTEST_S1_PA_BITS) | /* T0SZ, 2^hftest_s1_pa_bits */
 		     0;
 
 	mm_sctlr_el1 = (1 << 0) |  /* M, enable stage 1 EL2 MMU. */

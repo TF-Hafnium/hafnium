@@ -142,6 +142,7 @@ struct arch_mm_config {
 	uintreg_t hcr_el2;
 } arch_mm_config;
 
+static uint8_t mm_s1_max_level;
 static uint8_t mm_s2_max_level;
 static uint8_t mm_s2_root_table_count;
 
@@ -689,14 +690,22 @@ uint32_t arch_mm_stage2_attrs_to_mode(uint64_t attrs)
 	return mode;
 }
 
+void arch_mm_stage1_max_level_set(uint32_t pa_bits)
+{
+	/* Maximum supported PA range in bits is 48 */
+	CHECK(pa_bits <= 48);
+
+	if (pa_bits >= 40) {
+		mm_s1_max_level = 3;
+	} else {
+		/* Setting to 2 covers physical memory upto 512GB */
+		mm_s1_max_level = 2;
+	}
+}
+
 uint8_t arch_mm_stage1_max_level(void)
 {
-	/*
-	 * For stage 1 we hard-code this to 2 for now so that we can
-	 * save one page table level at the expense of limiting the
-	 * physical memory to 512GB.
-	 */
-	return 2;
+	return mm_s1_max_level;
 }
 
 uint8_t arch_mm_stage2_max_level(void)
@@ -806,6 +815,8 @@ bool arch_mm_init(paddr_t table)
 		mm_s2_max_level = 1;
 	}
 
+	arch_mm_stage1_max_level_set(pa_bits);
+
 	/*
 	 * Since the shallowest possible tree is used, the maximum number of
 	 * concatenated tables must be used. This means if no more than 4 bits
@@ -821,6 +832,10 @@ bool arch_mm_init(paddr_t table)
 	dlog_info(
 		"Stage 2 has %d page table levels with %d pages at the root.\n",
 		mm_s2_max_level + 1, mm_s2_root_table_count);
+
+	dlog_info(
+		"Stage 1 has %d page table levels with %d pages at the root.\n",
+		mm_s1_max_level + 1, arch_mm_stage1_root_table_count());
 
 	/*
 	 * If the PE implements S-EL2 then VTCR_EL2.NSA/NSW bits are significant
@@ -901,14 +916,16 @@ bool arch_mm_init(paddr_t table)
 			 << 24) | /* IRGN1, normal mem, WB RA WA Cacheable. */
 			(1UL << 23) | /* EPD1 - Disable TTBR1_EL2 translation */
 			(0UL << 22) | /* TTBR0_EL2.ASID defines ASID */
-			(25UL << 16) | /* T1SZ, input address is 2^39 bytes. */
-			(0UL << 14) |  /* TG0, granule size, 4KB. */
-			(3UL << 12) |  /* SH0, inner shareable. */
+			((64 - pa_bits)
+			 << 16) | /* T1SZ, input address is 2^pa_bits bytes. */
+			(0UL << 14) | /* TG0, granule size, 4KB. */
+			(3UL << 12) | /* SH0, inner shareable. */
 			(1UL
 			 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
 			(1UL
 			 << 8) | /* IRGN0, normal mem, WB RA WA Cacheable. */
-			(25UL << 0) | /* T0SZ, input address is 2^39 bytes. */
+			((64 - pa_bits)
+			 << 0) | /* T0SZ, input address is 2^pa_bits bytes. */
 			0;
 	} else {
 		arch_mm_config.tcr_el2 =
@@ -918,7 +935,8 @@ bool arch_mm_init(paddr_t table)
 			(3 << 12) |		   /* SH0, inner shareable. */
 			(1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
 			(1 << 8) |  /* IRGN0, normal mem, WB RA WA Cacheable. */
-			(25 << 0) | /* T0SZ, input address is 2^39 bytes. */
+			((64 - pa_bits)
+			 << 0) | /* T0SZ, input address is  2^pa_bits bytes. */
 			0;
 	}
 	return true;
