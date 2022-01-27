@@ -9,6 +9,7 @@
 #include "hf/mm.h"
 
 #include "vmapi/hf/call.h"
+#include "vmapi/hf/ffa.h"
 
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
@@ -319,4 +320,23 @@ TEST(ffa_msg_send_direct_req, fails_if_sp_to_nwd)
 				      msg[1], msg[2], msg[3], msg[4]);
 
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Dumps the content of the SPs boot information. The fact it can dump this info
+ * serves as validator that the SP can access the information.
+ */
+TEST(ffa_boot_info, dump_and_validate_boot_info)
+{
+	struct ffa_boot_info_header* boot_info_header = get_boot_info_header();
+	struct ffa_boot_info_desc* fdt_info;
+
+	dump_boot_info(boot_info_header);
+
+	fdt_info = get_boot_info_desc(boot_info_header, FFA_BOOT_INFO_TYPE_STD,
+				      FFA_BOOT_INFO_TYPE_ID_FDT);
+	ASSERT_TRUE(fdt_info != NULL);
+
+	EXPECT_EQ(ffa_boot_info_content_format(fdt_info),
+		  FFA_BOOT_INFO_FLAG_CONTENT_FORMAT_ADDR);
 }

@@ -74,3 +74,9 @@ ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
 				      struct ffa_partition_info *info,
 				      size_t info_size);
+
+struct ffa_boot_info_header *get_boot_info_header(void);
+void dump_boot_info(struct ffa_boot_info_header *boot_info_header);
+struct ffa_boot_info_desc *get_boot_info_desc(
+	struct ffa_boot_info_header *boot_info_heade, uint8_t type,
+	uint8_t type_id);

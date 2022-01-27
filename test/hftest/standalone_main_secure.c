@@ -18,10 +18,17 @@
 
 alignas(4096) uint8_t kstack[4096];
 
+static struct ffa_boot_info_header* boot_info_header;
+
+struct ffa_boot_info_header* get_boot_info_header(void)
+{
+	return boot_info_header;
+}
+
 extern struct hftest_test hftest_begin[];
 extern struct hftest_test hftest_end[];
 
-void kmain(void)
+void kmain(void* boot_info_blob)
 {
 	/* Dummy fdt. It is not really used */
 	struct fdt fdt;
@@ -33,6 +40,8 @@ void kmain(void)
 		HFTEST_LOG("Memory initialization failed.");
 		goto out;
 	}
+
+	boot_info_header = boot_info_blob;
 
 	/*
 	 * Install the exception handler with no IRQ callback for now, so that

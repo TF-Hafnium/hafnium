@@ -21,7 +21,14 @@
 	load-address = <0x6280000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0>; /* Direct messaging only */
+	messaging-method = <0>;
+	gp-register-num = <0>;
+
+	/* Boot Info */
+	boot-info {
+		compatible = "arm,ffa-manifest-boot-info";
+		ffa_manifest;
+	};
 
 	device-regions {
 		compatible = "arm,ffa-manifest-device-regions";

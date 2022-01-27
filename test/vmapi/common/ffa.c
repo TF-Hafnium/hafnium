@@ -358,3 +358,71 @@ ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
 
 	return ret.arg2;
 }
+
+/**
+ * Dump the boot information passed to the partition.
+ */
+void dump_boot_info(struct ffa_boot_info_header *boot_info_header)
+{
+	struct ffa_boot_info_desc *boot_info_desc;
+
+	if (boot_info_header == NULL) {
+		HFTEST_LOG("SP doesn't have boot arguments!\n");
+		return;
+	}
+
+	HFTEST_LOG("SP boot info (%x):", (uintptr_t)boot_info_header);
+	HFTEST_LOG("  Signature: %x", boot_info_header->signature);
+	HFTEST_LOG("  Version: %x", boot_info_header->version);
+	HFTEST_LOG("  Blob Size: %u", boot_info_header->info_blob_size);
+	HFTEST_LOG("  Descriptor Size: %u", boot_info_header->desc_size);
+	HFTEST_LOG("  Descriptor Count: %u", boot_info_header->desc_count);
+
+	boot_info_desc = boot_info_header->boot_info;
+
+	if (boot_info_desc == NULL) {
+		dlog_error("Boot data arguments error...");
+		return;
+	}
+
+	for (uint32_t i = 0; i < boot_info_header->desc_count; i++) {
+		HFTEST_LOG("      Type: %u", boot_info_desc[i].type);
+		HFTEST_LOG("      Flags:");
+		HFTEST_LOG("        Name Format: %x",
+			   ffa_boot_info_name_format(&boot_info_desc[i]));
+		HFTEST_LOG("        Content Format: %x",
+			   ffa_boot_info_content_format(&boot_info_desc[i]));
+		HFTEST_LOG("      Size: %u", boot_info_desc[i].size);
+		HFTEST_LOG("      Value: %x", boot_info_desc[i].content);
+	}
+}
+
+/**
+ * Retrieve the boot info descriptor related to the provided type and type ID.
+ */
+struct ffa_boot_info_desc *get_boot_info_desc(
+	struct ffa_boot_info_header *boot_info_header, uint8_t type,
+	uint8_t type_id)
+{
+	struct ffa_boot_info_desc *boot_info_desc;
+
+	assert(boot_info_header != NULL);
+
+	ASSERT_EQ(boot_info_header->signature, 0xFFAU);
+	ASSERT_EQ(boot_info_header->version, 0x10001U);
+	ASSERT_EQ(boot_info_header->desc_size,
+		  sizeof(struct ffa_boot_info_desc));
+	ASSERT_EQ((uintptr_t)boot_info_header + boot_info_header->desc_offset,
+		  (uintptr_t)boot_info_header->boot_info);
+
+	boot_info_desc = boot_info_header->boot_info;
+
+	for (uint32_t i = 0; i < boot_info_header->desc_count; i++) {
+		if (ffa_boot_info_type_id(&boot_info_desc[i]) == type_id &&
+		    ffa_boot_info_type(&boot_info_desc[i]) == type) {
+			return &boot_info_desc[i];
+		}
+	}
+
+	return NULL;
+}

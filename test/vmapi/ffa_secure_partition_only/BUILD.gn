@@ -17,6 +17,7 @@ vm_kernel("secure_partition_test_vm") {
 
   deps = [
     "//test/hftest:hftest_standalone_secure",
+    "//test/vmapi/common",
   ]
 }
 
