@@ -340,3 +340,35 @@ TEST(ffa_boot_info, dump_and_validate_boot_info)
 	EXPECT_EQ(ffa_boot_info_content_format(fdt_info),
 		  FFA_BOOT_INFO_FLAG_CONTENT_FORMAT_ADDR);
 }
+
+/**
+ * Validate that SP can access its own FF-A manifest.
+ */
+TEST(ffa_boot_info, parse_fdt)
+{
+	struct ffa_boot_info_header* boot_info_header = get_boot_info_header();
+	struct ffa_boot_info_desc* fdt_info;
+	struct fdt fdt;
+	struct fdt_node root;
+	void* fdt_ptr;
+	size_t fdt_len;
+	uint64_t ffa_version;
+
+	fdt_info = get_boot_info_desc(boot_info_header, FFA_BOOT_INFO_TYPE_STD,
+				      FFA_BOOT_INFO_TYPE_ID_FDT);
+
+	ASSERT_TRUE(fdt_info != NULL);
+
+	HFTEST_LOG("FF-A Manifest Address: %x", fdt_info->content);
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	fdt_ptr = (void*)fdt_info->content;
+
+	ASSERT_TRUE(fdt_size_from_header(fdt_ptr, &fdt_len));
+	ASSERT_TRUE(fdt_init_from_ptr(&fdt, fdt_ptr, fdt_len));
+	EXPECT_TRUE(fdt_find_node(&fdt, "/", &root));
+
+	EXPECT_TRUE(fdt_is_compatible(&root, "arm,ffa-manifest-1.0"));
+	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &ffa_version));
+	HFTEST_LOG("FF-A Version: %x", ffa_version);
+	ASSERT_EQ(ffa_version, MAKE_FFA_VERSION(1, 1));
+}
