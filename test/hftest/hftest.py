@@ -575,7 +575,7 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
 
     @property
     def HYPERVISOR_DTB_ADDRESS(self):
-        return "0x80000000"
+        return "0x82000000"
 
     def compile_dt(self, run_state, dt):
         FvpDriver.compile_dt(self, run_state, dt["hypervisor"])
