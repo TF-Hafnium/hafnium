@@ -56,12 +56,22 @@ static struct gicv3_driver plat_gicv3_driver;
 static uint32_t affinity_to_core_id(uint64_t reg)
 {
 	struct cpu *this_cpu;
+	uint32_t core_id;
 
 	this_cpu = cpu_find(reg & MPIDR_AFFINITY_MASK);
 
-	CHECK(this_cpu != NULL);
+	if (this_cpu == NULL) {
+		/*
+		 * There might be holes in all redistributor frames (some CPUs
+		 * don't exist). For these CPUs, return MAX_CPUS, so that the
+		 * caller has a chance to recover.
+		 */
+		core_id = MAX_CPUS;
+	} else {
+		core_id = cpu_index(this_cpu);
+	}
 
-	return cpu_index(this_cpu);
+	return core_id;
 }
 
 /**
@@ -310,6 +320,11 @@ uint64_t read_gicr_typer_reg(uintptr_t gicr_frame_addr)
 	return io_read64(IO64_C(gicr_frame_addr + GICR_TYPER));
 }
 
+/*
+ * This function calculates the core position from the affinity values
+ * provided by the GICR_TYPER register. This function may return MAX_CORES
+ * if typer_reg doesn't match a known core.
+ */
 static inline uint32_t gicr_affinity_to_core_pos(uint64_t typer_reg)
 {
 	uint64_t aff3;
@@ -342,9 +357,15 @@ static inline void populate_redist_base_addrs(void)
 		typer_reg = read_gicr_typer_reg(current_rdist_frame);
 		core_idx = gicr_affinity_to_core_pos(typer_reg);
 
-		CHECK(core_idx < MAX_CPUS);
-		plat_gicv3_driver.all_redist_frames[core_idx] =
-			current_rdist_frame;
+		/*
+		 * If the PE in redistributor does not exist, core_idx
+		 * will be MAX_CPUS, then do not fill up frame entry
+		 * and just move to next frame.
+		 */
+		if (core_idx < MAX_CPUS) {
+			plat_gicv3_driver.all_redist_frames[core_idx] =
+				current_rdist_frame;
+		}
 
 		/* Check if this is the last frame. */
 		if (typer_reg & REDIST_LAST_FRAME_MASK) {
@@ -358,10 +379,13 @@ static inline void populate_redist_base_addrs(void)
 static uint32_t find_core_pos(void)
 {
 	uint64_t mpidr_reg;
+	uint32_t core_id;
 
 	mpidr_reg = read_msr(MPIDR_EL1);
 
-	return affinity_to_core_id(mpidr_reg);
+	core_id = affinity_to_core_id(mpidr_reg);
+	CHECK(core_id < MAX_CPUS);
+	return core_id;
 }
 
 /**
