@@ -100,9 +100,6 @@ bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 					ffa_notifications_bitmap_t *from_sp,
 					struct ffa_value *ret);
 
-bool plat_ffa_notifications_get_call(ffa_vm_id_t receiver_id, uint32_t vcpu_id,
-				     uint32_t flags, struct ffa_value *ret);
-
 /**
  * Checks whether managed exit is supported by given SP.
  */
