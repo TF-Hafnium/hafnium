@@ -835,6 +835,45 @@ static inline uint32_t ffa_mem_relinquish_init(
 	return sizeof(struct ffa_mem_relinquish) + sizeof(ffa_vm_id_t);
 }
 
+/**
+ * Endpoint RX/TX descriptor, as defined by Table 13.27 in FF-A v1.1 EAC0.
+ * It's used by the Hypervisor to describe the RX/TX buffers mapped by a VM
+ * to the SPMC, in order to allow indirect messaging.
+ */
+struct ffa_endpoint_rx_tx_descriptor {
+	ffa_vm_id_t endpoint_id;
+	uint16_t reserved;
+
+	/*
+	 * 8-byte aligned offset from the base address of this descriptor to the
+	 * `ffa_composite_memory_region` describing the RX buffer.
+	 */
+	uint32_t rx_offset;
+
+	/*
+	 * 8-byte aligned offset from the base address of this descriptor to the
+	 * `ffa_composite_memory_region` describing the TX buffer.
+	 */
+	uint32_t tx_offset;
+
+	/* Pad to align on 16-byte boundary. */
+	uint32_t pad;
+};
+
+static inline struct ffa_composite_memory_region *
+ffa_enpoint_get_rx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
+{
+	return (struct ffa_composite_memory_region *)((uintptr_t)desc +
+						      desc->rx_offset);
+}
+
+static inline struct ffa_composite_memory_region *
+ffa_enpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
+{
+	return (struct ffa_composite_memory_region *)((uintptr_t)desc +
+						      desc->tx_offset);
+}
+
 uint32_t ffa_memory_region_init(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
 	ffa_vm_id_t sender, ffa_vm_id_t receiver,
@@ -869,3 +908,6 @@ uint32_t ffa_memory_fragment_init(
 	size_t fragment_max_size,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t *fragment_length);
+void ffa_endpoint_rx_tx_descriptor_init(
+	struct ffa_endpoint_rx_tx_descriptor *desc, ffa_vm_id_t endpoint_id,
+	uint64_t rx_address, uint64_t tx_address);
