@@ -15,6 +15,9 @@
 #include "hf/std.h"
 #include "hf/vm.h"
 
+/** GP register to be used to pass the current vCPU ID, at core bring up. */
+#define PHYS_CORE_IDX_GP_REG 4
+
 /**
  * Locks the given vCPU and updates `locked` to hold the newly locked vCPU.
  */
@@ -196,4 +199,10 @@ void vcpu_reset(struct vcpu *vcpu)
 
 	/* Reset the registers to give a clean start for vCPU. */
 	arch_regs_reset(vcpu);
+}
+
+void vcpu_set_phys_core_idx(struct vcpu *vcpu)
+{
+	arch_regs_set_gp_reg(&vcpu->regs, cpu_index(vcpu->cpu),
+			     PHYS_CORE_IDX_GP_REG);
 }

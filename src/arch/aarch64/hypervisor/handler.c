@@ -354,6 +354,9 @@ static bool sp_boot_next(struct vcpu *current, struct vcpu **next,
 			(*next)->state = VCPU_STATE_RUNNING;
 			(*next)->regs_available = false;
 
+			/* Set the designated GP register with the vCPU ID. */
+			vcpu_set_phys_core_idx(*next);
+
 			*ffa_ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
 			ret = true;
 			goto out;

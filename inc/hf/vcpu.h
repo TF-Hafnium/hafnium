@@ -148,6 +148,8 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 
 void vcpu_reset(struct vcpu *vcpu);
 
+void vcpu_set_phys_core_idx(struct vcpu *vcpu);
+
 static inline void vcpu_irq_count_increment(struct vcpu_locked vcpu_locked)
 {
 	vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count++;

@@ -36,6 +36,9 @@ struct vcpu *cpu_main(struct cpu *c)
 	/* Reset the registers to give a clean start for vCPU. */
 	vcpu_reset(vcpu);
 
+	/* Set the designated GP with the physical core index. */
+	vcpu_set_phys_core_idx(vcpu);
+
 	/* Initialize SRI for running core. */
 	plat_ffa_sri_init(c);
 
