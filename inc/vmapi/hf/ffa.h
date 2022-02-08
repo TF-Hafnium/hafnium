@@ -145,6 +145,59 @@
  */
 #define FFA_PAGE_SIZE 4096
 
+/** The ID of a VM. These are assigned sequentially starting with an offset. */
+typedef uint16_t ffa_vm_id_t;
+
+/**
+ * Partition message header as specified by table 6.2 from FF-A v1.1 EAC0
+ * specification.
+ */
+struct ffa_partition_rxtx_header {
+	uint32_t flags; /* MBZ */
+	uint32_t reserved;
+	/* Offset from the beginning of the buffer to the message payload. */
+	uint32_t offset;
+	/* Sender(Bits[31:16]) and Receiver(Bits[15:0]) endpoint IDs. */
+	uint32_t sender_receiver;
+	/* Size of message in buffer. */
+	uint32_t size;
+};
+
+#define FFA_RXTX_HEADER_SIZE sizeof(struct ffa_partition_rxtx_header)
+#define FFA_RXTX_SENDER_SHIFT (0x10U)
+
+static inline void ffa_rxtx_header_init(
+	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t size,
+	struct ffa_partition_rxtx_header *header)
+{
+	header->flags = 0;
+	header->reserved = 0;
+	header->offset = FFA_RXTX_HEADER_SIZE;
+	header->sender_receiver =
+		(uint32_t)(receiver | (sender << FFA_RXTX_SENDER_SHIFT));
+	header->size = size;
+}
+
+static inline ffa_vm_id_t ffa_rxtx_header_sender(
+	const struct ffa_partition_rxtx_header *h)
+{
+	return (ffa_vm_id_t)(h->sender_receiver >> FFA_RXTX_SENDER_SHIFT);
+}
+
+static inline ffa_vm_id_t ffa_rxtx_header_receiver(
+	const struct ffa_partition_rxtx_header *h)
+{
+	return (ffa_vm_id_t)(h->sender_receiver);
+}
+
+/* The maximum length possible for a single message. */
+#define FFA_PARTITION_MSG_PAYLOAD_MAX (HF_MAILBOX_SIZE - FFA_RXTX_HEADER_SIZE)
+
+struct ffa_partition_msg {
+	struct ffa_partition_rxtx_header header;
+	char payload[FFA_PARTITION_MSG_PAYLOAD_MAX];
+};
+
 /* The maximum length possible for a single message. */
 #define FFA_MSG_PAYLOAD_MAX HF_MAILBOX_SIZE
 
@@ -261,9 +314,6 @@ typedef uint64_t ffa_memory_handle_t;
 
 #define FFA_MEMORY_HANDLE_ALLOCATOR_SPMC (UINT64_C(0) << 63)
 #define FFA_MEMORY_HANDLE_INVALID (~UINT64_C(0))
-
-/** The ID of a VM. These are assigned sequentially starting with an offset. */
-typedef uint16_t ffa_vm_id_t;
 
 /**
  * A count of VMs. This has the same range as the VM IDs but we give it a
