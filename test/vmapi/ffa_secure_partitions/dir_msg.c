@@ -51,7 +51,7 @@ TEST(ffa_msg_send_direct_req, succeeds_sp_to_sp_echo)
 				   msg[3]);
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_EQ(res.arg2, SP_SUCCESS);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 }
 
 /**
@@ -67,5 +67,5 @@ TEST(ffa_msg_send_direct_req, fails_direct_req_to_waiting_sp)
 	res = sp_req_echo_busy_cmd_send(own_id, receiver_id);
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_EQ(res.arg2, SP_SUCCESS);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 }
