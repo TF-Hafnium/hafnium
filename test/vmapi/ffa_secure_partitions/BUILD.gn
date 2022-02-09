@@ -38,8 +38,6 @@ vm_kernel("secure_partitions_services") {
 
   deps = [
     "services:message_loop",
-    "services:notifications",
-    "services:partition_services",
     "//test/hftest:hftest_secure_service",
   ]
 }
@@ -97,8 +95,6 @@ vm_kernel("sel0_partition") {
 
   deps = [
     "services:message_loop",
-    "services:notifications",
-    "services:partition_services",
     "//test/hftest:hftest_sel0_partition_base",
   ]
 }

@@ -21,5 +21,5 @@ struct ffa_value sp_check_ffa_return_resp(ffa_vm_id_t test_source,
 		return sp_error(own_id, test_source, ffa_error_code(res));
 	}
 
-	return sp_success(own_id, test_source);
+	return sp_success(own_id, test_source, 0);
 }

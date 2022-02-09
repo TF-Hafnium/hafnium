@@ -23,12 +23,13 @@ alignas(4096) static uint8_t secondary_ec_stack[MAX_CPUS - 1][4096];
 
 struct pwr_mgt_cpu_entry_args {
 	ffa_vm_id_t receiver_id;
+	ffa_vcpu_count_t vcpu_count;
 	ffa_vcpu_index_t vcpu_id;
 	struct spinlock lock;
 };
 
 /**
- * Releases the lock passed in.
+ * Performs direct request echo test in the running CPU.
  */
 static void cpu_entry_echo(uintptr_t arg)
 {
@@ -48,8 +49,8 @@ static void cpu_entry_echo(uintptr_t arg)
 	EXPECT_EQ(res.arg6, msg[2]);
 	EXPECT_EQ(res.arg7, msg[3]);
 
+	/* Releases the lock passed in. */
 	sl_unlock(&args->lock);
-
 	arch_cpu_stop();
 }
 
@@ -59,6 +60,7 @@ static void cpu_entry_echo_second_sp(uintptr_t arg)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		(struct pwr_mgt_cpu_entry_args *)arg;
 	struct ffa_value res;
+	ffa_vcpu_index_t vcpu_id = args->vcpu_count == 1 ? 0 : args->vcpu_id;
 
 	/*
 	 * Second SP needs FFA_RUN before communicating with it.
@@ -68,14 +70,58 @@ static void cpu_entry_echo_second_sp(uintptr_t arg)
 	 * caller with FFA_MSG_WAIT interface, without resuming the target
 	 * SP. When fixing the FFA_RUN issue, this bit of code needs addressing.
 	 */
-	res = ffa_run(args->receiver_id, args->vcpu_id);
+	res = ffa_run(args->receiver_id, vcpu_id);
 	EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
 
 	cpu_entry_echo(arg);
 }
 
+/**
+ * Validates that the core index passed, matches the vMPDIR set by the SPMC.
+ */
+static void cpu_entry_check_cpu_idx(uintptr_t arg)
+{
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct pwr_mgt_cpu_entry_args *args =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct pwr_mgt_cpu_entry_args *)arg;
+	struct ffa_value res;
+
+	/*
+	 * For S-EL1 MP partitions, the linear cpu index is expected to match
+	 * the vCPU ID.
+	 */
+	res = sp_check_cpu_idx_cmd_send(own_id, args->receiver_id,
+					args->vcpu_id);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/* Releases the lock passed in. */
+	sl_unlock(&args->lock);
+	arch_cpu_stop();
+}
+
+static void cpu_entry_check_cpu_idx_second_sp(uintptr_t arg)
+{
+	struct pwr_mgt_cpu_entry_args *args =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct pwr_mgt_cpu_entry_args *)arg;
+	struct ffa_value res;
+
+	/*
+	 * Make the receiver VM reach the message loop in the respective EC.
+	 * This function is meant to be used if the receiver is an MP FF-A
+	 * endpoint.
+	 */
+	res = ffa_run(args->receiver_id, args->vcpu_id);
+	EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
+
+	cpu_entry_check_cpu_idx(arg);
+}
+
 static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
-				void (*entry)(uintptr_t arg))
+				void (*entry)(uintptr_t arg),
+				bool skip_if_up_sp)
 {
 	struct pwr_mgt_cpu_entry_args args = {.lock = SPINLOCK_INIT};
 	struct ffa_partition_info receiver;
@@ -83,6 +129,12 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 	EXPECT_EQ(get_ffa_partition_info(recv_uuid, &receiver, 1), 1);
 
 	args.receiver_id = receiver.vm_id;
+	args.vcpu_count = receiver.vcpu_count;
+
+	if (args.vcpu_count == 1 && skip_if_up_sp) {
+		HFTEST_LOG("Skipping test as receiver is UP SP.\n");
+		return;
+	}
 
 	/* Start secondary EC while holding lock. */
 	sl_lock(&args.lock);
@@ -96,8 +148,7 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 		 * execution context. If it is S-EL1 partition can have MAX_CPUS
 		 * or 1.
 		 */
-		args.vcpu_id =
-			(receiver.vcpu_count == 1) ? 0 : (ffa_vcpu_index_t)i;
+		args.vcpu_id = (ffa_vcpu_index_t)i;
 
 		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(hftest_cpu_index),
 					   secondary_ec_stack[i - 1],
@@ -112,15 +163,29 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 	}
 }
 
-TEST(ffa_power_mgt, cpu_start_second_sp)
+TEST(ffa_power_mgt, cpu_start_echo_second_sp)
 {
 	/* Second SP can be either S-EL0 or S-EL1 SP. */
 	base_cpu_start_test(&(struct ffa_uuid){SP_SERVICE_SECOND_UUID},
-			    cpu_entry_echo_second_sp);
+			    cpu_entry_echo_second_sp, false);
 }
 
-TEST(ffa_power_mgt, cpu_start_first_sp)
+TEST(ffa_power_mgt, cpu_start_echo_first_sp)
 {
 	base_cpu_start_test(&(struct ffa_uuid){SP_SERVICE_FIRST_UUID},
-			    cpu_entry_echo);
+			    cpu_entry_echo, false);
+}
+
+TEST(ffa_power_mgt, cpu_start_core_idx_second_sp)
+{
+	/* Test to be skipped for S-EL0 partition. */
+	base_cpu_start_test(&(struct ffa_uuid){SP_SERVICE_SECOND_UUID},
+			    cpu_entry_check_cpu_idx_second_sp, true);
+}
+
+TEST(ffa_power_mgt, cpu_start_core_idx_first_sp)
+{
+	/* Test to be skipped for S-EL0 partition. */
+	base_cpu_start_test(&(struct ffa_uuid){SP_SERVICE_FIRST_UUID},
+			    cpu_entry_check_cpu_idx, true);
 }

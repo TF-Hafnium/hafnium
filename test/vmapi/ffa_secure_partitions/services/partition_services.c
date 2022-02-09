@@ -37,7 +37,7 @@ struct ffa_value sp_req_echo_cmd(ffa_vm_id_t test_source, uint32_t val1,
 	EXPECT_EQ(res.arg6, val3);
 	EXPECT_EQ(res.arg7, val4);
 
-	return sp_success(own_id, test_source);
+	return sp_success(own_id, test_source, 0);
 }
 
 struct ffa_value sp_req_echo_busy_cmd(ffa_vm_id_t test_source)
@@ -56,5 +56,5 @@ struct ffa_value sp_req_echo_busy_cmd(ffa_vm_id_t test_source)
 		EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 	}
 
-	return sp_success(own_id, test_source);
+	return sp_success(own_id, test_source, 0);
 }

@@ -60,6 +60,10 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 						  sp_notif_bind_sender(res),
 						  sp_notif_bitmap(res));
 			break;
+		case SP_CHECK_CPU_IDX_CMD:
+			res = sp_check_cpu_idx_cmd(ffa_sender(res),
+						   sp_check_cpu_idx(res));
+			break;
 		default:
 			HFTEST_LOG_FAILURE();
 			HFTEST_LOG(HFTEST_LOG_INDENT

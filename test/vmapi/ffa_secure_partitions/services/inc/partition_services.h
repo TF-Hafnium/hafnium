@@ -16,9 +16,9 @@
 #define SP_ERROR -1
 
 static inline struct ffa_value sp_success(ffa_vm_id_t sender,
-					  ffa_vm_id_t receiver)
+					  ffa_vm_id_t receiver, uint64_t val)
 {
-	return ffa_msg_send_direct_resp(sender, receiver, SP_SUCCESS, 0, 0, 0,
+	return ffa_msg_send_direct_resp(sender, receiver, SP_SUCCESS, val, 0, 0,
 					0);
 }
 
@@ -207,3 +207,24 @@ struct ffa_value sp_notif_unbind_cmd(ffa_vm_id_t test_source,
 struct ffa_value sp_check_ffa_return_resp(ffa_vm_id_t test_source,
 					  ffa_vm_id_t own_id,
 					  struct ffa_value res);
+
+/**
+ * Command to request SP to validate if core index passed to the SP is as
+ * expected.
+ */
+#define SP_CHECK_CPU_IDX_CMD 0x76637075U
+
+static inline struct ffa_value sp_check_cpu_idx_cmd_send(
+	ffa_vm_id_t test_source, ffa_vm_id_t receiver, ffa_vcpu_index_t cpu_idx)
+{
+	return ffa_msg_send_direct_req(test_source, receiver,
+				       SP_CHECK_CPU_IDX_CMD, cpu_idx, 0, 0, 0);
+}
+
+static inline ffa_vcpu_index_t sp_check_cpu_idx(struct ffa_value cmd)
+{
+	return (ffa_vcpu_index_t)cmd.arg4;
+}
+
+struct ffa_value sp_check_cpu_idx_cmd(ffa_vm_id_t test_source,
+				      ffa_vcpu_index_t received_cpu_idx);
