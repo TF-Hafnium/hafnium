@@ -562,6 +562,30 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 	plat_ffa_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
 }
 
+void plat_ffa_rxtx_unmap_forward(ffa_vm_id_t id)
+{
+	struct ffa_value ret;
+	uint64_t func;
+
+	if (!ffa_tee_enabled) {
+		return;
+	}
+
+	/* Hypervisor always forwards forward RXTX_UNMAP to SPMC. */
+	ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_RXTX_UNMAP_32, .arg1 = id << 16});
+	func = ret.func & ~SMCCC_CONVENTION_MASK;
+	if (ret.func == SMCCC_ERROR_UNKNOWN) {
+		panic("Unknown error forwarding RXTX_UNMAP.\n");
+	} else if (func == FFA_ERROR_32) {
+		panic("Error %d forwarding RX/TX buffers.\n", ret.arg2);
+	} else if (func != FFA_SUCCESS_32) {
+		panic("Unexpected function %#x returned forwarding RX/TX "
+		      "buffers.",
+		      ret.func);
+	}
+}
+
 bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current)
 {
 	(void)current;

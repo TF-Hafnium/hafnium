@@ -1354,20 +1354,28 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 {
 	struct vm *vm = current->vm;
 	struct vm_locked vm_locked;
+	ffa_vm_id_t owner_vm_id;
 	struct mm_stage1_locked mm_stage1_locked;
 	paddr_t send_pa_begin;
 	paddr_t send_pa_end;
 	paddr_t recv_pa_begin;
 	paddr_t recv_pa_end;
+	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
-	/*
-	 * Check there is a buffer pair registered on behalf of the caller.
-	 * Since forwarding is not yet supported the allocator ID MBZ.
-	 */
-	if (allocator_id != 0) {
-		dlog_error(
-			"Forwarding MAP/UNMAP from the hypervisor is not yet "
-			"supported so vm id must be zero.\n");
+	/* Ensure `allocator_id` is set only at Non-Secure Physical instance. */
+	if (vm_id_is_current_world(vm->id) && (allocator_id != 0)) {
+		dlog_error("`allocator_id` must be 0 at virtual instances.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* VM ID of which buffers have to be unmapped. */
+	owner_vm_id = (allocator_id != 0) ? allocator_id : vm->id;
+
+	vm_locked = plat_ffa_vm_find_locked(owner_vm_id);
+	vm = vm_locked.vm;
+	if (vm == NULL) {
+		dlog_error("Cannot unmap RX/TX for VM ID %#x, not found.\n",
+			   owner_vm_id);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -1375,7 +1383,8 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 	if (vm->mailbox.send == NULL || vm->mailbox.recv == NULL) {
 		dlog_verbose(
 			"No buffer pair registered on behalf of the caller.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
 	}
 
 	/* Currently a mailbox size of 1 page is assumed. */
@@ -1384,21 +1393,23 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 	recv_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.recv));
 	recv_pa_end = pa_add(recv_pa_begin, HF_MAILBOX_SIZE);
 
-	vm_locked = vm_lock(vm);
 	mm_stage1_locked = mm_lock_stage1();
 
-	/*
-	 * Set the memory region of the buffers back to the default mode
-	 * for the VM. Since this memory region was already mapped for the
-	 * RXTX buffers we can safely remap them.
-	 */
-	CHECK(vm_identity_map(vm_locked, send_pa_begin, send_pa_end,
-			      MM_MODE_R | MM_MODE_W | MM_MODE_X, &api_page_pool,
-			      NULL));
+	/* Reset stage 2 mapping only for virtual FF-A instances. */
+	if (vm_id_is_current_world(owner_vm_id)) {
+		/*
+		 * Set the memory region of the buffers back to the default mode
+		 * for the VM. Since this memory region was already mapped for
+		 * the RXTX buffers we can safely remap them.
+		 */
+		CHECK(vm_identity_map(vm_locked, send_pa_begin, send_pa_end,
+				      MM_MODE_R | MM_MODE_W | MM_MODE_X,
+				      &api_page_pool, NULL));
 
-	CHECK(vm_identity_map(vm_locked, recv_pa_begin, recv_pa_end,
-			      MM_MODE_R | MM_MODE_W | MM_MODE_X, &api_page_pool,
-			      NULL));
+		CHECK(vm_identity_map(vm_locked, recv_pa_begin, recv_pa_end,
+				      MM_MODE_R | MM_MODE_W | MM_MODE_X,
+				      &api_page_pool, NULL));
+	}
 
 	/* Unmap the buffers in the partition manager. */
 	CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end,
@@ -1409,10 +1420,15 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 	vm->mailbox.send = NULL;
 	vm->mailbox.recv = NULL;
 
+	/* Forward buffer unmapping to SPMC if coming from a VM. */
+	plat_ffa_rxtx_unmap_forward(owner_vm_id);
+
 	mm_unlock_stage1(&mm_stage1_locked);
+
+out:
 	vm_unlock(&vm_locked);
 
-	return (struct ffa_value){.func = FFA_SUCCESS_32};
+	return ret;
 }
 
 /**

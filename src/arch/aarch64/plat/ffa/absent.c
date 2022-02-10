@@ -104,6 +104,11 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 	(void)vm_locked;
 }
 
+void plat_ffa_rxtx_unmap_forward(ffa_vm_id_t id)
+{
+	(void)id;
+}
+
 bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret)

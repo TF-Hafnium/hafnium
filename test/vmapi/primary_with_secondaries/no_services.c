@@ -289,3 +289,21 @@ TEST(ffa_rxtx_unmap, succeeds_in_remapping_region)
 	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
 		  FFA_SUCCESS_32);
 }
+
+/**
+ * The `allocator_id` must be 0 at virtual instances.
+ */
+TEST(ffa_rxtx_unmap, validate_allocator_id)
+{
+	struct ffa_value ret;
+
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+
+	/* Set the `allocator_id`, which MBZ at virtual instances. */
+	ret = ffa_call(
+		(struct ffa_value){.func = FFA_RXTX_UNMAP_32, .arg1 = 1});
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
+
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+}

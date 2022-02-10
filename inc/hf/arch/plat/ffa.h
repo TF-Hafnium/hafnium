@@ -103,6 +103,8 @@ bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 
 void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked);
 
+void plat_ffa_rxtx_unmap_forward(ffa_vm_id_t id);
+
 /**
  * Checks whether managed exit is supported by given SP.
  */

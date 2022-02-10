@@ -79,6 +79,11 @@ bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	return false;
 }
 
+void plat_ffa_rxtx_unmap_forward(ffa_vm_id_t id)
+{
+	(void)id;
+}
+
 bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret)
