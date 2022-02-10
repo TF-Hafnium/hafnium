@@ -246,6 +246,8 @@ template("aarch64_common_toolchain") {
            "\"gicd_base_address\" must be defined for ${target_name}.")
     assert(defined(invoker.gicr_base_address),
            "\"gicr_base_address\" must be defined for ${target_name}.")
+    assert(defined(invoker.gicr_frames),
+           "\"gicr_frames\" must be defined for ${target_name}.")
   }
   assert(defined(invoker.platform_name),
          "\"platform_name\" must be defined for ${target_name}.")
@@ -277,7 +279,7 @@ template("aarch64_common_toolchain") {
       extra_defines += " -DGIC_VERSION=${invoker.gic_version}"
     }
     if (invoker.gic_version == 3 || invoker.gic_version == 4) {
-      extra_defines += " -DGICD_BASE=${invoker.gicd_base_address} -DGICR_BASE=${invoker.gicr_base_address}"
+      extra_defines += " -DGICD_BASE=${invoker.gicd_base_address} -DGICR_BASE=${invoker.gicr_base_address} -DGICR_FRAMES=${invoker.gicr_frames}"
     }
 
     if (defined(invoker.branch_protection)) {
@@ -320,6 +322,7 @@ template("aarch64_toolchains") {
                              "gic_version",
                              "gicd_base_address",
                              "gicr_base_address",
+                             "gicr_frames",
                              "heap_pages",
                              "max_cpus",
                              "max_image_size",
@@ -341,6 +344,7 @@ template("aarch64_toolchains") {
                              "gic_version",
                              "gicd_base_address",
                              "gicr_base_address",
+                             "gicr_frames",
                              "max_cpus",
                              "toolchain_args",
                              "console",
