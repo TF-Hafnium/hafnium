@@ -44,47 +44,36 @@ vm_kernel("secure_partitions_services") {
   ]
 }
 
-manifest("secure_partition_services_manifest") {
-  source = "partition_manifest_services_sp.dts"
-  output = "partition_manifest_services_sp.dtb"
+manifest("partition_manifest_service_sp_first") {
+  source = "partition_manifest_service_sp_first.dts"
+  output = "partition_manifest_service_sp_first.dtb"
 }
 
-manifest("secure_partition_services_secondary_manifest") {
-  source = "partition_manifest_services_secondary_sp.dts"
-  output = "partition_manifest_services_secondary_sp.dtb"
+manifest("partition_manifest_service_sp_second") {
+  source = "partition_manifest_service_sp_second.dts"
+  output = "partition_manifest_service_sp_second.dtb"
 }
 
-partition_package("secure_partition_control_test_package") {
+partition_package("service_sp_second_package") {
   testonly = true
   files = [ [
-        "partition_manifest_control_sp.dtb",
-        "secure_partitions_control.bin",
-        ":partition_manifest_control_sp",
-        ":secure_partitions_control",
-      ] ]
-  output = "secure_partition_control_test_package.img"
-}
-
-partition_package("secure_partition_services_test_package") {
-  testonly = true
-  files = [ [
-        "partition_manifest_services_sp.dtb",
+        "partition_manifest_service_sp_second.dtb",
         "secure_partitions_services.bin",
-        ":secure_partition_services_manifest",
+        ":partition_manifest_service_sp_second",
         ":secure_partitions_services",
       ] ]
-  output = "secure_partition_services_test_package.img"
+  output = "service_sp_second_package.img"
 }
 
-partition_package("secure_partition_services_secondary_test_package") {
+partition_package("service_sp_first_package") {
   testonly = true
   files = [ [
-        "partition_manifest_services_secondary_sp.dtb",
+        "partition_manifest_service_sp_first.dtb",
         "secure_partitions_services.bin",
-        ":secure_partition_services_secondary_manifest",
+        ":partition_manifest_service_sp_first",
         ":secure_partitions_services",
       ] ]
-  output = "secure_partition_services_secondary_test_package.img"
+  output = "service_sp_first_package.img"
 }
 
 manifest("vm_primary_manifest") {
@@ -114,20 +103,20 @@ vm_kernel("sel0_partition") {
   ]
 }
 
-manifest("partition_manifest_services_tertiary_sel0_sp") {
-  source = "partition_manifest_services_tertiary_sel0_sp.dts"
-  output = "partition_manifest_services_tertiary_sel0_sp.dtb"
+manifest("partition_manifest_service_sp_second_el0") {
+  source = "partition_manifest_service_sp_second_el0.dts"
+  output = "partition_manifest_service_sp_second_el0.dtb"
 }
 
-partition_package("sel0_sp_test_package") {
+partition_package("service_sp_second_el0_package") {
   testonly = true
   files = [ [
-        "partition_manifest_services_tertiary_sel0_sp.dtb",
+        "partition_manifest_service_sp_second_el0.dtb",
         "sel0_partition.bin",
-        ":partition_manifest_services_tertiary_sel0_sp",
+        ":partition_manifest_service_sp_second_el0",
         ":sel0_partition",
       ] ]
-  output = "sel0_sp_test_package.img"
+  output = "service_sp_second_el0_package.img"
 }
 
 partitions_json("ffa_both_world_partitions_vhe_test") {
@@ -135,16 +124,16 @@ partitions_json("ffa_both_world_partitions_vhe_test") {
 
   sps = [
     [
-      "sel0_sp_test_package.img",
-      "manifest_services_tertiary_sel0_sp.dts",
-      ":sel0_sp_test_package",
-      ":partition_manifest_services_tertiary_sel0_sp",
+      "service_sp_second_el0_package.img",
+      "manifest_service_sp_second_el0.dts",
+      ":service_sp_second_el0_package",
+      ":partition_manifest_service_sp_second_el0",
     ],
     [
-      "secure_partition_services_secondary_test_package.img",
-      "manifest_services_secondary_sp.dts",
-      ":secure_partition_services_secondary_test_package",
-      ":secure_partition_services_secondary_manifest",
+      "service_sp_first_package.img",
+      "manifest_service_sp_first.dts",
+      ":service_sp_first_package",
+      ":partition_manifest_service_sp_first",
     ],
   ]
 
@@ -163,16 +152,16 @@ partitions_json("ffa_both_world_partitions_test") {
 
   sps = [
     [
-      "secure_partition_services_test_package.img",
-      "manifest_services_sp.dts",
-      ":secure_partition_services_test_package",
-      ":secure_partition_services_manifest",
+      "service_sp_second_package.img",
+      "manifest_service_sp_second.dts",
+      ":service_sp_second_package",
+      ":partition_manifest_service_sp_second",
     ],
     [
-      "secure_partition_services_secondary_test_package.img",
-      "manifest_services_secondary_sp.dts",
-      ":secure_partition_services_secondary_test_package",
-      ":secure_partition_services_secondary_manifest",
+      "service_sp_first_package.img",
+      "manifest_service_sp_first.dts",
+      ":service_sp_first_package",
+      ":partition_manifest_service_sp_first",
     ],
   ]
 

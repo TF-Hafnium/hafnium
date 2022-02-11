@@ -10,7 +10,7 @@
 
 / {
   compatible = "arm,ffa-manifest-1.0";
-  debug_name = "partition-manifest";
+  debug_name = "SP Service Second EL0";
 
   /* Properties */
   ffa-version = <0x00010000>; /* 31:16 - Major, 15:0 - Minor */
