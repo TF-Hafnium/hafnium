@@ -101,6 +101,54 @@ static void nwd_vms_unlock(struct nwd_vms_locked *vms)
 	sl_unlock(&nwd_vms_lock_instance);
 }
 
+static struct vm_locked plat_ffa_nwd_vm_find_locked(
+	struct nwd_vms_locked nwd_vms_locked, ffa_vm_id_t vm_id)
+{
+	assert(nwd_vms_locked.nwd_vms != NULL);
+
+	for (uint32_t i = 0U; i < nwd_vms_size; i++) {
+		if (nwd_vms[i].id == vm_id) {
+			return vm_lock(&nwd_vms[i]);
+		}
+	}
+
+	return (struct vm_locked){.vm = NULL};
+}
+
+/**
+ * Allocates a NWd VM structure to the VM of given ID.
+ * If a VM with the ID already exists return it.
+ * Return NULL if it can't allocate a new VM.
+ */
+static struct vm_locked plat_ffa_nwd_vm_create(ffa_vm_id_t vm_id)
+{
+	struct vm_locked vm_locked;
+	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
+
+	CHECK(!vm_id_is_current_world(vm_id));
+
+	/* Check if a VM with `vm_id` already exists and returns it. */
+	vm_locked = plat_ffa_nwd_vm_find_locked(nwd_vms_locked, vm_id);
+	if (vm_locked.vm != NULL) {
+		goto out;
+	}
+
+	/* Get first empty slot in `nwd_vms` to create VM. */
+	vm_locked =
+		plat_ffa_nwd_vm_find_locked(nwd_vms_locked, HF_INVALID_VM_ID);
+	if (vm_locked.vm == NULL) {
+		/* NULL means there are no slots in `nwd_vms`. */
+		goto out;
+	}
+
+	vm_locked.vm->id = vm_id;
+
+out:
+	nwd_vms_unlock(&nwd_vms_locked);
+
+	return vm_locked;
+}
+
 void plat_ffa_log_init(void)
 {
 	dlog_info("Initializing Hafnium (SPMC)\n");
@@ -445,20 +493,6 @@ bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 	return vm->managed_exit;
 }
 
-/** Allocates a NWd VM structure to the VM of given ID. */
-static void plat_ffa_vm_create(struct nwd_vms_locked nwd_vms_locked,
-			       struct vm_locked to_create_locked,
-			       ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
-{
-	CHECK(nwd_vms_locked.nwd_vms != NULL);
-	CHECK(to_create_locked.vm != NULL &&
-	      to_create_locked.vm->id == HF_INVALID_VM_ID);
-
-	to_create_locked.vm->id = vm_id;
-	to_create_locked.vm->vcpu_count = vcpu_count;
-	to_create_locked.vm->notifications.enabled = true;
-}
-
 static void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
 {
 	to_destroy_locked.vm->id = HF_INVALID_VM_ID;
@@ -466,20 +500,6 @@ static void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
 	vm_notifications_init_bindings(
 		&to_destroy_locked.vm->notifications.from_sp);
 	to_destroy_locked.vm->notifications.enabled = false;
-}
-
-static struct vm_locked plat_ffa_nwd_vm_find_locked(
-	struct nwd_vms_locked nwd_vms_locked, ffa_vm_id_t vm_id)
-{
-	assert(nwd_vms_locked.nwd_vms != NULL);
-
-	for (unsigned int i = 0U; i < nwd_vms_size; i++) {
-		if (nwd_vms[i].id == vm_id) {
-			return vm_lock(&nwd_vms[i]);
-		}
-	}
-
-	return (struct vm_locked){.vm = NULL};
 }
 
 struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
@@ -504,7 +524,6 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 {
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 	struct vm_locked vm_locked;
-	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
 
 	if (vm_id == HF_OTHER_WORLD_ID) {
 		/*
@@ -518,47 +537,37 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 		CHECK(vm_locked.vm != NULL);
 
 		/* Call has been used for the other world vm already */
-		if (vm_locked.vm->notifications.enabled != false) {
-			dlog_verbose("Notification bitmap already created.");
+		if (vm_locked.vm->notifications.enabled) {
+			dlog_error("Notification bitmap already created.\n");
 			ret = ffa_error(FFA_DENIED);
-			goto out_vm_unlock;
+			goto out;
 		}
 
 		/* Enable notifications for `other_world_vm`. */
 		vm_locked.vm->notifications.enabled = true;
 	} else {
 		/* Else should regard with NWd VM ID. */
+		vm_locked = plat_ffa_nwd_vm_create(vm_id);
 
-		/* If vm already exists bitmap has been created as well. */
-		vm_locked = plat_ffa_nwd_vm_find_locked(nwd_vms_locked, vm_id);
-		if (vm_locked.vm != NULL) {
-			dlog_verbose("Notification bitmap already created.");
-			ret = ffa_error(FFA_DENIED);
-			goto out_vm_unlock;
+		/* If received NULL, there are no slots for VM creation. */
+		if (vm_locked.vm == NULL) {
+			dlog_error("No memory to create VM ID %#x.\n", vm_id);
+			return ffa_error(FFA_NO_MEMORY);
 		}
 
-		/* Get first empty slot in `nwd_vms` to create VM. */
-		vm_locked = plat_ffa_nwd_vm_find_locked(nwd_vms_locked,
-							HF_INVALID_VM_ID);
-
-		/*
-		 * If received NULL, means there are no slots in `nwd_vms` for
-		 * VM creation.
-		 */
-		if (vm_locked.vm == NULL) {
-			dlog_error("No memory to create.\n");
-			ret = ffa_error(FFA_NO_MEMORY);
+		/* Ensure bitmap has not already been created. */
+		if (vm_locked.vm->notifications.enabled) {
+			dlog_error("Notification bitmap already created.\n");
+			ret = ffa_error(FFA_DENIED);
 			goto out;
 		}
 
-		plat_ffa_vm_create(nwd_vms_locked, vm_locked, vm_id,
-				   vcpu_count);
+		vm_locked.vm->notifications.enabled = true;
+		vm_locked.vm->vcpu_count = vcpu_count;
 	}
 
-out_vm_unlock:
-	vm_unlock(&vm_locked);
 out:
-	nwd_vms_unlock(&nwd_vms_locked);
+	vm_unlock(&vm_locked);
 
 	return ret;
 }
