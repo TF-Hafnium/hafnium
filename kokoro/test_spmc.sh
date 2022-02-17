@@ -20,7 +20,7 @@ SPMC_PATH="$OUT/secure_aem_v8a_fvp_clang"
 HYPERVISOR_PATH="$OUT/aem_v8a_fvp_clang"
 HFTEST+=(--out_partitions "$OUT/secure_aem_v8a_fvp_vm_clang")
 
-HFTEST_VHE+=(--log "$LOG_DIR_BASE")
+HFTEST_VHE+=(--log "$LOG_DIR_BASE/vhe")
 HFTEST+=(--log "$LOG_DIR_BASE")
 
 HFTEST_VHE+=(--spmc "$SPMC_PATH_VHE/hafnium.bin" --driver=fvp)
