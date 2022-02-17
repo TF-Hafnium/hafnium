@@ -363,72 +363,68 @@ struct vcpu *api_abort(struct vcpu *current)
  * by the endpoint and return the size of the array created.
  */
 static struct ffa_value send_versioned_partition_info_descriptors(
-	struct vm *current_vm, struct ffa_partition_info *partitions,
+	struct vm_locked vm_locked, struct ffa_partition_info *partitions,
 	uint32_t vm_count)
 {
-	struct vm_locked current_vm_locked;
-	uint32_t version = current_vm->ffa_version;
-	void *versioned_partition_info;
+	struct vm *vm = vm_locked.vm;
+	uint32_t version = vm->ffa_version;
 	uint32_t size;
-	struct ffa_value ret;
 
-	if (version == MAKE_FFA_VERSION(1, 0)) {
-		struct ffa_partition_info_v1_0 v1_0_partitions[2 * MAX_VMS];
-
-		for (uint32_t i = 0; i < vm_count; i++) {
-			v1_0_partitions[i].vm_id = partitions[i].vm_id;
-			v1_0_partitions[i].vcpu_count =
-				partitions[i].vcpu_count;
-			v1_0_partitions[i].properties =
-				partitions[i].properties;
-		}
-		versioned_partition_info = v1_0_partitions;
-		size = sizeof(v1_0_partitions[0]) * vm_count;
-	} else {
-		versioned_partition_info = partitions;
-		size = sizeof(partitions[0]) * vm_count;
-	}
-
-	if (size > FFA_MSG_PAYLOAD_MAX) {
-		dlog_error(
-			"Partition information does not fit in the VM's RX "
-			"buffer.\n");
-		return ffa_error(FFA_NO_MEMORY);
-	}
-
-	/*
-	 * Partition information is returned in the VM's RX buffer, which is why
-	 * the lock is needed.
-	 */
-	current_vm_locked = vm_lock(current_vm);
-
-	if (msg_receiver_busy(current_vm_locked, NULL, false)) {
+	if (msg_receiver_busy(vm_locked, NULL, false)) {
 		/*
 		 * Can't retrieve memory information if the mailbox is not
 		 * available.
 		 */
 		dlog_verbose("RX buffer not ready.\n");
-		ret = ffa_error(FFA_BUSY);
-		goto out_unlock;
+		return ffa_error(FFA_BUSY);
 	}
 
-	/* Populate the VM's RX buffer with the partition information. */
-	memcpy_s(current_vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
-		 versioned_partition_info, size);
-	current_vm->mailbox.recv_size = size;
+	if (version == MAKE_FFA_VERSION(1, 0)) {
+		struct ffa_partition_info_v1_0 *recv_mailbox = vm->mailbox.recv;
+
+		size = sizeof(struct ffa_partition_info_v1_0) * vm_count;
+		if (size > HF_MAILBOX_SIZE) {
+			dlog_error(
+				"Partition information does not fit in the "
+				"VM's RX "
+				"buffer.\n");
+			return ffa_error(FFA_NO_MEMORY);
+		}
+
+		for (uint32_t i = 0; i < vm_count; i++) {
+			/*
+			 * Populate the VM's RX buffer with the partition
+			 * information.
+			 */
+			recv_mailbox[i].vm_id = partitions[i].vm_id;
+			recv_mailbox[i].vcpu_count = partitions[i].vcpu_count;
+			recv_mailbox[i].properties = partitions[i].properties;
+		}
+
+	} else {
+		size = sizeof(partitions[0]) * vm_count;
+		if (size > HF_MAILBOX_SIZE) {
+			dlog_error(
+				"Partition information does not fit in the "
+				"VM's RX "
+				"buffer.\n");
+			return ffa_error(FFA_NO_MEMORY);
+		}
+
+		/* Populate the VM's RX buffer with the partition information.
+		 */
+		memcpy_s(vm->mailbox.recv, HF_MAILBOX_SIZE, partitions, size);
+	}
+
+	vm->mailbox.recv_size = size;
 
 	/* Sender is Hypervisor in the normal world (TEE in secure world). */
-	current_vm->mailbox.recv_sender = HF_VM_ID_BASE;
-	current_vm->mailbox.recv_func = FFA_PARTITION_INFO_GET_32;
-	current_vm->mailbox.state = MAILBOX_STATE_READ;
+	vm->mailbox.recv_sender = HF_VM_ID_BASE;
+	vm->mailbox.recv_func = FFA_PARTITION_INFO_GET_32;
+	vm->mailbox.state = MAILBOX_STATE_READ;
 
 	/* Return the count of partition information descriptors in w2. */
-	ret = (struct ffa_value){.func = FFA_SUCCESS_32, .arg2 = vm_count};
-
-out_unlock:
-	vm_unlock(&current_vm_locked);
-
-	return ret;
+	return (struct ffa_value){.func = FFA_SUCCESS_32, .arg2 = vm_count};
 }
 
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
@@ -441,6 +437,8 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 			  FFA_PARTITION_COUNT_FLAG;
 	bool uuid_is_null = ffa_uuid_is_null(uuid);
 	struct ffa_partition_info partitions[2 * MAX_VMS];
+	struct vm_locked vm_locked;
+	struct ffa_value ret;
 
 	/* Bits 31:1 Must Be Zero */
 	if ((flags & ~FFA_PARTITION_COUNT_FLAG) != 0) {
@@ -516,8 +514,11 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					  .arg2 = vm_count};
 	}
 
-	return send_versioned_partition_info_descriptors(current_vm, partitions,
-							 vm_count);
+	vm_locked = vm_lock(current_vm);
+	ret = send_versioned_partition_info_descriptors(vm_locked, partitions,
+							vm_count);
+	vm_unlock(&vm_locked);
+	return ret;
 }
 
 /**
