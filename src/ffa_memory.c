@@ -1360,21 +1360,21 @@ static struct ffa_value ffa_memory_attributes_validate(
 	if (memory_type != FFA_MEMORY_NORMAL_MEM) {
 		dlog_verbose("Invalid memory type %#x, expected %#x.\n",
 			     memory_type, FFA_MEMORY_NORMAL_MEM);
-		return ffa_error(FFA_INVALID_PARAMETERS);
+		return ffa_error(FFA_DENIED);
 	}
 
 	cacheability = ffa_get_memory_cacheability_attr(attributes);
 	if (cacheability != FFA_MEMORY_CACHE_WRITE_BACK) {
 		dlog_verbose("Invalid cacheability %#x, expected %#x.\n",
 			     cacheability, FFA_MEMORY_CACHE_WRITE_BACK);
-		return ffa_error(FFA_INVALID_PARAMETERS);
+		return ffa_error(FFA_DENIED);
 	}
 
 	shareability = ffa_get_memory_shareability_attr(attributes);
 	if (shareability != FFA_MEMORY_INNER_SHAREABLE) {
 		dlog_verbose("Invalid shareability %#x, expected #%x.\n",
 			     shareability, FFA_MEMORY_INNER_SHAREABLE);
-		return ffa_error(FFA_INVALID_PARAMETERS);
+		return ffa_error(FFA_DENIED);
 	}
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
