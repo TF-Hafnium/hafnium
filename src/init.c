@@ -38,6 +38,12 @@ alignas(MM_PPOOL_ENTRY_SIZE) char ptable_buf[MM_PPOOL_ENTRY_SIZE * HEAP_PAGES];
 
 static struct mpool ppool;
 
+/*
+ * Hafnium manifest declaring all VMs. Notice this structure is large hence kept
+ * in BSS rather than directly allocated to the stack in one_time_init.
+ */
+static struct manifest manifest;
+
 /**
  * Performs one-time initialisation of memory management for the hypervisor.
  *
@@ -67,7 +73,6 @@ void one_time_init(void)
 {
 	struct string manifest_fname = STRING_INIT("manifest.dtb");
 	struct fdt fdt;
-	struct manifest manifest;
 	enum manifest_return_code manifest_ret;
 	struct boot_params params;
 	struct boot_params_update update;

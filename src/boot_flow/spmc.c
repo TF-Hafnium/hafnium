@@ -32,14 +32,17 @@ uintreg_t plat_boot_flow_get_kernel_arg(void)
 
 /**
  * The value returned by this function is not meaningful in context of the SPMC
- * as there is no initrd.
+ * as there is no initrd. Initrd begin and end values are cleared such that the
+ * check done in one_time_init (initrd_begin is non null) is false, hinting a
+ * ramdisk is not present.
  */
 bool plat_boot_flow_get_initrd_range(const struct fdt *fdt, paddr_t *begin,
 				     paddr_t *end)
 {
 	(void)fdt;
-	(void)begin;
-	(void)end;
+
+	*begin = pa_init(0);
+	*end = pa_init(0);
 
 	return true;
 }
