@@ -104,6 +104,11 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 	(void)vm_locked;
 }
 
+void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
+{
+	(void)to_destroy_locked;
+}
+
 void plat_ffa_rxtx_unmap_forward(ffa_vm_id_t id)
 {
 	(void)id;

@@ -149,6 +149,21 @@ out:
 	return vm_locked;
 }
 
+void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
+{
+	struct vm *vm = to_destroy_locked.vm;
+	/*
+	 * Free the VM slot if notifications are disabled and mailbox is not
+	 * mapped.
+	 */
+	if (!vm_id_is_current_world(vm->id) && vm->id != HF_HYPERVISOR_VM_ID &&
+	    !vm->notifications.enabled && vm->mailbox.send == NULL &&
+	    vm->mailbox.recv == NULL) {
+		to_destroy_locked.vm->id = HF_INVALID_VM_ID;
+		to_destroy_locked.vm->vcpu_count = 0U;
+	}
+}
+
 void plat_ffa_log_init(void)
 {
 	dlog_info("Initializing Hafnium (SPMC)\n");
@@ -503,15 +518,6 @@ bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 	return vm->managed_exit;
 }
 
-static void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
-{
-	to_destroy_locked.vm->id = HF_INVALID_VM_ID;
-	to_destroy_locked.vm->vcpu_count = 0U;
-	vm_notifications_init_bindings(
-		&to_destroy_locked.vm->notifications.from_sp);
-	to_destroy_locked.vm->notifications.enabled = false;
-}
-
 struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
 {
 	struct vm_locked to_ret_locked;
@@ -603,58 +609,36 @@ bool plat_ffa_notifications_bitmap_create_call(ffa_vm_id_t vm_id,
 struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 {
 	struct ffa_value ret = {.func = FFA_SUCCESS_32};
-	struct vm_locked to_destroy_locked;
-	const char *error_not_created_string = "Bitmap not created for vm:";
+	struct vm_locked to_destroy_locked = plat_ffa_vm_find_locked(vm_id);
 
-	if (vm_id == HF_OTHER_WORLD_ID) {
-		/*
-		 * Bitmap is part of `other_world_vm`, destroy will reset
-		 * bindings and will disable notifications.
-		 */
+	if (to_destroy_locked.vm == NULL) {
+		dlog_error("Bitmap not created for VM: %u\n", vm_id);
+		return ffa_error(FFA_DENIED);
+	}
 
-		to_destroy_locked = vm_find_locked(vm_id);
+	if (!to_destroy_locked.vm->notifications.enabled) {
+		dlog_error("Notification disabled for VM: %u\n", vm_id);
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
 
-		CHECK(to_destroy_locked.vm != NULL);
+	/* Check if there is any notification pending. */
+	if (vm_are_notifications_pending(to_destroy_locked, false, ~0x0U)) {
+		dlog_verbose("VM has notifications pending.\n");
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
 
-		if (to_destroy_locked.vm->notifications.enabled == false) {
-			dlog_error("%s %u\n", error_not_created_string, vm_id);
-			ret = ffa_error(FFA_DENIED);
-			goto out;
-		}
-
-		/* Check if there is any notification pending. */
-		if (vm_are_notifications_pending(to_destroy_locked, false,
-						 ~0x0U)) {
-			dlog_verbose("VM has notifications pending.\n");
-			ret = ffa_error(FFA_DENIED);
-			goto out;
-		}
-
-		to_destroy_locked.vm->notifications.enabled = false;
-		vm_notifications_init_bindings(
-			&to_destroy_locked.vm->notifications.from_sp);
-	} else {
-		to_destroy_locked = plat_ffa_vm_find_locked(vm_id);
-
-		/* If VM doesn't exist, bitmap hasn't been created. */
-		if (to_destroy_locked.vm == NULL) {
-			dlog_verbose("%s: %u.\n", error_not_created_string,
-				     vm_id);
-			return ffa_error(FFA_DENIED);
-		}
-
-		/* Check if there is any notification pending. */
-		if (vm_are_notifications_pending(to_destroy_locked, false,
-						 ~0x0U)) {
-			dlog_verbose("VM has notifications pending.\n");
-			ret = ffa_error(FFA_DENIED);
-			goto out;
-		}
-
+	to_destroy_locked.vm->notifications.enabled = false;
+	vm_notifications_init_bindings(
+		&to_destroy_locked.vm->notifications.from_sp);
+	if (vm_id != HF_OTHER_WORLD_ID) {
 		plat_ffa_vm_destroy(to_destroy_locked);
 	}
+
 out:
 	vm_unlock(&to_destroy_locked);
+
 	return ret;
 }
 

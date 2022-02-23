@@ -562,6 +562,12 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 	plat_ffa_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
 }
 
+void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
+{
+	/* Hypervisor never frees VM structs. */
+	(void)to_destroy_locked;
+}
+
 void plat_ffa_rxtx_unmap_forward(ffa_vm_id_t id)
 {
 	struct ffa_value ret;

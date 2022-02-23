@@ -1419,6 +1419,7 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 
 	vm->mailbox.send = NULL;
 	vm->mailbox.recv = NULL;
+	plat_ffa_vm_destroy(vm_locked);
 
 	/* Forward buffer unmapping to SPMC if coming from a VM. */
 	plat_ffa_rxtx_unmap_forward(owner_vm_id);
