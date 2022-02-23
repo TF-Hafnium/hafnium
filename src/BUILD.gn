@@ -51,6 +51,7 @@ source_set("src_testable") {
     "cpu.c",
     "ffa_memory.c",
     "manifest.c",
+    "sp_pkg.c",
     "vcpu.c",
   ]
 

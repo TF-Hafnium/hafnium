@@ -12,6 +12,7 @@
 #include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/sp_pkg.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
 
@@ -756,92 +757,63 @@ static enum manifest_return_code parse_ffa_partition_package(
 	struct manifest_vm *vm, ffa_vm_id_t vm_id, struct mpool *ppool)
 {
 	enum manifest_return_code ret = MANIFEST_ERROR_NOT_COMPATIBLE;
-	uintpaddr_t sp_pkg_addr;
-	paddr_t sp_pkg_start;
-	paddr_t sp_pkg_end;
-	struct sp_pkg_header *sp_pkg;
-	size_t sp_header_dtb_size;
-	paddr_t sp_dtb_addr;
+	uintpaddr_t load_address;
+	struct sp_pkg_header header;
 	struct fdt sp_fdt;
+	vaddr_t pkg_start;
+	vaddr_t manifest_address;
 
 	/*
 	 * This must have been hinted as being an FF-A partition,
 	 * return straight with failure if this is not the case.
 	 */
 	if (!vm->is_ffa_partition) {
+		return ret;
+	}
+
+	TRY(read_uint64(node, "load_address", &load_address));
+	if (!is_aligned(load_address, PAGE_SIZE)) {
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	TRY(read_uint64(node, "load_address", &sp_pkg_addr));
-	if (!is_aligned(sp_pkg_addr, PAGE_SIZE)) {
-		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	assert(load_address != 0U);
+
+	if (!sp_pkg_init(stage1_locked, pa_init(load_address), &header,
+			 ppool)) {
+		return ret;
 	}
 
-	/* Map top of package as a single page to extract the header */
-	sp_pkg_start = pa_init(sp_pkg_addr);
-	sp_pkg_end = pa_add(sp_pkg_start, PAGE_SIZE);
-	sp_pkg = mm_identity_map(stage1_locked, sp_pkg_start,
-				 pa_add(sp_pkg_start, PAGE_SIZE), MM_MODE_R,
-				 ppool);
-	CHECK(sp_pkg != NULL);
+	pkg_start = va_init(load_address);
 
-	dlog_verbose("Package load address %#x\n", sp_pkg_addr);
-
-	if (sp_pkg->magic != SP_PKG_HEADER_MAGIC) {
-		dlog_error("Invalid package magic.\n");
-		goto exit_unmap;
-	}
-
-	if (sp_pkg->version != SP_PKG_HEADER_VERSION) {
-		dlog_error("Invalid package version.\n");
-		goto exit_unmap;
-	}
-
-	/* TODO: Do not map 2 pages. */
-	sp_header_dtb_size = align_up(sp_pkg->pm_size, 2 * PAGE_SIZE);
-
-	if ((vm_id != HF_PRIMARY_VM_ID) &&
-	    (sp_header_dtb_size >= vm->secondary.mem_size)) {
+	if (vm_id != HF_PRIMARY_VM_ID &&
+	    sp_pkg_get_mem_size(&header) >= vm->secondary.mem_size) {
 		dlog_error("Invalid package header or DT size.\n");
-		goto exit_unmap;
+		goto out;
 	}
 
-	if (sp_header_dtb_size > PAGE_SIZE) {
-		/* Map remainder of header + DTB  */
-		sp_pkg_end = pa_add(sp_pkg_start, sp_header_dtb_size);
-
-		sp_pkg = mm_identity_map(stage1_locked, sp_pkg_start,
-					 sp_pkg_end, MM_MODE_R, ppool);
-		CHECK(sp_pkg != NULL);
-	}
-
-	sp_dtb_addr = pa_add(sp_pkg_start, sp_pkg->pm_offset);
-
-	/* Since the address is from pa_addr allow the cast */
-	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	if (!fdt_init_from_ptr(&sp_fdt, (void *)pa_addr(sp_dtb_addr),
-			       sp_pkg->pm_size)) {
+	manifest_address = va_add(va_init(load_address), header.pm_offset);
+	if (!fdt_init_from_ptr(&sp_fdt, ptr_from_va(manifest_address),
+			       header.pm_size)) {
 		dlog_error("FDT failed validation.\n");
-		goto exit_unmap;
+		goto out;
 	}
 
 	ret = parse_ffa_manifest(&sp_fdt, vm);
 	if (ret != MANIFEST_SUCCESS) {
 		dlog_error("Error parsing partition manifest: %s.\n",
 			   manifest_strerror(ret));
-		goto exit_unmap;
+		goto out;
 	}
 
-	if (vm->partition.load_addr != sp_pkg_addr) {
+	if (vm->partition.load_addr != load_address) {
 		dlog_warning(
 			"Partition's load address at its manifest differs"
 			" from specified in partition's package.\n");
-		vm->partition.load_addr = sp_pkg_addr;
+		vm->partition.load_addr = load_address;
 	}
 
-exit_unmap:
-	CHECK(mm_unmap(stage1_locked, sp_pkg_start, sp_pkg_end, ppool));
-
+out:
+	sp_pkg_deinit(stage1_locked, pkg_start, &header, ppool);
 	return ret;
 }
 

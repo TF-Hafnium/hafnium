@@ -18,9 +18,6 @@
 #define MANIFEST_INVALID_ADDRESS UINT64_MAX
 #define MANIFEST_INVALID_ID UINT32_MAX
 
-#define SP_PKG_HEADER_MAGIC (0x474b5053)
-#define SP_PKG_HEADER_VERSION (0x2)
-
 #define SP_RTX_BUF_NAME_SIZE 10
 
 #define SP_MAX_MEMORY_REGIONS 8
@@ -159,24 +156,6 @@ struct partition_manifest {
 	/** Device regions */
 	uint8_t dev_region_count;
 	struct device_region dev_regions[SP_MAX_DEVICE_REGIONS];
-};
-
-/**
- *  Header for a FF-A partition package.
- */
-struct sp_pkg_header {
-	/** Magic used to identify a SP package. Value is "SPKG" */
-	uint32_t magic;
-	/** Version number of the header */
-	uint32_t version;
-	/** Offset in bytes to the partition manifest */
-	uint32_t pm_offset;
-	/** Size in bytes of the partition manifest */
-	uint32_t pm_size;
-	/** Offset in bytes to the base address of the partition binary */
-	uint32_t img_offset;
-	/** Size in bytes of the partition binary */
-	uint32_t img_size;
 };
 
 /**

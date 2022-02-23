@@ -14,7 +14,10 @@
 #include <gmock/gmock.h>
 
 extern "C" {
+#include "hf/arch/std.h"
+
 #include "hf/manifest.h"
+#include "hf/sp_pkg.h"
 }
 
 namespace
@@ -232,7 +235,7 @@ class ManifestDtBuilder
 		Property("execution-ctx-count", "<1>");
 		Property("exception-level", "<2>");
 		Property("execution-state", "<0>");
-		Property("entrypoint-offset", "<0x00001000>");
+		Property("entrypoint-offset", "<0x00002000>");
 		Property("xlat-granule", "<0>");
 		Property("boot-order", "<0>");
 		Property("messaging-method", "<4>");
@@ -650,15 +653,18 @@ class Partition_package
 {
        public:
 	__attribute__((aligned(PAGE_SIZE))) struct sp_pkg_header spkg;
-	char manifest_dtb[PAGE_SIZE] = {};
+	__attribute__((aligned(PAGE_SIZE))) char manifest_dtb[PAGE_SIZE] = {};
+	__attribute__((aligned(PAGE_SIZE))) char img[PAGE_SIZE] = {};
 
 	Partition_package(const std::vector<char> &vec)
 	{
 		// Initialise header field
 		spkg.magic = SP_PKG_HEADER_MAGIC;
 		spkg.version = SP_PKG_HEADER_VERSION;
-		spkg.pm_offset = sizeof(struct sp_pkg_header);
+		spkg.pm_offset = PAGE_SIZE;
 		spkg.pm_size = vec.size();
+		spkg.img_offset = 2 * PAGE_SIZE;
+		spkg.img_size = ARRAY_SIZE(img);
 
 		// Copy dtb into package
 		std::copy(vec.begin(), vec.end(), manifest_dtb);
@@ -702,7 +708,7 @@ TEST(manifest, ffa_not_compatible)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<0>")
-		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("entrypoint-offset", "<0x00002000>")
 		.Property("xlat-granule", "<0>")
 		.Property("messaging-method", "<1>")
 		.Build();
@@ -744,7 +750,7 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<0>")
-		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("entrypoint-offset", "<0x00002000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<1>")
@@ -762,7 +768,7 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<0>")
-		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("entrypoint-offset", "<0x00002000>")
 		.Property("xlat-granule", "<3>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<1>")
@@ -780,7 +786,7 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<6>")
 		.Property("execution-state", "<0>")
-		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("entrypoint-offset", "<0x00002000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<1>")
@@ -798,7 +804,7 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<2>")
-		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("entrypoint-offset", "<0x00002000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<1>")
@@ -816,7 +822,7 @@ TEST(manifest, ffa_validate_sanity_check)
 		.Property("execution-ctx-count", "<1>")
 		.Property("exception-level", "<2>")
 		.Property("execution-state", "<0>")
-		.Property("entrypoint-offset", "<0x00001000>")
+		.Property("entrypoint-offset", "<0x00002000>")
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<16>")
@@ -1149,7 +1155,7 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].partition.execution_ctx_count, 1);
 	ASSERT_EQ(m.vm[0].partition.run_time_el, S_EL1);
 	ASSERT_EQ(m.vm[0].partition.execution_state, AARCH64);
-	ASSERT_EQ(m.vm[0].partition.ep_offset, 0x00001000);
+	ASSERT_EQ(m.vm[0].partition.ep_offset, 0x00002000);
 	ASSERT_EQ(m.vm[0].partition.xlat_granule, PAGE_4KB);
 	ASSERT_EQ(m.vm[0].partition.boot_order, 0);
 	ASSERT_EQ(m.vm[0].partition.messaging_method,
