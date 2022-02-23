@@ -6,28 +6,9 @@
 
 import("//build/toolchain/platform.gni")
 
-declare_args() {
-  boot_flow_android_initrd_addr = 0
-  boot_flow_android_initrd_size = 0
-}
-
 source_set("common") {
   sources = [
     "common.c",
-  ]
-}
-
-source_set("android") {
-  sources = [
-    "android.c",
-  ]
-  deps = [
-    ":common",
-    "//src/arch/${plat_arch}/boot_flow:android",
-  ]
-  defines = [
-    "INITRD_ADDR=${boot_flow_android_initrd_addr}",
-    "INITRD_SIZE=${boot_flow_android_initrd_size}",
   ]
 }
 

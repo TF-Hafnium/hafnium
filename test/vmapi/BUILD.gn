@@ -7,6 +7,17 @@
 import("//build/image/image.gni")
 import("//build/toolchain/platform.gni")
 
+group("partitions") {
+  testonly = true
+  deps = [
+    "arch/${plat_arch}:arch",
+    "common:common",
+    "ffa_secure_partition_only:ffa_secure_partition_only_test",
+    "ffa_secure_partitions:ffa_both_world_partitions_test",
+    "ffa_secure_partitions:ffa_both_world_partitions_vhe_test",
+  ]
+}
+
 group("vmapi") {
   testonly = true
 
@@ -14,9 +25,6 @@ group("vmapi") {
     "arch/${plat_arch}:arch",
     "common:common",
     "el0_partitions:el0_partitions_test",
-    "ffa_secure_partition_only:ffa_secure_partition_only_test",
-    "ffa_secure_partitions:ffa_both_world_partitions_test",
-    "ffa_secure_partitions:ffa_both_world_partitions_vhe_test",
     "primary_only:primary_only_test",
     "primary_only_ffa:primary_only_ffa_test",
     "primary_with_secondaries:primary_with_secondaries_no_fdt",

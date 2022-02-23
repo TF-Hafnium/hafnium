@@ -4,12 +4,6 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/BSD-3-Clause.
 
-source_set("android") {
-  sources = [
-    "android.S",
-  ]
-}
-
 source_set("linux") {
   sources = [
     "linux.S",
