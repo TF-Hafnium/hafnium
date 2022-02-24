@@ -96,8 +96,9 @@ uint32_t gicv3_get_pending_interrupt_id(void)
 /**
  * This function returns the type of the interrupt id depending on the group
  * this interrupt has been configured under by the interrupt controller i.e.
- * group1 Secure / group1 Non Secure. The return value can be one of the
+ * group0 or group1 Secure / Non Secure. The return value can be one of the
  * following :
+ *    INTR_GROUP0  : The interrupt type is a Secure Group 0 interrupt
  *    INTR_GROUP1S : The interrupt type is a Secure Group 1 secure interrupt.
  *    INTR_GROUP1NS: The interrupt type is a Secure Group 1 non secure
  *                   interrupt.
@@ -143,6 +144,9 @@ uint32_t gicv3_get_interrupt_type(uint32_t id, uint32_t proc_num)
 	}
 
 	CHECK(false);
+
+	/* Else it is a Group 0 Secure interrupt */
+	return INTR_GROUP0;
 }
 
 /**
