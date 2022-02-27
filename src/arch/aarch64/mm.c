@@ -587,10 +587,24 @@ uint64_t arch_mm_mode_to_stage2_attrs(uint32_t mode)
 	uint64_t access = 0;
 
 	/*
-	 * Non-shareable is the "neutral" share mode, i.e., the shareability
-	 * attribute of stage 1 will determine the actual attribute.
+	 * Default shareability is inner shareable in stage 2 tables. Per
+	 * table D5-45 of ARM ARM DDI0487G, Inner shareable attribute will
+	 * pass through the stage 1 attribute of outer shareable and inner
+	 * shareable, but NOT non-shareable. A stage 1 non-shareable attribute
+	 * combined with stage 2 inner shareable, results in an inner shareable
+	 * access. This is intentional, since a VCPU that marks a memory region
+	 * as non-shareable in its stage 1 translation tables, can be migrated
+	 * to a different PHYSICAL PE unless the VCPU is pinned to the PE.
+	 * If stage 2 was marked as non-shareable below, the resulting accesses
+	 * for a VCPU on a physical PE would be marked as non-shareable, and
+	 * hence potentially not visible on another physical PE, which could
+	 * cause coherency issues when the VCPU is migrated and expects its
+	 * non-shareable accesses to be visible, but would read stale or invalid
+	 * data. Note that for a access that results in device memory type, the
+	 * shareability does not matter and is always treated as outer
+	 * shareable.
 	 */
-	attrs |= STAGE2_AF | STAGE2_SH(NON_SHAREABLE);
+	attrs |= STAGE2_AF | STAGE2_SH(INNER_SHAREABLE);
 
 	/* Define the read/write bits. */
 	if (mode & MM_MODE_R) {
