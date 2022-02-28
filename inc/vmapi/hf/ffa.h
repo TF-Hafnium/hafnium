@@ -257,6 +257,17 @@ enum ffa_memory_shareability {
 	FFA_MEMORY_INNER_SHAREABLE,
 };
 
+/**
+ * FF-A v1.1 REL0 Table 10.18 memory region attributes descriptor NS Bit 6.
+ * Per section 10.10.4.1, NS bit is reserved for FFA_MEM_DONATE/LEND/SHARE
+ * and FFA_MEM_RETRIEVE_REQUEST.
+ */
+enum ffa_memory_security {
+	FFA_MEMORY_SECURITY_UNSPECIFIED = 0,
+	FFA_MEMORY_SECURITY_SECURE = 0,
+	FFA_MEMORY_SECURITY_NON_SECURE,
+};
+
 typedef uint8_t ffa_memory_access_permissions_t;
 
 /**
@@ -273,6 +284,9 @@ typedef uint8_t ffa_memory_attributes_t;
 
 #define FFA_MEMORY_TYPE_OFFSET (0x4U)
 #define FFA_MEMORY_TYPE_MASK ((0x3U) << FFA_MEMORY_TYPE_OFFSET)
+
+#define FFA_MEMORY_SECURITY_OFFSET (0x6U)
+#define FFA_MEMORY_SECURITY_MASK ((0x1U) << FFA_MEMORY_SECURITY_OFFSET)
 
 #define FFA_MEMORY_CACHEABILITY_OFFSET (0x2U)
 #define FFA_MEMORY_CACHEABILITY_MASK ((0x3U) << FFA_MEMORY_CACHEABILITY_OFFSET)
@@ -318,6 +332,11 @@ ATTR_FUNCTION_SET(memory_shareability, ffa_memory_attributes_t,
 		  FFA_MEMORY_SHAREABILITY_OFFSET, FFA_MEMORY_SHAREABILITY_MASK)
 ATTR_FUNCTION_GET(memory_shareability, ffa_memory_attributes_t,
 		  FFA_MEMORY_SHAREABILITY_OFFSET, FFA_MEMORY_SHAREABILITY_MASK)
+
+ATTR_FUNCTION_SET(memory_security, ffa_memory_attributes_t,
+		  FFA_MEMORY_SECURITY_OFFSET, FFA_MEMORY_SECURITY_MASK)
+ATTR_FUNCTION_GET(memory_security, ffa_memory_attributes_t,
+		  FFA_MEMORY_SECURITY_OFFSET, FFA_MEMORY_SECURITY_MASK)
 
 /**
  * A globally-unique ID assigned by the hypervisor for a region of memory being

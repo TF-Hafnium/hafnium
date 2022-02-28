@@ -1192,6 +1192,7 @@ struct ffa_value ffa_memory_send_validate(
 	uint32_t constituents_length;
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
+	enum ffa_memory_security security_state;
 	struct ffa_value ret;
 
 	/* The sender must match the caller. */
@@ -1360,6 +1361,15 @@ struct ffa_value ffa_memory_send_validate(
 				permissions);
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
+	}
+
+	/* Memory region attributes NS-Bit MBZ for FFA_MEM_SHARE/LEND/DONATE. */
+	security_state =
+		ffa_get_memory_security_attr(memory_region->attributes);
+	if (security_state != FFA_MEMORY_SECURITY_UNSPECIFIED) {
+		dlog_verbose(
+			"Invalid security state for memory share operation.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -1914,6 +1924,7 @@ static struct ffa_value ffa_memory_retrieve_validate(
 	ffa_memory_region_flags_t transaction_type =
 		retrieve_request->flags &
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK;
+	enum ffa_memory_security security_state;
 
 	assert(retrieve_request != NULL);
 	assert(memory_region != NULL);
@@ -2001,6 +2012,16 @@ static struct ffa_value ffa_memory_retrieve_validate(
 			"Borrower needs memory cleared. Sender needs to set "
 			"flag for clearing memory.\n");
 		return ffa_error(FFA_DENIED);
+	}
+
+	/* Memory region attributes NS-Bit MBZ for FFA_MEM_RETRIEVE_REQ. */
+	security_state =
+		ffa_get_memory_security_attr(retrieve_request->attributes);
+	if (security_state != FFA_MEMORY_SECURITY_UNSPECIFIED) {
+		dlog_verbose(
+			"Invalid security state for memory retrieve request "
+			"operation.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
