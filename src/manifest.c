@@ -662,7 +662,7 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	dlog_verbose("  Total %u device regions found\n",
 		     vm->partition.dev_region_count);
 
-	return MANIFEST_SUCCESS;
+	return sanity_check_ffa_manifest(vm);
 }
 
 enum manifest_return_code sanity_check_ffa_manifest(struct manifest_vm *vm)
@@ -832,6 +832,8 @@ static enum manifest_return_code parse_ffa_partition_package(
 
 	ret = parse_ffa_manifest(&sp_fdt, vm);
 	if (ret != MANIFEST_SUCCESS) {
+		dlog_error("Error parsing partition manifest: %s.\n",
+			   manifest_strerror(ret));
 		goto exit_unmap;
 	}
 
@@ -841,8 +843,6 @@ static enum manifest_return_code parse_ffa_partition_package(
 			" from specified in partition's package.\n");
 		vm->partition.load_addr = sp_pkg_addr;
 	}
-
-	ret = sanity_check_ffa_manifest(vm);
 
 exit_unmap:
 	CHECK(mm_unmap(stage1_locked, sp_pkg_start, sp_pkg_end, ppool));
