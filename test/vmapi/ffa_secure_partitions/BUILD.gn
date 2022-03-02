@@ -54,6 +54,8 @@ manifest("partition_manifest_service_sp_second") {
 
 partition_package("service_sp_second_package") {
   testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
   files = [ [
         "partition_manifest_service_sp_second.dtb",
         "secure_partitions_services.bin",
@@ -65,6 +67,8 @@ partition_package("service_sp_second_package") {
 
 partition_package("service_sp_first_package") {
   testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
   files = [ [
         "partition_manifest_service_sp_first.dtb",
         "secure_partitions_services.bin",
@@ -81,6 +85,8 @@ manifest("vm_primary_manifest") {
 
 partition_package("vm_primary_test_package") {
   testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
   files = [ [
         "partition_manifest_nwd_primary.dtb",
         "vm_primary.bin",
@@ -106,6 +112,8 @@ manifest("partition_manifest_service_sp_second_el0") {
 
 partition_package("service_sp_second_el0_package") {
   testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
   files = [ [
         "partition_manifest_service_sp_second_el0.dtb",
         "sel0_partition.bin",

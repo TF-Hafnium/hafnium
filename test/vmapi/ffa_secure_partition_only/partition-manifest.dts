@@ -19,7 +19,7 @@
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6280000>;
-	entrypoint-offset = <0x1000>;
+	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0>; /* Direct messaging only */
 

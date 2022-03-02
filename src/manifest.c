@@ -797,14 +797,9 @@ static enum manifest_return_code parse_ffa_partition_package(
 		goto exit_unmap;
 	}
 
-	/* Expect DTB to immediately follow header */
-	if (sp_pkg->pm_offset != sizeof(struct sp_pkg_header)) {
-		dlog_error("Invalid package manifest offset.\n");
-		goto exit_unmap;
-	}
+	/* TODO: Do not map 2 pages. */
+	sp_header_dtb_size = align_up(sp_pkg->pm_size, 2 * PAGE_SIZE);
 
-	sp_header_dtb_size = align_up(
-		sp_pkg->pm_size + sizeof(struct sp_pkg_header), PAGE_SIZE);
 	if ((vm_id != HF_PRIMARY_VM_ID) &&
 	    (sp_header_dtb_size >= vm->secondary.mem_size)) {
 		dlog_error("Invalid package header or DT size.\n");

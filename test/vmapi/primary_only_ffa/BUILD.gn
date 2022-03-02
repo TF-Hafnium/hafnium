@@ -28,6 +28,8 @@ manifest("primary_only_ffa_partition_manifest") {
 
 partition_package("primary_only_ffa_test_package") {
   testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
   files = [ [
         "partition-manifest.dtb",
         "primary_only_test_vm.bin",

@@ -28,6 +28,8 @@ manifest("ffa_secure_partition_only_partition_manifest") {
 
 partition_package("ffa_secure_partition_only_test_package") {
   testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
   files = [ [
         "partition-manifest.dtb",
         "secure_partition_test_vm.bin",

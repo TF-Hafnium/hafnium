@@ -19,7 +19,7 @@
 	exception-level = <0>; /* EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x90000000>;
-	entrypoint-offset = <0x1000>;
+	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0x3>; /* Supports sending/receiving direct requests. */
 	notification-support; /* Receipt of notifications. */

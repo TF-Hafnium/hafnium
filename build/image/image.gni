@@ -364,7 +364,7 @@ template("partition_package") {
 
   action(target_name) {
     forward_variables_from(invoker, [ "testonly" ])
-    script = "//build/image/generate_partition_image.py"
+    script = "//build/image/sptool.py"
 
     output_package = "${base_out_dir}/${invoker.output}"
 
@@ -385,6 +385,13 @@ template("partition_package") {
         rebase_path(output_package),
       ]
     }
+
+    args += [
+      "--pm-offset",
+      "${invoker.pm_offset}",
+      "--img-offset",
+      "${invoker.img_offset}",
+    ]
 
     outputs = [
       output_package,
