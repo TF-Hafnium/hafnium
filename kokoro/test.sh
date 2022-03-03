@@ -95,8 +95,6 @@ CPUS=("")
 if [ $RUN_ALL_QEMU_CPUS == true ]
 then
   CPUS=("cortex-a53" "max")
-  # cortext-a53 does not have support for ARMv8.1
-  USE_VHE=false
 fi
 
 for CPU in "${CPUS[@]}"
@@ -138,7 +136,8 @@ do
                        --force-long-running --vm_args "rdinit=/test_binary --"
   fi
 
-  if [ $USE_VHE == true ]
+  # For VHE EL0 test cases, omit cortex-a53 as it doesn't support ARMv8.1.
+  if [ $USE_VHE == true ] && [ $CPU == "max" ]
   then
     "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
                        --initrd test/vmapi/el0_partitions/el0_partitions_test
