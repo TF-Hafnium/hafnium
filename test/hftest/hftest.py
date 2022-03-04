@@ -375,6 +375,9 @@ class FvpDriver(Driver, ABC):
             "-C", "cluster1.restriction_on_speculative_execution=2",
             "-C", "cluster0.restriction_on_speculative_execution_aarch32=2",
             "-C", "cluster1.restriction_on_speculative_execution_aarch32=2",
+            "-C", "cluster0.memory_tagging_support_level=2",
+            "-C", "cluster1.memory_tagging_support_level=2",
+            "-C", "bp.dram_metadata.is_enabled=1",
         ]
 
         if uart0_log_path and uart1_log_path:
