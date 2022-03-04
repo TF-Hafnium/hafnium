@@ -11,6 +11,8 @@
 #include <stdatomic.h>
 #include <stdint.h>
 
+#include "hf/arch/init.h"
+
 #include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
@@ -1110,6 +1112,8 @@ bool mm_init(struct mpool *ppool)
 		  pa_addr(layout_rodata_end()));
 	dlog_info("data: %#x - %#x\n", pa_addr(layout_data_begin()),
 		  pa_addr(layout_data_end()));
+	dlog_info("stacks: %#x - %#x\n", pa_addr(layout_stacks_begin()),
+		  pa_addr(layout_stacks_end()));
 
 	/* ASID 0 is reserved for use by the hypervisor. */
 	if (!mm_ptable_init(&ptable, 0, MM_FLAG_STAGE1, ppool)) {
@@ -1134,6 +1138,9 @@ bool mm_init(struct mpool *ppool)
 
 	mm_identity_map(stage1_locked, layout_data_begin(), layout_data_end(),
 			MM_MODE_R | MM_MODE_W, ppool);
+
+	/* Arch-specific stack mapping. */
+	arch_stack_mm_init(stage1_locked, ppool);
 
 	return true;
 }

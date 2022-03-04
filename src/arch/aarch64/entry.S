@@ -72,5 +72,18 @@ entry:
 	stp xzr, xzr, [x29], #16
 	b 3b
 
+	/* Zero out the stack section. */
+4:	adrp x29, stacks_begin
+	add x29, x29, :lo12:stacks_begin
+
+	adrp x30, stacks_end
+	add x30, x30, :lo12:stacks_end
+
+5:	cmp x29, x30
+	b.hs 6f
+
+	stp xzr, xzr, [x29], #16
+	b 5b
+
 	/* Branch to the entry point for the specific image. */
-4:	b image_entry
+6:	b image_entry

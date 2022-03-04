@@ -18,6 +18,8 @@
 
 #include "vmapi/hf/call.h"
 
+#include "system/sys/cdefs.h"
+
 #define STACK_SIZE PAGE_SIZE
 
 /**
@@ -28,7 +30,8 @@
  * happen, there may be coherency problems when the stack is being used before
  * caching is enabled.
  */
-alignas(PAGE_SIZE) static char callstacks[MAX_CPUS][STACK_SIZE];
+alignas(PAGE_SIZE) static char callstacks[MAX_CPUS][STACK_SIZE] __section(
+		.stacks);
 
 /* NOLINTNEXTLINE(misc-redundant-expression) */
 static_assert((STACK_SIZE % PAGE_SIZE) == 0, "Keep each stack page aligned.");

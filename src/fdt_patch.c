@@ -121,6 +121,8 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	rsv &= add_mem_reservation(fdt, layout_rodata_begin(),
 				   layout_rodata_end());
 	rsv &= add_mem_reservation(fdt, layout_data_begin(), layout_data_end());
+	rsv &= add_mem_reservation(fdt, layout_stacks_begin(),
+				   layout_stacks_end());
 
 	/* Patch FDT to reserve memory for secondary VMs. */
 	for (i = 0; i < p->reserved_ranges_count; ++i) {

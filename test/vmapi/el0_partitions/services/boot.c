@@ -27,6 +27,8 @@ extern uint8_t volatile rodata_begin[];
 extern uint8_t volatile rodata_end[];
 extern uint8_t volatile data_begin[];
 extern uint8_t volatile data_end[];
+extern uint8_t volatile stacks_begin[];
+extern uint8_t volatile stacks_end[];
 extern uint8_t volatile image_end[];
 
 TEST_SERVICE(boot_memory)
@@ -125,6 +127,18 @@ TEST_SERVICE(ffa_mem_perm_get)
 		num_pages--;
 	}
 	EXPECT_EQ(num_ro_pages_in_data, 1);
+
+	num_pages =
+		align_up((stacks_end - stacks_begin), PAGE_SIZE) / PAGE_SIZE;
+	base_va = (uint64_t)align_down(stacks_begin, PAGE_SIZE);
+
+	while (num_pages) {
+		struct ffa_value res = ffa_mem_perm_get(base_va);
+		EXPECT_EQ(res.func, FFA_SUCCESS_32);
+		EXPECT_EQ(res.arg2, FFA_MEM_PERM_RW);
+		base_va += PAGE_SIZE;
+		num_pages--;
+	}
 
 	num_pages = align_up((image_end - data_end), PAGE_SIZE) / PAGE_SIZE;
 	base_va = (uint64_t)align_down(data_end, PAGE_SIZE);

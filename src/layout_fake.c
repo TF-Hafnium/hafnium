@@ -43,6 +43,16 @@ paddr_t layout_image_end(void)
 	return pa_init(600);
 }
 
+paddr_t layout_stacks_begin(void)
+{
+	return pa_init(700);
+}
+
+paddr_t layout_stacks_end(void)
+{
+	return pa_init(700);
+}
+
 paddr_t layout_primary_begin(void)
 {
 	return pa_init(0x80000);

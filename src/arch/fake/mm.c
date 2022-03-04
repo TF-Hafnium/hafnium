@@ -167,6 +167,13 @@ uint32_t arch_mm_stage1_attrs_to_mode(uint64_t attrs)
 	return attrs >> PTE_ATTR_MODE_SHIFT;
 }
 
+void arch_stack_mm_init(struct mm_stage1_locked stage1_locked,
+			struct mpool *ppool)
+{
+	(void)stage1_locked;
+	(void)ppool;
+}
+
 bool arch_mm_init(paddr_t table)
 {
 	/* No initialization required. */

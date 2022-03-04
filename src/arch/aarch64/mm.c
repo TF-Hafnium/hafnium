@@ -50,6 +50,7 @@
 
 #define STAGE1_DEVICEINDX UINT64_C(0)
 #define STAGE1_NORMALINDX UINT64_C(1)
+#define STAGE1_STACKINDX UINT64_C(2)
 
 #define STAGE2_XN(x)      ((x) << 53)
 #define STAGE2_CONTIGUOUS (UINT64_C(1) << 52)
@@ -506,6 +507,8 @@ uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode)
 	/* Define the memory attribute bits. */
 	if (mode & MM_MODE_D) {
 		attrs |= STAGE1_ATTRINDX(STAGE1_DEVICEINDX);
+	} else if (mode & MM_MODE_T) {
+		attrs |= STAGE1_ATTRINDX(STAGE1_STACKINDX);
 	} else {
 		attrs |= STAGE1_ATTRINDX(STAGE1_NORMALINDX);
 	}

@@ -126,7 +126,7 @@ SECTIONS
 	. = ALIGN(4096);
 	data_begin = .;
 	.data : {
-		*(.data)
+		*(.data*)
 	}
 	/*
 	 * Global offset table used for relocations. This is where relocation
@@ -156,6 +156,12 @@ SECTIONS
 	data_size = ABSOLUTE(. - data_begin);
 	. = ALIGN(4096);
 	data_end = .;
+
+	.stacks : {
+		stacks_begin = .;
+		*(.stacks)
+		stacks_end = .;
+	}
 
 	/*
 	 * Remove unused sections from the image.

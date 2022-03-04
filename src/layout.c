@@ -71,6 +71,26 @@ paddr_t layout_data_end(void)
 }
 
 /**
+ * Get the address the .stacks section begins at.
+ */
+paddr_t layout_stacks_begin(void)
+{
+	extern uint8_t stacks_begin[];
+
+	return pa_init((uintpaddr_t)stacks_begin);
+}
+
+/**
+ * Get the address the .stacks section ends at.
+ */
+paddr_t layout_stacks_end(void)
+{
+	extern uint8_t stacks_end[];
+
+	return pa_init((uintpaddr_t)stacks_end);
+}
+
+/**
  * Get the address the .initrd section begins at.
  */
 paddr_t layout_initrd_begin(void)

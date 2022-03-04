@@ -368,6 +368,8 @@ bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool)
 	       vm_unmap(vm_locked, layout_rodata_begin(), layout_rodata_end(),
 			ppool) &&
 	       vm_unmap(vm_locked, layout_data_begin(), layout_data_end(),
+			ppool) &&
+	       vm_unmap(vm_locked, layout_stacks_begin(), layout_stacks_end(),
 			ppool);
 }
 

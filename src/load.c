@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 
+#include "hf/arch/init.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/vm.h"
@@ -690,6 +691,10 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		CHECK(vm_identity_map(vm_locked, layout_data_begin(),
 				      layout_data_end(), MM_MODE_R | MM_MODE_W,
 				      ppool, NULL));
+
+		CHECK(arch_stack_mm_init(mm_lock_ptable_unsafe(&vm->ptable),
+					 ppool));
+
 		plat_console_mm_init(mm_lock_ptable_unsafe(&vm->ptable), ppool);
 	}
 
