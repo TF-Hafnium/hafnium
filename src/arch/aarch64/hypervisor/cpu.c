@@ -201,5 +201,6 @@ void arch_cpu_init(struct cpu *c, ipaddr_t entry_point)
 	/* Initialize counter-timer virtual offset register to 0. */
 	write_msr(CNTVOFF_EL2, 0);
 
+	isb();
 	plat_interrupts_controller_hw_init(c);
 }
