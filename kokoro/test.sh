@@ -137,7 +137,7 @@ do
   fi
 
   # For VHE EL0 test cases, omit cortex-a53 as it doesn't support ARMv8.1.
-  if [ $USE_VHE == true ] && [ $CPU == "max" ]
+  if [ $USE_VHE == true ] && [ "$CPU" != "cortex-a53" ]
   then
     "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
                        --initrd test/vmapi/el0_partitions/el0_partitions_test
