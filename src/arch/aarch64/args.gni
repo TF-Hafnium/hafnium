@@ -22,4 +22,6 @@ declare_args() {
   secure_world = "0"
 
   enable_vhe = "0"
+
+  enable_mte = "0"
 }

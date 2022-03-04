@@ -16,6 +16,18 @@
 	orr \reg1, \reg2, \reg1, lsl #32
 .endm
 
+.macro init_stack_zero_tag
+#if ENABLE_MTE
+	mov x1, sp
+	/* TODO: assume stack size is one page. */
+	sub x2, x1, #4096
+	/* Assume 16 bytes tag granule size. */
+0:	stz2g x2, [x2], #32
+	cmp x2, x1
+	bne 0b
+#endif
+.endm
+
 /**
  * Called only on first boot after the image has been relocated and BSS zeroed.
  *
@@ -71,8 +83,30 @@ image_entry:
 	stp	x0, x1, [x2]
 #endif
 
+#if ENABLE_MTE
+	/* Expect at least MTE level 2. */
+	mrs	x1, id_aa64pfr1_el1
+	ubfx	x1, x1, #8, #4
+	cmp	x1, #2
+	bcc	.
+
+	/* Get a random number to use as a seed for MTE tags. */
+	bl 	plat_prng_get_number
+	# Mask random RGSR_EL1 seed and tag field.
+	lsr	w0, w0, #8
+	bic	w0, w0, #0xf0
+	adrp	x2, mte_seed
+	add	x2, x2, :lo12: mte_seed
+	str	x0, [x2]
+	msr	rgsr_el1, x0
+	msr	gcr_el1, xzr
+#endif
+
 	/* Enable MMU and caches before running the rest of initialization. */
 	bl mm_enable
+
+	init_stack_zero_tag
+
 	bl one_time_init
 
 	/* Begin steady state operation. */
@@ -135,8 +169,27 @@ cpu_entry:
 	beq	.
 #endif
 
+#if ENABLE_MTE
+	/* Expect at least MTE level 2. */
+	mrs	x1, id_aa64pfr1_el1
+	ubfx	x1, x1, #8, #4
+	cmp	x1, #2
+	bcc	.
+
+	/* Feed previously generated MTE seed. */
+	adrp	x2, mte_seed
+	add	x2, x2, :lo12: mte_seed
+	ldr	x1, [x2]
+	msr	rgsr_el1, x1
+	# GCR_EL1.RRND=0: IRG generates a tag value as defined by RandomTag()
+	# GCR_EL1.Exclude=0x0000: none of allocation tag is excluded
+	msr	gcr_el1, xzr
+#endif
+
 	bl mm_enable
 	bl prepare_for_c
+
+	init_stack_zero_tag
 
 	/* Intentional fallthrough. */
 

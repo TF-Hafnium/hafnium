@@ -236,3 +236,18 @@
 	msr     APIAKEYHI_EL1, \reg2
 	isb
 .endm
+
+/**
+ * mte_restore_hypervisor_state
+ */
+.macro mte_restore_hypervisor_state reg1
+	adrp	\reg1, mte_seed
+	add	\reg1, \reg1, :lo12: mte_seed
+	ldr	\reg1, [\reg1]
+	msr     rgsr_el1, \reg1
+	msr     gcr_el1, xzr
+
+	/* Reset TCO on taking an exception. */
+	msr TCO, 0
+	isb
+.endm

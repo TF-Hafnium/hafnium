@@ -258,6 +258,16 @@
 #define HCR_EL2_TID5 (UINT64_C(0x1) << 58)
 
 /**
+ * Stage 1 translations are treated as Tagged.
+ */
+#define HCR_EL2_DCT (UINT64_C(0x1) << 57)
+
+/**
+ * Allocation tag access for MTE.
+ */
+#define HCR_EL2_ATA (UINT64_C(0x1) << 56)
+
+/**
  * Trap TLB maintenance instructions that operate on the Outer Shareable domain.
  */
 #define HCR_EL2_TTLBOS (UINT64_C(0x1) << 55)
@@ -548,6 +558,22 @@
  * Define configurations bits for the System Control Register (EL2), SCTLR_EL2.
  * See Arm Architecture Reference Manual, D13.2.106.
  */
+
+/**
+ * When SCTLR_EL3.ATA is 1, controls EL2 access to Allocation Tags.
+ */
+#define SCTLR_EL2_ATA (UINT64_C(0x1) << 43)
+
+/**
+ * When SCTLR_EL3.ATA0 is 1, controls EL0 access to Allocation Tags.
+ */
+#define SCTLR_EL2_ATA0 (UINT64_C(0x1) << 42)
+
+/**
+ * SCTLR_EL2.TCF controls the effect of Tag Check Faults in EL2.
+ */
+#define SCTLR_EL2_TCF_SHIFT (40)
+#define SCTLR_EL2_TCF_MASK (UINT64_C(0x3))
 
 /**
  * When FEAT_BTI is implemented, BT bit set, and PE executing at EL2

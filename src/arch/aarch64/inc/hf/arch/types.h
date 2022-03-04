@@ -165,4 +165,14 @@ struct arch_regs {
 		uintreg_t apgakeyhi_el1;
 	} pac;
 #endif
+
+#if ENABLE_MTE
+	/* MTE registers. */
+	struct {
+		uintreg_t tfsr_el1;
+		uintreg_t gcr_el1;
+		uintreg_t rgsr_el1;
+		uintreg_t tfsre0_el1;
+	} mte;
+#endif
 };

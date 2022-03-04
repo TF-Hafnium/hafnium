@@ -56,6 +56,14 @@ uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id, bool is_el0_partition)
 	 */
 	hcr_el2_value |= HCR_EL2_PTW;
 
+#if ENABLE_MTE
+	/* Allow access to MTE allocation tags. */
+	hcr_el2_value |= HCR_EL2_ATA;
+
+	/* Do not trap access to group 5 for MTE. */
+	hcr_el2_value &= ~HCR_EL2_TID5;
+#endif
+
 	/* Enable stage 2 address translation;*/
 	hcr_el2_value |= HCR_EL2_VM;
 
@@ -170,6 +178,14 @@ uintreg_t get_sctlr_el2_value(void)
 	sctlr_el2_value |= SCTLR_EL2_SA;
 	sctlr_el2_value |= SCTLR_EL2_I;
 	sctlr_el2_value |= SCTLR_EL2_WXN;
+
+#if ENABLE_MTE
+	/* Allow access to Allocations tags at EL2 */
+	sctlr_el2_value |= SCTLR_EL2_ATA;
+
+	/* Tag Check Faults in EL2 cause precise synchronous exceptions. */
+	sctlr_el2_value |= ((SCTLR_EL2_TCF_MASK & 1) << SCTLR_EL2_TCF_SHIFT);
+#endif
 
 #if BRANCH_PROTECTION
 	/* Enable pointer authentication for instructions. */

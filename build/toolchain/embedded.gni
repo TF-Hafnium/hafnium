@@ -299,6 +299,12 @@ template("aarch64_common_toolchain") {
       }
       forward_variables_from(invoker.toolchain_args, "*")
     }
+
+    if (defined(toolchain_args.enable_mte)) {
+      extra_cflags += " -march=armv8.5-a+memtag"
+      extra_cflags += " -fsanitize=memtag"
+      extra_defines += " -DENABLE_MTE"
+    }
   }
 }
 
@@ -334,6 +340,7 @@ template("aarch64_toolchains") {
 
     # Add a macro so files can tell whether they are not being built for a VM.
     extra_defines = " -DVM_TOOLCHAIN=0"
+    extra_cflags = " -mgeneral-regs-only"
   }
 
   # Toolchain for building test VMs which run under Hafnium.

@@ -26,6 +26,10 @@ DEFINE_OFFSETOF(VCPU_FPSR, struct vcpu, regs.fpsr)
 DEFINE_OFFSETOF(VCPU_PAC, struct vcpu, regs.pac)
 #endif
 
+#if ENABLE_MTE
+DEFINE_OFFSETOF(VCPU_MTE, struct vcpu, regs.mte)
+#endif
+
 DEFINE_OFFSETOF(VM_ID, struct vm, id)
 
 #if GIC_VERSION == 3 || GIC_VERSION == 4

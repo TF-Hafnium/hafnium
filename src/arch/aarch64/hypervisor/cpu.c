@@ -32,6 +32,13 @@ __uint128_t pauth_apia_key;
 
 #endif
 
+#if ENABLE_MTE
+
+/* MTE hypervisor seed. */
+uintptr_t mte_seed;
+
+#endif
+
 /**
  * The LO field indicates whether LORegions are supported.
  */

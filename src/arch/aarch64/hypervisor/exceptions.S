@@ -75,6 +75,10 @@
 	bl pauth_save_vcpu_and_restore_hyp_key
 #endif
 
+#if ENABLE_MTE
+	bl mte_save_vcpu_and_restore_hyp_state
+#endif
+
 	/* Call C handler. */
 	bl \handler
 
@@ -99,6 +103,10 @@
 #if BRANCH_PROTECTION
 	/* NOTE: x18 still holds pointer to current vCPU. */
 	bl pauth_save_vcpu_and_restore_hyp_key
+#endif
+
+#if ENABLE_MTE
+	bl mte_save_vcpu_and_restore_hyp_state
 #endif
 
 	/* Extract the exception class (EC) from exception syndrome register. */
@@ -206,13 +214,31 @@ pauth_save_vcpu_and_restore_hyp_key:
 	 * Save APIA key for the vCPU as Hypervisor replaces it with its
 	 * own key. Other vCPU PAuth keys are taken care in vcpu_switch.
 	 */
-	mrs     x0, APIAKEYLO_EL1
-	mrs     x1, APIAKEYHI_EL1
-	add	x18, x18, #VCPU_PAC
-	stp	x0, x1, [x18]
+	add	x0, x18, #VCPU_PAC
+	mrs     x1, APIAKEYLO_EL1
+	mrs     x2, APIAKEYHI_EL1
+	stp	x1, x2, [x0]
 
 	/* Restore Hypervisor APIA key. */
 	pauth_restore_hypervisor_key x0 x1
+	ret
+#endif
+
+/**
+ * mte_save_vcpu_and_restore_hyp_state
+ */
+#if ENABLE_MTE
+mte_save_vcpu_and_restore_hyp_state:
+	add	x0, x18, #VCPU_MTE
+	mrs	x1, tfsr_el1
+	mrs	x2, gcr_el1
+	mrs	x3, rgsr_el1
+	mrs	x4, tfsre0_el1
+	stp	x1, x2, [x0], #16
+	stp	x3, x4, [x0]
+
+	mte_restore_hypervisor_state x0
+
 	ret
 #endif
 
@@ -507,6 +533,14 @@ sve_skip_context_restore:
 	/* Omit ISB as SMC following is a context synchronizing event. */
 #endif
 
+#if ENABLE_MTE
+	/* Clearing MTE context. */
+	msr rgsr_el1, xzr
+	msr tfsr_el1, xzr
+	msr tfsr_el2, xzr
+	msr tfsre0_el1, xzr
+#endif
+
 	smc #0
 
 	/*
@@ -559,6 +593,10 @@ sve_skip_context_save:
 
 #if BRANCH_PROTECTION
 	pauth_restore_hypervisor_key x0 x1
+#endif
+
+#if ENABLE_MTE
+	mte_restore_hypervisor_state x0
 #endif
 
 	/*
@@ -803,6 +841,18 @@ vcpu_restore_volatile_and_run:
 	/* Restore vCPU APIA key. */
 	msr     APIAKEYLO_EL1, x1
 	msr     APIAKEYHI_EL1, x2
+	/* Omit ISB as ERET following is a context synchronizing event. */
+#endif
+
+#if ENABLE_MTE
+	/* Restore vCPU MTE state. */
+	add	x1, x0, #VCPU_MTE
+	ldp	x2, x3, [x1], #16
+	msr	tfsr_el1, x2
+	msr	gcr_el1, x3
+	ldp	x2, x3, [x1]
+	msr	rgsr_el1, x2
+	msr	tfsre0_el1, x3
 	/* Omit ISB as ERET following is a context synchronizing event. */
 #endif
 
