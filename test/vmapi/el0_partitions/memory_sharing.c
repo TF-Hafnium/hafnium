@@ -2093,8 +2093,7 @@ TEST(memory_sharing, ffa_validate_attributes)
 		for (uint32_t j = 0; j < ARRAY_SIZE(send_function); j++) {
 			ret = send_function[j](msg_size, msg_size);
 			EXPECT_EQ(ret.func, FFA_ERROR_32);
-			EXPECT_TRUE(ffa_error_code(ret) ==
-				    FFA_INVALID_PARAMETERS);
+			EXPECT_TRUE(ffa_error_code(ret) == FFA_DENIED);
 		}
 	}
 }
@@ -2182,8 +2181,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_attributes)
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 
-	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail_invalid_parameters",
-		       mb.send);
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail", mb.send);
 
 	struct {
 		enum ffa_memory_type memory_type;
