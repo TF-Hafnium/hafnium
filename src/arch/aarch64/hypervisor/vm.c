@@ -148,13 +148,13 @@ void arch_vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
 	if (vm_locked.vm->el0_partition) {
 		mm_stage1_defrag(&vm_locked.vm->ptable, ppool);
 	} else {
-		mm_vm_defrag(&vm_locked.vm->ptable, ppool);
+		mm_vm_defrag(&vm_locked.vm->ptable, ppool, false);
 #if SECURE_WORLD == 1
 		/*
 		 * TODO: check if this can be better optimized (pass the
-		 * security state ?).
+		 * security state?).
 		 */
-		mm_vm_defrag(&vm_locked.vm->arch.ptable_ns, ppool);
+		mm_vm_defrag(&vm_locked.vm->arch.ptable_ns, ppool, true);
 #endif
 	}
 }

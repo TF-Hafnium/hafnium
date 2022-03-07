@@ -110,7 +110,7 @@ void arch_mm_invalidate_stage1_range(uint16_t asid, vaddr_t va_begin,
 }
 
 void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
-				     ipaddr_t va_end)
+				     ipaddr_t va_end, bool non_secure)
 {
 	/* There's no modelling of the stage-2 TLB. */
 }

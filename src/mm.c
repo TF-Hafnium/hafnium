@@ -161,14 +161,14 @@ static uint8_t mm_root_table_count(int flags)
  * Invalidates the TLB for the given address range.
  */
 static void mm_invalidate_tlb(ptable_addr_t begin, ptable_addr_t end, int flags,
-			      uint16_t id)
+			      uint16_t id, bool non_secure)
 {
 	if (flags & MM_FLAG_STAGE1) {
 		arch_mm_invalidate_stage1_range(id, va_init(begin),
 						va_init(end));
 	} else {
 		arch_mm_invalidate_stage2_range(id, ipa_init(begin),
-						ipa_init(end));
+						ipa_init(end), non_secure);
 	}
 }
 
@@ -268,7 +268,7 @@ static void mm_ptable_fini(struct mm_ptable *t, int flags, struct mpool *ppool)
  */
 static void mm_replace_entry(ptable_addr_t begin, pte_t *pte, pte_t new_pte,
 			     uint8_t level, int flags, struct mpool *ppool,
-			     uint16_t id)
+			     uint16_t id, bool non_secure)
 {
 	pte_t v = *pte;
 
@@ -280,7 +280,7 @@ static void mm_replace_entry(ptable_addr_t begin, pte_t *pte, pte_t new_pte,
 	    arch_mm_pte_is_valid(v, level)) {
 		*pte = arch_mm_absent_pte(level);
 		mm_invalidate_tlb(begin, begin + mm_entry_size(level), flags,
-				  id);
+				  id, non_secure);
 	}
 
 	/* Assign the new pte. */
@@ -300,7 +300,7 @@ static struct mm_page_table *mm_populate_table_pte(ptable_addr_t begin,
 						   pte_t *pte, uint8_t level,
 						   int flags,
 						   struct mpool *ppool,
-						   uint16_t id)
+						   uint16_t id, bool non_secure)
 {
 	struct mm_page_table *ntable;
 	pte_t v = *pte;
@@ -344,7 +344,7 @@ static struct mm_page_table *mm_populate_table_pte(ptable_addr_t begin,
 	/* Replace the pte entry, doing a break-before-make if needed. */
 	mm_replace_entry(begin, pte,
 			 arch_mm_table_pte(level, pa_init((uintpaddr_t)ntable)),
-			 level, flags, ppool, id);
+			 level, flags, ppool, id, non_secure);
 
 	return ntable;
 }
@@ -399,7 +399,8 @@ static bool mm_map_level(ptable_addr_t begin, ptable_addr_t end, paddr_t pa,
 					      : arch_mm_block_pte(level, pa,
 								  attrs);
 				mm_replace_entry(begin, pte, new_pte, level,
-						 flags, ppool, id);
+						 flags, ppool, id,
+						 (attrs & (1ULL << 57)) != 0);
 			}
 		} else {
 			/*
@@ -407,7 +408,8 @@ static bool mm_map_level(ptable_addr_t begin, ptable_addr_t end, paddr_t pa,
 			 * replace it with an equivalent subtable and get that.
 			 */
 			struct mm_page_table *nt = mm_populate_table_pte(
-				begin, pte, level, flags, ppool, id);
+				begin, pte, level, flags, ppool, id,
+				(attrs & (1ULL << 57)) != 0);
 			if (nt == NULL) {
 				return false;
 			}
@@ -639,7 +641,8 @@ static pte_t mm_merge_table_pte(pte_t table_pte, uint8_t level)
 // NOLINTNEXTLINE(misc-no-recursion)
 static void mm_ptable_defrag_entry(ptable_addr_t base_addr, pte_t *entry,
 				   uint8_t level, int flags,
-				   struct mpool *ppool, uint16_t id)
+				   struct mpool *ppool, uint16_t id,
+				   bool non_secure)
 {
 	struct mm_page_table *table;
 	uint64_t i;
@@ -658,7 +661,7 @@ static void mm_ptable_defrag_entry(ptable_addr_t base_addr, pte_t *entry,
 	static_assert(MM_PTE_PER_PAGE >= 1, "There must be at least one PTE.");
 
 	mm_ptable_defrag_entry(base_addr, &(table->entries[0]), level - 1,
-			       flags, ppool, id);
+			       flags, ppool, id, non_secure);
 
 	base_present = arch_mm_pte_is_present(table->entries[0], level - 1);
 	base_attrs = arch_mm_pte_attrs(table->entries[0], level - 1);
@@ -676,7 +679,7 @@ static void mm_ptable_defrag_entry(ptable_addr_t base_addr, pte_t *entry,
 			base_addr + (i * mm_entry_size(level - 1));
 
 		mm_ptable_defrag_entry(block_addr, &(table->entries[i]),
-				       level - 1, flags, ppool, id);
+				       level - 1, flags, ppool, id, non_secure);
 
 		present = arch_mm_pte_is_present(table->entries[i], level - 1);
 
@@ -707,8 +710,8 @@ static void mm_ptable_defrag_entry(ptable_addr_t base_addr, pte_t *entry,
 
 	new_entry = mm_merge_table_pte(*entry, level);
 	if (*entry != new_entry) {
-		mm_replace_entry(base_addr, entry, new_entry, level, flags,
-				 ppool, id);
+		mm_replace_entry(base_addr, entry, (uintptr_t)new_entry, level,
+				 flags, ppool, id, non_secure);
 	}
 }
 
@@ -717,7 +720,7 @@ static void mm_ptable_defrag_entry(ptable_addr_t base_addr, pte_t *entry,
  * blocks whenever possible.
  */
 static void mm_ptable_defrag(struct mm_ptable *t, int flags,
-			     struct mpool *ppool)
+			     struct mpool *ppool, bool non_secure)
 {
 	struct mm_page_table *tables = mm_page_table_from_pa(t->root);
 	uint8_t level = mm_max_level(flags);
@@ -734,7 +737,7 @@ static void mm_ptable_defrag(struct mm_ptable *t, int flags,
 		for (j = 0; j < MM_PTE_PER_PAGE; ++j) {
 			mm_ptable_defrag_entry(block_addr,
 					       &(tables[i].entries[j]), level,
-					       flags, ppool, t->id);
+					       flags, ppool, t->id, non_secure);
 			block_addr = mm_start_of_next_block(
 				block_addr, mm_entry_size(level));
 		}
@@ -984,15 +987,15 @@ void mm_vm_dump(struct mm_ptable *t)
  */
 void mm_stage1_defrag(struct mm_ptable *t, struct mpool *ppool)
 {
-	mm_ptable_defrag(t, MM_FLAG_STAGE1, ppool);
+	mm_ptable_defrag(t, MM_FLAG_STAGE1, ppool, false);
 }
 
 /**
  * Defragments the VM page table.
  */
-void mm_vm_defrag(struct mm_ptable *t, struct mpool *ppool)
+void mm_vm_defrag(struct mm_ptable *t, struct mpool *ppool, bool non_secure)
 {
-	mm_ptable_defrag(t, 0, ppool);
+	mm_ptable_defrag(t, 0, ppool, non_secure);
 }
 
 /**
@@ -1095,7 +1098,7 @@ bool mm_unmap(struct mm_stage1_locked stage1_locked, paddr_t begin, paddr_t end,
  */
 void mm_defrag(struct mm_stage1_locked stage1_locked, struct mpool *ppool)
 {
-	mm_ptable_defrag(stage1_locked.ptable, MM_FLAG_STAGE1, ppool);
+	mm_ptable_defrag(stage1_locked.ptable, MM_FLAG_STAGE1, ppool, false);
 }
 
 /**

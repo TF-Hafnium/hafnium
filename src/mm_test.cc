@@ -1106,7 +1106,7 @@ TEST_F(mm, defrag_empty)
 {
 	struct mm_ptable ptable;
 	ASSERT_TRUE(mm_vm_init(&ptable, 0, &ppool));
-	mm_vm_defrag(&ptable, &ppool);
+	mm_vm_defrag(&ptable, &ppool, false);
 	EXPECT_THAT(
 		get_ptable(ptable),
 		AllOf(SizeIs(4), Each(Each(arch_mm_absent_pte(TOP_LEVEL)))));
@@ -1132,7 +1132,7 @@ TEST_F(mm, defrag_empty_subtables)
 				       nullptr));
 	ASSERT_TRUE(mm_vm_unmap(&ptable, l0_begin, l0_end, &ppool));
 	ASSERT_TRUE(mm_vm_unmap(&ptable, l1_begin, l1_end, &ppool));
-	mm_vm_defrag(&ptable, &ppool);
+	mm_vm_defrag(&ptable, &ppool, false);
 	EXPECT_THAT(
 		get_ptable(ptable),
 		AllOf(SizeIs(4), Each(Each(arch_mm_absent_pte(TOP_LEVEL)))));
@@ -1158,7 +1158,7 @@ TEST_F(mm, defrag_block_subtables)
 				       nullptr));
 	ASSERT_TRUE(mm_vm_identity_map(&ptable, middle, end, mode, &ppool,
 				       nullptr));
-	mm_vm_defrag(&ptable, &ppool);
+	mm_vm_defrag(&ptable, &ppool, false);
 	EXPECT_THAT(
 		get_ptable(ptable),
 		AllOf(SizeIs(4), Each(Each(Truly(std::bind(arch_mm_pte_is_block,

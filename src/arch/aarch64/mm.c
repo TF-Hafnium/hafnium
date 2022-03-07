@@ -343,7 +343,7 @@ void arch_mm_invalidate_stage1_range(uint16_t asid, vaddr_t va_begin,
  * address range.
  */
 void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
-				     ipaddr_t va_end)
+				     ipaddr_t va_end, bool non_secure)
 {
 	uintpaddr_t begin = ipa_addr(va_begin);
 	uintpaddr_t end = ipa_addr(va_end);
@@ -388,6 +388,12 @@ void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
 		 */
 		for (it = begin; it < end;
 		     it += (UINT64_C(1) << (PAGE_BITS - 12))) {
+			(void)non_secure;
+#if SECURE_WORLD == 1
+			if (non_secure) {
+				it |= (1ULL << 63);
+			}
+#endif
 			tlbi_reg(ipas2e1is, it);
 		}
 
