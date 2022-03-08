@@ -115,7 +115,12 @@ void arch_regs_reset(struct vcpu *vcpu)
 		r->spsr = PSR_PE_MODE_EL0T;
 	} else {
 		r->ttbr0_el2 = read_msr(ttbr0_el2);
+		r->lazy.vtcr_el2 = arch_mm_get_vtcr_el2();
 		r->lazy.vttbr_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
+#if SECURE_WORLD == 1
+		r->lazy.vstcr_el2 = arch_mm_get_vstcr_el2();
+		r->lazy.vsttbr_el2 = pa_addr(table);
+#endif
 		r->lazy.vmpidr_el2 = vcpu_id;
 		/* Mask (disable) interrupts and run in EL1h mode. */
 		r->spsr = PSR_D | PSR_A | PSR_I | PSR_F | PSR_PE_MODE_EL1H;

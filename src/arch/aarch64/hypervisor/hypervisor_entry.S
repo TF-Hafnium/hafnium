@@ -191,27 +191,21 @@ mm_enable:
 	adrp x7, arch_mm_config
 	add x7, x7, :lo12:arch_mm_config
 
-	ldp x1, x2, [x7]
-	ldp x3, x4, [x7, #16]
-	ldp x5, x6, [x7, #32]
-	ldr x7, [x7, #48]
+	ldp x1, x2, [x7]	/* x1: ttbr0_el2, x2: mair_el2 */
+	ldp x3, x4, [x7, #16]	/* x3: tcr_el2, x4: sctlr_el2 */
+	ldp x5, xzr, [x7, #32]	/* x5: hcr_el2 */
 
 	/*
 	 * Set hcr_el2 before tcr_el2, since hcr_el2.e2h may be set, which changes
 	 * the definition of tcr_el2.
 	 */
-	msr hcr_el2, x7
+	msr hcr_el2, x5
 	isb
 
 	msr ttbr0_el2, x1
-	msr vtcr_el2, x2
 
-#if SECURE_WORLD == 1
-	msr MSR_VSTCR_EL2, x6
-#endif
-
-	msr mair_el2, x3
-	msr tcr_el2, x4
+	msr mair_el2, x2
+	msr tcr_el2, x3
 
 	/* Ensure everything before this point has completed. */
 	dsb sy
@@ -236,6 +230,6 @@ mm_enable:
 	 * Configure sctlr_el2 to enable MMU and cache and don't proceed until
 	 * this has completed.
 	 */
-	msr sctlr_el2, x5
+	msr sctlr_el2, x4
 	isb
 	ret

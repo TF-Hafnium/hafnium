@@ -184,3 +184,7 @@ void arch_mm_sync_table_writes(void);
  * Returns the maximum supported PA Range in bits.
  */
 uint32_t arch_mm_get_pa_range(void);
+
+uintptr_t arch_mm_get_vtcr_el2(void);
+
+uintptr_t arch_mm_get_vstcr_el2(void);

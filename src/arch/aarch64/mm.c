@@ -134,12 +134,12 @@
  */
 struct arch_mm_config {
 	uintreg_t ttbr0_el2;
-	uintreg_t vtcr_el2;
 	uintreg_t mair_el2;
 	uintreg_t tcr_el2;
 	uintreg_t sctlr_el2;
-	uintreg_t vstcr_el2;
 	uintreg_t hcr_el2;
+	uintreg_t vtcr_el2;
+	uintreg_t vstcr_el2;
 } arch_mm_config;
 
 static uint8_t mm_s1_max_level;
@@ -958,4 +958,14 @@ uint32_t arch_mm_get_pa_range(void)
 	static const uint32_t pa_bits_table[16] = {32, 36, 40, 42, 44, 48, 52};
 	uint64_t features = read_msr(id_aa64mmfr0_el1);
 	return pa_bits_table[features & 0xf];
+}
+
+uintptr_t arch_mm_get_vtcr_el2(void)
+{
+	return arch_mm_config.vtcr_el2;
+}
+
+uintptr_t arch_mm_get_vstcr_el2(void)
+{
+	return arch_mm_config.vstcr_el2;
 }
