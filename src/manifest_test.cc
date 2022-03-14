@@ -1116,6 +1116,12 @@ TEST(manifest, ffa_valid)
 				.Property("pages-count", "<4>")
 				.Property("attributes", "<3>")
 			.EndChild()
+			.StartChild("test-memory-ns")
+				.Description("test-memory")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<0xb>")
+			.EndChild()
 			.Label("rx")
 			.StartChild("rx")
 				.Description("rx-buffer")
@@ -1135,12 +1141,18 @@ TEST(manifest, ffa_valid)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device")
 				.Description("test-device")
-				.Property("base-address", "<0x7200000>")
+				.Property("base-address", "<0x7400000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 				.Property("smmu-id", "<1>")
 				.Property("stream-ids", "<0 1>")
 				.Property("interrupts", "<2 3>, <4 5>")
+			.EndChild()
+			.StartChild("test-device-ns")
+				.Description("test-device")
+				.Property("base-address", "<0x7500000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<0x9>")
 			.EndChild()
 		.EndChild()
 		.Build();
@@ -1164,6 +1176,7 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].partition.mem_regions[0].base_address, 0x7100000);
 	ASSERT_EQ(m.vm[0].partition.mem_regions[0].page_count, 4);
 	ASSERT_EQ(m.vm[0].partition.mem_regions[0].attributes, 3);
+	ASSERT_EQ(m.vm[0].partition.mem_regions[1].attributes, (8 | 3));
 	ASSERT_EQ(m.vm[0].partition.rxtx.available, true);
 	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->base_address, 0x7300000);
 	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->page_count, 1);
@@ -1171,11 +1184,10 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->base_address, 0x7310000);
 	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->page_count, 1);
 	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->attributes, 3);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].base_address, 0x7200000);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].base_address, 0x7400000);
 	ASSERT_EQ(m.vm[0].partition.dev_regions[0].page_count, 16);
 
-	/* Attribute is ORed with MM_MODE_D */
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].attributes, (3 | 8));
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].attributes, 3);
 	ASSERT_EQ(m.vm[0].partition.dev_regions[0].smmu_id, 1);
 	ASSERT_EQ(m.vm[0].partition.dev_regions[0].stream_ids[0], 0);
 	ASSERT_EQ(m.vm[0].partition.dev_regions[0].stream_ids[1], 1);
@@ -1183,6 +1195,7 @@ TEST(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[0].attributes, 3);
 	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[1].id, 4);
 	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[1].attributes, 5);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[1].attributes, (8 | 1));
 }
 
 } /* namespace */

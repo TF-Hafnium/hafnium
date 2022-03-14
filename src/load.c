@@ -444,6 +444,59 @@ static bool load_secondary_fdt(struct mm_stage1_locked stage1_locked,
 	return true;
 }
 
+/**
+ * Convert the manifest memory region attributes to mode consumed by mm layer.
+ */
+static uint32_t memory_region_attributes_to_mode(uint32_t attributes)
+{
+	uint32_t mode = 0U;
+
+	if ((attributes & MANIFEST_REGION_ATTR_READ) != 0U) {
+		mode |= MM_MODE_R;
+	}
+
+	if ((attributes & MANIFEST_REGION_ATTR_WRITE) != 0U) {
+		mode |= MM_MODE_W;
+	}
+
+	if ((attributes & MANIFEST_REGION_ATTR_EXEC) != 0U) {
+		mode |= MM_MODE_X;
+	}
+
+	assert((mode == (MM_MODE_R | MM_MODE_W)) || (mode == MM_MODE_R) ||
+	       (mode == (MM_MODE_R | MM_MODE_X)));
+
+	if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0U) {
+		mode |= arch_mm_extra_attributes_from_vm(HF_HYPERVISOR_VM_ID);
+	}
+
+	return mode;
+}
+
+/**
+ * Convert the manifest device region attributes to mode consumed by mm layer.
+ */
+static uint32_t device_region_attributes_to_mode(uint32_t attributes)
+{
+	uint32_t mode = 0U;
+
+	if ((attributes & MANIFEST_REGION_ATTR_READ) != 0U) {
+		mode |= MM_MODE_R;
+	}
+
+	if ((attributes & MANIFEST_REGION_ATTR_WRITE) != 0U) {
+		mode |= MM_MODE_W;
+	}
+
+	assert((mode == (MM_MODE_R | MM_MODE_W)) || (mode == MM_MODE_R));
+
+	if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0U) {
+		mode |= arch_mm_extra_attributes_from_vm(HF_HYPERVISOR_VM_ID);
+	}
+
+	return mode | MM_MODE_D;
+}
+
 /*
  * Loads a secondary VM.
  */
@@ -453,6 +506,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			   const struct manifest_vm *manifest_vm,
 			   const struct memiter *cpio, struct mpool *ppool)
 {
+	const char *error_string = " region security state ignored for ";
 	struct vm *vm;
 	struct vm_locked vm_locked;
 	struct vcpu_locked vcpu_locked;
@@ -552,6 +606,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		paddr_t alloc_base = mem_end;
 		size_t size;
 		size_t total_alloc = 0;
+		uint32_t attributes;
 
 		/* Map memory-regions */
 		while (j < manifest_vm->partition.mem_region_count) {
@@ -583,8 +638,29 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 				region_begin = pa_subtract(alloc_base, size);
 				alloc_base = region_begin;
 
-				map_mode = manifest_vm->partition.mem_regions[j]
-						   .attributes;
+				attributes =
+					manifest_vm->partition.mem_regions[j]
+						.attributes;
+				if ((attributes &
+				     MANIFEST_REGION_ATTR_SECURITY) != 0) {
+					if (plat_ffa_is_vm_id(
+						    vm_locked.vm->id)) {
+						dlog_warning("Memory%sVMs\n",
+							     error_string);
+						attributes &=
+							~MANIFEST_REGION_ATTR_SECURITY;
+					} else if (!vm->el0_partition) {
+						dlog_warning(
+							"Memory%sS-EL1 "
+							"partitions.\n",
+							error_string);
+						attributes &=
+							~MANIFEST_REGION_ATTR_SECURITY;
+					}
+				}
+
+				map_mode = memory_region_attributes_to_mode(
+					attributes);
 				if (vm->el0_partition) {
 					map_mode |= MM_MODE_USER | MM_MODE_NG;
 				}
@@ -612,8 +688,30 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 						.base_address);
 				region_end = pa_add(region_begin, size);
 
-				map_mode = manifest_vm->partition.mem_regions[j]
-						   .attributes;
+				attributes =
+					manifest_vm->partition.mem_regions[j]
+						.attributes;
+				if ((attributes &
+				     MANIFEST_REGION_ATTR_SECURITY) != 0) {
+					if (plat_ffa_is_vm_id(
+						    vm_locked.vm->id)) {
+						dlog_warning("Memory%sVMs\n",
+							     error_string);
+						attributes &=
+							~MANIFEST_REGION_ATTR_SECURITY;
+
+					} else if (!vm->el0_partition) {
+						dlog_warning(
+							"Memory%sS-EL1 "
+							"partitions.\n",
+							error_string);
+						attributes &=
+							~MANIFEST_REGION_ATTR_SECURITY;
+					}
+				}
+
+				map_mode = memory_region_attributes_to_mode(
+					attributes);
 				if (vm->el0_partition) {
 					map_mode |= MM_MODE_USER | MM_MODE_NG;
 				}
@@ -653,8 +751,25 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			       PAGE_SIZE;
 			region_end = pa_add(region_begin, size);
 
-			map_mode = manifest_vm->partition.dev_regions[j]
-					   .attributes;
+			attributes = manifest_vm->partition.dev_regions[j]
+					     .attributes;
+			if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
+				if (plat_ffa_is_vm_id(vm_locked.vm->id)) {
+					dlog_warning("Device%sVMs\n",
+						     error_string);
+					attributes &=
+						~MANIFEST_REGION_ATTR_SECURITY;
+				} else if (!vm->el0_partition) {
+					dlog_warning(
+						"Device%sS-EL1 "
+						"partitions.\n",
+						error_string);
+					attributes &=
+						~MANIFEST_REGION_ATTR_SECURITY;
+				}
+			}
+
+			map_mode = device_region_attributes_to_mode(attributes);
 			if (vm->el0_partition) {
 				map_mode |= MM_MODE_USER | MM_MODE_NG;
 			}

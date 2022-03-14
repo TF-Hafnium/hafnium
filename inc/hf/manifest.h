@@ -25,8 +25,15 @@
 #define SP_MAX_INTERRUPTS_PER_DEVICE 4
 #define SP_MAX_STREAMS_PER_DEVICE 4
 
-/** Mask for getting read/write/execute permission */
-#define MM_PERM_MASK 0x7
+/** FF-A manifest memory and device regions attributes. */
+#define MANIFEST_REGION_ATTR_READ (UINT32_C(1) << 0)
+#define MANIFEST_REGION_ATTR_WRITE (UINT32_C(1) << 1)
+#define MANIFEST_REGION_ATTR_EXEC (UINT32_C(1) << 2)
+#define MANIFEST_REGION_ATTR_SECURITY (UINT32_C(1) << 3)
+
+#define MANIFEST_REGION_ALL_ATTR_MASK                             \
+	(MANIFEST_REGION_ATTR_READ | MANIFEST_REGION_ATTR_WRITE | \
+	 MANIFEST_REGION_ATTR_EXEC | MANIFEST_REGION_ATTR_SECURITY)
 
 /* Highest possible value for the boot-order field. */
 #define DEFAULT_BOOT_ORDER 0xFFFF

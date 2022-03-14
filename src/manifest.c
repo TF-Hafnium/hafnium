@@ -393,15 +393,27 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 
 		TRY(read_uint32(mem_node, "attributes",
 				&mem_regions[i].attributes));
-		mem_regions[i].attributes &= MM_PERM_MASK;
 
-		if (mem_regions[i].attributes != (MM_MODE_R) &&
-		    mem_regions[i].attributes != (MM_MODE_R | MM_MODE_W) &&
-		    mem_regions[i].attributes != (MM_MODE_R | MM_MODE_X)) {
+		/*
+		 * Check RWX permission attributes.
+		 * Security attribute is checked at load phase.
+		 */
+		uint32_t permissions = mem_regions[i].attributes &
+				       (MANIFEST_REGION_ATTR_READ |
+					MANIFEST_REGION_ATTR_WRITE |
+					MANIFEST_REGION_ATTR_EXEC);
+		if (permissions != MANIFEST_REGION_ATTR_READ &&
+		    permissions != (MANIFEST_REGION_ATTR_READ |
+				    MANIFEST_REGION_ATTR_WRITE) &&
+		    permissions != (MANIFEST_REGION_ATTR_READ |
+				    MANIFEST_REGION_ATTR_EXEC)) {
 			return MANIFEST_ERROR_INVALID_MEM_PERM;
 		}
 
-		dlog_verbose("      Attributes:  %u\n",
+		/* Filter memory region attributes. */
+		mem_regions[i].attributes &= MANIFEST_REGION_ALL_ATTR_MASK;
+
+		dlog_verbose("      Attributes:  %#x\n",
 			     mem_regions[i].attributes);
 
 		if (rxtx->available) {
@@ -468,16 +480,27 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 		TRY(read_uint32(dev_node, "attributes",
 				&dev_regions[i].attributes));
-		dev_regions[i].attributes =
-			(dev_regions[i].attributes & MM_PERM_MASK) | MM_MODE_D;
 
-		if (dev_regions[i].attributes != (MM_MODE_R | MM_MODE_D) &&
-		    dev_regions[i].attributes !=
-			    (MM_MODE_R | MM_MODE_W | MM_MODE_D)) {
+		/*
+		 * Check RWX permission attributes.
+		 * Security attribute is checked at load phase.
+		 */
+		uint32_t permissions = dev_regions[i].attributes &
+				       (MANIFEST_REGION_ATTR_READ |
+					MANIFEST_REGION_ATTR_WRITE |
+					MANIFEST_REGION_ATTR_EXEC);
+
+		if (permissions != MANIFEST_REGION_ATTR_READ &&
+		    permissions != (MANIFEST_REGION_ATTR_READ |
+				    MANIFEST_REGION_ATTR_WRITE)) {
 			return MANIFEST_ERROR_INVALID_MEM_PERM;
 		}
 
-		dlog_verbose("      Attributes:  %u\n",
+		/* Filer device region attributes. */
+		dev_regions[i].attributes = dev_regions[i].attributes &
+					    MANIFEST_REGION_ALL_ATTR_MASK;
+
+		dlog_verbose("      Attributes:  %#x\n",
 			     dev_regions[i].attributes);
 
 		TRY(read_optional_uint32list(dev_node, "interrupts", &list));
