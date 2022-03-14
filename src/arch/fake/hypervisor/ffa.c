@@ -99,6 +99,25 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 	return false;
 }
 
+bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
+					struct vm_locked receiver_locked)
+{
+	(void)sender_locked;
+	(void)receiver_locked;
+
+	return false;
+}
+
+bool plat_ffa_msg_send2_forward(ffa_vm_id_t receiver_vm_id,
+				ffa_vm_id_t sender_vm_id, struct ffa_value *ret)
+{
+	(void)receiver_vm_id;
+	(void)sender_vm_id;
+	(void)ret;
+
+	return false;
+}
+
 ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
 {
 	return index;

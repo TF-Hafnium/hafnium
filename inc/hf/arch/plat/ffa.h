@@ -73,6 +73,14 @@ bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
 bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret);
+
+bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
+					struct vm_locked receiver_locked);
+
+bool plat_ffa_msg_send2_forward(ffa_vm_id_t receiver_vm_id,
+				ffa_vm_id_t sender_vm_id,
+				struct ffa_value *ret);
+
 bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
 					    ffa_vm_id_t vm_id);
 

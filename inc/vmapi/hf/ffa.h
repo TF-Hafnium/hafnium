@@ -372,6 +372,11 @@ static inline uint32_t ffa_msg_send_attributes(struct ffa_value args)
 	return args.arg4;
 }
 
+static inline uint32_t ffa_msg_send2_flags(struct ffa_value args)
+{
+	return args.arg2;
+}
+
 static inline uint32_t ffa_partition_info_get_count(struct ffa_value args)
 {
 	return args.arg2;

@@ -243,6 +243,43 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 	return false;
 }
 
+bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
+					struct vm_locked receiver_locked)
+{
+	(void)sender_locked;
+	(void)receiver_locked;
+
+	/*
+	 * Hypervisor is only for testing purposes, always allow indirect
+	 * messages from VM.
+	 */
+	return true;
+}
+
+bool plat_ffa_msg_send2_forward(ffa_vm_id_t receiver_vm_id,
+				ffa_vm_id_t sender_vm_id, struct ffa_value *ret)
+{
+	/* FFA_MSG_SEND2 is forwarded to SPMC when the receiver is an SP. */
+	if (!vm_id_is_current_world(receiver_vm_id)) {
+		/*
+		 * Set the sender in arg1 to allow the SPMC to retrieve
+		 * VM's TX buffer to copy in SP's RX buffer.
+		 */
+		*ret = arch_other_world_call((struct ffa_value){
+			.func = FFA_MSG_SEND2_32, .arg1 = sender_vm_id << 16});
+		if (ffa_func_id(*ret) != FFA_SUCCESS_32) {
+			dlog_verbose(
+				"Failed forwarding FFA_MSG_SEND2_32 to the "
+				"SPMC, got error (%d).\n",
+				ret->arg2);
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
 ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
 {
 	return index | FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;

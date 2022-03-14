@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Hafnium Authors.
+ * Copyright 2022 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -671,8 +671,12 @@ static int64_t internal_interrupt_inject(struct vcpu *target_vcpu,
 }
 
 /**
- * Constructs an FFA_MSG_SEND value to return from a successful FFA_MSG_POLL
- * or FFA_MSG_WAIT call.
+ * Constructs the return value from a successful FFA_MSG_POLL or
+ * FFA_MSG_WAIT call.
+ *
+ * Note: FFA_MSG_POLL is deprecated in FF-A v1.1 and should not be used with
+ * FFA_MSG_SEND2; no check is done on mixing FF-A v1.0 and FF-A v1.1 indirect
+ * message protocols.
  */
 static struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 {
@@ -683,6 +687,16 @@ static struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 			.arg1 = (receiver->mailbox.recv_sender << 16) |
 				receiver->id,
 			.arg3 = receiver->mailbox.recv_size};
+	case FFA_MSG_SEND2_32:
+		return (struct ffa_value){
+			.func = FFA_RUN_32,
+			/*
+			 * TODO: FFA_RUN should return vCPU and VM ID in arg1.
+			 * Retrieving vCPU requires a rework of the function,
+			 * while receiver ID must be set because it's checked by
+			 * other APIs (eg: FFA_NOTIFICATION_GET).
+			 */
+			.arg1 = receiver->id};
 	default:
 		/* This should never be reached, but return an error in case. */
 		dlog_error("Tried to return an invalid message function %#x\n",
@@ -819,7 +833,9 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 		if (vcpu->vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
 			arch_regs_set_retval(&vcpu->regs,
 					     ffa_msg_recv_return(vcpu->vm));
-			vcpu->vm->mailbox.state = MAILBOX_STATE_READ;
+			if (vcpu->vm->mailbox.recv_func == FFA_MSG_SEND_32) {
+				vcpu->vm->mailbox.state = MAILBOX_STATE_READ;
+			}
 			break;
 		}
 
@@ -1590,6 +1606,165 @@ out:
 }
 
 /**
+ * Copies data from the sender's send buffer to the recipient's receive buffer
+ * and notifies the receiver.
+ */
+struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
+				   struct vcpu *current)
+{
+	struct vm *from = current->vm;
+	struct vm *to;
+	struct vm_locked to_locked;
+	ffa_vm_id_t msg_sender_id;
+	struct vm_locked sender_locked;
+	const void *from_msg;
+	struct ffa_value ret;
+	struct ffa_partition_rxtx_header header;
+	ffa_vm_id_t sender_id;
+	ffa_vm_id_t receiver_id;
+	uint32_t msg_size;
+	ffa_notifications_bitmap_t rx_buffer_full;
+
+	/* Only Hypervisor can set `sender_vm_id` when forwarding messages. */
+	if (from->id != HF_HYPERVISOR_VM_ID && sender_vm_id != 0) {
+		dlog_error("Sender VM ID must be zero.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* `flags` can be set only at secure virtual FF-A instances. */
+	if (plat_ffa_is_vm_id(sender_vm_id) && (flags != 0)) {
+		dlog_error("flags must be zero.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Get message sender's mailbox, which can be different to the `from` vm
+	 * when the message is forwarded.
+	 */
+	msg_sender_id = (sender_vm_id != 0) ? sender_vm_id : from->id;
+	sender_locked = plat_ffa_vm_find_locked(msg_sender_id);
+	if (sender_locked.vm == NULL) {
+		dlog_error("Cannot send message from VM ID %#x, not found.\n",
+			   msg_sender_id);
+		return ffa_error(FFA_DENIED);
+	}
+
+	from_msg = sender_locked.vm->mailbox.send;
+	if (from_msg == NULL) {
+		dlog_error("Cannot retrieve TX buffer for VM ID %#x.\n",
+			   msg_sender_id);
+		ret = ffa_error(FFA_DENIED);
+		goto out_unlock_sender;
+	}
+
+	/*
+	 * Copy message header as safety measure to avoid multiple accesses to
+	 * unsafe memory which could be 'corrupted' between safety checks and
+	 * final buffer copy.
+	 */
+	memcpy_s(&header, FFA_RXTX_HEADER_SIZE, from_msg, FFA_RXTX_HEADER_SIZE);
+	sender_id = ffa_rxtx_header_sender(&header);
+	receiver_id = ffa_rxtx_header_receiver(&header);
+
+	/* Ensure Sender IDs from API and from message header match. */
+	if (msg_sender_id != sender_id) {
+		dlog_error(
+			"Message sender VM ID (%#x) doesn't match header's VM "
+			"ID (%#x).\n",
+			msg_sender_id, sender_id);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out_unlock_sender;
+	}
+
+	/* Disallow reflexive requests as this suggests an error in the VM. */
+	if (receiver_id == sender_id) {
+		dlog_error("Sender and receive VM IDs must be different.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out_unlock_sender;
+	}
+
+	/*
+	 * Check if the message has to be forwarded to the SPMC, in
+	 * this case return, the SPMC will handle the buffer copy.
+	 */
+	if (plat_ffa_msg_send2_forward(receiver_id, sender_id, &ret)) {
+		goto out_unlock_sender;
+	}
+
+	/* Ensure the receiver VM exists. */
+	to_locked = plat_ffa_vm_find_locked(receiver_id);
+	to = to_locked.vm;
+
+	if (to == NULL) {
+		dlog_error("Cannot deliver message to VM %#x, not found.\n",
+			   receiver_id);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out_unlock_sender;
+	}
+
+	/*
+	 * Check sender and receiver can use indirect messages.
+	 * Sender is the VM/SP who originally sent the message, not the
+	 * hypervisor possibly relaying it.
+	 */
+	if (!plat_ffa_is_indirect_msg_supported(sender_locked, to_locked)) {
+		dlog_verbose("VM %#x doesn't support indirect message\n",
+			     sender_id);
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	if (to->mailbox.state != MAILBOX_STATE_EMPTY ||
+	    to->mailbox.recv == NULL) {
+		dlog_error(
+			"Cannot deliver message to VM %#x, RX buffer not "
+			"ready.\n",
+			receiver_id);
+		ret = ffa_error(FFA_BUSY);
+		goto out;
+	}
+
+	/* Check the size of transfer. */
+	msg_size = FFA_RXTX_HEADER_SIZE + header.size;
+	if ((msg_size > FFA_PARTITION_MSG_PAYLOAD_MAX) ||
+	    (header.size > FFA_PARTITION_MSG_PAYLOAD_MAX)) {
+		dlog_error("Message is too big.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/* Copy data. */
+	memcpy_s(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX, from_msg, msg_size);
+	to->mailbox.recv_size = msg_size;
+	to->mailbox.recv_sender = sender_id;
+	to->mailbox.recv_func = FFA_MSG_SEND2_32;
+	to->mailbox.state = MAILBOX_STATE_RECEIVED;
+
+	rx_buffer_full = plat_ffa_is_vm_id(sender_id)
+				 ? FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK
+				 : FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK;
+	vm_notifications_framework_set_pending(to_locked, rx_buffer_full);
+
+	if ((FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) == 0) {
+		dlog_verbose("SRI was NOT delayed. vcpu: %u!\n",
+			     vcpu_index(current));
+		plat_ffa_sri_trigger_not_delayed(current->cpu);
+	} else {
+		plat_ffa_sri_state_set(DELAYED);
+	}
+
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+
+out:
+	vm_unlock(&to_locked);
+
+out_unlock_sender:
+	vm_unlock(&sender_locked);
+
+	return ret;
+}
+
+/**
  * Checks whether the vCPU's attempt to block for a message has already been
  * interrupted or whether it is allowed to block.
  */
@@ -1652,8 +1827,10 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 
 	/* Return pending messages without blocking. */
 	if (vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
-		vm->mailbox.state = MAILBOX_STATE_READ;
 		return_code = ffa_msg_recv_return(vm);
+		if (return_code.func == FFA_MSG_SEND_32) {
+			vm->mailbox.state = MAILBOX_STATE_READ;
+		}
 		goto out;
 	}
 
@@ -2102,6 +2279,7 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id)
 	case FFA_MEM_PERM_SET_32:
 	case FFA_MEM_PERM_GET_64:
 	case FFA_MEM_PERM_SET_64:
+	case FFA_MSG_SEND2_32:
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 

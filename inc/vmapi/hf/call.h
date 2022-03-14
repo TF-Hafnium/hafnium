@@ -174,6 +174,24 @@ static inline struct ffa_value ffa_msg_send(ffa_vm_id_t sender_vm_id,
 		.arg4 = attributes});
 }
 
+/**
+ * Copies data from the sender's send buffer to the recipient's receive buffer
+ * and notifies the receiver.
+ *
+ * `flags` may include a 'Delay Schedule Receiver interrupt'.
+ *
+ * Returns FFA_SUCCESS if the message is sent, or an error code otherwise:
+ *  - INVALID_PARAMETERS: one or more of the parameters do not conform.
+ *  - BUSY: receiver's mailbox was full.
+ *  - DENIED: receiver is not in a state to handle the request or doesn't
+ *    support indirect messages.
+ */
+static inline struct ffa_value ffa_msg_send2(uint32_t flags)
+{
+	return ffa_call((struct ffa_value){
+		.func = FFA_MSG_SEND2_32, .arg1 = 0, .arg2 = flags});
+}
+
 static inline struct ffa_value ffa_mem_donate(uint32_t length,
 					      uint32_t fragment_length)
 {

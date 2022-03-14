@@ -516,6 +516,10 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 					 ffa_msg_send_attributes(*args),
 					 current, next);
 		return true;
+	case FFA_MSG_SEND2_32:
+		*args = api_ffa_msg_send2(ffa_sender(*args),
+					  ffa_msg_send2_flags(*args), current);
+		return true;
 	case FFA_MSG_WAIT_32:
 		*args = api_ffa_msg_wait(current, next, args);
 		return true;
