@@ -204,6 +204,47 @@ struct ffa_value sp_notif_unbind_cmd(ffa_vm_id_t test_source,
 				     ffa_vm_id_t notif_sender,
 				     ffa_notifications_bitmap_t bitmap);
 
+/**
+ * Command to request an SP to send an indirect message.
+ */
+#define SP_INDIR_MSG_CMD 0x494dU
+
+static inline struct ffa_value sp_indirect_msg_cmd_send(
+	ffa_vm_id_t sender, ffa_vm_id_t receiver, ffa_vm_id_t msg_receiver,
+	uint32_t payload)
+{
+	return ffa_msg_send_direct_req(sender, receiver, SP_INDIR_MSG_CMD,
+				       msg_receiver, payload, 0, 0);
+}
+
+static inline ffa_vm_id_t sp_indirect_msg_receiver(struct ffa_value cmd)
+{
+	return (ffa_vm_id_t)cmd.arg4;
+}
+
+static inline uint32_t sp_indirect_msg_payload(struct ffa_value cmd)
+{
+	return cmd.arg5;
+}
+
+struct ffa_value sp_indirect_msg_cmd(ffa_vm_id_t test_source,
+				     ffa_vm_id_t receiver_id, uint32_t payload);
+
+/**
+ * Command to notify an SP an indirect message is available in it's RX buffer,
+ * echoes it back to sender.
+ */
+#define SP_ECHO_INDIR_MSG_CMD 0x43494eU
+
+static inline struct ffa_value sp_echo_indirect_msg_cmd_send(
+	ffa_vm_id_t sender, ffa_vm_id_t receiver)
+{
+	return ffa_msg_send_direct_req(sender, receiver, SP_ECHO_INDIR_MSG_CMD,
+				       0, 0, 0, 0);
+}
+
+struct ffa_value sp_echo_indirect_msg_cmd(ffa_vm_id_t test_source);
+
 struct ffa_value sp_check_ffa_return_resp(ffa_vm_id_t test_source,
 					  ffa_vm_id_t own_id,
 					  struct ffa_value res);

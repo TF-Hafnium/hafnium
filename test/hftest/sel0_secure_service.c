@@ -16,6 +16,7 @@
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
+#include "test/vmapi/ffa.h"
 
 alignas(4096) uint8_t kstack[4096];
 
@@ -43,6 +44,9 @@ noreturn void abort(void)
 
 noreturn void kmain(void)
 {
+	/* Register RX/TX buffers via FFA_RXTX_MAP */
+	set_up_mailbox();
+
 	test_main_sp(true);
 
 	/* Do not expect to get to this point, so abort. */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Hafnium Authors.
+ * Copyright 2022 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -55,6 +55,90 @@ struct ffa_value sp_req_echo_busy_cmd(ffa_vm_id_t test_source)
 		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 		EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 	}
+
+	return sp_success(own_id, test_source, 0);
+}
+
+/**
+ * VM asking an SP to send an indirect message to another endpoint.
+ * Message is sent via FFA_MSG_SEND2 ABI, and the receiver is notified through
+ * a direct message.
+ * The message is expected to be echoed back by an indirect message.
+ */
+struct ffa_value sp_indirect_msg_cmd(ffa_vm_id_t test_source,
+				     ffa_vm_id_t receiver_id, uint32_t payload)
+{
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_msg *message;
+	const uint32_t *echo_payload;
+	struct ffa_value ret;
+
+	ret = send_indirect_message(own_id, receiver_id, mb.send, &payload,
+				    sizeof(payload),
+				    FFA_NOTIFICATIONS_FLAG_DELAY_SRI);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/*
+	 * Notify the receiver that got an indirect message using a direct
+	 * message.
+	 */
+	ret = sp_echo_indirect_msg_cmd_send(own_id, receiver_id);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
+
+	/* Check notification. */
+	ret = ffa_notification_get(own_id, 0, FFA_NOTIFICATION_FLAG_BITMAP_SPM);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	ASSERT_TRUE(is_ffa_spm_buffer_full_notification(
+		ffa_notification_get_from_framework(ret)));
+
+	/* Ensure echoed message is the same as sent. */
+	message = (struct ffa_partition_msg *)mb.recv;
+	echo_payload = (const uint32_t *)message->payload;
+	ASSERT_EQ(payload, *echo_payload);
+
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
+	return sp_success(own_id, test_source, 0);
+}
+
+/**
+ * Echo the indirect message back to sender.
+ */
+struct ffa_value sp_echo_indirect_msg_cmd(ffa_vm_id_t test_source)
+{
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_vm_id_t target_vm_id;
+	ffa_vm_id_t source_vm_id;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_msg *message;
+	const uint32_t *payload;
+	struct ffa_value ret;
+
+	/* Check notification. */
+	ret = ffa_notification_get(own_id, 0,
+				   FFA_NOTIFICATION_FLAG_BITMAP_HYP |
+					   FFA_NOTIFICATION_FLAG_BITMAP_SPM);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	ASSERT_TRUE(is_ffa_hyp_buffer_full_notification(
+			    ffa_notification_get_from_framework(ret)) |
+		    is_ffa_spm_buffer_full_notification(
+			    ffa_notification_get_from_framework(ret)));
+
+	message = (struct ffa_partition_msg *)mb.recv;
+	source_vm_id = ffa_rxtx_header_sender(&message->header);
+	target_vm_id = ffa_rxtx_header_receiver(&message->header);
+	EXPECT_EQ(own_id, target_vm_id);
+
+	payload = (const uint32_t *)message->payload;
+
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
+	/* Echo message back. */
+	send_indirect_message(target_vm_id, source_vm_id, mb.send, payload,
+			      sizeof(*payload),
+			      FFA_NOTIFICATIONS_FLAG_DELAY_SRI);
 
 	return sp_success(own_id, test_source, 0);
 }

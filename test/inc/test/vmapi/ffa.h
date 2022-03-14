@@ -81,3 +81,8 @@ void dump_boot_info(struct ffa_boot_info_header *boot_info_header);
 struct ffa_boot_info_desc *get_boot_info_desc(
 	struct ffa_boot_info_header *boot_info_heade, uint8_t type,
 	uint8_t type_id);
+
+struct ffa_value send_indirect_message(ffa_vm_id_t from, ffa_vm_id_t to,
+				       void *send, const void *payload,
+				       size_t payload_size,
+				       uint32_t send_flags);

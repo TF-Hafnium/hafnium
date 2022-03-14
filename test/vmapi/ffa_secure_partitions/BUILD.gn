@@ -18,6 +18,7 @@ vm_kernel("vm_primary") {
 
   sources = [
     "dir_msg.c",
+    "indirect_msg.c",
     "interrupts.c",
     "notifications.c",
     "power_mgt.c",

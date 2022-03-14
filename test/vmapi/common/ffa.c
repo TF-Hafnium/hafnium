@@ -27,8 +27,12 @@ static hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 
 struct mailbox_buffers set_up_mailbox(void)
 {
-	ASSERT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
-		  FFA_SUCCESS_32);
+	static bool set_up = false;
+	if (!set_up) {
+		ASSERT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+			  FFA_SUCCESS_32);
+		set_up = true;
+	}
 	return (struct mailbox_buffers){
 		.send = send_page,
 		.recv = recv_page,
@@ -430,4 +434,21 @@ struct ffa_boot_info_desc *get_boot_info_desc(
 	}
 
 	return NULL;
+}
+
+struct ffa_value send_indirect_message(ffa_vm_id_t from, ffa_vm_id_t to,
+				       void *send, const void *payload,
+				       size_t payload_size, uint32_t send_flags)
+{
+	struct ffa_partition_msg *message = (struct ffa_partition_msg *)send;
+
+	/* Initialize message header. */
+	ffa_rxtx_header_init(from, to, payload_size, &message->header);
+
+	/* Fill TX buffer with payload. */
+	memcpy_s(message->payload, FFA_PARTITION_MSG_PAYLOAD_MAX, payload,
+		 payload_size);
+
+	/* Send the message. */
+	return ffa_msg_send2(send_flags);
 }

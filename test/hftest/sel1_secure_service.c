@@ -17,6 +17,7 @@
 
 #include "test/abort.h"
 #include "test/hftest.h"
+#include "test/vmapi/ffa.h"
 
 alignas(4096) uint8_t kstack[MAX_CPUS][4096];
 
@@ -39,6 +40,9 @@ noreturn void kmain(void)
 	/* Register entry point for secondary vCPUs. */
 	res = ffa_secondary_ep_register((uintptr_t)secondary_ep_entry);
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Register RX/TX buffers via FFA_RXTX_MAP */
+	set_up_mailbox();
 
 	test_main_sp(true);
 

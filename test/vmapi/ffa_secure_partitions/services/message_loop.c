@@ -64,6 +64,14 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 			res = sp_check_cpu_idx_cmd(ffa_sender(res),
 						   sp_check_cpu_idx(res));
 			break;
+		case SP_INDIR_MSG_CMD:
+			res = sp_indirect_msg_cmd(ffa_sender(res),
+						  sp_indirect_msg_receiver(res),
+						  sp_indirect_msg_payload(res));
+			break;
+		case SP_ECHO_INDIR_MSG_CMD:
+			res = sp_echo_indirect_msg_cmd(ffa_sender(res));
+			break;
 		case SP_WAIT_BUSY_LOOP_CMD:
 			for (volatile uint64_t loop = 0; loop < res.arg4;
 			     loop++) {

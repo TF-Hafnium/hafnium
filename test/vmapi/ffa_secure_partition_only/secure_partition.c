@@ -137,6 +137,9 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 
 	ret = ffa_features(FFA_MEM_PERM_SET_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MSG_SEND2_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 #endif
 }
 

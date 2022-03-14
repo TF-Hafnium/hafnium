@@ -193,3 +193,14 @@ TEST_SERVICE(ffa_direct_msg_run)
 	ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res), 4, 0, 0, 0,
 				 0);
 }
+
+/**
+ * Service for indirect message error checking.
+ * The VM unmap its RX/TX and waits for a message.
+ */
+TEST_SERVICE(ffa_indirect_msg_error)
+{
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+
+	ffa_msg_wait();
+}
