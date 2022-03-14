@@ -1631,12 +1631,6 @@ struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	/* `flags` can be set only at secure virtual FF-A instances. */
-	if (plat_ffa_is_vm_id(sender_vm_id) && (flags != 0)) {
-		dlog_error("flags must be zero.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
 	/*
 	 * Get message sender's mailbox, which can be different to the `from` vm
 	 * when the message is forwarded.
@@ -1681,6 +1675,12 @@ struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
 		dlog_error("Sender and receive VM IDs must be different.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out_unlock_sender;
+	}
+
+	/* `flags` can be set only at secure virtual FF-A instances. */
+	if (plat_ffa_is_vm_id(sender_id) && (flags != 0)) {
+		dlog_error("flags must be zero.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
