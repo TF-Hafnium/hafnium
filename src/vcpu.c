@@ -200,7 +200,7 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 
 void vcpu_reset(struct vcpu *vcpu)
 {
-	arch_cpu_init(vcpu->cpu, vcpu->vm->secondary_ep);
+	arch_cpu_init(vcpu->cpu);
 
 	/* Reset the registers to give a clean start for vCPU. */
 	arch_regs_reset(vcpu);

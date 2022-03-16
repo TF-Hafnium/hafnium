@@ -60,10 +60,7 @@ void arch_regs_set_retval(struct arch_regs *r, struct ffa_value v)
 	r->arg[7] = v.arg7;
 }
 
-void arch_cpu_init(struct cpu *c, ipaddr_t entry_point)
+void arch_cpu_init(struct cpu *c)
 {
-	(void)c;
-	(void)entry_point;
-
 	plat_interrupts_controller_hw_init(c);
 }

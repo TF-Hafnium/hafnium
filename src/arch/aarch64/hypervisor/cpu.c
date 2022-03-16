@@ -245,10 +245,8 @@ static void arch_cpu_sve_configure_sve_vector_length(void)
 	isb();
 }
 
-void arch_cpu_init(struct cpu *c, ipaddr_t entry_point)
+void arch_cpu_init(struct cpu *c)
 {
-	plat_psci_cpu_resume(c, entry_point);
-
 	/*
 	 * Linux expects LORegions to be disabled, hence if the current system
 	 * supports them, Hafnium ensures that they are disabled.
@@ -266,4 +264,9 @@ void arch_cpu_init(struct cpu *c, ipaddr_t entry_point)
 	}
 
 	plat_interrupts_controller_hw_init(c);
+}
+
+struct vcpu *arch_vcpu_resume(struct cpu *c)
+{
+	return plat_psci_cpu_resume(c);
 }

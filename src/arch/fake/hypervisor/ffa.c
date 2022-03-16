@@ -382,11 +382,6 @@ void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
 	(void)cpu;
 }
 
-void plat_ffa_sri_init(struct cpu *cpu)
-{
-	(void)cpu;
-}
-
 bool plat_ffa_inject_notification_pending_interrupt(
 	struct vcpu_locked target_locked, struct vcpu *current,
 	struct vm_locked receiver_locked)

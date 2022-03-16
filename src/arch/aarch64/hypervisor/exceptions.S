@@ -499,6 +499,12 @@ sve_context_restore:
 	add x20, x18, #SVE_CTX_VECTORS
 	sve_op_vectors ldr, x20
 .arch_extension nosve
+	b sve_skip_context_restore
+
+/* Called after cpu_main. */
+.globl other_world_exit
+other_world_exit:
+	mov x19, x0
 
 sve_skip_context_restore:
 	/*

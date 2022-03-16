@@ -6,8 +6,11 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/plat/psci.h"
+
 #include "hf/cpu.h"
 #include "hf/dlog.h"
+#include "hf/vm.h"
 
 #include "psci.h"
 
@@ -55,8 +58,19 @@ void plat_psci_cpu_suspend(uint32_t power_state)
 	(void)power_state;
 }
 
-void plat_psci_cpu_resume(struct cpu *c, ipaddr_t entry_point)
+struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 {
-	(void)c;
-	(void)entry_point;
+	struct vcpu *vcpu = vcpu_get_boot_vcpu();
+
+	vcpu = vm_get_vcpu(vcpu->vm, cpu_index(c));
+	vcpu->cpu = c;
+
+	arch_cpu_init(c);
+
+	/* Reset the registers to give a clean start for vCPU. */
+	arch_regs_reset(vcpu);
+
+	/* TODO: call plat_ffa_sri_init? */
+
+	return vcpu;
 }

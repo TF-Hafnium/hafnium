@@ -197,6 +197,15 @@ cpu_init:
 	/* Call into C code, x0 holds the CPU pointer. */
 	bl cpu_main
 
+#if SECURE_WORLD == 1
+	ldr x1, [x0, #VCPU_VM]
+	ldrh w1, [x1, #VM_ID]
+
+	/* Exit to normal world if VM is HF_OTHER_WORLD_ID. */
+	cmp w1, #0
+	beq other_world_exit
+#endif
+
 	/* Run the vCPU returned by cpu_main. */
 	bl vcpu_restore_all_and_run
 

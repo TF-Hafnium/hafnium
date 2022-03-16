@@ -6,9 +6,16 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/plat/ffa.h"
+#include "hf/arch/plat/psci.h"
+
+#include "hf/api.h"
+#include "hf/check.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/vm.h"
+
+#include "vmapi/hf/types.h"
 
 #include "psci.h"
 
@@ -50,16 +57,49 @@ void plat_psci_cpu_suspend(uint32_t power_state)
 	(void)power_state;
 }
 
-void plat_psci_cpu_resume(struct cpu *c, ipaddr_t entry_point)
+struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 {
+	struct vcpu_locked vcpu_locked;
 	struct vcpu *vcpu = vcpu_get_boot_vcpu();
 	struct vm *vm = vcpu->vm;
-	struct vcpu_locked vcpu_locked;
+	struct vm *other_world_vm;
 
-	if (!cpu_on(c)) {
-		vcpu = vm_get_vcpu(vm, cpu_index(c));
-		vcpu_locked = vcpu_lock(vcpu);
-		vcpu_on(vcpu_locked, entry_point, 0LL);
-		vcpu_unlock(&vcpu_locked);
+	cpu_on(c);
+
+	arch_cpu_init(c);
+
+	/* Initialize SRI for running core. */
+	plat_ffa_sri_init(c);
+
+	vcpu = vm_get_vcpu(vm, (vm->vcpu_count == 1) ? 0 : cpu_index(c));
+	vcpu_locked = vcpu_lock(vcpu);
+
+	if (vcpu->rt_model != RTM_SP_INIT &&
+	    vm_power_management_cpu_on_requested(vm) == false) {
+		other_world_vm = vm_find(HF_OTHER_WORLD_ID);
+		CHECK(other_world_vm != NULL);
+		vcpu = api_switch_to_other_world(
+			vm_get_vcpu(other_world_vm, cpu_index(c)),
+			(struct ffa_value){.func = FFA_MSG_WAIT_32},
+			VCPU_STATE_WAITING);
+		goto exit;
 	}
+
+	vcpu->cpu = c;
+
+	vcpu_secondary_reset_and_start(vcpu_locked, vcpu->vm->secondary_ep,
+				       0ULL);
+
+	/* vCPU restarts in runtime model for SP initialization. */
+	vcpu->rt_model = RTM_SP_INIT;
+
+	/* Set the designated GP register with the core linear id. */
+	vcpu_set_phys_core_idx(vcpu);
+
+	vcpu_set_boot_info_gp_reg(vcpu);
+
+exit:
+	vcpu_unlock(&vcpu_locked);
+
+	return vcpu;
 }
