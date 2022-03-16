@@ -89,8 +89,8 @@ ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu)
  * Check whether the given vcpu_state is an off state, for the purpose of
  * turning vCPUs on and off. Note that Aborted still counts as ON for the
  * purposes of PSCI, because according to the PSCI specification (section
- * 5.7.1) a core is only considered to be off if it has  been turned off
- * with a CPU_OFF call or hasn't yet  been turned on with a CPU_ON call.
+ * 5.7.1) a core is only considered to be off if it has been turned off
+ * with a CPU_OFF call or hasn't yet been turned on with a CPU_ON call.
  */
 bool vcpu_is_off(struct vcpu_locked vcpu)
 {

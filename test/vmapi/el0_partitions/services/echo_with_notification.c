@@ -32,7 +32,7 @@ static void wait_for_vm(uint32_t vmid)
 		 * guarantee that these instructions will be trapped, only that
 		 * it may be trapped if it does not complete in finite time. To
 		 * work around this, if there are more than a threshold number
-		 * of retries, simply call yiled to allow primary VM to get back
+		 * of retries, simply call yield to allow primary VM to get back
 		 * control. Note that on QEMU, WFI/WFE trap just fine.
 		 */
 		if (retry_count > 1000) {

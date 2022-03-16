@@ -493,7 +493,6 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 {
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 	struct vm_locked vm_locked;
-	const char *error_string = "Notification bitmap already created.";
 	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
 
 	if (vm_id == HF_OTHER_WORLD_ID) {
@@ -509,7 +508,7 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 
 		/* Call has been used for the other world vm already */
 		if (vm_locked.vm->notifications.enabled != false) {
-			dlog_error("%s\n", error_string);
+			dlog_verbose("Notification bitmap already created.");
 			ret = ffa_error(FFA_DENIED);
 			goto out;
 		}
@@ -523,7 +522,7 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 		/* If vm already exists bitmap has been created as well. */
 		vm_locked = plat_ffa_nwd_vm_find_locked(nwd_vms_locked, vm_id);
 		if (vm_locked.vm != NULL) {
-			dlog_error("%s\n", error_string);
+			dlog_verbose("Notification bitmap already created.");
 			ret = ffa_error(FFA_DENIED);
 			goto out;
 		}

@@ -536,7 +536,7 @@ static struct ffa_value ffa_send_check_transition(
 				    fragment_constituent_counts,
 				    fragment_count);
 	if (ret.func != FFA_SUCCESS_32) {
-		dlog_verbose("Inconsistent modes.\n", fragment_count);
+		dlog_verbose("Inconsistent modes.\n");
 		return ret;
 	}
 
