@@ -141,7 +141,12 @@ static struct vm_locked plat_ffa_nwd_vm_create(ffa_vm_id_t vm_id)
 		goto out;
 	}
 
+	/*
+	 * Note: VM struct for Nwd VMs is only partially initialized, to the
+	 * extend of what's currently used by the SPMC (VM ID, waiter list).
+	 */
 	vm_locked.vm->id = vm_id;
+	list_init(&vm_locked.vm->mailbox.waiter_list);
 
 out:
 	nwd_vms_unlock(&nwd_vms_locked);
@@ -345,6 +350,22 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 	(void)receiver_vm_id;
 	(void)args;
 	(void)ret;
+
+	return false;
+}
+
+bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
+				 struct ffa_value *ret)
+{
+	(void)vm_locked;
+	(void)ret;
+
+	return true;
+}
+
+bool plat_ffa_rx_release_forwarded(struct vm_locked vm_locked)
+{
+	(void)vm_locked;
 
 	return false;
 }

@@ -1962,31 +1962,94 @@ int64_t api_mailbox_waiter_get(ffa_vm_id_t vm_id, const struct vcpu *current)
  * will overwrite the old and will arrive asynchronously.
  *
  * Returns:
+ *  - FFA_ERROR FFA_INVALID_PARAMETERS if message is forwarded to SPMC but
+ *    there's no buffer pair mapped.
  *  - FFA_ERROR FFA_DENIED on failure, if the mailbox hasn't been read.
  *  - FFA_SUCCESS on success if no further action is needed.
  *  - FFA_RX_RELEASE if it was called by the primary VM and the primary VM now
  *    needs to wake up or kick waiters. Waiters should be retrieved by calling
  *    hf_mailbox_waiter_get.
  */
-struct ffa_value api_ffa_rx_release(struct vcpu *current, struct vcpu **next)
+struct ffa_value api_ffa_rx_release(ffa_vm_id_t receiver_id,
+				    struct vcpu *current, struct vcpu **next)
 {
-	struct vm *vm = current->vm;
-	struct vm_locked locked;
+	struct vm *current_vm = current->vm;
+	struct vm *vm;
+	struct vm_locked vm_locked;
+	ffa_vm_id_t current_vm_id = current_vm->id;
+	ffa_vm_id_t release_vm_id;
 	struct ffa_value ret;
 
-	locked = vm_lock(vm);
+	/* `receiver_id` can be set only at Non-Secure Physical interface. */
+	if (vm_id_is_current_world(current_vm_id) && (receiver_id != 0)) {
+		dlog_error("Invalid `receiver_id`, must be zero.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * VM ID to be released: `receiver_id` if message has been forwarded by
+	 * Hypervisor to release a VM's buffer, current VM ID otherwise.
+	 */
+	if (vm_id_is_current_world(current_vm_id) || (receiver_id == 0)) {
+		release_vm_id = current_vm_id;
+	} else {
+		release_vm_id = receiver_id;
+	}
+
+	vm_locked = plat_ffa_vm_find_locked(release_vm_id);
+	vm = vm_locked.vm;
+	if (vm == NULL) {
+		dlog_error("No buffer registered for VM ID %#x.\n",
+			   release_vm_id);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (!plat_ffa_rx_release_forward(vm_locked, &ret)) {
+		dlog_verbose("RX_RELEASE forward failed for VM ID %#x.\n",
+			     release_vm_id);
+		goto out;
+	}
+
+	/*
+	 * When SPMC owns a VM's RX buffer, the Hypervisor's view can be out of
+	 * sync: reset it to empty and exit.
+	 */
+	if (plat_ffa_rx_release_forwarded(vm_locked)) {
+		ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+		goto out;
+	}
+
 	switch (vm->mailbox.state) {
 	case MAILBOX_STATE_EMPTY:
-	case MAILBOX_STATE_RECEIVED:
 		ret = ffa_error(FFA_DENIED);
 		break;
 
+	case MAILBOX_STATE_RECEIVED:
+		if (release_vm_id == current_vm_id) {
+			/*
+			 * VM requesting to release its own RX buffer,
+			 * must be in READ state.
+			 */
+			ret = ffa_error(FFA_DENIED);
+		} else {
+			/*
+			 * Forwarded message from Hypervisor to release a VM
+			 * RX buffer, SPMC's mailbox view can be still in
+			 * RECEIVED state.
+			 */
+			ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+			vm->mailbox.state = MAILBOX_STATE_EMPTY;
+		}
+		break;
+
 	case MAILBOX_STATE_READ:
-		ret = api_waiter_result(locked, current, next);
+		ret = api_waiter_result(vm_locked, current, next);
 		vm->mailbox.state = MAILBOX_STATE_EMPTY;
 		break;
 	}
-	vm_unlock(&locked);
+
+out:
+	vm_unlock(&vm_locked);
 
 	return ret;
 }

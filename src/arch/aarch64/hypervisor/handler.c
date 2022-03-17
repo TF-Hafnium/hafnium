@@ -497,7 +497,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_features(args->arg1);
 		return true;
 	case FFA_RX_RELEASE_32:
-		*args = api_ffa_rx_release(current, next);
+		*args = api_ffa_rx_release(ffa_receiver(*args), current, next);
 		return true;
 	case FFA_RXTX_MAP_64:
 		*args = api_ffa_rxtx_map(ipa_init(args->arg1),

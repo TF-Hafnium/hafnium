@@ -243,6 +243,48 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 	return false;
 }
 
+bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
+				 struct ffa_value *ret)
+{
+	struct vm *vm = vm_locked.vm;
+	ffa_vm_id_t vm_id = vm->id;
+
+	if (!ffa_tee_enabled || (vm->ffa_version < MAKE_FFA_VERSION(1, 1))) {
+		*ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+		return true;
+	}
+
+	CHECK(vm_id_is_current_world(vm_id));
+
+	/* Hypervisor always forward VM's RX_RELEASE to SPMC. */
+	*ret = arch_other_world_call(
+		(struct ffa_value){.func = FFA_RX_RELEASE_32, .arg1 = vm_id});
+
+	return ret->func == FFA_SUCCESS_32;
+}
+
+/**
+ * In FF-A v1.1 with SPMC enabled the SPMC owns the RX buffers for NWd VMs,
+ * hence the SPMC is handling FFA_RX_RELEASE calls for NWd VMs too.
+ * The Hypervisor's view of a VM's RX buffer can be out of sync, reset it to
+ * 'empty' if the FFA_RX_RELEASE call has been successfully forwarded to the
+ * SPMC.
+ */
+bool plat_ffa_rx_release_forwarded(struct vm_locked vm_locked)
+{
+	struct vm *vm = vm_locked.vm;
+
+	if (ffa_tee_enabled && (vm->ffa_version > MAKE_FFA_VERSION(1, 0))) {
+		dlog_verbose(
+			"RX_RELEASE forwarded, reset MB state for VM ID %#x.\n",
+			vm->id);
+		vm->mailbox.state = MAILBOX_STATE_EMPTY;
+		return true;
+	}
+
+	return false;
+}
+
 /**
  * Acquire the RX buffer of a VM from the SPM.
  *
