@@ -74,6 +74,9 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret);
 
+bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
+				  struct ffa_value *ret);
+
 bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 					struct vm_locked receiver_locked);
 

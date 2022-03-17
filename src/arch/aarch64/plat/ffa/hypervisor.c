@@ -243,6 +243,30 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 	return false;
 }
 
+/**
+ * Acquire the RX buffer of a VM from the SPM.
+ *
+ * VM RX/TX buffers must have been previously mapped in the SPM either
+ * by forwarding VM's RX_TX_MAP API or another way if buffers were
+ * declared in manifest.
+ */
+bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
+				  struct ffa_value *ret)
+{
+	if (!ffa_tee_enabled) {
+		return true;
+	}
+
+	if (to_locked.vm->ffa_version < MAKE_FFA_VERSION(1, 1)) {
+		return true;
+	}
+
+	*ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_RX_ACQUIRE_32, .arg1 = to_locked.vm->id});
+
+	return ret->func == FFA_SUCCESS_32;
+}
+
 bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 					struct vm_locked receiver_locked)
 {

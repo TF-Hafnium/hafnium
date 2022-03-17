@@ -367,6 +367,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 	uint32_t version = vm->ffa_version;
 	uint32_t partition_info_size;
 	uint32_t buffer_size;
+	struct ffa_value ret;
 
 	if (msg_receiver_busy(vm_locked, NULL, false)) {
 		/*
@@ -375,6 +376,12 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		 */
 		dlog_verbose("RX buffer not ready.\n");
 		return ffa_error(FFA_BUSY);
+	}
+
+	/* Acquire receiver's RX buffer. */
+	if (!plat_ffa_acquire_receiver_rx(vm_locked, &ret)) {
+		dlog_verbose("Failed to acquire RX buffer for VM %x\n", vm->id);
+		return ret;
 	}
 
 	if (version == MAKE_FFA_VERSION(1, 0)) {
@@ -1724,6 +1731,12 @@ struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
 		goto out;
 	}
 
+	/* Acquire receiver's RX buffer. */
+	if (!plat_ffa_acquire_receiver_rx(to_locked, &ret)) {
+		dlog_error("Failed to acquire RX buffer for VM %#x\n", to->id);
+		goto out;
+	}
+
 	/* Check the size of transfer. */
 	msg_size = FFA_RXTX_HEADER_SIZE + header.size;
 	if ((msg_size > FFA_PARTITION_MSG_PAYLOAD_MAX) ||
@@ -1981,6 +1994,60 @@ struct ffa_value api_ffa_rx_release(struct vcpu *current, struct vcpu **next)
 		break;
 	}
 	vm_unlock(&locked);
+
+	return ret;
+}
+
+/**
+ * Acquire ownership of an RX buffer before writing to it. Both
+ * Hypervisor and SPMC are producers of VM's RX buffer, and they
+ * could contend for the same buffer. SPMC owns VM's RX buffer after
+ * it's mapped in its translation regime. This ABI should be
+ * used by the Hypervisor to get the ownership of a VM's RX buffer
+ * from the SPMC solving the aforementioned possible contention.
+ *
+ * Returns:
+ * - FFA_DENIED: callee cannot relinquish ownership of RX buffer.
+ * - FFA_INVALID_PARAMETERS: there is no buffer pair registered for the VM.
+ * - FFA_NOT_SUPPORTED: function not implemented at the FF-A instance.
+ */
+struct ffa_value api_ffa_rx_acquire(ffa_vm_id_t receiver_id,
+				    struct vcpu *current)
+{
+	struct vm_locked receiver_locked;
+	struct vm *receiver;
+	struct ffa_value ret;
+
+	if ((current->vm->id != HF_HYPERVISOR_VM_ID) ||
+	    !plat_ffa_is_vm_id(receiver_id)) {
+		dlog_error(
+			"FFA_RX_ACQUIRE not supported at this FF-A "
+			"instance.\n");
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	receiver_locked = plat_ffa_vm_find_locked(receiver_id);
+	receiver = receiver_locked.vm;
+
+	if (receiver == NULL || receiver->mailbox.recv == NULL) {
+		dlog_error("Cannot retrieve RX buffer for VM ID %#x.\n",
+			   receiver_id);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (receiver->mailbox.state != MAILBOX_STATE_EMPTY) {
+		dlog_error("Mailbox busy for VM ID %#x.\n", receiver_id);
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	receiver->mailbox.state = MAILBOX_STATE_RECEIVED;
+
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+
+out:
+	vm_unlock(&receiver_locked);
 
 	return ret;
 }

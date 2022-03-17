@@ -180,6 +180,12 @@ TEST(ffa, ffa_partition_info_get_versioned_descriptors)
 	struct ffa_uuid uuid;
 	uint32_t version;
 
+	/* Set version 1.1 to forward RX/TX buffers to SPMC. */
+	ffa_version(MAKE_FFA_VERSION(1, 1));
+
+	/* Setup the mailbox (which holds the RX buffer). */
+	mb = set_up_mailbox();
+
 	/*
 	 * First call FF-A version to tell the SPMC our version
 	 * is v1.0.
@@ -187,8 +193,6 @@ TEST(ffa, ffa_partition_info_get_versioned_descriptors)
 	version = ffa_version(MAKE_FFA_VERSION(1, 0));
 	EXPECT_EQ(version, FFA_VERSION_COMPILED);
 
-	/* Setup the mailbox (which holds the RX buffer). */
-	mb = set_up_mailbox();
 	partitions_v1_0 = mb.recv;
 
 	/*
