@@ -20,6 +20,11 @@ secondary_ep_entry:
 	adrp x30, kstack
 	add sp, x30, x27
 
+	/* Disable trapping floating point access in EL1. */
+	mov x30, #(0x3 << 20)
+	msr cpacr_el1, x30
+	isb
+
 	/* Enable MMU and cache. */
 	bl hftest_mm_vcpu_init
 
