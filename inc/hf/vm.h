@@ -305,6 +305,8 @@ void vm_notifications_partition_set_pending(
 	bool is_per_vcpu);
 ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
 	struct vm_locked vm_locked, bool is_from_vm, ffa_vcpu_index_t vcpu_id);
+void vm_notifications_framework_set_pending(
+	struct vm_locked vm_locked, ffa_notifications_bitmap_t notifications);
 ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 	struct vm_locked vm_locked);
 void vm_notifications_info_get_pending(

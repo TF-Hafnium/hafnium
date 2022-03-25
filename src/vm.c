@@ -684,24 +684,41 @@ bool vm_notifications_validate_per_vcpu(struct vm_locked vm_locked,
 			   : (to_check->bindings_per_vcpu & notif) == 0U;
 }
 
+static void vm_notifications_state_set(struct notifications_state *state,
+				       ffa_notifications_bitmap_t notifications)
+{
+	state->pending |= notifications;
+	vm_notifications_pending_count_add(notifications);
+}
+
 void vm_notifications_partition_set_pending(
 	struct vm_locked vm_locked, bool is_from_vm,
 	ffa_notifications_bitmap_t notifications, ffa_vcpu_index_t vcpu_id,
 	bool is_per_vcpu)
 {
+	struct notifications *to_set;
+	struct notifications_state *state;
+
 	CHECK(vm_locked.vm != NULL);
-	struct notifications *to_set =
-		vm_get_notifications(vm_locked, is_from_vm);
 	CHECK(vcpu_id < MAX_CPUS);
 
-	if (is_per_vcpu) {
-		to_set->per_vcpu[vcpu_id].pending |= notifications;
-	} else {
-		to_set->global.pending |= notifications;
-	}
+	to_set = vm_get_notifications(vm_locked, is_from_vm);
 
-	/* Update count of notifications pending. */
-	vm_notifications_pending_count_add(notifications);
+	state = is_per_vcpu ? &to_set->per_vcpu[vcpu_id] : &to_set->global;
+
+	vm_notifications_state_set(state, notifications);
+}
+
+/**
+ * Set pending framework notifications.
+ */
+void vm_notifications_framework_set_pending(
+	struct vm_locked vm_locked, ffa_notifications_bitmap_t notifications)
+{
+	CHECK(vm_locked.vm != NULL);
+	assert(notifications == 0x1U);
+	vm_notifications_state_set(&vm_locked.vm->notifications.framework,
+				   notifications);
 }
 
 static ffa_notifications_bitmap_t vm_notifications_state_get_pending(
