@@ -756,6 +756,17 @@ ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
 }
 
 /**
+ * Get pending framework notifications.
+ */
+ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
+	struct vm_locked vm_locked)
+{
+	assert(vm_locked.vm != NULL);
+	return vm_notifications_state_get_pending(
+		&vm_locked.vm->notifications.framework);
+}
+
+/**
  * Get pending notification's information to return to the receiver scheduler.
  */
 void vm_notifications_info_get_pending(

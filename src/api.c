@@ -3079,7 +3079,7 @@ struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 					  ffa_vcpu_index_t vcpu_id,
 					  uint32_t flags, struct vcpu *current)
 {
-	/* TODO: get framework notifications, when these are supported. */
+	ffa_notifications_bitmap_t framework_notifications = 0;
 	ffa_notifications_bitmap_t sp_notifications = 0;
 	ffa_notifications_bitmap_t vm_notifications = 0;
 	struct vm_locked receiver_locked;
@@ -3146,8 +3146,8 @@ struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 			receiver_locked, true, vcpu_id);
 	}
 
-	ret = api_ffa_notification_get_success_return(sp_notifications,
-						      vm_notifications, 0);
+	ret = api_ffa_notification_get_success_return(
+		sp_notifications, vm_notifications, framework_notifications);
 
 	/*
 	 * If there are no more pending notifications, change `sri_state` to
