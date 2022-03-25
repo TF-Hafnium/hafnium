@@ -653,43 +653,39 @@ bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 					uint32_t *lists_count,
 					const uint32_t ids_count_max)
 {
-	enum notifications_info_get_state info_get_state = INIT;
 	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
 	struct vm_locked other_world_locked = vm_find_locked(HF_OTHER_WORLD_ID);
+	/*
+	 * Variable to save return from 'vm_notifications_info_get'. To be
+	 * returned and used as indicator that scheduler should conduct more
+	 * calls to retrieve info of pending notifications.
+	 */
+	bool list_full_and_more_pending = false;
 
 	CHECK(other_world_locked.vm != NULL);
 
-	vm_notifications_info_get_pending(other_world_locked, false, ids,
-					  ids_count, lists_sizes, lists_count,
-					  ids_count_max, &info_get_state);
+	list_full_and_more_pending = vm_notifications_info_get(
+		other_world_locked, ids, ids_count, lists_sizes, lists_count,
+		ids_count_max);
 
 	vm_unlock(&other_world_locked);
 
-	if (info_get_state == FULL) {
-		goto out;
-	}
-
-	for (unsigned int i = 0; i < nwd_vms_size; i++) {
-		info_get_state = INIT;
-
+	for (ffa_vm_count_t i = 0;
+	     i < nwd_vms_size && !list_full_and_more_pending; i++) {
 		if (nwd_vms[i].id != HF_INVALID_VM_ID) {
 			struct vm_locked vm_locked = vm_lock(&nwd_vms[i]);
 
-			vm_notifications_info_get_pending(
-				vm_locked, false, ids, ids_count, lists_sizes,
-				lists_count, ids_count_max, &info_get_state);
+			list_full_and_more_pending = vm_notifications_info_get(
+				vm_locked, ids, ids_count, lists_sizes,
+				lists_count, ids_count_max);
 
 			vm_unlock(&vm_locked);
-
-			if (info_get_state == FULL) {
-				goto out;
-			}
 		}
 	}
-out:
+
 	nwd_vms_unlock(&nwd_vms_locked);
 
-	return info_get_state == FULL;
+	return list_full_and_more_pending;
 }
 
 bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current)

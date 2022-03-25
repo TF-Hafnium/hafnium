@@ -905,12 +905,18 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 {
 	enum notifications_info_get_state current_state = INIT;
 
-	/* Get info of pending notifications from SPs */
+	/* Get info of pending notifications from the framework. */
+	vm_notifications_state_info_get(&vm_locked.vm->notifications.framework,
+					vm_locked.vm->id, false, 0, ids,
+					ids_count, lists_sizes, lists_count,
+					ids_max_count, &current_state);
+
+	/* Get info of pending notifications from SPs. */
 	vm_notifications_info_get_pending(vm_locked, false, ids, ids_count,
 					  lists_sizes, lists_count,
 					  ids_max_count, &current_state);
 
-	/* Get info of pending notifications from VMs */
+	/* Get info of pending notifications from VMs. */
 	vm_notifications_info_get_pending(vm_locked, true, ids, ids_count,
 					  lists_sizes, lists_count,
 					  ids_max_count, &current_state);

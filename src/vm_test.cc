@@ -688,4 +688,29 @@ TEST_F(vm, vm_notifications_info_get_full_global)
 	vm_unlock(&current_vm_locked);
 }
 
+TEST_F(vm, vm_notifications_info_get_from_framework)
+{
+	struct vm_locked vm_locked = vm_lock(vm_find_index(0));
+	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t ids_count = 0;
+	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t lists_count = 0;
+
+	vm_notifications_framework_set_pending(vm_locked, 0x1U);
+
+	/* Get notifications info for the given notifications. */
+	vm_notifications_info_get(vm_locked, ids, &ids_count, lists_sizes,
+				  &lists_count,
+				  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
+
+	EXPECT_EQ(ids[0], vm_locked.vm->id);
+	EXPECT_EQ(ids_count, 1);
+	EXPECT_EQ(lists_sizes[0], 0);
+	EXPECT_EQ(lists_count, 1);
+
+	EXPECT_EQ(vm_notifications_framework_get_pending(vm_locked), 0x1U);
+
+	vm_unlock(&vm_locked);
+}
+
 } /* namespace */
