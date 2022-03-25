@@ -477,7 +477,8 @@ bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 bool vm_are_global_notifications_pending(struct vm_locked vm_locked)
 {
 	return vm_get_notifications(vm_locked, true)->global.pending != 0ULL ||
-	       vm_get_notifications(vm_locked, false)->global.pending != 0ULL;
+	       vm_get_notifications(vm_locked, false)->global.pending != 0ULL ||
+	       vm_locked.vm->notifications.framework.pending != 0ULL;
 }
 
 /**

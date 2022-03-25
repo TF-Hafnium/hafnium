@@ -187,7 +187,7 @@ struct vm {
 		 */
 		struct notifications from_vm;
 		struct notifications from_sp;
-		/* TODO: include framework notifications */
+		struct notifications_state framework;
 		bool enabled;
 		bool npi_injected;
 	} notifications;
