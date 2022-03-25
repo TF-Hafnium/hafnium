@@ -702,60 +702,53 @@ void vm_notifications_set(struct vm_locked vm_locked, bool is_from_vm,
 	vm_notifications_pending_count_add(notifications);
 }
 
-/**
- * Get Global notifications and per CPU only of the current VCPU.
- */
-ffa_notifications_bitmap_t vm_notifications_get_pending_and_clear(
-	struct vm_locked vm_locked, bool is_from_vm,
-	ffa_vcpu_index_t cur_vcpu_id)
+static ffa_notifications_bitmap_t vm_notifications_state_get_pending(
+	struct notifications_state *state)
 {
-	ffa_notifications_bitmap_t to_ret = 0;
+	ffa_notifications_bitmap_t to_ret;
 	ffa_notifications_bitmap_t pending_and_info_get_retrieved;
 
-	CHECK(vm_locked.vm != NULL);
-	struct notifications *to_get =
-		vm_get_notifications(vm_locked, is_from_vm);
-	CHECK(cur_vcpu_id < MAX_CPUS);
+	assert(state != NULL);
 
-	to_ret |= to_get->global.pending;
+	to_ret = state->pending;
 
 	/* Update count of currently pending notifications in the system. */
-	vm_notifications_pending_count_sub(to_get->global.pending);
+	vm_notifications_pending_count_sub(state->pending);
 
 	/*
 	 * If notifications receiver is getting have been retrieved by the
 	 * receiver scheduler, decrement those from respective count.
 	 */
 	pending_and_info_get_retrieved =
-		to_get->global.pending & to_get->global.info_get_retrieved;
+		state->pending & state->info_get_retrieved;
 
 	if (pending_and_info_get_retrieved != 0) {
 		vm_notifications_info_get_retrieved_count_sub(
 			pending_and_info_get_retrieved);
 	}
 
-	to_get->global.pending = 0U;
-	to_get->global.info_get_retrieved = 0U;
+	state->pending = 0U;
+	state->info_get_retrieved = 0U;
 
-	to_ret |= to_get->per_vcpu[cur_vcpu_id].pending;
+	return to_ret;
+}
 
-	/*
-	 * Update counts of notifications, this time for per-vCPU notifications.
-	 */
-	vm_notifications_pending_count_sub(
-		to_get->per_vcpu[cur_vcpu_id].pending);
+/**
+ * Get global and per-vCPU notifications for the given vCPU ID.
+ */
+ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
+	struct vm_locked vm_locked, bool is_from_vm, ffa_vcpu_index_t vcpu_id)
+{
+	ffa_notifications_bitmap_t to_ret;
+	struct notifications *to_get;
 
-	pending_and_info_get_retrieved =
-		to_get->per_vcpu[cur_vcpu_id].pending &
-		to_get->per_vcpu[cur_vcpu_id].info_get_retrieved;
+	assert(vm_locked.vm != NULL);
+	to_get = vm_get_notifications(vm_locked, is_from_vm);
+	assert(vcpu_id < MAX_CPUS);
 
-	if (pending_and_info_get_retrieved != 0) {
-		vm_notifications_info_get_retrieved_count_sub(
-			pending_and_info_get_retrieved);
-	}
-
-	to_get->per_vcpu[cur_vcpu_id].pending = 0U;
-	to_get->per_vcpu[cur_vcpu_id].info_get_retrieved = 0U;
+	to_ret = vm_notifications_state_get_pending(&to_get->global);
+	to_ret |=
+		vm_notifications_state_get_pending(&to_get->per_vcpu[vcpu_id]);
 
 	return to_ret;
 }

@@ -642,7 +642,7 @@ bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 {
 	(void)ret;
 
-	*from_sp = vm_notifications_get_pending_and_clear(receiver_locked,
+	*from_sp = vm_notifications_partition_get_pending(receiver_locked,
 							  false, vcpu_id);
 
 	return true;

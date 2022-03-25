@@ -308,7 +308,7 @@ TEST_F(vm, vm_notifications_set_and_get)
 	vm_notifications_set(current_vm_locked, is_from_vm, global, 0ull,
 			     false);
 
-	ret = vm_notifications_get_pending_and_clear(current_vm_locked,
+	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, 0ull);
 	EXPECT_EQ(ret, global);
 	EXPECT_EQ(notifications->global.pending, 0ull);
@@ -319,7 +319,7 @@ TEST_F(vm, vm_notifications_set_and_get)
 	vm_notifications_set(current_vm_locked, is_from_vm, per_vcpu, vcpu_idx,
 			     true);
 
-	ret = vm_notifications_get_pending_and_clear(current_vm_locked,
+	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, vcpu_idx);
 	EXPECT_EQ(ret, per_vcpu);
 	EXPECT_EQ(notifications->per_vcpu[vcpu_idx].pending, 0ull);
@@ -333,7 +333,7 @@ TEST_F(vm, vm_notifications_set_and_get)
 	vm_notifications_set(current_vm_locked, is_from_vm, global, 0ull,
 			     false);
 
-	ret = vm_notifications_get_pending_and_clear(current_vm_locked,
+	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, vcpu_idx);
 	EXPECT_EQ(ret, per_vcpu | global);
 	EXPECT_EQ(notifications->per_vcpu[vcpu_idx].pending, 0ull);
@@ -400,7 +400,7 @@ TEST_F(vm, vm_notifications_info_get_global)
 		 * return and cleans the 'pending' and 'info_get_retrieved'
 		 * bitmaps.
 		 */
-		got = vm_notifications_get_pending_and_clear(current_vm_locked,
+		got = vm_notifications_partition_get_pending(current_vm_locked,
 							     is_from_vm, 0);
 		EXPECT_EQ(got, to_set);
 
@@ -465,7 +465,7 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu)
 		 * return and cleans the 'pending' and 'info_get_retrieved'
 		 * bitmaps.
 		 */
-		got = vm_notifications_get_pending_and_clear(current_vm_locked,
+		got = vm_notifications_partition_get_pending(current_vm_locked,
 							     is_from_vm, 0);
 		EXPECT_EQ(got, per_vcpu);
 
@@ -534,12 +534,13 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus)
 	EXPECT_EQ(lists_sizes[1], 1);
 
 	for (unsigned int i = 0; i < vcpu_count; i++) {
-		got = vm_notifications_get_pending_and_clear(current_vm_locked,
+		got = vm_notifications_partition_get_pending(current_vm_locked,
 							     is_from_sp, i);
 
 		/*
-		 * The first call to vm_notifications_get_pending_and_clear
-		 * should also include the global notifications on the return.
+		 * The first call to
+		 * vm_notifications_partition_get_pending should also
+		 * include the global notifications on the return.
 		 */
 		ffa_notifications_bitmap_t to_check =
 			(i != 0) ? FFA_NOTIFICATION_MASK(i)
@@ -592,10 +593,10 @@ TEST_F(vm, vm_notifications_info_get_full_per_vcpu)
 
 	/*
 	 * Verify that as soon as there isn't space to do the required
-	 * insertion in the list, the 'vm_notifications_get_pending_and_clear'
-	 * returns and changes list state to FULL.
-	 * In this case returning, because it would need to add two IDs (VM ID
-	 * and VCPU ID).
+	 * insertion in the list, the
+	 * 'vm_notifications_partition_get_pending' returns and changes
+	 * list state to FULL. In this case returning, because it would need to
+	 * add two IDs (VM ID and VCPU ID).
 	 */
 	EXPECT_EQ(current_state, FULL);
 	EXPECT_EQ(ids_count, FFA_NOTIFICATIONS_INFO_GET_MAX_IDS - 1);
@@ -627,7 +628,7 @@ TEST_F(vm, vm_notifications_info_get_full_per_vcpu)
 	EXPECT_EQ(notifications->global.info_get_retrieved,
 		  FFA_NOTIFICATION_MASK(2));
 
-	got = vm_notifications_get_pending_and_clear(current_vm_locked,
+	got = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, 0);
 	EXPECT_EQ(got, FFA_NOTIFICATION_MASK(1) | FFA_NOTIFICATION_MASK(2));
 
@@ -675,7 +676,7 @@ TEST_F(vm, vm_notifications_info_get_full_global)
 	EXPECT_EQ(ids_count, FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
 	EXPECT_EQ(current_state, FULL);
 
-	got = vm_notifications_get_pending_and_clear(current_vm_locked,
+	got = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, 0);
 	EXPECT_EQ(got, FFA_NOTIFICATION_MASK(10));
 
