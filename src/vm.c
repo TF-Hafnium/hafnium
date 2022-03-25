@@ -783,6 +783,85 @@ ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 		&vm_locked.vm->notifications.framework);
 }
 
+static void vm_notifications_state_info_get(
+	struct notifications_state *state, ffa_vm_id_t vm_id, bool is_per_vcpu,
+	ffa_vcpu_index_t vcpu_id, uint16_t *ids, uint32_t *ids_count,
+	uint32_t *lists_sizes, uint32_t *lists_count,
+	const uint32_t ids_max_count,
+	enum notifications_info_get_state *info_get_state)
+{
+	ffa_notifications_bitmap_t pending_not_retrieved;
+
+	CHECK(*ids_count <= ids_max_count);
+	CHECK(*lists_count <= ids_max_count);
+
+	if (*info_get_state == FULL) {
+		return;
+	}
+
+	pending_not_retrieved = state->pending & ~state->info_get_retrieved;
+
+	/* No notifications pending that haven't been retrieved. */
+	if (pending_not_retrieved == 0U) {
+		return;
+	}
+
+	if (*ids_count == ids_max_count) {
+		*info_get_state = FULL;
+		return;
+	}
+
+	switch (*info_get_state) {
+	case INIT:
+	case STARTING_NEW:
+		/*
+		 * At this iteration two ids are to be added: the VM ID
+		 * and vCPU ID. If there is no space, change state and
+		 * terminate function.
+		 */
+		if (is_per_vcpu && ids_max_count - *ids_count < 2) {
+			*info_get_state = FULL;
+			return;
+		}
+
+		*info_get_state = INSERTING;
+		ids[*ids_count] = vm_id;
+		++(*ids_count);
+
+		if (is_per_vcpu) {
+			/* Insert vCPU ID. */
+			ids[*ids_count] = vcpu_id;
+			++(*ids_count);
+			++lists_sizes[*lists_count];
+		}
+
+		++(*lists_count);
+		break;
+	case INSERTING:
+		/* For per-vCPU notifications only. */
+		if (!is_per_vcpu) {
+			break;
+		}
+
+		/* Insert vCPU ID */
+		ids[*ids_count] = vcpu_id;
+		(*ids_count)++;
+		/* Increment respective list size */
+		++lists_sizes[*lists_count - 1];
+
+		if (lists_sizes[*lists_count - 1] == 3) {
+			*info_get_state = STARTING_NEW;
+		}
+		break;
+	default:
+		panic("Notification info get action error!!\n");
+	}
+
+	state->info_get_retrieved |= pending_not_retrieved;
+
+	vm_notifications_info_get_retrieved_count_add(pending_not_retrieved);
+}
+
 /**
  * Get pending notification's information to return to the receiver scheduler.
  */
@@ -792,107 +871,26 @@ void vm_notifications_info_get_pending(
 	const uint32_t ids_max_count,
 	enum notifications_info_get_state *info_get_state)
 {
-	ffa_notifications_bitmap_t pending_not_retrieved;
+	struct notifications *notifications;
 
 	CHECK(vm_locked.vm != NULL);
-	struct notifications *notifications =
-		vm_get_notifications(vm_locked, is_from_vm);
 
-	if (*info_get_state == FULL) {
-		return;
-	}
+	notifications = vm_get_notifications(vm_locked, is_from_vm);
 
-	CHECK(*ids_count <= ids_max_count);
-	CHECK(*lists_count <= ids_max_count);
-
-	pending_not_retrieved = notifications->global.pending &
-				~notifications->global.info_get_retrieved;
-
-	if (pending_not_retrieved != 0U && *info_get_state == INIT) {
-		/*
-		 * If action is to INIT, means that no list has been
-		 * created for the given VM ID, which also means that global
-		 * notifications are not represented in the list yet.
-		 */
-		if (*ids_count == ids_max_count) {
-			*info_get_state = FULL;
-			return;
-		}
-
-		*info_get_state = INSERTING;
-
-		(*lists_count)++;
-		ids[*ids_count] = vm_locked.vm->id;
-		++(*ids_count);
-	}
-
-	notifications->global.info_get_retrieved |= pending_not_retrieved;
-
-	vm_notifications_info_get_retrieved_count_add(pending_not_retrieved);
+	/*
+	 * Perform info get for global notifications, before doing it for
+	 * per-vCPU.
+	 */
+	vm_notifications_state_info_get(&notifications->global,
+					vm_locked.vm->id, false, 0, ids,
+					ids_count, lists_sizes, lists_count,
+					ids_max_count, info_get_state);
 
 	for (ffa_vcpu_count_t i = 0; i < vm_locked.vm->vcpu_count; i++) {
-		/*
-		 * Include VCPU ID of per-VCPU notifications.
-		 */
-		pending_not_retrieved =
-			notifications->per_vcpu[i].pending &
-			~notifications->per_vcpu[i].info_get_retrieved;
-
-		if (pending_not_retrieved == 0U) {
-			continue;
-		}
-
-		switch (*info_get_state) {
-		case INIT:
-		case STARTING_NEW:
-			/*
-			 * At this iteration two ids need to be added: the VM ID
-			 * and VCPU ID. If there is not space, change state and
-			 * terminate function.
-			 */
-			if (ids_max_count - *ids_count < 2) {
-				*info_get_state = FULL;
-				return;
-			}
-
-			ids[*ids_count] = vm_locked.vm->id;
-			++(*ids_count);
-
-			/* Insert VCPU ID */
-			ids[*ids_count] = i;
-			++(*ids_count);
-
-			++lists_sizes[*lists_count];
-			++(*lists_count);
-
-			*info_get_state = INSERTING;
-			break;
-		case INSERTING:
-			if (*ids_count == ids_max_count) {
-				*info_get_state = FULL;
-				return;
-			}
-
-			/* Insert VCPU ID */
-			ids[*ids_count] = i;
-			(*ids_count)++;
-
-			/* Increment respective list size */
-			++lists_sizes[*lists_count - 1];
-
-			if (lists_sizes[*lists_count - 1] == 3) {
-				*info_get_state = STARTING_NEW;
-			}
-			break;
-		default:
-			panic("Notification info get action error!!\n");
-		}
-
-		notifications->per_vcpu[i].info_get_retrieved |=
-			pending_not_retrieved;
-
-		vm_notifications_info_get_retrieved_count_add(
-			pending_not_retrieved);
+		vm_notifications_state_info_get(
+			&notifications->per_vcpu[i], vm_locked.vm->id, true, i,
+			ids, ids_count, lists_sizes, lists_count, ids_max_count,
+			info_get_state);
 	}
 }
 
