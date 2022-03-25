@@ -683,9 +683,10 @@ bool vm_notifications_validate_per_vcpu(struct vm_locked vm_locked,
 			   : (to_check->bindings_per_vcpu & notif) == 0U;
 }
 
-void vm_notifications_set(struct vm_locked vm_locked, bool is_from_vm,
-			  ffa_notifications_bitmap_t notifications,
-			  ffa_vcpu_index_t vcpu_id, bool is_per_vcpu)
+void vm_notifications_partition_set_pending(
+	struct vm_locked vm_locked, bool is_from_vm,
+	ffa_notifications_bitmap_t notifications, ffa_vcpu_index_t vcpu_id,
+	bool is_per_vcpu)
 {
 	CHECK(vm_locked.vm != NULL);
 	struct notifications *to_set =

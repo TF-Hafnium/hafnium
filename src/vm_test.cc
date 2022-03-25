@@ -305,8 +305,8 @@ TEST_F(vm, vm_notifications_set_and_get)
 	/*
 	 * Validate get notifications bitmap for global notifications.
 	 */
-	vm_notifications_set(current_vm_locked, is_from_vm, global, 0ull,
-			     false);
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
+					       global, 0ull, false);
 
 	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, 0ull);
@@ -316,8 +316,8 @@ TEST_F(vm, vm_notifications_set_and_get)
 	/*
 	 * Validate get notifications bitmap for per-vCPU notifications.
 	 */
-	vm_notifications_set(current_vm_locked, is_from_vm, per_vcpu, vcpu_idx,
-			     true);
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
+					       per_vcpu, vcpu_idx, true);
 
 	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, vcpu_idx);
@@ -328,10 +328,10 @@ TEST_F(vm, vm_notifications_set_and_get)
 	 * Validate that getting notifications for a specific vCPU also returns
 	 * global notifications.
 	 */
-	vm_notifications_set(current_vm_locked, is_from_vm, per_vcpu, vcpu_idx,
-			     true);
-	vm_notifications_set(current_vm_locked, is_from_vm, global, 0ull,
-			     false);
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
+					       per_vcpu, vcpu_idx, true);
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
+					       global, 0ull, false);
 
 	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, vcpu_idx);
@@ -374,8 +374,8 @@ TEST_F(vm, vm_notifications_info_get_global)
 			&current_vm->notifications.from_sp;
 		const bool is_from_vm = false;
 
-		vm_notifications_set(current_vm_locked, is_from_vm, to_set, 0,
-				     false);
+		vm_notifications_partition_set_pending(
+			current_vm_locked, is_from_vm, to_set, 0, false);
 
 		vm_notifications_info_get_pending(
 			current_vm_locked, is_from_vm, ids, &ids_count,
@@ -438,8 +438,8 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu)
 			&current_vm->notifications.from_sp;
 		const bool is_from_vm = false;
 
-		vm_notifications_set(current_vm_locked, is_from_vm, per_vcpu, 0,
-				     true);
+		vm_notifications_partition_set_pending(
+			current_vm_locked, is_from_vm, per_vcpu, 0, true);
 
 		vm_notifications_info_get_pending(
 			current_vm_locked, is_from_vm, ids, &ids_count,
@@ -505,8 +505,9 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus)
 	notifications = &current_vm->notifications.from_sp;
 
 	for (unsigned int i = 0; i < vcpu_count; i++) {
-		vm_notifications_set(current_vm_locked, is_from_sp,
-				     FFA_NOTIFICATION_MASK(i), i, true);
+		vm_notifications_partition_set_pending(
+			current_vm_locked, is_from_sp, FFA_NOTIFICATION_MASK(i),
+			i, true);
 	}
 
 	/*
@@ -514,7 +515,8 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus)
 	 * because global notifications only require the VM ID to be included in
 	 * the list, at least once.
 	 */
-	vm_notifications_set(current_vm_locked, is_from_sp, global, 0, false);
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_sp,
+					       global, 0, false);
 
 	vm_notifications_info_get_pending(current_vm_locked, is_from_sp, ids,
 					  &ids_count, lists_sizes, &lists_count,
@@ -582,8 +584,9 @@ TEST_F(vm, vm_notifications_info_get_full_per_vcpu)
 	enum notifications_info_get_state current_state = INIT;
 	CHECK(vm_get_count() >= 2);
 
-	vm_notifications_set(current_vm_locked, is_from_vm,
-			     FFA_NOTIFICATION_MASK(1), 0, true);
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
+					       FFA_NOTIFICATION_MASK(1), 0,
+					       true);
 
 	/* Call function to get notifications info, with only per-vCPU set. */
 	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
@@ -610,8 +613,9 @@ TEST_F(vm, vm_notifications_info_get_full_per_vcpu)
 	current_state = INIT;
 
 	/* Setting global notification */
-	vm_notifications_set(current_vm_locked, is_from_vm,
-			     FFA_NOTIFICATION_MASK(2), 0, false);
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
+					       FFA_NOTIFICATION_MASK(2), 0,
+					       false);
 
 	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
 					  &ids_count, lists_sizes, &lists_count,
@@ -661,8 +665,9 @@ TEST_F(vm, vm_notifications_info_get_full_global)
 	notifications = &current_vm->notifications.from_sp;
 
 	/* Set global notification. */
-	vm_notifications_set(current_vm_locked, is_from_vm,
-			     FFA_NOTIFICATION_MASK(10), 0, false);
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
+					       FFA_NOTIFICATION_MASK(10), 0,
+					       false);
 
 	/* Get notifications info for the given notifications. */
 	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,

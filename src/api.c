@@ -3038,8 +3038,10 @@ struct ffa_value api_ffa_notification_set(
 	}
 
 	/* Set notifications pending. */
-	vm_notifications_set(receiver_locked, plat_ffa_is_vm_id(sender_vm_id),
-			     notifications, vcpu_id, is_per_vcpu);
+	vm_notifications_partition_set_pending(
+		receiver_locked, plat_ffa_is_vm_id(sender_vm_id), notifications,
+		vcpu_id, is_per_vcpu);
+
 	dlog_verbose("Set the notifications: %x.\n", notifications);
 
 	if ((FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) == 0) {
