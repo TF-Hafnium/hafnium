@@ -207,6 +207,20 @@ bool plat_ffa_notifications_get_from_sp(
 	return false;
 }
 
+bool plat_ffa_notifications_get_framework_notifications(
+	struct vm_locked receiver_locked,
+	ffa_notifications_bitmap_t *from_fwk,  // NOLINT
+	uint32_t flags, ffa_vcpu_index_t vcpu_id, struct ffa_value *ret)
+{
+	(void)receiver_locked;
+	(void)from_fwk;
+	(void)flags;
+	(void)vcpu_id;
+	(void)ret;
+
+	return false;
+}
+
 bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
 				       ffa_vm_id_t receiver_vm_id,
 				       uint32_t flags,

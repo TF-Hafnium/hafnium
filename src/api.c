@@ -3233,6 +3233,18 @@ struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 			receiver_locked, true, vcpu_id);
 	}
 
+	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) != 0U ||
+	    (flags & FFA_NOTIFICATION_FLAG_BITMAP_SPM) != 0U) {
+		if (!plat_ffa_notifications_get_framework_notifications(
+			    receiver_locked, &framework_notifications, flags,
+			    vcpu_id, &ret)) {
+			dlog_verbose(
+				"Failed to get notifications from "
+				"framework.\n");
+			goto out;
+		}
+	}
+
 	ret = api_ffa_notification_get_success_return(
 		sp_notifications, vm_notifications, framework_notifications);
 

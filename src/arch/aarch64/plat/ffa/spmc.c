@@ -660,6 +660,29 @@ bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 	return true;
 }
 
+bool plat_ffa_notifications_get_framework_notifications(
+	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_fwk,
+	uint32_t flags, ffa_vcpu_index_t vcpu_id, struct ffa_value *ret)
+{
+	assert(from_fwk != NULL);
+	assert(ret != NULL);
+
+	(void)vcpu_id;
+
+	if (!vm_id_is_current_world(receiver_locked.vm->id) &&
+	    (flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) != 0U) {
+		dlog_error(
+			"Notification get flag from hypervisor in call to SPMC "
+			"MBZ.\n");
+		*ret = ffa_error(FFA_INVALID_PARAMETERS);
+		return false;
+	}
+
+	*from_fwk = vm_notifications_framework_get_pending(receiver_locked);
+
+	return true;
+}
+
 bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 					uint32_t *lists_sizes,
 					uint32_t *lists_count,

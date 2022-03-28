@@ -502,9 +502,9 @@ bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 					ffa_notifications_bitmap_t *from_sp,
 					struct ffa_value *ret)
 {
-	CHECK(from_sp != NULL && ret != NULL);
-
 	ffa_vm_id_t receiver_id = receiver_locked.vm->id;
+
+	assert(from_sp != NULL && ret != NULL);
 
 	*ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_NOTIFICATION_GET_32,
@@ -517,6 +517,40 @@ bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 	}
 
 	*from_sp = ffa_notification_get_from_sp(*ret);
+
+	return true;
+}
+
+bool plat_ffa_notifications_get_framework_notifications(
+	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_fwk,
+	uint32_t flags, ffa_vcpu_index_t vcpu_id, struct ffa_value *ret)
+{
+	ffa_vm_id_t receiver_id = receiver_locked.vm->id;
+	ffa_notifications_bitmap_t spm_notifications = 0;
+
+	(void)flags;
+
+	assert(from_fwk != NULL);
+	assert(ret != NULL);
+
+	/* Get SPMC notifications. */
+	if (ffa_tee_enabled) {
+		*ret = arch_other_world_call((struct ffa_value){
+			.func = FFA_NOTIFICATION_GET_32,
+			.arg1 = (vcpu_id << 16) | receiver_id,
+			.arg2 = FFA_NOTIFICATION_FLAG_BITMAP_SPM,
+		});
+
+		if (ffa_func_id(*ret) == FFA_ERROR_32) {
+			return false;
+		}
+
+		spm_notifications = ffa_notification_get_from_framework(*ret);
+	}
+
+	/* Merge notifications from SPMC and Hypervisor. */
+	*from_fwk = spm_notifications |
+		    vm_notifications_framework_get_pending(receiver_locked);
 
 	return true;
 }
