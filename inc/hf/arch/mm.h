@@ -185,6 +185,12 @@ void arch_mm_sync_table_writes(void);
  */
 uint32_t arch_mm_get_pa_range(void);
 
+/**
+ * Returns VTCR_EL2 configured in arch_mm_init.
+ */
 uintptr_t arch_mm_get_vtcr_el2(void);
 
+/**
+ * Returns VSTCR_EL2 configured in arch_mm_init.
+ */
 uintptr_t arch_mm_get_vstcr_el2(void);
