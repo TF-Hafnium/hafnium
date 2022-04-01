@@ -1747,6 +1747,14 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 
 	current_locked = vcpu_lock(current);
 	if (enable) {
+		if (type == INTERRUPT_TYPE_IRQ) {
+			current->interrupts.interrupt_type[intid_index] &=
+				~intid_mask;
+		} else if (type == INTERRUPT_TYPE_FIQ) {
+			current->interrupts.interrupt_type[intid_index] |=
+				intid_mask;
+		}
+
 		/*
 		 * If it is pending and was not enabled before, increment the
 		 * count.
@@ -1764,14 +1772,6 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 		}
 		current->interrupts.interrupt_enabled[intid_index] |=
 			intid_mask;
-
-		if (type == INTERRUPT_TYPE_IRQ) {
-			current->interrupts.interrupt_type[intid_index] &=
-				~intid_mask;
-		} else if (type == INTERRUPT_TYPE_FIQ) {
-			current->interrupts.interrupt_type[intid_index] |=
-				intid_mask;
-		}
 	} else {
 		/*
 		 * If it is pending and was enabled before, decrement the count.
