@@ -20,6 +20,7 @@ EL0_TEST_ONLY=false
 SKIP_LONG_RUNNING_TESTS=false
 SKIP_UNIT_TESTS=false
 RUN_ALL_QEMU_CPUS=false
+DEFAULT_HFTEST_TIMEOUT="600s"
 
 while test $# -gt 0
 do
@@ -46,7 +47,7 @@ do
 done
 
 # Run the tests with a timeout so they can't loop forever.
-HFTEST=(${TIMEOUT[@]} 300s ./test/hftest/hftest.py)
+HFTEST=(${TIMEOUT[@]} $DEFAULT_HFTEST_TIMEOUT ./test/hftest/hftest.py)
 HYPERVISOR_PATH="$OUT/"
 if [ $USE_FVP == true ]
 then
