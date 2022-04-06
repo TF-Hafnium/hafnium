@@ -26,7 +26,7 @@
 /* UART FBRD (Fractional Baudrate) Register. */
 #define UART_FBRD IO32_C(PL011_BASE + 0x028)
 
-/* UART Line Control Register Register. */
+/* UART Line Control Register. */
 #define UART_LCR_H IO32_C(PL011_BASE + 0x02C)
 
 /* UART Control Register. */

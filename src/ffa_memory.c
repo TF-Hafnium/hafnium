@@ -1852,7 +1852,7 @@ struct ffa_value ffa_memory_tee_send(
 		} else if (ret.func != FFA_MEM_FRAG_RX_32) {
 			dlog_warning(
 				"Got %#x from TEE in response to %#x for "
-				"fragment with with %d/%d, expected "
+				"fragment with %d/%d, expected "
 				"FFA_MEM_FRAG_RX.\n",
 				ret.func, share_func, fragment_length,
 				memory_share_length);

@@ -399,7 +399,7 @@ static bool load_secondary_fdt(struct mm_stage1_locked stage1_locked,
 	}
 
 	/*
-	 * Ensure the FDT has one additional page at the end for patching, and
+	 * Ensure the FDT has one additional page at the end for patching,
 	 * and align it to the page boundary.
 	 */
 	allocated_size = align_up(memiter_size(&fdt), PAGE_SIZE) + PAGE_SIZE;
