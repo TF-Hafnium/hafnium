@@ -2586,3 +2586,79 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_sender_not_clear)
 		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 	}
 }
+
+/**
+ * If the borrower specifies the transaction type in the flags of the memory
+ * region descriptor, and it doesn't match operation performed by sender,
+ * call to FFA_RETRIEVE_REQ must fail.
+ */
+TEST(memory_sharing, ffa_validate_retrieve_transaction_type)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_lend,
+		ffa_mem_share,
+		ffa_mem_donate,
+	};
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	SERVICE_SELECT(SERVICE_VM1, "ffa_memory_share_fail_invalid_parameters",
+		       mb.send);
+
+	for (uint32_t i = 0; i < ARRAY_SIZE(send_function); i++) {
+		/* Call the memory share interface. */
+		EXPECT_EQ(ffa_memory_region_init(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  SERVICE_VM1, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  send_function[i] != ffa_mem_donate
+					  ? FFA_DATA_ACCESS_RW
+					  : FFA_DATA_ACCESS_NOT_SPECIFIED,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  0);
+
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+		handle = ffa_mem_success_handle(ret);
+
+		/*
+		 * Prepare retrieve request with RW, and set the transaction
+		 * type wrongly in the memory region flags.
+		 * Should fail at the receiver's FFA_MEM_RETRIEVE_REQ
+		 * call with FFA_INVALID_PARAMETERS.
+		 */
+		msg_size = ffa_memory_retrieve_request_init(
+			mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
+			send_function[i] == ffa_mem_share
+				? FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND
+				: FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE,
+			FFA_DATA_ACCESS_RW,
+			send_function[i] != ffa_mem_donate
+				? FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED
+				: FFA_INSTRUCTION_ACCESS_NX,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE);
+
+		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+		EXPECT_EQ(
+			ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size, 0)
+				.func,
+			FFA_SUCCESS_32);
+
+		ffa_run(SERVICE_VM1, 0);
+
+		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+	}
+}
