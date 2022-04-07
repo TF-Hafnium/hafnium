@@ -120,7 +120,7 @@ TEST_SERVICE(give_memory_and_fault)
 	send_memory_and_retrieve_request(
 		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
 		constituents, ARRAY_SIZE(constituents),
-		FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_NOT_SPECIFIED,
+		FFA_MEMORY_REGION_FLAG_CLEAR, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_INSTRUCTION_ACCESS_X);
 
@@ -143,7 +143,7 @@ TEST_SERVICE(lend_memory_and_fault)
 	send_memory_and_retrieve_request(
 		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
 		constituents, ARRAY_SIZE(constituents),
-		FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RW,
+		FFA_MEMORY_REGION_FLAG_CLEAR, 0, FFA_DATA_ACCESS_RW,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_INSTRUCTION_ACCESS_X);
 
@@ -183,7 +183,7 @@ TEST_SERVICE(ffa_memory_return)
 	/* Give the memory back and notify the sender. */
 	send_memory_and_retrieve_request(
 		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), sender,
-		composite->constituents, composite->constituent_count, 0,
+		composite->constituents, composite->constituent_count, 0, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
@@ -294,7 +294,7 @@ TEST_SERVICE(ffa_donate_secondary_and_fault)
 	/* Donate memory to next VM. */
 	send_memory_and_retrieve_request(
 		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), SERVICE_VM2,
-		composite->constituents, composite->constituent_count, 0,
+		composite->constituents, composite->constituent_count, 0, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
@@ -329,7 +329,7 @@ TEST_SERVICE(ffa_donate_twice)
 	/* Give the memory back and notify the sender. */
 	send_memory_and_retrieve_request(
 		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), sender,
-		&constituent, 1, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
+		&constituent, 1, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_INSTRUCTION_ACCESS_X);
 
@@ -399,7 +399,7 @@ TEST_SERVICE(ffa_donate_invalid_source)
 	/* Give the memory back and notify the sender. */
 	send_memory_and_retrieve_request(
 		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), sender,
-		composite->constituents, composite->constituent_count, 0,
+		composite->constituents, composite->constituent_count, 0, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 

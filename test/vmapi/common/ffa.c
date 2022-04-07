@@ -43,7 +43,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
 	ffa_vm_id_t recipient,
 	struct ffa_memory_region_constituent constituents[],
-	uint32_t constituent_count, ffa_memory_region_flags_t flags,
+	uint32_t constituent_count, ffa_memory_region_flags_t send_flags,
+	ffa_memory_region_flags_t retrieve_flags,
 	enum ffa_data_access send_data_access,
 	enum ffa_data_access retrieve_data_access,
 	enum ffa_instruction_access send_instruction_access,
@@ -62,7 +63,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	/* Send the first fragment of the memory. */
 	remaining_constituent_count = ffa_memory_region_init(
 		tx_buffer, HF_MAILBOX_SIZE, sender, recipient, constituents,
-		constituent_count, 0, flags, send_data_access,
+		constituent_count, 0, send_flags, send_data_access,
 		send_instruction_access,
 		share_func == FFA_MEM_SHARE_32 ? FFA_MEMORY_NORMAL_MEM
 					       : FFA_MEMORY_NOT_SPECIFIED_MEM,
@@ -126,7 +127,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	 * to retrieve the memory.
 	 */
 	msg_size = ffa_memory_retrieve_request_init(
-		tx_buffer, handle, sender, recipient, 0, 0,
+		tx_buffer, handle, sender, recipient, 0, retrieve_flags,
 		retrieve_data_access, retrieve_instruction_access,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 		FFA_MEMORY_INNER_SHAREABLE);
