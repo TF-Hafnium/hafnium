@@ -450,11 +450,12 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 	/* Dirty the memory before sharing it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
+	/* Specify the transaction type in the retrieve request. */
 	handle = send_memory_and_retrieve_request(
 		FFA_MEM_SHARE_32, mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
-		constituents, ARRAY_SIZE(constituents), 0, 0,
-		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		constituents, ARRAY_SIZE(constituents), 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_DATA_ACCESS_RW,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_INSTRUCTION_ACCESS_NX);
 
 	/* Let the memory be returned. */
@@ -677,9 +678,11 @@ TEST(memory_sharing, give_and_get_back)
 	/* Dirty the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
 
+	/* Specify the transaction type in the retrieve request. */
 	send_memory_and_retrieve_request(
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
-		constituents, ARRAY_SIZE(constituents), 0, 0,
+		constituents, ARRAY_SIZE(constituents), 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_DONATE,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
@@ -716,11 +719,13 @@ TEST(memory_sharing, lend_and_get_back)
 	/* Dirty the memory before lending it. */
 	memset_s(ptr, sizeof(pages), 'c', PAGE_SIZE);
 
+	/* Specify the transaction type in the retrieve request. */
 	handle = send_memory_and_retrieve_request(
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
-		constituents, ARRAY_SIZE(constituents), 0, 0,
-		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		constituents, ARRAY_SIZE(constituents), 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND, FFA_DATA_ACCESS_RW,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_INSTRUCTION_ACCESS_X);
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(SERVICE_VM1, 0);
