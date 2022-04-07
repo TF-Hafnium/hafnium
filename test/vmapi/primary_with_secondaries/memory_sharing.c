@@ -244,8 +244,8 @@ static void memory_send_reclaim(uint32_t msg_size,
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	/* Write to pages to validate access has been reestablished. */
-	for (uint8_t i = 0; i < 5; i++) {
-		*ptr = i;
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		ptr[i] = i;
 	}
 }
 
