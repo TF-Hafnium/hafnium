@@ -48,7 +48,7 @@ enum execution_state { AARCH64 = 0, AARCH32 };
 enum xlat_granule { PAGE_4KB = 0, PAGE_16KB, PAGE_64KB };
 
 /**
- * Partition Memory region as described in PSA FFA v1.0 spec, Table 10
+ * Partition Memory region as described in FFA v1.0 spec, Table 10
  */
 struct memory_region {
 	/**
@@ -70,7 +70,7 @@ struct interrupt {
 };
 
 /**
- * Partition Device region as described in PSA FFA v1.0 spec, Table 11
+ * Partition Device region as described in FFA v1.0 spec, Table 11
  */
 struct device_region {
 	/** Device base PA - mandatory */
@@ -108,10 +108,10 @@ struct rx_tx {
 };
 
 /**
- * Partition manifest as described in PSA FF-A v1.0 spec section 3.1
+ * Partition manifest as described in FF-A v1.0 spec section 3.1
  */
 struct partition_manifest {
-	/** PSA-FF-A expected version - mandatory */
+	/** FF-A expected version - mandatory */
 	uint32_t ffa_version;
 	/** UUID - mandatory */
 	struct ffa_uuid uuid;
@@ -162,7 +162,7 @@ struct partition_manifest {
 };
 
 /**
- *  Header for a PSA FF-A partition package.
+ *  Header for a FF-A partition package.
  */
 struct sp_pkg_header {
 	/** Magic used to identify a SP package. Value is "SPKG" */

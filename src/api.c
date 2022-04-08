@@ -2131,7 +2131,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	}
 
 	/*
-	 * Per PSA FF-A EAC spec section 4.4.1 the firmware framework supports
+	 * Per FF-A EAC spec section 4.4.1 the firmware framework supports
 	 * UP (migratable) or MP partitions with a number of vCPUs matching the
 	 * number of PEs in the system. It further states that MP partitions
 	 * accepting direct request messages cannot migrate.
