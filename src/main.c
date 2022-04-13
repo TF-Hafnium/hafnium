@@ -42,5 +42,7 @@ struct vcpu *cpu_main(struct cpu *c)
 	/* Initialize SRI for running core. */
 	plat_ffa_sri_init(c);
 
+	vm_set_boot_info_gp_reg(first_boot, vcpu);
+
 	return vcpu;
 }

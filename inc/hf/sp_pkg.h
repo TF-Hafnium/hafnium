@@ -41,6 +41,12 @@ static inline size_t sp_pkg_get_mem_size(struct sp_pkg_header *sp_pkg)
 	return (size_t)(sp_pkg->img_offset + sp_pkg->img_size);
 }
 
+/** Get the size of the boot information descriptors section. */
+static inline size_t sp_pkg_get_boot_info_size(struct sp_pkg_header *sp_pkg)
+{
+	return sp_pkg->pm_offset;
+}
+
 bool sp_pkg_init(struct mm_stage1_locked stage1_locked, paddr_t pkg_start,
 		 struct sp_pkg_header *header, struct mpool *ppool);
 

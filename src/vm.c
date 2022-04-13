@@ -920,3 +920,16 @@ bool vm_notifications_is_npi_injected(struct vm_locked vm_locked)
 {
 	return vm_locked.vm->notifications.npi_injected;
 }
+
+/**
+ * Sets the designated GP register that the VM expects to receive the boot
+ * info's address.
+ */
+void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu)
+{
+	if (!vm->initialized && vm->boot_info.blob_addr.ipa != 0U) {
+		arch_regs_set_gp_reg(&vcpu->regs,
+				     ipa_addr(vm->boot_info.blob_addr),
+				     vm->boot_info.gp_register_num);
+	}
+}

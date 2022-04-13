@@ -1440,16 +1440,18 @@ static bool sp_boot_next(struct vcpu *current, struct vcpu **next)
 			     current_vm_locked.vm->id,
 			     current_vm_locked.vm->boot_order);
 
-		if (current_vm_locked.vm->next_boot != NULL) {
+		vm_next = current_vm_locked.vm->next_boot;
+		if (vm_next != NULL) {
 			/* Refer FF-A v1.1 Beta0 section 7.5 Rule 2. */
 			current->state = VCPU_STATE_WAITING;
-			vm_next = current_vm_locked.vm->next_boot;
 			CHECK(vm_next->initialized == false);
 			*next = vm_get_vcpu(vm_next, vcpu_index(current));
 			arch_regs_reset(*next);
 			(*next)->cpu = current->cpu;
 			(*next)->state = VCPU_STATE_RUNNING;
 			(*next)->regs_available = false;
+
+			vm_set_boot_info_gp_reg(vm_next, (*next));
 
 			ret = true;
 			goto out;
