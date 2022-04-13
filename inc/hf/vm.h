@@ -208,6 +208,13 @@ struct vm {
 	 */
 	bool initialized;
 	uint16_t boot_order;
+
+	/** Entries to pass boot data to the VM. */
+	struct {
+		uint32_t gp_register_num;
+		ipaddr_t blob_addr;
+	} boot_info;
+
 	uint8_t messaging_method;
 	bool managed_exit;
 	struct vm *next_boot;
@@ -313,3 +320,4 @@ bool vm_supports_messaging_method(struct vm *vm, uint8_t messaging_method);
 void vm_notifications_set_npi_injected(struct vm_locked vm_locked,
 				       bool npi_injected);
 bool vm_notifications_is_npi_injected(struct vm_locked vm_locked);
+void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu);

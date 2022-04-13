@@ -212,6 +212,19 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 
 		vm_locked.vm->boot_order = manifest_vm->partition.boot_order;
 
+		vm_locked.vm->boot_info.gp_register_num =
+			manifest_vm->partition.gp_register_num;
+
+		if (manifest_vm->partition.boot_info) {
+			/*
+			 * If the partition expects the boot information blob
+			 * per the ff-a v1.1 boot protocol, then its address
+			 * shall match the partition's load address.
+			 */
+			vm_locked.vm->boot_info.blob_addr =
+				ipa_init(manifest_vm->partition.load_addr);
+		}
+
 		/* Updating boot list according to boot_order */
 		vm_update_boot(vm_locked.vm);
 
