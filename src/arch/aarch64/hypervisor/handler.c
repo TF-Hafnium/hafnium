@@ -502,7 +502,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_RXTX_MAP_64:
 		*args = api_ffa_rxtx_map(ipa_init(args->arg1),
 					 ipa_init(args->arg2), args->arg3,
-					 current, next);
+					 current);
 		return true;
 	case FFA_RXTX_UNMAP_32:
 		*args = api_ffa_rxtx_unmap(args->arg1, current);

@@ -1240,12 +1240,9 @@ out:
  *    due to insuffient page table memory.
  *  - FFA_ERROR FFA_DENIED if the pages are already mapped.
  *  - FFA_SUCCESS on success if no further action is needed.
- *  - FFA_RX_RELEASE if it was called by the primary VM and the primary VM now
- *    needs to wake up or kick waiters.
  */
 struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
-				  uint32_t page_count, struct vcpu *current,
-				  struct vcpu **next)
+				  uint32_t page_count, struct vcpu *current)
 {
 	struct vm *vm = current->vm;
 	struct ffa_value ret;
@@ -1269,8 +1266,7 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 		goto exit;
 	}
 
-	/* Tell caller about waiters, if any. */
-	ret = api_waiter_result(vm_locked, current, next);
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 exit:
 	mpool_fini(&local_page_pool);

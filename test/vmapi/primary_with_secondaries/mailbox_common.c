@@ -210,36 +210,6 @@ TEST(mailbox, no_primary_to_secondary_notification_on_configure)
 }
 
 /**
- * Send a message before the secondary VM is configured, and receive a
- * notification when it configures.
- */
-TEST(mailbox, secondary_to_primary_notification_on_configure)
-{
-	struct ffa_value run_res;
-
-	set_up_mailbox();
-
-	EXPECT_FFA_ERROR(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
-				      FFA_MSG_SEND_NOTIFY),
-			 FFA_BUSY);
-
-	/*
-	 * Run first VM for it to configure itself. It should result in
-	 * notifications having to be issued.
-	 */
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_RX_RELEASE_32);
-
-	/* A single waiter is returned. */
-	EXPECT_EQ(hf_mailbox_waiter_get(SERVICE_VM1), HF_PRIMARY_VM_ID);
-	EXPECT_EQ(hf_mailbox_waiter_get(SERVICE_VM1), -1);
-
-	/* Send should now succeed. */
-	EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, 0, 0).func,
-		  FFA_SUCCESS_32);
-}
-
-/**
  * Sends two messages to secondary VM without letting it run, so second message
  * won't go through. Ensure that a notification is delivered when secondary VM
  * clears the mailbox.

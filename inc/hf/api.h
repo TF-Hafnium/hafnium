@@ -51,8 +51,7 @@ struct ffa_value api_vm_configure_pages(
 	ipaddr_t send, ipaddr_t recv, uint32_t page_count,
 	struct mpool *local_page_pool);
 struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
-				  uint32_t page_count, struct vcpu *current,
-				  struct vcpu **next);
+				  uint32_t page_count, struct vcpu *current);
 struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 				    struct vcpu *current);
 struct ffa_value api_yield(struct vcpu *current, struct vcpu **next);
