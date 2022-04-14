@@ -62,11 +62,22 @@ void plat_ffa_log_init(void)
 	dlog_info("Initializing Hafnium (Hypervisor)\n");
 }
 
+static void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send,
+				   uint64_t page_count)
+{
+	struct ffa_value ret;
+
+	ret = arch_other_world_call((struct ffa_value){.func = FFA_RXTX_MAP_64,
+						       .arg1 = pa_addr(recv),
+						       .arg2 = pa_addr(send),
+						       .arg3 = page_count});
+	CHECK(ret.func == FFA_SUCCESS_32);
+}
+
 void plat_ffa_init(bool tee_enabled)
 {
 	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
 	struct ffa_value ret;
-	uint32_t func;
 
 	if (!tee_enabled) {
 		return;
@@ -97,27 +108,10 @@ void plat_ffa_init(bool tee_enabled)
 	 * perspective and vice-versa.
 	 */
 	dlog_verbose("Setting up buffers for TEE.\n");
-	ret = arch_other_world_call((struct ffa_value){
-		.func = FFA_RXTX_MAP_64,
-		.arg1 = pa_addr(
-			pa_from_va(va_from_ptr(other_world_vm->mailbox.recv))),
-		.arg2 = pa_addr(
-			pa_from_va(va_from_ptr(other_world_vm->mailbox.send))),
-		.arg3 = HF_MAILBOX_SIZE / FFA_PAGE_SIZE});
-	func = ret.func & ~SMCCC_CONVENTION_MASK;
-	if (ret.func == SMCCC_ERROR_UNKNOWN) {
-		dlog_error(
-			"Unknown function setting up TEE message buffers. "
-			"Memory sharing with TEE will not work.\n");
-		return;
-	}
-	if (func == FFA_ERROR_32) {
-		panic("Error %d setting up TEE message buffers.", ret.arg2);
-	} else if (func != FFA_SUCCESS_32) {
-		panic("Unexpected function %#x returned setting up TEE message "
-		      "buffers.",
-		      ret.func);
-	}
+	plat_ffa_rxtx_map_spmc(
+		pa_from_va(va_from_ptr(other_world_vm->mailbox.recv)),
+		pa_from_va(va_from_ptr(other_world_vm->mailbox.send)),
+		HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
 
 	ffa_tee_enabled = true;
 
@@ -420,6 +414,11 @@ struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
 	return (struct vm_locked){.vm = NULL};
 }
 
+struct vm_locked plat_ffa_vm_find_locked_create(ffa_vm_id_t vm_id)
+{
+	return plat_ffa_vm_find_locked(vm_id);
+}
+
 bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
 {
 	return vm_id_is_current_world(vm_id);
@@ -534,6 +533,33 @@ bool plat_ffa_vm_notifications_info_get(     // NOLINTNEXTLINE
 	(void)ids_count_max;
 
 	return false;
+}
+
+void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
+{
+	struct vm *vm = vm_locked.vm;
+	struct vm *other_world;
+
+	if (!ffa_tee_enabled) {
+		return;
+	}
+
+	if (vm->ffa_version < MAKE_FFA_VERSION(1, 1)) {
+		return;
+	}
+
+	/* Hypervisor always forward the call to the SPMC. */
+
+	other_world = vm_find(HF_OTHER_WORLD_ID);
+
+	/* Fill the buffers descriptor in SPMC's RX buffer. */
+	ffa_endpoint_rx_tx_descriptor_init(
+		(struct ffa_endpoint_rx_tx_descriptor *)
+			other_world->mailbox.recv,
+		vm->id, (uintptr_t)vm->mailbox.recv,
+		(uintptr_t)vm->mailbox.send);
+
+	plat_ffa_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
 }
 
 bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current)

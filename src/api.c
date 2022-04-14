@@ -1103,8 +1103,8 @@ struct ffa_value api_vm_configure_pages(
 	paddr_t pa_send_end;
 	paddr_t pa_recv_begin;
 	paddr_t pa_recv_end;
-	uint32_t orig_send_mode;
-	uint32_t orig_recv_mode;
+	uint32_t orig_send_mode = 0;
+	uint32_t orig_recv_mode = 0;
 	uint32_t extra_attributes;
 
 	/* We only allow these to be setup once. */
@@ -1138,51 +1138,63 @@ struct ffa_value api_vm_configure_pages(
 		goto out;
 	}
 
-	/*
-	 * Ensure the pages are valid, owned and exclusive to the VM and that
-	 * the VM has the required access to the memory.
-	 */
-	if (!vm_mem_get_mode(vm_locked, send, ipa_add(send, PAGE_SIZE),
-			     &orig_send_mode) ||
-	    !api_mode_valid_owned_and_exclusive(orig_send_mode) ||
-	    (orig_send_mode & MM_MODE_R) == 0 ||
-	    (orig_send_mode & MM_MODE_W) == 0) {
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
+	/* Set stage 2 translation tables only for virtual FF-A instances. */
+	if (vm_id_is_current_world(vm_locked.vm->id)) {
+		/*
+		 * Ensure the pages are valid, owned and exclusive to the VM and
+		 * that the VM has the required access to the memory.
+		 */
+		if (!vm_mem_get_mode(vm_locked, send, ipa_add(send, PAGE_SIZE),
+				     &orig_send_mode) ||
+		    !api_mode_valid_owned_and_exclusive(orig_send_mode) ||
+		    (orig_send_mode & MM_MODE_R) == 0 ||
+		    (orig_send_mode & MM_MODE_W) == 0) {
+			dlog_error(
+				"VM doesn't have required access rights to map "
+				"TX buffer in stage 2.\n");
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
 
-	if (!vm_mem_get_mode(vm_locked, recv, ipa_add(recv, PAGE_SIZE),
-			     &orig_recv_mode) ||
-	    !api_mode_valid_owned_and_exclusive(orig_recv_mode) ||
-	    (orig_recv_mode & MM_MODE_R) == 0) {
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
+		if (!vm_mem_get_mode(vm_locked, recv, ipa_add(recv, PAGE_SIZE),
+				     &orig_recv_mode) ||
+		    !api_mode_valid_owned_and_exclusive(orig_recv_mode) ||
+		    (orig_recv_mode & MM_MODE_R) == 0) {
+			dlog_error(
+				"VM doesn't have required access rights to map "
+				"RX buffer in stage 2.\n");
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
 
-	/* Take memory ownership away from the VM and mark as shared. */
-	uint32_t mode =
-		MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R | MM_MODE_W;
-	if (vm_locked.vm->el0_partition) {
-		mode |= MM_MODE_USER | MM_MODE_NG;
-	}
+		/* Take memory ownership away from the VM and mark as shared. */
+		uint32_t mode = MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R |
+				MM_MODE_W;
+		if (vm_locked.vm->el0_partition) {
+			mode |= MM_MODE_USER | MM_MODE_NG;
+		}
 
-	if (!vm_identity_map(vm_locked, pa_send_begin, pa_send_end, mode,
-			     local_page_pool, NULL)) {
-		ret = ffa_error(FFA_NO_MEMORY);
-		goto out;
-	}
+		if (!vm_identity_map(vm_locked, pa_send_begin, pa_send_end,
+				     mode, local_page_pool, NULL)) {
+			dlog_error(
+				"Cannot allocate a new entry in stage 2 "
+				"translation table.\n");
+			ret = ffa_error(FFA_NO_MEMORY);
+			goto out;
+		}
 
-	mode = MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R;
-	if (vm_locked.vm->el0_partition) {
-		mode |= MM_MODE_USER | MM_MODE_NG;
-	}
+		mode = MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R;
+		if (vm_locked.vm->el0_partition) {
+			mode |= MM_MODE_USER | MM_MODE_NG;
+		}
 
-	if (!vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end, mode,
-			     local_page_pool, NULL)) {
-		/* TODO: partial defrag of failed range. */
-		/* Recover any memory consumed in failed mapping. */
-		vm_ptable_defrag(vm_locked, local_page_pool);
-		goto fail_undo_send;
+		if (!vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
+				     mode, local_page_pool, NULL)) {
+			/* TODO: partial defrag of failed range. */
+			/* Recover any memory consumed in failed mapping. */
+			vm_ptable_defrag(vm_locked, local_page_pool);
+			goto fail_undo_send;
+		}
 	}
 
 	/* Get extra send/recv pages mapping attributes for the given VM ID. */
@@ -1214,7 +1226,7 @@ struct ffa_value api_vm_configure_pages(
 
 fail_undo_send_and_recv:
 	CHECK(vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
-			      orig_send_mode, local_page_pool, NULL));
+			      orig_recv_mode, local_page_pool, NULL));
 
 fail_undo_send:
 	CHECK(vm_identity_map(vm_locked, pa_send_begin, pa_send_end,
@@ -1225,6 +1237,35 @@ out:
 	return ret;
 }
 
+static void api_get_rxtx_description(struct vm_locked vm_locked, ipaddr_t *send,
+				     ipaddr_t *recv, uint32_t *page_count,
+				     ffa_vm_id_t *owner_vm_id)
+{
+	/*
+	 * If the message has been forwarded the effective addresses are in
+	 * hypervisor's TX buffer.
+	 */
+	bool forwarded = (vm_locked.vm->id == HF_OTHER_WORLD_ID) &&
+			 (ipa_addr(*send) == 0) && (ipa_addr(*recv) == 0) &&
+			 (*page_count == 0);
+
+	if (forwarded) {
+		struct ffa_endpoint_rx_tx_descriptor *endpoint_desc =
+			(struct ffa_endpoint_rx_tx_descriptor *)
+				vm_locked.vm->mailbox.send;
+		struct ffa_composite_memory_region *rx_region =
+			ffa_enpoint_get_rx_memory_region(endpoint_desc);
+		struct ffa_composite_memory_region *tx_region =
+			ffa_enpoint_get_tx_memory_region(endpoint_desc);
+
+		*owner_vm_id = endpoint_desc->endpoint_id;
+		*recv = ipa_init(rx_region->constituents[0].address);
+		*send = ipa_init(tx_region->constituents[0].address);
+		*page_count = rx_region->constituents[0].page_count;
+	} else {
+		*owner_vm_id = vm_locked.vm->id;
+	}
+}
 /**
  * Configures the VM to send/receive data through the specified pages. The pages
  * must not be shared. Locking of the page tables combined with a local memory
@@ -1247,8 +1288,26 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	struct vm *vm = current->vm;
 	struct ffa_value ret;
 	struct vm_locked vm_locked;
+	struct vm_locked owner_vm_locked;
 	struct mm_stage1_locked mm_stage1_locked;
 	struct mpool local_page_pool;
+	ffa_vm_id_t owner_vm_id;
+
+	vm_locked = vm_lock(vm);
+	/*
+	 * Get the original buffer addresses and VM ID in case of forwarded
+	 * message.
+	 */
+	api_get_rxtx_description(vm_locked, &send, &recv, &page_count,
+				 &owner_vm_id);
+	vm_unlock(&vm_locked);
+
+	owner_vm_locked = plat_ffa_vm_find_locked_create(owner_vm_id);
+	if (owner_vm_locked.vm == NULL) {
+		dlog_error("Cannot map RX/TX for VM ID %#x, not found.\n",
+			   owner_vm_id);
+		return ffa_error(FFA_DENIED);
+	}
 
 	/*
 	 * Create a local pool so any freed memory can't be used by another
@@ -1257,22 +1316,23 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	 */
 	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
 
-	vm_locked = vm_lock(vm);
 	mm_stage1_locked = mm_lock_stage1();
 
-	ret = api_vm_configure_pages(mm_stage1_locked, vm_locked, send, recv,
-				     page_count, &local_page_pool);
+	ret = api_vm_configure_pages(mm_stage1_locked, owner_vm_locked, send,
+				     recv, page_count, &local_page_pool);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto exit;
 	}
+
+	/* Forward buffer mapping to SPMC if coming from a VM. */
+	plat_ffa_rxtx_map_forward(owner_vm_locked);
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 exit:
 	mpool_fini(&local_page_pool);
-
 	mm_unlock_stage1(&mm_stage1_locked);
-	vm_unlock(&vm_locked);
+	vm_unlock(&owner_vm_locked);
 
 	return ret;
 }

@@ -137,6 +137,11 @@ bool plat_ffa_notifications_update_bindings_forward(
 	return false;
 }
 
+void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
+{
+	(void)vm_locked;
+}
+
 ffa_partition_properties_t plat_ffa_partition_properties(
 	ffa_vm_id_t vm_id, const struct vm *target)
 {
@@ -224,6 +229,12 @@ struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 }
 
 struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
+{
+	(void)vm_id;
+	return (struct vm_locked){.vm = NULL};
+}
+
+struct vm_locked plat_ffa_vm_find_locked_create(ffa_vm_id_t vm_id)
 {
 	(void)vm_id;
 	return (struct vm_locked){.vm = NULL};

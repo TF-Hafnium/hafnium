@@ -99,6 +99,11 @@ bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
 	return false;
 }
 
+void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
+{
+	(void)vm_locked;
+}
+
 bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret)
@@ -231,6 +236,12 @@ struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 }
 
 struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
+{
+	(void)vm_id;
+	return (struct vm_locked){.vm = NULL};
+}
+
+struct vm_locked plat_ffa_vm_find_locked_create(ffa_vm_id_t vm_id)
 {
 	(void)vm_id;
 	return (struct vm_locked){.vm = NULL};

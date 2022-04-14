@@ -410,6 +410,11 @@ bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
 	return false;
 }
 
+void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
+{
+	(void)vm_locked;
+}
+
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 					ffa_vm_id_t receiver_id, uint32_t flags)
 {
@@ -517,6 +522,15 @@ struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
 	nwd_vms_unlock(&nwd_vms_locked);
 
 	return to_ret_locked;
+}
+
+struct vm_locked plat_ffa_vm_find_locked_create(ffa_vm_id_t vm_id)
+{
+	if (vm_id_is_current_world(vm_id) || vm_id == HF_OTHER_WORLD_ID) {
+		return vm_find_locked(vm_id);
+	}
+
+	return plat_ffa_nwd_vm_create(vm_id);
 }
 
 struct ffa_value plat_ffa_notifications_bitmap_create(
