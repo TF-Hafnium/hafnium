@@ -779,9 +779,27 @@ ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
 ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 	struct vm_locked vm_locked)
 {
-	assert(vm_locked.vm != NULL);
-	return vm_notifications_state_get_pending(
-		&vm_locked.vm->notifications.framework);
+	struct vm *vm = vm_locked.vm;
+	ffa_notifications_bitmap_t framework;
+	bool rx_buffer_full;
+
+	assert(vm != NULL);
+
+	framework = vm_notifications_state_get_pending(
+		&vm->notifications.framework);
+
+	/*
+	 * By retrieving an RX buffer full notification the buffer state
+	 * transitions from RECEIVED to READ; the VM is now the RX buffer
+	 * owner, can read it and is allowed to release it.
+	 */
+	rx_buffer_full = is_ffa_spm_buffer_full_notification(framework) ||
+			 is_ffa_hyp_buffer_full_notification(framework);
+	if (rx_buffer_full && vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
+		vm->mailbox.state = MAILBOX_STATE_READ;
+	}
+
+	return framework;
 }
 
 static void vm_notifications_state_info_get(

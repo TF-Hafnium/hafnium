@@ -29,9 +29,9 @@
  *
  * EMPTY is the initial state. The follow state transitions are possible:
  * * EMPTY => RECEIVED: message sent to the VM.
- * * RECEIVED => READ: secondary VM returns from FFA_MSG_WAIT or
- *   FFA_MSG_POLL, or primary VM returns from FFA_RUN with an FFA_MSG_SEND
- *   where the receiver is itself.
+ * * RECEIVED => READ: secondary VM receives an RX buffer full notification
+ *   or primary VM returns from FFA_RUN with an FFA_MSG_SEND where the receiver
+ *   is itself.
  * * READ => EMPTY: VM called FFA_RX_RELEASE.
  */
 enum mailbox_state {
