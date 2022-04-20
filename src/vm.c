@@ -716,7 +716,8 @@ void vm_notifications_framework_set_pending(
 	struct vm_locked vm_locked, ffa_notifications_bitmap_t notifications)
 {
 	CHECK(vm_locked.vm != NULL);
-	assert(notifications == 0x1U);
+	assert(is_ffa_spm_buffer_full_notification(notifications) ||
+	       is_ffa_hyp_buffer_full_notification(notifications));
 	vm_notifications_state_set(&vm_locked.vm->notifications.framework,
 				   notifications);
 }

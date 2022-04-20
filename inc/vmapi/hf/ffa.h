@@ -561,6 +561,24 @@ typedef uint64_t ffa_notifications_bitmap_t;
  */
 #define FFA_NOTIFICATION_FLAG_PER_VCPU (UINT32_C(1) << 0)
 
+#define FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK FFA_NOTIFICATION_MASK(0)
+#define FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK FFA_NOTIFICATION_MASK(32)
+
+/**
+ * Helper functions to check for buffer full notification.
+ */
+static inline bool is_ffa_hyp_buffer_full_notification(
+	ffa_notifications_bitmap_t framework)
+{
+	return (framework & FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK) != 0;
+}
+
+static inline bool is_ffa_spm_buffer_full_notification(
+	ffa_notifications_bitmap_t framework)
+{
+	return (framework & FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK) != 0;
+}
+
 /**
  * Helper function to assemble a 64-bit sized bitmap, from the 32-bit sized lo
  * and hi.
@@ -583,6 +601,12 @@ static inline ffa_notifications_bitmap_t ffa_notification_get_from_vm(
 	struct ffa_value val)
 {
 	return ffa_notifications_bitmap((uint32_t)val.arg4, (uint32_t)val.arg5);
+}
+
+static inline ffa_notifications_bitmap_t ffa_notification_get_from_framework(
+	struct ffa_value val)
+{
+	return ffa_notifications_bitmap((uint32_t)val.arg6, (uint32_t)val.arg7);
 }
 
 /**

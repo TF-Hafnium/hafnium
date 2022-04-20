@@ -14,6 +14,8 @@
 #include <linux/types.h>
 
 #define INT32_C(c) c
+#define UINT32_C(c) c##U
+#define UINT64_C(c) c##ULL
 
 typedef phys_addr_t hf_ipaddr_t;
 
