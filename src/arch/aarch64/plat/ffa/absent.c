@@ -170,8 +170,9 @@ bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 }
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_vm_id_t receiver_id)
+					ffa_vm_id_t receiver_id, uint32_t flags)
 {
+	(void)flags;
 	(void)current;
 	(void)receiver_id;
 	return false;

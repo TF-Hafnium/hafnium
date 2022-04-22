@@ -363,18 +363,29 @@ bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
 }
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_vm_id_t receiver_id)
+					ffa_vm_id_t receiver_id, uint32_t flags)
 {
 	ffa_vm_id_t current_vm_id = current->vm->id;
-
 	/*
 	 * SPMC:
 	 * - An SP can ask for its notifications, or the hypervisor can get
 	 *  notifications target to a VM.
 	 */
-	return (current_vm_id == receiver_id) ||
-	       (current_vm_id == HF_HYPERVISOR_VM_ID &&
-		!vm_id_is_current_world(receiver_id));
+	bool caller_and_receiver_valid =
+		(current_vm_id == receiver_id) ||
+		(current_vm_id == HF_HYPERVISOR_VM_ID &&
+		 !vm_id_is_current_world(receiver_id));
+
+	/*
+	 * Flags field is not valid if NWd endpoint requests notifications from
+	 * VMs or Hypervisor. Those are managed by the hypervisor if present.
+	 */
+	bool flags_valid =
+		!(plat_ffa_is_vm_id(receiver_id) &&
+		  ((flags & FFA_NOTIFICATION_FLAG_BITMAP_VM) != 0U ||
+		   (flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) != 0U));
+
+	return caller_and_receiver_valid && flags_valid;
 }
 
 void plat_ffa_notification_info_get_forward(  // NOLINTNEXTLINE

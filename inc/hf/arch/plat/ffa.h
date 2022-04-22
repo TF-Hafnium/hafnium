@@ -93,7 +93,8 @@ bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
 				       struct ffa_value *ret);
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_vm_id_t receiver_id);
+					ffa_vm_id_t receiver_id,
+					uint32_t flags);
 
 bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 					ffa_vcpu_index_t vcpu_id,

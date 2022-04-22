@@ -3082,13 +3082,27 @@ struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
 	ffa_notifications_bitmap_t vm_notifications = 0;
 	struct vm_locked receiver_locked;
 	struct ffa_value ret;
+	const uint32_t flags_mbz = ~(FFA_NOTIFICATION_FLAG_BITMAP_HYP |
+				     FFA_NOTIFICATION_FLAG_BITMAP_SPM |
+				     FFA_NOTIFICATION_FLAG_BITMAP_SP |
+				     FFA_NOTIFICATION_FLAG_BITMAP_VM);
+
+	/* The FF-A v1.1 EAC0 specification states bits [31:4] Must Be Zero. */
+	if ((flags & flags_mbz) != 0U) {
+		dlog_verbose(
+			"Invalid flags bit(s) set in notifications get. [31:4] "
+			"MBZ(%x)\n",
+			flags);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	/*
-	 * Following check should capture wrong uses of the interface, depending
-	 * on whether Hafnium is SPMC or hypervisor.
-	 * On the rest of the function it is assumed this condition is met.
+	 * Following check should capture wrong uses of the interface,
+	 * depending on whether Hafnium is SPMC or hypervisor. On the
+	 * rest of the function it is assumed this condition is met.
 	 */
-	if (!plat_ffa_is_notification_get_valid(current, receiver_vm_id)) {
+	if (!plat_ffa_is_notification_get_valid(current, receiver_vm_id,
+						flags)) {
 		dlog_verbose("Invalid use of notifications get interface.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}

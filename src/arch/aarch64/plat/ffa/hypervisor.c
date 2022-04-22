@@ -365,9 +365,11 @@ bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
 }
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_vm_id_t receiver_id)
+					ffa_vm_id_t receiver_id, uint32_t flags)
 {
 	ffa_vm_id_t current_vm_id = current->vm->id;
+
+	(void)flags;
 
 	/* If Hafnium is hypervisor, receiver needs to be current vm. */
 	return (current_vm_id == receiver_id);
