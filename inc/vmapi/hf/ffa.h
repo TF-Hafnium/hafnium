@@ -461,6 +461,10 @@ struct ffa_partition_info_v1_0 {
 /** Length in bytes of the name in boot information descriptor. */
 #define FFA_BOOT_INFO_NAME_LEN 16
 
+/**
+ * The FF-A boot info descriptor, as defined in table 5.8 of section 5.4.1, of
+ * the FF-A v1.1 EAC0 specification.
+ */
 struct ffa_boot_info_desc {
 	char name[FFA_BOOT_INFO_NAME_LEN];
 	uint8_t type;
@@ -526,6 +530,10 @@ static inline uint8_t ffa_boot_info_type(struct ffa_boot_info_desc *desc)
 /** Length in bytes of the signature in the boot descriptor. */
 #define FFA_BOOT_INFO_HEADER_SIGNATURE_LEN 4
 
+/**
+ * The FF-A boot information header, as defined in table 5.9 of section 5.4.2,
+ * of the FF-A v1.1 EAC0 specification.
+ */
 struct ffa_boot_info_header {
 	uint32_t signature;
 	uint32_t version;
