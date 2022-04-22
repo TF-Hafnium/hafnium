@@ -67,12 +67,20 @@ static void ffa_memory_region_init_header(
 {
 	memory_region->sender = sender;
 	memory_region->attributes = attributes;
-	memory_region->reserved_0 = 0;
 	memory_region->flags = flags;
 	memory_region->handle = handle;
 	memory_region->tag = tag;
-	memory_region->reserved_1 = 0;
+	memory_region->memory_access_desc_size =
+		sizeof(struct ffa_memory_access);
 	memory_region->receiver_count = receiver_count;
+	memory_region->receivers_offset =
+		offsetof(struct ffa_memory_region, receivers);
+#if defined(__linux__) && defined(__KERNEL__)
+	memset(memory_region->reserved, 0, sizeof(memory_region->reserved));
+#else
+	memset_s(memory_region->reserved, sizeof(memory_region->reserved), 0,
+		 sizeof(memory_region->reserved));
+#endif
 }
 
 /**
@@ -293,13 +301,16 @@ uint32_t ffa_memory_lender_retrieve_request_init(
 {
 	memory_region->sender = sender;
 	memory_region->attributes = 0;
-	memory_region->reserved_0 = 0;
 	memory_region->flags = 0;
-	memory_region->reserved_1 = 0;
 	memory_region->handle = handle;
 	memory_region->tag = 0;
 	memory_region->receiver_count = 0;
-
+#if defined(__linux__) && defined(__KERNEL__)
+	memset(memory_region->reserved, 0, sizeof(memory_region->reserved));
+#else
+	memset_s(memory_region->reserved, sizeof(memory_region->reserved), 0,
+		 sizeof(memory_region->reserved));
+#endif
 	return sizeof(struct ffa_memory_region);
 }
 

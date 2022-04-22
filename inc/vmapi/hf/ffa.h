@@ -271,10 +271,13 @@ enum ffa_memory_security {
 typedef uint8_t ffa_memory_access_permissions_t;
 
 /**
- * This corresponds to table 44 of the FF-A 1.0 EAC specification, "Memory
+ * This corresponds to table 10.18 of the FF-A v1.1 EAC0 specification, "Memory
  * region attributes descriptor".
  */
-typedef uint8_t ffa_memory_attributes_t;
+typedef uint16_t ffa_memory_attributes_t;
+
+/* FF-A v1.1 EAC0 states bit [15:7] Must Be Zero. */
+#define FFA_MEMORY_ATTRIBUTES_MBZ_MASK 0xFF80U
 
 #define FFA_DATA_ACCESS_OFFSET (0x0U)
 #define FFA_DATA_ACCESS_MASK ((0x3U) << FFA_DATA_ACCESS_OFFSET)
@@ -812,8 +815,8 @@ static inline bool ffa_notification_info_get_more_pending(struct ffa_value args)
 
 /**
  * A set of contiguous pages which is part of a memory region. This corresponds
- * to table 40 of the FF-A 1.0 EAC specification, "Constituent memory region
- * descriptor".
+ * to table 10.14 of the FF-A v1.1 EAC0 specification, "Constituent memory
+ * region descriptor".
  */
 struct ffa_memory_region_constituent {
 	/**
@@ -828,8 +831,8 @@ struct ffa_memory_region_constituent {
 };
 
 /**
- * A set of pages comprising a memory region. This corresponds to table 39 of
- * the FF-A 1.0 EAC specification, "Composite memory region descriptor".
+ * A set of pages comprising a memory region. This corresponds to table 10.13 of
+ * the FF-A v1.1 EAC0 specification, "Composite memory region descriptor".
  */
 struct ffa_composite_memory_region {
 	/**
@@ -853,7 +856,7 @@ struct ffa_composite_memory_region {
 typedef uint8_t ffa_memory_receiver_flags_t;
 
 /**
- * This corresponds to table 41 of the FF-A 1.0 EAC specification, "Memory
+ * This corresponds to table 10.15 of the FF-A v1.1 EAC0 specification, "Memory
  * access permissions descriptor".
  */
 struct ffa_memory_region_attributes {
@@ -902,8 +905,8 @@ typedef uint32_t ffa_memory_region_flags_t;
 #define FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_MASK ((0xFU) << 5)
 
 /**
- * This corresponds to table 42 of the FF-A 1.0 EAC specification, "Endpoint
- * memory access descriptor".
+ * This corresponds to table 10.16 of the FF-A v1.1 EAC0 specification,
+ * "Endpoint memory access descriptor".
  */
 struct ffa_memory_access {
 	struct ffa_memory_region_attributes receiver_permissions;
@@ -920,9 +923,9 @@ struct ffa_memory_access {
 
 /**
  * Information about a set of pages which are being shared. This corresponds to
- * table 45 of the FF-A 1.0 EAC specification, "Lend, donate or share memory
- * transaction descriptor". Note that it is also used for retrieve requests and
- * responses.
+ * table 10.20 of the FF-A v1.1 EAC0 specification, "Lend, donate or share
+ * memory transaction descriptor". Note that it is also used for retrieve
+ * requests and responses.
  */
 struct ffa_memory_region {
 	/**
@@ -931,8 +934,6 @@ struct ffa_memory_region {
 	 */
 	ffa_vm_id_t sender;
 	ffa_memory_attributes_t attributes;
-	/** Reserved field, must be 0. */
-	uint8_t reserved_0;
 	/** Flags to control behaviour of the transaction. */
 	ffa_memory_region_flags_t flags;
 	ffa_memory_handle_t handle;
@@ -941,13 +942,20 @@ struct ffa_memory_region {
 	 * memory region.
 	 */
 	uint64_t tag;
-	/** Reserved field, must be 0. */
-	uint32_t reserved_1;
+	/* Size of the memory access descriptor. */
+	uint32_t memory_access_desc_size;
 	/**
 	 * The number of `ffa_memory_access` entries included in this
 	 * transaction.
 	 */
 	uint32_t receiver_count;
+	/**
+	 * Offset of the 'receivers' field, which relates to the memory access
+	 * descriptors.
+	 */
+	uint32_t receivers_offset;
+	/** Reserved field (12 bytes) must be 0. */
+	uint32_t reserved[3];
 	/**
 	 * An array of `receiver_count` endpoint memory access descriptors.
 	 * Each one specifies a memory region offset, an endpoint and the
@@ -959,7 +967,7 @@ struct ffa_memory_region {
 
 /**
  * Descriptor used for FFA_MEM_RELINQUISH requests. This corresponds to table
- * 150 of the FF-A 1.0 EAC specification, "Descriptor to relinquish a memory
+ * 16.25 of the FF-A v1.1 EAC0 specification, "Descriptor to relinquish a memory
  * region".
  */
 struct ffa_mem_relinquish {

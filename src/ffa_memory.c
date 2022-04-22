@@ -1195,6 +1195,11 @@ struct ffa_value ffa_memory_send_validate(
 	enum ffa_memory_security security_state;
 	struct ffa_value ret;
 
+	assert(memory_region->receivers_offset ==
+	       offsetof(struct ffa_memory_region, receivers));
+	assert(memory_region->memory_access_desc_size ==
+	       sizeof(struct ffa_memory_access));
+
 	/* The sender must match the caller. */
 	if ((!vm_id_is_current_world(from_locked.vm->id) &&
 	     vm_id_is_current_world(memory_region->sender)) ||
