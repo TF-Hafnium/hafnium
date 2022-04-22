@@ -952,7 +952,7 @@ ffa_enpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
 						      desc->tx_offset);
 }
 
-uint32_t ffa_memory_region_init(
+uint32_t ffa_memory_region_init_single_receiver(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
 	ffa_vm_id_t sender, ffa_vm_id_t receiver,
 	const struct ffa_memory_region_constituent constituents[],

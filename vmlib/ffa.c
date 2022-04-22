@@ -68,7 +68,7 @@ static void ffa_memory_region_init_header(
  * `memory_region` (attributes, constituents and memory region header size), and
  * the total size of the memory sharing message including all constituents.
  */
-uint32_t ffa_memory_region_init(
+uint32_t ffa_memory_region_init_single_receiver(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
 	ffa_vm_id_t sender, ffa_vm_id_t receiver,
 	const struct ffa_memory_region_constituent constituents[],

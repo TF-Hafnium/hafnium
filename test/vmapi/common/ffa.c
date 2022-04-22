@@ -61,7 +61,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	uint32_t sent_length;
 
 	/* Send the first fragment of the memory. */
-	remaining_constituent_count = ffa_memory_region_init(
+	remaining_constituent_count = ffa_memory_region_init_single_receiver(
 		tx_buffer, HF_MAILBOX_SIZE, sender, recipient, constituents,
 		constituent_count, 0, send_flags, send_data_access,
 		send_instruction_access,
@@ -161,7 +161,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	ffa_memory_handle_t handle;
 
 	/* Send everything except the last constituent in the first fragment. */
-	remaining_constituent_count = ffa_memory_region_init(
+	remaining_constituent_count = ffa_memory_region_init_single_receiver(
 		tx_buffer, HF_MAILBOX_SIZE, sender, recipient, constituents,
 		constituent_count, 0, flags, send_data_access,
 		send_instruction_access,

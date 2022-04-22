@@ -32,7 +32,7 @@ static ffa_memory_handle_t init_and_send(
 	struct ffa_value ret;
 	ffa_memory_handle_t handle;
 
-	EXPECT_EQ(ffa_memory_region_init(
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
 			  HF_TEE_VM_ID, constituents, constituents_count, 0, 0,
 			  FFA_DATA_ACCESS_RW,
@@ -99,7 +99,7 @@ TEST(trusty, memory_share_fragmented)
 	/* Dirty the memory before sharing it. */
 	memset_s(pages, sizeof(pages), 'b', PAGE_SIZE * 2);
 
-	EXPECT_EQ(ffa_memory_region_init(
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
 			  HF_TEE_VM_ID, constituents, ARRAY_SIZE(constituents),
 			  0, 0, FFA_DATA_ACCESS_RW,
@@ -220,7 +220,7 @@ TEST(trusty, memory_reclaim_reshare_fragmented)
 		constituent->reserved = 0;
 	}
 
-	remaining_constituent_count = ffa_memory_region_init(
+	remaining_constituent_count = ffa_memory_region_init_single_receiver(
 		mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, HF_TEE_VM_ID,
 		constituents_reclaim_reshare_fragmented,
 		ARRAY_SIZE(constituents_reclaim_reshare_fragmented), 0, 0,
@@ -263,7 +263,7 @@ TEST(trusty, memory_reclaim_reshare_fragmented)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	/* Share it again. */
-	remaining_constituent_count = ffa_memory_region_init(
+	remaining_constituent_count = ffa_memory_region_init_single_receiver(
 		mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, HF_TEE_VM_ID,
 		constituents_reclaim_reshare_fragmented,
 		ARRAY_SIZE(constituents_reclaim_reshare_fragmented), 0, 0,

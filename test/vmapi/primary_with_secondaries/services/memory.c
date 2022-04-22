@@ -335,7 +335,7 @@ TEST_SERVICE(ffa_donate_twice)
 
 	/* Attempt to donate the memory to another VM. */
 	EXPECT_EQ(
-		ffa_memory_region_init(
+		ffa_memory_region_init_single_receiver(
 			send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(), SERVICE_VM2,
 			&constituent, 1, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
@@ -404,7 +404,7 @@ TEST_SERVICE(ffa_donate_invalid_source)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	/* Fail to donate the memory from the primary to VM2. */
-	EXPECT_EQ(ffa_memory_region_init(
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
 			  SERVICE_VM2, composite->constituents,
 			  composite->constituent_count, 0, 0,
@@ -625,7 +625,7 @@ TEST_SERVICE(ffa_lend_invalid_source)
 		  FFA_SUCCESS_32);
 
 	/* Ensure we cannot lend from the primary to another secondary. */
-	EXPECT_EQ(ffa_memory_region_init(
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
 			  SERVICE_VM2, composite->constituents,
 			  composite->constituent_count, 0, 0,
@@ -636,7 +636,7 @@ TEST_SERVICE(ffa_lend_invalid_source)
 	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
 
 	/* Ensure we cannot share from the primary to another secondary. */
-	EXPECT_EQ(ffa_memory_region_init(
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
 			  SERVICE_VM2, composite->constituents,
 			  composite->constituent_count, 0, 0,
@@ -816,7 +816,7 @@ TEST_SERVICE(ffa_memory_lend_twice)
 		constituent_copy.address = (uint64_t)ptr + i;
 
 		/* Fail to lend or share the memory from the primary. */
-		EXPECT_EQ(ffa_memory_region_init(
+		EXPECT_EQ(ffa_memory_region_init_single_receiver(
 				  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
 				  SERVICE_VM2, &constituent_copy, 1, 0, 0,
 				  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
@@ -825,7 +825,7 @@ TEST_SERVICE(ffa_memory_lend_twice)
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
-		EXPECT_EQ(ffa_memory_region_init(
+		EXPECT_EQ(ffa_memory_region_init_single_receiver(
 				  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
 				  SERVICE_VM2, &constituent_copy, 1, 0, 0,
 				  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
