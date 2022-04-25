@@ -952,6 +952,11 @@ ffa_enpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
 						      desc->tx_offset);
 }
 
+void ffa_memory_access_init_permissions(
+	struct ffa_memory_access *receiver, ffa_vm_id_t receiver_id,
+	enum ffa_data_access data_access,
+	enum ffa_instruction_access instruction_access,
+	ffa_memory_receiver_flags_t flags);
 uint32_t ffa_memory_region_init_single_receiver(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
 	ffa_vm_id_t sender, ffa_vm_id_t receiver,
