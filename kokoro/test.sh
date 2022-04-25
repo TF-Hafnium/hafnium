@@ -9,10 +9,6 @@
 # Note: this assumes that the images have all been built and the current working
 # directory is the root of the repo.
 
-# TIMEOUT, PROJECT, OUT, LOG_DIR_BASE set in:
-KOKORO_DIR="$(dirname "$0")"
-source $KOKORO_DIR/test_common.sh
-
 USE_FVP=false
 USE_TFA=false
 USE_VHE=false
@@ -20,6 +16,7 @@ EL0_TEST_ONLY=false
 SKIP_LONG_RUNNING_TESTS=false
 SKIP_UNIT_TESTS=false
 RUN_ALL_QEMU_CPUS=false
+ASSERT_DISABLED_BUILD=false
 DEFAULT_HFTEST_TIMEOUT="600s"
 
 while test $# -gt 0
@@ -39,12 +36,18 @@ do
       ;;
     --run-all-qemu-cpus) RUN_ALL_QEMU_CPUS=true
       ;;
+    --assert-disabled-build) ASSERT_DISABLED_BUILD=true
+      ;;
     *) echo "Unexpected argument $1"
       exit 1
       ;;
   esac
   shift
 done
+
+# TIMEOUT, PROJECT, OUT, LOG_DIR_BASE set in:
+KOKORO_DIR="$(dirname "$0")"
+source $KOKORO_DIR/test_common.sh
 
 # Run the tests with a timeout so they can't loop forever.
 HFTEST=(${TIMEOUT[@]} $DEFAULT_HFTEST_TIMEOUT ./test/hftest/hftest.py)

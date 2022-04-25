@@ -6,6 +6,33 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/BSD-3-Clause.
 
+run_tests ()
+{
+	local TEST_ARGS=()
+	if [ $USE_FVP == true ]
+	then
+		TEST_ARGS+=(--fvp)
+	elif [ $USE_TFA == true ]
+	then
+		TEST_ARGS+=(--tfa)
+	fi
+	if [ $HAFNIUM_SKIP_LONG_RUNNING_TESTS == true ]
+	then
+		TEST_ARGS+=(--skip-long-running-tests)
+	fi
+	if [ $HAFNIUM_RUN_ALL_QEMU_CPUS == true ]
+	then
+		TEST_ARGS+=(--run-all-qemu-cpus)
+	fi
+
+	./kokoro/test.sh ${TEST_ARGS[@]}
+
+	# Run again the test suite with VHE option.
+	TEST_ARGS+=(--vhe)
+	TEST_ARGS+=(--skip-unit-tests)
+	./kokoro/test.sh ${TEST_ARGS[@]}
+}
+
 source "$(dirname ${BASH_SOURCE[0]})/../build/bash/common.inc"
 
 # Initialize global variables, prepare repo for building.
@@ -21,6 +48,7 @@ then
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS false
 	default_value HAFNIUM_RUN_ALL_QEMU_CPUS true
 	default_value USE_TFA true
+	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD true
 elif is_jenkins_build
 then
 	# Default config for Jenkins builds.
@@ -28,12 +56,14 @@ then
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS false
 	default_value HAFNIUM_RUN_ALL_QEMU_CPUS true
 	default_value USE_TFA true
+	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD true
 else
 	# Default config for local builds.
 	default_value HAFNIUM_HERMETIC_BUILD false
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS true
 	default_value HAFNIUM_RUN_ALL_QEMU_CPUS false
 	default_value USE_TFA false
+	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD false
 fi
 
 # If HAFNIUM_HERMETIC_BUILD is "true", relaunch this script inside a container.
@@ -58,6 +88,9 @@ do
 	--run-all-qemu-cpus)
 		HAFNIUM_RUN_ALL_QEMU_CPUS=true
 		;;
+	--run-assert-disabled-build)
+		HAFNIUM_RUN_ASSERT_DISABLED_BUILD=true
+		;;
 	*)
 		echo "Unexpected argument $1"
 		exit 1
@@ -67,40 +100,40 @@ do
 done
 
 #
-# Step 1: make sure it builds.
+# Build and run tests with asserts disabled if required.
 #
-
-make PROJECT=reference
-
-#
-# Step 2: make sure it works.
-#
-
-TEST_ARGS=()
-if [ $USE_FVP == true ]
+if [ "$HAFNIUM_RUN_ASSERT_DISABLED_BUILD" == "true" ]
 then
-	TEST_ARGS+=(--fvp)
-elif [ $USE_TFA == true ]
-then
-	TEST_ARGS+=(--tfa)
+	#
+	# Call 'make clean' and remove args.gn file to ensure the value of
+	# enable_assertions is updated from the default.
+	#
+	if [ -d "out/reference" ]; then
+		make clean
+		rm -f out/reference/build.ninja out/reference/args.gn
+	fi
+
+	make PROJECT=reference ENABLE_ASSERTIONS=0
+
+	run_tests
+
+	#
+	# Call 'make clean' and remove args.gn file so future runs of make
+	# include assertions.
+	#
+	make clean
+	rm out/reference/build.ninja out/reference/args.gn
 fi
-if [ "${HAFNIUM_SKIP_LONG_RUNNING_TESTS}" == "true" ]
-then
-	TEST_ARGS+=(--skip-long-running-tests)
-fi
-if [ "${HAFNIUM_RUN_ALL_QEMU_CPUS}" == "true" ]
-then
-	TEST_ARGS+=(--run-all-qemu-cpus)
-fi
-./kokoro/test.sh ${TEST_ARGS[@]}
-
-# Run again the test suite with VHE option.
-TEST_ARGS+=(--vhe)
-TEST_ARGS+=(--skip-unit-tests)
-./kokoro/test.sh ${TEST_ARGS[@]}
 
 #
-# Step 3: static analysis.
+# Build and run with asserts enabled.
+#
+
+make PROJECT=reference ENABLE_ASSERTIONS=1
+run_tests
+
+#
+# Static analysis.
 #
 
 make check
@@ -111,7 +144,7 @@ then
 fi
 
 #
-# Step 4: make sure the code looks good.
+# Make sure the code looks good.
 #
 
 make format
@@ -124,7 +157,7 @@ fi
 make checkpatch
 
 #
-# Step 5: make sure there's not lint.
+# Make sure there's not lint.
 #
 
 make tidy
@@ -135,7 +168,7 @@ then
 fi
 
 #
-# Step 6: make sure all the files have a license.
+# Make sure all the files have a license.
 #
 
 make license
@@ -145,8 +178,8 @@ then
 	exit 1
 fi
 
-# Step 7: make sure the Linux driver maintains style. It's already built as part
-# of the tests.
+# Make sure the Linux driver maintains style. It's already built as
+# part of the tests.
 (
 unset CHECKPATCH &&
 export ARCH=arm64 &&

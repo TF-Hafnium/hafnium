@@ -16,10 +16,6 @@ set -u
 set -x
 
 TIMEOUT=(timeout --foreground)
-PROJECT="${PROJECT:-reference}"
-OUT="out/${PROJECT}"
-LOG_DIR_BASE="${OUT}/kokoro_log"
-
 # Set path to prebuilts used in the build.
 UNAME_S=$(uname -s | tr '[:upper:]' '[:lower:]')
 UNAME_M=$(uname -m)
@@ -32,3 +28,18 @@ fi
 export PREBUILTS="$PWD/prebuilts/${UNAME_S}-${UNAME_M}"
 export LD_LIBRARY_PATH="$(clang --print-resource-dir)/../.."
 
+# Set output and log directories.
+PROJECT="${PROJECT:-reference}"
+OUT="out/${PROJECT}"
+# Use the gn args command to search the value of enable_assertions in the
+# args.gn config file. Use grep to take the value from within the quotes.
+ENABLE_ASSERTIONS_BUILD=$(${PREBUILTS}/gn/gn args out/reference \
+				--list=enable_assertions --short \
+			  | grep -oP '(?<=").*(?=")')
+if [ "$ENABLE_ASSERTIONS_BUILD" == "1" ]
+then
+	BUILD_TYPE="debug"
+else
+	BUILD_TYPE="release"
+fi
+LOG_DIR_BASE="${OUT}/kokoro_log/${BUILD_TYPE}"
