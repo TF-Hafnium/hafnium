@@ -60,55 +60,41 @@ static void ffa_memory_region_init_header(
 }
 
 /**
- * Initialises the given `ffa_memory_region` and copies as many as possible of
- * the given constituents to it.
+ * Copies as many as possible of the given constituents to the respective
+ * memory region and sets the respective offset.
  *
  * Returns the number of constituents remaining which wouldn't fit, and (via
  * return parameters) the size in bytes of the first fragment of data copied to
  * `memory_region` (attributes, constituents and memory region header size), and
  * the total size of the memory sharing message including all constituents.
  */
-uint32_t ffa_memory_region_init_single_receiver(
+static uint32_t ffa_memory_region_init_constituents(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
-	ffa_vm_id_t sender, ffa_vm_id_t receiver,
 	const struct ffa_memory_region_constituent constituents[],
-	uint32_t constituent_count, uint32_t tag,
-	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
-	enum ffa_instruction_access instruction_access,
-	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability, uint32_t *total_length,
+	uint32_t constituent_count, uint32_t *total_length,
 	uint32_t *fragment_length)
 {
-	ffa_memory_access_permissions_t permissions = 0;
-	ffa_memory_attributes_t attributes = 0;
 	struct ffa_composite_memory_region *composite_memory_region;
 	uint32_t fragment_max_constituents;
+	uint32_t constituents_offset;
 	uint32_t count_to_copy;
 	uint32_t i;
-	uint32_t constituents_offset;
 
-	/* Set memory region's permissions. */
-	ffa_set_data_access_attr(&permissions, data_access);
-	ffa_set_instruction_access_attr(&permissions, instruction_access);
-
-	/* Set memory region's page attributes. */
-	ffa_set_memory_type_attr(&attributes, type);
-	ffa_set_memory_cacheability_attr(&attributes, cacheability);
-	ffa_set_memory_shareability_attr(&attributes, shareability);
-
-	ffa_memory_region_init_header(memory_region, sender, attributes, flags,
-				      0, tag, receiver, permissions);
 	/*
 	 * Note that `sizeof(struct_ffa_memory_region)` and `sizeof(struct
 	 * ffa_memory_access)` must both be multiples of 16 (as verified by the
 	 * asserts in `ffa_memory.c`, so it is guaranteed that the offset we
 	 * calculate here is aligned to a 64-bit boundary and so 64-bit values
 	 * can be copied without alignment faults.
+	 * If there are multiple receiver endpoints, their respective access
+	 * structure should point to the same offset value.
 	 */
-	memory_region->receivers[0].composite_memory_region_offset =
-		sizeof(struct ffa_memory_region) +
-		memory_region->receiver_count *
-			sizeof(struct ffa_memory_access);
+	for (i = 0U; i < memory_region->receiver_count; i++) {
+		memory_region->receivers[i].composite_memory_region_offset =
+			sizeof(struct ffa_memory_region) +
+			memory_region->receiver_count *
+				sizeof(struct ffa_memory_access);
+	}
 
 	composite_memory_region =
 		ffa_memory_region_get_composite(memory_region, 0);
@@ -128,7 +114,7 @@ uint32_t ffa_memory_region_init_single_receiver(
 		count_to_copy = fragment_max_constituents;
 	}
 
-	for (i = 0; i < constituent_count; ++i) {
+	for (i = 0U; i < constituent_count; i++) {
 		if (i < count_to_copy) {
 			ffa_copy_memory_region_constituents(
 				&composite_memory_region->constituents[i],
@@ -152,6 +138,46 @@ uint32_t ffa_memory_region_init_single_receiver(
 	}
 
 	return composite_memory_region->constituent_count - count_to_copy;
+}
+
+/**
+ * Initialises the given `ffa_memory_region` and copies as many as possible of
+ * the given constituents to it.
+ *
+ * Returns the number of constituents remaining which wouldn't fit, and (via
+ * return parameters) the size in bytes of the first fragment of data copied to
+ * `memory_region` (attributes, constituents and memory region header size), and
+ * the total size of the memory sharing message including all constituents.
+ */
+uint32_t ffa_memory_region_init_single_receiver(
+	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
+	ffa_vm_id_t sender, ffa_vm_id_t receiver,
+	const struct ffa_memory_region_constituent constituents[],
+	uint32_t constituent_count, uint32_t tag,
+	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
+	enum ffa_instruction_access instruction_access,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability, uint32_t *total_length,
+	uint32_t *fragment_length)
+{
+	ffa_memory_access_permissions_t permissions = 0;
+	ffa_memory_attributes_t attributes = 0;
+
+	/* Set memory region's permissions. */
+	ffa_set_data_access_attr(&permissions, data_access);
+	ffa_set_instruction_access_attr(&permissions, instruction_access);
+
+	/* Set memory region's page attributes. */
+	ffa_set_memory_type_attr(&attributes, type);
+	ffa_set_memory_cacheability_attr(&attributes, cacheability);
+	ffa_set_memory_shareability_attr(&attributes, shareability);
+
+	ffa_memory_region_init_header(memory_region, sender, attributes, flags,
+				      0, tag, receiver, permissions);
+
+	return ffa_memory_region_init_constituents(
+		memory_region, memory_region_max_size, constituents,
+		constituent_count, total_length, fragment_length);
 }
 
 /**
