@@ -837,7 +837,7 @@ struct ffa_memory_access {
 };
 
 /** The maximum number of recipients a memory region may be sent to. */
-#define MAX_MEM_SHARE_RECIPIENTS 1
+#define MAX_MEM_SHARE_RECIPIENTS UINT32_C(2)
 
 /**
  * Information about a set of pages which are being shared. This corresponds to
