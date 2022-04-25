@@ -2465,6 +2465,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	const void *from_msg;
 	struct ffa_memory_region *memory_region;
 	struct ffa_value ret;
+	bool targets_other_world = false;
 
 	if (ipa_addr(address) != 0 || page_count != 0) {
 		/*
@@ -2535,11 +2536,27 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		goto out;
 	}
 
-	if (memory_region->receiver_count != 1) {
-		/* Hafnium doesn't support multi-way memory sharing for now. */
+	if (memory_region->receiver_count == 0U) {
+		dlog_verbose("Receiver count can't be 0.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (share_func == FFA_MEM_DONATE_32 &&
+	    memory_region->receiver_count != 1U) {
 		dlog_verbose(
-			"Multi-way memory sharing not supported (got %d "
-			"endpoint memory access descriptors, expected 1).\n",
+			"FFA_MEM_DONATE only supports one recipient. "
+			"Specified %u\n",
+			memory_region->receiver_count);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (memory_region->receiver_count > MAX_MEM_SHARE_RECIPIENTS) {
+		dlog_verbose(
+			"Max number of recipients supported is %u "
+			"specified %u\n",
+			MAX_MEM_SHARE_RECIPIENTS,
 			memory_region->receiver_count);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -2547,20 +2564,38 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 
 	/*
 	 * Ensure that the receiver VM exists and isn't the same as the sender.
+	 * If there is a receiver from the other world, track it for later
+	 * forwarding if needed.
 	 */
-	to = vm_find(memory_region->receivers[0].receiver_permissions.receiver);
-	if (to == NULL || to == from) {
-		dlog_verbose("Invalid receiver.\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
+	for (uint32_t i = 0U; i < memory_region->receiver_count; i++) {
+		ffa_vm_id_t receiver_id =
+			memory_region->receivers[i]
+				.receiver_permissions.receiver;
+		to = vm_find(receiver_id);
+
+		if (vm_id_is_current_world(receiver_id) &&
+		    (to == NULL || to == from)) {
+			dlog_verbose("%s: invalid receiver.\n", __func__);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		if (!plat_ffa_is_memory_send_valid(receiver_id, share_func)) {
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		/* Capture if any of the receivers is from the other world. */
+		if (!targets_other_world) {
+			targets_other_world =
+				!vm_id_is_current_world(receiver_id);
+		}
 	}
 
-	if (!plat_ffa_is_memory_send_valid(to->id, share_func)) {
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
-	if (to->id == HF_TEE_VM_ID) {
+	/* Allow for one memory region to be shared to the TEE. */
+	if (targets_other_world) {
+		assert(memory_region->receiver_count == 1 &&
+		       to->id == HF_TEE_VM_ID);
 		/*
 		 * The 'to' VM lock is only needed in the case that it is the
 		 * TEE VM.

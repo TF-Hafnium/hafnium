@@ -831,6 +831,9 @@ struct ffa_memory_access {
 	uint64_t reserved_0;
 };
 
+/** The maximum number of recipients a memory region may be sent to. */
+#define MAX_MEM_SHARE_RECIPIENTS 1
+
 /**
  * Information about a set of pages which are being shared. This corresponds to
  * table 45 of the FF-A 1.0 EAC specification, "Lend, donate or share memory

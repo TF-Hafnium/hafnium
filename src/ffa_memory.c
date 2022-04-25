@@ -21,9 +21,6 @@
 #include "hf/std.h"
 #include "hf/vm.h"
 
-/** The maximum number of recipients a memory region may be sent to. */
-#define MAX_MEM_SHARE_RECIPIENTS 1
-
 /**
  * The maximum number of memory sharing handles which may be active at once. A
  * DONATE handle is active from when it is sent to when it is retrieved; a SHARE
@@ -522,14 +519,14 @@ static struct ffa_value constituents_get_mode(
  */
 static struct ffa_value ffa_send_check_transition(
 	struct vm_locked from, uint32_t share_func,
-	ffa_memory_access_permissions_t permissions, uint32_t *orig_from_mode,
+	struct ffa_memory_access *receivers, uint32_t receivers_count,
+	uint32_t *orig_from_mode,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t *from_mode)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
-	uint32_t required_from_mode;
 	struct ffa_value ret;
 
 	ret = constituents_get_mode(from, orig_from_mode, fragments,
@@ -555,15 +552,23 @@ static struct ffa_value ffa_send_check_transition(
 		return ffa_error(FFA_DENIED);
 	}
 
-	required_from_mode =
-		ffa_memory_permissions_to_mode(permissions, *orig_from_mode);
+	assert(receivers != NULL && receivers_count > 0U);
 
-	if ((*orig_from_mode & required_from_mode) != required_from_mode) {
-		dlog_verbose(
-			"Sender tried to send memory with permissions which "
-			"required mode %#x but only had %#x itself.\n",
-			required_from_mode, *orig_from_mode);
-		return ffa_error(FFA_DENIED);
+	for (uint32_t i = 0U; i < receivers_count; i++) {
+		ffa_memory_access_permissions_t permissions =
+			receivers[i].receiver_permissions.permissions;
+		uint32_t required_from_mode = ffa_memory_permissions_to_mode(
+			permissions, *orig_from_mode);
+
+		if ((*orig_from_mode & required_from_mode) !=
+		    required_from_mode) {
+			dlog_verbose(
+				"Sender tried to send memory with permissions "
+				"which "
+				"required mode %#x but only had %#x itself.\n",
+				required_from_mode, *orig_from_mode);
+			return ffa_error(FFA_DENIED);
+		}
 	}
 
 	/* Find the appropriate new mode. */
@@ -895,8 +900,9 @@ static struct ffa_value ffa_send_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t share_func, ffa_memory_access_permissions_t permissions,
-	struct mpool *page_pool, bool clear, uint32_t *orig_from_mode_ret)
+	uint32_t share_func, struct ffa_memory_access *receivers,
+	uint32_t receivers_count, struct mpool *page_pool, bool clear,
+	uint32_t *orig_from_mode_ret)
 {
 	uint32_t i;
 	uint32_t orig_from_mode;
@@ -920,9 +926,9 @@ static struct ffa_value ffa_send_check_update(
 	 * all constituents of a memory region being shared are at the same
 	 * state.
 	 */
-	ret = ffa_send_check_transition(from_locked, share_func, permissions,
-					&orig_from_mode, fragments,
-					fragment_constituent_counts,
+	ret = ffa_send_check_transition(from_locked, share_func, receivers,
+					receivers_count, &orig_from_mode,
+					fragments, fragment_constituent_counts,
 					fragment_count, &from_mode);
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition for send.\n");
@@ -1323,7 +1329,7 @@ static struct ffa_value ffa_memory_send_complete(
 		from_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, share_state->share_func,
-		memory_region->receivers[0].receiver_permissions.permissions,
+		memory_region->receivers, memory_region->receiver_count,
 		page_pool, memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
 		orig_from_mode_ret);
 	if (ret.func != FFA_SUCCESS_32) {
@@ -1388,7 +1394,7 @@ static struct ffa_value ffa_memory_attributes_validate(
 static struct ffa_value ffa_memory_send_validate(
 	struct vm_locked from_locked, struct ffa_memory_region *memory_region,
 	uint32_t memory_share_length, uint32_t fragment_length,
-	uint32_t share_func, ffa_memory_access_permissions_t *permissions)
+	uint32_t share_func)
 {
 	struct ffa_composite_memory_region *composite;
 	uint32_t receivers_length;
@@ -1398,14 +1404,6 @@ static struct ffa_value ffa_memory_send_validate(
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
 	struct ffa_value ret;
-
-	assert(permissions != NULL);
-
-	/*
-	 * This should already be checked by the caller, just making the
-	 * assumption clear here.
-	 */
-	assert(memory_region->receiver_count == 1);
 
 	/* The sender must match the message sender. */
 	if (memory_region->sender != from_locked.vm->id) {
@@ -1473,59 +1471,99 @@ static struct ffa_value ffa_memory_send_validate(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	/* Check that the permissions are valid. */
-	*permissions =
-		memory_region->receivers[0].receiver_permissions.permissions;
-	data_access = ffa_get_data_access_attr(*permissions);
-	instruction_access = ffa_get_instruction_access_attr(*permissions);
-	if (data_access == FFA_DATA_ACCESS_RESERVED ||
-	    instruction_access == FFA_INSTRUCTION_ACCESS_RESERVED) {
-		dlog_verbose("Reserved value for receiver permissions %#x.\n",
-			     *permissions);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-	if (instruction_access != FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
-		dlog_verbose(
-			"Invalid instruction access permissions %#x for "
-			"sending memory.\n",
-			*permissions);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-	if (share_func == FFA_MEM_SHARE_32) {
-		if (data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
-			dlog_verbose(
-				"Invalid data access permissions %#x for "
-				"sharing memory.\n",
-				*permissions);
+	/* Check that the permissions are valid, for each specified receiver. */
+	for (uint32_t i = 0U; i < memory_region->receiver_count; i++) {
+		ffa_memory_access_permissions_t permissions =
+			memory_region->receivers[i]
+				.receiver_permissions.permissions;
+		ffa_vm_id_t receiver_id =
+			memory_region->receivers[i]
+				.receiver_permissions.receiver;
+
+		if (memory_region->sender == receiver_id) {
+			dlog_verbose("Can't share memory with itself.\n");
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
-		/*
-		 * According to section 5.11.3 of the FF-A 1.0 spec NX is
-		 * required for share operations (but must not be specified by
-		 * the sender) so set it in the copy that we store, ready to be
-		 * returned to the retriever.
-		 */
-		ffa_set_instruction_access_attr(permissions,
-						FFA_INSTRUCTION_ACCESS_NX);
-		memory_region->receivers[0].receiver_permissions.permissions =
-			*permissions;
-	}
-	if (share_func == FFA_MEM_LEND_32 &&
-	    data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
-		dlog_verbose(
-			"Invalid data access permissions %#x for lending "
-			"memory.\n",
-			*permissions);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
 
-	if (share_func == FFA_MEM_DONATE_32 &&
-	    data_access != FFA_DATA_ACCESS_NOT_SPECIFIED) {
-		dlog_verbose(
-			"Invalid data access permissions %#x for donating "
-			"memory.\n",
-			*permissions);
-		return ffa_error(FFA_INVALID_PARAMETERS);
+		for (uint32_t j = i + 1; j < memory_region->receiver_count;
+		     j++) {
+			if (receiver_id ==
+			    memory_region->receivers[j]
+				    .receiver_permissions.receiver) {
+				dlog_verbose(
+					"Repeated receiver(%x) in memory send "
+					"operation.\n",
+					memory_region->receivers[j]
+						.receiver_permissions.receiver);
+				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
+		}
+
+		if (composite_memory_region_offset !=
+		    memory_region->receivers[i]
+			    .composite_memory_region_offset) {
+			dlog_verbose(
+				"All ffa_memory_access should point to the "
+				"same composite memory region offset.\n");
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+
+		data_access = ffa_get_data_access_attr(permissions);
+		instruction_access =
+			ffa_get_instruction_access_attr(permissions);
+		if (data_access == FFA_DATA_ACCESS_RESERVED ||
+		    instruction_access == FFA_INSTRUCTION_ACCESS_RESERVED) {
+			dlog_verbose(
+				"Reserved value for receiver permissions "
+				"%#x.\n",
+				permissions);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+		if (instruction_access !=
+		    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
+			dlog_verbose(
+				"Invalid instruction access permissions %#x "
+				"for sending memory.\n",
+				permissions);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+		if (share_func == FFA_MEM_SHARE_32) {
+			if (data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
+				dlog_verbose(
+					"Invalid data access permissions %#x "
+					"for sharing memory.\n",
+					permissions);
+				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
+			/*
+			 * According to section 10.10.3 of the FF-A v1.1 EAC0
+			 * spec, NX is required for share operations (but must
+			 * not be specified by the sender) so set it in the
+			 * copy that we store, ready to be returned to the
+			 * retriever.
+			 */
+			ffa_set_instruction_access_attr(
+				&permissions, FFA_INSTRUCTION_ACCESS_NX);
+			memory_region->receivers[i]
+				.receiver_permissions.permissions = permissions;
+		}
+		if (share_func == FFA_MEM_LEND_32 &&
+		    data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
+			dlog_verbose(
+				"Invalid data access permissions %#x for "
+				"lending memory.\n",
+				permissions);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+
+		if (share_func == FFA_MEM_DONATE_32 &&
+		    data_access != FFA_DATA_ACCESS_NOT_SPECIFIED) {
+			dlog_verbose(
+				"Invalid data access permissions %#x for "
+				"donating memory.\n",
+				permissions);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
 	}
 
 	/*
@@ -1694,7 +1732,6 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				 uint32_t fragment_length, uint32_t share_func,
 				 struct mpool *page_pool)
 {
-	ffa_memory_access_permissions_t permissions;
 	struct ffa_value ret;
 	struct share_states_locked share_states;
 	struct ffa_memory_share_state *share_state;
@@ -1706,7 +1743,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	 */
 	ret = ffa_memory_send_validate(from_locked, memory_region,
 				       memory_share_length, fragment_length,
-				       share_func, &permissions);
+				       share_func);
 	if (ret.func != FFA_SUCCESS_32) {
 		mpool_free(page_pool, memory_region);
 		return ret;
@@ -1781,7 +1818,6 @@ struct ffa_value ffa_memory_tee_send(
 	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
 	uint32_t fragment_length, uint32_t share_func, struct mpool *page_pool)
 {
-	ffa_memory_access_permissions_t permissions;
 	struct ffa_value ret;
 
 	/*
@@ -1791,7 +1827,7 @@ struct ffa_value ffa_memory_tee_send(
 	 */
 	ret = ffa_memory_send_validate(from_locked, memory_region,
 				       memory_share_length, fragment_length,
-				       share_func, &permissions);
+				       share_func);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
@@ -1813,7 +1849,8 @@ struct ffa_value ffa_memory_tee_send(
 		ret = ffa_send_check_update(
 			from_locked, &constituents,
 			&composite->constituent_count, 1, share_func,
-			permissions, &local_page_pool,
+			memory_region->receivers, memory_region->receiver_count,
+			&local_page_pool,
 			memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
 			&orig_from_mode);
 		if (ret.func != FFA_SUCCESS_32) {
