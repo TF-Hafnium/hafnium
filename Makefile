@@ -9,13 +9,14 @@ PROJECT ?= reference
 
 TOOLCHAIN_LIB := $(shell clang --print-resource-dir)
 
+ENABLE_ASSERTIONS ?= 1
+
 GN_ARGS := project="$(PROJECT)"
 GN_ARGS += toolchain_lib="$(TOOLCHAIN_LIB)"
-
-# Include assertions in the build
-ifneq (${ENABLE_ASSERTIONS},)
-	GN_ARGS += enable_assertions="$(ENABLE_ASSERTIONS)"
+ifeq ($(filter $(ENABLE_ASSERTIONS), 1 0),)
+         $(error invalid value for ENABLE_ASSERTIONS, should be 1 or 0)
 endif
+GN_ARGS += enable_assertions="$(ENABLE_ASSERTIONS)"
 
 # If HAFNIUM_HERMETIC_BUILD is "true" (not default), invoke `make` inside
 # a container. The 'run_in_container.sh' script will set the variable value to

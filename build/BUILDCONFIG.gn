@@ -23,8 +23,9 @@ declare_args() {
   # defined in dlog.h.
   log_level = "LOG_LEVEL_INFO"
 
-  # Whether assertions are included in the build
-  enable_assertions = true
+  # Whether assertions are included in the build, this is overriden from the Makefile
+  # based on the enable_assertions arg passed through gn
+  enable_assertions = 1
 }
 
 # Check that we support the attempted build.
