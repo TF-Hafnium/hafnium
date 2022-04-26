@@ -2223,6 +2223,226 @@ static void ffa_memory_retrieve_complete(
 	}
 }
 
+/*
+ * Gets the receiver's access permissions from 'struct ffa_memory_region' and
+ * returns its index in the receiver's array. If receiver's ID doesn't exist
+ * in the array, return the region's 'receiver_count'.
+ */
+static uint32_t ffa_memory_region_get_receiver(
+	struct ffa_memory_region *memory_region, ffa_vm_id_t receiver)
+{
+	struct ffa_memory_access *receivers;
+	uint32_t i;
+
+	assert(memory_region != NULL);
+
+	receivers = memory_region->receivers;
+
+	for (i = 0U; i < memory_region->receiver_count; i++) {
+		if (receivers[i].receiver_permissions.receiver == receiver) {
+			break;
+		}
+	}
+
+	return i;
+}
+
+/**
+ * Validates the retrieved permissions against those specified by the lender
+ * of memory share operation. Optionally can help set the permissions to be used
+ * for the S2 mapping, through the `permissions` argument.
+ * Returns true if permissions are valid, false otherwise.
+ */
+static bool ffa_memory_retrieve_is_memory_access_valid(
+	enum ffa_data_access sent_data_access,
+	enum ffa_data_access requested_data_access,
+	enum ffa_instruction_access sent_instruction_access,
+	enum ffa_instruction_access requested_instruction_access,
+	ffa_memory_access_permissions_t *permissions)
+{
+	switch (sent_data_access) {
+	case FFA_DATA_ACCESS_NOT_SPECIFIED:
+	case FFA_DATA_ACCESS_RW:
+		if (requested_data_access == FFA_DATA_ACCESS_NOT_SPECIFIED ||
+		    requested_data_access == FFA_DATA_ACCESS_RW) {
+			if (permissions != NULL) {
+				ffa_set_data_access_attr(permissions,
+							 FFA_DATA_ACCESS_RW);
+			}
+			break;
+		}
+		/* Intentional fall-through. */
+	case FFA_DATA_ACCESS_RO:
+		if (requested_data_access == FFA_DATA_ACCESS_NOT_SPECIFIED ||
+		    requested_data_access == FFA_DATA_ACCESS_RO) {
+			if (permissions != NULL) {
+				ffa_set_data_access_attr(permissions,
+							 FFA_DATA_ACCESS_RO);
+			}
+			break;
+		}
+		dlog_verbose(
+			"Invalid data access requested; sender specified "
+			"permissions %#x but receiver requested %#x.\n",
+			sent_data_access, requested_data_access);
+		return false;
+	case FFA_DATA_ACCESS_RESERVED:
+		panic("Got unexpected FFA_DATA_ACCESS_RESERVED. Should be "
+		      "checked before this point.");
+	}
+
+	switch (sent_instruction_access) {
+	case FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED:
+	case FFA_INSTRUCTION_ACCESS_X:
+		if (requested_instruction_access ==
+			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
+		    requested_instruction_access == FFA_INSTRUCTION_ACCESS_X) {
+			if (permissions != NULL) {
+				ffa_set_instruction_access_attr(
+					permissions, FFA_INSTRUCTION_ACCESS_X);
+			}
+			break;
+		}
+	case FFA_INSTRUCTION_ACCESS_NX:
+		if (requested_instruction_access ==
+			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
+		    requested_instruction_access == FFA_INSTRUCTION_ACCESS_NX) {
+			if (permissions != NULL) {
+				ffa_set_instruction_access_attr(
+					permissions, FFA_INSTRUCTION_ACCESS_NX);
+			}
+			break;
+		}
+		dlog_verbose(
+			"Invalid instruction access requested; sender "
+			"specified permissions %#x but receiver requested "
+			"%#x.\n",
+			sent_instruction_access, requested_instruction_access);
+		return false;
+	case FFA_INSTRUCTION_ACCESS_RESERVED:
+		panic("Got unexpected FFA_INSTRUCTION_ACCESS_RESERVED. Should "
+		      "be checked before this point.");
+	}
+
+	return true;
+}
+
+/**
+ * Validate the receivers' permissions in the retrieve request against those
+ * specified by the lender.
+ * In the `permissions` argument returns the permissions to set at S2 for the
+ * caller to the FFA_MEMORY_RETRIEVE_REQ.
+ * Returns FFA_SUCCESS if all specified permissions are valid.
+ */
+static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
+	struct ffa_memory_region *memory_region,
+	struct ffa_memory_region *retrieve_request, ffa_vm_id_t to_vm_id,
+	ffa_memory_access_permissions_t *permissions)
+{
+	uint32_t retrieve_receiver_index;
+
+	assert(permissions != NULL);
+
+	if (retrieve_request->receiver_count != memory_region->receiver_count) {
+		dlog_verbose(
+			"Retrieve request should contain same list of "
+			"borrowers, as specified by the lender.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	retrieve_receiver_index = retrieve_request->receiver_count;
+
+	/* Should be populated with the permissions of the retriever. */
+	*permissions = 0;
+
+	for (uint32_t i = 0U; i < retrieve_request->receiver_count; i++) {
+		ffa_memory_access_permissions_t sent_permissions;
+		struct ffa_memory_access *current_receiver =
+			&retrieve_request->receivers[i];
+		ffa_memory_access_permissions_t requested_permissions =
+			current_receiver->receiver_permissions.permissions;
+		ffa_vm_id_t current_receiver_id =
+			current_receiver->receiver_permissions.receiver;
+		bool found_to_id = current_receiver_id == to_vm_id;
+
+		/*
+		 * Find the current receiver in the transaction descriptor from
+		 * sender.
+		 */
+		uint32_t mem_region_receiver_index =
+			ffa_memory_region_get_receiver(memory_region,
+						       current_receiver_id);
+
+		if (mem_region_receiver_index ==
+		    memory_region->receiver_count) {
+			dlog_verbose("%s: receiver %x not found\n", __func__,
+				     current_receiver_id);
+			return ffa_error(FFA_DENIED);
+		}
+
+		sent_permissions =
+			memory_region->receivers[mem_region_receiver_index]
+				.receiver_permissions.permissions;
+
+		if (found_to_id) {
+			retrieve_receiver_index = i;
+		}
+
+		/*
+		 * Since we are traversing the list of receivers, save the index
+		 * of the caller. As it needs to be there.
+		 */
+
+		if (current_receiver->composite_memory_region_offset != 0U) {
+			dlog_verbose(
+				"Retriever specified address ranges not "
+				"supported (got offset %d).\n",
+				current_receiver
+					->composite_memory_region_offset);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+
+		/*
+		 * Check permissions from sender against permissions requested
+		 * by receiver.
+		 */
+		if (!ffa_memory_retrieve_is_memory_access_valid(
+			    ffa_get_data_access_attr(sent_permissions),
+			    ffa_get_data_access_attr(requested_permissions),
+			    ffa_get_instruction_access_attr(sent_permissions),
+			    ffa_get_instruction_access_attr(
+				    requested_permissions),
+			    found_to_id ? permissions : NULL)) {
+			return ffa_error(FFA_DENIED);
+		}
+
+		/*
+		 * Can't request PM to clear memory if only provided with RO
+		 * permissions.
+		 */
+		if (found_to_id &&
+		    (ffa_get_data_access_attr(*permissions) ==
+		     FFA_DATA_ACCESS_RO) &&
+		    (retrieve_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) !=
+			    0U) {
+			dlog_verbose(
+				"Receiver has RO permissions can not request "
+				"clear.\n");
+			return ffa_error(FFA_DENIED);
+		}
+	}
+
+	if (retrieve_receiver_index == retrieve_request->receiver_count) {
+		dlog_verbose(
+			"Retrieve request does not contain caller's (%x) "
+			"permissions\n",
+			to_vm_id);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
 				     uint32_t retrieve_request_length,
@@ -2237,12 +2457,6 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		retrieve_request->flags &
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK;
 	struct ffa_memory_region *memory_region;
-	ffa_memory_access_permissions_t sent_permissions;
-	enum ffa_data_access sent_data_access;
-	enum ffa_instruction_access sent_instruction_access;
-	ffa_memory_access_permissions_t requested_permissions;
-	enum ffa_data_access requested_data_access;
-	enum ffa_instruction_access requested_instruction_access;
 	ffa_memory_access_permissions_t permissions;
 	uint32_t memory_to_attributes;
 	struct share_states_locked share_states;
@@ -2251,6 +2465,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	struct ffa_composite_memory_region *composite;
 	uint32_t total_length;
 	uint32_t fragment_length;
+	uint32_t receiver_index;
 
 	dump_share_states();
 
@@ -2263,15 +2478,6 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (retrieve_request->receiver_count != 1) {
-		dlog_verbose(
-			"Multi-way memory sharing not supported (got %d "
-			"receivers descriptors on FFA_MEM_RETRIEVE_REQ, "
-			"expected 1).\n",
-			retrieve_request->receiver_count);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
 	share_states = share_states_lock();
 	if (!get_share_state(share_states, handle, &share_state)) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_RETRIEVE_REQ.\n",
@@ -2280,8 +2486,39 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		goto out;
 	}
 
+	if (!share_state->sending_complete) {
+		dlog_verbose(
+			"Memory with handle %#x not fully sent, can't "
+			"retrieve.\n",
+			handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
 	memory_region = share_state->memory_region;
 	CHECK(memory_region != NULL);
+
+	/*
+	 * Find receiver index in the receivers list specified by the sender.
+	 */
+	receiver_index =
+		ffa_memory_region_get_receiver(memory_region, to_locked.vm->id);
+
+	if (receiver_index == memory_region->receiver_count) {
+		dlog_verbose(
+			"Incorrect receiver VM ID %x for FFA_MEM_RETRIEVE_REQ, "
+			"for handle %#x.\n",
+			to_locked.vm->id, handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (share_state->retrieved_fragment_count[receiver_index] != 0U) {
+		dlog_verbose("Memory with handle %#x already retrieved.\n",
+			     handle);
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
 
 	/*
 	 * Check that the transaction type expected by the receiver is correct,
@@ -2321,59 +2558,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		goto out;
 	}
 
-	if (retrieve_request->receivers[0].receiver_permissions.receiver !=
-	    to_locked.vm->id) {
-		dlog_verbose(
-			"Retrieve request receiver VM ID %d didn't match "
-			"caller of FFA_MEM_RETRIEVE_REQ.\n",
-			retrieve_request->receivers[0]
-				.receiver_permissions.receiver);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	if (memory_region->receivers[0].receiver_permissions.receiver !=
-	    to_locked.vm->id) {
-		dlog_verbose(
-			"Incorrect receiver VM ID %d for FFA_MEM_RETRIEVE_REQ, "
-			"expected %d for handle %#x.\n",
-			to_locked.vm->id,
-			memory_region->receivers[0]
-				.receiver_permissions.receiver,
-			handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	if (!share_state->sending_complete) {
-		dlog_verbose(
-			"Memory with handle %#x not fully sent, can't "
-			"retrieve.\n",
-			handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	if (share_state->retrieved_fragment_count[0] != 0) {
-		dlog_verbose("Memory with handle %#x already retrieved.\n",
-			     handle);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
-	if (retrieve_request->receivers[0].composite_memory_region_offset !=
-	    0) {
-		dlog_verbose(
-			"Retriever specified address ranges not supported (got "
-			"offset %d).\n",
-			retrieve_request->receivers[0]
-				.composite_memory_region_offset);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
 	if ((retrieve_request->flags &
-	     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_VALID) != 0) {
+	     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_VALID) != 0U) {
 		dlog_verbose(
 			"Retriever specified 'address range alignment hint'"
 			" not supported.\n");
@@ -2413,8 +2599,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	 * FFA_MEM_LEND/FFA_MEM_DONATE, else return FFA_DENIED.
 	 */
 	if ((retrieve_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) != 0U &&
-	    (share_state->memory_region->flags &
-	     FFA_MEMORY_REGION_FLAG_CLEAR) == 0U) {
+	    (memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR) == 0U) {
 		dlog_verbose(
 			"Borrower needs memory cleared. Sender needs to set "
 			"flag for clearing memory.\n");
@@ -2422,86 +2607,11 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		goto out;
 	}
 
-	/*
-	 * Check permissions from sender against permissions requested by
-	 * receiver.
-	 */
-	sent_permissions =
-		memory_region->receivers[0].receiver_permissions.permissions;
-	sent_data_access = ffa_get_data_access_attr(sent_permissions);
-	sent_instruction_access =
-		ffa_get_instruction_access_attr(sent_permissions);
-	requested_permissions =
-		retrieve_request->receivers[0].receiver_permissions.permissions;
-	requested_data_access = ffa_get_data_access_attr(requested_permissions);
-	requested_instruction_access =
-		ffa_get_instruction_access_attr(requested_permissions);
-	permissions = 0;
-
-	if ((sent_data_access == FFA_DATA_ACCESS_RO ||
-	     requested_permissions == FFA_DATA_ACCESS_RO) &&
-	    (retrieve_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) != 0U) {
-		dlog_verbose(
-			"Receiver has RO permissions can not request clear.\n");
-		ret = ffa_error(FFA_DENIED);
+	ret = ffa_memory_retrieve_validate_memory_access_list(
+		memory_region, retrieve_request, to_locked.vm->id,
+		&permissions);
+	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
-	}
-
-	switch (sent_data_access) {
-	case FFA_DATA_ACCESS_NOT_SPECIFIED:
-	case FFA_DATA_ACCESS_RW:
-		if (requested_data_access == FFA_DATA_ACCESS_NOT_SPECIFIED ||
-		    requested_data_access == FFA_DATA_ACCESS_RW) {
-			ffa_set_data_access_attr(&permissions,
-						 FFA_DATA_ACCESS_RW);
-			break;
-		}
-		/* Intentional fall-through. */
-	case FFA_DATA_ACCESS_RO:
-		if (requested_data_access == FFA_DATA_ACCESS_NOT_SPECIFIED ||
-		    requested_data_access == FFA_DATA_ACCESS_RO) {
-			ffa_set_data_access_attr(&permissions,
-						 FFA_DATA_ACCESS_RO);
-			break;
-		}
-		dlog_verbose(
-			"Invalid data access requested; sender specified "
-			"permissions %#x but receiver requested %#x.\n",
-			sent_permissions, requested_permissions);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	case FFA_DATA_ACCESS_RESERVED:
-		panic("Got unexpected FFA_DATA_ACCESS_RESERVED. Should be "
-		      "checked before this point.");
-	}
-	switch (sent_instruction_access) {
-	case FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED:
-	case FFA_INSTRUCTION_ACCESS_X:
-		if (requested_instruction_access ==
-			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
-		    requested_instruction_access == FFA_INSTRUCTION_ACCESS_X) {
-			ffa_set_instruction_access_attr(
-				&permissions, FFA_INSTRUCTION_ACCESS_X);
-			break;
-		}
-	case FFA_INSTRUCTION_ACCESS_NX:
-		if (requested_instruction_access ==
-			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
-		    requested_instruction_access == FFA_INSTRUCTION_ACCESS_NX) {
-			ffa_set_instruction_access_attr(
-				&permissions, FFA_INSTRUCTION_ACCESS_NX);
-			break;
-		}
-		dlog_verbose(
-			"Invalid instruction access requested; sender "
-			"specified permissions %#x but receiver requested "
-			"%#x.\n",
-			sent_permissions, requested_permissions);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	case FFA_INSTRUCTION_ACCESS_RESERVED:
-		panic("Got unexpected FFA_INSTRUCTION_ACCESS_RESERVED. Should "
-		      "be checked before this point.");
 	}
 
 	if (ffa_get_memory_type_attr(retrieve_request->attributes) !=
@@ -2554,8 +2664,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
 
-	share_state->retrieved_fragment_count[0] = 1;
-	if (share_state->retrieved_fragment_count[0] ==
+	share_state->retrieved_fragment_count[receiver_index] = 1;
+	if (share_state->retrieved_fragment_count[receiver_index] ==
 	    share_state->fragment_count) {
 		ffa_memory_retrieve_complete(share_states, share_state,
 					     page_pool);
