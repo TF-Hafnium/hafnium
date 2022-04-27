@@ -13,7 +13,8 @@
 #include "hf/types.h"
 
 #define SP_PKG_HEADER_MAGIC 0x474b5053U
-#define SP_PKG_HEADER_VERSION 0x2U
+#define SP_PKG_HEADER_VERSION_1 0x1U
+#define SP_PKG_HEADER_VERSION_2 0x2U
 
 #define SP_PKG_FLAG_BOOT_INFO UINT32_C(0x1U << 0)
 

@@ -660,7 +660,7 @@ class Partition_package
 	{
 		// Initialise header field
 		spkg.magic = SP_PKG_HEADER_MAGIC;
-		spkg.version = SP_PKG_HEADER_VERSION;
+		spkg.version = SP_PKG_HEADER_VERSION_2;
 		spkg.pm_offset = PAGE_SIZE;
 		spkg.pm_size = vec.size();
 		spkg.img_offset = 2 * PAGE_SIZE;

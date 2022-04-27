@@ -844,7 +844,8 @@ static enum manifest_return_code parse_ffa_partition_package(
 		vm->partition.load_addr = load_address;
 	}
 
-	if (vm->partition.boot_info &&
+	if (header.version == SP_PKG_HEADER_VERSION_2 &&
+	    vm->partition.boot_info &&
 	    !ffa_boot_info_node(&boot_info_node, pkg_start, &header)) {
 		dlog_error("Failed to process boot information.\n");
 	}
