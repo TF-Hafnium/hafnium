@@ -823,6 +823,20 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 		if (!vm_locked.vm->el0_partition &&
 		    plat_ffa_inject_notification_pending_interrupt(
 			    vcpu_locked, current, vm_locked)) {
+			/* TODO: setting a return value to override
+			 * the placeholder (FFA_ERROR(INTERRUPTED))
+			 * set by FFA_MSG_WAIT. FF-A v1.1 allows
+			 * FFA_MSG_WAIT to successfully return even if
+			 * it didn't receive a message. TFTF tests are
+			 * still expecting an FFA_ERROR instead,
+			 * should be fixed?
+			 */
+			arch_regs_set_retval(
+				&vcpu->regs,
+				(struct ffa_value){.func = FFA_RUN_32,
+						   // TODO: does it make sense
+						   // to set vCPU/receiver?
+						   .arg1 = 0});
 			break;
 		}
 
