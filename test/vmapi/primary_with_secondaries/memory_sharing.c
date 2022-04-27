@@ -2818,3 +2818,95 @@ TEST(memory_sharing, mem_share_multiple_borrowers)
 		}
 	}
 }
+
+/**
+ * Validate that sender can specify multiple borrowers to memory lend
+ * operation. All receivers will increment the content of the first page and
+ * relinquish access to the region. The sender shall reclaim access to it.
+ */
+TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+	uint8_t *ptr = pages;
+	struct ffa_memory_region *mem_region =
+		(struct ffa_memory_region *)mb.send;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	struct ffa_memory_access receivers[2];
+	/*
+	 * To prove the receiver can relinquish and retrieve whilst sender
+	 * didn't reclaim.
+	 */
+	const uint32_t number_of_retrieves = 2;
+
+	ffa_memory_access_init_permissions(
+		&receivers[0], SERVICE_VM1, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	ffa_memory_access_init_permissions(
+		&receivers[1], SERVICE_VM2, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	ffa_memory_region_init(
+		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
+		ARRAY_SIZE(receivers), constituents, ARRAY_SIZE(constituents),
+		0, 0, FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size);
+
+	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
+		ptr[i] = i;
+	}
+
+	ret = ffa_mem_lend(msg_size, msg_size);
+
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	handle = ffa_mem_success_handle(ret);
+
+	for (uint32_t j = 0; j < ARRAY_SIZE(receivers); j++) {
+		ffa_vm_id_t recipient =
+			receivers[j].receiver_permissions.receiver;
+
+		SERVICE_SELECT(recipient, "memory_increment_relinquish",
+			       mb.send);
+
+		msg_size = ffa_memory_retrieve_request_init(
+			mem_region, handle, HF_PRIMARY_VM_ID, receivers,
+			ARRAY_SIZE(receivers), 0,
+			FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE);
+
+		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+		for (uint32_t k = 0; k < number_of_retrieves; k++) {
+			/*
+			 * Send the appropriate retrieve request to the VM so
+			 * that it can use it to retrieve the memory.
+			 */
+			EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, recipient,
+					       msg_size, 0)
+					  .func,
+				  FFA_SUCCESS_32);
+			/* Run borrower such that it can retrieve memory. */
+			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
+			/* Run borrower such that it can write to memory. */
+			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
+			/* Run borrower such that it relinquishes its access. */
+			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_MSG_SEND_32);
+			EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+		}
+	}
+
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	for (int i = 0; i < PAGE_SIZE; ++i) {
+		/* Should have been incremented by each receiver. */
+		uint8_t value = i + ARRAY_SIZE(receivers) * number_of_retrieves;
+		EXPECT_EQ(ptr[i], value);
+	}
+}

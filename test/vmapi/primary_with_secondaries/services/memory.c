@@ -59,6 +59,50 @@ TEST_SERVICE(memory_increment)
 	}
 }
 
+TEST_SERVICE(memory_increment_relinquish)
+{
+	/* Loop, writing message to the shared memory. */
+	for (;;) {
+		size_t i;
+		void *recv_buf = SERVICE_RECV_BUFFER();
+		void *send_buf = SERVICE_SEND_BUFFER();
+
+		struct ffa_value ret = ffa_msg_wait();
+		struct ffa_memory_region *memory_region =
+			(struct ffa_memory_region *)retrieve_buffer;
+		ffa_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, NULL, memory_region,
+			HF_MAILBOX_SIZE);
+		struct ffa_composite_memory_region *composite =
+			ffa_memory_region_get_composite(memory_region, 0);
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		uint8_t *ptr = (uint8_t *)composite->constituents[0].address;
+
+		ASSERT_EQ(memory_region->receiver_count, 1);
+		ASSERT_NE(memory_region->receivers[0]
+				  .composite_memory_region_offset,
+			  0);
+
+		/* Allow the memory to be populated. */
+		EXPECT_EQ(ffa_yield().func, FFA_SUCCESS_32);
+
+		/* Increment each byte of memory. */
+		for (i = 0; i < PAGE_SIZE; ++i) {
+			++ptr[i];
+		}
+
+		EXPECT_EQ(ffa_yield().func, FFA_SUCCESS_32);
+
+		/* Give the memory back and notify the sender. */
+		ffa_mem_relinquish_init(send_buf, memory_region->handle, 0,
+					hf_vm_get_id());
+		EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
+
+		/* Signal completion and reset. */
+		ffa_msg_send(hf_vm_get_id(), sender, sizeof(ptr), 0);
+	}
+}
+
 TEST_SERVICE(memory_increment_check_mem_attr)
 {
 	/* Loop, writing message to the shared memory. */
