@@ -8,12 +8,17 @@
 
 #include "partition_services.h"
 
+#include "hf/arch/irq.h"
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/dlog.h"
 
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
+
+extern bool sel1_secure_service;
 
 struct ffa_value sp_echo_cmd(ffa_vm_id_t receiver, uint32_t val1, uint32_t val2,
 			     uint32_t val3, uint32_t val4, uint32_t val5)
@@ -103,6 +108,28 @@ struct ffa_value sp_indirect_msg_cmd(ffa_vm_id_t test_source,
 	return sp_success(own_id, test_source, 0);
 }
 
+static void check_rx_buffer_full_notification(void)
+{
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct ffa_value ret;
+	ffa_notifications_bitmap_t framework_notifications;
+
+	ret = ffa_notification_get(own_id, 0,
+				   FFA_NOTIFICATION_FLAG_BITMAP_HYP |
+					   FFA_NOTIFICATION_FLAG_BITMAP_SPM);
+	framework_notifications = ffa_notification_get_from_framework(ret);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	ASSERT_TRUE(
+		is_ffa_hyp_buffer_full_notification(framework_notifications) ||
+		is_ffa_spm_buffer_full_notification(framework_notifications));
+}
+
+static void irq(void)
+{
+	ASSERT_EQ(hf_interrupt_get(), HF_NOTIFICATION_PENDING_INTID);
+	check_rx_buffer_full_notification();
+}
+
 /**
  * Echo the indirect message back to sender.
  */
@@ -114,17 +141,21 @@ struct ffa_value sp_echo_indirect_msg_cmd(ffa_vm_id_t test_source)
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_msg *message;
 	const uint32_t *payload;
-	struct ffa_value ret;
 
-	/* Check notification. */
-	ret = ffa_notification_get(own_id, 0,
-				   FFA_NOTIFICATION_FLAG_BITMAP_HYP |
-					   FFA_NOTIFICATION_FLAG_BITMAP_SPM);
-	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
-	ASSERT_TRUE(is_ffa_hyp_buffer_full_notification(
-			    ffa_notification_get_from_framework(ret)) |
-		    is_ffa_spm_buffer_full_notification(
-			    ffa_notification_get_from_framework(ret)));
+	if (sel1_secure_service) {
+		/* S-EL1 partition, register interrupt handler for NPI. */
+		exception_setup(irq, NULL);
+		hf_interrupt_enable(HF_NOTIFICATION_PENDING_INTID, true,
+				    INTERRUPT_TYPE_IRQ);
+		arch_irq_enable();
+	} else {
+		/*
+		 * S-EL0 partition, can't get interrupts, check notification
+		 * is set.
+		 */
+		check_rx_buffer_full_notification();
+		(void)irq;
+	}
 
 	message = (struct ffa_partition_msg *)mb.recv;
 	source_vm_id = ffa_rxtx_header_sender(&message->header);

@@ -34,6 +34,8 @@ source_set("partition_services") {
 
   deps = [
     ":common",
+    "//src/arch/aarch64:arch",
+    "//src/arch/aarch64/hftest:interrupts",
     "//test/vmapi/common:common",
   ]
 }

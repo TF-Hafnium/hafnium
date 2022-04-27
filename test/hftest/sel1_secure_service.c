@@ -21,6 +21,8 @@
 
 alignas(4096) uint8_t kstack[MAX_CPUS][4096];
 
+bool sel1_secure_service = true;
+
 void test_main_sp(bool);
 
 noreturn void kmain(void)

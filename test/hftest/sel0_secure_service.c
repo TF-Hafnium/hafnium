@@ -29,6 +29,8 @@ struct hftest_context *hftest_get_context(void)
 	return &global_context;
 }
 
+bool sel1_secure_service = false;
+
 void test_main_sp(bool);
 
 noreturn void abort(void)
