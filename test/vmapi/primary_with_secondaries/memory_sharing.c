@@ -2945,3 +2945,86 @@ TEST(memory_sharing, fail_if_multi_receiver_donate)
 	ret = ffa_mem_donate(msg_size, msg_size);
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 }
+
+static void fail_multiple_receiver_mem_share_lend(
+	struct ffa_memory_region *mem_region, ffa_vm_id_t receiver_id1,
+	ffa_vm_id_t receiver_id2, enum ffa_data_access data_access1,
+	enum ffa_data_access data_access2,
+	enum ffa_instruction_access instruction_access1,
+	enum ffa_instruction_access instruction_access2)
+{
+	struct ffa_value ret;
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_lend,
+		ffa_mem_share,
+	};
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	struct ffa_memory_access receivers[2];
+	uint32_t msg_size;
+
+	ffa_memory_access_init_permissions(&receivers[0], receiver_id1,
+					   data_access1, instruction_access1,
+					   0);
+
+	ffa_memory_access_init_permissions(&receivers[1], receiver_id2,
+					   data_access2, instruction_access2,
+					   0);
+
+	ffa_memory_region_init(
+		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
+		ARRAY_SIZE(receivers), constituents, ARRAY_SIZE(constituents),
+		0, 0, FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size);
+
+	for (uint32_t i = 0U; i < ARRAY_SIZE(send_function); i++) {
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
+	}
+}
+
+/**
+ * Validate that operation fails if at least one of the borroweres is given
+ * invalid permissions.
+ */
+TEST(memory_sharing, fail_if_one_receiver_wrong_permissions)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+
+	/* The 2nd specified receiver has X permissions for the memory. */
+	fail_multiple_receiver_mem_share_lend(
+		mb.send, SERVICE_VM1, SERVICE_VM2, FFA_DATA_ACCESS_RW,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_INSTRUCTION_ACCESS_X);
+}
+
+/**
+ * Validate that sender can't repeat a borrower in the memory transaction
+ * descriptor.
+ */
+TEST(memory_sharing, fail_if_repeated_borrower)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+
+	/* Used the same borrower ID. */
+	fail_multiple_receiver_mem_share_lend(
+		mb.send, SERVICE_VM1, SERVICE_VM1, FFA_DATA_ACCESS_RW,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+}
+
+/**
+ * Validate that sender can't specify its own id as a receiver.
+ */
+TEST(memory_sharing, fail_if_one_receiver_is_self)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+
+	/* Use own id. */
+	fail_multiple_receiver_mem_share_lend(
+		mb.send, SERVICE_VM1, hf_vm_get_id(), FFA_DATA_ACCESS_RW,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+}
