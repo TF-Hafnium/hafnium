@@ -2910,3 +2910,38 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 		EXPECT_EQ(ptr[i], value);
 	}
 }
+
+/**
+ * Validate that sender can't specify multiple borrowers to memory donate
+ * operation.
+ */
+TEST(memory_sharing, fail_if_multi_receiver_donate)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	struct ffa_memory_region *mem_region =
+		(struct ffa_memory_region *)mb.send;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	struct ffa_memory_access receivers[2];
+
+	ffa_memory_access_init_permissions(
+		&receivers[0], SERVICE_VM1, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	ffa_memory_access_init_permissions(
+		&receivers[1], SERVICE_VM2, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	ffa_memory_region_init(
+		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
+		ARRAY_SIZE(receivers), constituents, ARRAY_SIZE(constituents),
+		0, 0, FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size);
+
+	ret = ffa_mem_donate(msg_size, msg_size);
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
+}
