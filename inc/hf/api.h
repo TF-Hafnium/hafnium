@@ -41,8 +41,7 @@ void api_sri_send_if_delayed(struct vcpu *current);
 
 struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 				  ffa_vm_id_t receiver_vm_id, uint32_t size,
-				  uint32_t attributes, struct vcpu *current,
-				  struct vcpu **next);
+				  struct vcpu *current, struct vcpu **next);
 struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
 				   struct vcpu *current);
 struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,

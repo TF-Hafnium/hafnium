@@ -44,7 +44,6 @@ vm_kernel("el0_partition_test_vm") {
     "//test/vmapi/primary_with_secondaries/mailbox_common.c",
     "boot.c",
     "interrupts.c",
-    "mailbox.c",
   ]
 
   deps = [

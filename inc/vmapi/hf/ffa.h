@@ -367,11 +367,6 @@ static inline uint32_t ffa_msg_send_size(struct ffa_value args)
 	return args.arg3;
 }
 
-static inline uint32_t ffa_msg_send_attributes(struct ffa_value args)
-{
-	return args.arg4;
-}
-
 static inline uint32_t ffa_msg_send2_flags(struct ffa_value args)
 {
 	return args.arg2;

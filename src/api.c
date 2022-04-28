@@ -187,32 +187,12 @@ struct vcpu *api_switch_to_other_world(struct vcpu *current,
 }
 
 /**
- * Checks whether the given `to` VM's mailbox is currently busy, and optionally
- * registers the `from` VM to be notified when it becomes available.
+ * Checks whether the given `to` VM's mailbox is currently busy.
  */
-static bool msg_receiver_busy(struct vm_locked to, struct vm *from, bool notify)
+static bool msg_receiver_busy(struct vm_locked to)
 {
-	if (to.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
-	    to.vm->mailbox.recv == NULL) {
-		/*
-		 * Fail if the receiver isn't currently ready to receive data,
-		 * setting up for notification if requested.
-		 */
-		if (notify) {
-			struct wait_entry *entry =
-				vm_get_wait_entry(from, to.vm->id);
-
-			/* Append waiter only if it's not there yet. */
-			if (list_empty(&entry->wait_links)) {
-				list_append(&to.vm->mailbox.waiter_list,
-					    &entry->wait_links);
-			}
-		}
-
-		return true;
-	}
-
-	return false;
+	return to.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
+	       to.vm->mailbox.recv == NULL;
 }
 
 /**
@@ -369,7 +349,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 	uint32_t buffer_size;
 	struct ffa_value ret;
 
-	if (msg_receiver_busy(vm_locked, NULL, false)) {
+	if (msg_receiver_busy(vm_locked)) {
 		/*
 		 * Can't retrieve memory information if the mailbox is not
 		 * available.
@@ -1044,6 +1024,8 @@ static struct ffa_value api_waiter_result(struct vm_locked locked_vm,
 {
 	struct vm *vm = locked_vm.vm;
 
+	CHECK(list_empty(&vm->mailbox.waiter_list));
+
 	if (list_empty(&vm->mailbox.waiter_list)) {
 		/* No waiters, nothing else to do. */
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
@@ -1538,8 +1520,7 @@ static struct ffa_value deliver_msg(struct vm_locked to, ffa_vm_id_t from_id,
  */
 struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 				  ffa_vm_id_t receiver_vm_id, uint32_t size,
-				  uint32_t attributes, struct vcpu *current,
-				  struct vcpu **next)
+				  struct vcpu *current, struct vcpu **next)
 {
 	struct vm *from = current->vm;
 	struct vm *to;
@@ -1548,8 +1529,6 @@ struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 	struct ffa_value ret;
 	struct vcpu_locked current_locked;
 	bool is_direct_request_ongoing;
-	bool notify =
-		(attributes & FFA_MSG_SEND_NOTIFY_MASK) == FFA_MSG_SEND_NOTIFY;
 
 	/* Ensure sender VM ID corresponds to the current VM. */
 	if (sender_vm_id != from->id) {
@@ -1601,7 +1580,7 @@ struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 
 	to_locked = vm_lock(to);
 
-	if (msg_receiver_busy(to_locked, from, notify)) {
+	if (msg_receiver_busy(to_locked)) {
 		ret = ffa_error(FFA_BUSY);
 		goto out;
 	}
@@ -2893,7 +2872,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		 */
 		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
 
-		if (msg_receiver_busy(vm_to_from_lock.vm1, from, false)) {
+		if (msg_receiver_busy(vm_to_from_lock.vm1)) {
 			ret = ffa_error(FFA_BUSY);
 			goto out_unlock;
 		}
@@ -2981,7 +2960,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	 */
 	memcpy_s(retrieve_request, message_buffer_size, to_msg, length);
 
-	if (msg_receiver_busy(to_locked, NULL, false)) {
+	if (msg_receiver_busy(to_locked)) {
 		/*
 		 * Can't retrieve memory information if the mailbox is not
 		 * available.
@@ -3102,7 +3081,7 @@ struct ffa_value api_ffa_mem_frag_rx(ffa_memory_handle_t handle,
 
 	to_locked = vm_lock(to);
 
-	if (msg_receiver_busy(to_locked, NULL, false)) {
+	if (msg_receiver_busy(to_locked)) {
 		/*
 		 * Can't retrieve memory information if the mailbox is not
 		 * available.
