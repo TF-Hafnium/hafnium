@@ -2804,6 +2804,7 @@ struct ffa_value ffa_memory_relinquish(
 	struct ffa_memory_region *memory_region;
 	bool clear;
 	struct ffa_value ret;
+	uint32_t receiver_index;
 
 	if (relinquish_request->endpoint_count != 1) {
 		dlog_verbose(
@@ -2843,24 +2844,24 @@ struct ffa_value ffa_memory_relinquish(
 	memory_region = share_state->memory_region;
 	CHECK(memory_region != NULL);
 
-	if (memory_region->receivers[0].receiver_permissions.receiver !=
-	    from_locked.vm->id) {
+	receiver_index = ffa_memory_region_get_receiver(memory_region,
+							from_locked.vm->id);
+
+	if (receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
 			"VM ID %d tried to relinquish memory region with "
-			"handle %#x but receiver was %d.\n",
-			from_locked.vm->id, handle,
-			memory_region->receivers[0]
-				.receiver_permissions.receiver);
+			"handle %#x and it is not a valid borrower.\n",
+			from_locked.vm->id, handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
-	if (share_state->retrieved_fragment_count[0] !=
+	if (share_state->retrieved_fragment_count[receiver_index] !=
 	    share_state->fragment_count) {
 		dlog_verbose(
-			"Memory with handle %#x not yet fully retrieved, can't "
-			"relinquish.\n",
-			handle);
+			"Memory with handle %#x not yet fully retrieved, "
+			"receiver %x can't relinquish.\n",
+			handle, from_locked.vm->id);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -2887,7 +2888,7 @@ struct ffa_value ffa_memory_relinquish(
 		 * Mark memory handle as not retrieved, so it can be reclaimed
 		 * (or retrieved again).
 		 */
-		share_state->retrieved_fragment_count[0] = 0;
+		share_state->retrieved_fragment_count[receiver_index] = 0;
 	}
 
 out:
