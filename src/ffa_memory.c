@@ -2943,13 +2943,17 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 		goto out;
 	}
 
-	if (share_state->retrieved_fragment_count[0] != 0) {
-		dlog_verbose(
-			"Tried to reclaim memory handle %#x that has not been "
-			"relinquished.\n",
-			handle);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
+	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
+		if (share_state->retrieved_fragment_count[i] != 0) {
+			dlog_verbose(
+				"Tried to reclaim memory handle %#x that has "
+				"not been relinquished by all borrowers(%x).\n",
+				handle,
+				memory_region->receivers[i]
+					.receiver_permissions.receiver);
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
 	}
 
 	ret = ffa_retrieve_check_update(
