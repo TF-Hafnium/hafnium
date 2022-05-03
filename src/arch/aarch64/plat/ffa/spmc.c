@@ -510,12 +510,11 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 		if (vm_locked.vm->notifications.enabled != false) {
 			dlog_verbose("Notification bitmap already created.");
 			ret = ffa_error(FFA_DENIED);
-			goto out;
+			goto out_vm_unlock;
 		}
 
 		/* Enable notifications for `other_world_vm`. */
 		vm_locked.vm->notifications.enabled = true;
-
 	} else {
 		/* Else should regard with NWd VM ID. */
 
@@ -524,7 +523,7 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 		if (vm_locked.vm != NULL) {
 			dlog_verbose("Notification bitmap already created.");
 			ret = ffa_error(FFA_DENIED);
-			goto out;
+			goto out_vm_unlock;
 		}
 
 		/* Get first empty slot in `nwd_vms` to create VM. */
@@ -545,8 +544,9 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 				   vcpu_count);
 	}
 
-out:
+out_vm_unlock:
 	vm_unlock(&vm_locked);
+out:
 	nwd_vms_unlock(&nwd_vms_locked);
 
 	return ret;
