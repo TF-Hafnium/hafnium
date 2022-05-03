@@ -663,11 +663,11 @@ bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 					  ids_count, lists_sizes, lists_count,
 					  ids_count_max, &info_get_state);
 
+	vm_unlock(&other_world_locked);
+
 	if (info_get_state == FULL) {
 		goto out;
 	}
-
-	vm_unlock(&other_world_locked);
 
 	for (unsigned int i = 0; i < nwd_vms_size; i++) {
 		info_get_state = INIT;
@@ -679,11 +679,11 @@ bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 				vm_locked, false, ids, ids_count, lists_sizes,
 				lists_count, ids_count_max, &info_get_state);
 
+			vm_unlock(&vm_locked);
+
 			if (info_get_state == FULL) {
 				goto out;
 			}
-
-			vm_unlock(&vm_locked);
 		}
 	}
 out:
