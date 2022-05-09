@@ -343,7 +343,7 @@ class FvpDriver(Driver, ABC):
             "-C", "pci.pci_smmuv3.mmu.SMMU_S_IDR2=0",
             "-C", "pci.pci_smmuv3.mmu.SMMU_S_IDR3=0",
             "-C", "pctl.startup=0.0.0.0",
-            "-C", "bp.secure_memory=0",
+            "-C", "bp.secure_memory=1",
             "-C", "cluster0.NUM_CORES=4",
             "-C", "cluster1.NUM_CORES=4",
             "-C", "cache_state_modelled=0",
