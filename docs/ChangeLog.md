@@ -1,5 +1,94 @@
 # Change log
 
+## v2.7
+#### Highlights
+
+* Boot protocol (FF-A v1.1 EAC0)
+    * The SPMC primarily supports passing the SP manifest address at boot time.
+    * In a secure partition package, partition manifest and image offsets are
+      configurable.
+      * Allows for larger partition manifest sizes.
+* Setup and discovery (FF-A v1.1 EAC0)
+    * FFA_VERSION is forwarded from SPMD to SPMC. SPMC records the version of
+      a normal world endpoint.
+    * Added UUID to partition info descriptors.
+    * Introduced count flag to FFA_PARTITION_INFO_GET.
+* Interrupt handling (FF-A v1.1 Beta0)
+    * Physical GIC registers trapped when accessed from secure partitions.
+    * Priority mask register saved/restored on world switches.
+    * Interrupts masked before resuming a pre-empted vCPU.
+    * Implemented implicit secure interrupt completion signal.
+    * Allow unused GICR frame for non-existent PEs.
+* Notifications (FF-A v1.1 EAC0)
+    * Implemented notification pending interrupt and additional test coverage.
+* MTE stack tagging
+    * Implemented FEAT_MTE2 stack tagging support at S-EL2.
+    * Core stacks marked as normal tagged memory. A synchronous abort triggers
+      on a load/store tag check failure.
+    * This permits detection of wrong operations affecting buffers allocated
+      from the stack.
+* FF-A v1.0 compliance
+    * Check composite memory region offset is defined in FF-A memory sharing.
+    * Check sender and receiver memory attributes in a FF-A memory sharing
+      operation match the attributes expected in the Hafnium implementation.
+    * Fix clear memory bit use in FF-A memory sharing from NWd to SWd.
+    * Prevent FF-A memory sharing from a SP to a NS endpoint.
+    * Reject a FF-A memory retrieve operation with the 'Address Range Alignment
+      Hint' bit set (not supported by the implementation).
+    * Refine usage of FF-A memory sharing 'clear memory flag'.
+* Misc
+    * Improved extended memory address ranges support:
+        * 52 bits PA (FEAT_LPA/FEAT_LPA2) architecture extension detected
+	  results in limiting the EL2 Stage-1 physical address range to 48 bits.
+        * In the FF-A memory sharing operations, harden address width checks on
+	  buffer mapping.
+    * Improved MP SP and S-EL0 partitions support
+      * The physical core index is passed to a SP vCPU0 on booting.
+      * Added MP SP and S-EL0 partitions boot test coverage.
+    * Emulate SMCCC VERSION to the primary VM.
+    * Memory config registers (non-secure and secure virtualization control and
+      translation table base) moved to the vCPU context.
+    * EL2 stage 1 mapping extended to 1TB to support systems with physical
+      address space larger than 512GB.
+    * FFA_RUN ABI hardened to check the vCPU index matches the PE index onto
+      which a vCPU is requested to run.
+    * Fixed missing ISB after CPTR_EL2 update upon PE initialization.
+    * Fixed stage 2 default shareability to inner shareable (from non-shareable)
+      to better support vCPU migration.
+    * Fixed manifest structure allocation from BSS rather than stack
+      at initialization.
+    * Fixed an issue with FF-A memory reclaim executed after memory donate
+      resulting in a returned error code.
+* Build and test environment
+    * Add the ability to use an out-of-tree toolchain.
+      * Primary intent is to permit building Hafnium on Aarch64 hosts.
+      * CI runs using the toolchain versioned in prebuilts submodule.
+        A developer can still use this version as well.
+    * Introduce an assert macro enabled by a build option on the command line.
+      Assertions are checked by default. Production builds can optionally
+      disable assertions.
+    * Added manifest options to permit loading VMs using an FF-A manifest.
+* CI
+    * Added job running the Hypervisor + SPMC configuration on patch
+      submissions.
+    * FVP
+      * Enable secure memory option.
+      * Remove restriction on speculative execution options.
+      * Updated to use model version 11.17 build 21.
+    * Updated linux submodule to v5.10.
+    * VHE EL0 partitions tests automated through jenkins.
+
+#### Known limitations:
+* FF-A v1.1 EAC0 implementation is partial mainly on interrupt handling and
+  memory sharing.
+* Hafnium limits physical interrupt IDs to 64. The legacy virtual interrupt
+  controller driver limits to 64. The recent addition of physical interrupt
+  handling in the SPMC through the GIC assumes a 1:1 mapping of a physical
+  interrupt ID to a virtual interrupt ID.
+* Secure timer virtualization is not supported.
+* The security state of memory or device region cannot be specified in a SP
+  manifest.
+
 ## v2.6
 #### Highlights
 * FF-A Setup and discovery
