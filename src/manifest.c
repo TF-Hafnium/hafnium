@@ -844,10 +844,12 @@ static enum manifest_return_code parse_ffa_partition_package(
 		vm->partition.load_addr = load_address;
 	}
 
-	if (header.version == SP_PKG_HEADER_VERSION_2 &&
-	    vm->partition.boot_info &&
-	    !ffa_boot_info_node(&boot_info_node, pkg_start, &header)) {
-		dlog_error("Failed to process boot information.\n");
+	if (vm->partition.gp_register_num != DEFAULT_BOOT_GP_REGISTER) {
+		if (header.version == SP_PKG_HEADER_VERSION_2 &&
+		    vm->partition.boot_info &&
+		    !ffa_boot_info_node(&boot_info_node, pkg_start, &header)) {
+			dlog_error("Failed to process boot information.\n");
+		}
 	}
 
 out:
