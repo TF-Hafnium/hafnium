@@ -2696,6 +2696,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	uint32_t expected_fragment_offset;
 	uint32_t remaining_constituent_count;
 	uint32_t fragment_length;
+	uint32_t receiver_index;
 
 	dump_share_states();
 
@@ -2710,15 +2711,14 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	memory_region = share_state->memory_region;
 	CHECK(memory_region != NULL);
 
-	if (memory_region->receivers[0].receiver_permissions.receiver !=
-	    to_locked.vm->id) {
+	receiver_index =
+		ffa_memory_region_get_receiver(memory_region, to_locked.vm->id);
+
+	if (receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
-			"Caller of FFA_MEM_FRAG_RX (%d) is not receiver (%d) "
-			"of handle %#x.\n",
-			to_locked.vm->id,
-			memory_region->receivers[0]
-				.receiver_permissions.receiver,
-			handle);
+			"Caller of FFA_MEM_FRAG_RX (%x) is not a borrower to "
+			"memory sharing transaction (%x)\n",
+			to_locked.vm->id, handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -2732,19 +2732,20 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		goto out;
 	}
 
-	if (share_state->retrieved_fragment_count[0] == 0 ||
-	    share_state->retrieved_fragment_count[0] >=
+	if (share_state->retrieved_fragment_count[receiver_index] == 0 ||
+	    share_state->retrieved_fragment_count[receiver_index] >=
 		    share_state->fragment_count) {
 		dlog_verbose(
 			"Retrieval of memory with handle %#x not yet started "
 			"or already completed (%d/%d fragments retrieved).\n",
-			handle, share_state->retrieved_fragment_count[0],
+			handle,
+			share_state->retrieved_fragment_count[receiver_index],
 			share_state->fragment_count);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
-	fragment_index = share_state->retrieved_fragment_count[0];
+	fragment_index = share_state->retrieved_fragment_count[receiver_index];
 
 	/*
 	 * Check that the given fragment offset is correct by counting how many
@@ -2755,10 +2756,16 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		retrieved_constituents_count +=
 			share_state->fragment_constituent_counts[i];
 	}
+
+	CHECK(memory_region->receiver_count > 0);
+
 	expected_fragment_offset =
-		ffa_composite_constituent_offset(memory_region, 0) +
+		ffa_composite_constituent_offset(memory_region,
+						 receiver_index) +
 		retrieved_constituents_count *
-			sizeof(struct ffa_memory_region_constituent);
+			sizeof(struct ffa_memory_region_constituent) -
+		sizeof(struct ffa_memory_access) *
+			(memory_region->receiver_count - 1);
 	if (fragment_offset != expected_fragment_offset) {
 		dlog_verbose("Fragment offset was %d but expected %d.\n",
 			     fragment_offset, expected_fragment_offset);
@@ -2776,8 +2783,8 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
 	to_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
-	share_state->retrieved_fragment_count[0]++;
-	if (share_state->retrieved_fragment_count[0] ==
+	share_state->retrieved_fragment_count[receiver_index]++;
+	if (share_state->retrieved_fragment_count[receiver_index] ==
 	    share_state->fragment_count) {
 		ffa_memory_retrieve_complete(share_states, share_state,
 					     page_pool);
