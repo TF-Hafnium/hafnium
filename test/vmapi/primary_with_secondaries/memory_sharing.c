@@ -3028,3 +3028,73 @@ TEST(memory_sharing, fail_if_one_receiver_is_self)
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 }
+
+/**
+ * Check that memory can be lent and retrieved with multiple fragments, in the
+ * multiple receiver scenario.
+ */
+TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	uint32_t i;
+	ffa_memory_handle_t handle;
+	struct ffa_memory_access receivers[2];
+
+	ffa_memory_access_init_permissions(
+		&receivers[0], SERVICE_VM1, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	ffa_memory_access_init_permissions(
+		&receivers[1], SERVICE_VM2, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
+		ffa_vm_id_t vm_id = receivers[i].receiver_permissions.receiver;
+		SERVICE_SELECT(vm_id, "ffa_memory_lend_relinquish", mb.send);
+	}
+
+	/* Initialise the memory before giving it. */
+	memset_s(ptr, sizeof(pages), 'b',
+		 PAGE_SIZE * FRAGMENTED_SHARE_PAGE_COUNT);
+
+	for (i = 0; i < ARRAY_SIZE(constituents_lend_fragmented_relinquish);
+	     ++i) {
+		constituents_lend_fragmented_relinquish[i].address =
+			(uint64_t)pages + i * PAGE_SIZE;
+		constituents_lend_fragmented_relinquish[i].page_count = 1;
+		constituents_lend_fragmented_relinquish[i].reserved = 0;
+	}
+
+	handle = send_memory_and_retrieve_request_multi_receiver(
+		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
+		constituents_lend_fragmented_relinquish,
+		ARRAY_SIZE(constituents_lend_fragmented_relinquish), receivers,
+		ARRAY_SIZE(receivers), receivers, ARRAY_SIZE(receivers), 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND);
+
+	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
+		ffa_vm_id_t vm_id = receivers[i].receiver_permissions.receiver;
+		run_res = ffa_run(vm_id, 0);
+		/* Let the memory be returned. */
+		EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
+		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	}
+
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	/* Ensure that both borrowers accessed the region. */
+	for (i = 0; i < PAGE_SIZE * FRAGMENTED_SHARE_PAGE_COUNT; ++i) {
+		ASSERT_EQ(ptr[i], 'd');
+	}
+
+	/* Check that subsequents accesses to the memory fail. */
+	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
+		ffa_vm_id_t vm_id = receivers[i].receiver_permissions.receiver;
+		run_res = ffa_run(vm_id, 0);
+		EXPECT_EQ(exception_handler_receive_exception_count(&run_res,
+								    mb.recv),
+			  1);
+	}
+}

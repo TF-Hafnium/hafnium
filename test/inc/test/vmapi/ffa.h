@@ -43,6 +43,14 @@ struct mailbox_buffers {
 };
 
 struct mailbox_buffers set_up_mailbox(void);
+ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
+	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
+	struct ffa_memory_region_constituent constituents[],
+	uint32_t constituent_count, struct ffa_memory_access receivers_send[],
+	uint32_t receivers_send_count,
+	struct ffa_memory_access receivers_retrieve[],
+	uint32_t receivers_retrieve_count, ffa_memory_region_flags_t send_flags,
+	ffa_memory_region_flags_t retrieve_flags);
 ffa_memory_handle_t send_memory_and_retrieve_request(
 	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
 	ffa_vm_id_t recipient,

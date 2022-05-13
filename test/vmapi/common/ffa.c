@@ -39,40 +39,81 @@ struct mailbox_buffers set_up_mailbox(void)
 	};
 }
 
-/*
- * Helper function to send memory to a VM then send a message with the retrieve
- * request it needs to retrieve it.
- */
-ffa_memory_handle_t send_memory_and_retrieve_request(
-	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
-	ffa_vm_id_t recipient,
+static void send_fragmented_memory_region(
+	struct ffa_value *send_ret, void *tx_buffer,
 	struct ffa_memory_region_constituent constituents[],
-	uint32_t constituent_count, ffa_memory_region_flags_t send_flags,
-	ffa_memory_region_flags_t retrieve_flags,
-	enum ffa_data_access send_data_access,
-	enum ffa_data_access retrieve_data_access,
-	enum ffa_instruction_access send_instruction_access,
-	enum ffa_instruction_access retrieve_instruction_access)
+	uint32_t constituent_count, uint32_t remaining_constituent_count,
+	uint32_t sent_length, uint32_t total_length,
+	ffa_memory_handle_t *handle)
+{
+	const ffa_memory_handle_t INVALID_FRAGMENT_HANDLE = 0xffffffffffffffff;
+	ffa_memory_handle_t fragment_handle = INVALID_FRAGMENT_HANDLE;
+	uint32_t fragment_length;
+
+	/* Send the remaining fragments. */
+	while (remaining_constituent_count != 0) {
+		dlog_verbose("%d constituents left to send.\n",
+			     remaining_constituent_count);
+		EXPECT_EQ(send_ret->func, FFA_MEM_FRAG_RX_32);
+		if (fragment_handle == INVALID_FRAGMENT_HANDLE) {
+			fragment_handle = ffa_frag_handle(*send_ret);
+		} else {
+			EXPECT_EQ(ffa_frag_handle(*send_ret), fragment_handle);
+		}
+		EXPECT_EQ(send_ret->arg3, sent_length);
+		/* Sender MBZ at virtual instance. */
+		EXPECT_EQ(ffa_frag_sender(*send_ret), 0);
+
+		remaining_constituent_count = ffa_memory_fragment_init(
+			tx_buffer, HF_MAILBOX_SIZE,
+			constituents + constituent_count -
+				remaining_constituent_count,
+			remaining_constituent_count, &fragment_length);
+
+		*send_ret = ffa_mem_frag_tx(fragment_handle, fragment_length);
+		sent_length += fragment_length;
+	}
+
+	EXPECT_EQ(sent_length, total_length);
+	EXPECT_EQ(send_ret->func, FFA_SUCCESS_32);
+	*handle = ffa_mem_success_handle(*send_ret);
+	EXPECT_EQ(*handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK,
+		  FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR);
+	if (fragment_handle != INVALID_FRAGMENT_HANDLE) {
+		EXPECT_EQ(*handle, fragment_handle);
+	}
+}
+
+ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
+	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
+	struct ffa_memory_region_constituent constituents[],
+	uint32_t constituent_count, struct ffa_memory_access receivers_send[],
+	uint32_t receivers_send_count,
+	struct ffa_memory_access receivers_retrieve[],
+	uint32_t receivers_retrieve_count, ffa_memory_region_flags_t send_flags,
+	ffa_memory_region_flags_t retrieve_flags)
 {
 	uint32_t total_length;
 	uint32_t fragment_length;
 	uint32_t msg_size;
 	struct ffa_value ret;
-	const ffa_memory_handle_t INVALID_FRAGMENT_HANDLE = 0xffffffffffffffff;
-	ffa_memory_handle_t fragment_handle = INVALID_FRAGMENT_HANDLE;
 	ffa_memory_handle_t handle;
 	uint32_t remaining_constituent_count;
-	uint32_t sent_length;
+	uint32_t i;
+	bool not_specify_memory_type =
+		share_func == FFA_MEM_DONATE_32 ||
+		(share_func == FFA_MEM_LEND_32 && receivers_send_count == 1);
 
 	/* Send the first fragment of the memory. */
-	remaining_constituent_count = ffa_memory_region_init_single_receiver(
-		tx_buffer, HF_MAILBOX_SIZE, sender, recipient, constituents,
-		constituent_count, 0, send_flags, send_data_access,
-		send_instruction_access,
-		share_func == FFA_MEM_SHARE_32 ? FFA_MEMORY_NORMAL_MEM
-					       : FFA_MEMORY_NOT_SPECIFIED_MEM,
+	remaining_constituent_count = ffa_memory_region_init(
+		tx_buffer, HF_MAILBOX_SIZE, sender, receivers_send,
+		receivers_send_count, constituents, constituent_count, 0,
+		send_flags,
+		not_specify_memory_type ? FFA_MEMORY_NOT_SPECIFIED_MEM
+					: FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
 		&total_length, &fragment_length);
+
 	if (remaining_constituent_count == 0) {
 		EXPECT_EQ(total_length, fragment_length);
 	}
@@ -91,55 +132,68 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 		/* Never reached, but needed to keep clang-analyser happy. */
 		return 0;
 	}
-	sent_length = fragment_length;
 
-	/* Send the remaining fragments. */
-	while (remaining_constituent_count != 0) {
-		dlog_verbose("%d constituents left to send.\n",
-			     remaining_constituent_count);
-		EXPECT_EQ(ret.func, FFA_MEM_FRAG_RX_32);
-		if (fragment_handle == INVALID_FRAGMENT_HANDLE) {
-			fragment_handle = ffa_frag_handle(ret);
-		} else {
-			EXPECT_EQ(ffa_frag_handle(ret), fragment_handle);
-		}
-		EXPECT_EQ(ret.arg3, sent_length);
-		/* Sender MBZ at virtual instance. */
-		EXPECT_EQ(ffa_frag_sender(ret), 0);
+	send_fragmented_memory_region(&ret, tx_buffer, constituents,
+				      constituent_count,
+				      remaining_constituent_count,
+				      fragment_length, total_length, &handle);
 
-		remaining_constituent_count = ffa_memory_fragment_init(
-			tx_buffer, HF_MAILBOX_SIZE,
-			constituents + constituent_count -
-				remaining_constituent_count,
-			remaining_constituent_count, &fragment_length);
-
-		ret = ffa_mem_frag_tx(fragment_handle, fragment_length);
-		sent_length += fragment_length;
-	}
-
-	EXPECT_EQ(sent_length, total_length);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-	handle = ffa_mem_success_handle(ret);
-	EXPECT_EQ(handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK,
-		  FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR);
-	if (fragment_handle != INVALID_FRAGMENT_HANDLE) {
-		EXPECT_EQ(handle, fragment_handle);
-	}
-
-	/*
-	 * Send the appropriate retrieve request to the VM so that it can use it
-	 * to retrieve the memory.
-	 */
-	msg_size = ffa_memory_retrieve_request_init_single_receiver(
-		tx_buffer, handle, sender, recipient, 0, retrieve_flags,
-		retrieve_data_access, retrieve_instruction_access,
+	msg_size = ffa_memory_retrieve_request_init(
+		tx_buffer, handle, sender, receivers_retrieve,
+		receivers_retrieve_count, 0, retrieve_flags,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 		FFA_MEMORY_INNER_SHAREABLE);
-	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-	EXPECT_EQ(ffa_msg_send(sender, recipient, msg_size, 0).func,
-		  FFA_SUCCESS_32);
+
+	for (i = 0; i < receivers_send_count; i++) {
+		struct ffa_memory_region_attributes *receiver =
+			&(receivers_send[i].receiver_permissions);
+		dlog_verbose(
+			"Sending the retrieve request message to receiver: "
+			"%x\n",
+			receiver->receiver);
+		/*
+		 * Send the appropriate retrieve request to the VM so that it
+		 * can use it to retrieve the memory.
+		 */
+		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+		EXPECT_EQ(ffa_msg_send(sender, receiver->receiver, msg_size, 0)
+				  .func,
+			  FFA_SUCCESS_32);
+	}
 
 	return handle;
+}
+
+/*
+ * Helper function to send memory to a VM then send a message with the retrieve
+ * request it needs to retrieve it.
+ */
+ffa_memory_handle_t send_memory_and_retrieve_request(
+	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
+	ffa_vm_id_t recipient,
+	struct ffa_memory_region_constituent constituents[],
+	uint32_t constituent_count, ffa_memory_region_flags_t send_flags,
+	ffa_memory_region_flags_t retrieve_flags,
+	enum ffa_data_access send_data_access,
+	enum ffa_data_access retrieve_data_access,
+	enum ffa_instruction_access send_instruction_access,
+	enum ffa_instruction_access retrieve_instruction_access)
+{
+	struct ffa_memory_access receiver_send_permissions;
+	struct ffa_memory_access receiver_retrieve_permissions;
+
+	ffa_memory_access_init_permissions(&receiver_send_permissions,
+					   recipient, send_data_access,
+					   send_instruction_access, 0);
+
+	ffa_memory_access_init_permissions(&receiver_retrieve_permissions,
+					   recipient, retrieve_data_access,
+					   retrieve_instruction_access, 0);
+
+	return send_memory_and_retrieve_request_multi_receiver(
+		share_func, tx_buffer, sender, constituents, constituent_count,
+		&receiver_send_permissions, 1, &receiver_retrieve_permissions,
+		1, send_flags, retrieve_flags);
 }
 
 /*
@@ -163,14 +217,16 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	uint32_t remaining_constituent_count;
 	struct ffa_value ret;
 	ffa_memory_handle_t handle;
+	bool not_specify_memory_type = share_func == FFA_MEM_DONATE_32 ||
+				       (share_func == FFA_MEM_LEND_32);
 
 	/* Send everything except the last constituent in the first fragment. */
 	remaining_constituent_count = ffa_memory_region_init_single_receiver(
 		tx_buffer, HF_MAILBOX_SIZE, sender, recipient, constituents,
 		constituent_count, 0, flags, send_data_access,
 		send_instruction_access,
-		share_func == FFA_MEM_SHARE_32 ? FFA_MEMORY_NORMAL_MEM
-					       : FFA_MEMORY_NOT_SPECIFIED_MEM,
+		not_specify_memory_type ? FFA_MEMORY_NOT_SPECIFIED_MEM
+					: FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
 		&total_length, &fragment_length);
 	EXPECT_EQ(remaining_constituent_count, 0);
@@ -289,6 +345,8 @@ ffa_vm_id_t retrieve_memory_from_message(
 	/* Retrieve the remaining fragments. */
 	fragment_offset = fragment_length;
 	while (fragment_offset < total_length) {
+		dlog_verbose("Calling again. frag offset: %x; total: %x\n",
+			     fragment_offset, total_length);
 		ret = ffa_mem_frag_rx(handle_, fragment_offset);
 		EXPECT_EQ(ret.func, FFA_MEM_FRAG_TX_32);
 		EXPECT_EQ(ffa_frag_handle(ret), handle_);
