@@ -2255,7 +2255,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 			"expected %d for handle %#x.\n",
 			retrieve_request->sender, memory_region->sender,
 			handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
 
