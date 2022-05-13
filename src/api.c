@@ -2058,7 +2058,7 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id)
 	 * if using a feature ID.
 	 */
 	if ((feature_function_id & FFA_FEATURES_FUNC_ID_MASK) == 0U &&
-	    (feature_function_id & ~FFA_FEATURES_FEATURE_ID_MASK) != 0) {
+	    (feature_function_id & ~FFA_FEATURES_FEATURE_ID_MASK) != 0U) {
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
@@ -2083,6 +2083,8 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id)
 	case FFA_MEM_RETRIEVE_RESP_32:
 	case FFA_MEM_RELINQUISH_32:
 	case FFA_MEM_RECLAIM_32:
+	case FFA_MEM_FRAG_RX_32:
+	case FFA_MEM_FRAG_TX_32:
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 	case FFA_MSG_SEND_DIRECT_REQ_64:

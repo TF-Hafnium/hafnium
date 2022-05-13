@@ -254,6 +254,12 @@ TEST(ffa, ffa_features)
 	ret = ffa_features(FFA_MEM_RECLAIM_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
+	ret = ffa_features(FFA_MEM_FRAG_TX_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MEM_FRAG_RX_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_REQ_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
