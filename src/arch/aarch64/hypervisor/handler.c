@@ -631,6 +631,10 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_INTERRUPT_32:
 		*args = plat_ffa_delegate_ffa_interrupt(current, next);
 		return true;
+	case FFA_CONSOLE_LOG_32:
+	case FFA_CONSOLE_LOG_64:
+		*args = api_ffa_console_log(*args, current);
+		return true;
 	}
 
 	return false;

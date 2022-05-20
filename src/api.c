@@ -3562,3 +3562,79 @@ out:
 
 	return ret;
 }
+
+/**
+ * Helper function for FFA_CONSOLE_LOG ABI.
+ * Writes number of characters to a given VM buffer.
+ */
+static rsize_t arg_to_char_helper(struct vm_locked from_locked,
+				  const uint64_t src, rsize_t src_size,
+				  rsize_t to_write)
+{
+	bool flush = false;
+	char c;
+	rsize_t size = src_size < to_write ? src_size : to_write;
+	rsize_t written = 0;
+
+	if (size == 0) {
+		return 0;
+	}
+
+	while (written < size) {
+		c = ((char *)&src)[written++];
+		if (c == '\n' || c == '\0') {
+			flush = true;
+		} else {
+			from_locked.vm->log_buffer
+				[from_locked.vm->log_buffer_length++] = c;
+			flush = (from_locked.vm->log_buffer_length ==
+				 LOG_BUFFER_SIZE);
+		}
+
+		if (flush) {
+			dlog_flush_vm_buffer(from_locked.vm->id,
+					     from_locked.vm->log_buffer,
+					     from_locked.vm->log_buffer_length);
+			from_locked.vm->log_buffer_length = 0;
+		}
+	}
+
+	return written;
+}
+
+/**
+ * Implements FFA_CONSOLE_LOG buffered logging.
+ */
+struct ffa_value api_ffa_console_log(const struct ffa_value args,
+				     struct vcpu *current)
+{
+	struct vm *vm = current->vm;
+	struct vm_locked vm_locked;
+	size_t chars_in_param = args.func == FFA_CONSOLE_LOG_32
+					? sizeof(uint32_t)
+					: sizeof(uint64_t);
+	size_t total_to_write = args.arg1;
+
+	if (total_to_write == 0 || total_to_write > chars_in_param * 6) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	vm_locked = vm_lock(vm);
+
+	total_to_write -= arg_to_char_helper(vm_locked, args.arg2,
+					     chars_in_param, total_to_write);
+	total_to_write -= arg_to_char_helper(vm_locked, args.arg3,
+					     chars_in_param, total_to_write);
+	total_to_write -= arg_to_char_helper(vm_locked, args.arg4,
+					     chars_in_param, total_to_write);
+	total_to_write -= arg_to_char_helper(vm_locked, args.arg5,
+					     chars_in_param, total_to_write);
+	total_to_write -= arg_to_char_helper(vm_locked, args.arg6,
+					     chars_in_param, total_to_write);
+	arg_to_char_helper(vm_locked, args.arg7, chars_in_param,
+			   total_to_write);
+
+	vm_unlock(&vm_locked);
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}

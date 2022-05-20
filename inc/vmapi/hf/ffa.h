@@ -80,6 +80,10 @@
 #define FFA_MEM_PERM_GET_64                 0xC4000088
 #define FFA_MEM_PERM_SET_64                 0xC4000089
 
+/* Implementation-defined ABIs. */
+#define FFA_CONSOLE_LOG_32                  0x8400008A
+#define FFA_CONSOLE_LOG_64                  0xC400008A
+
 /* FF-A error codes. */
 #define FFA_NOT_SUPPORTED      INT32_C(-1)
 #define FFA_INVALID_PARAMETERS INT32_C(-2)
