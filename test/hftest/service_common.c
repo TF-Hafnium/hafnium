@@ -19,17 +19,12 @@
 
 #include "test/hftest.h"
 #include "test/hftest_impl.h"
+#include "test/vmapi/ffa.h"
 
 HFTEST_ENABLE();
 
 extern struct hftest_test hftest_begin[];
 extern struct hftest_test hftest_end[];
-
-static alignas(HF_MAILBOX_SIZE) uint8_t send[HF_MAILBOX_SIZE];
-static alignas(HF_MAILBOX_SIZE) uint8_t recv[HF_MAILBOX_SIZE];
-
-static hf_ipaddr_t send_addr = (hf_ipaddr_t)send;
-static hf_ipaddr_t recv_addr = (hf_ipaddr_t)recv;
 
 static struct hftest_context global_context;
 
@@ -76,16 +71,29 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	struct hftest_context *ctx;
 	struct ffa_value ret;
 	struct fdt fdt;
-
-	/* Prepare the context. */
-
-	/* Set up the mailbox. */
-	ffa_rxtx_map(send_addr, recv_addr);
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_notifications_bitmap_t bitmap;
+	struct ffa_partition_msg *message = (struct ffa_partition_msg *)mb.recv;
 
 	/* Receive the name of the service to run. */
-	ret = ffa_msg_wait();
-	ASSERT_EQ(ret.func, FFA_MSG_SEND_32);
-	memiter_init(&args, recv, ffa_msg_send_size(ret));
+	ffa_msg_wait();
+
+	/*
+	 * Expect to wake up with indirect message related to the next service
+	 * to be executed.
+	 */
+	ret = ffa_notification_get(own_id, 0,
+				   FFA_NOTIFICATION_FLAG_BITMAP_SPM |
+					   FFA_NOTIFICATION_FLAG_BITMAP_HYP);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	bitmap = ffa_notification_get_from_framework(ret);
+	ASSERT_TRUE(is_ffa_spm_buffer_full_notification(bitmap) ||
+		    is_ffa_hyp_buffer_full_notification(bitmap));
+	ASSERT_EQ(own_id, ffa_rxtx_header_receiver(&message->header));
+	memiter_init(&args, message->payload, message->header.size);
+
+	/* Find service handler. */
 	service = find_service(&args);
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
@@ -106,9 +114,16 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	ctx = hftest_get_context();
 	memset_s(ctx, sizeof(*ctx), 0, sizeof(*ctx));
 	ctx->abort = abort;
-	ctx->send = send;
-	ctx->recv = recv;
-	if (!fdt_get_memory_size(&fdt, &ctx->memory_size)) {
+	ctx->send = mb.send;
+	ctx->recv = mb.recv;
+
+	/*
+	 * The memory size argument is to be used only by VMs. It is part of
+	 * the dt provided by the Hypervisor. SPs expect to receive their
+	 * FF-A manifest which doesn't have a memory size field.
+	 */
+	if (!IS_SP_ID(own_id) &&
+	    !fdt_get_memory_size(&fdt, &ctx->memory_size)) {
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
 			   "No entry in the FDT on memory size details");

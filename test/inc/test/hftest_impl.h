@@ -274,29 +274,35 @@ union hftest_any {
 /**
  * Select the service to run in a service VM.
  */
-#define HFTEST_SERVICE_SELECT(vm_id, service, send_buffer)                    \
-	do {                                                                  \
-		struct ffa_value run_res;                                     \
-		uint32_t msg_length =                                         \
-			strnlen_s(service, SERVICE_NAME_MAX_LENGTH);          \
-                                                                              \
-		/*                                                            \
-		 * Let the service configure its mailbox and wait for a       \
-		 * message.                                                   \
-		 */                                                           \
-		run_res = ffa_run(vm_id, 0);                                  \
-		ASSERT_EQ(run_res.func, FFA_MSG_WAIT_32);                     \
-		ASSERT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);                \
-                                                                              \
-		/* Send the selected service to run and let it be handled. */ \
-		memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, service,           \
-			 msg_length);                                         \
-                                                                              \
-		ASSERT_EQ(ffa_msg_send(hf_vm_get_id(), vm_id, msg_length, 0)  \
-				  .func,                                      \
-			  FFA_SUCCESS_32);                                    \
-		run_res = ffa_run(vm_id, 0);                                  \
-		ASSERT_EQ(run_res.func, FFA_YIELD_32);                        \
+#define HFTEST_SERVICE_SELECT(vm_id, service, send_buffer)                 \
+	do {                                                               \
+		struct ffa_value res;                                      \
+		uint32_t msg_length =                                      \
+			strnlen_s(service, SERVICE_NAME_MAX_LENGTH);       \
+		struct ffa_partition_msg *message =                        \
+			(struct ffa_partition_msg *)send_buffer;           \
+                                                                           \
+		/*                                                         \
+		 * If service is a Secondary VM, let the service configure \
+		 * its mailbox and wait for a message.                     \
+		 */                                                        \
+		res = ffa_run(vm_id, 0);                                   \
+		ASSERT_EQ(res.func, FFA_MSG_WAIT_32);                      \
+		ASSERT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);                 \
+                                                                           \
+		/*                                                         \
+		 * Send the selected service to run and let it be          \
+		 * handled.                                                \
+		 */                                                        \
+		ffa_rxtx_header_init(hf_vm_get_id(), vm_id, msg_length,    \
+				     &message->header);                    \
+		memcpy_s(message->payload, FFA_PARTITION_MSG_PAYLOAD_MAX,  \
+			 service, msg_length);                             \
+		res = ffa_msg_send2(0);                                    \
+                                                                           \
+		ASSERT_EQ(res.func, FFA_SUCCESS_32);                       \
+		res = ffa_run(vm_id, 0);                                   \
+		ASSERT_EQ(res.func, FFA_YIELD_32);                         \
 	} while (0)
 
 #define HFTEST_SERVICE_SEND_BUFFER() hftest_get_context()->send
