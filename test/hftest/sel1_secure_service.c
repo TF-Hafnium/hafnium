@@ -19,13 +19,20 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+static struct ffa_boot_info_header* boot_info_header;
+
+struct ffa_boot_info_header* get_boot_info_header(void)
+{
+	return boot_info_header;
+}
+
 alignas(4096) uint8_t kstack[MAX_CPUS][4096];
 
 bool sel1_secure_service = true;
 
 void test_main_sp(bool);
 
-noreturn void kmain(void)
+noreturn void kmain(struct ffa_boot_info_header* boot_info_blob)
 {
 	extern void secondary_ep_entry(void);
 	struct ffa_value res;
@@ -42,6 +49,8 @@ noreturn void kmain(void)
 	/* Register entry point for secondary vCPUs. */
 	res = ffa_secondary_ep_register((uintptr_t)secondary_ep_entry);
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	boot_info_header = boot_info_blob;
 
 	/* Register RX/TX buffers via FFA_RXTX_MAP */
 	set_up_mailbox();
