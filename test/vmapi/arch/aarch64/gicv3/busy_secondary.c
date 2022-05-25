@@ -8,6 +8,7 @@
 
 #include "hf/arch/irq.h"
 #include "hf/arch/vm/interrupts_gicv3.h"
+#include "hf/arch/vm/timer.h"
 
 #include "hf/dlog.h"
 #include "hf/ffa.h"
@@ -20,17 +21,9 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
-/**
- * Converts a number of nanoseconds to the equivalent number of timer ticks.
- */
-static uint64_t ns_to_ticks(uint64_t ns)
-{
-	return ns * read_msr(cntfrq_el0) / NANOS_PER_UNIT;
-}
-
 SET_UP(busy_secondary)
 {
-	system_setup();
+	gicv3_system_setup();
 	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
 		  FFA_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM1, "busy", send_buffer);
@@ -43,7 +36,7 @@ TEAR_DOWN(busy_secondary)
 
 SET_UP(busy_secondary_direct_message)
 {
-	system_setup();
+	gicv3_system_setup();
 	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
 		  FFA_SUCCESS_32);
 	SERVICE_SELECT(SERVICE_VM1, "busy_secondary_direct_message",

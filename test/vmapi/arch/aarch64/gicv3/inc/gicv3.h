@@ -30,4 +30,4 @@ extern void *recv_buffer;
 
 extern volatile uint32_t last_interrupt_id;
 
-void system_setup();
+void gicv3_system_setup();

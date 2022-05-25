@@ -12,6 +12,18 @@ config("config") {
   include_dirs = [ "inc" ]
 }
 
+source_set("gicv3_setup") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+  ]
+
+  sources = [
+    "gicv3_setup.c",
+  ]
+}
+
 # Tests specific to GICv3.
 vm_kernel("gicv3_test_vm") {
   testonly = true
@@ -25,6 +37,7 @@ vm_kernel("gicv3_test_vm") {
   ]
 
   deps = [
+    ":gicv3_setup",
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64/hftest:interrupts",
     "//src/arch/aarch64/hftest:interrupts_gicv3",

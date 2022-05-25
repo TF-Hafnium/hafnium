@@ -64,6 +64,12 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 			res = sp_check_cpu_idx_cmd(ffa_sender(res),
 						   sp_check_cpu_idx(res));
 			break;
+		case SP_WAIT_BUSY_LOOP_CMD:
+			for (volatile uint64_t loop = 0; loop < res.arg4;
+			     loop++) {
+			}
+			res = sp_success(ffa_receiver(res), ffa_sender(res), 0);
+			break;
 		default:
 			HFTEST_LOG_FAILURE();
 			HFTEST_LOG(HFTEST_LOG_INDENT

@@ -21,12 +21,12 @@
 
 SET_UP(interrupts)
 {
-	system_setup();
+	gicv3_system_setup();
 }
 
 SET_UP(interrupts_ffa_direct_msg)
 {
-	system_setup();
+	gicv3_system_setup();
 
 	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
 		  FFA_SUCCESS_32);

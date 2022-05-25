@@ -228,3 +228,17 @@ static inline ffa_vcpu_index_t sp_check_cpu_idx(struct ffa_value cmd)
 
 struct ffa_value sp_check_cpu_idx_cmd(ffa_vm_id_t test_source,
 				      ffa_vcpu_index_t received_cpu_idx);
+
+/**
+ * Command to request SP to actively wait in a busy loop.
+ */
+#define SP_WAIT_BUSY_LOOP_CMD 0x42555359
+
+static inline struct ffa_value sp_busy_loop_cmd_send(ffa_vm_id_t test_source,
+						     ffa_vm_id_t receiver,
+						     uint64_t loop_count)
+{
+	return ffa_msg_send_direct_req(test_source, receiver,
+				       SP_WAIT_BUSY_LOOP_CMD, loop_count, 0, 0,
+				       0);
+}

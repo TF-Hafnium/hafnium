@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "hf/arch/cpu.h"
+#include "hf/arch/vm/timer.h"
 
 #include "hf/addr.h"
 
@@ -22,8 +23,6 @@
 #define CNTV_CTL_EL0_ENABLE (1u << 0)
 #define CNTV_CTL_EL0_IMASK (1u << 1)
 #define CNTV_CTL_EL0_ISTATUS (1u << 2)
-
-#define NANOS_PER_UNIT 1000000000
 
 /**
  * Sets the bit to mask virtual timer interrupts.

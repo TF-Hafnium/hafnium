@@ -31,28 +31,6 @@ hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 void *send_buffer = send_page;
 void *recv_buffer = recv_page;
 
-volatile uint32_t last_interrupt_id = 0;
-
-static void irq(void)
-{
-	uint32_t interrupt_id = interrupt_get_and_acknowledge();
-	dlog("primary IRQ %d from current\n", interrupt_id);
-	last_interrupt_id = interrupt_id;
-	interrupt_end(interrupt_id);
-	dlog("primary IRQ %d ended\n", interrupt_id);
-}
-
-void system_setup()
-{
-	const uint32_t mode = MM_MODE_R | MM_MODE_W | MM_MODE_D;
-	hftest_mm_identity_map((void *)GICD_BASE, PAGE_SIZE, mode);
-	hftest_mm_identity_map((void *)GICR_BASE, PAGE_SIZE, mode);
-	hftest_mm_identity_map((void *)IO32_C(SGI_BASE).ptr, PAGE_SIZE, mode);
-
-	exception_setup(irq, NULL);
-	interrupt_gic_setup();
-}
-
 TEAR_DOWN(system)
 {
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
@@ -71,7 +49,7 @@ TEST(system, system_registers_enabled)
 
 TEST(system, system_setup)
 {
-	system_setup();
+	gicv3_system_setup();
 
 	/* Should have affinity routing enabled, group 1 interrupts enabled,
 	 * group 0 disabled. */

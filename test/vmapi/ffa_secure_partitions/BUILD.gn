@@ -6,26 +6,29 @@
 
 import("//build/image/image.gni")
 import("//test/hftest/args.gni")
-import("//src/arch/aarch64/args.gni")
+import("//src/arch/${plat_arch}/args.gni")
 
 # VM that will control execution of tests in a VM-to-SP set-up
 vm_kernel("vm_primary") {
   testonly = true
   public_configs = [
     "services:config",
-    "//src/arch/aarch64:arch_config",
+    "//src/arch/${plat_arch}:arch_config",
   ]
 
   sources = [
     "dir_msg.c",
+    "interrupts.c",
     "notifications.c",
     "power_mgt.c",
     "setup_and_discovery.c",
   ]
 
   deps = [
+    "//src/arch/${plat_arch}/hftest:interrupts_gicv3",
     "//src/arch/${plat_arch}/hftest:power_mgmt",
     "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/arch/${plat_arch}/gicv3:gicv3_setup",
     "//test/vmapi/common:common",
   ]
 }
