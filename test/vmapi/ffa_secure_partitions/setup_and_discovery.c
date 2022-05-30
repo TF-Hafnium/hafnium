@@ -78,6 +78,9 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	/* Expect three partitions. */
 	EXPECT_EQ(ret.arg2, 3);
 
+	/* Check the partition info descritor size returned in w3 is correct. */
+	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
+
 	/* Expect the PVM as first partition. */
 	check_v1_1_partition_info_descriptors(partitions);
 
@@ -96,6 +99,9 @@ TEST(ffa, ffa_partition_info_get_count_flag)
 
 	/* Expect three partitions. */
 	EXPECT_EQ(ret.arg2, 3);
+
+	/* Check when the count flag is set w3 MBZ. */
+	EXPECT_EQ(ret.arg3, 0);
 }
 
 TEST(ffa, ffa_partition_info_get_flags_mbz_fail)
@@ -130,6 +136,9 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 	/* Expect one partition. */
 	EXPECT_EQ(ret.arg2, 1);
 
+	/* Check when the count flag is set w3 MBZ. */
+	EXPECT_EQ(ret.arg3, 0);
+
 	/* And that the buffer is zero */
 	EXPECT_EQ(partitions[0].vm_id, 0);
 	EXPECT_EQ(partitions[0].vcpu_count, 0);
@@ -140,6 +149,9 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 
 	/* Expect one partition. */
 	EXPECT_EQ(ret.arg2, 1);
+
+	/* Check the partition info descritor size returned in w3 is correct. */
+	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
 
 	/* Expect a secure partition. */
 	EXPECT_EQ(partitions[0].vm_id, HF_SPMC_VM_ID + 1);
@@ -199,6 +211,9 @@ TEST(ffa, ffa_partition_info_get_versioned_descriptors)
 	/* Expect three partitions. */
 	EXPECT_EQ(ret.arg2, 3);
 
+	/* Check the partition info descritor size returned in w3 is correct. */
+	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info_v1_0));
+
 	/* Expect the PVM as first partition. */
 	EXPECT_EQ(partitions_v1_0[0].vm_id, hf_vm_get_id());
 	EXPECT_TRUE(partitions_v1_0[1].vcpu_count == 8 ||
@@ -226,6 +241,9 @@ TEST(ffa, ffa_partition_info_get_versioned_descriptors)
 
 	/* Expect three partitions. */
 	EXPECT_EQ(ret.arg2, 3);
+
+	/* Check the partition info descritor size returned in w3 is correct. */
+	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
 
 	check_v1_1_partition_info_descriptors(partitions_v1_1);
 

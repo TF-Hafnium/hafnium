@@ -364,7 +364,8 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 {
 	struct vm *vm = vm_locked.vm;
 	uint32_t version = vm->ffa_version;
-	uint32_t size;
+	uint32_t partition_info_size;
+	uint32_t buffer_size;
 
 	if (msg_receiver_busy(vm_locked, NULL, false)) {
 		/*
@@ -378,8 +379,9 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 	if (version == MAKE_FFA_VERSION(1, 0)) {
 		struct ffa_partition_info_v1_0 *recv_mailbox = vm->mailbox.recv;
 
-		size = sizeof(struct ffa_partition_info_v1_0) * vm_count;
-		if (size > HF_MAILBOX_SIZE) {
+		partition_info_size = sizeof(struct ffa_partition_info_v1_0);
+		buffer_size = partition_info_size * vm_count;
+		if (buffer_size > HF_MAILBOX_SIZE) {
 			dlog_error(
 				"Partition information does not fit in the "
 				"VM's RX "
@@ -398,8 +400,9 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		}
 
 	} else {
-		size = sizeof(partitions[0]) * vm_count;
-		if (size > HF_MAILBOX_SIZE) {
+		partition_info_size = sizeof(struct ffa_partition_info);
+		buffer_size = partition_info_size * vm_count;
+		if (buffer_size > HF_MAILBOX_SIZE) {
 			dlog_error(
 				"Partition information does not fit in the "
 				"VM's RX "
@@ -409,18 +412,24 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 
 		/* Populate the VM's RX buffer with the partition information.
 		 */
-		memcpy_s(vm->mailbox.recv, HF_MAILBOX_SIZE, partitions, size);
+		memcpy_s(vm->mailbox.recv, HF_MAILBOX_SIZE, partitions,
+			 buffer_size);
 	}
 
-	vm->mailbox.recv_size = size;
+	vm->mailbox.recv_size = buffer_size;
 
 	/* Sender is Hypervisor in the normal world (TEE in secure world). */
 	vm->mailbox.recv_sender = HF_VM_ID_BASE;
 	vm->mailbox.recv_func = FFA_PARTITION_INFO_GET_32;
 	vm->mailbox.state = MAILBOX_STATE_READ;
 
-	/* Return the count of partition information descriptors in w2. */
-	return (struct ffa_value){.func = FFA_SUCCESS_32, .arg2 = vm_count};
+	/*
+	 * Return the count of partition information descriptors in w2
+	 * and the size of the descriptors in w3.
+	 */
+	return (struct ffa_value){.func = FFA_SUCCESS_32,
+				  .arg2 = vm_count,
+				  .arg3 = partition_info_size};
 }
 
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
