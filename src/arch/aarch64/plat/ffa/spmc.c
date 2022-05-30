@@ -1317,11 +1317,10 @@ void plat_ffa_sri_state_set(enum plat_ffa_sri_state state)
 
 static void plat_ffa_send_schedule_receiver_interrupt(struct cpu *cpu)
 {
-	dlog_verbose("Setting Schedule Receiver SGI %d on core: %d\n",
+	dlog_verbose("Setting Schedule Receiver SGI %u on core: %u\n",
 		     HF_SCHEDULE_RECEIVER_INTID, cpu_index(cpu));
 
-	plat_interrupts_send_sgi(HF_SCHEDULE_RECEIVER_INTID, false,
-				 (1 << cpu_index(cpu)), false);
+	plat_interrupts_send_sgi(HF_SCHEDULE_RECEIVER_INTID, cpu, false);
 }
 
 void plat_ffa_sri_trigger_if_delayed(struct cpu *cpu)

@@ -415,16 +415,14 @@ void gicv3_cpuif_enable(uint32_t core_pos)
 	(void)core_pos;
 }
 
-void gicv3_send_sgi(uint32_t sgi_id, bool send_to_all, uint32_t target_list,
+void gicv3_send_sgi(uint32_t sgi_id, bool send_to_all, uint64_t mpidr_target,
 		    bool to_this_security_state)
 {
 	uint64_t sgir;
 	uint64_t irm;
-	uint64_t mpidr_reg;
 
 	CHECK(is_sgi_ppi(sgi_id));
 
-	mpidr_reg = read_msr(MPIDR_EL1);
 	sgir = (sgi_id & SGIR_INTID_MASK) << SGIR_INTID_SHIFT;
 
 	/* Check the interrupt routing mode. */
@@ -438,6 +436,7 @@ void gicv3_send_sgi(uint32_t sgi_id, bool send_to_all, uint32_t target_list,
 		 * generated.
 		 */
 
+		uint64_t aff0;
 		uint64_t aff1;
 		uint64_t aff2;
 		uint64_t aff3;
@@ -447,12 +446,10 @@ void gicv3_send_sgi(uint32_t sgi_id, bool send_to_all, uint32_t target_list,
 		 * will be delivered the interrupt. At least one has to be
 		 * enabled.
 		 */
-
-		CHECK(target_list != 0U);
-
-		aff3 = (mpidr_reg >> MPIDR_AFF3_SHIFT) & (0xff);
-		aff2 = (mpidr_reg >> MPIDR_AFF2_SHIFT) & (0xff);
-		aff1 = (mpidr_reg >> MPIDR_AFF1_SHIFT) & (0xff);
+		aff3 = (mpidr_target >> MPIDR_AFF3_SHIFT) & (0xff);
+		aff2 = (mpidr_target >> MPIDR_AFF2_SHIFT) & (0xff);
+		aff1 = (mpidr_target >> MPIDR_AFF1_SHIFT) & (0xff);
+		aff0 = (mpidr_target >> MPIDR_AFF0_SHIFT) & (0xff);
 
 		/* Populate the various affinity fields. */
 		sgir |= ((aff3 & SGIR_AFF_MASK) << SGIR_AFF3_SHIFT) |
@@ -460,7 +457,7 @@ void gicv3_send_sgi(uint32_t sgi_id, bool send_to_all, uint32_t target_list,
 			((aff1 & SGIR_AFF_MASK) << SGIR_AFF1_SHIFT);
 
 		/* Construct the SGI target affinity. */
-		sgir |= (target_list & SGIR_TGT_MASK) << SGIR_TGT_SHIFT;
+		sgir |= ((1U << aff0) & SGIR_TGT_MASK) << SGIR_TGT_SHIFT;
 	}
 
 	/* Populate the Interrupt Routing Mode field. */
@@ -638,8 +635,8 @@ void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 	gicv3_enable_interrupt(intr_num, core_idx);
 }
 
-void plat_interrupts_send_sgi(uint32_t id, bool send_to_all,
-			      uint32_t target_list, bool to_this_security_state)
+void plat_interrupts_send_sgi(uint32_t id, struct cpu *cpu,
+			      bool to_this_security_state)
 {
-	gicv3_send_sgi(id, send_to_all, target_list, to_this_security_state);
+	gicv3_send_sgi(id, false, cpu->id, to_this_security_state);
 }

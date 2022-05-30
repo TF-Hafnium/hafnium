@@ -29,6 +29,5 @@ uint32_t plat_interrupts_get_type(uint32_t id);
 uint32_t plat_interrupts_get_pending_interrupt_id(void);
 void plat_interrupts_end_of_interrupt(uint32_t id);
 void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc);
-void plat_interrupts_send_sgi(uint32_t id, bool send_to_all,
-			      uint32_t target_list,
+void plat_interrupts_send_sgi(uint32_t id, struct cpu *cpu,
 			      bool to_this_security_state);

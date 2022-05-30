@@ -697,7 +697,8 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 #if SECURE_WORLD == 1
 		/*
 		 * If giving back execution to the NWd, check if the Schedule
-		 * Receiver Interrupt has been delayed, and trigger it if so.
+		 * Receiver Interrupt has been delayed, and trigger it on
+		 * current core if so.
 		 */
 		if ((*next != NULL && (*next)->vm->id == HF_OTHER_WORLD_ID) ||
 		    (*next == NULL && vcpu->vm->id == HF_OTHER_WORLD_ID)) {

@@ -75,11 +75,10 @@ void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 	(void)int_desc;
 }
 
-void plat_interrupts_send_sgi(uint32_t id, bool send_to_all,
-			      uint32_t target_list, bool to_this_security_state)
+void plat_interrupts_send_sgi(uint32_t id, struct cpu *cpu,
+			      bool to_this_security_state)
 {
 	(void)id;
-	(void)send_to_all;
-	(void)target_list;
+	(void)cpu;
 	(void)to_this_security_state;
 }
