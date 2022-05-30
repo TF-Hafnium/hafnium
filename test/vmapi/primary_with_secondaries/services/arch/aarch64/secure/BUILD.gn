@@ -1,0 +1,91 @@
+# Copyright 2022 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+import("//test/hftest/args.gni")
+
+config("config") {
+  include_dirs = [ "//test/inc" ]
+}
+
+source_set("message_loop") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [
+    "message_loop.c",
+  ]
+  deps = [
+    "//test/vmapi/common:common",
+  ]
+}
+
+vm_kernel("secure_service") {
+  testonly = true
+  deps = [
+    ":message_loop",
+    "//test/hftest:hftest_secure_service",
+    "//test/vmapi/primary_with_secondaries/services:echo",
+    "//test/vmapi/primary_with_secondaries/services:ffa_check",
+  ]
+}
+
+manifest("partition_manifest_service_sp1") {
+  source = "partition_manifest_service_sp1.dts"
+  output = "partition_manifest_service_sp1.dtb"
+}
+
+manifest("partition_manifest_service_sp2") {
+  source = "partition_manifest_service_sp2.dts"
+  output = "partition_manifest_service_sp2.dtb"
+}
+
+manifest("partition_manifest_service_sp3") {
+  source = "partition_manifest_service_sp3.dts"
+  output = "partition_manifest_service_sp3.dtb"
+}
+
+partition_package("service_sp1_partition_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp1.dtb",
+        "secure_service.bin",
+        ":partition_manifest_service_sp1",
+        ":secure_service",
+      ] ]
+  output = "service_sp1_partition_package.img"
+}
+
+partition_package("service_sp2_partition_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp2.dtb",
+        "secure_service.bin",
+        ":partition_manifest_service_sp2",
+        ":secure_service",
+      ] ]
+  output = "service_sp2_partition_package.img"
+}
+
+partition_package("service_sp3_partition_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp3.dtb",
+        "secure_service.bin",
+        ":partition_manifest_service_sp3",
+        ":secure_service",
+      ] ]
+  output = "service_sp3_partition_package.img"
+}

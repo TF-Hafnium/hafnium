@@ -46,6 +46,26 @@
 		}                                            \
 	}
 
+#define SERVICE_PARTITION_INFO_GET(service_name, uuid)                         \
+	struct ffa_partition_info* service_name(void)                          \
+	{                                                                      \
+		static struct ffa_partition_info partition;                    \
+		static bool is_set = false;                                    \
+		if (!is_set) {                                                 \
+			ASSERT_EQ(get_ffa_partition_info(uuid, &partition, 1), \
+				  1);                                          \
+			is_set = true;                                         \
+		}                                                              \
+		return &partition;                                             \
+	}
+
+/* Helpers to get services information.
+ * Defined with SERVICE_PARTITION_INFO_GET macro.
+ */
+struct ffa_partition_info* service1(void);
+struct ffa_partition_info* service2(void);
+struct ffa_partition_info* service3(void);
+
 #define SERVICE_VM1 (HF_VM_ID_OFFSET + 1)
 #define SERVICE_VM2 (HF_VM_ID_OFFSET + 2)
 #define SERVICE_VM3 (HF_VM_ID_OFFSET + 3)

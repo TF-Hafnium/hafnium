@@ -130,6 +130,7 @@ source_set("hftest_secure_service") {
     ":mm",
     ":service_common",
     "//src:dlog",
+    "//src:fdt_handler",
     "//src:panic",
     "//src:std",
     "//src/arch/${plat_arch}:entry",

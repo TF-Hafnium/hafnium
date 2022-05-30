@@ -425,8 +425,8 @@ template("partitions_json") {
       ]
 
       package_dir = get_label_info(sp[2], "name")
-      img = rebase_path(
-              get_label_info(package_dir + "/" + sp[0], "target_out_dir"))
+      out_dir = get_label_info(sp[2], "target_out_dir")
+      img = rebase_path(out_dir) + "/" + package_dir + "/" + sp[0]
 
       dts = rebase_path(sp[1])
 

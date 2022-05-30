@@ -15,6 +15,7 @@ group("partitions") {
     "ffa_secure_partition_only:ffa_secure_partition_only_test",
     "ffa_secure_partitions:ffa_both_world_partitions_test",
     "ffa_secure_partitions:ffa_both_world_partitions_vhe_test",
+    "primary_with_secondaries:primary_with_sp",
   ]
 }
 

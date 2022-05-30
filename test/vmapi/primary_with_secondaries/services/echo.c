@@ -44,13 +44,11 @@ TEST_SERVICE(echo_msg_send2)
 	const uint32_t *payload;
 	struct ffa_value ret;
 
-	ret = ffa_msg_wait();
-	ASSERT_EQ(ret.func, FFA_RUN_32);
-
 	/* Check notification */
-	ret = ffa_notification_get(ffa_receiver(ret), 0,
+	ret = ffa_notification_get(hf_vm_get_id(), 0,
 				   FFA_NOTIFICATION_FLAG_BITMAP_HYP);
 	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
 	ASSERT_TRUE(is_ffa_hyp_buffer_full_notification(
 		ffa_notification_get_from_framework(ret)));
 
