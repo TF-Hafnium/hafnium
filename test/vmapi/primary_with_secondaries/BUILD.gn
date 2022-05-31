@@ -109,9 +109,19 @@ manifest("primary_with_secondaries_test_manifest") {
   overlay = hftest_manifest_overlay
 }
 
-device_tree("secondary_dtb") {
-  source = "secondary.dts"
-  output = "$target_out_dir/secondary.dtb"
+device_tree("service1_dtb") {
+  source = "service1.dts"
+  output = "$target_out_dir/service1.dtb"
+}
+
+device_tree("service2_dtb") {
+  source = "service2.dts"
+  output = "$target_out_dir/service2.dtb"
+}
+
+device_tree("service3_dtb") {
+  source = "service3.dts"
+  output = "$target_out_dir/service3.dtb"
 }
 
 initrd("primary_with_secondaries_test") {
@@ -144,9 +154,19 @@ initrd("primary_with_secondaries_test") {
       "service_vm3.bin",
     ],
     [
-      "secondary.dtb",
-      ":secondary_dtb",
-      "secondary.dtb",
+      "service1.dtb",
+      ":service1_dtb",
+      "service1.dtb",
+    ],
+    [
+      "service2.dtb",
+      ":service2_dtb",
+      "service2.dtb",
+    ],
+    [
+      "service3.dtb",
+      ":service3_dtb",
+      "service3.dtb",
     ],
   ]
 }

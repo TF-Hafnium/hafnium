@@ -75,9 +75,9 @@ TEST(ffa_partition_info_get, three_secondary_vms)
 	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
 
 	/* The first two secondary VMs should have 1 vCPU, the other one 2. */
-	EXPECT_EQ(partitions[1].vcpu_count, 1);
-	EXPECT_EQ(partitions[2].vcpu_count, 1);
-	EXPECT_EQ(partitions[3].vcpu_count, 2);
+	EXPECT_EQ(partitions[1].vcpu_count, 8);
+	EXPECT_EQ(partitions[2].vcpu_count, 8);
+	EXPECT_EQ(partitions[3].vcpu_count, 8);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
@@ -130,9 +130,9 @@ TEST(ffa_partition_info_get, get_v1_0_descriptor)
 	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
 
 	/* The first two secondary VMs should have 1 vCPU, the other one 2. */
-	EXPECT_EQ(partitions[1].vcpu_count, 1);
-	EXPECT_EQ(partitions[2].vcpu_count, 1);
-	EXPECT_EQ(partitions[3].vcpu_count, 2);
+	EXPECT_EQ(partitions[1].vcpu_count, 8);
+	EXPECT_EQ(partitions[2].vcpu_count, 8);
+	EXPECT_EQ(partitions[3].vcpu_count, 8);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }

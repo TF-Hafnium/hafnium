@@ -1,0 +1,26 @@
+/*
+ * Copyright 2022 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/dts-v1/;
+
+/ {
+        compatible = "arm,ffa-manifest-1.0";
+        debug_name = "Service1";
+
+        /* FF-A Properties */
+        ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
+        uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>;
+        execution-ctx-count = <8>;
+        exception-level = <0>; /* EL1 */
+        execution-state = <0>; /* AARCH64 */
+        load-address = <0x90000000>; /* To make parsing of manifest happy. it is not yet used. */
+        entrypoint-offset = <0x0>;
+        xlat-granule = <0>; /* 4KiB */
+        messaging-method = <0x7>; /* Supports direct and indirect requests. */
+        notification-support; /* Receipt of notifications. */
+};
