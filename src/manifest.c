@@ -568,6 +568,101 @@ static enum manifest_return_code parse_ffa_device_region_node(
 	return MANIFEST_SUCCESS;
 }
 
+static enum manifest_return_code sanity_check_ffa_manifest(
+	struct manifest_vm *vm)
+{
+	uint16_t ffa_version_major;
+	uint16_t ffa_version_minor;
+	enum manifest_return_code ret_code = MANIFEST_SUCCESS;
+	const char *error_string = "specified in manifest is unsupported";
+	uint32_t k = 0;
+
+	/* ensure that the SPM version is compatible */
+	ffa_version_major = (vm->partition.ffa_version & 0xffff0000) >>
+			    FFA_VERSION_MAJOR_OFFSET;
+	ffa_version_minor = vm->partition.ffa_version & 0xffff;
+
+	if (ffa_version_major != FFA_VERSION_MAJOR ||
+	    ffa_version_minor > FFA_VERSION_MINOR) {
+		dlog_error("FF-A partition manifest version %s: %u.%u\n",
+			   error_string, ffa_version_major, ffa_version_minor);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (vm->partition.xlat_granule != PAGE_4KB) {
+		dlog_error("Translation granule %s: %u\n", error_string,
+			   vm->partition.xlat_granule);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (vm->partition.execution_state != AARCH64) {
+		dlog_error("Execution state %s: %u\n", error_string,
+			   vm->partition.execution_state);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (vm->partition.run_time_el != EL1 &&
+	    vm->partition.run_time_el != S_EL1 &&
+	    vm->partition.run_time_el != S_EL0) {
+		dlog_error("Exception level %s: %d\n", error_string,
+			   vm->partition.run_time_el);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if ((vm->partition.messaging_method &
+	     ~(FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND |
+	       FFA_PARTITION_INDIRECT_MSG)) != 0U) {
+		dlog_error("Messaging method %s: %x\n", error_string,
+			   vm->partition.messaging_method);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	if (vm->partition.run_time_el == S_EL0 &&
+	    vm->partition.execution_ctx_count != 1) {
+		dlog_error(
+			"Exception level and execution context count %s: %d "
+			"%d\n",
+			error_string, vm->partition.run_time_el,
+			vm->partition.execution_ctx_count);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	for (uint8_t i = 0; i < vm->partition.dev_region_count; i++) {
+		struct device_region dev_region;
+
+		dev_region = vm->partition.dev_regions[i];
+
+		if (dev_region.interrupt_count > SP_MAX_INTERRUPTS_PER_DEVICE) {
+			dlog_error(
+				"Interrupt count for device region exceeds "
+				"limit.\n");
+			ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+			continue;
+		}
+
+		for (uint8_t j = 0; j < dev_region.interrupt_count; j++) {
+			k++;
+			if (k > VM_MANIFEST_MAX_INTERRUPTS) {
+				dlog_error(
+					"Interrupt count for VM exceeds "
+					"limit.\n");
+				ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+				continue;
+			}
+		}
+	}
+
+	/* GP register is restricted to one of x0 - x3. */
+	if (vm->partition.gp_register_num != -1 &&
+	    vm->partition.gp_register_num > 3) {
+		dlog_error("GP register number %s: %u\n", error_string,
+			   vm->partition.gp_register_num);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	return ret_code;
+}
+
 enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 					     struct manifest_vm *vm,
 					     struct fdt_node *boot_info_node)
@@ -710,100 +805,6 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 		     vm->partition.dev_region_count);
 
 	return sanity_check_ffa_manifest(vm);
-}
-
-enum manifest_return_code sanity_check_ffa_manifest(struct manifest_vm *vm)
-{
-	uint16_t ffa_version_major;
-	uint16_t ffa_version_minor;
-	enum manifest_return_code ret_code = MANIFEST_SUCCESS;
-	const char *error_string = "specified in manifest is unsupported";
-	uint32_t k = 0;
-
-	/* ensure that the SPM version is compatible */
-	ffa_version_major = (vm->partition.ffa_version & 0xffff0000) >>
-			    FFA_VERSION_MAJOR_OFFSET;
-	ffa_version_minor = vm->partition.ffa_version & 0xffff;
-
-	if (ffa_version_major != FFA_VERSION_MAJOR ||
-	    ffa_version_minor > FFA_VERSION_MINOR) {
-		dlog_error("FF-A partition manifest version %s: %u.%u\n",
-			   error_string, ffa_version_major, ffa_version_minor);
-		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-	}
-
-	if (vm->partition.xlat_granule != PAGE_4KB) {
-		dlog_error("Translation granule %s: %u\n", error_string,
-			   vm->partition.xlat_granule);
-		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-	}
-
-	if (vm->partition.execution_state != AARCH64) {
-		dlog_error("Execution state %s: %u\n", error_string,
-			   vm->partition.execution_state);
-		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-	}
-
-	if (vm->partition.run_time_el != EL1 &&
-	    vm->partition.run_time_el != S_EL1 &&
-	    vm->partition.run_time_el != S_EL0) {
-		dlog_error("Exception level %s: %d\n", error_string,
-			   vm->partition.run_time_el);
-		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-	}
-
-	if ((vm->partition.messaging_method &
-	     ~(FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND |
-	       FFA_PARTITION_INDIRECT_MSG)) != 0U) {
-		dlog_error("Messaging method %s: %x\n", error_string,
-			   vm->partition.messaging_method);
-		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-	}
-
-	if (vm->partition.run_time_el == S_EL0 &&
-	    vm->partition.execution_ctx_count != 1) {
-		dlog_error(
-			"Exception level and execution context count %s: %d "
-			"%d\n",
-			error_string, vm->partition.run_time_el,
-			vm->partition.execution_ctx_count);
-		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-	}
-
-	for (uint8_t i = 0; i < vm->partition.dev_region_count; i++) {
-		struct device_region dev_region;
-
-		dev_region = vm->partition.dev_regions[i];
-
-		if (dev_region.interrupt_count > SP_MAX_INTERRUPTS_PER_DEVICE) {
-			dlog_error(
-				"Interrupt count for device region exceeds "
-				"limit.\n");
-			ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-			continue;
-		}
-
-		for (uint8_t j = 0; j < dev_region.interrupt_count; j++) {
-			k++;
-			if (k > VM_MANIFEST_MAX_INTERRUPTS) {
-				dlog_error(
-					"Interrupt count for VM exceeds "
-					"limit.\n");
-				ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-				continue;
-			}
-		}
-	}
-
-	/* GP register is restricted to one of x0 - x3. */
-	if (vm->partition.gp_register_num != -1 &&
-	    vm->partition.gp_register_num > 3) {
-		dlog_error("GP register number %s: %u\n", error_string,
-			   vm->partition.gp_register_num);
-		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-	}
-
-	return ret_code;
 }
 
 static enum manifest_return_code parse_ffa_partition_package(

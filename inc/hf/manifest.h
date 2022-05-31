@@ -242,7 +242,6 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 					     struct manifest_vm *vm,
 					     struct fdt_node *boot_info);
 
-enum manifest_return_code sanity_check_ffa_manifest(struct manifest_vm *vm);
 void manifest_dump(struct manifest_vm *vm);
 
 const char *manifest_strerror(enum manifest_return_code ret_code);
