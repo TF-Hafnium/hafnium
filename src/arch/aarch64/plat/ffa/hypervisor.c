@@ -393,18 +393,22 @@ struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 bool plat_ffa_notifications_bitmap_create_call(ffa_vm_id_t vm_id,
 					       ffa_vcpu_count_t vcpu_count)
 {
-	struct ffa_value ret = arch_other_world_call((struct ffa_value){
-		.func = FFA_NOTIFICATION_BITMAP_CREATE_32,
-		.arg1 = vm_id,
-		.arg2 = vcpu_count,
-	});
+	struct ffa_value ret;
 
-	if (ret.func == FFA_ERROR_32) {
-		dlog_error(
-			"Failed to create notifications bitmap "
-			"to VM: %#x; error: %#x.\n",
-			vm_id, ffa_error_code(ret));
-		return false;
+	if (ffa_tee_enabled) {
+		ret = arch_other_world_call((struct ffa_value){
+			.func = FFA_NOTIFICATION_BITMAP_CREATE_32,
+			.arg1 = vm_id,
+			.arg2 = vcpu_count,
+		});
+
+		if (ret.func == FFA_ERROR_32) {
+			dlog_error(
+				"Failed to create notifications bitmap "
+				"to VM: %#x; error: %#x.\n",
+				vm_id, ffa_error_code(ret));
+			return false;
+		}
 	}
 
 	return true;
