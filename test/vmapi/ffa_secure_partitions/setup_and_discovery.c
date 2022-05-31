@@ -157,10 +157,15 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 	EXPECT_EQ(partitions[0].vm_id, HF_SPMC_VM_ID + 1);
 	EXPECT_TRUE(partitions[0].vcpu_count == 8 ||
 		    partitions[0].vcpu_count == 1);
-	EXPECT_EQ(partitions[0].uuid.uuid[0], uuid.uuid[0]);
-	EXPECT_EQ(partitions[0].uuid.uuid[1], uuid.uuid[1]);
-	EXPECT_EQ(partitions[0].uuid.uuid[2], uuid.uuid[2]);
-	EXPECT_EQ(partitions[0].uuid.uuid[3], uuid.uuid[3]);
+
+	/*
+	 * If a uuid is specified (not null) ensure the uuid returned in the
+	 * partition info descriptor is zeroed.
+	 */
+	EXPECT_EQ(partitions[0].uuid.uuid[0], 0);
+	EXPECT_EQ(partitions[0].uuid.uuid[1], 0);
+	EXPECT_EQ(partitions[0].uuid.uuid[2], 0);
+	EXPECT_EQ(partitions[0].uuid.uuid[3], 0);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }

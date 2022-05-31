@@ -441,7 +441,7 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	bool count_flag = (flags && FFA_PARTITION_COUNT_FLAG_MASK) ==
 			  FFA_PARTITION_COUNT_FLAG;
 	bool uuid_is_null = ffa_uuid_is_null(uuid);
-	struct ffa_partition_info partitions[2 * MAX_VMS];
+	struct ffa_partition_info partitions[2 * MAX_VMS] = {0};
 	struct vm_locked vm_locked;
 	struct ffa_value ret;
 
@@ -482,7 +482,9 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					vm_are_notifications_enabled(vm)
 						? FFA_PARTITION_NOTIFICATION
 						: 0;
-				partitions[array_index].uuid = vm->uuid;
+				if (uuid_is_null) {
+					partitions[array_index].uuid = vm->uuid;
+				}
 			}
 		}
 	}
