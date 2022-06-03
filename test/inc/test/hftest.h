@@ -115,6 +115,7 @@ bool hftest_ctrl_start(const struct fdt *fdt, struct memiter *cmd);
 
 /** Inform a host that this test run has finished and clean up. */
 void hftest_ctrl_finish(void);
+void hftest_ctrl_reboot(void);
 
 /** Parses and run test command */
 void hftest_command(struct fdt *fdt);

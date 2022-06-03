@@ -35,3 +35,8 @@ void hftest_ctrl_finish(void)
 {
 	/* Nothing to do. */
 }
+
+void hftest_ctrl_reboot(void)
+{
+	/* Nothing to do. */
+}

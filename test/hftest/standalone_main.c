@@ -52,4 +52,5 @@ void kmain(const void *fdt_ptr)
 
 out:
 	hftest_ctrl_finish();
+	hftest_ctrl_reboot();
 }

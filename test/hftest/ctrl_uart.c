@@ -71,7 +71,10 @@ void hftest_ctrl_finish(void)
 	 * subsequent logs belong to the next run.
 	 */
 	write(CMD_FINISHED);
+}
 
+void hftest_ctrl_reboot(void)
+{
 	/* Reboot the device. */
 	hftest_device_reboot();
 }

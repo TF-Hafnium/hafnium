@@ -28,6 +28,13 @@ struct ffa_boot_info_header* get_boot_info_header(void)
 extern struct hftest_test hftest_begin[];
 extern struct hftest_test hftest_end[];
 
+static noreturn void hftest_wait(void)
+{
+	for (;;) {
+		interrupt_wait();
+	}
+}
+
 void kmain(void* boot_info_blob)
 {
 	/* Dummy fdt. It is not really used */
@@ -55,4 +62,5 @@ void kmain(void* boot_info_blob)
 
 out:
 	hftest_ctrl_finish();
+	hftest_wait();
 }
