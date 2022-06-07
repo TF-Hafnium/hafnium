@@ -62,6 +62,11 @@ void plat_ffa_log_init(void)
 	dlog_info("Initializing Hafnium (Hypervisor)\n");
 }
 
+void plat_ffa_set_tee_enabled(bool tee_enabled)
+{
+	ffa_tee_enabled = tee_enabled;
+}
+
 static void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send,
 				   uint64_t page_count)
 {
@@ -74,12 +79,12 @@ static void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send,
 	CHECK(ret.func == FFA_SUCCESS_32);
 }
 
-void plat_ffa_init(bool tee_enabled)
+void plat_ffa_init(void)
 {
 	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
 	struct ffa_value ret;
 
-	if (!tee_enabled) {
+	if (!ffa_tee_enabled) {
 		return;
 	}
 

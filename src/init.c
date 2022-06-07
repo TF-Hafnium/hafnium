@@ -143,6 +143,8 @@ void one_time_init(void)
 		      manifest_strerror(manifest_ret));
 	}
 
+	plat_ffa_set_tee_enabled(manifest.ffa_tee_enabled);
+
 	if (!plat_iommu_init(&fdt, mm_stage1_locked, &ppool)) {
 		panic("Could not initialize IOMMUs.");
 	}
@@ -180,7 +182,7 @@ void one_time_init(void)
 	mm_vm_enable_invalidation();
 
 	/* Perform platform specfic FF-A initialization. */
-	plat_ffa_init(manifest.ffa_tee_enabled);
+	plat_ffa_init();
 
 	dlog_info("Hafnium initialisation completed\n");
 }
