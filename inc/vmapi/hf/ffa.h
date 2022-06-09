@@ -99,7 +99,7 @@
  * 13.2.
  */
 
-#define FFA_FEATURES_FUNC_ID_MASK UINT32_C(0x1 << 31)
+#define FFA_FEATURES_FUNC_ID_MASK (UINT32_C(1) << 31)
 #define FFA_FEATURES_FEATURE_ID_MASK UINT32_C(0x7F)
 
 /* Query interrupt ID of Notification Pending Interrupt. */
@@ -559,7 +559,7 @@ typedef uint64_t ffa_notifications_bitmap_t;
  * Flag for notification bind and set, to specify call is about per-vCPU
  * notifications.
  */
-#define FFA_NOTIFICATION_FLAG_PER_VCPU UINT32_C(1 << 0)
+#define FFA_NOTIFICATION_FLAG_PER_VCPU (UINT32_C(1) << 0)
 
 /**
  * Helper function to assemble a 64-bit sized bitmap, from the 32-bit sized lo
@@ -588,17 +588,19 @@ static inline ffa_notifications_bitmap_t ffa_notification_get_from_vm(
 /**
  * Flags used in calls to FFA_NOTIFICATION_GET interface.
  */
-#define FFA_NOTIFICATION_FLAG_BITMAP_SP UINT32_C(0x1 << 0)
-#define FFA_NOTIFICATION_FLAG_BITMAP_VM UINT32_C(0x1 << 1)
-#define FFA_NOTIFICATION_FLAG_BITMAP_SPM UINT32_C(0x1 << 2)
-#define FFA_NOTIFICATION_FLAG_BITMAP_HYP UINT32_C(0x1 << 3)
+#define FFA_NOTIFICATION_FLAG_BITMAP_SP (UINT32_C(1) << 0)
+#define FFA_NOTIFICATION_FLAG_BITMAP_VM (UINT32_C(1) << 1)
+#define FFA_NOTIFICATION_FLAG_BITMAP_SPM (UINT32_C(1) << 2)
+#define FFA_NOTIFICATION_FLAG_BITMAP_HYP (UINT32_C(1) << 3)
 
 /* Flag to configure notification as being per vCPU. */
-#define FFA_NOTIFICATIONS_FLAG_PER_VCPU UINT32_C(0x1 << 0)
+#define FFA_NOTIFICATIONS_FLAG_PER_VCPU (UINT32_C(1) << 0)
 
 /** Flag for FFA_NOTIFICATION_SET to delay Schedule Receiver Interrupt */
-#define FFA_NOTIFICATIONS_FLAG_DELAY_SRI UINT32_C(0x1 << 1)
-#define FFA_NOTIFICATIONS_FLAGS_VCPU_ID(id) UINT32_C((id & 0xFFFF) << 16)
+#define FFA_NOTIFICATIONS_FLAG_DELAY_SRI (UINT32_C(1) << 1)
+
+#define FFA_NOTIFICATIONS_FLAGS_VCPU_ID(id) \
+	((((uint32_t)(id)) & UINT32_C(0xffff)) << 16)
 
 static inline ffa_vcpu_index_t ffa_notifications_get_vcpu(struct ffa_value args)
 {

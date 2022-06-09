@@ -59,7 +59,7 @@
 /*
  * Target function IDs for framework messages from the SPMD.
  */
-#define SPMD_FWK_MSG_BIT UINT64_C(1 << 31)
+#define SPMD_FWK_MSG_BIT (UINT64_C(1) << 31)
 #define SPMD_FWK_MSG_FUNC_MASK UINT64_C(0xFF)
 #define SPMD_FWK_MSG_PSCI UINT8_C(0)
 #define SPMD_FWK_MSG_FFA_VERSION_REQ UINT8_C(0x8)

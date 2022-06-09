@@ -16,7 +16,7 @@
 #define SP_PKG_HEADER_VERSION_1 0x1U
 #define SP_PKG_HEADER_VERSION_2 0x2U
 
-#define SP_PKG_FLAG_BOOT_INFO UINT32_C(0x1U << 0)
+#define SP_PKG_FLAG_BOOT_INFO (UINT32_C(1) << 0)
 
 /**
  *  Header for a SP Partition Package.

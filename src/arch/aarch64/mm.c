@@ -94,7 +94,7 @@
 
 /* The following construct and destruct stage-2 memory attributes. */
 #define STAGE2_MEMATTR(outer, inner) ((((outer) << 2) | (inner)) << 2)
-#define STAGE2_MEMATTR_TYPE_MASK UINT64_C(3 << 4)
+#define STAGE2_MEMATTR_TYPE_MASK (UINT64_C(3) << 4)
 
 #define STAGE2_ACCESS_READ  UINT64_C(1)
 #define STAGE2_ACCESS_WRITE UINT64_C(2)

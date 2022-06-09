@@ -122,8 +122,9 @@ static void cpu_entry_vm_to_sp_signaling(uintptr_t arg)
 	struct notif_cpu_entry_args *test_args =
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		(struct notif_cpu_entry_args *)arg;
-	ffa_vcpu_index_t sp_vcpu_id =
-		test_args->is_sp_up ? 0U : test_args->vcpu_id;
+	ffa_vcpu_index_t sp_vcpu_id = test_args->is_sp_up
+					      ? ((ffa_vcpu_index_t)0)
+					      : test_args->vcpu_id;
 
 	/*
 	 * Make receiver SP reach message loop.
@@ -154,8 +155,9 @@ static void cpu_entry_sp_to_vm_signaling(uintptr_t arg)
 	struct notif_cpu_entry_args *test_args =
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		(struct notif_cpu_entry_args *)arg;
-	ffa_vcpu_index_t sp_vcpu_id =
-		test_args->is_sp_up ? 0U : test_args->vcpu_id;
+	ffa_vcpu_index_t sp_vcpu_id = test_args->is_sp_up
+					      ? ((ffa_vcpu_index_t)0)
+					      : test_args->vcpu_id;
 
 	/*
 	 * Make sender SP reach message loop.

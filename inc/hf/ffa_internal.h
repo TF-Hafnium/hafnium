@@ -14,7 +14,8 @@
 
 #include "vmapi/hf/ffa.h"
 
-#define FFA_VERSION_RESERVED_BIT UINT32_C(1U << 31)
+#define FFA_VERSION_RESERVED_BIT (UINT32_C(1) << 31)
+
 static inline struct ffa_value ffa_error(int32_t error_code)
 {
 	return (struct ffa_value){.func = FFA_ERROR_32,
