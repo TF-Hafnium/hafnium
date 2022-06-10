@@ -29,29 +29,20 @@ static void check_v1_1_partition_info_descriptors(
 	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
 	EXPECT_EQ(partitions[0].vcpu_count, 8);
 	ffa_uuid_init(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb, &uuid);
-	EXPECT_EQ(partitions[0].uuid.uuid[0], uuid.uuid[0]);
-	EXPECT_EQ(partitions[0].uuid.uuid[1], uuid.uuid[1]);
-	EXPECT_EQ(partitions[0].uuid.uuid[2], uuid.uuid[2]);
-	EXPECT_EQ(partitions[0].uuid.uuid[3], uuid.uuid[3]);
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[0].uuid, &uuid));
 
 	/* Expect a SP as second partition. */
 	EXPECT_EQ(partitions[1].vm_id, SP_ID(1));
 	EXPECT_TRUE(partitions[1].vcpu_count == 8 ||
 		    partitions[1].vcpu_count == 1);
 	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
-	EXPECT_EQ(partitions[1].uuid.uuid[0], uuid.uuid[0]);
-	EXPECT_EQ(partitions[1].uuid.uuid[1], uuid.uuid[1]);
-	EXPECT_EQ(partitions[1].uuid.uuid[2], uuid.uuid[2]);
-	EXPECT_EQ(partitions[1].uuid.uuid[3], uuid.uuid[3]);
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[1].uuid, &uuid));
 
 	/* Expect secondary SP as third partition */
 	EXPECT_EQ(partitions[2].vm_id, SP_ID(2));
 	EXPECT_EQ(partitions[2].vcpu_count, 8);
 	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
-	EXPECT_EQ(partitions[2].uuid.uuid[0], uuid.uuid[0]);
-	EXPECT_EQ(partitions[2].uuid.uuid[1], uuid.uuid[1]);
-	EXPECT_EQ(partitions[2].uuid.uuid[2], uuid.uuid[2]);
-	EXPECT_EQ(partitions[2].uuid.uuid[3], uuid.uuid[3]);
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[2].uuid, &uuid));
 }
 
 TEST(ffa, ffa_partition_info_get_uuid_null)
@@ -162,10 +153,7 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 	 * If a uuid is specified (not null) ensure the uuid returned in the
 	 * partition info descriptor is zeroed.
 	 */
-	EXPECT_EQ(partitions[0].uuid.uuid[0], 0);
-	EXPECT_EQ(partitions[0].uuid.uuid[1], 0);
-	EXPECT_EQ(partitions[0].uuid.uuid[2], 0);
-	EXPECT_EQ(partitions[0].uuid.uuid[3], 0);
+	EXPECT_TRUE(ffa_uuid_is_null(&partitions[0].uuid));
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
