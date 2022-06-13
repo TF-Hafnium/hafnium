@@ -1354,7 +1354,6 @@ void plat_ffa_sri_trigger_if_delayed(struct cpu *cpu)
 	struct sri_state_locked sri_state_locked = sri_state_lock();
 
 	if (*(sri_state_locked.sri_state) == DELAYED) {
-		dlog_verbose("Triggering delayed SRI!\n");
 		plat_ffa_send_schedule_receiver_interrupt(cpu);
 		sri_state_set(sri_state_locked, TRIGGERED);
 	}
@@ -1371,7 +1370,6 @@ void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
 		 * If flag to delay SRI isn't set, trigger SRI such that the
 		 * receiver scheduler is aware there are pending notifications.
 		 */
-		dlog_verbose("Triggering not delayed SRI!\n");
 		plat_ffa_send_schedule_receiver_interrupt(cpu);
 		sri_state_set(sri_state_locked, TRIGGERED);
 	}
