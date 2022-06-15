@@ -113,12 +113,12 @@ static struct spinlock share_states_lock_instance = SPINLOCK_INIT;
 static struct ffa_memory_share_state share_states[MAX_MEM_SHARES];
 
 /**
- * Buffer for retrieving memory region information from the TEE for when a
- * region is reclaimed by a VM. Access to this buffer must be guarded by the VM
- * lock of the TEE VM.
+ * Buffer for retrieving memory region information from the other world for when
+ * a region is reclaimed by a VM. Access to this buffer must be guarded by the
+ * VM lock of the other world VM.
  */
 alignas(PAGE_SIZE) static uint8_t
-	tee_retrieve_buffer[HF_MAILBOX_SIZE * MAX_FRAGMENTS];
+	other_world_retrieve_buffer[HF_MAILBOX_SIZE * MAX_FRAGMENTS];
 
 /**
  * Extracts the index from a memory handle allocated by Hafnium's current world.
@@ -1095,10 +1095,10 @@ out:
 }
 
 /**
- * Reclaims the given memory from the TEE. To do this space is first reserved in
- * the <to> VM's page table, then the reclaim request is sent on to the TEE,
- * then (if that is successful) the memory is mapped back into the <to> VM's
- * page table.
+ * Reclaims the given memory from the other world. To do this space is first
+ * reserved in the <to> VM's page table, then the reclaim request is sent on to
+ * the other world. then (if that is successful) the memory is mapped back into
+ * the <to> VM's page table.
  *
  * This function requires the calling context to hold the <to> lock.
  *
@@ -1110,7 +1110,7 @@ out:
  *     the request.
  *  Success is indicated by FFA_SUCCESS.
  */
-static struct ffa_value ffa_tee_reclaim_check_update(
+static struct ffa_value ffa_other_world_reclaim_check_update(
 	struct vm_locked to_locked, ffa_memory_handle_t handle,
 	struct ffa_memory_region_constituent *constituents,
 	uint32_t constituent_count, uint32_t memory_to_attributes, bool clear,
@@ -1119,7 +1119,7 @@ static struct ffa_value ffa_tee_reclaim_check_update(
 	uint32_t to_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
-	ffa_memory_region_flags_t tee_flags;
+	ffa_memory_region_flags_t other_world_flags;
 
 	/*
 	 * Make sure constituents are properly aligned to a 64-bit boundary. If
@@ -1167,29 +1167,30 @@ static struct ffa_value ffa_tee_reclaim_check_update(
 	}
 
 	/*
-	 * Forward the request to the TEE and see what happens.
+	 * Forward the request to the other world and see what happens.
 	 */
-	tee_flags = 0;
+	other_world_flags = 0;
 	if (clear) {
-		tee_flags |= FFA_MEMORY_REGION_FLAG_CLEAR;
+		other_world_flags |= FFA_MEMORY_REGION_FLAG_CLEAR;
 	}
 	ret = arch_other_world_call(
 		(struct ffa_value){.func = FFA_MEM_RECLAIM_32,
 				   .arg1 = (uint32_t)handle,
 				   .arg2 = (uint32_t)(handle >> 32),
-				   .arg3 = tee_flags});
+				   .arg3 = other_world_flags});
 
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose(
-			"Got %#x (%d) from TEE in response to FFA_MEM_RECLAIM, "
+			"Got %#x (%d) from other world in response to "
+			"FFA_MEM_RECLAIM, "
 			"expected FFA_SUCCESS.\n",
 			ret.func, ret.arg2);
 		goto out;
 	}
 
 	/*
-	 * The TEE was happy with it, so complete the reclaim by mapping the
-	 * memory into the recipient. This won't allocate because the
+	 * The other world was happy with it, so complete the reclaim by mapping
+	 * the memory into the recipient. This won't allocate because the
 	 * transaction was already prepared above, so it doesn't need to use the
 	 * `local_page_pool`.
 	 */
@@ -1586,29 +1587,30 @@ static struct ffa_value ffa_memory_send_validate(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-/** Forwards a memory send message on to the TEE. */
-static struct ffa_value memory_send_tee_forward(
-	struct vm_locked tee_locked, ffa_vm_id_t sender_vm_id,
+/** Forwards a memory send message on to the other world. */
+static struct ffa_value memory_send_other_world_forward(
+	struct vm_locked other_world_locked, ffa_vm_id_t sender_vm_id,
 	uint32_t share_func, struct ffa_memory_region *memory_region,
 	uint32_t memory_share_length, uint32_t fragment_length)
 {
 	struct ffa_value ret;
 
-	memcpy_s(tee_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
+	/* Use its own RX buffer. */
+	memcpy_s(other_world_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
 		 memory_region, fragment_length);
-	tee_locked.vm->mailbox.recv_size = fragment_length;
-	tee_locked.vm->mailbox.recv_sender = sender_vm_id;
-	tee_locked.vm->mailbox.recv_func = share_func;
-	tee_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+	other_world_locked.vm->mailbox.recv_size = fragment_length;
+	other_world_locked.vm->mailbox.recv_sender = sender_vm_id;
+	other_world_locked.vm->mailbox.recv_func = share_func;
+	other_world_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
 	ret = arch_other_world_call(
 		(struct ffa_value){.func = share_func,
 				   .arg1 = memory_share_length,
 				   .arg2 = fragment_length});
 	/*
-	 * After the call to the TEE completes it must have finished reading its
-	 * RX buffer, so it is ready for another message.
+	 * After the call to the other world completes it must have finished
+	 * reading its RX buffer, so it is ready for another message.
 	 */
-	tee_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
+	other_world_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
 
 	return ret;
 }
@@ -1674,20 +1676,20 @@ static struct ffa_value ffa_memory_send_continue_validate(
 }
 
 /**
- * Forwards a memory send continuation message on to the TEE.
+ * Forwards a memory send continuation message on to the other world.
  */
-static struct ffa_value memory_send_continue_tee_forward(
-	struct vm_locked tee_locked, ffa_vm_id_t sender_vm_id, void *fragment,
-	uint32_t fragment_length, ffa_memory_handle_t handle)
+static struct ffa_value memory_send_continue_other_world_forward(
+	struct vm_locked other_world_locked, ffa_vm_id_t sender_vm_id,
+	void *fragment, uint32_t fragment_length, ffa_memory_handle_t handle)
 {
 	struct ffa_value ret;
 
-	memcpy_s(tee_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX, fragment,
-		 fragment_length);
-	tee_locked.vm->mailbox.recv_size = fragment_length;
-	tee_locked.vm->mailbox.recv_sender = sender_vm_id;
-	tee_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
-	tee_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+	memcpy_s(other_world_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
+		 fragment, fragment_length);
+	other_world_locked.vm->mailbox.recv_size = fragment_length;
+	other_world_locked.vm->mailbox.recv_sender = sender_vm_id;
+	other_world_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
+	other_world_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
 	ret = arch_other_world_call(
 		(struct ffa_value){.func = FFA_MEM_FRAG_TX_32,
 				   .arg1 = (uint32_t)handle,
@@ -1695,10 +1697,10 @@ static struct ffa_value memory_send_continue_tee_forward(
 				   .arg3 = fragment_length,
 				   .arg4 = (uint64_t)sender_vm_id << 16});
 	/*
-	 * After the call to the TEE completes it must have finished reading its
-	 * RX buffer, so it is ready for another message.
+	 * After the call to the other world completes it must have finished
+	 * reading its RX buffer, so it is ready for another message.
 	 */
-	tee_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
+	other_world_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
 
 	return ret;
 }
@@ -1720,10 +1722,10 @@ static bool memory_region_receivers_from_other_world(
 }
 
 /**
- * Validates a call to donate, lend or share memory to a non-TEE VM and then
- * updates the stage-2 page tables. Specifically, check if the message length
- * and number of memory region constituents match, and if the transition is
- * valid for the type of memory sending operation.
+ * Validates a call to donate, lend or share memory to a non-other world VM and
+ * then updates the stage-2 page tables. Specifically, check if the message
+ * length and number of memory region constituents match, and if the transition
+ * is valid for the type of memory sending operation.
  *
  * Assumes that the caller has already found and locked the sender VM and copied
  * the memory region descriptor from the sender's TX buffer to a freshly
@@ -1807,20 +1809,20 @@ out:
 }
 
 /**
- * Validates a call to donate, lend or share memory to the TEE and then updates
- * the stage-2 page tables. Specifically, check if the message length and number
- * of memory region constituents match, and if the transition is valid for the
- * type of memory sending operation.
+ * Validates a call to donate, lend or share memory to the other world and then
+ * updates the stage-2 page tables. Specifically, check if the message length
+ * and number of memory region constituents match, and if the transition is
+ * valid for the type of memory sending operation.
  *
  * Assumes that the caller has already found and locked the sender VM and the
- * TEE VM, and copied the memory region descriptor from the sender's TX buffer
- * to a freshly allocated page from Hafnium's internal pool. The caller must
- * have also validated that the receiver VM ID is valid.
+ * other world VM, and copied the memory region descriptor from the sender's TX
+ * buffer to a freshly allocated page from Hafnium's internal pool. The caller
+ * must have also validated that the receiver VM ID is valid.
  *
  * This function takes ownership of the `memory_region` passed in and will free
  * it when necessary; it must not be freed by the caller.
  */
-struct ffa_value ffa_memory_tee_send(
+struct ffa_value ffa_memory_other_world_send(
 	struct vm_locked from_locked, struct vm_locked to_locked,
 	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
 	uint32_t fragment_length, uint32_t share_func, struct mpool *page_pool)
@@ -1865,23 +1867,24 @@ struct ffa_value ffa_memory_tee_send(
 			goto out;
 		}
 
-		/* Forward memory send message on to TEE. */
-		ret = memory_send_tee_forward(
+		/* Forward memory send message on to other world. */
+		ret = memory_send_other_world_forward(
 			to_locked, from_locked.vm->id, share_func,
 			memory_region, memory_share_length, fragment_length);
 
 		if (ret.func != FFA_SUCCESS_32) {
 			dlog_verbose(
-				"TEE didn't successfully complete memory send "
-				"operation; returned %#x (%d). Rolling back.\n",
+				"Other world didn't successfully complete "
+				"memory send operation; returned %#x (%d). "
+				"Rolling back.\n",
 				ret.func, ret.arg2);
 
 			/*
-			 * The TEE failed to complete the send operation, so
-			 * roll back the page table update for the VM. This
-			 * can't fail because it won't try to allocate more
-			 * memory than was freed into the `local_page_pool` by
-			 * `ffa_send_check_update` in the initial update.
+			 * The other world failed to complete the send
+			 * operation, so roll back the page table update for the
+			 * VM. This can't fail because it won't try to allocate
+			 * more memory than was freed into the `local_page_pool`
+			 * by `ffa_send_check_update` in the initial update.
 			 */
 			CHECK(ffa_region_group_identity_map(
 				from_locked, &constituents,
@@ -1897,18 +1900,19 @@ struct ffa_value ffa_memory_tee_send(
 		/*
 		 * We need to wait for the rest of the fragments before we can
 		 * check whether the transaction is valid and unmap the memory.
-		 * Call the TEE so it can do its initial validation and assign a
-		 * handle, and allocate a share state to keep what we have so
-		 * far.
+		 * Call the other world so it can do its initial validation and
+		 * assign a handle, and allocate a share state to keep what we
+		 * have so far.
 		 */
-		ret = memory_send_tee_forward(
+		ret = memory_send_other_world_forward(
 			to_locked, from_locked.vm->id, share_func,
 			memory_region, memory_share_length, fragment_length);
 		if (ret.func == FFA_ERROR_32) {
 			goto out_unlock;
 		} else if (ret.func != FFA_MEM_FRAG_RX_32) {
 			dlog_warning(
-				"Got %#x from TEE in response to %#x for "
+				"Got %#x from other world in response to %#x "
+				"for "
 				"fragment with %d/%d, expected "
 				"FFA_MEM_FRAG_RX.\n",
 				ret.func, share_func, fragment_length,
@@ -1920,7 +1924,8 @@ struct ffa_value ffa_memory_tee_send(
 		if (ret.arg3 != fragment_length) {
 			dlog_warning(
 				"Got unexpected fragment offset %d for "
-				"FFA_MEM_FRAG_RX from TEE (expected %d).\n",
+				"FFA_MEM_FRAG_RX from other world (expected "
+				"%d).\n",
 				ret.arg3, fragment_length);
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
 			goto out_unlock;
@@ -1928,7 +1933,8 @@ struct ffa_value ffa_memory_tee_send(
 		if (ffa_frag_sender(ret) != from_locked.vm->id) {
 			dlog_warning(
 				"Got unexpected sender ID %d for "
-				"FFA_MEM_FRAG_RX from TEE (expected %d).\n",
+				"FFA_MEM_FRAG_RX from other world (expected "
+				"%d).\n",
 				ffa_frag_sender(ret), from_locked.vm->id);
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
 			goto out_unlock;
@@ -1959,10 +1965,10 @@ out:
 }
 
 /**
- * Continues an operation to donate, lend or share memory to a non-TEE VM. If
- * this is the last fragment then checks that the transition is valid for the
- * type of memory sending operation and updates the stage-2 page tables of the
- * sender.
+ * Continues an operation to donate, lend or share memory to a VM from current
+ * world. If this is the last fragment then checks that the transition is valid
+ * for the type of memory sending operation and updates the stage-2 page tables
+ * of the sender.
  *
  * Assumes that the caller has already found and locked the sender VM and copied
  * the memory region descriptor from the sender's TX buffer to a freshly
@@ -1993,7 +1999,8 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 	if (memory_region_receivers_from_other_world(memory_region)) {
 		dlog_error(
 			"Got hypervisor-allocated handle for memory send to "
-			"TEE. This should never happen, and indicates a bug in "
+			"other world. This should never happen, and indicates "
+			"a bug in "
 			"EL3 code.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out_free_fragment;
@@ -2029,9 +2036,10 @@ out:
 }
 
 /**
- * Continues an operation to donate, lend or share memory to the TEE VM. If this
- * is the last fragment then checks that the transition is valid for the type of
- * memory sending operation and updates the stage-2 page tables of the sender.
+ * Continues an operation to donate, lend or share memory to the other world VM.
+ * If this is the last fragment then checks that the transition is valid for the
+ * type of memory sending operation and updates the stage-2 page tables of the
+ * sender.
  *
  * Assumes that the caller has already found and locked the sender VM and copied
  * the memory region descriptor from the sender's TX buffer to a freshly
@@ -2040,12 +2048,10 @@ out:
  * This function takes ownership of the `memory_region` passed in and will free
  * it when necessary; it must not be freed by the caller.
  */
-struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
-					      struct vm_locked to_locked,
-					      void *fragment,
-					      uint32_t fragment_length,
-					      ffa_memory_handle_t handle,
-					      struct mpool *page_pool)
+struct ffa_value ffa_memory_other_world_send_continue(
+	struct vm_locked from_locked, struct vm_locked to_locked,
+	void *fragment, uint32_t fragment_length, ffa_memory_handle_t handle,
+	struct mpool *page_pool)
 {
 	struct share_states_locked share_states = share_states_lock();
 	struct ffa_memory_share_state *share_state;
@@ -2062,8 +2068,9 @@ struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
 
 	if (!memory_region_receivers_from_other_world(memory_region)) {
 		dlog_error(
-			"Got SPM-allocated handle for memory send to non-TEE "
-			"VM. This should never happen, and indicates a bug.\n");
+			"Got SPM-allocated handle for memory send to non-other "
+			"world VM. This should never happen, and indicates a "
+			"bug.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out_free_fragment;
 	}
@@ -2071,8 +2078,8 @@ struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
 	if (to_locked.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
 	    to_locked.vm->mailbox.recv == NULL) {
 		/*
-		 * If the TEE RX buffer is not available, tell the sender to
-		 * retry by returning the current offset again.
+		 * If the other world RX buffer is not available, tell the
+		 * sender to retry by returning the current offset again.
 		 */
 		ret = (struct ffa_value){
 			.func = FFA_MEM_FRAG_RX_32,
@@ -2106,10 +2113,10 @@ struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
 
 		if (ret.func == FFA_SUCCESS_32) {
 			/*
-			 * Forward final fragment on to the TEE so that
+			 * Forward final fragment on to the other world so that
 			 * it can complete the memory sending operation.
 			 */
-			ret = memory_send_continue_tee_forward(
+			ret = memory_send_continue_other_world_forward(
 				to_locked, from_locked.vm->id, fragment,
 				fragment_length, handle);
 
@@ -2119,13 +2126,14 @@ struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
 				 * but log it here too.
 				 */
 				dlog_verbose(
-					"TEE didn't successfully complete "
+					"other world didn't successfully "
+					"complete "
 					"memory send operation; returned %#x "
 					"(%d). Rolling back.\n",
 					ret.func, ret.arg2);
 
 				/*
-				 * The TEE failed to complete the send
+				 * The other world failed to complete the send
 				 * operation, so roll back the page table update
 				 * for the VM. This can't fail because it won't
 				 * try to allocate more memory than was freed
@@ -2145,23 +2153,25 @@ struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
 			/* Free share state. */
 			share_state_free(share_states, share_state, page_pool);
 		} else {
-			/* Abort sending to TEE. */
-			struct ffa_value tee_ret =
+			/* Abort sending to other world. */
+			struct ffa_value other_world_ret =
 				arch_other_world_call((struct ffa_value){
 					.func = FFA_MEM_RECLAIM_32,
 					.arg1 = (uint32_t)handle,
 					.arg2 = (uint32_t)(handle >> 32)});
 
-			if (tee_ret.func != FFA_SUCCESS_32) {
+			if (other_world_ret.func != FFA_SUCCESS_32) {
 				/*
-				 * Nothing we can do if TEE doesn't abort
-				 * properly, just log it.
+				 * Nothing we can do if other world doesn't
+				 * abort properly, just log it.
 				 */
 				dlog_verbose(
-					"TEE didn't successfully abort failed "
+					"other world didn't successfully abort "
+					"failed "
 					"memory send operation; returned %#x "
 					"(%d).\n",
-					tee_ret.func, tee_ret.arg2);
+					other_world_ret.func,
+					other_world_ret.arg2);
 			}
 			/*
 			 * We don't need to free the share state in this case
@@ -2175,7 +2185,7 @@ struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
 			share_state_next_fragment_offset(share_states,
 							 share_state);
 
-		ret = memory_send_continue_tee_forward(
+		ret = memory_send_continue_other_world_forward(
 			to_locked, from_locked.vm->id, fragment,
 			fragment_length, handle);
 
@@ -2185,7 +2195,8 @@ struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
 		    ffa_frag_sender(ret) != from_locked.vm->id) {
 			dlog_verbose(
 				"Got unexpected result from forwarding "
-				"FFA_MEM_FRAG_TX to TEE: %#x (handle %#x, "
+				"FFA_MEM_FRAG_TX to other world. %#x (handle "
+				"%#x, "
 				"offset %d, sender %d); expected "
 				"FFA_MEM_FRAG_RX (handle %#x, offset %d, "
 				"sender %d).\n",
@@ -2986,20 +2997,22 @@ out:
 
 /**
  * Validates that the reclaim transition is allowed for the memory region with
- * the given handle which was previously shared with the TEE, tells the TEE to
- * mark it as reclaimed, and updates the page table of the reclaiming VM.
+ * the given handle which was previously shared with the other world. tells the
+ * other world to mark it as reclaimed, and updates the page table of the
+ * reclaiming VM.
  *
- * To do this information about the memory region is first fetched from the TEE.
+ * To do this information about the memory region is first fetched from the
+ * other world.
  */
-struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
-					struct vm_locked from_locked,
-					ffa_memory_handle_t handle,
-					ffa_memory_region_flags_t flags,
-					struct mpool *page_pool)
+struct ffa_value ffa_memory_other_world_reclaim(struct vm_locked to_locked,
+						struct vm_locked from_locked,
+						ffa_memory_handle_t handle,
+						ffa_memory_region_flags_t flags,
+						struct mpool *page_pool)
 {
 	uint32_t request_length = ffa_memory_lender_retrieve_request_init(
 		from_locked.vm->mailbox.recv, handle, to_locked.vm->id);
-	struct ffa_value tee_ret;
+	struct ffa_value other_world_ret;
 	uint32_t length;
 	uint32_t fragment_length;
 	uint32_t fragment_offset;
@@ -3008,32 +3021,32 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 
 	CHECK(request_length <= HF_MAILBOX_SIZE);
-	CHECK(from_locked.vm->id == HF_TEE_VM_ID);
+	CHECK(from_locked.vm->id == HF_OTHER_WORLD_ID);
 
-	/* Retrieve memory region information from the TEE. */
-	tee_ret = arch_other_world_call(
+	/* Retrieve memory region information from the other world. */
+	other_world_ret = arch_other_world_call(
 		(struct ffa_value){.func = FFA_MEM_RETRIEVE_REQ_32,
 				   .arg1 = request_length,
 				   .arg2 = request_length});
-	if (tee_ret.func == FFA_ERROR_32) {
-		dlog_verbose("Got error %d from EL3.\n", tee_ret.arg2);
-		return tee_ret;
+	if (other_world_ret.func == FFA_ERROR_32) {
+		dlog_verbose("Got error %d from EL3.\n", other_world_ret.arg2);
+		return other_world_ret;
 	}
-	if (tee_ret.func != FFA_MEM_RETRIEVE_RESP_32) {
+	if (other_world_ret.func != FFA_MEM_RETRIEVE_RESP_32) {
 		dlog_verbose(
 			"Got %#x from EL3, expected FFA_MEM_RETRIEVE_RESP.\n",
-			tee_ret.func);
+			other_world_ret.func);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	length = tee_ret.arg1;
-	fragment_length = tee_ret.arg2;
+	length = other_world_ret.arg1;
+	fragment_length = other_world_ret.arg2;
 
 	if (fragment_length > HF_MAILBOX_SIZE || fragment_length > length ||
-	    length > sizeof(tee_retrieve_buffer)) {
+	    length > sizeof(other_world_retrieve_buffer)) {
 		dlog_verbose("Invalid fragment length %d/%d (max %d/%d).\n",
 			     fragment_length, length, HF_MAILBOX_SIZE,
-			     sizeof(tee_retrieve_buffer));
+			     sizeof(other_world_retrieve_buffer));
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -3041,40 +3054,41 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 	 * Copy the first fragment of the memory region descriptor to an
 	 * internal buffer.
 	 */
-	memcpy_s(tee_retrieve_buffer, sizeof(tee_retrieve_buffer),
+	memcpy_s(other_world_retrieve_buffer,
+		 sizeof(other_world_retrieve_buffer),
 		 from_locked.vm->mailbox.send, fragment_length);
 
 	/* Fetch the remaining fragments into the same buffer. */
 	fragment_offset = fragment_length;
 	while (fragment_offset < length) {
-		tee_ret = arch_other_world_call(
+		other_world_ret = arch_other_world_call(
 			(struct ffa_value){.func = FFA_MEM_FRAG_RX_32,
 					   .arg1 = (uint32_t)handle,
 					   .arg2 = (uint32_t)(handle >> 32),
 					   .arg3 = fragment_offset});
-		if (tee_ret.func != FFA_MEM_FRAG_TX_32) {
+		if (other_world_ret.func != FFA_MEM_FRAG_TX_32) {
 			dlog_verbose(
-				"Got %#x (%d) from TEE in response to "
+				"Got %#x (%d) from other world in response to "
 				"FFA_MEM_FRAG_RX, expected FFA_MEM_FRAG_TX.\n",
-				tee_ret.func, tee_ret.arg2);
-			return tee_ret;
+				other_world_ret.func, other_world_ret.arg2);
+			return other_world_ret;
 		}
-		if (ffa_frag_handle(tee_ret) != handle) {
+		if (ffa_frag_handle(other_world_ret) != handle) {
 			dlog_verbose(
 				"Got FFA_MEM_FRAG_TX for unexpected handle %#x "
 				"in response to FFA_MEM_FRAG_RX for handle "
 				"%#x.\n",
-				ffa_frag_handle(tee_ret), handle);
+				ffa_frag_handle(other_world_ret), handle);
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
-		if (ffa_frag_sender(tee_ret) != 0) {
+		if (ffa_frag_sender(other_world_ret) != 0) {
 			dlog_verbose(
 				"Got FFA_MEM_FRAG_TX with unexpected sender %d "
 				"(expected 0).\n",
-				ffa_frag_sender(tee_ret));
+				ffa_frag_sender(other_world_ret));
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
-		fragment_length = tee_ret.arg3;
+		fragment_length = other_world_ret.arg3;
 		if (fragment_length > HF_MAILBOX_SIZE ||
 		    fragment_offset + fragment_length > length) {
 			dlog_verbose(
@@ -3084,14 +3098,14 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 				HF_MAILBOX_SIZE);
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
-		memcpy_s(tee_retrieve_buffer + fragment_offset,
-			 sizeof(tee_retrieve_buffer) - fragment_offset,
+		memcpy_s(other_world_retrieve_buffer + fragment_offset,
+			 sizeof(other_world_retrieve_buffer) - fragment_offset,
 			 from_locked.vm->mailbox.send, fragment_length);
 
 		fragment_offset += fragment_length;
 	}
 
-	memory_region = (struct ffa_memory_region *)tee_retrieve_buffer;
+	memory_region = (struct ffa_memory_region *)other_world_retrieve_buffer;
 
 	if (memory_region->receiver_count != 1) {
 		/* Only one receiver supported by Hafnium for now. */
@@ -3104,7 +3118,8 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 
 	if (memory_region->handle != handle) {
 		dlog_verbose(
-			"Got memory region handle %#x from TEE but requested "
+			"Got memory region handle %#x from other world but "
+			"requested "
 			"handle %#x.\n",
 			memory_region->handle, handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -3123,10 +3138,10 @@ struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
 
 	/*
 	 * Validate that the reclaim transition is allowed for the given memory
-	 * region, forward the request to the TEE and then map the memory back
-	 * into the caller's stage-2 page table.
+	 * region, forward the request to the other world and then map the
+	 * memory back into the caller's stage-2 page table.
 	 */
-	return ffa_tee_reclaim_check_update(
+	return ffa_other_world_reclaim_check_update(
 		to_locked, handle, composite->constituents,
 		composite->constituent_count, memory_to_attributes,
 		flags & FFA_MEM_RECLAIM_CLEAR, page_pool);

@@ -2914,14 +2914,14 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		}
 	}
 
-	/* Allow for one memory region to be shared to the TEE. */
+	/* Allow for one memory region to be shared to the other world. */
 	if (targets_other_world) {
 		assert(memory_region->receiver_count == 1);
 		to = vm_find(HF_OTHER_WORLD_ID);
 
 		/*
 		 * The 'to' VM lock is only needed in the case that it is the
-		 * TEE VM.
+		 * other world VM.
 		 */
 		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
 
@@ -2930,12 +2930,12 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 			goto out_unlock;
 		}
 
-		ret = ffa_memory_tee_send(
+		ret = ffa_memory_other_world_send(
 			vm_to_from_lock.vm2, vm_to_from_lock.vm1, memory_region,
 			length, fragment_length, share_func, &api_page_pool);
 		/*
-		 * ffa_tee_memory_send takes ownership of the memory_region, so
-		 * make sure we don't free it.
+		 * ffa_other_world_memory_send takes ownership of the
+		 * memory_region, so make sure we don't free it.
 		 */
 		memory_region = NULL;
 
@@ -3107,9 +3107,9 @@ struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 		struct vm *from = vm_find(HF_TEE_VM_ID);
 		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
 
-		ret = ffa_memory_tee_reclaim(vm_to_from_lock.vm1,
-					     vm_to_from_lock.vm2, handle, flags,
-					     &api_page_pool);
+		ret = ffa_memory_other_world_reclaim(
+			vm_to_from_lock.vm1, vm_to_from_lock.vm2, handle, flags,
+			&api_page_pool);
 
 		vm_unlock(&vm_to_from_lock.vm1);
 		vm_unlock(&vm_to_from_lock.vm2);
@@ -3233,16 +3233,16 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 
 		/*
 		 * The TEE RX buffer state is checked in
-		 * `ffa_memory_tee_send_continue` rather than here, as we need
-		 * to return `FFA_MEM_FRAG_RX` with the current offset rather
-		 * than FFA_ERROR FFA_BUSY in case it is busy.
+		 * `ffa_memory_other_world_send_continue` rather than here, as
+		 * we need to return `FFA_MEM_FRAG_RX` with the current offset
+		 * rather than FFA_ERROR FFA_BUSY in case it is busy.
 		 */
 
-		ret = ffa_memory_tee_send_continue(
+		ret = ffa_memory_other_world_send_continue(
 			vm_to_from_lock.vm2, vm_to_from_lock.vm1, fragment_copy,
 			fragment_length, handle, &api_page_pool);
 		/*
-		 * `ffa_memory_tee_send_continue` takes ownership of the
+		 * `ffa_memory_other_world_send_continue` takes ownership of the
 		 * fragment_copy, so we don't need to free it here.
 		 */
 

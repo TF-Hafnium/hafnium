@@ -18,7 +18,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				 uint32_t memory_share_length,
 				 uint32_t fragment_length, uint32_t share_func,
 				 struct mpool *page_pool);
-struct ffa_value ffa_memory_tee_send(
+struct ffa_value ffa_memory_other_world_send(
 	struct vm_locked from_locked, struct vm_locked to_locked,
 	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
 	uint32_t fragment_length, uint32_t share_func, struct mpool *page_pool);
@@ -27,12 +27,10 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 					  uint32_t fragment_length,
 					  ffa_memory_handle_t handle,
 					  struct mpool *page_pool);
-struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
-					      struct vm_locked to_locked,
-					      void *fragment,
-					      uint32_t fragment_length,
-					      ffa_memory_handle_t handle,
-					      struct mpool *page_pool);
+struct ffa_value ffa_memory_other_world_send_continue(
+	struct vm_locked from_locked, struct vm_locked to_locked,
+	void *fragment, uint32_t fragment_length, ffa_memory_handle_t handle,
+	struct mpool *page_pool);
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
 				     uint32_t retrieve_request_length,
@@ -48,8 +46,8 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 				    ffa_memory_handle_t handle,
 				    ffa_memory_region_flags_t flags,
 				    struct mpool *page_pool);
-struct ffa_value ffa_memory_tee_reclaim(struct vm_locked to_locked,
-					struct vm_locked from_locked,
-					ffa_memory_handle_t handle,
-					ffa_memory_region_flags_t flags,
-					struct mpool *page_pool);
+struct ffa_value ffa_memory_other_world_reclaim(struct vm_locked to_locked,
+						struct vm_locked from_locked,
+						ffa_memory_handle_t handle,
+						ffa_memory_region_flags_t flags,
+						struct mpool *page_pool);
