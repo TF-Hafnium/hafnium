@@ -284,7 +284,8 @@ bool ffa_retrieved_memory_region_init(
 	 * one borrower to be specified.
 	 */
 	ffa_memory_access_init_permissions(&response->receivers[0], receiver, 0,
-					   0, 0);
+					   0, flags);
+	response->receivers[0].receiver_permissions.permissions = permissions;
 
 	/*
 	 * Note that `sizeof(struct_ffa_memory_region)` and `sizeof(struct
