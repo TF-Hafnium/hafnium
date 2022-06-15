@@ -32,10 +32,11 @@
  * If bit 15 is set partition is an SP; if bit 15 is clear partition is
  * a VM.
  */
-#define SP_ID_MASK 1 << 15
+#define SP_ID_MASK 0x1U << 15
 #define SP_ID(x) ((x) | SP_ID_MASK)
 #define VM_ID(x) (x & ~SP_ID_MASK)
 #define IS_SP_ID(x) ((x & SP_ID_MASK) != 0U)
+#define IS_VM_ID(x) ((x & SP_ID_MASK) == 0U)
 
 struct mailbox_buffers {
 	void *send;
@@ -84,13 +85,11 @@ void send_retrieve_request(
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability, ffa_vm_id_t recipient);
 ffa_vm_id_t retrieve_memory_from_message(
-	void *recv_buf, void *send_buf, struct ffa_value msg_ret,
-	ffa_memory_handle_t *handle,
+	void *recv_buf, void *send_buf, ffa_memory_handle_t *handle,
 	struct ffa_memory_region *memory_region_ret,
 	size_t memory_region_max_size);
 ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 						     void *send_buf,
-						     struct ffa_value msg_ret,
 						     int32_t expected_error);
 
 ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,

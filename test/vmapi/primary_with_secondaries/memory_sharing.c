@@ -257,11 +257,6 @@ static void memory_send_reclaim(uint32_t msg_size,
 	}
 }
 
-TEAR_DOWN(memory_sharing)
-{
-	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
-}
-
 /**
  * Test memory reclaim after a donate.
  */
@@ -386,20 +381,12 @@ TEST(memory_sharing, share_retrieve_memory_type_not_specified)
 	 * to retrieve the memory.
 	 * The retrieve request doesn't specify the memory type.
 	 */
-	msg_size = ffa_memory_retrieve_request_init_single_receiver(
+	send_retrieve_request_single_receiver(
 		mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id, 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_MEMORY_NOT_SPECIFIED_MEM, 0, 0);
 
-	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-	EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, service1_info->vm_id, msg_size,
-			       0)
-			  .func,
-		  FFA_SUCCESS_32);
-
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
-	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		EXPECT_EQ(pages[i], 'b');
@@ -439,8 +426,7 @@ TEST(memory_sharing, concurrent)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		uint8_t value = i + 1;
@@ -479,8 +465,7 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
@@ -545,10 +530,8 @@ TEST(memory_sharing, lend_relinquish)
 	run_res = ffa_run(service1_info->vm_id, 0);
 
 	/* Let the memory be returned. */
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
-
 	/* Ensure that the secondary VM accessed the region. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
@@ -596,8 +579,7 @@ TEST(memory_sharing, lend_fragmented_relinquish)
 	run_res = ffa_run(service1_info->vm_id, 0);
 
 	/* Let the memory be returned. */
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	/* Ensure that the secondary VM accessed the region. */
@@ -640,12 +622,9 @@ TEST(memory_sharing, lend_force_fragmented_relinquish)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-
 	/* Let the memory be returned. */
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
-
 	/* Ensure that the secondary VM accessed the region. */
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
@@ -718,8 +697,9 @@ TEST(memory_sharing, give_and_get_back)
 
 	/* Let the memory be returned, and retrieve it. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
-					       NULL, HF_MAILBOX_SIZE),
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, NULL, NULL,
+					       HF_MAILBOX_SIZE),
 		  service1_info->vm_id);
 
 	for (int i = 0; i < PAGE_SIZE; ++i) {
@@ -761,9 +741,10 @@ TEST(memory_sharing, lend_and_get_back)
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
 	for (int i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'd');
 	}
@@ -798,10 +779,7 @@ TEST(memory_sharing, relend_after_return)
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(run_res.arg2, 0);
-	EXPECT_EQ(run_res.arg3, 0);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	/* Lend the memory again after it has been returned. */
@@ -813,10 +791,7 @@ TEST(memory_sharing, relend_after_return)
 
 	/* Observe the service doesn't fault when accessing the memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(run_res.arg2, 0);
-	EXPECT_EQ(run_res.arg3, 0);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 }
 
@@ -848,9 +823,8 @@ TEST(memory_sharing, lend_elsewhere_after_return)
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Share the memory with a different VM after it has been returned. */
 	send_memory_and_retrieve_request(
@@ -861,6 +835,7 @@ TEST(memory_sharing, lend_elsewhere_after_return)
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
 }
 
@@ -880,8 +855,9 @@ TEST(memory_sharing, give_memory_and_lose_access)
 
 	/* Have the memory be given. */
 	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	memory_region = (struct ffa_memory_region *)retrieve_buffer;
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, NULL,
 					       memory_region, HF_MAILBOX_SIZE),
 		  service1_info->vm_id);
 
@@ -917,8 +893,9 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 
 	/* Have the memory be lent. */
 	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	memory_region = (struct ffa_memory_region *)retrieve_buffer;
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, NULL,
 					       memory_region, HF_MAILBOX_SIZE),
 		  service1_info->vm_id);
 
@@ -1095,10 +1072,11 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Let the memory be returned. */
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
-					       NULL, HF_MAILBOX_SIZE),
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, NULL, NULL,
+					       HF_MAILBOX_SIZE),
 		  service1_info->vm_id);
 
 	/* Share the memory with another VM. */
@@ -1149,8 +1127,7 @@ TEST(memory_sharing, donate_vms)
 
 	/* Let the memory be sent from VM1 to VM2. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_receiver(run_res), service2_info->vm_id);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Receive memory in VM2. */
 	run_res = ffa_run(service2_info->vm_id, 0);
@@ -1211,8 +1188,9 @@ TEST(memory_sharing, donate_twice)
 
 	/* Let the memory be sent from VM1 to PRIMARY (returned). */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
-					       NULL, HF_MAILBOX_SIZE),
+	ASSERT_NE(run_res.func, FFA_ERROR_32);
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, NULL, NULL,
+					       HF_MAILBOX_SIZE),
 		  service1_info->vm_id);
 
 	/* Check we have access again. */
@@ -1371,8 +1349,9 @@ TEST(memory_sharing, donate_invalid_source)
 
 	/* Receive and return memory from VM1. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, run_res, NULL,
-					       NULL, HF_MAILBOX_SIZE),
+	ASSERT_NE(run_res.func, FFA_ERROR_32);
+	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, NULL, NULL,
+					       HF_MAILBOX_SIZE),
 		  service1_info->vm_id);
 
 	/* Use VM1 to fail to donate memory from the primary to VM2. */
@@ -1477,8 +1456,7 @@ TEST(memory_sharing, lend_invalid_source)
 
 	/* Receive and return memory from VM1. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	/* Try to lend memory from primary in VM1. */
@@ -1520,8 +1498,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 
 	/* Let service write to and return memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	/* Re-initialise the memory before giving it. */
@@ -1646,8 +1623,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 
 	/* Let service write to and return memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	/* Re-initialise the memory before giving it. */
@@ -1706,8 +1682,7 @@ TEST(memory_sharing, share_relinquish_clear)
 
 	/* Let the memory be received, fail to be cleared, and then returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	/* Check that it has not been cleared. */
@@ -1753,8 +1728,7 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 
 	/* Attempt to execute from memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	send_memory_and_retrieve_request(
@@ -1805,8 +1779,7 @@ TEST(memory_sharing, lend_relinquish_RO_X)
 
 	/* Attempt to execute from memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	send_memory_and_retrieve_request(
@@ -2449,25 +2422,16 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 		handle = ffa_mem_success_handle(ret);
 
 		for (unsigned int j = 0; j < ARRAY_SIZE(invalid_flags); ++j) {
-			msg_size =
-				ffa_memory_retrieve_request_init_single_receiver(
-					mb.send, handle, HF_PRIMARY_VM_ID,
-					service1_info->vm_id, 0,
-					invalid_flags[j], FFA_DATA_ACCESS_RW,
-					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-					FFA_MEMORY_NORMAL_MEM,
-					FFA_MEMORY_CACHE_WRITE_BACK,
-					FFA_MEMORY_INNER_SHAREABLE);
-
-			EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-
-			EXPECT_EQ(
-				ffa_msg_send(HF_PRIMARY_VM_ID,
-					     service1_info->vm_id, msg_size, 0)
-					.func,
-				FFA_SUCCESS_32);
-
-			ffa_run(service1_info->vm_id, 0);
+			send_retrieve_request_single_receiver(
+				mb.send, handle, hf_vm_get_id(),
+				service1_info->vm_id, 0, invalid_flags[j],
+				FFA_DATA_ACCESS_RW,
+				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				FFA_MEMORY_NORMAL_MEM,
+				FFA_MEMORY_CACHE_WRITE_BACK,
+				FFA_MEMORY_INNER_SHAREABLE);
+			EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func,
+				  FFA_YIELD_32);
 		}
 
 		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
@@ -2536,27 +2500,15 @@ TEST(memory_sharing, ffa_validate_retrieve_req_attributes)
 		handle = ffa_mem_success_handle(ret);
 
 		for (uint32_t j = 0; j < ARRAY_SIZE(invalid_attributes); ++j) {
-			msg_size =
-				ffa_memory_retrieve_request_init_single_receiver(
-					mb.send, handle, HF_PRIMARY_VM_ID,
-					service1_info->vm_id, 0, 0,
-					FFA_DATA_ACCESS_RW,
-					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-					invalid_attributes[j].memory_type,
-					invalid_attributes[j]
-						.memory_cacheability,
-					invalid_attributes[j]
-						.memory_shareability);
-
-			EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-
-			EXPECT_EQ(
-				ffa_msg_send(HF_PRIMARY_VM_ID,
-					     service1_info->vm_id, msg_size, 0)
-					.func,
-				FFA_SUCCESS_32);
-
-			ffa_run(service1_info->vm_id, 0);
+			send_retrieve_request_single_receiver(
+				mb.send, handle, HF_PRIMARY_VM_ID,
+				service1_info->vm_id, 0, 0, FFA_DATA_ACCESS_RW,
+				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				invalid_attributes[j].memory_type,
+				invalid_attributes[j].memory_cacheability,
+				invalid_attributes[j].memory_shareability);
+			EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func,
+				  FFA_YIELD_32);
 		}
 
 		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
@@ -2574,6 +2526,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_mem_share)
 	uint32_t msg_size;
 	ffa_memory_handle_t handle;
 	struct ffa_partition_info *service1_info = service1();
+
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
@@ -2617,7 +2570,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_mem_share)
 	handle = ffa_mem_success_handle(ret);
 
 	/* Prepare retrieve request setting clear memory flags. */
-	msg_size = ffa_memory_retrieve_request_init_single_receiver(
+	send_retrieve_request_single_receiver(
 		mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
 		FFA_MEMORY_REGION_FLAG_CLEAR |
 			FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH,
@@ -2625,14 +2578,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_mem_share)
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 		FFA_MEMORY_INNER_SHAREABLE);
 
-	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-
-	EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, service1_info->vm_id, msg_size,
-			       0)
-			  .func,
-		  FFA_SUCCESS_32);
-
-	ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 }
@@ -2648,6 +2594,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 	uint32_t msg_size;
 	ffa_memory_handle_t handle;
 	struct ffa_partition_info *service1_info = service1();
+
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
@@ -2676,21 +2623,13 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 	 * Prepare retrieve request with RO, and setting flag to clear memory.
 	 * Should fail at the receiver's FFA_MEM_RETRIEVE call.
 	 */
-	msg_size = ffa_memory_retrieve_request_init_single_receiver(
+	send_retrieve_request_single_receiver(
 		mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
 		FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RO,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
 
-	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-
-	EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, service1_info->vm_id, msg_size,
-			       0)
-			  .func,
-		  FFA_SUCCESS_32);
-
-	ffa_run(service1_info->vm_id, 0);
-
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 }
 
@@ -2747,7 +2686,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_sender_not_clear)
 		 * memory. Should fail at the receiver's FFA_MEM_RETRIEVE_REQ
 		 * call with FFA_DENIED.
 		 */
-		msg_size = ffa_memory_retrieve_request_init_single_receiver(
+		send_retrieve_request_single_receiver(
 			mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id,
 			0, FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RW,
 			/* Different args for lend and donate. */
@@ -2757,15 +2696,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_sender_not_clear)
 			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			FFA_MEMORY_INNER_SHAREABLE);
 
-		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-
-		EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, service1_info->vm_id,
-				       msg_size, 0)
-				  .func,
-			  FFA_SUCCESS_32);
-
-		ffa_run(service1_info->vm_id, 0);
-
+		EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 	}
 }
@@ -2823,7 +2754,7 @@ TEST(memory_sharing, ffa_validate_retrieve_transaction_type)
 		 * Should fail at the receiver's FFA_MEM_RETRIEVE_REQ
 		 * call with FFA_INVALID_PARAMETERS.
 		 */
-		msg_size = ffa_memory_retrieve_request_init_single_receiver(
+		send_retrieve_request_single_receiver(
 			mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id,
 			0,
 			send_function[i] == ffa_mem_share
@@ -2836,14 +2767,7 @@ TEST(memory_sharing, ffa_validate_retrieve_transaction_type)
 			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			FFA_MEMORY_INNER_SHAREABLE);
 
-		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-
-		EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, service1_info->vm_id,
-				       msg_size, 0)
-				  .func,
-			  FFA_SUCCESS_32);
-
-		ffa_run(service1_info->vm_id, 0);
+		EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
 		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 	}
@@ -2899,24 +2823,19 @@ TEST(memory_sharing, mem_share_multiple_borrowers)
 		 * Send the appropriate retrieve request to the VM so that it
 		 * can use it to retrieve the memory.
 		 */
-		msg_size = ffa_memory_retrieve_request_init(
-			mem_region, handle, HF_PRIMARY_VM_ID, receivers,
-			ARRAY_SIZE(receivers), 0,
-			FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE,
-			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_INNER_SHAREABLE);
-		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-		EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, recipient, msg_size, 0)
-				  .func,
-			  FFA_SUCCESS_32);
+		send_retrieve_request(mb.send, handle, hf_vm_get_id(),
+				      receivers, ARRAY_SIZE(receivers), 0,
+				      FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE,
+				      FFA_MEMORY_NORMAL_MEM,
+				      FFA_MEMORY_CACHE_WRITE_BACK,
+				      FFA_MEMORY_INNER_SHAREABLE, recipient);
 		EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
 
 		for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
 			ptr[i] = i;
 		}
 
-		EXPECT_EQ(ffa_run(recipient, 0).func, FFA_MSG_SEND_32);
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+		EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
 
 		for (int i = 0; i < PAGE_SIZE; ++i) {
 			/* Should have been incremented by each receiver. */
@@ -2979,12 +2898,14 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 	for (uint32_t j = 0; j < ARRAY_SIZE(receivers); j++) {
 		ffa_vm_id_t recipient =
 			receivers[j].receiver_permissions.receiver;
+		struct ffa_partition_msg *retrieve_message = mb.send;
 
 		SERVICE_SELECT(recipient, "memory_increment_relinquish",
 			       mb.send);
 
 		msg_size = ffa_memory_retrieve_request_init(
-			mem_region, handle, HF_PRIMARY_VM_ID, receivers,
+			(struct ffa_memory_region *)retrieve_message->payload,
+			handle, HF_PRIMARY_VM_ID, receivers,
 			ARRAY_SIZE(receivers), 0,
 			FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND,
 			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
@@ -2993,21 +2914,21 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
 		for (uint32_t k = 0; k < number_of_retrieves; k++) {
+			struct ffa_partition_msg *retrieve_message = mb.send;
 			/*
 			 * Send the appropriate retrieve request to the VM so
 			 * that it can use it to retrieve the memory.
 			 */
-			EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, recipient,
-					       msg_size, 0)
-					  .func,
-				  FFA_SUCCESS_32);
+			ffa_rxtx_header_init(hf_vm_get_id(), recipient,
+					     msg_size,
+					     &retrieve_message->header);
+			EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 			/* Run borrower such that it can retrieve memory. */
 			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
 			/* Run borrower such that it can write to memory. */
 			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
 			/* Run borrower such that it relinquishes its access. */
-			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_MSG_SEND_32);
-			EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
 		}
 	}
 
@@ -3197,8 +3118,7 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 		ffa_vm_id_t vm_id = receivers[i].receiver_permissions.receiver;
 		run_res = ffa_run(vm_id, 0);
 		/* Let the memory be returned. */
-		EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+		EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	}
 
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);

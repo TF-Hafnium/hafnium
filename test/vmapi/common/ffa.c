@@ -44,7 +44,7 @@ static void send_fragmented_memory_region(
 	struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t remaining_constituent_count,
 	uint32_t sent_length, uint32_t total_length,
-	ffa_memory_handle_t *handle)
+	ffa_memory_handle_t *handle, uint64_t allocator_mask)
 {
 	const ffa_memory_handle_t INVALID_FRAGMENT_HANDLE = 0xffffffffffffffff;
 	ffa_memory_handle_t fragment_handle = INVALID_FRAGMENT_HANDLE;
@@ -77,8 +77,7 @@ static void send_fragmented_memory_region(
 	EXPECT_EQ(sent_length, total_length);
 	EXPECT_EQ(send_ret->func, FFA_SUCCESS_32);
 	*handle = ffa_mem_success_handle(*send_ret);
-	EXPECT_EQ(*handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK,
-		  FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR);
+	EXPECT_EQ(*handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK, allocator_mask);
 	if (fragment_handle != INVALID_FRAGMENT_HANDLE) {
 		EXPECT_EQ(*handle, fragment_handle);
 	}
@@ -100,9 +99,12 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	ffa_memory_handle_t handle;
 	uint32_t remaining_constituent_count;
 	uint32_t i;
+	struct ffa_partition_msg *retrieve_message = tx_buffer;
 	bool not_specify_memory_type =
 		share_func == FFA_MEM_DONATE_32 ||
 		(share_func == FFA_MEM_LEND_32 && receivers_send_count == 1);
+	uint64_t allocator_mask;
+	bool contains_secure_receiver = false;
 
 	/* Send the first fragment of the memory. */
 	remaining_constituent_count = ffa_memory_region_init(
@@ -133,16 +135,35 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 		return 0;
 	}
 
-	send_fragmented_memory_region(&ret, tx_buffer, constituents,
-				      constituent_count,
-				      remaining_constituent_count,
-				      fragment_length, total_length, &handle);
+	/* Check if any of the receivers is a secure endpoint. */
+	for (i = 0; i < receivers_send_count; i++) {
+		if (!IS_VM_ID(
+			    receivers_send[i].receiver_permissions.receiver)) {
+			contains_secure_receiver = true;
+			break;
+		}
+	}
+
+	/*
+	 * If the sender is a secure endpoint, or at least one of the
+	 * receivers in a multi-endpoint memory sharing is a secure endpoint,
+	 * the allocator will be the SPMC.
+	 * Else, it will be the hypervisor.
+	 */
+	allocator_mask = (IS_VM_ID(sender) || contains_secure_receiver)
+				 ? FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR
+				 : FFA_MEMORY_HANDLE_ALLOCATOR_SPMC;
+
+	send_fragmented_memory_region(
+		&ret, tx_buffer, constituents, constituent_count,
+		remaining_constituent_count, fragment_length, total_length,
+		&handle, allocator_mask);
 
 	msg_size = ffa_memory_retrieve_request_init(
-		tx_buffer, handle, sender, receivers_retrieve,
-		receivers_retrieve_count, 0, retrieve_flags,
-		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_INNER_SHAREABLE);
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		sender, receivers_retrieve, receivers_retrieve_count, 0,
+		retrieve_flags, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
 
 	for (i = 0; i < receivers_send_count; i++) {
 		struct ffa_memory_region_attributes *receiver =
@@ -151,14 +172,15 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 			"Sending the retrieve request message to receiver: "
 			"%x\n",
 			receiver->receiver);
+
 		/*
 		 * Send the appropriate retrieve request to the VM so that it
 		 * can use it to retrieve the memory.
 		 */
 		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-		EXPECT_EQ(ffa_msg_send(sender, receiver->receiver, msg_size, 0)
-				  .func,
-			  FFA_SUCCESS_32);
+		ffa_rxtx_header_init(sender, receiver->receiver, msg_size,
+				     &retrieve_message->header);
+		ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 	}
 
 	return handle;
@@ -200,6 +222,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
  * Helper function to send memory to a VM then send a message with the retrieve
  * request it needs to retrieve it, forcing the request to be made in at least
  * two fragments even if it could fit in one.
+ * TODO: check if it can be based off a base function like the above functions.
  */
 ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
@@ -217,6 +240,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	uint32_t remaining_constituent_count;
 	struct ffa_value ret;
 	ffa_memory_handle_t handle;
+	struct ffa_partition_msg *retrieve_message;
 	bool not_specify_memory_type = share_func == FFA_MEM_DONATE_32 ||
 				       (share_func == FFA_MEM_LEND_32);
 
@@ -264,18 +288,19 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_mem_success_handle(ret), handle);
 
+	retrieve_message = (struct ffa_partition_msg *)tx_buffer;
 	/*
 	 * Send the appropriate retrieve request to the VM so that it can use it
-	 * to retrieve the memory.
 	 */
 	msg_size = ffa_memory_retrieve_request_init_single_receiver(
-		tx_buffer, handle, sender, recipient, 0, 0,
-		retrieve_data_access, retrieve_instruction_access,
-		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_INNER_SHAREABLE);
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		sender, recipient, 0, flags, retrieve_data_access,
+		retrieve_instruction_access, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+	ffa_rxtx_header_init(sender, recipient, msg_size,
+			     &retrieve_message->header);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-	EXPECT_EQ(ffa_msg_send(sender, recipient, msg_size, 0).func,
-		  FFA_SUCCESS_32);
+	ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 
 	return handle;
 }
@@ -322,6 +347,38 @@ void send_retrieve_request(
 	ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 }
 
+static struct ffa_partition_msg *get_mailbox_message(void *recv)
+{
+	ffa_vm_id_t sender;
+	ffa_vm_id_t receiver;
+	struct ffa_partition_msg *msg = (struct ffa_partition_msg *)recv;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct ffa_value ret =
+		ffa_notification_get(own_id, 0,
+				     FFA_NOTIFICATION_FLAG_BITMAP_HYP |
+					     FFA_NOTIFICATION_FLAG_BITMAP_SPM);
+	ffa_notifications_bitmap_t fwk_notif =
+		ffa_notification_get_from_framework(ret);
+
+	if (fwk_notif == 0U) {
+		HFTEST_LOG("There is no framework notifications.");
+		return NULL;
+	}
+
+	sender = ffa_rxtx_header_sender(&(msg->header));
+	receiver = ffa_rxtx_header_receiver(&(msg->header));
+
+	EXPECT_EQ(receiver, own_id);
+
+	if (is_ffa_spm_buffer_full_notification(fwk_notif)) {
+		EXPECT_FALSE(IS_VM_ID(sender));
+	} else if (is_ffa_hyp_buffer_full_notification(fwk_notif)) {
+		EXPECT_TRUE(IS_VM_ID(sender));
+	}
+
+	return msg;
+}
+
 /*
  * Use the retrieve request from the receive buffer to retrieve a memory region
  * which has been sent to us. Copies all the fragments into the provided buffer
@@ -330,8 +387,7 @@ void send_retrieve_request(
  * parameter.
  */
 ffa_vm_id_t retrieve_memory_from_message(
-	void *recv_buf, void *send_buf, struct ffa_value msg_ret,
-	ffa_memory_handle_t *handle,
+	void *recv_buf, void *send_buf, ffa_memory_handle_t *handle,
 	struct ffa_memory_region *memory_region_ret,
 	size_t memory_region_max_size)
 {
@@ -340,24 +396,29 @@ ffa_vm_id_t retrieve_memory_from_message(
 	struct ffa_memory_region *memory_region;
 	ffa_vm_id_t sender;
 	struct ffa_memory_region *retrieve_request;
-	ffa_memory_handle_t handle_;
+	ffa_memory_handle_t retrieved_handle;
 	uint32_t fragment_length;
 	uint32_t total_length;
 	uint32_t fragment_offset;
+	const struct ffa_partition_msg *retrv_message =
+		get_mailbox_message(recv_buf);
 
-	EXPECT_EQ(msg_ret.func, FFA_MSG_SEND_32);
-	msg_size = ffa_msg_send_size(msg_ret);
-	sender = ffa_sender(msg_ret);
+	ASSERT_TRUE(retrv_message != NULL);
 
-	retrieve_request = (struct ffa_memory_region *)recv_buf;
-	handle_ = retrieve_request->handle;
+	sender = ffa_rxtx_header_sender(&retrv_message->header);
+	msg_size = retrv_message->header.size;
+
+	retrieve_request = (struct ffa_memory_region *)retrv_message->payload;
+
+	retrieved_handle = retrieve_request->handle;
 	if (handle != NULL) {
-		*handle = handle_;
+		*handle = retrieved_handle;
 	}
-	memcpy_s(send_buf, HF_MAILBOX_SIZE, recv_buf, msg_size);
-	ffa_rx_release();
+	memcpy_s(send_buf, HF_MAILBOX_SIZE, retrv_message->payload, msg_size);
+
+	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	ret = ffa_mem_retrieve_req(msg_size, msg_size);
-	EXPECT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
+	ASSERT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
 	total_length = ret.arg1;
 	fragment_length = ret.arg2;
 	EXPECT_GE(fragment_length,
@@ -382,16 +443,16 @@ ffa_vm_id_t retrieve_memory_from_message(
 	 * it.
 	 */
 	memory_region = NULL;
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/* Retrieve the remaining fragments. */
 	fragment_offset = fragment_length;
 	while (fragment_offset < total_length) {
 		dlog_verbose("Calling again. frag offset: %x; total: %x\n",
 			     fragment_offset, total_length);
-		ret = ffa_mem_frag_rx(handle_, fragment_offset);
+		ret = ffa_mem_frag_rx(retrieved_handle, fragment_offset);
 		EXPECT_EQ(ret.func, FFA_MEM_FRAG_TX_32);
-		EXPECT_EQ(ffa_frag_handle(ret), handle_);
+		EXPECT_EQ(ffa_frag_handle(ret), retrieved_handle);
 		/* Sender MBZ at virtual instance. */
 		EXPECT_EQ(ffa_frag_sender(ret), 0);
 		fragment_length = ret.arg3;
@@ -404,7 +465,7 @@ ffa_vm_id_t retrieve_memory_from_message(
 				 recv_buf, fragment_length);
 		}
 		fragment_offset += fragment_length;
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+		ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	}
 	EXPECT_EQ(fragment_offset, total_length);
 
@@ -418,19 +479,25 @@ ffa_vm_id_t retrieve_memory_from_message(
  */
 ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 						     void *send_buf,
-						     struct ffa_value msg_ret,
 						     int32_t expected_error)
 {
 	uint32_t msg_size;
 	struct ffa_value ret;
 	ffa_vm_id_t sender;
+	struct ffa_memory_region *retrieve_request;
+	const struct ffa_partition_msg *retrv_message =
+		get_mailbox_message(recv_buf);
 
-	EXPECT_EQ(msg_ret.func, FFA_MSG_SEND_32);
-	msg_size = ffa_msg_send_size(msg_ret);
-	sender = ffa_sender(msg_ret);
+	ASSERT_TRUE(retrv_message != NULL);
 
-	memcpy_s(send_buf, HF_MAILBOX_SIZE, recv_buf, msg_size);
-	ffa_rx_release();
+	sender = ffa_rxtx_header_sender(&retrv_message->header);
+	msg_size = retrv_message->header.size;
+
+	retrieve_request = (struct ffa_memory_region *)retrv_message->payload;
+
+	memcpy_s(send_buf, HF_MAILBOX_SIZE, retrieve_request, msg_size);
+	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
 	ret = ffa_mem_retrieve_req(msg_size, msg_size);
 	EXPECT_FFA_ERROR(ret, expected_error);
 
