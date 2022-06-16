@@ -1529,13 +1529,29 @@ static struct ffa_value ffa_memory_send_validate(
 	}
 
 	/*
-	 * Check that sender's memory attributes match Hafnium expectations:
-	 * Normal Memory, Inner shareable, Write-Back Read-Allocate
-	 * Write-Allocate Cacheable.
+	 * If a memory donate or lend with single borrower, the memory type
+	 * shall not be specified by the sender.
 	 */
-	ret = ffa_memory_attributes_validate(memory_region->attributes);
-	if (ret.func != FFA_SUCCESS_32) {
-		return ret;
+	if (share_func == FFA_MEM_DONATE_32 ||
+	    (share_func == FFA_MEM_LEND_32 &&
+	     memory_region->receiver_count == 1)) {
+		if (ffa_get_memory_type_attr(memory_region->attributes) !=
+		    FFA_MEMORY_NOT_SPECIFIED_MEM) {
+			dlog_verbose(
+				"Memory type shall not be specified by "
+				"sender.\n");
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+	} else {
+		/*
+		 * Check that sender's memory attributes match Hafnium
+		 * expectations: Normal Memory, Inner shareable, Write-Back
+		 * Read-Allocate Write-Allocate Cacheable.
+		 */
+		ret = ffa_memory_attributes_validate(memory_region->attributes);
+		if (ret.func != FFA_SUCCESS_32) {
+			return ret;
+		}
 	}
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};

@@ -63,7 +63,9 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	remaining_constituent_count = ffa_memory_region_init(
 		tx_buffer, HF_MAILBOX_SIZE, sender, recipient, constituents,
 		constituent_count, 0, flags, send_data_access,
-		send_instruction_access, FFA_MEMORY_NORMAL_MEM,
+		send_instruction_access,
+		share_func == FFA_MEM_SHARE_32 ? FFA_MEMORY_NORMAL_MEM
+					       : FFA_MEMORY_NOT_SPECIFIED_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
 		&total_length, &fragment_length);
 	if (remaining_constituent_count == 0) {
@@ -161,7 +163,9 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	remaining_constituent_count = ffa_memory_region_init(
 		tx_buffer, HF_MAILBOX_SIZE, sender, recipient, constituents,
 		constituent_count, 0, flags, send_data_access,
-		send_instruction_access, FFA_MEMORY_NORMAL_MEM,
+		send_instruction_access,
+		share_func == FFA_MEM_SHARE_32 ? FFA_MEMORY_NORMAL_MEM
+					       : FFA_MEMORY_NOT_SPECIFIED_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
 		&total_length, &fragment_length);
 	EXPECT_EQ(remaining_constituent_count, 0);

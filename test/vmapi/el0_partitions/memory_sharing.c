@@ -1586,7 +1586,7 @@ TEST(memory_sharing, lend_donate)
 				  ARRAY_SIZE(constituents), 0, 0,
 				  FFA_DATA_ACCESS_NOT_SPECIFIED,
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
@@ -1600,7 +1600,8 @@ TEST(memory_sharing, lend_donate)
 			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
 			  0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
@@ -1651,7 +1652,7 @@ TEST(memory_sharing, share_donate)
 				  ARRAY_SIZE(constituents), 0, 0,
 				  FFA_DATA_ACCESS_NOT_SPECIFIED,
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
@@ -1665,7 +1666,8 @@ TEST(memory_sharing, share_donate)
 			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
 			  0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
@@ -1736,7 +1738,7 @@ TEST(memory_sharing, lend_twice)
 				  ARRAY_SIZE(constituents), 0, 0,
 				  FFA_DATA_ACCESS_RO,
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
@@ -2048,11 +2050,6 @@ TEST(memory_sharing, ffa_validate_attributes)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
 
-	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
-		ffa_mem_share,
-		ffa_mem_lend,
-	};
-
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
@@ -2090,11 +2087,9 @@ TEST(memory_sharing, ffa_validate_attributes)
 			  0);
 
 		/* Call the various mem send functions on the same region. */
-		for (uint32_t j = 0; j < ARRAY_SIZE(send_function); j++) {
-			ret = send_function[j](msg_size, msg_size);
-			EXPECT_EQ(ret.func, FFA_ERROR_32);
-			EXPECT_TRUE(ffa_error_code(ret) == FFA_DENIED);
-		}
+		ret = ffa_mem_share(msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_ERROR_32);
+		EXPECT_EQ(ffa_error_code(ret), FFA_DENIED);
 	}
 }
 
@@ -2130,12 +2125,14 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 				  ARRAY_SIZE(constituents), 0, 0,
 				  FFA_DATA_ACCESS_RW,
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				  FFA_MEMORY_NORMAL_MEM,
+				  send_function[i] == ffa_mem_share
+					  ? FFA_MEMORY_NORMAL_MEM
+					  : FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
 
-		ret = send_function[0](msg_size, msg_size);
+		ret = send_function[i](msg_size, msg_size);
 		EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 		handle = ffa_mem_success_handle(ret);
@@ -2208,7 +2205,9 @@ TEST(memory_sharing, ffa_validate_retrieve_req_attributes)
 				  ARRAY_SIZE(constituents), 0, 0,
 				  FFA_DATA_ACCESS_RW,
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				  FFA_MEMORY_NORMAL_MEM,
+				  send_function[i] == ffa_mem_share
+					  ? FFA_MEMORY_NORMAL_MEM
+					  : FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
@@ -2336,7 +2335,8 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
 			  0, 0, FFA_DATA_ACCESS_RO,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 
