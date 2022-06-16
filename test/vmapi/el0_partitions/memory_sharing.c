@@ -221,9 +221,114 @@ static void check_cannot_relinquish_memory(struct mailbox_buffers mb,
 	}
 }
 
+/**
+ * Base test function for a memory reclaim after a successful memory send call.
+ */
+static void memory_send_reclaim(uint32_t msg_size,
+				struct ffa_value (*mem_send_function)(uint32_t,
+								      uint32_t))
+{
+	struct ffa_value ret;
+	ffa_memory_handle_t handle;
+
+	/*
+	 * It is assumed that the same pages as for other mem share tests are
+	 * used.
+	 */
+	uint8_t *ptr = pages;
+	ret = mem_send_function(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	handle = ffa_mem_success_handle(ret);
+
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	/* Write to pages to validate access has been reestablished. */
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		ptr[i] = i;
+	}
+}
+
 TEAR_DOWN(memory_sharing)
 {
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
+/**
+ * Test memory reclaim after a donate.
+ */
+TEST(memory_sharing, donate_reclaim)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	uint32_t msg_size;
+
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	/* Call base function's test. */
+	memory_send_reclaim(msg_size, ffa_mem_donate);
+}
+
+/**
+ * Test memory reclaim after a lend.
+ */
+TEST(memory_sharing, lend_reclaim)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	uint32_t msg_size;
+
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	/* Call base function's test. */
+	memory_send_reclaim(msg_size, ffa_mem_lend);
+}
+
+/**
+ * Test memory reclaim after a share.
+ */
+TEST(memory_sharing, share_reclaim)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	uint32_t msg_size;
+
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	/* Call base function's test. */
+	memory_send_reclaim(msg_size, ffa_mem_share);
 }
 
 /**
