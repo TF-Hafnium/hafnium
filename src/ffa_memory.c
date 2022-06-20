@@ -1534,10 +1534,14 @@ static struct ffa_value ffa_memory_send_validate(
 			 * copy that we store, ready to be returned to the
 			 * retriever.
 			 */
-			ffa_set_instruction_access_attr(
-				&permissions, FFA_INSTRUCTION_ACCESS_NX);
-			memory_region->receivers[i]
-				.receiver_permissions.permissions = permissions;
+			if (vm_id_is_current_world(receiver_id)) {
+				ffa_set_instruction_access_attr(
+					&permissions,
+					FFA_INSTRUCTION_ACCESS_NX);
+				memory_region->receivers[i]
+					.receiver_permissions.permissions =
+					permissions;
+			}
 		}
 		if (share_func == FFA_MEM_LEND_32 &&
 		    data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
