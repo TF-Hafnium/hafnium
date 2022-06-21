@@ -199,6 +199,7 @@ void vcpu_reset(struct vcpu *vcpu)
 
 	/* Reset the registers to give a clean start for vCPU. */
 	arch_regs_reset(vcpu);
+	vcpu->rt_model = RTM_SP_INIT;
 }
 
 void vcpu_set_phys_core_idx(struct vcpu *vcpu)

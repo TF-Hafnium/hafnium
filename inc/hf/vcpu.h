@@ -40,6 +40,19 @@ enum vcpu_state {
 	VCPU_STATE_ABORTED,
 };
 
+/** Refer to section 7 of the FF-A v1.1 EAC0 spec. */
+enum partition_runtime_model {
+	RTM_NONE,
+	/** Runtime model for FFA_RUN. */
+	RTM_FFA_RUN,
+	/** Runtime model for FFA_MSG_SEND_DIRECT_REQUEST. */
+	RTM_FFA_DIR_REQ,
+	/** Runtime model for Secure Interrupt handling. */
+	RTM_SEC_INTERRUPT,
+	/** Runtime model for SP Initialization. */
+	RTM_SP_INIT,
+};
+
 struct interrupts {
 	/** Bitfield keeping track of which interrupts are enabled. */
 	struct interrupt_bitmap interrupt_enabled;
@@ -137,6 +150,9 @@ struct vcpu {
 	 * mechanism and perform appropriate bookkeeping.
 	 */
 	bool implicit_completion_signal;
+
+	/** Partition Runtime Model. */
+	enum partition_runtime_model rt_model;
 };
 
 /** Encapsulates a vCPU whose lock is held. */

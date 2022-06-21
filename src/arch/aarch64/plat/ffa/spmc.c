@@ -1548,7 +1548,8 @@ bool plat_ffa_is_secondary_ep_register_supported(void)
 	return true;
 }
 
-static bool sp_boot_next(struct vcpu *current, struct vcpu **next)
+static bool sp_boot_next(struct vcpu *current, struct vcpu **next,
+			 bool *boot_order_complete)
 {
 	struct vm_locked current_vm_locked;
 	struct vm *vm_next = NULL;
@@ -1564,6 +1565,7 @@ static bool sp_boot_next(struct vcpu *current, struct vcpu **next)
 	if (current_vm_locked.vm->initialized == false) {
 		current_vm_locked.vm->initialized = true;
 		current->is_bootstrapped = true;
+		current->rt_model = RTM_NONE;
 		dlog_verbose("Initialized VM: %#x, boot_order: %u\n",
 			     current_vm_locked.vm->id,
 			     current_vm_locked.vm->boot_order);
@@ -1578,6 +1580,7 @@ static bool sp_boot_next(struct vcpu *current, struct vcpu **next)
 			(*next)->cpu = current->cpu;
 			(*next)->state = VCPU_STATE_RUNNING;
 			(*next)->regs_available = false;
+			(*next)->rt_model = RTM_SP_INIT;
 
 			vm_set_boot_info_gp_reg(vm_next, (*next));
 
@@ -1585,6 +1588,7 @@ static bool sp_boot_next(struct vcpu *current, struct vcpu **next)
 			goto out;
 		}
 
+		*boot_order_complete = true;
 		dlog_verbose("Finished initializing all VMs.\n");
 	}
 
@@ -1596,9 +1600,16 @@ out:
 bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 			       struct ffa_value *ret_args)
 {
-	if (sp_boot_next(current, next)) {
+	bool boot_order_complete = false;
+
+	if (sp_boot_next(current, next, &boot_order_complete)) {
 		*ret_args = (struct ffa_value){.func = FFA_INTERRUPT_32};
 		return true;
+	}
+
+	/* All the SPs have been booted now. Return to NWd. */
+	if (boot_order_complete) {
+		return false;
 	}
 
 	/* Refer FF-A v1.1 Beta0 section 7.4 bullet 2. */
@@ -1621,6 +1632,14 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 		*ret_args = plat_ffa_preempted_vcpu_resume(current, next);
 		return true;
 	}
+
+	/*
+	 * The vCPU of an SP on secondary CPUs will invoke FFA_MSG_WAIT
+	 * to indicate successful initialization to SPMC.
+	 */
+	sl_lock(&current->lock);
+	current->rt_model = RTM_NONE;
+	sl_unlock(&current->lock);
 
 	return false;
 }
