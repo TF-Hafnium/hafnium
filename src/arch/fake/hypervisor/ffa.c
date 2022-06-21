@@ -449,3 +449,11 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 	(void)current_locked;
 	(void)receiver_vcpu_locked;
 }
+
+void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
+						struct vcpu *next)
+{
+	/* Calls chains not supported in the Hypervisor/VMs. */
+	(void)current;
+	(void)next;
+}

@@ -2741,6 +2741,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		panic("Invalid direct message response invocation");
 	}
 
+	plat_ffa_unwind_call_chain_ffa_direct_resp(current, *next);
+
 	return (struct ffa_value){.func = FFA_INTERRUPT_32};
 }
 

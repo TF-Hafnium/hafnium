@@ -1904,3 +1904,31 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 		receiver_vcpu->scheduling_mode = current->scheduling_mode;
 	}
 }
+
+/*
+ * Unwind the present call chain upon the invocation of
+ * FFA_MSG_SEND_DIRECT_RESP ABI.
+ */
+void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
+						struct vcpu *next)
+{
+	ffa_vm_id_t receiver_vm_id = next->vm->id;
+
+	/* Lock both vCPUs at once. */
+	vcpu_lock_both(current, next);
+
+	assert(current->call_chain.next_node == NULL);
+	current->scheduling_mode = NONE;
+	current->rt_model = RTM_NONE;
+
+	if (!vm_id_is_current_world(receiver_vm_id)) {
+		/* End of NWd scheduled call chain. */
+		assert(current->call_chain.prev_node == NULL);
+	} else {
+		/* Removing a node from an existing call chain. */
+		vcpu_call_chain_remove_node(current, next);
+	}
+
+	sl_unlock(&next->lock);
+	sl_unlock(&current->lock);
+}
