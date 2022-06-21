@@ -1877,6 +1877,48 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 }
 
 /*
+ * Initialize the scheduling mode and/or Partition Runtime model of the target
+ * SP upon being resumed by an FFA_RUN ABI.
+ */
+void plat_ffa_init_schedule_mode_ffa_run(struct vcpu *current,
+					 struct vcpu_locked target_locked)
+{
+	struct vcpu_locked current_vcpu_locked;
+	struct vcpu *vcpu = target_locked.vcpu;
+
+	/* Lock current vCPU now. */
+	current_vcpu_locked = vcpu_lock(current);
+
+	/*
+	 * Scenario 1 in Table 8.4; Therefore SPMC could be resuming a vCPU
+	 * that was part of NWd scheduled mode.
+	 */
+	CHECK(vcpu->scheduling_mode != SPMC_MODE);
+
+	/* Section 8.2.3 bullet 4.2 of spec FF-A v1.1 EAC0. */
+	if (vcpu->state == VCPU_STATE_WAITING) {
+		if (vcpu->rt_model == RTM_SP_INIT) {
+			vcpu->scheduling_mode = NONE;
+		} else if (vcpu->rt_model == RTM_NONE) {
+			vcpu->rt_model = RTM_FFA_RUN;
+
+			if (!vm_id_is_current_world(current->vm->id) ||
+			    (current->scheduling_mode == NWD_MODE)) {
+				vcpu->scheduling_mode = NWD_MODE;
+			}
+		} else {
+			CHECK(false);
+		}
+	} else {
+		/* SP vCPU would have been pre-empted earlier or blocked. */
+		CHECK(vcpu->state == VCPU_STATE_PREEMPTED ||
+		      vcpu->state == VCPU_STATE_BLOCKED);
+	}
+
+	vcpu_unlock(&current_vcpu_locked);
+}
+
+/*
  * Start winding the call chain or continue to wind the present one upon the
  * invocation of FFA_MSG_SEND_DIRECT_REQ ABI.
  */

@@ -920,6 +920,8 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 		goto out;
 	}
 
+	plat_ffa_init_schedule_mode_ffa_run(current, vcpu_locked);
+
 	/* It has been decided that the vCPU should be run. */
 	vcpu->cpu = current->cpu;
 	vcpu->state = VCPU_STATE_RUNNING;
