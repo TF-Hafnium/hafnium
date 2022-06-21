@@ -53,6 +53,15 @@ enum partition_runtime_model {
 	RTM_SP_INIT,
 };
 
+/** Refer to section 8.2.3 of the FF-A EAC0 spec. */
+enum schedule_mode {
+	NONE,
+	/** Normal world scheduled mode. */
+	NWD_MODE,
+	/** SPMC scheduled mode. */
+	SPMC_MODE,
+};
+
 struct interrupts {
 	/** Bitfield keeping track of which interrupts are enabled. */
 	struct interrupt_bitmap interrupt_enabled;
@@ -75,6 +84,14 @@ struct vcpu_fault_info {
 	vaddr_t vaddr;
 	vaddr_t pc;
 	uint32_t mode;
+};
+
+struct call_chain {
+	/** Previous node in the SP call chain. */
+	struct vcpu *prev_node;
+
+	/** Next node in the SP call chain. */
+	struct vcpu *next_node;
 };
 
 struct vcpu {
@@ -150,6 +167,15 @@ struct vcpu {
 	 * mechanism and perform appropriate bookkeeping.
 	 */
 	bool implicit_completion_signal;
+
+	/** SP call chain. */
+	struct call_chain call_chain;
+
+	/**
+	 * Indicates if the current vCPU is running in SPMC scheduled
+	 * mode or Normal World scheduled mode.
+	 */
+	enum schedule_mode scheduling_mode;
 
 	/** Partition Runtime Model. */
 	enum partition_runtime_model rt_model;
@@ -300,4 +326,18 @@ static inline uint32_t vcpu_interrupt_count_get(struct vcpu_locked vcpu_locked)
 {
 	return vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count +
 	       vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count;
+}
+
+static inline void vcpu_call_chain_extend(struct vcpu *vcpu1,
+					  struct vcpu *vcpu2)
+{
+	vcpu1->call_chain.next_node = vcpu2;
+	vcpu2->call_chain.prev_node = vcpu1;
+}
+
+static inline void vcpu_call_chain_remove_node(struct vcpu *vcpu1,
+					       struct vcpu *vcpu2)
+{
+	vcpu1->call_chain.prev_node = NULL;
+	vcpu2->call_chain.next_node = NULL;
 }
