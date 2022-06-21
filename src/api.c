@@ -2178,6 +2178,14 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 	return 0;
 }
 
+static void api_interrupt_clear_decrement(struct vcpu_locked locked_vcpu,
+					  struct interrupts *interrupts,
+					  uint32_t intid)
+{
+	vcpu_virt_interrupt_clear_pending(interrupts, intid);
+	vcpu_interrupt_count_decrement(locked_vcpu, interrupts, intid);
+}
+
 /**
  * Returns the ID of the next pending interrupt for the calling vCPU, and
  * acknowledges it (i.e. marks it as no longer pending). Returns
@@ -2209,10 +2217,7 @@ uint32_t api_interrupt_get(struct vcpu *current)
 			/*
 			 * Mark it as no longer pending and decrement the count.
 			 */
-			vcpu_virt_interrupt_clear_pending(interrupts,
-							  first_interrupt);
-
-			vcpu_interrupt_count_decrement(
+			api_interrupt_clear_decrement(
 				current_locked, interrupts, first_interrupt);
 			break;
 		}
@@ -2689,7 +2694,23 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		CHECK(!current->processing_secure_interrupt);
 
 		plat_interrupts_set_priority_mask(current->priority_mask);
+		/*
+		 * A SP may be signaled a managed exit but actually not trap
+		 * the virtual interrupt, probably because it has virtual
+		 * interrupts masked, and emit direct resp. In this case the
+		 * managed exit operation is considered completed and it would
+		 * also need to clear the pending managed exit flag for the SP
+		 * vCPU.
+		 */
 		current->processing_managed_exit = false;
+		struct interrupts *interrupts = &current->interrupts;
+
+		if (vcpu_is_virt_interrupt_pending(interrupts,
+						   HF_MANAGED_EXIT_INTID)) {
+			api_interrupt_clear_decrement(current_locked,
+						      interrupts,
+						      HF_MANAGED_EXIT_INTID);
+		}
 	}
 
 	/* Clear direct request origin for the caller. */
