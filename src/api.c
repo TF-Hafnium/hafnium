@@ -2665,18 +2665,23 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 
 	assert(next_state == VCPU_STATE_WAITING);
 	current_locked = vcpu_lock(current);
+
+	/*
+	 * Ensure the terminating FFA_MSG_SEND_DIRECT_REQ had a
+	 * defined originator.
+	 */
+	if (!is_ffa_direct_msg_request_ongoing(current_locked)) {
+		/*
+		 * Sending direct response but direct request origin
+		 * vCPU is not set.
+		 */
+		vcpu_unlock(&current_locked);
+		return ffa_error(FFA_DENIED);
+	}
+
 	if (api_ffa_is_managed_exit_ongoing(current_locked)) {
 		/*
-		 * No need for REQ/RESP state management as managed exit does
-		 * not have corresponding REQ pair.
-		 */
-		if (receiver_vm_id != HF_PRIMARY_VM_ID) {
-			vcpu_unlock(&current_locked);
-			return ffa_error(FFA_DENIED);
-		}
-
-		/*
-		 * Per FF-A v1.1 Beta section 8.4.1.2 bullet 6, SPMC can signal
+		 * Per FF-A v1.1 EAC0 section 8.3.1.2.1 rule 6, SPMC can signal
 		 * a secure interrupt to a SP that is performing managed exit.
 		 * We have taken a implementation defined choice to not allow
 		 * Managed exit while a SP is processing a secure interrupt.
@@ -2685,25 +2690,6 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 
 		plat_interrupts_set_priority_mask(current->priority_mask);
 		current->processing_managed_exit = false;
-	} else {
-		/*
-		 * Ensure the terminating FFA_MSG_SEND_DIRECT_REQ had a
-		 * defined originator.
-		 */
-		if (!is_ffa_direct_msg_request_ongoing(current_locked)) {
-			/*
-			 * Sending direct response but direct request origin
-			 * vCPU is not set.
-			 */
-			vcpu_unlock(&current_locked);
-			return ffa_error(FFA_DENIED);
-		}
-
-		/* Refer to FF-A v1.1 Beta0 section 7.3 bulet 3. */
-		if (current->direct_request_origin_vm_id != receiver_vm_id) {
-			vcpu_unlock(&current_locked);
-			return ffa_error(FFA_DENIED);
-		}
 	}
 
 	/* Clear direct request origin for the caller. */
