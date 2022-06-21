@@ -270,7 +270,8 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
 {
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 	struct vcpu_locked current_locked;
-	bool is_direct_request_ongoing;
+	bool transition_allowed;
+	enum vcpu_state next_state = VCPU_STATE_BLOCKED;
 
 	if (current->vm->id == HF_PRIMARY_VM_ID) {
 		/* NOOP on the primary as it makes the scheduling decisions. */
@@ -278,20 +279,23 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
 	}
 
 	current_locked = vcpu_lock(current);
-	is_direct_request_ongoing =
-		is_ffa_direct_msg_request_ongoing(current_locked);
+	transition_allowed = plat_ffa_check_runtime_state_transition(
+		current, current->vm->id, HF_INVALID_VM_ID, NULL, FFA_YIELD_32,
+		&next_state);
 	vcpu_unlock(&current_locked);
 
-	if (is_direct_request_ongoing) {
+	if (!transition_allowed) {
 		return ffa_error(FFA_DENIED);
 	}
+
+	assert(next_state == VCPU_STATE_BLOCKED);
 
 	*next = api_switch_to_primary(
 		current,
 		(struct ffa_value){.func = FFA_YIELD_32,
 				   .arg1 = ffa_vm_vcpu(current->vm->id,
 						       vcpu_index(current))},
-		VCPU_STATE_BLOCKED);
+		next_state);
 
 	return ret;
 }
@@ -689,12 +693,21 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 				  struct ffa_value *args)
 {
 	struct ffa_value ret;
+	enum vcpu_state next_state = VCPU_STATE_WAITING;
 
 	if (args->arg1 != 0U || args->arg2 != 0U || args->arg3 != 0U ||
 	    args->arg4 != 0U || args->arg5 != 0U || args->arg6 != 0U ||
 	    args->arg7 != 0U) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
+
+	if (!plat_ffa_check_runtime_state_transition(
+		    current, current->vm->id, HF_INVALID_VM_ID, NULL,
+		    FFA_MSG_WAIT_32, &next_state)) {
+		return ffa_error(FFA_DENIED);
+	}
+
+	assert(next_state == VCPU_STATE_WAITING);
 
 	if (plat_ffa_msg_wait_prepare(current, next, &ret)) {
 		return ret;
@@ -941,6 +954,8 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	struct vm *vm;
 	struct vcpu *vcpu;
 	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
+	enum vcpu_state next_state = VCPU_STATE_BLOCKED;
+	struct vcpu_locked current_locked;
 
 	if (!plat_ffa_run_checks(current, vm_id, vcpu_idx, &ret, next)) {
 		return ret;
@@ -961,8 +976,23 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 		goto out;
 	}
 
-	/* Update state if allowed. */
-	vcpu = vm_get_vcpu(vm, vcpu_idx);
+	/*
+	 * Refer Figure 8.13 Scenario 1 of the FF-A v1.1 EAC spec. SPMC
+	 * bypasses the intermediate execution contexts and resumes the
+	 * SP execution context that was originally preempted.
+	 */
+	if (*next != NULL) {
+		vcpu = *next;
+	} else {
+		vcpu = vm_get_vcpu(vm, vcpu_idx);
+	}
+
+	if (!plat_ffa_check_runtime_state_transition(current, current->vm->id,
+						     HF_INVALID_VM_ID, vcpu,
+						     FFA_RUN_32, &next_state)) {
+		return ffa_error(FFA_DENIED);
+	}
+
 	if (!api_vcpu_prepare_run(current, vcpu, &ret)) {
 		goto out;
 	}
@@ -990,6 +1020,11 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 
 	/* Switch to the vCPU. */
 	*next = vcpu;
+
+	assert(next_state == VCPU_STATE_BLOCKED);
+	current_locked = vcpu_lock(current);
+	current->state = VCPU_STATE_BLOCKED;
+	vcpu_unlock(&current_locked);
 
 	/*
 	 * Set a placeholder return code to the scheduler. This will be
@@ -2445,6 +2480,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	struct vm_locked receiver_locked;
 	struct vcpu *receiver_vcpu;
 	struct two_vcpu_locked vcpus_locked;
+	enum vcpu_state next_state = VCPU_STATE_BLOCKED;
 
 	if (!api_ffa_dir_msg_is_arg2_zero(args)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -2485,6 +2521,12 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	if (receiver_vcpu == NULL) {
 		dlog_verbose("Invalid vCPU!\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (!plat_ffa_check_runtime_state_transition(
+		    current, sender_vm_id, HF_INVALID_VM_ID, receiver_vcpu,
+		    args.func, &next_state)) {
+		return ffa_error(FFA_DENIED);
 	}
 
 	receiver_locked = vm_lock(receiver_vm);
@@ -2554,6 +2596,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 
 	arch_regs_set_retval(&receiver_vcpu->regs, api_ffa_dir_msg_value(args));
 
+	assert(next_state == VCPU_STATE_BLOCKED);
 	current->state = VCPU_STATE_BLOCKED;
 
 	/* Switch to receiver vCPU targeted to by direct msg request */
@@ -2596,6 +2639,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 					      struct vcpu **next)
 {
 	struct vcpu_locked current_locked;
+	enum vcpu_state next_state = VCPU_STATE_WAITING;
 
 	if (!api_ffa_dir_msg_is_arg2_zero(args)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -2608,6 +2652,13 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	if (!plat_ffa_check_runtime_state_transition(current, sender_vm_id,
+						     receiver_vm_id, NULL,
+						     args.func, &next_state)) {
+		return ffa_error(FFA_DENIED);
+	}
+
+	assert(next_state == VCPU_STATE_WAITING);
 	current_locked = vcpu_lock(current);
 	if (api_ffa_is_managed_exit_ongoing(current_locked)) {
 		/*

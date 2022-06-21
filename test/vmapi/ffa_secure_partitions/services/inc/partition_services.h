@@ -69,18 +69,18 @@ struct ffa_value sp_req_echo_cmd(ffa_vm_id_t test_source, uint32_t val1,
 				 uint32_t val2, uint32_t val3, uint32_t val4);
 
 /**
- * Command to request SP to run echo busy test with second SP.
+ * Command to request SP to run echo denied test with second SP.
  */
-#define SP_REQ_ECHO_BUSY_CMD 0x65636871
+#define SP_REQ_ECHO_DENIED_CMD 0x65636871
 
-static inline struct ffa_value sp_req_echo_busy_cmd_send(ffa_vm_id_t sender,
-							 ffa_vm_id_t receiver)
+static inline struct ffa_value sp_req_echo_denied_cmd_send(ffa_vm_id_t sender,
+							   ffa_vm_id_t receiver)
 {
-	return ffa_msg_send_direct_req(sender, receiver, SP_REQ_ECHO_BUSY_CMD,
+	return ffa_msg_send_direct_req(sender, receiver, SP_REQ_ECHO_DENIED_CMD,
 				       0, 0, 0, 0);
 }
 
-struct ffa_value sp_req_echo_busy_cmd(ffa_vm_id_t test_source);
+struct ffa_value sp_req_echo_denied_cmd(ffa_vm_id_t test_source);
 
 /**
  * Command to request SP to set notifications.

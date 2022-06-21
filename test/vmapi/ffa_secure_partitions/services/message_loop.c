@@ -37,8 +37,8 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 			res = sp_req_echo_cmd(ffa_sender(res), res.arg4,
 					      res.arg5, res.arg6, res.arg7);
 			break;
-		case SP_REQ_ECHO_BUSY_CMD:
-			res = sp_req_echo_busy_cmd(ffa_sender(res));
+		case SP_REQ_ECHO_DENIED_CMD:
+			res = sp_req_echo_denied_cmd(ffa_sender(res));
 			break;
 		case SP_NOTIF_SET_CMD:
 			res = sp_notif_set_cmd(
