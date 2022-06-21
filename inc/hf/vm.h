@@ -222,6 +222,7 @@ struct vm {
 	 * non secure interrupt.
 	 */
 	uint8_t ns_interrupts_action;
+	bool me_signal_virq;
 	struct vm *next_boot;
 
 	/**

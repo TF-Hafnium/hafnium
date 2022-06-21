@@ -910,6 +910,12 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 				"partition\n");
 			return MANIFEST_ILLEGAL_NS_ACTION;
 		}
+
+		TRY(read_bool(&root, "managed-exit-virq",
+			      &vm->partition.me_signal_virq));
+		if (vm->partition.me_signal_virq) {
+			dlog_verbose("  Managed Exit signaled through vIRQ\n");
+		}
 	}
 
 	TRY(read_bool(&root, "notification-support",

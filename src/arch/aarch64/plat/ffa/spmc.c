@@ -2040,3 +2040,38 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
 	sl_unlock(&next->lock);
 	sl_unlock(&current->lock);
 }
+
+void plat_ffa_enable_virtual_maintenance_interrupts(
+	struct vcpu_locked current_locked)
+{
+	struct vcpu *current;
+	struct interrupts *interrupts;
+	struct vm *vm;
+
+	current = current_locked.vcpu;
+	interrupts = &current->interrupts;
+	vm = current->vm;
+
+	if (plat_ffa_vm_managed_exit_supported(vm)) {
+		vcpu_virt_interrupt_set_enabled(interrupts,
+						HF_MANAGED_EXIT_INTID);
+		/*
+		 * SPMC decides the interrupt type for Managed exit signal based
+		 * on the partition manifest.
+		 */
+		if (vm->me_signal_virq) {
+			vcpu_virt_interrupt_set_type(interrupts,
+						     HF_MANAGED_EXIT_INTID,
+						     INTERRUPT_TYPE_IRQ);
+		} else {
+			vcpu_virt_interrupt_set_type(interrupts,
+						     HF_MANAGED_EXIT_INTID,
+						     INTERRUPT_TYPE_FIQ);
+		}
+	}
+
+	if (vm->notifications.enabled) {
+		vcpu_virt_interrupt_set_enabled(interrupts,
+						HF_NOTIFICATION_PENDING_INTID);
+	}
+}

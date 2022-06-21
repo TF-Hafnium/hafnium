@@ -151,6 +151,8 @@ struct partition_manifest {
 	uint8_t messaging_method;
 	/** mandatory - action in response to non secure interrupt */
 	uint8_t ns_interrupts_action;
+	/** optional - managed exit signaled through vIRQ */
+	bool me_signal_virq;
 	/** optional - receipt of notifications. */
 	bool notification_support;
 	/** optional */

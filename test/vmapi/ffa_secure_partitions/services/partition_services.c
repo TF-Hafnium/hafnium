@@ -146,8 +146,6 @@ struct ffa_value sp_echo_indirect_msg_cmd(ffa_vm_id_t test_source)
 	if (sel1_secure_service) {
 		/* S-EL1 partition, register interrupt handler for NPI. */
 		exception_setup(irq, NULL);
-		hf_interrupt_enable(HF_NOTIFICATION_PENDING_INTID, true,
-				    INTERRUPT_TYPE_IRQ);
 		arch_irq_enable();
 	} else {
 		/*

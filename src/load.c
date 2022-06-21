@@ -207,6 +207,9 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->ns_interrupts_action =
 			manifest_vm->partition.ns_interrupts_action;
 
+		vm_locked.vm->me_signal_virq =
+			manifest_vm->partition.me_signal_virq;
+
 		vm_locked.vm->notifications.enabled =
 			manifest_vm->partition.notification_support;
 
@@ -837,6 +840,10 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	vcpu = vm_get_vcpu(vm, 0);
 
 	vcpu_locked = vcpu_lock(vcpu);
+
+	/* Enable virtual maintenance interrupts for Secure Partitions. */
+	plat_ffa_enable_virtual_maintenance_interrupts(vcpu_locked);
+
 	if (has_fdt) {
 		vcpu_secondary_reset_and_start(vcpu_locked, secondary_entry,
 					       pa_addr(fdt_addr));

@@ -311,3 +311,6 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 
 void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
 						struct vcpu *next);
+
+void plat_ffa_enable_virtual_maintenance_interrupts(
+	struct vcpu_locked current_locked);
