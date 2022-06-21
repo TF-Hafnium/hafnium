@@ -422,3 +422,21 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 
 	return false;
 }
+
+bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
+					     ffa_vm_id_t vm_id,
+					     ffa_vm_id_t receiver_vm_id,
+					     struct vcpu *receiver_vcpu,
+					     uint32_t func,  // NOLINTNEXTLINE
+					     enum vcpu_state *next_state)
+{
+	/* Perform state transition checks only for Secure Partitions. */
+	(void)current;
+	(void)vm_id;
+	(void)receiver_vm_id;
+	(void)receiver_vcpu;
+	(void)func;
+	(void)next_state;
+
+	return true;
+}

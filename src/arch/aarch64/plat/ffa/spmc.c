@@ -277,6 +277,238 @@ bool plat_ffa_is_memory_send_valid(ffa_vm_id_t receiver_vm_id,
 	return result;
 }
 
+static bool is_predecessor_in_call_chain(struct vcpu *current,
+					 struct vcpu *target)
+{
+	struct vcpu *prev_node;
+
+	assert(current != NULL);
+	assert(target != NULL);
+
+	prev_node = current->call_chain.prev_node;
+
+	while (prev_node != NULL) {
+		if (prev_node == target) {
+			return true;
+		}
+
+		/* The target vCPU is not it's immediate predecessor. */
+		prev_node = prev_node->call_chain.prev_node;
+	}
+
+	/* Search terminated. Reached start of call chain. */
+	return false;
+}
+
+/**
+ * Validates the Runtime model for FFA_RUN. Refer to section 7.2 of the FF-A
+ * v1.1 EAC0 spec.
+ */
+static bool plat_ffa_check_rtm_ffa_run(struct vcpu *current, struct vcpu *vcpu,
+				       uint32_t func,
+				       enum vcpu_state *next_state)
+{
+	switch (func) {
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+		/* Fall through. */
+	case FFA_RUN_32: {
+		/* Rules 1,2 section 7.2 EAC0 spec. */
+		if (is_predecessor_in_call_chain(current, vcpu)) {
+			return false;
+		}
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	}
+	case FFA_MSG_WAIT_32:
+		/* Rule 4 section 7.2 EAC0 spec. Fall through. */
+		*next_state = VCPU_STATE_WAITING;
+		return true;
+	case FFA_YIELD_32:
+		/* Rule 5 section 7.2 EAC0 spec. */
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+		/* Rule 3 section 7.2 EAC0 spec. Fall through. */
+	default:
+		/* Deny state transitions by default. */
+		return false;
+	}
+}
+
+/**
+ * Validates the Runtime model for FFA_MSG_SEND_DIRECT_REQ. Refer to section 7.3
+ * of the FF-A v1.1 EAC0 spec.
+ */
+static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu *current,
+					   struct vcpu *vcpu,
+					   ffa_vm_id_t receiver_vm_id,
+					   uint32_t func,
+					   enum vcpu_state *next_state)
+{
+	switch (func) {
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+		/* Fall through. */
+	case FFA_RUN_32: {
+		/* Rules 1,2. */
+		if (is_predecessor_in_call_chain(current, vcpu)) {
+			return false;
+		}
+
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	}
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32: {
+		/* Rule 3. */
+		if (current->direct_request_origin_vm_id == receiver_vm_id) {
+			*next_state = VCPU_STATE_WAITING;
+			return true;
+		}
+
+		return false;
+	}
+	case FFA_MSG_WAIT_32:
+		/* Rule 4. Fall through. */
+	case FFA_YIELD_32:
+		/* Rule 5. Fall through. */
+	default:
+		/* Deny state transitions by default. */
+		return false;
+	}
+}
+
+/**
+ * Validates the Runtime model for Secure interrupt handling. Refer to section
+ * 7.4 of the FF-A v1.1 EAC0 spec.
+ */
+static bool plat_ffa_check_rtm_sec_interrupt(struct vcpu *current,
+					     struct vcpu *vcpu, uint32_t func,
+					     enum vcpu_state *next_state)
+{
+	CHECK(current->scheduling_mode == SPMC_MODE);
+
+	switch (func) {
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+		/* Rule 3. */
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	case FFA_RUN_32: {
+		/* Rule 6. */
+		if (vcpu->state == VCPU_STATE_PREEMPTED) {
+			*next_state = VCPU_STATE_BLOCKED;
+			return true;
+		}
+
+		return false;
+	}
+	case FFA_MSG_WAIT_32:
+		/* Rule 2. */
+		*next_state = VCPU_STATE_WAITING;
+		return true;
+	case FFA_YIELD_32:
+		/* Rule 4. Fall through. */
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+		/* Rule 5. Fall through. */
+	default:
+		/* Deny state transitions by default. */
+		return false;
+	}
+}
+
+/**
+ * Validates the Runtime model for SP initialization. Refer to section 7.5 of
+ * the FF-A v1.1 EAC0 spec.
+ */
+static bool plat_ffa_check_rtm_sp_init(struct vcpu *vcpu, uint32_t func,
+				       enum vcpu_state *next_state)
+{
+	switch (func) {
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_REQ_32: {
+		assert(vcpu != NULL);
+		/* Rule 1. */
+		if (vcpu->is_bootstrapped) {
+			*next_state = VCPU_STATE_BLOCKED;
+			return true;
+		}
+
+		return false;
+	}
+	case FFA_MSG_WAIT_32:
+		/* Rule 2. Fall through. */
+	case FFA_ERROR_32:
+		/* Rule 3. */
+		*next_state = VCPU_STATE_WAITING;
+		return true;
+	case FFA_YIELD_32:
+		/* Rule 4. Fall through. */
+	case FFA_RUN_32:
+		/* Rule 6. Fall through. */
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+		/* Rule 5. Fall through. */
+	default:
+		/* Deny state transitions by default. */
+		return false;
+	}
+}
+
+/**
+ * Check if the runtime model (state machine) of the current SP supports the
+ * given FF-A ABI invocation. If yes, next_state represents the state to which
+ * the current vcpu would transition upon the FF-A ABI invocation as determined
+ * by the Partition runtime model.
+ */
+bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
+					     ffa_vm_id_t vm_id,
+					     ffa_vm_id_t receiver_vm_id,
+					     struct vcpu *vcpu, uint32_t func,
+					     enum vcpu_state *next_state)
+{
+	bool allowed = false;
+
+	assert(current != NULL);
+
+	/* Perform state transition checks only for Secure Partitions. */
+	if (!vm_id_is_current_world(vm_id)) {
+		return true;
+	}
+
+	switch (current->rt_model) {
+	case RTM_FFA_RUN:
+		allowed = plat_ffa_check_rtm_ffa_run(current, vcpu, func,
+						     next_state);
+		break;
+	case RTM_FFA_DIR_REQ:
+		allowed = plat_ffa_check_rtm_ffa_dir_req(
+			current, vcpu, receiver_vm_id, func, next_state);
+		break;
+	case RTM_SEC_INTERRUPT:
+		allowed = plat_ffa_check_rtm_sec_interrupt(current, vcpu, func,
+							   next_state);
+		break;
+	case RTM_SP_INIT:
+		allowed = plat_ffa_check_rtm_sp_init(vcpu, func, next_state);
+		break;
+	default:
+		panic("Illegal Runtime Model specified by SP%x on CPU%x\n",
+		      current->vm->id, cpu_index(current->cpu));
+		allowed = false;
+		break;
+	}
+
+	if (!allowed) {
+		dlog_error("State transition denied\n");
+	}
+
+	return allowed;
+}
+
 /**
  * Check validity of a FF-A direct message request.
  */

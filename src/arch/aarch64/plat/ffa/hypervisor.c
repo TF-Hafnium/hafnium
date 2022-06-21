@@ -940,3 +940,36 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 
 	return false;
 }
+
+bool plat_ffa_check_runtime_state_transition(
+	struct vcpu *current, ffa_vm_id_t vm_id, ffa_vm_id_t receiver_vm_id,
+	struct vcpu *receiver_vcpu, uint32_t func, enum vcpu_state *next_state)
+{
+	(void)vm_id;
+	(void)receiver_vm_id;
+	(void)receiver_vcpu;
+
+	switch (func) {
+	case FFA_YIELD_32:
+		/* Check if a direct message is ongoing. */
+		if (current->direct_request_origin_vm_id != HF_INVALID_VM_ID) {
+			return false;
+		}
+
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_RUN_32:
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	case FFA_MSG_WAIT_32:
+		/* Fall through. */
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+		*next_state = VCPU_STATE_WAITING;
+		return true;
+	default:
+		return false;
+	}
+}

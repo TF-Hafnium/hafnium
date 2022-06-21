@@ -289,3 +289,14 @@ void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
  * the virtual FF-A instance.
  */
 bool plat_ffa_is_secondary_ep_register_supported(void);
+
+/**
+ * Perform checks for the state transition being requested by the Partition
+ * based on it's runtime model and return false if an illegal transition is
+ * being performed.
+ */
+bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
+					     ffa_vm_id_t vm_id,
+					     ffa_vm_id_t receiver_vm_id,
+					     struct vcpu *vcpu, uint32_t func,
+					     enum vcpu_state *next_state);
