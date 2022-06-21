@@ -204,8 +204,8 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->messaging_method =
 			manifest_vm->partition.messaging_method;
 
-		vm_locked.vm->managed_exit =
-			manifest_vm->partition.managed_exit;
+		vm_locked.vm->ns_interrupts_action =
+			manifest_vm->partition.ns_interrupts_action;
 
 		vm_locked.vm->notifications.enabled =
 			manifest_vm->partition.notification_support;

@@ -216,7 +216,12 @@ struct vm {
 	} boot_info;
 
 	uint8_t messaging_method;
-	bool managed_exit;
+
+	/**
+	 * Action specified by a Partition through the manifest in response to
+	 * non secure interrupt.
+	 */
+	uint8_t ns_interrupts_action;
 	struct vm *next_boot;
 
 	/**

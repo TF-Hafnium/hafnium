@@ -243,7 +243,7 @@ class ManifestDtBuilder
 		Property("xlat-granule", "<0>");
 		Property("boot-order", "<0>");
 		Property("messaging-method", "<4>");
-		BooleanProperty("managed-exit");
+		Property("ns-interrupts-action", "<1>");
 		return *this;
 	}
 
@@ -738,6 +738,7 @@ TEST_F(manifest, ffa_not_compatible)
 		.Property("entrypoint-offset", "<0x00002000>")
 		.Property("xlat-granule", "<0>")
 		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<1>")
 		.Build();
 	/* clang-format on */
 
@@ -781,6 +782,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<1>")
 		.Build();
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
@@ -799,6 +801,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 		.Property("xlat-granule", "<3>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<1>")
 		.Build();
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
@@ -817,6 +820,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<0>")
 		.Build();
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
@@ -835,6 +839,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<0>")
 		.Build();
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
@@ -853,10 +858,29 @@ TEST_F(manifest, ffa_validate_sanity_check)
 		.Property("xlat-granule", "<0>")
 		.Property("boot-order", "<0>")
 		.Property("messaging-method", "<16>")
+		.Property("ns-interrupts-action", "<0>")
 		.Build();
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
+
+	/* Incompatible NS interrupt action */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<4>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_ILLEGAL_NS_ACTION);
 }
 
 TEST_F(manifest, ffa_validate_rxtx_info)
@@ -1307,7 +1331,7 @@ TEST_F(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].partition.boot_order, 0);
 	ASSERT_EQ(m.vm[0].partition.messaging_method,
 		  FFA_PARTITION_INDIRECT_MSG);
-	ASSERT_EQ(m.vm[0].partition.managed_exit, true);
+	ASSERT_EQ(m.vm[0].partition.ns_interrupts_action, NS_ACTION_ME);
 	ASSERT_EQ(m.vm[0].partition.mem_regions[0].base_address, 0x7100000);
 	ASSERT_EQ(m.vm[0].partition.mem_regions[0].page_count, 4);
 	ASSERT_EQ(m.vm[0].partition.mem_regions[0].attributes, 3);

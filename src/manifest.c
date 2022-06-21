@@ -785,6 +785,7 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	struct string mem_region_node_name = STRING_INIT("memory-regions");
 	struct string dev_region_node_name = STRING_INIT("device-regions");
 	struct string boot_info_node_name = STRING_INIT("boot-info");
+	bool managed_exit_field_present = false;
 
 	if (!fdt_find_node(fdt, "/", &root)) {
 		return MANIFEST_ERROR_NO_ROOT_NODE;
@@ -870,9 +871,45 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 		       (uint8_t *)&vm->partition.messaging_method));
 	dlog_verbose("  Messaging method %u\n", vm->partition.messaging_method);
 
-	TRY(read_bool(&root, "managed-exit", &vm->partition.managed_exit));
-	if (vm->partition.managed_exit) {
-		dlog_verbose("  Managed Exit Supported\n");
+	TRY(read_bool(&root, "managed-exit", &managed_exit_field_present));
+
+	TRY(read_optional_uint8(
+		&root, "ns-interrupts-action", NS_ACTION_SIGNALED,
+		(uint8_t *)&vm->partition.ns_interrupts_action));
+
+	/*
+	 * An SP manifest can specify one of the fields listed below:
+	 * `managed-exit`: Introduced in FF-A v1.0 spec.
+	 * `ns-interrupts-action`: Introduced in FF-A v1.1 EAC0 spec.
+	 * If both are missing from the manifest, the default response is
+	 * NS_ACTION_SIGNALED.
+	 */
+	if (managed_exit_field_present) {
+		vm->partition.ns_interrupts_action = NS_ACTION_ME;
+	}
+
+	if (vm->partition.ns_interrupts_action != NS_ACTION_QUEUED &&
+	    vm->partition.ns_interrupts_action != NS_ACTION_ME &&
+	    vm->partition.ns_interrupts_action != NS_ACTION_SIGNALED) {
+		return MANIFEST_ILLEGAL_NS_ACTION;
+	}
+
+	dlog_verbose(
+		"NS Interrupts %s\n",
+		(vm->partition.ns_interrupts_action == NS_ACTION_QUEUED)
+			? "Queued"
+		: (vm->partition.ns_interrupts_action == NS_ACTION_SIGNALED)
+			? "Signaled"
+			: "Managed exit");
+
+	if (vm->partition.ns_interrupts_action == NS_ACTION_ME) {
+		/* Managed exit only supported by S_EL1 partitions. */
+		if (vm->partition.run_time_el != S_EL1) {
+			dlog_error(
+				"Managed exit cannot be supported by this "
+				"partition\n");
+			return MANIFEST_ILLEGAL_NS_ACTION;
+		}
 	}
 
 	TRY(read_bool(&root, "notification-support",
@@ -1139,6 +1176,9 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Arguments-list node should have at least one argument";
 	case MANIFEST_ERROR_INTERRUPT_ID_REPEATED:
 		return "Interrupt ID already assigned to another endpoint";
+	case MANIFEST_ILLEGAL_NS_ACTION:
+		return "Illegal value specidied for the field: Action in "
+		       "response to NS Interrupt";
 	}
 
 	panic("Unexpected manifest return code.");

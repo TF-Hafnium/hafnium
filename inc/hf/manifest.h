@@ -149,8 +149,8 @@ struct partition_manifest {
 
 	/** mandatory - direct/indirect msg or both */
 	uint8_t messaging_method;
-	/** optional */
-	bool managed_exit;
+	/** mandatory - action in response to non secure interrupt */
+	uint8_t ns_interrupts_action;
 	/** optional - receipt of notifications. */
 	bool notification_support;
 	/** optional */
@@ -228,6 +228,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_MEM_REGION_OVERLAP,
 	MANIFEST_ERROR_INVALID_MEM_PERM,
 	MANIFEST_ERROR_INTERRUPT_ID_REPEATED,
+	MANIFEST_ILLEGAL_NS_ACTION,
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,

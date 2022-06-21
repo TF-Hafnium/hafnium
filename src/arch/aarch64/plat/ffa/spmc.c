@@ -829,7 +829,7 @@ ffa_partition_properties_t plat_ffa_partition_properties(
 
 bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 {
-	return vm->managed_exit;
+	return (vm->ns_interrupts_action == NS_ACTION_ME);
 }
 
 struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)

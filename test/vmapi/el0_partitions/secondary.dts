@@ -22,4 +22,5 @@
 	entrypoint-offset = <0x0>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <7>; /* Direct and indirect messaging */
+	ns-interrupts-action = <0>; /* NS interrupts are queued */
 };

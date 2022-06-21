@@ -16,6 +16,12 @@
 
 #include "vmapi/hf/ffa.h"
 
+/** Action for non secure interrupt by SPMC. */
+#define NS_ACTION_QUEUED 0
+#define NS_ACTION_ME 1
+#define NS_ACTION_SIGNALED 2
+#define NS_ACTION_INVALID 3
+
 enum vcpu_state {
 	/** The vCPU is switched off. */
 	VCPU_STATE_OFF,
@@ -178,6 +184,13 @@ struct vcpu {
 	 * mode or Normal World scheduled mode.
 	 */
 	enum schedule_mode scheduling_mode;
+
+	/**
+	 * Present action taken by SP in response to a non secure interrupt
+	 * based on the precedence rules as specified in section 8.3.1.4 of
+	 * the FF-A v1.1 EAC0 spec.
+	 */
+	uint8_t present_action_ns_interrupts;
 
 	/** Partition Runtime Model. */
 	enum partition_runtime_model rt_model;
