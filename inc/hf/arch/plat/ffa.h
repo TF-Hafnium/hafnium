@@ -300,3 +300,7 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
 					     ffa_vm_id_t receiver_vm_id,
 					     struct vcpu *vcpu, uint32_t func,
 					     enum vcpu_state *next_state);
+
+void plat_ffa_wind_call_chain_ffa_direct_req(
+	struct vcpu_locked current_locked,
+	struct vcpu_locked receiver_vcpu_locked);

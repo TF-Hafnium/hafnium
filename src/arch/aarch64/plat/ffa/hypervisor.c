@@ -973,3 +973,12 @@ bool plat_ffa_check_runtime_state_transition(
 		return false;
 	}
 }
+
+void plat_ffa_wind_call_chain_ffa_direct_req(
+	struct vcpu_locked current_locked,
+	struct vcpu_locked receiver_vcpu_locked)
+{
+	/* Calls chains not supported in the Hypervisor/VMs. */
+	(void)current_locked;
+	(void)receiver_vcpu_locked;
+}

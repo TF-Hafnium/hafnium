@@ -2599,6 +2599,9 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	assert(next_state == VCPU_STATE_BLOCKED);
 	current->state = VCPU_STATE_BLOCKED;
 
+	plat_ffa_wind_call_chain_ffa_direct_req(vcpus_locked.vcpu2,
+						vcpus_locked.vcpu1);
+
 	/* Switch to receiver vCPU targeted to by direct msg request */
 	*next = receiver_vcpu;
 

@@ -470,3 +470,11 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
 
 	return true;
 }
+
+void plat_ffa_wind_call_chain_ffa_direct_req(
+	struct vcpu_locked current_locked,
+	struct vcpu_locked receiver_vcpu_locked)
+{
+	(void)current_locked;
+	(void)receiver_vcpu_locked;
+}

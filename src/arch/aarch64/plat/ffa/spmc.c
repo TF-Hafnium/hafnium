@@ -1875,3 +1875,32 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 
 	return false;
 }
+
+/*
+ * Start winding the call chain or continue to wind the present one upon the
+ * invocation of FFA_MSG_SEND_DIRECT_REQ ABI.
+ */
+void plat_ffa_wind_call_chain_ffa_direct_req(
+	struct vcpu_locked current_locked,
+	struct vcpu_locked receiver_vcpu_locked)
+{
+	struct vcpu *current = current_locked.vcpu;
+	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
+	ffa_vm_id_t sender_vm_id = current->vm->id;
+
+	CHECK(receiver_vcpu->scheduling_mode == NONE);
+	CHECK(receiver_vcpu->call_chain.prev_node == NULL);
+	CHECK(receiver_vcpu->call_chain.next_node == NULL);
+	CHECK(receiver_vcpu->rt_model == RTM_NONE);
+
+	receiver_vcpu->rt_model = RTM_FFA_DIR_REQ;
+
+	if (!vm_id_is_current_world(sender_vm_id)) {
+		/* Start of NWd scheduled call chain. */
+		receiver_vcpu->scheduling_mode = NWD_MODE;
+	} else {
+		/* Adding a new node to an existing call chain. */
+		vcpu_call_chain_extend(current, receiver_vcpu);
+		receiver_vcpu->scheduling_mode = current->scheduling_mode;
+	}
+}
