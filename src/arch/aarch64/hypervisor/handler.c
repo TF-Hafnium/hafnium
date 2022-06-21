@@ -1046,15 +1046,12 @@ struct vcpu *fiq_lower(void)
 		/* Resume current vCPU. */
 		return NULL;
 	}
-	/*
-	 * SP does not support managed exit. It is pre-empted and execution
-	 * handed back to the normal world through the FFA_INTERRUPT ABI. The
-	 * api_preempt() call is equivalent to calling api_switch_to_other_world
-	 * for current vCPU passing FFA_INTERRUPT. The SP can be resumed later
-	 * by FFA_RUN.
-	 */
-	return api_preempt(current_vcpu);
 
+	/*
+	 * Unwind Normal World Scheduled Call chain in response to NS
+	 * Interrupt.
+	 */
+	return plat_ffa_unwind_nwd_call_chain_interrupt(current_vcpu);
 #else
 	return irq_lower();
 #endif

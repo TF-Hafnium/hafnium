@@ -301,6 +301,7 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
 					     struct vcpu *vcpu, uint32_t func,
 					     enum vcpu_state *next_state);
 
+struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current);
 void plat_ffa_init_schedule_mode_ffa_run(struct vcpu *current,
 					 struct vcpu_locked target_locked);
 

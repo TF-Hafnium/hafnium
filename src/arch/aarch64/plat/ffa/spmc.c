@@ -1876,6 +1876,71 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 	return false;
 }
 
+struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
+{
+	struct vcpu *next;
+	struct vcpu_locked current_vcpu_locked;
+	struct vcpu_locked next_vcpu_locked;
+	struct ffa_value ret = {
+		.func = FFA_INTERRUPT_32,
+		.arg1 = ffa_vm_vcpu(current_vcpu->vm->id,
+				    vcpu_index(current_vcpu)),
+	};
+
+	/*
+	 * The action specified by SP in its manifest is ``Non-secure interrupt
+	 * is signaled``. Refer to section 8.2.4 rules and guidelines bullet 4.
+	 * Hence, the call chain starts unwinding. The current vCPU must have
+	 * been a part of NWd scheduled call chain. Therefore, it is pre-empted
+	 * and execution is either handed back to the normal world or to the
+	 * previous SP vCPU in the call chain through the FFA_INTERRUPT ABI.
+	 * The api_preempt() call is equivalent to calling
+	 * api_switch_to_other_world for current vCPU passing FFA_INTERRUPT. The
+	 * SP can be resumed later by FFA_RUN.
+	 */
+	CHECK(current_vcpu->scheduling_mode == NWD_MODE);
+	assert(current_vcpu->call_chain.next_node == NULL);
+
+	if (current_vcpu->call_chain.prev_node == NULL) {
+		/* End of NWd scheduled call chain */
+		return api_preempt(current_vcpu);
+	}
+
+	next = current_vcpu->call_chain.prev_node;
+	CHECK(next != NULL);
+
+	/* Removing a node from an existing call chain. */
+	current_vcpu_locked = vcpu_lock(current_vcpu);
+	current_vcpu->call_chain.prev_node = NULL;
+	current_vcpu->state = VCPU_STATE_PREEMPTED;
+
+	/*
+	 * SPMC applies the runtime model till when the vCPU transitions from
+	 * running to waiting state. Moreover, the SP continues to remain in
+	 * its CPU cycle allocation mode. Hence, rt_model and scheduling_mode
+	 * are not changed here.
+	 */
+
+	vcpu_unlock(&current_vcpu_locked);
+
+	/* Lock next vcpu. */
+	next_vcpu_locked = vcpu_lock(next);
+	assert(next->state == VCPU_STATE_BLOCKED);
+	next->state = VCPU_STATE_RUNNING;
+	assert(next->call_chain.next_node == current_vcpu);
+	next->call_chain.next_node = NULL;
+
+	/* Mark the registers as unavailable now. */
+	assert(next->regs_available);
+	next->regs_available = false;
+
+	/* Set the return value for the target VM. */
+	arch_regs_set_retval(&next->regs, ret);
+	vcpu_unlock(&next_vcpu_locked);
+
+	return next;
+}
+
 /*
  * Initialize the scheduling mode and/or Partition Runtime model of the target
  * SP upon being resumed by an FFA_RUN ABI.
