@@ -635,7 +635,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_notification_info_get(current);
 		return true;
 	case FFA_INTERRUPT_32:
-		*args = plat_ffa_delegate_ffa_interrupt(current, next);
+		*args = plat_ffa_handle_secure_interrupt(current, next, true);
 		return true;
 	case FFA_CONSOLE_LOG_32:
 	case FFA_CONSOLE_LOG_64:
@@ -985,7 +985,7 @@ struct vcpu *irq_lower(void)
 #if SECURE_WORLD == 1
 	struct vcpu *next = NULL;
 
-	plat_ffa_secure_interrupt(current(), &next);
+	plat_ffa_handle_secure_interrupt(current(), &next, false);
 
 	/*
 	 * Since we are in interrupt context, set the bit for the

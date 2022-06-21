@@ -774,11 +774,13 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 	return true;
 }
 
-struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
-						 struct vcpu **next)
+struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
+						  struct vcpu **next,
+						  bool from_normal_world)
 {
 	(void)current;
 	(void)next;
+	(void)from_normal_world;
 
 	/*
 	 * SPMD uses FFA_INTERRUPT ABI to convey secure interrupt to

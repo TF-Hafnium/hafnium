@@ -866,7 +866,7 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 		goto out;
 	}
 
-	if ((current->vm->id & HF_VM_ID_WORLD_MASK) != 0) {
+	if (vm_id_is_current_world(current->vm->id)) {
 		/*
 		 * Refer FF-A v1.1 Beta0 section 8.3.
 		 * SPMC treats the first invocation of FFA_RUN as interrupt
@@ -875,13 +875,6 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 		 * to resume the vCPU of preempted SP through this FFA_RUN.
 		 */
 		if (current->processing_secure_interrupt) {
-			/*
-			 * Refer FF-A v1.1 Beta0 section 8.3 Rule 2. FFA_RUN
-			 * ABI is used for secure interrupt signal completion by
-			 * SP if it was in BLOCKED state.
-			 */
-			CHECK(current->state == VCPU_STATE_BLOCKED);
-
 			CHECK(target_vcpu == current->preempted_vcpu);
 			/*
 			 * This flag should not have been set by SPMC when it
@@ -1043,23 +1036,7 @@ out:
 }
 
 /**
- * TODO: As of now, we did not implement support for checking legal state
- * transitions defined under the partition runtime models defined in the
- * FF-A v1.1-Beta0 spec.
- * Moreover, support for scheduling models has not been implemented. However,
- * the current implementation loosely maps to the following valid actions for
- * a S-EL1 Partition as described in Table 8.14 of FF-A v1.1 Beta0 spec with
- * the exception that Other S-Int are unconditionally queued during secure
- * interrupt handling.
- * Refer Table 8.5 for detailed description of actions.
-
- Runtime Model		NS-Int			Self S-Int	Other S-Int
- --------------------------------------------------------------------------
- Message Processing	Signalable with ME	Signalable	Signalable
- Interrupt Handling	Queued			Queued		Queued
- --------------------------------------------------------------------------
-
- * Note 1: TODO: The current design makes the assumption that the target vCPU
+ * TODO: The current design makes the assumption that the target vCPU
  * of a secure interrupt is pinned to the same physical CPU on which the
  * secure interrupt triggered. The target vCPU has to be resumed on the current
  * CPU in order for it to service the virtual interrupt. This design limitation
@@ -1120,8 +1097,12 @@ static struct vcpu_locked plat_ffa_secure_interrupt_prepare(
 	return target_vcpu_locked;
 }
 
-static void plat_ffa_signal_secure_interrupt(
-	struct vcpu_locked target_vcpu_locked, uint32_t id, struct vcpu **next)
+/**
+ * Helper for secure interrupt signaling for a S-EL1 SP.
+ */
+static void plat_ffa_signal_secure_interrupt_sel1(
+	struct vcpu *current, struct vcpu_locked target_vcpu_locked,
+	uint32_t id, struct vcpu **next, bool from_normal_world)
 {
 	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
 	struct ffa_value args = {
@@ -1133,33 +1114,48 @@ static void plat_ffa_signal_secure_interrupt(
 	 * vCPU cannot be resumed, SPMC resumes current vCPU.
 	 */
 	*next = target_vcpu;
+	(void)current;
 
+	/* Secure interrupt signaling and queuing for S-EL1 SP. */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
-		/* FF-A v1.1 Beta0 section 7.4 bullet 1 and Table 8.2 case 1. */
+		/* FF-A v1.1 EAC0 Table 8.2 case 1. */
 		args.arg1 = id;
 		break;
 	case VCPU_STATE_BLOCKED:
+		if (from_normal_world) {
+			/*
+			 * TODO: Current design has the following limitation.
+			 * All endpoints with multiple execution contexts have
+			 * their contexts pinned to corresponding PEs.
+			 * Assuming no UP migratable execution contexts, under
+			 * the current design, the target vCPU cannot be in
+			 * BLOCKED state.
+			 */
+			panic("Target vCPU cannot be in blocked state\n");
+		}
 		break;
 	case VCPU_STATE_PREEMPTED:
 		/*
-		 * The scenario in which vCPU of target SP is in PREEMPTED state
-		 * due to a Self S-Int has been handled separately in
-		 * plat_ffa_secure_interrupt() function.
-		 *
 		 * We do not resume a target vCPU that has been already
-		 * pre-empted by an interrupt or waiting for an
-		 * interrupt(WFI). We only pend the vIRQ for target SP
-		 * and continue to resume current vCPU.
+		 * pre-empted by an interrupt. Make the vIRQ pending for target
+		 * SP(i.e., queue the interrupt) and continue to resume current
+		 * vCPU. Refer to section 8.3.2.1 bullet 3 in the FF-A v1.1
+		 * EAC0 spec.
+		 *
+		 * The scenario in which vCPU of target SP is in
+		 * PREEMPTED state due to a Self S-Int has been handled
+		 * separately in the function
+		 * plat_ffa_handle_secure_interrupt_secure_world().
 		 */
 		*next = NULL;
-
 		/*
 		 * De-activate the interrupt. If not, it could trigger again
 		 * after resuming current vCPU.
 		 */
 		plat_interrupts_end_of_interrupt(id);
 		target_vcpu->secure_interrupt_deactivated = true;
+
 		/*
 		 * Refer the embedded comment in vcpu.h file for description of
 		 * this variable.
@@ -1167,33 +1163,26 @@ static void plat_ffa_signal_secure_interrupt(
 		target_vcpu->implicit_completion_signal = true;
 		return;
 	case VCPU_STATE_BLOCKED_INTERRUPT:
-		/* WFI is no-op for SP. Fall through*/
+		/* WFI is no-op for SP. Fall through. */
 	default:
 		/*
 		 * vCPU of Target SP cannot be in OFF/ABORTED state if it has
 		 * to handle secure interrupt.
-		 * TODO: Refer Note 1. We do not support signaling virtual
-		 * interrupt to a target vCPU that is in RUNNING state on
-		 * another physical CPU.
+		 * TODO: We do not support signaling virtual interrupt to a
+		 * target vCPU that is in RUNNING state on another physical CPU.
 		 */
-		panic("Secure interrupt cannot be signaled to target "
-		      "SP\n");
+		panic("Secure interrupt cannot be signaled to target SP\n");
 		break;
 	}
 
-	CHECK((*next)->regs_available);
-	arch_regs_set_retval(&((*next)->regs), args);
-
-	/*
-	 * Strictly speaking, we are about to resume target vCPU which means it
-	 * should move to RUNNING state. But, we do not modify the state as per
-	 * rules defined in section 7.4 of FF-A v1.1 Beta0 spec. This is because
-	 * we associate the state of vCPU with the mechanism used for interrupt
-	 * completion.
-	 */
+	CHECK(target_vcpu->regs_available);
+	arch_regs_set_retval(&target_vcpu->regs, args);
 
 	/* Mark the registers as unavailable now. */
-	(*next)->regs_available = false;
+	target_vcpu->regs_available = false;
+
+	/* We are about to resume target vCPU. */
+	target_vcpu->state = VCPU_STATE_RUNNING;
 }
 
 /**
@@ -1201,22 +1190,23 @@ static void plat_ffa_signal_secure_interrupt(
  * controller and inject the corresponding virtual interrupt to the target vCPU
  * for handling.
  */
-void plat_ffa_secure_interrupt(struct vcpu *current, struct vcpu **next)
+static struct ffa_value plat_ffa_handle_secure_interrupt_secure_world(
+	struct vcpu *current, struct vcpu **next)
 {
 	struct vcpu_locked target_vcpu_locked;
+	struct ffa_value ffa_ret = ffa_error(FFA_NOT_SUPPORTED);
 	uint32_t id;
 
-	/* Secure interrupt triggered while execution is in SWD. */
+	/* Secure interrupt triggered while execution is in SWd. */
 	CHECK((current->vm->id & HF_VM_ID_WORLD_MASK) != 0);
 	target_vcpu_locked = plat_ffa_secure_interrupt_prepare(current, &id);
 
 	if (current == target_vcpu_locked.vcpu) {
 		/*
 		 * A scenario where target vCPU is the current vCPU in secure
-		 * world. This is when a vCPU was preempted by a Self S-Int
+		 * world. This is when a vCPU gets preempted by a Self S-Int
 		 * while it was in RUNNING state.
 		 */
-		dlog_verbose("Resume current vCPU\n");
 		*next = NULL;
 
 		/* We have already locked vCPU. */
@@ -1233,7 +1223,8 @@ void plat_ffa_secure_interrupt(struct vcpu *current, struct vcpu **next)
 		 */
 		target_vcpu_locked.vcpu->preempted_vcpu = NULL;
 	} else {
-		plat_ffa_signal_secure_interrupt(target_vcpu_locked, id, next);
+		plat_ffa_signal_secure_interrupt_sel1(
+			current, target_vcpu_locked, id, next, false);
 		/*
 		 * In the scenario where target SP cannot be resumed for
 		 * processing interrupt, resume the current vCPU.
@@ -1248,6 +1239,8 @@ void plat_ffa_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	target_vcpu_locked.vcpu->processing_secure_interrupt = true;
 	target_vcpu_locked.vcpu->current_sec_interrupt_id = id;
 	vcpu_unlock(&target_vcpu_locked);
+
+	return ffa_ret;
 }
 
 /**
@@ -1255,8 +1248,8 @@ void plat_ffa_secure_interrupt(struct vcpu *current, struct vcpu **next)
  * the interrupt to SPMC through FFA_INTERRUPT_32 ABI synchronously using eret
  * conduit.
  */
-struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
-						 struct vcpu **next)
+static struct ffa_value plat_ffa_handle_secure_interrupt_from_normal_world(
+	struct vcpu *current, struct vcpu **next)
 {
 	struct ffa_value ffa_ret = ffa_error(FFA_NOT_SUPPORTED);
 	uint32_t id;
@@ -1271,7 +1264,8 @@ struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
 	}
 
 	target_vcpu_locked = plat_ffa_secure_interrupt_prepare(current, &id);
-	plat_ffa_signal_secure_interrupt(target_vcpu_locked, id, next);
+	plat_ffa_signal_secure_interrupt_sel1(current, target_vcpu_locked, id,
+					      next, true);
 
 	/*
 	 * current refers to other world. target must be a vCPU in the secure
@@ -1295,6 +1289,17 @@ struct ffa_value plat_ffa_delegate_ffa_interrupt(struct vcpu *current,
 	vcpu_unlock(&target_vcpu_locked);
 
 	return ffa_ret;
+}
+
+struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
+						  struct vcpu **next,
+						  bool from_normal_world)
+{
+	if (from_normal_world) {
+		return plat_ffa_handle_secure_interrupt_from_normal_world(
+			current, next);
+	}
+	return plat_ffa_handle_secure_interrupt_secure_world(current, next);
 }
 
 /**
@@ -1324,6 +1329,7 @@ struct ffa_value plat_ffa_normal_world_resume(struct vcpu *current,
 	/* Clear fields corresponding to secure interrupt handling. */
 	current->preempted_vcpu = NULL;
 	current->current_sec_interrupt_id = 0;
+	current->state = VCPU_STATE_WAITING;
 	vcpu_unlock(&current_locked);
 
 	/* Restore interrupt priority mask. */
@@ -1370,6 +1376,7 @@ struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
 	/* Clear fields corresponding to secure interrupt handling. */
 	current->preempted_vcpu = NULL;
 	current->current_sec_interrupt_id = 0;
+	current->state = VCPU_STATE_WAITING;
 
 	target_vcpu->state = VCPU_STATE_RUNNING;
 
@@ -1596,8 +1603,6 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 
 	/* Refer FF-A v1.1 Beta0 section 7.4 bullet 2. */
 	if (current->processing_secure_interrupt) {
-		CHECK(current->state == VCPU_STATE_WAITING);
-
 		/*
 		 * This flag should not have been set by SPMC when it signaled
 		 * the virtual interrupt to the SP while SP was in WAITING or
