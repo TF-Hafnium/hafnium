@@ -1614,7 +1614,15 @@ struct ffa_value plat_ffa_normal_world_resume(struct vcpu *current,
 	/* Clear fields corresponding to secure interrupt handling. */
 	current->preempted_vcpu = NULL;
 	current->current_sec_interrupt_id = 0;
+
+	/* SPMC scheduled call chain is completely unwound. */
+	assert(current->call_chain.prev_node == NULL);
+	assert(current->call_chain.next_node == NULL);
+	CHECK(current->scheduling_mode == SPMC_MODE);
+	current->scheduling_mode = NONE;
+	current->rt_model = RTM_NONE;
 	current->state = VCPU_STATE_WAITING;
+
 	vcpu_unlock(&current_locked);
 
 	/* Restore interrupt priority mask. */
@@ -1661,6 +1669,13 @@ struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
 	/* Clear fields corresponding to secure interrupt handling. */
 	current->preempted_vcpu = NULL;
 	current->current_sec_interrupt_id = 0;
+
+	/* SPMC scheduled call chain is completely unwound. */
+	assert(current->call_chain.prev_node == NULL);
+	assert(current->call_chain.next_node == NULL);
+	CHECK(current->scheduling_mode == SPMC_MODE);
+	current->scheduling_mode = NONE;
+	current->rt_model = RTM_NONE;
 	current->state = VCPU_STATE_WAITING;
 
 	target_vcpu->state = VCPU_STATE_RUNNING;
