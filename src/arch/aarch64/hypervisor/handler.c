@@ -1017,6 +1017,8 @@ struct vcpu *fiq_lower(void)
 	struct vcpu *current_vcpu = current();
 	int64_t ret;
 
+	assert(current_vcpu->vm->ns_interrupts_action != NS_ACTION_QUEUED);
+
 	if (plat_ffa_vm_managed_exit_supported(current_vcpu->vm)) {
 		uint8_t pmr = plat_interrupts_get_priority_mask();
 

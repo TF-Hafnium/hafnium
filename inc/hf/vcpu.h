@@ -192,6 +192,12 @@ struct vcpu {
 	 */
 	uint8_t present_action_ns_interrupts;
 
+	/**
+	 * If the action in response to a non secure interrupt is to queue it,
+	 * this field is used to save and restore the current priority mask.
+	 */
+	uint8_t mask_ns_interrupts;
+
 	/** Partition Runtime Model. */
 	enum partition_runtime_model rt_model;
 };
