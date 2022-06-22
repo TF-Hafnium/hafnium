@@ -1346,13 +1346,35 @@ static void plat_ffa_signal_secure_interrupt_sel1(
 	 * vCPU cannot be resumed, SPMC resumes current vCPU.
 	 */
 	*next = target_vcpu;
-	(void)current;
 
 	/* Secure interrupt signaling and queuing for S-EL1 SP. */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
 		/* FF-A v1.1 EAC0 Table 8.2 case 1. */
 		args.arg1 = id;
+
+		/*
+		 * Only one SPMC scheduled call chain can be running in SWd on
+		 * a given PE, since the current implementation does not allow
+		 * secure interrupt prioritization. A SPMC scheduled mode call
+		 * chain can only start when the target vCPU is in the waiting
+		 * state.
+		 */
+		assert(target_vcpu->scheduling_mode == NONE);
+		assert(target_vcpu->call_chain.prev_node == NULL);
+		assert(target_vcpu->call_chain.next_node == NULL);
+		assert(target_vcpu->rt_model == RTM_NONE);
+
+		target_vcpu->scheduling_mode = SPMC_MODE;
+		target_vcpu->rt_model = RTM_SEC_INTERRUPT;
+
+		/*
+		 * TODO: Ideally, we have to mask non-secure interrupts here
+		 * since the spec mandates that SPMC should make sure SPMC
+		 * scheduled call chain cannot be preempted by a non-secure
+		 * interrupt. However, our current design takes care of it
+		 * implicitly.
+		 */
 		break;
 	case VCPU_STATE_BLOCKED:
 		if (from_normal_world) {
@@ -1365,8 +1387,25 @@ static void plat_ffa_signal_secure_interrupt_sel1(
 			 * BLOCKED state.
 			 */
 			panic("Target vCPU cannot be in blocked state\n");
+		} else {
+			/*
+			 * Under the current design, there is only one possible
+			 * scenario in which target vCPU is in blocked state:
+			 * both the preempted and target vCPU are in NWd
+			 * scheduled call chain and is described in scenario 1
+			 * of Table 8.4 in EAC0 spec. SPMC leaves all
+			 * intermediate execution contexts in blocked state and
+			 * resumes the target vCPU for handling secure
+			 * interrupt.
+			 */
+			assert(current->scheduling_mode == NWD_MODE);
+			assert(target_vcpu->scheduling_mode == NWD_MODE);
+
+			/* Both must be part of the same call chain. */
+			assert(is_predecessor_in_call_chain(current,
+							    target_vcpu));
+			break;
 		}
-		break;
 	case VCPU_STATE_PREEMPTED:
 		/*
 		 * We do not resume a target vCPU that has been already
@@ -1381,6 +1420,20 @@ static void plat_ffa_signal_secure_interrupt_sel1(
 		 * plat_ffa_handle_secure_interrupt_secure_world().
 		 */
 		*next = NULL;
+
+		if (from_normal_world) {
+			/*
+			 * The target vCPU must have been preempted by a non
+			 * secure interrupt. It could not have been preempted by
+			 * a secure interrupt as current SPMC implementation
+			 * does not allow secure interrupt prioritization.
+			 * Moreover, the target vCPU should have been in Normal
+			 * World scheduled mode as SPMC scheduled mode call
+			 * chain cannot be preempted by a non secure interrupt.
+			 */
+			CHECK(target_vcpu->scheduling_mode == NWD_MODE);
+		}
+
 		/*
 		 * De-activate the interrupt. If not, it could trigger again
 		 * after resuming current vCPU.
