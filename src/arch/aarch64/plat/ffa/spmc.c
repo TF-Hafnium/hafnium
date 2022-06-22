@@ -1870,6 +1870,7 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 	 * to indicate successful initialization to SPMC.
 	 */
 	sl_lock(&current->lock);
+	current->scheduling_mode = NONE;
 	current->rt_model = RTM_NONE;
 	sl_unlock(&current->lock);
 
