@@ -1056,7 +1056,6 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 			 ffa_vcpu_index_t vcpu_idx, struct ffa_value *run_ret,
 			 struct vcpu **next)
 {
-	(void)next;
 	/*
 	 * Under the Partition runtime model specified in FF-A v1.1-Beta0 spec,
 	 * SP can invoke FFA_RUN to resume target SP.
@@ -1100,14 +1099,25 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 
 	if (vm_id_is_current_world(current->vm->id)) {
 		/*
-		 * Refer FF-A v1.1 Beta0 section 8.3.
-		 * SPMC treats the first invocation of FFA_RUN as interrupt
-		 * completion signal when interrupt handling is ongoing.
-		 * TODO: Current design limitation. We expect the current SP
-		 * to resume the vCPU of preempted SP through this FFA_RUN.
+		 * Refer FF-A v1.1 EAC0 spec section 8.3.2.2.1
+		 * Signaling an Other S-Int in blocked state
 		 */
 		if (current->processing_secure_interrupt) {
-			CHECK(target_vcpu == current->preempted_vcpu);
+			/*
+			 * After the target SP execution context has handled
+			 * the interrupt, it uses the FFA_RUN ABI to resume
+			 * the request due to which it had entered the blocked
+			 * state earlier.
+			 * Refer Figure 8.13 Scenario 1: Implementation choice:
+			 * SPMC left all intermediate SP execution contexts in
+			 * blocked state. Hence, SPMC now bypasses the
+			 * intermediate these execution contexts and resumes the
+			 * SP execution context that was originally preempted.
+			 */
+			if (target_vcpu != current->preempted_vcpu) {
+				dlog_verbose("Skipping intermediate vCPUs\n");
+				*next = current->preempted_vcpu;
+			}
 			/*
 			 * This flag should not have been set by SPMC when it
 			 * signaled the virtual interrupt to the SP while SP was
@@ -1133,18 +1143,31 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 
 	/* Check if a vCPU of SP is being resumed. */
 	if ((target_vm_id & HF_VM_ID_WORLD_MASK) != 0) {
-		/* Check if the target vCPU is processing secure interrupt. */
-		if (target_vcpu->processing_secure_interrupt) {
+		if (!target_vcpu->is_bootstrapped) {
+			target_vcpu->rt_model = RTM_SP_INIT;
+		} else if (target_vcpu->processing_secure_interrupt) {
 			/*
-			 * When the target vCPU of a SP is in preempted state,
+			 * Consider the following case: a secure interrupt
+			 * triggered in normal world and is targeted to an SP
+			 * which got preempted by a non secure interrupt.
+			 * Since the vCPU of target SP is in preempted state,
 			 * SPMC would have injected a virtual interrupt and set
 			 * the appropriate flags after de-activating the secure
-			 * physical interrupt.
+			 * physical interrupt. SPMC did not resume the target
+			 * vCPU at that moment.
 			 */
 			assert(target_vcpu->state == VCPU_STATE_PREEMPTED);
 			assert(vcpu_interrupt_count_get(vcpus_locked.vcpu2) >
 			       0);
 			assert(target_vcpu->secure_interrupt_deactivated);
+
+			/*
+			 * This check is to ensure a preempted SP vCPU could
+			 * only be a part of NWd scheduled call chain. FF-A v1.1
+			 * spec prohibits an SPMC scheduled call chain to be
+			 * preempted by a non secure interrupt.
+			 */
+			CHECK(target_vcpu->scheduling_mode == NWD_MODE);
 
 			/* Save current value of priority mask. */
 			priority_mask = plat_interrupts_get_priority_mask();
