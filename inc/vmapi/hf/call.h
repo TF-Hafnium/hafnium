@@ -18,6 +18,7 @@
  */
 int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
 struct ffa_value ffa_call(struct ffa_value args);
+void memcpy_s(void *dest, size_t destsz, const void *src, size_t count);
 
 /**
  * Returns the VM's own ID.
@@ -499,4 +500,26 @@ static inline struct ffa_value ffa_mem_perm_set(uint64_t base_va,
 					   .arg1 = base_va,
 					   .arg2 = page_count,
 					   .arg3 = mem_perm});
+}
+
+static inline struct ffa_value ffa_console_log_32(const char *src, size_t size)
+{
+	struct ffa_value req = {
+		.func = FFA_CONSOLE_LOG_32,
+		.arg1 = size,
+	};
+	memcpy_s(&req.arg2, sizeof(uint32_t) * 6, src, size);
+
+	return ffa_call(req);
+}
+
+static inline struct ffa_value ffa_console_log_64(const char *src, size_t size)
+{
+	struct ffa_value req = {
+		.func = FFA_CONSOLE_LOG_64,
+		.arg1 = size,
+	};
+	memcpy_s(&req.arg2, sizeof(uint64_t) * 6, src, size);
+
+	return ffa_call(req);
 }

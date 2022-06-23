@@ -386,3 +386,35 @@ TEST(ffa_notifications, fails_info_get_from_sp)
 {
 	EXPECT_FFA_ERROR(ffa_notification_info_get(), FFA_NOT_SUPPORTED);
 }
+
+/*
+ * Validate FFA_CONSOLE_LOG sends a message.
+ */
+TEST(ffa_console_log, successfull_msg_send)
+{
+	const char msg_long[] = "This does not fit in 6x32 bits, only 6x64\n";
+	const char msg_short[] = "This fits in 6x32 bits\n";
+
+	EXPECT_EQ(ffa_console_log_32(msg_short, sizeof(msg_short)).func,
+		  FFA_SUCCESS_32);
+
+	EXPECT_EQ(ffa_console_log_64(msg_long, sizeof(msg_long)).func,
+		  FFA_SUCCESS_32);
+}
+
+/*
+ * Validate FFA_CONSOLE_LOG reports invalid parameters on inadequate message.
+ */
+TEST(ffa_console_log, invalid_parameters)
+{
+	/* Expecting INVALID_PARAMETERS on zero-length message */
+	struct ffa_value req = {
+		.func = FFA_CONSOLE_LOG_64,
+		.arg1 = 0,
+	};
+	EXPECT_FFA_ERROR(ffa_call(req), FFA_INVALID_PARAMETERS);
+
+	/* Expecting INVALID_PARAMETERS on length > payload message */
+	req.arg1 = 0xffff;
+	EXPECT_FFA_ERROR(ffa_call(req), FFA_INVALID_PARAMETERS);
+}
