@@ -22,6 +22,44 @@
 alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];
 static uint8_t retrieve_buffer[PAGE_SIZE * 2];
 
+static void update_mm_security_state(
+	struct ffa_composite_memory_region *composite,
+	struct ffa_memory_region *mem_region)
+{
+	/*
+	 * TODO: change function to NS bit from memory region.
+	 * As it stands it is a temporary hack to make things work for
+	 * memory sharing between worlds.
+	 */
+	uint32_t extra_attributes =
+		arch_mm_extra_attributes_from_vm(mem_region->sender);
+
+	if (extra_attributes != 0U) {
+		for (uint32_t i = 0; i < composite->constituent_count; i++) {
+			uint32_t mode;
+
+			if (!hftest_mm_get_mode(
+				    // NOLINTNEXTLINE(performance-no-int-to-ptr)
+				    (const void *)composite->constituents[i]
+					    .address,
+				    FFA_PAGE_SIZE * composite->constituents[i]
+							    .page_count,
+				    &mode)) {
+				FAIL("Couldn't get the mode of the "
+				     "composite.\n");
+			}
+
+			hftest_mm_identity_map(
+				// NOLINTNEXTLINE(performance-no-int-to-ptr)
+				(const void *)composite->constituents[i]
+					.address,
+				FFA_PAGE_SIZE *
+					composite->constituents[i].page_count,
+				mode | extra_attributes);
+		}
+	}
+}
+
 TEST_SERVICE(memory_increment)
 {
 	/* Loop, writing message to the shared memory. */
@@ -45,6 +83,8 @@ TEST_SERVICE(memory_increment)
 		ASSERT_NE(memory_region->receivers[0]
 				  .composite_memory_region_offset,
 			  0);
+
+		update_mm_security_state(composite, memory_region);
 
 		/* Allow the memory to be populated. */
 		EXPECT_EQ(ffa_yield().func, FFA_SUCCESS_32);
@@ -85,6 +125,8 @@ TEST_SERVICE(memory_increment_relinquish)
 		/* Allow the memory to be populated. */
 		EXPECT_EQ(ffa_yield().func, FFA_SUCCESS_32);
 
+		update_mm_security_state(composite, memory_region);
+
 		/* Increment each byte of memory. */
 		for (i = 0; i < PAGE_SIZE; ++i) {
 			++ptr[i];
@@ -123,6 +165,8 @@ TEST_SERVICE(memory_increment_check_mem_attr)
 		ASSERT_NE(memory_region->receivers[0]
 				  .composite_memory_region_offset,
 			  0);
+
+		update_mm_security_state(composite, memory_region);
 
 		/*
 		 * Validate retrieve response contains the memory attributes
@@ -216,6 +260,8 @@ TEST_SERVICE(ffa_memory_return)
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
 
+	update_mm_security_state(composite, memory_region);
+
 	/* Check that one has access to the shared region. */
 	for (i = 0; i < PAGE_SIZE; ++i) {
 		ptr[i]++;
@@ -265,6 +311,8 @@ TEST_SERVICE(ffa_check_upper_bound)
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[index].address;
 
+	update_mm_security_state(composite, memory_region);
+
 	/*
 	 * Check that we can't access out of bounds after the region sent to us.
 	 * This should trigger the exception handler.
@@ -299,6 +347,8 @@ TEST_SERVICE(ffa_check_lower_bound)
 	index = *(uint8_t *)composite->constituents[0].address;
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[index].address;
+
+	update_mm_security_state(composite, memory_region);
 
 	/*
 	 * Check that we can't access out of bounds before the region sent to
@@ -412,7 +462,6 @@ TEST_SERVICE(ffa_memory_receive)
 			(struct ffa_memory_region *)retrieve_buffer;
 		struct ffa_composite_memory_region *composite;
 		uint8_t *ptr;
-
 		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		retrieve_memory_from_message(recv_buf, send_buf, NULL,
@@ -420,6 +469,8 @@ TEST_SERVICE(ffa_memory_receive)
 		composite = ffa_memory_region_get_composite(memory_region, 0);
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint8_t *)composite->constituents[0].address;
+
+		update_mm_security_state(composite, memory_region);
 
 		ptr[0] = 'd';
 		ffa_yield();
@@ -495,6 +546,8 @@ TEST_SERVICE(ffa_memory_lend_relinquish_relend)
 		CHECK(composite != NULL);
 		constituents = composite->constituents;
 
+		update_mm_security_state(composite, memory_region);
+
 		/*
 		 * Check that we can read and write every page that was shared.
 		 */
@@ -543,6 +596,8 @@ TEST_SERVICE(ffa_memory_lend_relinquish)
 		constituents = composite->constituents;
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		first_ptr = (uint8_t *)constituents[0].address;
+
+		update_mm_security_state(composite, memory_region);
 
 		/*
 		 * Check that we can read and write every page that was shared.
@@ -593,6 +648,8 @@ TEST_SERVICE(ffa_memory_donate_relinquish)
 
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint8_t *)composite->constituents[0].address;
+
+		update_mm_security_state(composite, memory_region);
 
 		/* Check that we have access to the shared region. */
 		for (i = 0; i < PAGE_SIZE; ++i) {
@@ -720,6 +777,8 @@ TEST_SERVICE(ffa_memory_lend_relinquish_X)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint32_t *)constituents[0].address;
 
+		update_mm_security_state(composite, memory_region);
+
 		/*
 		 * Verify that the instruction in memory is the encoded RET
 		 * instruction.
@@ -799,6 +858,8 @@ TEST_SERVICE(ffa_memory_lend_relinquish_RW)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint8_t *)constituent_copy.address;
 
+		update_mm_security_state(composite, memory_region);
+
 		/* Check that we have read access. */
 		for (i = 0; i < PAGE_SIZE; ++i) {
 			EXPECT_EQ(ptr[i], 'b');
@@ -839,6 +900,8 @@ TEST_SERVICE(ffa_memory_lend_twice)
 
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)constituent_copy.address;
+
+	update_mm_security_state(composite, memory_region);
 
 	/* Check that we have read access. */
 	for (i = 0; i < PAGE_SIZE; ++i) {

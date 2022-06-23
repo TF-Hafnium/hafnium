@@ -11,7 +11,7 @@
 #include "test/hftest.h"
 
 /* Number of pages reserved for page tables. Increase if necessary. */
-#define PTABLE_PAGES 4
+#define PTABLE_PAGES 5
 
 /**
  * Start address space mapping at 0x1000 for the mm to create a L2 table to
@@ -66,6 +66,17 @@ bool hftest_mm_init(void)
 	arch_vm_mm_enable(ptable.root);
 
 	return true;
+}
+
+bool hftest_mm_get_mode(const void *base, size_t size, uint32_t *mode)
+{
+	vaddr_t start = va_from_ptr(base);
+	vaddr_t end = va_add(start, size);
+	struct mm_stage1_locked stage1_locked = hftest_mm_get_stage1();
+
+	assert(mode != NULL);
+
+	return mm_get_mode(stage1_locked.ptable, start, end, mode);
 }
 
 void hftest_mm_identity_map(const void *base, size_t size, uint32_t mode)
