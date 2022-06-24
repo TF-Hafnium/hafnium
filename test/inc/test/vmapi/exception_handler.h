@@ -25,5 +25,4 @@ void exception_handler_reset(void);
 void exception_handler_send_exception_count(void);
 
 int exception_handler_receive_exception_count(
-	const struct ffa_value *send_res,
 	const struct ffa_memory_region *recv_buf);

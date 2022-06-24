@@ -24,30 +24,47 @@ static int exception_handler_exception_count = 0;
  */
 void exception_handler_send_exception_count(void)
 {
-	void *send_buf = SERVICE_SEND_BUFFER();
+	struct ffa_partition_msg *exception_msg =
+		(struct ffa_partition_msg *)SERVICE_SEND_BUFFER();
 
 	dlog("Sending exception_count %d to primary VM\n",
 	     exception_handler_exception_count);
-	memcpy_s(send_buf, FFA_MSG_PAYLOAD_MAX,
+
+	/*
+	 * TODO: remove use of HF_PRIMARY_VM_ID, replace with a mechanism that
+	 * allows to detect the caller to a running test service. This may
+	 * eventually become to be another endpoint, different from primary VM.
+	 */
+	ffa_rxtx_header_init(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(int),
+			     &exception_msg->header);
+	memcpy_s(exception_msg->payload, FFA_MSG_PAYLOAD_MAX,
 		 (const void *)&exception_handler_exception_count,
 		 sizeof(exception_handler_exception_count));
-	EXPECT_EQ(ffa_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID,
-			       sizeof(exception_handler_exception_count), 0)
-			  .func,
-		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+	ffa_yield();
 }
 
 /**
  * Receives the number of exceptions handled.
  */
-int exception_handler_receive_exception_count(
-	const struct ffa_value *send_res,
-	const struct ffa_memory_region *recv_buf)
+int exception_handler_receive_exception_count(const void *recv_buf)
 {
-	int exception_count = *((const int *)recv_buf);
+	struct ffa_partition_msg *exception_msg =
+		(struct ffa_partition_msg *)recv_buf;
+	int exception_count = *((const int *)exception_msg->payload);
+	struct ffa_value ret;
+	ffa_notifications_bitmap_t fwk_notif;
 
-	EXPECT_EQ(send_res->func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_msg_send_size(*send_res), sizeof(exception_count));
+	/* Assert we received a message with the exception count. */
+	ret = ffa_notification_get(hf_vm_get_id(), 0,
+				   FFA_NOTIFICATION_FLAG_BITMAP_HYP |
+					   FFA_NOTIFICATION_FLAG_BITMAP_SPM);
+
+	fwk_notif = ffa_notification_get_from_framework(ret);
+	ASSERT_TRUE(is_ffa_hyp_buffer_full_notification(fwk_notif) ||
+		    is_ffa_spm_buffer_full_notification(fwk_notif));
+
+	EXPECT_EQ(exception_msg->header.size, sizeof(exception_count));
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	return exception_count;
 }

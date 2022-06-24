@@ -25,13 +25,11 @@ TEAR_DOWN(boot)
  */
 TEST(boot, memory_size)
 {
-	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM1, "boot_memory", mb.send);
 
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+	EXPECT_EQ(ffa_run(SERVICE_VM1, 0).func, FFA_YIELD_32);
 }
 
 /**
@@ -39,14 +37,12 @@ TEST(boot, memory_size)
  */
 TEST(boot, beyond_memory_size)
 {
-	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM1, "boot_memory_overrun", mb.send);
 
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
-		  1);
+	EXPECT_EQ(ffa_run(SERVICE_VM1, 0).func, FFA_YIELD_32);
+	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
 }
 
 /**
@@ -54,12 +50,10 @@ TEST(boot, beyond_memory_size)
  */
 TEST(boot, memory_before_image)
 {
-	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM1, "boot_memory_underrun", mb.send);
 
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
-		  1);
+	EXPECT_EQ(ffa_run(SERVICE_VM1, 0).func, FFA_YIELD_32);
+	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
 }

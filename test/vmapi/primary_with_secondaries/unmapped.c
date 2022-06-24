@@ -23,14 +23,12 @@ TEAR_DOWN(unmapped)
  */
 TEST(unmapped, data_unmapped)
 {
-	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM1, "data_unmapped", mb.send);
 
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
-		  1);
+	EXPECT_EQ(ffa_run(SERVICE_VM1, 0).func, FFA_YIELD_32);
+	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
 }
 
 /**
@@ -38,14 +36,12 @@ TEST(unmapped, data_unmapped)
  */
 TEST(unmapped, straddling_data_unmapped)
 {
-	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM1, "straddling_data_unmapped", mb.send);
 
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
-		  1);
+	EXPECT_EQ(ffa_run(SERVICE_VM1, 0).func, FFA_YIELD_32);
+	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
 }
 
 /**
@@ -53,12 +49,10 @@ TEST(unmapped, straddling_data_unmapped)
  */
 TEST(unmapped, instruction_unmapped)
 {
-	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 
 	SERVICE_SELECT(SERVICE_VM1, "instruction_unmapped", mb.send);
 
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(exception_handler_receive_exception_count(&run_res, mb.recv),
-		  1);
+	EXPECT_EQ(ffa_run(SERVICE_VM1, 0).func, FFA_YIELD_32);
+	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
 }
