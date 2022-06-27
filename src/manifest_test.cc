@@ -1026,6 +1026,37 @@ TEST_F(manifest, ffa_validate_dev_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MALFORMED_INTEGER_LIST);
+
+	/* Non-unique interrupt IDs */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device-0")
+				.Description("test-device-0")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("interrupts", "<2 3>")
+			.EndChild()
+			.StartChild("test-device-1")
+				.Description("test-device-1")
+				.Property("base-address", "<0x8200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("interrupts", "<1 3>, <2 5> ")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_INTERRUPT_ID_REPEATED);
+	/* Check valid interrupts were still mapped */
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[0].id, 2);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[0].attributes, 3);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[1].interrupts[0].id, 1);
+	ASSERT_EQ(m.vm[0].partition.dev_regions[1].interrupts[0].attributes, 3);
 }
 
 TEST_F(manifest, ffa_invalid_memory_region_attributes)
