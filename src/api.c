@@ -607,9 +607,8 @@ int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
 				    struct vcpu **next)
 {
 	struct vcpu *target_vcpu = target_locked.vcpu;
-	uint32_t intid_index = intid / INTERRUPT_REGISTER_BITS;
-	uint32_t intid_shift = intid % INTERRUPT_REGISTER_BITS;
-	uint32_t intid_mask = 1U << intid_shift;
+	uint32_t intid_index = INTID_INDEX(intid);
+	uint32_t intid_mask = INTID_MASK(1U, intid);
 	int64_t ret = 0;
 
 	/*
@@ -625,7 +624,7 @@ int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
 
 	/* Increment the count. */
 	if ((target_vcpu->interrupts.interrupt_type[intid_index] &
-	     intid_mask) == (INTERRUPT_TYPE_IRQ << intid_shift)) {
+	     intid_mask) == INTID_MASK(INTERRUPT_TYPE_IRQ, intid)) {
 		vcpu_irq_count_increment(target_locked);
 	} else {
 		vcpu_fiq_count_increment(target_locked);
@@ -1818,9 +1817,8 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 			     enum interrupt_type type, struct vcpu *current)
 {
 	struct vcpu_locked current_locked;
-	uint32_t intid_index = intid / INTERRUPT_REGISTER_BITS;
-	uint32_t intid_shift = intid % INTERRUPT_REGISTER_BITS;
-	uint32_t intid_mask = 1U << intid_shift;
+	uint32_t intid_index = INTID_INDEX(intid);
+	uint32_t intid_mask = INTID_MASK(1U, intid);
 
 	if (intid >= HF_NUM_INTIDS) {
 		return -1;
@@ -1845,7 +1843,7 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 		    intid_mask) {
 			if ((current->interrupts.interrupt_type[intid_index] &
 			     intid_mask) ==
-			    (INTERRUPT_TYPE_IRQ << intid_shift)) {
+			    INTID_MASK(INTERRUPT_TYPE_IRQ, intid)) {
 				vcpu_irq_count_increment(current_locked);
 			} else {
 				vcpu_fiq_count_increment(current_locked);
@@ -1862,7 +1860,7 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 		    intid_mask) {
 			if ((current->interrupts.interrupt_type[intid_index] &
 			     intid_mask) ==
-			    (INTERRUPT_TYPE_IRQ << intid_shift)) {
+			    INTID_MASK(INTERRUPT_TYPE_IRQ, intid)) {
 				vcpu_irq_count_decrement(current_locked);
 			} else {
 				vcpu_fiq_count_decrement(current_locked);

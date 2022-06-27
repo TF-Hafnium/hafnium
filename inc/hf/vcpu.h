@@ -9,12 +9,10 @@
 #pragma once
 
 #include "hf/addr.h"
+#include "hf/interrupt_desc.h"
 #include "hf/spinlock.h"
 
 #include "vmapi/hf/ffa.h"
-
-/** The number of bits in each element of the interrupt bitfields. */
-#define INTERRUPT_REGISTER_BITS 32
 
 enum vcpu_state {
 	/** The vCPU is switched off. */

@@ -38,6 +38,42 @@ static_assert((HF_OTHER_WORLD_ID > VM_ID_MAX) ||
 		      (HF_OTHER_WORLD_ID < HF_VM_ID_BASE),
 	      "TrustZone VM ID clashes with normal VM range.");
 
+/**
+ * A struct to keep track of fields that are allocated by partitions
+ * in the manifest.
+ */
+struct allocated_fields {
+	uint32_t intids[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
+};
+
+/**
+ * Ensure the allocated_fields struct will fit in the entry allocated from
+ * the mpool.
+ */
+static_assert(sizeof(struct allocated_fields) < MM_PPOOL_ENTRY_SIZE,
+	      "More space required for the allocated_fields struct.");
+static struct allocated_fields *allocated_fields;
+
+/**
+ * Allocates memory for the allocated fields struct in the given memory
+ * pool.
+ * Returns true if the memory is successfully allocated.
+ */
+static bool manifest_allocated_fields_init(struct mpool *ppool)
+{
+	allocated_fields = (struct allocated_fields *)mpool_alloc(ppool);
+	return allocated_fields != NULL;
+}
+
+/**
+ * Frees the memory used for the allocated field struct in the given
+ * memory pool.
+ */
+static void manifest_allocated_fields_deinit(struct mpool *ppool)
+{
+	mpool_free(ppool, allocated_fields);
+}
+
 static inline size_t count_digits(ffa_vm_id_t vm_id)
 {
 	size_t digits = 0;
@@ -450,6 +486,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 	struct uint32list_iter list;
 	uint16_t i = 0;
 	uint32_t j = 0;
+	uint32_t *allocated_intids = allocated_fields->intids;
 
 	dlog_verbose("  Partition Device Regions\n");
 
@@ -509,8 +546,25 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		j = 0;
 		while (uint32list_has_next(&list) &&
 		       j < PARTITION_MAX_INTERRUPTS_PER_DEVICE) {
+			uint32_t intid;
+			uint32_t intid_index;
+			uint32_t intid_mask;
+
 			TRY(uint32list_get_next(
 				&list, &dev_regions[i].interrupts[j].id));
+			intid = dev_regions[i].interrupts[j].id;
+			intid_index = INTID_INDEX(intid);
+			intid_mask = INTID_MASK(1U, intid);
+
+			dlog_verbose("        ID = %u\n", intid);
+
+			if ((allocated_intids[intid_index] & intid_mask) !=
+			    0U) {
+				return MANIFEST_ERROR_INTERRUPT_ID_REPEATED;
+			}
+
+			allocated_intids[intid_index] |= intid_mask;
+
 			if (uint32list_has_next(&list)) {
 				TRY(uint32list_get_next(&list,
 							&dev_regions[i]
@@ -520,8 +574,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 				return MANIFEST_ERROR_MALFORMED_INTEGER_LIST;
 			}
 
-			dlog_verbose("        ID = %u, attributes = %u\n",
-				     dev_regions[i].interrupts[j].id,
+			dlog_verbose("        attributes = %u\n",
 				     dev_regions[i].interrupts[j].attributes);
 			j++;
 		}
@@ -900,6 +953,12 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 
 	memset_s(manifest, sizeof(*manifest), 0, sizeof(*manifest));
 
+	/* Allocate space in the ppool for tracking the allocated fields. */
+	if (!manifest_allocated_fields_init(ppool)) {
+		panic("Unable to allocated space for allocated fields "
+		      "struct.\n");
+	}
+
 	if (!fdt_init_from_memiter(&fdt, manifest_fdt)) {
 		return MANIFEST_ERROR_FILE_SIZE; /* TODO */
 	}
@@ -971,6 +1030,12 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 	return MANIFEST_SUCCESS;
 }
 
+/* Free resources used when parsing the manifest. */
+void manifest_deinit(struct mpool *ppool)
+{
+	manifest_allocated_fields_deinit(ppool);
+}
+
 const char *manifest_strerror(enum manifest_return_code ret_code)
 {
 	switch (ret_code) {
@@ -1017,6 +1082,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Memory permission should be RO, RW or RX";
 	case MANIFEST_ERROR_ARGUMENTS_LIST_EMPTY:
 		return "Arguments-list node should have at least one argument";
+	case MANIFEST_ERROR_INTERRUPT_ID_REPEATED:
+		return "Interrupt ID already assigned to another endpoint";
 	}
 
 	panic("Unexpected manifest return code.");

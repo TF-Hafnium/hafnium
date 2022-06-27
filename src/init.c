@@ -167,6 +167,9 @@ void one_time_init(void)
 		panic("Unable to load VMs.");
 	}
 
+	/* Now manifest parsing has completed free the resourses used. */
+	manifest_deinit(&ppool);
+
 	if (!boot_flow_update(mm_stage1_locked, &manifest, &update, &cpio,
 			      &ppool)) {
 		panic("Unable to update boot flow.");

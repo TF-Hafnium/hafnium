@@ -27,6 +27,10 @@ using ::testing::Eq;
 using ::testing::IsEmpty;
 using ::testing::NotNull;
 
+using struct_manifest = struct manifest;
+
+constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 32;
+
 template <typename T>
 void exec(const char *program, const char *args[], const T &stdin,
 	  std::vector<char> *stdout)
@@ -308,29 +312,102 @@ class ManifestDtBuilder
 	std::stringstream dts_;
 };
 
-static enum manifest_return_code manifest_from_vec(struct manifest *m,
-						   const std::vector<char> &vec)
+class manifest : public ::testing::Test
 {
-	struct memiter it;
+	void SetUp() override
+	{
+		test_heap = std::make_unique<uint8_t[]>(TEST_HEAP_SIZE);
+		mpool_init(&ppool, MM_PPOOL_ENTRY_SIZE);
+		mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
+	}
+
+	std::unique_ptr<uint8_t[]> test_heap;
+
+       protected:
 	struct mpool ppool;
-	struct mm_stage1_locked mm_stage1_locked;
 
-	memiter_init(&it, vec.data(), vec.size());
-	return manifest_init(mm_stage1_locked, m, &it, &ppool);
-}
+       public:
+	/**
+	 * Class for programatically building a Partition package.
+	 */
+	class Partition_package
+	{
+	       public:
+		__attribute__((aligned(PAGE_SIZE))) struct sp_pkg_header spkg;
+		__attribute__((
+			aligned(PAGE_SIZE))) char manifest_dtb[PAGE_SIZE] = {};
+		__attribute__((aligned(PAGE_SIZE))) char img[PAGE_SIZE] = {};
 
-TEST(manifest, no_hypervisor_node)
+		Partition_package(const std::vector<char> &vec)
+		{
+			// Initialise header field
+			spkg.magic = SP_PKG_HEADER_MAGIC;
+			spkg.version = SP_PKG_HEADER_VERSION_2;
+			spkg.pm_offset = PAGE_SIZE;
+			spkg.pm_size = vec.size();
+			spkg.img_offset = 2 * PAGE_SIZE;
+			spkg.img_size = ARRAY_SIZE(img);
+
+			// Copy dtb into package
+			std::copy(vec.begin(), vec.end(), manifest_dtb);
+		}
+	};
+
+	enum manifest_return_code manifest_from_vec(
+		struct_manifest *m, const std::vector<char> &vec)
+	{
+		struct memiter it;
+		struct mm_stage1_locked mm_stage1_locked;
+		enum manifest_return_code ret;
+
+		memiter_init(&it, vec.data(), vec.size());
+		ret = manifest_init(mm_stage1_locked, m, &it, &ppool);
+
+		manifest_deinit(&ppool);
+		return ret;
+	}
+
+	enum manifest_return_code ffa_manifest_from_vec(
+		struct_manifest *m, const std::vector<char> &vec)
+	{
+		struct memiter it;
+		struct mm_stage1_locked mm_stage1_locked;
+		enum manifest_return_code ret;
+
+		Partition_package spkg(vec);
+
+		/* clang-format off */
+		std::vector<char> core_dtb = ManifestDtBuilder()
+			.StartChild("hypervisor")
+				.Compatible()
+				.StartChild("vm1")
+					.DebugName("primary_vm")
+					.FfaPartition()
+					.LoadAddress((uint64_t)&spkg)
+				.EndChild()
+			.EndChild()
+			.Build();
+		/* clang-format on */
+		memiter_init(&it, core_dtb.data(), core_dtb.size());
+		ret = manifest_init(mm_stage1_locked, m, &it, &ppool);
+
+		manifest_deinit(&ppool);
+		return ret;
+	}
+};
+
+TEST_F(manifest, no_hypervisor_node)
 {
-	struct manifest m;
+	struct_manifest m;
 	std::vector<char> dtb = ManifestDtBuilder().Build();
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE);
 }
 
-TEST(manifest, no_compatible_property)
+TEST_F(manifest, no_compatible_property)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -342,9 +419,9 @@ TEST(manifest, no_compatible_property)
 	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_ERROR_NOT_COMPATIBLE);
 }
 
-TEST(manifest, not_compatible)
+TEST_F(manifest, not_compatible)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -357,9 +434,9 @@ TEST(manifest, not_compatible)
 	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_ERROR_NOT_COMPATIBLE);
 }
 
-TEST(manifest, compatible_one_of_many)
+TEST_F(manifest, compatible_one_of_many)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -375,9 +452,9 @@ TEST(manifest, compatible_one_of_many)
 	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
 }
 
-TEST(manifest, no_vm_nodes)
+TEST_F(manifest, no_vm_nodes)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -409,9 +486,9 @@ static std::vector<char> gen_long_string_dtb(bool valid)
 	/* clang-format on */
 }
 
-TEST(manifest, long_string)
+TEST_F(manifest, long_string)
 {
-	struct manifest m;
+	struct_manifest m;
 	std::vector<char> dtb_last_valid = gen_long_string_dtb(true);
 	std::vector<char> dtb_first_invalid = gen_long_string_dtb(false);
 
@@ -420,9 +497,9 @@ TEST(manifest, long_string)
 		  MANIFEST_ERROR_STRING_TOO_LONG);
 }
 
-TEST(manifest, reserved_vm_id)
+TEST_F(manifest, reserved_vm_id)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -464,9 +541,9 @@ static std::vector<char> gen_vcpu_count_limit_dtb(uint32_t vcpu_count)
 	/* clang-format on */
 }
 
-TEST(manifest, vcpu_count_limit)
+TEST_F(manifest, vcpu_count_limit)
 {
-	struct manifest m;
+	struct_manifest m;
 	std::vector<char> dtb_last_valid = gen_vcpu_count_limit_dtb(UINT16_MAX);
 	std::vector<char> dtb_first_invalid =
 		gen_vcpu_count_limit_dtb(UINT16_MAX + 1);
@@ -479,9 +556,9 @@ TEST(manifest, vcpu_count_limit)
 		  MANIFEST_ERROR_INTEGER_OVERFLOW);
 }
 
-TEST(manifest, no_ramdisk_primary)
+TEST_F(manifest, no_ramdisk_primary)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -500,9 +577,9 @@ TEST(manifest, no_ramdisk_primary)
 	ASSERT_STREQ(string_data(&m.vm[0].primary.ramdisk_filename), "");
 }
 
-TEST(manifest, no_boot_address_primary)
+TEST_F(manifest, no_boot_address_primary)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -521,9 +598,9 @@ TEST(manifest, no_boot_address_primary)
 	ASSERT_EQ(m.vm[0].primary.boot_address, MANIFEST_INVALID_ADDRESS);
 }
 
-TEST(manifest, boot_address_primary)
+TEST_F(manifest, boot_address_primary)
 {
-	struct manifest m;
+	struct_manifest m;
 	const uint64_t addr = UINT64_C(0x12345678ABCDEFEF);
 
 	/* clang-format off */
@@ -560,9 +637,9 @@ static std::vector<char> gen_malformed_boolean_dtb(
 	/* clang-format on */
 }
 
-TEST(manifest, malformed_booleans)
+TEST_F(manifest, malformed_booleans)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	std::vector<char> dtb_false = gen_malformed_boolean_dtb("\"false\"");
 	std::vector<char> dtb_true = gen_malformed_boolean_dtb("\"true\"");
@@ -579,9 +656,9 @@ TEST(manifest, malformed_booleans)
 		  MANIFEST_ERROR_MALFORMED_BOOLEAN);
 }
 
-TEST(manifest, valid)
+TEST_F(manifest, valid)
 {
-	struct manifest m;
+	struct_manifest m;
 	struct manifest_vm *vm;
 
 	/* clang-format off */
@@ -646,59 +723,9 @@ TEST(manifest, valid)
 	ASSERT_FALSE(vm->smc_whitelist.permissive);
 }
 
-/**
- * Class for programatically building a Partition package.
- */
-class Partition_package
+TEST_F(manifest, ffa_not_compatible)
 {
-       public:
-	__attribute__((aligned(PAGE_SIZE))) struct sp_pkg_header spkg;
-	__attribute__((aligned(PAGE_SIZE))) char manifest_dtb[PAGE_SIZE] = {};
-	__attribute__((aligned(PAGE_SIZE))) char img[PAGE_SIZE] = {};
-
-	Partition_package(const std::vector<char> &vec)
-	{
-		// Initialise header field
-		spkg.magic = SP_PKG_HEADER_MAGIC;
-		spkg.version = SP_PKG_HEADER_VERSION_2;
-		spkg.pm_offset = PAGE_SIZE;
-		spkg.pm_size = vec.size();
-		spkg.img_offset = 2 * PAGE_SIZE;
-		spkg.img_size = ARRAY_SIZE(img);
-
-		// Copy dtb into package
-		std::copy(vec.begin(), vec.end(), manifest_dtb);
-	}
-};
-
-static enum manifest_return_code ffa_manifest_from_vec(
-	struct manifest *m, const std::vector<char> &vec)
-{
-	struct memiter it;
-	struct mpool ppool;
-	struct mm_stage1_locked mm_stage1_locked;
-
-	Partition_package spkg(vec);
-
-	/* clang-format off */
-	std::vector<char> core_dtb = ManifestDtBuilder()
-		.StartChild("hypervisor")
-			.Compatible()
-			.StartChild("vm1")
-				.DebugName("primary_vm")
-				.FfaPartition()
-				.LoadAddress((uint64_t)&spkg)
-			.EndChild()
-		.EndChild()
-		.Build();
-	/* clang-format on */
-	memiter_init(&it, core_dtb.data(), core_dtb.size());
-	return manifest_init(mm_stage1_locked, m, &it, &ppool);
-}
-
-TEST(manifest, ffa_not_compatible)
-{
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
@@ -718,9 +745,9 @@ TEST(manifest, ffa_not_compatible)
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
 }
 
-TEST(manifest, ffa_missing_property)
+TEST_F(manifest, ffa_missing_property)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
@@ -733,13 +760,13 @@ TEST(manifest, ffa_missing_property)
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 }
 
-TEST(manifest, ffa_validate_sanity_check)
+TEST_F(manifest, ffa_validate_sanity_check)
 {
 	/*
 	 * TODO: write test excluding all optional fields of the manifest, in
 	 * accordance with specification.
 	 */
-	struct manifest m;
+	struct_manifest m;
 
 	/* Incompatible version */
 	/* clang-format off */
@@ -832,9 +859,9 @@ TEST(manifest, ffa_validate_sanity_check)
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
 }
 
-TEST(manifest, ffa_validate_rxtx_info)
+TEST_F(manifest, ffa_validate_rxtx_info)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* Not Compatible */
 	/* clang-format off */
@@ -861,9 +888,9 @@ TEST(manifest, ffa_validate_rxtx_info)
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 }
 
-TEST(manifest, ffa_validate_mem_regions)
+TEST_F(manifest, ffa_validate_mem_regions)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* Not Compatible */
 	/* clang-format off */
@@ -936,9 +963,9 @@ TEST(manifest, ffa_validate_mem_regions)
 		  MANIFEST_ERROR_RXTX_SIZE_MISMATCH);
 }
 
-TEST(manifest, ffa_validate_dev_regions)
+TEST_F(manifest, ffa_validate_dev_regions)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* Not Compatible */
 	/* clang-format off */
@@ -1000,9 +1027,10 @@ TEST(manifest, ffa_validate_dev_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MALFORMED_INTEGER_LIST);
 }
-TEST(manifest, ffa_invalid_memory_region_attributes)
+
+TEST_F(manifest, ffa_invalid_memory_region_attributes)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
@@ -1042,9 +1070,9 @@ TEST(manifest, ffa_invalid_memory_region_attributes)
 		  MANIFEST_ERROR_INVALID_MEM_PERM);
 }
 
-TEST(manifest, ffa_invalid_device_region_attributes)
+TEST_F(manifest, ffa_invalid_device_region_attributes)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
@@ -1096,9 +1124,9 @@ TEST(manifest, ffa_invalid_device_region_attributes)
 		  MANIFEST_ERROR_INVALID_MEM_PERM);
 }
 
-TEST(manifest, ffa_valid)
+TEST_F(manifest, ffa_valid)
 {
-	struct manifest m;
+	struct_manifest m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()

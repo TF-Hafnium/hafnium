@@ -15,6 +15,15 @@
 #include "vmapi/hf/ffa.h"
 
 /**
+ * Macros for accessing the bitmap tracking interrupts.
+ */
+/* The number of bits in each element of the interrupt bitfields. */
+#define INTERRUPT_REGISTER_BITS 32
+
+#define INTID_INDEX(intid) (intid / INTERRUPT_REGISTER_BITS)
+#define INTID_MASK(v, intid) (v << (intid % INTERRUPT_REGISTER_BITS))
+
+/**
  * Attributes encoding in the manifest:
 
  * Field		Bit(s)
