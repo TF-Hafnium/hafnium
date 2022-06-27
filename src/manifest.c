@@ -44,15 +44,22 @@ static_assert((HF_OTHER_WORLD_ID > VM_ID_MAX) ||
  */
 struct allocated_fields {
 	uint32_t intids[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
+	struct {
+		uintptr_t base;
+		uintptr_t limit;
+	} mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS];
 };
-
 /**
- * Ensure the allocated_fields struct will fit in the entry allocated from
- * the mpool.
+ * Calculate the number of entries in the ppool that are required to
+ * store the allocated_fields struct.
  */
-static_assert(sizeof(struct allocated_fields) < MM_PPOOL_ENTRY_SIZE,
-	      "More space required for the allocated_fields struct.");
+static size_t allocated_fields_ppool_entries =
+	(align_up(sizeof(struct allocated_fields), MM_PPOOL_ENTRY_SIZE) /
+	 MM_PPOOL_ENTRY_SIZE);
+
 static struct allocated_fields *allocated_fields;
+/* Index used the track the number of memory regions allocted. */
+static size_t allocated_mem_regions_index = 0;
 
 /**
  * Allocates memory for the allocated fields struct in the given memory
@@ -61,7 +68,9 @@ static struct allocated_fields *allocated_fields;
  */
 static bool manifest_allocated_fields_init(struct mpool *ppool)
 {
-	allocated_fields = (struct allocated_fields *)mpool_alloc(ppool);
+	allocated_fields = (struct allocated_fields *)mpool_alloc_contiguous(
+		ppool, allocated_fields_ppool_entries, 1);
+
 	return allocated_fields != NULL;
 }
 
@@ -71,7 +80,17 @@ static bool manifest_allocated_fields_init(struct mpool *ppool)
  */
 static void manifest_allocated_fields_deinit(struct mpool *ppool)
 {
-	mpool_free(ppool, allocated_fields);
+	/**
+	 * Return the memory used for the allocated_fields struct to the
+	 * memory pool
+	 */
+	mpool_add_chunk(ppool, allocated_fields,
+			allocated_fields_ppool_entries);
+	/**
+	 * Reset the index used for tracking the number of memory regions
+	 * allocated.
+	 */
+	allocated_mem_regions_index = 0;
 }
 
 static inline size_t count_digits(ffa_vm_id_t vm_id)
@@ -391,6 +410,39 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
+static bool check_and_record_mem_regions(uintptr_t base_address,
+					 uint32_t page_count)
+{
+	uintptr_t limit = base_address + page_count * PAGE_SIZE;
+
+	for (size_t i = 0; i < allocated_mem_regions_index; i++) {
+		uintptr_t mem_region_base =
+			allocated_fields->mem_regions[i].base;
+		uintptr_t mem_region_limit =
+			allocated_fields->mem_regions[i].limit;
+
+		if ((base_address >= mem_region_base &&
+		     base_address < mem_region_limit) ||
+		    (limit < mem_region_limit && limit >= mem_region_base)) {
+			dlog_error(
+				"Overlapping memory regions\n"
+				"New Region %#x - %#x\n"
+				"Overlapping region %#x - %#x\n",
+				base_address, limit, mem_region_base,
+				mem_region_limit);
+			return false;
+		}
+	}
+
+	allocated_fields->mem_regions[allocated_mem_regions_index].base =
+		base_address;
+	allocated_fields->mem_regions[allocated_mem_regions_index].limit =
+		limit;
+	allocated_mem_regions_index++;
+
+	return true;
+}
+
 static enum manifest_return_code parse_ffa_memory_region_node(
 	struct fdt_node *mem_node, struct memory_region *mem_regions,
 	uint16_t *count, struct rx_tx *rxtx)
@@ -426,6 +478,11 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 				&mem_regions[i].page_count));
 		dlog_verbose("      Pages_count:  %u\n",
 			     mem_regions[i].page_count);
+
+		if (!check_and_record_mem_regions(mem_regions[i].base_address,
+						  mem_regions[i].page_count)) {
+			return MANIFEST_ERROR_MEM_REGION_OVERLAP;
+		}
 
 		TRY(read_uint32(mem_node, "attributes",
 				&mem_regions[i].attributes));
@@ -1078,6 +1135,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Device-region node should have at least one entry";
 	case MANIFEST_ERROR_RXTX_SIZE_MISMATCH:
 		return "RX and TX buffers should be of same size";
+	case MANIFEST_ERROR_MEM_REGION_OVERLAP:
+		return "Memory region overlaps with one already allocated";
 	case MANIFEST_ERROR_INVALID_MEM_PERM:
 		return "Memory permission should be RO, RW or RX";
 	case MANIFEST_ERROR_ARGUMENTS_LIST_EMPTY:
