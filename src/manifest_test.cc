@@ -931,6 +931,82 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 
+	/* Overlapping memory regions */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("base-address", "<0x7301000>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("base-address", "<0x7301FFF>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+
 	/* Different RXTX buffer sizes */
 	/* clang-format off */
 	dtb = ManifestDtBuilder()
@@ -1191,7 +1267,7 @@ TEST_F(manifest, ffa_valid)
 			.Label("tx")
 			.StartChild("tx")
 				.Description("tx-buffer")
-				.Property("base-address", "<0x7310000>")
+				.Property("base-address", "<0x7301000>")
 				.Property("pages-count", "<1>")
 				.Property("attributes", "<3>")
 			.EndChild()
@@ -1240,7 +1316,7 @@ TEST_F(manifest, ffa_valid)
 	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->base_address, 0x7300000);
 	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->page_count, 1);
 	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->attributes, 1);
-	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->base_address, 0x7310000);
+	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->base_address, 0x7301000);
 	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->page_count, 1);
 	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->attributes, 3);
 	ASSERT_EQ(m.vm[0].partition.dev_regions[0].base_address, 0x7400000);
