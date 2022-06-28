@@ -2467,14 +2467,18 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		      "be checked before this point.");
 	}
 
-	/*
-	 * Ensure receiver's attributes are compatible with how Hafnium maps
-	 * memory: Normal Memory, Inner shareable, Write-Back Read-Allocate
-	 * Write-Allocate Cacheable.
-	 */
-	ret = ffa_memory_attributes_validate(retrieve_request->attributes);
-	if (ret.func != FFA_SUCCESS_32) {
-		goto out;
+	if (ffa_get_memory_type_attr(retrieve_request->attributes) !=
+	    FFA_MEMORY_NOT_SPECIFIED_MEM) {
+		/*
+		 * Ensure receiver's attributes are compatible with how Hafnium
+		 * maps memory: Normal Memory, Inner shareable, Write-Back
+		 * Read-Allocate Write-Allocate Cacheable.
+		 */
+		ret = ffa_memory_attributes_validate(
+			retrieve_request->attributes);
+		if (ret.func != FFA_SUCCESS_32) {
+			goto out;
+		}
 	}
 
 	memory_to_attributes = ffa_memory_permissions_to_mode(

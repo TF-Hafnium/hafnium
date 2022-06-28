@@ -332,6 +332,65 @@ TEST(memory_sharing, share_reclaim)
 }
 
 /**
+ * Perform memory share operation, and propagate retrieve request to the
+ * receiver that doesn't specify the memory type. Hafnium should skip its
+ * internal validation, and provide the right memory attributes in the
+ * FFA_MEM_RETRIEVE_RESP. The receiver will validate the arguments are as
+ * expected.
+ */
+TEST(memory_sharing, share_retrieve_memory_type_not_specified)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+	};
+	uint32_t msg_size;
+	struct ffa_value ret;
+	ffa_memory_handle_t handle;
+
+	SERVICE_SELECT(SERVICE_VM1, "memory_increment_check_mem_attr", mb.send);
+
+	memset_s(ptr, sizeof(pages), 'a', PAGE_SIZE);
+
+	EXPECT_EQ(ffa_memory_region_init(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  SERVICE_VM1, constituents, ARRAY_SIZE(constituents),
+			  0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	/* Call base function's test. */
+	ret = ffa_mem_share(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	handle = ffa_mem_success_handle(ret);
+
+	/*
+	 * Send the appropriate retrieve request to the VM so that it can use it
+	 * to retrieve the memory.
+	 * The retrieve request doesn't specify the memory type.
+	 */
+	msg_size = ffa_memory_retrieve_request_init(
+		mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, 0, 0);
+
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+	EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, msg_size, 0).func,
+		  FFA_SUCCESS_32);
+
+	EXPECT_EQ(ffa_run(SERVICE_VM1, 0).func, FFA_YIELD_32);
+	EXPECT_EQ(ffa_run(SERVICE_VM1, 0).func, FFA_MSG_SEND_32);
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
+	for (int i = 0; i < PAGE_SIZE; ++i) {
+		EXPECT_EQ(pages[i], 'b');
+	}
+}
+
+/**
  * Sharing memory concurrently gives both VMs access to the memory so it can be
  * used for communication.
  */

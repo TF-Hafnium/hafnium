@@ -59,6 +59,56 @@ TEST_SERVICE(memory_increment)
 	}
 }
 
+TEST_SERVICE(memory_increment_check_mem_attr)
+{
+	/* Loop, writing message to the shared memory. */
+	for (;;) {
+		size_t i;
+		void *recv_buf = SERVICE_RECV_BUFFER();
+		void *send_buf = SERVICE_SEND_BUFFER();
+
+		struct ffa_value ret = ffa_msg_wait();
+		struct ffa_memory_region *memory_region =
+			(struct ffa_memory_region *)retrieve_buffer;
+		ffa_vm_id_t sender = retrieve_memory_from_message(
+			recv_buf, send_buf, ret, NULL, memory_region,
+			HF_MAILBOX_SIZE);
+		struct ffa_composite_memory_region *composite =
+			ffa_memory_region_get_composite(memory_region, 0);
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		uint8_t *ptr = (uint8_t *)composite->constituents[0].address;
+
+		ASSERT_EQ(memory_region->receiver_count, 1);
+		ASSERT_NE(memory_region->receivers[0]
+				  .composite_memory_region_offset,
+			  0);
+
+		/*
+		 * Validate retrieve response contains the memory attributes
+		 * hafnium implements.
+		 */
+		ASSERT_EQ(ffa_get_memory_type_attr(memory_region->attributes),
+			  FFA_MEMORY_NORMAL_MEM);
+		ASSERT_EQ(ffa_get_memory_shareability_attr(
+				  memory_region->attributes),
+			  FFA_MEMORY_INNER_SHAREABLE);
+		ASSERT_EQ(ffa_get_memory_cacheability_attr(
+				  memory_region->attributes),
+			  FFA_MEMORY_CACHE_WRITE_BACK);
+
+		/* Allow the memory to be populated. */
+		EXPECT_EQ(ffa_yield().func, FFA_SUCCESS_32);
+
+		/* Increment each byte of memory. */
+		for (i = 0; i < PAGE_SIZE; ++i) {
+			++ptr[i];
+		}
+
+		/* Signal completion and reset. */
+		ffa_msg_send(hf_vm_get_id(), sender, sizeof(ptr), 0);
+	}
+}
+
 TEST_SERVICE(give_memory_and_fault)
 {
 	void *send_buf = SERVICE_SEND_BUFFER();
