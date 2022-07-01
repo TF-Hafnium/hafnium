@@ -96,6 +96,14 @@ struct ffa_memory_share_state {
 	 * entries beyond the receiver_count will always be 0.
 	 */
 	uint32_t retrieved_fragment_count[MAX_MEM_SHARE_RECIPIENTS];
+
+	/**
+	 * Field for the SPMC to keep track of how many fragments of the memory
+	 * region the hypervisor has managed to retrieve, using a
+	 * `hypervisor retrieve request`, as defined by FF-A v1.1 EAC0
+	 * specification.
+	 */
+	uint32_t hypervisor_fragment_count;
 };
 
 /**
@@ -270,6 +278,7 @@ static void share_state_free(struct share_states_locked share_states,
 	}
 	share_state->fragment_count = 0;
 	share_state->memory_region = NULL;
+	share_state->hypervisor_fragment_count = 0;
 }
 
 /** Checks whether the given share state has been fully sent. */
@@ -679,12 +688,15 @@ static struct ffa_value ffa_retrieve_check_transition(
 					MM_MODE_SHARED)) != 0U);
 	} else {
 		/*
+		 * If the retriever is from virtual FF-A instance:
 		 * Ensure the retriever has the expected state. We don't care
 		 * about the MM_MODE_SHARED bit; either with or without it set
 		 * are both valid representations of the !O-NA state.
 		 */
-		if ((orig_to_mode & MM_MODE_UNMAPPED_MASK) !=
-		    MM_MODE_UNMAPPED_MASK) {
+		if (vm_id_is_current_world(to.vm->id) &&
+		    to.vm->id != HF_PRIMARY_VM_ID &&
+		    (orig_to_mode & MM_MODE_UNMAPPED_MASK) !=
+			    MM_MODE_UNMAPPED_MASK) {
 			return ffa_error(FFA_DENIED);
 		}
 	}
@@ -1168,7 +1180,9 @@ static struct ffa_value ffa_other_world_reclaim_check_update(
 	}
 
 	/*
-	 * Forward the request to the other world and see what happens.
+	 * Forward the request to the other world, check if SPMC returned
+	 * FFA_SUCCESS_32. If not, terminate and return the error to caller
+	 * VM.
 	 */
 	other_world_flags = 0;
 	if (clear) {
@@ -2464,6 +2478,36 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
+/*
+ * According to section 16.4.3 of FF-A v1.1 EAC0 specification, the hypervisor
+ * may issue an FFA_MEM_RETRIEVE_REQ to obtain the memory region description
+ * of a pending memory sharing operation whose allocator is the SPM, for
+ * validation purposes before forwarding an FFA_MEM_RECLAIM call. In doing so
+ * the memory region descriptor of the retrieve request must be zeroed with the
+ * exception of the sender ID and handle.
+ */
+bool is_ffa_memory_retrieve_borrower_request(struct ffa_memory_region *request,
+					     struct vm_locked to_locked)
+{
+	return to_locked.vm->id == HF_HYPERVISOR_VM_ID &&
+	       request->attributes == 0U && request->flags == 0U &&
+	       request->tag == 0U && request->receiver_count == 0U &&
+	       plat_ffa_memory_handle_allocated_by_current_world(
+		       request->handle);
+}
+
+/*
+ * Helper to reset count of fragments retrieved by the hypervisor.
+ */
+static void ffa_memory_retrieve_complete_from_hyp(
+	struct ffa_memory_share_state *share_state)
+{
+	if (share_state->hypervisor_fragment_count ==
+	    share_state->fragment_count) {
+		share_state->hypervisor_fragment_count = 0;
+	}
+}
+
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
 				     uint32_t retrieve_request_length,
@@ -2478,7 +2522,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		retrieve_request->flags &
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK;
 	struct ffa_memory_region *memory_region;
-	ffa_memory_access_permissions_t permissions;
+	ffa_memory_access_permissions_t permissions = 0;
 	uint32_t memory_to_attributes;
 	struct share_states_locked share_states;
 	struct ffa_memory_share_state *share_state;
@@ -2486,7 +2530,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	struct ffa_composite_memory_region *composite;
 	uint32_t total_length;
 	uint32_t fragment_length;
-	uint32_t receiver_index;
+	ffa_vm_id_t receiver_id;
+	bool is_send_complete = false;
 
 	dump_share_states();
 
@@ -2519,163 +2564,208 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	memory_region = share_state->memory_region;
 	CHECK(memory_region != NULL);
 
-	/*
-	 * Find receiver index in the receivers list specified by the sender.
-	 */
-	receiver_index =
-		ffa_memory_region_get_receiver(memory_region, to_locked.vm->id);
+	receiver_id = to_locked.vm->id;
 
-	if (receiver_index == memory_region->receiver_count) {
-		dlog_verbose(
-			"Incorrect receiver VM ID %x for FFA_MEM_RETRIEVE_REQ, "
-			"for handle %#x.\n",
-			to_locked.vm->id, handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	if (share_state->retrieved_fragment_count[receiver_index] != 0U) {
-		dlog_verbose("Memory with handle %#x already retrieved.\n",
-			     handle);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
-	/*
-	 * Check that the transaction type expected by the receiver is correct,
-	 * if it has been specified.
-	 */
-	if (transaction_type !=
-		    FFA_MEMORY_REGION_TRANSACTION_TYPE_UNSPECIFIED &&
-	    transaction_type != (memory_region->flags &
-				 FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK)) {
-		dlog_verbose(
-			"Incorrect transaction type %#x for "
-			"FFA_MEM_RETRIEVE_REQ, expected %#x for handle %#x.\n",
-			transaction_type,
-			memory_region->flags &
-				FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK,
-			handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	if (retrieve_request->sender != memory_region->sender) {
-		dlog_verbose(
-			"Incorrect sender ID %d for FFA_MEM_RETRIEVE_REQ, "
-			"expected %d for handle %#x.\n",
-			retrieve_request->sender, memory_region->sender,
-			handle);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
-	if (retrieve_request->tag != memory_region->tag) {
-		dlog_verbose(
-			"Incorrect tag %d for FFA_MEM_RETRIEVE_REQ, expected "
-			"%d for handle %#x.\n",
-			retrieve_request->tag, memory_region->tag, handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	if ((retrieve_request->flags &
-	     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_VALID) != 0U) {
-		dlog_verbose(
-			"Retriever specified 'address range alignment hint'"
-			" not supported.\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-	if ((retrieve_request->flags &
-	     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_MASK) != 0) {
-		dlog_verbose(
-			"Bits 8-5 must be zero in memory region's flags "
-			"(address range alignment hint not supported).\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	if ((retrieve_request->flags & ~0x7FF) != 0U) {
-		dlog_verbose(
-			"Bits 31-10 must be zero in memory region's flags.\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	if (share_state->share_func == FFA_MEM_SHARE_32 &&
-	    (retrieve_request->flags &
-	     (FFA_MEMORY_REGION_FLAG_CLEAR |
-	      FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH)) != 0U) {
-		dlog_verbose(
-			"Memory Share operation can't clean after relinquish "
-			"memory region.\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	/*
-	 * If the borrower needs the memory to be cleared before mapping to its
-	 * address space, the sender should have set the flag when calling
-	 * FFA_MEM_LEND/FFA_MEM_DONATE, else return FFA_DENIED.
-	 */
-	if ((retrieve_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) != 0U &&
-	    (memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR) == 0U) {
-		dlog_verbose(
-			"Borrower needs memory cleared. Sender needs to set "
-			"flag for clearing memory.\n");
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
-	ret = ffa_memory_retrieve_validate_memory_access_list(
-		memory_region, retrieve_request, to_locked.vm->id,
-		&permissions);
-	if (ret.func != FFA_SUCCESS_32) {
-		goto out;
-	}
-
-	if (ffa_get_memory_type_attr(retrieve_request->attributes) !=
-	    FFA_MEMORY_NOT_SPECIFIED_MEM) {
+	if (!is_ffa_memory_retrieve_borrower_request(retrieve_request,
+						     to_locked)) {
+		uint32_t receiver_index;
 		/*
-		 * Ensure receiver's attributes are compatible with how Hafnium
-		 * maps memory: Normal Memory, Inner shareable, Write-Back
-		 * Read-Allocate Write-Allocate Cacheable.
+		 * Find receiver index in the receivers list specified by the
+		 * sender.
 		 */
-		ret = ffa_memory_attributes_validate(
-			retrieve_request->attributes);
+		receiver_index = ffa_memory_region_get_receiver(
+			memory_region, to_locked.vm->id);
+
+		if (receiver_index == memory_region->receiver_count) {
+			dlog_verbose(
+				"Incorrect receiver VM ID %x for "
+				"FFA_MEM_RETRIEVE_REQ, "
+				"for handle %#x.\n",
+				to_locked.vm->id, handle);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		if (share_state->retrieved_fragment_count[receiver_index] !=
+		    0U) {
+			dlog_verbose(
+				"Memory with handle %#x already retrieved.\n",
+				handle);
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		/*
+		 * Check that the transaction type expected by the receiver is
+		 * correct, if it has been specified.
+		 */
+		if (transaction_type !=
+			    FFA_MEMORY_REGION_TRANSACTION_TYPE_UNSPECIFIED &&
+		    transaction_type !=
+			    (memory_region->flags &
+			     FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK)) {
+			dlog_verbose(
+				"Incorrect transaction type %#x for "
+				"FFA_MEM_RETRIEVE_REQ, expected %#x for handle "
+				"%#x.\n",
+				transaction_type,
+				memory_region->flags &
+					FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK,
+				handle);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		if (retrieve_request->sender != memory_region->sender) {
+			dlog_verbose(
+				"Incorrect sender ID %d for "
+				"FFA_MEM_RETRIEVE_REQ, "
+				"expected %d for handle %#x.\n",
+				retrieve_request->sender, memory_region->sender,
+				handle);
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		if (retrieve_request->tag != memory_region->tag) {
+			dlog_verbose(
+				"Incorrect tag %d for FFA_MEM_RETRIEVE_REQ, "
+				"expected "
+				"%d for handle %#x.\n",
+				retrieve_request->tag, memory_region->tag,
+				handle);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		if ((retrieve_request->flags &
+		     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_VALID) != 0U) {
+			dlog_verbose(
+				"Retriever specified 'address range alignment "
+				"hint' not supported.\n");
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		if ((retrieve_request->flags &
+		     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_MASK) != 0) {
+			dlog_verbose(
+				"Bits 8-5 must be zero in memory region's "
+				"flags (address range alignment hint not "
+				"supported).\n");
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		if ((retrieve_request->flags & ~0x7FF) != 0U) {
+			dlog_verbose(
+				"Bits 31-10 must be zero in memory region's "
+				"flags.\n");
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		if (share_state->share_func == FFA_MEM_SHARE_32 &&
+		    (retrieve_request->flags &
+		     (FFA_MEMORY_REGION_FLAG_CLEAR |
+		      FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH)) != 0U) {
+			dlog_verbose(
+				"Memory Share operation can't clean after "
+				"relinquish "
+				"memory region.\n");
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		/*
+		 * If the borrower needs the memory to be cleared before mapping
+		 * to its address space, the sender should have set the flag
+		 * when calling FFA_MEM_LEND/FFA_MEM_DONATE, else return
+		 * FFA_DENIED.
+		 */
+		if ((retrieve_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) !=
+			    0U &&
+		    (memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR) ==
+			    0U) {
+			dlog_verbose(
+				"Borrower needs memory cleared. Sender needs "
+				"to set "
+				"flag for clearing memory.\n");
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		ret = ffa_memory_retrieve_validate_memory_access_list(
+			memory_region, retrieve_request, receiver_id,
+			&permissions);
 		if (ret.func != FFA_SUCCESS_32) {
 			goto out;
 		}
-	}
 
-	memory_to_attributes = ffa_memory_permissions_to_mode(
-		permissions, share_state->sender_orig_mode);
-	ret = ffa_retrieve_check_update(
-		to_locked, memory_region->sender, share_state->fragments,
-		share_state->fragment_constituent_counts,
-		share_state->fragment_count, memory_to_attributes,
-		share_state->share_func, false, page_pool);
-	if (ret.func != FFA_SUCCESS_32) {
-		goto out;
+		if (ffa_get_memory_type_attr(retrieve_request->attributes) !=
+		    FFA_MEMORY_NOT_SPECIFIED_MEM) {
+			/*
+			 * Ensure receiver's attributes are compatible with how
+			 * Hafnium maps memory: Normal Memory, Inner shareable,
+			 * Write-Back Read-Allocate Write-Allocate Cacheable.
+			 */
+			ret = ffa_memory_attributes_validate(
+				retrieve_request->attributes);
+			if (ret.func != FFA_SUCCESS_32) {
+				goto out;
+			}
+		}
+
+		memory_to_attributes = ffa_memory_permissions_to_mode(
+			permissions, share_state->sender_orig_mode);
+		ret = ffa_retrieve_check_update(
+			to_locked, memory_region->sender,
+			share_state->fragments,
+			share_state->fragment_constituent_counts,
+			share_state->fragment_count, memory_to_attributes,
+			share_state->share_func, false, page_pool);
+
+		if (ret.func != FFA_SUCCESS_32) {
+			goto out;
+		}
+
+		share_state->retrieved_fragment_count[receiver_index] = 1;
+		is_send_complete =
+			share_state->retrieved_fragment_count[receiver_index] ==
+			share_state->fragment_count;
+	} else {
+		if (share_state->hypervisor_fragment_count != 0U) {
+			dlog_verbose(
+				"Memory with handle %#x already "
+				"retrieved by "
+				"the hypervisor.\n",
+				handle);
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+
+		share_state->hypervisor_fragment_count = 1;
+
+		ffa_memory_retrieve_complete_from_hyp(share_state);
 	}
 
 	/*
-	 * Copy response to RX buffer of caller and deliver the message. This
-	 * must be done before the share_state is (possibly) freed.
+	 * Copy response to RX buffer of caller and deliver the message.
+	 * This must be done before the share_state is (possibly) freed.
 	 */
 	/* TODO: combine attributes from sender and request. */
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	/*
-	 * Constituents which we received in the first fragment should always
-	 * fit in the first fragment we are sending, because the header is the
-	 * same size in both cases and we have a fixed message buffer size. So
-	 * `ffa_retrieved_memory_region_init` should never fail.
+	 * Constituents which we received in the first fragment should
+	 * always fit in the first fragment we are sending, because the
+	 * header is the same size in both cases and we have a fixed
+	 * message buffer size. So `ffa_retrieved_memory_region_init`
+	 * should never fail.
 	 */
 	CHECK(ffa_retrieved_memory_region_init(
 		to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
 		memory_region->sender, memory_region->attributes,
-		memory_region->flags, handle, to_locked.vm->id, permissions,
+		memory_region->flags, handle, receiver_id, permissions,
 		composite->page_count, composite->constituent_count,
 		share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
@@ -2685,13 +2775,10 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
 
-	share_state->retrieved_fragment_count[receiver_index] = 1;
-	if (share_state->retrieved_fragment_count[receiver_index] ==
-	    share_state->fragment_count) {
+	if (is_send_complete) {
 		ffa_memory_retrieve_complete(share_states, share_state,
 					     page_pool);
 	}
-
 	ret = (struct ffa_value){.func = FFA_MEM_RETRIEVE_RESP_32,
 				 .arg1 = total_length,
 				 .arg2 = fragment_length};
@@ -2769,8 +2856,8 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	fragment_index = share_state->retrieved_fragment_count[receiver_index];
 
 	/*
-	 * Check that the given fragment offset is correct by counting how many
-	 * constituents were in the fragments previously sent.
+	 * Check that the given fragment offset is correct by counting
+	 * how many constituents were in the fragments previously sent.
 	 */
 	retrieved_constituents_count = 0;
 	for (i = 0; i < fragment_index; ++i) {
@@ -2836,7 +2923,8 @@ struct ffa_value ffa_memory_relinquish(
 
 	if (relinquish_request->endpoint_count != 1) {
 		dlog_verbose(
-			"Stream endpoints not supported (got %d endpoints on "
+			"Stream endpoints not supported (got %d "
+			"endpoints on "
 			"FFA_MEM_RELINQUISH, expected 1).\n",
 			relinquish_request->endpoint_count);
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -2844,7 +2932,8 @@ struct ffa_value ffa_memory_relinquish(
 
 	if (relinquish_request->endpoints[0] != from_locked.vm->id) {
 		dlog_verbose(
-			"VM ID %d in relinquish message doesn't match calling "
+			"VM ID %d in relinquish message doesn't match "
+			"calling "
 			"VM ID %d.\n",
 			relinquish_request->endpoints[0], from_locked.vm->id);
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -2877,7 +2966,8 @@ struct ffa_value ffa_memory_relinquish(
 
 	if (receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
-			"VM ID %d tried to relinquish memory region with "
+			"VM ID %d tried to relinquish memory region "
+			"with "
 			"handle %#x and it is not a valid borrower.\n",
 			from_locked.vm->id, handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -2887,7 +2977,8 @@ struct ffa_value ffa_memory_relinquish(
 	if (share_state->retrieved_fragment_count[receiver_index] !=
 	    share_state->fragment_count) {
 		dlog_verbose(
-			"Memory with handle %#x not yet fully retrieved, "
+			"Memory with handle %#x not yet fully "
+			"retrieved, "
 			"receiver %x can't relinquish.\n",
 			handle, from_locked.vm->id);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -2897,8 +2988,8 @@ struct ffa_value ffa_memory_relinquish(
 	clear = relinquish_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR;
 
 	/*
-	 * Clear is not allowed for memory that was shared, as the original
-	 * sender still has access to the memory.
+	 * Clear is not allowed for memory that was shared, as the
+	 * original sender still has access to the memory.
 	 */
 	if (clear && share_state->share_func == FFA_MEM_SHARE_32) {
 		dlog_verbose("Memory which was shared can't be cleared.\n");
@@ -2913,8 +3004,8 @@ struct ffa_value ffa_memory_relinquish(
 
 	if (ret.func == FFA_SUCCESS_32) {
 		/*
-		 * Mark memory handle as not retrieved, so it can be reclaimed
-		 * (or retrieved again).
+		 * Mark memory handle as not retrieved, so it can be
+		 * reclaimed (or retrieved again).
 		 */
 		share_state->retrieved_fragment_count[receiver_index] = 0;
 	}
@@ -2926,9 +3017,9 @@ out:
 }
 
 /**
- * Validates that the reclaim transition is allowed for the given handle,
- * updates the page table of the reclaiming VM, and frees the internal state
- * associated with the handle.
+ * Validates that the reclaim transition is allowed for the given
+ * handle, updates the page table of the reclaiming VM, and frees the
+ * internal state associated with the handle.
  */
 struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 				    ffa_memory_handle_t handle,
@@ -2953,7 +3044,8 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	memory_region = share_state->memory_region;
 	CHECK(memory_region != NULL);
 
-	if (to_locked.vm->id != memory_region->sender) {
+	if (vm_id_is_current_world(to_locked.vm->id) &&
+	    to_locked.vm->id != memory_region->sender) {
 		dlog_verbose(
 			"VM %#x attempted to reclaim memory handle %#x "
 			"originally sent by VM %#x.\n",
@@ -2974,8 +3066,10 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
 		if (share_state->retrieved_fragment_count[i] != 0) {
 			dlog_verbose(
-				"Tried to reclaim memory handle %#x that has "
-				"not been relinquished by all borrowers(%x).\n",
+				"Tried to reclaim memory handle %#x "
+				"that has "
+				"not been relinquished by all "
+				"borrowers(%x).\n",
 				handle,
 				memory_region->receivers[i]
 					.receiver_permissions.receiver);
@@ -2992,7 +3086,9 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 
 	if (ret.func == FFA_SUCCESS_32) {
 		share_state_free(share_states, share_state, page_pool);
-		dlog_verbose("Freed share state after successful reclaim.\n");
+		dlog_verbose(
+			"Freed share state after successful "
+			"reclaim.\n");
 	}
 
 out:
@@ -3001,13 +3097,13 @@ out:
 }
 
 /**
- * Validates that the reclaim transition is allowed for the memory region with
- * the given handle which was previously shared with the other world. tells the
- * other world to mark it as reclaimed, and updates the page table of the
- * reclaiming VM.
+ * Validates that the reclaim transition is allowed for the memory
+ * region with the given handle which was previously shared with the
+ * other world. Tells the other world to mark it as reclaimed, and
+ * updates the page table of the reclaiming VM.
  *
- * To do this information about the memory region is first fetched from the
- * other world.
+ * To do this information about the memory region is first fetched from
+ * the other world.
  */
 struct ffa_value ffa_memory_other_world_reclaim(struct vm_locked to_locked,
 						struct vm_locked from_locked,
@@ -3115,17 +3211,16 @@ struct ffa_value ffa_memory_other_world_reclaim(struct vm_locked to_locked,
 	if (memory_region->receiver_count != 1) {
 		/* Only one receiver supported by Hafnium for now. */
 		dlog_verbose(
-			"Multiple recipients not supported (got %d, expected "
-			"1).\n",
+			"Multiple recipients not supported (got %d, "
+			"expected 1).\n",
 			memory_region->receiver_count);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	if (memory_region->handle != handle) {
 		dlog_verbose(
-			"Got memory region handle %#x from other world but "
-			"requested "
-			"handle %#x.\n",
+			"Got memory region handle %#x from other world "
+			"but requested handle %#x.\n",
 			memory_region->handle, handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -3142,9 +3237,10 @@ struct ffa_value ffa_memory_other_world_reclaim(struct vm_locked to_locked,
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/*
-	 * Validate that the reclaim transition is allowed for the given memory
-	 * region, forward the request to the other world and then map the
-	 * memory back into the caller's stage-2 page table.
+	 * Validate that the reclaim transition is allowed for the given
+	 * memory region, forward the request to the other world and
+	 * then map the memory back into the caller's stage-2 page
+	 * table.
 	 */
 	return ffa_other_world_reclaim_check_update(
 		to_locked, handle, composite->constituents,
