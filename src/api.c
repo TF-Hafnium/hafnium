@@ -2907,7 +2907,6 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 
 	/* Allow for one memory region to be shared to the other world. */
 	if (targets_other_world) {
-		assert(memory_region->receiver_count == 1);
 		to = vm_find(HF_OTHER_WORLD_ID);
 
 		/*
