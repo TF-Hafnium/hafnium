@@ -241,6 +241,7 @@ struct vcpu *api_preempt(struct vcpu *current)
 {
 	struct ffa_value ret = {
 		.func = FFA_INTERRUPT_32,
+		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
 	return api_switch_to_primary(current, ret, VCPU_STATE_PREEMPTED);
