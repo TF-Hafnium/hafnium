@@ -21,21 +21,3 @@ static inline struct ffa_value ffa_error(int32_t error_code)
 	return (struct ffa_value){.func = FFA_ERROR_32,
 				  .arg2 = (uint32_t)error_code};
 }
-
-/**
- * Return the offset to the first constituent within the
- * `ffa_composite_memory_region` for the given receiver from an
- * `ffa_memory_region`. The caller must check that the receiver_index is within
- * bounds, and that it has a composite memory region offset.
- */
-static inline uint32_t ffa_composite_constituent_offset(
-	struct ffa_memory_region *memory_region, uint32_t receiver_index)
-{
-	CHECK(receiver_index < memory_region->receiver_count);
-	CHECK(memory_region->receivers[receiver_index]
-		      .composite_memory_region_offset != 0);
-
-	return memory_region->receivers[receiver_index]
-		       .composite_memory_region_offset +
-	       sizeof(struct ffa_composite_memory_region);
-}

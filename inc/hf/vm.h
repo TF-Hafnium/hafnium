@@ -285,9 +285,9 @@ struct vm *vm_get_first_boot(void);
 
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     uint32_t *mode);
-
 void vm_notifications_init(struct vm *vm, ffa_vcpu_count_t vcpu_count,
 			   struct mpool *ppool);
+bool vm_mailbox_state_busy(struct vm_locked vm_locked);
 bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 				  ffa_notifications_bitmap_t notifications);
 bool vm_are_global_notifications_pending(struct vm_locked vm_locked);

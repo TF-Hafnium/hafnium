@@ -17,101 +17,10 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa_internal.h"
+#include "hf/ffa_memory_internal.h"
 #include "hf/mpool.h"
 #include "hf/std.h"
 #include "hf/vm.h"
-
-/**
- * The maximum number of memory sharing handles which may be active at once. A
- * DONATE handle is active from when it is sent to when it is retrieved; a SHARE
- * or LEND handle is active from when it is sent to when it is reclaimed.
- */
-#define MAX_MEM_SHARES 100
-
-/**
- * The maximum number of fragments into which a memory sharing message may be
- * broken.
- */
-#define MAX_FRAGMENTS 20
-
-static_assert(sizeof(struct ffa_memory_region_constituent) % 16 == 0,
-	      "struct ffa_memory_region_constituent must be a multiple of 16 "
-	      "bytes long.");
-static_assert(sizeof(struct ffa_composite_memory_region) % 16 == 0,
-	      "struct ffa_composite_memory_region must be a multiple of 16 "
-	      "bytes long.");
-static_assert(sizeof(struct ffa_memory_region_attributes) == 4,
-	      "struct ffa_memory_region_attributes must be 4 bytes long.");
-static_assert(sizeof(struct ffa_memory_access) % 16 == 0,
-	      "struct ffa_memory_access must be a multiple of 16 bytes long.");
-static_assert(sizeof(struct ffa_memory_region) % 16 == 0,
-	      "struct ffa_memory_region must be a multiple of 16 bytes long.");
-static_assert(sizeof(struct ffa_mem_relinquish) % 16 == 0,
-	      "struct ffa_mem_relinquish must be a multiple of 16 "
-	      "bytes long.");
-
-struct ffa_memory_share_state {
-	/**
-	 * The memory region being shared, or NULL if this share state is
-	 * unallocated.
-	 */
-	struct ffa_memory_region *memory_region;
-
-	struct ffa_memory_region_constituent *fragments[MAX_FRAGMENTS];
-
-	/** The number of constituents in each fragment. */
-	uint32_t fragment_constituent_counts[MAX_FRAGMENTS];
-
-	/**
-	 * The number of valid elements in the `fragments` and
-	 * `fragment_constituent_counts` arrays.
-	 */
-	uint32_t fragment_count;
-
-	/**
-	 * The FF-A function used for sharing the memory. Must be one of
-	 * FFA_MEM_DONATE_32, FFA_MEM_LEND_32 or FFA_MEM_SHARE_32 if the
-	 * share state is allocated, or 0.
-	 */
-	uint32_t share_func;
-
-	/**
-	 * The sender's original mode before invoking the FF-A function for
-	 * sharing the memory.
-	 * This is used to reset the original configuration when sender invokes
-	 * FFA_MEM_RECLAIM_32.
-	 */
-	uint32_t sender_orig_mode;
-
-	/**
-	 * True if all the fragments of this sharing request have been sent and
-	 * Hafnium has updated the sender page table accordingly.
-	 */
-	bool sending_complete;
-
-	/**
-	 * How many fragments of the memory region each recipient has retrieved
-	 * so far. The order of this array matches the order of the endpoint
-	 * memory access descriptors in the memory region descriptor. Any
-	 * entries beyond the receiver_count will always be 0.
-	 */
-	uint32_t retrieved_fragment_count[MAX_MEM_SHARE_RECIPIENTS];
-
-	/**
-	 * Field for the SPMC to keep track of how many fragments of the memory
-	 * region the hypervisor has managed to retrieve, using a
-	 * `hypervisor retrieve request`, as defined by FF-A v1.1 EAC0
-	 * specification.
-	 */
-	uint32_t hypervisor_fragment_count;
-};
-
-/**
- * Encapsulates the set of share states while the `share_states_lock` is held.
- */
-struct share_states_locked {
-	struct ffa_memory_share_state *share_states;
-};
 
 /**
  * All access to members of a `struct ffa_memory_share_state` must be guarded
@@ -144,11 +53,11 @@ uint64_t ffa_memory_handle_get_index(ffa_memory_handle_t handle)
  *
  * Returns true on success or false if none are available.
  */
-static bool allocate_share_state(
-	struct share_states_locked share_states, uint32_t share_func,
-	struct ffa_memory_region *memory_region, uint32_t fragment_length,
-	ffa_memory_handle_t handle,
-	struct ffa_memory_share_state **share_state_ret)
+bool allocate_share_state(struct share_states_locked share_states,
+			  uint32_t share_func,
+			  struct ffa_memory_region *memory_region,
+			  uint32_t fragment_length, ffa_memory_handle_t handle,
+			  struct ffa_memory_share_state **share_state_ret)
 {
 	uint64_t i;
 
@@ -203,7 +112,7 @@ struct share_states_locked share_states_lock(void)
 }
 
 /** Unlocks the share states lock. */
-static void share_states_unlock(struct share_states_locked *share_states)
+void share_states_unlock(struct share_states_locked *share_states)
 {
 	assert(share_states->share_states != NULL);
 	share_states->share_states = NULL;
@@ -370,7 +279,7 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 	dlog("]");
 }
 
-static void dump_share_states(void)
+void dump_share_states(void)
 {
 	uint32_t i;
 
@@ -746,7 +655,7 @@ static struct ffa_value ffa_retrieve_check_transition(
  * Returns true on success, or false if the update failed and no changes were
  * made to memory mappings.
  */
-static bool ffa_region_group_identity_map(
+bool ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
@@ -897,7 +806,7 @@ out:
  *     memory with the given permissions.
  *  Success is indicated by FFA_SUCCESS.
  */
-static struct ffa_value ffa_send_check_update(
+struct ffa_value ffa_send_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
@@ -1395,7 +1304,7 @@ static struct ffa_value ffa_memory_attributes_validate(
  * Returns FFA_SUCCESS if the request was valid, or the relevant FFA_ERROR if
  * not.
  */
-static struct ffa_value ffa_memory_send_validate(
+struct ffa_value ffa_memory_send_validate(
 	struct vm_locked from_locked, struct ffa_memory_region *memory_region,
 	uint32_t memory_share_length, uint32_t fragment_length,
 	uint32_t share_func)
@@ -1606,34 +1515,6 @@ static struct ffa_value ffa_memory_send_validate(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-/** Forwards a memory send message on to the other world. */
-static struct ffa_value memory_send_other_world_forward(
-	struct vm_locked other_world_locked, ffa_vm_id_t sender_vm_id,
-	uint32_t share_func, struct ffa_memory_region *memory_region,
-	uint32_t memory_share_length, uint32_t fragment_length)
-{
-	struct ffa_value ret;
-
-	/* Use its own RX buffer. */
-	memcpy_s(other_world_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
-		 memory_region, fragment_length);
-	other_world_locked.vm->mailbox.recv_size = fragment_length;
-	other_world_locked.vm->mailbox.recv_sender = sender_vm_id;
-	other_world_locked.vm->mailbox.recv_func = share_func;
-	other_world_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
-	ret = arch_other_world_call(
-		(struct ffa_value){.func = share_func,
-				   .arg1 = memory_share_length,
-				   .arg2 = fragment_length});
-	/*
-	 * After the call to the other world completes it must have finished
-	 * reading its RX buffer, so it is ready for another message.
-	 */
-	other_world_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
-
-	return ret;
-}
-
 /**
  * Gets the share state for continuing an operation to donate, lend or share
  * memory, and checks that it is a valid request.
@@ -1823,162 +1704,6 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 
 out:
 	share_states_unlock(&share_states);
-	dump_share_states();
-	return ret;
-}
-
-/**
- * Validates a call to donate, lend or share memory to the other world and then
- * updates the stage-2 page tables. Specifically, check if the message length
- * and number of memory region constituents match, and if the transition is
- * valid for the type of memory sending operation.
- *
- * Assumes that the caller has already found and locked the sender VM and the
- * other world VM, and copied the memory region descriptor from the sender's TX
- * buffer to a freshly allocated page from Hafnium's internal pool. The caller
- * must have also validated that the receiver VM ID is valid.
- *
- * This function takes ownership of the `memory_region` passed in and will free
- * it when necessary; it must not be freed by the caller.
- */
-struct ffa_value ffa_memory_other_world_send(
-	struct vm_locked from_locked, struct vm_locked to_locked,
-	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
-	uint32_t fragment_length, uint32_t share_func, struct mpool *page_pool)
-{
-	struct ffa_value ret;
-
-	/*
-	 * If there is an error validating the `memory_region` then we need to
-	 * free it because we own it but we won't be storing it in a share state
-	 * after all.
-	 */
-	ret = ffa_memory_send_validate(from_locked, memory_region,
-				       memory_share_length, fragment_length,
-				       share_func);
-	if (ret.func != FFA_SUCCESS_32) {
-		goto out;
-	}
-
-	if (fragment_length == memory_share_length) {
-		/* No more fragments to come, everything fit in one message. */
-		struct ffa_composite_memory_region *composite =
-			ffa_memory_region_get_composite(memory_region, 0);
-		struct ffa_memory_region_constituent *constituents =
-			composite->constituents;
-		struct mpool local_page_pool;
-		uint32_t orig_from_mode;
-
-		/*
-		 * Use a local page pool so that we can roll back if necessary.
-		 */
-		mpool_init_with_fallback(&local_page_pool, page_pool);
-
-		ret = ffa_send_check_update(
-			from_locked, &constituents,
-			&composite->constituent_count, 1, share_func,
-			memory_region->receivers, memory_region->receiver_count,
-			&local_page_pool,
-			memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
-			&orig_from_mode);
-		if (ret.func != FFA_SUCCESS_32) {
-			mpool_fini(&local_page_pool);
-			goto out;
-		}
-
-		/* Forward memory send message on to other world. */
-		ret = memory_send_other_world_forward(
-			to_locked, from_locked.vm->id, share_func,
-			memory_region, memory_share_length, fragment_length);
-
-		if (ret.func != FFA_SUCCESS_32) {
-			dlog_verbose(
-				"Other world didn't successfully complete "
-				"memory send operation; returned %#x (%d). "
-				"Rolling back.\n",
-				ret.func, ret.arg2);
-
-			/*
-			 * The other world failed to complete the send
-			 * operation, so roll back the page table update for the
-			 * VM. This can't fail because it won't try to allocate
-			 * more memory than was freed into the `local_page_pool`
-			 * by `ffa_send_check_update` in the initial update.
-			 */
-			CHECK(ffa_region_group_identity_map(
-				from_locked, &constituents,
-				&composite->constituent_count, 1,
-				orig_from_mode, &local_page_pool, true));
-		}
-
-		mpool_fini(&local_page_pool);
-	} else {
-		struct share_states_locked share_states = share_states_lock();
-		ffa_memory_handle_t handle;
-
-		/*
-		 * We need to wait for the rest of the fragments before we can
-		 * check whether the transaction is valid and unmap the memory.
-		 * Call the other world so it can do its initial validation and
-		 * assign a handle, and allocate a share state to keep what we
-		 * have so far.
-		 */
-		ret = memory_send_other_world_forward(
-			to_locked, from_locked.vm->id, share_func,
-			memory_region, memory_share_length, fragment_length);
-		if (ret.func == FFA_ERROR_32) {
-			goto out_unlock;
-		} else if (ret.func != FFA_MEM_FRAG_RX_32) {
-			dlog_warning(
-				"Got %#x from other world in response to %#x "
-				"for "
-				"fragment with %d/%d, expected "
-				"FFA_MEM_FRAG_RX.\n",
-				ret.func, share_func, fragment_length,
-				memory_share_length);
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out_unlock;
-		}
-		handle = ffa_frag_handle(ret);
-		if (ret.arg3 != fragment_length) {
-			dlog_warning(
-				"Got unexpected fragment offset %d for "
-				"FFA_MEM_FRAG_RX from other world (expected "
-				"%d).\n",
-				ret.arg3, fragment_length);
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out_unlock;
-		}
-		if (ffa_frag_sender(ret) != from_locked.vm->id) {
-			dlog_warning(
-				"Got unexpected sender ID %d for "
-				"FFA_MEM_FRAG_RX from other world (expected "
-				"%d).\n",
-				ffa_frag_sender(ret), from_locked.vm->id);
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out_unlock;
-		}
-
-		if (!allocate_share_state(share_states, share_func,
-					  memory_region, fragment_length,
-					  handle, NULL)) {
-			dlog_verbose("Failed to allocate share state.\n");
-			ret = ffa_error(FFA_NO_MEMORY);
-			goto out_unlock;
-		}
-		/*
-		 * Don't free the memory region fragment, as it has been stored
-		 * in the share state.
-		 */
-		memory_region = NULL;
-	out_unlock:
-		share_states_unlock(&share_states);
-	}
-
-out:
-	if (memory_region != NULL) {
-		mpool_free(page_pool, memory_region);
-	}
 	dump_share_states();
 	return ret;
 }

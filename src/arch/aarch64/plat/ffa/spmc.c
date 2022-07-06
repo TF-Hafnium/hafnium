@@ -16,6 +16,7 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
+#include "hf/ffa_memory.h"
 #include "hf/interrupt_desc.h"
 #include "hf/plat/interrupts.h"
 #include "hf/std.h"
@@ -2361,4 +2362,25 @@ void plat_ffa_enable_virtual_maintenance_interrupts(
 		vcpu_virt_interrupt_set_enabled(interrupts,
 						HF_NOTIFICATION_PENDING_INTID);
 	}
+}
+
+struct ffa_value plat_ffa_other_world_mem_send(
+	struct vm *from, uint32_t share_func,
+	struct ffa_memory_region **memory_region, uint32_t length,
+	uint32_t fragment_length, struct mpool *page_pool)
+{
+	struct ffa_value ret;
+	struct vm_locked from_locked = vm_lock(from);
+
+	ret = ffa_memory_send(from_locked, *memory_region, length,
+			      fragment_length, share_func, page_pool);
+	/*
+	 * ffa_memory_send takes ownership of the memory_region, so
+	 * make sure we don't free it.
+	 */
+	*memory_region = NULL;
+
+	vm_unlock(&from_locked);
+
+	return ret;
 }

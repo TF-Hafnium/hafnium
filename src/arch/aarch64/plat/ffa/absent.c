@@ -498,3 +498,16 @@ void plat_ffa_enable_virtual_maintenance_interrupts(
 {
 	(void)current_locked;
 }
+
+struct ffa_value plat_ffa_other_world_mem_send(
+	struct vm *from, struct ffa_memory_region *memory_region,
+	uint32_t length, uint32_t fragment_length, struct mpool *page_pool)
+{
+	(void)from;
+	(void)memory_region;
+	(void)length;
+	(void)fragment_length;
+	(void)page_pool;
+
+	return (struct ffa_value){.func = FFA_ERROR_32};
+}

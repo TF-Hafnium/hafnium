@@ -15,6 +15,8 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
+#include "hf/ffa_memory.h"
+#include "hf/ffa_memory_internal.h"
 #include "hf/std.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
@@ -1007,4 +1009,227 @@ void plat_ffa_enable_virtual_maintenance_interrupts(
 	struct vcpu_locked current_locked)
 {
 	(void)current_locked;
+}
+
+/** Forwards a memory send message on to the other world. */
+static struct ffa_value memory_send_other_world_forward(
+	struct vm_locked other_world_locked, ffa_vm_id_t sender_vm_id,
+	uint32_t share_func, struct ffa_memory_region *memory_region,
+	uint32_t memory_share_length, uint32_t fragment_length)
+{
+	struct ffa_value ret;
+
+	/* Use its own RX buffer. */
+	memcpy_s(other_world_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
+		 memory_region, fragment_length);
+	other_world_locked.vm->mailbox.recv_size = fragment_length;
+	other_world_locked.vm->mailbox.recv_sender = sender_vm_id;
+	other_world_locked.vm->mailbox.recv_func = share_func;
+	other_world_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+	ret = arch_other_world_call(
+		(struct ffa_value){.func = share_func,
+				   .arg1 = memory_share_length,
+				   .arg2 = fragment_length});
+	/*
+	 * After the call to the other world completes it must have finished
+	 * reading its RX buffer, so it is ready for another message.
+	 */
+	other_world_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
+
+	return ret;
+}
+
+/**
+ * Validates a call to donate, lend or share memory to the other world and then
+ * updates the stage-2 page tables. Specifically, check if the message length
+ * and number of memory region constituents match, and if the transition is
+ * valid for the type of memory sending operation.
+ *
+ * Assumes that the caller has already found and locked the sender VM and the
+ * other world VM, and copied the memory region descriptor from the sender's TX
+ * buffer to a freshly allocated page from Hafnium's internal pool. The caller
+ * must have also validated that the receiver VM ID is valid.
+ *
+ * This function takes ownership of the `memory_region` passed in and will free
+ * it when necessary; it must not be freed by the caller.
+ */
+static struct ffa_value ffa_memory_other_world_send(
+	struct vm_locked from_locked, struct vm_locked to_locked,
+	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
+	uint32_t fragment_length, uint32_t share_func, struct mpool *page_pool)
+{
+	struct ffa_value ret;
+
+	/*
+	 * If there is an error validating the `memory_region` then we need to
+	 * free it because we own it but we won't be storing it in a share state
+	 * after all.
+	 */
+	ret = ffa_memory_send_validate(from_locked, memory_region,
+				       memory_share_length, fragment_length,
+				       share_func);
+	if (ret.func != FFA_SUCCESS_32) {
+		goto out;
+	}
+
+	if (fragment_length == memory_share_length) {
+		/* No more fragments to come, everything fit in one message. */
+		struct ffa_composite_memory_region *composite =
+			ffa_memory_region_get_composite(memory_region, 0);
+		struct ffa_memory_region_constituent *constituents =
+			composite->constituents;
+		struct mpool local_page_pool;
+		uint32_t orig_from_mode;
+
+		/*
+		 * Use a local page pool so that we can roll back if necessary.
+		 */
+		mpool_init_with_fallback(&local_page_pool, page_pool);
+
+		ret = ffa_send_check_update(
+			from_locked, &constituents,
+			&composite->constituent_count, 1, share_func,
+			memory_region->receivers, memory_region->receiver_count,
+			&local_page_pool,
+			memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
+			&orig_from_mode);
+		if (ret.func != FFA_SUCCESS_32) {
+			mpool_fini(&local_page_pool);
+			goto out;
+		}
+
+		/* Forward memory send message on to other world. */
+		ret = memory_send_other_world_forward(
+			to_locked, from_locked.vm->id, share_func,
+			memory_region, memory_share_length, fragment_length);
+
+		if (ret.func != FFA_SUCCESS_32) {
+			dlog_verbose(
+				"Other world didn't successfully complete "
+				"memory send operation; returned %#x (%d). "
+				"Rolling back.\n",
+				ret.func, ret.arg2);
+
+			/*
+			 * The other world failed to complete the send
+			 * operation, so roll back the page table update for the
+			 * VM. This can't fail because it won't try to allocate
+			 * more memory than was freed into the `local_page_pool`
+			 * by `ffa_send_check_update` in the initial update.
+			 */
+			CHECK(ffa_region_group_identity_map(
+				from_locked, &constituents,
+				&composite->constituent_count, 1,
+				orig_from_mode, &local_page_pool, true));
+		}
+
+		mpool_fini(&local_page_pool);
+	} else {
+		struct share_states_locked share_states = share_states_lock();
+		ffa_memory_handle_t handle;
+
+		/*
+		 * We need to wait for the rest of the fragments before we can
+		 * check whether the transaction is valid and unmap the memory.
+		 * Call the other world so it can do its initial validation and
+		 * assign a handle, and allocate a share state to keep what we
+		 * have so far.
+		 */
+		ret = memory_send_other_world_forward(
+			to_locked, from_locked.vm->id, share_func,
+			memory_region, memory_share_length, fragment_length);
+		if (ret.func == FFA_ERROR_32) {
+			goto out_unlock;
+		} else if (ret.func != FFA_MEM_FRAG_RX_32) {
+			dlog_warning(
+				"Got %#x from other world in response to %#x "
+				"for "
+				"fragment with %d/%d, expected "
+				"FFA_MEM_FRAG_RX.\n",
+				ret.func, share_func, fragment_length,
+				memory_share_length);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out_unlock;
+		}
+		handle = ffa_frag_handle(ret);
+		if (ret.arg3 != fragment_length) {
+			dlog_warning(
+				"Got unexpected fragment offset %d for "
+				"FFA_MEM_FRAG_RX from other world (expected "
+				"%d).\n",
+				ret.arg3, fragment_length);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out_unlock;
+		}
+		if (ffa_frag_sender(ret) != from_locked.vm->id) {
+			dlog_warning(
+				"Got unexpected sender ID %d for "
+				"FFA_MEM_FRAG_RX from other world (expected "
+				"%d).\n",
+				ffa_frag_sender(ret), from_locked.vm->id);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out_unlock;
+		}
+
+		if (!allocate_share_state(share_states, share_func,
+					  memory_region, fragment_length,
+					  handle, NULL)) {
+			dlog_verbose("Failed to allocate share state.\n");
+			ret = ffa_error(FFA_NO_MEMORY);
+			goto out_unlock;
+		}
+		/*
+		 * Don't free the memory region fragment, as it has been stored
+		 * in the share state.
+		 */
+		memory_region = NULL;
+	out_unlock:
+		share_states_unlock(&share_states);
+	}
+
+out:
+	if (memory_region != NULL) {
+		mpool_free(page_pool, memory_region);
+	}
+	dump_share_states();
+	return ret;
+}
+
+struct ffa_value plat_ffa_other_world_mem_send(
+	struct vm *from, uint32_t share_func,
+	struct ffa_memory_region **memory_region, uint32_t length,
+	uint32_t fragment_length, struct mpool *page_pool)
+{
+	struct vm *to;
+	struct ffa_value ret;
+
+	to = vm_find(HF_OTHER_WORLD_ID);
+
+	/*
+	 * The 'to' VM lock is only needed in the case that it is the
+	 * TEE VM.
+	 */
+	struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
+
+	/* Check if the `to` VM has the mailbox busy. */
+	if (vm_is_mailbox_busy(vm_to_from_lock.vm1)) {
+		dlog_verbose("The other world VM has a message. %x\n",
+			     vm_to_from_lock.vm1.vm->id);
+		ret = ffa_error(FFA_BUSY);
+	} else {
+		ret = ffa_memory_other_world_send(
+			vm_to_from_lock.vm2, vm_to_from_lock.vm1,
+			*memory_region, length, fragment_length, share_func,
+			page_pool);
+		/*
+		 * ffa_other_world_memory_send takes ownership of the
+		 * memory_region, so make sure we don't free it.
+		 */
+		*memory_region = NULL;
+	}
+
+	vm_unlock(&vm_to_from_lock.vm1);
+	vm_unlock(&vm_to_from_lock.vm2);
+
+	return ret;
 }

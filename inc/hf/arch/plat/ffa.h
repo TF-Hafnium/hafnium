@@ -314,3 +314,11 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
 
 void plat_ffa_enable_virtual_maintenance_interrupts(
 	struct vcpu_locked current_locked);
+
+/*
+ * Handles FF-A memory share calls with recipients from the other world.
+ */
+struct ffa_value plat_ffa_other_world_mem_send(
+	struct vm *from, uint32_t share_func,
+	struct ffa_memory_region **memory_region, uint32_t length,
+	uint32_t fragment_length, struct mpool *page_pool);

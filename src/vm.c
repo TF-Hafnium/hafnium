@@ -444,6 +444,12 @@ bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 	return mm_vm_get_mode(&vm_locked.vm->ptable, begin, end, mode);
 }
 
+bool vm_mailbox_state_busy(struct vm_locked vm_locked)
+{
+	return vm_locked.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
+	       vm_locked.vm->mailbox.recv == NULL;
+}
+
 static struct notifications *vm_get_notifications(struct vm_locked vm_locked,
 						  bool is_from_vm)
 {

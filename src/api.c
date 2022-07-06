@@ -2905,33 +2905,10 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		}
 	}
 
-	/* Allow for one memory region to be shared to the other world. */
 	if (targets_other_world) {
-		to = vm_find(HF_OTHER_WORLD_ID);
-
-		/*
-		 * The 'to' VM lock is only needed in the case that it is the
-		 * other world VM.
-		 */
-		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
-
-		if (vm_is_mailbox_busy(vm_to_from_lock.vm1)) {
-			ret = ffa_error(FFA_BUSY);
-			goto out_unlock;
-		}
-
-		ret = ffa_memory_other_world_send(
-			vm_to_from_lock.vm2, vm_to_from_lock.vm1, memory_region,
-			length, fragment_length, share_func, &api_page_pool);
-		/*
-		 * ffa_other_world_memory_send takes ownership of the
-		 * memory_region, so make sure we don't free it.
-		 */
-		memory_region = NULL;
-
-	out_unlock:
-		vm_unlock(&vm_to_from_lock.vm1);
-		vm_unlock(&vm_to_from_lock.vm2);
+		ret = plat_ffa_other_world_mem_send(
+			from, share_func, &memory_region, length,
+			fragment_length, &api_page_pool);
 	} else {
 		struct vm_locked from_locked = vm_lock(from);
 
