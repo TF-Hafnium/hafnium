@@ -486,3 +486,15 @@ struct ffa_value plat_ffa_other_world_mem_send(
 
 	return (struct ffa_value){0};
 }
+
+struct ffa_value plat_ffa_other_world_mem_reclaim(
+	struct vm *to, ffa_memory_handle_t handle,
+	ffa_memory_region_flags_t flags, struct mpool *page_pool)
+{
+	(void)handle;
+	(void)flags;
+	(void)page_pool;
+	(void)to;
+
+	return ffa_error(FFA_INVALID_PARAMETERS);
+}

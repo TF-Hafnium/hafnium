@@ -2384,3 +2384,20 @@ struct ffa_value plat_ffa_other_world_mem_send(
 
 	return ret;
 }
+
+/*
+ * SPMC handles its memory share requests internally, so no forwarding of the
+ * request is required.
+ */
+struct ffa_value plat_ffa_other_world_mem_reclaim(
+	struct vm *to, ffa_memory_handle_t handle,
+	ffa_memory_region_flags_t flags, struct mpool *page_pool)
+{
+	(void)handle;
+	(void)flags;
+	(void)page_pool;
+	(void)to;
+
+	dlog_verbose("Invalid handle %#x for FFA_MEM_RECLAIM.\n", handle);
+	return ffa_error(FFA_INVALID_PARAMETERS);
+}

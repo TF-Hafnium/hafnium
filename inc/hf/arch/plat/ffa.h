@@ -322,3 +322,11 @@ struct ffa_value plat_ffa_other_world_mem_send(
 	struct vm *from, uint32_t share_func,
 	struct ffa_memory_region **memory_region, uint32_t length,
 	uint32_t fragment_length, struct mpool *page_pool);
+
+/**
+ * Handles the memory reclaim if a memory handle from the other world is
+ * provided.
+ */
+struct ffa_value plat_ffa_other_world_mem_reclaim(
+	struct vm *to, ffa_memory_handle_t handle,
+	ffa_memory_region_flags_t flags, struct mpool *page_pool);

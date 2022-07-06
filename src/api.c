@@ -3071,15 +3071,8 @@ struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 
 		vm_unlock(&to_locked);
 	} else {
-		struct vm *from = vm_find(HF_TEE_VM_ID);
-		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
-
-		ret = ffa_memory_other_world_reclaim(
-			vm_to_from_lock.vm1, vm_to_from_lock.vm2, handle, flags,
-			&api_page_pool);
-
-		vm_unlock(&vm_to_from_lock.vm1);
-		vm_unlock(&vm_to_from_lock.vm2);
+		ret = plat_ffa_other_world_mem_reclaim(to, handle, flags,
+						       &api_page_pool);
 	}
 
 	return ret;

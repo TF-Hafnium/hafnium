@@ -141,3 +141,8 @@ bool ffa_region_group_identity_map(
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t mode, struct mpool *ppool, bool commit);
+struct ffa_value ffa_retrieve_check_transition(
+	struct vm_locked to, uint32_t share_func,
+	struct ffa_memory_region_constituent **fragments,
+	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t memory_to_attributes, uint32_t *to_mode);
