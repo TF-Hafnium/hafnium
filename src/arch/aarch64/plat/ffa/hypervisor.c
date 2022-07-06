@@ -308,6 +308,8 @@ bool plat_ffa_rx_release_forwarded(struct vm_locked vm_locked)
 bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 				  struct ffa_value *ret)
 {
+	struct ffa_value other_world_ret;
+
 	if (!ffa_tee_enabled) {
 		return true;
 	}
@@ -316,10 +318,14 @@ bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 		return true;
 	}
 
-	*ret = arch_other_world_call((struct ffa_value){
+	other_world_ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_RX_ACQUIRE_32, .arg1 = to_locked.vm->id});
 
-	return ret->func == FFA_SUCCESS_32;
+	if (ret != NULL) {
+		*ret = other_world_ret;
+	}
+
+	return other_world_ret.func == FFA_SUCCESS_32;
 }
 
 bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
@@ -1592,5 +1598,126 @@ struct ffa_value plat_ffa_other_world_mem_reclaim(
 	vm_unlock(&vm_to_from_lock.vm1);
 	vm_unlock(&vm_to_from_lock.vm2);
 
+	return ret;
+}
+
+struct ffa_value plat_ffa_other_world_mem_retrieve(
+	struct vm_locked to_locked, struct ffa_memory_region *retrieve_request,
+	uint32_t length, struct mpool *page_pool)
+{
+	struct ffa_memory_region_constituent *constituents = NULL;
+	struct ffa_value ret;
+	struct ffa_memory_region *memory_region;
+	struct vm *from;
+	struct vm_locked from_locked;
+	struct ffa_composite_memory_region *composite;
+	uint32_t receiver_index;
+	uint32_t fragment_length;
+	uint32_t share_func;
+	ffa_memory_region_flags_t transaction_type;
+
+	/*
+	 * TODO: Is there a way to retrieve the sender's original attributes
+	 * if it is an SP? Such that a receiver VM does not get more privilege
+	 * than a sender SP.
+	 */
+	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+
+	assert(length <= HF_MAILBOX_SIZE);
+
+	if (!ffa_tee_enabled) {
+		dlog_verbose("There isn't a TEE in the system.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	from = vm_find(HF_TEE_VM_ID);
+	assert(from != NULL);
+	from_locked = vm_lock(from);
+
+	/* Copy retrieve request to the SPMC's RX buffer. */
+	memcpy_s(from->mailbox.recv, HF_MAILBOX_SIZE, retrieve_request, length);
+
+	ret = arch_other_world_call(
+		(struct ffa_value){.func = FFA_MEM_RETRIEVE_REQ_32,
+				   .arg1 = length,
+				   .arg2 = length});
+	if (ret.func == FFA_ERROR_32) {
+		dlog_verbose(
+			"Fail to forward FFA_MEM_RETRIEVE_REQ to the SPMC.\n");
+		goto out;
+	}
+
+	/* Check we received a valid memory retrieve response from the SPMC. */
+	CHECK(ret.func == FFA_MEM_RETRIEVE_RESP_32);
+
+	fragment_length = ret.arg2;
+	CHECK(fragment_length >=
+	      sizeof(struct ffa_memory_region) +
+		      sizeof(struct ffa_memory_access) +
+		      sizeof(struct ffa_composite_memory_region));
+	CHECK(fragment_length <= sizeof(other_world_retrieve_buffer));
+
+	/* Retrieve the retrieve response from SPMC. */
+	memcpy_s(other_world_retrieve_buffer,
+		 sizeof(other_world_retrieve_buffer),
+		 from_locked.vm->mailbox.send, fragment_length);
+
+	memory_region = (struct ffa_memory_region *)other_world_retrieve_buffer;
+
+	if (retrieve_request->sender != memory_region->sender) {
+		dlog_verbose(
+			"Retrieve request doesn't match the received memory "
+			"region from SPMC.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	receiver_index =
+		ffa_memory_region_get_receiver(memory_region, to_locked.vm->id);
+	CHECK(receiver_index == 0);
+
+	composite =
+		ffa_memory_region_get_composite(memory_region, receiver_index);
+	constituents = &composite->constituents[0];
+
+	/* Get the share func ID from the transaction type flag. */
+	transaction_type =
+		memory_region->flags & FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK;
+	switch (transaction_type) {
+	case FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE:
+		share_func = FFA_MEM_SHARE_32;
+		break;
+	case FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND:
+		share_func = FFA_MEM_LEND_32;
+		break;
+	case FFA_MEMORY_REGION_TRANSACTION_TYPE_DONATE:
+		share_func = FFA_MEM_DONATE_32;
+		break;
+	case FFA_MEMORY_REGION_TRANSACTION_TYPE_UNSPECIFIED:
+	default:
+		panic("Invalid transaction in memory region flag: %x\n",
+		      transaction_type);
+	}
+
+	CHECK(ffa_retrieve_check_update(
+		      to_locked, memory_region->sender, &constituents,
+		      &composite->constituent_count, 1, memory_to_attributes,
+		      share_func, false, page_pool)
+		      .func == FFA_SUCCESS_32);
+
+	/* Acquire RX buffer from the SPMC and copy the retrieve response. */
+	CHECK(plat_ffa_acquire_receiver_rx(to_locked, NULL));
+	memcpy_s(to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE, memory_region,
+		 fragment_length);
+
+	to_locked.vm->mailbox.recv_size = length;
+	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
+	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
+	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
+
+out:
+	vm_unlock(&from_locked);
+
+	/* Return ret as received from the SPMC. */
 	return ret;
 }

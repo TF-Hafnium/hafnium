@@ -315,6 +315,10 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
 void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 					struct vm_locked vm_locked);
 
+bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
+					struct vcpu **next,
+					struct ffa_value to_ret,
+					struct ffa_value *signal_interrupt);
 /*
  * Handles FF-A memory share calls with recipients from the other world.
  */
@@ -331,7 +335,10 @@ struct ffa_value plat_ffa_other_world_mem_reclaim(
 	struct vm *to, ffa_memory_handle_t handle,
 	ffa_memory_region_flags_t flags, struct mpool *page_pool);
 
-bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					struct ffa_value to_ret,
-					struct ffa_value *signal_interrupt);
+/**
+ * Handles the memory retrieve request if the specified memory handle belongs
+ * to the other world.
+ */
+struct ffa_value plat_ffa_other_world_mem_retrieve(
+	struct vm_locked to_locked, struct ffa_memory_region *retrieve_request,
+	uint32_t length, struct mpool *page_pool);

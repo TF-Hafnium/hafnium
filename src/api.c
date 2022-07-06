@@ -3014,9 +3014,14 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 		goto out;
 	}
 
-	ret = ffa_memory_retrieve(to_locked, retrieve_request, length,
-				  &api_page_pool);
-
+	if (plat_ffa_memory_handle_allocated_by_current_world(
+		    retrieve_request->handle)) {
+		ret = ffa_memory_retrieve(to_locked, retrieve_request, length,
+					  &api_page_pool);
+	} else {
+		ret = plat_ffa_other_world_mem_retrieve(
+			to_locked, retrieve_request, length, &api_page_pool);
+	}
 out:
 	vm_unlock(&to_locked);
 	return ret;

@@ -918,7 +918,7 @@ out:
  *     the request.
  *  Success is indicated by FFA_SUCCESS.
  */
-static struct ffa_value ffa_retrieve_check_update(
+struct ffa_value ffa_retrieve_check_update(
 	struct vm_locked to_locked, ffa_vm_id_t from_id,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
@@ -936,6 +936,7 @@ static struct ffa_value ffa_retrieve_check_update(
 	 */
 	for (i = 0; i < fragment_count; ++i) {
 		if (!is_aligned(fragments[i], 8)) {
+			dlog_verbose("Fragment not properly aligned.\n");
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 	}
@@ -981,6 +982,7 @@ static struct ffa_value ffa_retrieve_check_update(
 	    !ffa_clear_memory_constituents(
 		    plat_ffa_owner_world_mode(from_id), fragments,
 		    fragment_constituent_counts, fragment_count, page_pool)) {
+		dlog_verbose("Couldn't clear constituents.\n");
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
@@ -1860,8 +1862,8 @@ static void ffa_memory_retrieve_complete(
  * returns its index in the receiver's array. If receiver's ID doesn't exist
  * in the array, return the region's 'receiver_count'.
  */
-static uint32_t ffa_memory_region_get_receiver(
-	struct ffa_memory_region *memory_region, ffa_vm_id_t receiver)
+uint32_t ffa_memory_region_get_receiver(struct ffa_memory_region *memory_region,
+					ffa_vm_id_t receiver)
 {
 	struct ffa_memory_access *receivers;
 	uint32_t i;
@@ -2292,6 +2294,43 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 						     to_locked)) {
 		uint32_t receiver_index;
 
+		/*
+		 * The SPMC can only process retrieve requests to memory share
+		 * operations with one borrower from the other world. It can't
+		 * determine the ID of the NWd VM that invoked the retrieve
+		 * request interface call. It relies on the hypervisor to
+		 * validate the caller's ID against that provided in the
+		 * `receivers` list of the retrieve response.
+		 * In case there is only one borrower from the NWd in the
+		 * transaction descriptor, record that in the `receiver_id` for
+		 * later use, and validate in the retrieve request message.
+		 */
+		if (to_locked.vm->id == HF_HYPERVISOR_VM_ID) {
+			uint32_t other_world_count = 0;
+
+			for (uint32_t i = 0; i < memory_region->receiver_count;
+			     i++) {
+				receiver_id =
+					retrieve_request->receivers[0]
+						.receiver_permissions.receiver;
+				if (!vm_id_is_current_world(receiver_id)) {
+					other_world_count++;
+				}
+			}
+			if (other_world_count > 1) {
+				dlog_verbose(
+					"Support one receiver from the other "
+					"world.\n");
+				return ffa_error(FFA_NOT_SUPPORTED);
+			}
+		}
+
+		/*
+		 * Validate retrieve request, according to what was sent by the
+		 * sender. Function will output the `receiver_index` from the
+		 * provided memory region, and will output `permissions` from
+		 * the validated requested permissions.
+		 */
 		ret = ffa_memory_retrieve_validate(
 			receiver_id, retrieve_request, memory_region,
 			&receiver_index, share_state->share_func);
@@ -2335,8 +2374,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	} else {
 		if (share_state->hypervisor_fragment_count != 0U) {
 			dlog_verbose(
-				"Memory with handle %#x already "
-				"retrieved by "
+				"Memory with handle %#x already retrieved by "
 				"the hypervisor.\n",
 				handle);
 			ret = ffa_error(FFA_DENIED);
@@ -2347,6 +2385,9 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 
 		ffa_memory_retrieve_complete_from_hyp(share_state);
 	}
+
+	/* VMs acquire the RX buffer from SPMC. */
+	CHECK(plat_ffa_acquire_receiver_rx(to_locked, &ret));
 
 	/*
 	 * Copy response to RX buffer of caller and deliver the message.
@@ -2369,6 +2410,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
 		&fragment_length));
+
 	to_locked.vm->mailbox.recv_size = fragment_length;
 	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
 	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
@@ -2633,14 +2675,15 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	dump_share_states();
 
 	share_states = share_states_lock();
-	if (!get_share_state(share_states, handle, &share_state)) {
+	if (get_share_state(share_states, handle, &share_state)) {
+		memory_region = share_state->memory_region;
+	} else {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_RECLAIM.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
-	memory_region = share_state->memory_region;
 	CHECK(memory_region != NULL);
 
 	if (vm_id_is_current_world(to_locked.vm->id) &&

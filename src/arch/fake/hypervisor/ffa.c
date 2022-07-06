@@ -516,3 +516,15 @@ struct ffa_value plat_ffa_other_world_mem_reclaim(
 
 	return ffa_error(FFA_INVALID_PARAMETERS);
 }
+
+struct ffa_value plat_ffa_other_world_mem_retrieve(
+	struct vm_locked to_locked, struct ffa_memory_region *retrieve_request,
+	uint32_t length, struct mpool *page_pool)
+{
+	(void)to_locked;
+	(void)retrieve_request;
+	(void)length;
+	(void)page_pool;
+
+	return ffa_error(FFA_INVALID_PARAMETERS);
+}
