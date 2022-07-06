@@ -1370,19 +1370,9 @@ out:
 	return ret;
 }
 
-/**
- * Validates that the reclaim transition is allowed for the memory region with
- * the given handle which was previously shared with the other world. tells the
- * other world to mark it as reclaimed, and updates the page table of the
- * reclaiming VM.
- *
- * To do this information about the memory region is first fetched from the
- * other world.
- */
-static struct ffa_value ffa_memory_other_world_reclaim(
+static struct ffa_value plat_ffa_hyp_memory_retrieve(
 	struct vm_locked to_locked, struct vm_locked from_locked,
-	ffa_memory_handle_t handle, ffa_memory_region_flags_t flags,
-	struct mpool *page_pool)
+	ffa_memory_handle_t handle, struct ffa_memory_region **memory_region)
 {
 	uint32_t request_length = ffa_memory_lender_retrieve_request_init(
 		from_locked.vm->mailbox.recv, handle, to_locked.vm->id);
@@ -1390,9 +1380,6 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 	uint32_t length;
 	uint32_t fragment_length;
 	uint32_t fragment_offset;
-	struct ffa_memory_region *memory_region;
-	struct ffa_composite_memory_region *composite;
-	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 
 	CHECK(request_length <= HF_MAILBOX_SIZE);
 	CHECK(from_locked.vm->id == HF_OTHER_WORLD_ID);
@@ -1479,7 +1466,40 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 		fragment_offset += fragment_length;
 	}
 
-	memory_region = (struct ffa_memory_region *)other_world_retrieve_buffer;
+	*memory_region =
+		(struct ffa_memory_region *)other_world_retrieve_buffer;
+
+	return other_world_ret;
+}
+
+/**
+ * Validates that the reclaim transition is allowed for the memory region with
+ * the given handle which was previously shared with the SPMC. Tells the
+ * SPMC to mark it as reclaimed, and updates the page table of the reclaiming
+ * VM.
+ *
+ * To do this information about the memory region is first fetched from the
+ * SPMC.
+ */
+static struct ffa_value ffa_memory_other_world_reclaim(
+	struct vm_locked to_locked, struct vm_locked from_locked,
+	ffa_memory_handle_t handle, ffa_memory_region_flags_t flags,
+	struct mpool *page_pool)
+{
+	struct ffa_memory_region *memory_region = NULL;
+	struct ffa_composite_memory_region *composite;
+	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
+	struct ffa_value hyp_retr_ret;
+
+	/* Retrieve memory region from the SPMC. */
+	hyp_retr_ret = plat_ffa_hyp_memory_retrieve(to_locked, from_locked,
+						    handle, &memory_region);
+
+	if (hyp_retr_ret.func == FFA_ERROR_32) {
+		return hyp_retr_ret;
+	}
+
+	assert(memory_region != NULL);
 
 	if (memory_region->receiver_count != 1) {
 		/* Only one receiver supported by Hafnium for now. */
