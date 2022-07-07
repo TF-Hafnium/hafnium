@@ -501,11 +501,17 @@
 
 /**
  * When HCR_EL2.E2H=1 (ARMv8.1-VHE enabled), CPTR_EL2 contains control bits to
- * enable and disable access to floating point, SVE and advanced SIMD
- * instructions. This define enables FP instruction when executing in EL0 with
- * HCR_EL2.TGE=1.
+ * enable and disable access to Floating Point, Advanced SIMD and SVE
+ * instructions. This control does not cause execution of FP/SIMD instructions
+ * to be trapped.
  */
 #define CPTR_EL2_VHE_FPEN (UINT64_C(0x3) << 20)
+
+/**
+ * When HCR_EL2.E2H=1, this control does not cause execution of SVE instructions
+ * and accesses to ZCR_EL2/ZCR_EL1 to be trapped.
+ */
+#define CPTR_EL2_VHE_ZEN (UINT64_C(0x3) << 16)
 
 /*
  * Process State Bit definitions.
@@ -704,3 +710,19 @@ static inline void vhe_switch_to_host_or_guest(bool guest)
 		isb();
 	}
 }
+
+/**
+ * Scalable Vector Extension.
+ */
+#define ID_AA64PFR0_EL1_SVE_SHIFT 32
+#define ID_AA64PFR0_EL1_SVE_MASK UINT64_C(0xf)
+#define ID_AA64PFR0_EL1_SVE_SUPPORTED UINT64_C(0x1)
+
+/**
+ * Returns true if the SVE feature is implemented.
+ */
+bool is_arch_feat_sve_supported(void);
+
+/** SVE control register. */
+#define ZCR_LEN_MASK UINT32_C(0xf)
+#define ZCR_LEN_MAX UINT32_C(0xf)

@@ -37,5 +37,5 @@ DEFINE_OFFSETOF(VCPU_GIC, struct vcpu, regs.gic)
 #endif
 
 DEFINE_SIZEOF(SVE_CTX_SIZE, struct sve_context_t)
-DEFINE_OFFSETOF(SVE_CTX_FFR, struct sve_context_t, ffr)
 DEFINE_OFFSETOF(SVE_CTX_PREDICATES, struct sve_context_t, predicates)
+DEFINE_OFFSETOF(SVE_CTX_VECTORS, struct sve_context_t, vectors)

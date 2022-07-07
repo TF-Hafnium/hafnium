@@ -83,7 +83,6 @@
  * Helper macros for SVE vectors save/restore operations.
  */
 .macro sve_op_vectors op:req reg:req
-.arch_extension sve
 	\op z0, [\reg, #0, MUL VL]
 	\op z1, [\reg, #1, MUL VL]
 	\op z2, [\reg, #2, MUL VL]

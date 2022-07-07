@@ -200,6 +200,48 @@ struct ffa_value arch_regs_get_args(struct arch_regs *regs)
 	};
 }
 
+/* Returns the SVE implemented VL in bytes (constrained by ZCR_EL3.LEN) */
+static uint64_t arch_cpu_sve_len_get(void)
+{
+	uint64_t vl;
+
+	__asm__ volatile(
+		".arch_extension sve;"
+		"rdvl %0, #1;"
+		".arch_extension nosve;"
+		: "=r"(vl));
+
+	return vl;
+}
+
+static void arch_cpu_sve_configure_sve_vector_length(void)
+{
+	uint64_t vl_bits;
+	uint32_t zcr_len;
+
+	/*
+	 * Set ZCR_EL2.LEN to the maximum vector length permitted by the
+	 * architecture which applies to EL2 and lower ELs (limited by the
+	 * HW implementation).
+	 * This is done so that the VL read by arch_cpu_sve_len_get isn't
+	 * constrained by EL2 and thus indirectly retrieves the value
+	 * constrained by EL3 which applies to EL3 and lower ELs (limited by
+	 * the HW implementation).
+	 */
+	write_msr(MSR_ZCR_EL2, ZCR_LEN_MAX);
+	isb();
+
+	vl_bits = arch_cpu_sve_len_get() << 3;
+	zcr_len = (vl_bits >> 7) - 1;
+
+	/*
+	 * Set ZCR_EL2.LEN to the discovered value which contrains the VL at
+	 * EL2 and lower ELs to the value set by EL3.
+	 */
+	write_msr(MSR_ZCR_EL2, zcr_len & ZCR_LEN_MASK);
+	isb();
+}
+
 void arch_cpu_init(struct cpu *c, ipaddr_t entry_point)
 {
 	plat_psci_cpu_resume(c, entry_point);
@@ -214,7 +256,11 @@ void arch_cpu_init(struct cpu *c, ipaddr_t entry_point)
 
 	/* Initialize counter-timer virtual offset register to 0. */
 	write_msr(CNTVOFF_EL2, 0);
-
 	isb();
+
+	if (is_arch_feat_sve_supported()) {
+		arch_cpu_sve_configure_sve_vector_length();
+	}
+
 	plat_interrupts_controller_hw_init(c);
 }

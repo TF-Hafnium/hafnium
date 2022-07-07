@@ -8,14 +8,14 @@
 
 #include "hf/arch/types.h"
 
-/** SVE vector size supported. */
-#define HF_SVE_VECTOR_LENGTH 512
+/** Max SVE vector length supported by the architecture. */
+#define HF_SVE_VECTOR_LEN_MAX UINT32_C(2048)
 
 struct sve_context_t {
-	uint8_t vectors[32][HF_SVE_VECTOR_LENGTH / 8];
-
 	/* FFR and predicates are one-eigth of the SVE vector length */
-	uint8_t ffr[HF_SVE_VECTOR_LENGTH / 64];
+	uint8_t ffr[HF_SVE_VECTOR_LEN_MAX / 64];
 
-	uint8_t predicates[16][HF_SVE_VECTOR_LENGTH / 64];
+	uint8_t predicates[16][HF_SVE_VECTOR_LEN_MAX / 64];
+
+	uint8_t vectors[32][HF_SVE_VECTOR_LEN_MAX / 8];
 } __attribute__((aligned(16)));

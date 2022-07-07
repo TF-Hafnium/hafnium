@@ -149,11 +149,20 @@ uintreg_t get_mdcr_el2_value(void)
  */
 uintreg_t get_cptr_el2_value(void)
 {
+	uintreg_t ret;
+
 	if (has_vhe_support()) {
-		return CPTR_EL2_VHE_FPEN | CPTR_EL2_VHE_TTA;
+		ret = CPTR_EL2_VHE_FPEN | CPTR_EL2_VHE_TTA;
+
+		if (is_arch_feat_sve_supported()) {
+			/* CPTR_EL2.ZEN Disable SVE traps at EL2/1/0. */
+			ret |= CPTR_EL2_VHE_ZEN;
+		}
+	} else {
+		ret = CPTR_EL2_TTA;
 	}
 
-	return CPTR_EL2_TTA;
+	return ret;
 }
 
 /**
@@ -216,4 +225,15 @@ bool is_arch_feat_bti_supported(void)
 	uint64_t id_aa64pfr1_el1 = read_msr(ID_AA64PFR1_EL1);
 
 	return (id_aa64pfr1_el1 & ID_AA64PFR1_EL1_BT) == 1ULL;
+}
+
+/**
+ * Returns true if the SVE feature is implemented.
+ */
+bool is_arch_feat_sve_supported(void)
+{
+	uint64_t id_aa64pfr0_el1 = read_msr(ID_AA64PFR0_EL1);
+
+	return ((id_aa64pfr0_el1 >> ID_AA64PFR0_EL1_SVE_SHIFT) &
+		ID_AA64PFR0_EL1_SVE_MASK) == ID_AA64PFR0_EL1_SVE_SUPPORTED;
 }

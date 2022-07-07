@@ -13,13 +13,6 @@
 #include "msr.h"
 #include "exception_macros.S"
 
-
-/**
- * PE feature information about SVE implementation in AArch64 state.
- */
-#define ID_AA64PFR0_SVE_SHIFT (32)
-#define ID_AA64PFR0_SVE_LENGTH (4)
-
 /**
  * Saves the volatile registers into the register buffer of the current vCPU.
  */
@@ -477,8 +470,7 @@ other_world_loop:
 	msr fpcr, x1
 
 	/* Check if SVE is implemented. */
-	mrs x0, id_aa64pfr0_el1
-	ubfx x0, x0, ID_AA64PFR0_SVE_SHIFT, ID_AA64PFR0_SVE_LENGTH
+	bl is_arch_feat_sve_supported
 	cbnz x0, sve_context_restore
 
 	/* Restore the other world SIMD context to the other world VM vCPU. */
@@ -495,15 +487,19 @@ sve_context_restore:
 	mov x20, #SVE_CTX_SIZE
 	madd x18, x0, x20, x18
 
-	/* Restore vector registers. */
-	sve_op_vectors ldr, x18
+.arch_extension sve
 	/* Restore FFR register before predicates. */
-	add x20, x18, #SVE_CTX_FFR
-	ldr p0, [x20]
+	ldr p0, [x18]
 	wrffr p0.b
+
 	/* Restore predicate registers. */
 	add x20, x18, #SVE_CTX_PREDICATES
 	sve_predicate_op ldr, x20
+
+	/* Restore vector registers. */
+	add x20, x18, #SVE_CTX_VECTORS
+	sve_op_vectors ldr, x20
+.arch_extension nosve
 
 sve_skip_context_restore:
 	/*
@@ -561,8 +557,7 @@ sve_skip_context_restore:
 	stp x0, x1, [x18]
 
 	/* Check if SVE is implemented. */
-	mrs x0, id_aa64pfr0_el1
-	ubfx x0, x0, ID_AA64PFR0_SVE_SHIFT, ID_AA64PFR0_SVE_LENGTH
+	bl is_arch_feat_sve_supported
 	cbnz x0, sve_context_save
 
 	/* Save the other world SIMD context to the other world VM vCPU. */
@@ -579,15 +574,19 @@ sve_context_save:
 	mov x20, #SVE_CTX_SIZE
 	madd x18, x0, x20, x18
 
-	/* Save vector registers. */
-	sve_op_vectors str, x18
+.arch_extension sve
 	/* Save predicate registers. */
 	add x20, x18, #SVE_CTX_PREDICATES
 	sve_predicate_op str, x20
+
 	/* Save FFR register after predicates. */
-	add x20, x18, #SVE_CTX_FFR
 	rdffr p0.b
-	str p0, [x20]
+	str p0, [x18]
+
+	/* Save vector registers. */
+	add x20, x18, #SVE_CTX_VECTORS
+	sve_op_vectors str, x20
+.arch_extension nosve
 
 sve_skip_context_save:
 

@@ -79,6 +79,11 @@
  */
 #define MSR_VSTCR_EL2 S3_4_C2_C6_2
 
+/*
+ * SVE Control Register for EL2.
+ */
+#define MSR_ZCR_EL2 S3_4_C1_C2_0
+
 #if BRANCH_PROTECTION
 
 #define APIAKEYLO_EL1 S3_0_C2_C1_0
