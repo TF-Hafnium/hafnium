@@ -2105,6 +2105,126 @@ static void ffa_memory_retrieve_complete_from_hyp(
 	}
 }
 
+/**
+ * Validate that the memory region descriptor provided by the borrower on
+ * FFA_MEM_RETRIEVE_REQ, against saved memory region provided by lender at the
+ * memory sharing call.
+ */
+static struct ffa_value ffa_memory_retrieve_validate(
+	ffa_vm_id_t receiver_id, struct ffa_memory_region *retrieve_request,
+	struct ffa_memory_region *memory_region, uint32_t *receiver_index,
+	uint32_t share_func)
+{
+	ffa_memory_region_flags_t transaction_type =
+		retrieve_request->flags &
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK;
+
+	assert(retrieve_request != NULL);
+	assert(memory_region != NULL);
+	assert(receiver_index != NULL);
+	assert(retrieve_request->sender == memory_region->sender);
+
+	/*
+	 * Check that the transaction type expected by the receiver is
+	 * correct, if it has been specified.
+	 */
+	if (transaction_type !=
+		    FFA_MEMORY_REGION_TRANSACTION_TYPE_UNSPECIFIED &&
+	    transaction_type != (memory_region->flags &
+				 FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK)) {
+		dlog_verbose(
+			"Incorrect transaction type %#x for "
+			"FFA_MEM_RETRIEVE_REQ, expected %#x for handle %#x.\n",
+			transaction_type,
+			memory_region->flags &
+				FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK,
+			retrieve_request->handle);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (retrieve_request->tag != memory_region->tag) {
+		dlog_verbose(
+			"Incorrect tag %d for FFA_MEM_RETRIEVE_REQ, expected "
+			"%d for handle %#x.\n",
+			retrieve_request->tag, memory_region->tag,
+			retrieve_request->handle);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	*receiver_index =
+		ffa_memory_region_get_receiver(memory_region, receiver_id);
+
+	if (*receiver_index == memory_region->receiver_count) {
+		dlog_verbose(
+			"Incorrect receiver VM ID %d for "
+			"FFA_MEM_RETRIEVE_REQ, for handle %#x.\n",
+			receiver_id, handle);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if ((retrieve_request->flags &
+	     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_VALID) != 0U) {
+		dlog_verbose(
+			"Retriever specified 'address range alignment 'hint' "
+			"not supported.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+	if ((retrieve_request->flags &
+	     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_MASK) != 0) {
+		dlog_verbose(
+			"Bits 8-5 must be zero in memory region's flags "
+			"(address range alignment hint not supported).\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if ((retrieve_request->flags & ~0x7FF) != 0U) {
+		dlog_verbose(
+			"Bits 31-10 must be zero in memory region's flags.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (share_func == FFA_MEM_SHARE_32 &&
+	    (retrieve_request->flags &
+	     (FFA_MEMORY_REGION_FLAG_CLEAR |
+	      FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH)) != 0U) {
+		dlog_verbose(
+			"Memory Share operation can't clean after relinquish "
+			"memory region.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * If the borrower needs the memory to be cleared before mapping
+	 * to its address space, the sender should have set the flag
+	 * when calling FFA_MEM_LEND/FFA_MEM_DONATE, else return
+	 * FFA_DENIED.
+	 */
+	if ((retrieve_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) != 0U &&
+	    (memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR) == 0U) {
+		dlog_verbose(
+			"Borrower needs memory cleared. Sender needs to set "
+			"flag for clearing memory.\n");
+		return ffa_error(FFA_DENIED);
+	}
+
+	/*
+	 * If memory type is not specified, bypass validation of memory
+	 * attributes in the retrieve request. The retriever is expecting to
+	 * obtain this information from the SPMC.
+	 */
+	if (ffa_get_memory_type_attr(retrieve_request->attributes) ==
+	    FFA_MEMORY_NOT_SPECIFIED_MEM) {
+		return (struct ffa_value){.func = FFA_SUCCESS_32};
+	}
+
+	/*
+	 * Ensure receiver's attributes are compatible with how
+	 * Hafnium maps memory: Normal Memory, Inner shareable,
+	 * Write-Back Read-Allocate Write-Allocate Cacheable.
+	 */
+	return ffa_memory_attributes_validate(retrieve_request->attributes);
+}
+
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
 				     uint32_t retrieve_request_length,
@@ -2115,9 +2235,6 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		retrieve_request->receiver_count *
 			sizeof(struct ffa_memory_access);
 	ffa_memory_handle_t handle = retrieve_request->handle;
-	ffa_memory_region_flags_t transaction_type =
-		retrieve_request->flags &
-		FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK;
 	struct ffa_memory_region *memory_region;
 	ffa_memory_access_permissions_t permissions = 0;
 	uint32_t memory_to_attributes;
@@ -2127,7 +2244,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	struct ffa_composite_memory_region *composite;
 	uint32_t total_length;
 	uint32_t fragment_length;
-	ffa_vm_id_t receiver_id;
+	ffa_vm_id_t receiver_id = to_locked.vm->id;
 	bool is_send_complete = false;
 
 	dump_share_states();
@@ -2159,27 +2276,26 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	}
 
 	memory_region = share_state->memory_region;
+
 	CHECK(memory_region != NULL);
 
-	receiver_id = to_locked.vm->id;
+	if (retrieve_request->sender != memory_region->sender) {
+		dlog_verbose(
+			"Memory with handle %#x not fully sent, can't "
+			"retrieve.\n",
+			handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
 
 	if (!is_ffa_memory_retrieve_borrower_request(retrieve_request,
 						     to_locked)) {
 		uint32_t receiver_index;
-		/*
-		 * Find receiver index in the receivers list specified by the
-		 * sender.
-		 */
-		receiver_index = ffa_memory_region_get_receiver(
-			memory_region, to_locked.vm->id);
 
-		if (receiver_index == memory_region->receiver_count) {
-			dlog_verbose(
-				"Incorrect receiver VM ID %x for "
-				"FFA_MEM_RETRIEVE_REQ, "
-				"for handle %#x.\n",
-				to_locked.vm->id, handle);
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
+		ret = ffa_memory_retrieve_validate(
+			receiver_id, retrieve_request, memory_region,
+			&receiver_index, share_state->share_func);
+		if (ret.func != FFA_SUCCESS_32) {
 			goto out;
 		}
 
@@ -2192,125 +2308,11 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 			goto out;
 		}
 
-		/*
-		 * Check that the transaction type expected by the receiver is
-		 * correct, if it has been specified.
-		 */
-		if (transaction_type !=
-			    FFA_MEMORY_REGION_TRANSACTION_TYPE_UNSPECIFIED &&
-		    transaction_type !=
-			    (memory_region->flags &
-			     FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK)) {
-			dlog_verbose(
-				"Incorrect transaction type %#x for "
-				"FFA_MEM_RETRIEVE_REQ, expected %#x for handle "
-				"%#x.\n",
-				transaction_type,
-				memory_region->flags &
-					FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK,
-				handle);
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out;
-		}
-
-		if (retrieve_request->sender != memory_region->sender) {
-			dlog_verbose(
-				"Incorrect sender ID %d for "
-				"FFA_MEM_RETRIEVE_REQ, "
-				"expected %d for handle %#x.\n",
-				retrieve_request->sender, memory_region->sender,
-				handle);
-			ret = ffa_error(FFA_DENIED);
-			goto out;
-		}
-
-		if (retrieve_request->tag != memory_region->tag) {
-			dlog_verbose(
-				"Incorrect tag %d for FFA_MEM_RETRIEVE_REQ, "
-				"expected "
-				"%d for handle %#x.\n",
-				retrieve_request->tag, memory_region->tag,
-				handle);
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out;
-		}
-
-		if ((retrieve_request->flags &
-		     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_VALID) != 0U) {
-			dlog_verbose(
-				"Retriever specified 'address range alignment "
-				"hint' not supported.\n");
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out;
-		}
-
-		if ((retrieve_request->flags &
-		     FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_MASK) != 0) {
-			dlog_verbose(
-				"Bits 8-5 must be zero in memory region's "
-				"flags (address range alignment hint not "
-				"supported).\n");
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out;
-		}
-
-		if ((retrieve_request->flags & ~0x7FF) != 0U) {
-			dlog_verbose(
-				"Bits 31-10 must be zero in memory region's "
-				"flags.\n");
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out;
-		}
-
-		if (share_state->share_func == FFA_MEM_SHARE_32 &&
-		    (retrieve_request->flags &
-		     (FFA_MEMORY_REGION_FLAG_CLEAR |
-		      FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH)) != 0U) {
-			dlog_verbose(
-				"Memory Share operation can't clean after "
-				"relinquish "
-				"memory region.\n");
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out;
-		}
-
-		/*
-		 * If the borrower needs the memory to be cleared before mapping
-		 * to its address space, the sender should have set the flag
-		 * when calling FFA_MEM_LEND/FFA_MEM_DONATE, else return
-		 * FFA_DENIED.
-		 */
-		if ((retrieve_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) !=
-			    0U &&
-		    (memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR) ==
-			    0U) {
-			dlog_verbose(
-				"Borrower needs memory cleared. Sender needs "
-				"to set "
-				"flag for clearing memory.\n");
-			ret = ffa_error(FFA_DENIED);
-			goto out;
-		}
-
 		ret = ffa_memory_retrieve_validate_memory_access_list(
 			memory_region, retrieve_request, receiver_id,
 			&permissions);
 		if (ret.func != FFA_SUCCESS_32) {
 			goto out;
-		}
-
-		if (ffa_get_memory_type_attr(retrieve_request->attributes) !=
-		    FFA_MEMORY_NOT_SPECIFIED_MEM) {
-			/*
-			 * Ensure receiver's attributes are compatible with how
-			 * Hafnium maps memory: Normal Memory, Inner shareable,
-			 * Write-Back Read-Allocate Write-Allocate Cacheable.
-			 */
-			ret = ffa_memory_attributes_validate(
-				retrieve_request->attributes);
-			if (ret.func != FFA_SUCCESS_32) {
-				goto out;
-			}
 		}
 
 		memory_to_attributes = ffa_memory_permissions_to_mode(
