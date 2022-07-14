@@ -500,6 +500,154 @@ static uint32_t device_region_attributes_to_mode(uint32_t attributes)
 	return mode | MM_MODE_D;
 }
 
+static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
+				   const struct vm_locked vm_locked,
+				   const struct vm_locked primary_vm_locked,
+				   paddr_t mem_end, bool is_el0_partition,
+				   struct mpool *ppool)
+{
+#if LOG_LEVEL >= LOG_LEVEL_WARNING
+	const char *error_string = " region security state ignored for ";
+#endif
+	int j = 0;
+	paddr_t region_begin;
+	paddr_t region_end;
+	paddr_t alloc_base = mem_end;
+	size_t size;
+	size_t total_alloc = 0;
+	uint32_t map_mode;
+	uint32_t attributes;
+
+	/* Map memory-regions */
+	while (j < manifest_vm->partition.mem_region_count) {
+		size = manifest_vm->partition.mem_regions[j].page_count *
+		       PAGE_SIZE;
+		/*
+		 * For memory-regions without base-address, memory
+		 * should be allocated inside partition's page table.
+		 * Start allocating memory regions in partition's
+		 * page table, starting from the end.
+		 * TODO: Add mechanism to let partition know of these
+		 * memory regions
+		 */
+		if (manifest_vm->partition.mem_regions[j].base_address ==
+		    MANIFEST_INVALID_ADDRESS) {
+			total_alloc += size;
+			/* Don't go beyond half the VM's memory space */
+			if (total_alloc >
+			    (manifest_vm->secondary.mem_size / 2)) {
+				dlog_error(
+					"Not enough space for memory-"
+					"region allocation");
+				return false;
+			}
+
+			region_end = alloc_base;
+			region_begin = pa_subtract(alloc_base, size);
+			alloc_base = region_begin;
+		} else {
+			/*
+			 * Identity map memory region for both case,
+			 * VA(S-EL0) or IPA(S-EL1).
+			 */
+			region_begin =
+				pa_init(manifest_vm->partition.mem_regions[j]
+						.base_address);
+			region_end = pa_add(region_begin, size);
+		}
+
+		attributes = manifest_vm->partition.mem_regions[j].attributes;
+		if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
+			if (plat_ffa_is_vm_id(vm_locked.vm->id)) {
+				dlog_warning("Memory%sVMs\n", error_string);
+				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
+
+			} else if (!is_el0_partition) {
+				dlog_warning(
+					"Memory%sS-EL1 "
+					"partitions.\n",
+					error_string);
+				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
+			}
+		}
+
+		map_mode = memory_region_attributes_to_mode(attributes);
+
+		if (is_el0_partition) {
+			map_mode |= MM_MODE_USER | MM_MODE_NG;
+		}
+
+		if (!vm_identity_map(vm_locked, region_begin, region_end,
+				     map_mode, ppool, NULL)) {
+			dlog_error(
+				"Unable to map secondary VM "
+				"memory-region.\n");
+			return false;
+		}
+
+		/* Deny the primary VM access to this memory */
+		if (!vm_unmap(primary_vm_locked, region_begin, region_end,
+			      ppool)) {
+			dlog_error(
+				"Unable to unmap secondary VM memory-"
+				"region from primary VM.\n");
+			return false;
+		}
+
+		dlog_verbose("Memory region %#x - %#x allocated.\n",
+			     region_begin, region_end);
+
+		j++;
+	}
+
+	/* Map device-regions */
+	j = 0;
+	while (j < manifest_vm->partition.dev_region_count) {
+		region_begin = pa_init(
+			manifest_vm->partition.dev_regions[j].base_address);
+		size = manifest_vm->partition.dev_regions[j].page_count *
+		       PAGE_SIZE;
+		region_end = pa_add(region_begin, size);
+
+		attributes = manifest_vm->partition.dev_regions[j].attributes;
+		if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
+			if (plat_ffa_is_vm_id(vm_locked.vm->id)) {
+				dlog_warning("Device%sVMs\n", error_string);
+				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
+			} else if (!is_el0_partition) {
+				dlog_warning(
+					"Device%sS-EL1 "
+					"partitions.\n",
+					error_string);
+				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
+			}
+		}
+
+		map_mode = device_region_attributes_to_mode(attributes);
+		if (is_el0_partition) {
+			map_mode |= MM_MODE_USER | MM_MODE_NG;
+		}
+
+		if (!vm_identity_map(vm_locked, region_begin, region_end,
+				     map_mode, ppool, NULL)) {
+			dlog_error(
+				"Unable to map secondary VM "
+				"device-region.\n");
+			return false;
+		}
+		/* Deny primary VM access to this region */
+		if (!vm_unmap(primary_vm_locked, region_begin, region_end,
+			      ppool)) {
+			dlog_error(
+				"Unable to unmap secondary VM device-"
+				"region from primary VM.\n");
+			return false;
+		}
+		j++;
+	}
+	return true;
+}
+
 /*
  * Loads a secondary VM.
  */
@@ -509,9 +657,6 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			   const struct manifest_vm *manifest_vm,
 			   const struct memiter *cpio, struct mpool *ppool)
 {
-#if LOG_LEVEL >= LOG_LEVEL_WARNING
-	const char *error_string = " region security state ignored for ";
-#endif
 	struct vm *vm;
 	struct vm_locked vm_locked;
 	struct vcpu_locked vcpu_locked;
@@ -523,6 +668,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	size_t kernel_size = 0;
 	const size_t mem_size = pa_difference(mem_begin, mem_end);
 	uint32_t map_mode;
+	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0;
 
 	/*
 	 * Load the kernel if a filename is specified in the VM manifest.
@@ -572,11 +718,10 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	 * An S-EL0 partition must contain only 1 vCPU (UP migratable) per the
 	 * FF-A 1.0 spec.
 	 */
-	CHECK(manifest_vm->partition.run_time_el != S_EL0 ||
-	      manifest_vm->secondary.vcpu_count == 1);
+	CHECK(!is_el0_partition || manifest_vm->secondary.vcpu_count == 1);
 
 	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm,
-			  (manifest_vm->partition.run_time_el == S_EL0))) {
+			  is_el0_partition)) {
 		dlog_error("Unable to initialise VM.\n");
 		return false;
 	}
@@ -591,7 +736,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	 * expected to perform its owns relocations and call the FFA_MEM_PERM_*
 	 * API's to change permissions on its image layout.
 	 */
-	if (vm->el0_partition) {
+	if (is_el0_partition) {
 		map_mode = MM_MODE_R | MM_MODE_X | MM_MODE_USER | MM_MODE_NG;
 	} else {
 		map_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
@@ -605,199 +750,11 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	}
 
 	if (manifest_vm->is_ffa_partition) {
-		int j = 0;
-		paddr_t region_begin;
-		paddr_t region_end;
-		paddr_t alloc_base = mem_end;
-		size_t size;
-		size_t total_alloc = 0;
-		uint32_t attributes;
-
-		/* Map memory-regions */
-		while (j < manifest_vm->partition.mem_region_count) {
-			size = manifest_vm->partition.mem_regions[j]
-				       .page_count *
-			       PAGE_SIZE;
-			/*
-			 * For memory-regions without base-address, memory
-			 * should be allocated inside partition's page table.
-			 * Start allocating memory regions in partition's
-			 * page table, starting from the end.
-			 * TODO: Add mechanism to let partition know of these
-			 * memory regions
-			 */
-			if (manifest_vm->partition.mem_regions[j]
-				    .base_address == MANIFEST_INVALID_ADDRESS) {
-				total_alloc += size;
-				/* Don't go beyond half the VM's memory space */
-				if (total_alloc >
-				    (manifest_vm->secondary.mem_size / 2)) {
-					dlog_error(
-						"Not enough space for memory-"
-						"region allocation");
-					ret = false;
-					goto out;
-				}
-
-				region_end = alloc_base;
-				region_begin = pa_subtract(alloc_base, size);
-				alloc_base = region_begin;
-
-				attributes =
-					manifest_vm->partition.mem_regions[j]
-						.attributes;
-				if ((attributes &
-				     MANIFEST_REGION_ATTR_SECURITY) != 0) {
-					if (plat_ffa_is_vm_id(
-						    vm_locked.vm->id)) {
-						dlog_warning("Memory%sVMs\n",
-							     error_string);
-						attributes &=
-							~MANIFEST_REGION_ATTR_SECURITY;
-					} else if (!vm->el0_partition) {
-						dlog_warning(
-							"Memory%sS-EL1 "
-							"partitions.\n",
-							error_string);
-						attributes &=
-							~MANIFEST_REGION_ATTR_SECURITY;
-					}
-				}
-
-				map_mode = memory_region_attributes_to_mode(
-					attributes);
-				if (vm->el0_partition) {
-					map_mode |= MM_MODE_USER | MM_MODE_NG;
-				}
-
-				if (!vm_identity_map(vm_locked, region_begin,
-						     region_end, map_mode,
-						     ppool, NULL)) {
-					dlog_error(
-						"Unable to map secondary VM "
-						"memory-region.\n");
-					ret = false;
-					goto out;
-				}
-
-				dlog_verbose(
-					"  Memory region %#x - %#x allocated\n",
-					region_begin, region_end);
-			} else {
-				/*
-				 * Identity map memory region for both case,
-				 * VA(S-EL0) or IPA(S-EL1).
-				 */
-				region_begin = pa_init(
-					manifest_vm->partition.mem_regions[j]
-						.base_address);
-				region_end = pa_add(region_begin, size);
-
-				attributes =
-					manifest_vm->partition.mem_regions[j]
-						.attributes;
-				if ((attributes &
-				     MANIFEST_REGION_ATTR_SECURITY) != 0) {
-					if (plat_ffa_is_vm_id(
-						    vm_locked.vm->id)) {
-						dlog_warning("Memory%sVMs\n",
-							     error_string);
-						attributes &=
-							~MANIFEST_REGION_ATTR_SECURITY;
-
-					} else if (!vm->el0_partition) {
-						dlog_warning(
-							"Memory%sS-EL1 "
-							"partitions.\n",
-							error_string);
-						attributes &=
-							~MANIFEST_REGION_ATTR_SECURITY;
-					}
-				}
-
-				map_mode = memory_region_attributes_to_mode(
-					attributes);
-				if (vm->el0_partition) {
-					map_mode |= MM_MODE_USER | MM_MODE_NG;
-				}
-
-				if (!vm_identity_map(vm_locked, region_begin,
-						     region_end, map_mode,
-						     ppool, NULL)) {
-					dlog_error(
-						"Unable to map secondary VM "
-						"memory-region.\n");
-					ret = false;
-					goto out;
-				}
-			}
-
-			/* Deny the primary VM access to this memory */
-			if (!vm_unmap(primary_vm_locked, region_begin,
-				      region_end, ppool)) {
-				dlog_error(
-					"Unable to unmap secondary VM memory-"
-					"region from primary VM.\n");
-				ret = false;
-				goto out;
-			}
-
-			j++;
-		}
-
-		/* Map device-regions */
-		j = 0;
-		while (j < manifest_vm->partition.dev_region_count) {
-			region_begin =
-				pa_init(manifest_vm->partition.dev_regions[j]
-						.base_address);
-			size = manifest_vm->partition.dev_regions[j]
-				       .page_count *
-			       PAGE_SIZE;
-			region_end = pa_add(region_begin, size);
-
-			attributes = manifest_vm->partition.dev_regions[j]
-					     .attributes;
-			if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
-				if (plat_ffa_is_vm_id(vm_locked.vm->id)) {
-					dlog_warning("Device%sVMs\n",
-						     error_string);
-					attributes &=
-						~MANIFEST_REGION_ATTR_SECURITY;
-				} else if (!vm->el0_partition) {
-					dlog_warning(
-						"Device%sS-EL1 "
-						"partitions.\n",
-						error_string);
-					attributes &=
-						~MANIFEST_REGION_ATTR_SECURITY;
-				}
-			}
-
-			map_mode = device_region_attributes_to_mode(attributes);
-			if (vm->el0_partition) {
-				map_mode |= MM_MODE_USER | MM_MODE_NG;
-			}
-
-			if (!vm_identity_map(vm_locked, region_begin,
-					     region_end, map_mode, ppool,
-					     NULL)) {
-				dlog_error(
-					"Unable to map secondary VM "
-					"device-region.\n");
-				ret = false;
-				goto out;
-			}
-			/* Deny primary VM access to this region */
-			if (!vm_unmap(primary_vm_locked, region_begin,
-				      region_end, ppool)) {
-				dlog_error(
-					"Unable to unmap secondary VM device-"
-					"region from primary VM.\n");
-				ret = false;
-				goto out;
-			}
-			j++;
+		if (!ffa_map_memory_regions(manifest_vm, vm_locked,
+					    primary_vm_locked, mem_end,
+					    is_el0_partition, ppool)) {
+			ret = false;
+			goto out;
 		}
 
 		secondary_entry = ipa_add(secondary_entry,
@@ -812,7 +769,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	 * require and not the entire hypervisor. This helps with speculative
 	 * side-channel attacks.
 	 */
-	if (vm->el0_partition) {
+	if (is_el0_partition) {
 		CHECK(vm_identity_map(vm_locked, layout_text_begin(),
 				      layout_text_end(), MM_MODE_X, ppool,
 				      NULL));
