@@ -99,9 +99,6 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 					      struct vcpu **next);
 struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 					       struct vcpu *current);
-struct vcpu *api_switch_to_primary(struct vcpu *current,
-				   struct ffa_value primary_ret,
-				   enum vcpu_state secondary_state);
 struct vcpu *api_switch_to_other_world(struct vcpu *current,
 				       struct ffa_value other_world_ret,
 				       enum vcpu_state vcpu_state);

@@ -128,9 +128,9 @@ static struct vcpu *api_switch_to_vm(struct vcpu *current,
  * This triggers the scheduling logic to run. Run in the context of secondary VM
  * to cause FFA_RUN to return and the primary VM to regain control of the CPU.
  */
-struct vcpu *api_switch_to_primary(struct vcpu *current,
-				   struct ffa_value primary_ret,
-				   enum vcpu_state secondary_state)
+static struct vcpu *api_switch_to_primary(struct vcpu *current,
+					  struct ffa_value primary_ret,
+					  enum vcpu_state secondary_state)
 {
 	/*
 	 * If the secondary is blocked but has a timer running, sleep until the
@@ -1593,7 +1593,7 @@ out:
  * Checks whether the vCPU's attempt to block for a message has already been
  * interrupted or whether it is allowed to block.
  */
-bool api_ffa_msg_recv_block_interrupted(struct vcpu *current)
+static bool api_ffa_msg_recv_block_interrupted(struct vcpu *current)
 {
 	struct vcpu_locked current_locked;
 	bool interrupted;
