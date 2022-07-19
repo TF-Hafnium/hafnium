@@ -2584,3 +2584,16 @@ struct ffa_value plat_ffa_other_world_mem_retrieve(
 
 	return ffa_error(FFA_INVALID_PARAMETERS);
 }
+
+struct ffa_value plat_ffa_other_world_mem_send_continue(
+	struct vm *from, void *fragment, uint32_t fragment_length,
+	ffa_memory_handle_t handle, struct mpool *page_pool)
+{
+	(void)from;
+	(void)fragment;
+	(void)fragment_length;
+	(void)handle;
+	(void)page_pool;
+
+	return ffa_error(FFA_INVALID_PARAMETERS);
+}

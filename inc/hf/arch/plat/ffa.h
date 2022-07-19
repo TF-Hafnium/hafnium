@@ -342,3 +342,11 @@ struct ffa_value plat_ffa_other_world_mem_reclaim(
 struct ffa_value plat_ffa_other_world_mem_retrieve(
 	struct vm_locked to_locked, struct ffa_memory_region *retrieve_request,
 	uint32_t length, struct mpool *page_pool);
+
+/**
+ * Handles the continuation of the memory send operation in case the memory
+ * region descriptor contains multiple segments.
+ */
+struct ffa_value plat_ffa_other_world_mem_send_continue(
+	struct vm *from, void *fragment, uint32_t fragment_length,
+	ffa_memory_handle_t handle, struct mpool *page_pool);

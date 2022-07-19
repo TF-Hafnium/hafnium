@@ -61,8 +61,6 @@ static void send_fragmented_memory_region(
 			EXPECT_EQ(ffa_frag_handle(*send_ret), fragment_handle);
 		}
 		EXPECT_EQ(send_ret->arg3, sent_length);
-		/* Sender MBZ at virtual instance. */
-		EXPECT_EQ(ffa_frag_sender(*send_ret), 0);
 
 		remaining_constituent_count = ffa_memory_fragment_init(
 			tx_buffer, HF_MAILBOX_SIZE,

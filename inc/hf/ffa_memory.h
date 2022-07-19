@@ -23,10 +23,6 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 					  uint32_t fragment_length,
 					  ffa_memory_handle_t handle,
 					  struct mpool *page_pool);
-struct ffa_value ffa_memory_other_world_send_continue(
-	struct vm_locked from_locked, struct vm_locked to_locked,
-	void *fragment, uint32_t fragment_length, ffa_memory_handle_t handle,
-	struct mpool *page_pool);
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
 				     uint32_t retrieve_request_length,

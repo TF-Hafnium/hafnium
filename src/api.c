@@ -3152,7 +3152,8 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	struct ffa_value ret;
 
 	/* Sender ID MBZ at virtual instance. */
-	if (sender_vm_id != 0) {
+	if (vm_id_is_current_world(from->id) && sender_vm_id != 0) {
+		dlog_verbose("Invalid sender.");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -3202,10 +3203,9 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	 * memory send (i.e. donate, lend or share) request.
 	 *
 	 * We can tell from the handle whether the memory transaction is for the
-	 * TEE or not.
+	 * other world or not.
 	 */
-	if ((handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK) ==
-	    FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR) {
+	if (plat_ffa_memory_handle_allocated_by_current_world(handle)) {
 		struct vm_locked from_locked = vm_lock(from);
 
 		ret = ffa_memory_send_continue(from_locked, fragment_copy,
@@ -3217,26 +3217,9 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 		 */
 		vm_unlock(&from_locked);
 	} else {
-		struct vm *to = vm_find(HF_TEE_VM_ID);
-		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
-
-		/*
-		 * The TEE RX buffer state is checked in
-		 * `ffa_memory_other_world_send_continue` rather than here, as
-		 * we need to return `FFA_MEM_FRAG_RX` with the current offset
-		 * rather than FFA_ERROR FFA_BUSY in case it is busy.
-		 */
-
-		ret = ffa_memory_other_world_send_continue(
-			vm_to_from_lock.vm2, vm_to_from_lock.vm1, fragment_copy,
-			fragment_length, handle, &api_page_pool);
-		/*
-		 * `ffa_memory_other_world_send_continue` takes ownership of the
-		 * fragment_copy, so we don't need to free it here.
-		 */
-
-		vm_unlock(&vm_to_from_lock.vm1);
-		vm_unlock(&vm_to_from_lock.vm2);
+		ret = plat_ffa_other_world_mem_send_continue(
+			from, fragment_copy, fragment_length, handle,
+			&api_page_pool);
 	}
 
 	return ret;

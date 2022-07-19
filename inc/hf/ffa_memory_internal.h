@@ -105,6 +105,15 @@ bool allocate_share_state(struct share_states_locked share_states,
 			  struct ffa_memory_share_state **share_state_ret);
 struct share_states_locked share_states_lock(void);
 void share_states_unlock(struct share_states_locked *share_states);
+void share_state_free(struct share_states_locked share_states,
+		      struct ffa_memory_share_state *share_state,
+		      struct mpool *page_pool);
+uint32_t share_state_next_fragment_offset(
+	struct share_states_locked share_states,
+	struct ffa_memory_share_state *share_state);
+/** Checks whether the given share state has been fully sent. */
+bool share_state_sending_complete(struct share_states_locked share_states,
+				  struct ffa_memory_share_state *share_state);
 void dump_share_states(void);
 
 /**
@@ -136,21 +145,38 @@ struct ffa_value ffa_send_check_update(
 	uint32_t share_func, struct ffa_memory_access *receivers,
 	uint32_t receivers_count, struct mpool *page_pool, bool clear,
 	uint32_t *orig_from_mode_ret);
-bool ffa_region_group_identity_map(
-	struct vm_locked vm_locked,
+struct ffa_value ffa_memory_send_complete(
+	struct vm_locked from_locked, struct share_states_locked share_states,
+	struct ffa_memory_share_state *share_state, struct mpool *page_pool,
+	uint32_t *orig_from_mode_ret);
+struct ffa_value ffa_memory_send_continue_validate(
+	struct share_states_locked share_states, ffa_memory_handle_t handle,
+	struct ffa_memory_share_state **share_state_ret, ffa_vm_id_t from_vm_id,
+	struct mpool *page_pool);
+struct ffa_value ffa_send_check_update(
+	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
-	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t mode, struct mpool *ppool, bool commit);
+	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t share_func, struct ffa_memory_access *receivers,
+	uint32_t receivers_count, struct mpool *page_pool, bool clear,
+	uint32_t *orig_from_mode_ret);
 struct ffa_value ffa_retrieve_check_transition(
 	struct vm_locked to, uint32_t share_func,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t memory_to_attributes, uint32_t *to_mode);
-uint32_t ffa_memory_region_get_receiver(struct ffa_memory_region *memory_region,
-					ffa_vm_id_t receiver);
 struct ffa_value ffa_retrieve_check_update(
 	struct vm_locked to_locked, ffa_vm_id_t from_id,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t memory_to_attributes, uint32_t share_func, bool clear,
 	struct mpool *page_pool);
+uint32_t ffa_memory_region_get_receiver(struct ffa_memory_region *memory_region,
+					ffa_vm_id_t receiver);
+bool ffa_region_group_identity_map(
+	struct vm_locked vm_locked,
+	struct ffa_memory_region_constituent **fragments,
+	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t mode, struct mpool *ppool, bool commit);
+bool memory_region_receivers_from_other_world(
+	struct ffa_memory_region *memory_region);
