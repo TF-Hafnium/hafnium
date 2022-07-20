@@ -176,6 +176,28 @@ uint32_t ffa_memory_region_init_single_receiver(
 	enum ffa_memory_shareability shareability, uint32_t *total_length,
 	uint32_t *fragment_length)
 {
+	struct ffa_memory_access receiver_access;
+
+	ffa_memory_access_init_permissions(&receiver_access, receiver,
+					   data_access, instruction_access, 0);
+
+	return ffa_memory_region_init(
+		memory_region, memory_region_max_size, sender, &receiver_access,
+		1, constituents, constituent_count, tag, flags, type,
+		cacheability, shareability, total_length, fragment_length);
+}
+
+uint32_t ffa_memory_region_init(
+	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
+	ffa_vm_id_t sender, struct ffa_memory_access receivers[],
+	uint32_t receiver_count,
+	const struct ffa_memory_region_constituent constituents[],
+	uint32_t constituent_count, uint32_t tag,
+	ffa_memory_region_flags_t flags, enum ffa_memory_type type,
+	enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability, uint32_t *total_length,
+	uint32_t *fragment_length)
+{
 	ffa_memory_attributes_t attributes = 0;
 
 	/* Set memory region's page attributes. */
@@ -184,10 +206,16 @@ uint32_t ffa_memory_region_init_single_receiver(
 	ffa_set_memory_shareability_attr(&attributes, shareability);
 
 	ffa_memory_region_init_header(memory_region, sender, attributes, flags,
-				      0, tag, 1);
-	ffa_memory_access_init_permissions(&memory_region->receivers[0],
-					   receiver, data_access,
-					   instruction_access, 0);
+				      0, tag, receiver_count);
+
+#if defined(__linux__) && defined(__KERNEL__)
+	memcpy(memory_region->receivers, receivers,
+	       receiver_count * sizeof(struct ffa_memory_access));
+#else
+	memcpy_s(memory_region->receivers,
+		 MAX_MEM_SHARE_RECIPIENTS * sizeof(struct ffa_memory_access),
+		 receivers, receiver_count * sizeof(struct ffa_memory_access));
+#endif
 
 	return ffa_memory_region_init_constituents(
 		memory_region, memory_region_max_size, constituents,
