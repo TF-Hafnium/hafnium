@@ -1884,7 +1884,7 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
  */
 uint32_t api_interrupt_get(struct vcpu *current)
 {
-	uint8_t i;
+	uint32_t i;
 	uint32_t first_interrupt = HF_INVALID_INTID;
 	struct vcpu_locked current_locked;
 

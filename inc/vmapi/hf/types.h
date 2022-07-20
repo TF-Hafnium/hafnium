@@ -39,9 +39,6 @@ typedef uintptr_t hf_ipaddr_t;
 /** The amount of data that can be sent to a mailbox. */
 #define HF_MAILBOX_SIZE 4096
 
-/** The number of virtual interrupt IDs which are supported. */
-#define HF_NUM_INTIDS 64
-
 /** Interrupt ID returned when there is no interrupt pending. */
 #define HF_INVALID_INTID 0xffffffff
 

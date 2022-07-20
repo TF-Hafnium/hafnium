@@ -44,6 +44,11 @@ config("platform") {
           plat_partition_max_streams_per_device < 256,
       "Maximum streams per device regions must be between 1 and 255: current = ${plat_partition_max_streams_per_device}")
 
+  assert(
+      plat_num_virtual_interrupts_ids > 0 &&
+          plat_num_virtual_interrupts_ids < 5120,
+      "Maximum virtual interrupt ids per vcpu must be between 1 and 5119: current = ${plat_num_virtual_interrupts_ids}")
+
   include_dirs = [
     "//inc",
     "//inc/vmapi",
@@ -63,5 +68,6 @@ config("platform") {
     "PARTITION_MAX_DEVICE_REGIONS=${plat_partition_max_device_regions}",
     "PARTITION_MAX_INTERRUPTS_PER_DEVICE=${plat_partition_max_intr_per_device}",
     "PARTITION_MAX_STREAMS_PER_DEVICE=${plat_partition_max_streams_per_device}",
+    "HF_NUM_INTIDS=${plat_num_virtual_interrupts_ids}",
   ]
 }

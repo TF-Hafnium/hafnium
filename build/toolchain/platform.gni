@@ -44,4 +44,7 @@ declare_args() {
 
   # the maximum number of streams allowed per device, per partition, in the partition manifest
   plat_partition_max_streams_per_device = 4
+
+  # The number of virtual interrupt IDs which are supported
+  plat_num_virtual_interrupts_ids = 64
 }
