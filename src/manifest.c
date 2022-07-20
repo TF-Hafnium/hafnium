@@ -357,10 +357,10 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 
 static enum manifest_return_code parse_ffa_memory_region_node(
 	struct fdt_node *mem_node, struct memory_region *mem_regions,
-	uint8_t *count, struct rx_tx *rxtx)
+	uint16_t *count, struct rx_tx *rxtx)
 {
 	uint32_t phandle;
-	uint8_t i = 0;
+	uint16_t i = 0;
 
 	dlog_verbose("  Partition memory regions\n");
 
@@ -430,7 +430,8 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		}
 
 		i++;
-	} while (fdt_next_sibling(mem_node) && (i < SP_MAX_MEMORY_REGIONS));
+	} while (fdt_next_sibling(mem_node) &&
+		 (i < PARTITION_MAX_MEMORY_REGIONS));
 
 	if (rxtx->available &&
 	    (rxtx->rx_buffer->page_count != rxtx->tx_buffer->page_count)) {
@@ -444,10 +445,10 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 
 static enum manifest_return_code parse_ffa_device_region_node(
 	struct fdt_node *dev_node, struct device_region *dev_regions,
-	uint8_t *count)
+	uint16_t *count)
 {
 	struct uint32list_iter list;
-	uint8_t i = 0;
+	uint16_t i = 0;
 	uint32_t j = 0;
 
 	dlog_verbose("  Partition Device Regions\n");
@@ -507,7 +508,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		dlog_verbose("      Interrupt List:\n");
 		j = 0;
 		while (uint32list_has_next(&list) &&
-		       j < SP_MAX_INTERRUPTS_PER_DEVICE) {
+		       j < PARTITION_MAX_INTERRUPTS_PER_DEVICE) {
 			TRY(uint32list_get_next(
 				&list, &dev_regions[i].interrupts[j].id));
 			if (uint32list_has_next(&list)) {
@@ -543,7 +544,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 		j = 0;
 		while (uint32list_has_next(&list) &&
-		       j < SP_MAX_STREAMS_PER_DEVICE) {
+		       j < PARTITION_MAX_STREAMS_PER_DEVICE) {
 			TRY(uint32list_get_next(&list,
 						&dev_regions[i].stream_ids[j]));
 			dlog_verbose("        %u\n",
@@ -561,7 +562,8 @@ static enum manifest_return_code parse_ffa_device_region_node(
 			     dev_regions[i].exclusive_access);
 
 		i++;
-	} while (fdt_next_sibling(dev_node) && (i < SP_MAX_DEVICE_REGIONS));
+	} while (fdt_next_sibling(dev_node) &&
+		 (i < PARTITION_MAX_DEVICE_REGIONS));
 
 	*count = i;
 
@@ -627,12 +629,13 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	for (uint8_t i = 0; i < vm->partition.dev_region_count; i++) {
+	for (uint16_t i = 0; i < vm->partition.dev_region_count; i++) {
 		struct device_region dev_region;
 
 		dev_region = vm->partition.dev_regions[i];
 
-		if (dev_region.interrupt_count > SP_MAX_INTERRUPTS_PER_DEVICE) {
+		if (dev_region.interrupt_count >
+		    PARTITION_MAX_INTERRUPTS_PER_DEVICE) {
 			dlog_error(
 				"Interrupt count for device region exceeds "
 				"limit.\n");

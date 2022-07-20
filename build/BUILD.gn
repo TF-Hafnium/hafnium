@@ -27,6 +27,23 @@ config("compiler_defaults") {
 
 # Platform configuration.
 config("platform") {
+  assert(
+      plat_partition_max_memory_regions > 0 &&
+          plat_partition_max_memory_regions < 65536,
+      "Maximum SP memory regions must be between 1 and 65535: current = ${plat_partition_max_memory_regions}")
+  assert(
+      plat_partition_max_device_regions > 0 &&
+          plat_partition_max_device_regions < 65536,
+      "Maximum SP device regions must be between 1 and 65535: current = ${plat_partition_max_device_regions}")
+  assert(
+      plat_partition_max_intr_per_device > 0 &&
+          plat_partition_max_intr_per_device < 256,
+      "Maximum interrupts per device regions must be between 1 and 255: current = ${plat_partition_max_intr_per_device}")
+  assert(
+      plat_partition_max_streams_per_device > 0 &&
+          plat_partition_max_streams_per_device < 256,
+      "Maximum streams per device regions must be between 1 and 255: current = ${plat_partition_max_streams_per_device}")
+
   include_dirs = [
     "//inc",
     "//inc/vmapi",
@@ -42,5 +59,9 @@ config("platform") {
     "MAX_VMS=${plat_max_vms}",
     "LOG_LEVEL=${log_level}",
     "ENABLE_ASSERTIONS=${enable_assertions}",
+    "PARTITION_MAX_MEMORY_REGIONS=${plat_partition_max_memory_regions}",
+    "PARTITION_MAX_DEVICE_REGIONS=${plat_partition_max_device_regions}",
+    "PARTITION_MAX_INTERRUPTS_PER_DEVICE=${plat_partition_max_intr_per_device}",
+    "PARTITION_MAX_STREAMS_PER_DEVICE=${plat_partition_max_streams_per_device}",
   ]
 }

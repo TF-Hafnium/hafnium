@@ -20,11 +20,6 @@
 
 #define SP_RTX_BUF_NAME_SIZE 10
 
-#define SP_MAX_MEMORY_REGIONS 8
-#define SP_MAX_DEVICE_REGIONS 8
-#define SP_MAX_INTERRUPTS_PER_DEVICE 4
-#define SP_MAX_STREAMS_PER_DEVICE 4
-
 /** FF-A manifest memory and device regions attributes. */
 #define MANIFEST_REGION_ATTR_READ (UINT32_C(1) << 0)
 #define MANIFEST_REGION_ATTR_WRITE (UINT32_C(1) << 1)
@@ -85,7 +80,7 @@ struct device_region {
 	/** Memory attributes - mandatory */
 	uint32_t attributes;
 	/** List of physical interrupt ID's and their attributes - optional */
-	struct interrupt interrupts[SP_MAX_INTERRUPTS_PER_DEVICE];
+	struct interrupt interrupts[PARTITION_MAX_INTERRUPTS_PER_DEVICE];
 	/** Count of physical interrupts - optional */
 	uint8_t interrupt_count;
 	/** SMMU ID - optional */
@@ -93,7 +88,7 @@ struct device_region {
 	/** Count of Stream IDs assigned to device - optional */
 	uint8_t stream_count;
 	/** List of Stream IDs assigned to device - optional */
-	uint32_t stream_ids[SP_MAX_STREAMS_PER_DEVICE];
+	uint32_t stream_ids[PARTITION_MAX_STREAMS_PER_DEVICE];
 	/** Exclusive access to an endpoint - optional */
 	bool exclusive_access;
 	/** Name of Device region - optional */
@@ -166,11 +161,11 @@ struct partition_manifest {
 	uint32_t stream_ep_ids[1];
 
 	/** Memory regions */
-	uint8_t mem_region_count;
-	struct memory_region mem_regions[SP_MAX_MEMORY_REGIONS];
+	uint16_t mem_region_count;
+	struct memory_region mem_regions[PARTITION_MAX_MEMORY_REGIONS];
 	/** Device regions */
-	uint8_t dev_region_count;
-	struct device_region dev_regions[SP_MAX_DEVICE_REGIONS];
+	uint16_t dev_region_count;
+	struct device_region dev_regions[PARTITION_MAX_DEVICE_REGIONS];
 };
 
 /**

@@ -163,11 +163,11 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	vm_locked.vm->uuid = manifest_vm->partition.uuid;
 
 	/* Populate the interrupt descriptor for current VM. */
-	for (uint8_t i = 0; i < SP_MAX_DEVICE_REGIONS; i++) {
+	for (uint16_t i = 0; i < PARTITION_MAX_DEVICE_REGIONS; i++) {
 		dev_region = manifest_vm->partition.dev_regions[i];
 
 		CHECK(dev_region.interrupt_count <=
-		      SP_MAX_INTERRUPTS_PER_DEVICE);
+		      PARTITION_MAX_INTERRUPTS_PER_DEVICE);
 
 		for (uint8_t j = 0; j < dev_region.interrupt_count; j++) {
 			struct interrupt_descriptor int_desc;
