@@ -127,7 +127,7 @@ static bool link_rxtx_to_mailbox(struct mm_stage1_locked stage1_locked,
 	return true;
 }
 
-static void infer_interrupt(struct interrupt interrupt,
+static void infer_interrupt(struct interrupt_info interrupt,
 			    struct interrupt_descriptor *int_desc)
 {
 	uint32_t attr = interrupt.attributes;
@@ -156,7 +156,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 			struct mpool *ppool)
 {
 	struct device_region dev_region;
-	struct interrupt interrupt;
+	struct interrupt_info interrupt;
 	uint32_t k = 0;
 
 	vm_locked.vm->smc_whitelist = manifest_vm->smc_whitelist;

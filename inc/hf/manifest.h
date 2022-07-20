@@ -64,7 +64,7 @@ struct memory_region {
 	struct string name;
 };
 
-struct interrupt {
+struct interrupt_info {
 	uint32_t id;
 	uint32_t attributes;
 };
@@ -80,7 +80,7 @@ struct device_region {
 	/** Memory attributes - mandatory */
 	uint32_t attributes;
 	/** List of physical interrupt ID's and their attributes - optional */
-	struct interrupt interrupts[PARTITION_MAX_INTERRUPTS_PER_DEVICE];
+	struct interrupt_info interrupts[PARTITION_MAX_INTERRUPTS_PER_DEVICE];
 	/** Count of physical interrupts - optional */
 	uint8_t interrupt_count;
 	/** SMMU ID - optional */
