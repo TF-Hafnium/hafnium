@@ -1090,6 +1090,19 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 		goto out;
 	}
 
+	/*
+	 * An SPx can resume another SPy only when SPy is in PREEMPTED state.
+	 */
+	if (vm_id_is_current_world(current->vm->id) &&
+	    vm_id_is_current_world(target_vm_id)) {
+		/* Target SP must be in preempted state. */
+		if (target_vcpu->state != VCPU_STATE_PREEMPTED) {
+			run_ret->arg2 = FFA_DENIED;
+			ret = false;
+			goto out;
+		}
+	}
+
 	/* A SP cannot invoke FFA_RUN to resume a normal world VM. */
 	if (!vm_id_is_current_world(target_vm_id)) {
 		run_ret->arg2 = FFA_DENIED;
