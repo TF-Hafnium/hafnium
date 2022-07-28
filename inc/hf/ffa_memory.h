@@ -30,6 +30,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 					      ffa_memory_handle_t handle,
 					      uint32_t fragment_offset,
+					      ffa_vm_id_t sender_vm_id,
 					      struct mpool *page_pool);
 struct ffa_value ffa_memory_relinquish(
 	struct vm_locked from_locked,

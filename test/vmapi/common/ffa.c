@@ -272,8 +272,6 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	}
 	EXPECT_EQ(ret.func, FFA_MEM_FRAG_RX_32);
 	EXPECT_EQ(ret.arg3, fragment_length);
-	/* Sender MBZ at virtual instance. */
-	EXPECT_EQ(ffa_frag_sender(ret), 0);
 
 	handle = ffa_frag_handle(ret);
 

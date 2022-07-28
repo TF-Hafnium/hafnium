@@ -3009,7 +3009,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 		 * Can't retrieve memory information if the mailbox is not
 		 * available.
 		 */
-		dlog_verbose("RX buffer not ready.\n");
+		dlog_verbose("%s: RX buffer not ready.\n", __func__);
 		ret = ffa_error(FFA_BUSY);
 		goto out;
 	}
@@ -3117,8 +3117,11 @@ struct ffa_value api_ffa_mem_frag_rx(ffa_memory_handle_t handle,
 	struct ffa_value ret;
 
 	/* Sender ID MBZ at virtual instance. */
-	if (sender_vm_id != 0) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
+	if (vm_id_is_current_world(to->id)) {
+		if (sender_vm_id != 0) {
+			dlog_verbose("%s: Invalid sender.\n", __func__);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
 	}
 
 	to_locked = vm_lock(to);
@@ -3128,14 +3131,14 @@ struct ffa_value api_ffa_mem_frag_rx(ffa_memory_handle_t handle,
 		 * Can't retrieve memory information if the mailbox is not
 		 * available.
 		 */
-		dlog_verbose("RX buffer not ready.\n");
+		dlog_verbose("%s: RX buffer not ready partition %x.\n",
+			     __func__, to_locked.vm->id);
 		ret = ffa_error(FFA_BUSY);
 		goto out;
 	}
 
 	ret = ffa_memory_retrieve_continue(to_locked, handle, fragment_offset,
-					   &api_page_pool);
-
+					   sender_vm_id, &api_page_pool);
 out:
 	vm_unlock(&to_locked);
 	return ret;
@@ -3168,6 +3171,7 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	sl_unlock(&from->lock);
 
 	if (from_msg == NULL) {
+		dlog_verbose("Mailbox from %x is not set.\n", from->id);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 

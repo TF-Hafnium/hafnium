@@ -1414,6 +1414,7 @@ static struct ffa_value plat_ffa_hyp_memory_retrieve(
 	uint32_t length;
 	uint32_t fragment_length;
 	uint32_t fragment_offset;
+	struct ffa_memory_region *retrieved;
 
 	CHECK(request_length <= HF_MAILBOX_SIZE);
 	CHECK(from_locked.vm->id == HF_OTHER_WORLD_ID);
@@ -1453,14 +1454,27 @@ static struct ffa_value plat_ffa_hyp_memory_retrieve(
 		 sizeof(other_world_retrieve_buffer),
 		 from_locked.vm->mailbox.send, fragment_length);
 
+	retrieved = (struct ffa_memory_region *)other_world_retrieve_buffer;
+
+	/* Hypervisor always forward VM's RX_RELEASE to SPMC. */
+	other_world_ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_RX_RELEASE_32, .arg1 = HF_HYPERVISOR_VM_ID});
+	assert(other_world_ret.func == FFA_SUCCESS_32);
+
 	/* Fetch the remaining fragments into the same buffer. */
 	fragment_offset = fragment_length;
 	while (fragment_offset < length) {
-		other_world_ret = arch_other_world_call(
-			(struct ffa_value){.func = FFA_MEM_FRAG_RX_32,
-					   .arg1 = (uint32_t)handle,
-					   .arg2 = (uint32_t)(handle >> 32),
-					   .arg3 = fragment_offset});
+		/*
+		 * Request the next fragment, and provide the sender ID,
+		 * it is expected to be part of FFA_MEM_FRAG_RX_32 at
+		 * physical FF-A instance.
+		 */
+		other_world_ret = arch_other_world_call((struct ffa_value){
+			.func = FFA_MEM_FRAG_RX_32,
+			.arg1 = (uint32_t)handle,
+			.arg2 = (uint32_t)(handle >> 32),
+			.arg3 = fragment_offset,
+			.arg4 = (uint32_t)retrieved->sender << 16});
 		if (other_world_ret.func != FFA_MEM_FRAG_TX_32) {
 			dlog_verbose(
 				"Got %#x (%d) from other world in response to "
@@ -1498,6 +1512,10 @@ static struct ffa_value plat_ffa_hyp_memory_retrieve(
 			 from_locked.vm->mailbox.send, fragment_length);
 
 		fragment_offset += fragment_length;
+		other_world_ret = arch_other_world_call(
+			(struct ffa_value){.func = FFA_RX_RELEASE_32,
+					   .arg1 = HF_HYPERVISOR_VM_ID});
+		assert(other_world_ret.func == FFA_SUCCESS_32);
 	}
 
 	*memory_region =
@@ -1534,7 +1552,6 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 	}
 
 	assert(memory_region != NULL);
-
 	if (memory_region->receiver_count != 1) {
 		/* Only one receiver supported by Hafnium for now. */
 		dlog_verbose(

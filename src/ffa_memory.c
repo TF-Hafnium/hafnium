@@ -584,8 +584,11 @@ struct ffa_value ffa_retrieve_check_transition(
 		 * with `state_mask`, as a result of the function
 		 * `ffa_send_check_transition`.
 		 */
-		assert((orig_to_mode & (MM_MODE_INVALID | MM_MODE_UNOWNED |
-					MM_MODE_SHARED)) != 0U);
+		if (vm_id_is_current_world(to.vm->id)) {
+			assert((orig_to_mode &
+				(MM_MODE_INVALID | MM_MODE_UNOWNED |
+				 MM_MODE_SHARED)) != 0U);
+		}
 	} else {
 		/*
 		 * If the retriever is from virtual FF-A instance:
@@ -1951,7 +1954,7 @@ static struct ffa_value ffa_memory_retrieve_validate(
 		dlog_verbose(
 			"Incorrect receiver VM ID %d for "
 			"FFA_MEM_RETRIEVE_REQ, for handle %#x.\n",
-			receiver_id, handle);
+			receiver_id, memory_region->handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2214,7 +2217,6 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	ret = (struct ffa_value){.func = FFA_MEM_RETRIEVE_RESP_32,
 				 .arg1 = total_length,
 				 .arg2 = fragment_length};
-
 out:
 	share_states_unlock(&share_states);
 	dump_share_states();
@@ -2224,6 +2226,7 @@ out:
 struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 					      ffa_memory_handle_t handle,
 					      uint32_t fragment_offset,
+					      ffa_vm_id_t sender_vm_id,
 					      struct mpool *page_pool)
 {
 	struct ffa_memory_region *memory_region;
@@ -2237,6 +2240,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	uint32_t remaining_constituent_count;
 	uint32_t fragment_length;
 	uint32_t receiver_index;
+	bool continue_ffa_hyp_mem_retrieve_req;
 
 	dump_share_states();
 
@@ -2251,18 +2255,6 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	memory_region = share_state->memory_region;
 	CHECK(memory_region != NULL);
 
-	receiver_index =
-		ffa_memory_region_get_receiver(memory_region, to_locked.vm->id);
-
-	if (receiver_index == memory_region->receiver_count) {
-		dlog_verbose(
-			"Caller of FFA_MEM_FRAG_RX (%x) is not a borrower to "
-			"memory sharing transaction (%x)\n",
-			to_locked.vm->id, handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
 	if (!share_state->sending_complete) {
 		dlog_verbose(
 			"Memory with handle %#x not fully sent, can't "
@@ -2272,20 +2264,72 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		goto out;
 	}
 
-	if (share_state->retrieved_fragment_count[receiver_index] == 0 ||
-	    share_state->retrieved_fragment_count[receiver_index] >=
-		    share_state->fragment_count) {
-		dlog_verbose(
-			"Retrieval of memory with handle %#x not yet started "
-			"or already completed (%d/%d fragments retrieved).\n",
-			handle,
-			share_state->retrieved_fragment_count[receiver_index],
-			share_state->fragment_count);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
+	/*
+	 * If retrieve request from the hypervisor has been initiated in the
+	 * given share_state, continue it, else assume it is a continuation of
+	 * retrieve request from a NWd VM.
+	 */
+	continue_ffa_hyp_mem_retrieve_req =
+		(to_locked.vm->id == HF_HYPERVISOR_VM_ID) &&
+		(share_state->hypervisor_fragment_count != 0U) &&
+		plat_ffa_is_vm_id(sender_vm_id);
 
-	fragment_index = share_state->retrieved_fragment_count[receiver_index];
+	if (!continue_ffa_hyp_mem_retrieve_req) {
+		receiver_index = ffa_memory_region_get_receiver(
+			memory_region, to_locked.vm->id);
+
+		if (receiver_index == memory_region->receiver_count) {
+			dlog_verbose(
+				"Caller of FFA_MEM_FRAG_RX (%x) is not a "
+				"borrower to memory sharing transaction (%x)\n",
+				to_locked.vm->id, handle);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		if (share_state->retrieved_fragment_count[receiver_index] ==
+			    0 ||
+		    share_state->retrieved_fragment_count[receiver_index] >=
+			    share_state->fragment_count) {
+			dlog_verbose(
+				"Retrieval of memory with handle %#x not yet "
+				"started or already completed (%d/%d fragments "
+				"retrieved).\n",
+				handle,
+				share_state->retrieved_fragment_count
+					[receiver_index],
+				share_state->fragment_count);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		fragment_index =
+			share_state->retrieved_fragment_count[receiver_index];
+	} else {
+		if (share_state->hypervisor_fragment_count == 0 ||
+		    share_state->hypervisor_fragment_count >=
+			    share_state->fragment_count) {
+			dlog_verbose(
+				"Retrieve of memory with handle %x not "
+				"started from hypervisor.\n",
+				handle);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		if (memory_region->sender != sender_vm_id) {
+			dlog_verbose(
+				"Sender ID (%x) is not as expected for memory "
+				"handle %x\n",
+				sender_vm_id, handle);
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		fragment_index = share_state->hypervisor_fragment_count;
+
+		receiver_index = 0;
+	}
 
 	/*
 	 * Check that the given fragment offset is correct by counting
@@ -2313,6 +2357,9 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		goto out;
 	}
 
+	/* VMs acquire the RX buffer from SPMC. */
+	CHECK(plat_ffa_acquire_receiver_rx(to_locked, &ret));
+
 	remaining_constituent_count = ffa_memory_fragment_init(
 		to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
 		share_state->fragments[fragment_index],
@@ -2323,13 +2370,19 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
 	to_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
-	share_state->retrieved_fragment_count[receiver_index]++;
-	if (share_state->retrieved_fragment_count[receiver_index] ==
-	    share_state->fragment_count) {
-		ffa_memory_retrieve_complete(share_states, share_state,
-					     page_pool);
-	}
 
+	if (!continue_ffa_hyp_mem_retrieve_req) {
+		share_state->retrieved_fragment_count[receiver_index]++;
+		if (share_state->retrieved_fragment_count[receiver_index] ==
+		    share_state->fragment_count) {
+			ffa_memory_retrieve_complete(share_states, share_state,
+						     page_pool);
+		}
+	} else {
+		share_state->hypervisor_fragment_count++;
+
+		ffa_memory_retrieve_complete_from_hyp(share_state);
+	}
 	ret = (struct ffa_value){.func = FFA_MEM_FRAG_TX_32,
 				 .arg1 = (uint32_t)handle,
 				 .arg2 = (uint32_t)(handle >> 32),
