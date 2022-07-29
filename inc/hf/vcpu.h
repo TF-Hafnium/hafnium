@@ -42,11 +42,11 @@ enum vcpu_state {
 
 struct interrupts {
 	/** Bitfield keeping track of which interrupts are enabled. */
-	uint32_t interrupt_enabled[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
+	struct interrupt_bitmap interrupt_enabled;
 	/** Bitfield keeping track of which interrupts are pending. */
-	uint32_t interrupt_pending[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
+	struct interrupt_bitmap interrupt_pending;
 	/** Bitfield recording the interrupt pin configuration. */
-	uint32_t interrupt_type[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
+	struct interrupt_bitmap interrupt_type;
 	/**
 	 * The number of interrupts which are currently both enabled and
 	 * pending. Count independently virtual IRQ and FIQ interrupt types
@@ -167,6 +167,63 @@ void vcpu_reset(struct vcpu *vcpu);
 
 void vcpu_set_phys_core_idx(struct vcpu *vcpu);
 
+static inline bool vcpu_is_virt_interrupt_enabled(struct interrupts *interrupts,
+						  uint32_t intid)
+{
+	return interrupt_bitmap_get_value(&interrupts->interrupt_enabled,
+					  intid) == 1U;
+}
+
+static inline void vcpu_virt_interrupt_set_enabled(
+	struct interrupts *interrupts, uint32_t intid)
+{
+	interrupt_bitmap_set_value(&interrupts->interrupt_enabled, intid);
+}
+
+static inline void vcpu_virt_interrupt_clear_enabled(
+	struct interrupts *interrupts, uint32_t intid)
+{
+	interrupt_bitmap_clear_value(&interrupts->interrupt_enabled, intid);
+}
+
+static inline bool vcpu_is_virt_interrupt_pending(struct interrupts *interrupts,
+						  uint32_t intid)
+{
+	return interrupt_bitmap_get_value(&interrupts->interrupt_pending,
+					  intid) == 1U;
+}
+
+static inline void vcpu_virt_interrupt_set_pending(
+	struct interrupts *interrupts, uint32_t intid)
+{
+	interrupt_bitmap_set_value(&interrupts->interrupt_pending, intid);
+}
+
+static inline void vcpu_virt_interrupt_clear_pending(
+	struct interrupts *interrupts, uint32_t intid)
+{
+	interrupt_bitmap_clear_value(&interrupts->interrupt_pending, intid);
+}
+
+static inline enum interrupt_type vcpu_virt_interrupt_get_type(
+	struct interrupts *interrupts, uint32_t intid)
+{
+	return (enum interrupt_type)interrupt_bitmap_get_value(
+		&interrupts->interrupt_type, intid);
+}
+
+static inline void vcpu_virt_interrupt_set_type(struct interrupts *interrupts,
+						uint32_t intid,
+						enum interrupt_type type)
+{
+	if (type == INTERRUPT_TYPE_IRQ) {
+		interrupt_bitmap_clear_value(&interrupts->interrupt_type,
+					     intid);
+	} else {
+		interrupt_bitmap_set_value(&interrupts->interrupt_type, intid);
+	}
+}
+
 static inline void vcpu_irq_count_increment(struct vcpu_locked vcpu_locked)
 {
 	vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count++;
@@ -185,6 +242,30 @@ static inline void vcpu_fiq_count_increment(struct vcpu_locked vcpu_locked)
 static inline void vcpu_fiq_count_decrement(struct vcpu_locked vcpu_locked)
 {
 	vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count--;
+}
+
+static inline void vcpu_interrupt_count_increment(
+	struct vcpu_locked vcpu_locked, struct interrupts *interrupts,
+	uint32_t intid)
+{
+	if (vcpu_virt_interrupt_get_type(interrupts, intid) ==
+	    INTERRUPT_TYPE_IRQ) {
+		vcpu_irq_count_increment(vcpu_locked);
+	} else {
+		vcpu_fiq_count_increment(vcpu_locked);
+	}
+}
+
+static inline void vcpu_interrupt_count_decrement(
+	struct vcpu_locked vcpu_locked, struct interrupts *interrupts,
+	uint32_t intid)
+{
+	if (vcpu_virt_interrupt_get_type(interrupts, intid) ==
+	    INTERRUPT_TYPE_IRQ) {
+		vcpu_irq_count_decrement(vcpu_locked);
+	} else {
+		vcpu_fiq_count_decrement(vcpu_locked);
+	}
 }
 
 static inline uint32_t vcpu_interrupt_irq_count_get(

@@ -20,9 +20,36 @@
 /* The number of bits in each element of the interrupt bitfields. */
 #define INTERRUPT_REGISTER_BITS 32
 
-#define INTID_INDEX(intid) (intid / INTERRUPT_REGISTER_BITS)
-#define INTID_MASK(v, intid) (v << (intid % INTERRUPT_REGISTER_BITS))
+struct interrupt_bitmap {
+	uint32_t bitmap[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
+};
 
+static inline uint32_t interrupt_bitmap_get_value(
+	struct interrupt_bitmap *bitmap, uint32_t intid)
+{
+	uint32_t index = intid / INTERRUPT_REGISTER_BITS;
+	uint32_t shift = intid % INTERRUPT_REGISTER_BITS;
+
+	return (bitmap->bitmap[index] >> shift) & 1U;
+}
+
+static inline void interrupt_bitmap_set_value(struct interrupt_bitmap *bitmap,
+					      uint32_t intid)
+{
+	uint32_t index = intid / INTERRUPT_REGISTER_BITS;
+	uint32_t shift = intid % INTERRUPT_REGISTER_BITS;
+
+	bitmap->bitmap[index] |= 1U << shift;
+}
+
+static inline void interrupt_bitmap_clear_value(struct interrupt_bitmap *bitmap,
+						uint32_t intid)
+{
+	uint32_t index = intid / INTERRUPT_REGISTER_BITS;
+	uint32_t shift = intid % INTERRUPT_REGISTER_BITS;
+
+	bitmap->bitmap[index] &= ~(1U << shift);
+}
 /**
  * Attributes encoding in the manifest:
 

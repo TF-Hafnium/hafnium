@@ -43,7 +43,7 @@ static_assert((HF_OTHER_WORLD_ID > VM_ID_MAX) ||
  * in the manifest.
  */
 struct allocated_fields {
-	uint32_t intids[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
+	struct interrupt_bitmap intids;
 	struct {
 		uintptr_t base;
 		uintptr_t limit;
@@ -543,7 +543,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 	struct uint32list_iter list;
 	uint16_t i = 0;
 	uint32_t j = 0;
-	uint32_t *allocated_intids = allocated_fields->intids;
+	struct interrupt_bitmap allocated_intids = allocated_fields->intids;
 
 	dlog_verbose("  Partition Device Regions\n");
 
@@ -604,23 +604,19 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		while (uint32list_has_next(&list) &&
 		       j < PARTITION_MAX_INTERRUPTS_PER_DEVICE) {
 			uint32_t intid;
-			uint32_t intid_index;
-			uint32_t intid_mask;
 
 			TRY(uint32list_get_next(
 				&list, &dev_regions[i].interrupts[j].id));
 			intid = dev_regions[i].interrupts[j].id;
-			intid_index = INTID_INDEX(intid);
-			intid_mask = INTID_MASK(1U, intid);
 
 			dlog_verbose("        ID = %u\n", intid);
 
-			if ((allocated_intids[intid_index] & intid_mask) !=
-			    0U) {
+			if (interrupt_bitmap_get_value(&allocated_intids,
+						       intid) == 1U) {
 				return MANIFEST_ERROR_INTERRUPT_ID_REPEATED;
 			}
 
-			allocated_intids[intid_index] |= intid_mask;
+			interrupt_bitmap_set_value(&allocated_intids, intid);
 
 			if (uint32list_has_next(&list)) {
 				TRY(uint32list_get_next(&list,

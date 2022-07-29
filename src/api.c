@@ -614,8 +614,7 @@ int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
 				    struct vcpu **next)
 {
 	struct vcpu *target_vcpu = target_locked.vcpu;
-	uint32_t intid_index = INTID_INDEX(intid);
-	uint32_t intid_mask = INTID_MASK(1U, intid);
+	struct interrupts *interrupts = &target_vcpu->interrupts;
 	int64_t ret = 0;
 
 	/*
@@ -623,19 +622,13 @@ int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
 	 * if it is enabled and was not previously pending. Otherwise we can
 	 * skip everything except setting the pending bit.
 	 */
-	if (!(target_vcpu->interrupts.interrupt_enabled[intid_index] &
-	      ~target_vcpu->interrupts.interrupt_pending[intid_index] &
-	      intid_mask)) {
+	if (!(vcpu_is_virt_interrupt_enabled(interrupts, intid) &&
+	      !vcpu_is_virt_interrupt_pending(interrupts, intid))) {
 		goto out;
 	}
 
 	/* Increment the count. */
-	if ((target_vcpu->interrupts.interrupt_type[intid_index] &
-	     intid_mask) == INTID_MASK(INTERRUPT_TYPE_IRQ, intid)) {
-		vcpu_irq_count_increment(target_locked);
-	} else {
-		vcpu_fiq_count_increment(target_locked);
-	}
+	vcpu_interrupt_count_increment(target_locked, interrupts, intid);
 
 	/*
 	 * Only need to update state if there was not already an
@@ -657,7 +650,7 @@ int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
 
 out:
 	/* Either way, make it pending. */
-	target_vcpu->interrupts.interrupt_pending[intid_index] |= intid_mask;
+	vcpu_virt_interrupt_set_pending(interrupts, intid);
 
 	return ret;
 }
@@ -2061,8 +2054,7 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 			     enum interrupt_type type, struct vcpu *current)
 {
 	struct vcpu_locked current_locked;
-	uint32_t intid_index = INTID_INDEX(intid);
-	uint32_t intid_mask = INTID_MASK(1U, intid);
+	struct interrupts *interrupts = &current->interrupts;
 
 	if (intid >= HF_NUM_INTIDS) {
 		return -1;
@@ -2070,49 +2062,29 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 
 	current_locked = vcpu_lock(current);
 	if (enable) {
-		if (type == INTERRUPT_TYPE_IRQ) {
-			current->interrupts.interrupt_type[intid_index] &=
-				~intid_mask;
-		} else if (type == INTERRUPT_TYPE_FIQ) {
-			current->interrupts.interrupt_type[intid_index] |=
-				intid_mask;
-		}
-
 		/*
 		 * If it is pending and was not enabled before, increment the
 		 * count.
 		 */
-		if (current->interrupts.interrupt_pending[intid_index] &
-		    ~current->interrupts.interrupt_enabled[intid_index] &
-		    intid_mask) {
-			if ((current->interrupts.interrupt_type[intid_index] &
-			     intid_mask) ==
-			    INTID_MASK(INTERRUPT_TYPE_IRQ, intid)) {
-				vcpu_irq_count_increment(current_locked);
-			} else {
-				vcpu_fiq_count_increment(current_locked);
-			}
+		if (vcpu_is_virt_interrupt_pending(interrupts, intid) &&
+		    !vcpu_is_virt_interrupt_enabled(interrupts, intid)) {
+			vcpu_interrupt_count_increment(current_locked,
+						       interrupts, intid);
 		}
-		current->interrupts.interrupt_enabled[intid_index] |=
-			intid_mask;
+		vcpu_virt_interrupt_set_enabled(interrupts, intid);
+		vcpu_virt_interrupt_set_type(interrupts, intid, type);
 	} else {
 		/*
 		 * If it is pending and was enabled before, decrement the count.
 		 */
-		if (current->interrupts.interrupt_pending[intid_index] &
-		    current->interrupts.interrupt_enabled[intid_index] &
-		    intid_mask) {
-			if ((current->interrupts.interrupt_type[intid_index] &
-			     intid_mask) ==
-			    INTID_MASK(INTERRUPT_TYPE_IRQ, intid)) {
-				vcpu_irq_count_decrement(current_locked);
-			} else {
-				vcpu_fiq_count_decrement(current_locked);
-			}
+		if (vcpu_is_virt_interrupt_pending(interrupts, intid) &&
+		    vcpu_is_virt_interrupt_enabled(interrupts, intid)) {
+			vcpu_interrupt_count_decrement(current_locked,
+						       interrupts, intid);
 		}
-		current->interrupts.interrupt_enabled[intid_index] &=
-			~intid_mask;
-		current->interrupts.interrupt_type[intid_index] &= ~intid_mask;
+		vcpu_virt_interrupt_clear_enabled(interrupts, intid);
+		vcpu_virt_interrupt_set_type(interrupts, intid,
+					     INTERRUPT_TYPE_IRQ);
 	}
 
 	vcpu_unlock(&current_locked);
@@ -2129,6 +2101,7 @@ uint32_t api_interrupt_get(struct vcpu *current)
 	uint32_t i;
 	uint32_t first_interrupt = HF_INVALID_INTID;
 	struct vcpu_locked current_locked;
+	struct interrupts *interrupts = &current->interrupts;
 
 	/*
 	 * Find the first enabled and pending interrupt ID, return it, and
@@ -2137,27 +2110,23 @@ uint32_t api_interrupt_get(struct vcpu *current)
 	current_locked = vcpu_lock(current);
 	for (i = 0; i < HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS; ++i) {
 		uint32_t enabled_and_pending =
-			current->interrupts.interrupt_enabled[i] &
-			current->interrupts.interrupt_pending[i];
+			interrupts->interrupt_enabled.bitmap[i] &
+			interrupts->interrupt_pending.bitmap[i];
 
 		if (enabled_and_pending != 0) {
 			uint8_t bit_index = ctz(enabled_and_pending);
-			uint32_t intid_mask = 1U << bit_index;
+
+			first_interrupt =
+				i * INTERRUPT_REGISTER_BITS + bit_index;
 
 			/*
 			 * Mark it as no longer pending and decrement the count.
 			 */
-			current->interrupts.interrupt_pending[i] &= ~intid_mask;
+			vcpu_virt_interrupt_clear_pending(interrupts,
+							  first_interrupt);
 
-			if ((current->interrupts.interrupt_type[i] &
-			     intid_mask) == (INTERRUPT_TYPE_IRQ << bit_index)) {
-				vcpu_irq_count_decrement(current_locked);
-			} else {
-				vcpu_fiq_count_decrement(current_locked);
-			}
-
-			first_interrupt =
-				i * INTERRUPT_REGISTER_BITS + bit_index;
+			vcpu_interrupt_count_decrement(
+				current_locked, interrupts, first_interrupt);
 			break;
 		}
 	}
