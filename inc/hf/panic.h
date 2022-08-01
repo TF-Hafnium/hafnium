@@ -8,6 +8,4 @@
 
 #pragma once
 
-#include <stdnoreturn.h>
-
-noreturn void panic(const char *fmt, ...);
+__attribute__((__noreturn__)) void panic(const char *fmt, ...);
