@@ -130,7 +130,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	 * Send the appropriate retrieve request to the VM so that it can use it
 	 * to retrieve the memory.
 	 */
-	msg_size = ffa_memory_retrieve_request_init(
+	msg_size = ffa_memory_retrieve_request_init_single_receiver(
 		tx_buffer, handle, sender, recipient, 0, retrieve_flags,
 		retrieve_data_access, retrieve_instruction_access,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
@@ -212,7 +212,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	 * Send the appropriate retrieve request to the VM so that it can use it
 	 * to retrieve the memory.
 	 */
-	msg_size = ffa_memory_retrieve_request_init(
+	msg_size = ffa_memory_retrieve_request_init_single_receiver(
 		tx_buffer, handle, sender, recipient, 0, 0,
 		retrieve_data_access, retrieve_instruction_access,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,

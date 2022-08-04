@@ -228,7 +228,7 @@ uint32_t ffa_memory_region_init(
  *
  * Returns the size of the message written.
  */
-uint32_t ffa_memory_retrieve_request_init(
+uint32_t ffa_memory_retrieve_request_init_single_receiver(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
 	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t tag,
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
@@ -236,7 +236,25 @@ uint32_t ffa_memory_retrieve_request_init(
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability)
 {
+	struct ffa_memory_access receiver_permissions;
+
+	ffa_memory_access_init_permissions(&receiver_permissions, receiver,
+					   data_access, instruction_access, 0);
+
+	return ffa_memory_retrieve_request_init(
+		memory_region, handle, sender, &receiver_permissions, 1, tag,
+		flags, type, cacheability, shareability);
+}
+
+uint32_t ffa_memory_retrieve_request_init(
+	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
+	ffa_vm_id_t sender, struct ffa_memory_access receivers[],
+	uint32_t receiver_count, uint32_t tag, ffa_memory_region_flags_t flags,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability)
+{
 	ffa_memory_attributes_t attributes = 0;
+	uint32_t i;
 
 	/* Set memory region's page attributes. */
 	ffa_set_memory_type_attr(&attributes, type);
@@ -244,18 +262,20 @@ uint32_t ffa_memory_retrieve_request_init(
 	ffa_set_memory_shareability_attr(&attributes, shareability);
 
 	ffa_memory_region_init_header(memory_region, sender, attributes, flags,
-				      handle, tag, 1);
-	ffa_memory_access_init_permissions(&memory_region->receivers[0],
-					   receiver, data_access,
-					   instruction_access, 0);
+				      handle, tag, receiver_count);
 
-	/*
-	 * Offset 0 in this case means that the hypervisor should allocate the
-	 * address ranges. This is the only configuration supported by Hafnium,
-	 * as it enforces 1:1 mappings in the stage 2 page tables.
-	 */
-	memory_region->receivers[0].composite_memory_region_offset = 0;
-	memory_region->receivers[0].reserved_0 = 0;
+#if defined(__linux__) && defined(__KERNEL__)
+	memcpy(memory_region->receivers, receivers,
+	       receiver_count * sizeof(struct ffa_memory_access));
+#else
+	memcpy_s(memory_region->receivers,
+		 MAX_MEM_SHARE_RECIPIENTS * sizeof(struct ffa_memory_access),
+		 receivers, receiver_count * sizeof(struct ffa_memory_access));
+#endif
+	/* Zero the composite offset for all receivers */
+	for (i = 0U; i < receiver_count; i++) {
+		memory_region->receivers[i].composite_memory_region_offset = 0U;
+	}
 
 	return sizeof(struct ffa_memory_region) +
 	       memory_region->receiver_count * sizeof(struct ffa_memory_access);

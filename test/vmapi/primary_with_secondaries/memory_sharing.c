@@ -372,7 +372,7 @@ TEST(memory_sharing, share_retrieve_memory_type_not_specified)
 	 * to retrieve the memory.
 	 * The retrieve request doesn't specify the memory type.
 	 */
-	msg_size = ffa_memory_retrieve_request_init(
+	msg_size = ffa_memory_retrieve_request_init_single_receiver(
 		mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_MEMORY_NOT_SPECIFIED_MEM, 0, 0);
@@ -2357,13 +2357,15 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 		handle = ffa_mem_success_handle(ret);
 
 		for (unsigned int j = 0; j < ARRAY_SIZE(invalid_flags); ++j) {
-			msg_size = ffa_memory_retrieve_request_init(
-				mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1,
-				0, invalid_flags[j], FFA_DATA_ACCESS_RW,
-				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				FFA_MEMORY_NORMAL_MEM,
-				FFA_MEMORY_CACHE_WRITE_BACK,
-				FFA_MEMORY_INNER_SHAREABLE);
+			msg_size =
+				ffa_memory_retrieve_request_init_single_receiver(
+					mb.send, handle, HF_PRIMARY_VM_ID,
+					SERVICE_VM1, 0, invalid_flags[j],
+					FFA_DATA_ACCESS_RW,
+					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+					FFA_MEMORY_NORMAL_MEM,
+					FFA_MEMORY_CACHE_WRITE_BACK,
+					FFA_MEMORY_INNER_SHAREABLE);
 
 			EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
@@ -2440,13 +2442,16 @@ TEST(memory_sharing, ffa_validate_retrieve_req_attributes)
 		handle = ffa_mem_success_handle(ret);
 
 		for (uint32_t j = 0; j < ARRAY_SIZE(invalid_attributes); ++j) {
-			msg_size = ffa_memory_retrieve_request_init(
-				mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1,
-				0, 0, FFA_DATA_ACCESS_RW,
-				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				invalid_attributes[j].memory_type,
-				invalid_attributes[j].memory_cacheability,
-				invalid_attributes[j].memory_shareability);
+			msg_size =
+				ffa_memory_retrieve_request_init_single_receiver(
+					mb.send, handle, HF_PRIMARY_VM_ID,
+					SERVICE_VM1, 0, 0, FFA_DATA_ACCESS_RW,
+					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+					invalid_attributes[j].memory_type,
+					invalid_attributes[j]
+						.memory_cacheability,
+					invalid_attributes[j]
+						.memory_shareability);
 
 			EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
@@ -2515,7 +2520,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_mem_share)
 	handle = ffa_mem_success_handle(ret);
 
 	/* Prepare retrieve request setting clear memory flags. */
-	msg_size = ffa_memory_retrieve_request_init(
+	msg_size = ffa_memory_retrieve_request_init_single_receiver(
 		mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
 		FFA_MEMORY_REGION_FLAG_CLEAR |
 			FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH,
@@ -2571,7 +2576,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 	 * Prepare retrieve request with RO, and setting flag to clear memory.
 	 * Should fail at the receiver's FFA_MEM_RETRIEVE call.
 	 */
-	msg_size = ffa_memory_retrieve_request_init(
+	msg_size = ffa_memory_retrieve_request_init_single_receiver(
 		mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
 		FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RO,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
@@ -2639,7 +2644,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_sender_not_clear)
 		 * memory. Should fail at the receiver's FFA_MEM_RETRIEVE_REQ
 		 * call with FFA_DENIED.
 		 */
-		msg_size = ffa_memory_retrieve_request_init(
+		msg_size = ffa_memory_retrieve_request_init_single_receiver(
 			mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
 			FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RW,
 			/* Different args for lend and donate. */
@@ -2715,7 +2720,7 @@ TEST(memory_sharing, ffa_validate_retrieve_transaction_type)
 		 * Should fail at the receiver's FFA_MEM_RETRIEVE_REQ
 		 * call with FFA_INVALID_PARAMETERS.
 		 */
-		msg_size = ffa_memory_retrieve_request_init(
+		msg_size = ffa_memory_retrieve_request_init_single_receiver(
 			mb.send, handle, HF_PRIMARY_VM_ID, SERVICE_VM1, 0,
 			send_function[i] == ffa_mem_share
 				? FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND
