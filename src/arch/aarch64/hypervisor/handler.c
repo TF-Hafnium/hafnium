@@ -271,9 +271,9 @@ noreturn void sync_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 static void set_virtual_irq(struct arch_regs *r, bool enable)
 {
 	if (enable) {
-		r->hcr_el2 |= HCR_EL2_VI;
+		r->hyp_state.hcr_el2 |= HCR_EL2_VI;
 	} else {
-		r->hcr_el2 &= ~HCR_EL2_VI;
+		r->hyp_state.hcr_el2 &= ~HCR_EL2_VI;
 	}
 }
 
@@ -282,14 +282,15 @@ static void set_virtual_irq(struct arch_regs *r, bool enable)
  */
 static void set_virtual_irq_current(bool enable)
 {
-	uintreg_t hcr_el2 = current()->regs.hcr_el2;
+	struct vcpu *vcpu = current();
+	uintreg_t hcr_el2 = vcpu->regs.hyp_state.hcr_el2;
 
 	if (enable) {
 		hcr_el2 |= HCR_EL2_VI;
 	} else {
 		hcr_el2 &= ~HCR_EL2_VI;
 	}
-	current()->regs.hcr_el2 = hcr_el2;
+	vcpu->regs.hyp_state.hcr_el2 = hcr_el2;
 }
 
 /**
@@ -299,9 +300,9 @@ static void set_virtual_irq_current(bool enable)
 static void set_virtual_fiq(struct arch_regs *r, bool enable)
 {
 	if (enable) {
-		r->hcr_el2 |= HCR_EL2_VF;
+		r->hyp_state.hcr_el2 |= HCR_EL2_VF;
 	} else {
-		r->hcr_el2 &= ~HCR_EL2_VF;
+		r->hyp_state.hcr_el2 &= ~HCR_EL2_VF;
 	}
 }
 
@@ -310,14 +311,15 @@ static void set_virtual_fiq(struct arch_regs *r, bool enable)
  */
 static void set_virtual_fiq_current(bool enable)
 {
-	uintreg_t hcr_el2 = current()->regs.hcr_el2;
+	struct vcpu *vcpu = current();
+	uintreg_t hcr_el2 = vcpu->regs.hyp_state.hcr_el2;
 
 	if (enable) {
 		hcr_el2 |= HCR_EL2_VF;
 	} else {
 		hcr_el2 &= ~HCR_EL2_VF;
 	}
-	current()->regs.hcr_el2 = hcr_el2;
+	vcpu->regs.hyp_state.hcr_el2 = hcr_el2;
 }
 
 #if SECURE_WORLD == 1

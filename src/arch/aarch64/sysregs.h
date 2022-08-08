@@ -24,7 +24,7 @@ uintreg_t get_mdcr_el2_value(void);
 uintreg_t get_cptr_el2_value(void);
 
 /** SCTLR_EL2 */
-uintreg_t get_sctlr_el2_value(void);
+uintreg_t get_sctlr_el2_value(bool is_el0_partition);
 
 /**
  * Branch Target Identification mechanism support in AArch64 state.

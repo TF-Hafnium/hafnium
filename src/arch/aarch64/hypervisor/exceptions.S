@@ -45,8 +45,6 @@
 	mrs x1, elr_el2
 	mrs x2, spsr_el2
 	stp x1, x2, [x18, #VCPU_REGS + 8 * 31]
-	mrs x1, hcr_el2
-	str x1, [x18, #VCPU_REGS + 8 * 33]
 .endm
 
 /**
@@ -286,7 +284,7 @@ vcpu_switch:
 #if ENABLE_VHE
 	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
 	mrs x19, id_aa64mmfr1_el1
-	tst x19, #0xf00
+	tst x19, #(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT)
 	b.ne vhe_save
 #endif
 
@@ -653,7 +651,7 @@ vcpu_restore_lazy_and_run:
 #if ENABLE_VHE
 	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
 	mrs x19, id_aa64mmfr1_el1
-	tst x19, #0xf00
+	tst x19, #(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT)
 	b.ne vhe_restore
 #endif
 
@@ -871,12 +869,13 @@ vcpu_restore_volatile_and_run:
 	msr elr_el2, x1
 	msr spsr_el2, x2
 
-	ldr x1, [x0, #VCPU_REGS + 8 * 33]
+	ldp x1, x2, [x0, #VCPU_REGS + 8 * 33]
+	ldp x3, xzr, [x0, #VCPU_REGS + 8 * 35]
 	msr hcr_el2, x1
 	isb
 
-	ldr x1, [x0, #VCPU_REGS + 8 * 34]
-	msr ttbr0_el2, x1
+	msr ttbr0_el2, x2
+	msr sctlr_el2, x3
 	isb
 
 	/* Restore x0..x3, which we have used as scratch before. */
@@ -886,25 +885,27 @@ vcpu_restore_volatile_and_run:
 
 #if ENABLE_VHE
 enable_vhe_tge:
-	/**
-	 * Switch to host mode ({E2H, TGE} = {1,1}) when VHE is enabled.
-	 * Note that E2H is always set when VHE is enabled.
-	 */
 	mrs x0, id_aa64mmfr1_el1
-	tst x0, #0xf00
+	tst x0, #(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT)
 	b.eq 1f
-	orr x1, x1, #(1 << 27)
-	msr hcr_el2, x1
-	isb
 
 	/**
-	 * Switch to host page tables(ASID 0 tables).
+	 * Apply Hypervisor/SPMC configuration when VHE is enabled:
+	 * Switch to host mode (HCR_EL2.{E2H, TGE} = {1,1}).
+	 * Note that E2H is always set when VHE is enabled.
+	 * Enable alignment check (SCTLR_EL2.A).
+	 * Switch TTBR0_EL2 to host page tables (ASID 0 tables).
 	 */
 	adrp x0, arch_mm_config
 	add x0, x0, :lo12:arch_mm_config
-	ldr x0, [x0]
-	msr ttbr0_el2, x0
+	ldp x3, xzr, [x0]
+	ldp x1, x2, [x0, #0x18]
+	msr hcr_el2, x2
 	isb
-1:
-	ret
+
+	msr sctlr_el2, x1
+	msr ttbr0_el2, x3
+	isb
+
+1:	ret
 #endif

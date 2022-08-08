@@ -79,8 +79,13 @@ struct arch_regs {
 	uintreg_t r[NUM_GP_REGS];
 	uintreg_t pc;
 	uintreg_t spsr;
-	uintreg_t hcr_el2;
-	uintreg_t ttbr0_el2;
+
+	/* Hypervisor configuration while a vCPU runs. */
+	struct {
+		uintreg_t hcr_el2;
+		uintreg_t ttbr0_el2;
+		uintreg_t sctlr_el2;
+	} hyp_state;
 
 	/*
 	 * System registers.

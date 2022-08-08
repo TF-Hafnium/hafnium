@@ -168,7 +168,7 @@ uintreg_t get_cptr_el2_value(void)
 /**
  * Returns the value for SCTLR_EL2 for the CPU.
  */
-uintreg_t get_sctlr_el2_value(void)
+uintreg_t get_sctlr_el2_value(bool is_el0_partition)
 {
 	uintreg_t sctlr_el2_value = 0;
 
@@ -182,7 +182,14 @@ uintreg_t get_sctlr_el2_value(void)
 
 	/* MMU-related bits. */
 	sctlr_el2_value |= SCTLR_EL2_M;
-	sctlr_el2_value |= SCTLR_EL2_A;
+
+	/*
+	 * Alignment check enabled, but in the case of an EL0 partition
+	 * with VHE enabled.
+	 */
+	if (!(has_vhe_support() && is_el0_partition)) {
+		sctlr_el2_value |= SCTLR_EL2_A;
+	}
 	sctlr_el2_value |= SCTLR_EL2_C;
 	sctlr_el2_value |= SCTLR_EL2_SA;
 	sctlr_el2_value |= SCTLR_EL2_I;

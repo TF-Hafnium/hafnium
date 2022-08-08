@@ -886,7 +886,7 @@ bool arch_mm_init(paddr_t table)
 #endif
 				    (0xff << (8 * STAGE1_NORMALINDX)),
 
-		.sctlr_el2 = get_sctlr_el2_value(),
+		.sctlr_el2 = get_sctlr_el2_value(false),
 		.vstcr_el2 = (1U << 31) |	    /* RES1. */
 			     (0 << 30) |	    /* SA. */
 			     (0 << 29) |	    /* SW. */

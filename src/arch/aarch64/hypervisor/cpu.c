@@ -108,7 +108,9 @@ void arch_regs_reset(struct vcpu *vcpu)
 		}
 	}
 
-	r->hcr_el2 = get_hcr_el2_value(vm_id, vcpu->vm->el0_partition);
+	r->hyp_state.hcr_el2 =
+		get_hcr_el2_value(vm_id, vcpu->vm->el0_partition);
+	r->hyp_state.sctlr_el2 = get_sctlr_el2_value(vcpu->vm->el0_partition);
 	r->lazy.cnthctl_el2 = cnthctl;
 	if (vcpu->vm->el0_partition) {
 		CHECK(has_vhe_support());
@@ -118,10 +120,11 @@ void arch_regs_reset(struct vcpu *vcpu)
 		 * are ignored and treated as 0. There is no need to mask the
 		 * VMID (used as asid) to only 8 bits.
 		 */
-		r->ttbr0_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
+		r->hyp_state.ttbr0_el2 =
+			pa_addr(table) | ((uint64_t)vm_id << 48);
 		r->spsr = PSR_PE_MODE_EL0T;
 	} else {
-		r->ttbr0_el2 = read_msr(ttbr0_el2);
+		r->hyp_state.ttbr0_el2 = read_msr(ttbr0_el2);
 		r->lazy.vtcr_el2 = arch_mm_get_vtcr_el2();
 		r->lazy.vttbr_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
 #if SECURE_WORLD == 1
