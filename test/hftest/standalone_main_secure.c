@@ -35,7 +35,7 @@ static noreturn void hftest_wait(void)
 	}
 }
 
-void kmain(void* boot_info_blob)
+void kmain(struct ffa_boot_info_header* boot_info_blob)
 {
 	/* Dummy fdt. It is not really used */
 	struct fdt fdt;
