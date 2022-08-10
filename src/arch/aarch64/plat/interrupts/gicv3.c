@@ -320,6 +320,11 @@ uint64_t read_gicr_typer_reg(uintptr_t gicr_frame_addr)
 	return io_read64(IO64_C(gicr_frame_addr + GICR_TYPER));
 }
 
+uint64_t read_gicd_typer_reg(uintptr_t base)
+{
+	return io_read32(IO32_C(base + GICD_TYPER));
+}
+
 /*
  * This function calculates the core position from the affinity values
  * provided by the GICR_TYPER register. This function may return MAX_CORES
@@ -472,6 +477,31 @@ void gicv3_send_sgi(uint32_t sgi_id, bool send_to_all, uint64_t mpidr_target,
 	isb();
 }
 
+#if GIC_EXT_INTID
+/*******************************************************************************
+ * Helper function to get the maximum ESPI INTID + 1.
+ ******************************************************************************/
+unsigned int gicv3_get_espi_limit(uintptr_t gicd_base)
+{
+	unsigned int typer_reg = read_gicd_typer_reg(gicd_base);
+
+	/* Check if extended SPI range is implemented */
+	if ((typer_reg & TYPER_ESPI) != 0U) {
+		/*
+		 * (maximum ESPI INTID + 1) is equal to
+		 * 32 * (GICD_TYPER.ESPI_range + 1) + 4096
+		 */
+		return ((((typer_reg >> TYPER_ESPI_RANGE_SHIFT) &
+			  TYPER_ESPI_RANGE_MASK) +
+			 1U)
+			<< 5) +
+		       MIN_ESPI_ID;
+	}
+
+	return 0U;
+}
+#endif /* GIC_EXT_INTID */
+
 bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 		       struct mpool *ppool)
 {
@@ -512,6 +542,11 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 #endif
 	populate_redist_base_addrs();
 
+#if GIC_EXT_INTID
+	CHECK((read_gicd_typer_reg(plat_gicv3_driver.dist_base) & TYPER_ESPI) ==
+	      TYPER_ESPI);
+	CHECK(gicv3_get_espi_limit(plat_gicv3_driver.dist_base) != 0);
+#endif
 	return true;
 }
 
@@ -594,6 +629,7 @@ void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 	uint32_t intr_num = interrupt_desc_get_id(int_desc);
 
 	CHECK(core_idx < MAX_CPUS);
+	CHECK(IS_SGI_PPI(intr_num) || IS_SPI(intr_num));
 
 	/* Configure the interrupt as either G1S or G1NS. */
 	if (interrupt_desc_get_sec_state(int_desc) != 0) {

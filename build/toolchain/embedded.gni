@@ -281,7 +281,9 @@ template("aarch64_common_toolchain") {
     if (invoker.gic_version == 3 || invoker.gic_version == 4) {
       extra_defines += " -DGICD_BASE=${invoker.gicd_base_address} -DGICR_BASE=${invoker.gicr_base_address} -DGICR_FRAMES=${invoker.gicr_frames}"
     }
-
+    if (defined(invoker.gic_enable_espi)) {
+      extra_defines += " -DGIC_EXT_INTID=${invoker.gic_enable_espi}"
+    }
     if (defined(invoker.branch_protection)) {
       extra_cflags += " -mbranch-protection=${invoker.branch_protection}"
       extra_defines += " -DBRANCH_PROTECTION=1"
@@ -326,6 +328,7 @@ template("aarch64_toolchains") {
                              "console",
                              "iommu",
                              "gic_version",
+                             "gic_enable_espi",
                              "gicd_base_address",
                              "gicr_base_address",
                              "gicr_frames",
@@ -349,6 +352,7 @@ template("aarch64_toolchains") {
                            [
                              "origin_address",
                              "gic_version",
+                             "gic_enable_espi",
                              "gicd_base_address",
                              "gicr_base_address",
                              "gicr_frames",

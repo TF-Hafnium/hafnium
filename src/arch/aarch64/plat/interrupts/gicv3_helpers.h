@@ -267,11 +267,33 @@
 #define MIN_SPI_ID (32)
 #define MAX_SPI_ID (1019)
 
+#if GIC_EXT_INTID
+
+/* GICv3.1 extended PPIs INTIDs 1056-1119 */
+#define MIN_EPPI_ID (1056)
+#define MAX_EPPI_ID (1119)
+
+/* GICv3.1 extended SPIs INTIDs 4096 - 5119 */
+#define MIN_ESPI_ID (4096)
+#define MAX_ESPI_ID (5119)
+
+/* SGIs: 0-15, PPIs: 16-31, EPPIs: 1056-1119 */
+#define IS_SGI_PPI(id)           \
+	(((id) <= MAX_PPI_ID) || \
+	 (((id) >= MIN_EPPI_ID) && ((id) <= MAX_EPPI_ID)))
+
+/* SPIs: 32-1019, ESPIs: 4096-5119 */
+#define IS_SPI(id)                                         \
+	((((id) >= MIN_SPI_ID) && ((id) <= MAX_SPI_ID)) || \
+	 (((id) >= MIN_ESPI_ID) && ((id) <= MAX_ESPI_ID)))
+#else /* GICv3 */
 /* SGIs: 0-15, PPIs: 16-31 */
 #define IS_SGI_PPI(id) ((id) <= MAX_PPI_ID)
 
 /* SPIs: 32-1019 */
 #define IS_SPI(id) (((id) >= MIN_SPI_ID) && ((id) <= MAX_SPI_ID))
+
+#endif /* GIC_EXT_INTID */
 
 /**
  * GICv3 private macro definitions
@@ -288,6 +310,27 @@
  * Calculate 8, 32 and 64-bit GICD register offset
  * corresponding to its interrupt ID
  */
+#if GIC_EXT_INTID
+/* GICv3.1 */
+#define GICD_OFFSET_8(REG, id)                                  \
+	(((id) <= MAX_SPI_ID) ? GICD_##REG##R + (uintptr_t)(id) \
+			      : GICD_##REG##RE + (uintptr_t)(id)-MIN_ESPI_ID)
+
+#define GICD_OFFSET(REG, id)                                                \
+	(((id) <= MAX_SPI_ID)                                               \
+		 ? GICD_##REG##R + (((uintptr_t)(id) >> REG##R_SHIFT) << 2) \
+		 : GICD_##REG##RE +                                         \
+			   ((((uintptr_t)(id)-MIN_ESPI_ID) >> REG##R_SHIFT) \
+			    << 2))
+
+#define GICD_OFFSET_64(REG, id)                                             \
+	(((id) <= MAX_SPI_ID)                                               \
+		 ? GICD_##REG##R + (((uintptr_t)(id) >> REG##R_SHIFT) << 3) \
+		 : GICD_##REG##RE +                                         \
+			   ((((uintptr_t)(id)-MIN_ESPI_ID) >> REG##R_SHIFT) \
+			    << 3))
+
+#else /* GICv3 */
 #define GICD_OFFSET_8(REG, id) (GICD_##REG##R + (uintptr_t)(id))
 
 #define GICD_OFFSET(REG, id) \
@@ -295,6 +338,7 @@
 
 #define GICD_OFFSET_64(REG, id) \
 	(GICD_##REG##R + (((uintptr_t)(id) >> REG##R_SHIFT) << 3))
+#endif /* GIC_EXT_INTID */
 
 /*
  * Read/Write 8, 32 and 64-bit GIC Distributor register
@@ -340,14 +384,30 @@
 	io_write32(IO32_C((base) + GICD_OFFSET(REG, (id))), \
 		   ((uint32_t)1 << BIT_NUM(REG, (id))))
 
-/**
+/*
  * Calculate 8 and 32-bit GICR register offset
  * corresponding to its interrupt ID
  */
+#if GIC_EXT_INTID
+/* GICv3.1 */
+#define GICR_OFFSET_8(REG, id)                                    \
+	(((id) <= MAX_PPI_ID) ? GICR_##REG##R + (uintptr_t)(id)   \
+			      : GICR_##REG##R + (uintptr_t)(id) - \
+					(MIN_EPPI_ID - MIN_SPI_ID))
+
+#define GICR_OFFSET(REG, id)                                                   \
+	(((id) <= MAX_PPI_ID)                                                  \
+		 ? GICR_##REG##R + (((uintptr_t)(id) >> REG##R_SHIFT) << 2)    \
+		 : GICR_##REG##R +                                             \
+			   ((((uintptr_t)(id) - (MIN_EPPI_ID - MIN_SPI_ID)) >> \
+			     REG##R_SHIFT)                                     \
+			    << 2))
+#else /* GICv3 */
 #define GICR_OFFSET_8(REG, id) (GICR_##REG##R + (uintptr_t)(id))
 
 #define GICR_OFFSET(REG, id) \
 	(GICR_##REG##R + (((uintptr_t)(id) >> REG##R_SHIFT) << 2))
+#endif /* GIC_EXT_INTID */
 
 /* Read/Write GIC Redistributor register corresponding to its interrupt ID */
 #define GICR_READ(REG, base, id) \
