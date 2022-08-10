@@ -16,6 +16,7 @@ vm_kernel("secure_partition_test_vm") {
   ]
 
   deps = [
+    "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_standalone_secure",
     "//test/vmapi/common",
   ]

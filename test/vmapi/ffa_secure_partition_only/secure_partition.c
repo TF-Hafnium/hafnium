@@ -6,12 +6,17 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/barriers.h"
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/mm.h"
 
 #include "vmapi/hf/call.h"
 #include "vmapi/hf/ffa.h"
 
+#include "../msr.h"
 #include "test/hftest.h"
+#include "test/vmapi/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 static alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
@@ -420,4 +425,34 @@ TEST(ffa_console_log, invalid_parameters)
 	/* Expecting INVALID_PARAMETERS on length > payload message */
 	req.arg1 = 0xffff;
 	EXPECT_FFA_ERROR(ffa_call(req), FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Validate a S-EL1 partition can enable/disable alignment checks.
+ */
+TEST(arch_features, vm_unaligned_access)
+{
+	uint64_t sctlr_el1;
+	uint64_t val = 0x1122334400000000;
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	volatile uint32_t* ptr = (volatile uint32_t*)((uintptr_t)&val + 2);
+
+	exception_setup(NULL, exception_handler_skip_instruction);
+
+	/* Expect alignment checks to be disabled. */
+	sctlr_el1 = read_msr(sctlr_el1);
+	EXPECT_EQ((sctlr_el1 >> 1) & 1, 0);
+
+	/* This read access is expected to pass. */
+	EXPECT_EQ(*ptr, 0x33440000);
+	EXPECT_EQ(exception_handler_get_num(), 0);
+
+	/* Enable alignment checks. */
+	write_msr(sctlr_el1, sctlr_el1 | 2);
+	isb();
+
+	/* This read access is expected to trigger an abort. */
+	*ptr;
+
+	EXPECT_EQ(exception_handler_get_num(), 1);
 }
