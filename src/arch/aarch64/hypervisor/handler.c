@@ -909,14 +909,24 @@ static void inject_el1_unknown_exception(struct vcpu *vcpu, uintreg_t esr_el2)
 	uintreg_t esr_el1_value =
 		GET_ESR_IL(esr_el2) | (EC_UNKNOWN << ESR_EC_OFFSET);
 
+	dlog_notice("Injecting Unknown Reason exception into VM %#x.\n",
+		    vcpu->vm->id);
+
 	/*
 	 * The value of the far_el2 register is UNKNOWN in this case,
 	 * therefore, don't propagate it to avoid leaking sensitive information.
 	 */
-	uintreg_t far_el1_value = 0;
-	char *direction_str;
+	inject_el1_exception(vcpu, esr_el1_value, 0);
+}
 
-	direction_str = ISS_IS_READ(esr_el2) ? "read" : "write";
+/**
+ * Injects an exception because of a system register trap.
+ */
+static void inject_el1_sysreg_trap_exception(struct vcpu *vcpu,
+					     uintreg_t esr_el2)
+{
+	char *direction_str = ISS_IS_READ(esr_el2) ? "read" : "write";
+
 	dlog_notice(
 		"Trapped access to system register %s: op0=%d, op1=%d, crn=%d, "
 		"crm=%d, op2=%d, rt=%d.\n",
@@ -924,10 +934,7 @@ static void inject_el1_unknown_exception(struct vcpu *vcpu, uintreg_t esr_el2)
 		GET_ISS_CRN(esr_el2), GET_ISS_CRM(esr_el2),
 		GET_ISS_OP2(esr_el2), GET_ISS_RT(esr_el2));
 
-	dlog_notice("Injecting Unknown Reason exception into VM %#x.\n",
-		    vcpu->vm->id);
-
-	inject_el1_exception(vcpu, esr_el1_value, far_el1_value);
+	inject_el1_unknown_exception(vcpu, esr_el2);
 }
 
 static struct vcpu *hvc_handler(struct vcpu *vcpu)
@@ -1275,21 +1282,21 @@ void handle_system_register_access(uintreg_t esr_el2)
 	 */
 	if (debug_el1_is_register_access(esr_el2)) {
 		if (!debug_el1_process_access(vcpu, vm_id, esr_el2)) {
-			inject_el1_unknown_exception(vcpu, esr_el2);
+			inject_el1_sysreg_trap_exception(vcpu, esr_el2);
 			return;
 		}
 	} else if (perfmon_is_register_access(esr_el2)) {
 		if (!perfmon_process_access(vcpu, vm_id, esr_el2)) {
-			inject_el1_unknown_exception(vcpu, esr_el2);
+			inject_el1_sysreg_trap_exception(vcpu, esr_el2);
 			return;
 		}
 	} else if (feature_id_is_register_access(esr_el2)) {
 		if (!feature_id_process_access(vcpu, esr_el2)) {
-			inject_el1_unknown_exception(vcpu, esr_el2);
+			inject_el1_sysreg_trap_exception(vcpu, esr_el2);
 			return;
 		}
 	} else {
-		inject_el1_unknown_exception(vcpu, esr_el2);
+		inject_el1_sysreg_trap_exception(vcpu, esr_el2);
 		return;
 	}
 
