@@ -374,6 +374,11 @@ class FvpDriver(Driver, ABC):
             "-C", "cluster0.memory_tagging_support_level=2",
             "-C", "cluster1.memory_tagging_support_level=2",
             "-C", "bp.dram_metadata.is_enabled=1",
+            "-C", "cluster0.gicv3.extended-interrupt-range-support=1",
+            "-C", "cluster1.gicv3.extended-interrupt-range-support=1",
+            "-C", "gic_distributor.extended-ppi-count=64",
+            "-C", "gic_distributor.extended-spi-count=1024",
+            "-C", "gic_distributor.ARE-fixed-to-one=1",
         ]
 
         if uart0_log_path and uart1_log_path:
