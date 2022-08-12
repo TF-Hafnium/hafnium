@@ -73,6 +73,7 @@ source_set("memory") {
   ]
   deps = [
     "//test/vmapi/common",
+    "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
     "//vmlib",
   ]
 
