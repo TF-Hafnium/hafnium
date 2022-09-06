@@ -1040,10 +1040,22 @@ bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
 	return false;
 }
 
-void plat_ffa_enable_virtual_maintenance_interrupts(
-	struct vcpu_locked current_locked)
+/**
+ * Enable relevant virtual interrupts for VMs.
+ */
+void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
+					struct vm_locked vm_locked)
 {
-	(void)current_locked;
+	struct vcpu *current;
+	struct interrupts *interrupts;
+
+	current = current_locked.vcpu;
+	interrupts = &current->interrupts;
+
+	if (vm_locked.vm->notifications.enabled) {
+		vcpu_virt_interrupt_set_enabled(interrupts,
+						HF_NOTIFICATION_PENDING_INTID);
+	}
 }
 
 /** Forwards a memory send message on to the other world. */

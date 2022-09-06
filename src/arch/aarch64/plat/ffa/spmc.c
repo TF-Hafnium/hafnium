@@ -2462,7 +2462,7 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
 	sl_unlock(&current->lock);
 }
 
-void plat_ffa_enable_virtual_maintenance_interrupts(
+static void plat_ffa_enable_virtual_maintenance_interrupts(
 	struct vcpu_locked current_locked)
 {
 	struct vcpu *current;
@@ -2533,4 +2533,42 @@ struct ffa_value plat_ffa_other_world_mem_reclaim(
 
 	dlog_verbose("Invalid handle %#x for FFA_MEM_RECLAIM.\n", handle);
 	return ffa_error(FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Enable relevant virtual interrupts for Secure Partitions.
+ * For all SPs, any applicable virtual maintenance interrupts are enabled.
+ * Additionally, for S-EL0 partitions, all the interrupts declared in the
+ * partition manifest are enabled at the virtual interrupt controller
+ * interface early during the boot stage as an S-EL0 SP need not call
+ * HF_INTERRUPT_ENABLE hypervisor ABI explicitly.
+ */
+void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
+					struct vm_locked vm_locked)
+{
+	struct vcpu *current;
+	struct interrupts *interrupts;
+	struct vm *vm;
+
+	current = current_locked.vcpu;
+	interrupts = &current->interrupts;
+	vm = current->vm;
+	assert(vm == vm_locked.vm);
+
+	if (vm->el0_partition) {
+		for (uint32_t k = 0; k < VM_MANIFEST_MAX_INTERRUPTS; k++) {
+			struct interrupt_descriptor int_desc;
+
+			int_desc = vm_locked.vm->interrupt_desc[k];
+
+			/* Interrupt descriptors are populated contiguously. */
+			if (!interrupt_desc_get_valid(int_desc)) {
+				break;
+			}
+			vcpu_virt_interrupt_set_enabled(interrupts,
+							int_desc.interrupt_id);
+		}
+	}
+
+	plat_ffa_enable_virtual_maintenance_interrupts(current_locked);
 }

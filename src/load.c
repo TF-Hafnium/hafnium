@@ -806,8 +806,8 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	vcpu_locked = vcpu_lock(vcpu);
 
-	/* Enable virtual maintenance interrupts for Secure Partitions. */
-	plat_ffa_enable_virtual_maintenance_interrupts(vcpu_locked);
+	/* Enable relevant virtual interrupts for Secure Partitions. */
+	plat_ffa_enable_virtual_interrupts(vcpu_locked, vm_locked);
 
 	if (has_fdt) {
 		vcpu_secondary_reset_and_start(vcpu_locked, secondary_entry,

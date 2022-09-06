@@ -510,10 +510,11 @@ bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
 	return false;
 }
 
-void plat_ffa_enable_virtual_maintenance_interrupts(
-	struct vcpu_locked current_locked)
+void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
+					struct vm_locked vm_locked)
 {
 	(void)current_locked;
+	(void)vm_locked;
 }
 
 struct ffa_value plat_ffa_other_world_mem_send(
