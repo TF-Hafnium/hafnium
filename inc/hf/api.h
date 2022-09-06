@@ -133,3 +133,8 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 
 struct ffa_value api_ffa_console_log(const struct ffa_value args,
 				     struct vcpu *current);
+
+void api_ffa_resume_direct_resp_target(struct vcpu *current, struct vcpu **next,
+				       ffa_vm_id_t receiver_vm_id,
+				       struct ffa_value to_ret,
+				       bool is_nwd_call_chain);

@@ -2040,6 +2040,134 @@ out:
 	return ret;
 }
 
+static void plat_ffa_signal_interrupt_args(struct ffa_value *args, uint32_t id)
+{
+	assert(args != NULL);
+	args->func = (uint32_t)FFA_INTERRUPT_32;
+	args->arg2 = id;
+}
+
+/**
+ * Run the vCPU in SPMC schedule mode under the runtime model for secure
+ * interrupt handling.
+ */
+static void plat_ffa_run_in_sec_interrupt_rtm(
+	struct vcpu_locked target_vcpu_locked)
+{
+	struct vcpu *target_vcpu;
+
+	target_vcpu = target_vcpu_locked.vcpu;
+
+	/* Mark the registers as unavailable now. */
+	target_vcpu->regs_available = false;
+	target_vcpu->scheduling_mode = SPMC_MODE;
+	target_vcpu->rt_model = RTM_SEC_INTERRUPT;
+	target_vcpu->state = VCPU_STATE_RUNNING;
+}
+
+/**
+ * Intercept a direct response message from current S-EL0 vCPU to signal a
+ * pending virtual secure interrupt and prepare to resume it in SPMC schedule
+ * mode under runtime model for secure interrupt handling.
+ */
+bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
+					struct vcpu **next,
+					struct ffa_value to_ret,
+					struct ffa_value *signal_interrupt)
+{
+	bool is_el0_partition;
+	struct vcpu *current;
+
+	current = current_locked.vcpu;
+	is_el0_partition = current->vm->el0_partition;
+	assert(*next == NULL);
+
+	if (is_el0_partition && vcpu_interrupt_count_get(current_locked) > 0) {
+		dlog_verbose(
+			"Intercepting FFA_MSG_SEND_DIRECT_RESP call to "
+			"signal secure interrupt: %x\n",
+			current->vm->id);
+
+		assert(current->processing_secure_interrupt);
+		current->direct_resp_intercepted = true;
+
+		/* Save direct response message args. */
+		current->direct_resp_ffa_value = to_ret;
+
+		/*
+		 * Prepare to signal virtual secure interrupt to S-EL0 SP. Refer
+		 * to FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10.
+		 */
+		plat_ffa_signal_interrupt_args(
+			signal_interrupt, current->current_sec_interrupt_id);
+
+		/*
+		 * Prepare to resume this partition's vCPU in SPMC schedule
+		 * mode to handle virtual secure interrupt.
+		 */
+		plat_ffa_run_in_sec_interrupt_rtm(current_locked);
+
+		/* Resume current vCPU. */
+		*next = NULL;
+
+		return true;
+	}
+
+	return false;
+}
+
+/*
+ * First, all the fields related to secure interrupt handling are reset and
+ * SPMC scheduled call chain is unwound.
+ * Second, the intercepted direct response message is replayed followed by
+ * unwinding of the NWd scheduled call chain.
+ */
+static struct ffa_value plat_ffa_resume_direct_response(struct vcpu *current,
+							struct vcpu **next)
+{
+	ffa_vm_id_t receiver_vm_id;
+	struct ffa_value to_ret;
+	struct vcpu_locked current_vcpu_locked;
+
+	/* Lock current vCPU. */
+	current_vcpu_locked = vcpu_lock(current);
+
+	/* Reset the fields tracking secure interrupt processing. */
+	plat_ffa_reset_secure_interrupt_flags(current_vcpu_locked);
+
+	/* SPMC scheduled call chain is completely unwound. */
+	plat_ffa_exit_spmc_schedule_mode(current_vcpu_locked);
+
+	/* Restore interrupt priority mask. */
+	plat_interrupts_set_priority_mask(current->priority_mask);
+
+	/* Replay the direct response message. */
+	receiver_vm_id = current->direct_request_origin_vm_id;
+	to_ret = current->direct_resp_ffa_value;
+
+	/* Reset the flag now. */
+	current->direct_resp_intercepted = false;
+
+	dlog_verbose(
+		"Resuming intercepted direct response from: %x to: "
+		"%x\n",
+		current->vm->id, receiver_vm_id);
+
+	/* Clear direct request origin for the caller. */
+	current->direct_request_origin_vm_id = HF_INVALID_VM_ID;
+	vcpu_unlock(&current_vcpu_locked);
+
+	api_ffa_resume_direct_resp_target(current, next, receiver_vm_id, to_ret,
+					  true);
+
+	/* Unmask non secure interrupts. */
+	if (current->present_action_ns_interrupts == NS_ACTION_QUEUED) {
+		plat_interrupts_set_priority_mask(current->mask_ns_interrupts);
+	}
+
+	return (struct ffa_value){.func = FFA_MSG_WAIT_32};
+}
+
 /**
  * The invocation of FFA_MSG_WAIT at secure virtual FF-A instance is compliant
  * with FF-A v1.1 EAC0 specification. It only performs the  state transition
@@ -2082,6 +2210,11 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
 		 * for further description.
 		 */
 		assert(!current->implicit_completion_signal);
+
+		if (current->direct_resp_intercepted) {
+			assert(current->vm->el0_partition);
+			return plat_ffa_resume_direct_response(current, next);
+		}
 
 		/* Secure interrupt pre-empted normal world. */
 		if (current->preempted_vcpu->vm->id == HF_OTHER_WORLD_ID) {

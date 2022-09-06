@@ -200,6 +200,15 @@ struct vcpu {
 
 	/** Partition Runtime Model. */
 	enum partition_runtime_model rt_model;
+
+	/**
+	 * Direct response message has been intercepted to handle virtual
+	 * secure interrupt for a S-EL0 partition.
+	 */
+	bool direct_resp_intercepted;
+
+	/** Save direct response message args to be resumed later. */
+	struct ffa_value direct_resp_ffa_value;
 };
 
 /** Encapsulates a vCPU whose lock is held. */

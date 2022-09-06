@@ -330,3 +330,8 @@ struct ffa_value plat_ffa_other_world_mem_send(
 struct ffa_value plat_ffa_other_world_mem_reclaim(
 	struct vm *to, ffa_memory_handle_t handle,
 	ffa_memory_region_flags_t flags, struct mpool *page_pool);
+
+bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
+					struct vcpu **next,
+					struct ffa_value to_ret,
+					struct ffa_value *signal_interrupt);

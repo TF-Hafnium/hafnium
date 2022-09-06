@@ -2630,6 +2630,43 @@ out:
 }
 
 /**
+ * Resume the target vCPU after the current vCPU sent a direct response.
+ * Current vCPU moves to waiting state.
+ */
+void api_ffa_resume_direct_resp_target(struct vcpu *current, struct vcpu **next,
+				       ffa_vm_id_t receiver_vm_id,
+				       struct ffa_value to_ret,
+				       bool is_nwd_call_chain)
+{
+	if (!vm_id_is_current_world(receiver_vm_id)) {
+		*next = api_switch_to_other_world(current, to_ret,
+						  VCPU_STATE_WAITING);
+
+		/* End of NWd scheduled call chain. */
+		assert(!is_nwd_call_chain ||
+		       (current->call_chain.prev_node == NULL));
+	} else if (receiver_vm_id == HF_PRIMARY_VM_ID) {
+		*next = api_switch_to_primary(current, to_ret,
+					      VCPU_STATE_WAITING);
+
+		/* Removing a node from NWd scheduled call chain. */
+		if (is_nwd_call_chain) {
+			vcpu_call_chain_remove_node(current, *next);
+		}
+	} else if (vm_id_is_current_world(receiver_vm_id)) {
+		/*
+		 * It is expected the receiver_vm_id to be from an SP, otherwise
+		 * 'plat_ffa_is_direct_response_valid' should have
+		 * made function return error before getting to this point.
+		 */
+		*next = api_switch_to_vm(current, to_ret, VCPU_STATE_WAITING,
+					 receiver_vm_id);
+	} else {
+		panic("Invalid direct message response invocation");
+	}
+}
+
+/**
  * Send an FF-A direct message response.
  */
 struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
@@ -2640,6 +2677,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 {
 	struct vcpu_locked current_locked;
 	enum vcpu_state next_state = VCPU_STATE_WAITING;
+	struct ffa_value signal_interrupt =
+		(struct ffa_value){.func = FFA_INTERRUPT_32};
 
 	if (!api_ffa_dir_msg_is_arg2_zero(args)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -2703,42 +2742,19 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		}
 	}
 
+	if (plat_ffa_intercept_direct_response(current_locked, next, to_ret,
+					       &signal_interrupt)) {
+		vcpu_unlock(&current_locked);
+		return signal_interrupt;
+	}
+
 	/* Clear direct request origin for the caller. */
 	current->direct_request_origin_vm_id = HF_INVALID_VM_ID;
 
 	vcpu_unlock(&current_locked);
 
-	if (!vm_id_is_current_world(receiver_vm_id)) {
-		*next = api_switch_to_other_world(
-			current, to_ret,
-			/*
-			 * Current vcpu sent a direct response. It moves to
-			 * waiting state.
-			 */
-			VCPU_STATE_WAITING);
-	} else if (receiver_vm_id == HF_PRIMARY_VM_ID) {
-		*next = api_switch_to_primary(
-			current, to_ret,
-			/*
-			 * Current vcpu sent a direct response. It moves to
-			 * waiting state.
-			 */
-			VCPU_STATE_WAITING);
-	} else if (vm_id_is_current_world(receiver_vm_id)) {
-		/*
-		 * It is expected the receiver_vm_id to be from an SP, otherwise
-		 * 'plat_ffa_is_direct_response_valid' should have
-		 * made function return error before getting to this point.
-		 */
-		*next = api_switch_to_vm(current, to_ret,
-					 /*
-					  * current vcpu sent a direct response.
-					  * It moves to waiting state.
-					  */
-					 VCPU_STATE_WAITING, receiver_vm_id);
-	} else {
-		panic("Invalid direct message response invocation");
-	}
+	api_ffa_resume_direct_resp_target(current, next, receiver_vm_id, to_ret,
+					  false);
 
 	plat_ffa_unwind_call_chain_ffa_direct_resp(current, *next);
 
