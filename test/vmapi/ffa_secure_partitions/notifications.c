@@ -249,3 +249,15 @@ TEST(ffa_notifications, fail_if_mbz_set_in_notification_get)
 	res = ffa_notification_get(own_id, 0, 0xFF00U);
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
+
+TEST(ffa_notifications, fail_if_mbz_set_in_notifications_bind)
+{
+	struct ffa_value res;
+	const ffa_vm_id_t sender = SP_ID(1);
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	res = ffa_notification_bind(sender, own_id,
+				    ~FFA_NOTIFICATION_FLAG_PER_VCPU,
+				    FFA_NOTIFICATION_MASK(1));
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}

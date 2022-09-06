@@ -3280,6 +3280,12 @@ struct ffa_value api_ffa_notification_update_bindings(
 		is_bind ? sender_vm_id : HF_INVALID_VM_ID;
 	const ffa_vm_id_t id_to_validate =
 		is_bind ? HF_INVALID_VM_ID : sender_vm_id;
+	const uint32_t flags_mbz =
+		is_bind ? ~FFA_NOTIFICATIONS_FLAG_PER_VCPU : ~0U;
+
+	if ((flags_mbz & flags) != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	if (!plat_ffa_is_notifications_bind_valid(current, sender_vm_id,
 						  receiver_vm_id)) {
