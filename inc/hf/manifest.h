@@ -234,7 +234,7 @@ enum manifest_return_code {
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
-					struct manifest *manifest,
+					struct manifest **manifest,
 					struct memiter *manifest_fdt,
 					struct mpool *ppool);
 void manifest_deinit(struct mpool *ppool);

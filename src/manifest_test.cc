@@ -321,10 +321,20 @@ class manifest : public ::testing::Test
 		mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
 	}
 
+	void TearDown() override
+	{
+		manifest_dealloc();
+	}
+
 	std::unique_ptr<uint8_t[]> test_heap;
 
        protected:
 	struct mpool ppool;
+
+	void manifest_dealloc(void)
+	{
+		manifest_deinit(&ppool);
+	}
 
        public:
 	/**
@@ -354,26 +364,21 @@ class manifest : public ::testing::Test
 	};
 
 	enum manifest_return_code manifest_from_vec(
-		struct_manifest *m, const std::vector<char> &vec)
+		struct_manifest **m, const std::vector<char> &vec)
 	{
 		struct memiter it;
 		struct mm_stage1_locked mm_stage1_locked;
-		enum manifest_return_code ret;
 
 		memiter_init(&it, vec.data(), vec.size());
-		ret = manifest_init(mm_stage1_locked, m, &it, &ppool);
 
-		manifest_deinit(&ppool);
-		return ret;
+		return manifest_init(mm_stage1_locked, m, &it, &ppool);
 	}
 
 	enum manifest_return_code ffa_manifest_from_vec(
-		struct_manifest *m, const std::vector<char> &vec)
+		struct_manifest **m, const std::vector<char> &vec)
 	{
 		struct memiter it;
 		struct mm_stage1_locked mm_stage1_locked;
-		enum manifest_return_code ret;
-
 		Partition_package spkg(vec);
 
 		/* clang-format off */
@@ -389,16 +394,14 @@ class manifest : public ::testing::Test
 			.Build();
 		/* clang-format on */
 		memiter_init(&it, core_dtb.data(), core_dtb.size());
-		ret = manifest_init(mm_stage1_locked, m, &it, &ppool);
 
-		manifest_deinit(&ppool);
-		return ret;
+		return manifest_init(mm_stage1_locked, m, &it, &ppool);
 	}
 };
 
 TEST_F(manifest, no_hypervisor_node)
 {
-	struct_manifest m;
+	struct_manifest *m;
 	std::vector<char> dtb = ManifestDtBuilder().Build();
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb),
@@ -407,7 +410,7 @@ TEST_F(manifest, no_hypervisor_node)
 
 TEST_F(manifest, no_compatible_property)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -421,7 +424,7 @@ TEST_F(manifest, no_compatible_property)
 
 TEST_F(manifest, not_compatible)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -436,7 +439,7 @@ TEST_F(manifest, not_compatible)
 
 TEST_F(manifest, compatible_one_of_many)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -454,7 +457,7 @@ TEST_F(manifest, compatible_one_of_many)
 
 TEST_F(manifest, no_vm_nodes)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -488,18 +491,20 @@ static std::vector<char> gen_long_string_dtb(bool valid)
 
 TEST_F(manifest, long_string)
 {
-	struct_manifest m;
+	struct_manifest *m;
 	std::vector<char> dtb_last_valid = gen_long_string_dtb(true);
 	std::vector<char> dtb_first_invalid = gen_long_string_dtb(false);
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb_last_valid), MANIFEST_SUCCESS);
+	manifest_dealloc();
+
 	ASSERT_EQ(manifest_from_vec(&m, dtb_first_invalid),
 		  MANIFEST_ERROR_STRING_TOO_LONG);
 }
 
 TEST_F(manifest, reserved_vm_id)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -543,14 +548,15 @@ static std::vector<char> gen_vcpu_count_limit_dtb(uint32_t vcpu_count)
 
 TEST_F(manifest, vcpu_count_limit)
 {
-	struct_manifest m;
+	struct_manifest *m;
 	std::vector<char> dtb_last_valid = gen_vcpu_count_limit_dtb(UINT16_MAX);
 	std::vector<char> dtb_first_invalid =
 		gen_vcpu_count_limit_dtb(UINT16_MAX + 1);
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb_last_valid), MANIFEST_SUCCESS);
-	ASSERT_EQ(m.vm_count, 2);
-	ASSERT_EQ(m.vm[1].secondary.vcpu_count, UINT16_MAX);
+	ASSERT_EQ(m->vm_count, 2);
+	ASSERT_EQ(m->vm[1].secondary.vcpu_count, UINT16_MAX);
+	manifest_dealloc();
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb_first_invalid),
 		  MANIFEST_ERROR_INTEGER_OVERFLOW);
@@ -558,7 +564,7 @@ TEST_F(manifest, vcpu_count_limit)
 
 TEST_F(manifest, no_ramdisk_primary)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -572,14 +578,14 @@ TEST_F(manifest, no_ramdisk_primary)
 	/* clang-format on */
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
-	ASSERT_EQ(m.vm_count, 1);
-	ASSERT_STREQ(string_data(&m.vm[0].debug_name), "primary_vm");
-	ASSERT_STREQ(string_data(&m.vm[0].primary.ramdisk_filename), "");
+	ASSERT_EQ(m->vm_count, 1);
+	ASSERT_STREQ(string_data(&m->vm[0].debug_name), "primary_vm");
+	ASSERT_STREQ(string_data(&m->vm[0].primary.ramdisk_filename), "");
 }
 
 TEST_F(manifest, no_boot_address_primary)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char> dtb = ManifestDtBuilder()
@@ -593,14 +599,14 @@ TEST_F(manifest, no_boot_address_primary)
 	/* clang-format on */
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
-	ASSERT_EQ(m.vm_count, 1);
-	ASSERT_STREQ(string_data(&m.vm[0].debug_name), "primary_vm");
-	ASSERT_EQ(m.vm[0].primary.boot_address, MANIFEST_INVALID_ADDRESS);
+	ASSERT_EQ(m->vm_count, 1);
+	ASSERT_STREQ(string_data(&m->vm[0].debug_name), "primary_vm");
+	ASSERT_EQ(m->vm[0].primary.boot_address, MANIFEST_INVALID_ADDRESS);
 }
 
 TEST_F(manifest, boot_address_primary)
 {
-	struct_manifest m;
+	struct_manifest *m;
 	const uint64_t addr = UINT64_C(0x12345678ABCDEFEF);
 
 	/* clang-format off */
@@ -616,9 +622,9 @@ TEST_F(manifest, boot_address_primary)
 	/* clang-format on */
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
-	ASSERT_EQ(m.vm_count, 1);
-	ASSERT_STREQ(string_data(&m.vm[0].debug_name), "primary_vm");
-	ASSERT_EQ(m.vm[0].primary.boot_address, addr);
+	ASSERT_EQ(m->vm_count, 1);
+	ASSERT_STREQ(string_data(&m->vm[0].debug_name), "primary_vm");
+	ASSERT_EQ(m->vm[0].primary.boot_address, addr);
 }
 
 static std::vector<char> gen_malformed_boolean_dtb(
@@ -639,7 +645,7 @@ static std::vector<char> gen_malformed_boolean_dtb(
 
 TEST_F(manifest, malformed_booleans)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	std::vector<char> dtb_false = gen_malformed_boolean_dtb("\"false\"");
 	std::vector<char> dtb_true = gen_malformed_boolean_dtb("\"true\"");
@@ -648,17 +654,23 @@ TEST_F(manifest, malformed_booleans)
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb_false),
 		  MANIFEST_ERROR_MALFORMED_BOOLEAN);
+	manifest_dealloc();
+
 	ASSERT_EQ(manifest_from_vec(&m, dtb_true),
 		  MANIFEST_ERROR_MALFORMED_BOOLEAN);
+	manifest_dealloc();
+
 	ASSERT_EQ(manifest_from_vec(&m, dtb_0),
 		  MANIFEST_ERROR_MALFORMED_BOOLEAN);
+	manifest_dealloc();
+
 	ASSERT_EQ(manifest_from_vec(&m, dtb_1),
 		  MANIFEST_ERROR_MALFORMED_BOOLEAN);
 }
 
 TEST_F(manifest, valid)
 {
-	struct_manifest m;
+	struct_manifest *m;
 	struct manifest_vm *vm;
 
 	/* clang-format off */
@@ -689,9 +701,9 @@ TEST_F(manifest, valid)
 	/* clang-format on */
 
 	ASSERT_EQ(manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
-	ASSERT_EQ(m.vm_count, 3);
+	ASSERT_EQ(m->vm_count, 3);
 
-	vm = &m.vm[0];
+	vm = &m->vm[0];
 	ASSERT_STREQ(string_data(&vm->debug_name), "primary_vm");
 	ASSERT_STREQ(string_data(&vm->kernel_filename), "primary_kernel");
 	ASSERT_STREQ(string_data(&vm->primary.ramdisk_filename),
@@ -701,7 +713,7 @@ TEST_F(manifest, valid)
 		ElementsAre(0x32000000, 0x33001111));
 	ASSERT_FALSE(vm->smc_whitelist.permissive);
 
-	vm = &m.vm[1];
+	vm = &m->vm[1];
 	ASSERT_STREQ(string_data(&vm->debug_name), "first_secondary_vm");
 	ASSERT_STREQ(string_data(&vm->kernel_filename), "");
 	ASSERT_EQ(vm->secondary.vcpu_count, 42);
@@ -711,7 +723,7 @@ TEST_F(manifest, valid)
 		ElementsAre(0x04000000, 0x30002222, 0x31445566));
 	ASSERT_TRUE(vm->smc_whitelist.permissive);
 
-	vm = &m.vm[2];
+	vm = &m->vm[2];
 	ASSERT_STREQ(string_data(&vm->debug_name), "second_secondary_vm");
 	ASSERT_STREQ(string_data(&vm->kernel_filename),
 		     "second_secondary_kernel");
@@ -725,7 +737,7 @@ TEST_F(manifest, valid)
 
 TEST_F(manifest, ffa_not_compatible)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
@@ -748,7 +760,7 @@ TEST_F(manifest, ffa_not_compatible)
 
 TEST_F(manifest, ffa_missing_property)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
@@ -767,7 +779,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 	 * TODO: write test excluding all optional fields of the manifest, in
 	 * accordance with specification.
 	 */
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* Incompatible version */
 	/* clang-format off */
@@ -787,6 +799,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
 
 	/* Incompatible translation granule */
 	/* clang-format off */
@@ -806,6 +819,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
 
 	/* Incompatible exeption level */
 	/* clang-format off */
@@ -825,6 +839,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
 
 	/* Incompatible execution state */
 	/* clang-format off */
@@ -844,6 +859,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
 
 	/* Incompatible messaging method */
 	/* clang-format off */
@@ -863,6 +879,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
 
 	/* Incompatible NS interrupt action */
 	/* clang-format off */
@@ -885,7 +902,7 @@ TEST_F(manifest, ffa_validate_sanity_check)
 
 TEST_F(manifest, ffa_validate_rxtx_info)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* Not Compatible */
 	/* clang-format off */
@@ -898,6 +915,7 @@ TEST_F(manifest, ffa_validate_rxtx_info)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
 
 	/* Missing Properties */
 	/* clang-format off */
@@ -914,7 +932,7 @@ TEST_F(manifest, ffa_validate_rxtx_info)
 
 TEST_F(manifest, ffa_validate_mem_regions)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* Not Compatible */
 	/* clang-format off */
@@ -927,6 +945,7 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
 
 	/* Memory regions unavailable  */
 	/* clang-format off */
@@ -939,6 +958,7 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY);
+	manifest_dealloc();
 
 	/* Missing Properties */
 	/* clang-format off */
@@ -954,6 +974,7 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
+	manifest_dealloc();
 
 	/* Overlapping memory regions */
 	/* clang-format off */
@@ -980,6 +1001,7 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+	manifest_dealloc();
 
 	/* clang-format off */
 	dtb = ManifestDtBuilder()
@@ -1005,6 +1027,7 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+	manifest_dealloc();
 
 	/* clang-format off */
 	dtb = ManifestDtBuilder()
@@ -1030,6 +1053,7 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+	manifest_dealloc();
 
 	/* Different RXTX buffer sizes */
 	/* clang-format off */
@@ -1065,7 +1089,7 @@ TEST_F(manifest, ffa_validate_mem_regions)
 
 TEST_F(manifest, ffa_validate_dev_regions)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* Not Compatible */
 	/* clang-format off */
@@ -1078,6 +1102,7 @@ TEST_F(manifest, ffa_validate_dev_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
 
 	/* Memory regions unavailable  */
 	/* clang-format off */
@@ -1090,6 +1115,7 @@ TEST_F(manifest, ffa_validate_dev_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_DEVICE_REGION_NODE_EMPTY);
+	manifest_dealloc();
 
 	/* Missing Properties */
 	/* clang-format off */
@@ -1105,6 +1131,7 @@ TEST_F(manifest, ffa_validate_dev_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
+	manifest_dealloc();
 
 	/* Malformed interrupt list pair */
 	/* clang-format off */
@@ -1126,6 +1153,7 @@ TEST_F(manifest, ffa_validate_dev_regions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MALFORMED_INTEGER_LIST);
+	manifest_dealloc();
 
 	/* Non-unique interrupt IDs */
 	/* clang-format off */
@@ -1153,15 +1181,17 @@ TEST_F(manifest, ffa_validate_dev_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_INTERRUPT_ID_REPEATED);
 	/* Check valid interrupts were still mapped */
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[0].id, 2);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[0].attributes, 3);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[1].interrupts[0].id, 1);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[1].interrupts[0].attributes, 3);
+	ASSERT_EQ(m->vm[0].partition.dev_regions[0].interrupts[0].id, 2);
+	ASSERT_EQ(m->vm[0].partition.dev_regions[0].interrupts[0].attributes,
+		  3);
+	ASSERT_EQ(m->vm[0].partition.dev_regions[1].interrupts[0].id, 1);
+	ASSERT_EQ(m->vm[0].partition.dev_regions[1].interrupts[0].attributes,
+		  3);
 }
 
 TEST_F(manifest, ffa_invalid_memory_region_attributes)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
@@ -1203,7 +1233,7 @@ TEST_F(manifest, ffa_invalid_memory_region_attributes)
 
 TEST_F(manifest, ffa_invalid_device_region_attributes)
 {
-	struct_manifest m;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
@@ -1257,7 +1287,8 @@ TEST_F(manifest, ffa_invalid_device_region_attributes)
 
 TEST_F(manifest, ffa_valid)
 {
-	struct_manifest m;
+	struct manifest_vm *vm;
+	struct_manifest *m;
 
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
@@ -1319,42 +1350,43 @@ TEST_F(manifest, ffa_valid)
 
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
 
-	ASSERT_EQ(m.vm[0].partition.ffa_version, 0x10000);
+	vm = &m->vm[0];
+	ASSERT_EQ(vm->partition.ffa_version, 0x10000);
 	ASSERT_THAT(
-		std::span(m.vm[0].partition.uuid.uuid, 4),
+		std::span(vm->partition.uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
-	ASSERT_EQ(m.vm[0].partition.execution_ctx_count, 1);
-	ASSERT_EQ(m.vm[0].partition.run_time_el, S_EL1);
-	ASSERT_EQ(m.vm[0].partition.execution_state, AARCH64);
-	ASSERT_EQ(m.vm[0].partition.ep_offset, 0x00002000);
-	ASSERT_EQ(m.vm[0].partition.xlat_granule, PAGE_4KB);
-	ASSERT_EQ(m.vm[0].partition.boot_order, 0);
-	ASSERT_EQ(m.vm[0].partition.messaging_method,
-		  FFA_PARTITION_INDIRECT_MSG);
-	ASSERT_EQ(m.vm[0].partition.ns_interrupts_action, NS_ACTION_ME);
-	ASSERT_EQ(m.vm[0].partition.mem_regions[0].base_address, 0x7100000);
-	ASSERT_EQ(m.vm[0].partition.mem_regions[0].page_count, 4);
-	ASSERT_EQ(m.vm[0].partition.mem_regions[0].attributes, 3);
-	ASSERT_EQ(m.vm[0].partition.mem_regions[1].attributes, (8 | 3));
-	ASSERT_EQ(m.vm[0].partition.rxtx.available, true);
-	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->base_address, 0x7300000);
-	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->page_count, 1);
-	ASSERT_EQ(m.vm[0].partition.rxtx.rx_buffer->attributes, 1);
-	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->base_address, 0x7301000);
-	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->page_count, 1);
-	ASSERT_EQ(m.vm[0].partition.rxtx.tx_buffer->attributes, 3);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].base_address, 0x7400000);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].page_count, 16);
+	ASSERT_EQ(vm->partition.execution_ctx_count, 1);
+	ASSERT_EQ(vm->partition.run_time_el, S_EL1);
+	ASSERT_EQ(vm->partition.execution_state, AARCH64);
+	ASSERT_EQ(vm->partition.ep_offset, 0x00002000);
+	ASSERT_EQ(vm->partition.xlat_granule, PAGE_4KB);
+	ASSERT_EQ(vm->partition.boot_order, 0);
+	ASSERT_EQ(vm->partition.messaging_method, FFA_PARTITION_INDIRECT_MSG);
+	ASSERT_EQ(vm->partition.ns_interrupts_action, NS_ACTION_ME);
+	ASSERT_EQ(vm->partition.mem_regions[0].base_address, 0x7100000);
+	ASSERT_EQ(vm->partition.mem_regions[0].page_count, 4);
+	ASSERT_EQ(vm->partition.mem_regions[0].attributes, 3);
+	ASSERT_EQ(vm->partition.mem_regions[1].attributes, (8 | 3));
 
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].attributes, 3);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].smmu_id, 1);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].stream_ids[0], 0);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].stream_ids[1], 1);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[0].id, 2);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[0].attributes, 3);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[1].id, 4);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[0].interrupts[1].attributes, 5);
-	ASSERT_EQ(m.vm[0].partition.dev_regions[1].attributes, (8 | 1));
+	ASSERT_EQ(vm->partition.rxtx.available, true);
+	ASSERT_EQ(vm->partition.rxtx.rx_buffer->base_address, 0x7300000);
+	ASSERT_EQ(vm->partition.rxtx.rx_buffer->page_count, 1);
+	ASSERT_EQ(vm->partition.rxtx.rx_buffer->attributes, 1);
+	ASSERT_EQ(vm->partition.rxtx.tx_buffer->base_address, 0x7301000);
+	ASSERT_EQ(vm->partition.rxtx.tx_buffer->page_count, 1);
+	ASSERT_EQ(vm->partition.rxtx.tx_buffer->attributes, 3);
+
+	ASSERT_EQ(vm->partition.dev_regions[0].base_address, 0x7400000);
+	ASSERT_EQ(vm->partition.dev_regions[0].page_count, 16);
+	ASSERT_EQ(vm->partition.dev_regions[0].attributes, 3);
+	ASSERT_EQ(vm->partition.dev_regions[0].smmu_id, 1);
+	ASSERT_EQ(vm->partition.dev_regions[0].stream_ids[0], 0);
+	ASSERT_EQ(vm->partition.dev_regions[0].stream_ids[1], 1);
+	ASSERT_EQ(vm->partition.dev_regions[0].interrupts[0].id, 2);
+	ASSERT_EQ(vm->partition.dev_regions[0].interrupts[0].attributes, 3);
+	ASSERT_EQ(vm->partition.dev_regions[0].interrupts[1].id, 4);
+	ASSERT_EQ(vm->partition.dev_regions[0].interrupts[1].attributes, 5);
+	ASSERT_EQ(vm->partition.dev_regions[1].attributes, (8 | 1));
 }
 
 } /* namespace */

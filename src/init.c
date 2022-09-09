@@ -38,12 +38,6 @@ alignas(MM_PPOOL_ENTRY_SIZE) char ptable_buf[MM_PPOOL_ENTRY_SIZE * HEAP_PAGES];
 
 static struct mpool ppool;
 
-/*
- * Hafnium manifest declaring all VMs. Notice this structure is large hence kept
- * in BSS rather than directly allocated to the stack in one_time_init.
- */
-static struct manifest manifest;
-
 /**
  * Performs one-time initialisation of memory management for the hypervisor.
  *
@@ -81,6 +75,7 @@ void one_time_init(void)
 	void *initrd;
 	size_t i;
 	struct mm_stage1_locked mm_stage1_locked;
+	struct manifest *manifest;
 
 	arch_one_time_init();
 
@@ -143,7 +138,7 @@ void one_time_init(void)
 		      manifest_strerror(manifest_ret));
 	}
 
-	plat_ffa_set_tee_enabled(manifest.ffa_tee_enabled);
+	plat_ffa_set_tee_enabled(manifest->ffa_tee_enabled);
 
 	if (!plat_iommu_init(&fdt, mm_stage1_locked, &ppool)) {
 		panic("Could not initialize IOMMUs.");
@@ -162,18 +157,18 @@ void one_time_init(void)
 
 	/* Load all VMs. */
 	update.reserved_ranges_count = 0;
-	if (!load_vms(mm_stage1_locked, &manifest, &cpio, &params, &update,
+	if (!load_vms(mm_stage1_locked, manifest, &cpio, &params, &update,
 		      &ppool)) {
 		panic("Unable to load VMs.");
 	}
 
-	/* Now manifest parsing has completed free the resourses used. */
-	manifest_deinit(&ppool);
-
-	if (!boot_flow_update(mm_stage1_locked, &manifest, &update, &cpio,
+	if (!boot_flow_update(mm_stage1_locked, manifest, &update, &cpio,
 			      &ppool)) {
 		panic("Unable to update boot flow.");
 	}
+
+	/* Now manifest parsing has completed free the resourses used. */
+	manifest_deinit(&ppool);
 
 	mm_unlock_stage1(&mm_stage1_locked);
 

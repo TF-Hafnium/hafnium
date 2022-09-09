@@ -39,53 +39,57 @@ static_assert((HF_OTHER_WORLD_ID > VM_ID_MAX) ||
 	      "TrustZone VM ID clashes with normal VM range.");
 
 /**
- * A struct to keep track of fields that are allocated by partitions
- * in the manifest.
+ * A struct to keep track of a VM's properties during early boot
+ * manifest parsing.
  */
-struct allocated_fields {
+struct manifest_data {
+	struct manifest manifest;
 	struct interrupt_bitmap intids;
 	struct {
 		uintptr_t base;
 		uintptr_t limit;
 	} mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS];
 };
+
 /**
  * Calculate the number of entries in the ppool that are required to
- * store the allocated_fields struct.
+ * store the manifest_data struct.
  */
-static size_t allocated_fields_ppool_entries =
-	(align_up(sizeof(struct allocated_fields), MM_PPOOL_ENTRY_SIZE) /
+static size_t manifest_data_ppool_entries =
+	(align_up(sizeof(struct manifest_data), MM_PPOOL_ENTRY_SIZE) /
 	 MM_PPOOL_ENTRY_SIZE);
 
-static struct allocated_fields *allocated_fields;
-/* Index used the track the number of memory regions allocted. */
+static struct manifest_data *manifest_data;
+/* Index used to track the number of memory regions allocated. */
 static size_t allocated_mem_regions_index = 0;
 
 /**
- * Allocates memory for the allocated fields struct in the given memory
- * pool.
+ * Allocates and clear memory for the manifest data in the given memory pool.
  * Returns true if the memory is successfully allocated.
  */
-static bool manifest_allocated_fields_init(struct mpool *ppool)
+static bool manifest_data_init(struct mpool *ppool)
 {
-	allocated_fields = (struct allocated_fields *)mpool_alloc_contiguous(
-		ppool, allocated_fields_ppool_entries, 1);
+	manifest_data = (struct manifest_data *)mpool_alloc_contiguous(
+		ppool, manifest_data_ppool_entries, 1);
+	memset_s(manifest_data, sizeof(struct manifest_data), 0,
+		 sizeof(struct manifest_data));
 
-	return allocated_fields != NULL;
+	return manifest_data != NULL;
 }
 
 /**
- * Frees the memory used for the allocated field struct in the given
- * memory pool.
+ * Frees the memory used for the manifest data in the given memory pool.
  */
-static void manifest_allocated_fields_deinit(struct mpool *ppool)
+static void manifest_data_deinit(struct mpool *ppool)
 {
 	/**
-	 * Return the memory used for the allocated_fields struct to the
-	 * memory pool
+	 * Clear and return the memory used for the manifest_data struct to the
+	 * memory pool.
 	 */
-	mpool_add_chunk(ppool, allocated_fields,
-			allocated_fields_ppool_entries);
+	memset_s(manifest_data, sizeof(struct manifest_data), 0,
+		 sizeof(struct manifest_data));
+	mpool_add_chunk(ppool, manifest_data, manifest_data_ppool_entries);
+
 	/**
 	 * Reset the index used for tracking the number of memory regions
 	 * allocated.
@@ -416,10 +420,9 @@ static bool check_and_record_mem_regions(uintptr_t base_address,
 	uintptr_t limit = base_address + page_count * PAGE_SIZE;
 
 	for (size_t i = 0; i < allocated_mem_regions_index; i++) {
-		uintptr_t mem_region_base =
-			allocated_fields->mem_regions[i].base;
+		uintptr_t mem_region_base = manifest_data->mem_regions[i].base;
 		uintptr_t mem_region_limit =
-			allocated_fields->mem_regions[i].limit;
+			manifest_data->mem_regions[i].limit;
 
 		if ((base_address >= mem_region_base &&
 		     base_address < mem_region_limit) ||
@@ -434,10 +437,9 @@ static bool check_and_record_mem_regions(uintptr_t base_address,
 		}
 	}
 
-	allocated_fields->mem_regions[allocated_mem_regions_index].base =
+	manifest_data->mem_regions[allocated_mem_regions_index].base =
 		base_address;
-	allocated_fields->mem_regions[allocated_mem_regions_index].limit =
-		limit;
+	manifest_data->mem_regions[allocated_mem_regions_index].limit = limit;
 	allocated_mem_regions_index++;
 
 	return true;
@@ -543,7 +545,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 	struct uint32list_iter list;
 	uint16_t i = 0;
 	uint32_t j = 0;
-	struct interrupt_bitmap allocated_intids = allocated_fields->intids;
+	struct interrupt_bitmap allocated_intids = manifest_data->intids;
 
 	dlog_verbose("  Partition Device Regions\n");
 
@@ -1037,23 +1039,24 @@ out:
  * Parse manifest from FDT.
  */
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
-					struct manifest *manifest,
+					struct manifest **manifest_ret,
 					struct memiter *manifest_fdt,
 					struct mpool *ppool)
 {
+	struct manifest *manifest;
 	struct string vm_name;
 	struct fdt fdt;
 	struct fdt_node hyp_node;
 	size_t i = 0;
 	bool found_primary_vm = false;
 
-	memset_s(manifest, sizeof(*manifest), 0, sizeof(*manifest));
-
-	/* Allocate space in the ppool for tracking the allocated fields. */
-	if (!manifest_allocated_fields_init(ppool)) {
-		panic("Unable to allocated space for allocated fields "
-		      "struct.\n");
+	/* Allocate space in the ppool for the manifest data. */
+	if (!manifest_data_init(ppool)) {
+		panic("Unable to allocate manifest data.\n");
 	}
+
+	manifest = &manifest_data->manifest;
+	*manifest_ret = manifest;
 
 	if (!fdt_init_from_memiter(&fdt, manifest_fdt)) {
 		return MANIFEST_ERROR_FILE_SIZE; /* TODO */
@@ -1126,10 +1129,13 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 	return MANIFEST_SUCCESS;
 }
 
-/* Free resources used when parsing the manifest. */
+/**
+ * Free manifest data resources, called once manifest parsing has
+ * completed and VMs are loaded.
+ */
 void manifest_deinit(struct mpool *ppool)
 {
-	manifest_allocated_fields_deinit(ppool);
+	manifest_data_deinit(ppool);
 }
 
 const char *manifest_strerror(enum manifest_return_code ret_code)
