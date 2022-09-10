@@ -801,9 +801,6 @@ static bool clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool,
 	size_t size = pa_difference(begin, end);
 
 	if (!ptr) {
-		/* TODO: partial defrag of failed range. */
-		/* Recover any memory consumed in failed mapping. */
-		mm_defrag(stage1_locked, ppool);
 		goto fail;
 	}
 
@@ -835,7 +832,6 @@ static bool ffa_clear_memory_constituents(
 {
 	struct mpool local_page_pool;
 	uint32_t i;
-	struct mm_stage1_locked stage1_locked;
 	bool ret = false;
 
 	/*
@@ -865,14 +861,6 @@ static bool ffa_clear_memory_constituents(
 			}
 		}
 	}
-
-	/*
-	 * Need to defrag after clearing, as it may have added extra mappings to
-	 * the stage 1 page table.
-	 */
-	stage1_locked = mm_lock_stage1();
-	mm_defrag(stage1_locked, &local_page_pool);
-	mm_unlock_stage1(&stage1_locked);
 
 	ret = true;
 

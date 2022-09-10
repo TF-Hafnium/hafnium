@@ -175,7 +175,6 @@ void one_time_init(void)
 		panic("Unable to update boot flow.");
 	}
 
-	mm_defrag(mm_stage1_locked, &ppool);
 	mm_unlock_stage1(&mm_stage1_locked);
 
 	/* Initialise the API page pool. ppool will be empty from now on. */

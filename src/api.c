@@ -1064,9 +1064,6 @@ static bool api_vm_configure_stage1(struct mm_stage1_locked mm_stage1_locked,
 		mm_identity_map(mm_stage1_locked, pa_send_begin, pa_send_end,
 				MM_MODE_R | extra_attributes, local_page_pool);
 	if (!vm_locked.vm->mailbox.send) {
-		/* TODO: partial defrag of failed range. */
-		/* Recover any memory consumed in failed mapping. */
-		mm_defrag(mm_stage1_locked, local_page_pool);
 		goto fail;
 	}
 
@@ -1078,9 +1075,6 @@ static bool api_vm_configure_stage1(struct mm_stage1_locked mm_stage1_locked,
 		mm_identity_map(mm_stage1_locked, pa_recv_begin, pa_recv_end,
 				MM_MODE_W | extra_attributes, local_page_pool);
 	if (!vm_locked.vm->mailbox.recv) {
-		/* TODO: partial defrag of failed range. */
-		/* Recover any memory consumed in failed mapping. */
-		mm_defrag(mm_stage1_locked, local_page_pool);
 		goto fail_undo_send;
 	}
 
