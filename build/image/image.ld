@@ -157,7 +157,7 @@ SECTIONS
 	. = ALIGN(4096);
 	data_end = .;
 
-	.stacks : {
+	.stacks (NOLOAD) : {
 		stacks_begin = .;
 		*(.stacks)
 		stacks_end = .;
