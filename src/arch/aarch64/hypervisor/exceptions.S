@@ -12,6 +12,7 @@
 
 #include "msr.h"
 #include "exception_macros.S"
+#include "sysregs_defs.h"
 
 /**
  * Saves the volatile registers into the register buffer of the current vCPU.
