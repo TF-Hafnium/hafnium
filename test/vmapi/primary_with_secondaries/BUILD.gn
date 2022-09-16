@@ -259,3 +259,70 @@ partitions_json("primary_with_sp") {
 
   json_file = "primary_with_sp.json"
 }
+
+# The primary VM target links together all test suites.
+# Defining a new primary VM for the VHE enabled setup below,
+# because the level of support of certain features might differ for S-EL0 and
+# S-EL1 partitions.
+# A test suite is expected to be fully functional with S-EL0 partitions when
+# adding the respective source file to the 'sources' field of the target below.
+vm_kernel("primary_with_sp_vhe_test_vm") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:config",
+  ]
+
+  sources = [
+    "indirect_messaging.c",
+  ]
+
+  deps = [
+    ":primary_with_secondaries",
+    "//src/arch/${plat_arch}/hftest:registers",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/common",
+    "//vmlib",
+  ]
+}
+
+partition_package("primary_with_sp_vhe_test_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_nwd_primary.dtb",
+        "primary_with_sp_vhe_test_vm.bin",
+        ":primary_with_sp_manifest",
+        ":primary_with_sp_vhe_test_vm",
+      ] ]
+  output = "primary_with_sp_vhe_test_package.img"
+}
+
+partitions_json("primary_with_sp_vhe") {
+  testonly = true
+
+  sps = [
+    [
+      "service_sp1_partition_package.img",
+      "services/arch/aarch64/secure/el0/manifest_secure_service1.dts",
+      "services/arch/aarch64/secure/el0:service_sp1_partition_package",
+      "services/arch/aarch64/secure/el0:partition_manifest_service_sp1",
+    ],
+    [
+      "service_sp2_partition_package.img",
+      "services/arch/aarch64/secure/manifest_secure_service2.dts",
+      "services/arch/aarch64/secure:service_sp2_partition_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp2",
+    ],
+  ]
+
+  vms = [ [
+        "primary_with_sp_vhe_test_package.img",
+        "manifest_vm_sp.dts",
+        ":primary_with_sp_vhe_test_package",
+        ":primary_with_sp_manifest",
+      ] ]
+
+  json_file = "primary_with_sp_vhe.json"
+}

@@ -15,37 +15,27 @@
 
 #include "vmapi/hf/call.h"
 
+#include "test/abort.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
 alignas(4096) uint8_t kstack[4096];
 
-HFTEST_ENABLE();
-
-static struct hftest_context global_context;
-
-struct hftest_context *hftest_get_context(void)
-{
-	return &global_context;
-}
-
 bool sel1_secure_service = false;
+
+static struct ffa_boot_info_header* boot_info_header;
+
+struct ffa_boot_info_header* get_boot_info_header(void)
+{
+	return boot_info_header;
+}
 
 void test_main_sp(bool);
 
-noreturn void abort(void)
+noreturn void kmain(struct ffa_boot_info_header* boot_info_blob)
 {
-	HFTEST_LOG("Service contained failures.");
-	/* Cause a fault, as a secondary can't power down the machine. */
-	*((volatile uint8_t *)1) = 1;
+	boot_info_header = boot_info_blob;
 
-	/* This should never be reached, but to make the compiler happy... */
-	for (;;) {
-	}
-}
-
-noreturn void kmain(void)
-{
 	/* Register RX/TX buffers via FFA_RXTX_MAP */
 	set_up_mailbox();
 

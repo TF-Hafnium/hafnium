@@ -1,0 +1,36 @@
+# Copyright 2022 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+import("//test/hftest/args.gni")
+
+vm_kernel("secure_service") {
+  testonly = true
+  deps = [
+    "//test/hftest:hftest_sel0_partition_base",
+    "//test/vmapi/primary_with_secondaries/services:echo",
+    "//test/vmapi/primary_with_secondaries/services:ffa_check",
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:message_loop",
+  ]
+}
+
+manifest("partition_manifest_service_sp1") {
+  source = "partition_manifest_service_sp1.dts"
+  output = "partition_manifest_service_sp1.dtb"
+}
+
+partition_package("service_sp1_partition_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp1.dtb",
+        "secure_service.bin",
+        ":partition_manifest_service_sp1",
+        ":secure_service",
+      ] ]
+  output = "service_sp1_partition_package.img"
+}

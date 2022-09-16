@@ -35,4 +35,7 @@ ${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
              --partitions_json test/vmapi/primary_with_secondaries/primary_with_sp.json
 
 ${HFTEST_VHE[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                 --partitions_json test/vmapi/primary_with_secondaries/primary_with_sp_vhe.json
+
+${HFTEST_VHE[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
                  --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_vhe_test.json

@@ -64,6 +64,7 @@ source_set("hftest_sel0_partition_base") {
 
   sources = [
     "sel0_secure_service.c",
+    "service_common.c",
   ]
 
   deps = [
