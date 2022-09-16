@@ -20,7 +20,7 @@
 /**
  * Reverses the order of the elements in the given array.
  */
-void reverse(char *s, size_t len)
+static void reverse(char *s, size_t len)
 {
 	size_t i;
 

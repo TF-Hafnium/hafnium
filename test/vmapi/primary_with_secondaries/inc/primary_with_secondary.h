@@ -54,5 +54,3 @@
 #define EXTERNAL_INTERRUPT_ID_A 7
 #define EXTERNAL_INTERRUPT_ID_B 8
 #define EXTERNAL_INTERRUPT_ID_C 9
-
-void reverse(char *s, size_t len);
