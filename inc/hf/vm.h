@@ -174,7 +174,7 @@ struct vm {
 	/** See api.c for the partial ordering on locks. */
 	struct spinlock lock;
 	ffa_vcpu_count_t vcpu_count;
-	struct vcpu vcpus[MAX_CPUS];
+	struct vcpu *vcpus;
 	struct mm_ptable ptable;
 	struct mailbox mailbox;
 

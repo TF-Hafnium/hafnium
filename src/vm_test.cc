@@ -285,7 +285,7 @@ TEST_F(vm, vm_notifications_set_and_get)
 	ffa_notifications_bitmap_t global = 0x00000000FFFFFFFFU;
 	ffa_notifications_bitmap_t per_vcpu = ~global;
 	ffa_notifications_bitmap_t ret;
-	const unsigned int vcpu_idx = 1;
+	const unsigned int vcpu_idx = 0;
 	struct notifications *notifications;
 	const bool is_from_vm = true;
 

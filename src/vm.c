@@ -54,6 +54,9 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 {
 	uint32_t i;
 	struct vm *vm;
+	size_t vcpu_ppool_entries = (align_up(sizeof(struct vcpu) * vcpu_count,
+					      MM_PPOOL_ENTRY_SIZE) /
+				     MM_PPOOL_ENTRY_SIZE);
 
 	if (id == HF_OTHER_WORLD_ID) {
 		CHECK(el0_partition == false);
@@ -74,6 +77,10 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 
 	vm->id = id;
 	vm->vcpu_count = vcpu_count;
+
+	vm->vcpus = (struct vcpu *)mpool_alloc_contiguous(
+		ppool, vcpu_ppool_entries, 1);
+	CHECK(vm->vcpus != NULL);
 	vm->mailbox.state = MAILBOX_STATE_EMPTY;
 	atomic_init(&vm->aborting, false);
 	vm->el0_partition = el0_partition;
@@ -460,7 +467,7 @@ bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 	to_check = vm_get_notifications(vm_locked, from_vm);
 
 	/* Check if there are pending per vcpu notifications */
-	for (uint32_t i = 0U; i < MAX_CPUS; i++) {
+	for (uint32_t i = 0U; i < vm_locked.vm->vcpu_count; i++) {
 		if ((to_check->per_vcpu[i].pending & notifications) != 0U) {
 			return true;
 		}
@@ -488,7 +495,7 @@ bool vm_are_global_notifications_pending(struct vm_locked vm_locked)
 bool vm_are_per_vcpu_notifications_pending(struct vm_locked vm_locked,
 					   ffa_vcpu_index_t vcpu_id)
 {
-	CHECK(vcpu_id < MAX_CPUS);
+	CHECK(vcpu_id < vm_locked.vm->vcpu_count);
 
 	return vm_get_notifications(vm_locked, true)
 			       ->per_vcpu[vcpu_id]
@@ -700,7 +707,7 @@ void vm_notifications_partition_set_pending(
 	struct notifications_state *state;
 
 	CHECK(vm_locked.vm != NULL);
-	CHECK(vcpu_id < MAX_CPUS);
+	CHECK(vcpu_id < vm_locked.vm->vcpu_count);
 
 	to_set = vm_get_notifications(vm_locked, is_from_vm);
 
@@ -764,7 +771,7 @@ ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
 
 	assert(vm_locked.vm != NULL);
 	to_get = vm_get_notifications(vm_locked, is_from_vm);
-	assert(vcpu_id < MAX_CPUS);
+	assert(vcpu_id < vm_locked.vm->vcpu_count);
 
 	to_ret = vm_notifications_state_get_pending(&to_get->global);
 	to_ret |=
