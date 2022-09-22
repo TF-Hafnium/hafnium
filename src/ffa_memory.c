@@ -2150,6 +2150,19 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 
 		memory_to_attributes = ffa_memory_permissions_to_mode(
 			permissions, share_state->sender_orig_mode);
+
+		if (to_locked.vm->el0_partition) {
+			/*
+			 * Get extra mapping attributes for the given VM ID.
+			 * If the memory is shared by a VM executing in non
+			 * secure world, attribute MM_MODE_NS has to be set
+			 * while mapping that in a SP executing in secure world.
+			 */
+			memory_to_attributes |=
+				arch_mm_extra_attributes_from_vm(
+					retrieve_request->sender);
+		}
+
 		ret = ffa_retrieve_check_update(
 			to_locked, memory_region->sender,
 			share_state->fragments,
