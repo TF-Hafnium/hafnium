@@ -147,13 +147,6 @@ do
                        --initrd test/vmapi/el0_partitions/el0_partitions_test
   fi
 
-  # TODO: Get Trusty tests working on FVP too.
-  if [ $USE_TFA == true ]
-  then
-    "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
-                       --initrd test/vmapi/arch/aarch64/trusty/trusty_test
-  fi
-
   if [ $USE_TFA == true ] && [ $USE_FVP == true ]
   then
      "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
