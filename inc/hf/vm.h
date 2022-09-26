@@ -237,6 +237,12 @@ struct vm {
 	bool me_signal_virq;
 
 	/**
+	 * Bitmask reporting the power management events that a partition
+	 * requests to the signaled about.
+	 */
+	uint32_t power_management;
+
+	/**
 	 * Secondary entry point supplied by FFA_SECONDARY_EP_REGISTER used
 	 * for cold and warm boot of SP execution contexts.
 	 */

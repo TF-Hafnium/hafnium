@@ -1014,6 +1014,21 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 		vm->partition.boot_info = false;
 	}
 
+	TRY(read_optional_uint32(
+		&root, "power-management-messages",
+		MANIFEST_POWER_MANAGEMENT_CPU_OFF_SUPPORTED |
+			MANIFEST_POWER_MANAGEMENT_CPU_ON_SUPPORTED,
+		&vm->partition.power_management));
+	vm->partition.power_management &= MANIFEST_POWER_MANAGEMENT_ALL_MASK;
+	if (vm->partition.execution_ctx_count == 1 ||
+	    vm->partition.run_time_el == S_EL0) {
+		vm->partition.power_management =
+			MANIFEST_POWER_MANAGEMENT_NONE_MASK;
+	}
+
+	dlog_verbose("  Power management messages %#x\n",
+		     vm->partition.power_management);
+
 	/* Parse memory-regions */
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {

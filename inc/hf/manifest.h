@@ -30,6 +30,13 @@
 	(MANIFEST_REGION_ATTR_READ | MANIFEST_REGION_ATTR_WRITE | \
 	 MANIFEST_REGION_ATTR_EXEC | MANIFEST_REGION_ATTR_SECURITY)
 
+#define MANIFEST_POWER_MANAGEMENT_CPU_OFF_SUPPORTED (UINT32_C(1) << 0)
+#define MANIFEST_POWER_MANAGEMENT_CPU_ON_SUPPORTED (UINT32_C(1) << 3)
+#define MANIFEST_POWER_MANAGEMENT_NONE_MASK (UINT32_C(0))
+#define MANIFEST_POWER_MANAGEMENT_ALL_MASK             \
+	(MANIFEST_POWER_MANAGEMENT_CPU_OFF_SUPPORTED | \
+	 MANIFEST_POWER_MANAGEMENT_CPU_ON_SUPPORTED)
+
 /* Highest possible value for the boot-order field. */
 #define DEFAULT_BOOT_ORDER 0xFFFF
 #define DEFAULT_BOOT_GP_REGISTER UINT32_C(-1)
@@ -157,6 +164,19 @@ struct partition_manifest {
 	bool me_signal_virq;
 	/** optional - receipt of notifications. */
 	bool notification_support;
+	/**
+	 * optional - power management messages bitfield.
+	 *
+	 * See [1] power-management-messages manifest field.
+	 *
+	 * The Hafnium supported combinations for a MP SP are:
+	 * Bit 0 - relay PSCI cpu off message to the SP.
+	 * Bit 3 - relay PSCI cpu on to the SP.
+	 *
+	 * [1]
+	 * https://trustedfirmware-a.readthedocs.io/en/latest/components/ffa-manifest-binding.html#partition-properties
+	 */
+	uint32_t power_management;
 	/** optional */
 	bool has_primary_scheduler;
 	/** optional - tuples SEPID/SMMUID/streamId */
