@@ -228,7 +228,10 @@ vm_kernel("service_vm1") {
     ":run_waiting",
     ":unmapped",
     ":wfi",
+    "//src/arch/aarch64/hftest:interrupts",
+    "//src/arch/aarch64/hftest:mm",
     "//test/hftest:hftest_secondary_vm",
+    "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
   ]
 }
 
@@ -239,7 +242,10 @@ vm_kernel("service_vm2") {
     ":interruptible",
     ":memory",
     ":relay",
+    "//src/arch/aarch64/hftest:interrupts",
+    "//src/arch/aarch64/hftest:mm",
     "//test/hftest:hftest_secondary_vm",
+    "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
   ]
 }
 
@@ -249,5 +255,6 @@ vm_kernel("service_vm3") {
   deps = [
     ":smp",
     "//test/hftest:hftest_secondary_vm",
+    "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
   ]
 }

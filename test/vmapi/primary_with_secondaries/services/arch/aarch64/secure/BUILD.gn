@@ -30,6 +30,8 @@ vm_kernel("secure_service") {
   testonly = true
   deps = [
     ":message_loop",
+    "//src/arch/aarch64/hftest:interrupts",
+    "//src/arch/aarch64/hftest:mm",
     "//test/hftest:hftest_secure_service",
     "//test/vmapi/primary_with_secondaries/services:echo",
     "//test/vmapi/primary_with_secondaries/services:ffa_check",

@@ -72,6 +72,7 @@ source_set("hftest_sel0_partition_base") {
     ":el0_fdt_handler",
     "//src:panic",
     "//src/arch/${plat_arch}/hftest:el0_entry",
+    "//test/hftest/arch/aarch64/el0:mm",
   ]
 }
 
