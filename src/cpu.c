@@ -141,7 +141,7 @@ struct cpu *cpu_find_index(size_t index)
 /**
  * Turns CPU on and returns the previous state.
  */
-bool cpu_on(struct cpu *c, ipaddr_t entry, uintreg_t arg)
+bool cpu_on(struct cpu *c)
 {
 	bool prev;
 
@@ -149,16 +149,6 @@ bool cpu_on(struct cpu *c, ipaddr_t entry, uintreg_t arg)
 	prev = c->is_on;
 	c->is_on = true;
 	sl_unlock(&c->lock);
-
-	if (!prev) {
-		struct vcpu *boot_vcpu = vcpu_get_boot_vcpu();
-		struct vcpu_locked vcpu_locked;
-
-		vcpu_locked =
-			vcpu_lock(vm_get_vcpu(boot_vcpu->vm, cpu_index(c)));
-		vcpu_on(vcpu_locked, entry, arg);
-		vcpu_unlock(&vcpu_locked);
-	}
 
 	return prev;
 }

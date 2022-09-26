@@ -38,6 +38,8 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 {
 	struct cpu *c;
 	struct ffa_value smc_res;
+	struct vcpu *vcpu_target;
+	struct vcpu_locked vcpu_locked;
 
 	/*
 	 * If there's a problem with the EL3 PSCI, block standard secure service
@@ -160,10 +162,15 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 			break;
 		}
 
-		if (cpu_on(c, ipa_init(arg1), arg2)) {
+		if (cpu_on(c)) {
 			*ret = PSCI_ERROR_ALREADY_ON;
 			break;
 		}
+
+		vcpu_target = vm_get_vcpu(vcpu->vm, cpu_index(c));
+		vcpu_locked = vcpu_lock(vcpu_target);
+		vcpu_on(vcpu_locked, ipa_init(arg1), arg2);
+		vcpu_unlock(&vcpu_locked);
 
 		/*
 		 * There's a race when turning a CPU on when it's in the

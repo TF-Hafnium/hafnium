@@ -8,6 +8,7 @@
 
 #include "hf/cpu.h"
 #include "hf/dlog.h"
+#include "hf/vm.h"
 
 #include "psci.h"
 
@@ -51,11 +52,14 @@ void plat_psci_cpu_suspend(uint32_t power_state)
 
 void plat_psci_cpu_resume(struct cpu *c, ipaddr_t entry_point)
 {
-	if (cpu_on(c, entry_point, 0UL)) {
-		/*
-		 * This is the boot time PSCI cold reset path (svc_cpu_on_finish
-		 * handler relayed by SPMD) on secondary cores.
-		 */
-		dlog_verbose("%s: cpu mpidr 0x%x ON\n", __func__, c->id);
+	struct vcpu *vcpu = vcpu_get_boot_vcpu();
+	struct vm *vm = vcpu->vm;
+	struct vcpu_locked vcpu_locked;
+
+	if (!cpu_on(c)) {
+		vcpu = vm_get_vcpu(vm, cpu_index(c));
+		vcpu_locked = vcpu_lock(vcpu);
+		vcpu_on(vcpu_locked, entry_point, 0LL);
+		vcpu_unlock(&vcpu_locked);
 	}
 }
