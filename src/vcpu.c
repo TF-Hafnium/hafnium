@@ -213,6 +213,22 @@ void vcpu_set_phys_core_idx(struct vcpu *vcpu)
 }
 
 /**
+ * Sets the designated GP register through which the vCPU expects to receive the
+ * boot info's address.
+ */
+void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu)
+{
+	struct vm *vm = vcpu->vm;
+	uint32_t gp_register_num = vm->boot_info.gp_register_num;
+
+	if (vm->boot_info.blob_addr.ipa != 0U) {
+		arch_regs_set_gp_reg(&vcpu->regs,
+				     ipa_addr(vm->boot_info.blob_addr),
+				     gp_register_num);
+	}
+}
+
+/**
  * Gets the first partition to boot, according to Boot Protocol from FFA spec.
  */
 struct vcpu *vcpu_get_boot_vcpu(void)

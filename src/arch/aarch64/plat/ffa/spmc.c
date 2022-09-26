@@ -2025,7 +2025,7 @@ static bool sp_boot_next(struct vcpu *current, struct vcpu **next)
 	vcpu_next->state = VCPU_STATE_RUNNING;
 	vcpu_next->regs_available = false;
 	vcpu_set_phys_core_idx(vcpu_next);
-	vm_set_boot_info_gp_reg(vcpu_next->vm, vcpu_next);
+	vcpu_set_boot_info_gp_reg(vcpu_next);
 
 	*next = vcpu_next;
 

@@ -239,6 +239,8 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 void vcpu_reset(struct vcpu *vcpu);
 
 void vcpu_set_phys_core_idx(struct vcpu *vcpu);
+void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu);
+
 void vcpu_update_boot(struct vcpu *vcpu);
 struct vcpu *vcpu_get_boot_vcpu(void);
 
