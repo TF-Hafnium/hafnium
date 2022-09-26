@@ -472,8 +472,7 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -538,8 +537,7 @@ TEST(memory_sharing, lend_relinquish)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -588,8 +586,7 @@ TEST(memory_sharing, lend_fragmented_relinquish)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -631,8 +628,7 @@ TEST(memory_sharing, lend_force_fragmented_relinquish)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -707,8 +703,7 @@ TEST(memory_sharing, give_and_get_back)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -750,8 +745,7 @@ TEST(memory_sharing, lend_and_get_back)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -834,9 +828,8 @@ TEST(memory_sharing, lend_elsewhere_after_return)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -873,8 +866,7 @@ TEST_PRECONDITION(memory_sharing, give_memory_and_lose_access, service1_is_vm)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -911,8 +903,7 @@ TEST_PRECONDITION(memory_sharing, lend_memory_and_lose_access, service1_is_vm)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -951,8 +942,7 @@ TEST(memory_sharing, donate_check_upper_bounds)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 
 	/* Use different memory regions for verifying the second constituent. */
 	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
@@ -975,8 +965,7 @@ TEST(memory_sharing, donate_check_upper_bounds)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service2_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -1015,8 +1004,7 @@ TEST(memory_sharing, donate_check_lower_bounds)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 
 	/* Use different memory regions for verifying the second constituent. */
 	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
@@ -1039,8 +1027,7 @@ TEST(memory_sharing, donate_check_lower_bounds)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service2_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -1087,8 +1074,7 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -1116,8 +1102,7 @@ TEST(memory_sharing, donate_vms)
 
 	/* Try to access memory in service1. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 
 	/* Ensure that memory in service2 remains the same. */
 	run_res = ffa_run(service2_info->vm_id, 0);
@@ -1497,8 +1482,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -1629,8 +1613,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -1721,8 +1704,7 @@ TEST_PRECONDITION(memory_sharing, lend_relinquish_RW_X, service1_is_vm)
 		FFA_INSTRUCTION_ACCESS_NX);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -1772,8 +1754,7 @@ TEST_PRECONDITION(memory_sharing, lend_relinquish_RO_X, service1_is_vm)
 		FFA_INSTRUCTION_ACCESS_NX);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -2166,8 +2147,7 @@ TEST(memory_sharing, ffa_lend_check_upper_bounds)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 
 	/* Use different memory regions for verifying the second constituent. */
 	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
@@ -2190,8 +2170,7 @@ TEST(memory_sharing, ffa_lend_check_upper_bounds)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service2_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -2230,8 +2209,7 @@ TEST(memory_sharing, ffa_lend_check_lower_bounds)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 
 	/* Use different memory regions for verifying the second constituent. */
 	constituents[0].address = (uint64_t)pages + PAGE_SIZE * 1;
@@ -2254,8 +2232,7 @@ TEST(memory_sharing, ffa_lend_check_lower_bounds)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	run_res = ffa_run(service2_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
@@ -3116,8 +3093,6 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
 		ffa_vm_id_t vm_id = receivers[i].receiver_permissions.receiver;
 		run_res = ffa_run(vm_id, 0);
-		EXPECT_EQ(run_res.func, FFA_YIELD_32);
-		EXPECT_EQ(exception_handler_receive_exception_count(mb.recv),
-			  1);
+		EXPECT_TRUE(exception_received(&run_res, mb.recv));
 	}
 }
