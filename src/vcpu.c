@@ -198,14 +198,6 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 	return resume;
 }
 
-void vcpu_reset(struct vcpu *vcpu)
-{
-	arch_cpu_init(vcpu->cpu);
-
-	/* Reset the registers to give a clean start for vCPU. */
-	arch_regs_reset(vcpu);
-}
-
 void vcpu_set_phys_core_idx(struct vcpu *vcpu)
 {
 	arch_regs_set_gp_reg(&vcpu->regs, cpu_index(vcpu->cpu),

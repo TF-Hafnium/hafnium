@@ -236,8 +236,6 @@ bool vcpu_secondary_reset_and_start(struct vcpu_locked vcpu_locked,
 bool vcpu_handle_page_fault(const struct vcpu *current,
 			    struct vcpu_fault_info *f);
 
-void vcpu_reset(struct vcpu *vcpu);
-
 void vcpu_set_phys_core_idx(struct vcpu *vcpu);
 void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu);
 
