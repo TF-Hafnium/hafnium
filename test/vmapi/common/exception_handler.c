@@ -55,18 +55,33 @@ int exception_handler_receive_exception_count(const void *recv_buf)
 	struct ffa_value ret;
 	ffa_notifications_bitmap_t fwk_notif;
 
-	/* Assert we received a message with the exception count. */
 	ret = ffa_notification_get(hf_vm_get_id(), 0,
 				   FFA_NOTIFICATION_FLAG_BITMAP_HYP |
 					   FFA_NOTIFICATION_FLAG_BITMAP_SPM);
 
 	fwk_notif = ffa_notification_get_from_framework(ret);
-	ASSERT_TRUE(is_ffa_hyp_buffer_full_notification(fwk_notif) ||
-		    is_ffa_spm_buffer_full_notification(fwk_notif));
 
-	EXPECT_EQ(exception_msg->header.size, sizeof(exception_count));
+	if (fwk_notif == 0U ||
+	    exception_msg->header.size != sizeof(exception_count)) {
+		return 0;
+	}
+
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	return exception_count;
+}
+
+/*
+ * Returns true if the receiver has been preempted by an exception:
+ * - if the receiver is an EL1 partition, it should have sent the exception
+ * count in a message.
+ * - if the receiver is an EL0 partition, the Hyp/SPMC should return FFA_ERROR
+ * with error code FFA_ABORTED.
+ */
+bool exception_received(struct ffa_value *run_res, const void *recv_buf)
+{
+	return exception_handler_receive_exception_count(recv_buf) == 1 ||
+	       (run_res->func == FFA_ERROR_32 &&
+		ffa_error_code(*run_res) == FFA_ABORTED);
 }
 
 /**
