@@ -345,31 +345,22 @@ TEST_SERVICE(ffa_check_lower_bound)
 TEST_SERVICE(ffa_donate_secondary_and_fault)
 {
 	uint8_t *ptr;
-	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-
-	struct ffa_value ret = ffa_msg_wait();
-	ASSERT_NE(ret.func, FFA_ERROR_32);
-
-	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)retrieve_buffer;
-	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
-				     HF_MAILBOX_SIZE);
-	struct ffa_composite_memory_region *composite =
-		ffa_memory_region_get_composite(memory_region, 0);
 	struct ffa_partition_info *service2_info = service2();
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)&page, .page_count = 1},
+	};
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	ptr = (uint8_t *)composite->constituents[0].address;
+	ptr = (uint8_t *)page;
 
 	/* Donate memory to next VM. */
 	send_memory_and_retrieve_request(
 		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(),
-		service2_info->vm_id, composite->constituents,
-		composite->constituent_count, 0, 0,
-		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
+		service2_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
+		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	ffa_yield();

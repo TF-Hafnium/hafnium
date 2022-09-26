@@ -1099,7 +1099,6 @@ TEST(memory_sharing, donate_vms)
 {
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	uint8_t *ptr = pages;
 	struct ffa_partition_info *service1_info = service1();
 	struct ffa_partition_info *service2_info = service2();
 
@@ -1107,38 +1106,24 @@ TEST(memory_sharing, donate_vms)
 		       mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_receive", mb.send);
 
-	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
-
-	struct ffa_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 1},
-	};
-
-	/* Set up VM2 to wait for message. */
+	/* Set up service2 to wait for message. */
 	run_res = ffa_run(service2_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
 
-	/* Donate memory. */
-	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
-		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
-		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
-
-	/* Let the memory be sent from VM1 to VM2. */
+	/* Let the memory be sent from service1 to service2. */
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
-	/* Receive memory in VM2. */
+	/* Receive memory in service2. */
 	run_res = ffa_run(service2_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
-	/* Try to access memory in VM1. */
+	/* Try to access memory in service1. */
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(exception_handler_receive_exception_count(mb.recv), 1);
 
-	/* Ensure that memory in VM2 remains the same. */
+	/* Ensure that memory in service2 remains the same. */
 	run_res = ffa_run(service2_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }
