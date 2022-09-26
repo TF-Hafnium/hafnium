@@ -718,6 +718,7 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 	struct vm_locked vm_locked;
 	bool ret;
 	uint64_t timer_remaining_ns = FFA_SLEEP_INDEFINITE;
+	bool vcpu_was_init_state = false;
 	bool need_vm_lock;
 
 	/*
@@ -730,15 +731,6 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 	 */
 	vcpu_locked = vcpu_lock(vcpu);
 
-#if SECURE_WORLD == 1
-	bool is_vcpu_reset_and_start = vcpu_secondary_reset_and_start(
-		vcpu_locked, vcpu->vm->secondary_ep, 0);
-	if (is_vcpu_reset_and_start) {
-		dlog_verbose("%s secondary cold boot vmid %#x vcpu id %#x\n",
-			     __func__, vcpu->vm->id, current->cpu->id);
-	}
-
-#endif
 	/* The VM needs to be locked to deliver mailbox messages. */
 	need_vm_lock = vcpu->state == VCPU_STATE_WAITING ||
 		       (!vcpu->vm->el0_partition &&
@@ -804,6 +796,8 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 			 * normal world arch gicv3 tests failing.
 			 */
 			vcpu->rt_model = RTM_NONE;
+
+			vcpu_was_init_state = true;
 			break;
 		}
 
@@ -921,12 +915,10 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 	vcpu->cpu = current->cpu;
 	vcpu->state = VCPU_STATE_RUNNING;
 
-#if SECURE_WORLD == 1
-	/* Set the designated GP register with the vCPU ID. */
-	if (is_vcpu_reset_and_start) {
-		vcpu_set_phys_core_idx(vcpu_locked.vcpu);
+	if (vcpu_was_init_state) {
+		vcpu_set_phys_core_idx(vcpu);
+		vcpu_set_boot_info_gp_reg(vcpu);
 	}
-#endif
 
 	/*
 	 * Mark the registers as unavailable now that we're about to reflect

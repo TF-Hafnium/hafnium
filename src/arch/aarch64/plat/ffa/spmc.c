@@ -1131,6 +1131,8 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 		goto out;
 	}
 
+	vcpu_secondary_reset_and_start(vcpus_locked.vcpu2, vm->secondary_ep, 0);
+
 	if (vm_id_is_current_world(current->vm->id)) {
 		/*
 		 * Refer FF-A v1.1 EAC0 spec section 8.3.2.2.1
