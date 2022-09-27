@@ -24,6 +24,10 @@ declare_args() {
   # The number of pages to allocate for the hypervisor heap.
   plat_heap_pages = 0
 
+  # The level of debug logs to include. This should match one of the levels
+  # defined in dlog.h.
+  plat_log_level = "LOG_LEVEL_INFO"
+
   # The maximum number of CPUs available on the platform.
   plat_max_cpus = 1
 

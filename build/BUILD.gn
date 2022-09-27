@@ -62,7 +62,7 @@ config("platform") {
     "HEAP_PAGES=${plat_heap_pages}",
     "MAX_CPUS=${plat_max_cpus}",
     "MAX_VMS=${plat_max_vms}",
-    "LOG_LEVEL=${log_level}",
+    "LOG_LEVEL=${plat_log_level}",
     "ENABLE_ASSERTIONS=${enable_assertions}",
     "PARTITION_MAX_MEMORY_REGIONS=${plat_partition_max_memory_regions}",
     "PARTITION_MAX_DEVICE_REGIONS=${plat_partition_max_device_regions}",
