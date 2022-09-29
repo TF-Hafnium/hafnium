@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 
+#include "hf/ffa_v1_0.h"
 #include "hf/mm.h"
 #include "hf/std.h"
 
@@ -3100,4 +3101,69 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 		run_res = ffa_run(vm_id, 0);
 		EXPECT_TRUE(exception_received(&run_res, mb.recv));
 	}
+}
+
+TEST(memory_sharing, share_ffa_v1_0_to_v1_1)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+	};
+	struct ffa_memory_access receiver;
+	uint32_t msg_size;
+	struct ffa_partition_msg *retrieve_message = mb.send;
+	uint8_t *ptr = pages;
+	ffa_memory_handle_t handle;
+
+	SERVICE_SELECT(service1_info->vm_id, "memory_increment", mb.send);
+
+	ffa_memory_access_init_permissions(
+		&receiver, service1_info->vm_id, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	/* Initialize memory sharing test according to v1.0. */
+	ffa_memory_region_init_v1_0(
+		(struct ffa_memory_region_v1_0 *)mb.send, HF_MAILBOX_SIZE,
+		hf_vm_get_id(), &receiver, 1, constituents,
+		ARRAY_SIZE(constituents), 0, 0, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL,
+		&msg_size);
+
+	/* Set current version to FF-A v1.0. */
+	EXPECT_NE(ffa_version(MAKE_FFA_VERSION(1, 0)), FFA_ERROR_32);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+
+	handle = ffa_mem_success_handle(ret);
+
+	/* Send v1.1 retrieve to the borrower. */
+	msg_size = ffa_memory_retrieve_request_init(
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		HF_PRIMARY_VM_ID, &receiver, 1, 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
+			     &retrieve_message->header);
+	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+
+	/* Run service1 for it to fetch memory, and then use memory. */
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
+		ptr[i] = i;
+	}
+
+	/* Run service1 for it access memory. */
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	for (int i = 0; i < PAGE_SIZE; ++i) {
+		/* Should have been incremented by each receiver. */
+		uint8_t value = i + 1;
+		EXPECT_EQ(ptr[i], value);
+	}
+
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
