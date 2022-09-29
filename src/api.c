@@ -20,6 +20,7 @@
 #include "hf/dlog.h"
 #include "hf/ffa_internal.h"
 #include "hf/ffa_memory.h"
+#include "hf/ffa_v1_0.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
 #include "hf/plat/interrupts.h"
@@ -2863,6 +2864,213 @@ static bool api_memory_region_check_flags(
 	return true;
 }
 
+/*
+ * Convert memory transaction descriptor from FF-A v1.0 to FF-A v1.1 EAC0.
+ */
+static void api_ffa_memory_region_v1_1_from_v1_0(
+	struct ffa_memory_region_v1_0 *memory_region_v1_0,
+	struct ffa_memory_region *memory_region_v1_1)
+{
+	memory_region_v1_1->sender = memory_region_v1_0->sender;
+	memory_region_v1_1->attributes = memory_region_v1_0->attributes;
+	memory_region_v1_1->flags = memory_region_v1_0->flags;
+	memory_region_v1_1->tag = memory_region_v1_0->tag;
+	memory_region_v1_1->memory_access_desc_size =
+		sizeof(struct ffa_memory_access);
+	memory_region_v1_1->receiver_count = memory_region_v1_0->receiver_count;
+	memory_region_v1_1->receivers_offset =
+		offsetof(struct ffa_memory_region, receivers);
+
+	/* Zero reserved fields. */
+	for (uint32_t i = 0; i < 3U; i++) {
+		memory_region_v1_1->reserved[i] = 0U;
+	}
+}
+
+/*
+ * Checks the FF-A version of the lender and makes necessary updates.
+ */
+static struct ffa_value api_ffa_memory_send_per_ffa_version(
+	void *allocated, struct ffa_memory_region **out_v1_1,
+	uint32_t *fragment_length, uint32_t *total_length, uint32_t ffa_version)
+{
+	struct ffa_memory_region_v1_0 *memory_region_v1_0;
+	struct ffa_memory_region *memory_region_v1_1 = NULL;
+	struct ffa_composite_memory_region *composite_v1_0;
+	struct ffa_composite_memory_region *composite_v1_1;
+	size_t receivers_length;
+	size_t space_left;
+	size_t composite_offset_v1_1;
+	size_t composite_offset_v1_0;
+	size_t fragment_constituents_size;
+	size_t fragment_length_v1_1;
+
+	assert(out_v1_1 != NULL);
+	assert(fragment_length != NULL);
+	assert(total_length != NULL);
+
+	*out_v1_1 = (struct ffa_memory_region *)allocated;
+
+	if (ffa_version == MAKE_FFA_VERSION(1, 1)) {
+		return (struct ffa_value){.func = FFA_SUCCESS_32};
+	}
+
+	if (ffa_version != MAKE_FFA_VERSION(1, 0)) {
+		dlog_verbose("%s: Unsupported FF-A version %x\n", __func__,
+			     ffa_version);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	dlog_verbose("FF-A v1.0 memory transaction descriptor.\n");
+
+	memory_region_v1_0 = (struct ffa_memory_region_v1_0 *)allocated;
+
+	/* Test and validate fragmented with conversion. */
+	if (*total_length != *fragment_length) {
+		dlog_verbose(
+			"Fragmented FF-A v1.0 descriptors is unsupported.");
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	if (memory_region_v1_0->reserved_0 != 0U ||
+	    memory_region_v1_0->reserved_1 != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* This should also prevent over flows. */
+	if (memory_region_v1_0->receiver_count > MAX_MEM_SHARE_RECIPIENTS) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	receivers_length = sizeof(struct ffa_memory_access) *
+			   memory_region_v1_0->receiver_count;
+
+	/*
+	 * Check the specified composite offset of v1.0 descriptor, and that all
+	 * receivers were configured with the same offset.
+	 */
+	composite_offset_v1_0 =
+		memory_region_v1_0->receivers[0].composite_memory_region_offset;
+
+	if (composite_offset_v1_0 == 0U ||
+	    composite_offset_v1_0 <
+		    sizeof(struct ffa_memory_region_v1_0) + receivers_length ||
+	    composite_offset_v1_0 + sizeof(struct ffa_composite_memory_region) >
+		    *fragment_length ||
+	    composite_offset_v1_0 > *fragment_length) {
+		dlog_verbose(
+			"Invalid composite memory region descriptor offset "
+			"%d.\n",
+			composite_offset_v1_0);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	for (uint32_t i = 1; i < memory_region_v1_0->receiver_count; i++) {
+		const uint32_t current_offset =
+			memory_region_v1_0->receivers[i]
+				.composite_memory_region_offset;
+
+		if (current_offset != composite_offset_v1_0) {
+			dlog_verbose(
+				"Composite offset %x differs from %x in index "
+				"%u\n",
+				composite_offset_v1_0, current_offset, i);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+	}
+
+	fragment_constituents_size = *fragment_length - composite_offset_v1_0 -
+				     sizeof(struct ffa_composite_memory_region);
+
+	/* Determine the composite offset for v1.1 descriptor. */
+	composite_offset_v1_1 =
+		sizeof(struct ffa_memory_region) + receivers_length;
+
+	/* Determine final size of the v1.1 descriptor. */
+	fragment_length_v1_1 = composite_offset_v1_1 +
+			       sizeof(struct ffa_composite_memory_region) +
+			       fragment_constituents_size;
+
+	/*
+	 * Currently only support the simpler cases: memory transaction
+	 * in a single fragment that fits in a MM_PPOOL_ENTRY_SIZE.
+	 * TODO: allocate the entries needed for this fragment_length_v1_1.
+	 *      - Check corner when v1.1 descriptor converted size surpasses
+	 *        the size of the entry.
+	 */
+	if (fragment_length_v1_1 > MM_PPOOL_ENTRY_SIZE) {
+		dlog_verbose(
+			"Translation of FF-A v1.0 descriptors for over %u is "
+			"unsupported.",
+			MM_PPOOL_ENTRY_SIZE);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	space_left = fragment_length_v1_1;
+
+	memory_region_v1_1 =
+		(struct ffa_memory_region *)mpool_alloc(&api_page_pool);
+	if (memory_region_v1_1 == NULL) {
+		return ffa_error(FFA_NO_MEMORY);
+	}
+
+	/* Translate header from v1.0 to v1.1. */
+	api_ffa_memory_region_v1_1_from_v1_0(memory_region_v1_0,
+					     memory_region_v1_1);
+
+	space_left -= sizeof(struct ffa_memory_region);
+
+	/* Copy memory access information. */
+	memcpy_s(memory_region_v1_1->receivers, space_left,
+		 memory_region_v1_0->receivers, receivers_length);
+
+	/* Initialize the memory access descriptors with composite offset. */
+	for (uint32_t i = 0; i < memory_region_v1_1->receiver_count; i++) {
+		struct ffa_memory_access *receiver =
+			&memory_region_v1_1->receivers[i];
+
+		receiver->composite_memory_region_offset =
+			composite_offset_v1_1;
+	}
+
+	space_left -= receivers_length;
+
+	/* Init v1.1 composite. */
+	composite_v1_1 = (struct ffa_composite_memory_region
+				  *)((uint8_t *)memory_region_v1_1 +
+				     composite_offset_v1_1);
+
+	composite_v1_0 =
+		ffa_memory_region_get_composite_v1_0(memory_region_v1_0, 0);
+	composite_v1_1->constituent_count = composite_v1_0->constituent_count;
+	composite_v1_1->page_count = composite_v1_0->page_count;
+
+	space_left -= sizeof(struct ffa_composite_memory_region);
+
+	/* Initialize v1.1 constituents. */
+	memcpy_s(composite_v1_1->constituents, space_left,
+		 composite_v1_0->constituents, fragment_constituents_size);
+
+	space_left -= fragment_constituents_size;
+	assert(space_left == 0U);
+
+	*out_v1_1 = memory_region_v1_1;
+
+	/*
+	 * Remove the v1.0 fragment size, and resultant size of v1.1 fragment.
+	 */
+	*total_length = *total_length - *fragment_length + fragment_length_v1_1;
+	*fragment_length = fragment_length_v1_1;
+
+	/*
+	 * After successfully convert to v1.1 free memory containing v1.0
+	 * descriptor.
+	 */
+	mpool_free(&api_page_pool, allocated);
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
 struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 				  uint32_t fragment_length, ipaddr_t address,
 				  uint32_t page_count, struct vcpu *current)
@@ -2870,9 +3078,11 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	struct vm *from = current->vm;
 	struct vm *to;
 	const void *from_msg;
+	void *allocated_entry;
 	struct ffa_memory_region *memory_region;
 	struct ffa_value ret;
 	bool targets_other_world = false;
+	uint32_t ffa_version;
 
 	if (ipa_addr(address) != 0 || page_count != 0) {
 		/*
@@ -2888,14 +3098,9 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 			fragment_length, length);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
-	if (fragment_length < sizeof(struct ffa_memory_region) +
-				      sizeof(struct ffa_memory_access)) {
-		dlog_verbose(
-			"Initial fragment length %d smaller than header size "
-			"%d.\n",
-			fragment_length,
-			sizeof(struct ffa_memory_region) +
-				sizeof(struct ffa_memory_access));
+
+	if (fragment_length > HF_MAILBOX_SIZE ||
+	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2907,6 +3112,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	 */
 	sl_lock(&from->lock);
 	from_msg = from->mailbox.send;
+	ffa_version = from->ffa_version;
 	sl_unlock(&from->lock);
 
 	if (from_msg == NULL) {
@@ -2918,16 +3124,32 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	 * pool. This prevents the sender from changing it underneath us, and
 	 * also lets us keep it around in the share state table if needed.
 	 */
-	if (fragment_length > HF_MAILBOX_SIZE ||
-	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-	memory_region = (struct ffa_memory_region *)mpool_alloc(&api_page_pool);
-	if (memory_region == NULL) {
+	allocated_entry = mpool_alloc(&api_page_pool);
+	if (allocated_entry == NULL) {
 		dlog_verbose("Failed to allocate memory region copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
 	}
-	memcpy_s(memory_region, MM_PPOOL_ENTRY_SIZE, from_msg, fragment_length);
+
+	memcpy_s(allocated_entry, MM_PPOOL_ENTRY_SIZE, from_msg,
+		 fragment_length);
+
+	ret = api_ffa_memory_send_per_ffa_version(
+		allocated_entry, &memory_region, &fragment_length, &length,
+		ffa_version);
+	if (ret.func != FFA_SUCCESS_32) {
+		goto out;
+	}
+
+	if (fragment_length < sizeof(struct ffa_memory_region) +
+				      sizeof(struct ffa_memory_access)) {
+		dlog_verbose(
+			"Initial fragment length %d smaller than header size "
+			"%d.\n",
+			fragment_length,
+			sizeof(struct ffa_memory_region) +
+				sizeof(struct ffa_memory_access));
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	if (!api_memory_region_check_flags(memory_region, share_func)) {
 		dlog_verbose(
@@ -3040,7 +3262,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	}
 
 	if (fragment_length != length) {
-		dlog_verbose("Fragmentation not yet supported.\n");
+		dlog_verbose("Fragmentation not supported.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
