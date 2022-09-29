@@ -10,6 +10,7 @@
 
 #include <stddef.h>
 
+#include "hf/ffa_v1_0.h"
 #include "hf/types.h"
 
 #if defined(__linux__) && defined(__KERNEL__)
@@ -25,7 +26,7 @@ static_assert(sizeof(struct ffa_endpoint_rx_tx_descriptor) % 16 == 0,
 	      "struct ffa_endpoint_rx_tx_descriptor must be a multiple of 16 "
 	      "bytes long.");
 
-static void ffa_copy_memory_region_constituents(
+void ffa_copy_memory_region_constituents(
 	struct ffa_memory_region_constituent *dest,
 	const struct ffa_memory_region_constituent *src)
 {

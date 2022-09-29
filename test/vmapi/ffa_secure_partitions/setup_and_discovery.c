@@ -8,6 +8,7 @@
 
 #include "hf/dlog.h"
 #include "hf/ffa.h"
+#include "hf/ffa_v1_0.h"
 
 #include "vmapi/hf/call.h"
 

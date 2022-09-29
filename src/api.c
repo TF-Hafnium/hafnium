@@ -30,6 +30,7 @@
 
 #include "vmapi/hf/call.h"
 #include "vmapi/hf/ffa.h"
+#include "vmapi/hf/ffa_v1_0.h"
 
 static_assert(sizeof(struct ffa_partition_info_v1_0) == 8,
 	      "Partition information descriptor size doesn't match the one in "

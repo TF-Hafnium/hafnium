@@ -579,26 +579,6 @@ struct ffa_partition_info {
 	struct ffa_uuid uuid;
 };
 
-/**
- * Bits[31:3] of partition properties must be zero for FF-A v1.0.
- * This corresponds to table 8.25 "Partition information descriptor"
- * in DEN0077A FF-A 1.0 REL specification.
- */
-#define FFA_PARTITION_v1_0_RES_MASK (~(UINT32_C(0x7)))
-
-/**
- * Create a struct for the "Partition information descriptor" defined for v1.0
- * which can be returned to v1.0 endpoints.
- * This corresponds to table 8.25 "Partition information descriptor"
- * in DEN0077A FF-A 1.0 REL specification.
- */
-
-struct ffa_partition_info_v1_0 {
-	ffa_vm_id_t vm_id;
-	ffa_vcpu_count_t vcpu_count;
-	ffa_partition_properties_t properties;
-};
-
 /** Length in bytes of the name in boot information descriptor. */
 #define FFA_BOOT_INFO_NAME_LEN 16
 
@@ -1007,6 +987,10 @@ static inline uint32_t ffa_mem_relinquish_init(
 	relinquish_request->endpoints[0] = sender;
 	return sizeof(struct ffa_mem_relinquish) + sizeof(ffa_vm_id_t);
 }
+
+void ffa_copy_memory_region_constituents(
+	struct ffa_memory_region_constituent *dest,
+	const struct ffa_memory_region_constituent *src);
 
 /**
  * Endpoint RX/TX descriptor, as defined by Table 13.27 in FF-A v1.1 EAC0.
