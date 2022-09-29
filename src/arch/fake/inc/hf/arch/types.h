@@ -42,3 +42,8 @@ struct arch_regs {
 	cpu_id_t vcpu_id;
 	bool virtual_interrupt;
 };
+
+/** Type of interrupts */
+enum interrupt_type {
+	INTERRUPT_TYPE_IRQ,
+};

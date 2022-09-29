@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "hf/arch/types.h"
+
 #include "hf/addr.h"
 #include "hf/interrupt_desc.h"
 #include "hf/spinlock.h"

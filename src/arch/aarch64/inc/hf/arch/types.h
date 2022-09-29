@@ -176,3 +176,9 @@ struct arch_regs {
 	} mte;
 #endif
 };
+
+/** Type of interrupts */
+enum interrupt_type {
+	INTERRUPT_TYPE_IRQ,
+	INTERRUPT_TYPE_FIQ,
+};

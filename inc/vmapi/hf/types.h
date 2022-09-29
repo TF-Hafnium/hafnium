@@ -59,9 +59,3 @@ typedef uintptr_t hf_ipaddr_t;
 
 /** The physical interrupt ID use for the schedule receiver interrupt. */
 #define HF_SCHEDULE_RECEIVER_INTID 8
-
-/** Type of interrupts */
-enum interrupt_type {
-	INTERRUPT_TYPE_IRQ,
-	INTERRUPT_TYPE_FIQ,
-};

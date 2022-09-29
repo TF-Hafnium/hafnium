@@ -9,6 +9,7 @@
 #include "partition_services.h"
 
 #include "hf/arch/irq.h"
+#include "hf/arch/types.h"
 #include "hf/arch/vm/interrupts.h"
 
 #include "hf/dlog.h"

@@ -348,7 +348,7 @@ static inline int64_t hf_mailbox_waiter_get(ffa_vm_id_t vm_id)
  * Returns 0 on success, or -1 if the intid is invalid.
  */
 static inline int64_t hf_interrupt_enable(uint32_t intid, bool enable,
-					  enum interrupt_type type)
+					  uint32_t type)
 {
 	return hf_call(HF_INTERRUPT_ENABLE, intid, enable, type);
 }
