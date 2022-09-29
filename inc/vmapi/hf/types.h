@@ -13,11 +13,15 @@
 
 #include <linux/types.h>
 
+typedef phys_addr_t hf_ipaddr_t;
+
+#endif
+
+#if defined(__ASSEMBLER__) || (defined(__linux__) && defined(__KERNEL__))
+
 #define INT32_C(c) c
 #define UINT32_C(c) c##U
 #define UINT64_C(c) c##ULL
-
-typedef phys_addr_t hf_ipaddr_t;
 
 #else
 
