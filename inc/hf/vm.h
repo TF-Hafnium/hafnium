@@ -120,8 +120,11 @@ struct notifications {
 	ffa_vm_id_t bindings_sender_id[MAX_FFA_NOTIFICATIONS];
 	ffa_notifications_bitmap_t bindings_per_vcpu;
 
-	/* The index of the array below relates to the ID of the VCPU. */
-	struct notifications_state per_vcpu[MAX_CPUS];
+	/* The index of the array below relates to the ID of the VCPU.
+	 * This is a dynamically allocated array of struct
+	 * notifications_state and has as many entries as vcpu_count.
+	 */
+	struct notifications_state *per_vcpu;
 	struct notifications_state global;
 };
 
@@ -283,7 +286,8 @@ struct vm *vm_get_first_boot(void);
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     uint32_t *mode);
 
-void vm_notifications_init_bindings(struct notifications *n);
+void vm_notifications_init(struct vm *vm, ffa_vcpu_count_t vcpu_count,
+			   struct mpool *ppool);
 bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 				  ffa_notifications_bitmap_t notifications);
 bool vm_are_global_notifications_pending(struct vm_locked vm_locked);

@@ -58,7 +58,7 @@ struct ffa_value plat_ffa_spmc_id_get(void);
 
 void plat_ffa_log_init(void);
 void plat_ffa_set_tee_enabled(bool tee_enabled);
-void plat_ffa_init(void);
+void plat_ffa_init(struct mpool *ppool);
 bool plat_ffa_is_memory_send_valid(ffa_vm_id_t receiver_vm_id,
 				   uint32_t share_func);
 

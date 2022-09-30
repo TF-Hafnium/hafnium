@@ -81,6 +81,7 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 	vm->vcpus = (struct vcpu *)mpool_alloc_contiguous(
 		ppool, vcpu_ppool_entries, 1);
 	CHECK(vm->vcpus != NULL);
+
 	vm->mailbox.state = MAILBOX_STATE_EMPTY;
 	atomic_init(&vm->aborting, false);
 	vm->el0_partition = el0_partition;
@@ -101,10 +102,7 @@ struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
 		vcpu_init(vm_get_vcpu(vm, i), vm);
 	}
 
-	/* Basic initialization of the notifications structure. */
-	vm_notifications_init_bindings(&vm->notifications.from_sp);
-	vm_notifications_init_bindings(&vm->notifications.from_vm);
-
+	vm_notifications_init(vm, vcpu_count, ppool);
 	return vm;
 }
 
@@ -445,13 +443,66 @@ static struct notifications *vm_get_notifications(struct vm_locked vm_locked,
 }
 
 /*
+ * Dynamically allocate per_vcpu_notifications structure for a given VM.
+ */
+static void vm_notifications_init_per_vcpu_notifications(
+	struct vm *vm, ffa_vcpu_count_t vcpu_count, struct mpool *ppool)
+{
+	size_t notif_ppool_entries =
+		(align_up(sizeof(struct notifications_state) * vcpu_count,
+			  MM_PPOOL_ENTRY_SIZE) /
+		 MM_PPOOL_ENTRY_SIZE);
+
+	/*
+	 * Allow for function to be called on already initialized VMs but those
+	 * that require notification structure to be cleared.
+	 */
+	if (vm->notifications.from_sp.per_vcpu == NULL) {
+		assert(vm->notifications.from_vm.per_vcpu == NULL);
+		assert(vcpu_count != 0);
+		CHECK(ppool != NULL);
+		vm->notifications.from_sp.per_vcpu =
+			(struct notifications_state *)mpool_alloc_contiguous(
+				ppool, notif_ppool_entries, 1);
+		CHECK(vm->notifications.from_sp.per_vcpu != NULL);
+
+		vm->notifications.from_vm.per_vcpu =
+			(struct notifications_state *)mpool_alloc_contiguous(
+				ppool, notif_ppool_entries, 1);
+		CHECK(vm->notifications.from_vm.per_vcpu != NULL);
+	} else {
+		assert(vm->notifications.from_vm.per_vcpu != NULL);
+	}
+
+	memset_s(vm->notifications.from_sp.per_vcpu,
+		 sizeof(*(vm->notifications.from_sp.per_vcpu)) * vcpu_count, 0,
+		 sizeof(*(vm->notifications.from_sp.per_vcpu)) * vcpu_count);
+	memset_s(vm->notifications.from_vm.per_vcpu,
+		 sizeof(*(vm->notifications.from_vm.per_vcpu)) * vcpu_count, 0,
+		 sizeof(*(vm->notifications.from_vm.per_vcpu)) * vcpu_count);
+}
+
+/*
  * Initializes the notifications structure.
  */
-void vm_notifications_init_bindings(struct notifications *notifications)
+static void vm_notifications_init_bindings(struct notifications *notifications)
 {
 	for (uint32_t i = 0U; i < MAX_FFA_NOTIFICATIONS; i++) {
 		notifications->bindings_sender_id[i] = HF_INVALID_VM_ID;
 	}
+}
+
+/*
+ * Initialize notification related structures for a VM.
+ */
+void vm_notifications_init(struct vm *vm, ffa_vcpu_count_t vcpu_count,
+			   struct mpool *ppool)
+{
+	vm_notifications_init_per_vcpu_notifications(vm, vcpu_count, ppool);
+
+	/* Basic initialization of the notifications structure. */
+	vm_notifications_init_bindings(&vm->notifications.from_sp);
+	vm_notifications_init_bindings(&vm->notifications.from_vm);
 }
 
 /**

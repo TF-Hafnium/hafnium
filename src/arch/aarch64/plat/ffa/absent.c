@@ -41,8 +41,9 @@ void plat_ffa_set_tee_enabled(bool tee_enabled)
 	(void)tee_enabled;
 }
 
-void plat_ffa_init(void)
+void plat_ffa_init(struct mpool *ppool)
 {
+	(void)ppool;
 }
 
 /**

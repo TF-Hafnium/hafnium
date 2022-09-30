@@ -79,10 +79,12 @@ static void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send,
 	CHECK(ret.func == FFA_SUCCESS_32);
 }
 
-void plat_ffa_init(void)
+void plat_ffa_init(struct mpool *ppool)
 {
 	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
 	struct ffa_value ret;
+
+	(void)ppool;
 
 	if (!ffa_tee_enabled) {
 		return;

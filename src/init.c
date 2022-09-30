@@ -177,14 +177,14 @@ void one_time_init(void)
 
 	mm_unlock_stage1(&mm_stage1_locked);
 
-	/* Initialise the API page pool. ppool will be empty from now on. */
-	api_init(&ppool);
-
 	/* Enable TLB invalidation for VM page table updates. */
 	mm_vm_enable_invalidation();
 
 	/* Perform platform specfic FF-A initialization. */
-	plat_ffa_init();
+	plat_ffa_init(&ppool);
+
+	/* Initialise the API page pool. ppool will be empty from now on. */
+	api_init(&ppool);
 
 	dlog_info("Hafnium initialisation completed\n");
 }

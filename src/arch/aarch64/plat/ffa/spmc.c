@@ -206,17 +206,21 @@ struct ffa_value plat_ffa_spmc_id_get(void)
 	return smc_ffa_call((struct ffa_value){.func = FFA_ID_GET_32});
 }
 
-static void plat_ffa_vm_init(void)
+static void plat_ffa_vm_init(struct mpool *ppool)
 {
 	/* Init NWd VMs structures for use of Notifications interfaces. */
 	for (uint32_t i = 0; i < nwd_vms_size; i++) {
 		/*
-		 * A slot in 'nwd_vms' is considered available if its id
-		 * is HF_INVALID_VM_ID.
+		 * Note that vm_init() is not called on nwd_vms. This means that
+		 * dynamically allocated structures, such as vcpus, are left
+		 * as NULL in the nwd_vms structures. This is okay, since as of
+		 * today, the vcpu structures are not used. This also helps
+		 * reduce memory foot print. A slot in 'nwd_vms' is considered
+		 * available if its id is HF_INVALID_VM_ID.
 		 */
 		nwd_vms[i].id = HF_INVALID_VM_ID;
-		vm_notifications_init_bindings(
-			&nwd_vms[i].notifications.from_sp);
+		nwd_vms[i].vcpu_count = MAX_CPUS;
+		vm_notifications_init(&nwd_vms[i], MAX_CPUS, ppool);
 	}
 }
 
@@ -225,10 +229,10 @@ void plat_ffa_set_tee_enabled(bool tee_enabled)
 	(void)tee_enabled;
 }
 
-void plat_ffa_init(void)
+void plat_ffa_init(struct mpool *ppool)
 {
 	arch_ffa_init();
-	plat_ffa_vm_init();
+	plat_ffa_vm_init(ppool);
 }
 
 bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
@@ -944,8 +948,8 @@ struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 	}
 
 	to_destroy_locked.vm->notifications.enabled = false;
-	vm_notifications_init_bindings(
-		&to_destroy_locked.vm->notifications.from_sp);
+	vm_notifications_init(to_destroy_locked.vm,
+			      to_destroy_locked.vm->vcpu_count, NULL);
 	if (vm_id != HF_OTHER_WORLD_ID) {
 		plat_ffa_vm_destroy(to_destroy_locked);
 	}
