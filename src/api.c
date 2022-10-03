@@ -2872,6 +2872,7 @@ static void api_ffa_memory_region_v1_1_from_v1_0(
 	struct ffa_memory_region *memory_region_v1_1)
 {
 	memory_region_v1_1->sender = memory_region_v1_0->sender;
+	memory_region_v1_1->handle = memory_region_v1_0->handle;
 	memory_region_v1_1->attributes = memory_region_v1_0->attributes;
 	memory_region_v1_1->flags = memory_region_v1_0->flags;
 	memory_region_v1_1->tag = memory_region_v1_0->tag;
@@ -3241,6 +3242,100 @@ out:
 	return ret;
 }
 
+static struct ffa_value api_ffa_mem_retrieve_req_version_update(
+	void *retrieve_msg, uint32_t retrieve_msg_buffer_size,
+	struct ffa_memory_region **out_v1_1, uint32_t *fragment_length,
+	uint32_t ffa_version)
+{
+	struct ffa_memory_region_v1_0 *retrieve_request_v1_0;
+	struct ffa_memory_region *retrieve_request_v1_1;
+	size_t fragment_length_v1_1;
+	uint32_t expected_retrieve_request_length_v1_0;
+	size_t space_left = retrieve_msg_buffer_size;
+	size_t receivers_length;
+
+	assert(out_v1_1 != NULL);
+	assert(fragment_length != NULL);
+	assert(retrieve_msg != NULL);
+
+	if (ffa_version == MAKE_FFA_VERSION(1, 1)) {
+		*out_v1_1 = (struct ffa_memory_region *)retrieve_msg;
+		return (struct ffa_value){.func = FFA_SUCCESS_32};
+	}
+	if (ffa_version != MAKE_FFA_VERSION(1, 0)) {
+		dlog_verbose("%s: Unsupported FF-A version %x\n", __func__,
+			     ffa_version);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	retrieve_request_v1_0 = (struct ffa_memory_region_v1_0 *)retrieve_msg;
+
+	if (retrieve_request_v1_0->receiver_count > MAX_MEM_SHARE_RECIPIENTS) {
+		dlog_verbose(
+			"Specified more than expected maximum receivers.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	receivers_length = retrieve_request_v1_0->receiver_count *
+			   sizeof(struct ffa_memory_access);
+
+	expected_retrieve_request_length_v1_0 =
+		sizeof(struct ffa_memory_region_v1_0) + receivers_length;
+
+	if (*fragment_length != expected_retrieve_request_length_v1_0) {
+		dlog_verbose("Retrieve request size is not as expected.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Determine expected v1.1 retrieve request size. */
+	fragment_length_v1_1 = sizeof(struct ffa_memory_region) +
+			       retrieve_request_v1_0->receiver_count *
+				       sizeof(struct ffa_memory_access);
+
+	/*
+	 * At this point there is the assumption that the retrieve request has
+	 * been copied to an internal buffer to prevent TOCTOU attacks.
+	 * The translation of the resultant v1.1 transaction descriptor will be
+	 * written to that same buffer. That said, the referred buffer needs
+	 * space to accommodate both v1.0 and v1.1 descriptors simultaneously.
+	 */
+	assert(fragment_length_v1_1 + expected_retrieve_request_length_v1_0 <=
+	       retrieve_msg_buffer_size);
+
+	space_left -= expected_retrieve_request_length_v1_0;
+
+	/*
+	 * Prepare to write the resultant FF-A v1.1 retrieve request in an
+	 * offset following the FF-A v1.0 within the same buffer.
+	 */
+	retrieve_request_v1_1 =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct ffa_memory_region *)((uintptr_t)retrieve_msg +
+					     *fragment_length);
+
+	api_ffa_memory_region_v1_1_from_v1_0(retrieve_request_v1_0,
+					     retrieve_request_v1_1);
+
+	space_left -= sizeof(struct ffa_memory_region);
+
+	/* Copy memory access information. */
+	memcpy_s(retrieve_request_v1_1->receivers, space_left,
+		 retrieve_request_v1_0->receivers, receivers_length);
+
+	/* Initialize the memory access descriptors with composite offset. */
+	for (uint32_t i = 0; i < retrieve_request_v1_1->receiver_count; i++) {
+		struct ffa_memory_access *receiver =
+			&retrieve_request_v1_1->receivers[i];
+
+		receiver->composite_memory_region_offset = 0U;
+	}
+
+	*fragment_length = fragment_length_v1_1;
+	*out_v1_1 = retrieve_request_v1_1;
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
 struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 					  uint32_t fragment_length,
 					  ipaddr_t address, uint32_t page_count,
@@ -3249,9 +3344,11 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	struct vm *to = current->vm;
 	struct vm_locked to_locked;
 	const void *to_msg;
-	struct ffa_memory_region *retrieve_request;
+	void *retrieve_msg;
+	struct ffa_memory_region *retrieve_request = NULL;
 	uint32_t message_buffer_size;
 	struct ffa_value ret;
+	uint32_t ffa_version;
 
 	if (ipa_addr(address) != 0 || page_count != 0) {
 		/*
@@ -3266,8 +3363,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	retrieve_request =
-		(struct ffa_memory_region *)cpu_get_buffer(current->cpu);
+	retrieve_msg = cpu_get_buffer(current->cpu);
 	message_buffer_size = cpu_get_buffer_size(current->cpu);
 	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
 		dlog_verbose("Retrieve request too long.\n");
@@ -3276,6 +3372,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 
 	to_locked = vm_lock(to);
 	to_msg = to->mailbox.send;
+	ffa_version = to->ffa_version;
 
 	if (to_msg == NULL) {
 		dlog_verbose("TX buffer not setup.\n");
@@ -3287,7 +3384,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	 * Copy the retrieve request descriptor to an internal buffer, so that
 	 * the caller can't change it underneath us.
 	 */
-	memcpy_s(retrieve_request, message_buffer_size, to_msg, length);
+	memcpy_s(retrieve_msg, message_buffer_size, to_msg, length);
 
 	if ((vm_is_mailbox_other_world_owned(to_locked) &&
 	     !plat_ffa_acquire_receiver_rx(to_locked, &ret)) ||
@@ -3298,6 +3395,18 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 		 */
 		dlog_verbose("%s: RX buffer not ready.\n", __func__);
 		ret = ffa_error(FFA_BUSY);
+		goto out;
+	}
+
+	/*
+	 * If required, transform the retrieve request to FF-A v1.1.
+	 */
+	ret = api_ffa_mem_retrieve_req_version_update(
+		retrieve_msg, message_buffer_size, &retrieve_request, &length,
+		ffa_version);
+	assert(retrieve_request != NULL);
+
+	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
 
