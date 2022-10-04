@@ -657,12 +657,22 @@ void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 		gicd_set_icfgr(plat_gicv3_driver.dist_base, intr_num, config);
 	}
 
-	/* Target SPI to primary CPU using affinity routing. */
+	/*
+	 * Target SPI to primary PE using affinity routing if no PE was
+	 * specified in the manifest. If one was specified, target the interrupt
+	 * to the corresponding PE.
+	 */
 	if (IS_SPI(intr_num)) {
 		uint64_t gic_affinity_val;
 
-		gic_affinity_val =
-			gicd_irouter_val_from_mpidr(read_msr(MPIDR_EL1), 0U);
+		if (interrupt_desc_get_mpidr_valid(int_desc)) {
+			gic_affinity_val = gicd_irouter_val_from_mpidr(
+				interrupt_desc_get_mpidr(int_desc),
+				GICV3_IRM_PE);
+		} else {
+			gic_affinity_val = gicd_irouter_val_from_mpidr(
+				read_msr(MPIDR_EL1), 0U);
+		}
 		gicd_write_irouter(plat_gicv3_driver.dist_base, intr_num,
 				   gic_affinity_val);
 	}

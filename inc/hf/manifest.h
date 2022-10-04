@@ -67,6 +67,8 @@ struct memory_region {
 struct interrupt_info {
 	uint32_t id;
 	uint32_t attributes;
+	bool mpidr_valid;
+	uint64_t mpidr;
 };
 
 /**
@@ -231,6 +233,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_INVALID_MEM_PERM,
 	MANIFEST_ERROR_INTERRUPT_ID_REPEATED,
 	MANIFEST_ILLEGAL_NS_ACTION,
+	MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST,
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,

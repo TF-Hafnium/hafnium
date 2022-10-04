@@ -143,6 +143,12 @@ static void infer_interrupt(struct interrupt_info interrupt,
 			(((attr >> INT_DESC_CONFIG_SHIFT) & 0x1) << 1) |
 			((attr >> INT_DESC_SEC_STATE_SHIFT) & 0x1));
 
+	if (interrupt.mpidr_valid) {
+		interrupt_desc_set_mpidr(int_desc, interrupt.mpidr);
+	} else {
+		interrupt_desc_set_mpidr_invalid(int_desc);
+	}
+
 	interrupt_desc_set_valid(int_desc, true);
 }
 
@@ -170,7 +176,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		      PARTITION_MAX_INTERRUPTS_PER_DEVICE);
 
 		for (uint8_t j = 0; j < dev_region.interrupt_count; j++) {
-			struct interrupt_descriptor int_desc;
+			struct interrupt_descriptor int_desc = {0};
 
 			interrupt = dev_region.interrupts[j];
 			infer_interrupt(interrupt, &int_desc);

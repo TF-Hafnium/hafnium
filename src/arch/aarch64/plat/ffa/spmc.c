@@ -1908,7 +1908,7 @@ void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
 
 void plat_ffa_sri_init(struct cpu *cpu)
 {
-	struct interrupt_descriptor sri_desc;
+	struct interrupt_descriptor sri_desc = {0};
 
 	/* TODO: when supported, make the interrupt driver use cpu structure. */
 	(void)cpu;

@@ -538,6 +538,17 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 	return MANIFEST_SUCCESS;
 }
 
+static struct interrupt_info *device_region_get_interrupt_info(
+	struct device_region *dev_regions, uint32_t intid)
+{
+	for (uint32_t i = 0; i < ARRAY_SIZE(dev_regions->interrupts); i++) {
+		if (dev_regions->interrupts[i].id == intid) {
+			return &(dev_regions->interrupts[i]);
+		}
+	}
+	return NULL;
+}
+
 static enum manifest_return_code parse_ffa_device_region_node(
 	struct fdt_node *dev_node, struct device_region *dev_regions,
 	uint16_t *count)
@@ -629,6 +640,9 @@ static enum manifest_return_code parse_ffa_device_region_node(
 				return MANIFEST_ERROR_MALFORMED_INTEGER_LIST;
 			}
 
+			dev_regions[i].interrupts[j].mpidr_valid = false;
+			dev_regions[i].interrupts[j].mpidr = 0;
+
 			dlog_verbose("        attributes = %u\n",
 				     dev_regions[i].interrupts[j].attributes);
 			j++;
@@ -637,6 +651,46 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		dev_regions[i].interrupt_count = j;
 		if (j == 0) {
 			dlog_verbose("        Empty\n");
+		} else {
+			TRY(read_optional_uint32list(
+				dev_node, "interrupts-target", &list));
+			dlog_verbose("      Interrupt Target List:\n");
+
+			while (uint32list_has_next(&list)) {
+				uint32_t intid;
+				uint64_t mpidr = 0;
+				uint32_t mpidr_lower = 0;
+				uint32_t mpidr_upper = 0;
+				struct interrupt_info *info = NULL;
+
+				TRY(uint32list_get_next(&list, &intid));
+
+				dlog_verbose("        ID = %u\n", intid);
+
+				if (interrupt_bitmap_get_value(
+					    &allocated_intids, intid) != 1U) {
+					return MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST;
+				}
+
+				TRY(uint32list_get_next(&list, &mpidr_upper));
+				TRY(uint32list_get_next(&list, &mpidr_lower));
+				mpidr = mpidr_upper;
+				mpidr <<= 32;
+				mpidr |= mpidr_lower;
+
+				info = device_region_get_interrupt_info(
+					&dev_regions[i], intid);
+				/*
+				 * We should find info since
+				 * interrupt_bitmap_get_value already ensures
+				 * that we saw the interrupt and allocated ids
+				 * for it.
+				 */
+				assert(info != NULL);
+				info->mpidr = mpidr;
+				info->mpidr_valid = true;
+				dlog_verbose("        MPIDR = %#x\n", mpidr);
+			}
 		}
 
 		TRY(read_optional_uint32(dev_node, "smmu-id",
@@ -1191,6 +1245,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ILLEGAL_NS_ACTION:
 		return "Illegal value specidied for the field: Action in "
 		       "response to NS Interrupt";
+	case MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST:
+		return "Interrupt ID is not in the list of interrupts";
 	}
 
 	panic("Unexpected manifest return code.");

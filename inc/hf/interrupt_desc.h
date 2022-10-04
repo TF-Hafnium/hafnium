@@ -102,6 +102,8 @@ struct interrupt_descriptor {
 	uint8_t type_config_sec_state;
 	uint8_t priority;
 	bool valid;
+	bool mpidr_valid;
+	uint64_t mpidr;
 };
 
 /**
@@ -137,6 +139,18 @@ static inline uint8_t interrupt_desc_get_priority(
 	return int_desc.priority;
 }
 
+static inline uint64_t interrupt_desc_get_mpidr(
+	struct interrupt_descriptor int_desc)
+{
+	return int_desc.mpidr;
+}
+
+static inline bool interrupt_desc_get_mpidr_valid(
+	struct interrupt_descriptor int_desc)
+{
+	return int_desc.mpidr_valid;
+}
+
 static inline bool interrupt_desc_get_valid(
 	struct interrupt_descriptor int_desc)
 {
@@ -147,6 +161,20 @@ static inline void interrupt_desc_set_id(struct interrupt_descriptor *int_desc,
 					 uint32_t interrupt_id)
 {
 	int_desc->interrupt_id = interrupt_id;
+}
+
+static inline void interrupt_desc_set_mpidr(
+	struct interrupt_descriptor *int_desc, uint64_t mpidr)
+{
+	int_desc->mpidr_valid = true;
+	int_desc->mpidr = mpidr;
+}
+
+static inline void interrupt_desc_set_mpidr_invalid(
+	struct interrupt_descriptor *int_desc)
+{
+	int_desc->mpidr_valid = false;
+	int_desc->mpidr = 0;
 }
 
 static inline void interrupt_desc_set_type_config_sec_state(
