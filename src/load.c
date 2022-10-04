@@ -509,7 +509,9 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			   const struct manifest_vm *manifest_vm,
 			   const struct memiter *cpio, struct mpool *ppool)
 {
+#if LOG_LEVEL >= LOG_LEVEL_WARNING
 	const char *error_string = " region security state ignored for ";
+#endif
 	struct vm *vm;
 	struct vm_locked vm_locked;
 	struct vcpu_locked vcpu_locked;
