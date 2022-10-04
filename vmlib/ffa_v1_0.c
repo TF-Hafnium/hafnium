@@ -157,3 +157,40 @@ uint32_t ffa_memory_region_init_v1_0(
 		memory_region, memory_region_max_size, constituents,
 		constituent_count, total_length, fragment_length);
 }
+
+uint32_t ffa_memory_retrieve_request_init_v1_0(
+	struct ffa_memory_region_v1_0 *memory_region,
+	ffa_memory_handle_t handle, ffa_vm_id_t sender,
+	struct ffa_memory_access receivers[], uint32_t receiver_count,
+	uint32_t tag, ffa_memory_region_flags_t flags,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability)
+{
+	ffa_memory_attributes_t attributes = 0;
+	uint32_t i;
+
+	/* Set memory region's page attributes. */
+	ffa_set_memory_type_attr(&attributes, type);
+	ffa_set_memory_cacheability_attr(&attributes, cacheability);
+	ffa_set_memory_shareability_attr(&attributes, shareability);
+
+	ffa_memory_region_init_header_v1_0(memory_region, sender, attributes,
+					   flags, handle, tag, receiver_count);
+
+#if defined(__linux__) && defined(__KERNEL__)
+	memcpy(memory_region->receivers, receivers,
+	       receiver_count * sizeof(struct ffa_memory_access));
+#else
+	memcpy_s(memory_region->receivers,
+		 MAX_MEM_SHARE_RECIPIENTS * sizeof(struct ffa_memory_access),
+		 receivers, receiver_count * sizeof(struct ffa_memory_access));
+#endif
+
+	/* Zero the composite offset for all receivers */
+	for (i = 0U; i < receiver_count; i++) {
+		memory_region->receivers[i].composite_memory_region_offset = 0U;
+	}
+
+	return sizeof(struct ffa_memory_region_v1_0) +
+	       memory_region->receiver_count * sizeof(struct ffa_memory_access);
+}

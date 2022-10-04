@@ -3167,3 +3167,61 @@ TEST(memory_sharing, share_ffa_v1_0_to_v1_1)
 
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
+
+TEST(memory_sharing, share_ffa_v1_1_to_v1_0)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+	};
+	struct ffa_memory_access receiver;
+	uint32_t msg_size;
+	struct ffa_partition_msg *retrieve_message = mb.send;
+	ffa_memory_handle_t handle;
+	uint8_t *ptr = pages;
+
+	SERVICE_SELECT(service1_info->vm_id, "retrieve_ffa_v1_0", mb.send);
+
+	ffa_memory_access_init_permissions(
+		&receiver, service1_info->vm_id, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	/* Initialize memory sharing test according to v1.1. */
+	ffa_memory_region_init((struct ffa_memory_region *)mb.send,
+			       HF_MAILBOX_SIZE, hf_vm_get_id(), &receiver, 1,
+			       constituents, ARRAY_SIZE(constituents), 0, 0,
+			       FFA_MEMORY_NORMAL_MEM,
+			       FFA_MEMORY_CACHE_WRITE_BACK,
+			       FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+	EXPECT_NE(ret.func, FFA_ERROR_32);
+
+	handle = ffa_mem_success_handle(ret);
+
+	msg_size = ffa_memory_retrieve_request_init_v1_0(
+		(struct ffa_memory_region_v1_0 *)retrieve_message->payload,
+		handle, hf_vm_get_id(), &receiver, 1, 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
+			     &retrieve_message->header);
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/* Initialise the memory before giving it. */
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		ptr[i] = i;
+	}
+
+	/* Run service1 to access memory. */
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		uint8_t val = i + 1;
+		ASSERT_EQ(ptr[i], val);
+	}
+}

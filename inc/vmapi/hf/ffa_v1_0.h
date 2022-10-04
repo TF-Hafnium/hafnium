@@ -103,3 +103,11 @@ uint32_t ffa_memory_region_init_v1_0(
 	enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability, uint32_t *total_length,
 	uint32_t *fragment_length);
+
+uint32_t ffa_memory_retrieve_request_init_v1_0(
+	struct ffa_memory_region_v1_0 *memory_region,
+	ffa_memory_handle_t handle, ffa_vm_id_t sender,
+	struct ffa_memory_access receivers[], uint32_t receiver_count,
+	uint32_t tag, ffa_memory_region_flags_t flags,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability);
