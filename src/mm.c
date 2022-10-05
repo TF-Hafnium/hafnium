@@ -1130,17 +1130,18 @@ bool mm_init(struct mpool *ppool)
 	plat_console_mm_init(stage1_locked, ppool);
 
 	/* Map each section. */
-	mm_identity_map(stage1_locked, layout_text_begin(), layout_text_end(),
-			MM_MODE_X, ppool);
+	CHECK(mm_identity_map(stage1_locked, layout_text_begin(),
+			      layout_text_end(), MM_MODE_X, ppool) != NULL);
 
-	mm_identity_map(stage1_locked, layout_rodata_begin(),
-			layout_rodata_end(), MM_MODE_R, ppool);
+	CHECK(mm_identity_map(stage1_locked, layout_rodata_begin(),
+			      layout_rodata_end(), MM_MODE_R, ppool) != NULL);
 
-	mm_identity_map(stage1_locked, layout_data_begin(), layout_data_end(),
-			MM_MODE_R | MM_MODE_W, ppool);
+	CHECK(mm_identity_map(stage1_locked, layout_data_begin(),
+			      layout_data_end(), MM_MODE_R | MM_MODE_W,
+			      ppool) != NULL);
 
 	/* Arch-specific stack mapping. */
-	arch_stack_mm_init(stage1_locked, ppool);
+	CHECK(arch_stack_mm_init(stage1_locked, ppool));
 
 	return true;
 }
