@@ -20,6 +20,7 @@
 /* Keep macro alignment */
 /* clang-format off */
 
+#define GIC_PRI_MASK 0xff
 #define SGI_BASE (GICR_BASE + 0x10000)
 
 #define GICD_CTLR       IO32_C(GICD_BASE + 0x0000)
@@ -39,7 +40,11 @@
 #define GICR_ISPENDR0   IO32_C(SGI_BASE + 0x0200)
 #define GICR_ICPENDR0   IO32_C(SGI_BASE + 0x0280)
 #define GICR_ISACTIVER0 IO32_C(SGI_BASE + 0x0300)
+#define GICR_IPRIORITYR IO8_ARRAY_C(SGI_BASE + 0x0400, 32)
 #define GICR_ICFGR      IO32_ARRAY_C(SGI_BASE + 0x0c00, 32)
+
+/* PPIs INTIDs 16-31 */
+#define MAX_PPI_ID (31)
 
 /* clang-format on */
 

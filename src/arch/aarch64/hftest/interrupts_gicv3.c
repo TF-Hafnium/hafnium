@@ -15,6 +15,19 @@
 
 #include "msr.h"
 
+/**
+ * This function checks the interrupt ID and returns true for SGIs and PPIs.
+ */
+bool is_ppi_sgi(uint32_t id)
+{
+	/* SGIs: 0-15, PPIs: 16-31. */
+	if (id <= MAX_PPI_ID) {
+		return true;
+	}
+
+	return false;
+}
+
 void interrupt_gic_setup(void)
 {
 	uint32_t ctlr = 1U << 4	   /* Enable affinity routing. */
@@ -49,12 +62,12 @@ void interrupt_enable(uint32_t intid, bool enable)
 
 	if (enable) {
 		io_write32_array(GICD_ISENABLER, index, bit);
-		if (intid < 32) {
+		if (is_ppi_sgi(intid)) {
 			io_write32(GICR_ISENABLER0, bit);
 		}
 	} else {
 		io_write32_array(GICD_ICENABLER, index, bit);
-		if (intid < 32) {
+		if (is_ppi_sgi(intid)) {
 			io_write32(GICR_ICENABLER0, bit);
 		}
 	}
@@ -84,7 +97,13 @@ void interrupt_set_priority_mask(uint8_t min_priority)
 
 void interrupt_set_priority(uint32_t intid, uint8_t priority)
 {
-	io_write8_array(GICD_IPRIORITYR, intid, priority);
+	if (is_ppi_sgi(intid)) {
+		io_write8_array(GICR_IPRIORITYR, intid,
+				priority & GIC_PRI_MASK);
+	} else {
+		io_write8_array(GICD_IPRIORITYR, intid,
+				priority & GIC_PRI_MASK);
+	}
 }
 
 void interrupt_set_edge_triggered(uint32_t intid, bool edge_triggered)
@@ -92,7 +111,7 @@ void interrupt_set_edge_triggered(uint32_t intid, bool edge_triggered)
 	uint32_t index = intid / 16;
 	uint32_t bit = 1U << (((intid % 16) * 2) + 1);
 
-	if (intid < 32) {
+	if (is_ppi_sgi(intid)) {
 		uint32_t v = io_read32_array(GICR_ICFGR, index);
 
 		if (edge_triggered) {
