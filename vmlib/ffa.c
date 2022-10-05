@@ -61,10 +61,12 @@ void ffa_memory_access_init_permissions(
  * Initialises the header of the given `ffa_memory_region`, not
  * including the composite memory region offset.
  */
-static void ffa_memory_region_init_header(
-	struct ffa_memory_region *memory_region, ffa_vm_id_t sender,
-	ffa_memory_attributes_t attributes, ffa_memory_region_flags_t flags,
-	ffa_memory_handle_t handle, uint32_t tag, uint32_t receiver_count)
+void ffa_memory_region_init_header(struct ffa_memory_region *memory_region,
+				   ffa_vm_id_t sender,
+				   ffa_memory_attributes_t attributes,
+				   ffa_memory_region_flags_t flags,
+				   ffa_memory_handle_t handle, uint32_t tag,
+				   uint32_t receiver_count)
 {
 	memory_region->sender = sender;
 	memory_region->attributes = attributes;
@@ -313,84 +315,6 @@ uint32_t ffa_memory_lender_retrieve_request_init(
 		 sizeof(memory_region->reserved));
 #endif
 	return sizeof(struct ffa_memory_region);
-}
-
-/**
- * Initialises the given `ffa_memory_region` to be used for an
- * `FFA_MEM_RETRIEVE_RESP`, including the given constituents for the first
- * fragment.
- *
- * Returns true on success, or false if the given constituents won't all fit in
- * the first fragment.
- */
-bool ffa_retrieved_memory_region_init(
-	struct ffa_memory_region *response, size_t response_max_size,
-	ffa_vm_id_t sender, ffa_memory_attributes_t attributes,
-	ffa_memory_region_flags_t flags, ffa_memory_handle_t handle,
-	ffa_vm_id_t receiver, ffa_memory_access_permissions_t permissions,
-	uint32_t page_count, uint32_t total_constituent_count,
-	const struct ffa_memory_region_constituent constituents[],
-	uint32_t fragment_constituent_count, uint32_t *total_length,
-	uint32_t *fragment_length)
-{
-	struct ffa_composite_memory_region *composite_memory_region;
-	uint32_t i;
-	uint32_t constituents_offset;
-
-	ffa_memory_region_init_header(response, sender, attributes, flags,
-				      handle, 0, 1);
-	/*
-	 * Initialized here as in memory retrieve responses we currently expect
-	 * one borrower to be specified.
-	 */
-	ffa_memory_access_init_permissions(&response->receivers[0], receiver, 0,
-					   0, flags);
-	response->receivers[0].receiver_permissions.permissions = permissions;
-
-	/*
-	 * Note that `sizeof(struct_ffa_memory_region)` and `sizeof(struct
-	 * ffa_memory_access)` must both be multiples of 16 (as verified by the
-	 * asserts in `ffa_memory.c`, so it is guaranteed that the offset we
-	 * calculate here is aligned to a 64-bit boundary and so 64-bit values
-	 * can be copied without alignment faults.
-	 */
-	response->receivers[0].composite_memory_region_offset =
-		sizeof(struct ffa_memory_region) +
-		response->receiver_count * sizeof(struct ffa_memory_access);
-
-	composite_memory_region = ffa_memory_region_get_composite(response, 0);
-	composite_memory_region->page_count = page_count;
-	composite_memory_region->constituent_count = total_constituent_count;
-	composite_memory_region->reserved_0 = 0;
-
-	constituents_offset =
-		response->receivers[0].composite_memory_region_offset +
-		sizeof(struct ffa_composite_memory_region);
-	if (constituents_offset +
-		    fragment_constituent_count *
-			    sizeof(struct ffa_memory_region_constituent) >
-	    response_max_size) {
-		return false;
-	}
-
-	for (i = 0; i < fragment_constituent_count; ++i) {
-		composite_memory_region->constituents[i] = constituents[i];
-	}
-
-	if (total_length != NULL) {
-		*total_length =
-			constituents_offset +
-			composite_memory_region->constituent_count *
-				sizeof(struct ffa_memory_region_constituent);
-	}
-	if (fragment_length != NULL) {
-		*fragment_length =
-			constituents_offset +
-			fragment_constituent_count *
-				sizeof(struct ffa_memory_region_constituent);
-	}
-
-	return true;
 }
 
 uint32_t ffa_memory_fragment_init(

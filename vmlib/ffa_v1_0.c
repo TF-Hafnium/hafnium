@@ -26,7 +26,7 @@
  * Initialises the header of the given `ffa_memory_region_v1_0`, not
  * including the composite memory region offset.
  */
-static void ffa_memory_region_init_header_v1_0(
+void ffa_memory_region_init_header_v1_0(
 	struct ffa_memory_region_v1_0 *memory_region, ffa_vm_id_t sender,
 	ffa_memory_attributes_t attributes, ffa_memory_region_flags_t flags,
 	ffa_memory_handle_t handle, uint32_t tag, uint32_t receiver_count)

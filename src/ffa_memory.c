@@ -22,6 +22,8 @@
 #include "hf/std.h"
 #include "hf/vm.h"
 
+#include "vmapi/hf/ffa_v1_0.h"
+
 /**
  * All access to members of a `struct ffa_memory_share_state` must be guarded
  * by this lock.
@@ -1666,6 +1668,121 @@ static void ffa_memory_retrieve_complete(
 	}
 }
 
+/**
+ * Initialises the given memory region descriptor to be used for an
+ * `FFA_MEM_RETRIEVE_RESP`, including the given constituents for the first
+ * fragment.
+ * The memory region descriptor is initialized according to retriever's
+ * FF-A version.
+ *
+ * Returns true on success, or false if the given constituents won't all fit in
+ * the first fragment.
+ */
+static bool ffa_retrieved_memory_region_init(
+	void *response, uint32_t ffa_version, size_t response_max_size,
+	ffa_vm_id_t sender, ffa_memory_attributes_t attributes,
+	ffa_memory_region_flags_t flags, ffa_memory_handle_t handle,
+	ffa_vm_id_t receiver_id, ffa_memory_access_permissions_t permissions,
+	uint32_t page_count, uint32_t total_constituent_count,
+	const struct ffa_memory_region_constituent constituents[],
+	uint32_t fragment_constituent_count, uint32_t *total_length,
+	uint32_t *fragment_length)
+{
+	struct ffa_composite_memory_region *composite_memory_region;
+	struct ffa_memory_access *receiver;
+	uint32_t i;
+	uint32_t constituents_offset;
+	uint32_t receiver_count;
+
+	assert(response != NULL);
+
+	if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
+		struct ffa_memory_region_v1_0 *retrieve_response =
+			(struct ffa_memory_region_v1_0 *)response;
+
+		ffa_memory_region_init_header_v1_0(retrieve_response, sender,
+						   attributes, flags, handle, 0,
+						   1);
+
+		receiver = &retrieve_response->receivers[0];
+		receiver_count = retrieve_response->receiver_count;
+
+		receiver->composite_memory_region_offset =
+			sizeof(struct ffa_memory_region_v1_0) +
+			receiver_count * sizeof(struct ffa_memory_access);
+
+		composite_memory_region = ffa_memory_region_get_composite_v1_0(
+			retrieve_response, 0);
+	} else {
+		/* Default to FF-A v1.1 version. */
+		struct ffa_memory_region *retrieve_response =
+			(struct ffa_memory_region *)response;
+
+		ffa_memory_region_init_header(retrieve_response, sender,
+					      attributes, flags, handle, 0, 1);
+
+		receiver = &retrieve_response->receivers[0];
+		receiver_count = retrieve_response->receiver_count;
+
+		/*
+		 * Note that `sizeof(struct_ffa_memory_region)` and
+		 * `sizeof(struct ffa_memory_access)` must both be multiples of
+		 * 16 (as verified by the asserts in `ffa_memory.c`, so it is
+		 * guaranteed that the offset we calculate here is aligned to a
+		 * 64-bit boundary and so 64-bit values can be copied without
+		 * alignment faults.
+		 */
+		receiver->composite_memory_region_offset =
+			sizeof(struct ffa_memory_region) +
+			receiver_count * sizeof(struct ffa_memory_access);
+
+		composite_memory_region =
+			ffa_memory_region_get_composite(retrieve_response, 0);
+	}
+
+	assert(receiver != NULL);
+	assert(composite_memory_region != NULL);
+
+	/*
+	 * Initialized here as in memory retrieve responses we currently expect
+	 * one borrower to be specified.
+	 */
+	ffa_memory_access_init_permissions(receiver, receiver_id, 0, 0, flags);
+	receiver->receiver_permissions.permissions = permissions;
+
+	composite_memory_region->page_count = page_count;
+	composite_memory_region->constituent_count = total_constituent_count;
+	composite_memory_region->reserved_0 = 0;
+
+	constituents_offset = receiver->composite_memory_region_offset +
+			      sizeof(struct ffa_composite_memory_region);
+	if (constituents_offset +
+		    fragment_constituent_count *
+			    sizeof(struct ffa_memory_region_constituent) >
+	    response_max_size) {
+		return false;
+	}
+
+	for (i = 0; i < fragment_constituent_count; ++i) {
+		composite_memory_region->constituents[i] = constituents[i];
+	}
+
+	if (total_length != NULL) {
+		*total_length =
+			constituents_offset +
+			composite_memory_region->constituent_count *
+				sizeof(struct ffa_memory_region_constituent);
+	}
+	if (fragment_length != NULL) {
+		*fragment_length =
+			constituents_offset +
+			fragment_constituent_count *
+				sizeof(struct ffa_memory_region_constituent);
+	}
+
+	return true;
+}
+
 /*
  * Gets the receiver's access permissions from 'struct ffa_memory_region' and
  * returns its index in the receiver's array. If receiver's ID doesn't exist
@@ -2236,11 +2353,11 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	 * should never fail.
 	 */
 	CHECK(ffa_retrieved_memory_region_init(
-		to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
-		memory_region->sender, memory_region->attributes,
-		memory_region->flags, handle, receiver_id, permissions,
-		composite->page_count, composite->constituent_count,
-		share_state->fragments[0],
+		to_locked.vm->mailbox.recv, to_locked.vm->ffa_version,
+		HF_MAILBOX_SIZE, memory_region->sender,
+		memory_region->attributes, memory_region->flags, handle,
+		receiver_id, permissions, composite->page_count,
+		composite->constituent_count, share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
 		&fragment_length));
 

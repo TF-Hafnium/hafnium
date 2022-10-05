@@ -1031,6 +1031,12 @@ ffa_enpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
 						      desc->tx_offset);
 }
 
+void ffa_memory_region_init_header(struct ffa_memory_region *memory_region,
+				   ffa_vm_id_t sender,
+				   ffa_memory_attributes_t attributes,
+				   ffa_memory_region_flags_t flags,
+				   ffa_memory_handle_t handle, uint32_t tag,
+				   uint32_t receiver_count);
 void ffa_memory_access_init_permissions(
 	struct ffa_memory_access *receiver, ffa_vm_id_t receiver_id,
 	enum ffa_data_access data_access,
@@ -1072,15 +1078,6 @@ uint32_t ffa_memory_retrieve_request_init_single_receiver(
 uint32_t ffa_memory_lender_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
 	ffa_vm_id_t sender);
-bool ffa_retrieved_memory_region_init(
-	struct ffa_memory_region *response, size_t response_max_size,
-	ffa_vm_id_t sender, ffa_memory_attributes_t attributes,
-	ffa_memory_region_flags_t flags, ffa_memory_handle_t handle,
-	ffa_vm_id_t receiver, ffa_memory_access_permissions_t permissions,
-	uint32_t page_count, uint32_t total_constituent_count,
-	const struct ffa_memory_region_constituent constituents[],
-	uint32_t fragment_constituent_count, uint32_t *total_length,
-	uint32_t *fragment_length);
 uint32_t ffa_memory_fragment_init(
 	struct ffa_memory_region_constituent *fragment,
 	size_t fragment_max_size,
