@@ -73,31 +73,25 @@ bool arch_vm_mm_init(void)
 	 * 0xff -> Normal memory, Inner/Outer Write-Back Non-transient,
 	 *         Write-Alloc, Read-Alloc.
 	 */
-	mm_mair_el1 = (0 << (8 * STAGE1_DEVICEINDX)) |
-		      (0xff << (8 * STAGE1_NORMALINDX));
+	mm_mair_el1 = (0ULL << (8 * STAGE1_DEVICEINDX)) |
+		      (0xffULL << (8 * STAGE1_NORMALINDX));
 
-	mm_tcr_el1 = (1 << 20) |	/* TBI, top byte ignored. */
-		     (pa_range << 16) | /* PS. */
-		     (0 << 14) |	/* TG0, granule size, 4KB. */
-		     (3 << 12) |	/* SH0, inner shareable. */
-		     (1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
-		     (1 << 8) |	 /* IRGN0, normal mem, WB RA WA Cacheable. */
+	mm_tcr_el1 = (0ULL << 37) |	/* disable TBI0, top byte ignored. */
+		     (pa_range << 32) | /* PS. */
+		     (0ULL << 14) |	/* TG0, granule size, 4KB. */
+		     (3ULL << 12) |	/* SH0, inner shareable. */
+		     (1ULL << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
+		     (1ULL << 8) |  /* IRGN0, normal mem, WB RA WA Cacheable. */
 		     (64 - HFTEST_S1_PA_BITS) | /* T0SZ, 2^hftest_s1_pa_bits */
-		     0;
+		     0ULL;
 
-	mm_sctlr_el1 = (1 << 0) |  /* M, enable stage 1 EL2 MMU. */
-		       (1 << 2) |  /* C, data cache enable. */
-		       (1 << 3) |  /* SA, enable stack alignment check. */
-		       (3 << 4) |  /* RES1 bits. */
-		       (1 << 11) | /* RES1 bit. */
-		       (1 << 12) | /* I, instruction cache enable. */
-		       (1 << 16) | /* RES1 bit. */
-		       (1 << 18) | /* RES1 bit. */
-		       (0 << 19) | /* WXN bit, writable execute never. */
-		       (3 << 22) | /* RES1 bits. */
-		       (3 << 28) | /* RES1 bits. */
-		       0;
-
+	mm_sctlr_el1 = (1ULL << 0) |  /* M, enable stage 1 EL2 MMU. */
+		       (1ULL << 2) |  /* C, data cache enable. */
+		       (1ULL << 3) |  /* SA, enable stack alignment check. */
+		       (1ULL << 12) | /* I, instruction cache enable. */
+		       (0ULL << 19) | /* WXN bit, writable execute never. */
+		       (1ULL << 31) | /* EnIA */
+		       0ULL;
 	return true;
 }
 

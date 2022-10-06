@@ -7,15 +7,23 @@
 # These components are only used by VMs for aarch64 specific actions.
 
 # Implements image_entry for a simple VM kernel.
+import("//src/arch/aarch64/args.gni")
+
 source_set("entry") {
   sources = [
     "entry.S",
+  ]
+  deps = [
+    ":pauth",
   ]
 }
 
 source_set("sp_secondary_entry") {
   sources = [
     "sp_secondary_entry.S",
+  ]
+  deps = [
+    ":pauth",
   ]
 }
 
@@ -103,5 +111,12 @@ source_set("stdout") {
 source_set("mm") {
   sources = [
     "mm.c",
+  ]
+}
+
+source_set("pauth") {
+  public_configs = [ "//src/arch/aarch64:config" ]
+  sources = [
+    "pauth_macros.S",
   ]
 }

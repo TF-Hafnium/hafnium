@@ -456,3 +456,38 @@ TEST(arch_features, vm_unaligned_access)
 
 	EXPECT_EQ(exception_handler_get_num(), 1);
 }
+
+/*
+ * Validate PAuth can be enabled at S-EL1 and an S-EL1 partition can
+ * change its APIAKey.
+ */
+TEST(arch_features, enable_pauth)
+{
+	uint64_t sctlr_el1;
+	uint64_t id_aa64isar1_el1;
+	uint64_t sctlr_el1_enia = (UINT64_C(0x1) << 31);
+	uint64_t apiakeylo_el1_val = (0x123456789);
+	uint64_t apiakeyhi_el1_val = (0x987654321);
+
+	/* Check that PAuth is implemented. */
+	id_aa64isar1_el1 = read_msr(id_aa64isar1_el1);
+	EXPECT_NE((id_aa64isar1_el1 & (0xff0)), 0);
+
+	/* Check that PAuth is enabled at EL1. */
+	sctlr_el1 = read_msr(sctlr_el1);
+	EXPECT_EQ((sctlr_el1 & sctlr_el1_enia), sctlr_el1_enia);
+
+	/* Attempt to write to APIAKey_EL1. */
+	write_msr(apiakeylo_el1, apiakeylo_el1_val);
+	write_msr(apiakeyhi_el1, apiakeyhi_el1_val);
+	isb();
+
+	/* Verify keys were written to. */
+	EXPECT_EQ(read_msr(apiakeylo_el1), apiakeylo_el1_val);
+	EXPECT_EQ(read_msr(apiakeyhi_el1), apiakeyhi_el1_val);
+
+	/* Restore APIA keys to inital value. */
+	write_msr(apiakeylo_el1, 1842);
+	write_msr(apiakeyhi_el1, 1842);
+	isb();
+}

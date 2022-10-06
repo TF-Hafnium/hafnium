@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "pauth_macros.S"
+
 .section .init.image_entry, "ax"
 .global image_entry
 image_entry:
@@ -18,12 +20,19 @@ image_entry:
 	msr cpacr_el1, x30
 	isb
 
+#if BRANCH_PROTECTION
+	mrs x1, id_aa64isar1_el1
+	ands x1, x1, #0xff0		/* API / APA */
+	b.eq 0f
+
+	enable_pauth_el1 x30 39
+#endif
 	/* Call into C code. */
-	bl kmain
+0:	bl kmain
 
 	/* If the VM returns, shutdown the system. */
 	bl arch_power_off
 
 	/* Loop forever waiting for interrupts. */
-0:	wfi
-	b 0b
+1:	wfi
+	b 1b

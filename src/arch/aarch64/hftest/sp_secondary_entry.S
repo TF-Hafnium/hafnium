@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "pauth_macros.S"
+
 .section .init.image_entry, "ax"
 .global secondary_ep_entry
 secondary_ep_entry:
@@ -25,8 +27,15 @@ secondary_ep_entry:
 	msr cpacr_el1, x30
 	isb
 
+#if BRANCH_PROTECTION
+	mrs x1, id_aa64isar1_el1
+	ands x1, x1, #0xff0		/* API / APA */
+	b.eq 0f
+
+	enable_pauth_el1 x30 39
+#endif
 	/* Enable MMU and cache. */
-	bl hftest_mm_vcpu_init
+0:	bl hftest_mm_vcpu_init
 
 	/* Branch to message loop hinting a secondary vCPU. */
 	mov x0, xzr

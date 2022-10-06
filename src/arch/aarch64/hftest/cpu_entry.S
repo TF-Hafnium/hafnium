@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "pauth_macros.S"
+
 .global vm_cpu_entry
 vm_cpu_entry:
 	/* Disable trapping floating point access in EL1. */
@@ -13,8 +15,14 @@ vm_cpu_entry:
 	msr cpacr_el1, x1
 	isb
 
+#if BRANCH_PROTECTION
+	mrs x1, id_aa64isar1_el1
+	ands x1, x1, #0xff0		/* API / APA */
+	b.eq 0f
+	enable_pauth_el1 x30 39
+#endif
 	/* Initialise stack from the cpu_start_state struct. */
-	ldr x1, [x0]
+0:	ldr x1, [x0]
 	mov sp, x1
 
 	/* Load entry function pointer and its argument. */

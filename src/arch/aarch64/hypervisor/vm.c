@@ -41,12 +41,16 @@ void arch_vm_features_set(struct vm *vm)
 		 */
 		vm->arch.trapped_features |= HF_FEATURE_RAS;
 
+#if !BRANCH_PROTECTION
 		/*
-		 * The PAuth mechanism holds state in the key registers. Only
-		 * the primary VM is allowed to use the PAuth functionality for
-		 * now. This prevents Hafnium from having to save/restore the
-		 * key register on a VM switch.
+		 * When branch protection is enabled in the build
+		 * (BRANCH_PROTECTION=1), the primary VM, secondary VMs and SPs
+		 * are allowed to enable and use pointer authentication. When
+		 * branch protection is disabled, only the primary VM is allowed
+		 * to. Secondary VMs and SPs shall trap on accessing PAuth key
+		 * registers.
 		 */
 		vm->arch.trapped_features |= HF_FEATURE_PAUTH;
+#endif
 	}
 }
