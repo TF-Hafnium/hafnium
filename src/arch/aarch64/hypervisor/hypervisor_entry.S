@@ -7,6 +7,7 @@
  */
 
 #include "hf/arch/offsets.h"
+#include "hf/cpu.h"
 #include "msr.h"
 
 .macro get_core_affinity reg1 reg2
@@ -19,8 +20,7 @@
 .macro init_stack_zero_tag
 #if ENABLE_MTE
 	mov x1, sp
-	/* TODO: assume stack size is one page. */
-	sub x2, x1, #4096
+	sub x2, x1, #STACK_SIZE
 	/* Assume 16 bytes tag granule size. */
 0:	stz2g x2, [x2], #32
 	cmp x2, x1

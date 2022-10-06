@@ -20,8 +20,6 @@
 
 #include "system/sys/cdefs.h"
 
-#define STACK_SIZE PAGE_SIZE
-
 /**
  * The stacks to be used by the CPUs.
  *
