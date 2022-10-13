@@ -881,7 +881,7 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 
 		/* Call has been used for the other world vm already */
 		if (vm_locked.vm->notifications.enabled) {
-			dlog_error("Notification bitmap already created.\n");
+			dlog_verbose("Notification bitmap already created.\n");
 			ret = ffa_error(FFA_DENIED);
 			goto out;
 		}
@@ -894,13 +894,13 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 
 		/* If received NULL, there are no slots for VM creation. */
 		if (vm_locked.vm == NULL) {
-			dlog_error("No memory to create VM ID %#x.\n", vm_id);
+			dlog_verbose("No memory to create VM ID %#x.\n", vm_id);
 			return ffa_error(FFA_NO_MEMORY);
 		}
 
 		/* Ensure bitmap has not already been created. */
 		if (vm_locked.vm->notifications.enabled) {
-			dlog_error("Notification bitmap already created.\n");
+			dlog_verbose("Notification bitmap already created.\n");
 			ret = ffa_error(FFA_DENIED);
 			goto out;
 		}
@@ -930,12 +930,12 @@ struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
 	struct vm_locked to_destroy_locked = plat_ffa_vm_find_locked(vm_id);
 
 	if (to_destroy_locked.vm == NULL) {
-		dlog_error("Bitmap not created for VM: %u\n", vm_id);
+		dlog_verbose("Bitmap not created for VM: %u\n", vm_id);
 		return ffa_error(FFA_DENIED);
 	}
 
 	if (!to_destroy_locked.vm->notifications.enabled) {
-		dlog_error("Notification disabled for VM: %u\n", vm_id);
+		dlog_verbose("Notification disabled for VM: %u\n", vm_id);
 		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
