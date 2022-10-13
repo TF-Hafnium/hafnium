@@ -417,7 +417,7 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 static bool check_and_record_mem_regions(uintptr_t base_address,
 					 uint32_t page_count)
 {
-	uintptr_t limit = base_address + page_count * PAGE_SIZE;
+	uintptr_t limit = base_address + (page_count * PAGE_SIZE) - 1U;
 
 	for (size_t i = 0; i < allocated_mem_regions_index; i++) {
 		uintptr_t mem_region_base = manifest_data->mem_regions[i].base;
@@ -425,8 +425,8 @@ static bool check_and_record_mem_regions(uintptr_t base_address,
 			manifest_data->mem_regions[i].limit;
 
 		if ((base_address >= mem_region_base &&
-		     base_address < mem_region_limit) ||
-		    (limit < mem_region_limit && limit >= mem_region_base)) {
+		     base_address <= mem_region_limit) ||
+		    (limit <= mem_region_limit && limit >= mem_region_base)) {
 			dlog_error(
 				"Overlapping memory regions\n"
 				"New Region %#x - %#x\n"

@@ -29,7 +29,7 @@ using ::testing::NotNull;
 
 using struct_manifest = struct manifest;
 
-constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 32;
+constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
 
 template <typename T>
 void exec(const char *program, const char *args[], const T &stdin,
@@ -1210,6 +1210,31 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
 	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7301000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
 
 	/* Different RXTX buffer sizes */
 	/* clang-format off */
