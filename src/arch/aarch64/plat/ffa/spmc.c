@@ -507,7 +507,7 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
 	}
 
 	if (!allowed) {
-		dlog_error("State transition denied\n");
+		dlog_verbose("State transition denied\n");
 	}
 
 	return allowed;
