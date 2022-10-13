@@ -1132,6 +1132,38 @@ TEST_F(manifest, ffa_validate_mem_regions)
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 	manifest_dealloc();
 
+	/* Empty memory region */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<0>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("base-address", "<0x7310000>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.StartChild("rx_tx-info")
+			.Compatible({ "arm,ffa-manifest-rx_tx-buffer" })
+			.Property("rx-buffer", "<&rx>")
+			.Property("tx-buffer", "<&tx>")
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_EMPTY);
+	manifest_dealloc();
+
 	/* Overlapping memory regions */
 	/* clang-format off */
 	dtb = ManifestDtBuilder()

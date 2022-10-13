@@ -414,10 +414,17 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
-static bool check_and_record_mem_regions(uintptr_t base_address,
-					 uint32_t page_count)
+static enum manifest_return_code check_and_record_mem_regions(
+	uintptr_t base_address, uint32_t page_count)
 {
 	uintptr_t limit = base_address + (page_count * PAGE_SIZE) - 1U;
+
+	if (page_count == 0U) {
+		dlog_error(
+			"Empty memory region defined with base address: %x\n",
+			base_address);
+		return MANIFEST_ERROR_MEM_REGION_EMPTY;
+	}
 
 	for (size_t i = 0; i < allocated_mem_regions_index; i++) {
 		uintptr_t mem_region_base = manifest_data->mem_regions[i].base;
@@ -433,7 +440,7 @@ static bool check_and_record_mem_regions(uintptr_t base_address,
 				"Overlapping region %#x - %#x\n",
 				base_address, limit, mem_region_base,
 				mem_region_limit);
-			return false;
+			return MANIFEST_ERROR_MEM_REGION_OVERLAP;
 		}
 	}
 
@@ -442,7 +449,7 @@ static bool check_and_record_mem_regions(uintptr_t base_address,
 	manifest_data->mem_regions[allocated_mem_regions_index].limit = limit;
 	allocated_mem_regions_index++;
 
-	return true;
+	return MANIFEST_SUCCESS;
 }
 
 static enum manifest_return_code parse_ffa_memory_region_node(
@@ -481,10 +488,8 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		dlog_verbose("      Pages_count:  %u\n",
 			     mem_regions[i].page_count);
 
-		if (!check_and_record_mem_regions(mem_regions[i].base_address,
-						  mem_regions[i].page_count)) {
-			return MANIFEST_ERROR_MEM_REGION_OVERLAP;
-		}
+		TRY(check_and_record_mem_regions(mem_regions[i].base_address,
+						 mem_regions[i].page_count));
 
 		TRY(read_uint32(mem_node, "attributes",
 				&mem_regions[i].attributes));
@@ -1271,6 +1276,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Device-region node should have at least one entry";
 	case MANIFEST_ERROR_RXTX_SIZE_MISMATCH:
 		return "RX and TX buffers should be of same size";
+	case MANIFEST_ERROR_MEM_REGION_EMPTY:
+		return "Memory region should have at least one page";
 	case MANIFEST_ERROR_MEM_REGION_OVERLAP:
 		return "Memory region overlaps with one already allocated";
 	case MANIFEST_ERROR_INVALID_MEM_PERM:
