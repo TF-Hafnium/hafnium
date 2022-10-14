@@ -61,6 +61,13 @@ bool arch_other_world_vm_init(struct vm *other_world_vm,
 			goto out;
 		}
 	}
+	/*
+	 * Force the hypervisor's version to be same as ours.
+	 * FF-A version at hypervisor's initialization is not getting to the
+	 * SPMC.
+	 * TODO: fix the described above and delete this.
+	 */
+	other_world_vm->ffa_version = FFA_VERSION_COMPILED;
 
 	ret = true;
 
