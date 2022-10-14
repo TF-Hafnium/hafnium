@@ -428,12 +428,10 @@ TEST_SERVICE(ffa_memory_receive)
 	void *send_buf = SERVICE_SEND_BUFFER();
 
 	for (;;) {
-		struct ffa_value ret = ffa_msg_wait();
 		struct ffa_memory_region *memory_region =
 			(struct ffa_memory_region *)retrieve_buffer;
 		struct ffa_composite_memory_region *composite;
 		uint8_t *ptr;
-		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		retrieve_memory_from_message(recv_buf, send_buf, NULL,
 					     memory_region, HF_MAILBOX_SIZE);

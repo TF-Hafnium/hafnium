@@ -1106,10 +1106,6 @@ TEST(memory_sharing, donate_vms)
 		       mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_receive", mb.send);
 
-	/* Set up service2 to wait for message. */
-	run_res = ffa_run(service2_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
-
 	/* Let the memory be sent from service1 to service2. */
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
