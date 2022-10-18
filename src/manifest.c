@@ -421,9 +421,15 @@ static enum manifest_return_code check_and_record_mem_regions(
 
 	if (page_count == 0U) {
 		dlog_error(
-			"Empty memory region defined with base address: %x\n",
+			"Empty memory region defined with base address: %#x.\n",
 			base_address);
 		return MANIFEST_ERROR_MEM_REGION_EMPTY;
+	}
+
+	if (!is_aligned(base_address, PAGE_SIZE)) {
+		dlog_error("base_address (%#x) is not aligned to page size.\n",
+			   base_address);
+		return MANIFEST_ERROR_MEM_REGION_UNALIGNED;
 	}
 
 	for (size_t i = 0; i < allocated_mem_regions_index; i++) {
@@ -1280,6 +1286,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Memory region should have at least one page";
 	case MANIFEST_ERROR_MEM_REGION_OVERLAP:
 		return "Memory region overlaps with one already allocated";
+	case MANIFEST_ERROR_MEM_REGION_UNALIGNED:
+		return "Memory region is not aligned to a page boundary";
 	case MANIFEST_ERROR_INVALID_MEM_PERM:
 		return "Memory permission should be RO, RW or RX";
 	case MANIFEST_ERROR_ARGUMENTS_LIST_EMPTY:
