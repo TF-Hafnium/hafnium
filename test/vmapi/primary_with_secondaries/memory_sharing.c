@@ -2892,6 +2892,12 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
 			/* Run borrower such that it can write to memory. */
 			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
+			/*
+			 * Attempt to reclaim memory, and validate it fails as
+			 * there are still borrowers using the memory.
+			 */
+			EXPECT_EQ(ffa_mem_reclaim(handle, 0).func,
+				  FFA_ERROR_32);
 			/* Run borrower such that it relinquishes its access. */
 			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
 		}
