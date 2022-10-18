@@ -500,8 +500,8 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
 		allowed = plat_ffa_check_rtm_sp_init(vcpu, func, next_state);
 		break;
 	default:
-		panic("Illegal Runtime Model specified by SP%x on CPU%x\n",
-		      current->vm->id, cpu_index(current->cpu));
+		dlog_error("Illegal Runtime Model specified by SP%x on CPU%x\n",
+			   current->vm->id, cpu_index(current->cpu));
 		allowed = false;
 		break;
 	}
