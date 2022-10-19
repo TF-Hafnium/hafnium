@@ -193,9 +193,19 @@ void arch_mm_sync_table_writes(void)
 }
 
 /**
+ * Returns the maximum supported PA Range index.
+ */
+uint64_t arch_mm_get_pa_range(void)
+{
+	return 2;
+}
+
+/**
  * Returns the maximum supported PA Range in bits.
  */
-uint32_t arch_mm_get_pa_range(void)
+uint32_t arch_mm_get_pa_bits(uint64_t pa_range)
 {
+	(void)pa_range;
+
 	return 40;
 }

@@ -11,6 +11,7 @@
 #include "hf/arch/barriers.h"
 #include "hf/arch/cpu.h"
 #include "hf/arch/mmu.h"
+#include "hf/arch/std.h"
 
 #include "hf/check.h"
 #include "hf/dlog.h"
@@ -767,15 +768,16 @@ uint64_t arch_mm_combine_table_entry_attrs(uint64_t table_attrs,
  */
 bool arch_mm_init(paddr_t table)
 {
-	uint64_t features = read_msr(id_aa64mmfr0_el1);
+	uint64_t mm_features = read_msr(id_aa64mmfr0_el1);
 	uint64_t pe_features = read_msr(id_aa64pfr0_el1);
+	uint64_t pa_range = arch_mm_get_pa_range();
+	uint32_t pa_bits = arch_mm_get_pa_bits(pa_range);
 	unsigned int nsa_nsw;
-	uint32_t pa_bits = arch_mm_get_pa_range();
 	uint32_t extend_bits;
 	uint32_t sl0;
 
 	/* Check that 4KB granules are supported. */
-	if (((features >> 28) & 0xf) == 0xf) {
+	if (((mm_features >> 28) & 0xf) == 0xf) {
 		dlog_error("4KB granules are not supported\n");
 		return false;
 	}
@@ -784,16 +786,8 @@ bool arch_mm_init(paddr_t table)
 	if (!pa_bits) {
 		dlog_error(
 			"Unsupported value of id_aa64mmfr0_el1.PARange: %x\n",
-			features & 0xf);
+			pa_range);
 		return false;
-	}
-
-	/* Downgrade PA size from 52 to 48 bits (FEAT_LPA workaround). */
-	if (pa_bits == 52) {
-		dlog_verbose(
-			"52-bit PA size not supported,"
-			" falling back to 48-bit\n");
-		pa_bits = 48;
 	}
 
 	dlog_info("Supported bits in physical address: %d\n", pa_bits);
@@ -861,17 +855,16 @@ bool arch_mm_init(paddr_t table)
 	{
 		.ttbr0_el2 = pa_addr(table),
 
-		.vtcr_el2 =
-			(1U << 31) |		   /* RES1. */
-			(nsa_nsw << 29) |	   /* NSA/NSW. */
-			((features & 0xf) << 16) | /* PS, matching features. */
-			(0 << 14) |		   /* TG0: 4 KB granule. */
-			(3 << 12) |		   /* SH0: inner shareable. */
-			(1 << 10) |  /* ORGN0: normal, cacheable ... */
-			(1 << 8) |   /* IRGN0: normal, cacheable ... */
-			(sl0 << 6) | /* SL0. */
-			((64 - pa_bits) << 0) | /* T0SZ: dependent on PS. */
-			0,
+		.vtcr_el2 = (1U << 31) |       /* RES1. */
+			    (nsa_nsw << 29) |  /* NSA/NSW. */
+			    (pa_range << 16) | /* PS, matching features. */
+			    (0 << 14) |	       /* TG0: 4 KB granule. */
+			    (3 << 12) |	       /* SH0: inner shareable. */
+			    (1 << 10) |	 /* ORGN0: normal, cacheable ... */
+			    (1 << 8) |	 /* IRGN0: normal, cacheable ... */
+			    (sl0 << 6) | /* SL0. */
+			    ((64 - pa_bits) << 0) | /* T0SZ: dependent on PS. */
+			    0,
 
 		/*
 		 * 0    -> Device-nGnRnE memory
@@ -914,11 +907,11 @@ bool arch_mm_init(paddr_t table)
 	if (has_vhe_support()) {
 		arch_mm_config.hcr_el2 |= (HCR_EL2_E2H | HCR_EL2_TGE);
 		arch_mm_config.tcr_el2 =
-			(1UL << 38) | /* TBI1, top byte ignored. */
-			(1UL << 37) | /* TBI0, top byte ignored. */
-			(2UL << 32) | /* IPS, IPA size */
-			(2UL << 30) | /* TG1, granule size, 4KB. */
-			(3UL << 28) | /* SH1, inner shareable. */
+			(1UL << 38) |	   /* TBI1, top byte ignored. */
+			(1UL << 37) |	   /* TBI0, top byte ignored. */
+			(pa_range << 32) | /* IPS, IPA size */
+			(2UL << 30) |	   /* TG1, granule size, 4KB. */
+			(3UL << 28) |	   /* SH1, inner shareable. */
 			(1UL
 			 << 26) | /* ORGN1, normal mem, WB RA WA Cacheable. */
 			(1UL
@@ -938,10 +931,10 @@ bool arch_mm_init(paddr_t table)
 			0;
 	} else {
 		arch_mm_config.tcr_el2 =
-			(1 << 20) |		   /* TBI, top byte ignored. */
-			((features & 0xf) << 16) | /* PS. */
-			(0 << 14) |		   /* TG0, granule size, 4KB. */
-			(3 << 12) |		   /* SH0, inner shareable. */
+			(1 << 20) |	   /* TBI, top byte ignored. */
+			(pa_range << 16) | /* PS. */
+			(0 << 14) |	   /* TG0, granule size, 4KB. */
+			(3 << 12) |	   /* SH0, inner shareable. */
 			(1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
 			(1 << 8) |  /* IRGN0, normal mem, WB RA WA Cacheable. */
 			((64 - pa_bits)
@@ -952,22 +945,43 @@ bool arch_mm_init(paddr_t table)
 }
 
 /**
+ * Returns the maximum supported PA Range index.
+ */
+uint64_t arch_mm_get_pa_range(void)
+{
+	uint64_t mm_features = read_msr(id_aa64mmfr0_el1);
+	uint64_t pa_range = mm_features & 0xf;
+
+	/* Downgrade PA size from 52 to 48 bits (FEAT_LPA workaround). */
+	if (pa_range == 6) {
+		dlog_verbose(
+			"52-bit PA size not supported,"
+			" falling back to 48-bit\n");
+		pa_range = 5;
+	}
+
+	return pa_range;
+}
+
+/**
+ * Returns the maximum supported PA Range in bits.
+ */
+uint32_t arch_mm_get_pa_bits(uint64_t pa_range)
+{
+	static const uint32_t pa_bits_table[16] = {32, 36, 40, 42, 44, 48, 52};
+
+	assert(pa_range < ARRAY_SIZE(pa_bits_table));
+
+	return pa_bits_table[pa_range];
+}
+
+/**
  * Return the arch specific mm mode for send/recv pages of given VM ID.
  */
 uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id)
 {
 	return ((id & HF_VM_ID_WORLD_MASK) == HF_HYPERVISOR_VM_ID) ? MM_MODE_NS
 								   : 0;
-}
-
-/**
- * Returns the maximum supported PA Range in bits.
- */
-uint32_t arch_mm_get_pa_range(void)
-{
-	static const uint32_t pa_bits_table[16] = {32, 36, 40, 42, 44, 48, 52};
-	uint64_t features = read_msr(id_aa64mmfr0_el1);
-	return pa_bits_table[features & 0xf];
 }
 
 uintptr_t arch_mm_get_vtcr_el2(void)

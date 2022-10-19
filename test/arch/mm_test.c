@@ -44,9 +44,10 @@ TEST(arch_mm, block_allowed_at_level0)
  */
 TEST(arch_mm, max_level_stage1)
 {
+	uint32_t pa_bits = arch_mm_get_pa_bits(arch_mm_get_pa_range());
 	uint8_t max_level;
 
-	arch_mm_stage1_max_level_set(arch_mm_get_pa_range());
+	arch_mm_stage1_max_level_set(pa_bits);
 	max_level = arch_mm_stage1_max_level();
 
 	EXPECT_GE(max_level, MAX_LEVEL_LOWER_BOUND);

@@ -754,14 +754,15 @@ static bool ffa_region_group_identity_map(
 			paddr_t pa_begin =
 				pa_from_ipa(ipa_init(fragments[i][j].address));
 			paddr_t pa_end = pa_add(pa_begin, size);
-			uint32_t pa_range = arch_mm_get_pa_range();
+			uint32_t pa_bits =
+				arch_mm_get_pa_bits(arch_mm_get_pa_range());
 
 			/*
 			 * Ensure the requested region falls into system's PA
 			 * range.
 			 */
-			if (((pa_addr(pa_begin) >> pa_range) > 0) ||
-			    ((pa_addr(pa_end) >> pa_range) > 0)) {
+			if (((pa_addr(pa_begin) >> pa_bits) > 0) ||
+			    ((pa_addr(pa_end) >> pa_bits) > 0)) {
 				dlog_error("Region is outside of PA Range\n");
 				return false;
 			}

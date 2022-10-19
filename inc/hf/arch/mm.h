@@ -181,9 +181,14 @@ uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id);
 void arch_mm_sync_table_writes(void);
 
 /**
+ * Returns the maximum supported PA Range index.
+ */
+uint64_t arch_mm_get_pa_range(void);
+
+/**
  * Returns the maximum supported PA Range in bits.
  */
-uint32_t arch_mm_get_pa_range(void);
+uint32_t arch_mm_get_pa_bits(uint64_t pa_range);
 
 /**
  * Returns VTCR_EL2 configured in arch_mm_init.

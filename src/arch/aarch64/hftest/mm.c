@@ -35,11 +35,12 @@ static uintreg_t mm_reset_sctlr_el1;
  */
 bool arch_vm_mm_init(void)
 {
-	uint64_t features = read_msr(id_aa64mmfr0_el1);
-	uint32_t pa_bits = arch_mm_get_pa_range();
+	uint64_t mm_features = read_msr(id_aa64mmfr0_el1);
+	uint64_t pa_range = arch_mm_get_pa_range();
+	uint32_t pa_bits = arch_mm_get_pa_bits(pa_range);
 
 	/* Check that 4KB granules are supported. */
-	if (((features >> 28) & 0xf) == 0xf) {
+	if (((mm_features >> 28) & 0xf) == 0xf) {
 		dlog_error("4KB granules are not supported\n");
 		return false;
 	}
@@ -48,7 +49,7 @@ bool arch_vm_mm_init(void)
 	if (!pa_bits) {
 		dlog_error(
 			"Unsupported value of id_aa64mmfr0_el1.PARange: %x\n",
-			features & 0xf);
+			pa_range);
 		return false;
 	}
 
@@ -75,10 +76,10 @@ bool arch_vm_mm_init(void)
 	mm_mair_el1 = (0 << (8 * STAGE1_DEVICEINDX)) |
 		      (0xff << (8 * STAGE1_NORMALINDX));
 
-	mm_tcr_el1 = (1 << 20) |		/* TBI, top byte ignored. */
-		     ((features & 0xf) << 16) | /* PS. */
-		     (0 << 14) |		/* TG0, granule size, 4KB. */
-		     (3 << 12) |		/* SH0, inner shareable. */
+	mm_tcr_el1 = (1 << 20) |	/* TBI, top byte ignored. */
+		     (pa_range << 16) | /* PS. */
+		     (0 << 14) |	/* TG0, granule size, 4KB. */
+		     (3 << 12) |	/* SH0, inner shareable. */
 		     (1 << 10) | /* ORGN0, normal mem, WB RA WA Cacheable. */
 		     (1 << 8) |	 /* IRGN0, normal mem, WB RA WA Cacheable. */
 		     (64 - HFTEST_S1_PA_BITS) | /* T0SZ, 2^hftest_s1_pa_bits */
