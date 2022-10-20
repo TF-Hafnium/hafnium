@@ -3231,3 +3231,63 @@ TEST(memory_sharing, share_ffa_v1_1_to_v1_0)
 		ASSERT_EQ(ptr[i], val);
 	}
 }
+
+/*
+ * Validate that a borrower can't retrieve memory if the fragments aren't
+ * totally sent.
+ */
+TEST(memory_sharing, fail_fragmented_if_retrieve_before_sent)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+	struct ffa_memory_region *mem_region =
+		(struct ffa_memory_region *)mb.send;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	uint32_t remaining_constituent_count;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_msg *retrieve_message = mb.send;
+	uint32_t fragment_length;
+	uint32_t total_length;
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_memory_share_fail_invalid_parameters", mb.send);
+
+	/* Send everything except the last constituent in the first fragment. */
+	remaining_constituent_count = ffa_memory_region_init_single_receiver(
+		mem_region, HF_MAILBOX_SIZE, hf_vm_get_id(),
+		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
+		0, FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE, &total_length, &fragment_length);
+	EXPECT_EQ(remaining_constituent_count, 0);
+	EXPECT_EQ(total_length, fragment_length);
+
+	/* Don't include the last constituent in the first fragment. */
+	fragment_length -= sizeof(struct ffa_memory_region_constituent);
+
+	ret = ffa_mem_share(total_length, fragment_length);
+	EXPECT_EQ(ret.func, FFA_MEM_FRAG_RX_32);
+	handle = ffa_frag_handle(ret);
+
+	/*
+	 * Send the appropriate retrieve request to the VM so that it can use
+	 * it.
+	 */
+	msg_size = ffa_memory_retrieve_request_init_single_receiver(
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		hf_vm_get_id(), service1_info->vm_id, 0, 0,
+		FFA_DATA_ACCESS_NOT_SPECIFIED,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
+			     &retrieve_message->header);
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+}
