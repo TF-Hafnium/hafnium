@@ -2926,13 +2926,6 @@ static struct ffa_value api_ffa_memory_send_per_ffa_version(
 
 	memory_region_v1_0 = (struct ffa_memory_region_v1_0 *)allocated;
 
-	/* Test and validate fragmented with conversion. */
-	if (*total_length != *fragment_length) {
-		dlog_verbose(
-			"Fragmented FF-A v1.0 descriptors is unsupported.");
-		return ffa_error(FFA_NOT_SUPPORTED);
-	}
-
 	if (memory_region_v1_0->reserved_0 != 0U ||
 	    memory_region_v1_0->reserved_1 != 0U) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
