@@ -102,6 +102,12 @@ void send_retrieve_request(
 	uint32_t tag, ffa_memory_region_flags_t flags,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability, ffa_vm_id_t recipient);
+void send_fragmented_memory_region(
+	struct ffa_value *send_ret, void *tx_buffer,
+	struct ffa_memory_region_constituent constituents[],
+	uint32_t constituent_count, uint32_t remaining_constituent_count,
+	uint32_t sent_length, uint32_t total_length,
+	ffa_memory_handle_t *handle, uint64_t allocator_mask);
 ffa_vm_id_t retrieve_memory_from_message(
 	void *recv_buf, void *send_buf, ffa_memory_handle_t *handle,
 	struct ffa_memory_region *memory_region_ret,

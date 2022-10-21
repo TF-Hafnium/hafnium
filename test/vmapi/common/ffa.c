@@ -99,7 +99,7 @@ void mailbox_receive_retry(void *buffer, size_t buffer_size, void *recv,
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
 
-static void send_fragmented_memory_region(
+void send_fragmented_memory_region(
 	struct ffa_value *send_ret, void *tx_buffer,
 	struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t remaining_constituent_count,

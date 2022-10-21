@@ -938,12 +938,17 @@ TEST_SERVICE(retrieve_ffa_v1_0)
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
 	struct ffa_memory_region_v1_0 *memory_region =
-		(struct ffa_memory_region_v1_0 *)recv_buf;
+		(struct ffa_memory_region_v1_0 *)retrieve_buffer;
 	struct ffa_composite_memory_region *composite;
 	ffa_vm_id_t own_id = hf_vm_get_id();
 	const struct ffa_partition_msg *retrv_message =
 		(struct ffa_partition_msg *)recv_buf;
 	struct ffa_value ret;
+	uint32_t fragment_length;
+	uint32_t total_length;
+	uint32_t memory_region_max_size = HF_MAILBOX_SIZE;
+	uint32_t fragment_offset;
+	ffa_memory_handle_t handle;
 
 	/* Set Version to v1.0. */
 	ffa_version(MAKE_FFA_VERSION(1, 0));
@@ -964,9 +969,39 @@ TEST_SERVICE(retrieve_ffa_v1_0)
 
 	ret = ffa_mem_retrieve_req(msg_size, msg_size);
 	EXPECT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
+	fragment_length = ret.arg2;
+	total_length = ret.arg1;
 
+	memcpy_s(memory_region, memory_region_max_size, recv_buf,
+		 fragment_length);
+
+	handle = memory_region->handle;
+
+	/* Copy first fragment. */
+	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
+	fragment_offset = fragment_length;
+
+	while (fragment_offset < total_length) {
+		ret = ffa_mem_frag_rx(handle, fragment_offset);
+		EXPECT_EQ(ret.func, FFA_MEM_FRAG_TX_32);
+		EXPECT_EQ(ffa_frag_handle(ret), handle);
+		fragment_length = ret.arg3;
+		EXPECT_GT(fragment_length, 0);
+		ASSERT_LE(fragment_offset + fragment_length,
+			  memory_region_max_size);
+		/* Copy received fragment. */
+		memcpy_s((uint8_t *)memory_region + fragment_offset,
+			 memory_region_max_size - fragment_offset, recv_buf,
+			 fragment_length);
+		fragment_offset += fragment_length;
+		ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	}
+
+	/* Retrieved all the fragments. */
 	ffa_yield();
 
+	/* Point to the whole copied structure. */
 	composite = ffa_memory_region_get_composite_v1_0(memory_region, 0);
 
 	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
