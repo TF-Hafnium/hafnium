@@ -24,6 +24,8 @@
 
 #include "vmapi/hf/ffa_v1_0.h"
 
+#define RECEIVERS_COUNT_IN_RETRIEVE_RESP 1
+
 /**
  * All access to members of a `struct ffa_memory_share_state` must be guarded
  * by this lock.
@@ -1700,9 +1702,9 @@ static bool ffa_retrieved_memory_region_init(
 		struct ffa_memory_region_v1_0 *retrieve_response =
 			(struct ffa_memory_region_v1_0 *)response;
 
-		ffa_memory_region_init_header_v1_0(retrieve_response, sender,
-						   attributes, flags, handle, 0,
-						   1);
+		ffa_memory_region_init_header_v1_0(
+			retrieve_response, sender, attributes, flags, handle, 0,
+			RECEIVERS_COUNT_IN_RETRIEVE_RESP);
 
 		receiver = &retrieve_response->receivers[0];
 		receiver_count = retrieve_response->receiver_count;
@@ -2379,6 +2381,49 @@ out:
 	return ret;
 }
 
+/**
+ * Determine expected fragment offset according to the FF-A version of
+ * the caller.
+ */
+static uint32_t ffa_memory_retrieve_expected_offset_per_ffa_version(
+	struct ffa_memory_region *memory_region,
+	uint32_t retrieved_constituents_count, uint32_t ffa_version)
+{
+	uint32_t expected_fragment_offset;
+	uint32_t composite_constituents_offset;
+
+	if (ffa_version == MAKE_FFA_VERSION(1, 1)) {
+		/*
+		 * Hafnium operates memory regions in FF-A v1.1 format, so we
+		 * can retrieve the constituents offset from descriptor.
+		 */
+		composite_constituents_offset =
+			ffa_composite_constituent_offset(memory_region, 0);
+	} else if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
+		/*
+		 * If retriever is FF-A v1.0, determine the composite offset
+		 * as it is expected to have been configured in the
+		 * retrieve response.
+		 */
+		composite_constituents_offset =
+			sizeof(struct ffa_memory_region_v1_0) +
+			RECEIVERS_COUNT_IN_RETRIEVE_RESP *
+				sizeof(struct ffa_memory_access) +
+			sizeof(struct ffa_composite_memory_region);
+	} else {
+		panic("%s received an invalid FF-A version.\n", __func__);
+	}
+
+	expected_fragment_offset =
+		composite_constituents_offset +
+		retrieved_constituents_count *
+			sizeof(struct ffa_memory_region_constituent) -
+		sizeof(struct ffa_memory_access) *
+			(memory_region->receiver_count - 1);
+
+	return expected_fragment_offset;
+}
+
 struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 					      ffa_memory_handle_t handle,
 					      uint32_t fragment_offset,
@@ -2500,12 +2545,10 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	CHECK(memory_region->receiver_count > 0);
 
 	expected_fragment_offset =
-		ffa_composite_constituent_offset(memory_region,
-						 receiver_index) +
-		retrieved_constituents_count *
-			sizeof(struct ffa_memory_region_constituent) -
-		sizeof(struct ffa_memory_access) *
-			(memory_region->receiver_count - 1);
+		ffa_memory_retrieve_expected_offset_per_ffa_version(
+			memory_region, retrieved_constituents_count,
+			to_locked.vm->ffa_version);
+
 	if (fragment_offset != expected_fragment_offset) {
 		dlog_verbose("Fragment offset was %d but expected %d.\n",
 			     fragment_offset, expected_fragment_offset);
