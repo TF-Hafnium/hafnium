@@ -1937,19 +1937,29 @@ out:
 	return ret;
 }
 
-bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
-			       struct ffa_value *ret_args)
+/**
+ * The invocation of FFA_MSG_WAIT at secure virtual FF-A instance is compliant
+ * with FF-A v1.1 EAC0 specification. It only performs the  state transition
+ * from RUNNING to WAITING for the following Partition runtime models:
+ * RTM_FFA_RUN, RTM_SEC_INTERRUPT, RTM_SP_INIT.
+ */
+struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
+					   struct vcpu **next)
 {
+	struct ffa_value ret_args =
+		(struct ffa_value){.func = FFA_INTERRUPT_32};
 	bool boot_order_complete = false;
 
 	if (sp_boot_next(current, next, &boot_order_complete)) {
-		*ret_args = (struct ffa_value){.func = FFA_INTERRUPT_32};
-		return true;
+		return ret_args;
 	}
 
 	/* All the SPs have been booted now. Return to NWd. */
 	if (boot_order_complete) {
-		return false;
+		*next = api_switch_to_other_world(
+			current, (struct ffa_value){.func = FFA_MSG_WAIT_32},
+			VCPU_STATE_WAITING);
+		return ret_args;
 	}
 
 	/* Refer FF-A v1.1 Beta0 section 7.4 bullet 2. */
@@ -1964,13 +1974,11 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 
 		/* Secure interrupt pre-empted normal world. */
 		if (current->preempted_vcpu->vm->id == HF_OTHER_WORLD_ID) {
-			*ret_args = plat_ffa_normal_world_resume(current, next);
-			return true;
+			return plat_ffa_normal_world_resume(current, next);
 		}
 
 		/* Secure interrupt pre-empted an SP. Resume it. */
-		*ret_args = plat_ffa_preempted_vcpu_resume(current, next);
-		return true;
+		return plat_ffa_preempted_vcpu_resume(current, next);
 	}
 
 	/*
@@ -1982,7 +1990,12 @@ bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
 	current->rt_model = RTM_NONE;
 	sl_unlock(&current->lock);
 
-	return false;
+	/* Relinquish control back to the NWd. */
+	*next = api_switch_to_other_world(
+		current, (struct ffa_value){.func = FFA_MSG_WAIT_32},
+		VCPU_STATE_WAITING);
+
+	return ret_args;
 }
 
 struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)

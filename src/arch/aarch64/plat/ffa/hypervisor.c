@@ -11,6 +11,7 @@
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
 
+#include "hf/api.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
@@ -933,14 +934,15 @@ bool plat_ffa_is_secondary_ep_register_supported(void)
 	return false;
 }
 
-bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
-			       struct ffa_value *ret_args)
+/**
+ * The invocation of FFA_MSG_WAIT at non-secure virtual FF-A instance is made
+ * to be compliant with version v1.0 of the FF-A specification. It serves as
+ * a blocking call.
+ */
+struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
+					   struct vcpu **next)
 {
-	(void)current;
-	(void)next;
-	(void)ret_args;
-
-	return false;
+	return api_ffa_msg_recv(true, current, next);
 }
 
 bool plat_ffa_check_runtime_state_transition(

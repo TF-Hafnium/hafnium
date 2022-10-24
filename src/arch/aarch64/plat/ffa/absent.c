@@ -445,14 +445,13 @@ void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 	(void)ppool;
 }
 
-bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
-			       struct ffa_value *ret_args)
+struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
+					   struct vcpu **next)
 {
 	(void)current;
 	(void)next;
-	(void)ret_args;
 
-	return false;
+	return (struct ffa_value){.func = FFA_INTERRUPT_32};
 }
 
 bool plat_ffa_check_runtime_state_transition(struct vcpu *current,

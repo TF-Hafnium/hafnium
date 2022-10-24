@@ -692,7 +692,6 @@ static struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 				  struct ffa_value *args)
 {
-	struct ffa_value ret;
 	enum vcpu_state next_state = VCPU_STATE_WAITING;
 
 	if (args->arg1 != 0U || args->arg2 != 0U || args->arg3 != 0U ||
@@ -709,11 +708,7 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 
 	assert(next_state == VCPU_STATE_WAITING);
 
-	if (plat_ffa_msg_wait_prepare(current, next, &ret)) {
-		return ret;
-	}
-
-	return api_ffa_msg_recv(true, current, next);
+	return plat_ffa_msg_wait_prepare(current, next);
 }
 
 /**

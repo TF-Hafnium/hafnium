@@ -245,8 +245,8 @@ void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
 bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current);
 bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current);
 
-bool plat_ffa_msg_wait_prepare(struct vcpu *current, struct vcpu **next,
-			       struct ffa_value *ret_args);
+struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
+					   struct vcpu **next);
 
 /**
  * Check if current SP can resume target VM/SP using FFA_RUN ABI.
