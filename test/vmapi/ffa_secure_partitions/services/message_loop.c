@@ -78,6 +78,10 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 			}
 			res = sp_success(ffa_receiver(res), ffa_sender(res), 0);
 			break;
+		case SP_CHECK_STATE_TRANSITIONS_CMD:
+			res = sp_check_state_transitions_cmd(ffa_sender(res),
+							     res.arg4);
+			break;
 		default:
 			HFTEST_LOG_FAILURE();
 			HFTEST_LOG(HFTEST_LOG_INDENT

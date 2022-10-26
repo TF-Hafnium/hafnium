@@ -283,3 +283,19 @@ static inline struct ffa_value sp_busy_loop_cmd_send(ffa_vm_id_t test_source,
 				       SP_WAIT_BUSY_LOOP_CMD, loop_count, 0, 0,
 				       0);
 }
+
+/**
+ * Command to request an SP to perform various state transitions through FFA
+ * ABIs.
+ */
+#define SP_CHECK_STATE_TRANSITIONS_CMD 0x5052544dU
+static inline struct ffa_value sp_check_state_transitions_cmd_send(
+	ffa_vm_id_t test_source, ffa_vm_id_t receiver, ffa_vm_id_t companion_sp)
+{
+	return ffa_msg_send_direct_req(test_source, receiver,
+				       SP_CHECK_STATE_TRANSITIONS_CMD,
+				       companion_sp, 0, 0, 0);
+}
+
+struct ffa_value sp_check_state_transitions_cmd(ffa_vm_id_t test_source,
+						ffa_vm_id_t companion_sp);

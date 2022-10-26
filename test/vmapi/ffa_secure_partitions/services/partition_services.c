@@ -172,3 +172,40 @@ struct ffa_value sp_echo_indirect_msg_cmd(ffa_vm_id_t test_source)
 
 	return sp_success(own_id, test_source, 0);
 }
+
+/**
+ * This test illustrates the checks performed by the RTM_FFA_DIR_REQ partition
+ * runtime model for various transitions requested by SP through invocation of
+ * FFA ABIs.
+ */
+struct ffa_value sp_check_state_transitions_cmd(ffa_vm_id_t test_source,
+						ffa_vm_id_t companion_sp_id)
+{
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	/*
+	 * The invocation of FFA_MSG_SEND_DIRECT_REQ under RTM_FFA_DIR_REQ is
+	 * already part of the `succeeds_sp_to_sp_echo` test belonging to the
+	 * `ffa_msg_send_direct_req` testsuite.
+	 */
+
+	/*
+	 * Test invocation of FFA_MSG_SEND_DIRECT_RESP to an endpoint other
+	 * than the one that allocated CPU cycles.
+	 */
+	res = ffa_msg_send_direct_resp(own_id, companion_sp_id, 0, 0, 0, 0, 0);
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+
+	/* Test invocation of FFA_MSG_WAIT. */
+	res = ffa_msg_wait();
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+
+	/* Test invocation of FFA_YIELD. */
+	res = ffa_yield();
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+
+	/* TODO: test the invocation of FFA_RUN ABI.*/
+	/* Perform legal invocation of FFA_MSG_SEND_DIRECT_RESP. */
+	return sp_success(own_id, test_source, 0);
+}

@@ -69,3 +69,20 @@ TEST(ffa_msg_send_direct_req, fails_direct_req_to_waiting_sp)
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 }
+
+/**
+ * Test various state transitions requested by an SP under RTM_FFA_DIR_REQ
+ * partition runtime model
+ */
+TEST(partition_runtime_model, rtm_ffa_dir_req)
+{
+	const ffa_vm_id_t receiver_id = SP_ID(1);
+	const ffa_vm_id_t companion_sp_id = SP_ID(2);
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	res = sp_check_state_transitions_cmd_send(own_id, receiver_id,
+						  companion_sp_id);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+}
