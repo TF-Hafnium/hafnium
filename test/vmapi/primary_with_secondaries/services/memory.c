@@ -67,12 +67,9 @@ TEST_SERVICE(memory_increment_relinquish)
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
 
-		struct ffa_value ret = ffa_msg_wait();
 		struct ffa_memory_region *memory_region =
 			(struct ffa_memory_region *)retrieve_buffer;
 		struct ffa_composite_memory_region *composite;
-
-		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		retrieve_memory_from_message(recv_buf, send_buf, NULL,
 					     memory_region, HF_MAILBOX_SIZE);
@@ -112,9 +109,6 @@ TEST_SERVICE(memory_increment_check_mem_attr)
 		size_t i;
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-
-		struct ffa_value ret = ffa_msg_wait();
-		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		struct ffa_memory_region *memory_region =
 			(struct ffa_memory_region *)retrieve_buffer;
@@ -205,13 +199,10 @@ TEST_SERVICE(lend_memory_and_fault)
 
 TEST_SERVICE(ffa_memory_return)
 {
-	struct ffa_value ret = ffa_msg_wait();
 	uint8_t *ptr;
 	size_t i;
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-
-	ASSERT_NE(ret.func, FFA_ERROR_32);
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
@@ -260,8 +251,6 @@ TEST_SERVICE(ffa_check_upper_bound)
 
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct ffa_value ret = ffa_msg_wait();
-	ASSERT_NE(ret.func, FFA_ERROR_32);
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
@@ -297,8 +286,6 @@ TEST_SERVICE(ffa_check_lower_bound)
 
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct ffa_value ret = ffa_msg_wait();
-	ASSERT_NE(ret.func, FFA_ERROR_32);
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
@@ -377,9 +364,6 @@ TEST_SERVICE(ffa_donate_twice)
 	ffa_vm_id_t sender;
 	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region_constituent constituent;
-	struct ffa_value ret = ffa_msg_wait();
-
-	ASSERT_NE(ret.func, FFA_ERROR_32);
 
 	sender = retrieve_memory_from_message(recv_buf, send_buf, NULL,
 					      memory_region, HF_MAILBOX_SIZE);
@@ -455,15 +439,12 @@ TEST_SERVICE(ffa_donate_invalid_source)
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
 
-	struct ffa_value ret = ffa_msg_wait();
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
 	ffa_vm_id_t sender = retrieve_memory_from_message(
 		recv_buf, send_buf, NULL, memory_region, HF_MAILBOX_SIZE);
 	struct ffa_composite_memory_region *composite =
 		ffa_memory_region_get_composite(memory_region, 0);
-
-	ASSERT_NE(ret.func, FFA_ERROR_32);
 
 	/* Give the memory back and notify the sender. */
 	send_memory_and_retrieve_request(
@@ -504,8 +485,6 @@ TEST_SERVICE(ffa_memory_lend_relinquish_relend)
 			(struct ffa_memory_region *)retrieve_buffer;
 		struct ffa_composite_memory_region *composite;
 		struct ffa_memory_region_constituent *constituents;
-		struct ffa_value ret = ffa_msg_wait();
-		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		retrieve_memory_from_message(recv_buf, send_buf, &handle,
 					     memory_region,
@@ -554,9 +533,6 @@ TEST_SERVICE(ffa_memory_lend_relinquish)
 		struct ffa_composite_memory_region *composite;
 		struct ffa_memory_region_constituent *constituents;
 		uint8_t *first_ptr;
-		struct ffa_value ret = ffa_msg_wait();
-
-		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		retrieve_memory_from_message(recv_buf, send_buf, &handle,
 					     memory_region,
@@ -609,9 +585,6 @@ TEST_SERVICE(ffa_memory_donate_relinquish)
 
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		struct ffa_value ret = ffa_msg_wait();
-
-		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		memory_region = (struct ffa_memory_region *)retrieve_buffer;
 		retrieve_memory_from_message(recv_buf, send_buf, &handle,
@@ -655,9 +628,6 @@ TEST_SERVICE(ffa_memory_share_relinquish_clear)
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
 
-		struct ffa_value ret = ffa_msg_wait();
-		ASSERT_NE(ret.func, FFA_MSG_WAIT_32);
-
 		retrieve_memory_from_message(recv_buf, send_buf, &handle, NULL,
 					     HF_MAILBOX_SIZE);
 
@@ -684,12 +654,9 @@ TEST_SERVICE(ffa_lend_invalid_source)
 
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct ffa_value ret = ffa_msg_wait();
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
 	struct ffa_composite_memory_region *composite;
-
-	ASSERT_NE(ret.func, FFA_ERROR_32);
 
 	retrieve_memory_from_message(recv_buf, send_buf, &handle, memory_region,
 				     HF_MAILBOX_SIZE);
@@ -736,14 +703,11 @@ TEST_SERVICE(ffa_memory_lend_relinquish_X)
 		ffa_memory_handle_t handle;
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		struct ffa_value ret = ffa_msg_wait();
 		struct ffa_memory_region *memory_region =
 			(struct ffa_memory_region *)retrieve_buffer;
 		struct ffa_composite_memory_region *composite;
 		struct ffa_memory_region_constituent *constituents;
 		uint32_t *ptr;
-
-		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		retrieve_memory_from_message(recv_buf, send_buf, &handle,
 					     memory_region, HF_MAILBOX_SIZE);
@@ -781,8 +745,7 @@ TEST_SERVICE(ffa_memory_share_fail_denied)
 	for (;;) {
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		struct ffa_value ret = ffa_msg_wait();
-		ASSERT_NE(ret.func, FFA_ERROR_32);
+
 		retrieve_memory_from_message_expect_fail(recv_buf, send_buf,
 							 FFA_DENIED);
 
@@ -800,8 +763,6 @@ TEST_SERVICE(ffa_memory_share_fail_invalid_parameters)
 	for (;;) {
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		struct ffa_value ret = ffa_msg_wait();
-		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		retrieve_memory_from_message_expect_fail(
 			recv_buf, send_buf, FFA_INVALID_PARAMETERS);
@@ -825,13 +786,10 @@ TEST_SERVICE(ffa_memory_lend_relinquish_RW)
 
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		struct ffa_value ret = ffa_msg_wait();
 		struct ffa_memory_region *memory_region =
 			(struct ffa_memory_region *)retrieve_buffer;
 		struct ffa_composite_memory_region *composite;
 		struct ffa_memory_region_constituent constituent_copy;
-
-		ASSERT_NE(ret.func, FFA_ERROR_32);
 
 		retrieve_memory_from_message(recv_buf, send_buf, &handle,
 					     memory_region, HF_MAILBOX_SIZE);
@@ -863,7 +821,6 @@ TEST_SERVICE(ffa_memory_lend_relinquish_RW)
 
 TEST_SERVICE(ffa_memory_lend_twice)
 {
-	struct ffa_value ret = ffa_msg_wait();
 	uint8_t *ptr;
 	uint32_t msg_size;
 	size_t i;
@@ -873,8 +830,6 @@ TEST_SERVICE(ffa_memory_lend_twice)
 	struct ffa_memory_region *memory_region;
 	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region_constituent constituent_copy;
-
-	ASSERT_NE(ret.func, FFA_ERROR_32);
 
 	memory_region = (struct ffa_memory_region *)retrieve_buffer;
 	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
