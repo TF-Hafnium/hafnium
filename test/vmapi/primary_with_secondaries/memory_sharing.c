@@ -3377,3 +3377,178 @@ TEST(memory_sharing, force_fragmented_ffa_v1_0)
 		ASSERT_EQ(ptr[i], val);
 	}
 }
+
+/**
+ * Clear memory flags with only one receiver.
+ */
+TEST(memory_sharing, lend_zero_memory_after_relinquish)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_msg *retrieve_message = mb.send;
+	uint8_t *ptr = pages;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "memory_increment_relinquish_check_not_zeroed", mb.send);
+
+	/* If mem share can't clear memory before sharing. */
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	/* Write to memory. */
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		ptr[i] = i;
+	}
+
+	ret = ffa_mem_lend(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_error_code(ret), 0);
+
+	handle = ffa_mem_success_handle(ret);
+
+	/* Prepare retrieve request setting clear memory flags. */
+	msg_size = ffa_memory_retrieve_request_init_single_receiver(
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
+		FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
+			     &retrieve_message->header);
+	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+	/* Run to retrieve memory. */
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/*
+	 * Run such that SP can retrieve the memory, and check it is not zeroed.
+	 */
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/* Run such that SP can use and relinquish memory. */
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/* Reestablish exclusive access to memory. */
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		EXPECT_EQ(ptr[i], 0);
+	}
+}
+
+/**
+ * Clear memory flag with multiple receivers:
+ * - Both test services retrieve memory.
+ * - Service1 sets clear memory on relinquish flag.
+ * - Service1 uses it and relinquishes access.
+ * - Service2 uses it and checks its contents are not zeroed.
+ * - Service2 relinquishes access.
+ * - This partition reclaims and checks memory has been zeroed.
+ */
+TEST(memory_sharing, lend_zero_memory_after_relinquish_multiple_borrowers)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+	uint8_t *ptr = pages;
+	struct ffa_memory_region *mem_region =
+		(struct ffa_memory_region *)mb.send;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	struct ffa_memory_access receivers[2];
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id, "memory_increment_relinquish",
+		       mb.send);
+
+	/* Before incrementing memory service2 checks memory is not cleared. */
+	SERVICE_SELECT(service2_info->vm_id,
+		       "memory_increment_relinquish_check_not_zeroed", mb.send);
+
+	ffa_memory_access_init_permissions(
+		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	ffa_memory_access_init_permissions(
+		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	ffa_memory_region_init(
+		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
+		ARRAY_SIZE(receivers), constituents, ARRAY_SIZE(constituents),
+		0, 0, FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size);
+
+	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
+		ptr[i] = i;
+	}
+
+	ret = ffa_mem_lend(msg_size, msg_size);
+
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	handle = ffa_mem_success_handle(ret);
+
+	for (uint32_t j = 0; j < ARRAY_SIZE(receivers); j++) {
+		ffa_vm_id_t recipient =
+			receivers[j].receiver_permissions.receiver;
+		struct ffa_partition_msg *retrieve_message = mb.send;
+
+		/* Set flag to clear memory after relinquish. */
+		msg_size = ffa_memory_retrieve_request_init(
+			(struct ffa_memory_region *)retrieve_message->payload,
+			handle, HF_PRIMARY_VM_ID, receivers,
+			ARRAY_SIZE(receivers), 0,
+			FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND |
+				FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE);
+		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+		/*
+		 * Send the appropriate retrieve request to the VM so
+		 * that it can use it to retrieve the memory.
+		 */
+		ffa_rxtx_header_init(hf_vm_get_id(), recipient, msg_size,
+				     &retrieve_message->header);
+		EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+		/* Run borrower such that it can retrieve memory. */
+		EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
+	}
+
+	/* Run borrower such that it can write to memory. */
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+	/* Run borrower such that it relinquishes its access. */
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/* Run borrower such that it can write to memory. */
+	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
+	/* Run borrower such that it relinquishes its access. */
+	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
+
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	/* Check memory is cleared. */
+	for (uint32_t i = 1; i < PAGE_SIZE; ++i) {
+		EXPECT_EQ(ptr[i], 0);
+	}
+}

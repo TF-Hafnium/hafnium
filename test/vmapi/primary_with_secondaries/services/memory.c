@@ -58,15 +58,18 @@ static void update_mm_security_state(
 	}
 }
 
-static void memory_increment(ffa_memory_handle_t *handle)
+static void memory_increment(ffa_memory_handle_t *handle,
+			     bool check_not_cleared)
 {
-	size_t i;
+	uint32_t i;
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
 	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
 	uint8_t *ptr;
+	/* Variable to detect if retrieved page was used before. */
+	bool page_used = false;
 
 	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
 				     HF_MAILBOX_SIZE);
@@ -89,8 +92,23 @@ static void memory_increment(ffa_memory_handle_t *handle)
 	EXPECT_EQ(ffa_yield().func, FFA_SUCCESS_32);
 
 	/* Increment each byte of memory. */
-	for (i = 0; i < PAGE_SIZE; ++i) {
+	for (i = 0; i < PAGE_SIZE; i++) {
+		/* Check that memory is not cleared before incrementing. */
+		if (check_not_cleared) {
+			page_used = page_used || (ptr[i] != 0U);
+		}
 		++ptr[i];
+	}
+
+	/*
+	 * In case 'check_not_cleared' was provided as true in the arguments,
+	 * during iteration over content of the page, 'page_used' captures if
+	 * there was any value different from 0. This is an indication that
+	 * memory hasn't been cleared before use in the context of the running
+	 * partition.
+	 */
+	if (check_not_cleared) {
+		EXPECT_TRUE(page_used);
 	}
 
 	/* Return control to primary. */
@@ -101,7 +119,7 @@ TEST_SERVICE(memory_increment)
 {
 	/* Loop, writing message to the shared memory. */
 	for (;;) {
-		memory_increment(NULL);
+		memory_increment(NULL, false);
 	}
 }
 
@@ -111,7 +129,25 @@ TEST_SERVICE(memory_increment_relinquish)
 	for (;;) {
 		ffa_memory_handle_t handle;
 
-		memory_increment(&handle);
+		memory_increment(&handle, false);
+
+		/* Give the memory back and notify the sender. */
+		ffa_mem_relinquish_init(SERVICE_SEND_BUFFER(), handle, 0,
+					hf_vm_get_id());
+		EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
+
+		/* Signal completion and reset. */
+		ffa_yield();
+	}
+}
+
+TEST_SERVICE(memory_increment_relinquish_check_not_zeroed)
+{
+	/* Loop, writing message to the shared memory. */
+	for (;;) {
+		ffa_memory_handle_t handle;
+
+		memory_increment(&handle, true);
 
 		/* Give the memory back and notify the sender. */
 		ffa_mem_relinquish_init(SERVICE_SEND_BUFFER(), handle, 0,
