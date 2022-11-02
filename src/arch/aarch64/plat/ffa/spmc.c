@@ -1125,6 +1125,16 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 			 * the interrupt, it uses the FFA_RUN ABI to resume
 			 * the request due to which it had entered the blocked
 			 * state earlier.
+			 * Deny the state transition if the SP didnt perform the
+			 * deactivation of the secure virtual interrupt.
+			 */
+			if (!current->secure_interrupt_deactivated) {
+				run_ret->arg2 = FFA_DENIED;
+				ret = false;
+				goto out;
+			}
+
+			/*
 			 * Refer Figure 8.13 Scenario 1: Implementation choice:
 			 * SPMC left all intermediate SP execution contexts in
 			 * blocked state. Hence, SPMC now bypasses the
@@ -1964,6 +1974,14 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
 
 	/* Refer FF-A v1.1 Beta0 section 7.4 bullet 2. */
 	if (current->processing_secure_interrupt) {
+		/*
+		 * Deny the state transition if the SP didnt perform the
+		 * deactivation of the secure virtual interrupt.
+		 */
+		if (!current->secure_interrupt_deactivated) {
+			return ffa_error(FFA_DENIED);
+		}
+
 		/*
 		 * This flag should not have been set by SPMC when it signaled
 		 * the virtual interrupt to the SP while SP was in WAITING or
