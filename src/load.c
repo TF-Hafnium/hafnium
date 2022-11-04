@@ -678,6 +678,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	const size_t mem_size = pa_difference(mem_begin, mem_end);
 	uint32_t map_mode;
 	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0;
+	size_t n;
 
 	/*
 	 * Load the kernel if a filename is specified in the VM manifest.
@@ -809,9 +810,6 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	vcpu_locked = vcpu_lock(vcpu);
 
-	/* Enable relevant virtual interrupts for Secure Partitions. */
-	plat_ffa_enable_virtual_interrupts(vcpu_locked, vm_locked);
-
 	if (has_fdt) {
 		vcpu_secondary_reset_and_start(vcpu_locked, secondary_entry,
 					       pa_addr(fdt_addr));
@@ -826,6 +824,22 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	}
 
 	vcpu_unlock(&vcpu_locked);
+
+	/*
+	 * For all vCPUs,
+	 * in a VM: enable the notification pending virtual interrupt if
+	 *          requested in the manifest.
+	 * in a SP: enable the NPI and managed exit virtual interrupts if
+	 *          requested in the manifest. For a S-EL0 partition, enable
+	 *          the virtual interrupts IDs matching the secure physical
+	 *          interrupt IDs declared in device regions.
+	 */
+	for (n = 0; n < manifest_vm->secondary.vcpu_count; n++) {
+		vcpu = vm_get_vcpu(vm, n);
+		vcpu_locked = vcpu_lock(vcpu);
+		plat_ffa_enable_virtual_interrupts(vcpu_locked, vm_locked);
+		vcpu_unlock(&vcpu_locked);
+	}
 
 	ret = true;
 
