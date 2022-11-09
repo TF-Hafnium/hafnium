@@ -30,6 +30,10 @@ static void check_v1_1_partition_info_descriptors(
 	EXPECT_EQ(partitions[0].vcpu_count, 8);
 	ffa_uuid_init(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[0].uuid, &uuid));
+	EXPECT_EQ(partitions[0].properties,
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_DIRECT_REQ_SEND);
 
 	/* Expect a SP as second partition. */
 	EXPECT_EQ(partitions[1].vm_id, SP_ID(1));
@@ -37,12 +41,18 @@ static void check_v1_1_partition_info_descriptors(
 		    partitions[1].vcpu_count == 1);
 	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[1].uuid, &uuid));
+	EXPECT_EQ(partitions[1].properties,
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_DIRECT_REQ_RECV);
 
 	/* Expect secondary SP as third partition */
 	EXPECT_EQ(partitions[2].vm_id, SP_ID(2));
 	EXPECT_EQ(partitions[2].vcpu_count, 8);
 	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[2].uuid, &uuid));
+	EXPECT_EQ(partitions[2].properties,
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_DIRECT_REQ_RECV);
 }
 
 TEST(ffa, ffa_partition_info_get_uuid_null)
@@ -69,7 +79,10 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	/* Expect three partitions. */
 	EXPECT_EQ(ret.arg2, 3);
 
-	/* Check the partition info descritor size returned in w3 is correct. */
+	/*
+	 * Check the partition info descriptor size returned in w3 is
+	 * correct.
+	 */
 	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
 
 	/* Expect the PVM as first partition. */
@@ -141,13 +154,19 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 	/* Expect one partition. */
 	EXPECT_EQ(ret.arg2, 1);
 
-	/* Check the partition info descritor size returned in w3 is correct. */
+	/*
+	 * Check the partition info descriptor size returned in w3 is
+	 * correct.
+	 */
 	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
 
 	/* Expect a secure partition. */
 	EXPECT_EQ(partitions[0].vm_id, HF_SPMC_VM_ID + 1);
 	EXPECT_TRUE(partitions[0].vcpu_count == 8 ||
 		    partitions[0].vcpu_count == 1);
+	EXPECT_EQ(partitions[0].properties,
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_DIRECT_REQ_RECV);
 
 	/*
 	 * If a uuid is specified (not null) ensure the uuid returned in the
@@ -208,21 +227,35 @@ TEST(ffa, ffa_partition_info_get_versioned_descriptors)
 	/* Expect three partitions. */
 	EXPECT_EQ(ret.arg2, 3);
 
-	/* Check the partition info descritor size returned in w3 is correct. */
+	/*
+	 * Check the partition info descriptor size returned in w3 is
+	 * correct.
+	 */
 	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info_v1_0));
 
 	/* Expect the PVM as first partition. */
 	EXPECT_EQ(partitions_v1_0[0].vm_id, hf_vm_get_id());
-	EXPECT_TRUE(partitions_v1_0[1].vcpu_count == 8 ||
-		    partitions_v1_0[1].vcpu_count == 1);
+	EXPECT_TRUE(partitions_v1_0[0].vcpu_count == 8 ||
+		    partitions_v1_0[0].vcpu_count == 1);
+	EXPECT_EQ(partitions_v1_0[0].properties,
+		  FFA_PARTITION_INDIRECT_MSG | FFA_PARTITION_DIRECT_REQ_SEND);
+	EXPECT_EQ(partitions_v1_0[0].properties & FFA_PARTITION_v1_0_RES_MASK,
+		  0);
 
 	/* Expect a SP as second partition. */
 	EXPECT_EQ(partitions_v1_0[1].vm_id, SP_ID(1));
-	EXPECT_EQ(partitions_v1_0[0].vcpu_count, 8);
+	EXPECT_TRUE(partitions_v1_0[1].vcpu_count == 8 ||
+		    partitions_v1_0[1].vcpu_count == 1);
+	EXPECT_EQ(partitions_v1_0[1].properties, FFA_PARTITION_DIRECT_REQ_RECV);
+	EXPECT_EQ(partitions_v1_0[1].properties & FFA_PARTITION_v1_0_RES_MASK,
+		  0);
 
 	/* Expect secondary SP as third partition. */
 	EXPECT_EQ(partitions_v1_0[2].vm_id, SP_ID(2));
 	EXPECT_EQ(partitions_v1_0[2].vcpu_count, 8);
+	EXPECT_EQ(partitions_v1_0[2].properties, FFA_PARTITION_DIRECT_REQ_RECV);
+	EXPECT_EQ(partitions_v1_0[2].properties & FFA_PARTITION_v1_0_RES_MASK,
+		  0);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
@@ -239,7 +272,10 @@ TEST(ffa, ffa_partition_info_get_versioned_descriptors)
 	/* Expect three partitions. */
 	EXPECT_EQ(ret.arg2, 3);
 
-	/* Check the partition info descritor size returned in w3 is correct. */
+	/*
+	 * Check the partition info descriptor size returned in w3 is
+	 * correct.
+	 */
 	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
 
 	check_v1_1_partition_info_descriptors(partitions_v1_1);

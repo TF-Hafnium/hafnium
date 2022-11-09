@@ -469,28 +469,31 @@ static inline bool ffa_uuid_is_null(const struct ffa_uuid *uuid)
  * Flags to determine the partition properties, as required by
  * FFA_PARTITION_INFO_GET.
  *
- * The values of the flags are specified in table 82 of the FF-A 1.0 EAC
+ * The values of the flags are specified in table 8.25 of DEN0077A FF-A 1.0 REL
  * specification, "Partition information descriptor, partition properties".
  */
 typedef uint32_t ffa_partition_properties_t;
 
 /** Partition property: partition supports receipt of direct requests. */
-#define FFA_PARTITION_DIRECT_REQ_RECV 0x1
+#define FFA_PARTITION_DIRECT_REQ_RECV (UINT32_C(1) << 0)
 
 /** Partition property: partition can send direct requests. */
-#define FFA_PARTITION_DIRECT_REQ_SEND 0x2
+#define FFA_PARTITION_DIRECT_REQ_SEND (UINT32_C(1) << 1)
 
 /** Partition property: partition can send and receive indirect messages. */
-#define FFA_PARTITION_INDIRECT_MSG 0x4
+#define FFA_PARTITION_INDIRECT_MSG (UINT32_C(1) << 2)
 
 /** Partition property: partition can receive notifications. */
-#define FFA_PARTITION_NOTIFICATION 0x8
+#define FFA_PARTITION_NOTIFICATION (UINT32_C(1) << 3)
+
+/** Partition property: partition runs in the AArch64 execution state. */
+#define FFA_PARTITION_AARCH64_EXEC (UINT32_C(1) << 8)
 
 /**
  * Holds information returned for each partition by the FFA_PARTITION_INFO_GET
  * interface.
- * This corresponds to table 13.34 of the FF-A 1.1 BETA0 EAC specification,
- * "Partition information descriptor".
+ * This corresponds to table 13.37 "Partition information descriptor"
+ * in FF-A 1.1 EAC0 specification.
  */
 struct ffa_partition_info {
 	ffa_vm_id_t vm_id;
@@ -500,10 +503,17 @@ struct ffa_partition_info {
 };
 
 /**
+ * Bits[31:3] of partition properties must be zero for FF-A v1.0.
+ * This corresponds to table 8.25 "Partition information descriptor"
+ * in DEN0077A FF-A 1.0 REL specification.
+ */
+#define FFA_PARTITION_v1_0_RES_MASK (~(UINT32_C(0x7)))
+
+/**
  * Create a struct for the "Partition information descriptor" defined for v1.0
  * which can be returned to v1.0 endpoints.
- * This corresponds to table 82 of the FF-A 1.0 EAC specification, "Partition
- * information descriptor".
+ * This corresponds to table 8.25 "Partition information descriptor"
+ * in DEN0077A FF-A 1.0 REL specification.
  */
 
 struct ffa_partition_info_v1_0 {

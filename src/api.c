@@ -384,11 +384,14 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		for (uint32_t i = 0; i < vm_count; i++) {
 			/*
 			 * Populate the VM's RX buffer with the partition
-			 * information.
+			 * information. Clear properties bits that must be zero
+			 * according to DEN0077A FF-A v1.0 REL Table 8.25.
 			 */
 			recv_mailbox[i].vm_id = partitions[i].vm_id;
 			recv_mailbox[i].vcpu_count = partitions[i].vcpu_count;
-			recv_mailbox[i].properties = partitions[i].properties;
+			recv_mailbox[i].properties =
+				partitions[i].properties &
+				~FFA_PARTITION_v1_0_RES_MASK;
 		}
 
 	} else {
@@ -443,7 +446,7 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	}
 
 	/*
-	 * No need to count if we are returning the number of paritions as we
+	 * No need to count if we are returning the number of partitions as we
 	 * already know this.
 	 */
 	if (uuid_is_null && count_flag) {
@@ -474,6 +477,8 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					vm_are_notifications_enabled(vm)
 						? FFA_PARTITION_NOTIFICATION
 						: 0;
+				partitions[array_index].properties |=
+					FFA_PARTITION_AARCH64_EXEC;
 				if (uuid_is_null) {
 					partitions[array_index].uuid = vm->uuid;
 				}
