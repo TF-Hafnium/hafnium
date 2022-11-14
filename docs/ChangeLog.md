@@ -1,5 +1,90 @@
 # Change log
 
+## v2.8
+#### Highlights
+
+* FF-A v1.1 partition runtime model and CPU cycle allocation modes
+    * Implemented partition runtime models for secure partitions entered at
+      initialization, processing a secure interrupt or as a result of allocation
+      of CPU cycles by FFA_RUN and FFA_MSG_SEND_DIRECT_REQ ABIs invocations.
+    * Added state machine checks related to above, in which a partition has a
+      set of allowed transitions to enter and exit a partition runtime model.
+    * Implemented CPU cycle allocation modes and winding/unwinding of call
+      chains.
+    * Refactored managed exit field in manifests to use one of the possible
+      "Action for a non-secure interrupt" defined by the specification.
+    * Added support for preferred managed exit signal (among vIRQ or vFIQ).
+    * Support for precedence of the NS interrupt action in unwinding a normal
+      world scheduled call chain.
+* FF-A v1.1 memory sharing
+    * Preparation changes for multiple borrowers and fragmented memory
+      sharing support.
+    * Fixed memory attributes checks as they are passed to memory sharing
+      primitives (FFA_MEM_SHARE/LEND/DONATE and FFA_MEM_RETRIEVE_REQ).
+    * Memory sharing support for S-EL0 partitions.
+* FF-A v1.1 notifications
+    * Added framework notifications support.
+      The supported use case is for indirect messaging to notify a partition
+      about a message pending in its RX buffer (or 'RX buffer full' framework
+      notification).
+    * Added support for notification pending interrupt injection on a RX buffer
+      full event.
+* FF-A v1.1 Indirect messaging
+    * Added support for VM-VM, VM-SP, SP-SP indirect messaging scenarios.
+    * Added partition message header structures.
+    * Implemented FFA_MSG_SEND2 and FFA_RX_ACQUIRE ABIs.
+    * Refactored VM internal state tracking in the SPMC to support forwarding
+      of RX/TX buffer mapping/unmapping, notifications creation/destruction,
+      RX buffer acquire/release.
+    * Refactored VM mailbox states to support the RX buffer full event.
+* FF-A console log ABI
+    * Added the FFA_CONSOLE_LOG ABI as a simple and standardized means to print
+      characters without depending on an MMIO device mapped into the VM.
+      This allows a VM to print debug or information strings through an
+      hypervisor call service using general-purpose registers rather than a
+      shared buffer. Multiple VMs can use the ABI concurrently as the SPMC
+      buffers data per VM and serializes output to the physical serial device.
+* FF-A v1.1 Setup & Discovery
+    * Updated the PARTITION_INFO_GET ABI to return the partition UUID in the
+      partition information descriptors. Additionaly the partition information
+      descriptor size is returned as part of the response.
+    * Added FFA_MEM_FRAG_RX/TX as supported interface in FFA_FEATURE response.
+* Image footprint optimization
+    * The following updates were made with the general idea of reducing the
+      flash and RAM footprints. They are also means to adjust the memory
+      utilization based on the target market segment.
+        * Added platform defines to state the per-VM maximum number of memory and
+          device regions, interrupts and SMMU streams per device.
+        * Dynamically allocate per vCPU notifications.
+        * Allocate vCPU structures from heap.
+        * Manifest data allocation from page pool.
+        * Fixed core stacks section with noload attribute.
+* GIC
+    * Added support for GICv3.1 extended SPI / PPI INTID ranges.
+    * Add build options to extend the number of supported virtual interrupt IDs.
+* SVE
+    * Detect the platform supported SVE vector length or set the limit for the
+      lower ELs.
+    * Increased the SVE NS context to support the maximum vector length
+      permitted by the architecture.
+    * Above changes lift the limit about a fixed sized SVE vector length (of
+      512 bits) used in earlier releases.
+* Misc
+    * Partition manifest parsing:
+        * Added checks forbidding SPs to declare overlapping memory regions and
+	  conflicting device interrupt ID resources.
+        * Add ability to specify the security state of a memory region
+	  for S-EL0 partitions.
+    * Fixed system register trap exception injection.
+    * Removed hypervisor tables defragmentation.
+    * Add ability to define a log level per platform.
+    * Disable alignment check for EL0 partitions (when VHE is enabled).
+
+#### Known limitations:
+* S-EL0 partitions interrupt handling is work in progress.
+* Normal world to secure world fragmented memory sharing and sharing to multiple
+  borrowers is work in progress.
+
 ## v2.7
 #### Highlights
 
