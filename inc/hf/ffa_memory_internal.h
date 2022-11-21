@@ -94,6 +94,14 @@ struct ffa_memory_share_state {
 	 */
 	uint32_t retrieved_fragment_count[MAX_MEM_SHARE_RECIPIENTS];
 
+	/*
+	 * This is set when one of the receivers has requested that the page is
+	 * cleared after relinquish. This is reset when the memory is cleared.
+	 * In a multi-receiver case this is when all receivers relinquish the
+	 * memory.
+	 */
+	bool clear_after_relinquish;
+
 	/**
 	 * Field for the SPMC to keep track of how many fragments of the memory
 	 * region the hypervisor has managed to retrieve, using a

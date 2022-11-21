@@ -1017,7 +1017,7 @@ out:
 }
 
 static struct ffa_value ffa_relinquish_check_update(
-	struct vm_locked from_locked,
+	struct vm_locked from_locked, ffa_vm_id_t owner_id,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	struct mpool *page_pool, bool clear)
@@ -1068,7 +1068,7 @@ static struct ffa_value ffa_relinquish_check_update(
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear &&
 	    !ffa_clear_memory_constituents(
-		    plat_ffa_owner_world_mode(from_locked.vm->id), fragments,
+		    plat_ffa_owner_world_mode(owner_id), fragments,
 		    fragment_constituent_counts, fragment_count, page_pool)) {
 		/*
 		 * On failure, roll back by returning memory to the sender. This
@@ -2395,6 +2395,11 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		is_send_complete =
 			share_state->retrieved_fragment_count[receiver_index] ==
 			share_state->fragment_count;
+
+		share_state->clear_after_relinquish =
+			(retrieve_request->flags &
+			 FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH) != 0U;
+
 	} else {
 		if (share_state->hypervisor_fragment_count != 0U) {
 			dlog_verbose(
@@ -2676,6 +2681,7 @@ struct ffa_value ffa_memory_relinquish(
 	bool clear;
 	struct ffa_value ret;
 	uint32_t receiver_index;
+	bool receivers_relinquished_memory;
 
 	if (relinquish_request->endpoint_count != 1) {
 		dlog_verbose(
@@ -2738,7 +2744,31 @@ struct ffa_value ffa_memory_relinquish(
 		goto out;
 	}
 
-	clear = relinquish_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR;
+	/*
+	 * Either clear if requested in relinquish call, or in a retrieve
+	 * request from one of the borrowers.
+	 */
+	receivers_relinquished_memory = true;
+
+	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
+		struct ffa_memory_access *receiver =
+			&memory_region->receivers[i];
+
+		if (receiver->receiver_permissions.receiver ==
+		    from_locked.vm->id) {
+			continue;
+		}
+
+		if (share_state->retrieved_fragment_count[i] != 0U) {
+			receivers_relinquished_memory = false;
+			break;
+		}
+	}
+
+	clear = receivers_relinquished_memory &&
+		(share_state->clear_after_relinquish ||
+		 (relinquish_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) !=
+			 0U);
 
 	/*
 	 * Clear is not allowed for memory that was shared, as the
@@ -2751,7 +2781,7 @@ struct ffa_value ffa_memory_relinquish(
 	}
 
 	ret = ffa_relinquish_check_update(
-		from_locked, share_state->fragments,
+		from_locked, memory_region->sender, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, page_pool, clear);
 
@@ -2821,8 +2851,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 		if (share_state->retrieved_fragment_count[i] != 0) {
 			dlog_verbose(
 				"Tried to reclaim memory handle %#x "
-				"that has "
-				"not been relinquished by all "
+				"that has not been relinquished by all "
 				"borrowers(%x).\n",
 				handle,
 				memory_region->receivers[i]
@@ -2840,9 +2869,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 
 	if (ret.func == FFA_SUCCESS_32) {
 		share_state_free(share_states, share_state, page_pool);
-		dlog_verbose(
-			"Freed share state after successful "
-			"reclaim.\n");
+		dlog_verbose("Freed share state after successful reclaim.\n");
 	}
 
 out:
