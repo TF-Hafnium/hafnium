@@ -430,7 +430,7 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 {
 	struct vm *current_vm = current->vm;
 	ffa_vm_count_t vm_count = 0;
-	bool count_flag = (flags && FFA_PARTITION_COUNT_FLAG_MASK) ==
+	bool count_flag = (flags & FFA_PARTITION_COUNT_FLAG_MASK) ==
 			  FFA_PARTITION_COUNT_FLAG;
 	bool uuid_is_null = ffa_uuid_is_null(uuid);
 	struct ffa_partition_info partitions[2 * MAX_VMS] = {0};
@@ -438,7 +438,7 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	struct ffa_value ret;
 
 	/* Bits 31:1 Must Be Zero */
-	if ((flags & ~FFA_PARTITION_COUNT_FLAG) != 0) {
+	if ((flags & ~FFA_PARTITION_COUNT_FLAG_MASK) != 0) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 

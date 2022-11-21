@@ -877,7 +877,7 @@ void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
 		return;
 	}
 
-	if ((flags && FFA_PARTITION_COUNT_FLAG_MASK) ==
+	if ((flags & FFA_PARTITION_COUNT_FLAG_MASK) ==
 	    FFA_PARTITION_COUNT_FLAG) {
 		vm_count += tee_partitions_count;
 	} else {
