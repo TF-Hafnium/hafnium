@@ -26,7 +26,11 @@ import subprocess
 import sys
 import time
 import fdt
+import platform
 from telnetlib import Telnet
+
+MACHINE = platform.machine()
+MACHINE = "linux-" + ("x64" if MACHINE == "x86_64" else MACHINE)
 
 HFTEST_LOG_PREFIX = "[hftest] "
 HFTEST_LOG_FAILURE_PREFIX = "Failure:"
@@ -42,6 +46,7 @@ FVP_BINARY = os.path.join(
     os.path.dirname(HF_ROOT), "fvp", "Base_RevC_AEMvA_pkg", "models",
     "Linux64_GCC-9.3", "FVP_Base_RevC-2xAEMvA")
 HF_PREBUILTS = os.path.join(HF_ROOT, "prebuilts")
+QEMU_PREBUILTS = os.path.join(HF_PREBUILTS, MACHINE, "qemu", "qemu-system-aarch64")
 FVP_PREBUILTS_TFA_TRUSTY_ROOT = os.path.join(
     HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a-trusty", "fvp")
 FVP_PREBUILT_DTS = os.path.join(
@@ -223,7 +228,7 @@ class QemuDriver(Driver):
         cpu = self.args.cpu or "max"
         exec_args = [
             "timeout", "--foreground", time_limit,
-            os.path.abspath("prebuilts/linux-x64/qemu/qemu-system-aarch64"),
+            QEMU_PREBUILTS,
             "-no-reboot", "-machine", "virt,virtualization=on,gic-version=3",
             "-cpu", cpu, "-smp", "8", "-m", "1G",
             "-nographic", "-nodefaults", "-serial", "stdio",
