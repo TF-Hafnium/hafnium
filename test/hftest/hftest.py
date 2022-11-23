@@ -229,7 +229,7 @@ class QemuDriver(Driver):
         exec_args = [
             "timeout", "--foreground", time_limit,
             QEMU_PREBUILTS,
-            "-no-reboot", "-machine", "virt,virtualization=on,gic-version=3",
+            "-no-reboot", "-machine", "virt-6.2,virtualization=on,gic-version=3",
             "-cpu", cpu, "-smp", "8", "-m", "1G",
             "-nographic", "-nodefaults", "-serial", "stdio",
             "-d", "unimp", "-kernel", os.path.abspath(self.args.hypervisor),
