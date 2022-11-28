@@ -1054,6 +1054,22 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
 }
 
 /**
+ * Indicate that secure interrupt processing is complete and clear corresponding
+ * fields.
+ */
+static void plat_ffa_reset_secure_interrupt_flags(
+	struct vcpu_locked current_locked)
+{
+	struct vcpu *current;
+
+	current = current_locked.vcpu;
+	current->processing_secure_interrupt = false;
+	current->secure_interrupt_deactivated = false;
+	current->preempted_vcpu = NULL;
+	current->current_sec_interrupt_id = 0;
+}
+
+/**
  * Check if current VM can resume target VM using FFA_RUN ABI.
  */
 bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
@@ -1161,10 +1177,8 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 			 * Clear fields corresponding to secure interrupt
 			 * handling.
 			 */
-			current->processing_secure_interrupt = false;
-			current->secure_interrupt_deactivated = false;
-			current->preempted_vcpu = NULL;
-			current->current_sec_interrupt_id = 0;
+			plat_ffa_reset_secure_interrupt_flags(
+				vcpus_locked.vcpu1);
 		}
 	}
 
@@ -1338,14 +1352,21 @@ static struct vcpu_locked plat_ffa_secure_interrupt_prepare(
 
 	target_vcpu = plat_ffa_find_target_vcpu(current, id);
 
-	/* Update the state of current vCPU. */
+	/* Update the state of current vCPU if it belongs to an SP. */
 	current_vcpu_locked = vcpu_lock(current);
-	current->state = VCPU_STATE_PREEMPTED;
+
+	if (vm_id_is_current_world(current->vm->id)) {
+		current->state = VCPU_STATE_PREEMPTED;
+	}
+
 	vcpu_unlock(&current_vcpu_locked);
 
 	/*
-	 * TODO: Temporarily mask all interrupts to disallow high priority
-	 * interrupts from pre-empting current interrupt processing.
+	 * TODO: Design limitation. Current implementation does not support
+	 * handling a secure interrupt while currently handling a secure
+	 * interrupt. Temporarily mask all interrupts to disallow high priority
+	 * interrupts from pre-empting current interrupt processing. Hence,
+	 * SPMC does not queue more than one virtual interrupt per each vCPU.
 	 */
 	priority_mask = plat_interrupts_get_priority_mask();
 	plat_interrupts_set_priority_mask(0x0);
@@ -1354,13 +1375,6 @@ static struct vcpu_locked plat_ffa_secure_interrupt_prepare(
 
 	/* Save current value of priority mask. */
 	target_vcpu->priority_mask = priority_mask;
-
-	/*
-	 * TODO: Design limitation. Current implementation does not support
-	 * handling a secure interrupt while currently handling a secure
-	 * interrupt. Moreover, we cannot queue more than one virtual interrupt
-	 * at a time.
-	 */
 	CHECK(!target_vcpu->processing_secure_interrupt);
 	CHECK(vcpu_interrupt_irq_count_get(target_vcpu_locked) == 0);
 
@@ -1400,8 +1414,8 @@ static void plat_ffa_signal_secure_interrupt_sel1(
 	/* Secure interrupt signaling and queuing for S-EL1 SP. */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
-		/* FF-A v1.1 EAC0 Table 8.2 case 1. */
-		args.arg1 = id;
+		/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
+		args.arg2 = id;
 
 		/*
 		 * Only one SPMC scheduled call chain can be running in SWd on
@@ -1533,7 +1547,7 @@ static struct ffa_value plat_ffa_handle_secure_interrupt_secure_world(
 	uint32_t id;
 
 	/* Secure interrupt triggered while execution is in SWd. */
-	CHECK((current->vm->id & HF_VM_ID_WORLD_MASK) != 0);
+	CHECK(vm_id_is_current_world(current->vm->id));
 	target_vcpu_locked = plat_ffa_secure_interrupt_prepare(current, &id);
 
 	if (current == target_vcpu_locked.vcpu) {
@@ -1556,7 +1570,7 @@ static struct ffa_value plat_ffa_handle_secure_interrupt_secure_world(
 		 * secure world, there is no vCPU to resume when target
 		 * vCPU exits after secure interrupt completion.
 		 */
-		target_vcpu_locked.vcpu->preempted_vcpu = NULL;
+		current->preempted_vcpu = NULL;
 	} else {
 		plat_ffa_signal_secure_interrupt_sel1(
 			current, target_vcpu_locked, id, next, false);
@@ -1612,7 +1626,7 @@ static struct ffa_value plat_ffa_handle_secure_interrupt_from_normal_world(
 	target_vcpu_locked.vcpu->current_sec_interrupt_id = id;
 
 	/*
-	 * next==NULL represents a scenario where SPMC cannot resume target SP.
+	 * *next==NULL represents a scenario where SPMC cannot resume target SP.
 	 * Resume normal world using FFA_NORMAL_WORLD_RESUME.
 	 */
 	if (*next == NULL) {
@@ -1638,6 +1652,21 @@ struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
 }
 
 /**
+ * SPMC scheduled call chain is completely unwound.
+ */
+static void plat_ffa_exit_spmc_schedule_mode(struct vcpu_locked current_locked)
+{
+	struct vcpu *current;
+
+	current = current_locked.vcpu;
+	assert(current->call_chain.next_node == NULL);
+	CHECK(current->scheduling_mode == SPMC_MODE);
+
+	current->scheduling_mode = NONE;
+	current->rt_model = RTM_NONE;
+}
+
+/**
  * Switches the physical CPU back to the corresponding vCPU of the normal world.
  *
  * The current vCPU has finished handling the secure interrupt. Resume the
@@ -1655,22 +1684,12 @@ struct ffa_value plat_ffa_normal_world_resume(struct vcpu *current,
 
 	current_locked = vcpu_lock(current);
 
-	/* Indicate that secure interrupt processing is complete. */
-	current->processing_secure_interrupt = false;
-
-	/* Reset the flag. */
-	current->secure_interrupt_deactivated = false;
-
-	/* Clear fields corresponding to secure interrupt handling. */
-	current->preempted_vcpu = NULL;
-	current->current_sec_interrupt_id = 0;
+	/* Reset the fields tracking secure interrupt processing. */
+	plat_ffa_reset_secure_interrupt_flags(current_locked);
 
 	/* SPMC scheduled call chain is completely unwound. */
+	plat_ffa_exit_spmc_schedule_mode(current_locked);
 	assert(current->call_chain.prev_node == NULL);
-	assert(current->call_chain.next_node == NULL);
-	CHECK(current->scheduling_mode == SPMC_MODE);
-	current->scheduling_mode = NONE;
-	current->rt_model = RTM_NONE;
 	current->state = VCPU_STATE_WAITING;
 
 	vcpu_unlock(&current_locked);
@@ -1701,6 +1720,7 @@ struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
 {
 	struct ffa_value ffa_ret = (struct ffa_value){.func = FFA_MSG_WAIT_32};
 	struct vcpu *target_vcpu;
+	struct two_vcpu_locked vcpus_locked;
 
 	CHECK(current->preempted_vcpu != NULL);
 	CHECK(current->preempted_vcpu->state == VCPU_STATE_PREEMPTED);
@@ -1708,24 +1728,14 @@ struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
 	target_vcpu = current->preempted_vcpu;
 
 	/* Lock both vCPUs at once. */
-	vcpu_lock_both(current, target_vcpu);
+	vcpus_locked = vcpu_lock_both(current, target_vcpu);
 
-	/* Indicate that secure interrupt processing is complete. */
-	current->processing_secure_interrupt = false;
-
-	/* Reset the flag. */
-	current->secure_interrupt_deactivated = false;
-
-	/* Clear fields corresponding to secure interrupt handling. */
-	current->preempted_vcpu = NULL;
-	current->current_sec_interrupt_id = 0;
+	/* Reset the fields tracking secure interrupt processing. */
+	plat_ffa_reset_secure_interrupt_flags(vcpus_locked.vcpu1);
 
 	/* SPMC scheduled call chain is completely unwound. */
+	plat_ffa_exit_spmc_schedule_mode(vcpus_locked.vcpu1);
 	assert(current->call_chain.prev_node == NULL);
-	assert(current->call_chain.next_node == NULL);
-	CHECK(current->scheduling_mode == SPMC_MODE);
-	current->scheduling_mode = NONE;
-	current->rt_model = RTM_NONE;
 	current->state = VCPU_STATE_WAITING;
 
 	target_vcpu->state = VCPU_STATE_RUNNING;
