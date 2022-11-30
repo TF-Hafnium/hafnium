@@ -70,6 +70,19 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	enum ffa_data_access retrieve_data_access,
 	enum ffa_instruction_access send_instruction_access,
 	enum ffa_instruction_access retrieve_instruction_access);
+void send_retrieve_request_single_receiver(
+	void *send, ffa_memory_handle_t handle, ffa_vm_id_t sender,
+	ffa_vm_id_t receiver, uint32_t tag, ffa_memory_region_flags_t flags,
+	enum ffa_data_access data_access,
+	enum ffa_instruction_access instruction_access,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability);
+void send_retrieve_request(
+	void *send, ffa_memory_handle_t handle, ffa_vm_id_t sender,
+	struct ffa_memory_access receivers[], uint32_t receiver_count,
+	uint32_t tag, ffa_memory_region_flags_t flags,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability, ffa_vm_id_t recipient);
 ffa_vm_id_t retrieve_memory_from_message(
 	void *recv_buf, void *send_buf, struct ffa_value msg_ret,
 	ffa_memory_handle_t *handle,

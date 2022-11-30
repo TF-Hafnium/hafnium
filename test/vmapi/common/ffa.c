@@ -280,6 +280,48 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	return handle;
 }
 
+void send_retrieve_request_single_receiver(
+	void *send, ffa_memory_handle_t handle, ffa_vm_id_t sender,
+	ffa_vm_id_t receiver, uint32_t tag, ffa_memory_region_flags_t flags,
+	enum ffa_data_access data_access,
+	enum ffa_instruction_access instruction_access,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability)
+{
+	struct ffa_memory_access receiver_retrieve_permissions;
+
+	ffa_memory_access_init_permissions(&receiver_retrieve_permissions,
+					   receiver, data_access,
+					   instruction_access, 0);
+
+	send_retrieve_request(send, handle, sender,
+			      &receiver_retrieve_permissions, 1, tag, flags,
+			      type, cacheability, shareability, receiver);
+}
+
+void send_retrieve_request(
+	void *send, ffa_memory_handle_t handle, ffa_vm_id_t sender,
+	struct ffa_memory_access receivers[], uint32_t receiver_count,
+	uint32_t tag, ffa_memory_region_flags_t flags,
+	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	enum ffa_memory_shareability shareability, ffa_vm_id_t recipient)
+{
+	size_t msg_size;
+	struct ffa_partition_msg *retrieve_message = send;
+
+	msg_size = ffa_memory_retrieve_request_init(
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		sender, receivers, receiver_count, tag, flags, type,
+		cacheability, shareability);
+
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+	ffa_rxtx_header_init(sender, recipient, msg_size,
+			     &retrieve_message->header);
+
+	ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+}
+
 /*
  * Use the retrieve request from the receive buffer to retrieve a memory region
  * which has been sent to us. Copies all the fragments into the provided buffer
