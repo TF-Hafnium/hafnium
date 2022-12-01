@@ -29,4 +29,6 @@
 #define assert(e) ((void)0)
 #endif /* ENABLE_ASSERTIONS */
 
+#else
+#include <assert.h>
 #endif /* !defined(__cplusplus) */

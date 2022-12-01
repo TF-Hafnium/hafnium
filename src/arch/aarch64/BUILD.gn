@@ -28,6 +28,7 @@ source_set("arch") {
     "cache_helpers.S",
     "irq.c",
     "mm.c",
+    "stacks.S",
     "sysregs.c",
     "timer.c",
   ]

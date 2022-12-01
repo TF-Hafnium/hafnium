@@ -492,7 +492,7 @@ TEST(arch_features, enable_pauth)
 	isb();
 }
 
-static void pauth_fault_helper()
+static void pauth_fault_helper(void)
 {
 	FAIL("This should not be called\n");
 }

@@ -23,13 +23,11 @@
 /**
  * The stacks to be used by the CPUs.
  *
- * Align to page boundaries to ensure that cache lines are not shared between a
- * CPU's stack and data that can be accessed from other CPUs. If this did
- * happen, there may be coherency problems when the stack is being used before
- * caching is enabled.
+ * Defined in assembly for aarch64 in "src/arch/aarch64/stacks.S."
+ * Defined for host-based unit tests in "src/cpu_test.cc".
  */
-alignas(PAGE_SIZE) static char callstacks[MAX_CPUS][STACK_SIZE] __section(
-		.stacks);
+
+extern char callstacks[MAX_CPUS][STACK_SIZE];
 
 /* NOLINTNEXTLINE(misc-redundant-expression) */
 static_assert((STACK_SIZE % PAGE_SIZE) == 0, "Keep each stack page aligned.");
