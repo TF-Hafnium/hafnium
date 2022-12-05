@@ -150,9 +150,9 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	 * the allocator will be the SPMC.
 	 * Else, it will be the hypervisor.
 	 */
-	allocator_mask = (IS_VM_ID(sender) || contains_secure_receiver)
-				 ? FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR
-				 : FFA_MEMORY_HANDLE_ALLOCATOR_SPMC;
+	allocator_mask = (!IS_VM_ID(sender) || contains_secure_receiver)
+				 ? FFA_MEMORY_HANDLE_ALLOCATOR_SPMC
+				 : FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
 
 	send_fragmented_memory_region(
 		&ret, tx_buffer, constituents, constituent_count,
