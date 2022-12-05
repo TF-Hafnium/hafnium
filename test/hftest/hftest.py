@@ -780,7 +780,7 @@ class TestRunner:
         test_xml.set("name", test["name"])
         test_xml.set("classname", suite["name"])
 
-        if self.skip_long_running_tests and test["is_long_running"]:
+        if (self.skip_long_running_tests and test["is_long_running"]) or test["skip_test"]:
             print("      SKIP", test["name"])
             test_xml.set("status", "notrun")
             skipped_xml = ET.SubElement(test_xml, "skipped")

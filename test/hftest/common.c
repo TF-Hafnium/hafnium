@@ -94,6 +94,14 @@ void hftest_json(void)
 			HFTEST_LOG("      \"teardown\": true,");
 		}
 		if (test->kind == HFTEST_KIND_TEST) {
+			/*
+			 * If test has a precondition, run respective function.
+			 * If it returns false, then the current setup is not
+			 * meant to run the test. Hence, we must skip it.
+			 */
+			bool skip_test = test->precondition != NULL &&
+					 !test->precondition();
+
 			if (!tests_in_suite) {
 				HFTEST_LOG("      \"tests\": [");
 			}
@@ -103,8 +111,10 @@ void hftest_json(void)
 			 */
 			HFTEST_LOG("       %c{", tests_in_suite ? ',' : ' ');
 			HFTEST_LOG("          \"name\": \"%s\",", test->name);
-			HFTEST_LOG("          \"is_long_running\": %s",
+			HFTEST_LOG("          \"is_long_running\": %s,",
 				   test->is_long_running ? "true" : "false");
+			HFTEST_LOG("          \"skip_test\": %s",
+				   skip_test ? "true" : "false");
 			HFTEST_LOG("       }");
 			++tests_in_suite;
 		}

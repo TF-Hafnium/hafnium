@@ -95,7 +95,7 @@
 	}                                                              \
 	static void HFTEST_TEAR_DOWN_FN(suite_name)(void)
 
-#define HFTEST_TEST(suite_name, test_name, long_running)                     \
+#define HFTEST_TEST(suite_name, test_name, long_running, precon_fn)          \
 	static void HFTEST_TEST_FN(suite_name, test_name)(void);             \
 	const struct hftest_test __attribute__((used))                       \
 	__attribute__((section(HFTEST_TEST_SECTION(suite_name, test_name)))) \
@@ -105,6 +105,7 @@
 		.name = #test_name,                                          \
 		.is_long_running = long_running,                             \
 		.fn = HFTEST_TEST_FN(suite_name, test_name),                 \
+		.precondition = precon_fn,                                   \
 	};                                                                   \
 	static void __attribute__((constructor))                             \
 	HFTEST_TEST_CONSTRUCTOR(suite_name, test_name)(void)                 \
@@ -121,6 +122,7 @@
 		.kind = HFTEST_KIND_SERVICE,                           \
 		.name = #service_name,                                 \
 		.fn = HFTEST_SERVICE_FN(service_name),                 \
+		.precondition = NULL,                                  \
 	};                                                             \
 	static void HFTEST_SERVICE_FN(service_name)(void)
 
@@ -142,6 +144,7 @@ struct hftest_context *hftest_get_context(void);
 
 /* A test case. */
 typedef void (*hftest_test_fn)(void);
+typedef bool (*hftest_test_precondition)(void);
 
 enum hftest_kind {
 	HFTEST_KIND_SET_UP = 0,
@@ -161,6 +164,7 @@ struct hftest_test {
 	const char *name;
 	bool is_long_running;
 	hftest_test_fn fn;
+	hftest_test_precondition precondition;
 };
 
 /*

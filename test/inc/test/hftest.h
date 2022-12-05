@@ -30,12 +30,18 @@
 /*
  * Define a test as part of a test suite.
  */
-#define TEST(suite, test) HFTEST_TEST(suite, test, false)
+#define TEST(suite, test) HFTEST_TEST(suite, test, false, NULL)
 
 /*
  * Define a test as part of a test suite and mark it long-running.
  */
-#define TEST_LONG_RUNNING(suite, test) HFTEST_TEST(suite, test, true)
+#define TEST_LONG_RUNNING(suite, test) HFTEST_TEST(suite, test, true, NULL)
+
+/*
+ * Define a test as part of a test suite and add a precondition function.
+ */
+#define TEST_PRECONDITION(suite, test, precon_fn) \
+	HFTEST_TEST(suite, test, false, precon_fn)
 
 /*
  * Define a test service.
