@@ -842,7 +842,7 @@ TEST(memory_sharing, lend_elsewhere_after_return)
 /**
  * After memory has been given, it is no longer accessible by the sharing VM.
  */
-TEST(memory_sharing, give_memory_and_lose_access)
+TEST_PRECONDITION(memory_sharing, give_memory_and_lose_access, service1_is_vm)
 {
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -850,16 +850,6 @@ TEST(memory_sharing, give_memory_and_lose_access)
 	struct ffa_composite_memory_region *composite;
 	uint8_t *ptr;
 	struct ffa_partition_info *service1_info = service1();
-
-	/*
-	 * Currently we don't have a viable way to check the correct NS bit
-	 * value in the SPMC. This is particularly a problem when donating
-	 * NS memory from the SP to a NWd VM.
-	 */
-	if (!IS_VM_ID(service1_info->vm_id)) {
-		HFTEST_LOG("Can't share NS memory from SP.");
-		return;
-	}
 
 	SERVICE_SELECT(service1_info->vm_id, "give_memory_and_fault", mb.send);
 
@@ -890,7 +880,7 @@ TEST(memory_sharing, give_memory_and_lose_access)
 /**
  * After memory has been lent, it is no longer accessible by the sharing VM.
  */
-TEST(memory_sharing, lend_memory_and_lose_access)
+TEST_PRECONDITION(memory_sharing, lend_memory_and_lose_access, service1_is_vm)
 {
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -898,11 +888,6 @@ TEST(memory_sharing, lend_memory_and_lose_access)
 	struct ffa_composite_memory_region *composite;
 	uint8_t *ptr;
 	struct ffa_partition_info *service1_info = service1();
-
-	if (!IS_VM_ID(service1_info->vm_id)) {
-		HFTEST_LOG("Receiver is an SP, shouldn't do this test.\n");
-		return;
-	}
 
 	SERVICE_SELECT(service1_info->vm_id, "lend_memory_and_fault", mb.send);
 
@@ -1709,18 +1694,13 @@ TEST(memory_sharing, share_relinquish_clear)
 /**
  * Exercise execution permissions for lending memory.
  */
-TEST(memory_sharing, lend_relinquish_RW_X)
+TEST_PRECONDITION(memory_sharing, lend_relinquish_RW_X, service1_is_vm)
 {
 	ffa_memory_handle_t handle;
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	struct ffa_partition_info *service1_info = service1();
-
-	if (!IS_VM_ID(service1_info->vm_id)) {
-		HFTEST_LOG("Receiver is an SP, shouldn't do this test.\n");
-		return;
-	}
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish_X",
 		       mb.send);
@@ -1766,18 +1746,13 @@ TEST(memory_sharing, lend_relinquish_RW_X)
 /**
  * Exercise execution permissions for lending memory without write access.
  */
-TEST(memory_sharing, lend_relinquish_RO_X)
+TEST_PRECONDITION(memory_sharing, lend_relinquish_RO_X, service1_is_vm)
 {
 	ffa_memory_handle_t handle;
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	struct ffa_partition_info *service1_info = service1();
-
-	if (!IS_VM_ID(service1_info->vm_id)) {
-		HFTEST_LOG("Receiver is an SP, shouldn't do this test.\n");
-		return;
-	}
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish_X",
 		       mb.send);
