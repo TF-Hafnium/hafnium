@@ -254,6 +254,11 @@ TEAR_DOWN(memory_sharing)
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
+SET_UP(memory_sharing)
+{
+	ffa_version(MAKE_FFA_VERSION(1, 1));
+}
+
 /**
  * Test memory reclaim after a donate.
  */

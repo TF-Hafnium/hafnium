@@ -257,6 +257,11 @@ static void memory_send_reclaim(uint32_t msg_size,
 	}
 }
 
+SET_UP(memory_sharing)
+{
+	ffa_version(MAKE_FFA_VERSION(1, 1));
+}
+
 /**
  * Test memory reclaim after a donate.
  */
