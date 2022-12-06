@@ -236,7 +236,7 @@ static bool smmuv3_queue_sizes(struct smmuv3_driver *smmuv3)
 	 * SubStreamID Size for both Secure and Non-secure states is determined
 	 * by SMMU_IDR1 register.
 	 */
-	size = EXTRACT(idr1, SUB_SID_SHIFT, SUB_SID_MASK);
+	size = EXTRACT(idr1, SUB_SID_SHIFT, SUB_SID_SIZE_MASK);
 
 	if (size > SUB_SID_SIZE_MAX) {
 		dlog_error("SMMuv3: Max bits of SubStreamID cannot exceed %d\n",
@@ -250,9 +250,9 @@ static bool smmuv3_queue_sizes(struct smmuv3_driver *smmuv3)
 	uint32_t s_idr1;
 
 	s_idr1 = mmio_read32_offset(smmuv3->base_addr, S_IDR1);
-	size = EXTRACT(s_idr1, SID_SHIFT, SID_MASK);
+	size = EXTRACT(s_idr1, SID_SHIFT, SID_SIZE_MASK);
 #else
-	size = EXTRACT(idr1, SID_SHIFT, SID_MASK);
+	size = EXTRACT(idr1, SID_SHIFT, SID_SIZE_MASK);
 #endif
 
 	if (size > SID_SIZE_MAX) {
