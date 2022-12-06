@@ -1204,7 +1204,7 @@ TEST(memory_sharing, donate_twice)
 /**
  * Check cannot donate to self.
  */
-TEST(memory_sharing, donate_to_self)
+TEST_PRECONDITION(memory_sharing, donate_to_self, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
@@ -1233,7 +1233,7 @@ TEST(memory_sharing, donate_to_self)
 /**
  * Check cannot lend to self.
  */
-TEST(memory_sharing, lend_to_self)
+TEST_PRECONDITION(memory_sharing, lend_to_self, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
@@ -1260,7 +1260,7 @@ TEST(memory_sharing, lend_to_self)
 /**
  * Check cannot share to self.
  */
-TEST(memory_sharing, share_to_self)
+TEST_PRECONDITION(memory_sharing, share_to_self, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
@@ -1287,7 +1287,7 @@ TEST(memory_sharing, share_to_self)
 /**
  * Check cannot donate from alternative VM.
  */
-TEST(memory_sharing, donate_invalid_source)
+TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 {
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -1362,7 +1362,7 @@ TEST(memory_sharing, donate_invalid_source)
 /**
  * Check that unaligned addresses can not be shared.
  */
-TEST(memory_sharing, give_and_get_back_unaligned)
+TEST_PRECONDITION(memory_sharing, give_and_get_back_unaligned, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1();
@@ -2113,7 +2113,7 @@ TEST(memory_sharing, lend_clear)
 /**
  * Memory cannot be cleared while being shared.
  */
-TEST(memory_sharing, share_clear)
+TEST_PRECONDITION(memory_sharing, share_clear, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
@@ -2280,7 +2280,7 @@ TEST(memory_sharing, ffa_lend_check_lower_bounds)
  * Memory can't be shared if flags in the memory transaction description that
  * Must Be Zero, are not.
  */
-TEST(memory_sharing, ffa_validate_mbz)
+TEST_PRECONDITION(memory_sharing, ffa_validate_mbz, hypervisor_only)
 {
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -2320,7 +2320,7 @@ TEST(memory_sharing, ffa_validate_mbz)
  * Memory can't be shared with arbitrary attributes because Hafnium maps pages
  * with hardcoded values and doesn't support custom mappings.
  */
-TEST(memory_sharing, ffa_validate_attributes)
+TEST_PRECONDITION(memory_sharing, ffa_validate_attributes, hypervisor_only)
 {
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -2945,7 +2945,8 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
  * Validate that sender can't specify multiple borrowers to memory donate
  * operation.
  */
-TEST(memory_sharing, fail_if_multi_receiver_donate)
+TEST_PRECONDITION(memory_sharing, fail_if_multi_receiver_donate,
+		  hypervisor_only)
 {
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -3021,7 +3022,8 @@ static void fail_multiple_receiver_mem_share_lend(
  * Validate that operation fails if at least one of the borroweres is given
  * invalid permissions.
  */
-TEST(memory_sharing, fail_if_one_receiver_wrong_permissions)
+TEST_PRECONDITION(memory_sharing, fail_if_one_receiver_wrong_permissions,
+		  hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1();
@@ -3038,7 +3040,7 @@ TEST(memory_sharing, fail_if_one_receiver_wrong_permissions)
  * Validate that sender can't repeat a borrower in the memory transaction
  * descriptor.
  */
-TEST(memory_sharing, fail_if_repeated_borrower)
+TEST_PRECONDITION(memory_sharing, fail_if_repeated_borrower, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1();
@@ -3054,7 +3056,7 @@ TEST(memory_sharing, fail_if_repeated_borrower)
 /**
  * Validate that sender can't specify its own id as a receiver.
  */
-TEST(memory_sharing, fail_if_one_receiver_is_self)
+TEST_PRECONDITION(memory_sharing, fail_if_one_receiver_is_self, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1();

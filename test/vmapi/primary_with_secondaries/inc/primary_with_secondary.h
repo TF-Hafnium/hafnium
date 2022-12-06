@@ -69,6 +69,7 @@ struct ffa_partition_info* service3(void);
 
 /* Precondition functions for this test setup. */
 bool service1_is_vm(void);
+bool hypervisor_only(void);
 
 #define SERVICE_VM1 (HF_VM_ID_OFFSET + 1)
 #define SERVICE_VM2 (HF_VM_ID_OFFSET + 2)
