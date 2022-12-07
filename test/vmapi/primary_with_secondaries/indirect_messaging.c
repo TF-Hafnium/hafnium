@@ -69,7 +69,7 @@ TEST(indirect_messaging, echo)
 }
 
 /** Sender haven't mapped TX buffer. */
-TEST(indirect_messaging, unmapped_tx)
+TEST_PRECONDITION(indirect_messaging, unmapped_tx, hypervisor_only)
 {
 	struct ffa_value ret;
 	struct mailbox_buffers mb;
