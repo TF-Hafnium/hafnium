@@ -190,20 +190,13 @@ TEST(ffa, ffa_partition_info_get_uuid_unknown)
 	EXPECT_EQ(ret.func, FFA_ERROR_32);
 }
 
-TEST(ffa, ffa_partition_info_get_versioned_descriptors)
+TEST(ffa, ffa_partition_info_get_v1_0_descriptors)
 {
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
 	const struct ffa_partition_info_v1_0 *partitions_v1_0;
-	const struct ffa_partition_info *partitions_v1_1;
 	struct ffa_uuid uuid;
 	uint32_t version;
-
-	/* Set version 1.1 to forward RX/TX buffers to SPMC. */
-	ffa_version(MAKE_FFA_VERSION(1, 1));
-
-	/* Setup the mailbox (which holds the RX buffer). */
-	mb = set_up_mailbox();
 
 	/*
 	 * First call FF-A version to tell the SPMC our version
@@ -211,6 +204,9 @@ TEST(ffa, ffa_partition_info_get_versioned_descriptors)
 	 */
 	version = ffa_version(MAKE_FFA_VERSION(1, 0));
 	EXPECT_EQ(version, FFA_VERSION_COMPILED);
+
+	/* Setup the mailbox (which holds the RX buffer). */
+	mb = set_up_mailbox();
 
 	partitions_v1_0 = mb.recv;
 
@@ -256,29 +252,6 @@ TEST(ffa, ffa_partition_info_get_versioned_descriptors)
 	EXPECT_EQ(partitions_v1_0[2].properties, FFA_PARTITION_DIRECT_REQ_RECV);
 	EXPECT_EQ(partitions_v1_0[2].properties & FFA_PARTITION_v1_0_RES_MASK,
 		  0);
-
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
-
-	/* Set version to v1.1 to see if uuid is now returned. */
-	version = ffa_version(MAKE_FFA_VERSION(1, 1));
-	EXPECT_EQ(version, FFA_VERSION_COMPILED);
-
-	partitions_v1_1 = mb.recv;
-
-	/* Check that expected partition information is returned. */
-	ret = ffa_partition_info_get(&uuid, 0);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-
-	/* Expect three partitions. */
-	EXPECT_EQ(ret.arg2, 3);
-
-	/*
-	 * Check the partition info descriptor size returned in w3 is
-	 * correct.
-	 */
-	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
-
-	check_v1_1_partition_info_descriptors(partitions_v1_1);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
