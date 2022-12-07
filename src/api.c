@@ -2851,13 +2851,6 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	}
 	memcpy_s(memory_region, MM_PPOOL_ENTRY_SIZE, from_msg, fragment_length);
 
-	/* The sender must match the caller. */
-	if (memory_region->sender != from->id) {
-		dlog_verbose("Memory region sender doesn't match caller.\n");
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
 	if (!api_memory_region_check_flags(memory_region, share_func)) {
 		dlog_verbose(
 			"Memory region reserved arguments must be zero.\n");
@@ -2923,8 +2916,9 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 
 	/* Allow for one memory region to be shared to the TEE. */
 	if (targets_other_world) {
-		assert(memory_region->receiver_count == 1 &&
-		       to->id == HF_TEE_VM_ID);
+		assert(memory_region->receiver_count == 1);
+		to = vm_find(HF_OTHER_WORLD_ID);
+
 		/*
 		 * The 'to' VM lock is only needed in the case that it is the
 		 * TEE VM.

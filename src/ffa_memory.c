@@ -1393,10 +1393,13 @@ static struct ffa_value ffa_memory_send_validate(
 	enum ffa_instruction_access instruction_access;
 	struct ffa_value ret;
 
-	/* The sender must match the message sender. */
-	if (memory_region->sender != from_locked.vm->id) {
-		dlog_verbose("Invalid sender %d.\n", memory_region->sender);
-		return ffa_error(FFA_INVALID_PARAMETERS);
+	/* The sender must match the caller. */
+	if ((!vm_id_is_current_world(from_locked.vm->id) &&
+	     vm_id_is_current_world(memory_region->sender)) ||
+	    (vm_id_is_current_world(from_locked.vm->id) &&
+	     memory_region->sender != from_locked.vm->id)) {
+		dlog_verbose("Invalid memory sender ID.\n");
+		return ffa_error(FFA_DENIED);
 	}
 
 	/*
@@ -1701,6 +1704,22 @@ static struct ffa_value memory_send_continue_tee_forward(
 }
 
 /**
+ * Checks if there is at least one receiver from the other world.
+ */
+static bool memory_region_receivers_from_other_world(
+	struct ffa_memory_region *memory_region)
+{
+	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
+		ffa_vm_id_t receiver = memory_region->receivers[i]
+					       .receiver_permissions.receiver;
+		if (!vm_id_is_current_world(receiver)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
  * Validates a call to donate, lend or share memory to a non-TEE VM and then
  * updates the stage-2 page tables. Specifically, check if the message length
  * and number of memory region constituents match, and if the transition is
@@ -1971,8 +1990,7 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 	}
 	memory_region = share_state->memory_region;
 
-	if (memory_region->receivers[0].receiver_permissions.receiver ==
-	    HF_TEE_VM_ID) {
+	if (memory_region_receivers_from_other_world(memory_region)) {
 		dlog_error(
 			"Got hypervisor-allocated handle for memory send to "
 			"TEE. This should never happen, and indicates a bug in "
@@ -2042,8 +2060,7 @@ struct ffa_value ffa_memory_tee_send_continue(struct vm_locked from_locked,
 	}
 	memory_region = share_state->memory_region;
 
-	if (memory_region->receivers[0].receiver_permissions.receiver !=
-	    HF_TEE_VM_ID) {
+	if (!memory_region_receivers_from_other_world(memory_region)) {
 		dlog_error(
 			"Got SPM-allocated handle for memory send to non-TEE "
 			"VM. This should never happen, and indicates a bug.\n");

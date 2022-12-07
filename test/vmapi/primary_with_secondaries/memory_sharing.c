@@ -1309,7 +1309,7 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 	/* Try invalid configurations. */
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  mb.send, HF_MAILBOX_SIZE, service1_info->vm_id,
-			  HF_PRIMARY_VM_ID, constituents,
+			  service2_info->vm_id, constituents,
 			  ARRAY_SIZE(constituents), 0, 0,
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
@@ -1426,6 +1426,7 @@ TEST(memory_sharing, lend_invalid_source)
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service2_info = service2();
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_lend_invalid_source",
 		       mb.send);
@@ -1436,10 +1437,10 @@ TEST(memory_sharing, lend_invalid_source)
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
-	/* Check cannot swap VM IDs. */
+	/* Check use of invalid partition IDs. */
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  mb.send, HF_MAILBOX_SIZE, service1_info->vm_id,
-			  HF_PRIMARY_VM_ID, constituents,
+			  service2_info->vm_id, constituents,
 			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,

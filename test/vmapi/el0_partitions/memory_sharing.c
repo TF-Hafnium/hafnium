@@ -1192,7 +1192,7 @@ TEST(memory_sharing, donate_invalid_source)
 
 	/* Try invalid configurations. */
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
-			  mb.send, HF_MAILBOX_SIZE, SERVICE_VM1, hf_vm_get_id(),
+			  mb.send, HF_MAILBOX_SIZE, SERVICE_VM1, SERVICE_VM2,
 			  constituents, ARRAY_SIZE(constituents), 0, 0,
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
@@ -1316,9 +1316,9 @@ TEST(memory_sharing, lend_invalid_source)
 
 	/* Check cannot swap VM IDs. */
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
-			  mb.send, HF_MAILBOX_SIZE, SERVICE_VM1,
-			  HF_PRIMARY_VM_ID, constituents,
-			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
+			  mb.send, HF_MAILBOX_SIZE, SERVICE_VM1, SERVICE_VM2,
+			  constituents, ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
