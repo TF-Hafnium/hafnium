@@ -165,6 +165,7 @@ struct ffa_partition_rxtx_header {
 
 #define FFA_RXTX_HEADER_SIZE sizeof(struct ffa_partition_rxtx_header)
 #define FFA_RXTX_SENDER_SHIFT (0x10U)
+#define FFA_RXTX_ALLOCATOR_SHIFT 16
 
 static inline void ffa_rxtx_header_init(
 	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t size,

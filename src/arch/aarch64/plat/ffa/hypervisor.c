@@ -727,18 +727,28 @@ void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
 	(void)to_destroy_locked;
 }
 
-void plat_ffa_rxtx_unmap_forward(ffa_vm_id_t id)
+void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 {
 	struct ffa_value ret;
 	uint64_t func;
+	ffa_vm_id_t id;
+
+	assert(vm_locked.vm != NULL);
+
+	id = vm_locked.vm->id;
 
 	if (!ffa_tee_enabled) {
 		return;
 	}
 
+	if (vm_locked.vm->ffa_version < MAKE_FFA_VERSION(1, 1)) {
+		return;
+	}
+
 	/* Hypervisor always forwards forward RXTX_UNMAP to SPMC. */
-	ret = arch_other_world_call((struct ffa_value){
-		.func = FFA_RXTX_UNMAP_32, .arg1 = id << 16});
+	ret = arch_other_world_call(
+		(struct ffa_value){.func = FFA_RXTX_UNMAP_32,
+				   .arg1 = id << FFA_RXTX_ALLOCATOR_SHIFT});
 	func = ret.func & ~SMCCC_CONVENTION_MASK;
 	if (ret.func == SMCCC_ERROR_UNKNOWN) {
 		panic("Unknown error forwarding RXTX_UNMAP.\n");

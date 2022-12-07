@@ -507,7 +507,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 					 current);
 		return true;
 	case FFA_RXTX_UNMAP_32:
-		*args = api_ffa_rxtx_unmap(args->arg1, current);
+		*args = api_ffa_rxtx_unmap(ffa_vm_id(*args), current);
 		return true;
 	case FFA_RX_ACQUIRE_32:
 		*args = api_ffa_rx_acquire(ffa_receiver(*args), current);

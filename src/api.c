@@ -1467,7 +1467,7 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 	plat_ffa_vm_destroy(vm_locked);
 
 	/* Forward buffer unmapping to SPMC if coming from a VM. */
-	plat_ffa_rxtx_unmap_forward(owner_vm_id);
+	plat_ffa_rxtx_unmap_forward(vm_locked);
 
 	mm_unlock_stage1(&mm_stage1_locked);
 

@@ -302,7 +302,8 @@ TEST(ffa_rxtx_unmap, validate_allocator_id)
 
 	/* Set the `allocator_id`, which MBZ at virtual instances. */
 	ret = ffa_call(
-		(struct ffa_value){.func = FFA_RXTX_UNMAP_32, .arg1 = 1});
+		(struct ffa_value){.func = FFA_RXTX_UNMAP_32,
+				   .arg1 = 1ULL << FFA_RXTX_ALLOCATOR_SHIFT});
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
