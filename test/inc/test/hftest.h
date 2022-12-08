@@ -155,3 +155,5 @@ uintptr_t hftest_get_cpu_id(size_t index);
 noreturn void hftest_service_main(const void *fdt_ptr);
 /* Above this point is the public API. Now include the implementation. */
 #include "hftest_impl.h"
+
+void hftest_context_init(struct hftest_context *ctx, void *send, void *recv);

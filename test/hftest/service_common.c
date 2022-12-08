@@ -64,6 +64,14 @@ static hftest_test_fn find_service(struct memiter *args)
 	return NULL;
 }
 
+void hftest_context_init(struct hftest_context *ctx, void *send, void *recv)
+{
+	memset_s(ctx, sizeof(*ctx), 0, sizeof(*ctx));
+	ctx->abort = abort;
+	ctx->send = send;
+	ctx->recv = recv;
+}
+
 noreturn void hftest_service_main(const void *fdt_ptr)
 {
 	struct memiter args;
@@ -112,10 +120,7 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 
 	/* Clean the context. */
 	ctx = hftest_get_context();
-	memset_s(ctx, sizeof(*ctx), 0, sizeof(*ctx));
-	ctx->abort = abort;
-	ctx->send = mb.send;
-	ctx->recv = mb.recv;
+	hftest_context_init(ctx, mb.send, mb.recv);
 
 	/*
 	 * The memory size argument is to be used only by VMs. It is part of

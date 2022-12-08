@@ -36,9 +36,6 @@ noreturn void kmain(struct ffa_boot_info_header* boot_info_blob)
 {
 	boot_info_header = boot_info_blob;
 
-	/* Register RX/TX buffers via FFA_RXTX_MAP */
-	set_up_mailbox();
-
 	test_main_sp(true);
 
 	/* Do not expect to get to this point, so abort. */

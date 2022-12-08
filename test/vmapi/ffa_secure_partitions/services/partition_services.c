@@ -75,12 +75,13 @@ struct ffa_value sp_indirect_msg_cmd(ffa_vm_id_t test_source,
 				     ffa_vm_id_t receiver_id, uint32_t payload)
 {
 	ffa_vm_id_t own_id = hf_vm_get_id();
-	struct mailbox_buffers mb = set_up_mailbox();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	void *send_buf = SERVICE_SEND_BUFFER();
 	struct ffa_partition_msg *message;
 	const uint32_t *echo_payload;
 	struct ffa_value ret;
 
-	ret = send_indirect_message(own_id, receiver_id, mb.send, &payload,
+	ret = send_indirect_message(own_id, receiver_id, send_buf, &payload,
 				    sizeof(payload),
 				    FFA_NOTIFICATIONS_FLAG_DELAY_SRI);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -100,7 +101,7 @@ struct ffa_value sp_indirect_msg_cmd(ffa_vm_id_t test_source,
 		ffa_notification_get_from_framework(ret)));
 
 	/* Ensure echoed message is the same as sent. */
-	message = (struct ffa_partition_msg *)mb.recv;
+	message = (struct ffa_partition_msg *)recv_buf;
 	echo_payload = (const uint32_t *)message->payload;
 	ASSERT_EQ(payload, *echo_payload);
 
@@ -139,7 +140,8 @@ struct ffa_value sp_echo_indirect_msg_cmd(ffa_vm_id_t test_source)
 	ffa_vm_id_t own_id = hf_vm_get_id();
 	ffa_vm_id_t target_vm_id;
 	ffa_vm_id_t source_vm_id;
-	struct mailbox_buffers mb = set_up_mailbox();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	void *send_buf = SERVICE_SEND_BUFFER();
 	struct ffa_partition_msg *message;
 	const uint32_t *payload;
 
@@ -156,7 +158,7 @@ struct ffa_value sp_echo_indirect_msg_cmd(ffa_vm_id_t test_source)
 		(void)irq;
 	}
 
-	message = (struct ffa_partition_msg *)mb.recv;
+	message = (struct ffa_partition_msg *)recv_buf;
 	source_vm_id = ffa_rxtx_header_sender(&message->header);
 	target_vm_id = ffa_rxtx_header_receiver(&message->header);
 	EXPECT_EQ(own_id, target_vm_id);
@@ -166,7 +168,7 @@ struct ffa_value sp_echo_indirect_msg_cmd(ffa_vm_id_t test_source)
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/* Echo message back. */
-	send_indirect_message(target_vm_id, source_vm_id, mb.send, payload,
+	send_indirect_message(target_vm_id, source_vm_id, send_buf, payload,
 			      sizeof(*payload),
 			      FFA_NOTIFICATIONS_FLAG_DELAY_SRI);
 

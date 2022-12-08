@@ -11,6 +11,7 @@
 #include "partition_services.h"
 #include "test/abort.h"
 #include "test/hftest.h"
+#include "test/vmapi/ffa.h"
 
 /**
  * Message loop to add tests to be controlled by the control partition(depends
@@ -18,7 +19,16 @@
  */
 noreturn void test_main_sp(bool is_boot_vcpu)
 {
-	struct ffa_value res = ffa_msg_wait();
+	struct mailbox_buffers mb;
+	struct hftest_context* ctx = hftest_get_context();
+	struct ffa_value res;
+
+	if (is_boot_vcpu) {
+		mb = set_up_mailbox();
+		hftest_context_init(ctx, mb.send, mb.recv);
+	}
+
+	res = ffa_msg_wait();
 
 	while (1) {
 		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
