@@ -1282,7 +1282,7 @@ out:
 	return ret;
 }
 
-static void api_get_rxtx_description(struct vm_locked vm_locked, ipaddr_t *send,
+static void api_get_rxtx_description(struct vm *current_vm, ipaddr_t *send,
 				     ipaddr_t *recv, uint32_t *page_count,
 				     ffa_vm_id_t *owner_vm_id)
 {
@@ -1290,11 +1290,12 @@ static void api_get_rxtx_description(struct vm_locked vm_locked, ipaddr_t *send,
 	 * If the message has been forwarded the effective addresses are in
 	 * hypervisor's TX buffer.
 	 */
-	bool forwarded = (vm_locked.vm->id == HF_OTHER_WORLD_ID) &&
+	bool forwarded = (current_vm->id == HF_OTHER_WORLD_ID) &&
 			 (ipa_addr(*send) == 0) && (ipa_addr(*recv) == 0) &&
 			 (*page_count == 0);
 
 	if (forwarded) {
+		struct vm_locked vm_locked = vm_lock(current_vm);
 		struct ffa_endpoint_rx_tx_descriptor *endpoint_desc =
 			(struct ffa_endpoint_rx_tx_descriptor *)
 				vm_locked.vm->mailbox.send;
@@ -1307,8 +1308,10 @@ static void api_get_rxtx_description(struct vm_locked vm_locked, ipaddr_t *send,
 		*recv = ipa_init(rx_region->constituents[0].address);
 		*send = ipa_init(tx_region->constituents[0].address);
 		*page_count = rx_region->constituents[0].page_count;
+
+		vm_unlock(&vm_locked);
 	} else {
-		*owner_vm_id = vm_locked.vm->id;
+		*owner_vm_id = current_vm->id;
 	}
 }
 /**
@@ -1330,22 +1333,18 @@ static void api_get_rxtx_description(struct vm_locked vm_locked, ipaddr_t *send,
 struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 				  uint32_t page_count, struct vcpu *current)
 {
-	struct vm *vm = current->vm;
 	struct ffa_value ret;
-	struct vm_locked vm_locked;
 	struct vm_locked owner_vm_locked;
 	struct mm_stage1_locked mm_stage1_locked;
 	struct mpool local_page_pool;
 	ffa_vm_id_t owner_vm_id;
 
-	vm_locked = vm_lock(vm);
 	/*
 	 * Get the original buffer addresses and VM ID in case of forwarded
 	 * message.
 	 */
-	api_get_rxtx_description(vm_locked, &send, &recv, &page_count,
+	api_get_rxtx_description(current->vm, &send, &recv, &page_count,
 				 &owner_vm_id);
-	vm_unlock(&vm_locked);
 
 	owner_vm_locked = plat_ffa_vm_find_locked_create(owner_vm_id);
 	if (owner_vm_locked.vm == NULL) {
