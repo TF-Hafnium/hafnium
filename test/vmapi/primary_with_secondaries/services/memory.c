@@ -346,7 +346,8 @@ TEST_SERVICE(ffa_donate_secondary_and_fault)
 {
 	uint8_t *ptr;
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct ffa_partition_info *service2_info = service2();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_partition_info *service2_info = service2(recv_buf);
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)&page, .page_count = 1},
 	};
@@ -406,7 +407,7 @@ TEST_SERVICE(ffa_donate_twice)
 	/* Attempt to donate the memory to another VM. */
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service2()->vm_id, &constituent, 1, 0, 0,
+			  service2(recv_buf)->vm_id, &constituent, 1, 0, 0,
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
@@ -478,7 +479,7 @@ TEST_SERVICE(ffa_donate_invalid_source)
 	/* Fail to donate the memory from the primary to VM2. */
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
-			  service2()->vm_id, composite->constituents,
+			  service2(recv_buf)->vm_id, composite->constituents,
 			  composite->constituent_count, 0, 0,
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
@@ -696,7 +697,7 @@ TEST_SERVICE(ffa_lend_invalid_source)
 	/* Ensure we cannot lend from the primary to another secondary. */
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
-			  service2()->vm_id, composite->constituents,
+			  service2(recv_buf)->vm_id, composite->constituents,
 			  composite->constituent_count, 0, 0,
 			  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
@@ -707,7 +708,7 @@ TEST_SERVICE(ffa_lend_invalid_source)
 	/* Ensure we cannot share from the primary to another secondary. */
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
-			  service2()->vm_id, composite->constituents,
+			  service2(recv_buf)->vm_id, composite->constituents,
 			  composite->constituent_count, 0, 0,
 			  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
@@ -888,21 +889,23 @@ TEST_SERVICE(ffa_memory_lend_twice)
 		/* Fail to lend or share the memory from the primary. */
 		EXPECT_EQ(ffa_memory_region_init_single_receiver(
 				  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
-				  service2()->vm_id, &constituent_copy, 1, 0, 0,
-				  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
+				  service2(recv_buf)->vm_id, &constituent_copy,
+				  1, 0, 0, FFA_DATA_ACCESS_RW,
+				  FFA_INSTRUCTION_ACCESS_X,
 				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
-		EXPECT_EQ(ffa_memory_region_init_single_receiver(
-				  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
-				  service2()->vm_id, &constituent_copy, 1, 0, 0,
-				  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
-				  FFA_MEMORY_NORMAL_MEM,
-				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
-			  0);
+		EXPECT_EQ(
+			ffa_memory_region_init_single_receiver(
+				send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				service2(recv_buf)->vm_id, &constituent_copy, 1,
+				0, 0, FFA_DATA_ACCESS_RW,
+				FFA_INSTRUCTION_ACCESS_X, FFA_MEMORY_NORMAL_MEM,
+				FFA_MEMORY_CACHE_WRITE_BACK,
+				FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			0);
 		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size), FFA_DENIED);
 	}
 

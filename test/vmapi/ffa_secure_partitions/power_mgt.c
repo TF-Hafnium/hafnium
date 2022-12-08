@@ -125,8 +125,9 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 {
 	struct pwr_mgt_cpu_entry_args args = {.lock = SPINLOCK_INIT};
 	struct ffa_partition_info receiver;
+	struct mailbox_buffers mb = set_up_mailbox();
 
-	EXPECT_EQ(get_ffa_partition_info(recv_uuid, &receiver, 1), 1);
+	EXPECT_EQ(get_ffa_partition_info(recv_uuid, &receiver, 1, mb.recv), 1);
 
 	args.receiver_id = receiver.vm_id;
 	args.vcpu_count = receiver.vcpu_count;

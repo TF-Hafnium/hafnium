@@ -17,6 +17,20 @@ SERVICE_PARTITION_INFO_GET(service1, SERVICE1)
 SERVICE_PARTITION_INFO_GET(service2, SERVICE2)
 SERVICE_PARTITION_INFO_GET(service3, SERVICE3)
 
+/**
+ * Helper to setup mailbox for precondition functions.
+ */
+static struct mailbox_buffers get_precondition_mailbox(void)
+{
+	static struct mailbox_buffers mb = {.recv = NULL, .send = NULL};
+
+	if (mb.send == NULL && mb.recv == NULL) {
+		mb = set_up_mailbox();
+	}
+
+	return mb;
+}
+
 /*
  * The following is a precondition function, for the current system set-up.
  * This is currently being used to skip memory sharing tests, when
@@ -24,7 +38,8 @@ SERVICE_PARTITION_INFO_GET(service3, SERVICE3)
  */
 bool service1_is_vm(void)
 {
-	struct ffa_partition_info *service1_info = service1();
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 	return IS_VM_ID(service1_info->vm_id);
 }
 
@@ -41,7 +56,7 @@ bool hypervisor_only(void)
 	 * Determine only PVM and VMS are deployed by checking we don't retrieve
 	 * IDs of endpoints that are not VMs.
 	 */
-	struct mailbox_buffers mb = set_up_mailbox();
+	struct mailbox_buffers mb = get_precondition_mailbox();
 	struct ffa_partition_info *endpoint_info = mb.recv;
 	struct ffa_uuid uuid;
 	struct ffa_value ret;

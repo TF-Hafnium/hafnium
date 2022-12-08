@@ -116,7 +116,8 @@ TEST(secure_interrupts, sp_running)
 {
 	struct ffa_value res;
 	ffa_vm_id_t own_id = hf_vm_get_id();
-	struct ffa_partition_info *service2_info = service2();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 	const ffa_vm_id_t receiver_id = service2_info->vm_id;
 
 	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 400);
@@ -144,7 +145,8 @@ TEST(secure_interrupts, sp_running)
 TEST(secure_interrupts, sp_waiting)
 {
 	ffa_vm_id_t own_id = hf_vm_get_id();
-	struct ffa_partition_info *service2_info = service2();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 	const ffa_vm_id_t receiver_id = service2_info->vm_id;
 	uint64_t time1;
 	volatile uint64_t time_lapsed;
@@ -175,8 +177,9 @@ TEST(secure_interrupts, sp_blocked)
 {
 	struct ffa_value res;
 	ffa_vm_id_t own_id = hf_vm_get_id();
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 	const ffa_vm_id_t receiver_id = service2_info->vm_id;
 	const ffa_vm_id_t companion_id = service1_info->vm_id;
 
@@ -203,7 +206,8 @@ TEST(secure_interrupts, sp_preempted)
 {
 	struct ffa_value res;
 	ffa_vm_id_t own_id = hf_vm_get_id();
-	struct ffa_partition_info *service2_info = service2();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 	const ffa_vm_id_t receiver_id = service2_info->vm_id;
 
 	gicv3_system_setup();

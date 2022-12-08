@@ -48,8 +48,8 @@ static void check_cannot_send_memory(
 	enum ffa_memory_shareability shareability[] = {
 		FFA_MEMORY_SHARE_NON_SHAREABLE, FFA_MEMORY_SHARE_RESERVED,
 		FFA_MEMORY_OUTER_SHAREABLE, FFA_MEMORY_INNER_SHAREABLE};
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 	uint32_t vms[] = {HF_PRIMARY_VM_ID, service1_info->vm_id,
 			  service2_info->vm_id};
 
@@ -176,8 +176,8 @@ static void check_cannot_donate_memory(
 	struct ffa_memory_region_constituent constituents[],
 	int constituent_count, int32_t avoid_vm)
 {
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 	uint32_t vms[] = {HF_PRIMARY_VM_ID, service1_info->vm_id,
 			  service2_info->vm_id};
 
@@ -212,8 +212,8 @@ static void check_cannot_donate_memory(
 static void check_cannot_relinquish_memory(struct mailbox_buffers mb,
 					   ffa_memory_handle_t handle)
 {
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 	uint32_t vms[] = {HF_PRIMARY_VM_ID, service1_info->vm_id,
 			  service2_info->vm_id};
 
@@ -268,7 +268,7 @@ TEST(memory_sharing, donate_reclaim)
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
@@ -296,7 +296,7 @@ TEST(memory_sharing, lend_reclaim)
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
@@ -323,7 +323,7 @@ TEST(memory_sharing, share_reclaim)
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
 			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
@@ -355,7 +355,7 @@ TEST(memory_sharing, share_retrieve_memory_type_not_specified)
 	uint32_t msg_size;
 	struct ffa_value ret;
 	ffa_memory_handle_t handle;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "memory_increment_check_mem_attr",
 		       mb.send);
@@ -405,7 +405,7 @@ TEST(memory_sharing, concurrent)
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "memory_increment", mb.send);
 
@@ -447,7 +447,7 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish",
 		       mb.send);
@@ -484,8 +484,8 @@ TEST(memory_sharing, cannot_share_device_memory)
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)PAGE_SIZE, .page_count = 1},
 	};
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_return", mb.send);
@@ -507,7 +507,7 @@ TEST(memory_sharing, lend_relinquish)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	ffa_memory_handle_t handle;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish",
 		       mb.send);
@@ -550,7 +550,7 @@ TEST(memory_sharing, lend_fragmented_relinquish)
 	uint8_t *ptr = pages;
 	uint32_t i;
 	ffa_memory_handle_t handle;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish",
 		       mb.send);
@@ -599,7 +599,7 @@ TEST(memory_sharing, lend_force_fragmented_relinquish)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	ffa_memory_handle_t handle;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish",
 		       mb.send);
@@ -639,7 +639,7 @@ TEST(memory_sharing, donate_relinquish)
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_donate_relinquish",
 		       mb.send);
@@ -676,7 +676,7 @@ TEST(memory_sharing, give_and_get_back)
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
 
@@ -718,7 +718,7 @@ TEST(memory_sharing, lend_and_get_back)
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish",
 		       mb.send);
@@ -759,7 +759,7 @@ TEST(memory_sharing, relend_after_return)
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id,
 		       "ffa_memory_lend_relinquish_relend", mb.send);
@@ -800,8 +800,8 @@ TEST(memory_sharing, lend_elsewhere_after_return)
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish",
 		       mb.send);
@@ -842,7 +842,7 @@ TEST_PRECONDITION(memory_sharing, give_memory_and_lose_access, service1_is_vm)
 	struct ffa_memory_region *memory_region;
 	struct ffa_composite_memory_region *composite;
 	uint8_t *ptr;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "give_memory_and_fault", mb.send);
 
@@ -879,7 +879,7 @@ TEST_PRECONDITION(memory_sharing, lend_memory_and_lose_access, service1_is_vm)
 	struct ffa_memory_region *memory_region;
 	struct ffa_composite_memory_region *composite;
 	uint8_t *ptr;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "lend_memory_and_fault", mb.send);
 
@@ -914,8 +914,8 @@ TEST(memory_sharing, donate_check_upper_bounds)
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_check_upper_bound", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_check_upper_bound", mb.send);
@@ -976,8 +976,8 @@ TEST(memory_sharing, donate_check_lower_bounds)
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_check_lower_bound", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_check_lower_bound", mb.send);
@@ -1039,8 +1039,8 @@ TEST(memory_sharing, donate_elsewhere_after_return)
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_return", mb.send);
@@ -1085,8 +1085,8 @@ TEST(memory_sharing, donate_vms)
 {
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_donate_secondary_and_fault",
 		       mb.send);
@@ -1118,8 +1118,8 @@ TEST(memory_sharing, donate_twice)
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_donate_twice", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_receive", mb.send);
@@ -1259,8 +1259,8 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_donate_invalid_source",
 		       mb.send);
@@ -1331,7 +1331,7 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 TEST_PRECONDITION(memory_sharing, give_and_get_back_unaligned, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
 
@@ -1391,8 +1391,8 @@ TEST(memory_sharing, lend_invalid_source)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_lend_invalid_source",
 		       mb.send);
@@ -1441,7 +1441,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 	ffa_memory_handle_t handle;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish_RW",
 		       mb.send);
@@ -1495,7 +1495,7 @@ TEST(memory_sharing, share_X_RW)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	struct ffa_value run_res;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_share_fail_denied",
 		       mb.send);
@@ -1559,7 +1559,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 	ffa_memory_handle_t handle;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish_RW",
 		       mb.send);
@@ -1626,7 +1626,7 @@ TEST(memory_sharing, share_relinquish_clear)
 	ffa_memory_handle_t handle;
 	struct ffa_value run_res;
 	size_t i;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id,
 		       "ffa_memory_share_relinquish_clear", mb.send);
@@ -1665,7 +1665,7 @@ TEST_PRECONDITION(memory_sharing, lend_relinquish_RW_X, service1_is_vm)
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish_X",
 		       mb.send);
@@ -1716,7 +1716,7 @@ TEST_PRECONDITION(memory_sharing, lend_relinquish_RO_X, service1_is_vm)
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish_X",
 		       mb.send);
@@ -1766,8 +1766,8 @@ TEST(memory_sharing, lend_donate)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish_RW",
 		       mb.send);
@@ -1833,8 +1833,8 @@ TEST(memory_sharing, share_donate)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish_RW",
 		       mb.send);
@@ -1906,8 +1906,8 @@ TEST(memory_sharing, lend_twice)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_twice", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_lend_twice", mb.send);
@@ -1981,8 +1981,8 @@ TEST(memory_sharing, share_twice)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_twice", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_lend_twice", mb.send);
@@ -2046,7 +2046,7 @@ TEST(memory_sharing, lend_clear)
 	uint8_t *ptr = pages;
 	ffa_memory_handle_t handle;
 	size_t i;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
 
@@ -2082,7 +2082,7 @@ TEST_PRECONDITION(memory_sharing, share_clear, hypervisor_only)
 	uint8_t *ptr = pages;
 	uint32_t msg_size;
 	size_t i;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
 
@@ -2119,8 +2119,8 @@ TEST(memory_sharing, ffa_lend_check_upper_bounds)
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_check_upper_bound", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_check_upper_bound", mb.send);
@@ -2181,8 +2181,8 @@ TEST(memory_sharing, ffa_lend_check_lower_bounds)
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_check_lower_bound", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_check_lower_bound", mb.send);
@@ -2244,7 +2244,7 @@ TEST_PRECONDITION(memory_sharing, ffa_validate_mbz, hypervisor_only)
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
 		ffa_mem_share,
 		ffa_mem_lend,
@@ -2284,7 +2284,7 @@ TEST_PRECONDITION(memory_sharing, ffa_validate_attributes, hypervisor_only)
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
@@ -2338,7 +2338,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
 	ffa_memory_handle_t handle;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
 		ffa_mem_share,
@@ -2407,7 +2407,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_attributes)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
 	ffa_memory_handle_t handle;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
 		ffa_mem_share,
 		ffa_mem_lend,
@@ -2484,7 +2484,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_mem_share)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
 	ffa_memory_handle_t handle;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
@@ -2552,7 +2552,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint32_t msg_size;
 	ffa_memory_handle_t handle;
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
@@ -2607,7 +2607,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_sender_not_clear)
 		ffa_mem_lend,
 		ffa_mem_donate,
 	};
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
@@ -2676,7 +2676,7 @@ TEST(memory_sharing, ffa_validate_retrieve_transaction_type)
 		ffa_mem_share,
 		ffa_mem_donate,
 	};
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
@@ -2750,8 +2750,8 @@ TEST(memory_sharing, mem_share_multiple_borrowers)
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 	struct ffa_memory_access receivers[2];
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	ffa_memory_access_init_permissions(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
@@ -2828,8 +2828,8 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 	 * didn't reclaim.
 	 */
 	const uint32_t number_of_retrieves = 2;
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	ffa_memory_access_init_permissions(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
@@ -2917,8 +2917,8 @@ TEST_PRECONDITION(memory_sharing, fail_if_multi_receiver_donate,
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 	struct ffa_memory_access receivers[2];
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	ffa_memory_access_init_permissions(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
@@ -2985,8 +2985,8 @@ TEST_PRECONDITION(memory_sharing, fail_if_one_receiver_wrong_permissions,
 		  hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	/* The 2nd specified receiver has X permissions for the memory. */
 	fail_multiple_receiver_mem_share_lend(
@@ -3002,7 +3002,7 @@ TEST_PRECONDITION(memory_sharing, fail_if_one_receiver_wrong_permissions,
 TEST_PRECONDITION(memory_sharing, fail_if_repeated_borrower, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	/* Used the same borrower ID. */
 	fail_multiple_receiver_mem_share_lend(
@@ -3018,7 +3018,7 @@ TEST_PRECONDITION(memory_sharing, fail_if_repeated_borrower, hypervisor_only)
 TEST_PRECONDITION(memory_sharing, fail_if_one_receiver_is_self, hypervisor_only)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	/* Use own id. */
 	fail_multiple_receiver_mem_share_lend(
@@ -3040,8 +3040,8 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 	uint32_t i;
 	ffa_memory_handle_t handle;
 	struct ffa_memory_access receivers[2];
-	struct ffa_partition_info *service1_info = service1();
-	struct ffa_partition_info *service2_info = service2();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
 	ffa_memory_access_init_permissions(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,

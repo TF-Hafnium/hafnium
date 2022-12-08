@@ -24,17 +24,18 @@
 		EXPECT_EQ(ffa_error_code(v), (ffa_error)); \
 	} while (0)
 
-#define SERVICE_PARTITION_INFO_GET(service_name, uuid)                         \
-	struct ffa_partition_info *service_name(void)                          \
-	{                                                                      \
-		static struct ffa_partition_info partition;                    \
-		static bool is_set = false;                                    \
-		if (!is_set) {                                                 \
-			ASSERT_EQ(get_ffa_partition_info(uuid, &partition, 1), \
-				  1);                                          \
-			is_set = true;                                         \
-		}                                                              \
-		return &partition;                                             \
+#define SERVICE_PARTITION_INFO_GET(service_name, uuid)                        \
+	struct ffa_partition_info* service_name(void* recv)                   \
+	{                                                                     \
+		static struct ffa_partition_info partition;                   \
+		static bool is_set = false;                                   \
+		if (!is_set) {                                                \
+			ASSERT_EQ(get_ffa_partition_info(uuid, &partition, 1, \
+							 recv),               \
+				  1);                                         \
+			is_set = true;                                        \
+		}                                                             \
+		return &partition;                                            \
 	}
 
 /*
@@ -107,7 +108,7 @@ ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 
 ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
 				      struct ffa_partition_info *info,
-				      size_t info_size);
+				      size_t info_size, void *recv);
 
 struct ffa_boot_info_header *get_boot_info_header(void);
 void dump_boot_info(struct ffa_boot_info_header *boot_info_header);

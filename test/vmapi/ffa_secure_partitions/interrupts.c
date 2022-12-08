@@ -98,7 +98,8 @@ static void check_physical_timer_interrupt_serviced(void)
 TEST(interrupts, sp_preempted_by_ns_interrupt)
 {
 	struct ffa_value res;
-	struct ffa_partition_info *receiver_info = service2();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *receiver_info = service2(mb.recv);
 	const ffa_vm_id_t receiver_id = receiver_info->vm_id;
 
 	setup_physical_timer();
@@ -139,7 +140,8 @@ TEST(interrupts, sp_managed_exit)
 {
 	struct ffa_value res;
 	ffa_vm_id_t own_id = hf_vm_get_id();
-	struct ffa_partition_info *receiver_info = service1();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *receiver_info = service1(mb.recv);
 	const ffa_vm_id_t receiver_id = receiver_info->vm_id;
 
 	setup_physical_timer();

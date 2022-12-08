@@ -48,9 +48,9 @@
  * Helpers to get services information.
  * Defined with SERVICE_PARTITION_INFO_GET macro.
  */
-struct ffa_partition_info* service1(void);
-struct ffa_partition_info* service2(void);
-struct ffa_partition_info* service3(void);
+struct ffa_partition_info* service1(void* recv);
+struct ffa_partition_info* service2(void* recv);
+struct ffa_partition_info* service3(void* recv);
 
 /* Precondition functions for this test setup. */
 bool service1_is_vm(void);

@@ -188,9 +188,11 @@ static void base_per_cpu_notifications_test(void (*cpu_entry)(uintptr_t arg))
 	alignas(4096) static uint8_t other_stack[MAX_CPUS - 1][4096];
 	struct notif_cpu_entry_args args = {.lock = &lock};
 	struct ffa_partition_info sp;
+	struct mailbox_buffers mb = set_up_mailbox();
 
 	EXPECT_EQ(get_ffa_partition_info(
-			  &(struct ffa_uuid){SP_SERVICE_SECOND_UUID}, &sp, 1),
+			  &(struct ffa_uuid){SP_SERVICE_SECOND_UUID}, &sp, 1,
+			  mb.recv),
 		  1);
 	args.sp_id = sp.vm_id;
 	args.is_sp_up = sp.vcpu_count == 1U;

@@ -502,10 +502,10 @@ ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 
 ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
 				      struct ffa_partition_info *info,
-				      size_t info_size)
+				      size_t info_size, void *recv)
 {
 	struct ffa_value ret;
-	struct ffa_partition_info *ret_info = set_up_mailbox().recv;
+	struct ffa_partition_info *ret_info = recv;
 
 	CHECK(uuid != NULL);
 	CHECK(info != NULL);
