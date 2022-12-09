@@ -618,3 +618,55 @@ struct ffa_value send_indirect_message(ffa_vm_id_t from, ffa_vm_id_t to,
 	/* Send the message. */
 	return ffa_msg_send2(send_flags);
 }
+
+void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
+			      ffa_vm_id_t *sender)
+{
+	const struct ffa_partition_msg *message;
+	struct ffa_partition_rxtx_header header;
+	ffa_vm_id_t source_vm_id;
+	const uint32_t *payload;
+	struct ffa_value ret;
+	ffa_notifications_bitmap_t fwk_notif;
+	const ffa_vm_id_t own_id = hf_vm_get_id();
+
+	EXPECT_LE(buffer_size, FFA_MSG_PAYLOAD_MAX);
+
+	/* Check notification */
+	ret = ffa_notification_get(own_id, 0,
+				   FFA_NOTIFICATION_FLAG_BITMAP_SPM |
+					   FFA_NOTIFICATION_FLAG_BITMAP_HYP);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
+	fwk_notif = ffa_notification_get_from_framework(ret);
+
+	if (fwk_notif == 0U) {
+		FAIL("Expected Rx buffer full notification.");
+	}
+
+	message = (const struct ffa_partition_msg *)recv;
+	memcpy_s(&header, sizeof(header), message,
+		 sizeof(struct ffa_partition_rxtx_header));
+
+	source_vm_id = ffa_rxtx_header_sender(&header);
+
+	if (is_ffa_hyp_buffer_full_notification(fwk_notif)) {
+		EXPECT_TRUE(IS_VM_ID(source_vm_id));
+	} else if (is_ffa_spm_buffer_full_notification(fwk_notif)) {
+		EXPECT_FALSE(IS_VM_ID(source_vm_id));
+	}
+
+	/* Check receiver ID against own ID. */
+	ASSERT_EQ(ffa_rxtx_header_receiver(&header), own_id);
+	ASSERT_LE(header.size, buffer_size);
+
+	payload = (const uint32_t *)message->payload;
+
+	/* Get message to free the RX buffer. */
+	memcpy_s(buffer, buffer_size, payload, header.size);
+
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
+	ASSERT_TRUE(sender != NULL);
+	*sender = source_vm_id;
+}

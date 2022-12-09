@@ -32,8 +32,8 @@ TEST(indirect_messaging, echo)
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	const uint32_t payload = 0xAA55AA55;
-	struct ffa_partition_msg *echo;
-	const uint32_t *echo_payload;
+	const uint32_t echo_payload;
+	ffa_vm_id_t echo_sender;
 	ffa_vm_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
@@ -48,23 +48,12 @@ TEST(indirect_messaging, echo)
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
-	/* Check notification. */
-	ret = ffa_notification_get(own_id, 0,
-				   FFA_NOTIFICATION_FLAG_BITMAP_SPM |
-					   FFA_NOTIFICATION_FLAG_BITMAP_HYP);
-	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	receive_indirect_message((void *)&echo_payload, sizeof(echo_payload),
+				 mb.recv, &echo_sender);
 
-	ASSERT_TRUE(is_ffa_spm_buffer_full_notification(
-			    ffa_notification_get_from_framework(ret)) ||
-		    is_ffa_hyp_buffer_full_notification(
-			    ffa_notification_get_from_framework(ret)));
-
-	echo = (struct ffa_partition_msg *)mb.recv;
-	echo_payload = (const uint32_t *)echo->payload;
-	HFTEST_LOG("Message echoed back: %#x", *echo_payload);
-	EXPECT_EQ(*echo_payload, payload);
-
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	HFTEST_LOG("Message echoed back: %#x", echo_payload);
+	EXPECT_EQ(echo_payload, payload);
+	EXPECT_EQ(echo_sender, service1_info->vm_id);
 }
 
 /** Sender haven't mapped TX buffer. */
