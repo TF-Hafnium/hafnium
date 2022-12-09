@@ -25,7 +25,7 @@
 	} while (0)
 
 #define SERVICE_PARTITION_INFO_GET(service_name, uuid)                        \
-	struct ffa_partition_info* service_name(void* recv)                   \
+	struct ffa_partition_info *service_name(void *recv)                   \
 	{                                                                     \
 		static struct ffa_partition_info partition;                   \
 		static bool is_set = false;                                   \

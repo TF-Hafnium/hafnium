@@ -53,14 +53,6 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		res = sp_check_cpu_idx_cmd(ffa_sender(res),
 					   sp_check_cpu_idx(res));
 		break;
-	case SP_INDIR_MSG_CMD:
-		res = sp_indirect_msg_cmd(ffa_sender(res),
-					  sp_indirect_msg_receiver(res),
-					  sp_indirect_msg_payload(res));
-		break;
-	case SP_ECHO_INDIR_MSG_CMD:
-		res = sp_echo_indirect_msg_cmd(ffa_sender(res));
-		break;
 	case SP_WAIT_BUSY_LOOP_CMD:
 		sp_wait_loop(res.arg4);
 		res = sp_success(ffa_receiver(res), ffa_sender(res), 0);

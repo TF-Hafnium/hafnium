@@ -28,8 +28,6 @@ struct ffa_boot_info_header* get_boot_info_header(void)
 
 alignas(4096) uint8_t kstack[MAX_CPUS][4096];
 
-bool sel1_secure_service = true;
-
 void test_main_sp(bool);
 
 noreturn void kmain(struct ffa_boot_info_header* boot_info_blob)
