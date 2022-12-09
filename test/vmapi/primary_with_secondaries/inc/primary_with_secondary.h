@@ -21,7 +21,7 @@
  * portable between setups where the test service is either a VM or an SP.
  */
 #define SERVICE1                                                        \
-	&(struct ffa_uuid)                                              \
+	(struct ffa_uuid)                                               \
 	{                                                               \
 		{                                                       \
 			0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb, \
@@ -29,7 +29,7 @@
 	}
 
 #define SERVICE2                                               \
-	&(struct ffa_uuid)                                     \
+	(struct ffa_uuid)                                      \
 	{                                                      \
 		{                                              \
 			0x5d45882e, 0xf637, 0xa720, 0xe8669dc, \
@@ -37,7 +37,7 @@
 	}
 
 #define SERVICE3                                             \
-	&(struct ffa_uuid)                                   \
+	(struct ffa_uuid)                                    \
 	{                                                    \
 		{                                            \
 			0xcbd4482f, 0xcbab, 0x4dba, 0x0738d, \

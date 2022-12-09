@@ -27,3 +27,7 @@ void exception_setup(void (*irq)(void), bool (*exception)(void))
 void interrupt_wait(void)
 {
 }
+
+void arch_irq_enable(void)
+{
+}

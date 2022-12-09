@@ -178,3 +178,61 @@ TEST(indirect_messaging, invalid_size)
 	msg_send2_invalid_parameters(own_id, service1_info->vm_id, 1024 * 1024,
 				     mb.send, mb.recv);
 }
+
+/**
+ * First, service1 sends message to service2, which sends it back to service1.
+ * After, PVM sends another message to service2, and see it echoes back
+ * to the PVM.
+ */
+TEST(indirect_messaging, services_echo)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const struct ffa_uuid service2_uuid = SERVICE2;
+	const ffa_vm_id_t own_id = hf_vm_get_id();
+	struct ffa_value ret;
+	const uint32_t payload = 0xAA55AA55;
+	uint32_t echo_payload;
+	ffa_vm_id_t echo_sender;
+
+	SERVICE_SELECT(service1_info->vm_id, "echo_msg_send2_service", mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "echo_msg_send2", mb.send);
+
+	/* Send to service1 the uuid of the target for its message. */
+	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
+				    &service2_uuid, sizeof(service2_uuid), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Run service1 to retrieve uuid of target, and send message. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Run service2 to echo message back to service1. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Run service1 to validate message received from service2. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/*
+	 * Send another message to service2 and check that it echos back
+	 * correctly.
+	 */
+	ret = send_indirect_message(own_id, service2_info->vm_id, mb.send,
+				    &payload, sizeof(payload), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Run service2 to echo message back to PVM. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	receive_indirect_message(&echo_payload, sizeof(echo_payload), mb.recv,
+				 &echo_sender);
+
+	HFTEST_LOG("Message received: %#x", echo_payload);
+
+	EXPECT_EQ(echo_sender, service2_info->vm_id);
+	EXPECT_EQ(echo_payload, payload);
+}

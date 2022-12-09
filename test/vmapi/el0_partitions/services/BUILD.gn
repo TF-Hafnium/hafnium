@@ -18,6 +18,7 @@ vm_kernel("service_vm1") {
     "receive_block.c",
   ]
   deps = [
+    "//src/arch/${plat_arch}/hftest/el0:interrupts",
     "//test/hftest:hftest_secondary_el0_partition",
     "//test/vmapi/common:common",
     "//test/vmapi/primary_with_secondaries/services:echo",

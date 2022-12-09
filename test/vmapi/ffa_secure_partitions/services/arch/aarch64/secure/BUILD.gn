@@ -32,7 +32,6 @@ source_set("partition_services") {
 
   deps = [
     ":common",
-    "//src/arch/aarch64:arch",
     "//test/vmapi/common:common",
   ]
 }
@@ -111,6 +110,7 @@ vm_kernel("secure_partitions_services") {
     ":message_loop",
     ":sp805",
     ":sp_helpers",
+    "//src/arch/aarch64:arch",
     "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_secure_service",
   ]

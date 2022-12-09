@@ -198,6 +198,7 @@ vm_kernel("service_vm2") {
   testonly = true
 
   deps = [
+    ":echo",
     ":interruptible",
     ":memory",
     ":relay",
@@ -212,6 +213,7 @@ vm_kernel("service_vm3") {
   testonly = true
 
   deps = [
+    ":echo",
     ":smp",
     "//test/hftest:hftest_secondary_vm",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",

@@ -667,6 +667,7 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
-	ASSERT_TRUE(sender != NULL);
-	*sender = source_vm_id;
+	if (sender != NULL) {
+		*sender = source_vm_id;
+	}
 }

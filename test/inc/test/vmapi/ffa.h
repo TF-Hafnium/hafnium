@@ -24,18 +24,19 @@
 		EXPECT_EQ(ffa_error_code(v), (ffa_error)); \
 	} while (0)
 
-#define SERVICE_PARTITION_INFO_GET(service_name, uuid)                        \
-	struct ffa_partition_info *service_name(void *recv)                   \
-	{                                                                     \
-		static struct ffa_partition_info partition;                   \
-		static bool is_set = false;                                   \
-		if (!is_set) {                                                \
-			ASSERT_EQ(get_ffa_partition_info(uuid, &partition, 1, \
-							 recv),               \
-				  1);                                         \
-			is_set = true;                                        \
-		}                                                             \
-		return &partition;                                            \
+#define SERVICE_PARTITION_INFO_GET(service_name, uuid)                         \
+	struct ffa_partition_info *service_name(void *recv)                    \
+	{                                                                      \
+		static struct ffa_partition_info partition;                    \
+		static bool is_set = false;                                    \
+		struct ffa_uuid to_get_uuid = uuid;                            \
+		if (!is_set) {                                                 \
+			ASSERT_EQ(get_ffa_partition_info(&to_get_uuid,         \
+							 &partition, 1, recv), \
+				  1);                                          \
+			is_set = true;                                         \
+		}                                                              \
+		return &partition;                                             \
 	}
 
 /*
