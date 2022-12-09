@@ -10,7 +10,11 @@
 
 #include "vmapi/hf/ffa.h"
 
+void exception_handler_set_return_addr(uint64_t instr_addr);
+
 bool exception_handler_skip_instruction(void);
+
+bool exception_handler_skip_to_instruction(void);
 
 bool exception_handler_yield_unknown(void);
 

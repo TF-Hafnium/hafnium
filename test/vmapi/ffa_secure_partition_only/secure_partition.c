@@ -491,3 +491,39 @@ TEST(arch_features, enable_pauth)
 	write_msr(s3_0_c2_c1_1, 1842);
 	isb();
 }
+
+static void pauth_fault_helper()
+{
+	FAIL("This should not be called\n");
+}
+
+/*
+ * Trigger a Pointer Authentication Fault and verify that an exception
+ * was generated.
+ */
+TEST(arch_features, pauth_fault)
+{
+	uintptr_t bad_addr = (uintptr_t)&pauth_fault_helper;
+	uint64_t exception_return_addr;
+
+	exception_setup(NULL, exception_handler_skip_to_instruction);
+
+	__asm__("adr %0, end; " : "=r"(exception_return_addr) :);
+
+	exception_handler_set_return_addr(exception_return_addr);
+
+	/* Overwrite LR and trigger PAuth Fault exception. */
+	__asm__("mov x17, x30; "
+		"mov x30, %0; "	      /* Overwite LR. */
+		"add sp, sp, #0x30; " /* Revert SP to value at entrance to
+					 function (when PAC is generated). */
+		"isb; "
+		"autiasp; "
+		"sub sp, sp, #0x30; " /* Restore SP. */
+		"ret; "		      /* Fault on return.  */
+		"end: "
+		:
+		: "r"(bad_addr));
+
+	EXPECT_EQ(exception_handler_get_num(), 1);
+}

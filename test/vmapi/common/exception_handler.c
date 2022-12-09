@@ -25,6 +25,12 @@ static int exception_handler_exception_count = 0;
 static uint32_t last_serviced_interrupt = 0;
 
 /**
+ * Used to specify an instruction address to return to after exception
+ * is handled.
+ */
+static uint64_t exception_handler_return_addr = 0;
+
+/**
  * Sends the number of exceptions handled to the Primary VM.
  */
 void exception_handler_send_exception_count(void)
@@ -105,6 +111,48 @@ bool exception_handler_skip_instruction(void)
 
 	/* Indicate that elr_el1 should not be restored. */
 	return true;
+}
+
+/**
+ * Warning: Intended to be used only in test code.
+ * The ability to jump to any address after an exception could
+ * possibily be exploited by malicious code.
+ *
+ * Sets the specified instruction address to return to after handler exits.
+ */
+void exception_handler_set_return_addr(uint64_t instr_addr)
+{
+	exception_handler_return_addr = instr_addr;
+}
+
+/**
+ * Returns the specified instruction address to return to after handler exits.
+ */
+static uint64_t exception_handler_get_return_addr(void)
+{
+	return exception_handler_return_addr;
+}
+
+/**
+ * EL1 exception handler to use in unit test VMs.
+ * Skips to the instruction address specified in general
+ * register x19.
+ */
+bool exception_handler_skip_to_instruction(void)
+{
+	dlog("%s function is triggered!\n", __func__);
+	++exception_handler_exception_count;
+
+	uint64_t instr_addr = exception_handler_get_return_addr();
+
+	if (instr_addr) {
+		write_msr(elr_el1, instr_addr);
+		/* Indicate that elr_el1 should not be restored. */
+		return true;
+	}
+
+	dlog_error("%s: Return address not set, restoring elr_el1\n", __func__);
+	return false;
 }
 
 /**
