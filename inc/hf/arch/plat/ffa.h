@@ -352,3 +352,11 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
 	ffa_memory_handle_t handle, struct mpool *page_pool);
 
 bool plat_ffa_is_direct_response_interrupted(struct vcpu *current);
+
+/**
+ * This FF-A v1.0 FFA_MSG_SEND interface.
+ * Implemented for the Hypervisor, but not in the SPMC.
+ */
+struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
+				   ffa_vm_id_t receiver_vm_id, uint32_t size,
+				   struct vcpu *current, struct vcpu **next);

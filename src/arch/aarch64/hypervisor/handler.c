@@ -556,9 +556,9 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_yield(current, next);
 		return true;
 	case FFA_MSG_SEND_32:
-		*args = api_ffa_msg_send(ffa_sender(*args), ffa_receiver(*args),
-					 ffa_msg_send_size(*args), current,
-					 next);
+		*args = plat_ffa_msg_send(
+			ffa_sender(*args), ffa_receiver(*args),
+			ffa_msg_send_size(*args), current, next);
 		return true;
 	case FFA_MSG_SEND2_32:
 		*args = api_ffa_msg_send2(ffa_sender(*args),

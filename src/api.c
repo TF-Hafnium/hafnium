@@ -128,9 +128,9 @@ static struct vcpu *api_switch_to_vm(struct vcpu *current,
  * This triggers the scheduling logic to run. Run in the context of secondary VM
  * to cause FFA_RUN to return and the primary VM to regain control of the CPU.
  */
-static struct vcpu *api_switch_to_primary(struct vcpu *current,
-					  struct ffa_value primary_ret,
-					  enum vcpu_state secondary_state)
+struct vcpu *api_switch_to_primary(struct vcpu *current,
+				   struct ffa_value primary_ret,
+				   enum vcpu_state secondary_state)
 {
 	/*
 	 * If the secondary is blocked but has a timer running, sleep until the
@@ -190,7 +190,7 @@ struct vcpu *api_switch_to_other_world(struct vcpu *current,
  * Returns true if the given vCPU is executing in context of an
  * FFA_MSG_SEND_DIRECT_REQ invocation.
  */
-static bool is_ffa_direct_msg_request_ongoing(struct vcpu_locked locked)
+bool is_ffa_direct_msg_request_ongoing(struct vcpu_locked locked)
 {
 	return locked.vcpu->direct_request_origin_vm_id != HF_INVALID_VM_ID;
 }
@@ -658,7 +658,7 @@ static int64_t internal_interrupt_inject(struct vcpu *target_vcpu,
  * FFA_MSG_SEND2; no check is done on mixing FF-A v1.0 and FF-A v1.1 indirect
  * message protocols.
  */
-static struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
+struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 {
 	switch (receiver->mailbox.recv_func) {
 	case FFA_MSG_SEND_32:
@@ -1477,149 +1477,6 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 
 out:
 	vm_unlock(&vm_locked);
-
-	return ret;
-}
-
-/**
- * Notifies the `to` VM about the message currently in its mailbox, possibly
- * with the help of the primary VM.
- */
-static struct ffa_value deliver_msg(struct vm_locked to, ffa_vm_id_t from_id,
-				    struct vcpu *current, struct vcpu **next)
-{
-	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
-	struct ffa_value primary_ret = {
-		.func = FFA_MSG_SEND_32,
-		.arg1 = ((uint32_t)from_id << 16) | to.vm->id,
-	};
-
-	/* Messages for the primary VM are delivered directly. */
-	if (to.vm->id == HF_PRIMARY_VM_ID) {
-		/*
-		 * Only tell the primary VM the size and other details if the
-		 * message is for it, to avoid leaking data about messages for
-		 * other VMs.
-		 */
-		primary_ret = ffa_msg_recv_return(to.vm);
-
-		to.vm->mailbox.state = MAILBOX_STATE_READ;
-		*next = api_switch_to_primary(current, primary_ret,
-					      VCPU_STATE_BLOCKED);
-		return ret;
-	}
-
-	to.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
-
-	/* Messages for the TEE are sent on via the dispatcher. */
-	if (to.vm->id == HF_TEE_VM_ID) {
-		struct ffa_value call = ffa_msg_recv_return(to.vm);
-
-		ret = arch_other_world_call(call);
-		/*
-		 * After the call to the TEE completes it must have finished
-		 * reading its RX buffer, so it is ready for another message.
-		 */
-		to.vm->mailbox.state = MAILBOX_STATE_EMPTY;
-		/*
-		 * Don't return to the primary VM in this case, as the TEE is
-		 * not (yet) scheduled via FF-A.
-		 */
-		return ret;
-	}
-
-	/* Return to the primary VM directly or with a switch. */
-	if (from_id != HF_PRIMARY_VM_ID) {
-		*next = api_switch_to_primary(current, primary_ret,
-					      VCPU_STATE_BLOCKED);
-	}
-
-	return ret;
-}
-
-/**
- * Copies data from the sender's send buffer to the recipient's receive buffer
- * and notifies the recipient.
- *
- * If the recipient's receive buffer is busy, it can optionally register the
- * caller to be notified when the recipient's receive buffer becomes available.
- */
-struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
-				  ffa_vm_id_t receiver_vm_id, uint32_t size,
-				  struct vcpu *current, struct vcpu **next)
-{
-	struct vm *from = current->vm;
-	struct vm *to;
-	struct vm_locked to_locked;
-	const void *from_msg;
-	struct ffa_value ret;
-	struct vcpu_locked current_locked;
-	bool is_direct_request_ongoing;
-
-	/* Ensure sender VM ID corresponds to the current VM. */
-	if (sender_vm_id != from->id) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Disallow reflexive requests as this suggests an error in the VM. */
-	if (receiver_vm_id == from->id) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Limit the size of transfer. */
-	if (size > FFA_MSG_PAYLOAD_MAX) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/*
-	 * Deny if vCPU is executing in context of an FFA_MSG_SEND_DIRECT_REQ
-	 * invocation.
-	 */
-	current_locked = vcpu_lock(current);
-	is_direct_request_ongoing =
-		is_ffa_direct_msg_request_ongoing(current_locked);
-	vcpu_unlock(&current_locked);
-
-	if (is_direct_request_ongoing) {
-		return ffa_error(FFA_DENIED);
-	}
-
-	/* Ensure the receiver VM exists. */
-	to = vm_find(receiver_vm_id);
-	if (to == NULL) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/*
-	 * Check that the sender has configured its send buffer. If the tx
-	 * mailbox at from_msg is configured (i.e. from_msg != NULL) then it can
-	 * be safely accessed after releasing the lock since the tx mailbox
-	 * address can only be configured once.
-	 */
-	sl_lock(&from->lock);
-	from_msg = from->mailbox.send;
-	sl_unlock(&from->lock);
-
-	if (from_msg == NULL) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	to_locked = vm_lock(to);
-
-	if (vm_is_mailbox_busy(to_locked)) {
-		ret = ffa_error(FFA_BUSY);
-		goto out;
-	}
-
-	/* Copy data. */
-	memcpy_s(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX, from_msg, size);
-	to->mailbox.recv_size = size;
-	to->mailbox.recv_sender = sender_vm_id;
-	to->mailbox.recv_func = FFA_MSG_SEND_32;
-	ret = deliver_msg(to_locked, sender_vm_id, current, next);
-
-out:
-	vm_unlock(&to_locked);
 
 	return ret;
 }

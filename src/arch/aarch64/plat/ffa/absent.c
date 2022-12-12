@@ -572,3 +572,16 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
 
 	return ffa_error(FFA_INVALID_PARAMETERS);
 }
+
+struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
+				   ffa_vm_id_t receiver_vm_id, uint32_t size,
+				   struct vcpu *current, struct vcpu **next)
+{
+	(void)sender_vm_id;
+	(void)receiver_vm_id;
+	(void)size;
+	(void)current;
+	(void)next;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
