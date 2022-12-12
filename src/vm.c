@@ -244,6 +244,15 @@ struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_vm_id_t for_vm)
 }
 
 /**
+ * Checks whether the given `to` VM's mailbox is currently busy.
+ */
+bool vm_is_mailbox_busy(struct vm_locked to)
+{
+	return to.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
+	       to.vm->mailbox.recv == NULL;
+}
+
+/**
  * Gets the ID of the VM which the given VM's wait entry is for.
  */
 ffa_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)

@@ -187,15 +187,6 @@ struct vcpu *api_switch_to_other_world(struct vcpu *current,
 }
 
 /**
- * Checks whether the given `to` VM's mailbox is currently busy.
- */
-static bool msg_receiver_busy(struct vm_locked to)
-{
-	return to.vm->mailbox.state != MAILBOX_STATE_EMPTY ||
-	       to.vm->mailbox.recv == NULL;
-}
-
-/**
  * Returns true if the given vCPU is executing in context of an
  * FFA_MSG_SEND_DIRECT_REQ invocation.
  */
@@ -353,7 +344,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 	uint32_t buffer_size;
 	struct ffa_value ret;
 
-	if (msg_receiver_busy(vm_locked)) {
+	if (vm_is_mailbox_busy(vm_locked)) {
 		/*
 		 * Can't retrieve memory information if the mailbox is not
 		 * available.
@@ -1611,7 +1602,7 @@ struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 
 	to_locked = vm_lock(to);
 
-	if (msg_receiver_busy(to_locked)) {
+	if (vm_is_mailbox_busy(to_locked)) {
 		ret = ffa_error(FFA_BUSY);
 		goto out;
 	}
@@ -2925,7 +2916,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		 */
 		struct two_vm_locked vm_to_from_lock = vm_lock_both(to, from);
 
-		if (msg_receiver_busy(vm_to_from_lock.vm1)) {
+		if (vm_is_mailbox_busy(vm_to_from_lock.vm1)) {
 			ret = ffa_error(FFA_BUSY);
 			goto out_unlock;
 		}
@@ -3013,7 +3004,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	 */
 	memcpy_s(retrieve_request, message_buffer_size, to_msg, length);
 
-	if (msg_receiver_busy(to_locked)) {
+	if (vm_is_mailbox_busy(to_locked)) {
 		/*
 		 * Can't retrieve memory information if the mailbox is not
 		 * available.
@@ -3134,7 +3125,7 @@ struct ffa_value api_ffa_mem_frag_rx(ffa_memory_handle_t handle,
 
 	to_locked = vm_lock(to);
 
-	if (msg_receiver_busy(to_locked)) {
+	if (vm_is_mailbox_busy(to_locked)) {
 		/*
 		 * Can't retrieve memory information if the mailbox is not
 		 * available.
