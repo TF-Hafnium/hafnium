@@ -622,6 +622,17 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	(void)current;
 	(void)next;
 	(void)error_code;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+struct ffa_value plat_ffa_msg_recv(bool block, struct vcpu *current,
+				   struct vcpu **next)
+{
+	(void)block;
+	(void)current;
+	(void)next;
+
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 

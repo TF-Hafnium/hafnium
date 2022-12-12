@@ -50,8 +50,6 @@ struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 				  struct vcpu *current, struct vcpu **next);
 struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
 				   struct vcpu *current);
-struct ffa_value api_ffa_msg_recv(bool block, struct vcpu_locked current_locked,
-				  struct vcpu **next);
 struct ffa_value api_ffa_rx_release(ffa_vm_id_t receiver_id,
 				    struct vcpu *current);
 struct ffa_value api_ffa_rx_acquire(ffa_vm_id_t receiver_id,

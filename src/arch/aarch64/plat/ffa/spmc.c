@@ -2762,3 +2762,14 @@ out:
 	vcpu_unlock(&current_locked);
 	return ret;
 }
+
+struct ffa_value plat_ffa_msg_recv(bool block,
+				   struct vcpu_locked current_locked,
+				   struct vcpu **next)
+{
+	(void)block;
+	(void)current_locked;
+	(void)next;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
+}

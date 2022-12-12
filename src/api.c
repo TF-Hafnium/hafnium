@@ -1019,12 +1019,8 @@ out:
 }
 
 /**
- * Constructs the return value from a successful FFA_MSG_POLL or
- * FFA_MSG_WAIT call.
- *
- * Note: FFA_MSG_POLL is deprecated in FF-A v1.1 and should not be used with
- * FFA_MSG_SEND2; no check is done on mixing FF-A v1.0 and FF-A v1.1 indirect
- * message protocols.
+ * Constructs the return value from a successful FFA_MSG_WAIT call, when used
+ * with FFA_MSG_SEND_32.
  */
 struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 {
@@ -2071,115 +2067,6 @@ out_unlock_sender:
 	vm_unlock(&sender_locked);
 
 	return ret;
-}
-
-/**
- * Checks whether the vCPU's attempt to block for a message has already been
- * interrupted or whether it is allowed to block.
- */
-static bool api_ffa_msg_recv_block_interrupted(
-	struct vcpu_locked current_locked)
-{
-	bool interrupted;
-
-	/*
-	 * Don't block if there are enabled and pending interrupts, to match
-	 * behaviour of wait_for_interrupt.
-	 */
-	interrupted = (vcpu_interrupt_count_get(current_locked) > 0);
-
-	return interrupted;
-}
-
-/**
- * Receives a message from the mailbox. If one isn't available, this function
- * can optionally block the caller until one becomes available.
- *
- * No new messages can be received until the mailbox has been cleared.
- */
-struct ffa_value api_ffa_msg_recv(bool block, struct vcpu_locked current_locked,
-				  struct vcpu **next)
-{
-	bool is_direct_request_ongoing;
-	struct vcpu *current = current_locked.vcpu;
-	struct vm *vm = current->vm;
-	struct ffa_value return_code;
-	bool is_from_secure_world =
-		(current->vm->id & HF_VM_ID_WORLD_MASK) != 0;
-
-	/*
-	 * The primary VM will receive messages as a status code from running
-	 * vCPUs and must not call this function.
-	 */
-	if (!is_from_secure_world && vm->id == HF_PRIMARY_VM_ID) {
-		return ffa_error(FFA_NOT_SUPPORTED);
-	}
-
-	/*
-	 * Deny if vCPU is executing in context of an FFA_MSG_SEND_DIRECT_REQ
-	 * invocation.
-	 */
-	is_direct_request_ongoing =
-		is_ffa_direct_msg_request_ongoing(current_locked);
-
-	/*
-	 * A VM's lock must be acquired before any of its vCPU's lock. Hence,
-	 * unlock current vCPU and acquire it immediately after its VM's lock.
-	 */
-	vcpu_unlock(&current_locked);
-	sl_lock(&vm->lock);
-	current_locked = vcpu_lock(current);
-
-	if (is_direct_request_ongoing) {
-		return_code = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
-	/* Return pending messages without blocking. */
-	if (vm->mailbox.state == MAILBOX_STATE_FULL) {
-		return_code = ffa_msg_recv_return(vm);
-		if (return_code.func == FFA_MSG_SEND_32) {
-			vm->mailbox.state = MAILBOX_STATE_EMPTY;
-		}
-		goto out;
-	}
-
-	/* No pending message so fail if not allowed to block. */
-	if (!block) {
-		return_code = ffa_error(FFA_RETRY);
-		goto out;
-	}
-
-	/*
-	 * From this point onward this call can only be interrupted or a message
-	 * received. If a message is received the return value will be set at
-	 * that time to FFA_SUCCESS.
-	 */
-	return_code = ffa_error(FFA_INTERRUPTED);
-	if (api_ffa_msg_recv_block_interrupted(current_locked)) {
-		goto out;
-	}
-
-	if (is_from_secure_world) {
-		/* Return to other world if caller is a SP. */
-		*next = api_switch_to_other_world(
-			current_locked,
-			(struct ffa_value){.func = FFA_MSG_WAIT_32},
-			VCPU_STATE_WAITING);
-	} else {
-		/* Switch back to primary VM to block. */
-		struct ffa_value run_return = {
-			.func = FFA_MSG_WAIT_32,
-			.arg1 = ffa_vm_vcpu(vm->id, vcpu_index(current)),
-		};
-
-		*next = api_switch_to_primary(current_locked, run_return,
-					      VCPU_STATE_WAITING);
-	}
-out:
-	sl_unlock(&vm->lock);
-
-	return return_code;
 }
 
 /**

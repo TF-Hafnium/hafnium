@@ -595,7 +595,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		struct vcpu_locked current_locked;
 
 		current_locked = vcpu_lock(current);
-		*args = api_ffa_msg_recv(false, current_locked, next);
+		*args = plat_ffa_msg_recv(false, current_locked, next);
 		vcpu_unlock(&current_locked);
 		return true;
 	}

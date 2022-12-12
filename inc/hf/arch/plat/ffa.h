@@ -372,3 +372,7 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 				   uint32_t error_code);
 
 bool plat_ffa_is_spmd_lp_id(ffa_vm_id_t vm_id);
+
+struct ffa_value plat_ffa_msg_recv(bool block,
+				   struct vcpu_locked current_locked,
+				   struct vcpu **next);
