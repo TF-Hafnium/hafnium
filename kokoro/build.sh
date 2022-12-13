@@ -56,7 +56,7 @@ then
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS false
 	default_value HAFNIUM_RUN_ALL_QEMU_CPUS true
 	default_value USE_TFA true
-	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD true
+	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD false
 else
 	# Default config for local builds.
 	default_value HAFNIUM_HERMETIC_BUILD false
