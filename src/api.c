@@ -936,29 +936,6 @@ void api_regs_state_saved(struct vcpu *vcpu)
 	vcpu->regs_available = true;
 	sl_unlock(&vcpu->lock);
 }
-
-/**
- * Retrieves the next waiter and removes it from the wait list if the VM's
- * mailbox is in a writable state.
- */
-static struct wait_entry *api_fetch_waiter(struct vm_locked locked_vm)
-{
-	struct wait_entry *entry;
-	struct vm *vm = locked_vm.vm;
-
-	if (vm->mailbox.state != MAILBOX_STATE_EMPTY ||
-	    vm->mailbox.recv == NULL || list_empty(&vm->mailbox.waiter_list)) {
-		/* The mailbox is not writable or there are no waiters. */
-		return NULL;
-	}
-
-	/* Remove waiter from the wait list. */
-	entry = CONTAINER_OF(vm->mailbox.waiter_list.next, struct wait_entry,
-			     wait_links);
-	list_remove(&entry->wait_links);
-	return entry;
-}
-
 /**
  * Assuming that the arguments have already been checked by the caller, injects
  * a virtual interrupt of the given ID into the given target vCPU. This doesn't
@@ -2067,85 +2044,6 @@ out_unlock_sender:
 	vm_unlock(&sender_locked);
 
 	return ret;
-}
-
-/**
- * Retrieves the next VM whose mailbox became writable. For a VM to be notified
- * by this function, the caller must have called api_mailbox_send before with
- * the notify argument set to true, and this call must have failed because the
- * mailbox was not available.
- *
- * It should be called repeatedly to retrieve a list of VMs.
- *
- * Returns -1 if no VM became writable, or the id of the VM whose mailbox
- * became writable.
- */
-int64_t api_mailbox_writable_get(const struct vcpu *current)
-{
-	struct vm *vm = current->vm;
-	struct wait_entry *entry;
-	int64_t ret;
-
-	sl_lock(&vm->lock);
-	if (list_empty(&vm->mailbox.ready_list)) {
-		ret = -1;
-		goto exit;
-	}
-
-	entry = CONTAINER_OF(vm->mailbox.ready_list.next, struct wait_entry,
-			     ready_links);
-	list_remove(&entry->ready_links);
-	ret = vm_id_for_wait_entry(vm, entry);
-
-exit:
-	sl_unlock(&vm->lock);
-	return ret;
-}
-
-/**
- * Retrieves the next VM waiting to be notified that the mailbox of the
- * specified VM became writable. Only primary VMs are allowed to call this.
- *
- * Returns -1 on failure or if there are no waiters; the VM id of the next
- * waiter otherwise.
- */
-int64_t api_mailbox_waiter_get(ffa_vm_id_t vm_id, const struct vcpu *current)
-{
-	struct vm *vm;
-	struct vm_locked locked;
-	struct wait_entry *entry;
-	struct vm *waiting_vm;
-
-	/* Only primary VMs are allowed to call this function. */
-	if (current->vm->id != HF_PRIMARY_VM_ID) {
-		return -1;
-	}
-
-	vm = vm_find(vm_id);
-	if (vm == NULL) {
-		return -1;
-	}
-
-	/* Check if there are outstanding notifications from given VM. */
-	locked = vm_lock(vm);
-	entry = api_fetch_waiter(locked);
-	vm_unlock(&locked);
-
-	if (entry == NULL) {
-		return -1;
-	}
-
-	/* Enqueue notification to waiting VM. */
-	waiting_vm = entry->waiting_vm;
-
-	sl_lock(&waiting_vm->lock);
-	if (list_empty(&entry->ready_links)) {
-		list_append(&waiting_vm->mailbox.ready_list,
-			    &entry->ready_links);
-	}
-	sl_unlock(&waiting_vm->lock);
-
-	return waiting_vm->id;
 }
 
 /**

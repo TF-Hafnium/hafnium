@@ -2763,13 +2763,18 @@ out:
 	return ret;
 }
 
-struct ffa_value plat_ffa_msg_recv(bool block,
-				   struct vcpu_locked current_locked,
-				   struct vcpu **next)
+int64_t plat_ffa_mailbox_waiter_get(ffa_vm_id_t vm_id,
+				    const struct vcpu *current)
 {
-	(void)block;
-	(void)current_locked;
-	(void)next;
+	(void)vm_id;
+	(void)current;
 
-	return ffa_error(FFA_NOT_SUPPORTED);
+	return -1;
+}
+
+int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current)
+{
+	(void)current;
+
+	return -1;
 }

@@ -591,6 +591,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_MSG_WAIT_32:
 		*args = api_ffa_msg_wait(current, next, args);
 		return true;
+#if SECURE_WORLD == 0
 	case FFA_MSG_POLL_32: {
 		struct vcpu_locked current_locked;
 
@@ -599,6 +600,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		vcpu_unlock(&current_locked);
 		return true;
 	}
+#endif
 	case FFA_RUN_32:
 		*args = api_ffa_run(ffa_vm_id(*args), ffa_vcpu_index(*args),
 				    current, next);
@@ -1035,14 +1037,15 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 	}
 
 	switch (args.func) {
+#if SECURE_WORLD == 0
 	case HF_MAILBOX_WRITABLE_GET:
-		vcpu->regs.r[0] = api_mailbox_writable_get(vcpu);
+		vcpu->regs.r[0] = plat_ffa_mailbox_writable_get(vcpu);
 		break;
 
 	case HF_MAILBOX_WAITER_GET:
-		vcpu->regs.r[0] = api_mailbox_waiter_get(args.arg1, vcpu);
+		vcpu->regs.r[0] = plat_ffa_mailbox_waiter_get(args.arg1, vcpu);
 		break;
-
+#endif
 	case HF_INTERRUPT_ENABLE:
 		vcpu->regs.r[0] = api_interrupt_enable(args.arg1, args.arg2,
 						       args.arg3, vcpu);

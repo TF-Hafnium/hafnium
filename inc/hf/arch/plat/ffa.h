@@ -376,3 +376,8 @@ bool plat_ffa_is_spmd_lp_id(ffa_vm_id_t vm_id);
 struct ffa_value plat_ffa_msg_recv(bool block,
 				   struct vcpu_locked current_locked,
 				   struct vcpu **next);
+
+int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current);
+
+int64_t plat_ffa_mailbox_waiter_get(ffa_vm_id_t vm_id,
+				    const struct vcpu *current);
