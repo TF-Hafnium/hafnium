@@ -1004,10 +1004,6 @@ TEST(memory_sharing, donate_vms)
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
-	/* Set up VM2 to wait for message. */
-	run_res = ffa_run(SERVICE_VM2, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
-
 	/* Donate memory. */
 	send_memory_and_retrieve_request(
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID, SERVICE_VM1,
