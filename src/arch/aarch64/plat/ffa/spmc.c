@@ -597,7 +597,7 @@ bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 	(void)vm_locked;
 	(void)ret;
 
-	return true;
+	return false;
 }
 
 bool plat_ffa_rx_release_forwarded(struct vm_locked vm_locked)

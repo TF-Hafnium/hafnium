@@ -36,24 +36,43 @@
 #define VM_POWER_MANAGEMENT_CPU_ON_SHIFT (3)
 
 /**
- * The state of an RX buffer.
+ * The state of an RX buffer, as defined by FF-A v1.1 EAC0 specification.
+ * It is used to implement ownership rules, as defined in the section 6.2.2.4.2.
  *
- * EMPTY is the initial state. The follow state transitions are possible:
- * * EMPTY => RECEIVED: message sent to the VM.
- * * RECEIVED => READ: secondary VM receives an RX buffer full notification
- *   or primary VM returns from FFA_RUN with an FFA_MSG_SEND where the receiver
- *   is itself.
- * * READ => EMPTY: VM called FFA_RX_RELEASE.
+ * EMPTY is the initial state. It is set by default to the endpoints at the
+ * virtual instance.
+ * The follow state transitions are possible:
+ * * EMPTY => FULL: message sent to a partition. Ownership given to the
+ * partition.
+ * * EMPTY => OTHER_WORLD_OWNED: This state transition only applies to NWd VMs.
+ * Used by the SPMC or Hypervisor to track that ownership of the RX buffer
+ * belong to the other world:
+ * - The Hypervisor does this state transition after forwarding
+ * FFA_RXTX_MAP call to the SPMC, for it to map a VM's RXTX buffers into SPMC's
+ * translation regime.
+ * - SPMC was previously given ownership of the VM's RX buffer, after the
+ * FFA_RXTX_MAP interface has been successfully forwarded to it. The SPMC does
+ * this state transition, when handling a successful FFA_RX_ACQUIRE, assigning
+ * ownership to the hypervisor.
+ * * FULL => EMPTY: Partition received an RX buffer full notification, consumed
+ * the content of buffers, and called FFA_RX_RELEASE or FFA_MSG_WAIT. SPMC or
+ * Hypervisor's ownership reestablished.
+ * * OTHER_WORLD_OWNED => EMPTY: VM called FFA_RX_RELEASE, the hypervisor
+ * forwarded it to the SPMC, which reestablishes ownership of the VM's buffer.
+ * SPs should never have their buffers state set to OTHER_WORLD_OWNED.
  */
 enum mailbox_state {
 	/** There is no message in the mailbox. */
 	MAILBOX_STATE_EMPTY,
 
 	/** There is a message in the mailbox that is waiting for a reader. */
-	MAILBOX_STATE_RECEIVED,
+	MAILBOX_STATE_FULL,
 
-	/** There is a message in the mailbox that has been read. */
-	MAILBOX_STATE_READ,
+	/**
+	 * In the SPMC, it means the Hypervisor/OS Kernel owns the RX buffer.
+	 * In the Hypervisor, it means the SPMC owns the Rx buffer.
+	 */
+	MAILBOX_STATE_OTHER_WORLD_OWNED,
 };
 
 struct wait_entry {
@@ -290,6 +309,7 @@ struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_vm_id_t for_vm);
 ffa_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry);
 bool vm_id_is_current_world(ffa_vm_id_t vm_id);
 bool vm_is_mailbox_busy(struct vm_locked to);
+bool vm_is_mailbox_other_world_owned(struct vm_locked to);
 bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 		     uint32_t mode, struct mpool *ppool, ipaddr_t *ipa);
 bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
@@ -308,6 +328,7 @@ void vm_notifications_init(struct vm *vm, ffa_vcpu_count_t vcpu_count,
 bool vm_mailbox_state_busy(struct vm_locked vm_locked);
 bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 				  ffa_notifications_bitmap_t notifications);
+bool vm_are_fwk_notifications_pending(struct vm_locked vm_locked);
 bool vm_are_global_notifications_pending(struct vm_locked vm_locked);
 bool vm_are_per_vcpu_notifications_pending(struct vm_locked vm_locked,
 					   ffa_vcpu_index_t vcpu_id);

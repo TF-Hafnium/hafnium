@@ -362,6 +362,12 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 	uint32_t buffer_size;
 	struct ffa_value ret;
 
+	/* Acquire receiver's RX buffer. */
+	if (!plat_ffa_acquire_receiver_rx(vm_locked, &ret)) {
+		dlog_verbose("Failed to acquire RX buffer for VM %x\n", vm->id);
+		return ret;
+	}
+
 	if (vm_is_mailbox_busy(vm_locked)) {
 		/*
 		 * Can't retrieve memory information if the mailbox is not
@@ -369,12 +375,6 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		 */
 		dlog_verbose("RX buffer not ready.\n");
 		return ffa_error(FFA_BUSY);
-	}
-
-	/* Acquire receiver's RX buffer. */
-	if (!plat_ffa_acquire_receiver_rx(vm_locked, &ret)) {
-		dlog_verbose("Failed to acquire RX buffer for VM %x\n", vm->id);
-		return ret;
 	}
 
 	if (version == MAKE_FFA_VERSION(1, 0)) {
@@ -425,7 +425,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 	/* Sender is Hypervisor in the normal world (TEE in secure world). */
 	vm->mailbox.recv_sender = HF_VM_ID_BASE;
 	vm->mailbox.recv_func = FFA_PARTITION_INFO_GET_32;
-	vm->mailbox.state = MAILBOX_STATE_READ;
+	vm->mailbox.state = MAILBOX_STATE_FULL;
 
 	/*
 	 * Return the count of partition information descriptors in w2
@@ -863,10 +863,65 @@ struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 	}
 }
 
+/**
+ * Change the state of mailbox to empty, such that the ownership is given to the
+ * Partition manager.
+ * Returns true if the mailbox was reset successfully, false otherwise.
+ */
+static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
+{
+	ffa_vm_id_t vm_id = vm_locked.vm->id;
+	int32_t error_code_to_ret = 0;
+	bool ret = false;
+
+	switch (vm_locked.vm->mailbox.state) {
+	case MAILBOX_STATE_EMPTY:
+		dlog_verbose("Mailbox of %x is empty.\n", vm_id);
+		error_code_to_ret = FFA_DENIED;
+		goto out;
+	case MAILBOX_STATE_FULL:
+		/* Check it doesn't have pending RX full notifications. */
+		if (vm_are_fwk_notifications_pending(vm_locked)) {
+			dlog_verbose(
+				"Mailbox of endpoint %x has pending "
+				"messages.\n",
+				vm_id);
+			error_code_to_ret = FFA_DENIED;
+			goto out;
+		}
+		break;
+	case MAILBOX_STATE_OTHER_WORLD_OWNED:
+		/*
+		 * The SPMC shouldn't let SP's mailbox get into this state.
+		 * For the Hypervisor, the VM may call FFA_RX_RELEASE, whilst
+		 * the mailbox is in this state. In that case, we should report
+		 * error.
+		 */
+		if (vm_id_is_current_world(vm_id)) {
+			dlog_verbose(
+				"Mailbox of endpoint %x in a wrongful state.\n",
+				vm_id);
+			error_code_to_ret = FFA_ABORTED;
+			goto out;
+		}
+		break;
+	}
+
+	vm_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
+	ret = true;
+out:
+	if (error_code != NULL) {
+		*error_code = error_code_to_ret;
+	}
+
+	return ret;
+}
+
 struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 				  struct ffa_value *args)
 {
 	enum vcpu_state next_state = VCPU_STATE_WAITING;
+	struct ffa_value ret;
 
 	if (args->arg1 != 0U || args->arg2 != 0U || args->arg3 != 0U ||
 	    args->arg4 != 0U || args->arg5 != 0U || args->arg6 != 0U ||
@@ -882,7 +937,16 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 
 	assert(next_state == VCPU_STATE_WAITING);
 
-	return plat_ffa_msg_wait_prepare(current, next);
+	ret = plat_ffa_msg_wait_prepare(current, next);
+
+	if (ret.func != FFA_ERROR_32) {
+		struct vm_locked vm_locked = vm_lock(current->vm);
+
+		api_release_mailbox(vm_locked, NULL);
+		vm_unlock(&vm_locked);
+	}
+
+	return ret;
 }
 
 /**
@@ -1004,12 +1068,9 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 		 * A pending message allows the vCPU to run so the message can
 		 * be delivered directly.
 		 */
-		if (vcpu->vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
+		if (vcpu->vm->mailbox.state == MAILBOX_STATE_FULL) {
 			arch_regs_set_retval(&vcpu->regs,
 					     ffa_msg_recv_return(vcpu->vm));
-			if (vcpu->vm->mailbox.recv_func == FFA_MSG_SEND_32) {
-				vcpu->vm->mailbox.state = MAILBOX_STATE_READ;
-			}
 			break;
 		}
 
@@ -1212,41 +1273,6 @@ static bool api_mode_valid_owned_and_exclusive(uint32_t mode)
 {
 	return (mode & (MM_MODE_D | MM_MODE_INVALID | MM_MODE_UNOWNED |
 			MM_MODE_SHARED)) == 0;
-}
-
-/**
- * Determines the value to be returned by api_ffa_rxtx_map and
- * api_ffa_rx_release after they've succeeded. If a secondary VM is running and
- * there are waiters, it also switches back to the primary VM for it to wake
- * waiters up.
- */
-static struct ffa_value api_waiter_result(struct vm_locked locked_vm,
-					  struct vcpu *current,
-					  struct vcpu **next)
-{
-	struct vm *vm = locked_vm.vm;
-
-	CHECK(list_empty(&vm->mailbox.waiter_list));
-
-	if (list_empty(&vm->mailbox.waiter_list)) {
-		/* No waiters, nothing else to do. */
-		return (struct ffa_value){.func = FFA_SUCCESS_32};
-	}
-
-	if (vm->id == HF_PRIMARY_VM_ID) {
-		/* The caller is the primary VM. Tell it to wake up waiters. */
-		return (struct ffa_value){.func = FFA_RX_RELEASE_32};
-	}
-
-	/*
-	 * Switch back to the primary VM, informing it that there are waiters
-	 * that need to be notified.
-	 */
-	*next = api_switch_to_primary(
-		current, (struct ffa_value){.func = FFA_RX_RELEASE_32},
-		VCPU_STATE_WAITING);
-
-	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
 /**
@@ -1768,8 +1794,7 @@ struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
 		goto out;
 	}
 
-	if (to->mailbox.state != MAILBOX_STATE_EMPTY ||
-	    to->mailbox.recv == NULL) {
+	if (vm_is_mailbox_busy(to_locked)) {
 		dlog_error(
 			"Cannot deliver message to VM %#x, RX buffer not "
 			"ready.\n",
@@ -1798,7 +1823,7 @@ struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
 	to->mailbox.recv_size = msg_size;
 	to->mailbox.recv_sender = sender_id;
 	to->mailbox.recv_func = FFA_MSG_SEND2_32;
-	to->mailbox.state = MAILBOX_STATE_RECEIVED;
+	to->mailbox.state = MAILBOX_STATE_FULL;
 
 	rx_buffer_full = plat_ffa_is_vm_id(sender_id)
 				 ? FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK
@@ -1886,10 +1911,10 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 	sl_lock(&vm->lock);
 
 	/* Return pending messages without blocking. */
-	if (vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
+	if (vm->mailbox.state == MAILBOX_STATE_FULL) {
 		return_code = ffa_msg_recv_return(vm);
 		if (return_code.func == FFA_MSG_SEND_32) {
-			vm->mailbox.state = MAILBOX_STATE_READ;
+			vm->mailbox.state = MAILBOX_STATE_EMPTY;
 		}
 		goto out;
 	}
@@ -2025,7 +2050,7 @@ int64_t api_mailbox_waiter_get(ffa_vm_id_t vm_id, const struct vcpu *current)
  *    hf_mailbox_waiter_get.
  */
 struct ffa_value api_ffa_rx_release(ffa_vm_id_t receiver_id,
-				    struct vcpu *current, struct vcpu **next)
+				    struct vcpu *current)
 {
 	struct vm *current_vm = current->vm;
 	struct vm *vm;
@@ -2033,6 +2058,7 @@ struct ffa_value api_ffa_rx_release(ffa_vm_id_t receiver_id,
 	ffa_vm_id_t current_vm_id = current_vm->id;
 	ffa_vm_id_t release_vm_id;
 	struct ffa_value ret;
+	int32_t error_code;
 
 	/* `receiver_id` can be set only at Non-Secure Physical interface. */
 	if (vm_id_is_current_world(current_vm_id) && (receiver_id != 0)) {
@@ -2058,49 +2084,16 @@ struct ffa_value api_ffa_rx_release(ffa_vm_id_t receiver_id,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (!plat_ffa_rx_release_forward(vm_locked, &ret)) {
-		dlog_verbose("RX_RELEASE forward failed for VM ID %#x.\n",
-			     release_vm_id);
+	if (plat_ffa_rx_release_forward(vm_locked, &ret)) {
 		goto out;
 	}
 
-	/*
-	 * When SPMC owns a VM's RX buffer, the Hypervisor's view can be out of
-	 * sync: reset it to empty and exit.
-	 */
-	if (plat_ffa_rx_release_forwarded(vm_locked)) {
-		ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+	if (!api_release_mailbox(vm_locked, &error_code)) {
+		ret = ffa_error(error_code);
 		goto out;
 	}
 
-	switch (vm->mailbox.state) {
-	case MAILBOX_STATE_EMPTY:
-		ret = ffa_error(FFA_DENIED);
-		break;
-
-	case MAILBOX_STATE_RECEIVED:
-		if (release_vm_id == current_vm_id) {
-			/*
-			 * VM requesting to release its own RX buffer,
-			 * must be in READ state.
-			 */
-			ret = ffa_error(FFA_DENIED);
-		} else {
-			/*
-			 * Forwarded message from Hypervisor to release a VM
-			 * RX buffer, SPMC's mailbox view can be still in
-			 * RECEIVED state.
-			 */
-			ret = (struct ffa_value){.func = FFA_SUCCESS_32};
-			vm->mailbox.state = MAILBOX_STATE_EMPTY;
-		}
-		break;
-
-	case MAILBOX_STATE_READ:
-		ret = api_waiter_result(vm_locked, current, next);
-		vm->mailbox.state = MAILBOX_STATE_EMPTY;
-		break;
-	}
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
 	vm_unlock(&vm_locked);
@@ -2152,7 +2145,7 @@ struct ffa_value api_ffa_rx_acquire(ffa_vm_id_t receiver_id,
 		goto out;
 	}
 
-	receiver->mailbox.state = MAILBOX_STATE_RECEIVED;
+	receiver->mailbox.state = MAILBOX_STATE_OTHER_WORLD_OWNED;
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
@@ -3073,10 +3066,12 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	 */
 	memcpy_s(retrieve_request, message_buffer_size, to_msg, length);
 
-	if (vm_is_mailbox_busy(to_locked)) {
+	if ((vm_is_mailbox_other_world_owned(to_locked) &&
+	     !plat_ffa_acquire_receiver_rx(to_locked, &ret)) ||
+	    vm_is_mailbox_busy(to_locked)) {
 		/*
-		 * Can't retrieve memory information if the mailbox is not
-		 * available.
+		 * Can't retrieve memory information if the mailbox is
+		 * not available.
 		 */
 		dlog_verbose("%s: RX buffer not ready.\n", __func__);
 		ret = ffa_error(FFA_BUSY);

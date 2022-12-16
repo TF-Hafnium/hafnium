@@ -14,6 +14,7 @@
 #include "hf/arch/plat/ffa.h"
 
 #include "hf/api.h"
+#include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
@@ -86,16 +87,13 @@ void plat_ffa_set_tee_enabled(bool tee_enabled)
 	ffa_tee_enabled = tee_enabled;
 }
 
-static void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send,
-				   uint64_t page_count)
+static struct ffa_value plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send,
+					       uint64_t page_count)
 {
-	struct ffa_value ret;
-
-	ret = arch_other_world_call((struct ffa_value){.func = FFA_RXTX_MAP_64,
-						       .arg1 = pa_addr(recv),
-						       .arg2 = pa_addr(send),
-						       .arg3 = page_count});
-	CHECK(ret.func == FFA_SUCCESS_32);
+	return arch_other_world_call((struct ffa_value){.func = FFA_RXTX_MAP_64,
+							.arg1 = pa_addr(recv),
+							.arg2 = pa_addr(send),
+							.arg3 = page_count});
 }
 
 void plat_ffa_init(struct mpool *ppool)
@@ -134,10 +132,12 @@ void plat_ffa_init(struct mpool *ppool)
 	 * perspective and vice-versa.
 	 */
 	dlog_verbose("Setting up buffers for TEE.\n");
-	plat_ffa_rxtx_map_spmc(
+	ret = plat_ffa_rxtx_map_spmc(
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.recv)),
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.send)),
 		HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
+
+	CHECK(ret.func == FFA_SUCCESS_32);
 
 	ffa_tee_enabled = true;
 
@@ -271,7 +271,7 @@ bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 	ffa_vm_id_t vm_id = vm->id;
 
 	if (!ffa_tee_enabled || vm_does_not_support_indirect_messages(vm)) {
-		return true;
+		return false;
 	}
 
 	CHECK(vm_id_is_current_world(vm_id));
@@ -280,29 +280,18 @@ bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 	*ret = arch_other_world_call(
 		(struct ffa_value){.func = FFA_RX_RELEASE_32, .arg1 = vm_id});
 
-	return ret->func == FFA_SUCCESS_32;
-}
-
-/**
- * In FF-A v1.1 with SPMC enabled the SPMC owns the RX buffers for NWd VMs,
- * hence the SPMC is handling FFA_RX_RELEASE calls for NWd VMs too.
- * The Hypervisor's view of a VM's RX buffer can be out of sync, reset it to
- * 'empty' if the FFA_RX_RELEASE call has been successfully forwarded to the
- * SPMC.
- */
-bool plat_ffa_rx_release_forwarded(struct vm_locked vm_locked)
-{
-	struct vm *vm = vm_locked.vm;
-
-	if (ffa_tee_enabled && (vm->ffa_version > MAKE_FFA_VERSION(1, 0))) {
-		dlog_verbose(
-			"RX_RELEASE forwarded, reset MB state for VM ID %#x.\n",
-			vm->id);
-		vm->mailbox.state = MAILBOX_STATE_EMPTY;
-		return true;
+	if (ret->func == FFA_SUCCESS_32) {
+		/*
+		 * The SPMC owns the VM's RX buffer after a successful
+		 * FFA_RX_RELEASE call.
+		 */
+		vm->mailbox.state = MAILBOX_STATE_OTHER_WORLD_OWNED;
+	} else {
+		dlog_verbose("FFA_RX_RELEASE forwarded failed for VM ID %#x.\n",
+			     vm_locked.vm->id);
 	}
 
-	return false;
+	return true;
 }
 
 /**
@@ -311,17 +300,23 @@ bool plat_ffa_rx_release_forwarded(struct vm_locked vm_locked)
  * VM RX/TX buffers must have been previously mapped in the SPM either
  * by forwarding VM's RX_TX_MAP API or another way if buffers were
  * declared in manifest.
+ *
+ * Returns true if the ownership belongs to the hypervisor.
  */
 bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 				  struct ffa_value *ret)
 {
 	struct ffa_value other_world_ret;
 
-	if (!ffa_tee_enabled) {
-		return true;
-	}
-
-	if (vm_does_not_support_indirect_messages(to_locked.vm)) {
+	/*
+	 * Do not forward the call if either:
+	 * - The TEE is not present.
+	 * - The VM's version is not FF-A v1.1.
+	 * - If the mailbox ownership hasn't been transferred to the SPMC.
+	 */
+	if (!ffa_tee_enabled ||
+	    vm_does_not_support_indirect_messages(to_locked.vm) ||
+	    to_locked.vm->mailbox.state != MAILBOX_STATE_OTHER_WORLD_OWNED) {
 		return true;
 	}
 
@@ -332,7 +327,13 @@ bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 		*ret = other_world_ret;
 	}
 
-	return other_world_ret.func == FFA_SUCCESS_32;
+	if (other_world_ret.func != FFA_SUCCESS_32) {
+		return false;
+	}
+
+	to_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
+
+	return true;
 }
 
 bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
@@ -711,8 +712,10 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 {
 	struct vm *vm = vm_locked.vm;
 	struct vm *other_world;
+	struct ffa_value ret;
 
 	if (!ffa_tee_enabled) {
+		vm_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
 		return;
 	}
 
@@ -731,7 +734,17 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 		vm->id, (uintptr_t)vm->mailbox.recv,
 		(uintptr_t)vm->mailbox.send);
 
-	plat_ffa_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
+	ret = plat_ffa_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
+
+	if (ret.func != FFA_SUCCESS_32) {
+		panic("Fail to map RXTX buffers for VM %x, in the SPMC's "
+		      "translation regime\n",
+		      vm->id);
+	}
+
+	vm_locked.vm->mailbox.state = MAILBOX_STATE_OTHER_WORLD_OWNED;
+
+	dlog_verbose("Mailbox of %x owned by SPMC.\n", vm_locked.vm->id);
 }
 
 void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
@@ -1219,7 +1232,7 @@ static struct ffa_value memory_send_other_world_forward(
 	other_world_locked.vm->mailbox.recv_size = fragment_length;
 	other_world_locked.vm->mailbox.recv_sender = sender_vm_id;
 	other_world_locked.vm->mailbox.recv_func = share_func;
-	other_world_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+	other_world_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
 	ret = arch_other_world_call(
 		(struct ffa_value){.func = share_func,
 				   .arg1 = memory_share_length,
@@ -1449,13 +1462,12 @@ static struct ffa_value deliver_msg(struct vm_locked to, ffa_vm_id_t from_id,
 		 */
 		primary_ret = ffa_msg_recv_return(to.vm);
 
-		to.vm->mailbox.state = MAILBOX_STATE_READ;
 		*next = api_switch_to_primary(current, primary_ret,
 					      VCPU_STATE_BLOCKED);
 		return ret;
 	}
 
-	to.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+	to.vm->mailbox.state = MAILBOX_STATE_FULL;
 
 	/* Messages for the TEE are sent on via the dispatcher. */
 	if (to.vm->id == HF_TEE_VM_ID) {
@@ -1925,7 +1937,7 @@ struct ffa_value plat_ffa_other_world_mem_retrieve(
 	to_locked.vm->mailbox.recv_size = length;
 	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
 	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
-	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
+	to_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
 
 out:
 	vm_unlock(&from_locked);
@@ -1948,7 +1960,7 @@ static struct ffa_value memory_send_continue_other_world_forward(
 	other_world_locked.vm->mailbox.recv_size = fragment_length;
 	other_world_locked.vm->mailbox.recv_sender = sender_vm_id;
 	other_world_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
-	other_world_locked.vm->mailbox.state = MAILBOX_STATE_RECEIVED;
+	other_world_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
 	ret = arch_other_world_call(
 		(struct ffa_value){.func = FFA_MEM_FRAG_TX_32,
 				   .arg1 = (uint32_t)handle,
@@ -2259,6 +2271,7 @@ struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 	to->mailbox.recv_size = size;
 	to->mailbox.recv_sender = sender_vm_id;
 	to->mailbox.recv_func = FFA_MSG_SEND_32;
+	to->mailbox.state = MAILBOX_STATE_FULL;
 	ret = deliver_msg(to_locked, sender_vm_id, current, next);
 
 out:

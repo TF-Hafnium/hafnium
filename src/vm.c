@@ -252,6 +252,14 @@ bool vm_is_mailbox_busy(struct vm_locked to)
 }
 
 /**
+ * Checks if mailbox is currently owned by the other world.
+ */
+bool vm_is_mailbox_other_world_owned(struct vm_locked to)
+{
+	return to.vm->mailbox.state == MAILBOX_STATE_OTHER_WORLD_OWNED;
+}
+
+/**
  * Gets the ID of the VM which the given VM's wait entry is for.
  */
 ffa_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)
@@ -512,7 +520,16 @@ bool vm_are_global_notifications_pending(struct vm_locked vm_locked)
 {
 	return vm_get_notifications(vm_locked, true)->global.pending != 0ULL ||
 	       vm_get_notifications(vm_locked, false)->global.pending != 0ULL ||
-	       vm_locked.vm->notifications.framework.pending != 0ULL;
+	       vm_are_fwk_notifications_pending(vm_locked);
+}
+
+/**
+ * Currently only RX full notification is supported as framework notification.
+ * Returns true if there is one pending, either from Hypervisor or SPMC.
+ */
+bool vm_are_fwk_notifications_pending(struct vm_locked vm_locked)
+{
+	return vm_locked.vm->notifications.framework.pending != 0ULL;
 }
 
 /**
@@ -815,23 +832,11 @@ ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 {
 	struct vm *vm = vm_locked.vm;
 	ffa_notifications_bitmap_t framework;
-	bool rx_buffer_full;
 
 	assert(vm != NULL);
 
 	framework = vm_notifications_state_get_pending(
 		&vm->notifications.framework);
-
-	/*
-	 * By retrieving an RX buffer full notification the buffer state
-	 * transitions from RECEIVED to READ; the VM is now the RX buffer
-	 * owner, can read it and is allowed to release it.
-	 */
-	rx_buffer_full = is_ffa_spm_buffer_full_notification(framework) ||
-			 is_ffa_hyp_buffer_full_notification(framework);
-	if (rx_buffer_full && vm->mailbox.state == MAILBOX_STATE_RECEIVED) {
-		vm->mailbox.state = MAILBOX_STATE_READ;
-	}
 
 	return framework;
 }

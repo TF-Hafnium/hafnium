@@ -2221,7 +2221,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	to_locked.vm->mailbox.recv_size = fragment_length;
 	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
 	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
-	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
+	to_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
 
 	if (is_send_complete) {
 		ffa_memory_retrieve_complete(share_states, share_state,
@@ -2382,7 +2382,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	to_locked.vm->mailbox.recv_size = fragment_length;
 	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
 	to_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
-	to_locked.vm->mailbox.state = MAILBOX_STATE_READ;
+	to_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
 
 	if (!continue_ffa_hyp_mem_retrieve_req) {
 		share_state->retrieved_fragment_count[receiver_index]++;
