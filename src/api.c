@@ -2494,6 +2494,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 
 	if (!plat_ffa_is_direct_request_valid(current, sender_vm_id,
 					      receiver_vm_id)) {
+		dlog_verbose("Invalid direct message request.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2697,6 +2698,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 
 	if (!plat_ffa_is_direct_response_valid(current, sender_vm_id,
 					       receiver_vm_id)) {
+		dlog_verbose("Invalid direct response call.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 

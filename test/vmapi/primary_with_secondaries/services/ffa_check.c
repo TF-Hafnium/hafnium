@@ -66,117 +66,20 @@ TEST_SERVICE(ffa_recv_non_blocking)
 	ffa_yield();
 }
 
-TEST_SERVICE(ffa_direct_message_resp_echo)
-{
-	struct ffa_value args = ffa_msg_wait();
-
-	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
-
-	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
-				 args.arg3, args.arg4, args.arg5, args.arg6,
-				 args.arg7);
-}
-
-TEST_SERVICE(ffa_direct_msg_req_disallowed_smc)
-{
-	struct ffa_value args = ffa_msg_wait();
-	struct ffa_value ret;
-
-	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
-
-	ret = ffa_yield();
-	EXPECT_FFA_ERROR(ret, FFA_DENIED);
-
-	ret = ffa_msg_send(ffa_receiver(args), ffa_sender(args), 0, 0);
-	EXPECT_FFA_ERROR(ret, FFA_DENIED);
-
-	ret = ffa_msg_wait();
-	EXPECT_FFA_ERROR(ret, FFA_DENIED);
-
-	ret = ffa_msg_send_direct_req(SERVICE_VM1, SERVICE_VM2, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
-
-	ret = ffa_msg_poll();
-	EXPECT_FFA_ERROR(ret, FFA_DENIED);
-
-	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
-				 args.arg3, args.arg4, args.arg5, args.arg6,
-				 args.arg7);
-}
-
 /**
- * Verify that secondary VMs can't send direct message requests
- * when invoked by FFA_RUN.
+ * Service for indirect message error checking.
+ * The VM unmap its RX/TX and waits for a message.
  */
-TEST_SERVICE(ffa_disallowed_direct_msg_req)
+TEST_SERVICE(ffa_indirect_msg_error)
 {
-	struct ffa_value args;
-	struct ffa_value ret;
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
 
-	ret = ffa_msg_send_direct_req(SERVICE_VM1, HF_PRIMARY_VM_ID, 0, 0, 0, 0,
-				      0);
-	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
-
-	ret = ffa_msg_send_direct_req(SERVICE_VM1, SERVICE_VM2, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
-
-	args = ffa_msg_wait();
-	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
-
-	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
-				 args.arg3, args.arg4, args.arg5, args.arg6,
-				 args.arg7);
+	ffa_msg_wait();
 }
 
 /**
- * Verify a secondary VM can't send a direct message response when it hasn't
- * first been sent a request.
- */
-TEST_SERVICE(ffa_disallowed_direct_msg_resp)
-{
-	struct ffa_value args;
-	struct ffa_value ret;
-
-	ret = ffa_msg_send_direct_resp(SERVICE_VM1, HF_PRIMARY_VM_ID, 0, 0, 0,
-				       0, 0);
-	EXPECT_FFA_ERROR(ret, FFA_DENIED);
-
-	args = ffa_msg_wait();
-	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
-
-	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
-				 args.arg3, args.arg4, args.arg5, args.arg6,
-				 args.arg7);
-}
-
-/**
- * Verify a secondary VM can't send a response to a different VM than the one
- * that sent the request.
- * Verify a secondary VM cannot send a response with a sender ID different from
- * its own secondary VM ID.
- */
-TEST_SERVICE(ffa_direct_msg_resp_invalid_sender_receiver)
-{
-	struct ffa_value args = ffa_msg_wait();
-	struct ffa_value res;
-
-	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
-
-	ffa_vm_id_t sender = ffa_sender(args);
-	ffa_vm_id_t receiver = ffa_receiver(args);
-
-	res = ffa_msg_send_direct_resp(receiver, SERVICE_VM2, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
-
-	res = ffa_msg_send_direct_resp(SERVICE_VM2, sender, 0, 0, 0, 0, 0);
-	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
-
-	ffa_msg_send_direct_resp(receiver, sender, 0, 0, 0, 0, 0);
-}
-
-/**
- * Secondary VM waits for a direct message request but primary VM
- * calls ffa_run instead. Verify the secondary VM does not run.
+ * Service waits for a direct message request but primary VM
+ * calls ffa_run instead. Verify the service does not run.
  */
 TEST_SERVICE(ffa_direct_msg_run)
 {
@@ -192,15 +95,4 @@ TEST_SERVICE(ffa_direct_msg_run)
 
 	ffa_msg_send_direct_resp(ffa_receiver(res), ffa_sender(res), 4, 0, 0, 0,
 				 0);
-}
-
-/**
- * Service for indirect message error checking.
- * The VM unmap its RX/TX and waits for a message.
- */
-TEST_SERVICE(ffa_indirect_msg_error)
-{
-	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-
-	ffa_msg_wait();
 }

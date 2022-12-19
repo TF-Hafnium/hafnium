@@ -87,6 +87,7 @@ vm_kernel("primary_with_secondaries_test_vm") {
   sources = [
     "boot.c",
     "debug_el1.c",
+    "dir_msg.c",
     "ffa.c",
     "floating_point.c",
     "indirect_messaging.c",
@@ -186,6 +187,7 @@ vm_kernel("primary_with_sp_test_vm") {
   ]
 
   sources = [
+    "dir_msg.c",
     "indirect_messaging.c",
     "memory_sharing.c",
   ]
@@ -265,6 +267,7 @@ vm_kernel("primary_with_sp_vhe_test_vm") {
   ]
 
   sources = [
+    "dir_msg.c",
     "indirect_messaging.c",
     "memory_sharing.c",
   ]

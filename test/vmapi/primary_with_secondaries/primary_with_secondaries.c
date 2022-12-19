@@ -31,6 +31,16 @@ static struct mailbox_buffers get_precondition_mailbox(void)
 	return mb;
 }
 
+bool service1_and_service2_are_secure(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	return !IS_VM_ID(service1_info->vm_id) &&
+	       !IS_VM_ID(service2_info->vm_id);
+}
+
 /*
  * The following is a precondition function, for the current system set-up.
  * This is currently being used to skip memory sharing tests, when
@@ -40,6 +50,7 @@ bool service1_is_vm(void)
 {
 	struct mailbox_buffers mb = get_precondition_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
+
 	return IS_VM_ID(service1_info->vm_id);
 }
 

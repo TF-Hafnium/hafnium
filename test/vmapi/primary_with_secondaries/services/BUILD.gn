@@ -164,7 +164,10 @@ source_set("ffa_check") {
   ]
   deps = [ "//test/vmapi/common" ]
 
-  sources = [ "ffa_check.c" ]
+  sources = [
+    "dir_msg.c",
+    "ffa_check.c",
+  ]
 }
 
 # Group services together into VMs.
@@ -199,6 +202,7 @@ vm_kernel("service_vm2") {
 
   deps = [
     ":echo",
+    ":ffa_check",
     ":interruptible",
     ":memory",
     ":relay",
@@ -214,6 +218,7 @@ vm_kernel("service_vm3") {
 
   deps = [
     ":echo",
+    ":ffa_check",
     ":smp",
     "//test/hftest:hftest_secondary_vm",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",

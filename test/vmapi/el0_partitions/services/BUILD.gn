@@ -21,6 +21,7 @@ vm_kernel("service_vm1") {
     "//src/arch/${plat_arch}/hftest/el0:interrupts",
     "//test/hftest:hftest_secondary_el0_partition",
     "//test/vmapi/common:common",
+    "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
     "//test/vmapi/primary_with_secondaries/services:echo",
     "//test/vmapi/primary_with_secondaries/services:ffa_check",
     "//test/vmapi/primary_with_secondaries/services:relay",
