@@ -1,0 +1,54 @@
+/*
+ * Copyright 2023 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "arm,ffa-manifest-1.0";
+	debug_name = "partition-manifest";
+
+	/* Properties */
+	ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
+	uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>;
+	execution-ctx-count = <8>;
+	exception-level = <2>; /* S-EL1 */
+	execution-state = <0>; /* AARCH64 */
+
+	/*
+	* The EL3 SPMC expects its running SP to be loaded at 0xFF200000
+	* Subtracting the offset to the expected load address, to make the
+	* hftest.py script load the SP's image at the expected address.
+	*/
+	load-address = <0xFF1FE000>;
+
+	/*
+	* Offset 0x2000 is used for parity between Hafnium SPMC.
+	* Hafnium needs partition manifest to be placed before SP's image.
+	*/
+	entrypoint-offset = <0x2000>;
+	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
+	xlat-granule = <0>; /* 4KiB */
+	messaging-method = <0x3>;
+	gp-register-num = <0>;
+
+	/* Boot Info */
+	boot-info {
+		compatible = "arm,ffa-manifest-boot-info";
+		ffa_manifest;
+	};
+
+	device-regions {
+		compatible = "arm,ffa-manifest-device-regions";
+
+		uart0 {
+			base-address = <0x00000000 0x1c090000>;
+			pages-count = <1>;
+			attributes = <0x3>; /* read-write */
+		};
+	};
+};

@@ -20,6 +20,33 @@ HFTEST+=(--log "$LOG_DIR_BASE")
 
 HFTEST+=(--spmc "$SPMC_PATH/hafnium.bin" --driver=fvp)
 
+USE_PARITY=false
+USAGE="Use --parity to run EL3 SPMC testsuite"
+
+while test $# -gt 0
+do
+  case "$1" in
+    --parity) USE_PARITY=true
+      ;;
+    -h) echo $USAGE
+	exit 1
+	;;
+    --help) echo $USAGE
+	exit 1
+	;;
+    *) echo "Unexpected argument $1"
+	echo $USAGE
+	exit 1
+	;;
+  esac
+  shift
+done
+
+if [ $USE_PARITY == true ]
+then
+   ${HFTEST[@]} --partitions_json test/vmapi/ffa_secure_partition_el3_spmc/ffa_secure_partition_only_test.json
+fi
+
 ${HFTEST[@]} --partitions_json test/vmapi/ffa_secure_partition_only/ffa_secure_partition_only_test.json
 
 ${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \

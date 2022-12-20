@@ -1,4 +1,4 @@
-# Copyright 2021 The Hafnium Authors.
+# Copyright 2023 The Hafnium Authors.
 #
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
@@ -17,7 +17,7 @@ vm_kernel("secure_partition_test_vm") {
     "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_standalone_secure",
     "//test/vmapi/common",
-    "//vmlib/${plat_arch}:call",
+    "//vmlib/${plat_arch}:smc_call",
   ]
 }
 
@@ -27,6 +27,9 @@ manifest("ffa_secure_partition_only_partition_manifest") {
   overlay = hftest_manifest_overlay
 }
 
+# EL3 SPMC does not require this binary format
+# Format is kept same for consistency with Hafnium SPMC
+# And to re-use same tests to check parity between the 2 SPMC
 partition_package("ffa_secure_partition_only_test_package") {
   testonly = true
   pm_offset = "0x1000"
@@ -40,6 +43,8 @@ partition_package("ffa_secure_partition_only_test_package") {
   output = "ffa_secure_partition_only_test_package.img"
 }
 
+# EL3 SPMC can manage only single SP
+# Script will load only the first SP if multiple are supplied here
 partitions_json("ffa_secure_partition_only_test") {
   testonly = true
 

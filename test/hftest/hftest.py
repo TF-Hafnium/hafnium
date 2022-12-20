@@ -57,6 +57,8 @@ FVP_PREBUILT_DTS = os.path.join(
 FVP_PREBUILT_TFA_SPMD_ROOT = os.path.join(
     HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a-spmd", "fvp")
 
+FVP_PREBUILTS_TFA_EL3_SPMC_ROOT = os.path.join(
+    HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a-el3-spmc")
 VM_NODE_REGEX = "vm[1-9]"
 
 QEMU_CPU_MAX = "max,pauth-impdef=true"
@@ -556,6 +558,15 @@ class FvpDriverSPMC(FvpDriver):
         write_file(dt.dts, read_file(FvpDriverSPMC.FVP_PREBUILT_SECURE_DTS))
         append_file(dt.dts, to_append)
 
+    def secure_ctrl_fvp_args(self, secure_ctrl):
+        fvp_args = ""
+        if secure_ctrl:
+            fvp_args = [
+                "-C", f"bp.pl011_uart0.in_file={FvpDriverSPMC.hftest_cmd_file.name}",
+                "-C", f"bp.pl011_uart0.shutdown_tag=\"{HFTEST_CTRL_FINISHED}\"",
+            ]
+        return fvp_args
+
     def gen_fvp_args(
         self, is_long_running, uart0_log_path, uart1_log_path, dt,
         call_super = True, secure_ctrl = True, debug = False, show_output = False):
@@ -569,11 +580,7 @@ class FvpDriverSPMC(FvpDriver):
             "--data", f"cluster0.cpu0={self.args.spmc}@{self.SPMC_ADDRESS}",
         ]
 
-        if secure_ctrl:
-            fvp_args += [
-                "-C", f"bp.pl011_uart0.in_file={FvpDriverSPMC.hftest_cmd_file.name}",
-                "-C", f"bp.pl011_uart0.shutdown_tag=\"{HFTEST_CTRL_FINISHED}\"",
-            ]
+        fvp_args += FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
 
         img_ldadd = self.get_img_and_ldadd(self.args.partitions["SPs"])
         for img, ldadd in img_ldadd:
@@ -646,6 +653,54 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
     def finish(self):
         """Clean up after running tests."""
         FvpDriver.finish(self)
+
+class FvpDriverEL3SPMC(FvpDriverSPMC):
+    """
+    Driver which runs tests in Arm FVP emulator, with EL3 as SPMC
+    """
+
+    def __init__(self, args):
+        self.vms_in_partitions_json = args.partitions and args.partitions["SPs"]
+        self.args = args
+
+    @property
+    def CPU_START_ADDRESS(self):
+        return "0x04003000"
+
+    @property
+    def FVP_PREBUILT_BL31(self):
+        return os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl31.bin")
+
+    def sp_partition_manifest_fvp_args(self):
+        img_ldadd = self.get_img_and_ldadd(self.args.partitions["SPs"])
+
+        # Expect only one tuple with img and load address, as EL3 SPMC only supports
+        # one SP.
+        assert(len(img_ldadd) == 1)
+        img, ldadd = img_ldadd[0]
+        fvp_args = ["--data", f"cluster0.cpu0={img}@{ldadd}"]
+
+        # Even though FF-A manifest is part of the SP PKG we need to load at a specific
+        # location. Fetch the respective dtb file and load at the following address.
+        SP_DTB_ADDRESS = "0x0403f000"
+        output_path = os.path.dirname(os.path.dirname(img))
+        partition_manifest = f"{output_path}/partition-manifest.dtb"
+        fvp_args += ["--data", f"cluster0.cpu0={partition_manifest}@{SP_DTB_ADDRESS}"]
+        return fvp_args
+
+    def gen_fvp_args(
+        self, is_long_running, uart0_log_path, uart1_log_path, dt,
+        call_super = True, secure_ctrl = True, debug = False, show_output = False):
+        """Generate command line arguments for FVP."""
+        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt.dtb,
+                       debug, show_output)
+        fvp_args = FvpDriver.gen_fvp_args(*common_args) if call_super else []
+
+        fvp_args += FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
+
+        fvp_args += self.sp_partition_manifest_fvp_args()
+
+        return fvp_args
 
 class SerialDriver(Driver):
     """Driver which communicates with a device over the serial port."""
@@ -925,6 +980,7 @@ def Main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--hypervisor")
     parser.add_argument("--spmc")
+    parser.add_argument("--el3_spmc", action="store_true")
     parser.add_argument("--log", required=True)
     parser.add_argument("--out_initrd")
     parser.add_argument("--out_partitions")
@@ -954,6 +1010,8 @@ def Main():
         test_set_up = "hypervisor"
     elif args.spmc:
         test_set_up = "spmc"
+    elif args.el3_spmc:
+        test_set_up = "el3_spmc"
     else:
         raise Exception("No Hafnium image provided!\n")
 
@@ -986,11 +1044,15 @@ def Main():
     driver_args = DriverArgs(artifacts, args.hypervisor, args.spmc, initrd,
                              vm_args, args.cpu, partitions, global_run_name)
 
-    if args.spmc:
+    if args.el3_spmc:
         # So far only FVP supports tests for SPMC.
         if args.driver != "fvp":
             raise Exception("Secure tests can only run with fvp driver")
-
+        driver = FvpDriverEL3SPMC(driver_args)
+    elif args.spmc:
+        # So far only FVP supports tests for SPMC.
+        if args.driver != "fvp":
+            raise Exception("Secure tests can only run with fvp driver")
         if args.hypervisor:
             driver = FvpDriverBothWorlds(driver_args)
         else:
