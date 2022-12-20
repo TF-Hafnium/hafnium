@@ -151,6 +151,7 @@ DriverArgs = collections.namedtuple("DriverArgs", [
         "cpu",
         "partitions",
         "global_run_name",
+        "coverage_plugin",
     ])
 
 # State shared between the common Driver class and its subclasses during
@@ -286,6 +287,7 @@ class FvpDriver(Driver, ABC):
     """Base class for driver which runs tests in Arm FVP emulator."""
 
     def __init__(self, args, cpu_start_address, fvp_prebuilt_bl31):
+        self.cov_plugin = args.coverage_plugin or None
         if args.cpu:
             raise ValueError("FVP emulator does not support the --cpu option.")
         super().__init__(args)
@@ -409,7 +411,12 @@ class FvpDriver(Driver, ABC):
 
         if debug:
             fvp_args += [
-                    "-I", "-p",
+                    "-I", "-p"
+                    ]
+
+        if self.cov_plugin is not None:
+            fvp_args += [
+                "--plugin", self.cov_plugin
             ]
         return fvp_args
 
@@ -974,6 +981,7 @@ def Main():
     parser.add_argument("--cpu",
         help="Selects the CPU configuration for the run environment.")
     parser.add_argument("--tfa", action="store_true")
+    parser.add_argument("--coverage_plugin", default="")
     args = parser.parse_args()
 
     # Create class which will manage all test artifacts.
@@ -1015,7 +1023,8 @@ def Main():
 
     # Create a driver for the platform we want to test on.
     driver_args = DriverArgs(artifacts, args.hypervisor, args.spmc, initrd,
-                             vm_args, args.cpu, partitions, global_run_name)
+                             vm_args, args.cpu, partitions, global_run_name,
+                             args.coverage_plugin)
 
     if args.el3_spmc:
         # So far only FVP supports tests for SPMC.
