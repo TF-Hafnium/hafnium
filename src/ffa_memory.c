@@ -1550,10 +1550,18 @@ bool memory_region_receivers_from_other_world(
 }
 
 /**
- * Validates a call to donate, lend or share memory to a non-other world VM and
- * then updates the stage-2 page tables. Specifically, check if the message
- * length and number of memory region constituents match, and if the transition
- * is valid for the type of memory sending operation.
+ * Validates a call to donate, lend or share memory in which Hafnium is the
+ * designated allocator of the memory handle. In practice, this also means
+ * Hafnium is responsible for managing the state structures for the transaction.
+ * If Hafnium is the SPMC, it should allocate the memory handle when either the
+ * sender is an SP or there is at least one borrower that is an SP.
+ * If Hafnium is the hypervisor, it should allocate the memory handle when
+ * operation involves only NWd VMs.
+ *
+ * If validation goes well, Hafnium updates the stage-2 page tables of the
+ * sender. Validation consists of checking if the message length and number of
+ * memory region constituents match, and if the transition is valid for the
+ * type of memory sending operation.
  *
  * Assumes that the caller has already found and locked the sender VM and copied
  * the memory region descriptor from the sender's TX buffer to a freshly
