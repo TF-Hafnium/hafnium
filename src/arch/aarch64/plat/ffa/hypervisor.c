@@ -1284,9 +1284,9 @@ static struct ffa_value ffa_memory_other_world_send(
 
 		ret = ffa_send_check_update(
 			from_locked, &constituents,
-			&composite->constituent_count, 1, share_func,
-			memory_region->receivers, memory_region->receiver_count,
-			&local_page_pool,
+			&composite->constituent_count, 1, composite->page_count,
+			share_func, memory_region->receivers,
+			memory_region->receiver_count, &local_page_pool,
 			memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
 			&orig_from_mode);
 		if (ret.func != FFA_SUCCESS_32) {

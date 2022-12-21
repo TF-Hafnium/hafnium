@@ -808,15 +808,17 @@ struct ffa_value ffa_send_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t share_func, struct ffa_memory_access *receivers,
-	uint32_t receivers_count, struct mpool *page_pool, bool clear,
-	uint32_t *orig_from_mode_ret)
+	uint32_t composite_total_page_count, uint32_t share_func,
+	struct ffa_memory_access *receivers, uint32_t receivers_count,
+	struct mpool *page_pool, bool clear, uint32_t *orig_from_mode_ret)
 {
 	uint32_t i;
+	uint32_t j;
 	uint32_t orig_from_mode;
 	uint32_t from_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
+	uint32_t constituents_total_page_count = 0;
 
 	/*
 	 * Make sure constituents are properly aligned to a 64-bit boundary. If
@@ -827,6 +829,17 @@ struct ffa_value ffa_send_check_update(
 			dlog_verbose("Constituents not aligned.\n");
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
+		for (j = 0; j < fragment_constituent_counts[i]; ++j) {
+			constituents_total_page_count +=
+				fragments[i][j].page_count;
+		}
+	}
+
+	if (constituents_total_page_count != composite_total_page_count) {
+		dlog_verbose(
+			"Composite page count differs from calculated page "
+			"count from constituents.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/*
@@ -1112,18 +1125,23 @@ struct ffa_value ffa_memory_send_complete(
 	uint32_t *orig_from_mode_ret)
 {
 	struct ffa_memory_region *memory_region = share_state->memory_region;
+	struct ffa_composite_memory_region *composite;
 	struct ffa_value ret;
 
 	/* Lock must be held. */
 	assert(share_states.share_states != NULL);
+	assert(memory_region != NULL);
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+	assert(composite != NULL);
 
 	/* Check that state is valid in sender page table and update. */
 	ret = ffa_send_check_update(
 		from_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
-		share_state->fragment_count, share_state->share_func,
-		memory_region->receivers, memory_region->receiver_count,
-		page_pool, memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
+		share_state->fragment_count, composite->page_count,
+		share_state->share_func, memory_region->receivers,
+		memory_region->receiver_count, page_pool,
+		memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
 		orig_from_mode_ret);
 	if (ret.func != FFA_SUCCESS_32) {
 		/*
