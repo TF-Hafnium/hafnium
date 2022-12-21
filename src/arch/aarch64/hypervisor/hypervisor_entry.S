@@ -66,7 +66,9 @@ image_entry:
 	 * This prevents re-use of stale data cache entries from
 	 * prior bootloader stages.
 	 */
-	adrp x0, ORIGIN_ADDRESS
+	movz x0, :abs_g2_s:ORIGIN_ADDRESS
+	movk x0, :abs_g1_nc:ORIGIN_ADDRESS
+	movk x0, :abs_g0_nc:ORIGIN_ADDRESS
 	adrp x1, image_end
 	sub x1, x1, x0
 	bl arch_cache_data_invalidate_range

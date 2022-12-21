@@ -33,8 +33,9 @@ entry:
 0:	adrp x25, entry
 	add x25, x25, :lo12:entry
 
-	ldr w29, =ORIGIN_ADDRESS
-
+	movz x29, :abs_g2_s:ORIGIN_ADDRESS
+	movk x29, :abs_g1_nc:ORIGIN_ADDRESS
+	movk x29, :abs_g0_nc:ORIGIN_ADDRESS
 	sub x25, x25, x29
 
 	/* Find where the relocations begin and end. */
