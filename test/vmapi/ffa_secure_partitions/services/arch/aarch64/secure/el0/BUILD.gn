@@ -1,0 +1,42 @@
+# Copyright 2023 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+
+config("config") {
+  include_dirs = [
+    "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure/inc",
+    "//test/inc",
+  ]
+}
+
+vm_kernel("sel0_partition") {
+  testonly = true
+
+  deps = [
+    "//src/arch/aarch64/hftest/el0:interrupts",
+    "//test/hftest:hftest_sel0_partition_base",
+    "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure:message_loop",
+  ]
+}
+
+manifest("partition_manifest_service_sp_second") {
+  source = "partition_manifest_service_sp_second.dts"
+  output = "partition_manifest_service_sp_second.dtb"
+}
+
+partition_package("service_sp_second_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp_second.dtb",
+        "sel0_partition.bin",
+        ":partition_manifest_service_sp_second",
+        ":sel0_partition",
+      ] ]
+  output = "service_sp_second_el0_package.img"
+}

@@ -37,9 +37,8 @@ static void check_v1_1_partition_info_descriptors(
 
 	/* Expect a SP as second partition. */
 	EXPECT_EQ(partitions[1].vm_id, SP_ID(1));
-	EXPECT_TRUE(partitions[1].vcpu_count == 8 ||
-		    partitions[1].vcpu_count == 1);
-	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
+	EXPECT_EQ(partitions[1].vcpu_count, 8);
+	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[1].uuid, &uuid));
 	EXPECT_EQ(partitions[1].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
@@ -47,8 +46,9 @@ static void check_v1_1_partition_info_descriptors(
 
 	/* Expect secondary SP as third partition */
 	EXPECT_EQ(partitions[2].vm_id, SP_ID(2));
-	EXPECT_EQ(partitions[2].vcpu_count, 8);
-	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
+	EXPECT_TRUE(partitions[2].vcpu_count == 8 ||
+		    partitions[2].vcpu_count == 1);
+	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[2].uuid, &uuid));
 	EXPECT_EQ(partitions[2].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
@@ -161,7 +161,7 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
 
 	/* Expect a secure partition. */
-	EXPECT_EQ(partitions[0].vm_id, HF_SPMC_VM_ID + 1);
+	EXPECT_EQ(partitions[0].vm_id, HF_SPMC_VM_ID + 2);
 	EXPECT_TRUE(partitions[0].vcpu_count == 8 ||
 		    partitions[0].vcpu_count == 1);
 	EXPECT_EQ(partitions[0].properties,
@@ -244,15 +244,15 @@ TEST(ffa, ffa_partition_info_get_versioned_descriptors)
 
 	/* Expect a SP as second partition. */
 	EXPECT_EQ(partitions_v1_0[1].vm_id, SP_ID(1));
-	EXPECT_TRUE(partitions_v1_0[1].vcpu_count == 8 ||
-		    partitions_v1_0[1].vcpu_count == 1);
+	EXPECT_EQ(partitions_v1_0[1].vcpu_count, 8);
 	EXPECT_EQ(partitions_v1_0[1].properties, FFA_PARTITION_DIRECT_REQ_RECV);
 	EXPECT_EQ(partitions_v1_0[1].properties & FFA_PARTITION_v1_0_RES_MASK,
 		  0);
 
 	/* Expect secondary SP as third partition. */
 	EXPECT_EQ(partitions_v1_0[2].vm_id, SP_ID(2));
-	EXPECT_EQ(partitions_v1_0[2].vcpu_count, 8);
+	EXPECT_TRUE(partitions_v1_0[2].vcpu_count == 8 ||
+		    partitions_v1_0[2].vcpu_count == 1);
 	EXPECT_EQ(partitions_v1_0[2].properties, FFA_PARTITION_DIRECT_REQ_RECV);
 	EXPECT_EQ(partitions_v1_0[2].properties & FFA_PARTITION_v1_0_RES_MASK,
 		  0);

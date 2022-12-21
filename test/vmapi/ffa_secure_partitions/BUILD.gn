@@ -12,7 +12,7 @@ import("//src/arch/${plat_arch}/args.gni")
 vm_kernel("vm_primary") {
   testonly = true
   public_configs = [
-    "services:config",
+    "services/arch/${plat_arch}/secure:config",
     "//src/arch/${plat_arch}:arch_config",
   ]
 
@@ -34,54 +34,6 @@ vm_kernel("vm_primary") {
   ]
 }
 
-# SP that will be controlled via communication/scheduling primitives by the
-# former SP
-vm_kernel("secure_partitions_services") {
-  testonly = true
-  public_configs = [ "services:config" ]
-
-  deps = [
-    "services:message_loop",
-    "//test/hftest:hftest_secure_service",
-  ]
-}
-
-manifest("partition_manifest_service_sp_first") {
-  source = "partition_manifest_service_sp_first.dts"
-  output = "partition_manifest_service_sp_first.dtb"
-}
-
-manifest("partition_manifest_service_sp_second") {
-  source = "partition_manifest_service_sp_second.dts"
-  output = "partition_manifest_service_sp_second.dtb"
-}
-
-partition_package("service_sp_second_package") {
-  testonly = true
-  pm_offset = "0x1000"
-  img_offset = "0x2000"
-  files = [ [
-        "partition_manifest_service_sp_second.dtb",
-        "secure_partitions_services.bin",
-        ":partition_manifest_service_sp_second",
-        ":secure_partitions_services",
-      ] ]
-  output = "service_sp_second_package.img"
-}
-
-partition_package("service_sp_first_package") {
-  testonly = true
-  pm_offset = "0x1000"
-  img_offset = "0x2000"
-  files = [ [
-        "partition_manifest_service_sp_first.dtb",
-        "secure_partitions_services.bin",
-        ":partition_manifest_service_sp_first",
-        ":secure_partitions_services",
-      ] ]
-  output = "service_sp_first_package.img"
-}
-
 manifest("vm_primary_manifest") {
   source = "partition_manifest_nwd_primary.dts"
   output = "partition_manifest_nwd_primary.dtb"
@@ -100,48 +52,21 @@ partition_package("vm_primary_test_package") {
   output = "vm_primary_test_package.img"
 }
 
-vm_kernel("sel0_partition") {
-  testonly = true
-
-  deps = [
-    "services:message_loop",
-    "//test/hftest:hftest_sel0_partition_base",
-  ]
-}
-
-manifest("partition_manifest_service_sp_second_el0") {
-  source = "partition_manifest_service_sp_second_el0.dts"
-  output = "partition_manifest_service_sp_second_el0.dtb"
-}
-
-partition_package("service_sp_second_el0_package") {
-  testonly = true
-  pm_offset = "0x1000"
-  img_offset = "0x2000"
-  files = [ [
-        "partition_manifest_service_sp_second_el0.dtb",
-        "sel0_partition.bin",
-        ":partition_manifest_service_sp_second_el0",
-        ":sel0_partition",
-      ] ]
-  output = "service_sp_second_el0_package.img"
-}
-
 partitions_json("ffa_both_world_partitions_vhe_test") {
   testonly = true
 
   sps = [
     [
-      "service_sp_second_el0_package.img",
-      "manifest_service_sp_second_el0.dts",
-      ":service_sp_second_el0_package",
-      ":partition_manifest_service_sp_second_el0",
+      "service_sp_first_package.img",
+      "services/arch/${plat_arch}/secure/manifest_service_sp_first.dts",
+      "services/arch/${plat_arch}/secure:service_sp_first_package",
+      "services/arch/${plat_arch}/secure:partition_manifest_service_sp_first",
     ],
     [
-      "service_sp_first_package.img",
-      "manifest_service_sp_first.dts",
-      ":service_sp_first_package",
-      ":partition_manifest_service_sp_first",
+      "service_sp_second_el0_package.img",
+      "services/arch/${plat_arch}/secure/el0/manifest_service_sp_second.dts",
+      "services/arch/${plat_arch}/secure/el0:service_sp_second_package",
+      "services//arch/${plat_arch}/secure/el0:partition_manifest_service_sp_second",
     ],
   ]
 
@@ -160,16 +85,16 @@ partitions_json("ffa_both_world_partitions_test") {
 
   sps = [
     [
-      "service_sp_second_package.img",
-      "manifest_service_sp_second.dts",
-      ":service_sp_second_package",
-      ":partition_manifest_service_sp_second",
+      "service_sp_first_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_first.dts",
+      "services/arch/aarch64/secure:service_sp_first_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_first",
     ],
     [
-      "service_sp_first_package.img",
-      "manifest_service_sp_first.dts",
-      ":service_sp_first_package",
-      ":partition_manifest_service_sp_first",
+      "service_sp_second_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_second.dts",
+      "services/arch/aarch64/secure:service_sp_second_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_second",
     ],
   ]
 
