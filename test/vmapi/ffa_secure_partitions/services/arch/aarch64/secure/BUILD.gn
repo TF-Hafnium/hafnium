@@ -67,6 +67,17 @@ source_set("power_mgt") {
   ]
 }
 
+source_set("sp805") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [
+    "sp805.c",
+  ]
+}
+
 source_set("message_loop") {
   testonly = true
   public_configs = [
@@ -93,6 +104,7 @@ vm_kernel("secure_partitions_services") {
 
   deps = [
     ":message_loop",
+    ":sp805",
     "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_secure_service",
   ]
