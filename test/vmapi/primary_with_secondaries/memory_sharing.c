@@ -3589,3 +3589,45 @@ TEST_PRECONDITION(memory_sharing, fail_inconsistent_page_count, hypervisor_only)
 	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
 }
+
+/*
+ * As per FF-A v1.1 EAC0 specification, section 10.11.3.1, the memory ranges
+ * specified in the composite memory region descriptor shall not overlap.
+ * This test validates the error return, if memory ranges do overlap.
+ * The following test doesn't require a world switch. So running test, once
+ * in the system configuration with only the hypervisor should suffice. The
+ * related code is common to SPMC and Hypervisor targets.
+ */
+TEST_PRECONDITION(memory_sharing, fail_page_overlap, hypervisor_only)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_memory_region *memory_region =
+		(struct ffa_memory_region *)mb.send;
+	struct ffa_memory_region_constituent constituents[3][2] = {
+		{{.address = (uint64_t)pages, .page_count = 5},
+		 {.address = (uint64_t)pages + PAGE_SIZE, .page_count = 2}},
+		{{.address = (uint64_t)pages, .page_count = 5},
+		 {.address = (uint64_t)pages, .page_count = 5}},
+		{{.address = (uint64_t)pages, .page_count = 5},
+		 {.address = (uint64_t)pages + PAGE_SIZE * 3,
+		  .page_count = 2}}};
+
+	for (uint32_t i = 0; i < ARRAY_SIZE(constituents); i++) {
+		HFTEST_LOG("Testing constituents in position: %x\n", i);
+
+		EXPECT_EQ(ffa_memory_region_init_single_receiver(
+				  memory_region, HF_MAILBOX_SIZE,
+				  HF_PRIMARY_VM_ID, service1_info->vm_id,
+				  constituents[i], ARRAY_SIZE(constituents[i]),
+				  0, 0, FFA_DATA_ACCESS_RW,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  0);
+		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
+				 FFA_INVALID_PARAMETERS);
+	}
+}
