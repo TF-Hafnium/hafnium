@@ -24,6 +24,19 @@
 		EXPECT_EQ(ffa_error_code(v), (ffa_error)); \
 	} while (0)
 
+#define SERVICE_PARTITION_INFO_GET(service_name, uuid)                         \
+	struct ffa_partition_info *service_name(void)                          \
+	{                                                                      \
+		static struct ffa_partition_info partition;                    \
+		static bool is_set = false;                                    \
+		if (!is_set) {                                                 \
+			ASSERT_EQ(get_ffa_partition_info(uuid, &partition, 1), \
+				  1);                                          \
+			is_set = true;                                         \
+		}                                                              \
+		return &partition;                                             \
+	}
+
 /*
  * The bit 15 of the FF-A ID indicates whether the partition is executing
  * in the normal world, in case it is a Virtual Machine (VM); or in the

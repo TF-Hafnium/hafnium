@@ -364,6 +364,16 @@ static inline uint32_t hf_interrupt_get(void)
 }
 
 /**
+ * Deactivate the physical interrupt.
+ *
+ * Returns 0 on success, or -1 otherwise.
+ */
+static inline int64_t hf_interrupt_deactivate(uint32_t intid)
+{
+	return hf_call(HF_INTERRUPT_DEACTIVATE, intid, intid, 0);
+}
+
+/**
  * Injects a virtual interrupt of the given ID into the given target vCPU.
  * This doesn't cause the vCPU to actually be run immediately; it will be taken
  * when the vCPU is next run, which is up to the scheduler.

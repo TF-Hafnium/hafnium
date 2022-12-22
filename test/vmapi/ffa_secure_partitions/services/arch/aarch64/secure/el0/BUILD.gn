@@ -13,10 +13,22 @@ config("config") {
   ]
 }
 
+source_set("sp_helpers") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [
+    "sp_helpers.c",
+  ]
+}
+
 vm_kernel("sel0_partition") {
   testonly = true
 
   deps = [
+    ":sp_helpers",
     "//src/arch/aarch64/hftest/el0:interrupts",
     "//test/hftest:hftest_sel0_partition_base",
     "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure:message_loop",

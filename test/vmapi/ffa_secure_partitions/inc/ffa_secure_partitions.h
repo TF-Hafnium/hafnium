@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Hafnium Authors.
+ * Copyright 2023 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
 /*
@@ -24,24 +25,16 @@
 	&(struct ffa_uuid)                                              \
 	{                                                               \
 		{                                                       \
-			0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb, \
+			0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, \
 		}                                                       \
 	}
 
-#define SERVICE2                                               \
-	&(struct ffa_uuid)                                     \
-	{                                                      \
-		{                                              \
-			0x5d45882e, 0xf637, 0xa720, 0xe8669dc, \
-		}                                              \
-	}
-
-#define SERVICE3                                             \
-	&(struct ffa_uuid)                                   \
-	{                                                    \
-		{                                            \
-			0xcbd4482f, 0xcbab, 0x4dba, 0x0738d, \
-		}                                            \
+#define SERVICE2                                            \
+	&(struct ffa_uuid)                                  \
+	{                                                   \
+		{                                           \
+			0xa609f132, 0x6b4f, 0x4c14, 0x9489, \
+		}                                           \
 	}
 
 /*
@@ -50,17 +43,3 @@
  */
 struct ffa_partition_info* service1(void);
 struct ffa_partition_info* service2(void);
-struct ffa_partition_info* service3(void);
-
-/* Precondition functions for this test setup. */
-bool service1_is_vm(void);
-bool hypervisor_only(void);
-
-#define SERVICE_VM1 (HF_VM_ID_OFFSET + 1)
-#define SERVICE_VM2 (HF_VM_ID_OFFSET + 2)
-#define SERVICE_VM3 (HF_VM_ID_OFFSET + 3)
-
-#define SELF_INTERRUPT_ID 5
-#define EXTERNAL_INTERRUPT_ID_A 7
-#define EXTERNAL_INTERRUPT_ID_B 8
-#define EXTERNAL_INTERRUPT_ID_C 9

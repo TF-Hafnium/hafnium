@@ -299,3 +299,10 @@ static inline struct ffa_value sp_check_state_transitions_cmd_send(
 
 struct ffa_value sp_check_state_transitions_cmd(ffa_vm_id_t test_source,
 						ffa_vm_id_t companion_sp);
+
+static inline void sp_wait_loop(uint32_t iterations)
+{
+	for (volatile uint64_t loop = 0; loop < iterations; loop++) {
+		/* Wait */
+	}
+}

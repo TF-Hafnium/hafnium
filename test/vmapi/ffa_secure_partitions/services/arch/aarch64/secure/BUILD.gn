@@ -96,6 +96,17 @@ source_set("message_loop") {
   ]
 }
 
+source_set("sp_helpers") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [
+    "sp_helpers.c",
+  ]
+}
+
 # SP that will be controlled via communication/scheduling primitives by the
 # former SP
 vm_kernel("secure_partitions_services") {
@@ -105,6 +116,7 @@ vm_kernel("secure_partitions_services") {
   deps = [
     ":message_loop",
     ":sp805",
+    ":sp_helpers",
     "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_secure_service",
   ]

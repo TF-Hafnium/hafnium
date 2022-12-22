@@ -8,10 +8,31 @@ import("//build/image/image.gni")
 import("//test/hftest/args.gni")
 import("//src/arch/${plat_arch}/args.gni")
 
+config("config") {
+  include_dirs = [ "inc" ]
+}
+
+source_set("ffa_secure_partitions") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/${plat_arch}:config",
+  ]
+
+  sources = [
+    "ffa_secure_partitions.c",
+  ]
+
+  deps = [
+    "//test/vmapi/common",
+  ]
+}
+
 # VM that will control execution of tests in a VM-to-SP set-up
 vm_kernel("vm_primary") {
   testonly = true
   public_configs = [
+    ":config",
     "services/arch/${plat_arch}/secure:config",
     "//src/arch/${plat_arch}:arch_config",
   ]
@@ -26,6 +47,7 @@ vm_kernel("vm_primary") {
   ]
 
   deps = [
+    ":ffa_secure_partitions",
     "//src/arch/${plat_arch}/hftest:interrupts_gicv3",
     "//src/arch/${plat_arch}/hftest:power_mgmt",
     "//test/hftest:hftest_primary_vm",
