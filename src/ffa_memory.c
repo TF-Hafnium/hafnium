@@ -12,12 +12,14 @@
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
 
+#include "hf/addr.h"
 #include "hf/api.h"
 #include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa_internal.h"
 #include "hf/ffa_memory_internal.h"
+#include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/std.h"
 #include "hf/vm.h"
@@ -789,6 +791,82 @@ out:
 	return ret;
 }
 
+static bool is_memory_range_within(ipaddr_t begin, ipaddr_t end,
+				   ipaddr_t in_begin, ipaddr_t in_end)
+{
+	return (ipa_addr(begin) >= ipa_addr(in_begin) &&
+		ipa_addr(begin) < ipa_addr(in_end)) ||
+	       (ipa_addr(end) <= ipa_addr(in_end) &&
+		ipa_addr(end) > ipa_addr(in_begin));
+}
+
+/**
+ * Receives a memory range and looks for overlaps with the remainder
+ * constituents of the memory share/lend/donate operation. Assumes they are
+ * passed in order to avoid having to loop over all the elements at each call.
+ * The function only compares the received memory ranges with those that follow
+ * within the same fragment, and subsequent fragments from the same operation.
+ */
+static bool ffa_memory_check_overlap(
+	struct ffa_memory_region_constituent **fragments,
+	const uint32_t *fragment_constituent_counts,
+	const uint32_t fragment_count, const uint32_t current_fragment,
+	const uint32_t current_constituent)
+{
+	uint32_t i = current_fragment;
+	uint32_t j = current_constituent;
+	ipaddr_t current_begin = ipa_init(fragments[i][j].address);
+	const uint32_t current_page_count = fragments[i][j].page_count;
+	size_t current_size = current_page_count * PAGE_SIZE;
+	ipaddr_t current_end = ipa_add(current_begin, current_size - 1);
+
+	if (current_size == 0 ||
+	    current_size > UINT64_MAX - ipa_addr(current_begin)) {
+		dlog_verbose("Invalid page count. Addr: %x page_count: %x\n",
+			     current_begin, current_page_count);
+		return false;
+	}
+
+	for (; i < fragment_count; i++) {
+		j = (i == current_fragment) ? j + 1 : 0;
+
+		for (; j < fragment_constituent_counts[i]; j++) {
+			ipaddr_t begin = ipa_init(fragments[i][j].address);
+			const uint32_t page_count = fragments[i][j].page_count;
+			size_t size = page_count * PAGE_SIZE;
+			ipaddr_t end = ipa_add(begin, size - 1);
+
+			if (size == 0 || size > UINT64_MAX - ipa_addr(begin)) {
+				dlog_verbose(
+					"Invalid page count. Addr: %x "
+					"page_count: %x\n",
+					begin, page_count);
+				return false;
+			}
+
+			/*
+			 * Check if current ranges is within begin and end, as
+			 * well as the reverse. This should help optimize the
+			 * loop, and reduce the number of iterations.
+			 */
+			if (is_memory_range_within(begin, end, current_begin,
+						   current_end) ||
+			    is_memory_range_within(current_begin, current_end,
+						   begin, end)) {
+				dlog_verbose(
+					"Overlapping memory ranges: %#x - %#x "
+					"with %#x - %#x\n",
+					ipa_addr(begin), ipa_addr(end),
+					ipa_addr(current_begin),
+					ipa_addr(current_end));
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 /**
  * Validates and prepares memory to be sent from the calling VM to another.
  *
@@ -832,6 +910,11 @@ struct ffa_value ffa_send_check_update(
 		for (j = 0; j < fragment_constituent_counts[i]; ++j) {
 			constituents_total_page_count +=
 				fragments[i][j].page_count;
+			if (ffa_memory_check_overlap(
+				    fragments, fragment_constituent_counts,
+				    fragment_count, i, j)) {
+				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
 		}
 	}
 
