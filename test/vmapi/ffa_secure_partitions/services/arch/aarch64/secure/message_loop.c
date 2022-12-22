@@ -77,6 +77,9 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_TWDOG_START_CMD:
 		res = sp_twdog_cmd(ffa_sender(res), res.arg4);
 		break;
+	case SP_TWDOG_MAP_CMD:
+		res = sp_twdog_map_cmd(ffa_sender(res));
+		break;
 	case SP_LAST_INTERRUPT_SERVICED_CMD:
 		res = sp_get_last_interrupt_cmd(ffa_sender(res));
 		break;

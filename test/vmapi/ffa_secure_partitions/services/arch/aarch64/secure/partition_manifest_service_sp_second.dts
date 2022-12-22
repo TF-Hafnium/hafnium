@@ -25,4 +25,16 @@
 	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
 	boot-order = <4>;
 	notification-support; /* Receipt of notifications. */
+
+	device-regions {
+		compatible = "arm,ffa-manifest-device-regions";
+
+		sec_wdog {
+			/* SP805 Trusted Watchdog Module */
+			base-address = <0x00000000 0x2a490000>;
+			pages-count = <32>; /* Two 64KB pages */
+			attributes = <0x3>; /* read-write */
+			interrupts = <56 0x900>;
+		};
+	};
 };

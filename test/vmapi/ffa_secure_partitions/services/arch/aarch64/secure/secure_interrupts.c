@@ -114,6 +114,17 @@ struct ffa_value sp_twdog_cmd(ffa_vm_id_t test_source, uint64_t time)
 	return sp_success(own_id, test_source, time);
 }
 
+struct ffa_value sp_twdog_map_cmd(ffa_vm_id_t test_source)
+{
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	/* Map peripheral(such as secure watchdog timer) address space. */
+	hftest_mm_identity_map((void*)PLAT_ARM_TWDOG_BASE, PLAT_ARM_TWDOG_SIZE,
+			       MM_MODE_R | MM_MODE_W | MM_MODE_D);
+
+	return sp_success(own_id, test_source, 0);
+}
+
 struct ffa_value sp_get_last_interrupt_cmd(ffa_vm_id_t test_source)
 {
 	ffa_vm_id_t own_id = hf_vm_get_id();
