@@ -3552,3 +3552,40 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish_multiple_borrowers)
 		EXPECT_EQ(ptr[i], 0);
 	}
 }
+
+TEST_PRECONDITION(memory_sharing, fail_inconsistent_page_count, hypervisor_only)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_memory_region *memory_region =
+		(struct ffa_memory_region *)mb.send;
+	struct ffa_composite_memory_region *composite;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+	};
+
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  memory_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	/*
+	 * Change the count of composite for the ffa_mem_share call to return
+	 * error.
+	.*/
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+
+	ASSERT_TRUE(composite != NULL);
+
+	if (composite != NULL) {
+		composite->page_count = 100;
+	}
+
+	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
+			 FFA_INVALID_PARAMETERS);
+}
