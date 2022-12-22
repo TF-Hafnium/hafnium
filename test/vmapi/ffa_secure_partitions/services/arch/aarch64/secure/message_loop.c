@@ -67,6 +67,26 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_CHECK_STATE_TRANSITIONS_CMD:
 		res = sp_check_state_transitions_cmd(ffa_sender(res), res.arg4);
 		break;
+	case SP_VIRTUAL_INTERRUPT_CMD:
+		res = sp_virtual_interrupt_cmd(ffa_sender(res),
+					       sp_interrupt_id(res),
+					       sp_is_interrupt_enable(res),
+					       sp_interrupt_pin_type(res));
+		break;
+	case SP_TWDOG_START_CMD:
+		res = sp_twdog_cmd(ffa_sender(res), res.arg4);
+		break;
+	case SP_LAST_INTERRUPT_SERVICED_CMD:
+		res = sp_get_last_interrupt_cmd(ffa_sender(res));
+		break;
+	case SP_SLEEP_CMD:
+		res = sp_sleep_cmd(ffa_sender(res), sp_get_sleep_time(res));
+		break;
+	case SP_FWD_SLEEP_CMD:
+		res = sp_fwd_sleep_cmd(ffa_sender(res), sp_get_sleep_time(res),
+				       sp_get_fwd_sleep_dest(res),
+				       sp_get_fwd_sleep_interrupted_hint(res));
+		break;
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT

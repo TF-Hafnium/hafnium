@@ -78,6 +78,17 @@ source_set("sp805") {
   ]
 }
 
+source_set("secure_interrupts") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [
+    "secure_interrupts.c",
+  ]
+}
+
 source_set("message_loop") {
   testonly = true
   public_configs = [
@@ -93,6 +104,7 @@ source_set("message_loop") {
     ":notifications",
     ":partition_services",
     ":power_mgt",
+    ":secure_interrupts",
   ]
 }
 

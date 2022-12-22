@@ -30,9 +30,26 @@ static inline struct ffa_value sp_error(ffa_vm_id_t sender,
 					0, 0, 0);
 }
 
+static inline struct ffa_value sp_send_response(ffa_vm_id_t sender,
+						ffa_vm_id_t receiver,
+						uint64_t resp)
+{
+	return ffa_msg_send_direct_resp(sender, receiver, resp, 0, 0, 0, 0);
+}
+
 static inline int sp_resp(struct ffa_value res)
 {
 	return (int)res.arg3;
+}
+
+static inline int sp_get_cmd(struct ffa_value res)
+{
+	return (int)res.arg3;
+}
+
+static inline int sp_resp_value(struct ffa_value res)
+{
+	return (int)res.arg4;
 }
 
 /**
@@ -285,7 +302,7 @@ static inline struct ffa_value sp_busy_loop_cmd_send(ffa_vm_id_t test_source,
 }
 
 /**
- * Command to request an SP to perform various state transitions through FFA
+ * Command to request an SP to perform various state transitions through FF-A
  * ABIs.
  */
 #define SP_CHECK_STATE_TRANSITIONS_CMD 0x5052544dU
@@ -299,6 +316,142 @@ static inline struct ffa_value sp_check_state_transitions_cmd_send(
 
 struct ffa_value sp_check_state_transitions_cmd(ffa_vm_id_t test_source,
 						ffa_vm_id_t companion_sp);
+
+/**
+ * Command to request SP to enable/disable a secure virtual interrupt.
+ */
+#define SP_VIRTUAL_INTERRUPT_CMD 0x696e7472U
+
+static inline struct ffa_value sp_virtual_interrupt_cmd_send(
+	ffa_vm_id_t source, ffa_vm_id_t dest, uint32_t interrupt_id,
+	bool enable, uint32_t pin)
+{
+	return ffa_msg_send_direct_req(source, dest, SP_VIRTUAL_INTERRUPT_CMD,
+				       interrupt_id, enable, pin, 0);
+}
+
+static inline uint32_t sp_interrupt_id(struct ffa_value cmd)
+{
+	return cmd.arg4;
+}
+
+static inline uint32_t sp_is_interrupt_enable(struct ffa_value cmd)
+{
+	return cmd.arg5;
+}
+
+static inline uint32_t sp_interrupt_pin_type(struct ffa_value cmd)
+{
+	return cmd.arg6;
+}
+
+struct ffa_value sp_virtual_interrupt_cmd(ffa_vm_id_t source,
+					  uint32_t interrupt_id, bool enable,
+					  uint32_t pin);
+
+/**
+ * Request to start trusted watchdog timer.
+ * The command id is the hex representaton of the string "WDOG".
+ */
+#define SP_TWDOG_START_CMD 0x57444f47U
+
+static inline struct ffa_value sp_twdog_cmd_send(ffa_vm_id_t source,
+						 ffa_vm_id_t dest,
+						 uint64_t time)
+{
+	return ffa_msg_send_direct_req(source, dest, SP_TWDOG_START_CMD, time,
+				       0, 0, 0);
+}
+
+struct ffa_value sp_twdog_cmd(ffa_vm_id_t source, uint64_t time);
+
+/**
+ * Request SP to return the last serviced secure virtual interrupt.
+ *
+ * The command id is the hex representaton of the string "vINT".
+ */
+#define SP_LAST_INTERRUPT_SERVICED_CMD 0x76494e54U
+
+static inline struct ffa_value sp_get_last_interrupt_cmd_send(
+	ffa_vm_id_t source, ffa_vm_id_t dest)
+{
+	return ffa_msg_send_direct_req(
+		source, dest, SP_LAST_INTERRUPT_SERVICED_CMD, 0, 0, 0, 0);
+}
+
+struct ffa_value sp_get_last_interrupt_cmd(ffa_vm_id_t source);
+
+/**
+ * Command to request SP to sleep for the given time in ms.
+ *
+ * The command id is the hex representation of string "slep".
+ */
+#define SP_SLEEP_CMD 0x736c6570U
+
+static inline struct ffa_value sp_sleep_cmd_send(ffa_vm_id_t source,
+						 ffa_vm_id_t dest,
+						 uint32_t sleep_time)
+{
+	return ffa_msg_send_direct_req(source, dest, SP_SLEEP_CMD, sleep_time,
+				       0, 0, 0);
+}
+
+struct ffa_value sp_sleep_cmd(ffa_vm_id_t source, uint32_t sleep_ms);
+
+/**
+ * Command to request SP to forward sleep command for the given time in ms.
+ *
+ * The sender of this command expects to receive SP_SUCCESS if the request to
+ * forward sleep command was handled successfully, or SP_ERROR otherwise.
+ * Moreover, the sender can send a hint to the destination SP to expect that
+ * the forwaded sleep command could be preempted by a non-secure interrupt.
+ */
+#define SP_FWD_SLEEP_CMD (SP_SLEEP_CMD + 1)
+
+static inline struct ffa_value sp_fwd_sleep_cmd_send(ffa_vm_id_t source,
+						     ffa_vm_id_t dest,
+						     ffa_vm_id_t fwd_dest,
+						     uint32_t busy_wait,
+						     bool hint_interrupted)
+{
+	return ffa_msg_send_direct_req(source, dest, SP_FWD_SLEEP_CMD,
+				       busy_wait, fwd_dest, hint_interrupted,
+				       0);
+}
+
+static inline uint32_t sp_get_sleep_time(struct ffa_value ret)
+{
+	return (uint32_t)ret.arg4;
+}
+
+static inline ffa_vm_id_t sp_get_fwd_sleep_dest(struct ffa_value ret)
+{
+	return (ffa_vm_id_t)ret.arg5;
+}
+
+static inline bool sp_get_fwd_sleep_interrupted_hint(struct ffa_value ret)
+{
+	return (bool)ret.arg6;
+}
+
+struct ffa_value sp_fwd_sleep_cmd(ffa_vm_id_t source, uint32_t sleep_ms,
+				  ffa_vm_id_t fwd_dest, bool hint_interrupted);
+
+/**
+ * Command to request SP to resume the task requested by current endpoint after
+ * managed exit.
+ *
+ * The command id is the hex representation of the string "RAME" which denotes
+ * (R)esume (A)fter (M)anaged (E)xit.
+ */
+#define SP_RESUME_AFTER_MANAGED_EXIT 0x52414d45U
+
+static inline struct ffa_value sp_resume_after_managed_exit_send(
+	ffa_vm_id_t source, ffa_vm_id_t dest)
+{
+	return ffa_msg_send_direct_req(
+		source, dest, SP_RESUME_AFTER_MANAGED_EXIT, 0, 0, 0, 0);
+}
 
 static inline void sp_wait_loop(uint32_t iterations)
 {
