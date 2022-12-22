@@ -43,6 +43,7 @@ vm_kernel("vm_primary") {
     "interrupts.c",
     "notifications.c",
     "power_mgt.c",
+    "secure_interrupts.c",
     "setup_and_discovery.c",
   ]
 
