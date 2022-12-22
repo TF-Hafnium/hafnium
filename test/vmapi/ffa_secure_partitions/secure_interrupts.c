@@ -162,3 +162,35 @@ TEST(secure_interrupts, sp_waiting)
 
 	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
 }
+
+/*
+ * Test secure interrupt handling while the Secure Partition is in BLOCKED
+ * state.
+ */
+TEST(secure_interrupts, sp_blocked)
+{
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_info *service1_info = service1();
+	struct ffa_partition_info *service2_info = service2();
+	const ffa_vm_id_t receiver_id = service2_info->vm_id;
+	const ffa_vm_id_t companion_id = service1_info->vm_id;
+
+	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 400);
+
+	/*
+	 * Send command to receiver SP to send command to companion SP to sleep
+	 * there by putting receiver SP in BLOCKED state.
+	 */
+	res = sp_fwd_sleep_cmd_send(own_id, receiver_id, companion_id,
+				    SP_SLEEP_TIME, false);
+
+	/*
+	 * Secure interrupt should trigger during this time, receiver SP will
+	 * handle the trusted watchdog timer and sends direct response message.
+	 */
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
+}
