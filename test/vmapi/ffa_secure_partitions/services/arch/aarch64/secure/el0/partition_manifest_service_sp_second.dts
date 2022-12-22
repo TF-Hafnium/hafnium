@@ -22,7 +22,7 @@
   entrypoint-offset = <0x2000>;
   xlat-granule = <0>; /* 4KiB */
   messaging-method = <0x7>; /* Support direct and indirect messaging. */
-  ns-interrupts-action = <0>; /* NS interrupts are queued */
+  ns-interrupts-action = <2>; /* NS interrupts are signaled */
   boot-order = <4>;
   notification-support; /* Receipt of notifications. */
 
