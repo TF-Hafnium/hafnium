@@ -150,3 +150,15 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 		/* Hang if the service returns. */
 	}
 }
+
+ffa_vm_id_t hftest_get_dir_req_source_id()
+{
+	struct hftest_context *ctx = hftest_get_context();
+	return ctx->dir_req_source_id;
+}
+
+void hftest_set_dir_req_source_id(ffa_vm_id_t id)
+{
+	struct hftest_context *ctx = hftest_get_context();
+	ctx->dir_req_source_id = id;
+}

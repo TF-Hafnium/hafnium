@@ -138,6 +138,7 @@ struct hftest_context {
 	void *send;
 	void *recv;
 	size_t memory_size;
+	ffa_vm_id_t dir_req_source_id;
 };
 
 struct hftest_context *hftest_get_context(void);

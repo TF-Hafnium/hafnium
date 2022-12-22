@@ -161,6 +161,17 @@ bool hftest_cpu_start(uintptr_t id, void *stack, size_t stack_size,
 uintptr_t hftest_get_cpu_id(size_t index);
 
 noreturn void hftest_service_main(const void *fdt_ptr);
+
+/*
+ * Return the field tracking the source of the direct request message.
+ */
+ffa_vm_id_t hftest_get_dir_req_source_id();
+
+/*
+ * Set the field tracking the source of the direct request message.
+ */
+void hftest_set_dir_req_source_id(ffa_vm_id_t id);
+
 /* Above this point is the public API. Now include the implementation. */
 #include "hftest_impl.h"
 
