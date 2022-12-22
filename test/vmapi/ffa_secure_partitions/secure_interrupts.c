@@ -6,11 +6,39 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/barriers.h"
+
 #include "ffa_secure_partitions.h"
+#include "msr.h"
 #include "partition_services.h"
 #include "sp_helpers.h"
 
 #define SP_SLEEP_TIME 400U
+#define NS_SLEEP_TIME 200U
+
+static inline uint64_t syscounter_read(void)
+{
+	isb();
+	return read_msr(cntvct_el0);
+}
+
+static void waitus(uint64_t us)
+{
+	uint64_t start_count_val = syscounter_read();
+	uint64_t wait_cycles = (us * read_msr(cntfrq_el0)) / 1000000;
+
+	while ((syscounter_read() - start_count_val) < wait_cycles) {
+		/* Busy wait... */;
+	}
+}
+
+static void waitms(uint64_t ms)
+{
+	while (ms > 0) {
+		waitus(1000);
+		ms--;
+	}
+}
 
 static void configure_trusted_wdog_interrupt(ffa_vm_id_t source,
 					     ffa_vm_id_t dest, bool enable)
@@ -101,6 +129,36 @@ TEST(secure_interrupts, sp_running)
 
 	/* Make sure elapsed time not less than sleep time. */
 	EXPECT_GE(sp_resp_value(res), SP_SLEEP_TIME);
+
+	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
+}
+
+/*
+ * Test secure interrupt handling while the Secure Partition is in WAITING
+ * state.
+ */
+TEST(secure_interrupts, sp_waiting)
+{
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_info *service2_info = service2();
+	const ffa_vm_id_t receiver_id = service2_info->vm_id;
+	uint64_t time1;
+	volatile uint64_t time_lapsed;
+	uint64_t timer_freq = read_msr(cntfrq_el0);
+
+	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 100);
+	time1 = syscounter_read();
+
+	/*
+	 * Sleep for NS_SLEEP_TIME ms. This ensures secure wdog timer triggers
+	 * during this time.
+	 */
+	waitms(NS_SLEEP_TIME);
+
+	/* Lapsed time should be at least equal to sleep time. */
+	time_lapsed = ((syscounter_read() - time1) * 1000) / timer_freq;
+
+	EXPECT_GE(time_lapsed, NS_SLEEP_TIME);
 
 	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
 }
