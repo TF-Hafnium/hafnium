@@ -17,3 +17,7 @@ uint64_t sp_sleep_active_wait(uint32_t ms)
 	sp_wait_loop(ms * ITERATIONS_PER_MS);
 	return ms;
 }
+
+void sp_enable_irq(void)
+{
+}

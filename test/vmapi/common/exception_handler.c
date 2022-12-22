@@ -20,6 +20,11 @@
 static int exception_handler_exception_count = 0;
 
 /**
+ * Tracks the virtual interrupt that was last handled by SP.
+ */
+static uint32_t last_serviced_interrupt = 0;
+
+/**
  * Sends the number of exceptions handled to the Primary VM.
  */
 void exception_handler_send_exception_count(void)
@@ -184,4 +189,20 @@ int exception_handler_get_num(void)
 void exception_handler_reset(void)
 {
 	exception_handler_exception_count = 0;
+}
+
+/**
+ * Updates the last serviced virtual interrupt ID.
+ */
+void exception_handler_set_last_interrupt(uint32_t id)
+{
+	last_serviced_interrupt = id;
+}
+
+/**
+ * Returns the last serviced virtual interrupt ID.
+ */
+uint32_t exception_handler_get_last_interrupt(void)
+{
+	return last_serviced_interrupt;
 }

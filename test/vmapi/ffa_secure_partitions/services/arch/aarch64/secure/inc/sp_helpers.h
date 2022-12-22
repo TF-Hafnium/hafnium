@@ -12,3 +12,4 @@
 #define IRQ_TWDOG_INTID 56
 
 uint64_t sp_sleep_active_wait(uint32_t ms);
+void sp_enable_irq(void);

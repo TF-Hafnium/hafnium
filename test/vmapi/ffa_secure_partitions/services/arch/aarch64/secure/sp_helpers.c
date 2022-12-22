@@ -31,3 +31,8 @@ uint64_t sp_sleep_active_wait(uint32_t ms)
 
 	return ((time2 - time1) * 1000) / timer_freq;
 }
+
+void sp_enable_irq(void)
+{
+	arch_irq_enable();
+}

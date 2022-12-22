@@ -17,10 +17,67 @@
 #include "sp805.h"
 #include "sp_helpers.h"
 #include "test/hftest.h"
+#include "test/vmapi/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 #define PLAT_ARM_TWDOG_BASE 0x2a490000
 #define PLAT_ARM_TWDOG_SIZE 0x20000
+
+static void send_managed_exit_response(ffa_vm_id_t dir_req_source_id)
+{
+	struct ffa_value ffa_ret;
+	bool waiting_resume_after_managed_exit;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	/* Send managed exit response. */
+	ffa_ret = sp_send_response(own_id, dir_req_source_id,
+				   HF_MANAGED_EXIT_INTID);
+	waiting_resume_after_managed_exit = true;
+
+	while (waiting_resume_after_managed_exit) {
+		waiting_resume_after_managed_exit =
+			(ffa_ret.func != FFA_MSG_SEND_DIRECT_REQ_32) ||
+			ffa_sender(ffa_ret) != dir_req_source_id ||
+			sp_get_cmd(ffa_ret) != SP_RESUME_AFTER_MANAGED_EXIT;
+
+		if (waiting_resume_after_managed_exit) {
+			HFTEST_LOG(
+				"Expected a direct message request from "
+				"endpoint %x with command "
+				"SP_RESUME_AFTER_MANAGED_EXIT",
+				dir_req_source_id);
+			ffa_ret = sp_error(own_id, ffa_sender(ffa_ret), 0);
+		}
+	}
+	HFTEST_LOG("Resuming the suspended command");
+}
+
+static void irq_current(void)
+{
+	uint32_t intid;
+	ffa_vm_id_t dir_req_source_id = hftest_get_dir_req_source_id();
+
+	intid = hf_interrupt_get();
+
+	if (intid == HF_MANAGED_EXIT_INTID) {
+		HFTEST_LOG("vIRQ: Sending ME response to %x",
+			   dir_req_source_id);
+		send_managed_exit_response(dir_req_source_id);
+	} else {
+		ASSERT_EQ(intid, IRQ_TWDOG_INTID);
+
+		/*
+		 * Interrupt triggered due to Trusted watchdog timer expiry.
+		 * Clear the interrupt and stop the timer.
+		 */
+		HFTEST_LOG("Trusted WatchDog timer stopped: %u", intid);
+		sp805_twdog_stop();
+
+		/* Perform secure interrupt de-activation. */
+		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+		exception_handler_set_last_interrupt(intid);
+	}
+}
 
 struct ffa_value sp_virtual_interrupt_cmd(ffa_vm_id_t test_source,
 					  uint32_t interrupt_id, bool enable,
@@ -33,6 +90,15 @@ struct ffa_value sp_virtual_interrupt_cmd(ffa_vm_id_t test_source,
 	if (ret != 0) {
 		return sp_error(own_id, test_source, 0);
 	}
+
+	ASSERT_EQ(pin, INTERRUPT_TYPE_IRQ);
+
+	/*
+	 * Register interrupt handler for virtual interrupt signaled by
+	 * SPMC through vIRQ.
+	 */
+	exception_setup(irq_current, NULL);
+	sp_enable_irq();
 
 	return sp_success(own_id, test_source, 0);
 }
@@ -52,7 +118,8 @@ struct ffa_value sp_get_last_interrupt_cmd(ffa_vm_id_t test_source)
 {
 	ffa_vm_id_t own_id = hf_vm_get_id();
 
-	return sp_success(own_id, test_source, 0);
+	return sp_success(own_id, test_source,
+			  exception_handler_get_last_interrupt());
 }
 
 static bool is_expected_sp_response(struct ffa_value ret,
