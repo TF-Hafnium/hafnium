@@ -9,6 +9,7 @@
 #include "vmapi/hf/call.h"
 
 #include "partition_services.h"
+#include "sp_helpers.h"
 #include "test/abort.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
@@ -125,6 +126,10 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 				HFTEST_LOG("Received direct message request");
 			}
 			res = handle_direct_req_cmd(res);
+		} else if (res.func == FFA_INTERRUPT_32) {
+			res = handle_ffa_interrupt(res);
+		} else if (res.func == FFA_RUN_32) {
+			res = handle_ffa_run(res);
 		} else {
 			HFTEST_LOG_FAILURE();
 			HFTEST_LOG(HFTEST_LOG_INDENT

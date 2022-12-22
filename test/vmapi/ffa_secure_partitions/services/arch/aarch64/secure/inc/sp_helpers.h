@@ -13,3 +13,5 @@
 
 uint64_t sp_sleep_active_wait(uint32_t ms);
 void sp_enable_irq(void);
+struct ffa_value handle_ffa_interrupt(struct ffa_value res);
+struct ffa_value handle_ffa_run(struct ffa_value res);

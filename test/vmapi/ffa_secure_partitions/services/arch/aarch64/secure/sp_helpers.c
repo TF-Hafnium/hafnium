@@ -12,6 +12,12 @@
 #include "hf/arch/irq.h"
 #include "hf/arch/vm/timer.h"
 
+#include "vmapi/hf/call.h"
+
+#include "sp805.h"
+#include "test/abort.h"
+#include "test/hftest.h"
+
 static inline uint64_t virtualcounter_read(void)
 {
 	isb();
@@ -35,4 +41,27 @@ uint64_t sp_sleep_active_wait(uint32_t ms)
 void sp_enable_irq(void)
 {
 	arch_irq_enable();
+}
+
+struct ffa_value handle_ffa_interrupt(struct ffa_value res)
+{
+	/*
+	 * Received FFA_INTERRUPT in waiting state. The
+	 * interrupt ID is passed although this is just
+	 * informational as we're running with virtual
+	 * interrupts unmasked and the interrupt is processed by
+	 * the interrupt handler.
+	 */
+	ASSERT_EQ(res.arg1, 0);
+	return ffa_msg_wait();
+}
+
+struct ffa_value handle_ffa_run(struct ffa_value res)
+{
+	/*
+	 * Received FFA_RUN in waiting state, the endpoint
+	 * simply returns by FFA_MSG_WAIT.
+	 */
+	ASSERT_EQ(res.arg1, 0);
+	return ffa_msg_wait();
 }
