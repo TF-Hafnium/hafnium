@@ -418,6 +418,18 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 				  .arg3 = partition_info_size};
 }
 
+struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
+						 const struct ffa_uuid *uuid,
+						 const uint16_t start_index,
+						 const uint16_t tag)
+{
+	(void)current;
+	(void)uuid;
+	(void)start_index;
+	(void)tag;
+	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					    const struct ffa_uuid *uuid,
 					    const uint32_t flags)
@@ -2260,6 +2272,7 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id)
 	case FFA_MEM_PERM_GET_64:
 	case FFA_MEM_PERM_SET_64:
 	case FFA_MSG_SEND2_32:
+	case FFA_PARTITION_INFO_GET_REGS_64:
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 
