@@ -187,6 +187,19 @@ void arch_regs_set_retval(struct arch_regs *r, struct ffa_value v)
 	r->r[5] = v.arg5;
 	r->r[6] = v.arg6;
 	r->r[7] = v.arg7;
+
+	if (v.extended_val.valid) {
+		r->r[8] = v.extended_val.arg8;
+		r->r[9] = v.extended_val.arg9;
+		r->r[10] = v.extended_val.arg10;
+		r->r[11] = v.extended_val.arg11;
+		r->r[12] = v.extended_val.arg12;
+		r->r[13] = v.extended_val.arg13;
+		r->r[14] = v.extended_val.arg14;
+		r->r[15] = v.extended_val.arg15;
+		r->r[16] = v.extended_val.arg16;
+		r->r[17] = v.extended_val.arg17;
+	}
 }
 
 struct ffa_value arch_regs_get_args(struct arch_regs *regs)
@@ -200,6 +213,7 @@ struct ffa_value arch_regs_get_args(struct arch_regs *regs)
 		.arg5 = regs->r[5],
 		.arg6 = regs->r[6],
 		.arg7 = regs->r[7],
+		.extended_val.valid = false,
 	};
 }
 

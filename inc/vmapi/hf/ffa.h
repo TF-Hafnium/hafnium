@@ -341,6 +341,20 @@ struct ffa_value {
 	uint64_t arg5;
 	uint64_t arg6;
 	uint64_t arg7;
+
+	struct {
+		uint64_t arg8;
+		uint64_t arg9;
+		uint64_t arg10;
+		uint64_t arg11;
+		uint64_t arg12;
+		uint64_t arg13;
+		uint64_t arg14;
+		uint64_t arg15;
+		uint64_t arg16;
+		uint64_t arg17;
+		bool valid;
+	} extended_val;
 };
 
 static inline uint32_t ffa_func_id(struct ffa_value args)
