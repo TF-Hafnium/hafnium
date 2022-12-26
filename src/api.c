@@ -37,7 +37,11 @@ static_assert(sizeof(struct ffa_partition_info_v1_0) == 8,
 static_assert(sizeof(struct ffa_partition_info) == 24,
 	      "Partition information descriptor size doesn't match the one in "
 	      "the FF-A 1.1 BETA0 EAC specification, Table 13.34.");
-
+static_assert((sizeof(struct ffa_partition_info) & 7) == 0,
+	      "Partition information descriptor must be a multiple of 8 bytes"
+	      " for ffa_partition_info_get_regs to work correctly. Information"
+	      " from this structure are returned in 8 byte registers and the"
+	      " count of 8 byte registers is returned by the ABI.");
 /*
  * To eliminate the risk of deadlocks, we define a partial order for the
  * acquisition of locks held concurrently by the same physical CPU. Our current
@@ -418,16 +422,155 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 				  .arg3 = partition_info_size};
 }
 
+static void api_ffa_fill_partitions_info_array(
+	struct ffa_partition_info *partitions, size_t partitions_len,
+	const struct ffa_uuid *uuid, bool count_flag, ffa_vm_id_t vm_id,
+	ffa_vm_count_t *vm_count_out)
+{
+	ffa_vm_count_t vm_count = 0;
+	bool uuid_is_null = ffa_uuid_is_null(uuid);
+
+	assert(vm_get_count() <= partitions_len);
+
+	/*
+	 * Iterate through the VMs to find the ones with a matching
+	 * UUID. A Null UUID retrieves information for all VMs.
+	 */
+	for (ffa_vm_count_t index = 0; index < vm_get_count(); ++index) {
+		struct vm *vm = vm_find_index(index);
+
+		if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuid)) {
+			uint16_t array_index = vm_count;
+
+			++vm_count;
+			if (count_flag) {
+				continue;
+			}
+
+			partitions[array_index].vm_id = vm->id;
+			partitions[array_index].vcpu_count = vm->vcpu_count;
+			partitions[array_index].properties =
+				plat_ffa_partition_properties(vm_id, vm);
+			partitions[array_index].properties |=
+				vm_are_notifications_enabled(vm)
+					? FFA_PARTITION_NOTIFICATION
+					: 0;
+			partitions[array_index].properties |=
+				FFA_PARTITION_AARCH64_EXEC;
+			if (uuid_is_null) {
+				partitions[array_index].uuid = vm->uuid;
+			}
+		}
+	}
+
+	*vm_count_out = vm_count;
+}
 struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 						 const struct ffa_uuid *uuid,
 						 const uint16_t start_index,
 						 const uint16_t tag)
 {
-	(void)current;
-	(void)uuid;
-	(void)start_index;
-	(void)tag;
-	return ffa_error(FFA_NOT_SUPPORTED);
+	struct vm *current_vm = current->vm;
+	static struct ffa_partition_info partitions[MAX_VMS];
+	bool uuid_is_null = ffa_uuid_is_null(uuid);
+	ffa_vm_count_t vm_count = 0;
+	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
+	uint16_t max_idx = 0;
+	uint16_t curr_idx = 0;
+	uint8_t max_entries_per_call = 0;
+	uint8_t num_entries_to_ret = 0;
+	uint8_t arg_idx = 0;
+	/* list of pointers to args in return value */
+	uint64_t *arg_ptrs[15] = {
+		&ret.arg3,
+		&ret.arg4,
+		&ret.arg5,
+		&ret.arg6,
+		&ret.arg7,
+		&ret.extended_val.arg8,
+		&ret.extended_val.arg9,
+		&ret.extended_val.arg10,
+		&ret.extended_val.arg11,
+		&ret.extended_val.arg12,
+		&ret.extended_val.arg13,
+		&ret.extended_val.arg14,
+		&ret.extended_val.arg15,
+		&ret.extended_val.arg16,
+		&ret.extended_val.arg17,
+	};
+
+	/* TODO: Add support for using tags */
+	if (tag != 0) {
+		return ffa_error(FFA_RETRY);
+	}
+
+	memset_s(&partitions, sizeof(partitions), 0, sizeof(partitions));
+
+	api_ffa_fill_partitions_info_array(partitions, ARRAY_SIZE(partitions),
+					   uuid, false, current_vm->id,
+					   &vm_count);
+
+	/* If UUID is Null vm_count must not be zero at this stage. */
+	CHECK(!uuid_is_null || vm_count != 0);
+
+	/* TODO: Forward to secure world */
+
+	/*
+	 * Unrecognized UUID: does not match any of the VMs (or SPs)
+	 * and is not Null.
+	 */
+	if (vm_count == 0 || vm_count > vm_get_count()) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (start_index >= vm_count) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Max entries that can be returned is size in bytes, of available
+	 * registers divided by size of struct ffa_partition_info. For this
+	 * ABI, arg3-arg17 in ffa_value can be used, ie 15 uint64_t fields.
+	 * For FF-A V1.1, this should be 5.
+	 */
+	max_entries_per_call =
+		(15 * sizeof(uint64_t)) / sizeof(struct ffa_partition_info);
+	assert(max_entries_per_call == 5);
+
+	max_idx = (uint16_t)(vm_count - 1);
+	num_entries_to_ret = (max_idx - start_index) + 1;
+	num_entries_to_ret = num_entries_to_ret > max_entries_per_call
+				     ? max_entries_per_call
+				     : num_entries_to_ret;
+	curr_idx = start_index + num_entries_to_ret - 1;
+	assert(curr_idx <= max_idx);
+
+	ret.func = FFA_SUCCESS_64;
+	ret.arg2 = (sizeof(struct ffa_partition_info) & 0xFFFF) << 48;
+	ret.arg2 |= curr_idx << 16;
+	ret.arg2 |= max_idx;
+
+	if (num_entries_to_ret > 1) {
+		ret.extended_val.valid = 1;
+	}
+
+	for (uint16_t idx = start_index; idx <= curr_idx; ++idx) {
+		uint64_t *arg1 = arg_ptrs[arg_idx++];
+		uint64_t *arg2 = arg_ptrs[arg_idx++];
+		uint64_t *arg3 = arg_ptrs[arg_idx++];
+		*arg1 = (uint64_t)(partitions[idx].vm_id);
+		*arg1 |= (uint64_t)(partitions[idx].vcpu_count) << 16;
+		*arg1 |= (uint64_t)(partitions[idx].properties) << 32;
+		if (uuid_is_null) {
+			*arg2 = (uint64_t)partitions[idx].uuid.uuid[0];
+			*arg2 |= (uint64_t)partitions[idx].uuid.uuid[1] << 32;
+			*arg3 = (uint64_t)partitions[idx].uuid.uuid[2];
+			*arg3 |= (uint64_t)partitions[idx].uuid.uuid[3] << 32;
+		}
+		assert(arg_idx < ARRAY_SIZE(arg_ptrs));
+	}
+
+	return ret;
 }
 
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
@@ -455,38 +598,9 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	if (uuid_is_null && count_flag) {
 		vm_count = vm_get_count();
 	} else {
-		/*
-		 * Iterate through the VMs to find the ones with a matching
-		 * UUID. A Null UUID retrieves information for all VMs.
-		 */
-		for (uint16_t index = 0; index < vm_get_count(); ++index) {
-			struct vm *vm = vm_find_index(index);
-
-			if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuid)) {
-				uint16_t array_index = vm_count;
-
-				++vm_count;
-				if (count_flag) {
-					continue;
-				}
-
-				partitions[array_index].vm_id = vm->id;
-				partitions[array_index].vcpu_count =
-					vm->vcpu_count;
-				partitions[array_index].properties =
-					plat_ffa_partition_properties(
-						current_vm->id, vm);
-				partitions[array_index].properties |=
-					vm_are_notifications_enabled(vm)
-						? FFA_PARTITION_NOTIFICATION
-						: 0;
-				partitions[array_index].properties |=
-					FFA_PARTITION_AARCH64_EXEC;
-				if (uuid_is_null) {
-					partitions[array_index].uuid = vm->uuid;
-				}
-			}
-		}
+		api_ffa_fill_partitions_info_array(
+			partitions, ARRAY_SIZE(partitions), uuid, count_flag,
+			current_vm->id, &vm_count);
 	}
 
 	/* If UUID is Null vm_count must not be zero at this stage. */
