@@ -528,6 +528,11 @@ sve_skip_context_restore:
 	ldp x2, x3, [x19, #VCPU_REGS + 8 * 2]
 	ldp x4, x5, [x19, #VCPU_REGS + 8 * 4]
 	ldp x6, x7, [x19, #VCPU_REGS + 8 * 6]
+	ldp x8, x9, [x19, #VCPU_REGS + 8 * 8]
+	ldp x10, x11, [x19, #VCPU_REGS + 8 * 10]
+	ldp x12, x13, [x19, #VCPU_REGS + 8 * 12]
+	ldp x14, x15, [x19, #VCPU_REGS + 8 * 14]
+	ldp x16, x17, [x19, #VCPU_REGS + 8 * 16]
 
 #if BRANCH_PROTECTION
 	/*
@@ -567,6 +572,11 @@ sve_skip_context_restore:
 	stp x2, x3, [x19, #VCPU_REGS + 8 * 2]
 	stp x4, x5, [x19, #VCPU_REGS + 8 * 4]
 	stp x6, x7, [x19, #VCPU_REGS + 8 * 6]
+	stp x8, x9, [x19, #VCPU_REGS + 8 * 8]
+	stp x10, x11, [x19, #VCPU_REGS + 8 * 10]
+	stp x12, x13, [x19, #VCPU_REGS + 8 * 12]
+	stp x14, x15, [x19, #VCPU_REGS + 8 * 14]
+	stp x16, x17, [x19, #VCPU_REGS + 8 * 16]
 
 	/* Save FP status and control registers. */
 	mrs x0, fpsr
