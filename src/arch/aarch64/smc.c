@@ -25,12 +25,24 @@ static struct ffa_value smc_internal(uint32_t func, uint64_t arg0,
 	register uint64_t r5 __asm__("x5") = arg4;
 	register uint64_t r6 __asm__("x6") = arg5;
 	register uint64_t r7 __asm__("x7") = arg6;
+	register uint64_t r8 __asm__("x8");
+	register uint64_t r9 __asm__("x9");
+	register uint64_t r10 __asm__("x10");
+	register uint64_t r11 __asm__("x11");
+	register uint64_t r12 __asm__("x12");
+	register uint64_t r13 __asm__("x13");
+	register uint64_t r14 __asm__("x14");
+	register uint64_t r15 __asm__("x15");
+	register uint64_t r16 __asm__("x16");
+	register uint64_t r17 __asm__("x17");
 
 	__asm__ volatile(
 		"smc #0"
 		: /* Output registers, also used as inputs ('+' constraint). */
 		"+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3), "+r"(r4), "+r"(r5),
-		"+r"(r6), "+r"(r7));
+		"+r"(r6), "+r"(r7), "=r"(r8), "=r"(r9), "=r"(r10), "=r"(r11),
+		"=r"(r12), "=r"(r13), "=r"(r14), "=r"(r15), "=r"(r16),
+		"=r"(r17));
 
 	return (struct ffa_value){.func = r0,
 				  .arg1 = r1,
@@ -39,7 +51,18 @@ static struct ffa_value smc_internal(uint32_t func, uint64_t arg0,
 				  .arg4 = r4,
 				  .arg5 = r5,
 				  .arg6 = r6,
-				  .arg7 = r7};
+				  .arg7 = r7,
+				  .extended_val.valid = 1,
+				  .extended_val.arg8 = r8,
+				  .extended_val.arg9 = r9,
+				  .extended_val.arg10 = r10,
+				  .extended_val.arg11 = r11,
+				  .extended_val.arg12 = r12,
+				  .extended_val.arg13 = r13,
+				  .extended_val.arg14 = r14,
+				  .extended_val.arg15 = r15,
+				  .extended_val.arg16 = r16,
+				  .extended_val.arg17 = r17};
 }
 
 /** Make an SMC call following the 32-bit SMC calling convention. */
