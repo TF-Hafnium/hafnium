@@ -22,6 +22,17 @@ source_set("common") {
   sources = [ "common.c" ]
 }
 
+source_set("setup_and_discovery") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "setup_and_discovery.c" ]
+
+  deps = [ ":common" ]
+}
+
 source_set("partition_services") {
   testonly = true
   public_configs = [
@@ -88,6 +99,7 @@ source_set("message_loop") {
     ":partition_services",
     ":power_mgt",
     ":secure_interrupts",
+    ":setup_and_discovery",
   ]
 }
 

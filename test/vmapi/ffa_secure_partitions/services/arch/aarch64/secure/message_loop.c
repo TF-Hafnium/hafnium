@@ -83,6 +83,9 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 				       sp_get_fwd_sleep_dest(res),
 				       sp_get_fwd_sleep_interrupted_hint(res));
 		break;
+	case SP_CHECK_PARTITION_INFO_GET_REGS_CMD:
+		res = sp_check_partition_info_get_regs_cmd(ffa_sender(res));
+		break;
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT

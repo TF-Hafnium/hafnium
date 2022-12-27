@@ -20,6 +20,18 @@ TEAR_DOWN(ffa)
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
+TEST(ffa, ffa_partition_info_get_regs_sp_test)
+{
+	const ffa_vm_id_t receiver_id = SP_ID(1);
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	res = sp_check_partition_info_get_regs_cmd_send(own_id, receiver_id);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+}
+
 TEST(ffa, ffa_partition_info_get_regs_uuid_null)
 {
 	struct ffa_value ret;

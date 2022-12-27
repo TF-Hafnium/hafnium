@@ -434,3 +434,18 @@ static inline void sp_wait_loop(uint32_t iterations)
 		/* Wait */
 	}
 }
+
+/**
+ * Command to request an SP to perform checks using ffa_partition_info_get_regs
+ * ABI.
+ */
+#define SP_CHECK_PARTITION_INFO_GET_REGS_CMD 0x5054567DU
+static inline struct ffa_value sp_check_partition_info_get_regs_cmd_send(
+	ffa_vm_id_t test_source, ffa_vm_id_t receiver)
+{
+	return ffa_msg_send_direct_req(test_source, receiver,
+				       SP_CHECK_PARTITION_INFO_GET_REGS_CMD, 0,
+				       0, 0, 0);
+}
+
+struct ffa_value sp_check_partition_info_get_regs_cmd(ffa_vm_id_t test_source);
