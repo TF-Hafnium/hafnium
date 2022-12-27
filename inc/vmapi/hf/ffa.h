@@ -393,6 +393,29 @@ static inline uint32_t ffa_partition_info_get_count(struct ffa_value args)
 	return args.arg2;
 }
 
+static inline uint16_t ffa_partition_info_regs_get_last_idx(
+	struct ffa_value args)
+{
+	return args.arg2 & 0xFFFF;
+}
+
+static inline uint16_t ffa_partition_info_regs_get_curr_idx(
+	struct ffa_value args)
+{
+	return (args.arg2 >> 16) & 0xFFFF;
+}
+
+static inline uint16_t ffa_partition_info_regs_get_tag(struct ffa_value args)
+{
+	return (args.arg2 >> 32) & 0xFFFF;
+}
+
+static inline uint16_t ffa_partition_info_regs_get_desc_size(
+	struct ffa_value args)
+{
+	return (args.arg2 >> 48);
+}
+
 static inline ffa_memory_handle_t ffa_assemble_handle(uint32_t a1, uint32_t a2)
 {
 	return (uint64_t)a1 | (uint64_t)a2 << 32;

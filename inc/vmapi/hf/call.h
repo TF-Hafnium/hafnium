@@ -39,6 +39,26 @@ static inline struct ffa_value ffa_spm_id_get(void)
 }
 
 /**
+ * Requests information for partitions instantiated in the system via registers
+ * (as opposed to rx buffer in the case of ffa_partition_info_get).
+ */
+static inline struct ffa_value ffa_partition_info_get_regs(
+	const struct ffa_uuid *uuid, const uint16_t start_index,
+	const uint16_t tag)
+{
+	uint64_t arg1 = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
+	uint64_t arg2 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
+	uint64_t arg3 = start_index | (uint64_t)tag << 16;
+
+	return ffa_call((struct ffa_value){
+		.func = FFA_PARTITION_INFO_GET_REGS_64,
+		.arg1 = arg1,
+		.arg2 = arg2,
+		.arg3 = arg3,
+	});
+}
+
+/**
  * Requests information for partitions instantiated in the system. If the
  * FFA_PARTITION_COUNT_FLAG is not set, the information is returned
  * in the RX buffer of the caller as an array of partition information
