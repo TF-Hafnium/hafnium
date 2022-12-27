@@ -20,6 +20,51 @@ TEAR_DOWN(ffa)
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
+TEST(ffa, ffa_partition_info_get_regs_uuid_null)
+{
+	struct ffa_value ret;
+	uint16_t start_index = 0;
+	struct ffa_uuid uuid;
+	struct ffa_partition_info partition_info;
+	uint16_t last_index;
+	uint16_t curr_index;
+	uint16_t tag;
+	uint16_t desc_size;
+
+	/*
+	 * A Null UUID requests information for all partitions
+	 * including VMs and SPs.
+	 */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+
+	/* Check that expected partition information is returned. */
+	ret = ffa_partition_info_get_regs(&uuid, start_index, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+
+	last_index = ffa_partition_info_regs_get_last_idx(ret);
+	curr_index = ffa_partition_info_regs_get_curr_idx(ret);
+	tag = ffa_partition_info_regs_get_tag(ret);
+	desc_size = ffa_partition_info_regs_get_desc_size(ret);
+
+	/* Expect one partition. TODO: SP forwarding not implemented */
+	EXPECT_EQ(last_index, 0);
+	EXPECT_EQ(curr_index, 0);
+	EXPECT_EQ(tag, 0);
+	EXPECT_EQ(desc_size, sizeof(struct ffa_partition_info));
+
+	ffa_partition_info_regs_get_part_info(ret, 0, &partition_info);
+
+	/* Expect the PVM as first partition. */
+	EXPECT_EQ(partition_info.vm_id, hf_vm_get_id());
+	EXPECT_EQ(partition_info.vcpu_count, 8);
+	ffa_uuid_init(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb, &uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partition_info.uuid, &uuid));
+	EXPECT_EQ(partition_info.properties,
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_DIRECT_REQ_SEND);
+}
+
 static void check_v1_1_partition_info_descriptors(
 	const struct ffa_partition_info *partitions)
 {

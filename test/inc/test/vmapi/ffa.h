@@ -125,3 +125,7 @@ struct ffa_value send_indirect_message(ffa_vm_id_t from, ffa_vm_id_t to,
 
 void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 			      ffa_vm_id_t *sender);
+
+bool ffa_partition_info_regs_get_part_info(
+	struct ffa_value args, uint8_t idx,
+	struct ffa_partition_info *partition_info);

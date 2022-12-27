@@ -671,3 +671,49 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 		*sender = source_vm_id;
 	}
 }
+
+bool ffa_partition_info_regs_get_part_info(
+	struct ffa_value args, uint8_t idx,
+	struct ffa_partition_info *partition_info)
+{
+	/* list of pointers to args in return value */
+	uint64_t *arg_ptrs[15] = {
+		&args.arg3,
+		&args.arg4,
+		&args.arg5,
+		&args.arg6,
+		&args.arg7,
+		&args.extended_val.arg8,
+		&args.extended_val.arg9,
+		&args.extended_val.arg10,
+		&args.extended_val.arg11,
+		&args.extended_val.arg12,
+		&args.extended_val.arg13,
+		&args.extended_val.arg14,
+		&args.extended_val.arg15,
+		&args.extended_val.arg16,
+		&args.extended_val.arg17,
+	};
+
+	/*
+	 * Each partition information is encoded in 3 registers, so there can be
+	 * a maximum of 5 entries.
+	 */
+	if (idx >= 5 || !partition_info) {
+		return false;
+	}
+
+	uint64_t info = *(arg_ptrs[(idx * 3)]);
+	uint64_t uuid_lo = *(arg_ptrs[(idx * 3) + 1]);
+	uint64_t uuid_high = *(arg_ptrs[(idx * 3) + 2]);
+
+	partition_info->vm_id = info & 0xFFFF;
+	partition_info->vcpu_count = (info >> 16) & 0xFFFF;
+	partition_info->properties = (info >> 32);
+	partition_info->uuid.uuid[0] = uuid_lo & 0xFFFFFFFF;
+	partition_info->uuid.uuid[1] = (uuid_lo >> 32) & 0xFFFFFFFF;
+	partition_info->uuid.uuid[2] = uuid_high & 0xFFFFFFFF;
+	partition_info->uuid.uuid[3] = (uuid_high >> 32) & 0xFFFFFFFF;
+
+	return true;
+}
