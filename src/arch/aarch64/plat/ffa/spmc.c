@@ -2384,16 +2384,6 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 	if (!vm_id_is_current_world(sender_vm_id)) {
 		/* Start of NWd scheduled call chain. */
 		receiver_vcpu->scheduling_mode = NWD_MODE;
-		if (receiver_vcpu->present_action_ns_interrupts ==
-		    NS_ACTION_QUEUED) {
-			uint8_t priority_mask;
-			/* Save current value of priority mask. */
-			priority_mask = plat_interrupts_get_priority_mask();
-			receiver_vcpu->mask_ns_interrupts = priority_mask;
-
-			/* Mask non secure interrupts. */
-			plat_interrupts_set_priority_mask(0x80);
-		}
 	} else {
 		/* Adding a new node to an existing call chain. */
 		vcpu_call_chain_extend(current, receiver_vcpu);
@@ -2406,14 +2396,23 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 			receiver_vcpu->present_action_ns_interrupts =
 				current->present_action_ns_interrupts;
 		}
+	}
 
-		if (receiver_vcpu->present_action_ns_interrupts ==
-		    NS_ACTION_QUEUED) {
-			uint8_t priority_mask;
-			/* Save current value of priority mask. */
-			priority_mask = plat_interrupts_get_priority_mask();
-			receiver_vcpu->mask_ns_interrupts = priority_mask;
+	if (receiver_vcpu->present_action_ns_interrupts == NS_ACTION_QUEUED) {
+		uint8_t priority_mask;
 
+		/* Save current value of priority mask. */
+		priority_mask = plat_interrupts_get_priority_mask();
+		receiver_vcpu->mask_ns_interrupts = priority_mask;
+
+		if (current->vm->other_s_interrupts_action ==
+		    OTHER_S_INT_ACTION_QUEUED) {
+			/*
+			 * Mask all interrupts such that the vCPU
+			 * runs to completion.
+			 */
+			plat_interrupts_set_priority_mask(0x0);
+		} else {
 			/* Mask non secure interrupts. */
 			plat_interrupts_set_priority_mask(0x80);
 		}
