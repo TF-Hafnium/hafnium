@@ -908,6 +908,71 @@ TEST_F(manifest, ffa_validate_interrupt_actions)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION);
+	manifest_dealloc();
+
+	/* Incompatible other-s-interrupts-action for S-EL1 partition */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<1>")
+		.Property("other-s-interrupts-action", "<0>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
+
+	/*
+	 * Incompatible choice of the fields ns-interrupts-action and
+	 * other-s-interrupts-action.
+	 */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<1>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<2>")
+		.Property("other-s-interrupts-action", "<0>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+	manifest_dealloc();
+
+	/* Illegal value specified for the field other-s-interrupts-action. */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<1>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("messaging-method", "<1>")
+		.Property("other-s-interrupts-action", "<2>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION);
 }
 
 TEST_F(manifest, ffa_validate_rxtx_info)
