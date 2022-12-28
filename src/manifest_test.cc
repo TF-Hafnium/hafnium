@@ -879,11 +879,20 @@ TEST_F(manifest, ffa_validate_sanity_check)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
-	manifest_dealloc();
+
+	/*
+	 * No need to invoke manifest_dealloac() since manifest TearDown calls
+	 * it when the test ends.
+	 */
+}
+
+TEST_F(manifest, ffa_validate_interrupt_actions)
+{
+	struct_manifest *m;
 
 	/* Incompatible NS interrupt action */
 	/* clang-format off */
-	dtb = ManifestDtBuilder()
+	std::vector<char>  dtb = ManifestDtBuilder()
 		.Compatible({ "arm,ffa-manifest-1.0" })
 		.Property("ffa-version", "<0x10000>")
 		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
@@ -897,7 +906,8 @@ TEST_F(manifest, ffa_validate_sanity_check)
 		.Property("ns-interrupts-action", "<4>")
 		.Build();
 	/* clang-format on */
-	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_ILLEGAL_NS_ACTION);
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION);
 }
 
 TEST_F(manifest, ffa_validate_rxtx_info)

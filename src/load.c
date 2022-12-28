@@ -213,6 +213,9 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->ns_interrupts_action =
 			manifest_vm->partition.ns_interrupts_action;
 
+		vm_locked.vm->other_s_interrupts_action =
+			manifest_vm->partition.other_s_interrupts_action;
+
 		vm_locked.vm->me_signal_virq =
 			manifest_vm->partition.me_signal_virq;
 

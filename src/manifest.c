@@ -947,7 +947,7 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	if (vm->partition.ns_interrupts_action != NS_ACTION_QUEUED &&
 	    vm->partition.ns_interrupts_action != NS_ACTION_ME &&
 	    vm->partition.ns_interrupts_action != NS_ACTION_SIGNALED) {
-		return MANIFEST_ILLEGAL_NS_ACTION;
+		return MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION;
 	}
 
 	dlog_verbose(
@@ -964,7 +964,7 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 			dlog_error(
 				"Managed exit cannot be supported by this "
 				"partition\n");
-			return MANIFEST_ILLEGAL_NS_ACTION;
+			return MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION;
 		}
 
 		TRY(read_bool(&root, "managed-exit-virq",
@@ -978,6 +978,28 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 		      &vm->partition.notification_support));
 	if (vm->partition.notification_support) {
 		dlog_verbose("  Notifications Receipt Supported\n");
+	}
+
+	TRY(read_optional_uint8(
+		&root, "other-s-interrupts-action", OTHER_S_INT_ACTION_SIGNALED,
+		(uint8_t *)&vm->partition.other_s_interrupts_action));
+
+	if (vm->partition.other_s_interrupts_action ==
+	    OTHER_S_INT_ACTION_QUEUED) {
+		if (vm->partition.ns_interrupts_action != NS_ACTION_QUEUED) {
+			dlog_error(
+				"Choice of the fields 'ns-interrupts-action' "
+				"and 'other-s-interrupts-action' not "
+				"compatible\n");
+			return MANIFEST_ERROR_NOT_COMPATIBLE;
+		}
+	} else if (vm->partition.other_s_interrupts_action >
+		   OTHER_S_INT_ACTION_SIGNALED) {
+		dlog_error(
+			"Illegal value specified for the field"
+			" 'other-s-interrupts-action': %u\n",
+			vm->partition.other_s_interrupts_action);
+		return MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION;
 	}
 
 	/* Parse boot info node. */
@@ -1242,11 +1264,14 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Arguments-list node should have at least one argument";
 	case MANIFEST_ERROR_INTERRUPT_ID_REPEATED:
 		return "Interrupt ID already assigned to another endpoint";
-	case MANIFEST_ILLEGAL_NS_ACTION:
+	case MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION:
 		return "Illegal value specidied for the field: Action in "
 		       "response to NS Interrupt";
 	case MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST:
 		return "Interrupt ID is not in the list of interrupts";
+	case MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION:
+		return "Illegal value specified for the field: Action in "
+		       "response to Other-S Interrupt";
 	}
 
 	panic("Unexpected manifest return code.");

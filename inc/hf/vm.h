@@ -24,6 +24,10 @@
 #define LOG_BUFFER_SIZE 256
 #define VM_MANIFEST_MAX_INTERRUPTS 32
 
+/** Action for Other-Secure interrupts by SPMC. */
+#define OTHER_S_INT_ACTION_QUEUED 0
+#define OTHER_S_INT_ACTION_SIGNALED 1
+
 /**
  * The state of an RX buffer.
  *
@@ -225,6 +229,12 @@ struct vm {
 	 * non secure interrupt.
 	 */
 	uint8_t ns_interrupts_action;
+
+	/**
+	 * Action specified by a Partition through the manifest in response to
+	 * Other-S-Int.
+	 */
+	uint8_t other_s_interrupts_action;
 	bool me_signal_virq;
 	struct vm *next_boot;
 

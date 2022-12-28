@@ -159,8 +159,6 @@ struct partition_manifest {
 	bool notification_support;
 	/** optional */
 	bool has_primary_scheduler;
-	/** optional - preemptible / run to completion */
-	uint8_t runtime_model;
 	/** optional - tuples SEPID/SMMUID/streamId */
 	uint32_t stream_ep_ids[1];
 
@@ -170,6 +168,8 @@ struct partition_manifest {
 	/** Device regions */
 	uint16_t dev_region_count;
 	struct device_region dev_regions[PARTITION_MAX_DEVICE_REGIONS];
+	/** optional - action in response to Other-Secure interrupt */
+	uint8_t other_s_interrupts_action;
 };
 
 /**
@@ -232,8 +232,9 @@ enum manifest_return_code {
 	MANIFEST_ERROR_MEM_REGION_OVERLAP,
 	MANIFEST_ERROR_INVALID_MEM_PERM,
 	MANIFEST_ERROR_INTERRUPT_ID_REPEATED,
-	MANIFEST_ILLEGAL_NS_ACTION,
+	MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION,
 	MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST,
+	MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION,
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
