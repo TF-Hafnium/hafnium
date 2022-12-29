@@ -852,6 +852,139 @@ bool plat_ffa_inject_notification_pending_interrupt(
 	return false;
 }
 
+static struct ffa_value plat_ffa_partition_info_get_regs(
+	const struct ffa_uuid *uuid, const uint16_t start_index,
+	const uint16_t tag)
+{
+	uint64_t arg1 = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
+	uint64_t arg2 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
+	uint64_t arg3 = start_index | (uint64_t)tag << 16;
+
+	return arch_other_world_call((struct ffa_value){
+		.func = FFA_PARTITION_INFO_GET_REGS_64,
+		.arg1 = arg1,
+		.arg2 = arg2,
+		.arg3 = arg3,
+	});
+}
+
+static bool plat_ffa_fill_partition_info_from_regs(
+	struct ffa_value ret, uint16_t start_index,
+	struct ffa_partition_info *partitions, uint16_t partitions_len,
+	ffa_vm_count_t *ret_count)
+{
+	uint16_t vm_count = *ret_count;
+	uint16_t curr_index = 0;
+	uint8_t num_entries = 0;
+	uint8_t idx = 0;
+	/* list of pointers to args in return value */
+	uint64_t *arg_ptrs[15] = {
+		&ret.arg3,
+		&ret.arg4,
+		&ret.arg5,
+		&ret.arg6,
+		&ret.arg7,
+		&ret.extended_val.arg8,
+		&ret.extended_val.arg9,
+		&ret.extended_val.arg10,
+		&ret.extended_val.arg11,
+		&ret.extended_val.arg12,
+		&ret.extended_val.arg13,
+		&ret.extended_val.arg14,
+		&ret.extended_val.arg15,
+		&ret.extended_val.arg16,
+		&ret.extended_val.arg17,
+	};
+
+	if (vm_count > partitions_len) {
+		return false;
+	}
+	assert(ffa_partition_info_regs_get_tag(ret) == 0);
+	assert(ffa_partition_info_regs_get_desc_size(ret) ==
+	       sizeof(struct ffa_partition_info));
+
+	curr_index = ffa_partition_info_regs_get_curr_idx(ret);
+	assert(start_index <= curr_index);
+
+	num_entries = curr_index - start_index + 1;
+	if (num_entries > (partitions_len - vm_count) || num_entries > 5) {
+		return false;
+	}
+
+	while (num_entries) {
+		uint64_t info = *(arg_ptrs[(idx * 3)]);
+		uint64_t uuid_lo = *(arg_ptrs[(idx * 3) + 1]);
+		uint64_t uuid_high = *(arg_ptrs[(idx * 3) + 2]);
+
+		partitions[vm_count].vm_id = info & 0xFFFF;
+		partitions[vm_count].vcpu_count = (info >> 16) & 0xFFFF;
+		partitions[vm_count].properties = (info >> 32);
+		partitions[vm_count].uuid.uuid[0] = uuid_lo & 0xFFFFFFFF;
+		partitions[vm_count].uuid.uuid[1] =
+			(uuid_lo >> 32) & 0xFFFFFFFF;
+		partitions[vm_count].uuid.uuid[2] = uuid_high & 0xFFFFFFFF;
+		partitions[vm_count].uuid.uuid[3] =
+			(uuid_high >> 32) & 0xFFFFFFFF;
+		vm_count++;
+		idx++;
+		num_entries--;
+	}
+
+	*ret_count = vm_count;
+	return true;
+}
+
+bool plat_ffa_partition_info_get_regs_forward(
+	const struct ffa_uuid *uuid, const uint16_t start_index,
+	const uint16_t tag, struct ffa_partition_info *partitions,
+	uint16_t partitions_len, ffa_vm_count_t *ret_count)
+{
+	(void)start_index;
+	(void)tag;
+	struct ffa_value ret;
+	uint16_t last_index = 0;
+	uint16_t curr_index = 0;
+	uint16_t swd_start_index = 0;
+
+	/*
+	 * Allow forwarding from the Hypervisor if TEE or SPMC exists and
+	 * declared as such in the Hypervisor manifest.
+	 */
+	if (!ffa_tee_enabled) {
+		return true;
+	}
+
+	ret = plat_ffa_partition_info_get_regs(uuid, swd_start_index, 0);
+	if (ffa_func_id(ret) != FFA_SUCCESS_64) {
+		return false;
+	}
+
+	if (!plat_ffa_fill_partition_info_from_regs(ret, swd_start_index,
+						    partitions, partitions_len,
+						    ret_count)) {
+		return false;
+	}
+
+	last_index = ffa_partition_info_regs_get_last_idx(ret);
+	curr_index = ffa_partition_info_regs_get_curr_idx(ret);
+	swd_start_index = curr_index + 1;
+	while (swd_start_index <= last_index) {
+		ret = plat_ffa_partition_info_get_regs(uuid, swd_start_index,
+						       0);
+		if (ffa_func_id(ret) != FFA_SUCCESS_32) {
+			return false;
+		}
+
+		if (!plat_ffa_fill_partition_info_from_regs(
+			    ret, swd_start_index, partitions, partitions_len,
+			    ret_count)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 /*
  * Forward helper for FFA_PARTITION_INFO_GET.
  * Emits FFA_PARTITION_INFO_GET from Hypervisor to SPMC if allowed.

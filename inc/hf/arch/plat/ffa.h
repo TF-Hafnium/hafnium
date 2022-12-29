@@ -273,6 +273,11 @@ bool plat_ffa_inject_notification_pending_interrupt(
 	struct vcpu_locked next_locked, struct vcpu *current,
 	struct vm_locked receiver_locked);
 
+bool plat_ffa_partition_info_get_regs_forward(
+	const struct ffa_uuid *uuid, const uint16_t start_index,
+	const uint16_t tag, struct ffa_partition_info *partitions,
+	uint16_t partitions_len, ffa_vm_count_t *ret_count);
+
 void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
 					 const uint32_t flags,
 					 struct ffa_partition_info *partitions,

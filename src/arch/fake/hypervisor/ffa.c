@@ -393,6 +393,22 @@ bool plat_ffa_inject_notification_pending_interrupt(
 	return false;
 }
 
+bool plat_ffa_partition_info_get_regs_forward(	// NOLINTNEXTLINE
+	const struct ffa_uuid *uuid,
+	const uint16_t start_index,  // NOLINTNEXTLINE
+	const uint16_t tag,
+	struct ffa_partition_info *partitions,	// NOLINTNEXTLINE
+	uint16_t partitions_len, ffa_vm_count_t *ret_count)
+{
+	(void)uuid;
+	(void)start_index;
+	(void)tag;
+	(void)partitions;
+	(void)partitions_len;
+	(void)ret_count;
+	return true;
+}
+
 void plat_ffa_partition_info_get_forward(  // NOLINTNEXTLINE
 	const struct ffa_uuid *uuid,	   // NOLINTNEXTLINE
 	const uint32_t flags,		   // NOLINTNEXTLINE

@@ -432,6 +432,23 @@ bool plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
 	return false;
 }
 
+bool plat_ffa_partition_info_get_regs_forward(	// NOLINTNEXTLINE
+	const struct ffa_uuid *uuid,
+	const uint16_t start_index,  // NOLINTNEXTLINE
+	const uint16_t tag,
+	struct ffa_partition_info *partitions,		     // NOLINTNEXTLINE
+	uint16_t partitions_len, ffa_vm_count_t *ret_count)  // NOLINTNEXTLINE
+{
+	(void)uuid;
+	(void)start_index;
+	(void)tag;
+	(void)partitions;
+	(void)partitions_len;
+	(void)ret_count;
+
+	return true;
+}
+
 void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 				       paddr_t fdt_addr,
 				       size_t fdt_allocated_size,

@@ -471,7 +471,7 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 						 const uint16_t tag)
 {
 	struct vm *current_vm = current->vm;
-	static struct ffa_partition_info partitions[MAX_VMS];
+	static struct ffa_partition_info partitions[2 * MAX_VMS];
 	bool uuid_is_null = ffa_uuid_is_null(uuid);
 	ffa_vm_count_t vm_count = 0;
 	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -513,13 +513,32 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	/* If UUID is Null vm_count must not be zero at this stage. */
 	CHECK(!uuid_is_null || vm_count != 0);
 
-	/* TODO: Forward to secure world */
+	/*
+	 * When running the Hypervisor:
+	 * - If UUID is Null the Hypervisor forwards the query to the SPMC for
+	 * it to fill with secure partitions information.
+	 * TODO: Note that for this ABI, forwarding on every invocation when
+	 * uuid is Null is inefficient,and if performance becomes a problem,
+	 * this would be a good place to optimize using strategies such as
+	 * caching info etc. For now, assuming this inefficiency is not a major
+	 * issue.
+	 * - If UUID is non-Null vm_count may be zero because the UUID matches
+	 * a secure partition and the query is forwarded to the SPMC.
+	 * When running the SPMC:
+	 * - If UUID is non-Null and vm_count is zero it means there is no such
+	 * partition identified in the system.
+	 */
+	if (!plat_ffa_partition_info_get_regs_forward(
+		    uuid, start_index, tag, partitions, ARRAY_SIZE(partitions),
+		    &vm_count)) {
+		return ffa_error(FFA_DENIED);
+	}
 
 	/*
 	 * Unrecognized UUID: does not match any of the VMs (or SPs)
 	 * and is not Null.
 	 */
-	if (vm_count == 0 || vm_count > vm_get_count()) {
+	if (vm_count == 0 || vm_count > ARRAY_SIZE(partitions)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
