@@ -22,7 +22,8 @@
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0x7>; /* Supports direct and indirect requests. */
-	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
+	ns-interrupts-action = <1>; /* Managed exit is supported. */
+	managed-exit-virq;
 	boot-order = <1>;
 	notification-support; /* Receipt of notifications. */
 };
