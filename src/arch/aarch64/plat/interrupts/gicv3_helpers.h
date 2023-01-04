@@ -32,6 +32,10 @@
 /* Mask for the configuration field common to all GIC interfaces */
 #define GIC_CFG_MASK (0x3)
 
+/* Interrupt configurations: 2-bit fields with LSB reserved */
+#define GIC_INTR_CFG_LEVEL (UINT32_C(0) << 1)
+#define GIC_INTR_CFG_EDGE (UINT32_C(1) << 1)
+
 /**
  * Common GIC Distributor interface register offsets
  */

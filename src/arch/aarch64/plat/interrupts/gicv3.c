@@ -625,7 +625,7 @@ void plat_interrupts_end_of_interrupt(uint32_t id)
 void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 {
 	uint32_t core_idx = find_core_pos();
-	uint32_t level_cfg = 0U;
+	uint32_t config = GIC_INTR_CFG_LEVEL;
 	uint32_t intr_num = interrupt_desc_get_id(int_desc);
 
 	CHECK(core_idx < MAX_CPUS);
@@ -642,19 +642,19 @@ void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 	gicv3_set_interrupt_priority(intr_num, core_idx,
 				     interrupt_desc_get_priority(int_desc));
 
-	if (interrupt_desc_get_config(int_desc) != 0) {
-		level_cfg = 1U;
+	if (interrupt_desc_get_config(int_desc) == 0) {
+		/* Interrupt is edge-triggered. */
+		config = GIC_INTR_CFG_EDGE;
 	}
 
 	/* Set interrupt configuration. */
 	if (is_sgi_ppi(intr_num)) {
 		/* GICR interface. */
 		gicr_set_icfgr(plat_gicv3_driver.all_redist_frames[core_idx],
-			       intr_num, level_cfg);
+			       intr_num, config);
 	} else {
 		/* GICD interface. */
-		gicd_set_icfgr(plat_gicv3_driver.dist_base, intr_num,
-			       level_cfg);
+		gicd_set_icfgr(plat_gicv3_driver.dist_base, intr_num, config);
 	}
 
 	/* Target SPI to primary CPU using affinity routing. */

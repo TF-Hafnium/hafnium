@@ -69,7 +69,7 @@ static inline void interrupt_bitmap_clear_value(struct interrupt_bitmap *bitmap,
  *
  * Configuration:
  *	- Edge triggered:	0
- *	- Level triggered:	1
+ *	- Level sensitive:	1
  * Type:
  *	- SPI:	0b10
  *	- PPI:	0b01
