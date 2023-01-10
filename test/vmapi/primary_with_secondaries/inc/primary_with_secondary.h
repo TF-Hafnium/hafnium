@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include <stddef.h>
-
 #include "test/vmapi/ffa.h"
 
 /*
