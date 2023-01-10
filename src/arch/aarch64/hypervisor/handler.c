@@ -61,7 +61,8 @@
  */
 #define SPMD_FWK_MSG_BIT (UINT64_C(1) << 31)
 #define SPMD_FWK_MSG_FUNC_MASK UINT64_C(0xFF)
-#define SPMD_FWK_MSG_PSCI UINT8_C(0)
+#define SPMD_FWK_MSG_PSCI_REQ UINT8_C(0x0)
+#define SPMD_FWK_MSG_PSCI_RESP UINT8_C(0x2)
 #define SPMD_FWK_MSG_FFA_VERSION_REQ UINT8_C(0x8)
 #define SPMD_FWK_MSG_FFA_VERSION_RESP UINT8_C(0x9)
 
@@ -346,35 +347,48 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 		return false;
 	}
 
+	/*
+	 * The framework message is conveyed by EL3/SPMD to SPMC so the
+	 * current VM id must match to the other world VM id.
+	 */
+	CHECK(current->vm->id == HF_HYPERVISOR_VM_ID);
+
 	switch (fwk_msg_func_id) {
-	case SPMD_FWK_MSG_PSCI: {
+	case SPMD_FWK_MSG_PSCI_REQ: {
+		uint32_t psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
 		struct vcpu *boot_vcpu = vcpu_get_boot_vcpu();
 		struct vm *vm = boot_vcpu->vm;
 		struct vcpu *vcpu = vm_get_vcpu(vm, vcpu_index(current));
 
+		/*
+		 * TODO: the power management event reached the SPMC.
+		 * In a later iteration, the power management event can
+		 * be passed to the SP by resuming it.
+		 */
 		switch (args->arg3) {
 		case PSCI_CPU_OFF: {
-			/*
-			 * TODO: the PM event reached the SPMC. In a later
-			 * iteration, the PM event can be passed to the SP by
-			 * resuming it.
-			 */
-			*args = (struct ffa_value){
-				.func = FFA_MSG_SEND_DIRECT_RESP_32,
-				.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) |
-					HF_SPMD_VM_ID,
-				.arg2 = 0U};
+			dlog_verbose("cpu%u off notification!\n",
+				     vcpu_index(vcpu));
 
-			dlog_verbose("%s cpu off notification cpuid %#x\n",
-				     __func__, vcpu->cpu->id);
 			cpu_off(vcpu->cpu);
+			psci_msg_response = PSCI_RETURN_SUCCESS;
 			break;
 		}
 		default:
-			dlog_verbose("%s PSCI message not handled %#x\n",
-				     __func__, args->arg3);
-			return false;
+			dlog_error(
+				"FF-A PSCI framework message not handled "
+				"%#x %#x %#x %#x\n",
+				args->func, args->arg1, args->arg2, args->arg3);
+			psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
 		}
+
+		*args = (struct ffa_value){
+			.func = FFA_MSG_SEND_DIRECT_RESP_32,
+			.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) | HF_SPMD_VM_ID,
+			.arg2 = SPMD_FWK_MSG_BIT | SPMD_FWK_MSG_PSCI_RESP,
+			.arg3 = psci_msg_response};
+
+		return true;
 	}
 	case SPMD_FWK_MSG_FFA_VERSION_REQ: {
 		struct ffa_value ret = api_ffa_version(current, args->arg3);
@@ -385,18 +399,32 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 			.arg2 = SPMD_FWK_MSG_BIT |
 				SPMD_FWK_MSG_FFA_VERSION_RESP,
 			.arg3 = ret.func};
-		break;
+		return true;
 	}
 	default:
-		dlog_verbose("%s message not handled %#x\n", __func__, fwk_msg);
+		dlog_error("FF-A framework message not handled %#x\n",
+			   args->arg2);
+
+		/*
+		 * TODO: the framework message that was conveyed by a direct
+		 * request is not handled although we still want to complete
+		 * by a direct response. However, there is no defined error
+		 * response to state that the message couldn't be handled.
+		 * An alternative would be to return FFA_ERROR.
+		 */
 		*args = (struct ffa_value){
 			.func = FFA_MSG_SEND_DIRECT_RESP_32,
 			.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) | HF_SPMD_VM_ID,
 			/* Set bit 31 since this is a framework message. */
 			.arg2 = SPMD_FWK_MSG_BIT | fwk_msg_func_id};
+
+		return true;
 	}
 
-	return true;
+	/* Should not reach this point. */
+	assert(false);
+
+	return false;
 }
 
 #endif
