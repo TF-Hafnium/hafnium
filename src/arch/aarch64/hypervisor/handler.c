@@ -358,7 +358,8 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 		uint32_t psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
 		struct vcpu *boot_vcpu = vcpu_get_boot_vcpu();
 		struct vm *vm = boot_vcpu->vm;
-		struct vcpu *vcpu = vm_get_vcpu(vm, vcpu_index(current));
+		struct vcpu *vcpu;
+		struct vcpu_locked vcpu_locked;
 
 		/*
 		 * TODO: the power management event reached the SPMC.
@@ -370,7 +371,18 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 			dlog_verbose("cpu%u off notification!\n",
 				     vcpu_index(vcpu));
 
-			cpu_off(vcpu->cpu);
+			if (vm_power_management_cpu_off_requested(vm) == true) {
+				/* Allow only S-EL1 MP SPs to reach here. */
+				CHECK(vm->el0_partition == false);
+				CHECK(vm->vcpu_count > 1);
+
+				vcpu = vm_get_vcpu(vm, vcpu_index(current));
+				vcpu_locked = vcpu_lock(vcpu);
+				vcpu->state = VCPU_STATE_OFF;
+				vcpu_unlock(&vcpu_locked);
+				cpu_off(vcpu->cpu);
+			}
+
 			psci_msg_response = PSCI_RETURN_SUCCESS;
 			break;
 		}
