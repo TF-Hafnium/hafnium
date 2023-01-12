@@ -1406,9 +1406,18 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
 	paddr_t recv_pa_end;
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
+	if (vm->id == HF_HYPERVISOR_VM_ID && !plat_ffa_is_vm_id(allocator_id)) {
+		dlog_error(
+			"The Hypervisor must specify a valid VM ID in register "
+			"W1, if FFA_RXTX_UNMAP call forwarded to SPM.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
 	/* Ensure `allocator_id` is set only at Non-Secure Physical instance. */
 	if (vm_id_is_current_world(vm->id) && (allocator_id != 0)) {
-		dlog_error("`allocator_id` must be 0 at virtual instances.\n");
+		dlog_error(
+			"The register W1 (containing ID) must be 0 at virtual "
+			"instances.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
