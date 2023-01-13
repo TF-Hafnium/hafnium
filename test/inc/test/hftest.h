@@ -43,6 +43,14 @@
 #define TEST_PRECONDITION(suite, test, precon_fn) \
 	HFTEST_TEST(suite, test, false, precon_fn)
 
+/* Define a test voluntarily skipped from the test suite. */
+#define TEST_SKIP(suite, test)                       \
+	static bool precon_skip_##suite_##test(void) \
+	{                                            \
+		return false;                        \
+	}                                            \
+	TEST_PRECONDITION(suite, test, precon_skip_##suite_##test)
+
 /*
  * Define a test service.
  */
