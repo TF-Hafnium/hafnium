@@ -557,7 +557,8 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_spm_id_get();
 		return true;
 	case FFA_FEATURES_32:
-		*args = api_ffa_features(args->arg1);
+		*args = api_ffa_features(args->arg1, args->arg2,
+					 current->vm->ffa_version);
 		return true;
 	case FFA_RX_RELEASE_32:
 		*args = api_ffa_rx_release(ffa_receiver(*args), current, next);

@@ -2385,7 +2385,8 @@ struct ffa_value api_ffa_feature_success(uint32_t arg2)
  * Discovery function returning information about the implementation of optional
  * FF-A interfaces.
  */
-struct ffa_value api_ffa_features(uint32_t feature_function_id)
+struct ffa_value api_ffa_features(uint32_t feature_function_id,
+				  uint32_t input_property, uint32_t ffa_version)
 {
 	/*
 	 * According to table 13.8 of FF-A v1.1 Beta 0 spec, bits [30:8] MBZ
@@ -2394,6 +2395,14 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id)
 	if ((feature_function_id & FFA_FEATURES_FUNC_ID_MASK) == 0U &&
 	    (feature_function_id & ~FFA_FEATURES_FEATURE_ID_MASK) != 0U) {
 		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	if (feature_function_id != FFA_MEM_RETRIEVE_REQ_32 &&
+	    input_property != 0U) {
+		dlog_verbose(
+			"input_property must be zero.\ninput_property = %u.\n",
+			input_property);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	switch (feature_function_id) {
@@ -2413,7 +2422,6 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id)
 	case FFA_MEM_DONATE_32:
 	case FFA_MEM_LEND_32:
 	case FFA_MEM_SHARE_32:
-	case FFA_MEM_RETRIEVE_REQ_32:
 	case FFA_MEM_RETRIEVE_RESP_32:
 	case FFA_MEM_RELINQUISH_32:
 	case FFA_MEM_RECLAIM_32:
@@ -2441,6 +2449,29 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id)
 	case FFA_PARTITION_INFO_GET_REGS_64:
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
+	case FFA_MEM_RETRIEVE_REQ_32:
+		if ((input_property & FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_MASK) !=
+		    0U) {
+			dlog_verbose(
+				"Bits[31:2] and Bit[0] of input_property must "
+				"be zero.\ninput_property = %u.\n",
+				input_property);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+
+		if (ffa_version >= MAKE_FFA_VERSION(1, 1)) {
+			if ((input_property &
+			     FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT) == 0U) {
+				dlog_verbose("NS bit support must be 1.\n");
+				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
+		}
+
+		return api_ffa_feature_success(
+			FFA_FEATURES_MEM_RETRIEVE_REQ_BUFFER_SUPPORT |
+			(input_property &
+			 FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT) |
+			FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT);
 
 #if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
 	/* Check support of a feature provided respective feature ID. */

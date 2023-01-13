@@ -107,6 +107,21 @@
 #define FFA_FEATURES_FUNC_ID_MASK (UINT32_C(1) << 31)
 #define FFA_FEATURES_FEATURE_ID_MASK UINT32_C(0x7F)
 
+/**
+ * Defined in Table 13.14 in the FF-A v.1.1 REL0 specification.
+ * Bits[31:2] and Bit[0] of input are reserved (must be zero).
+ * Bit[0]: dynamically allocated buffer support.
+ * Bit[1]: NS bit handling.
+ * Bit[2]: support for retrieval by hypervisor.
+ */
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_BUFFER_SUPPORT 0
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT (UINT32_C(1) << 1)
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT (UINT32_C(1) << 2)
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_MASK            \
+	(~(FFA_FEATURES_MEM_RETRIEVE_REQ_BUFFER_SUPPORT | \
+	   FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT |     \
+	   FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT))
+
 /* Query interrupt ID of Notification Pending Interrupt. */
 #define FFA_FEATURE_NPI 0x1U
 

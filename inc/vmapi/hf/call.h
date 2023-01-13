@@ -442,10 +442,29 @@ static inline int32_t ffa_version(uint32_t requested_version)
  *  - FFA_ERROR in .func if the optional interface with function_id is not
  * implemented.
  */
-static inline struct ffa_value ffa_features(uint32_t function_id)
+static inline struct ffa_value ffa_features(uint64_t function_id)
 {
-	return ffa_call((struct ffa_value){.func = FFA_FEATURES_32,
-					   .arg1 = function_id});
+	return ffa_call((struct ffa_value){
+		.func = FFA_FEATURES_32,
+		.arg1 = function_id,
+	});
+}
+
+/**
+ * Discovery function returning information about the implementation of optional
+ * FF-A interfaces which require an extra input property
+ *
+ * Returns:
+ *  - FFA_SUCCESS in .func if the optional interface with function_id is
+ * implemented.
+ *  - FFA_ERROR in .func if the optional interface with function_id is not
+ * implemented.
+ */
+static inline struct ffa_value ffa_features_with_input_property(
+	uint64_t function_id, uint64_t param)
+{
+	return ffa_call((struct ffa_value){
+		.func = FFA_FEATURES_32, .arg1 = function_id, .arg2 = param});
 }
 
 static inline struct ffa_value ffa_msg_send_direct_req(

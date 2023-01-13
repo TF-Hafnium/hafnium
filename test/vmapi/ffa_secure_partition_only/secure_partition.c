@@ -36,6 +36,7 @@ TEST(hf_vm_get_id, secure_partition_id)
 }
 
 /** Ensures that FFA_FEATURES is reporting the expected interfaces. */
+// NOLINTNEXTLINE(readability-function-size)
 TEST(ffa_features, succeeds_ffa_call_ids)
 {
 	struct ffa_value ret;
@@ -85,8 +86,15 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	ret = ffa_features(FFA_MEM_SHARE_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = ffa_features(FFA_MEM_RETRIEVE_REQ_32);
+	ret = ffa_features_with_input_property(
+		FFA_MEM_RETRIEVE_REQ_32,
+		FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ret.arg1, 0);
+	EXPECT_EQ(ret.arg2,
+		  FFA_FEATURES_MEM_RETRIEVE_REQ_BUFFER_SUPPORT |
+			  FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT |
+			  FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT);
 
 	ret = ffa_features(FFA_MEM_RETRIEVE_RESP_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -168,6 +176,31 @@ TEST(ffa_features, succeeds_feature_ids)
 TEST(ffa_features, fails_if_feature_id_wrong)
 {
 	EXPECT_FFA_ERROR(ffa_features(0x0FFFFF), FFA_NOT_SUPPORTED);
+}
+
+/**
+ * Validates error return for FFA_FEATURES given:
+ *  - Version is v1.1 or greater
+ *  - function_id is FFA_MEM_RETRIEVE_REQ_32
+ *  - parameter does not have bit 1 set
+ */
+TEST(ffa_features, fails_if_parameter_wrong_and_v_1_1)
+{
+	ffa_version(MAKE_FFA_VERSION(1, 1));
+
+	EXPECT_FFA_ERROR(
+		ffa_features_with_input_property(FFA_MEM_RETRIEVE_REQ_32, 0),
+		FFA_INVALID_PARAMETERS);
+}
+
+TEST(ffa_features, does_not_fail_if_parameter_wrong_and_v_1_0)
+{
+	struct ffa_value ret;
+
+	ffa_version(MAKE_FFA_VERSION(1, 0));
+
+	ret = ffa_features_with_input_property(FFA_MEM_RETRIEVE_REQ_32, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
 /**

@@ -10,6 +10,7 @@
 
 #include "hf/arch/vm/power_mgmt.h"
 
+#include "hf/ffa.h"
 #include "hf/spinlock.h"
 
 #include "vmapi/hf/call.h"
@@ -242,7 +243,9 @@ TEST(ffa, ffa_features)
 	ret = ffa_features(FFA_MEM_SHARE_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = ffa_features(FFA_MEM_RETRIEVE_REQ_32);
+	ret = ffa_features_with_input_property(
+		FFA_MEM_RETRIEVE_REQ_32,
+		FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MEM_RETRIEVE_RESP_32);
