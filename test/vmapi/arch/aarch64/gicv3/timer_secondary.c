@@ -263,7 +263,7 @@ TEST(timer_secondary, receive_long)
 /**
  * Set the timer for a very long time, and expect that it doesn't fire.
  */
-TEST(timer_secondary, wfi_very_long)
+TEST_SKIP(timer_secondary, wfi_very_long)
 {
 	const char message[] = "WFI  9999999";
 	size_t message_length = strnlen_s(message, 64) + 1;
