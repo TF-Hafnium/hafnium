@@ -11,7 +11,6 @@
 
 USE_FVP=false
 USE_TFA=false
-USE_VHE=false
 EL0_TEST_ONLY=false
 SKIP_LONG_RUNNING_TESTS=false
 SKIP_UNIT_TESTS=false
@@ -25,8 +24,6 @@ do
     --fvp) USE_FVP=true
       ;;
     --tfa) USE_TFA=true
-      ;;
-    --vhe) USE_VHE=true
       ;;
     --el0) EL0_TEST_ONLY=true
       ;;
@@ -54,27 +51,13 @@ HFTEST=(${TIMEOUT[@]} $DEFAULT_HFTEST_TIMEOUT ./test/hftest/hftest.py)
 HYPERVISOR_PATH="$OUT/"
 if [ $USE_FVP == true ]
 then
-if [ $USE_VHE == true ]
-then
   HYPERVISOR_PATH+="aem_v8a_fvp_vhe_clang"
   HFTEST+=(--out_initrd "$OUT/aem_v8a_fvp_vhe_vm_clang")
   HFTEST+=(--out_partitions "$OUT/aem_v8a_fvp_vhe_vm_clang")
   HFTEST+=(--driver=fvp)
 else
-  HYPERVISOR_PATH+="aem_v8a_fvp_clang"
-  HFTEST+=(--out_initrd "$OUT/aem_v8a_fvp_vm_clang")
-  HFTEST+=(--out_partitions "$OUT/aem_v8a_fvp_vm_clang")
-  HFTEST+=(--driver=fvp)
-fi
-else
-if [ $USE_VHE == true ]
-then
   HYPERVISOR_PATH+="qemu_aarch64_vhe_clang"
   HFTEST+=(--out_initrd "$OUT/qemu_aarch64_vhe_vm_clang")
-else
-  HYPERVISOR_PATH+="qemu_aarch64_clang"
-  HFTEST+=(--out_initrd "$OUT/qemu_aarch64_vm_clang")
-fi
 fi
 if [ $USE_TFA == true ]
 then
@@ -141,7 +124,7 @@ do
   fi
 
   # For VHE EL0 test cases, omit cortex-a53 as it doesn't support ARMv8.1.
-  if [ $USE_VHE == true ] && [ "$CPU" != "cortex-a53" ]
+  if [ "$CPU" != "cortex-a53" ]
   then
     "${HFTEST_CPU[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
                        --initrd test/vmapi/el0_partitions/el0_partitions_test

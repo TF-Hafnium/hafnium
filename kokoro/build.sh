@@ -26,11 +26,6 @@ run_tests ()
 	fi
 
 	./kokoro/test.sh ${TEST_ARGS[@]}
-
-	# Run again the test suite with VHE option.
-	TEST_ARGS+=(--vhe)
-	TEST_ARGS+=(--skip-unit-tests)
-	./kokoro/test.sh ${TEST_ARGS[@]}
 }
 
 source "$(dirname ${BASH_SOURCE[0]})/../build/bash/common.inc"
