@@ -10,6 +10,8 @@
 #include <stdint.h>
 
 #define FW_CFG_ID 0x01
+#define FW_CFG_SIGNATURE 0x00
+#define FW_CFG_FEATURES 0x01
 #define FW_CFG_KERNEL_SIZE 0x08
 #define FW_CFG_INITRD_SIZE 0x0b
 #define FW_CFG_KERNEL_DATA 0x11

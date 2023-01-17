@@ -94,11 +94,21 @@ noreturn void kmain(struct fdt_header *fdt)
 	uintptr_t initrd_start = align_up(pa_addr(image_end), LINUX_ALIGNMENT);
 	uint32_t initrd_size = fw_cfg_read_uint32(FW_CFG_INITRD_SIZE);
 
+	/* Check FW_CFG signature matches (LE 32b 'QEMU' ascii chars). */
+	if (fw_cfg_read_uint32(FW_CFG_SIGNATURE) != 0x554d4551) {
+		panic("Invalid FW_CFG signature.");
+	}
+
+	/* Check traditional and DMA interfaces are supported. */
+	if (fw_cfg_read_uint32(FW_CFG_FEATURES) != 3) {
+		panic("Invalid FW_CFG features.");
+	}
+
 	dlog_info("Initrd start %#x, size %#x\n", initrd_start, initrd_size);
-	/* Since the address was calculated from pa_addr above allow the cast */
-	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	fw_cfg_read_bytes(FW_CFG_INITRD_DATA, (uint8_t *)initrd_start,
-			  initrd_size);
+	if (initrd_size != 0 &&
+	    fw_cfg_read_dma(FW_CFG_INITRD_DATA, initrd_start, initrd_size)) {
+		panic("FW_CFG DMA failed.");
+	}
 
 	/*
 	 * Load the kernel after the initrd. Follow Linux alignment conventions
@@ -108,10 +118,12 @@ noreturn void kmain(struct fdt_header *fdt)
 		       LINUX_OFFSET;
 	kernel_size = fw_cfg_read_uint32(FW_CFG_KERNEL_SIZE);
 	dlog_info("Kernel start %#x, size %#x\n", kernel_start, kernel_size);
-	/* Since the address was calculated from pa_addr above allow the cast */
-	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	fw_cfg_read_bytes(FW_CFG_KERNEL_DATA, (uint8_t *)kernel_start,
-			  kernel_size);
+	if (kernel_size == 0) {
+		panic("Invalid kernel size.");
+	}
+	if (fw_cfg_read_dma(FW_CFG_KERNEL_DATA, kernel_start, kernel_size)) {
+		panic("FW_CFG DMA failed.");
+	}
 
 	/* Update FDT to point to initrd. */
 	if (initrd_size > 0) {

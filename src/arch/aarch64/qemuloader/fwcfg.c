@@ -51,15 +51,29 @@ void fw_cfg_read_bytes(uint16_t key, uint8_t *destination, uint32_t length)
 
 bool fw_cfg_read_dma(uint16_t key, uintptr_t destination, uint32_t length)
 {
-	struct fw_cfg_dma_access access = {
+	volatile struct fw_cfg_dma_access access = {
 		.control = FW_CFG_CONTROL_READ,
 		.length = htobe32(length),
 		.address = htobe64(destination),
 	};
 	uint64_t access_address = (uint64_t)&access;
+	uint32_t control;
 
 	io_write16(FW_CFG_SELECTOR, htobe16(key));
 	io_write64(FW_CFG_DMA, htobe64(access_address));
 
-	return access.control != 0;
+	do {
+		control = access.control;
+		if (control == 0) {
+			break;
+		}
+		if ((control & FW_CFG_CONTROL_ERROR) != 0) {
+			return true;
+		}
+		if ((control & FW_CFG_CONTROL_READ) == 0) {
+			return true;
+		}
+	} while (1);
+
+	return false;
 }
