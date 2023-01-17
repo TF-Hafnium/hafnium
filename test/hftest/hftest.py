@@ -52,8 +52,8 @@ FVP_PREBUILTS_TFA_TRUSTY_ROOT = os.path.join(
 FVP_PREBUILT_DTS = os.path.join(
     FVP_PREBUILTS_TFA_TRUSTY_ROOT, "fvp-base-gicv3-psci-1t.dts")
 
-FVP_PREBUILT_TFA_ROOT = os.path.join(
-    HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a", "fvp")
+FVP_PREBUILT_TFA_SPMD_ROOT = os.path.join(
+    HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a-spmd", "fvp")
 
 VM_NODE_REGEX = "vm[1-9]"
 
@@ -508,7 +508,7 @@ class FvpDriverSPMC(FvpDriver):
 
     @property
     def FVP_PREBUILT_BL31(self):
-        return os.path.join(FVP_PREBUILT_TFA_ROOT, "bl31_spmd.bin")
+        return os.path.join(FVP_PREBUILT_TFA_SPMD_ROOT, "bl31.bin")
 
     @property
     def SPMC_ADDRESS(self):
@@ -570,7 +570,7 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
 
     @property
     def FVP_PREBUILT_BL31(self):
-        return str(os.path.join(FVP_PREBUILT_TFA_ROOT, "bl31_spmd.bin"))
+        return str(os.path.join(FVP_PREBUILT_TFA_SPMD_ROOT, "bl31.bin"))
 
     def create_dt(self, run_name):
         dt = dict()
