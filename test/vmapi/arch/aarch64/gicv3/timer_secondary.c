@@ -216,8 +216,8 @@ TEST(timer_secondary, wfi_long)
 	 * Run the test twice in a row, to check that the state doesn't get
 	 * messed up.
 	 */
-	timer_secondary("WFI  0099999", HF_FFA_RUN_WAIT_FOR_INTERRUPT);
-	timer_secondary("WFI  0099999", HF_FFA_RUN_WAIT_FOR_INTERRUPT);
+	timer_secondary("WFI  0899999", HF_FFA_RUN_WAIT_FOR_INTERRUPT);
+	timer_secondary("WFI  0899999", HF_FFA_RUN_WAIT_FOR_INTERRUPT);
 }
 
 TEST(timer_secondary, wfe_short)
@@ -236,8 +236,8 @@ TEST(timer_secondary, wfe_long)
 	 * Run the test twice in a row, to check that the state doesn't get
 	 * messed up.
 	 */
-	timer_secondary("WFE  0099999", FFA_YIELD_32);
-	timer_secondary("WFE  0099999", FFA_YIELD_32);
+	timer_secondary("WFE  0899999", FFA_YIELD_32);
+	timer_secondary("WFE  0899999", FFA_YIELD_32);
 }
 
 TEST(timer_secondary, receive_short)
@@ -256,14 +256,14 @@ TEST(timer_secondary, receive_long)
 	 * Run the test twice in a row, to check that the state doesn't get
 	 * messed up.
 	 */
-	timer_secondary("RECV 0099999", FFA_MSG_WAIT_32);
-	timer_secondary("RECV 0099999", FFA_MSG_WAIT_32);
+	timer_secondary("RECV 0899999", FFA_MSG_WAIT_32);
+	timer_secondary("RECV 0899999", FFA_MSG_WAIT_32);
 }
 
 /**
  * Set the timer for a very long time, and expect that it doesn't fire.
  */
-TEST_SKIP(timer_secondary, wfi_very_long)
+TEST(timer_secondary, wfi_very_long)
 {
 	const char message[] = "WFI  9999999";
 	size_t message_length = strnlen_s(message, 64) + 1;

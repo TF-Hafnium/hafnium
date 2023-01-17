@@ -115,7 +115,7 @@ TEST(busy_secondary, virtual_timer)
 	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
 }
 
-TEST_SKIP(busy_secondary, physical_timer)
+TEST(busy_secondary, physical_timer)
 {
 	const char message[] = "loop";
 	struct ffa_value run_res;
