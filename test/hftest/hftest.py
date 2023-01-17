@@ -47,10 +47,10 @@ FVP_BINARY = os.path.join(
     "Linux64_GCC-9.3", "FVP_Base_RevC-2xAEMvA")
 HF_PREBUILTS = os.path.join(HF_ROOT, "prebuilts")
 QEMU_PREBUILTS = os.path.join(HF_PREBUILTS, MACHINE, "qemu", "qemu-system-aarch64")
-FVP_PREBUILTS_TFA_TRUSTY_ROOT = os.path.join(
-    HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a-trusty", "fvp")
+FVP_PREBUILTS_TFA_ROOT = os.path.join(
+    HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a", "fvp")
 FVP_PREBUILT_DTS = os.path.join(
-    FVP_PREBUILTS_TFA_TRUSTY_ROOT, "fvp-base-gicv3-psci-1t.dts")
+    FVP_PREBUILTS_TFA_ROOT, "fvp-base-gicv3-psci-1t.dts")
 
 FVP_PREBUILT_TFA_SPMD_ROOT = os.path.join(
     HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a-spmd", "fvp")
@@ -237,7 +237,7 @@ class QemuDriver(Driver):
 
         if self.tfa:
             bl1_path = os.path.join(
-                HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a-trusty",
+                HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a",
                 "qemu", "bl1.bin")
             exec_args += ["-bios",
                 os.path.abspath(bl1_path),
@@ -434,7 +434,7 @@ class FvpDriverHypervisor(FvpDriver):
 
     @property
     def FVP_PREBUILT_BL31(self):
-        return os.path.join(FVP_PREBUILTS_TFA_TRUSTY_ROOT, "bl31.bin")
+        return os.path.join(FVP_PREBUILTS_TFA_ROOT, "bl31.bin")
 
     @property
     def HYPERVISOR_ADDRESS(self):

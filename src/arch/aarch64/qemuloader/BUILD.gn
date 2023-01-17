@@ -38,9 +38,9 @@ source_set("loader") {
 
 copy("tfa_trusty_copy") {
   sources = [
-    "//prebuilts/linux-aarch64/trusted-firmware-a-trusty/qemu/bl2.bin",
-    "//prebuilts/linux-aarch64/trusted-firmware-a-trusty/qemu/bl31.bin",
-    "//prebuilts/linux-aarch64/trusted-firmware-a-trusty/qemu/bl32.bin",
+    "//prebuilts/linux-aarch64/trusted-firmware-a/qemu/bl2.bin",
+    "//prebuilts/linux-aarch64/trusted-firmware-a/qemu/bl31.bin",
+    "//prebuilts/linux-aarch64/trusted-firmware-a/qemu/bl32.bin",
   ]
   outputs = [
     "$root_out_dir/{{source_file_part}}",
