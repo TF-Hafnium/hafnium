@@ -57,6 +57,8 @@ FVP_PREBUILT_TFA_SPMD_ROOT = os.path.join(
 
 VM_NODE_REGEX = "vm[1-9]"
 
+QEMU_CPU_MAX = "max,pauth-impdef=true"
+
 def read_file(path):
     with open(path, "r") as f:
         return f.read()
@@ -225,7 +227,11 @@ class QemuDriver(Driver):
         time_limit = "120s" if is_long_running else "10s"
         # If no CPU configuration is selected, then test against the maximum
         # configuration, "max", supported by QEMU.
-        cpu = self.args.cpu or "max"
+        if not self.args.cpu or self.args.cpu == "max":
+            cpu = QEMU_CPU_MAX
+        else:
+            cpu = self.args.cpu
+
         exec_args = [
             "timeout", "--foreground", time_limit,
             QEMU_PREBUILTS,
