@@ -36,12 +36,8 @@ bool is_arch_feat_bti_supported(void);
  */
 static inline bool has_vhe_support(void)
 {
-#if ENABLE_VHE == 1
 	return (((read_msr(ID_AA64MMFR1_EL1) >> ID_AA64MMFR1_EL1_VH_SHIFT) &
 		 ID_AA64MMFR1_EL1_VH_MASK) == ID_AA64MMFR1_EL1_VH_SUPPORTED);
-#else
-	return false;
-#endif
 }
 
 static inline void vhe_switch_to_host_or_guest(bool guest)

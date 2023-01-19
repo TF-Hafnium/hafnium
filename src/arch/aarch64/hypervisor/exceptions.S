@@ -58,9 +58,7 @@
 .macro lower_exception handler:req
 	save_volatile_to_vcpu
 
-#if ENABLE_VHE
 	bl enable_vhe_tge
-#endif
 
 #if BRANCH_PROTECTION
 	/* NOTE: x18 still holds pointer to current vCPU. */
@@ -88,9 +86,7 @@
 .macro lower_sync_exception
 	save_volatile_to_vcpu
 
-#if ENABLE_VHE
 	bl enable_vhe_tge
-#endif
 
 #if BRANCH_PROTECTION
 	/* NOTE: x18 still holds pointer to current vCPU. */
@@ -281,12 +277,10 @@ vcpu_switch:
 	/* Use x28 as the base */
 	add x28, x1, #VCPU_LAZY
 
-#if ENABLE_VHE
 	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
 	mrs x19, id_aa64mmfr1_el1
 	tst x19, #(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT)
 	b.ne vhe_save
-#endif
 
 	mrs x24, sctlr_el1
 	mrs x25, cpacr_el1
@@ -320,7 +314,6 @@ vcpu_switch:
 	mrs x15, spsr_el1
 	stp x14, x15, [x28], #16
 
-#if ENABLE_VHE
 	b skip_vhe_save
 
 vhe_save:
@@ -357,7 +350,6 @@ vhe_save:
 	stp x14, x15, [x28], #16
 
 skip_vhe_save:
-#endif
 	mrs x16, vmpidr_el2
 	mrs x17, csselr_el1
 	stp x16, x17, [x28], #16
@@ -675,12 +667,10 @@ vcpu_restore_lazy_and_run:
 	/* Use x28 as the base. */
 	add x28, x0, #VCPU_LAZY
 
-#if ENABLE_VHE
 	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
 	mrs x19, id_aa64mmfr1_el1
 	tst x19, #(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT)
 	b.ne vhe_restore
-#endif
 
 	ldp x24, x25, [x28], #16
 	msr sctlr_el1, x24
@@ -713,8 +703,6 @@ vcpu_restore_lazy_and_run:
 	ldp x14, x15, [x28], #16
 	msr elr_el1, x14
 	msr spsr_el1, x15
-
-#if ENABLE_VHE
 	b skip_vhe_restore
 
 vhe_restore:
@@ -751,7 +739,6 @@ vhe_restore:
 	msr MSR_SPSR_EL12, x15
 
 skip_vhe_restore:
-#endif
 	ldp x16, x17, [x28], #16
 	msr vmpidr_el2, x16
 	msr csselr_el1, x17
@@ -910,7 +897,6 @@ vcpu_restore_volatile_and_run:
 	ldp x0, x1, [x0, #VCPU_REGS + 8 * 0]
 	eret_with_sb
 
-#if ENABLE_VHE
 enable_vhe_tge:
 	mrs x0, id_aa64mmfr1_el1
 	tst x0, #(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT)
@@ -935,4 +921,3 @@ enable_vhe_tge:
 	isb
 
 1:	ret
-#endif

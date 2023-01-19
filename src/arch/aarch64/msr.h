@@ -99,7 +99,6 @@
 
 #endif
 
-#if ENABLE_VHE
 /*
  * EL1 register encodings when ARMv8.1 VHE is enabled, as defined in table
  * D5-47 of the ARMv8 ARM (DDI0487F).
@@ -129,5 +128,3 @@
 #define MSR_CNTV_CVAL_EL02 S3_5_C14_C3_2
 #define MSR_SPSR_EL12 S3_5_C4_C0_0
 #define MSR_ELR_EL12 S3_5_C4_C0_1
-
-#endif
