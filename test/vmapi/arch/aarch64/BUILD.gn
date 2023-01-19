@@ -12,7 +12,6 @@ group("arch") {
 
   deps = [
     ":aarch64_test",
-    "trusty:trusty_test",
   ]
 }
 
