@@ -2009,7 +2009,6 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	ffa_id_t sender_id;
 	ffa_id_t receiver_id;
 	uint32_t msg_size;
-	ffa_notifications_bitmap_t rx_buffer_full;
 
 	alignas(8) struct ffa_partition_rxtx_header header;
 
@@ -2156,17 +2155,29 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	to->mailbox.recv_func = FFA_MSG_SEND2_32;
 	to->mailbox.state = MAILBOX_STATE_FULL;
 
-	rx_buffer_full = ffa_is_vm_id(sender_id)
-				 ? FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK
-				 : FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK;
-	vm_notifications_framework_set_pending(to_locked, rx_buffer_full);
+	/*
+	 * Set framework notifications, only if the SP has enabled
+	 * receipt of notifications.
+	 * If VMs have provided the RX buffer it is implied they already
+	 * support indirect messaging, and therefore framework notifications.
+	 */
+	if (ffa_is_vm_id(to_locked.vm->id) ||
+	    vm_are_notifications_enabled(to_locked.vm)) {
+		ffa_notifications_bitmap_t rx_buffer_full =
+			ffa_is_vm_id(sender_id)
+				? FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK
+				: FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK;
 
-	if ((FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) == 0) {
-		dlog_verbose("SRI was NOT delayed. vcpu: %u!\n",
-			     vcpu_index(current));
-		plat_ffa_sri_trigger_not_delayed(current->cpu);
-	} else {
-		plat_ffa_sri_state_set(DELAYED);
+		vm_notifications_framework_set_pending(to_locked,
+						       rx_buffer_full);
+
+		if ((FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) == 0) {
+			dlog_verbose("SRI was NOT delayed. vcpu: %u!\n",
+				     vcpu_index(current));
+			plat_ffa_sri_trigger_not_delayed(current->cpu);
+		} else {
+			plat_ffa_sri_state_set(DELAYED);
+		}
 	}
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
