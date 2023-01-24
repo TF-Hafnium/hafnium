@@ -36,7 +36,7 @@ source_set("loader") {
   ]
 }
 
-copy("tfa_trusty_copy") {
+copy("tfa_copy") {
   sources = [
     "//prebuilts/linux-aarch64/trusted-firmware-a/qemu/bl2.bin",
     "//prebuilts/linux-aarch64/trusted-firmware-a/qemu/bl31.bin",
@@ -62,6 +62,6 @@ copy("qemuloader_copy") {
 group("bl") {
   deps = [
     ":qemuloader_copy",
-    ":tfa_trusty_copy",
+    ":tfa_copy",
   ]
 }
