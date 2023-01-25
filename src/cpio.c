@@ -10,7 +10,10 @@
 
 #include <stdint.h>
 
+#include "hf/dlog.h"
 #include "hf/std.h"
+
+#define CPIO_OLD_BINARY_FORMAT_MAGIC 070707
 
 #pragma pack(push, 1)
 struct cpio_header {
@@ -38,19 +41,38 @@ static bool cpio_next(struct memiter *iter, const char **name,
 {
 	static const char trailer[] = "TRAILER!!!";
 	size_t len;
-	struct memiter lit = *iter;
-	const struct cpio_header *h = (const struct cpio_header *)lit.next;
+	struct memiter lit;
+	const struct cpio_header *h;
+
+	if (!iter) {
+		return false;
+	}
+
+	lit = *iter;
+
+	h = (const struct cpio_header *)lit.next;
+	if (!h) {
+		return false;
+	}
 
 	if (!memiter_advance(&lit, sizeof(struct cpio_header))) {
 		return false;
 	}
 
-	*name = lit.next;
+	if (h->magic != CPIO_OLD_BINARY_FORMAT_MAGIC) {
+		dlog_error("cpio: only old binary format is supported\n");
+		return false;
+	}
 
-	/* TODO: Check magic. */
+	*name = lit.next;
 
 	len = (h->namesize + 1) & ~1;
 	if (!memiter_advance(&lit, len)) {
+		return false;
+	}
+
+	/* previous memiter_advance checks for boundaries */
+	if (h->namesize == 0U || (*name)[h->namesize - 1] != '\0') {
 		return false;
 	}
 
@@ -60,8 +82,6 @@ static bool cpio_next(struct memiter *iter, const char **name,
 	if (!memiter_advance(&lit, (len + 1) & ~1)) {
 		return false;
 	}
-
-	/* TODO: Check that string is null-terminated. */
 
 	/* Stop enumerating files when we hit the end marker. */
 	if (!strncmp(*name, trailer, sizeof(trailer))) {
