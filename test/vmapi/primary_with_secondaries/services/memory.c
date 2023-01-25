@@ -6,6 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/mmu.h"
 #include "hf/arch/vm/interrupts.h"
 
 #include "hf/check.h"
@@ -24,15 +25,16 @@ alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];
 static uint8_t retrieve_buffer[PAGE_SIZE * 2];
 
 /*
- * TODO: change function to NS bit from memory region.
- * As it stands it is a temporary hack to make things work for
- * memory sharing between worlds.
+ * Update security state on S1 page table based on attributes
+ * set in the memory region structure.
  */
 static void update_mm_security_state(
 	struct ffa_composite_memory_region *composite,
-	uint32_t extra_attributes)
+	ffa_memory_attributes_t attributes)
 {
-	if (extra_attributes != 0U) {
+	if (ffa_get_memory_security_attr(attributes) ==
+		    FFA_MEMORY_SECURITY_NON_SECURE &&
+	    !ffa_is_vm_id(hf_vm_get_id())) {
 		for (uint32_t i = 0; i < composite->constituent_count; i++) {
 			uint32_t mode;
 
@@ -53,7 +55,7 @@ static void update_mm_security_state(
 					.address,
 				FFA_PAGE_SIZE *
 					composite->constituents[i].page_count,
-				mode | extra_attributes);
+				mode | MM_MODE_NS);
 		}
 	}
 }
@@ -81,8 +83,7 @@ static void memory_increment(ffa_memory_handle_t *handle,
 	ASSERT_NE(memory_region->receivers[0].composite_memory_region_offset,
 		  0);
 
-	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
-						    memory_region->sender));
+	update_mm_security_state(composite, memory_region->attributes);
 
 	if (handle != NULL) {
 		*handle = memory_region->handle;
@@ -181,9 +182,7 @@ TEST_SERVICE(memory_increment_check_mem_attr)
 				  .composite_memory_region_offset,
 			  0);
 
-		update_mm_security_state(composite,
-					 arch_mm_extra_attributes_from_vm(
-						 memory_region->sender));
+		update_mm_security_state(composite, memory_region->attributes);
 
 		/*
 		 * Validate retrieve response contains the memory attributes
@@ -277,8 +276,7 @@ TEST_SERVICE(ffa_memory_return)
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
 
-	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
-						    memory_region->sender));
+	update_mm_security_state(composite, memory_region->attributes);
 
 	/* Check that one has access to the shared region. */
 	for (i = 0; i < PAGE_SIZE; ++i) {
@@ -322,8 +320,8 @@ TEST_SERVICE(ffa_check_upper_bound)
 	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
 				     HF_MAILBOX_SIZE);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
-	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
-						    memory_region->sender));
+
+	update_mm_security_state(composite, memory_region->attributes);
 
 	/* Choose which constituent we want to test. */
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
@@ -360,8 +358,8 @@ TEST_SERVICE(ffa_check_lower_bound)
 				     HF_MAILBOX_SIZE);
 
 	composite = ffa_memory_region_get_composite(memory_region, 0);
-	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
-						    memory_region->sender));
+
+	update_mm_security_state(composite, memory_region->attributes);
 
 	/* Choose which constituent we want to test. */
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
@@ -479,9 +477,7 @@ TEST_SERVICE(ffa_memory_receive)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint8_t *)composite->constituents[0].address;
 
-		update_mm_security_state(composite,
-					 arch_mm_extra_attributes_from_vm(
-						 memory_region->sender));
+		update_mm_security_state(composite, memory_region->attributes);
 
 		ptr[0] = 'd';
 		ffa_yield();
@@ -557,9 +553,7 @@ TEST_SERVICE(ffa_memory_lend_relinquish_relend)
 		CHECK(composite != NULL);
 		constituents = composite->constituents;
 
-		update_mm_security_state(composite,
-					 arch_mm_extra_attributes_from_vm(
-						 memory_region->sender));
+		update_mm_security_state(composite, memory_region->attributes);
 
 		/*
 		 * Check that we can read and write every page that was shared.
@@ -610,9 +604,7 @@ TEST_SERVICE(ffa_memory_lend_relinquish)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		first_ptr = (uint8_t *)constituents[0].address;
 
-		update_mm_security_state(composite,
-					 arch_mm_extra_attributes_from_vm(
-						 memory_region->sender));
+		update_mm_security_state(composite, memory_region->attributes);
 
 		/*
 		 * Check that we can read and write every page that was shared.
@@ -664,9 +656,7 @@ TEST_SERVICE(ffa_memory_donate_relinquish)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint8_t *)composite->constituents[0].address;
 
-		update_mm_security_state(composite,
-					 arch_mm_extra_attributes_from_vm(
-						 memory_region->sender));
+		update_mm_security_state(composite, memory_region->attributes);
 
 		/* Check that we have access to the shared region. */
 		for (i = 0; i < PAGE_SIZE; ++i) {
@@ -794,9 +784,7 @@ TEST_SERVICE(ffa_memory_lend_relinquish_X)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint32_t *)constituents[0].address;
 
-		update_mm_security_state(composite,
-					 arch_mm_extra_attributes_from_vm(
-						 memory_region->sender));
+		update_mm_security_state(composite, memory_region->attributes);
 
 		/*
 		 * Verify that the instruction in memory is the encoded RET
@@ -877,9 +865,7 @@ TEST_SERVICE(ffa_memory_lend_relinquish_RW)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		ptr = (uint8_t *)constituent_copy.address;
 
-		update_mm_security_state(composite,
-					 arch_mm_extra_attributes_from_vm(
-						 memory_region->sender));
+		update_mm_security_state(composite, memory_region->attributes);
 
 		/* Check that we have read access. */
 		for (i = 0; i < PAGE_SIZE; ++i) {
@@ -922,8 +908,7 @@ TEST_SERVICE(ffa_memory_lend_twice)
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)constituent_copy.address;
 
-	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
-						    memory_region->sender));
+	update_mm_security_state(composite, memory_region->attributes);
 
 	/* Check that we have read access. */
 	for (i = 0; i < PAGE_SIZE; ++i) {
@@ -1039,8 +1024,7 @@ TEST_SERVICE(retrieve_ffa_v1_0)
 	/* Point to the whole copied structure. */
 	composite = ffa_memory_region_get_composite_v1_0(memory_region, 0);
 
-	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
-						    memory_region->sender));
+	update_mm_security_state(composite, memory_region->attributes);
 
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;

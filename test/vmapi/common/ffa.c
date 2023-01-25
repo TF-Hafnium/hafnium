@@ -447,6 +447,7 @@ void retrieve_memory(void *recv_buf, ffa_memory_handle_t handle,
 	uint32_t fragment_length;
 	uint32_t total_length;
 	uint32_t fragment_offset;
+	ffa_id_t own_id = hf_vm_get_id();
 
 	ret = ffa_mem_retrieve_req(msg_size, msg_size);
 	ASSERT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
@@ -461,7 +462,7 @@ void retrieve_memory(void *recv_buf, ffa_memory_handle_t handle,
 	memory_region = (struct ffa_memory_region *)recv_buf;
 	EXPECT_EQ(memory_region->receiver_count, 1);
 	EXPECT_EQ(memory_region->receivers[0].receiver_permissions.receiver,
-		  hf_vm_get_id());
+		  own_id);
 
 	/* Copy into the return buffer. */
 	if (memory_region_ret != NULL) {
@@ -517,9 +518,9 @@ ffa_id_t retrieve_memory_from_message(
 	ffa_id_t sender;
 	struct ffa_memory_region *retrieve_request;
 	ffa_memory_handle_t retrieved_handle;
-
 	const struct ffa_partition_msg *retrv_message =
 		get_mailbox_message(recv_buf);
+	ffa_id_t own_id = hf_vm_get_id();
 
 	ASSERT_TRUE(retrv_message != NULL);
 
@@ -538,6 +539,19 @@ ffa_id_t retrieve_memory_from_message(
 
 	retrieve_memory(recv_buf, retrieved_handle, memory_region_ret,
 			memory_region_max_size, msg_size);
+
+	/*
+	 * If the sender is a VM, and the receiver is an SP the NS bit
+	 * should be set in the retrieve response.
+	 */
+	if (!ffa_is_vm_id(own_id) && ffa_is_vm_id(sender) &&
+	    memory_region_ret != NULL) {
+		enum ffa_memory_security retrieved_security =
+			ffa_get_memory_security_attr(
+				memory_region_ret->attributes);
+
+		EXPECT_EQ(retrieved_security, FFA_MEMORY_SECURITY_NON_SECURE);
+	}
 
 	return sender;
 }
