@@ -477,17 +477,17 @@ TEST(arch_features, enable_pauth)
 	sctlr_el1 = read_msr(sctlr_el1);
 	EXPECT_EQ((sctlr_el1 & sctlr_el1_enia), sctlr_el1_enia);
 
-	/* Attempt to write to APIAKey_EL1. */
-	write_msr(apiakeylo_el1, apiakeylo_el1_val);
-	write_msr(apiakeyhi_el1, apiakeyhi_el1_val);
+	/* Attempt to write to APIAKey_EL1) */
+	write_msr(s3_0_c2_c1_0, apiakeylo_el1_val);
+	write_msr(s3_0_c2_c1_1, apiakeyhi_el1_val);
 	isb();
 
 	/* Verify keys were written to. */
-	EXPECT_EQ(read_msr(apiakeylo_el1), apiakeylo_el1_val);
-	EXPECT_EQ(read_msr(apiakeyhi_el1), apiakeyhi_el1_val);
+	EXPECT_EQ(read_msr(s3_0_c2_c1_0), apiakeylo_el1_val);
+	EXPECT_EQ(read_msr(s3_0_c2_c1_1), apiakeyhi_el1_val);
 
 	/* Restore APIA keys to inital value. */
-	write_msr(apiakeylo_el1, 1842);
-	write_msr(apiakeyhi_el1, 1842);
+	write_msr(s3_0_c2_c1_0, 1842);
+	write_msr(s3_0_c2_c1_1, 1842);
 	isb();
 }
