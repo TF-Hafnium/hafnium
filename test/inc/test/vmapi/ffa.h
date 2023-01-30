@@ -58,6 +58,7 @@ struct mailbox_buffers {
 };
 
 struct mailbox_buffers set_up_mailbox(void);
+void mailbox_unmap_buffers(struct mailbox_buffers *mb);
 ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
 	struct ffa_memory_region_constituent constituents[],

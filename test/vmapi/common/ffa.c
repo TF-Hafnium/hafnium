@@ -27,16 +27,19 @@ static hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 
 struct mailbox_buffers set_up_mailbox(void)
 {
-	static bool set_up = false;
-	if (!set_up) {
-		ASSERT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
-			  FFA_SUCCESS_32);
-		set_up = true;
-	}
+	ASSERT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
 	return (struct mailbox_buffers){
 		.send = send_page,
 		.recv = recv_page,
 	};
+}
+
+void mailbox_unmap_buffers(struct mailbox_buffers *mb)
+{
+	ASSERT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+	mb->send = NULL;
+	mb->recv = NULL;
 }
 
 static void send_fragmented_memory_region(
