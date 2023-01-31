@@ -27,7 +27,7 @@ import sys
 import time
 import fdt
 import platform
-from telnetlib import Telnet
+import tempfile
 
 MACHINE = platform.machine()
 
@@ -503,7 +503,7 @@ class FvpDriverSPMC(FvpDriver):
     """
     FVP_PREBUILT_SECURE_DTS = os.path.join(
         HF_ROOT, "test", "vmapi", "fvp-base-spmc.dts")
-    HFTEST_CMD_FILE =  os.path.join("/tmp/", "hftest_cmds")
+    hftest_cmd_file = tempfile.NamedTemporaryFile(mode="w+")
 
     def __init__(self, args):
         if args.partitions is None or args.partitions["SPs"] is None:
@@ -547,7 +547,7 @@ class FvpDriverSPMC(FvpDriver):
 
         if secure_ctrl:
             fvp_args += [
-                "-C", f"bp.pl011_uart0.in_file={FvpDriverSPMC.HFTEST_CMD_FILE}",
+                "-C", f"bp.pl011_uart0.in_file={FvpDriverSPMC.hftest_cmd_file.name}",
                 "-C", f"bp.pl011_uart0.shutdown_tag=\"{HFTEST_CTRL_FINISHED}\"",
             ]
 
@@ -558,14 +558,14 @@ class FvpDriverSPMC(FvpDriver):
         return fvp_args
 
     def run(self, run_name, test_args, is_long_running):
-        with open(FvpDriverSPMC.HFTEST_CMD_FILE, "w+") as f:
-            vm_args = join_if_not_None(self.args.vm_args, test_args)
-            f.write(f"{vm_args}\n")
+        vm_args = join_if_not_None(self.args.vm_args, test_args)
+        FvpDriverSPMC.hftest_cmd_file.write(f"{vm_args}\n")
+        FvpDriverSPMC.hftest_cmd_file.seek(0)
         return super().run(run_name, test_args, is_long_running)
 
     def finish(self):
         """Clean up after running tests."""
-        os.remove(FvpDriverSPMC.HFTEST_CMD_FILE)
+        FvpDriverSPMC.hftest_cmd_file.close()
 
 class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
     def __init__(self, args):
