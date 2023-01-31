@@ -25,4 +25,5 @@
 	boot-order = <1>;
 	notification-support; /* Receipt of notifications. */
 	ns-interrupts-action = <0>; /* Non secure interrupts are queued. */
+	other-s-interrupts-action = <0>; /* Other S-Interrupts are queued. */
 };

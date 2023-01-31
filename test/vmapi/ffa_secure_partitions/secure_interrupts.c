@@ -264,3 +264,55 @@ TEST(secure_interrupts, sp_preempted)
 
 	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
 }
+
+/*
+ * Test Secure Partition runs to completion if it specifies action in response
+ * to Other-S Interrupt as queued.
+ */
+TEST(secure_interrupts, sp_other_s_interrupt_queued)
+{
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+
+	/*
+	 * Service2 SP is the target of trusted watchdog timer interrupt.
+	 * Service3 SP specified action to Other-S Interrupt as queued.
+	 */
+	const ffa_vm_id_t target_id = service2_info->vm_id;
+	const ffa_vm_id_t receiver_id = service3_info->vm_id;
+
+	enable_trigger_trusted_wdog_timer(own_id, target_id, 400);
+
+	/*
+	 * Send command to receiver SP(Service3) to sleep for SP_SLEEP_TIME
+	 * ms. Secure interrupt should trigger while SP is busy in running the
+	 * sleep command. SPMC queues the virtual interrupt and resumes the
+	 * SP.
+	 */
+	res = sp_sleep_cmd_send(own_id, receiver_id, SP_SLEEP_TIME);
+
+	/* Service3 SP finishes and sends direct response back. */
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/*
+	 * Allocate cycles to target SP for it to handle the virtual secure
+	 * interrupt.
+	 */
+	res = sp_sleep_cmd_send(own_id, target_id, 10);
+
+	/*
+	 * Secure interrupt should trigger during this time, SP will handle the
+	 * trusted watchdog timer interrupt.
+	 */
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/*
+	 * Check if the trusted watchdog timer interrupt has been handled.
+	 */
+	check_and_disable_trusted_wdog_timer(own_id, target_id);
+}
