@@ -30,7 +30,6 @@ import platform
 from telnetlib import Telnet
 
 MACHINE = platform.machine()
-MACHINE = "linux-" + ("x64" if MACHINE == "x86_64" else MACHINE)
 
 HFTEST_LOG_PREFIX = "[hftest] "
 HFTEST_LOG_FAILURE_PREFIX = "Failure:"
@@ -44,9 +43,12 @@ HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
 DTC_SCRIPT = os.path.join(HF_ROOT, "build", "image", "dtc.py")
 FVP_BINARY = os.path.join(
     os.path.dirname(HF_ROOT), "fvp", "Base_RevC_AEMvA_pkg", "models",
-    "Linux64_GCC-9.3", "FVP_Base_RevC-2xAEMvA")
+    "Linux64_armv8l_GCC-9.3" if MACHINE == "aarch64" else "Linux64_GCC-9.3",
+    "FVP_Base_RevC-2xAEMvA")
 HF_PREBUILTS = os.path.join(HF_ROOT, "prebuilts")
-QEMU_PREBUILTS = os.path.join(HF_PREBUILTS, MACHINE, "qemu", "qemu-system-aarch64")
+QEMU_PREBUILTS = os.path.join(HF_PREBUILTS,
+         "linux-" + ("x64" if MACHINE == "x86_64" else MACHINE),
+         "qemu", "qemu-system-aarch64")
 FVP_PREBUILTS_TFA_ROOT = os.path.join(
     HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a", "fvp")
 FVP_PREBUILT_DTS = os.path.join(
