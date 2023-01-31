@@ -20,7 +20,7 @@ static void sp_check_partition_info_get_regs_null_uuid(void)
 	struct ffa_value ret;
 	uint16_t start_index = 0;
 	struct ffa_uuid uuid;
-	struct ffa_partition_info partitions[2];
+	struct ffa_partition_info partitions[3];
 	uint16_t last_index;
 	uint16_t curr_index;
 	uint16_t tag;
@@ -41,14 +41,15 @@ static void sp_check_partition_info_get_regs_null_uuid(void)
 	tag = ffa_partition_info_regs_get_tag(ret);
 	desc_size = ffa_partition_info_regs_get_desc_size(ret);
 
-	/* Expect two partitions (2 SPs) */
-	EXPECT_EQ(last_index, 1);
-	EXPECT_EQ(curr_index, 1);
+	/* Expect three partitions (3 SPs) */
+	EXPECT_EQ(last_index, 2);
+	EXPECT_EQ(curr_index, 2);
 	EXPECT_EQ(tag, 0);
 	EXPECT_EQ(desc_size, sizeof(struct ffa_partition_info));
 
 	ffa_partition_info_regs_get_part_info(ret, 0, &partitions[0]);
 	ffa_partition_info_regs_get_part_info(ret, 1, &partitions[1]);
+	ffa_partition_info_regs_get_part_info(ret, 2, &partitions[2]);
 
 	EXPECT_EQ(partitions[0].vm_id, SP_ID(1));
 	EXPECT_EQ(partitions[0].vcpu_count, 8);
@@ -65,6 +66,15 @@ static void sp_check_partition_info_get_regs_null_uuid(void)
 	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[1].uuid, &uuid));
 	EXPECT_EQ(partitions[1].properties,
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_DIRECT_REQ_RECV |
+			  FFA_PARTITION_DIRECT_REQ_SEND);
+
+	EXPECT_EQ(partitions[2].vm_id, SP_ID(3));
+	EXPECT_EQ(partitions[2].vcpu_count, 8);
+	ffa_uuid_init(0x1df938ef, 0xe8b94490, 0x84967204, 0xab77f4a5, &uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[2].uuid, &uuid));
+	EXPECT_EQ(partitions[2].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
 			  FFA_PARTITION_DIRECT_REQ_RECV |
 			  FFA_PARTITION_DIRECT_REQ_SEND);
@@ -149,11 +159,11 @@ static void sp_check_partition_info_get_regs_bad_start_idx(void)
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 
 	/*
-	 * Get all entries (2 entries for 2 SPs). start_index can only be 0 or
-	 * 1 corresponding to the 2 entries.
+	 * Get all entries (3 entries for 3 SPs). start_index can only be 0 or
+	 * 1 or 2 corresponding to the 3 entries.
 	 */
 	ffa_uuid_init(0, 0, 0, 0, &uuid);
-	ret = ffa_partition_info_get_regs(&uuid, 2, 0);
+	ret = ffa_partition_info_get_regs(&uuid, 3, 0);
 	EXPECT_EQ(ret.func, FFA_ERROR_32);
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 }
@@ -183,8 +193,8 @@ static void sp_check_partition_info_get_regs_start_idx(void)
 	tag = ffa_partition_info_regs_get_tag(ret);
 	desc_size = ffa_partition_info_regs_get_desc_size(ret);
 
-	EXPECT_EQ(last_index, 1);
-	EXPECT_EQ(curr_index, 1);
+	EXPECT_EQ(last_index, 2);
+	EXPECT_EQ(curr_index, 2);
 	EXPECT_EQ(tag, 0);
 	EXPECT_EQ(desc_size, sizeof(struct ffa_partition_info));
 

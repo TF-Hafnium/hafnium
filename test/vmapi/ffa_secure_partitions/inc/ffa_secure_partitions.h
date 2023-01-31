@@ -37,9 +37,18 @@
 		}                                           \
 	}
 
+#define SERVICE3                                                       \
+	(struct ffa_uuid)                                              \
+	{                                                              \
+		{                                                      \
+			0x1df938ef, 0xe8b94490, 0x84967204, 0xab77f4a5 \
+		}                                                      \
+	}
+
 /*
  * Helpers to get services information.
  * Defined with SERVICE_PARTITION_INFO_GET macro.
  */
 struct ffa_partition_info* service1(void* recv);
 struct ffa_partition_info* service2(void* recv);
+struct ffa_partition_info* service3(void* recv);

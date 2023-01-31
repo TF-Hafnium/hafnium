@@ -24,3 +24,12 @@
 	{                                          \
 		0xa609f132, 0x6b4f, 0x4c14, 0x9489 \
 	}
+
+/*
+ * FF-A UUID of the SP Service Third. Named as it is the third service to
+ * boot.
+ */
+#define SP_SERVICE_THIRD_UUID                                  \
+	{                                                      \
+		0x1df938ef, 0xe8b94490, 0x84967204, 0xab77f4a5 \
+	}

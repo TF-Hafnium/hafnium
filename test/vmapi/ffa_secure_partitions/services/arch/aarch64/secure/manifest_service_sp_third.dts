@@ -6,8 +6,15 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "ffa_secure_partitions.h"
-
-SERVICE_PARTITION_INFO_GET(service1, SERVICE1)
-SERVICE_PARTITION_INFO_GET(service2, SERVICE2)
-SERVICE_PARTITION_INFO_GET(service3, SERVICE3)
+/ {
+	hypervisor {
+		compatible = "hafnium,hafnium";
+		vm1 {
+			is_ffa_partition;
+			load_address = <0x6280000>;
+			debug_name = "SP Service Third";
+			vcpu_count = <8>;
+			mem_size = <0x100000>;
+		};
+	};
+};

@@ -18,7 +18,7 @@
   execution-ctx-count = <1>;
   exception-level = <1>; /* S-EL0 */
   execution-state = <0>; /* AARCH64 */
-  load-address = <0x6290000>;
+  load-address = <0x6380000>;
   entrypoint-offset = <0x2000>;
   xlat-granule = <0>; /* 4KiB */
   messaging-method = <0x7>; /* Support direct and indirect messaging. */

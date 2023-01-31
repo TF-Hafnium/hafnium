@@ -86,6 +86,12 @@ partitions_json("ffa_both_world_partitions_vhe_test") {
       "services/arch/${plat_arch}/secure/el0:service_sp_second_package",
       "services//arch/${plat_arch}/secure/el0:partition_manifest_service_sp_second",
     ],
+    [
+      "service_sp_third_package.img",
+      "services/arch/${plat_arch}/secure/manifest_service_sp_third.dts",
+      "services/arch/${plat_arch}/secure:service_sp_third_package",
+      "services/arch/${plat_arch}/secure:partition_manifest_service_sp_third",
+    ],
   ]
 
   vms = [ [
@@ -113,6 +119,12 @@ partitions_json("ffa_both_world_partitions_test") {
       "services/arch/aarch64/secure/manifest_service_sp_second.dts",
       "services/arch/aarch64/secure:service_sp_second_package",
       "services/arch/aarch64/secure:partition_manifest_service_sp_second",
+    ],
+    [
+      "service_sp_third_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_third.dts",
+      "services/arch/aarch64/secure:service_sp_third_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_third",
     ],
   ]
 
