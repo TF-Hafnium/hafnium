@@ -29,7 +29,7 @@ def check_eret_speculation_barrier(args):
 	"""
 
 	objdump_stdout = subprocess\
-		.check_output([ OBJDUMP, "-d", args.input_elf ])\
+		.check_output([ OBJDUMP, "--no-show-raw-insn", "-d", args.input_elf ])\
 		.decode("utf-8")\
 		.splitlines()
 
@@ -39,9 +39,9 @@ def check_eret_speculation_barrier(args):
 	STATE_EXPECT_DSB_NSH = 2
 	STATE_EXPECT_ISB = 3
 
-	REGEX_ERET = re.compile(r"^\s*[0-9a-f]+:\s*e0 03 9f d6\s+eret$")
-	REGEX_DSB_NSH = re.compile(r"^\s*[0-9a-f]+:\s*9f 37 03 d5\s*dsb\s+nsh$")
-	REGEX_ISB = re.compile(r"^\s*[0-9a-f]+:\s*df 3f 03 d5\s+isb$")
+	REGEX_ERET = re.compile(r"^\s*[0-9a-f]+:\s*eret$")
+	REGEX_DSB_NSH = re.compile(r"^\s*[0-9a-f]+:\s*dsb\s+nsh$")
+	REGEX_ISB = re.compile(r"^\s*[0-9a-f]+:\s*isb$")
 
 	state = STATE_DEFAULT
 	for line in objdump_stdout:
