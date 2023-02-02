@@ -42,14 +42,10 @@ source_set("std") {
 
 # Entry code to prepare the loaded image to be run.
 source_set("entry") {
-  sources = [
-    "entry.S",
-  ]
+  sources = [ "entry.S" ]
 }
 
 # Make a call to the secure monitor.
 source_set("smc") {
-  sources = [
-    "smc.c",
-  ]
+  sources = [ "smc.c" ]
 }

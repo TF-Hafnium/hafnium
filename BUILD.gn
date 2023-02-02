@@ -9,24 +9,18 @@
 
 # The root of the build.
 group("root") {
-  deps = [
-    "//project/${project}:root",
-  ]
+  deps = [ "//project/${project}:root" ]
 }
 
 # The root of the build for test artifacts.
 group("test_root") {
   testonly = true
 
-  deps = [
-    "//project/${project}:test_root",
-  ]
+  deps = [ "//project/${project}:test_root" ]
 }
 
 group("update_prebuilts") {
-  deps = [
-    "//third_party/linux",
-  ]
+  deps = [ "//third_party/linux" ]
 }
 
 group("default") {

@@ -18,13 +18,9 @@ source_set("primary_with_secondaries") {
     "//src/arch/aarch64:config",
   ]
 
-  sources = [
-    "primary_with_secondaries.c",
-  ]
+  sources = [ "primary_with_secondaries.c" ]
 
-  deps = [
-    "//test/vmapi/common",
-  ]
+  deps = [ "//test/vmapi/common" ]
 }
 
 # Tests with secondary VMs.
@@ -35,9 +31,7 @@ vm_kernel("primary_with_secondaries_no_fdt_vm") {
     "//src/arch/aarch64:config",
   ]
 
-  sources = [
-    "no_fdt.c",
-  ]
+  sources = [ "no_fdt.c" ]
 
   deps = [
     "//src/arch/aarch64/hftest:registers",
@@ -50,13 +44,9 @@ vm_kernel("primary_with_secondaries_no_fdt_vm") {
 vm_kernel("secondary_vm_no_fdt") {
   testonly = true
 
-  sources = [
-    "no_fdt_secondary.c",
-  ]
+  sources = [ "no_fdt_secondary.c" ]
 
-  deps = [
-    "//test/hftest:hftest_secondary_vm_no_fdt",
-  ]
+  deps = [ "//test/hftest:hftest_secondary_vm_no_fdt" ]
 }
 
 manifest("primary_with_secondaries_no_fdt_manifest") {

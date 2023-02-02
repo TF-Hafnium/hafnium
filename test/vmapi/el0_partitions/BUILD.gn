@@ -17,9 +17,7 @@ source_set("ffa") {
     "//src/arch/aarch64:config",
     "//test/hftest:hftest_config",
   ]
-  sources = [
-    "//test/vmapi/primary_with_secondaries/ffa.c",
-  ]
+  sources = [ "//test/vmapi/primary_with_secondaries/ffa.c" ]
 }
 
 source_set("memory_sharing") {
@@ -28,9 +26,7 @@ source_set("memory_sharing") {
     "//src/arch/aarch64:config",
     "//test/hftest:hftest_config",
   ]
-  sources = [
-    "memory_sharing.c",
-  ]
+  sources = [ "memory_sharing.c" ]
 }
 
 vm_kernel("el0_partition_test_vm") {

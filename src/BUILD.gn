@@ -77,9 +77,7 @@ source_set("src_testable") {
 }
 
 source_set("layout") {
-  sources = [
-    "layout.c",
-  ]
+  sources = [ "layout.c" ]
 }
 
 source_set("mm") {
@@ -91,38 +89,26 @@ source_set("mm") {
 
 source_set("vm") {
   public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
-  sources = [
-    "vm.c",
-  ]
+  sources = [ "vm.c" ]
 }
 
 # Standard library functions.
 source_set("std") {
-  sources = [
-    "std.c",
-  ]
+  sources = [ "std.c" ]
 
-  deps = [
-    "//src/arch/${plat_arch}:std",
-  ]
+  deps = [ "//src/arch/${plat_arch}:std" ]
 }
 
 # Default implementation of stdout which sends the character to the
 # 'plat_console' driver.
 source_set("stdout") {
-  sources = [
-    "stdout.c",
-  ]
-  deps = [
-    plat_console,
-  ]
+  sources = [ "stdout.c" ]
+  deps = [ plat_console ]
 }
 
 # Debug code that is not specific to a certain image so can be shared.
 source_set("dlog") {
-  sources = [
-    "dlog.c",
-  ]
+  sources = [ "dlog.c" ]
 
   deps = [
     ":std",
@@ -131,9 +117,7 @@ source_set("dlog") {
 }
 
 source_set("string") {
-  sources = [
-    "string.c",
-  ]
+  sources = [ "string.c" ]
   deps = [
     ":memiter",
     ":std",
@@ -141,9 +125,7 @@ source_set("string") {
 }
 
 source_set("fdt_handler") {
-  sources = [
-    "fdt_handler.c",
-  ]
+  sources = [ "fdt_handler.c" ]
   deps = [
     ":dlog",
     ":fdt",
@@ -153,9 +135,7 @@ source_set("fdt_handler") {
 
 # Flattened Device Tree (FDT) utilities.
 source_set("fdt") {
-  sources = [
-    "fdt.c",
-  ]
+  sources = [ "fdt.c" ]
 
   deps = [
     ":memiter",
@@ -165,9 +145,7 @@ source_set("fdt") {
 }
 
 source_set("fdt_patch") {
-  sources = [
-    "fdt_patch.c",
-  ]
+  sources = [ "fdt_patch.c" ]
   deps = [
     ":dlog",
     ":fdt",
@@ -176,21 +154,15 @@ source_set("fdt_patch") {
 }
 
 source_set("memiter") {
-  sources = [
-    "memiter.c",
-  ]
+  sources = [ "memiter.c" ]
 }
 
 source_set("panic") {
-  sources = [
-    "panic.c",
-  ]
+  sources = [ "panic.c" ]
 }
 
 source_set("abort") {
-  sources = [
-    "abort.c",
-  ]
+  sources = [ "abort.c" ]
 }
 
 executable("unit_tests") {

@@ -18,22 +18,14 @@ config("hftest_config") {
 #dlog for el0 partition that uses SVCs for debug logging
 source_set("el0_dlog") {
   testonly = true
-  sources = [
-    "//src/dlog.c",
-  ]
-  deps = [
-    "//src/arch/aarch64/hftest:el0_stdout",
-  ]
+  sources = [ "//src/dlog.c" ]
+  deps = [ "//src/arch/aarch64/hftest:el0_stdout" ]
 }
 
 source_set("el0_fdt_handler") {
   testonly = true
-  sources = [
-    "//src/fdt_handler.c",
-  ]
-  deps = [
-    "//src:fdt",
-  ]
+  sources = [ "//src/fdt_handler.c" ]
+  deps = [ "//src:fdt" ]
 }
 
 # Testing framework for a secondary EL0 partition in the normal world.
@@ -95,9 +87,7 @@ source_set("hftest_secondary_vm") {
 
   public_configs = [ ":hftest_config" ]
 
-  sources = [
-    "service.c",
-  ]
+  sources = [ "service.c" ]
 
   deps = [
     ":mm",
@@ -124,9 +114,7 @@ source_set("hftest_secure_service") {
     ":hftest_config",
   ]
 
-  sources = [
-    "sel1_secure_service.c",
-  ]
+  sources = [ "sel1_secure_service.c" ]
 
   deps = [
     ":mm",
@@ -151,9 +139,7 @@ source_set("hftest_secondary_vm_no_fdt") {
 
   public_configs = [ ":hftest_config" ]
 
-  sources = [
-    "secondary_no_fdt.c",
-  ]
+  sources = [ "secondary_no_fdt.c" ]
 
   deps = [
     ":mm",
@@ -172,9 +158,7 @@ source_set("hftest_secondary_vm_no_fdt") {
 source_set("hftest_hypervisor") {
   testonly = true
   public_configs = [ ":hftest_config" ]
-  deps = [
-    ":hftest_standalone",
-  ]
+  deps = [ ":hftest_standalone" ]
 }
 
 # Testing framework for tests running under Linux in the primary VM.
@@ -182,9 +166,7 @@ source_set("hftest_linux") {
   testonly = true
   public_configs = [ ":hftest_config" ]
 
-  sources = [
-    "linux_main.c",
-  ]
+  sources = [ "linux_main.c" ]
 
   deps = [
     ":common",
@@ -200,9 +182,7 @@ source_set("hftest_standalone") {
 
   public_configs = [ ":hftest_config" ]
 
-  sources = [
-    "standalone_main.c",
-  ]
+  sources = [ "standalone_main.c" ]
 
   deps = [
     ":common",
@@ -227,9 +207,7 @@ source_set("hftest_standalone_secure") {
     ":hftest_config",
   ]
 
-  sources = [
-    "standalone_main_secure.c",
-  ]
+  sources = [ "standalone_main_secure.c" ]
 
   deps = [
     ":common",
@@ -255,9 +233,7 @@ source_set("common") {
   visibility = [ ":*" ]
   testonly = true
   public_configs = [ ":hftest_config" ]
-  sources = [
-    "common.c",
-  ]
+  sources = [ "common.c" ]
   deps = [
     "//src:fdt_handler",
     "//src:memiter",
@@ -270,9 +246,7 @@ source_set("service_common") {
   visibility = [ ":*" ]
   testonly = true
   public_configs = [ ":hftest_config" ]
-  sources = [
-    "service_common.c",
-  ]
+  sources = [ "service_common.c" ]
   deps = [
     "//src:memiter",
     "//src:panic",
@@ -286,13 +260,9 @@ source_set("device_psci") {
 
   public_configs = [ ":hftest_config" ]
 
-  sources = [
-    "device_psci.c",
-  ]
+  sources = [ "device_psci.c" ]
 
-  deps = [
-    "//src/arch/${plat_arch}/hftest:power_mgmt",
-  ]
+  deps = [ "//src/arch/${plat_arch}/hftest:power_mgmt" ]
 }
 
 source_set("mm") {
@@ -300,9 +270,7 @@ source_set("mm") {
 
   public_configs = [ ":hftest_config" ]
 
-  sources = [
-    "mm.c",
-  ]
+  sources = [ "mm.c" ]
 
   deps = [
     "//src:layout",
@@ -317,9 +285,7 @@ source_set("power_mgmt") {
 
   public_configs = [ ":hftest_config" ]
 
-  sources = [
-    "power_mgmt.c",
-  ]
+  sources = [ "power_mgmt.c" ]
 
   deps = [
     ":mm",
@@ -332,9 +298,7 @@ source_set("ctrl_fdt") {
 
   public_configs = [ ":hftest_config" ]
 
-  sources = [
-    "ctrl_fdt.c",
-  ]
+  sources = [ "ctrl_fdt.c" ]
 
   deps = [
     "//src:dlog",
@@ -348,9 +312,7 @@ source_set("ctrl_uart") {
 
   public_configs = [ ":hftest_config" ]
 
-  sources = [
-    "ctrl_uart.c",
-  ]
+  sources = [ "ctrl_uart.c" ]
 
   deps = [
     "//src:dlog",

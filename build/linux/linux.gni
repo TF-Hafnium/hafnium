@@ -7,9 +7,7 @@
 template("source_dir") {
   action("${target_name}") {
     depfile = "${target_out_dir}/${target_name}.d"
-    outputs = [
-      "$target_out_dir/${target_name}.script.stamp",
-    ]
+    outputs = [ "$target_out_dir/${target_name}.script.stamp" ]
 
     script = "//build/linux/gen_depfile.py"
     args = [
@@ -29,17 +27,13 @@ template("source_dir_copy") {
 
   action("${target_name}") {
     script = "//build/linux/copy_dirs.py"
-    outputs = [
-      "$target_out_dir/${target_name}.script.stamp",
-    ]
+    outputs = [ "$target_out_dir/${target_name}.script.stamp" ]
     args = [
       rebase_path(invoker.path),
       rebase_path(target_out_dir),
       rebase_path(outputs[0]),
     ]
-    deps = [
-      ":${source_dir_target}",
-    ]
+    deps = [ ":${source_dir_target}" ]
   }
 }
 
@@ -86,12 +80,8 @@ template("linux_kernel") {
 
     # We never use the output but GN requires each target to have one, and for
     # its timestamp to change after a recompile. Use the .config file.
-    outputs = [
-      "${target_out_dir}/.config",
-    ]
-    deps = [
-      ":${source_target}",
-    ]
+    outputs = [ "${target_out_dir}/.config" ]
+    deps = [ ":${source_target}" ]
   }
 
   action(target_name) {
@@ -102,9 +92,7 @@ template("linux_kernel") {
              rebase_path("${target_out_dir}/arch/arm64/boot/Image"),
              rebase_path(output_file),
            ]
-    outputs = [
-      output_file,
-    ]
+    outputs = [ output_file ]
     deps = [
       ":${defconfig_target}",
       ":${source_target}",
@@ -114,12 +102,8 @@ template("linux_kernel") {
   # Subtarget for a prebuilt image, if defined.
   if (defined(invoker.prebuilt)) {
     copy(prebuilt_target) {
-      sources = [
-        invoker.prebuilt,
-      ]
-      outputs = [
-        "${target_out_dir}/${prebuilt_target}.bin",
-      ]
+      sources = [ invoker.prebuilt ]
+      outputs = [ "${target_out_dir}/${prebuilt_target}.bin" ]
     }
   }
 }
@@ -152,9 +136,7 @@ template("linux_kernel_module") {
       "LLVM_IAS=1",
       "CROSS_COMPILE=aarch64-linux-gnu-",
     ]
-    outputs = [
-      "${target_out_dir}/${invoker.module_name}.ko",
-    ]
+    outputs = [ "${target_out_dir}/${invoker.module_name}.ko" ]
     deps = [
       ":${source_target}",
       "${invoker.kernel_target}__defconfig",

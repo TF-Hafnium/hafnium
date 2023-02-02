@@ -5,8 +5,8 @@
 # https://opensource.org/licenses/BSD-3-Clause.
 
 import("//build/image/image.gni")
-import("//test/hftest/args.gni")
 import("//src/arch/${plat_arch}/args.gni")
+import("//test/hftest/args.gni")
 
 config("config") {
   include_dirs = [ "inc" ]
@@ -19,13 +19,9 @@ source_set("ffa_secure_partitions") {
     "//src/arch/${plat_arch}:config",
   ]
 
-  sources = [
-    "ffa_secure_partitions.c",
-  ]
+  sources = [ "ffa_secure_partitions.c" ]
 
-  deps = [
-    "//test/vmapi/common",
-  ]
+  deps = [ "//test/vmapi/common" ]
 }
 
 # VM that will control execution of tests in a VM-to-SP set-up

@@ -8,12 +8,8 @@ import("args.gni")
 
 # aarch64 PL011 implementation of putchar for debugging.
 source_set("pl011") {
-  sources = [
-    "pl011.c",
-  ]
-  deps = [
-    "//src/arch/aarch64:arch",
-  ]
+  sources = [ "pl011.c" ]
+  deps = [ "//src/arch/aarch64:arch" ]
 
   assert(defined(pl011_base_address),
          "\"pl011_base_address\" must be defined for ${target_name}.")

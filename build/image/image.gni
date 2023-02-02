@@ -40,9 +40,7 @@ template("image_binary") {
                              "testonly",
                            ])
     output_name = "${output_root}.elf"
-    inputs = [
-      rebase_path("//build/image/image.ld"),
-    ]
+    inputs = [ rebase_path("//build/image/image.ld") ]
     ldflags = [
       "-T",
       rebase_path("//build/image/image.ld"),
@@ -60,18 +58,14 @@ template("image_binary") {
     stamp_file = elf_file + "_check.stamp"
 
     script = "//build/image/check_elf.py"
-    deps = [
-      ":${elf_target}",
-    ]
+    deps = [ ":${elf_target}" ]
     args = [
       rebase_path(elf_file),
       rebase_path(stamp_file),
       "--max-image-size",
       "$plat_max_image_size",
     ]
-    outputs = [
-      stamp_file,
-    ]
+    outputs = [ stamp_file ]
     visibility = [ ":${invoker.target_name}" ]
   }
 
@@ -81,13 +75,9 @@ template("image_binary") {
     script = "//build/image/convert_to_binary.py"
 
     if (defined(invoker.check_binary) && invoker.check_binary == true) {
-      deps = [
-        ":${checked_elf_target}",
-      ]
+      deps = [ ":${checked_elf_target}" ]
     } else {
-      deps = [
-        ":${elf_target}",
-      ]
+      deps = [ ":${elf_target}" ]
     }
     args = [
       "--input",
@@ -95,9 +85,7 @@ template("image_binary") {
       "--output",
       rebase_path(bin_file),
     ]
-    outputs = [
-      bin_file,
-    ]
+    outputs = [ bin_file ]
   }
 }
 
@@ -165,9 +153,7 @@ template("linux_initrd") {
     forward_variables_from(invoker, [ "testonly" ])
     sources = copy_sources
     deps = copy_deps
-    outputs = [
-      "${initrd_staging}/{{source_file_part}}",
-    ]
+    outputs = [ "${initrd_staging}/{{source_file_part}}" ]
   }
 
   action(target_name) {
@@ -179,12 +165,8 @@ template("linux_initrd") {
       "--output",
       rebase_path(initrd_file),
     ]
-    deps = [
-      ":${target_name}__staging",
-    ]
-    outputs = [
-      initrd_file,
-    ]
+    deps = [ ":${target_name}__staging" ]
+    outputs = [ initrd_file ]
   }
 }
 
@@ -197,12 +179,8 @@ template("device_tree") {
                            ])
     script = "//build/image/dtc.py"
 
-    sources = [
-      invoker.source,
-    ]
-    outputs = [
-      invoker.output,
-    ]
+    sources = [ invoker.source ]
+    outputs = [ invoker.output ]
     args = [
       "compile",
       "-i",
@@ -226,9 +204,7 @@ template("fdt_overlay") {
       invoker.base,
       invoker.overlay,
     ]
-    outputs = [
-      invoker.output,
-    ]
+    outputs = [ invoker.output ]
     args = [
       "overlay",
       rebase_path(outputs[0]),
@@ -246,9 +222,7 @@ template("incbin") {
                              "deps",
                            ])
 
-    sources = [
-      "//build/image/incbin.S",
-    ]
+    sources = [ "//build/image/incbin.S" ]
     inputs = invoker.sources
     defines = [
       "SECTION_NAME=" + invoker.section,
@@ -267,12 +241,8 @@ template("incbin_target") {
                            ])
     target_outputs = get_target_outputs(invoker.target)
     target_file = target_outputs[0]
-    sources = [
-      target_file,
-    ]
-    deps = [
-      invoker.target,
-    ]
+    sources = [ target_file ]
+    deps = [ invoker.target ]
   }
 }
 
@@ -352,9 +322,7 @@ template("initrd") {
       ]
     }
 
-    outputs = [
-      initrd_file,
-    ]
+    outputs = [ initrd_file ]
   }
 }
 
@@ -393,9 +361,7 @@ template("partition_package") {
       "${invoker.img_offset}",
     ]
 
-    outputs = [
-      output_package,
-    ]
+    outputs = [ output_package ]
   }
 }
 
@@ -458,8 +424,6 @@ template("partitions_json") {
       rebase_path(json_file),
     ]
 
-    outputs = [
-      json_file,
-    ]
+    outputs = [ json_file ]
   }
 }

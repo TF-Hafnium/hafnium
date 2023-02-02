@@ -7,7 +7,5 @@
 import("//build/toolchain/platform.gni")
 
 source_set("vmlib") {
-  sources = [
-    "ffa.c",
-  ]
+  sources = [ "ffa.c" ]
 }

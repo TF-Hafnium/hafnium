@@ -5,7 +5,5 @@
 # https://opensource.org/licenses/BSD-3-Clause.
 
 source_set("linux") {
-  sources = [
-    "linux.S",
-  ]
+  sources = [ "linux.S" ]
 }

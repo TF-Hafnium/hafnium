@@ -19,9 +19,7 @@ source_set("sp_helpers") {
     ":config",
     "//src/arch/aarch64:arch_config",
   ]
-  sources = [
-    "sp_helpers.c",
-  ]
+  sources = [ "sp_helpers.c" ]
 }
 
 vm_kernel("sel0_partition") {

@@ -5,7 +5,5 @@
 # https://opensource.org/licenses/BSD-3-Clause.
 
 source_set("absent") {
-  sources = [
-    "absent.c",
-  ]
+  sources = [ "absent.c" ]
 }

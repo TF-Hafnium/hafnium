@@ -8,20 +8,14 @@ import("//build/toolchain/offset_size_header.gni")
 import("//src/arch/aarch64/args.gni")
 
 offset_size_header("offsets") {
-  sources = [
-    "offsets.c",
-  ]
+  sources = [ "offsets.c" ]
   path = "hf/arch/offsets.h"
 }
 
 source_set("other_world") {
   public_configs = [ "//src/arch/aarch64:config" ]
-  sources = [
-    "other_world.c",
-  ]
-  deps = [
-    "//src:vm",
-  ]
+  sources = [ "other_world.c" ]
+  deps = [ "//src:vm" ]
 }
 
 # Hypervisor specific code.

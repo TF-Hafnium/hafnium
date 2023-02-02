@@ -9,9 +9,7 @@ import("args.gni")
 # Arm SMMUv3 driver for stage2 translation of streams.
 source_set("arm_smmuv3") {
   public_configs = [ "//src/arch/aarch64:arch_config" ]
-  sources = [
-    "arm_smmuv3.c",
-  ]
+  sources = [ "arm_smmuv3.c" ]
 
   assert(defined(smmu_base_address),
          "\"smmu_base_address\" must be defined for ${target_name}.")

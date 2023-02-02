@@ -10,9 +10,7 @@ import("//build/toolchain/platform.gni")
 # The bootloader image.
 image_binary("qemuloader") {
   image_name = "qemuloader"
-  deps = [
-    ":loader",
-  ]
+  deps = [ ":loader" ]
 }
 
 source_set("loader") {
@@ -42,21 +40,13 @@ copy("tfa_copy") {
     "//prebuilts/linux-aarch64/trusted-firmware-a/qemu/bl31.bin",
     "//prebuilts/linux-aarch64/trusted-firmware-a/qemu/bl32.bin",
   ]
-  outputs = [
-    "$root_out_dir/{{source_file_part}}",
-  ]
+  outputs = [ "$root_out_dir/{{source_file_part}}" ]
 }
 
 copy("qemuloader_copy") {
-  sources = [
-    "$root_out_dir/qemuloader.bin",
-  ]
-  deps = [
-    ":qemuloader",
-  ]
-  outputs = [
-    "$root_out_dir/bl33.bin",
-  ]
+  sources = [ "$root_out_dir/qemuloader.bin" ]
+  deps = [ ":qemuloader" ]
+  outputs = [ "$root_out_dir/bl33.bin" ]
 }
 
 group("bl") {

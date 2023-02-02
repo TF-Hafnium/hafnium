@@ -47,12 +47,8 @@ template("offset_size_header") {
       rebase_path(lib_file, root_build_dir),
       rebase_path(out_file, root_build_dir),
     ]
-    deps = [
-      ":$target_lib",
-    ]
-    outputs = [
-      out_file,
-    ]
+    deps = [ ":$target_lib" ]
+    outputs = [ out_file ]
   }
 
   # This source_set will be compiled into the target that depends on this one.
@@ -69,8 +65,6 @@ template("offset_size_header") {
       invoker.path,
     ]
     defines = [ "VERIFY_HEADER" ]
-    deps = [
-      ":$target_header",
-    ]
+    deps = [ ":$target_header" ]
   }
 }

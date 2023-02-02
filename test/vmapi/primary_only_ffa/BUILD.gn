@@ -11,13 +11,9 @@ import("//test/hftest/args.gni")
 vm_kernel("primary_only_test_vm") {
   testonly = true
 
-  sources = [
-    "primary_only_ffa.c",
-  ]
+  sources = [ "primary_only_ffa.c" ]
 
-  deps = [
-    "//test/hftest:hftest_primary_vm",
-  ]
+  deps = [ "//test/hftest:hftest_primary_vm" ]
 }
 
 manifest("primary_only_ffa_partition_manifest") {

@@ -11,13 +11,9 @@ source_set("check_state") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "check_state.c",
-  ]
+  sources = [ "check_state.c" ]
 
-  deps = [
-    "//src/arch/aarch64/hftest:state",
-  ]
+  deps = [ "//src/arch/aarch64/hftest:state" ]
 }
 
 # Service to try to access EL1 debug registers.
@@ -25,9 +21,7 @@ source_set("debug_el1") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "debug_el1.c",
-  ]
+  sources = [ "debug_el1.c" ]
 }
 
 # Service to try to access performance monitor registers.
@@ -35,9 +29,7 @@ source_set("perfmon") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "perfmon.c",
-  ]
+  sources = [ "perfmon.c" ]
 }
 
 # Service to listen for messages and echo them back to the sender.
@@ -45,9 +37,7 @@ source_set("echo") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "echo.c",
-  ]
+  sources = [ "echo.c" ]
 }
 
 # Service for floating point register save/restore checks.
@@ -55,13 +45,9 @@ source_set("floating_point") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "floating_point.c",
-  ]
+  sources = [ "floating_point.c" ]
 
-  deps = [
-    "//src/arch/aarch64/hftest:registers",
-  ]
+  deps = [ "//src/arch/aarch64/hftest:registers" ]
 }
 
 # Services related to memory sharing.
@@ -77,9 +63,7 @@ source_set("memory") {
     "//vmlib",
   ]
 
-  sources = [
-    "memory.c",
-  ]
+  sources = [ "memory.c" ]
 }
 
 # Services related to VMs that access unmapped memory.
@@ -87,13 +71,9 @@ source_set("unmapped") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "unmapped.c",
-  ]
+  sources = [ "unmapped.c" ]
 
-  deps = [
-    "//test/vmapi/common:common",
-  ]
+  deps = [ "//test/vmapi/common:common" ]
 }
 
 # Services related to the boot process for VMs.
@@ -101,13 +81,9 @@ source_set("boot") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "boot.c",
-  ]
+  sources = [ "boot.c" ]
 
-  deps = [
-    "//test/vmapi/common:common",
-  ]
+  deps = [ "//test/vmapi/common:common" ]
 }
 
 # Service that can be interrupted.
@@ -123,9 +99,7 @@ source_set("interruptible") {
     "interruptible_echo.c",
   ]
 
-  deps = [
-    "//src/arch/aarch64/hftest:interrupts",
-  ]
+  deps = [ "//src/arch/aarch64/hftest:interrupts" ]
 }
 
 # Service to check that hf_mailbox_receive can't block when there are pending
@@ -136,9 +110,7 @@ source_set("receive_block") {
     "..:config",
     "//test/hftest:hftest_config",
   ]
-  sources = [
-    "receive_block.c",
-  ]
+  sources = [ "receive_block.c" ]
   deps = [
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64/hftest:interrupts",
@@ -151,9 +123,7 @@ source_set("relay") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "relay.c",
-  ]
+  sources = [ "relay.c" ]
 }
 
 # Service to wait for a message but expect never to get one.
@@ -161,9 +131,7 @@ source_set("run_waiting") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "run_waiting.c",
-  ]
+  sources = [ "run_waiting.c" ]
 }
 
 # Service to start a second vCPU and send messages from both.
@@ -173,9 +141,7 @@ source_set("smp") {
     "..:config",
     "//test/hftest:hftest_config",
   ]
-  sources = [
-    "smp.c",
-  ]
+  sources = [ "smp.c" ]
 }
 
 # Service to check that WFI is a no-op when there are pending interrupts.
@@ -185,12 +151,8 @@ source_set("wfi") {
     "..:config",
     "//test/hftest:hftest_config",
   ]
-  sources = [
-    "wfi.c",
-  ]
-  deps = [
-    "//src/arch/aarch64/hftest:interrupts",
-  ]
+  sources = [ "wfi.c" ]
+  deps = [ "//src/arch/aarch64/hftest:interrupts" ]
 }
 
 # Service to receive messages in a secondary VM and ensure that the header fields are correctly set.
@@ -200,13 +162,9 @@ source_set("ffa_check") {
     "..:config",
     "//test/hftest:hftest_config",
   ]
-  deps = [
-    "//test/vmapi/common",
-  ]
+  deps = [ "//test/vmapi/common" ]
 
-  sources = [
-    "ffa_check.c",
-  ]
+  sources = [ "ffa_check.c" ]
 }
 
 # Group services together into VMs.

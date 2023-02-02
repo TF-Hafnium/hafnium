@@ -11,9 +11,7 @@ import("//test/hftest/args.gni")
 vm_kernel("secure_partition_test_vm") {
   testonly = true
 
-  sources = [
-    "secure_partition.c",
-  ]
+  sources = [ "secure_partition.c" ]
 
   deps = [
     "//src/arch/aarch64/hftest:interrupts",

@@ -10,17 +10,13 @@ import("//build/toolchain/platform.gni")
 group("aarch64") {
   testonly = true
 
-  deps = [
-    ":aarch64_test",
-  ]
+  deps = [ ":aarch64_test" ]
 }
 
 hypervisor("aarch64_test") {
   testonly = true
 
-  sources = [
-    "tee_test.c",
-  ]
+  sources = [ "tee_test.c" ]
 
   deps = [
     "//src:vm",

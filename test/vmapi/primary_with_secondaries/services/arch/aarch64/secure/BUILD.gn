@@ -18,12 +18,8 @@ source_set("message_loop") {
     "//test/hftest:hftest_config",
     "//src/arch/aarch64:arch_config",
   ]
-  sources = [
-    "message_loop.c",
-  ]
-  deps = [
-    "//test/vmapi/common:common",
-  ]
+  sources = [ "message_loop.c" ]
+  deps = [ "//test/vmapi/common:common" ]
 }
 
 vm_kernel("secure_service") {

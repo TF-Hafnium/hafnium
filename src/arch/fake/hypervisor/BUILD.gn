@@ -10,13 +10,9 @@ source_set("hypervisor") {
     "ffa.c",
     "interrupts.c",
   ]
-  deps = [
-    "//src/arch/fake:arch",
-  ]
+  deps = [ "//src/arch/fake:arch" ]
 }
 
 source_set("other_world") {
-  sources = [
-    "other_world.c",
-  ]
+  sources = [ "other_world.c" ]
 }

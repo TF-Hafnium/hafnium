@@ -23,9 +23,7 @@ source_set("boot_flow") {
 
 # Fake implementation of putchar logs to the console.
 source_set("console") {
-  sources = [
-    "console.c",
-  ]
+  sources = [ "console.c" ]
 }
 
 # Empty, as the functions are provided by libc already.

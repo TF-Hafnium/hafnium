@@ -19,9 +19,7 @@ source_set("gicv3_setup") {
     "//test/hftest:hftest_config",
   ]
 
-  sources = [
-    "gicv3_setup.c",
-  ]
+  sources = [ "gicv3_setup.c" ]
 }
 
 # Tests specific to GICv3.

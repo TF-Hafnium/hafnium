@@ -6,14 +6,10 @@
 
 source_set("interrupts") {
   testonly = true
-  sources = [
-    "interrupts.c",
-  ]
+  sources = [ "interrupts.c" ]
 }
 
 source_set("mm") {
   testonly = true
-  sources = [
-    "mm.c",
-  ]
+  sources = [ "mm.c" ]
 }

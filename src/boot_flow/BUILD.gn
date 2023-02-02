@@ -7,15 +7,11 @@
 import("//build/toolchain/platform.gni")
 
 source_set("common") {
-  sources = [
-    "common.c",
-  ]
+  sources = [ "common.c" ]
 }
 
 source_set("linux") {
-  sources = [
-    "linux.c",
-  ]
+  sources = [ "linux.c" ]
   deps = [
     ":common",
     "//src/arch/${plat_arch}/boot_flow:linux",
@@ -23,9 +19,7 @@ source_set("linux") {
 }
 
 source_set("spmc") {
-  sources = [
-    "spmc.c",
-  ]
+  sources = [ "spmc.c" ]
   deps = [
     ":common",
     "//src/arch/${plat_arch}/boot_flow:linux",

@@ -9,9 +9,7 @@ import("//build/image/image.gni")
 source_set("common") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
-  sources = [
-    "common.c",
-  ]
+  sources = [ "common.c" ]
 }
 
 # Service which loops forever.
@@ -19,13 +17,9 @@ source_set("busy") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "busy.c",
-  ]
+  sources = [ "busy.c" ]
 
-  deps = [
-    ":common",
-  ]
+  deps = [ ":common" ]
 }
 
 # Service waiting for a direct message request.
@@ -33,13 +27,9 @@ source_set("interrupts") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "interrupts.c",
-  ]
+  sources = [ "interrupts.c" ]
 
-  deps = [
-    ":common",
-  ]
+  deps = [ ":common" ]
 }
 
 # Service which uses timers.
@@ -47,9 +37,7 @@ source_set("timer") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "timer.c",
-  ]
+  sources = [ "timer.c" ]
 
   deps = [
     ":common",
@@ -63,9 +51,7 @@ source_set("systemreg") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
-  sources = [
-    "systemreg.c",
-  ]
+  sources = [ "systemreg.c" ]
 
   deps = [
     ":common",

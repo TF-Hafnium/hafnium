@@ -9,7 +9,5 @@ source_set("mm") {
 
   testonly = true
 
-  sources = [
-    "mm.c",
-  ]
+  sources = [ "mm.c" ]
 }

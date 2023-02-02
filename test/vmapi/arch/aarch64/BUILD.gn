@@ -10,9 +10,7 @@ import("//test/hftest/args.gni")
 group("arch") {
   testonly = true
 
-  deps = [
-    ":aarch64_test",
-  ]
+  deps = [ ":aarch64_test" ]
 }
 
 # Tests specific to aarch64.

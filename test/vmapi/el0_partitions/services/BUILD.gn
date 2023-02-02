@@ -31,9 +31,7 @@ vm_kernel("service_vm1") {
 vm_kernel("service_vm2") {
   testonly = true
   public_configs = [ "//test/vmapi/primary_with_secondaries:config" ]
-  sources = [
-    "memory.c",
-  ]
+  sources = [ "memory.c" ]
   deps = [
     "//test/hftest:hftest_secondary_el0_partition",
     "//test/vmapi/common:common",
