@@ -261,8 +261,10 @@ class QemuDriver(Driver):
 
         return exec_args
 
-    def run(self, run_name, test_args, is_long_running):
+    def run(self, run_name, test_args, is_long_running, debug = False,
+            show_output = False):
         """Run test given by `test_args` in QEMU."""
+        # TODO: use 'debug' and 'show_output' flags.
         run_state = self.start_run(run_name)
 
         try:
@@ -341,11 +343,19 @@ class FvpDriver(Driver, ABC):
 
     @abstractmethod
     def gen_fvp_args(
-            self, is_long_running, uart0_log_path, uart1_log_path, dt):
+            self, is_long_running, uart0_log_path, uart1_log_path, dt,
+            debug = False, show_output = False):
         """Generate command line arguments for FVP."""
+        show_output = debug or show_output
         time_limit = "80s" if is_long_running else "40s"
-        fvp_args = [
-            "timeout", "--foreground", time_limit,
+        fvp_args = []
+
+        if not show_output:
+            fvp_args = [
+                "timeout", "--foreground", time_limit,
+            ]
+
+        fvp_args += [
             FVP_BINARY,
             "-C", "pci.pci_smmuv3.mmu.SMMU_AIDR=2",
             "-C", "pci.pci_smmuv3.mmu.SMMU_IDR0=0x0046123B",
@@ -360,12 +370,7 @@ class FvpDriver(Driver, ABC):
             "-C", "cluster0.NUM_CORES=4",
             "-C", "cluster1.NUM_CORES=4",
             "-C", "cache_state_modelled=0",
-            "-C", "bp.vis.disable_visualisation=true",
             "-C", "bp.vis.rate_limit-enable=false",
-            "-C", "bp.terminal_0.start_telnet=false",
-            "-C", "bp.terminal_1.start_telnet=false",
-            "-C", "bp.terminal_2.start_telnet=false",
-            "-C", "bp.terminal_3.start_telnet=false",
             "-C", "bp.pl011_uart0.untimed_fifos=1",
             "-C", "bp.pl011_uart0.unbuffered_output=1",
             "-C", f"cluster0.cpu0.RVBAR={self.CPU_START_ADDRESS}",
@@ -379,7 +384,6 @@ class FvpDriver(Driver, ABC):
             "--data",
             f"cluster0.cpu0={self.FVP_PREBUILT_BL31}@{self.CPU_START_ADDRESS}",
             "-C", "bp.ve_sysregs.mmbSiteDefault=0",
-            "-C", "bp.ve_sysregs.exit_on_shutdown=1",
             "-C", "cluster0.has_arm_v8-5=1",
             "-C", "cluster1.has_arm_v8-5=1",
             "-C", "cluster0.has_branch_target_exception=1",
@@ -399,9 +403,25 @@ class FvpDriver(Driver, ABC):
                 "-C", f"bp.pl011_uart0.out_file={uart0_log_path}",
                 "-C", f"bp.pl011_uart1.out_file={uart1_log_path}",
             ]
+
+        if not show_output:
+            fvp_args += [
+                "-C", "bp.vis.disable_visualisation=true",
+                "-C", "bp.terminal_0.start_telnet=false",
+                "-C", "bp.terminal_1.start_telnet=false",
+                "-C", "bp.terminal_2.start_telnet=false",
+                "-C", "bp.terminal_3.start_telnet=false",
+                "-C", "bp.ve_sysregs.exit_on_shutdown=1",
+            ]
+
+        if debug:
+            fvp_args += [
+                    "-I", "-p",
+            ]
         return fvp_args
 
-    def run(self, run_name, test_args, is_long_running):
+    def run(self, run_name, test_args, is_long_running, debug = False,
+            show_output = False):
         """ Run test """
         run_state = self.start_run(run_name)
         dt = self.create_dt(run_name)
@@ -412,7 +432,8 @@ class FvpDriver(Driver, ABC):
             self.gen_dts(dt, test_args)
             self.compile_dt(run_state, dt)
             fvp_args = self.gen_fvp_args(is_long_running, uart0_log_path,
-                                         uart1_log_path, dt)
+                                         uart1_log_path, dt, debug=debug,
+                                         show_output=show_output)
             self.exec_logged(run_state, fvp_args)
         except DriverRunException:
             pass
@@ -475,10 +496,12 @@ class FvpDriverHypervisor(FvpDriver):
         append_file(dt.dts, to_append)
 
     def gen_fvp_args(
-            self, is_long_running, uart0_log_path, uart1_log_path, dt, call_super = True):
+            self, is_long_running, uart0_log_path, uart1_log_path, dt,
+            debug = False, show_output = False):
         """Generate command line arguments for FVP."""
-        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt)
-        fvp_args = FvpDriver.gen_fvp_args(*common_args) if call_super else []
+        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt,
+                       debug, show_output)
+        fvp_args = FvpDriver.gen_fvp_args(*common_args)
 
         fvp_args += [
             "--data", f"cluster0.cpu0={dt.dtb}@{self.HYPERVISOR_DTB_ADDRESS}",
@@ -535,9 +558,10 @@ class FvpDriverSPMC(FvpDriver):
 
     def gen_fvp_args(
         self, is_long_running, uart0_log_path, uart1_log_path, dt,
-        call_super = True, secure_ctrl = True):
+        call_super = True, secure_ctrl = True, debug = False, show_output = False):
         """Generate command line arguments for FVP."""
-        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt.dtb)
+        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt.dtb,
+                       debug, show_output)
         fvp_args = FvpDriver.gen_fvp_args(*common_args) if call_super else []
 
         fvp_args += [
@@ -557,11 +581,11 @@ class FvpDriverSPMC(FvpDriver):
 
         return fvp_args
 
-    def run(self, run_name, test_args, is_long_running):
+    def run(self, run_name, test_args, is_long_running, debug = False, show_output = False):
         vm_args = join_if_not_None(self.args.vm_args, test_args)
         FvpDriverSPMC.hftest_cmd_file.write(f"{vm_args}\n")
         FvpDriverSPMC.hftest_cmd_file.seek(0)
-        return super().run(run_name, test_args, is_long_running)
+        return super().run(run_name, test_args, is_long_running, debug, show_output)
 
     def finish(self):
         """Clean up after running tests."""
@@ -602,16 +626,22 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
         FvpDriverHypervisor.gen_dts(self, dt["hypervisor"], test_args)
         FvpDriverSPMC.gen_dts(self, dt["spmc"], test_args)
 
-    def gen_fvp_args(self, is_long_running, uart0_log_path, uart1_log_path, dt):
+    def gen_fvp_args(self, is_long_running, uart0_log_path, uart1_log_path, dt,
+                     debug = False, show_output = False):
+
         """Generate command line arguments for FVP."""
         common_args = (self, is_long_running, uart0_log_path, uart1_log_path)
-        fvp_args = FvpDriverHypervisor.gen_fvp_args(*common_args, dt["hypervisor"])
+        fvp_args = FvpDriverHypervisor.gen_fvp_args(*common_args, dt["hypervisor"],
+                                                    debug, show_output)
         fvp_args += FvpDriverSPMC.gen_fvp_args(*common_args, dt["spmc"], False,
                                                False)
         return fvp_args
 
-    def run(self, run_name, test_args, is_long_running):
-        return FvpDriver.run(self, run_name, test_args, is_long_running)
+    def run(self, run_name, test_args, is_long_running, debug = False,
+            show_output = False):
+
+        return FvpDriver.run(self, run_name, test_args, is_long_running,
+               debug, show_output)
 
     def finish(self):
         """Clean up after running tests."""
@@ -685,12 +715,14 @@ class TestRunner:
     available tests and driving their execution."""
 
     def __init__(self, artifacts, driver, test_set_up, suite_regex, test_regex,
-            skip_long_running_tests, force_long_running):
+            skip_long_running_tests, force_long_running, debug, show_output):
         self.artifacts = artifacts
         self.driver = driver
         self.test_set_up = test_set_up
         self.skip_long_running_tests = skip_long_running_tests
         self.force_long_running = force_long_running
+        self.debug = debug
+        self.show_output = show_output
 
         self.suite_re = re.compile(suite_regex or ".*")
         self.test_re = re.compile(test_regex or ".*")
@@ -800,7 +832,8 @@ class TestRunner:
             skipped_xml.set("message", "Long running")
             return TestRunnerResult(tests_run=0, tests_failed=0, tests_skipped=1)
 
-        print("      RUN", test["name"])
+        action_log = "DEBUG" if self.debug else "RUN"
+        print(f"      {action_log}", test["name"])
         log_name = self.get_log_name(suite, test)
 
         test_xml.set("status", "run")
@@ -808,7 +841,9 @@ class TestRunner:
         start_time = time.perf_counter()
         out = self.driver.run(
             log_name, "run {} {}".format(suite["name"], test["name"]),
-            test["is_long_running"] or self.force_long_running)
+            test["is_long_running"] or self.force_long_running,
+            self.debug, self.show_output)
+
         hftest_out = self.extract_hftest_lines(out)
         elapsed_time = time.perf_counter() - start_time
 
@@ -904,6 +939,9 @@ def Main():
     parser.add_argument("--serial-no-init-wait", action="store_true")
     parser.add_argument("--skip-long-running-tests", action="store_true")
     parser.add_argument("--force-long-running", action="store_true")
+    parser.add_argument("--debug", action="store_true",
+        help="Makes platforms stall waiting for debugger connection.")
+    parser.add_argument("--show-output", action="store_true")
     parser.add_argument("--cpu",
         help="Selects the CPU configuration for the run environment.")
     parser.add_argument("--tfa", action="store_true")
@@ -973,7 +1011,7 @@ def Main():
 
     # Create class which will drive test execution.
     runner = TestRunner(artifacts, driver, test_set_up, args.suite, args.test,
-        args.skip_long_running_tests, args.force_long_running)
+        args.skip_long_running_tests, args.force_long_running, args.debug, args.show_output)
 
     # Run tests.
     runner_result = runner.run_tests()
