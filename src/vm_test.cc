@@ -30,6 +30,7 @@ using ::testing::Each;
 using ::testing::SizeIs;
 
 using struct_vm = struct vm;
+using struct_vcpu = struct vcpu;
 using struct_vm_locked = struct vm_locked;
 
 constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
@@ -91,34 +92,38 @@ TEST_F(vm, vm_unmap_hypervisor_not_mapped)
 TEST_F(vm, vm_boot_order)
 {
 	struct_vm *vm_cur;
+	struct_vcpu *vcpu;
 	std::list<struct_vm *> expected_final_order;
 
-	EXPECT_TRUE(vm_get_first_boot() == NULL);
+	EXPECT_TRUE(vcpu_get_boot_vcpu() == NULL);
 
 	/*
-	 * Insertion when no call to "vm_update_boot" has been made yet.
+	 * Insertion when no call to "vcpu_update_boot" has been made yet.
 	 * The "boot_list" is expected to be empty.
 	 */
 	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
 	vm_cur->boot_order = 3;
-	vm_update_boot(vm_cur);
+	vcpu = vm_get_vcpu(vm_cur, 0);
+	vcpu_update_boot(vcpu);
 	expected_final_order.push_back(vm_cur);
 
-	EXPECT_EQ(vm_get_first_boot()->id, vm_cur->id);
+	EXPECT_EQ(vcpu_get_boot_vcpu()->vm->id, vm_cur->id);
 
 	/* Insertion at the head of the boot list */
 	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
 	vm_cur->boot_order = 1;
-	vm_update_boot(vm_cur);
+	vcpu = vm_get_vcpu(vm_cur, 0);
+	vcpu_update_boot(vcpu);
 	expected_final_order.push_back(vm_cur);
 
-	EXPECT_EQ(vm_get_first_boot()->id, vm_cur->id);
+	EXPECT_EQ(vcpu_get_boot_vcpu()->vm->id, vm_cur->id);
 
 	/* Insertion of two in the middle of the boot list */
-	for (int i = 0; i < 2; i++) {
+	for (uint32_t i = 0; i < 2; i++) {
 		EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
 		vm_cur->boot_order = 2;
-		vm_update_boot(vm_cur);
+		vcpu = vm_get_vcpu(vm_cur, 0);
+		vcpu_update_boot(vcpu);
 		expected_final_order.push_back(vm_cur);
 	}
 
@@ -130,7 +135,8 @@ TEST_F(vm, vm_boot_order)
 	 */
 	vm_cur = vm_find(1);
 	EXPECT_FALSE(vm_cur == NULL);
-	vm_update_boot(vm_cur);
+	vcpu = vm_get_vcpu(vm_cur, 0);
+	vcpu_update_boot(vcpu);
 	expected_final_order.push_back(vm_cur);
 
 	/*
@@ -144,10 +150,12 @@ TEST_F(vm, vm_boot_order)
 	expected_final_order.sort(vm::BootOrderSmallerThan);
 
 	std::list<struct_vm *>::iterator it;
-	for (it = expected_final_order.begin(), vm_cur = vm_get_first_boot();
-	     it != expected_final_order.end() && vm_cur != NULL;
-	     it++, vm_cur = vm_cur->next_boot) {
-		EXPECT_EQ((*it)->id, vm_cur->id);
+	vcpu = vcpu_get_boot_vcpu();
+	for (it = expected_final_order.begin();
+	     it != expected_final_order.end(); it++) {
+		EXPECT_TRUE(vcpu != NULL);
+		EXPECT_EQ((*it)->id, vcpu->vm->id);
+		vcpu = vcpu->next_boot;
 	}
 }
 

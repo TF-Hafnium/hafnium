@@ -238,7 +238,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		}
 
 		/* Updating boot list according to boot_order */
-		vm_update_boot(vm_locked.vm);
+		vcpu_update_boot(vm_get_vcpu(vm_locked.vm, 0));
 
 		if (vm_locked_are_notifications_enabled(vm_locked) &&
 		    !plat_ffa_notifications_bitmap_create_call(
@@ -388,8 +388,8 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	dlog_info("Loaded primary VM with %u vCPUs, entry at %#x.\n",
 		  vm->vcpu_count, pa_addr(primary_begin));
 
-	/* Mark the primary to be the first booted VM */
-	vm_update_boot(vm);
+	/* Mark the first VM vCPU to be the first booted vCPU. */
+	vcpu_update_boot(vm_get_vcpu(vm, 0));
 
 	vcpu_locked = vcpu_lock(vm_get_vcpu(vm, 0));
 	vcpu_on(vcpu_locked, primary_entry, params->kernel_arg);

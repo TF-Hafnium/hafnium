@@ -20,16 +20,15 @@
  */
 struct vcpu *cpu_main(struct cpu *c)
 {
-	struct vm *first_boot;
+	struct vcpu *boot_vcpu = vcpu_get_boot_vcpu();
 	struct vcpu *vcpu;
 
 	/*
-	 * This returns the PVM in the normal world and the first
-	 * booted Secure Partition in the secure world.
+	 * Get the pinned vCPU from which Hafnium booted.
+	 * This is the boot vCPU from PVM in the normal world and
+	 * the first booted Secure Partition in the secure world.
 	 */
-	first_boot = vm_get_first_boot();
-
-	vcpu = vm_get_vcpu(first_boot, cpu_index(c));
+	vcpu = vm_get_vcpu(boot_vcpu->vm, cpu_index(c));
 
 	vcpu->cpu = c;
 
@@ -42,7 +41,7 @@ struct vcpu *cpu_main(struct cpu *c)
 	/* Initialize SRI for running core. */
 	plat_ffa_sri_init(c);
 
-	vm_set_boot_info_gp_reg(first_boot, vcpu);
+	vm_set_boot_info_gp_reg(vcpu->vm, vcpu);
 
 	return vcpu;
 }

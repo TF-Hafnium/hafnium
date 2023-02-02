@@ -209,6 +209,8 @@ struct vcpu {
 
 	/** Save direct response message args to be resumed later. */
 	struct ffa_value direct_resp_ffa_value;
+
+	struct vcpu *next_boot;
 };
 
 /** Encapsulates a vCPU whose lock is held. */
@@ -238,6 +240,8 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 void vcpu_reset(struct vcpu *vcpu);
 
 void vcpu_set_phys_core_idx(struct vcpu *vcpu);
+void vcpu_update_boot(struct vcpu *vcpu);
+struct vcpu *vcpu_get_boot_vcpu(void);
 
 static inline bool vcpu_is_virt_interrupt_enabled(struct interrupts *interrupts,
 						  uint32_t intid)

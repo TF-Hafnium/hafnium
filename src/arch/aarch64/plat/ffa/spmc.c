@@ -1995,7 +1995,7 @@ static bool sp_boot_next(struct vcpu *current, struct vcpu **next,
 			 bool *boot_order_complete)
 {
 	struct vm_locked current_vm_locked;
-	struct vm *vm_next = NULL;
+	struct vcpu *vcpu_next = NULL;
 	bool ret = false;
 
 	/*
@@ -2013,19 +2013,19 @@ static bool sp_boot_next(struct vcpu *current, struct vcpu **next,
 			     current_vm_locked.vm->id,
 			     current_vm_locked.vm->boot_order);
 
-		vm_next = current_vm_locked.vm->next_boot;
-		if (vm_next != NULL) {
+		vcpu_next = current->next_boot;
+		if (vcpu_next != NULL) {
 			/* Refer FF-A v1.1 Beta0 section 7.5 Rule 2. */
 			current->state = VCPU_STATE_WAITING;
-			CHECK(vm_next->initialized == false);
-			*next = vm_get_vcpu(vm_next, vcpu_index(current));
+			CHECK(vcpu_next->vm->initialized == false);
+			*next = vcpu_next;
 			arch_regs_reset(*next);
 			(*next)->cpu = current->cpu;
 			(*next)->state = VCPU_STATE_RUNNING;
 			(*next)->regs_available = false;
 			(*next)->rt_model = RTM_SP_INIT;
 
-			vm_set_boot_info_gp_reg(vm_next, (*next));
+			vm_set_boot_info_gp_reg(vcpu_next->vm, vcpu_next);
 
 			ret = true;
 			goto out;

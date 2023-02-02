@@ -236,7 +236,6 @@ struct vm {
 	 */
 	uint8_t other_s_interrupts_action;
 	bool me_signal_virq;
-	struct vm *next_boot;
 
 	/**
 	 * Secondary entry point supplied by FFA_SECONDARY_EP_REGISTER used
@@ -289,9 +288,6 @@ bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 	      struct mpool *ppool);
 void vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool);
 bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool);
-
-void vm_update_boot(struct vm *vm);
-struct vm *vm_get_first_boot(void);
 
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     uint32_t *mode);

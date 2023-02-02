@@ -348,12 +348,12 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 
 	switch (fwk_msg_func_id) {
 	case SPMD_FWK_MSG_PSCI: {
+		struct vcpu *boot_vcpu = vcpu_get_boot_vcpu();
+		struct vm *vm = boot_vcpu->vm;
+		struct vcpu *vcpu = vm_get_vcpu(vm, vcpu_index(current));
+
 		switch (args->arg3) {
 		case PSCI_CPU_OFF: {
-			struct vm *vm = vm_get_first_boot();
-			struct vcpu *vcpu =
-				vm_get_vcpu(vm, vcpu_index(current));
-
 			/*
 			 * TODO: the PM event reached the SPMC. In a later
 			 * iteration, the PM event can be passed to the SP by

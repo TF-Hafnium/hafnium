@@ -15,6 +15,8 @@
 #include "hf/std.h"
 #include "hf/vm.h"
 
+static struct vcpu *boot_vcpu;
+
 /** GP register to be used to pass the current vCPU ID, at core bring up. */
 #define PHYS_CORE_IDX_GP_REG 4
 
@@ -66,6 +68,7 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 	vcpu->state = VCPU_STATE_OFF;
 	vcpu->direct_request_origin_vm_id = HF_INVALID_VM_ID;
 	vcpu->present_action_ns_interrupts = NS_ACTION_INVALID;
+	vcpu->next_boot = NULL;
 }
 
 /**
@@ -207,4 +210,43 @@ void vcpu_set_phys_core_idx(struct vcpu *vcpu)
 {
 	arch_regs_set_gp_reg(&vcpu->regs, cpu_index(vcpu->cpu),
 			     PHYS_CORE_IDX_GP_REG);
+}
+
+/**
+ * Gets the first partition to boot, according to Boot Protocol from FFA spec.
+ */
+struct vcpu *vcpu_get_boot_vcpu(void)
+{
+	return boot_vcpu;
+}
+
+/**
+ * Insert in boot list, sorted by `boot_order` parameter in the vm structure
+ * and rooted in `first_boot_vm`.
+ */
+void vcpu_update_boot(struct vcpu *vcpu)
+{
+	struct vcpu *current = NULL;
+	struct vcpu *previous = NULL;
+
+	if (boot_vcpu == NULL) {
+		boot_vcpu = vcpu;
+		return;
+	}
+
+	current = boot_vcpu;
+
+	while (current != NULL &&
+	       current->vm->boot_order <= vcpu->vm->boot_order) {
+		previous = current;
+		current = current->next_boot;
+	}
+
+	if (previous != NULL) {
+		previous->next_boot = vcpu;
+	} else {
+		boot_vcpu = vcpu;
+	}
+
+	vcpu->next_boot = current;
 }
