@@ -25,7 +25,7 @@ static void irq(void)
 	HFTEST_LOG("primary IRQ %d ended\n", interrupt_id);
 }
 
-void gicv3_system_setup()
+void gicv3_system_setup(void)
 {
 	const uint32_t mode = MM_MODE_R | MM_MODE_W | MM_MODE_D;
 	hftest_mm_identity_map((void *)GICD_BASE, PAGE_SIZE, mode);

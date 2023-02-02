@@ -44,7 +44,7 @@ static void irq(void)
  * Try to receive a message from the mailbox, blocking if necessary, and
  * retrying if interrupted.
  */
-static struct ffa_value mailbox_receive_retry()
+static struct ffa_value mailbox_receive_retry(void)
 {
 	struct ffa_value received;
 

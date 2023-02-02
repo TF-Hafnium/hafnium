@@ -67,7 +67,6 @@ void hftest_json(void)
 {
 	const char *suite = NULL;
 	size_t i;
-	size_t suites_in_image = 0;
 	size_t tests_in_suite = 0;
 
 	HFTEST_LOG("{");
@@ -81,7 +80,6 @@ void hftest_json(void)
 				HFTEST_LOG("    },");
 			}
 			/* Move onto new suite. */
-			++suites_in_image;
 			suite = test->suite;
 			tests_in_suite = 0;
 			HFTEST_LOG("    {");

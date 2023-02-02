@@ -55,7 +55,7 @@ TEAR_DOWN(timer_secondary_ffa)
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
-static void timer_busywait_secondary()
+static void timer_busywait_secondary(void)
 {
 	const char message[] = "loop 0099999";
 	const char expected_response[] = "Got IRQ 03.";

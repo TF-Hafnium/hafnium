@@ -151,7 +151,7 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	}
 }
 
-ffa_vm_id_t hftest_get_dir_req_source_id()
+ffa_vm_id_t hftest_get_dir_req_source_id(void)
 {
 	struct hftest_context *ctx = hftest_get_context();
 	return ctx->dir_req_source_id;
