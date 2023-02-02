@@ -2321,17 +2321,13 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu *current,
 
 	/* Section 8.2.3 bullet 4.2 of spec FF-A v1.1 EAC0. */
 	if (vcpu->state == VCPU_STATE_WAITING) {
-		if (vcpu->rt_model == RTM_SP_INIT) {
-			vcpu->scheduling_mode = NONE;
-		} else if (vcpu->rt_model == RTM_NONE) {
-			vcpu->rt_model = RTM_FFA_RUN;
+		assert(vcpu->rt_model == RTM_SP_INIT ||
+		       vcpu->rt_model == RTM_NONE);
+		vcpu->rt_model = RTM_FFA_RUN;
 
-			if (!vm_id_is_current_world(current->vm->id) ||
-			    (current->scheduling_mode == NWD_MODE)) {
-				vcpu->scheduling_mode = NWD_MODE;
-			}
-		} else {
-			CHECK(false);
+		if (!vm_id_is_current_world(current->vm->id) ||
+		    (current->scheduling_mode == NWD_MODE)) {
+			vcpu->scheduling_mode = NWD_MODE;
 		}
 	} else {
 		/* SP vCPU would have been pre-empted earlier or blocked. */
