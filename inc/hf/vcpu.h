@@ -112,7 +112,6 @@ struct vcpu {
 	 */
 	enum vcpu_state state;
 
-	bool is_bootstrapped;
 	struct cpu *cpu;
 	struct vm *vm;
 	struct arch_regs regs;

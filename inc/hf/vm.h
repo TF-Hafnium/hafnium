@@ -213,7 +213,6 @@ struct vm {
 	/**
 	 * Booting parameters (FF-A SP partitions).
 	 */
-	bool initialized;
 	uint16_t boot_order;
 
 	/** Entries to pass boot data to the VM. */

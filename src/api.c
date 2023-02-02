@@ -795,11 +795,15 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 
 	case VCPU_STATE_WAITING:
 		/*
-		 * An initial FFA_RUN is necessary for secondary VM/SP to reach
-		 * the message wait loop.
+		 * An initial FFA_RUN is necessary for SP's secondary vCPUs to
+		 * reach the message wait loop.
 		 */
-		if (!vcpu->is_bootstrapped) {
-			vcpu->is_bootstrapped = true;
+		if (vcpu->rt_model == RTM_SP_INIT) {
+			/*
+			 * TODO: this should be removed, but omitting it makes
+			 * normal world arch gicv3 tests failing.
+			 */
+			vcpu->rt_model = RTM_NONE;
 			break;
 		}
 
@@ -3241,7 +3245,7 @@ struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 					       struct vcpu *current)
 {
 	struct vm_locked vm_locked;
-	struct ffa_value ret = ffa_error(FFA_DENIED);
+	struct vcpu_locked current_locked;
 
 	/*
 	 * Reject if interface is not supported at this FF-A instance
@@ -3264,19 +3268,21 @@ struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 	 * address specified in the last valid invocation must be used by the
 	 * callee.
 	 */
-	vm_locked = vm_lock(current->vm);
-	if (vm_locked.vm->initialized) {
-		goto out;
+	current_locked = vcpu_lock(current);
+	if (current->rt_model != RTM_SP_INIT) {
+		dlog_error(
+			"FFA_SECONDARY_EP_REGISTER can only be called while "
+			"vCPU in run-time state for initialization.\n");
+		vcpu_unlock(&current_locked);
+		return ffa_error(FFA_DENIED);
 	}
+	vcpu_unlock(&current_locked);
 
+	vm_locked = vm_lock(current->vm);
 	vm_locked.vm->secondary_ep = entry_point;
-
-	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
-
-out:
 	vm_unlock(&vm_locked);
 
-	return ret;
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
 struct ffa_value api_ffa_notification_bitmap_create(ffa_vm_id_t vm_id,

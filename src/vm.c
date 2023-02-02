@@ -1007,7 +1007,7 @@ bool vm_notifications_is_npi_injected(struct vm_locked vm_locked)
  */
 void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu)
 {
-	if (!vm->initialized && vm->boot_info.blob_addr.ipa != 0U) {
+	if (vm->boot_info.blob_addr.ipa != 0U) {
 		arch_regs_set_gp_reg(&vcpu->regs,
 				     ipa_addr(vm->boot_info.blob_addr),
 				     vm->boot_info.gp_register_num);

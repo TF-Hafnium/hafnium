@@ -437,7 +437,7 @@ static bool plat_ffa_check_rtm_sp_init(struct vcpu *vcpu, uint32_t func,
 	case FFA_MSG_SEND_DIRECT_REQ_32: {
 		assert(vcpu != NULL);
 		/* Rule 1. */
-		if (vcpu->is_bootstrapped) {
+		if (vcpu->rt_model != RTM_SP_INIT) {
 			*next_state = VCPU_STATE_BLOCKED;
 			return true;
 		}
@@ -1045,13 +1045,13 @@ bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current)
 {
 	/* FFA_MEM_PERM_SET/GET is only valid before SPs are initialized */
-	return has_vhe_support() && (current->vm->initialized == false);
+	return has_vhe_support() && (current->rt_model == RTM_SP_INIT);
 }
 
 bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
 {
 	/* FFA_MEM_PERM_SET/GET is only valid before SPs are initialized */
-	return has_vhe_support() && (current->vm->initialized == false);
+	return has_vhe_support() && (current->rt_model == RTM_SP_INIT);
 }
 
 /**
@@ -1185,9 +1185,7 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 
 	/* Check if a vCPU of SP is being resumed. */
 	if ((target_vm_id & HF_VM_ID_WORLD_MASK) != 0) {
-		if (!target_vcpu->is_bootstrapped) {
-			target_vcpu->rt_model = RTM_SP_INIT;
-		} else if (target_vcpu->processing_secure_interrupt) {
+		if (target_vcpu->processing_secure_interrupt) {
 			/*
 			 * Consider the following case: a secure interrupt
 			 * triggered in normal world and is targeted to an SP
@@ -1991,53 +1989,47 @@ bool plat_ffa_is_secondary_ep_register_supported(void)
 	return true;
 }
 
-static bool sp_boot_next(struct vcpu *current, struct vcpu **next,
-			 bool *boot_order_complete)
+static bool sp_boot_next(struct vcpu *current, struct vcpu **next)
 {
-	struct vm_locked current_vm_locked;
+	static bool spmc_booted = false;
 	struct vcpu *vcpu_next = NULL;
-	bool ret = false;
 
-	/*
-	 * If VM hasn't been initialized, initialize it and traverse
-	 * booting list following "next_boot" field in the VM structure.
-	 * Once all the SPs have been booted (when "next_boot" is NULL),
-	 * return execution to the NWd.
-	 */
-	current_vm_locked = vm_lock(current->vm);
-	if (current_vm_locked.vm->initialized == false) {
-		current_vm_locked.vm->initialized = true;
-		current->is_bootstrapped = true;
-		current->rt_model = RTM_NONE;
-		dlog_verbose("Initialized VM: %#x, boot_order: %u\n",
-			     current_vm_locked.vm->id,
-			     current_vm_locked.vm->boot_order);
-
-		vcpu_next = current->next_boot;
-		if (vcpu_next != NULL) {
-			/* Refer FF-A v1.1 Beta0 section 7.5 Rule 2. */
-			current->state = VCPU_STATE_WAITING;
-			CHECK(vcpu_next->vm->initialized == false);
-			*next = vcpu_next;
-			arch_regs_reset(*next);
-			(*next)->cpu = current->cpu;
-			(*next)->state = VCPU_STATE_RUNNING;
-			(*next)->regs_available = false;
-			(*next)->rt_model = RTM_SP_INIT;
-
-			vm_set_boot_info_gp_reg(vcpu_next->vm, vcpu_next);
-
-			ret = true;
-			goto out;
-		}
-
-		*boot_order_complete = true;
-		dlog_verbose("Finished initializing all VMs.\n");
+	if (spmc_booted) {
+		return false;
 	}
 
-out:
-	vm_unlock(&current_vm_locked);
-	return ret;
+	assert(current->rt_model == RTM_SP_INIT);
+
+	/* vCPU has just returned from initialization. */
+	dlog_notice("Initialized VM: %#x, boot_order: %u\n", current->vm->id,
+		    current->vm->boot_order);
+
+	/*
+	 * Pick next vCPU to be booted. Once all SPs have booted
+	 * (next_boot is NULL), then return execution to NWd.
+	 */
+	vcpu_next = current->next_boot;
+	if (vcpu_next == NULL) {
+		dlog_notice("Finished initializing all VMs.\n");
+		spmc_booted = true;
+		return false;
+	}
+
+	current->state = VCPU_STATE_WAITING;
+	current->rt_model = RTM_NONE;
+	current->scheduling_mode = NONE;
+
+	CHECK(vcpu_next->rt_model == RTM_SP_INIT);
+	arch_regs_reset(vcpu_next);
+	vcpu_next->cpu = current->cpu;
+	vcpu_next->state = VCPU_STATE_RUNNING;
+	vcpu_next->regs_available = false;
+	vcpu_set_phys_core_idx(vcpu_next);
+	vm_set_boot_info_gp_reg(vcpu_next->vm, vcpu_next);
+
+	*next = vcpu_next;
+
+	return true;
 }
 
 static void plat_ffa_signal_interrupt_args(struct ffa_value *args, uint32_t id)
@@ -2170,7 +2162,7 @@ static struct ffa_value plat_ffa_resume_direct_response(struct vcpu *current,
 
 /**
  * The invocation of FFA_MSG_WAIT at secure virtual FF-A instance is compliant
- * with FF-A v1.1 EAC0 specification. It only performs the  state transition
+ * with FF-A v1.1 EAC0 specification. It only performs the state transition
  * from RUNNING to WAITING for the following Partition runtime models:
  * RTM_FFA_RUN, RTM_SEC_INTERRUPT, RTM_SP_INIT.
  */
@@ -2179,17 +2171,8 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
 {
 	struct ffa_value ret_args =
 		(struct ffa_value){.func = FFA_INTERRUPT_32};
-	bool boot_order_complete = false;
 
-	if (sp_boot_next(current, next, &boot_order_complete)) {
-		return ret_args;
-	}
-
-	/* All the SPs have been booted now. Return to NWd. */
-	if (boot_order_complete) {
-		*next = api_switch_to_other_world(
-			current, (struct ffa_value){.func = FFA_MSG_WAIT_32},
-			VCPU_STATE_WAITING);
+	if (sp_boot_next(current, next)) {
 		return ret_args;
 	}
 

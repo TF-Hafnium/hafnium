@@ -68,6 +68,7 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 	vcpu->state = VCPU_STATE_OFF;
 	vcpu->direct_request_origin_vm_id = HF_INVALID_VM_ID;
 	vcpu->present_action_ns_interrupts = NS_ACTION_INVALID;
+	vcpu->rt_model = RTM_SP_INIT;
 	vcpu->next_boot = NULL;
 }
 
@@ -203,7 +204,6 @@ void vcpu_reset(struct vcpu *vcpu)
 
 	/* Reset the registers to give a clean start for vCPU. */
 	arch_regs_reset(vcpu);
-	vcpu->rt_model = RTM_SP_INIT;
 }
 
 void vcpu_set_phys_core_idx(struct vcpu *vcpu)
