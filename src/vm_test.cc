@@ -32,26 +32,29 @@ using ::testing::SizeIs;
 using struct_vm = struct vm;
 using struct_vm_locked = struct vm_locked;
 
-constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 32;
+constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
 const int TOP_LEVEL = arch_mm_stage2_max_level();
 
 class vm : public ::testing::Test
 {
+       protected:
+	static std::unique_ptr<uint8_t[]> test_heap;
+
+	struct mpool ppool;
+
 	void SetUp() override
 	{
-		/*
-		 * TODO: replace with direct use of stdlib allocator so
-		 * sanitizers are more effective.
-		 */
-		test_heap = std::make_unique<uint8_t[]>(TEST_HEAP_SIZE);
-		mpool_init(&ppool, sizeof(struct mm_page_table));
-		mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
+		if (!test_heap) {
+			/*
+			 * TODO: replace with direct use of stdlib allocator so
+			 * sanitizers are more effective.
+			 */
+			test_heap = std::make_unique<uint8_t[]>(TEST_HEAP_SIZE);
+			mpool_init(&ppool, sizeof(struct mm_page_table));
+			mpool_add_chunk(&ppool, test_heap.get(),
+					TEST_HEAP_SIZE);
+		}
 	}
-
-	std::unique_ptr<uint8_t[]> test_heap;
-
-       protected:
-	struct mpool ppool;
 
        public:
 	static bool BootOrderSmallerThan(struct_vm *vm1, struct_vm *vm2)
@@ -59,6 +62,8 @@ class vm : public ::testing::Test
 		return vm1->boot_order < vm2->boot_order;
 	}
 };
+
+std::unique_ptr<uint8_t[]> vm::test_heap;
 
 /**
  * If nothing is mapped, unmapping the hypervisor has no effect.
@@ -88,7 +93,7 @@ TEST_F(vm, vm_boot_order)
 	struct_vm *vm_cur;
 	std::list<struct_vm *> expected_final_order;
 
-	EXPECT_FALSE(vm_get_first_boot());
+	EXPECT_TRUE(vm_get_first_boot() == NULL);
 
 	/*
 	 * Insertion when no call to "vm_update_boot" has been made yet.
