@@ -1211,6 +1211,19 @@ struct ffa_value ffa_memory_send_validate(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	static_assert(sizeof(struct ffa_memory_region_constituent) == 16,
+		      "struct ffa_memory_region_constituent must be 16 bytes");
+	if (!is_aligned(fragment_length,
+			sizeof(struct ffa_memory_region_constituent)) ||
+	    !is_aligned(memory_share_length,
+			sizeof(struct ffa_memory_region_constituent))) {
+		dlog_verbose(
+			"Fragment length %u or total length %u"
+			" is not 16-byte aligned.\n",
+			fragment_length, memory_share_length);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
 	if (fragment_length > memory_share_length) {
 		dlog_verbose(
 			"Fragment length %u greater than total length %u.\n",
@@ -1656,6 +1669,16 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 	struct ffa_memory_share_state *share_state;
 	struct ffa_value ret;
 	struct ffa_memory_region *memory_region;
+
+	CHECK(is_aligned(fragment,
+			 alignof(struct ffa_memory_region_constituent)));
+	if (fragment_length % sizeof(struct ffa_memory_region_constituent) !=
+	    0) {
+		dlog_verbose("Fragment length %u misaligned.\n",
+			     fragment_length);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out_free_fragment;
+	}
 
 	ret = ffa_memory_send_continue_validate(share_states, handle,
 						&share_state,
