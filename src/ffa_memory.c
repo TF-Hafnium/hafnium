@@ -1190,14 +1190,33 @@ struct ffa_value ffa_memory_send_validate(
 	uint32_t share_func)
 {
 	struct ffa_composite_memory_region *composite;
-	uint32_t receivers_length;
+	uint64_t receivers_end;
+	uint64_t min_length;
 	uint32_t composite_memory_region_offset;
-	uint32_t constituents_offset;
+	uint32_t constituents_start;
 	uint32_t constituents_length;
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
 	enum ffa_memory_security security_state;
 	struct ffa_value ret;
+	const size_t minimum_first_fragment_length =
+		(sizeof(struct ffa_memory_region) +
+		 sizeof(struct ffa_memory_access) +
+		 sizeof(struct ffa_composite_memory_region));
+
+	if (fragment_length < minimum_first_fragment_length) {
+		dlog_verbose("Fragment length %u too short (min %u).\n",
+			     (size_t)fragment_length,
+			     minimum_first_fragment_length);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (fragment_length > memory_share_length) {
+		dlog_verbose(
+			"Fragment length %u greater than total length %u.\n",
+			(size_t)fragment_length, (size_t)memory_share_length);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	assert(memory_region->receivers_offset ==
 	       offsetof(struct ffa_memory_region, receivers));
@@ -1213,40 +1232,70 @@ struct ffa_value ffa_memory_send_validate(
 		return ffa_error(FFA_DENIED);
 	}
 
-	/*
-	 * Ensure that the composite header is within the memory bounds and
-	 * doesn't overlap the first part of the message.
-	 */
-	receivers_length = sizeof(struct ffa_memory_access) *
-			   memory_region->receiver_count;
-	constituents_offset =
-		ffa_composite_constituent_offset(memory_region, 0);
-	composite_memory_region_offset =
-		memory_region->receivers[0].composite_memory_region_offset;
-	if ((composite_memory_region_offset == 0) ||
-	    (composite_memory_region_offset <
-	     sizeof(struct ffa_memory_region) + receivers_length) ||
-	    constituents_offset > fragment_length) {
-		dlog_verbose(
-			"Invalid composite memory region descriptor offset "
-			"%d.\n",
-			memory_region->receivers[0]
-				.composite_memory_region_offset);
+	if (memory_region->receiver_count <= 0) {
+		dlog_verbose("No receivers!\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	composite = ffa_memory_region_get_composite(memory_region, 0);
+	/*
+	 * Ensure that the composite header is within the memory bounds and
+	 * doesn't overlap the first part of the message.  Cast to uint64_t
+	 * to prevent overflow.
+	 */
+	receivers_end = ((uint64_t)sizeof(struct ffa_memory_access) *
+			 (uint64_t)memory_region->receiver_count) +
+			sizeof(struct ffa_memory_region);
+	min_length = receivers_end +
+		     sizeof(struct ffa_composite_memory_region) +
+		     sizeof(struct ffa_memory_region_constituent);
+	if (min_length > memory_share_length) {
+		dlog_verbose("Share too short: got %u but minimum is %u.\n",
+			     (size_t)memory_share_length, (size_t)min_length);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	composite_memory_region_offset =
+		memory_region->receivers[0].composite_memory_region_offset;
 
 	/*
-	 * Ensure the number of constituents are within the memory bounds.
+	 * Check that the composite memory region descriptor is after the access
+	 * descriptors, is at least 16-byte aligned, and fits in the first
+	 * fragment.
 	 */
-	constituents_length = sizeof(struct ffa_memory_region_constituent) *
-			      composite->constituent_count;
-	if (memory_share_length != constituents_offset + constituents_length) {
-		dlog_verbose("Invalid length %d or composite offset %d.\n",
-			     memory_share_length,
-			     memory_region->receivers[0]
-				     .composite_memory_region_offset);
+	if ((composite_memory_region_offset < receivers_end) ||
+	    (composite_memory_region_offset % 16 != 0) ||
+	    (composite_memory_region_offset >
+	     fragment_length - sizeof(struct ffa_composite_memory_region))) {
+		dlog_verbose(
+			"Invalid composite memory region descriptor offset "
+			"%u.\n",
+			(size_t)composite_memory_region_offset);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Compute the start of the constituent regions.  Already checked
+	 * to be not more than fragment_length and thus not more than
+	 * memory_share_length.
+	 */
+	constituents_start = composite_memory_region_offset +
+			     sizeof(struct ffa_composite_memory_region);
+	constituents_length = memory_share_length - constituents_start;
+
+	/*
+	 * Check that the number of constituents is consistent with the length
+	 * of the constituent region.
+	 */
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+	if ((constituents_length %
+		     sizeof(struct ffa_memory_region_constituent) !=
+	     0) ||
+	    ((constituents_length /
+	      sizeof(struct ffa_memory_region_constituent)) !=
+	     composite->constituent_count)) {
+		dlog_verbose("Invalid length %u or composite offset %u.\n",
+			     (size_t)memory_share_length,
+			     (size_t)composite_memory_region_offset);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 	if (fragment_length < memory_share_length &&

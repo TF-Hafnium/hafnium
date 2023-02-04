@@ -44,6 +44,8 @@ static_assert(sizeof(struct ffa_memory_region) % 16 == 0,
 static_assert(sizeof(struct ffa_mem_relinquish) % 16 == 0,
 	      "struct ffa_mem_relinquish must be a multiple of 16 "
 	      "bytes long.");
+static_assert(sizeof(((struct ffa_memory_region){0}).receiver_count == 4),
+	      "struct ffa_memory_region::receiver_count must be 4 bytes long");
 
 struct ffa_memory_share_state {
 	/**
