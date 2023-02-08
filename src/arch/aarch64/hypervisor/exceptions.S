@@ -447,20 +447,39 @@ skip_vhe_save:
 	bl complete_saving_state
 	mov x0, x19
 
+	/* Intentional fallthrough. */
+
+/**
+ * vcpu_restore_all_and_run
+ *
+ * Called from hypervisor entry after cpu_main has returned in 'x0' the address
+ * of a vCPU to be resumed on current PE. Either way, fall through from above,
+ * in case of a vCPU switch happens with or without world change.
+ * Additionally, for the SPMC case cpu_main can return a vCPU from the 'other
+ * world VM' in which case this queries returning to the normal world.
+ */
+.global vcpu_restore_all_and_run
+vcpu_restore_all_and_run:
+
 #if SECURE_WORLD == 1
 
+	/* Check if vCPU to switch to is from 'other world' VM. */
 	ldr x1, [x0, #VCPU_VM]
 	ldrh w1, [x1, #VM_ID]
 
-	/* Exit to normal world if VM is HF_OTHER_WORLD_ID. */
+	/* Exit to normal world if VM id is HF_OTHER_WORLD_ID. */
 	cmp w1, #HF_OTHER_WORLD_ID
-	bne vcpu_restore_all_and_run
+	bne 0f
 
 	/*
-	 * The current vCPU state is saved so it's now safe to switch to the
-	 * normal world.
+	 * The current vCPU state is saved, or SPMC exits after a cold or
+	 * warm boot. It's now safe to switch to the normal world.
 	 */
 
+	/* Update pointer to current vCPU. */
+	msr tpidr_el2, x0
+
+	mov x19, x0
 other_world_loop:
 	/* Restore FP status and control registers. */
 	add x18, x19, #VCPU_FPSR
@@ -499,12 +518,6 @@ sve_context_restore:
 	add x20, x18, #SVE_CTX_VECTORS
 	sve_op_vectors ldr, x20
 .arch_extension nosve
-	b sve_skip_context_restore
-
-/* Called after cpu_main. */
-.globl other_world_exit
-other_world_exit:
-	mov x19, x0
 
 sve_skip_context_restore:
 	/*
@@ -617,14 +630,12 @@ sve_skip_context_save:
 	 * Otherwise restore the vCPU pointed to by the handler return value.
 	 */
 	cbz x0, other_world_loop
-
-#endif
+#endif /* SECURE_WORLD */
 
 	/* Intentional fallthrough. */
-.global vcpu_restore_all_and_run
-vcpu_restore_all_and_run:
+
 	/* Update pointer to current vCPU. */
-	msr tpidr_el2, x0
+0:	msr tpidr_el2, x0
 
 	/* Restore peripheral registers. */
 	mov x19, x0
