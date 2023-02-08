@@ -7,8 +7,10 @@
  */
 
 #include "hf/arch/irq.h"
+#include "hf/arch/std.h"
 #include "hf/arch/vm/interrupts_gicv3.h"
 #include "hf/arch/vm/timer.h"
+#include "hf/arch/vmid_base.h"
 
 #include "hf/dlog.h"
 #include "hf/ffa.h"
@@ -80,11 +82,11 @@ TEST(busy_secondary, virtual_timer)
 
 	/* Let secondary start looping. */
 	dlog("Telling secondary to loop.\n");
-	memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, message, sizeof(message));
-	EXPECT_EQ(
-		ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
-			.func,
-		FFA_SUCCESS_32);
+	EXPECT_EQ(send_indirect_message(HF_PRIMARY_VM_ID, SERVICE_VM1,
+					send_buffer, message,
+					ARRAY_SIZE(message), 0)
+			  .func,
+		  FFA_SUCCESS_32);
 
 	dlog("Starting timer\n");
 	/* Set virtual timer for 20 mS and enable. */
@@ -139,11 +141,11 @@ TEST(busy_secondary, physical_timer)
 
 	/* Let secondary start looping. */
 	dlog("Telling secondary to loop.\n");
-	memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, message, sizeof(message));
-	EXPECT_EQ(
-		ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
-			.func,
-		FFA_SUCCESS_32);
+	EXPECT_EQ(send_indirect_message(HF_PRIMARY_VM_ID, SERVICE_VM1,
+					send_buffer, message,
+					ARRAY_SIZE(message), 0)
+			  .func,
+		  FFA_SUCCESS_32);
 
 	dlog("Starting timer\n");
 	/* Set physical timer for 20 ms and enable. */

@@ -32,6 +32,7 @@ static volatile bool timer_fired = false;
 
 static void irq_current(void)
 {
+	ffa_vm_id_t own_id = hf_vm_get_id();
 	uint32_t interrupt_id = hf_interrupt_get();
 	char buffer[] = "Got IRQ xx.";
 	int size = sizeof(buffer);
@@ -41,10 +42,11 @@ static void irq_current(void)
 	}
 	buffer[8] = '0' + interrupt_id / 10;
 	buffer[9] = '0' + interrupt_id % 10;
-	memcpy_s(SERVICE_SEND_BUFFER(), FFA_MSG_PAYLOAD_MAX, buffer, size);
-	ffa_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, size, 0);
+	send_indirect_message(own_id, HF_PRIMARY_VM_ID, SERVICE_SEND_BUFFER(),
+			      buffer, size, 0);
 	dlog("secondary IRQ %d ended\n", interrupt_id);
 	event_send_local();
+	ffa_yield();
 }
 
 TEST_SERVICE(timer)
@@ -60,29 +62,33 @@ TEST_SERVICE(timer)
 		bool receive;
 		bool disable_interrupts;
 		uint32_t ticks;
-		struct ffa_value ret = mailbox_receive_retry();
+		ffa_vm_id_t sender;
+		uint8_t actual_message[sizeof("**** xxxxxxx")];
+		struct ffa_partition_rxtx_header header;
 
-		if (ffa_sender(ret) != HF_PRIMARY_VM_ID ||
-		    ffa_msg_send_size(ret) != sizeof("**** xxxxxxx")) {
-			FAIL("Got unexpected message from VM %d, size %d.\n",
-			     ffa_sender(ret), ffa_msg_send_size(ret));
+		mailbox_receive_retry(actual_message, sizeof(actual_message),
+				      message, &header);
+
+		sender = ffa_rxtx_header_sender(&header);
+
+		if (sender != HF_PRIMARY_VM_ID) {
+			FAIL("Got unexpected message from VM %d\n", sender);
 		}
 
 		/*
-		 * Start a timer to send the message back: enable it and
+		 * Start a timer to send the actual_message back: enable it and
 		 * set it for the requested number of ticks.
 		 */
-		wfi = memcmp(message, "WFI ", 4) == 0;
-		wfe = memcmp(message, "WFE ", 4) == 0;
-		receive = memcmp(message, "RECV", 4) == 0;
+		wfi = memcmp(actual_message, "WFI ", 4) == 0;
+		wfe = memcmp(actual_message, "WFE ", 4) == 0;
+		receive = memcmp(actual_message, "RECV", 4) == 0;
 		disable_interrupts = wfi || receive;
-		ticks = (message[5] - '0') * 1000000 +
-			(message[6] - '0') * 100000 +
-			(message[7] - '0') * 10000 + (message[8] - '0') * 1000 +
-			(message[9] - '0') * 100 + (message[10] - '0') * 10 +
-			(message[11] - '0');
-
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+		ticks = (actual_message[5] - '0') * 1000000 +
+			(actual_message[6] - '0') * 100000 +
+			(actual_message[7] - '0') * 10000 +
+			(message[8] - '0') * 1000 +
+			(actual_message[9] - '0') * 100 +
+			(message[10] - '0') * 10 + (actual_message[11] - '0');
 
 		dlog("Starting timer for %d ticks.\n", ticks);
 

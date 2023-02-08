@@ -85,7 +85,8 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	struct ffa_partition_msg *message = (struct ffa_partition_msg *)mb.recv;
 
 	/* Receive the name of the service to run. */
-	ffa_msg_wait();
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
 
 	/*
 	 * Expect to wake up with indirect message related to the next service

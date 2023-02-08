@@ -8,4 +8,5 @@
 
 #include "vmapi/hf/ffa.h"
 
-struct ffa_value mailbox_receive_retry(void);
+void mailbox_receive_retry(void *buffer, size_t buffer_size, void *recv,
+			   struct ffa_partition_rxtx_header *header);

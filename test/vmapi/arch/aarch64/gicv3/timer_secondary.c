@@ -59,19 +59,19 @@ static void timer_busywait_secondary(void)
 {
 	const char message[] = "loop 0099999";
 	const char expected_response[] = "Got IRQ 03.";
-	struct ffa_value run_res;
+	uint8_t response[sizeof(expected_response)];
+	ffa_vm_id_t sender;
+	struct ffa_value ret;
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
+	ret = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(ret.arg2, FFA_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
-	memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, message, sizeof(message));
-	EXPECT_EQ(
-		ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
-			.func,
-		FFA_SUCCESS_32);
+	ret = send_indirect_message(HF_PRIMARY_VM_ID, SERVICE_VM1, send_buffer,
+				    message, sizeof(message), 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	/*
 	 * Let the secondary handle the message and set the timer. It will loop
@@ -80,8 +80,8 @@ static void timer_busywait_secondary(void)
 	 */
 	dlog("running secondary after sending timer message.\n");
 	last_interrupt_id = 0;
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_INTERRUPT_32);
+	ret = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(ret.func, FFA_INTERRUPT_32);
 	dlog("secondary yielded after receiving timer message\n");
 	EXPECT_EQ(last_interrupt_id, VIRTUAL_TIMER_IRQ);
 
@@ -90,13 +90,14 @@ static void timer_busywait_secondary(void)
 	 * should inject a virtual timer interrupt into the secondary, which
 	 * should get it and respond.
 	 */
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_msg_send_size(run_res), sizeof(expected_response));
-	EXPECT_EQ(memcmp(recv_buffer, expected_response,
-			 sizeof(expected_response)),
-		  0);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	ret = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+	receive_indirect_message((void *)response, sizeof(response),
+				 recv_buffer, &sender);
+	EXPECT_EQ(
+		memcmp(response, expected_response, sizeof(expected_response)),
+		0);
+	EXPECT_EQ(sender, SERVICE_VM1);
 }
 
 /**
@@ -117,22 +118,22 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 {
 	const char expected_response[] = "Got IRQ 03.";
 	size_t message_length = strnlen_s(message, 64) + 1;
-	struct ffa_value run_res;
+	uint8_t response[sizeof(expected_response)];
+	ffa_vm_id_t sender;
+	struct ffa_value ret;
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
+	ret = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
 
 	/* Send the message for the secondary to set a timer. */
-	memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, message, message_length);
-	EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, message_length, 0)
-			  .func,
-		  FFA_SUCCESS_32);
+	ret = send_indirect_message(HF_PRIMARY_VM_ID, SERVICE_VM1, send_buffer,
+				    message, message_length, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	/* Let the secondary handle the message and set the timer. */
 	last_interrupt_id = 0;
-	run_res = ffa_run(SERVICE_VM1, 0);
+	ret = ffa_run(SERVICE_VM1, 0);
 
 	/*
 	 * There's a race for whether the secondary manages to block and switch
@@ -147,14 +148,14 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 	 *   FFA_INTERRUPT as in case 1.
 	 */
 
-	if (run_res.func != expected_code && run_res.func != FFA_INTERRUPT_32) {
+	if (ret.func != expected_code && ret.func != FFA_INTERRUPT_32) {
 		FAIL("Expected run to return FFA_INTERRUPT or %#x, but "
 		     "got %#x",
-		     expected_code, run_res.func);
+		     expected_code, ret.func);
 	}
 
 	/* Loop until the timer fires. */
-	while (run_res.func == expected_code) {
+	while (ret.func == expected_code) {
 		/*
 		 * This case happens if the secondary manages to block and
 		 * switch to the primary before the timer fires.
@@ -162,14 +163,14 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 		dlog("Primary looping until timer fires\n");
 		if (expected_code == HF_FFA_RUN_WAIT_FOR_INTERRUPT ||
 		    expected_code == FFA_MSG_WAIT_32) {
-			EXPECT_NE(run_res.arg2, FFA_SLEEP_INDEFINITE);
-			dlog("%d ns remaining\n", run_res.arg2);
+			EXPECT_NE(ret.arg2, FFA_SLEEP_INDEFINITE);
+			dlog("%d ns remaining\n", ret.arg2);
 		}
-		run_res = ffa_run(SERVICE_VM1, 0);
+		ret = ffa_run(SERVICE_VM1, 0);
 	}
 	dlog("Primary done looping\n");
 
-	if (run_res.func == FFA_INTERRUPT_32) {
+	if (ret.func == FFA_INTERRUPT_32) {
 		/*
 		 * This case happens if the (hardware) timer fires before the
 		 * secondary blocks and switches to the primary, either
@@ -181,16 +182,16 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 		 */
 		EXPECT_EQ(last_interrupt_id, VIRTUAL_TIMER_IRQ);
 		dlog("Preempted by timer interrupt, running again\n");
-		run_res = ffa_run(SERVICE_VM1, 0);
+		ffa_run(SERVICE_VM1, 0);
 	}
 
 	/* Once we wake it up it should get the timer interrupt and respond. */
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_msg_send_size(run_res), sizeof(expected_response));
-	EXPECT_EQ(memcmp(recv_buffer, expected_response,
-			 sizeof(expected_response)),
-		  0);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	receive_indirect_message((void *)response, sizeof(response),
+				 recv_buffer, &sender);
+	EXPECT_EQ(
+		memcmp(response, expected_response, sizeof(expected_response)),
+		0);
+	EXPECT_EQ(sender, SERVICE_VM1);
 }
 
 /**
@@ -267,29 +268,28 @@ TEST(timer_secondary, wfi_very_long)
 {
 	const char message[] = "WFI  9999999";
 	size_t message_length = strnlen_s(message, 64) + 1;
-	struct ffa_value run_res;
+	struct ffa_value ret;
 
 	/* Let the secondary get started and wait for our message. */
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
+	ret = ffa_run(SERVICE_VM1, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(ret.arg2, FFA_SLEEP_INDEFINITE);
 
 	/* Send the message for the secondary to set a timer. */
-	memcpy_s(send_buffer, FFA_MSG_PAYLOAD_MAX, message, message_length);
-	EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, message_length, 0)
-			  .func,
-		  FFA_SUCCESS_32);
+	ret = send_indirect_message(HF_PRIMARY_VM_ID, SERVICE_VM1, send_buffer,
+				    message, message_length, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	/*
 	 * Let the secondary handle the message and set the timer.
 	 */
 	last_interrupt_id = 0;
 	for (int i = 0; i < 20; ++i) {
-		run_res = ffa_run(SERVICE_VM1, 0);
-		EXPECT_EQ(run_res.func, HF_FFA_RUN_WAIT_FOR_INTERRUPT);
+		ret = ffa_run(SERVICE_VM1, 0);
+		EXPECT_EQ(ret.func, HF_FFA_RUN_WAIT_FOR_INTERRUPT);
 		dlog("Primary looping until timer fires; %d ns "
 		     "remaining\n",
-		     run_res.arg2);
+		     ret.arg2);
 	}
 }
 
