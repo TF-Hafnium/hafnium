@@ -1142,7 +1142,7 @@ struct ffa_value ffa_memory_send_complete(
  * Write-Allocate Cacheable.
  */
 static struct ffa_value ffa_memory_attributes_validate(
-	ffa_memory_access_permissions_t attributes)
+	ffa_memory_attributes_t attributes)
 {
 	enum ffa_memory_type memory_type;
 	enum ffa_memory_cacheability cacheability;
