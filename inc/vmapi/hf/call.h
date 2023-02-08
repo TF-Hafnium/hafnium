@@ -536,7 +536,21 @@ static inline struct ffa_value ffa_console_log_32(const char *src, size_t size)
 		.func = FFA_CONSOLE_LOG_32,
 		.arg1 = size,
 	};
-	memcpy_s(&req.arg2, sizeof(uint32_t) * 6, src, size);
+
+	uint64_t *arg_addrs[] = {&req.arg2, &req.arg3, &req.arg4,
+				 &req.arg5, &req.arg6, &req.arg7};
+
+	uint32_t src_index = 0;
+	uint32_t arg_idx = 0;
+
+	while (size > 0 && arg_idx < 6) {
+		size_t arg_size =
+			size < sizeof(uint32_t) ? size : sizeof(uint32_t);
+		memcpy_s(arg_addrs[arg_idx++], sizeof(uint32_t),
+			 &src[src_index], arg_size);
+		src_index += arg_size;
+		size -= arg_size;
+	}
 
 	return ffa_call(req);
 }
