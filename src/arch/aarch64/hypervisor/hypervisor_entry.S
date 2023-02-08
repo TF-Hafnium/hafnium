@@ -64,6 +64,9 @@ image_entry:
 	mov x0, x28
 	bl prepare_for_c
 
+	/* Initialization of the stack guard by a random value */
+	bl stack_protector_init
+
 	/*
 	 * Call into C to initialize the memory management configuration with
 	 * MMU and caches disabled. Result will be stored in `arch_mm_config`.

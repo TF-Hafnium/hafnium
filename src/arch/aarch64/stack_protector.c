@@ -11,6 +11,8 @@
 
 #include "hf/panic.h"
 
+#include "plat/prng/prng.h"
+
 /**
  * This is the value that is used as the stack canary. It is written to the top
  * of the stack when entering a function and compared against the stack when
@@ -19,8 +21,6 @@
  * As the value must be the same at the beginning and end of the function, this
  * is a global variable and there are multiple CPUs executing concurrently, this
  * value cannot change after being initialized.
- *
- * TODO: initialize to a random value at boot.
  */
 uint64_t __attribute__((used)) __stack_chk_guard = 0x72afaf72bad0feed;
 
@@ -31,4 +31,20 @@ uint64_t __attribute__((used)) __stack_chk_guard = 0x72afaf72bad0feed;
 noreturn void __stack_chk_fail(void)
 {
 	panic("stack corruption");
+}
+
+void __attribute__((no_stack_protector)) stack_protector_init(void)
+{
+	__uint128_t ret;
+
+	/* The prng function is executed with the hardcoded stack guard. */
+	ret = plat_prng_get_number();
+
+	/**
+	 * The stack guard is changed only if the prng function is supported
+	 * by the platform, otherwise, the hardcoded value is used.
+	 */
+	if (ret != 0) {
+		__stack_chk_guard = ret;
+	}
 }
