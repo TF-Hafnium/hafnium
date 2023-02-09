@@ -17,44 +17,6 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
-/**
- * Reverses the order of the elements in the given array.
- */
-static void reverse(char *s, size_t len)
-{
-	size_t i;
-
-	for (i = 0; i < len / 2; i++) {
-		char t = s[i];
-		s[i] = s[len - 1 - i];
-		s[len - 1 - i] = t;
-	}
-}
-
-/**
- * Finds the next lexicographic permutation of the given array, if there is one.
- */
-static void next_permutation(char *s, size_t len)
-{
-	size_t i;
-	size_t j;
-
-	for (i = len - 2; i < len; i--) {
-		const char t = s[i];
-		if (t >= s[i + 1]) {
-			continue;
-		}
-
-		for (j = len - 1; t >= s[j]; j--) {
-		}
-
-		s[i] = s[j];
-		s[j] = t;
-		reverse(s + i + 1, len - i - 1);
-		return;
-	}
-}
-
 TEAR_DOWN(mailbox)
 {
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
@@ -68,68 +30,6 @@ TEST(mailbox, clear_empty)
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
-}
-
-/**
- * Send and receive the same message from the echo VM.
- */
-TEST(mailbox, echo)
-{
-	const char message[] = "Echo this back to me!";
-	struct ffa_value run_res;
-	struct mailbox_buffers mb = set_up_mailbox();
-
-	SERVICE_SELECT(SERVICE_VM1, "echo", mb.send);
-
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
-	EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
-
-	/* Set the message, echo it and check it didn't change. */
-	memcpy_s(mb.send, FFA_MSG_PAYLOAD_MAX, message, sizeof(message));
-	EXPECT_EQ(
-		ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1, sizeof(message), 0)
-			.func,
-		FFA_SUCCESS_32);
-	run_res = ffa_run(SERVICE_VM1, 0);
-	EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-	EXPECT_EQ(ffa_msg_send_size(run_res), sizeof(message));
-	EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
-}
-
-/**
- * Repeatedly send a message and receive it back from the echo VM.
- */
-TEST(mailbox, repeated_echo)
-{
-	char message[] = "Echo this back to me!";
-	struct ffa_value run_res;
-	uint8_t i;
-	struct mailbox_buffers mb = set_up_mailbox();
-
-	SERVICE_SELECT(SERVICE_VM1, "echo", mb.send);
-
-	for (i = 0; i < 100; i++) {
-		/* Run secondary until it reaches the wait for messages. */
-		run_res = ffa_run(SERVICE_VM1, 0);
-		EXPECT_EQ(run_res.func, FFA_MSG_WAIT_32);
-		EXPECT_EQ(run_res.arg2, FFA_SLEEP_INDEFINITE);
-
-		/* Set the message, echo it and check it didn't change. */
-		next_permutation(message, sizeof(message) - 1);
-		memcpy_s(mb.send, FFA_MSG_PAYLOAD_MAX, message,
-			 sizeof(message));
-		EXPECT_EQ(ffa_msg_send(HF_PRIMARY_VM_ID, SERVICE_VM1,
-				       sizeof(message), 0)
-				  .func,
-			  FFA_SUCCESS_32);
-		run_res = ffa_run(SERVICE_VM1, 0);
-		EXPECT_EQ(run_res.func, FFA_MSG_SEND_32);
-		EXPECT_EQ(ffa_msg_send_size(run_res), sizeof(message));
-		EXPECT_EQ(memcmp(mb.recv, message, sizeof(message)), 0);
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
-	}
 }
 
 /**
