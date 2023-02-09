@@ -33,7 +33,7 @@ static void irq(void)
  * Try to receive a message from the mailbox, blocking if necessary, and
  * retrying if interrupted.
  */
-static struct ffa_value mailbox_receive_retry(void)
+static struct ffa_value mailbox_receive_retry_v1_0(void)
 {
 	struct ffa_value received;
 
@@ -52,7 +52,7 @@ TEST_SERVICE(interruptible_echo)
 
 	EXPECT_EQ(irq_counter, 0);
 	for (;;) {
-		struct ffa_value res = mailbox_receive_retry();
+		struct ffa_value res = mailbox_receive_retry_v1_0();
 		void *message = SERVICE_SEND_BUFFER();
 		void *recv_message = SERVICE_RECV_BUFFER();
 
@@ -114,7 +114,7 @@ TEST_SERVICE(interruptible_echo_direct_msg_with_interrupt)
 
 	dlog("Secondary VM waits for a direct message request.\n");
 
-	res = mailbox_receive_retry();
+	res = mailbox_receive_retry_v1_0();
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ_32);
 	EXPECT_EQ(res.arg3, 1);
 	EXPECT_EQ(irq_counter, 1);

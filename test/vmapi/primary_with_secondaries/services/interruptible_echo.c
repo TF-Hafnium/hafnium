@@ -31,24 +31,28 @@ static void irq(void)
 
 TEST_SERVICE(interruptible_echo)
 {
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
 	exception_setup(irq, NULL);
 	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true, INTERRUPT_TYPE_IRQ);
 	arch_irq_enable();
-
 	EXPECT_EQ(irq_counter, 0);
+
 	for (;;) {
 		struct ffa_value res = ffa_msg_wait();
-		void *message = SERVICE_SEND_BUFFER();
-		void *recv_message = SERVICE_RECV_BUFFER();
+		void *send_buf = SERVICE_SEND_BUFFER();
+		void *recv_buf = SERVICE_RECV_BUFFER();
+		char response[sizeof("I\'ll see you again.")];
+		ffa_vm_id_t sender;
 
-		ASSERT_EQ(res.func, FFA_MSG_SEND_32);
+		ASSERT_EQ(res.func, FFA_RUN_32);
 		EXPECT_EQ(irq_counter, 1);
-		memcpy_s(message, FFA_MSG_PAYLOAD_MAX, recv_message,
-			 ffa_msg_send_size(res));
 
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
-		ffa_msg_send(SERVICE_VM1, HF_PRIMARY_VM_ID,
-			     ffa_msg_send_size(res), 0);
+		receive_indirect_message(response, sizeof(response), recv_buf,
+					 &sender);
+
+		send_indirect_message(own_id, HF_PRIMARY_VM_ID, send_buf,
+				      response, sizeof(response), 0);
 	}
 }
 

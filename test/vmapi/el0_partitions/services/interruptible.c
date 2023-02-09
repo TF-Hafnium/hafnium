@@ -44,7 +44,7 @@ static void irq(void)
  * Try to receive a message from the mailbox, blocking if necessary, and
  * retrying if interrupted.
  */
-static struct ffa_value mailbox_receive_retry(void)
+static struct ffa_value mailbox_receive_retry_v1_0(void)
 {
 	struct ffa_value received;
 
@@ -70,7 +70,7 @@ TEST_SERVICE(interruptible)
 		const char ping_message[] = "Ping";
 		const char enable_message[] = "Enable interrupt C";
 
-		struct ffa_value ret = mailbox_receive_retry();
+		struct ffa_value ret = mailbox_receive_retry_v1_0();
 
 		ASSERT_EQ(ret.func, FFA_MSG_SEND_32);
 		if (ffa_sender(ret) == HF_PRIMARY_VM_ID &&

@@ -16,7 +16,6 @@
 
 #include "vmapi/hf/call.h"
 
-#include "common.h"
 #include "test/hftest.h"
 #include "test/vmapi/exception_handler.h"
 

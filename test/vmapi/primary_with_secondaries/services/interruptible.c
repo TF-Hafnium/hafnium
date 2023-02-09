@@ -29,28 +29,16 @@ static void irq(void)
 	uint32_t interrupt_id = hf_interrupt_get();
 	char buffer[] = "Got IRQ xx.";
 	int size = sizeof(buffer);
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
 	dlog("secondary IRQ %d from current\n", interrupt_id);
 	buffer[8] = '0' + interrupt_id / 10;
 	buffer[9] = '0' + interrupt_id % 10;
-	memcpy_s(SERVICE_SEND_BUFFER(), FFA_MSG_PAYLOAD_MAX, buffer, size);
-	ffa_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, size, 0);
+
+	send_indirect_message(own_id, HF_PRIMARY_VM_ID, SERVICE_SEND_BUFFER(),
+			      buffer, size, 0);
 	dlog("secondary IRQ %d ended\n", interrupt_id);
-}
-
-/**
- * Try to receive a message from the mailbox, blocking if necessary, and
- * retrying if interrupted.
- */
-struct ffa_value mailbox_receive_retry(void)
-{
-	struct ffa_value received;
-
-	do {
-		received = ffa_msg_wait();
-	} while (received.func == FFA_ERROR_32 &&
-		 ffa_error_code(received) == FFA_INTERRUPTED);
-
-	return received;
+	ffa_yield();
 }
 
 TEST_SERVICE(interruptible)
@@ -67,27 +55,31 @@ TEST_SERVICE(interruptible)
 	for (;;) {
 		const char ping_message[] = "Ping";
 		const char enable_message[] = "Enable interrupt C";
+		/* Allocate for the longest of the above two messages. */
+		char response[sizeof(enable_message) + 1];
+		struct ffa_partition_rxtx_header header;
+		ffa_vm_id_t sender;
 
-		struct ffa_value ret = mailbox_receive_retry();
+		mailbox_receive_retry(response, sizeof(response), recv_buf,
+				      &header);
 
-		ASSERT_EQ(ret.func, FFA_MSG_SEND_32);
-		if (ffa_sender(ret) == HF_PRIMARY_VM_ID &&
-		    ffa_msg_send_size(ret) == sizeof(ping_message) &&
-		    memcmp(recv_buf, ping_message, sizeof(ping_message)) == 0) {
+		sender = ffa_rxtx_header_sender(&header);
+		if (sender == HF_PRIMARY_VM_ID &&
+		    header.size == sizeof(ping_message) &&
+		    memcmp(response, ping_message, sizeof(ping_message)) == 0) {
 			/* Interrupt ourselves */
 			hf_interrupt_inject(this_vm_id, 0, SELF_INTERRUPT_ID);
-		} else if (ffa_sender(ret) == HF_PRIMARY_VM_ID &&
-			   ffa_msg_send_size(ret) == sizeof(enable_message) &&
-			   memcmp(recv_buf, enable_message,
+		} else if (sender == HF_PRIMARY_VM_ID &&
+			   header.size == sizeof(enable_message) &&
+			   memcmp(response, enable_message,
 				  sizeof(enable_message)) == 0) {
 			/* Enable interrupt ID C. */
 			hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_C, true,
 					    INTERRUPT_TYPE_IRQ);
 		} else {
 			dlog("Got unexpected message from VM %d, size %d.\n",
-			     ffa_sender(ret), ffa_msg_send_size(ret));
+			     sender, header.size);
 			FAIL("Unexpected message");
 		}
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	}
 }

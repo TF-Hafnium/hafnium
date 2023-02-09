@@ -14,9 +14,9 @@
 
 #include "vmapi/hf/call.h"
 
-#include "common.h"
 #include "test/hftest.h"
 #include "test/hftest_impl.h"
+#include "test/vmapi/ffa.h"
 
 /*
  * Secondary VM that loops forever after receiving a message.

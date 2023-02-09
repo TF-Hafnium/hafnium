@@ -34,6 +34,8 @@ TEST_SERVICE(receive_block)
 {
 	int32_t i;
 	const char message[] = "Done waiting";
+	void* send_buf = SERVICE_SEND_BUFFER();
+	ffa_vm_id_t own_id = hf_vm_get_id();
 
 	exception_setup(irq, NULL);
 	arch_irq_disable();
@@ -44,8 +46,7 @@ TEST_SERVICE(receive_block)
 		EXPECT_FFA_ERROR(res, FFA_INTERRUPTED);
 	}
 
-	memcpy_s(SERVICE_SEND_BUFFER(), FFA_MSG_PAYLOAD_MAX, message,
-		 sizeof(message));
-
-	ffa_msg_send(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(message), 0);
+	send_indirect_message(own_id, HF_PRIMARY_VM_ID, send_buf, message,
+			      sizeof(message), 0);
+	ffa_yield();
 }
