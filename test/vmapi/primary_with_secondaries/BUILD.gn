@@ -92,7 +92,6 @@ vm_kernel("primary_with_secondaries_test_vm") {
     "floating_point.c",
     "indirect_messaging.c",
     "interrupts.c",
-    "mailbox_common.c",
     "memory_sharing.c",
     "no_services.c",
     "perfmon.c",

@@ -11,6 +11,7 @@
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
+#include "test/vmapi/ffa.h"
 
 TEST_SERVICE(relay)
 {
@@ -22,31 +23,38 @@ TEST_SERVICE(relay)
 	 * message so multiple IDs can be places at the start of the message.
 	 */
 	for (;;) {
+		const char expected_message[] = "Send this round the relay!";
 		ffa_vm_id_t *chain;
-		ffa_vm_id_t next_vm_id;
+		ffa_vm_id_t next_id;
 		void *next_message;
-		uint32_t next_message_size;
-
-		/* Receive the message to relay. */
-		struct ffa_value ret = ffa_msg_wait();
-		ASSERT_EQ(ret.func, FFA_MSG_SEND_32);
-
+		uint8_t message[sizeof(expected_message) + sizeof(ffa_vm_id_t)];
+		ffa_vm_id_t sender;
+		ffa_vm_id_t own_id = hf_vm_get_id();
 		/* Prepare to relay the message. */
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
-		ASSERT_GE(ffa_msg_send_size(ret), sizeof(ffa_vm_id_t));
 
-		chain = (ffa_vm_id_t *)recv_buf;
-		next_vm_id = le16toh(*chain);
-		next_message = chain + 1;
-		next_message_size =
-			ffa_msg_send_size(ret) - sizeof(ffa_vm_id_t);
+		receive_indirect_message(message, sizeof(message), recv_buf,
+					 &sender);
+
+		chain = (ffa_vm_id_t *)message;
+		next_id = le16toh(*chain);
+		next_message = &message[sizeof(*chain)];
+
+		/* Check expected message is the same received message. */
+		ASSERT_EQ(memcmp(expected_message, next_message,
+				 sizeof(expected_message)),
+			  0);
+
+		/*
+		 * Tell next partition to send message to sender, for full
+		 * circle.
+		 */
+		*chain = sender;
 
 		/* Send the message to the next stage. */
-		memcpy_s(send_buf, FFA_MSG_PAYLOAD_MAX, next_message,
-			 next_message_size);
-
-		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
-		ffa_msg_send(hf_vm_get_id(), next_vm_id, next_message_size, 0);
+		send_indirect_message(own_id, next_id, send_buf, message,
+				      sizeof(message), 0);
+		ffa_yield();
 	}
 }

@@ -37,7 +37,6 @@ vm_kernel("el0_partition_test_vm") {
   ]
 
   sources = [
-    "//test/vmapi/primary_with_secondaries/mailbox_common.c",
     "boot.c",
     "interrupts.c",
   ]

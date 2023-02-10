@@ -236,3 +236,70 @@ TEST(indirect_messaging, services_echo)
 	EXPECT_EQ(echo_sender, service2_info->vm_id);
 	EXPECT_EQ(echo_payload, payload);
 }
+
+TEAR_DOWN(indirect_messaging)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
+/**
+ * Clearing an empty mailbox is an error.
+ */
+TEST(indirect_messaging, clear_empty)
+{
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
+}
+
+/**
+ * Send a message to relay_a which will forward it to relay_b where it will be
+ * sent back here.
+ */
+TEST(indirect_messaging, relay)
+{
+	const char expected_message[] = "Send this round the relay!";
+	const size_t message_size =
+		sizeof(expected_message) + sizeof(ffa_vm_id_t);
+	char response[message_size];
+	char message[message_size];
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_value ret;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	SERVICE_SELECT(service1_info->vm_id, "relay", mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "relay", mb.send);
+
+	/*
+	 * Build the message chain so the message is sent from here to
+	 * service1, then to service2 and finally back to here.
+	 */
+	{
+		ffa_vm_id_t *chain = (ffa_vm_id_t *)message;
+		*chain = htole32(service2_info->vm_id);
+
+		memcpy_s(&message[sizeof(*chain)],
+			 message_size - sizeof(ffa_vm_id_t), expected_message,
+			 sizeof(expected_message));
+
+		ret = send_indirect_message(own_id, service1_info->vm_id,
+					    mb.send, message, message_size, 0);
+		EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	}
+
+	/* Let service1 forward the message. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Let service2 forward the message. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Ensure the message is intact. */
+	receive_indirect_message(response, sizeof(response), mb.recv, NULL);
+	EXPECT_EQ(memcmp(&response[sizeof(ffa_vm_id_t)], expected_message,
+			 sizeof(expected_message)),
+		  0);
+}
