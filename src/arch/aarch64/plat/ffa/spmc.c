@@ -2126,7 +2126,16 @@ bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
 	return false;
 }
 
-/*
+/**
+ * If the interrupts were indeed masked by SPMC before an SP's vCPU was resumed,
+ * restore the priority mask thereby allowing the interrupts to be delivered.
+ */
+static void plat_ffa_vcpu_allow_interrupts(struct vcpu *current)
+{
+	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
+}
+
+/**
  * First, all the fields related to secure interrupt handling are reset and
  * SPMC scheduled call chain is unwound.
  * Second, the intercepted direct response message is replayed followed by
@@ -2170,8 +2179,7 @@ static struct ffa_value plat_ffa_resume_direct_response(struct vcpu *current,
 	api_ffa_resume_direct_resp_target(current, next, receiver_vm_id, to_ret,
 					  true);
 
-	/* Unmask non secure interrupts. */
-	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
+	plat_ffa_vcpu_allow_interrupts(current);
 
 	return (struct ffa_value){.func = FFA_MSG_WAIT_32};
 }
@@ -2306,6 +2314,35 @@ struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
 	return next;
 }
 
+/**
+ * Enforce action of an SP in response to non-secure or other-secure interrupt
+ * by changing the priority mask, there by potentially queueing interrupts.
+ */
+static void plat_ffa_vcpu_queue_interrupts(
+	struct vcpu_locked receiver_vcpu_locked)
+{
+	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
+	uint8_t current_priority;
+
+	/* Save current value of priority mask. */
+	current_priority = plat_interrupts_get_priority_mask();
+	receiver_vcpu->prev_interrupt_priority = current_priority;
+
+	if (receiver_vcpu->vm->other_s_interrupts_action ==
+	    OTHER_S_INT_ACTION_QUEUED) {
+		/* If secure interrupts not masked yet, mask them now. */
+		if (current_priority > 0) {
+			plat_interrupts_set_priority_mask(0x0);
+		}
+	} else if (receiver_vcpu->vm->ns_interrupts_action ==
+		   NS_ACTION_QUEUED) {
+		/* If non secure interrupts not masked yet, mask them now. */
+		if (current_priority > 0x80) {
+			plat_interrupts_set_priority_mask(0x80);
+		}
+	}
+}
+
 /*
  * Initialize the scheduling mode and/or Partition Runtime model of the target
  * SP upon being resumed by an FFA_RUN ABI.
@@ -2355,7 +2392,6 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 	struct vcpu *current = current_locked.vcpu;
 	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
 	ffa_vm_id_t sender_vm_id = current->vm->id;
-	uint8_t current_priority;
 
 	CHECK(receiver_vcpu->scheduling_mode == NONE);
 	CHECK(receiver_vcpu->call_chain.prev_node == NULL);
@@ -2372,24 +2408,7 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 		vcpu_call_chain_extend(current, receiver_vcpu);
 		receiver_vcpu->scheduling_mode = current->scheduling_mode;
 	}
-
-	/* Save current value of priority mask. */
-	current_priority = plat_interrupts_get_priority_mask();
-	receiver_vcpu->prev_interrupt_priority = current_priority;
-
-	if (receiver_vcpu->vm->other_s_interrupts_action ==
-	    OTHER_S_INT_ACTION_QUEUED) {
-		/* If secure interrupts not masked yet, mask them now. */
-		if (current_priority > 0) {
-			plat_interrupts_set_priority_mask(0x0);
-		}
-	} else if (receiver_vcpu->vm->ns_interrupts_action ==
-		   NS_ACTION_QUEUED) {
-		/* If non secure interrupts not masked yet, mask them now. */
-		if (current_priority > 0x80) {
-			plat_interrupts_set_priority_mask(0x80);
-		}
-	}
+	plat_ffa_vcpu_queue_interrupts(receiver_vcpu_locked);
 }
 
 /*
@@ -2409,7 +2428,7 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
 	current->rt_model = RTM_NONE;
 
 	/* Allow interrupts if they were masked earlier. */
-	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
+	plat_ffa_vcpu_allow_interrupts(current);
 
 	if (!vm_id_is_current_world(receiver_vm_id)) {
 		/* End of NWd scheduled call chain. */
