@@ -186,6 +186,7 @@ vm_kernel("primary_with_sp_test_vm") {
   ]
 
   sources = [
+    "boot.c",
     "dir_msg.c",
     "indirect_messaging.c",
     "memory_sharing.c",

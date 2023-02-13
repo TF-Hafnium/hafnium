@@ -190,6 +190,9 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 		 * manifest for the SP.
 		 */
 		hftest_parse_ffa_manifest(ctx, &fdt);
+
+		/* TODO: Determine memory size referring to the SP Pkg. */
+		ctx->memory_size = 1048576;
 	}
 
 	/* Pause so the next time cycles are given the service will be run. */

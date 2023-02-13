@@ -8,13 +8,16 @@
 
 #include "hf/arch/vm/interrupts.h"
 
+#include "hf/ffa_partition_manifest.h"
 #include "hf/mm.h"
+#include "hf/panic.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
 #include "test/vmapi/exception_handler.h"
+#include "test/vmapi/ffa.h"
 
 /*
  * This must match the size specified for services1 in
@@ -24,9 +27,26 @@
 
 extern uint8_t volatile text_begin[];
 
+/*
+ * SVMs are not yet receiving their manifest.
+ * SPs do not have text_begin set to load_address.
+ * TODO: use address as set in the manifest for both VMs and SPs.
+ */
+static uintptr_t get_load_address(struct hftest_context* ctx)
+{
+	if (ctx->is_ffa_manifest_parsed) {
+		return ctx->partition_manifest.load_addr;
+	}
+
+	return (uintptr_t)&text_begin[0];
+}
+
 TEST_SERVICE(boot_memory)
 {
+	struct hftest_context* ctx = hftest_get_context();
 	uint8_t checksum = 0;
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	uint8_t* mem_ptr = (uint8_t*)get_load_address(ctx);
 
 	/* Check that the size passed in by Hafnium is what is expected. */
 	ASSERT_EQ(SERVICE_MEMORY_SIZE(), SECONDARY_MEMORY_SIZE);
@@ -37,33 +57,37 @@ TEST_SERVICE(boot_memory)
 	 * we are actually reading something.
 	 */
 	for (size_t i = 0; i < SERVICE_MEMORY_SIZE(); ++i) {
-		checksum += text_begin[i];
+		checksum += mem_ptr[i];
 	}
 	ASSERT_NE(checksum, 0);
-	dlog("Checksum of all memory is %d\n", checksum);
 
 	ffa_yield();
 }
 
 TEST_SERVICE(boot_memory_underrun)
 {
+	struct hftest_context* ctx = hftest_get_context();
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	uint8_t* mem_ptr = (uint8_t*)get_load_address(ctx);
 	exception_setup(NULL, exception_handler_yield_data_abort);
 	/*
 	 * Try to read memory below the start of the image. This should result
 	 * in the VM trapping and yielding.
 	 */
-	dlog("Read memory below limit: %d\n", text_begin[-1]);
+	dlog("Read memory below limit: %d\n", mem_ptr[-1]);
 	FAIL("Managed to read memory below limit");
 }
 
 TEST_SERVICE(boot_memory_overrun)
 {
+	struct hftest_context* ctx = hftest_get_context();
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	uint8_t* mem_ptr = (uint8_t*)get_load_address(ctx);
 	exception_setup(NULL, exception_handler_yield_data_abort);
 	/*
 	 * Try to read memory above the limit defined by memory_size. This
 	 * should result in the VM trapping and yielding.
 	 */
-	dlog("Read memory above limit: %d\n",
-	     text_begin[SERVICE_MEMORY_SIZE()]);
+	dlog("Read memory above limit: %d\n", mem_ptr[SERVICE_MEMORY_SIZE()]);
 	FAIL("Managed to read memory above limit");
 }

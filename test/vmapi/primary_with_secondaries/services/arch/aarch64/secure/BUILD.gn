@@ -30,6 +30,7 @@ vm_kernel("secure_service") {
     "//src/arch/aarch64/hftest:mm",
     "//test/hftest:hftest_secure_service",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
+    "//test/vmapi/primary_with_secondaries/services:boot",
     "//test/vmapi/primary_with_secondaries/services:echo",
     "//test/vmapi/primary_with_secondaries/services:ffa_check",
     "//test/vmapi/primary_with_secondaries/services:memory",
