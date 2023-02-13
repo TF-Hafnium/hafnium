@@ -35,16 +35,6 @@ noreturn void __stack_chk_fail(void)
 
 void __attribute__((no_stack_protector)) stack_protector_init(void)
 {
-	__uint128_t ret;
-
 	/* The prng function is executed with the hardcoded stack guard. */
-	ret = plat_prng_get_number();
-
-	/**
-	 * The stack guard is changed only if the prng function is supported
-	 * by the platform, otherwise, the hardcoded value is used.
-	 */
-	if (ret != 0) {
-		__stack_chk_guard = ret;
-	}
+	__stack_chk_guard = (uint64_t)plat_prng_get_number();
 }

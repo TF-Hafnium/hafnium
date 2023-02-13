@@ -6,11 +6,7 @@
 
 import("//build/toolchain/platform.gni")
 
-source_set("absent") {
-  sources = [ "absent.c" ]
-}
-
-source_set("prng") {
+source_set("prng_fake") {
   public_configs = [ "//src/arch/${plat_arch}:config" ]
-  sources = [ "prng.c" ]
+  sources = [ "prng_fake.c" ]
 }
