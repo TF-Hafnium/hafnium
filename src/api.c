@@ -285,6 +285,7 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
 
 	assert(next_state == VCPU_STATE_BLOCKED);
 
+	plat_ffa_yield_prepare(current);
 	*next = api_switch_to_primary(
 		current,
 		(struct ffa_value){.func = FFA_YIELD_32,

@@ -365,3 +365,5 @@ bool plat_ffa_is_direct_response_interrupted(struct vcpu *current);
 struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 				   ffa_vm_id_t receiver_vm_id, uint32_t size,
 				   struct vcpu *current, struct vcpu **next);
+
+void plat_ffa_yield_prepare(struct vcpu *current);

@@ -2259,3 +2259,8 @@ out:
 
 	return ret;
 }
+
+void plat_ffa_yield_prepare(struct vcpu *current)
+{
+	(void)current;
+}

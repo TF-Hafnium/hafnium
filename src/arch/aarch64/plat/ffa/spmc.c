@@ -2233,6 +2233,15 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
 	}
 
 	/*
+	 * If CPU cycles were allocated through FFA_RUN interface, allow the
+	 * interrupts(if they were masked earlier) before returning control
+	 * to NWd.
+	 */
+	if (current->rt_model == RTM_FFA_RUN) {
+		plat_ffa_vcpu_allow_interrupts(current);
+	}
+
+	/*
 	 * The vCPU of an SP on secondary CPUs will invoke FFA_MSG_WAIT
 	 * to indicate successful initialization to SPMC.
 	 */
@@ -2377,6 +2386,8 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu *current,
 		CHECK(vcpu->state == VCPU_STATE_PREEMPTED ||
 		      vcpu->state == VCPU_STATE_BLOCKED);
 	}
+
+	plat_ffa_vcpu_queue_interrupts(target_locked);
 
 	vcpu_unlock(&current_vcpu_locked);
 }
@@ -2648,4 +2659,13 @@ struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 	(void)next;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+void plat_ffa_yield_prepare(struct vcpu *current)
+{
+	/*
+	 * Before returning control  to NWd, allow the interrupts(if they were
+	 * masked earlier).
+	 */
+	plat_ffa_vcpu_allow_interrupts(current);
 }
