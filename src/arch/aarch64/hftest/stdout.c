@@ -12,5 +12,5 @@
 
 void stdout_putchar(char c)
 {
-	hf_debug_log(c);
+	ffa_console_log_32((const char *)&c, 1);
 }
