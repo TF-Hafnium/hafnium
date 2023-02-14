@@ -29,34 +29,49 @@ void dlog_enable_lock(void);
 void dlog(const char *fmt, ...);
 void vdlog(const char *fmt, va_list args);
 
-#if LOG_LEVEL >= LOG_LEVEL_ERROR
-#define dlog_error(...) dlog("ERROR: " __VA_ARGS__)
-#else
-#define dlog_error(...)
-#endif
+/*
+ * The do { ... } while (0) syntax is used to ensure that callers of
+ * these macros follow them with a semicolon.
+ *
+ * Run-time conditionals are preferred over preprocessor conditionals to ensure
+ * that the code is type-checked and linted unconditionally, even if it will not
+ * be executed at run-time.  Logging statements that are disabled at
+ * compile-time are unreachable code and will be eliminated by compiler
+ * optimizations.
+ */
+#define dlog_error(...)                              \
+	do {                                         \
+		if (LOG_LEVEL >= LOG_LEVEL_ERROR) {  \
+			dlog("ERROR: " __VA_ARGS__); \
+		}                                    \
+	} while (0)
 
-#if LOG_LEVEL >= LOG_LEVEL_NOTICE
-#define dlog_notice(...) dlog("NOTICE: " __VA_ARGS__)
-#else
-#define dlog_notice(...)
-#endif
+#define dlog_notice(...)                              \
+	do {                                          \
+		if (LOG_LEVEL >= LOG_LEVEL_NOTICE) {  \
+			dlog("NOTICE: " __VA_ARGS__); \
+		}                                     \
+	} while (0)
 
-#if LOG_LEVEL >= LOG_LEVEL_WARNING
-#define dlog_warning(...) dlog("WARNING: " __VA_ARGS__)
-#else
-#define dlog_warning(...)
-#endif
+#define dlog_warning(...)                              \
+	do {                                           \
+		if (LOG_LEVEL >= LOG_LEVEL_WARNING) {  \
+			dlog("WARNING: " __VA_ARGS__); \
+		}                                      \
+	} while (0)
 
-#if LOG_LEVEL >= LOG_LEVEL_INFO
-#define dlog_info(...) dlog("INFO: " __VA_ARGS__)
-#else
-#define dlog_info(...)
-#endif
+#define dlog_info(...)                                \
+	do {                                          \
+		if (LOG_LEVEL >= LOG_LEVEL_WARNING) { \
+			dlog("INFO: " __VA_ARGS__);   \
+		}                                     \
+	} while (0)
 
-#if LOG_LEVEL >= LOG_LEVEL_VERBOSE
-#define dlog_verbose(...) dlog("VERBOSE: " __VA_ARGS__)
-#else
-#define dlog_verbose(...)
-#endif
+#define dlog_verbose(...)                              \
+	do {                                           \
+		if (LOG_LEVEL >= LOG_LEVEL_VERBOSE) {  \
+			dlog("VERBOSE: " __VA_ARGS__); \
+		}                                      \
+	} while (0)
 
 void dlog_flush_vm_buffer(ffa_vm_id_t id, char buffer[], size_t length);
