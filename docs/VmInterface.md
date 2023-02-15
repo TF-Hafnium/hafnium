@@ -31,26 +31,26 @@ through PSCI.
 The primary VM will be able to control the physical CPUs through the following
 PSCI 1.1 calls, which will be forwarded to the underlying implementation in EL3:
 
-*   PSCI_VERSION
-*   PSCI_FEATURES
-*   PSCI_SYSTEM_OFF
-*   PSCI_SYSTEM_RESET
-*   PSCI_AFFINITY_INFO
-*   PSCI_CPU_SUSPEND
-*   PSCI_CPU_OFF
-*   PSCI_CPU_ON
+*   `PSCI_VERSION`
+*   `PSCI_FEATURES`
+*   `PSCI_SYSTEM_OFF`
+*   `PSCI_SYSTEM_RESET`
+*   `PSCI_AFFINITY_INFO`
+*   `PSCI_CPU_SUSPEND`
+*   `PSCI_CPU_OFF`
+*   `PSCI_CPU_ON`
 
 All other PSCI calls are unsupported.
 
 Secondary VMs will be able to control their vCPUs through the following PSCI 1.1
 calls, which will be implemented by Hafnium:
 
-*   PSCI_VERSION
-*   PSCI_FEATURES
-*   PSCI_AFFINITY_INFO
-*   PSCI_CPU_SUSPEND
-*   PSCI_CPU_OFF
-*   PSCI_CPU_ON
+*   `PSCI_VERSION`
+*   `PSCI_FEATURES`
+*   `PSCI_AFFINITY_INFO`
+*   `PSCI_CPU_SUSPEND`
+*   `PSCI_CPU_OFF`
+*   `PSCI_CPU_ON`
 
 All other PSCI calls are unsupported.
 

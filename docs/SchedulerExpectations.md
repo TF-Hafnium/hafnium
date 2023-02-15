@@ -51,7 +51,7 @@ run queue and not call `FFA_RUN` on the vCPU until it has either:
 A message has been sent by the vCPU. If the recipient is the scheduler VM itself
 then it can handle it as it pleases. Otherwise the scheduler MUST run a vCPU
 from the recipient VM and priority SHOULD be given to those vCPUs that are
-waiting for a message. The scheduler should call FFA_RUN again on the sending
+waiting for a message. The scheduler should call `FFA_RUN` again on the sending
 VM as usual.
 
 ### `FFA_RX_RELEASE`
@@ -59,7 +59,7 @@ VM as usual.
 The vCPU has made the mailbox writable and there are pending waiters. The
 scheduler MUST call `hf_mailbox_waiter_get()` repeatedly and notify all waiters
 by injecting an `HF_MAILBOX_WRITABLE_INTID` interrupt. The scheduler should call
-FFA_RUN again on the sending VM as usual.
+`FFA_RUN` again on the sending VM as usual.
 
 ### `HF_FFA_RUN_WAIT_FOR_INTERRUPT`
 
@@ -79,7 +79,7 @@ run queue and not call `FFA_RUN` on the vCPU until it has either:
 
 The vCPU has aborted triggering the whole VM to abort. The scheduler MUST treat
 this the same as `FFA_INTERRUPT` for all the other vCPUs of the VM. For this
-vCPU the scheduler SHOULD either never call FFA_RUN on the vCPU again, or treat
+vCPU the scheduler SHOULD either never call `FFA_RUN` on the vCPU again, or treat
 it the same as `HF_FFA_RUN_WAIT_FOR_INTERRUPT`.
 
 #### Any other error code

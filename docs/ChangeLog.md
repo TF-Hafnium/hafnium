@@ -6,7 +6,7 @@
 * FF-A v1.1 partition runtime model and CPU cycle allocation modes
     * Implemented partition runtime models for secure partitions entered at
       initialization, processing a secure interrupt or as a result of allocation
-      of CPU cycles by FFA_RUN and FFA_MSG_SEND_DIRECT_REQ ABIs invocations.
+      of CPU cycles by `FFA_RUN` and `FFA_MSG_SEND_DIRECT_REQ` ABIs invocations.
     * Added state machine checks related to above, in which a partition has a
       set of allowed transitions to enter and exit a partition runtime model.
     * Implemented CPU cycle allocation modes and winding/unwinding of call
@@ -20,7 +20,7 @@
     * Preparation changes for multiple borrowers and fragmented memory
       sharing support.
     * Fixed memory attributes checks as they are passed to memory sharing
-      primitives (FFA_MEM_SHARE/LEND/DONATE and FFA_MEM_RETRIEVE_REQ).
+      primitives (`FFA_MEM_SHARE/LEND/DONATE` and `FFA_MEM_RETRIEVE_REQ`).
     * Memory sharing support for S-EL0 partitions.
 * FF-A v1.1 notifications
     * Added framework notifications support.
@@ -32,23 +32,23 @@
 * FF-A v1.1 Indirect messaging
     * Added support for VM-VM, VM-SP, SP-SP indirect messaging scenarios.
     * Added partition message header structures.
-    * Implemented FFA_MSG_SEND2 and FFA_RX_ACQUIRE ABIs.
+    * Implemented `FFA_MSG_SEND2` and `FFA_RX_ACQUIRE` ABIs.
     * Refactored VM internal state tracking in the SPMC to support forwarding
       of RX/TX buffer mapping/unmapping, notifications creation/destruction,
       RX buffer acquire/release.
     * Refactored VM mailbox states to support the RX buffer full event.
 * FF-A console log ABI
-    * Added the FFA_CONSOLE_LOG ABI as a simple and standardized means to print
+    * Added the `FFA_CONSOLE_LOG` ABI as a simple and standardized means to print
       characters without depending on an MMIO device mapped into the VM.
       This allows a VM to print debug or information strings through an
       hypervisor call service using general-purpose registers rather than a
       shared buffer. Multiple VMs can use the ABI concurrently as the SPMC
       buffers data per VM and serializes output to the physical serial device.
 * FF-A v1.1 Setup & Discovery
-    * Updated the PARTITION_INFO_GET ABI to return the partition UUID in the
+    * Updated the `PARTITION_INFO_GET` ABI to return the partition UUID in the
       partition information descriptors. Additionaly the partition information
       descriptor size is returned as part of the response.
-    * Added FFA_MEM_FRAG_RX/TX as supported interface in FFA_FEATURE response.
+    * Added `FFA_MEM_FRAG_RX/TX` as supported interface in `FFA_FEATURE` response.
 * Image footprint optimization
     * The following updates were made with the general idea of reducing the
       flash and RAM footprints. They are also means to adjust the memory
@@ -94,10 +94,10 @@
       configurable.
       * Allows for larger partition manifest sizes.
 * Setup and discovery (FF-A v1.1 EAC0)
-    * FFA_VERSION is forwarded from SPMD to SPMC. SPMC records the version of
+    * `FFA_VERSION` is forwarded from SPMD to SPMC. SPMC records the version of
       a normal world endpoint.
     * Added UUID to partition info descriptors.
-    * Introduced count flag to FFA_PARTITION_INFO_GET.
+    * Introduced count flag to `FFA_PARTITION_INFO_GET`.
 * Interrupt handling (FF-A v1.1 Beta0)
     * Physical GIC registers trapped when accessed from secure partitions.
     * Priority mask register saved/restored on world switches.
@@ -107,7 +107,7 @@
 * Notifications (FF-A v1.1 EAC0)
     * Implemented notification pending interrupt and additional test coverage.
 * MTE stack tagging
-    * Implemented FEAT_MTE2 stack tagging support at S-EL2.
+    * Implemented `FEAT_MTE2` stack tagging support at S-EL2.
     * Core stacks marked as normal tagged memory. A synchronous abort triggers
       on a load/store tag check failure.
     * This permits detection of wrong operations affecting buffers allocated
@@ -123,7 +123,7 @@
     * Refine usage of FF-A memory sharing 'clear memory flag'.
 * Misc
     * Improved extended memory address ranges support:
-        * 52 bits PA (FEAT_LPA/FEAT_LPA2) architecture extension detected
+        * 52 bits PA (`FEAT_LPA`/`FEAT_LPA2`) architecture extension detected
 	  results in limiting the EL2 Stage-1 physical address range to 48 bits.
         * In the FF-A memory sharing operations, harden address width checks on
 	  buffer mapping.
@@ -135,9 +135,9 @@
       translation table base) moved to the vCPU context.
     * EL2 stage 1 mapping extended to 1TB to support systems with physical
       address space larger than 512GB.
-    * FFA_RUN ABI hardened to check the vCPU index matches the PE index onto
+    * `FFA_RUN` ABI hardened to check the vCPU index matches the PE index onto
       which a vCPU is requested to run.
-    * Fixed missing ISB after CPTR_EL2 update upon PE initialization.
+    * Fixed missing ISB after `CPTR_EL2` update upon PE initialization.
     * Fixed stage 2 default shareability to inner shareable (from non-shareable)
       to better support vCPU migration.
     * Fixed manifest structure allocation from BSS rather than stack
@@ -179,13 +179,13 @@
 * FF-A Setup and discovery
     * FF-A build time version updated to v1.1.
     * Managed exit and notifications feature support enabled in SP manifests.
-    * Updated FFA_FEATURES to permit discovery of managed exit, schedule receiver,
+    * Updated `FFA_FEATURES` to permit discovery of managed exit, schedule receiver,
       and notification pending interrupt IDs.
-    * FFA_PARTITION_INFO_GET updated to permit managed exit and notification
+    * `FFA_PARTITION_INFO_GET` updated to permit managed exit and notification
       support discovery.
-    * FFA_SPM_ID_GET added to permit discovering the SPMC endpoint ID (or the
+    * `FFA_SPM_ID_GET` added to permit discovering the SPMC endpoint ID (or the
       SPMD ID at the secure physical FF-A instance).
-    * FFA_RXTX_UNMAP implementation added.
+    * `FFA_RXTX_UNMAP` implementation added.
 * FF-A v1.1 notifications
     * Added ABIs permitting VM (or OS kernel) to SP, and SP to SP asynchronous
       signaling.
@@ -213,7 +213,7 @@
       relying on an operating system at S-EL1.
     * It leverages the EL2&0 Stage-1 translation regime. Apps use FF-A
       ABIs through the SVC conduit.
-    * Added FF-A v1.1 FFA_MEM_PERM_GET/SET ABIs permitting run-time update of
+    * Added FF-A v1.1 `FFA_MEM_PERM_GET/SET` ABIs permitting run-time update of
       memory region permissions.
     * It supersedes the existing S-EL1 shim architecture (without removing its
       support).
@@ -238,17 +238,17 @@
       among normal and secure world endpoints.
     * The second configuration launches the SPMC alone for component testing
       or SP to SP ABI testing.
-    * Hafnium CI Qemu version updated to v6.0.0 (implements VHE and FEAT_SEL2
+    * Hafnium CI Qemu version updated to v6.0.0 (implements VHE and `FEAT_SEL2`
       extensions).
 * FF-A compliance fixes
     * Added checks for valid memory permissions values in manifest memory and
       device regions declarations.
-    * FFA_FEATURES fixed to state indirect messages are not supported by
+    * `FFA_FEATURES` fixed to state indirect messages are not supported by
       the SPMC.
     * Limit an SP to emit a direct request to another SP only.
     * Memory sharing: fixed input validation and return values.
-    * FFA_RXTX_MAP fixed returned error codes.
-    * FFA_MSG_WAIT input parameters check hardened.
+    * `FFA_RXTX_MAP` fixed returned error codes.
+    * `FFA_MSG_WAIT` input parameters check hardened.
 
 #### Known limitations:
 * S-EL0 partitions/VHE: the feature is in an experimental stage and not all use
@@ -265,7 +265,7 @@
 ## v2.5
 #### Highlights
 * BTI/Pointer authentication support
-    * Add branch protection build option for FEAT_PAuth and FEAT_BTI to the
+    * Add branch protection build option for `FEAT_PAuth` and `FEAT_BTI` to the
       clang command line. This only affects the S-EL2 image.
     * Enable pointer authentication by supplying a platform defined pseudo
       random key.
@@ -283,7 +283,7 @@
 * FF-A power management support at boot time
     * Provide platform-independent power management implementations for the
       Hypervisor and SPMC.
-    * Implement the FFA_SECONDARY_EP_REGISTER interface for an MP SP or SPMC
+    * Implement the `FFA_SECONDARY_EP_REGISTER` interface for an MP SP or SPMC
       to register the secondary core cold boot entry point for each of their
       execution contexts.
     * Introduce a generic "SPMD handler" to process the power management events
@@ -296,13 +296,13 @@
     * When a sender of a memory management operation reclaims memory, set the
       memory regions permissions back to it's original configuration.
     * Require default permissions to be supplied to the function
-      'ffa_memory_permissions_to_mode', so in the case where no permissions are
+      `ffa_memory_permissions_to_mode`, so in the case where no permissions are
       specified for a memory operation, the data and instruction permissions can
       be set to the default.
     * Encode Bit[63] of the memory region handle according to if the handle is
       allocated by the Hypervisor or SPMC.
 * FF-A v1.0 spec compliance
-    * Return INVALID_PARAMETER error code instead of NOT_SUPPORTED for direct
+    * Return `INVALID_PARAMETER` error code instead of `NOT_SUPPORTED` for direct
       messaging interfaces when an invalid sender or receiver id is given.
     * Check that reserved parameter registers are 0 when invoking direct
       messaging ABI interfaces.
@@ -310,7 +310,7 @@
       parameter values.
     * Change the FF-A error codes to 32-bit to match the FF-A specification.
     * Fix consistency with maintaining the calling convention bit of the
-      func id between the ffa_handler and the FFA_FEATURES function.
+      func id between the `ffa_handler` and the `FFA_FEATURES` function.
 * Remove primary VM dependencies in the SPMC
     * Treat normal world as primary VM when running in the secure world.
     * Create an SPMC boot flow.
@@ -338,7 +338,7 @@
 * Only supporting models of MultiProcessor SP (vCPUs pinned to physical
   CPUs) or UniProcessor SP (single vCPU).
 * The first secure partition booted must be a MP SP.
-* FFA_RXTX_UNMAP not implemented.
+* `FFA_RXTX_UNMAP` not implemented.
 * Use of an alternate caller provided buffer from RX/TX buffers for memory
   sharing operations is not implemented.
 * A memory retrieve request to SPMC does not support the caller endpoint to
@@ -362,7 +362,7 @@ Hafnium CI test suite.
       the SPMC sets up in the SP EL1&0 Stage-2 translation regime at boot time.
     * FF-A IDs normal and secure world split ranges.
     * The SPMC maps the Hypervisor (or OS kernel) RX/TX buffers as non-secure
-      buffers in its EL2 Stage-1 translation regime on FFA_RXTX_MAP ABI
+      buffers in its EL2 Stage-1 translation regime on `FFA_RXTX_MAP` ABI
       invocation from the non-secure physical FF-A instance.
 * FF-A v1.0 Direct message interface
     * Added implementation for the normal world Hypervisor and test cases.
@@ -389,7 +389,7 @@ Hafnium CI test suite.
     * The SPMC implements the logic to receive FF-A messages through the EL3
       SPMD, process them, and either return to the SPMD (and normal world) or
       resume a Secure Partition.
-    * Extract NS bit from HPFAR_EL2 on Stage-2 page fault.
+    * Extract NS bit from `HPFAR_EL2` on Stage-2 page fault.
     * Prevent setup of LOR regions in SWd.
     * Avoid direct PSCI calls down to EL3.
 * Platforms
@@ -397,10 +397,10 @@ Hafnium CI test suite.
     * Added Arm TC0 "Total Compute" secure Hafnium build support.
 * Other improvements
     * Re-hosting to trustedfirmware.org
-    * busy_secondary timer increased to improve CI stability.
+    * `busy_secondary` timer increased to improve CI stability.
     * Removed legacy Hypervisor calls.
-    * Fix CPTR_EL2 TTA bit position.
-    * Report FAR_EL2 on injecting EL1 exception.
+    * Fix `CPTR_EL2` TTA bit position.
+    * Report `FAR_EL2` on injecting EL1 exception.
 #### Known limitations:
 * Not all fields of the FF-A manifest are actually processed by the Hafnium
   device-tree parser.
