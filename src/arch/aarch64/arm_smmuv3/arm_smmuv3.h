@@ -158,11 +158,11 @@
 #define PTM_SHIFT 2
 #define PTM_MASK 1
 
-#define CMD_SIZE 16
-#define CMD_SIZE_DW (CMD_SIZE / 8)
+#define CMD_SIZE ((size_t)(16))
+#define CMD_SIZE_DW ((size_t)(CMD_SIZE / 8))
 #define EVT_RECORD_SIZE 32
 #define STE_SIZE 64
-#define STE_SIZE_DW (STE_SIZE / 8)
+#define STE_SIZE_DW ((size_t)(STE_SIZE / 8))
 
 /* Global ByPass Attribute fields */
 #define BYPASS_GBPA 0

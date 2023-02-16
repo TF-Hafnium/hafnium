@@ -17,7 +17,7 @@ typedef size_t rsize_t;
  * likely to catch errors. This may need to be relaxed if it proves to be overly
  * restrictive.
  */
-#define RSIZE_MAX (128 * 1024 * 1024)
+#define RSIZE_MAX ((size_t)(128 * 1024 * 1024))
 
 /*
  * Only the safer versions of these functions are exposed to reduce the chance

@@ -10,6 +10,7 @@
 
 #include <stdalign.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "hf/arch/mm.h"
@@ -21,7 +22,7 @@
 /* Keep macro alignment */
 /* clang-format off */
 
-#define PAGE_SIZE (1 << PAGE_BITS)
+#define PAGE_SIZE ((size_t)(1 << PAGE_BITS))
 #define MM_PTE_PER_PAGE (PAGE_SIZE / sizeof(pte_t))
 
 /* The following are arch-independent page mapping modes. */

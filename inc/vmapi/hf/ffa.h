@@ -144,7 +144,7 @@
  * be confused with PAGE_SIZE, which is the translation granule Hafnium is
  * configured to use.
  */
-#define FFA_PAGE_SIZE 4096
+#define FFA_PAGE_SIZE ((size_t)4096)
 
 /** The ID of a VM. These are assigned sequentially starting with an offset. */
 typedef uint16_t ffa_vm_id_t;

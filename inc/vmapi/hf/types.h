@@ -41,10 +41,10 @@ typedef uintptr_t hf_ipaddr_t;
 #define HF_SLEEP_INDEFINITE 0xffffffffffffffff
 
 /** The amount of data that can be sent to a mailbox. */
-#define HF_MAILBOX_SIZE 4096
+#define HF_MAILBOX_SIZE ((size_t)4096)
 
 /** Interrupt ID returned when there is no interrupt pending. */
-#define HF_INVALID_INTID 0xffffffff
+#define HF_INVALID_INTID ((ffa_vm_id_t)0xffffffff)
 
 /** Interrupt ID indicating the mailbox is readable. */
 #define HF_MAILBOX_READABLE_INTID 1
