@@ -77,8 +77,6 @@ source_set("el0_stdout") {
 
 source_set("stdout") {
   sources = [ "stdout.c" ]
-
-  deps = [ "//vmlib/aarch64:call" ]
 }
 
 source_set("mm") {

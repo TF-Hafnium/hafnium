@@ -23,7 +23,10 @@ executable("test_binary") {
 vm_kernel("socket_vm1") {
   testonly = true
 
-  deps = [ ":hftest_secondary_vm_socket" ]
+  deps = [
+    ":hftest_secondary_vm_socket",
+    "//vmlib/aarch64:call",
+  ]
 }
 
 linux_initrd("linux_test_initrd") {
