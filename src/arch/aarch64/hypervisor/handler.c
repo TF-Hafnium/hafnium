@@ -544,8 +544,8 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		w3 = (uint32_t)(args->arg2 >> 32);
 		ffa_uuid_init(w0, w1, w2, w3, &uuid);
 
-		start_index = (uint32_t)args->arg3 & 0xFFFF;
-		tag = (uint32_t)args->arg3 >> 16;
+		start_index = args->arg3 & 0xFFFF;
+		tag = (args->arg3 >> 16) & 0xFFFF;
 		*args = api_ffa_partition_info_get_regs(current, &uuid,
 							start_index, tag);
 		return true;
