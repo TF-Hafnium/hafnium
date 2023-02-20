@@ -40,6 +40,12 @@ alignas(FFA_PAGE_SIZE) static uint8_t other_world_recv_buffer[HF_MAILBOX_SIZE];
 alignas(PAGE_SIZE) static uint8_t
 	other_world_retrieve_buffer[HF_MAILBOX_SIZE * MAX_FRAGMENTS];
 
+bool vm_does_not_support_indirect_messages(struct vm *vm)
+{
+	return (vm->ffa_version < MAKE_FFA_VERSION(1, 1) ||
+		!vm_supports_messaging_method(vm, FFA_PARTITION_INDIRECT_MSG));
+}
+
 /** Returns information on features specific to the NWd. */
 struct ffa_value plat_ffa_features(uint32_t function_feature_id)
 {
@@ -264,8 +270,7 @@ bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 	struct vm *vm = vm_locked.vm;
 	ffa_vm_id_t vm_id = vm->id;
 
-	if (!ffa_tee_enabled || (vm->ffa_version < MAKE_FFA_VERSION(1, 1))) {
-		*ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+	if (!ffa_tee_enabled || vm_does_not_support_indirect_messages(vm)) {
 		return true;
 	}
 
@@ -316,7 +321,7 @@ bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 		return true;
 	}
 
-	if (to_locked.vm->ffa_version < MAKE_FFA_VERSION(1, 1)) {
+	if (vm_does_not_support_indirect_messages(to_locked.vm)) {
 		return true;
 	}
 
@@ -711,7 +716,7 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 		return;
 	}
 
-	if (vm->ffa_version < MAKE_FFA_VERSION(1, 1)) {
+	if (vm_does_not_support_indirect_messages(vm)) {
 		return;
 	}
 
@@ -749,7 +754,7 @@ void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 		return;
 	}
 
-	if (vm_locked.vm->ffa_version < MAKE_FFA_VERSION(1, 1)) {
+	if (vm_does_not_support_indirect_messages(vm_locked.vm)) {
 		return;
 	}
 
