@@ -67,7 +67,6 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 	vcpu->vm = vm;
 	vcpu->state = VCPU_STATE_OFF;
 	vcpu->direct_request_origin_vm_id = HF_INVALID_VM_ID;
-	vcpu->present_action_ns_interrupts = NS_ACTION_INVALID;
 	vcpu->rt_model = RTM_SP_INIT;
 	vcpu->next_boot = NULL;
 }

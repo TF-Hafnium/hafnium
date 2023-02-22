@@ -2171,9 +2171,7 @@ static struct ffa_value plat_ffa_resume_direct_response(struct vcpu *current,
 					  true);
 
 	/* Unmask non secure interrupts. */
-	if (current->present_action_ns_interrupts == NS_ACTION_QUEUED) {
-		plat_interrupts_set_priority_mask(current->mask_ns_interrupts);
-	}
+	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
 
 	return (struct ffa_value){.func = FFA_MSG_WAIT_32};
 }
@@ -2270,13 +2268,6 @@ struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
 
 	if (current_vcpu->call_chain.prev_node == NULL) {
 		/* End of NWd scheduled call chain */
-		if (current_vcpu->present_action_ns_interrupts ==
-		    NS_ACTION_QUEUED) {
-			/* Unmask non secure interrupts. */
-			plat_interrupts_set_priority_mask(
-				current_vcpu->mask_ns_interrupts);
-		}
-
 		return api_preempt(current_vcpu);
 	}
 
@@ -2295,9 +2286,6 @@ struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
 	 * are not changed here.
 	 */
 
-	/* Restore action for Non secure interrupts. */
-	current_vcpu->present_action_ns_interrupts =
-		current_vcpu->vm->ns_interrupts_action;
 	vcpu_unlock(&current_vcpu_locked);
 
 	/* Lock next vcpu. */
@@ -2367,15 +2355,13 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 	struct vcpu *current = current_locked.vcpu;
 	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
 	ffa_vm_id_t sender_vm_id = current->vm->id;
+	uint8_t current_priority;
 
 	CHECK(receiver_vcpu->scheduling_mode == NONE);
 	CHECK(receiver_vcpu->call_chain.prev_node == NULL);
 	CHECK(receiver_vcpu->call_chain.next_node == NULL);
 	CHECK(receiver_vcpu->rt_model == RTM_NONE);
 
-	/* Inherit action for non secure interrupts from partition. */
-	receiver_vcpu->present_action_ns_interrupts =
-		receiver_vcpu->vm->ns_interrupts_action;
 	receiver_vcpu->rt_model = RTM_FFA_DIR_REQ;
 
 	if (!vm_id_is_current_world(sender_vm_id)) {
@@ -2385,32 +2371,22 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 		/* Adding a new node to an existing call chain. */
 		vcpu_call_chain_extend(current, receiver_vcpu);
 		receiver_vcpu->scheduling_mode = current->scheduling_mode;
-
-		/* Precedence for NS-Interrupt actions. */
-		if (current->present_action_ns_interrupts <
-		    receiver_vcpu->present_action_ns_interrupts) {
-			/* A less permissive action is preferred. */
-			receiver_vcpu->present_action_ns_interrupts =
-				current->present_action_ns_interrupts;
-		}
 	}
 
-	if (receiver_vcpu->present_action_ns_interrupts == NS_ACTION_QUEUED) {
-		uint8_t priority_mask;
+	/* Save current value of priority mask. */
+	current_priority = plat_interrupts_get_priority_mask();
+	receiver_vcpu->prev_interrupt_priority = current_priority;
 
-		/* Save current value of priority mask. */
-		priority_mask = plat_interrupts_get_priority_mask();
-		receiver_vcpu->mask_ns_interrupts = priority_mask;
-
-		if (current->vm->other_s_interrupts_action ==
-		    OTHER_S_INT_ACTION_QUEUED) {
-			/*
-			 * Mask all interrupts such that the vCPU
-			 * runs to completion.
-			 */
+	if (receiver_vcpu->vm->other_s_interrupts_action ==
+	    OTHER_S_INT_ACTION_QUEUED) {
+		/* If secure interrupts not masked yet, mask them now. */
+		if (current_priority > 0) {
 			plat_interrupts_set_priority_mask(0x0);
-		} else {
-			/* Mask non secure interrupts. */
+		}
+	} else if (receiver_vcpu->vm->ns_interrupts_action ==
+		   NS_ACTION_QUEUED) {
+		/* If non secure interrupts not masked yet, mask them now. */
+		if (current_priority > 0x80) {
 			plat_interrupts_set_priority_mask(0x80);
 		}
 	}
@@ -2432,26 +2408,15 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
 	current->scheduling_mode = NONE;
 	current->rt_model = RTM_NONE;
 
+	/* Allow interrupts if they were masked earlier. */
+	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
+
 	if (!vm_id_is_current_world(receiver_vm_id)) {
 		/* End of NWd scheduled call chain. */
 		assert(current->call_chain.prev_node == NULL);
-		if (current->present_action_ns_interrupts == NS_ACTION_QUEUED) {
-			/* Unmask non secure interrupts. */
-			plat_interrupts_set_priority_mask(
-				current->mask_ns_interrupts);
-		}
 	} else {
 		/* Removing a node from an existing call chain. */
 		vcpu_call_chain_remove_node(current, next);
-		if (current->present_action_ns_interrupts == NS_ACTION_QUEUED) {
-			/* Unmask non secure interrupts. */
-			plat_interrupts_set_priority_mask(
-				current->mask_ns_interrupts);
-		}
-
-		/* Restore action for Non secure interrupts. */
-		current->present_action_ns_interrupts =
-			current->vm->ns_interrupts_action;
 	}
 
 	sl_unlock(&next->lock);
