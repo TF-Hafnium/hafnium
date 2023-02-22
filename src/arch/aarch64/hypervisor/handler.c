@@ -800,12 +800,6 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
 		return next;
 	}
 
-	switch (args.func & ~SMCCC_CONVENTION_MASK) {
-	case HF_DEBUG_LOG:
-		vcpu->regs.r[0] = api_debug_log(args.arg1, vcpu);
-		return NULL;
-	}
-
 	smc_forwarder(vcpu->vm, &args);
 	arch_regs_set_retval(&vcpu->regs, args);
 	return NULL;
@@ -1030,10 +1024,6 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 	case HF_INTERRUPT_INJECT:
 		vcpu->regs.r[0] = api_interrupt_inject(args.arg1, args.arg2,
 						       args.arg3, vcpu, &next);
-		break;
-
-	case HF_DEBUG_LOG:
-		vcpu->regs.r[0] = api_debug_log(args.arg1, vcpu);
 		break;
 
 #if SECURE_WORLD == 1

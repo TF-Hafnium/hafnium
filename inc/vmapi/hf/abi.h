@@ -25,7 +25,4 @@
 /* Custom FF-A-like calls returned from FFA_RUN. */
 #define HF_FFA_RUN_WAIT_FOR_INTERRUPT 0xff06
 
-/* This matches what Trusty and its TF-A module currently use. */
-#define HF_DEBUG_LOG            0xbd000000
-
 /* clang-format on */

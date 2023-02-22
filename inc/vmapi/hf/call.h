@@ -414,16 +414,6 @@ static inline int64_t hf_interrupt_inject(ffa_vm_id_t target_vm_id,
 		       intid);
 }
 
-/**
- * Sends a character to the debug log for the VM.
- *
- * Returns 0 on success, or -1 if it failed for some reason.
- */
-static inline int64_t hf_debug_log(char c)
-{
-	return hf_call(HF_DEBUG_LOG, c, 0, 0);
-}
-
 /** Obtains the Hafnium's version of the implemented FF-A specification. */
 static inline int32_t ffa_version(uint32_t requested_version)
 {

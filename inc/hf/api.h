@@ -24,8 +24,6 @@ struct vcpu *api_switch_to_primary(struct vcpu *current,
 				   struct ffa_value primary_ret,
 				   enum vcpu_state secondary_state);
 
-int64_t api_debug_log(char c, struct vcpu *current);
-
 struct vcpu *api_preempt(struct vcpu *current);
 struct vcpu *api_wait_for_interrupt(struct vcpu *current);
 struct vcpu *api_vcpu_off(struct vcpu *current);

@@ -2342,30 +2342,6 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	return ((struct ffa_value){.func = FFA_VERSION_COMPILED});
 }
 
-int64_t api_debug_log(char c, struct vcpu *current)
-{
-	bool flush;
-	struct vm *vm = current->vm;
-	struct vm_locked vm_locked = vm_lock(vm);
-
-	if (c == '\n' || c == '\0') {
-		flush = true;
-	} else {
-		vm->log_buffer[vm->log_buffer_length++] = c;
-		flush = (vm->log_buffer_length == sizeof(vm->log_buffer));
-	}
-
-	if (flush) {
-		dlog_flush_vm_buffer(vm->id, vm->log_buffer,
-				     vm->log_buffer_length);
-		vm->log_buffer_length = 0;
-	}
-
-	vm_unlock(&vm_locked);
-
-	return 0;
-}
-
 /**
  * Helper for success return of FFA_FEATURES, for when it is used to query
  * an interrupt ID.
