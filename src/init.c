@@ -130,6 +130,12 @@ void one_time_init(void)
 		manifest_it = fdt.buf;
 	}
 
+	dlog_verbose("Manifest range: %#x - %#x (%d bytes)\n", manifest_it.next,
+		     manifest_it.limit, manifest_it.limit - manifest_it.next);
+	if (!is_aligned(manifest_it.next, 4)) {
+		panic("Manifest not aligned.");
+	}
+
 	manifest_ret = manifest_init(mm_stage1_locked, &manifest, &manifest_it,
 				     &ppool);
 

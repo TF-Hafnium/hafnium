@@ -7,6 +7,10 @@ disk:
 *   kernels for the VMs, whose names are described in the manifest (optional)
 *   initrd of the primary VM, whose name is described in the manifest (optional)
 
+The `manifest.dtb` must be the first file in the RAM disk, to ensure that it is
+properly aligned. Hafnium will not be able to read it if it is not aligned to a
+4 byte boundary.
+
 Follow the [preparing Linux](PreparingLinux.md) instructions to produce
 `vmlinuz` and `initrd.img` for a basic Linux primary VM.
 
