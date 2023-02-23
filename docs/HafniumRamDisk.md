@@ -16,5 +16,5 @@ Assuming that a subdirectory called `initrd` contains the files listed in the
 previous section, we can build `initrd.img` with the following command:
 
 ```shell
-cd initrd; find . | cpio -o > ../initrd.img; cd -
+cd initrd; echo -e "./manifest.dtb\n$(find . -type f -not -name manifest.dtb)" | cpio -o -v > ../initrd.img; cd -
 ```
