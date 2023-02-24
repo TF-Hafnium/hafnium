@@ -62,6 +62,19 @@ static_assert(MM_PPOOL_ENTRY_SIZE >= HF_MAILBOX_SIZE,
 	      "size, so that memory region descriptors can be copied from the "
 	      "mailbox for memory sharing.");
 
+/*
+ * Maximum ffa_partition_info entries that can be returned by an invocation
+ * of FFA_PARTITION_INFO_GET_REGS_64 is size in bytes, of available
+ * registers/args in struct ffa_value divided by size of struct
+ * ffa_partition_info. For this ABI, arg3-arg17 in ffa_value can be used, i.e.
+ * 15 uint64_t fields. For FF-A v1.1, this value should be 5.
+ */
+#define MAX_INFO_REGS_ENTRIES_PER_CALL \
+	((15 * sizeof(uint64_t)) / sizeof(struct ffa_partition_info))
+static_assert(MAX_INFO_REGS_ENTRIES_PER_CALL == 5,
+	      "FF-A v1.1 supports no more than 5 entries"
+	      " per FFA_PARTITION_INFO_GET_REGS64 calls");
+
 static struct mpool api_page_pool;
 
 /**
@@ -466,6 +479,25 @@ static void api_ffa_fill_partitions_info_array(
 
 	*vm_count_out = vm_count;
 }
+
+static inline void api_ffa_pack_vmid_count_props(
+	uint64_t *xn, ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count,
+	ffa_partition_properties_t properties)
+{
+	*xn = (uint64_t)vm_id;
+	*xn |= (uint64_t)vcpu_count << 16;
+	*xn |= (uint64_t)properties << 32;
+}
+
+static inline void api_ffa_pack_uuid(uint64_t *xn_1, uint64_t *xn_2,
+				     struct ffa_uuid *uuid)
+{
+	*xn_1 = (uint64_t)uuid->uuid[0];
+	*xn_1 |= (uint64_t)uuid->uuid[1] << 32;
+	*xn_2 = (uint64_t)uuid->uuid[2];
+	*xn_2 |= (uint64_t)uuid->uuid[3] << 32;
+}
+
 struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 						 const struct ffa_uuid *uuid,
 						 const uint16_t start_index,
@@ -478,30 +510,34 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
 	uint16_t max_idx = 0;
 	uint16_t curr_idx = 0;
-	uint8_t max_entries_per_call = 0;
 	uint8_t num_entries_to_ret = 0;
-	uint8_t arg_idx = 0;
+	uint8_t arg_idx = 3;
+
 	/* list of pointers to args in return value */
-	uint64_t *arg_ptrs[15] = {
-		&ret.arg3,
-		&ret.arg4,
-		&ret.arg5,
-		&ret.arg6,
-		&ret.arg7,
-		&ret.extended_val.arg8,
-		&ret.extended_val.arg9,
-		&ret.extended_val.arg10,
-		&ret.extended_val.arg11,
-		&ret.extended_val.arg12,
-		&ret.extended_val.arg13,
-		&ret.extended_val.arg14,
-		&ret.extended_val.arg15,
-		&ret.extended_val.arg16,
-		&ret.extended_val.arg17,
+	uint64_t *arg_ptrs[] = {
+		&(ret).func,
+		&(ret).arg1,
+		&(ret).arg2,
+		&(ret).arg3,
+		&(ret).arg4,
+		&(ret).arg5,
+		&(ret).arg6,
+		&(ret).arg7,
+		&(ret).extended_val.arg8,
+		&(ret).extended_val.arg9,
+		&(ret).extended_val.arg10,
+		&(ret).extended_val.arg11,
+		&(ret).extended_val.arg12,
+		&(ret).extended_val.arg13,
+		&(ret).extended_val.arg14,
+		&(ret).extended_val.arg15,
+		&(ret).extended_val.arg16,
+		&(ret).extended_val.arg17,
 	};
 
 	/* TODO: Add support for using tags */
 	if (tag != 0) {
+		dlog_error("Tag not 0. Unsupported tag. %d\n", tag);
 		return ffa_error(FFA_RETRY);
 	}
 
@@ -532,6 +568,7 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	if (!plat_ffa_partition_info_get_regs_forward(
 		    uuid, start_index, tag, partitions, ARRAY_SIZE(partitions),
 		    &vm_count)) {
+		dlog_error("Failed to forward ffa_partition_info_get_regs.\n");
 		return ffa_error(FFA_DENIED);
 	}
 
@@ -540,28 +577,25 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	 * and is not Null.
 	 */
 	if (vm_count == 0 || vm_count > ARRAY_SIZE(partitions)) {
+		dlog_error(
+			"Invalid parameters. vm_count = %d (must not be zero "
+			"or > %d)\n",
+			vm_count, ARRAY_SIZE(partitions));
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	if (start_index >= vm_count) {
+		dlog_error(
+			"start index = %d vm_count = %d (start_index must be "
+			"less than vm_count)\n",
+			start_index, vm_count);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	/*
-	 * Max entries that can be returned is size in bytes, of available
-	 * registers divided by size of struct ffa_partition_info. For this
-	 * ABI, arg3-arg17 in ffa_value can be used, ie 15 uint64_t fields.
-	 * For FF-A V1.1, this should be 5.
-	 */
-	max_entries_per_call =
-		(15 * sizeof(uint64_t)) / sizeof(struct ffa_partition_info);
-	assert(max_entries_per_call == 5);
-
-	max_idx = (uint16_t)(vm_count - 1);
+	max_idx = vm_count - 1;
 	num_entries_to_ret = (max_idx - start_index) + 1;
-	num_entries_to_ret = num_entries_to_ret > max_entries_per_call
-				     ? max_entries_per_call
-				     : num_entries_to_ret;
+	num_entries_to_ret =
+		MIN(num_entries_to_ret, MAX_INFO_REGS_ENTRIES_PER_CALL);
 	curr_idx = start_index + num_entries_to_ret - 1;
 	assert(curr_idx <= max_idx);
 
@@ -575,17 +609,15 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	}
 
 	for (uint16_t idx = start_index; idx <= curr_idx; ++idx) {
-		uint64_t *arg1 = arg_ptrs[arg_idx++];
-		uint64_t *arg2 = arg_ptrs[arg_idx++];
-		uint64_t *arg3 = arg_ptrs[arg_idx++];
-		*arg1 = (uint64_t)(partitions[idx].vm_id);
-		*arg1 |= (uint64_t)(partitions[idx].vcpu_count) << 16;
-		*arg1 |= (uint64_t)(partitions[idx].properties) << 32;
+		uint64_t *xn_0 = arg_ptrs[arg_idx++];
+		uint64_t *xn_1 = arg_ptrs[arg_idx++];
+		uint64_t *xn_2 = arg_ptrs[arg_idx++];
+
+		api_ffa_pack_vmid_count_props(xn_0, partitions[idx].vm_id,
+					      partitions[idx].vcpu_count,
+					      partitions[idx].properties);
 		if (uuid_is_null) {
-			*arg2 = (uint64_t)partitions[idx].uuid.uuid[0];
-			*arg2 |= (uint64_t)partitions[idx].uuid.uuid[1] << 32;
-			*arg3 = (uint64_t)partitions[idx].uuid.uuid[2];
-			*arg3 |= (uint64_t)partitions[idx].uuid.uuid[3] << 32;
+			api_ffa_pack_uuid(xn_1, xn_2, &partitions[idx].uuid);
 		}
 		assert(arg_idx < ARRAY_SIZE(arg_ptrs));
 	}

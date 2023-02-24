@@ -10,6 +10,9 @@
 
 #include "hf/arch/std.h"
 
+#define MAX(x, y) (x > y ? x : y)
+#define MIN(x, y) (x < y ? x : y)
+
 typedef size_t rsize_t;
 
 /**
