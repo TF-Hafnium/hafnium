@@ -1,4 +1,4 @@
-# Copyright 2022 The Hafnium Authors.
+# Copyright 2023 The Hafnium Authors.
 #
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
@@ -35,6 +35,7 @@ vm_kernel("secure_service") {
     "//test/vmapi/primary_with_secondaries/services:ffa_check",
     "//test/vmapi/primary_with_secondaries/services:memory",
     "//test/vmapi/primary_with_secondaries/services:relay",
+    "//vmlib/${plat_arch}:call",
   ]
 }
 

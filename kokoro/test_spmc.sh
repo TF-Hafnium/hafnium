@@ -44,6 +44,8 @@ done
 
 if [ $USE_PARITY == true ]
 then
+   ${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" --partitions_json test/vmapi/ffa_both_worlds_el3_spmc/ffa_both_world_partitions_test.json
+
    ${HFTEST[@]} --partitions_json test/vmapi/ffa_secure_partition_el3_spmc/ffa_secure_partition_only_test.json
 fi
 

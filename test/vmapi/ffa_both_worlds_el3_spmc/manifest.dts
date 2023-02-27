@@ -1,0 +1,19 @@
+/*
+ * Copyright 2023 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/ {
+	hypervisor {
+		compatible = "hafnium,hafnium";
+		ffa_tee_enabled;
+		vm1 {
+			is_ffa_partition;
+			debug_name = "primary_ffa_test";
+			load_address = <0x90000000>;
+		};
+	};
+};

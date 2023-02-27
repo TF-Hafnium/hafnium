@@ -1,0 +1,96 @@
+# Copyright 2023 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+
+config("config") {
+  include_dirs = [
+    "inc",
+    "//test/inc",
+  ]
+}
+
+source_set("common") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "common.c" ]
+}
+
+source_set("setup_and_discovery") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "setup_and_discovery.c" ]
+
+  deps = [ ":common" ]
+}
+
+source_set("partition_services") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "partition_services.c" ]
+
+  deps = [
+    ":common",
+    "//test/vmapi/common:common",
+  ]
+}
+
+source_set("message_loop") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "message_loop.c" ]
+
+  deps = [
+    ":partition_services",
+    ":setup_and_discovery",
+  ]
+}
+
+# SP that will be controlled via communication/scheduling primitives by the
+# former SP
+vm_kernel("secure_partitions_services") {
+  testonly = true
+  public_configs = [ ":config" ]
+
+  deps = [
+    ":message_loop",
+    "//src/arch/aarch64:arch",
+    "//src/arch/aarch64/hftest:interrupts",
+    "//test/hftest:hftest_secure_service",
+    "//vmlib/${plat_arch}:smc_call",
+  ]
+}
+
+manifest("partition_manifest_service_sp_first") {
+  source = "partition_manifest_service_sp_first.dts"
+  output = "partition-manifest.dtb"
+}
+
+partition_package("service_sp_first_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition-manifest.dtb",
+        "secure_partitions_services.bin",
+        ":partition_manifest_service_sp_first",
+        ":secure_partitions_services",
+      ] ]
+  output = "service_sp_first_package.img"
+}

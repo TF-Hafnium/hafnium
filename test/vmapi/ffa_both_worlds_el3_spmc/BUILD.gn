@@ -1,0 +1,90 @@
+# Copyright 2023 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+import("//src/arch/${plat_arch}/args.gni")
+import("//test/hftest/args.gni")
+
+config("config") {
+  include_dirs = [ "inc" ]
+}
+
+source_set("ffa_secure_partitions") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/${plat_arch}:config",
+  ]
+
+  sources = [ "ffa_secure_partitions.c" ]
+
+  deps = [ "//test/vmapi/common" ]
+}
+
+# VM that will control execution of tests in a VM-to-SP set-up
+vm_kernel("vm_primary") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "services/arch/${plat_arch}/secure:config",
+    "//src/arch/${plat_arch}:arch_config",
+  ]
+
+  sources = [
+    "dir_msg.c",
+    "setup_and_discovery.c",
+  ]
+
+  deps = [
+    ":ffa_secure_partitions",
+    "//src/arch/${plat_arch}/hftest:interrupts_gicv3",
+    "//src/arch/${plat_arch}/hftest:power_mgmt",
+    "//src/arch/${plat_arch}/hftest:registers",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/arch/${plat_arch}/gicv3:gicv3_setup",
+    "//test/vmapi/common:common",
+    "//vmlib",
+  ]
+}
+
+manifest("vm_primary_manifest") {
+  source = "partition_manifest_nwd_primary.dts"
+  output = "partition_manifest_nwd_primary.dtb"
+}
+
+partition_package("vm_primary_test_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_nwd_primary.dtb",
+        "vm_primary.bin",
+        ":vm_primary_manifest",
+        ":vm_primary",
+      ] ]
+  output = "vm_primary_test_package.img"
+}
+
+partitions_json("ffa_both_world_partitions_test") {
+  testonly = true
+
+  # This setup should only have one SP
+  sps = [ [
+        "service_sp_first_package.img",
+        "services/arch/aarch64/secure/manifest_service_sp_first.dts",
+        "services/arch/aarch64/secure:service_sp_first_package",
+        "services/arch/aarch64/secure:partition_manifest_service_sp_first",
+      ] ]
+
+  vms = [ [
+        "vm_primary_test_package.img",
+        "manifest.dts",
+        ":vm_primary_test_package",
+        ":vm_primary_test_package",
+      ] ]
+
+  json_file = "ffa_both_world_partitions_test.json"
+}

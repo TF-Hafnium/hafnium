@@ -127,7 +127,6 @@ source_set("hftest_secure_service") {
     "//src/arch/${plat_arch}/hftest:entry",
     "//src/arch/${plat_arch}/hftest:power_mgmt",
     "//src/arch/${plat_arch}/hftest:sp_secondary_entry",
-    "//vmlib/${plat_arch}:call",
   ]
 }
 
