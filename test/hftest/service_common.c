@@ -6,9 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stdalign.h>
-#include <stdint.h>
-
+#include "hf/check.h"
 #include "hf/fdt_handler.h"
 #include "hf/ffa.h"
 #include "hf/memiter.h"
@@ -72,6 +70,59 @@ void hftest_context_init(struct hftest_context *ctx, void *send, void *recv)
 	ctx->recv = recv;
 }
 
+/*
+ * Parse the FF-A partition's manifest.
+ * This function assumes the 'fdt' field of the passed 'ctx' has been
+ * initialized.
+ * TODO: Parse other fields as needed.
+ */
+static void hftest_parse_ffa_manifest(struct hftest_context *ctx,
+				      struct fdt *fdt)
+{
+	struct fdt_node root;
+	struct fdt_node ffa_node;
+	struct string mem_region_node_name = STRING_INIT("memory-regions");
+	uint64_t number;
+
+	CHECK(ctx != NULL);
+	CHECK(fdt != NULL);
+
+	ASSERT_TRUE(fdt_find_node(fdt, "/", &root));
+	EXPECT_TRUE(fdt_is_compatible(&root, "arm,ffa-manifest-1.0"));
+	ASSERT_TRUE(fdt_read_number(&root, "load-address",
+				    &ctx->partition_manifest.load_addr));
+	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &number));
+
+	ffa_node = root;
+
+	/* Look for the memory region node. */
+	if (fdt_find_child(&ffa_node, &mem_region_node_name) &&
+	    fdt_first_child(&ffa_node)) {
+		uint32_t mem_count = 0;
+
+		do {
+			struct memory_region *cur_region =
+				&ctx->partition_manifest.mem_regions[mem_count];
+			EXPECT_TRUE(fdt_read_number(&ffa_node, "pages-count",
+						    &number));
+			cur_region->page_count = (uint32_t)number;
+			EXPECT_TRUE(fdt_read_number(&ffa_node, "base-address",
+						    &number));
+			cur_region->base_address = number;
+			EXPECT_TRUE(fdt_read_number(&ffa_node, "attributes",
+						    &number));
+			cur_region->attributes = (uint32_t)number;
+			mem_count++;
+		} while (fdt_next_sibling(&ffa_node));
+
+		assert(mem_count < PARTITION_MAX_MEMORY_REGIONS);
+
+		ctx->partition_manifest.mem_region_count = mem_count;
+	}
+
+	ctx->is_ffa_manifest_parsed = true;
+}
+
 noreturn void hftest_service_main(const void *fdt_ptr)
 {
 	struct memiter args;
@@ -128,12 +179,17 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	 * the dt provided by the Hypervisor. SPs expect to receive their
 	 * FF-A manifest which doesn't have a memory size field.
 	 */
-	if (!IS_SP_ID(own_id) &&
-	    !fdt_get_memory_size(&fdt, &ctx->memory_size)) {
+	if (IS_VM_ID(own_id) && !fdt_get_memory_size(&fdt, &ctx->memory_size)) {
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
 			   "No entry in the FDT on memory size details");
 		abort();
+	} else if (!IS_VM_ID(own_id)) {
+		/*
+		 * It is secure partition. We are currently using the partition
+		 * manifest for the SP.
+		 */
+		hftest_parse_ffa_manifest(ctx, &fdt);
 	}
 
 	/* Pause so the next time cycles are given the service will be run. */

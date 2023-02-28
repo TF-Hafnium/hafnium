@@ -12,6 +12,7 @@
 
 #include "hf/fdt.h"
 #include "hf/ffa.h"
+#include "hf/ffa_partition_manifest.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/ffa.h"
@@ -133,6 +134,8 @@ struct hftest_context {
 
 	/* These are used in primary VMs. */
 	const struct fdt *fdt;
+	bool is_ffa_manifest_parsed;
+	struct ffa_partition_manifest partition_manifest;
 
 	/* These are used in services. */
 	void *send;
@@ -285,7 +288,7 @@ union hftest_any {
 		uint32_t msg_length =                                      \
 			strnlen_s(service, SERVICE_NAME_MAX_LENGTH);       \
 		struct ffa_partition_msg *message =                        \
-			(struct ffa_partition_msg *)send_buffer;           \
+			(struct ffa_partition_msg *)(send_buffer);         \
                                                                            \
 		/*                                                         \
 		 * If service is a Secondary VM, let the service configure \
