@@ -9,6 +9,7 @@
 #include <stdnoreturn.h>
 
 #include "hf/arch/barriers.h"
+#include "hf/arch/gicv3.h"
 #include "hf/arch/init.h"
 #include "hf/arch/mmu.h"
 #include "hf/arch/plat/ffa.h"
@@ -1085,7 +1086,23 @@ struct vcpu *fiq_lower(void)
 	struct vcpu_locked current_locked;
 	struct vcpu *current_vcpu = current();
 	int64_t ret;
+	uint32_t intid;
 
+	intid = get_highest_pending_g0_interrupt_id();
+
+	/* Check for the highest priority pending Group0 interrupt. */
+	if (intid != SPURIOUS_INTID_OTHER_WORLD) {
+		/*
+		 * TODO: Delegate handling of Group0 interrupt to EL3 firmware.
+		 */
+		panic();
+	}
+
+	/*
+	 * A special interrupt indicating there is no pending interrupt
+	 * with sufficient priority for current security state. This
+	 * means a non-secure interrupt is pending.
+	 */
 	assert(current_vcpu->vm->ns_interrupts_action != NS_ACTION_QUEUED);
 
 	if (plat_ffa_vm_managed_exit_supported(current_vcpu->vm)) {

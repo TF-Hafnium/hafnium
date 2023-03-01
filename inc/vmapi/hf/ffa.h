@@ -84,6 +84,7 @@
 #define FFA_CONSOLE_LOG_32                  0x8400008A
 #define FFA_CONSOLE_LOG_64                  0xC400008A
 #define FFA_PARTITION_INFO_GET_REGS_64      0xC400008B
+#define FFA_EL3_INTR_HANDLE_32              0x8400008C
 
 /* FF-A error codes. */
 #define FFA_NOT_SUPPORTED      INT32_C(-1)
