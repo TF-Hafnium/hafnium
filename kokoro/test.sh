@@ -74,9 +74,12 @@ mkdir -p "${LOG_DIR_BASE}/unit_tests"
     | tee "${LOG_DIR_BASE}/unit_tests/sponge_log.log"
 fi
 
-CPU=("max")
+if [ $USE_FVP == false ]
+then
+  HFTEST+=(--cpu "max")
+fi
 
-HFTEST+=(--cpu $CPU --log "$LOG_DIR_BASE")
+HFTEST+=(--log "$LOG_DIR_BASE")
 
 if [ $EL0_TEST_ONLY == false ]
 then
