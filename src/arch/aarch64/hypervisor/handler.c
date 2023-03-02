@@ -1080,6 +1080,20 @@ struct vcpu *irq_lower(void)
 #endif
 }
 
+#if SECURE_WORLD == 1
+static void spmd_group0_intr_delegate(void)
+{
+	struct ffa_value ret;
+
+	dlog_verbose("Delegating Group0 interrupt to SPMD\n");
+
+	ret = smc_ffa_call((struct ffa_value){.func = FFA_EL3_INTR_HANDLE_32});
+
+	/* Check if the Group0 interrupt was handled successfully. */
+	CHECK(ret.func == FFA_SUCCESS_32);
+}
+#endif
+
 struct vcpu *fiq_lower(void)
 {
 #if SECURE_WORLD == 1
@@ -1092,10 +1106,11 @@ struct vcpu *fiq_lower(void)
 
 	/* Check for the highest priority pending Group0 interrupt. */
 	if (intid != SPURIOUS_INTID_OTHER_WORLD) {
-		/*
-		 * TODO: Delegate handling of Group0 interrupt to EL3 firmware.
-		 */
-		panic();
+		/* Delegate handling of Group0 interrupt to EL3 firmware. */
+		spmd_group0_intr_delegate();
+
+		/* Resume current vCPU. */
+		return NULL;
 	}
 
 	/*
