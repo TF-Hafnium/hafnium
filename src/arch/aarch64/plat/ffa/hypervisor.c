@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include <stddef.h>
+
 #include "hf/arch/barriers.h"
 #include "hf/arch/ffa.h"
 #include "hf/arch/other_world.h"
@@ -912,9 +914,9 @@ static bool plat_ffa_fill_partition_info_from_regs(
 	}
 
 	while (num_entries) {
-		uint64_t info = *(arg_ptrs[(idx * 3)]);
-		uint64_t uuid_lo = *(arg_ptrs[(idx * 3) + 1]);
-		uint64_t uuid_high = *(arg_ptrs[(idx * 3) + 2]);
+		uint64_t info = *(arg_ptrs[(ptrdiff_t)(idx * 3)]);
+		uint64_t uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx * 3) + 1]);
+		uint64_t uuid_high = *(arg_ptrs[(ptrdiff_t)(idx * 3) + 2]);
 
 		partitions[vm_count].vm_id = info & 0xFFFF;
 		partitions[vm_count].vcpu_count = (info >> 16) & 0xFFFF;

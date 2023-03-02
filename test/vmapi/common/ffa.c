@@ -760,9 +760,9 @@ bool ffa_partition_info_regs_get_part_info(
 		return false;
 	}
 
-	uint64_t info = *(arg_ptrs[(idx * 3)]);
-	uint64_t uuid_lo = *(arg_ptrs[(idx * 3) + 1]);
-	uint64_t uuid_high = *(arg_ptrs[(idx * 3) + 2]);
+	uint64_t info = *(arg_ptrs[(ptrdiff_t)(idx * 3)]);
+	uint64_t uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx * 3) + 1]);
+	uint64_t uuid_high = *(arg_ptrs[(ptrdiff_t)(idx * 3) + 2]);
 
 	partition_info->vm_id = info & 0xFFFF;
 	partition_info->vcpu_count = (info >> 16) & 0xFFFF;
