@@ -80,6 +80,7 @@
 /* The following are stage-2 software defined attributes. */
 #define STAGE2_SW_OWNED     (UINT64_C(1) << 55)
 #define STAGE2_SW_EXCLUSIVE (UINT64_C(1) << 56)
+#define STAGE2_SW_NS        (UINT64_C(1) << 57)
 
 /* The following are stage-2 memory attributes for normal memory. */
 #define STAGE2_DEVICE_MEMORY UINT64_C(0)
@@ -641,6 +642,10 @@ uint64_t arch_mm_mode_to_stage2_attrs(uint32_t mode)
 		attrs |= STAGE2_SW_EXCLUSIVE;
 	}
 
+	if (mode & MM_MODE_NS) {
+		attrs |= STAGE2_SW_NS;
+	}
+
 	/* Define the valid bit. */
 	if (!(mode & MM_MODE_INVALID)) {
 		attrs |= PTE_VALID;
@@ -676,6 +681,10 @@ uint32_t arch_mm_stage2_attrs_to_mode(uint64_t attrs)
 
 	if (!(attrs & STAGE2_SW_EXCLUSIVE)) {
 		mode |= MM_MODE_SHARED;
+	}
+
+	if (attrs & STAGE2_SW_NS) {
+		mode |= MM_MODE_NS;
 	}
 
 	if (!(attrs & PTE_VALID)) {
