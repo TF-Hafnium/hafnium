@@ -544,13 +544,6 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 			if (plat_ffa_is_vm_id(vm_locked.vm->id)) {
 				dlog_warning("Memory%sVMs\n", error_string);
 				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
-
-			} else if (!is_el0_partition) {
-				dlog_warning(
-					"Memory%sS-EL1 "
-					"partitions.\n",
-					error_string);
-				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
 			}
 		}
 
@@ -596,12 +589,6 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 		if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
 			if (plat_ffa_is_vm_id(vm_locked.vm->id)) {
 				dlog_warning("Device%sVMs\n", error_string);
-				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
-			} else if (!is_el0_partition) {
-				dlog_warning(
-					"Device%sS-EL1 "
-					"partitions.\n",
-					error_string);
 				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
 			}
 		}
