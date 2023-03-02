@@ -168,7 +168,7 @@ bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	size_t mem_size = pa_difference(mem_begin, mem_end);
 	struct fdt_header *fdt;
 	int fdt_memory_node;
-	int root_offset;
+	int root;
 
 	/* Map the fdt in r/w mode in preparation for updating it. */
 	fdt = mm_identity_map(stage1_locked, fdt_addr,
@@ -193,14 +193,14 @@ bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 		goto out_unmap_fdt;
 	}
 
-	root_offset = fdt_path_offset(fdt, "/");
+	root = fdt_path_offset(fdt, "/");
 	if (ret < 0) {
 		dlog_error("FDT cannot find root offset. Error: %d\n", ret);
 		goto out_unmap_fdt;
 	}
 
 	/* Add a node to hold the memory information. */
-	fdt_memory_node = fdt_add_subnode(fdt, root_offset, "memory");
+	fdt_memory_node = fdt_add_subnode(fdt, root, "memory");
 	if (fdt_memory_node < 0) {
 		ret = fdt_memory_node;
 		dlog_error("FDT cannot add memory node. Error: %d\n", ret);
@@ -208,7 +208,7 @@ bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	}
 
 	/* Set the values for the VM's memory in the FDT. */
-	ret = fdt_appendprop_addrrange(fdt, root_offset, fdt_memory_node, "reg",
+	ret = fdt_appendprop_addrrange(fdt, root, fdt_memory_node, "reg",
 				       mem_start_addr, mem_size);
 	if (ret != 0) {
 		dlog_error(
