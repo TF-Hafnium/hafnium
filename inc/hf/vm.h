@@ -10,7 +10,7 @@
 
 #include <stdatomic.h>
 
-#include "hf/arch/types.h"
+#include "hf/arch/vm/vm.h"
 
 #include "hf/cpu.h"
 #include "hf/interrupt_desc.h"

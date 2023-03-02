@@ -30,12 +30,6 @@ typedef uint64_t uintreg_t;
 /** The ID of a physical or virtual CPU. */
 typedef uint32_t cpu_id_t;
 
-/** Arch-specifc information about a VM. */
-struct arch_vm {
-	/* This field is only here because empty structs aren't allowed. */
-	void *dummy;
-};
-
 /** Type to represent the register state of a VM. */
 struct arch_regs {
 	uintreg_t arg[8];
