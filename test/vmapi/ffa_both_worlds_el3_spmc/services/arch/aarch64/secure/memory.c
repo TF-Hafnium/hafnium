@@ -1,0 +1,158 @@
+/*
+ * Copyright 2023 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+#include "hf/arch/irq.h"
+#include "hf/arch/mmu.h"
+#include "hf/arch/types.h"
+#include "hf/arch/vm/interrupts.h"
+
+#include "hf/dlog.h"
+#include "hf/mm.h"
+
+#include "vmapi/hf/call.h"
+
+#include "partition_services.h"
+#include "test/hftest.h"
+#include "test/vmapi/ffa.h"
+
+static uint8_t retrieve_buffer[PAGE_SIZE * 2];
+
+static void update_mm_security_state(
+	struct ffa_composite_memory_region *composite,
+	ffa_memory_attributes_t attributes)
+{
+	if (ffa_get_memory_security_attr(attributes) ==
+		    FFA_MEMORY_SECURITY_NON_SECURE &&
+	    !IS_VM_ID(hf_vm_get_id())) {
+		for (uint32_t i = 0; i < composite->constituent_count; i++) {
+			uint32_t mode;
+
+			if (!hftest_mm_get_mode(
+				    // NOLINTNEXTLINE(performance-no-int-to-ptr)
+				    (const void *)composite->constituents[i]
+					    .address,
+				    FFA_PAGE_SIZE * composite->constituents[i]
+							    .page_count,
+				    &mode)) {
+				FAIL("Couldn't get the mode of the "
+				     "composite.\n");
+			}
+
+			hftest_mm_identity_map(
+				// NOLINTNEXTLINE(performance-no-int-to-ptr)
+				(const void *)composite->constituents[i]
+					.address,
+				FFA_PAGE_SIZE *
+					composite->constituents[i].page_count,
+				mode | MM_MODE_NS);
+		}
+	}
+}
+
+static void memory_increment(struct ffa_memory_region *memory_region)
+{
+	size_t i;
+	struct ffa_composite_memory_region *composite;
+	uint8_t *ptr;
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	ptr = (uint8_t *)composite->constituents[0].address;
+
+	ASSERT_EQ(memory_region->receiver_count, 1);
+	ASSERT_NE(memory_region->receivers[0].composite_memory_region_offset,
+		  0);
+
+	/*
+	 * Validate retrieve response contains the memory attributes
+	 * hafnium implements.
+	 */
+	ASSERT_EQ(ffa_get_memory_shareability_attr(memory_region->attributes),
+		  FFA_MEMORY_INNER_SHAREABLE);
+	ASSERT_EQ(ffa_get_memory_cacheability_attr(memory_region->attributes),
+		  FFA_MEMORY_CACHE_WRITE_BACK);
+
+	update_mm_security_state(composite, memory_region->attributes);
+
+	/* Increment each byte of memory. */
+	for (i = 0; i < PAGE_SIZE; ++i) {
+		++ptr[i];
+	}
+}
+
+void ffa_mem_retrieve_from_args(struct mailbox_buffers mb,
+				void *retrieved_memory, ffa_vm_id_t sender,
+				uint32_t handle, uint32_t tag, uint32_t flags)
+{
+	struct ffa_value ret;
+	uint32_t msg_size;
+	struct ffa_memory_region *memory_region;
+	uint32_t fragment_length;
+	uint32_t total_length;
+	uint32_t fragment_offset;
+
+	msg_size = ffa_memory_retrieve_request_init_single_receiver(
+		(struct ffa_memory_region *)mb.send, handle, sender,
+		hf_vm_get_id(), tag, flags, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE);
+
+	ret = ffa_mem_retrieve_req(msg_size, msg_size);
+	ASSERT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
+	total_length = ret.arg1;
+	fragment_length = ret.arg2;
+	EXPECT_GE(fragment_length,
+		  sizeof(struct ffa_memory_region) +
+			  sizeof(struct ffa_memory_access) +
+			  sizeof(struct ffa_composite_memory_region));
+	EXPECT_LE(fragment_length, HF_MAILBOX_SIZE);
+	EXPECT_LE(fragment_length, total_length);
+	memory_region = (struct ffa_memory_region *)mb.recv;
+	EXPECT_EQ(memory_region->receiver_count, 1);
+	EXPECT_EQ(memory_region->receivers[0].receiver_permissions.receiver,
+		  hf_vm_get_id());
+	memcpy_s((uint8_t *)retrieved_memory, HF_MAILBOX_SIZE, mb.recv,
+		 fragment_length);
+	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	/* Retrieve the remaining fragments. */
+	fragment_offset = fragment_length;
+	while (fragment_offset < total_length) {
+		HFTEST_LOG("Calling again. frag offset: %x; total: %x\n",
+			   fragment_offset, total_length);
+		ret = ffa_mem_frag_rx(handle, fragment_offset);
+		EXPECT_EQ(ret.func, FFA_MEM_FRAG_TX_32);
+		EXPECT_EQ(ffa_frag_handle(ret), handle);
+		/* Sender MBZ at virtual instance. */
+		EXPECT_EQ(ffa_frag_sender(ret), 0);
+		fragment_length = ret.arg3;
+		EXPECT_GT(fragment_length, 0);
+		ASSERT_LE(fragment_offset + fragment_length, HF_MAILBOX_SIZE);
+		memcpy_s((uint8_t *)retrieved_memory + fragment_offset,
+			 HF_MAILBOX_SIZE - fragment_offset, mb.recv,
+			 fragment_length);
+		fragment_offset += fragment_length;
+		ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	}
+	EXPECT_EQ(fragment_offset, total_length);
+}
+
+struct ffa_value sp_req_retrieve_cmd(ffa_vm_id_t sender, uint32_t handle,
+				     uint32_t tag, uint32_t flags,
+				     struct mailbox_buffers mb)
+{
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	ffa_mem_retrieve_from_args(mb, (void *)retrieve_buffer, sender, handle,
+				   tag, flags);
+	memory_increment((struct ffa_memory_region *)retrieve_buffer);
+
+	/* Give the memory back and notify the sender. */
+	ffa_mem_relinquish_init(mb.send, handle, 0, own_id);
+	EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
+	return sp_send_response(own_id, sender, 0);
+}

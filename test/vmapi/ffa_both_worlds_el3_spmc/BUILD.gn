@@ -35,6 +35,7 @@ vm_kernel("vm_primary") {
 
   sources = [
     "dir_msg.c",
+    "memory_sharing.c",
     "setup_and_discovery.c",
   ]
 

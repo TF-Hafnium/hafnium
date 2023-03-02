@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/check.h"
+
 #include "vmapi/hf/call.h"
 
 #include "partition_services.h"
@@ -13,8 +15,14 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
-static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
+struct mailbox_buffers mb;
+
+static struct ffa_value handle_direct_req_cmd(struct mailbox_buffers mb,
+					      struct ffa_value res)
 {
+	CHECK(mb.recv != NULL);
+	CHECK(mb.send != NULL);
+
 	hftest_set_dir_req_source_id(ffa_sender(res));
 
 	switch (res.arg3) {
@@ -31,6 +39,10 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		break;
 	case SP_CHECK_PARTITION_INFO_GET_REGS_CMD:
 		res = sp_check_partition_info_get_regs_cmd(ffa_sender(res));
+		break;
+	case SP_REQ_RETRIEVE_CMD:
+		res = sp_req_retrieve_cmd(ffa_sender(res), res.arg4, res.arg5,
+					  res.arg6, mb);
 		break;
 	default:
 		HFTEST_LOG_FAILURE();
@@ -52,7 +64,6 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
  */
 noreturn void test_main_sp(bool is_boot_vcpu)
 {
-	struct mailbox_buffers mb;
 	struct hftest_context* ctx = hftest_get_context();
 	struct ffa_value res;
 
@@ -69,7 +80,7 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 				/* TODO: can only print from boot vCPU. */
 				HFTEST_LOG("Received direct message request");
 			}
-			res = handle_direct_req_cmd(res);
+			res = handle_direct_req_cmd(mb, res);
 		} else {
 			HFTEST_LOG_FAILURE();
 			HFTEST_LOG(HFTEST_LOG_INDENT

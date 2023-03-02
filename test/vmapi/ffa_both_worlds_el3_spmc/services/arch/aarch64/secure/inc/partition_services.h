@@ -16,6 +16,8 @@
 #include "vmapi/hf/call.h"
 #include "vmapi/hf/ffa.h"
 
+#include "test/vmapi/ffa.h"
+
 /* Return values for the test commands. */
 #define SP_SUCCESS 0
 #define SP_ERROR -1
@@ -119,3 +121,22 @@ static inline struct ffa_value sp_check_partition_info_get_regs_cmd_send(
 }
 
 struct ffa_value sp_check_partition_info_get_regs_cmd(ffa_vm_id_t test_source);
+
+/**
+ * Command to request an SP to retrieve and increment memory.
+ */
+#define SP_REQ_RETRIEVE_CMD 0x65636900
+
+static inline struct ffa_value sp_req_retrieve_cmd_send(ffa_vm_id_t sender,
+							ffa_vm_id_t receiver,
+							uint32_t handle,
+							uint32_t tag,
+							uint32_t flags)
+{
+	return ffa_msg_send_direct_req(sender, receiver, SP_REQ_RETRIEVE_CMD,
+				       handle, tag, flags, 0);
+}
+
+struct ffa_value sp_req_retrieve_cmd(ffa_vm_id_t sender, uint32_t handle,
+				     uint32_t tag, uint32_t flags,
+				     struct mailbox_buffers mb);

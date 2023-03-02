@@ -54,7 +54,10 @@ source_set("message_loop") {
     "//test/hftest:hftest_config",
     "//src/arch/aarch64:arch_config",
   ]
-  sources = [ "message_loop.c" ]
+  sources = [
+    "memory.c",
+    "message_loop.c",
+  ]
 
   deps = [
     ":partition_services",
@@ -73,6 +76,7 @@ vm_kernel("secure_partitions_services") {
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_secure_service",
+    "//vmlib",
     "//vmlib/${plat_arch}:smc_call",
   ]
 }
