@@ -15,6 +15,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
+#include "test/hftest_impl.h"
 #include "test/vmapi/ffa.h"
 
 SET_UP(indirect_messaging)
@@ -235,4 +236,49 @@ TEST(indirect_messaging, services_echo)
 
 	EXPECT_EQ(echo_sender, service2_info->vm_id);
 	EXPECT_EQ(echo_payload, payload);
+}
+
+/**
+ * Send and receive the same message from the echo VM using
+ * FFA v1.1 FFA_MSG_SEND2 ABI.
+ */
+TEST_PRECONDITION(indirect_messaging, echo_release_msg_wait, service1_is_not_vm)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t payload = 0xAA55AA55;
+	const uint32_t echo_payload;
+	ffa_vm_id_t echo_sender;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id, "echo_msg_send2_release_msg_wait",
+		       mb.send);
+
+	/*
+	 * Send the message twice for the sake of validating that the RX buffer
+	 * was properly released.
+	 */
+	for (uint32_t i = 0; i < 2; i++) {
+		/* Send the message. */
+		ret = send_indirect_message(own_id, service1_info->vm_id,
+					    mb.send, &payload, sizeof(payload),
+					    0);
+		EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+		/* Schedule message receiver. */
+		ret = ffa_run(service1_info->vm_id, 0);
+		/* Receiver should have relinquished execution with
+		 * FFA_MSG_WAIT_32. */
+		EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+		receive_indirect_message((void *)&echo_payload,
+					 sizeof(echo_payload), mb.recv,
+					 &echo_sender);
+
+		HFTEST_LOG("Message echoed back: %#x", echo_payload);
+		EXPECT_EQ(echo_payload, payload);
+		EXPECT_EQ(echo_sender, service1_info->vm_id);
+		payload++;
+	}
 }

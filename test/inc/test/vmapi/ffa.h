@@ -125,6 +125,9 @@ struct ffa_value send_indirect_message(ffa_vm_id_t from, ffa_vm_id_t to,
 				       size_t payload_size,
 				       uint32_t send_flags);
 
+void receive_indirect_message_release(void *buffer, size_t buffer_size,
+				      void *recv, ffa_vm_id_t *sender,
+				      bool release_mailbox);
 void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 			      ffa_vm_id_t *sender);
 

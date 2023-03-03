@@ -56,6 +56,14 @@ bool service1_is_vm(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
+ */
+bool service1_is_not_vm(void)
+{
+	return !service1_is_vm();
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
  * This is currently being used to skip memory sharing tests, if the SPMC
  * and SPs are present in the secure world. The rationale, is to skip
  * tests that are not doing any world switch. These tests are running in the

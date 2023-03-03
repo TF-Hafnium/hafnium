@@ -586,7 +586,7 @@ ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
 		memcpy_s(info, dest_size, ret_info, src_size);
 	}
 
-	ffa_rx_release();
+	assert(ffa_rx_release().func == FFA_SUCCESS_32);
 
 	return ret.arg2;
 }
@@ -676,8 +676,9 @@ struct ffa_value send_indirect_message(ffa_vm_id_t from, ffa_vm_id_t to,
 	return ffa_msg_send2(send_flags);
 }
 
-void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
-			      ffa_vm_id_t *sender)
+void receive_indirect_message_release(void *buffer, size_t buffer_size,
+				      void *recv, ffa_vm_id_t *sender,
+				      bool release_mailbox)
 {
 	const struct ffa_partition_msg *message;
 	struct ffa_partition_rxtx_header header;
@@ -721,12 +722,20 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 
 	/* Get message to free the RX buffer. */
 	memcpy_s(buffer, buffer_size, payload, header.size);
-
-	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	if (release_mailbox) {
+		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	}
 
 	if (sender != NULL) {
 		*sender = source_vm_id;
 	}
+}
+
+void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
+			      ffa_vm_id_t *sender)
+{
+	receive_indirect_message_release(buffer, buffer_size, recv, sender,
+					 true);
 }
 
 bool ffa_partition_info_regs_get_part_info(
