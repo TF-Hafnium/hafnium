@@ -336,11 +336,11 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
 /**
  * Check if current VM can resume target VM/SP using FFA_RUN ABI.
  */
-bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
-			 ffa_vcpu_index_t vcpu_idx, struct ffa_value *run_ret,
-			 struct vcpu **next)
+bool plat_ffa_run_checks(struct vcpu_locked current_locked,
+			 ffa_vm_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
+			 struct ffa_value *run_ret, struct vcpu **next)
 {
-	(void)current;
+	(void)current_locked;
 	(void)target_vm_id;
 	(void)run_ret;
 	(void)next;
@@ -376,11 +376,11 @@ void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
 }
 
 bool plat_ffa_inject_notification_pending_interrupt(
-	struct vcpu_locked target_locked, struct vcpu *current,
+	struct vcpu_locked target_locked, struct vcpu_locked current_locked,
 	struct vm_locked receiver_locked)
 {
 	(void)target_locked;
-	(void)current;
+	(void)current_locked;
 	(void)receiver_locked;
 
 	return false;
@@ -418,38 +418,38 @@ bool plat_ffa_is_secondary_ep_register_supported(void)
 	return false;
 }
 
-struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
+struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 					   struct vcpu **next)
 {
-	(void)current;
+	(void)current_locked;
 	(void)next;
 
 	return (struct ffa_value){.func = FFA_INTERRUPT_32};
 }
 
-bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
+bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
 					     ffa_vm_id_t vm_id,
 					     ffa_vm_id_t receiver_vm_id,
-					     struct vcpu *receiver_vcpu,
+					     struct vcpu_locked receiver_locked,
 					     uint32_t func,  // NOLINTNEXTLINE
 					     enum vcpu_state *next_state)
 {
 	/* Perform state transition checks only for Secure Partitions. */
-	(void)current;
+	(void)current_locked;
 	(void)vm_id;
 	(void)receiver_vm_id;
-	(void)receiver_vcpu;
+	(void)receiver_locked;
 	(void)func;
 	(void)next_state;
 
 	return true;
 }
 
-void plat_ffa_init_schedule_mode_ffa_run(struct vcpu *current,
+void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
 					 struct vcpu_locked target_locked)
 {
 	/* Scheduling mode not supported in the Hypervisor/VMs. */
-	(void)current;
+	(void)current_locked;
 	(void)target_locked;
 }
 
@@ -462,12 +462,12 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 	(void)receiver_vcpu_locked;
 }
 
-void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
-						struct vcpu *next)
+void plat_ffa_unwind_call_chain_ffa_direct_resp(
+	struct vcpu_locked current_locked, struct vcpu_locked next_locked)
 {
 	/* Calls chains not supported in the Hypervisor/VMs. */
-	(void)current;
-	(void)next;
+	(void)current_locked;
+	(void)next_locked;
 }
 
 bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
@@ -494,9 +494,9 @@ void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 	(void)vm_locked;
 }
 
-bool plat_ffa_is_direct_response_interrupted(struct vcpu *current)
+bool plat_ffa_is_direct_response_interrupted(struct vcpu_locked current_locked)
 {
-	(void)current;
+	(void)current_locked;
 	return false;
 }
 
@@ -565,12 +565,12 @@ struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
+struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 					struct vcpu **next,
 					uint32_t timeout_low,
 					uint32_t timeout_high)
 {
-	(void)current;
+	(void)current_locked;
 	(void)next;
 	(void)timeout_low;
 	(void)timeout_high;

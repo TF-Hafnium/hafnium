@@ -243,15 +243,15 @@ void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
 bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current);
 bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current);
 
-struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu *current,
+struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 					   struct vcpu **next);
 
 /**
  * Check if current SP can resume target VM/SP using FFA_RUN ABI.
  */
-bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
-			 ffa_vcpu_index_t vcpu_idx, struct ffa_value *run_ret,
-			 struct vcpu **next);
+bool plat_ffa_run_checks(struct vcpu_locked current_locked,
+			 ffa_vm_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
+			 struct ffa_value *run_ret, struct vcpu **next);
 
 /**
  * Deactivate interrupt.
@@ -262,13 +262,8 @@ int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
 						  struct vcpu **next,
 						  bool from_normal_world);
-struct ffa_value plat_ffa_normal_world_resume(struct vcpu *current,
-					      struct vcpu **next);
-struct ffa_value plat_ffa_preempted_vcpu_resume(struct vcpu *current,
-						struct vcpu **next);
-
 bool plat_ffa_inject_notification_pending_interrupt(
-	struct vcpu_locked next_locked, struct vcpu *current,
+	struct vcpu_locked next_locked, struct vcpu_locked current_locked,
 	struct vm_locked receiver_locked);
 
 bool plat_ffa_partition_info_get_regs_forward(
@@ -299,22 +294,23 @@ bool plat_ffa_is_secondary_ep_register_supported(void);
  * based on it's runtime model and return false if an illegal transition is
  * being performed.
  */
-bool plat_ffa_check_runtime_state_transition(struct vcpu *current,
+bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
 					     ffa_vm_id_t vm_id,
 					     ffa_vm_id_t receiver_vm_id,
-					     struct vcpu *vcpu, uint32_t func,
+					     struct vcpu_locked locked_vcpu,
+					     uint32_t func,
 					     enum vcpu_state *next_state);
 
 struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current);
-void plat_ffa_init_schedule_mode_ffa_run(struct vcpu *current,
+void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
 					 struct vcpu_locked target_locked);
 
 void plat_ffa_wind_call_chain_ffa_direct_req(
 	struct vcpu_locked current_locked,
 	struct vcpu_locked receiver_vcpu_locked);
 
-void plat_ffa_unwind_call_chain_ffa_direct_resp(struct vcpu *current,
-						struct vcpu *next);
+void plat_ffa_unwind_call_chain_ffa_direct_resp(
+	struct vcpu_locked current_locked, struct vcpu_locked next_locked);
 
 void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 					struct vm_locked vm_locked);
@@ -355,7 +351,7 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
 	struct vm *from, void *fragment, uint32_t fragment_length,
 	ffa_memory_handle_t handle, struct mpool *page_pool);
 
-bool plat_ffa_is_direct_response_interrupted(struct vcpu *current);
+bool plat_ffa_is_direct_response_interrupted(struct vcpu_locked current_locked);
 
 /**
  * This FF-A v1.0 FFA_MSG_SEND interface.
@@ -365,7 +361,7 @@ struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 				   ffa_vm_id_t receiver_vm_id, uint32_t size,
 				   struct vcpu *current, struct vcpu **next);
 
-struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
+struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 					struct vcpu **next,
 					uint32_t timeout_low,
 					uint32_t timeout_high);

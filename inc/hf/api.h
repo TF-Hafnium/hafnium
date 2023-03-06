@@ -20,9 +20,10 @@ struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current);
 void api_regs_state_saved(struct vcpu *vcpu);
 int64_t api_mailbox_writable_get(const struct vcpu *current);
 int64_t api_mailbox_waiter_get(ffa_vm_id_t vm_id, const struct vcpu *current);
-struct vcpu *api_switch_to_vm(struct vcpu *current, struct ffa_value to_ret,
+struct vcpu *api_switch_to_vm(struct vcpu_locked current_locked,
+			      struct ffa_value to_ret,
 			      enum vcpu_state vcpu_state, ffa_vm_id_t to_id);
-struct vcpu *api_switch_to_primary(struct vcpu *current,
+struct vcpu *api_switch_to_primary(struct vcpu_locked current_locked,
 				   struct ffa_value primary_ret,
 				   enum vcpu_state secondary_state);
 
@@ -39,7 +40,8 @@ int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
 			     ffa_vcpu_index_t target_vcpu_idx, uint32_t intid,
 			     struct vcpu *current, struct vcpu **next);
 int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
-				    uint32_t intid, struct vcpu *current,
+				    uint32_t intid,
+				    struct vcpu_locked current_locked,
 				    struct vcpu **next);
 void api_sri_send_if_delayed(struct vcpu *current);
 
@@ -48,7 +50,7 @@ struct ffa_value api_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 				  struct vcpu *current, struct vcpu **next);
 struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
 				   struct vcpu *current);
-struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
+struct ffa_value api_ffa_msg_recv(bool block, struct vcpu_locked current_locked,
 				  struct vcpu **next);
 struct ffa_value api_ffa_rx_release(ffa_vm_id_t receiver_id,
 				    struct vcpu *current);
@@ -113,7 +115,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 					      struct vcpu **next);
 struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 					       struct vcpu *current);
-struct vcpu *api_switch_to_other_world(struct vcpu *current,
+struct vcpu *api_switch_to_other_world(struct vcpu_locked current_locked,
 				       struct ffa_value other_world_ret,
 				       enum vcpu_state vcpu_state);
 struct ffa_value api_ffa_notification_bitmap_create(ffa_vm_id_t vm_id,
@@ -144,7 +146,8 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 struct ffa_value api_ffa_console_log(const struct ffa_value args,
 				     struct vcpu *current);
 
-void api_ffa_resume_direct_resp_target(struct vcpu *current, struct vcpu **next,
+void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
+				       struct vcpu **next,
 				       ffa_vm_id_t receiver_vm_id,
 				       struct ffa_value to_ret,
 				       bool is_nwd_call_chain);

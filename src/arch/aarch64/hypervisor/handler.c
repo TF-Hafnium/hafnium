@@ -590,9 +590,14 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_MSG_WAIT_32:
 		*args = api_ffa_msg_wait(current, next, args);
 		return true;
-	case FFA_MSG_POLL_32:
-		*args = api_ffa_msg_recv(false, current, next);
+	case FFA_MSG_POLL_32: {
+		struct vcpu_locked current_locked;
+
+		current_locked = vcpu_lock(current);
+		*args = api_ffa_msg_recv(false, current_locked, next);
+		vcpu_unlock(&current_locked);
 		return true;
+	}
 	case FFA_RUN_32:
 		*args = api_ffa_run(ffa_vm_id(*args), ffa_vcpu_index(*args),
 				    current, next);
@@ -1120,7 +1125,7 @@ struct vcpu *fiq_lower(void)
 		current_vcpu->priority_mask = pmr;
 		ret = api_interrupt_inject_locked(current_locked,
 						  HF_MANAGED_EXIT_INTID,
-						  current_vcpu, NULL);
+						  current_locked, NULL);
 		if (ret != 0) {
 			panic("Failed to inject managed exit interrupt\n");
 		}

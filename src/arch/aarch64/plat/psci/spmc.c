@@ -60,9 +60,12 @@ void plat_psci_cpu_suspend(uint32_t power_state)
 struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 {
 	struct vcpu_locked vcpu_locked;
+	struct vcpu_locked other_world_vcpu_locked;
 	struct vcpu *vcpu = vcpu_get_boot_vcpu();
 	struct vm *vm = vcpu->vm;
 	struct vm *other_world_vm;
+	struct vcpu *other_world_vcpu;
+	struct two_vcpu_locked vcpus_locked;
 
 	cpu_on(c);
 
@@ -78,10 +81,19 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	    vm_power_management_cpu_on_requested(vm) == false) {
 		other_world_vm = vm_find(HF_OTHER_WORLD_ID);
 		CHECK(other_world_vm != NULL);
+		other_world_vcpu = vm_get_vcpu(other_world_vm, cpu_index(c));
+		vcpu_unlock(&vcpu_locked);
+
+		/* Lock both vCPUs at once to avoid deadlock. */
+		vcpus_locked = vcpu_lock_both(vcpu, other_world_vcpu);
+		vcpu_locked = vcpus_locked.vcpu1;
+		other_world_vcpu_locked = vcpus_locked.vcpu2;
+
 		vcpu = api_switch_to_other_world(
-			vm_get_vcpu(other_world_vm, cpu_index(c)),
+			other_world_vcpu_locked,
 			(struct ffa_value){.func = FFA_MSG_WAIT_32},
 			VCPU_STATE_WAITING);
+		vcpu_unlock(&other_world_vcpu_locked);
 		goto exit;
 	}
 

@@ -354,16 +354,16 @@ static inline uint32_t vcpu_interrupt_count_get(struct vcpu_locked vcpu_locked)
 	       vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count;
 }
 
-static inline void vcpu_call_chain_extend(struct vcpu *vcpu1,
-					  struct vcpu *vcpu2)
+static inline void vcpu_call_chain_extend(struct vcpu_locked vcpu1_locked,
+					  struct vcpu_locked vcpu2_locked)
 {
-	vcpu1->call_chain.next_node = vcpu2;
-	vcpu2->call_chain.prev_node = vcpu1;
+	vcpu1_locked.vcpu->call_chain.next_node = vcpu2_locked.vcpu;
+	vcpu2_locked.vcpu->call_chain.prev_node = vcpu1_locked.vcpu;
 }
 
-static inline void vcpu_call_chain_remove_node(struct vcpu *vcpu1,
-					       struct vcpu *vcpu2)
+static inline void vcpu_call_chain_remove_node(struct vcpu_locked vcpu1_locked,
+					       struct vcpu_locked vcpu2_locked)
 {
-	vcpu1->call_chain.prev_node = NULL;
-	vcpu2->call_chain.next_node = NULL;
+	vcpu1_locked.vcpu->call_chain.prev_node = NULL;
+	vcpu2_locked.vcpu->call_chain.next_node = NULL;
 }

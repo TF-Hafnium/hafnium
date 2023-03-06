@@ -120,11 +120,12 @@ struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current)
  * - UP migratable.
  * - MP with pinned Execution Contexts.
  */
-struct vcpu *api_switch_to_vm(struct vcpu *current, struct ffa_value to_ret,
+struct vcpu *api_switch_to_vm(struct vcpu_locked current_locked,
+			      struct ffa_value to_ret,
 			      enum vcpu_state vcpu_state, ffa_vm_id_t to_id)
 {
 	struct vm *to_vm = vm_find(to_id);
-	struct vcpu *next = api_ffa_get_vm_vcpu(to_vm, current);
+	struct vcpu *next = api_ffa_get_vm_vcpu(to_vm, current_locked.vcpu);
 
 	CHECK(next != NULL);
 
@@ -132,9 +133,7 @@ struct vcpu *api_switch_to_vm(struct vcpu *current, struct ffa_value to_ret,
 	arch_regs_set_retval(&next->regs, to_ret);
 
 	/* Set the current vCPU state. */
-	sl_lock(&current->lock);
-	current->state = vcpu_state;
-	sl_unlock(&current->lock);
+	current_locked.vcpu->state = vcpu_state;
 
 	return next;
 }
@@ -145,7 +144,7 @@ struct vcpu *api_switch_to_vm(struct vcpu *current, struct ffa_value to_ret,
  * This triggers the scheduling logic to run. Run in the context of secondary VM
  * to cause FFA_RUN to return and the primary VM to regain control of the CPU.
  */
-struct vcpu *api_switch_to_primary(struct vcpu *current,
+struct vcpu *api_switch_to_primary(struct vcpu_locked current_locked,
 				   struct ffa_value primary_ret,
 				   enum vcpu_state secondary_state)
 {
@@ -182,7 +181,7 @@ struct vcpu *api_switch_to_primary(struct vcpu *current,
 		break;
 	}
 
-	return api_switch_to_vm(current, primary_ret, secondary_state,
+	return api_switch_to_vm(current_locked, primary_ret, secondary_state,
 				HF_PRIMARY_VM_ID);
 }
 
@@ -195,11 +194,11 @@ struct vcpu *api_switch_to_primary(struct vcpu *current,
  * Called in context of a direct message response from a secure
  * partition to a VM.
  */
-struct vcpu *api_switch_to_other_world(struct vcpu *current,
+struct vcpu *api_switch_to_other_world(struct vcpu_locked current_locked,
 				       struct ffa_value other_world_ret,
 				       enum vcpu_state vcpu_state)
 {
-	return api_switch_to_vm(current, other_world_ret, vcpu_state,
+	return api_switch_to_vm(current_locked, other_world_ret, vcpu_state,
 				HF_OTHER_WORLD_ID);
 }
 
@@ -227,12 +226,18 @@ static bool api_ffa_is_managed_exit_ongoing(struct vcpu_locked vcpu_locked)
  */
 struct vcpu *api_preempt(struct vcpu *current)
 {
+	struct vcpu_locked current_locked;
+	struct vcpu *next;
 	struct ffa_value ret = {
 		.func = FFA_INTERRUPT_32,
 		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
-	return api_switch_to_primary(current, ret, VCPU_STATE_PREEMPTED);
+	current_locked = vcpu_lock(current);
+	next = api_switch_to_primary(current_locked, ret, VCPU_STATE_PREEMPTED);
+	vcpu_unlock(&current_locked);
+
+	return next;
 }
 
 /**
@@ -241,13 +246,19 @@ struct vcpu *api_preempt(struct vcpu *current)
  */
 struct vcpu *api_wait_for_interrupt(struct vcpu *current)
 {
+	struct vcpu_locked current_locked;
+	struct vcpu *next;
 	struct ffa_value ret = {
 		.func = HF_FFA_RUN_WAIT_FOR_INTERRUPT,
 		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
-	return api_switch_to_primary(current, ret,
+	current_locked = vcpu_lock(current);
+	next = api_switch_to_primary(current_locked, ret,
 				     VCPU_STATE_BLOCKED_INTERRUPT);
+	vcpu_unlock(&current_locked);
+
+	return next;
 }
 
 /**
@@ -255,18 +266,24 @@ struct vcpu *api_wait_for_interrupt(struct vcpu *current)
  */
 struct vcpu *api_vcpu_off(struct vcpu *current)
 {
+	struct vcpu_locked current_locked;
+	struct vcpu *next;
 	struct ffa_value ret = {
 		.func = HF_FFA_RUN_WAIT_FOR_INTERRUPT,
 		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
 	};
 
+	current_locked = vcpu_lock(current);
 	/*
 	 * Disable the timer, so the scheduler doesn't get told to call back
 	 * based on it.
 	 */
 	arch_timer_disable_current();
 
-	return api_switch_to_primary(current, ret, VCPU_STATE_OFF);
+	next = api_switch_to_primary(current_locked, ret, VCPU_STATE_OFF);
+	vcpu_unlock(&current_locked);
+
+	return next;
 }
 
 /**
@@ -283,6 +300,9 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next,
 	enum vcpu_state next_state = VCPU_STATE_RUNNING;
 	uint32_t timeout_low = 0;
 	uint32_t timeout_high = 0;
+	struct vcpu_locked next_locked = (struct vcpu_locked){
+		.vcpu = NULL,
+	};
 
 	if (args != NULL) {
 		if (args->arg4 != 0U || args->arg5 != 0U || args->arg6 != 0U ||
@@ -303,12 +323,12 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next,
 
 	current_locked = vcpu_lock(current);
 	transition_allowed = plat_ffa_check_runtime_state_transition(
-		current, current->vm->id, HF_INVALID_VM_ID, NULL, FFA_YIELD_32,
-		&next_state);
-	vcpu_unlock(&current_locked);
+		current_locked, current->vm->id, HF_INVALID_VM_ID, next_locked,
+		FFA_YIELD_32, &next_state);
 
 	if (!transition_allowed) {
-		return ffa_error(FFA_DENIED);
+		ret = ffa_error(FFA_DENIED);
+		goto out;
 	}
 
 	/*
@@ -322,21 +342,39 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next,
 	assert(!vm_id_is_current_world(current->vm->id) ||
 	       next_state == VCPU_STATE_BLOCKED);
 
-	return plat_ffa_yield_prepare(current, next, timeout_low, timeout_high);
+	ret = plat_ffa_yield_prepare(current_locked, next, timeout_low,
+				     timeout_high);
+out:
+	vcpu_unlock(&current_locked);
+	return ret;
 }
 
 /**
  * Switches to the primary so that it can switch to the target, or kick it if it
  * is already running on a different physical CPU.
  */
-struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
+static struct vcpu *api_wake_up_locked(struct vcpu_locked current_locked,
+				       struct vcpu *target_vcpu)
 {
 	struct ffa_value ret = {
 		.func = FFA_INTERRUPT_32,
 		.arg1 = ffa_vm_vcpu(target_vcpu->vm->id,
 				    vcpu_index(target_vcpu)),
 	};
-	return api_switch_to_primary(current, ret, VCPU_STATE_BLOCKED);
+
+	return api_switch_to_primary(current_locked, ret, VCPU_STATE_BLOCKED);
+}
+
+struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
+{
+	struct vcpu_locked current_locked;
+	struct vcpu *next;
+
+	current_locked = vcpu_lock(current);
+	next = api_wake_up_locked(current_locked, target_vcpu);
+	vcpu_unlock(&current_locked);
+
+	return next;
 }
 
 /**
@@ -345,6 +383,8 @@ struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
 struct vcpu *api_abort(struct vcpu *current)
 {
 	struct ffa_value ret = ffa_error(FFA_ABORTED);
+	struct vcpu_locked current_locked;
+	struct vcpu *next;
 
 	dlog_notice("Aborting VM %#x vCPU %u\n", current->vm->id,
 		    vcpu_index(current));
@@ -361,7 +401,11 @@ struct vcpu *api_abort(struct vcpu *current)
 
 	/* TODO: free resources once all vCPUs abort. */
 
-	return api_switch_to_primary(current, ret, VCPU_STATE_ABORTED);
+	current_locked = vcpu_lock(current);
+	next = api_switch_to_primary(current_locked, ret, VCPU_STATE_ABORTED);
+	vcpu_unlock(&current_locked);
+
+	return next;
 }
 
 /*
@@ -784,10 +828,12 @@ static struct wait_entry *api_fetch_waiter(struct vm_locked locked_vm)
  *    up or kick the target vCPU.
  */
 int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
-				    uint32_t intid, struct vcpu *current,
+				    uint32_t intid,
+				    struct vcpu_locked current_locked,
 				    struct vcpu **next)
 {
 	struct vcpu *target_vcpu = target_locked.vcpu;
+	struct vcpu *current = current_locked.vcpu;
 	struct interrupts *interrupts = &target_vcpu->interrupts;
 	int64_t ret = 0;
 
@@ -819,27 +865,12 @@ int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
 		 */
 		ret = 1;
 	} else if (current != target_vcpu && next != NULL) {
-		*next = api_wake_up(current, target_vcpu);
+		*next = api_wake_up_locked(current_locked, target_vcpu);
 	}
 
 out:
 	/* Either way, make it pending. */
 	vcpu_virt_interrupt_set_pending(interrupts, intid);
-
-	return ret;
-}
-
-/* Wrapper to internal_interrupt_inject with locking of target vCPU */
-static int64_t internal_interrupt_inject(struct vcpu *target_vcpu,
-					 uint32_t intid, struct vcpu *current,
-					 struct vcpu **next)
-{
-	int64_t ret;
-	struct vcpu_locked target_locked;
-
-	target_locked = vcpu_lock(target_vcpu);
-	ret = api_interrupt_inject_locked(target_locked, intid, current, next);
-	vcpu_unlock(&target_locked);
 
 	return ret;
 }
@@ -936,8 +967,12 @@ out:
 struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 				  struct ffa_value *args)
 {
+	struct vcpu_locked current_locked;
 	enum vcpu_state next_state = VCPU_STATE_RUNNING;
 	struct ffa_value ret;
+	struct vcpu_locked next_locked = (struct vcpu_locked){
+		.vcpu = NULL,
+	};
 
 	if (args->arg1 != 0U || args->arg2 != 0U || args->arg3 != 0U ||
 	    args->arg4 != 0U || args->arg5 != 0U || args->arg6 != 0U ||
@@ -945,16 +980,20 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	current_locked = vcpu_lock(current);
 	if (!plat_ffa_check_runtime_state_transition(
-		    current, current->vm->id, HF_INVALID_VM_ID, NULL,
-		    FFA_MSG_WAIT_32, &next_state)) {
-		return ffa_error(FFA_DENIED);
+		    current_locked, current->vm->id, HF_INVALID_VM_ID,
+		    next_locked, FFA_MSG_WAIT_32, &next_state)) {
+		ret = ffa_error(FFA_DENIED);
+		goto out;
 	}
 
 	assert(!vm_id_is_current_world(current->vm->id) ||
 	       next_state == VCPU_STATE_WAITING);
 
-	ret = plat_ffa_msg_wait_prepare(current, next);
+	ret = plat_ffa_msg_wait_prepare(current_locked, next);
+out:
+	vcpu_unlock(&current_locked);
 
 	if (ret.func != FFA_ERROR_32) {
 		struct vm_locked vm_locked = vm_lock(current->vm);
@@ -970,15 +1009,16 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
  * Prepares the vCPU to run by updating its state and fetching whether a return
  * value needs to be forced onto the vCPU.
  */
-static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
+static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
+				 struct vcpu_locked vcpu_next_locked,
 				 struct ffa_value *run_ret)
 {
-	struct vcpu_locked vcpu_locked;
 	struct vm_locked vm_locked;
 	bool ret;
 	uint64_t timer_remaining_ns = FFA_SLEEP_INDEFINITE;
 	bool vcpu_was_init_state = false;
 	bool need_vm_lock;
+	struct two_vcpu_locked vcpus_locked;
 
 	/*
 	 * Check that the registers are available so that the vCPU can be run.
@@ -988,7 +1028,8 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 	 * dependencies in the common run case meaning the sensitive context
 	 * switch performance is consistent.
 	 */
-	vcpu_locked = vcpu_lock(vcpu);
+	struct vcpu *vcpu = vcpu_next_locked.vcpu;
+	struct vcpu *current = current_locked.vcpu;
 
 	/* The VM needs to be locked to deliver mailbox messages. */
 	need_vm_lock = vcpu->state == VCPU_STATE_WAITING ||
@@ -998,9 +1039,14 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 			 vcpu->state == VCPU_STATE_PREEMPTED));
 
 	if (need_vm_lock) {
-		vcpu_unlock(&vcpu_locked);
+		vcpu_unlock(&vcpu_next_locked);
+		vcpu_unlock(&current_locked);
 		vm_locked = vm_lock(vcpu->vm);
-		vcpu_locked = vcpu_lock(vcpu);
+
+		/* Lock both vCPUs at once to avoid deadlock. */
+		vcpus_locked = vcpu_lock_both(current, vcpu);
+		current_locked = vcpus_locked.vcpu1;
+		vcpu_next_locked = vcpus_locked.vcpu2;
 	}
 
 	/*
@@ -1063,7 +1109,7 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 		assert(need_vm_lock == true);
 		if (!vm_locked.vm->el0_partition &&
 		    plat_ffa_inject_notification_pending_interrupt(
-			    vcpu_locked, current, vm_locked)) {
+			    vcpu_next_locked, current_locked, vm_locked)) {
 			/* TODO: setting a return value to override
 			 * the placeholder (FFA_ERROR(INTERRUPTED))
 			 * set by FFA_MSG_WAIT. FF-A v1.1 allows
@@ -1091,7 +1137,7 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 			break;
 		}
 
-		if (vcpu_interrupt_count_get(vcpu_locked) > 0) {
+		if (vcpu_interrupt_count_get(vcpu_next_locked) > 0) {
 			break;
 		}
 
@@ -1112,13 +1158,13 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 		if (need_vm_lock &&
 		    plat_ffa_inject_notification_pending_interrupt(
-			    vcpu_locked, current, vm_locked)) {
-			assert(vcpu_interrupt_count_get(vcpu_locked) > 0);
+			    vcpu_next_locked, current_locked, vm_locked)) {
+			assert(vcpu_interrupt_count_get(vcpu_next_locked) > 0);
 			break;
 		}
 
 		/* Allow virtual interrupts to be delivered. */
-		if (vcpu_interrupt_count_get(vcpu_locked) > 0) {
+		if (vcpu_interrupt_count_get(vcpu_next_locked) > 0) {
 			break;
 		}
 
@@ -1152,7 +1198,7 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 		/* Check NPI is to be injected here. */
 		if (need_vm_lock) {
 			plat_ffa_inject_notification_pending_interrupt(
-				vcpu_locked, current, vm_locked);
+				vcpu_next_locked, current_locked, vm_locked);
 		}
 		break;
 	default:
@@ -1165,10 +1211,10 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 		goto out;
 	}
 
-	plat_ffa_init_schedule_mode_ffa_run(current, vcpu_locked);
+	plat_ffa_init_schedule_mode_ffa_run(current_locked, vcpu_next_locked);
 
 	/* It has been decided that the vCPU should be run. */
-	vcpu->cpu = current->cpu;
+	vcpu->cpu = current_locked.vcpu->cpu;
 	vcpu->state = VCPU_STATE_RUNNING;
 
 	if (vcpu_was_init_state) {
@@ -1186,7 +1232,6 @@ static bool api_vcpu_prepare_run(struct vcpu *current, struct vcpu *vcpu,
 	ret = true;
 
 out:
-	vcpu_unlock(&vcpu_locked);
 	if (need_vm_lock) {
 		vm_unlock(&vm_locked);
 	}
@@ -1201,13 +1246,16 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
 	enum vcpu_state next_state = VCPU_STATE_RUNNING;
 	struct vcpu_locked current_locked;
+	struct vcpu_locked vcpu_next_locked;
+	struct two_vcpu_locked vcpus_locked;
 
-	if (!plat_ffa_run_checks(current, vm_id, vcpu_idx, &ret, next)) {
-		return ret;
+	current_locked = vcpu_lock(current);
+	if (!plat_ffa_run_checks(current_locked, vm_id, vcpu_idx, &ret, next)) {
+		goto out;
 	}
 
 	if (plat_ffa_run_forward(vm_id, vcpu_idx, &ret)) {
-		return ret;
+		goto out;
 	}
 
 	/* The requested VM must exist. */
@@ -1232,14 +1280,26 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 		vcpu = vm_get_vcpu(vm, vcpu_idx);
 	}
 
-	if (!plat_ffa_check_runtime_state_transition(current, current->vm->id,
-						     HF_INVALID_VM_ID, vcpu,
-						     FFA_RUN_32, &next_state)) {
-		return ffa_error(FFA_DENIED);
+	/*
+	 * Unlock current vCPU to allow it to be locked together with next
+	 * vcpu.
+	 */
+	vcpu_unlock(&current_locked);
+
+	/* Lock both vCPUs at once to avoid deadlock. */
+	vcpus_locked = vcpu_lock_both(current, vcpu);
+	current_locked = vcpus_locked.vcpu1;
+	vcpu_next_locked = vcpus_locked.vcpu2;
+
+	if (!plat_ffa_check_runtime_state_transition(
+		    current_locked, current->vm->id, HF_INVALID_VM_ID,
+		    vcpu_next_locked, FFA_RUN_32, &next_state)) {
+		ret = ffa_error(FFA_DENIED);
+		goto out_vcpu;
 	}
 
-	if (!api_vcpu_prepare_run(current, vcpu, &ret)) {
-		goto out;
+	if (!api_vcpu_prepare_run(current_locked, vcpu_next_locked, &ret)) {
+		goto out_vcpu;
 	}
 
 	/*
@@ -1250,8 +1310,9 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	 */
 	if (arch_timer_pending(&vcpu->regs)) {
 		/* Make virtual timer interrupt pending. */
-		internal_interrupt_inject(vcpu, HF_VIRTUAL_TIMER_INTID, vcpu,
-					  NULL);
+		api_interrupt_inject_locked(vcpu_next_locked,
+					    HF_VIRTUAL_TIMER_INTID,
+					    vcpu_next_locked, NULL);
 
 		/*
 		 * Set the mask bit so the hardware interrupt doesn't fire
@@ -1268,9 +1329,7 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 
 	assert(!vm_id_is_current_world(current->vm->id) ||
 	       next_state == VCPU_STATE_BLOCKED);
-	current_locked = vcpu_lock(current);
 	current->state = VCPU_STATE_BLOCKED;
-	vcpu_unlock(&current_locked);
 
 	/*
 	 * Set a placeholder return code to the scheduler. This will be
@@ -1280,7 +1339,11 @@ struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	ret.arg1 = 0;
 	ret.arg2 = 0;
 
+out_vcpu:
+	vcpu_unlock(&vcpu_next_locked);
+
 out:
+	vcpu_unlock(&current_locked);
 	return ret;
 }
 
@@ -1871,20 +1934,16 @@ out_unlock_sender:
  * Checks whether the vCPU's attempt to block for a message has already been
  * interrupted or whether it is allowed to block.
  */
-static bool api_ffa_msg_recv_block_interrupted(struct vcpu *current)
+static bool api_ffa_msg_recv_block_interrupted(
+	struct vcpu_locked current_locked)
 {
-	struct vcpu_locked current_locked;
 	bool interrupted;
-
-	current_locked = vcpu_lock(current);
 
 	/*
 	 * Don't block if there are enabled and pending interrupts, to match
 	 * behaviour of wait_for_interrupt.
 	 */
 	interrupted = (vcpu_interrupt_count_get(current_locked) > 0);
-
-	vcpu_unlock(&current_locked);
 
 	return interrupted;
 }
@@ -1895,11 +1954,11 @@ static bool api_ffa_msg_recv_block_interrupted(struct vcpu *current)
  *
  * No new messages can be received until the mailbox has been cleared.
  */
-struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
+struct ffa_value api_ffa_msg_recv(bool block, struct vcpu_locked current_locked,
 				  struct vcpu **next)
 {
 	bool is_direct_request_ongoing;
-	struct vcpu_locked current_locked;
+	struct vcpu *current = current_locked.vcpu;
 	struct vm *vm = current->vm;
 	struct ffa_value return_code;
 	bool is_from_secure_world =
@@ -1917,16 +1976,21 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 	 * Deny if vCPU is executing in context of an FFA_MSG_SEND_DIRECT_REQ
 	 * invocation.
 	 */
-	current_locked = vcpu_lock(current);
 	is_direct_request_ongoing =
 		is_ffa_direct_msg_request_ongoing(current_locked);
+
+	/*
+	 * A VM's lock must be acquired before any of its vCPU's lock. Hence,
+	 * unlock current vCPU and acquire it immediately after its VM's lock.
+	 */
 	vcpu_unlock(&current_locked);
+	sl_lock(&vm->lock);
+	current_locked = vcpu_lock(current);
 
 	if (is_direct_request_ongoing) {
-		return ffa_error(FFA_DENIED);
+		return_code = ffa_error(FFA_DENIED);
+		goto out;
 	}
-
-	sl_lock(&vm->lock);
 
 	/* Return pending messages without blocking. */
 	if (vm->mailbox.state == MAILBOX_STATE_FULL) {
@@ -1949,14 +2013,15 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 	 * that time to FFA_SUCCESS.
 	 */
 	return_code = ffa_error(FFA_INTERRUPTED);
-	if (api_ffa_msg_recv_block_interrupted(current)) {
+	if (api_ffa_msg_recv_block_interrupted(current_locked)) {
 		goto out;
 	}
 
 	if (is_from_secure_world) {
 		/* Return to other world if caller is a SP. */
 		*next = api_switch_to_other_world(
-			current, (struct ffa_value){.func = FFA_MSG_WAIT_32},
+			current_locked,
+			(struct ffa_value){.func = FFA_MSG_WAIT_32},
 			VCPU_STATE_WAITING);
 	} else {
 		/* Switch back to primary VM to block. */
@@ -1965,7 +2030,7 @@ struct ffa_value api_ffa_msg_recv(bool block, struct vcpu *current,
 			.arg1 = ffa_vm_vcpu(vm->id, vcpu_index(current)),
 		};
 
-		*next = api_switch_to_primary(current, run_return,
+		*next = api_switch_to_primary(current_locked, run_return,
 					      VCPU_STATE_WAITING);
 	}
 out:
@@ -2304,6 +2369,10 @@ int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
 {
 	struct vcpu *target_vcpu;
 	struct vm *target_vm = vm_find(target_vm_id);
+	struct vcpu_locked current_locked;
+	struct vcpu_locked target_locked;
+	struct two_vcpu_locked vcpus_locked;
+	int64_t ret;
 
 	if (intid >= HF_NUM_INTIDS) {
 		return -1;
@@ -2324,12 +2393,30 @@ int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
 
 	target_vcpu = vm_get_vcpu(target_vm, target_vcpu_idx);
 
+	/* A VM could inject an interrupt for itself. */
+	if (target_vcpu != current) {
+		/* Lock both vCPUs at once to avoid deadlock. */
+		vcpus_locked = vcpu_lock_both(current, target_vcpu);
+		current_locked = vcpus_locked.vcpu1;
+		target_locked = vcpus_locked.vcpu2;
+	} else {
+		current_locked = vcpu_lock(current);
+		target_locked = current_locked;
+	}
+
 	dlog_verbose(
 		"Injecting interrupt %u for VM %#x vCPU %u from VM %#x vCPU "
 		"%u\n",
 		intid, target_vm_id, target_vcpu_idx, current->vm->id,
 		vcpu_index(current));
-	return internal_interrupt_inject(target_vcpu, intid, current, next);
+	ret = api_interrupt_inject_locked(target_locked, intid, current_locked,
+					  next);
+	if (target_vcpu != current) {
+		vcpu_unlock(&target_locked);
+	}
+
+	vcpu_unlock(&current_locked);
+	return ret;
 }
 
 /** Returns the version of the implemented FF-A specification. */
@@ -2535,6 +2622,8 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	struct vm *receiver_vm;
 	struct vm_locked receiver_locked;
 	struct vcpu *receiver_vcpu;
+	struct vcpu_locked current_locked;
+	struct vcpu_locked receiver_vcpu_locked;
 	struct two_vcpu_locked vcpus_locked;
 	enum vcpu_state next_state = VCPU_STATE_RUNNING;
 
@@ -2580,14 +2669,23 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (!plat_ffa_check_runtime_state_transition(
-		    current, sender_vm_id, HF_INVALID_VM_ID, receiver_vcpu,
-		    args.func, &next_state)) {
-		return ffa_error(FFA_DENIED);
-	}
-
+	/*
+	 * If VM must be locked, it must be done before any of its vCPUs are
+	 * locked.
+	 */
 	receiver_locked = vm_lock(receiver_vm);
-	vcpus_locked = vcpu_lock_both(receiver_vcpu, current);
+
+	/* Lock both vCPUs at once to avoid deadlock. */
+	vcpus_locked = vcpu_lock_both(current, receiver_vcpu);
+	current_locked = vcpus_locked.vcpu1;
+	receiver_vcpu_locked = vcpus_locked.vcpu2;
+
+	if (!plat_ffa_check_runtime_state_transition(
+		    current_locked, sender_vm_id, HF_INVALID_VM_ID,
+		    receiver_vcpu_locked, args.func, &next_state)) {
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
 
 	/*
 	 * If destination vCPU is executing or already received an
@@ -2596,7 +2694,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	 * changed but regs_available is still false thus consider this case as
 	 * the vCPU not yet ready to receive a direct message request.
 	 */
-	if (is_ffa_direct_msg_request_ongoing(vcpus_locked.vcpu1) ||
+	if (is_ffa_direct_msg_request_ongoing(receiver_vcpu_locked) ||
 	    receiver_vcpu->state == VCPU_STATE_RUNNING ||
 	    !receiver_vcpu->regs_available) {
 		dlog_verbose("Receiver is busy with another request.\n");
@@ -2638,9 +2736,9 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 
 	/* Inject timer interrupt if any pending */
 	if (arch_timer_pending(&receiver_vcpu->regs)) {
-		api_interrupt_inject_locked(vcpus_locked.vcpu1,
-					    HF_VIRTUAL_TIMER_INTID, current,
-					    NULL);
+		api_interrupt_inject_locked(receiver_vcpu_locked,
+					    HF_VIRTUAL_TIMER_INTID,
+					    current_locked, NULL);
 
 		arch_timer_mask(&receiver_vcpu->regs);
 	}
@@ -2657,8 +2755,8 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	       next_state == VCPU_STATE_BLOCKED);
 	current->state = VCPU_STATE_BLOCKED;
 
-	plat_ffa_wind_call_chain_ffa_direct_req(vcpus_locked.vcpu2,
-						vcpus_locked.vcpu1);
+	plat_ffa_wind_call_chain_ffa_direct_req(current_locked,
+						receiver_vcpu_locked);
 
 	/* Switch to receiver vCPU targeted to by direct msg request */
 	*next = receiver_vcpu;
@@ -2671,10 +2769,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 		 * to receiver_vcpu.
 		 */
 		plat_ffa_inject_notification_pending_interrupt(
-			vcpus_locked.vcpu1.vcpu == receiver_vcpu
-				? vcpus_locked.vcpu1
-				: vcpus_locked.vcpu2,
-			current, receiver_locked);
+			receiver_vcpu_locked, current_locked, receiver_locked);
 	}
 
 	/*
@@ -2683,9 +2778,9 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	 */
 
 out:
-	sl_unlock(&receiver_vcpu->lock);
-	sl_unlock(&current->lock);
+	vcpu_unlock(&receiver_vcpu_locked);
 	vm_unlock(&receiver_locked);
+	vcpu_unlock(&current_locked);
 
 	return ret;
 }
@@ -2694,34 +2789,30 @@ out:
  * Resume the target vCPU after the current vCPU sent a direct response.
  * Current vCPU moves to waiting state.
  */
-void api_ffa_resume_direct_resp_target(struct vcpu *current, struct vcpu **next,
+void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
+				       struct vcpu **next,
 				       ffa_vm_id_t receiver_vm_id,
 				       struct ffa_value to_ret,
 				       bool is_nwd_call_chain)
 {
 	if (!vm_id_is_current_world(receiver_vm_id)) {
-		*next = api_switch_to_other_world(current, to_ret,
+		*next = api_switch_to_other_world(current_locked, to_ret,
 						  VCPU_STATE_WAITING);
 
 		/* End of NWd scheduled call chain. */
 		assert(!is_nwd_call_chain ||
-		       (current->call_chain.prev_node == NULL));
+		       (current_locked.vcpu->call_chain.prev_node == NULL));
 	} else if (receiver_vm_id == HF_PRIMARY_VM_ID) {
-		*next = api_switch_to_primary(current, to_ret,
+		*next = api_switch_to_primary(current_locked, to_ret,
 					      VCPU_STATE_WAITING);
-
-		/* Removing a node from NWd scheduled call chain. */
-		if (is_nwd_call_chain) {
-			vcpu_call_chain_remove_node(current, *next);
-		}
 	} else if (vm_id_is_current_world(receiver_vm_id)) {
 		/*
 		 * It is expected the receiver_vm_id to be from an SP, otherwise
 		 * 'plat_ffa_is_direct_response_valid' should have
 		 * made function return error before getting to this point.
 		 */
-		*next = api_switch_to_vm(current, to_ret, VCPU_STATE_WAITING,
-					 receiver_vm_id);
+		*next = api_switch_to_vm(current_locked, to_ret,
+					 VCPU_STATE_WAITING, receiver_vm_id);
 	} else {
 		panic("Invalid direct message response invocation");
 	}
@@ -2737,15 +2828,19 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 					      struct vcpu **next)
 {
 	struct vcpu_locked current_locked;
+	struct vcpu_locked next_locked = (struct vcpu_locked){
+		.vcpu = NULL,
+	};
 	enum vcpu_state next_state = VCPU_STATE_RUNNING;
+	struct ffa_value ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
 	struct ffa_value signal_interrupt =
 		(struct ffa_value){.func = FFA_INTERRUPT_32};
+	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
+	struct two_vcpu_locked vcpus_locked;
 
 	if (!api_ffa_dir_msg_is_arg2_zero(args)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
-
-	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
 
 	if (!plat_ffa_is_direct_response_valid(current, sender_vm_id,
 					       receiver_vm_id)) {
@@ -2753,19 +2848,22 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (!plat_ffa_check_runtime_state_transition(current, sender_vm_id,
-						     receiver_vm_id, NULL,
-						     args.func, &next_state)) {
-		return ffa_error(FFA_DENIED);
+	current_locked = vcpu_lock(current);
+
+	if (!plat_ffa_check_runtime_state_transition(
+		    current_locked, sender_vm_id, receiver_vm_id, next_locked,
+		    args.func, &next_state)) {
+		ret = ffa_error(FFA_DENIED);
+		goto out;
 	}
 
-	if (plat_ffa_is_direct_response_interrupted(current)) {
-		return ffa_error(FFA_INTERRUPTED);
+	if (plat_ffa_is_direct_response_interrupted(current_locked)) {
+		ret = ffa_error(FFA_INTERRUPTED);
+		goto out;
 	}
 
 	assert(!vm_id_is_current_world(current->vm->id) ||
 	       next_state == VCPU_STATE_WAITING);
-	current_locked = vcpu_lock(current);
 
 	/*
 	 * Ensure the terminating FFA_MSG_SEND_DIRECT_REQ had a
@@ -2776,8 +2874,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 		 * Sending direct response but direct request origin
 		 * vCPU is not set.
 		 */
-		vcpu_unlock(&current_locked);
-		return ffa_error(FFA_DENIED);
+		ret = ffa_error(FFA_DENIED);
+		goto out;
 	}
 
 	if (api_ffa_is_managed_exit_ongoing(current_locked)) {
@@ -2811,21 +2909,33 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
 
 	if (plat_ffa_intercept_direct_response(current_locked, next, to_ret,
 					       &signal_interrupt)) {
-		vcpu_unlock(&current_locked);
-		return signal_interrupt;
+		ret = signal_interrupt;
+		goto out;
 	}
 
 	/* Clear direct request origin for the caller. */
 	current->direct_request_origin_vm_id = HF_INVALID_VM_ID;
 
+	api_ffa_resume_direct_resp_target(current_locked, next, receiver_vm_id,
+					  to_ret, false);
+
+	/*
+	 * Unlock current vCPU to allow it to be locked together with next
+	 * vcpu.
+	 */
 	vcpu_unlock(&current_locked);
 
-	api_ffa_resume_direct_resp_target(current, next, receiver_vm_id, to_ret,
-					  false);
+	/* Lock both vCPUs at once to avoid deadlock. */
+	vcpus_locked = vcpu_lock_both(current, *next);
+	current_locked = vcpus_locked.vcpu1;
+	next_locked = vcpus_locked.vcpu2;
 
-	plat_ffa_unwind_call_chain_ffa_direct_resp(current, *next);
+	plat_ffa_unwind_call_chain_ffa_direct_resp(current_locked, next_locked);
+	vcpu_unlock(&next_locked);
 
-	return (struct ffa_value){.func = FFA_INTERRUPT_32};
+out:
+	vcpu_unlock(&current_locked);
+	return ret;
 }
 
 static bool api_memory_region_check_flags(
