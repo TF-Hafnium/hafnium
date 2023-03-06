@@ -26,7 +26,13 @@ then
 fi
 
 export PREBUILTS="$PWD/prebuilts/${UNAME_S}-${UNAME_M}"
-export LD_LIBRARY_PATH="$(clang --print-resource-dir)/../.."
+
+# Find out where libc++.so.1 resides so that LD_LIBRARY_PATH is adjusted to
+# the right toolchain lib path. This is required by unit tests.
+# Do an explicit search because the libs path is different from older toolchains
+# (e.g. LLVM/clang 12) to newer toolchains (e.g. clang 15).
+LLVM_LIB_PATH=$(clang -print-file-name="libc++.so.1")
+export LD_LIBRARY_PATH=$(dirname ${LLVM_LIB_PATH})
 
 # Set output and log directories.
 PROJECT="${PROJECT:-reference}"
