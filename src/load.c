@@ -514,8 +514,7 @@ static uint32_t device_region_attributes_to_mode(uint32_t attributes)
 static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 				   const struct vm_locked vm_locked,
 				   const struct vm_locked primary_vm_locked,
-				   paddr_t mem_end, bool is_el0_partition,
-				   struct mpool *ppool)
+				   bool is_el0_partition, struct mpool *ppool)
 {
 #if LOG_LEVEL >= LOG_LEVEL_WARNING
 	const char *error_string = " region security state ignored for ";
@@ -523,9 +522,7 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 	int j = 0;
 	paddr_t region_begin;
 	paddr_t region_end;
-	paddr_t alloc_base = mem_end;
 	size_t size;
-	size_t total_alloc = 0;
 	uint32_t map_mode;
 	uint32_t attributes;
 
@@ -534,38 +531,12 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 		size = manifest_vm->partition.mem_regions[j].page_count *
 		       PAGE_SIZE;
 		/*
-		 * For memory-regions without base-address, memory
-		 * should be allocated inside partition's page table.
-		 * Start allocating memory regions in partition's
-		 * page table, starting from the end.
-		 * TODO: Add mechanism to let partition know of these
-		 * memory regions
+		 * Identity map memory region for both case,
+		 * VA(S-EL0) or IPA(S-EL1).
 		 */
-		if (manifest_vm->partition.mem_regions[j].base_address ==
-		    MANIFEST_INVALID_ADDRESS) {
-			total_alloc += size;
-			/* Don't go beyond half the VM's memory space */
-			if (total_alloc >
-			    (manifest_vm->secondary.mem_size / 2)) {
-				dlog_error(
-					"Not enough space for memory-"
-					"region allocation");
-				return false;
-			}
-
-			region_end = alloc_base;
-			region_begin = pa_subtract(alloc_base, size);
-			alloc_base = region_begin;
-		} else {
-			/*
-			 * Identity map memory region for both case,
-			 * VA(S-EL0) or IPA(S-EL1).
-			 */
-			region_begin =
-				pa_init(manifest_vm->partition.mem_regions[j]
-						.base_address);
-			region_end = pa_add(region_begin, size);
-		}
+		region_begin = pa_init(
+			manifest_vm->partition.mem_regions[j].base_address);
+		region_end = pa_add(region_begin, size);
 
 		attributes = manifest_vm->partition.mem_regions[j].attributes;
 		if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
@@ -763,8 +734,8 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	if (manifest_vm->is_ffa_partition) {
 		if (!ffa_map_memory_regions(manifest_vm, vm_locked,
-					    primary_vm_locked, mem_end,
-					    is_el0_partition, ppool)) {
+					    primary_vm_locked, is_el0_partition,
+					    ppool)) {
 			ret = false;
 			goto out;
 		}

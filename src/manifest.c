@@ -8,6 +8,8 @@
 
 #include "hf/manifest.h"
 
+#include <stddef.h>
+
 #include "hf/arch/types.h"
 
 #include "hf/addr.h"
@@ -417,7 +419,8 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 static enum manifest_return_code check_and_record_mem_regions(
 	uintptr_t base_address, uint32_t page_count)
 {
-	uintptr_t limit = base_address + (page_count * PAGE_SIZE) - 1U;
+	uintptr_t limit =
+		base_address + ((uintptr_t)page_count * PAGE_SIZE) - 1U;
 
 	if (page_count == 0U) {
 		dlog_error(
@@ -483,9 +486,8 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		dlog_verbose("      Name: %s\n",
 			     string_data(&mem_regions[i].name));
 
-		TRY(read_optional_uint64(mem_node, "base-address",
-					 MANIFEST_INVALID_ADDRESS,
-					 &mem_regions[i].base_address));
+		TRY(read_uint64(mem_node, "base-address",
+				&mem_regions[i].base_address));
 		dlog_verbose("      Base address:  %#x\n",
 			     mem_regions[i].base_address);
 
