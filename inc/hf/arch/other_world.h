@@ -8,8 +8,11 @@
 
 #pragma once
 
+#include "hf/boot_params.h"
 #include "hf/ffa.h"
 #include "hf/vm.h"
 
-bool arch_other_world_vm_init(struct vm *other_world_vm, struct mpool *ppool);
+bool arch_other_world_vm_init(struct vm *other_world_vm,
+			      const struct boot_params *params,
+			      struct mpool *ppool);
 struct ffa_value arch_other_world_call(struct ffa_value args);

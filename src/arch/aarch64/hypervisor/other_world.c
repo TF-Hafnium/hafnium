@@ -17,27 +17,50 @@
 
 #include "smc.h"
 
-bool arch_other_world_vm_init(struct vm *other_world_vm, struct mpool *ppool)
+bool arch_other_world_vm_init(struct vm *other_world_vm,
+			      const struct boot_params *params,
+			      struct mpool *ppool)
 {
+	const char *err_msg =
+		"Unable to initialise address space for Other world VM.\n";
 	struct vm_locked other_world_vm_locked;
 	bool ret = false;
+	uint32_t i;
 
-	/* Map 1TB address range to "Other world VM" Stage-2 */
 	other_world_vm_locked = vm_lock(other_world_vm);
-
-	if (!vm_identity_map(other_world_vm_locked, pa_init(0),
-			     pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
-			     MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
-			     ppool, NULL)) {
-		dlog_error(
-			"Unable to initialise address space for "
-			"Hypervisor VM.\n");
-		goto out;
-	}
 
 	/* Enabling all communication methods for the other world. */
 	other_world_vm->messaging_method =
 		FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND;
+
+	/*
+	 * If no NS memory ranges provided, map the full 1TB system address
+	 * space to the other world VM.
+	 */
+	if (params->ns_mem_ranges_count == 0) {
+		dlog_warning("Missing NS memory ranges, default to 1TB.\n");
+		if (!vm_identity_map(
+			    other_world_vm_locked, pa_init(0),
+			    pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
+			    MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
+			    ppool, NULL)) {
+			dlog_error("%s", err_msg);
+			goto out;
+		}
+	}
+
+	/* Map NS mem ranges to "Other world VM" Stage-2 PTs. */
+	for (i = 0; i < params->ns_mem_ranges_count; i++) {
+		if (!vm_identity_map(
+			    other_world_vm_locked,
+			    params->ns_mem_ranges[i].begin,
+			    params->ns_mem_ranges[i].end,
+			    MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
+			    ppool, NULL)) {
+			dlog_error("%s", err_msg);
+			goto out;
+		}
+	}
 
 	ret = true;
 

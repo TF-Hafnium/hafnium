@@ -929,7 +929,8 @@ static bool update_reserved_ranges(struct boot_params_update *update,
 	return true;
 }
 
-static bool init_other_world_vm(struct mpool *ppool)
+static bool init_other_world_vm(const struct boot_params *params,
+				struct mpool *ppool)
 {
 	struct vm *other_world_vm;
 	size_t i;
@@ -949,7 +950,7 @@ static bool init_other_world_vm(struct mpool *ppool)
 		vcpu->cpu = cpu;
 	}
 
-	return arch_other_world_vm_init(other_world_vm, ppool);
+	return arch_other_world_vm_init(other_world_vm, params, ppool);
 }
 
 /*
@@ -979,7 +980,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 		}
 	}
 
-	if (!init_other_world_vm(ppool)) {
+	if (!init_other_world_vm(params, ppool)) {
 		return false;
 	}
 

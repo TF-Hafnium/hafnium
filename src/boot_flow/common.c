@@ -17,6 +17,7 @@
 bool boot_flow_get_params(struct boot_params *p, const struct fdt *fdt)
 {
 	struct string memory = STRING_INIT("memory");
+	struct string ns_memory = STRING_INIT("ns-memory");
 	struct string device_memory = STRING_INIT("device-memory");
 
 	p->mem_ranges_count = 0;
@@ -29,7 +30,9 @@ bool boot_flow_get_params(struct boot_params *p, const struct fdt *fdt)
 				      &p->mem_ranges_count, MAX_MEM_RANGES) &&
 	       fdt_find_memory_ranges(fdt, &device_memory, p->device_mem_ranges,
 				      &p->device_mem_ranges_count,
-				      MAX_DEVICE_MEM_RANGES);
+				      MAX_DEVICE_MEM_RANGES) &&
+	       fdt_find_memory_ranges(fdt, &ns_memory, p->ns_mem_ranges,
+				      &p->ns_mem_ranges_count, MAX_MEM_RANGES);
 }
 
 /**
