@@ -62,3 +62,15 @@ TEST(boot, memory_before_image)
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
+
+TEST_PRECONDITION(boot, memory_manifest, service1_is_not_vm)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value run_res;
+
+	SERVICE_SELECT(service1_info->vm_id, "boot_memory_manifest", mb.send);
+	run_res = ffa_run(service1_info->vm_id, 0);
+
+	EXPECT_FALSE(exception_received(&run_res, mb.recv));
+}

@@ -31,4 +31,19 @@
 		compatible = "arm,ffa-manifest-boot-info";
 		ffa_manifest;
 	};
+
+	memory-regions {
+		compatible = "arm,ffa-manifest-memory-regions";
+
+		secure-memory {
+			base-address = <0x00000000 0x7100000>;
+			pages-count = <1>;
+			attributes = <0x3>; /* read-write */
+		};
+		ns-memory {
+			base-address = <0x00000000 0x8000F000>;
+			pages-count = <1>;
+			attributes = <0xb>;
+		};
+	};
 };

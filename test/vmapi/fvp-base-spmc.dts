@@ -68,8 +68,13 @@
 		};
 	};
 
-	memory@6000000 {
+	memory@0 {
 		device_type = "memory";
-		reg = <0x0 0x6000000 0x2000000>;
+		reg = <0x0 0x6000000 0x2000000 0x0 0xff000000 0x1000000>;
+	};
+
+	memory@1 {
+		device_type = "ns-memory";
+		reg = <0x0 0x80000000 0x7f000000>;
 	};
 };

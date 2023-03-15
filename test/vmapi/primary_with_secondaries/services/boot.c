@@ -6,6 +6,10 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include <stddef.h>
+#include <stdint.h>
+
+#include "hf/arch/mmu.h"
 #include "hf/arch/vm/interrupts.h"
 
 #include "hf/ffa_partition_manifest.h"
@@ -16,6 +20,7 @@
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
+#include "test/hftest_impl.h"
 #include "test/vmapi/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
@@ -39,6 +44,26 @@ static uintptr_t get_load_address(struct hftest_context* ctx)
 	}
 
 	return (uintptr_t)&text_begin[0];
+}
+
+static void update_mm_security_state(void* address, size_t page_count,
+				     uint32_t attributes)
+{
+	uint32_t mode = 0;
+	uint32_t extra_attributes =
+		(attributes & MANIFEST_REGION_ATTR_SECURITY) != 0 ? MM_MODE_NS
+								  : 0U;
+
+	if (!hftest_mm_get_mode(
+		    // NOLINTNEXTLINE(performance-no-int-to-ptr)
+		    address, FFA_PAGE_SIZE * page_count, &mode)) {
+		FAIL("Memory range has different modes.\n");
+	}
+
+	hftest_mm_identity_map(
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(const void*)address, FFA_PAGE_SIZE * page_count,
+		mode | extra_attributes);
 }
 
 TEST_SERVICE(boot_memory)
@@ -90,4 +115,50 @@ TEST_SERVICE(boot_memory_overrun)
 	 */
 	dlog("Read memory above limit: %d\n", mem_ptr[SERVICE_MEMORY_SIZE()]);
 	FAIL("Managed to read memory above limit");
+}
+
+/*
+ * Access all memory regions provided to the SP.
+ */
+TEST_SERVICE(boot_memory_manifest)
+{
+	uint8_t* mem_ptr;
+	struct hftest_context* ctx = hftest_get_context();
+	struct memory_region* mem_region;
+	uint32_t regions_count;
+
+	if (!ctx->is_ffa_manifest_parsed) {
+		panic("This test requires the running partition to have "
+		      "received and parsed its own FF-A manifest.\n");
+	}
+
+	regions_count = ctx->partition_manifest.mem_region_count;
+
+	ASSERT_TRUE(regions_count != 0U);
+
+	/* Try to access all regions defined. */
+	for (uint32_t i = 0; i < regions_count; i++) {
+		uint64_t checksum = 0;
+		mem_region = &ctx->partition_manifest.mem_regions[i];
+
+		HFTEST_LOG("Accessing memory: %#x - %u pages - %#x attributes",
+			   mem_region->base_address, mem_region->page_count,
+			   mem_region->attributes);
+
+		EXPECT_NE(mem_region->attributes & (MM_MODE_R | MM_MODE_W), 0);
+
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		mem_ptr = (uint8_t*)mem_region->base_address;
+
+		update_mm_security_state(mem_ptr, mem_region->page_count,
+					 mem_region->attributes);
+		for (size_t i = 0; i < mem_region->page_count * PAGE_SIZE;
+		     ++i) {
+			mem_ptr[i] = (uint8_t)i / 2;
+			checksum += (uint64_t)mem_ptr[i];
+		}
+
+		ASSERT_NE(checksum, 0);
+	}
+	ffa_yield();
 }
