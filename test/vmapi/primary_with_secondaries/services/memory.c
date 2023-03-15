@@ -322,15 +322,14 @@ TEST_SERVICE(ffa_check_upper_bound)
 	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
 				     HF_MAILBOX_SIZE);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
+	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
+						    memory_region->sender));
 
 	/* Choose which constituent we want to test. */
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	index = *(uint8_t *)composite->constituents[0].address;
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[index].address;
-
-	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
-						    memory_region->sender));
 
 	/*
 	 * Check that we can't access out of bounds after the region sent to us.
@@ -359,16 +358,16 @@ TEST_SERVICE(ffa_check_lower_bound)
 	memory_region = (struct ffa_memory_region *)retrieve_buffer;
 	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
 				     HF_MAILBOX_SIZE);
+
 	composite = ffa_memory_region_get_composite(memory_region, 0);
+	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
+						    memory_region->sender));
 
 	/* Choose which constituent we want to test. */
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	index = *(uint8_t *)composite->constituents[0].address;
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[index].address;
-
-	update_mm_security_state(composite, arch_mm_extra_attributes_from_vm(
-						    memory_region->sender));
 
 	/*
 	 * Check that we can't access out of bounds before the region sent to
