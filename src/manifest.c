@@ -47,20 +47,28 @@ static_assert((HF_OTHER_WORLD_ID > VM_ID_MAX) ||
 	      "TrustZone VM ID clashes with normal VM range.");
 
 /**
- * A struct to keep track of a VM's properties during early boot
- * manifest parsing.
+ * A struct to keep track of the partitions properties during early boot
+ * manifest parsing:
+ * - Interrupts ID.
+ * - Physical memory ranges.
  */
 struct manifest_data {
 	struct manifest manifest;
 	struct interrupt_bitmap intids;
-	struct mem_range mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS];
+	/*
+	 * Allocate enough for the maximum amount of memory regions defined via
+	 * the partitions manifest, and regions for each partition
+	 * address-space.
+	 */
+	struct mem_range
+		mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS + MAX_VMS];
 };
 
 /**
  * Calculate the number of entries in the ppool that are required to
  * store the manifest_data struct.
  */
-static size_t manifest_data_ppool_entries =
+static const size_t manifest_data_ppool_entries =
 	(align_up(sizeof(struct manifest_data), MM_PPOOL_ENTRY_SIZE) /
 	 MM_PPOOL_ENTRY_SIZE);
 
@@ -1203,7 +1211,6 @@ static enum manifest_return_code parse_ffa_partition_package(
 			dlog_error("Failed to process boot information.\n");
 		}
 	}
-
 out:
 	sp_pkg_deinit(stage1_locked, pkg_start, &header, ppool);
 	return ret;
@@ -1297,6 +1304,26 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 			TRY(parse_ffa_partition_package(stage1_locked, &vm_node,
 							&manifest->vm[i], vm_id,
 							boot_params, ppool));
+			size_t page_count =
+				align_up(manifest->vm[i].secondary.mem_size,
+					 PAGE_SIZE) /
+				PAGE_SIZE;
+
+			if (vm_id == HF_PRIMARY_VM_ID) {
+				continue;
+			}
+
+			TRY(check_partition_memory_is_valid(
+				manifest->vm[i].partition.load_addr, page_count,
+				0, boot_params));
+
+			/*
+			 * Check if memory from load-address until (load-address
+			 * + memory size) has been used by other partition.
+			 */
+			TRY(check_and_record_memory_used(
+				manifest->vm[i].partition.load_addr,
+				page_count));
 		} else {
 			TRY(parse_vm(&vm_node, &manifest->vm[i], vm_id));
 		}
