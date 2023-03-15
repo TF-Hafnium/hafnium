@@ -22,6 +22,7 @@
 #include "hf/dlog.h"
 #include "hf/fdt_handler.h"
 #include "hf/load.h"
+#include "hf/manifest.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/panic.h"
@@ -137,7 +138,7 @@ void one_time_init(void)
 	}
 
 	manifest_ret = manifest_init(mm_stage1_locked, &manifest, &manifest_it,
-				     &ppool);
+				     &params, &ppool);
 
 	if (manifest_ret != MANIFEST_SUCCESS) {
 		panic("Could not parse manifest: %s.",

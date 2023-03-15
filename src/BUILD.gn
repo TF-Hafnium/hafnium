@@ -183,6 +183,7 @@ executable("unit_tests") {
     "-Wno-nested-anon-types",
   ]
   deps = [
+    ":memiter",
     ":src_testable",
     "//third_party/googletest:gtest_main",
   ]

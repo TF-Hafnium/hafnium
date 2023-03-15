@@ -9,6 +9,7 @@
 #pragma once
 
 #include "hf/addr.h"
+#include "hf/boot_params.h"
 #include "hf/fdt.h"
 #include "hf/ffa.h"
 #include "hf/ffa_partition_manifest.h"
@@ -76,6 +77,9 @@ enum manifest_return_code {
 	MANIFEST_ERROR_MEM_REGION_EMPTY,
 	MANIFEST_ERROR_MEM_REGION_UNALIGNED,
 	MANIFEST_ERROR_MEM_REGION_OVERLAP,
+	MANIFEST_ERROR_MEMORY_MISSING,
+	MANIFEST_ERROR_MEM_REGION_INVALID,
+	MANIFEST_ERROR_PARTITION_ADDRESS_OVERLAP,
 	MANIFEST_ERROR_INVALID_MEM_PERM,
 	MANIFEST_ERROR_INTERRUPT_ID_REPEATED,
 	MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION,
@@ -84,14 +88,14 @@ enum manifest_return_code {
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
-					struct manifest **manifest,
+					struct manifest **manifest_ret,
 					struct memiter *manifest_fdt,
+					struct boot_params *boot_params,
 					struct mpool *ppool);
 void manifest_deinit(struct mpool *ppool);
-
-enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
-					     struct manifest_vm *vm,
-					     struct fdt_node *boot_info);
+enum manifest_return_code parse_ffa_manifest(
+	struct fdt *fdt, struct manifest_vm *vm,
+	struct fdt_node *boot_info_node, const struct boot_params *boot_params);
 
 void manifest_dump(struct manifest_vm *vm);
 

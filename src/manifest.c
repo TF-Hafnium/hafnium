@@ -9,14 +9,20 @@
 #include "hf/manifest.h"
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "hf/arch/types.h"
+#include "hf/arch/vmid_base.h"
 
 #include "hf/addr.h"
 #include "hf/assert.h"
 #include "hf/boot_info.h"
+#include "hf/boot_params.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/fdt.h"
+#include "hf/mm.h"
+#include "hf/mpool.h"
 #include "hf/sp_pkg.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
@@ -47,10 +53,7 @@ static_assert((HF_OTHER_WORLD_ID > VM_ID_MAX) ||
 struct manifest_data {
 	struct manifest manifest;
 	struct interrupt_bitmap intids;
-	struct {
-		uintptr_t base;
-		uintptr_t limit;
-	} mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS];
+	struct mem_range mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS];
 };
 
 /**
@@ -416,11 +419,78 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
-static enum manifest_return_code check_and_record_mem_regions(
+static bool is_memory_region_within_ranges(uintptr_t base_address,
+					   uint32_t page_count,
+					   const struct mem_range *ranges,
+					   const size_t ranges_size)
+{
+	uintptr_t region_end =
+		base_address + ((uintptr_t)page_count * PAGE_SIZE - 1);
+
+	for (size_t i = 0; i < ranges_size; i++) {
+		uintptr_t base = (uintptr_t)pa_addr(ranges[i].begin);
+		uintptr_t end = (uintptr_t)pa_addr(ranges[i].end);
+
+		if ((base_address >= base && base_address <= end) ||
+		    (region_end >= base && region_end <= end)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void dump_memory_ranges(const struct mem_range *ranges,
+			const size_t ranges_size, bool ns)
+{
+	if (LOG_LEVEL < LOG_LEVEL_VERBOSE) {
+		return;
+	}
+
+	dlog("%s Memory ranges:\n", ns ? "NS" : "S");
+
+	for (size_t i = 0; i < ranges_size; i++) {
+		uintptr_t begin = pa_addr(ranges[i].begin);
+		uintptr_t end = pa_addr(ranges[i].end);
+		size_t page_count =
+			align_up(pa_difference(ranges[i].begin, ranges[i].end),
+				 PAGE_SIZE) /
+			PAGE_SIZE;
+
+		dlog("  [%x - %x (%u pages)]\n", begin, end, page_count);
+	}
+}
+
+/**
+ * Check the partition's assigned memory is contained in the memory ranges
+ * configured for the SWd, in the SPMC's manifest.
+ */
+static enum manifest_return_code check_partition_memory_is_valid(
+	uintptr_t base_address, uint32_t page_count, uint32_t attributes,
+	const struct boot_params *params)
+{
+	bool is_secure_region =
+		(attributes & MANIFEST_REGION_ATTR_SECURITY) == 0U;
+	const struct mem_range *ranges_from_manifest =
+		is_secure_region ? params->mem_ranges : params->ns_mem_ranges;
+	size_t ranges_count = is_secure_region ? params->mem_ranges_count
+					       : params->ns_mem_ranges_count;
+	bool within_ranges = is_memory_region_within_ranges(
+		base_address, page_count, ranges_from_manifest, ranges_count);
+
+	return within_ranges ? MANIFEST_SUCCESS
+			     : MANIFEST_ERROR_MEM_REGION_INVALID;
+}
+
+/*
+ * Keep track of the memory allocated by partitions. This includes memory region
+ * nodes defined in their respective partition manifests, as well address space
+ * defined from their load address.
+ */
+static enum manifest_return_code check_and_record_memory_used(
 	uintptr_t base_address, uint32_t page_count)
 {
-	uintptr_t limit =
-		base_address + ((uintptr_t)page_count * PAGE_SIZE) - 1U;
+	bool overlap_of_regions;
 
 	if (page_count == 0U) {
 		dlog_error(
@@ -435,35 +505,29 @@ static enum manifest_return_code check_and_record_mem_regions(
 		return MANIFEST_ERROR_MEM_REGION_UNALIGNED;
 	}
 
-	for (size_t i = 0; i < allocated_mem_regions_index; i++) {
-		uintptr_t mem_region_base = manifest_data->mem_regions[i].base;
-		uintptr_t mem_region_limit =
-			manifest_data->mem_regions[i].limit;
+	overlap_of_regions = is_memory_region_within_ranges(
+		base_address, page_count, manifest_data->mem_regions,
+		allocated_mem_regions_index);
 
-		if ((base_address >= mem_region_base &&
-		     base_address <= mem_region_limit) ||
-		    (limit <= mem_region_limit && limit >= mem_region_base)) {
-			dlog_error(
-				"Overlapping memory regions\n"
-				"New Region %#x - %#x\n"
-				"Overlapping region %#x - %#x\n",
-				base_address, limit, mem_region_base,
-				mem_region_limit);
-			return MANIFEST_ERROR_MEM_REGION_OVERLAP;
-		}
+	if (!overlap_of_regions) {
+		paddr_t begin = pa_init(base_address);
+
+		manifest_data->mem_regions[allocated_mem_regions_index].begin =
+			begin;
+		manifest_data->mem_regions[allocated_mem_regions_index].end =
+			pa_add(begin, page_count * PAGE_SIZE - 1);
+		allocated_mem_regions_index++;
+
+		return MANIFEST_SUCCESS;
 	}
 
-	manifest_data->mem_regions[allocated_mem_regions_index].base =
-		base_address;
-	manifest_data->mem_regions[allocated_mem_regions_index].limit = limit;
-	allocated_mem_regions_index++;
-
-	return MANIFEST_SUCCESS;
+	return MANIFEST_ERROR_MEM_REGION_OVERLAP;
 }
 
 static enum manifest_return_code parse_ffa_memory_region_node(
 	struct fdt_node *mem_node, struct memory_region *mem_regions,
-	uint16_t *count, struct rx_tx *rxtx)
+	uint16_t *count, struct rx_tx *rxtx,
+	const struct boot_params *boot_params)
 {
 	uint32_t phandle;
 	uint16_t i = 0;
@@ -496,9 +560,6 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		dlog_verbose("      Pages_count:  %u\n",
 			     mem_regions[i].page_count);
 
-		TRY(check_and_record_mem_regions(mem_regions[i].base_address,
-						 mem_regions[i].page_count));
-
 		TRY(read_uint32(mem_node, "attributes",
 				&mem_regions[i].attributes));
 
@@ -523,6 +584,13 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 
 		dlog_verbose("      Attributes:  %#x\n",
 			     mem_regions[i].attributes);
+
+		TRY(check_partition_memory_is_valid(
+			mem_regions[i].base_address, mem_regions[i].page_count,
+			mem_regions[i].attributes, boot_params));
+
+		TRY(check_and_record_memory_used(mem_regions[i].base_address,
+						 mem_regions[i].page_count));
 
 		if (rxtx->available) {
 			TRY(read_optional_uint32(
@@ -841,9 +909,9 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	return ret_code;
 }
 
-enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
-					     struct manifest_vm *vm,
-					     struct fdt_node *boot_info_node)
+enum manifest_return_code parse_ffa_manifest(
+	struct fdt *fdt, struct manifest_vm *vm,
+	struct fdt_node *boot_info_node, const struct boot_params *boot_params)
 {
 	unsigned int i = 0;
 	struct uint32list_iter uuid;
@@ -1047,7 +1115,8 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
 		TRY(parse_ffa_memory_region_node(
 			&ffa_node, vm->partition.mem_regions,
-			&vm->partition.mem_region_count, &vm->partition.rxtx));
+			&vm->partition.mem_region_count, &vm->partition.rxtx,
+			boot_params));
 	}
 	dlog_verbose("  Total %u memory regions found\n",
 		     vm->partition.mem_region_count);
@@ -1067,7 +1136,8 @@ enum manifest_return_code parse_ffa_manifest(struct fdt *fdt,
 
 static enum manifest_return_code parse_ffa_partition_package(
 	struct mm_stage1_locked stage1_locked, struct fdt_node *node,
-	struct manifest_vm *vm, ffa_vm_id_t vm_id, struct mpool *ppool)
+	struct manifest_vm *vm, ffa_vm_id_t vm_id,
+	const struct boot_params *boot_params, struct mpool *ppool)
 {
 	enum manifest_return_code ret = MANIFEST_ERROR_NOT_COMPATIBLE;
 	uintpaddr_t load_address;
@@ -1112,7 +1182,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 		goto out;
 	}
 
-	ret = parse_ffa_manifest(&sp_fdt, vm, &boot_info_node);
+	ret = parse_ffa_manifest(&sp_fdt, vm, &boot_info_node, boot_params);
 	if (ret != MANIFEST_SUCCESS) {
 		dlog_error("Error parsing partition manifest: %s.\n",
 			   manifest_strerror(ret));
@@ -1145,6 +1215,7 @@ out:
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 					struct manifest **manifest_ret,
 					struct memiter *manifest_fdt,
+					struct boot_params *boot_params,
 					struct mpool *ppool)
 {
 	struct manifest *manifest;
@@ -1153,6 +1224,11 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 	struct fdt_node hyp_node;
 	size_t i = 0;
 	bool found_primary_vm = false;
+
+	dump_memory_ranges(boot_params->mem_ranges,
+			   boot_params->mem_ranges_count, false);
+	dump_memory_ranges(boot_params->ns_mem_ranges,
+			   boot_params->ns_mem_ranges_count, true);
 
 	/* Allocate space in the ppool for the manifest data. */
 	if (!manifest_data_init(ppool)) {
@@ -1220,7 +1296,7 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 		    !manifest->vm[i].is_hyp_loaded) {
 			TRY(parse_ffa_partition_package(stage1_locked, &vm_node,
 							&manifest->vm[i], vm_id,
-							ppool));
+							boot_params, ppool));
 		} else {
 			TRY(parse_vm(&vm_node, &manifest->vm[i], vm_id));
 		}
@@ -1304,6 +1380,16 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION:
 		return "Illegal value specified for the field: Action in "
 		       "response to Other-S Interrupt";
+	case MANIFEST_ERROR_MEMORY_MISSING:
+		return "Memory nodes must be defined in the SPMC manifest "
+		       "('memory' and 'ns-memory').";
+	case MANIFEST_ERROR_PARTITION_ADDRESS_OVERLAP:
+		return "Partition's memory [load address: load address + "
+		       "memory size[ overlap with other allocated "
+		       "regions.";
+	case MANIFEST_ERROR_MEM_REGION_INVALID:
+		return "Memory region must within memory ranges defined "
+		       "in the SPMC manifest.";
 	}
 
 	panic("Unexpected manifest return code.");

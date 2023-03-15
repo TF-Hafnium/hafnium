@@ -16,6 +16,7 @@
 extern "C" {
 #include "hf/arch/std.h"
 
+#include "hf/boot_params.h"
 #include "hf/manifest.h"
 #include "hf/sp_pkg.h"
 }
@@ -363,15 +364,46 @@ class manifest : public ::testing::Test
 		}
 	};
 
+	static void boot_params_init(struct boot_params *params,
+				     Partition_package *pkg)
+	{
+		/*
+		 * For the manifest tests we only care about the memory ranges
+		 * in boot_params.
+		 */
+		params->mem_ranges[0].begin = pa_init((uintpaddr_t)0x7000000);
+		params->mem_ranges[0].end = pa_init((uintpaddr_t)0x8ffffff);
+		params->mem_ranges_count = 1;
+
+		if (pkg != nullptr) {
+			auto mem_base = (uintpaddr_t)pkg;
+			uintpaddr_t mem_end =
+				mem_base + sp_pkg_get_mem_size(&pkg->spkg);
+
+			params->mem_ranges_count++;
+
+			params->mem_ranges[1].begin = pa_init(mem_base);
+			params->mem_ranges[1].end = pa_init(mem_end);
+		}
+
+		params->ns_mem_ranges[0].begin =
+			pa_init((uintpaddr_t)0x7000000);
+		params->ns_mem_ranges[0].end = pa_init((uintpaddr_t)0x8ffffff);
+		params->ns_mem_ranges_count = 1;
+	}
+
 	enum manifest_return_code manifest_from_vec(
 		struct_manifest **m, const std::vector<char> &vec)
 	{
 		struct memiter it;
 		struct mm_stage1_locked mm_stage1_locked;
+		struct boot_params params;
+
+		boot_params_init(&params, nullptr);
 
 		memiter_init(&it, vec.data(), vec.size());
 
-		return manifest_init(mm_stage1_locked, m, &it, &ppool);
+		return manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
 	}
 
 	enum manifest_return_code ffa_manifest_from_vec(
@@ -380,6 +412,9 @@ class manifest : public ::testing::Test
 		struct memiter it;
 		struct mm_stage1_locked mm_stage1_locked;
 		Partition_package spkg(vec);
+		struct boot_params params;
+
+		boot_params_init(&params, &spkg);
 
 		/* clang-format off */
 		std::vector<char> core_dtb = ManifestDtBuilder()
@@ -395,7 +430,7 @@ class manifest : public ::testing::Test
 		/* clang-format on */
 		memiter_init(&it, core_dtb.data(), core_dtb.size());
 
-		return manifest_init(mm_stage1_locked, m, &it, &ppool);
+		return manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
 	}
 };
 

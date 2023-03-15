@@ -21,6 +21,7 @@
 #include "hf/dlog.h"
 #include "hf/fdt_patch.h"
 #include "hf/layout.h"
+#include "hf/manifest.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
@@ -637,6 +638,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			   struct vm_locked primary_vm_locked,
 			   paddr_t mem_begin, paddr_t mem_end,
 			   const struct manifest_vm *manifest_vm,
+			   const struct boot_params *boot_params,
 			   const struct memiter *cpio, struct mpool *ppool)
 {
 	struct vm *vm;
@@ -688,7 +690,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		if (manifest_vm->is_ffa_partition) {
 			plat_ffa_parse_partition_manifest(
 				stage1_locked, fdt_addr, fdt_allocated_size,
-				manifest_vm, ppool);
+				manifest_vm, boot_params, ppool);
 		}
 
 		if (!fdt_patch_mem(stage1_locked, fdt_addr, fdt_allocated_size,
@@ -1005,7 +1007,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 
 		if (!load_secondary(stage1_locked, primary_vm_locked,
 				    secondary_mem_begin, secondary_mem_end,
-				    manifest_vm, cpio, ppool)) {
+				    manifest_vm, params, cpio, ppool)) {
 			dlog_error("Unable to load VM.\n");
 			continue;
 		}
