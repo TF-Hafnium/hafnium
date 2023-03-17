@@ -8,37 +8,38 @@
 
 #include "hf/stdout.h"
 
+#include "hf/assert.h"
+
 #include "vmapi/hf/call.h"
 
 #define FFA_CONSOLE_LOG64_MAX_CHAR ((size_t)48)
-#define STDOUT_BUFFER_SIZE ((size_t)4096)
 
-static char stdout_buffer[STDOUT_BUFFER_SIZE];
+static char stdout_buffer[FFA_CONSOLE_LOG64_MAX_CHAR];
+static size_t buffer_char_count = 0;
 
 void stdout_putchar(char c)
 {
-	static size_t buffer_head = 0;
-	static size_t buffer_tail = 0;
-	size_t to_write;
-
 	/* Write single char to buffer. */
-	stdout_buffer[buffer_tail++] = c;
-	to_write = buffer_tail - buffer_head;
+	stdout_buffer[buffer_char_count++] = c;
 
+	assert(buffer_char_count <= FFA_CONSOLE_LOG64_MAX_CHAR);
 	/*
 	 * Flush buffer to stdout when buffer is full, a terminal character is
 	 * reached ('\0' or '\n'), or enough characters have been buffered to
 	 * fill all the registers in ffa_console_log_64.
 	 */
-	if (buffer_tail == STDOUT_BUFFER_SIZE) {
-		ffa_console_log_64((const char *)&stdout_buffer[buffer_head],
-				   to_write);
-		buffer_head = 0;
-		buffer_tail = 0;
-	} else if (to_write >= FFA_CONSOLE_LOG64_MAX_CHAR || c == '\0' ||
-		   c == '\n') {
-		ffa_console_log_64((const char *)&stdout_buffer[buffer_head],
-				   to_write);
-		buffer_head = buffer_tail;
+	if (buffer_char_count == FFA_CONSOLE_LOG64_MAX_CHAR || c == '\0' ||
+	    c == '\n') {
+		ffa_console_log_64((const char *)stdout_buffer,
+				   buffer_char_count);
+		buffer_char_count = 0;
+	}
+}
+
+void stdout_flush(void)
+{
+	/* Skip flushing if buffer is empty. */
+	if (buffer_char_count > 0) {
+		stdout_putchar('\0');
 	}
 }

@@ -14,3 +14,4 @@
  * avoid clashes when linking against libc.
  */
 void stdout_putchar(char c);
+void stdout_flush(void);

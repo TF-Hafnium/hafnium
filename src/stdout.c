@@ -14,3 +14,7 @@ void stdout_putchar(char c)
 {
 	plat_console_putchar(c);
 }
+
+void stdout_flush(void)
+{
+}

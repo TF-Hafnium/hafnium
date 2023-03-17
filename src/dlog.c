@@ -347,7 +347,7 @@ void vdlog(const char *fmt, va_list args)
 			break;
 		}
 	}
-
+	stdout_flush();
 	unlock();
 }
 
