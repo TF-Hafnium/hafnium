@@ -15,3 +15,12 @@
 
 /** Page mapping mode for tagged normal memory. */
 #define MM_MODE_T UINT32_C(0x0400)
+
+#define tlbi(op)                               \
+	do {                                   \
+		__asm__ volatile("tlbi " #op); \
+	} while (0)
+#define tlbi_reg(op, reg)                                              \
+	do {                                                           \
+		__asm__ __volatile__("tlbi " #op ", %0" : : "r"(reg)); \
+	} while (0)

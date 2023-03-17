@@ -111,15 +111,6 @@
 
 /* clang-format on */
 
-#define tlbi(op)                               \
-	do {                                   \
-		__asm__ volatile("tlbi " #op); \
-	} while (0)
-#define tlbi_reg(op, reg)                                              \
-	do {                                                           \
-		__asm__ __volatile__("tlbi " #op ", %0" : : "r"(reg)); \
-	} while (0)
-
 /** Mask for the address bits of the pte. */
 #define PTE_ADDR_MASK \
 	(((UINT64_C(1) << 48) - 1) & ~((UINT64_C(1) << PAGE_BITS) - 1))

@@ -164,7 +164,7 @@ static void invalidate_vm_tlb(void)
 	 */
 	isb();
 
-	__asm__ volatile("tlbi vmalle1");
+	tlbi(vmalle1);
 
 	/*
 	 * Ensure that no instructions are fetched for the VM until after the
