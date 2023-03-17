@@ -30,4 +30,15 @@ struct arch_vm {
 		uintreg_t id_aa64dfr0_el1;
 		uintreg_t id_aa64isar1_el1;
 	} tid3_masks;
+
+#if SECURE_WORLD == 1
+	/**
+	 * struct vm ptable is root page table pointed to by:
+	 * - VTTBR_EL2 for the Hypervisor defining the VM non-secure IPA space.
+	 * - VSTTBR_EL2 for the SPMC defining the SP secure IPA space.
+	 * ptable_ns is root page table pointed to by VTTBR_EL2 for
+	 * the SPMC defining the SP non-secure IPA space.
+	 */
+	struct mm_ptable ptable_ns;
+#endif
 };

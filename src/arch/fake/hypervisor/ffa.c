@@ -577,3 +577,63 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
+
+bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool)
+{
+	(void)vm;
+	(void)ppool;
+
+	return true;
+}
+
+bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
+			      paddr_t end, uint32_t mode, struct mpool *ppool)
+{
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)mode;
+	(void)ppool;
+
+	return true;
+}
+
+void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
+			     paddr_t end, uint32_t mode, struct mpool *ppool,
+			     ipaddr_t *ipa)
+{
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)mode;
+	(void)ppool;
+	(void)ipa;
+}
+
+bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
+		   struct mpool *ppool)
+{
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)ppool;
+
+	return true;
+}
+
+void arch_vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
+{
+	(void)vm_locked;
+	(void)ppool;
+}
+
+bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
+			  ipaddr_t end, uint32_t *mode)	 // NOLINT
+{
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)mode;
+
+	return true;
+}

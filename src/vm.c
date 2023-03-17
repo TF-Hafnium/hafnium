@@ -8,6 +8,8 @@
 
 #include "hf/vm.h"
 
+#include "hf/arch/vm.h"
+
 #include "hf/api.h"
 #include "hf/assert.h"
 #include "hf/check.h"
@@ -15,7 +17,6 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/layout.h"
-#include "hf/plat/iommu.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
@@ -41,11 +42,7 @@ static struct {
 
 static bool vm_init_mm(struct vm *vm, struct mpool *ppool)
 {
-	if (vm->el0_partition) {
-		return mm_ptable_init(&vm->ptable, vm->id, MM_FLAG_STAGE1,
-				      ppool);
-	}
-	return mm_vm_init(&vm->ptable, vm->id, ppool);
+	return arch_vm_init_mm(vm, ppool);
 }
 
 struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
@@ -317,12 +314,7 @@ bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			 uint32_t mode, struct mpool *ppool)
 {
-	if (vm_locked.vm->el0_partition) {
-		return mm_identity_prepare(&vm_locked.vm->ptable, begin, end,
-					   mode, ppool);
-	}
-	return mm_vm_identity_prepare(&vm_locked.vm->ptable, begin, end, mode,
-				      ppool);
+	return arch_vm_identity_prepare(vm_locked, begin, end, mode, ppool);
 }
 
 /**
@@ -333,23 +325,7 @@ bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			uint32_t mode, struct mpool *ppool, ipaddr_t *ipa)
 {
-	if (vm_locked.vm->el0_partition) {
-		mm_identity_commit(&vm_locked.vm->ptable, begin, end, mode,
-				   ppool);
-		if (ipa != NULL) {
-			/*
-			 * EL0 partitions are modeled as lightweight VM's, to
-			 * promote code reuse. The below statement returns the
-			 * mapped PA as an IPA, however, for an EL0 partition,
-			 * this is really a VA.
-			 */
-			*ipa = ipa_from_pa(begin);
-		}
-	} else {
-		mm_vm_identity_commit(&vm_locked.vm->ptable, begin, end, mode,
-				      ppool, ipa);
-	}
-	plat_iommu_identity_map(vm_locked, begin, end, mode);
+	arch_vm_identity_commit(vm_locked, begin, end, mode, ppool, ipa);
 }
 
 /**
@@ -361,9 +337,7 @@ void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 	      struct mpool *ppool)
 {
-	uint32_t mode = MM_MODE_UNMAPPED_MASK;
-
-	return vm_identity_map(vm_locked, begin, end, mode, ppool, NULL);
+	return arch_vm_unmap(vm_locked, begin, end, ppool);
 }
 
 /**
@@ -371,11 +345,7 @@ bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
  */
 void vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
 {
-	if (vm_locked.vm->el0_partition) {
-		mm_stage1_defrag(&vm_locked.vm->ptable, ppool);
-	} else {
-		mm_vm_defrag(&vm_locked.vm->ptable, ppool);
-	}
+	arch_vm_ptable_defrag(vm_locked, ppool);
 }
 
 /**
@@ -405,12 +375,7 @@ bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool)
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     uint32_t *mode)
 {
-	if (vm_locked.vm->el0_partition) {
-		return mm_get_mode(&vm_locked.vm->ptable,
-				   va_from_pa(pa_from_ipa(begin)),
-				   va_from_pa(pa_from_ipa(end)), mode);
-	}
-	return mm_vm_get_mode(&vm_locked.vm->ptable, begin, end, mode);
+	return arch_vm_mem_get_mode(vm_locked, begin, end, mode);
 }
 
 bool vm_mailbox_state_busy(struct vm_locked vm_locked)

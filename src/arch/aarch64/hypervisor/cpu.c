@@ -126,11 +126,26 @@ void arch_regs_reset(struct vcpu *vcpu)
 	} else {
 		r->hyp_state.ttbr0_el2 = read_msr(ttbr0_el2);
 		r->lazy.vtcr_el2 = arch_mm_get_vtcr_el2();
+#if SECURE_WORLD == 0
+		/*
+		 * For a VM managed by the Hypervisor a single set
+		 * of NS S2 PT exists.
+		 * vttbr_el2 points to the single S2 root PT.
+		 */
 		r->lazy.vttbr_el2 = pa_addr(table) | ((uint64_t)vm_id << 48);
-#if SECURE_WORLD == 1
+#else
+		/*
+		 * For a SP managed by the SPMC both sets of NS and secure
+		 * S2 PTs exist.
+		 * vttbr_el2 points to the NS S2 root PT.
+		 * vsttbr_el2 points to secure S2 root PT.
+		 */
+		r->lazy.vttbr_el2 = pa_addr(vcpu->vm->arch.ptable_ns.root) |
+				    ((uint64_t)vm_id << 48);
 		r->lazy.vstcr_el2 = arch_mm_get_vstcr_el2();
 		r->lazy.vsttbr_el2 = pa_addr(table);
 #endif
+
 		r->lazy.vmpidr_el2 = vcpu_id;
 		/* Mask (disable) interrupts and run in EL1h mode. */
 		r->spsr = PSR_D | PSR_A | PSR_I | PSR_F | PSR_PE_MODE_EL1H;
