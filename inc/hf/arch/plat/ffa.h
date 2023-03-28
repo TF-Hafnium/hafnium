@@ -306,7 +306,7 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
 
 void plat_ffa_wind_call_chain_ffa_direct_req(
 	struct vcpu_locked current_locked,
-	struct vcpu_locked receiver_vcpu_locked);
+	struct vcpu_locked receiver_vcpu_locked, ffa_vm_id_t sender_vm_id);
 
 void plat_ffa_unwind_call_chain_ffa_direct_resp(
 	struct vcpu_locked current_locked, struct vcpu_locked next_locked);
@@ -374,3 +374,5 @@ ffa_memory_attributes_t plat_ffa_memory_security_mode(
  */
 struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 				   uint32_t error_code);
+
+bool plat_ffa_is_spmd_lp_id(ffa_vm_id_t vm_id);

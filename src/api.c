@@ -2764,8 +2764,8 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	       next_state == VCPU_STATE_BLOCKED);
 	current->state = VCPU_STATE_BLOCKED;
 
-	plat_ffa_wind_call_chain_ffa_direct_req(current_locked,
-						receiver_vcpu_locked);
+	plat_ffa_wind_call_chain_ffa_direct_req(
+		current_locked, receiver_vcpu_locked, sender_vm_id);
 
 	/* Switch to receiver vCPU targeted to by direct msg request */
 	*next = receiver_vcpu;
@@ -2804,7 +2804,8 @@ void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
 				       struct ffa_value to_ret,
 				       bool is_nwd_call_chain)
 {
-	if (!vm_id_is_current_world(receiver_vm_id)) {
+	if (plat_ffa_is_spmd_lp_id(receiver_vm_id) ||
+	    !vm_id_is_current_world(receiver_vm_id)) {
 		*next = api_switch_to_other_world(current_locked, to_ret,
 						  VCPU_STATE_WAITING);
 

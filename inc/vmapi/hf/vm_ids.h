@@ -47,3 +47,7 @@
  * like power management events.
  */
 #define HF_SPMD_VM_ID 0xFFFF
+
+/* Reserve 63 IDs for SPMD Logical Partitions. */
+#define EL3_SPMD_LP_ID_END (HF_SPMD_VM_ID - 1)
+#define EL3_SPMD_LP_ID_START (EL3_SPMD_LP_ID_END - 62)

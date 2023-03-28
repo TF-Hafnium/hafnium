@@ -534,6 +534,11 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
 	return allowed;
 }
 
+bool plat_ffa_is_spmd_lp_id(ffa_vm_id_t vm_id)
+{
+	return (vm_id >= EL3_SPMD_LP_ID_START && vm_id <= EL3_SPMD_LP_ID_END);
+}
+
 /**
  * Check validity of a FF-A direct message request.
  */
@@ -547,12 +552,14 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 	 * The normal world can send direct message requests
 	 * via the Hypervisor to any SP. Currently SPs can only send
 	 * direct messages to each other and not to the NWd.
+	 * SPMD Logical partitions can also send direct messages.
 	 */
 	return sender_vm_id != receiver_vm_id &&
 	       vm_id_is_current_world(receiver_vm_id) &&
 	       (sender_vm_id == current_vm_id ||
 		(current_vm_id == HF_HYPERVISOR_VM_ID &&
-		 !vm_id_is_current_world(sender_vm_id)));
+		 (plat_ffa_is_spmd_lp_id(sender_vm_id) ||
+		  !vm_id_is_current_world(sender_vm_id))));
 }
 
 /**
@@ -589,8 +596,8 @@ bool plat_ffa_is_direct_response_valid(struct vcpu *current,
 	ffa_vm_id_t current_vm_id = current->vm->id;
 
 	/*
-	 * Direct message responses emitted from a SP target either the NWd
-	 * or another SP.
+	 * Direct message responses emitted from a SP target either the NWd,
+	 * or EL3 SPMD logical partition or another SP.
 	 */
 	return sender_vm_id != receiver_vm_id &&
 	       sender_vm_id == current_vm_id &&
@@ -2338,8 +2345,15 @@ static void plat_ffa_vcpu_queue_interrupts(
 	receiver_vcpu->prev_interrupt_priority = current_priority;
 
 	if (receiver_vcpu->vm->other_s_interrupts_action ==
-	    OTHER_S_INT_ACTION_QUEUED) {
-		/* If secure interrupts not masked yet, mask them now. */
+		    OTHER_S_INT_ACTION_QUEUED ||
+	    receiver_vcpu->scheduling_mode == SPMC_MODE) {
+		/*
+		 * If secure interrupts not masked yet, mask them now. We could
+		 * enter SPMC scheduled mode when an EL3 SPMD Logical partition
+		 * sends a direct request, and we are making the IMPDEF choice
+		 * to mask interrupts when such a situation occurs. This keeps
+		 * design simple.
+		 */
 		if (current_priority > 0) {
 			plat_interrupts_set_priority_mask(0x0);
 		}
@@ -2393,11 +2407,10 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
  */
 void plat_ffa_wind_call_chain_ffa_direct_req(
 	struct vcpu_locked current_locked,
-	struct vcpu_locked receiver_vcpu_locked)
+	struct vcpu_locked receiver_vcpu_locked, ffa_vm_id_t sender_vm_id)
 {
 	struct vcpu *current = current_locked.vcpu;
 	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
-	ffa_vm_id_t sender_vm_id = current->vm->id;
 
 	CHECK(receiver_vcpu->scheduling_mode == NONE);
 	CHECK(receiver_vcpu->call_chain.prev_node == NULL);
@@ -2409,6 +2422,8 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 	if (!vm_id_is_current_world(sender_vm_id)) {
 		/* Start of NWd scheduled call chain. */
 		receiver_vcpu->scheduling_mode = NWD_MODE;
+	} else if (plat_ffa_is_spmd_lp_id(sender_vm_id)) {
+		receiver_vcpu->scheduling_mode = SPMC_MODE;
 	} else {
 		/* Adding a new node to an existing call chain. */
 		vcpu_call_chain_extend(current_locked, receiver_vcpu_locked);
@@ -2419,7 +2434,12 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 
 /*
  * Unwind the present call chain upon the invocation of
- * FFA_MSG_SEND_DIRECT_RESP ABI.
+ * FFA_MSG_SEND_DIRECT_RESP ABI. The function also returns
+ * the partition ID to which the caller must return to. In
+ * case the call chain was started by an SPMD logical
+ * partition direct message, at the end of the call chain,
+ * we need to return other world's id so that the SPMC can
+ * return to the SPMD.
  */
 void plat_ffa_unwind_call_chain_ffa_direct_resp(
 	struct vcpu_locked current_locked, struct vcpu_locked next_locked)

@@ -455,11 +455,12 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
 
 void plat_ffa_wind_call_chain_ffa_direct_req(
 	struct vcpu_locked current_locked,
-	struct vcpu_locked receiver_vcpu_locked)
+	struct vcpu_locked receiver_vcpu_locked, ffa_vm_id_t sender_vm_id)
 {
 	/* Calls chains not supported in the Hypervisor/VMs. */
 	(void)current_locked;
 	(void)receiver_vcpu_locked;
+	(void)sender_vm_id;
 }
 
 void plat_ffa_unwind_call_chain_ffa_direct_resp(
@@ -468,6 +469,12 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(
 	/* Calls chains not supported in the Hypervisor/VMs. */
 	(void)current_locked;
 	(void)next_locked;
+}
+
+bool plat_ffa_is_spmd_lp_id(ffa_vm_id_t vm_id)
+{
+	(void)vm_id;
+	return false;
 }
 
 bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
