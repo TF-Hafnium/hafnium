@@ -663,6 +663,7 @@ class FvpDriverEL3SPMC(FvpDriverSPMC):
         self.vms_in_partitions_json = args.partitions and args.partitions["SPs"]
         self.args = args
 
+    SP_DTB_ADDRESS = "0x0403f000"
     @property
     def CPU_START_ADDRESS(self):
         return "0x04003000"
@@ -682,10 +683,9 @@ class FvpDriverEL3SPMC(FvpDriverSPMC):
 
         # Even though FF-A manifest is part of the SP PKG we need to load at a specific
         # location. Fetch the respective dtb file and load at the following address.
-        SP_DTB_ADDRESS = "0x0403f000"
         output_path = os.path.dirname(os.path.dirname(img))
         partition_manifest = f"{output_path}/partition-manifest.dtb"
-        fvp_args += ["--data", f"cluster0.cpu0={partition_manifest}@{SP_DTB_ADDRESS}"]
+        fvp_args += ["--data", f"cluster0.cpu0={partition_manifest}@{self.SP_DTB_ADDRESS}"]
         return fvp_args
 
     def gen_fvp_args(
@@ -699,6 +699,47 @@ class FvpDriverEL3SPMC(FvpDriverSPMC):
         fvp_args += FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
 
         fvp_args += self.sp_partition_manifest_fvp_args()
+
+        return fvp_args
+
+class FvpDriverEL3SPMCBothWorlds(FvpDriverHypervisor, FvpDriverEL3SPMC):
+    """
+    Driver which runs tests in Arm FVP emulator, with EL3 as SPMC
+    """
+
+    @property
+    def CPU_START_ADDRESS(self):
+        return "0x04003000"
+
+    @property
+    def FVP_PREBUILT_BL31(self):
+        return os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl31.bin")
+
+    @property
+    def FVP_PREBUILT_BL32(self):
+        return os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl32.bin")
+
+    @property
+    def FVP_PREBUILT_DTB(self):
+        return os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "fdts/fvp_tsp_sp_manifest.dtb")
+
+    def gen_fvp_args(
+        self, is_long_running, uart0_log_path, uart1_log_path, dt,
+        call_super = True, secure_ctrl = True, debug = False, show_output = False):
+        """Generate command line arguments for FVP."""
+
+        fvp_args = FvpDriverHypervisor.gen_fvp_args(self, is_long_running, uart0_log_path, uart1_log_path, dt,
+        debug, show_output)
+
+        fvp_args += FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
+
+        if self.args.partitions is not None and self.args.partitions["SPs"] is not None:
+            fvp_args += FvpDriverEL3SPMC.sp_partition_manifest_fvp_args(self)
+        else :
+            # Use prebuilt TSP and TSP manifest if build does not specify SP
+            # EL3 SPMC expects SP to be loaded at 0xFF200000 and SP manifest at 0x0403F000
+            fvp_args += ["--data", f"cluster0.cpu0={self.FVP_PREBUILT_BL32}@0xff200000"]
+            fvp_args += ["--data", f"cluster0.cpu0={self.FVP_PREBUILT_DTB}@{self.SP_DTB_ADDRESS}"]
 
         return fvp_args
 
@@ -1048,7 +1089,10 @@ def Main():
         # So far only FVP supports tests for SPMC.
         if args.driver != "fvp":
             raise Exception("Secure tests can only run with fvp driver")
-        driver = FvpDriverEL3SPMC(driver_args)
+        if args.hypervisor:
+           driver = FvpDriverEL3SPMCBothWorlds(driver_args)
+        else:
+           driver = FvpDriverEL3SPMC(driver_args)
     elif args.spmc:
         # So far only FVP supports tests for SPMC.
         if args.driver != "fvp":

@@ -17,6 +17,10 @@ HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_clang"
 HFTEST+=(--log "$LOG_DIR_BASE/el3_spmc")
 HFTEST+=(--el3_spmc  --driver=fvp)
 
+#Test Hafnium primary_only_test with EL3 SPMC and TSP SP
+${HFTEST[@]}  --out_initrd "$OUT/aem_v8a_fvp_vhe_vm_clang" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                    --initrd test/vmapi/primary_only/primary_only_test
+
 #Test EL3 SPMC with S-EL1 SP based on Hafnium standalone secure SP
 ${HFTEST[@]} --out_partitions "$OUT/secure_aem_v8a_fvp_vhe_vm_clang" --partitions_json \
 	test/vmapi/ffa_secure_partition_el3_spmc/ffa_secure_partition_only_test.json
