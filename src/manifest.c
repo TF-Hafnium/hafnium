@@ -533,12 +533,13 @@ static enum manifest_return_code check_and_record_memory_used(
 }
 
 static enum manifest_return_code parse_ffa_memory_region_node(
-	struct fdt_node *mem_node, struct memory_region *mem_regions,
-	uint16_t *count, struct rx_tx *rxtx,
+	struct fdt_node *mem_node, uintptr_t load_address,
+	struct memory_region *mem_regions, uint16_t *count, struct rx_tx *rxtx,
 	const struct boot_params *boot_params)
 {
 	uint32_t phandle;
 	uint16_t i = 0;
+	uintptr_t relative_address;
 
 	dlog_verbose("  Partition memory regions\n");
 
@@ -558,10 +559,37 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		dlog_verbose("      Name: %s\n",
 			     string_data(&mem_regions[i].name));
 
-		TRY(read_uint64(mem_node, "base-address",
-				&mem_regions[i].base_address));
+		TRY(read_optional_uint64(mem_node, "base-address",
+					 MANIFEST_INVALID_ADDRESS,
+					 &mem_regions[i].base_address));
 		dlog_verbose("      Base address:  %#x\n",
 			     mem_regions[i].base_address);
+
+		TRY(read_optional_uint64(mem_node, "relative-address",
+					 MANIFEST_INVALID_ADDRESS,
+					 &relative_address));
+		dlog_verbose("      Relative address:  %#x\n",
+			     relative_address);
+
+		if (mem_regions[i].base_address == MANIFEST_INVALID_ADDRESS &&
+		    relative_address == MANIFEST_INVALID_ADDRESS) {
+			return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
+		}
+
+		if (mem_regions[i].base_address != MANIFEST_INVALID_ADDRESS &&
+		    relative_address != MANIFEST_INVALID_ADDRESS) {
+			return MANIFEST_ERROR_BASE_ADDRESS_AND_RELATIVE_ADDRESS;
+		}
+
+		if (relative_address != MANIFEST_INVALID_ADDRESS &&
+		    relative_address > UINT64_MAX - load_address) {
+			return MANIFEST_ERROR_INTEGER_OVERFLOW;
+		}
+
+		if (relative_address != MANIFEST_INVALID_ADDRESS) {
+			mem_regions[i].base_address =
+				load_address + relative_address;
+		}
 
 		TRY(read_uint32(mem_node, "pages-count",
 				&mem_regions[i].page_count));
@@ -1122,7 +1150,8 @@ enum manifest_return_code parse_ffa_manifest(
 	ffa_node = root;
 	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
 		TRY(parse_ffa_memory_region_node(
-			&ffa_node, vm->partition.mem_regions,
+			&ffa_node, vm->partition.load_addr,
+			vm->partition.mem_regions,
 			&vm->partition.mem_region_count, &vm->partition.rxtx,
 			boot_params));
 	}
@@ -1394,6 +1423,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "RX and TX buffers should be of same size";
 	case MANIFEST_ERROR_MEM_REGION_EMPTY:
 		return "Memory region should have at least one page";
+	case MANIFEST_ERROR_BASE_ADDRESS_AND_RELATIVE_ADDRESS:
+		return "Base and relative addresses are mutually exclusive";
 	case MANIFEST_ERROR_MEM_REGION_OVERLAP:
 		return "Memory region overlaps with one already allocated";
 	case MANIFEST_ERROR_MEM_REGION_UNALIGNED:
