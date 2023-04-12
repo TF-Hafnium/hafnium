@@ -6,8 +6,6 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stdbool.h>
-
 #include "hf/arch/irq.h"
 #include "hf/arch/vm/interrupts.h"
 
@@ -70,34 +68,6 @@ TEST_SERVICE(echo_msg_send2)
 
 		/* Give back control to PVM. */
 		ffa_yield();
-	}
-}
-
-TEST_SERVICE(echo_msg_send2_release_msg_wait)
-{
-	void *send_buf = SERVICE_SEND_BUFFER();
-	void *recv_buf = SERVICE_RECV_BUFFER();
-
-	/* Setup handling of NPI, to handle RX buffer full notification. */
-	exception_setup(check_npi, NULL);
-	arch_irq_enable();
-
-	for (;;) {
-		uint32_t payload;
-		ffa_vm_id_t echo_sender;
-
-		receive_indirect_message_release((void *)&payload,
-						 sizeof(payload), recv_buf,
-						 &echo_sender, false);
-
-		HFTEST_LOG("Message received: %#x", payload);
-
-		/* Echo message back. */
-		send_indirect_message(hf_vm_get_id(), echo_sender, send_buf,
-				      &payload, sizeof(payload), 0);
-
-		/* This is when the buffer is expected to have been released. */
-		ffa_msg_wait();
 	}
 }
 
