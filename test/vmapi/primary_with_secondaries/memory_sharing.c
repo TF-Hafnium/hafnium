@@ -3826,3 +3826,19 @@ TEST(memory_sharing, retrieve_instruction_access_not_specified)
 		ffa_mem_reclaim(handle, 0);
 	}
 }
+
+/**
+ * Validate that an SP can't share/lend/donate secure memory to a VM.
+ */
+TEST_PRECONDITION(memory_sharing, invalid_from_sp, service1_is_not_vm)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id, "invalid_memory_share", mb.send);
+
+	/* Run SP to attempt to donate memory. */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+}

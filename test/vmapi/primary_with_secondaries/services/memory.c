@@ -8,10 +8,13 @@
 
 #include "hf/arch/mmu.h"
 #include "hf/arch/vm/interrupts.h"
+#include "hf/arch/vmid_base.h"
 
 #include "hf/check.h"
+#include "hf/ffa.h"
 #include "hf/mm.h"
 #include "hf/std.h"
+#include "hf/types.h"
 
 #include "vmapi/hf/call.h"
 #include "vmapi/hf/ffa_v1_0.h"
@@ -1047,6 +1050,38 @@ TEST_SERVICE(retrieve_ffa_v1_0)
 	for (i = 0; i < PAGE_SIZE; ++i) {
 		++ptr[i];
 	}
+
+	ffa_yield();
+}
+
+/*
+ * Secure services fail to share/lend/donate memory to the primary VM.
+ */
+TEST_SERVICE(invalid_memory_share)
+{
+	void *send_buf = SERVICE_SEND_BUFFER();
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)&page, .page_count = 1},
+	};
+	uint32_t msg_size;
+
+	/* If the service partition is not an SP, do not execute. */
+	assert(!ffa_is_vm_id(hf_vm_get_id()));
+
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  HF_PRIMARY_VM_ID, constituents, 1, 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	/* All three memory sharing interfaces must fail. */
+	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
+	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
+	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size), FFA_DENIED);
 
 	ffa_yield();
 }
