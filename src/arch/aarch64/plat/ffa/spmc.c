@@ -257,24 +257,18 @@ bool plat_ffa_is_memory_send_valid(ffa_id_t receiver_vm_id, uint32_t share_func)
 	bool result = false;
 
 	/*
-	 * Currently SP to NS-endpoint memory donation is limited:
-	 * In it's current implementation SPMC is not aware of the memory type
-	 * being donated and can not ensure that the memory type is marked as
-	 * non-secure when SP is donating to NS-endpoint.
+	 * SPs can only share/lend/donate to another SP.
 	 */
 	switch (share_func) {
 	case FFA_MEM_DONATE_32:
-		result = true;
-		break;
 	case FFA_MEM_LEND_32:
 	case FFA_MEM_SHARE_32:
 		/* SP to VM not allowed, VM to VM should not end up here */
 		result = vm_id_is_current_world(receiver_vm_id);
 		if (!result) {
 			dlog_verbose(
-				"SP to NS-endpoint memory sharing/lending is "
-				"not "
-				"permitted.\n");
+				"SPMC only supports memory sharing operations "
+				"for SPs as the receiver(s).\n");
 		}
 		break;
 	default:

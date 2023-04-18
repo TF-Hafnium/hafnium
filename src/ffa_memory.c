@@ -456,7 +456,7 @@ static struct ffa_value ffa_send_check_transition(
 	}
 
 	/* Ensure the address range is normal memory and not a device. */
-	if (*orig_from_mode & MM_MODE_D) {
+	if ((*orig_from_mode & MM_MODE_D) != 0U) {
 		dlog_verbose("Can't share device memory (mode is %#x).\n",
 			     *orig_from_mode);
 		return ffa_error(FFA_DENIED);
@@ -478,12 +478,22 @@ static struct ffa_value ffa_send_check_transition(
 		uint32_t required_from_mode = ffa_memory_permissions_to_mode(
 			permissions, *orig_from_mode);
 
+		/*
+		 * The assumption is that at this point, the operation from
+		 * SP to a receiver VM, should have returned an FFA_ERROR
+		 * already.
+		 */
+		if (!ffa_is_vm_id(from.vm->id)) {
+			assert(!ffa_is_vm_id(
+				receivers[i].receiver_permissions.receiver));
+		}
+
 		if ((*orig_from_mode & required_from_mode) !=
 		    required_from_mode) {
 			dlog_verbose(
 				"Sender tried to send memory with permissions "
-				"which "
-				"required mode %#x but only had %#x itself.\n",
+				"which required mode %#x but only had %#x "
+				"itself.\n",
 				required_from_mode, *orig_from_mode);
 			return ffa_error(FFA_DENIED);
 		}
