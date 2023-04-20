@@ -184,12 +184,6 @@ uint32_t plat_ffa_other_world_mode(void)
 	return 0U;
 }
 
-uint32_t plat_ffa_owner_world_mode(ffa_id_t owner_id)
-{
-	(void)owner_id;
-	return 0U;
-}
-
 bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 					  ffa_id_t sender_id,
 					  ffa_id_t receiver_id)

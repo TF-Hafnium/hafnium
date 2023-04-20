@@ -988,9 +988,9 @@ struct ffa_value ffa_send_check_update(
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear &&
-	    !ffa_clear_memory_constituents(
-		    plat_ffa_owner_world_mode(from_locked.vm->id), fragments,
-		    fragment_constituent_counts, fragment_count, page_pool)) {
+	    !ffa_clear_memory_constituents(orig_from_mode, fragments,
+					   fragment_constituent_counts,
+					   fragment_count, page_pool)) {
 		/*
 		 * On failure, roll back by returning memory to the sender. This
 		 * may allocate pages which were previously freed into
@@ -1034,10 +1034,10 @@ out:
  *  Success is indicated by FFA_SUCCESS.
  */
 struct ffa_value ffa_retrieve_check_update(
-	struct vm_locked to_locked, ffa_id_t from_id,
+	struct vm_locked to_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t memory_to_attributes, uint32_t share_func, bool clear,
+	uint32_t sender_orig_mode, uint32_t share_func, bool clear,
 	struct mpool *page_pool)
 {
 	uint32_t i;
@@ -1063,7 +1063,7 @@ struct ffa_value ffa_retrieve_check_update(
 	 */
 	ret = ffa_retrieve_check_transition(
 		to_locked, share_func, fragments, fragment_constituent_counts,
-		fragment_count, memory_to_attributes, &to_mode);
+		fragment_count, sender_orig_mode, &to_mode);
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition for retrieve.\n");
 		return ret;
@@ -1094,9 +1094,9 @@ struct ffa_value ffa_retrieve_check_update(
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear &&
-	    !ffa_clear_memory_constituents(
-		    plat_ffa_owner_world_mode(from_id), fragments,
-		    fragment_constituent_counts, fragment_count, page_pool)) {
+	    !ffa_clear_memory_constituents(sender_orig_mode, fragments,
+					   fragment_constituent_counts,
+					   fragment_count, page_pool)) {
 		dlog_verbose("Couldn't clear constituents.\n");
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1126,7 +1126,7 @@ out:
 }
 
 static struct ffa_value ffa_relinquish_check_update(
-	struct vm_locked from_locked, ffa_id_t owner_id,
+	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	struct mpool *page_pool, bool clear)
@@ -1176,9 +1176,9 @@ static struct ffa_value ffa_relinquish_check_update(
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear &&
-	    !ffa_clear_memory_constituents(
-		    plat_ffa_owner_world_mode(owner_id), fragments,
-		    fragment_constituent_counts, fragment_count, page_pool)) {
+	    !ffa_clear_memory_constituents(orig_from_mode, fragments,
+					   fragment_constituent_counts,
+					   fragment_count, page_pool)) {
 		/*
 		 * On failure, roll back by returning memory to the sender. This
 		 * may allocate pages which were previously freed into
@@ -2574,8 +2574,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 			permissions, share_state->sender_orig_mode);
 
 		ret = ffa_retrieve_check_update(
-			to_locked, memory_region->sender,
-			share_state->fragments,
+			to_locked, share_state->fragments,
 			share_state->fragment_constituent_counts,
 			share_state->fragment_count, memory_to_mode,
 			share_state->share_func, false, page_pool);
@@ -2984,7 +2983,7 @@ struct ffa_value ffa_memory_relinquish(
 	}
 
 	ret = ffa_relinquish_check_update(
-		from_locked, memory_region->sender, share_state->fragments,
+		from_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, page_pool, clear);
 
@@ -3066,7 +3065,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	}
 
 	ret = ffa_retrieve_check_update(
-		to_locked, memory_region->sender, share_state->fragments,
+		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, share_state->sender_orig_mode,
 		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool);

@@ -834,12 +834,6 @@ uint32_t plat_ffa_other_world_mode(void)
 	return MM_MODE_NS;
 }
 
-uint32_t plat_ffa_owner_world_mode(ffa_id_t owner_id)
-{
-	return vm_id_is_current_world(owner_id) ? 0U
-						: plat_ffa_other_world_mode();
-}
-
 ffa_partition_properties_t plat_ffa_partition_properties(
 	ffa_id_t vm_id, const struct vm *target)
 {

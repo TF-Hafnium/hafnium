@@ -384,12 +384,6 @@ uint32_t plat_ffa_other_world_mode(void)
 	return 0U;
 }
 
-uint32_t plat_ffa_owner_world_mode(ffa_id_t owner_id)
-{
-	(void)owner_id;
-	return plat_ffa_other_world_mode();
-}
-
 ffa_partition_properties_t plat_ffa_partition_properties(
 	ffa_id_t vm_id, const struct vm *target)
 {
@@ -1596,7 +1590,7 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 	 */
 	flags &= ~FFA_MEMORY_REGION_FLAG_CLEAR;
 	ret = ffa_retrieve_check_update(
-		to_locked, memory_region->sender, share_state->fragments,
+		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, share_state->sender_orig_mode,
 		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool);
@@ -1735,9 +1729,8 @@ struct ffa_value plat_ffa_other_world_mem_retrieve(
 	}
 
 	CHECK(ffa_retrieve_check_update(
-		      to_locked, memory_region->sender, &constituents,
-		      &composite->constituent_count, 1, memory_to_attributes,
-		      share_func, false, page_pool)
+		      to_locked, &constituents, &composite->constituent_count,
+		      1, memory_to_attributes, share_func, false, page_pool)
 		      .func == FFA_SUCCESS_32);
 
 	/* Acquire RX buffer from the SPMC and copy the retrieve response. */
