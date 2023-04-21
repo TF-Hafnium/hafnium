@@ -22,7 +22,7 @@
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0x7>; /* Supports direct and indirect requests. */
-	boot-order = <1>;
+	boot-order = <3>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
 

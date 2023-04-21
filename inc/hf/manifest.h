@@ -86,6 +86,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION,
 	MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST,
 	MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION,
+	MANIFEST_ERROR_INVALID_BOOT_ORDER,
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,

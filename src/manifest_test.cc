@@ -248,6 +248,12 @@ class ManifestDtBuilder
 		return *this;
 	}
 
+	ManifestDtBuilder &FfaLoadAddress(uint64_t value)
+	{
+		Integer64Property("load-address", value);
+		return *this;
+	}
+
        private:
 	ManifestDtBuilder &StringProperty(const std::string_view &name,
 					  const std::string_view &value)
@@ -350,6 +356,15 @@ class manifest : public ::testing::Test
 		__attribute__((aligned(PAGE_SIZE))) char img[PAGE_SIZE] = {};
 
 		Partition_package(const std::vector<char> &vec)
+		{
+			init(vec);
+		}
+
+		Partition_package()
+		{
+		}
+
+		void init(const std::vector<char> &vec)
 		{
 			// Initialise header field
 			spkg.magic = SP_PKG_HEADER_MAGIC;
@@ -1752,4 +1767,75 @@ TEST_F(manifest, ffa_invalid_interrupt_target_manifest)
 		  MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST);
 }
 
+TEST_F(manifest, ffa_boot_order_not_unique)
+{
+	struct_manifest *m;
+	struct memiter it;
+	struct mm_stage1_locked mm_stage1_locked;
+	struct boot_params params;
+	Partition_package spkg_1;
+	Partition_package spkg_2;
+
+	/* clang-format off */
+	std::vector<char>  dtb1 = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.FfaLoadAddress((uint64_t)&spkg_1)
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<1>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<1>")
+		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<0>")
+		.Build();
+
+	std::vector<char> dtb2 = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1daaa>")
+		.FfaLoadAddress((uint64_t)&spkg_2)
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<1>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<1>")
+		.Property("messaging-method", "<1>")
+		.Property("ns-interrupts-action", "<0>")
+		.Build();
+
+	/* clang-format on */
+	spkg_1.init(dtb1);
+	spkg_2.init(dtb2);
+
+	/* clang-format off */
+	std::vector<char> core_dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+			.StartChild("vm1")
+				.DebugName("ffa_partition_1")
+				.FfaPartition()
+				.LoadAddress((uint64_t)&spkg_1)
+				.VcpuCount(1)
+				.MemSize(0x10000000)
+			.EndChild()
+			.StartChild("vm2")
+				.DebugName("ffa_partition_2")
+				.FfaPartition()
+				.LoadAddress((uint64_t)&spkg_2)
+				.VcpuCount(1)
+				.MemSize(0x10000000)
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	boot_params_init(&params, nullptr);
+	memiter_init(&it, core_dtb.data(), core_dtb.size());
+	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
+		  MANIFEST_ERROR_INVALID_BOOT_ORDER);
+}
 } /* namespace */

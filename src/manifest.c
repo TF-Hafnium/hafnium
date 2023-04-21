@@ -46,6 +46,12 @@ static_assert((HF_OTHER_WORLD_ID > VM_ID_MAX) ||
 		      (HF_OTHER_WORLD_ID < HF_VM_ID_BASE),
 	      "TrustZone VM ID clashes with normal VM range.");
 
+/* Bitmap to track boot order values in use. */
+#define BOOT_ORDER_ENTRY_BITS (sizeof(uint64_t) * 8)
+#define BOOT_ORDER_MAP_ENTRIES                                \
+	((DEFAULT_BOOT_ORDER + (BOOT_ORDER_ENTRY_BITS - 1)) / \
+	 BOOT_ORDER_ENTRY_BITS)
+
 /**
  * A struct to keep track of the partitions properties during early boot
  * manifest parsing:
@@ -62,6 +68,7 @@ struct manifest_data {
 	 */
 	struct mem_range
 		mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS + MAX_VMS];
+	uint64_t boot_order_values[BOOT_ORDER_MAP_ENTRIES];
 };
 
 /**
@@ -75,6 +82,33 @@ static const size_t manifest_data_ppool_entries =
 static struct manifest_data *manifest_data;
 /* Index used to track the number of memory regions allocated. */
 static size_t allocated_mem_regions_index = 0;
+
+static bool check_boot_order(uint16_t boot_order)
+{
+	uint16_t i;
+	uint64_t boot_order_mask;
+
+	if (boot_order == DEFAULT_BOOT_ORDER) {
+		return true;
+	}
+	if (boot_order > DEFAULT_BOOT_ORDER) {
+		dlog_error("Boot order should not exceed %x",
+			   DEFAULT_BOOT_ORDER);
+		return false;
+	}
+
+	i = boot_order / BOOT_ORDER_ENTRY_BITS;
+	boot_order_mask = 1 << (boot_order % BOOT_ORDER_ENTRY_BITS);
+
+	if ((boot_order_mask & manifest_data->boot_order_values[i]) != 0U) {
+		dlog_error("Boot order must be a unique value.");
+		return false;
+	}
+
+	manifest_data->boot_order_values[i] |= boot_order_mask;
+
+	return true;
+}
 
 /**
  * Allocates and clear memory for the manifest data in the given memory pool.
@@ -262,7 +296,6 @@ static enum manifest_return_code read_uint16(const struct fdt_node *node,
 	uint64_t value;
 
 	TRY(read_uint64(node, property, &value));
-
 	if (value > UINT16_MAX) {
 		return MANIFEST_ERROR_INTEGER_OVERFLOW;
 	}
@@ -283,7 +316,7 @@ static enum manifest_return_code read_optional_uint16(
 		return MANIFEST_SUCCESS;
 	}
 
-	return MANIFEST_SUCCESS;
+	return ret;
 }
 
 static enum manifest_return_code read_uint8(const struct fdt_node *node,
@@ -1014,7 +1047,13 @@ enum manifest_return_code parse_ffa_manifest(
 
 	TRY(read_optional_uint16(&root, "boot-order", DEFAULT_BOOT_ORDER,
 				 &vm->partition.boot_order));
-	dlog_verbose("  Boot order %#u\n", vm->partition.boot_order);
+	if (vm->partition.boot_order != DEFAULT_BOOT_ORDER) {
+		dlog_verbose("  Boot order %#u\n", vm->partition.boot_order);
+	}
+
+	if (!check_boot_order(vm->partition.boot_order)) {
+		return MANIFEST_ERROR_INVALID_BOOT_ORDER;
+	}
 
 	TRY(read_optional_uint8(&root, "xlat-granule", 0,
 				(uint8_t *)&vm->partition.xlat_granule));
@@ -1453,6 +1492,9 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_MEM_REGION_INVALID:
 		return "Memory region must within memory ranges defined "
 		       "in the SPMC manifest.";
+	case MANIFEST_ERROR_INVALID_BOOT_ORDER:
+		return "Boot order should be a unique value less than "
+		       "default largest value";
 	}
 
 	panic("Unexpected manifest return code.");
