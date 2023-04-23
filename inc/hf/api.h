@@ -71,6 +71,10 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					    const struct ffa_uuid *uuid,
 					    const uint32_t flags);
+bool api_ffa_fill_partition_info_from_regs(
+	struct ffa_value ret, uint16_t start_index,
+	struct ffa_partition_info *partitions, uint16_t partitions_len,
+	ffa_vm_count_t *ret_count);
 struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 						 const struct ffa_uuid *uuid,
 						 const uint16_t start_index,

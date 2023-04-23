@@ -558,6 +558,94 @@ static inline void api_ffa_pack_uuid(uint64_t *xn_1, uint64_t *xn_2,
 	*xn_2 |= (uint64_t)uuid->uuid[3] << 32;
 }
 
+/**
+ * This function takes an ffa_value structure containing register results from
+ * a call to FFA_PARTITION_INFO_GET_REGS and fills out an ffa_partition_info
+ * structure array. It also updates the partition count in the ret_count
+ * variable. This function expects that the ffa_value input is set by a
+ * more trusted or higher privileged entity, such as the SPMC for the hypervisor
+ * or the SPMD for the SPMC.
+ */
+bool api_ffa_fill_partition_info_from_regs(
+	struct ffa_value ret, uint16_t start_index,
+	struct ffa_partition_info *partitions, uint16_t partitions_len,
+	ffa_vm_count_t *ret_count)
+{
+	uint16_t vm_count = *ret_count;
+	uint16_t curr_index = 0;
+	uint8_t num_entries = 0;
+	uint8_t idx = 0;
+	/* List of pointers to args in return value. */
+	uint64_t *arg_ptrs[] = {
+		&ret.arg3,
+		&ret.arg4,
+		&ret.arg5,
+		&ret.arg6,
+		&ret.arg7,
+		&ret.extended_val.arg8,
+		&ret.extended_val.arg9,
+		&ret.extended_val.arg10,
+		&ret.extended_val.arg11,
+		&ret.extended_val.arg12,
+		&ret.extended_val.arg13,
+		&ret.extended_val.arg14,
+		&ret.extended_val.arg15,
+		&ret.extended_val.arg16,
+		&ret.extended_val.arg17,
+	};
+
+	if (vm_count > partitions_len) {
+		return false;
+	}
+
+	/*
+	 * Tags are currently unused in the implementation. Expect it to be
+	 * zero since the implementation does not provide a tag when calling
+	 * the FFA_PARTITION_INFO_GET_REGS ABI.
+	 */
+	assert(ffa_partition_info_regs_get_tag(ret) == 0);
+
+	/*
+	 * Hafnium expects the size of the returned descriptor to be equal to
+	 * the size of the structure in the FF-A 1.1 specification. When future
+	 * enhancements are made, this assert can be relaxed.
+	 */
+	assert(ffa_partition_info_regs_get_desc_size(ret) ==
+	       sizeof(struct ffa_partition_info));
+
+	curr_index = ffa_partition_info_regs_get_curr_idx(ret);
+
+	/* FF-A 1.2 ALP0, section 14.9.2 Usage rule 7. */
+	assert(start_index <= curr_index);
+
+	num_entries = curr_index - start_index + 1;
+	if (num_entries > (partitions_len - vm_count) ||
+	    num_entries > MAX_INFO_REGS_ENTRIES_PER_CALL) {
+		return false;
+	}
+
+	while (num_entries) {
+		uint64_t info = *(arg_ptrs[(ptrdiff_t)(idx++)]);
+		uint64_t uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx++)]);
+		uint64_t uuid_high = *(arg_ptrs[(ptrdiff_t)(idx++)]);
+
+		partitions[vm_count].vm_id = info & 0xFFFF;
+		partitions[vm_count].vcpu_count = (info >> 16) & 0xFFFF;
+		partitions[vm_count].properties = (info >> 32);
+		partitions[vm_count].uuid.uuid[0] = uuid_lo & 0xFFFFFFFF;
+		partitions[vm_count].uuid.uuid[1] =
+			(uuid_lo >> 32) & 0xFFFFFFFF;
+		partitions[vm_count].uuid.uuid[2] = uuid_high & 0xFFFFFFFF;
+		partitions[vm_count].uuid.uuid[3] =
+			(uuid_high >> 32) & 0xFFFFFFFF;
+		vm_count++;
+		num_entries--;
+	}
+
+	*ret_count = vm_count;
+	return true;
+}
+
 struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 						 const struct ffa_uuid *uuid,
 						 const uint16_t start_index,
@@ -614,6 +702,9 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	 * When running the Hypervisor:
 	 * - If UUID is Null the Hypervisor forwards the query to the SPMC for
 	 * it to fill with secure partitions information.
+	 * When running the SPMC, the SPMC forwards the call to the SPMD to
+	 * discover any EL3 SPMD logical partitions, if the call came from an
+	 * SP. Otherwise, the call is not forwarded.
 	 * TODO: Note that for this ABI, forwarding on every invocation when
 	 * uuid is Null is inefficient,and if performance becomes a problem,
 	 * this would be a good place to optimize using strategies such as
@@ -625,11 +716,15 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	 * - If UUID is non-Null and vm_count is zero it means there is no such
 	 * partition identified in the system.
 	 */
-	if (!plat_ffa_partition_info_get_regs_forward(
-		    uuid, start_index, tag, partitions, ARRAY_SIZE(partitions),
-		    &vm_count)) {
-		dlog_error("Failed to forward ffa_partition_info_get_regs.\n");
-		return ffa_error(FFA_DENIED);
+	if (vm_id_is_current_world(current_vm->id)) {
+		if (!plat_ffa_partition_info_get_regs_forward(
+			    uuid, start_index, tag, partitions,
+			    ARRAY_SIZE(partitions), &vm_count)) {
+			dlog_error(
+				"Failed to forward "
+				"ffa_partition_info_get_regs.\n");
+			return ffa_error(FFA_DENIED);
+		}
 	}
 
 	/*

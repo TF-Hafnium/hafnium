@@ -24,5 +24,8 @@ source_set("spmc") {
     "//src/arch/${plat_arch}:config",
     "//src/arch/${plat_arch}:arch_config",
   ]
+
+  deps = [ "//vmlib/${plat_arch}:smc_call" ]
+
   sources = [ "spmc.c" ]
 }
