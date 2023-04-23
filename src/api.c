@@ -822,7 +822,7 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 		if (uuid_is_null) {
 			api_ffa_pack_uuid(xn_1, xn_2, &partitions[idx].uuid);
 		}
-		assert(arg_idx < ARRAY_SIZE(arg_ptrs));
+		assert(arg_idx <= ARRAY_SIZE(arg_ptrs));
 	}
 
 	return ret;
