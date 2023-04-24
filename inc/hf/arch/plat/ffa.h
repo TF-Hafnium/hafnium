@@ -77,8 +77,6 @@ bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
 bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 				 struct ffa_value *ret);
 
-bool plat_ffa_rx_release_forwarded(struct vm_locked vm_locked);
-
 bool plat_ffa_acquire_receiver_rx(struct vm_locked locked,
 				  struct ffa_value *ret);
 

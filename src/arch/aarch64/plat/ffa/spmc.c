@@ -600,13 +600,6 @@ bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 	return false;
 }
 
-bool plat_ffa_rx_release_forwarded(struct vm_locked vm_locked)
-{
-	(void)vm_locked;
-
-	return false;
-}
-
 bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 				  struct ffa_value *ret)
 {
