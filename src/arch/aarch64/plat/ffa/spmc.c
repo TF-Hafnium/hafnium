@@ -1180,6 +1180,18 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 
 	/* Check if a vCPU of SP is being resumed. */
 	if ((target_vm_id & HF_VM_ID_WORLD_MASK) != 0) {
+		/*
+		 * A call chain cannot span CPUs. The target vCPU can only be
+		 * resumed by FFA_RUN on present CPU.
+		 */
+		if ((target_vcpu->call_chain.prev_node != NULL ||
+		     target_vcpu->call_chain.next_node != NULL) &&
+		    (target_vcpu->cpu != current->cpu)) {
+			run_ret->arg2 = FFA_DENIED;
+			ret = false;
+			goto out;
+		}
+
 		if (target_vcpu->processing_secure_interrupt) {
 			/*
 			 * Consider the following case: a secure interrupt
