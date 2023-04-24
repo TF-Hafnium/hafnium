@@ -6,15 +6,12 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stddef.h>
-
 #include "hf/arch/barriers.h"
 #include "hf/arch/ffa.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
 
 #include "hf/api.h"
-#include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
@@ -41,10 +38,10 @@ alignas(FFA_PAGE_SIZE) static uint8_t other_world_recv_buffer[HF_MAILBOX_SIZE];
 alignas(PAGE_SIZE) static uint8_t
 	other_world_retrieve_buffer[HF_MAILBOX_SIZE * MAX_FRAGMENTS];
 
-bool vm_does_not_support_indirect_messages(struct vm *vm)
+bool vm_supports_indirect_messages(struct vm *vm)
 {
-	return (vm->ffa_version < MAKE_FFA_VERSION(1, 1) ||
-		!vm_supports_messaging_method(vm, FFA_PARTITION_INDIRECT_MSG));
+	return vm->ffa_version >= MAKE_FFA_VERSION(1, 1) &&
+	       vm_supports_messaging_method(vm, FFA_PARTITION_INDIRECT_MSG);
 }
 
 /** Returns information on features specific to the NWd. */
@@ -87,13 +84,16 @@ void plat_ffa_set_tee_enabled(bool tee_enabled)
 	ffa_tee_enabled = tee_enabled;
 }
 
-static struct ffa_value plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send,
-					       uint64_t page_count)
+static void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send,
+				   uint64_t page_count)
 {
-	return arch_other_world_call((struct ffa_value){.func = FFA_RXTX_MAP_64,
-							.arg1 = pa_addr(recv),
-							.arg2 = pa_addr(send),
-							.arg3 = page_count});
+	struct ffa_value ret;
+
+	ret = arch_other_world_call((struct ffa_value){.func = FFA_RXTX_MAP_64,
+						       .arg1 = pa_addr(recv),
+						       .arg2 = pa_addr(send),
+						       .arg3 = page_count});
+	CHECK(ret.func == FFA_SUCCESS_32);
 }
 
 void plat_ffa_init(struct mpool *ppool)
@@ -132,12 +132,10 @@ void plat_ffa_init(struct mpool *ppool)
 	 * perspective and vice-versa.
 	 */
 	dlog_verbose("Setting up buffers for TEE.\n");
-	ret = plat_ffa_rxtx_map_spmc(
+	plat_ffa_rxtx_map_spmc(
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.recv)),
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.send)),
 		HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
-
-	CHECK(ret.func == FFA_SUCCESS_32);
 
 	ffa_tee_enabled = true;
 
@@ -270,7 +268,7 @@ bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 	struct vm *vm = vm_locked.vm;
 	ffa_vm_id_t vm_id = vm->id;
 
-	if (!ffa_tee_enabled || vm_does_not_support_indirect_messages(vm)) {
+	if (!ffa_tee_enabled || !vm_supports_indirect_messages(vm)) {
 		return false;
 	}
 
@@ -314,8 +312,7 @@ bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 	 * - The VM's version is not FF-A v1.1.
 	 * - If the mailbox ownership hasn't been transferred to the SPMC.
 	 */
-	if (!ffa_tee_enabled ||
-	    vm_does_not_support_indirect_messages(to_locked.vm) ||
+	if (!ffa_tee_enabled || !vm_supports_indirect_messages(to_locked.vm) ||
 	    to_locked.vm->mailbox.state != MAILBOX_STATE_OTHER_WORLD_OWNED) {
 		return true;
 	}
@@ -327,13 +324,11 @@ bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 		*ret = other_world_ret;
 	}
 
-	if (other_world_ret.func != FFA_SUCCESS_32) {
-		return false;
+	if (other_world_ret.func == FFA_SUCCESS_32) {
+		to_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
 	}
 
-	to_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
-
-	return true;
+	return other_world_ret.func == FFA_SUCCESS_32;
 }
 
 bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
@@ -712,14 +707,13 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 {
 	struct vm *vm = vm_locked.vm;
 	struct vm *other_world;
-	struct ffa_value ret;
 
 	if (!ffa_tee_enabled) {
 		vm_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
 		return;
 	}
 
-	if (vm_does_not_support_indirect_messages(vm)) {
+	if (!vm_supports_indirect_messages(vm)) {
 		return;
 	}
 
@@ -734,13 +728,7 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 		vm->id, (uintptr_t)vm->mailbox.recv,
 		(uintptr_t)vm->mailbox.send);
 
-	ret = plat_ffa_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
-
-	if (ret.func != FFA_SUCCESS_32) {
-		panic("Fail to map RXTX buffers for VM %x, in the SPMC's "
-		      "translation regime\n",
-		      vm->id);
-	}
+	plat_ffa_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
 
 	vm_locked.vm->mailbox.state = MAILBOX_STATE_OTHER_WORLD_OWNED;
 
@@ -767,7 +755,7 @@ void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 		return;
 	}
 
-	if (vm_does_not_support_indirect_messages(vm_locked.vm)) {
+	if (!vm_supports_indirect_messages(vm_locked.vm)) {
 		return;
 	}
 
