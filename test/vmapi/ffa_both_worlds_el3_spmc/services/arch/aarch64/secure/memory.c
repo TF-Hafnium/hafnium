@@ -86,14 +86,10 @@ static void memory_increment(struct ffa_memory_region *memory_region)
 
 void ffa_mem_retrieve_from_args(struct mailbox_buffers mb,
 				void *retrieved_memory, ffa_vm_id_t sender,
-				uint32_t handle, uint32_t tag, uint32_t flags)
+				ffa_memory_handle_t handle, uint32_t tag,
+				ffa_memory_region_flags_t flags)
 {
-	struct ffa_value ret;
 	uint32_t msg_size;
-	struct ffa_memory_region *memory_region;
-	uint32_t fragment_length;
-	uint32_t total_length;
-	uint32_t fragment_offset;
 
 	msg_size = ffa_memory_retrieve_request_init_single_receiver(
 		(struct ffa_memory_region *)mb.send, handle, sender,
@@ -102,43 +98,8 @@ void ffa_mem_retrieve_from_args(struct mailbox_buffers mb,
 		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 		FFA_MEMORY_INNER_SHAREABLE);
 
-	ret = ffa_mem_retrieve_req(msg_size, msg_size);
-	ASSERT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
-	total_length = ret.arg1;
-	fragment_length = ret.arg2;
-	EXPECT_GE(fragment_length,
-		  sizeof(struct ffa_memory_region) +
-			  sizeof(struct ffa_memory_access) +
-			  sizeof(struct ffa_composite_memory_region));
-	EXPECT_LE(fragment_length, HF_MAILBOX_SIZE);
-	EXPECT_LE(fragment_length, total_length);
-	memory_region = (struct ffa_memory_region *)mb.recv;
-	EXPECT_EQ(memory_region->receiver_count, 1);
-	EXPECT_EQ(memory_region->receivers[0].receiver_permissions.receiver,
-		  hf_vm_get_id());
-	memcpy_s((uint8_t *)retrieved_memory, HF_MAILBOX_SIZE, mb.recv,
-		 fragment_length);
-	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
-	/* Retrieve the remaining fragments. */
-	fragment_offset = fragment_length;
-	while (fragment_offset < total_length) {
-		HFTEST_LOG("Calling again. frag offset: %x; total: %x\n",
-			   fragment_offset, total_length);
-		ret = ffa_mem_frag_rx(handle, fragment_offset);
-		EXPECT_EQ(ret.func, FFA_MEM_FRAG_TX_32);
-		EXPECT_EQ(ffa_frag_handle(ret), handle);
-		/* Sender MBZ at virtual instance. */
-		EXPECT_EQ(ffa_frag_sender(ret), 0);
-		fragment_length = ret.arg3;
-		EXPECT_GT(fragment_length, 0);
-		ASSERT_LE(fragment_offset + fragment_length, HF_MAILBOX_SIZE);
-		memcpy_s((uint8_t *)retrieved_memory + fragment_offset,
-			 HF_MAILBOX_SIZE - fragment_offset, mb.recv,
-			 fragment_length);
-		fragment_offset += fragment_length;
-		ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
-	}
-	EXPECT_EQ(fragment_offset, total_length);
+	retrieve_memory(mb.recv, handle, retrieved_memory, HF_MAILBOX_SIZE,
+			msg_size);
 }
 
 struct ffa_value sp_req_retrieve_cmd(ffa_vm_id_t sender, uint32_t handle,

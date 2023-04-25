@@ -436,43 +436,20 @@ static struct ffa_partition_msg *get_mailbox_message(void *recv)
 }
 
 /*
- * Use the retrieve request from the receive buffer to retrieve a memory region
- * which has been sent to us. Copies all the fragments into the provided buffer
- * if any, and checks that the total length of all fragments is no more than
- * `memory_region_max_size`. Returns the sender, and the handle via a return
- * parameter.
+ * Retrieve a memory region from `recv_buf`. Copies all the fragments into
+ * `memory_region_ret` if non-null, and checks that the total length of all
+ * fragments is no more than `memory_region_max_size`.
  */
-ffa_vm_id_t retrieve_memory_from_message(
-	void *recv_buf, void *send_buf, ffa_memory_handle_t *handle,
-	struct ffa_memory_region *memory_region_ret,
-	size_t memory_region_max_size)
+void retrieve_memory(void *recv_buf, ffa_memory_handle_t handle,
+		     struct ffa_memory_region *memory_region_ret,
+		     size_t memory_region_max_size, uint32_t msg_size)
 {
-	uint32_t msg_size;
 	struct ffa_value ret;
 	struct ffa_memory_region *memory_region;
-	ffa_vm_id_t sender;
-	struct ffa_memory_region *retrieve_request;
-	ffa_memory_handle_t retrieved_handle;
 	uint32_t fragment_length;
 	uint32_t total_length;
 	uint32_t fragment_offset;
-	const struct ffa_partition_msg *retrv_message =
-		get_mailbox_message(recv_buf);
 
-	ASSERT_TRUE(retrv_message != NULL);
-
-	sender = ffa_rxtx_header_sender(&retrv_message->header);
-	msg_size = retrv_message->header.size;
-
-	retrieve_request = (struct ffa_memory_region *)retrv_message->payload;
-
-	retrieved_handle = retrieve_request->handle;
-	if (handle != NULL) {
-		*handle = retrieved_handle;
-	}
-	memcpy_s(send_buf, HF_MAILBOX_SIZE, retrv_message->payload, msg_size);
-
-	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	ret = ffa_mem_retrieve_req(msg_size, msg_size);
 	ASSERT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
 	total_length = ret.arg1;
@@ -506,9 +483,9 @@ ffa_vm_id_t retrieve_memory_from_message(
 	while (fragment_offset < total_length) {
 		dlog_verbose("Calling again. frag offset: %x; total: %x\n",
 			     fragment_offset, total_length);
-		ret = ffa_mem_frag_rx(retrieved_handle, fragment_offset);
+		ret = ffa_mem_frag_rx(handle, fragment_offset);
 		EXPECT_EQ(ret.func, FFA_MEM_FRAG_TX_32);
-		EXPECT_EQ(ffa_frag_handle(ret), retrieved_handle);
+		EXPECT_EQ(ffa_frag_handle(ret), handle);
 		/* Sender MBZ at virtual instance. */
 		EXPECT_EQ(ffa_frag_sender(ret), 0);
 		fragment_length = ret.arg3;
@@ -524,6 +501,45 @@ ffa_vm_id_t retrieve_memory_from_message(
 		ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 	}
 	EXPECT_EQ(fragment_offset, total_length);
+}
+
+/*
+ * Use the retrieve request from the receive buffer (`recv_buf`) to retrieve a
+ * memory region which has been sent to us. Copies all the fragments into
+ * `memory_region_ret` if non-null, and checks that the total length of all
+ * fragments is no more than `memory_region_max_size`. Returns the sender, and
+ * the handle via `ret_handle`
+ */
+ffa_vm_id_t retrieve_memory_from_message(
+	void *recv_buf, void *send_buf, ffa_memory_handle_t *ret_handle,
+	struct ffa_memory_region *memory_region_ret,
+	size_t memory_region_max_size)
+{
+	uint32_t msg_size;
+	ffa_vm_id_t sender;
+	struct ffa_memory_region *retrieve_request;
+	ffa_memory_handle_t retrieved_handle;
+
+	const struct ffa_partition_msg *retrv_message =
+		get_mailbox_message(recv_buf);
+
+	ASSERT_TRUE(retrv_message != NULL);
+
+	sender = ffa_rxtx_header_sender(&retrv_message->header);
+	msg_size = retrv_message->header.size;
+
+	retrieve_request = (struct ffa_memory_region *)retrv_message->payload;
+
+	retrieved_handle = retrieve_request->handle;
+	if (ret_handle != NULL) {
+		*ret_handle = retrieved_handle;
+	}
+	memcpy_s(send_buf, HF_MAILBOX_SIZE, retrv_message->payload, msg_size);
+
+	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
+	retrieve_memory(recv_buf, retrieved_handle, memory_region_ret,
+			memory_region_max_size, msg_size);
 
 	return sender;
 }
