@@ -1232,6 +1232,11 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 	size_t i = 0;
 	bool found_primary_vm = false;
 
+	if (boot_params->mem_ranges_count == 0 &&
+	    boot_params->ns_mem_ranges_count == 0) {
+		return MANIFEST_ERROR_MEMORY_MISSING;
+	}
+
 	dump_memory_ranges(boot_params->mem_ranges,
 			   boot_params->mem_ranges_count, false);
 	dump_memory_ranges(boot_params->ns_mem_ranges,
