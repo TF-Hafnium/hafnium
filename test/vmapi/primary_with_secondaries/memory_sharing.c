@@ -1700,18 +1700,25 @@ TEST_PRECONDITION(memory_sharing, lend_relinquish_RW_X, service1_is_vm)
 
 	/* Attempt to execute from memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
-	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
-	send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
-		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
-		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX);
+	if (run_res.func == FFA_YIELD_32) {
+		/* Service running at EL1 */
+		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
-	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_TRUE(exception_received(&run_res, mb.recv));
+		send_memory_and_retrieve_request(
+			FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
+			service1_info->vm_id, constituents,
+			ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
+			FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			FFA_INSTRUCTION_ACCESS_NX);
+
+		run_res = ffa_run(service1_info->vm_id, 0);
+		EXPECT_TRUE(exception_received(&run_res, mb.recv));
+	} else {
+		/* Service running at EL0 where SCTLR_EL2.WXN is set. */
+		EXPECT_FFA_ERROR(run_res, FFA_ABORTED);
+	}
 }
 
 /**

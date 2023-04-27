@@ -180,6 +180,98 @@ initrd("primary_with_secondaries_test") {
   ]
 }
 
+vm_kernel("primary_with_secondaries_el0_test_vm") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/${plat_arch}:config",
+  ]
+
+  sources = [
+    "boot.c",
+    "el0_interrupts.c",
+    "ffa.c",
+    "memory_sharing.c",
+  ]
+
+  deps = [
+    ":primary_with_secondaries",
+    "//src/arch/aarch64/hftest:registers",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
+    "//vmlib",
+  ]
+}
+
+manifest("primary_with_secondaries_el0_test_manifest") {
+  source = "manifest_el0_vms.dts"
+  output = "manifest_el0_vms.dtb"
+  overlay = hftest_manifest_overlay
+}
+
+device_tree("service1_el0_dtb") {
+  source = "services/arch/aarch64/el0/service1.dts"
+  output = "$target_out_dir/service1_el0.dtb"
+}
+
+device_tree("service2_el0_dtb") {
+  source = "services/arch/aarch64/el0/service2.dts"
+  output = "$target_out_dir/service2_el0.dtb"
+}
+
+device_tree("service3_el0_dtb") {
+  source = "services/arch/aarch64/el0/service3.dts"
+  output = "$target_out_dir/service3_el0.dtb"
+}
+
+initrd("primary_with_secondaries_el0_test") {
+  testonly = true
+
+  files = [
+    [
+      "manifest.dtb",
+      ":primary_with_secondaries_el0_test_manifest",
+      "manifest_el0_vms.dtb",
+    ],
+    [
+      "primary_with_secondaries_el0",
+      ":primary_with_secondaries_el0_test_vm",
+      "primary_with_secondaries_el0_test_vm.bin",
+    ],
+    [
+      "services1_el0",
+      "services/arch/aarch64/el0:service_el0_vm1",
+      "service_el0_vm1.bin",
+    ],
+    [
+      "services2_el0",
+      "services/arch/aarch64/el0:service_el0_vm2",
+      "service_el0_vm2.bin",
+    ],
+    [
+      "services3_el0",
+      "services/arch/aarch64/el0:service_el0_vm3",
+      "service_el0_vm3.bin",
+    ],
+    [
+      "service1_el0.dtb",
+      ":service1_el0_dtb",
+      "service1_el0.dtb",
+    ],
+    [
+      "service2_el0.dtb",
+      ":service2_el0_dtb",
+      "service2_el0.dtb",
+    ],
+    [
+      "service3_el0.dtb",
+      ":service3_el0_dtb",
+      "service3_el0.dtb",
+    ],
+  ]
+}
+
 vm_kernel("primary_with_sp_test_vm") {
   testonly = true
   public_configs = [

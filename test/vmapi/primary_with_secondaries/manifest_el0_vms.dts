@@ -1,0 +1,52 @@
+/*
+ * Copyright 2023 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/dts-v1/;
+
+/ {
+	hypervisor {
+		compatible = "hafnium,hafnium";
+		vm1 {
+			debug_name = "primary_with_secondaries_el0";
+			kernel_filename = "primary_with_secondaries_el0";
+		};
+
+		vm2 {
+			is_ffa_partition;
+			hyp_loaded;
+			debug_name = "services1_el0";
+			vcpu_count = <1>;
+			mem_size = <0x100000>;
+			kernel_filename = "services1_el0";
+			fdt_filename = "service1_el0.dtb";
+			exception-level = <6>; /* EL0 */
+		};
+
+		vm3 {
+			is_ffa_partition;
+			hyp_loaded;
+			debug_name = "services2_el0";
+			vcpu_count = <1>;
+			mem_size = <0x100000>;
+			kernel_filename = "services2_el0";
+			fdt_filename = "service2_el0.dtb";
+			exception-level = <6>; /* EL0 */
+		};
+
+		vm4 {
+			is_ffa_partition;
+			hyp_loaded;
+			debug_name = "services3_el0";
+			vcpu_count = <1>;
+			mem_size = <0x100000>;
+			kernel_filename = "services3_el0";
+			fdt_filename = "service3_el0.dtb";
+			exception-level = <6>; /* EL0 */
+		};
+	};
+};

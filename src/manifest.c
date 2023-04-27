@@ -922,7 +922,8 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 
 	if (vm->partition.run_time_el != EL1 &&
 	    vm->partition.run_time_el != S_EL1 &&
-	    vm->partition.run_time_el != S_EL0) {
+	    vm->partition.run_time_el != S_EL0 &&
+	    vm->partition.run_time_el != EL0) {
 		dlog_error("Exception level %s: %d\n", error_string,
 			   vm->partition.run_time_el);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
@@ -936,7 +937,8 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if (vm->partition.run_time_el == S_EL0 &&
+	if ((vm->partition.run_time_el == S_EL0 ||
+	     vm->partition.run_time_el == EL0) &&
 	    vm->partition.execution_ctx_count != 1) {
 		dlog_error(
 			"Exception level and execution context count %s: %d "
@@ -1185,7 +1187,8 @@ enum manifest_return_code parse_ffa_manifest(
 		&vm->partition.power_management));
 	vm->partition.power_management &= MANIFEST_POWER_MANAGEMENT_ALL_MASK;
 	if (vm->partition.execution_ctx_count == 1 ||
-	    vm->partition.run_time_el == S_EL0) {
+	    vm->partition.run_time_el == S_EL0 ||
+	    vm->partition.run_time_el == EL0) {
 		vm->partition.power_management =
 			MANIFEST_POWER_MANAGEMENT_NONE_MASK;
 	}

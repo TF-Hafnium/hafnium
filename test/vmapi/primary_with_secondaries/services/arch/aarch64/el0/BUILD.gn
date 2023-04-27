@@ -1,0 +1,81 @@
+# Copyright 2023 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+
+# Service that can be interrupted.
+source_set("interruptible") {
+  testonly = true
+  public_configs = [
+    "//test/vmapi/primary_with_secondaries:config",
+    "//test/hftest:hftest_config",
+  ]
+
+  sources = [
+    "interruptible.c",
+    "interruptible_echo.c",
+  ]
+
+  deps = [ "//src/arch/aarch64/hftest/el0:interrupts" ]
+}
+
+# Service to check that hf_mailbox_receive can't block when there are pending
+# interrupts.
+source_set("receive_block") {
+  testonly = true
+  public_configs = [
+    "//test/vmapi/primary_with_secondaries:config",
+    "//test/hftest:hftest_config",
+  ]
+  sources = [ "receive_block.c" ]
+  deps = [ "//src/arch/aarch64/hftest/el0:interrupts" ]
+}
+
+vm_kernel("service_el0_vm1") {
+  testonly = true
+
+  deps = [
+    ":interruptible",
+    ":receive_block",
+    "//src/arch/${plat_arch}/hftest/el0:interrupts",
+    "//src/arch/${plat_arch}/hftest/el0:mm",
+    "//test/hftest:hftest_secondary_el0_partition",
+    "//test/hftest/arch/${plat_arch}/el0:mm",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
+    "//test/vmapi/primary_with_secondaries/services:boot",
+    "//test/vmapi/primary_with_secondaries/services:echo",
+    "//test/vmapi/primary_with_secondaries/services:ffa_check",
+    "//test/vmapi/primary_with_secondaries/services:memory",
+    "//test/vmapi/primary_with_secondaries/services:relay",
+    "//test/vmapi/primary_with_secondaries/services:run_waiting",
+    "//vmlib",
+  ]
+}
+
+vm_kernel("service_el0_vm2") {
+  testonly = true
+
+  deps = [
+    "//src/arch/${plat_arch}/hftest/el0:interrupts",
+    "//src/arch/${plat_arch}/hftest/el0:mm",
+    "//test/hftest:hftest_secondary_el0_partition",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/primary_with_secondaries/services/:memory",
+    "//test/vmapi/primary_with_secondaries/services/:relay",
+    "//vmlib",
+  ]
+}
+
+vm_kernel("service_el0_vm3") {
+  testonly = true
+
+  deps = [
+    "//test/hftest:hftest_secondary_el0_partition",
+    "//test/vmapi/common:ffa",
+    "//vmlib",
+  ]
+}

@@ -48,7 +48,8 @@ enum run_time_el {
 	S_EL1,
 	SUPERVISOR_MODE,
 	SECURE_USER_MODE,
-	SECURE_SUPERVISOR_MODE
+	SECURE_SUPERVISOR_MODE,
+	EL0
 };
 
 enum execution_state { AARCH64 = 0, AARCH32 };

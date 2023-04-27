@@ -641,7 +641,8 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	size_t kernel_size = 0;
 	const size_t mem_size = pa_difference(mem_begin, mem_end);
 	uint32_t map_mode;
-	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0;
+	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0 ||
+				manifest_vm->partition.run_time_el == EL0;
 	size_t n;
 
 	/*
