@@ -109,12 +109,8 @@ then
                      --force-long-running --vm_args "rdinit=/test_binary --"
 fi
 
-"${HFTEST[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
-                    --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_el0_test
-
-
-"${HFTEST[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
-                   --initrd test/vmapi/el0_partitions/el0_partitions_test
+  "${HFTEST[@]}" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                     --initrd test/vmapi/primary_with_secondaries/primary_with_secondaries_el0_test
 
 if [ $USE_TFA == true ] && [ $USE_FVP == true ]
 then

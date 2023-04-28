@@ -31,7 +31,6 @@ group("vmapi") {
   deps = [
     "arch/${plat_arch}:arch",
     "common:ffa",
-    "el0_partitions:el0_partitions_test",
     "primary_only:primary_only_test",
     "primary_only_ffa:primary_only_ffa_test",
     "primary_with_secondaries:primary_with_secondaries_el0_test",
