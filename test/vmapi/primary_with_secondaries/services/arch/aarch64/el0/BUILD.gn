@@ -22,6 +22,18 @@ source_set("interruptible") {
   deps = [ "//src/arch/aarch64/hftest/el0:interrupts" ]
 }
 
+# Service to exercise the FFA_MEM_PERM_GET and FFA_MEM_PERM_SET interfaces
+# for el0 partitions.
+source_set("mem_permissions") {
+  testonly = true
+  public_configs = [
+    "//test/vmapi/primary_with_secondaries:config",
+    "//test/hftest:hftest_config",
+  ]
+
+  sources = [ "mem_permissions_test.c" ]
+}
+
 # Service to check that hf_mailbox_receive can't block when there are pending
 # interrupts.
 source_set("receive_block") {
@@ -39,6 +51,7 @@ vm_kernel("service_el0_vm1") {
 
   deps = [
     ":interruptible",
+    ":mem_permissions",
     ":receive_block",
     "//src/arch/${plat_arch}/hftest/el0:interrupts",
     "//src/arch/${plat_arch}/hftest/el0:mm",
@@ -60,6 +73,7 @@ vm_kernel("service_el0_vm2") {
   testonly = true
 
   deps = [
+    ":mem_permissions",
     "//src/arch/${plat_arch}/hftest/el0:interrupts",
     "//src/arch/${plat_arch}/hftest/el0:mm",
     "//test/hftest:hftest_secondary_el0_partition",

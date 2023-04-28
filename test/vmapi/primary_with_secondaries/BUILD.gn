@@ -364,6 +364,7 @@ vm_kernel("primary_with_sp_vhe_test_vm") {
   sources = [
     "dir_msg.c",
     "indirect_messaging.c",
+    "memory_permissions.c",
     "memory_sharing.c",
   ]
 
@@ -402,9 +403,9 @@ partitions_json("primary_with_sp_vhe") {
     ],
     [
       "service_sp2_partition_package.img",
-      "services/arch/aarch64/secure/manifest_secure_service2.dts",
-      "services/arch/aarch64/secure:service_sp2_partition_package",
-      "services/arch/aarch64/secure:partition_manifest_service_sp2",
+      "services/arch/aarch64/secure/el0/manifest_secure_service2.dts",
+      "services/arch/aarch64/secure/el0:service_sp2_partition_package",
+      "services/arch/aarch64/secure/el0:partition_manifest_service_sp2",
     ],
   ]
 

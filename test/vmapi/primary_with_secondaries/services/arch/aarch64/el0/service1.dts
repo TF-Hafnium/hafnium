@@ -22,4 +22,16 @@
 	entrypoint-offset = <0x0>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <7>; /* Direct and indirect messaging */
+	gp-register-num = <0>;
+
+	/* Boot Info */
+	boot-info {
+		compatible = "arm,ffa-manifest-boot-info";
+		ffa_manifest;
+	};
+
+	hftest-service-setup {
+		compatible = "arm,hftest";
+		ffa_mem_perm_set_ro;
+	};
 };
