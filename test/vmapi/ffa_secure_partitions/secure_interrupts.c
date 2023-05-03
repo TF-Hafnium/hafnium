@@ -6,43 +6,18 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/barriers.h"
 #include "hf/arch/irq.h"
+#include "hf/arch/vm/delay.h"
 #include "hf/arch/vm/interrupts_gicv3.h"
 #include "hf/arch/vm/timer.h"
 
 #include "ffa_secure_partitions.h"
 #include "gicv3.h"
-#include "msr.h"
 #include "partition_services.h"
 #include "sp_helpers.h"
 
 #define SP_SLEEP_TIME 400U
 #define NS_SLEEP_TIME 200U
-
-static inline uint64_t syscounter_read(void)
-{
-	isb();
-	return read_msr(cntvct_el0);
-}
-
-static void waitus(uint64_t us)
-{
-	uint64_t start_count_val = syscounter_read();
-	uint64_t wait_cycles = (us * read_msr(cntfrq_el0)) / 1000000;
-
-	while ((syscounter_read() - start_count_val) < wait_cycles) {
-		/* Busy wait... */;
-	}
-}
-
-static void waitms(uint64_t ms)
-{
-	while (ms > 0) {
-		waitus(1000);
-		ms--;
-	}
-}
 
 static void configure_trusted_wdog_interrupt(ffa_vm_id_t source,
 					     ffa_vm_id_t dest, bool enable)
