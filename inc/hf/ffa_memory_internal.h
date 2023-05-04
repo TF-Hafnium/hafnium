@@ -137,24 +137,6 @@ bool share_state_sending_complete(struct share_states_locked share_states,
 				  struct ffa_memory_share_state *share_state);
 void dump_share_states(void);
 
-/**
- * Return the offset to the first constituent within the
- * `ffa_composite_memory_region` for the given receiver from an
- * `ffa_memory_region`. The caller must check that the receiver_index is within
- * bounds, and that it has a composite memory region offset.
- */
-static inline uint32_t ffa_composite_constituent_offset(
-	struct ffa_memory_region *memory_region, uint32_t receiver_index)
-{
-	CHECK(receiver_index < memory_region->receiver_count);
-	CHECK(memory_region->receivers[receiver_index]
-		      .composite_memory_region_offset != 0);
-
-	return memory_region->receivers[receiver_index]
-		       .composite_memory_region_offset +
-	       sizeof(struct ffa_composite_memory_region);
-}
-
 struct ffa_value ffa_memory_send_validate(
 	struct vm_locked from_locked, struct ffa_memory_region *memory_region,
 	uint32_t memory_share_length, uint32_t fragment_length,

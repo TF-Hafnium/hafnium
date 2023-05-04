@@ -38,6 +38,24 @@ static struct spinlock share_states_lock_instance = SPINLOCK_INIT;
 static struct ffa_memory_share_state share_states[MAX_MEM_SHARES];
 
 /**
+ * Return the offset to the first constituent within the
+ * `ffa_composite_memory_region` for the given receiver from an
+ * `ffa_memory_region`. The caller must check that the receiver_index is within
+ * bounds, and that it has a composite memory region offset.
+ */
+static uint32_t ffa_composite_constituent_offset(
+	struct ffa_memory_region *memory_region, uint32_t receiver_index)
+{
+	CHECK(receiver_index < memory_region->receiver_count);
+	CHECK(memory_region->receivers[receiver_index]
+		      .composite_memory_region_offset != 0);
+
+	return memory_region->receivers[receiver_index]
+		       .composite_memory_region_offset +
+	       sizeof(struct ffa_composite_memory_region);
+}
+
+/**
  * Extracts the index from a memory handle allocated by Hafnium's current world.
  */
 uint64_t ffa_memory_handle_get_index(ffa_memory_handle_t handle)
