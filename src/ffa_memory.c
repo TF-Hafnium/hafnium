@@ -901,12 +901,16 @@ struct ffa_value ffa_retrieve_check_transition(
  * are mapped in the address space at the corresponding address ranges, in the
  * mode provided.
  *
- * If commit is false, the page tables will be allocated from the mpool but no
- * mappings will actually be updated. This function must always be called first
- * with commit false to check that it will succeed before calling with commit
- * true, to avoid leaving the page table in a half-updated state. To make a
- * series of changes atomically you can call them all with commit false before
- * calling them all with commit true.
+ * The enum  ffa_map_action determines the action taken from a call to the
+ * function below:
+ * - If action is MAP_ACTION_CHECK, the page tables will be allocated from the
+ * mpool but no mappings will actually be updated. This function must always
+ * be called first with action set to MAP_ACTION_CHECK to check that it will
+ * succeed before calling ffa_region_group_identity_map with whichever one of
+ * the remaining actions, to avoid leaving the page table in a half-updated
+ * state.
+ * - The action MAP_ACTION_COMMIT allocates the page tables from the mpool, and
+ *   changes the memory mappings.
  *
  * vm_ptable_defrag should always be called after a series of page table
  * updates, whether they succeed or fail.
@@ -918,7 +922,7 @@ bool ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t mode, struct mpool *ppool, bool commit)
+	uint32_t mode, struct mpool *ppool, enum ffa_map_action action)
 {
 	uint32_t i;
 	uint32_t j;
@@ -947,12 +951,21 @@ bool ffa_region_group_identity_map(
 				return false;
 			}
 
-			if (commit) {
+			switch (action) {
+			case MAP_ACTION_COMMIT:
 				vm_identity_commit(vm_locked, pa_begin, pa_end,
 						   mode, ppool, NULL);
-			} else if (!vm_identity_prepare(vm_locked, pa_begin,
-							pa_end, mode, ppool)) {
-				return false;
+				break;
+			case MAP_ACTION_CHECK:
+				if (!vm_identity_prepare(vm_locked, pa_begin,
+							 pa_end, mode, ppool)) {
+					return false;
+				}
+
+				break;
+			default:
+				panic("%s: invalid action state %x\n", __func__,
+				      action);
 			}
 		}
 	}
@@ -1216,7 +1229,7 @@ struct ffa_value ffa_send_check_update(
 	 */
 	if (!ffa_region_group_identity_map(
 		    from_locked, fragments, fragment_constituent_counts,
-		    fragment_count, from_mode, page_pool, false)) {
+		    fragment_count, from_mode, page_pool, MAP_ACTION_CHECK)) {
 		/* TODO: partial defrag of failed range. */
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1230,7 +1243,8 @@ struct ffa_value ffa_send_check_update(
 	 */
 	CHECK(ffa_region_group_identity_map(
 		from_locked, fragments, fragment_constituent_counts,
-		fragment_count, from_mode, &local_page_pool, true));
+		fragment_count, from_mode, &local_page_pool,
+		MAP_ACTION_COMMIT));
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear &&
@@ -1246,7 +1260,7 @@ struct ffa_value ffa_send_check_update(
 		CHECK(ffa_region_group_identity_map(
 			from_locked, fragments, fragment_constituent_counts,
 			fragment_count, orig_from_mode, &local_page_pool,
-			true));
+			MAP_ACTION_COMMIT));
 
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1329,7 +1343,7 @@ struct ffa_value ffa_retrieve_check_update(
 	 */
 	if (!ffa_region_group_identity_map(
 		    to_locked, fragments, fragment_constituent_counts,
-		    fragment_count, to_mode, page_pool, false)) {
+		    fragment_count, to_mode, page_pool, MAP_ACTION_CHECK)) {
 		/* TODO: partial defrag of failed range. */
 		dlog_verbose(
 			"Insufficient memory to update recipient page "
@@ -1355,7 +1369,7 @@ struct ffa_value ffa_retrieve_check_update(
 	 */
 	CHECK(ffa_region_group_identity_map(
 		to_locked, fragments, fragment_constituent_counts,
-		fragment_count, to_mode, page_pool, true));
+		fragment_count, to_mode, page_pool, MAP_ACTION_COMMIT));
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
@@ -1404,7 +1418,7 @@ static struct ffa_value ffa_relinquish_check_update(
 	 */
 	if (!ffa_region_group_identity_map(
 		    from_locked, fragments, fragment_constituent_counts,
-		    fragment_count, from_mode, page_pool, false)) {
+		    fragment_count, from_mode, page_pool, MAP_ACTION_CHECK)) {
 		/* TODO: partial defrag of failed range. */
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1418,7 +1432,8 @@ static struct ffa_value ffa_relinquish_check_update(
 	 */
 	CHECK(ffa_region_group_identity_map(
 		from_locked, fragments, fragment_constituent_counts,
-		fragment_count, from_mode, &local_page_pool, true));
+		fragment_count, from_mode, &local_page_pool,
+		MAP_ACTION_COMMIT));
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear &&
@@ -1434,7 +1449,7 @@ static struct ffa_value ffa_relinquish_check_update(
 		CHECK(ffa_region_group_identity_map(
 			from_locked, fragments, fragment_constituent_counts,
 			fragment_count, orig_from_mode, &local_page_pool,
-			true));
+			MAP_ACTION_COMMIT));
 
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;

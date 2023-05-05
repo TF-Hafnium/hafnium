@@ -104,6 +104,17 @@ struct ffa_memory_share_state {
 };
 
 /**
+ * Actions that can be taken by function `ffa_region_group_identity_map`.
+ */
+enum ffa_map_action {
+	MAP_ACTION_CHECK,
+	MAP_ACTION_CHECK_PROTECT,
+	MAP_ACTION_COMMIT,
+	MAP_ACTION_COMMIT_UNPROTECT,
+	MAP_ACTION_MAX,
+};
+
+/**
  * Encapsulates the set of share states while the `share_states_lock` is held.
  */
 struct share_states_locked {
@@ -163,6 +174,6 @@ bool ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t mode, struct mpool *ppool, bool commit);
+	uint32_t mode, struct mpool *ppool, enum ffa_map_action action);
 bool memory_region_receivers_from_other_world(
 	struct ffa_memory_region *memory_region);
