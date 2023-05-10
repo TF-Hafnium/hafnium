@@ -608,3 +608,12 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu current_locked,
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
+
+struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
+				   uint32_t error_code)
+{
+	(void)current;
+	(void)next;
+	(void)error_code;
+	return ffa_error(FFA_NOT_SUPPORTED);
+}

@@ -645,3 +645,12 @@ ffa_memory_attributes_t plat_ffa_memory_security_mode(
 
 	return attributes;
 }
+
+struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
+				   uint32_t error_code)
+{
+	(void)current;
+	(void)next;
+	(void)error_code;
+	return ffa_error(FFA_NOT_SUPPORTED);
+}

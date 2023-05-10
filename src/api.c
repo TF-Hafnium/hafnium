@@ -1078,6 +1078,7 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 				    vcpu_index(vcpu));
 			vcpu->state = VCPU_STATE_ABORTED;
 		}
+		*run_ret = ffa_error(FFA_ABORTED);
 		ret = false;
 		goto out;
 	}

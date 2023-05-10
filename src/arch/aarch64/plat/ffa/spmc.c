@@ -2016,9 +2016,10 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 
 	assert(current->rt_model == RTM_SP_INIT);
 
-	/* vCPU has just returned from initialization. */
+	/* vCPU has just returned from successful initialization. */
 	dlog_notice("Initialized VM: %#x, boot_order: %u\n", current->vm->id,
 		    current->vm->boot_order);
+	current->state = VCPU_STATE_WAITING;
 
 	/*
 	 * Pick next vCPU to be booted. Once all SPs have booted
@@ -2031,7 +2032,6 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 		return false;
 	}
 
-	current->state = VCPU_STATE_WAITING;
 	current->rt_model = RTM_NONE;
 	current->scheduling_mode = NONE;
 
@@ -2735,5 +2735,53 @@ ffa_memory_attributes_t plat_ffa_memory_security_mode(
 					     FFA_MEMORY_SECURITY_NON_SECURE);
 	}
 
+	return ret;
+}
+
+/*
+ * Handle FFA_ERROR_32 call according to the given error code.
+ *
+ * Error codes other than FFA_ABORTED, and cases of FFA_ABORTED not
+ * in RTM_SP_INIT runtime model, not implemented. Refer to section 8.5
+ * of FF-A 1.2 spec.
+ */
+struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
+				   uint32_t error_code)
+{
+	struct vcpu_locked current_locked;
+	enum partition_runtime_model rt_model;
+	struct ffa_value ret;
+
+	current_locked = vcpu_lock(current);
+	rt_model = current_locked.vcpu->rt_model;
+
+	if (error_code == FFA_ABORTED && rt_model == RTM_SP_INIT) {
+		dlog_error("Aborting SP %#x from vCPU %u\n", current->vm->id,
+			   vcpu_index(current));
+
+		atomic_store_explicit(&current->vm->aborting, true,
+				      memory_order_relaxed);
+
+		if (sp_boot_next(current_locked, next)) {
+			ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+			goto out;
+		}
+
+		/*
+		 * Relinquish control back to the NWd. Return
+		 * FFA_MSG_WAIT_32 to indicate to SPMD that SPMC
+		 * has successfully finished initialization.
+		 */
+		*next = api_switch_to_other_world(
+			current_locked,
+			(struct ffa_value){.func = FFA_MSG_WAIT_32},
+			VCPU_STATE_ABORTED);
+
+		ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+		goto out;
+	}
+	ret = ffa_error(FFA_NOT_SUPPORTED);
+out:
+	vcpu_unlock(&current_locked);
 	return ret;
 }
