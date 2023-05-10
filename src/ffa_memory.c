@@ -2680,8 +2680,7 @@ struct ffa_value ffa_memory_relinquish(
 	if (relinquish_request->endpoint_count != 1) {
 		dlog_verbose(
 			"Stream endpoints not supported (got %d "
-			"endpoints on "
-			"FFA_MEM_RELINQUISH, expected 1).\n",
+			"endpoints on FFA_MEM_RELINQUISH, expected 1).\n",
 			relinquish_request->endpoint_count);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -2689,8 +2688,7 @@ struct ffa_value ffa_memory_relinquish(
 	if (relinquish_request->endpoints[0] != from_locked.vm->id) {
 		dlog_verbose(
 			"VM ID %d in relinquish message doesn't match "
-			"calling "
-			"VM ID %d.\n",
+			"calling VM ID %d.\n",
 			relinquish_request->endpoints[0], from_locked.vm->id);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -2723,8 +2721,7 @@ struct ffa_value ffa_memory_relinquish(
 	if (receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
 			"VM ID %d tried to relinquish memory region "
-			"with "
-			"handle %#x and it is not a valid borrower.\n",
+			"with handle %#x and it is not a valid borrower.\n",
 			from_locked.vm->id, handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
