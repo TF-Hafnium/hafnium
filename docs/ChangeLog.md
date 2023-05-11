@@ -1,5 +1,86 @@
 # Change log
 
+## v2.9
+#### Highlights
+
+* FF-A v1.2 (early adoption)
+    * Implemented `FFA_PARTITION_INFO_GET_REGS` ABI permitting discovery of
+      secure partitions by the use of general purpose registers instead of RX/TX
+      buffers.
+    * `FFA_CONSOLE_LOG` ABI support is improved from earlier release. It permits
+      handling multiple characters passed through general purpose registers.
+      The intent is to deprecate the legacy `HF_DEBUG_LOG` hypercall in a next
+      release.
+    * Introduced `FFA_EL3_INTR_HANDLE` ABI permitting the delegation of Group0
+      physical secure interrupt handling to EL3. A G0 interrupt triggered while
+      an SP is running traps to S-EL2 and is routed to the SPMD by the use of
+      this ABI. Conversely, a G0 interrupt triggered while the normal world runs
+      traps to EL3.
+* FF-A v1.1 interrupt handling
+    * Added support for secure interrupt signalling to S-EL0 partitions.
+    * Increased the maximum number of virtual interrupts supported by an SP to a
+      platform defined value (default 1024). This lifts a limitation in which
+      SPs were allowed to declare only the first 64 physical interrupt IDs.
+    * Added the impdef 'other-s-interrupts-action' field to SP manifests
+      specifying the action to be taken (queued or signaled) in response to a
+      secure interrupt targetted to an SP that is not the currently running SP.
+    * For S-EL1 SP vCPUs, enable the notification pending and managed exit
+      virtual interrupts if requested in the manifest.
+      For S-EL0 SP vCPUs, enable virtual interrupts IDs matching the secure
+      physical interrupt IDs declared in device regions.
+    * Allow a physical interrupt declared in a SP manifest device region to be
+      routed to any PE specified by its MPIDR. Introduce the 'interrupts-target'
+      manifest field for this purpose.
+* FF-A v1.1 memory sharing
+    * Implemented changes to memory sharing structures to support FF-A backwards
+      compatibility updates in the specification. The SPMC implementation caters
+      for the case of existing FF-A v1.0 endpoints on top of the FF-A v1.1 SPMC.
+      The latter performs the necessary conversions in the memory sharing
+      structures.
+    * Implemented capability to share/lend/donate memory to multiple borrowers
+      including VMs or SPs.
+    * Fragmented memory sharing is supported between normal world and secure
+      world endpoints.
+* FF-A v1.1 power management
+    * Added the impdef 'power-management-messages' field to SP manifests
+      specifying the type of power management events relayed to the SPMC.
+    * Removed the limitation in which the first SP must be a MP SP.
+      The configuration where all deployed SPs are S-EL0 SPs is now supported.
+* FF-A v1.1 Indirect messaging
+    * Updated mailbox internal state structures to align with RX/TX buffer
+      synchronization rules (buffer state and ownership transfer).
+* Misc and bug fixes
+    * Introduced SPMC manifest memory region nodes specifying the system address
+      ranges for secure and non-secure memory. This permits further hardening in
+      which the SPMC needs to know the security state of a memory range. This
+      helps boot time validation of SP manifests, and run-time checks in the
+      memory sharing protocol.
+    * SP manifest memory regions validation is hardened such that one SP cannot
+      declare a memory region overlapping another SP's memory region.
+    * Drop dynamic allocation of memory region base address. The option for
+      declaring a memory region without its base address (and let the SPMC
+      choose it) is removed.
+    * Fixed handling of FEAT_LPA/FEAT_LPA2.
+    * SMMUv3: fix SIDSIZE field usage.
+    * GIC: fixed interrupt type configuration (edge/level).
+* CI and test infrastructure
+    * Migration to LLVM/clang 15.0.6
+    * Removal of non-VHE configurations. Keep only configurations assuming
+      Armv8.1 Virtualization Host Extensions is implemented. This implies
+      HCR_EL2.E2H is always set. This change is transparent for the end user as
+      configurations supported with VHE enabled are a superset of legacy non-VHE
+      configurations.
+    * EL3 SPMC: added test configurations to permit testing TF-A's EL3 SPMC
+      by the use of Hafnium's CI test and infrastructure. The goal is to improve
+      the test coverage for this alternative SPMC configuration and maintain a
+      feature set parity with the S-EL2 SPMC.
+    * Added debug capabilities to hftest script.
+
+#### Known limitations:
+* Power management support limits to cpu on and cpu off events. Only S-EL1
+  partitions can opt in for power management events. A power management
+  event is forwarded from the SPMD to the SPMC and isn't forwarded to a SP.
+
 ## v2.8
 #### Highlights
 
