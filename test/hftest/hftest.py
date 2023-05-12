@@ -217,7 +217,6 @@ class Driver:
             log_content + "\r\n\r\n")
         return log_content
 
-
 class QemuDriver(Driver):
     """Driver which runs tests in QEMU."""
 
@@ -286,20 +285,12 @@ class QemuDriver(Driver):
 class FvpDriver(Driver, ABC):
     """Base class for driver which runs tests in Arm FVP emulator."""
 
-    def __init__(self, args):
+    def __init__(self, args, cpu_start_address, fvp_prebuilt_bl31):
         if args.cpu:
             raise ValueError("FVP emulator does not support the --cpu option.")
         super().__init__(args)
-
-    @property
-    @abstractmethod
-    def CPU_START_ADDRESS(self):
-        pass
-
-    @property
-    @abstractmethod
-    def FVP_PREBUILT_BL31(self):
-        pass
+        self._cpu_start_address = cpu_start_address
+        self._fvp_prebuilt_bl31 = fvp_prebuilt_bl31
 
     def create_dt(self, run_name : str):
         """Create DT related files, and return respective paths in a tuple
@@ -375,16 +366,16 @@ class FvpDriver(Driver, ABC):
             "-C", "bp.vis.rate_limit-enable=false",
             "-C", "bp.pl011_uart0.untimed_fifos=1",
             "-C", "bp.pl011_uart0.unbuffered_output=1",
-            "-C", f"cluster0.cpu0.RVBAR={self.CPU_START_ADDRESS}",
-            "-C", f"cluster0.cpu1.RVBAR={self.CPU_START_ADDRESS}",
-            "-C", f"cluster0.cpu2.RVBAR={self.CPU_START_ADDRESS}",
-            "-C", f"cluster0.cpu3.RVBAR={self.CPU_START_ADDRESS}",
-            "-C", f"cluster1.cpu0.RVBAR={self.CPU_START_ADDRESS}",
-            "-C", f"cluster1.cpu1.RVBAR={self.CPU_START_ADDRESS}",
-            "-C", f"cluster1.cpu2.RVBAR={self.CPU_START_ADDRESS}",
-            "-C", f"cluster1.cpu3.RVBAR={self.CPU_START_ADDRESS}",
+            "-C", f"cluster0.cpu0.RVBAR={self._cpu_start_address}",
+            "-C", f"cluster0.cpu1.RVBAR={self._cpu_start_address}",
+            "-C", f"cluster0.cpu2.RVBAR={self._cpu_start_address}",
+            "-C", f"cluster0.cpu3.RVBAR={self._cpu_start_address}",
+            "-C", f"cluster1.cpu0.RVBAR={self._cpu_start_address}",
+            "-C", f"cluster1.cpu1.RVBAR={self._cpu_start_address}",
+            "-C", f"cluster1.cpu2.RVBAR={self._cpu_start_address}",
+            "-C", f"cluster1.cpu3.RVBAR={self._cpu_start_address}",
             "--data",
-            f"cluster0.cpu0={self.FVP_PREBUILT_BL31}@{self.CPU_START_ADDRESS}",
+            f"cluster0.cpu0={self._fvp_prebuilt_bl31}@{self._cpu_start_address}",
             "-C", "bp.ve_sysregs.mmbSiteDefault=0",
             "-C", "cluster0.has_arm_v8-5=1",
             "-C", "cluster1.has_arm_v8-5=1",
@@ -455,25 +446,12 @@ class FvpDriverHypervisor(FvpDriver):
     INITRD_START= 0x84000000
     INITRD_END = 0x86000000 #Default value, however may change if initrd in args
 
-    def __init__(self, args):
+    def __init__(self, args, hypervisor_address=0x80000000, hypervisor_dtb_address=0x82000000):
+        fvp_prebuilt_bl31 = os.path.join(FVP_PREBUILTS_TFA_ROOT, "bl31.bin")
+        FvpDriver.__init__(self, args, 0x04020000, fvp_prebuilt_bl31)
         self.vms_in_partitions_json = args.partitions and args.partitions["VMs"]
-        super().__init__(args)
-
-    @property
-    def CPU_START_ADDRESS(self):
-        return "0x04020000"
-
-    @property
-    def FVP_PREBUILT_BL31(self):
-        return os.path.join(FVP_PREBUILTS_TFA_ROOT, "bl31.bin")
-
-    @property
-    def HYPERVISOR_ADDRESS(self):
-        return "0x80000000"
-
-    @property
-    def HYPERVISOR_DTB_ADDRESS(self):
-        return "0x82000000"
+        self._hypervisor_address = hypervisor_address
+        self._hypervisor_dtb_address = hypervisor_dtb_address
 
     def gen_dts(self, dt, test_args):
         """Create a DeviceTree source which will be compiled into a DTB and
@@ -506,8 +484,8 @@ class FvpDriverHypervisor(FvpDriver):
         fvp_args = FvpDriver.gen_fvp_args(*common_args)
 
         fvp_args += [
-            "--data", f"cluster0.cpu0={dt.dtb}@{self.HYPERVISOR_DTB_ADDRESS}",
-            "--data", f"cluster0.cpu0={self.args.hypervisor}@{self.HYPERVISOR_ADDRESS}",
+            "--data", f"cluster0.cpu0={dt.dtb}@{self._hypervisor_dtb_address}",
+            "--data", f"cluster0.cpu0={self.args.hypervisor}@{self._hypervisor_address}",
         ]
 
         if self.vms_in_partitions_json:
@@ -530,26 +508,12 @@ class FvpDriverSPMC(FvpDriver):
         HF_ROOT, "test", "vmapi", "fvp-base-spmc.dts")
     hftest_cmd_file = tempfile.NamedTemporaryFile(mode="w+")
 
-    def __init__(self, args):
-        if args.partitions is None or args.partitions["SPs"] is None:
-            raise Exception("Need to provide SPs in partitions_json")
-        super().__init__(args)
+    def __init__(self, args, cpu_start_address=0x04010000, fvp_prebuilt_bl31=None):
+        fvp_prebuilt_bl31 = os.path.join(FVP_PREBUILT_TFA_SPMD_ROOT, "bl31.bin") if fvp_prebuilt_bl31 is None else fvp_prebuilt_bl31
+        super().__init__(args, cpu_start_address, fvp_prebuilt_bl31)
 
-    @property
-    def CPU_START_ADDRESS(self):
-        return "0x04010000"
-
-    @property
-    def FVP_PREBUILT_BL31(self):
-        return os.path.join(FVP_PREBUILT_TFA_SPMD_ROOT, "bl31.bin")
-
-    @property
-    def SPMC_ADDRESS(self):
-        return "0x6000000"
-
-    @property
-    def SPMC_DTB_ADDRESS(self):
-        return "0x0403f000"
+        self._spmc_address = 0x6000000
+        self._spmc_dtb_address = 0x0403f000
 
     def gen_dts(self, dt, test_args):
         """Create a DeviceTree source which will be compiled into a DTB and
@@ -576,8 +540,8 @@ class FvpDriverSPMC(FvpDriver):
         fvp_args = FvpDriver.gen_fvp_args(*common_args) if call_super else []
 
         fvp_args += [
-            "--data", f"cluster0.cpu0={dt.dtb}@{self.SPMC_DTB_ADDRESS}",
-            "--data", f"cluster0.cpu0={self.args.spmc}@{self.SPMC_ADDRESS}",
+            "--data", f"cluster0.cpu0={dt.dtb}@{self._spmc_dtb_address}",
+            "--data", f"cluster0.cpu0={self.args.spmc}@{self._spmc_address}",
         ]
 
         fvp_args += FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
@@ -600,30 +564,14 @@ class FvpDriverSPMC(FvpDriver):
 
 class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
     def __init__(self, args):
-        FvpDriverHypervisor.__init__(self, args)
+        FvpDriverHypervisor.__init__(self, args, hypervisor_address=0x88000000)
         FvpDriverSPMC.__init__(self, args)
-
-    @property
-    def CPU_START_ADDRESS(self):
-        return str(0x04010000)
-
-    @property
-    def FVP_PREBUILT_BL31(self):
-        return str(os.path.join(FVP_PREBUILT_TFA_SPMD_ROOT, "bl31.bin"))
 
     def create_dt(self, run_name):
         dt = dict()
         dt["hypervisor"] = FvpDriver.create_dt(self, run_name + "_hypervisor")
         dt["spmc"] = FvpDriver.create_dt(self, run_name + "_spmc")
         return dt
-
-    @property
-    def HYPERVISOR_ADDRESS(self):
-        return "0x88000000"
-
-    @property
-    def HYPERVISOR_DTB_ADDRESS(self):
-        return "0x82000000"
 
     def compile_dt(self, run_state, dt):
         FvpDriver.compile_dt(self, run_state, dt["hypervisor"])
@@ -635,7 +583,6 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
 
     def gen_fvp_args(self, is_long_running, uart0_log_path, uart1_log_path, dt,
                      debug = False, show_output = False):
-
         """Generate command line arguments for FVP."""
         common_args = (self, is_long_running, uart0_log_path, uart1_log_path)
         fvp_args = FvpDriverHypervisor.gen_fvp_args(*common_args, dt["hypervisor"],
@@ -660,17 +607,11 @@ class FvpDriverEL3SPMC(FvpDriverSPMC):
     """
 
     def __init__(self, args):
+        FvpDriverSPMC.__init__(
+                self, args, cpu_start_address=0x04003000,
+                fvp_prebuilt_bl31=os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl31.bin"))
         self.vms_in_partitions_json = args.partitions and args.partitions["SPs"]
-        self.args = args
-
-    SP_DTB_ADDRESS = "0x0403f000"
-    @property
-    def CPU_START_ADDRESS(self):
-        return "0x04003000"
-
-    @property
-    def FVP_PREBUILT_BL31(self):
-        return os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl31.bin")
+        self._sp_dtb_address = 0x0403f000
 
     def sp_partition_manifest_fvp_args(self):
         img_ldadd = self.get_img_and_ldadd(self.args.partitions["SPs"])
@@ -685,7 +626,7 @@ class FvpDriverEL3SPMC(FvpDriverSPMC):
         # location. Fetch the respective dtb file and load at the following address.
         output_path = os.path.dirname(os.path.dirname(img))
         partition_manifest = f"{output_path}/partition-manifest.dtb"
-        fvp_args += ["--data", f"cluster0.cpu0={partition_manifest}@{self.SP_DTB_ADDRESS}"]
+        fvp_args += ["--data", f"cluster0.cpu0={partition_manifest}@{self._sp_dtb_address}"]
         return fvp_args
 
     def gen_fvp_args(
@@ -707,21 +648,12 @@ class FvpDriverEL3SPMCBothWorlds(FvpDriverHypervisor, FvpDriverEL3SPMC):
     Driver which runs tests in Arm FVP emulator, with EL3 as SPMC
     """
 
-    @property
-    def CPU_START_ADDRESS(self):
-        return "0x04003000"
+    def __init__(self, args):
+        FvpDriverHypervisor.__init__(self, args)
+        FvpDriverEL3SPMC.__init__(self, args)
 
-    @property
-    def FVP_PREBUILT_BL31(self):
-        return os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl31.bin")
-
-    @property
-    def FVP_PREBUILT_BL32(self):
-        return os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl32.bin")
-
-    @property
-    def FVP_PREBUILT_DTB(self):
-        return os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "fdts/fvp_tsp_sp_manifest.dtb")
+        self._fvp_prebuilt_bl32 = os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl32.bin")
+        self._fvp_prebuilt_dtb = os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "fdts/fvp_tsp_sp_manifest.dtb")
 
     def gen_fvp_args(
         self, is_long_running, uart0_log_path, uart1_log_path, dt,
@@ -738,8 +670,8 @@ class FvpDriverEL3SPMCBothWorlds(FvpDriverHypervisor, FvpDriverEL3SPMC):
         else :
             # Use prebuilt TSP and TSP manifest if build does not specify SP
             # EL3 SPMC expects SP to be loaded at 0xFF200000 and SP manifest at 0x0403F000
-            fvp_args += ["--data", f"cluster0.cpu0={self.FVP_PREBUILT_BL32}@0xff200000"]
-            fvp_args += ["--data", f"cluster0.cpu0={self.FVP_PREBUILT_DTB}@{self.SP_DTB_ADDRESS}"]
+            fvp_args += ["--data", f"cluster0.cpu0={self._fvp_prebuilt_bl32}@0xff200000"]
+            fvp_args += ["--data", f"cluster0.cpu0={self._fvp_prebuilt_dtb}@{self._sp_dtb_address}"]
 
         return fvp_args
 
