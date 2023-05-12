@@ -259,6 +259,26 @@ static void memory_send_reclaim(uint32_t msg_size,
 	}
 }
 
+/*
+ * Test service "ffa_memory_return" expects to receive the ID of the partition
+ * to send the memory to next.
+ */
+void send_target_id(ffa_id_t receiver, ffa_id_t target, void *send)
+{
+	struct ffa_value ret;
+
+	/*
+	 * Send the ID `target` to `receiver`, such that it can then relay
+	 * memory to it.
+	 */
+	ret = send_indirect_message(HF_PRIMARY_VM_ID, receiver, send, &target,
+				    sizeof(target), 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_run(receiver, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}
+
 SET_UP(memory_sharing)
 {
 	ffa_version(MAKE_FFA_VERSION(1, 1));
@@ -674,8 +694,11 @@ TEST(memory_sharing, donate_relinquish)
 
 /**
  * Memory given away can be given back.
+ * Added precondition to this test, for it run on the NWd only, and not on setup
+ * with PVM and SP. Because the FF-A specification doesn't permit donate memory
+ * from SP to VM.
  */
-TEST(memory_sharing, give_and_get_back)
+TEST_PRECONDITION(memory_sharing, give_and_get_back, hypervisor_only)
 {
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -686,6 +709,8 @@ TEST(memory_sharing, give_and_get_back)
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
+
+	send_target_id(service1_info->vm_id, HF_PRIMARY_VM_ID, mb.send);
 
 	/* Dirty the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
@@ -1039,49 +1064,52 @@ TEST(memory_sharing, donate_check_lower_bounds)
 
 /**
  * After memory has been returned, it is free to be shared with another
- * VM.
+ * partition.
  */
-TEST(memory_sharing, donate_elsewhere_after_return)
+TEST(memory_sharing, donate_and_donate_elsewhere)
 {
-	struct ffa_value run_res;
+	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-
-	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
-	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_return", mb.send);
-
-	/* Initialise the memory before giving it. */
-	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
-
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
 
+	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_receive", mb.send);
+
+	send_target_id(service1_info->vm_id, service2_info->vm_id, mb.send);
+
+	/* Initialise the memory before giving it. */
+	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
+
+	/* Donate memory to service 1. */
 	send_memory_and_retrieve_request(
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
-	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+	/*
+	 * Run service1 such it can retrieve memory, and donate it to
+	 * service2.
+	 */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
-	/* Let the memory be returned. */
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, NULL, NULL,
-					       HF_MAILBOX_SIZE),
-		  service1_info->vm_id);
+	/* Run service2 for it to retrieve memory donated by service1. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
-	/* Share the memory with another VM. */
-	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
-		service2_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
-		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
-
-	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_TRUE(exception_received(&run_res, mb.recv));
+	/*
+	 * Re-run service1 for it to attempt to access the memory.
+	 * Expect exception due to page fault, as the memory is accessible
+	 * to service1 anymore.
+	 */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_TRUE(exception_received(&ret, mb.recv));
 }
 
 /**
@@ -1122,7 +1150,7 @@ TEST(memory_sharing, donate_vms)
 TEST(memory_sharing, donate_twice)
 {
 	ffa_memory_handle_t handle;
-	struct ffa_value run_res;
+	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	uint8_t *ptr = pages;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
@@ -1130,6 +1158,8 @@ TEST(memory_sharing, donate_twice)
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_donate_twice", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_receive", mb.send);
+
+	send_target_id(service1_info->vm_id, service2_info->vm_id, mb.send);
 
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', 1 * PAGE_SIZE);
@@ -1146,8 +1176,8 @@ TEST(memory_sharing, donate_twice)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
 
 	/* Let the memory be received. */
-	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
 	/* Fail to share memory again with any VM. */
 	check_cannot_share_memory(mb, constituents, ARRAY_SIZE(constituents),
@@ -1159,19 +1189,17 @@ TEST(memory_sharing, donate_twice)
 	/* Fail to relinquish memory from any VM. */
 	check_cannot_relinquish_memory(mb, handle);
 
-	/* Let the memory be sent from VM1 to PRIMARY (returned). */
-	run_res = ffa_run(service1_info->vm_id, 0);
-	ASSERT_NE(run_res.func, FFA_ERROR_32);
-	EXPECT_EQ(retrieve_memory_from_message(mb.recv, mb.send, NULL, NULL,
-					       HF_MAILBOX_SIZE),
-		  service1_info->vm_id);
+	/* Let the memory be sent from service1 to service2. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	ASSERT_NE(ret.func, FFA_ERROR_32);
 
-	/* Check we have access again. */
-	ptr[0] = 'f';
+	/* Let service2 retrieve the pending memory. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
 	/* Try and fail to donate memory from VM1 to VM2. */
-	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
 }
 
 /**

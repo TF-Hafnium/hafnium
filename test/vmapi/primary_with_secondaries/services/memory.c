@@ -263,15 +263,25 @@ TEST_SERVICE(ffa_memory_return)
 	size_t i;
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
+	ffa_id_t target_id;
+	struct ffa_memory_region *memory_region =
+		(struct ffa_memory_region *)retrieve_buffer;
+	ffa_id_t sender;
+	struct ffa_composite_memory_region *composite;
+
+	receive_indirect_message(&target_id, sizeof(target_id), recv_buf,
+				 &sender);
+
+	ffa_yield();
 
 	exception_setup(NULL, exception_handler_yield_data_abort);
 
-	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)retrieve_buffer;
-	ffa_id_t sender = retrieve_memory_from_message(
-		recv_buf, send_buf, NULL, memory_region, HF_MAILBOX_SIZE);
-	struct ffa_composite_memory_region *composite =
-		ffa_memory_region_get_composite(memory_region, 0);
+	/* Expect same sender as the previous indirect message. */
+	EXPECT_EQ(retrieve_memory_from_message(recv_buf, send_buf, NULL,
+					       memory_region, HF_MAILBOX_SIZE),
+		  sender);
+
+	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
@@ -283,9 +293,9 @@ TEST_SERVICE(ffa_memory_return)
 		ptr[i]++;
 	}
 
-	/* Give the memory back and notify the sender. */
+	/* Give the memory back and notify the target_id. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), sender,
+		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), target_id,
 		composite->constituents, composite->constituent_count, 0, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
@@ -421,31 +431,36 @@ TEST_SERVICE(ffa_donate_twice)
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
 	ffa_id_t sender;
+	ffa_id_t target_id;
 	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region_constituent constituent;
 
-	sender = retrieve_memory_from_message(recv_buf, send_buf, NULL,
-					      memory_region, HF_MAILBOX_SIZE);
+	receive_indirect_message(&target_id, sizeof(target_id), recv_buf,
+				 &sender);
+
+	ffa_yield();
+	EXPECT_EQ(retrieve_memory_from_message(recv_buf, send_buf, NULL,
+					       memory_region, HF_MAILBOX_SIZE),
+		  sender);
+
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	constituent = composite->constituents[0];
 
 	/* Yield to allow attempt to re donate from primary. */
 	ffa_yield();
 
-	/* Give the memory back and notify the sender. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), sender,
+		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), target_id,
 		&constituent, 1, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_INSTRUCTION_ACCESS_X);
 
 	ffa_yield();
 
-	/* Attempt to donate the memory to another VM. */
+	/* Attempt to donate the memory again. */
 	EXPECT_EQ(ffa_memory_region_init_single_receiver(
-			  send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service2(recv_buf)->vm_id, &constituent, 1, 0, 0,
-			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(), target_id,
+			  &constituent, 1, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
