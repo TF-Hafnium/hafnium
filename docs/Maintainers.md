@@ -12,17 +12,19 @@ design decisions.
 
 *   João Alves <joao.alves@arm.com>
 
+*   Madhukar Pappireddy <madhukar.pappireddy@arm.com>
+
 *   Raghupathy Krishnamurthy <raghupathyk@nvidia.com>
-
-*   Andrew Walbran <qwandor@google.com>
-
-*   Benjamin Copeland <ben.copeland@linaro.org>
 
 *   Joanna Farley <joanna.farley@arm.com>
 
 ## Inactive Maintainers
 
+*   Andrew Walbran <qwandor@google.com>
+
 *   David Brázdil <david.brazdil@gmail.com>
+
+*   Benjamin Copeland <ben.copeland@linaro.org>
 
 *   Fuad Tabba <tabba@google.com>
 
