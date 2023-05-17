@@ -9,7 +9,7 @@ import("//build/toolchain/platform.gni")
 # Default language and error reporting configuration.
 config("compiler_defaults") {
   cflags = [
-    "-g",
+    "-gdwarf-4",
     "-Wall",
     "-O2",
 
