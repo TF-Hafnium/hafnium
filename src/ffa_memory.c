@@ -861,7 +861,8 @@ struct ffa_value ffa_retrieve_check_transition(
 	struct vm_locked to, uint32_t share_func,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t memory_to_attributes, uint32_t *to_mode, bool memory_protected)
+	uint32_t memory_to_attributes, uint32_t *to_mode, bool memory_protected,
+	enum ffa_map_action *map_action)
 {
 	uint32_t orig_to_mode;
 	struct ffa_value ret;
@@ -883,11 +884,28 @@ struct ffa_value ffa_retrieve_check_transition(
 		 * successfully, it is expected the orig_to_mode would overlay
 		 * with `state_mask`, as a result of the function
 		 * `ffa_send_check_transition`.
+		 *
+		 * If Hafnium is the SPMC:
+		 * - Caller of the reclaim interface is an SP, the memory shall
+		 *   have been protected throughout the flow.
+		 * - Caller of the reclaim is from the NWd, the memory may have
+		 *   been protected at the time of lending/donating the memory.
+		 *   In such case, set action to unprotect memory in the
+		 *   handling of reclaim operation.
+		 * - If Hafnium is the hypervisor memory shall never have been
+		 *   protected in memory lend/share/donate.
+		 *
+		 * More details in the doc comment of the function
+		 * `ffa_region_group_identity_map`.
 		 */
 		if (vm_id_is_current_world(to.vm->id)) {
 			assert((orig_to_mode &
 				(MM_MODE_INVALID | MM_MODE_UNOWNED |
 				 MM_MODE_SHARED)) != 0U);
+			assert(!memory_protected);
+		} else if (to.vm->id == HF_OTHER_WORLD_ID &&
+			   map_action != NULL && memory_protected) {
+			*map_action = MAP_ACTION_COMMIT_UNPROTECT;
 		}
 	} else {
 		/*
@@ -1476,6 +1494,7 @@ struct ffa_value ffa_retrieve_check_update(
 	uint32_t to_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
+	enum ffa_map_action map_action = MAP_ACTION_COMMIT;
 
 	/*
 	 * Make sure constituents are properly aligned to a 64-bit boundary. If
@@ -1495,7 +1514,8 @@ struct ffa_value ffa_retrieve_check_update(
 	 */
 	ret = ffa_retrieve_check_transition(
 		to_locked, share_func, fragments, fragment_constituent_counts,
-		fragment_count, sender_orig_mode, &to_mode, memory_protected);
+		fragment_count, sender_orig_mode, &to_mode, memory_protected,
+		&map_action);
 
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition for retrieve.\n");
@@ -1537,10 +1557,9 @@ struct ffa_value ffa_retrieve_check_update(
 	 * won't allocate because the transaction was already prepared above, so
 	 * it doesn't need to use the `local_page_pool`.
 	 */
-	CHECK(ffa_region_group_identity_map(to_locked, fragments,
-					    fragment_constituent_counts,
-					    fragment_count, to_mode, page_pool,
-					    MAP_ACTION_COMMIT, NULL)
+	CHECK(ffa_region_group_identity_map(
+		      to_locked, fragments, fragment_constituent_counts,
+		      fragment_count, to_mode, page_pool, map_action, NULL)
 		      .func == FFA_SUCCESS_32);
 
 	/* Return the mode used in mapping the memory in retriever's PT. */
@@ -3682,7 +3701,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, share_state->sender_orig_mode,
 		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool,
-		NULL, false);
+		NULL, share_state->memory_protected);
 
 	if (ret.func == FFA_SUCCESS_32) {
 		share_state_free(share_states, share_state, page_pool);

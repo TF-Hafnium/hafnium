@@ -176,8 +176,9 @@ struct ffa_value ffa_retrieve_check_transition(
 	struct vm_locked to, uint32_t share_func,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t memory_to_attributes, uint32_t *to_mode,
-	bool memory_protected);
+	uint32_t memory_to_attributes, uint32_t *to_mode, bool memory_protected,
+	enum ffa_map_action *map_action);
+
 struct ffa_value ffa_retrieve_check_update(
 	struct vm_locked to_locked,
 	struct ffa_memory_region_constituent **fragments,
