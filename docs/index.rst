@@ -8,6 +8,7 @@ Hafnium Documentation
    about/index
    design/index
    threat_model_spm
+   change-log
    appendix
 
 --------------

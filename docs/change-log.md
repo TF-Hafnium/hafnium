@@ -1,7 +1,7 @@
 # Change log
 
 ## v2.9
-#### Highlights
+### Highlights
 
 * FF-A v1.2 (early adoption)
     * Implemented `FFA_PARTITION_INFO_GET_REGS` ABI permitting discovery of
@@ -76,13 +76,13 @@
       feature set parity with the S-EL2 SPMC.
     * Added debug capabilities to hftest script.
 
-#### Known limitations:
+### Known limitations:
 * Power management support limits to cpu on and cpu off events. Only S-EL1
   partitions can opt in for power management events. A power management
   event is forwarded from the SPMD to the SPMC and isn't forwarded to a SP.
 
 ## v2.8
-#### Highlights
+### Highlights
 
 * FF-A v1.1 partition runtime model and CPU cycle allocation modes
     * Implemented partition runtime models for secure partitions entered at
@@ -161,13 +161,13 @@
     * Add ability to define a log level per platform.
     * Disable alignment check for EL0 partitions (when VHE is enabled).
 
-#### Known limitations:
+### Known limitations:
 * S-EL0 partitions interrupt handling is work in progress.
 * Normal world to secure world fragmented memory sharing and sharing to multiple
   borrowers is work in progress.
 
 ## v2.7
-#### Highlights
+### Highlights
 
 * Boot protocol (FF-A v1.1 EAC0)
     * The SPMC primarily supports passing the SP manifest address at boot time.
@@ -244,7 +244,7 @@
     * Updated linux submodule to v5.10.
     * VHE EL0 partitions tests automated through jenkins.
 
-#### Known limitations:
+### Known limitations:
 * FF-A v1.1 EAC0 implementation is partial mainly on interrupt handling and
   memory sharing.
 * Hafnium limits physical interrupt IDs to 64. The legacy virtual interrupt
@@ -256,7 +256,7 @@
   manifest.
 
 ## v2.6
-#### Highlights
+### Highlights
 * FF-A Setup and discovery
     * FF-A build time version updated to v1.1.
     * Managed exit and notifications feature support enabled in SP manifests.
@@ -331,7 +331,7 @@
     * `FFA_RXTX_MAP` fixed returned error codes.
     * `FFA_MSG_WAIT` input parameters check hardened.
 
-#### Known limitations:
+### Known limitations:
 * S-EL0 partitions/VHE: the feature is in an experimental stage and not all use
   cases have been implemented or tested. Normal world to SP and SP to SP memory
   sharing is not tested. Interrupt handling is not tested.
@@ -344,7 +344,7 @@
   purposes only, not meant for production use cases.
 
 ## v2.5
-#### Highlights
+### Highlights
 * BTI/Pointer authentication support
     * Add branch protection build option for `FEAT_PAuth` and `FEAT_BTI` to the
       clang command line. This only affects the S-EL2 image.
@@ -413,7 +413,7 @@
       according to the UART clock and baud rate specified at build time.
     * License script checker fixes.
 
-#### Known limitations:
+### Known limitations:
 * Secure interrupts not supported.
 * FF-A indirect message interface not supported in the secure world.
 * Only supporting models of MultiProcessor SP (vCPUs pinned to physical
@@ -433,7 +433,7 @@ It is a companion to the broader TF-A v2.4 release.
 The normal world Hypervisor is maintained functional along with the
 Hafnium CI test suite.
 
-#### Highlights
+### Highlights
 * FF-A v1.0 Setup and discovery interface
     * Hypervisor implementation re-used and extended to the SPMC and SPs.
     * Added partition info get ABI and appropriate properties response depending
@@ -482,7 +482,7 @@ Hafnium CI test suite.
     * Removed legacy Hypervisor calls.
     * Fix `CPTR_EL2` TTA bit position.
     * Report `FAR_EL2` on injecting EL1 exception.
-#### Known limitations:
+### Known limitations:
 * Not all fields of the FF-A manifest are actually processed by the Hafnium
   device-tree parser.
 * SP to SP communication not supported.
