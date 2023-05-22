@@ -3,8 +3,6 @@
 To boot Linux, a kernel image (`vmlinuz`) and a suitable initial RAM disk
 (`initrd.img`) need to be created.
 
-[TOC]
-
 ## Build the kernel
 
 The Linux kernel for the primary VM can be built using the following

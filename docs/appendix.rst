@@ -1,11 +1,10 @@
-Hafnium Documentation
-=====================
+Appendix
+========
 
 .. toctree::
    :maxdepth: 1
-   :numbered:
 
-   appendix
+   hypervisor/index
 
 --------------
 

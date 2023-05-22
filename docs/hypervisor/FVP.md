@@ -22,7 +22,7 @@ Hafnium checkout:
 $ make && kokoro/test.sh --fvp
 ```
 
-See the `FvpDriver` class in [`hftest.py`](../test/hftest/hftest.py) for details
+See the `FvpDriver` class in [`hftest.py`](../../test/hftest/hftest.py) for details
 on how this works.
 
 ## Other resources

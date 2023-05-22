@@ -1,6 +1,4 @@
-# Getting started
-
-[TOC]
+# Get started
 
 ## Getting the source code
 
@@ -16,8 +14,6 @@ git push origin HEAD:refs/for/master
 
 Browse source at https://review.trustedfirmware.org/plugins/gitiles/. Review CLs
 at https://review.trustedfirmware.org/.
-
-See details of [how to contribute](../CONTRIBUTING.md).
 
 ## Compiling the hypervisor
 

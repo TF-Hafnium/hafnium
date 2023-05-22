@@ -13,8 +13,6 @@ Hafnium in mind.
 The interface documented here is what is planned for the first release of
 Hafnium, not necessarily what is currently implemented.
 
-[TOC]
-
 ## CPU scheduling
 
 The primary VM will have one vCPU for each physical CPU, and control the

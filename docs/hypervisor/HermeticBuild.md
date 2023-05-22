@@ -13,8 +13,6 @@ nightly builds. As rootless container tools mature, Hafnium may change the
 default settings. For now, running the hermetic build locally is intended
 primarily to reproduce issues in pre-submit tests.
 
-[TOC]
-
 ## Installing Docker
 
 ### Stable

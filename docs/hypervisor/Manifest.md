@@ -1,7 +1,5 @@
 # Hafnium Manifest
 
-[TOC]
-
 ## Format
 
 The format of the manifest is a simple DeviceTree overlay:

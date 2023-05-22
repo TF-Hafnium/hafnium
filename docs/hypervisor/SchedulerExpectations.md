@@ -4,8 +4,6 @@ Hafnium requires there to be a special 'primary' or 'scheduler' VM which is
 responsible for scheduling the other VMs. There are some particular expectations
 on this VM that are required for the rest of the system to function normally.
 
-[TOC]
-
 ## Scheduling
 
 The scheduler VM is responsible for scheduling the vCPUs of all the other VMs.
