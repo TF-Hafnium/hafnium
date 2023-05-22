@@ -1332,10 +1332,10 @@ element of the data flow diagram.
 
 --------------
 
-*Copyright (c) 2021-2023, Arm Limited. All rights reserved.*
+*Copyright (c) 2023, Arm Limited. All rights reserved.*
 
 .. _Arm Firmware Framework for Arm A-profile: https://developer.arm.com/docs/den0077/latest
 .. _Secure Partition Manager: ../components/secure-partition-manager.html
-.. _Generic TF-A threat model: ./threat_model.html#threat-analysis
+.. _Generic TF-A threat model: https://trustedfirmware-a.readthedocs.io/en/latest/threat_model/threat_model.html
 .. _FF-A ACS: https://github.com/ARM-software/ff-a-acs/releases
 
