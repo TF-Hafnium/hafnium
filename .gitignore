@@ -1,5 +1,6 @@
 out/
 .repo/
+docs/build
 
 # Ignore project/ subfolders which are not part of the public Hafnium tree.
 # When these are checked out using a `repo` manifest Git otherwise treats them
