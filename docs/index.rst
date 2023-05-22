@@ -6,6 +6,7 @@ Hafnium Documentation
    :numbered:
 
    about/index
+   design/index
    appendix
 
 --------------
