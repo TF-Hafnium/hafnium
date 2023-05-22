@@ -6,6 +6,7 @@ Hafnium Documentation
    :numbered:
 
    about/index
+   getting_started/index
    design/index
    threat_model_spm
    change-log
