@@ -311,6 +311,14 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next,
 		return ffa_error(FFA_DENIED);
 	}
 
+	/*
+	 * The current vCPU is expected to move to BLOCKED state. However,
+	 * under certain circumstances, it is allowed for the current vCPU
+	 * to be resumed immediately without ever moving to BLOCKED state. One
+	 * such scenario occurs when an SP's execution context attempts to
+	 * yield cycles while handling secure interrupt. Refer to the comments
+	 * in the SPMC variant of the plat_ffa_yield_prepare function.
+	 */
 	assert(next_state == VCPU_STATE_BLOCKED);
 
 	return plat_ffa_yield_prepare(current, next, timeout_low, timeout_high);

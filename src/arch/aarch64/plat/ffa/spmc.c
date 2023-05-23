@@ -417,7 +417,9 @@ static bool plat_ffa_check_rtm_sec_interrupt(struct vcpu *current,
 		*next_state = VCPU_STATE_WAITING;
 		return true;
 	case FFA_YIELD_32:
-		/* Rule 4. Fall through. */
+		/* Rule 3, section 8.4 of FF-A v1.2 spec. */
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 		/* Rule 5. Fall through. */
@@ -2674,7 +2676,9 @@ struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 
 /*
  * Prepare to yield execution back to the VM/SP that allocated CPU cycles and
- * move to BLOCKED state.
+ * move to BLOCKED state. If the CPU cycles were allocated to the current
+ * execution context by the SPMC to handle secure virtual interrupt, then
+ * FFA_YIELD invocation is essentially a no-op.
  */
 struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
 					struct vcpu **next,
@@ -2710,6 +2714,23 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
 				current->direct_request_origin_vm_id);
 		}
 		break;
+	case RTM_SEC_INTERRUPT: {
+		assert(current->processing_secure_interrupt);
+
+		/*
+		 * SPMC does not implement a scheduler needed to resume the
+		 * current vCPU upon timeout expiration. Hence, SPMC makes the
+		 * implementation defined choice to treat FFA_YIELD invocation
+		 * as a no-op if the SP execution context is in the secure
+		 * interrupt runtime model. This does not violate FF-A spec as
+		 * the spec does not mandate timeout to be honored. Moreover,
+		 * timeout specified by an endpoint is just a hint to the
+		 * partition manager which allocated CPU cycles.
+		 * Resume the current vCPU.
+		 */
+		*next = NULL;
+		break;
+	}
 	default:
 		CHECK(current->rt_model == RTM_FFA_RUN);
 		*next = api_switch_to_primary(current, ret, VCPU_STATE_BLOCKED);
@@ -2720,7 +2741,9 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
 	 * Before yielding CPU cycles, allow the interrupts(if they were
 	 * masked earlier).
 	 */
-	plat_ffa_vcpu_allow_interrupts(current);
+	if (*next != NULL) {
+		plat_ffa_vcpu_allow_interrupts(current);
+	}
 
 	return ret_args;
 }
