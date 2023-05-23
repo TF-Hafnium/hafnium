@@ -23,6 +23,28 @@ TEST_SERVICE(ffa_direct_message_resp_echo)
 	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
 				 args.arg3, args.arg4, args.arg5, args.arg6,
 				 args.arg7);
+
+	FAIL("Direct response not expected to return");
+}
+
+TEST_SERVICE(ffa_yield_direct_message_resp_echo)
+{
+	struct ffa_value args = ffa_msg_wait();
+
+	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
+
+	/*
+	 * Give back control to VM/SP, that sent the direct request message,
+	 * through FFA_YIELD ABI and specify timeout of 0x123456789.
+	 */
+	ffa_yield_timeout(0x1, 0x23456789);
+
+	/* Send the echo through direct message response. */
+	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
+				 args.arg3, args.arg4, args.arg5, args.arg6,
+				 args.arg7);
+
+	FAIL("Direct response not expected to return");
 }
 
 TEST_SERVICE(ffa_direct_message_echo_services)
@@ -53,6 +75,45 @@ TEST_SERVICE(ffa_direct_message_echo_services)
 	ffa_yield();
 }
 
+TEST_SERVICE(ffa_yield_direct_message_echo_services)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_value res;
+	ffa_vm_id_t target_id;
+
+	/* Retrieve FF-A ID of the target endpoint. */
+	receive_indirect_message((void *)&target_id, sizeof(target_id),
+				 recv_buf, NULL);
+
+	HFTEST_LOG("Echo test with: %x", target_id);
+
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), target_id, msg[0], msg[1],
+				      msg[2], msg[3], msg[4]);
+
+	/*
+	 * Be prepared to allocate CPU cycles to target vCPU if it yields while
+	 * processing direct message.
+	 */
+	while (res.func == FFA_YIELD_32) {
+		/* VM id/vCPU index are passed through arg1. */
+		EXPECT_EQ(res.arg1, ffa_vm_vcpu(target_id, 0));
+
+		/* Allocate CPU cycles to resume SP. */
+		res = ffa_run(target_id, 0);
+	}
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	EXPECT_EQ(res.arg3, msg[0]);
+	EXPECT_EQ(res.arg4, msg[1]);
+	EXPECT_EQ(res.arg5, msg[2]);
+	EXPECT_EQ(res.arg6, msg[3]);
+	EXPECT_EQ(res.arg7, msg[4]);
+
+	ffa_yield();
+}
+
 TEST_SERVICE(ffa_direct_msg_req_disallowed_smc)
 {
 	struct ffa_value args = ffa_msg_wait();
@@ -72,6 +133,8 @@ TEST_SERVICE(ffa_direct_msg_req_disallowed_smc)
 	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
 				 args.arg3, args.arg4, args.arg5, args.arg6,
 				 args.arg7);
+
+	FAIL("Direct response not expected to return");
 }
 
 /**
@@ -99,6 +162,8 @@ TEST_SERVICE(ffa_disallowed_direct_msg_req)
 	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
 				 args.arg3, args.arg4, args.arg5, args.arg6,
 				 args.arg7);
+
+	FAIL("Direct response not expected to return");
 }
 
 /**
@@ -122,6 +187,8 @@ TEST_SERVICE(ffa_disallowed_direct_msg_resp)
 	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
 				 args.arg3, args.arg4, args.arg5, args.arg6,
 				 args.arg7);
+
+	FAIL("Direct response not expected to return");
 }
 
 /**
@@ -154,6 +221,8 @@ TEST_SERVICE(ffa_direct_msg_resp_invalid_sender_receiver)
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 
 	ffa_msg_send_direct_resp(own_id, sender, 0, 0, 0, 0, 0);
+
+	FAIL("Direct response not expected to return");
 }
 
 TEST_SERVICE(ffa_direct_message_cycle_denied)
@@ -176,4 +245,6 @@ TEST_SERVICE(ffa_direct_message_cycle_denied)
 	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
 				 args.arg3, args.arg4, args.arg5, args.arg6,
 				 args.arg7);
+
+	FAIL("Direct response not expected to return");
 }

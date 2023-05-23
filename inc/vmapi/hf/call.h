@@ -120,12 +120,23 @@ static inline struct ffa_value ffa_run(ffa_vm_id_t vm_id,
 }
 
 /**
- * Hints that the vCPU is willing to yield its current use of the physical CPU.
- * This call always returns FFA_SUCCESS.
+ * Hints that the vCPU is willing to yield its current use of the physical CPU
+ * and intends to be resumed at the expiration of the timeout.
+ */
+static inline struct ffa_value ffa_yield_timeout(uint32_t timeout_low,
+						 uint32_t timeout_high)
+{
+	return ffa_call((struct ffa_value){.func = FFA_YIELD_32,
+					   .arg2 = timeout_low,
+					   .arg3 = timeout_high});
+}
+
+/**
+ * Relinquish the current physical CPU cycles back.
  */
 static inline struct ffa_value ffa_yield(void)
 {
-	return ffa_call((struct ffa_value){.func = FFA_YIELD_32});
+	return ffa_yield_timeout(0, 0);
 }
 
 /**
