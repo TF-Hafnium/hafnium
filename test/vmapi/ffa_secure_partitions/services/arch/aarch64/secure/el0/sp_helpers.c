@@ -16,6 +16,8 @@
 
 #define ITERATIONS_PER_MS 15000
 
+extern bool yield_while_handling_sec_interrupt;
+
 uint64_t sp_sleep_active_wait(uint32_t ms)
 {
 	sp_wait_loop(ms * ITERATIONS_PER_MS);
@@ -49,6 +51,15 @@ struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 
 	/* Perform secure interrupt de-activation. */
 	ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+
+	if (yield_while_handling_sec_interrupt) {
+		struct ffa_value ret;
+		HFTEST_LOG("Yield cycles while handling secure interrupt");
+		ret = ffa_yield();
+
+		ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+		HFTEST_LOG("Resuming secure interrupt handling");
+	}
 	exception_handler_set_last_interrupt(intid);
 	return ffa_msg_wait();
 }

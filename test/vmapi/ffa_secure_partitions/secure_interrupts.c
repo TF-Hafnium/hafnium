@@ -291,3 +291,52 @@ TEST(secure_interrupts, sp_other_s_interrupt_queued)
 	 */
 	check_and_disable_trusted_wdog_timer(own_id, target_id);
 }
+
+/*
+ * Test that an SP can attempt to yield CPU cycles while handling secure
+ * interrupt by invoking FFA_YIELD.
+ */
+TEST(secure_interrupts, sp_yield_sec_interrupt_handling)
+{
+	struct ffa_value res;
+	ffa_vm_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_vm_id_t receiver_id = service2_info->vm_id;
+	uint64_t time1;
+	volatile uint64_t time_lapsed;
+	uint64_t timer_freq = read_msr(cntfrq_el0);
+
+	/*
+	 * Send command to SP asking it attempt to yield cycles while handling
+	 * secure interrupt.
+	 */
+	res = sp_yield_secure_interrupt_handling_cmd_send(own_id, receiver_id,
+							  true);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 75);
+	time1 = syscounter_read();
+
+	/*
+	 * Sleep for 100ms. This ensures secure wdog timer triggers
+	 * during this time. SP starts handling secure interrupt but attempts
+	 * to yields cycles. However, SPMC just resumes the SP to complete
+	 * interrupt handling.
+	 */
+	waitms(100);
+
+	/* Lapsed time should be at least equal to sleep time. */
+	time_lapsed = ((syscounter_read() - time1) * 1000) / timer_freq;
+
+	EXPECT_GE(time_lapsed, 100);
+
+	res = sp_yield_secure_interrupt_handling_cmd_send(own_id, receiver_id,
+							  false);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
+}

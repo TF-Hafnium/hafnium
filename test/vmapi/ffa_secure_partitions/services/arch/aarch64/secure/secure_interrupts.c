@@ -23,6 +23,8 @@
 #define PLAT_ARM_TWDOG_BASE 0x2a490000
 #define PLAT_ARM_TWDOG_SIZE 0x20000
 
+bool yield_while_handling_sec_interrupt = false;
+
 static void send_managed_exit_response(ffa_vm_id_t dir_req_source_id)
 {
 	struct ffa_value ffa_ret;
@@ -75,6 +77,17 @@ static void irq_current(void)
 
 		/* Perform secure interrupt de-activation. */
 		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+
+		if (yield_while_handling_sec_interrupt) {
+			struct ffa_value ret;
+			HFTEST_LOG(
+				"Yield cycles while handling secure interrupt");
+			ret = ffa_yield();
+
+			ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+			HFTEST_LOG("Resuming secure interrupt handling");
+		}
+
 		exception_handler_set_last_interrupt(intid);
 	}
 }
@@ -225,5 +238,14 @@ struct ffa_value sp_fwd_sleep_cmd(ffa_vm_id_t source, uint32_t sleep_ms,
 		return sp_error(own_id, source, 0);
 	}
 
+	return sp_success(own_id, source, 0);
+}
+
+struct ffa_value sp_yield_secure_interrupt_handling_cmd(ffa_vm_id_t source,
+							bool yield)
+{
+	ffa_vm_id_t own_id = hf_vm_get_id();
+
+	yield_while_handling_sec_interrupt = yield;
 	return sp_success(own_id, source, 0);
 }

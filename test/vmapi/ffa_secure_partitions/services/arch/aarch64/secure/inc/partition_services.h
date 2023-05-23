@@ -449,3 +449,20 @@ static inline struct ffa_value sp_check_partition_info_get_regs_cmd_send(
 }
 
 struct ffa_value sp_check_partition_info_get_regs_cmd(ffa_vm_id_t test_source);
+
+/**
+ * Command to request an SP to yield while handling a secure interrupt.
+ * The command id is the hex representaton of the string "YSIH".
+ */
+#define SP_YIELD_SEC_INTERRUPT_HANDLING_CMD 0x59534948U
+
+static inline struct ffa_value sp_yield_secure_interrupt_handling_cmd_send(
+	ffa_vm_id_t source, ffa_vm_id_t dest, bool yield)
+{
+	return ffa_msg_send_direct_req(source, dest,
+				       SP_YIELD_SEC_INTERRUPT_HANDLING_CMD,
+				       yield, 0, 0, 0);
+}
+
+struct ffa_value sp_yield_secure_interrupt_handling_cmd(ffa_vm_id_t source,
+							bool yield);
