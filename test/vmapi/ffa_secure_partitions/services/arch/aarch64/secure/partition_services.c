@@ -91,10 +91,6 @@ struct ffa_value sp_check_state_transitions_cmd(ffa_vm_id_t test_source,
 	res = ffa_msg_wait();
 	EXPECT_FFA_ERROR(res, FFA_DENIED);
 
-	/* Test invocation of FFA_YIELD. */
-	res = ffa_yield();
-	EXPECT_FFA_ERROR(res, FFA_DENIED);
-
 	/* TODO: test the invocation of FFA_RUN ABI.*/
 	/* Perform legal invocation of FFA_MSG_SEND_DIRECT_RESP. */
 	return sp_success(own_id, test_source, 0);

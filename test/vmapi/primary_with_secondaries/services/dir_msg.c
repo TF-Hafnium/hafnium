@@ -62,9 +62,6 @@ TEST_SERVICE(ffa_direct_msg_req_disallowed_smc)
 
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
 
-	ret = ffa_yield();
-	EXPECT_FFA_ERROR(ret, FFA_DENIED);
-
 	ret = ffa_msg_wait();
 	EXPECT_FFA_ERROR(ret, FFA_DENIED);
 

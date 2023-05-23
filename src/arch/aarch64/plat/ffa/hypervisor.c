@@ -1112,19 +1112,14 @@ bool plat_ffa_check_runtime_state_transition(
 	struct vcpu *current, ffa_vm_id_t vm_id, ffa_vm_id_t receiver_vm_id,
 	struct vcpu *receiver_vcpu, uint32_t func, enum vcpu_state *next_state)
 {
+	(void)current;
 	(void)vm_id;
 	(void)receiver_vm_id;
 	(void)receiver_vcpu;
 
 	switch (func) {
 	case FFA_YIELD_32:
-		/* Check if a direct message is ongoing. */
-		if (current->direct_request_origin_vm_id != HF_INVALID_VM_ID) {
-			return false;
-		}
-
-		*next_state = VCPU_STATE_BLOCKED;
-		return true;
+		/* Fall through. */
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
 	case FFA_RUN_32:
@@ -2269,7 +2264,22 @@ out:
 	return ret;
 }
 
-void plat_ffa_yield_prepare(struct vcpu *current)
+/*
+ * Prepare to yield execution back to the VM that allocated cpu cycles and move
+ * to BLOCKED state.
+ */
+struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
+					struct vcpu **next)
 {
-	(void)current;
+	struct ffa_value ret = {
+		.func = FFA_YIELD_32,
+		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
+	};
+
+	/*
+	 * Return execution to primary VM.
+	 */
+	*next = api_switch_to_primary(current, ret, VCPU_STATE_BLOCKED);
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }

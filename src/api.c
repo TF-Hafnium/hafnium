@@ -120,10 +120,8 @@ struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current)
  * - UP migratable.
  * - MP with pinned Execution Contexts.
  */
-static struct vcpu *api_switch_to_vm(struct vcpu *current,
-				     struct ffa_value to_ret,
-				     enum vcpu_state vcpu_state,
-				     ffa_vm_id_t to_id)
+struct vcpu *api_switch_to_vm(struct vcpu *current, struct ffa_value to_ret,
+			      enum vcpu_state vcpu_state, ffa_vm_id_t to_id)
 {
 	struct vm *to_vm = vm_find(to_id);
 	struct vcpu *next = api_ffa_get_vm_vcpu(to_vm, current);
@@ -300,15 +298,7 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
 
 	assert(next_state == VCPU_STATE_BLOCKED);
 
-	plat_ffa_yield_prepare(current);
-	*next = api_switch_to_primary(
-		current,
-		(struct ffa_value){.func = FFA_YIELD_32,
-				   .arg1 = ffa_vm_vcpu(current->vm->id,
-						       vcpu_index(current))},
-		next_state);
-
-	return ret;
+	return plat_ffa_yield_prepare(current, next);
 }
 
 /**

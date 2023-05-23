@@ -596,7 +596,11 @@ struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-void plat_ffa_yield_prepare(struct vcpu *current)
+struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
+					struct vcpu **next)
 {
 	(void)current;
+	(void)next;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
 }

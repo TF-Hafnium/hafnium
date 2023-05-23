@@ -375,10 +375,12 @@ static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu *current,
 
 		return false;
 	}
+	case FFA_YIELD_32:
+		/* Rule 3, section 8.3 of FF-A v1.2 spec. */
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
 	case FFA_MSG_WAIT_32:
 		/* Rule 4. Fall through. */
-	case FFA_YIELD_32:
-		/* Rule 5. Fall through. */
 	default:
 		/* Deny state transitions by default. */
 		return false;
@@ -1105,12 +1107,14 @@ bool plat_ffa_run_checks(struct vcpu *current, ffa_vm_id_t target_vm_id,
 	}
 
 	/*
-	 * An SPx can resume another SPy only when SPy is in PREEMPTED state.
+	 * An SPx can resume another SPy only when SPy is in PREEMPTED or
+	 * BLOCKED state.
 	 */
 	if (vm_id_is_current_world(current->vm->id) &&
 	    vm_id_is_current_world(target_vm_id)) {
-		/* Target SP must be in preempted state. */
-		if (target_vcpu->state != VCPU_STATE_PREEMPTED) {
+		/* Target SP must be in preempted or blocked state. */
+		if (target_vcpu->state != VCPU_STATE_PREEMPTED &&
+		    target_vcpu->state != VCPU_STATE_BLOCKED) {
 			run_ret->arg2 = FFA_DENIED;
 			ret = false;
 			goto out;
@@ -2668,11 +2672,51 @@ struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-void plat_ffa_yield_prepare(struct vcpu *current)
+/*
+ * Prepare to yield execution back to the VM/SP that allocated CPU cycles and
+ * move to BLOCKED state.
+ */
+struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
+					struct vcpu **next)
 {
+	struct ffa_value ret_args = (struct ffa_value){.func = FFA_SUCCESS_32};
+	struct ffa_value ret = {
+		.func = FFA_YIELD_32,
+		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
+	};
+
+	switch (current->rt_model) {
+	case RTM_FFA_DIR_REQ:
+		assert(current->direct_request_origin_vm_id !=
+		       HF_INVALID_VM_ID);
+		if (current->call_chain.prev_node == NULL) {
+			/*
+			 * Relinquish cycles to the NWd VM that sent direct
+			 * request message to the current SP.
+			 */
+			*next = api_switch_to_other_world(current, ret,
+							  VCPU_STATE_BLOCKED);
+		} else {
+			/*
+			 * Relinquish cycles to the SP that sent direct request
+			 * message to the current SP.
+			 */
+			*next = api_switch_to_vm(
+				current, ret, VCPU_STATE_BLOCKED,
+				current->direct_request_origin_vm_id);
+		}
+		break;
+	default:
+		CHECK(current->rt_model == RTM_FFA_RUN);
+		*next = api_switch_to_primary(current, ret, VCPU_STATE_BLOCKED);
+		break;
+	}
+
 	/*
-	 * Before returning control  to NWd, allow the interrupts(if they were
+	 * Before yielding CPU cycles, allow the interrupts(if they were
 	 * masked earlier).
 	 */
 	plat_ffa_vcpu_allow_interrupts(current);
+
+	return ret_args;
 }

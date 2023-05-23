@@ -20,6 +20,8 @@ struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current);
 void api_regs_state_saved(struct vcpu *vcpu);
 int64_t api_mailbox_writable_get(const struct vcpu *current);
 int64_t api_mailbox_waiter_get(ffa_vm_id_t vm_id, const struct vcpu *current);
+struct vcpu *api_switch_to_vm(struct vcpu *current, struct ffa_value to_ret,
+			      enum vcpu_state vcpu_state, ffa_vm_id_t to_id);
 struct vcpu *api_switch_to_primary(struct vcpu *current,
 				   struct ffa_value primary_ret,
 				   enum vcpu_state secondary_state);
