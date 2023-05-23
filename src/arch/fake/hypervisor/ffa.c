@@ -566,10 +566,14 @@ struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 }
 
 struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
-					struct vcpu **next)
+					struct vcpu **next,
+					uint32_t timeout_low,
+					uint32_t timeout_high)
 {
 	(void)current;
 	(void)next;
+	(void)timeout_low;
+	(void)timeout_high;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }

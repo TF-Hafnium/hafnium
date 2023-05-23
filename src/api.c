@@ -274,12 +274,27 @@ struct vcpu *api_vcpu_off(struct vcpu *current)
  * control back to the execution context of the endpoint that originally
  * allocated cycles to it.
  */
-struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
+struct ffa_value api_yield(struct vcpu *current, struct vcpu **next,
+			   struct ffa_value *args)
 {
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 	struct vcpu_locked current_locked;
 	bool transition_allowed;
 	enum vcpu_state next_state = VCPU_STATE_BLOCKED;
+	uint32_t timeout_low = 0;
+	uint32_t timeout_high = 0;
+
+	if (args != NULL) {
+		if (args->arg4 != 0U || args->arg5 != 0U || args->arg6 != 0U ||
+		    args->arg7 != 0U) {
+			dlog_error(
+				"Parameters passed through registers X4-X7 "
+				"must be zero\n");
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+		timeout_low = (uint32_t)args->arg2 & 0xFFFFFFFF;
+		timeout_high = (uint32_t)args->arg3 & 0xFFFFFFFF;
+	}
 
 	if (current->vm->id == HF_PRIMARY_VM_ID) {
 		/* NOOP on the primary as it makes the scheduling decisions. */
@@ -298,7 +313,7 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next)
 
 	assert(next_state == VCPU_STATE_BLOCKED);
 
-	return plat_ffa_yield_prepare(current, next);
+	return plat_ffa_yield_prepare(current, next, timeout_low, timeout_high);
 }
 
 /**

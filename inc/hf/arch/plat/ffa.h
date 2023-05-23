@@ -366,4 +366,6 @@ struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
 				   struct vcpu *current, struct vcpu **next);
 
 struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
-					struct vcpu **next);
+					struct vcpu **next,
+					uint32_t timeout_low,
+					uint32_t timeout_high);

@@ -2269,11 +2269,15 @@ out:
  * to BLOCKED state.
  */
 struct ffa_value plat_ffa_yield_prepare(struct vcpu *current,
-					struct vcpu **next)
+					struct vcpu **next,
+					uint32_t timeout_low,
+					uint32_t timeout_high)
 {
 	struct ffa_value ret = {
 		.func = FFA_YIELD_32,
 		.arg1 = ffa_vm_vcpu(current->vm->id, vcpu_index(current)),
+		.arg2 = timeout_low,
+		.arg3 = timeout_high,
 	};
 
 	/*

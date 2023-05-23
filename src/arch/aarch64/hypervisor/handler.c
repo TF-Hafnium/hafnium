@@ -576,7 +576,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_rx_acquire(ffa_receiver(*args), current);
 		return true;
 	case FFA_YIELD_32:
-		*args = api_yield(current, next);
+		*args = api_yield(current, next, args);
 		return true;
 	case FFA_MSG_SEND_32:
 		*args = plat_ffa_msg_send(
@@ -1236,7 +1236,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 		 * interrupts into EL0 partitions.
 		 */
 		if (is_el0_partition) {
-			api_yield(vcpu, &new_vcpu);
+			api_yield(vcpu, &new_vcpu, NULL);
 			return new_vcpu;
 		}
 
@@ -1247,7 +1247,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 			 * TODO: consider giving the scheduler more context,
 			 * somehow.
 			 */
-			api_yield(vcpu, &new_vcpu);
+			api_yield(vcpu, &new_vcpu, NULL);
 			return new_vcpu;
 		}
 		/* WFI */
