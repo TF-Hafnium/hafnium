@@ -71,6 +71,102 @@ partition_package("vm_primary_test_package") {
   output = "vm_primary_test_package.img"
 }
 
+# VM that will control execution of tests in a VM-to-SP set-up
+# VM for running boot tests only
+vm_kernel("vm_primary_boot_fail_test_sp1") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "services/arch/${plat_arch}/secure:config",
+    "//src/arch/${plat_arch}:arch_config",
+  ]
+  defines = [ "FAILING_SP=1" ]
+  sources = [ "boot_fail.c" ]
+
+  deps = [
+    ":ffa_secure_partitions",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/common:common",
+  ]
+}
+
+# VM that will control execution of tests in a VM-to-SP set-up
+# VM for running boot tests only
+vm_kernel("vm_primary_boot_fail_test_sp2") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "services/arch/${plat_arch}/secure:config",
+    "//src/arch/${plat_arch}:arch_config",
+  ]
+  defines = [ "FAILING_SP=2" ]
+  sources = [ "boot_fail.c" ]
+
+  deps = [
+    ":ffa_secure_partitions",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/common:common",
+  ]
+}
+
+# VM that will control execution of tests in a VM-to-SP set-up
+# VM for running boot tests only
+vm_kernel("vm_primary_boot_fail_test_sp3") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "services/arch/${plat_arch}/secure:config",
+    "//src/arch/${plat_arch}:arch_config",
+  ]
+  defines = [ "FAILING_SP=3" ]
+  sources = [ "boot_fail.c" ]
+
+  deps = [
+    ":ffa_secure_partitions",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/common:common",
+  ]
+}
+
+partition_package("vm_primary_boot_fail_test_package_sp1") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_nwd_primary.dtb",
+        "vm_primary_boot_fail_test_sp1.bin",
+        ":vm_primary_manifest",
+        ":vm_primary_boot_fail_test_sp1",
+      ] ]
+  output = "vm_primary_boot_fail_test_package_sp1.img"
+}
+
+partition_package("vm_primary_boot_fail_test_package_sp2") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_nwd_primary.dtb",
+        "vm_primary_boot_fail_test_sp2.bin",
+        ":vm_primary_manifest",
+        ":vm_primary_boot_fail_test_sp2",
+      ] ]
+  output = "vm_primary_boot_fail_test_package_sp2.img"
+}
+
+partition_package("vm_primary_boot_fail_test_package_sp3") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_nwd_primary.dtb",
+        "vm_primary_boot_fail_test_sp3.bin",
+        ":vm_primary_manifest",
+        ":vm_primary_boot_fail_test_sp3",
+      ] ]
+  output = "vm_primary_boot_fail_test_package_sp3.img"
+}
+
 partitions_json("ffa_both_world_partitions_vhe_test") {
   testonly = true
 
@@ -137,4 +233,106 @@ partitions_json("ffa_both_world_partitions_test") {
       ] ]
 
   json_file = "ffa_both_world_partitions_test.json"
+}
+
+partitions_json("ffa_both_world_partitions_boot_fail_test_sp1") {
+  testonly = true
+
+  sps = [
+    [
+      "service_sp_first_package_boot_fail_test.img",
+      "services/arch/aarch64/secure/manifest_service_sp_first.dts",
+      "services/arch/aarch64/secure:service_sp_first_package_boot_fail_test",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_first",
+    ],
+    [
+      "service_sp_second_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_second.dts",
+      "services/arch/aarch64/secure:service_sp_second_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_second",
+    ],
+    [
+      "service_sp_third_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_third.dts",
+      "services/arch/aarch64/secure:service_sp_third_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_third",
+    ],
+  ]
+
+  vms = [ [
+        "vm_primary_boot_fail_test_package_sp1.img",
+        "manifest.dts",
+        ":vm_primary_boot_fail_test_package_sp1",
+        ":vm_primary_boot_fail_test_package_sp1",
+      ] ]
+
+  json_file = "ffa_both_world_partitions_boot_fail_test_sp1.json"
+}
+
+partitions_json("ffa_both_world_partitions_boot_fail_test_sp2") {
+  testonly = true
+
+  sps = [
+    [
+      "service_sp_first_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_first.dts",
+      "services/arch/aarch64/secure:service_sp_first_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_first",
+    ],
+    [
+      "service_sp_second_package_boot_fail_test.img",
+      "services/arch/aarch64/secure/manifest_service_sp_second.dts",
+      "services/arch/aarch64/secure:service_sp_second_package_boot_fail_test",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_second",
+    ],
+    [
+      "service_sp_third_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_third.dts",
+      "services/arch/aarch64/secure:service_sp_third_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_third",
+    ],
+  ]
+
+  vms = [ [
+        "vm_primary_boot_fail_test_package_sp2.img",
+        "manifest.dts",
+        ":vm_primary_boot_fail_test_package_sp2",
+        ":vm_primary_boot_fail_test_package_sp2",
+      ] ]
+
+  json_file = "ffa_both_world_partitions_boot_fail_test_sp2.json"
+}
+
+partitions_json("ffa_both_world_partitions_boot_fail_test_sp3") {
+  testonly = true
+
+  sps = [
+    [
+      "service_sp_first_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_first.dts",
+      "services/arch/aarch64/secure:service_sp_first_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_first",
+    ],
+    [
+      "service_sp_second_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_second.dts",
+      "services/arch/aarch64/secure:service_sp_second_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_second",
+    ],
+    [
+      "service_sp_third_package_boot_fail_test.img",
+      "services/arch/aarch64/secure/manifest_service_sp_third.dts",
+      "services/arch/aarch64/secure:service_sp_third_package_boot_fail_test",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_third",
+    ],
+  ]
+
+  vms = [ [
+        "vm_primary_boot_fail_test_package_sp3.img",
+        "manifest.dts",
+        ":vm_primary_boot_fail_test_package_sp3",
+        ":vm_primary_boot_fail_test_package_sp3",
+      ] ]
+
+  json_file = "ffa_both_world_partitions_boot_fail_test_sp3.json"
 }

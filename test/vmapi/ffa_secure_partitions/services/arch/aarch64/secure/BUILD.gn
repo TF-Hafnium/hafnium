@@ -102,6 +102,17 @@ source_set("message_loop") {
     ":secure_interrupts",
   ]
 }
+source_set("test_main_sp_boot_fail") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "test_main_sp_boot_fail.c" ]
+
+  deps = [ "//vmlib/${plat_arch}:call" ]
+}
 
 source_set("sp_helpers") {
   testonly = true
@@ -126,6 +137,19 @@ vm_kernel("secure_partitions_services") {
     "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_secure_service",
     "//vmlib/${plat_arch}:call",
+  ]
+}
+
+# SP that will be controlled via communication/scheduling primitives by the
+# former SP.
+# Uses a modified boot flow to test SP initialization error handling.
+vm_kernel("secure_partitions_services_boot_fail_test") {
+  testonly = true
+  public_configs = [ ":config" ]
+
+  deps = [
+    ":test_main_sp_boot_fail",
+    "//test/hftest:hftest_secure_service",
   ]
 }
 
@@ -181,4 +205,54 @@ partition_package("service_sp_third_package") {
         ":secure_partitions_services",
       ] ]
   output = "service_sp_third_package.img"
+}
+
+# The following partition packages (service_sp_<X>_package_boot_fail_test)
+# are used in tests where the <X> service SP fails to initialize.
+#
+# These may be used in various combinations with the existing
+# service_sp_<X>_package partition packages to create test configurations
+# where one or more SPs fail to boot while others may succeed.
+#
+# The manifest contents are not important as long as they represent
+# a valid configuration that would reach the boot stage in order
+# to test the failure reporting.
+
+partition_package("service_sp_first_package_boot_fail_test") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp_first.dtb",
+        "secure_partitions_services_boot_fail_test.bin",
+        ":partition_manifest_service_sp_first",
+        ":secure_partitions_services_boot_fail_test",
+      ] ]
+  output = "service_sp_first_package_boot_fail_test.img"
+}
+
+partition_package("service_sp_second_package_boot_fail_test") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp_second.dtb",
+        "secure_partitions_services_boot_fail_test.bin",
+        ":partition_manifest_service_sp_second",
+        ":secure_partitions_services_boot_fail_test",
+      ] ]
+  output = "service_sp_second_package_boot_fail_test.img"
+}
+
+partition_package("service_sp_third_package_boot_fail_test") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp_third.dtb",
+        "secure_partitions_services_boot_fail_test.bin",
+        ":partition_manifest_service_sp_third",
+        ":secure_partitions_services_boot_fail_test",
+      ] ]
+  output = "service_sp_third_package_boot_fail_test.img"
 }

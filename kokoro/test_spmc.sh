@@ -42,6 +42,15 @@ do
   shift
 done
 
+${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_boot_fail_test_sp1.json
+
+${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_boot_fail_test_sp2.json
+
+${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_boot_fail_test_sp3.json
+
 if [ $USE_PARITY == true ]
 then
    ${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" --partitions_json test/vmapi/ffa_both_worlds_el3_spmc/ffa_both_world_partitions_test.json

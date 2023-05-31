@@ -55,6 +55,8 @@ struct ffa_partition_info* service3(void* recv);
 
 /* Precondition functions for this test setup. */
 bool service2_is_up_sp(void);
-
 uint64_t syscounter_read(void);
 void waitms(uint64_t ms);
+bool sp1_fail_at_boot(void);
+bool sp2_fail_at_boot(void);
+bool sp3_fail_at_boot(void);

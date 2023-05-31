@@ -23,7 +23,7 @@
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0x7>; /* Supports direct and indirect messages. */
 	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
-	boot-order = <4>;
+	boot-order = <2>;
 	notification-support; /* Receipt of notifications. */
 
 	device-regions {
