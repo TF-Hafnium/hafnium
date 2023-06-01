@@ -33,7 +33,14 @@
 	};
 
 	memory-regions {
+
 		compatible = "arm,ffa-manifest-memory-regions";
+
+		test-memory {
+			relative-address = <0x300000>; /* effective address = 0x6780000 */
+			pages-count = <1>;
+			attributes = <0x3>;
+		};
 
 		secure-memory {
 			base-address = <0x00000000 0x7100000>;
@@ -41,9 +48,9 @@
 			attributes = <0x3>; /* read-write */
 		};
 		ns-memory {
-			base-address = <0x00000000 0x8000F000>;
+			base-address = <0x00000000 0x9001F000>;
 			pages-count = <1>;
-			attributes = <0xb>;
+			attributes = <0xb>; /* read-write and NS */
 		};
 	};
 };

@@ -106,9 +106,17 @@ static void hftest_parse_ffa_manifest(struct hftest_context *ctx,
 			EXPECT_TRUE(fdt_read_number(&ffa_node, "pages-count",
 						    &number));
 			cur_region->page_count = (uint32_t)number;
-			EXPECT_TRUE(fdt_read_number(&ffa_node, "base-address",
-						    &number));
-			cur_region->base_address = number;
+
+			if (!fdt_read_number(&ffa_node, "base-address",
+					     &cur_region->base_address)) {
+				EXPECT_TRUE(fdt_read_number(&ffa_node,
+							    "relative-address",
+							    &number));
+				cur_region->base_address =
+					ctx->partition_manifest.load_addr +
+					number;
+			}
+
 			EXPECT_TRUE(fdt_read_number(&ffa_node, "attributes",
 						    &number));
 			cur_region->attributes = (uint32_t)number;

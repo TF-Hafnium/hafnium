@@ -75,6 +75,6 @@
 
 	memory@1 {
 		device_type = "ns-memory";
-		reg = <0x0 0x80000000 0x7f000000>;
+		reg = <0x0 0x90010000 0x70000000>;
 	};
 };
