@@ -1199,6 +1199,47 @@ TEST_F(manifest, ffa_validate_mem_regions)
 		  MANIFEST_ERROR_MEM_REGION_EMPTY);
 	manifest_dealloc();
 
+	/* Mutually exclusive base-address and relative-address properties */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("relative-address", "<0x7300000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_BASE_ADDRESS_AND_RELATIVE_ADDRESS);
+	manifest_dealloc();
+	/* Relative-address overflow*/
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.Property("load-address", "<0xffffff00 0xffffff00>")
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("relative-address", "<0xffffff00 0xffffff00>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_INTEGER_OVERFLOW);
+	manifest_dealloc();
+
 	/* Overlapping memory regions */
 	/* clang-format off */
 	dtb = ManifestDtBuilder()
@@ -1552,7 +1593,7 @@ TEST_F(manifest, ffa_valid)
 			.Compatible({ "arm,ffa-manifest-memory-regions" })
 			.StartChild("test-memory")
 				.Description("test-memory")
-				.Property("base-address", "<0x7100000>")
+				.Property("relative-address", "<0x7100000>")
 				.Property("pages-count", "<4>")
 				.Property("attributes", "<3>")
 			.EndChild()
@@ -1597,7 +1638,6 @@ TEST_F(manifest, ffa_valid)
 		.EndChild()
 		.Build();
 	/* clang-format on */
-
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
 
 	vm = &m->vm[0];
