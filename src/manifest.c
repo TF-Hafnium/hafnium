@@ -1263,8 +1263,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 
 	ret = parse_ffa_manifest(&sp_fdt, vm, &boot_info_node, boot_params);
 	if (ret != MANIFEST_SUCCESS) {
-		dlog_error("Error parsing partition manifest: %s.\n",
-			   manifest_strerror(ret));
+		dlog_error("Error parsing partition manifest.\n");
 		goto out;
 	}
 
@@ -1487,14 +1486,13 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		       "response to Other-S Interrupt";
 	case MANIFEST_ERROR_MEMORY_MISSING:
 		return "Memory nodes must be defined in the SPMC manifest "
-		       "('memory' and 'ns-memory').";
+		       "('memory' and 'ns-memory')";
 	case MANIFEST_ERROR_PARTITION_ADDRESS_OVERLAP:
 		return "Partition's memory [load address: load address + "
 		       "memory size[ overlap with other allocated "
-		       "regions.";
+		       "regions";
 	case MANIFEST_ERROR_MEM_REGION_INVALID:
-		return "Memory region must within memory ranges defined "
-		       "in the SPMC manifest.";
+		return "Invalid memory region range";
 	case MANIFEST_ERROR_INVALID_BOOT_ORDER:
 		return "Boot order should be a unique value less than "
 		       "default largest value";
