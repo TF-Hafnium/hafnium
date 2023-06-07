@@ -75,5 +75,5 @@ struct ffa_value ffa_call(struct ffa_value args)
 				  .extended_val.arg14 = r14,
 				  .extended_val.arg15 = r15,
 				  .extended_val.arg16 = r16,
-				  .extended_val.arg17 = r1};
+				  .extended_val.arg17 = r17};
 }
