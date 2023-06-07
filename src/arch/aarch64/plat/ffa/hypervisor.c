@@ -858,71 +858,13 @@ bool plat_ffa_inject_notification_pending_interrupt(
 	return false;
 }
 
-static struct ffa_value plat_ffa_partition_info_get_regs(
-	const struct ffa_uuid *uuid, const uint16_t start_index,
-	const uint16_t tag)
+bool plat_ffa_partition_info_get_regs_forward_allowed(void)
 {
-	uint64_t arg1 = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
-	uint64_t arg2 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
-	uint64_t arg3 = start_index | (uint64_t)tag << 16;
-
-	return arch_other_world_call_ext((struct ffa_value){
-		.func = FFA_PARTITION_INFO_GET_REGS_64,
-		.arg1 = arg1,
-		.arg2 = arg2,
-		.arg3 = arg3,
-	});
-}
-
-bool plat_ffa_partition_info_get_regs_forward(
-	const struct ffa_uuid *uuid, const uint16_t start_index,
-	const uint16_t tag, struct ffa_partition_info *partitions,
-	uint16_t partitions_len, ffa_vm_count_t *ret_count)
-{
-	(void)start_index;
-	(void)tag;
-	struct ffa_value ret;
-	uint16_t last_index = 0;
-	uint16_t curr_index = 0;
-	uint16_t swd_start_index = 0;
-
 	/*
 	 * Allow forwarding from the Hypervisor if TEE or SPMC exists and
 	 * declared as such in the Hypervisor manifest.
 	 */
-	if (!ffa_tee_enabled) {
-		return true;
-	}
-
-	ret = plat_ffa_partition_info_get_regs(uuid, swd_start_index, 0);
-	if (ffa_func_id(ret) != FFA_SUCCESS_64) {
-		return false;
-	}
-
-	if (!api_ffa_fill_partition_info_from_regs(ret, swd_start_index,
-						   partitions, partitions_len,
-						   ret_count)) {
-		return false;
-	}
-
-	last_index = ffa_partition_info_regs_get_last_idx(ret);
-	curr_index = ffa_partition_info_regs_get_curr_idx(ret);
-	swd_start_index = curr_index + 1;
-	while (swd_start_index <= last_index) {
-		ret = plat_ffa_partition_info_get_regs(uuid, swd_start_index,
-						       0);
-		if (ffa_func_id(ret) != FFA_SUCCESS_32) {
-			return false;
-		}
-
-		if (!api_ffa_fill_partition_info_from_regs(
-			    ret, swd_start_index, partitions, partitions_len,
-			    ret_count)) {
-			return false;
-		}
-	}
-
-	return true;
+	return ffa_tee_enabled;
 }
 
 /*

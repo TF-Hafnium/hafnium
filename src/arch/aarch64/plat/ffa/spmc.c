@@ -1966,54 +1966,11 @@ bool plat_ffa_inject_notification_pending_interrupt(
 	return ret;
 }
 
-bool plat_ffa_partition_info_get_regs_forward(
-	const struct ffa_uuid *uuid, const uint16_t start_index,
-	const uint16_t tag, struct ffa_partition_info *partitions,
-	uint16_t partitions_len, ffa_vm_count_t *ret_count)
+bool plat_ffa_partition_info_get_regs_forward_allowed(void)
 {
-	(void)start_index;
-	(void)tag;
-	struct ffa_value ret;
-	uint16_t last_index = 0;
-	uint16_t curr_index = 0;
-	uint16_t swd_start_index = 0;
-
-	ret = ffa_partition_info_get_regs(uuid, swd_start_index, 0);
-	if (ffa_func_id(ret) != FFA_SUCCESS_64) {
-		/*
-		 * If there are no logical partitions, SPMD returns
-		 * NOT_SUPPORTED, that is not an error.
-		 */
-		if ((ffa_func_id(ret) == FFA_ERROR_32) &&
-		    (ffa_error_code(ret) == FFA_NOT_SUPPORTED)) {
-			return true;
-		}
-
-		return false;
-	}
-
-	if (!api_ffa_fill_partition_info_from_regs(ret, swd_start_index,
-						   partitions, partitions_len,
-						   ret_count)) {
-		return false;
-	}
-
-	last_index = ffa_partition_info_regs_get_last_idx(ret);
-	curr_index = ffa_partition_info_regs_get_curr_idx(ret);
-	swd_start_index = curr_index + 1;
-	while (swd_start_index <= last_index) {
-		ret = ffa_partition_info_get_regs(uuid, swd_start_index, 0);
-		if (ffa_func_id(ret) != FFA_SUCCESS_64) {
-			return false;
-		}
-
-		if (!api_ffa_fill_partition_info_from_regs(
-			    ret, swd_start_index, partitions, partitions_len,
-			    ret_count)) {
-			return false;
-		}
-	}
-
+	/*
+	 * Allow forwarding from the SPMC to SPMD unconditionally.
+	 */
 	return true;
 }
 

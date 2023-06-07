@@ -559,13 +559,61 @@ static inline void api_ffa_pack_uuid(uint64_t *xn_1, uint64_t *xn_2,
 }
 
 /**
- * This function takes an ffa_value structure containing register results from
- * a call to FFA_PARTITION_INFO_GET_REGS and fills out an ffa_partition_info
- * structure array. It also updates the partition count in the ret_count
- * variable. This function expects that the ffa_value input is set by a
- * more trusted or higher privileged entity, such as the SPMC for the hypervisor
- * or the SPMD for the SPMC.
+ * This function forwards the FFA_PARTITION_INFO_GET_REGS ABI to the other world
+ * when hafnium is the hypervisor to determine the secure partitions. When
+ * hafnium is the SPMC, this function forwards the call to the SPMD to discover
+ * SPMD logical partitions. The function returns true when partition information
+ * is filled in the partitions array and false if there are errors. Note that
+ * the SPMD and SPMC may return an FF-A error code of FFA_NOT_SUPPORTED when
+ * there are no SPMD logical partitions or no secure partitions respectively,
+ * and this is not considered a failure of the forwarded call. A caller is
+ * expected to check the return value before consuming the information in the
+ * partitions array passed in and ret_count.
  */
+static bool api_ffa_partition_info_get_regs_forward(
+	const struct ffa_uuid *uuid, const uint16_t tag,
+	struct ffa_partition_info *partitions, uint16_t partitions_len,
+	ffa_vm_count_t *ret_count)
+{
+	(void)tag;
+	struct ffa_value ret;
+	uint16_t last_index = UINT16_MAX;
+	uint16_t curr_index = 0;
+	uint16_t start_index = 0;
+
+	if (!plat_ffa_partition_info_get_regs_forward_allowed()) {
+		return true;
+	}
+
+	while (start_index <= last_index) {
+		ret = ffa_partition_info_get_regs(uuid, start_index, 0);
+		if (ffa_func_id(ret) != FFA_SUCCESS_64) {
+			/*
+			 * If there are no logical partitions, SPMD returns
+			 * NOT_SUPPORTED, that is not an error. If there are no
+			 * secure partitions the SPMC returns NOT_SUPPORTED.
+			 */
+			if ((ffa_func_id(ret) == FFA_ERROR_32) &&
+			    (ffa_error_code(ret) == FFA_NOT_SUPPORTED)) {
+				return true;
+			}
+
+			return false;
+		}
+
+		if (!api_ffa_fill_partition_info_from_regs(
+			    ret, start_index, partitions, partitions_len,
+			    ret_count)) {
+			return false;
+		}
+
+		last_index = ffa_partition_info_regs_get_last_idx(ret);
+		curr_index = ffa_partition_info_regs_get_curr_idx(ret);
+		start_index = curr_index + 1;
+	}
+	return true;
+}
+
 bool api_ffa_fill_partition_info_from_regs(
 	struct ffa_value ret, uint16_t start_index,
 	struct ffa_partition_info *partitions, uint16_t partitions_len,
@@ -717,9 +765,9 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	 * partition identified in the system.
 	 */
 	if (vm_id_is_current_world(current_vm->id)) {
-		if (!plat_ffa_partition_info_get_regs_forward(
-			    uuid, start_index, tag, partitions,
-			    ARRAY_SIZE(partitions), &vm_count)) {
+		if (!api_ffa_partition_info_get_regs_forward(
+			    uuid, tag, partitions, ARRAY_SIZE(partitions),
+			    &vm_count)) {
 			dlog_error(
 				"Failed to forward "
 				"ffa_partition_info_get_regs.\n");

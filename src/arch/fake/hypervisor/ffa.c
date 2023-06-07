@@ -661,3 +661,8 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	(void)error_code;
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
+
+bool plat_ffa_partition_info_get_regs_forward_allowed(void)
+{
+	return false;
+}

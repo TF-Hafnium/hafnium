@@ -25,6 +25,7 @@ hypervisor("hafnium") {
 source_set("src_not_testable_yet") {
   public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
   sources = [
+    "api.c",
     "cpio.c",
     "init.c",
     "load.c",
@@ -47,7 +48,6 @@ source_set("src_not_testable_yet") {
 source_set("src_testable") {
   public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
   sources = [
-    "api.c",
     "boot_info.c",
     "cpu.c",
     "ffa_memory.c",
