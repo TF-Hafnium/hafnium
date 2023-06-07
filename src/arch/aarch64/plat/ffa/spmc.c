@@ -704,11 +704,15 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 
 	/**
 	 * SPMC:
+	 * - A bind call cannot be from an SPMD logical partition or target an
+	 * SPMD logical partition.
 	 * - If bind call from SP, receiver's ID must be same as current VM ID.
 	 * - If bind call from NWd, current VM ID must be same as Hypervisor ID,
 	 * receiver's ID must be from NWd, and sender's ID from SWd.
 	 */
-	return sender_id != receiver_id &&
+	return !plat_ffa_is_spmd_lp_id(sender_id) &&
+	       !plat_ffa_is_spmd_lp_id(receiver_id) &&
+	       sender_id != receiver_id &&
 	       (current_vm_id == receiver_id ||
 		(current_vm_id == HF_HYPERVISOR_VM_ID &&
 		 !vm_id_is_current_world(receiver_id) &&
@@ -738,11 +742,15 @@ bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 
 	/*
 	 * SPMC:
+	 * - A set call cannot be from an SPMD logical partition or target an
+	 * SPMD logical partition.
 	 * - If set call from SP, sender's ID must be the same as current.
 	 * - If set call from NWd, current VM ID must be same as Hypervisor ID,
 	 * and receiver must be an SP.
 	 */
-	return sender_id != receiver_id &&
+	return !plat_ffa_is_spmd_lp_id(sender_id) &&
+	       !plat_ffa_is_spmd_lp_id(receiver_id) &&
+	       sender_id != receiver_id &&
 	       (sender_id == current_vm_id ||
 		(current_vm_id == HF_HYPERVISOR_VM_ID &&
 		 !vm_id_is_current_world(sender_id) &&
@@ -780,11 +788,13 @@ bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 	ffa_vm_id_t current_vm_id = current->vm->id;
 	/*
 	 * SPMC:
+	 * - A get call cannot be targeted to an SPMD logical partition.
 	 * - An SP can ask for its notifications, or the hypervisor can get
 	 *  notifications target to a VM.
 	 */
 	bool caller_and_receiver_valid =
-		(current_vm_id == receiver_id) ||
+		(!plat_ffa_is_spmd_lp_id(receiver_id) &&
+		 (current_vm_id == receiver_id)) ||
 		(current_vm_id == HF_HYPERVISOR_VM_ID &&
 		 !vm_id_is_current_world(receiver_id));
 
