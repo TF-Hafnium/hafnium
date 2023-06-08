@@ -5,6 +5,7 @@ Getting Started
    :maxdepth: 1
    :caption: Contents
 
+   building
    docs-build
 
 --------------
