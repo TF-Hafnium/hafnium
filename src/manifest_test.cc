@@ -30,7 +30,7 @@ using ::testing::NotNull;
 
 using struct_manifest = struct manifest;
 
-constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
+constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 128;
 
 template <typename T>
 void exec(const char *program, const char *args[], const T &stdin,

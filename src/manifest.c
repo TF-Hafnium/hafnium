@@ -118,6 +118,9 @@ static bool manifest_data_init(struct mpool *ppool)
 {
 	manifest_data = (struct manifest_data *)mpool_alloc_contiguous(
 		ppool, manifest_data_ppool_entries, 1);
+
+	assert(manifest_data != NULL);
+
 	memset_s(manifest_data, sizeof(struct manifest_data), 0,
 		 sizeof(struct manifest_data));
 
