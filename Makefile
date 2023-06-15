@@ -72,6 +72,10 @@ all: $(OUT_DIR)/build.ninja
 $(OUT_DIR)/build.ninja:
 	@$(GN) --export-compile-commands gen --args='$(GN_ARGS)' $(OUT_DIR)
 
+doc:
+	@echo "  BUILD DOCUMENTATION"
+	make --no-print-directory -C docs html
+
 .PHONY: clean
 clean:
 	@$(NINJA) -C $(OUT_DIR) -t clean
