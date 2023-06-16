@@ -5,6 +5,7 @@ Hafnium Documentation
    :maxdepth: 1
    :numbered:
 
+   about/index
    appendix
 
 --------------

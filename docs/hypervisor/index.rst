@@ -17,7 +17,6 @@ Hypervisor
    FVP
    HafniumRamDisk
    HermeticBuild
-   Maintainers
    Manifest
    PreparingLinux
    SchedulerExpectations

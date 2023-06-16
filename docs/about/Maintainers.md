@@ -8,11 +8,11 @@ design decisions.
 
 ## Active Maintainers
 
-*   Olivier Deprez <olivier.deprez@arm.com>
-
 *   João Alves <joao.alves@arm.com>
 
 *   Madhukar Pappireddy <madhukar.pappireddy@arm.com>
+
+*   Olivier Deprez <olivier.deprez@arm.com>
 
 *   Raghupathy Krishnamurthy <raghupathyk@nvidia.com>
 
