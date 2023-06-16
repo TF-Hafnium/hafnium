@@ -16,6 +16,9 @@
 #include "hftest_common.h"
 #include "test/hftest.h"
 
+#define HFTEST_CTRL_JSON_START "[hftest_ctrl:json_start]"
+#define HFTEST_CTRL_JSON_END "[hftest_ctrl:json_end]"
+
 HFTEST_ENABLE();
 
 static struct hftest_test hftest_constructed[HFTEST_MAX_TESTS];
@@ -68,6 +71,9 @@ void hftest_json(void)
 	const char *suite = NULL;
 	size_t i;
 	size_t tests_in_suite = 0;
+
+	/* Wrap the JSON in tags for the hftest script to use. */
+	HFTEST_LOG(HFTEST_CTRL_JSON_START);
 
 	HFTEST_LOG("{");
 	HFTEST_LOG("  \"suites\": [");
@@ -123,6 +129,9 @@ void hftest_json(void)
 	}
 	HFTEST_LOG("  ]");
 	HFTEST_LOG("}");
+
+	/* Wrap the JSON in tags for the hftest script to use. */
+	HFTEST_LOG(HFTEST_CTRL_JSON_END);
 }
 
 /**

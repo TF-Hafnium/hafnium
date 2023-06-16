@@ -35,6 +35,9 @@ HFTEST_LOG_PREFIX = "[hftest] "
 HFTEST_LOG_FAILURE_PREFIX = "Failure:"
 HFTEST_LOG_FINISHED = "FINISHED"
 
+HFTEST_CTRL_JSON_START = "[hftest_ctrl:json_start]"
+HFTEST_CTRL_JSON_END = "[hftest_ctrl:json_end]"
+
 HFTEST_CTRL_GET_COMMAND_LINE = "[hftest_ctrl:get_command_line]"
 HFTEST_CTRL_FINISHED = "[hftest_ctrl:finished]"
 
@@ -792,7 +795,10 @@ class TestRunner:
         """Invoke the test platform and request a JSON of available test and
         test suites."""
         out = self.driver.run("json", "json", self.force_long_running)
-        hf_out = "\n".join(self.extract_hftest_lines(out))
+        hf_out = self.extract_hftest_lines(out)
+        hf_out = hf_out[hf_out.index(HFTEST_CTRL_JSON_START) + 1
+                        :hf_out.index(HFTEST_CTRL_JSON_END)];
+        hf_out = "\n".join(hf_out)
         try:
             return json.loads(hf_out)
         except ValueError as e:
