@@ -141,7 +141,6 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 	sl_lock(&args.lock);
 
 	for (size_t i = 1; i < MAX_CPUS - 1; i++) {
-		size_t hftest_cpu_index = MAX_CPUS - i;
 		HFTEST_LOG("Booting CPU %u", i);
 
 		/*
@@ -151,7 +150,7 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 		 */
 		args.vcpu_id = (ffa_vcpu_index_t)i;
 
-		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(hftest_cpu_index),
+		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i),
 					   secondary_ec_stack[i - 1],
 					   sizeof(secondary_ec_stack[0]), entry,
 					   (uintptr_t)&args),

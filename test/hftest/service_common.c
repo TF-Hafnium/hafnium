@@ -15,8 +15,10 @@
 
 #include "vmapi/hf/call.h"
 
+#include "../msr.h"
 #include "test/hftest.h"
 #include "test/hftest_impl.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 HFTEST_ENABLE();
@@ -252,19 +254,24 @@ static void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
 
 noreturn void hftest_service_main(const void *fdt_ptr)
 {
+	struct hftest_context *ctx;
 	struct memiter args;
 	hftest_test_fn service;
-	struct hftest_context *ctx;
 	struct ffa_value ret;
 	struct fdt fdt;
-	ffa_id_t own_id = hf_vm_get_id();
-	struct mailbox_buffers mb = set_up_mailbox();
+	const ffa_id_t own_id = hf_vm_get_id();
 	ffa_notifications_bitmap_t bitmap;
-	struct ffa_partition_msg *message = (struct ffa_partition_msg *)mb.recv;
+	struct ffa_partition_msg *message;
+	uint32_t vcpu = get_current_vcpu_index();
 
-	/* Clean the context. */
 	ctx = hftest_get_context();
-	hftest_context_init(ctx, mb.send, mb.recv);
+
+	/* If boot vcpu, set up mailbox and intialize context abort function. */
+	if (vcpu == 0) {
+		struct mailbox_buffers mb;
+		mb = set_up_mailbox();
+		hftest_context_init(ctx, mb.send, mb.recv);
+	}
 
 	if (!fdt_struct_from_ptr(fdt_ptr, &fdt)) {
 		HFTEST_LOG(HFTEST_LOG_INDENT "Unable to access the FDT");
@@ -299,11 +306,13 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	ret = ffa_msg_wait();
 	EXPECT_EQ(ret.func, FFA_RUN_32);
 
+	message = (struct ffa_partition_msg *)SERVICE_RECV_BUFFER();
+
 	/*
 	 * Expect to wake up with indirect message related to the next service
 	 * to be executed.
 	 */
-	ret = ffa_notification_get(own_id, 0,
+	ret = ffa_notification_get(own_id, vcpu,
 				   FFA_NOTIFICATION_FLAG_BITMAP_SPM |
 					   FFA_NOTIFICATION_FLAG_BITMAP_HYP);
 	ASSERT_EQ(ret.func, FFA_SUCCESS_32);

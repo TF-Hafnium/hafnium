@@ -85,7 +85,14 @@ TEST(cpus, start)
 
 	/* Start secondary while holding lock. */
 	sl_lock(&lock);
-	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(1), other_stack,
+
+	/**
+	 * `hftest_get_cpu_id` function makes the assumption that cpus are
+	 * specified in the FDT in reverse order and does the conversion
+	 * MAX_CPUS - index internally. Since legacy VMs do not follow this
+	 * convention, index 7 is passed into `hftest_cpu_get_id`.
+	 */
+	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(7), other_stack,
 				   sizeof(other_stack), vm_cpu_entry,
 				   (uintptr_t)&lock),
 		  true);
@@ -123,12 +130,20 @@ TEST(cpus, stop)
 	struct spinlock lock = SPINLOCK_INIT;
 	alignas(4096) static uint8_t other_stack[4096];
 
+	/**
+	 * `hftest_get_cpu_id` function makes the assumption that cpus are
+	 * specified in the FDT in reverse order and does the conversion
+	 * MAX_CPUS - index internally. Since legacy VMs do not follow this
+	 * convention, index 7 is passed into `hftest_cpu_get_id`.
+	 */
+	size_t secondary_cpu_index = 7;
+
 	/* Start secondary while holding lock. */
 	sl_lock(&lock);
 	dlog("Starting second CPU.\n");
-	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(1), other_stack,
-				   sizeof(other_stack), vm_cpu_entry_stop,
-				   (uintptr_t)&lock),
+	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(secondary_cpu_index),
+				   other_stack, sizeof(other_stack),
+				   vm_cpu_entry_stop, (uintptr_t)&lock),
 		  true);
 
 	/* Wait for CPU to release the lock after starting. */
@@ -136,14 +151,15 @@ TEST(cpus, stop)
 
 	dlog("Waiting for second CPU to stop.\n");
 	/* Wait a while for CPU to stop. */
-	while (arch_cpu_status(hftest_get_cpu_id(1)) != POWER_STATUS_OFF) {
+	while (arch_cpu_status(hftest_get_cpu_id(secondary_cpu_index)) !=
+	       POWER_STATUS_OFF) {
 	}
 	dlog("Second CPU stopped.\n");
 
 	dlog("Starting second CPU again.\n");
-	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(1), other_stack,
-				   sizeof(other_stack), vm_cpu_entry_stop,
-				   (uintptr_t)&lock),
+	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(secondary_cpu_index),
+				   other_stack, sizeof(other_stack),
+				   vm_cpu_entry_stop, (uintptr_t)&lock),
 		  true);
 
 	/* Wait for CPU to release the lock after starting. */
@@ -151,7 +167,8 @@ TEST(cpus, stop)
 
 	dlog("Waiting for second CPU to stop.\n");
 	/* Wait a while for CPU to stop. */
-	while (arch_cpu_status(hftest_get_cpu_id(1)) != POWER_STATUS_OFF) {
+	while (arch_cpu_status(hftest_get_cpu_id(secondary_cpu_index)) !=
+	       POWER_STATUS_OFF) {
 	}
 	dlog("Second CPU stopped.\n");
 }

@@ -42,7 +42,7 @@ static uint64_t exception_handler_return_addr = 0;
 /**
  * Get the index of the current vCPU.
  */
-static ffa_vcpu_index_t get_current_vcpu_index(void)
+ffa_vcpu_index_t get_current_vcpu_index(void)
 {
 	ffa_vcpu_index_t index;
 

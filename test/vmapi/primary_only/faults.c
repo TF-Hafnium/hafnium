@@ -64,8 +64,15 @@ TEST(faults, spurious_due_to_configure)
 
 	/* Start secondary CPU while holding lock. */
 	sl_lock(&s.lock);
+
+	/**
+	 * `hftest_get_cpu_id` function makes the assumption that cpus are
+	 * specified in the FDT in reverse order and does the conversion
+	 * MAX_CPUS - index internally. Since legacy VMs do not follow this
+	 * convention, index 7 is passed into `hftest_cpu_get_id`.
+	 */
 	EXPECT_EQ(
-		hftest_cpu_start(hftest_get_cpu_id(1), other_stack,
+		hftest_cpu_start(hftest_get_cpu_id(7), other_stack,
 				 sizeof(other_stack), rx_reader, (uintptr_t)&s),
 		true);
 

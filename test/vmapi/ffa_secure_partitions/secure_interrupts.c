@@ -546,9 +546,8 @@ static void sp_route_interrupt_to_secondary_vcpu_base(
 
 	for (ffa_vcpu_index_t i = 1; i < MAX_CPUS; i++) {
 		uintptr_t cpu_id;
-		ffa_vcpu_index_t hftest_cpu_index = MAX_CPUS - i;
 
-		cpu_id = hftest_get_cpu_id(hftest_cpu_index);
+		cpu_id = hftest_get_cpu_id(i);
 		args.vcpu_id = i;
 		HFTEST_LOG("Booting CPU %u - %x", i, cpu_id);
 

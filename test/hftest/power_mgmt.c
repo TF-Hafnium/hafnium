@@ -94,6 +94,7 @@ bool hftest_cpu_start(uintptr_t id, void *stack, size_t stack_size,
 
 	/* Try to start the given CPU. */
 	if (!arch_cpu_start(id, &s_arch)) {
+		HFTEST_LOG("Couldn't start cpu %u", id);
 		return false;
 	}
 

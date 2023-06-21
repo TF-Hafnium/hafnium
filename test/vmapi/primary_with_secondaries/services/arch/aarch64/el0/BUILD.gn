@@ -58,6 +58,7 @@ vm_kernel("service_el0_vm1") {
     "//test/hftest:hftest_secondary_el0_partition",
     "//test/hftest/arch/${plat_arch}/el0:mm",
     "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/${plat_arch}/el0:exception_handler",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
     "//test/vmapi/primary_with_secondaries/services:boot",
     "//test/vmapi/primary_with_secondaries/services:echo",
@@ -78,6 +79,7 @@ vm_kernel("service_el0_vm2") {
     "//src/arch/${plat_arch}/hftest/el0:mm",
     "//test/hftest:hftest_secondary_el0_partition",
     "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/${plat_arch}/el0:exception_handler",
     "//test/vmapi/primary_with_secondaries/services/:memory",
     "//test/vmapi/primary_with_secondaries/services/:relay",
     "//vmlib",
@@ -90,6 +92,7 @@ vm_kernel("service_el0_vm3") {
   deps = [
     "//test/hftest:hftest_secondary_el0_partition",
     "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/${plat_arch}/el0:exception_handler",
     "//vmlib",
   ]
 }

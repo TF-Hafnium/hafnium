@@ -311,6 +311,12 @@ uintptr_t hftest_get_cpu_id(size_t index)
 		return vcpu_index_to_id(index);
 	}
 
+	/*
+	 * VM is primary VM. Convert vCPU ids to the linear cpu id as passed to
+	 * the primary VM in the FDT structure.
+	 */
+	index = MAX_CPUS - index;
+
 	/* Find physical CPU ID from FDT. */
 	fdt_find_cpus(fdt, params.cpu_ids, &params.cpu_count);
 

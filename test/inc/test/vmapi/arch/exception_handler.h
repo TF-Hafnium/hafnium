@@ -10,6 +10,8 @@
 
 #include "vmapi/hf/ffa.h"
 
+ffa_vcpu_index_t get_current_vcpu_index(void);
+
 void exception_handler_set_return_addr(uint64_t instr_addr);
 
 bool exception_handler_skip_instruction(void);

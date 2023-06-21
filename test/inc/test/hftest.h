@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdnoreturn.h>
 
+#include "hf/call.h"
 #include "hf/dlog.h"
 #include "hf/fdt.h"
 #include "hf/memiter.h"

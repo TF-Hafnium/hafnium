@@ -201,13 +201,12 @@ static void base_per_cpu_notifications_test(void (*cpu_entry)(uintptr_t arg))
 	sl_lock(&lock);
 
 	for (size_t i = 1; i < MAX_CPUS - 1; i++) {
-		size_t hftest_cpu_index = MAX_CPUS - i;
 		HFTEST_LOG("Notifications signaling VM to SP. Booting CPU %u.",
 			   i);
 
 		args.vcpu_id = i;
 
-		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(hftest_cpu_index),
+		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i),
 					   other_stack[i - 1],
 					   sizeof(other_stack[0]), cpu_entry,
 					   (uintptr_t)&args),
