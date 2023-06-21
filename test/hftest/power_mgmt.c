@@ -10,6 +10,7 @@
 
 #include "hf/arch/mm.h"
 
+#include "hf/mm.h"
 #include "hf/spinlock.h"
 
 #include "test/hftest.h"
@@ -19,6 +20,12 @@ struct cpu_start_state {
 	uintreg_t arg;
 	struct spinlock lock;
 };
+
+/*
+ * Stack for secondary execution contexts.
+ * Used in tests for MP partitions where multicore functionality is tested.
+ */
+alignas(PAGE_SIZE) uint8_t secondary_ec_stack[MAX_CPUS - 1][PAGE_SIZE];
 
 static noreturn void cpu_entry(uintptr_t arg)
 {

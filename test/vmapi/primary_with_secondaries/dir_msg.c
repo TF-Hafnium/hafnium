@@ -8,33 +8,42 @@
 
 #include <stdint.h>
 
+#include "hf/arch/vm/power_mgmt.h"
+
 #include "hf/ffa.h"
 
 #include "vmapi/hf/call.h"
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
+#include "test/hftest_impl.h"
+#include "test/semaphore.h"
 #include "test/vmapi/ffa.h"
 
 #define MAX_RESP_REGS (MAX_MSG_SIZE / sizeof(uint64_t))
 
 /**
- * Send direct message, verify that sent info is echoed back.
+ * Structure defined for usage in tests with multiple cores.
+ * Used to pass arguments from primary to secondary core.
  */
-TEST(direct_message, ffa_send_direct_message_req_echo)
+struct echo_test_secondary_cpu_entry_args {
+	uint32_t req_func;
+	ffa_id_t receiver_id;
+	struct ffa_uuid receiver_uuid;
+	ffa_vcpu_count_t receiver_vcpu_count;
+	ffa_vcpu_index_t vcpu_id;
+	struct mailbox_buffers mb;
+	struct semaphore sync;
+};
+
+static void echo_test(ffa_id_t target_id)
 {
 	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
 				0x88889999};
-	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_value res;
-	struct ffa_partition_info *service1_info = service1(mb.recv);
 
-	SERVICE_SELECT(service1_info->vm_id, "ffa_direct_message_resp_echo",
-		       mb.send);
-	ffa_run(service1_info->vm_id, 0);
-
-	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, service1_info->vm_id,
-				      msg[0], msg[1], msg[2], msg[3], msg[4]);
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, target_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 
@@ -43,6 +52,36 @@ TEST(direct_message, ffa_send_direct_message_req_echo)
 	EXPECT_EQ(res.arg5, msg[2]);
 	EXPECT_EQ(res.arg6, msg[3]);
 	EXPECT_EQ(res.arg7, msg[4]);
+}
+
+static void echo_test_req2(ffa_id_t target_id, struct ffa_uuid target_uuid)
+{
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999, 0x01010101, 0x23232323, 0x45454545,
+				0x67676767, 0x89898989, 0x11001100, 0x22332233,
+				0x44554455, 0x66776677};
+
+	struct ffa_value res;
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, target_id,
+				       &target_uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+
+	EXPECT_EQ(res.arg4, msg[0]);
+	EXPECT_EQ(res.arg5, msg[1]);
+	EXPECT_EQ(res.arg6, msg[2]);
+	EXPECT_EQ(res.arg7, msg[3]);
+	EXPECT_EQ(res.extended_val.arg8, msg[4]);
+	EXPECT_EQ(res.extended_val.arg9, msg[5]);
+	EXPECT_EQ(res.extended_val.arg10, msg[6]);
+	EXPECT_EQ(res.extended_val.arg11, msg[7]);
+	EXPECT_EQ(res.extended_val.arg12, msg[8]);
+	EXPECT_EQ(res.extended_val.arg13, msg[9]);
+	EXPECT_EQ(res.extended_val.arg14, msg[10]);
+	EXPECT_EQ(res.extended_val.arg15, msg[11]);
+	EXPECT_EQ(res.extended_val.arg16, msg[12]);
+	EXPECT_EQ(res.extended_val.arg17, msg[13]);
 }
 
 /**
@@ -95,6 +134,22 @@ TEST(direct_message, ffa_send_direct_message_req_yield_echo)
 	EXPECT_EQ(res.arg5, msg[2]);
 	EXPECT_EQ(res.arg6, msg[3]);
 	EXPECT_EQ(res.arg7, msg[4]);
+}
+
+/*
+ * Send direct message, verify that sent info is echoed back.
+ */
+TEST(direct_message, ffa_send_direct_message_req_echo)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id, "ffa_direct_message_resp_echo",
+		       mb.send);
+
+	ffa_run(service1_info->vm_id, 0);
+
+	echo_test(service1_info->vm_id);
 }
 
 /**
@@ -323,39 +378,15 @@ TEST_PRECONDITION(direct_message, fail_if_cyclic_dependency,
  */
 TEST(direct_message, ffa_send_direct_message_req2_echo)
 {
-	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
-				0x88889999, 0x01010101, 0x23232323, 0x45454545,
-				0x67676767, 0x89898989, 0x11001100, 0x22332233,
-				0x44554455, 0x66776677};
 	struct mailbox_buffers mb = set_up_mailbox();
-	struct ffa_value res;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
-	struct ffa_uuid uuid = SERVICE1;
+	struct ffa_uuid target_uuid = SERVICE1;
 
 	SERVICE_SELECT(service1_info->vm_id,
 		       "ffa_direct_message_req2_resp_echo", mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
-				       &uuid, (const uint64_t *)&msg,
-				       ARRAY_SIZE(msg));
-
-	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
-
-	EXPECT_EQ(res.arg4, msg[0]);
-	EXPECT_EQ(res.arg5, msg[1]);
-	EXPECT_EQ(res.arg6, msg[2]);
-	EXPECT_EQ(res.arg7, msg[3]);
-	EXPECT_EQ(res.extended_val.arg8, msg[4]);
-	EXPECT_EQ(res.extended_val.arg9, msg[5]);
-	EXPECT_EQ(res.extended_val.arg10, msg[6]);
-	EXPECT_EQ(res.extended_val.arg11, msg[7]);
-	EXPECT_EQ(res.extended_val.arg12, msg[8]);
-	EXPECT_EQ(res.extended_val.arg13, msg[9]);
-	EXPECT_EQ(res.extended_val.arg14, msg[10]);
-	EXPECT_EQ(res.extended_val.arg15, msg[11]);
-	EXPECT_EQ(res.extended_val.arg16, msg[12]);
-	EXPECT_EQ(res.extended_val.arg17, msg[13]);
+	echo_test_req2(service1_info->vm_id, target_uuid);
 }
 
 /**
@@ -972,4 +1003,111 @@ TEST_PRECONDITION(direct_message, fail_if_cyclic_dependency_req_req2,
 
 	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+}
+
+static void cpu_entry_echo_mp(uintptr_t arg)
+{
+	struct echo_test_secondary_cpu_entry_args *args =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct echo_test_secondary_cpu_entry_args *)arg;
+	ffa_vcpu_index_t service_vcpu_id;
+
+	ASSERT_TRUE(args != NULL);
+
+	HFTEST_LOG("Within secondary core... %u\n", args->vcpu_id);
+
+	service_vcpu_id = (args->receiver_vcpu_count > 1) ? args->vcpu_id : 0;
+
+	if (args->req_func == FFA_MSG_SEND_DIRECT_REQ_32) {
+		SERVICE_SELECT_MP(args->receiver_id,
+				  "ffa_direct_message_resp_echo", args->mb.send,
+				  service_vcpu_id);
+		ffa_run(args->receiver_id, service_vcpu_id);
+		echo_test(args->receiver_id);
+	} else {
+		SERVICE_SELECT_MP(args->receiver_id,
+				  "ffa_direct_message_req2_resp_echo",
+				  args->mb.send, service_vcpu_id);
+		ffa_run(args->receiver_id, service_vcpu_id);
+		echo_test_req2(args->receiver_id, args->receiver_uuid);
+	}
+
+	/* Signal to primary core that test is complete.*/
+	semaphore_signal(&args->sync);
+
+	HFTEST_LOG("Done with secondary core...\n");
+
+	arch_cpu_stop();
+}
+
+/**
+ *  Test validating direct messaging via FFA_MSG_SEND_DIRECT_REQ/RESP
+ *  between secondary cores.
+ */
+TEST_PRECONDITION(direct_message, echo_mp, service1_is_not_vm)
+{
+	struct mailbox_buffers mb_mp = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb_mp.recv);
+	const ffa_vcpu_index_t vcpu_id = 1;
+	struct echo_test_secondary_cpu_entry_args args = {
+		.req_func = FFA_MSG_SEND_DIRECT_REQ_32,
+		.receiver_id = service1_info->vm_id,
+		.receiver_uuid = SERVICE1,
+		.receiver_vcpu_count = service1_info->vcpu_count,
+		.vcpu_id = vcpu_id,
+		.mb = mb_mp};
+
+	/*
+	 * Initialize semaphore for synchronization purposes between primary and
+	 * secondary core.
+	 */
+	semaphore_init(&args.sync);
+
+	HFTEST_LOG("Starting secondary core...\n");
+
+	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(vcpu_id),
+				     secondary_ec_stack,
+				     sizeof(secondary_ec_stack),
+				     cpu_entry_echo_mp, (uintptr_t)&args));
+
+	/* Wait for secondary core to return before finishing the test. */
+	semaphore_wait(&args.sync);
+
+	HFTEST_LOG("Finished the test...\n");
+}
+
+/**
+ *  Test validating direct messaging via FFA_MSG_SEND_DIRECT_REQ2/RESP2
+ *  between secondary cores.
+ */
+TEST_PRECONDITION(direct_message, echo_mp_req2, service1_is_not_vm)
+{
+	struct mailbox_buffers mb_mp = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb_mp.recv);
+	const ffa_vcpu_index_t vcpu_id = 1;
+	struct echo_test_secondary_cpu_entry_args args = {
+		.req_func = FFA_MSG_SEND_DIRECT_REQ2_64,
+		.receiver_id = service1_info->vm_id,
+		.receiver_uuid = SERVICE1,
+		.receiver_vcpu_count = service1_info->vcpu_count,
+		.vcpu_id = vcpu_id,
+		.mb = mb_mp};
+
+	/*
+	 * Initialize semaphore for synchronization purposes between primary and
+	 * secondary core.
+	 */
+	semaphore_init(&args.sync);
+
+	HFTEST_LOG("Starting secondary core...\n");
+
+	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(vcpu_id),
+				     secondary_ec_stack,
+				     sizeof(secondary_ec_stack),
+				     cpu_entry_echo_mp, (uintptr_t)&args));
+
+	/* Wait for secondary core to return before finishing the test. */
+	semaphore_wait(&args.sync);
+
+	HFTEST_LOG("Finished the test...\n");
 }
