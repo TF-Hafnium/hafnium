@@ -300,7 +300,7 @@ union hftest_any {
 /**
  * Select the service to run in a service VM.
  */
-#define HFTEST_SERVICE_SELECT(vm_id, service, send_buffer)                 \
+#define HFTEST_SERVICE_SELECT(vm_id, service, send_buffer, vcpu_id)        \
 	do {                                                               \
 		struct ffa_value res;                                      \
 		uint32_t msg_length =                                      \
@@ -312,7 +312,7 @@ union hftest_any {
 		 * If service is a Secondary VM, let the service configure \
 		 * its mailbox and wait for a message.                     \
 		 */                                                        \
-		res = ffa_run(vm_id, 0);                                   \
+		res = ffa_run(vm_id, vcpu_id);                             \
 		ASSERT_EQ(res.func, FFA_MSG_WAIT_32);                      \
 		ASSERT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);                 \
                                                                            \
@@ -327,7 +327,7 @@ union hftest_any {
 		res = ffa_msg_send2(0);                                    \
                                                                            \
 		ASSERT_EQ(res.func, FFA_SUCCESS_32);                       \
-		res = ffa_run(vm_id, 0);                                   \
+		res = ffa_run(vm_id, vcpu_id);                             \
 		ASSERT_EQ(res.func, FFA_YIELD_32);                         \
 	} while (0)
 

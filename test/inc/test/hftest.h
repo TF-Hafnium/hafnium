@@ -98,7 +98,9 @@
 /* Service utilities. */
 #define SERVICE_NAME_MAX_LENGTH 64
 #define SERVICE_SELECT(vm_id, service, send_buffer) \
-	HFTEST_SERVICE_SELECT(vm_id, service, send_buffer)
+	HFTEST_SERVICE_SELECT(vm_id, service, send_buffer, 0)
+#define SERVICE_SELECT_MP(vm_id, service, send_buffer, vcpu_id) \
+	HFTEST_SERVICE_SELECT(vm_id, service, send_buffer, vcpu_id)
 
 #define SERVICE_SEND_BUFFER() HFTEST_SERVICE_SEND_BUFFER()
 #define SERVICE_RECV_BUFFER() HFTEST_SERVICE_RECV_BUFFER()
