@@ -79,3 +79,29 @@ static inline bool is_arch_feat_sve_supported(void)
 	return ((id_aa64pfr0_el1 >> ID_AA64PFR0_EL1_SVE_SHIFT) &
 		ID_AA64PFR0_EL1_SVE_MASK) == ID_AA64PFR0_EL1_SVE_SUPPORTED;
 }
+
+/**
+ * FEAT_SME/FEAT_SME2.
+ */
+
+/**
+ * Returns true if FEAT_SME/FEAT_SME2 is implemented.
+ */
+static inline bool is_arch_feat_sme_supported(void)
+{
+	uint64_t id_aa64pfr1_el1 = read_msr(ID_AA64PFR1_EL1);
+
+	return ((id_aa64pfr1_el1 >> ID_AA64PFR1_EL1_SME_SHIFT) &
+		ID_AA64PFR1_EL1_SME_MASK) >= ID_AA64PFR1_EL1_SME_SUPPORTED;
+}
+
+/**
+ * Returns true if FEAT_SME_FA64 is implemented.
+ */
+static inline bool is_arch_feat_sme_fa64_supported(void)
+{
+	uint64_t id_aa64smfr0_el1 = read_msr(MSR_ID_AA64SMFR0_EL1);
+
+	return ((id_aa64smfr0_el1 >> ID_AA64SMFR0_EL1_FA64_SHIFT) &
+		ID_AA64SMFR0_EL1_FA64_MASK) == ID_AA64SMFR0_EL1_FA64_SUPPORTED;
+}

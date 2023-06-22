@@ -128,3 +128,16 @@
 #define MSR_CNTV_CVAL_EL02 S3_5_C14_C3_2
 #define MSR_SPSR_EL12 S3_5_C4_C0_0
 #define MSR_ELR_EL12 S3_5_C4_C0_1
+
+/**
+ * FEAT_SME
+ */
+
+/* SME Feature ID register 0. */
+#define MSR_ID_AA64SMFR0_EL1 S3_0_C0_C4_5
+
+#define MSR_SMCR_EL2 S3_4_C1_C2_6
+
+#define MSR_SVCR S3_3_C4_C2_2
+#define MSR_SVCR_ZA (UINT64_C(1) << 1)
+#define MSR_SVCR_SM (UINT64_C(1) << 0)

@@ -524,6 +524,12 @@
 #define CPTR_EL2_VHE_ZEN (UINT64_C(0x3) << 16)
 
 /**
+ * When HCR_EL2.E2H=1, this control does not cause execution of SME instructions
+ * and accesses to SMCR_EL2/EL1 to be trapped.
+ */
+#define CPTR_EL2_SME_VHE_SMEN (UINT64_C(0x3) << 24)
+
+/**
  * With CPTR_EL2.TAM=1 accesses from EL1 and EL0 to Activity Monitor registers
  * are trapped to EL2, when EL2 is enabled in the current Security state.
  * Note TAM is CPTR_EL2[30] whichever HCR_EL2.E2H state (VHE/nVHE).
@@ -707,3 +713,15 @@
  */
 #define ID_AA64PFR0_EL1_RME_SHIFT 52
 #define ID_AA64PFR0_EL1_RME_MASK UINT64_C(0xf)
+
+/**
+ * Scalable Matrix Extension (FEAT_SME).
+ */
+#define ID_AA64PFR1_EL1_SME_SHIFT (24)
+#define ID_AA64PFR1_EL1_SME_MASK UINT64_C(0xf)
+#define ID_AA64PFR1_EL1_SME_SUPPORTED UINT64_C(1)
+#define ID_AA64PFR1_EL1_SME2_SUPPORTED UINT64_C(2)
+
+#define ID_AA64SMFR0_EL1_FA64_SHIFT (63)
+#define ID_AA64SMFR0_EL1_FA64_MASK UINT64_C(1)
+#define ID_AA64SMFR0_EL1_FA64_SUPPORTED UINT64_C(1)
