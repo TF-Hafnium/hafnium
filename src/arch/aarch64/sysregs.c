@@ -224,16 +224,6 @@ uintreg_t get_sctlr_el2_value(bool is_el0_partition)
 	return sctlr_el2_value;
 }
 
-/*
- * Returns true if FEAT_BTI is supported.
- */
-bool is_arch_feat_bti_supported(void)
-{
-	uint64_t id_aa64pfr1_el1 = read_msr(ID_AA64PFR1_EL1);
-
-	return (id_aa64pfr1_el1 & ID_AA64PFR1_EL1_BT) == 1ULL;
-}
-
 /**
  * Returns true if the SVE feature is implemented.
  */

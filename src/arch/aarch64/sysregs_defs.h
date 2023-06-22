@@ -672,21 +672,17 @@
 #define ID_AA64MMFR1_EL1_VH_SUPPORTED UINT64_C(0x1)
 
 /**
- * Branch Target Identification mechanism support in AArch64 state.
- */
-#define ID_AA64PFR1_EL1_BT (UINT64_C(0xf) << 0)
-
-/**
  * Scalable Vector Extension.
  */
 #define ID_AA64PFR0_EL1_SVE_SHIFT 32
 #define ID_AA64PFR0_EL1_SVE_MASK UINT64_C(0xf)
 #define ID_AA64PFR0_EL1_SVE_SUPPORTED UINT64_C(0x1)
 
-/**
- * Returns true if the SVE feature is implemented.
- */
-
 /** SVE control register. */
 #define ZCR_LEN_MASK UINT32_C(0xf)
 #define ZCR_LEN_MAX UINT32_C(0xf)
+
+/**
+ * Branch Target Identification mechanism support in AArch64 state.
+ */
+#define ID_AA64PFR1_EL1_BT (UINT64_C(0xf) << 0)

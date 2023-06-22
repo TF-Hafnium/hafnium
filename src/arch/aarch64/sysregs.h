@@ -27,11 +27,6 @@ uintreg_t get_cptr_el2_value(void);
 uintreg_t get_sctlr_el2_value(bool is_el0_partition);
 
 /**
- * Branch Target Identification mechanism support in AArch64 state.
- */
-bool is_arch_feat_bti_supported(void);
-
-/**
  * Returns true if the processor supports ARMv8.1 VHE.
  */
 static inline bool has_vhe_support(void)
@@ -53,6 +48,16 @@ static inline void vhe_switch_to_host_or_guest(bool guest)
 		write_msr(hcr_el2, hcr_el2);
 		isb();
 	}
+}
+
+/**
+ * Branch Target Identification mechanism support in AArch64 state.
+ */
+static inline bool is_arch_feat_bti_supported(void)
+{
+	uint64_t id_aa64pfr1_el1 = read_msr(ID_AA64PFR1_EL1);
+
+	return (id_aa64pfr1_el1 & ID_AA64PFR1_EL1_BT) == 1ULL;
 }
 
 /**
