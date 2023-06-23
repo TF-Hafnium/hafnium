@@ -108,6 +108,11 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 					     struct ffa_value args,
 					     struct vcpu *current,
 					     struct vcpu **next);
+struct ffa_value api_ffa_msg_send_direct_req2(ffa_id_t sender_vm_id,
+					      ffa_id_t receiver_vm_id,
+					      struct ffa_value args,
+					      struct vcpu *current,
+					      struct vcpu **next);
 struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 					      ffa_id_t receiver_vm_id,
 					      struct ffa_value args,

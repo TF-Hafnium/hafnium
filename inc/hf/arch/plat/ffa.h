@@ -69,7 +69,8 @@ bool plat_ffa_is_direct_response_valid(struct vcpu *current,
 				       ffa_id_t sender_vm_id,
 				       ffa_id_t receiver_vm_id);
 bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
-					  struct vm *receiver_vm);
+					  struct vm *receiver_vm,
+					  uint32_t func);
 bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret);

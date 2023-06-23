@@ -316,6 +316,7 @@ static bool plat_ffa_check_rtm_ffa_run(struct vcpu_locked current_locked,
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
 		/* Fall through. */
 	case FFA_RUN_32: {
 		/* Rules 1,2 section 7.2 EAC0 spec. */
@@ -343,8 +344,9 @@ static bool plat_ffa_check_rtm_ffa_run(struct vcpu_locked current_locked,
 }
 
 /**
- * Validates the Runtime model for FFA_MSG_SEND_DIRECT_REQ. Refer to section 7.3
- * of the FF-A v1.1 EAC0 spec.
+ * Validates the Runtime model for FFA_MSG_SEND_DIRECT_REQ and
+ * FFA_MSG_SEND_DIRECT_REQ2. Refer to section 8.3 of the FF-A
+ * v1.2 spec.
  */
 static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu_locked current_locked,
 					   struct vcpu_locked locked_vcpu,
@@ -355,6 +357,7 @@ static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu_locked current_locked,
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
 		/* Fall through. */
 	case FFA_RUN_32: {
 		/* Rules 1,2. */
@@ -390,7 +393,7 @@ static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu_locked current_locked,
 
 /**
  * Validates the Runtime model for Secure interrupt handling. Refer to section
- * 7.4 of the FF-A v1.1 EAC0 spec.
+ * 8.4 of the FF-A v1.2 ALP0 spec.
  */
 static bool plat_ffa_check_rtm_sec_interrupt(struct vcpu_locked current_locked,
 					     struct vcpu_locked locked_vcpu,
@@ -405,6 +408,7 @@ static bool plat_ffa_check_rtm_sec_interrupt(struct vcpu_locked current_locked,
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
 		/* Rule 3. */
 		*next_state = VCPU_STATE_BLOCKED;
 		return true;
@@ -435,8 +439,8 @@ static bool plat_ffa_check_rtm_sec_interrupt(struct vcpu_locked current_locked,
 }
 
 /**
- * Validates the Runtime model for SP initialization. Refer to section 7.5 of
- * the FF-A v1.1 EAC0 spec.
+ * Validates the Runtime model for SP initialization. Refer to section
+ * 8.3 of the FF-A v1.2 ALP0 spec.
  */
 static bool plat_ffa_check_rtm_sp_init(struct vcpu_locked locked_vcpu,
 				       uint32_t func,
@@ -444,7 +448,8 @@ static bool plat_ffa_check_rtm_sp_init(struct vcpu_locked locked_vcpu,
 {
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
-	case FFA_MSG_SEND_DIRECT_REQ_32: {
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64: {
 		struct vcpu *vcpu = locked_vcpu.vcpu;
 
 		assert(vcpu != NULL);
@@ -564,18 +569,56 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
  * respective configurations at the partition's FF-A manifest.
  */
 bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
-					  struct vm *receiver_vm)
+					  struct vm *receiver_vm, uint32_t func)
 {
-	if (!vm_supports_messaging_method(sender_vm,
-					  FFA_PARTITION_DIRECT_REQ_SEND)) {
-		dlog_verbose("Sender can't send direct message requests.\n");
+	uint16_t sender_method;
+	uint16_t receiver_method;
+	uint32_t sender_ffa_version = sender_vm->ffa_version;
+	uint32_t receiver_ffa_version = receiver_vm->ffa_version;
+
+	/* Check if version supports messaging function. */
+	if ((func == FFA_MSG_SEND_DIRECT_REQ2_64) &&
+	    (sender_ffa_version < MAKE_FFA_VERSION(1, 2))) {
+		dlog_verbose(
+			"Sender version does not allow usage of func id "
+			"0x%x.\n",
+			func);
 		return false;
 	}
 
-	if (!vm_supports_messaging_method(receiver_vm,
-					  FFA_PARTITION_DIRECT_REQ_RECV)) {
+	if ((func == FFA_MSG_SEND_DIRECT_REQ2_64) &&
+	    (receiver_ffa_version < MAKE_FFA_VERSION(1, 2))) {
 		dlog_verbose(
-			"Receiver can't receive direct message requests.\n");
+			"Receiver version does not allow usage of func id "
+			"0x%x.\n",
+			func);
+		return false;
+	}
+
+	/*
+	 * Check if endpoint is configured to accept direct requests via given
+	 * method.
+	 */
+	sender_method = (func == FFA_MSG_SEND_DIRECT_REQ2_64)
+				? FFA_PARTITION_DIRECT_REQ2_SEND
+				: FFA_PARTITION_DIRECT_REQ_SEND;
+	receiver_method = (func == FFA_MSG_SEND_DIRECT_REQ2_64)
+				  ? FFA_PARTITION_DIRECT_REQ2_RECV
+				  : FFA_PARTITION_DIRECT_REQ_RECV;
+
+	if (!vm_supports_messaging_method(sender_vm, sender_method)) {
+		dlog_verbose(
+			"Sender can't send direct message requests via func id "
+			"0x%x.\n",
+			func);
+		return false;
+	}
+
+	if (!vm_supports_messaging_method(receiver_vm, receiver_method)) {
+		dlog_verbose(
+			"Receiver can't receive direct message requests via "
+			"func id 0x%x.\n",
+			func);
 		return false;
 	}
 
@@ -2402,7 +2445,8 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
 
 /*
  * Start winding the call chain or continue to wind the present one upon the
- * invocation of FFA_MSG_SEND_DIRECT_REQ ABI.
+ * invocation of FFA_MSG_SEND_DIRECT_REQ or FFA_MSG_SEND_DIRECT_REQ2 (FF-A v1.2)
+ * ABI.
  */
 void plat_ffa_wind_call_chain_ffa_direct_req(
 	struct vcpu_locked current_locked,

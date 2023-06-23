@@ -647,6 +647,11 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 						    current, next);
 		return true;
 	}
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
+		*args = api_ffa_msg_send_direct_req(ffa_sender(*args),
+						    ffa_receiver(*args), *args,
+						    current, next);
+		return true;
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 		*args = api_ffa_msg_send_direct_resp(ffa_sender(*args),

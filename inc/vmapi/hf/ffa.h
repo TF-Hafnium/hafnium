@@ -99,6 +99,7 @@
 #define FFA_CONSOLE_LOG_64                  0xC400008A
 #define FFA_PARTITION_INFO_GET_REGS_64      0xC400008B
 #define FFA_EL3_INTR_HANDLE_32              0x8400008C
+#define FFA_MSG_SEND_DIRECT_REQ2_64	    0xC400008D
 
 /**
  * FF-A error codes.
@@ -718,6 +719,15 @@ static inline bool ffa_uuid_is_null(const struct ffa_uuid *uuid)
 	       (uuid->uuid[2] == 0) && (uuid->uuid[3] == 0);
 }
 
+static inline void ffa_uuid_unpack_from_uint64(uint64_t uuid_lo,
+					       uint64_t uuid_hi,
+					       struct ffa_uuid *uuid)
+{
+	ffa_uuid_init((uint32_t)(uuid_lo & 0xFFFFFFFFU),
+		      (uint32_t)(uuid_lo >> 32),
+		      (uint32_t)(uuid_hi & 0xFFFFFFFFU),
+		      (uint32_t)(uuid_hi >> 32), uuid);
+}
 /**
  * Flags to determine the partition properties, as required by
  * FFA_PARTITION_INFO_GET.

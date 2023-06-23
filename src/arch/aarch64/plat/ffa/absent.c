@@ -72,10 +72,11 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 }
 
 bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
-					  struct vm *receiver_vm)
+					  struct vm *receiver_vm, uint32_t func)
 {
 	(void)sender_vm;
 	(void)receiver_vm;
+	(void)func;
 
 	return false;
 }

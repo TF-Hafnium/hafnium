@@ -201,10 +201,11 @@ bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
 }
 
 bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
-					  struct vm *receiver_vm)
+					  struct vm *receiver_vm, uint32_t func)
 {
 	(void)sender_vm;
 	(void)receiver_vm;
+	(void)func;
 
 	/*
 	 * As Hypervisor is only meant to be used as a test artifact, allow
@@ -1088,6 +1089,7 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
 		/* Fall through. */
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
 	case FFA_RUN_32:
 		*next_state = VCPU_STATE_BLOCKED;
 		return true;

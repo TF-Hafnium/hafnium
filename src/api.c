@@ -2463,6 +2463,7 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	case FFA_CONSOLE_LOG_64:
 	case FFA_PARTITION_INFO_GET_REGS_64:
 	case FFA_EL3_INTR_HANDLE_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	case FFA_MEM_RETRIEVE_REQ_32:
@@ -2503,8 +2504,9 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 }
 
 /**
- * FF-A specification states that x2/w2 Must Be Zero for direct messaging
- * interfaces.
+ * FF-A specification states that x2/w2 Must Be Zero for FFA_MSG_SEND_DIRECT_REQ
+ * and FFA_MSG_SEND_DIRECT_RESP interfaces when used for partition messages. See
+ * FF-A v1.2 Table 16.6: FFA_MSG_SEND_DIRECT_REQ function syntax.
  */
 static inline bool api_ffa_dir_msg_is_arg2_zero(struct ffa_value args)
 {
@@ -2529,8 +2531,8 @@ static struct ffa_value api_ffa_value_copy32(struct ffa_value args)
 }
 
 /**
- * Helper to copy direct message payload, depending on SMC used and expected
- * registers size.
+ * Helper to copy direct message payload, depending on SMC used, direct
+ * messaging interface used, and expected registers size.
  */
 static struct ffa_value api_ffa_dir_msg_value(struct ffa_value args)
 {
@@ -2539,20 +2541,36 @@ static struct ffa_value api_ffa_dir_msg_value(struct ffa_value args)
 		return api_ffa_value_copy32(args);
 	}
 
-	return (struct ffa_value){
-		.func = args.func,
-		.arg1 = args.arg1,
-		.arg2 = 0,
-		.arg3 = args.arg3,
-		.arg4 = args.arg4,
-		.arg5 = args.arg5,
-		.arg6 = args.arg6,
-		.arg7 = args.arg7,
-	};
+	if (args.func == FFA_MSG_SEND_DIRECT_REQ_64 ||
+	    args.func == FFA_MSG_SEND_DIRECT_RESP_64) {
+		args.arg2 = 0;
+	}
+
+	return args;
+}
+
+static bool api_ffa_dir_msg_req2_is_uuid_valid(struct vm *receiver_vm,
+					       struct ffa_value args)
+{
+	struct ffa_uuid target_uuid;
+
+	ffa_uuid_unpack_from_uint64(args.arg2, args.arg3, &target_uuid);
+
+	return (ffa_uuid_is_null(&target_uuid) ||
+		ffa_uuid_equal(&target_uuid, &receiver_vm->uuid));
 }
 
 /**
  * Send an FF-A direct message request.
+ * This handler covers both FFA_MSG_SEND_DIRECT_REQ_32/64
+ * and FFA_MSG_SEND_DIRECT_REQ2_64 (introduced in FF-A v1.2) with function-based
+ * checks to accomodate for the difference between the ABIs.
+ *
+ * FFA_MSG_SEND_DIRECT_REQ2_64 works mostly the same as
+ * FFA_MSG_SEND_DIRECT_REQ_32/64, but adds the ability to send a direct message
+ * request to a specified UUID within a partition and the usage of an extended
+ * range of registers (x4-x17, instead of x4-x7) to be used as part of the
+ * message payload.
  */
 struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 					     ffa_id_t receiver_vm_id,
@@ -2569,7 +2587,9 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	struct two_vcpu_locked vcpus_locked;
 	enum vcpu_state next_state = VCPU_STATE_RUNNING;
 
-	if (!api_ffa_dir_msg_is_arg2_zero(args)) {
+	if ((args.func == FFA_MSG_SEND_DIRECT_REQ_32 ||
+	     args.func == FFA_MSG_SEND_DIRECT_REQ_64) &&
+	    !api_ffa_dir_msg_is_arg2_zero(args)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2591,11 +2611,18 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	if (args.func == FFA_MSG_SEND_DIRECT_REQ2_64 &&
+	    !api_ffa_dir_msg_req2_is_uuid_valid(receiver_vm, args)) {
+		dlog_verbose("UUID unrecognized for this VM\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
 	/*
 	 * Check if sender supports sending direct message req, and if
 	 * receiver supports receipt of direct message requests.
 	 */
-	if (!plat_ffa_is_direct_request_supported(current->vm, receiver_vm)) {
+	if (!plat_ffa_is_direct_request_supported(current->vm, receiver_vm,
+						  args.func)) {
 		return ffa_error(FFA_DENIED);
 	}
 
@@ -2692,6 +2719,10 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	receiver_vcpu->regs_available = false;
 	receiver_vcpu->direct_request_origin_vm_id = sender_vm_id;
 
+	/*
+	 * TODO: when extending registers, have to set extended_val.valid before
+	 * this call.
+	 */
 	arch_regs_set_retval(&receiver_vcpu->regs, api_ffa_dir_msg_value(args));
 
 	assert(!vm_id_is_current_world(current->vm->id) ||
