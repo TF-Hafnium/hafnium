@@ -598,14 +598,16 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		TRY(read_optional_uint64(mem_node, "base-address",
 					 MANIFEST_INVALID_ADDRESS,
 					 &mem_regions[i].base_address));
-		dlog_verbose("      Base address:  %#x\n",
+		dlog_verbose("      Base address: %#x\n",
 			     mem_regions[i].base_address);
 
 		TRY(read_optional_uint64(mem_node, "relative-address",
 					 MANIFEST_INVALID_ADDRESS,
 					 &relative_address));
-		dlog_verbose("      Relative address:  %#x\n",
-			     relative_address);
+		if (relative_address != MANIFEST_INVALID_ADDRESS) {
+			dlog_verbose("      Relative address:  %#x\n",
+				     relative_address);
+		}
 
 		if (mem_regions[i].base_address == MANIFEST_INVALID_ADDRESS &&
 		    relative_address == MANIFEST_INVALID_ADDRESS) {
@@ -629,7 +631,7 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 
 		TRY(read_uint32(mem_node, "pages-count",
 				&mem_regions[i].page_count));
-		dlog_verbose("      Pages_count:  %u\n",
+		dlog_verbose("      Pages_count: %u\n",
 			     mem_regions[i].page_count);
 
 		TRY(read_uint32(mem_node, "attributes",
@@ -654,7 +656,7 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		/* Filter memory region attributes. */
 		mem_regions[i].attributes &= MANIFEST_REGION_ALL_ATTR_MASK;
 
-		dlog_verbose("      Attributes:  %#x\n",
+		dlog_verbose("      Attributes: %#x\n",
 			     mem_regions[i].attributes);
 
 		TRY(check_partition_memory_is_valid(
@@ -731,12 +733,12 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 		TRY(read_uint64(dev_node, "base-address",
 				&dev_regions[i].base_address));
-		dlog_verbose("      Base address:  %#x\n",
+		dlog_verbose("      Base address: %#x\n",
 			     dev_regions[i].base_address);
 
 		TRY(read_uint32(dev_node, "pages-count",
 				&dev_regions[i].page_count));
-		dlog_verbose("      Pages_count:  %u\n",
+		dlog_verbose("      Pages_count: %u\n",
 			     dev_regions[i].page_count);
 
 		TRY(read_uint32(dev_node, "attributes",
@@ -761,7 +763,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		dev_regions[i].attributes = dev_regions[i].attributes &
 					    MANIFEST_REGION_ALL_ATTR_MASK;
 
-		dlog_verbose("      Attributes:  %#x\n",
+		dlog_verbose("      Attributes: %#x\n",
 			     dev_regions[i].attributes);
 
 		TRY(read_optional_uint32list(dev_node, "interrupts", &list));
@@ -1005,11 +1007,6 @@ enum manifest_return_code parse_ffa_manifest(
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	TRY(read_uint32(&root, "ffa-version", &vm->partition.ffa_version));
-	dlog_verbose("  Expected FF-A version %u.%u\n",
-		     vm->partition.ffa_version >> 16,
-		     vm->partition.ffa_version & 0xffff);
-
 	TRY(read_uint32list(&root, "uuid", &uuid));
 
 	while (uint32list_has_next(&uuid) && i < 4) {
@@ -1017,9 +1014,14 @@ enum manifest_return_code parse_ffa_manifest(
 		vm->partition.uuid.uuid[i] = uuid_word;
 		i++;
 	}
-	dlog_verbose("  UUID %#x-%x-%x-%x\n", vm->partition.uuid.uuid[0],
+	dlog_verbose("UUID %#x-%x-%x-%x\n", vm->partition.uuid.uuid[0],
 		     vm->partition.uuid.uuid[1], vm->partition.uuid.uuid[2],
 		     vm->partition.uuid.uuid[3]);
+
+	TRY(read_uint32(&root, "ffa-version", &vm->partition.ffa_version));
+	dlog_verbose("  Expected FF-A version %u.%u\n",
+		     vm->partition.ffa_version >> 16,
+		     vm->partition.ffa_version & 0xffff);
 
 	TRY(read_uint16(&root, "execution-ctx-count",
 			&vm->partition.execution_ctx_count));
@@ -1045,8 +1047,11 @@ enum manifest_return_code parse_ffa_manifest(
 	TRY(read_optional_uint32(&root, "gp-register-num",
 				 DEFAULT_BOOT_GP_REGISTER,
 				 &vm->partition.gp_register_num));
-	dlog_verbose("  Boot GP register: %#x\n",
-		     vm->partition.gp_register_num);
+
+	if (vm->partition.gp_register_num != DEFAULT_BOOT_GP_REGISTER) {
+		dlog_verbose("  Boot GP register: x%u\n",
+			     vm->partition.gp_register_num);
+	}
 
 	TRY(read_optional_uint16(&root, "boot-order", DEFAULT_BOOT_ORDER,
 				 &vm->partition.boot_order));
@@ -1110,7 +1115,7 @@ enum manifest_return_code parse_ffa_manifest(
 	}
 
 	dlog_verbose(
-		"NS Interrupts %s\n",
+		"  NS Interrupts %s\n",
 		(vm->partition.ns_interrupts_action == NS_ACTION_QUEUED)
 			? "Queued"
 		: (vm->partition.ns_interrupts_action == NS_ACTION_SIGNALED)
