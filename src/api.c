@@ -516,7 +516,8 @@ static void api_ffa_fill_partitions_info_array(
 	for (ffa_vm_count_t index = 0; index < vm_get_count(); ++index) {
 		struct vm *vm = vm_find_index(index);
 
-		if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuid)) {
+		/*TODO fix logic to search through all uuids */
+		if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuids[0])) {
 			uint16_t array_index = vm_count;
 
 			++vm_count;
@@ -535,7 +536,7 @@ static void api_ffa_fill_partitions_info_array(
 			partitions[array_index].properties |=
 				FFA_PARTITION_AARCH64_EXEC;
 			if (uuid_is_null) {
-				partitions[array_index].uuid = vm->uuid;
+				partitions[array_index].uuid = vm->uuids[0];
 			}
 		}
 	}
@@ -2584,11 +2585,24 @@ static bool api_ffa_dir_msg_req2_is_uuid_valid(struct vm *receiver_vm,
 					       struct ffa_value args)
 {
 	struct ffa_uuid target_uuid;
+	uint16_t i;
 
 	ffa_uuid_unpack_from_uint64(args.arg2, args.arg3, &target_uuid);
 
-	return (ffa_uuid_is_null(&target_uuid) ||
-		ffa_uuid_equal(&target_uuid, &receiver_vm->uuid));
+	/* Allow for use of Nil UUID. */
+	if (ffa_uuid_is_null(&target_uuid)) {
+		return true;
+	}
+
+	for (i = 0; i < PARTITION_MAX_UUIDS; i++) {
+		if (ffa_uuid_is_null(&receiver_vm->uuids[i])) {
+			break;
+		}
+		if (ffa_uuid_equal(&target_uuid, &receiver_vm->uuids[i])) {
+			return true;
+		}
+	}
+	return false;
 }
 
 /**

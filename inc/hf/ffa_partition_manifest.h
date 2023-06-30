@@ -123,8 +123,9 @@ struct rx_tx {
 struct ffa_partition_manifest {
 	/** FF-A expected version - mandatory */
 	uint32_t ffa_version;
-	/** UUID - mandatory */
-	struct ffa_uuid uuid;
+	/** UUID - at least one UUID mandatory */
+	uint16_t uuid_count;
+	struct ffa_uuid uuids[PARTITION_MAX_UUIDS];
 	/** Partition id - optional */
 	ffa_id_t id;
 	/** Aux ids for mem transactions - optional */

@@ -1000,6 +1000,7 @@ enum manifest_return_code parse_ffa_manifest(
 	struct fdt_node *boot_info_node, const struct boot_params *boot_params)
 {
 	unsigned int i = 0;
+	unsigned int j = 0;
 	struct uint32list_iter uuid;
 	uint32_t uuid_word;
 	struct fdt_node root;
@@ -1021,14 +1022,27 @@ enum manifest_return_code parse_ffa_manifest(
 
 	TRY(read_uint32list(&root, "uuid", &uuid));
 
-	while (uint32list_has_next(&uuid) && i < 4) {
-		TRY(uint32list_get_next(&uuid, &uuid_word));
-		vm->partition.uuid.uuid[i] = uuid_word;
-		i++;
+	while (uint32list_has_next(&uuid) && j < PARTITION_MAX_UUIDS) {
+		while (uint32list_has_next(&uuid) && i < 4) {
+			TRY(uint32list_get_next(&uuid, &uuid_word));
+			vm->partition.uuids[j].uuid[i] = uuid_word;
+			i++;
+		}
+
+		if (ffa_uuid_is_null(&vm->partition.uuids[j])) {
+			return MANIFEST_ERROR_UUID_ALL_ZEROS;
+		}
+		dlog_verbose("  UUID %#x-%x-%x-%x\n",
+			     vm->partition.uuids[j].uuid[0],
+			     vm->partition.uuids[j].uuid[1],
+			     vm->partition.uuids[j].uuid[2],
+			     vm->partition.uuids[j].uuid[3]);
+		j++;
+		i = 0;
 	}
-	dlog_verbose("UUID %#x-%x-%x-%x\n", vm->partition.uuid.uuid[0],
-		     vm->partition.uuid.uuid[1], vm->partition.uuid.uuid[2],
-		     vm->partition.uuid.uuid[3]);
+
+	vm->partition.uuid_count = j;
+	dlog_verbose("  Number of UUIDs %u\n", vm->partition.uuid_count);
 
 	TRY(read_uint32(&root, "ffa-version", &vm->partition.ffa_version));
 	dlog_verbose("  Expected FF-A version %u.%u\n",
@@ -1275,7 +1289,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 	manifest_address = va_add(va_init(load_address), header.pm_offset);
 	if (!fdt_init_from_ptr(&sp_fdt, ptr_from_va(manifest_address),
 			       header.pm_size)) {
-		dlog_error("FDT failed validation.\n");
+		dlog_error("manifest.c: FDT failed validation.\n");
 		goto out;
 	}
 
@@ -1514,6 +1528,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_INVALID_BOOT_ORDER:
 		return "Boot order should be a unique value less than "
 		       "default largest value";
+	case MANIFEST_ERROR_UUID_ALL_ZEROS:
+		return "UUID should not be NIL";
 	}
 
 	panic("Unexpected manifest return code.");

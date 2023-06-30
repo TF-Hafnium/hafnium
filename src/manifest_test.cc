@@ -1680,7 +1680,7 @@ TEST_F(manifest, ffa_valid)
 	vm = &m->vm[0];
 	ASSERT_EQ(vm->partition.ffa_version, 0x10000);
 	ASSERT_THAT(
-		std::span(vm->partition.uuid.uuid, 4),
+		std::span(vm->partition.uuids[0].uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
 	ASSERT_EQ(vm->partition.execution_ctx_count, 1);
 	ASSERT_EQ(vm->partition.run_time_el, S_EL1);
@@ -1859,5 +1859,70 @@ TEST_F(manifest, ffa_boot_order_not_unique)
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
 	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
 		  MANIFEST_ERROR_INVALID_BOOT_ORDER);
+}
+TEST_F(manifest, ffa_valid_multiple_uuids)
+{
+	struct manifest_vm *vm;
+	struct_manifest *m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10002>")
+		.Property("uuid",
+			 "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>,\
+			  <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1daaa>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("messaging-method", "<4>")
+		.Property("ns-interrupts-action", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+
+	vm = &m->vm[0];
+	ASSERT_EQ(vm->partition.ffa_version, 0x10002);
+	ASSERT_THAT(
+		std::span(vm->partition.uuids[0].uuid, 4),
+		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
+	ASSERT_THAT(
+		std::span(vm->partition.uuids[1].uuid, 4),
+		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1daaa));
+	ASSERT_EQ(vm->partition.uuid_count, 2);
+	ASSERT_EQ(vm->partition.execution_ctx_count, 1);
+	ASSERT_EQ(vm->partition.run_time_el, S_EL1);
+	ASSERT_EQ(vm->partition.execution_state, AARCH64);
+	ASSERT_EQ(vm->partition.ep_offset, 0x00002000);
+	ASSERT_EQ(vm->partition.xlat_granule, PAGE_4KB);
+	ASSERT_EQ(vm->partition.boot_order, 0);
+	ASSERT_EQ(vm->partition.messaging_method, FFA_PARTITION_INDIRECT_MSG);
+	ASSERT_EQ(vm->partition.ns_interrupts_action, NS_ACTION_ME);
+}
+TEST_F(manifest, ffa_uuid_all_zeros)
+{
+	struct_manifest *m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10002>")
+		.Property("uuid",
+			 "<0x0 0x0 0x0 0x0>, <0x0 0x0 0x0 0x0>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("messaging-method", "<4>")
+		.Property("ns-interrupts-action", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_UUID_ALL_ZEROS);
 }
 } /* namespace */

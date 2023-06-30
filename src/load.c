@@ -168,9 +168,19 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	uint32_t k = 0;
 
 	vm_locked.vm->smc_whitelist = manifest_vm->smc_whitelist;
-	vm_locked.vm->uuid = manifest_vm->partition.uuid;
 	vm_locked.vm->power_management =
 		manifest_vm->partition.power_management;
+
+	/* Populate array of UUIDs. */
+	for (uint16_t i = 0; i < PARTITION_MAX_UUIDS; i++) {
+		struct ffa_uuid current_uuid = manifest_vm->partition.uuids[i];
+
+		if (ffa_uuid_is_null(&current_uuid)) {
+			break;
+		}
+
+		vm_locked.vm->uuids[i] = current_uuid;
+	}
 
 	/* Populate the interrupt descriptor for current VM. */
 	for (uint16_t i = 0; i < PARTITION_MAX_DEVICE_REGIONS; i++) {

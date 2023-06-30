@@ -64,6 +64,7 @@ config("platform") {
     "MAX_VMS=${plat_max_vms}",
     "LOG_LEVEL=${plat_log_level}",
     "ENABLE_ASSERTIONS=${enable_assertions}",
+    "PARTITION_MAX_UUIDS=${plat_partition_max_uuids}",
     "PARTITION_MAX_MEMORY_REGIONS=${plat_partition_max_memory_regions}",
     "PARTITION_MAX_DEVICE_REGIONS=${plat_partition_max_device_regions}",
     "PARTITION_MAX_INTERRUPTS_PER_DEVICE=${plat_partition_max_intr_per_device}",
