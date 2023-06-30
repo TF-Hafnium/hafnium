@@ -118,11 +118,10 @@ struct share_states_locked {
 	struct ffa_memory_share_state *share_states;
 };
 
-bool allocate_share_state(struct share_states_locked share_states,
-			  uint32_t share_func,
-			  struct ffa_memory_region *memory_region,
-			  uint32_t fragment_length, ffa_memory_handle_t handle,
-			  struct ffa_memory_share_state **share_state_ret);
+struct ffa_memory_share_state *allocate_share_state(
+	struct share_states_locked share_states, uint32_t share_func,
+	struct ffa_memory_region *memory_region, uint32_t fragment_length,
+	ffa_memory_handle_t handle);
 struct share_states_locked share_states_lock(void);
 void share_states_unlock(struct share_states_locked *share_states);
 void share_state_free(struct share_states_locked share_states,

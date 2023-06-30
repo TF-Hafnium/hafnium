@@ -44,27 +44,23 @@ uint64_t ffa_memory_handle_get_index(ffa_memory_handle_t handle)
 }
 
 /**
- * Initialises the next available `struct ffa_memory_share_state` and sets
- * `share_state_ret` to a pointer to it. If `handle` is
- * `FFA_MEMORY_HANDLE_INVALID` then allocates an appropriate handle, otherwise
- * uses the provided handle which is assumed to be globally unique.
+ * Initialises the next available `struct ffa_memory_share_state`. If `handle`
+ * is `FFA_MEMORY_HANDLE_INVALID` then allocates an appropriate handle,
+ * otherwise uses the provided handle which is assumed to be globally unique.
  *
- * Returns true on success or false if none are available.
+ * Returns a pointer to the allocated `ffa_memory_share_state` on success or
+ * `NULL` if none are available.
  */
-bool allocate_share_state(struct share_states_locked share_states,
-			  uint32_t share_func,
-			  struct ffa_memory_region *memory_region,
-			  uint32_t fragment_length, ffa_memory_handle_t handle,
-			  struct ffa_memory_share_state **share_state_ret)
+struct ffa_memory_share_state *allocate_share_state(
+	struct share_states_locked share_states, uint32_t share_func,
+	struct ffa_memory_region *memory_region, uint32_t fragment_length,
+	ffa_memory_handle_t handle)
 {
-	uint64_t i;
-
 	assert(share_states.share_states != NULL);
 	assert(memory_region != NULL);
 
-	for (i = 0; i < MAX_MEM_SHARES; ++i) {
+	for (uint64_t i = 0; i < MAX_MEM_SHARES; ++i) {
 		if (share_states.share_states[i].share_func == 0) {
-			uint32_t j;
 			struct ffa_memory_share_state *allocated_state =
 				&share_states.share_states[i];
 			struct ffa_composite_memory_region *composite =
@@ -87,18 +83,16 @@ bool allocate_share_state(struct share_states_locked share_states,
 								  0)) /
 				sizeof(struct ffa_memory_region_constituent);
 			allocated_state->sending_complete = false;
-			for (j = 0; j < MAX_MEM_SHARE_RECIPIENTS; ++j) {
+			for (uint32_t j = 0; j < MAX_MEM_SHARE_RECIPIENTS;
+			     ++j) {
 				allocated_state->retrieved_fragment_count[j] =
 					0;
 			}
-			if (share_state_ret != NULL) {
-				*share_state_ret = allocated_state;
-			}
-			return true;
+			return allocated_state;
 		}
 	}
 
-	return false;
+	return NULL;
 }
 
 /** Locks the share states lock. */
@@ -1722,9 +1716,10 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	 * failed then it would leave the memory in a state where nobody could
 	 * get it back.
 	 */
-	if (!allocate_share_state(share_states, share_func, memory_region,
-				  fragment_length, FFA_MEMORY_HANDLE_INVALID,
-				  &share_state)) {
+	share_state = allocate_share_state(share_states, share_func,
+					   memory_region, fragment_length,
+					   FFA_MEMORY_HANDLE_INVALID);
+	if (!share_state) {
 		dlog_verbose("Failed to allocate share state.\n");
 		mpool_free(page_pool, memory_region);
 		ret = ffa_error(FFA_NO_MEMORY);
@@ -2387,7 +2382,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	}
 
 	share_states = share_states_lock();
-	if (!get_share_state(share_states, handle, &share_state)) {
+	if (!get_share_state(share_states, handle, share_state)) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_RETRIEVE_REQ.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -2928,6 +2923,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	dump_share_states();
 
 	share_states = share_states_lock();
+
 	if (get_share_state(share_states, handle, &share_state)) {
 		memory_region = share_state->memory_region;
 	} else {

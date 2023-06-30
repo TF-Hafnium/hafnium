@@ -1247,7 +1247,7 @@ static struct ffa_value ffa_memory_other_world_send(
 
 		if (!allocate_share_state(share_states, share_func,
 					  memory_region, fragment_length,
-					  handle, NULL)) {
+					  handle)) {
 			dlog_verbose("Failed to allocate share state.\n");
 			ret = ffa_error(FFA_NO_MEMORY);
 			goto out_unlock;
