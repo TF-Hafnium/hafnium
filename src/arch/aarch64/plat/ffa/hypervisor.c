@@ -1236,7 +1236,12 @@ static struct ffa_value ffa_memory_other_world_send(
 	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
 	uint32_t fragment_length, uint32_t share_func, struct mpool *page_pool)
 {
+	ffa_memory_handle_t handle;
+	struct share_states_locked share_states;
+	struct ffa_memory_share_state *share_state;
 	struct ffa_value ret;
+	struct ffa_value reclaim_ret;
+	(void)reclaim_ret;
 
 	/*
 	 * If there is an error validating the `memory_region` then we need to
@@ -1247,64 +1252,71 @@ static struct ffa_value ffa_memory_other_world_send(
 				       memory_share_length, fragment_length,
 				       share_func);
 	if (ret.func != FFA_SUCCESS_32) {
-		goto out;
+		goto out_err;
 	}
 
+	share_states = share_states_lock();
+
 	if (fragment_length == memory_share_length) {
-		/* No more fragments to come, everything fit in one message. */
-		struct ffa_composite_memory_region *composite =
-			ffa_memory_region_get_composite(memory_region, 0);
-		struct ffa_memory_region_constituent *constituents =
-			composite->constituents;
-		struct mpool local_page_pool;
-		uint32_t orig_from_mode;
-
-		/*
-		 * Use a local page pool so that we can roll back if necessary.
-		 */
-		mpool_init_with_fallback(&local_page_pool, page_pool);
-
-		ret = ffa_send_check_update(
-			from_locked, &constituents,
-			&composite->constituent_count, 1, composite->page_count,
-			share_func, memory_region->receivers,
-			memory_region->receiver_count, &local_page_pool,
-			memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
-			&orig_from_mode);
-		if (ret.func != FFA_SUCCESS_32) {
-			mpool_fini(&local_page_pool);
-			goto out;
-		}
+		/* No more fragments to come, everything fits in one message. */
 
 		/* Forward memory send message on to other world. */
 		ret = memory_send_other_world_forward(
 			to_locked, from_locked.vm->id, share_func,
 			memory_region, memory_share_length, fragment_length);
-
 		if (ret.func != FFA_SUCCESS_32) {
 			dlog_verbose(
-				"Other world didn't successfully complete "
-				"memory send operation; returned %#x (%d). "
-				"Rolling back.\n",
-				ret.func, ret.arg2);
-
-			/*
-			 * The other world failed to complete the send
-			 * operation, so roll back the page table update for the
-			 * VM. This can't fail because it won't try to allocate
-			 * more memory than was freed into the `local_page_pool`
-			 * by `ffa_send_check_update` in the initial update.
-			 */
-			CHECK(ffa_region_group_identity_map(
-				from_locked, &constituents,
-				&composite->constituent_count, 1,
-				orig_from_mode, &local_page_pool, true));
+				"%s: failed to forward memory send message to "
+				"other world: %s(%s).\n",
+				__func__, ffa_func_name(ret.func),
+				ffa_error_name(ffa_error_code(ret)));
+			goto out;
 		}
 
-		mpool_fini(&local_page_pool);
+		handle = ffa_mem_success_handle(ret);
+		share_state = allocate_share_state(share_states, share_func,
+						   memory_region,
+						   fragment_length, handle);
+		if (share_state == NULL) {
+			dlog_verbose("%s: failed to allocate share state.\n",
+				     __func__);
+			ret = ffa_error(FFA_NO_MEMORY);
+
+			reclaim_ret = arch_other_world_call((struct ffa_value){
+				.func = FFA_MEM_RECLAIM_32,
+				.arg1 = (uint32_t)handle,
+				.arg2 = (uint32_t)(handle >> 32),
+				.arg3 = 0});
+			assert(reclaim_ret.func == FFA_SUCCESS_32);
+			goto out;
+		}
+
+		ret = ffa_memory_send_complete(from_locked, share_states,
+					       share_state, page_pool,
+					       &share_state->sender_orig_mode);
+		if (ret.func != FFA_SUCCESS_32) {
+			dlog_verbose(
+				"%s: failed to complete memory send: %s(%s).\n",
+				__func__, ffa_func_name(ret.func),
+				ffa_error_name(ffa_error_code(ret)));
+
+			reclaim_ret = arch_other_world_call((struct ffa_value){
+				.func = FFA_MEM_RECLAIM_32,
+				.arg1 = (uint32_t)handle,
+				.arg2 = (uint32_t)(handle >> 32),
+				.arg3 = 0});
+			assert(reclaim_ret.func == FFA_SUCCESS_32);
+			goto out;
+		}
+		/*
+		 * Don't free the memory region fragment, as it has been stored
+		 * in the share state.
+		 */
+		memory_region = NULL;
 	} else {
-		struct share_states_locked share_states = share_states_lock();
-		ffa_memory_handle_t handle;
+		/* More fragments remaining, fragmented message. */
+		dlog_verbose("%s: more fragments remaining: %d/%d\n", __func__,
+			     fragment_length, memory_share_length);
 
 		/*
 		 * We need to wait for the rest of the fragments before we can
@@ -1316,59 +1328,78 @@ static struct ffa_value ffa_memory_other_world_send(
 		ret = memory_send_other_world_forward(
 			to_locked, from_locked.vm->id, share_func,
 			memory_region, memory_share_length, fragment_length);
-		if (ret.func == FFA_ERROR_32) {
-			goto out_unlock;
-		} else if (ret.func != FFA_MEM_FRAG_RX_32) {
+		if (ret.func != FFA_MEM_FRAG_RX_32) {
 			dlog_warning(
-				"Got %#x from other world in response to %#x "
-				"for fragment with %d/%d, expected "
-				"FFA_MEM_FRAG_RX.\n",
-				ret.func, share_func, fragment_length,
-				memory_share_length);
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out_unlock;
+				"%s: failed to forward to other world: "
+				"%s(%s)\n",
+				__func__, ffa_func_name(ret.func),
+				ffa_error_name(ffa_error_code(ret)));
+			goto out;
 		}
-		handle = ffa_frag_handle(ret);
+		if (ret.func != FFA_MEM_FRAG_RX_32) {
+			dlog_warning(
+				"%s: got unexpected response to %s "
+				"from other world (expected %s, got %s)\n",
+				__func__, ffa_func_name(share_func),
+				ffa_func_name(FFA_MEM_FRAG_RX_32),
+				ffa_func_name(ret.func));
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
 		if (ret.arg3 != fragment_length) {
 			dlog_warning(
-				"Got unexpected fragment offset %d for "
-				"FFA_MEM_FRAG_RX from other world (expected "
-				"%d).\n",
-				ret.arg3, fragment_length);
+				"%s: got unexpected fragment offset for %s "
+				"from other world (expected %d, got %d)\n",
+				__func__, ffa_func_name(FFA_MEM_FRAG_RX_32),
+				fragment_length, ret.arg3);
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out_unlock;
+			goto out;
 		}
 		if (ffa_frag_sender(ret) != from_locked.vm->id) {
 			dlog_warning(
-				"Got unexpected sender ID %d for "
-				"FFA_MEM_FRAG_RX from other world (expected "
-				"%d).\n",
-				ffa_frag_sender(ret), from_locked.vm->id);
+				"%s: got unexpected sender ID for %s from "
+				"other world (expected %d, got %d)\n",
+				__func__, ffa_func_name(FFA_MEM_FRAG_RX_32),
+				from_locked.vm->id, ffa_frag_sender(ret));
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out_unlock;
+			goto out;
 		}
-
-		if (!allocate_share_state(share_states, share_func,
-					  memory_region, fragment_length,
-					  handle)) {
-			dlog_verbose("Failed to allocate share state.\n");
+		handle = ffa_frag_handle(ret);
+		share_state = allocate_share_state(share_states, share_func,
+						   memory_region,
+						   fragment_length, handle);
+		if (share_state == NULL) {
+			dlog_verbose("%s: failed to allocate share state.\n",
+				     __func__);
 			ret = ffa_error(FFA_NO_MEMORY);
-			goto out_unlock;
+
+			reclaim_ret = arch_other_world_call((struct ffa_value){
+				.func = FFA_MEM_RECLAIM_32,
+				.arg1 = (uint32_t)handle,
+				.arg2 = (uint32_t)(handle >> 32),
+				.arg3 = 0});
+			assert(reclaim_ret.func == FFA_SUCCESS_32);
+			goto out;
 		}
+		ret = (struct ffa_value){
+			.func = FFA_MEM_FRAG_RX_32,
+			.arg1 = (uint32_t)handle,
+			.arg2 = (uint32_t)(handle >> 32),
+			.arg3 = fragment_length,
+		};
 		/*
 		 * Don't free the memory region fragment, as it has been stored
 		 * in the share state.
 		 */
 		memory_region = NULL;
-	out_unlock:
-		share_states_unlock(&share_states);
 	}
 
 out:
+	share_states_unlock(&share_states);
+out_err:
 	if (memory_region != NULL) {
 		mpool_free(page_pool, memory_region);
 	}
-	dump_share_states();
 	return ret;
 }
 
@@ -2014,7 +2045,6 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 	/* Check whether the memory send operation is now ready to complete. */
 	if (share_state_sending_complete(share_states, share_state)) {
 		struct mpool local_page_pool;
-		uint32_t orig_from_mode;
 
 		/*
 		 * Use a local page pool so that we can roll back if necessary.
@@ -2023,7 +2053,7 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 
 		ret = ffa_memory_send_complete(from_locked, share_states,
 					       share_state, &local_page_pool,
-					       &orig_from_mode);
+					       &share_state->sender_orig_mode);
 
 		if (ret.func == FFA_SUCCESS_32) {
 			/*
@@ -2060,12 +2090,9 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 					share_state
 						->fragment_constituent_counts,
 					share_state->fragment_count,
-					orig_from_mode, &local_page_pool,
-					true));
+					share_state->sender_orig_mode,
+					&local_page_pool, true));
 			}
-
-			/* Free share state. */
-			share_state_free(share_states, share_state, page_pool);
 		} else {
 			/* Abort sending to other_world. */
 			struct ffa_value other_world_ret =

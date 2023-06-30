@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 
+#include "hf/ffa.h"
 #include "hf/mm.h"
 #include "hf/std.h"
 
@@ -102,7 +103,7 @@ TEST(memory_sharing, fail_on_share_twice)
 		  0);
 	ret = ffa_mem_share(msg_size, msg_size);
 	EXPECT_EQ(ret.func, FFA_ERROR_32);
-	EXPECT_FFA_ERROR(ret, FFA_DENIED);
+	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 }
 
 /**

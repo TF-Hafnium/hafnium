@@ -1226,13 +1226,15 @@ struct ffa_value ffa_memory_send_complete(
 		/*
 		 * Free share state, it failed to send so it can't be retrieved.
 		 */
-		dlog_verbose("Complete failed, freeing share state.\n");
+		dlog_verbose("%s: failed to send check update: %s(%s)\n",
+			     __func__, ffa_func_name(ret.func),
+			     ffa_error_name(ffa_error_code(ret)));
 		share_state_free(share_states, share_state, page_pool);
 		return ret;
 	}
 
 	share_state->sending_complete = true;
-	dlog_verbose("Marked sending complete.\n");
+	dlog_verbose("%s: marked sending complete.\n", __func__);
 
 	return ffa_mem_success(share_state->memory_region->handle);
 }
