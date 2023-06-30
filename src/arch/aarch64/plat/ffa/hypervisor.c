@@ -1499,243 +1499,6 @@ static struct ffa_value deliver_msg(struct vm_locked to, ffa_id_t from_id,
 }
 
 /**
- * Reclaims the given memory from the other world. To do this space is first
- * reserved in the <to> VM's page table, then the reclaim request is sent on to
- * the other world. then (if that is successful) the memory is mapped back into
- * the <to> VM's page table.
- *
- * This function requires the calling context to hold the <to> lock.
- *
- * Returns:
- *  In case of error, one of the following values is returned:
- *   1) FFA_INVALID_PARAMETERS - The endpoint provided parameters were
- *     erroneous;
- *   2) FFA_NO_MEMORY - Hafnium did not have sufficient memory to complete
- *     the request.
- *  Success is indicated by FFA_SUCCESS.
- */
-static struct ffa_value ffa_other_world_reclaim_check_update(
-	struct vm_locked to_locked, ffa_memory_handle_t handle,
-	struct ffa_memory_region_constituent *constituents,
-	uint32_t constituent_count, uint32_t memory_to_attributes, bool clear,
-	struct mpool *page_pool)
-{
-	uint32_t to_mode;
-	struct mpool local_page_pool;
-	struct ffa_value ret;
-	ffa_memory_region_flags_t other_world_flags;
-
-	/*
-	 * Make sure constituents are properly aligned to a 64-bit boundary. If
-	 * not we would get alignment faults trying to read (64-bit) values.
-	 */
-	if (!is_aligned(constituents, 8)) {
-		dlog_verbose("Constituents not aligned.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/*
-	 * Check if the state transition is lawful for the recipient, and ensure
-	 * that all constituents of the memory region being retrieved are at the
-	 * same state.
-	 */
-	ret = ffa_retrieve_check_transition(to_locked, FFA_MEM_RECLAIM_32,
-					    &constituents, &constituent_count,
-					    1, memory_to_attributes, &to_mode);
-	if (ret.func != FFA_SUCCESS_32) {
-		dlog_verbose("Invalid transition.\n");
-		return ret;
-	}
-
-	/*
-	 * Create a local pool so any freed memory can't be used by another
-	 * thread. This is to ensure the original mapping can be restored if the
-	 * clear fails.
-	 */
-	mpool_init_with_fallback(&local_page_pool, page_pool);
-
-	/*
-	 * First reserve all required memory for the new page table entries in
-	 * the recipient page tables without committing, to make sure the entire
-	 * operation will succeed without exhausting the page pool.
-	 */
-	if (!ffa_region_group_identity_map(to_locked, &constituents,
-					   &constituent_count, 1, to_mode,
-					   page_pool, false)) {
-		/* TODO: partial defrag of failed range. */
-		dlog_verbose(
-			"Insufficient memory to update recipient page "
-			"table.\n");
-		ret = ffa_error(FFA_NO_MEMORY);
-		goto out;
-	}
-
-	/*
-	 * Forward the request to the other world and see what happens.
-	 */
-	other_world_flags = 0;
-	if (clear) {
-		other_world_flags |= FFA_MEMORY_REGION_FLAG_CLEAR;
-	}
-	ret = arch_other_world_call(
-		(struct ffa_value){.func = FFA_MEM_RECLAIM_32,
-				   .arg1 = (uint32_t)handle,
-				   .arg2 = (uint32_t)(handle >> 32),
-				   .arg3 = other_world_flags});
-
-	if (ret.func != FFA_SUCCESS_32) {
-		dlog_verbose(
-			"Got %#x (%d) from other world in response to "
-			"FFA_MEM_RECLAIM, "
-			"expected FFA_SUCCESS.\n",
-			ret.func, ret.arg2);
-		goto out;
-	}
-
-	/*
-	 * The other world was happy with it, so complete the reclaim by mapping
-	 * the memory into the recipient. This won't allocate because the
-	 * transaction was already prepared above, so it doesn't need to use the
-	 * `local_page_pool`.
-	 */
-	CHECK(ffa_region_group_identity_map(to_locked, &constituents,
-					    &constituent_count, 1, to_mode,
-					    page_pool, true));
-
-	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
-
-out:
-	mpool_fini(&local_page_pool);
-
-	/*
-	 * Tidy up the page table by reclaiming failed mappings (if there was an
-	 * error) or merging entries into blocks where possible (on success).
-	 */
-	vm_ptable_defrag(to_locked, page_pool);
-
-	return ret;
-}
-
-static struct ffa_value plat_ffa_hyp_memory_retrieve(
-	struct vm_locked to_locked, struct vm_locked from_locked,
-	ffa_memory_handle_t handle, struct ffa_memory_region **memory_region)
-{
-	uint32_t request_length = ffa_memory_lender_retrieve_request_init(
-		from_locked.vm->mailbox.recv, handle, to_locked.vm->id);
-	struct ffa_value other_world_ret;
-	uint32_t length;
-	uint32_t fragment_length;
-	uint32_t fragment_offset;
-	struct ffa_memory_region *retrieved;
-
-	CHECK(request_length <= HF_MAILBOX_SIZE);
-	CHECK(from_locked.vm->id == HF_OTHER_WORLD_ID);
-
-	/* Retrieve memory region information from the other world. */
-	other_world_ret = arch_other_world_call(
-		(struct ffa_value){.func = FFA_MEM_RETRIEVE_REQ_32,
-				   .arg1 = request_length,
-				   .arg2 = request_length});
-	if (other_world_ret.func == FFA_ERROR_32) {
-		dlog_verbose("Got error %d from EL3.\n", other_world_ret.arg2);
-		return other_world_ret;
-	}
-	if (other_world_ret.func != FFA_MEM_RETRIEVE_RESP_32) {
-		dlog_verbose(
-			"Got %#x from EL3, expected FFA_MEM_RETRIEVE_RESP.\n",
-			other_world_ret.func);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	length = other_world_ret.arg1;
-	fragment_length = other_world_ret.arg2;
-
-	if (fragment_length > HF_MAILBOX_SIZE || fragment_length > length ||
-	    length > sizeof(other_world_retrieve_buffer)) {
-		dlog_verbose("Invalid fragment length %d/%d (max %d/%d).\n",
-			     fragment_length, length, HF_MAILBOX_SIZE,
-			     sizeof(other_world_retrieve_buffer));
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-	/*
-	 * Copy the first fragment of the memory region descriptor to an
-	 * internal buffer.
-	 */
-	memcpy_s(other_world_retrieve_buffer,
-		 sizeof(other_world_retrieve_buffer),
-		 from_locked.vm->mailbox.send, fragment_length);
-
-	retrieved = (struct ffa_memory_region *)other_world_retrieve_buffer;
-
-	/* Hypervisor always forward VM's RX_RELEASE to SPMC. */
-	other_world_ret = arch_other_world_call((struct ffa_value){
-		.func = FFA_RX_RELEASE_32, .arg1 = HF_HYPERVISOR_VM_ID});
-	assert(other_world_ret.func == FFA_SUCCESS_32);
-
-	/* Fetch the remaining fragments into the same buffer. */
-	fragment_offset = fragment_length;
-	while (fragment_offset < length) {
-		/*
-		 * Request the next fragment, and provide the sender ID,
-		 * it is expected to be part of FFA_MEM_FRAG_RX_32 at
-		 * physical FF-A instance.
-		 */
-		other_world_ret = arch_other_world_call((struct ffa_value){
-			.func = FFA_MEM_FRAG_RX_32,
-			.arg1 = (uint32_t)handle,
-			.arg2 = (uint32_t)(handle >> 32),
-			.arg3 = fragment_offset,
-			.arg4 = (uint32_t)retrieved->sender << 16});
-		if (other_world_ret.func != FFA_MEM_FRAG_TX_32) {
-			dlog_verbose(
-				"Got %#x (%d) from other world in response to "
-				"FFA_MEM_FRAG_RX, expected FFA_MEM_FRAG_TX.\n",
-				other_world_ret.func, other_world_ret.arg2);
-			return other_world_ret;
-		}
-		if (ffa_frag_handle(other_world_ret) != handle) {
-			dlog_verbose(
-				"Got FFA_MEM_FRAG_TX for unexpected handle %#x "
-				"in response to FFA_MEM_FRAG_RX for handle "
-				"%#x.\n",
-				ffa_frag_handle(other_world_ret), handle);
-			return ffa_error(FFA_INVALID_PARAMETERS);
-		}
-		if (ffa_frag_sender(other_world_ret) != 0) {
-			dlog_verbose(
-				"Got FFA_MEM_FRAG_TX with unexpected sender %d "
-				"(expected 0).\n",
-				ffa_frag_sender(other_world_ret));
-			return ffa_error(FFA_INVALID_PARAMETERS);
-		}
-		fragment_length = other_world_ret.arg3;
-		if (fragment_length > HF_MAILBOX_SIZE ||
-		    fragment_offset + fragment_length > length) {
-			dlog_verbose(
-				"Invalid fragment length %d at offset %d (max "
-				"%d).\n",
-				fragment_length, fragment_offset,
-				HF_MAILBOX_SIZE);
-			return ffa_error(FFA_INVALID_PARAMETERS);
-		}
-		memcpy_s(other_world_retrieve_buffer + fragment_offset,
-			 sizeof(other_world_retrieve_buffer) - fragment_offset,
-			 from_locked.vm->mailbox.send, fragment_length);
-
-		fragment_offset += fragment_length;
-		other_world_ret = arch_other_world_call(
-			(struct ffa_value){.func = FFA_RX_RELEASE_32,
-					   .arg1 = HF_HYPERVISOR_VM_ID});
-		assert(other_world_ret.func == FFA_SUCCESS_32);
-	}
-
-	*memory_region =
-		(struct ffa_memory_region *)other_world_retrieve_buffer;
-
-	return other_world_ret;
-}
-
-/**
  * Validates that the reclaim transition is allowed for the memory region with
  * the given handle which was previously shared with the SPMC. Tells the
  * SPMC to mark it as reclaimed, and updates the page table of the reclaiming
@@ -1745,61 +1508,107 @@ static struct ffa_value plat_ffa_hyp_memory_retrieve(
  * SPMC.
  */
 static struct ffa_value ffa_memory_other_world_reclaim(
-	struct vm_locked to_locked, struct vm_locked from_locked,
-	ffa_memory_handle_t handle, ffa_memory_region_flags_t flags,
-	struct mpool *page_pool)
+	struct vm_locked to_locked, ffa_memory_handle_t handle,
+	ffa_memory_region_flags_t flags, struct mpool *page_pool)
 {
-	struct ffa_memory_region *memory_region = NULL;
-	struct ffa_composite_memory_region *composite;
-	uint32_t memory_to_attributes = MM_MODE_R | MM_MODE_W | MM_MODE_X;
-	struct ffa_value hyp_retr_ret;
+	struct share_states_locked share_states;
+	struct ffa_memory_share_state *share_state;
+	struct ffa_memory_region *memory_region;
+	struct ffa_value ret;
 
-	/* Retrieve memory region from the SPMC. */
-	hyp_retr_ret = plat_ffa_hyp_memory_retrieve(to_locked, from_locked,
-						    handle, &memory_region);
+	dump_share_states();
 
-	if (hyp_retr_ret.func == FFA_ERROR_32) {
-		return hyp_retr_ret;
+	share_states = share_states_lock();
+
+	share_state = get_share_state(share_states, handle);
+	if (share_state == NULL) {
+		dlog_verbose("Unable to find share state for handle %#x.\n",
+			     handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
 	}
+	memory_region = share_state->memory_region;
 
-	assert(memory_region != NULL);
-	if (memory_region->receiver_count != 1) {
-		/* Only one receiver supported by Hafnium for now. */
-		dlog_verbose(
-			"Multiple recipients not supported (got %d, expected "
-			"1).\n",
-			memory_region->receiver_count);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
+	CHECK(memory_region != NULL);
 
-	if (memory_region->handle != handle) {
-		dlog_verbose(
-			"Got memory region handle %#x from other world but "
-			"requested handle %#x.\n",
-			memory_region->handle, handle);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* The original sender must match the caller. */
-	if (to_locked.vm->id != memory_region->sender) {
+	if (vm_id_is_current_world(to_locked.vm->id) &&
+	    to_locked.vm->id != memory_region->sender) {
 		dlog_verbose(
 			"VM %#x attempted to reclaim memory handle %#x "
 			"originally sent by VM %#x.\n",
 			to_locked.vm->id, handle, memory_region->sender);
-		return ffa_error(FFA_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
 	}
 
-	composite = ffa_memory_region_get_composite(memory_region, 0);
+	if (!share_state->sending_complete) {
+		dlog_verbose(
+			"Memory with handle %#x not fully sent, can't "
+			"reclaim.\n",
+			handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
+		/* Skip the entries that relate to SPs. */
+		if (!ffa_is_vm_id(memory_region->receivers[i]
+					  .receiver_permissions.receiver)) {
+			continue;
+		}
+
+		/* Check that all VMs have relinquished. */
+		if (share_state->retrieved_fragment_count[i] != 0) {
+			dlog_verbose(
+				"Tried to reclaim memory handle %#x "
+				"that has not been relinquished by all "
+				"borrowers(%x).\n",
+				handle,
+				memory_region->receivers[i]
+					.receiver_permissions.receiver);
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
+	}
 
 	/*
-	 * Validate that the reclaim transition is allowed for the given memory
-	 * region, forward the request to the other world and then map the
-	 * memory back into the caller's stage-2 page table.
+	 * Call to the SPMC, for it to free the memory state tracking
+	 * structures. This can fail if the SPs haven't finished using the
+	 * memory.
 	 */
-	return ffa_other_world_reclaim_check_update(
-		to_locked, handle, composite->constituents,
-		composite->constituent_count, memory_to_attributes,
-		flags & FFA_MEM_RECLAIM_CLEAR, page_pool);
+	ret = arch_other_world_call(
+		(struct ffa_value){.func = FFA_MEM_RECLAIM_32,
+				   .arg1 = (uint32_t)handle,
+				   .arg2 = (uint32_t)(handle >> 32),
+				   .arg3 = flags});
+
+	if (ret.func != FFA_SUCCESS_32) {
+		dlog_verbose(
+			"FFA_MEM_RECLAIM returned an error. Expected "
+			"FFA_SUCCESS, got %s (%s)",
+			ffa_func_name(ret.func), ffa_error_name(ret.arg2));
+		goto out;
+	}
+
+	/*
+	 * Masking the CLEAR flag, as this operation was expected to have been
+	 * done by the SPMC.
+	 */
+	flags &= ~FFA_MEMORY_REGION_FLAG_CLEAR;
+	ret = ffa_retrieve_check_update(
+		to_locked, memory_region->sender, share_state->fragments,
+		share_state->fragment_constituent_counts,
+		share_state->fragment_count, share_state->sender_orig_mode,
+		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool);
+
+	if (ret.func == FFA_SUCCESS_32) {
+		share_state_free(share_states, share_state, page_pool);
+		dlog_verbose("Freed share state after successful reclaim.\n");
+	}
+
+out:
+	share_states_unlock(&share_states);
+	return ret;
 }
 
 struct ffa_value plat_ffa_other_world_mem_reclaim(
@@ -1818,8 +1627,7 @@ struct ffa_value plat_ffa_other_world_mem_reclaim(
 
 	vm_to_from_lock = vm_lock_both(to, from);
 
-	ret = ffa_memory_other_world_reclaim(vm_to_from_lock.vm1,
-					     vm_to_from_lock.vm2, handle, flags,
+	ret = ffa_memory_other_world_reclaim(vm_to_from_lock.vm1, handle, flags,
 					     page_pool);
 
 	vm_unlock(&vm_to_from_lock.vm1);
