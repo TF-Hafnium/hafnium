@@ -686,3 +686,9 @@
  * Branch Target Identification mechanism support in AArch64 state.
  */
 #define ID_AA64PFR1_EL1_BT (UINT64_C(0xf) << 0)
+
+/**
+ * RME feature support.
+ */
+#define ID_AA64PFR0_EL1_RME_SHIFT 52
+#define ID_AA64PFR0_EL1_RME_MASK UINT64_C(0xf)

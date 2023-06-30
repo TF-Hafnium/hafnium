@@ -61,6 +61,15 @@ static inline bool is_arch_feat_bti_supported(void)
 }
 
 /**
+ * Returns true if the RME feature is implemented.
+ */
+static inline bool is_arch_feat_rme_supported(void)
+{
+	return ((read_msr(ID_AA64PFR0_EL1) >> ID_AA64PFR0_EL1_RME_SHIFT) &
+		ID_AA64PFR0_EL1_RME_MASK) != 0;
+}
+
+/**
  * Returns true if the SVE feature is implemented.
  */
 bool is_arch_feat_sve_supported(void);
