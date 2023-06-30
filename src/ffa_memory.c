@@ -113,46 +113,41 @@ void share_states_unlock(struct share_states_locked *share_states)
 
 /**
  * If the given handle is a valid handle for an allocated share state then
- * initialises `share_state_ret` to point to the share state and returns true.
- * Otherwise returns false.
+ * returns a pointer to the share state. Otherwise returns NULL.
  */
-bool get_share_state(struct share_states_locked share_states,
-		     ffa_memory_handle_t handle,
-		     struct ffa_memory_share_state **share_state_ret)
+struct ffa_memory_share_state *get_share_state(
+	struct share_states_locked share_states, ffa_memory_handle_t handle)
 {
 	struct ffa_memory_share_state *share_state;
-	uint64_t index;
 
 	assert(share_states.share_states != NULL);
-	assert(share_state_ret != NULL);
 
 	/*
 	 * First look for a share_state allocated by us, in which case the
 	 * handle is based on the index.
 	 */
 	if (plat_ffa_memory_handle_allocated_by_current_world(handle)) {
-		index = ffa_memory_handle_get_index(handle);
+		uint64_t index = ffa_memory_handle_get_index(handle);
+
 		if (index < MAX_MEM_SHARES) {
 			share_state = &share_states.share_states[index];
 			if (share_state->share_func != 0) {
-				*share_state_ret = share_state;
-				return true;
+				return share_state;
 			}
 		}
 	}
 
 	/* Fall back to a linear scan. */
-	for (index = 0; index < MAX_MEM_SHARES; ++index) {
+	for (uint64_t index = 0; index < MAX_MEM_SHARES; ++index) {
 		share_state = &share_states.share_states[index];
 		if (share_state->memory_region != NULL &&
 		    share_state->memory_region->handle == handle &&
 		    share_state->share_func != 0) {
-			*share_state_ret = share_state;
-			return true;
+			return share_state;
 		}
 	}
 
-	return false;
+	return NULL;
 }
 
 /** Marks a share state as unallocated. */
@@ -1593,7 +1588,8 @@ struct ffa_value ffa_memory_send_continue_validate(
 	 * Look up the share state by handle and make sure that the VM ID
 	 * matches.
 	 */
-	if (!get_share_state(share_states, handle, &share_state)) {
+	share_state = get_share_state(share_states, handle);
+	if (!share_state) {
 		dlog_verbose(
 			"Invalid handle %#x for memory send continuation.\n",
 			handle);
@@ -2382,7 +2378,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	}
 
 	share_states = share_states_lock();
-	if (!get_share_state(share_states, handle, share_state)) {
+	share_state = get_share_state(share_states, handle);
+	if (!share_state) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_RETRIEVE_REQ.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -2629,7 +2626,8 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	dump_share_states();
 
 	share_states = share_states_lock();
-	if (!get_share_state(share_states, handle, &share_state)) {
+	share_state = get_share_state(share_states, handle);
+	if (!share_state) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_FRAG_RX.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -2808,7 +2806,8 @@ struct ffa_value ffa_memory_relinquish(
 	dump_share_states();
 
 	share_states = share_states_lock();
-	if (!get_share_state(share_states, handle, &share_state)) {
+	share_state = get_share_state(share_states, handle);
+	if (!share_state) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_RELINQUISH.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -2924,14 +2923,14 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 
 	share_states = share_states_lock();
 
-	if (get_share_state(share_states, handle, &share_state)) {
-		memory_region = share_state->memory_region;
-	} else {
+	share_state = get_share_state(share_states, handle);
+	if (!share_state) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_RECLAIM.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
+	memory_region = share_state->memory_region;
 
 	CHECK(memory_region != NULL);
 

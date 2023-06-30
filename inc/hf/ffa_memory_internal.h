@@ -124,6 +124,8 @@ struct ffa_memory_share_state *allocate_share_state(
 	ffa_memory_handle_t handle);
 struct share_states_locked share_states_lock(void);
 void share_states_unlock(struct share_states_locked *share_states);
+struct ffa_memory_share_state *get_share_state(
+	struct share_states_locked share_states, ffa_memory_handle_t handle);
 void share_state_free(struct share_states_locked share_states,
 		      struct ffa_memory_share_state *share_state,
 		      struct mpool *page_pool);
