@@ -57,3 +57,4 @@ struct ffa_value smc_forward(uint32_t func, uint64_t arg0, uint64_t arg1,
 			     uint64_t arg5, uint32_t caller_id);
 
 struct ffa_value smc_ffa_call(struct ffa_value args);
+struct ffa_value smc_ffa_call_ext(struct ffa_value args);

@@ -18,6 +18,7 @@
  */
 int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
 struct ffa_value ffa_call(struct ffa_value args);
+struct ffa_value ffa_call_ext(struct ffa_value args);
 void memcpy_s(void *dest, size_t destsz, const void *src, size_t count);
 
 /**
@@ -50,7 +51,7 @@ static inline struct ffa_value ffa_partition_info_get_regs(
 	uint64_t arg2 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
 	uint64_t arg3 = start_index | (uint64_t)tag << 16;
 
-	return ffa_call((struct ffa_value){
+	return ffa_call_ext((struct ffa_value){
 		.func = FFA_PARTITION_INFO_GET_REGS_64,
 		.arg1 = arg1,
 		.arg2 = arg2,

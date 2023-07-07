@@ -65,3 +65,8 @@ struct ffa_value arch_other_world_call(struct ffa_value args)
 {
 	return smc_ffa_call(args);
 }
+
+struct ffa_value arch_other_world_call_ext(struct ffa_value args)
+{
+	return smc_ffa_call_ext(args);
+}

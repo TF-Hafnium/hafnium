@@ -868,7 +868,7 @@ static struct ffa_value plat_ffa_partition_info_get_regs(
 	uint64_t arg2 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
 	uint64_t arg3 = start_index | (uint64_t)tag << 16;
 
-	return arch_other_world_call((struct ffa_value){
+	return arch_other_world_call_ext((struct ffa_value){
 		.func = FFA_PARTITION_INFO_GET_REGS_64,
 		.arg1 = arg1,
 		.arg2 = arg2,
