@@ -1,37 +1,14 @@
 /*
- * Copyright 2019 The Hafnium Authors.
+ * Copyright 2023 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stdint.h>
+#include "hf/ffa.h"
 
-#include "vmapi/hf/call.h"
-#include "vmapi/hf/ffa.h"
-
-#include "smc.h"
 #include "test/hftest.h"
-
-/**
- * Checks that calling FFA_FEATURES via an SMC works as expected.
- * The ffa_features helper function uses an HVC, but an SMC should also work.
- */
-TEST(smccc, ffa_features_smc)
-{
-	struct ffa_value ret;
-
-	ret = smc32(FFA_FEATURES_32, FFA_VERSION_32, 0, 0, 0, 0, 0, 0);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-	EXPECT_EQ(ret.arg1, 0);
-	EXPECT_EQ(ret.arg2, 0);
-	EXPECT_EQ(ret.arg3, 0);
-	EXPECT_EQ(ret.arg4, 0);
-	EXPECT_EQ(ret.arg5, 0);
-	EXPECT_EQ(ret.arg6, 0);
-	EXPECT_EQ(ret.arg7, 0);
-}
 
 static struct ffa_value test_ffa_smc(uint32_t func, uint64_t arg0,
 				     uint64_t arg1, uint64_t arg2,
@@ -111,16 +88,16 @@ static struct ffa_value test_ffa_smc(uint32_t func, uint64_t arg0,
 }
 
 /**
- * An FF-A service call is emitted at the secure physical FF-A instance.
+ * An FF-A service call is emitted at the NS virtual FF-A instance.
  * The service does not require results in registers beyond x7, hence per
  * SMCCCv1.2 ensure GP registers beyond x7 are preserved by callee.
  */
-TEST(smccc, smccc_regs_callee_preserved)
+TEST(arch, smccc_nwd_regs_callee_preserved)
 {
 	struct ffa_value ret;
 
 	ret = test_ffa_smc(FFA_VERSION_32, 0x10001, 0, 0, 0, 0, 0, 0);
-	EXPECT_EQ(ret.func, 0x10001);
+	EXPECT_GE(ret.func, 0x10001);
 	EXPECT_EQ(ret.arg1, 0x0);
 	EXPECT_EQ(ret.arg2, 0x0);
 	EXPECT_EQ(ret.arg3, 0x0);
@@ -132,7 +109,7 @@ TEST(smccc, smccc_regs_callee_preserved)
 	ret = test_ffa_smc(FFA_ID_GET_32, 0, 0, 0, 0, 0, 0, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	EXPECT_EQ(ret.arg1, 0x0);
-	EXPECT_EQ(ret.arg2, 1);
+	EXPECT_EQ(ret.arg2, 0x1);
 	EXPECT_EQ(ret.arg3, 0x0);
 	EXPECT_EQ(ret.arg4, 0x0);
 	EXPECT_EQ(ret.arg5, 0x0);
