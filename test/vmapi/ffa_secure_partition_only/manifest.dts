@@ -15,6 +15,8 @@
 			debug_name = "ffa_secure_partition";
 			vcpu_count = <8>;
 			mem_size = <1048576>;
+			/* Required by arch.smccc_forward test: */
+			smc_whitelist = <0x82000010>;
 		};
 	};
 };
