@@ -1074,8 +1074,8 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 
 	if (atomic_load_explicit(&vcpu->vm->aborting, memory_order_relaxed)) {
 		if (vcpu->state != VCPU_STATE_ABORTED) {
-			dlog_notice("Aborting VM %#x vCPU %u\n", vcpu->vm->id,
-				    vcpu_index(vcpu));
+			dlog_verbose("VM %#x was aborted, cannot run vCPU %u\n",
+				     vcpu->vm->id, vcpu_index(vcpu));
 			vcpu->state = VCPU_STATE_ABORTED;
 		}
 		*run_ret = ffa_error(FFA_ABORTED);
@@ -2713,9 +2713,10 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
 	if (atomic_load_explicit(&receiver_vcpu->vm->aborting,
 				 memory_order_relaxed)) {
 		if (receiver_vcpu->state != VCPU_STATE_ABORTED) {
-			dlog_notice("Aborting VM %#x vCPU %u\n",
-				    receiver_vcpu->vm->id,
-				    vcpu_index(receiver_vcpu));
+			dlog_verbose(
+				"Receiver VM %#x aborted, cannot run vCPU %u\n",
+				receiver_vcpu->vm->id,
+				vcpu_index(receiver_vcpu));
 			receiver_vcpu->state = VCPU_STATE_ABORTED;
 		}
 

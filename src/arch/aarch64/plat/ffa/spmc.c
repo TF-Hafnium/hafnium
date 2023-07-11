@@ -2004,7 +2004,8 @@ bool plat_ffa_is_secondary_ep_register_supported(void)
 	return true;
 }
 
-static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
+static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next,
+			 bool current_booted)
 {
 	static bool spmc_booted = false;
 	struct vcpu *vcpu_next = NULL;
@@ -2016,9 +2017,12 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 
 	assert(current->rt_model == RTM_SP_INIT);
 
-	/* vCPU has just returned from successful initialization. */
-	dlog_notice("Initialized VM: %#x, boot_order: %u\n", current->vm->id,
-		    current->vm->boot_order);
+	if (current_booted) {
+		/* vCPU has just returned from successful initialization. */
+		dlog_info("Initialized VM: %#x, boot_order: %u\n",
+			  current->vm->id, current->vm->boot_order);
+	}
+
 	current->state = VCPU_STATE_WAITING;
 
 	/*
@@ -2191,7 +2195,7 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 		(struct ffa_value){.func = FFA_INTERRUPT_32};
 	struct vcpu *current = current_locked.vcpu;
 
-	if (sp_boot_next(current_locked, next)) {
+	if (sp_boot_next(current_locked, next, true)) {
 		return ret_args;
 	}
 
@@ -2762,7 +2766,7 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 		atomic_store_explicit(&current->vm->aborting, true,
 				      memory_order_relaxed);
 
-		if (sp_boot_next(current_locked, next)) {
+		if (sp_boot_next(current_locked, next, false)) {
 			ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 			goto out;
 		}
