@@ -369,6 +369,7 @@ static struct ffa_value constituents_get_mode(
 		 * Fail if there are no constituents. Otherwise we would get an
 		 * uninitialised *orig_mode.
 		 */
+		dlog_verbose("%s: no constituents\n", __func__);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -382,6 +383,8 @@ static struct ffa_value constituents_get_mode(
 			/* Fail if addresses are not page-aligned. */
 			if (!is_aligned(ipa_addr(begin), PAGE_SIZE) ||
 			    !is_aligned(ipa_addr(end), PAGE_SIZE)) {
+				dlog_verbose("%s: addresses not page-aligned\n",
+					     __func__);
 				return ffa_error(FFA_INVALID_PARAMETERS);
 			}
 
@@ -390,6 +393,10 @@ static struct ffa_value constituents_get_mode(
 			 * mapped with the same mode.
 			 */
 			if (!vm_mem_get_mode(vm, begin, end, &current_mode)) {
+				dlog_verbose(
+					"%s: constituent memory range %#x..%#x "
+					"not mapped with the same mode\n",
+					__func__, begin, end);
 				return ffa_error(FFA_DENIED);
 			}
 
@@ -401,9 +408,9 @@ static struct ffa_value constituents_get_mode(
 				*orig_mode = current_mode;
 			} else if (current_mode != *orig_mode) {
 				dlog_verbose(
-					"Expected mode %#x but was %#x for %d "
-					"pages at %#x.\n",
-					*orig_mode, current_mode,
+					"%s: expected mode %#x but was %#x for "
+					"%d pages at %#x.\n",
+					__func__, *orig_mode, current_mode,
 					fragments[i][j].page_count,
 					ipa_addr(begin));
 				return ffa_error(FFA_DENIED);
