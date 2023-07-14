@@ -919,13 +919,12 @@ static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
 {
 	ffa_vm_id_t vm_id = vm_locked.vm->id;
 	int32_t error_code_to_ret = 0;
-	bool ret = false;
 
 	switch (vm_locked.vm->mailbox.state) {
 	case MAILBOX_STATE_EMPTY:
 		dlog_verbose("Mailbox of %x is empty.\n", vm_id);
 		error_code_to_ret = FFA_DENIED;
-		goto out;
+		break;
 	case MAILBOX_STATE_FULL:
 		/* Check it doesn't have pending RX full notifications. */
 		if (vm_are_fwk_notifications_pending(vm_locked)) {
@@ -934,7 +933,6 @@ static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
 				"messages.\n",
 				vm_id);
 			error_code_to_ret = FFA_DENIED;
-			goto out;
 		}
 		break;
 	case MAILBOX_STATE_OTHER_WORLD_OWNED:
@@ -949,19 +947,20 @@ static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
 				"Mailbox of endpoint %x in a wrongful state.\n",
 				vm_id);
 			error_code_to_ret = FFA_ABORTED;
-			goto out;
 		}
 		break;
 	}
 
-	vm_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
-	ret = true;
-out:
-	if (error_code != NULL) {
-		*error_code = error_code_to_ret;
+	if (error_code_to_ret != 0) {
+		if (error_code != NULL) {
+			*error_code = error_code_to_ret;
+		}
+		return false;
 	}
 
-	return ret;
+	vm_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
+
+	return true;
 }
 
 struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
