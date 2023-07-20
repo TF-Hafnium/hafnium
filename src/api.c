@@ -2437,6 +2437,14 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
 	}
 
+	if ((requested_version >> FFA_VERSION_MAJOR_OFFSET) !=
+		    FFA_VERSION_MAJOR ||
+	    requested_version > FFA_VERSION_COMPILED) {
+		dlog_error("Version %x incompatible with %x\n",
+			   requested_version, FFA_VERSION_COMPILED);
+		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
+	}
+
 	current_vm_locked = vm_lock(current->vm);
 	current_vm_locked.vm->ffa_version = requested_version;
 	vm_unlock(&current_vm_locked);

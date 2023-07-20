@@ -7,6 +7,7 @@
  */
 
 #include <stdalign.h>
+#include <stdint.h>
 
 #include "hf/arch/vm/power_mgmt.h"
 
@@ -165,15 +166,17 @@ TEST(ffa, ffa_version)
 {
 	const uint16_t major_revision = 1;
 	const uint16_t minor_revision = 1;
-	const int32_t current_version =
+	const uint32_t current_version =
 		(int32_t)MAKE_FFA_VERSION(major_revision, minor_revision);
+	const int32_t older_compatible_version = MAKE_FFA_VERSION(1, 0);
 
 	EXPECT_EQ(ffa_version(current_version), current_version);
-	EXPECT_EQ(ffa_version(0x0), current_version);
-	EXPECT_EQ(ffa_version(0x1), current_version);
-	EXPECT_EQ(ffa_version(0x10003), current_version);
-	EXPECT_EQ(ffa_version(0xffff), current_version);
-	EXPECT_EQ(ffa_version(0xfffffff), current_version);
+	EXPECT_EQ(ffa_version(older_compatible_version), current_version);
+	EXPECT_EQ(ffa_version(0x0), (int32_t)FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0x1), (int32_t)FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0x10003), (int32_t)FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0xffff), (int32_t)FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0xfffffff), (int32_t)FFA_NOT_SUPPORTED);
 }
 
 /** Ensures that an invalid call to FFA_VERSION gets an error back. */
