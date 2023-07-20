@@ -875,6 +875,11 @@ typedef uint32_t ffa_memory_region_flags_t;
  */
 #define FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH 0x4
 
+/**
+ * On retrieve request, bypass the multi-borrower check.
+ */
+#define FFA_MEMORY_REGION_FLAG_BYPASS_BORROWERS_CHECK (0x1U << 10)
+
 #define FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK ((0x3U) << 3)
 #define FFA_MEMORY_REGION_TRANSACTION_TYPE_UNSPECIFIED ((0x0U) << 3)
 #define FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE ((0x1U) << 3)

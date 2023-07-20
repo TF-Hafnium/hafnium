@@ -17,8 +17,10 @@
 #include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/ffa.h"
 #include "hf/ffa_internal.h"
 #include "hf/ffa_memory_internal.h"
+#include "hf/ffa_partition_manifest.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/std.h"
@@ -2071,7 +2073,11 @@ static bool ffa_memory_retrieve_is_memory_access_valid(
  * specified by the lender.
  * In the `permissions` argument returns the permissions to set at S2 for the
  * caller to the FFA_MEMORY_RETRIEVE_REQ.
- * Returns FFA_SUCCESS if all specified permissions are valid.
+ * The function looks into the flag to bypass multiple borrower checks:
+ * - If not set returns FFA_SUCCESS if all specified permissions are valid.
+ * - If set returns FFA_SUCCESS if the descriptor contains the permissions
+ *   to the caller of FFA_MEM_RETRIEVE_REQ and they are valid. Other permissions
+ *   are ignored, if provided.
  */
 static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	struct ffa_memory_region *memory_region,
@@ -2079,14 +2085,28 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	ffa_memory_access_permissions_t *permissions)
 {
 	uint32_t retrieve_receiver_index;
+	bool bypass_multi_receiver_check =
+		(retrieve_request->flags &
+		 FFA_MEMORY_REGION_FLAG_BYPASS_BORROWERS_CHECK) != 0U;
 
 	assert(permissions != NULL);
 
-	if (retrieve_request->receiver_count != memory_region->receiver_count) {
-		dlog_verbose(
-			"Retrieve request should contain same list of "
-			"borrowers, as specified by the lender.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
+	if (!bypass_multi_receiver_check) {
+		if (retrieve_request->receiver_count !=
+		    memory_region->receiver_count) {
+			dlog_verbose(
+				"Retrieve request should contain same list of "
+				"borrowers, as specified by the lender.\n");
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+	} else {
+		if (retrieve_request->receiver_count != 1) {
+			dlog_verbose(
+				"Set bypass multiple borrower check, receiver "
+				"list must be sized 1 (%x)\n",
+				memory_region->receiver_count);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
 	}
 
 	retrieve_receiver_index = retrieve_request->receiver_count;
@@ -2103,6 +2123,13 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 		ffa_vm_id_t current_receiver_id =
 			current_receiver->receiver_permissions.receiver;
 		bool found_to_id = current_receiver_id == to_vm_id;
+
+		if (bypass_multi_receiver_check && !found_to_id) {
+			dlog_verbose(
+				"Bypass multiple borrower check for id %x.\n",
+				current_receiver_id);
+			continue;
+		}
 
 		/*
 		 * Find the current receiver in the transaction descriptor from
