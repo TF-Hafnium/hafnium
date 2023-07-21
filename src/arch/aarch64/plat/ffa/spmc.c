@@ -11,6 +11,7 @@
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/sve.h"
+#include "hf/arch/vmid_base.h"
 
 #include "hf/api.h"
 #include "hf/dlog.h"
@@ -1361,37 +1362,13 @@ out:
 	return target_vcpu;
 }
 
-/**
- * TODO: The current design makes the assumption that the target vCPU
- * of a secure interrupt is pinned to the same physical CPU on which the
- * secure interrupt triggered. The target vCPU has to be resumed on the current
- * CPU in order for it to service the virtual interrupt. This design limitation
- * simplifies the interrupt management implementation in SPMC.
- */
-static struct vcpu_locked plat_ffa_secure_interrupt_prepare(
-	struct vcpu_locked current_locked, uint32_t *int_id)
+void plat_ffa_secure_interrupt_inject(struct vcpu_locked current_locked,
+				      struct vcpu_locked target_vcpu_locked,
+				      uint32_t id)
 {
-	struct vcpu_locked target_vcpu_locked;
-	struct vcpu *target_vcpu;
-	struct vcpu *current = current_locked.vcpu;
-	uint32_t id;
 	uint8_t priority_mask;
-	struct two_vcpu_locked vcpus_locked;
-
-	/* Find pending interrupt id. This also activates the interrupt. */
-	id = plat_interrupts_get_pending_interrupt_id();
-
-	target_vcpu = plat_ffa_find_target_vcpu(current, id);
-
-	if (target_vcpu == current) {
-		current_locked = vcpu_lock(current);
-		target_vcpu_locked = current_locked;
-	} else {
-		/* Lock both vCPUs at once to avoid deadlock. */
-		vcpus_locked = vcpu_lock_both(current, target_vcpu);
-		current_locked = vcpus_locked.vcpu1;
-		target_vcpu_locked = vcpus_locked.vcpu2;
-	}
+	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
+	struct vcpu *current = current_locked.vcpu;
 
 	/* Update the state of current vCPU if it belongs to an SP. */
 	if (vm_id_is_current_world(current->vm->id)) {
@@ -1424,8 +1401,6 @@ static struct vcpu_locked plat_ffa_secure_interrupt_prepare(
 	/* TODO: check api_interrupt_inject_locked return value. */
 	(void)api_interrupt_inject_locked(target_vcpu_locked, id,
 					  current_locked, NULL);
-	*int_id = id;
-	return target_vcpu_locked;
 }
 
 /**
@@ -1650,51 +1625,73 @@ static void plat_ffa_signal_secure_interrupt_sp(
 }
 
 /**
- * Obtain the Self S-Int/Other S-Int physical interrupt ID from the interrupt
- * controller and inject the corresponding virtual interrupt to the target vCPU
- * for handling.
+ * Obtain the physical interrupt that triggered from the interrupt controller,
+ * and inject the corresponding virtual interrupt to the target vCPU.
+ * When PEs executing in the Normal World, and secure interrupts trigger,
+ * execution is trapped into EL3. SPMD then routes the interrupt to SPMC
+ * through FFA_INTERRUPT_32 ABI synchronously using eret conduit.
+ * TODO: The current design makes the assumption that the target vCPU
+ * of a secure interrupt is pinned to the same physical CPU on which the
+ * secure interrupt triggered. The target vCPU has to be resumed on the current
+ * CPU in order for it to service the virtual interrupt. This design limitation
+ * simplifies the interrupt management implementation in SPMC.
  */
-static struct ffa_value plat_ffa_handle_secure_interrupt_secure_world(
-	struct vcpu *current, struct vcpu **next)
+struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
+						  struct vcpu **next)
 {
-	struct vcpu_locked target_vcpu_locked;
-	struct vcpu_locked current_locked = {
-		.vcpu = current,
-	};
+	struct vcpu *target_vcpu;
+	struct vcpu_locked target_vcpu_locked =
+		(struct vcpu_locked){.vcpu = NULL};
+	struct vcpu_locked current_locked;
+	struct two_vcpu_locked vcpus_locked;
 	struct ffa_value ffa_ret = ffa_error(FFA_NOT_SUPPORTED);
 	uint32_t id;
-	bool is_el0_partition;
 
-	/* Secure interrupt triggered while execution is in SWd. */
-	CHECK(vm_id_is_current_world(current->vm->id));
-	target_vcpu_locked =
-		plat_ffa_secure_interrupt_prepare(current_locked, &id);
-	is_el0_partition = target_vcpu_locked.vcpu->vm->el0_partition;
+	/* Find pending interrupt id. This also activates the interrupt. */
+	id = plat_interrupts_get_pending_interrupt_id();
 
-	if (current == target_vcpu_locked.vcpu && !is_el0_partition) {
-		/*
-		 * A scenario where target vCPU is the current vCPU in secure
-		 * world. This is when a vCPU belonging to an S-EL1 SP gets
-		 * preempted by a Self S-Int while it was in RUNNING state.
-		 * Note that an S-EL0 SP can handle a secure virtual interrupt
-		 * only when its in WAITING state.
-		 */
-		*next = NULL;
+	target_vcpu = plat_ffa_find_target_vcpu(current, id);
 
-		/* We have already locked vCPU. */
-		current->state = VCPU_STATE_RUNNING;
+	if (target_vcpu == current) {
+		current_locked = vcpu_lock(current);
+
+		plat_ffa_secure_interrupt_inject(current_locked, current_locked,
+						 id);
+
 		/*
-		 * Refer the embedded comment in vcpu.h file for description of
-		 * this variable.
+		 * Note: an S-EL0 partition can only handle secure interrupt
+		 * whilst in WAITING state; which for this case always means
+		 * target_vcpu != current vcpu.
 		 */
-		current->implicit_completion_signal = true;
-		/*
-		 * In scenario where target vCPU is the current vCPU in
-		 * secure world, there is no vCPU to resume when target
-		 * vCPU exits after secure interrupt completion.
-		 */
-		current->preempted_vcpu = NULL;
+		if (!current->vm->el0_partition) {
+			*next = NULL;
+
+			current->state = VCPU_STATE_RUNNING;
+			/*
+			 * Getting here means the target SP was preempted whilst
+			 * RUNNING, and sits at S-EL1.
+			 * In this case the it needs to signal completion
+			 * of secure interrupt implicitly.
+			 * Refer to the embedded comment in vcpu.h file
+			 * for the description of this variable.
+			 */
+			current->implicit_completion_signal = true;
+
+			/*
+			 * If the target vCPU is the running vCPU, no other
+			 * context needs to be resumed on interrupt completion.
+			 */
+			current->preempted_vcpu = NULL;
+		}
 	} else {
+		/* Lock both vCPUs at once to avoid deadlock. */
+		vcpus_locked = vcpu_lock_both(current, target_vcpu);
+		current_locked = vcpus_locked.vcpu1;
+		target_vcpu_locked = vcpus_locked.vcpu2;
+
+		plat_ffa_secure_interrupt_inject(current_locked,
+						 target_vcpu_locked, id);
+
 		plat_ffa_signal_secure_interrupt_sp(
 			current_locked, target_vcpu_locked, id, next, false);
 
@@ -1703,85 +1700,32 @@ static struct ffa_value plat_ffa_handle_secure_interrupt_secure_world(
 		 * processing interrupt, resume the current vCPU.
 		 */
 		if (*next == NULL) {
+			/*
+			 * If next is NULL, it means the SPMC can't resume
+			 * the SP. If the normal world has been preempted,
+			 * use FFA_NORMAL_WORLD_RESUME for SPMD to give
+			 * execution back to the Normal World.
+			 */
+			if (current->vm->id == HF_OTHER_WORLD_ID) {
+				ffa_ret = (struct ffa_value){
+					.func = FFA_NORMAL_WORLD_RESUME};
+			}
 			target_vcpu_locked.vcpu->preempted_vcpu = NULL;
 		} else {
 			target_vcpu_locked.vcpu->preempted_vcpu = current;
 		}
 	}
 
-	target_vcpu_locked.vcpu->processing_secure_interrupt = true;
-	target_vcpu_locked.vcpu->current_sec_interrupt_id = id;
+	target_vcpu->processing_secure_interrupt = true;
+	target_vcpu->current_sec_interrupt_id = id;
 
-	if (current != target_vcpu_locked.vcpu) {
+	if (target_vcpu_locked.vcpu != NULL) {
 		vcpu_unlock(&target_vcpu_locked);
 	}
+
 	vcpu_unlock(&current_locked);
 
 	return ffa_ret;
-}
-
-/**
- * Secure interrupts in the normal world are trapped to EL3. SPMD then routes
- * the interrupt to SPMC through FFA_INTERRUPT_32 ABI synchronously using eret
- * conduit.
- */
-static struct ffa_value plat_ffa_handle_secure_interrupt_from_normal_world(
-	struct vcpu *current, struct vcpu **next)
-{
-	struct ffa_value ffa_ret = ffa_error(FFA_NOT_SUPPORTED);
-	uint32_t id;
-	struct vcpu_locked target_vcpu_locked;
-	struct vcpu_locked current_locked = {
-		.vcpu = current,
-	};
-
-	/*
-	 * A malicious SP could invoke a HVC call with FFA_INTERRUPT_32 as
-	 * the function argument. Return error to avoid DoS.
-	 */
-	if (current->vm->id != HF_OTHER_WORLD_ID) {
-		return ffa_error(FFA_DENIED);
-	}
-
-	target_vcpu_locked =
-		plat_ffa_secure_interrupt_prepare(current_locked, &id);
-
-	plat_ffa_signal_secure_interrupt_sp(current_locked, target_vcpu_locked,
-					    id, next, true);
-	/*
-	 * current refers to other world. target must be a vCPU in the secure
-	 * world.
-	 */
-	CHECK(*next != current);
-
-	target_vcpu_locked.vcpu->processing_secure_interrupt = true;
-	target_vcpu_locked.vcpu->current_sec_interrupt_id = id;
-
-	/*
-	 * *next==NULL represents a scenario where SPMC cannot resume target SP.
-	 * Resume normal world using FFA_NORMAL_WORLD_RESUME.
-	 */
-	if (*next == NULL) {
-		ffa_ret = (struct ffa_value){.func = FFA_NORMAL_WORLD_RESUME};
-		target_vcpu_locked.vcpu->preempted_vcpu = NULL;
-	} else {
-		target_vcpu_locked.vcpu->preempted_vcpu = current;
-	}
-	vcpu_unlock(&target_vcpu_locked);
-	vcpu_unlock(&current_locked);
-
-	return ffa_ret;
-}
-
-struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
-						  struct vcpu **next,
-						  bool from_normal_world)
-{
-	if (from_normal_world) {
-		return plat_ffa_handle_secure_interrupt_from_normal_world(
-			current, next);
-	}
-	return plat_ffa_handle_secure_interrupt_secure_world(current, next);
 }
 
 /**

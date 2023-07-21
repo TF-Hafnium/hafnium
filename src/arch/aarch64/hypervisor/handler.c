@@ -14,6 +14,7 @@
 #include "hf/arch/mmu.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/smc.h"
+#include "hf/arch/vmid_base.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
@@ -705,7 +706,16 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_notification_info_get(current);
 		return true;
 	case FFA_INTERRUPT_32:
-		*args = plat_ffa_handle_secure_interrupt(current, next, true);
+		/*
+		 * A malicious SP could invoke a HVC/SMC call with
+		 * FFA_INTERRUPT_32 as the function argument. Return error to
+		 * avoid DoS.
+		 */
+		if (current->vm->id != HF_OTHER_WORLD_ID) {
+			*args = ffa_error(FFA_DENIED);
+			return true;
+		}
+		*args = plat_ffa_handle_secure_interrupt(current, next);
 		return true;
 	case FFA_CONSOLE_LOG_32:
 	case FFA_CONSOLE_LOG_64:
@@ -1052,7 +1062,7 @@ struct vcpu *irq_lower(void)
 #if SECURE_WORLD == 1
 	struct vcpu *next = NULL;
 
-	plat_ffa_handle_secure_interrupt(current(), &next, false);
+	plat_ffa_handle_secure_interrupt(current(), &next);
 
 	/*
 	 * Since we are in interrupt context, set the bit for the
