@@ -146,6 +146,14 @@ struct ffa_value sp_get_last_interrupt_cmd(ffa_id_t test_source)
 			  exception_handler_get_last_interrupt());
 }
 
+struct ffa_value sp_clear_last_interrupt_cmd(ffa_id_t test_source)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+
+	exception_handler_set_last_interrupt(HF_INVALID_INTID);
+	return sp_success(own_id, test_source, 0);
+}
+
 static bool is_expected_sp_response(struct ffa_value ret,
 				    uint32_t expected_resp, uint32_t arg)
 {
@@ -248,4 +256,20 @@ struct ffa_value sp_yield_secure_interrupt_handling_cmd(ffa_id_t source,
 
 	yield_while_handling_sec_interrupt = yield;
 	return sp_success(own_id, source, 0);
+}
+
+struct ffa_value sp_route_interrupt_to_target_vcpu_cmd(
+	ffa_id_t source, ffa_vcpu_index_t target_vcpu_id, uint32_t int_id)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+
+	/* Change target vCPU for the trusted watchdog interrupt. */
+	if (hf_interrupt_reconfigure_target_cpu(int_id, target_vcpu_id) == 0) {
+		return sp_success(own_id, source, 0);
+	}
+
+	HFTEST_LOG(
+		"Request to route trusted wdog interrupt to target vCPU "
+		"denied\n");
+	return sp_error(own_id, source, 0);
 }

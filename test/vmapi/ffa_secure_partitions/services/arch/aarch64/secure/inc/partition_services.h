@@ -354,6 +354,20 @@ static inline struct ffa_value sp_get_last_interrupt_cmd_send(ffa_id_t source,
 struct ffa_value sp_get_last_interrupt_cmd(ffa_id_t source);
 
 /**
+ * Request SP to clear the last serviced secure virtual interrupt.
+ */
+#define SP_CLEAR_LAST_INTERRUPT_CMD (SP_LAST_INTERRUPT_SERVICED_CMD + 1)
+
+static inline struct ffa_value sp_clear_last_interrupt_cmd_send(ffa_id_t source,
+								ffa_id_t dest)
+{
+	return ffa_msg_send_direct_req(source, dest,
+				       SP_CLEAR_LAST_INTERRUPT_CMD, 0, 0, 0, 0);
+}
+
+struct ffa_value sp_clear_last_interrupt_cmd(ffa_id_t source);
+
+/**
  * Command to request SP to sleep for the given time in ms.
  *
  * The command id is the hex representation of string "slep".
@@ -462,3 +476,22 @@ static inline struct ffa_value sp_yield_secure_interrupt_handling_cmd_send(
 
 struct ffa_value sp_yield_secure_interrupt_handling_cmd(ffa_id_t source,
 							bool yield);
+
+/**
+ * Command to request an SP to reconfigure the secure interrupt to be targetted
+ * to a given vCPU identified by its linear id.
+ * The command id is the hex representaton of the string "RSTV".
+ */
+#define SP_ROUTE_SEC_INT_TARGET_VCPU_CMD 0x52535456U
+
+static inline struct ffa_value sp_route_interrupt_to_target_vcpu_cmd_send(
+	ffa_id_t source, ffa_id_t dest, ffa_vcpu_index_t target_vcpu_id,
+	uint32_t int_id)
+{
+	return ffa_msg_send_direct_req(source, dest,
+				       SP_ROUTE_SEC_INT_TARGET_VCPU_CMD,
+				       target_vcpu_id, int_id, 0, 0);
+}
+
+struct ffa_value sp_route_interrupt_to_target_vcpu_cmd(
+	ffa_id_t source, ffa_vcpu_index_t target_vcpu_id, uint32_t int_id);

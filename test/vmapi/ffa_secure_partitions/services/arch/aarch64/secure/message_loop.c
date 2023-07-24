@@ -75,6 +75,9 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_LAST_INTERRUPT_SERVICED_CMD:
 		res = sp_get_last_interrupt_cmd(ffa_sender(res));
 		break;
+	case SP_CLEAR_LAST_INTERRUPT_CMD:
+		res = sp_clear_last_interrupt_cmd(ffa_sender(res));
+		break;
 	case SP_SLEEP_CMD:
 		res = sp_sleep_cmd(ffa_sender(res), sp_get_sleep_time(res));
 		break;
@@ -89,6 +92,11 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_YIELD_SEC_INTERRUPT_HANDLING_CMD:
 		res = sp_yield_secure_interrupt_handling_cmd(ffa_sender(res),
 							     res.arg4);
+		break;
+	case SP_ROUTE_SEC_INT_TARGET_VCPU_CMD:
+		res = sp_route_interrupt_to_target_vcpu_cmd(
+			ffa_sender(res), (ffa_vcpu_index_t)res.arg4,
+			(uint32_t)res.arg5);
 		break;
 	default:
 		HFTEST_LOG_FAILURE();

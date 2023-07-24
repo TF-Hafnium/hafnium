@@ -426,6 +426,25 @@ static inline int64_t hf_interrupt_inject(ffa_id_t target_vm_id,
 		       intid);
 }
 
+/**
+ * Reconfigure the virtual interrupt belonging to the current SP. Note that the
+ * virtual interrupt is identity mapped to the physical interrupt id.
+ *
+ * Returns -1 on failure, or 0 on success.
+ */
+static inline int64_t hf_interrupt_reconfigure(uint32_t intid, uint32_t command,
+					       uint32_t value)
+{
+	return hf_call(HF_INTERRUPT_RECONFIGURE, intid, command, value);
+}
+
+static inline int64_t hf_interrupt_reconfigure_target_cpu(
+	uint32_t intid, ffa_vcpu_index_t target_cpu_index)
+{
+	return hf_interrupt_reconfigure(intid, INT_RECONFIGURE_TARGET_PE,
+					(uint32_t)target_cpu_index);
+}
+
 /** Obtains the Hafnium's version of the implemented FF-A specification. */
 static inline int32_t ffa_version(uint32_t requested_version)
 {
