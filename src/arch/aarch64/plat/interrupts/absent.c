@@ -82,3 +82,8 @@ void plat_interrupts_send_sgi(uint32_t id, struct cpu *cpu,
 	(void)cpu;
 	(void)to_this_security_state;
 }
+
+void plat_interrupts_reconfigure_interrupt(struct interrupt_descriptor int_desc)
+{
+	(void)int_desc;
+}

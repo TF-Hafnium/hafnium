@@ -677,12 +677,31 @@ void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 				   gic_affinity_val);
 	}
 
-	/* Enable the interrupt now. */
-	gicv3_enable_interrupt(intr_num, core_idx);
+	if (int_desc.enabled) {
+		/* Enable the interrupt now. */
+		gicv3_enable_interrupt(intr_num, core_idx);
+	}
 }
 
 void plat_interrupts_send_sgi(uint32_t id, struct cpu *cpu,
 			      bool to_this_security_state)
 {
 	gicv3_send_sgi(id, false, cpu->id, to_this_security_state);
+}
+
+/**
+ * Reconfigure the interrupt based on the interrupt descriptor.
+ */
+void plat_interrupts_reconfigure_interrupt(struct interrupt_descriptor int_desc)
+{
+	assert(int_desc.valid);
+
+	gicv3_disable_interrupt(interrupt_desc_get_id(int_desc),
+				find_core_pos());
+
+	/*
+	 * Interrupt already disabled above. Proceed to (re)configure the
+	 * interrupt and enable it, if permitted.
+	 */
+	plat_interrupts_configure_interrupt(int_desc);
 }

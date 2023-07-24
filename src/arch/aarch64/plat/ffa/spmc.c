@@ -2860,6 +2860,8 @@ int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
 	}
 
 	ret = 0;
+	plat_interrupts_reconfigure_interrupt(*int_desc);
+
 out_unlock:
 	vm_unlock(&vm_locked);
 
