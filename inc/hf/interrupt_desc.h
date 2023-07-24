@@ -50,6 +50,13 @@ static inline void interrupt_bitmap_clear_value(struct interrupt_bitmap *bitmap,
 
 	bitmap->bitmap[index] &= ~(1U << shift);
 }
+
+/**
+ * Legal values to change the security state of an interrupt.
+ */
+#define INT_SEC_STATE_NS 0
+#define INT_SEC_STATE_S 1
+
 /**
  * Attributes encoding in the manifest:
 

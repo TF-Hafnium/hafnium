@@ -26,4 +26,8 @@
 /* Custom FF-A-like calls returned from FFA_RUN. */
 #define HF_FFA_RUN_WAIT_FOR_INTERRUPT 0xff06
 
+/* Possible commands that reconfigure an interrupt. */
+#define INT_RECONFIGURE_TARGET_PE 0
+#define INT_RECONFIGURE_SEC_STATE 1
+
 /* clang-format on */

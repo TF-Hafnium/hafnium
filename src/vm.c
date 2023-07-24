@@ -988,7 +988,7 @@ void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu)
  * Obtain the interrupt descriptor entry of the specified vm corresponding
  * to the specific interrupt id.
  */
-struct interrupt_descriptor *vm_find_interrupt_descriptor(
+static struct interrupt_descriptor *vm_find_interrupt_descriptor(
 	struct vm_locked vm_locked, uint32_t id)
 {
 	for (uint32_t i = 0; i < HF_NUM_INTIDS; i++) {

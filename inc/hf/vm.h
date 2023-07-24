@@ -395,8 +395,6 @@ static inline bool vm_power_management_cpu_off_requested(struct vm *vm)
 		(UINT32_C(1) << VM_POWER_MANAGEMENT_CPU_OFF_SHIFT)) != 0;
 }
 
-struct interrupt_descriptor *vm_find_interrupt_descriptor(
-	struct vm_locked vm_locked, uint32_t id);
 struct interrupt_descriptor *vm_interrupt_set_target_mpidr(
 	struct vm_locked vm_locked, uint32_t id, uint32_t target_mpidr);
 struct interrupt_descriptor *vm_interrupt_set_sec_state(

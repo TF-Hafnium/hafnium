@@ -2773,6 +2773,11 @@ int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current)
 
 /**
  * Reconfigure the interrupt belonging to the current partition at runtime.
+ * At present, this paravirtualized interface only allows the following
+ * commands which signify what change is being requested by the current
+ * partition:
+ * - Change the target CPU of the interrupt.
+ * - Change the security state of the interrupt.
  */
 int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
 				       uint32_t value, struct vcpu *current)
@@ -2780,7 +2785,7 @@ int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
 	struct vm *vm = current->vm;
 	struct vm_locked vm_locked;
 	int64_t ret = -1;
-	struct interrupt_descriptor *int_desc;
+	struct interrupt_descriptor *int_desc = NULL;
 
 	/*
 	 * Lock VM to protect interrupt descriptor from being modified
@@ -2788,9 +2793,52 @@ int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
 	 */
 	vm_locked = vm_lock(vm);
 
-	/* Check if the interrupt belongs to the current SP. */
-	int_desc = vm_find_interrupt_descriptor(vm_locked, int_id);
+	switch (command) {
+	case INT_RECONFIGURE_TARGET_PE:
+		/* Here, value represents the target PE index. */
+		if (value >= MAX_CPUS) {
+			dlog_verbose(
+				"Illegal target PE index specified while "
+				"reconfiguring interrupt %x\n",
+				int_id);
+			goto out_unlock;
+		}
 
+		/*
+		 * An UP SP cannot reconfigure an interrupt to be targetted to
+		 * any other physical CPU except the one it is currently
+		 * running on.
+		 */
+		if ((vm->vcpu_count == 1) &&
+		    (value != cpu_index(current->cpu))) {
+			dlog_verbose(
+				"Illegal target PE index specified by current "
+				"UP SP\n");
+			goto out_unlock;
+		}
+
+		/* Configure the interrupt to be routed to a specific CPU. */
+		int_desc = vm_interrupt_set_target_mpidr(
+			vm_locked, int_id, cpu_find_index(value)->id);
+		break;
+	case INT_RECONFIGURE_SEC_STATE:
+		/* Specify the new security state of the interrupt. */
+		if (value != INT_SEC_STATE_NS && value != INT_SEC_STATE_S) {
+			dlog_verbose(
+				"Illegal value %x specified while "
+				"reconfiguring interrupt %x\n",
+				value, int_id);
+			goto out_unlock;
+		}
+		int_desc = vm_interrupt_set_sec_state(vm_locked, int_id, value);
+		break;
+	default:
+		dlog_verbose("Interrupt reconfigure: Unsupported command %x\n",
+			     command);
+		goto out_unlock;
+	}
+
+	/* Check if the interrupt belongs to the current SP. */
 	if (int_desc == NULL) {
 		dlog_verbose("Interrupt %x does not belong to current SP\n",
 			     int_id);
