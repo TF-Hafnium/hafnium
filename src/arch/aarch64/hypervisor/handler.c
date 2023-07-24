@@ -1065,6 +1065,11 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 		vcpu->regs.r[0] = plat_ffa_interrupt_deactivate(
 			args.arg1, args.arg2, vcpu);
 		break;
+
+	case HF_INTERRUPT_RECONFIGURE:
+		vcpu->regs.r[0] = plat_ffa_interrupt_reconfigure(
+			args.arg1, args.arg2, args.arg3, vcpu);
+		break;
 #endif
 
 	default:

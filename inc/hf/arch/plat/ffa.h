@@ -372,3 +372,9 @@ struct ffa_value plat_ffa_msg_recv(bool block,
 int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current);
 
 int64_t plat_ffa_mailbox_waiter_get(ffa_id_t vm_id, const struct vcpu *current);
+
+/**
+ * Reconfigure the interrupt belonging to the current partition at runtime.
+ */
+int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
+				       uint32_t value, struct vcpu *current);

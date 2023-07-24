@@ -2770,3 +2770,36 @@ int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current)
 
 	return -1;
 }
+
+/**
+ * Reconfigure the interrupt belonging to the current partition at runtime.
+ */
+int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
+				       uint32_t value, struct vcpu *current)
+{
+	struct vm *vm = current->vm;
+	struct vm_locked vm_locked;
+	int64_t ret = -1;
+	struct interrupt_descriptor *int_desc;
+
+	/*
+	 * Lock VM to protect interrupt descriptor from being modified
+	 * concurrently.
+	 */
+	vm_locked = vm_lock(vm);
+
+	/* Check if the interrupt belongs to the current SP. */
+	int_desc = vm_find_interrupt_descriptor(vm_locked, int_id);
+
+	if (int_desc == NULL) {
+		dlog_verbose("Interrupt %x does not belong to current SP\n",
+			     int_id);
+		goto out_unlock;
+	}
+
+	ret = 0;
+out_unlock:
+	vm_unlock(&vm_locked);
+
+	return ret;
+}
