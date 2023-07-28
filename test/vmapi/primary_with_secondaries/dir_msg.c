@@ -314,3 +314,60 @@ TEST_PRECONDITION(direct_message, fail_if_cyclic_dependency,
 	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 }
+
+/**
+ * Send direct message via FFA_MSG_SEND_DIRECT_REQ2, verify that sent info is
+ * echoed back.
+ */
+TEST(direct_message, ffa_send_direct_message_req2_echo)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_uuid uuid = SERVICE1;
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_direct_message_req2_resp_echo", mb.send);
+	ffa_run(service1_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+				       &uuid, msg[0], msg[1], msg[2], msg[3]);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	EXPECT_EQ(res.arg4, msg[0]);
+	EXPECT_EQ(res.arg5, msg[1]);
+	EXPECT_EQ(res.arg6, msg[2]);
+	EXPECT_EQ(res.arg7, msg[3]);
+}
+
+/**
+ * Initiate direct message request between test SPs.
+ * If test services are VMs, test should be skipped.
+ */
+TEST_PRECONDITION(direct_message, ffa_direct_message_req2_services_echo,
+		  service1_and_service2_are_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_value ret;
+	const struct ffa_uuid service2_uuid = SERVICE2;
+
+	/* Run service2 for it to wait for a request from service1. */
+	SERVICE_SELECT(service2_info->vm_id,
+		       "ffa_direct_message_req2_resp_echo", mb.send);
+	ffa_run(service2_info->vm_id, 0);
+
+	/* Service1 requests echo from service2. */
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_direct_message_req2_echo_services", mb.send);
+
+	/* Send to service1 the uuid of the target for its message. */
+	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
+				    &service2_uuid, sizeof(service2_uuid), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	ffa_run(service1_info->vm_id, 0);
+}

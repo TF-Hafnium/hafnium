@@ -21,6 +21,6 @@
 	load-address = <0x90000000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x7>; /* Supports direct and indirect requests. */
+	messaging-method = <0x607>; /* Supports direct and indirect requests. */
 	notification-support; /* Receipt of notifications. */
 };

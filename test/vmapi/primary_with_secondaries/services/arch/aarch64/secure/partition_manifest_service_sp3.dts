@@ -21,7 +21,7 @@
 	load-address = <0x6280000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x7>; /* Supports direct and indirect requests. */
+	messaging-method = <0x7>; /* Supports direct (both APIs) and indirect requests. */
 	boot-order = <3>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;

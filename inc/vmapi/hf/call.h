@@ -503,6 +503,30 @@ static inline struct ffa_value ffa_msg_send_direct_req(
 	});
 }
 
+/*
+ * TODO edit function to accept more arguments and make use of full range of
+ * registers if needed.
+ */
+static inline struct ffa_value ffa_msg_send_direct_req2(
+	ffa_id_t sender_vm_id, ffa_id_t target_vm_id,
+	const struct ffa_uuid *uuid, uint32_t arg4, uint32_t arg5,
+	uint32_t arg6, uint32_t arg7)
+{
+	uint64_t arg2 = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
+	uint64_t arg3 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
+
+	return ffa_call_ext((struct ffa_value){
+		.func = FFA_MSG_SEND_DIRECT_REQ2_64,
+		.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id,
+		.arg2 = arg2,
+		.arg3 = arg3,
+		.arg4 = arg4,
+		.arg5 = arg5,
+		.arg6 = arg6,
+		.arg7 = arg7,
+	});
+}
+
 static inline struct ffa_value ffa_msg_send_direct_resp(
 	ffa_id_t sender_vm_id, ffa_id_t target_vm_id, uint32_t arg3,
 	uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7)

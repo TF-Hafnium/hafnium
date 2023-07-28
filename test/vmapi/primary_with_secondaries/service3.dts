@@ -21,7 +21,7 @@
         load-address = <0x90000000>; /* To make parsing of manifest happy. it is not yet used. */
         entrypoint-offset = <0x0>;
         xlat-granule = <0>; /* 4KiB */
-        messaging-method = <0x7>; /* Supports direct and indirect requests. */
+        messaging-method = <0x607>; /* Supports direct and indirect requests. */
         notification-support; /* Receipt of notifications. */
 
 };
