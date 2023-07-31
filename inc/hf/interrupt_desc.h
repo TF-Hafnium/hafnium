@@ -58,6 +58,14 @@ static inline void interrupt_bitmap_clear_value(struct interrupt_bitmap *bitmap,
 #define INT_SEC_STATE_S 1
 
 /**
+ * Legal values to enable or disable an interrupt through the
+ * `INT_RECONFIGURE_ENABLE` command using the `HF_INTERRUPT_RECONFIGURE`
+ * paravirtualized interface.
+ */
+#define INT_DISABLE 0
+#define INT_ENABLE 1
+
+/**
  * Attributes encoding in the manifest:
 
  * Field		Bit(s)
@@ -111,6 +119,7 @@ struct interrupt_descriptor {
 	bool valid;
 	bool mpidr_valid;
 	uint64_t mpidr;
+	bool enabled;
 };
 
 /**
@@ -212,4 +221,10 @@ static inline void interrupt_desc_set_valid(
 	struct interrupt_descriptor *int_desc, bool valid)
 {
 	int_desc->valid = valid;
+}
+
+static inline void interrupt_desc_set_enabled(
+	struct interrupt_descriptor *int_desc, bool enable)
+{
+	int_desc->enabled = enable;
 }

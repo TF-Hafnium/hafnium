@@ -1041,3 +1041,20 @@ struct interrupt_descriptor *vm_interrupt_set_sec_state(
 
 	return int_desc;
 }
+
+/**
+ * Enable or disable the specified interrupt id belonging to specified vm.
+ */
+struct interrupt_descriptor *vm_interrupt_set_enable(struct vm_locked vm_locked,
+						     uint32_t id, bool enable)
+{
+	struct interrupt_descriptor *int_desc;
+
+	int_desc = vm_find_interrupt_descriptor(vm_locked, id);
+
+	if (int_desc != NULL) {
+		interrupt_desc_set_enabled(int_desc, enable);
+	}
+
+	return int_desc;
+}

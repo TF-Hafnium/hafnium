@@ -151,6 +151,7 @@ static void infer_interrupt(struct interrupt_info interrupt,
 	}
 
 	interrupt_desc_set_valid(int_desc, true);
+	interrupt_desc_set_enabled(int_desc, true);
 }
 
 /**
@@ -184,6 +185,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 			interrupt = dev_region.interrupts[j];
 			infer_interrupt(interrupt, &int_desc);
 			vm_locked.vm->interrupt_desc[k] = int_desc;
+			assert(int_desc.enabled);
 
 			/*
 			 * Configure the physical interrupts allocated for this

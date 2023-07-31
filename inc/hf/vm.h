@@ -399,3 +399,5 @@ struct interrupt_descriptor *vm_interrupt_set_target_mpidr(
 	struct vm_locked vm_locked, uint32_t id, uint32_t target_mpidr);
 struct interrupt_descriptor *vm_interrupt_set_sec_state(
 	struct vm_locked vm_locked, uint32_t id, uint32_t sec_state);
+struct interrupt_descriptor *vm_interrupt_set_enable(struct vm_locked vm_locked,
+						     uint32_t id, bool enable);

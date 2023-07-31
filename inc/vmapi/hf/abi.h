@@ -29,5 +29,6 @@
 /* Possible commands that reconfigure an interrupt. */
 #define INT_RECONFIGURE_TARGET_PE 0
 #define INT_RECONFIGURE_SEC_STATE 1
+#define INT_RECONFIGURE_ENABLE 2
 
 /* clang-format on */

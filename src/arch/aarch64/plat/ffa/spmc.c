@@ -2778,6 +2778,7 @@ int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current)
  * partition:
  * - Change the target CPU of the interrupt.
  * - Change the security state of the interrupt.
+ * - Enable or disable the physical interrupt.
  */
 int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
 				       uint32_t value, struct vcpu *current)
@@ -2831,6 +2832,19 @@ int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
 			goto out_unlock;
 		}
 		int_desc = vm_interrupt_set_sec_state(vm_locked, int_id, value);
+		break;
+	case INT_RECONFIGURE_ENABLE:
+		/* Enable or disable the interrupt. */
+		if (value != INT_DISABLE && value != INT_ENABLE) {
+			dlog_verbose(
+				"Illegal value %x specified while "
+				"reconfiguring interrupt %x\n",
+				value, int_id);
+			goto out_unlock;
+		} else {
+			int_desc = vm_interrupt_set_enable(vm_locked, int_id,
+							   value == INT_ENABLE);
+		}
 		break;
 	default:
 		dlog_verbose("Interrupt reconfigure: Unsupported command %x\n",
