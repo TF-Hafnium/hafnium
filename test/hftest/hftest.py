@@ -774,7 +774,7 @@ class TestRunner:
         lines_to_process = lines_to_process[hftest_start : hftest_end]
 
         for line in lines_to_process:
-            match = re.search(f"^VM \d+: ", line)
+            match = re.search(f"^(VM|SP) \d+: ", line)
             if match is not None:
                 line = line[match.end():]
             if line.startswith(HFTEST_LOG_PREFIX):
