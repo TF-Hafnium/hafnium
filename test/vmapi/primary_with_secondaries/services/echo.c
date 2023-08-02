@@ -35,7 +35,7 @@ TEST_SERVICE(echo_msg_send2)
 
 	for (;;) {
 		uint32_t payload;
-		ffa_vm_id_t echo_sender;
+		ffa_id_t echo_sender;
 
 		receive_indirect_message((void *)&payload, sizeof(payload),
 					 recv_buf, &echo_sender);
@@ -58,10 +58,10 @@ TEST_SERVICE(echo_msg_send2_service)
 	struct ffa_uuid target_uuid;
 	struct ffa_partition_info target_info;
 	uint32_t echo_payload;
-	ffa_vm_id_t echo_sender;
+	ffa_id_t echo_sender;
 	const uint32_t payload = 0xBEEFU;
 	struct ffa_value ret;
-	const ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_id_t own_id = hf_vm_get_id();
 
 	/* Setup handling of NPI, to handle RX buffer notification. */
 	exception_setup(check_npi, NULL);

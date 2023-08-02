@@ -15,7 +15,7 @@
 #include "sysregs_defs.h"
 
 /** HCR_EL2 */
-uintreg_t get_hcr_el2_value(ffa_vm_id_t vm_id, bool is_el0_partition);
+uintreg_t get_hcr_el2_value(ffa_id_t vm_id, bool is_el0_partition);
 
 /** MDCR_EL2 */
 uintreg_t get_mdcr_el2_value(void);

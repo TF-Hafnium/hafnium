@@ -65,9 +65,9 @@ TEST(ffa, ffa_partition_info)
 	EXPECT_EQ(vm_count, 4);
 
 	for (uint16_t index = 0; index < vm_count; ++index) {
-		ffa_vm_id_t vm_id = partitions[index].vm_id;
-		EXPECT_GE(vm_id, (ffa_vm_id_t)HF_PRIMARY_VM_ID);
-		EXPECT_LE(vm_id, (ffa_vm_id_t)SERVICE_VM3);
+		ffa_id_t vm_id = partitions[index].vm_id;
+		EXPECT_GE(vm_id, (ffa_id_t)HF_PRIMARY_VM_ID);
+		EXPECT_LE(vm_id, (ffa_id_t)SERVICE_VM3);
 
 		/*
 		 * NOTE: The ordering is NOT specified by the spec, but is an

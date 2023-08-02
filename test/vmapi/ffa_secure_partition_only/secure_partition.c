@@ -361,7 +361,7 @@ TEST(ffa_msg_send_direct_req, fails_if_sp_to_nwd)
 	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
 				0x88889999};
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = ffa_msg_send_direct_req(own_id, HF_HYPERVISOR_VM_ID + 1, msg[0],
 				      msg[1], msg[2], msg[3], msg[4]);

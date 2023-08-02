@@ -75,7 +75,7 @@ TEST(linux, load_hafnium)
  */
 TEST(linux, socket_echo_hafnium)
 {
-	ffa_vm_id_t vm_id = HF_VM_ID_OFFSET + 1;
+	ffa_id_t vm_id = HF_VM_ID_OFFSET + 1;
 	int port = 10;
 	int socket_id;
 	struct hf_sockaddr addr;

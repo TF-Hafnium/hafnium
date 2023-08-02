@@ -25,11 +25,11 @@
 
 bool yield_while_handling_sec_interrupt = false;
 
-static void send_managed_exit_response(ffa_vm_id_t dir_req_source_id)
+static void send_managed_exit_response(ffa_id_t dir_req_source_id)
 {
 	struct ffa_value ffa_ret;
 	bool waiting_resume_after_managed_exit;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	/* Send managed exit response. */
 	ffa_ret = sp_send_response(own_id, dir_req_source_id,
@@ -57,7 +57,7 @@ static void send_managed_exit_response(ffa_vm_id_t dir_req_source_id)
 static void irq_current(void)
 {
 	uint32_t intid;
-	ffa_vm_id_t dir_req_source_id = hftest_get_dir_req_source_id();
+	ffa_id_t dir_req_source_id = hftest_get_dir_req_source_id();
 
 	intid = hf_interrupt_get();
 
@@ -92,12 +92,12 @@ static void irq_current(void)
 	}
 }
 
-struct ffa_value sp_virtual_interrupt_cmd(ffa_vm_id_t test_source,
+struct ffa_value sp_virtual_interrupt_cmd(ffa_id_t test_source,
 					  uint32_t interrupt_id, bool enable,
 					  uint32_t pin)
 {
 	int64_t ret;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	ret = hf_interrupt_enable(interrupt_id, enable, pin);
 	if (ret != 0) {
@@ -116,9 +116,9 @@ struct ffa_value sp_virtual_interrupt_cmd(ffa_vm_id_t test_source,
 	return sp_success(own_id, test_source, 0);
 }
 
-struct ffa_value sp_twdog_cmd(ffa_vm_id_t test_source, uint64_t time)
+struct ffa_value sp_twdog_cmd(ffa_id_t test_source, uint64_t time)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	HFTEST_LOG("Starting TWDOG: %u ms", time);
 	sp805_twdog_refresh();
@@ -127,9 +127,9 @@ struct ffa_value sp_twdog_cmd(ffa_vm_id_t test_source, uint64_t time)
 	return sp_success(own_id, test_source, time);
 }
 
-struct ffa_value sp_twdog_map_cmd(ffa_vm_id_t test_source)
+struct ffa_value sp_twdog_map_cmd(ffa_id_t test_source)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	/* Map peripheral(such as secure watchdog timer) address space. */
 	hftest_mm_identity_map((void*)PLAT_ARM_TWDOG_BASE, PLAT_ARM_TWDOG_SIZE,
@@ -138,9 +138,9 @@ struct ffa_value sp_twdog_map_cmd(ffa_vm_id_t test_source)
 	return sp_success(own_id, test_source, 0);
 }
 
-struct ffa_value sp_get_last_interrupt_cmd(ffa_vm_id_t test_source)
+struct ffa_value sp_get_last_interrupt_cmd(ffa_id_t test_source)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	return sp_success(own_id, test_source,
 			  exception_handler_get_last_interrupt());
@@ -165,10 +165,10 @@ static bool is_expected_sp_response(struct ffa_value ret,
 	return true;
 }
 
-struct ffa_value sp_sleep_cmd(ffa_vm_id_t source, uint32_t sleep_ms)
+struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms)
 {
 	uint64_t time_lapsed;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	HFTEST_LOG("Request to sleep %x for %ums", own_id, sleep_ms);
 
@@ -180,11 +180,11 @@ struct ffa_value sp_sleep_cmd(ffa_vm_id_t source, uint32_t sleep_ms)
 	return sp_success(own_id, source, time_lapsed);
 }
 
-struct ffa_value sp_fwd_sleep_cmd(ffa_vm_id_t source, uint32_t sleep_ms,
-				  ffa_vm_id_t fwd_dest, bool hint_interrupted)
+struct ffa_value sp_fwd_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
+				  ffa_id_t fwd_dest, bool hint_interrupted)
 {
 	struct ffa_value ffa_ret;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	bool fwd_dest_interrupted = false;
 
 	HFTEST_LOG("VM%x requested %x to sleep for %ums", source, fwd_dest,
@@ -241,10 +241,10 @@ struct ffa_value sp_fwd_sleep_cmd(ffa_vm_id_t source, uint32_t sleep_ms,
 	return sp_success(own_id, source, 0);
 }
 
-struct ffa_value sp_yield_secure_interrupt_handling_cmd(ffa_vm_id_t source,
+struct ffa_value sp_yield_secure_interrupt_handling_cmd(ffa_id_t source,
 							bool yield)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	yield_while_handling_sec_interrupt = yield;
 	return sp_success(own_id, source, 0);

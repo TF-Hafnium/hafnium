@@ -43,11 +43,11 @@ bool sp3_fail_at_boot(void)
 	return (FAILING_SP == 3);
 }
 
-static void nwd_to_sp_echo(ffa_vm_id_t receiver_id)
+static void nwd_to_sp_echo(ffa_id_t receiver_id)
 {
 	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_echo_cmd_send(own_id, receiver_id, msg[0], msg[1], msg[2],
 			       msg[3]);
@@ -141,9 +141,9 @@ TEST_PRECONDITION(boot_fail, sp3_fails_to_init, sp3_fail_at_boot)
 TEST_PRECONDITION(boot_fail, dir_msg_to_failed_sp, sp1_fail_at_boot)
 {
 	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
-	const ffa_vm_id_t receiver_id = SP_ID(1);
+	const ffa_id_t receiver_id = SP_ID(1);
 	struct ffa_value ret;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	ret = sp_echo_cmd_send(own_id, receiver_id, msg[0], msg[1], msg[2],
 			       msg[3]);

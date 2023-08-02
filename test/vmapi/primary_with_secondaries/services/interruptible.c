@@ -29,7 +29,7 @@ static void irq(void)
 	uint32_t interrupt_id = hf_interrupt_get();
 	char buffer[] = "Got IRQ xx.";
 	int size = sizeof(buffer);
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	dlog("secondary IRQ %d from current\n", interrupt_id);
 	buffer[8] = '0' + interrupt_id / 10;
@@ -43,7 +43,7 @@ static void irq(void)
 
 TEST_SERVICE(interruptible)
 {
-	ffa_vm_id_t this_vm_id = hf_vm_get_id();
+	ffa_id_t this_vm_id = hf_vm_get_id();
 	void *recv_buf = SERVICE_RECV_BUFFER();
 
 	exception_setup(irq, NULL);
@@ -58,7 +58,7 @@ TEST_SERVICE(interruptible)
 		/* Allocate for the longest of the above two messages. */
 		char response[sizeof(enable_message) + 1];
 		struct ffa_partition_rxtx_header header;
-		ffa_vm_id_t sender;
+		ffa_id_t sender;
 
 		mailbox_receive_retry(response, sizeof(response), recv_buf,
 				      &header);

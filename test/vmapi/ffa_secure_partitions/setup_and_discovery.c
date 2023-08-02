@@ -68,9 +68,9 @@ static void check_v1_1_partition_info_descriptors(
 
 TEST(ffa, ffa_partition_info_get_regs_sp_test)
 {
-	const ffa_vm_id_t receiver_id = SP_ID(1);
+	const ffa_id_t receiver_id = SP_ID(1);
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_check_partition_info_get_regs_cmd_send(own_id, receiver_id);
 

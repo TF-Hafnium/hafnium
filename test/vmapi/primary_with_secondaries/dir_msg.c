@@ -105,7 +105,7 @@ TEST_PRECONDITION(direct_message, ffa_direct_message_services_echo,
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value ret;
 
 	/* Run service2 for it to wait for a request from service1. */
@@ -137,7 +137,7 @@ TEST_PRECONDITION(direct_message, ffa_direct_message_services_yield_echo,
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value ret;
 
 	/* Run service2 for it to wait for a request from service1. */
@@ -294,7 +294,7 @@ TEST_PRECONDITION(direct_message, fail_if_cyclic_dependency,
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value ret;
 
 	/* Run service2 for it to wait for a request from service1. */

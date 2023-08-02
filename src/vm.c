@@ -45,7 +45,7 @@ static bool vm_init_mm(struct vm *vm, struct mpool *ppool)
 	return arch_vm_init_mm(vm, ppool);
 }
 
-struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
+struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 		   struct mpool *ppool, bool el0_partition)
 {
 	uint32_t i;
@@ -128,7 +128,7 @@ ffa_vm_count_t vm_get_count(void)
 /**
  * Returns a pointer to the VM with the corresponding id.
  */
-struct vm *vm_find(ffa_vm_id_t id)
+struct vm *vm_find(ffa_id_t id)
 {
 	uint16_t index;
 
@@ -152,7 +152,7 @@ struct vm *vm_find(ffa_vm_id_t id)
 /**
  * Returns a locked instance of the VM with the corresponding id.
  */
-struct vm_locked vm_find_locked(ffa_vm_id_t id)
+struct vm_locked vm_find_locked(ffa_id_t id)
 {
 	struct vm *vm = vm_find(id);
 
@@ -228,7 +228,7 @@ struct vcpu *vm_get_vcpu(struct vm *vm, ffa_vcpu_index_t vcpu_index)
 /**
  * Gets `vm`'s wait entry for waiting on the `for_vm`.
  */
-struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_vm_id_t for_vm)
+struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_id_t for_vm)
 {
 	uint16_t index;
 
@@ -259,7 +259,7 @@ bool vm_is_mailbox_other_world_owned(struct vm_locked to)
 /**
  * Gets the ID of the VM which the given VM's wait entry is for.
  */
-ffa_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)
+ffa_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)
 {
 	uint16_t index = entry - vm->wait_entries;
 
@@ -271,7 +271,7 @@ ffa_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)
  * i.e. the hypervisor or a normal world VM when running in the normal world, or
  * the SPM or an SP when running in the secure world.
  */
-bool vm_id_is_current_world(ffa_vm_id_t vm_id)
+bool vm_id_is_current_world(ffa_id_t vm_id)
 {
 	return (vm_id & HF_VM_ID_WORLD_MASK) !=
 	       (HF_OTHER_WORLD_ID & HF_VM_ID_WORLD_MASK);
@@ -630,7 +630,7 @@ bool vm_is_notifications_pending_count_zero(void)
  * are per VCPU or global, as specified.
  */
 bool vm_notifications_validate_binding(struct vm_locked vm_locked,
-				       bool is_from_vm, ffa_vm_id_t sender_id,
+				       bool is_from_vm, ffa_id_t sender_id,
 				       ffa_notifications_bitmap_t notifications,
 				       bool is_per_vcpu)
 {
@@ -645,7 +645,7 @@ bool vm_notifications_validate_binding(struct vm_locked vm_locked,
  * notifications.
  */
 void vm_notifications_update_bindings(struct vm_locked vm_locked,
-				      bool is_from_vm, ffa_vm_id_t sender_id,
+				      bool is_from_vm, ffa_id_t sender_id,
 				      ffa_notifications_bitmap_t notifications,
 				      bool is_per_vcpu)
 {
@@ -671,7 +671,7 @@ void vm_notifications_update_bindings(struct vm_locked vm_locked,
 }
 
 bool vm_notifications_validate_bound_sender(
-	struct vm_locked vm_locked, bool is_from_vm, ffa_vm_id_t sender_id,
+	struct vm_locked vm_locked, bool is_from_vm, ffa_id_t sender_id,
 	ffa_notifications_bitmap_t notifications)
 {
 	CHECK(vm_locked.vm != NULL);
@@ -807,7 +807,7 @@ ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 }
 
 static void vm_notifications_state_info_get(
-	struct notifications_state *state, ffa_vm_id_t vm_id, bool is_per_vcpu,
+	struct notifications_state *state, ffa_id_t vm_id, bool is_per_vcpu,
 	ffa_vcpu_index_t vcpu_id, uint16_t *ids, uint32_t *ids_count,
 	uint32_t *lists_sizes, uint32_t *lists_count,
 	const uint32_t ids_max_count,

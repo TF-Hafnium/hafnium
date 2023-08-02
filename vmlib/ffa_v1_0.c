@@ -27,7 +27,7 @@
  * including the composite memory region offset.
  */
 void ffa_memory_region_init_header_v1_0(
-	struct ffa_memory_region_v1_0 *memory_region, ffa_vm_id_t sender,
+	struct ffa_memory_region_v1_0 *memory_region, ffa_id_t sender,
 	ffa_memory_attributes_t attributes, ffa_memory_region_flags_t flags,
 	ffa_memory_handle_t handle, uint32_t tag, uint32_t receiver_count)
 {
@@ -125,7 +125,7 @@ static uint32_t ffa_memory_region_init_constituents_v1_0(
 
 uint32_t ffa_memory_region_init_v1_0(
 	struct ffa_memory_region_v1_0 *memory_region,
-	size_t memory_region_max_size, ffa_vm_id_t sender,
+	size_t memory_region_max_size, ffa_id_t sender,
 	struct ffa_memory_access receivers[], uint32_t receiver_count,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
@@ -160,7 +160,7 @@ uint32_t ffa_memory_region_init_v1_0(
 
 uint32_t ffa_memory_retrieve_request_init_v1_0(
 	struct ffa_memory_region_v1_0 *memory_region,
-	ffa_memory_handle_t handle, ffa_vm_id_t sender,
+	ffa_memory_handle_t handle, ffa_id_t sender,
 	struct ffa_memory_access receivers[], uint32_t receiver_count,
 	uint32_t tag, ffa_memory_region_flags_t flags,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,

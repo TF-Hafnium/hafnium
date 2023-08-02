@@ -125,9 +125,9 @@ struct ffa_partition_manifest {
 	/** UUID - mandatory */
 	struct ffa_uuid uuid;
 	/** Partition id - optional */
-	ffa_vm_id_t id;
+	ffa_id_t id;
 	/** Aux ids for mem transactions - optional */
-	ffa_vm_id_t aux_id;
+	ffa_id_t aux_id;
 
 	/* NOTE: optional name field maps to VM debug_name field */
 

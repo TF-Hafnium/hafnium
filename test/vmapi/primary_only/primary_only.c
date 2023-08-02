@@ -394,8 +394,8 @@ TEST(fp, fp)
 	 * Get some numbers that the compiler can't tell are constants, so it
 	 * can't optimise them away.
 	 */
-	ffa_vm_id_t ai = hf_vm_get_id();
-	ffa_vm_id_t bi = hf_vm_get_id();
+	ffa_id_t ai = hf_vm_get_id();
+	ffa_id_t bi = hf_vm_get_id();
 	double a = ai;
 	double b = bi;
 	double result = a * b * 8.0;

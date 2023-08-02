@@ -31,7 +31,7 @@ static volatile bool timer_fired = false;
 
 static void irq_current(void)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	uint32_t interrupt_id = hf_interrupt_get();
 	char buffer[] = "Got IRQ xx.";
 	int size = sizeof(buffer);
@@ -61,7 +61,7 @@ TEST_SERVICE(timer)
 		bool receive;
 		bool disable_interrupts;
 		uint32_t ticks;
-		ffa_vm_id_t sender;
+		ffa_id_t sender;
 		uint8_t actual_message[sizeof("**** xxxxxxx")];
 		struct ffa_partition_rxtx_header header;
 

@@ -12,8 +12,7 @@
 
 #include "partition_services.h"
 
-struct ffa_value sp_check_ffa_return_resp(ffa_vm_id_t test_source,
-					  ffa_vm_id_t own_id,
+struct ffa_value sp_check_ffa_return_resp(ffa_id_t test_source, ffa_id_t own_id,
 					  struct ffa_value res)
 {
 	if (res.func == FFA_ERROR_32) {

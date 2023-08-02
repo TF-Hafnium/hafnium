@@ -98,7 +98,7 @@ struct mailbox {
 	const void *send;
 
 	/** The ID of the VM which sent the message currently in `recv`. */
-	ffa_vm_id_t recv_sender;
+	ffa_id_t recv_sender;
 
 	/** The size of the message currently in `recv`. */
 	uint32_t recv_size;
@@ -147,7 +147,7 @@ struct notifications {
 	 * The index in the bindings array relates to the notification
 	 * ID, and bit position in 'ffa_notifications_bitmap_t'.
 	 */
-	ffa_vm_id_t bindings_sender_id[MAX_FFA_NOTIFICATIONS];
+	ffa_id_t bindings_sender_id[MAX_FFA_NOTIFICATIONS];
 	ffa_notifications_bitmap_t bindings_per_vcpu;
 
 	/* The index of the array below relates to the ID of the VCPU.
@@ -199,7 +199,7 @@ struct smc_whitelist {
 };
 
 struct vm {
-	ffa_vm_id_t id;
+	ffa_id_t id;
 	struct ffa_uuid uuid;
 	uint32_t ffa_version;
 	struct smc_whitelist smc_whitelist;
@@ -293,21 +293,21 @@ struct two_vm_locked {
 	struct vm_locked vm2;
 };
 
-struct vm *vm_init(ffa_vm_id_t id, ffa_vcpu_count_t vcpu_count,
+struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 		   struct mpool *ppool, bool el0_partition);
 bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
 		  struct vm **new_vm, bool el0_partition);
 ffa_vm_count_t vm_get_count(void);
-struct vm *vm_find(ffa_vm_id_t id);
-struct vm_locked vm_find_locked(ffa_vm_id_t id);
+struct vm *vm_find(ffa_id_t id);
+struct vm_locked vm_find_locked(ffa_id_t id);
 struct vm *vm_find_index(uint16_t index);
 struct vm_locked vm_lock(struct vm *vm);
 struct two_vm_locked vm_lock_both(struct vm *vm1, struct vm *vm2);
 void vm_unlock(struct vm_locked *locked);
 struct vcpu *vm_get_vcpu(struct vm *vm, ffa_vcpu_index_t vcpu_index);
-struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_vm_id_t for_vm);
-ffa_vm_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry);
-bool vm_id_is_current_world(ffa_vm_id_t vm_id);
+struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_id_t for_vm);
+ffa_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry);
+bool vm_id_is_current_world(ffa_id_t vm_id);
 bool vm_is_mailbox_busy(struct vm_locked to);
 bool vm_is_mailbox_other_world_owned(struct vm_locked to);
 bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
@@ -338,14 +338,14 @@ bool vm_notifications_validate_per_vcpu(struct vm_locked vm_locked,
 					bool is_from_vm, bool is_per_vcpu,
 					ffa_notifications_bitmap_t notif);
 bool vm_notifications_validate_bound_sender(
-	struct vm_locked vm_locked, bool is_from_vm, ffa_vm_id_t sender_id,
+	struct vm_locked vm_locked, bool is_from_vm, ffa_id_t sender_id,
 	ffa_notifications_bitmap_t notifications);
 bool vm_notifications_validate_binding(struct vm_locked vm_locked,
-				       bool is_from_vm, ffa_vm_id_t sender_id,
+				       bool is_from_vm, ffa_id_t sender_id,
 				       ffa_notifications_bitmap_t notifications,
 				       bool is_per_vcpu);
 void vm_notifications_update_bindings(struct vm_locked vm_locked,
-				      bool is_from_vm, ffa_vm_id_t sender_id,
+				      bool is_from_vm, ffa_id_t sender_id,
 				      ffa_notifications_bitmap_t notifications,
 				      bool is_per_vcpu);
 void vm_notifications_partition_set_pending(

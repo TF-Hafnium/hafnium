@@ -19,19 +19,19 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
-struct ffa_value sp_echo_cmd(ffa_vm_id_t receiver, uint32_t val1, uint32_t val2,
+struct ffa_value sp_echo_cmd(ffa_id_t receiver, uint32_t val1, uint32_t val2,
 			     uint32_t val3, uint32_t val4, uint32_t val5)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	return ffa_msg_send_direct_resp(own_id, receiver, val1, val2, val3,
 					val4, val5);
 }
 
-struct ffa_value sp_req_echo_cmd(ffa_vm_id_t test_source, uint32_t val1,
+struct ffa_value sp_req_echo_cmd(ffa_id_t test_source, uint32_t val1,
 				 uint32_t val2, uint32_t val3, uint32_t val4)
 {
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_echo_cmd_send(own_id, own_id + 1, val1, val2, val3, val4);
 
@@ -44,9 +44,9 @@ struct ffa_value sp_req_echo_cmd(ffa_vm_id_t test_source, uint32_t val1,
 	return sp_success(own_id, test_source, 0);
 }
 
-struct ffa_value sp_req_echo_denied_cmd(ffa_vm_id_t test_source)
+struct ffa_value sp_req_echo_denied_cmd(ffa_id_t test_source)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value res;
 
 	if (IS_SP_ID(test_source)) {
@@ -68,11 +68,11 @@ struct ffa_value sp_req_echo_denied_cmd(ffa_vm_id_t test_source)
  * runtime model for various transitions requested by SP through invocation of
  * FFA ABIs.
  */
-struct ffa_value sp_check_state_transitions_cmd(ffa_vm_id_t test_source,
-						ffa_vm_id_t companion_sp_id)
+struct ffa_value sp_check_state_transitions_cmd(ffa_id_t test_source,
+						ffa_id_t companion_sp_id)
 {
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	/*
 	 * The invocation of FFA_MSG_SEND_DIRECT_REQ under RTM_FFA_DIR_REQ is

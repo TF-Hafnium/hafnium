@@ -14,7 +14,7 @@
 struct ffa_value arch_ffa_features(uint32_t function_id);
 
 /** Returns the SPMC ID. */
-ffa_vm_id_t arch_ffa_spmc_id_get(void);
+ffa_id_t arch_ffa_spmc_id_get(void);
 
 /** Called once at boot time to initialize the platform ffa module. */
 void arch_ffa_init(void);

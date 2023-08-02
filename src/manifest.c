@@ -147,7 +147,7 @@ static void manifest_data_deinit(struct mpool *ppool)
 	allocated_mem_regions_index = 0;
 }
 
-static inline size_t count_digits(ffa_vm_id_t vm_id)
+static inline size_t count_digits(ffa_id_t vm_id)
 {
 	size_t digits = 0;
 
@@ -162,7 +162,7 @@ static inline size_t count_digits(ffa_vm_id_t vm_id)
  * Generates a string with the two letters "vm" followed by an integer.
  * Assumes `buf` is of size VM_NAME_BUF_SIZE.
  */
-static void generate_vm_node_name(struct string *str, ffa_vm_id_t vm_id)
+static void generate_vm_node_name(struct string *str, ffa_id_t vm_id)
 {
 	static const char *digits = "0123456789";
 	size_t vm_id_digits = count_digits(vm_id);
@@ -408,7 +408,7 @@ static enum manifest_return_code uint32list_get_next(
 
 static enum manifest_return_code parse_vm_common(const struct fdt_node *node,
 						 struct manifest_vm *vm,
-						 ffa_vm_id_t vm_id)
+						 ffa_id_t vm_id)
 {
 	struct uint32list_iter smcs;
 	size_t idx;
@@ -445,7 +445,7 @@ static enum manifest_return_code parse_vm_common(const struct fdt_node *node,
 
 static enum manifest_return_code parse_vm(struct fdt_node *node,
 					  struct manifest_vm *vm,
-					  ffa_vm_id_t vm_id)
+					  ffa_id_t vm_id)
 {
 	TRY(read_optional_string(node, "kernel_filename",
 				 &vm->kernel_filename));
@@ -1220,7 +1220,7 @@ enum manifest_return_code parse_ffa_manifest(
 
 static enum manifest_return_code parse_ffa_partition_package(
 	struct mm_stage1_locked stage1_locked, struct fdt_node *node,
-	struct manifest_vm *vm, ffa_vm_id_t vm_id,
+	struct manifest_vm *vm, ffa_id_t vm_id,
 	const struct boot_params *boot_params, struct mpool *ppool)
 {
 	enum manifest_return_code ret = MANIFEST_ERROR_NOT_COMPATIBLE;
@@ -1344,7 +1344,7 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 
 	/* Iterate over reserved VM IDs and check no such nodes exist. */
 	for (i = HF_VM_ID_BASE; i < HF_VM_ID_OFFSET; i++) {
-		ffa_vm_id_t vm_id = (ffa_vm_id_t)i - HF_VM_ID_BASE;
+		ffa_id_t vm_id = (ffa_id_t)i - HF_VM_ID_BASE;
 		struct fdt_node vm_node = hyp_node;
 
 		generate_vm_node_name(&vm_name, vm_id);
@@ -1355,7 +1355,7 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 
 	/* Iterate over VM nodes until we find one that does not exist. */
 	for (i = 0; i <= MAX_VMS; ++i) {
-		ffa_vm_id_t vm_id = HF_VM_ID_OFFSET + i;
+		ffa_id_t vm_id = HF_VM_ID_OFFSET + i;
 		struct fdt_node vm_node = hyp_node;
 
 		generate_vm_node_name(&vm_name, vm_id - HF_VM_ID_BASE);

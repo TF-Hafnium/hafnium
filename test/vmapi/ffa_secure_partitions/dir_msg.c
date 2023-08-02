@@ -25,7 +25,7 @@
 alignas(4096) static uint8_t secondary_ec_stack[MAX_CPUS - 1][PAGE_SIZE];
 
 struct secondary_cpu_entry_args {
-	ffa_vm_id_t receiver_id;
+	ffa_id_t receiver_id;
 	ffa_vcpu_count_t vcpu_count;
 };
 
@@ -36,9 +36,9 @@ struct secondary_cpu_entry_args {
 TEST(ffa_msg_send_direct_req, succeeds_nwd_to_sp_echo)
 {
 	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
-	const ffa_vm_id_t receiver_id = SP_ID(1);
+	const ffa_id_t receiver_id = SP_ID(1);
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_echo_cmd_send(own_id, receiver_id, msg[0], msg[1], msg[2],
 			       msg[3]);
@@ -57,9 +57,9 @@ TEST(ffa_msg_send_direct_req, succeeds_nwd_to_sp_echo)
 TEST(ffa_msg_send_direct_req, succeeds_sp_to_sp_echo)
 {
 	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
-	const ffa_vm_id_t receiver_id = SP_ID(1);
+	const ffa_id_t receiver_id = SP_ID(1);
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_req_echo_cmd_send(own_id, receiver_id, msg[0], msg[1], msg[2],
 				   msg[3]);
@@ -74,9 +74,9 @@ TEST(ffa_msg_send_direct_req, succeeds_sp_to_sp_echo)
  */
 TEST(ffa_msg_send_direct_req, fails_direct_req_to_waiting_sp)
 {
-	const ffa_vm_id_t receiver_id = SP_ID(1);
+	const ffa_id_t receiver_id = SP_ID(1);
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_req_echo_denied_cmd_send(own_id, receiver_id);
 
@@ -90,10 +90,10 @@ TEST(ffa_msg_send_direct_req, fails_direct_req_to_waiting_sp)
  */
 TEST(partition_runtime_model, rtm_ffa_dir_req)
 {
-	const ffa_vm_id_t receiver_id = SP_ID(1);
-	const ffa_vm_id_t companion_sp_id = SP_ID(2);
+	const ffa_id_t receiver_id = SP_ID(1);
+	const ffa_id_t companion_sp_id = SP_ID(2);
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_check_state_transitions_cmd_send(own_id, receiver_id,
 						  companion_sp_id);
@@ -103,7 +103,7 @@ TEST(partition_runtime_model, rtm_ffa_dir_req)
 
 static void migrate_busy_up_sp(uintptr_t arg)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value res;
 	const uint32_t msg[] = {SP_ECHO_CMD, 0x1, 0x2, 0x3, 0x4};
 	struct secondary_cpu_entry_args *args =
@@ -145,13 +145,13 @@ TEST_PRECONDITION(ffa_call_chain, disallow_migration_blocked_sp,
 		  service2_is_up_sp)
 {
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct secondary_cpu_entry_args args;
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *receiver_info = service2(mb.recv);
 	struct ffa_partition_info *companion_info = service1(mb.recv);
-	ffa_vm_id_t receiver_id = receiver_info->vm_id;
-	ffa_vm_id_t companion_id = companion_info->vm_id;
+	ffa_id_t receiver_id = receiver_info->vm_id;
+	ffa_id_t companion_id = companion_info->vm_id;
 
 	args.receiver_id = receiver_id;
 	args.vcpu_count = receiver_info->vcpu_count;

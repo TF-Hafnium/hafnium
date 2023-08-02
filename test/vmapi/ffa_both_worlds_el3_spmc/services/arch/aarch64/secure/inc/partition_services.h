@@ -22,23 +22,22 @@
 #define SP_SUCCESS 0
 #define SP_ERROR -1
 
-static inline struct ffa_value sp_success(ffa_vm_id_t sender,
-					  ffa_vm_id_t receiver, uint64_t val)
+static inline struct ffa_value sp_success(ffa_id_t sender, ffa_id_t receiver,
+					  uint64_t val)
 {
 	return ffa_msg_send_direct_resp(sender, receiver, SP_SUCCESS, val, 0, 0,
 					0);
 }
 
-static inline struct ffa_value sp_error(ffa_vm_id_t sender,
-					ffa_vm_id_t receiver,
+static inline struct ffa_value sp_error(ffa_id_t sender, ffa_id_t receiver,
 					uint32_t error_code)
 {
 	return ffa_msg_send_direct_resp(sender, receiver, SP_ERROR, error_code,
 					0, 0, 0);
 }
 
-static inline struct ffa_value sp_send_response(ffa_vm_id_t sender,
-						ffa_vm_id_t receiver,
+static inline struct ffa_value sp_send_response(ffa_id_t sender,
+						ffa_id_t receiver,
 						uint64_t resp)
 {
 	return ffa_msg_send_direct_resp(sender, receiver, resp, 0, 0, 0, 0);
@@ -64,8 +63,8 @@ static inline int sp_resp_value(struct ffa_value res)
  */
 #define SP_ECHO_CMD 0x6563686f
 
-static inline struct ffa_value sp_echo_cmd_send(ffa_vm_id_t sender,
-						ffa_vm_id_t receiver,
+static inline struct ffa_value sp_echo_cmd_send(ffa_id_t sender,
+						ffa_id_t receiver,
 						uint32_t val1, uint32_t val2,
 						uint32_t val3, uint32_t val4)
 {
@@ -73,7 +72,7 @@ static inline struct ffa_value sp_echo_cmd_send(ffa_vm_id_t sender,
 				       val2, val3, val4);
 }
 
-struct ffa_value sp_echo_cmd(ffa_vm_id_t receiver, uint32_t val1, uint32_t val2,
+struct ffa_value sp_echo_cmd(ffa_id_t receiver, uint32_t val1, uint32_t val2,
 			     uint32_t val3, uint32_t val4, uint32_t val5);
 
 /**
@@ -82,14 +81,14 @@ struct ffa_value sp_echo_cmd(ffa_vm_id_t receiver, uint32_t val1, uint32_t val2,
 #define SP_REQ_ECHO_CMD 0x65636870
 
 static inline struct ffa_value sp_req_echo_cmd_send(
-	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t val1, uint32_t val2,
+	ffa_id_t sender, ffa_id_t receiver, uint32_t val1, uint32_t val2,
 	uint32_t val3, uint32_t val4)
 {
 	return ffa_msg_send_direct_req(sender, receiver, SP_REQ_ECHO_CMD, val1,
 				       val2, val3, val4);
 }
 
-struct ffa_value sp_req_echo_cmd(ffa_vm_id_t test_source, uint32_t val1,
+struct ffa_value sp_req_echo_cmd(ffa_id_t test_source, uint32_t val1,
 				 uint32_t val2, uint32_t val3, uint32_t val4);
 
 /**
@@ -97,14 +96,14 @@ struct ffa_value sp_req_echo_cmd(ffa_vm_id_t test_source, uint32_t val1,
  */
 #define SP_REQ_ECHO_DENIED_CMD 0x65636871
 
-static inline struct ffa_value sp_req_echo_denied_cmd_send(ffa_vm_id_t sender,
-							   ffa_vm_id_t receiver)
+static inline struct ffa_value sp_req_echo_denied_cmd_send(ffa_id_t sender,
+							   ffa_id_t receiver)
 {
 	return ffa_msg_send_direct_req(sender, receiver, SP_REQ_ECHO_DENIED_CMD,
 				       0, 0, 0, 0);
 }
 
-struct ffa_value sp_req_echo_denied_cmd(ffa_vm_id_t test_source);
+struct ffa_value sp_req_echo_denied_cmd(ffa_id_t test_source);
 
 /**
  * Command to request an SP to perform checks using ffa_partition_info_get_regs
@@ -113,22 +112,22 @@ struct ffa_value sp_req_echo_denied_cmd(ffa_vm_id_t test_source);
 #define SP_CHECK_PARTITION_INFO_GET_REGS_CMD 0x5054567DU
 
 static inline struct ffa_value sp_check_partition_info_get_regs_cmd_send(
-	ffa_vm_id_t test_source, ffa_vm_id_t receiver)
+	ffa_id_t test_source, ffa_id_t receiver)
 {
 	return ffa_msg_send_direct_req(test_source, receiver,
 				       SP_CHECK_PARTITION_INFO_GET_REGS_CMD, 0,
 				       0, 0, 0);
 }
 
-struct ffa_value sp_check_partition_info_get_regs_cmd(ffa_vm_id_t test_source);
+struct ffa_value sp_check_partition_info_get_regs_cmd(ffa_id_t test_source);
 
 /**
  * Command to request an SP to retrieve and increment memory.
  */
 #define SP_REQ_RETRIEVE_CMD 0x65636900
 
-static inline struct ffa_value sp_req_retrieve_cmd_send(ffa_vm_id_t sender,
-							ffa_vm_id_t receiver,
+static inline struct ffa_value sp_req_retrieve_cmd_send(ffa_id_t sender,
+							ffa_id_t receiver,
 							uint32_t handle,
 							uint32_t tag,
 							uint32_t flags)
@@ -137,6 +136,6 @@ static inline struct ffa_value sp_req_retrieve_cmd_send(ffa_vm_id_t sender,
 				       handle, tag, flags, 0);
 }
 
-struct ffa_value sp_req_retrieve_cmd(ffa_vm_id_t sender, uint32_t handle,
+struct ffa_value sp_req_retrieve_cmd(ffa_id_t sender, uint32_t handle,
 				     uint32_t tag, uint32_t flags,
 				     struct mailbox_buffers mb);

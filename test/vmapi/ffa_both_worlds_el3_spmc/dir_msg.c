@@ -22,9 +22,9 @@
 TEST(ffa_msg_send_direct_req, succeeds_nwd_to_sp_echo)
 {
 	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
-	const ffa_vm_id_t receiver_id = SP_ID(1);
+	const ffa_id_t receiver_id = SP_ID(1);
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_echo_cmd_send(own_id, receiver_id, msg[0], msg[1], msg[2],
 			       msg[3]);
@@ -43,9 +43,9 @@ TEST(ffa_msg_send_direct_req, succeeds_nwd_to_sp_echo)
 TEST(ffa_msg_send_direct_req, succeeds_sp_to_sp_echo)
 {
 	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
-	const ffa_vm_id_t receiver_id = SP_ID(1);
+	const ffa_id_t receiver_id = SP_ID(1);
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_req_echo_cmd_send(own_id, receiver_id, msg[0], msg[1], msg[2],
 				   msg[3]);
@@ -60,9 +60,9 @@ TEST(ffa_msg_send_direct_req, succeeds_sp_to_sp_echo)
  */
 TEST(ffa_msg_send_direct_req, fails_direct_req_to_waiting_sp)
 {
-	const ffa_vm_id_t receiver_id = SP_ID(1);
+	const ffa_id_t receiver_id = SP_ID(1);
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = sp_req_echo_denied_cmd_send(own_id, receiver_id);
 

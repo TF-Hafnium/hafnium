@@ -22,7 +22,7 @@
 alignas(4096) static uint8_t secondary_ec_stack[MAX_CPUS - 1][4096];
 
 struct pwr_mgt_cpu_entry_args {
-	ffa_vm_id_t receiver_id;
+	ffa_id_t receiver_id;
 	ffa_vcpu_count_t vcpu_count;
 	ffa_vcpu_index_t vcpu_id;
 	struct spinlock lock;
@@ -33,7 +33,7 @@ struct pwr_mgt_cpu_entry_args {
  */
 static void cpu_entry_echo(uintptr_t arg)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	const uint32_t msg[] = {SP_ECHO_CMD, 0x1, 0x2, 0x3, 0x4};
 	struct pwr_mgt_cpu_entry_args *args =
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
@@ -81,7 +81,7 @@ static void cpu_entry_echo_second_sp(uintptr_t arg)
  */
 static void cpu_entry_check_cpu_idx(uintptr_t arg)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct pwr_mgt_cpu_entry_args *args =
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		(struct pwr_mgt_cpu_entry_args *)arg;

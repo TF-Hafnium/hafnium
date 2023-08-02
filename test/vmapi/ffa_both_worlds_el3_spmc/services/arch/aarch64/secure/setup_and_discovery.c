@@ -200,9 +200,9 @@ static void sp_check_partition_info_get_regs_start_idx(void)
 						 FFA_PARTITION_DIRECT_REQ_SEND);
 }
 
-struct ffa_value sp_check_partition_info_get_regs_cmd(ffa_vm_id_t test_source)
+struct ffa_value sp_check_partition_info_get_regs_cmd(ffa_id_t test_source)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	sp_check_partition_info_get_regs_null_uuid();
 	sp_check_partition_info_get_regs_uuid();

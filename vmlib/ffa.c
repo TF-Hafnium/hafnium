@@ -39,7 +39,7 @@ void ffa_copy_memory_region_constituents(
  * Initializes receiver permissions, in a memory transaction descriptor.
  */
 void ffa_memory_access_init_permissions(
-	struct ffa_memory_access *receiver, ffa_vm_id_t receiver_id,
+	struct ffa_memory_access *receiver, ffa_id_t receiver_id,
 	enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	ffa_memory_receiver_flags_t flags)
@@ -62,7 +62,7 @@ void ffa_memory_access_init_permissions(
  * including the composite memory region offset.
  */
 void ffa_memory_region_init_header(struct ffa_memory_region *memory_region,
-				   ffa_vm_id_t sender,
+				   ffa_id_t sender,
 				   ffa_memory_attributes_t attributes,
 				   ffa_memory_region_flags_t flags,
 				   ffa_memory_handle_t handle, uint32_t tag,
@@ -178,7 +178,7 @@ static uint32_t ffa_memory_region_init_constituents(
  */
 uint32_t ffa_memory_region_init_single_receiver(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
-	ffa_vm_id_t sender, ffa_vm_id_t receiver,
+	ffa_id_t sender, ffa_id_t receiver,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
@@ -200,7 +200,7 @@ uint32_t ffa_memory_region_init_single_receiver(
 
 uint32_t ffa_memory_region_init(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
-	ffa_vm_id_t sender, struct ffa_memory_access receivers[],
+	ffa_id_t sender, struct ffa_memory_access receivers[],
 	uint32_t receiver_count,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
@@ -241,7 +241,7 @@ uint32_t ffa_memory_region_init(
  */
 uint32_t ffa_memory_retrieve_request_init_single_receiver(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
-	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t tag,
+	ffa_id_t sender, ffa_id_t receiver, uint32_t tag,
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
@@ -259,7 +259,7 @@ uint32_t ffa_memory_retrieve_request_init_single_receiver(
 
 uint32_t ffa_memory_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
-	ffa_vm_id_t sender, struct ffa_memory_access receivers[],
+	ffa_id_t sender, struct ffa_memory_access receivers[],
 	uint32_t receiver_count, uint32_t tag, ffa_memory_region_flags_t flags,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability)
@@ -300,7 +300,7 @@ uint32_t ffa_memory_retrieve_request_init(
  */
 uint32_t ffa_memory_lender_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
-	ffa_vm_id_t sender)
+	ffa_id_t sender)
 {
 	memory_region->sender = sender;
 	memory_region->attributes = 0;
@@ -308,6 +308,7 @@ uint32_t ffa_memory_lender_retrieve_request_init(
 	memory_region->handle = handle;
 	memory_region->tag = 0;
 	memory_region->receiver_count = 0;
+
 #if defined(__linux__) && defined(__KERNEL__)
 	memset(memory_region->reserved, 0, sizeof(memory_region->reserved));
 #else
@@ -366,7 +367,7 @@ static void ffa_composite_memory_region_init(
  * one `ffa_memory_region_constituent`.
  */
 void ffa_endpoint_rx_tx_descriptor_init(
-	struct ffa_endpoint_rx_tx_descriptor *desc, ffa_vm_id_t endpoint_id,
+	struct ffa_endpoint_rx_tx_descriptor *desc, ffa_id_t endpoint_id,
 	uint64_t rx_address, uint64_t tx_address)
 {
 	desc->endpoint_id = endpoint_id;

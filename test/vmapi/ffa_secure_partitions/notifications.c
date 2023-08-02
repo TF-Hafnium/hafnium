@@ -22,11 +22,11 @@
 struct notif_cpu_entry_args {
 	struct spinlock *lock;
 	ffa_vcpu_index_t vcpu_id;
-	ffa_vm_id_t sp_id;
+	ffa_id_t sp_id;
 	bool is_sp_up;
 };
 
-static void notif_signal_vm_to_sp(ffa_vm_id_t sender, ffa_vm_id_t receiver,
+static void notif_signal_vm_to_sp(ffa_id_t sender, ffa_id_t receiver,
 				  ffa_notifications_bitmap_t bitmap,
 				  uint32_t flags)
 {
@@ -59,7 +59,7 @@ static void notif_signal_vm_to_sp(ffa_vm_id_t sender, ffa_vm_id_t receiver,
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 }
 
-static void notif_signal_sp_to_vm(ffa_vm_id_t sender, ffa_vm_id_t receiver,
+static void notif_signal_sp_to_vm(ffa_id_t sender, ffa_id_t receiver,
 				  ffa_notifications_bitmap_t bitmap,
 				  uint32_t flags)
 {
@@ -233,8 +233,8 @@ TEST(ffa_notifications, per_vcpu_sp_to_vm)
 TEST(ffa_notifications, fail_if_mbz_set_in_notification_get)
 {
 	struct ffa_value res;
-	const ffa_vm_id_t sender = SP_ID(1);
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_id_t sender = SP_ID(1);
+	ffa_id_t own_id = hf_vm_get_id();
 
 	/* Arbitrarily bind notification. */
 	res = ffa_notification_bind(sender, own_id, 0,
@@ -255,8 +255,8 @@ TEST(ffa_notifications, fail_if_mbz_set_in_notification_get)
 TEST(ffa_notifications, fail_if_mbz_set_in_notifications_bind)
 {
 	struct ffa_value res;
-	const ffa_vm_id_t sender = SP_ID(1);
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_id_t sender = SP_ID(1);
+	ffa_id_t own_id = hf_vm_get_id();
 
 	res = ffa_notification_bind(sender, own_id,
 				    ~FFA_NOTIFICATION_FLAG_PER_VCPU,

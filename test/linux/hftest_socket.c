@@ -88,8 +88,8 @@ noreturn void kmain(size_t memory_size)
 		swap(&(hdr->src_port), &(hdr->dst_port));
 
 		/* Swap the destination and source ids. */
-		ffa_vm_id_t dst_id = ffa_sender(ret);
-		ffa_vm_id_t src_id = ffa_receiver(ret);
+		ffa_id_t dst_id = ffa_sender(ret);
+		ffa_id_t src_id = ffa_receiver(ret);
 
 		EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 		EXPECT_EQ(

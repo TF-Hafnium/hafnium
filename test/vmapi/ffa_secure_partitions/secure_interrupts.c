@@ -19,8 +19,8 @@
 #define SP_SLEEP_TIME 400U
 #define NS_SLEEP_TIME 200U
 
-static void configure_trusted_wdog_interrupt(ffa_vm_id_t source,
-					     ffa_vm_id_t dest, bool enable)
+static void configure_trusted_wdog_interrupt(ffa_id_t source, ffa_id_t dest,
+					     bool enable)
 {
 	struct ffa_value res;
 
@@ -31,18 +31,18 @@ static void configure_trusted_wdog_interrupt(ffa_vm_id_t source,
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 }
 
-static void enable_trusted_wdog_interrupt(ffa_vm_id_t source, ffa_vm_id_t dest)
+static void enable_trusted_wdog_interrupt(ffa_id_t source, ffa_id_t dest)
 {
 	configure_trusted_wdog_interrupt(source, dest, true);
 }
 
-static void disable_trusted_wdog_interrupt(ffa_vm_id_t source, ffa_vm_id_t dest)
+static void disable_trusted_wdog_interrupt(ffa_id_t source, ffa_id_t dest)
 {
 	configure_trusted_wdog_interrupt(source, dest, false);
 }
 
-static void enable_trigger_trusted_wdog_timer(ffa_vm_id_t own_id,
-					      ffa_vm_id_t receiver_id,
+static void enable_trigger_trusted_wdog_timer(ffa_id_t own_id,
+					      ffa_id_t receiver_id,
 					      uint32_t timer_ms)
 {
 	struct ffa_value res;
@@ -65,8 +65,8 @@ static void enable_trigger_trusted_wdog_timer(ffa_vm_id_t own_id,
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 }
 
-static void check_and_disable_trusted_wdog_timer(ffa_vm_id_t own_id,
-						 ffa_vm_id_t receiver_id)
+static void check_and_disable_trusted_wdog_timer(ffa_id_t own_id,
+						 ffa_id_t receiver_id)
 {
 	struct ffa_value res;
 
@@ -90,10 +90,10 @@ static void check_and_disable_trusted_wdog_timer(ffa_vm_id_t own_id,
 TEST(secure_interrupts, sp_running)
 {
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-	const ffa_vm_id_t receiver_id = service2_info->vm_id;
+	const ffa_id_t receiver_id = service2_info->vm_id;
 
 	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 400);
 
@@ -119,10 +119,10 @@ TEST(secure_interrupts, sp_running)
  */
 TEST(secure_interrupts, sp_waiting)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-	const ffa_vm_id_t receiver_id = service2_info->vm_id;
+	const ffa_id_t receiver_id = service2_info->vm_id;
 	uint64_t time1;
 	volatile uint64_t time_lapsed;
 	uint64_t timer_freq = read_msr(cntfrq_el0);
@@ -151,12 +151,12 @@ TEST(secure_interrupts, sp_waiting)
 TEST(secure_interrupts, sp_blocked)
 {
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-	const ffa_vm_id_t receiver_id = service2_info->vm_id;
-	const ffa_vm_id_t companion_id = service1_info->vm_id;
+	const ffa_id_t receiver_id = service2_info->vm_id;
+	const ffa_id_t companion_id = service1_info->vm_id;
 
 	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 400);
 
@@ -180,10 +180,10 @@ TEST(secure_interrupts, sp_blocked)
 TEST(secure_interrupts, sp_preempted)
 {
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-	const ffa_vm_id_t receiver_id = service2_info->vm_id;
+	const ffa_id_t receiver_id = service2_info->vm_id;
 
 	gicv3_system_setup();
 	interrupt_enable(PHYSICAL_TIMER_IRQ, true);
@@ -247,7 +247,7 @@ TEST(secure_interrupts, sp_preempted)
 TEST(secure_interrupts, sp_other_s_interrupt_queued)
 {
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 	struct ffa_partition_info *service3_info = service3(mb.recv);
@@ -256,8 +256,8 @@ TEST(secure_interrupts, sp_other_s_interrupt_queued)
 	 * Service2 SP is the target of trusted watchdog timer interrupt.
 	 * Service3 SP specified action to Other-S Interrupt as queued.
 	 */
-	const ffa_vm_id_t target_id = service2_info->vm_id;
-	const ffa_vm_id_t receiver_id = service3_info->vm_id;
+	const ffa_id_t target_id = service2_info->vm_id;
+	const ffa_id_t receiver_id = service3_info->vm_id;
 
 	enable_trigger_trusted_wdog_timer(own_id, target_id, 400);
 
@@ -299,10 +299,10 @@ TEST(secure_interrupts, sp_other_s_interrupt_queued)
 TEST(secure_interrupts, sp_yield_sec_interrupt_handling)
 {
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-	const ffa_vm_id_t receiver_id = service2_info->vm_id;
+	const ffa_id_t receiver_id = service2_info->vm_id;
 	uint64_t time1;
 	volatile uint64_t time_lapsed;
 	uint64_t timer_freq = read_msr(cntfrq_el0);

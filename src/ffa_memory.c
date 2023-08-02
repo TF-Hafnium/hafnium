@@ -1017,7 +1017,7 @@ out:
  *  Success is indicated by FFA_SUCCESS.
  */
 struct ffa_value ffa_retrieve_check_update(
-	struct vm_locked to_locked, ffa_vm_id_t from_id,
+	struct vm_locked to_locked, ffa_id_t from_id,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t memory_to_attributes, uint32_t share_func, bool clear,
@@ -1109,7 +1109,7 @@ out:
 }
 
 static struct ffa_value ffa_relinquish_check_update(
-	struct vm_locked from_locked, ffa_vm_id_t owner_id,
+	struct vm_locked from_locked, ffa_id_t owner_id,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	struct mpool *page_pool, bool clear)
@@ -1437,9 +1437,8 @@ struct ffa_value ffa_memory_send_validate(
 		ffa_memory_access_permissions_t permissions =
 			memory_region->receivers[i]
 				.receiver_permissions.permissions;
-		ffa_vm_id_t receiver_id =
-			memory_region->receivers[i]
-				.receiver_permissions.receiver;
+		ffa_id_t receiver_id = memory_region->receivers[i]
+					       .receiver_permissions.receiver;
 
 		if (memory_region->sender == receiver_id) {
 			dlog_verbose("Can't share memory with itself.\n");
@@ -1578,7 +1577,7 @@ struct ffa_value ffa_memory_send_validate(
  */
 struct ffa_value ffa_memory_send_continue_validate(
 	struct share_states_locked share_states, ffa_memory_handle_t handle,
-	struct ffa_memory_share_state **share_state_ret, ffa_vm_id_t from_vm_id,
+	struct ffa_memory_share_state **share_state_ret, ffa_id_t from_vm_id,
 	struct mpool *page_pool)
 {
 	struct ffa_memory_share_state *share_state;
@@ -1638,8 +1637,8 @@ bool memory_region_receivers_from_other_world(
 	struct ffa_memory_region *memory_region)
 {
 	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
-		ffa_vm_id_t receiver = memory_region->receivers[i]
-					       .receiver_permissions.receiver;
+		ffa_id_t receiver = memory_region->receivers[i]
+					    .receiver_permissions.receiver;
 		if (!vm_id_is_current_world(receiver)) {
 			return true;
 		}
@@ -1735,7 +1734,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 		 * that at this point it has been validated:
 		 * - MBZ at virtual FF-A instance.
 		 */
-		ffa_vm_id_t sender_to_ret =
+		ffa_id_t sender_to_ret =
 			(from_locked.vm->id == HF_OTHER_WORLD_ID)
 				? memory_region->sender
 				: 0;
@@ -1861,9 +1860,9 @@ static void ffa_memory_retrieve_complete(
  */
 static bool ffa_retrieved_memory_region_init(
 	void *response, uint32_t ffa_version, size_t response_max_size,
-	ffa_vm_id_t sender, ffa_memory_attributes_t attributes,
+	ffa_id_t sender, ffa_memory_attributes_t attributes,
 	ffa_memory_region_flags_t flags, ffa_memory_handle_t handle,
-	ffa_vm_id_t receiver_id, ffa_memory_access_permissions_t permissions,
+	ffa_id_t receiver_id, ffa_memory_access_permissions_t permissions,
 	uint32_t page_count, uint32_t total_constituent_count,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t fragment_constituent_count, uint32_t *total_length,
@@ -1970,7 +1969,7 @@ static bool ffa_retrieved_memory_region_init(
  * in the array, return the region's 'receiver_count'.
  */
 uint32_t ffa_memory_region_get_receiver(struct ffa_memory_region *memory_region,
-					ffa_vm_id_t receiver)
+					ffa_id_t receiver)
 {
 	struct ffa_memory_access *receivers;
 	uint32_t i;
@@ -2081,7 +2080,7 @@ static bool ffa_memory_retrieve_is_memory_access_valid(
  */
 static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	struct ffa_memory_region *memory_region,
-	struct ffa_memory_region *retrieve_request, ffa_vm_id_t to_vm_id,
+	struct ffa_memory_region *retrieve_request, ffa_id_t to_vm_id,
 	ffa_memory_access_permissions_t *permissions)
 {
 	uint32_t retrieve_receiver_index;
@@ -2120,7 +2119,7 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 			&retrieve_request->receivers[i];
 		ffa_memory_access_permissions_t requested_permissions =
 			current_receiver->receiver_permissions.permissions;
-		ffa_vm_id_t current_receiver_id =
+		ffa_id_t current_receiver_id =
 			current_receiver->receiver_permissions.receiver;
 		bool found_to_id = current_receiver_id == to_vm_id;
 
@@ -2245,7 +2244,7 @@ static void ffa_memory_retrieve_complete_from_hyp(
  * memory sharing call.
  */
 static struct ffa_value ffa_memory_retrieve_validate(
-	ffa_vm_id_t receiver_id, struct ffa_memory_region *retrieve_request,
+	ffa_id_t receiver_id, struct ffa_memory_region *retrieve_request,
 	struct ffa_memory_region *memory_region, uint32_t *receiver_index,
 	uint32_t share_func)
 {
@@ -2389,7 +2388,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	struct ffa_composite_memory_region *composite;
 	uint32_t total_length;
 	uint32_t fragment_length;
-	ffa_vm_id_t receiver_id = to_locked.vm->id;
+	ffa_id_t receiver_id = to_locked.vm->id;
 	bool is_send_complete = false;
 	ffa_memory_attributes_t attributes;
 
@@ -2634,7 +2633,7 @@ static uint32_t ffa_memory_retrieve_expected_offset_per_ffa_version(
 struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 					      ffa_memory_handle_t handle,
 					      uint32_t fragment_offset,
-					      ffa_vm_id_t sender_vm_id,
+					      ffa_id_t sender_vm_id,
 					      struct mpool *page_pool)
 {
 	struct ffa_memory_region *memory_region;

@@ -269,7 +269,7 @@ TEST_SERVICE(ffa_memory_return)
 
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
-	ffa_vm_id_t sender = retrieve_memory_from_message(
+	ffa_id_t sender = retrieve_memory_from_message(
 		recv_buf, send_buf, NULL, memory_region, HF_MAILBOX_SIZE);
 	struct ffa_composite_memory_region *composite =
 		ffa_memory_region_get_composite(memory_region, 0);
@@ -422,7 +422,7 @@ TEST_SERVICE(ffa_donate_twice)
 
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
-	ffa_vm_id_t sender;
+	ffa_id_t sender;
 	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region_constituent constituent;
 
@@ -503,7 +503,7 @@ TEST_SERVICE(ffa_donate_invalid_source)
 
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
-	ffa_vm_id_t sender = retrieve_memory_from_message(
+	ffa_id_t sender = retrieve_memory_from_message(
 		recv_buf, send_buf, NULL, memory_region, HF_MAILBOX_SIZE);
 	struct ffa_composite_memory_region *composite =
 		ffa_memory_region_get_composite(memory_region, 0);
@@ -975,7 +975,7 @@ TEST_SERVICE(retrieve_ffa_v1_0)
 	struct ffa_memory_region_v1_0 *memory_region =
 		(struct ffa_memory_region_v1_0 *)retrieve_buffer;
 	struct ffa_composite_memory_region *composite;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	const struct ffa_partition_msg *retrv_message =
 		(struct ffa_partition_msg *)recv_buf;
 	struct ffa_value ret;

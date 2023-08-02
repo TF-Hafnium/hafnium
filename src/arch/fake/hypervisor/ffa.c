@@ -20,7 +20,7 @@ struct ffa_value arch_ffa_features(uint32_t function_id)
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-ffa_vm_id_t arch_ffa_spmc_id_get(void)
+ffa_id_t arch_ffa_spmc_id_get(void)
 {
 	return HF_SPMC_VM_ID;
 }
@@ -29,8 +29,7 @@ void plat_ffa_log_init(void)
 {
 }
 
-bool plat_ffa_is_memory_send_valid(ffa_vm_id_t receiver_vm_id,
-				   uint32_t share_func)
+bool plat_ffa_is_memory_send_valid(ffa_id_t receiver_vm_id, uint32_t share_func)
 {
 	(void)receiver_vm_id;
 	(void)share_func;
@@ -39,8 +38,8 @@ bool plat_ffa_is_memory_send_valid(ffa_vm_id_t receiver_vm_id,
 }
 
 bool plat_ffa_is_direct_request_valid(struct vcpu *current,
-				      ffa_vm_id_t sender_vm_id,
-				      ffa_vm_id_t receiver_vm_id)
+				      ffa_id_t sender_vm_id,
+				      ffa_id_t receiver_vm_id)
 {
 	(void)current;
 	(void)sender_vm_id;
@@ -59,8 +58,8 @@ bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
 }
 
 bool plat_ffa_is_direct_response_valid(struct vcpu *current,
-				       ffa_vm_id_t sender_vm_id,
-				       ffa_vm_id_t receiver_vm_id)
+				       ffa_id_t sender_vm_id,
+				       ffa_id_t receiver_vm_id)
 {
 	(void)current;
 	(void)sender_vm_id;
@@ -69,7 +68,7 @@ bool plat_ffa_is_direct_response_valid(struct vcpu *current,
 	return true;
 }
 
-bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 			  struct ffa_value *ret)
 {
 	(void)vm_id;
@@ -89,7 +88,7 @@ void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 	(void)vm_locked;
 }
 
-bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
+bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret)
 {
@@ -126,8 +125,8 @@ bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 	return false;
 }
 
-bool plat_ffa_msg_send2_forward(ffa_vm_id_t receiver_vm_id,
-				ffa_vm_id_t sender_vm_id, struct ffa_value *ret)
+bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
+				struct ffa_value *ret)
 {
 	(void)receiver_vm_id;
 	(void)sender_vm_id;
@@ -153,15 +152,15 @@ uint32_t plat_ffa_other_world_mode(void)
 	return 0U;
 }
 
-uint32_t plat_ffa_owner_world_mode(ffa_vm_id_t owner_id)
+uint32_t plat_ffa_owner_world_mode(ffa_id_t owner_id)
 {
 	(void)owner_id;
 	return 0U;
 }
 
 bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
-					  ffa_vm_id_t sender_id,
-					  ffa_vm_id_t receiver_id)
+					  ffa_id_t sender_id,
+					  ffa_id_t receiver_id)
 {
 	(void)current;
 	(void)sender_id;
@@ -170,7 +169,7 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 }
 
 bool plat_ffa_notifications_update_bindings_forward(
-	ffa_vm_id_t receiver_id, ffa_vm_id_t sender_id, uint32_t flags,
+	ffa_id_t receiver_id, ffa_id_t sender_id, uint32_t flags,
 	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret)
 {
 	(void)ret;
@@ -190,7 +189,7 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 }
 
 ffa_partition_properties_t plat_ffa_partition_properties(
-	ffa_vm_id_t vm_id, const struct vm *target)
+	ffa_id_t vm_id, const struct vm *target)
 {
 	(void)vm_id;
 	(void)target;
@@ -204,7 +203,7 @@ bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 }
 
 bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
-					    ffa_vm_id_t vm_id)
+					    ffa_id_t vm_id)
 {
 	(void)current;
 	(void)vm_id;
@@ -213,8 +212,8 @@ bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
 }
 
 bool plat_ffa_is_notification_set_valid(struct vcpu *current,
-					ffa_vm_id_t sender_id,
-					ffa_vm_id_t receiver_id)
+					ffa_id_t sender_id,
+					ffa_id_t receiver_id)
 {
 	(void)current;
 	(void)sender_id;
@@ -223,7 +222,7 @@ bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 }
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_vm_id_t receiver_id, uint32_t flags)
+					ffa_id_t receiver_id, uint32_t flags)
 {
 	(void)flags;
 	(void)current;
@@ -258,9 +257,8 @@ bool plat_ffa_notifications_get_framework_notifications(
 	return false;
 }
 
-bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
-				       ffa_vm_id_t receiver_vm_id,
-				       uint32_t flags,
+bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
+				       ffa_id_t receiver_vm_id, uint32_t flags,
 				       ffa_notifications_bitmap_t bitmap,
 				       struct ffa_value *ret)
 {
@@ -274,7 +272,7 @@ bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
 }
 
 struct ffa_value plat_ffa_notifications_bitmap_create(
-	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count)
+	ffa_id_t vm_id, ffa_vcpu_count_t vcpu_count)
 {
 	(void)vm_id;
 	(void)vcpu_count;
@@ -282,26 +280,26 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id)
+struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_id_t vm_id)
 {
 	(void)vm_id;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id)
+struct vm_locked plat_ffa_vm_find_locked(ffa_id_t vm_id)
 {
 	(void)vm_id;
 	return (struct vm_locked){.vm = NULL};
 }
 
-struct vm_locked plat_ffa_vm_find_locked_create(ffa_vm_id_t vm_id)
+struct vm_locked plat_ffa_vm_find_locked_create(ffa_id_t vm_id)
 {
 	(void)vm_id;
 	return (struct vm_locked){.vm = NULL};
 }
 
-bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id)
+bool plat_ffa_is_vm_id(ffa_id_t vm_id)
 {
 	(void)vm_id;
 	return false;
@@ -337,7 +335,7 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
  * Check if current VM can resume target VM/SP using FFA_RUN ABI.
  */
 bool plat_ffa_run_checks(struct vcpu_locked current_locked,
-			 ffa_vm_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
+			 ffa_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
 			 struct ffa_value *run_ret, struct vcpu **next)
 {
 	(void)current_locked;
@@ -428,8 +426,8 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 }
 
 bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
-					     ffa_vm_id_t vm_id,
-					     ffa_vm_id_t receiver_vm_id,
+					     ffa_id_t vm_id,
+					     ffa_id_t receiver_vm_id,
 					     struct vcpu_locked receiver_locked,
 					     uint32_t func,  // NOLINTNEXTLINE
 					     enum vcpu_state *next_state)
@@ -455,7 +453,7 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
 
 void plat_ffa_wind_call_chain_ffa_direct_req(
 	struct vcpu_locked current_locked,
-	struct vcpu_locked receiver_vcpu_locked, ffa_vm_id_t sender_vm_id)
+	struct vcpu_locked receiver_vcpu_locked, ffa_id_t sender_vm_id)
 {
 	/* Calls chains not supported in the Hypervisor/VMs. */
 	(void)current_locked;
@@ -471,7 +469,7 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(
 	(void)next_locked;
 }
 
-bool plat_ffa_is_spmd_lp_id(ffa_vm_id_t vm_id)
+bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	(void)vm_id;
 	return false;
@@ -559,8 +557,8 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
 	return ffa_error(FFA_INVALID_PARAMETERS);
 }
 
-struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
-				   ffa_vm_id_t receiver_vm_id, uint32_t size,
+struct ffa_value plat_ffa_msg_send(ffa_id_t sender_vm_id,
+				   ffa_id_t receiver_vm_id, uint32_t size,
 				   struct vcpu *current, struct vcpu **next)
 {
 	(void)sender_vm_id;
@@ -663,8 +661,7 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-int64_t plat_ffa_mailbox_waiter_get(ffa_vm_id_t vm_id,
-				    const struct vcpu *current)
+int64_t plat_ffa_mailbox_waiter_get(ffa_id_t vm_id, const struct vcpu *current)
 {
 	(void)vm_id;
 	(void)current;

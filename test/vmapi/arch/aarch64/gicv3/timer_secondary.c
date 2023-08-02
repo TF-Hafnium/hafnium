@@ -60,7 +60,7 @@ static void timer_busywait_secondary(void)
 	const char message[] = "loop 0099999";
 	const char expected_response[] = "Got IRQ 03.";
 	uint8_t response[sizeof(expected_response)];
-	ffa_vm_id_t sender;
+	ffa_id_t sender;
 	struct ffa_value ret;
 
 	/* Let the secondary get started and wait for our message. */
@@ -119,7 +119,7 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 	const char expected_response[] = "Got IRQ 03.";
 	size_t message_length = strnlen_s(message, 64) + 1;
 	uint8_t response[sizeof(expected_response)];
-	ffa_vm_id_t sender;
+	ffa_id_t sender;
 	struct ffa_value ret;
 
 	/* Let the secondary get started and wait for our message. */

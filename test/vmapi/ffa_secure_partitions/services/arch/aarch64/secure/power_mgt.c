@@ -10,10 +10,10 @@
 #include "partition_services.h"
 #include "test/hftest.h"
 
-struct ffa_value sp_check_cpu_idx_cmd(ffa_vm_id_t test_source,
+struct ffa_value sp_check_cpu_idx_cmd(ffa_id_t test_source,
 				      ffa_vcpu_index_t received_cpu_idx)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	ffa_vcpu_index_t core_idx =
 		(ffa_vcpu_index_t)(read_msr(mpidr_el1) & ~0x80000000ULL);
 

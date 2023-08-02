@@ -74,4 +74,4 @@ void vdlog(const char *fmt, va_list args);
 		}                                      \
 	} while (0)
 
-void dlog_flush_vm_buffer(ffa_vm_id_t id, char buffer[], size_t length);
+void dlog_flush_vm_buffer(ffa_id_t id, char buffer[], size_t length);

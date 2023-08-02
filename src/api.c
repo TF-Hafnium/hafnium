@@ -122,7 +122,7 @@ struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current)
  */
 struct vcpu *api_switch_to_vm(struct vcpu_locked current_locked,
 			      struct ffa_value to_ret,
-			      enum vcpu_state vcpu_state, ffa_vm_id_t to_id)
+			      enum vcpu_state vcpu_state, ffa_id_t to_id)
 {
 	struct vm *to_vm = vm_find(to_id);
 	struct vcpu *next = api_ffa_get_vm_vcpu(to_vm, current_locked.vcpu);
@@ -498,7 +498,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 
 static void api_ffa_fill_partitions_info_array(
 	struct ffa_partition_info *partitions, size_t partitions_len,
-	const struct ffa_uuid *uuid, bool count_flag, ffa_vm_id_t vm_id,
+	const struct ffa_uuid *uuid, bool count_flag, ffa_id_t vm_id,
 	ffa_vm_count_t *vm_count_out)
 {
 	ffa_vm_count_t vm_count = 0;
@@ -541,7 +541,7 @@ static void api_ffa_fill_partitions_info_array(
 }
 
 static inline void api_ffa_pack_vmid_count_props(
-	uint64_t *xn, ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count,
+	uint64_t *xn, ffa_id_t vm_id, ffa_vcpu_count_t vcpu_count,
 	ffa_partition_properties_t properties)
 {
 	*xn = (uint64_t)vm_id;
@@ -1033,7 +1033,7 @@ struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
  */
 static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
 {
-	ffa_vm_id_t vm_id = vm_locked.vm->id;
+	ffa_id_t vm_id = vm_locked.vm->id;
 	int32_t error_code_to_ret = 0;
 
 	switch (vm_locked.vm->mailbox.state) {
@@ -1354,7 +1354,7 @@ out:
 	return ret;
 }
 
-struct ffa_value api_ffa_run(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+struct ffa_value api_ffa_run(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 			     struct vcpu *current, struct vcpu **next)
 {
 	struct vm *vm;
@@ -1681,7 +1681,7 @@ out:
 
 static void api_get_rxtx_description(struct vm *current_vm, ipaddr_t *send,
 				     ipaddr_t *recv, uint32_t *page_count,
-				     ffa_vm_id_t *owner_vm_id)
+				     ffa_id_t *owner_vm_id)
 {
 	/*
 	 * If the message has been forwarded the effective addresses are in
@@ -1734,7 +1734,7 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	struct vm_locked owner_vm_locked;
 	struct mm_stage1_locked mm_stage1_locked;
 	struct mpool local_page_pool;
-	ffa_vm_id_t owner_vm_id;
+	ffa_id_t owner_vm_id;
 
 	/*
 	 * Get the original buffer addresses and VM ID in case of forwarded
@@ -1790,12 +1790,11 @@ exit:
  *     behalf of the caller.
  *   - FFA_SUCCESS on success if no further action is needed.
  */
-struct ffa_value api_ffa_rxtx_unmap(ffa_vm_id_t allocator_id,
-				    struct vcpu *current)
+struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 {
 	struct vm *vm = current->vm;
 	struct vm_locked vm_locked;
-	ffa_vm_id_t owner_vm_id;
+	ffa_id_t owner_vm_id;
 	struct mm_stage1_locked mm_stage1_locked;
 	paddr_t send_pa_begin;
 	paddr_t send_pa_end;
@@ -1886,19 +1885,19 @@ out:
  * Copies data from the sender's send buffer to the recipient's receive buffer
  * and notifies the receiver.
  */
-struct ffa_value api_ffa_msg_send2(ffa_vm_id_t sender_vm_id, uint32_t flags,
+struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 				   struct vcpu *current)
 {
 	struct vm *from = current->vm;
 	struct vm *to;
 	struct vm_locked to_locked;
-	ffa_vm_id_t msg_sender_id;
+	ffa_id_t msg_sender_id;
 	struct vm_locked sender_locked;
 	const void *from_msg;
 	struct ffa_value ret;
 	struct ffa_partition_rxtx_header header;
-	ffa_vm_id_t sender_id;
-	ffa_vm_id_t receiver_id;
+	ffa_id_t sender_id;
+	ffa_id_t receiver_id;
 	uint32_t msg_size;
 	ffa_notifications_bitmap_t rx_buffer_full;
 
@@ -2060,14 +2059,13 @@ out_unlock_sender:
  *    needs to wake up or kick waiters. Waiters should be retrieved by calling
  *    hf_mailbox_waiter_get.
  */
-struct ffa_value api_ffa_rx_release(ffa_vm_id_t receiver_id,
-				    struct vcpu *current)
+struct ffa_value api_ffa_rx_release(ffa_id_t receiver_id, struct vcpu *current)
 {
 	struct vm *current_vm = current->vm;
 	struct vm *vm;
 	struct vm_locked vm_locked;
-	ffa_vm_id_t current_vm_id = current_vm->id;
-	ffa_vm_id_t release_vm_id;
+	ffa_id_t current_vm_id = current_vm->id;
+	ffa_id_t release_vm_id;
 	struct ffa_value ret;
 	int32_t error_code;
 
@@ -2125,8 +2123,7 @@ out:
  * - FFA_INVALID_PARAMETERS: there is no buffer pair registered for the VM.
  * - FFA_NOT_SUPPORTED: function not implemented at the FF-A instance.
  */
-struct ffa_value api_ffa_rx_acquire(ffa_vm_id_t receiver_id,
-				    struct vcpu *current)
+struct ffa_value api_ffa_rx_acquire(ffa_id_t receiver_id, struct vcpu *current)
 {
 	struct vm_locked receiver_locked;
 	struct vm *receiver;
@@ -2291,7 +2288,7 @@ static inline bool is_injection_allowed(uint32_t target_vm_id,
  *  - 1 if it was called by the primary VM and the primary VM now needs to wake
  *    up or kick the target vCPU.
  */
-int64_t api_interrupt_inject(ffa_vm_id_t target_vm_id,
+int64_t api_interrupt_inject(ffa_id_t target_vm_id,
 			     ffa_vcpu_index_t target_vcpu_idx, uint32_t intid,
 			     struct vcpu *current, struct vcpu **next)
 {
@@ -2548,8 +2545,8 @@ static struct ffa_value api_ffa_dir_msg_value(struct ffa_value args)
 /**
  * Send an FF-A direct message request.
  */
-struct ffa_value api_ffa_msg_send_direct_req(ffa_vm_id_t sender_vm_id,
-					     ffa_vm_id_t receiver_vm_id,
+struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
+					     ffa_id_t receiver_vm_id,
 					     struct ffa_value args,
 					     struct vcpu *current,
 					     struct vcpu **next)
@@ -2728,7 +2725,7 @@ out:
  */
 void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
 				       struct vcpu **next,
-				       ffa_vm_id_t receiver_vm_id,
+				       ffa_id_t receiver_vm_id,
 				       struct ffa_value to_ret,
 				       bool is_nwd_call_chain)
 {
@@ -2759,8 +2756,8 @@ void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
 /**
  * Send an FF-A direct message response.
  */
-struct ffa_value api_ffa_msg_send_direct_resp(ffa_vm_id_t sender_vm_id,
-					      ffa_vm_id_t receiver_vm_id,
+struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
+					      ffa_id_t receiver_vm_id,
 					      struct ffa_value args,
 					      struct vcpu *current,
 					      struct vcpu **next)
@@ -3226,9 +3223,8 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	 * forwarding if needed.
 	 */
 	for (uint32_t i = 0U; i < memory_region->receiver_count; i++) {
-		ffa_vm_id_t receiver_id =
-			memory_region->receivers[i]
-				.receiver_permissions.receiver;
+		ffa_id_t receiver_id = memory_region->receivers[i]
+					       .receiver_permissions.receiver;
 		to = vm_find(receiver_id);
 
 		if (vm_id_is_current_world(receiver_id) &&
@@ -3483,7 +3479,7 @@ struct ffa_value api_ffa_mem_relinquish(struct vcpu *current)
 	 */
 	length = sizeof(struct ffa_mem_relinquish) +
 		 ((struct ffa_mem_relinquish *)from_msg)->endpoint_count *
-			 sizeof(ffa_vm_id_t);
+			 sizeof(ffa_id_t);
 	/*
 	 * Copy the relinquish descriptor to an internal buffer, so that the
 	 * caller can't change it underneath us.
@@ -3499,7 +3495,7 @@ struct ffa_value api_ffa_mem_relinquish(struct vcpu *current)
 	memcpy_s(relinquish_request, message_buffer_size, from_msg, length);
 
 	if (sizeof(struct ffa_mem_relinquish) +
-		    relinquish_request->endpoint_count * sizeof(ffa_vm_id_t) !=
+		    relinquish_request->endpoint_count * sizeof(ffa_id_t) !=
 	    length) {
 		dlog_verbose(
 			"Endpoint count changed while copying to internal "
@@ -3540,7 +3536,7 @@ struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 
 struct ffa_value api_ffa_mem_frag_rx(ffa_memory_handle_t handle,
 				     uint32_t fragment_offset,
-				     ffa_vm_id_t sender_vm_id,
+				     ffa_id_t sender_vm_id,
 				     struct vcpu *current)
 {
 	struct vm *to = current->vm;
@@ -3577,7 +3573,7 @@ out:
 
 struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 				     uint32_t fragment_length,
-				     ffa_vm_id_t sender_vm_id,
+				     ffa_id_t sender_vm_id,
 				     struct vcpu *current)
 {
 	struct vm *from = current->vm;
@@ -3708,7 +3704,7 @@ struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-struct ffa_value api_ffa_notification_bitmap_create(ffa_vm_id_t vm_id,
+struct ffa_value api_ffa_notification_bitmap_create(ffa_id_t vm_id,
 						    ffa_vcpu_count_t vcpu_count,
 						    struct vcpu *current)
 {
@@ -3721,7 +3717,7 @@ struct ffa_value api_ffa_notification_bitmap_create(ffa_vm_id_t vm_id,
 	return plat_ffa_notifications_bitmap_create(vm_id, vcpu_count);
 }
 
-struct ffa_value api_ffa_notification_bitmap_destroy(ffa_vm_id_t vm_id,
+struct ffa_value api_ffa_notification_bitmap_destroy(ffa_id_t vm_id,
 						     struct vcpu *current)
 {
 	/*
@@ -3737,16 +3733,15 @@ struct ffa_value api_ffa_notification_bitmap_destroy(ffa_vm_id_t vm_id,
 }
 
 struct ffa_value api_ffa_notification_update_bindings(
-	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id, uint32_t flags,
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t notifications, bool is_bind,
 	struct vcpu *current)
 {
 	struct ffa_value ret = {.func = FFA_SUCCESS_32};
 	struct vm_locked receiver_locked;
 	const bool is_per_vcpu = (flags & FFA_NOTIFICATION_FLAG_PER_VCPU) != 0U;
-	const ffa_vm_id_t id_to_update =
-		is_bind ? sender_vm_id : HF_INVALID_VM_ID;
-	const ffa_vm_id_t id_to_validate =
+	const ffa_id_t id_to_update = is_bind ? sender_vm_id : HF_INVALID_VM_ID;
+	const ffa_id_t id_to_validate =
 		is_bind ? HF_INVALID_VM_ID : sender_vm_id;
 	const uint32_t flags_mbz =
 		is_bind ? ~FFA_NOTIFICATIONS_FLAG_PER_VCPU : ~0U;
@@ -3831,7 +3826,7 @@ out:
 }
 
 struct ffa_value api_ffa_notification_set(
-	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id, uint32_t flags,
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t notifications, struct vcpu *current)
 {
 	struct ffa_value ret;
@@ -3933,7 +3928,7 @@ static struct ffa_value api_ffa_notification_get_success_return(
 	};
 }
 
-struct ffa_value api_ffa_notification_get(ffa_vm_id_t receiver_vm_id,
+struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 					  ffa_vcpu_index_t vcpu_id,
 					  uint32_t flags, struct vcpu *current)
 {

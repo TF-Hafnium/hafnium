@@ -138,7 +138,7 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	struct hftest_context *ctx;
 	struct ffa_value ret;
 	struct fdt fdt;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct mailbox_buffers mb = set_up_mailbox();
 	ffa_notifications_bitmap_t bitmap;
 	struct ffa_partition_msg *message = (struct ffa_partition_msg *)mb.recv;
@@ -219,13 +219,13 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	}
 }
 
-ffa_vm_id_t hftest_get_dir_req_source_id(void)
+ffa_id_t hftest_get_dir_req_source_id(void)
 {
 	struct hftest_context *ctx = hftest_get_context();
 	return ctx->dir_req_source_id;
 }
 
-void hftest_set_dir_req_source_id(ffa_vm_id_t id)
+void hftest_set_dir_req_source_id(ffa_id_t id)
 {
 	struct hftest_context *ctx = hftest_get_context();
 	ctx->dir_req_source_id = id;

@@ -333,9 +333,9 @@ static void set_virtual_fiq_current(bool enable)
  */
 static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 {
-	ffa_vm_id_t sender = ffa_sender(*args);
-	ffa_vm_id_t receiver = ffa_receiver(*args);
-	ffa_vm_id_t current_vm_id = current->vm->id;
+	ffa_id_t sender = ffa_sender(*args);
+	ffa_id_t receiver = ffa_receiver(*args);
+	ffa_id_t current_vm_id = current->vm->id;
 	uint32_t fwk_msg = ffa_fwk_msg(*args);
 	uint8_t fwk_msg_func_id = fwk_msg & SPMD_FWK_MSG_FUNC_MASK;
 
@@ -665,12 +665,12 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		return true;
 	case FFA_NOTIFICATION_BITMAP_CREATE_32:
 		*args = api_ffa_notification_bitmap_create(
-			(ffa_vm_id_t)args->arg1, (ffa_vcpu_count_t)args->arg2,
+			(ffa_id_t)args->arg1, (ffa_vcpu_count_t)args->arg2,
 			current);
 		return true;
 	case FFA_NOTIFICATION_BITMAP_DESTROY_32:
 		*args = api_ffa_notification_bitmap_destroy(
-			(ffa_vm_id_t)args->arg1, current);
+			(ffa_id_t)args->arg1, current);
 		return true;
 	case FFA_NOTIFICATION_BIND_32:
 		*args = api_ffa_notification_update_bindings(
@@ -1390,7 +1390,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 void handle_system_register_access(uintreg_t esr_el2)
 {
 	struct vcpu *vcpu = current();
-	ffa_vm_id_t vm_id = vcpu->vm->id;
+	ffa_id_t vm_id = vcpu->vm->id;
 	uintreg_t ec = GET_ESR_EC(esr_el2);
 
 	CHECK(ec == EC_MSR);

@@ -163,7 +163,7 @@
 #define FFA_PAGE_SIZE ((size_t)4096)
 
 /** The ID of a VM. These are assigned sequentially starting with an offset. */
-typedef uint16_t ffa_vm_id_t;
+typedef uint16_t ffa_id_t;
 
 /**
  * Partition message header as specified by table 6.2 from FF-A v1.1 EAC0
@@ -185,7 +185,7 @@ struct ffa_partition_rxtx_header {
 #define FFA_RXTX_ALLOCATOR_SHIFT 16
 
 static inline void ffa_rxtx_header_init(
-	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t size,
+	ffa_id_t sender, ffa_id_t receiver, uint32_t size,
 	struct ffa_partition_rxtx_header *header)
 {
 	header->flags = 0;
@@ -196,16 +196,16 @@ static inline void ffa_rxtx_header_init(
 	header->size = size;
 }
 
-static inline ffa_vm_id_t ffa_rxtx_header_sender(
+static inline ffa_id_t ffa_rxtx_header_sender(
 	const struct ffa_partition_rxtx_header *h)
 {
-	return (ffa_vm_id_t)(h->sender_receiver >> FFA_RXTX_SENDER_SHIFT);
+	return (ffa_id_t)(h->sender_receiver >> FFA_RXTX_SENDER_SHIFT);
 }
 
-static inline ffa_vm_id_t ffa_rxtx_header_receiver(
+static inline ffa_id_t ffa_rxtx_header_receiver(
 	const struct ffa_partition_rxtx_header *h)
 {
-	return (ffa_vm_id_t)(h->sender_receiver);
+	return (ffa_id_t)(h->sender_receiver);
 }
 
 /* The maximum length possible for a single message. */
@@ -359,7 +359,7 @@ typedef uint64_t ffa_memory_handle_t;
  * A count of VMs. This has the same range as the VM IDs but we give it a
  * different name to make the different semantics clear.
  */
-typedef ffa_vm_id_t ffa_vm_count_t;
+typedef ffa_id_t ffa_vm_count_t;
 
 /** The index of a vCPU within a particular VM. */
 typedef uint16_t ffa_vcpu_index_t;
@@ -406,12 +406,12 @@ static inline int32_t ffa_error_code(struct ffa_value val)
 	return (int32_t)val.arg2;
 }
 
-static inline ffa_vm_id_t ffa_sender(struct ffa_value args)
+static inline ffa_id_t ffa_sender(struct ffa_value args)
 {
 	return (args.arg1 >> 16) & 0xffff;
 }
 
-static inline ffa_vm_id_t ffa_receiver(struct ffa_value args)
+static inline ffa_id_t ffa_receiver(struct ffa_value args)
 {
 	return args.arg1 & 0xffff;
 }
@@ -476,7 +476,7 @@ static inline struct ffa_value ffa_mem_success(ffa_memory_handle_t handle)
 				  .arg3 = (uint32_t)(handle >> 32)};
 }
 
-static inline ffa_vm_id_t ffa_vm_id(struct ffa_value args)
+static inline ffa_id_t ffa_vm_id(struct ffa_value args)
 {
 	return (args.arg1 >> 16) & 0xffff;
 }
@@ -486,13 +486,12 @@ static inline ffa_vcpu_index_t ffa_vcpu_index(struct ffa_value args)
 	return args.arg1 & 0xffff;
 }
 
-static inline uint64_t ffa_vm_vcpu(ffa_vm_id_t vm_id,
-				   ffa_vcpu_index_t vcpu_index)
+static inline uint64_t ffa_vm_vcpu(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_index)
 {
 	return ((uint32_t)vm_id << 16) | vcpu_index;
 }
 
-static inline ffa_vm_id_t ffa_frag_sender(struct ffa_value args)
+static inline ffa_id_t ffa_frag_sender(struct ffa_value args)
 {
 	return (args.arg4 >> 16) & 0xffff;
 }
@@ -573,7 +572,7 @@ typedef uint32_t ffa_partition_properties_t;
  * in FF-A 1.1 EAC0 specification.
  */
 struct ffa_partition_info {
-	ffa_vm_id_t vm_id;
+	ffa_id_t vm_id;
 	ffa_vcpu_count_t vcpu_count;
 	ffa_partition_properties_t properties;
 	struct ffa_uuid uuid;
@@ -841,7 +840,7 @@ typedef uint8_t ffa_memory_receiver_flags_t;
  */
 struct ffa_memory_region_attributes {
 	/** The ID of the VM to which the memory is being given or shared. */
-	ffa_vm_id_t receiver;
+	ffa_id_t receiver;
 	/**
 	 * The permissions with which the memory region should be mapped in the
 	 * receiver's page table.
@@ -917,7 +916,7 @@ struct ffa_memory_region {
 	 * The ID of the VM which originally sent the memory region, i.e. the
 	 * owner.
 	 */
-	ffa_vm_id_t sender;
+	ffa_id_t sender;
 	ffa_memory_attributes_t attributes;
 	/** Flags to control behaviour of the transaction. */
 	ffa_memory_region_flags_t flags;
@@ -959,7 +958,7 @@ struct ffa_mem_relinquish {
 	ffa_memory_handle_t handle;
 	ffa_memory_region_flags_t flags;
 	uint32_t endpoint_count;
-	ffa_vm_id_t endpoints[];
+	ffa_id_t endpoints[];
 };
 
 /**
@@ -984,13 +983,13 @@ ffa_memory_region_get_composite(struct ffa_memory_region *memory_region,
 static inline uint32_t ffa_mem_relinquish_init(
 	struct ffa_mem_relinquish *relinquish_request,
 	ffa_memory_handle_t handle, ffa_memory_region_flags_t flags,
-	ffa_vm_id_t sender)
+	ffa_id_t sender)
 {
 	relinquish_request->handle = handle;
 	relinquish_request->flags = flags;
 	relinquish_request->endpoint_count = 1;
 	relinquish_request->endpoints[0] = sender;
-	return sizeof(struct ffa_mem_relinquish) + sizeof(ffa_vm_id_t);
+	return sizeof(struct ffa_mem_relinquish) + sizeof(ffa_id_t);
 }
 
 void ffa_copy_memory_region_constituents(
@@ -1003,7 +1002,7 @@ void ffa_copy_memory_region_constituents(
  * to the SPMC, in order to allow indirect messaging.
  */
 struct ffa_endpoint_rx_tx_descriptor {
-	ffa_vm_id_t endpoint_id;
+	ffa_id_t endpoint_id;
 	uint16_t reserved;
 
 	/*
@@ -1037,19 +1036,19 @@ ffa_enpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
 }
 
 void ffa_memory_region_init_header(struct ffa_memory_region *memory_region,
-				   ffa_vm_id_t sender,
+				   ffa_id_t sender,
 				   ffa_memory_attributes_t attributes,
 				   ffa_memory_region_flags_t flags,
 				   ffa_memory_handle_t handle, uint32_t tag,
 				   uint32_t receiver_count);
 void ffa_memory_access_init_permissions(
-	struct ffa_memory_access *receiver, ffa_vm_id_t receiver_id,
+	struct ffa_memory_access *receiver, ffa_id_t receiver_id,
 	enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	ffa_memory_receiver_flags_t flags);
 uint32_t ffa_memory_region_init_single_receiver(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
-	ffa_vm_id_t sender, ffa_vm_id_t receiver,
+	ffa_id_t sender, ffa_id_t receiver,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
@@ -1059,7 +1058,7 @@ uint32_t ffa_memory_region_init_single_receiver(
 	uint32_t *total_length);
 uint32_t ffa_memory_region_init(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
-	ffa_vm_id_t sender, struct ffa_memory_access receivers[],
+	ffa_id_t sender, struct ffa_memory_access receivers[],
 	uint32_t receiver_count,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
@@ -1069,25 +1068,25 @@ uint32_t ffa_memory_region_init(
 	uint32_t *total_length);
 uint32_t ffa_memory_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
-	ffa_vm_id_t sender, struct ffa_memory_access receivers[],
+	ffa_id_t sender, struct ffa_memory_access receivers[],
 	uint32_t receiver_count, uint32_t tag, ffa_memory_region_flags_t flags,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability);
 uint32_t ffa_memory_retrieve_request_init_single_receiver(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
-	ffa_vm_id_t sender, ffa_vm_id_t receiver, uint32_t tag,
+	ffa_id_t sender, ffa_id_t receiver, uint32_t tag,
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability);
 uint32_t ffa_memory_lender_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
-	ffa_vm_id_t sender);
+	ffa_id_t sender);
 uint32_t ffa_memory_fragment_init(
 	struct ffa_memory_region_constituent *fragment,
 	size_t fragment_max_size,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t *fragment_length);
 void ffa_endpoint_rx_tx_descriptor_init(
-	struct ffa_endpoint_rx_tx_descriptor *desc, ffa_vm_id_t endpoint_id,
+	struct ffa_endpoint_rx_tx_descriptor *desc, ffa_id_t endpoint_id,
 	uint64_t rx_address, uint64_t tx_address);

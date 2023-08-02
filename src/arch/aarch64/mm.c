@@ -984,7 +984,7 @@ uint32_t arch_mm_get_pa_bits(uint64_t pa_range)
 /**
  * Return the arch specific mm mode for send/recv pages of given VM ID.
  */
-uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id)
+uint32_t arch_mm_extra_attributes_from_vm(ffa_id_t id)
 {
 	return ((id & HF_VM_ID_WORLD_MASK) == HF_HYPERVISOR_VM_ID) ? MM_MODE_NS
 								   : 0;

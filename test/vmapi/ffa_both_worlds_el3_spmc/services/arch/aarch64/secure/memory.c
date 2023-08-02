@@ -85,7 +85,7 @@ static void memory_increment(struct ffa_memory_region *memory_region)
 }
 
 void ffa_mem_retrieve_from_args(struct mailbox_buffers mb,
-				void *retrieved_memory, ffa_vm_id_t sender,
+				void *retrieved_memory, ffa_id_t sender,
 				ffa_memory_handle_t handle, uint32_t tag,
 				ffa_memory_region_flags_t flags)
 {
@@ -102,11 +102,11 @@ void ffa_mem_retrieve_from_args(struct mailbox_buffers mb,
 			msg_size);
 }
 
-struct ffa_value sp_req_retrieve_cmd(ffa_vm_id_t sender, uint32_t handle,
+struct ffa_value sp_req_retrieve_cmd(ffa_id_t sender, uint32_t handle,
 				     uint32_t tag, uint32_t flags,
 				     struct mailbox_buffers mb)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	ffa_mem_retrieve_from_args(mb, (void *)retrieve_buffer, sender, handle,
 				   tag, flags);

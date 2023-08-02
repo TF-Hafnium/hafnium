@@ -100,7 +100,7 @@ TEST(interrupts, sp_preempted_by_ns_interrupt)
 	struct ffa_value res;
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *receiver_info = service2(mb.recv);
-	const ffa_vm_id_t receiver_id = receiver_info->vm_id;
+	const ffa_id_t receiver_id = receiver_info->vm_id;
 
 	setup_physical_timer();
 	start_physical_timer(20000000);
@@ -139,10 +139,10 @@ TEST(interrupts, sp_preempted_by_ns_interrupt)
 TEST(interrupts, sp_managed_exit)
 {
 	struct ffa_value res;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *receiver_info = service1(mb.recv);
-	const ffa_vm_id_t receiver_id = receiver_info->vm_id;
+	const ffa_id_t receiver_id = receiver_info->vm_id;
 
 	setup_physical_timer();
 

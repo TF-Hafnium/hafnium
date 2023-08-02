@@ -51,10 +51,10 @@ void mailbox_receive_retry(void *buffer, size_t buffer_size, void *recv,
 {
 	const struct ffa_partition_msg *message;
 	const uint32_t *payload;
-	ffa_vm_id_t sender;
+	ffa_id_t sender;
 	struct ffa_value ret;
 	ffa_notifications_bitmap_t fwk_notif = 0U;
-	const ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_id_t own_id = hf_vm_get_id();
 
 	ASSERT_LE(buffer_size, FFA_MSG_PAYLOAD_MAX);
 	ASSERT_TRUE(header != NULL);
@@ -142,7 +142,7 @@ void send_fragmented_memory_region(
 }
 
 ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
-	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
+	uint32_t share_func, void *tx_buffer, ffa_id_t sender,
 	struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, struct ffa_memory_access receivers_send[],
 	uint32_t receivers_send_count,
@@ -249,9 +249,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
  * request it needs to retrieve it.
  */
 ffa_memory_handle_t send_memory_and_retrieve_request(
-	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
-	ffa_vm_id_t recipient,
-	struct ffa_memory_region_constituent constituents[],
+	uint32_t share_func, void *tx_buffer, ffa_id_t sender,
+	ffa_id_t recipient, struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, ffa_memory_region_flags_t send_flags,
 	ffa_memory_region_flags_t retrieve_flags,
 	enum ffa_data_access send_data_access,
@@ -283,9 +282,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
  * TODO: check if it can be based off a base function like the above functions.
  */
 ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
-	uint32_t share_func, void *tx_buffer, ffa_vm_id_t sender,
-	ffa_vm_id_t recipient,
-	struct ffa_memory_region_constituent constituents[],
+	uint32_t share_func, void *tx_buffer, ffa_id_t sender,
+	ffa_id_t recipient, struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, ffa_memory_region_flags_t flags,
 	enum ffa_data_access send_data_access,
 	enum ffa_data_access retrieve_data_access,
@@ -362,8 +360,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 }
 
 void send_retrieve_request_single_receiver(
-	void *send, ffa_memory_handle_t handle, ffa_vm_id_t sender,
-	ffa_vm_id_t receiver, uint32_t tag, ffa_memory_region_flags_t flags,
+	void *send, ffa_memory_handle_t handle, ffa_id_t sender,
+	ffa_id_t receiver, uint32_t tag, ffa_memory_region_flags_t flags,
 	enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
@@ -381,11 +379,11 @@ void send_retrieve_request_single_receiver(
 }
 
 void send_retrieve_request(
-	void *send, ffa_memory_handle_t handle, ffa_vm_id_t sender,
+	void *send, ffa_memory_handle_t handle, ffa_id_t sender,
 	struct ffa_memory_access receivers[], uint32_t receiver_count,
 	uint32_t tag, ffa_memory_region_flags_t flags,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability, ffa_vm_id_t recipient)
+	enum ffa_memory_shareability shareability, ffa_id_t recipient)
 {
 	size_t msg_size;
 	struct ffa_partition_msg *retrieve_message = send;
@@ -405,10 +403,10 @@ void send_retrieve_request(
 
 static struct ffa_partition_msg *get_mailbox_message(void *recv)
 {
-	ffa_vm_id_t sender;
-	ffa_vm_id_t receiver;
+	ffa_id_t sender;
+	ffa_id_t receiver;
 	struct ffa_partition_msg *msg = (struct ffa_partition_msg *)recv;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value ret =
 		ffa_notification_get(own_id, 0,
 				     FFA_NOTIFICATION_FLAG_BITMAP_HYP |
@@ -510,13 +508,13 @@ void retrieve_memory(void *recv_buf, ffa_memory_handle_t handle,
  * fragments is no more than `memory_region_max_size`. Returns the sender, and
  * the handle via `ret_handle`
  */
-ffa_vm_id_t retrieve_memory_from_message(
+ffa_id_t retrieve_memory_from_message(
 	void *recv_buf, void *send_buf, ffa_memory_handle_t *ret_handle,
 	struct ffa_memory_region *memory_region_ret,
 	size_t memory_region_max_size)
 {
 	uint32_t msg_size;
-	ffa_vm_id_t sender;
+	ffa_id_t sender;
 	struct ffa_memory_region *retrieve_request;
 	ffa_memory_handle_t retrieved_handle;
 
@@ -549,13 +547,13 @@ ffa_vm_id_t retrieve_memory_from_message(
  * which has been sent to us, expecting it to fail with the given error code.
  * Returns the sender.
  */
-ffa_vm_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
-						     void *send_buf,
-						     int32_t expected_error)
+ffa_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
+						  void *send_buf,
+						  int32_t expected_error)
 {
 	uint32_t msg_size;
 	struct ffa_value ret;
-	ffa_vm_id_t sender;
+	ffa_id_t sender;
 	struct ffa_memory_region *retrieve_request;
 	const struct ffa_partition_msg *retrv_message =
 		get_mailbox_message(recv_buf);
@@ -675,9 +673,9 @@ struct ffa_boot_info_desc *get_boot_info_desc(
 	return NULL;
 }
 
-struct ffa_value send_indirect_message(ffa_vm_id_t from, ffa_vm_id_t to,
-				       void *send, const void *payload,
-				       size_t payload_size, uint32_t send_flags)
+struct ffa_value send_indirect_message(ffa_id_t from, ffa_id_t to, void *send,
+				       const void *payload, size_t payload_size,
+				       uint32_t send_flags)
 {
 	struct ffa_partition_msg *message = (struct ffa_partition_msg *)send;
 
@@ -693,15 +691,15 @@ struct ffa_value send_indirect_message(ffa_vm_id_t from, ffa_vm_id_t to,
 }
 
 void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
-			      ffa_vm_id_t *sender)
+			      ffa_id_t *sender)
 {
 	const struct ffa_partition_msg *message;
 	struct ffa_partition_rxtx_header header;
-	ffa_vm_id_t source_vm_id;
+	ffa_id_t source_vm_id;
 	const uint32_t *payload;
 	struct ffa_value ret;
 	ffa_notifications_bitmap_t fwk_notif;
-	const ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_id_t own_id = hf_vm_get_id();
 
 	EXPECT_LE(buffer_size, FFA_MSG_PAYLOAD_MAX);
 

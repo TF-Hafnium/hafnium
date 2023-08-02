@@ -24,12 +24,12 @@ TEST_SERVICE(relay)
 	 */
 	for (;;) {
 		const char expected_message[] = "Send this round the relay!";
-		ffa_vm_id_t *chain;
-		ffa_vm_id_t next_id;
+		ffa_id_t *chain;
+		ffa_id_t next_id;
 		void *next_message;
-		uint8_t message[sizeof(expected_message) + sizeof(ffa_vm_id_t)];
-		ffa_vm_id_t sender;
-		ffa_vm_id_t own_id = hf_vm_get_id();
+		uint8_t message[sizeof(expected_message) + sizeof(ffa_id_t)];
+		ffa_id_t sender;
+		ffa_id_t own_id = hf_vm_get_id();
 		/* Prepare to relay the message. */
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
@@ -37,7 +37,7 @@ TEST_SERVICE(relay)
 		receive_indirect_message(message, sizeof(message), recv_buf,
 					 &sender);
 
-		chain = (ffa_vm_id_t *)message;
+		chain = (ffa_id_t *)message;
 		next_id = le16toh(*chain);
 		next_message = &message[sizeof(*chain)];
 

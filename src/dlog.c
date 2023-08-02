@@ -221,7 +221,7 @@ static const char *parse_flags(const char *p, int *flags)
  * Send the contents of the given VM's log buffer to the log, preceded by the VM
  * ID and followed by a newline.
  */
-void dlog_flush_vm_buffer(ffa_vm_id_t id, char buffer[], size_t length)
+void dlog_flush_vm_buffer(ffa_id_t id, char buffer[], size_t length)
 {
 	lock();
 

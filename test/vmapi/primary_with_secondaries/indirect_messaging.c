@@ -33,8 +33,8 @@ TEST(indirect_messaging, echo)
 	struct mailbox_buffers mb = set_up_mailbox();
 	const uint32_t payload = 0xAA55AA55;
 	const uint32_t echo_payload;
-	ffa_vm_id_t echo_sender;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t echo_sender;
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "echo_msg_send2", mb.send);
@@ -62,7 +62,7 @@ TEST_PRECONDITION(indirect_messaging, unmapped_tx, hypervisor_only)
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	const uint32_t payload = 0xAA55AA55;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_indirect_msg_error", mb.send);
@@ -81,7 +81,7 @@ TEST(indirect_messaging, unmapped_rx)
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	const uint32_t payload = 0xAA55AA55;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_indirect_msg_error", mb.send);
@@ -102,7 +102,7 @@ TEST(indirect_messaging, unread_message)
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	const uint32_t payload = 0xAA55AA55;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_indirect_msg_error", mb.send);
@@ -118,9 +118,8 @@ TEST(indirect_messaging, unread_message)
 	EXPECT_FFA_ERROR(ret, FFA_BUSY);
 }
 
-static void msg_send2_invalid_parameters(ffa_vm_id_t sender,
-					 ffa_vm_id_t receiver, uint32_t size,
-					 void *send, void *recv)
+static void msg_send2_invalid_parameters(ffa_id_t sender, ffa_id_t receiver,
+					 uint32_t size, void *send, void *recv)
 {
 	struct ffa_value ret;
 	struct ffa_partition_msg *message;
@@ -152,7 +151,7 @@ TEST(indirect_messaging, non_existing_sender)
 TEST(indirect_messaging, corrupted_sender)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	msg_send2_invalid_parameters(service1_info->vm_id, own_id, 0, mb.send,
@@ -163,7 +162,7 @@ TEST(indirect_messaging, corrupted_sender)
 TEST(indirect_messaging, self_message)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	msg_send2_invalid_parameters(own_id, own_id, 0, mb.send, mb.recv);
 }
@@ -172,7 +171,7 @@ TEST(indirect_messaging, self_message)
 TEST(indirect_messaging, invalid_size)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
 	msg_send2_invalid_parameters(own_id, service1_info->vm_id, 1024 * 1024,
@@ -190,11 +189,11 @@ TEST(indirect_messaging, services_echo)
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 	const struct ffa_uuid service2_uuid = SERVICE2;
-	const ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value ret;
 	const uint32_t payload = 0xAA55AA55;
 	uint32_t echo_payload;
-	ffa_vm_id_t echo_sender;
+	ffa_id_t echo_sender;
 
 	SERVICE_SELECT(service1_info->vm_id, "echo_msg_send2_service", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "echo_msg_send2", mb.send);
@@ -259,15 +258,14 @@ TEST(indirect_messaging, clear_empty)
 TEST(indirect_messaging, relay)
 {
 	const char expected_message[] = "Send this round the relay!";
-	const size_t message_size =
-		sizeof(expected_message) + sizeof(ffa_vm_id_t);
+	const size_t message_size = sizeof(expected_message) + sizeof(ffa_id_t);
 	char response[message_size];
 	char message[message_size];
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 	struct ffa_value ret;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	SERVICE_SELECT(service1_info->vm_id, "relay", mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "relay", mb.send);
@@ -277,11 +275,11 @@ TEST(indirect_messaging, relay)
 	 * service1, then to service2 and finally back to here.
 	 */
 	{
-		ffa_vm_id_t *chain = (ffa_vm_id_t *)message;
+		ffa_id_t *chain = (ffa_id_t *)message;
 		*chain = htole32(service2_info->vm_id);
 
 		memcpy_s(&message[sizeof(*chain)],
-			 message_size - sizeof(ffa_vm_id_t), expected_message,
+			 message_size - sizeof(ffa_id_t), expected_message,
 			 sizeof(expected_message));
 
 		ret = send_indirect_message(own_id, service1_info->vm_id,
@@ -299,7 +297,7 @@ TEST(indirect_messaging, relay)
 
 	/* Ensure the message is intact. */
 	receive_indirect_message(response, sizeof(response), mb.recv, NULL);
-	EXPECT_EQ(memcmp(&response[sizeof(ffa_vm_id_t)], expected_message,
+	EXPECT_EQ(memcmp(&response[sizeof(ffa_id_t)], expected_message,
 			 sizeof(expected_message)),
 		  0);
 }

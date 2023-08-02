@@ -105,7 +105,7 @@ static inline struct ffa_value ffa_secondary_ep_register(uintptr_t address)
 /**
  * Returns the VM's own ID.
  */
-static inline ffa_vm_id_t hf_vm_get_id(void)
+static inline ffa_id_t hf_vm_get_id(void)
 {
 	return ffa_id_get().arg2;
 }
@@ -113,7 +113,7 @@ static inline ffa_vm_id_t hf_vm_get_id(void)
 /**
  * Runs the given vCPU of the given VM.
  */
-static inline struct ffa_value ffa_run(ffa_vm_id_t vm_id,
+static inline struct ffa_value ffa_run(ffa_id_t vm_id,
 				       ffa_vcpu_index_t vcpu_idx)
 {
 	return ffa_call((struct ffa_value){.func = FFA_RUN_32,
@@ -195,8 +195,8 @@ static inline struct ffa_value ffa_rxtx_unmap(void)
  *  - BUSY: the message could not be delivered either because the mailbox
  *    was full or the target VM is not yet set up.
  */
-static inline struct ffa_value ffa_msg_send(ffa_vm_id_t sender_vm_id,
-					    ffa_vm_id_t target_vm_id,
+static inline struct ffa_value ffa_msg_send(ffa_id_t sender_vm_id,
+					    ffa_id_t target_vm_id,
 					    uint32_t size, uint32_t attributes)
 {
 	return ffa_call((struct ffa_value){
@@ -369,7 +369,7 @@ static inline int64_t hf_mailbox_writable_get(void)
  * Returns -1 on failure or if there are no waiters; the VM id of the next
  * waiter otherwise.
  */
-static inline int64_t hf_mailbox_waiter_get(ffa_vm_id_t vm_id)
+static inline int64_t hf_mailbox_waiter_get(ffa_id_t vm_id)
 {
 	return hf_call(HF_MAILBOX_WAITER_GET, vm_id, 0, 0);
 }
@@ -418,7 +418,7 @@ static inline int64_t hf_interrupt_deactivate(uint32_t intid)
  *  - 1 if it was called by the primary VM and the primary VM now needs to wake
  *    up or kick the target vCPU.
  */
-static inline int64_t hf_interrupt_inject(ffa_vm_id_t target_vm_id,
+static inline int64_t hf_interrupt_inject(ffa_id_t target_vm_id,
 					  ffa_vcpu_index_t target_vcpu_idx,
 					  uint32_t intid)
 {
@@ -470,7 +470,7 @@ static inline struct ffa_value ffa_features_with_input_property(
 }
 
 static inline struct ffa_value ffa_msg_send_direct_req(
-	ffa_vm_id_t sender_vm_id, ffa_vm_id_t target_vm_id, uint32_t arg3,
+	ffa_id_t sender_vm_id, ffa_id_t target_vm_id, uint32_t arg3,
 	uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7)
 {
 	return ffa_call((struct ffa_value){
@@ -485,7 +485,7 @@ static inline struct ffa_value ffa_msg_send_direct_req(
 }
 
 static inline struct ffa_value ffa_msg_send_direct_resp(
-	ffa_vm_id_t sender_vm_id, ffa_vm_id_t target_vm_id, uint32_t arg3,
+	ffa_id_t sender_vm_id, ffa_id_t target_vm_id, uint32_t arg3,
 	uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7)
 {
 	return ffa_call((struct ffa_value){
@@ -500,7 +500,7 @@ static inline struct ffa_value ffa_msg_send_direct_resp(
 }
 
 static inline struct ffa_value ffa_notification_bind(
-	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id, uint32_t flags,
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t bitmap)
 {
 	return ffa_call((struct ffa_value){
@@ -513,7 +513,7 @@ static inline struct ffa_value ffa_notification_bind(
 }
 
 static inline struct ffa_value ffa_notification_unbind(
-	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id,
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id,
 	ffa_notifications_bitmap_t bitmap)
 {
 	return ffa_call((struct ffa_value){
@@ -525,7 +525,7 @@ static inline struct ffa_value ffa_notification_unbind(
 }
 
 static inline struct ffa_value ffa_notification_set(
-	ffa_vm_id_t sender_vm_id, ffa_vm_id_t receiver_vm_id, uint32_t flags,
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t bitmap)
 {
 	return ffa_call((struct ffa_value){
@@ -537,7 +537,7 @@ static inline struct ffa_value ffa_notification_set(
 	});
 }
 
-static inline struct ffa_value ffa_notification_get(ffa_vm_id_t receiver_vm_id,
+static inline struct ffa_value ffa_notification_get(ffa_id_t receiver_vm_id,
 						    ffa_vcpu_index_t vcpu_id,
 						    uint32_t flags)
 {

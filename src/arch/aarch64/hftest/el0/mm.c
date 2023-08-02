@@ -26,7 +26,7 @@ void arch_vm_mm_reset(void)
 {
 }
 
-uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id)
+uint32_t arch_mm_extra_attributes_from_vm(ffa_id_t id)
 {
 	(void)id;
 	return 0;

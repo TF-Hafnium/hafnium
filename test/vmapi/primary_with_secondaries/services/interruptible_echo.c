@@ -31,7 +31,7 @@ static void irq(void)
 
 TEST_SERVICE(interruptible_echo)
 {
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	exception_setup(irq, NULL);
 	hf_interrupt_enable(EXTERNAL_INTERRUPT_ID_A, true, INTERRUPT_TYPE_IRQ);
@@ -43,7 +43,7 @@ TEST_SERVICE(interruptible_echo)
 		void *send_buf = SERVICE_SEND_BUFFER();
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		char response[sizeof("I\'ll see you again.")];
-		ffa_vm_id_t sender;
+		ffa_id_t sender;
 
 		ASSERT_EQ(res.func, FFA_RUN_32);
 		EXPECT_EQ(irq_counter, 1);

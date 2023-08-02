@@ -59,7 +59,7 @@ static struct ffa_value mailbox_receive_retry_v1_0(void)
 
 TEST_SERVICE(interruptible)
 {
-	ffa_vm_id_t this_vm_id = hf_vm_get_id();
+	ffa_id_t this_vm_id = hf_vm_get_id();
 	void *recv_buf = SERVICE_RECV_BUFFER();
 
 	hf_interrupt_enable(SELF_INTERRUPT_ID, true, INTERRUPT_TYPE_IRQ);

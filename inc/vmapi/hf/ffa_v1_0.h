@@ -25,7 +25,7 @@
  * in DEN0077A FF-A 1.0 REL specification.
  */
 struct ffa_partition_info_v1_0 {
-	ffa_vm_id_t vm_id;
+	ffa_id_t vm_id;
 	ffa_vcpu_count_t vcpu_count;
 	ffa_partition_properties_t properties;
 };
@@ -41,7 +41,7 @@ struct ffa_memory_region_v1_0 {
 	 * The ID of the VM which originally sent the memory region, i.e. the
 	 * owner.
 	 */
-	ffa_vm_id_t sender;
+	ffa_id_t sender;
 	uint8_t attributes;
 	/** Reserved field, must be 0. */
 	uint8_t reserved_0;
@@ -89,13 +89,13 @@ ffa_memory_region_get_composite_v1_0(
 }
 
 void ffa_memory_region_init_header_v1_0(
-	struct ffa_memory_region_v1_0 *memory_region, ffa_vm_id_t sender,
+	struct ffa_memory_region_v1_0 *memory_region, ffa_id_t sender,
 	ffa_memory_attributes_t attributes, ffa_memory_region_flags_t flags,
 	ffa_memory_handle_t handle, uint32_t tag, uint32_t receiver_count);
 
 uint32_t ffa_memory_region_init_v1_0(
 	struct ffa_memory_region_v1_0 *memory_region,
-	size_t memory_region_max_size, ffa_vm_id_t sender,
+	size_t memory_region_max_size, ffa_id_t sender,
 	struct ffa_memory_access receivers[], uint32_t receiver_count,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
@@ -106,7 +106,7 @@ uint32_t ffa_memory_region_init_v1_0(
 
 uint32_t ffa_memory_retrieve_request_init_v1_0(
 	struct ffa_memory_region_v1_0 *memory_region,
-	ffa_memory_handle_t handle, ffa_vm_id_t sender,
+	ffa_memory_handle_t handle, ffa_id_t sender,
 	struct ffa_memory_access receivers[], uint32_t receiver_count,
 	uint32_t tag, ffa_memory_region_flags_t flags,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,

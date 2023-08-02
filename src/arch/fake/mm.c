@@ -182,7 +182,7 @@ bool arch_mm_init(paddr_t table)
 	return true;
 }
 
-uint32_t arch_mm_extra_attributes_from_vm(ffa_vm_id_t id)
+uint32_t arch_mm_extra_attributes_from_vm(ffa_id_t id)
 {
 	(void)id;
 

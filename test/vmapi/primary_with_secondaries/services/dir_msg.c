@@ -53,7 +53,7 @@ TEST_SERVICE(ffa_direct_message_echo_services)
 				0x88889999};
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_value res;
-	ffa_vm_id_t target_id;
+	ffa_id_t target_id;
 
 	/* Retrieve FF-A ID of the target endpoint. */
 	receive_indirect_message((void *)&target_id, sizeof(target_id),
@@ -81,7 +81,7 @@ TEST_SERVICE(ffa_yield_direct_message_echo_services)
 				0x88889999};
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_value res;
-	ffa_vm_id_t target_id;
+	ffa_id_t target_id;
 
 	/* Retrieve FF-A ID of the target endpoint. */
 	receive_indirect_message((void *)&target_id, sizeof(target_id),
@@ -202,12 +202,12 @@ TEST_SERVICE(ffa_direct_msg_resp_invalid_sender_receiver)
 	struct ffa_value res;
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_partition_info *service2_info = service2(recv_buf);
-	ffa_vm_id_t invalid_receiver;
+	ffa_id_t invalid_receiver;
 	struct ffa_value args = ffa_msg_wait();
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
 
-	ffa_vm_id_t sender = ffa_sender(args);
+	ffa_id_t sender = ffa_sender(args);
 	ASSERT_EQ(own_id, ffa_receiver(args));
 
 	/* Other receiver ID. */
@@ -229,9 +229,9 @@ TEST_SERVICE(ffa_direct_message_cycle_denied)
 {
 	struct ffa_value res;
 	struct ffa_value args = ffa_msg_wait();
-	ffa_vm_id_t sender;
-	ffa_vm_id_t receiver;
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t sender;
+	ffa_id_t receiver;
+	ffa_id_t own_id = hf_vm_get_id();
 
 	ASSERT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
 	receiver = ffa_receiver(args);

@@ -59,18 +59,18 @@ struct ffa_value plat_ffa_spmc_id_get(void);
 void plat_ffa_log_init(void);
 void plat_ffa_set_tee_enabled(bool tee_enabled);
 void plat_ffa_init(struct mpool *ppool);
-bool plat_ffa_is_memory_send_valid(ffa_vm_id_t receiver_vm_id,
+bool plat_ffa_is_memory_send_valid(ffa_id_t receiver_vm_id,
 				   uint32_t share_func);
 
 bool plat_ffa_is_direct_request_valid(struct vcpu *current,
-				      ffa_vm_id_t sender_vm_id,
-				      ffa_vm_id_t receiver_vm_id);
+				      ffa_id_t sender_vm_id,
+				      ffa_id_t receiver_vm_id);
 bool plat_ffa_is_direct_response_valid(struct vcpu *current,
-				       ffa_vm_id_t sender_vm_id,
-				       ffa_vm_id_t receiver_vm_id);
+				       ffa_id_t sender_vm_id,
+				       ffa_id_t receiver_vm_id);
 bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
 					  struct vm *receiver_vm);
-bool plat_ffa_direct_request_forward(ffa_vm_id_t receiver_vm_id,
+bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
 				     struct ffa_value args,
 				     struct ffa_value *ret);
 
@@ -83,33 +83,30 @@ bool plat_ffa_acquire_receiver_rx(struct vm_locked locked,
 bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 					struct vm_locked receiver_locked);
 
-bool plat_ffa_msg_send2_forward(ffa_vm_id_t receiver_vm_id,
-				ffa_vm_id_t sender_vm_id,
+bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
 				struct ffa_value *ret);
 
 bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
-					    ffa_vm_id_t vm_id);
+					    ffa_id_t vm_id);
 
 bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
-					  ffa_vm_id_t sender_id,
-					  ffa_vm_id_t receiver_id);
+					  ffa_id_t sender_id,
+					  ffa_id_t receiver_id);
 bool plat_ffa_notifications_update_bindings_forward(
-	ffa_vm_id_t receiver_id, ffa_vm_id_t sender_id, uint32_t flags,
+	ffa_id_t receiver_id, ffa_id_t sender_id, uint32_t flags,
 	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret);
 
 bool plat_ffa_is_notification_set_valid(struct vcpu *current,
-					ffa_vm_id_t sender_id,
-					ffa_vm_id_t receiver_id);
+					ffa_id_t sender_id,
+					ffa_id_t receiver_id);
 
-bool plat_ffa_notification_set_forward(ffa_vm_id_t sender_vm_id,
-				       ffa_vm_id_t receiver_vm_id,
-				       uint32_t flags,
+bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
+				       ffa_id_t receiver_vm_id, uint32_t flags,
 				       ffa_notifications_bitmap_t bitmap,
 				       struct ffa_value *ret);
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_vm_id_t receiver_id,
-					uint32_t flags);
+					ffa_id_t receiver_id, uint32_t flags);
 
 bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
 					ffa_vcpu_index_t vcpu_id,
@@ -155,55 +152,55 @@ uint32_t plat_ffa_other_world_mode(void);
  * to operate NS-memory. The function below returns the mode to use in the mm.h
  * library, depending on the memory ownder's id.
  */
-uint32_t plat_ffa_owner_world_mode(ffa_vm_id_t owner_id);
+uint32_t plat_ffa_owner_world_mode(ffa_id_t owner_id);
 
 /**
  * Return the FF-A partition info VM/SP properties given the VM id.
  */
 ffa_partition_properties_t plat_ffa_partition_properties(
-	ffa_vm_id_t vm_id, const struct vm *target);
+	ffa_id_t vm_id, const struct vm *target);
 
 /**
  * Get NWd VM's structure.
  */
-struct vm_locked plat_ffa_vm_find_locked(ffa_vm_id_t vm_id);
+struct vm_locked plat_ffa_vm_find_locked(ffa_id_t vm_id);
 
-struct vm_locked plat_ffa_vm_find_locked_create(ffa_vm_id_t vm_id);
+struct vm_locked plat_ffa_vm_find_locked_create(ffa_id_t vm_id);
 
 /**
  * Creates a bitmap for the VM of the given ID.
  */
 struct ffa_value plat_ffa_notifications_bitmap_create(
-	ffa_vm_id_t vm_id, ffa_vcpu_count_t vcpu_count);
+	ffa_id_t vm_id, ffa_vcpu_count_t vcpu_count);
 
 /**
  * Issues a FFA_NOTIFICATION_BITMAP_CREATE.
  * Returns true if the call goes well, and false if call returns with
  * FFA_ERROR_32.
  */
-bool plat_ffa_notifications_bitmap_create_call(ffa_vm_id_t vm_id,
+bool plat_ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
 					       ffa_vcpu_count_t vcpu_count);
 
 /**
  * Destroys the notifications bitmap for the given VM ID.
  */
-struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_vm_id_t vm_id);
+struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_id_t vm_id);
 
 /**
  * Helper to get the struct notifications, depending on the sender's id.
  */
 struct notifications *plat_ffa_vm_get_notifications_senders_world(
-	struct vm_locked vm_locked, ffa_vm_id_t sender_id);
+	struct vm_locked vm_locked, ffa_id_t sender_id);
 
 /**
  * Helper to check if FF-A ID is a VM ID.
  */
-bool plat_ffa_is_vm_id(ffa_vm_id_t vm_id);
+bool plat_ffa_is_vm_id(ffa_id_t vm_id);
 
 /**
  * Forward normal world calls of FFA_RUN ABI to other world.
  */
-bool plat_ffa_run_forward(ffa_vm_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 			  struct ffa_value *ret);
 
 bool plat_ffa_notification_info_get_call(struct ffa_value *ret);
@@ -250,7 +247,7 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
  * Check if current SP can resume target VM/SP using FFA_RUN ABI.
  */
 bool plat_ffa_run_checks(struct vcpu_locked current_locked,
-			 ffa_vm_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
+			 ffa_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
 			 struct ffa_value *run_ret, struct vcpu **next);
 
 /**
@@ -290,8 +287,8 @@ bool plat_ffa_is_secondary_ep_register_supported(void);
  * being performed.
  */
 bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
-					     ffa_vm_id_t vm_id,
-					     ffa_vm_id_t receiver_vm_id,
+					     ffa_id_t vm_id,
+					     ffa_id_t receiver_vm_id,
 					     struct vcpu_locked locked_vcpu,
 					     uint32_t func,
 					     enum vcpu_state *next_state);
@@ -302,7 +299,7 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
 
 void plat_ffa_wind_call_chain_ffa_direct_req(
 	struct vcpu_locked current_locked,
-	struct vcpu_locked receiver_vcpu_locked, ffa_vm_id_t sender_vm_id);
+	struct vcpu_locked receiver_vcpu_locked, ffa_id_t sender_vm_id);
 
 void plat_ffa_unwind_call_chain_ffa_direct_resp(
 	struct vcpu_locked current_locked, struct vcpu_locked next_locked);
@@ -352,8 +349,8 @@ bool plat_ffa_is_direct_response_interrupted(struct vcpu_locked current_locked);
  * This FF-A v1.0 FFA_MSG_SEND interface.
  * Implemented for the Hypervisor, but not in the SPMC.
  */
-struct ffa_value plat_ffa_msg_send(ffa_vm_id_t sender_vm_id,
-				   ffa_vm_id_t receiver_vm_id, uint32_t size,
+struct ffa_value plat_ffa_msg_send(ffa_id_t sender_vm_id,
+				   ffa_id_t receiver_vm_id, uint32_t size,
 				   struct vcpu *current, struct vcpu **next);
 
 struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
@@ -371,7 +368,7 @@ ffa_memory_attributes_t plat_ffa_memory_security_mode(
 struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 				   uint32_t error_code);
 
-bool plat_ffa_is_spmd_lp_id(ffa_vm_id_t vm_id);
+bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id);
 
 struct ffa_value plat_ffa_msg_recv(bool block,
 				   struct vcpu_locked current_locked,
@@ -379,5 +376,4 @@ struct ffa_value plat_ffa_msg_recv(bool block,
 
 int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current);
 
-int64_t plat_ffa_mailbox_waiter_get(ffa_vm_id_t vm_id,
-				    const struct vcpu *current);
+int64_t plat_ffa_mailbox_waiter_get(ffa_id_t vm_id, const struct vcpu *current);

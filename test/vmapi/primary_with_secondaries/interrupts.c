@@ -27,9 +27,9 @@ static void receive_and_check_expected(char* response, size_t response_size,
 				       void* recv,
 				       const char* expected_response,
 				       size_t expected_response_size,
-				       ffa_vm_id_t expected_sender)
+				       ffa_id_t expected_sender)
 {
-	ffa_vm_id_t sender;
+	ffa_id_t sender;
 
 	receive_indirect_message(response, response_size, recv, &sender);
 	EXPECT_EQ(sender, expected_sender);
@@ -48,7 +48,7 @@ TEST(interrupts, interrupt_self)
 	char response[sizeof(expected_response)];
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
-	const ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_id_t own_id = hf_vm_get_id();
 
 	SERVICE_SELECT(SERVICE_VM1, "interruptible", mb.send);
 
@@ -153,7 +153,7 @@ TEST(interrupts, inject_interrupt_message)
 	char response[sizeof(expected_response)];
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
-	const ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_id_t own_id = hf_vm_get_id();
 
 	SERVICE_SELECT(SERVICE_VM1, "interruptible", mb.send);
 
@@ -193,7 +193,7 @@ TEST(interrupts, inject_interrupt_disabled)
 	char response[sizeof(expected_response)];
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
-	const ffa_vm_id_t own_id = hf_vm_get_id();
+	const ffa_id_t own_id = hf_vm_get_id();
 
 	SERVICE_SELECT(SERVICE_VM1, "interruptible", mb.send);
 
@@ -281,7 +281,7 @@ TEST(interrupts, deliver_interrupt_and_message)
 	char response[sizeof(message)];
 	struct ffa_value run_res;
 	struct mailbox_buffers mb = set_up_mailbox();
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	SERVICE_SELECT(SERVICE_VM1, "interruptible_echo", mb.send);
 

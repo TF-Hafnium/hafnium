@@ -14,7 +14,7 @@
 
 #include "test/hftest.h"
 
-void send_with_retry(ffa_vm_id_t sender_vm_id, ffa_vm_id_t target_vm_id,
+void send_with_retry(ffa_id_t sender_vm_id, ffa_id_t target_vm_id,
 		     uint32_t size)
 {
 	struct ffa_value res;

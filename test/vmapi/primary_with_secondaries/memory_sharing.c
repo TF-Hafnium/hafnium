@@ -2739,7 +2739,7 @@ TEST(memory_sharing, ffa_validate_retrieve_transaction_type)
 	}
 }
 
-void memory_retrieve_multiple_borrower_base(void *send, ffa_vm_id_t recipient,
+void memory_retrieve_multiple_borrower_base(void *send, ffa_id_t recipient,
 					    ffa_memory_handle_t handle,
 					    struct ffa_memory_access *receivers,
 					    uint32_t receiver_count,
@@ -2810,8 +2810,7 @@ TEST(memory_sharing, mem_share_multiple_borrowers)
 	handle = ffa_mem_success_handle(ret);
 
 	for (uint32_t j = 0; j < ARRAY_SIZE(receivers); j++) {
-		ffa_vm_id_t recipient =
-			receivers[j].receiver_permissions.receiver;
+		ffa_id_t recipient = receivers[j].receiver_permissions.receiver;
 
 		memory_retrieve_multiple_borrower_base(
 			mb.send, recipient, handle, receivers,
@@ -2861,8 +2860,7 @@ TEST(memory_sharing, mem_share_bypass_multiple_borrowers)
 	handle = ffa_mem_success_handle(ret);
 
 	for (uint32_t j = 0; j < ARRAY_SIZE(receivers); j++) {
-		ffa_vm_id_t recipient =
-			receivers[j].receiver_permissions.receiver;
+		ffa_id_t recipient = receivers[j].receiver_permissions.receiver;
 
 		/* Set the flag to bypass multiple borrower checks. */
 		memory_retrieve_multiple_borrower_base(
@@ -2887,7 +2885,7 @@ TEST(memory_sharing, mem_share_bypass_multiple_borrowers_wrong_receiver_count)
 	struct ffa_memory_access receivers[2];
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
-	ffa_vm_id_t own_id = hf_vm_get_id();
+	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_msg *retrieve_message = mb.send;
 
 	ffa_memory_access_init_permissions(
@@ -2982,8 +2980,7 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 	handle = ffa_mem_success_handle(ret);
 
 	for (uint32_t j = 0; j < ARRAY_SIZE(receivers); j++) {
-		ffa_vm_id_t recipient =
-			receivers[j].receiver_permissions.receiver;
+		ffa_id_t recipient = receivers[j].receiver_permissions.receiver;
 		struct ffa_partition_msg *retrieve_message = mb.send;
 
 		SERVICE_SELECT(recipient, "memory_increment_relinquish",
@@ -3072,8 +3069,8 @@ TEST_PRECONDITION(memory_sharing, fail_if_multi_receiver_donate,
 }
 
 static void fail_multiple_receiver_mem_share_lend(
-	struct ffa_memory_region *mem_region, ffa_vm_id_t receiver_id1,
-	ffa_vm_id_t receiver_id2, enum ffa_data_access data_access1,
+	struct ffa_memory_region *mem_region, ffa_id_t receiver_id1,
+	ffa_id_t receiver_id2, enum ffa_data_access data_access1,
 	enum ffa_data_access data_access2,
 	enum ffa_instruction_access instruction_access1,
 	enum ffa_instruction_access instruction_access2)
@@ -3185,7 +3182,7 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
 
 	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
-		ffa_vm_id_t vm_id = receivers[i].receiver_permissions.receiver;
+		ffa_id_t vm_id = receivers[i].receiver_permissions.receiver;
 		SERVICE_SELECT(vm_id, "ffa_memory_lend_relinquish", mb.send);
 	}
 
@@ -3209,7 +3206,7 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND);
 
 	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
-		ffa_vm_id_t vm_id = receivers[i].receiver_permissions.receiver;
+		ffa_id_t vm_id = receivers[i].receiver_permissions.receiver;
 		run_res = ffa_run(vm_id, 0);
 		/* Let the memory be returned. */
 		EXPECT_EQ(run_res.func, FFA_YIELD_32);
@@ -3224,7 +3221,7 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 
 	/* Check that subsequents accesses to the memory fail. */
 	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
-		ffa_vm_id_t vm_id = receivers[i].receiver_permissions.receiver;
+		ffa_id_t vm_id = receivers[i].receiver_permissions.receiver;
 		run_res = ffa_run(vm_id, 0);
 		EXPECT_TRUE(exception_received(&run_res, mb.recv));
 	}
@@ -3630,8 +3627,7 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish_multiple_borrowers)
 	handle = ffa_mem_success_handle(ret);
 
 	for (uint32_t j = 0; j < ARRAY_SIZE(receivers); j++) {
-		ffa_vm_id_t recipient =
-			receivers[j].receiver_permissions.receiver;
+		ffa_id_t recipient = receivers[j].receiver_permissions.receiver;
 		struct ffa_partition_msg *retrieve_message = mb.send;
 
 		/* Set flag to clear memory after relinquish. */

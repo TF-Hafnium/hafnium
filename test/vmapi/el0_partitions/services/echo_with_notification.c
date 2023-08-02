@@ -49,8 +49,8 @@ TEST_SERVICE(echo_with_notification)
 		void *send_buf = SERVICE_SEND_BUFFER();
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		struct ffa_value ret = ffa_msg_wait();
-		ffa_vm_id_t target_vm_id = ffa_receiver(ret);
-		ffa_vm_id_t source_vm_id = ffa_sender(ret);
+		ffa_id_t target_vm_id = ffa_receiver(ret);
+		ffa_id_t source_vm_id = ffa_sender(ret);
 
 		memcpy_s(send_buf, FFA_MSG_PAYLOAD_MAX, recv_buf,
 			 ffa_msg_send_size(ret));
