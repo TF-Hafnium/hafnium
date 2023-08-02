@@ -541,7 +541,7 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 
 		attributes = manifest_vm->partition.mem_regions[j].attributes;
 		if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
-			if (plat_ffa_is_vm_id(vm_locked.vm->id)) {
+			if (ffa_is_vm_id(vm_locked.vm->id)) {
 				dlog_warning("Memory%sVMs\n", error_string);
 				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
 			}
@@ -587,7 +587,7 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 
 		attributes = manifest_vm->partition.dev_regions[j].attributes;
 		if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
-			if (plat_ffa_is_vm_id(vm_locked.vm->id)) {
+			if (ffa_is_vm_id(vm_locked.vm->id)) {
 				dlog_warning("Device%sVMs\n", error_string);
 				attributes &= ~MANIFEST_REGION_ATTR_SECURITY;
 			}

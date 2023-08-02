@@ -551,11 +551,6 @@ struct vm_locked plat_ffa_vm_find_locked_create(ffa_id_t vm_id)
 	return plat_ffa_vm_find_locked(vm_id);
 }
 
-bool plat_ffa_is_vm_id(ffa_id_t vm_id)
-{
-	return vm_id_is_current_world(vm_id);
-}
-
 void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
 					    uint32_t *lists_sizes,
 					    uint32_t *lists_count,

@@ -1802,7 +1802,7 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 	paddr_t recv_pa_end;
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
-	if (vm->id == HF_HYPERVISOR_VM_ID && !plat_ffa_is_vm_id(allocator_id)) {
+	if (vm->id == HF_HYPERVISOR_VM_ID && !ffa_is_vm_id(allocator_id)) {
 		dlog_error(
 			"The Hypervisor must specify a valid VM ID in register "
 			"W1, if FFA_RXTX_UNMAP call forwarded to SPM.\n");
@@ -1954,7 +1954,7 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	}
 
 	/* `flags` can be set only at secure virtual FF-A instances. */
-	if (plat_ffa_is_vm_id(sender_id) && (flags != 0)) {
+	if (ffa_is_vm_id(sender_id) && (flags != 0)) {
 		dlog_error("flags must be zero.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -2021,7 +2021,7 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	to->mailbox.recv_func = FFA_MSG_SEND2_32;
 	to->mailbox.state = MAILBOX_STATE_FULL;
 
-	rx_buffer_full = plat_ffa_is_vm_id(sender_id)
+	rx_buffer_full = ffa_is_vm_id(sender_id)
 				 ? FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK
 				 : FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK;
 	vm_notifications_framework_set_pending(to_locked, rx_buffer_full);
@@ -2130,7 +2130,7 @@ struct ffa_value api_ffa_rx_acquire(ffa_id_t receiver_id, struct vcpu *current)
 	struct ffa_value ret;
 
 	if ((current->vm->id != HF_HYPERVISOR_VM_ID) ||
-	    !plat_ffa_is_vm_id(receiver_id)) {
+	    !ffa_is_vm_id(receiver_id)) {
 		dlog_error(
 			"FFA_RX_ACQUIRE not supported at this FF-A "
 			"instance.\n");
@@ -3796,8 +3796,8 @@ struct ffa_value api_ffa_notification_update_bindings(
 	 * different sender.
 	 */
 	if (!vm_notifications_validate_bound_sender(
-		    receiver_locked, plat_ffa_is_vm_id(sender_vm_id),
-		    id_to_validate, notifications)) {
+		    receiver_locked, ffa_is_vm_id(sender_vm_id), id_to_validate,
+		    notifications)) {
 		dlog_verbose("Notifications are bound to other sender.\n");
 		ret = ffa_error(FFA_DENIED);
 		goto out;
@@ -3808,7 +3808,7 @@ struct ffa_value api_ffa_notification_update_bindings(
 	 * the bitmap.
 	 */
 	if (vm_are_notifications_pending(receiver_locked,
-					 plat_ffa_is_vm_id(sender_vm_id),
+					 ffa_is_vm_id(sender_vm_id),
 					 notifications)) {
 		dlog_verbose("Notifications within '%x' pending.\n",
 			     notifications);
@@ -3817,7 +3817,7 @@ struct ffa_value api_ffa_notification_update_bindings(
 	}
 
 	vm_notifications_update_bindings(
-		receiver_locked, plat_ffa_is_vm_id(sender_vm_id), id_to_update,
+		receiver_locked, ffa_is_vm_id(sender_vm_id), id_to_update,
 		notifications, is_per_vcpu && is_bind);
 
 out:
@@ -3877,8 +3877,8 @@ struct ffa_value api_ffa_notification_set(
 	 * enabled either for the receiver.
 	 */
 	if (!vm_notifications_validate_binding(
-		    receiver_locked, plat_ffa_is_vm_id(sender_vm_id),
-		    sender_vm_id, notifications, is_per_vcpu)) {
+		    receiver_locked, ffa_is_vm_id(sender_vm_id), sender_vm_id,
+		    notifications, is_per_vcpu)) {
 		dlog_verbose("Notifications bindings not valid.\n");
 		ret = ffa_error(FFA_DENIED);
 		goto out;
@@ -3892,7 +3892,7 @@ struct ffa_value api_ffa_notification_set(
 
 	/* Set notifications pending. */
 	vm_notifications_partition_set_pending(
-		receiver_locked, plat_ffa_is_vm_id(sender_vm_id), notifications,
+		receiver_locked, ffa_is_vm_id(sender_vm_id), notifications,
 		vcpu_id, is_per_vcpu);
 
 	dlog_verbose("Set the notifications: %x.\n", notifications);

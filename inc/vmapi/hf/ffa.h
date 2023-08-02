@@ -166,6 +166,24 @@
 typedef uint16_t ffa_id_t;
 
 /**
+ * The FF-A v1.2 ALP0, section 6.1 defines that partition IDs are split into two
+ * parts:
+ * - Bit15 -> partition type identifier.
+ *   - b'0 -> ID relates to a VM ID.
+ *   - b'1 -> ID relates to an SP ID.
+ */
+#define FFA_ID_MASK ((ffa_id_t)0x8000)
+#define FFA_VM_ID_MASK ((ffa_id_t)0x0000)
+
+/**
+ * Helper to check if FF-A ID is a VM ID, managed by the hypervisor.
+ */
+static inline bool ffa_is_vm_id(ffa_id_t id)
+{
+	return (FFA_ID_MASK & id) == FFA_VM_ID_MASK;
+}
+
+/**
  * Partition message header as specified by table 6.2 from FF-A v1.1 EAC0
  * specification.
  */

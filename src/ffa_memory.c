@@ -2680,7 +2680,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	continue_ffa_hyp_mem_retrieve_req =
 		(to_locked.vm->id == HF_HYPERVISOR_VM_ID) &&
 		(share_state->hypervisor_fragment_count != 0U) &&
-		plat_ffa_is_vm_id(sender_vm_id);
+		ffa_is_vm_id(sender_vm_id);
 
 	if (!continue_ffa_hyp_mem_retrieve_req) {
 		receiver_index = ffa_memory_region_get_receiver(

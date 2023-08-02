@@ -310,12 +310,6 @@ struct vm_locked plat_ffa_vm_find_locked_create(ffa_id_t vm_id)
 	return (struct vm_locked){.vm = NULL};
 }
 
-bool plat_ffa_is_vm_id(ffa_id_t vm_id)
-{
-	(void)vm_id;
-	return false;
-}
-
 bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 			  struct ffa_value *ret)
 {

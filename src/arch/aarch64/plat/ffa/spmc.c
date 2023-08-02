@@ -803,7 +803,7 @@ bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 	 * VMs or Hypervisor. Those are managed by the hypervisor if present.
 	 */
 	bool flags_valid =
-		!(plat_ffa_is_vm_id(receiver_id) &&
+		!(ffa_is_vm_id(receiver_id) &&
 		  ((flags & FFA_NOTIFICATION_FLAG_BITMAP_VM) != 0U ||
 		   (flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) != 0U));
 
@@ -989,11 +989,6 @@ out:
 	vm_unlock(&to_destroy_locked);
 
 	return ret;
-}
-
-bool plat_ffa_is_vm_id(ffa_id_t vm_id)
-{
-	return !vm_id_is_current_world(vm_id);
 }
 
 bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,

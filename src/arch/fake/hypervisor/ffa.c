@@ -299,12 +299,6 @@ struct vm_locked plat_ffa_vm_find_locked_create(ffa_id_t vm_id)
 	return (struct vm_locked){.vm = NULL};
 }
 
-bool plat_ffa_is_vm_id(ffa_id_t vm_id)
-{
-	(void)vm_id;
-	return false;
-}
-
 bool plat_ffa_vm_notifications_info_get(     // NOLINTNEXTLINE
 	uint16_t *ids, uint32_t *ids_count,  // NOLINTNEXTLINE
 	uint32_t *lists_sizes,		     // NOLINTNEXTLINE
