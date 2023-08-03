@@ -1270,18 +1270,24 @@ static bool smmuv3_config_ste_stg2(struct smmuv3_driver *smmuv3, struct vm *vm,
 		COMPOSE(PTW_DEVICE_FAULT, STE_S2PTW_SHIFT, STE_S2PTW_MASK);
 	ste_data[2] |= COMPOSE(0ULL, STE_S2RS_SHIFT, STE_S2RS_MASK);
 
-	/* BITS 255:192 */
-	vttbr = (vm->ptable.root.pa & GEN_MASK(51, 4)) >> 4;
-
 	/* Refer to function arch_mm_init() in src/arch/aarch64/mm.c for
 	 * explanation of the choice of NSA, NSW, SA and SW fields in secure
 	 * state. NSA = 1 : NSW = 0 : SA =  0 : SW =  0 :
 	 */
 #if SECURE_WORLD == 1
+	uint64_t vsttbr;
+
+	/* BITS 243:196 */
+	vttbr = (pa_addr(vm->arch.ptable_ns.root) & GEN_MASK(51, 4)) >> 4;
+
+	/* BITS 435:388 */
+	vsttbr = (pa_addr(vm->ptable.root) & GEN_MASK(51, 4)) >> 4;
+
 	/* STRW is S-EL2*/
-	ste_data[1] |= COMPOSE(STW_SEL2, STE_STW_SHIFT, STE_STW_MASK);
+	ste_data[1] = COMPOSE(STW_SEL2, STE_STW_SHIFT, STE_STW_MASK);
 	ste_data[3] = COMPOSE(0, STE_S2NSW_SHIFT, STE_S2NSW_MASK);
 	ste_data[3] |= COMPOSE(1, STE_S2NSA_SHIFT, STE_S2NSA_MASK);
+	ste_data[3] |= COMPOSE(vttbr, STE_S2TTB_SHIFT, STE_S2TTB_MASK);
 
 	/* BITS 319:256 */
 	ste_data[4] = COMPOSE(64 - smmuv3->prop.ias, STE_SS2T0SZ_SHIFT,
@@ -1292,10 +1298,13 @@ static bool smmuv3_config_ste_stg2(struct smmuv3_driver *smmuv3, struct vm *vm,
 	/* BITS 447:384 */
 	ste_data[6] = COMPOSE(0, STE_S2SW_SHIFT, STE_S2SW_MASK);
 	ste_data[6] |= COMPOSE(0, STE_S2SA_SHIFT, STE_S2SA_MASK);
-	ste_data[6] |= COMPOSE(vttbr, STE_SS2TTB_SHIFT, STE_SS2TTB_MASK);
+	ste_data[6] |= COMPOSE(vsttbr, STE_SS2TTB_SHIFT, STE_SS2TTB_MASK);
 #else
+	/* BITS 243:196 */
+	vttbr = (pa_addr(vm->ptable.root) & GEN_MASK(51, 4)) >> 4;
+
 	/* STRW is EL2*/
-	ste_data[1] |= COMPOSE(STW_EL2, STE_STW_SHIFT, STE_STW_MASK);
+	ste_data[1] = COMPOSE(STW_EL2, STE_STW_SHIFT, STE_STW_MASK);
 	ste_data[3] = COMPOSE(vttbr, STE_S2TTB_SHIFT, STE_S2TTB_MASK);
 #endif
 
