@@ -257,3 +257,83 @@ void vcpu_update_boot(struct vcpu *vcpu)
 
 	vcpu->next_boot = current;
 }
+
+void vcpu_set_running(struct vcpu_locked target_locked, struct ffa_value args)
+{
+	struct vcpu *target_vcpu = target_locked.vcpu;
+
+	CHECK(target_vcpu->regs_available);
+	arch_regs_set_retval(&target_vcpu->regs, args);
+
+	/* Mark the registers as unavailable now. */
+	target_vcpu->regs_available = false;
+
+	/* We are about to resume target vCPU. */
+	target_vcpu->state = VCPU_STATE_RUNNING;
+}
+
+/**
+ * Saves the current interrupt priority.
+ */
+void vcpu_save_interrupt_priority(struct vcpu_locked vcpu_locked,
+				  uint8_t priority)
+{
+	vcpu_locked.vcpu->priority_mask = priority;
+}
+
+/**
+ * It injects a virtual interrupt in the vcpu if is enabled and is not pending.
+ */
+void vcpu_interrupt_inject(struct vcpu_locked target_locked, uint32_t intid)
+{
+	struct vcpu *target_vcpu = target_locked.vcpu;
+	struct interrupts *interrupts = &target_vcpu->interrupts;
+
+	/*
+	 * We only need to change state and (maybe) trigger a virtual interrupt
+	 * if it is enabled and was not previously pending. Otherwise we can
+	 * skip everything except setting the pending bit.
+	 */
+	if (!(vcpu_is_virt_interrupt_enabled(interrupts, intid) &&
+	      !vcpu_is_virt_interrupt_pending(interrupts, intid))) {
+		goto out;
+	}
+
+	/* Increment the count. */
+	vcpu_interrupt_count_increment(target_locked, interrupts, intid);
+
+	/*
+	 * Only need to update state if there was not already an
+	 * interrupt enabled and pending.
+	 */
+	if (vcpu_interrupt_count_get(target_locked) != 1) {
+		goto out;
+	}
+
+out:
+	/* Either way, make it pending. */
+	vcpu_virt_interrupt_set_pending(interrupts, intid);
+}
+
+void vcpu_set_processing_interrupt(struct vcpu_locked vcpu_locked,
+				   uint32_t intid, struct vcpu *preempted)
+{
+	struct vcpu *target_vcpu = vcpu_locked.vcpu;
+
+	target_vcpu->preempted_vcpu = preempted;
+	target_vcpu->processing_secure_interrupt = true;
+	target_vcpu->current_sec_interrupt_id = intid;
+}
+
+void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked)
+{
+	struct vcpu *target_vcpu = vcpu_locked.vcpu;
+
+	assert(target_vcpu->scheduling_mode == NONE);
+	assert(target_vcpu->call_chain.prev_node == NULL);
+	assert(target_vcpu->call_chain.next_node == NULL);
+	assert(target_vcpu->rt_model == RTM_NONE);
+
+	target_vcpu->scheduling_mode = SPMC_MODE;
+	target_vcpu->rt_model = RTM_SEC_INTERRUPT;
+}
