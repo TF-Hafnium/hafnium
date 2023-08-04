@@ -715,7 +715,20 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			*args = ffa_error(FFA_DENIED);
 			return true;
 		}
-		*args = plat_ffa_handle_secure_interrupt(current, next);
+
+		plat_ffa_handle_secure_interrupt(current, next);
+
+		/*
+		 * If the next vCPU belongs to an SP, the next time the NWd
+		 * gets resumed these values will be overwritten by the ABI
+		 * that used to handover execution back to the NWd.
+		 * If the NWd is to be resumed from here, then it will
+		 * receive the FFA_NORMAL_WORLD_RESUME ABI which is to signal
+		 * that an interrupt has occured, thought it wasn't handled.
+		 * This happens when the target vCPU was in preempted state,
+		 * and the SP couldn't not be resumed to handle the interrupt.
+		 */
+		*args = (struct ffa_value){.func = FFA_NORMAL_WORLD_RESUME};
 		return true;
 	case FFA_CONSOLE_LOG_32:
 	case FFA_CONSOLE_LOG_64:

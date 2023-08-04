@@ -1654,15 +1654,13 @@ static void plat_ffa_signal_secure_interrupt_sp(
  * CPU in order for it to service the virtual interrupt. This design limitation
  * simplifies the interrupt management implementation in SPMC.
  */
-struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
-						  struct vcpu **next)
+void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 {
 	struct vcpu *target_vcpu;
 	struct vcpu_locked target_vcpu_locked =
 		(struct vcpu_locked){.vcpu = NULL};
 	struct vcpu_locked current_locked;
 	struct two_vcpu_locked vcpus_locked;
-	struct ffa_value ffa_ret = ffa_error(FFA_NOT_SUPPORTED);
 	uint32_t id;
 
 	/* Find pending interrupt id. This also activates the interrupt. */
@@ -1718,16 +1716,6 @@ struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
 		 * processing interrupt, resume the current vCPU.
 		 */
 		if (*next == NULL) {
-			/*
-			 * If next is NULL, it means the SPMC can't resume
-			 * the SP. If the normal world has been preempted,
-			 * use FFA_NORMAL_WORLD_RESUME for SPMD to give
-			 * execution back to the Normal World.
-			 */
-			if (current->vm->id == HF_OTHER_WORLD_ID) {
-				ffa_ret = (struct ffa_value){
-					.func = FFA_NORMAL_WORLD_RESUME};
-			}
 			target_vcpu_locked.vcpu->preempted_vcpu = NULL;
 		} else {
 			target_vcpu_locked.vcpu->preempted_vcpu = current;
@@ -1742,8 +1730,6 @@ struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
 	}
 
 	vcpu_unlock(&current_locked);
-
-	return ffa_ret;
 }
 
 /**

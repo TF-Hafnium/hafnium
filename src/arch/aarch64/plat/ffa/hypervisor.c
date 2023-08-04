@@ -811,8 +811,7 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 	return true;
 }
 
-struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
-						  struct vcpu **next)
+void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 {
 	(void)current;
 	(void)next;
@@ -822,8 +821,6 @@ struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
 	 * SPMC. Execution should not reach hypervisor with this ABI.
 	 */
 	CHECK(false);
-
-	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
 void plat_ffa_sri_state_set(enum plat_ffa_sri_state state)

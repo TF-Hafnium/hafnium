@@ -259,8 +259,7 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 				      struct vcpu *current);
 
-struct ffa_value plat_ffa_handle_secure_interrupt(struct vcpu *current,
-						  struct vcpu **next);
+void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next);
 bool plat_ffa_inject_notification_pending_interrupt(
 	struct vcpu_locked next_locked, struct vcpu_locked current_locked,
 	struct vm_locked receiver_locked);
