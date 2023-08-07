@@ -81,6 +81,8 @@
 #define EXPECT_GE(x, y) HFTEST_ASSERT_OP(x, y, >=, false)
 #define EXPECT_GT(x, y) HFTEST_ASSERT_OP(x, y, >, false)
 
+#define EXPECT_STREQ(a, b) EXPECT_EQ(strncmp(a, b, STRING_MAX_SIZE), 0)
+
 #define EXPECT_TRUE(x) EXPECT_EQ(x, true)
 #define EXPECT_FALSE(x) EXPECT_EQ(x, false)
 

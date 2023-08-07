@@ -869,3 +869,15 @@ TEST(arch, smccc_forward)
 	EXPECT_EQ(ret.arg2, 0x0);
 	EXPECT_EQ(ret.arg3, 0x0);
 }
+
+TEST(ffa_enum_names, success_and_failure)
+{
+	EXPECT_STREQ(ffa_func_name(FFA_ERROR_32), "FFA_ERROR_32");
+	EXPECT_STREQ(ffa_func_name(FFA_EL3_INTR_HANDLE_32),
+		     "FFA_EL3_INTR_HANDLE_32");
+	EXPECT_STREQ(ffa_func_name(0), "UNKNOWN");
+
+	EXPECT_STREQ(ffa_error_name(FFA_NOT_SUPPORTED), "FFA_NOT_SUPPORTED");
+	EXPECT_STREQ(ffa_error_name(FFA_NO_DATA), "FFA_NO_DATA");
+	EXPECT_STREQ(ffa_error_name(0), "UNKNOWN");
+}

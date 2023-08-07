@@ -30,7 +30,10 @@
 #define FFA_LOW_64_ID  0xC4000060
 #define FFA_HIGH_64_ID 0xC400007F
 
-/* FF-A function identifiers. */
+/**
+ * FF-A function identifiers.
+ * Don't forget to update `ffa_func_name` if you add a new one.
+ */
 #define FFA_ERROR_32                        0x84000060
 #define FFA_SUCCESS_32                      0x84000061
 #define FFA_SUCCESS_64                      0xC4000061
@@ -86,7 +89,10 @@
 #define FFA_PARTITION_INFO_GET_REGS_64      0xC400008B
 #define FFA_EL3_INTR_HANDLE_32              0x8400008C
 
-/* FF-A error codes. */
+/**
+ * FF-A error codes.
+ * Don't forget to update `ffa_error_name` if you add a new one.
+ */
 #define FFA_NOT_SUPPORTED      INT32_C(-1)
 #define FFA_INVALID_PARAMETERS INT32_C(-2)
 #define FFA_NO_MEMORY          INT32_C(-3)
@@ -98,6 +104,147 @@
 #define FFA_NO_DATA            INT32_C(-9)
 
 /* clang-format on */
+
+/* Return the name of the function identifier. */
+static inline const char *ffa_func_name(uint32_t func)
+{
+	switch (func) {
+	case FFA_ERROR_32:
+		return "FFA_ERROR_32";
+	case FFA_SUCCESS_32:
+		return "FFA_SUCCESS_32";
+	case FFA_SUCCESS_64:
+		return "FFA_SUCCESS_64";
+	case FFA_INTERRUPT_32:
+		return "FFA_INTERRUPT_32";
+	case FFA_VERSION_32:
+		return "FFA_VERSION_32";
+	case FFA_FEATURES_32:
+		return "FFA_FEATURES_32";
+	case FFA_RX_RELEASE_32:
+		return "FFA_RX_RELEASE_32";
+	case FFA_RXTX_MAP_32:
+		return "FFA_RXTX_MAP_32";
+	case FFA_RXTX_MAP_64:
+		return "FFA_RXTX_MAP_64";
+	case FFA_RXTX_UNMAP_32:
+		return "FFA_RXTX_UNMAP_32";
+	case FFA_PARTITION_INFO_GET_32:
+		return "FFA_PARTITION_INFO_GET_32";
+	case FFA_ID_GET_32:
+		return "FFA_ID_GET_32";
+	case FFA_MSG_POLL_32:
+		return "FFA_MSG_POLL_32";
+	case FFA_MSG_WAIT_32:
+		return "FFA_MSG_WAIT_32";
+	case FFA_YIELD_32:
+		return "FFA_YIELD_32";
+	case FFA_RUN_32:
+		return "FFA_RUN_32";
+	case FFA_MSG_SEND_32:
+		return "FFA_MSG_SEND_32";
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+		return "FFA_MSG_SEND_DIRECT_REQ_32";
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+		return "FFA_MSG_SEND_DIRECT_REQ_64";
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+		return "FFA_MSG_SEND_DIRECT_RESP_32";
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+		return "FFA_MSG_SEND_DIRECT_RESP_64";
+	case FFA_MEM_DONATE_32:
+		return "FFA_MEM_DONATE_32";
+	case FFA_MEM_LEND_32:
+		return "FFA_MEM_LEND_32";
+	case FFA_MEM_SHARE_32:
+		return "FFA_MEM_SHARE_32";
+	case FFA_MEM_RETRIEVE_REQ_32:
+		return "FFA_MEM_RETRIEVE_REQ_32";
+	case FFA_MEM_RETRIEVE_RESP_32:
+		return "FFA_MEM_RETRIEVE_RESP_32";
+	case FFA_MEM_RELINQUISH_32:
+		return "FFA_MEM_RELINQUISH_32";
+	case FFA_MEM_RECLAIM_32:
+		return "FFA_MEM_RECLAIM_32";
+	case FFA_MEM_FRAG_RX_32:
+		return "FFA_MEM_FRAG_RX_32";
+	case FFA_MEM_FRAG_TX_32:
+		return "FFA_MEM_FRAG_TX_32";
+	case FFA_NORMAL_WORLD_RESUME:
+		return "FFA_NORMAL_WORLD_RESUME";
+
+	/* FF-A v1.1 */
+	case FFA_NOTIFICATION_BITMAP_CREATE_32:
+		return "FFA_NOTIFICATION_BITMAP_CREATE_32";
+	case FFA_NOTIFICATION_BITMAP_DESTROY_32:
+		return "FFA_NOTIFICATION_BITMAP_DESTROY_32";
+	case FFA_NOTIFICATION_BIND_32:
+		return "FFA_NOTIFICATION_BIND_32";
+	case FFA_NOTIFICATION_UNBIND_32:
+		return "FFA_NOTIFICATION_UNBIND_32";
+	case FFA_NOTIFICATION_SET_32:
+		return "FFA_NOTIFICATION_SET_32";
+	case FFA_NOTIFICATION_GET_32:
+		return "FFA_NOTIFICATION_GET_32";
+	case FFA_NOTIFICATION_INFO_GET_64:
+		return "FFA_NOTIFICATION_INFO_GET_64";
+	case FFA_RX_ACQUIRE_32:
+		return "FFA_RX_ACQUIRE_32";
+	case FFA_SPM_ID_GET_32:
+		return "FFA_SPM_ID_GET_32";
+	case FFA_MSG_SEND2_32:
+		return "FFA_MSG_SEND2_32";
+	case FFA_SECONDARY_EP_REGISTER_64:
+		return "FFA_SECONDARY_EP_REGISTER_64";
+	case FFA_MEM_PERM_GET_32:
+		return "FFA_MEM_PERM_GET_32";
+	case FFA_MEM_PERM_SET_32:
+		return "FFA_MEM_PERM_SET_32";
+	case FFA_MEM_PERM_GET_64:
+		return "FFA_MEM_PERM_GET_64";
+	case FFA_MEM_PERM_SET_64:
+		return "FFA_MEM_PERM_SET_64";
+
+	/* Implementation-defined ABIs. */
+	case FFA_CONSOLE_LOG_32:
+		return "FFA_CONSOLE_LOG_32";
+	case FFA_CONSOLE_LOG_64:
+		return "FFA_CONSOLE_LOG_64";
+	case FFA_PARTITION_INFO_GET_REGS_64:
+		return "FFA_PARTITION_INFO_GET_REGS_64";
+	case FFA_EL3_INTR_HANDLE_32:
+		return "FFA_EL3_INTR_HANDLE_32";
+
+	default:
+		return "UNKNOWN";
+	}
+}
+
+/* Return the name of the error code. */
+static inline const char *ffa_error_name(int32_t error)
+{
+	switch (error) {
+	case FFA_NOT_SUPPORTED:
+		return "FFA_NOT_SUPPORTED";
+	case FFA_INVALID_PARAMETERS:
+		return "FFA_INVALID_PARAMETERS";
+	case FFA_NO_MEMORY:
+		return "FFA_NO_MEMORY";
+	case FFA_BUSY:
+		return "FFA_BUSY";
+	case FFA_INTERRUPTED:
+		return "FFA_INTERRUPTED";
+	case FFA_DENIED:
+		return "FFA_DENIED";
+	case FFA_RETRY:
+		return "FFA_RETRY";
+	case FFA_ABORTED:
+		return "FFA_ABORTED";
+	case FFA_NO_DATA:
+		return "FFA_NO_DATA";
+	default:
+		return "UNKNOWN";
+	}
+}
 
 /**
  * FF-A Feature ID, to be used with interface FFA_FEATURES.
