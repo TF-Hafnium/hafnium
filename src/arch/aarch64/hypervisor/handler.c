@@ -360,7 +360,6 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 		uint32_t psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
 		struct vcpu *boot_vcpu = vcpu_get_boot_vcpu();
 		struct vm *vm = boot_vcpu->vm;
-		struct vcpu *vcpu;
 		struct vcpu_locked vcpu_locked;
 
 		/*
@@ -370,10 +369,9 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 		 */
 		switch (args->arg3) {
 		case PSCI_CPU_OFF: {
-			dlog_verbose("cpu%u off notification!\n",
-				     vcpu_index(vcpu));
-
 			if (vm_power_management_cpu_off_requested(vm) == true) {
+				struct vcpu *vcpu;
+
 				/* Allow only S-EL1 MP SPs to reach here. */
 				CHECK(vm->el0_partition == false);
 				CHECK(vm->vcpu_count > 1);
@@ -383,6 +381,8 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 				vcpu->state = VCPU_STATE_OFF;
 				vcpu_unlock(&vcpu_locked);
 				cpu_off(vcpu->cpu);
+				dlog_verbose("cpu%u off notification!\n",
+					     vcpu_index(vcpu));
 			}
 
 			psci_msg_response = PSCI_RETURN_SUCCESS;
