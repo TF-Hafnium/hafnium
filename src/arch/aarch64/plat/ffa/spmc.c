@@ -1648,11 +1648,13 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 		(struct vcpu_locked){.vcpu = NULL};
 	struct vcpu_locked current_locked;
 	uint32_t intid;
+	struct vm_locked target_vm_locked;
 
 	/* Find pending interrupt id. This also activates the interrupt. */
 	intid = plat_interrupts_get_pending_interrupt_id();
 
 	target_vcpu = plat_ffa_find_target_vcpu(current, intid);
+	target_vm_locked = vm_lock(target_vcpu->vm);
 
 	/*
 	 * SPMC has started handling a secure interrupt with a clean slate. This
@@ -1673,29 +1675,57 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	}
 
 	/*
-	 * Do not currently support nested interrupts as such, masking
-	 * interrupts.
+	 * A race condition can occur with the execution contexts belonging to
+	 * an MP SP. An interrupt targeting the execution context on present
+	 * core can trigger while the execution context of this SP on a
+	 * different core is being aborted. In such scenario, the physical
+	 * interrupts beloning to the aborted SP are disabled and the current
+	 * execution context is resumed.
 	 */
-	plat_ffa_mask_interrupts(target_vcpu_locked);
+	if (target_vcpu->state == VCPU_STATE_ABORTED ||
+	    atomic_load_explicit(&target_vcpu->vm->aborting,
+				 memory_order_relaxed)) {
+		/*
+		 * De-activate the interrupt. If not, it could trigger again
+		 * after resuming current vCPU.
+		 */
+		plat_interrupts_end_of_interrupt(intid);
 
-	/* Set the interrupt pending in the target vCPU. */
-	vcpu_interrupt_inject(target_vcpu_locked, intid);
+		/* Clear fields corresponding to secure interrupt handling. */
+		plat_ffa_reset_secure_interrupt_flags(target_vcpu_locked);
+		plat_ffa_disable_vm_interrupts(target_vm_locked);
 
-	/*
-	 * Either invoke the handler related to partitions from S-EL0 or from
-	 * S-EL1.
-	 */
-	*next = target_vcpu_locked.vcpu->vm->el0_partition
-			? plat_ffa_signal_secure_interrupt_sel0(
-				  current_locked, target_vcpu_locked, intid)
-			: plat_ffa_signal_secure_interrupt_sel1(
-				  current_locked, target_vcpu_locked, intid);
+		/* Resume current vCPU. */
+		*next = NULL;
+	} else {
+		/*
+		 * Do not currently support nested interrupts as such, masking
+		 * interrupts.
+		 */
+		plat_ffa_mask_interrupts(target_vcpu_locked);
+
+		/* Set the interrupt pending in the target vCPU. */
+		vcpu_interrupt_inject(target_vcpu_locked, intid);
+
+		/*
+		 * Either invoke the handler related to partitions from S-EL0 or
+		 * from S-EL1.
+		 */
+		*next = target_vcpu_locked.vcpu->vm->el0_partition
+				? plat_ffa_signal_secure_interrupt_sel0(
+					  current_locked, target_vcpu_locked,
+					  intid)
+				: plat_ffa_signal_secure_interrupt_sel1(
+					  current_locked, target_vcpu_locked,
+					  intid);
+	}
 
 	if (target_vcpu_locked.vcpu != NULL) {
 		vcpu_unlock(&target_vcpu_locked);
 	}
 
 	vcpu_unlock(&current_locked);
+	vm_unlock(&target_vm_locked);
 }
 
 /**
