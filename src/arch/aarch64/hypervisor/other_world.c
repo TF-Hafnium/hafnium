@@ -31,7 +31,18 @@ bool arch_other_world_vm_init(struct vm *other_world_vm,
 
 	/* Enabling all communication methods for the other world. */
 	other_world_vm->messaging_method =
-		FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND;
+		FFA_PARTITION_DIRECT_REQ_SEND | FFA_PARTITION_DIRECT_REQ2_SEND;
+
+	/*
+	 * If Hafnium is NWd Hypervisor, allow other_world_VM (SPMC) to
+	 * receive requests.
+	 * When Hafnium is SPMC, other_world_vm not allowed to receive requests
+	 * from SPs.
+	 */
+#if SECURE_WORLD == 0
+	other_world_vm->messaging_method |= FFA_PARTITION_DIRECT_REQ2_RECV;
+	other_world_vm->messaging_method |= FFA_PARTITION_DIRECT_REQ_RECV;
+#endif
 
 	/* Map NS mem ranges to "Other world VM" Stage-2 PTs. */
 	for (i = 0; i < params->ns_mem_ranges_count; i++) {

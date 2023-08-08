@@ -895,6 +895,9 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	enum manifest_return_code ret_code = MANIFEST_SUCCESS;
 	const char *error_string = "specified in manifest is unsupported";
 	uint32_t k = 0;
+	bool using_req2 = (vm->partition.messaging_method &
+			   (FFA_PARTITION_DIRECT_REQ2_RECV |
+			    FFA_PARTITION_DIRECT_REQ2_SEND)) != 0;
 
 	/* ensure that the SPM version is compatible */
 	ffa_version_major = (vm->partition.ffa_version & 0xffff0000) >>
@@ -929,9 +932,16 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
+	if (vm->partition.ffa_version < MAKE_FFA_VERSION(1, 2) && using_req2) {
+		dlog_error("Messaging method %s: %x\n", error_string,
+			   vm->partition.messaging_method);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
 	if ((vm->partition.messaging_method &
 	     ~(FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND |
-	       FFA_PARTITION_INDIRECT_MSG)) != 0U) {
+	       FFA_PARTITION_INDIRECT_MSG | FFA_PARTITION_DIRECT_REQ2_RECV |
+	       FFA_PARTITION_DIRECT_REQ2_SEND)) != 0U) {
 		dlog_error("Messaging method %s: %x\n", error_string,
 			   vm->partition.messaging_method);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
@@ -1089,8 +1099,8 @@ enum manifest_return_code parse_ffa_manifest(
 		vm->partition.rxtx.available = true;
 	}
 
-	TRY(read_uint8(&root, "messaging-method",
-		       (uint8_t *)&vm->partition.messaging_method));
+	TRY(read_uint16(&root, "messaging-method",
+			(uint16_t *)&vm->partition.messaging_method));
 	dlog_verbose("  Messaging method %u\n", vm->partition.messaging_method);
 
 	TRY(read_bool(&root, "managed-exit", &managed_exit_field_present));

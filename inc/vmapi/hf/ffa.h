@@ -722,15 +722,21 @@ static inline bool ffa_uuid_is_null(const struct ffa_uuid *uuid)
  * Flags to determine the partition properties, as required by
  * FFA_PARTITION_INFO_GET.
  *
- * The values of the flags are specified in table 8.25 of DEN0077A FF-A 1.0 REL
+ * The values of the flags are specified in table 6.2 of DEN0077A FF-A 1.2 ALP0
  * specification, "Partition information descriptor, partition properties".
  */
 typedef uint32_t ffa_partition_properties_t;
 
-/** Partition property: partition supports receipt of direct requests. */
+/**
+ * Partition property: partition supports receipt of direct requests via the
+ * FFA_MSG_SEND_DIRECT_REQ ABI.
+ */
 #define FFA_PARTITION_DIRECT_REQ_RECV (UINT32_C(1) << 0)
 
-/** Partition property: partition can send direct requests. */
+/**
+ * Partition property: partition can send direct requests via the
+ * FFA_MSG_SEND_DIRECT_REQ ABI.
+ */
 #define FFA_PARTITION_DIRECT_REQ_SEND (UINT32_C(1) << 1)
 
 /** Partition property: partition can send and receive indirect messages. */
@@ -741,6 +747,18 @@ typedef uint32_t ffa_partition_properties_t;
 
 /** Partition property: partition runs in the AArch64 execution state. */
 #define FFA_PARTITION_AARCH64_EXEC (UINT32_C(1) << 8)
+
+/**
+ * Partition property: partition supports receipt of direct requests via the
+ * FFA_MSG_SEND_DIRECT_REQ2 ABI.
+ */
+#define FFA_PARTITION_DIRECT_REQ2_RECV (UINT32_C(1) << 9)
+
+/**
+ * Partition property: partition can send direct requests via the
+ * FFA_MSG_SEND_DIRECT_REQ2 ABI.
+ */
+#define FFA_PARTITION_DIRECT_REQ2_SEND (UINT32_C(1) << 10)
 
 /**
  * Holds information returned for each partition by the FFA_PARTITION_INFO_GET

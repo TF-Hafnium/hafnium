@@ -247,7 +247,7 @@ struct vm {
 		ipaddr_t blob_addr;
 	} boot_info;
 
-	uint8_t messaging_method;
+	uint16_t messaging_method;
 
 	/**
 	 * Action specified by a Partition through the manifest in response to
@@ -369,7 +369,7 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 			       uint32_t *ids_count, uint32_t *lists_sizes,
 			       uint32_t *lists_count,
 			       const uint32_t ids_max_count);
-bool vm_supports_messaging_method(struct vm *vm, uint8_t messaging_method);
+bool vm_supports_messaging_method(struct vm *vm, uint16_t messaging_method);
 void vm_notifications_set_npi_injected(struct vm_locked vm_locked,
 				       bool npi_injected);
 bool vm_notifications_is_npi_injected(struct vm_locked vm_locked);

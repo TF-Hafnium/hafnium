@@ -158,7 +158,7 @@ struct ffa_partition_manifest {
 	struct rx_tx rxtx;
 
 	/** mandatory - direct/indirect msg or both */
-	uint8_t messaging_method;
+	uint16_t messaging_method;
 	/** mandatory - action in response to non secure interrupt */
 	uint8_t ns_interrupts_action;
 	/** optional - managed exit signaled through vIRQ */
