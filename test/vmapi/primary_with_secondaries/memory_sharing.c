@@ -3458,10 +3458,10 @@ TEST(memory_sharing, force_fragmented_ffa_v1_0)
 	handle = ffa_frag_handle(ret);
 	EXPECT_NE(handle, FFA_MEMORY_HANDLE_INVALID);
 
-	allocator_mask =
-		(IS_SP_ID(hf_vm_get_id()) || IS_SP_ID(service1_info->vm_id))
-			? FFA_MEMORY_HANDLE_ALLOCATOR_SPMC
-			: FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
+	allocator_mask = (!ffa_is_vm_id(hf_vm_get_id()) ||
+			  !ffa_is_vm_id(service1_info->vm_id))
+				 ? FFA_MEMORY_HANDLE_ALLOCATOR_SPMC
+				 : FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
 
 	send_fragmented_memory_region(
 		&ret, mb.send, constituents, ARRAY_SIZE(constituents),

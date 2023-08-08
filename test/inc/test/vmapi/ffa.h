@@ -50,8 +50,6 @@
 #define SP_ID_MASK 0x1U << 15
 #define SP_ID(x) ((x) | SP_ID_MASK)
 #define VM_ID(x) (x & ~SP_ID_MASK)
-#define IS_SP_ID(x) ((x & SP_ID_MASK) != 0U)
-#define IS_VM_ID(x) ((x & SP_ID_MASK) == 0U)
 
 struct mailbox_buffers {
 	void *send;

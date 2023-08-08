@@ -187,12 +187,13 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	 * the dt provided by the Hypervisor. SPs expect to receive their
 	 * FF-A manifest which doesn't have a memory size field.
 	 */
-	if (IS_VM_ID(own_id) && !fdt_get_memory_size(&fdt, &ctx->memory_size)) {
+	if (ffa_is_vm_id(own_id) &&
+	    !fdt_get_memory_size(&fdt, &ctx->memory_size)) {
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
 			   "No entry in the FDT on memory size details");
 		abort();
-	} else if (!IS_VM_ID(own_id)) {
+	} else if (!ffa_is_vm_id(own_id)) {
 		/*
 		 * It is secure partition. We are currently using the partition
 		 * manifest for the SP.

@@ -211,7 +211,7 @@ TEST_SERVICE(ffa_direct_msg_resp_invalid_sender_receiver)
 	ASSERT_EQ(own_id, ffa_receiver(args));
 
 	/* Other receiver ID. */
-	invalid_receiver = IS_VM_ID(own_id) ? service2_info->vm_id : own_id;
+	invalid_receiver = ffa_is_vm_id(own_id) ? service2_info->vm_id : own_id;
 	res = ffa_msg_send_direct_resp(own_id, invalid_receiver, 0, 0, 0, 0, 0);
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 

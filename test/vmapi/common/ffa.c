@@ -82,7 +82,7 @@ void mailbox_receive_retry(void *buffer, size_t buffer_size, void *recv,
 	sender = ffa_rxtx_header_sender(header);
 
 	if (is_ffa_hyp_buffer_full_notification(fwk_notif)) {
-		EXPECT_TRUE(IS_VM_ID(sender));
+		EXPECT_TRUE(ffa_is_vm_id(sender));
 	} else {
 		FAIL("Unexpected message sender.\n");
 	}
@@ -195,7 +195,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 
 	/* Check if any of the receivers is a secure endpoint. */
 	for (i = 0; i < receivers_send_count; i++) {
-		if (!IS_VM_ID(
+		if (!ffa_is_vm_id(
 			    receivers_send[i].receiver_permissions.receiver)) {
 			contains_secure_receiver = true;
 			break;
@@ -208,7 +208,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	 * the allocator will be the SPMC.
 	 * Else, it will be the hypervisor.
 	 */
-	allocator_mask = (!IS_VM_ID(sender) || contains_secure_receiver)
+	allocator_mask = (!ffa_is_vm_id(sender) || contains_secure_receiver)
 				 ? FFA_MEMORY_HANDLE_ALLOCATOR_SPMC
 				 : FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
 
@@ -425,9 +425,9 @@ static struct ffa_partition_msg *get_mailbox_message(void *recv)
 	EXPECT_EQ(receiver, own_id);
 
 	if (is_ffa_spm_buffer_full_notification(fwk_notif)) {
-		EXPECT_FALSE(IS_VM_ID(sender));
+		EXPECT_FALSE(ffa_is_vm_id(sender));
 	} else if (is_ffa_hyp_buffer_full_notification(fwk_notif)) {
-		EXPECT_TRUE(IS_VM_ID(sender));
+		EXPECT_TRUE(ffa_is_vm_id(sender));
 	}
 
 	return msg;
@@ -722,9 +722,9 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 	source_vm_id = ffa_rxtx_header_sender(&header);
 
 	if (is_ffa_hyp_buffer_full_notification(fwk_notif)) {
-		EXPECT_TRUE(IS_VM_ID(source_vm_id));
+		EXPECT_TRUE(ffa_is_vm_id(source_vm_id));
 	} else if (is_ffa_spm_buffer_full_notification(fwk_notif)) {
-		EXPECT_FALSE(IS_VM_ID(source_vm_id));
+		EXPECT_FALSE(ffa_is_vm_id(source_vm_id));
 	}
 
 	/* Check receiver ID against own ID. */

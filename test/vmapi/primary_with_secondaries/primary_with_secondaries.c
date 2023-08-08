@@ -38,8 +38,8 @@ bool service1_and_service2_are_secure(void)
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 
-	return !IS_VM_ID(service1_info->vm_id) &&
-	       !IS_VM_ID(service2_info->vm_id);
+	return !ffa_is_vm_id(service1_info->vm_id) &&
+	       !ffa_is_vm_id(service2_info->vm_id);
 }
 
 /*
@@ -52,7 +52,7 @@ bool service1_is_vm(void)
 	struct mailbox_buffers mb = get_precondition_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
-	return IS_VM_ID(service1_info->vm_id);
+	return ffa_is_vm_id(service1_info->vm_id);
 }
 
 /*
@@ -97,7 +97,7 @@ bool hypervisor_only(void)
 	ret = ffa_partition_info_get(&uuid, 0);
 
 	for (uint32_t i = 0; i < ffa_partition_info_get_count(ret); i++) {
-		if (!IS_VM_ID(endpoint_info[i].vm_id)) {
+		if (!ffa_is_vm_id(endpoint_info[i].vm_id)) {
 			is_there_non_vm_endpoints = true;
 			break;
 		}

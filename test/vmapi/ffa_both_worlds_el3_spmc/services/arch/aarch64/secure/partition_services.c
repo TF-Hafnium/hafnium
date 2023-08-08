@@ -49,7 +49,7 @@ struct ffa_value sp_req_echo_denied_cmd(ffa_id_t test_source)
 	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value res;
 
-	if (IS_SP_ID(test_source)) {
+	if (!ffa_is_vm_id(test_source)) {
 		res = ffa_msg_send_direct_req(own_id, test_source, 0, 0, 0, 0,
 					      0);
 		EXPECT_FFA_ERROR(res, FFA_DENIED);

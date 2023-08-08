@@ -28,7 +28,7 @@ static void update_mm_security_state(
 {
 	if (ffa_get_memory_security_attr(attributes) ==
 		    FFA_MEMORY_SECURITY_NON_SECURE &&
-	    !IS_VM_ID(hf_vm_get_id())) {
+	    !ffa_is_vm_id(hf_vm_get_id())) {
 		for (uint32_t i = 0; i < composite->constituent_count; i++) {
 			uint32_t mode;
 
