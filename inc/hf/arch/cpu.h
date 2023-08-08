@@ -68,3 +68,7 @@ struct ffa_value arch_regs_get_args(struct arch_regs *regs);
 void arch_cpu_init(struct cpu *c);
 
 struct vcpu *arch_vcpu_resume(struct cpu *c);
+
+uint32_t arch_affinity_to_core_pos(uint64_t reg);
+
+uint32_t arch_find_core_pos(void);

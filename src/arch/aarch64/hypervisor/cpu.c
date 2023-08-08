@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "hf/arch/gicv3.h"
 #include "hf/arch/plat/psci.h"
 
 #include "hf/addr.h"
@@ -298,4 +299,35 @@ void arch_cpu_init(struct cpu *c)
 struct vcpu *arch_vcpu_resume(struct cpu *c)
 {
 	return plat_psci_cpu_resume(c);
+}
+
+uint32_t arch_affinity_to_core_pos(uint64_t reg)
+{
+	struct cpu *this_cpu;
+	uint32_t core_id;
+
+	this_cpu = cpu_find(reg & MPIDR_AFFINITY_MASK);
+
+	if (this_cpu == NULL) {
+		/*
+		 * There might be holes in all redistributor frames (some CPUs
+		 * don't exist). For these CPUs, return MAX_CPUS, so that the
+		 * caller has a chance to recover.
+		 */
+		core_id = MAX_CPUS;
+	} else {
+		core_id = cpu_index(this_cpu);
+	}
+
+	return core_id;
+}
+
+uint32_t arch_find_core_pos(void)
+{
+	uint32_t core_id;
+
+	core_id = arch_affinity_to_core_pos(read_msr(MPIDR_EL1));
+	CHECK(core_id < MAX_CPUS);
+
+	return core_id;
 }

@@ -53,27 +53,6 @@ struct gicv3_driver {
 
 static struct gicv3_driver plat_gicv3_driver;
 
-static uint32_t affinity_to_core_id(uint64_t reg)
-{
-	struct cpu *this_cpu;
-	uint32_t core_id;
-
-	this_cpu = cpu_find(reg & MPIDR_AFFINITY_MASK);
-
-	if (this_cpu == NULL) {
-		/*
-		 * There might be holes in all redistributor frames (some CPUs
-		 * don't exist). For these CPUs, return MAX_CPUS, so that the
-		 * caller has a chance to recover.
-		 */
-		core_id = MAX_CPUS;
-	} else {
-		core_id = cpu_index(this_cpu);
-	}
-
-	return core_id;
-}
-
 /**
  * This function checks the interrupt ID and returns true for SGIs and (E)PPIs
  * and false for (E)SPIs IDs.
@@ -347,7 +326,7 @@ static inline uint32_t gicr_affinity_to_core_pos(uint64_t typer_reg)
 	reg = (aff3 << MPIDR_AFF3_SHIFT) | (aff2 << MPIDR_AFF2_SHIFT) |
 	      (aff1 << MPIDR_AFF1_SHIFT) | (aff0 << MPIDR_AFF0_SHIFT);
 
-	return affinity_to_core_id(reg);
+	return arch_affinity_to_core_pos(reg);
 }
 
 static inline void populate_redist_base_addrs(void)
@@ -379,18 +358,6 @@ static inline void populate_redist_base_addrs(void)
 
 		current_rdist_frame += GIC_REDIST_FRAMES_OFFSET;
 	}
-}
-
-static uint32_t find_core_pos(void)
-{
-	uint64_t mpidr_reg;
-	uint32_t core_id;
-
-	mpidr_reg = read_msr(MPIDR_EL1);
-
-	core_id = affinity_to_core_id(mpidr_reg);
-	CHECK(core_id < MAX_CPUS);
-	return core_id;
 }
 
 /**
@@ -562,7 +529,7 @@ bool plat_interrupts_controller_driver_init(
 	}
 
 	gicv3_distif_init();
-	gicv3_rdistif_init(find_core_pos());
+	gicv3_rdistif_init(arch_find_core_pos());
 
 	return true;
 }
@@ -570,7 +537,7 @@ bool plat_interrupts_controller_driver_init(
 void plat_interrupts_controller_hw_init(struct cpu *c)
 {
 	(void)c;
-	gicv3_cpuif_enable(find_core_pos());
+	gicv3_cpuif_enable(arch_find_core_pos());
 }
 
 void plat_interrupts_set_priority_mask(uint8_t min_priority)
@@ -601,12 +568,12 @@ void plat_interrupts_disable(uint32_t id, uint32_t core_pos)
 
 void plat_interrupts_set_type(uint32_t id, uint32_t type)
 {
-	gicv3_set_interrupt_type(id, find_core_pos(), type);
+	gicv3_set_interrupt_type(id, arch_find_core_pos(), type);
 }
 
 uint32_t plat_interrupts_get_type(uint32_t id)
 {
-	return gicv3_get_interrupt_type(id, find_core_pos());
+	return gicv3_get_interrupt_type(id, arch_find_core_pos());
 }
 
 uint32_t plat_interrupts_get_pending_interrupt_id(void)
@@ -624,7 +591,7 @@ void plat_interrupts_end_of_interrupt(uint32_t id)
  */
 void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 {
-	uint32_t core_idx = find_core_pos();
+	uint32_t core_idx = arch_find_core_pos();
 	uint32_t config = GIC_INTR_CFG_LEVEL;
 	uint32_t intr_num = interrupt_desc_get_id(int_desc);
 
@@ -697,7 +664,7 @@ void plat_interrupts_reconfigure_interrupt(struct interrupt_descriptor int_desc)
 	assert(int_desc.valid);
 
 	gicv3_disable_interrupt(interrupt_desc_get_id(int_desc),
-				find_core_pos());
+				arch_find_core_pos());
 
 	/*
 	 * Interrupt already disabled above. Proceed to (re)configure the
