@@ -1323,6 +1323,25 @@ int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 	return 0;
 }
 
+static void plat_ffa_disable_vm_interrupts(struct vm_locked vm_locked)
+{
+	uint32_t core_pos = arch_find_core_pos();
+
+	/* Gracefully disable interrupts. */
+	dlog_verbose("Interrupts belonging to SP %x disabled\n",
+		     vm_locked.vm->id);
+
+	for (uint32_t i = 0; i < HF_NUM_INTIDS; i++) {
+		struct interrupt_descriptor int_desc;
+
+		int_desc = vm_locked.vm->interrupt_desc[i];
+		if (!int_desc.valid) {
+			break;
+		}
+		plat_interrupts_disable(int_desc.interrupt_id, core_pos);
+	}
+}
+
 static struct vcpu *plat_ffa_find_target_vcpu(struct vcpu *current,
 					      uint32_t interrupt_id)
 {
@@ -2709,9 +2728,11 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 				   uint32_t error_code)
 {
 	struct vcpu_locked current_locked;
+	struct vm_locked vm_locked;
 	enum partition_runtime_model rt_model;
 	struct ffa_value ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
 
+	vm_locked = vm_lock(current->vm);
 	current_locked = vcpu_lock(current);
 	rt_model = current_locked.vcpu->rt_model;
 
@@ -2721,6 +2742,8 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 
 		atomic_store_explicit(&current->vm->aborting, true,
 				      memory_order_relaxed);
+
+		plat_ffa_free_vm_resources(vm_locked);
 
 		if (sp_boot_next(current_locked, next)) {
 			goto out;
@@ -2741,6 +2764,7 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	ret = ffa_error(FFA_NOT_SUPPORTED);
 out:
 	vcpu_unlock(&current_locked);
+	vm_unlock(&vm_locked);
 	return ret;
 }
 
@@ -2854,4 +2878,15 @@ out_unlock:
 	vm_unlock(&vm_locked);
 
 	return ret;
+}
+
+/**
+ * Reclaim all resources belonging to VM in aborted state.
+ */
+void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
+{
+	/*
+	 * Gracefully disable all interrupts belonging to SP.
+	 */
+	plat_ffa_disable_vm_interrupts(vm_locked);
 }

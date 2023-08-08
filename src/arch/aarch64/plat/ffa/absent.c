@@ -639,3 +639,8 @@ int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current)
 	(void)current;
 	return -1;
 }
+
+void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
+{
+	(void)vm_locked;
+}

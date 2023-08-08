@@ -385,6 +385,7 @@ struct vcpu *api_abort(struct vcpu *current)
 	struct ffa_value ret = ffa_error(FFA_ABORTED);
 	struct vcpu_locked current_locked;
 	struct vcpu *next;
+	struct vm_locked vm_locked;
 
 	dlog_notice("Aborting VM %#x vCPU %u\n", current->vm->id,
 		    vcpu_index(current));
@@ -399,7 +400,9 @@ struct vcpu *api_abort(struct vcpu *current)
 	atomic_store_explicit(&current->vm->aborting, true,
 			      memory_order_relaxed);
 
-	/* TODO: free resources once all vCPUs abort. */
+	vm_locked = vm_lock(current->vm);
+	plat_ffa_free_vm_resources(vm_locked);
+	vm_unlock(&vm_locked);
 
 	current_locked = vcpu_lock(current);
 	next = api_switch_to_primary(current_locked, ret, VCPU_STATE_ABORTED);

@@ -2233,3 +2233,8 @@ int64_t plat_ffa_mailbox_waiter_get(ffa_id_t vm_id, const struct vcpu *current)
 
 	return waiting_vm->id;
 }
+
+void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
+{
+	(void)vm_locked;
+}

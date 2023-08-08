@@ -668,3 +668,8 @@ bool plat_ffa_partition_info_get_regs_forward_allowed(void)
 {
 	return false;
 }
+
+void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
+{
+	(void)vm_locked;
+}
