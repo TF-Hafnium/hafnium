@@ -803,6 +803,9 @@ As part of the FF-A v1.1 support, the following interfaces were added:
  - ``FFA_MSG_SEND2``
  - ``FFA_RX_ACQUIRE``
 
+As part of the FF-A v1.2 support, the following interfaces were added:
+- ``FFA_PARTITION_INFO_GET_REGS``
+
 FFA_VERSION
 ~~~~~~~~~~~
 
@@ -852,6 +855,19 @@ Partition info get call can originate:
 
 - from SP to SPMC
 - from Hypervisor or OS kernel to SPMC. The request is relayed by the SPMD.
+
+FFA_PARTITION_INFO_GET_REGS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This call can originate:
+
+- from SP to SPMC
+- from SPMC to SPMD
+- from Hypervsior or OS kernel to SPMC. The request is relayed by the SPMD.
+
+The primary use of this ABI is to return partition information via registers
+as opposed to via RX/TX buffers and is useful in cases where sharing memory is
+difficult.
 
 FFA_ID_GET
 ~~~~~~~~~~
