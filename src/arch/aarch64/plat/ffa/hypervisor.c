@@ -1585,7 +1585,7 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose(
 			"FFA_MEM_RECLAIM returned an error. Expected "
-			"FFA_SUCCESS, got %s (%s)",
+			"FFA_SUCCESS, got %s (%s)\n",
 			ffa_func_name(ret.func), ffa_error_name(ret.arg2));
 		goto out;
 	}

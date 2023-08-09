@@ -134,6 +134,7 @@ TEST(memory_sharing, lend_retrieve_relinquish)
 			  FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
+
 	ret = ffa_mem_lend(msg_size, msg_size);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	handle = ffa_mem_success_handle(ret);
@@ -141,6 +142,9 @@ TEST(memory_sharing, lend_retrieve_relinquish)
 	ret = sp_req_retrieve_cmd_send(hf_vm_get_id(), service1_info->vm_id,
 				       handle, tag, retrieve_flags);
 	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	ret = ffa_mem_reclaim(handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
 /**
@@ -196,6 +200,9 @@ TEST(memory_sharing, force_fragmented_share_retrieve_relinquish)
 
 	/* Expect SP to have incremented the page */
 	EXPECT_EQ(pages[0], 1);
+
+	ret = ffa_mem_reclaim(handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
 /**
@@ -289,4 +296,154 @@ TEST(memory_sharing, ffa_validate_mbz)
 		EXPECT_EQ(ret.func, FFA_ERROR_32);
 		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
 	}
+}
+
+/**
+ * Test memory reclaim after a lend.
+ */
+TEST(memory_sharing, lend_reclaim)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	uint32_t msg_size;
+	struct ffa_value ret;
+	ffa_memory_handle_t handle;
+	uint32_t tag = 0xDEAD;
+	uint32_t retrieve_flags = 0;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), tag, retrieve_flags,
+			  FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	ret = ffa_mem_lend(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	handle = ffa_mem_success_handle(ret);
+
+	ret = ffa_mem_reclaim(handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
+/**
+ * Test memory reclaim after a lend but before a retrieve.
+ */
+TEST(memory_sharing, lend_reclaim_before_retrieve)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	uint32_t msg_size;
+	struct ffa_value ret;
+	ffa_memory_handle_t handle;
+	uint32_t tag = 0xDEAD;
+	uint32_t retrieve_flags = 0;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), tag, retrieve_flags,
+			  FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	ret = ffa_mem_lend(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	handle = ffa_mem_success_handle(ret);
+
+	ret = ffa_mem_reclaim(handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
+/**
+ * Test memory reclaim after a share.
+ */
+TEST(memory_sharing, share_reclaim)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	uint32_t msg_size;
+	struct ffa_value ret;
+	ffa_memory_handle_t handle;
+	uint32_t tag = 0xDEAD;
+	uint32_t retrieve_flags = 0;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), tag, retrieve_flags,
+			  FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	handle = ffa_mem_success_handle(ret);
+
+	ret = sp_req_retrieve_cmd_send(hf_vm_get_id(), service1_info->vm_id,
+				       handle, tag, retrieve_flags);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	ret = ffa_mem_reclaim(handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
+/**
+ * Test memory reclaim after a share but before a retrieve.
+ */
+TEST(memory_sharing, share_reclaim_before_retrieve)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	uint32_t msg_size;
+	struct ffa_value ret;
+	ffa_memory_handle_t handle;
+	uint32_t tag = 0xDEAD;
+	uint32_t retrieve_flags = 0;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), tag, retrieve_flags,
+			  FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+		  0);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	handle = ffa_mem_success_handle(ret);
+
+	ret = ffa_mem_reclaim(handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
