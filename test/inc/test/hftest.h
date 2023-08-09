@@ -52,6 +52,13 @@
 	TEST_PRECONDITION(suite, test, precon_skip_##suite_##test)
 
 /*
+ * Define set up functions to be run during a services initialisation phase.
+ * A service must partition must specify the set up functions it wishes to run
+ * in the partition manifest.
+ */
+#define SERVICE_SET_UP(service) HFTEST_SERVICE_SET_UP(service)
+
+/*
  * Define a test service.
  */
 #define TEST_SERVICE(service) HFTEST_TEST_SERVICE(service)

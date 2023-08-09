@@ -41,6 +41,8 @@
 	HFTEST_STR(.hftest.suite.suite_name .1tear_down)
 #define HFTEST_TEST_SECTION(suite_name, test_name) \
 	HFTEST_STR(.hftest.suite.suite_name .2test.test_name)
+#define HFTEST_SERVICE_SET_UP_SECTION(service_name) \
+	HFTEST_STR(.hftest.service_set_up.service_name)
 #define HFTEST_SERVICE_SECTION(service_name) \
 	HFTEST_STR(.hftest.service.service_name)
 
@@ -49,12 +51,16 @@
 #define HFTEST_TEAR_DOWN_STRUCT(suite_name) hftest_tear_down_##suite_name
 #define HFTEST_TEST_STRUCT(suite_name, test_name) \
 	hftest_test_##suite_name##_##test_name
+#define HFTEST_SERVICE_SET_UP_STRUCT(service_name) \
+	hftest_service_set_up_##service_name
 #define HFTEST_SERVICE_STRUCT(service_name) hftest_service_##service_name
 
 #define HFTEST_SET_UP_FN(suite_name) hftest_set_up_fn_##suite_name
 #define HFTEST_TEAR_DOWN_FN(suite_name) hftest_tear_down_fn_##suite_name
 #define HFTEST_TEST_FN(suite_name, test_name) \
 	hftest_test_fn_##suite_name##_##test_name
+#define HFTEST_SERVICE_SET_UP_FN(service_name) \
+	hftest_service_set_up_fn_##service_name
 #define HFTEST_SERVICE_FN(service_name) hftest_service_fn_##service_name
 
 #define HFTEST_SET_UP_CONSTRUCTOR(suite_name) hftest_set_up_ctor_##suite_name
@@ -115,6 +121,17 @@
 	}                                                                    \
 	static void HFTEST_TEST_FN(suite_name, test_name)(void)
 
+#define HFTEST_SERVICE_SET_UP(service_name)                                   \
+	static void HFTEST_SERVICE_SET_UP_FN(service_name)(void);             \
+	const struct hftest_test __attribute__((used))                        \
+	__attribute__((section(HFTEST_SERVICE_SET_UP_SECTION(service_name)))) \
+	HFTEST_SERVICE_SET_UP_STRUCT(service_name) = {                        \
+		.name = #service_name,                                        \
+		.kind = HFTEST_KIND_SERVICE_SET_UP,                           \
+		.fn = HFTEST_SERVICE_SET_UP_FN(service_name),                 \
+	};                                                                    \
+	static void HFTEST_SERVICE_SET_UP_FN(service_name)(void)
+
 #define HFTEST_TEST_SERVICE(service_name)                              \
 	static void HFTEST_SERVICE_FN(service_name)(void);             \
 	const struct hftest_test __attribute__((used))                 \
@@ -154,7 +171,8 @@ enum hftest_kind {
 	HFTEST_KIND_SET_UP = 0,
 	HFTEST_KIND_TEST = 1,
 	HFTEST_KIND_TEAR_DOWN = 2,
-	HFTEST_KIND_SERVICE = 3,
+	HFTEST_KIND_SERVICE_SET_UP = 3,
+	HFTEST_KIND_SERVICE = 4,
 };
 
 /**

@@ -131,6 +131,43 @@ static void hftest_parse_ffa_manifest(struct hftest_context *ctx,
 	ctx->is_ffa_manifest_parsed = true;
 }
 
+static void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
+{
+	struct fdt_node node;
+	struct hftest_test *hftest_info;
+
+	ASSERT_TRUE(fdt_find_node(fdt, "/", &node));
+
+	if (!fdt_find_child(&node, &(STRING_INIT("hftest-service-setup")))) {
+		return;
+	}
+
+	EXPECT_TRUE(fdt_is_compatible(&node, "arm,hftest"));
+
+	for (hftest_info = hftest_begin; hftest_info < hftest_end;
+	     ++hftest_info) {
+		struct memiter data;
+		if (hftest_info->kind != HFTEST_KIND_SERVICE_SET_UP) {
+			continue;
+		}
+		if (fdt_read_property(&node, hftest_info->name, &data)) {
+			HFTEST_LOG("Running service_setup: %s\n",
+				   hftest_info->name);
+			hftest_info->fn();
+			if (ctx->failures) {
+				HFTEST_LOG_FAILURE();
+				HFTEST_LOG(HFTEST_LOG_INDENT
+					   "%s service_setup failed\n",
+					   hftest_info->name);
+				abort();
+			}
+		} else {
+			HFTEST_LOG("Skipping service_setup: %s\n",
+				   hftest_info->name);
+		}
+	}
+}
+
 noreturn void hftest_service_main(const void *fdt_ptr)
 {
 	struct memiter args;
@@ -142,6 +179,39 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	struct mailbox_buffers mb = set_up_mailbox();
 	ffa_notifications_bitmap_t bitmap;
 	struct ffa_partition_msg *message = (struct ffa_partition_msg *)mb.recv;
+
+	/* Clean the context. */
+	ctx = hftest_get_context();
+	hftest_context_init(ctx, mb.send, mb.recv);
+
+	if (!fdt_struct_from_ptr(fdt_ptr, &fdt)) {
+		HFTEST_LOG(HFTEST_LOG_INDENT "Unable to access the FDT");
+		abort();
+	}
+
+	/*
+	 * The memory size argument is to be used only by VMs. It is part of
+	 * the dt provided by the Hypervisor. SPs expect to receive their
+	 * FF-A manifest which doesn't have a memory size field.
+	 */
+	if (ffa_is_vm_id(own_id) &&
+	    !fdt_get_memory_size(&fdt, &ctx->memory_size)) {
+		HFTEST_LOG_FAILURE();
+		HFTEST_LOG(HFTEST_LOG_INDENT
+			   "No entry in the FDT on memory size details");
+		abort();
+	} else if (!ffa_is_vm_id(own_id)) {
+		/*
+		 * It is secure partition. We are currently using the partition
+		 * manifest for the SP.
+		 */
+		hftest_parse_ffa_manifest(ctx, &fdt);
+
+		/* TODO: Determine memory size referring to the SP Pkg. */
+		ctx->memory_size = 1048576;
+	}
+
+	run_service_set_up(ctx, &fdt);
 
 	/* Receive the name of the service to run. */
 	ret = ffa_msg_wait();
@@ -171,37 +241,6 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 		HFTEST_LOG(HFTEST_LOG_INDENT
 			   "Unable to find requested service");
 		abort();
-	}
-
-	if (!fdt_struct_from_ptr(fdt_ptr, &fdt)) {
-		HFTEST_LOG(HFTEST_LOG_INDENT "Unable to access the FDT");
-		abort();
-	}
-
-	/* Clean the context. */
-	ctx = hftest_get_context();
-	hftest_context_init(ctx, mb.send, mb.recv);
-
-	/*
-	 * The memory size argument is to be used only by VMs. It is part of
-	 * the dt provided by the Hypervisor. SPs expect to receive their
-	 * FF-A manifest which doesn't have a memory size field.
-	 */
-	if (ffa_is_vm_id(own_id) &&
-	    !fdt_get_memory_size(&fdt, &ctx->memory_size)) {
-		HFTEST_LOG_FAILURE();
-		HFTEST_LOG(HFTEST_LOG_INDENT
-			   "No entry in the FDT on memory size details");
-		abort();
-	} else if (!ffa_is_vm_id(own_id)) {
-		/*
-		 * It is secure partition. We are currently using the partition
-		 * manifest for the SP.
-		 */
-		hftest_parse_ffa_manifest(ctx, &fdt);
-
-		/* TODO: Determine memory size referring to the SP Pkg. */
-		ctx->memory_size = 1048576;
 	}
 
 	/* Pause so the next time cycles are given the service will be run. */
