@@ -1044,6 +1044,56 @@ The handling of framework notifications is similar to that of
 global notifications. Binding of these is not necessary, as these are
 reserved to be used by the hypervisor or SPMC.
 
+Paravirtualized interfaces
+--------------------------
+
+Hafnium SPMC implements the following implementation-defined interface(s):
+
+HF_INTERRUPT_ENABLE
+~~~~~~~~~~~~~~~~~~~
+
+Enables or disables the given virtual interrupt for the calling execution
+context. Returns 0 on success, or -1 if the interrupt id is invalid.
+
+HF_INTERRUPT_GET
+~~~~~~~~~~~~~~~~
+
+Returns the ID of the next pending virtual interrupt for the calling execution
+context, and acknowledges it (i.e. marks it as no longer pending). Returns
+HF_INVALID_INTID if there are no pending interrupts.
+
+HF_INTERRUPT_DEACTIVATE
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Drops the current interrupt priority and deactivates the given virtual and
+physical interrupt ID for the calling execution context. Returns 0 on success,
+or -1 otherwise.
+
+HF_INTERRUPT_RECONFIGURE
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+An SP specifies the list of interrupts it owns through its partition manifest.
+This paravirtualized interface allows an SP to reconfigure a physical interrupt
+in runtime. It accepts three arguments, namely, interrupt ID, command and value.
+The command & value pair signify what change is being requested by the current
+Secure Partition for the given interrupt.
+
+SPMC returns 0 to indicate that the command was processed successfully or -1 if
+it failed to do so. At present, this interface only supports the following
+commands:
+
+ - ``INT_RECONFIGURE_TARGET_PE``
+     - Change the target CPU of the interrupt.
+     - Value represents linear CPU index in the range 0 to (MAX_CPUS - 1).
+
+ - ``INT_RECONFIGURE_SEC_STATE``
+     - Change the security state of the interrupt.
+     - Value must be either 0 (Non-secure) or 1 (Secure).
+
+ - ``INT_RECONFIGURE_ENABLE``
+     - Enable or disable the physical interrupt.
+     - Value must be either 0 (Disable) or 1 (Enable).
+
 SPMC-SPMD direct requests/responses
 -----------------------------------
 
