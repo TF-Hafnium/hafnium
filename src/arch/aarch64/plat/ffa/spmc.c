@@ -2777,7 +2777,7 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 {
 	struct vcpu_locked current_locked;
 	enum partition_runtime_model rt_model;
-	struct ffa_value ret;
+	struct ffa_value ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
 
 	current_locked = vcpu_lock(current);
 	rt_model = current_locked.vcpu->rt_model;
@@ -2790,7 +2790,6 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 				      memory_order_relaxed);
 
 		if (sp_boot_next(current_locked, next)) {
-			ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 			goto out;
 		}
 
@@ -2804,7 +2803,6 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 			(struct ffa_value){.func = FFA_MSG_WAIT_32},
 			VCPU_STATE_ABORTED);
 
-		ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 		goto out;
 	}
 	ret = ffa_error(FFA_NOT_SUPPORTED);
