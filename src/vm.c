@@ -983,3 +983,61 @@ void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu)
 				     vm->boot_info.gp_register_num);
 	}
 }
+
+/**
+ * Obtain the interrupt descriptor entry of the specified vm corresponding
+ * to the specific interrupt id.
+ */
+struct interrupt_descriptor *vm_find_interrupt_descriptor(
+	struct vm_locked vm_locked, uint32_t id)
+{
+	for (uint32_t i = 0; i < HF_NUM_INTIDS; i++) {
+		/* Interrupt descriptors are populated contiguously. */
+		if (!vm_locked.vm->interrupt_desc[i].valid) {
+			break;
+		}
+
+		if (vm_locked.vm->interrupt_desc[i].interrupt_id == id) {
+			/* Interrupt descriptor found. */
+			return &vm_locked.vm->interrupt_desc[i];
+		}
+	}
+
+	return NULL;
+}
+
+/**
+ * Update the target MPIDR corresponding to the specified interrupt id
+ * belonging to the specified vm.
+ */
+struct interrupt_descriptor *vm_interrupt_set_target_mpidr(
+	struct vm_locked vm_locked, uint32_t id, uint32_t target_mpidr)
+{
+	struct interrupt_descriptor *int_desc;
+
+	int_desc = vm_find_interrupt_descriptor(vm_locked, id);
+
+	if (int_desc != NULL) {
+		interrupt_desc_set_mpidr(int_desc, target_mpidr);
+	}
+
+	return int_desc;
+}
+
+/**
+ * Update the security state of the specified interrupt id belonging to the
+ * specified vm.
+ */
+struct interrupt_descriptor *vm_interrupt_set_sec_state(
+	struct vm_locked vm_locked, uint32_t id, uint32_t sec_state)
+{
+	struct interrupt_descriptor *int_desc;
+
+	int_desc = vm_find_interrupt_descriptor(vm_locked, id);
+
+	if (int_desc != NULL) {
+		interrupt_desc_set_sec_state(int_desc, sec_state);
+	}
+
+	return int_desc;
+}

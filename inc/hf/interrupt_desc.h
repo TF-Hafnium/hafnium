@@ -183,6 +183,18 @@ static inline void interrupt_desc_set_type_config_sec_state(
 	int_desc->type_config_sec_state = value;
 }
 
+static inline void interrupt_desc_set_sec_state(
+	struct interrupt_descriptor *int_desc, uint8_t value)
+{
+	/*
+	 * Note that the type_config_sec_state field is 8 bit wide. Modify only
+	 * the bit[0] of the type_config_sec_state field as it represents the
+	 * security state of the interrupt.
+	 */
+	int_desc->type_config_sec_state =
+		(int_desc->type_config_sec_state & 0xFE) | (value & 0x1);
+}
+
 static inline void interrupt_desc_set_priority(
 	struct interrupt_descriptor *int_desc, uint8_t priority)
 {
