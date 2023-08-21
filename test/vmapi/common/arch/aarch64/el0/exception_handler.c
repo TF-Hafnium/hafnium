@@ -6,19 +6,21 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "test/vmapi/arch/exception_handler.h"
+
 #include "vmapi/hf/call.h"
 
 /**
  * Tracks the virtual interrupt that was last handled by SP.
  */
-static uint32_t last_serviced_interrupt = 0;
+static uint32_t last_serviced_interrupt = HF_INVALID_INTID;
 
 /**
  * Updates the last serviced virtual interrupt ID.
  */
-void exception_handler_set_last_interrupt(uint32_t id)
+void exception_handler_set_last_interrupt(uint32_t int_id)
 {
-	last_serviced_interrupt = id;
+	last_serviced_interrupt = int_id;
 }
 
 /**

@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "test/vmapi/arch/exception_handler.h"
+
 #include "hf/dlog.h"
 
 #include "vmapi/hf/call.h"
@@ -15,20 +17,40 @@
 #include "test/hftest.h"
 
 /**
+ * Arm ARM states bit 31 of MPIDR register must be RES1. This mask can be used
+ * to clear it while extracting vCPU index from read of MPIDR_EL1 register.
+ */
+#define MPIDR_RES1_CLEAR_MASK (~(UINT64_C(1) << 31))
+
+/**
  * Tracks the number of times the exception handler has been invoked.
  */
 static int exception_handler_exception_count = 0;
 
 /**
- * Tracks the virtual interrupt that was last handled by SP.
+ * Tracks the virtual interrupt that was last handled by indexed execution
+ * context of an SP.
  */
-static uint32_t last_serviced_interrupt = 0;
+static uint32_t last_serviced_interrupt[MAX_CPUS] = {HF_INVALID_INTID};
 
 /**
  * Used to specify an instruction address to return to after exception
  * is handled.
  */
 static uint64_t exception_handler_return_addr = 0;
+
+/**
+ * Get the index of the current vCPU.
+ */
+static ffa_vcpu_index_t get_current_vcpu_index(void)
+{
+	ffa_vcpu_index_t index;
+
+	index = read_msr(mpidr_el1) & MPIDR_RES1_CLEAR_MASK;
+	EXPECT_LT(index, MAX_CPUS);
+
+	return index;
+}
 
 /**
  * Sends the number of exceptions handled to the Primary VM.
@@ -226,17 +248,17 @@ void exception_handler_reset(void)
 }
 
 /**
- * Updates the last serviced virtual interrupt ID.
+ * Updates the last serviced virtual interrupt ID for the given vCPU.
  */
-void exception_handler_set_last_interrupt(uint32_t id)
+void exception_handler_set_last_interrupt(uint32_t int_id)
 {
-	last_serviced_interrupt = id;
+	last_serviced_interrupt[get_current_vcpu_index()] = int_id;
 }
 
 /**
- * Returns the last serviced virtual interrupt ID.
+ * Returns the last serviced virtual interrupt ID for the given vCPU.
  */
 uint32_t exception_handler_get_last_interrupt(void)
 {
-	return last_serviced_interrupt;
+	return last_serviced_interrupt[get_current_vcpu_index()];
 }
