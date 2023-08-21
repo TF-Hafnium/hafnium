@@ -16,10 +16,10 @@
 	ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
 	uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>;
 	execution-ctx-count = <1>;
-	exception-level = <2>; /* S-EL1 */
+	exception-level = <0>; /* EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x90000000>;
-	entrypoint-offset = <0x1000>;
+	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0>; /* Direct messaging only */
 };
