@@ -12,8 +12,6 @@
 #include "hf/manifest.h"
 #include "hf/vm.h"
 
-#define DEFERRED_INT_ID 0xFFFF
-
 bool plat_interrupts_controller_driver_init(
 	const struct fdt *fdt, struct mm_stage1_locked stage1_locked,
 	struct mpool *ppool);
