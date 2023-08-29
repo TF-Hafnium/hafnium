@@ -44,7 +44,7 @@ typedef uintptr_t hf_ipaddr_t;
 #define HF_MAILBOX_SIZE ((size_t)4096)
 
 /** Interrupt ID returned when there is no interrupt pending. */
-#define HF_INVALID_INTID ((ffa_vm_id_t)0xffffffff)
+#define HF_INVALID_INTID UINT32_C(0xffffffff)
 
 /** Interrupt ID indicating the mailbox is readable. */
 #define HF_MAILBOX_READABLE_INTID 1
