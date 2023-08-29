@@ -516,27 +516,39 @@ static void api_ffa_fill_partitions_info_array(
 	for (ffa_vm_count_t index = 0; index < vm_get_count(); ++index) {
 		struct vm *vm = vm_find_index(index);
 
-		/*TODO fix logic to search through all uuids */
-		if (uuid_is_null || ffa_uuid_equal(uuid, &vm->uuids[0])) {
-			uint16_t array_index = vm_count;
-
-			++vm_count;
-			if (count_flag) {
-				continue;
+		for (uint32_t i = 0; i < PARTITION_MAX_UUIDS; i++) {
+			/*
+			 * Null UUID indicates reaching the end of a
+			 * partition's array of UUIDs.
+			 */
+			if (ffa_uuid_is_null(&vm->uuids[i])) {
+				break;
 			}
+			if (uuid_is_null ||
+			    ffa_uuid_equal(uuid, &vm->uuids[i])) {
+				uint16_t array_index = vm_count;
 
-			partitions[array_index].vm_id = vm->id;
-			partitions[array_index].vcpu_count = vm->vcpu_count;
-			partitions[array_index].properties =
-				plat_ffa_partition_properties(vm_id, vm);
-			partitions[array_index].properties |=
-				vm_are_notifications_enabled(vm)
-					? FFA_PARTITION_NOTIFICATION
-					: 0;
-			partitions[array_index].properties |=
-				FFA_PARTITION_AARCH64_EXEC;
-			if (uuid_is_null) {
-				partitions[array_index].uuid = vm->uuids[0];
+				++vm_count;
+				if (count_flag) {
+					continue;
+				}
+
+				partitions[array_index].vm_id = vm->id;
+				partitions[array_index].vcpu_count =
+					vm->vcpu_count;
+				partitions[array_index].properties =
+					plat_ffa_partition_properties(vm_id,
+								      vm);
+				partitions[array_index].properties |=
+					vm_are_notifications_enabled(vm)
+						? FFA_PARTITION_NOTIFICATION
+						: 0;
+				partitions[array_index].properties |=
+					FFA_PARTITION_AARCH64_EXEC;
+				if (uuid_is_null) {
+					partitions[array_index].uuid =
+						vm->uuids[i];
+				}
 			}
 		}
 	}
@@ -850,17 +862,9 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	/*
-	 * No need to count if we are returning the number of partitions as we
-	 * already know this.
-	 */
-	if (uuid_is_null && count_flag) {
-		vm_count = vm_get_count();
-	} else {
-		api_ffa_fill_partitions_info_array(
-			partitions, ARRAY_SIZE(partitions), uuid, count_flag,
-			current_vm->id, &vm_count);
-	}
+	api_ffa_fill_partitions_info_array(partitions, ARRAY_SIZE(partitions),
+					   uuid, count_flag, current_vm->id,
+					   &vm_count);
 
 	/* If UUID is Null vm_count must not be zero at this stage. */
 	CHECK(!uuid_is_null || vm_count != 0);
