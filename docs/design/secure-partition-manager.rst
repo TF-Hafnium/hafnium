@@ -367,23 +367,56 @@ Describing secure partitions
 A json-formatted description file is passed to the build flow specifying paths
 to the SP binary image and associated DTS partition manifest file. The latter
 is processed by the dtc compiler to generate a DTB fed into the SP package.
-Optionally, the partition's json description can contain offsets for both
-the image and partition manifest within the SP package. Both offsets need to be
-4KB aligned, because it is the translation granule supported by Hafnium SPMC.
-These fields can be leveraged to support SPs with S1 translation granules that
-differ from 4KB, and to configure the regions allocated within the SP package,
-as well as to comply with the requirements for the implementation of the boot
-information protocol (see `Passing boot data to the SP`_ for more details). In
-case the offsets are absent in their json node, they default to 0x1000 and
-0x4000 for the manifest offset and image offset respectively.
-This file also specifies the SP owner (as an optional field) identifying the
-signing domain in case of dual root CoT.
-The SP owner can either be the silicon or the platform provider. The
-corresponding "owner" field value can either take the value of "SiP" or "Plat".
-In absence of "owner" field, it defaults to "SiP" owner.
-The UUID of the partition can be specified as a field in the description file or
-if it does not exist there the UUID is extracted from the DTS partition
-manifest.
+Each partition can be configured with the following fields:
+
+:code:`image`
+  - Specifies the filename and offset of the image within the SP package.
+  - Can be written as :code:`"image": { "file": "path", "offset": 0x1234 }` to
+    give both :code:`image.file` and :code:`image.offset` values explicitly, or
+    can be written as :code:`"image": "path"` to give :code:`image.file` and value
+    and leave :code:`image.offset` absent.
+
+  :code:`image.file`
+    - Specifies the filename of the image.
+
+  :code:`image.offset`
+    - Specifies the offset of the image within the SP package.
+    - Must be 4KB aligned, because that is the translation granule supported by Hafnium SPMC.
+    - Optional. Defaults to :code:`0x4000`.
+
+:code:`pm`
+  - Specifies the filename and offset of the partition manifest within the SP package.
+  - Can be written as :code:`"pm": { "file": "path", "offset": 0x1234 }` to
+    give both :code:`pm.file` and :code:`pm.offset` values explicitly, or
+    can be written as :code:`"pm": "path"` to give :code:`pm.file` and value
+    and leave :code:`pm.offset` absent.
+
+  :code:`pm.file`
+    - Specifies the filename of the partition manifest.
+
+  :code:`pm.offset`
+    - Specifies the offset of the partition manifest within the SP package.
+    - Must be 4KB aligned, because that is the translation granule supported by Hafnium SPMC.
+    - Optional. Defaults to :code:`0x1000`.
+
+:code:`image.offset` and :code:`pm.offset` can be leveraged to support SPs with
+S1 translation granules that differ from 4KB, and to configure the regions
+allocated within the SP package, as well as to comply with the requirements for
+the implementation of the boot information protocol (see `Passing boot data to
+the SP`_ for more details).
+
+:code:`owner`
+  - Specifies the SP owner, identifying the signing domain in case of dual root CoT.
+  - Possible values are :code:`SiP` (silicon owner) or :code:`Plat` (platform owner).
+  - Optional. Defaults to :code:`SiP`.
+
+:code:`uuid`
+  - Specifies the UUID of the partition.
+  - Optional. Defaults to the value of the :code:`uuid` field from the DTS partition manifest.
+
+:code:`physical-load-address`
+  - Specifies the :code:`load_address` field of the generated DTS fragment.
+  - Optional. Defaults to the value of the :code:`load-address` from the DTS partition manifest.
 
 .. code:: shell
 
