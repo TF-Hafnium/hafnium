@@ -598,8 +598,6 @@ ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
 	CHECK(uuid != NULL);
 	CHECK(info != NULL);
 
-	ffa_version(MAKE_FFA_VERSION(1, 1));
-
 	ret = ffa_partition_info_get(uuid, 0);
 
 	if (ffa_func_id(ret) != FFA_SUCCESS_32) {
@@ -669,7 +667,7 @@ struct ffa_boot_info_desc *get_boot_info_desc(
 	assert(boot_info_header != NULL);
 
 	ASSERT_EQ(boot_info_header->signature, 0xFFAU);
-	ASSERT_EQ(boot_info_header->version, 0x10001U);
+	ASSERT_GE(boot_info_header->version, 0x10001U);
 	ASSERT_EQ(boot_info_header->desc_size,
 		  sizeof(struct ffa_boot_info_desc));
 	ASSERT_EQ((uintptr_t)boot_info_header + boot_info_header->desc_offset,

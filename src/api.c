@@ -2456,7 +2456,13 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	case FFA_MEM_PERM_GET_64:
 	case FFA_MEM_PERM_SET_64:
 	case FFA_MSG_SEND2_32:
+#endif
+#if (MAKE_FFA_VERSION(1, 2) <= FFA_VERSION_COMPILED)
+	/* FF-A v1.2 features. */
+	case FFA_CONSOLE_LOG_32:
+	case FFA_CONSOLE_LOG_64:
 	case FFA_PARTITION_INFO_GET_REGS_64:
+	case FFA_EL3_INTR_HANDLE_32:
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	case FFA_MEM_RETRIEVE_REQ_32:
@@ -2954,7 +2960,7 @@ static struct ffa_value api_ffa_memory_send_per_ffa_version(
 
 	*out_v1_1 = (struct ffa_memory_region *)allocated;
 
-	if (ffa_version == MAKE_FFA_VERSION(1, 1)) {
+	if (ffa_version >= MAKE_FFA_VERSION(1, 1)) {
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	}
 
@@ -3292,7 +3298,7 @@ static struct ffa_value api_ffa_mem_retrieve_req_version_update(
 	assert(fragment_length != NULL);
 	assert(retrieve_msg != NULL);
 
-	if (ffa_version == MAKE_FFA_VERSION(1, 1)) {
+	if (ffa_version >= MAKE_FFA_VERSION(1, 1)) {
 		*out_v1_1 = (struct ffa_memory_region *)retrieve_msg;
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	}

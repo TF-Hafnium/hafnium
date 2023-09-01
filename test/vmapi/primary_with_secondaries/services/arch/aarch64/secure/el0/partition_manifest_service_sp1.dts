@@ -13,7 +13,7 @@
 	debug_name = "Secure Service1 EL0";
 
 	/* Properties */
-	ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
+	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
         uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>;
 	execution-ctx-count = <1>;
 	exception-level = <1>; /* S-EL0 */

@@ -2687,7 +2687,7 @@ static uint32_t ffa_memory_retrieve_expected_offset_per_ffa_version(
 	uint32_t expected_fragment_offset;
 	uint32_t composite_constituents_offset;
 
-	if (ffa_version == MAKE_FFA_VERSION(1, 1)) {
+	if (ffa_version >= MAKE_FFA_VERSION(1, 1)) {
 		/*
 		 * Hafnium operates memory regions in FF-A v1.1 format, so we
 		 * can retrieve the constituents offset from descriptor.

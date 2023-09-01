@@ -13,7 +13,7 @@
 	debug_name = "SP Service Third";
 
 	/* Properties */
-	ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
+	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
 	uuid = <0x1df938ef 0xe8b94490 0x84967204 0xab77f4a5>;
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */

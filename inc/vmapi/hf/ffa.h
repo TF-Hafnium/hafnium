@@ -13,7 +13,7 @@
 #define FFA_VERSION_MAJOR 0x1
 #define FFA_VERSION_MAJOR_OFFSET 16
 #define FFA_VERSION_MAJOR_MASK 0x7FFF
-#define FFA_VERSION_MINOR 0x1
+#define FFA_VERSION_MINOR 0x2
 #define FFA_VERSION_MINOR_OFFSET 0
 #define FFA_VERSION_MINOR_MASK 0xFFFF
 
@@ -83,7 +83,7 @@
 #define FFA_MEM_PERM_GET_64                 0xC4000088
 #define FFA_MEM_PERM_SET_64                 0xC4000089
 
-/* Implementation-defined ABIs. */
+/* FF-A v1.2 */
 #define FFA_CONSOLE_LOG_32                  0x8400008A
 #define FFA_CONSOLE_LOG_64                  0xC400008A
 #define FFA_PARTITION_INFO_GET_REGS_64      0xC400008B
@@ -102,6 +102,7 @@
 #define FFA_RETRY              INT32_C(-7)
 #define FFA_ABORTED            INT32_C(-8)
 #define FFA_NO_DATA            INT32_C(-9)
+#define FFA_NOT_READY          INT32_C(-10)
 
 /* clang-format on */
 

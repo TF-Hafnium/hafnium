@@ -281,7 +281,7 @@ void send_target_id(ffa_id_t receiver, ffa_id_t target, void *send)
 
 SET_UP(memory_sharing)
 {
-	ffa_version(MAKE_FFA_VERSION(1, 1));
+	ffa_version(FFA_VERSION_COMPILED);
 }
 
 /**

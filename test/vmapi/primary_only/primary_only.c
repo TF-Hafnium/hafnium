@@ -165,13 +165,15 @@ TEAR_DOWN(ffa)
 TEST(ffa, ffa_version)
 {
 	const uint16_t major_revision = 1;
-	const uint16_t minor_revision = 1;
+	const uint16_t minor_revision = 2;
 	const uint32_t current_version =
 		(int32_t)MAKE_FFA_VERSION(major_revision, minor_revision);
-	const int32_t older_compatible_version = MAKE_FFA_VERSION(1, 0);
+	const int32_t older_compatible_version_0 = MAKE_FFA_VERSION(1, 0);
+	const int32_t older_compatible_version_1 = MAKE_FFA_VERSION(1, 1);
 
 	EXPECT_EQ(ffa_version(current_version), current_version);
-	EXPECT_EQ(ffa_version(older_compatible_version), current_version);
+	EXPECT_EQ(ffa_version(older_compatible_version_0), current_version);
+	EXPECT_EQ(ffa_version(older_compatible_version_1), current_version);
 	EXPECT_EQ(ffa_version(0x0), (int32_t)FFA_NOT_SUPPORTED);
 	EXPECT_EQ(ffa_version(0x1), (int32_t)FFA_NOT_SUPPORTED);
 	EXPECT_EQ(ffa_version(0x10003), (int32_t)FFA_NOT_SUPPORTED);
@@ -286,6 +288,20 @@ TEST(ffa, ffa_features)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MSG_SEND2_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+#endif
+
+#if (MAKE_FFA_VERSION(1, 2) <= FFA_VERSION_COMPILED)
+	ret = ffa_features(FFA_CONSOLE_LOG_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_CONSOLE_LOG_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_PARTITION_INFO_GET_REGS_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_EL3_INTR_HANDLE_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 #endif
 }

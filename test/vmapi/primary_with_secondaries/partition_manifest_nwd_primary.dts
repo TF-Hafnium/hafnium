@@ -13,7 +13,7 @@
 	debug_name = "partition-manifest";
 
 	/* Properties */
-	ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
+	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
 	uuid = <0xbdfaab86 0xe9ee 0x409a 0xde614c01>;
 	execution-ctx-count = <8>;
 	exception-level = <0>; /* EL1 */
