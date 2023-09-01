@@ -3435,11 +3435,12 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	ret = api_ffa_mem_retrieve_req_version_update(
 		retrieve_msg, message_buffer_size, &retrieve_request, &length,
 		ffa_version);
-	assert(retrieve_request != NULL);
 
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
+
+	assert(retrieve_request != NULL);
 
 	if (plat_ffa_memory_handle_allocated_by_current_world(
 		    retrieve_request->handle)) {
