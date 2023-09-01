@@ -780,7 +780,7 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	 * and is not Null.
 	 */
 	if (vm_count == 0 || vm_count > ARRAY_SIZE(partitions)) {
-		dlog_error(
+		dlog_verbose(
 			"Invalid parameters. vm_count = %d (must not be zero "
 			"or > %d)\n",
 			vm_count, ARRAY_SIZE(partitions));
