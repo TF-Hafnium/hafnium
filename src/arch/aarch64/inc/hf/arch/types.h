@@ -63,6 +63,7 @@ struct arch_regs {
 		uintreg_t hcr_el2;
 		uintreg_t ttbr0_el2;
 		uintreg_t sctlr_el2;
+		uintreg_t cptr_el2;
 	} hyp_state;
 
 	/*

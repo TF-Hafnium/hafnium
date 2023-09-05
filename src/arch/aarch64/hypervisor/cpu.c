@@ -109,6 +109,17 @@ void arch_regs_reset(struct vcpu *vcpu)
 		}
 	}
 
+	r->hyp_state.cptr_el2 = get_cptr_el2_value();
+	if (is_primary) {
+		/* Do not trap Advanced SIMD and SVE in the primary VM. */
+		if (has_vhe_support()) {
+			r->hyp_state.cptr_el2 |=
+				(CPTR_EL2_VHE_ZEN | CPTR_EL2_VHE_FPEN);
+		} else {
+			r->hyp_state.cptr_el2 &= ~(CPTR_EL2_TFP | CPTR_EL2_TZ);
+		}
+	}
+
 	r->hyp_state.hcr_el2 =
 		get_hcr_el2_value(vm_id, vcpu->vm->el0_partition);
 	r->hyp_state.sctlr_el2 = get_sctlr_el2_value(vcpu->vm->el0_partition);

@@ -495,6 +495,13 @@
 #define CPTR_EL2_VHE_TTA (UINT64_C(0x1) << 28)
 
 /**
+ * When HCR_EL2.E2H=0 traps execution of instructions which access the
+ * Advanced SIMD and floating-point functionality, from both Execution
+ * states to EL2, when EL2 is enabled in the current Security state.
+ */
+#define CPTR_EL2_TFP (UINT64_C(0x1) << 10)
+
+/**
  * When HCR_EL2.E2H=1 (ARMv8.1-VHE enabled), CPTR_EL2 contains control bits to
  * enable and disable access to Floating Point, Advanced SIMD and SVE
  * instructions. This control does not cause execution of FP/SIMD instructions
@@ -503,8 +510,16 @@
 #define CPTR_EL2_VHE_FPEN (UINT64_C(0x3) << 20)
 
 /**
- * When HCR_EL2.E2H=1, this control does not cause execution of SVE instructions
- * and accesses to ZCR_EL2/ZCR_EL1 to be trapped.
+ * When HCR_EL2.E2H=0 and FEAT_SVE is implemented, traps execution at EL2, EL1,
+ * and EL0 of SVE instructions when the PE is not in Streaming SVE mode, and
+ * instructions that directly access the ZCR_EL2 or ZCR_EL1 System registers to
+ * EL2, when EL2 is enabled in the current Security state.
+ */
+#define CPTR_EL2_TZ (UINT64_C(0x1) << 8)
+
+/**
+ * When HCR_EL2.E2H=1 and FEAT_SVE implemented, this control does not cause
+ * execution of SVE instructions and accesses to ZCR_EL2/ZCR_EL1 to be trapped.
  */
 #define CPTR_EL2_VHE_ZEN (UINT64_C(0x3) << 16)
 

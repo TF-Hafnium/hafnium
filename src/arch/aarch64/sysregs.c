@@ -151,15 +151,18 @@ uintreg_t get_cptr_el2_value(void)
 {
 	uintreg_t ret;
 
+	/*
+	 * Do not trap Advanced SIMD access.
+	 * Trap SVE, trace and AMU system register accesses.
+	 */
 	if (has_vhe_support()) {
 		ret = CPTR_EL2_VHE_FPEN | CPTR_EL2_VHE_TTA | CPTR_EL2_TAM;
-
-		if (is_arch_feat_sve_supported()) {
-			/* CPTR_EL2.ZEN Disable SVE traps at EL2/1/0. */
-			ret |= CPTR_EL2_VHE_ZEN;
-		}
 	} else {
 		ret = CPTR_EL2_TTA | CPTR_EL2_TAM;
+
+		if (is_arch_feat_sve_supported()) {
+			ret |= CPTR_EL2_TZ;
+		}
 	}
 
 	return ret;
