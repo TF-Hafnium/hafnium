@@ -35,7 +35,3 @@ DEFINE_OFFSETOF(VM_ID, struct vm, id)
 #if GIC_VERSION == 3 || GIC_VERSION == 4
 DEFINE_OFFSETOF(VCPU_GIC, struct vcpu, regs.gic)
 #endif
-
-DEFINE_SIZEOF(SVE_CTX_SIZE, struct sve_context_t)
-DEFINE_OFFSETOF(SVE_CTX_PREDICATES, struct sve_context_t, predicates)
-DEFINE_OFFSETOF(SVE_CTX_VECTORS, struct sve_context_t, vectors)

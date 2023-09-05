@@ -369,3 +369,5 @@ int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
  * Reclaim all resources belonging to VM in aborted state.
  */
 void plat_ffa_free_vm_resources(struct vm_locked vm_locked);
+
+void plat_save_ns_simd_context(struct vcpu *vcpu);

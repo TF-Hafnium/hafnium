@@ -14,6 +14,7 @@
 #include "hf/arch/mmu.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/smc.h"
+#include "hf/arch/sve.h"
 #include "hf/arch/vmid_base.h"
 
 #include "hf/api.h"
@@ -862,9 +863,12 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
  */
 struct vcpu *smc_handler_from_nwd(struct vcpu *vcpu)
 {
-	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
+	struct ffa_value args;
 	struct vcpu *next = NULL;
 
+	plat_save_ns_simd_context(vcpu);
+
+	args = arch_regs_get_args(&vcpu->regs);
 	if (hvc_smc_handler(args, vcpu, &next)) {
 		return next;
 	}

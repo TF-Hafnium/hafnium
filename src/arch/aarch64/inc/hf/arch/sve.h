@@ -11,7 +11,7 @@
 /** Max SVE vector length supported by the architecture. */
 #define HF_SVE_VECTOR_LEN_MAX UINT32_C(2048)
 
-struct sve_context_t {
+struct sve_context {
 	/* FFR and predicates are one-eigth of the SVE vector length */
 	uint8_t ffr[HF_SVE_VECTOR_LEN_MAX / 64];
 

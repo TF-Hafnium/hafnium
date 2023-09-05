@@ -473,45 +473,10 @@ vcpu_restore_all_and_run:
 
 	mov x19, x0
 other_world_loop:
-	/* Restore FP status and control registers. */
-	add x18, x19, #VCPU_FPSR
-	ldp x0, x1, [x18]
-	msr fpsr, x0
-	msr fpcr, x1
+	/* Restore 'other world VM' SIMD context. */
+	mov x0, x19
+	bl plat_restore_ns_simd_context
 
-	/* Check if SVE is implemented. */
-	bl is_arch_feat_sve_supported
-	cbnz x0, sve_context_restore
-
-	/* Restore the other world SIMD context to the other world VM vCPU. */
-	add x18, x19, #VCPU_FREGS
-	simd_op_vectors ldp, x18
-	b sve_skip_context_restore
-
-	/* Restore the other world SVE context from internal buffer. */
-sve_context_restore:
-	adrp x18, sve_context
-	add x18, x18, :lo12: sve_context
-	ldr x0, [x19, #VCPU_CPU]
-	bl cpu_index
-	mov x20, #SVE_CTX_SIZE
-	madd x18, x0, x20, x18
-
-.arch_extension sve
-	/* Restore FFR register before predicates. */
-	ldr p0, [x18]
-	wrffr p0.b
-
-	/* Restore predicate registers. */
-	add x20, x18, #SVE_CTX_PREDICATES
-	sve_predicate_op ldr, x20
-
-	/* Restore vector registers. */
-	add x20, x18, #SVE_CTX_VECTORS
-	sve_op_vectors ldr, x20
-.arch_extension nosve
-
-sve_skip_context_restore:
 	/*
 	 * Prepare arguments from other world VM vCPU.
 	 * x19 holds the other world VM vCPU pointer.
@@ -569,46 +534,6 @@ sve_skip_context_restore:
 	stp x12, x13, [x19, #VCPU_REGS + 8 * 12]
 	stp x14, x15, [x19, #VCPU_REGS + 8 * 14]
 	stp x16, x17, [x19, #VCPU_REGS + 8 * 16]
-
-	/* Save FP status and control registers. */
-	mrs x0, fpsr
-	mrs x1, fpcr
-	add x18, x19, #VCPU_FPSR
-	stp x0, x1, [x18]
-
-	/* Check if SVE is implemented. */
-	bl is_arch_feat_sve_supported
-	cbnz x0, sve_context_save
-
-	/* Save the other world SIMD context to the other world VM vCPU. */
-	add x18, x19, #VCPU_FREGS
-	simd_op_vectors stp, x18
-	b sve_skip_context_save
-
-	/* Save the other world SVE context to internal buffer. */
-sve_context_save:
-	adrp x18, sve_context
-	add x18, x18, :lo12: sve_context
-	ldr x0, [x19, #VCPU_CPU]
-	bl cpu_index
-	mov x20, #SVE_CTX_SIZE
-	madd x18, x0, x20, x18
-
-.arch_extension sve
-	/* Save predicate registers. */
-	add x20, x18, #SVE_CTX_PREDICATES
-	sve_predicate_op str, x20
-
-	/* Save FFR register after predicates. */
-	rdffr p0.b
-	str p0, [x18]
-
-	/* Save vector registers. */
-	add x20, x18, #SVE_CTX_VECTORS
-	sve_op_vectors str, x20
-.arch_extension nosve
-
-sve_skip_context_save:
 
 #if BRANCH_PROTECTION
 	pauth_restore_hypervisor_key x0 x1

@@ -63,9 +63,6 @@ void sri_state_unlock(struct sri_state_locked sri_state_locked)
 	sl_unlock(&sri_state_lock_instance);
 }
 
-/** Other world SVE context (accessed from other_world_loop). */
-struct sve_context_t sve_context[MAX_CPUS];
-
 /**
  * The SPMC needs to keep track of some information about NWd VMs.
  * For the time being, only the notifications state structures.
