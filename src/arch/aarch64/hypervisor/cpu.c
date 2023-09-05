@@ -112,12 +112,14 @@ void arch_regs_reset(struct vcpu *vcpu)
 
 	r->hyp_state.cptr_el2 = get_cptr_el2_value();
 	if (is_primary) {
-		/* Do not trap Advanced SIMD and SVE in the primary VM. */
+		/* Do not trap FPU/Adv. SIMD/SVE/SME in the primary VM. */
 		if (has_vhe_support()) {
 			r->hyp_state.cptr_el2 |=
-				(CPTR_EL2_VHE_ZEN | CPTR_EL2_VHE_FPEN);
+				(CPTR_EL2_VHE_ZEN | CPTR_EL2_VHE_FPEN |
+				 CPTR_EL2_SME_VHE_SMEN);
 		} else {
-			r->hyp_state.cptr_el2 &= ~(CPTR_EL2_TFP | CPTR_EL2_TZ);
+			r->hyp_state.cptr_el2 &=
+				~(CPTR_EL2_TFP | CPTR_EL2_TZ | CPTR_EL2_TSM);
 		}
 	}
 

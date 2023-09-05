@@ -524,6 +524,15 @@
 #define CPTR_EL2_VHE_ZEN (UINT64_C(0x3) << 16)
 
 /**
+ * When HCR_EL2.E2H=0 and FEAT_SME is implemented, traps execution at EL2, EL1,
+ * and EL0 of SME instructions, SVE instructions when FEAT_SVE is not
+ * implemented or the PE is in Streaming SVE mode, and instructions that
+ * directly access the SVCR, SMCR_EL1, or SMCR_EL2 System registers to EL2,
+ * when EL2 is enabled in the current Security state.
+ */
+#define CPTR_EL2_TSM (UINT64_C(0x1) << 12)
+
+/**
  * When HCR_EL2.E2H=1, this control does not cause execution of SME instructions
  * and accesses to SMCR_EL2/EL1 to be trapped.
  */

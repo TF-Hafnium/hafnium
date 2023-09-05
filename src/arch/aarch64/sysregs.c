@@ -153,7 +153,7 @@ uintreg_t get_cptr_el2_value(void)
 
 	/*
 	 * Do not trap Advanced SIMD access.
-	 * Trap SVE, trace and AMU system register accesses.
+	 * Trap SVE, SME, trace and AMU system register accesses.
 	 */
 	if (has_vhe_support()) {
 		ret = CPTR_EL2_VHE_FPEN | CPTR_EL2_VHE_TTA | CPTR_EL2_TAM;
@@ -162,6 +162,10 @@ uintreg_t get_cptr_el2_value(void)
 
 		if (is_arch_feat_sve_supported()) {
 			ret |= CPTR_EL2_TZ;
+		}
+
+		if (is_arch_feat_sme_supported()) {
+			ret |= CPTR_EL2_TSM;
 		}
 	}
 
