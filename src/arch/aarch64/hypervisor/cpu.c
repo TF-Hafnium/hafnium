@@ -14,7 +14,6 @@
 
 #include "hf/arch/gicv3.h"
 #include "hf/arch/plat/psci.h"
-#include "hf/arch/sve.h"
 
 #include "hf/addr.h"
 #include "hf/check.h"
@@ -286,12 +285,6 @@ void arch_cpu_init(struct cpu *c)
 	 * supports them, Hafnium ensures that they are disabled.
 	 */
 	lor_disable();
-
-	if (is_arch_feat_sve_supported()) {
-		arch_sve_disable_traps();
-
-		arch_sve_configure_vector_length();
-	}
 
 	write_msr(CPTR_EL2, get_cptr_el2_value());
 

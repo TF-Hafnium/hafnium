@@ -80,67 +80,6 @@
 .endm
 
 /**
- * Helper macros for SVE vectors save/restore operations.
- */
-.macro sve_op_vectors op:req reg:req
-	\op z0, [\reg, #0, MUL VL]
-	\op z1, [\reg, #1, MUL VL]
-	\op z2, [\reg, #2, MUL VL]
-	\op z3, [\reg, #3, MUL VL]
-	\op z4, [\reg, #4, MUL VL]
-	\op z5, [\reg, #5, MUL VL]
-	\op z6, [\reg, #6, MUL VL]
-	\op z7, [\reg, #7, MUL VL]
-	\op z8, [\reg, #8, MUL VL]
-	\op z9, [\reg, #9, MUL VL]
-	\op z10, [\reg, #10, MUL VL]
-	\op z11, [\reg, #11, MUL VL]
-	\op z12, [\reg, #12, MUL VL]
-	\op z13, [\reg, #13, MUL VL]
-	\op z14, [\reg, #14, MUL VL]
-	\op z15, [\reg, #15, MUL VL]
-	\op z16, [\reg, #16, MUL VL]
-	\op z17, [\reg, #17, MUL VL]
-	\op z18, [\reg, #18, MUL VL]
-	\op z19, [\reg, #19, MUL VL]
-	\op z20, [\reg, #20, MUL VL]
-	\op z21, [\reg, #21, MUL VL]
-	\op z22, [\reg, #22, MUL VL]
-	\op z23, [\reg, #23, MUL VL]
-	\op z24, [\reg, #24, MUL VL]
-	\op z25, [\reg, #25, MUL VL]
-	\op z26, [\reg, #26, MUL VL]
-	\op z27, [\reg, #27, MUL VL]
-	\op z28, [\reg, #28, MUL VL]
-	\op z29, [\reg, #29, MUL VL]
-	\op z30, [\reg, #30, MUL VL]
-	\op z31, [\reg, #31, MUL VL]
-
-.endm
-
-/**
- * Helper macros for SVE predicates save/restore operations.
- */
-.macro sve_predicate_op op:req reg:req
-	\op p0, [\reg, #0, MUL VL]
-	\op p1, [\reg, #1, MUL VL]
-	\op p2, [\reg, #2, MUL VL]
-	\op p3, [\reg, #3, MUL VL]
-	\op p4, [\reg, #4, MUL VL]
-	\op p5, [\reg, #5, MUL VL]
-	\op p6, [\reg, #6, MUL VL]
-	\op p7, [\reg, #7, MUL VL]
-	\op p8, [\reg, #8, MUL VL]
-	\op p9, [\reg, #9, MUL VL]
-	\op p10, [\reg, #10, MUL VL]
-	\op p11, [\reg, #11, MUL VL]
-	\op p12, [\reg, #12, MUL VL]
-	\op p13, [\reg, #13, MUL VL]
-	\op p14, [\reg, #14, MUL VL]
-	\op p15, [\reg, #15, MUL VL]
-.endm
-
-/**
  * Restores the volatile registers from the stack. This currently takes 14
  * instructions, so it can be used in exception handlers while still leaving 18
  * instructions left; if paired with save_volatile_to_stack, there are 4

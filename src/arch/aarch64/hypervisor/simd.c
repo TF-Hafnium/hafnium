@@ -6,6 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/sme.h"
 #include "hf/arch/sve.h"
 
 #include "hf/types.h"
@@ -15,20 +16,26 @@
 #include "sysregs.h"
 
 /**
- * Other world SIMD SVE context.
+ * Other world SIMD SVE/SME context.
  * By design the VM struct stores FPU/Adv. SIMD contexts but no SIMD context
  * for newer extensions. The structure below supplements the VM struct with
- * SVE context just for the other world VM usage.
+ * SVE/SME contexts just for the other world VM usage.
  * Restricting to the other world VM limits the required memory footprint when
- * compared to a design where the VM struct holds the full FPU/Adv. SIMD/SVE
+ * compared to a design where the VM struct holds the full FPU/Adv. SIMD/SVE/SME
  * contexts. There is no immediate requirement to extend the VM struct provided
- * SVE is not enabled for secure partitions (or secondary VMs).
+ * SVE/SME are not enabled for secure partitions (or secondary VMs).
  */
 static struct {
 	/** SMCCCv1.3 FID[16] hint bit state recorded on SPMC entry from NWd. */
 	bool hint;
+
+	/** SVE context. */
 	uint64_t zcr_el2;
 	struct sve_context sve_context;
+
+	/** SME context. */
+	uint64_t svcr;
+	uint64_t smcr_el2;
 } ns_simd_ctx[MAX_CPUS];
 
 /**
@@ -37,35 +44,72 @@ static struct {
  */
 void plat_restore_ns_simd_context(struct vcpu *vcpu)
 {
+	bool sve = is_arch_feat_sve_supported();
+	bool sme = is_arch_feat_sme_supported();
+	bool fa64 = is_arch_feat_sme_fa64_supported();
+	bool sm = false;
+	bool hint;
 	uint32_t cpu_id;
 
 	assert(vcpu->vm->id == HF_HYPERVISOR_VM_ID);
 	cpu_id = cpu_index(vcpu->cpu);
+	hint = ns_simd_ctx[cpu_id].hint;
 
-	if (is_arch_feat_sve_supported()) {
+	if (sme) {
+		/* Disable SME EL2 and lower traps. */
+		arch_sme_disable_traps();
+
+		/* Assert ZA array did not change state. */
+		assert((arch_sme_svcr_get() & MSR_SVCR_ZA) ==
+		       (ns_simd_ctx[cpu_id].svcr & MSR_SVCR_ZA));
+
+		/*
+		 * Restore SVCR, in particular (re)enable SSVE if it was enabled
+		 * at entry.
+		 * TODO: any PSTATE.SM transition resets all the Z0-Z31, P0-P15,
+		 * FFR and FPSR registers to an architecturally defined
+		 * constant.
+		 */
+		arch_sme_svcr_set(ns_simd_ctx[cpu_id].svcr);
+
+		sm = (ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == 1;
+	}
+
+	if (sve) {
 		/* Disable SVE EL2 and lower traps. */
 		arch_sve_disable_traps();
 
-		/* Configure EL2 vector length to maximum permitted value. */
+		/*
+		 * Configure EL2 vector length to maximum permitted value.
+		 * TODO: if PSTATE.SM=1 the SVE vector length is determined by
+		 * SMCR_ELx.LEN.
+		 */
 		arch_sve_configure_vector_length();
 	}
 
-	/* Restore FPCR/FPSR common to FPU/Adv. SIMD/SVE. */
+	/* Restore FPCR/FPSR common to FPU/Adv. SIMD./SVE/SME. */
 	__asm__ volatile(
 		"msr fpsr, %0;"
 		"msr fpcr, %1"
 		:
 		: "r"(vcpu->regs.fpsr), "r"(vcpu->regs.fpcr));
 
-	if (is_arch_feat_sve_supported() && !ns_simd_ctx[cpu_id].hint) {
+	if ((sve || sme) && !hint) {
+		/*
+		 * NOTE: When SSVE is disabled, the SVE Vector length applies.
+		 * When SSVE is enabled, the SSVL applies.
+		 */
+
 		/* Restore FFR register before predicates. */
-		__asm__ volatile(
-			".arch_extension sve;"
-			"ldr p0, [%0];"
-			"wrffr p0.b;"
-			".arch_extension nosve"
-			:
-			: "r"(&ns_simd_ctx[cpu_id].sve_context.ffr));
+		if ((sve && !sme) || (sme && (fa64 || !sm))) {
+			__asm__ volatile(
+				".arch_extension sve;"
+				"ldr p0, [%0];"
+				"wrffr p0.b;"
+				".arch_extension nosve"
+				:
+				: "r"(&ns_simd_ctx[cpu_id].sve_context.ffr));
+		}
 
 		/* Restore predicate registers. */
 		__asm__ volatile(
@@ -149,9 +193,12 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 			"ldp q30, q31, [%0], #32"
 			:
 			: "r"(&vcpu->regs.fp));
+		if ((sve || sme) && hint) {
+			/* TODO: clear predicates and ffr */
+		}
 	}
 
-	if (is_arch_feat_sve_supported()) {
+	if (sve) {
 		/*
 		 * Restore normal world ZCR_EL2.
 		 * ZCR_EL1 is untouched as SVE is not enabled for SPs.
@@ -159,7 +206,15 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 		write_msr(MSR_ZCR_EL2, ns_simd_ctx[cpu_id].zcr_el2);
 		isb();
 
-		/* TODO: enable EL2 and lower traps. */
+		arch_sve_enable_traps();
+	}
+
+	if (sme) {
+		/* Restore SSVE vector length if enabled. */
+		write_msr(MSR_SMCR_EL2, ns_simd_ctx[cpu_id].smcr_el2);
+		isb();
+
+		arch_sme_enable_traps();
 	}
 }
 
@@ -171,16 +226,40 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 {
 	uint32_t cpu_id;
 	uint64_t smc_fid;
+	bool sve = is_arch_feat_sve_supported();
+	bool sme = is_arch_feat_sme_supported();
+	bool fa64 = is_arch_feat_sme_fa64_supported();
+	bool sm = false;
+	bool hint = false;
 
 	assert(vcpu->vm->id == HF_HYPERVISOR_VM_ID);
 	cpu_id = cpu_index(vcpu->cpu);
 
 	/* Get SMCCCv1.3 SMC FID[16] SVE hint, and clear it from vCPU r0. */
 	smc_fid = vcpu->regs.r[0];
-	ns_simd_ctx[cpu_id].hint = ((smc_fid >> 16) & 1) != 0;
+	hint = ns_simd_ctx[cpu_id].hint = ((smc_fid >> 16) & 1) != 0;
 	vcpu->regs.r[0] &= ~(1 << 16);
 
-	if (is_arch_feat_sve_supported()) {
+	if (sme) {
+		/* Disable SME EL2 and lower traps. */
+		arch_sme_disable_traps();
+
+		/*
+		 * Save current SMCR_EL2 value, in particular to preserve
+		 * NS context SSVE vector length.
+		 */
+		ns_simd_ctx[cpu_id].smcr_el2 = read_msr(MSR_SMCR_EL2);
+
+		/* Configure EL2 SSVE vector length. */
+		arch_sme_configure_svl();
+
+		/* Save ZA array and SSVE enable state. */
+		ns_simd_ctx[cpu_id].svcr = arch_sme_svcr_get();
+
+		sm = (ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == 1;
+	}
+
+	if (sve) {
 		/* Disable SVE EL2 and lower traps. */
 		arch_sve_disable_traps();
 
@@ -194,19 +273,19 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 		arch_sve_configure_vector_length();
 	}
 
-	/* Save FPCR/FPSR common to FPU/Adv. SIMD/SVE. */
+	/* Save FPCR/FPSR common to FPU/Adv. SIMD/SVE/SME. */
 	__asm__ volatile(
 		"mrs %0, fpsr;"
 		"mrs %1, fpcr"
 		: "=r"(vcpu->regs.fpsr), "=r"(vcpu->regs.fpcr));
 
-	if (is_arch_feat_sve_supported() && !ns_simd_ctx[cpu_id].hint) {
+	if ((sve || sme) && !hint) {
 		/*
 		 * NOTE: When SSVE is disabled, the SVE Vector length applies.
 		 * When SSVE is enabled, the SSVL applies.
 		 */
 
-		/* Save SVE predicate registers. */
+		/* Save predicate registers. */
 		__asm__ volatile(
 			".arch_extension sve;"
 			"str p0, [%0, #0, MUL VL];"
@@ -229,14 +308,16 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 			:
 			: "r"(&ns_simd_ctx[cpu_id].sve_context.predicates));
 
-		/* Save SVE FFR register. */
-		__asm__ volatile(
-			".arch_extension sve;"
-			"rdffr p0.b;"
-			"str p0, [%0];"
-			".arch_extension nosve"
-			:
-			: "r"(&ns_simd_ctx[cpu_id].sve_context.ffr));
+		/* Save FFR register. */
+		if ((sve && !sme) || (sme && (fa64 || !sm))) {
+			__asm__ volatile(
+				".arch_extension sve;"
+				"rdffr p0.b;"
+				"str p0, [%0];"
+				".arch_extension nosve"
+				:
+				: "r"(&ns_simd_ctx[cpu_id].sve_context.ffr));
+		}
 
 		/* Save SVE vector registers. */
 		__asm__ volatile(
@@ -297,5 +378,36 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 			"stp q30, q31, [%0], #32"
 			:
 			: "r"(&vcpu->regs.fp));
+	}
+
+	if (sve) {
+		arch_sve_enable_traps();
+	}
+
+	/*
+	 * SVCR.ZA=1 indicates the ZA array is live.
+	 * We deliberately choose to leave the ZA array enabled, knowing
+	 * that S-EL2 and lower won't make use of SME.
+	 * S-EL1 and lower are prevented SME registers access.
+	 * There is a probable performance impact but this avoids us
+	 * saving/restoring the ZA array contents.
+	 * SME2 ZT0 is isn't touched by EL2 and lower hence no need to
+	 * save/restore it.
+	 */
+
+	if (sme) {
+		if (sm) {
+			/*
+			 * SVCR.SM=1 indicates active Streaming SVE mode.
+			 * It is preferable to disable it to save power.
+			 * The NS FPU/NEON/SVE state has already been saved
+			 * above. Disabling SSVE destroys the live state. Change
+			 * to this field doesn't impact the ZA storage.
+			 */
+			arch_sme_svcr_set(ns_simd_ctx[cpu_id].svcr &
+					  ~MSR_SVCR_SM);
+		}
+
+		arch_sme_enable_traps();
 	}
 }

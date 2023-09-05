@@ -14,7 +14,6 @@
 #include "hf/arch/mmu.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/smc.h"
-#include "hf/arch/sve.h"
 #include "hf/arch/vmid_base.h"
 
 #include "hf/api.h"
@@ -31,7 +30,6 @@
 
 #include "debug_el1.h"
 #include "feature_id.h"
-#include "msr.h"
 #include "perfmon.h"
 #include "psci.h"
 #include "psci_handler.h"
