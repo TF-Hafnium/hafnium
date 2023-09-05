@@ -19,3 +19,7 @@ struct sve_context_t {
 
 	uint8_t vectors[32][HF_SVE_VECTOR_LEN_MAX / 8];
 } __attribute__((aligned(16)));
+
+void arch_sve_disable_traps(void);
+void arch_sve_enable_traps(void);
+void arch_sve_configure_vector_length(void);
