@@ -2485,6 +2485,7 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	case FFA_PARTITION_INFO_GET_REGS_64:
 	case FFA_EL3_INTR_HANDLE_32:
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	case FFA_MEM_RETRIEVE_REQ_32:
@@ -2569,6 +2570,11 @@ static struct ffa_value api_ffa_dir_msg_value(struct ffa_value args)
 
 	if (args.func == FFA_MSG_SEND_DIRECT_REQ2_64) {
 		args.extended_val.valid = true;
+	}
+
+	if (args.func == FFA_MSG_SEND_DIRECT_RESP2_64) {
+		args.arg2 = 0;
+		args.arg3 = 0;
 	}
 
 	return args;
@@ -2816,6 +2822,14 @@ void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
 
 /**
  * Send an FF-A direct message response.
+ * This handler covers both FFA_MSG_SEND_DIRECT_RESP_32/64
+ * and FFA_MSG_SEND_DIRECT_RESP2_64 (introduced in FF-A v1.2) with
+ * function-based checks to accomodate for the difference between the ABIs.
+ *
+ * FFA_MSG_SEND_DIRECT_RESP2_64 is used to respond to requests sent via
+ * FFA_MSG_SEND_DIRECT_REQ2_64 and adds the usage of an extended range
+ * of registers (x4-x17, instead of x4-x7) to be used as part of the
+ * message payload.
  */
 struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 					      ffa_id_t receiver_vm_id,
@@ -2834,7 +2848,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
 	struct two_vcpu_locked vcpus_locked;
 
-	if (!api_ffa_dir_msg_is_arg2_zero(args)) {
+	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64 &&
+	    !api_ffa_dir_msg_is_arg2_zero(args)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 

@@ -118,6 +118,11 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 					      struct ffa_value args,
 					      struct vcpu *current,
 					      struct vcpu **next);
+struct ffa_value api_ffa_msg_send_direct_resp2(ffa_id_t sender_vm_id,
+					       ffa_id_t receiver_vm_id,
+					       struct ffa_value args,
+					       struct vcpu *current,
+					       struct vcpu **next);
 struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 					       struct vcpu *current);
 struct vcpu *api_switch_to_other_world(struct vcpu_locked current_locked,

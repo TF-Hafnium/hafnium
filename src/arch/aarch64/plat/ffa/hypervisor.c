@@ -1102,6 +1102,7 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
 		/* Fall through. */
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
 		*next_state = VCPU_STATE_WAITING;
 		return true;
 	default:

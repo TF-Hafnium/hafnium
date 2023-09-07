@@ -336,6 +336,7 @@ static bool plat_ffa_check_rtm_ffa_run(struct vcpu_locked current_locked,
 		return true;
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
 		/* Rule 3 section 7.2 EAC0 spec. Fall through. */
 	default:
 		/* Deny state transitions by default. */
@@ -370,6 +371,7 @@ static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu_locked current_locked,
 	}
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32: {
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
 		/* Rule 3. */
 		if (current_locked.vcpu->direct_request_origin_vm_id ==
 		    receiver_vm_id) {
@@ -431,6 +433,7 @@ static bool plat_ffa_check_rtm_sec_interrupt(struct vcpu_locked current_locked,
 		return true;
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
 		/* Rule 5. Fall through. */
 	default:
 		/* Deny state transitions by default. */
@@ -473,6 +476,7 @@ static bool plat_ffa_check_rtm_sp_init(struct vcpu_locked locked_vcpu,
 		/* Rule 6. Fall through. */
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
 		/* Rule 5. Fall through. */
 	default:
 		/* Deny state transitions by default. */
