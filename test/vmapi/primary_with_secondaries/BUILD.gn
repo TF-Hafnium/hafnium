@@ -20,7 +20,7 @@ source_set("primary_with_secondaries") {
 
   sources = [ "primary_with_secondaries.c" ]
 
-  deps = [ "//test/vmapi/common" ]
+  deps = [ "//test/vmapi/common:ffa" ]
 }
 
 # Tests with secondary VMs.
@@ -36,7 +36,8 @@ vm_kernel("primary_with_secondaries_no_fdt_vm") {
   deps = [
     "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
-    "//test/vmapi/common",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
     "//vmlib",
   ]
 }
@@ -105,7 +106,8 @@ vm_kernel("primary_with_secondaries_test_vm") {
     ":primary_with_secondaries",
     "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
-    "//test/vmapi/common",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
     "//vmlib",
   ]
 }
@@ -196,7 +198,8 @@ vm_kernel("primary_with_sp_test_vm") {
     ":primary_with_secondaries",
     "//src/arch/${plat_arch}/hftest:registers",
     "//test/hftest:hftest_primary_vm",
-    "//test/vmapi/common",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
     "//vmlib",
   ]
 }
@@ -276,7 +279,8 @@ vm_kernel("primary_with_sp_vhe_test_vm") {
     ":primary_with_secondaries",
     "//src/arch/${plat_arch}/hftest:registers",
     "//test/hftest:hftest_primary_vm",
-    "//test/vmapi/common",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
     "//vmlib",
   ]
 }

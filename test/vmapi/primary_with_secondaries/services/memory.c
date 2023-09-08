@@ -17,7 +17,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];

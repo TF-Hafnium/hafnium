@@ -46,7 +46,7 @@ vm_kernel("el0_partition_test_vm") {
     ":memory_sharing",
     "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
-    "//test/vmapi/common",
+    "//test/vmapi/common:ffa",
     "//vmlib",
   ]
 }

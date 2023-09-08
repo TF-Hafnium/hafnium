@@ -15,7 +15,7 @@
 
 #include "../sysregs.h"
 #include "test/hftest.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 
 alignas(PAGE_SIZE) static uint8_t pages[2 * PAGE_SIZE];
 

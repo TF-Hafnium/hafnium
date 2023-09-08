@@ -15,7 +15,7 @@
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 static void check_npi(void)

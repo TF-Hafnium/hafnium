@@ -16,7 +16,7 @@
 
 #include "../msr.h"
 #include "test/hftest.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 static alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];

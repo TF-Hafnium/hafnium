@@ -10,7 +10,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 TEAR_DOWN(unmapped)

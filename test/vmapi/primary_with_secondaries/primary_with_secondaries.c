@@ -11,6 +11,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 SERVICE_PARTITION_INFO_GET(service1, SERVICE1)
@@ -107,4 +108,18 @@ bool hypervisor_only(void)
 	ffa_rx_release();
 
 	return !is_there_non_vm_endpoints;
+}
+
+/*
+ * Returns true if the receiver has been preempted by an exception:
+ * - if the receiver is an EL1 partition, it should have sent the exception
+ * count in a message.
+ * - if the receiver is an EL0 partition, the Hyp/SPMC should return FFA_ERROR
+ * with error code FFA_ABORTED.
+ */
+bool exception_received(struct ffa_value *run_res, const void *recv_buf)
+{
+	return exception_handler_receive_exception_count(recv_buf) == 1 ||
+	       (run_res->func == FFA_ERROR_32 &&
+		ffa_error_code(*run_res) == FFA_ABORTED);
 }

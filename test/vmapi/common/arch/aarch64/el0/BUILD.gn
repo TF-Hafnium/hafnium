@@ -1,4 +1,4 @@
-# Copyright 2019 The Hafnium Authors.
+# Copyright 2023 The Hafnium Authors.
 #
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
@@ -6,9 +6,8 @@
 
 import("//build/image/image.gni")
 
-source_set("ffa") {
+source_set("exception_handler") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
-  sources = [ "ffa.c" ]
-  include_dirs = [ "//src/arch/aarch64" ]
+  sources = [ "exception_handler.c" ]
 }

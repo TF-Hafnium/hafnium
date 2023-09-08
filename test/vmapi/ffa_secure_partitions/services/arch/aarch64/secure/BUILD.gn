@@ -43,7 +43,7 @@ source_set("partition_services") {
 
   deps = [
     ":common",
-    "//test/vmapi/common:common",
+    "//test/vmapi/common:ffa",
   ]
 }
 
@@ -100,6 +100,7 @@ source_set("message_loop") {
     ":partition_services",
     ":power_mgt",
     ":secure_interrupts",
+    "//test/vmapi/common:ffa",
   ]
 }
 source_set("test_main_sp_boot_fail") {
@@ -136,6 +137,7 @@ vm_kernel("secure_partitions_services") {
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_secure_service",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
     "//vmlib/${plat_arch}:call",
   ]
 }

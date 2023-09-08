@@ -17,7 +17,7 @@
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 
 /*
  * Secondary VM that tries to access GICv3 system registers.

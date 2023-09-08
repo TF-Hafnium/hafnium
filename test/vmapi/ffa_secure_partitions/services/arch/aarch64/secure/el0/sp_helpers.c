@@ -12,7 +12,7 @@
 #include "sp805.h"
 #include "test/abort.h"
 #include "test/hftest.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 
 #define ITERATIONS_PER_MS 15000
 

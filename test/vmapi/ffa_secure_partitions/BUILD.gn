@@ -21,7 +21,7 @@ source_set("ffa_secure_partitions") {
 
   sources = [ "ffa_secure_partitions.c" ]
 
-  deps = [ "//test/vmapi/common" ]
+  deps = [ "//test/vmapi/common:ffa" ]
 }
 
 # VM that will control execution of tests in a VM-to-SP set-up
@@ -49,7 +49,8 @@ vm_kernel("vm_primary") {
     "//src/arch/${plat_arch}/hftest:power_mgmt",
     "//test/hftest:hftest_primary_vm",
     "//test/vmapi/arch/${plat_arch}/gicv3:gicv3_setup",
-    "//test/vmapi/common:common",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
   ]
 }
 
@@ -86,7 +87,7 @@ vm_kernel("vm_primary_boot_fail_test_sp1") {
   deps = [
     ":ffa_secure_partitions",
     "//test/hftest:hftest_primary_vm",
-    "//test/vmapi/common:common",
+    "//test/vmapi/common:ffa",
   ]
 }
 
@@ -105,7 +106,7 @@ vm_kernel("vm_primary_boot_fail_test_sp2") {
   deps = [
     ":ffa_secure_partitions",
     "//test/hftest:hftest_primary_vm",
-    "//test/vmapi/common:common",
+    "//test/vmapi/common:ffa",
   ]
 }
 
@@ -124,7 +125,7 @@ vm_kernel("vm_primary_boot_fail_test_sp3") {
   deps = [
     ":ffa_secure_partitions",
     "//test/hftest:hftest_primary_vm",
-    "//test/vmapi/common:common",
+    "//test/vmapi/common:ffa",
   ]
 }
 

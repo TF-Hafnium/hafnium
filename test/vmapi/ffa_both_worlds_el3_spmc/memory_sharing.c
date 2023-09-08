@@ -16,7 +16,7 @@
 #include "ffa_secure_partitions.h"
 #include "partition_services.h"
 #include "test/hftest.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 alignas(PAGE_SIZE) static uint8_t

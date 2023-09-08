@@ -11,7 +11,7 @@ group("partitions") {
   testonly = true
   deps = [
     "arch/${plat_arch}:arch",
-    "common:common",
+    "common:ffa",
     "ffa_both_worlds_el3_spmc:ffa_both_world_partitions_test",
     "ffa_secure_partition_el3_spmc:ffa_secure_partition_only_test",
     "ffa_secure_partition_only:ffa_secure_partition_only_test",
@@ -30,7 +30,7 @@ group("vmapi") {
 
   deps = [
     "arch/${plat_arch}:arch",
-    "common:common",
+    "common:ffa",
     "el0_partitions:el0_partitions_test",
     "primary_only:primary_only_test",
     "primary_only_ffa:primary_only_ffa_test",

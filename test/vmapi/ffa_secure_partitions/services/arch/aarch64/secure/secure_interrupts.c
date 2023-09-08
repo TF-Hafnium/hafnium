@@ -17,7 +17,7 @@
 #include "sp805.h"
 #include "sp_helpers.h"
 #include "test/hftest.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 #define PLAT_ARM_TWDOG_BASE 0x2a490000

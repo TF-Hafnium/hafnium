@@ -14,7 +14,7 @@ vm_kernel("secure_service") {
     "//src/arch/aarch64/hftest/el0:interrupts",
     "//src/arch/aarch64/hftest/el0:mm",
     "//test/hftest:hftest_sel0_partition_base",
-    "//test/vmapi/common",
+    "//test/vmapi/common/arch/aarch64/el0:exception_handler",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
     "//test/vmapi/primary_with_secondaries/services:echo",
     "//test/vmapi/primary_with_secondaries/services:ffa_check",

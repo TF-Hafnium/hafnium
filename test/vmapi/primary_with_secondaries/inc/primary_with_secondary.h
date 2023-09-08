@@ -66,3 +66,6 @@ bool hypervisor_only(void);
 #define EXTERNAL_INTERRUPT_ID_A 7
 #define EXTERNAL_INTERRUPT_ID_B 8
 #define EXTERNAL_INTERRUPT_ID_C 9
+
+/* Helpers common to the setup. */
+bool exception_received(struct ffa_value* run_res, const void* recv_buf);

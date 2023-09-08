@@ -45,7 +45,7 @@ source_set("systemreg") {
   deps = [ "//src/arch/aarch64:arch" ]
 
   include_dirs = [
-    "//test/vmapi/common",
+    "//test/vmapi/common:ffa",
     "//inc/vmapi/hf",
   ]
 }
@@ -61,6 +61,7 @@ vm_kernel("gicv3_service_vm1") {
     ":systemreg",
     ":timer",
     "//test/hftest:hftest_secondary_vm",
-    "//test/vmapi/common:common",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
   ]
 }

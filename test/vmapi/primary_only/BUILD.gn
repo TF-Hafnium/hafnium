@@ -18,7 +18,7 @@ vm_kernel("primary_only_test_vm") {
 
   deps = [
     "//test/hftest:hftest_primary_vm",
-    "//test/vmapi/common",
+    "//test/vmapi/common:ffa",
   ]
 }
 

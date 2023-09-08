@@ -249,7 +249,7 @@ source_set("service_common") {
     "//src:memiter",
     "//src:panic",
     "//src:std",
-    "//test/vmapi/common:common",
+    "//test/vmapi/common:ffa",
   ]
 }
 

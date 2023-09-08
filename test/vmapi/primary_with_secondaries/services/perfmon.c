@@ -11,7 +11,7 @@
 #include "hf/dlog.h"
 
 #include "../sysregs.h"
-#include "test/vmapi/exception_handler.h"
+#include "test/vmapi/arch/exception_handler.h"
 
 TEST_SERVICE(perfmon_secondary_basic)
 {

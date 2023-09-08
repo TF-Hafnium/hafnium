@@ -31,8 +31,6 @@ void exception_handler_send_exception_count(void);
 int exception_handler_receive_exception_count(
 	const struct ffa_memory_region *recv_buf);
 
-bool exception_received(struct ffa_value *run_res, const void *recv_buf);
-
 void exception_handler_set_last_interrupt(uint32_t id);
 
 uint32_t exception_handler_get_last_interrupt(void);

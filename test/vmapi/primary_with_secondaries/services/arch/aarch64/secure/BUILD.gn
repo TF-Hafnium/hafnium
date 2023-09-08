@@ -19,7 +19,7 @@ source_set("message_loop") {
     "//src/arch/aarch64:arch_config",
   ]
   sources = [ "message_loop.c" ]
-  deps = [ "//test/vmapi/common:common" ]
+  deps = [ "//test/vmapi/common:ffa" ]
 }
 
 vm_kernel("secure_service") {
@@ -29,6 +29,7 @@ vm_kernel("secure_service") {
     "//src/arch/aarch64/hftest:interrupts",
     "//src/arch/aarch64/hftest:mm",
     "//test/hftest:hftest_secure_service",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
     "//test/vmapi/primary_with_secondaries/services:boot",
     "//test/vmapi/primary_with_secondaries/services:echo",

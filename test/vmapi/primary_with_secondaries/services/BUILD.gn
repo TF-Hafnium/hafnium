@@ -58,7 +58,7 @@ source_set("memory") {
     "//test/hftest:hftest_config",
   ]
   deps = [
-    "//test/vmapi/common",
+    "//test/vmapi/common:ffa",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
     "//vmlib",
   ]
@@ -73,7 +73,7 @@ source_set("unmapped") {
 
   sources = [ "unmapped.c" ]
 
-  deps = [ "//test/vmapi/common:common" ]
+  deps = [ "//test/vmapi/common:ffa" ]
 }
 
 # Services related to the boot process for VMs.
@@ -83,7 +83,7 @@ source_set("boot") {
 
   sources = [ "boot.c" ]
 
-  deps = [ "//test/vmapi/common:common" ]
+  deps = [ "//test/vmapi/common:ffa" ]
 }
 
 # Service that can be interrupted.
@@ -114,7 +114,7 @@ source_set("receive_block") {
   deps = [
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64/hftest:interrupts",
-    "//test/vmapi/common",
+    "//test/vmapi/common:ffa",
   ]
 }
 
@@ -162,7 +162,7 @@ source_set("ffa_check") {
     "..:config",
     "//test/hftest:hftest_config",
   ]
-  deps = [ "//test/vmapi/common" ]
+  deps = [ "//test/vmapi/common:ffa" ]
 
   sources = [
     "dir_msg.c",
@@ -193,6 +193,7 @@ vm_kernel("service_vm1") {
     "//src/arch/aarch64/hftest:interrupts",
     "//src/arch/aarch64/hftest:mm",
     "//test/hftest:hftest_secondary_vm",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
   ]
 }
@@ -209,6 +210,7 @@ vm_kernel("service_vm2") {
     "//src/arch/aarch64/hftest:interrupts",
     "//src/arch/aarch64/hftest:mm",
     "//test/hftest:hftest_secondary_vm",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
   ]
 }
@@ -221,6 +223,7 @@ vm_kernel("service_vm3") {
     ":ffa_check",
     ":smp",
     "//test/hftest:hftest_secondary_vm",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
     "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
   ]
 }
