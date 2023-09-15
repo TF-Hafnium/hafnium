@@ -423,7 +423,7 @@ TEST(memory_sharing, concurrent)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
@@ -468,7 +468,7 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_DATA_ACCESS_RW,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1496,7 +1496,7 @@ TEST(memory_sharing, lend_relinquish_X_RW)
  * Memory cannot be shared with executable permissions.
  * Check RO and RW permissions.
  */
-TEST(memory_sharing, share_X_RW)
+TEST(memory_sharing, share_X)
 {
 	ffa_memory_handle_t handle;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -1504,8 +1504,8 @@ TEST(memory_sharing, share_X_RW)
 	struct ffa_value run_res;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
-	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_share_fail_denied",
-		       mb.send);
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_memory_share_fail_invalid_parameters", mb.send);
 
 	/* Initialise the memory before giving it. */
 	memset_s(ptr, sizeof(pages), 'b', PAGE_SIZE);
@@ -1557,7 +1557,7 @@ TEST(memory_sharing, share_X_RW)
 }
 
 /**
- * Memory can be shared without executable permissions.
+ * Memory should be shared without executable permissions.
  * Check RO and RW permissions.
  */
 TEST(memory_sharing, share_relinquish_NX_RW)
@@ -1583,7 +1583,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1607,7 +1607,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1650,7 +1650,7 @@ TEST(memory_sharing, share_relinquish_clear)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 
 	/* Let the memory be received, fail to be cleared, and then returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1868,7 +1868,7 @@ TEST(memory_sharing, share_donate)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -2013,7 +2013,7 @@ TEST(memory_sharing, share_twice)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -3550,7 +3550,7 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish)
 		(struct ffa_memory_region *)retrieve_message->payload, handle,
 		HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
 		FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_INSTRUCTION_ACCESS_NX, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
 
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
@@ -3753,5 +3753,48 @@ TEST_PRECONDITION(memory_sharing, fail_page_overlap, hypervisor_only)
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 				 FFA_INVALID_PARAMETERS);
+	}
+}
+
+/**
+ * FFA_MEM_LEND/FFA_MEM_DONATE shall fail if retriever doesn't specify the
+ * instruction permissions.
+ */
+TEST(memory_sharing, retrieve_instruction_access_not_specified)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint8_t *ptr = pages;
+	uint32_t func_ids[] = {
+		FFA_MEM_LEND_32,
+		FFA_MEM_DONATE_32,
+	};
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+	};
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_memory_share_fail_invalid_parameters", mb.send);
+
+	memset_s(ptr, sizeof(pages), 'a', PAGE_SIZE);
+
+	for (uint32_t i = 0; i < ARRAY_SIZE(func_ids); i++) {
+		const enum ffa_data_access sender_data_permissions =
+			(func_ids[i] == FFA_MEM_LEND_32)
+				? FFA_DATA_ACCESS_RW
+				: FFA_DATA_ACCESS_NOT_SPECIFIED;
+		ffa_memory_handle_t handle = send_memory_and_retrieve_request(
+			func_ids[i], mb.send, HF_PRIMARY_VM_ID,
+			service1_info->vm_id, constituents,
+			ARRAY_SIZE(constituents), 0, 0, sender_data_permissions,
+			FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			/*
+			 * Not specified retrieve request instruction
+			 * permissions.
+			 */
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+		EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+		ffa_mem_reclaim(handle, 0);
 	}
 }
