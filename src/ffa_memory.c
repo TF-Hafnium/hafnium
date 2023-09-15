@@ -1495,21 +1495,6 @@ struct ffa_value ffa_memory_send_validate(
 					permissions);
 				return ffa_error(FFA_INVALID_PARAMETERS);
 			}
-			/*
-			 * According to section 10.10.3 of the FF-A v1.1 EAC0
-			 * spec, NX is required for share operations (but must
-			 * not be specified by the sender) so set it in the
-			 * copy that we store, ready to be returned to the
-			 * retriever.
-			 */
-			if (vm_id_is_current_world(receiver_id)) {
-				ffa_set_instruction_access_attr(
-					&permissions,
-					FFA_INSTRUCTION_ACCESS_NX);
-				memory_region->receivers[i]
-					.receiver_permissions.permissions =
-					permissions;
-			}
 		}
 		if (share_func == FFA_MEM_LEND_32 &&
 		    data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
@@ -1991,14 +1976,18 @@ uint32_t ffa_memory_region_get_receiver(struct ffa_memory_region *memory_region,
  * Validates the retrieved permissions against those specified by the lender
  * of memory share operation. Optionally can help set the permissions to be used
  * for the S2 mapping, through the `permissions` argument.
- * Returns true if permissions are valid, false otherwise.
+ * Returns FFA_SUCCESS if all the fields are valid. FFA_ERROR, with error code:
+ * - FFA_INVALID_PARAMETERS -> if the fields have invalid values as per the
+ * specification for each ABI.
+ * - FFA_DENIED -> if the permissions specified by the retriever are not
+ *   less permissive than those provided by the sender.
  */
-static bool ffa_memory_retrieve_is_memory_access_valid(
-	enum ffa_data_access sent_data_access,
+static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
+	uint32_t share_func, enum ffa_data_access sent_data_access,
 	enum ffa_data_access requested_data_access,
 	enum ffa_instruction_access sent_instruction_access,
 	enum ffa_instruction_access requested_instruction_access,
-	ffa_memory_access_permissions_t *permissions)
+	ffa_memory_access_permissions_t *permissions, bool multiple_borrowers)
 {
 	switch (sent_data_access) {
 	case FFA_DATA_ACCESS_NOT_SPECIFIED:
@@ -2025,24 +2014,78 @@ static bool ffa_memory_retrieve_is_memory_access_valid(
 			"Invalid data access requested; sender specified "
 			"permissions %#x but receiver requested %#x.\n",
 			sent_data_access, requested_data_access);
-		return false;
+		return ffa_error(FFA_DENIED);
 	case FFA_DATA_ACCESS_RESERVED:
 		panic("Got unexpected FFA_DATA_ACCESS_RESERVED. Should be "
 		      "checked before this point.");
 	}
 
+	/*
+	 * For operations with a single borrower, If it is an FFA_MEMORY_LEND
+	 * or FFA_MEMORY_DONATE the retriever should have specifed the
+	 * instruction permissions it wishes to receive.
+	 */
+	switch (share_func) {
+	case FFA_MEM_SHARE_32:
+		if (requested_instruction_access !=
+		    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
+			dlog_verbose(
+				"%s: for share instruction permissions must "
+				"NOT be specified.\n",
+				__func__);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+		break;
+	case FFA_MEM_LEND_32:
+		/*
+		 * For operations with multiple borrowers only permit XN
+		 * permissions, and both Sender and borrower should have used
+		 * FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED.
+		 */
+		if (multiple_borrowers) {
+			if (requested_instruction_access !=
+			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
+				dlog_verbose(
+					"%s: lend/share/donate with multiple "
+					"borrowers "
+					"instruction permissions must NOT be "
+					"specified.\n",
+					__func__);
+				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
+			break;
+		}
+		/* Fall through if the operation targets a single borrower. */
+	case FFA_MEM_DONATE_32:
+		if (!multiple_borrowers &&
+		    requested_instruction_access ==
+			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
+			dlog_verbose(
+				"%s: for lend/donate with single borrower "
+				"instruction permissions must be speficified "
+				"by borrower\n",
+				__func__);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+		break;
+	default:
+		panic("%s: Wrong func id provided.\n", __func__);
+	}
+
 	switch (sent_instruction_access) {
 	case FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED:
 	case FFA_INSTRUCTION_ACCESS_X:
-		if (requested_instruction_access ==
-			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
-		    requested_instruction_access == FFA_INSTRUCTION_ACCESS_X) {
+		if (requested_instruction_access == FFA_INSTRUCTION_ACCESS_X) {
 			if (permissions != NULL) {
 				ffa_set_instruction_access_attr(
 					permissions, FFA_INSTRUCTION_ACCESS_X);
 			}
 			break;
 		}
+		/*
+		 * Fall through if requested permissions are less
+		 * permissive than those provided by the sender.
+		 */
 	case FFA_INSTRUCTION_ACCESS_NX:
 		if (requested_instruction_access ==
 			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
@@ -2058,13 +2101,13 @@ static bool ffa_memory_retrieve_is_memory_access_valid(
 			"specified permissions %#x but receiver requested "
 			"%#x.\n",
 			sent_instruction_access, requested_instruction_access);
-		return false;
+		return ffa_error(FFA_DENIED);
 	case FFA_INSTRUCTION_ACCESS_RESERVED:
 		panic("Got unexpected FFA_INSTRUCTION_ACCESS_RESERVED. Should "
 		      "be checked before this point.");
 	}
 
-	return true;
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
 /**
@@ -2081,18 +2124,19 @@ static bool ffa_memory_retrieve_is_memory_access_valid(
 static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	struct ffa_memory_region *memory_region,
 	struct ffa_memory_region *retrieve_request, ffa_id_t to_vm_id,
-	ffa_memory_access_permissions_t *permissions)
+	ffa_memory_access_permissions_t *permissions, uint32_t func_id)
 {
 	uint32_t retrieve_receiver_index;
 	bool bypass_multi_receiver_check =
 		(retrieve_request->flags &
 		 FFA_MEMORY_REGION_FLAG_BYPASS_BORROWERS_CHECK) != 0U;
+	const uint32_t region_receiver_count = memory_region->receiver_count;
+	struct ffa_value ret;
 
 	assert(permissions != NULL);
 
 	if (!bypass_multi_receiver_check) {
-		if (retrieve_request->receiver_count !=
-		    memory_region->receiver_count) {
+		if (retrieve_request->receiver_count != region_receiver_count) {
 			dlog_verbose(
 				"Retrieve request should contain same list of "
 				"borrowers, as specified by the lender.\n");
@@ -2168,17 +2212,19 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 		}
 
 		/*
-		 * Check permissions from sender against permissions requested
-		 * by receiver.
+		 * Check if retrieve request memory access list is valid:
+		 * - The retrieve request complies with the specification.
+		 * - Permissions are within those specified by the sender.
 		 */
-		if (!ffa_memory_retrieve_is_memory_access_valid(
-			    ffa_get_data_access_attr(sent_permissions),
-			    ffa_get_data_access_attr(requested_permissions),
-			    ffa_get_instruction_access_attr(sent_permissions),
-			    ffa_get_instruction_access_attr(
-				    requested_permissions),
-			    found_to_id ? permissions : NULL)) {
-			return ffa_error(FFA_DENIED);
+		ret = ffa_memory_retrieve_is_memory_access_valid(
+			func_id, ffa_get_data_access_attr(sent_permissions),
+			ffa_get_data_access_attr(requested_permissions),
+			ffa_get_instruction_access_attr(sent_permissions),
+			ffa_get_instruction_access_attr(requested_permissions),
+			found_to_id ? permissions : NULL,
+			region_receiver_count > 1);
+		if (ret.func != FFA_SUCCESS_32) {
+			return ret;
 		}
 
 		/*
@@ -2500,7 +2546,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		 */
 		ret = ffa_memory_retrieve_validate_memory_access_list(
 			memory_region, retrieve_request, receiver_id,
-			&permissions);
+			&permissions, share_state->share_func);
 		if (ret.func != FFA_SUCCESS_32) {
 			goto out;
 		}
