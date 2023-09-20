@@ -2448,6 +2448,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		 * In case there is only one borrower from the NWd in the
 		 * transaction descriptor, record that in the `receiver_id` for
 		 * later use, and validate in the retrieve request message.
+		 * This limitation is due to the fact SPMC can't determine the
+		 * index in the memory share structures state to update.
 		 */
 		if (to_locked.vm->id == HF_HYPERVISOR_VM_ID) {
 			uint32_t other_world_count = 0;
@@ -2472,8 +2474,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		/*
 		 * Validate retrieve request, according to what was sent by the
 		 * sender. Function will output the `receiver_index` from the
-		 * provided memory region, and will output `permissions` from
-		 * the validated requested permissions.
+		 * provided memory region.
 		 */
 		ret = ffa_memory_retrieve_validate(
 			receiver_id, retrieve_request, memory_region,
@@ -2491,6 +2492,12 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 			goto out;
 		}
 
+		/*
+		 * Validate the requested permissions against the sent
+		 * permissions.
+		 * Outputs the permissions to give to retriever at S2
+		 * PTs.
+		 */
 		ret = ffa_memory_retrieve_validate_memory_access_list(
 			memory_region, retrieve_request, receiver_id,
 			&permissions);
