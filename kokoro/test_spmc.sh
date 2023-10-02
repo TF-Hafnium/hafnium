@@ -99,6 +99,18 @@ fi
 
 execute_test HFTEST --partitions_json test/vmapi/ffa_secure_partition_only/ffa_secure_partition_only_test.json
 
+execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_test.json
+
+execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --partitions_json test/vmapi/primary_with_secondaries/primary_with_sp.json
+
+execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                 --partitions_json test/vmapi/primary_with_secondaries/primary_with_sp_vhe.json
+
+execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                 --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_vhe_test.json
+
 if [ "$CODE_COVERAGE" = true ]; then
   create_configuration_file
   generate_intermediate_layer
