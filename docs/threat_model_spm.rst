@@ -1377,6 +1377,82 @@ element of the data flow diagram.
 |                        | enforced by the SPMC.                              |
 +------------------------+----------------------------------------------------+
 
++------------------------+----------------------------------------------------+
+| ID                     | 30                                                 |
++========================+====================================================+
+| ``Threat``             | **A malicious secure endpoint might attempt to     |
+|                        | reconfigure a physical secure interrupt belonging  |
+|                        | to another endpoint using the                      |
+|                        | HF_INTERRUPT_RECONFIGURE interface.**              |
+|                        | Through this interface, the malicious secure       |
+|                        | endpoint could reroute or disable or even change   |
+|                        | security state of the physical interrupt.          |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1, DF5                                           |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC                                               |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SPMC state, SP state                               |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | S-Endpoint                                         |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Tampering                                          |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | Medium (3)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | Medium (3)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | Medium (9)       | Medium (9)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | At initialization, the TF-A SPMC parses the        |
+|                        | partition manifests to identify various physical   |
+|                        | interrupts associated with an SP. The SPMC         |
+|                        | provides mitigation against above mentioned threat |
+|                        | by denying any such attempts if the interrupt does |
+|                        | not belong to the caller SP.                       |
++------------------------+----------------------------------------------------+
+
++------------------------+----------------------------------------------------+
+| ID                     | 31                                                 |
++========================+====================================================+
+| ``Threat``             | **A malicious endpoint could leverage the          |
+|                        | HF_INTERRUPT_RECONFIGURE interface to change the   |
+|                        | security state of a physical interrupt it owns     |
+|                        | without coordinating with its normal world driver  |
+|                        | to register an appropriate non-secure handler. This|
+|                        | could lead to preemption of an endpoint when this  |
+|                        | interrupt gets triggered. Since there is no handler|
+|                        | to triage this interrupt in the normal world, it   |
+|                        | could render the system unresponsive.**            |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1, DF5                                           |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC                                               |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SPMC state, SP state, Scheduling cycles            |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | S-Endpoint                                         |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Tampering, Denial of Service                       |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | High (4)         | High (4)        |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | High (4)         | High (4)        |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | High (16)        | High (16)       |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | The TF-A SPMC does not provide mitigation against  |
+|                        | against such threats. System integrators must take |
+|                        | necessary high level design decisions that takes   |
+|                        | care of rogue interrupts.                          |
++------------------------+----------------------------------------------------+
+
 --------------
 
 *Copyright (c) 2023, Arm Limited. All rights reserved.*
