@@ -1053,6 +1053,47 @@ static void ffa_region_group_commit_actions(struct vm_locked vm_locked,
 }
 
 /**
+ * Helper function to revert a failed "Protect" action from the SPMC:
+ * - `fragment_count`: should specify the number of fragments to traverse from
+ * `fragments`. This may not be the full amount of fragments that are part of
+ * the share_state structure.
+ * - `fragment_constituent_counts`: array holding the amount of constituents
+ * per fragment.
+ * - `end`: pointer to the constituent that failed the "protect" action. It
+ * shall be part of the last fragment, and it shall make the loop below break.
+ */
+static void ffa_region_group_fragments_revert_protect(
+	struct ffa_memory_region_constituent **fragments,
+	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	const struct ffa_memory_region_constituent *end)
+{
+	for (uint32_t i = 0; i < fragment_count; ++i) {
+		for (uint32_t j = 0; j < fragment_constituent_counts[i]; ++j) {
+			struct ffa_memory_region_constituent *constituent =
+				&fragments[i][j];
+			size_t size = constituent->page_count * PAGE_SIZE;
+			paddr_t pa_begin =
+				pa_from_ipa(ipa_init(constituent->address));
+			paddr_t pa_end = pa_add(pa_begin, size);
+
+			dlog_verbose("%s: reverting fragment %x size %x\n",
+				     __func__, pa_addr(pa_begin), size);
+
+			if (constituent == end) {
+				/*
+				 * The last constituent is expected to be in the
+				 * last fragment.
+				 */
+				assert(i == fragment_count - 1);
+				break;
+			}
+
+			CHECK(arch_memory_unprotect(pa_begin, pa_end));
+		}
+	}
+}
+
+/**
  * Updates a VM's page table such that the given set of physical address ranges
  * are mapped in the address space at the corresponding address ranges, in the
  * mode provided.
@@ -1101,9 +1142,11 @@ struct ffa_value ffa_region_group_identity_map(
 	/* Iterate over the memory region constituents within each fragment. */
 	for (i = 0; i < fragment_count; ++i) {
 		for (j = 0; j < fragment_constituent_counts[i]; ++j) {
-			size_t size = fragments[i][j].page_count * PAGE_SIZE;
+			struct ffa_memory_region_constituent *constituent =
+				&fragments[i][j];
+			size_t size = constituent->page_count * PAGE_SIZE;
 			paddr_t pa_begin =
-				pa_from_ipa(ipa_init(fragments[i][j].address));
+				pa_from_ipa(ipa_init(constituent->address));
 			paddr_t pa_end = pa_add(pa_begin, size);
 			uint32_t pa_bits =
 				arch_mm_get_pa_bits(arch_mm_get_pa_range());
@@ -1122,6 +1165,19 @@ struct ffa_value ffa_region_group_identity_map(
 				ret = ffa_region_group_check_actions(
 					vm_locked, pa_begin, pa_end, ppool,
 					mode, action, memory_protected);
+
+				if (ret.func == FFA_ERROR_32 &&
+				    ffa_error_code(ret) == FFA_DENIED) {
+					if (memory_protected != NULL) {
+						assert(!*memory_protected);
+					}
+
+					ffa_region_group_fragments_revert_protect(
+						fragments,
+						fragment_constituent_counts,
+						i + 1, constituent);
+					break;
+				}
 			} else if (action >= MAP_ACTION_COMMIT &&
 				   action < MAP_ACTION_MAX) {
 				ffa_region_group_commit_actions(
