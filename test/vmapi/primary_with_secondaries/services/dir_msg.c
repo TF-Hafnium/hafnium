@@ -7,12 +7,15 @@
  */
 
 #include "hf/ffa.h"
+#include "hf/std.h"
 
 #include "vmapi/hf/call.h"
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
+
+#define MAX_RESP_REGS 14
 
 TEST_SERVICE(ffa_direct_message_resp_echo)
 {
@@ -29,17 +32,15 @@ TEST_SERVICE(ffa_direct_message_resp_echo)
 
 TEST_SERVICE(ffa_direct_message_req2_resp_echo)
 {
-	struct ffa_value args = ffa_msg_wait();
+	uint64_t msg[MAX_RESP_REGS];
+	struct ffa_value res = ffa_msg_wait();
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ2_64);
 
-	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ2_64);
+	memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &res.arg4,
+		 MAX_RESP_REGS * sizeof(uint64_t));
 
-	/*
-	 * TODO: replace with FFA_MSG_SEND_DIRECT_RESP2 abi once
-	 * extended register support is added.
-	 */
-	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
-				 args.arg3, args.arg4, args.arg5, args.arg6,
-				 args.arg7);
+	ffa_msg_send_direct_resp2(ffa_receiver(res), ffa_sender(res),
+				  (const uint64_t *)msg, MAX_RESP_REGS);
 
 	FAIL("Direct response not expected to return");
 }
@@ -94,7 +95,10 @@ TEST_SERVICE(ffa_direct_message_echo_services)
 
 TEST_SERVICE(ffa_direct_message_req2_echo_services)
 {
-	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777};
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999, 0x01010101, 0x23232323, 0x45454545,
+				0x67676767, 0x89898989, 0x11001100, 0x22332233,
+				0x44554455, 0x66776677};
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_value res;
 	struct ffa_partition_info target_info;
@@ -116,15 +120,25 @@ TEST_SERVICE(ffa_direct_message_req2_echo_services)
 	HFTEST_LOG("Echo test with: %x", target_info.vm_id);
 
 	res = ffa_msg_send_direct_req2(hf_vm_get_id(), target_info.vm_id,
-				       &target_uuid, msg[0], msg[1], msg[2],
-				       msg[3]);
+				       &target_uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
 
-	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
 
 	EXPECT_EQ(res.arg4, msg[0]);
 	EXPECT_EQ(res.arg5, msg[1]);
 	EXPECT_EQ(res.arg6, msg[2]);
 	EXPECT_EQ(res.arg7, msg[3]);
+	EXPECT_EQ(res.extended_val.arg8, msg[4]);
+	EXPECT_EQ(res.extended_val.arg9, msg[5]);
+	EXPECT_EQ(res.extended_val.arg10, msg[6]);
+	EXPECT_EQ(res.extended_val.arg11, msg[7]);
+	EXPECT_EQ(res.extended_val.arg12, msg[8]);
+	EXPECT_EQ(res.extended_val.arg13, msg[9]);
+	EXPECT_EQ(res.extended_val.arg14, msg[10]);
+	EXPECT_EQ(res.extended_val.arg15, msg[11]);
+	EXPECT_EQ(res.extended_val.arg16, msg[12]);
+	EXPECT_EQ(res.extended_val.arg17, msg[13]);
 
 	ffa_yield();
 }

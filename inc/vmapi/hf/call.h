@@ -309,7 +309,7 @@ static inline struct ffa_value ffa_mem_frag_tx(ffa_memory_handle_t handle,
  */
 static inline struct ffa_value ffa_msg_wait(void)
 {
-	return ffa_call((struct ffa_value){.func = FFA_MSG_WAIT_32});
+	return ffa_call_ext((struct ffa_value){.func = FFA_MSG_WAIT_32});
 }
 
 /**
@@ -503,28 +503,43 @@ static inline struct ffa_value ffa_msg_send_direct_req(
 	});
 }
 
-/*
- * TODO edit function to accept more arguments and make use of full range of
- * registers if needed.
- */
 static inline struct ffa_value ffa_msg_send_direct_req2(
 	ffa_id_t sender_vm_id, ffa_id_t target_vm_id,
-	const struct ffa_uuid *uuid, uint32_t arg4, uint32_t arg5,
-	uint32_t arg6, uint32_t arg7)
+	const struct ffa_uuid *uuid, const uint64_t *msg, size_t count)
 {
-	uint64_t arg2 = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
-	uint64_t arg3 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
+	struct ffa_value args;
+	size_t arg_idx = 0;
+	uint64_t total_args;
+	size_t msg_idx = 0;
+	uint64_t *arg_ptrs[] = {
+		&args.arg4,
+		&args.arg5,
+		&args.arg6,
+		&args.arg7,
+		&args.extended_val.arg8,
+		&args.extended_val.arg9,
+		&args.extended_val.arg10,
+		&args.extended_val.arg11,
+		&args.extended_val.arg12,
+		&args.extended_val.arg13,
+		&args.extended_val.arg14,
+		&args.extended_val.arg15,
+		&args.extended_val.arg16,
+		&args.extended_val.arg17,
+	};
 
-	return ffa_call_ext((struct ffa_value){
-		.func = FFA_MSG_SEND_DIRECT_REQ2_64,
-		.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id,
-		.arg2 = arg2,
-		.arg3 = arg3,
-		.arg4 = arg4,
-		.arg5 = arg5,
-		.arg6 = arg6,
-		.arg7 = arg7,
-	});
+	args.func = FFA_MSG_SEND_DIRECT_REQ2_64;
+	args.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id;
+	args.arg2 = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
+	args.arg3 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
+
+	total_args = (sizeof(arg_ptrs) / sizeof(uint64_t *));
+
+	while (arg_idx < total_args && msg_idx < count) {
+		*arg_ptrs[arg_idx++] = msg[msg_idx++];
+	}
+
+	return ffa_call_ext(args);
 }
 
 static inline struct ffa_value ffa_msg_send_direct_resp(
@@ -540,6 +555,46 @@ static inline struct ffa_value ffa_msg_send_direct_resp(
 		.arg6 = arg6,
 		.arg7 = arg7,
 	});
+}
+
+static inline struct ffa_value ffa_msg_send_direct_resp2(ffa_id_t sender_vm_id,
+							 ffa_id_t target_vm_id,
+							 const uint64_t *msg,
+							 size_t count)
+{
+	struct ffa_value args;
+	size_t arg_idx = 0;
+	size_t total_args;
+	size_t msg_idx = 0;
+	uint64_t *arg_ptrs[] = {
+		&args.arg4,
+		&args.arg5,
+		&args.arg6,
+		&args.arg7,
+		&args.extended_val.arg8,
+		&args.extended_val.arg9,
+		&args.extended_val.arg10,
+		&args.extended_val.arg11,
+		&args.extended_val.arg12,
+		&args.extended_val.arg13,
+		&args.extended_val.arg14,
+		&args.extended_val.arg15,
+		&args.extended_val.arg16,
+		&args.extended_val.arg17,
+	};
+
+	args.func = FFA_MSG_SEND_DIRECT_RESP2_64;
+	args.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id;
+	args.arg2 = 0;
+	args.arg3 = 0;
+
+	total_args = sizeof(arg_ptrs) / sizeof(uint64_t *);
+
+	while (arg_idx < total_args && msg_idx < count) {
+		*arg_ptrs[arg_idx++] = msg[msg_idx++];
+	}
+
+	return ffa_call_ext(args);
 }
 
 static inline struct ffa_value ffa_notification_bind(
