@@ -1082,6 +1082,22 @@ static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
 	return true;
 }
 
+/*
+ * Helper to check if extended arguments (corresponding to regs x8-x17)
+ * are zeroed out.
+ */
+static bool api_extended_args_are_zero(struct ffa_value *args)
+{
+	if (args->extended_val.arg8 != 0U || args->extended_val.arg9 != 0U ||
+	    args->extended_val.arg10 != 0U || args->extended_val.arg11 != 0U ||
+	    args->extended_val.arg12 != 0U || args->extended_val.arg13 != 0U ||
+	    args->extended_val.arg14 != 0U || args->extended_val.arg15 != 0U ||
+	    args->extended_val.arg16 != 0U || args->extended_val.arg17 != 0U) {
+		return false;
+	}
+	return true;
+}
+
 struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 				  struct ffa_value *args)
 {
@@ -1095,6 +1111,11 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 	if (args->arg1 != 0U || args->arg2 != 0U || args->arg3 != 0U ||
 	    args->arg4 != 0U || args->arg5 != 0U || args->arg6 != 0U ||
 	    args->arg7 != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (current->vm->ffa_version >= MAKE_FFA_VERSION(1, 2) &&
+	    !api_extended_args_are_zero(args)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2546,6 +2567,10 @@ static struct ffa_value api_ffa_dir_msg_value(struct ffa_value args)
 		args.arg2 = 0;
 	}
 
+	if (args.func == FFA_MSG_SEND_DIRECT_REQ2_64) {
+		args.extended_val.valid = true;
+	}
+
 	return args;
 }
 
@@ -2719,10 +2744,6 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	receiver_vcpu->regs_available = false;
 	receiver_vcpu->direct_request_origin_vm_id = sender_vm_id;
 
-	/*
-	 * TODO: when extending registers, have to set extended_val.valid before
-	 * this call.
-	 */
 	arch_regs_set_retval(&receiver_vcpu->regs, api_ffa_dir_msg_value(args));
 
 	assert(!vm_id_is_current_world(current->vm->id) ||

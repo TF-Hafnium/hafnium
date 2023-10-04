@@ -247,7 +247,12 @@ bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
 		dlog_verbose("%s calling SPMC %#x %#x %#x %#x %#x\n", __func__,
 			     args.func, args.arg1, args.arg2, args.arg3,
 			     args.arg4);
-		*ret = arch_other_world_call(args);
+		if (args.func == FFA_MSG_SEND_DIRECT_REQ_64 ||
+		    args.func == FFA_MSG_SEND_DIRECT_REQ_32) {
+			*ret = arch_other_world_call(args);
+		} else if (args.func == FFA_MSG_SEND_DIRECT_REQ2_64) {
+			*ret = arch_other_world_call_ext(args);
+		}
 		return true;
 	}
 

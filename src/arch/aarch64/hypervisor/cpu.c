@@ -218,10 +218,41 @@ void arch_regs_set_retval(struct arch_regs *r, struct ffa_value v)
 	}
 }
 
-struct ffa_value arch_regs_get_args(struct arch_regs *regs)
+static struct ffa_value arch_regs_get_args_ext(struct arch_regs *regs)
 {
 	return (struct ffa_value){
 		.func = regs->r[0],
+		.arg1 = regs->r[1],
+		.arg2 = regs->r[2],
+		.arg3 = regs->r[3],
+		.arg4 = regs->r[4],
+		.arg5 = regs->r[5],
+		.arg6 = regs->r[6],
+		.arg7 = regs->r[7],
+		.extended_val.valid = true,
+		.extended_val.arg8 = regs->r[8],
+		.extended_val.arg9 = regs->r[9],
+		.extended_val.arg10 = regs->r[10],
+		.extended_val.arg11 = regs->r[11],
+		.extended_val.arg12 = regs->r[12],
+		.extended_val.arg13 = regs->r[13],
+		.extended_val.arg14 = regs->r[14],
+		.extended_val.arg15 = regs->r[15],
+		.extended_val.arg16 = regs->r[16],
+		.extended_val.arg17 = regs->r[17],
+	};
+}
+
+struct ffa_value arch_regs_get_args(struct arch_regs *regs)
+{
+	uint32_t func_id = regs->r[0];
+
+	if (func_id == FFA_MSG_SEND_DIRECT_REQ2_64) {
+		return arch_regs_get_args_ext(regs);
+	}
+
+	return (struct ffa_value){
+		.func = func_id,
 		.arg1 = regs->r[1],
 		.arg2 = regs->r[2],
 		.arg3 = regs->r[3],

@@ -38,16 +38,16 @@ struct ffa_value ffa_call_ext(struct ffa_value args)
 	register uint64_t r5 __asm__("x5") = args.arg5;
 	register uint64_t r6 __asm__("x6") = args.arg6;
 	register uint64_t r7 __asm__("x7") = args.arg7;
-	register uint64_t r8 __asm__("x8") = 0;
-	register uint64_t r9 __asm__("x9") = 0;
-	register uint64_t r10 __asm__("x10") = 0;
-	register uint64_t r11 __asm__("x11") = 0;
-	register uint64_t r12 __asm__("x12") = 0;
-	register uint64_t r13 __asm__("x13") = 0;
-	register uint64_t r14 __asm__("x14") = 0;
-	register uint64_t r15 __asm__("x15") = 0;
-	register uint64_t r16 __asm__("x16") = 0;
-	register uint64_t r17 __asm__("x17") = 0;
+	register uint64_t r8 __asm__("x8") = args.extended_val.arg8;
+	register uint64_t r9 __asm__("x9") = args.extended_val.arg9;
+	register uint64_t r10 __asm__("x10") = args.extended_val.arg10;
+	register uint64_t r11 __asm__("x11") = args.extended_val.arg11;
+	register uint64_t r12 __asm__("x12") = args.extended_val.arg12;
+	register uint64_t r13 __asm__("x13") = args.extended_val.arg13;
+	register uint64_t r14 __asm__("x14") = args.extended_val.arg14;
+	register uint64_t r15 __asm__("x15") = args.extended_val.arg15;
+	register uint64_t r16 __asm__("x16") = args.extended_val.arg16;
+	register uint64_t r17 __asm__("x17") = args.extended_val.arg17;
 
 	__asm__ volatile(
 		"svc #0"
