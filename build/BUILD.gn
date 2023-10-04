@@ -46,8 +46,8 @@ config("platform") {
 
   assert(
       plat_num_virtual_interrupts_ids > 0 &&
-          plat_num_virtual_interrupts_ids < 5120,
-      "Maximum virtual interrupt ids per vcpu must be between 1 and 5119: current = ${plat_num_virtual_interrupts_ids}")
+          plat_num_virtual_interrupts_ids <= 5120,
+      "Maximum virtual interrupt ids per vcpu must be between 1 and 5120: current = ${plat_num_virtual_interrupts_ids}")
 
   include_dirs = [
     "//inc",
