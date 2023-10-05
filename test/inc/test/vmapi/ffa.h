@@ -51,6 +51,12 @@
 #define SP_ID(x) ((x) | SP_ID_MASK)
 #define VM_ID(x) (x & ~SP_ID_MASK)
 
+/*
+ * Implementation-defined maximum registers that may be used in a
+ * direct message response.
+ */
+#define MAX_MSG_SIZE (14 * sizeof(uint64_t))
+
 struct mailbox_buffers {
 	void *send;
 	void *recv;

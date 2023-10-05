@@ -20,6 +20,14 @@
  * attempting to communicate with it. Thus, the code for the PVM becomes
  * portable between setups where the test service is either a VM or an SP.
  */
+#define PVM                                                     \
+	(struct ffa_uuid)                                       \
+	{                                                       \
+		{                                               \
+			0xbdfaab86, 0xe9ee, 0x409a, 0xde614c01, \
+		}                                               \
+	}
+
 #define SERVICE1                                                        \
 	(struct ffa_uuid)                                               \
 	{                                                               \

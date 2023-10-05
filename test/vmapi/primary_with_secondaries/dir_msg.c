@@ -16,6 +16,8 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+#define MAX_RESP_REGS (MAX_MSG_SIZE / sizeof(uint64_t))
+
 /**
  * Send direct message, verify that sent info is echoed back.
  */
@@ -355,6 +357,7 @@ TEST(direct_message, ffa_send_direct_message_req2_echo)
 	EXPECT_EQ(res.extended_val.arg16, msg[12]);
 	EXPECT_EQ(res.extended_val.arg17, msg[13]);
 }
+
 /**
  * Initiate direct message request between test SPs.
  * If test services are VMs, test should be skipped.
@@ -383,4 +386,204 @@ TEST_PRECONDITION(direct_message, ffa_direct_message_req2_services_echo,
 				    &service2_uuid, sizeof(service2_uuid), 0);
 	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
 	ffa_run(service1_info->vm_id, 0);
+}
+
+/**
+ * If Hafnium is the hypervisor, and service1 is a VM:
+ * - Service verifies disallowed SMC invocations while ffa_msg_send_direct_req
+ * is being serviced.
+ *
+ * If Hafnium as SPMC is deployed and service1 is an SP:
+ * - Validate the state transitions permitted under RTM_FFA_DIR_REQ partition
+ * runtime model
+ */
+TEST(direct_message, ffa_send_direct_message_req2_disallowed_smc)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	const struct ffa_uuid service1_uuid = SERVICE1;
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_direct_msg_req2_disallowed_smc", mb.send);
+	ffa_run(service1_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service1_info->vm_id,
+				       &service1_uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+}
+
+/**
+ * Send direct message via FFA_MSG_SEND_DIRECT_REQ2 targeting an invalid UUID.
+ */
+TEST(direct_message, ffa_send_direct_message_req2_invalid_uuid)
+{
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999, 0x01010101, 0x23232323, 0x45454545,
+				0x67676767, 0x89898989, 0x11001100, 0x22332233,
+				0x44554455, 0x66776677};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_uuid uuid;
+
+	/* Non-existent UUID. */
+	ffa_uuid_init(1, 1, 1, 1, &uuid);
+
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+				       &uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+
+	/* UUID for a different partition than given FF-A id. */
+	uuid = SERVICE2;
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+				       &uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Verify that the primary VM can't send direct message responses
+ * via FFA_MSG_SEND_DIRECT_RESP2_64.
+ */
+TEST(direct_message, ffa_send_direct_message_resp2_invalid)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	const uint64_t msg[] = {1, 2, 3, 4, 5};
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_direct_message_req2_resp_echo", mb.send);
+	ffa_run(service1_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_resp2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+					(const uint64_t *)&msg,
+					ARRAY_SIZE(msg));
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Test runs the test service via ffa_run, and validates that:
+ * - If service is an SP, it can't send a direct message request to a VM in the
+ * NWd.
+ *
+ * Legacy case for secondary VM
+ * - If service is a secondary VM, it can't invoke a direct message request to
+ * the PVM (legacy behavior, for hafnium as an hypervisor).
+ */
+TEST(direct_message, ffa_secondary_direct_msg_req2_invalid)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	const struct ffa_uuid service1_uuid = SERVICE1;
+	uint64_t msg[MAX_RESP_REGS] = {0};
+	struct ffa_uuid own_uuid = PVM;
+
+	SERVICE_SELECT(service1_info->vm_id, "ffa_disallowed_direct_msg_req2",
+		       mb.send);
+	res = send_indirect_message(HF_PRIMARY_VM_ID, service1_info->vm_id,
+				    mb.send, &own_uuid, sizeof(own_uuid), 0);
+	ASSERT_EQ(res.func, FFA_SUCCESS_32);
+	ffa_run(service1_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+				       &service1_uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+}
+
+/**
+ * Run secondary VM without sending a direct message request beforehand.
+ * Secondary VM must fail sending a direct message response.
+ */
+TEST(direct_message, ffa_secondary_direct_msg_resp2_invalid)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_uuid service1_uuid = SERVICE1;
+	uint64_t msg[MAX_RESP_REGS] = {0};
+
+	SERVICE_SELECT(service1_info->vm_id, "ffa_disallowed_direct_msg_resp2",
+		       mb.send);
+	ffa_run(service1_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+				       &service1_uuid, (uint64_t *)msg,
+				       ARRAY_SIZE(msg));
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+}
+
+/**
+ * Run secondary VM and send a direct message request. Secondary VM attempts
+ * altering the sender and receiver in its direct message responses, and must
+ * fail to do so.
+ */
+TEST(direct_message, ffa_secondary_spoofed_response2)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_uuid service1_uuid = SERVICE1;
+	uint64_t msg[MAX_RESP_REGS] = {0};
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_direct_msg_resp2_invalid_sender_receiver", mb.send);
+	ffa_run(service1_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+				       &service1_uuid, (uint64_t *)msg,
+				       ARRAY_SIZE(msg));
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+}
+
+/**
+ * Validate that the creation of a cyclic dependency via direct messaging
+ * interfaces introduced in FF-A v1.2 is not possible. The test only makes sense
+ * in the scope of validating the SPMC, as the hypervisor limits the direct
+ * message requests to be only invoked from the primary VM. Thus, using
+ * precondition that checks both involved test services are SPs.
+ */
+TEST_PRECONDITION(direct_message, fail_if_cyclic_dependency_v1_2,
+		  service1_and_service2_are_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_uuid service1_uuid = SERVICE1;
+	struct ffa_uuid service2_uuid = SERVICE2;
+	struct ffa_value ret;
+
+	/*
+	 * Run service2 for it to wait for a request from service1 after
+	 * receiving indirect message containing uuid.
+	 */
+	SERVICE_SELECT(service2_info->vm_id,
+		       "ffa_direct_message_v_1_2_cycle_denied", mb.send);
+
+	/* Send to service2 the uuid of service1 for its attempted message. */
+	ret = send_indirect_message(own_id, service2_info->vm_id, mb.send,
+				    &service1_uuid, sizeof(service1_uuid), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	ffa_run(service2_info->vm_id, 0);
+
+	/* Service1 requests echo from service2. */
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_direct_message_req2_echo_services", mb.send);
+
+	/* Send to service1 the uuid of the target for its message. */
+	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
+				    &service2_uuid, sizeof(service2_uuid), 0);
+
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 }
