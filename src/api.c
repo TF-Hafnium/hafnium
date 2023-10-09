@@ -2931,12 +2931,24 @@ static void api_ffa_memory_region_v1_1_from_v1_0(
 	}
 }
 
-/*
- * Checks the FF-A version of the lender and makes necessary updates.
+/**
+ * Updates a v1.0 transaction descriptor to v1.1. This gives us the
+ * memory_access_desc_size field we need for forwards compatability.
+ * Copy the receivers and composite descriptors to the new struct.
+ * We also check the fields in the v1.0 transaction descriptor and return:
+ *  - FFA_ERROR FFA_INVALID_PARAMETERS: If any of the fields are not valid
+ *    values, eg the reserved fields are not 0, receiver_count is too large or
+ *    composite offsets are not 0 for retrieve requests or in bounds for send
+ *    requests.
+ *  - FFA ERROR FFA_NOT_SUPPORTED: If an invalid ffa_version is supplied to the
+ *    function. Or the fragment length is more than a single page.
+ *  - FFA_ERROR FFA_NO_MEMORY: If we do not have enough memory for a scratch
+ *    memory transaction descriptor.
+ *  - FFA_SUCCESS: If a successful update has occured.
  */
-static struct ffa_value api_ffa_memory_send_per_ffa_version(
-	void *allocated, struct ffa_memory_region **out_v1_1,
-	uint32_t *fragment_length, uint32_t *total_length, uint32_t ffa_version)
+static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
+	void *allocated, uint32_t *fragment_length, uint32_t *total_length,
+	uint32_t ffa_version, bool send_transaction)
 {
 	struct ffa_memory_region_v1_0 *memory_region_v1_0;
 	struct ffa_memory_region *memory_region_v1_1 = NULL;
@@ -2944,16 +2956,14 @@ static struct ffa_value api_ffa_memory_send_per_ffa_version(
 	struct ffa_composite_memory_region *composite_v1_1;
 	size_t receivers_length;
 	size_t space_left;
+	size_t receivers_end;
 	size_t composite_offset_v1_1;
 	size_t composite_offset_v1_0;
 	size_t fragment_constituents_size;
 	size_t fragment_length_v1_1;
 
-	assert(out_v1_1 != NULL);
 	assert(fragment_length != NULL);
 	assert(total_length != NULL);
-
-	*out_v1_1 = (struct ffa_memory_region *)allocated;
 
 	if (ffa_version >= MAKE_FFA_VERSION(1, 1)) {
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
@@ -2965,22 +2975,33 @@ static struct ffa_value api_ffa_memory_send_per_ffa_version(
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
-	dlog_verbose("FF-A v1.0 memory transaction descriptor.\n");
+	dlog_verbose(
+		"Updating memory transaction descriptor "
+		" from v1.0 to v1.1.\n");
 
 	memory_region_v1_0 = (struct ffa_memory_region_v1_0 *)allocated;
 
 	if (memory_region_v1_0->reserved_0 != 0U ||
 	    memory_region_v1_0->reserved_1 != 0U) {
+		dlog_verbose(
+			"Memory region descriptor reserved fields must be "
+			"0.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	/* This should also prevent over flows. */
 	if (memory_region_v1_0->receiver_count > MAX_MEM_SHARE_RECIPIENTS) {
+		dlog_verbose(
+			"Max number of recipients supported is %u "
+			"specified %u\n",
+			MAX_MEM_SHARE_RECIPIENTS,
+			memory_region_v1_0->receiver_count);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	receivers_length = sizeof(struct ffa_memory_access) *
 			   memory_region_v1_0->receiver_count;
+	receivers_end = sizeof(struct ffa_memory_region) + receivers_length;
 
 	/*
 	 * Check the specified composite offset of v1.0 descriptor, and that all
@@ -2989,17 +3010,34 @@ static struct ffa_value api_ffa_memory_send_per_ffa_version(
 	composite_offset_v1_0 =
 		memory_region_v1_0->receivers[0].composite_memory_region_offset;
 
-	if (composite_offset_v1_0 == 0U ||
-	    composite_offset_v1_0 <
-		    sizeof(struct ffa_memory_region_v1_0) + receivers_length ||
-	    composite_offset_v1_0 + sizeof(struct ffa_composite_memory_region) >
-		    *fragment_length ||
-	    composite_offset_v1_0 > *fragment_length) {
-		dlog_verbose(
-			"Invalid composite memory region descriptor offset "
-			"%d.\n",
-			composite_offset_v1_0);
-		return ffa_error(FFA_INVALID_PARAMETERS);
+	if (!send_transaction) {
+		if (composite_offset_v1_0 != 0) {
+			dlog_verbose(
+				"Composite offset memory region descriptor "
+				"offset must be 0 for retrieve requests. "
+				"Currently %d\n",
+				composite_offset_v1_0);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+	} else {
+		bool comp_offset_is_zero = composite_offset_v1_0 == 0U;
+		bool comp_offset_lt_transaction_descriptor_size =
+			composite_offset_v1_0 <
+			sizeof(struct ffa_memory_region_v1_0) +
+				receivers_length;
+		bool comp_offset_with_comp_gt_fragment_length =
+			composite_offset_v1_0 +
+				sizeof(struct ffa_composite_memory_region) >
+			*fragment_length;
+		if (comp_offset_is_zero ||
+		    comp_offset_lt_transaction_descriptor_size ||
+		    comp_offset_with_comp_gt_fragment_length) {
+			dlog_verbose(
+				"Invalid composite memory region descriptor "
+				"offset for send transaction %d\n",
+				composite_offset_v1_0);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
 	}
 
 	for (uint32_t i = 1; i < memory_region_v1_0->receiver_count; i++) {
@@ -3016,17 +3054,21 @@ static struct ffa_value api_ffa_memory_send_per_ffa_version(
 		}
 	}
 
-	fragment_constituents_size = *fragment_length - composite_offset_v1_0 -
-				     sizeof(struct ffa_composite_memory_region);
-
 	/* Determine the composite offset for v1.1 descriptor. */
-	composite_offset_v1_1 =
-		sizeof(struct ffa_memory_region) + receivers_length;
-
-	/* Determine final size of the v1.1 descriptor. */
-	fragment_length_v1_1 = composite_offset_v1_1 +
-			       sizeof(struct ffa_composite_memory_region) +
-			       fragment_constituents_size;
+	if (send_transaction) {
+		fragment_constituents_size =
+			*fragment_length - composite_offset_v1_0 -
+			sizeof(struct ffa_composite_memory_region);
+		fragment_length_v1_1 =
+			receivers_end +
+			sizeof(struct ffa_composite_memory_region) +
+			fragment_constituents_size;
+		composite_offset_v1_1 = receivers_end;
+	} else {
+		fragment_constituents_size = 0;
+		fragment_length_v1_1 = receivers_end;
+		composite_offset_v1_1 = 0;
+	}
 
 	/*
 	 * Currently only support the simpler cases: memory transaction
@@ -3045,6 +3087,11 @@ static struct ffa_value api_ffa_memory_send_per_ffa_version(
 
 	space_left = fragment_length_v1_1;
 
+	/*
+	 * Allocate a page of memory to construct the v1.1 memory descriptor.
+	 * Earlier we checked that the fragment_length_v1_1 would not be larger
+	 * than a page.
+	 */
 	memory_region_v1_1 =
 		(struct ffa_memory_region *)mpool_alloc(&api_page_pool);
 	if (memory_region_v1_1 == NULL) {
@@ -3072,26 +3119,30 @@ static struct ffa_value api_ffa_memory_send_per_ffa_version(
 
 	space_left -= receivers_length;
 
-	/* Init v1.1 composite. */
-	composite_v1_1 = (struct ffa_composite_memory_region
-				  *)((uint8_t *)memory_region_v1_1 +
-				     composite_offset_v1_1);
+	/* Composite memory descriptors to copy. */
+	if (send_transaction) {
+		/* Init v1.1 composite. */
+		composite_v1_1 = (struct ffa_composite_memory_region
+					  *)((uint8_t *)memory_region_v1_1 +
+					     composite_offset_v1_1);
 
-	composite_v1_0 =
-		ffa_memory_region_get_composite_v1_0(memory_region_v1_0, 0);
-	composite_v1_1->constituent_count = composite_v1_0->constituent_count;
-	composite_v1_1->page_count = composite_v1_0->page_count;
+		composite_v1_0 = ffa_memory_region_get_composite_v1_0(
+			memory_region_v1_0, 0);
+		composite_v1_1->constituent_count =
+			composite_v1_0->constituent_count;
+		composite_v1_1->page_count = composite_v1_0->page_count;
 
-	space_left -= sizeof(struct ffa_composite_memory_region);
+		space_left -= sizeof(struct ffa_composite_memory_region);
 
-	/* Initialize v1.1 constituents. */
-	memcpy_s(composite_v1_1->constituents, space_left,
-		 composite_v1_0->constituents, fragment_constituents_size);
+		/* Initialize v1.1 constituents. */
+		memcpy_s(composite_v1_1->constituents, space_left,
+			 composite_v1_0->constituents,
+			 fragment_constituents_size);
 
-	space_left -= fragment_constituents_size;
+		space_left -= fragment_constituents_size;
+	}
+
 	assert(space_left == 0U);
-
-	*out_v1_1 = memory_region_v1_1;
 
 	/*
 	 * Remove the v1.0 fragment size, and resultant size of v1.1 fragment.
@@ -3100,10 +3151,13 @@ static struct ffa_value api_ffa_memory_send_per_ffa_version(
 	*fragment_length = fragment_length_v1_1;
 
 	/*
-	 * After successfully convert to v1.1 free memory containing v1.0
-	 * descriptor.
+	 * After successfully updating to v1.1 copy the descriptor to the
+	 * internal buffer given as a parameter (used to prevent TOCTOU attacks)
+	 * and free the scratch memory used to construct it.
 	 */
-	mpool_free(&api_page_pool, allocated);
+	memcpy_s(allocated, MM_PPOOL_ENTRY_SIZE, memory_region_v1_1,
+		 *fragment_length);
+	mpool_free(&api_page_pool, memory_region_v1_1);
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
@@ -3116,7 +3170,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	struct vm *to;
 	const void *from_msg;
 	void *allocated_entry;
-	struct ffa_memory_region *memory_region;
+	struct ffa_memory_region *memory_region = NULL;
 	struct ffa_value ret;
 	bool targets_other_world = false;
 	uint32_t ffa_version;
@@ -3170,12 +3224,13 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	memcpy_s(allocated_entry, MM_PPOOL_ENTRY_SIZE, from_msg,
 		 fragment_length);
 
-	ret = api_ffa_memory_send_per_ffa_version(
-		allocated_entry, &memory_region, &fragment_length, &length,
-		ffa_version);
+	ret = api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
+		allocated_entry, &fragment_length, &length, ffa_version, true);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
+
+	memory_region = allocated_entry;
 
 	if (fragment_length < sizeof(struct ffa_memory_region) +
 				      sizeof(struct ffa_memory_access)) {
@@ -3277,100 +3332,6 @@ out:
 	return ret;
 }
 
-static struct ffa_value api_ffa_mem_retrieve_req_version_update(
-	void *retrieve_msg, uint32_t retrieve_msg_buffer_size,
-	struct ffa_memory_region **out_v1_1, uint32_t *fragment_length,
-	uint32_t ffa_version)
-{
-	struct ffa_memory_region_v1_0 *retrieve_request_v1_0;
-	struct ffa_memory_region *retrieve_request_v1_1;
-	size_t fragment_length_v1_1;
-	uint32_t expected_retrieve_request_length_v1_0;
-	size_t space_left = retrieve_msg_buffer_size;
-	size_t receivers_length;
-
-	assert(out_v1_1 != NULL);
-	assert(fragment_length != NULL);
-	assert(retrieve_msg != NULL);
-
-	if (ffa_version >= MAKE_FFA_VERSION(1, 1)) {
-		*out_v1_1 = (struct ffa_memory_region *)retrieve_msg;
-		return (struct ffa_value){.func = FFA_SUCCESS_32};
-	}
-	if (ffa_version != MAKE_FFA_VERSION(1, 0)) {
-		dlog_verbose("%s: Unsupported FF-A version %x\n", __func__,
-			     ffa_version);
-		return ffa_error(FFA_NOT_SUPPORTED);
-	}
-
-	retrieve_request_v1_0 = (struct ffa_memory_region_v1_0 *)retrieve_msg;
-
-	if (retrieve_request_v1_0->receiver_count > MAX_MEM_SHARE_RECIPIENTS) {
-		dlog_verbose(
-			"Specified more than expected maximum receivers.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	receivers_length = retrieve_request_v1_0->receiver_count *
-			   sizeof(struct ffa_memory_access);
-
-	expected_retrieve_request_length_v1_0 =
-		sizeof(struct ffa_memory_region_v1_0) + receivers_length;
-
-	if (*fragment_length != expected_retrieve_request_length_v1_0) {
-		dlog_verbose("Retrieve request size is not as expected.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Determine expected v1.1 retrieve request size. */
-	fragment_length_v1_1 = sizeof(struct ffa_memory_region) +
-			       retrieve_request_v1_0->receiver_count *
-				       sizeof(struct ffa_memory_access);
-
-	/*
-	 * At this point there is the assumption that the retrieve request has
-	 * been copied to an internal buffer to prevent TOCTOU attacks.
-	 * The translation of the resultant v1.1 transaction descriptor will be
-	 * written to that same buffer. That said, the referred buffer needs
-	 * space to accommodate both v1.0 and v1.1 descriptors simultaneously.
-	 */
-	assert(fragment_length_v1_1 + expected_retrieve_request_length_v1_0 <=
-	       retrieve_msg_buffer_size);
-
-	space_left -= expected_retrieve_request_length_v1_0;
-
-	/*
-	 * Prepare to write the resultant FF-A v1.1 retrieve request in an
-	 * offset following the FF-A v1.0 within the same buffer.
-	 */
-	retrieve_request_v1_1 =
-		// NOLINTNEXTLINE(performance-no-int-to-ptr)
-		(struct ffa_memory_region *)((uintptr_t)retrieve_msg +
-					     *fragment_length);
-
-	api_ffa_memory_region_v1_1_from_v1_0(retrieve_request_v1_0,
-					     retrieve_request_v1_1);
-
-	space_left -= sizeof(struct ffa_memory_region);
-
-	/* Copy memory access information. */
-	memcpy_s(retrieve_request_v1_1->receivers, space_left,
-		 retrieve_request_v1_0->receivers, receivers_length);
-
-	/* Initialize the memory access descriptors with composite offset. */
-	for (uint32_t i = 0; i < retrieve_request_v1_1->receiver_count; i++) {
-		struct ffa_memory_access *receiver =
-			&retrieve_request_v1_1->receivers[i];
-
-		receiver->composite_memory_region_offset = 0U;
-	}
-
-	*fragment_length = fragment_length_v1_1;
-	*out_v1_1 = retrieve_request_v1_1;
-
-	return (struct ffa_value){.func = FFA_SUCCESS_32};
-}
-
 struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 					  uint32_t fragment_length,
 					  ipaddr_t address, uint32_t page_count,
@@ -3436,15 +3397,14 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	/*
 	 * If required, transform the retrieve request to FF-A v1.1.
 	 */
-	ret = api_ffa_mem_retrieve_req_version_update(
-		retrieve_msg, message_buffer_size, &retrieve_request, &length,
-		ffa_version);
+	ret = api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
+		retrieve_msg, &fragment_length, &length, ffa_version, false);
 
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
 
-	assert(retrieve_request != NULL);
+	retrieve_request = retrieve_msg;
 
 	if (plat_ffa_memory_handle_allocated_by_current_world(
 		    retrieve_request->handle)) {
