@@ -119,6 +119,11 @@ Partition Properties
    - This field is deprecated in favor of ns-interrupts-action field in the FF-A
      v1.1 EAC0 spec.
 
+- managed-exit-virq
+   - value type: <empty>
+   - Indicates if the partition needs managed exit, if supported, to be signaled
+     through vFIQ signal.
+
 - ns-interrupts-action [mandatory]
    - value type: <u32>
    - Specifies the action that the SPMC must take in response to a Non-secure
@@ -137,6 +142,12 @@ Partition Properties
 
       - 0x0: Other-Secure interrupt is queued
       - 0x1: Other-Secure interrupt is signaled
+
+- runtime-model
+   - value type: <u32>
+   - Indicates whether the SP execution can be preempted.
+   - This field is deprecated in favor of other-s-interrupts-action and
+     ns-interrupts-action fields in the FF-A v1.1 spec.
 
 - has-primary-scheduler
    - value type: <empty>
@@ -158,11 +169,6 @@ Partition Properties
      Presence of this field indicates that the partition expects the address of
      the FF-A boot information blob to be passed in the specified general purpose
      register.
-
-- stream-endpoint-ids
-   - value type: <prop-encoded-array>
-   - List of <u32> tuples, identifying the IDs this partition is acting as
-     proxy for.
 
 - power-management-messages
    - value type: <u32>
@@ -253,9 +259,8 @@ Device Regions
 
 - stream-ids
    - value type: <prop-encoded-array>
-   - A list of (id, mem-manage) pair, where:
-
-      - id: A unique <u32> value amongst all devices assigned to the partition.
+   - List of IDs where an ID is a unique <u32> value amongst all devices assigned
+     to the partition.
 
 - interrupts [mandatory]
    - value type: <prop-encoded-array>
