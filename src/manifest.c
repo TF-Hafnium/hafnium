@@ -575,7 +575,9 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 {
 	uint32_t phandle;
 	uint16_t i = 0;
+	uint32_t j = 0;
 	uintptr_t relative_address;
+	struct uint32list_iter list;
 
 	dlog_verbose("  Partition memory regions\n");
 
@@ -665,6 +667,86 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 
 		TRY(check_and_record_memory_used(mem_regions[i].base_address,
 						 mem_regions[i].page_count));
+
+		TRY(read_optional_uint32(mem_node, "smmu-id",
+					 MANIFEST_INVALID_ID,
+					 &mem_regions[i].dma_prop.smmu_id));
+		if (mem_regions[i].dma_prop.smmu_id != MANIFEST_INVALID_ID) {
+			dlog_verbose("      smmu-id:  %u\n",
+				     mem_regions[i].dma_prop.smmu_id);
+		}
+
+		TRY(read_optional_uint32list(mem_node, "stream-ids", &list));
+		dlog_verbose("      Stream IDs assigned:\n");
+
+		j = 0;
+		while (uint32list_has_next(&list)) {
+			if (j == PARTITION_MAX_STREAMS_PER_DEVICE) {
+				return MANIFEST_ERROR_STREAM_IDS_OVERFLOW;
+			}
+
+			TRY(uint32list_get_next(
+				&list, &mem_regions[i].dma_prop.stream_ids[j]));
+			dlog_verbose("        %u\n",
+				     mem_regions[i].dma_prop.stream_ids[j]);
+			j++;
+		}
+		if (j == 0) {
+			dlog_verbose("        None\n");
+		} else if (mem_regions[i].dma_prop.smmu_id ==
+			   MANIFEST_INVALID_ID) {
+			/*
+			 * SMMU ID must be specified if the partition specifies
+			 * Stream IDs for any device upstream of SMMU.
+			 */
+			return MANIFEST_ERROR_MISSING_SMMU_ID;
+		}
+
+		mem_regions[i].dma_prop.stream_count = j;
+
+		TRY(read_optional_uint32list(
+			mem_node, "stream-ids-access-permissions", &list));
+		dlog_verbose("      Access permissions of Stream IDs:\n");
+
+		j = 0;
+		while (uint32list_has_next(&list)) {
+			uint32_t permissions;
+
+			if (j == PARTITION_MAX_STREAMS_PER_DEVICE) {
+				return MANIFEST_ERROR_DMA_ACCESS_PERMISSIONS_OVERFLOW;
+			}
+
+			TRY(uint32list_get_next(&list, &permissions));
+			dlog_verbose("        %u\n", permissions);
+
+			if (j == 0) {
+				mem_regions[i].dma_prop.dma_access_permissions =
+					permissions;
+			}
+
+			/*
+			 * All stream ids belonging to a dma device must specify
+			 * the same access permissions.
+			 */
+			if (permissions !=
+			    mem_regions[i].dma_prop.dma_access_permissions) {
+				return MANIFEST_ERROR_MISMATCH_DMA_ACCESS_PERMISSIONS;
+			}
+
+			j++;
+		}
+
+		if (j == 0) {
+			dlog_verbose("        None\n");
+		} else if (j != mem_regions[i].dma_prop.stream_count) {
+			return MANIFEST_ERROR_MISMATCH_DMA_ACCESS_PERMISSIONS;
+		}
+
+		if (j > 0) {
+			/* Filter the dma access permissions. */
+			mem_regions[i].dma_prop.dma_access_permissions &=
+				MANIFEST_REGION_ALL_ATTR_MASK;
+		}
 
 		if (rxtx->available) {
 			TRY(read_optional_uint32(
@@ -1530,6 +1612,15 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		       "default largest value";
 	case MANIFEST_ERROR_UUID_ALL_ZEROS:
 		return "UUID should not be NIL";
+	case MANIFEST_ERROR_MISSING_SMMU_ID:
+		return "SMMU ID must be specified for the given Stream IDs";
+	case MANIFEST_ERROR_MISMATCH_DMA_ACCESS_PERMISSIONS:
+		return "DMA device access permissions must match memory region "
+		       "attributes";
+	case MANIFEST_ERROR_STREAM_IDS_OVERFLOW:
+		return "DMA device stream ID count exceeds predefined limit";
+	case MANIFEST_ERROR_DMA_ACCESS_PERMISSIONS_OVERFLOW:
+		return "DMA access permissions count exceeds predefined limit";
 	}
 
 	panic("Unexpected manifest return code.");

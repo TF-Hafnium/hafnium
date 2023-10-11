@@ -57,7 +57,26 @@ enum execution_state { AARCH64 = 0, AARCH32 };
 enum xlat_granule { PAGE_4KB = 0, PAGE_16KB, PAGE_64KB };
 
 /**
- * Partition Memory region as described in FFA v1.0 spec, Table 10
+ * Properties of the DMA capable device upstream of an SMMU as specified in the
+ * memory region description of the partition manifest.
+ */
+struct dma_device_properties {
+	/** SMMU ID - optional */
+	uint32_t smmu_id;
+	/** IMPDEF id tracking DMA peripheral device - optional */
+	uint8_t dma_device_id;
+	/** Count of Stream IDs assigned to device - optional */
+	uint8_t stream_count;
+	/** List of Stream IDs assigned to device - optional */
+	uint32_t stream_ids[PARTITION_MAX_STREAMS_PER_DEVICE];
+	/** Instruction and data access permissions - optional */
+	uint32_t dma_access_permissions;
+};
+
+/**
+ * Partition Memory region as described in FFA v1.2 spec, Table 5.2 along with
+ * an implementation defined struct to track the properties of a DMA capable
+ * device that has access to this memory region.
  */
 struct memory_region {
 	struct string name;
@@ -70,6 +89,8 @@ struct memory_region {
 	uint32_t page_count;
 	/** Memory attributes - mandatory */
 	uint32_t attributes;
+	/** DMA device properties - optional */
+	struct dma_device_properties dma_prop;
 };
 
 struct interrupt_info {
@@ -80,7 +101,8 @@ struct interrupt_info {
 };
 
 /**
- * Partition Device region as described in FFA v1.0 spec, Table 11
+ * Partition Device region as described in FFA v1.2 spec, Table 5.3 along with
+ * few implementation defined fields.
  */
 struct device_region {
 	/** Device base PA - mandatory */
