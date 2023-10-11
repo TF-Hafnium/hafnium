@@ -1184,8 +1184,11 @@ bool smmuv3_driver_init(struct smmuv3_driver *smmuv3, uintpaddr_t base,
 	return true;
 }
 
-static bool smmuv3_config_ste_stg2(struct smmuv3_driver *smmuv3, struct vm *vm,
-				   uint64_t *ste_data)
+static bool smmuv3_config_ste_stg2(struct smmuv3_driver *smmuv3, uint16_t vm_id,
+				   uint64_t *ste_data,
+				   struct mm_ptable *iommu_ptable,
+				   struct mm_ptable *iommu_ptable_ns,
+				   uint8_t dma_device_id)
 {
 	unsigned int pa_bits;
 	uint64_t sl0;
@@ -1252,7 +1255,7 @@ static bool smmuv3_config_ste_stg2(struct smmuv3_driver *smmuv3, struct vm *vm,
 		STE_VALID | COMPOSE(STE_CFG_STG2, STE_CFG_SHIFT, STE_CFG_MASK);
 
 	/* BITS 191:128 */
-	ste_data[2] = COMPOSE(vm->id, STE_VMID_SHIFT, STE_VMID_MASK);
+	ste_data[2] = COMPOSE(vm_id, STE_VMID_SHIFT, STE_VMID_MASK);
 	ste_data[2] |= COMPOSE(64 - smmuv3->prop.ias, STE_S2T0SZ_SHIFT,
 			       STE_S2T0SZ_MASK);
 	ste_data[2] |= COMPOSE(sl0, STE_S2SL0_SHIFT, STE_S2SL0_MASK);
@@ -1278,16 +1281,19 @@ static bool smmuv3_config_ste_stg2(struct smmuv3_driver *smmuv3, struct vm *vm,
 	uint64_t vsttbr;
 
 	/* BITS 243:196 */
-	vttbr = (pa_addr(vm->arch.ptable_ns.root) & GEN_MASK(51, 4)) >> 4;
+	vttbr = (pa_addr(iommu_ptable_ns[dma_device_id].root) &
+		 GEN_MASK(51, 4)) >>
+		4;
 
 	/* BITS 435:388 */
-	vsttbr = (pa_addr(vm->ptable.root) & GEN_MASK(51, 4)) >> 4;
+	vsttbr =
+		(pa_addr(iommu_ptable[dma_device_id].root) & GEN_MASK(51, 4)) >>
+		4;
 
 	/* STRW is S-EL2*/
 	ste_data[1] = COMPOSE(STW_SEL2, STE_STW_SHIFT, STE_STW_MASK);
 	ste_data[3] = COMPOSE(0, STE_S2NSW_SHIFT, STE_S2NSW_MASK);
 	ste_data[3] |= COMPOSE(1, STE_S2NSA_SHIFT, STE_S2NSA_MASK);
-	ste_data[3] |= COMPOSE(vttbr, STE_S2TTB_SHIFT, STE_S2TTB_MASK);
 
 	/* BITS 319:256 */
 	ste_data[4] = COMPOSE(64 - smmuv3->prop.ias, STE_SS2T0SZ_SHIFT,
@@ -1300,19 +1306,25 @@ static bool smmuv3_config_ste_stg2(struct smmuv3_driver *smmuv3, struct vm *vm,
 	ste_data[6] |= COMPOSE(0, STE_S2SA_SHIFT, STE_S2SA_MASK);
 	ste_data[6] |= COMPOSE(vsttbr, STE_SS2TTB_SHIFT, STE_SS2TTB_MASK);
 #else
+	(void)iommu_ptable_ns;
+
 	/* BITS 243:196 */
-	vttbr = (pa_addr(vm->ptable.root) & GEN_MASK(51, 4)) >> 4;
+	vttbr = (pa_addr(iommu_ptable[dma_device_id].root) & GEN_MASK(51, 4)) >>
+		4;
 
 	/* STRW is EL2*/
 	ste_data[1] = COMPOSE(STW_EL2, STE_STW_SHIFT, STE_STW_MASK);
-	ste_data[3] = COMPOSE(vttbr, STE_S2TTB_SHIFT, STE_S2TTB_MASK);
 #endif
+	ste_data[3] |= COMPOSE(vttbr, STE_S2TTB_SHIFT, STE_S2TTB_MASK);
 
 	return true;
 }
 
 static bool smmuv3_configure_stream(struct smmuv3_driver *smmuv3,
-				    struct vm_locked locked_vm, uint32_t sid)
+				    uint16_t vm_id, uint32_t sid,
+				    struct mm_ptable *iommu_ptable,
+				    struct mm_ptable *iommu_ptable_ns,
+				    uint8_t dma_device_id)
 {
 	track_cmdq_idx(smmuv3);
 
@@ -1320,9 +1332,7 @@ static bool smmuv3_configure_stream(struct smmuv3_driver *smmuv3,
 	uint64_t ste_data[STE_SIZE_DW];
 	uint64_t *ste_addr;
 	uint32_t max_sid;
-	struct vm *vm;
 
-	vm = locked_vm.vm;
 	max_sid = (1 << smmuv3->prop.stream_n_bits) - 1;
 
 	if (sid > max_sid) {
@@ -1336,7 +1346,8 @@ static bool smmuv3_configure_stream(struct smmuv3_driver *smmuv3,
 	}
 
 	clear_ste(ste_data);
-	if (!smmuv3_config_ste_stg2(smmuv3, vm, ste_data)) {
+	if (!smmuv3_config_ste_stg2(smmuv3, vm_id, ste_data, iommu_ptable,
+				    iommu_ptable_ns, dma_device_id)) {
 		return false;
 	}
 
@@ -1395,6 +1406,27 @@ bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
 	unsigned int j;
 
 	struct device_region upstream_peripheral;
+	uint16_t vm_id;
+	struct mm_ptable *iommu_ptable;
+	struct mm_ptable *iommu_ptable_ns;
+
+	vm_id = vm_locked.vm->id;
+	iommu_ptable = vm_locked.vm->iommu_ptables;
+
+#if SECURE_WORLD == 1
+	iommu_ptable_ns = vm_locked.vm->arch.iommu_ptables_ns;
+#else
+	iommu_ptable_ns = NULL;
+#endif
+
+	/*
+	 * No support to enforce access control through (stage 1) address
+	 * translation for memory accesses by DMA device on behalf of an
+	 * EL0/S-EL0 partition.
+	 */
+	if (vm_locked.vm->el0_partition) {
+		return true;
+	}
 
 	/* Iterate through device region nodes described in vm manifest */
 	for (i = 0; i < manifest_vm->partition.dev_region_count; i++) {
@@ -1440,8 +1472,10 @@ bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
 
 		for (j = 0; j < upstream_peripheral.stream_count; j++) {
 			if (!smmuv3_configure_stream(
-				    &arm_smmuv3, vm_locked,
-				    upstream_peripheral.stream_ids[j])) {
+				    &arm_smmuv3, vm_id,
+				    upstream_peripheral.stream_ids[j],
+				    iommu_ptable, iommu_ptable_ns,
+				    upstream_peripheral.dma_device_id)) {
 				dlog_error(
 					"SMMUv3: Could not configure "
 					"streamID: %u",
