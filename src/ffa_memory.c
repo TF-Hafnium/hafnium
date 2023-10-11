@@ -780,7 +780,7 @@ static bool ffa_clear_memory_constituents(
 	for (i = 0; i < fragment_count; ++i) {
 		uint32_t j;
 
-		for (j = 0; j < fragment_constituent_counts[j]; ++j) {
+		for (j = 0; j < fragment_constituent_counts[i]; ++j) {
 			size_t size = fragments[i][j].page_count * PAGE_SIZE;
 			paddr_t begin =
 				pa_from_ipa(ipa_init(fragments[i][j].address));
