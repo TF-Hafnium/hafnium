@@ -11,7 +11,6 @@
 #include "hf/arch/mmu.h"
 
 #include "hf/dlog.h"
-#include "hf/plat/iommu.h"
 
 #include "hypervisor/feature_id.h"
 
@@ -170,9 +169,6 @@ void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
 
 		mm_vm_identity_commit(table, begin, end, mode, ppool, ipa);
 	}
-
-	/* TODO: pass security state to SMMU? */
-	plat_iommu_identity_map(vm_locked, begin, end, mode);
 }
 
 bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
@@ -239,4 +235,65 @@ bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 #endif
 
 	return ret;
+}
+
+static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, paddr_t begin,
+				     paddr_t end, uint32_t mode,
+				     struct mpool *ppool, uint8_t dma_device_id)
+{
+	struct mm_ptable *table = &vm_locked.vm->iommu_ptables[dma_device_id];
+
+#if SECURE_WORLD == 1
+	if (0 != (mode & MM_MODE_NS)) {
+		table = &vm_locked.vm->arch.iommu_ptables_ns[dma_device_id];
+	}
+#endif
+
+	return mm_vm_identity_prepare(table, begin, end, mode, ppool);
+}
+
+static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, paddr_t begin,
+				    paddr_t end, uint32_t mode,
+				    struct mpool *ppool, ipaddr_t *ipa,
+				    uint8_t dma_device_id)
+{
+	struct mm_ptable *table = &vm_locked.vm->iommu_ptables[dma_device_id];
+
+#if SECURE_WORLD == 1
+	if (0 != (mode & MM_MODE_NS)) {
+		table = &vm_locked.vm->arch.iommu_ptables_ns[dma_device_id];
+	}
+#endif
+
+	mm_vm_identity_commit(table, begin, end, mode, ppool, ipa);
+}
+
+bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
+				   paddr_t end, uint32_t mode,
+				   struct mpool *ppool, ipaddr_t *ipa,
+				   uint8_t dma_device_id)
+{
+	/*
+	 * No support to enforce access control through (stage 1) address
+	 * translation for memory accesses by DMA device on behalf of an
+	 * EL0/S-EL0 partition.
+	 */
+	if (vm_locked.vm->el0_partition) {
+		return true;
+	}
+
+	if (dma_device_id >= vm_locked.vm->dma_device_count) {
+		dlog_error("Illegal DMA device specified.\n");
+		return false;
+	}
+
+	if (!arch_vm_iommu_mm_prepare(vm_locked, begin, end, mode, ppool,
+				      dma_device_id)) {
+		return false;
+	}
+
+	arch_vm_iommu_mm_commit(vm_locked, begin, end, mode, ppool, ipa,
+				dma_device_id);
+
+	return true;
 }

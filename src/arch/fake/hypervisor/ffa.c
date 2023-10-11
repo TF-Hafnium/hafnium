@@ -664,3 +664,19 @@ void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
 {
 	(void)vm_locked;
 }
+
+bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
+				   paddr_t end, uint32_t mode,
+				   struct mpool *ppool, ipaddr_t *ipa,
+				   struct dma_device_properties *dma_prop)
+{
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)mode;
+	(void)ppool;
+	(void)ipa;
+	(void)dma_prop;
+
+	return true;
+}

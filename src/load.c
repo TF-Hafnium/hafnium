@@ -542,17 +542,18 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 
 	/* Map memory-regions */
 	while (j < manifest_vm->partition.mem_region_count) {
-		size = manifest_vm->partition.mem_regions[j].page_count *
-		       PAGE_SIZE;
+		struct memory_region mem_region;
+
+		mem_region = manifest_vm->partition.mem_regions[j];
+		size = mem_region.page_count * PAGE_SIZE;
 		/*
 		 * Identity map memory region for both case,
 		 * VA(S-EL0) or IPA(S-EL1).
 		 */
-		region_begin = pa_init(
-			manifest_vm->partition.mem_regions[j].base_address);
+		region_begin = pa_init(mem_region.base_address);
 		region_end = pa_add(region_begin, size);
 
-		attributes = manifest_vm->partition.mem_regions[j].attributes;
+		attributes = mem_region.attributes;
 		if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
 			if (ffa_is_vm_id(vm_locked.vm->id)) {
 				dlog_warning("Memory%sVMs\n", error_string);
@@ -571,6 +572,23 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 			dlog_error(
 				"Unable to map secondary VM "
 				"memory-region.\n");
+			return false;
+		}
+
+		/*
+		 * Enforce static DMA isolation through stage 2 address
+		 * translation.
+		 * Only the DMA device that is specified as part of this memory
+		 * region node in the partition manifest will be granted access
+		 * to the memory region.
+		 */
+		if (mem_region.dma_prop.stream_count > 0 &&
+		    !vm_iommu_mm_identity_map(
+			    vm_locked, region_begin, region_end, map_mode,
+			    ppool, NULL, mem_region.dma_prop.dma_device_id)) {
+			dlog_error(
+				"Unable to map memory-region in the page "
+				"tables of DMA device.\n");
 			return false;
 		}
 

@@ -334,6 +334,10 @@ bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool);
 
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     uint32_t *mode);
+bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
+			      paddr_t end, uint32_t mode, struct mpool *ppool,
+			      ipaddr_t *ipa, uint8_t dma_device_id);
+
 void vm_notifications_init(struct vm *vm, ffa_vcpu_count_t vcpu_count,
 			   struct mpool *ppool);
 bool vm_mailbox_state_busy(struct vm_locked vm_locked);

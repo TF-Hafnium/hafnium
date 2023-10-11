@@ -17,6 +17,7 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/layout.h"
+#include "hf/plat/iommu.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
@@ -379,6 +380,14 @@ bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     uint32_t *mode)
 {
 	return arch_vm_mem_get_mode(vm_locked, begin, end, mode);
+}
+
+bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
+			      paddr_t end, uint32_t mode, struct mpool *ppool,
+			      ipaddr_t *ipa, uint8_t dma_device_id)
+{
+	return arch_vm_iommu_mm_identity_map(vm_locked, begin, end, mode, ppool,
+					     ipa, dma_device_id);
 }
 
 bool vm_mailbox_state_busy(struct vm_locked vm_locked)
