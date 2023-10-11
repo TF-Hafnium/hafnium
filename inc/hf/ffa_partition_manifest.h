@@ -117,6 +117,8 @@ struct device_region {
 	uint8_t interrupt_count;
 	/** SMMU ID - optional */
 	uint32_t smmu_id;
+	/** IMPDEF id tracking DMA peripheral device - optional */
+	uint8_t dma_device_id;
 	/** Count of Stream IDs assigned to device - optional */
 	uint8_t stream_count;
 	/** List of Stream IDs assigned to device - optional */
@@ -212,6 +214,9 @@ struct ffa_partition_manifest {
 	/** Device regions */
 	uint16_t dev_region_count;
 	struct device_region dev_regions[PARTITION_MAX_DEVICE_REGIONS];
+	/** DMA device count. */
+	uint8_t dma_device_count;
+
 	/** optional - action in response to Other-Secure interrupt */
 	uint8_t other_s_interrupts_action;
 };

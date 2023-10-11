@@ -788,12 +788,13 @@ static struct interrupt_info *device_region_get_interrupt_info(
 
 static enum manifest_return_code parse_ffa_device_region_node(
 	struct fdt_node *dev_node, struct device_region *dev_regions,
-	uint16_t *count)
+	uint16_t *count, uint8_t *dma_device_count)
 {
 	struct uint32list_iter list;
 	uint16_t i = 0;
 	uint32_t j = 0;
 	struct interrupt_bitmap allocated_intids = manifest_data->intids;
+	static uint8_t dma_device_id = 0;
 
 	dlog_verbose("  Partition Device Regions\n");
 
@@ -804,6 +805,8 @@ static enum manifest_return_code parse_ffa_device_region_node(
 	if (!fdt_first_child(dev_node)) {
 		return MANIFEST_ERROR_DEVICE_REGION_NODE_EMPTY;
 	}
+
+	*dma_device_count = 0;
 
 	do {
 		dlog_verbose("    Device Region[%u]\n", i);
@@ -942,17 +945,34 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		dlog_verbose("      Stream IDs assigned:\n");
 
 		j = 0;
-		while (uint32list_has_next(&list) &&
-		       j < PARTITION_MAX_STREAMS_PER_DEVICE) {
+		while (uint32list_has_next(&list)) {
+			if (j == PARTITION_MAX_STREAMS_PER_DEVICE) {
+				return MANIFEST_ERROR_STREAM_IDS_OVERFLOW;
+			}
+
 			TRY(uint32list_get_next(&list,
 						&dev_regions[i].stream_ids[j]));
 			dlog_verbose("        %u\n",
 				     dev_regions[i].stream_ids[j]);
 			j++;
 		}
+
 		if (j == 0) {
 			dlog_verbose("        None\n");
+		} else if (dev_regions[i].smmu_id != MANIFEST_INVALID_ID) {
+			dev_regions[i].dma_device_id = dma_device_id++;
+			*dma_device_count = dma_device_id;
+
+			dlog_verbose("      dma peripheral device id:  %u\n",
+				     dev_regions[i].dma_device_id);
+		} else {
+			/*
+			 * SMMU ID must be specified if the partition specifies
+			 * Stream IDs for any device upstream of SMMU.
+			 */
+			return MANIFEST_ERROR_MISSING_SMMU_ID;
 		}
+
 		dev_regions[i].stream_count = j;
 
 		TRY(read_bool(dev_node, "exclusive-access",
@@ -1075,6 +1095,60 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	}
 
 	return ret_code;
+}
+
+/**
+ * Find the device id allocated to the device region node corresponding to the
+ * specified stream id.
+ */
+static bool find_dma_device_id_from_dev_region_nodes(
+	const struct manifest_vm *manifest_vm, uint32_t sid, uint8_t *device_id)
+{
+	for (uint16_t i = 0; i < manifest_vm->partition.dev_region_count; i++) {
+		struct device_region dev_region =
+			manifest_vm->partition.dev_regions[i];
+
+		for (uint8_t j = 0; j < dev_region.stream_count; j++) {
+			if (sid == dev_region.stream_ids[j]) {
+				*device_id = dev_region.dma_device_id;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
+ * Identify the device id of a DMA device node corresponding to a stream id
+ * specified in the memory region node.
+ */
+static bool map_dma_device_id_to_stream_ids(struct manifest_vm *vm)
+{
+	for (uint16_t i = 0; i < vm->partition.mem_region_count; i++) {
+		struct memory_region mem_region = vm->partition.mem_regions[i];
+
+		for (uint8_t j = 0; j < mem_region.dma_prop.stream_count; j++) {
+			uint32_t sid = mem_region.dma_prop.stream_ids[j];
+			uint8_t device_id = 0;
+
+			/*
+			 * Every stream id must have been declared in the
+			 * device node as well.
+			 */
+			if (!find_dma_device_id_from_dev_region_nodes(
+				    vm, sid, &device_id)) {
+				dlog_verbose(
+					"Stream ID not found in any device "
+					"region node of partition manifest\n",
+					sid);
+				return false;
+			}
+
+			mem_region.dma_prop.dma_device_id = device_id;
+		}
+	}
+
+	return true;
 }
 
 enum manifest_return_code parse_ffa_manifest(
@@ -1319,10 +1393,15 @@ enum manifest_return_code parse_ffa_manifest(
 	if (fdt_find_child(&ffa_node, &dev_region_node_name)) {
 		TRY(parse_ffa_device_region_node(
 			&ffa_node, vm->partition.dev_regions,
-			&vm->partition.dev_region_count));
+			&vm->partition.dev_region_count,
+			&vm->partition.dma_device_count));
 	}
 	dlog_verbose("  Total %u device regions found\n",
 		     vm->partition.dev_region_count);
+
+	if (!map_dma_device_id_to_stream_ids(vm)) {
+		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
 
 	return sanity_check_ffa_manifest(vm);
 }
