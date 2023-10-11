@@ -36,6 +36,12 @@ config("platform") {
           plat_partition_max_device_regions < 65536,
       "Maximum SP device regions must be between 1 and 65535: current = ${plat_partition_max_device_regions}")
   assert(
+      plat_partition_max_dma_devices > 0 && plat_partition_max_dma_devices < 64,
+      "Maximum SP DMA devices must be between 1 and 64: current = ${plat_partition_max_dma_devices}")
+  assert(
+      plat_partition_max_dma_devices < plat_partition_max_device_regions,
+      "Maximum SP DMA devices must be less than device regions: current = ${plat_partition_max_dma_devices}")
+  assert(
       plat_partition_max_intr_per_device > 0 &&
           plat_partition_max_intr_per_device < 256,
       "Maximum interrupts per device regions must be between 1 and 255: current = ${plat_partition_max_intr_per_device}")
@@ -67,6 +73,7 @@ config("platform") {
     "PARTITION_MAX_UUIDS=${plat_partition_max_uuids}",
     "PARTITION_MAX_MEMORY_REGIONS=${plat_partition_max_memory_regions}",
     "PARTITION_MAX_DEVICE_REGIONS=${plat_partition_max_device_regions}",
+    "PARTITION_MAX_DMA_DEVICES=${plat_partition_max_dma_devices}",
     "PARTITION_MAX_INTERRUPTS_PER_DEVICE=${plat_partition_max_intr_per_device}",
     "PARTITION_MAX_STREAMS_PER_DEVICE=${plat_partition_max_streams_per_device}",
     "HF_NUM_INTIDS=${plat_num_virtual_interrupts_ids}",

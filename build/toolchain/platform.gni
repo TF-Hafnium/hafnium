@@ -47,8 +47,11 @@ declare_args() {
   # The maximum number of memory regions allowed per partition, in the partition manifest
   plat_partition_max_memory_regions = 8
 
-  # The maximum number of device regions allower per partition, in the partition manifest
+  # The maximum number of device regions allowed per partition, in the partition manifest
   plat_partition_max_device_regions = 8
+
+  # The maximum number of dma devices allowed per partition, in the partition manifest
+  plat_partition_max_dma_devices = 2
 
   # The maximum number of interrupts allowed per device, per partition, in the partition manifest
   plat_partition_max_intr_per_device = 4

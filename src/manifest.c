@@ -963,6 +963,10 @@ static enum manifest_return_code parse_ffa_device_region_node(
 			dev_regions[i].dma_device_id = dma_device_id++;
 			*dma_device_count = dma_device_id;
 
+			if (*dma_device_count > PARTITION_MAX_DMA_DEVICES) {
+				return MANIFEST_ERROR_DMA_DEVICE_OVERFLOW;
+			}
+
 			dlog_verbose("      dma peripheral device id:  %u\n",
 				     dev_regions[i].dma_device_id);
 		} else {
@@ -1700,6 +1704,9 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "DMA device stream ID count exceeds predefined limit";
 	case MANIFEST_ERROR_DMA_ACCESS_PERMISSIONS_OVERFLOW:
 		return "DMA access permissions count exceeds predefined limit";
+	case MANIFEST_ERROR_DMA_DEVICE_OVERFLOW:
+		return "Number of device regions with DMA peripheral exceeds "
+		       "limit.";
 	}
 
 	panic("Unexpected manifest return code.");
