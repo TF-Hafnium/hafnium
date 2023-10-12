@@ -32,6 +32,14 @@
 #define SMCCC_VENDOR_HYPERVISOR_SERVICE_CALL   0x06000000
 
 #define SMCCC_CALLER_HYPERVISOR   0x0
+
+/* SMCCC return codes. */
+#define SMCCC_OK 0
+
+/* NOT defined by the SMCCC */
+#define SMCCC_DENIED (-3)
+#define SMCCC_INVALID (-4)
+
 /*
  * TODO: Trusted application call: 0x30000000 - 0x31000000
  * TODO: Trusted OS call: 0x32000000 - 0x3f000000
