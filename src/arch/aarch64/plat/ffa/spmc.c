@@ -2871,8 +2871,7 @@ ffa_memory_attributes_t plat_ffa_memory_security_mode(
 	ffa_memory_attributes_t ret = attributes;
 
 	if ((mode & MM_MODE_NS) != 0) {
-		ffa_set_memory_security_attr(&ret,
-					     FFA_MEMORY_SECURITY_NON_SECURE);
+		ret.security = FFA_MEMORY_SECURITY_NON_SECURE;
 	}
 
 	return ret;

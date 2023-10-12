@@ -3057,7 +3057,8 @@ static void api_ffa_memory_region_v1_1_from_v1_0(
 {
 	memory_region_v1_1->sender = memory_region_v1_0->sender;
 	memory_region_v1_1->handle = memory_region_v1_0->handle;
-	memory_region_v1_1->attributes = memory_region_v1_0->attributes;
+	memory_region_v1_1->attributes =
+		ffa_memory_attributes_extend(memory_region_v1_0->attributes);
 	memory_region_v1_1->flags = memory_region_v1_0->flags;
 	memory_region_v1_1->tag = memory_region_v1_0->tag;
 	memory_region_v1_1->memory_access_desc_size =

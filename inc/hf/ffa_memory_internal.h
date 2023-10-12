@@ -20,6 +20,7 @@
 
 #include "hf/check.h"
 #include "hf/ffa_memory.h"
+#include "hf/ffa_v1_0.h"
 #include "hf/mpool.h"
 #include "hf/vm.h"
 
@@ -52,6 +53,13 @@ static_assert(sizeof(((struct ffa_memory_region){0}).receiver_count == 4),
 static_assert(sizeof(struct ffa_features_rxtx_map_params) == 4,
 	      "struct ffa_features_rxtx_map_params must be 4 "
 	      "bytes long");
+
+static_assert(sizeof(ffa_memory_access_permissions_t) == 1,
+	      "ffa_memory_access_permissions_t must be 1 byte wide");
+static_assert(sizeof(ffa_memory_attributes_t) == 2,
+	      "ffa_memory_attributes_t must be 2 bytes wide");
+static_assert(sizeof(ffa_memory_attributes_v1_0) == 1,
+	      "ffa_memory_attributes_v1_0 must be 1 byte wide");
 
 struct ffa_memory_share_state {
 	/**

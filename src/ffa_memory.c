@@ -354,7 +354,7 @@ static inline uint32_t ffa_memory_permissions_to_mode(
 {
 	uint32_t mode = 0;
 
-	switch (ffa_get_data_access_attr(permissions)) {
+	switch (permissions.data_access) {
 	case FFA_DATA_ACCESS_RO:
 		mode = MM_MODE_R;
 		break;
@@ -368,7 +368,7 @@ static inline uint32_t ffa_memory_permissions_to_mode(
 		panic("Tried to convert FFA_DATA_ACCESS_RESERVED.");
 	}
 
-	switch (ffa_get_instruction_access_attr(permissions)) {
+	switch (permissions.instruction_access) {
 	case FFA_INSTRUCTION_ACCESS_NX:
 		break;
 	case FFA_INSTRUCTION_ACCESS_X:
@@ -1779,21 +1779,21 @@ static struct ffa_value ffa_memory_attributes_validate(
 	enum ffa_memory_cacheability cacheability;
 	enum ffa_memory_shareability shareability;
 
-	memory_type = ffa_get_memory_type_attr(attributes);
+	memory_type = attributes.type;
 	if (memory_type != FFA_MEMORY_NORMAL_MEM) {
 		dlog_verbose("Invalid memory type %#x, expected %#x.\n",
 			     memory_type, FFA_MEMORY_NORMAL_MEM);
 		return ffa_error(FFA_DENIED);
 	}
 
-	cacheability = ffa_get_memory_cacheability_attr(attributes);
+	cacheability = attributes.cacheability;
 	if (cacheability != FFA_MEMORY_CACHE_WRITE_BACK) {
 		dlog_verbose("Invalid cacheability %#x, expected %#x.\n",
 			     cacheability, FFA_MEMORY_CACHE_WRITE_BACK);
 		return ffa_error(FFA_DENIED);
 	}
 
-	shareability = ffa_get_memory_shareability_attr(attributes);
+	shareability = attributes.shareability;
 	if (shareability != FFA_MEMORY_INNER_SHAREABLE) {
 		dlog_verbose("Invalid shareability %#x, expected #%x.\n",
 			     shareability, FFA_MEMORY_INNER_SHAREABLE);
@@ -2001,9 +2001,8 @@ struct ffa_value ffa_memory_send_validate(
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
-		data_access = ffa_get_data_access_attr(permissions);
-		instruction_access =
-			ffa_get_instruction_access_attr(permissions);
+		data_access = permissions.data_access;
+		instruction_access = permissions.instruction_access;
 		if (data_access == FFA_DATA_ACCESS_RESERVED ||
 		    instruction_access == FFA_INSTRUCTION_ACCESS_RESERVED) {
 			dlog_verbose(
@@ -2036,9 +2035,8 @@ struct ffa_value ffa_memory_send_validate(
 			 * retriever.
 			 */
 			if (vm_id_is_current_world(receiver_id)) {
-				ffa_set_instruction_access_attr(
-					&permissions,
-					FFA_INSTRUCTION_ACCESS_NX);
+				permissions.instruction_access =
+					FFA_INSTRUCTION_ACCESS_NX;
 				receiver_permissions.permissions = permissions;
 			}
 		}
@@ -2062,8 +2060,7 @@ struct ffa_value ffa_memory_send_validate(
 	}
 
 	/* Memory region attributes NS-Bit MBZ for FFA_MEM_SHARE/LEND/DONATE. */
-	security_state =
-		ffa_get_memory_security_attr(memory_region->attributes);
+	security_state = memory_region->attributes.security;
 	if (security_state != FFA_MEMORY_SECURITY_UNSPECIFIED) {
 		dlog_verbose(
 			"Invalid security state for memory share operation.\n");
@@ -2077,7 +2074,7 @@ struct ffa_value ffa_memory_send_validate(
 	if (share_func == FFA_MEM_DONATE_32 ||
 	    (share_func == FFA_MEM_LEND_32 &&
 	     memory_region->receiver_count == 1)) {
-		if (ffa_get_memory_type_attr(memory_region->attributes) !=
+		if (memory_region->attributes.type !=
 		    FFA_MEMORY_NOT_SPECIFIED_MEM) {
 			dlog_verbose(
 				"Memory type shall not be specified by "
@@ -2435,10 +2432,8 @@ static bool ffa_retrieved_memory_region_init(
 			 * currently expect one borrower to be specified.
 			 */
 			ffa_memory_access_init_v1_0(
-				receiver, receiver_id,
-				ffa_get_data_access_attr(permissions),
-				ffa_get_instruction_access_attr(permissions),
-				recv_flags);
+				receiver, receiver_id, permissions.data_access,
+				permissions.instruction_access, recv_flags);
 		}
 
 		composite_offset =
@@ -2548,8 +2543,7 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 		if (requested_data_access == FFA_DATA_ACCESS_NOT_SPECIFIED ||
 		    requested_data_access == FFA_DATA_ACCESS_RW) {
 			if (permissions != NULL) {
-				ffa_set_data_access_attr(permissions,
-							 FFA_DATA_ACCESS_RW);
+				permissions->data_access = FFA_DATA_ACCESS_RW;
 			}
 			break;
 		}
@@ -2558,8 +2552,7 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 		if (requested_data_access == FFA_DATA_ACCESS_NOT_SPECIFIED ||
 		    requested_data_access == FFA_DATA_ACCESS_RO) {
 			if (permissions != NULL) {
-				ffa_set_data_access_attr(permissions,
-							 FFA_DATA_ACCESS_RO);
+				permissions->data_access = FFA_DATA_ACCESS_RO;
 			}
 			break;
 		}
@@ -2630,8 +2623,8 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 	case FFA_INSTRUCTION_ACCESS_X:
 		if (requested_instruction_access == FFA_INSTRUCTION_ACCESS_X) {
 			if (permissions != NULL) {
-				ffa_set_instruction_access_attr(
-					permissions, FFA_INSTRUCTION_ACCESS_X);
+				permissions->instruction_access =
+					FFA_INSTRUCTION_ACCESS_X;
 			}
 			break;
 		}
@@ -2644,8 +2637,8 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||
 		    requested_instruction_access == FFA_INSTRUCTION_ACCESS_NX) {
 			if (permissions != NULL) {
-				ffa_set_instruction_access_attr(
-					permissions, FFA_INSTRUCTION_ACCESS_NX);
+				permissions->instruction_access =
+					FFA_INSTRUCTION_ACCESS_NX;
 			}
 			break;
 		}
@@ -2690,7 +2683,7 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	assert(receiver_ret != NULL);
 	assert(permissions != NULL);
 
-	*permissions = 0;
+	*permissions = (ffa_memory_access_permissions_t){0};
 
 	if (!bypass_multi_receiver_check) {
 		if (retrieve_request->receiver_count != region_receiver_count) {
@@ -2778,10 +2771,10 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 		 * - Permissions are within those specified by the sender.
 		 */
 		ret = ffa_memory_retrieve_is_memory_access_valid(
-			func_id, ffa_get_data_access_attr(sent_permissions),
-			ffa_get_data_access_attr(requested_permissions),
-			ffa_get_instruction_access_attr(sent_permissions),
-			ffa_get_instruction_access_attr(requested_permissions),
+			func_id, sent_permissions.data_access,
+			requested_permissions.data_access,
+			sent_permissions.instruction_access,
+			requested_permissions.instruction_access,
 			found_to_id ? permissions : NULL,
 			region_receiver_count > 1);
 
@@ -2789,8 +2782,8 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 			return ret;
 		}
 
-		permissions_RO = (ffa_get_data_access_attr(*permissions) ==
-				  FFA_DATA_ACCESS_RO);
+		permissions_RO =
+			(permissions->data_access == FFA_DATA_ACCESS_RO);
 		clear_memory_flags =
 			(retrieve_request->flags &
 			 (FFA_MEMORY_REGION_FLAG_CLEAR |
@@ -2860,7 +2853,10 @@ bool is_ffa_hypervisor_retrieve_request(struct ffa_memory_region *request,
 					struct vm_locked to_locked)
 {
 	return to_locked.vm->id == HF_HYPERVISOR_VM_ID &&
-	       request->attributes == 0U && request->flags == 0U &&
+	       request->attributes.shareability == 0U &&
+	       request->attributes.cacheability == 0U &&
+	       request->attributes.type == 0U &&
+	       request->attributes.security == 0U && request->flags == 0U &&
 	       request->tag == 0U && request->receiver_count == 0U &&
 	       plat_ffa_memory_handle_allocated_by_current_world(
 		       request->handle);
@@ -3052,8 +3048,7 @@ static struct ffa_value ffa_memory_retrieve_validate(
 	}
 
 	/* Memory region attributes NS-Bit MBZ for FFA_MEM_RETRIEVE_REQ. */
-	security_state =
-		ffa_get_memory_security_attr(retrieve_request->attributes);
+	security_state = retrieve_request->attributes.security;
 	if (security_state != FFA_MEMORY_SECURITY_UNSPECIFIED) {
 		dlog_verbose(
 			"Invalid security state for memory retrieve request "
@@ -3066,8 +3061,7 @@ static struct ffa_value ffa_memory_retrieve_validate(
 	 * attributes in the retrieve request. The retriever is expecting to
 	 * obtain this information from the SPMC.
 	 */
-	if (ffa_get_memory_type_attr(retrieve_request->attributes) ==
-	    FFA_MEMORY_NOT_SPECIFIED_MEM) {
+	if (retrieve_request->attributes.type == FFA_MEMORY_NOT_SPECIFIED_MEM) {
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	}
 
@@ -3085,7 +3079,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 	struct ffa_memory_region *retrieve_request,
 	uint32_t retrieve_request_length, struct mpool *page_pool)
 {
-	ffa_memory_access_permissions_t permissions = 0;
+	ffa_memory_access_permissions_t permissions = {0};
 	uint32_t memory_to_mode;
 	struct ffa_value ret;
 	struct ffa_composite_memory_region *composite;
@@ -3098,7 +3092,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 	uint32_t receiver_index;
 	struct ffa_memory_access *receiver;
 	ffa_memory_handle_t handle = retrieve_request->handle;
-	ffa_memory_attributes_t attributes = 0;
+	ffa_memory_attributes_t attributes = {0};
 	uint32_t retrieve_mode = 0;
 	struct ffa_memory_region *memory_region = share_state->memory_region;
 
@@ -3556,7 +3550,7 @@ struct ffa_value ffa_memory_relinquish(
 	struct ffa_value ret;
 	uint32_t receiver_index;
 	bool receivers_relinquished_memory;
-	ffa_memory_access_permissions_t receiver_permissions = 0;
+	ffa_memory_access_permissions_t receiver_permissions = {0};
 
 	if (relinquish_request->endpoint_count != 1) {
 		dlog_verbose(
@@ -3657,8 +3651,8 @@ struct ffa_value ffa_memory_relinquish(
 		goto out;
 	}
 
-	if (clear && ffa_get_data_access_attr(receiver_permissions) ==
-			     FFA_DATA_ACCESS_RO) {
+	if (clear && receiver_permissions.instruction_access == 0 &&
+	    receiver_permissions.data_access == FFA_DATA_ACCESS_RO) {
 		dlog_verbose("%s: RO memory can't use clear memory flag.\n",
 			     __func__);
 		ret = ffa_error(FFA_DENIED);

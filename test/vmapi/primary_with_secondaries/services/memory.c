@@ -35,8 +35,7 @@ static void update_mm_security_state(
 	struct ffa_composite_memory_region *composite,
 	ffa_memory_attributes_t attributes)
 {
-	if (ffa_get_memory_security_attr(attributes) ==
-		    FFA_MEMORY_SECURITY_NON_SECURE &&
+	if (attributes.security == FFA_MEMORY_SECURITY_NON_SECURE &&
 	    !ffa_is_vm_id(hf_vm_get_id())) {
 		for (uint32_t i = 0; i < composite->constituent_count; i++) {
 			uint32_t mode;
@@ -214,13 +213,11 @@ TEST_SERVICE(memory_increment_check_mem_attr)
 		 * Validate retrieve response contains the memory attributes
 		 * hafnium implements.
 		 */
-		ASSERT_EQ(ffa_get_memory_type_attr(memory_region->attributes),
+		ASSERT_EQ(memory_region->attributes.type,
 			  FFA_MEMORY_NORMAL_MEM);
-		ASSERT_EQ(ffa_get_memory_shareability_attr(
-				  memory_region->attributes),
+		ASSERT_EQ(memory_region->attributes.shareability,
 			  FFA_MEMORY_INNER_SHAREABLE);
-		ASSERT_EQ(ffa_get_memory_cacheability_attr(
-				  memory_region->attributes),
+		ASSERT_EQ(memory_region->attributes.cacheability,
 			  FFA_MEMORY_CACHE_WRITE_BACK);
 
 		/* Increment each byte of memory. */
@@ -1109,7 +1106,8 @@ TEST_SERVICE(retrieve_ffa_v1_0)
 	/* Point to the whole copied structure. */
 	composite = ffa_memory_region_get_composite_v1_0(memory_region, 0);
 
-	update_mm_security_state(composite, memory_region->attributes);
+	update_mm_security_state(composite, ffa_memory_attributes_extend(
+						    memory_region->attributes));
 
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;

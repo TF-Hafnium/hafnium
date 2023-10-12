@@ -573,8 +573,7 @@ ffa_id_t retrieve_memory_from_message(
 	if (!ffa_is_vm_id(own_id) && ffa_is_vm_id(sender) &&
 	    memory_region_ret != NULL) {
 		enum ffa_memory_security retrieved_security =
-			ffa_get_memory_security_attr(
-				memory_region_ret->attributes);
+			memory_region_ret->attributes.security;
 
 		EXPECT_EQ(retrieved_security, FFA_MEMORY_SECURITY_NON_SECURE);
 	}

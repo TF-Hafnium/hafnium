@@ -44,6 +44,19 @@ struct ffa_memory_access_v1_0 {
 	uint64_t reserved_0;
 };
 
+typedef struct {
+	uint8_t shareability : 2;
+	uint8_t cacheability : 2;
+	uint8_t type : 2;
+	uint8_t security : 2;
+} ffa_memory_attributes_v1_0;
+
+ffa_memory_attributes_v1_0 ffa_memory_attributes_truncate(
+	ffa_memory_attributes_t attrs);
+
+ffa_memory_attributes_t ffa_memory_attributes_extend(
+	ffa_memory_attributes_v1_0 attrs);
+
 /**
  * Information about a set of pages which are being shared. This corresponds to
  * table 45 of the FF-A 1.0 EAC specification, "Lend, donate or share memory
@@ -56,7 +69,7 @@ struct ffa_memory_region_v1_0 {
 	 * owner.
 	 */
 	ffa_id_t sender;
-	uint8_t attributes;
+	ffa_memory_attributes_v1_0 attributes;
 	/** Reserved field, must be 0. */
 	uint8_t reserved_0;
 	/** Flags to control behaviour of the transaction. */

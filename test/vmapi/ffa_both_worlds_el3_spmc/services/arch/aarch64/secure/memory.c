@@ -26,8 +26,7 @@ static void update_mm_security_state(
 	struct ffa_composite_memory_region *composite,
 	ffa_memory_attributes_t attributes)
 {
-	if (ffa_get_memory_security_attr(attributes) ==
-		    FFA_MEMORY_SECURITY_NON_SECURE &&
+	if (attributes.security == FFA_MEMORY_SECURITY_NON_SECURE &&
 	    !ffa_is_vm_id(hf_vm_get_id())) {
 		for (uint32_t i = 0; i < composite->constituent_count; i++) {
 			uint32_t mode;
@@ -73,9 +72,9 @@ static void memory_increment(struct ffa_memory_region *memory_region)
 	 * Validate retrieve response contains the memory attributes
 	 * hafnium implements.
 	 */
-	ASSERT_EQ(ffa_get_memory_shareability_attr(memory_region->attributes),
+	ASSERT_EQ(memory_region->attributes.shareability,
 		  FFA_MEMORY_INNER_SHAREABLE);
-	ASSERT_EQ(ffa_get_memory_cacheability_attr(memory_region->attributes),
+	ASSERT_EQ(memory_region->attributes.cacheability,
 		  FFA_MEMORY_CACHE_WRITE_BACK);
 
 	update_mm_security_state(composite, memory_region->attributes);

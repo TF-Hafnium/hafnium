@@ -56,11 +56,10 @@ void ffa_memory_access_init(struct ffa_memory_access *receiver,
 			    ffa_memory_receiver_flags_t flags,
 			    struct ffa_memory_access_impdef *impdef_val)
 {
-	ffa_memory_access_permissions_t permissions = 0;
-
-	/* Set memory region's permissions. */
-	ffa_set_data_access_attr(&permissions, data_access);
-	ffa_set_instruction_access_attr(&permissions, instruction_access);
+	ffa_memory_access_permissions_t permissions = {
+		.data_access = data_access,
+		.instruction_access = instruction_access,
+	};
 
 	*receiver = (struct ffa_memory_access){
 		.receiver_permissions =
@@ -235,12 +234,11 @@ uint32_t ffa_memory_region_init(
 	enum ffa_memory_shareability shareability, uint32_t *total_length,
 	uint32_t *fragment_length)
 {
-	ffa_memory_attributes_t attributes = 0;
-
-	/* Set memory region's page attributes. */
-	ffa_set_memory_type_attr(&attributes, type);
-	ffa_set_memory_cacheability_attr(&attributes, cacheability);
-	ffa_set_memory_shareability_attr(&attributes, shareability);
+	ffa_memory_attributes_t attributes = {
+		.type = type,
+		.cacheability = cacheability,
+		.shareability = shareability,
+	};
 
 	ffa_memory_region_init_header(memory_region, sender, attributes, flags,
 				      0, tag, receiver_count,
@@ -296,13 +294,12 @@ uint32_t ffa_memory_retrieve_request_init(
 	enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability)
 {
-	ffa_memory_attributes_t attributes = 0;
 	uint32_t i;
-
-	/* Set memory region's page attributes. */
-	ffa_set_memory_type_attr(&attributes, type);
-	ffa_set_memory_cacheability_attr(&attributes, cacheability);
-	ffa_set_memory_shareability_attr(&attributes, shareability);
+	ffa_memory_attributes_t attributes = {
+		.type = type,
+		.cacheability = cacheability,
+		.shareability = shareability,
+	};
 
 	ffa_memory_region_init_header(memory_region, sender, attributes, flags,
 				      handle, tag, receiver_count,
@@ -343,7 +340,7 @@ uint32_t ffa_memory_lender_retrieve_request_init(
 	ffa_id_t sender)
 {
 	memory_region->sender = sender;
-	memory_region->attributes = 0;
+	memory_region->attributes = (ffa_memory_attributes_t){0};
 	memory_region->flags = 0;
 	memory_region->handle = handle;
 	memory_region->tag = 0;
