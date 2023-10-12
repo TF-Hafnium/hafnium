@@ -1781,22 +1781,27 @@ static struct ffa_value ffa_memory_attributes_validate(
 
 	memory_type = attributes.type;
 	if (memory_type != FFA_MEMORY_NORMAL_MEM) {
-		dlog_verbose("Invalid memory type %#x, expected %#x.\n",
-			     memory_type, FFA_MEMORY_NORMAL_MEM);
+		dlog_verbose("Invalid memory type %s, expected %s\n",
+			     ffa_memory_type_name(memory_type),
+			     ffa_memory_type_name(FFA_MEMORY_NORMAL_MEM));
 		return ffa_error(FFA_DENIED);
 	}
 
 	cacheability = attributes.cacheability;
 	if (cacheability != FFA_MEMORY_CACHE_WRITE_BACK) {
-		dlog_verbose("Invalid cacheability %#x, expected %#x.\n",
-			     cacheability, FFA_MEMORY_CACHE_WRITE_BACK);
+		dlog_verbose("Invalid cacheability %s, expected %s.\n",
+			     ffa_memory_cacheability_name(cacheability),
+			     ffa_memory_cacheability_name(
+				     FFA_MEMORY_CACHE_WRITE_BACK));
 		return ffa_error(FFA_DENIED);
 	}
 
 	shareability = attributes.shareability;
 	if (shareability != FFA_MEMORY_INNER_SHAREABLE) {
-		dlog_verbose("Invalid shareability %#x, expected #%x.\n",
-			     shareability, FFA_MEMORY_INNER_SHAREABLE);
+		dlog_verbose("Invalid shareability %s, expected %s.\n",
+			     ffa_memory_shareability_name(shareability),
+			     ffa_memory_shareability_name(
+				     FFA_MEMORY_INNER_SHAREABLE));
 		return ffa_error(FFA_DENIED);
 	}
 
@@ -1827,6 +1832,7 @@ struct ffa_value ffa_memory_send_validate(
 	enum ffa_data_access data_access;
 	enum ffa_instruction_access instruction_access;
 	enum ffa_memory_security security_state;
+	enum ffa_memory_type type;
 	struct ffa_value ret;
 	const size_t minimum_first_fragment_length =
 		memory_region->receivers_offset +
@@ -2007,24 +2013,30 @@ struct ffa_value ffa_memory_send_validate(
 		    instruction_access == FFA_INSTRUCTION_ACCESS_RESERVED) {
 			dlog_verbose(
 				"Reserved value for receiver permissions "
-				"%#x.\n",
-				permissions);
+				"(data_access = %s, instruction_access = %s)\n",
+				ffa_data_access_name(data_access),
+				ffa_instruction_access_name(
+					instruction_access));
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 		if (instruction_access !=
 		    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
 			dlog_verbose(
-				"Invalid instruction access permissions %#x "
-				"for sending memory.\n",
-				permissions);
+				"Invalid instruction access permissions %s "
+				"for sending memory, expected %s.\n",
+				ffa_instruction_access_name(instruction_access),
+				ffa_instruction_access_name(
+					FFA_INSTRUCTION_ACCESS_RESERVED));
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 		if (share_func == FFA_MEM_SHARE_32) {
 			if (data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
 				dlog_verbose(
-					"Invalid data access permissions %#x "
-					"for sharing memory.\n",
-					permissions);
+					"Invalid data access permissions %s "
+					"for sharing memory, expected %s.\n",
+					ffa_data_access_name(data_access),
+					ffa_data_access_name(
+						FFA_DATA_ACCESS_NOT_SPECIFIED));
 				return ffa_error(FFA_INVALID_PARAMETERS);
 			}
 			/*
@@ -2043,18 +2055,22 @@ struct ffa_value ffa_memory_send_validate(
 		if (share_func == FFA_MEM_LEND_32 &&
 		    data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
 			dlog_verbose(
-				"Invalid data access permissions %#x for "
-				"lending memory.\n",
-				permissions);
+				"Invalid data access permissions %s for "
+				"lending memory, expected %s.\n",
+				ffa_data_access_name(data_access),
+				ffa_data_access_name(
+					FFA_DATA_ACCESS_NOT_SPECIFIED));
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
 		if (share_func == FFA_MEM_DONATE_32 &&
 		    data_access != FFA_DATA_ACCESS_NOT_SPECIFIED) {
 			dlog_verbose(
-				"Invalid data access permissions %#x for "
-				"donating memory.\n",
-				permissions);
+				"Invalid data access permissions %s for "
+				"donating memory, expected %s.\n",
+				ffa_data_access_name(data_access),
+				ffa_data_access_name(
+					FFA_DATA_ACCESS_NOT_SPECIFIED));
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 	}
@@ -2063,7 +2079,11 @@ struct ffa_value ffa_memory_send_validate(
 	security_state = memory_region->attributes.security;
 	if (security_state != FFA_MEMORY_SECURITY_UNSPECIFIED) {
 		dlog_verbose(
-			"Invalid security state for memory share operation.\n");
+			"Invalid security state %s for memory share operation, "
+			"expected %s.\n",
+			ffa_memory_security_name(security_state),
+			ffa_memory_security_name(
+				FFA_MEMORY_SECURITY_UNSPECIFIED));
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2071,14 +2091,17 @@ struct ffa_value ffa_memory_send_validate(
 	 * If a memory donate or lend with single borrower, the memory type
 	 * shall not be specified by the sender.
 	 */
+	type = memory_region->attributes.type;
 	if (share_func == FFA_MEM_DONATE_32 ||
 	    (share_func == FFA_MEM_LEND_32 &&
 	     memory_region->receiver_count == 1)) {
-		if (memory_region->attributes.type !=
-		    FFA_MEMORY_NOT_SPECIFIED_MEM) {
+		if (type != FFA_MEMORY_NOT_SPECIFIED_MEM) {
 			dlog_verbose(
-				"Memory type shall not be specified by "
-				"sender.\n");
+				"Invalid memory type %s for memory share "
+				"operation, expected %s.\n",
+				ffa_memory_type_name(type),
+				ffa_memory_type_name(
+					FFA_MEMORY_NOT_SPECIFIED_MEM));
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 	} else {

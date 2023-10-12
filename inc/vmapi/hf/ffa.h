@@ -405,6 +405,20 @@ enum ffa_data_access {
 	FFA_DATA_ACCESS_RESERVED,
 };
 
+static inline const char *ffa_data_access_name(enum ffa_data_access data_access)
+{
+	switch (data_access) {
+	case FFA_DATA_ACCESS_NOT_SPECIFIED:
+		return "FFA_DATA_ACCESS_NOT_SPECIFIED";
+	case FFA_DATA_ACCESS_RO:
+		return "FFA_DATA_ACCESS_RO";
+	case FFA_DATA_ACCESS_RW:
+		return "FFA_DATA_ACCESS_RW";
+	case FFA_DATA_ACCESS_RESERVED:
+		return "FFA_DATA_ACCESS_RESERVED";
+	}
+}
+
 enum ffa_instruction_access {
 	FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 	FFA_INSTRUCTION_ACCESS_NX,
@@ -412,11 +426,38 @@ enum ffa_instruction_access {
 	FFA_INSTRUCTION_ACCESS_RESERVED,
 };
 
+static inline const char *ffa_instruction_access_name(
+	enum ffa_instruction_access instruction_access)
+{
+	switch (instruction_access) {
+	case FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED:
+		return "FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED";
+	case FFA_INSTRUCTION_ACCESS_NX:
+		return "FFA_INSTRUCTION_ACCESS_NX";
+	case FFA_INSTRUCTION_ACCESS_X:
+		return "FFA_INSTRUCTION_ACCESS_X";
+	case FFA_INSTRUCTION_ACCESS_RESERVED:
+		return "FFA_INSTRUCTION_ACCESS_RESERVED";
+	}
+}
+
 enum ffa_memory_type {
 	FFA_MEMORY_NOT_SPECIFIED_MEM,
 	FFA_MEMORY_DEVICE_MEM,
 	FFA_MEMORY_NORMAL_MEM,
 };
+
+static inline const char *ffa_memory_type_name(enum ffa_memory_type type)
+{
+	switch (type) {
+	case FFA_MEMORY_NOT_SPECIFIED_MEM:
+		return "FFA_MEMORY_NOT_SPECIFIED_MEM";
+	case FFA_MEMORY_DEVICE_MEM:
+		return "FFA_MEMORY_DEVICE_MEM";
+	case FFA_MEMORY_NORMAL_MEM:
+		return "FFA_MEMORY_NORMAL_MEM";
+	}
+}
 
 enum ffa_memory_cacheability {
 	FFA_MEMORY_CACHE_RESERVED = 0x0,
@@ -429,12 +470,42 @@ enum ffa_memory_cacheability {
 	FFA_MEMORY_DEV_GRE = 0x3,
 };
 
+static inline const char *ffa_memory_cacheability_name(
+	enum ffa_memory_cacheability cacheability)
+{
+	switch (cacheability) {
+	case FFA_MEMORY_CACHE_RESERVED:
+		return "FFA_MEMORY_CACHE_RESERVED";
+	case FFA_MEMORY_CACHE_NON_CACHEABLE:
+		return "FFA_MEMORY_CACHE_NON_CACHEABLE";
+	case FFA_MEMORY_CACHE_RESERVED_1:
+		return "FFA_MEMORY_CACHE_RESERVED_1";
+	case FFA_MEMORY_CACHE_WRITE_BACK:
+		return "FFA_MEMORY_CACHE_WRITE_BACK";
+	}
+}
+
 enum ffa_memory_shareability {
 	FFA_MEMORY_SHARE_NON_SHAREABLE,
 	FFA_MEMORY_SHARE_RESERVED,
 	FFA_MEMORY_OUTER_SHAREABLE,
 	FFA_MEMORY_INNER_SHAREABLE,
 };
+
+static inline const char *ffa_memory_shareability_name(
+	enum ffa_memory_shareability shareability)
+{
+	switch (shareability) {
+	case FFA_MEMORY_SHARE_NON_SHAREABLE:
+		return "FFA_MEMORY_SHARE_NON_SHAREABLE";
+	case FFA_MEMORY_SHARE_RESERVED:
+		return "FFA_MEMORY_SHARE_RESERVED";
+	case FFA_MEMORY_OUTER_SHAREABLE:
+		return "FFA_MEMORY_OUTER_SHAREABLE";
+	case FFA_MEMORY_INNER_SHAREABLE:
+		return "FFA_MEMORY_INNER_SHAREABLE";
+	}
+}
 
 /**
  * FF-A v1.1 REL0 Table 10.18 memory region attributes descriptor NS Bit 6.
@@ -446,6 +517,17 @@ enum ffa_memory_security {
 	FFA_MEMORY_SECURITY_SECURE = 0,
 	FFA_MEMORY_SECURITY_NON_SECURE,
 };
+
+static inline const char *ffa_memory_security_name(
+	enum ffa_memory_security security)
+{
+	switch (security) {
+	case FFA_MEMORY_SECURITY_UNSPECIFIED:
+		return "FFA_MEMORY_SECURITY_UNSPECIFIED";
+	case FFA_MEMORY_SECURITY_NON_SECURE:
+		return "FFA_MEMORY_SECURITY_NON_SECURE";
+	}
+}
 
 typedef struct {
 	uint8_t data_access : 2;
