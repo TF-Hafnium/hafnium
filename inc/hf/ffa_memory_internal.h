@@ -11,6 +11,8 @@
  * DONATE handle is active from when it is sent to when it is retrieved; a SHARE
  * or LEND handle is active from when it is sent to when it is reclaimed.
  */
+#pragma once
+
 #define MAX_MEM_SHARES 100
 
 #include <stdbool.h>
@@ -101,6 +103,16 @@ struct ffa_memory_share_state {
 	 * specification.
 	 */
 	uint32_t hypervisor_fragment_count;
+
+	/*
+	 * Record whether memory has been protected through the platform
+	 * specific means. Used for linking map action on memory send to memory
+	 * action on reclaim. I.e. if as a result of memory lend/donate the
+	 * memory has been protected, this will be used to reset memory's state,
+	 * by unprotecting on reclaim when the sender reestablishes its
+	 * ownership and exclusive access.
+	 */
+	bool memory_protected;
 };
 
 /**
@@ -148,9 +160,10 @@ struct ffa_value ffa_send_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t total_page_count, uint32_t share_func,
+	uint32_t composite_total_page_count, uint32_t share_func,
 	struct ffa_memory_access *receivers, uint32_t receivers_count,
-	struct mpool *page_pool, bool clear, uint32_t *orig_from_mode_ret);
+	struct mpool *page_pool, bool clear, uint32_t *orig_from_mode_ret,
+	bool *memory_protected);
 struct ffa_value ffa_memory_send_complete(
 	struct vm_locked from_locked, struct share_states_locked share_states,
 	struct ffa_memory_share_state *share_state, struct mpool *page_pool,
@@ -163,13 +176,15 @@ struct ffa_value ffa_retrieve_check_transition(
 	struct vm_locked to, uint32_t share_func,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t memory_to_attributes, uint32_t *to_mode);
+	uint32_t memory_to_attributes, uint32_t *to_mode,
+	bool memory_protected);
 struct ffa_value ffa_retrieve_check_update(
 	struct vm_locked to_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t sender_orig_mode, uint32_t share_func, bool clear,
-	struct mpool *page_pool);
+	struct mpool *page_pool, uint32_t *response_mode,
+	bool memory_protected);
 struct ffa_value ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,

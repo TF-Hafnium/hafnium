@@ -8,6 +8,8 @@
 
 #include "hf/ffa_memory.h"
 
+#include <stdint.h>
+
 #include "hf/arch/mm.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
@@ -670,9 +672,27 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 }
 
 /**
+ * If the receivers for the memory management operation are all from the
+ * secure world and this isn't a FFA_MEM_SHARE, then request memory security
+ * state update by returning MAP_ACTION_CHECK_PROTECT.
+ */
+static enum ffa_map_action ffa_mem_send_get_map_action(
+	bool all_receivers_from_current_world, ffa_id_t sender_id,
+	uint32_t mem_func_id)
+{
+	bool protect_memory =
+		(mem_func_id != FFA_MEM_SHARE_32 &&
+		 all_receivers_from_current_world && ffa_is_vm_id(sender_id));
+
+	return protect_memory ? MAP_ACTION_CHECK_PROTECT : MAP_ACTION_CHECK;
+}
+
+/**
  * Verify that all pages have the same mode, that the starting mode
  * constitutes a valid state and obtain the next mode to apply
- * to the sending VM.
+ * to the sending VM. It outputs the mapping action that needs to be
+ * invoked for the given memory range. On memory lend/donate there
+ * could be a need to protect the memory from the normal world.
  *
  * Returns:
  *   1) FFA_DENIED if a state transition was not found;
@@ -689,11 +709,12 @@ static struct ffa_value ffa_send_check_transition(
 	uint32_t *orig_from_mode,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t *from_mode)
+	uint32_t *from_mode, enum ffa_map_action *map_action)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 	struct ffa_value ret;
+	bool all_receivers_from_current_world = true;
 
 	ret = constituents_get_mode(from, orig_from_mode, fragments,
 				    fragment_constituent_counts,
@@ -736,6 +757,12 @@ static struct ffa_value ffa_send_check_transition(
 				receivers[i].receiver_permissions.receiver));
 		}
 
+		/* Track if all senders are from current world. */
+		all_receivers_from_current_world =
+			all_receivers_from_current_world &&
+			vm_id_is_current_world(
+				receivers[i].receiver_permissions.receiver);
+
 		if ((*orig_from_mode & required_from_mode) !=
 		    required_from_mode) {
 			dlog_verbose(
@@ -746,6 +773,9 @@ static struct ffa_value ffa_send_check_transition(
 			return ffa_error(FFA_DENIED);
 		}
 	}
+
+	*map_action = ffa_mem_send_get_map_action(
+		all_receivers_from_current_world, from.vm->id, share_func);
 
 	/* Find the appropriate new mode. */
 	*from_mode = ~state_mask & *orig_from_mode;
@@ -831,7 +861,7 @@ struct ffa_value ffa_retrieve_check_transition(
 	struct vm_locked to, uint32_t share_func,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t memory_to_attributes, uint32_t *to_mode)
+	uint32_t memory_to_attributes, uint32_t *to_mode, bool memory_protected)
 {
 	uint32_t orig_to_mode;
 	struct ffa_value ret;
@@ -843,6 +873,9 @@ struct ffa_value ffa_retrieve_check_transition(
 		dlog_verbose("Inconsistent modes.\n");
 		return ret;
 	}
+
+	/* Find the appropriate new mode. */
+	*to_mode = memory_to_attributes;
 
 	if (share_func == FFA_MEM_RECLAIM_32) {
 		/*
@@ -869,10 +902,16 @@ struct ffa_value ffa_retrieve_check_transition(
 			    MM_MODE_UNMAPPED_MASK) {
 			return ffa_error(FFA_DENIED);
 		}
+
+		/*
+		 * If memory has been protected before, clear the NS bit to
+		 * allow the secure access from the SP.
+		 */
+		if (memory_protected) {
+			*to_mode &= ~plat_ffa_other_world_mode();
+		}
 	}
 
-	/* Find the appropriate new mode. */
-	*to_mode = memory_to_attributes;
 	switch (share_func) {
 	case FFA_MEM_DONATE_32:
 		*to_mode |= 0;
@@ -1269,15 +1308,18 @@ struct ffa_value ffa_send_check_update(
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t composite_total_page_count, uint32_t share_func,
 	struct ffa_memory_access *receivers, uint32_t receivers_count,
-	struct mpool *page_pool, bool clear, uint32_t *orig_from_mode_ret)
+	struct mpool *page_pool, bool clear, uint32_t *orig_from_mode_ret,
+	bool *memory_protected)
 {
 	uint32_t i;
 	uint32_t j;
 	uint32_t orig_from_mode;
+	uint32_t clean_mode;
 	uint32_t from_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
 	uint32_t constituents_total_page_count = 0;
+	enum ffa_map_action map_action = MAP_ACTION_CHECK;
 
 	/*
 	 * Make sure constituents are properly aligned to a 64-bit boundary. If
@@ -1311,10 +1353,10 @@ struct ffa_value ffa_send_check_update(
 	 * all constituents of a memory region being shared are at the same
 	 * state.
 	 */
-	ret = ffa_send_check_transition(from_locked, share_func, receivers,
-					receivers_count, &orig_from_mode,
-					fragments, fragment_constituent_counts,
-					fragment_count, &from_mode);
+	ret = ffa_send_check_transition(
+		from_locked, share_func, receivers, receivers_count,
+		&orig_from_mode, fragments, fragment_constituent_counts,
+		fragment_count, &from_mode, &map_action);
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition for send.\n");
 		return ret;
@@ -1335,10 +1377,13 @@ struct ffa_value ffa_send_check_update(
 	 * First reserve all required memory for the new page table entries
 	 * without committing, to make sure the entire operation will succeed
 	 * without exhausting the page pool.
+	 * Provide the map_action as populated by 'ffa_send_check_transition'.
+	 * It may request memory to be protected.
 	 */
 	ret = ffa_region_group_identity_map(
 		from_locked, fragments, fragment_constituent_counts,
-		fragment_count, from_mode, page_pool, MAP_ACTION_CHECK, NULL);
+		fragment_count, from_mode, page_pool, map_action,
+		memory_protected);
 	if (ret.func == FFA_ERROR_32) {
 		goto out;
 	}
@@ -1355,11 +1400,28 @@ struct ffa_value ffa_send_check_update(
 		      MAP_ACTION_COMMIT, NULL)
 		      .func == FFA_SUCCESS_32);
 
+	/*
+	 * If memory has been protected, it is now part of the secure PAS
+	 * (happens for lend/donate from NWd to SWd), and the `orig_from_mode`
+	 * should have the MM_MODE_NS set, as such mask it in `clean_mode` for
+	 * SPM's S1 translation.
+	 * In case memory hasn't been protected, and it is in the non-secure
+	 * PAS (e.g. memory share from NWd to SWd), as such the SPM needs to
+	 * perform a non-secure memory access. In such case `clean_mode` takes
+	 * the same mode as `orig_from_mode`.
+	 */
+	clean_mode = (memory_protected != NULL && *memory_protected)
+			     ? orig_from_mode & ~plat_ffa_other_world_mode()
+			     : orig_from_mode;
+
 	/* Clear the memory so no VM or device can see the previous contents. */
-	if (clear &&
-	    !ffa_clear_memory_constituents(orig_from_mode, fragments,
-					   fragment_constituent_counts,
-					   fragment_count, page_pool)) {
+	if (clear && !ffa_clear_memory_constituents(
+			     clean_mode, fragments, fragment_constituent_counts,
+			     fragment_count, page_pool)) {
+		map_action = (memory_protected != NULL && *memory_protected)
+				     ? MAP_ACTION_COMMIT_UNPROTECT
+				     : MAP_ACTION_COMMIT;
+
 		/*
 		 * On failure, roll back by returning memory to the sender. This
 		 * may allocate pages which were previously freed into
@@ -1408,7 +1470,7 @@ struct ffa_value ffa_retrieve_check_update(
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t sender_orig_mode, uint32_t share_func, bool clear,
-	struct mpool *page_pool)
+	struct mpool *page_pool, uint32_t *response_mode, bool memory_protected)
 {
 	uint32_t i;
 	uint32_t to_mode;
@@ -1433,7 +1495,8 @@ struct ffa_value ffa_retrieve_check_update(
 	 */
 	ret = ffa_retrieve_check_transition(
 		to_locked, share_func, fragments, fragment_constituent_counts,
-		fragment_count, sender_orig_mode, &to_mode);
+		fragment_count, sender_orig_mode, &to_mode, memory_protected);
+
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition for retrieve.\n");
 		return ret;
@@ -1479,6 +1542,11 @@ struct ffa_value ffa_retrieve_check_update(
 					    fragment_count, to_mode, page_pool,
 					    MAP_ACTION_COMMIT, NULL)
 		      .func == FFA_SUCCESS_32);
+
+	/* Return the mode used in mapping the memory in retriever's PT. */
+	if (response_mode != NULL) {
+		*response_mode = to_mode;
+	}
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
@@ -1613,7 +1681,7 @@ struct ffa_value ffa_memory_send_complete(
 		share_state->share_func, receiver,
 		memory_region->receiver_count, page_pool,
 		memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
-		orig_from_mode_ret);
+		orig_from_mode_ret, &share_state->memory_protected);
 	if (ret.func != FFA_SUCCESS_32) {
 		/*
 		 * Free share state, it failed to send so it can't be retrieved.
@@ -2956,13 +3024,13 @@ static struct ffa_value ffa_partition_retrieve_request(
 	uint32_t fragment_length;
 	ffa_id_t receiver_id = to_locked.vm->id;
 	bool is_retrieve_complete = false;
-	ffa_memory_attributes_t attributes;
 	const uint64_t memory_access_desc_size =
 		retrieve_request->memory_access_desc_size;
 	uint32_t receiver_index;
 	struct ffa_memory_access *receiver;
 	ffa_memory_handle_t handle = retrieve_request->handle;
-
+	ffa_memory_attributes_t attributes = 0;
+	uint32_t retrieve_mode = 0;
 	struct ffa_memory_region *memory_region = share_state->memory_region;
 
 	if (!share_state->sending_complete) {
@@ -2986,12 +3054,6 @@ static struct ffa_value ffa_partition_retrieve_request(
 		return ret;
 	}
 
-	if (share_state->retrieved_fragment_count[receiver_index] != 0U) {
-		dlog_verbose("Memory with handle %#x already retrieved.\n",
-			     handle);
-		return ffa_error(FFA_DENIED);
-	}
-
 	/*
 	 * Validate the requested permissions against the sent
 	 * permissions.
@@ -3012,7 +3074,8 @@ static struct ffa_value ffa_partition_retrieve_request(
 		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, memory_to_mode,
-		share_state->share_func, false, page_pool);
+		share_state->share_func, false, page_pool, &retrieve_mode,
+		share_state->memory_protected);
 
 	if (ret.func != FFA_SUCCESS_32) {
 		return ret;
@@ -3034,19 +3097,19 @@ static struct ffa_value ffa_partition_retrieve_request(
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/*
+	 * Set the security state in the memory retrieve response attributes
+	 * if specified by the target mode.
+	 */
+	attributes = plat_ffa_memory_security_mode(memory_region->attributes,
+						   retrieve_mode);
+
+	/*
 	 * Constituents which we received in the first fragment should
 	 * always fit in the first fragment we are sending, because the
 	 * header is the same size in both cases and we have a fixed
 	 * message buffer size. So `ffa_retrieved_memory_region_init`
 	 * should never fail.
 	 */
-
-	/*
-	 * Set the security state in the memory retrieve response attributes
-	 * if specified by the target mode.
-	 */
-	attributes = plat_ffa_memory_security_mode(
-		memory_region->attributes, share_state->sender_orig_mode);
 
 	/* Provide the permissions that had been provided. */
 	receiver->receiver_permissions.permissions = permissions;
@@ -3618,7 +3681,8 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, share_state->sender_orig_mode,
-		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool);
+		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool,
+		NULL, false);
 
 	if (ret.func == FFA_SUCCESS_32) {
 		share_state_free(share_states, share_state, page_pool);

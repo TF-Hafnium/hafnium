@@ -20,6 +20,7 @@
 #include "hf/std.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
+#include "hf/vm_ids.h"
 
 #include "msr.h"
 #include "smc.h"
@@ -1591,7 +1592,8 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, share_state->sender_orig_mode,
-		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool);
+		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool,
+		NULL, false);
 
 	if (ret.func == FFA_SUCCESS_32) {
 		share_state_free(share_states, share_state, page_pool);

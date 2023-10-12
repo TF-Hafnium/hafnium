@@ -8,7 +8,9 @@
 
 #pragma once
 
+#include "hf/addr.h"
 #include "hf/ffa.h"
+#include "hf/ffa_memory_internal.h"
 #include "hf/manifest.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
