@@ -3026,8 +3026,7 @@ static void api_ffa_memory_region_v1_1_from_v1_0(
 	memory_region_v1_1->memory_access_desc_size =
 		sizeof(struct ffa_memory_access_v1_0);
 	memory_region_v1_1->receiver_count = memory_region_v1_0->receiver_count;
-	memory_region_v1_1->receivers_offset =
-		offsetof(struct ffa_memory_region, receivers);
+	memory_region_v1_1->receivers_offset = sizeof(struct ffa_memory_region);
 
 	/* Zero reserved fields. */
 	for (uint32_t i = 0; i < 3U; i++) {
@@ -3147,8 +3146,9 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	space_left -= sizeof(struct ffa_memory_region);
 
 	/* Copy memory access information. */
-	memcpy_s(memory_region_v1_1->receivers, space_left,
-		 memory_region_v1_0->receivers, receivers_length);
+	memcpy_s((uint8_t *)memory_region_v1_1 +
+			 memory_region_v1_1->receivers_offset,
+		 space_left, memory_region_v1_0->receivers, receivers_length);
 
 	/* Initialize the memory access descriptors with composite offset. */
 	for (uint32_t i = 0; i < memory_region_v1_1->receiver_count; i++) {

@@ -1467,6 +1467,7 @@ struct ffa_value ffa_memory_send_complete(
 {
 	struct ffa_memory_region *memory_region = share_state->memory_region;
 	struct ffa_composite_memory_region *composite;
+	struct ffa_memory_access *receiver;
 	struct ffa_value ret;
 
 	/* Lock must be held. */
@@ -1474,13 +1475,15 @@ struct ffa_value ffa_memory_send_complete(
 	assert(memory_region != NULL);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	assert(composite != NULL);
+	receiver = ffa_memory_region_get_receiver(memory_region, 0);
+	assert(receiver != NULL);
 
 	/* Check that state is valid in sender page table and update. */
 	ret = ffa_send_check_update(
 		from_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, composite->page_count,
-		share_state->share_func, memory_region->receivers,
+		share_state->share_func, receiver,
 		memory_region->receiver_count, page_pool,
 		memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
 		orig_from_mode_ret);
@@ -1563,9 +1566,9 @@ struct ffa_value ffa_memory_send_validate(
 	enum ffa_memory_security security_state;
 	struct ffa_value ret;
 	const size_t minimum_first_fragment_length =
-		(sizeof(struct ffa_memory_region) +
-		 memory_region->memory_access_desc_size +
-		 sizeof(struct ffa_composite_memory_region));
+		memory_region->receivers_offset +
+		memory_region->memory_access_desc_size +
+		sizeof(struct ffa_composite_memory_region);
 
 	if (fragment_length < minimum_first_fragment_length) {
 		dlog_verbose("Fragment length %u too short (min %u).\n",
@@ -1594,9 +1597,6 @@ struct ffa_value ffa_memory_send_validate(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	assert(memory_region->receivers_offset ==
-	       offsetof(struct ffa_memory_region, receivers));
-
 	/* The sender must match the caller. */
 	if ((!vm_id_is_current_world(from_locked.vm->id) &&
 	     vm_id_is_current_world(memory_region->sender)) ||
@@ -1618,7 +1618,7 @@ struct ffa_value ffa_memory_send_validate(
 	 */
 	receivers_end = ((uint64_t)memory_region->memory_access_desc_size *
 			 (uint64_t)memory_region->receiver_count) +
-			sizeof(struct ffa_memory_region);
+			memory_region->receivers_offset;
 	min_length = receivers_end +
 		     sizeof(struct ffa_composite_memory_region) +
 		     sizeof(struct ffa_memory_region_constituent);
@@ -2198,7 +2198,7 @@ static bool ffa_retrieved_memory_region_init(
 		 * alignment faults.
 		 */
 		composite_offset =
-			sizeof(struct ffa_memory_region) +
+			retrieve_response->receivers_offset +
 			(uint32_t)(receiver_count *
 				   retrieve_response->memory_access_desc_size);
 
@@ -2739,7 +2739,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct mpool *page_pool)
 {
 	uint32_t expected_retrieve_request_length =
-		sizeof(struct ffa_memory_region) +
+		retrieve_request->receivers_offset +
 		(uint32_t)(retrieve_request->receiver_count *
 			   retrieve_request->memory_access_desc_size);
 	ffa_memory_handle_t handle = retrieve_request->handle;

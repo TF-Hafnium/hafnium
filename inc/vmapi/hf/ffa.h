@@ -1155,13 +1155,6 @@ struct ffa_memory_region {
 	uint32_t receivers_offset;
 	/** Reserved field (12 bytes) must be 0. */
 	uint32_t reserved[3];
-	/**
-	 * An array of `receiver_count` endpoint memory access descriptors.
-	 * Each one specifies a memory region offset, an endpoint and the
-	 * attributes with which this memory region should be mapped in that
-	 * endpoint's page table.
-	 */
-	struct ffa_memory_access receivers[];
 };
 
 /**
@@ -1215,8 +1208,14 @@ static inline struct ffa_memory_access *ffa_memory_region_get_receiver(
 		return NULL;
 	}
 
-	return (struct ffa_memory_access *)((uint8_t *)
-						    memory_region->receivers +
+	/* Check we cannot use receivers offset to cause overflow. */
+	if (memory_region->receivers_offset !=
+	    sizeof(struct ffa_memory_region)) {
+		return NULL;
+	}
+
+	return (struct ffa_memory_access *)((uint8_t *)memory_region +
+					    memory_region->receivers_offset +
 					    (receiver_index *
 					     memory_access_desc_size));
 }

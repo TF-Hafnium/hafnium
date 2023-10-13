@@ -97,8 +97,7 @@ void ffa_memory_region_init_header(struct ffa_memory_region *memory_region,
 	memory_region->tag = tag;
 	memory_region->memory_access_desc_size = receiver_desc_size;
 	memory_region->receiver_count = receiver_count;
-	memory_region->receivers_offset =
-		offsetof(struct ffa_memory_region, receivers);
+	memory_region->receivers_offset = sizeof(struct ffa_memory_region);
 #if defined(__linux__) && defined(__KERNEL__)
 	memset(memory_region->reserved, 0, sizeof(memory_region->reserved));
 #else
@@ -139,7 +138,7 @@ static uint32_t ffa_memory_region_init_constituents(
 	 * structure should point to the same offset value.
 	 */
 	composite_memory_region_offset =
-		sizeof(struct ffa_memory_region) +
+		memory_region->receivers_offset +
 		memory_region->receiver_count *
 			memory_region->memory_access_desc_size;
 	for (i = 0U; i < memory_region->receiver_count; i++) {
@@ -249,10 +248,10 @@ uint32_t ffa_memory_region_init(
 				      receiver_desc_size);
 
 #if defined(__linux__) && defined(__KERNEL__)
-	memcpy(memory_region->receivers, receivers,
+	memcpy(ffa_memory_region_get_receiver(memory_region, 0), receivers,
 	       receiver_count * memory_region->memory_access_desc_size);
 #else
-	memcpy_s(memory_region->receivers,
+	memcpy_s(ffa_memory_region_get_receiver(memory_region, 0),
 		 MAX_MEM_SHARE_RECIPIENTS *
 			 memory_region->memory_access_desc_size,
 		 receivers,
@@ -311,10 +310,10 @@ uint32_t ffa_memory_retrieve_request_init(
 				      receiver_desc_size);
 
 #if defined(__linux__) && defined(__KERNEL__)
-	memcpy(memory_region->receivers, receivers,
+	memcpy(ffa_memory_region_get_receiver(memory_region, 0), receivers,
 	       receiver_count * memory_region->memory_access_desc_size);
 #else
-	memcpy_s(memory_region->receivers,
+	memcpy_s(ffa_memory_region_get_receiver(memory_region, 0),
 		 MAX_MEM_SHARE_RECIPIENTS *
 			 memory_region->memory_access_desc_size,
 		 receivers,
@@ -329,7 +328,7 @@ uint32_t ffa_memory_retrieve_request_init(
 		receiver->composite_memory_region_offset = 0U;
 	}
 
-	return sizeof(struct ffa_memory_region) +
+	return memory_region->receivers_offset +
 	       memory_region->receiver_count *
 		       memory_region->memory_access_desc_size;
 }
