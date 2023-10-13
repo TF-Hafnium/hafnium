@@ -8,3 +8,9 @@ docs/build
 !project/
 project/*/
 !project/reference/
+
+# Ctags
+tags
+
+# Used to pin dependencies by Poetry tool
+poetry.lock
