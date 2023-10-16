@@ -221,6 +221,23 @@ Memory Regions
      then communicate the region properties (including the base address chosen
      by the partition manager) to the partition.
 
+- stream-ids
+   - value type: <prop-encoded-array>
+   - List of IDs belonging to a DMA capable peripheral device that has access to
+     the memory region represented by current node.
+   - Each ID must have been declared in exactly one device region node.
+
+- smmu-id
+   - value type: <u32>
+   - Identifies the SMMU IP that enforces the access control for the DMA device
+     that owns the above stream-ids.
+
+- stream-ids-access-permissions
+   - value type: <prop-encoded-array>
+   - List of attributes representing the instruction and data access permissions
+     used by the DMA device streams to access the memory region represented by
+     current node.
+
 .. _device_region_node:
 
 Device Regions
