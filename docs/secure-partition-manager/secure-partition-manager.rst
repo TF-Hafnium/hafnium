@@ -1519,15 +1519,12 @@ Peripheral device manifest
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Currently, SMMUv3 driver in Hafnium only supports dependent peripheral devices.
-These devices are dependent on PE endpoint to initiate and receive memory
+These DMA devices are dependent on PE endpoint to initiate and receive memory
 management transactions on their behalf. The acccess to the MMIO regions of
-any such device is assigned to the endpoint during boot. Moreover, SMMUv3 driver
-uses the same stage 2 translations for the device as those used by partition
-manager on behalf of the PE endpoint. This ensures that the peripheral device
-has the same visibility of the physical address space as the endpoint. The
-device node of the corresponding partition manifest (refer to `[1]`_ section 3.2
-) must specify these additional properties for each peripheral device in the
-system :
+any such device is assigned to the endpoint during boot.
+The :ref:`device node<device_region_node>` of the corresponding partition
+manifest must specify these additional properties for each peripheral device in
+the system:
 
 -  smmu-id: This field helps to identify the SMMU instance that this device is
    upstream of.
@@ -1543,6 +1540,35 @@ system :
         stream-ids = <0x0 0x1>;
         interrupts = <0x2 0x3>, <0x4 0x5>;
         exclusive-access;
+    };
+
+DMA isolation
+-------------
+
+Hafnium, with help of SMMUv3 driver, enables the support for static DMA
+isolation. The DMA device is explicitly granted access to a specific
+memory region only if the partition requests it by declaring the following
+properties of the DMA device in the :ref:`memory region node<memory_region_node>`
+of the partition manifest:
+
+-  smmu-id
+-  stream-ids
+-  stream-ids-access-permissions
+
+SMMUv3 driver uses a unqiue set of stage 2 translations for the DMA device
+rather than those used on behalf of the PE endpoint. This ensures that the DMA
+device has a limited visibility of the physical address space.
+
+.. code:: shell
+
+    smmuv3-memcpy-src {
+        description = "smmuv3-memcpy-source";
+        pages-count = <4>;
+        base-address = <0x00000000 0x7400000>;
+        attributes = <0x3>; /* read-write */
+        smmu-id = <0>;
+        stream-ids = <0x0 0x1>;
+        stream-ids-access-permissions = <0x3 0x3>;
     };
 
 SMMUv3 driver limitations

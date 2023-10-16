@@ -182,6 +182,8 @@ Partition Properties
       - Bit[1]: CPU_SUSPEND
       - Bit[2]: CPU_SUSPEND_RESUME
 
+.. _memory_region_node:
+
 Memory Regions
 --------------
 
@@ -218,6 +220,8 @@ Memory Regions
      region of the specified size into the partition's translation regime and
      then communicate the region properties (including the base address chosen
      by the partition manager) to the partition.
+
+.. _device_region_node:
 
 Device Regions
 --------------
