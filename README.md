@@ -1,30 +1,35 @@
 # Hafnium
 
-Hafnium is a hypervisor, initially supporting aarch64 (64-bit Armv8 CPUs).
+Hafnium is the Secure Partition Manager(SPM) reference implementation, following the
+[Arm's Firmware Framework specification](https://developer.arm.com/documentation/den0077/latest/).
 
-Get in touch and keep up-to-date at
-[hafnium@lists.trustedfirmware.org](https://lists.trustedfirmware.org/mailman/listinfo/hafnium).
-See feature requests and bugs on our
-[bug dashboard](https://developer.trustedfirmware.org/project/21/item/view/67/).
+It leverages Arm's virtualization extensions in the secure world of Arm's A class of
+devices (feature introduced with Armv8.4 FEAT_SEL2) to allow multiple Trusted OSes or
+Applications to run concurrently, inside the Trusted Execution Environment, each running
+as a Secure Partition (SP).
+Its main goal is to control the system access given to Trusted OSes, and serve as
+a mediator to the rest of the system.
 
-## Getting started
+For example, it limits the memory use, and handles all system calls from Trusted OS.
+Thus the SPM can enforce spacial isolation, and enforce some level of access control,
+protecting other critical system resources such as: the secure monitor, the normal world
+software stack, the SPM itself and other SPs/Trusted Applications.
+Other important features are: secure interrupt handling, device assignment, inter-partition
+communication and with the Normal World Software stack, also known as Rich Execution
+Environment (REE).
 
-To jump in and build Hafnium, follow the
-[getting started](docs/GettingStarted.md) instructions.
+The following diagram shows an overview of a typical aarch64-based system, and where the Hafnium
+fits:
 
-If you want to contribute to the project, see details of
-[how we accept contributions](CONTRIBUTING.md).
+![Hafnium Architecture](./docs/resources/diagrams/Hafnium_overview.png)
+
+Get in touch and keep up-to-date at:
+* [hafnium@lists.trustedfirmware.org](https://lists.trustedfirmware.org/mailman3/lists/hafnium.lists.trustedfirmware.org/).
+* At the community [Discord](https://discord.gg/8bxF2rRZBg).
+
+See feature requests and bugs throught [github](https://github.com/TF-Hafnium/hafnium/issues).
 
 ## Documentation
 
-More documentation is available on:
-
-*   [Hafnium architecture](docs/Architecture.md)
-*   [Code structure](docs/CodeStructure.md)
-*   [Hafnium test infrastructure](docs/Testing.md)
-*   [Running Hafnium under the Arm Fixed Virtual Platform](docs/FVP.md)
-*   [How to build a RAM disk containing VMs for Hafnium to run](docs/HafniumRamDisk.md)
-*   [Building Hafnium hermetically with Docker](docs/HermeticBuild.md)
-*   [The interface Hafnium provides to VMs](docs/VmInterface.md)
-*   [Scheduler VM expectations](docs/SchedulerExpectations.md)
-*   [Hafnium coding style](docs/StyleGuide.md)
+To find more about Hafnium, [view the full documentation](https://hafnium.readthedocs.io/en/latest/).
+It includes valuable resources such as: Getting Started guide, Threat Model, and other documentation.
