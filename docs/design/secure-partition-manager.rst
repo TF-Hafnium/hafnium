@@ -1177,7 +1177,7 @@ state of the operation.
 The SPMC is also the designated allocator for the memory handle. The hypervisor
 or OS kernel has the possibility to rely on the SPMC to maintain the state
 of the operation, thus saving memory.
-A lender SP can only donate NS memory to a borrower from the normal world.
+An SP can not share, lend or donate memory to the NWd.
 
 The SPMC supports the hypervisor retrieve request, as defined by the FF-A
 v1.1 EAC0 specification, in section 16.4.3. The intent is to aid with operations
