@@ -6,7 +6,7 @@ Threat Model
 ************
 Introduction
 ************
-This document provides a threat model for the TF-A `Secure Partition Manager`_
+This document provides a threat model for the TF-A :ref:`Secure Partition Manager`
 (SPM) implementation or more generally the S-EL2 reference firmware running on
 systems implementing the FEAT_SEL2 (formerly Armv8.4 Secure EL2) architecture
 extension. The SPM implementation is based on the `Arm Firmware Framework for
@@ -99,7 +99,7 @@ The following sections define:
 
 - Trust boundaries
 - Assets
-- Theat agents
+- Threat agents
 - Threat types
 
 Trust boundaries
@@ -1328,6 +1328,53 @@ element of the data flow diagram.
 |                        | FFA_INVALID_PARAMETERS. The permissiveness rules   |
 |                        | are enforced in any call to share/lend or donate   |
 |                        | the memory, and in retrieve requests.              |
+|                        | Security state attributes are provided by the SPMC |
+|                        | as set in the S2 translation regime, without       |
+|                        | requiring the configuration of the lender.         |
++------------------------+----------------------------------------------------+
+
++------------------------+----------------------------------------------------+
+| ID                     | 29                                                 |
++========================+====================================================+
+| ``Threat``             | **A rogue NS FF-A endpoint may attempt to share    |
+|                        | memory that belongs to another system component.** |
+|                        | E.g. the secure memory belonging to the monitor,   |
+|                        | or the SPMC, as well as other SPs.                 |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1, DF2                                           |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC, FF-A endpoint                                |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SP state                                           |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | NS-Endpoint, S-Endpoint                            |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Denial of Service, Tampering                       |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | High (4)         | Low (2)         |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | Medium (3)       | Low (2)         |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | High (12)        | Low (2)         |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | The system integrator shall configure memory       |
+|                        | ranges in the SPMC manifest, which limit the       |
+|                        | memory that can be used by SPs in their address    |
+|                        | space. This includes both secure and non-secure    |
+|                        | memory. All non-secure memory that is not          |
+|                        | assigned to SPs is used to create a page table     |
+|                        | that the SPMC relates to the NWd, which is used to |
+|                        | contain the memory sharing operations from the     |
+|                        | NWd to SPs. I.e. if the SPMC handles a request     |
+|                        | from the NWd to lend or donate memory that is not  |
+|                        | mapped in the referred page table, the operation   |
+|                        | will fail with FFA_ERROR. No secure memory shall   |
+|                        | be mapped, thus mitigating the possibility of      |
+|                        | an NWd component circumventing the sandboxing      |
+|                        | enforced by the SPMC.                              |
 +------------------------+----------------------------------------------------+
 
 --------------
@@ -1335,7 +1382,6 @@ element of the data flow diagram.
 *Copyright (c) 2023, Arm Limited. All rights reserved.*
 
 .. _Arm Firmware Framework for Arm A-profile: https://developer.arm.com/docs/den0077/latest
-.. _Secure Partition Manager: ../components/secure-partition-manager.html
 .. _Generic TF-A threat model: https://trustedfirmware-a.readthedocs.io/en/latest/threat_model/threat_model.html
 .. _FF-A ACS: https://github.com/ARM-software/ff-a-acs/releases
 
