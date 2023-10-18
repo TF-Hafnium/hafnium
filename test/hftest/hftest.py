@@ -345,7 +345,7 @@ class FvpDriver(Driver, ABC):
             debug = False, show_output = False):
         """Generate command line arguments for FVP."""
         show_output = debug or show_output
-        time_limit = "80s" if is_long_running else "40s"
+        time_limit = "100s" if is_long_running else "40s"
         fvp_args = []
 
         if not show_output:

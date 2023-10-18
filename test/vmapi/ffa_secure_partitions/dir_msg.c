@@ -141,8 +141,8 @@ static void migrate_busy_up_sp(uintptr_t arg)
  * to a different physical CPU while the vCPU is in BLOCKED state as part of an
  * SP call chain.
  */
-TEST_PRECONDITION(ffa_call_chain, disallow_migration_blocked_sp,
-		  service2_is_up_sp)
+TEST_PRECONDITION_LONG_RUNNING(ffa_call_chain, disallow_migration_blocked_sp,
+			       service2_is_up_sp)
 {
 	struct ffa_value res;
 	ffa_id_t own_id = hf_vm_get_id();

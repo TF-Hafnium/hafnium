@@ -43,6 +43,13 @@
 #define TEST_PRECONDITION(suite, test, precon_fn) \
 	HFTEST_TEST(suite, test, false, precon_fn)
 
+/*
+ * Define a long-running test as part of a test suite and add a precondition
+ * function.
+ */
+#define TEST_PRECONDITION_LONG_RUNNING(suite, test, precon_fn) \
+	HFTEST_TEST(suite, test, true, precon_fn)
+
 /* Define a test voluntarily skipped from the test suite. */
 #define TEST_SKIP(suite, test)                       \
 	static bool precon_skip_##suite_##test(void) \
