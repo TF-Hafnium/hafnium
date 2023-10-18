@@ -8,6 +8,7 @@ Getting Started
    building
    docs-build
    coding-style
+   commit-style
 
 --------------
 
