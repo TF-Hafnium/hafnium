@@ -11,6 +11,7 @@ Hafnium Documentation
    threat_model_spm
    change-log
    appendix
+   glossary
 
 --------------
 
