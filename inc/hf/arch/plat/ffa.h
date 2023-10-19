@@ -316,14 +316,6 @@ struct ffa_value plat_ffa_other_world_mem_reclaim(
 	ffa_memory_region_flags_t flags, struct mpool *page_pool);
 
 /**
- * Handles the memory retrieve request if the specified memory handle belongs
- * to the other world.
- */
-struct ffa_value plat_ffa_other_world_mem_retrieve(
-	struct vm_locked to_locked, struct ffa_memory_region *retrieve_request,
-	uint32_t length, struct mpool *page_pool);
-
-/**
  * Handles the continuation of the memory send operation in case the memory
  * region descriptor contains multiple segments.
  */

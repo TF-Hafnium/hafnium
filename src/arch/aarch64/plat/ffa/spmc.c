@@ -2563,18 +2563,6 @@ void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 	plat_ffa_enable_virtual_maintenance_interrupts(current_locked);
 }
 
-struct ffa_value plat_ffa_other_world_mem_retrieve(
-	struct vm_locked to_locked, struct ffa_memory_region *retrieve_request,
-	uint32_t length, struct mpool *page_pool)
-{
-	(void)to_locked;
-	(void)retrieve_request;
-	(void)length;
-	(void)page_pool;
-
-	return ffa_error(FFA_INVALID_PARAMETERS);
-}
-
 struct ffa_value plat_ffa_other_world_mem_send_continue(
 	struct vm *from, void *fragment, uint32_t fragment_length,
 	ffa_memory_handle_t handle, struct mpool *page_pool)

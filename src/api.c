@@ -3451,8 +3451,8 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 		ret = ffa_memory_retrieve(to_locked, retrieve_request, length,
 					  &api_page_pool);
 	} else {
-		ret = plat_ffa_other_world_mem_retrieve(
-			to_locked, retrieve_request, length, &api_page_pool);
+		dlog_error("Invalid FF-A memory handle.\n");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 	}
 out:
 	vm_unlock(&to_locked);
