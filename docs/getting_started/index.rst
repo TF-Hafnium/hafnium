@@ -10,6 +10,7 @@ Getting Started
    building
    coding-style
    commit-style
+   project-structure
 
 --------------
 
