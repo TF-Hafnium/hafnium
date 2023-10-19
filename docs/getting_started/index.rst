@@ -5,8 +5,9 @@ Getting Started
    :maxdepth: 1
    :caption: Contents
 
+   prerequisites
+   get-source
    building
-   docs-build
    coding-style
    commit-style
 
