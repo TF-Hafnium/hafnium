@@ -1,33 +1,5 @@
-Secure Partition Manager
-************************
-
-.. contents::
-
-Foreword
-========
-
-Three implementations of a Secure Partition Manager co-exist in the TF-A
-codebase:
-
-#. S-EL2 SPMC based on the FF-A specification `[1]`_, enabling virtualization in
-   the secure world, managing multiple S-EL1 or S-EL0 partitions.
-#. EL3 SPMC based on the FF-A specification, managing a single S-EL1 partition
-   without virtualization in the secure world.
-#. EL3 SPM based on the MM specification, legacy implementation managing a
-   single S-EL0 partition `[2]`_.
-
-These implementations differ in their respective SW architecture and only one
-can be selected at build time. This document:
-
-- describes the implementation from bullet 1. when the SPMC resides at S-EL2.
-- is not an architecture specification and it might provide assumptions
-  on sections mandated as implementation-defined in the specification.
-- covers the implications to TF-A used as a bootloader, and Hafnium used as a
-  reference code base for an S-EL2/SPMC secure firmware on platforms
-  implementing the FEAT_SEL2 architecture extension.
-
 Terminology
------------
+===========
 
 - The term Hypervisor refers to the NS-EL2 component managing Virtual Machines
   (or partitions) in the normal world.
@@ -40,7 +12,7 @@ Terminology
 - The term SP refers to a secure world "Virtual Machine" managed by an SPMC.
 
 Support for legacy platforms
-----------------------------
+============================
 
 The SPM is split into a dispatcher and a core component (respectively SPMD and
 SPMC) residing at different exception levels. To permit the FF-A specification

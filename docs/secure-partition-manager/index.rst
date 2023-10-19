@@ -1,5 +1,5 @@
-Design
-======
+Secure Partition Manager
+========================
 
 .. toctree::
    :maxdepth: 1
