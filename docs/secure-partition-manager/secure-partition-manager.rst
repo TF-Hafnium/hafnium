@@ -39,7 +39,7 @@ FEAT_SEL2 architecture extension is implemented, showing the SPMD
 and SPMC, one or multiple secure partitions, with an optional
 Hypervisor:
 
-.. image:: ../resources/diagrams/ff-a-spm-sel2.png
+.. image:: ../resources/diagrams/Hafnium_overview_SPMD.png
 
 TF-A build options
 ==================
