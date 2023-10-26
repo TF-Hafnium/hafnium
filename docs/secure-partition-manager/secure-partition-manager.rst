@@ -15,14 +15,28 @@ Sample reference stack
 ======================
 
 The following diagram illustrates a possible configuration when the
-FEAT_SEL2 architecture extension is implemented, showing the SPMD
-and SPMC, one or multiple secure partitions, with an optional
+FEAT_SEL2 architecture extension is implemented, showing the |SPMD|
+and |SPMC|, one or multiple secure partitions, with an optional
 Hypervisor:
 
 .. image:: ../resources/diagrams/Hafnium_overview_SPMD.png
 
+Integration with TF-A (Bootloader and SPMD)
+===========================================
+
+The `TF-A project`_ provides the reference implementation for the secure monitor
+for Arm A class devices, executing at EL3. It includes the implementation of the
+|SPMD|, which manages the world-switch, to relay the FF-A calls to the |SPMC|.
+
+TF-A also serves as the system bootlader, and it was used in the reference
+implemenation for the SPMC and SPs.
+SPs may be signed by different parties (SiP, OEM/ODM, TOS vendor, etc.).
+Thus they are supplied as distinct signed entities within the FIP flash
+image. The FIP image itself is not signed hence this provides the ability
+to upgrade SPs in the field.
+
 TF-A build options
-==================
+------------------
 
 This section explains the TF-A build options for an FF-A based SPM, in which SPMD
 is located at EL3.
@@ -41,7 +55,7 @@ the TF-A as SPMD, together making the SPM component.
   extensions.
 - **SP_LAYOUT_FILE**: this option specifies a text description file
   providing paths to SP binary images and manifests in DTS format
-  (see `Describing secure partitions`_). It is required when ``SPMD_SPM_AT_SEL2``
+  (see `Secure Partitions Layout File`_). It is required when ``SPMD_SPM_AT_SEL2``
   is enabled, i.e. when multiple secure partitions are to be loaded by BL2 on
   behalf of the SPMC.
 - **BL32** option is re-purposed to specify the SPMC image. It can specify either
@@ -102,7 +116,7 @@ implemented, the SPMC is located at S-EL2, and enabling secure boot:
     all fip
 
 FVP model invocation
-====================
+--------------------
 
 The FVP command line needs the following options to exercise the S-EL2 SPMC:
 
@@ -150,29 +164,91 @@ Sample FVP command line invocation:
     -C pci.pci_smmuv3.mmu.SMMU_IDR5=0xFFFF0472 -C pci.pci_smmuv3.mmu.SMMU_S_IDR1=0xA0000002 \
     -C pci.pci_smmuv3.mmu.SMMU_S_IDR2=0 -C pci.pci_smmuv3.mmu.SMMU_S_IDR3=0
 
-Boot process
-============
+SPMC Configuration
+==================
 
-Loading Hafnium and secure partitions in the secure world
----------------------------------------------------------
+This section details the configuration files required to deploy Hafnium as the SPMC,
+along with those required to configure each secure partion.
 
-TF-A BL2 is the bootlader for the SPMC and SPs in the secure world.
+SPMC Manifest
+-------------
 
-SPs may be signed by different parties (SiP, OEM/ODM, TOS vendor, etc.).
-Thus they are supplied as distinct signed entities within the FIP flash
-image. The FIP image itself is not signed hence this provides the ability
-to upgrade SPs in the field.
+This manifest contains the SPMC *attribute* node consumed by the SPMD at boot
+time. It implements `[1]`_ (SP manifest at physical FF-A instance) and serves
+two different cases:
 
-Booting through TF-A
---------------------
+The SPMC manifest is used by the SPMD to setup the environment required by the
+SPMC to run at S-EL2. SPs run at S-EL1 or S-EL0.
 
-SP manifests
+.. code:: shell
+
+    attribute {
+        spmc_id = <0x8000>;
+        maj_ver = <0x1>;
+        min_ver = <0x1>;
+        exec_state = <0x0>;
+        load_address = <0x0 0x6000000>;
+        entrypoint = <0x0 0x6000000>;
+        binary_size = <0x60000>;
+    };
+
+- *spmc_id* defines the endpoint ID value that SPMC can query through
+  ``FFA_ID_GET``.
+- *maj_ver/min_ver*. SPMD checks provided FF-A version versus its internal
+  version and aborts if not matching.
+- *exec_state* defines the SPMC execution state (AArch64 or AArch32).
+  Notice Hafnium used as a SPMC only supports AArch64.
+- *load_address* and *binary_size* are mostly used to verify secondary
+  entry points fit into the loaded binary image.
+- *entrypoint* defines the cold boot primary core entry point used by
+  SPMD (currently matches ``BL32_BASE``) to enter the SPMC.
+
+Other nodes in the manifest are consumed by Hafnium in the secure world.
+A sample can be found at `[7]`_:
+
+- The *hypervisor* node describes SPs. *is_ffa_partition* boolean attribute
+  indicates a FF-A compliant SP. The *load_address* field specifies the load
+  address at which BL2 loaded the SP package.
+- The *cpus* node provides the platform topology and allows MPIDR to VMPIDR mapping.
+  Note the primary core is declared first, then secondary cores are declared
+  in reverse order.
+- The *memory* nodes provide platform information on the ranges of memory
+  available for use by SPs at runtime. These ranges relate to either
+  secure or non-secure memory, depending on the *device_type* field.
+  If the field specifies "memory" the range is secure, else if it specifies
+  "ns-memory" the memory is non-secure. The system integrator must exclude
+  the memory used by other components that are not SPs, such as the monitor,
+  or the SPMC itself, the OS Kernel/Hypervisor, or other NWd VMs.
+  The SPMC  limits the SP's address space such that they can only refer to memory
+  inside of those ranges, either by defining memory region nodes in their manifest
+  as well as memory starting at the load address until the limit defined by the memory
+  size. Thus, the SPMC prevents rogue SPs from tampering with memory from other
+  components.
+
+Secure Partitions Configuration
+-------------------------------
+
+SP Manifests
 ~~~~~~~~~~~~
 
 An SP manifest describes SP attributes as defined in `[1]`_
 (partition manifest at virtual FF-A instance) in DTS format. It is
 represented as a single file associated with the SP. A sample is
 provided by `[5]`_. A binding document is provided by `[6]`_.
+
+Platform topology
+~~~~~~~~~~~~~~~~~
+
+The *execution-ctx-count* SP manifest field can take the value of one or the
+total number of PEs. The FF-A specification `[1]`_  recommends the
+following SP types:
+
+- Pinned MP SPs: an execution context matches a physical PE. MP SPs must
+  implement the same number of ECs as the number of PEs in the platform.
+- Migratable UP SPs: a single execution context can run and be migrated on any
+  physical PE. Such SP declares a single EC in its SP manifest. An UP SP can
+  receive a direct message request originating from any physical core targeting
+  the single execution context.
 
 Secure Partition packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -208,8 +284,8 @@ as shown:
 
 .. uml:: ../resources/diagrams/plantuml/fip-secure-partitions.puml
 
-Describing secure partitions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Secure Partitions Layout File
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A json-formatted description file is passed to the build flow specifying paths
 to the SP binary image and associated DTS partition manifest file. The latter
@@ -294,64 +370,8 @@ the SP`_ for more details).
         },
     }
 
-SPMC manifest
-~~~~~~~~~~~~~
-
-This manifest contains the SPMC *attribute* node consumed by the SPMD at boot
-time. It implements `[1]`_ (SP manifest at physical FF-A instance) and serves
-two different cases:
-
-- The SPMC resides at S-EL1: the SPMC manifest is used by the SPMD to setup a
-  SP that co-resides with the SPMC and executes at S-EL1 or Secure Supervisor
-  mode.
-- The SPMC resides at S-EL2: the SPMC manifest is used by the SPMD to setup
-  the environment required by the SPMC to run at S-EL2. SPs run at S-EL1 or
-  S-EL0.
-
-.. code:: shell
-
-    attribute {
-        spmc_id = <0x8000>;
-        maj_ver = <0x1>;
-        min_ver = <0x1>;
-        exec_state = <0x0>;
-        load_address = <0x0 0x6000000>;
-        entrypoint = <0x0 0x6000000>;
-        binary_size = <0x60000>;
-    };
-
-- *spmc_id* defines the endpoint ID value that SPMC can query through
-  ``FFA_ID_GET``.
-- *maj_ver/min_ver*. SPMD checks provided version versus its internal
-  version and aborts if not matching.
-- *exec_state* defines the SPMC execution state (AArch64 or AArch32).
-  Notice Hafnium used as a SPMC only supports AArch64.
-- *load_address* and *binary_size* are mostly used to verify secondary
-  entry points fit into the loaded binary image.
-- *entrypoint* defines the cold boot primary core entry point used by
-  SPMD (currently matches ``BL32_BASE``) to enter the SPMC.
-
-Other nodes in the manifest are consumed by Hafnium in the secure world.
-A sample can be found at `[7]`_:
-
-- The *hypervisor* node describes SPs. *is_ffa_partition* boolean attribute
-  indicates a FF-A compliant SP. The *load_address* field specifies the load
-  address at which BL2 loaded the SP package.
-- *cpus* node provide the platform topology and allows MPIDR to VMPIDR mapping.
-  Note the primary core is declared first, then secondary cores are declared
-  in reverse order.
-- The *memory* nodes provide platform information on the ranges of memory
-  available for use by SPs at runtime. These ranges relate to either
-  secure or non-secure memory, depending on the *device_type* field.
-  If the field specifies "memory" the range is secure, else if it specifies
-  "ns-memory" the memory is non-secure. The system integrator must exclude
-  the memory used by other components that are not SPs, such as the monitor,
-  or the SPMC itself, the OS Kernel/Hypervisor, or other NWd VMs. The SPMC
-  limits the SP's address space such that they do not access memory outside
-  of those ranges.
-
 SPMC boot
-~~~~~~~~~
+=========
 
 The SPMC is loaded by BL2 as the BL32 image.
 
@@ -367,20 +387,8 @@ registers:
 - X1 holds the ``HW_CONFIG`` physical address.
 - X4 holds the currently running core linear id.
 
-Loading of SPs
-~~~~~~~~~~~~~~
-
-At boot time, BL2 loads SPs sequentially in addition to the SPMC as depicted
-below:
-
-.. uml:: ../resources/diagrams/plantuml/bl2-loading-sp.puml
-
-Note this boot flow is an implementation sample on Arm's FVP platform.
-Platforms not using TF-A's *Firmware CONFiguration* framework would adjust to a
-different boot flow. The flow restricts to a maximum of 8 secure partitions.
-
 Secure boot
-~~~~~~~~~~~
+-----------
 
 The SP content certificate is inserted as a separate FIP item so that BL2 loads SPMC,
 SPMC manifest, secure partitions and verifies them for authenticity and integrity.
@@ -395,135 +403,7 @@ the use of two root keys namely S-ROTPK and NS-ROTPK:
 - A maximum of 4 partitions can be signed with the S-ROTPK key and 4 partitions
   signed with the NS-ROTPK key.
 
-Also refer to `Describing secure partitions`_ and `TF-A build options`_ sections.
-
-Hafnium in the secure world
-===========================
-
-General considerations
-----------------------
-
-Build platform for the secure world
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In the Hafnium reference implementation specific code parts are only relevant to
-the secure world. Such portions are isolated in architecture specific files
-and/or enclosed by a ``SECURE_WORLD`` macro.
-
-Secure partitions scheduling
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The FF-A specification `[1]`_ provides two ways to relinquinsh CPU time to
-secure partitions. For this a VM (Hypervisor or OS kernel), or SP invokes one of:
-
-- the FFA_MSG_SEND_DIRECT_REQ interface.
-- the FFA_RUN interface.
-
-Additionally a secure interrupt can pre-empt the normal world execution and give
-CPU cycles by transitioning to EL3 and S-EL2.
-
-Platform topology
-~~~~~~~~~~~~~~~~~
-
-The *execution-ctx-count* SP manifest field can take the value of one or the
-total number of PEs. The FF-A specification `[1]`_  recommends the
-following SP types:
-
-- Pinned MP SPs: an execution context matches a physical PE. MP SPs must
-  implement the same number of ECs as the number of PEs in the platform.
-- Migratable UP SPs: a single execution context can run and be migrated on any
-  physical PE. Such SP declares a single EC in its SP manifest. An UP SP can
-  receive a direct message request originating from any physical core targeting
-  the single execution context.
-
-Parsing SP partition manifests
-------------------------------
-
-Hafnium consumes SP manifests as defined in `[1]`_ and `SP manifests`_.
-Note the current implementation may not implement all optional fields.
-
-The SP manifest may contain memory and device regions nodes. In case of
-an S-EL2 SPMC:
-
-- Memory regions are mapped in the SP EL1&0 Stage-2 translation regime at
-  load time (or EL1&0 Stage-1 for an S-EL1 SPMC). A memory region node can
-  specify RX/TX buffer regions in which case it is not necessary for an SP
-  to explicitly invoke the ``FFA_RXTX_MAP`` interface. The memory referred
-  shall be contained within the memory ranges defined in SPMC manifest. The
-  NS bit in the attributes field should be consistent with the security
-  state of the range that it relates to. I.e. non-secure memory shall be
-  part of a non-secure memory range, and secure memory shall be contained
-  in a secure memory range of a given platform.
-- Device regions are mapped in the SP EL1&0 Stage-2 translation regime (or
-  EL1&0 Stage-1 for an S-EL1 SPMC) as peripherals and possibly allocate
-  additional resources (e.g. interrupts).
-
-For the S-EL2 SPMC, base addresses for memory and device region nodes are IPAs
-provided the SPMC identity maps IPAs to PAs within SP EL1&0 Stage-2 translation
-regime.
-
-Note: in the current implementation both VTTBR_EL2 and VSTTBR_EL2 point to the
-same set of page tables. It is still open whether two sets of page tables shall
-be provided per SP. The memory region node as defined in the specification
-provides a memory security attribute hinting to map either to the secure or
-non-secure EL1&0 Stage-2 table if it exists.
-
-Passing boot data to the SP
----------------------------
-
-In `[1]`_ , the section  "Boot information protocol" defines a method for passing
-data to the SPs at boot time. It specifies the format for the boot information
-descriptor and boot information header structures, which describe the data to be
-exchanged between SPMC and SP.
-The specification also defines the types of data that can be passed.
-The aggregate of both the boot info structures and the data itself is designated
-the boot information blob, and is passed to a Partition as a contiguous memory
-region.
-
-Currently, the SPM implementation supports the FDT type which is used to pass the
-partition's DTB manifest.
-
-The region for the boot information blob is allocated through the SP package.
-
-.. image:: ../resources/diagrams/partition-package.png
-
-To adjust the space allocated for the boot information blob, the json description
-of the SP (see section `Describing secure partitions`_) shall be updated to contain
-the manifest offset. If no offset is provided the manifest offset defaults to 0x1000,
-which is the page size in the Hafnium SPMC.
-
-The configuration of the boot protocol is done in the SPs manifest. As defined by
-the specification, the manifest field 'gp-register-num' configures the GP register
-which shall be used to pass the address to the partitions boot information blob when
-booting the partition.
-In addition, the Hafnium SPMC implementation requires the boot information arguments
-to be listed in a designated DT node:
-
-.. code:: shell
-
-  boot-info {
-      compatible = "arm,ffa-manifest-boot-info";
-      ffa_manifest;
-  };
-
-The whole secure partition package image (see `Secure Partition packages`_) is
-mapped to the SP secure EL1&0 Stage-2 translation regime. As such, the SP can
-retrieve the address for the boot information blob in the designated GP register,
-process the boot information header and descriptors, access its own manifest
-DTB blob and extract its partition manifest properties.
-
-SP Boot order
--------------
-
-SP manifests provide an optional boot order attribute meant to resolve
-dependencies such as an SP providing a service required to properly boot
-another SP. SPMC boots the SPs in accordance to the boot order attribute,
-lowest to the highest value. If the boot order attribute is absent from the FF-A
-manifest, the SP is treated as if it had the highest boot order value
-(i.e. lowest booting priority).
-
-It is possible for an SP to call into another SP through a direct request
-provided the latter SP has already been booted.
+Also refer to `Secure Partitions Configuration`_ and `TF-A build options`_ sections.
 
 Boot phases
 -----------
@@ -579,67 +459,120 @@ a NWd FF-A driver has been loaded:
 
 Refer to `Power management`_ for further details.
 
-Notifications
--------------
+Loading of SPs
+--------------
 
-The FF-A v1.1 specification `[1]`_ defines notifications as an asynchronous
-communication mechanism with non-blocking semantics. It allows for one FF-A
-endpoint to signal another for service provision, without hindering its current
-progress.
+At boot time, BL2 loads SPs sequentially in addition to the SPMC as depicted
+below:
 
-Hafnium currently supports 64 notifications. The IDs of each notification define
-a position in a 64-bit bitmap.
+.. uml:: ../resources/diagrams/plantuml/bl2-loading-sp.puml
 
-The signaling of notifications can interchangeably happen between NWd and SWd
-FF-A endpoints.
+Note this boot flow is an implementation sample on Arm's FVP platform.
+Platforms not using TF-A's *Firmware CONFiguration* framework would adjust to a
+different boot flow. The flow restricts to a maximum of 8 secure partitions.
 
-The SPMC is in charge of managing notifications from SPs to SPs, from SPs to
-VMs, and from VMs to SPs. An hypervisor component would only manage
-notifications from VMs to VMs. Given the SPMC has no visibility of the endpoints
-deployed in NWd, the Hypervisor or OS kernel must invoke the interface
-FFA_NOTIFICATION_BITMAP_CREATE to allocate the notifications bitmap per FF-A
-endpoint in the NWd that supports it.
+SP Boot order
+~~~~~~~~~~~~~
 
-A sender can signal notifications once the receiver has provided it with
-permissions. Permissions are provided by invoking the interface
-FFA_NOTIFICATION_BIND.
+SP manifests provide an optional boot order attribute meant to resolve
+dependencies such as an SP providing a service required to properly boot
+another SP. SPMC boots the SPs in accordance to the boot order attribute,
+lowest to the highest value. If the boot order attribute is absent from the FF-A
+manifest, the SP is treated as if it had the highest boot order value
+(i.e. lowest booting priority). The FF-A specification mandates this field
+is unique to each SP.
 
-Notifications are signaled by invoking FFA_NOTIFICATION_SET. Henceforth
-they are considered to be in a pending sate. The receiver can retrieve its
-pending notifications invoking FFA_NOTIFICATION_GET, which, from that moment,
-are considered to be handled.
+It is possible for an SP to call into another SP through a direct request
+provided the latter SP has already been booted.
 
-Per the FF-A v1.1 spec, each FF-A endpoint must be associated with a scheduler
-that is in charge of donating CPU cycles for notifications handling. The
-FF-A driver calls FFA_NOTIFICATION_INFO_GET to retrieve the information about
-which FF-A endpoints have pending notifications. The receiver scheduler is
-called and informed by the FF-A driver, and it should allocate CPU cycles to the
-receiver.
+Passing boot data to the SP
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-There are two types of notifications supported:
+In `[1]`_ , the section  "Boot information protocol" defines a method for passing
+data to the SPs at boot time. It specifies the format for the boot information
+descriptor and boot information header structures, which describe the data to be
+exchanged between SPMC and SP.
+The specification also defines the types of data that can be passed.
+The aggregate of both the boot info structures and the data itself is designated
+the boot information blob, and is passed to a Partition as a contiguous memory
+region.
 
-- Global, which are targeted to a FF-A endpoint and can be handled within any of
-  its execution contexts, as determined by the scheduler of the system.
-- Per-vCPU, which are targeted to a FF-A endpoint and to be handled within a
-  a specific execution context, as determined by the sender.
+Currently, the SPM implementation supports the FDT type which is used to pass the
+partition's DTB manifest.
 
-The type of a notification is set when invoking FFA_NOTIFICATION_BIND to give
-permissions to the sender.
+The region for the boot information blob is allocated through the SP package.
 
-Notification signaling resorts to two interrupts:
+.. image:: ../resources/diagrams/partition-package.png
 
-- Schedule Receiver Interrupt: non-secure physical interrupt to be handled by
-  the FF-A driver within the receiver scheduler. At initialization the SPMC
-  donates a SGI ID chosen from the secure SGI IDs range and configures it as
-  non-secure. The SPMC triggers this SGI on the currently running core when
-  there are pending notifications, and the respective receivers need CPU cycles
-  to handle them.
-- Notifications Pending Interrupt: virtual interrupt to be handled by the
-  receiver of the notification. Set when there are pending notifications for the
-  given secure partition. The NPI is pended when the NWd relinquishes CPU cycles
-  to an SP.
+To adjust the space allocated for the boot information blob, the json description
+of the SP (see section `Secure Partitions Layout File`_) shall be updated to contain
+the manifest offset. If no offset is provided the manifest offset defaults to 0x1000,
+which is the page size in the Hafnium SPMC.
 
-The notifications receipt support is enabled in the partition FF-A manifest.
+The configuration of the boot protocol is done in the SPs manifest. As defined by
+the specification, the manifest field 'gp-register-num' configures the GP register
+which shall be used to pass the address to the partitions boot information blob when
+booting the partition.
+In addition, the Hafnium SPMC implementation requires the boot information arguments
+to be listed in a designated DT node:
+
+.. code:: shell
+
+  boot-info {
+      compatible = "arm,ffa-manifest-boot-info";
+      ffa_manifest;
+  };
+
+The whole secure partition package image (see `Secure Partition packages`_) is
+mapped to the SP secure EL1&0 Stage-2 translation regime. As such, the SP can
+retrieve the address for the boot information blob in the designated GP register,
+process the boot information header and descriptors, access its own manifest
+DTB blob and extract its partition manifest properties.
+
+SPMC Runtime
+============
+
+Parsing SP partition manifests
+------------------------------
+
+Hafnium consumes SP manifests as defined in `[1]`_ and `SP manifests`_.
+Note the current implementation may not implement all optional fields.
+
+The SP manifest may contain memory and device regions nodes:
+
+- Memory regions are mapped in the SP EL1&0 Stage-2 translation regime at
+  load time (or EL1&0 Stage-1 for an S-EL1 SPMC). A memory region node can
+  specify RX/TX buffer regions in which case it is not necessary for an SP
+  to explicitly invoke the ``FFA_RXTX_MAP`` interface. The memory referred
+  shall be contained within the memory ranges defined in SPMC manifest. The
+  NS bit in the attributes field should be consistent with the security
+  state of the range that it relates to. I.e. non-secure memory shall be
+  part of a non-secure memory range, and secure memory shall be contained
+  in a secure memory range of a given platform.
+- Device regions are mapped in the SP EL1&0 Stage-2 translation regime (or
+  EL1&0 Stage-1 for an S-EL1 SPMC) as peripherals and possibly allocate
+  additional resources (e.g. interrupts).
+
+For the SPMC, base addresses for memory and device region nodes are IPAs provided
+the SPMC identity maps IPAs to PAs within SP EL1&0 Stage-2 translation regime.
+
+Note: in the current implementation both VTTBR_EL2 and VSTTBR_EL2 point to the
+same set of page tables. It is still open whether two sets of page tables shall
+be provided per SP. The memory region node as defined in the specification
+provides a memory security attribute hinting to map either to the secure or
+non-secure EL1&0 Stage-2 table if it exists.
+
+Secure partitions scheduling
+----------------------------
+
+The FF-A specification `[1]`_ provides two ways to relinquinsh CPU time to
+secure partitions. For this a VM (Hypervisor or OS kernel), or SP invokes one of:
+
+- the FFA_MSG_SEND_DIRECT_REQ interface.
+- the FFA_RUN interface.
+
+Additionally a secure interrupt can pre-empt the normal world execution and give
+CPU cycles by transitioning to EL3 and S-EL2.
 
 Mandatory interfaces
 --------------------
@@ -985,6 +918,68 @@ permits SPMD to SPMC communication and either way.
 - SPMD to SPMC direct request/response uses ERET conduit.
 
 This is used in particular to convey power management messages.
+
+Notifications
+-------------
+
+The FF-A v1.1 specification `[1]`_ defines notifications as an asynchronous
+communication mechanism with non-blocking semantics. It allows for one FF-A
+endpoint to signal another for service provision, without hindering its current
+progress.
+
+Hafnium currently supports 64 notifications. The IDs of each notification define
+a position in a 64-bit bitmap.
+
+The signaling of notifications can interchangeably happen between NWd and SWd
+FF-A endpoints.
+
+The SPMC is in charge of managing notifications from SPs to SPs, from SPs to
+VMs, and from VMs to SPs. An hypervisor component would only manage
+notifications from VMs to VMs. Given the SPMC has no visibility of the endpoints
+deployed in NWd, the Hypervisor or OS kernel must invoke the interface
+FFA_NOTIFICATION_BITMAP_CREATE to allocate the notifications bitmap per FF-A
+endpoint in the NWd that supports it.
+
+A sender can signal notifications once the receiver has provided it with
+permissions. Permissions are provided by invoking the interface
+FFA_NOTIFICATION_BIND.
+
+Notifications are signaled by invoking FFA_NOTIFICATION_SET. Henceforth
+they are considered to be in a pending sate. The receiver can retrieve its
+pending notifications invoking FFA_NOTIFICATION_GET, which, from that moment,
+are considered to be handled.
+
+Per the FF-A v1.1 spec, each FF-A endpoint must be associated with a scheduler
+that is in charge of donating CPU cycles for notifications handling. The
+FF-A driver calls FFA_NOTIFICATION_INFO_GET to retrieve the information about
+which FF-A endpoints have pending notifications. The receiver scheduler is
+called and informed by the FF-A driver, and it should allocate CPU cycles to the
+receiver.
+
+There are two types of notifications supported:
+
+- Global, which are targeted to a FF-A endpoint and can be handled within any of
+  its execution contexts, as determined by the scheduler of the system.
+- Per-vCPU, which are targeted to a FF-A endpoint and to be handled within a
+  a specific execution context, as determined by the sender.
+
+The type of a notification is set when invoking FFA_NOTIFICATION_BIND to give
+permissions to the sender.
+
+Notification signaling resorts to two interrupts:
+
+- Schedule Receiver Interrupt: non-secure physical interrupt to be handled by
+  the FF-A driver within the receiver scheduler. At initialization the SPMC
+  donates an SGI ID chosen from the secure SGI IDs range and configures it as
+  non-secure. The SPMC triggers this SGI on the currently running core when
+  there are pending notifications, and the respective receivers need CPU cycles
+  to handle them.
+- Notifications Pending Interrupt: virtual interrupt to be handled by the
+  receiver of the notification. Set when there are pending notifications for the
+  given secure partition. The NPI is pended when the NWd relinquishes CPU cycles
+  to an SP.
+
+The notifications receipt support is enabled in the partition FF-A manifest.
 
 Memory Sharing
 --------------
@@ -1386,7 +1381,7 @@ When using the SPMD as a Secure Payload Dispatcher:
   userspace.
 
 Arm architecture extensions for security hardening
-==================================================
+--------------------------------------------------
 
 Hafnium supports the following architecture extensions for security hardening:
 
@@ -1416,7 +1411,7 @@ Hafnium supports the following architecture extensions for security hardening:
   vCPU contexts permitting MTE usage from VMs/SPs.
 
 SMMUv3 support in Hafnium
-=========================
+-------------------------
 
 An SMMU is analogous to an MMU in a CPU. It performs address translations for
 Direct Memory Access (DMA) requests from system I/O devices.
@@ -1442,7 +1437,7 @@ of SMMUv3 functionality and the corresponding software support in Hafnium is
 provided here.
 
 SMMUv3 features
----------------
+~~~~~~~~~~~~~~~
 
 -  SMMUv3 provides Stage1, Stage2 translation as well as nested (Stage1 + Stage2)
    translation support. It can either bypass or abort incoming translations as
@@ -1466,7 +1461,7 @@ SMMUv3 features
    devices.
 
 SMMUv3 Programming Interfaces
------------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 SMMUv3 has three software interfaces that are used by the Hafnium driver to
 configure the behaviour of SMMUv3 and manage the streams.
@@ -1481,7 +1476,7 @@ configure the behaviour of SMMUv3 and manage the streams.
    respectively.
 
 Peripheral device manifest
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Currently, SMMUv3 driver in Hafnium only supports dependent peripheral devices.
 These devices are dependent on PE endpoint to initiate and receive memory
@@ -1511,7 +1506,7 @@ system :
     };
 
 SMMUv3 driver limitations
--------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The primary design goal for the Hafnium SMMU driver is to support secure
 streams.
@@ -1524,7 +1519,7 @@ streams.
 -  No support for independent peripheral devices.
 
 S-EL0 Partition support
-=======================
+-----------------------
 The SPMC (Hafnium) has limited capability to run S-EL0 FF-A partitions using
 FEAT_VHE (mandatory with ARMv8.1 in non-secure state, and in secure world
 with ARMv8.4 and FEAT_SEL2).
@@ -1555,6 +1550,8 @@ progress.
 
 References
 ==========
+
+.. _TF-A project: https://trustedfirmware-a.readthedocs.io/en/latest/
 
 .. _[1]:
 
