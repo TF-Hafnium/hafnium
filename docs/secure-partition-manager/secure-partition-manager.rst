@@ -11,26 +11,6 @@ Terminology
 - The term VM refers to a normal world Virtual Machine managed by an Hypervisor.
 - The term SP refers to a secure world "Virtual Machine" managed by an SPMC.
 
-Support for legacy platforms
-============================
-
-The SPM is split into a dispatcher and a core component (respectively SPMD and
-SPMC) residing at different exception levels. To permit the FF-A specification
-adoption and a smooth migration, the SPMD supports an SPMC residing either at
-S-EL1 or S-EL2:
-
-- The SPMD is located at EL3 and mainly relays the FF-A protocol from NWd
-  (Hypervisor or OS kernel) to the SPMC.
-- The same SPMD component is used for both S-EL1 and S-EL2 SPMC configurations.
-- The SPMC exception level is a build time choice.
-
-TF-A supports both cases:
-
-- S-EL1 SPMC for platforms not supporting the FEAT_SEL2 architecture
-  extension. The SPMD relays the FF-A protocol from EL3 to S-EL1.
-- S-EL2 SPMC for platforms implementing the FEAT_SEL2 architecture
-  extension. The SPMD relays the FF-A protocol from EL3 to S-EL2.
-
 Sample reference stack
 ======================
 
@@ -44,73 +24,43 @@ Hypervisor:
 TF-A build options
 ==================
 
-This section explains the TF-A build options involved in building with
-support for an FF-A based SPM where the SPMD is located at EL3 and the
-SPMC located at S-EL1, S-EL2 or EL3:
+This section explains the TF-A build options for an FF-A based SPM, in which SPMD
+is located at EL3.
+
+This is a step needed for integrating Hafnium as the S-EL2 SPMC and
+the TF-A as SPMD, together making the SPM component.
 
 - **SPD=spmd**: this option selects the SPMD component to relay the FF-A
   protocol from NWd to SWd back and forth. It is not possible to
   enable another Secure Payload Dispatcher when this option is chosen.
 - **SPMD_SPM_AT_SEL2**: this option adjusts the SPMC exception
   level to being at S-EL2. It defaults to enabled (value 1) when
-  SPD=spmd is chosen.
-- **SPMC_AT_EL3**: this option adjusts the SPMC exception level to being
-  at EL3.
-- If neither ``SPMD_SPM_AT_SEL2`` or ``SPMC_AT_EL3`` are enabled the SPMC
-  exception level is set to S-EL1.
-  ``SPMD_SPM_AT_SEL2`` is enabled. The context save/restore routine
-  and exhaustive list of registers is visible at `[4]`_.
+  SPD=spmd is chosen.The context save/restore routine and exhaustive list
+  of registers is visible at `[4]`_. When set the reference software stack
+  assumes enablement of FEAT_PAuth, FEAT_BTI and FEAT_MTE architecture
+  extensions.
 - **SP_LAYOUT_FILE**: this option specifies a text description file
   providing paths to SP binary images and manifests in DTS format
-  (see `Describing secure partitions`_). It
-  is required when ``SPMD_SPM_AT_SEL2`` is enabled hence when multiple
-  secure partitions are to be loaded by BL2 on behalf of the SPMC.
-
-+---------------+------------------+-------------+-------------------------+
-|               | SPMD_SPM_AT_SEL2 | SPMC_AT_EL3 | CTX_INCLUDE_EL2_REGS(*) |
-+---------------+------------------+-------------+-------------------------+
-| SPMC at S-EL1 |        0         |      0      |             0           |
-+---------------+------------------+-------------+-------------------------+
-| SPMC at S-EL2 | 1 (default when  |      0      |             1           |
-|               |    SPD=spmd)     |             |                         |
-+---------------+------------------+-------------+-------------------------+
-| SPMC at EL3   |        0         |      1      |             0           |
-+---------------+------------------+-------------+-------------------------+
-
-Other combinations of such build options either break the build or are not
-supported.
-
-Notes:
-
-- Only Arm's FVP platform is supported to use with the TF-A reference software
-  stack.
-- When ``SPMD_SPM_AT_SEL2=1``, the reference software stack assumes enablement
-  of FEAT_PAuth, FEAT_BTI and FEAT_MTE architecture extensions.
-- ``(*) CTX_INCLUDE_EL2_REGS``, this flag is TF-A internal and informational
-  in this table. When set, it provides the generic support for saving/restoring
-  EL2 registers required when S-EL2 firmware is present.
-- BL32 option is re-purposed to specify the SPMC image. It can specify either
+  (see `Describing secure partitions`_). It is required when ``SPMD_SPM_AT_SEL2``
+  is enabled, i.e. when multiple secure partitions are to be loaded by BL2 on
+  behalf of the SPMC.
+- **BL32** option is re-purposed to specify the SPMC image. It can specify either
   the Hafnium binary path (built for the secure world) or the path to a TEE
   binary implementing FF-A interfaces.
-- BL33 option can specify the TFTF binary or a normal world loader
-  such as U-Boot or the UEFI framework payload.
+- **BL33** option to specify normal world loader such as U-Boot or the UEFI
+  framework payload, which would use FF-A calls during runtime to interact with
+  Hafnium as the SPMC.
 
-Sample TF-A build command line when the SPMC is located at S-EL1
-(e.g. when the FEAT_SEL2 architecture extension is not implemented):
+As a result of configuring ``SPD=spmd`` and ``SPMD_SPM_AT_SEL2`` TF-A provides
+context save/restore operations when entering/exiting an EL2 execution context.
 
-.. code:: shell
-
-    make \
-    CROSS_COMPILE=aarch64-none-elf- \
-    SPD=spmd \
-    SPMD_SPM_AT_SEL2=0 \
-    BL32=<path-to-tee-binary> \
-    BL33=<path-to-bl33-binary> \
-    PLAT=fvp \
-    all fip
+There are other build options that relate support other valid FF-A
+system configurations where the SPMC is implemented at S-EL1 and EL3.
+Note that they conflict with those needed to integrate with Hafnium as the SPMC.
+For more details refer to |TF-A| build options `[10]`_.
 
 Sample TF-A build command line when FEAT_SEL2 architecture extension is
-implemented and the SPMC is located at S-EL2:
+implemented and the SPMC is located at S-EL2, for Arm's FVP platform:
 
 .. code:: shell
 
@@ -149,20 +99,6 @@ implemented, the SPMC is located at S-EL2, and enabling secure boot:
     ARM_ROTPK_LOCATION=devel_rsa \
     ROT_KEY=plat/arm/board/common/rotpk/arm_rotprivk_rsa.pem \
     GENERATE_COT=1 \
-    all fip
-
-Sample TF-A build command line when the SPMC is located at EL3:
-
-.. code:: shell
-
-    make \
-    CROSS_COMPILE=aarch64-none-elf- \
-    SPD=spmd \
-    SPMD_SPM_AT_SEL2=0 \
-    SPMC_AT_EL3=1 \
-    BL32=<path-to-tee-binary> \
-    BL33=<path-to-bl33-binary> \
-    PLAT=fvp \
     all fip
 
 FVP model invocation
@@ -1656,6 +1592,10 @@ Client <https://developer.arm.com/documentation/den0006/d/>`__
 .. _[9]:
 
 [9] https://trustedfirmware-a.readthedocs.io/en/latest/design/firmware-design.html#dynamic-configuration-during-cold-boot
+
+.. _[10]:
+
+[10] https://trustedfirmware-a.readthedocs.io/en/latest/getting_started/build-options.html#
 
 --------------
 
