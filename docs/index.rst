@@ -6,7 +6,7 @@ Hafnium Documentation
    :numbered:
 
    Home<self>
-   about/index
+   about
    getting_started/index
    design/index
    threat_model_spm
