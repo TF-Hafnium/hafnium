@@ -495,3 +495,19 @@ static inline struct ffa_value sp_route_interrupt_to_target_vcpu_cmd_send(
 
 struct ffa_value sp_route_interrupt_to_target_vcpu_cmd(
 	ffa_id_t source, ffa_vcpu_index_t target_vcpu_id, uint32_t int_id);
+
+/**
+ * Command to request SP to pend an interrupt in the extended SPI range.
+ * The command is the hex representation of the string "espi".
+ */
+#define SP_TRIGGER_ESPI_CMD 0x65737069U
+
+static inline struct ffa_value sp_trigger_espi_cmd_send(ffa_id_t source,
+							ffa_id_t dest,
+							uint32_t espi_id)
+{
+	return ffa_msg_send_direct_req(source, dest, SP_TRIGGER_ESPI_CMD,
+				       espi_id, 0, 0, 0);
+}
+
+struct ffa_value sp_trigger_espi_cmd(ffa_id_t source, uint32_t espi_id);

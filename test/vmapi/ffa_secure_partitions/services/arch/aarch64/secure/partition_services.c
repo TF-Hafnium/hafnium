@@ -16,6 +16,7 @@
 
 #include "vmapi/hf/call.h"
 
+#include "../smc.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
@@ -94,4 +95,27 @@ struct ffa_value sp_check_state_transitions_cmd(ffa_id_t test_source,
 	/* TODO: test the invocation of FFA_RUN ABI.*/
 	/* Perform legal invocation of FFA_MSG_SEND_DIRECT_RESP. */
 	return sp_success(own_id, test_source, 0);
+}
+
+/**
+ * Using an SiP call, this helper utility can pend an interrupt. Useful for
+ * testing purposes.
+ */
+struct ffa_value sp_trigger_espi_cmd(ffa_id_t source, uint32_t espi_id)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+
+	/*
+	 * The SiP function ID, 0x82000100, must have been added to the SMC
+	 * whitelist of the SP that invokes it.
+	 */
+	res = smc32(0x82000100, espi_id, 0, 0, 0, 0, 0, 0);
+
+	if (res.func == SMCCC_ERROR_UNKNOWN) {
+		HFTEST_LOG("SiP SMC call not supported");
+		sp_error(own_id, source, 0);
+	}
+
+	return sp_success(own_id, source, 0);
 }

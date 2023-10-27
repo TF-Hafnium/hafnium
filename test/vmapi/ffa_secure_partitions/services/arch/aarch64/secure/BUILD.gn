@@ -43,6 +43,7 @@ source_set("partition_services") {
 
   deps = [
     ":common",
+    "//src/arch/aarch64:smc",
     "//test/vmapi/common:ffa",
   ]
 }
