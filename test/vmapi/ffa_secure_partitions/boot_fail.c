@@ -16,6 +16,8 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+#define SP2_ESPI_TEST_INTID 5000
+
 /*
  * The following is a precondition function, for the current system set-up.
  * Check that SP 1 is configured to fail at boot in this setup.
@@ -107,6 +109,39 @@ TEST_PRECONDITION(boot_fail, sp2_fails_to_init, sp2_fail_at_boot)
 
 	nwd_to_sp_echo(service1_info->vm_id);
 	nwd_to_sp_echo(service3_info->vm_id);
+}
+
+/**
+ * This test is an extension of the prior test, sp2_fails_to_init. It aims to
+ * validate the functionality of SPMC to reclaim resources, such as interrupts,
+ * belonging to an aborted SP. It does so by sending a command to SP1 to pend
+ * an espi interrupt belonging to the aborted SP2.
+ *
+ * The SPMC shall not resume the execution context of aborted SP2. Similar to
+ * the prior test, it ensures SP1 and SP3 boot successfully by performing echo
+ * tests.
+ */
+TEST_PRECONDITION(boot_fail, secure_interrupt_targets_aborted_sp2,
+		  sp2_fail_at_boot)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+	struct ffa_value ret;
+
+	ret = sp_trigger_espi_cmd_send(hf_vm_get_id(), service1_info->vm_id,
+				       SP2_ESPI_TEST_INTID);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
+
+	nwd_to_sp_echo(service1_info->vm_id);
+	nwd_to_sp_echo(service3_info->vm_id);
+
+	/* The aborted SP shall not be resumed by a direct request message. */
+	ret = sp_get_last_interrupt_cmd_send(hf_vm_get_id(),
+					     service2_info->vm_id);
+	EXPECT_FFA_ERROR(ret, FFA_ABORTED);
 }
 
 /**
