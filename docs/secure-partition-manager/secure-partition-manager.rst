@@ -1,3 +1,14 @@
+Foreword
+========
+
+- This document describes the FF-A implementation from `[1]`_ for the
+  configuration where the SPMC resides at S-EL2 on platforms implementing the
+  FEAT_SEL2 architecture extension.
+- It is not an architecture specification and it might provide assumptions on
+  sections mandated as implementation-defined in the specification.
+- It covers the implications of TF-A used as a bootloader, and Hafnium used as a
+  reference code base for an SPMC.
+
 Terminology
 ===========
 
@@ -584,7 +595,7 @@ non-secure EL1&0 Stage-2 table if it exists.
 Secure partitions scheduling
 ----------------------------
 
-The FF-A specification `[1]`_ provides two ways to provide CPU cycles to
+The FF-A specification `[1]`_ provides two ways to allocate CPU cycles to
 secure partitions. For this a VM (Hypervisor or OS kernel), or SP invokes one of:
 
 - the FFA_MSG_SEND_DIRECT_REQ interface.
