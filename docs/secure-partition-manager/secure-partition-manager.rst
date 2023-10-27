@@ -586,7 +586,7 @@ The SP manifest may contain memory and device regions nodes:
 For the SPMC, base addresses for memory and device region nodes are IPAs provided
 the SPMC identity maps IPAs to PAs within SP EL1&0 Stage-2 translation regime.
 
-Note: in the current implementation both VTTBR_EL2 and VSTTBR_EL2 point to the
+ote: in the current implementation both VTTBR_EL2 and VSTTBR_EL2 point to the
 same set of page tables. It is still open whether two sets of page tables shall
 be provided per SP. The memory region node as defined in the specification
 provides a memory security attribute hinting to map either to the secure or
@@ -988,8 +988,8 @@ receiver.
 
 There are two types of notifications supported:
 
-- Global, which are targeted to a FF-A endpoint and can be handled within any of
-  its execution contexts, as determined by the scheduler of the system.
+- Global, which are targeted to an FF-A endpoint and can be handled within any
+  of its execution contexts, as determined by the scheduler of the system.
 - Per-vCPU, which are targeted to a FF-A endpoint and to be handled within a
   a specific execution context, as determined by the sender.
 
@@ -1582,11 +1582,8 @@ a S-EL0 partition to accept a direct message from secure world and normal world,
 and generate direct responses to them.
 All S-EL0 partitions must use AArch64. AArch32 S-EL0 partitions are not supported.
 
-Memory sharing, indirect messaging, and notifications functionality with S-EL0
-partitions is supported.
-
-Interrupt handling is not supported with S-EL0 partitions and is work in
-progress.
+Interrupt handling, Memory sharing, indirect messaging, and notifications features
+in context of S-EL0 partitions are supported.
 
 References
 ==========
