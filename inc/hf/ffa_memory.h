@@ -13,6 +13,11 @@
 
 #include "vmapi/hf/ffa.h"
 
+bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
+				    uint32_t ffa_version,
+				    uint32_t fragment_length,
+				    bool send_transaction);
+
 struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				 struct ffa_memory_region *memory_region,
 				 uint32_t memory_share_length,

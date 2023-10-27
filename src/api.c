@@ -2981,24 +2981,6 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 
 	memory_region_v1_0 = (struct ffa_memory_region_v1_0 *)allocated;
 
-	if (memory_region_v1_0->reserved_0 != 0U ||
-	    memory_region_v1_0->reserved_1 != 0U) {
-		dlog_verbose(
-			"Memory region descriptor reserved fields must be "
-			"0.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* This should also prevent over flows. */
-	if (memory_region_v1_0->receiver_count > MAX_MEM_SHARE_RECIPIENTS) {
-		dlog_verbose(
-			"Max number of recipients supported is %u "
-			"specified %u\n",
-			MAX_MEM_SHARE_RECIPIENTS,
-			memory_region_v1_0->receiver_count);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
 	receivers_length = sizeof(struct ffa_memory_access_v1_0) *
 			   memory_region_v1_0->receiver_count;
 	receivers_end = sizeof(struct ffa_memory_region) + receivers_length;
@@ -3009,50 +2991,6 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	 */
 	composite_offset_v1_0 =
 		memory_region_v1_0->receivers[0].composite_memory_region_offset;
-
-	if (!send_transaction) {
-		if (composite_offset_v1_0 != 0) {
-			dlog_verbose(
-				"Composite offset memory region descriptor "
-				"offset must be 0 for retrieve requests. "
-				"Currently %d\n",
-				composite_offset_v1_0);
-			return ffa_error(FFA_INVALID_PARAMETERS);
-		}
-	} else {
-		bool comp_offset_is_zero = composite_offset_v1_0 == 0U;
-		bool comp_offset_lt_transaction_descriptor_size =
-			composite_offset_v1_0 <
-			sizeof(struct ffa_memory_region_v1_0) +
-				receivers_length;
-		bool comp_offset_with_comp_gt_fragment_length =
-			composite_offset_v1_0 +
-				sizeof(struct ffa_composite_memory_region) >
-			*fragment_length;
-		if (comp_offset_is_zero ||
-		    comp_offset_lt_transaction_descriptor_size ||
-		    comp_offset_with_comp_gt_fragment_length) {
-			dlog_verbose(
-				"Invalid composite memory region descriptor "
-				"offset for send transaction %d\n",
-				composite_offset_v1_0);
-			return ffa_error(FFA_INVALID_PARAMETERS);
-		}
-	}
-
-	for (uint32_t i = 1; i < memory_region_v1_0->receiver_count; i++) {
-		const uint32_t current_offset =
-			memory_region_v1_0->receivers[i]
-				.composite_memory_region_offset;
-
-		if (current_offset != composite_offset_v1_0) {
-			dlog_verbose(
-				"Composite offset %x differs from %x in index "
-				"%u\n",
-				composite_offset_v1_0, current_offset, i);
-			return ffa_error(FFA_INVALID_PARAMETERS);
-		}
-	}
 
 	/* Determine the composite offset for v1.1 descriptor. */
 	if (send_transaction) {
@@ -3224,6 +3162,12 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	memcpy_s(allocated_entry, MM_PPOOL_ENTRY_SIZE, from_msg,
 		 fragment_length);
 
+	if (!ffa_memory_region_sanity_check(allocated_entry, ffa_version,
+					    fragment_length, true)) {
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
 	ret = api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 		allocated_entry, &fragment_length, &length, ffa_version, true);
 	if (ret.func != FFA_SUCCESS_32) {
@@ -3231,18 +3175,6 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	}
 
 	memory_region = allocated_entry;
-
-	if (memory_region->memory_access_desc_size <
-	    sizeof(struct ffa_memory_access_v1_0)) {
-		dlog_verbose(
-			"Invalid memory access descritor size %d must be "
-			"at least as large as the v1_0 memory access array "
-			"%d\n",
-			memory_region->memory_access_desc_size,
-			sizeof(struct ffa_memory_access_v1_0));
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
 
 	if (fragment_length < sizeof(struct ffa_memory_region) +
 				      memory_region->memory_access_desc_size) {
@@ -3274,16 +3206,6 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		dlog_verbose(
 			"FFA_MEM_DONATE only supports one recipient. "
 			"Specified %u\n",
-			memory_region->receiver_count);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	if (memory_region->receiver_count > MAX_MEM_SHARE_RECIPIENTS) {
-		dlog_verbose(
-			"Max number of recipients supported is %u "
-			"specified %u\n",
-			MAX_MEM_SHARE_RECIPIENTS,
 			memory_region->receiver_count);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -3407,6 +3329,12 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 		 */
 		dlog_verbose("%s: RX buffer not ready.\n", __func__);
 		ret = ffa_error(FFA_BUSY);
+		goto out;
+	}
+
+	if (!ffa_memory_region_sanity_check(retrieve_msg, ffa_version,
+					    fragment_length, false)) {
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 

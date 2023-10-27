@@ -23,6 +23,17 @@
 #define FFA_VERSION_COMPILED \
 	MAKE_FFA_VERSION(FFA_VERSION_MAJOR, FFA_VERSION_MINOR)
 
+/**
+ * Check major versions are equal and the minor version of the caller is
+ * less than or equal to the minor version of the callee.
+ */
+#define FFA_VERSIONS_ARE_COMPATIBLE(v_caller, v_callee)                        \
+	((((v_caller >> FFA_VERSION_MAJOR_OFFSET) & FFA_VERSION_MAJOR_MASK) == \
+	  ((v_callee >> FFA_VERSION_MAJOR_OFFSET) &                            \
+	   FFA_VERSION_MAJOR_MASK)) &&                                         \
+	 (((v_caller >> FFA_VERSION_MINOR_OFFSET) & FFA_VERSION_MINOR_MASK) <= \
+	  ((v_callee >> FFA_VERSION_MINOR_OFFSET) & FFA_VERSION_MINOR_MASK)))
+
 /* clang-format off */
 
 #define FFA_LOW_32_ID  0x84000060
@@ -1126,6 +1137,13 @@ struct ffa_mem_relinquish {
 	uint32_t endpoint_count;
 	ffa_id_t endpoints[];
 };
+
+/**
+ * Returns the first FF-A version that matches the memory access descriptor
+ * size.
+ */
+uint32_t ffa_version_from_memory_access_desc_size(
+	uint32_t memory_access_desc_size);
 
 /**
  * To maintain forwards compatability we can't make assumptions about the size

@@ -445,6 +445,215 @@ static struct ffa_value constituents_get_mode(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
+uint32_t ffa_version_from_memory_access_desc_size(
+	uint32_t memory_access_desc_size)
+{
+	switch (memory_access_desc_size) {
+	/*
+	 * v1.0 and v1.1 memory access descriptors are the same size however
+	 * v1.1 is the first version to include the memory access descriptor
+	 * size field so return v1.1.
+	 */
+	case sizeof(struct ffa_memory_access):
+		return MAKE_FFA_VERSION(1, 1);
+	}
+	return 0;
+}
+
+/**
+ * Check if the receivers size and offset given is valid for the senders
+ * FF-A version.
+ */
+static bool receiver_size_and_offset_valid_for_version(
+	uint32_t receivers_size, uint32_t receivers_offset,
+	uint32_t ffa_version)
+{
+	/*
+	 * Check that the version that the memory access descriptor size belongs
+	 * to is compatible with the FF-A version we believe the sender to be.
+	 */
+	uint32_t expected_ffa_version =
+		ffa_version_from_memory_access_desc_size(receivers_size);
+	if (!FFA_VERSIONS_ARE_COMPATIBLE(expected_ffa_version, ffa_version)) {
+		return false;
+	}
+
+	/*
+	 * Check the receivers_offset matches the version we found from
+	 * memory access descriptor size.
+	 */
+	switch (expected_ffa_version) {
+	case MAKE_FFA_VERSION(1, 1):
+		return receivers_offset == sizeof(struct ffa_memory_region);
+	default:
+		return false;
+	}
+}
+
+/**
+ * Check the values set for fields in the memory region are valid and safe.
+ * Offset values are within safe bounds, receiver count will not cause overflows
+ * and reserved fields are 0.
+ */
+bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
+				    uint32_t ffa_version,
+				    uint32_t fragment_length,
+				    bool send_transaction)
+{
+	uint32_t receiver_count;
+	struct ffa_memory_access *receiver;
+	uint32_t composite_offset_0;
+
+	if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
+		struct ffa_memory_region_v1_0 *memory_region_v1_0 =
+			(struct ffa_memory_region_v1_0 *)memory_region;
+		/* Check the reserved fields are 0. */
+		if (memory_region_v1_0->reserved_0 != 0 ||
+		    memory_region_v1_0->reserved_1 != 0) {
+			dlog_verbose("Reserved fields must be 0.\n");
+			return false;
+		}
+
+		receiver_count = memory_region_v1_0->receiver_count;
+	} else {
+		uint32_t receivers_size =
+			memory_region->memory_access_desc_size;
+		uint32_t receivers_offset = memory_region->receivers_offset;
+
+		/* Check the reserved field is 0. */
+		if (memory_region->reserved[0] != 0 ||
+		    memory_region->reserved[1] != 0 ||
+		    memory_region->reserved[2] != 0) {
+			dlog_verbose("Reserved fields must be 0.\n");
+			return false;
+		}
+
+		/*
+		 * Check memory_access_desc_size matches the size of the struct
+		 * for the senders FF-A version.
+		 */
+		if (!receiver_size_and_offset_valid_for_version(
+			    receivers_size, receivers_offset, ffa_version)) {
+			dlog_verbose(
+				"Invalid memory access descriptor size %d, "
+				" or receiver offset %d, "
+				"for FF-A version %#x\n",
+				receivers_size, receivers_offset, ffa_version);
+			return false;
+		}
+
+		receiver_count = memory_region->receiver_count;
+	}
+
+	/* Check receiver count is not too large. */
+	if (receiver_count > MAX_MEM_SHARE_RECIPIENTS) {
+		dlog_verbose(
+			"Max number of recipients supported is %u "
+			"specified %u\n",
+			MAX_MEM_SHARE_RECIPIENTS, receiver_count);
+		return false;
+	}
+
+	/* Check values in the memory access descriptors. */
+	/*
+	 * The composite offset values must be the same for all recievers so
+	 * check the first one is valid and then they are all the same.
+	 */
+	receiver = ffa_version == MAKE_FFA_VERSION(1, 0)
+			   ? (struct ffa_memory_access *)&(
+				     (struct ffa_memory_region_v1_0 *)
+					     memory_region)
+				     ->receivers[0]
+			   : ffa_memory_region_get_receiver(memory_region, 0);
+	assert(receiver != NULL);
+	composite_offset_0 = receiver->composite_memory_region_offset;
+
+	if (!send_transaction) {
+		if (composite_offset_0 != 0) {
+			dlog_verbose(
+				"Composite offset memory region descriptor "
+				"offset must be 0 for retrieve requests. "
+				"Currently %d",
+				composite_offset_0);
+			return false;
+		}
+	} else {
+		bool comp_offset_is_zero = composite_offset_0 == 0U;
+		bool comp_offset_lt_transaction_descriptor_size =
+			composite_offset_0 <
+			(sizeof(struct ffa_memory_region) +
+			 (uint32_t)(memory_region->memory_access_desc_size *
+				    memory_region->receiver_count));
+		bool comp_offset_with_comp_gt_fragment_length =
+			composite_offset_0 +
+				sizeof(struct ffa_composite_memory_region) >
+			fragment_length;
+		if (comp_offset_is_zero ||
+		    comp_offset_lt_transaction_descriptor_size ||
+		    comp_offset_with_comp_gt_fragment_length) {
+			dlog_verbose(
+				"Invalid composite memory region descriptor "
+				"offset for send transaction %u\n",
+				composite_offset_0);
+			return false;
+		}
+	}
+
+	for (int i = 0; i < memory_region->receiver_count; i++) {
+		uint32_t composite_offset;
+
+		if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
+			struct ffa_memory_region_v1_0 *memory_region_v1_0 =
+				(struct ffa_memory_region_v1_0 *)memory_region;
+
+			struct ffa_memory_access_v1_0 *receiver_v1_0 =
+				&memory_region_v1_0->receivers[i];
+			/* Check reserved fields are 0 */
+			if (receiver_v1_0->reserved_0 != 0) {
+				dlog_verbose(
+					"Reserved field in the memory access "
+					" descriptor must be zero "
+					" Currently reciever %d has a reserved "
+					" field with a value of %d\n",
+					i, receiver_v1_0->reserved_0);
+				return false;
+			}
+			/*
+			 * We can cast to the current version receiver as the
+			 * remaining fields we are checking have the same
+			 * offsets for all versions since memory access
+			 * descriptors are forwards compatible.
+			 */
+			receiver = (struct ffa_memory_access *)receiver_v1_0;
+		} else {
+			receiver = ffa_memory_region_get_receiver(memory_region,
+								  i);
+			assert(receiver != NULL);
+
+			if (receiver->reserved_0 != 0) {
+				dlog_verbose(
+					"Reserved field in the memory access "
+					" descriptor must be zero "
+					" Currently reciever %d has a reserved "
+					" field with a value of %d\n",
+					i, receiver->reserved_0);
+				return false;
+			}
+		}
+
+		/* Check composite offset values are equal for all receivers. */
+		composite_offset = receiver->composite_memory_region_offset;
+		if (composite_offset != composite_offset_0) {
+			dlog_verbose(
+				"Composite offset %x differs from %x in index "
+				"%u\n",
+				composite_offset, composite_offset_0);
+			return false;
+		}
+	}
+	return true;
+}
+
 /**
  * Verify that all pages have the same mode, that the starting mode
  * constitutes a valid state and obtain the next mode to apply
