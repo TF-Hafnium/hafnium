@@ -2386,6 +2386,144 @@ TEST_PRECONDITION(memory_sharing, ffa_validate_attributes, hypervisor_only)
 }
 
 /**
+ * Memory can't be shared if the reserved_0 field in the ffa memory access
+ * descriptor is not 0. This is checked for both v1.0 and v1.1 memory access
+ * descriptors as the position of the reserved_0 moves.
+ */
+TEST(memory_sharing, ffa_validate_memory_access_reserved_mbz)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_share,
+		ffa_mem_lend,
+		ffa_mem_donate,
+	};
+	struct ffa_memory_access *receiver;
+	struct ffa_memory_access_v1_0 receiver_v1_0;
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	/* Check memory access reserved_0 mbz is enforced for v1.0 and v1.1. */
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+		  0);
+
+	receiver = ffa_memory_region_get_receiver((void *)mb.send, 0);
+	receiver->reserved_0 = 0xFFFFFFFF;
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_ERROR_32);
+		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
+	}
+
+	/* Run test for v1.0 mem access descriptors. */
+	EXPECT_NE(ffa_version(MAKE_FFA_VERSION(1, 0)), FFA_ERROR_32);
+
+	ffa_memory_access_init_v1_0(&receiver_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	receiver_v1_0.reserved_0 = 0xFFFFFFFF;
+
+	/* Initialize memory sharing test according to v1.0. */
+	ffa_memory_region_init_v1_0(
+		(struct ffa_memory_region_v1_0 *)mb.send, HF_MAILBOX_SIZE,
+		hf_vm_get_id(), &receiver_v1_0, 1, constituents,
+		ARRAY_SIZE(constituents), 0, 0, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL,
+		&msg_size);
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_ERROR_32);
+		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
+	}
+}
+
+/**
+ * Check that large values for the memory access descriptor size
+ * and receiver count return INVALID_PARAMETERS and cannot be used
+ * to access data outside of the receivers array.
+ */
+TEST(memory_sharing, ffa_memory_access_no_overflow)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_share,
+		ffa_mem_lend,
+		ffa_mem_donate,
+	};
+	struct ffa_memory_region *memory_region =
+		(struct ffa_memory_region *)mb.send;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	/*
+	 * Check a large memory_access_desc_size cannot be used to access
+	 * memory out of bounds of the recievers array.
+	 */
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+		  0);
+
+	memory_region->memory_access_desc_size =
+		2 * sizeof(struct ffa_memory_access);
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_ERROR_32);
+		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Check receiver_count cannot be used to access
+	 * memory out of bounds of the recievers array.
+	 */
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			  service1_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+		  0);
+
+	memory_region->receiver_count = MAX_MEM_SHARE_RECIPIENTS;
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_ERROR_32);
+		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
+	}
+}
+/**
  * Memory can't be shared if flags in the memory transaction description that
  * Must Be Zero, are not.
  */
