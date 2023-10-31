@@ -3598,8 +3598,8 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_0)
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
-	struct ffa_memory_access_v1_0 receiver_v1_0 = {0};
-	struct ffa_memory_access receiver_v_cur = {0};
+	struct ffa_memory_access_v1_0 receiver_v1_0;
+	struct ffa_memory_access receiver_v_cur;
 	uint32_t msg_size;
 	struct ffa_partition_msg *retrieve_message = mb.send;
 	ffa_memory_handle_t handle;
@@ -3656,7 +3656,165 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_0)
 	}
 }
 
-/*
+/**
+ * For the v1.1 transaction descriptor it is the case that the memory
+ * access descriptor is smaller than the descriptor for the current
+ * version. Therefore, we test that sending the smaller descriptor with
+ * the correct memory access descriptor size in the memory region
+ * descriptor passes as expected.
+ */
+TEST(memory_sharing, share_ffa_v1_1_to_current_version)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+	};
+	/* v1.1 and v1.0 share the same memory access descriptors */
+	struct ffa_memory_access_v1_0 receivers_v1_1[2];
+	struct ffa_memory_access receivers_v_cur[2];
+	uint32_t msg_size;
+	struct ffa_partition_msg *retrieve_message = mb.send;
+	uint8_t *ptr = pages;
+	ffa_memory_handle_t handle;
+
+	SERVICE_SELECT(service2_info->vm_id, "memory_increment", mb.send);
+
+	ffa_memory_access_init_v1_0(&receivers_v1_1[0], service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	ffa_memory_access_init(&receivers_v_cur[0], service1_info->vm_id,
+			       FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
+
+	ffa_memory_access_init_v1_0(&receivers_v1_1[1], service2_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	ffa_memory_access_init(&receivers_v_cur[1], service2_info->vm_id,
+			       FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
+
+	ffa_memory_region_init(
+		(struct ffa_memory_region *)mb.send, HF_MAILBOX_SIZE,
+		hf_vm_get_id(), (void *)receivers_v1_1,
+		ARRAY_SIZE(receivers_v1_1),
+		sizeof(struct ffa_memory_access_v1_0), constituents,
+		ARRAY_SIZE(constituents), 0, 0, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL,
+		&msg_size);
+
+	/* Set current version to FF-A v1.1. */
+	EXPECT_NE(ffa_version(MAKE_FFA_VERSION(1, 1)), FFA_ERROR_32);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+
+	handle = ffa_mem_success_handle(ret);
+
+	/* Send v1.current retrieve to the borrower. */
+	msg_size = ffa_memory_retrieve_request_init(
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		HF_PRIMARY_VM_ID, receivers_v_cur, ARRAY_SIZE(receivers_v_cur),
+		sizeof(struct ffa_memory_access), 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+	ffa_rxtx_header_init(hf_vm_get_id(), service2_info->vm_id, msg_size,
+			     &retrieve_message->header);
+	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+
+	/* Run service2 for it to fetch memory, and then use memory. */
+	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
+
+	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
+		ptr[i] = i;
+	}
+
+	/* Run service2 for it access memory. */
+	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
+
+	for (int i = 0; i < PAGE_SIZE; ++i) {
+		/* Should have been incremented by each receiver. */
+		uint8_t value = i + 1;
+		EXPECT_EQ(ptr[i], value);
+	}
+
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
+/**
+ * For the v1.1 transaction descriptor it is the case that the memory
+ * access descriptor is smaller than the descriptor for the current
+ * version. Sending a current memory descriptor to a v1_1 endpoint
+ * should still be possible this test checks that is the case.
+ */
+TEST(memory_sharing, share_ffa_current_version_to_v1_1)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+	};
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receiver_v1_1;
+	struct ffa_memory_access receiver_v_cur;
+	uint32_t msg_size;
+	struct ffa_partition_msg *retrieve_message = mb.send;
+	ffa_memory_handle_t handle;
+	uint8_t *ptr = pages;
+
+	SERVICE_SELECT(service1_info->vm_id, "retrieve_ffa_v1_1", mb.send);
+
+	ffa_memory_access_init_v1_0(&receiver_v1_1, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	ffa_memory_access_init(&receiver_v_cur, service1_info->vm_id,
+			       FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
+
+	/* Initialize memory sharing test according to current version. */
+	ffa_memory_region_init((struct ffa_memory_region *)mb.send,
+			       HF_MAILBOX_SIZE, hf_vm_get_id(), &receiver_v_cur,
+			       1, sizeof(struct ffa_memory_access),
+			       constituents, ARRAY_SIZE(constituents), 0, 0,
+			       FFA_MEMORY_NORMAL_MEM,
+			       FFA_MEMORY_CACHE_WRITE_BACK,
+			       FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+	EXPECT_NE(ret.func, FFA_ERROR_32);
+
+	handle = ffa_mem_success_handle(ret);
+
+	msg_size = ffa_memory_retrieve_request_init(
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		hf_vm_get_id(), (void *)&receiver_v1_1, 1,
+		sizeof(struct ffa_memory_access_v1_0), 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
+			     &retrieve_message->header);
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/* Initialise the memory before giving it. */
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		ptr[i] = i;
+	}
+
+	/* Run service1 to access memory. */
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		uint8_t val = i + 1;
+		ASSERT_EQ(ptr[i], val);
+	}
+}
+
+/**
  * Validate that a borrower can't retrieve memory if the fragments aren't
  * totally sent.
  */

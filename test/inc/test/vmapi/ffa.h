@@ -105,6 +105,11 @@ void send_fragmented_memory_region(
 	uint32_t constituent_count, uint32_t remaining_constituent_count,
 	uint32_t sent_length, uint32_t total_length,
 	ffa_memory_handle_t *handle, uint64_t allocator_mask);
+void memory_region_desc_from_rx_fragments(uint32_t fragment_length,
+					  uint32_t total_length,
+					  ffa_memory_handle_t handle,
+					  void *memory_region, void *recv_buf,
+					  uint32_t memory_region_max_size);
 void retrieve_memory(void *recv_buf, ffa_memory_handle_t handle,
 		     struct ffa_memory_region *memory_region_ret,
 		     size_t memory_region_max_size, uint32_t msg_size);

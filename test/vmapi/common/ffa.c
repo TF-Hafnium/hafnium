@@ -443,6 +443,38 @@ static struct ffa_partition_msg *get_mailbox_message(void *recv)
 	return msg;
 }
 
+/**
+ * Retrieve a memory region descriptor from fragments in the rx buffer.
+ * We keep building the memory region descriptor form the rx buffer until
+ * the fragment offset matches the total length we expect.
+ */
+void memory_region_desc_from_rx_fragments(uint32_t fragment_length,
+					  uint32_t total_length,
+					  ffa_memory_handle_t handle,
+					  void *memory_region, void *recv_buf,
+					  uint32_t memory_region_max_size)
+{
+	struct ffa_value ret;
+	uint32_t fragment_offset = fragment_length;
+
+	while (fragment_offset < total_length) {
+		ret = ffa_mem_frag_rx(handle, fragment_offset);
+		EXPECT_EQ(ret.func, FFA_MEM_FRAG_TX_32);
+		EXPECT_EQ(ffa_frag_handle(ret), handle);
+		fragment_length = ret.arg3;
+		EXPECT_GT(fragment_length, 0);
+		ASSERT_LE(fragment_offset + fragment_length,
+			  memory_region_max_size);
+		/* Copy received fragment. */
+		memcpy_s((uint8_t *)memory_region + fragment_offset,
+			 memory_region_max_size - fragment_offset, recv_buf,
+			 fragment_length);
+		fragment_offset += fragment_length;
+		ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	}
+	EXPECT_EQ(fragment_offset, total_length);
+}
+
 /*
  * Retrieve a memory region from `recv_buf`. Copies all the fragments into
  * `memory_region_ret` if non-null, and checks that the total length of all
@@ -457,7 +489,6 @@ void retrieve_memory(void *recv_buf, ffa_memory_handle_t handle,
 	struct ffa_memory_access *receiver;
 	uint32_t fragment_length;
 	uint32_t total_length;
-	uint32_t fragment_offset;
 	ffa_id_t own_id = hf_vm_get_id();
 
 	ret = ffa_mem_retrieve_req(msg_size, msg_size);
@@ -490,28 +521,9 @@ void retrieve_memory(void *recv_buf, ffa_memory_handle_t handle,
 	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
 	/* Retrieve the remaining fragments. */
-	fragment_offset = fragment_length;
-	while (fragment_offset < total_length) {
-		dlog_verbose("Calling again. frag offset: %x; total: %x\n",
-			     fragment_offset, total_length);
-		ret = ffa_mem_frag_rx(handle, fragment_offset);
-		EXPECT_EQ(ret.func, FFA_MEM_FRAG_TX_32);
-		EXPECT_EQ(ffa_frag_handle(ret), handle);
-		/* Sender MBZ at virtual instance. */
-		EXPECT_EQ(ffa_frag_sender(ret), 0);
-		fragment_length = ret.arg3;
-		EXPECT_GT(fragment_length, 0);
-		ASSERT_LE(fragment_offset + fragment_length,
-			  memory_region_max_size);
-		if (memory_region_ret != NULL) {
-			memcpy_s((uint8_t *)memory_region_ret + fragment_offset,
-				 memory_region_max_size - fragment_offset,
-				 recv_buf, fragment_length);
-		}
-		fragment_offset += fragment_length;
-		ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
-	}
-	EXPECT_EQ(fragment_offset, total_length);
+	memory_region_desc_from_rx_fragments(fragment_length, total_length,
+					     handle, memory_region_ret,
+					     recv_buf, memory_region_max_size);
 }
 
 /*
