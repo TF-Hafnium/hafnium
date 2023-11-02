@@ -107,11 +107,11 @@ void ffa_memory_region_init_header_v1_0(
 	ffa_memory_attributes_t attributes, ffa_memory_region_flags_t flags,
 	ffa_memory_handle_t handle, uint32_t tag, uint32_t receiver_count);
 
-void ffa_memory_access_v1_0_init_permissions(
-	struct ffa_memory_access_v1_0 *receiver, ffa_id_t receiver_id,
-	enum ffa_data_access data_access,
-	enum ffa_instruction_access instruction_access,
-	ffa_memory_receiver_flags_t flags);
+void ffa_memory_access_init_v1_0(struct ffa_memory_access_v1_0 *receiver,
+				 ffa_id_t receiver_id,
+				 enum ffa_data_access data_access,
+				 enum ffa_instruction_access instruction_access,
+				 ffa_memory_receiver_flags_t flags);
 
 uint32_t ffa_memory_region_init_v1_0(
 	struct ffa_memory_region_v1_0 *memory_region,

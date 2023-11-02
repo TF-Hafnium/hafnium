@@ -48,7 +48,7 @@ TEST(memory_sharing, share_retrieve_relinquish)
 			  FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	ret = ffa_mem_share(msg_size, msg_size);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -86,7 +86,7 @@ TEST(memory_sharing, fail_on_share_twice)
 			  FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	ret = ffa_mem_share(msg_size, msg_size);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -99,7 +99,7 @@ TEST(memory_sharing, fail_on_share_twice)
 			  FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	ret = ffa_mem_share(msg_size, msg_size);
 	EXPECT_EQ(ret.func, FFA_ERROR_32);
@@ -132,7 +132,7 @@ TEST(memory_sharing, lend_retrieve_relinquish)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_lend(msg_size, msg_size);
@@ -174,7 +174,7 @@ TEST(memory_sharing, force_fragmented_share_retrieve_relinquish)
 			  FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, &msg_size,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size,
 			  &fragment_length),
 		  0);
 	EXPECT_EQ(msg_size, fragment_length);
@@ -248,7 +248,7 @@ TEST(memory_sharing, ffa_validate_attributes)
 				  invalid_attributes[i].memory_type,
 				  invalid_attributes[i].memory_cacheability,
 				  invalid_attributes[i].memory_shareability,
-				  NULL, &msg_size),
+				  NULL, NULL, &msg_size),
 			  0);
 
 		/* Call the various mem send functions on the same region. */
@@ -287,7 +287,7 @@ TEST(memory_sharing, ffa_validate_mbz)
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	/* Using the same region, call the various mem send functions. */
@@ -324,7 +324,7 @@ TEST(memory_sharing, lend_reclaim)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_lend(msg_size, msg_size);
@@ -361,7 +361,7 @@ TEST(memory_sharing, lend_reclaim_before_retrieve)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_lend(msg_size, msg_size);
@@ -397,7 +397,7 @@ TEST(memory_sharing, share_reclaim)
 			  FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_share(msg_size, msg_size);
@@ -437,7 +437,7 @@ TEST(memory_sharing, share_reclaim_before_retrieve)
 			  FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_share(msg_size, msg_size);

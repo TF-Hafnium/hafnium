@@ -262,14 +262,19 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 {
 	struct ffa_memory_access receiver_send_permissions;
 	struct ffa_memory_access receiver_retrieve_permissions;
+	/*
+	 * Use the sender id as the impdef value so we can use this in later
+	 * testing.
+	 */
+	struct ffa_memory_access_impdef impdef_val = {{sender, sender + 1}};
 
-	ffa_memory_access_init_permissions(&receiver_send_permissions,
-					   recipient, send_data_access,
-					   send_instruction_access, 0);
+	ffa_memory_access_init(&receiver_send_permissions, recipient,
+			       send_data_access, send_instruction_access, 0,
+			       &impdef_val);
 
-	ffa_memory_access_init_permissions(&receiver_retrieve_permissions,
-					   recipient, retrieve_data_access,
-					   retrieve_instruction_access, 0);
+	ffa_memory_access_init(&receiver_retrieve_permissions, recipient,
+			       retrieve_data_access,
+			       retrieve_instruction_access, 0, &impdef_val);
 
 	return send_memory_and_retrieve_request_multi_receiver(
 		share_func, tx_buffer, sender, constituents, constituent_count,
@@ -301,6 +306,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	struct ffa_partition_msg *retrieve_message;
 	bool not_specify_memory_type = share_func == FFA_MEM_DONATE_32 ||
 				       (share_func == FFA_MEM_LEND_32);
+	struct ffa_memory_access_impdef impdef_val = {{sender, sender + 1}};
 
 	/* Send everything except the last constituent in the first fragment. */
 	remaining_constituent_count = ffa_memory_region_init_single_receiver(
@@ -310,7 +316,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 		not_specify_memory_type ? FFA_MEMORY_NOT_SPECIFIED_MEM
 					: FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
-		&total_length, &fragment_length);
+		&impdef_val, &total_length, &fragment_length);
 	EXPECT_EQ(remaining_constituent_count, 0);
 	EXPECT_EQ(total_length, fragment_length);
 	/* Don't include the last constituent in the first fragment. */
@@ -352,7 +358,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 		(struct ffa_memory_region *)retrieve_message->payload, handle,
 		sender, recipient, 0, flags, retrieve_data_access,
 		retrieve_instruction_access, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
+		&impdef_val);
 	ffa_rxtx_header_init(sender, recipient, msg_size,
 			     &retrieve_message->header);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
@@ -367,13 +374,13 @@ void send_retrieve_request_single_receiver(
 	enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability)
+	enum ffa_memory_shareability shareability,
+	struct ffa_memory_access_impdef *impdef_val)
 {
 	struct ffa_memory_access receiver_retrieve_permissions;
 
-	ffa_memory_access_init_permissions(&receiver_retrieve_permissions,
-					   receiver, data_access,
-					   instruction_access, 0);
+	ffa_memory_access_init(&receiver_retrieve_permissions, receiver,
+			       data_access, instruction_access, 0, impdef_val);
 
 	send_retrieve_request(send, handle, sender,
 			      &receiver_retrieve_permissions, 1, tag, flags,

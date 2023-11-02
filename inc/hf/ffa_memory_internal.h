@@ -167,8 +167,6 @@ struct ffa_value ffa_retrieve_check_update(
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t sender_orig_mode, uint32_t share_func, bool clear,
 	struct mpool *page_pool);
-uint32_t ffa_memory_region_get_receiver_index(
-	struct ffa_memory_region *memory_region, ffa_id_t receiver_id);
 bool ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,

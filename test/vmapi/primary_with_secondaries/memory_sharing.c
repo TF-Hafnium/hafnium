@@ -62,6 +62,8 @@ static void check_cannot_send_memory(
 	size_t m = 0;
 
 	for (i = 0; i < ARRAY_SIZE(vms); ++i) {
+		struct ffa_memory_access_impdef impdef_val = {
+			{vms[i], vms[i] + 1}};
 		/* Optionally skip one VM as the send would succeed. */
 		if (vms[i] == avoid_vm) {
 			continue;
@@ -88,6 +90,7 @@ static void check_cannot_send_memory(
 								FFA_MEMORY_NORMAL_MEM,
 								cacheability[m],
 								shareability[l],
+								&impdef_val,
 								NULL,
 								&msg_size),
 							0);
@@ -121,6 +124,7 @@ static void check_cannot_send_memory(
 								FFA_MEMORY_DEVICE_MEM,
 								device[m],
 								shareability[l],
+								&impdef_val,
 								NULL,
 								&msg_size),
 							0);
@@ -198,7 +202,8 @@ static void check_cannot_donate_memory(
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				  FFA_MEMORY_NORMAL_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 		ret = ffa_mem_donate(msg_size, msg_size);
 		EXPECT_EQ(ret.func, FFA_ERROR_32);
@@ -305,7 +310,7 @@ TEST(memory_sharing, donate_reclaim)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	/* Call base function's test. */
@@ -332,7 +337,7 @@ TEST(memory_sharing, lend_reclaim)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	/* Call base function's test. */
@@ -358,7 +363,7 @@ TEST(memory_sharing, share_reclaim)
 			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	/* Call base function's test. */
@@ -395,7 +400,7 @@ TEST(memory_sharing, share_retrieve_memory_type_not_specified)
 			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	/* Call base function's test. */
@@ -411,7 +416,7 @@ TEST(memory_sharing, share_retrieve_memory_type_not_specified)
 	send_retrieve_request_single_receiver(
 		mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id, 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_MEMORY_NOT_SPECIFIED_MEM, 0, 0);
+		FFA_MEMORY_NOT_SPECIFIED_MEM, 0, 0, NULL);
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
@@ -1230,7 +1235,7 @@ TEST_PRECONDITION(memory_sharing, donate_to_self, hypervisor_only)
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
@@ -1258,7 +1263,7 @@ TEST_PRECONDITION(memory_sharing, lend_to_self, hypervisor_only)
 			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
@@ -1285,7 +1290,7 @@ TEST_PRECONDITION(memory_sharing, share_to_self, hypervisor_only)
 			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
@@ -1321,7 +1326,7 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 
@@ -1332,7 +1337,7 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 
@@ -1343,7 +1348,7 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 
@@ -1399,7 +1404,7 @@ TEST_PRECONDITION(memory_sharing, give_and_get_back_unaligned, hypervisor_only)
 					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 					FFA_MEMORY_NORMAL_MEM,
 					FFA_MEMORY_CACHE_WRITE_BACK,
-					FFA_MEMORY_INNER_SHAREABLE, NULL,
+					FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
 					&msg_size),
 				0);
 			EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
@@ -1413,7 +1418,7 @@ TEST_PRECONDITION(memory_sharing, give_and_get_back_unaligned, hypervisor_only)
 					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 					FFA_MEMORY_NORMAL_MEM,
 					FFA_MEMORY_CACHE_WRITE_BACK,
-					FFA_MEMORY_INNER_SHAREABLE, NULL,
+					FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
 					&msg_size),
 				0);
 			EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size),
@@ -1451,7 +1456,7 @@ TEST(memory_sharing, lend_invalid_source)
 			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
 
@@ -1852,7 +1857,8 @@ TEST(memory_sharing, lend_donate)
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 				 FFA_DENIED);
@@ -1867,7 +1873,7 @@ TEST(memory_sharing, lend_donate)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 }
@@ -1924,7 +1930,8 @@ TEST(memory_sharing, share_donate)
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size),
 				 FFA_DENIED);
@@ -1939,7 +1946,7 @@ TEST(memory_sharing, share_donate)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
 }
@@ -2013,7 +2020,8 @@ TEST(memory_sharing, lend_twice)
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
 	}
@@ -2079,7 +2087,8 @@ TEST(memory_sharing, share_twice)
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				  FFA_MEMORY_NORMAL_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size), FFA_DENIED);
 	}
@@ -2148,7 +2157,7 @@ TEST_PRECONDITION(memory_sharing, share_clear, hypervisor_only)
 			  FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RO,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 			 FFA_INVALID_PARAMETERS);
@@ -2312,7 +2321,7 @@ TEST_PRECONDITION(memory_sharing, ffa_validate_mbz, hypervisor_only)
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	/* Using the same region, call the various mem send functions. */
@@ -2366,7 +2375,7 @@ TEST_PRECONDITION(memory_sharing, ffa_validate_attributes, hypervisor_only)
 				  invalid_attributes[i].memory_type,
 				  invalid_attributes[i].memory_cacheability,
 				  invalid_attributes[i].memory_shareability,
-				  NULL, &msg_size),
+				  NULL, NULL, &msg_size),
 			  0);
 
 		/* Call the various mem send functions on the same region. */
@@ -2420,7 +2429,8 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 					  ? FFA_MEMORY_NORMAL_MEM
 					  : FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 
 		ret = send_function[i](msg_size, msg_size);
@@ -2436,7 +2446,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				FFA_MEMORY_NORMAL_MEM,
 				FFA_MEMORY_CACHE_WRITE_BACK,
-				FFA_MEMORY_INNER_SHAREABLE);
+				FFA_MEMORY_INNER_SHAREABLE, NULL);
 			EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func,
 				  FFA_YIELD_32);
 		}
@@ -2445,6 +2455,69 @@ TEST(memory_sharing, ffa_validate_retrieve_req_mbz)
 	}
 }
 
+/**
+ * Check a different value for the impdef field of the receiver struct
+ * between the memory send transaction and the retrieve request causes
+ * the retrieve request to fail with FFA_INVALID_PARAMETERS and the
+ * memory to not be allocated to the endpoint.
+ */
+TEST(memory_sharing, ffa_validate_impdef_equal)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_share,
+		ffa_mem_lend,
+	};
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_memory_share_fail_invalid_parameters", mb.send);
+
+	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {
+		/* Prepare memory region, and set all flags */
+		EXPECT_EQ(ffa_memory_region_init_single_receiver(
+				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+				  service1_info->vm_id, constituents,
+				  ARRAY_SIZE(constituents), 0, 0,
+				  FFA_DATA_ACCESS_RW,
+				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  send_function[i] == ffa_mem_share
+					  ? FFA_MEMORY_NORMAL_MEM
+					  : FFA_MEMORY_NOT_SPECIFIED_MEM,
+				  FFA_MEMORY_CACHE_WRITE_BACK,
+				  FFA_MEMORY_INNER_SHAREABLE,
+				  &((struct ffa_memory_access_impdef){
+					  {0xAAAA, 0xBBBB}}),
+				  NULL, &msg_size),
+			  0);
+
+		ret = send_function[i](msg_size, msg_size);
+		EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+		handle = ffa_mem_success_handle(ret);
+
+		send_retrieve_request_single_receiver(
+			mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id,
+			0, 0, FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE,
+			&((struct ffa_memory_access_impdef){{0xCCCC, 0xDDDD}}));
+
+		EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+	}
+}
 /**
  * Memory can't be shared with arbitrary attributes because Hafnium maps pages
  * with hardcoded values and doesn't support custom mappings.
@@ -2498,7 +2571,8 @@ TEST(memory_sharing, ffa_validate_retrieve_req_attributes)
 					  ? FFA_MEMORY_NORMAL_MEM
 					  : FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 
 		ret = send_function[i](msg_size, msg_size);
@@ -2513,7 +2587,8 @@ TEST(memory_sharing, ffa_validate_retrieve_req_attributes)
 				FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				invalid_attributes[j].memory_type,
 				invalid_attributes[j].memory_cacheability,
-				invalid_attributes[j].memory_shareability);
+				invalid_attributes[j].memory_shareability,
+				NULL);
 			EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func,
 				  FFA_YIELD_32);
 		}
@@ -2550,7 +2625,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_mem_share)
 			  FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_share(msg_size, msg_size);
@@ -2568,7 +2643,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_mem_share)
 			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_share(msg_size, msg_size);
@@ -2583,7 +2658,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_mem_share)
 			FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_INNER_SHAREABLE);
+		FFA_MEMORY_INNER_SHAREABLE, NULL);
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
@@ -2618,7 +2693,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_lend(msg_size, msg_size);
@@ -2634,7 +2709,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 		mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
 		FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RO,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL);
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
@@ -2656,6 +2731,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_sender_not_clear)
 		ffa_mem_donate,
 	};
 	struct ffa_partition_info *service1_info = service1(mb.recv);
+
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
@@ -2680,7 +2756,8 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_sender_not_clear)
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 
 		ret = send_function[i](msg_size, msg_size);
@@ -2701,7 +2778,7 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_sender_not_clear)
 				? FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED
 				: FFA_INSTRUCTION_ACCESS_NX,
 			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_INNER_SHAREABLE);
+			FFA_MEMORY_INNER_SHAREABLE, NULL);
 
 		EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 		EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
@@ -2725,6 +2802,7 @@ TEST(memory_sharing, ffa_validate_retrieve_transaction_type)
 		ffa_mem_donate,
 	};
 	struct ffa_partition_info *service1_info = service1(mb.recv);
+
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
@@ -2747,7 +2825,8 @@ TEST(memory_sharing, ffa_validate_retrieve_transaction_type)
 					  ? FFA_MEMORY_NORMAL_MEM
 					  : FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 
 		ret = send_function[i](msg_size, msg_size);
@@ -2772,7 +2851,7 @@ TEST(memory_sharing, ffa_validate_retrieve_transaction_type)
 				? FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED
 				: FFA_INSTRUCTION_ACCESS_NX,
 			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_INNER_SHAREABLE);
+			FFA_MEMORY_INNER_SHAREABLE, NULL);
 
 		EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
@@ -2831,13 +2910,17 @@ TEST(memory_sharing, mem_share_multiple_borrowers)
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service1_info->vm_id, service1_info->vm_id + 1}}));
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service2_info->vm_id, service2_info->vm_id + 1}}));
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -2882,13 +2965,17 @@ TEST(memory_sharing, mem_share_bypass_multiple_borrowers)
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service1_info->vm_id, service1_info->vm_id + 1}}));
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service2_info->vm_id, service2_info->vm_id + 1}}));
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -2931,13 +3018,17 @@ TEST(memory_sharing, mem_share_bypass_multiple_borrowers_wrong_receiver_count)
 	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_msg *retrieve_message = mb.send;
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service1_info->vm_id, service1_info->vm_id + 1}}));
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service2_info->vm_id, service2_info->vm_id + 1}}));
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3001,13 +3092,17 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service1_info->vm_id, service1_info->vm_id + 1}}));
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service2_info->vm_id, service2_info->vm_id + 1}}));
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3096,13 +3191,17 @@ TEST_PRECONDITION(memory_sharing, fail_if_multi_receiver_donate,
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service1_info->vm_id, service1_info->vm_id + 1}}));
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service2_info->vm_id, service2_info->vm_id + 1}}));
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3134,13 +3233,15 @@ static void fail_multiple_receiver_mem_share_lend(
 	struct ffa_memory_access receivers[2];
 	uint32_t msg_size;
 
-	ffa_memory_access_init_permissions(&receivers[0], receiver_id1,
-					   data_access1, instruction_access1,
-					   0);
+	ffa_memory_access_init(&receivers[0], receiver_id1, data_access1,
+			       instruction_access1, 0,
+			       &((struct ffa_memory_access_impdef){
+				       {receiver_id1, receiver_id1 + 1}}));
 
-	ffa_memory_access_init_permissions(&receivers[1], receiver_id2,
-					   data_access2, instruction_access2,
-					   0);
+	ffa_memory_access_init(&receivers[1], receiver_id2, data_access2,
+			       instruction_access2, 0,
+			       &((struct ffa_memory_access_impdef){
+				       {receiver_id2, receiver_id2 + 1}}));
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3221,13 +3322,17 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service1_info->vm_id, service1_info->vm_id + 1}}));
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service2_info->vm_id, service2_info->vm_id + 1}}));
 
 	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
 		ffa_id_t vm_id = receivers[i].receiver_permissions.receiver;
@@ -3293,13 +3398,13 @@ TEST(memory_sharing, share_ffa_v1_0_to_v1_1)
 
 	SERVICE_SELECT(service1_info->vm_id, "memory_increment", mb.send);
 
-	ffa_memory_access_v1_0_init_permissions(
-		&receiver_v1_0, service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	ffa_memory_access_init_v1_0(&receiver_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
 
-	ffa_memory_access_init_permissions(
-		&receiver_v1_1, service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	ffa_memory_access_init(&receiver_v1_1, service1_info->vm_id,
+			       FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
 
 	/* Initialize memory sharing test according to v1.0. */
 	ffa_memory_region_init_v1_0(
@@ -3364,12 +3469,15 @@ TEST(memory_sharing, share_ffa_v1_1_to_v1_0)
 
 	SERVICE_SELECT(service1_info->vm_id, "retrieve_ffa_v1_0", mb.send);
 
-	ffa_memory_access_v1_0_init_permissions(
-		&receiver_v1_0, service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init_v1_0(&receiver_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	ffa_memory_access_init(
 		&receiver_v1_1, service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service1_info->vm_id, service1_info->vm_id + 1}}));
 
 	/* Initialize memory sharing test according to v1.1. */
 	ffa_memory_region_init((struct ffa_memory_region *)mb.send,
@@ -3441,7 +3549,8 @@ TEST(memory_sharing, fail_fragmented_if_retrieve_before_sent)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_INNER_SHAREABLE, &total_length, &fragment_length);
+		FFA_MEMORY_INNER_SHAREABLE, NULL, &total_length,
+		&fragment_length);
 	EXPECT_EQ(remaining_constituent_count, 0);
 	EXPECT_EQ(total_length, fragment_length);
 
@@ -3461,7 +3570,7 @@ TEST(memory_sharing, fail_fragmented_if_retrieve_before_sent)
 		hf_vm_get_id(), service1_info->vm_id, 0, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL);
 	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
 			     &retrieve_message->header);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
@@ -3494,9 +3603,9 @@ TEST(memory_sharing, force_fragmented_ffa_v1_0)
 
 	SERVICE_SELECT(service1_info->vm_id, "retrieve_ffa_v1_0", mb.send);
 
-	ffa_memory_access_v1_0_init_permissions(
-		&receiver_v1_0, service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	ffa_memory_access_init_v1_0(&receiver_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
 
 	/* Initialize memory sharing test according to v1.0. */
 	remaining_constituent_count = ffa_memory_region_init_v1_0(
@@ -3584,7 +3693,7 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	/* Write to memory. */
@@ -3604,7 +3713,7 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish)
 		HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
 		FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NX, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL);
 
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
@@ -3663,13 +3772,17 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish_multiple_borrowers)
 	SERVICE_SELECT(service2_info->vm_id,
 		       "memory_increment_relinquish_check_not_zeroed", mb.send);
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service1_info->vm_id, service1_info->vm_id + 1}}));
 
-	ffa_memory_access_init_permissions(
+	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+		&((struct ffa_memory_access_impdef){
+			{service2_info->vm_id, service2_info->vm_id + 1}}));
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3750,7 +3863,7 @@ TEST_PRECONDITION(memory_sharing, fail_inconsistent_page_count, hypervisor_only)
 			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
 	/*
@@ -3804,7 +3917,8 @@ TEST_PRECONDITION(memory_sharing, fail_page_overlap, hypervisor_only)
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				  FFA_MEMORY_NORMAL_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
-				  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
+				  &msg_size),
 			  0);
 		EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size),
 				 FFA_INVALID_PARAMETERS);

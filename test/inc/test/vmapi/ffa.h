@@ -91,7 +91,8 @@ void send_retrieve_request_single_receiver(
 	enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability);
+	enum ffa_memory_shareability shareability,
+	struct ffa_memory_access_impdef *impdef_val);
 void send_retrieve_request(
 	void *send, ffa_memory_handle_t handle, ffa_id_t sender,
 	struct ffa_memory_access receivers[], uint32_t receiver_count,

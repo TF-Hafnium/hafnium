@@ -2166,7 +2166,7 @@ static bool ffa_retrieved_memory_region_init(
 		 * Initialized here as in memory retrieve responses we currently
 		 * expect one borrower to be specified.
 		 */
-		ffa_memory_access_v1_0_init_permissions(
+		ffa_memory_access_init_v1_0(
 			receiver, receiver_id,
 			ffa_get_data_access_attr(permissions),
 			ffa_get_instruction_access_attr(permissions), flags);
@@ -2209,18 +2209,14 @@ static bool ffa_retrieved_memory_region_init(
 		 * Initialized here as in memory retrieve responses we currently
 		 * expect one borrower to be specified.
 		 */
-		ffa_memory_access_init_permissions(
+		ffa_memory_access_init(
 			receiver, receiver_id,
 			ffa_get_data_access_attr(permissions),
-			ffa_get_instruction_access_attr(permissions), flags);
+			ffa_get_instruction_access_attr(permissions), flags,
+			&receiver_impdef_val);
 		receiver->composite_memory_region_offset = composite_offset;
 		composite_memory_region =
 			ffa_memory_region_get_composite(retrieve_response, 0);
-		if (ffa_version_from_memory_access_desc_size(
-			    memory_access_desc_size) >=
-		    MAKE_FFA_VERSION(1, 2)) {
-			receiver->impdef = receiver_impdef_val;
-		}
 	}
 
 	assert(composite_memory_region != NULL);
@@ -2256,30 +2252,6 @@ static bool ffa_retrieved_memory_region_init(
 	}
 
 	return true;
-}
-
-/*
- * Gets the receiver's access permissions from 'struct ffa_memory_region' and
- * returns its index in the receiver's array. If receiver's ID doesn't exist
- * in the array, return the region's 'receiver_count'.
- */
-uint32_t ffa_memory_region_get_receiver_index(
-	struct ffa_memory_region *memory_region, ffa_id_t receiver_id)
-{
-	uint32_t i;
-
-	assert(memory_region != NULL);
-
-	for (i = 0U; i < memory_region->receiver_count; i++) {
-		struct ffa_memory_access *receiver =
-			ffa_memory_region_get_receiver(memory_region, i);
-		assert(receiver != NULL);
-		if (receiver->receiver_permissions.receiver == receiver_id) {
-			break;
-		}
-	}
-
-	return i;
 }
 
 /**

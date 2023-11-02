@@ -1148,7 +1148,8 @@ struct ffa_mem_relinquish {
 };
 
 /**
- * Return the first FF-A version that matches the memory access descriptor size.
+ * Returns the first FF-A version that matches the memory access descriptor
+ * size.
  */
 uint32_t ffa_version_from_memory_access_desc_size(
 	uint32_t memory_access_desc_size);
@@ -1189,6 +1190,27 @@ static inline struct ffa_memory_access *ffa_memory_region_get_receiver(
 						    memory_region->receivers +
 					    (receiver_index *
 					     memory_access_desc_size));
+}
+
+/**
+ * Gets the receiver's access permissions from 'struct ffa_memory_region' and
+ * returns its index in the receiver's array. If receiver's ID doesn't exist
+ * in the array, return the region's 'receivers_count'.
+ */
+static inline uint32_t ffa_memory_region_get_receiver_index(
+	struct ffa_memory_region *memory_region, ffa_id_t receiver_id)
+{
+	uint32_t i;
+
+	for (i = 0U; i < memory_region->receiver_count; i++) {
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, i);
+		if (receiver->receiver_permissions.receiver == receiver_id) {
+			break;
+		}
+	}
+
+	return i;
 }
 
 /**
@@ -1278,11 +1300,12 @@ void ffa_memory_region_init_header(struct ffa_memory_region *memory_region,
 				   ffa_memory_handle_t handle, uint32_t tag,
 				   uint32_t receiver_count,
 				   uint32_t receiver_desc_size);
-void ffa_memory_access_init_permissions(
-	struct ffa_memory_access *receiver, ffa_id_t receiver_id,
-	enum ffa_data_access data_access,
-	enum ffa_instruction_access instruction_access,
-	ffa_memory_receiver_flags_t flags);
+void ffa_memory_access_init(struct ffa_memory_access *receiver,
+			    ffa_id_t receiver_id,
+			    enum ffa_data_access data_access,
+			    enum ffa_instruction_access instruction_access,
+			    ffa_memory_receiver_flags_t flags,
+			    struct ffa_memory_access_impdef *impdef_val);
 uint32_t ffa_memory_region_init_single_receiver(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
 	ffa_id_t sender, ffa_id_t receiver,
@@ -1291,7 +1314,8 @@ uint32_t ffa_memory_region_init_single_receiver(
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability, uint32_t *fragment_length,
+	enum ffa_memory_shareability shareability,
+	struct ffa_memory_access_impdef *impdef_val, uint32_t *fragment_length,
 	uint32_t *total_length);
 uint32_t ffa_memory_region_init(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
@@ -1316,7 +1340,8 @@ uint32_t ffa_memory_retrieve_request_init_single_receiver(
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability);
+	enum ffa_memory_shareability shareability,
+	struct ffa_memory_access_impdef *impdef_val);
 uint32_t ffa_memory_lender_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
 	ffa_id_t sender);

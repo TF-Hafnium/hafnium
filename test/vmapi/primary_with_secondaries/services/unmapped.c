@@ -44,7 +44,7 @@ TEST_SERVICE(straddling_data_unmapped)
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	exception_setup(NULL, exception_handler_yield_data_abort);
 

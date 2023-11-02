@@ -49,11 +49,12 @@ void ffa_copy_memory_region_constituents(
  * Initializes receiver permissions, in a memory transaction descriptor
  * and zero out the other fields to be set later if required.
  */
-void ffa_memory_access_init_permissions(
-	struct ffa_memory_access *receiver, ffa_id_t receiver_id,
-	enum ffa_data_access data_access,
-	enum ffa_instruction_access instruction_access,
-	ffa_memory_receiver_flags_t flags)
+void ffa_memory_access_init(struct ffa_memory_access *receiver,
+			    ffa_id_t receiver_id,
+			    enum ffa_data_access data_access,
+			    enum ffa_instruction_access instruction_access,
+			    ffa_memory_receiver_flags_t flags,
+			    struct ffa_memory_access_impdef *impdef_val)
 {
 	ffa_memory_access_permissions_t permissions = 0;
 
@@ -69,7 +70,10 @@ void ffa_memory_access_init_permissions(
 				.flags = flags,
 			},
 		.composite_memory_region_offset = 0ULL,
-		.impdef = {0ULL, 0ULL},
+		.impdef = impdef_val != NULL
+				  ? *impdef_val
+				  : (struct ffa_memory_access_impdef){{0ULL,
+								       0ULL}},
 		receiver->reserved_0 = 0ULL,
 	};
 }
@@ -206,13 +210,14 @@ uint32_t ffa_memory_region_init_single_receiver(
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability, uint32_t *total_length,
+	enum ffa_memory_shareability shareability,
+	struct ffa_memory_access_impdef *impdef_val, uint32_t *total_length,
 	uint32_t *fragment_length)
 {
 	struct ffa_memory_access receiver_access;
 
-	ffa_memory_access_init_permissions(&receiver_access, receiver,
-					   data_access, instruction_access, 0);
+	ffa_memory_access_init(&receiver_access, receiver, data_access,
+			       instruction_access, 0, impdef_val);
 
 	return ffa_memory_region_init(
 		memory_region, memory_region_max_size, sender, &receiver_access,
@@ -271,12 +276,13 @@ uint32_t ffa_memory_retrieve_request_init_single_receiver(
 	ffa_memory_region_flags_t flags, enum ffa_data_access data_access,
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability)
+	enum ffa_memory_shareability shareability,
+	struct ffa_memory_access_impdef *impdef_val)
 {
 	struct ffa_memory_access receiver_access;
 
-	ffa_memory_access_init_permissions(&receiver_access, receiver,
-					   data_access, instruction_access, 0);
+	ffa_memory_access_init(&receiver_access, receiver, data_access,
+			       instruction_access, 0, impdef_val);
 
 	return ffa_memory_retrieve_request_init(
 		memory_region, handle, sender, &receiver_access, 1,

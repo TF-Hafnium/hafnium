@@ -98,7 +98,7 @@ void ffa_mem_retrieve_from_args(struct mailbox_buffers mb,
 		hf_vm_get_id(), tag, flags, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_INNER_SHAREABLE);
+		FFA_MEMORY_INNER_SHAREABLE, NULL);
 
 	retrieve_memory(mb.recv, handle, retrieved_memory, HF_MAILBOX_SIZE,
 			msg_size);

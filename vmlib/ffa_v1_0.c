@@ -26,11 +26,11 @@
  * Initializes receiver permissions, in a v1.0 memory transaction descriptor
  * and zero out the other fields to be set later if requred.
  */
-void ffa_memory_access_v1_0_init_permissions(
-	struct ffa_memory_access_v1_0 *receiver, ffa_id_t receiver_id,
-	enum ffa_data_access data_access,
-	enum ffa_instruction_access instruction_access,
-	ffa_memory_receiver_flags_t flags)
+void ffa_memory_access_init_v1_0(struct ffa_memory_access_v1_0 *receiver,
+				 ffa_id_t receiver_id,
+				 enum ffa_data_access data_access,
+				 enum ffa_instruction_access instruction_access,
+				 ffa_memory_receiver_flags_t flags)
 {
 	ffa_memory_access_permissions_t permissions = 0;
 
