@@ -1,5 +1,69 @@
 # Change Log
 
+## v2.10
+### Highlights
+
+* FF-A v1.2 (continued adoption):
+    * `FFA_YIELD` interface:
+        * Allow to be invoked while endpoint's partition runtime model is
+          either direct message request or secure interrupt handling.
+        * Allow an endpoint to specify an optional timeout such that it can be
+          rescheduled after appropriate time to avoid busy wait.
+    * Handle the `FFA_ERROR` interface at the SPs initialisation runtime model
+      to put the SP in an aborted state.
+    * Support for Logical Secure Partitions at EL3, managed by the SPMD:
+        * Direct messaging request from LSPs to SPs at the virtual FF-A instance.
+        * Discovery of LSPs via `FFA_PARTITION_INFO_GET(_REGS)` interfaces.
+    * Support flag to bypass multiple borrower checks as part of `FFA_MEM_RETRIEVE_REQ`
+      handling.
+    * Memory region nodes support addresses relative to partition's load address.
+* Hardware architecture support:
+    * Fix to SMCCC use on Hafnium, to support use of extended register set as per
+      SMCCCv1.2 for FF-A v1.2 and above.
+    * GICv3: Enable platforms to leverage Shared Peripheral Interrupts extended ranges.
+    * New paravirtualized interfaces to reconfigure a physical interrupt at runtime:
+      target CPU, disabling/enabling the secure interrupt, and changing interrupt's
+      security state.
+    * Leverage support of secure and non-secure set of page tables for SMMUv3 streams.
+    * Platform description of secure and non-secure memory is mandatory in the  SPMC
+      manifest.
+    * Use security state information in the S2 page tables to invalidate SP's TLB.
+* Tests, scripts and testing framework:
+    * Test framework improved to add tests into the SP's intialisation, via means of
+      a helper macro.
+    * Removed duplicated set of tests that were used to enable support of EL0
+      partitions.
+    * Hypervisor build refactored to track the state of memory sharing operations.
+    * Few memory sharing related tests to run on EL3 SPMC, and serve as an indicator
+      about feature parity.
+    * Added ability to perform test coverage analysis, via Hafnium's testing scripts.
+    * Increased test coverage of memory sharing functionality.
+* Bug fixes:
+    * Various fixes to memory sharing functionality:
+        * Clear memory operations retrieve security state from S2 translation
+          attributes.
+        * Validation to page count field in the composite memory descriptor.
+        * No overlapping of memory constituents.
+        * Restrict SP from doing lend/share/donate targeting a normal world borrower.
+        * Processing of instruction permissions specified in the lend/share/donate
+          and by the borrower in the memory retrieve operation.
+        * Use the NS bit in the `FFA_MEM_RETRIEVE_RESP` from SPMC to SP.
+    * Force uniqueness of boot order field in the partition's manifest.
+    * Added `FFA_RUN` interface restriction towards vCPU cores migration.
+    * Refactor use of locked vCPU structures in few identified scenarios, that
+      were prone to creating deadlocks.
+    * Fixed the version compatibility rules in handling of the `FFA_VERSION`
+      interface.
+* Misc:
+    * Migration of Hafnium documentation as the reference Secure Partition Manager
+      into its own pages, leveraging the sphinx documentation framework.
+    * Free resources allocated to SP if it gets to an aborted state, including
+      disabling any physical interrupts that might trigger.
+    * Deprecation of legacy hypervisor calls `HF_MAILBOX_*_GET`.
+    * Simplified code path in the handling of secure interrupts.
+    * Added build option to specify build target, which allows for faster builds,
+      e.g. `make PLATFORM=secure_aem_v8a_fvp_vhe`.
+
 ## v2.9
 ### Highlights
 
