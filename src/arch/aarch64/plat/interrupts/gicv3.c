@@ -448,7 +448,7 @@ void gicv3_send_sgi(uint32_t sgi_id, bool send_to_all, uint64_t mpidr_target,
 /*******************************************************************************
  * Helper function to get the maximum ESPI INTID + 1.
  ******************************************************************************/
-static unsigned int gicv3_get_espi_limit(uintptr_t gicd_base)
+unsigned int gicv3_get_espi_limit(uintptr_t gicd_base)
 {
 	unsigned int typer_reg = read_gicd_typer_reg(gicd_base);
 
@@ -510,16 +510,10 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 	populate_redist_base_addrs();
 
 #if GIC_EXT_INTID
-	if ((read_gicd_typer_reg(plat_gicv3_driver.dist_base) & TYPER_ESPI) !=
-	    TYPER_ESPI) {
-		dlog_warning(
-			"GIC extended SPI support built in but hardware "
-			"doesn't support it.\n");
-	} else {
-		CHECK(gicv3_get_espi_limit(plat_gicv3_driver.dist_base) != 0);
-	}
+	CHECK((read_gicd_typer_reg(plat_gicv3_driver.dist_base) & TYPER_ESPI) ==
+	      TYPER_ESPI);
+	CHECK(gicv3_get_espi_limit(plat_gicv3_driver.dist_base) != 0);
 #endif
-
 	return true;
 }
 
