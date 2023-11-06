@@ -1453,6 +1453,49 @@ element of the data flow diagram.
 |                        | care of rogue interrupts.                          |
 +------------------------+----------------------------------------------------+
 
++------------------------+----------------------------------------------------+
+| ID                     | 32                                                 |
++========================+====================================================+
+| ``Threat``             | **A malicious secure endpoint may tamper with the  |
+|                        | system resources allocated to it, such as memory   |
+|                        | regions, interrupts, timers, etc., in an attempt to|
+|                        | corrupt the internal state of the SPMC, there by   |
+|                        | leading to system crash.**                         |
+|                        | For example, such an endpoint can configure a      |
+|                        | secure virtual interrupt to be fired after driving |
+|                        | itself to an aborted state without handling the    |
+|                        | virtual interrupt. This attempt to corrupt the     |
+|                        | internal state of the SPMC and further lead to     |
+|                        | system crash.                                      |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1, DF5                                           |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC                                               |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SPMC state, SP state, Scheduling cycles            |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | S-Endpoint                                         |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Tampering, Denial of Service                       |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | Medium (3)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | Medium (3)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | Medium (9)       | Medium (9)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | The TF-A SPMC provides mitigation against such     |
+|                        | threat by freeing all resources belonging to an    |
+|                        | aborted partition. Specifically, all the interrupts|
+|                        | belonging to the partition are disabled as soon as |
+|                        | any execution context of the partition is aborted. |
+|                        | Also, any pending interrupt targeting the aborted  |
+|                        | partition is deactivated as soon as it triggers.   |
++------------------------+----------------------------------------------------+
+
 --------------
 
 *Copyright (c) 2023, Arm Limited. All rights reserved.*
