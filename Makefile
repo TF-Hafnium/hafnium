@@ -11,6 +11,8 @@ TOOLCHAIN_LIB := $(shell clang --print-resource-dir)
 
 ENABLE_ASSERTIONS ?= 1
 
+PLATFORM ?= default
+
 GN_ARGS := project="$(PROJECT)"
 GN_ARGS += toolchain_lib="$(TOOLCHAIN_LIB)"
 ifeq ($(filter $(ENABLE_ASSERTIONS), 1 0),)
@@ -67,7 +69,11 @@ OUT_DIR = out/$(PROJECT)
 
 .PHONY: all
 all: $(OUT_DIR)/build.ninja
+ifneq ($(PLATFORM),default)
+	@$(NINJA) -C $(OUT_DIR) project/$(PROJECT):$(PLATFORM)
+else
 	@$(NINJA) -C $(OUT_DIR)
+endif
 
 $(OUT_DIR)/build.ninja:
 	@$(GN) --export-compile-commands gen --args='$(GN_ARGS)' $(OUT_DIR)
