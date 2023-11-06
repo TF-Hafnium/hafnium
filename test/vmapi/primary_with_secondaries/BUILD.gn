@@ -363,6 +363,7 @@ vm_kernel("primary_with_sp_vhe_test_vm") {
 
   sources = [
     "dir_msg.c",
+    "free_sp_resources.c",
     "indirect_messaging.c",
     "memory_permissions.c",
     "memory_sharing.c",
