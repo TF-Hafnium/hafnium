@@ -22,10 +22,25 @@ source_set("message_loop") {
   deps = [ "//test/vmapi/common:ffa" ]
 }
 
+source_set("secure_interrupts") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "secure_interrupts.c" ]
+  deps = [
+    "//src/arch/aarch64:smc",
+    "//test/vmapi/common:ffa",
+  ]
+}
+
 vm_kernel("secure_service") {
   testonly = true
   deps = [
     ":message_loop",
+    ":secure_interrupts",
     "//src/arch/aarch64/hftest:interrupts",
     "//src/arch/aarch64/hftest:mm",
     "//test/hftest:hftest_secure_service",

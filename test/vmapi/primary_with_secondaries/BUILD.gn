@@ -407,6 +407,12 @@ partitions_json("primary_with_sp_vhe") {
       "services/arch/aarch64/secure/el0:service_sp2_partition_package",
       "services/arch/aarch64/secure/el0:partition_manifest_service_sp2",
     ],
+    [
+      "service_sp3_partition_package.img",
+      "services/arch/aarch64/secure/manifest_secure_service3.dts",
+      "services/arch/aarch64/secure:service_sp3_partition_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp3",
+    ],
   ]
 
   vms = [ [
