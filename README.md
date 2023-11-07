@@ -18,7 +18,7 @@ Other important features are: secure interrupt handling, device assignment, inte
 communication and with the Normal World Software stack, also known as Rich Execution
 Environment (REE).
 
-The following diagram shows an overview of a typical aarch64-based system, and where the Hafnium
+The following diagram shows an overview of a typical aarch64-based system, and where Hafnium
 fits:
 
 ![Hafnium Architecture](./docs/resources/diagrams/Hafnium_overview.png)
@@ -27,7 +27,7 @@ Get in touch and keep up-to-date at:
 * [hafnium@lists.trustedfirmware.org](https://lists.trustedfirmware.org/mailman3/lists/hafnium.lists.trustedfirmware.org/).
 * At the community [Discord](https://discord.gg/8bxF2rRZBg).
 
-See feature requests and bugs throught [github](https://github.com/TF-Hafnium/hafnium/issues).
+See feature requests and bugs through [github](https://github.com/TF-Hafnium/hafnium/issues).
 
 ## Documentation
 
