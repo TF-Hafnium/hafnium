@@ -584,7 +584,7 @@ non-secure EL1&0 Stage-2 table if it exists.
 Secure partitions scheduling
 ----------------------------
 
-The FF-A specification `[1]`_ provides two ways to relinquinsh CPU time to
+The FF-A specification `[1]`_ provides two ways to provide CPU cycles to
 secure partitions. For this a VM (Hypervisor or OS kernel), or SP invokes one of:
 
 - the FFA_MSG_SEND_DIRECT_REQ interface.
@@ -1061,6 +1061,16 @@ descriptors from FF-A v1.0. These get translated to FF-A v1.1 descriptors for
 Hafnium's internal processing of the operation. If the FF-A version of a
 borrower is v1.0, Hafnium provides FF-A v1.0 compliant memory transaction
 descriptors on memory retrieve response.
+
+In the section :ref:`SPMC Configuration` there is a mention of non-secure memory
+range, that limit the memory region nodes the SP can define. Whatever is left of
+the memory region node carve-outs, the SPMC utilizes the memory to create a set of
+page tables it associates with the NWd. The memory sharing operations incoming from
+the NWd should refer to addresses belonging to these page tables. The intent
+is for SPs not to be able to get access to regions they are not intended to access.
+This requires special care from the system integrator to configure the memory ranges
+correctly, such that any SP can't be given access and interfere with execution of
+other components. More information in the :ref:`Threat Model`.
 
 PE MMU configuration
 --------------------
