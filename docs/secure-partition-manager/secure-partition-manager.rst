@@ -225,6 +225,25 @@ A sample can be found at `[7]`_:
   size. Thus, the SPMC prevents rogue SPs from tampering with memory from other
   components.
 
+.. code:: shell
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x6000000 0x2000000 0x0 0xff000000 0x1000000>;
+	};
+
+	memory@1 {
+		device_type = "ns-memory";
+		reg = <0x0 0x90010000 0x70000000>;
+	};
+
+Above find an example representation of the referred memory description. The
+ranges are described in a list of unsigned 32-bit values, in which the first
+two addresses relate to the based physical address, followed by the respective
+page size. The first secure range defined in the node below has base address
+`0x0 0x6000000` and size `0x2000000`; following there is another range with
+base address `0x0 0xff000000` and size `0x1000000`.
+
 Secure Partitions Configuration
 -------------------------------
 
@@ -417,7 +436,7 @@ secondary physical core entry point physical address by the use of the
 `FFA_SECONDARY_EP_REGISTER`_ interface (SMC invocation from the SPMC to the SPMD
 at secure physical FF-A instance).
 
-The SPMC then creates secure partitions based on SP packages and manifests. Each
+The SPMC then creates secure partitions base on SP packages and manifests. Each
 secure partition is launched in sequence (`SP Boot order`_) on their "primary"
 execution context. If the primary boot physical core linear id is N, an MP SP is
 started using EC[N] on PE[N] (see `Platform topology`_). If the partition is a
