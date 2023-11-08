@@ -21,6 +21,10 @@ declare_args() {
   # IOMMU driver to be used for the platform, specified as build target.
   plat_iommu = ""
 
+  # Abstract the calls to platform memory protection functions.
+  # E.g. FVP leverages RME if present to change PAS (S or NS) of given address.
+  plat_memory_protect = ""
+
   # The number of pages to allocate for the hypervisor heap.
   plat_heap_pages = 0
 

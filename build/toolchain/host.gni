@@ -134,6 +134,7 @@ template("host_toolchain") {
 
         # When building for the ${target_name}, use the fake architecture to make things
         # testable.
+        plat_memory_protect = "//src/memory_protect:absent"
         plat_arch = "fake"
         plat_boot_flow = "//src/arch/fake:boot_flow"
         plat_console = "//src/arch/fake:console"
