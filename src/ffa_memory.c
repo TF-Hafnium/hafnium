@@ -1594,7 +1594,7 @@ struct ffa_value ffa_memory_send_continue_validate(
 	 * matches.
 	 */
 	share_state = get_share_state(share_states, handle);
-	if (!share_state) {
+	if (share_state == NULL) {
 		dlog_verbose(
 			"Invalid handle %#x for memory send continuation.\n",
 			handle);
@@ -1720,7 +1720,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	share_state = allocate_share_state(share_states, share_func,
 					   memory_region, fragment_length,
 					   FFA_MEMORY_HANDLE_INVALID);
-	if (!share_state) {
+	if (share_state == NULL) {
 		dlog_verbose("Failed to allocate share state.\n");
 		mpool_free(page_pool, memory_region);
 		ret = ffa_error(FFA_NO_MEMORY);
@@ -2470,7 +2470,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 
 	share_states = share_states_lock();
 	share_state = get_share_state(share_states, handle);
-	if (!share_state) {
+	if (share_state == NULL) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_RETRIEVE_REQ.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -2724,7 +2724,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 
 	share_states = share_states_lock();
 	share_state = get_share_state(share_states, handle);
-	if (!share_state) {
+	if (share_state == NULL) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_FRAG_RX.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -2905,7 +2905,7 @@ struct ffa_value ffa_memory_relinquish(
 
 	share_states = share_states_lock();
 	share_state = get_share_state(share_states, handle);
-	if (!share_state) {
+	if (share_state == NULL) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_RELINQUISH.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -3031,7 +3031,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	share_states = share_states_lock();
 
 	share_state = get_share_state(share_states, handle);
-	if (!share_state) {
+	if (share_state == NULL) {
 		dlog_verbose("Invalid handle %#x for FFA_MEM_RECLAIM.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
