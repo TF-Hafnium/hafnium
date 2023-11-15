@@ -475,6 +475,7 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 	void *base_addr;
 	uint32_t gic_version;
 	uint32_t reg_pidr;
+	uint32_t typer_reg;
 
 	base_addr = mm_identity_map(stage1_locked, pa_init(GICD_BASE),
 				    pa_init(GICD_BASE + GICD_SIZE),
@@ -496,6 +497,11 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
+	typer_reg = read_gicd_typer_reg(plat_gicv3_driver.dist_base);
+
+	/* Ensure GIC implementation supports two security states. */
+	CHECK((typer_reg & TYPER_SEC_EXTN) == TYPER_SEC_EXTN);
+
 	plat_gicv3_driver.base_redist_frame = (uintptr_t)base_addr;
 
 	/* Check GIC version reported by the Peripheral register. */
@@ -510,8 +516,7 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 	populate_redist_base_addrs();
 
 #if GIC_EXT_INTID
-	CHECK((read_gicd_typer_reg(plat_gicv3_driver.dist_base) & TYPER_ESPI) ==
-	      TYPER_ESPI);
+	CHECK((typer_reg & TYPER_ESPI) == TYPER_ESPI);
 	CHECK(gicv3_get_espi_limit(plat_gicv3_driver.dist_base) != 0);
 #endif
 	return true;

@@ -144,6 +144,7 @@
 
 /* GICD_TYPER shifts and masks */
 #define TYPER_ESPI (1 << 8)
+#define TYPER_SEC_EXTN (1 << 10)
 #define TYPER_DVIS (1 << 18)
 #define TYPER_ESPI_RANGE_MASK (0x1f)
 #define TYPER_ESPI_RANGE_SHIFT (27)
