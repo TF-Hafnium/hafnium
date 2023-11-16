@@ -2495,7 +2495,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 			"Memory with handle %#x not fully sent, can't "
 			"retrieve.\n",
 			handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
 
