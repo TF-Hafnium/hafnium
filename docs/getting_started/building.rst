@@ -6,15 +6,49 @@ This page assumes the :ref:`Prerequisites` have been followed to install all pro
 Hafnium
 ^^^^^^^
 
-By default, the Hafnium SPMC is built with clang for a few target platforms along
-with tests. From Hafnium top level directory, simply type:
+Most common options
+~~~~~~~~~~~~~~~~~~~
+
+By default, Hafnium builds all target platforms along with tests with clang.
+From Hafnium top level directory, use:
 
 .. code:: shell
 
    make
 
+The resulting Hafnium images are located in `out/reference/<platform>/hafnium.bin`.
+
+It is possible to build Hafnium for a single platform target omitting tests,
+resulting in faster builds when the test suite is not required.
+For example to build the SPMC targeting FVP:
+
+.. code:: shell
+
+   make PLATFORM=secure_aem_v8a_fvp_vhe
+
 The resulting FVP image is located in
 `out/reference/secure_aem_v8a_fvp_vhe_clang/hafnium.bin`.
+
+Multiple platform names can be provided for building e.g.:
+
+.. code:: shell
+
+   make PLATFORM="secure_aem_v8a_fvp_vhe,secure_tc"
+
+To get a list of available platforms, you may use:
+
+.. code:: shell
+
+    make list
+
+resulting in:
+
+.. code:: shell
+
+    Supported platforms:  ['secure_rd_fremont', 'secure_rd_fremont_cfg1', 'secure_aem_v8a_fvp_vhe', 'aem_v8a_fvp_vhe', 'qemu_aarch64_vhe', 'secure_qemu_aarch64', 'rpi4', 'secure_tc']
+
+Additional options
+~~~~~~~~~~~~~~~~~~
 
 The presence of assertions in the final build can be set using the `ENABLE_ASSERTIONS`
 make variable, by default this is set to `true`, meaning asserts are included in the build.
