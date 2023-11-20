@@ -75,6 +75,7 @@ all: $(OUT_DIR)/build.ninja
 ifeq ($(PLATFORM),default)
 	@$(NINJA) -C $(OUT_DIR)
 else
+	@build/check_platform_exists.py $(PROJECT) $(PLATFORM_LIST) || (exit 1)
 	@for PLAT in $(PLATFORM_LIST); do \
 		$(NINJA) -C $(OUT_DIR) project/$(PROJECT):$$PLAT; \
 	done
@@ -149,5 +150,9 @@ update-prebuilts: prebuilts/linux-aarch64/linux/vmlinuz
 prebuilts/linux-aarch64/linux/vmlinuz: $(OUT_DIR)/build.ninja
 	@$(NINJA) -C $(OUT_DIR) "third_party/linux"
 	cp out/reference/obj/third_party/linux/linux.bin $@
+
+.PHONY: list
+list:
+	@build/check_platform_exists.py $(PROJECT)
 
 endif  # HAFNIUM_HERMETIC_BUILD
