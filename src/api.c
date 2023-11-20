@@ -2801,11 +2801,6 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 		goto out;
 	}
 
-	if (plat_ffa_is_direct_response_interrupted(current_locked)) {
-		ret = ffa_error(FFA_INTERRUPTED);
-		goto out;
-	}
-
 	assert(!vm_id_is_current_world(current->vm->id) ||
 	       next_state == VCPU_STATE_WAITING);
 

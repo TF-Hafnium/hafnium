@@ -2071,7 +2071,7 @@ static void plat_ffa_run_in_sec_interrupt_rtm(
 }
 
 /**
- * Intercept a direct response message from current S-EL0 vCPU to signal a
+ * Intercept a direct response message from current vCPU to signal a
  * pending virtual secure interrupt and prepare to resume it in SPMC schedule
  * mode under runtime model for secure interrupt handling.
  */
@@ -2080,28 +2080,31 @@ bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
 					struct ffa_value to_ret,
 					struct ffa_value *signal_interrupt)
 {
-	bool is_el0_partition;
 	struct vcpu *current;
 
 	current = current_locked.vcpu;
-	is_el0_partition = current->vm->el0_partition;
 	assert(*next == NULL);
 
-	if (is_el0_partition && vcpu_interrupt_count_get(current_locked) > 0) {
+	/*
+	 * Check if there are any pending virtual secure interrupts to be
+	 * handled.
+	 */
+	if (vcpu_interrupt_count_get(current_locked) > 0 &&
+	    current->processing_secure_interrupt) {
 		dlog_verbose(
 			"Intercepting FFA_MSG_SEND_DIRECT_RESP call to "
 			"signal secure interrupt: %x\n",
 			current->vm->id);
 
-		assert(current->processing_secure_interrupt);
 		current->direct_resp_intercepted = true;
 
 		/* Save direct response message args. */
 		current->direct_resp_ffa_value = to_ret;
 
 		/*
-		 * Prepare to signal virtual secure interrupt to S-EL0 SP. Refer
-		 * to FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10.
+		 * Prepare to signal virtual secure interrupt to S-EL0/S-EL1 SP
+		 * in WAITING state. Refer to FF-A v1.2 Table 9.1 and Table 9.2
+		 * case 1.
 		 */
 		plat_ffa_signal_interrupt_args(
 			signal_interrupt, current->current_sec_interrupt_id);
@@ -2211,7 +2214,6 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 		assert(!current->implicit_completion_signal);
 
 		if (current->direct_resp_intercepted) {
-			assert(current->vm->el0_partition);
 			return plat_ffa_resume_direct_response(current_locked,
 							       next);
 		}
@@ -2584,62 +2586,6 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
 	(void)page_pool;
 
 	return ffa_error(FFA_INVALID_PARAMETERS);
-}
-
-bool plat_ffa_is_direct_response_interrupted(struct vcpu_locked current_locked)
-{
-	bool ret;
-
-	/*
-	 * A secure interrupt might trigger while the target SP is currently
-	 * running to send a direct response. SPMC would then inject virtual
-	 * interrupt to vCPU of target SP and resume it.
-	 * However, it is possible that the S-EL1 SP could have its interrupts
-	 * masked and hence might not handle the virtual interrupt before
-	 * sending direct response message. In such a scenario, SPMC must
-	 * return an error with code FFA_INTERRUPTED to inform the S-EL1 SP of
-	 * a pending interrupt and allow it to be handled before sending the
-	 * direct response.
-	 */
-	struct vcpu *current = current_locked.vcpu;
-
-	/*
-	 * An S-EL0 partition can handle virtual secure interrupt only in
-	 * WAITING state. Hence it is likely for an S-EL0 SP to have a pending
-	 * virtual interrupt during FFA_MSG_SEND_DIRECT_RESP invocation.
-	 */
-	if (current->vm->el0_partition) {
-		return false;
-	}
-
-	/*
-	 * Check if there are any pending virtual secure interrupts to be
-	 * handled.
-	 */
-	if (vcpu_interrupt_count_get(current_locked) > 0 &&
-	    current->processing_secure_interrupt) {
-		assert(current->implicit_completion_signal);
-
-		dlog_verbose(
-			"Secure virtual interrupt not yet serviced by "
-			"SP %x. FFA_MSG_SEND_DIRECT_RESP interrupted\n",
-			current->vm->id);
-		ret = true;
-	} else {
-		/*
-		 * SP must have completed handling of virtual interrupt and
-		 * performed de-activation. All the fields corresponding to
-		 * secure interrupt handling must have been cleared. Refer to
-		 * plat_ffa_interrupt_deactivate().
-		 */
-		assert(!current->processing_secure_interrupt);
-		assert(!current->secure_interrupt_deactivated);
-		assert(!current->implicit_completion_signal);
-
-		ret = false;
-	}
-
-	return ret;
 }
 
 struct ffa_value plat_ffa_msg_send(ffa_id_t sender_vm_id,

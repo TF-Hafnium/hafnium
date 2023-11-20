@@ -1177,12 +1177,6 @@ void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 	}
 }
 
-bool plat_ffa_is_direct_response_interrupted(struct vcpu_locked current_locked)
-{
-	(void)current_locked;
-	return false;
-}
-
 /** Forwards a memory send message on to the other world. */
 static struct ffa_value memory_send_other_world_forward(
 	struct vm_locked other_world_locked, ffa_id_t sender_vm_id,

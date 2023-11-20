@@ -487,12 +487,6 @@ void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 	(void)vm_locked;
 }
 
-bool plat_ffa_is_direct_response_interrupted(struct vcpu_locked current_locked)
-{
-	(void)current_locked;
-	return false;
-}
-
 struct ffa_value plat_ffa_other_world_mem_send(
 	struct vm *from, uint32_t share_func,
 	struct ffa_memory_region **memory_region, uint32_t length,
