@@ -2883,6 +2883,7 @@ struct ffa_value ffa_memory_relinquish(
 	struct ffa_value ret;
 	uint32_t receiver_index;
 	bool receivers_relinquished_memory;
+	ffa_memory_access_permissions_t receiver_permissions = 0;
 
 	if (relinquish_request->endpoint_count != 1) {
 		dlog_verbose(
@@ -2958,6 +2959,8 @@ struct ffa_value ffa_memory_relinquish(
 
 		if (receiver->receiver_permissions.receiver ==
 		    from_locked.vm->id) {
+			receiver_permissions =
+				receiver->receiver_permissions.permissions;
 			continue;
 		}
 
@@ -2979,6 +2982,13 @@ struct ffa_value ffa_memory_relinquish(
 	if (clear && share_state->share_func == FFA_MEM_SHARE_32) {
 		dlog_verbose("Memory which was shared can't be cleared.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (clear && receiver_permissions == FFA_DATA_ACCESS_RO) {
+		dlog_verbose("%s: RO memory can't use clear memory flag.\n",
+			     __func__);
+		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
 
