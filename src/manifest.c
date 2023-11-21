@@ -66,8 +66,9 @@ struct manifest_data {
 	 * the partitions manifest, and regions for each partition
 	 * address-space.
 	 */
-	struct mem_range
-		mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS + MAX_VMS];
+	struct mem_range mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS +
+				     PARTITION_MAX_DEVICE_REGIONS * MAX_VMS +
+				     MAX_VMS];
 	uint64_t boot_order_values[BOOT_ORDER_MAP_ENTRIES];
 };
 
@@ -528,8 +529,8 @@ static enum manifest_return_code check_partition_memory_is_valid(
 
 /*
  * Keep track of the memory allocated by partitions. This includes memory region
- * nodes defined in their respective partition manifests, as well address space
- * defined from their load address.
+ * nodes and device region nodes defined in their respective partition
+ * manifests, as well address space defined from their load address.
  */
 static enum manifest_return_code check_and_record_memory_used(
 	uintptr_t base_address, uint32_t page_count)
@@ -825,6 +826,9 @@ static enum manifest_return_code parse_ffa_device_region_node(
 				&dev_regions[i].page_count));
 		dlog_verbose("      Pages_count: %u\n",
 			     dev_regions[i].page_count);
+
+		TRY(check_and_record_memory_used(dev_regions[i].base_address,
+						 dev_regions[i].page_count));
 
 		TRY(read_uint32(dev_node, "attributes",
 				&dev_regions[i].attributes));
