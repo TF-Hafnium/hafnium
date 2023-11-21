@@ -1505,6 +1505,7 @@ TEST_F(manifest, ffa_validate_dev_regions)
 			.EndChild()
 		.EndChild()
 		.Build();
+
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_INTERRUPT_ID_REPEATED);
@@ -1515,6 +1516,63 @@ TEST_F(manifest, ffa_validate_dev_regions)
 	ASSERT_EQ(m->vm[0].partition.dev_regions[1].interrupts[0].id, 1);
 	ASSERT_EQ(m->vm[0].partition.dev_regions[1].interrupts[0].attributes,
 		  3);
+	manifest_dealloc();
+
+	/* Overlapping address space between two device region nodes. */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("device-regions")
+			.Compatible({"arm,ffa-manifest-device-regions"})
+			.StartChild("test-device-0")
+				.Description("test-device-0")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+			.EndChild()
+			.StartChild("test-device-1")
+				.Description("test-device-1")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+			.EndChild()
+			.EndChild()
+		.Build();
+
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+	manifest_dealloc();
+
+	/*
+	 * Check memory region node and device region node address space
+	 * cannot overlap.
+	 */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({"arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.StartChild("device-regions")
+			.Compatible({"arm,ffa-manifest-device-regions"})
+			.StartChild("test-device-0")
+				.Description("test-device-0")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
 }
 
 TEST_F(manifest, ffa_invalid_memory_region_attributes)
@@ -1860,6 +1918,7 @@ TEST_F(manifest, ffa_boot_order_not_unique)
 	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
 		  MANIFEST_ERROR_INVALID_BOOT_ORDER);
 }
+
 TEST_F(manifest, ffa_valid_multiple_uuids)
 {
 	struct manifest_vm *vm;
@@ -1924,5 +1983,171 @@ TEST_F(manifest, ffa_uuid_all_zeros)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_UUID_ALL_ZEROS);
+}
+
+/*
+ * Test that the address space of two device region nodes specified across
+ * different SPs cannot overlap.
+ */
+TEST_F(manifest, ffa_device_region_multi_sps)
+{
+	struct_manifest *m;
+	struct memiter it;
+	struct mm_stage1_locked mm_stage1_locked;
+	struct boot_params params;
+	Partition_package spkg_1;
+	Partition_package spkg_2;
+
+	/* clang-format off */
+	std::vector<char>  dtb1 = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.FfaLoadAddress((uint64_t)&spkg_1)
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<0>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x0>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<0x7>")
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device-0")
+				.Description("test-device-0")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+
+	std::vector<char> dtb2 = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1daaa>")
+		.FfaLoadAddress((uint64_t)&spkg_2)
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<0>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x0>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<0x7>")
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device-0")
+				.Description("test-device-1")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+
+	/* clang-format on */
+	spkg_1.init(dtb1);
+	spkg_2.init(dtb2);
+
+	/* clang-format off */
+	std::vector<char> core_dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+			.StartChild("vm1")
+				.DebugName("ffa_partition_1")
+				.FfaPartition()
+				.LoadAddress((uint64_t)&spkg_1)
+				.VcpuCount(1)
+				.MemSize(0x4000)
+			.EndChild()
+			.StartChild("vm2")
+				.DebugName("ffa_partition_2")
+				.FfaPartition()
+				.LoadAddress((uint64_t)&spkg_2)
+				.VcpuCount(1)
+				.MemSize(0x4000)
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	boot_params_init(&params, &spkg_1);
+	memiter_init(&it, core_dtb.data(), core_dtb.size());
+	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
+		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb1 = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.FfaLoadAddress((uint64_t)&spkg_1)
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<0>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x0>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<0x7>")
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device-0")
+				.Description("test-device-0")
+				.Property("base-address", "<0x7200000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+
+	dtb2 = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1daaa>")
+		.FfaLoadAddress((uint64_t)&spkg_2)
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<0>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x0>")
+		.Property("xlat-granule", "<0>")
+		.Property("messaging-method", "<0x7>")
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device-0")
+				.Description("test-device-1")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+
+	/* clang-format on */
+	spkg_1.init(dtb1);
+	spkg_2.init(dtb2);
+
+	/* clang-format off */
+	core_dtb = ManifestDtBuilder()
+		.StartChild("hypervisor")
+			.Compatible()
+			.StartChild("vm1")
+				.DebugName("ffa_partition_1")
+				.FfaPartition()
+				.LoadAddress((uint64_t)&spkg_1)
+				.VcpuCount(1)
+				.MemSize(0x4000)
+			.EndChild()
+			.StartChild("vm2")
+				.DebugName("ffa_partition_2")
+				.FfaPartition()
+				.LoadAddress((uint64_t)&spkg_2)
+				.VcpuCount(1)
+				.MemSize(0x4000)
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	boot_params_init(&params, &spkg_1);
+	memiter_init(&it, core_dtb.data(), core_dtb.size());
+	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
+		  MANIFEST_SUCCESS);
 }
 } /* namespace */
