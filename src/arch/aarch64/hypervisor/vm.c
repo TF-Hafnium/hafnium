@@ -31,7 +31,12 @@ void arch_vm_features_set(struct vm *vm)
 	vm->arch.trapped_features |= HF_FEATURE_DEBUG;
 
 	if (vm->id != HF_PRIMARY_VM_ID) {
-		/* Features to trap only for the secondary VMs. */
+		/*
+		 * Features to trap only for the secondary VMs (and Secure
+		 * Partitions).
+		 */
+
+		vm->arch.trapped_features |= HF_FEATURE_AMU;
 
 		vm->arch.trapped_features |= HF_FEATURE_PERFMON;
 

@@ -508,6 +508,13 @@
  */
 #define CPTR_EL2_VHE_ZEN (UINT64_C(0x3) << 16)
 
+/**
+ * With CPTR_EL2.TAM=1 accesses from EL1 and EL0 to Activity Monitor registers
+ * are trapped to EL2, when EL2 is enabled in the current Security state.
+ * Note TAM is CPTR_EL2[30] whichever HCR_EL2.E2H state (VHE/nVHE).
+ */
+#define CPTR_EL2_TAM (UINT64_C(0x1) << 30)
+
 /*
  * Process State Bit definitions.
  *

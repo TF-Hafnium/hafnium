@@ -100,6 +100,11 @@ bool feature_id_is_register_access(uintreg_t esr)
 #define ID_AA64PFR0_EL1_RAS (UINT64_C(0xf) << 28)
 
 /**
+ * Activity Monitor Unit.
+ */
+#define ID_AA64PFR0_EL1_AMU (UINT64_C(0xf) << 44)
+
+/**
  * Self-hosted Trace Extension Version
  */
 #define ID_AA64DFR0_EL1_TRACE_FILT (UINT64_C(0xf) << 40)
@@ -234,6 +239,10 @@ void feature_set_traps(struct vm *vm, struct arch_regs *regs)
 		vm->arch.tid3_masks.id_aa64isar1_el1 &= ~ID_AA64ISAR1_EL1_GPA;
 		vm->arch.tid3_masks.id_aa64isar1_el1 &= ~ID_AA64ISAR1_EL1_API;
 		vm->arch.tid3_masks.id_aa64isar1_el1 &= ~ID_AA64ISAR1_EL1_APA;
+	}
+
+	if (features & HF_FEATURE_AMU) {
+		vm->arch.tid3_masks.id_aa64pfr0_el1 &= ~ID_AA64PFR0_EL1_AMU;
 	}
 }
 
