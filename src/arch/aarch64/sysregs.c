@@ -226,14 +226,3 @@ uintreg_t get_sctlr_el2_value(bool is_el0_partition)
 
 	return sctlr_el2_value;
 }
-
-/**
- * Returns true if the SVE feature is implemented.
- */
-bool is_arch_feat_sve_supported(void)
-{
-	uint64_t id_aa64pfr0_el1 = read_msr(ID_AA64PFR0_EL1);
-
-	return ((id_aa64pfr0_el1 >> ID_AA64PFR0_EL1_SVE_SHIFT) &
-		ID_AA64PFR0_EL1_SVE_MASK) == ID_AA64PFR0_EL1_SVE_SUPPORTED;
-}
