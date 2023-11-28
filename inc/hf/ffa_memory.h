@@ -13,8 +13,7 @@
 
 #include "vmapi/hf/ffa.h"
 
-bool is_ffa_hypervisor_retrieve_request(struct ffa_memory_region *request,
-					struct vm_locked to_locked);
+bool is_ffa_hypervisor_retrieve_request(struct ffa_memory_region *request);
 
 bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 				    enum ffa_version ffa_version,

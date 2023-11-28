@@ -3042,23 +3042,34 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-/*
- * According to section 16.4.3 of FF-A v1.1 EAC0 specification, the hypervisor
- * may issue an FFA_MEM_RETRIEVE_REQ to obtain the memory region description
- * of a pending memory sharing operation whose allocator is the SPM, for
- * validation purposes before forwarding an FFA_MEM_RECLAIM call. In doing so
- * the memory region descriptor of the retrieve request must be zeroed with the
- * exception of the sender ID and handle.
+/**
+ * According to section 17.4.3 of the FF-A v1.2 ALP0 specification, the
+ * hypervisor may issue an FFA_MEM_RETRIEVE_REQ to obtain the memory region
+ * description of a pending memory sharing operation whose allocator is the SPM,
+ * for validation purposes before forwarding an FFA_MEM_RECLAIM call. For a
+ * hypervisor retrieve request the endpoint memory access descriptor count must
+ * be 0 (for any other retrieve request it must be >= 1).
  */
-bool is_ffa_hypervisor_retrieve_request(struct ffa_memory_region *request,
-					struct vm_locked to_locked)
+bool is_ffa_hypervisor_retrieve_request(struct ffa_memory_region *request)
 {
-	return to_locked.vm->id == HF_HYPERVISOR_VM_ID &&
+	return request->receiver_count == 0U;
+}
+
+/**
+ * An FFA_MEM_RETRIEVE_REQ from the hypervisor must specify the handle of the
+ * memory transaction it is querying and all other fields must be 0.
+ */
+static bool ffa_memory_hypervisor_retrieve_request_validate(
+	struct ffa_memory_region *request)
+{
+	return request->sender == 0U &&
 	       request->attributes.shareability == 0U &&
 	       request->attributes.cacheability == 0U &&
 	       request->attributes.type == 0U &&
 	       request->attributes.security == 0U && request->flags == 0U &&
-	       request->tag == 0U && request->receiver_count == 0U &&
+	       request->tag == 0U && request->memory_access_desc_size == 0U &&
+	       request->receiver_count == 0U &&
+	       request->receivers_offset == 0U &&
 	       plat_ffa_memory_handle_allocated_by_current_world(
 		       request->handle);
 }
@@ -3593,7 +3604,16 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		goto out;
 	}
 
-	if (is_ffa_hypervisor_retrieve_request(retrieve_request, to_locked)) {
+	if (is_ffa_hypervisor_retrieve_request(retrieve_request)) {
+		if (!ffa_memory_hypervisor_retrieve_request_validate(
+			    retrieve_request)) {
+			dlog_verbose(
+				"All fields except the handle in the "
+				"memory access descriptor must be zero for a "
+				"hypervisor retrieve request.\n");
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
 		ret = ffa_hypervisor_retrieve_request(share_state, to_locked,
 						      retrieve_request);
 	} else {

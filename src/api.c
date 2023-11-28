@@ -3707,7 +3707,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 		goto out;
 	}
 
-	if (!is_ffa_hypervisor_retrieve_request(retrieve_msg, to_locked)) {
+	if (!is_ffa_hypervisor_retrieve_request(retrieve_msg)) {
 		if (!ffa_memory_region_sanity_check(retrieve_msg, ffa_version,
 						    fragment_length, false)) {
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
