@@ -881,6 +881,9 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
 	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
 	struct vcpu *next = NULL;
 
+	/* Mask out SMCCC SVE hint bit from function id. */
+	args.func &= ~SMCCC_SVE_HINT_MASK;
+
 	if (hvc_smc_handler(args, vcpu, &next)) {
 		return next;
 	}
@@ -898,12 +901,14 @@ static struct vcpu *smc_handler(struct vcpu *vcpu)
  */
 struct vcpu *smc_handler_from_nwd(struct vcpu *vcpu)
 {
-	struct ffa_value args;
+	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
 	struct vcpu *next = NULL;
 
 	plat_save_ns_simd_context(vcpu);
 
-	args = arch_regs_get_args(&vcpu->regs);
+	/* Mask out SMCCC SVE hint bit from function id. */
+	args.func &= ~SMCCC_SVE_HINT_MASK;
+
 	if (hvc_smc_handler(args, vcpu, &next)) {
 		return next;
 	}
@@ -1086,6 +1091,9 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 {
 	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
 	struct vcpu *next = NULL;
+
+	/* Mask out SMCCC SVE hint bit from function id. */
+	args.func &= ~SMCCC_SVE_HINT_MASK;
 
 	if (hvc_smc_handler(args, vcpu, &next)) {
 		return next;
