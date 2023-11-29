@@ -1045,22 +1045,12 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 	case HF_MAILBOX_WAITER_GET:
 		vcpu->regs.r[0] = plat_ffa_mailbox_waiter_get(args.arg1, vcpu);
 		break;
-#endif
-	case HF_INTERRUPT_ENABLE:
-		vcpu->regs.r[0] = api_interrupt_enable(args.arg1, args.arg2,
-						       args.arg3, vcpu);
-		break;
-
-	case HF_INTERRUPT_GET:
-		vcpu->regs.r[0] = api_interrupt_get(vcpu);
-		break;
 
 	case HF_INTERRUPT_INJECT:
 		vcpu->regs.r[0] = api_interrupt_inject(args.arg1, args.arg2,
 						       args.arg3, vcpu, &next);
 		break;
-
-#if SECURE_WORLD == 1
+#else
 	case HF_INTERRUPT_DEACTIVATE:
 		vcpu->regs.r[0] = plat_ffa_interrupt_deactivate(
 			args.arg1, args.arg2, vcpu);
@@ -1071,6 +1061,14 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 			args.arg1, args.arg2, args.arg3, vcpu);
 		break;
 #endif
+	case HF_INTERRUPT_ENABLE:
+		vcpu->regs.r[0] = api_interrupt_enable(args.arg1, args.arg2,
+						       args.arg3, vcpu);
+		break;
+
+	case HF_INTERRUPT_GET:
+		vcpu->regs.r[0] = api_interrupt_get(vcpu);
+		break;
 
 	default:
 		vcpu->regs.r[0] = SMCCC_ERROR_UNKNOWN;
