@@ -1086,7 +1086,7 @@ static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
  * Helper to check if extended arguments (corresponding to regs x8-x17)
  * are zeroed out.
  */
-static bool api_extended_args_are_zero(struct ffa_value *args)
+bool api_extended_args_are_zero(struct ffa_value *args)
 {
 	if (args->extended_val.arg8 != 0U || args->extended_val.arg9 != 0U ||
 	    args->extended_val.arg10 != 0U || args->extended_val.arg11 != 0U ||

@@ -65,6 +65,31 @@ TEST_SERVICE(ffa_yield_direct_message_resp_echo)
 	FAIL("Direct response not expected to return");
 }
 
+TEST_SERVICE(ffa_yield_direct_message_resp2_echo)
+{
+	struct ffa_value res = ffa_msg_wait();
+	uint64_t msg[MAX_RESP_REGS] = {0};
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ2_64);
+
+	/*
+	 * Give back control to VM/SP, that sent the direct request message,
+	 * through FFA_YIELD ABI and specify timeout of 0x123456789.
+	 */
+	ffa_yield_timeout(0x1, 0x23456789);
+
+	HFTEST_LOG("after yield");
+
+	/* Send the echo through direct message response. */
+	memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &res.arg4,
+		 MAX_RESP_REGS * sizeof(uint64_t));
+
+	ffa_msg_send_direct_resp2(ffa_receiver(res), ffa_sender(res),
+				  (const uint64_t *)msg, MAX_RESP_REGS);
+
+	FAIL("Direct response not expected to return");
+}
+
 TEST_SERVICE(ffa_direct_message_echo_services)
 {
 	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
@@ -415,6 +440,7 @@ TEST_SERVICE(ffa_yield_direct_message_v_1_2_echo_services)
 
 	ffa_yield();
 }
+
 /**
  * Verify a service can't send a direct message response when it hasn't
  * first been sent a request.

@@ -359,6 +359,71 @@ TEST(direct_message, ffa_send_direct_message_req2_echo)
 }
 
 /**
+ * Send direct message to an VM/SP. Expect it to yield its CPU cycles. Allocate
+ * cycles through FFA_RUN and verify that sent info is echoed back.
+ */
+TEST(direct_message, ffa_send_direct_message_req2_yield_echo)
+{
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999, 0x01010101, 0x23232323, 0x45454545,
+				0x67676767, 0x89898989, 0x11001100, 0x22332233,
+				0x44554455, 0x66776677};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_uuid uuid = SERVICE1;
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_yield_direct_message_resp2_echo", mb.send);
+	ffa_run(service1_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+				       &uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+
+	/*
+	 * Consider the scenario where VM1 allocated CPU cycles to service1
+	 * through a direct request message but service1 yields execution back
+	 * to VM1 instead of busy waiting for an IO operation.
+	 */
+	EXPECT_EQ(res.func, FFA_YIELD_32);
+
+	/* Service1 id/vCPU index are passed through arg1. */
+	EXPECT_EQ(res.arg1, ffa_vm_vcpu(service1_info->vm_id, 0));
+
+	/*
+	 * Additionally, service1 can also specify timeout while yielding cycles
+	 * back to VM1. This is a hint to VM1 that it can be resumed upon
+	 * expiration of the timeout.
+	 * Check for 64-bit timeout specified by service1 through arg2 and arg3.
+	 * The purpose of these checks is just to validate the timeout value but
+	 * not to leverage it upon expiration.
+	 */
+	EXPECT_EQ(res.arg2, 0x1);
+	EXPECT_EQ(res.arg3, 0x23456789);
+
+	/* Allocate CPU cycles to resume service */
+	res = ffa_run(service1_info->vm_id, 0);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+
+	EXPECT_EQ(res.arg4, msg[0]);
+	EXPECT_EQ(res.arg5, msg[1]);
+	EXPECT_EQ(res.arg6, msg[2]);
+	EXPECT_EQ(res.arg7, msg[3]);
+	EXPECT_EQ(res.extended_val.arg8, msg[4]);
+	EXPECT_EQ(res.extended_val.arg9, msg[5]);
+	EXPECT_EQ(res.extended_val.arg10, msg[6]);
+	EXPECT_EQ(res.extended_val.arg11, msg[7]);
+	EXPECT_EQ(res.extended_val.arg12, msg[8]);
+	EXPECT_EQ(res.extended_val.arg13, msg[9]);
+	EXPECT_EQ(res.extended_val.arg14, msg[10]);
+	EXPECT_EQ(res.extended_val.arg15, msg[11]);
+	EXPECT_EQ(res.extended_val.arg16, msg[12]);
+	EXPECT_EQ(res.extended_val.arg17, msg[13]);
+}
+
+/**
  * Initiate direct message request between test SPs.
  * If test services are VMs, test should be skipped.
  */
@@ -386,6 +451,40 @@ TEST_PRECONDITION(direct_message, ffa_direct_message_req2_services_echo,
 				    &service2_uuid, sizeof(service2_uuid), 0);
 	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
 	ffa_run(service1_info->vm_id, 0);
+}
+
+/**
+ * Initiate direct message request between two Secure Partitions. Configure
+ * the second SP in the call chain to yield cycles received from first SP
+ * through direct message request. The first SP is equipped to reallocate
+ * CPU cycles to resume the direct message processing.
+ */
+TEST_PRECONDITION(direct_message, ffa_direct_message_req2_services_yield_echo,
+		  service1_and_service2_are_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_value ret;
+	const struct ffa_uuid service2_uuid = SERVICE2;
+
+	/* Run service2 for it to wait for a request from service1. */
+	SERVICE_SELECT(service2_info->vm_id,
+		       "ffa_yield_direct_message_resp2_echo", mb.send);
+	ffa_run(service2_info->vm_id, 0);
+
+	/* Service1 requests echo from service2. */
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_yield_direct_message_v_1_2_echo_services", mb.send);
+
+	/* Send to service1 the UUID of the target for its message. */
+	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
+				    &service2_uuid, sizeof(service2_uuid), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
 }
 
 /**

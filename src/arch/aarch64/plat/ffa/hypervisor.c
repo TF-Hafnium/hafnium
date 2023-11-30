@@ -141,7 +141,7 @@ bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	 * VM's requests should be forwarded to the SPMC, if target is an SP.
 	 */
 	if (!vm_id_is_current_world(vm_id)) {
-		*ret = arch_other_world_call((struct ffa_value){
+		*ret = arch_other_world_call_ext((struct ffa_value){
 			.func = FFA_RUN_32, ffa_vm_vcpu(vm_id, vcpu_idx)});
 		return true;
 	}

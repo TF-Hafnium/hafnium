@@ -116,8 +116,8 @@ static inline ffa_id_t hf_vm_get_id(void)
 static inline struct ffa_value ffa_run(ffa_id_t vm_id,
 				       ffa_vcpu_index_t vcpu_idx)
 {
-	return ffa_call((struct ffa_value){.func = FFA_RUN_32,
-					   ffa_vm_vcpu(vm_id, vcpu_idx)});
+	return ffa_call_ext((struct ffa_value){.func = FFA_RUN_32,
+					       ffa_vm_vcpu(vm_id, vcpu_idx)});
 }
 
 /**

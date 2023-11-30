@@ -602,6 +602,16 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	}
 #endif
 	case FFA_RUN_32:
+		/**
+		 * Ensure that an FF-A v1.2 endpoint preserves the
+		 * runtime state of the calling partition by setting
+		 * the extended registers (x8-x17) to zero.
+		 */
+		if (current->vm->ffa_version >= MAKE_FFA_VERSION(1, 2) &&
+		    !api_extended_args_are_zero(args)) {
+			*args = ffa_error(FFA_INVALID_PARAMETERS);
+			return false;
+		}
 		*args = api_ffa_run(ffa_vm_id(*args), ffa_vcpu_index(*args),
 				    current, next);
 		return true;
