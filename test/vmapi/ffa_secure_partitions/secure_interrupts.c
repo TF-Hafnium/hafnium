@@ -128,6 +128,39 @@ TEST(secure_interrupts, sp_running)
 }
 
 /*
+ * Test secure interrupt handling while the Secure Partition runs with
+ * interrupts potentially masked. This test helps to validate the functionality
+ * of the SPMC to intercept a direct response message if there are pending
+ * virtual secure interrupts and reschedule the partition to handle the pending
+ * interrupt.
+ */
+TEST(secure_interrupts, sp_direct_response_intercepted)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_id_t receiver_id = service2_info->vm_id;
+
+	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 400);
+
+	/* Send request to the SP to sleep uninterrupted. */
+	res = sp_sleep_cmd_send(own_id, receiver_id, SP_SLEEP_TIME, 1);
+
+	/*
+	 * Secure interrupt should trigger during this time, SP will handle the
+	 * trusted watchdog timer interrupt.
+	 */
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/* Make sure elapsed time not less than sleep time. */
+	EXPECT_GE(sp_resp_value(res), SP_SLEEP_TIME);
+
+	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
+}
+
+/*
  * Test secure interrupt handling while the Secure Partition is in WAITING
  * state.
  */
