@@ -79,7 +79,8 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		res = sp_clear_last_interrupt_cmd(ffa_sender(res));
 		break;
 	case SP_SLEEP_CMD:
-		res = sp_sleep_cmd(ffa_sender(res), sp_get_sleep_time(res));
+		res = sp_sleep_cmd(ffa_sender(res), sp_get_sleep_time(res),
+				   sp_get_sleep_options(res));
 		break;
 	case SP_FWD_SLEEP_CMD:
 		res = sp_fwd_sleep_cmd(ffa_sender(res), sp_get_sleep_time(res),

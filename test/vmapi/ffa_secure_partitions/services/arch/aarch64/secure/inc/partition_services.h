@@ -375,13 +375,20 @@ struct ffa_value sp_clear_last_interrupt_cmd(ffa_id_t source);
 #define SP_SLEEP_CMD 0x736c6570U
 
 static inline struct ffa_value sp_sleep_cmd_send(ffa_id_t source, ffa_id_t dest,
-						 uint32_t sleep_time)
+						 uint32_t sleep_time,
+						 uint32_t options)
 {
 	return ffa_msg_send_direct_req(source, dest, SP_SLEEP_CMD, sleep_time,
-				       0, 0, 0);
+				       options, 0, 0);
 }
 
-struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms);
+struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
+			      uint32_t options);
+
+static inline uint32_t sp_get_sleep_options(struct ffa_value ret)
+{
+	return (uint32_t)ret.arg5;
+}
 
 /**
  * Command to request SP to forward sleep command for the given time in ms.

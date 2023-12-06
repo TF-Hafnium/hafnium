@@ -28,6 +28,10 @@ void sp_enable_irq(void)
 {
 }
 
+void sp_disable_irq(void)
+{
+}
+
 struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 {
 	uint32_t intid;

@@ -43,6 +43,11 @@ void sp_enable_irq(void)
 	arch_irq_enable();
 }
 
+void sp_disable_irq(void)
+{
+	arch_irq_disable();
+}
+
 struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 {
 	/*
@@ -53,6 +58,10 @@ struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 	 * the interrupt handler.
 	 */
 	ASSERT_EQ(res.arg1, 0);
+
+	/* Unmask all virtual interrupts such that they are handled now. */
+	sp_enable_irq();
+
 	return ffa_msg_wait();
 }
 

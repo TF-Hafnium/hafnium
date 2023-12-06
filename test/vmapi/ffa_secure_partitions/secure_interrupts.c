@@ -112,7 +112,7 @@ TEST(secure_interrupts, sp_running)
 	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 400);
 
 	/* Send request to the SP to sleep. */
-	res = sp_sleep_cmd_send(own_id, receiver_id, SP_SLEEP_TIME);
+	res = sp_sleep_cmd_send(own_id, receiver_id, SP_SLEEP_TIME, 0);
 
 	/*
 	 * Secure interrupt should trigger during this time, SP will handle the
@@ -213,7 +213,7 @@ TEST(secure_interrupts, sp_preempted)
 	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 200);
 
 	/* Send request to receiver SP to sleep. */
-	res = sp_sleep_cmd_send(own_id, receiver_id, 50);
+	res = sp_sleep_cmd_send(own_id, receiver_id, 50, 0);
 
 	/* SP is pre-empted by the non-secure timer interrupt. */
 	EXPECT_EQ(res.func, FFA_INTERRUPT_32);
@@ -281,7 +281,7 @@ TEST(secure_interrupts, sp_other_s_interrupt_queued)
 	 * sleep command. SPMC queues the virtual interrupt and resumes the
 	 * SP.
 	 */
-	res = sp_sleep_cmd_send(own_id, receiver_id, SP_SLEEP_TIME);
+	res = sp_sleep_cmd_send(own_id, receiver_id, SP_SLEEP_TIME, 0);
 
 	/* Service3 SP finishes and sends direct response back. */
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
@@ -291,7 +291,7 @@ TEST(secure_interrupts, sp_other_s_interrupt_queued)
 	 * Allocate cycles to target SP for it to handle the virtual secure
 	 * interrupt.
 	 */
-	res = sp_sleep_cmd_send(own_id, target_id, 10);
+	res = sp_sleep_cmd_send(own_id, target_id, 10, 0);
 
 	/*
 	 * Secure interrupt should trigger during this time, SP will handle the
@@ -394,7 +394,7 @@ static void cpu_entry_sp_sleep_loop(uintptr_t arg)
 	}
 
 	/* Send request to the SP to sleep. */
-	res = sp_sleep_cmd_send(own_id, args->receiver_id, SP_SLEEP_TIME);
+	res = sp_sleep_cmd_send(own_id, args->receiver_id, SP_SLEEP_TIME, 0);
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 
