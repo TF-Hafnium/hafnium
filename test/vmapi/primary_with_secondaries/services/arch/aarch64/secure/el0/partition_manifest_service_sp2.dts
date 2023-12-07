@@ -14,9 +14,10 @@
 
 	/* Properties */
 	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-        uuid = <0x5d45882e 0xf637 0xa720 0xe8669dc>;
+        uuid = <0x5d45882e 0xf637 0xa720 0xe8669dc>,
+	       <0x6e56993f 0x0748 0xb831 0xf977aed>;
 	execution-ctx-count = <1>;
-	exception-level = <1>; /* S-EL1 */
+	exception-level = <1>; /* S-EL0 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6380000>;
 	entrypoint-offset = <0x2000>;

@@ -44,6 +44,14 @@
 		}                                              \
 	}
 
+#define SERVICE2_UUID2                                         \
+	(struct ffa_uuid)                                      \
+	{                                                      \
+		{                                              \
+			0x6e56993f, 0x0748, 0xb831, 0xf977aed, \
+		}                                              \
+	}
+
 #define SERVICE3                                             \
 	(struct ffa_uuid)                                    \
 	{                                                    \

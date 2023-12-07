@@ -686,3 +686,44 @@ TEST_PRECONDITION(direct_message, fail_if_cyclic_dependency_v1_2,
 	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 }
+
+/**
+ * Send direct message via FFA_MSG_SEND_DIR_REQ2, verify that sent info is
+ * echoed back.
+ */
+TEST(direct_message, ffa_send_direct_message_req2_multiple_uuids)
+{
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999, 0x01010101, 0x23232323, 0x45454545,
+				0x67676767, 0x89898989, 0x11001100, 0x22332233,
+				0x44554455, 0x66776677};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_uuid uuid = SERVICE2_UUID2;
+
+	SERVICE_SELECT(service2_info->vm_id,
+		       "ffa_direct_message_req2_resp_echo", mb.send);
+	ffa_run(service2_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service2_info->vm_id,
+				       &uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+
+	EXPECT_EQ(res.arg4, msg[0]);
+	EXPECT_EQ(res.arg5, msg[1]);
+	EXPECT_EQ(res.arg6, msg[2]);
+	EXPECT_EQ(res.arg7, msg[3]);
+	EXPECT_EQ(res.extended_val.arg8, msg[4]);
+	EXPECT_EQ(res.extended_val.arg9, msg[5]);
+	EXPECT_EQ(res.extended_val.arg10, msg[6]);
+	EXPECT_EQ(res.extended_val.arg11, msg[7]);
+	EXPECT_EQ(res.extended_val.arg12, msg[8]);
+	EXPECT_EQ(res.extended_val.arg13, msg[9]);
+	EXPECT_EQ(res.extended_val.arg14, msg[10]);
+	EXPECT_EQ(res.extended_val.arg15, msg[11]);
+	EXPECT_EQ(res.extended_val.arg16, msg[12]);
+	EXPECT_EQ(res.extended_val.arg17, msg[13]);
+}
