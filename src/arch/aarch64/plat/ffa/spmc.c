@@ -2067,6 +2067,7 @@ static void plat_ffa_run_in_sec_interrupt_rtm(
 	target_vcpu->scheduling_mode = SPMC_MODE;
 	target_vcpu->rt_model = RTM_SEC_INTERRUPT;
 	target_vcpu->state = VCPU_STATE_RUNNING;
+	target_vcpu->implicit_completion_signal = false;
 }
 
 /**
