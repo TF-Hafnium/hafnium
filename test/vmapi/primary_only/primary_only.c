@@ -273,8 +273,12 @@ TEST(ffa, ffa_features)
 
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
 
 #if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
+TEST(ffa, ffa_v_1_1_features)
+{
+	struct ffa_value ret;
 	ret = ffa_features(FFA_MEM_PERM_GET_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
@@ -289,9 +293,14 @@ TEST(ffa, ffa_features)
 
 	ret = ffa_features(FFA_MSG_SEND2_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
 #endif
 
 #if (MAKE_FFA_VERSION(1, 2) <= FFA_VERSION_COMPILED)
+TEST(ffa, ffa_v_1_2_features)
+{
+	struct ffa_value ret;
+
 	ret = ffa_features(FFA_CONSOLE_LOG_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
@@ -303,8 +312,14 @@ TEST(ffa, ffa_features)
 
 	ret = ffa_features(FFA_EL3_INTR_HANDLE_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-#endif
+
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_REQ2_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
+#endif
 
 /**
  * Ensures that FFA_FEATURES returns not supported for a bogus FID or

@@ -154,6 +154,22 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	ret = ffa_features(FFA_MSG_SEND2_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 #endif
+#if (MAKE_FFA_VERSION(1, 2) <= FFA_VERSION_COMPILED)
+	ret = ffa_features(FFA_CONSOLE_LOG_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_CONSOLE_LOG_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_PARTITION_INFO_GET_REGS_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_REQ2_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP2_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+#endif
 }
 
 /** Validates return for FFA_FEATURES provided a valid feature ID. */
