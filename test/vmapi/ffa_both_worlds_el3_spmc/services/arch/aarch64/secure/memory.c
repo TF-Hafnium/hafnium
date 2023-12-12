@@ -58,14 +58,16 @@ static void memory_increment(struct ffa_memory_region *memory_region)
 {
 	size_t i;
 	struct ffa_composite_memory_region *composite;
+	struct ffa_memory_access *receiver =
+		ffa_memory_region_get_receiver(memory_region, 0);
 	uint8_t *ptr;
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
 
 	ASSERT_EQ(memory_region->receiver_count, 1);
-	ASSERT_NE(memory_region->receivers[0].composite_memory_region_offset,
-		  0);
+	ASSERT_TRUE(receiver != NULL);
+	ASSERT_NE(receiver->composite_memory_region_offset, 0);
 
 	/*
 	 * Validate retrieve response contains the memory attributes

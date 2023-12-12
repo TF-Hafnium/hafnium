@@ -1128,6 +1128,37 @@ struct ffa_mem_relinquish {
 };
 
 /**
+ * To maintain forwards compatability we can't make assumptions about the size
+ * of the endpoint memory access descriptor so provide a helper function
+ * to get a receiver from the receiver array using the memory access descriptor
+ * size field from the memory region descriptor struct.
+ * Returns NULL if we cannot return the receiver.
+ */
+static inline struct ffa_memory_access *ffa_memory_region_get_receiver(
+	struct ffa_memory_region *memory_region, uint32_t receiver_index)
+{
+	uint32_t memory_access_desc_size =
+		memory_region->memory_access_desc_size;
+
+	if (receiver_index >= memory_region->receiver_count) {
+		return NULL;
+	}
+
+	/*
+	 * Memory access descriptor size cannot be greater than the size of
+	 * the memory access descriptor defined by the current FF-A version.
+	 */
+	if (memory_access_desc_size > sizeof(struct ffa_memory_access)) {
+		return NULL;
+	}
+
+	return (struct ffa_memory_access *)((uint8_t *)
+						    memory_region->receivers +
+					    (receiver_index *
+					     memory_access_desc_size));
+}
+
+/**
  * Gets the `ffa_composite_memory_region` for the given receiver from an
  * `ffa_memory_region`, or NULL if it is not valid.
  */
@@ -1135,9 +1166,15 @@ static inline struct ffa_composite_memory_region *
 ffa_memory_region_get_composite(struct ffa_memory_region *memory_region,
 				uint32_t receiver_index)
 {
-	uint32_t offset = memory_region->receivers[receiver_index]
-				  .composite_memory_region_offset;
+	struct ffa_memory_access *receiver =
+		ffa_memory_region_get_receiver(memory_region, receiver_index);
+	uint32_t offset;
 
+	if (receiver == NULL) {
+		return NULL;
+	}
+
+	offset = receiver->composite_memory_region_offset;
 	if (offset == 0) {
 		return NULL;
 	}
@@ -1206,7 +1243,8 @@ void ffa_memory_region_init_header(struct ffa_memory_region *memory_region,
 				   ffa_memory_attributes_t attributes,
 				   ffa_memory_region_flags_t flags,
 				   ffa_memory_handle_t handle, uint32_t tag,
-				   uint32_t receiver_count);
+				   uint32_t receiver_count,
+				   uint32_t receiver_desc_size);
 void ffa_memory_access_init_permissions(
 	struct ffa_memory_access *receiver, ffa_id_t receiver_id,
 	enum ffa_data_access data_access,
@@ -1225,7 +1263,7 @@ uint32_t ffa_memory_region_init_single_receiver(
 uint32_t ffa_memory_region_init(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
 	ffa_id_t sender, struct ffa_memory_access receivers[],
-	uint32_t receiver_count,
+	uint32_t receiver_count, uint32_t receiver_desc_size,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
 	ffa_memory_region_flags_t flags, enum ffa_memory_type type,
@@ -1235,8 +1273,9 @@ uint32_t ffa_memory_region_init(
 uint32_t ffa_memory_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
 	ffa_id_t sender, struct ffa_memory_access receivers[],
-	uint32_t receiver_count, uint32_t tag, ffa_memory_region_flags_t flags,
-	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	uint32_t receiver_count, uint32_t receiver_desc_size, uint32_t tag,
+	ffa_memory_region_flags_t flags, enum ffa_memory_type type,
+	enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability);
 uint32_t ffa_memory_retrieve_request_init_single_receiver(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,

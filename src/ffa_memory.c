@@ -46,13 +46,20 @@ static struct ffa_memory_share_state share_states[MAX_MEM_SHARES];
 static uint32_t ffa_composite_constituent_offset(
 	struct ffa_memory_region *memory_region, uint32_t receiver_index)
 {
-	CHECK(receiver_index < memory_region->receiver_count);
-	CHECK(memory_region->receivers[receiver_index]
-		      .composite_memory_region_offset != 0);
+	struct ffa_memory_access *receiver;
+	uint32_t composite_offset;
 
-	return memory_region->receivers[receiver_index]
-		       .composite_memory_region_offset +
-	       sizeof(struct ffa_composite_memory_region);
+	CHECK(receiver_index < memory_region->receiver_count);
+
+	receiver =
+		ffa_memory_region_get_receiver(memory_region, receiver_index);
+	CHECK(receiver != NULL);
+
+	composite_offset = receiver->composite_memory_region_offset;
+
+	CHECK(composite_offset != 0);
+
+	return composite_offset + sizeof(struct ffa_composite_memory_region);
 }
 
 /**
@@ -272,17 +279,16 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 	     memory_region->flags, memory_region->tag,
 	     memory_region->receiver_count);
 	for (i = 0; i < memory_region->receiver_count; ++i) {
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, i);
 		if (i != 0) {
 			dlog(", ");
 		}
-		dlog("VM %#x: %#x (offset %u)",
-		     memory_region->receivers[i].receiver_permissions.receiver,
-		     memory_region->receivers[i]
-			     .receiver_permissions.permissions,
-		     memory_region->receivers[i]
-			     .composite_memory_region_offset);
+		dlog("Receiver %#x: %#x (offset %u)",
+		     receiver->receiver_permissions.receiver,
+		     receiver->receiver_permissions.permissions,
+		     receiver->composite_memory_region_offset);
 	}
-	dlog("]");
 }
 
 void dump_share_states(void)
@@ -1324,6 +1330,8 @@ struct ffa_value ffa_memory_send_validate(
 	uint32_t share_func)
 {
 	struct ffa_composite_memory_region *composite;
+	struct ffa_memory_access *receiver =
+		ffa_memory_region_get_receiver(memory_region, 0);
 	uint64_t receivers_end;
 	uint64_t min_length;
 	uint32_t composite_memory_region_offset;
@@ -1335,7 +1343,7 @@ struct ffa_value ffa_memory_send_validate(
 	struct ffa_value ret;
 	const size_t minimum_first_fragment_length =
 		(sizeof(struct ffa_memory_region) +
-		 sizeof(struct ffa_memory_access) +
+		 memory_region->memory_access_desc_size +
 		 sizeof(struct ffa_composite_memory_region));
 
 	if (fragment_length < minimum_first_fragment_length) {
@@ -1367,8 +1375,6 @@ struct ffa_value ffa_memory_send_validate(
 
 	assert(memory_region->receivers_offset ==
 	       offsetof(struct ffa_memory_region, receivers));
-	assert(memory_region->memory_access_desc_size ==
-	       sizeof(struct ffa_memory_access));
 
 	/* The sender must match the caller. */
 	if ((!vm_id_is_current_world(from_locked.vm->id) &&
@@ -1389,7 +1395,7 @@ struct ffa_value ffa_memory_send_validate(
 	 * doesn't overlap the first part of the message.  Cast to uint64_t
 	 * to prevent overflow.
 	 */
-	receivers_end = ((uint64_t)sizeof(struct ffa_memory_access) *
+	receivers_end = ((uint64_t)memory_region->memory_access_desc_size *
 			 (uint64_t)memory_region->receiver_count) +
 			sizeof(struct ffa_memory_region);
 	min_length = receivers_end +
@@ -1402,7 +1408,7 @@ struct ffa_value ffa_memory_send_validate(
 	}
 
 	composite_memory_region_offset =
-		memory_region->receivers[0].composite_memory_region_offset;
+		receiver->composite_memory_region_offset;
 
 	/*
 	 * Check that the composite memory region descriptor is after the access
@@ -1471,11 +1477,14 @@ struct ffa_value ffa_memory_send_validate(
 
 	/* Check that the permissions are valid, for each specified receiver. */
 	for (uint32_t i = 0U; i < memory_region->receiver_count; i++) {
+		struct ffa_memory_region_attributes receiver_permissions;
+
+		receiver = ffa_memory_region_get_receiver(memory_region, i);
+		assert(receiver != NULL);
+		receiver_permissions = receiver->receiver_permissions;
 		ffa_memory_access_permissions_t permissions =
-			memory_region->receivers[i]
-				.receiver_permissions.permissions;
-		ffa_id_t receiver_id = memory_region->receivers[i]
-					       .receiver_permissions.receiver;
+			receiver_permissions.permissions;
+		ffa_id_t receiver_id = receiver_permissions.receiver;
 
 		if (memory_region->sender == receiver_id) {
 			dlog_verbose("Can't share memory with itself.\n");
@@ -1484,21 +1493,24 @@ struct ffa_value ffa_memory_send_validate(
 
 		for (uint32_t j = i + 1; j < memory_region->receiver_count;
 		     j++) {
+			struct ffa_memory_access *other_receiver =
+				ffa_memory_region_get_receiver(memory_region,
+							       j);
+			assert(other_receiver != NULL);
+
 			if (receiver_id ==
-			    memory_region->receivers[j]
-				    .receiver_permissions.receiver) {
+			    other_receiver->receiver_permissions.receiver) {
 				dlog_verbose(
 					"Repeated receiver(%x) in memory send "
 					"operation.\n",
-					memory_region->receivers[j]
-						.receiver_permissions.receiver);
+					other_receiver->receiver_permissions
+						.receiver);
 				return ffa_error(FFA_INVALID_PARAMETERS);
 			}
 		}
 
 		if (composite_memory_region_offset !=
-		    memory_region->receivers[i]
-			    .composite_memory_region_offset) {
+		    receiver->composite_memory_region_offset) {
 			dlog_verbose(
 				"All ffa_memory_access should point to the "
 				"same composite memory region offset.\n");
@@ -1531,6 +1543,19 @@ struct ffa_value ffa_memory_send_validate(
 					"for sharing memory.\n",
 					permissions);
 				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
+			/*
+			 * According to section 10.10.3 of the FF-A v1.1 EAC0
+			 * spec, NX is required for share operations (but must
+			 * not be specified by the sender) so set it in the
+			 * copy that we store, ready to be returned to the
+			 * retriever.
+			 */
+			if (vm_id_is_current_world(receiver_id)) {
+				ffa_set_instruction_access_attr(
+					&permissions,
+					FFA_INSTRUCTION_ACCESS_NX);
+				receiver_permissions.permissions = permissions;
 			}
 		}
 		if (share_func == FFA_MEM_LEND_32 &&
@@ -1659,9 +1684,12 @@ bool memory_region_receivers_from_other_world(
 	struct ffa_memory_region *memory_region)
 {
 	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
-		ffa_id_t receiver = memory_region->receivers[i]
-					    .receiver_permissions.receiver;
-		if (!vm_id_is_current_world(receiver)) {
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, i);
+		assert(receiver != NULL);
+		ffa_id_t receiver_id = receiver->receiver_permissions.receiver;
+
+		if (!vm_id_is_current_world(receiver_id)) {
 			return true;
 		}
 	}
@@ -1884,15 +1912,16 @@ static bool ffa_retrieved_memory_region_init(
 	void *response, uint32_t ffa_version, size_t response_max_size,
 	ffa_id_t sender, ffa_memory_attributes_t attributes,
 	ffa_memory_region_flags_t flags, ffa_memory_handle_t handle,
-	ffa_id_t receiver_id, ffa_memory_access_permissions_t permissions,
-	uint32_t page_count, uint32_t total_constituent_count,
+	ffa_id_t receiver_id, uint32_t memory_access_desc_size,
+	ffa_memory_access_permissions_t permissions, uint32_t page_count,
+	uint32_t total_constituent_count,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t fragment_constituent_count, uint32_t *total_length,
 	uint32_t *fragment_length)
 {
 	struct ffa_composite_memory_region *composite_memory_region;
-	struct ffa_memory_access *receiver;
 	uint32_t i;
+	uint32_t composite_offset;
 	uint32_t constituents_offset;
 	uint32_t receiver_count;
 
@@ -1901,29 +1930,41 @@ static bool ffa_retrieved_memory_region_init(
 	if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
 		struct ffa_memory_region_v1_0 *retrieve_response =
 			(struct ffa_memory_region_v1_0 *)response;
+		struct ffa_memory_access_v1_0 *receiver;
 
 		ffa_memory_region_init_header_v1_0(
 			retrieve_response, sender, attributes, flags, handle, 0,
 			RECEIVERS_COUNT_IN_RETRIEVE_RESP);
 
-		receiver = &retrieve_response->receivers[0];
+		receiver = (struct ffa_memory_access_v1_0 *)
+				   retrieve_response->receivers;
 		receiver_count = retrieve_response->receiver_count;
 
-		receiver->composite_memory_region_offset =
+		/*
+		 * Initialized here as in memory retrieve responses we currently
+		 * expect one borrower to be specified.
+		 */
+		ffa_memory_access_v1_0_init_permissions(
+			receiver, receiver_id,
+			ffa_get_data_access_attr(permissions),
+			ffa_get_instruction_access_attr(permissions), flags);
+
+		composite_offset =
 			sizeof(struct ffa_memory_region_v1_0) +
-			receiver_count * sizeof(struct ffa_memory_access);
+			receiver_count * sizeof(struct ffa_memory_access_v1_0);
+		receiver->composite_memory_region_offset = composite_offset;
 
 		composite_memory_region = ffa_memory_region_get_composite_v1_0(
 			retrieve_response, 0);
 	} else {
-		/* Default to FF-A v1.1 version. */
 		struct ffa_memory_region *retrieve_response =
 			(struct ffa_memory_region *)response;
+		struct ffa_memory_access *receiver;
 
 		ffa_memory_region_init_header(retrieve_response, sender,
-					      attributes, flags, handle, 0, 1);
+					      attributes, flags, handle, 0, 1,
+					      memory_access_desc_size);
 
-		receiver = &retrieve_response->receivers[0];
 		receiver_count = retrieve_response->receiver_count;
 
 		/*
@@ -1934,30 +1975,35 @@ static bool ffa_retrieved_memory_region_init(
 		 * 64-bit boundary and so 64-bit values can be copied without
 		 * alignment faults.
 		 */
-		receiver->composite_memory_region_offset =
+		composite_offset =
 			sizeof(struct ffa_memory_region) +
-			receiver_count * sizeof(struct ffa_memory_access);
+			(uint32_t)(receiver_count *
+				   retrieve_response->memory_access_desc_size);
 
+		receiver = ffa_memory_region_get_receiver(retrieve_response, 0);
+		assert(receiver != NULL);
+
+		/*
+		 * Initialized here as in memory retrieve responses we currently
+		 * expect one borrower to be specified.
+		 */
+		ffa_memory_access_init_permissions(
+			receiver, receiver_id,
+			ffa_get_data_access_attr(permissions),
+			ffa_get_instruction_access_attr(permissions), flags);
+		receiver->composite_memory_region_offset = composite_offset;
 		composite_memory_region =
 			ffa_memory_region_get_composite(retrieve_response, 0);
 	}
 
-	assert(receiver != NULL);
 	assert(composite_memory_region != NULL);
-
-	/*
-	 * Initialized here as in memory retrieve responses we currently expect
-	 * one borrower to be specified.
-	 */
-	ffa_memory_access_init_permissions(receiver, receiver_id, 0, 0, flags);
-	receiver->receiver_permissions.permissions = permissions;
 
 	composite_memory_region->page_count = page_count;
 	composite_memory_region->constituent_count = total_constituent_count;
 	composite_memory_region->reserved_0 = 0;
 
-	constituents_offset = receiver->composite_memory_region_offset +
-			      sizeof(struct ffa_composite_memory_region);
+	constituents_offset =
+		composite_offset + sizeof(struct ffa_composite_memory_region);
 	if (constituents_offset +
 		    fragment_constituent_count *
 			    sizeof(struct ffa_memory_region_constituent) >
@@ -1990,18 +2036,18 @@ static bool ffa_retrieved_memory_region_init(
  * returns its index in the receiver's array. If receiver's ID doesn't exist
  * in the array, return the region's 'receiver_count'.
  */
-uint32_t ffa_memory_region_get_receiver(struct ffa_memory_region *memory_region,
-					ffa_id_t receiver)
+uint32_t ffa_memory_region_get_receiver_index(
+	struct ffa_memory_region *memory_region, ffa_id_t receiver_id)
 {
-	struct ffa_memory_access *receivers;
 	uint32_t i;
 
 	assert(memory_region != NULL);
 
-	receivers = memory_region->receivers;
-
 	for (i = 0U; i < memory_region->receiver_count; i++) {
-		if (receivers[i].receiver_permissions.receiver == receiver) {
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, i);
+		assert(receiver != NULL);
+		if (receiver->receiver_permissions.receiver == receiver_id) {
 			break;
 		}
 	}
@@ -2196,12 +2242,15 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 
 	for (uint32_t i = 0U; i < retrieve_request->receiver_count; i++) {
 		ffa_memory_access_permissions_t sent_permissions;
-		struct ffa_memory_access *current_receiver =
-			&retrieve_request->receivers[i];
+		struct ffa_memory_access *retrieve_request_receiver =
+			ffa_memory_region_get_receiver(retrieve_request, i);
+		assert(retrieve_request_receiver != NULL);
 		ffa_memory_access_permissions_t requested_permissions =
-			current_receiver->receiver_permissions.permissions;
+			retrieve_request_receiver->receiver_permissions
+				.permissions;
 		ffa_id_t current_receiver_id =
-			current_receiver->receiver_permissions.receiver;
+			retrieve_request_receiver->receiver_permissions
+				.receiver;
 		bool found_to_id = current_receiver_id == to_vm_id;
 
 		if (bypass_multi_receiver_check && !found_to_id) {
@@ -2211,13 +2260,23 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 			continue;
 		}
 
+		if (retrieve_request_receiver->composite_memory_region_offset !=
+		    0U) {
+			dlog_verbose(
+				"Retriever specified address ranges not "
+				"supported (got offset %d).\n",
+				retrieve_request_receiver
+					->composite_memory_region_offset);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+
 		/*
 		 * Find the current receiver in the transaction descriptor from
 		 * sender.
 		 */
 		uint32_t mem_region_receiver_index =
-			ffa_memory_region_get_receiver(memory_region,
-						       current_receiver_id);
+			ffa_memory_region_get_receiver_index(
+				memory_region, current_receiver_id);
 
 		if (mem_region_receiver_index ==
 		    memory_region->receiver_count) {
@@ -2226,26 +2285,15 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 			return ffa_error(FFA_DENIED);
 		}
 
-		sent_permissions =
-			memory_region->receivers[mem_region_receiver_index]
-				.receiver_permissions.permissions;
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(
+				memory_region, mem_region_receiver_index);
+		assert(receiver != NULL);
+
+		sent_permissions = receiver->receiver_permissions.permissions;
 
 		if (found_to_id) {
 			retrieve_receiver_index = i;
-		}
-
-		/*
-		 * Since we are traversing the list of receivers, save the index
-		 * of the caller. As it needs to be there.
-		 */
-
-		if (current_receiver->composite_memory_region_offset != 0U) {
-			dlog_verbose(
-				"Retriever specified address ranges not "
-				"supported (got offset %d).\n",
-				current_receiver
-					->composite_memory_region_offset);
-			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
 		/*
@@ -2368,8 +2416,8 @@ static struct ffa_value ffa_memory_retrieve_validate(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	*receiver_index =
-		ffa_memory_region_get_receiver(memory_region, receiver_id);
+	*receiver_index = ffa_memory_region_get_receiver_index(memory_region,
+							       receiver_id);
 
 	if (*receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
@@ -2459,8 +2507,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 {
 	uint32_t expected_retrieve_request_length =
 		sizeof(struct ffa_memory_region) +
-		retrieve_request->receiver_count *
-			sizeof(struct ffa_memory_access);
+		(uint32_t)(retrieve_request->receiver_count *
+			   retrieve_request->memory_access_desc_size);
 	ffa_memory_handle_t handle = retrieve_request->handle;
 	struct ffa_memory_region *memory_region;
 	ffa_memory_access_permissions_t permissions = 0;
@@ -2539,9 +2587,13 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 
 			for (uint32_t i = 0; i < memory_region->receiver_count;
 			     i++) {
+				struct ffa_memory_access *receiver =
+					ffa_memory_region_get_receiver(
+						retrieve_request, 0);
+
+				assert(receiver != NULL);
 				receiver_id =
-					retrieve_request->receivers[0]
-						.receiver_permissions.receiver;
+					receiver->receiver_permissions.receiver;
 				if (!vm_id_is_current_world(receiver_id)) {
 					other_world_count++;
 				}
@@ -2652,7 +2704,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	CHECK(ffa_retrieved_memory_region_init(
 		to_locked.vm->mailbox.recv, to_locked.vm->ffa_version,
 		HF_MAILBOX_SIZE, memory_region->sender, attributes,
-		memory_region->flags, handle, receiver_id, permissions,
+		memory_region->flags, handle, receiver_id,
+		memory_region->memory_access_desc_size, permissions,
 		composite->page_count, composite->constituent_count,
 		share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
@@ -2703,7 +2756,7 @@ static uint32_t ffa_memory_retrieve_expected_offset_per_ffa_version(
 		composite_constituents_offset =
 			sizeof(struct ffa_memory_region_v1_0) +
 			RECEIVERS_COUNT_IN_RETRIEVE_RESP *
-				sizeof(struct ffa_memory_access) +
+				sizeof(struct ffa_memory_access_v1_0) +
 			sizeof(struct ffa_composite_memory_region);
 	} else {
 		panic("%s received an invalid FF-A version.\n", __func__);
@@ -2713,8 +2766,8 @@ static uint32_t ffa_memory_retrieve_expected_offset_per_ffa_version(
 		composite_constituents_offset +
 		retrieved_constituents_count *
 			sizeof(struct ffa_memory_region_constituent) -
-		sizeof(struct ffa_memory_access) *
-			(memory_region->receiver_count - 1);
+		(uint32_t)(memory_region->memory_access_desc_size *
+			   (memory_region->receiver_count - 1));
 
 	return expected_fragment_offset;
 }
@@ -2772,7 +2825,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		ffa_is_vm_id(sender_vm_id);
 
 	if (!continue_ffa_hyp_mem_retrieve_req) {
-		receiver_index = ffa_memory_region_get_receiver(
+		receiver_index = ffa_memory_region_get_receiver_index(
 			memory_region, to_locked.vm->id);
 
 		if (receiver_index == memory_region->receiver_count) {
@@ -2942,8 +2995,8 @@ struct ffa_value ffa_memory_relinquish(
 	memory_region = share_state->memory_region;
 	CHECK(memory_region != NULL);
 
-	receiver_index = ffa_memory_region_get_receiver(memory_region,
-							from_locked.vm->id);
+	receiver_index = ffa_memory_region_get_receiver_index(
+		memory_region, from_locked.vm->id);
 
 	if (receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
@@ -2973,8 +3026,8 @@ struct ffa_value ffa_memory_relinquish(
 
 	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
 		struct ffa_memory_access *receiver =
-			&memory_region->receivers[i];
-
+			ffa_memory_region_get_receiver(memory_region, i);
+		assert(receiver != NULL);
 		if (receiver->receiver_permissions.receiver ==
 		    from_locked.vm->id) {
 			receiver_permissions =
@@ -3085,8 +3138,8 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 				"that has not been relinquished by all "
 				"borrowers(%x).\n",
 				handle,
-				memory_region->receivers[i]
-					.receiver_permissions.receiver);
+				ffa_memory_region_get_receiver(memory_region, i)
+					->receiver_permissions.receiver);
 			ret = ffa_error(FFA_DENIED);
 			goto out;
 		}

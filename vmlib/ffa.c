@@ -16,10 +16,20 @@
 #if defined(__linux__) && defined(__KERNEL__)
 #include <linux/kernel.h>
 #include <linux/string.h>
-
 #else
+#include "hf/assert.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
+#endif
+
+/*
+ * hf/assert.h is not availble for linux builds as well as the
+ * ENABLE_ASSERTIONS and LOG_LEVEL macros it uses so we define the
+ * verbose log level macro here for this case.
+ */
+#if defined(__linux__) && defined(__KERNEL__)
+#define assert(e) \
+	((e) ? ((void)0) : panic("ASSERT: %s:%d\n", __FILE__, __LINE__, #e))
 #endif
 
 static_assert(sizeof(struct ffa_endpoint_rx_tx_descriptor) % 16 == 0,
@@ -36,7 +46,8 @@ void ffa_copy_memory_region_constituents(
 }
 
 /**
- * Initializes receiver permissions, in a memory transaction descriptor.
+ * Initializes receiver permissions, in a memory transaction descriptor
+ * and zero out the other fields to be set later if required.
  */
 void ffa_memory_access_init_permissions(
 	struct ffa_memory_access *receiver, ffa_id_t receiver_id,
@@ -50,11 +61,16 @@ void ffa_memory_access_init_permissions(
 	ffa_set_data_access_attr(&permissions, data_access);
 	ffa_set_instruction_access_attr(&permissions, instruction_access);
 
-	receiver->receiver_permissions.receiver = receiver_id;
-	receiver->receiver_permissions.permissions = permissions;
-	receiver->receiver_permissions.flags = flags;
-
-	receiver->reserved_0 = 0ULL;
+	*receiver = (struct ffa_memory_access){
+		.receiver_permissions =
+			{
+				.receiver = receiver_id,
+				.permissions = permissions,
+				.flags = flags,
+			},
+		.composite_memory_region_offset = 0ULL,
+		receiver->reserved_0 = 0ULL,
+	};
 }
 
 /**
@@ -66,15 +82,15 @@ void ffa_memory_region_init_header(struct ffa_memory_region *memory_region,
 				   ffa_memory_attributes_t attributes,
 				   ffa_memory_region_flags_t flags,
 				   ffa_memory_handle_t handle, uint32_t tag,
-				   uint32_t receiver_count)
+				   uint32_t receiver_count,
+				   uint32_t receiver_desc_size)
 {
 	memory_region->sender = sender;
 	memory_region->attributes = attributes;
 	memory_region->flags = flags;
 	memory_region->handle = handle;
 	memory_region->tag = tag;
-	memory_region->memory_access_desc_size =
-		sizeof(struct ffa_memory_access);
+	memory_region->memory_access_desc_size = receiver_desc_size;
 	memory_region->receiver_count = receiver_count;
 	memory_region->receivers_offset =
 		offsetof(struct ffa_memory_region, receivers);
@@ -101,6 +117,7 @@ static uint32_t ffa_memory_region_init_constituents(
 	uint32_t constituent_count, uint32_t *total_length,
 	uint32_t *fragment_length)
 {
+	uint32_t composite_memory_region_offset;
 	struct ffa_composite_memory_region *composite_memory_region;
 	uint32_t fragment_max_constituents;
 	uint32_t constituents_offset;
@@ -116,11 +133,16 @@ static uint32_t ffa_memory_region_init_constituents(
 	 * If there are multiple receiver endpoints, their respective access
 	 * structure should point to the same offset value.
 	 */
+	composite_memory_region_offset =
+		sizeof(struct ffa_memory_region) +
+		memory_region->receiver_count *
+			memory_region->memory_access_desc_size;
 	for (i = 0U; i < memory_region->receiver_count; i++) {
-		memory_region->receivers[i].composite_memory_region_offset =
-			sizeof(struct ffa_memory_region) +
-			memory_region->receiver_count *
-				sizeof(struct ffa_memory_access);
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, i);
+		assert(receiver != NULL);
+		receiver->composite_memory_region_offset =
+			composite_memory_region_offset;
 	}
 
 	composite_memory_region =
@@ -129,9 +151,8 @@ static uint32_t ffa_memory_region_init_constituents(
 	composite_memory_region->constituent_count = constituent_count;
 	composite_memory_region->reserved_0 = 0;
 
-	constituents_offset =
-		memory_region->receivers[0].composite_memory_region_offset +
-		sizeof(struct ffa_composite_memory_region);
+	constituents_offset = composite_memory_region_offset +
+			      sizeof(struct ffa_composite_memory_region);
 	fragment_max_constituents =
 		(memory_region_max_size - constituents_offset) /
 		sizeof(struct ffa_memory_region_constituent);
@@ -194,14 +215,15 @@ uint32_t ffa_memory_region_init_single_receiver(
 
 	return ffa_memory_region_init(
 		memory_region, memory_region_max_size, sender, &receiver_access,
-		1, constituents, constituent_count, tag, flags, type,
-		cacheability, shareability, total_length, fragment_length);
+		1, sizeof(struct ffa_memory_access), constituents,
+		constituent_count, tag, flags, type, cacheability, shareability,
+		total_length, fragment_length);
 }
 
 uint32_t ffa_memory_region_init(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
 	ffa_id_t sender, struct ffa_memory_access receivers[],
-	uint32_t receiver_count,
+	uint32_t receiver_count, uint32_t receiver_desc_size,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t tag,
 	ffa_memory_region_flags_t flags, enum ffa_memory_type type,
@@ -217,15 +239,18 @@ uint32_t ffa_memory_region_init(
 	ffa_set_memory_shareability_attr(&attributes, shareability);
 
 	ffa_memory_region_init_header(memory_region, sender, attributes, flags,
-				      0, tag, receiver_count);
+				      0, tag, receiver_count,
+				      receiver_desc_size);
 
 #if defined(__linux__) && defined(__KERNEL__)
 	memcpy(memory_region->receivers, receivers,
-	       receiver_count * sizeof(struct ffa_memory_access));
+	       receiver_count * memory_region->memory_access_desc_size);
 #else
 	memcpy_s(memory_region->receivers,
-		 MAX_MEM_SHARE_RECIPIENTS * sizeof(struct ffa_memory_access),
-		 receivers, receiver_count * sizeof(struct ffa_memory_access));
+		 MAX_MEM_SHARE_RECIPIENTS *
+			 memory_region->memory_access_desc_size,
+		 receivers,
+		 receiver_count * memory_region->memory_access_desc_size);
 #endif
 
 	return ffa_memory_region_init_constituents(
@@ -247,21 +272,23 @@ uint32_t ffa_memory_retrieve_request_init_single_receiver(
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability)
 {
-	struct ffa_memory_access receiver_permissions;
+	struct ffa_memory_access receiver_access;
 
-	ffa_memory_access_init_permissions(&receiver_permissions, receiver,
+	ffa_memory_access_init_permissions(&receiver_access, receiver,
 					   data_access, instruction_access, 0);
 
 	return ffa_memory_retrieve_request_init(
-		memory_region, handle, sender, &receiver_permissions, 1, tag,
-		flags, type, cacheability, shareability);
+		memory_region, handle, sender, &receiver_access, 1,
+		sizeof(struct ffa_memory_access), tag, flags, type,
+		cacheability, shareability);
 }
 
 uint32_t ffa_memory_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
 	ffa_id_t sender, struct ffa_memory_access receivers[],
-	uint32_t receiver_count, uint32_t tag, ffa_memory_region_flags_t flags,
-	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
+	uint32_t receiver_count, uint32_t receiver_desc_size, uint32_t tag,
+	ffa_memory_region_flags_t flags, enum ffa_memory_type type,
+	enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability)
 {
 	ffa_memory_attributes_t attributes = 0;
@@ -273,23 +300,31 @@ uint32_t ffa_memory_retrieve_request_init(
 	ffa_set_memory_shareability_attr(&attributes, shareability);
 
 	ffa_memory_region_init_header(memory_region, sender, attributes, flags,
-				      handle, tag, receiver_count);
+				      handle, tag, receiver_count,
+				      receiver_desc_size);
 
 #if defined(__linux__) && defined(__KERNEL__)
 	memcpy(memory_region->receivers, receivers,
-	       receiver_count * sizeof(struct ffa_memory_access));
+	       receiver_count * memory_region->memory_access_desc_size);
 #else
 	memcpy_s(memory_region->receivers,
-		 MAX_MEM_SHARE_RECIPIENTS * sizeof(struct ffa_memory_access),
-		 receivers, receiver_count * sizeof(struct ffa_memory_access));
+		 MAX_MEM_SHARE_RECIPIENTS *
+			 memory_region->memory_access_desc_size,
+		 receivers,
+		 receiver_count * memory_region->memory_access_desc_size);
 #endif
+
 	/* Zero the composite offset for all receivers */
 	for (i = 0U; i < receiver_count; i++) {
-		memory_region->receivers[i].composite_memory_region_offset = 0U;
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, i);
+		assert(receiver != NULL);
+		receiver->composite_memory_region_offset = 0U;
 	}
 
 	return sizeof(struct ffa_memory_region) +
-	       memory_region->receiver_count * sizeof(struct ffa_memory_access);
+	       memory_region->receiver_count *
+		       memory_region->memory_access_desc_size;
 }
 
 /**

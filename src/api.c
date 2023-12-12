@@ -2920,7 +2920,7 @@ static void api_ffa_memory_region_v1_1_from_v1_0(
 	memory_region_v1_1->flags = memory_region_v1_0->flags;
 	memory_region_v1_1->tag = memory_region_v1_0->tag;
 	memory_region_v1_1->memory_access_desc_size =
-		sizeof(struct ffa_memory_access);
+		sizeof(struct ffa_memory_access_v1_0);
 	memory_region_v1_1->receiver_count = memory_region_v1_0->receiver_count;
 	memory_region_v1_1->receivers_offset =
 		offsetof(struct ffa_memory_region, receivers);
@@ -2999,7 +2999,7 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	receivers_length = sizeof(struct ffa_memory_access) *
+	receivers_length = sizeof(struct ffa_memory_access_v1_0) *
 			   memory_region_v1_0->receiver_count;
 	receivers_end = sizeof(struct ffa_memory_region) + receivers_length;
 
@@ -3111,8 +3111,8 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	/* Initialize the memory access descriptors with composite offset. */
 	for (uint32_t i = 0; i < memory_region_v1_1->receiver_count; i++) {
 		struct ffa_memory_access *receiver =
-			&memory_region_v1_1->receivers[i];
-
+			ffa_memory_region_get_receiver(memory_region_v1_1, i);
+		assert(receiver != NULL);
 		receiver->composite_memory_region_offset =
 			composite_offset_v1_1;
 	}
@@ -3232,15 +3232,28 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 
 	memory_region = allocated_entry;
 
+	if (memory_region->memory_access_desc_size <
+	    sizeof(struct ffa_memory_access_v1_0)) {
+		dlog_verbose(
+			"Invalid memory access descritor size %d must be "
+			"at least as large as the v1_0 memory access array "
+			"%d\n",
+			memory_region->memory_access_desc_size,
+			sizeof(struct ffa_memory_access_v1_0));
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
 	if (fragment_length < sizeof(struct ffa_memory_region) +
-				      sizeof(struct ffa_memory_access)) {
+				      memory_region->memory_access_desc_size) {
 		dlog_verbose(
 			"Initial fragment length %d smaller than header size "
 			"%d.\n",
 			fragment_length,
 			sizeof(struct ffa_memory_region) +
-				sizeof(struct ffa_memory_access));
-		return ffa_error(FFA_INVALID_PARAMETERS);
+				memory_region->memory_access_desc_size);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
 	}
 
 	if (!api_memory_region_check_flags(memory_region, share_func)) {
@@ -3282,8 +3295,11 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	 * forwarding if needed.
 	 */
 	for (uint32_t i = 0U; i < memory_region->receiver_count; i++) {
-		ffa_id_t receiver_id = memory_region->receivers[i]
-					       .receiver_permissions.receiver;
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, i);
+		assert(receiver != NULL);
+		ffa_id_t receiver_id = receiver->receiver_permissions.receiver;
+
 		to = vm_find(receiver_id);
 
 		if (vm_id_is_current_world(receiver_id) &&

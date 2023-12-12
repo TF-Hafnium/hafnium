@@ -13,6 +13,7 @@
 #include "hf/static_assert.h"
 
 #include "vmapi/hf/call.h"
+#include "vmapi/hf/ffa_v1_0.h"
 
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
@@ -167,8 +168,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	/* Send the first fragment of the memory. */
 	remaining_constituent_count = ffa_memory_region_init(
 		tx_buffer, HF_MAILBOX_SIZE, sender, receivers_send,
-		receivers_send_count, constituents, constituent_count, 0,
-		send_flags,
+		receivers_send_count, sizeof(struct ffa_memory_access),
+		constituents, constituent_count, 0, send_flags,
 		not_specify_memory_type ? FFA_MEMORY_NOT_SPECIFIED_MEM
 					: FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
@@ -219,9 +220,10 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 
 	msg_size = ffa_memory_retrieve_request_init(
 		(struct ffa_memory_region *)retrieve_message->payload, handle,
-		sender, receivers_retrieve, receivers_retrieve_count, 0,
-		retrieve_flags, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+		sender, receivers_retrieve, receivers_retrieve_count,
+		sizeof(struct ffa_memory_access), 0, retrieve_flags,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE);
 
 	for (i = 0; i < receivers_send_count; i++) {
 		struct ffa_memory_region_attributes *receiver =
@@ -390,7 +392,8 @@ void send_retrieve_request(
 
 	msg_size = ffa_memory_retrieve_request_init(
 		(struct ffa_memory_region *)retrieve_message->payload, handle,
-		sender, receivers, receiver_count, tag, flags, type,
+		sender, receivers, receiver_count,
+		sizeof(struct ffa_memory_access), tag, flags, type,
 		cacheability, shareability);
 
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
@@ -444,6 +447,7 @@ void retrieve_memory(void *recv_buf, ffa_memory_handle_t handle,
 {
 	struct ffa_value ret;
 	struct ffa_memory_region *memory_region;
+	struct ffa_memory_access *receiver;
 	uint32_t fragment_length;
 	uint32_t total_length;
 	uint32_t fragment_offset;
@@ -455,14 +459,15 @@ void retrieve_memory(void *recv_buf, ffa_memory_handle_t handle,
 	fragment_length = ret.arg2;
 	EXPECT_GE(fragment_length,
 		  sizeof(struct ffa_memory_region) +
-			  sizeof(struct ffa_memory_access) +
+			  sizeof(struct ffa_memory_access_v1_0) +
 			  sizeof(struct ffa_composite_memory_region));
 	EXPECT_LE(fragment_length, HF_MAILBOX_SIZE);
 	EXPECT_LE(fragment_length, total_length);
 	memory_region = (struct ffa_memory_region *)recv_buf;
 	EXPECT_EQ(memory_region->receiver_count, 1);
-	EXPECT_EQ(memory_region->receivers[0].receiver_permissions.receiver,
-		  own_id);
+	receiver = ffa_memory_region_get_receiver(memory_region, 0);
+	EXPECT_TRUE(receiver != NULL);
+	EXPECT_EQ(receiver->receiver_permissions.receiver, own_id);
 
 	/* Copy into the return buffer. */
 	if (memory_region_ret != NULL) {

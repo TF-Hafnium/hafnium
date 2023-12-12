@@ -69,22 +69,24 @@ static void memory_increment(ffa_memory_handle_t *handle,
 	uint32_t i;
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	void *send_buf = SERVICE_SEND_BUFFER();
-	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
+	struct ffa_memory_access *receiver;
+	struct ffa_composite_memory_region *composite;
 	uint8_t *ptr;
 	/* Variable to detect if retrieved page was used before. */
 	bool page_used = false;
 
 	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
 				     HF_MAILBOX_SIZE);
+	receiver = ffa_memory_region_get_receiver(memory_region, 0);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
 
 	ASSERT_EQ(memory_region->receiver_count, 1);
-	ASSERT_NE(memory_region->receivers[0].composite_memory_region_offset,
-		  0);
+	ASSERT_TRUE(receiver != NULL);
+	ASSERT_NE(receiver->composite_memory_region_offset, 0);
 
 	update_mm_security_state(composite, memory_region->attributes);
 
@@ -175,15 +177,16 @@ TEST_SERVICE(memory_increment_check_mem_attr)
 			(struct ffa_memory_region *)retrieve_buffer;
 		retrieve_memory_from_message(recv_buf, send_buf, NULL,
 					     memory_region, HF_MAILBOX_SIZE);
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, 0);
 		struct ffa_composite_memory_region *composite =
 			ffa_memory_region_get_composite(memory_region, 0);
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		uint8_t *ptr = (uint8_t *)composite->constituents[0].address;
 
 		ASSERT_EQ(memory_region->receiver_count, 1);
-		ASSERT_NE(memory_region->receivers[0]
-				  .composite_memory_region_offset,
-			  0);
+		ASSERT_TRUE(receiver != NULL);
+		ASSERT_NE(receiver->composite_memory_region_offset, 0);
 
 		update_mm_security_state(composite, memory_region->attributes);
 

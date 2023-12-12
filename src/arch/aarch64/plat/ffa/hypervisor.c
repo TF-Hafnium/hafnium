@@ -1531,9 +1531,16 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 	}
 
 	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, i);
+		struct ffa_memory_region_attributes receiver_permissions;
+
+		CHECK(receiver != NULL);
+
+		receiver_permissions = receiver->receiver_permissions;
+
 		/* Skip the entries that relate to SPs. */
-		if (!ffa_is_vm_id(memory_region->receivers[i]
-					  .receiver_permissions.receiver)) {
+		if (!ffa_is_vm_id(receiver_permissions.receiver)) {
 			continue;
 		}
 
@@ -1543,9 +1550,7 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 				"Tried to reclaim memory handle %#x "
 				"that has not been relinquished by all "
 				"borrowers(%x).\n",
-				handle,
-				memory_region->receivers[i]
-					.receiver_permissions.receiver);
+				handle, receiver_permissions.receiver);
 			ret = ffa_error(FFA_DENIED);
 			goto out;
 		}
