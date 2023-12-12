@@ -69,6 +69,7 @@ void ffa_memory_access_init_permissions(
 				.flags = flags,
 			},
 		.composite_memory_region_offset = 0ULL,
+		.impdef = {0ULL, 0ULL},
 		receiver->reserved_0 = 0ULL,
 	};
 }

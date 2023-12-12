@@ -272,11 +272,12 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 		return;
 	}
 
-	dlog("from VM %#x, attributes %#x, flags %#x, tag %u, to "
-	     "%u "
+	dlog("from VM %#x, attributes %#x, flags %#x, handle %#x "
+	     "tag %u, memory access descriptor size %u, to %u "
 	     "recipients [",
 	     memory_region->sender, memory_region->attributes,
-	     memory_region->flags, memory_region->tag,
+	     memory_region->flags, memory_region->handle, memory_region->tag,
+	     memory_region->memory_access_desc_size,
 	     memory_region->receiver_count);
 	for (i = 0; i < memory_region->receiver_count; ++i) {
 		struct ffa_memory_access *receiver =
@@ -288,7 +289,15 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 		     receiver->receiver_permissions.receiver,
 		     receiver->receiver_permissions.permissions,
 		     receiver->composite_memory_region_offset);
+		/* The impdef field is only present from v1.2 and later */
+		if (ffa_version_from_memory_access_desc_size(
+			    memory_region->memory_access_desc_size) >=
+		    MAKE_FFA_VERSION(1, 2)) {
+			dlog(", impdef: %#x %#x", receiver->impdef.val[0],
+			     receiver->impdef.val[1]);
+		}
 	}
+	dlog("] at offset %u", memory_region->receivers_offset);
 }
 
 void dump_share_states(void)
@@ -454,8 +463,10 @@ uint32_t ffa_version_from_memory_access_desc_size(
 	 * v1.1 is the first version to include the memory access descriptor
 	 * size field so return v1.1.
 	 */
-	case sizeof(struct ffa_memory_access):
+	case sizeof(struct ffa_memory_access_v1_0):
 		return MAKE_FFA_VERSION(1, 1);
+	case sizeof(struct ffa_memory_access):
+		return MAKE_FFA_VERSION(1, 2);
 	}
 	return 0;
 }
@@ -484,6 +495,7 @@ static bool receiver_size_and_offset_valid_for_version(
 	 */
 	switch (expected_ffa_version) {
 	case MAKE_FFA_VERSION(1, 1):
+	case MAKE_FFA_VERSION(1, 2):
 		return receivers_offset == sizeof(struct ffa_memory_region);
 	default:
 		return false;
@@ -2122,8 +2134,9 @@ static bool ffa_retrieved_memory_region_init(
 	ffa_id_t sender, ffa_memory_attributes_t attributes,
 	ffa_memory_region_flags_t flags, ffa_memory_handle_t handle,
 	ffa_id_t receiver_id, uint32_t memory_access_desc_size,
-	ffa_memory_access_permissions_t permissions, uint32_t page_count,
-	uint32_t total_constituent_count,
+	ffa_memory_access_permissions_t permissions,
+	struct ffa_memory_access_impdef receiver_impdef_val,
+	uint32_t page_count, uint32_t total_constituent_count,
 	const struct ffa_memory_region_constituent constituents[],
 	uint32_t fragment_constituent_count, uint32_t *total_length,
 	uint32_t *fragment_length)
@@ -2203,6 +2216,11 @@ static bool ffa_retrieved_memory_region_init(
 		receiver->composite_memory_region_offset = composite_offset;
 		composite_memory_region =
 			ffa_memory_region_get_composite(retrieve_response, 0);
+		if (ffa_version_from_memory_access_desc_size(
+			    memory_access_desc_size) >=
+		    MAKE_FFA_VERSION(1, 2)) {
+			receiver->impdef = receiver_impdef_val;
+		}
 	}
 
 	assert(composite_memory_region != NULL);
@@ -2416,7 +2434,8 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	struct ffa_memory_region *memory_region,
 	struct ffa_memory_region *retrieve_request, ffa_id_t to_vm_id,
-	ffa_memory_access_permissions_t *permissions, uint32_t func_id)
+	ffa_memory_access_permissions_t *permissions, uint32_t func_id,
+	struct ffa_memory_access_impdef *to_impdef_val)
 {
 	uint32_t retrieve_receiver_index;
 	bool bypass_multi_receiver_check =
@@ -2534,6 +2553,39 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 				"Receiver has RO permissions can not request "
 				"clear.\n");
 			return ffa_error(FFA_DENIED);
+		}
+
+		/*
+		 * Check the impdef in the retrieve_request matches the value in
+		 * the original memory send.
+		 */
+		if (ffa_version_from_memory_access_desc_size(
+			    memory_region->memory_access_desc_size) >=
+			    MAKE_FFA_VERSION(1, 2) &&
+		    ffa_version_from_memory_access_desc_size(
+			    retrieve_request->memory_access_desc_size) >=
+			    MAKE_FFA_VERSION(1, 2)) {
+			if (found_to_id) {
+				*to_impdef_val =
+					retrieve_request_receiver->impdef;
+			}
+			if (receiver->impdef.val[0] !=
+				    retrieve_request_receiver->impdef.val[0] ||
+			    receiver->impdef.val[1] !=
+				    retrieve_request_receiver->impdef.val[1]) {
+				dlog_verbose(
+					"Impdef value in memory send does not "
+					"match retrieve request value "
+					"send value %#x %#x retrieve request "
+					"value %#x %#x\n",
+					receiver->impdef.val[0],
+					receiver->impdef.val[1],
+					retrieve_request_receiver->impdef
+						.val[0],
+					retrieve_request_receiver->impdef
+						.val[1]);
+				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
 		}
 	}
 
@@ -2731,6 +2783,9 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	ffa_id_t receiver_id = to_locked.vm->id;
 	bool is_send_complete = false;
 	ffa_memory_attributes_t attributes;
+	struct ffa_memory_access_impdef receiver_impdef_val;
+	uint64_t retrieve_memory_access_desc_size =
+		retrieve_request->memory_access_desc_size;
 
 	dump_share_states();
 
@@ -2844,7 +2899,8 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		 */
 		ret = ffa_memory_retrieve_validate_memory_access_list(
 			memory_region, retrieve_request, receiver_id,
-			&permissions, share_state->share_func);
+			&permissions, share_state->share_func,
+			&receiver_impdef_val);
 		if (ret.func != FFA_SUCCESS_32) {
 			goto out;
 		}
@@ -2914,9 +2970,9 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		to_locked.vm->mailbox.recv, to_locked.vm->ffa_version,
 		HF_MAILBOX_SIZE, memory_region->sender, attributes,
 		memory_region->flags, handle, receiver_id,
-		memory_region->memory_access_desc_size, permissions,
-		composite->page_count, composite->constituent_count,
-		share_state->fragments[0],
+		retrieve_memory_access_desc_size, permissions,
+		receiver_impdef_val, composite->page_count,
+		composite->constituent_count, share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
 		&fragment_length));
 

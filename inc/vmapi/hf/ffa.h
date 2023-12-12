@@ -1066,6 +1066,14 @@ typedef uint32_t ffa_memory_region_flags_t;
 #define FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_MASK ((0xFU) << 5)
 
 /**
+ * Struct to store the impdef value seen in Table 11.16 of the
+ * FF-A v1.2 ALP0 specification "Endpoint memory access descriptor".
+ */
+struct ffa_memory_access_impdef {
+	uint64_t val[2];
+};
+
+/**
  * This corresponds to table 10.16 of the FF-A v1.1 EAC0 specification,
  * "Endpoint memory access descriptor".
  */
@@ -1076,6 +1084,7 @@ struct ffa_memory_access {
 	 * an `ffa_composite_memory_region` struct.
 	 */
 	uint32_t composite_memory_region_offset;
+	struct ffa_memory_access_impdef impdef;
 	uint64_t reserved_0;
 };
 
@@ -1137,6 +1146,12 @@ struct ffa_mem_relinquish {
 	uint32_t endpoint_count;
 	ffa_id_t endpoints[];
 };
+
+/**
+ * Return the first FF-A version that matches the memory access descriptor size.
+ */
+uint32_t ffa_version_from_memory_access_desc_size(
+	uint32_t memory_access_desc_size);
 
 /**
  * Returns the first FF-A version that matches the memory access descriptor
