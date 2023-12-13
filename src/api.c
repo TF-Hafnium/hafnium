@@ -208,7 +208,7 @@ struct vcpu *api_switch_to_other_world(struct vcpu_locked current_locked,
  */
 bool is_ffa_direct_msg_request_ongoing(struct vcpu_locked locked)
 {
-	return locked.vcpu->direct_request_origin_vm_id != HF_INVALID_VM_ID;
+	return locked.vcpu->direct_request_origin.vm_id != HF_INVALID_VM_ID;
 }
 
 /**
@@ -2762,7 +2762,9 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	receiver_vcpu->cpu = current->cpu;
 	receiver_vcpu->state = VCPU_STATE_RUNNING;
 	receiver_vcpu->regs_available = false;
-	receiver_vcpu->direct_request_origin_vm_id = sender_vm_id;
+	receiver_vcpu->direct_request_origin.is_ffa_req2 =
+		(args.func == FFA_MSG_SEND_DIRECT_REQ2_64);
+	receiver_vcpu->direct_request_origin.vm_id = sender_vm_id;
 
 	arch_regs_set_retval(&receiver_vcpu->regs, api_ffa_dir_msg_value(args));
 
@@ -2861,6 +2863,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 		(struct ffa_value){.func = FFA_INTERRUPT_32};
 	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
 	struct two_vcpu_locked vcpus_locked;
+	bool received_req2;
 
 	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64 &&
 	    !api_ffa_dir_msg_is_arg2_zero(args)) {
@@ -2894,6 +2897,25 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 		 * Sending direct response but direct request origin
 		 * vCPU is not set.
 		 */
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	received_req2 = current->direct_request_origin.is_ffa_req2;
+
+	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64 && received_req2) {
+		dlog_verbose(
+			"%s: FFA_MSG_SEND_DIRECT_RESP must be used with "
+			"FFA_MSG_SEND_DIRECT_REQ.\n",
+			__func__);
+		ret = ffa_error(FFA_DENIED);
+		goto out;
+	} else if (args.func == FFA_MSG_SEND_DIRECT_RESP2_64 &&
+		   !received_req2) {
+		dlog_verbose(
+			"%s: FFA_MSG_SEND_DIRECT_RESP2 must be used with "
+			"FFA_MSG_SEND_DIRECT_REQ2.\n",
+			__func__);
 		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
@@ -2933,8 +2955,9 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 		goto out;
 	}
 
-	/* Clear direct request origin for the caller. */
-	current->direct_request_origin_vm_id = HF_INVALID_VM_ID;
+	/* Clear direct request origin vm_id and request type for the caller. */
+	current->direct_request_origin.is_ffa_req2 = false;
+	current->direct_request_origin.vm_id = HF_INVALID_VM_ID;
 
 	api_ffa_resume_direct_resp_target(current_locked, next, receiver_vm_id,
 					  to_ret, false);

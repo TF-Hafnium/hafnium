@@ -373,7 +373,7 @@ static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu_locked current_locked,
 	case FFA_MSG_SEND_DIRECT_RESP_32: {
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
 		/* Rule 3. */
-		if (current_locked.vcpu->direct_request_origin_vm_id ==
+		if (current_locked.vcpu->direct_request_origin.vm_id ==
 		    receiver_vm_id) {
 			*next_state = VCPU_STATE_WAITING;
 			return true;
@@ -2214,7 +2214,7 @@ static struct ffa_value plat_ffa_resume_direct_response(
 	plat_interrupts_set_priority_mask(current->priority_mask);
 
 	/* Replay the direct response message. */
-	receiver_vm_id = current->direct_request_origin_vm_id;
+	receiver_vm_id = current->direct_request_origin.vm_id;
 	to_ret = current->direct_resp_ffa_value;
 
 	/* Reset the flag now. */
@@ -2226,7 +2226,8 @@ static struct ffa_value plat_ffa_resume_direct_response(
 		current->vm->id, receiver_vm_id);
 
 	/* Clear direct request origin for the caller. */
-	current->direct_request_origin_vm_id = HF_INVALID_VM_ID;
+	current->direct_request_origin.is_ffa_req2 = false;
+	current->direct_request_origin.vm_id = HF_INVALID_VM_ID;
 
 	api_ffa_resume_direct_resp_target(current_locked, next, receiver_vm_id,
 					  to_ret, true);
@@ -2670,7 +2671,7 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 
 	switch (current->rt_model) {
 	case RTM_FFA_DIR_REQ:
-		assert(current->direct_request_origin_vm_id !=
+		assert(current->direct_request_origin.vm_id !=
 		       HF_INVALID_VM_ID);
 		if (current->call_chain.prev_node == NULL) {
 			/*
@@ -2686,7 +2687,7 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 			 */
 			*next = api_switch_to_vm(
 				current_locked, ret, VCPU_STATE_BLOCKED,
-				current->direct_request_origin_vm_id);
+				current->direct_request_origin.vm_id);
 		}
 		break;
 	case RTM_SEC_INTERRUPT: {

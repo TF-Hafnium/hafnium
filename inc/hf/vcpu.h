@@ -128,12 +128,18 @@ struct vcpu {
 
 	/*
 	 * If the current vCPU is executing as a consequence of a
-	 * FFA_MSG_SEND_DIRECT_REQ invocation, then this member holds the
+	 * direct request invocation, then this member holds the
 	 * originating VM ID from which the call originated.
 	 * The value HF_INVALID_VM_ID implies the vCPU is not executing as
-	 * a result of a prior FFA_MSG_SEND_DIRECT_REQ invocation.
+	 * a result of a prior direct request invocation.
 	 */
-	ffa_id_t direct_request_origin_vm_id;
+	struct {
+		/**
+		 * Indicate whether request is via FFA_MSG_SEND_DIRECT_REQ2.
+		 */
+		bool is_ffa_req2;
+		ffa_id_t vm_id;
+	} direct_request_origin;
 
 	/** Determine whether partition is currently handling managed exit. */
 	bool processing_managed_exit;
