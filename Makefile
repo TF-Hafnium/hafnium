@@ -13,6 +13,9 @@ ENABLE_ASSERTIONS ?= 1
 
 PLATFORM ?= default
 
+LIST_SEPARATOR := ,
+PLATFORM_LIST := $(subst $(LIST_SEPARATOR), ,$(PLATFORM))
+
 GN_ARGS := project="$(PROJECT)"
 GN_ARGS += toolchain_lib="$(TOOLCHAIN_LIB)"
 ifeq ($(filter $(ENABLE_ASSERTIONS), 1 0),)
@@ -69,10 +72,12 @@ OUT_DIR = out/$(PROJECT)
 
 .PHONY: all
 all: $(OUT_DIR)/build.ninja
-ifneq ($(PLATFORM),default)
-	@$(NINJA) -C $(OUT_DIR) project/$(PROJECT):$(PLATFORM)
-else
+ifeq ($(PLATFORM),default)
 	@$(NINJA) -C $(OUT_DIR)
+else
+	@for PLAT in $(PLATFORM_LIST); do \
+		$(NINJA) -C $(OUT_DIR) project/$(PROJECT):$$PLAT; \
+	done
 endif
 
 $(OUT_DIR)/build.ninja:
