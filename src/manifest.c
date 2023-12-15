@@ -22,6 +22,7 @@
 #include "hf/dlog.h"
 #include "hf/fdt.h"
 #include "hf/ffa.h"
+#include "hf/layout.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/sp_pkg.h"
@@ -70,6 +71,7 @@ struct manifest_data {
 	struct mem_range mem_regions[PARTITION_MAX_MEMORY_REGIONS * MAX_VMS +
 				     PARTITION_MAX_DEVICE_REGIONS * MAX_VMS +
 				     MAX_VMS];
+	size_t mem_regions_index;
 	uint64_t boot_order_values[BOOT_ORDER_MAP_ENTRIES];
 };
 
@@ -82,8 +84,6 @@ static const size_t manifest_data_ppool_entries =
 	 MM_PPOOL_ENTRY_SIZE);
 
 static struct manifest_data *manifest_data;
-/* Index used to track the number of memory regions allocated. */
-static size_t allocated_mem_regions_index = 0;
 
 static bool check_boot_order(uint16_t boot_order)
 {
@@ -141,12 +141,6 @@ static void manifest_data_deinit(struct mpool *ppool)
 	memset_s(manifest_data, sizeof(struct manifest_data), 0,
 		 sizeof(struct manifest_data));
 	mpool_add_chunk(ppool, manifest_data, manifest_data_ppool_entries);
-
-	/**
-	 * Reset the index used for tracking the number of memory regions
-	 * allocated.
-	 */
-	allocated_mem_regions_index = 0;
 }
 
 static inline size_t count_digits(ffa_id_t vm_id)
@@ -553,7 +547,8 @@ static enum manifest_return_code check_partition_memory_is_valid(
  * manifests, as well address space defined from their load address.
  */
 static enum manifest_return_code check_and_record_memory_used(
-	uintptr_t base_address, uint32_t page_count)
+	uintptr_t base_address, uint32_t page_count,
+	struct mem_range *mem_ranges, size_t *mem_regions_index)
 {
 	bool overlap_of_regions;
 
@@ -572,17 +567,15 @@ static enum manifest_return_code check_and_record_memory_used(
 	}
 
 	overlap_of_regions = is_memory_region_within_ranges(
-		base_address, page_count, manifest_data->mem_regions,
-		allocated_mem_regions_index);
+		base_address, page_count, mem_ranges, *mem_regions_index);
 
 	if (!overlap_of_regions) {
 		paddr_t begin = pa_init(base_address);
 
-		manifest_data->mem_regions[allocated_mem_regions_index].begin =
-			begin;
-		manifest_data->mem_regions[allocated_mem_regions_index].end =
+		mem_ranges[*mem_regions_index].begin = begin;
+		mem_ranges[*mem_regions_index].end =
 			pa_add(begin, page_count * PAGE_SIZE - 1);
-		allocated_mem_regions_index++;
+		(*mem_regions_index)++;
 
 		return MANIFEST_SUCCESS;
 	}
@@ -687,8 +680,10 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 			mem_regions[i].base_address, mem_regions[i].page_count,
 			mem_regions[i].attributes, boot_params));
 
-		TRY(check_and_record_memory_used(mem_regions[i].base_address,
-						 mem_regions[i].page_count));
+		TRY(check_and_record_memory_used(
+			mem_regions[i].base_address, mem_regions[i].page_count,
+			manifest_data->mem_regions,
+			&manifest_data->mem_regions_index));
 
 		TRY(read_optional_uint32(mem_node, "smmu-id",
 					 MANIFEST_INVALID_ID,
@@ -849,8 +844,10 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		dlog_verbose("      Pages_count: %u\n",
 			     dev_regions[i].page_count);
 
-		TRY(check_and_record_memory_used(dev_regions[i].base_address,
-						 dev_regions[i].page_count));
+		TRY(check_and_record_memory_used(
+			dev_regions[i].base_address, dev_regions[i].page_count,
+			manifest_data->mem_regions,
+			&manifest_data->mem_regions_index));
 
 		TRY(read_uint32(dev_node, "attributes",
 				&dev_regions[i].attributes));
@@ -1528,6 +1525,10 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 	struct fdt_node hyp_node;
 	size_t i = 0;
 	bool found_primary_vm = false;
+	const size_t spmc_size =
+		align_up(pa_difference(layout_text_begin(), layout_image_end()),
+			 PAGE_SIZE);
+	const size_t spmc_page_count = spmc_size / PAGE_SIZE;
 
 	if (boot_params->mem_ranges_count == 0 &&
 	    boot_params->ns_mem_ranges_count == 0) {
@@ -1542,6 +1543,22 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 	/* Allocate space in the ppool for the manifest data. */
 	if (!manifest_data_init(ppool)) {
 		panic("Unable to allocate manifest data.\n");
+	}
+
+	/*
+	 * Add SPMC load address range to memory ranges to track to ensure
+	 * no partitions overlap with this memory.
+	 * The system integrator should have prevented this by defining the
+	 * secure memory region ranges so as not to overlap the SPMC load
+	 * address range. Therefore, this code is intended to catch any
+	 * potential misconfigurations there.
+	 */
+	if (is_aligned(pa_addr(layout_text_begin()), PAGE_SIZE) &&
+	    spmc_page_count != 0) {
+		TRY(check_and_record_memory_used(
+			pa_addr(layout_text_begin()), spmc_page_count,
+			manifest_data->mem_regions,
+			&manifest_data->mem_regions_index));
 	}
 
 	manifest = &manifest_data->manifest;
@@ -1624,8 +1641,9 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 			 * + memory size) has been used by other partition.
 			 */
 			TRY(check_and_record_memory_used(
-				manifest->vm[i].partition.load_addr,
-				page_count));
+				manifest->vm[i].partition.load_addr, page_count,
+				manifest_data->mem_regions,
+				&manifest_data->mem_regions_index));
 		} else {
 			TRY(parse_vm(&vm_node, &manifest->vm[i], vm_id));
 		}
