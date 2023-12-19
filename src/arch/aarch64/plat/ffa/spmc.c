@@ -7,6 +7,7 @@
  */
 
 #include "hf/arch/ffa.h"
+#include "hf/arch/gicv3.h"
 #include "hf/arch/mmu.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
@@ -1652,6 +1653,16 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 
 	/* Find pending interrupt id. This also activates the interrupt. */
 	intid = plat_interrupts_get_pending_interrupt_id();
+
+	/*
+	 * Spurious interrupt ID indicating that there are no pending
+	 * interrupts to acknowledge. For such scenarios, resume the current
+	 * vCPU.
+	 */
+	if (intid == SPURIOUS_INTID_OTHER_WORLD) {
+		*next = NULL;
+		return;
+	}
 
 	target_vcpu = plat_ffa_find_target_vcpu(current, intid);
 	target_vm_locked = vm_lock(target_vcpu->vm);
