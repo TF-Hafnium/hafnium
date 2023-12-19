@@ -105,13 +105,15 @@ Partition Properties
      The "compatible" must be the string "arm,ffa-manifest-rx_tx-buffer".
 
 - messaging-method [mandatory]
-   - value type: <u8>
+   - value type: <u16>
    - Specifies which messaging methods are supported by the partition, set bit
      means the feature is supported, clear bit - not supported:
 
-      - Bit[0]: partition can receive direct requests if set
-      - Bit[1]: partition can send direct requests if set
+      - Bit[0]: partition can receive direct requests via FFA_MSG_SEND_DIRECT_REQ ABI if set
+      - Bit[1]: partition can send direct requests via FFA_MSG_SEND_DIRECT_REQ ABI if set
       - Bit[2]: partition can send and receive indirect messages
+      - Bit[9]: partition can receive direct requests via FFA_MSG_SEND_DIRECT_REQ2 ABI if set
+      - Bit[10]: partition can send direct requests via FFA_MSG_SEND_DIRECT_REQ2 ABI if set
 
 - managed-exit
    - value type: <empty>
