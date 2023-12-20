@@ -8,6 +8,8 @@
 
 #include "hf/arch/types.h"
 
+#include "hf/vcpu.h"
+
 /** Max SVE vector length supported by the architecture. */
 #define HF_SVE_VECTOR_LEN_MAX UINT32_C(2048)
 

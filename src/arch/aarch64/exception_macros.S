@@ -96,29 +96,7 @@ skip_restore_elr_\elx:
 	b exception_handler_return
 .endm
 
-/**
- * Helper macros for SIMD vectors save/restore operations.
- */
-.macro simd_op_vectors op:req reg:req
-	\op q0, q1, [\reg], #32
-	\op q2, q3, [\reg], #32
-	\op q4, q5, [\reg], #32
-	\op q6, q7, [\reg], #32
-	\op q8, q9, [\reg], #32
-	\op q10, q11, [\reg], #32
-	\op q12, q13, [\reg], #32
-	\op q14, q15, [\reg], #32
-	\op q16, q17, [\reg], #32
-	\op q18, q19, [\reg], #32
-	\op q20, q21, [\reg], #32
-	\op q22, q23, [\reg], #32
-	\op q24, q25, [\reg], #32
-	\op q26, q27, [\reg], #32
-	\op q28, q29, [\reg], #32
-	\op q30, q31, [\reg], #32
-.endm
-
-/**
+/*
  * Restores the volatile registers from the stack. This currently takes 14
  * instructions, so it can be used in exception handlers while still leaving 18
  * instructions left; if paired with save_volatile_to_stack, there are 4

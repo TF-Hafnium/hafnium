@@ -596,23 +596,21 @@ vcpu_switch:
 	stp x3, x4, [x2, #16 * 0]
 #endif
 
-	/* Save floating point registers. */
-	/* Use x28 as the base. */
-	add x28, x1, #VCPU_FREGS
-	simd_op_vectors stp, x28
-	mrs x3, fpsr
-	mrs x4, fpcr
-	stp x3, x4, [x28]
-
-	/* Save new vCPU pointer in non-volatile register. */
+	/* Save new/old vCPU pointers to non-volatile registers. */
 	mov x19, x0
+	mov x20, x1
+
+	/* Save floating point registers. */
+	mov x0, x20
+	bl arch_fpu_save_to_vcpu
 
 	/*
 	 * Save peripheral registers, and inform the arch-independent sections
 	 * that registers have been saved.
 	 */
-	mov x0, x1
+	mov x0, x20
 	bl complete_saving_state
+
 	mov x0, x19
 
 	/* Intentional fallthrough. */
@@ -796,24 +794,15 @@ handle_smc_from_nwd:
 	/* Restore peripheral registers. */
 	mov x19, x0
 	bl begin_restoring_state
-	mov x0, x19
 
 	/*
 	 * Restore floating point registers.
 	 */
-	add x2, x0, #VCPU_FREGS
-	simd_op_vectors ldp, x2
-	ldp x3, x4, [x2]
-	msr fpsr, x3
+	mov x0, x19
+	bl arch_fpu_restore_from_vcpu
 
-	/*
-	 * Only restore FPCR if changed, to avoid expensive
-	 * self-synchronising operation where possible.
-	 */
-	mrs x5, fpcr
-	cmp x5, x4
-	b.eq vcpu_restore_lazy_and_run
-	msr fpcr, x4
+	mov x0, x19
+
 	/* Intentional fallthrough. */
 
 vcpu_restore_lazy_and_run:

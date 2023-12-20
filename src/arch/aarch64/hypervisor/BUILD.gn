@@ -37,6 +37,7 @@ source_set("hypervisor") {
     "debug_el1.c",
     "feature_id.c",
     "ffa.c",
+    "fpu.c",
     "handler.c",
     "perfmon.c",
     "psci_handler.c",
