@@ -570,3 +570,49 @@ TEST_SERVICE(ffa_direct_msg_resp2_invalid_sender_receiver)
 
 	FAIL("Direct response not expected to return");
 }
+
+TEST_SERVICE(ffa_direct_msg_req2_resp_failure)
+{
+	struct ffa_value res;
+	struct ffa_value args = ffa_msg_wait();
+	uint64_t msg[MAX_RESP_REGS] = {0};
+
+	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ2_64);
+
+	/* Respond to FFA_MSG_SEND_DIRECT_REQ2 with FFA_MSG_SEND_DIRECT_RESP. */
+	res = ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
+				       args.arg3, args.arg4, args.arg5,
+				       args.arg6, args.arg7);
+
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+
+	memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &args.arg4,
+		 MAX_RESP_REGS * sizeof(uint64_t));
+	ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args),
+				  (uint64_t *)msg, ARRAY_SIZE(msg));
+
+	FAIL("Direct response not expected to return");
+}
+
+TEST_SERVICE(ffa_direct_msg_req_resp2_failure)
+{
+	struct ffa_value res;
+	struct ffa_value args = ffa_msg_wait();
+	uint64_t msg[MAX_RESP_REGS] = {0};
+
+	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
+
+	memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &args.arg4,
+		 MAX_RESP_REGS * sizeof(uint64_t));
+	/* Respond to FFA_MSG_SEND_DIRECT_REQ with FFA_MSG_SEND_DIRECT_RESP2. */
+	res = ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args),
+					(uint64_t *)msg, ARRAY_SIZE(msg));
+
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+
+	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
+				 args.arg3, args.arg4, args.arg5, args.arg6,
+				 args.arg7);
+
+	FAIL("Direct response not expected to return");
+}

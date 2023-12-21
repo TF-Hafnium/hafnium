@@ -727,3 +727,45 @@ TEST(direct_message, ffa_send_direct_message_req2_multiple_uuids)
 	EXPECT_EQ(res.extended_val.arg16, msg[12]);
 	EXPECT_EQ(res.extended_val.arg17, msg[13]);
 }
+
+/**
+ * Test that a request sent via:
+ *  - FFA_MSG_SEND_DIRECT_REQ2 cannot be completed by FFA_MSG_SEND_DIRECT_RESP
+ *  - FFA_MSG_SEND_DIRECT_REQ cannot be completed by FFA_MSG_SEND_DIRECT_RESP2
+ */
+TEST(direct_message, ffa_direct_msg_check_abi_pairs_nwd_to_sp)
+{
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_uuid uuid1 = SERVICE1;
+
+	/* Setup Service1 to respond with FFA_MSG_SEND_DIRECT_RESP ABI. */
+	SERVICE_SELECT(service1_info->vm_id, "ffa_direct_msg_req2_resp_failure",
+		       mb.send);
+	ffa_run(service1_info->vm_id, 0);
+
+	/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ2. */
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+				       &uuid1, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+
+	/* Set up Service2 to respond with FFA_MSG_SEND_DIRECT_RESP2 ABI. */
+	SERVICE_SELECT(service2_info->vm_id, "ffa_direct_msg_req_resp2_failure",
+		       mb.send);
+	ffa_run(service2_info->vm_id, 0);
+
+	/*
+	 * Send a direct request with FFA_MSG_SEND_DIRECT_REQ and expect
+	 * failure.
+	 */
+	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, service2_info->vm_id,
+				      msg[0], msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+}
