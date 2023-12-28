@@ -3518,7 +3518,7 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 	}
 }
 
-TEST(memory_sharing, share_ffa_v1_0_to_v1_1)
+TEST(memory_sharing, share_ffa_v1_0_to_current_version)
 {
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -3528,7 +3528,7 @@ TEST(memory_sharing, share_ffa_v1_0_to_v1_1)
 	};
 
 	struct ffa_memory_access_v1_0 receiver_v1_0;
-	struct ffa_memory_access receiver_v1_1;
+	struct ffa_memory_access receiver_v_cur;
 	uint32_t msg_size;
 	struct ffa_partition_msg *retrieve_message = mb.send;
 	uint8_t *ptr = pages;
@@ -3540,7 +3540,7 @@ TEST(memory_sharing, share_ffa_v1_0_to_v1_1)
 				    FFA_DATA_ACCESS_RW,
 				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
 
-	ffa_memory_access_init(&receiver_v1_1, service1_info->vm_id,
+	ffa_memory_access_init(&receiver_v_cur, service1_info->vm_id,
 			       FFA_DATA_ACCESS_RW,
 			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
 
@@ -3562,7 +3562,7 @@ TEST(memory_sharing, share_ffa_v1_0_to_v1_1)
 	/* Send v1.1 retrieve to the borrower. */
 	msg_size = ffa_memory_retrieve_request_init(
 		(struct ffa_memory_region *)retrieve_message->payload, handle,
-		HF_PRIMARY_VM_ID, &receiver_v1_1, 1,
+		HF_PRIMARY_VM_ID, &receiver_v_cur, 1,
 		sizeof(struct ffa_memory_access), 0,
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
@@ -3590,7 +3590,7 @@ TEST(memory_sharing, share_ffa_v1_0_to_v1_1)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
-TEST(memory_sharing, share_ffa_v1_1_to_v1_0)
+TEST(memory_sharing, share_ffa_current_version_to_v1_0)
 {
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -3599,7 +3599,7 @@ TEST(memory_sharing, share_ffa_v1_1_to_v1_0)
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
 	struct ffa_memory_access_v1_0 receiver_v1_0 = {0};
-	struct ffa_memory_access receiver_v1_1 = {0};
+	struct ffa_memory_access receiver_v_cur = {0};
 	uint32_t msg_size;
 	struct ffa_partition_msg *retrieve_message = mb.send;
 	ffa_memory_handle_t handle;
@@ -3612,14 +3612,14 @@ TEST(memory_sharing, share_ffa_v1_1_to_v1_0)
 				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
 
 	ffa_memory_access_init(
-		&receiver_v1_1, service1_info->vm_id, FFA_DATA_ACCESS_RW,
+		&receiver_v_cur, service1_info->vm_id, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
 		&((struct ffa_memory_access_impdef){
 			{service1_info->vm_id, service1_info->vm_id + 1}}));
 
 	/* Initialize memory sharing test according to v1.1. */
 	ffa_memory_region_init((struct ffa_memory_region *)mb.send,
-			       HF_MAILBOX_SIZE, hf_vm_get_id(), &receiver_v1_1,
+			       HF_MAILBOX_SIZE, hf_vm_get_id(), &receiver_v_cur,
 			       1, sizeof(struct ffa_memory_access),
 			       constituents, ARRAY_SIZE(constituents), 0, 0,
 			       FFA_MEMORY_NORMAL_MEM,
