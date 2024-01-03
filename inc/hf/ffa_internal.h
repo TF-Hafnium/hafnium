@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "hf/check.h"
+#include "hf/vm.h"
 
 #include "vmapi/hf/ffa.h"
 

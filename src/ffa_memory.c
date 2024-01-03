@@ -23,6 +23,8 @@
 #include "hf/ffa_partition_manifest.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
+#include "hf/panic.h"
+#include "hf/plat/memory_protect.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 #include "hf/vm_ids.h"
@@ -896,6 +898,103 @@ struct ffa_value ffa_retrieve_check_transition(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
+/*
+ * Performs the operations related to the `action` MAP_ACTION_CHECK*.
+ * Returns:
+ * - FFA_SUCCESS_32: if all goes well.
+ * - FFA_ERROR_32: with FFA_NO_MEMORY, if there is no memory to manage
+ *   the page table update. Or error code provided by the function
+ *   `arch_memory_protect`.
+ */
+static struct ffa_value ffa_region_group_check_actions(
+	struct vm_locked vm_locked, paddr_t pa_begin, paddr_t pa_end,
+	struct mpool *ppool, uint32_t mode, enum ffa_map_action action,
+	bool *memory_protected)
+{
+	struct ffa_value ret;
+	bool is_memory_protected;
+
+	if (!vm_identity_prepare(vm_locked, pa_begin, pa_end, mode, ppool)) {
+		dlog_verbose(
+			"%s: memory can't be mapped to %x due to lack of "
+			"memory. Base: %lx end: %x\n",
+			__func__, vm_locked.vm->id, pa_addr(pa_begin),
+			pa_addr(pa_end));
+		return ffa_error(FFA_NO_MEMORY);
+	}
+
+	switch (action) {
+	case MAP_ACTION_CHECK:
+		/* No protect requested. */
+		is_memory_protected = false;
+		ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+		break;
+	case MAP_ACTION_CHECK_PROTECT: {
+		paddr_t last_protected_pa = pa_init(0);
+
+		ret = arch_memory_protect(pa_begin, pa_end, &last_protected_pa);
+
+		is_memory_protected = (ret.func == FFA_SUCCESS_32);
+
+		/*
+		 * - If protect memory has failed with FFA_DENIED, means some
+		 * range of memory was in the wrong state. In such case, SPM
+		 * reverts the state of the pages that were successfully
+		 * updated.
+		 * - If protect memory has failed with FFA_NOT_SUPPORTED, it
+		 * means the platform doesn't support the protection mechanism.
+		 * That said, it still permits the page table update to go
+		 * through. The variable
+		 * `is_memory_protected` will be equal to false.
+		 * - If protect memory has failed with FFA_INVALID_PARAMETERS,
+		 *   break from switch and return the error.
+		 */
+		if (ret.func == FFA_ERROR_32) {
+			assert(!is_memory_protected);
+			if (ffa_error_code(ret) == FFA_DENIED &&
+			    pa_addr(last_protected_pa) != (uintptr_t)0) {
+				CHECK(arch_memory_unprotect(
+					pa_begin,
+					pa_add(last_protected_pa, PAGE_SIZE)));
+			} else if (ffa_error_code(ret) == FFA_NOT_SUPPORTED) {
+				ret = (struct ffa_value){
+					.func = FFA_SUCCESS_32,
+				};
+			}
+		}
+	} break;
+	default:
+		panic("%s: invalid action to process %x\n", __func__, action);
+	}
+
+	if (memory_protected != NULL) {
+		*memory_protected = is_memory_protected;
+	}
+
+	return ret;
+}
+
+static void ffa_region_group_commit_actions(struct vm_locked vm_locked,
+					    paddr_t pa_begin, paddr_t pa_end,
+					    struct mpool *ppool, uint32_t mode,
+					    enum ffa_map_action action)
+{
+	switch (action) {
+	case MAP_ACTION_COMMIT_UNPROTECT:
+		/*
+		 * Checking that it should succeed because SPM should be
+		 * unprotecting memory that it had protected before.
+		 */
+		CHECK(arch_memory_unprotect(pa_begin, pa_end));
+	case MAP_ACTION_COMMIT:
+		vm_identity_commit(vm_locked, pa_begin, pa_end, mode, ppool,
+				   NULL);
+		break;
+	default:
+		panic("%s: invalid action to process %x\n", __func__, action);
+	}
+}
+
 /**
  * Updates a VM's page table such that the given set of physical address ranges
  * are mapped in the address space at the corresponding address ranges, in the
@@ -911,21 +1010,32 @@ struct ffa_value ffa_retrieve_check_transition(
  * state.
  * - The action MAP_ACTION_COMMIT allocates the page tables from the mpool, and
  *   changes the memory mappings.
- *
+ * - The action MAP_ACTION_CHECK_PROTECT extends the MAP_ACTION_CHECK with an
+ * invocation to the monitor to update the security state of the memory,
+ * to that of the SPMC.
+ * - The action MAP_ACTION_COMMIT_UNPROTECT extends the MAP_ACTION_COMMIT
+ *   with a call into the monitor, to reset the security state of memory
+ *   that has priorly been mapped with the MAP_ACTION_CHECK_PROTECT action.
  * vm_ptable_defrag should always be called after a series of page table
  * updates, whether they succeed or fail.
  *
- * Returns true on success, or false if the update failed and no changes were
+ * If all goes well, returns FFA_SUCCESS_32; or FFA_ERROR, with following
+ * error codes:
+ * - FFA_INVALID_PARAMETERS: invalid range of memory.
+ * - FFA_DENIED:
+ *
  * made to memory mappings.
  */
-bool ffa_region_group_identity_map(
+struct ffa_value ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t mode, struct mpool *ppool, enum ffa_map_action action)
+	uint32_t mode, struct mpool *ppool, enum ffa_map_action action,
+	bool *memory_protected)
 {
 	uint32_t i;
 	uint32_t j;
+	struct ffa_value ret;
 
 	if (vm_locked.vm->el0_partition) {
 		mode |= MM_MODE_USER | MM_MODE_NG;
@@ -948,29 +1058,28 @@ bool ffa_region_group_identity_map(
 			if (((pa_addr(pa_begin) >> pa_bits) > 0) ||
 			    ((pa_addr(pa_end) >> pa_bits) > 0)) {
 				dlog_error("Region is outside of PA Range\n");
-				return false;
+				return ffa_error(FFA_INVALID_PARAMETERS);
 			}
 
-			switch (action) {
-			case MAP_ACTION_COMMIT:
-				vm_identity_commit(vm_locked, pa_begin, pa_end,
-						   mode, ppool, NULL);
-				break;
-			case MAP_ACTION_CHECK:
-				if (!vm_identity_prepare(vm_locked, pa_begin,
-							 pa_end, mode, ppool)) {
-					return false;
-				}
-
-				break;
-			default:
-				panic("%s: invalid action state %x\n", __func__,
-				      action);
+			if (action <= MAP_ACTION_CHECK_PROTECT) {
+				ret = ffa_region_group_check_actions(
+					vm_locked, pa_begin, pa_end, ppool,
+					mode, action, memory_protected);
+			} else if (action >= MAP_ACTION_COMMIT &&
+				   action < MAP_ACTION_MAX) {
+				ffa_region_group_commit_actions(
+					vm_locked, pa_begin, pa_end, ppool,
+					mode, action);
+				ret = (struct ffa_value){
+					.func = FFA_SUCCESS_32};
+			} else {
+				panic("%s: Unknown ffa_map_action.\n",
+				      __func__);
 			}
 		}
 	}
 
-	return true;
+	return ret;
 }
 
 /**
@@ -1227,11 +1336,10 @@ struct ffa_value ffa_send_check_update(
 	 * without committing, to make sure the entire operation will succeed
 	 * without exhausting the page pool.
 	 */
-	if (!ffa_region_group_identity_map(
-		    from_locked, fragments, fragment_constituent_counts,
-		    fragment_count, from_mode, page_pool, MAP_ACTION_CHECK)) {
-		/* TODO: partial defrag of failed range. */
-		ret = ffa_error(FFA_NO_MEMORY);
+	ret = ffa_region_group_identity_map(
+		from_locked, fragments, fragment_constituent_counts,
+		fragment_count, from_mode, page_pool, MAP_ACTION_CHECK, NULL);
+	if (ret.func == FFA_ERROR_32) {
 		goto out;
 	}
 
@@ -1242,9 +1350,10 @@ struct ffa_value ffa_send_check_update(
 	 * partially mapped.
 	 */
 	CHECK(ffa_region_group_identity_map(
-		from_locked, fragments, fragment_constituent_counts,
-		fragment_count, from_mode, &local_page_pool,
-		MAP_ACTION_COMMIT));
+		      from_locked, fragments, fragment_constituent_counts,
+		      fragment_count, from_mode, &local_page_pool,
+		      MAP_ACTION_COMMIT, NULL)
+		      .func == FFA_SUCCESS_32);
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear &&
@@ -1258,10 +1367,11 @@ struct ffa_value ffa_send_check_update(
 		 * more pages than that so can never fail.
 		 */
 		CHECK(ffa_region_group_identity_map(
-			from_locked, fragments, fragment_constituent_counts,
-			fragment_count, orig_from_mode, &local_page_pool,
-			MAP_ACTION_COMMIT));
-
+			      from_locked, fragments,
+			      fragment_constituent_counts, fragment_count,
+			      orig_from_mode, &local_page_pool,
+			      MAP_ACTION_COMMIT, NULL)
+			      .func == FFA_SUCCESS_32);
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
@@ -1341,14 +1451,11 @@ struct ffa_value ffa_retrieve_check_update(
 	 * the recipient page tables without committing, to make sure the entire
 	 * operation will succeed without exhausting the page pool.
 	 */
-	if (!ffa_region_group_identity_map(
-		    to_locked, fragments, fragment_constituent_counts,
-		    fragment_count, to_mode, page_pool, MAP_ACTION_CHECK)) {
+	ret = ffa_region_group_identity_map(
+		to_locked, fragments, fragment_constituent_counts,
+		fragment_count, to_mode, page_pool, MAP_ACTION_CHECK, NULL);
+	if (ret.func == FFA_ERROR_32) {
 		/* TODO: partial defrag of failed range. */
-		dlog_verbose(
-			"Insufficient memory to update recipient page "
-			"table.\n");
-		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
@@ -1367,9 +1474,11 @@ struct ffa_value ffa_retrieve_check_update(
 	 * won't allocate because the transaction was already prepared above, so
 	 * it doesn't need to use the `local_page_pool`.
 	 */
-	CHECK(ffa_region_group_identity_map(
-		to_locked, fragments, fragment_constituent_counts,
-		fragment_count, to_mode, page_pool, MAP_ACTION_COMMIT));
+	CHECK(ffa_region_group_identity_map(to_locked, fragments,
+					    fragment_constituent_counts,
+					    fragment_count, to_mode, page_pool,
+					    MAP_ACTION_COMMIT, NULL)
+		      .func == FFA_SUCCESS_32);
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
@@ -1416,11 +1525,10 @@ static struct ffa_value ffa_relinquish_check_update(
 	 * without committing, to make sure the entire operation will succeed
 	 * without exhausting the page pool.
 	 */
-	if (!ffa_region_group_identity_map(
-		    from_locked, fragments, fragment_constituent_counts,
-		    fragment_count, from_mode, page_pool, MAP_ACTION_CHECK)) {
-		/* TODO: partial defrag of failed range. */
-		ret = ffa_error(FFA_NO_MEMORY);
+	ret = ffa_region_group_identity_map(
+		from_locked, fragments, fragment_constituent_counts,
+		fragment_count, from_mode, page_pool, MAP_ACTION_CHECK, NULL);
+	if (ret.func == FFA_ERROR_32) {
 		goto out;
 	}
 
@@ -1431,9 +1539,10 @@ static struct ffa_value ffa_relinquish_check_update(
 	 * partially mapped.
 	 */
 	CHECK(ffa_region_group_identity_map(
-		from_locked, fragments, fragment_constituent_counts,
-		fragment_count, from_mode, &local_page_pool,
-		MAP_ACTION_COMMIT));
+		      from_locked, fragments, fragment_constituent_counts,
+		      fragment_count, from_mode, &local_page_pool,
+		      MAP_ACTION_COMMIT, NULL)
+		      .func == FFA_SUCCESS_32);
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear &&
@@ -1447,9 +1556,11 @@ static struct ffa_value ffa_relinquish_check_update(
 		 * more pages than that so can never fail.
 		 */
 		CHECK(ffa_region_group_identity_map(
-			from_locked, fragments, fragment_constituent_counts,
-			fragment_count, orig_from_mode, &local_page_pool,
-			MAP_ACTION_COMMIT));
+			      from_locked, fragments,
+			      fragment_constituent_counts, fragment_count,
+			      orig_from_mode, &local_page_pool,
+			      MAP_ACTION_COMMIT, NULL)
+			      .func == FFA_SUCCESS_32);
 
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;

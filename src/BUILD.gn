@@ -73,6 +73,7 @@ source_set("src_testable") {
     plat_boot_flow,
     plat_console,
     plat_iommu,
+    plat_memory_protect,
   ]
 }
 

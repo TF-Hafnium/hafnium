@@ -1764,12 +1764,15 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 				 * update.
 				 */
 				CHECK(ffa_region_group_identity_map(
-					from_locked, share_state->fragments,
-					share_state
-						->fragment_constituent_counts,
-					share_state->fragment_count,
-					share_state->sender_orig_mode,
-					&local_page_pool, true));
+					      from_locked,
+					      share_state->fragments,
+					      share_state
+						      ->fragment_constituent_counts,
+					      share_state->fragment_count,
+					      share_state->sender_orig_mode,
+					      &local_page_pool,
+					      MAP_ACTION_COMMIT, NULL)
+					      .func == FFA_SUCCESS_32);
 			}
 		} else {
 			/* Abort sending to other_world. */

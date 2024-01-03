@@ -51,7 +51,7 @@ struct ffa_value arch_memory_protect(paddr_t begin, paddr_t end,
 
 		/* If PAS update failed from first region. */
 		if (last_protected_pa != NULL) {
-			*last_protected_pa = pa_init(last_protected);
+			*last_protected_pa = last_protected;
 		}
 
 		return ffa_error(FFA_DENIED);

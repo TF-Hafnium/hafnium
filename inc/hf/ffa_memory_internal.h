@@ -170,10 +170,11 @@ struct ffa_value ffa_retrieve_check_update(
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t sender_orig_mode, uint32_t share_func, bool clear,
 	struct mpool *page_pool);
-bool ffa_region_group_identity_map(
+struct ffa_value ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t mode, struct mpool *ppool, enum ffa_map_action action);
+	uint32_t mode, struct mpool *ppool, enum ffa_map_action action,
+	bool *memory_protected);
 bool memory_region_receivers_from_other_world(
 	struct ffa_memory_region *memory_region);
