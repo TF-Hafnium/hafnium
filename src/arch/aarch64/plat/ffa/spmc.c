@@ -2125,20 +2125,14 @@ static void plat_ffa_run_in_sec_interrupt_rtm(
 	target_vcpu->implicit_completion_signal = false;
 }
 
-/**
- * Intercept a direct response message from current vCPU to signal a
- * pending virtual secure interrupt and prepare to resume it in SPMC schedule
- * mode under runtime model for secure interrupt handling.
- */
-bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					struct ffa_value to_ret,
-					struct ffa_value *signal_interrupt)
+static bool plat_ffa_helper_intercept_call(struct vcpu_locked current_locked,
+					   struct ffa_value to_ret,
+					   struct ffa_value *signal_interrupt,
+					   bool is_ffa_msg_wait)
 {
 	struct vcpu *current;
 
 	current = current_locked.vcpu;
-	assert(*next == NULL);
 
 	/*
 	 * Check if there are any pending virtual secure interrupts to be
@@ -2146,15 +2140,17 @@ bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
 	 */
 	if (vcpu_interrupt_count_get(current_locked) > 0 &&
 	    current->processing_secure_interrupt) {
-		dlog_verbose(
-			"Intercepting FFA_MSG_SEND_DIRECT_RESP call to "
-			"signal secure interrupt: %x\n",
-			current->vm->id);
+		if (!is_ffa_msg_wait) {
+			dlog_verbose(
+				"Intercepting FFA_MSG_SEND_DIRECT_RESP call to "
+				"signal secure interrupt: %x\n",
+				current->vm->id);
 
-		current->direct_resp_intercepted = true;
+			current->direct_resp_intercepted = true;
 
-		/* Save direct response message args. */
-		current->direct_resp_ffa_value = to_ret;
+			/* Save direct response message args. */
+			current->direct_resp_ffa_value = to_ret;
+		}
 
 		/*
 		 * Prepare to signal virtual secure interrupt to S-EL0/S-EL1 SP
@@ -2170,13 +2166,35 @@ bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
 		 */
 		plat_ffa_run_in_sec_interrupt_rtm(current_locked);
 
-		/* Resume current vCPU. */
-		*next = NULL;
-
 		return true;
 	}
 
 	return false;
+}
+
+/**
+ * Intercept a direct response message from current vCPU to signal a
+ * pending virtual secure interrupt and prepare to resume it in SPMC schedule
+ * mode under runtime model for secure interrupt handling.
+ */
+bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
+					struct vcpu **next,
+					struct ffa_value to_ret,
+					struct ffa_value *signal_interrupt)
+{
+	bool ret;
+
+	assert(*next == NULL);
+
+	ret = plat_ffa_helper_intercept_call(current_locked, to_ret,
+					     signal_interrupt, false);
+
+	if (ret) {
+		/* Resume current vCPU. */
+		*next = NULL;
+	}
+
+	return ret;
 }
 
 /**
@@ -2188,15 +2206,11 @@ static void plat_ffa_vcpu_allow_interrupts(struct vcpu *current)
 	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
 }
 
-/**
- * First, all the fields related to secure interrupt handling are reset and
- * SPMC scheduled call chain is unwound.
- * Second, the intercepted direct response message is replayed followed by
- * unwinding of the NWd scheduled call chain.
- */
-static struct ffa_value plat_ffa_resume_direct_response(
-	struct vcpu_locked current_locked, struct vcpu **next)
+static struct ffa_value plat_ffa_helper_resume_intercepted_call(
+	struct vcpu_locked current_locked, struct vcpu **next,
+	bool is_ffa_msg_wait)
 {
+	(void)is_ffa_msg_wait;
 	ffa_id_t receiver_vm_id;
 	struct vcpu *current = current_locked.vcpu;
 	struct ffa_value to_ret;
@@ -2210,12 +2224,14 @@ static struct ffa_value plat_ffa_resume_direct_response(
 	/* Restore interrupt priority mask. */
 	plat_interrupts_set_priority_mask(current->priority_mask);
 
-	/* Replay the direct response message. */
-	receiver_vm_id = current->direct_request_origin.vm_id;
-	to_ret = current->direct_resp_ffa_value;
+	plat_ffa_vcpu_allow_interrupts(current);
 
 	/* Reset the flag now. */
 	current->direct_resp_intercepted = false;
+
+	/* Replay the direct response message. */
+	receiver_vm_id = current->direct_request_origin.vm_id;
+	to_ret = current->direct_resp_ffa_value;
 
 	dlog_verbose(
 		"Resuming intercepted direct response from: %x to: "
@@ -2229,10 +2245,22 @@ static struct ffa_value plat_ffa_resume_direct_response(
 	api_ffa_resume_direct_resp_target(current_locked, next, receiver_vm_id,
 					  to_ret, true);
 
-	plat_ffa_vcpu_allow_interrupts(current);
-
-	return (struct ffa_value){.func = FFA_MSG_WAIT_32};
+	return (struct ffa_value){.func = FFA_INTERRUPT_32};
 }
+
+/**
+ * First, all the fields related to secure interrupt handling are reset and
+ * SPMC scheduled call chain is unwound.
+ * Second, the intercepted direct response message is replayed followed by
+ * unwinding of the NWd scheduled call chain.
+ */
+static struct ffa_value plat_ffa_resume_direct_response(
+	struct vcpu_locked current_locked, struct vcpu **next)
+{
+	return plat_ffa_helper_resume_intercepted_call(current_locked, next,
+						       false);
+}
+
 
 /**
  * The invocation of FFA_MSG_WAIT at secure virtual FF-A instance is compliant
