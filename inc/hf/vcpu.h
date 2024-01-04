@@ -200,10 +200,16 @@ struct vcpu {
 	enum partition_runtime_model rt_model;
 
 	/**
-	 * Direct response message has been intercepted to handle virtual
-	 * secure interrupt for a S-EL0 partition.
+	 * Direct response message has been intercepted to signal virtual
+	 * secure interrupt for an SP.
 	 */
 	bool direct_resp_intercepted;
+
+	/**
+	 * FFA_MSG_WAIT invocation has been intercepted to signal virtual
+	 * secure interrupt for an SP.
+	 */
+	bool msg_wait_intercepted;
 
 	/** Save direct response message args to be resumed later. */
 	struct ffa_value direct_resp_ffa_value;

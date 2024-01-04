@@ -2150,6 +2150,15 @@ static bool plat_ffa_helper_intercept_call(struct vcpu_locked current_locked,
 
 			/* Save direct response message args. */
 			current->direct_resp_ffa_value = to_ret;
+		} else {
+			assert(current->rt_model == RTM_FFA_RUN);
+
+			dlog_verbose(
+				"Intercepting FFA_MSG_WAIT call to signal "
+				"secure interrupt: %x\n",
+				current->vm->id);
+
+			current->msg_wait_intercepted = true;
 		}
 
 		/*
@@ -2210,7 +2219,6 @@ static struct ffa_value plat_ffa_helper_resume_intercepted_call(
 	struct vcpu_locked current_locked, struct vcpu **next,
 	bool is_ffa_msg_wait)
 {
-	(void)is_ffa_msg_wait;
 	ffa_id_t receiver_vm_id;
 	struct vcpu *current = current_locked.vcpu;
 	struct ffa_value to_ret;
@@ -2228,6 +2236,23 @@ static struct ffa_value plat_ffa_helper_resume_intercepted_call(
 
 	/* Reset the flag now. */
 	current->direct_resp_intercepted = false;
+
+	if (is_ffa_msg_wait) {
+		/* Resume intercepted FFA_MSG_WAIT call. */
+		dlog_verbose("Resuming intercepted FFA_MSG_WAIT from: %x\n",
+			     current->vm->id);
+
+		current->scheduling_mode = NONE;
+		current->rt_model = RTM_NONE;
+
+		/* Relinquish control back to the NWd. */
+		*next = api_switch_to_other_world(
+			current_locked,
+			(struct ffa_value){.func = FFA_MSG_WAIT_32},
+			VCPU_STATE_WAITING);
+
+		return (struct ffa_value){.func = FFA_INTERRUPT_32};
+	}
 
 	/* Replay the direct response message. */
 	receiver_vm_id = current->direct_request_origin.vm_id;
@@ -2261,6 +2286,51 @@ static struct ffa_value plat_ffa_resume_direct_response(
 						       false);
 }
 
+/*
+ * A secure physical interrupt could trigger while an SP is processing an
+ * indirect message under the RTM_FFA_RUN partition runtime model. However,
+ * the SP may not be able to service the corresponding secure virtual interrupt
+ * before reqlinquishin CPU cycles and exiting the RTM_FFA_RUN partition
+ * runtime model through invocation of FFA_MSG_WAIT ABI.
+ * SPMC shall intercept this invocation of FFA_MSG_WAIT to check if there
+ * are any pending secure virtual interrupts for the current execution context
+ * of the SP. If true, SPMC will signal the virtual interrupt through
+ * FFA_INTERRUPT interface and resume the execution context in SPMC schedule
+ * mode.
+ */
+static bool plat_ffa_intercept_msg_wait(struct vcpu_locked current_locked,
+					struct vcpu **next,
+					struct ffa_value *signal_interrupt)
+{
+	bool ret;
+
+	assert(*next == NULL);
+
+	ret = plat_ffa_helper_intercept_call(
+		current_locked, (struct ffa_value){.func = FFA_INTERRUPT_32},
+		signal_interrupt, true);
+
+	if (ret) {
+		/* Resume current vCPU. */
+		*next = NULL;
+	}
+
+	return ret;
+}
+
+/*
+ * Once the SP services the secure virtual interrupt in SPMC schedule mode, it
+ * signals the completion through FFA_MSG_WAIT ABI.
+ * SPMC then resets the fields related to secure interrupt handling and unwounds
+ * the SPMC scheduled call chain. Since the original FFA_MSG_WAIT invocation was
+ * intercepted, SPMC resumes the action of relinquishing cycles back to the NWd.
+ */
+static struct ffa_value plat_ffa_resume_msg_wait(
+	struct vcpu_locked current_locked, struct vcpu **next)
+{
+	return plat_ffa_helper_resume_intercepted_call(current_locked, next,
+						       true);
+}
 
 /**
  * The invocation of FFA_MSG_WAIT at secure virtual FF-A instance is compliant
@@ -2276,6 +2346,19 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 	struct vcpu *current = current_locked.vcpu;
 
 	if (sp_boot_next(current_locked, next)) {
+		return ret_args;
+	}
+
+	/* Check if an earlier invocation of FFA_MSG_WAIT was intercepted. */
+	if (current->msg_wait_intercepted) {
+		return plat_ffa_resume_msg_wait(current_locked, next);
+	}
+
+	/*
+	 * Check if there are any pending secure virtual interrupts to be
+	 * handled.
+	 */
+	if (plat_ffa_intercept_msg_wait(current_locked, next, &ret_args)) {
 		return ret_args;
 	}
 
