@@ -15,6 +15,7 @@
 #include "ffa_secure_partitions.h"
 #include "gicv3.h"
 #include "partition_services.h"
+#include "sp805.h"
 #include "sp_helpers.h"
 
 #define SP_SLEEP_TIME 400U

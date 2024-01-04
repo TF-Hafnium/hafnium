@@ -1,0 +1,23 @@
+# Copyright 2024 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+#import("//build/image/image.gni")
+
+config("config") {
+  include_dirs = [
+    "inc",
+    "//test/inc",
+  ]
+}
+
+source_set("sp805") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "sp805.c" ]
+}

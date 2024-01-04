@@ -10,6 +10,7 @@ config("config") {
   include_dirs = [
     "inc",
     "//test/inc",
+    "//test/vmapi/common/arch/aarch64/secure/inc",
   ]
 }
 
@@ -68,15 +69,6 @@ source_set("power_mgt") {
   sources = [ "power_mgt.c" ]
 }
 
-source_set("sp805") {
-  testonly = true
-  public_configs = [
-    ":config",
-    "//src/arch/aarch64:arch_config",
-  ]
-  sources = [ "sp805.c" ]
-}
-
 source_set("secure_interrupts") {
   testonly = true
   public_configs = [
@@ -133,12 +125,12 @@ vm_kernel("secure_partitions_services") {
 
   deps = [
     ":message_loop",
-    ":sp805",
     ":sp_helpers",
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_secure_service",
     "//test/vmapi/common/arch/aarch64:exception_handler",
+    "//test/vmapi/common/arch/aarch64/secure:sp805",
     "//vmlib/${plat_arch}:call",
   ]
 }

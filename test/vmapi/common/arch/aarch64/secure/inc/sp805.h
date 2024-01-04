@@ -26,6 +26,9 @@
 #define ARM_SP805_TWDG_CLK_HZ 32768
 #define SP805_TWDOG_BASE 0x2A490000
 
+/* Secure watchdog timer interrupt id. */
+#define IRQ_TWDOG_INTID 56
+
 /* Public APIs for trusted watchdog module. */
 void sp805_twdog_start(unsigned int wdog_cycles);
 void sp805_twdog_stop(void);

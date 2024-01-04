@@ -8,6 +8,7 @@ import("//build/image/image.gni")
 
 config("config") {
   include_dirs = [
+    "//test/vmapi/common/arch/aarch64/secure/inc",
     "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure/inc",
     "//test/inc",
   ]
@@ -30,8 +31,8 @@ vm_kernel("sel0_partition") {
     "//src/arch/aarch64/hftest/el0:interrupts",
     "//test/hftest:hftest_sel0_partition_base",
     "//test/vmapi/common/arch/aarch64/el0:exception_handler",
+    "//test/vmapi/common/arch/aarch64/secure:sp805",
     "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure:message_loop",
-    "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure:sp805",
   ]
 }
 
