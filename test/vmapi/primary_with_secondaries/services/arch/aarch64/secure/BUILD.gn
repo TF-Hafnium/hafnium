@@ -8,7 +8,10 @@ import("//build/image/image.gni")
 import("//test/hftest/args.gni")
 
 config("config") {
-  include_dirs = [ "//test/inc" ]
+  include_dirs = [
+    "inc",
+    "//test/vmapi/common/arch/aarch64/secure/inc/",
+  ]
 }
 
 source_set("message_loop") {
@@ -28,11 +31,13 @@ source_set("secure_interrupts") {
     ":config",
     "//test/hftest:hftest_config",
     "//src/arch/aarch64:arch_config",
+    "//src/arch/aarch64:config",
   ]
   sources = [ "secure_interrupts.c" ]
   deps = [
     "//src/arch/aarch64:smc",
     "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64/secure:sp805",
   ]
 }
 

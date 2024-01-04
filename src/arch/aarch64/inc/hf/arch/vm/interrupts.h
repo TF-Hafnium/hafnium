@@ -12,3 +12,5 @@
 
 void exception_setup(void (*irq)(void), bool (*exception)(void));
 void interrupt_wait(void);
+void interrupts_enable(void);
+void interrupts_disable(void);

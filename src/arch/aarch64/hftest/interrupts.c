@@ -94,3 +94,13 @@ void interrupt_wait(void)
 {
 	__asm__ volatile("wfi");
 }
+
+void interrupts_enable(void)
+{
+	__asm__ volatile("msr DAIFSet, #0x3");
+}
+
+void interrupts_disable(void)
+{
+	__asm__ volatile("msr DAIFClr, #0x3");
+}

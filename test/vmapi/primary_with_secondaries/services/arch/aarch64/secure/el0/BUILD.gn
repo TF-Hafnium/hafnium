@@ -7,6 +7,11 @@
 import("//build/image/image.gni")
 import("//test/hftest/args.gni")
 
+config("config") {
+  include_dirs =
+      [ "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure/inc" ]
+}
+
 vm_kernel("secure_service1") {
   testonly = true
 
@@ -22,6 +27,7 @@ vm_kernel("secure_service1") {
     "//test/vmapi/primary_with_secondaries/services:relay",
     "//test/vmapi/primary_with_secondaries/services/arch/aarch64/el0:mem_permissions",
     "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:message_loop",
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:secure_interrupts",
   ]
 }
 

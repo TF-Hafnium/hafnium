@@ -31,3 +31,11 @@ void interrupt_wait(void)
 void arch_irq_enable(void)
 {
 }
+
+void interrupts_enable(void)
+{
+}
+
+void interrupts_disable(void)
+{
+}
