@@ -284,6 +284,7 @@ vm_kernel("primary_with_sp_test_vm") {
     "dir_msg.c",
     "indirect_messaging.c",
     "memory_sharing.c",
+    "secure_interrupts.c",
   ]
 
   deps = [
@@ -367,6 +368,7 @@ vm_kernel("primary_with_sp_vhe_test_vm") {
     "indirect_messaging.c",
     "memory_permissions.c",
     "memory_sharing.c",
+    "secure_interrupts.c",
   ]
 
   deps = [
