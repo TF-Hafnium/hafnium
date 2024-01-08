@@ -2484,7 +2484,6 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	case FFA_CONSOLE_LOG_32:
 	case FFA_CONSOLE_LOG_64:
 	case FFA_PARTITION_INFO_GET_REGS_64:
-	case FFA_EL3_INTR_HANDLE_32:
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
 #endif

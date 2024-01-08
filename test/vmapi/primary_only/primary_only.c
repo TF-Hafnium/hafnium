@@ -310,9 +310,6 @@ TEST(ffa, ffa_v_1_2_features)
 	ret = ffa_features(FFA_PARTITION_INFO_GET_REGS_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	ret = ffa_features(FFA_EL3_INTR_HANDLE_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_REQ2_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
