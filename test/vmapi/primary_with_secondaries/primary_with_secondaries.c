@@ -17,6 +17,7 @@
 SERVICE_PARTITION_INFO_GET(service1, SERVICE1)
 SERVICE_PARTITION_INFO_GET(service2, SERVICE2)
 SERVICE_PARTITION_INFO_GET(service3, SERVICE3)
+SERVICE_PARTITION_INFO_GET(service4, SERVICE4)
 
 /**
  * Helper to setup mailbox for precondition functions.

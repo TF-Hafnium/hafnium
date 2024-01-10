@@ -653,3 +653,37 @@ TEST_SERVICE(ffa_direct_msg_resp_ext_registers_preserved)
 
 	FAIL("Direct response not expected to return");
 }
+
+/**
+ * FF-A v1.1 endpoint attempts to use FFA_MSG_SEND_DIRECT_REQ2
+ * and fails.
+ */
+TEST_SERVICE(version_does_not_support_req2)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_value res;
+	struct ffa_partition_info target_info;
+	struct ffa_uuid target_uuid;
+
+	/* Retrieve uuid of target endpoint. */
+	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
+				 recv_buf, NULL);
+
+	HFTEST_LOG("Target UUID: %X-%X-%X-%X", target_uuid.uuid[0],
+		   target_uuid.uuid[1], target_uuid.uuid[2],
+		   target_uuid.uuid[3]);
+
+	/* From uuid to respective partition info. */
+	ASSERT_EQ(get_ffa_partition_info(&target_uuid, &target_info,
+					 sizeof(target_info), recv_buf),
+		  1);
+
+	/* Attempt to send FFA_MSG_SEND_DIRECT_REQ2 and fail. */
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), target_info.vm_id,
+				       &target_uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+	ffa_yield();
+}

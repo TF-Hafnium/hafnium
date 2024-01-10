@@ -10,19 +10,20 @@
 
 / {
 	compatible = "arm,ffa-manifest-1.0";
-	debug_name = "Secure Service3";
+	debug_name = "Secure Service4";
 
 	/* Properties */
-	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-        uuid = <0xcbd4482f 0xcbab 0x4dba 0x0738d>;
+	/* v1.1 to test backwards compatibility */
+	ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
+        uuid = <0xd6d78930 0x6cb26103 0xda311d35 0xfc03fced>;
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
-	load-address = <0x6280000>;
+	load-address = <0x6180000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
 	messaging-method = <0x7>; /* Supports direct and indirect requests. */
-	boot-order = <3>;
+	boot-order = <4>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
 

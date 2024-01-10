@@ -59,6 +59,13 @@
 			0xcbd4482f, 0xcbab, 0x4dba, 0x0738d, \
 		}                                            \
 	}
+#define SERVICE4                                                       \
+	(struct ffa_uuid)                                              \
+	{                                                              \
+		{                                                      \
+			0xd6d78930, 0x6cb26103, 0xda311d35, 0xfc03fced \
+		}                                                      \
+	}
 
 /*
  * Helpers to get services information.
@@ -67,6 +74,7 @@
 struct ffa_partition_info* service1(void* recv);
 struct ffa_partition_info* service2(void* recv);
 struct ffa_partition_info* service3(void* recv);
+struct ffa_partition_info* service4(void* recv);
 
 /* Precondition functions for this test setup. */
 bool service1_is_vm(void);

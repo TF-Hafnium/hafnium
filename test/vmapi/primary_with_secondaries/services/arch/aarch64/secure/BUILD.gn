@@ -75,6 +75,12 @@ manifest("partition_manifest_service_sp3") {
   output = "partition_manifest_service_sp3.dtb"
 }
 
+# Partition using FF-A v1.1 for use in backwards compatibility tests.
+manifest("partition_manifest_service_sp4") {
+  source = "partition_manifest_service_sp4.dts"
+  output = "partition_manifest_service_sp4.dtb"
+}
+
 partition_package("service_sp1_partition_package") {
   testonly = true
   pm_offset = "0x1000"
@@ -112,4 +118,17 @@ partition_package("service_sp3_partition_package") {
         ":secure_service",
       ] ]
   output = "service_sp3_partition_package.img"
+}
+
+partition_package("service_sp4_partition_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp4.dtb",
+        "secure_service.bin",
+        ":partition_manifest_service_sp4",
+        ":secure_service",
+      ] ]
+  output = "service_sp4_partition_package.img"
 }

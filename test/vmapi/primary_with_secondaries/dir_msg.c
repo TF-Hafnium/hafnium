@@ -838,3 +838,71 @@ TEST(direct_message, ffa_direct_message_req2_after_req)
 		EXPECT_EQ(res.extended_val.arg17, msg[13]);
 	}
 }
+
+/**
+ * Test showing that an FF-A v1.1 endpoint (service4) cannot send a direct
+ * request via FFA_MSG_SEND_DIRECT_REQ2.
+ */
+TEST_PRECONDITION(direct_message,
+		  ffa_msg_send_direct_req2_send_v1_1_not_supported,
+		  service1_is_not_vm)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service4_info = service4(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_value ret;
+	const struct ffa_uuid service1_uuid = SERVICE1;
+
+	/*
+	 * Service4 requests echo from service1.
+	 * Request sent via FFA_MSG_SEND_DIRECT_REQ2 should fail as Service4
+	 * FF-A version is < FF-A v1.2.
+	 */
+	SERVICE_SELECT(service4_info->vm_id, "version_does_not_support_req2",
+		       mb.send);
+
+	/* Send to service4 the uuid of the target for its message. */
+	ret = send_indirect_message(own_id, service4_info->vm_id, mb.send,
+				    &service1_uuid, sizeof(service1_uuid), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	ffa_run(service4_info->vm_id, 0);
+}
+
+/**
+ * Test showing that an FF-A v1.1 endpoint (service3) cannot receive a direct
+ * request via FFA_MSG_SEND_DIRECT_REQ2.
+ *
+ * Also show an FF-A v1.2 endpoint (service4) that does not specify receipt of
+ * direct requsts via FFA_MSG_SEND_DIRECT_REQ2 in its manifest cannot receive a
+ * direct request via this function id.
+ */
+TEST_PRECONDITION(direct_message, ffa_msg_send_direct_req2_recv_not_supported,
+		  service1_and_service2_are_secure)
+{
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999, 0x01010101, 0x23232323, 0x45454545,
+				0x67676767, 0x89898989, 0x11001100, 0x22332233,
+				0x44554455, 0x66776677};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+	struct ffa_partition_info *service4_info = service4(mb.recv);
+	struct ffa_value res;
+	const struct ffa_uuid service3_uuid = SERVICE3;
+	const struct ffa_uuid service4_uuid = SERVICE4;
+
+	/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ2. */
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service3_info->vm_id,
+				       &service3_uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+
+	SERVICE_SELECT(service4_info->vm_id,
+		       "ffa_direct_message_req2_resp_echo", mb.send);
+	ffa_run(service4_info->vm_id, 0);
+
+	/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ2. */
+	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service4_info->vm_id,
+				       &service4_uuid, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+}
