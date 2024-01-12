@@ -13,6 +13,7 @@
 #include "hf/arch/vm/vm.h"
 
 #include "hf/cpu.h"
+#include "hf/ffa_partition_manifest.h"
 #include "hf/interrupt_desc.h"
 #include "hf/list.h"
 #include "hf/mm.h"
@@ -209,6 +210,14 @@ struct vm {
 	ffa_vcpu_count_t vcpu_count;
 	struct vcpu *vcpus;
 	struct mm_ptable ptable;
+
+	/**
+	 * Set of page tables used for defining the peripheral's secure
+	 * IPA space, in the context of SPMC.
+	 */
+	struct mm_ptable iommu_ptables[PARTITION_MAX_DMA_DEVICES];
+	/** Count of DMA devices assigned to this VM. */
+	uint8_t dma_device_count;
 	struct mailbox mailbox;
 
 	struct {
@@ -294,9 +303,11 @@ struct two_vm_locked {
 };
 
 struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
-		   struct mpool *ppool, bool el0_partition);
+		   struct mpool *ppool, bool el0_partition,
+		   uint8_t dma_device_count);
 bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
-		  struct vm **new_vm, bool el0_partition);
+		  struct vm **new_vm, bool el0_partition,
+		  uint8_t dma_device_count);
 ffa_vm_count_t vm_get_count(void);
 struct vm *vm_find(ffa_id_t id);
 struct vm_locked vm_find_locked(ffa_id_t id);

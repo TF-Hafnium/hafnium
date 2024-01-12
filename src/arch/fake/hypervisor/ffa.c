@@ -562,6 +562,14 @@ bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool)
 	return true;
 }
 
+bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool)
+{
+	(void)vm;
+	(void)ppool;
+
+	return true;
+}
+
 bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
 			      paddr_t end, uint32_t mode, struct mpool *ppool)
 {

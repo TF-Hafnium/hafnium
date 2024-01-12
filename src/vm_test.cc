@@ -75,7 +75,7 @@ TEST_F(vm, vm_unmap_hypervisor_not_mapped)
 	struct vm_locked vm_locked;
 
 	/* TODO: check ptable usage (security state?) */
-	EXPECT_TRUE(vm_init_next(1, &ppool, &vm, false));
+	EXPECT_TRUE(vm_init_next(1, &ppool, &vm, false, 0));
 	vm_locked = vm_lock(vm);
 	ASSERT_TRUE(mm_vm_init(&vm->ptable, vm->id, &ppool));
 	EXPECT_TRUE(vm_unmap_hypervisor(vm_locked, &ppool));
@@ -102,7 +102,7 @@ TEST_F(vm, vm_boot_order)
 	 * Insertion when no call to "vcpu_update_boot" has been made yet.
 	 * The "boot_list" is expected to be empty.
 	 */
-	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
+	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false, 0));
 	vm_cur->boot_order = 3;
 	vcpu = vm_get_vcpu(vm_cur, 0);
 	vcpu_update_boot(vcpu);
@@ -111,7 +111,7 @@ TEST_F(vm, vm_boot_order)
 	EXPECT_EQ(vcpu_get_boot_vcpu()->vm->id, vm_cur->id);
 
 	/* Insertion at the head of the boot list */
-	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
+	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false, 0));
 	vm_cur->boot_order = 1;
 	vcpu = vm_get_vcpu(vm_cur, 0);
 	vcpu_update_boot(vcpu);
@@ -121,7 +121,7 @@ TEST_F(vm, vm_boot_order)
 
 	/* Insertion of two in the middle of the boot list */
 	for (uint32_t i = 0; i < 2; i++) {
-		EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false));
+		EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false, 0));
 		vm_cur->boot_order = 2;
 		vcpu = vm_get_vcpu(vm_cur, 0);
 		vcpu_update_boot(vcpu);
@@ -514,7 +514,7 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus)
 	uint32_t lists_count = 0;
 	enum notifications_info_get_state current_state = INIT;
 
-	EXPECT_TRUE(vm_init_next(vcpu_count, &ppool, &current_vm, false));
+	EXPECT_TRUE(vm_init_next(vcpu_count, &ppool, &current_vm, false, 0));
 	current_vm_locked = vm_lock(current_vm);
 	notifications = &current_vm->notifications.from_sp;
 

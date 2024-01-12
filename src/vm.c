@@ -42,11 +42,12 @@ static struct {
 
 static bool vm_init_mm(struct vm *vm, struct mpool *ppool)
 {
-	return arch_vm_init_mm(vm, ppool);
+	return arch_vm_init_mm(vm, ppool) && arch_vm_iommu_init_mm(vm, ppool);
 }
 
 struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
-		   struct mpool *ppool, bool el0_partition)
+		   struct mpool *ppool, bool el0_partition,
+		   uint8_t dma_device_count)
 {
 	uint32_t i;
 	struct vm *vm;
@@ -81,6 +82,7 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 	vm->mailbox.state = MAILBOX_STATE_EMPTY;
 	atomic_init(&vm->aborting, false);
 	vm->el0_partition = el0_partition;
+	vm->dma_device_count = dma_device_count;
 
 	if (!vm_init_mm(vm, ppool)) {
 		return NULL;
@@ -103,7 +105,8 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 }
 
 bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
-		  struct vm **new_vm, bool el0_partition)
+		  struct vm **new_vm, bool el0_partition,
+		  uint8_t dma_device_count)
 {
 	if (vm_count >= MAX_VMS) {
 		return false;
@@ -111,7 +114,7 @@ bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
 
 	/* Generate IDs based on an offset, as low IDs e.g., 0, are reserved */
 	*new_vm = vm_init(vm_count + HF_VM_ID_OFFSET, vcpu_count, ppool,
-			  el0_partition);
+			  el0_partition, dma_device_count);
 	if (*new_vm == NULL) {
 		return false;
 	}

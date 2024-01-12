@@ -322,7 +322,8 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		}
 	}
 
-	if (!vm_init_next(MAX_CPUS, ppool, &vm, false)) {
+	if (!vm_init_next(MAX_CPUS, ppool, &vm, false,
+			  manifest_vm->partition.dma_device_count)) {
 		dlog_error("Unable to initialise primary VM.\n");
 		return false;
 	}
@@ -706,7 +707,8 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	CHECK(!is_el0_partition || manifest_vm->secondary.vcpu_count == 1);
 
 	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm,
-			  is_el0_partition)) {
+			  is_el0_partition,
+			  manifest_vm->partition.dma_device_count)) {
 		dlog_error("Unable to initialise VM.\n");
 		return false;
 	}
@@ -913,7 +915,7 @@ static bool init_other_world_vm(const struct boot_params *params,
 	 * -TrustZone (or the SPMC) when running the Hypervisor
 	 * -the Hypervisor when running TZ/SPMC
 	 */
-	other_world_vm = vm_init(HF_OTHER_WORLD_ID, MAX_CPUS, ppool, false);
+	other_world_vm = vm_init(HF_OTHER_WORLD_ID, MAX_CPUS, ppool, false, 0);
 	CHECK(other_world_vm != NULL);
 
 	for (i = 0; i < MAX_CPUS; i++) {
