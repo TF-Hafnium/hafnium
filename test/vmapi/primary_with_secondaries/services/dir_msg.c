@@ -616,3 +616,40 @@ TEST_SERVICE(ffa_direct_msg_req_resp2_failure)
 
 	FAIL("Direct response not expected to return");
 }
+
+/**
+ * Put SP in waiting state via FFA_MSG_SEND_DIRECT_RESP.
+ * Make sure extended registers are preserved when SP is brought
+ * into running state with receipt of FFA_MSG_SEND_DIRECT_REQ2.
+ *
+ * Run twice to cover the reverse scenario (SP waits with
+ * FFA_MSG_SEND_DIRECT_RESP2 and wakes up with receipt of
+ * FFA_MSG_SEND_DIRECT_REQ).
+ */
+TEST_SERVICE(ffa_direct_msg_resp_ext_registers_preserved)
+{
+	struct ffa_value args = ffa_msg_wait();
+	uint64_t msg[MAX_RESP_REGS];
+
+	for (uint32_t i = 0; i < 2; i++) {
+		EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
+
+		args = ffa_msg_send_direct_resp(
+			ffa_receiver(args), ffa_sender(args), args.arg3,
+			args.arg4, args.arg5, args.arg6, args.arg7);
+
+		/*
+		 * Wake up from waiting state with receipt of
+		 * FFA_MSG_SEND_DIRECT_REQ2.
+		 */
+		EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ2_64);
+		memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &args.arg4,
+			 MAX_RESP_REGS * sizeof(uint64_t));
+
+		args = ffa_msg_send_direct_resp2(
+			ffa_receiver(args), ffa_sender(args),
+			(const uint64_t *)msg, MAX_RESP_REGS);
+	}
+
+	FAIL("Direct response not expected to return");
+}

@@ -769,3 +769,72 @@ TEST(direct_message, ffa_direct_msg_check_abi_pairs_nwd_to_sp)
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 }
+
+/**
+ * Ensure that an SP that enters the waiting state with FFA_MSG_SEND_DIRECT_RESP
+ * can preserve extended registers when resumed by FFA_MSG_SEND_DIRECT_REQ2.
+ *
+ * Run twice to cover the reverse scenario - SP enters waiting state with
+ * FFA_MSG_SEND_DIRECT_RESP2 and is resumed by FFA_MSG_SEND_DIRECT_REQ.
+ */
+TEST(direct_message, ffa_direct_message_req2_after_req)
+{
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999, 0x01010101, 0x23232323, 0x45454545,
+				0x67676767, 0x89898989, 0x11001100, 0x22332233,
+				0x44554455, 0x66776677};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_uuid uuid1 = SERVICE1;
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_direct_msg_resp_ext_registers_preserved", mb.send);
+	ffa_run(service1_info->vm_id, 0);
+
+	for (uint32_t i = 0; i < 2; i++) {
+		/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ. */
+		res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID,
+					      service1_info->vm_id, msg[0],
+					      msg[1], msg[2], msg[3], msg[4]);
+
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+		EXPECT_EQ(res.arg3, msg[0]);
+		EXPECT_EQ(res.arg4, msg[1]);
+		EXPECT_EQ(res.arg5, msg[2]);
+		EXPECT_EQ(res.arg6, msg[3]);
+		EXPECT_EQ(res.arg7, msg[4]);
+		EXPECT_EQ(res.extended_val.arg8, 0);
+		EXPECT_EQ(res.extended_val.arg9, 0);
+		EXPECT_EQ(res.extended_val.arg10, 0);
+		EXPECT_EQ(res.extended_val.arg11, 0);
+		EXPECT_EQ(res.extended_val.arg12, 0);
+		EXPECT_EQ(res.extended_val.arg13, 0);
+		EXPECT_EQ(res.extended_val.arg14, 0);
+		EXPECT_EQ(res.extended_val.arg15, 0);
+		EXPECT_EQ(res.extended_val.arg16, 0);
+		EXPECT_EQ(res.extended_val.arg17, 0);
+
+		/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ2. */
+		res = ffa_msg_send_direct_req2(
+			HF_PRIMARY_VM_ID, service1_info->vm_id, &uuid1,
+			(const uint64_t *)&msg, ARRAY_SIZE(msg));
+
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
+		EXPECT_EQ(res.arg4, msg[0]);
+		EXPECT_EQ(res.arg5, msg[1]);
+		EXPECT_EQ(res.arg6, msg[2]);
+		EXPECT_EQ(res.arg7, msg[3]);
+		EXPECT_EQ(res.extended_val.arg8, msg[4]);
+		EXPECT_EQ(res.extended_val.arg9, msg[5]);
+		EXPECT_EQ(res.extended_val.arg10, msg[6]);
+		EXPECT_EQ(res.extended_val.arg11, msg[7]);
+		EXPECT_EQ(res.extended_val.arg12, msg[8]);
+		EXPECT_EQ(res.extended_val.arg13, msg[9]);
+		EXPECT_EQ(res.extended_val.arg14, msg[10]);
+		EXPECT_EQ(res.extended_val.arg15, msg[11]);
+		EXPECT_EQ(res.extended_val.arg16, msg[12]);
+		EXPECT_EQ(res.extended_val.arg17, msg[13]);
+	}
+}
