@@ -2864,9 +2864,20 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 	struct two_vcpu_locked vcpus_locked;
 	bool received_req2;
 
-	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64 &&
-	    !api_ffa_dir_msg_is_arg2_zero(args)) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
+	/*
+	 * If using FFA_MSG_SEND_DIRECT_RESP, the caller's
+	 *  - x2 MBZ for partition messages
+	 *  - x8-x17 SBZ if caller's FF-A version >= FF-A v1.2
+	 */
+	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64) {
+		if (!api_ffa_dir_msg_is_arg2_zero(args)) {
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+
+		if (current->vm->ffa_version >= MAKE_FFA_VERSION(1, 2) &&
+		    !api_extended_args_are_zero(&args)) {
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
 	}
 
 	if (!plat_ffa_is_direct_response_valid(current, sender_vm_id,

@@ -546,7 +546,7 @@ static inline struct ffa_value ffa_msg_send_direct_resp(
 	ffa_id_t sender_vm_id, ffa_id_t target_vm_id, uint32_t arg3,
 	uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7)
 {
-	return ffa_call((struct ffa_value){
+	return ffa_call_ext((struct ffa_value){
 		.func = FFA_MSG_SEND_DIRECT_RESP_32,
 		.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id,
 		.arg3 = arg3,
