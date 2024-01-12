@@ -28,9 +28,6 @@
 
 static bool ffa_tee_enabled;
 
-alignas(FFA_PAGE_SIZE) static uint8_t other_world_send_buffer[HF_MAILBOX_SIZE];
-alignas(FFA_PAGE_SIZE) static uint8_t other_world_recv_buffer[HF_MAILBOX_SIZE];
-
 bool vm_supports_indirect_messages(struct vm *vm)
 {
 	return vm->ffa_version >= MAKE_FFA_VERSION(1, 1) &&
@@ -93,6 +90,18 @@ void plat_ffa_init(struct mpool *ppool)
 {
 	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
 	struct ffa_value ret;
+	struct mm_stage1_locked mm_stage1_locked;
+
+	/* This is a segment from TDRAM for the NS memory in the FVP platform.
+	 *
+	 * TODO: We ought to provide a better way to do this, if porting the
+	 * hypervisor to other platforms. One option would be to provide this
+	 * via DTS.
+	 */
+	const uint64_t start = 0x90000000;
+	const uint64_t len = 0x60000000;
+	const paddr_t send_addr = pa_init(start + len - PAGE_SIZE * 1);
+	const paddr_t recv_addr = pa_init(start + len - PAGE_SIZE * 2);
 
 	(void)ppool;
 
@@ -115,9 +124,19 @@ void plat_ffa_init(struct mpool *ppool)
 		panic("Hypervisor and SPMC versions are not compatible.\n");
 	}
 
-	/* Setup TEE VM RX/TX buffers */
-	other_world_vm->mailbox.send = &other_world_send_buffer;
-	other_world_vm->mailbox.recv = &other_world_recv_buffer;
+	/*
+	 * Setup TEE VM RX/TX buffers.
+	 * Using the following hard-coded addresses, as they must be within the
+	 * NS memory node in the SPMC manifest. From that region we should
+	 * exclude the Hypervisor's address space to prevent SPs from using that
+	 * memory in memory region nodes, or for the NWd to misuse that memory
+	 * in runtime via memory sharing interfaces.
+	 */
+
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	other_world_vm->mailbox.send = (void *)pa_addr(send_addr);
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	other_world_vm->mailbox.recv = (void *)pa_addr(recv_addr);
 
 	/*
 	 * Note that send and recv are swapped around, as the send buffer from
@@ -131,6 +150,22 @@ void plat_ffa_init(struct mpool *ppool)
 		HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
 
 	ffa_tee_enabled = true;
+
+	/*
+	 * Hypervisor will write to secure world receive buffer, and will read
+	 * from the secure world send buffer.
+	 *
+	 * Mapping operation is necessary because the ranges are outside of the
+	 * hypervisor's binary.
+	 */
+	mm_stage1_locked = mm_lock_stage1();
+	CHECK(mm_identity_map(mm_stage1_locked, send_addr,
+			      pa_add(send_addr, PAGE_SIZE),
+			      MM_MODE_R | MM_MODE_SHARED, ppool) != NULL);
+	CHECK(mm_identity_map(
+		      mm_stage1_locked, recv_addr, pa_add(recv_addr, PAGE_SIZE),
+		      MM_MODE_R | MM_MODE_W | MM_MODE_SHARED, ppool) != NULL);
+	mm_unlock_stage1(&mm_stage1_locked);
 
 	dlog_verbose("TEE finished setting up buffers.\n");
 }

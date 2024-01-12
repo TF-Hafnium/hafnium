@@ -1496,35 +1496,38 @@ static bool api_mode_valid_owned_and_exclusive(uint32_t mode)
 /**
  * Configures the hypervisor's stage-1 view of the send and receive pages.
  */
-static bool api_vm_configure_stage1(struct mm_stage1_locked mm_stage1_locked,
-				    struct vm_locked vm_locked,
-				    paddr_t pa_send_begin, paddr_t pa_send_end,
-				    paddr_t pa_recv_begin, paddr_t pa_recv_end,
-				    uint32_t extra_attributes,
-				    struct mpool *local_page_pool)
+static struct ffa_value api_vm_configure_stage1(
+	struct mm_stage1_locked mm_stage1_locked, struct vm_locked vm_locked,
+	paddr_t pa_send_begin, paddr_t pa_send_end, paddr_t pa_recv_begin,
+	paddr_t pa_recv_end, uint32_t extra_attributes,
+	struct mpool *local_page_pool)
 {
-	bool ret;
+	struct ffa_value ret;
 
-	/* Map the send page as read-only in the hypervisor address space. */
+	/*
+	 * Map the send page as read-only in the SPMC/hypervisor address space.
+	 */
 	vm_locked.vm->mailbox.send =
 		mm_identity_map(mm_stage1_locked, pa_send_begin, pa_send_end,
 				MM_MODE_R | extra_attributes, local_page_pool);
 	if (!vm_locked.vm->mailbox.send) {
-		goto fail;
+		ret = ffa_error(FFA_NO_MEMORY);
+		goto out;
 	}
 
 	/*
-	 * Map the receive page as writable in the hypervisor address space. On
-	 * failure, unmap the send page before returning.
+	 * Map the receive page as writable in the SPMC/hypervisor address
+	 * space. On failure, unmap the send page before returning.
 	 */
 	vm_locked.vm->mailbox.recv =
 		mm_identity_map(mm_stage1_locked, pa_recv_begin, pa_recv_end,
 				MM_MODE_W | extra_attributes, local_page_pool);
 	if (!vm_locked.vm->mailbox.recv) {
+		ret = ffa_error(FFA_NO_MEMORY);
 		goto fail_undo_send;
 	}
 
-	ret = true;
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 	goto out;
 
 	/*
@@ -1535,9 +1538,6 @@ fail_undo_send:
 	vm_locked.vm->mailbox.send = NULL;
 	CHECK(mm_unmap(mm_stage1_locked, pa_send_begin, pa_send_end,
 		       local_page_pool));
-
-fail:
-	ret = false;
 
 out:
 	return ret;
@@ -1572,12 +1572,16 @@ struct ffa_value api_vm_configure_pages(
 
 	/* We only allow these to be setup once. */
 	if (vm_locked.vm->mailbox.send || vm_locked.vm->mailbox.recv) {
+		dlog_error("%s: Mailboxes have already been setup for VM %#x\n",
+			   __func__, vm_locked.vm->id);
 		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
 
 	/* Hafnium only supports a fixed size of RX/TX buffers. */
 	if (page_count != HF_MAILBOX_SIZE / FFA_PAGE_SIZE) {
+		dlog_error("%s: Page count must be %d, it is %d\n", __func__,
+			   HF_MAILBOX_SIZE / FFA_PAGE_SIZE, page_count);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -1585,6 +1589,7 @@ struct ffa_value api_vm_configure_pages(
 	/* Fail if addresses are not page-aligned. */
 	if (!is_aligned(ipa_addr(send), PAGE_SIZE) ||
 	    !is_aligned(ipa_addr(recv), PAGE_SIZE)) {
+		dlog_error("%s: Mailbox buffers not page-aligned\n", __func__);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -1597,6 +1602,7 @@ struct ffa_value api_vm_configure_pages(
 
 	/* Fail if the same page is used for the send and receive pages. */
 	if (pa_addr(pa_send_begin) == pa_addr(pa_recv_begin)) {
+		dlog_error("%s: Mailbox buffers overlap\n", __func__);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -1655,8 +1661,17 @@ struct ffa_value api_vm_configure_pages(
 				     mode, local_page_pool, NULL)) {
 			/* TODO: partial defrag of failed range. */
 			/* Recover any memory consumed in failed mapping. */
+			dlog_error("%s: cannot map recv page\n", __func__);
 			vm_ptable_defrag(vm_locked, local_page_pool);
+			ret = ffa_error(FFA_NO_MEMORY);
 			goto fail_undo_send;
+		}
+	} else {
+		ret = arch_other_world_vm_configure_rxtx_map(
+			vm_locked, local_page_pool, pa_send_begin, pa_send_end,
+			pa_recv_begin, pa_recv_end);
+		if (ret.func != FFA_SUCCESS_32) {
+			goto out;
 		}
 	}
 
@@ -1678,9 +1693,10 @@ struct ffa_value api_vm_configure_pages(
 		extra_attributes |= MM_MODE_NG;
 	}
 
-	if (!api_vm_configure_stage1(mm_stage1_locked, vm_locked, pa_send_begin,
-				     pa_send_end, pa_recv_begin, pa_recv_end,
-				     extra_attributes, local_page_pool)) {
+	ret = api_vm_configure_stage1(
+		mm_stage1_locked, vm_locked, pa_send_begin, pa_send_end,
+		pa_recv_begin, pa_recv_end, extra_attributes, local_page_pool);
+	if (ret.func != FFA_SUCCESS_32) {
 		goto fail_undo_send_and_recv;
 	}
 
@@ -1694,7 +1710,6 @@ fail_undo_send_and_recv:
 fail_undo_send:
 	CHECK(vm_identity_map(vm_locked, pa_send_begin, pa_send_end,
 			      orig_send_mode, local_page_pool, NULL));
-	ret = ffa_error(FFA_NO_MEMORY);
 
 out:
 	return ret;
@@ -1908,6 +1923,13 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 		CHECK(vm_identity_map(vm_locked, recv_pa_begin, recv_pa_end,
 				      MM_MODE_R | MM_MODE_W | MM_MODE_X,
 				      &api_page_pool, NULL));
+	} else {
+		ret = arch_other_world_vm_configure_rxtx_unmap(
+			vm_locked, &api_page_pool, send_pa_begin, send_pa_end,
+			recv_pa_begin, recv_pa_end);
+		if (ret.func != FFA_SUCCESS_32) {
+			goto out;
+		}
 	}
 
 	/* Unmap the buffers in the partition manager. */
