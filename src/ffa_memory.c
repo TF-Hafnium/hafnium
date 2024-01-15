@@ -2898,10 +2898,6 @@ static struct ffa_value ffa_partition_retrieve_request(
 		share_state->retrieved_fragment_count[receiver_index] ==
 		share_state->fragment_count;
 
-	share_state->clear_after_relinquish =
-		(retrieve_request->flags &
-		 FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH) != 0U;
-
 	/* VMs acquire the RX buffer from SPMC. */
 	CHECK(plat_ffa_acquire_receiver_rx(to_locked, &ret));
 
@@ -3390,9 +3386,8 @@ struct ffa_value ffa_memory_relinquish(
 	}
 
 	clear = receivers_relinquished_memory &&
-		(share_state->clear_after_relinquish ||
-		 (relinquish_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) !=
-			 0U);
+		((relinquish_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) !=
+		 0U);
 
 	/*
 	 * Clear is not allowed for memory that was shared, as the

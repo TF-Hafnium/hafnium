@@ -147,7 +147,26 @@ TEST_SERVICE(memory_increment_relinquish)
 	}
 }
 
-TEST_SERVICE(memory_increment_relinquish_check_not_zeroed)
+TEST_SERVICE(memory_increment_relinquish_with_clear)
+{
+	/* Loop, writing message to the shared memory. */
+	for (;;) {
+		ffa_memory_handle_t handle;
+
+		memory_increment(&handle, false);
+
+		/* Give the memory back and notify the sender. */
+		ffa_mem_relinquish_init(SERVICE_SEND_BUFFER(), handle,
+					FFA_MEMORY_REGION_FLAG_CLEAR,
+					hf_vm_get_id());
+		EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
+
+		/* Signal completion and reset. */
+		ffa_yield();
+	}
+}
+
+TEST_SERVICE(memory_increment_relinquish_with_clear_check_not_zeroed)
 {
 	/* Loop, writing message to the shared memory. */
 	for (;;) {
@@ -156,7 +175,8 @@ TEST_SERVICE(memory_increment_relinquish_check_not_zeroed)
 		memory_increment(&handle, true);
 
 		/* Give the memory back and notify the sender. */
-		ffa_mem_relinquish_init(SERVICE_SEND_BUFFER(), handle, 0,
+		ffa_mem_relinquish_init(SERVICE_SEND_BUFFER(), handle,
+					FFA_MEMORY_REGION_FLAG_CLEAR,
 					hf_vm_get_id());
 		EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
 
