@@ -2580,8 +2580,8 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
  * the memory region descriptor of the retrieve request must be zeroed with the
  * exception of the sender ID and handle.
  */
-bool is_ffa_memory_retrieve_borrower_request(struct ffa_memory_region *request,
-					     struct vm_locked to_locked)
+bool is_ffa_hypervisor_retrieve_request(struct ffa_memory_region *request,
+					struct vm_locked to_locked)
 {
 	return to_locked.vm->id == HF_HYPERVISOR_VM_ID &&
 	       request->attributes == 0U && request->flags == 0U &&
@@ -2603,12 +2603,24 @@ static void ffa_memory_retrieve_complete_from_hyp(
 }
 
 /**
+ * Prepares the return of the ffa_value for the memory retrieve response.
+ */
+static struct ffa_value ffa_memory_retrieve_resp(uint32_t total_length,
+						 uint32_t fragment_length)
+{
+	return (struct ffa_value){.func = FFA_MEM_RETRIEVE_RESP_32,
+				  .arg1 = total_length,
+				  .arg2 = fragment_length};
+}
+
+/**
  * Validate that the memory region descriptor provided by the borrower on
  * FFA_MEM_RETRIEVE_REQ, against saved memory region provided by lender at the
  * memory sharing call.
  */
 static struct ffa_value ffa_memory_retrieve_validate(
-	ffa_id_t receiver_id, struct ffa_memory_region *retrieve_request,
+	ffa_id_t to_id, struct ffa_memory_region *retrieve_request,
+	uint32_t retrieve_request_length,
 	struct ffa_memory_region *memory_region, uint32_t *receiver_index,
 	uint32_t share_func)
 {
@@ -2616,12 +2628,71 @@ static struct ffa_value ffa_memory_retrieve_validate(
 		retrieve_request->flags &
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK;
 	enum ffa_memory_security security_state;
+	const uint64_t memory_access_desc_size =
+		retrieve_request->memory_access_desc_size;
+	const uint32_t expected_retrieve_request_length =
+		retrieve_request->receivers_offset +
+		(uint32_t)(retrieve_request->receiver_count *
+			   memory_access_desc_size);
 
 	assert(retrieve_request != NULL);
 	assert(memory_region != NULL);
 	assert(receiver_index != NULL);
 	assert(retrieve_request->sender == memory_region->sender);
 
+	if (retrieve_request_length != expected_retrieve_request_length) {
+		dlog_verbose(
+			"Invalid length for FFA_MEM_RETRIEVE_REQ, expected %d "
+			"but was %d.\n",
+			expected_retrieve_request_length,
+			retrieve_request_length);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (retrieve_request->sender != memory_region->sender) {
+		dlog_verbose(
+			"Memory with handle %#x not fully sent, can't "
+			"retrieve.\n",
+			memory_region->handle);
+		return ffa_error(FFA_DENIED);
+	}
+
+	/*
+	 * The SPMC can only process retrieve requests to memory share
+	 * operations with one borrower from the other world. It can't
+	 * determine the ID of the NWd VM that invoked the retrieve
+	 * request interface call. It relies on the hypervisor to
+	 * validate the caller's ID against that provided in the
+	 * `receivers` list of the retrieve response.
+	 * In case there is only one borrower from the NWd in the
+	 * transaction descriptor, record that in the `receiver_id` for
+	 * later use, and validate in the retrieve request message.
+	 * This limitation is due to the fact SPMC can't determine the
+	 * index in the memory share structures state to update.
+	 */
+	if (to_id == HF_HYPERVISOR_VM_ID) {
+		uint32_t other_world_count = 0;
+
+		for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
+			struct ffa_memory_access *receiver =
+				ffa_memory_region_get_receiver(retrieve_request,
+							       0);
+			assert(receiver != NULL);
+
+			to_id = receiver->receiver_permissions.receiver;
+
+			if (!vm_id_is_current_world(to_id)) {
+				other_world_count++;
+			}
+		}
+
+		if (other_world_count > 1) {
+			dlog_verbose(
+				"Support one receiver from the other "
+				"world.\n");
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+	}
 	/*
 	 * Check that the transaction type expected by the receiver is
 	 * correct, if it has been specified.
@@ -2649,14 +2720,14 @@ static struct ffa_value ffa_memory_retrieve_validate(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	*receiver_index = ffa_memory_region_get_receiver_index(memory_region,
-							       receiver_id);
+	*receiver_index =
+		ffa_memory_region_get_receiver_index(memory_region, to_id);
 
 	if (*receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
 			"Incorrect receiver VM ID %d for "
 			"FFA_MEM_RETRIEVE_REQ, for handle %#x.\n",
-			receiver_id, memory_region->handle);
+			to_id, memory_region->handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2733,186 +2804,93 @@ static struct ffa_value ffa_memory_retrieve_validate(
 	return ffa_memory_attributes_validate(retrieve_request->attributes);
 }
 
-struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
-				     struct ffa_memory_region *retrieve_request,
-				     uint32_t retrieve_request_length,
-				     struct mpool *page_pool)
+static struct ffa_value ffa_partition_retrieve_request(
+	struct share_states_locked share_states,
+	struct ffa_memory_share_state *share_state, struct vm_locked to_locked,
+	struct ffa_memory_region *retrieve_request,
+	uint32_t retrieve_request_length, struct mpool *page_pool)
 {
-	uint32_t expected_retrieve_request_length =
-		retrieve_request->receivers_offset +
-		(uint32_t)(retrieve_request->receiver_count *
-			   retrieve_request->memory_access_desc_size);
-	ffa_memory_handle_t handle = retrieve_request->handle;
-	struct ffa_memory_region *memory_region;
 	ffa_memory_access_permissions_t permissions = 0;
 	uint32_t memory_to_mode;
-	struct share_states_locked share_states;
-	struct ffa_memory_share_state *share_state;
 	struct ffa_value ret;
 	struct ffa_composite_memory_region *composite;
 	uint32_t total_length;
 	uint32_t fragment_length;
 	ffa_id_t receiver_id = to_locked.vm->id;
-	bool is_send_complete = false;
+	bool is_retrieve_complete = false;
 	ffa_memory_attributes_t attributes;
 	struct ffa_memory_access_impdef receiver_impdef_val;
-	uint64_t retrieve_memory_access_desc_size =
+	const uint64_t memory_access_desc_size =
 		retrieve_request->memory_access_desc_size;
+	uint32_t receiver_index;
 
-	dump_share_states();
+	ffa_memory_handle_t handle = retrieve_request->handle;
 
-	if (retrieve_request_length != expected_retrieve_request_length) {
-		dlog_verbose(
-			"Invalid length for FFA_MEM_RETRIEVE_REQ, expected %d "
-			"but was %d.\n",
-			expected_retrieve_request_length,
-			retrieve_request_length);
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	share_states = share_states_lock();
-	share_state = get_share_state(share_states, handle);
-	if (share_state == NULL) {
-		dlog_verbose("Invalid handle %#x for FFA_MEM_RETRIEVE_REQ.\n",
-			     handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
+	struct ffa_memory_region *memory_region = share_state->memory_region;
 
 	if (!share_state->sending_complete) {
 		dlog_verbose(
 			"Memory with handle %#x not fully sent, can't "
 			"retrieve.\n",
 			handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	memory_region = share_state->memory_region;
+	/*
+	 * Validate retrieve request, according to what was sent by the
+	 * sender. Function will output the `receiver_index` from the
+	 * provided memory region.
+	 */
+	ret = ffa_memory_retrieve_validate(
+		receiver_id, retrieve_request, retrieve_request_length,
+		memory_region, &receiver_index, share_state->share_func);
 
-	CHECK(memory_region != NULL);
-
-	if (retrieve_request->sender != memory_region->sender) {
-		dlog_verbose(
-			"Memory with handle %#x not fully sent, can't "
-			"retrieve.\n",
-			handle);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
+	if (ret.func != FFA_SUCCESS_32) {
+		return ret;
 	}
 
-	if (!is_ffa_memory_retrieve_borrower_request(retrieve_request,
-						     to_locked)) {
-		uint32_t receiver_index;
-
-		/*
-		 * The SPMC can only process retrieve requests to memory share
-		 * operations with one borrower from the other world. It can't
-		 * determine the ID of the NWd VM that invoked the retrieve
-		 * request interface call. It relies on the hypervisor to
-		 * validate the caller's ID against that provided in the
-		 * `receivers` list of the retrieve response.
-		 * In case there is only one borrower from the NWd in the
-		 * transaction descriptor, record that in the `receiver_id` for
-		 * later use, and validate in the retrieve request message.
-		 * This limitation is due to the fact SPMC can't determine the
-		 * index in the memory share structures state to update.
-		 */
-		if (to_locked.vm->id == HF_HYPERVISOR_VM_ID) {
-			uint32_t other_world_count = 0;
-
-			for (uint32_t i = 0; i < memory_region->receiver_count;
-			     i++) {
-				struct ffa_memory_access *receiver =
-					ffa_memory_region_get_receiver(
-						retrieve_request, 0);
-
-				assert(receiver != NULL);
-				receiver_id =
-					receiver->receiver_permissions.receiver;
-				if (!vm_id_is_current_world(receiver_id)) {
-					other_world_count++;
-				}
-			}
-			if (other_world_count > 1) {
-				dlog_verbose(
-					"Support one receiver from the other "
-					"world.\n");
-				return ffa_error(FFA_NOT_SUPPORTED);
-			}
-		}
-
-		/*
-		 * Validate retrieve request, according to what was sent by the
-		 * sender. Function will output the `receiver_index` from the
-		 * provided memory region.
-		 */
-		ret = ffa_memory_retrieve_validate(
-			receiver_id, retrieve_request, memory_region,
-			&receiver_index, share_state->share_func);
-		if (ret.func != FFA_SUCCESS_32) {
-			goto out;
-		}
-
-		if (share_state->retrieved_fragment_count[receiver_index] !=
-		    0U) {
-			dlog_verbose(
-				"Memory with handle %#x already retrieved.\n",
-				handle);
-			ret = ffa_error(FFA_DENIED);
-			goto out;
-		}
-
-		/*
-		 * Validate the requested permissions against the sent
-		 * permissions.
-		 * Outputs the permissions to give to retriever at S2
-		 * PTs.
-		 */
-		ret = ffa_memory_retrieve_validate_memory_access_list(
-			memory_region, retrieve_request, receiver_id,
-			&permissions, share_state->share_func,
-			&receiver_impdef_val);
-		if (ret.func != FFA_SUCCESS_32) {
-			goto out;
-		}
-
-		memory_to_mode = ffa_memory_permissions_to_mode(
-			permissions, share_state->sender_orig_mode);
-
-		ret = ffa_retrieve_check_update(
-			to_locked, share_state->fragments,
-			share_state->fragment_constituent_counts,
-			share_state->fragment_count, memory_to_mode,
-			share_state->share_func, false, page_pool);
-
-		if (ret.func != FFA_SUCCESS_32) {
-			goto out;
-		}
-
-		share_state->retrieved_fragment_count[receiver_index] = 1;
-		is_send_complete =
-			share_state->retrieved_fragment_count[receiver_index] ==
-			share_state->fragment_count;
-
-		share_state->clear_after_relinquish =
-			(retrieve_request->flags &
-			 FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH) != 0U;
-
-	} else {
-		if (share_state->hypervisor_fragment_count != 0U) {
-			dlog_verbose(
-				"Memory with handle %#x already retrieved by "
-				"the hypervisor.\n",
-				handle);
-			ret = ffa_error(FFA_DENIED);
-			goto out;
-		}
-
-		share_state->hypervisor_fragment_count = 1;
-
-		ffa_memory_retrieve_complete_from_hyp(share_state);
+	if (share_state->retrieved_fragment_count[receiver_index] != 0U) {
+		dlog_verbose("Memory with handle %#x already retrieved.\n",
+			     handle);
+		return ffa_error(FFA_DENIED);
 	}
+
+	/*
+	 * Validate the requested permissions against the sent
+	 * permissions.
+	 * Outputs the permissions to give to retriever at S2
+	 * PTs.
+	 */
+	ret = ffa_memory_retrieve_validate_memory_access_list(
+		memory_region, retrieve_request, receiver_id, &permissions,
+		share_state->share_func, &receiver_impdef_val);
+
+	if (ret.func != FFA_SUCCESS_32) {
+		return ret;
+	}
+
+	memory_to_mode = ffa_memory_permissions_to_mode(
+		permissions, share_state->sender_orig_mode);
+
+	ret = ffa_retrieve_check_update(
+		to_locked, share_state->fragments,
+		share_state->fragment_constituent_counts,
+		share_state->fragment_count, memory_to_mode,
+		share_state->share_func, false, page_pool);
+
+	if (ret.func != FFA_SUCCESS_32) {
+		return ret;
+	}
+
+	share_state->retrieved_fragment_count[receiver_index] = 1;
+
+	is_retrieve_complete =
+		share_state->retrieved_fragment_count[receiver_index] ==
+		share_state->fragment_count;
+
+	share_state->clear_after_relinquish =
+		(retrieve_request->flags &
+		 FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH) != 0U;
 
 	/* VMs acquire the RX buffer from SPMC. */
 	CHECK(plat_ffa_acquire_receiver_rx(to_locked, &ret));
@@ -2923,6 +2901,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	 */
 	/* TODO: combine attributes from sender and request. */
 	composite = ffa_memory_region_get_composite(memory_region, 0);
+
 	/*
 	 * Constituents which we received in the first fragment should
 	 * always fit in the first fragment we are sending, because the
@@ -2942,24 +2921,124 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 		to_locked.vm->mailbox.recv, to_locked.vm->ffa_version,
 		HF_MAILBOX_SIZE, memory_region->sender, attributes,
 		memory_region->flags, handle, receiver_id,
-		retrieve_memory_access_desc_size, permissions,
-		receiver_impdef_val, composite->page_count,
-		composite->constituent_count, share_state->fragments[0],
+		memory_access_desc_size, permissions, receiver_impdef_val,
+		composite->page_count, composite->constituent_count,
+		share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
 		&fragment_length));
 
-	to_locked.vm->mailbox.recv_size = fragment_length;
-	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
-	to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
-	to_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
-
-	if (is_send_complete) {
+	if (is_retrieve_complete) {
 		ffa_memory_retrieve_complete(share_states, share_state,
 					     page_pool);
 	}
-	ret = (struct ffa_value){.func = FFA_MEM_RETRIEVE_RESP_32,
-				 .arg1 = total_length,
-				 .arg2 = fragment_length};
+
+	return ffa_memory_retrieve_resp(total_length, fragment_length);
+}
+
+static struct ffa_value ffa_hypervisor_retrieve_request(
+	struct ffa_memory_share_state *share_state, struct vm_locked to_locked,
+	struct ffa_memory_region *retrieve_request)
+{
+	struct ffa_value ret;
+	struct ffa_composite_memory_region *composite;
+	uint32_t total_length;
+	uint32_t fragment_length;
+	ffa_id_t receiver_id = to_locked.vm->id;
+	ffa_memory_attributes_t attributes;
+	uint64_t memory_access_desc_size = sizeof(struct ffa_memory_access);
+	struct ffa_memory_region *memory_region;
+
+	ffa_memory_handle_t handle = retrieve_request->handle;
+
+	/** TODO: include in the hypervisor retrieve response. */
+	struct ffa_memory_access_impdef receiver_impdef_val = {{0, 0}};
+
+	memory_region = share_state->memory_region;
+
+	if (share_state->hypervisor_fragment_count != 0U) {
+		dlog_verbose(
+			"Memory with handle %#x already retrieved by "
+			"the hypervisor.\n",
+			handle);
+		return ffa_error(FFA_DENIED);
+	}
+
+	share_state->hypervisor_fragment_count = 1;
+
+	ffa_memory_retrieve_complete_from_hyp(share_state);
+
+	/* VMs acquire the RX buffer from SPMC. */
+	CHECK(plat_ffa_acquire_receiver_rx(to_locked, &ret));
+
+	/*
+	 * Copy response to RX buffer of caller and deliver the message.
+	 * This must be done before the share_state is (possibly) freed.
+	 */
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+
+	/*
+	 * Constituents which we received in the first fragment should
+	 * always fit in the first fragment we are sending, because the
+	 * header is the same size in both cases and we have a fixed
+	 * message buffer size. So `ffa_retrieved_memory_region_init`
+	 * should never fail.
+	 */
+
+	/*
+	 * Set the security state in the memory retrieve response attributes
+	 * if specified by the target mode.
+	 */
+	attributes = plat_ffa_memory_security_mode(
+		memory_region->attributes, share_state->sender_orig_mode);
+	CHECK(ffa_retrieved_memory_region_init(
+		to_locked.vm->mailbox.recv, to_locked.vm->ffa_version,
+		HF_MAILBOX_SIZE, memory_region->sender, attributes,
+		memory_region->flags, handle, receiver_id,
+		memory_access_desc_size, 0, receiver_impdef_val,
+		composite->page_count, composite->constituent_count,
+		share_state->fragments[0],
+		share_state->fragment_constituent_counts[0], &total_length,
+		&fragment_length));
+
+	return ffa_memory_retrieve_resp(total_length, fragment_length);
+}
+
+struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
+				     struct ffa_memory_region *retrieve_request,
+				     uint32_t retrieve_request_length,
+				     struct mpool *page_pool)
+{
+	ffa_memory_handle_t handle = retrieve_request->handle;
+	struct share_states_locked share_states;
+	struct ffa_memory_share_state *share_state;
+	struct ffa_value ret;
+
+	dump_share_states();
+
+	share_states = share_states_lock();
+	share_state = get_share_state(share_states, handle);
+	if (share_state == NULL) {
+		dlog_verbose("Invalid handle %#x for FFA_MEM_RETRIEVE_REQ.\n",
+			     handle);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	if (is_ffa_hypervisor_retrieve_request(retrieve_request, to_locked)) {
+		ret = ffa_hypervisor_retrieve_request(share_state, to_locked,
+						      retrieve_request);
+	} else {
+		ret = ffa_partition_retrieve_request(
+			share_states, share_state, to_locked, retrieve_request,
+			retrieve_request_length, page_pool);
+	}
+
+	/* Track use of the RX buffer if the handling has succeeded. */
+	if (ret.func == FFA_MEM_RETRIEVE_RESP_32) {
+		to_locked.vm->mailbox.recv_func = FFA_MEM_RETRIEVE_RESP_32;
+		to_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
+	}
+
 out:
 	share_states_unlock(&share_states);
 	dump_share_states();
@@ -3142,8 +3221,11 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		goto out;
 	}
 
-	/* VMs acquire the RX buffer from SPMC. */
-	CHECK(plat_ffa_acquire_receiver_rx(to_locked, &ret));
+	/*
+	 * When hafnium is the hypervisor, acquire the RX buffer of a VM, that
+	 * is currently ownder by the SPMC.
+	 */
+	assert(plat_ffa_acquire_receiver_rx(to_locked, &ret));
 
 	remaining_constituent_count = ffa_memory_fragment_init(
 		to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
