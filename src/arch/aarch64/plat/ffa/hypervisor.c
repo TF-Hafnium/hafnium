@@ -1179,17 +1179,16 @@ void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 
 /** Forwards a memory send message on to the other world. */
 static struct ffa_value memory_send_other_world_forward(
-	struct vm_locked other_world_locked, ffa_id_t sender_vm_id,
-	uint32_t share_func, struct ffa_memory_region *memory_region,
-	uint32_t memory_share_length, uint32_t fragment_length)
+	struct vm_locked other_world_locked, uint32_t share_func,
+	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
+	uint32_t fragment_length)
 {
 	struct ffa_value ret;
 
 	/* Use its own RX buffer. */
 	memcpy_s(other_world_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
 		 memory_region, fragment_length);
-	other_world_locked.vm->mailbox.recv_size = fragment_length;
-	other_world_locked.vm->mailbox.recv_sender = sender_vm_id;
+
 	other_world_locked.vm->mailbox.recv_func = share_func;
 	other_world_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
 	ret = arch_other_world_call(
@@ -1250,8 +1249,8 @@ static struct ffa_value ffa_memory_other_world_send(
 
 		/* Forward memory send message on to other world. */
 		ret = memory_send_other_world_forward(
-			to_locked, from_locked.vm->id, share_func,
-			memory_region, memory_share_length, fragment_length);
+			to_locked, share_func, memory_region,
+			memory_share_length, fragment_length);
 		if (ret.func != FFA_SUCCESS_32) {
 			dlog_verbose(
 				"%s: failed to forward memory send message to "
@@ -1314,8 +1313,8 @@ static struct ffa_value ffa_memory_other_world_send(
 		 * have so far.
 		 */
 		ret = memory_send_other_world_forward(
-			to_locked, from_locked.vm->id, share_func,
-			memory_region, memory_share_length, fragment_length);
+			to_locked, share_func, memory_region,
+			memory_share_length, fragment_length);
 		if (ret.func != FFA_MEM_FRAG_RX_32) {
 			dlog_warning(
 				"%s: failed to forward to other world: "
@@ -1640,8 +1639,7 @@ static struct ffa_value memory_send_continue_other_world_forward(
 
 	memcpy_s(other_world_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
 		 fragment, fragment_length);
-	other_world_locked.vm->mailbox.recv_size = fragment_length;
-	other_world_locked.vm->mailbox.recv_sender = sender_vm_id;
+
 	other_world_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
 	other_world_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
 	ret = arch_other_world_call(

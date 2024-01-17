@@ -3263,8 +3263,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		share_state->fragment_constituent_counts[fragment_index],
 		&fragment_length);
 	CHECK(remaining_constituent_count == 0);
-	to_locked.vm->mailbox.recv_size = fragment_length;
-	to_locked.vm->mailbox.recv_sender = HF_HYPERVISOR_VM_ID;
+
 	to_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
 
