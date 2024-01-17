@@ -3435,20 +3435,22 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 		goto out;
 	}
 
-	if (!ffa_memory_region_sanity_check(retrieve_msg, ffa_version,
-					    fragment_length, false)) {
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
+	if (!is_ffa_hypervisor_retrieve_request(retrieve_msg, to_locked)) {
+		if (!ffa_memory_region_sanity_check(retrieve_msg, ffa_version,
+						    fragment_length, false)) {
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+		/*
+		 * If required, transform the retrieve request to FF-A v1.1.
+		 */
+		ret = api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
+			retrieve_msg, &fragment_length, &length, ffa_version,
+			false);
 
-	/*
-	 * If required, transform the retrieve request to FF-A v1.1.
-	 */
-	ret = api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
-		retrieve_msg, &fragment_length, &length, ffa_version, false);
-
-	if (ret.func != FFA_SUCCESS_32) {
-		goto out;
+		if (ret.func != FFA_SUCCESS_32) {
+			goto out;
+		}
 	}
 
 	retrieve_request = retrieve_msg;
