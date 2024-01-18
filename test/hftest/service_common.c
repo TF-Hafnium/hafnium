@@ -31,6 +31,23 @@ struct hftest_context *hftest_get_context(void)
 	return &global_context;
 }
 
+static bool uint32list_has_next(const struct memiter *list)
+{
+	return memiter_size(list) > 0;
+}
+
+static void uint32list_get_next(struct memiter *list, uint32_t *out)
+{
+	uint64_t num;
+
+	CHECK(uint32list_has_next(list));
+	if (!fdt_parse_number(list, sizeof(uint32_t), &num)) {
+		return;
+	}
+
+	*out = (uint32_t)num;
+}
+
 noreturn void abort(void)
 {
 	HFTEST_LOG("Service contained failures.");
@@ -83,6 +100,10 @@ static void hftest_parse_ffa_manifest(struct hftest_context *ctx,
 	struct fdt_node ffa_node;
 	struct string mem_region_node_name = STRING_INIT("memory-regions");
 	struct string dev_region_node_name = STRING_INIT("device-regions");
+	struct memiter uuid;
+	uint32_t uuid_word = 0;
+	uint16_t j = 0;
+	uint16_t i = 0;
 	uint64_t number;
 
 	CHECK(ctx != NULL);
@@ -93,6 +114,30 @@ static void hftest_parse_ffa_manifest(struct hftest_context *ctx,
 	ASSERT_TRUE(fdt_read_number(&root, "load-address",
 				    &ctx->partition_manifest.load_addr));
 	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &number));
+
+	EXPECT_TRUE(fdt_read_property(&root, "uuid", &uuid));
+
+	/* Parse UUIDs and populate uuid count.*/
+	while (uint32list_has_next(&uuid) && j < PARTITION_MAX_UUIDS) {
+		while (uint32list_has_next(&uuid) && i < 4) {
+			uint32list_get_next(&uuid, &uuid_word);
+			ctx->partition_manifest.uuids[j].uuid[i] = uuid_word;
+			i++;
+		}
+
+		EXPECT_FALSE(
+			ffa_uuid_is_null(&ctx->partition_manifest.uuids[j]));
+
+		dlog_verbose("  UUID %#x-%x-%x-%x\n",
+			     ctx->partition_manifest.uuids[j].uuid[0],
+			     ctx->partition_manifest.uuids[j].uuid[1],
+			     ctx->partition_manifest.uuids[j].uuid[2],
+			     ctx->partition_manifest.uuids[j].uuid[3]);
+		j++;
+		i = 0;
+	}
+
+	ctx->partition_manifest.uuid_count = j;
 
 	ffa_node = root;
 

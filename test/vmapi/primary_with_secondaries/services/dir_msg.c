@@ -17,6 +17,46 @@
 
 #define MAX_RESP_REGS (MAX_MSG_SIZE / sizeof(uint64_t))
 
+static uint16_t get_uuid_count(struct hftest_context *ctx)
+{
+	if (ctx->is_ffa_manifest_parsed) {
+		return ctx->partition_manifest.uuid_count;
+	}
+
+	return 0;
+}
+
+static struct ffa_uuid *get_uuids(struct hftest_context *ctx)
+{
+	if (ctx->is_ffa_manifest_parsed) {
+		return (struct ffa_uuid *)&ctx->partition_manifest.uuids;
+	}
+
+	return NULL;
+}
+
+static bool is_uuid_in_list(uint16_t uuid_count, struct ffa_uuid target_uuid,
+			    struct ffa_uuid *uuid_list)
+{
+	uint16_t i;
+
+	/* Allow for nil uuid usage. */
+	if (ffa_uuid_is_null(&target_uuid)) {
+		return true;
+	}
+
+	for (i = 0; i < uuid_count; i++) {
+		if (ffa_uuid_is_null(&target_uuid)) {
+			break;
+		}
+		if (ffa_uuid_equal(&uuid_list[i], &target_uuid)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 TEST_SERVICE(ffa_direct_message_resp_echo)
 {
 	struct ffa_value args = ffa_msg_wait();
@@ -686,4 +726,45 @@ TEST_SERVICE(version_does_not_support_req2)
 				       ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_DENIED);
 	ffa_yield();
+}
+
+/**
+ * Service traps execution in a loop, and expects to always wake up with a
+ * FFA_MSG_SEND_DIRECT_REQ2. Verify that target UUID was specified in the target
+ * partition's manifest before echoing message back to sender.
+ */
+TEST_SERVICE(ffa_direct_message_req2_resp_loop)
+{
+	struct hftest_context *ctx = hftest_get_context();
+	struct ffa_uuid *uuids = get_uuids(ctx);
+	uint16_t uuid_count = get_uuid_count(ctx);
+	struct ffa_value res;
+
+	if (!ctx->is_ffa_manifest_parsed) {
+		FAIL("Manifest not parsed");
+	}
+
+	res = ffa_msg_wait();
+
+	while (true) {
+		uint64_t msg[MAX_RESP_REGS];
+		struct ffa_uuid target_uuid;
+
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ2_64);
+
+		ffa_uuid_unpack_from_uint64(res.arg2, res.arg3, &target_uuid);
+
+		HFTEST_LOG("Target UUID: %X-%X-%X-%X", target_uuid.uuid[0],
+			   target_uuid.uuid[1], target_uuid.uuid[2],
+			   target_uuid.uuid[3]);
+
+		EXPECT_TRUE(is_uuid_in_list(uuid_count, target_uuid, uuids));
+
+		memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &res.arg4,
+			 MAX_RESP_REGS * sizeof(uint64_t));
+
+		res = ffa_msg_send_direct_resp2(
+			ffa_receiver(res), ffa_sender(res),
+			(const uint64_t *)msg, MAX_RESP_REGS);
+	}
 }
