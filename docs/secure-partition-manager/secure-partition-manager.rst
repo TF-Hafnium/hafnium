@@ -688,11 +688,13 @@ descriptors. The provided addresses may be owned by a VM in the normal world,
 which is expected to receive messages from the secure world. The SPMC will in
 this case allocate internal state structures to facilitate RX buffer access
 synchronization (through FFA_RX_ACQUIRE interface), and to permit SPs to send
-messages.
+messages. The addresses used must be contained in the SPMC manifest NS memory
+node (see `SPMC manifest`_).
 
 The FFA_RXTX_UNMAP unmaps the RX/TX pair from the translation regime of the
 caller, either it being the Hypervisor or OS kernel, as well as a secure
-partition.
+partition, and restores them in the VM's translation regime so that they can be
+used for memory sharing operations from the normal world again.
 
 FFA_PARTITION_INFO_GET
 ~~~~~~~~~~~~~~~~~~~~~~
