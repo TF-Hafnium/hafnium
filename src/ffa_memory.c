@@ -2945,7 +2945,7 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 	uint32_t fragment_length;
 	ffa_id_t receiver_id = to_locked.vm->id;
 	ffa_memory_attributes_t attributes;
-	uint64_t memory_access_desc_size = sizeof(struct ffa_memory_access);
+	uint64_t memory_access_desc_size;
 	struct ffa_memory_region *memory_region;
 
 	ffa_memory_handle_t handle = retrieve_request->handle;
@@ -2954,6 +2954,18 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 	struct ffa_memory_access_impdef receiver_impdef_val = {{0, 0}};
 
 	memory_region = share_state->memory_region;
+
+	switch (to_locked.vm->ffa_version) {
+	case MAKE_FFA_VERSION(1, 2):
+		memory_access_desc_size = sizeof(struct ffa_memory_access);
+		break;
+	case MAKE_FFA_VERSION(1, 0):
+	case MAKE_FFA_VERSION(1, 1):
+		memory_access_desc_size = sizeof(struct ffa_memory_access_v1_0);
+		break;
+	default:
+		panic("version not supported: %x\n", to_locked.vm->ffa_version);
+	}
 
 	if (share_state->hypervisor_fragment_count != 0U) {
 		dlog_verbose(
