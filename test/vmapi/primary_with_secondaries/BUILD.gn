@@ -285,6 +285,7 @@ vm_kernel("primary_with_sp_test_vm") {
     "indirect_messaging.c",
     "memory_sharing.c",
     "secure_interrupts.c",
+    "smccc.c",
   ]
 
   deps = [

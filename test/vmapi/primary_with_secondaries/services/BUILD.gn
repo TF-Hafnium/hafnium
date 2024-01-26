@@ -170,8 +170,19 @@ source_set("ffa_check") {
   ]
 }
 
-# Group services together into VMs.
+# Services related to SMCCC compliance.
+source_set("smccc") {
+  testonly = true
+  public_configs = [
+    "..:config",
+    "//test/hftest:hftest_config",
+  ]
+  deps = [ "//test/vmapi/common:ffa" ]
 
+  sources = [ "smccc.c" ]
+}
+
+# Group services together into VMs.
 vm_kernel("service_vm1") {
   testonly = true
 
@@ -188,6 +199,7 @@ vm_kernel("service_vm1") {
     ":receive_block",
     ":relay",
     ":run_waiting",
+    ":smccc",
     ":unmapped",
     ":wfi",
     "//src/arch/aarch64/hftest:interrupts",

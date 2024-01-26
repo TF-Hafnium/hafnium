@@ -56,6 +56,7 @@ vm_kernel("secure_service") {
     "//test/vmapi/primary_with_secondaries/services:ffa_check",
     "//test/vmapi/primary_with_secondaries/services:memory",
     "//test/vmapi/primary_with_secondaries/services:relay",
+    "//test/vmapi/primary_with_secondaries/services:smccc",
     "//vmlib/${plat_arch}:call",
   ]
 }
