@@ -633,7 +633,7 @@ uint64_t arch_mm_mode_to_stage2_attrs(uint32_t mode)
 	 */
 	if (mode & MM_MODE_D) {
 		attrs |= STAGE2_MEMATTR(STAGE2_DEVICE_MEMORY,
-					STAGE2_MEMATTR_DEVICE_GRE);
+					STAGE2_MEMATTR_DEVICE_nGnRnE);
 	} else {
 		attrs |= STAGE2_MEMATTR(STAGE2_WRITEBACK, STAGE2_WRITEBACK);
 	}
