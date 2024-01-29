@@ -1283,6 +1283,76 @@ TEST(memory_sharing, donate_vms)
 }
 
 /**
+ * Test that once device memory has been lent it is not longer accessible to
+ * the original owner.
+ */
+TEST_PRECONDITION(memory_sharing,
+		  lend_device_memory_between_sps_and_lose_access,
+		  service1_and_service2_are_secure)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_lend_device_memory_secondary_and_fault", mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_receive", mb.send);
+
+	/* Let the memory be sent from service1 to service2. */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Receive memory in service2. */
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Try to access memory in service1. */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
+
+	/* Ensure that memory in service2 remains the same. */
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+}
+
+/**
+ * Test that device memory can be shared from one SP to another and both can
+ * access it whilst they share it.
+ * The device memory shared is UART1 MMIO address space so the output can be
+ * viewed in the logs.
+ */
+TEST_PRECONDITION(memory_sharing, lend_device_memory_between_sps_and_reclaim,
+		  service1_and_service2_are_secure)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_lend_device_memory_to_sp_and_reclaim", mb.send);
+	SERVICE_SELECT(service2_info->vm_id,
+		       "ffa_memory_lend_relinquish_device", mb.send);
+
+	/* Let the memory be sent from service1 to service2. */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Receive memory, access it and relinquish it in service2. */
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Reclaim in service1. */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Check the service2 can no longer access the memory it was lent. */
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
+}
+
+/**
  * Check that memory is unable to be donated to multiple parties.
  */
 TEST(memory_sharing, donate_twice)

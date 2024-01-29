@@ -57,6 +57,12 @@
 	device-regions {
 		compatible = "arm,ffa-manifest-device-regions";
 
+		uart1 {
+			base-address = <0x00000000 0x1c0a0000>;
+			pages-count = <1>;
+			attributes = <0x3>; /* read-write */
+		};
+
 		sec_wdog {
 			/* SP805 Trusted Watchdog Module */
 			base-address = <0x00000000 0x2a490000>;
