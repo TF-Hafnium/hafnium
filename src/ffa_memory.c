@@ -719,10 +719,17 @@ static struct ffa_value ffa_send_check_transition(
 		return ret;
 	}
 
-	/* Ensure the address range is normal memory and not a device. */
-	if ((*orig_from_mode & MM_MODE_D) != 0U) {
-		dlog_verbose("Can't share device memory (mode is %#x).\n",
-			     *orig_from_mode);
+	/*
+	 * Device memory regions can only be lent from SP to SP and to a single
+	 * borrower.
+	 */
+	if ((*orig_from_mode & MM_MODE_D) != 0U &&
+	    !(share_func == FFA_MEM_LEND_32 && !ffa_is_vm_id(from.vm->id) &&
+	      receivers_count == 1)) {
+		dlog_verbose(
+			"Device memory can only be lent, from the secure world "
+			"and to a single borrower (mode is %#x).\n",
+			*orig_from_mode);
 		return ffa_error(FFA_DENIED);
 	}
 
@@ -1768,9 +1775,13 @@ struct ffa_value ffa_memory_send_complete(
 }
 
 /**
- * Check that the memory attributes match Hafnium expectations:
- * Normal Memory, Inner shareable, Write-Back Read-Allocate
- * Write-Allocate Cacheable.
+ * Check that the memory attributes match Hafnium expectations.
+ * Cacheability:
+ * - Normal Memory as `FFA_MEMORY_CACHE_WRITE_BACK`.
+ * - Device memory as `FFA_MEMORY_DEV_NGNRNE`.
+ *
+ * Shareability:
+ * - Inner Shareable.
  */
 static struct ffa_value ffa_memory_attributes_validate(
 	ffa_memory_attributes_t attributes)
@@ -1780,19 +1791,25 @@ static struct ffa_value ffa_memory_attributes_validate(
 	enum ffa_memory_shareability shareability;
 
 	memory_type = attributes.type;
-	if (memory_type != FFA_MEMORY_NORMAL_MEM) {
-		dlog_verbose("Invalid memory type %s, expected %s\n",
-			     ffa_memory_type_name(memory_type),
-			     ffa_memory_type_name(FFA_MEMORY_NORMAL_MEM));
+	cacheability = attributes.cacheability;
+	if (memory_type == FFA_MEMORY_NORMAL_MEM &&
+	    cacheability != FFA_MEMORY_CACHE_WRITE_BACK) {
+		dlog_verbose(
+			"Normal Memory: Invalid cacheability %s, "
+			"expected %s.\n",
+			ffa_memory_cacheability_name(cacheability),
+			ffa_memory_cacheability_name(
+				FFA_MEMORY_CACHE_WRITE_BACK));
 		return ffa_error(FFA_DENIED);
 	}
-
-	cacheability = attributes.cacheability;
-	if (cacheability != FFA_MEMORY_CACHE_WRITE_BACK) {
-		dlog_verbose("Invalid cacheability %s, expected %s.\n",
-			     ffa_memory_cacheability_name(cacheability),
-			     ffa_memory_cacheability_name(
-				     FFA_MEMORY_CACHE_WRITE_BACK));
+	if (memory_type == FFA_MEMORY_DEVICE_MEM &&
+	    cacheability != FFA_MEMORY_DEV_NGNRNE) {
+		dlog_verbose(
+			"Device Memory: Invalid cacheability %s, "
+			"expected %s.\n",
+			ffa_device_memory_cacheability_name(cacheability),
+			ffa_device_memory_cacheability_name(
+				FFA_MEMORY_DEV_NGNRNE));
 		return ffa_error(FFA_DENIED);
 	}
 

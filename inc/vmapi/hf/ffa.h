@@ -485,6 +485,21 @@ static inline const char *ffa_memory_cacheability_name(
 	}
 }
 
+static inline const char *ffa_device_memory_cacheability_name(
+	enum ffa_memory_cacheability cacheability)
+{
+	switch (cacheability) {
+	case FFA_MEMORY_DEV_NGNRNE:
+		return "FFA_MEMORY_DEV_NGNRNE";
+	case FFA_MEMORY_DEV_NGNRE:
+		return "FFA_MEMORY_DEV_NGNRE";
+	case FFA_MEMORY_DEV_NGRE:
+		return "FFA_MEMORY_DEV_NGRE";
+	case FFA_MEMORY_DEV_GRE:
+		return "FFA_MEMORY_DEV_GRE";
+	}
+}
+
 enum ffa_memory_shareability {
 	FFA_MEMORY_SHARE_NON_SHAREABLE,
 	FFA_MEMORY_SHARE_RESERVED,
