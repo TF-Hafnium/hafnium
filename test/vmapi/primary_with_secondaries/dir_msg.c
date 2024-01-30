@@ -930,3 +930,46 @@ TEST_PRECONDITION(direct_message, ffa_msg_send_direct_req2_recv_not_supported,
 				       ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_DENIED);
 }
+
+/**
+ * Validate that the creation of a cyclic dependency via combined usage of
+ * FFA_MSG_SEND_DIRECT_REQ and FFA_MSG_SEND_DIRECT_REQ2 is not possible. The
+ * test only makes sense in the scope of validating the SPMC, as the hypervisor
+ * limits the direct message requests to be only invoked from the primary VM.
+ * Thus, using precondition that checks both involved test services are SPs.
+ */
+TEST_PRECONDITION(direct_message, fail_if_cyclic_dependency_req_req2,
+		  service1_and_service2_are_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_uuid service1_uuid = SERVICE1;
+	struct ffa_value ret;
+
+	/*
+	 * Run service2 for it to wait for a request from service1 after
+	 * receiving indirect message containing uuid.
+	 */
+	SERVICE_SELECT(service2_info->vm_id,
+		       "ffa_direct_message_cycle_req_req2_denied", mb.send);
+
+	/* Send to service2 the uuid of service1 for its attempted message. */
+	ret = send_indirect_message(own_id, service2_info->vm_id, mb.send,
+				    &service1_uuid, sizeof(service1_uuid), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	ffa_run(service2_info->vm_id, 0);
+
+	/* Service1 requests echo from service2. */
+	SERVICE_SELECT(service1_info->vm_id, "ffa_direct_message_echo_services",
+		       mb.send);
+
+	/* Send to service1 the FF-A id of the target for its message. */
+	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
+				    &service2_info->vm_id,
+				    sizeof(service2_info->vm_id), 0);
+
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+}

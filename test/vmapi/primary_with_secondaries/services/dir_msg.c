@@ -425,6 +425,42 @@ TEST_SERVICE(ffa_direct_message_v_1_2_cycle_denied)
 	FAIL("Direct response not expected to return");
 }
 
+TEST_SERVICE(ffa_direct_message_cycle_req_req2_denied)
+{
+	struct ffa_value res;
+	struct ffa_value args;
+	ffa_id_t sender;
+	ffa_id_t receiver;
+	ffa_id_t own_id = hf_vm_get_id();
+	const uint64_t invalid_msg[] = {1, 2, 3, 4, 5};
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_uuid target_uuid;
+
+	/* Retrieve uuid of target endpoint. */
+	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
+				 recv_buf, NULL);
+
+	/* Wait for direct request. */
+	args = ffa_msg_wait();
+	ASSERT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
+	receiver = ffa_receiver(args);
+	sender = ffa_sender(args);
+
+	EXPECT_EQ(receiver, hf_vm_get_id());
+
+	/* Try to send a request back instead of a response. */
+	res = ffa_msg_send_direct_req2(own_id, sender, &target_uuid,
+				       (const uint64_t *)&invalid_msg,
+				       ARRAY_SIZE(invalid_msg));
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+
+	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
+				 args.arg3, args.arg4, args.arg5, args.arg6,
+				 args.arg7);
+
+	FAIL("Direct response not expected to return");
+}
+
 TEST_SERVICE(ffa_yield_direct_message_v_1_2_echo_services)
 {
 	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
