@@ -82,6 +82,7 @@ static void hftest_parse_ffa_manifest(struct hftest_context *ctx,
 	struct fdt_node root;
 	struct fdt_node ffa_node;
 	struct string mem_region_node_name = STRING_INIT("memory-regions");
+	struct string dev_region_node_name = STRING_INIT("device-regions");
 	uint64_t number;
 
 	CHECK(ctx != NULL);
@@ -126,6 +127,42 @@ static void hftest_parse_ffa_manifest(struct hftest_context *ctx,
 		assert(mem_count < PARTITION_MAX_MEMORY_REGIONS);
 
 		ctx->partition_manifest.mem_region_count = mem_count;
+	}
+
+	ffa_node = root;
+
+	/* Look for the device region node. */
+	if (fdt_find_child(&ffa_node, &dev_region_node_name) &&
+	    fdt_first_child(&ffa_node)) {
+		uint32_t dev_region_count = 0;
+
+		do {
+			struct device_region *cur_region =
+				&ctx->partition_manifest
+					 .dev_regions[dev_region_count];
+			EXPECT_TRUE(fdt_read_number(&ffa_node, "pages-count",
+						    &number));
+			cur_region->page_count = (uint32_t)number;
+
+			if (!fdt_read_number(&ffa_node, "base-address",
+					     &cur_region->base_address)) {
+				EXPECT_TRUE(fdt_read_number(&ffa_node,
+							    "relative-address",
+							    &number));
+				cur_region->base_address =
+					ctx->partition_manifest.load_addr +
+					number;
+			}
+
+			EXPECT_TRUE(fdt_read_number(&ffa_node, "attributes",
+						    &number));
+			cur_region->attributes = (uint32_t)number;
+			dev_region_count++;
+		} while (fdt_next_sibling(&ffa_node));
+
+		assert(dev_region_count < PARTITION_MAX_DEVICE_REGIONS);
+
+		ctx->partition_manifest.dev_region_count = dev_region_count;
 	}
 
 	ctx->is_ffa_manifest_parsed = true;
