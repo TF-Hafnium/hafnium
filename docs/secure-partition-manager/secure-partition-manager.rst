@@ -1014,7 +1014,8 @@ The notifications receipt support is enabled in the partition FF-A manifest.
 Memory Sharing
 --------------
 
-Hafnium implements the following memory sharing interfaces:
+Hafnium implements the following memory sharing interfaces as described in
+Chapter 11 of the FF-A 1.2 ALP0 specification:
 
  - ``FFA_MEM_SHARE`` - for shared access between lender and borrower.
  - ``FFA_MEM_LEND`` - borrower to obtain exclusive access, though lender
@@ -1068,7 +1069,14 @@ The semantics of ``FFA_MEM_DONATE`` implies ownership transmission,
 which should target only one partition.
 
 The memory share interfaces are backwards compatible with memory transaction
-descriptors from FF-A v1.0. These get translated to FF-A v1.1 descriptors for
+descriptors from FF-A v1.0. Starting from FF-A v1.1, with the introduction
+of the `Endpoint memory access descriptor size` and
+`Endpoint memory access descriptor access offset` fields (from Table 11.20 of the
+FF-A v1.2 ALP0 specification), memory transaction descriptors are forward
+compatible, so can be used internally by Hafnium as they are sent.
+These fields must be valid for a memory access descriptor defined for a compatible
+FF-A version to the SPMC FF-A version. For a transaction from an FF-A v1.0 endpoint
+the memory transaction descriptor will be translated to an FF-A v1.1 descriptor for
 Hafnium's internal processing of the operation. If the FF-A version of a
 borrower is v1.0, Hafnium provides FF-A v1.0 compliant memory transaction
 descriptors on memory retrieve response.
