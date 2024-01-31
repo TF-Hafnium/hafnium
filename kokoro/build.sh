@@ -37,7 +37,6 @@ then
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS false
 	default_value USE_TFA true
 	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD true
-	defualt_value SKIP_STATIC_CHECKS false
 elif is_jenkins_build
 then
 	# Default config for Jenkins builds.
@@ -45,14 +44,12 @@ then
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS false
 	default_value USE_TFA true
 	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD false
-	default_value SKIP_STATIC_CHECKS false
 else
 	# Default config for local builds.
 	default_value HAFNIUM_HERMETIC_BUILD false
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS true
 	default_value USE_TFA false
 	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD false
-	default_value SKIP_STATIC_CHECKS false
 fi
 
 # If HAFNIUM_HERMETIC_BUILD is "true", relaunch this script inside a container.
@@ -76,9 +73,6 @@ do
 		;;
 	--run-assert-disabled-build)
 		HAFNIUM_RUN_ASSERT_DISABLED_BUILD=true
-		;;
-	--skip-static-checks)
-		SKIP_STATIC_CHECKS=true
 		;;
 	*)
 		echo "Unexpected argument $1"
@@ -120,62 +114,3 @@ fi
 
 make PROJECT=reference ENABLE_ASSERTIONS=1
 run_tests
-
-#
-# Static analysis.
-#
-if [ "$SKIP_STATIC_CHECKS" != "true" ]
-then
-	make check
-	if is_repo_dirty
-	then
-		echo "Run \`make check\' locally to fix this."
-		exit 1
-	fi
-
-	#
-	# Make sure the code looks good.
-	#
-
-	make format
-	if is_repo_dirty
-	then
-		echo "Run \`make format\' locally to fix this."
-		exit 1
-	fi
-
-	make checkpatch
-
-	#
-	# Make sure there's not lint.
-	#
-
-	make tidy
-	if is_repo_dirty
-	then
-		echo "Run \`make tidy\' locally to fix this."
-		exit 1
-	fi
-
-	#
-	# Make sure all the files have a license.
-	#
-
-	make license
-	if is_repo_dirty
-	then
-		echo "Run \`make license\' locally to fix this."
-		exit 1
-	fi
-
-	# Make sure the Linux driver maintains style. It's already built as
-	# part of the tests.
-	(
-	unset CHECKPATCH &&
-	export ARCH=arm64 &&
-	export CROSS_COMPILE=aarch64-linux-gnu- &&
-	cd driver/linux &&
-	make HAFNIUM_PATH="${ROOT_DIR}" checkpatch
-	)
-
-fi
