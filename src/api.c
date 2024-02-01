@@ -3795,7 +3795,8 @@ struct ffa_value api_ffa_notification_update_bindings(
 	}
 
 	if (notifications == 0U) {
-		dlog_verbose("No notifications have been specified.\n");
+		dlog_verbose("No notifications have been specified %x.\n",
+			     notifications);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
