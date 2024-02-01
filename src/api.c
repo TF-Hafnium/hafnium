@@ -3808,7 +3808,7 @@ struct ffa_value api_ffa_notification_update_bindings(
 
 	if (receiver_locked.vm == NULL) {
 		dlog_verbose("Receiver doesn't exist!\n");
-		return ffa_error(FFA_DENIED);
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	if (!vm_locked_are_notifications_enabled(receiver_locked)) {
