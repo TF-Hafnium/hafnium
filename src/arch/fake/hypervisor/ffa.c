@@ -197,13 +197,21 @@ bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
 	return false;
 }
 
-bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
-					    ffa_id_t vm_id)
+/**
+ * Check validity of the calls:
+ * FFA_NOTIFICATION_BITMAP_CREATE/FFA_NOTIFICATION_BITMAP_DESTROY.
+ */
+struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
+	struct vcpu *current, ffa_id_t vm_id)
 {
+	/*
+	 * Call should only be used by the Hypervisor, so any attempt of
+	 * invocation from NWd FF-A endpoints should fail.
+	 */
 	(void)current;
 	(void)vm_id;
 
-	return false;
+	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
 bool plat_ffa_is_notification_set_valid(struct vcpu *current,

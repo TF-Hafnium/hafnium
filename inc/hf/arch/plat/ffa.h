@@ -89,8 +89,8 @@ bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
 				struct ffa_value *ret);
 
-bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
-					    ffa_id_t vm_id);
+struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
+	struct vcpu *current, ffa_id_t vm_id);
 
 bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 					  ffa_id_t sender_id,

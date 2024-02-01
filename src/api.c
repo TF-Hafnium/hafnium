@@ -3733,10 +3733,15 @@ struct ffa_value api_ffa_notification_bitmap_create(ffa_id_t vm_id,
 						    ffa_vcpu_count_t vcpu_count,
 						    struct vcpu *current)
 {
-	if (!plat_ffa_is_notifications_create_valid(current, vm_id)) {
-		dlog_verbose("Bitmap create for NWd VM IDs only (%x).\n",
-			     vm_id);
-		return ffa_error(FFA_NOT_SUPPORTED);
+	const struct ffa_value ret =
+		plat_ffa_is_notifications_bitmap_access_valid(current, vm_id);
+
+	if (ffa_func_id(ret) != FFA_SUCCESS_32) {
+		dlog_verbose(
+			"FFA_NOTIFICATION_BITMAP_CREATE to be used by "
+			"hypervisor for valid NWd VM IDs only (%x).\n",
+			vm_id);
+		return ret;
 	}
 
 	return plat_ffa_notifications_bitmap_create(vm_id, vcpu_count);
@@ -3745,13 +3750,15 @@ struct ffa_value api_ffa_notification_bitmap_create(ffa_id_t vm_id,
 struct ffa_value api_ffa_notification_bitmap_destroy(ffa_id_t vm_id,
 						     struct vcpu *current)
 {
-	/*
-	 * Validity of use of this interface is the same as for bitmap create.
-	 */
-	if (!plat_ffa_is_notifications_create_valid(current, vm_id)) {
-		dlog_verbose("Bitmap destroy for NWd VM IDs only (%x).\n",
-			     vm_id);
-		return ffa_error(FFA_NOT_SUPPORTED);
+	const struct ffa_value ret =
+		plat_ffa_is_notifications_bitmap_access_valid(current, vm_id);
+
+	if (ffa_func_id(ret) != FFA_SUCCESS_32) {
+		dlog_verbose(
+			"FFA_NOTIFICATION_BITMAP_DESTROY to be used by "
+			"hypervisor for valid NWd VM IDs only (%x).\n",
+			vm_id);
+		return ret;
 	}
 
 	return plat_ffa_notifications_bitmap_destroy(vm_id);

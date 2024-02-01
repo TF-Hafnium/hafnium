@@ -186,10 +186,11 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 }
 
 /**
- * Check validity of a FF-A notifications bitmap create.
+ * Check validity of the calls:
+ * FFA_NOTIFICATION_BITMAP_CREATE/FFA_NOTIFICATION_BITMAP_DESTROY.
  */
-bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
-					    ffa_id_t vm_id)
+struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
+	struct vcpu *current, ffa_id_t vm_id)
 {
 	/*
 	 * Call should only be used by the Hypervisor, so any attempt of
@@ -198,7 +199,7 @@ bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
 	(void)current;
 	(void)vm_id;
 
-	return false;
+	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
 bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,

@@ -725,15 +725,25 @@ bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
 	return false;
 }
 
-bool plat_ffa_is_notifications_create_valid(struct vcpu *current,
-					    ffa_id_t vm_id)
+struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
+	struct vcpu *current, ffa_id_t vm_id)
 {
 	/**
 	 * Create/Destroy interfaces to be called by the hypervisor, into the
 	 * SPMC.
 	 */
-	return current->vm->id == HF_HYPERVISOR_VM_ID &&
-	       !vm_id_is_current_world(vm_id);
+	if (current->vm->id != HF_HYPERVISOR_VM_ID) {
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	/* ID provided must be a valid VM ID. */
+	if (!ffa_is_vm_id(vm_id)) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	return (struct ffa_value){
+		.func = FFA_SUCCESS_32,
+	};
 }
 
 bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
