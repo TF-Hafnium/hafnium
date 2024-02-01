@@ -3831,7 +3831,10 @@ struct ffa_value api_ffa_notification_update_bindings(
 	if (!vm_notifications_validate_bound_sender(
 		    receiver_locked, ffa_is_vm_id(sender_vm_id), id_to_validate,
 		    notifications)) {
-		dlog_verbose("Notifications are bound to other sender.\n");
+		dlog_verbose(
+			"Sender %x not permitted to set notifications %x to "
+			"%x.\n",
+			sender_vm_id, notifications, receiver_vm_id);
 		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
