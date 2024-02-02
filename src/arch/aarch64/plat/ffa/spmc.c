@@ -1478,16 +1478,16 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
 		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
+			struct ffa_value ret_interrupt =
+				api_ffa_interrupt_return(intid);
+
 			/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
 			dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
 				     target_vcpu->vm->id);
 
 			vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
 
-			vcpu_set_running(
-				target_vcpu_locked,
-				&(struct ffa_value){.func = FFA_INTERRUPT_32,
-						    .arg2 = intid});
+			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
 			/*
 			 * If the execution was in NWd as well, set the vCPU
@@ -1551,6 +1551,9 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
 		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
+			struct ffa_value ret_interrupt =
+				api_ffa_interrupt_return(intid);
+
 			/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
 			vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
 			/*
@@ -1560,11 +1563,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * non-secure interrupt. However, our current design
 			 * takes care of it implicitly.
 			 */
-			vcpu_set_running(target_vcpu_locked,
-					 &(struct ffa_value){
-						 .func = FFA_INTERRUPT_32,
-						 .arg2 = intid,
-					 });
+			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
 			plat_ffa_queue_vint_deactivate_pint(
 				target_vcpu_locked, intid, current_locked);
@@ -1607,6 +1606,9 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 				target_vcpu_locked, intid,
 				(struct vcpu_locked){.vcpu = NULL});
 		} else {
+			struct ffa_value ret_interrupt =
+				api_ffa_interrupt_return(0);
+
 			/*
 			 * Under the current design, there is only one possible
 			 * scenario in which target vCPU is in blocked state:
@@ -1631,10 +1633,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * The targetted SP is set running, whilst the
 			 * preempted SP is set PREEMPTED.
 			 */
-			vcpu_set_running(target_vcpu_locked,
-					 &(struct ffa_value){
-						 .func = FFA_INTERRUPT_32,
-					 });
+			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
 			plat_ffa_queue_vint_deactivate_pint(
 				target_vcpu_locked, intid, current_locked);
@@ -1837,42 +1836,6 @@ static void plat_ffa_exit_spmc_schedule_mode(struct vcpu_locked current_locked)
 
 	current->scheduling_mode = NONE;
 	current->rt_model = RTM_NONE;
-}
-
-/**
- * Switches the physical CPU back to the corresponding vCPU of the normal world.
- *
- * The current vCPU has finished handling the secure interrupt. Resume the
- * execution in the normal world by invoking the FFA_NORMAL_WORLD_RESUME ABI
- * in SPMC that is processed by SPMD to make the world context switch. Refer
- * FF-A v1.1 Beta0 section 14.4.
- */
-struct ffa_value plat_ffa_normal_world_resume(struct vcpu_locked current_locked,
-					      struct vcpu **next)
-{
-	struct ffa_value ffa_ret = (struct ffa_value){.func = FFA_MSG_WAIT_32};
-	struct ffa_value other_world_ret =
-		(struct ffa_value){.func = FFA_NORMAL_WORLD_RESUME};
-	struct vcpu *current = current_locked.vcpu;
-
-	/* Reset the fields tracking secure interrupt processing. */
-	vcpu_secure_interrupt_complete(current_locked);
-
-	/* SPMC scheduled call chain is completely unwound. */
-	plat_ffa_exit_spmc_schedule_mode(current_locked);
-	assert(current->call_chain.prev_node == NULL);
-	current->state = VCPU_STATE_WAITING;
-
-	/* Restore interrupt priority mask. */
-	plat_interrupts_set_priority_mask(current->priority_mask);
-
-	*next = api_switch_to_other_world(current_locked, other_world_ret,
-					  VCPU_STATE_WAITING);
-
-	/* The next vCPU to be run cannot be null. */
-	CHECK(*next != NULL);
-
-	return ffa_ret;
 }
 
 /**
@@ -2139,13 +2102,6 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 	return true;
 }
 
-static void plat_ffa_signal_interrupt_args(struct ffa_value *args, uint32_t id)
-{
-	assert(args != NULL);
-	args->func = (uint32_t)FFA_INTERRUPT_32;
-	args->arg2 = id;
-}
-
 /**
  * Run the vCPU in SPMC schedule mode under the runtime model for secure
  * interrupt handling.
@@ -2165,95 +2121,40 @@ static void plat_ffa_run_in_sec_interrupt_rtm(
 	target_vcpu->requires_deactivate_call = false;
 }
 
-static bool plat_ffa_helper_intercept_call(struct vcpu_locked current_locked,
-					   struct ffa_value to_ret,
-					   struct ffa_value *signal_interrupt,
-					   bool is_ffa_msg_wait)
+bool plat_ffa_intercept_call(struct vcpu_locked current_locked,
+			     struct vcpu_locked next_locked,
+			     struct ffa_value *signal_interrupt)
 {
-	struct vcpu *current;
-
-	current = current_locked.vcpu;
+	uint32_t intid;
 
 	/*
 	 * Check if there are any pending virtual secure interrupts to be
 	 * handled.
 	 */
-	if (!vcpu_is_interrupt_queue_empty(current_locked)) {
-		uint32_t current_int_id;
-
-		if (!is_ffa_msg_wait) {
-			dlog_verbose(
-				"Intercepting FFA_MSG_SEND_DIRECT_RESP call to "
-				"signal secure interrupt: %x\n",
-				current->vm->id);
-
-			current->direct_resp_intercepted = true;
-
-			/* Save direct response message args. */
-			current->direct_resp_ffa_value = to_ret;
-		} else {
-			assert(current->rt_model == RTM_FFA_RUN ||
-			       current->rt_model == RTM_SEC_INTERRUPT);
-
-			dlog_verbose(
-				"Intercepting FFA_MSG_WAIT call to signal "
-				"secure interrupt: %x\n",
-				current->vm->id);
-
-			current->msg_wait_intercepted = true;
-		}
-
-		/* Take an entry from the pending virtual interrupt queue. */
-		if (!vcpu_interrupt_queue_peek(current_locked,
-					       &current_int_id)) {
-			panic("No pending virtual interrupt found for vcpu of "
-			      "SP: %x\n",
-			      current->vm->id);
-		}
-
+	if (vcpu_interrupt_queue_peek(current_locked, &intid)) {
 		/*
 		 * Prepare to signal virtual secure interrupt to S-EL0/S-EL1 SP
 		 * in WAITING state. Refer to FF-A v1.2 Table 9.1 and Table 9.2
 		 * case 1.
 		 */
-		plat_ffa_signal_interrupt_args(signal_interrupt,
-					       current_int_id);
+		*signal_interrupt = api_ffa_interrupt_return(intid);
 
 		/*
-		 * Prepare to resume this partition's vCPU in SPMC schedule
-		 * mode to handle virtual secure interrupt.
+		 * Prepare to resume this partition's vCPU in SPMC
+		 * schedule mode to handle virtual secure interrupt.
 		 */
 		plat_ffa_run_in_sec_interrupt_rtm(current_locked);
+
+		current_locked.vcpu->preempted_vcpu = next_locked.vcpu;
+		next_locked.vcpu->state = VCPU_STATE_PREEMPTED;
+
+		dlog_verbose("%s: Pending interrup, intercepting FF-A call.\n",
+			     __func__);
 
 		return true;
 	}
 
 	return false;
-}
-
-/**
- * Intercept a direct response message from current vCPU to signal a
- * pending virtual secure interrupt and prepare to resume it in SPMC schedule
- * mode under runtime model for secure interrupt handling.
- */
-bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					struct ffa_value to_ret,
-					struct ffa_value *signal_interrupt)
-{
-	bool ret;
-
-	assert(*next == NULL);
-
-	ret = plat_ffa_helper_intercept_call(current_locked, to_ret,
-					     signal_interrupt, false);
-
-	if (ret) {
-		/* Resume current vCPU. */
-		*next = NULL;
-	}
-
-	return ret;
 }
 
 /**
@@ -2278,132 +2179,42 @@ static struct ffa_value ffa_msg_wait_complete(struct vcpu_locked current_locked,
 		current_locked, (struct ffa_value){.func = FFA_MSG_WAIT_32},
 		VCPU_STATE_WAITING);
 
-	return (struct ffa_value){.func = FFA_INTERRUPT_32};
-}
-
-static struct ffa_value plat_ffa_helper_resume_intercepted_call(
-	struct vcpu_locked current_locked, struct vcpu **next,
-	bool is_ffa_msg_wait)
-{
-	ffa_id_t receiver_vm_id;
-	struct vcpu *current = current_locked.vcpu;
-	struct ffa_value to_ret;
-	struct vcpu_locked next_locked = (struct vcpu_locked){
-		.vcpu = NULL,
-	};
-	struct two_vcpu_locked vcpus_locked;
-
-	/* Reset the fields tracking secure interrupt processing. */
-	vcpu_secure_interrupt_complete(current_locked);
-
-	/* SPMC scheduled call chain is completely unwound. */
-	plat_ffa_exit_spmc_schedule_mode(current_locked);
-
-	/* Restore interrupt priority mask. */
-	plat_interrupts_set_priority_mask(current->priority_mask);
-
-	plat_ffa_vcpu_allow_interrupts(current);
-
-	if (is_ffa_msg_wait) {
-		/* Resume intercepted FFA_MSG_WAIT call. */
-		dlog_verbose("Resuming intercepted FFA_MSG_WAIT from: %x\n",
-			     current->vm->id);
-		return ffa_msg_wait_complete(current_locked, next);
-	}
-
-	/* Reset the flag now. */
-	current->direct_resp_intercepted = false;
-
-	/* Replay the direct response message. */
-	receiver_vm_id = current->direct_request_origin.vm_id;
-	to_ret = current->direct_resp_ffa_value;
-
-	dlog_verbose(
-		"Resuming intercepted direct response from: %x to: "
-		"%x\n",
-		current->vm->id, receiver_vm_id);
-
-	/* Clear direct request origin for the caller. */
-	current->direct_request_origin.is_ffa_req2 = false;
-	current->direct_request_origin.vm_id = HF_INVALID_VM_ID;
-
-	api_ffa_resume_direct_resp_target(current_locked, next, receiver_vm_id,
-					  to_ret, true);
-
-	/*
-	 * Unlock current vCPU to allow it to be locked together with next
-	 * vcpu.
-	 */
-	vcpu_unlock(&current_locked);
-
-	/* Lock both vCPUs at once to avoid deadlock. */
-	vcpus_locked = vcpu_lock_both(current, *next);
-	current_locked = vcpus_locked.vcpu1;
-	next_locked = vcpus_locked.vcpu2;
-
-	plat_ffa_unwind_call_chain_ffa_direct_resp(current_locked, next_locked);
-	vcpu_unlock(&next_locked);
-
-	return (struct ffa_value){.func = FFA_INTERRUPT_32};
+	return api_ffa_interrupt_return(0);
 }
 
 /**
- * First, all the fields related to secure interrupt handling are reset and
- * SPMC scheduled call chain is unwound.
- * Second, the intercepted direct response message is replayed followed by
- * unwinding of the NWd scheduled call chain.
+ * Deals with the common case of intercepting an FFA_MSG_WAIT call.
  */
-static struct ffa_value plat_ffa_resume_direct_response(
-	struct vcpu_locked current_locked, struct vcpu **next)
-{
-	return plat_ffa_helper_resume_intercepted_call(current_locked, next,
-						       false);
-}
-
-/*
- * A secure physical interrupt could trigger while an SP is processing an
- * indirect message under the RTM_FFA_RUN partition runtime model. However,
- * the SP may not be able to service the corresponding secure virtual interrupt
- * before reqlinquishin CPU cycles and exiting the RTM_FFA_RUN partition
- * runtime model through invocation of FFA_MSG_WAIT ABI.
- * SPMC shall intercept this invocation of FFA_MSG_WAIT to check if there
- * are any pending secure virtual interrupts for the current execution context
- * of the SP. If true, SPMC will signal the virtual interrupt through
- * FFA_INTERRUPT interface and resume the execution context in SPMC schedule
- * mode.
- */
-static bool plat_ffa_intercept_msg_wait(struct vcpu_locked current_locked,
+static bool plat_ffa_msg_wait_intercept(struct vcpu_locked current_locked,
 					struct vcpu **next,
-					struct ffa_value *signal_interrupt)
+					struct ffa_value *ffa_ret)
 {
-	bool ret;
+	struct two_vcpu_locked both_vcpu_locks;
+	struct vcpu *current = current_locked.vcpu;
+	bool ret = false;
 
-	assert(*next == NULL);
+	assert(next != NULL);
+	assert(*next != NULL);
 
-	ret = plat_ffa_helper_intercept_call(
-		current_locked, (struct ffa_value){.func = FFA_INTERRUPT_32},
-		signal_interrupt, true);
+	vcpu_unlock(&current_locked);
 
-	if (ret) {
-		/* Resume current vCPU. */
+	both_vcpu_locks = vcpu_lock_both(current, *next);
+
+	/*
+	 * Check if there are any pending secure virtual interrupts to
+	 * be handled. The `next` should have a pointer to the current
+	 * vCPU. Intercept call will set `ret` to FFA_INTERRUPT and the
+	 * respective interrupt id.
+	 */
+	if (plat_ffa_intercept_call(both_vcpu_locks.vcpu1,
+				    both_vcpu_locks.vcpu2, ffa_ret)) {
 		*next = NULL;
+		ret = true;
 	}
 
-	return ret;
-}
+	vcpu_unlock(&both_vcpu_locks.vcpu2);
 
-/*
- * Once the SP services the secure virtual interrupt in SPMC schedule mode, it
- * signals the completion through FFA_MSG_WAIT ABI.
- * SPMC then resets the fields related to secure interrupt handling and unwounds
- * the SPMC scheduled call chain. Since the original FFA_MSG_WAIT invocation was
- * intercepted, SPMC resumes the action of relinquishing cycles back to the NWd.
- */
-static struct ffa_value plat_ffa_resume_msg_wait(
-	struct vcpu_locked current_locked, struct vcpu **next)
-{
-	return plat_ffa_helper_resume_intercepted_call(current_locked, next,
-						       true);
+	return ret;
 }
 
 /**
@@ -2415,67 +2226,61 @@ static struct ffa_value plat_ffa_resume_msg_wait(
 struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 					   struct vcpu **next)
 {
-	struct ffa_value ret_args =
-		(struct ffa_value){.func = FFA_INTERRUPT_32};
+	struct ffa_value ret = api_ffa_interrupt_return(0);
 	struct vcpu *current = current_locked.vcpu;
 
-	if (sp_boot_next(current_locked, next)) {
-		return ret_args;
-	}
+	switch (current->rt_model) {
+	case RTM_SP_INIT:
+		if (!sp_boot_next(current_locked, next)) {
+			ret = ffa_msg_wait_complete(current_locked, next);
 
-	/* Check if an earlier invocation of FFA_MSG_WAIT was intercepted. */
-	if (current->msg_wait_intercepted &&
-	    !current->direct_resp_intercepted) {
-		return plat_ffa_resume_msg_wait(current_locked, next);
-	}
-
-	/*
-	 * Check if there are any pending secure virtual interrupts to be
-	 * handled.
-	 */
-	if (plat_ffa_intercept_msg_wait(current_locked, next, &ret_args)) {
-		return ret_args;
-	}
-
-	/* Refer FF-A v1.1 Beta0 section 7.4 bullet 2. */
-	if (current->rt_model == RTM_SEC_INTERRUPT) {
+			if (plat_ffa_msg_wait_intercept(current_locked, next,
+							&ret)) {
+			}
+		}
+		break;
+	case RTM_SEC_INTERRUPT:
 		/*
-		 * This flag should not have been set by SPMC when it signaled
-		 * the virtual interrupt to the SP while SP was in WAITING or
-		 * BLOCKED states. Refer the embedded comment in vcpu.h file
-		 * for further description.
+		 * Either resume the preempted SP or complete the FFA_MSG_WAIT.
 		 */
-		assert(!current->requires_deactivate_call);
+		assert(current->preempted_vcpu != NULL);
+		plat_ffa_preempted_vcpu_resume(current_locked, next);
 
-		if (current->direct_resp_intercepted) {
-			return plat_ffa_resume_direct_response(current_locked,
-							       next);
+		if (plat_ffa_msg_wait_intercept(current_locked, next, &ret)) {
+			break;
 		}
 
-		/* Secure interrupt pre-empted normal world. */
-		if (current->preempted_vcpu->vm->id == HF_OTHER_WORLD_ID) {
-			return plat_ffa_normal_world_resume(current_locked,
-							    next);
-		}
-
-		/* Secure interrupt pre-empted an SP. Resume it. */
-		return plat_ffa_preempted_vcpu_resume(current_locked, next);
-	}
-
-	/*
-	 * If CPU cycles were allocated through FFA_RUN interface, allow the
-	 * interrupts(if they were masked earlier) before returning control
-	 * to NWd.
-	 */
-	if (current->rt_model == RTM_FFA_RUN) {
+		/*
+		 * If CPU cycles were allocated through FFA_RUN interface,
+		 * allow the interrupts(if they were masked earlier) before
+		 * returning control to NWd.
+		 */
 		plat_ffa_vcpu_allow_interrupts(current);
+		break;
+	case RTM_FFA_RUN:
+		ret = ffa_msg_wait_complete(current_locked, next);
+
+		if (plat_ffa_msg_wait_intercept(current_locked, next, &ret)) {
+			break;
+		}
+
+		/*
+		 * If CPU cycles were allocated through FFA_RUN interface,
+		 * allow the interrupts(if they were masked earlier) before
+		 * returning control to NWd.
+		 */
+		plat_ffa_vcpu_allow_interrupts(current);
+
+		break;
+	default:
+		panic("%s: unexpected runtime model %x for [%x %x]",
+		      current->rt_model, current->vm->id,
+		      cpu_index(current->cpu));
 	}
 
-	/*
-	 * The vCPU of an SP on secondary CPUs will invoke FFA_MSG_WAIT
-	 * to indicate successful initialization to SPMC.
-	 */
-	return ffa_msg_wait_complete(current_locked, next);
+	vcpu_unlock(&current_locked);
+
+	return ret;
 }
 
 struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
@@ -2915,7 +2720,7 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	struct vcpu_locked current_locked;
 	struct vm_locked vm_locked;
 	enum partition_runtime_model rt_model;
-	struct ffa_value ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
+	struct ffa_value ret = api_ffa_interrupt_return(0);
 
 	vm_locked = vm_lock(current->vm);
 	current_locked = vcpu_lock(current);

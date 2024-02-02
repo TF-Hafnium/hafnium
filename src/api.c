@@ -1511,9 +1511,7 @@ struct ffa_value api_ffa_run(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	 * Set a placeholder return code to the scheduler. This will be
 	 * overwritten when the switch back to the primary occurs.
 	 */
-	ret.func = FFA_INTERRUPT_32;
-	ret.arg1 = 0;
-	ret.arg2 = 0;
+	ret = api_ffa_interrupt_return(0);
 
 out_vcpu:
 	vcpu_unlock(&vcpu_next_locked);
@@ -2960,7 +2958,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 		return ret;
 	}
 
-	ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
+	ret = api_ffa_interrupt_return(0);
 
 	receiver_vm = vm_find(receiver_vm_id);
 	if (receiver_vm == NULL) {
@@ -3244,6 +3242,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 	}
 
 	if (api_ffa_is_managed_exit_ongoing(current_locked)) {
+		struct interrupts *interrupts = &current->interrupts;
+
 		/*
 		 * Per FF-A v1.1 EAC0 section 8.3.1.2.1 rule 6, SPMC can signal
 		 * a secure interrupt to a SP that is performing managed exit.
@@ -3262,19 +3262,12 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 		 * vCPU.
 		 */
 		current->processing_managed_exit = false;
-		struct interrupts *interrupts = &current->interrupts;
 
 		if (vcpu_is_virt_interrupt_pending(interrupts,
 						   HF_MANAGED_EXIT_INTID)) {
 			vcpu_interrupt_clear_decrement(current_locked,
 						       HF_MANAGED_EXIT_INTID);
 		}
-	}
-
-	if (plat_ffa_intercept_direct_response(current_locked, next, to_ret,
-					       &signal_interrupt)) {
-		ret = signal_interrupt;
-		goto out;
 	}
 
 	/* Clear direct request origin vm_id and request type for the caller. */
@@ -3296,6 +3289,18 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 	next_locked = vcpus_locked.vcpu2;
 
 	plat_ffa_unwind_call_chain_ffa_direct_resp(current_locked, next_locked);
+
+	/*
+	 * Check if there is a pending secure interrupt.
+	 * If there is, return back to the caller with FFA_INTERRUPT,
+	 * and set the `next` vcpu in a preempted state.
+	 */
+	if (plat_ffa_intercept_call(current_locked, next_locked,
+				    &signal_interrupt)) {
+		ret = signal_interrupt;
+		*next = NULL;
+	}
+
 	vcpu_unlock(&next_locked);
 
 out:

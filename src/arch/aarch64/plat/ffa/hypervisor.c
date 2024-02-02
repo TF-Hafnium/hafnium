@@ -355,6 +355,17 @@ bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 	return other_world_ret.func == FFA_SUCCESS_32;
 }
 
+bool plat_ffa_intercept_call(struct vcpu_locked current_locked,
+			     struct vcpu_locked next_locked,
+			     struct ffa_value *signal_interrupt)
+{
+	(void)current_locked;
+	(void)next_locked;
+	(void)signal_interrupt;
+
+	return false;
+}
+
 bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 					struct vm_locked receiver_locked)
 {
@@ -1167,23 +1178,6 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(
 	/* Calls chains not supported in the Hypervisor/VMs. */
 	(void)current_locked;
 	(void)next_locked;
-}
-
-bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					struct ffa_value to_ret,
-					struct ffa_value *signal_interrupt)
-{
-	/*
-	 * Only applicable to SPMC as it signals virtual secure interrupt to
-	 * S-EL0 partitions.
-	 */
-	(void)current_locked;
-	(void)next;
-	(void)to_ret;
-	(void)signal_interrupt;
-
-	return false;
 }
 
 /**

@@ -250,6 +250,10 @@ bool plat_ffa_inject_notification_pending_interrupt(
 	struct vcpu_locked next_locked, struct vcpu_locked current_locked,
 	struct vm_locked receiver_locked);
 
+bool plat_ffa_intercept_call(struct vcpu_locked current_locked,
+			     struct vcpu_locked next_locked,
+			     struct ffa_value *signal_interrupt);
+
 bool plat_ffa_partition_info_get_regs_forward_allowed(void);
 
 void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
@@ -296,10 +300,6 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(
 void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 					struct vm_locked vm_locked);
 
-bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					struct ffa_value to_ret,
-					struct ffa_value *signal_interrupt);
 /*
  * Handles FF-A memory share calls with recipients from the other world.
  */

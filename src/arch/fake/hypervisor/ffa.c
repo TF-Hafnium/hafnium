@@ -469,23 +469,6 @@ bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
 	return false;
 }
 
-bool plat_ffa_intercept_direct_response(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					struct ffa_value to_ret,
-					struct ffa_value *signal_interrupt)
-{
-	/*
-	 * Only applicable to SPMC as it signals virtual secure interrupt to
-	 * S-EL0 partitions.
-	 */
-	(void)current_locked;
-	(void)next;
-	(void)to_ret;
-	(void)signal_interrupt;
-
-	return false;
-}
-
 void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 					struct vm_locked vm_locked)
 {
