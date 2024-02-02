@@ -387,7 +387,7 @@ static inline struct ffa_value sp_sleep_cmd_send(ffa_id_t source, ffa_id_t dest,
 }
 
 struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
-			      uint32_t options);
+			      uint32_t options, uint64_t func);
 
 static inline uint32_t sp_get_sleep_options(struct ffa_value ret)
 {

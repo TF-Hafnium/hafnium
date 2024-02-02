@@ -539,6 +539,10 @@ static inline struct ffa_value ffa_msg_send_direct_req2(
 		*arg_ptrs[arg_idx++] = msg[msg_idx++];
 	}
 
+	while (arg_idx < total_args) {
+		*arg_ptrs[arg_idx++] = 0;
+	}
+
 	return ffa_call_ext(args);
 }
 
@@ -592,6 +596,10 @@ static inline struct ffa_value ffa_msg_send_direct_resp2(ffa_id_t sender_vm_id,
 
 	while (arg_idx < total_args && msg_idx < count) {
 		*arg_ptrs[arg_idx++] = msg[msg_idx++];
+	}
+
+	while (arg_idx < total_args) {
+		*arg_ptrs[arg_idx++] = 0;
 	}
 
 	return ffa_call_ext(args);

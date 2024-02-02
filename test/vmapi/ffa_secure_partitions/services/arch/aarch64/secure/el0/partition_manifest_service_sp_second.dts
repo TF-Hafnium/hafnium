@@ -13,7 +13,7 @@
   debug_name = "SP Service Second EL0";
 
   /* Properties */
-  ffa-version = <0x00010000>; /* 31:16 - Major, 15:0 - Minor */
+  ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
   uuid = <0xa609f132 0x6b4f 0x4c14 0x9489>;
   execution-ctx-count = <1>;
   exception-level = <1>; /* S-EL0 */
@@ -21,7 +21,7 @@
   load-address = <0x6380000>;
   entrypoint-offset = <0x2000>;
   xlat-granule = <0>; /* 4KiB */
-  messaging-method = <0x7>; /* Support direct and indirect messaging. */
+  messaging-method = <0x607>; /* Support direct (both APIs) and indirect messaging. */
   ns-interrupts-action = <2>; /* NS interrupts are signaled */
   boot-order = <4>;
   notification-support; /* Receipt of notifications. */

@@ -14,6 +14,29 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+static struct ffa_value handle_direct_req2_cmd(struct ffa_value res)
+{
+	uint32_t options = res.arg6;
+
+	hftest_set_dir_req_source_id(ffa_sender(res));
+
+	if (res.arg4 == SP_SLEEP_CMD) {
+		res = sp_sleep_cmd(ffa_sender(res), res.arg5, options,
+				   FFA_MSG_SEND_DIRECT_REQ2_64);
+	} else {
+		HFTEST_LOG_FAILURE();
+		HFTEST_LOG(HFTEST_LOG_INDENT
+			   "0x%x is not a valid command from %x\n",
+			   res.arg4, ffa_sender(res));
+		abort();
+	}
+
+	/* Reset the field tracking the source of direct request message. */
+	hftest_set_dir_req_source_id(HF_INVALID_VM_ID);
+
+	return res;
+}
+
 static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 {
 	hftest_set_dir_req_source_id(ffa_sender(res));
@@ -80,7 +103,8 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		break;
 	case SP_SLEEP_CMD:
 		res = sp_sleep_cmd(ffa_sender(res), sp_get_sleep_time(res),
-				   sp_get_sleep_options(res));
+				   sp_get_sleep_options(res),
+				   FFA_MSG_SEND_DIRECT_REQ_32);
 		break;
 	case SP_FWD_SLEEP_CMD:
 		res = sp_fwd_sleep_cmd(ffa_sender(res), sp_get_sleep_time(res),
@@ -135,11 +159,11 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 
 	while (1) {
 		if (res.func == FFA_MSG_SEND_DIRECT_REQ_32) {
-			if (is_boot_vcpu) {
-				/* TODO: can only print from boot vCPU. */
-				HFTEST_LOG("Received direct message request");
-			}
+			HFTEST_LOG("Received direct message request");
 			res = handle_direct_req_cmd(res);
+		} else if (res.func == FFA_MSG_SEND_DIRECT_REQ2_64) {
+			HFTEST_LOG("Received direct message request2");
+			res = handle_direct_req2_cmd(res);
 		} else if (res.func == FFA_INTERRUPT_32) {
 			res = handle_ffa_interrupt(res);
 		} else if (res.func == FFA_RUN_32) {

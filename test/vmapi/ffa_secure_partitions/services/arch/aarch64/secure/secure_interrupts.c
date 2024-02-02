@@ -132,7 +132,7 @@ struct ffa_value sp_twdog_map_cmd(ffa_id_t test_source)
 	ffa_id_t own_id = hf_vm_get_id();
 
 	/* Map peripheral(such as secure watchdog timer) address space. */
-	hftest_mm_identity_map((void*)PLAT_ARM_TWDOG_BASE, PLAT_ARM_TWDOG_SIZE,
+	hftest_mm_identity_map((void *)PLAT_ARM_TWDOG_BASE, PLAT_ARM_TWDOG_SIZE,
 			       MM_MODE_R | MM_MODE_W | MM_MODE_D);
 
 	return sp_success(own_id, test_source, 0);
@@ -179,7 +179,7 @@ static inline bool mask_interrupts(uint32_t options)
 }
 
 struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
-			      uint32_t options)
+			      uint32_t options, uint64_t func)
 {
 	uint64_t time_lapsed;
 	ffa_id_t own_id = hf_vm_get_id();
@@ -196,6 +196,12 @@ struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
 	/* Lapsed time should be at least equal to sleep time. */
 	HFTEST_LOG("Sleep complete: %u", time_lapsed);
 
+	if (func == FFA_MSG_SEND_DIRECT_REQ2_64) {
+		uint64_t msg[] = {0, time_lapsed};
+		return ffa_msg_send_direct_resp2(own_id, source,
+						 (const uint64_t *)&msg,
+						 ARRAY_SIZE(msg));
+	}
 	return sp_success(own_id, source, time_lapsed);
 }
 
