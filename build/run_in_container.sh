@@ -31,7 +31,7 @@ IID_FILE="${TMP_DIR}/imgid.txt"
 	--build-arg LOCAL_UID="$(id -u)" \
 	--build-arg LOCAL_GID="$(id -g)" \
 	--iidfile="${IID_FILE}" \
-	-f "${SCRIPT_DIR}/docker/Dockerfile.local" \
+	-f "${SCRIPT_DIR}/docker/Dockerfile" \
 	"${SCRIPT_DIR}/docker"
 IMAGE_ID="$(cat ${IID_FILE})"
 

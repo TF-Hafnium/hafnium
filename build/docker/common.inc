@@ -4,7 +4,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/BSD-3-Clause.
 
-CONTAINER_TAG="eu.gcr.io/hafnium-build/hafnium_ci"
+CONTAINER_TAG="hafnium_dev"
 
 if [[ ! -v DOCKER ]]
 then

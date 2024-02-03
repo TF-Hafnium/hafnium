@@ -34,3 +34,18 @@ RUN apt-get update \
 		python3-pip                    `# for hftest.py` \
 		strace                         `# for strace_open.sh` \
 	&& pip3 install --break-system-packages fdt && rm -rf /var/lib/apt/lists/*
+
+ARG LOCAL_UID=1000
+ARG LOCAL_GID=1000
+
+RUN	addgroup \
+		--gid "${LOCAL_GID}" \
+		hafnium \
+	&& adduser \
+		-disabled-password \
+		-gecos "" \
+		--uid "${LOCAL_UID}" \
+		--shell "/bin/bash" \
+		--ingroup hafnium \
+		hafnium
+USER hafnium
