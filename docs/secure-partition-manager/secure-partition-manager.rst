@@ -598,7 +598,7 @@ Secure partitions scheduling
 The FF-A specification `[1]`_ provides two ways to allocate CPU cycles to
 secure partitions. For this a VM (Hypervisor or OS kernel), or SP invokes one of:
 
-- the FFA_MSG_SEND_DIRECT_REQ interface.
+- the FFA_MSG_SEND_DIRECT_REQ (or FFA_MSG_SEND_DIRECT_REQ2) interface.
 - the FFA_RUN interface.
 
 Additionally a secure interrupt can pre-empt the normal world execution and give
@@ -647,7 +647,10 @@ As part of the FF-A v1.1 support, the following interfaces were added:
  - ``FFA_RX_ACQUIRE``
 
 As part of the FF-A v1.2 support, the following interfaces were added:
+
 - ``FFA_PARTITION_INFO_GET_REGS``
+- ``FFA_MSG_SEND_DIRECT_REQ2``
+- ``FFA_MSG_SEND_DIRECT_RESP2``
 
 FFA_VERSION
 ~~~~~~~~~~~
@@ -767,6 +770,15 @@ and responses with the following rules:
 - An SP cannot send a direct request to an Hypervisor or OS kernel.
 - An Hypervisor or OS kernel can send a direct request to an SP.
 - An SP can send a direct response to an Hypervisor or OS kernel.
+
+FFA_MSG_SEND_DIRECT_REQ2/FFA_MSG_SEND_DIRECT_RESP2
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The primary usage of these ABIs is to send a direct request to a specified
+UUID within an SP that has multiple UUIDs declared in its manifest.
+
+Secondarily, it can be used to send a direct request with an extended
+set of message payload arguments.
 
 FFA_NOTIFICATION_BITMAP_CREATE/FFA_NOTIFICATION_BITMAP_DESTROY
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1143,7 +1155,8 @@ models supported (refer to `[1]`_ section 7):
   - RTM_FFA_RUN: runtime model presented to an execution context that is
     allocated CPU cycles through FFA_RUN interface.
   - RTM_FFA_DIR_REQ: runtime model presented to an execution context that is
-    allocated CPU cycles through FFA_MSG_SEND_DIRECT_REQ interface.
+    allocated CPU cycles through FFA_MSG_SEND_DIRECT_REQ or FFA_MSG_SEND_DIRECT_REQ2
+    interface.
   - RTM_SEC_INTERRUPT: runtime model presented to an execution context that is
     allocated CPU cycles by SPMC to handle a secure interrupt.
   - RTM_SP_INIT: runtime model presented to an execution context that is

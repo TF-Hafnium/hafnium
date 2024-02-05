@@ -893,10 +893,11 @@ element of the data flow diagram.
 |                        | SPMC and SPs, potentially leading to illegal state |
 |                        | transitions and deadlocks.**                       |
 |                        | An endpoint can call into another endpoint         |
-|                        | execution context using FFA_MSG_SEND_DIRECT_REQ    |
-|                        | ABI to create a call chain. A malicious endpoint   |
-|                        | could abuse this to form loops in a call chain that|
-|                        | could lead to potential deadlocks.                 |
+|                        | execution context using FFA_MSG_SEND_DIRECT_REQ (or|
+|                        | FFA_MSG_SEND_DIRECT_REQ2) ABI to create a call     |
+|                        | chain. A malicious endpoint could abuse this to    |
+|                        | form loops in a call chain that could lead to      |
+|                        | potential deadlocks.                               |
 +------------------------+----------------------------------------------------+
 | ``Diagram Elements``   | DF1, DF2, DF4                                      |
 +------------------------+----------------------------------------------------+
