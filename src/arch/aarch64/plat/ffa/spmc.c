@@ -1470,15 +1470,17 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
 		dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
 			     target_vcpu->vm->id);
-		if (vm_id_is_current_world(current_locked.vcpu->vm->id)) {
-			current_locked.vcpu->state = VCPU_STATE_PREEMPTED;
-		}
+
 		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
 
 		vcpu_set_running(target_vcpu_locked,
 				 &(struct ffa_value){.func = FFA_INTERRUPT_32,
 						     .arg2 = intid});
 
+		/*
+		 * If the execution was in NWd as well, set the vCPU
+		 * in preempted state as well.
+		 */
 		vcpu_set_processing_interrupt(target_vcpu_locked, intid,
 					      current_locked);
 
@@ -1556,10 +1558,6 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 					 .arg2 = intid,
 				 });
 
-		/* If interrupting other SPs set them in preempted state. */
-		if (vm_id_is_current_world(current->vm->id)) {
-			current->state = VCPU_STATE_PREEMPTED;
-		}
 		vcpu_set_processing_interrupt(target_vcpu_locked, intid,
 					      current_locked);
 		next = target_vcpu;
@@ -1601,7 +1599,6 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * The targetted SP is set running, whilst the
 			 * preempted SP is set PREEMPTED.
 			 */
-			current->state = VCPU_STATE_PREEMPTED;
 			vcpu_set_running(target_vcpu_locked,
 					 &(struct ffa_value){
 						 .func = FFA_INTERRUPT_32,
