@@ -49,6 +49,10 @@ static_assert(sizeof(struct ffa_mem_relinquish) % 16 == 0,
 static_assert(sizeof(((struct ffa_memory_region){0}).receiver_count == 4),
 	      "struct ffa_memory_region::receiver_count must be 4 bytes long");
 
+static_assert(sizeof(struct ffa_features_rxtx_map_params) == 4,
+	      "struct ffa_features_rxtx_map_params must be 4 "
+	      "bytes long");
+
 struct ffa_memory_share_state {
 	/**
 	 * The memory region being shared, or NULL if this share state is

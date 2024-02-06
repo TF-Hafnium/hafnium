@@ -2454,7 +2454,6 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	case FFA_VERSION_32:
 	case FFA_FEATURES_32:
 	case FFA_RX_RELEASE_32:
-	case FFA_RXTX_MAP_64:
 	case FFA_RXTX_UNMAP_32:
 	case FFA_PARTITION_INFO_GET_32:
 	case FFA_ID_GET_32:
@@ -2497,6 +2496,24 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
 #endif
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
+	case FFA_RXTX_MAP_64: {
+		uint32_t arg2 = 0;
+		struct ffa_features_rxtx_map_params params = {
+			.min_buf_size = FFA_RXTX_MAP_MIN_BUF_4K,
+			.mbz = 0,
+			.max_buf_size =
+				(ffa_version >= MAKE_FFA_VERSION(1, 2))
+					? FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT
+					: 0,
+		};
+
+		memcpy_s(&arg2, sizeof(arg2), &params, sizeof(params));
+		return (struct ffa_value){
+			.func = FFA_SUCCESS_32,
+			.arg2 = arg2,
+		};
+	}
+
 	case FFA_MEM_RETRIEVE_REQ_32:
 		if ((input_property & FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_MASK) !=
 		    0U) {

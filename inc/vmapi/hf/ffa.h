@@ -1288,6 +1288,32 @@ void ffa_copy_memory_region_constituents(
 	struct ffa_memory_region_constituent *dest,
 	const struct ffa_memory_region_constituent *src);
 
+struct ffa_features_rxtx_map_params {
+	/*
+	 * Bit[0:1]:
+	 * Minimum buffer size and alignment boundary:
+	 * 0b00: 4K
+	 * 0b01: 64K
+	 * 0b10: 16K
+	 * 0b11: Reserved
+	 */
+	uint8_t min_buf_size : 2;
+	/*
+	 * Bit[2:15]:
+	 * Reserved (MBZ)
+	 */
+	uint16_t mbz : 14;
+	/*
+	 * Bit[16:32]:
+	 * Maximum buffer size in number of pages
+	 * Only present on version 1.2 or later
+	 */
+	uint16_t max_buf_size : 16;
+};
+
+#define FFA_RXTX_MAP_MIN_BUF_4K 0
+#define FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT 1
+
 /**
  * Endpoint RX/TX descriptor, as defined by Table 13.27 in FF-A v1.1 EAC0.
  * It's used by the Hypervisor to describe the RX/TX buffers mapped by a VM
