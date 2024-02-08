@@ -1828,7 +1828,7 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 	if (vm->id == HF_HYPERVISOR_VM_ID && !ffa_is_vm_id(allocator_id)) {
-		dlog_error(
+		dlog_verbose(
 			"The Hypervisor must specify a valid VM ID in register "
 			"W1, if FFA_RXTX_UNMAP call forwarded to SPM.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -2391,8 +2391,8 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	if ((requested_version >> FFA_VERSION_MAJOR_OFFSET) !=
 		    FFA_VERSION_MAJOR ||
 	    requested_version > FFA_VERSION_COMPILED) {
-		dlog_error("Version %x incompatible with %x\n",
-			   requested_version, FFA_VERSION_COMPILED);
+		dlog_verbose("Version %x incompatible with %x\n",
+			     requested_version, FFA_VERSION_COMPILED);
 		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
 	}
 

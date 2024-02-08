@@ -27,7 +27,7 @@ struct ffa_value arch_memory_protect(paddr_t begin, paddr_t end,
 	struct ffa_value ret;
 
 	if (!is_arch_feat_rme_supported()) {
-		dlog_warning(
+		dlog_verbose(
 			"%s: memory protect services rely on RME feature. "
 			"Memory is not protected %x\n",
 			__func__, pa_addr(begin));
