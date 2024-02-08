@@ -9,6 +9,7 @@
 #include "msr.h"
 #include "sysregs.h"
 
+/** Disable FPU/Adv. SIMD/SVE traps. */
 void arch_sve_disable_traps(void)
 {
 	uint64_t cptr_el2_val;
@@ -25,6 +26,7 @@ void arch_sve_disable_traps(void)
 	isb();
 }
 
+/** Enable SVE traps (but leave FPU/Adv. SIMD traps disabled). */
 void arch_sve_enable_traps(void)
 {
 	uint64_t cptr_el2_val;

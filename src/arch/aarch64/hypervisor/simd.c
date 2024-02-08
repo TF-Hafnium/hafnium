@@ -41,7 +41,7 @@ static struct {
 } ns_simd_ctx[MAX_CPUS];
 
 /**
- * Restore FPU/Adv. SIMD/SVE 'Other world' context when exiting the SPMC.
+ * Restore FPU/Adv. SIMD/SVE/SME 'Other world' context when exiting the SPMC.
  * Called from exceptions.S: other_world_loop.
  */
 void plat_restore_ns_simd_context(struct vcpu *vcpu)
@@ -68,13 +68,18 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 		/*
 		 * Restore SVCR, in particular (re)enable SSVE if it was enabled
 		 * at entry.
-		 * TODO: any PSTATE.SM transition resets all the Z0-Z31, P0-P15,
+		 * NOTE: a PSTATE.SM transition resets Z0-Z31, P0-P15,
 		 * FFR and FPSR registers to an architecturally defined
 		 * constant.
 		 */
 		arch_sme_svcr_set(ns_simd_ctx[cpu_id].svcr);
 
-		sm = (ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == 1;
+		sm = (ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == MSR_SVCR_SM;
+
+		/*
+		 * Streaming SVE vector length is determined by SMCR_EL2.LEN
+		 * that was set earlier during the save operation.
+		 */
 	}
 
 	if (sve) {
@@ -94,8 +99,8 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 
 	if ((sve || sme) && !hint) {
 		/*
-		 * NOTE: When SSVE is disabled, the SVE Vector length applies.
-		 * When SSVE is enabled, the SSVL applies.
+		 * NOTE: When SSVE is disabled, the SVE VL applies.
+		 * When SSVE is enabled, the SME SVL applies.
 		 */
 
 		/* Restore FFR register before predicates. */
@@ -200,7 +205,7 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 }
 
 /**
- * Save FPU/Adv SIMD/SVE 'Other world' context when entering the SPMC.
+ * Save FPU/Adv SIMD/SVE/SME 'Other world' context when entering the SPMC.
  * Called from handler.c: smc_handler_from_nwd.
  */
 void plat_save_ns_simd_context(struct vcpu *vcpu)
@@ -236,7 +241,7 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 		/* Save ZA array and SSVE enable state. */
 		ns_simd_ctx[cpu_id].svcr = arch_sme_svcr_get();
 
-		sm = (ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == 1;
+		sm = (ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == MSR_SVCR_SM;
 	}
 
 	if (sve) {
@@ -258,8 +263,8 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 
 	if ((sve || sme) && !hint) {
 		/*
-		 * NOTE: When SSVE is disabled, the SVE Vector length applies.
-		 * When SSVE is enabled, the SSVL applies.
+		 * NOTE: When SSVE is disabled, the SVE VL applies.
+		 * When SSVE is enabled, the SME SVL applies.
 		 */
 
 		/* Save predicate registers. */
@@ -347,11 +352,10 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 	 * SVCR.ZA=1 indicates the ZA array is live.
 	 * We deliberately choose to leave the ZA array enabled, knowing
 	 * that S-EL2 and lower won't make use of SME.
-	 * S-EL1 and lower are prevented SME registers access.
-	 * There is a probable performance impact but this avoids us
-	 * saving/restoring the ZA array contents.
-	 * SME2 ZT0 is isn't touched by EL2 and lower hence no need to
-	 * save/restore it.
+	 * S-EL1 and lower are prevented SME registers access. There is
+	 * a probable performance impact but this avoids us saving/restoring
+	 * the ZA array contents. SME2 ZT0 isn't touched by EL2 and lower ELs
+	 * hence no need to save/restore it.
 	 */
 
 	if (sme) {
@@ -359,8 +363,8 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 			/*
 			 * SVCR.SM=1 indicates active Streaming SVE mode.
 			 * It is preferable to disable it to save power.
-			 * The NS FPU/NEON/SVE state has already been saved
-			 * above. Disabling SSVE destroys the live state. Change
+			 * The overall NS SIMD state has been saved above.
+			 * Disabling SSVE destroys the live state. Change
 			 * to this field doesn't impact the ZA storage.
 			 */
 			arch_sme_svcr_set(ns_simd_ctx[cpu_id].svcr &
