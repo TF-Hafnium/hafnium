@@ -1480,7 +1480,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 						    .arg2 = intid});
 
 		vcpu_set_processing_interrupt(target_vcpu_locked, intid,
-					      current_locked.vcpu);
+					      current_locked);
 
 		/* Switch to target vCPU responsible for this interrupt. */
 		next = target_vcpu;
@@ -1502,7 +1502,9 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		plat_interrupts_end_of_interrupt(intid);
 		target_vcpu->secure_interrupt_deactivated = true;
 
-		vcpu_set_processing_interrupt(target_vcpu_locked, intid, NULL);
+		vcpu_set_processing_interrupt(
+			target_vcpu_locked, intid,
+			(struct vcpu_locked){.vcpu = NULL});
 		break;
 	case VCPU_STATE_RUNNING:
 		/*
@@ -1510,8 +1512,9 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		 * target vCPU that is in RUNNING state on another physical CPU.
 		 */
 		if (current_locked.vcpu == target_vcpu_locked.vcpu) {
-			vcpu_set_processing_interrupt(target_vcpu_locked, intid,
-						      NULL);
+			vcpu_set_processing_interrupt(
+				target_vcpu_locked, intid,
+				(struct vcpu_locked){.vcpu = NULL});
 			next = NULL;
 			break;
 		}
@@ -1558,7 +1561,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			current->state = VCPU_STATE_PREEMPTED;
 		}
 		vcpu_set_processing_interrupt(target_vcpu_locked, intid,
-					      current);
+					      current_locked);
 		next = target_vcpu;
 		break;
 	case VCPU_STATE_BLOCKED:
@@ -1605,7 +1608,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 					 });
 
 			vcpu_set_processing_interrupt(target_vcpu_locked, intid,
-						      current);
+						      current_locked);
 
 			next = target_vcpu;
 			break;
@@ -1646,7 +1649,9 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 		 */
 		target_vcpu->implicit_completion_signal = true;
 
-		vcpu_set_processing_interrupt(target_vcpu_locked, intid, NULL);
+		vcpu_set_processing_interrupt(
+			target_vcpu_locked, intid,
+			(struct vcpu_locked){.vcpu = NULL});
 		break;
 	case VCPU_STATE_RUNNING:
 		if (current == target_vcpu) {
@@ -1666,8 +1671,9 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * If the target vCPU is the running vCPU, no other
 			 * context needs to be resumed on interrupt completion.
 			 */
-			vcpu_set_processing_interrupt(target_vcpu_locked, intid,
-						      NULL);
+			vcpu_set_processing_interrupt(
+				target_vcpu_locked, intid,
+				(struct vcpu_locked){.vcpu = NULL});
 			break;
 		}
 	case VCPU_STATE_BLOCKED_INTERRUPT:
