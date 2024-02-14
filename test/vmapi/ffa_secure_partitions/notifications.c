@@ -252,6 +252,27 @@ TEST(ffa_notifications, fail_if_mbz_set_in_notification_get)
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
+TEST(ffa_notifications, fail_if_mbz_set_in_notification_set)
+{
+	struct ffa_value res;
+	const ffa_id_t sender = SP_ID(1);
+	ffa_id_t own_id = hf_vm_get_id();
+
+	/* Arbitrarily bind notification. */
+	res = ffa_notification_bind(sender, own_id, 0,
+				    FFA_NOTIFICATION_MASK(1));
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Requesting sender to set notification. */
+	res = sp_notif_set_cmd_send(own_id, sender, own_id,
+				    ~(FFA_NOTIFICATION_FLAG_PER_VCPU |
+				      FFA_NOTIFICATIONS_FLAG_DELAY_SRI),
+				    FFA_NOTIFICATION_MASK(1));
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_ERROR);
+	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
+}
+
 TEST(ffa_notifications, fail_if_mbz_set_in_notifications_bind)
 {
 	struct ffa_value res;

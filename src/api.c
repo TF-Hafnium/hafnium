@@ -3867,13 +3867,21 @@ struct ffa_value api_ffa_notification_set(
 {
 	struct ffa_value ret;
 	struct vm_locked receiver_locked;
-
 	/*
 	 * Check if is per-vCPU or global, and extracting vCPU ID according
 	 * to table 17.19 of the FF-A v1.1 Beta 0 spec.
 	 */
 	bool is_per_vcpu = (flags & FFA_NOTIFICATION_FLAG_PER_VCPU) != 0U;
 	ffa_vcpu_index_t vcpu_id = (uint16_t)(flags >> 16);
+	const uint32_t flags_mbz =
+		~(FFA_NOTIFICATIONS_FLAG_PER_VCPU |
+		  FFA_NOTIFICATIONS_FLAG_DELAY_SRI | (0xFFFFU << 16));
+
+	if ((flags_mbz & flags) != 0U) {
+		dlog_verbose("%s: caller shouldn't set bits that MBZ.\n",
+			     __func__);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	if (!plat_ffa_is_notification_set_valid(current, sender_vm_id,
 						receiver_vm_id)) {
