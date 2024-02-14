@@ -3883,6 +3883,14 @@ struct ffa_value api_ffa_notification_set(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	/* Global notifications must target any vCPU. */
+	if (!is_per_vcpu && vcpu_id != 0U) {
+		dlog_verbose(
+			"For global notifications vCPU ID MBZ in call to set "
+			"notifications.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
 	if (!plat_ffa_is_notification_set_valid(current, sender_vm_id,
 						receiver_vm_id)) {
 		dlog_verbose("Invalid use of notifications set interface.\n");
