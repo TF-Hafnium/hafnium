@@ -261,7 +261,9 @@ struct ffa_value arch_regs_get_args(struct arch_regs *regs)
 	uint32_t func_id = regs->r[0];
 
 	if (func_id == FFA_MSG_SEND_DIRECT_REQ2_64 ||
-	    func_id == FFA_MSG_SEND_DIRECT_RESP2_64) {
+	    func_id == FFA_MSG_SEND_DIRECT_RESP2_64 ||
+	    (func_id == FFA_CONSOLE_LOG_64 &&
+	     MAKE_FFA_VERSION(1, 2) <= FFA_VERSION_COMPILED)) {
 		return arch_regs_get_args_ext(regs);
 	}
 

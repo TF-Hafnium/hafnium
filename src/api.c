@@ -4453,77 +4453,88 @@ out:
 }
 
 /**
- * Helper function for FFA_CONSOLE_LOG ABI.
- * Writes number of characters to a given VM buffer.
- */
-static rsize_t arg_to_char_helper(struct vm_locked from_locked,
-				  const uint64_t src, rsize_t src_size,
-				  rsize_t to_write)
-{
-	bool flush = false;
-	char c;
-	rsize_t size = src_size < to_write ? src_size : to_write;
-	rsize_t written = 0;
-
-	if (size == 0) {
-		return 0;
-	}
-
-	while (written < size) {
-		c = ((char *)&src)[written++];
-		if (c == '\n' || c == '\0') {
-			flush = true;
-		} else {
-			from_locked.vm->log_buffer
-				[from_locked.vm->log_buffer_length++] = c;
-			flush = (from_locked.vm->log_buffer_length ==
-				 LOG_BUFFER_SIZE);
-		}
-
-		if (flush) {
-			dlog_flush_vm_buffer(from_locked.vm->id,
-					     from_locked.vm->log_buffer,
-					     from_locked.vm->log_buffer_length);
-			from_locked.vm->log_buffer_length = 0;
-		}
-	}
-
-	return written;
-}
-
-/**
- * Implements FFA_CONSOLE_LOG buffered logging.
+ * Implements FF-A v1.2 FFA_CONSOLE_LOG ABI for buffered logging.
  */
 struct ffa_value api_ffa_console_log(const struct ffa_value args,
 				     struct vcpu *current)
 {
-	struct vm *vm = current->vm;
-	struct vm_locked vm_locked;
-	size_t chars_in_param = args.func == FFA_CONSOLE_LOG_32
-					? sizeof(uint32_t)
-					: sizeof(uint64_t);
-	size_t total_to_write = args.arg1;
+	/* Maximum number of characters is 128: 16 registers of 8 bytes each. */
+	char chars[128] = {0};
+	const bool v1_2 = current->vm->ffa_version >= MAKE_FFA_VERSION(1, 2);
+	const bool log32 = args.func == FFA_CONSOLE_LOG_32;
 
-	if (total_to_write == 0 || total_to_write > chars_in_param * 6) {
+	/*
+	 * 32bit: always 6 registers
+	 * 64bit and less than v1.2: 6 registers
+	 * 64bit and v1.2 or greater: 16 registers
+	 */
+	const size_t registers_max = log32 ? 6 : (v1_2 ? 16 : 6);
+	const size_t chars_max =
+		registers_max * (log32 ? sizeof(uint32_t) : sizeof(uint64_t));
+	const size_t chars_count = args.arg1;
+	struct vm_locked vm_locked;
+
+	assert(args.func == FFA_CONSOLE_LOG_32 ||
+	       args.func == FFA_CONSOLE_LOG_64);
+
+	if (chars_count == 0 || chars_count > chars_max) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	vm_locked = vm_lock(vm);
+	if (log32) {
+		uint32_t *registers = (uint32_t *)chars;
 
-	total_to_write -= arg_to_char_helper(vm_locked, args.arg2,
-					     chars_in_param, total_to_write);
-	total_to_write -= arg_to_char_helper(vm_locked, args.arg3,
-					     chars_in_param, total_to_write);
-	total_to_write -= arg_to_char_helper(vm_locked, args.arg4,
-					     chars_in_param, total_to_write);
-	total_to_write -= arg_to_char_helper(vm_locked, args.arg5,
-					     chars_in_param, total_to_write);
-	total_to_write -= arg_to_char_helper(vm_locked, args.arg6,
-					     chars_in_param, total_to_write);
-	arg_to_char_helper(vm_locked, args.arg7, chars_in_param,
-			   total_to_write);
+		registers[0] = args.arg2 & 0xffffffff;
+		registers[1] = args.arg3 & 0xffffffff;
+		registers[2] = args.arg4 & 0xffffffff;
+		registers[3] = args.arg5 & 0xffffffff;
+		registers[4] = args.arg6 & 0xffffffff;
+		registers[5] = args.arg7 & 0xffffffff;
+	} else {
+		uint64_t *registers = (uint64_t *)chars;
+
+		registers[0] = args.arg2;
+		registers[1] = args.arg3;
+		registers[2] = args.arg4;
+		registers[3] = args.arg5;
+		registers[4] = args.arg6;
+		registers[5] = args.arg7;
+		if (v1_2) {
+			registers[6] = args.extended_val.arg8;
+			registers[7] = args.extended_val.arg9;
+			registers[8] = args.extended_val.arg10;
+			registers[9] = args.extended_val.arg11;
+			registers[10] = args.extended_val.arg12;
+			registers[11] = args.extended_val.arg13;
+			registers[12] = args.extended_val.arg14;
+			registers[13] = args.extended_val.arg15;
+			registers[14] = args.extended_val.arg16;
+			registers[15] = args.extended_val.arg17;
+		}
+	}
+
+	vm_locked = vm_lock(current->vm);
+	for (size_t i = 0; i < chars_count; i++) {
+		bool flush = false;
+		const char c = chars[i];
+
+		if (c == '\n' || c == '\0') {
+			flush = true;
+		} else {
+			vm_locked.vm->log_buffer
+				[vm_locked.vm->log_buffer_length++] = c;
+			flush = (vm_locked.vm->log_buffer_length ==
+				 LOG_BUFFER_SIZE);
+		}
+
+		if (flush) {
+			dlog_flush_vm_buffer(vm_locked.vm->id,
+					     vm_locked.vm->log_buffer,
+					     vm_locked.vm->log_buffer_length);
+			vm_locked.vm->log_buffer_length = 0;
+		}
+	}
 
 	vm_unlock(&vm_locked);
-
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
