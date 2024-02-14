@@ -297,6 +297,46 @@ TEST(ffa_notifications, fail_if_global_notif_vcpu_not_zero)
 	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
 }
 
+TEST(ffa_notifications, fail_if_global_notif_set_as_per_vcpu)
+{
+	struct ffa_value res;
+	const ffa_id_t sender = SP_ID(1);
+	ffa_id_t own_id = hf_vm_get_id();
+
+	/* Arbitrarily bind global notification. */
+	res = ffa_notification_bind(sender, own_id, 0,
+				    FFA_NOTIFICATION_MASK(1));
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Requesting sender to set notification: as per-vCPU. */
+	res = sp_notif_set_cmd_send(own_id, sender, own_id,
+				    FFA_NOTIFICATION_FLAG_PER_VCPU,
+				    FFA_NOTIFICATION_MASK(1));
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_ERROR);
+	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
+}
+
+TEST(ffa_notifications, fail_if_per_vcpu_notif_set_as_global)
+{
+	struct ffa_value res;
+	const ffa_id_t sender = SP_ID(1);
+	ffa_id_t own_id = hf_vm_get_id();
+
+	/* Arbitrarily bind per-vCPU notification. */
+	res = ffa_notification_bind(sender, own_id,
+				    FFA_NOTIFICATION_FLAG_PER_VCPU,
+				    FFA_NOTIFICATION_MASK(1));
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Requesting sender to set notification: as global. */
+	res = sp_notif_set_cmd_send(own_id, sender, own_id, 0,
+				    FFA_NOTIFICATION_MASK(1));
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_ERROR);
+	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
+}
+
 TEST(ffa_notifications, fail_if_mbz_set_in_notifications_bind)
 {
 	struct ffa_value res;

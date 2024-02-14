@@ -3925,6 +3925,20 @@ struct ffa_value api_ffa_notification_set(
 	}
 
 	/*
+	 * Check the if the notifications are bound as global if per-vCPU flag
+	 * is set, or if they are bound as per-vCPU and caller setting as
+	 * global. In either case, return FFA_INVALID_PARAMETERS.
+	 */
+	if (vm_notifications_validate_binding(
+		    receiver_locked, ffa_is_vm_id(sender_vm_id), sender_vm_id,
+		    notifications, !is_per_vcpu)) {
+		dlog_verbose("Notifications in %x are %s\n", notifications,
+			     !is_per_vcpu ? "global" : "per-vCPU");
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	}
+
+	/*
 	 * If notifications are not bound to the sender, they wouldn't be
 	 * enabled either for the receiver.
 	 */
