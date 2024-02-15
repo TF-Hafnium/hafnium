@@ -163,6 +163,40 @@ TEST(secure_interrupts, sp_direct_response_intercepted)
 }
 
 /*
+ * This test is an extension of the 'sp_direct_response_intercepted' test. It
+ * creates a scenario where a direct response message between two Secure
+ * partitions in intercepted to signal a pending virtual secure interrupt.
+ */
+TEST(secure_interrupts, sp_forward_direct_response_intercepted)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_id_t receiver_id = service2_info->vm_id;
+	const ffa_id_t companion_id = service1_info->vm_id;
+
+	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 400);
+
+	/*
+	 * Send request to the companion SP to send command to receiver SP to
+	 * sleep uninterrupted.
+	 */
+	res = sp_fwd_sleep_cmd_send(own_id, companion_id, receiver_id,
+				    SP_SLEEP_TIME, OPTIONS_MASK_INTERRUPTS);
+
+	/*
+	 * Secure interrupt should trigger during this time, SP will handle the
+	 * trusted watchdog timer interrupt.
+	 */
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
+}
+
+/*
  * Test secure interrupt handling while the Secure Partition is in WAITING
  * state.
  */
