@@ -2232,6 +2232,10 @@ static struct ffa_value plat_ffa_helper_resume_intercepted_call(
 	ffa_id_t receiver_vm_id;
 	struct vcpu *current = current_locked.vcpu;
 	struct ffa_value to_ret;
+	struct vcpu_locked next_locked = (struct vcpu_locked){
+		.vcpu = NULL,
+	};
+	struct two_vcpu_locked vcpus_locked;
 
 	/* Reset the fields tracking secure interrupt processing. */
 	plat_ffa_reset_secure_interrupt_flags(current_locked);
@@ -2279,6 +2283,20 @@ static struct ffa_value plat_ffa_helper_resume_intercepted_call(
 
 	api_ffa_resume_direct_resp_target(current_locked, next, receiver_vm_id,
 					  to_ret, true);
+
+	/*
+	 * Unlock current vCPU to allow it to be locked together with next
+	 * vcpu.
+	 */
+	vcpu_unlock(&current_locked);
+
+	/* Lock both vCPUs at once to avoid deadlock. */
+	vcpus_locked = vcpu_lock_both(current, *next);
+	current_locked = vcpus_locked.vcpu1;
+	next_locked = vcpus_locked.vcpu2;
+
+	plat_ffa_unwind_call_chain_ffa_direct_resp(current_locked, next_locked);
+	vcpu_unlock(&next_locked);
 
 	return (struct ffa_value){.func = FFA_INTERRUPT_32};
 }
