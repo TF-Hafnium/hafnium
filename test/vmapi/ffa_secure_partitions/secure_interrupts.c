@@ -146,7 +146,8 @@ TEST(secure_interrupts, sp_direct_response_intercepted)
 	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 400);
 
 	/* Send request to the SP to sleep uninterrupted. */
-	res = sp_sleep_cmd_send(own_id, receiver_id, SP_SLEEP_TIME, 1);
+	res = sp_sleep_cmd_send(own_id, receiver_id, SP_SLEEP_TIME,
+				OPTIONS_MASK_INTERRUPTS);
 
 	/*
 	 * Secure interrupt should trigger during this time, SP will handle the
@@ -213,7 +214,7 @@ TEST(secure_interrupts, sp_blocked)
 	 * there by putting receiver SP in BLOCKED state.
 	 */
 	res = sp_fwd_sleep_cmd_send(own_id, receiver_id, companion_id,
-				    SP_SLEEP_TIME, false);
+				    SP_SLEEP_TIME, 0);
 
 	/*
 	 * Secure interrupt should trigger during this time, receiver SP will

@@ -175,7 +175,7 @@ static bool is_expected_sp_response(struct ffa_value ret,
 
 static inline bool mask_interrupts(uint32_t options)
 {
-	return ((options & 0x1) == 1);
+	return ((options & OPTIONS_MASK_INTERRUPTS) != 0);
 }
 
 struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
@@ -199,17 +199,27 @@ struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
 	return sp_success(own_id, source, time_lapsed);
 }
 
+static inline bool get_hint_interrupted(uint32_t options)
+{
+	return ((options & OPTIONS_HINT_INTERRUPTED) != 0);
+}
+
 struct ffa_value sp_fwd_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
-				  ffa_id_t fwd_dest, bool hint_interrupted)
+				  ffa_id_t fwd_dest, uint32_t options)
 {
 	struct ffa_value ffa_ret;
 	ffa_id_t own_id = hf_vm_get_id();
 	bool fwd_dest_interrupted = false;
+	bool hint_interrupted = false;
 
 	HFTEST_LOG("VM%x requested %x to sleep for %ums", source, fwd_dest,
 		   sleep_ms);
 
-	ffa_ret = sp_sleep_cmd_send(own_id, fwd_dest, sleep_ms, 0);
+	ffa_ret = sp_sleep_cmd_send(own_id, fwd_dest, sleep_ms, options);
+
+	if (get_hint_interrupted(options)) {
+		hint_interrupted = true;
+	}
 
 	/*
 	 * The target of the direct request could be pre-empted any number of

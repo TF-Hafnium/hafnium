@@ -176,7 +176,7 @@ TEST_PRECONDITION_LONG_RUNNING(ffa_call_chain, disallow_migration_blocked_sp,
 	 * there by putting receiver SP in BLOCKED state.
 	 */
 	res = sp_fwd_sleep_cmd_send(own_id, receiver_id, companion_id,
-				    SP_SLEEP_LONG, false);
+				    SP_SLEEP_LONG, 0);
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);

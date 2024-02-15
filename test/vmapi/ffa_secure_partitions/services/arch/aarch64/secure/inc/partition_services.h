@@ -15,6 +15,10 @@
 #define SP_SUCCESS 0
 #define SP_ERROR -1
 
+/* Various fields encoded in `options` parameter. */
+#define OPTIONS_MASK_INTERRUPTS (1 << 0)
+#define OPTIONS_HINT_INTERRUPTED (1 << 1)
+
 static inline struct ffa_value sp_success(ffa_id_t sender, ffa_id_t receiver,
 					  uint64_t val)
 {
@@ -404,11 +408,10 @@ static inline struct ffa_value sp_fwd_sleep_cmd_send(ffa_id_t source,
 						     ffa_id_t dest,
 						     ffa_id_t fwd_dest,
 						     uint32_t busy_wait,
-						     bool hint_interrupted)
+						     uint32_t options)
 {
 	return ffa_msg_send_direct_req(source, dest, SP_FWD_SLEEP_CMD,
-				       busy_wait, fwd_dest, hint_interrupted,
-				       0);
+				       busy_wait, fwd_dest, options, 0);
 }
 
 static inline uint32_t sp_get_sleep_time(struct ffa_value ret)
@@ -421,13 +424,13 @@ static inline ffa_id_t sp_get_fwd_sleep_dest(struct ffa_value ret)
 	return (ffa_id_t)ret.arg5;
 }
 
-static inline bool sp_get_fwd_sleep_interrupted_hint(struct ffa_value ret)
+static inline uint32_t sp_get_fwd_sleep_options(struct ffa_value ret)
 {
-	return (bool)ret.arg6;
+	return (uint32_t)ret.arg6;
 }
 
 struct ffa_value sp_fwd_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
-				  ffa_id_t fwd_dest, bool hint_interrupted);
+				  ffa_id_t fwd_dest, uint32_t options);
 
 /**
  * Command to request SP to resume the task requested by current endpoint after

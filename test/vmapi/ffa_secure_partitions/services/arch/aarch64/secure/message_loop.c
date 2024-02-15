@@ -85,7 +85,7 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_FWD_SLEEP_CMD:
 		res = sp_fwd_sleep_cmd(ffa_sender(res), sp_get_sleep_time(res),
 				       sp_get_fwd_sleep_dest(res),
-				       sp_get_fwd_sleep_interrupted_hint(res));
+				       sp_get_fwd_sleep_options(res));
 		break;
 	case SP_CHECK_PARTITION_INFO_GET_REGS_CMD:
 		res = sp_check_partition_info_get_regs_cmd(ffa_sender(res));
