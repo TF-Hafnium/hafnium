@@ -416,7 +416,8 @@ class FvpDriver(Driver, ABC):
 
         if debug:
             fvp_args += [
-                    "-I", "-p"
+                    "--iris-connect", "tcpserver,allowRemote",
+                    "-p",
                     ]
 
         if self.cov_plugin is not None:
