@@ -437,6 +437,81 @@ TEST_SERVICE(ffa_lend_device_memory_to_sp_and_reclaim)
 	ffa_yield();
 }
 
+/**
+ * Test that device memory cannot be donated or shared. And lending to
+ * multiple borrowers is not permitted.
+ */
+TEST_SERVICE(ffa_lend_device_memory_fails)
+{
+	void *send_buf = SERVICE_SEND_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_partition_info *service2_info = service2(recv_buf);
+	struct ffa_partition_info *service3_info = service3(recv_buf);
+	struct hftest_context *ctx = hftest_get_context();
+	uintptr_t device_mem_base_addr =
+		ctx->partition_manifest.dev_regions[0].base_address;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)device_mem_base_addr, .page_count = 1},
+	};
+	uint32_t msg_size;
+	struct ffa_memory_access receivers[2];
+	struct ffa_memory_access_impdef zeroed_impdef_val =
+		ffa_memory_access_impdef_init(0, 0);
+
+	ASSERT_TRUE(ctx->partition_manifest.dev_region_count > 0);
+
+	/* If the service partition is not an SP, do not execute. */
+	ASSERT_TRUE(!ffa_is_vm_id(hf_vm_get_id()));
+
+	/*
+	 * Memory type can't be set in the attributes on FFA_MEM_DONATE.
+	 */
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  service2_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), 0, 0,
+			  FFA_DATA_ACCESS_NOT_SPECIFIED,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_DEV_NGNRNE,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+		  0);
+
+	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
+
+	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+			  send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			  service2_info->vm_id, constituents,
+			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
+			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			  FFA_MEMORY_DEVICE_MEM, FFA_MEMORY_DEV_NGNRNE,
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+		  0);
+
+	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size), FFA_DENIED);
+
+	/* Test lending multiple borrowers is not permitted. */
+	ffa_memory_access_init(
+		&receivers[0], service2_info->vm_id, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &zeroed_impdef_val);
+	ffa_memory_access_init(
+		&receivers[1], service3_info->vm_id, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &zeroed_impdef_val);
+
+	/*
+	 * Memory type can't be set in the attributes on FFA_MEM_LEND.
+	 */
+	ffa_memory_region_init(
+		send_buf, HF_MAILBOX_SIZE, hf_vm_get_id(), receivers,
+		ARRAY_SIZE(receivers), sizeof(struct ffa_memory_access),
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_DEV_NGNRNE,
+		FFA_MEMORY_INNER_SHAREABLE, &msg_size, NULL);
+
+	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
+
+	ffa_yield();
+}
+
 TEST_SERVICE(ffa_memory_return)
 {
 	uint8_t *ptr;

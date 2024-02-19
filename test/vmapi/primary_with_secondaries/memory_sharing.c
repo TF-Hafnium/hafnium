@@ -1353,6 +1353,26 @@ TEST_PRECONDITION(memory_sharing, lend_device_memory_between_sps_and_reclaim,
 }
 
 /**
+ * Validate that an SP can't share/donate device memory or lend device memory
+ * to multiple borrowers. Currently only lending to a single borrower is
+ * supported, and tested so we want to ensure other cases are not permitted.
+ */
+TEST_PRECONDITION(memory_sharing, invalid_device_share_fails,
+		  service1_service2_and_service3_are_secure)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id, "ffa_lend_device_memory_fails",
+		       mb.send);
+
+	/* Run SP to attempt to donate memory. */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+}
+
+/**
  * Check that memory is unable to be donated to multiple parties.
  */
 TEST(memory_sharing, donate_twice)
