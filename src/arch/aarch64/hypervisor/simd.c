@@ -87,11 +87,9 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 		arch_sve_disable_traps();
 
 		/*
-		 * Configure EL2 vector length to maximum permitted value.
-		 * TODO: if PSTATE.SM=1 the SVE vector length is determined by
-		 * SMCR_ELx.LEN.
+		 * SVE vector length is determined by ZCR_EL2.LEN
+		 * that was set earlier during the save operation.
 		 */
-		arch_sve_configure_vector_length();
 	}
 
 	/* Restore FPCR/FPSR common to FPU/Adv. SIMD./SVE/SME. */
