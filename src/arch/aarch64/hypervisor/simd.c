@@ -14,6 +14,7 @@
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
+#include "smc.h"
 #include "sysregs.h"
 
 /**
@@ -217,7 +218,7 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 
 	/* Get SMCCCv1.3 SMC FID[16] SVE hint, and clear it from vCPU r0. */
 	smc_fid = vcpu->regs.r[0];
-	hint = ns_simd_ctx[cpu_id].hint = ((smc_fid >> 16) & 1) != 0;
+	hint = ns_simd_ctx[cpu_id].hint = (smc_fid & SMCCC_SVE_HINT_MASK) != 0;
 	vcpu->regs.r[0] &= ~(1 << 16);
 
 	if (sme) {
