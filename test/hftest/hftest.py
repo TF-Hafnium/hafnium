@@ -46,10 +46,16 @@ HFTEST_CTRL_JSON_REGEX = re.compile("^\\[[0-9a-fA-F]+ [0-9a-fA-F]+\\] ")
 HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 DTC_SCRIPT = os.path.join(HF_ROOT, "build", "image", "dtc.py")
-FVP_BINARY = os.path.join(
-    os.path.dirname(HF_ROOT), "fvp", "Base_RevC_AEMvA_pkg", "models",
-    "Linux64_armv8l_GCC-9.3" if MACHINE == "aarch64" else "Linux64_GCC-9.3",
-    "FVP_Base_RevC-2xAEMvA")
+
+try:
+    FVP_BINARY = os.environ['HAFNIUM_FVP']
+    print(f"Setting environment FVP: {FVP_BINARY}")
+except KeyError:
+    FVP_BINARY = os.path.join(
+        os.path.dirname(HF_ROOT), "fvp", "Base_RevC_AEMvA_pkg", "models",
+        "Linux64_armv8l_GCC-9.3" if MACHINE == "aarch64" else "Linux64_GCC-9.3",
+        "FVP_Base_RevC-2xAEMvA")
+
 HF_PREBUILTS = os.path.join(HF_ROOT, "prebuilts")
 QEMU_PREBUILTS = os.path.join(HF_PREBUILTS,
          "linux-" + ("x64" if MACHINE == "x86_64" else MACHINE),
