@@ -40,6 +40,7 @@ TEST(hf_vm_get_id, secure_partition_id)
 TEST(ffa_features, succeeds_ffa_call_ids)
 {
 	struct ffa_value ret;
+	struct ffa_features_rxtx_map_params rxtx_map_params;
 
 	ret = ffa_features(FFA_ERROR_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -169,6 +170,14 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP2_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_RXTX_MAP_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	rxtx_map_params = ffa_features_rxtx_map_params(ret);
+	EXPECT_EQ(rxtx_map_params.min_buf_size, FFA_RXTX_MAP_MIN_BUF_4K);
+	EXPECT_EQ(rxtx_map_params.mbz, 0);
+	EXPECT_EQ(rxtx_map_params.max_buf_size,
+		  FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT);
 #endif
 }
 

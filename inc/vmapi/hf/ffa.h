@@ -1314,6 +1314,17 @@ struct ffa_features_rxtx_map_params {
 #define FFA_RXTX_MAP_MIN_BUF_4K 0
 #define FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT 1
 
+static inline struct ffa_features_rxtx_map_params ffa_features_rxtx_map_params(
+	struct ffa_value args)
+{
+	struct ffa_features_rxtx_map_params params;
+	uint32_t arg2 = args.arg2;
+
+	params = *(struct ffa_features_rxtx_map_params *)(&arg2);
+
+	return params;
+}
+
 /**
  * Endpoint RX/TX descriptor, as defined by Table 13.27 in FF-A v1.1 EAC0.
  * It's used by the Hypervisor to describe the RX/TX buffers mapped by a VM
