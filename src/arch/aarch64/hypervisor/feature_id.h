@@ -40,11 +40,17 @@
 /* Activity Monitor Unit (AMU) */
 #define HF_FEATURE_AMU (UINT64_C(1) << 7)
 
+/* Scalable Vector Extension (SVE) */
+#define HF_FEATURE_SVE (UINT64_C(1) << 8)
+
+/* Scalable Matrix Extension (SME) */
+#define HF_FEATURE_SME (UINT64_C(1) << 9)
+
 /*
  * NOTE: This should be based on the last (highest value) defined feature.
  * Adjust if adding more features.
  */
-#define HF_FEATURE_ALL ((HF_FEATURE_AMU << 1) - 1)
+#define HF_FEATURE_ALL ((HF_FEATURE_SME << 1) - 1)
 
 bool feature_id_is_register_access(uintreg_t esr_el2);
 

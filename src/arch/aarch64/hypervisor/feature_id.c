@@ -169,6 +169,7 @@ void feature_set_traps(struct vm *vm, struct arch_regs *regs)
 	/* By default do not mask out any features. */
 	vm->arch.tid3_masks.id_aa64mmfr1_el1 = ~0ULL;
 	vm->arch.tid3_masks.id_aa64pfr0_el1 = ~0ULL;
+	vm->arch.tid3_masks.id_aa64pfr1_el1 = ~0ULL;
 	vm->arch.tid3_masks.id_aa64dfr0_el1 = ~0ULL;
 	vm->arch.tid3_masks.id_aa64isar1_el1 = ~0ULL;
 
@@ -178,6 +179,16 @@ void feature_set_traps(struct vm *vm, struct arch_regs *regs)
 	 */
 	vm->arch.tid3_masks.id_aa64mmfr1_el1 &=
 		~(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT);
+
+	if (features & HF_FEATURE_SVE) {
+		vm->arch.tid3_masks.id_aa64pfr0_el1 &= ~(
+			ID_AA64PFR0_EL1_SVE_MASK << ID_AA64PFR0_EL1_SVE_SHIFT);
+	}
+
+	if (features & HF_FEATURE_SME) {
+		vm->arch.tid3_masks.id_aa64pfr1_el1 &= ~(
+			ID_AA64PFR1_EL1_SME_MASK << ID_AA64PFR1_EL1_SME_SHIFT);
+	}
 
 	if (features & HF_FEATURE_RAS) {
 		regs->hyp_state.hcr_el2 |= HCR_EL2_TERR;
@@ -294,6 +305,9 @@ bool feature_id_process_access(struct vcpu *vcpu, uintreg_t esr)
 		break;
 	case ID_AA64PFR0_EL1_ENC:
 		value &= vm->arch.tid3_masks.id_aa64pfr0_el1;
+		break;
+	case ID_AA64PFR1_EL1_ENC:
+		value &= vm->arch.tid3_masks.id_aa64pfr1_el1;
 		break;
 	case ID_AA64DFR0_EL1_ENC:
 		value &= vm->arch.tid3_masks.id_aa64dfr0_el1;

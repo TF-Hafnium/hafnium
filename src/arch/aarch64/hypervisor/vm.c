@@ -30,6 +30,10 @@ void arch_vm_features_set(struct vm *vm)
 
 	vm->arch.trapped_features |= HF_FEATURE_DEBUG;
 
+	vm->arch.trapped_features |= HF_FEATURE_SVE;
+
+	vm->arch.trapped_features |= HF_FEATURE_SME;
+
 	if (vm->id != HF_PRIMARY_VM_ID) {
 		/*
 		 * Features to trap only for the secondary VMs (and Secure

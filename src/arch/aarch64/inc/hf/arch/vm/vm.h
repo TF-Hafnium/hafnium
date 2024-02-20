@@ -27,6 +27,7 @@ struct arch_vm {
 	struct {
 		uintreg_t id_aa64mmfr1_el1;
 		uintreg_t id_aa64pfr0_el1;
+		uintreg_t id_aa64pfr1_el1;
 		uintreg_t id_aa64dfr0_el1;
 		uintreg_t id_aa64isar1_el1;
 	} tid3_masks;
