@@ -2919,7 +2919,6 @@ static struct ffa_value ffa_memory_retrieve_validate(
 	assert(retrieve_request != NULL);
 	assert(memory_region != NULL);
 	assert(receiver_index != NULL);
-	assert(retrieve_request->sender == memory_region->sender);
 
 	if (retrieve_request_length != expected_retrieve_request_length) {
 		dlog_verbose(
