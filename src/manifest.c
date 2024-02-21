@@ -516,15 +516,33 @@ static enum manifest_return_code check_partition_memory_is_valid(
 {
 	bool is_secure_region =
 		(attributes & MANIFEST_REGION_ATTR_SECURITY) == 0U;
-	const struct mem_range *ranges_from_manifest =
-		is_secure_region ? params->mem_ranges : params->ns_mem_ranges;
-	size_t ranges_count = is_secure_region ? params->mem_ranges_count
-					       : params->ns_mem_ranges_count;
-	bool within_ranges = is_memory_region_within_ranges(
+	bool is_device_region =
+		(attributes & MANIFEST_REGION_ATTR_MEMORY_TYPE_DEVICE) != 0U;
+	const struct mem_range *ranges_from_manifest;
+	size_t ranges_count;
+	bool within_ranges;
+	enum manifest_return_code error_return;
+
+	if (!is_device_region) {
+		ranges_from_manifest = is_secure_region ? params->mem_ranges
+							: params->ns_mem_ranges;
+		ranges_count = is_secure_region ? params->mem_ranges_count
+						: params->ns_mem_ranges_count;
+		error_return = MANIFEST_ERROR_MEM_REGION_INVALID;
+	} else {
+		ranges_from_manifest = is_secure_region
+					       ? params->device_mem_ranges
+					       : params->ns_device_mem_ranges;
+		ranges_count = is_secure_region
+				       ? params->device_mem_ranges_count
+				       : params->ns_device_mem_ranges_count;
+		error_return = MANIFEST_ERROR_DEVICE_MEM_REGION_INVALID;
+	}
+
+	within_ranges = is_memory_region_within_ranges(
 		base_address, page_count, ranges_from_manifest, ranges_count);
 
-	return within_ranges ? MANIFEST_SUCCESS
-			     : MANIFEST_ERROR_MEM_REGION_INVALID;
+	return within_ranges ? MANIFEST_SUCCESS : error_return;
 }
 
 /*
@@ -789,7 +807,8 @@ static struct interrupt_info *device_region_get_interrupt_info(
 
 static enum manifest_return_code parse_ffa_device_region_node(
 	struct fdt_node *dev_node, struct device_region *dev_regions,
-	uint16_t *count, uint8_t *dma_device_count)
+	uint16_t *count, uint8_t *dma_device_count,
+	const struct boot_params *boot_params)
 {
 	struct uint32list_iter list;
 	uint16_t i = 0;
@@ -832,6 +851,10 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 		TRY(read_uint32(dev_node, "attributes",
 				&dev_regions[i].attributes));
+		/* Set the memory type attribute to device. */
+		dev_regions[i].attributes =
+			dev_regions[i].attributes |
+			MANIFEST_REGION_ATTR_MEMORY_TYPE_DEVICE;
 
 		/*
 		 * Check RWX permission attributes.
@@ -848,12 +871,16 @@ static enum manifest_return_code parse_ffa_device_region_node(
 			return MANIFEST_ERROR_INVALID_MEM_PERM;
 		}
 
-		/* Filer device region attributes. */
+		/* Filter device region attributes. */
 		dev_regions[i].attributes = dev_regions[i].attributes &
 					    MANIFEST_REGION_ALL_ATTR_MASK;
 
 		dlog_verbose("      Attributes: %#x\n",
 			     dev_regions[i].attributes);
+
+		TRY(check_partition_memory_is_valid(
+			dev_regions[i].base_address, dev_regions[i].page_count,
+			dev_regions[i].attributes, boot_params));
 
 		TRY(read_optional_uint32list(dev_node, "interrupts", &list));
 		dlog_verbose("      Interrupt List:\n");
@@ -1402,7 +1429,7 @@ enum manifest_return_code parse_ffa_manifest(
 		TRY(parse_ffa_device_region_node(
 			&ffa_node, vm->partition.dev_regions,
 			&vm->partition.dev_region_count,
-			&vm->partition.dma_device_count));
+			&vm->partition.dma_device_count, boot_params));
 	}
 	dlog_verbose("  Total %u device regions found\n",
 		     vm->partition.dev_region_count);
@@ -1694,6 +1721,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		       "regions";
 	case MANIFEST_ERROR_MEM_REGION_INVALID:
 		return "Invalid memory region range";
+	case MANIFEST_ERROR_DEVICE_MEM_REGION_INVALID:
+		return "Invalid device memory region range";
 	case MANIFEST_ERROR_INVALID_BOOT_ORDER:
 		return "Boot order should be a unique value less than "
 		       "default largest value";

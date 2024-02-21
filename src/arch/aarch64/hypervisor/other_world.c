@@ -55,10 +55,27 @@ bool arch_other_world_vm_init(struct vm *other_world_vm,
 			    params->ns_mem_ranges[i].end,
 			    MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
 			    ppool, NULL)) {
-			dlog_error("%s", err_msg);
+			dlog_error("Normal Memory: %s", err_msg);
 			goto out;
 		}
 	}
+
+	/*
+	 * Map NS device mem ranges to "Other world VM" Stage-2 PTs to allow
+	 * for memory sharing operations from NWd to SWd.
+	 */
+	for (i = 0; i < params->ns_device_mem_ranges_count; i++) {
+		if (!vm_identity_map(
+			    other_world_vm_locked,
+			    params->ns_device_mem_ranges[i].begin,
+			    params->ns_device_mem_ranges[i].end,
+			    MM_MODE_R | MM_MODE_W | MM_MODE_D | MM_MODE_NS,
+			    ppool, NULL)) {
+			dlog_error("Device Memory: %s", err_msg);
+			goto out;
+		}
+	}
+
 	/*
 	 * Force the hypervisor's version to be same as ours.
 	 * FF-A version at hypervisor's initialization is not getting to the

@@ -405,6 +405,18 @@ class manifest : public ::testing::Test
 			pa_init((uintpaddr_t)0x7000000);
 		params->ns_mem_ranges[0].end = pa_init((uintpaddr_t)0x8ffffff);
 		params->ns_mem_ranges_count = 1;
+
+		params->ns_device_mem_ranges[0].begin =
+			pa_init((uintpaddr_t)0x20000000);
+		params->ns_device_mem_ranges[0].end =
+			pa_init((uintpaddr_t)0x24000000);
+		params->ns_device_mem_ranges_count = 1;
+
+		params->device_mem_ranges[0].begin =
+			pa_init((uintpaddr_t)0x24000000);
+		params->device_mem_ranges[0].end =
+			pa_init((uintpaddr_t)0x28000000);
+		params->device_mem_ranges_count = 1;
 	}
 
 	enum manifest_return_code manifest_from_vec(
@@ -1469,7 +1481,7 @@ TEST_F(manifest, ffa_validate_dev_regions)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device")
 				.Description("test-device")
-				.Property("base-address", "<0x7200000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 				.Property("smmu-id", "<1>")
@@ -1491,14 +1503,14 @@ TEST_F(manifest, ffa_validate_dev_regions)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device-0")
 				.Description("test-device-0")
-				.Property("base-address", "<0x7200000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 				.Property("interrupts", "<2 3>")
 			.EndChild()
 			.StartChild("test-device-1")
 				.Description("test-device-1")
-				.Property("base-address", "<0x8200000>")
+				.Property("base-address", "<0x25000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 				.Property("interrupts", "<1 3>, <2 5> ")
@@ -1526,17 +1538,17 @@ TEST_F(manifest, ffa_validate_dev_regions)
 			.Compatible({"arm,ffa-manifest-device-regions"})
 			.StartChild("test-device-0")
 				.Description("test-device-0")
-				.Property("base-address", "<0x7200000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 			.EndChild()
 			.StartChild("test-device-1")
 				.Description("test-device-1")
-				.Property("base-address", "<0x7200000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 			.EndChild()
-			.EndChild()
+		.EndChild()
 		.Build();
 
 	/* clang-format on */
@@ -1545,26 +1557,17 @@ TEST_F(manifest, ffa_validate_dev_regions)
 	manifest_dealloc();
 
 	/*
-	 * Check memory region node and device region node address space
-	 * cannot overlap.
+	 * Device regions cannot be defined outside of the regions specified in
+	 * the spmc.
 	 */
 	/* clang-format off */
 	dtb = ManifestDtBuilder()
 		.FfaValidManifest()
-		.StartChild("memory-regions")
-			.Compatible({"arm,ffa-manifest-memory-regions" })
-			.StartChild("test-memory")
-				.Description("test-memory")
-				.Property("base-address", "<0x7100000>")
-				.Property("pages-count", "<16>")
-				.Property("attributes", "<3>")
-			.EndChild()
-		.EndChild()
 		.StartChild("device-regions")
 			.Compatible({"arm,ffa-manifest-device-regions"})
 			.StartChild("test-device-0")
 				.Description("test-device-0")
-				.Property("base-address", "<0x7100000>")
+				.Property("base-address", "<0x50000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 			.EndChild()
@@ -1572,7 +1575,28 @@ TEST_F(manifest, ffa_validate_dev_regions)
 		.Build();
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
-		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+		  MANIFEST_ERROR_DEVICE_MEM_REGION_INVALID);
+	manifest_dealloc();
+
+	/*
+	 * Memory defined as NS in SPMC manifest given Secure attribute should
+	 * fail.
+	 */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("device-regions")
+			.Compatible({"arm,ffa-manifest-device-regions"})
+			.StartChild("test-device-0")
+				.Description("test-device-0")
+				.Property("base-address", "<0x20000000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_DEVICE_MEM_REGION_INVALID);
 }
 
 TEST_F(manifest, ffa_invalid_memory_region_attributes)
@@ -1717,7 +1741,7 @@ TEST_F(manifest, ffa_valid)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device")
 				.Description("test-device")
-				.Property("base-address", "<0x7400000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 				.Property("smmu-id", "<1>")
@@ -1726,12 +1750,13 @@ TEST_F(manifest, ffa_valid)
 			.EndChild()
 			.StartChild("test-device-ns")
 				.Description("test-device")
-				.Property("base-address", "<0x7500000>")
+				.Property("base-address", "<0x20000000>")
 				.Property("pages-count", "<1>")
 				.Property("attributes", "<0x9>")
 			.EndChild()
 		.EndChild()
 		.Build();
+
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
 
@@ -1761,9 +1786,9 @@ TEST_F(manifest, ffa_valid)
 	ASSERT_EQ(vm->partition.rxtx.tx_buffer->page_count, 1);
 	ASSERT_EQ(vm->partition.rxtx.tx_buffer->attributes, 3);
 
-	ASSERT_EQ(vm->partition.dev_regions[0].base_address, 0x7400000);
+	ASSERT_EQ(vm->partition.dev_regions[0].base_address, 0x24000000);
 	ASSERT_EQ(vm->partition.dev_regions[0].page_count, 16);
-	ASSERT_EQ(vm->partition.dev_regions[0].attributes, 3);
+	ASSERT_EQ(vm->partition.dev_regions[0].attributes, (16 | 3));
 	ASSERT_EQ(vm->partition.dev_regions[0].smmu_id, 1);
 	ASSERT_EQ(vm->partition.dev_regions[0].stream_ids[0], 0);
 	ASSERT_EQ(vm->partition.dev_regions[0].stream_ids[1], 1);
@@ -1771,7 +1796,8 @@ TEST_F(manifest, ffa_valid)
 	ASSERT_EQ(vm->partition.dev_regions[0].interrupts[0].attributes, 3);
 	ASSERT_EQ(vm->partition.dev_regions[0].interrupts[1].id, 4);
 	ASSERT_EQ(vm->partition.dev_regions[0].interrupts[1].attributes, 5);
-	ASSERT_EQ(vm->partition.dev_regions[1].attributes, (8 | 1));
+	ASSERT_EQ(vm->partition.dev_regions[1].base_address, 0x20000000);
+	ASSERT_EQ(vm->partition.dev_regions[1].attributes, (16 | 8 | 1));
 }
 
 TEST_F(manifest, ffa_valid_interrupt_target_manifest)
@@ -1786,7 +1812,7 @@ TEST_F(manifest, ffa_valid_interrupt_target_manifest)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device")
 				.Description("test-device")
-				.Property("base-address", "<0x7400000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 				.Property("smmu-id", "<1>")
@@ -1802,9 +1828,9 @@ TEST_F(manifest, ffa_valid_interrupt_target_manifest)
 
 	vm = &m->vm[0];
 
-	ASSERT_EQ(vm->partition.dev_regions[0].base_address, 0x7400000);
+	ASSERT_EQ(vm->partition.dev_regions[0].base_address, 0x24000000);
 	ASSERT_EQ(vm->partition.dev_regions[0].page_count, 16);
-	ASSERT_EQ(vm->partition.dev_regions[0].attributes, 3);
+	ASSERT_EQ(vm->partition.dev_regions[0].attributes, (16 | 3));
 	ASSERT_EQ(vm->partition.dev_regions[0].smmu_id, 1);
 	ASSERT_EQ(vm->partition.dev_regions[0].stream_ids[0], 0);
 	ASSERT_EQ(vm->partition.dev_regions[0].stream_ids[1], 1);
@@ -1831,7 +1857,7 @@ TEST_F(manifest, ffa_invalid_interrupt_target_manifest)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device")
 				.Description("test-device")
-				.Property("base-address", "<0x7400000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 				.Property("smmu-id", "<1>")
@@ -2014,7 +2040,7 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device-0")
 				.Description("test-device-0")
-				.Property("base-address", "<0x7200000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 			.EndChild()
@@ -2036,7 +2062,7 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device-0")
 				.Description("test-device-1")
-				.Property("base-address", "<0x7200000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 			.EndChild()
@@ -2091,7 +2117,7 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device-0")
 				.Description("test-device-0")
-				.Property("base-address", "<0x7200000>")
+				.Property("base-address", "<0x24000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 			.EndChild()
@@ -2113,7 +2139,7 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 			.Compatible({ "arm,ffa-manifest-device-regions" })
 			.StartChild("test-device-0")
 				.Description("test-device-1")
-				.Property("base-address", "<0x7300000>")
+				.Property("base-address", "<0x25000000>")
 				.Property("pages-count", "<16>")
 				.Property("attributes", "<3>")
 			.EndChild()
