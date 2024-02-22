@@ -520,10 +520,10 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 	uint32_t receiver_count;
 	struct ffa_memory_access *receiver;
 	uint32_t composite_offset_0;
+	struct ffa_memory_region_v1_0 *memory_region_v1_0 =
+		(struct ffa_memory_region_v1_0 *)memory_region;
 
 	if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
-		struct ffa_memory_region_v1_0 *memory_region_v1_0 =
-			(struct ffa_memory_region_v1_0 *)memory_region;
 		/* Check the reserved fields are 0. */
 		if (memory_region_v1_0->reserved_0 != 0 ||
 		    memory_region_v1_0->reserved_1 != 0) {
@@ -563,9 +563,9 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 	}
 
 	/* Check receiver count is not too large. */
-	if (receiver_count > MAX_MEM_SHARE_RECIPIENTS) {
+	if (receiver_count > MAX_MEM_SHARE_RECIPIENTS || receiver_count < 1) {
 		dlog_verbose(
-			"Max number of recipients supported is %u "
+			"Receiver count must be 0 < receiver_count < %u "
 			"specified %u\n",
 			MAX_MEM_SHARE_RECIPIENTS, receiver_count);
 		return false;
@@ -577,9 +577,7 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 	 * check the first one is valid and then they are all the same.
 	 */
 	receiver = ffa_version == MAKE_FFA_VERSION(1, 0)
-			   ? (struct ffa_memory_access *)&(
-				     (struct ffa_memory_region_v1_0 *)
-					     memory_region)
+			   ? (struct ffa_memory_access *)&memory_region_v1_0
 				     ->receivers[0]
 			   : ffa_memory_region_get_receiver(memory_region, 0);
 	assert(receiver != NULL);
@@ -620,9 +618,6 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 		uint32_t composite_offset;
 
 		if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
-			struct ffa_memory_region_v1_0 *memory_region_v1_0 =
-				(struct ffa_memory_region_v1_0 *)memory_region;
-
 			struct ffa_memory_access_v1_0 *receiver_v1_0 =
 				&memory_region_v1_0->receivers[i];
 			/* Check reserved fields are 0 */
