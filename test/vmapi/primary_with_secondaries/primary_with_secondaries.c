@@ -43,6 +43,17 @@ bool service1_and_service2_are_secure(void)
 	       !ffa_is_vm_id(service2_info->vm_id);
 }
 
+bool service1_service2_and_service3_are_secure(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+
+	return !ffa_is_vm_id(service1_info->vm_id) &&
+	       !ffa_is_vm_id(service2_info->vm_id) &&
+	       !ffa_is_vm_id(service3_info->vm_id);
+}
 /*
  * The following is a precondition function, for the current system set-up.
  * This is currently being used to skip memory sharing tests, when

@@ -80,6 +80,7 @@ struct ffa_partition_info* service4(void* recv);
 bool service1_is_vm(void);
 bool service1_is_not_vm(void);
 bool service1_and_service2_are_secure(void);
+bool service1_service2_and_service3_are_secure(void);
 bool hypervisor_only(void);
 
 #define SERVICE_VM1 (HF_VM_ID_OFFSET + 1)

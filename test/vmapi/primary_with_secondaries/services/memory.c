@@ -993,6 +993,78 @@ TEST_SERVICE(ffa_memory_lend_twice)
 	ffa_yield();
 }
 
+/**
+ * Share memory from a v1.1 endpoint to multiple borrowers and check
+ * that the endpoints can access and modify it.
+ */
+TEST_SERVICE(share_ffa_v1_1)
+{
+	struct ffa_value ret;
+	void *send_buf = SERVICE_SEND_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_partition_info *service2_info = service2(recv_buf);
+	struct ffa_partition_info *service3_info = service3(recv_buf);
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)page, .page_count = 1},
+	};
+	/* v1.1 and v1.0 share the same memory access descriptors. */
+	struct ffa_memory_access_v1_0 receivers_v1_1[2];
+	uint32_t msg_size;
+	struct ffa_partition_msg *retrieve_message = send_buf;
+	uint8_t *ptr = page;
+	ffa_memory_handle_t handle;
+
+	ffa_memory_access_init_v1_0(&receivers_v1_1[0], service2_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	ffa_memory_access_init_v1_0(&receivers_v1_1[1], service3_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
+	ffa_memory_region_init(
+		(struct ffa_memory_region *)send_buf, HF_MAILBOX_SIZE,
+		hf_vm_get_id(), (void *)receivers_v1_1,
+		ARRAY_SIZE(receivers_v1_1),
+		sizeof(struct ffa_memory_access_v1_0), constituents,
+		ARRAY_SIZE(constituents), 0, 0, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL,
+		&msg_size);
+
+	EXPECT_NE(ffa_version(MAKE_FFA_VERSION(1, 1)), FFA_ERROR_32);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+
+	handle = ffa_mem_success_handle(ret);
+
+	msg_size = ffa_memory_retrieve_request_init(
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		hf_vm_get_id(), (void *)receivers_v1_1,
+		ARRAY_SIZE(receivers_v1_1),
+		sizeof(struct ffa_memory_access_v1_0), 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+	ffa_rxtx_header_init(hf_vm_get_id(), service2_info->vm_id, msg_size,
+			     &retrieve_message->header);
+	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+
+	/* Run service2 for it to fetch the memory. */
+	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
+
+	for (int i = 0; i < PAGE_SIZE; ++i) {
+		ptr[i] = i;
+	}
+
+	/* Run service2 for it to increment the memory. */
+	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
+
+	for (int i = 0; i < PAGE_SIZE; ++i) {
+		EXPECT_EQ(ptr[i], i + 1);
+	}
+
+	ffa_yield();
+}
+
 TEST_SERVICE(retrieve_ffa_v1_0)
 {
 	uint8_t *ptr = NULL;

@@ -3788,12 +3788,13 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_1)
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 1},
 	};
 	/* v1.1 receivers match the fields from v1.0 */
-	struct ffa_memory_access_v1_0 receiver_v1_1;
-	struct ffa_memory_access receiver_v_cur;
+	struct ffa_memory_access_v1_0 receivers_v1_1[2];
+	struct ffa_memory_access receivers_v_cur[2];
 	uint32_t msg_size;
 	struct ffa_partition_msg *retrieve_message = mb.send;
 	ffa_memory_handle_t handle;
@@ -3801,21 +3802,27 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_1)
 
 	SERVICE_SELECT(service1_info->vm_id, "retrieve_ffa_v1_1", mb.send);
 
-	ffa_memory_access_init_v1_0(&receiver_v1_1, service1_info->vm_id,
+	ffa_memory_access_init_v1_0(&receivers_v1_1[0], service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
 				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
-	ffa_memory_access_init(&receiver_v_cur, service1_info->vm_id,
+	ffa_memory_access_init(&receivers_v_cur[0], service1_info->vm_id,
+			       FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
+	ffa_memory_access_init_v1_0(&receivers_v1_1[1], service2_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	ffa_memory_access_init(&receivers_v_cur[1], service2_info->vm_id,
 			       FFA_DATA_ACCESS_RW,
 			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
 
 	/* Initialize memory sharing test according to current version. */
-	ffa_memory_region_init((struct ffa_memory_region *)mb.send,
-			       HF_MAILBOX_SIZE, hf_vm_get_id(), &receiver_v_cur,
-			       1, sizeof(struct ffa_memory_access),
-			       constituents, ARRAY_SIZE(constituents), 0, 0,
-			       FFA_MEMORY_NORMAL_MEM,
-			       FFA_MEMORY_CACHE_WRITE_BACK,
-			       FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size);
+	ffa_memory_region_init(
+		(struct ffa_memory_region *)mb.send, HF_MAILBOX_SIZE,
+		hf_vm_get_id(), receivers_v_cur, ARRAY_SIZE(receivers_v_cur),
+		sizeof(struct ffa_memory_access), constituents,
+		ARRAY_SIZE(constituents), 0, 0, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL,
+		&msg_size);
 
 	ret = ffa_mem_share(msg_size, msg_size);
 	EXPECT_NE(ret.func, FFA_ERROR_32);
@@ -3824,7 +3831,8 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_1)
 
 	msg_size = ffa_memory_retrieve_request_init(
 		(struct ffa_memory_region *)retrieve_message->payload, handle,
-		hf_vm_get_id(), (void *)&receiver_v1_1, 1,
+		hf_vm_get_id(), (void *)receivers_v1_1,
+		ARRAY_SIZE(receivers_v1_1),
 		sizeof(struct ffa_memory_access_v1_0), 0,
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
@@ -3846,6 +3854,25 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_1)
 		uint8_t val = i + 1;
 		ASSERT_EQ(ptr[i], val);
 	}
+}
+
+/**
+ * Test that a v1.1 SP can share memory to multiple endpoints, and
+ * that the endpoints can access and modify it.
+ */
+TEST_PRECONDITION(memory_sharing, v1_1_service_shares_memory,
+		  service1_service2_and_service3_are_secure)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id, "share_ffa_v1_1", mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "retrieve_ffa_v1_1", mb.send);
+
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }
 
 /**
