@@ -4218,7 +4218,7 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)
 	uint32_t mode = 0;
 
 	if (!plat_ffa_is_mem_perm_get_valid(current)) {
-		return ffa_error(FFA_NOT_SUPPORTED);
+		return ffa_error(FFA_DENIED);
 	}
 
 	if (!(current->vm->el0_partition)) {
@@ -4283,7 +4283,7 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	struct mpool local_page_pool;
 
 	if (!plat_ffa_is_mem_perm_set_valid(current)) {
-		return ffa_error(FFA_NOT_SUPPORTED);
+		return ffa_error(FFA_DENIED);
 	}
 
 	if (!(current->vm->el0_partition)) {
