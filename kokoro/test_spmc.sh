@@ -20,7 +20,7 @@ execute_test() {
   shift
 
   command="${runner[@]} $@" # The rest of arguments are extra parameters
-  ${command} || true # execute test
+  ${command}
   if [ "$CODE_COVERAGE" = true ];then
     move_log_files ${WORKSPACE} trace_folder
     # If one of the parameters of the executed command was spmc or hypervisor
