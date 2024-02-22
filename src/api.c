@@ -2427,8 +2427,11 @@ struct ffa_value api_ffa_feature_success(uint32_t arg2)
  * FF-A interfaces.
  */
 struct ffa_value api_ffa_features(uint32_t feature_function_id,
-				  uint32_t input_property, uint32_t ffa_version)
+				  uint32_t input_property, struct vcpu *current)
 {
+	const uint32_t ffa_version = current->vm->ffa_version;
+	const bool el0_partition = current->vm->el0_partition;
+
 	/*
 	 * According to table 13.8 of FF-A v1.1 Beta 0 spec, bits [30:8] MBZ
 	 * if using a feature ID.
@@ -2541,6 +2544,9 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 #if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
 	/* Check support of a feature provided respective feature ID. */
 	case FFA_FEATURE_NPI:
+		if (el0_partition) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
 		return api_ffa_feature_success(HF_NOTIFICATION_PENDING_INTID);
 	case FFA_FEATURE_SRI:
 		if (!ffa_is_vm_id(current->vm->id)) {
