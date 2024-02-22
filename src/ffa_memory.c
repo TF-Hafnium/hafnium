@@ -705,8 +705,7 @@ static enum ffa_map_action ffa_mem_send_get_map_action(
  */
 static struct ffa_value ffa_send_check_transition(
 	struct vm_locked from, uint32_t share_func,
-	struct ffa_memory_access *receivers, uint32_t receivers_count,
-	uint32_t *orig_from_mode,
+	struct ffa_memory_region *memory_region, uint32_t *orig_from_mode,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t *from_mode, enum ffa_map_action *map_action)
@@ -715,6 +714,7 @@ static struct ffa_value ffa_send_check_transition(
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 	struct ffa_value ret;
 	bool all_receivers_from_current_world = true;
+	uint32_t receivers_count = memory_region->receiver_count;
 
 	ret = constituents_get_mode(from, orig_from_mode, fragments,
 				    fragment_constituent_counts,
@@ -739,11 +739,14 @@ static struct ffa_value ffa_send_check_transition(
 		return ffa_error(FFA_DENIED);
 	}
 
-	assert(receivers != NULL && receivers_count > 0U);
+	assert(receivers_count > 0U);
 
 	for (uint32_t i = 0U; i < receivers_count; i++) {
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(memory_region, i);
+		assert(receiver != NULL);
 		ffa_memory_access_permissions_t permissions =
-			receivers[i].receiver_permissions.permissions;
+			receiver->receiver_permissions.permissions;
 		uint32_t required_from_mode = ffa_memory_permissions_to_mode(
 			permissions, *orig_from_mode);
 
@@ -754,14 +757,14 @@ static struct ffa_value ffa_send_check_transition(
 		 */
 		if (!ffa_is_vm_id(from.vm->id)) {
 			assert(!ffa_is_vm_id(
-				receivers[i].receiver_permissions.receiver));
+				receiver->receiver_permissions.receiver));
 		}
 
 		/* Track if all senders are from current world. */
 		all_receivers_from_current_world =
 			all_receivers_from_current_world &&
 			vm_id_is_current_world(
-				receivers[i].receiver_permissions.receiver);
+				receiver->receiver_permissions.receiver);
 
 		if ((*orig_from_mode & required_from_mode) !=
 		    required_from_mode) {
@@ -1376,14 +1379,13 @@ static bool ffa_memory_check_overlap(
  *     memory with the given permissions.
  *  Success is indicated by FFA_SUCCESS.
  */
-struct ffa_value ffa_send_check_update(
+static struct ffa_value ffa_send_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t composite_total_page_count, uint32_t share_func,
-	struct ffa_memory_access *receivers, uint32_t receivers_count,
-	struct mpool *page_pool, bool clear, uint32_t *orig_from_mode_ret,
-	bool *memory_protected)
+	struct ffa_memory_region *memory_region, struct mpool *page_pool,
+	uint32_t *orig_from_mode_ret, bool *memory_protected)
 {
 	uint32_t i;
 	uint32_t j;
@@ -1394,6 +1396,7 @@ struct ffa_value ffa_send_check_update(
 	struct ffa_value ret;
 	uint32_t constituents_total_page_count = 0;
 	enum ffa_map_action map_action = MAP_ACTION_CHECK;
+	bool clear = memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR;
 
 	/*
 	 * Make sure constituents are properly aligned to a 64-bit boundary. If
@@ -1428,9 +1431,9 @@ struct ffa_value ffa_send_check_update(
 	 * state.
 	 */
 	ret = ffa_send_check_transition(
-		from_locked, share_func, receivers, receivers_count,
-		&orig_from_mode, fragments, fragment_constituent_counts,
-		fragment_count, &from_mode, &map_action);
+		from_locked, share_func, memory_region, &orig_from_mode,
+		fragments, fragment_constituent_counts, fragment_count,
+		&from_mode, &map_action);
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition for send.\n");
 		return ret;
@@ -1737,7 +1740,6 @@ struct ffa_value ffa_memory_send_complete(
 {
 	struct ffa_memory_region *memory_region = share_state->memory_region;
 	struct ffa_composite_memory_region *composite;
-	struct ffa_memory_access *receiver;
 	struct ffa_value ret;
 
 	/* Lock must be held. */
@@ -1745,17 +1747,13 @@ struct ffa_value ffa_memory_send_complete(
 	assert(memory_region != NULL);
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	assert(composite != NULL);
-	receiver = ffa_memory_region_get_receiver(memory_region, 0);
-	assert(receiver != NULL);
 
 	/* Check that state is valid in sender page table and update. */
 	ret = ffa_send_check_update(
 		from_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, composite->page_count,
-		share_state->share_func, receiver,
-		memory_region->receiver_count, page_pool,
-		memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR,
+		share_state->share_func, memory_region, page_pool,
 		orig_from_mode_ret, &share_state->memory_protected);
 	if (ret.func != FFA_SUCCESS_32) {
 		/*

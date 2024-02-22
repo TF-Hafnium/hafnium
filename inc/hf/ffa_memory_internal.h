@@ -156,14 +156,6 @@ struct ffa_value ffa_memory_send_validate(
 	struct vm_locked from_locked, struct ffa_memory_region *memory_region,
 	uint32_t memory_share_length, uint32_t fragment_length,
 	uint32_t share_func);
-struct ffa_value ffa_send_check_update(
-	struct vm_locked from_locked,
-	struct ffa_memory_region_constituent **fragments,
-	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t composite_total_page_count, uint32_t share_func,
-	struct ffa_memory_access *receivers, uint32_t receivers_count,
-	struct mpool *page_pool, bool clear, uint32_t *orig_from_mode_ret,
-	bool *memory_protected);
 struct ffa_value ffa_memory_send_complete(
 	struct vm_locked from_locked, struct share_states_locked share_states,
 	struct ffa_memory_share_state *share_state, struct mpool *page_pool,
