@@ -380,7 +380,7 @@ static inline void vcpu_call_chain_remove_node(struct vcpu_locked vcpu1_locked,
 	vcpu2_locked.vcpu->call_chain.next_node = NULL;
 }
 
-void vcpu_set_running(struct vcpu_locked target_locked, struct ffa_value args);
+void vcpu_set_running(struct vcpu_locked target_locked, struct ffa_value *args);
 void vcpu_save_interrupt_priority(struct vcpu_locked vcpu_locked,
 				  uint8_t priority);
 void vcpu_interrupt_inject(struct vcpu_locked target_locked, uint32_t intid);

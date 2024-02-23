@@ -1476,8 +1476,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
 
 		vcpu_set_running(target_vcpu_locked,
-				 (struct ffa_value){.func = FFA_INTERRUPT_32,
-						    .arg2 = intid});
+				 &(struct ffa_value){.func = FFA_INTERRUPT_32,
+						     .arg2 = intid});
 
 		vcpu_set_processing_interrupt(target_vcpu_locked, intid,
 					      current_locked);
@@ -1551,7 +1551,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 		 * implicitly.
 		 */
 		vcpu_set_running(target_vcpu_locked,
-				 (struct ffa_value){
+				 &(struct ffa_value){
 					 .func = FFA_INTERRUPT_32,
 					 .arg2 = intid,
 				 });
@@ -1603,7 +1603,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 */
 			current->state = VCPU_STATE_PREEMPTED;
 			vcpu_set_running(target_vcpu_locked,
-					 (struct ffa_value){
+					 &(struct ffa_value){
 						 .func = FFA_INTERRUPT_32,
 					 });
 
@@ -1885,12 +1885,10 @@ static struct ffa_value plat_ffa_preempted_vcpu_resume(
 	/* SPMC scheduled call chain is completely unwound. */
 	plat_ffa_exit_spmc_schedule_mode(current_locked);
 	assert(current->call_chain.prev_node == NULL);
+
 	current->state = VCPU_STATE_WAITING;
 
-	target_vcpu->state = VCPU_STATE_RUNNING;
-
-	/* Mark the registers as unavailable now. */
-	target_vcpu->regs_available = false;
+	vcpu_set_running(target_locked, NULL);
 
 	vcpu_unlock(&target_locked);
 
@@ -2456,11 +2454,7 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
 {
 	struct vcpu *next;
-	struct ffa_value ret = {
-		.func = FFA_INTERRUPT_32,
-		.arg1 = ffa_vm_vcpu(current_vcpu->vm->id,
-				    vcpu_index(current_vcpu)),
-	};
+	struct two_vcpu_locked both_vcpu_locked;
 
 	/*
 	 * The action specified by SP in its manifest is ``Non-secure interrupt
@@ -2489,7 +2483,7 @@ struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
 	 * next is guaranteed to be in BLOCKED state as it is the predecessor of
 	 * the current vCPU in the present call chain.
 	 */
-	vcpu_lock_both(current_vcpu, next);
+	both_vcpu_locked = vcpu_lock_both(current_vcpu, next);
 
 	/* Removing a node from an existing call chain. */
 	current_vcpu->call_chain.prev_node = NULL;
@@ -2501,18 +2495,18 @@ struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
 	 * its CPU cycle allocation mode. Hence, rt_model and scheduling_mode
 	 * are not changed here.
 	 */
-
 	assert(next->state == VCPU_STATE_BLOCKED);
-	next->state = VCPU_STATE_RUNNING;
 	assert(next->call_chain.next_node == current_vcpu);
+
 	next->call_chain.next_node = NULL;
 
-	/* Mark the registers as unavailable now. */
-	assert(next->regs_available);
-	next->regs_available = false;
+	vcpu_set_running(both_vcpu_locked.vcpu2,
+			 &(struct ffa_value){
+				 .func = FFA_INTERRUPT_32,
+				 .arg1 = ffa_vm_vcpu(current_vcpu->vm->id,
+						     vcpu_index(current_vcpu)),
+			 });
 
-	/* Set the return value for the target VM. */
-	arch_regs_set_retval(&next->regs, ret);
 	sl_unlock(&next->lock);
 	sl_unlock(&current_vcpu->lock);
 
