@@ -2543,6 +2543,9 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	case FFA_FEATURE_NPI:
 		return api_ffa_feature_success(HF_NOTIFICATION_PENDING_INTID);
 	case FFA_FEATURE_SRI:
+		if (!ffa_is_vm_id(current->vm->id)) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
 		return api_ffa_feature_success(HF_SCHEDULE_RECEIVER_INTID);
 #endif
 	/* Platform specific feature support. */
