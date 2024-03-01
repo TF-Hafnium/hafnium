@@ -631,19 +631,10 @@ other_world_loop:
 	mov x0, x19
 	bl plat_restore_ns_simd_context
 
-	/*
-	 * Prepare arguments from other world VM vCPU.
-	 * x19 holds the other world VM vCPU pointer.
-	 */
-	ldp x0, x1, [x19, #VCPU_REGS + 8 * 0]
-	ldp x2, x3, [x19, #VCPU_REGS + 8 * 2]
-	ldp x4, x5, [x19, #VCPU_REGS + 8 * 4]
-	ldp x6, x7, [x19, #VCPU_REGS + 8 * 6]
-	ldp x8, x9, [x19, #VCPU_REGS + 8 * 8]
-	ldp x10, x11, [x19, #VCPU_REGS + 8 * 10]
-	ldp x12, x13, [x19, #VCPU_REGS + 8 * 12]
-	ldp x14, x15, [x19, #VCPU_REGS + 8 * 14]
-	ldp x16, x17, [x19, #VCPU_REGS + 8 * 16]
+	/* Restore peripheral registers. */
+	mov x1, x19
+	bl restore_sys_registers
+	mov x19, x1
 
 #if BRANCH_PROTECTION
 	/*
@@ -671,6 +662,20 @@ other_world_loop:
 	msr tfsre0_el1, xzr
 #endif
 
+	/*
+	 * Prepare arguments from other world VM vCPU.
+	 * x19 holds the other world VM vCPU pointer.
+	 */
+	ldp x0, x1, [x19, #VCPU_REGS + 8 * 0]
+	ldp x2, x3, [x19, #VCPU_REGS + 8 * 2]
+	ldp x4, x5, [x19, #VCPU_REGS + 8 * 4]
+	ldp x6, x7, [x19, #VCPU_REGS + 8 * 6]
+	ldp x8, x9, [x19, #VCPU_REGS + 8 * 8]
+	ldp x10, x11, [x19, #VCPU_REGS + 8 * 10]
+	ldp x12, x13, [x19, #VCPU_REGS + 8 * 12]
+	ldp x14, x15, [x19, #VCPU_REGS + 8 * 14]
+	ldp x16, x17, [x19, #VCPU_REGS + 8 * 16]
+
 	smc #0
 
 	/*
@@ -696,6 +701,11 @@ other_world_loop:
 #if ENABLE_MTE
 	mte_restore_hypervisor_state x0
 #endif
+
+	/* Save 'other world VM' EL1 registers. */
+	mov x1, x19
+	bl save_sys_registers
+	mov x19, x1
 
 	/*
 	 * Stack is at top and execution can restart straight into C code.
