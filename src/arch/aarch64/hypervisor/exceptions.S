@@ -645,6 +645,29 @@ other_world_loop:
 	bl plat_restore_ns_simd_context
 
 	/* Restore peripheral registers. */
+	add x2, x19, #VCPU_TIMER
+
+	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
+	vhe_support_check x1, vhe_timer_restore
+
+	/*
+	 * SPMC does not allow Secure Partitions to access EL1 Physical timer
+	 * registers. Hence, no need to save or restore them when entering or
+	 * leaving from/to normal world.
+	 */
+	ldp x24, x25, [x2]
+	msr cntv_cval_el0, x24
+	msr cntv_ctl_el0, x25
+
+	b restore_sys_regs
+
+vhe_timer_restore:
+	ldp x24, x25, [x2]
+	msr cntv_cval_el02, x24
+	msr cntv_ctl_el02, x25
+
+restore_sys_regs:
+	/* Restore 'other world VM' EL1 registers. */
 	mov x1, x19
 	bl restore_sys_registers
 	mov x19, x1
@@ -723,6 +746,23 @@ other_world_loop:
 	bl save_sys_registers
 	mov x19, x1
 
+	/* Save Peripheral registers. */
+	add x2, x19, #VCPU_TIMER
+
+	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
+	vhe_support_check x23, vhe_timer_save
+
+	mrs x24, cntv_cval_el0
+	mrs x25, cntv_ctl_el0
+
+	b handle_smc_from_nwd
+
+vhe_timer_save:
+	mrs x24, cntv_cval_el02
+	mrs x25, cntv_ctl_el02
+
+handle_smc_from_nwd:
+	stp x24, x25, [x2]
 	/*
 	 * Stack is at top and execution can restart straight into C code.
 	 * Handle the FF-A call from other world.
