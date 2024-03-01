@@ -129,6 +129,19 @@
 .endm
 
 /**
+ * Restore vCPU MTE state.
+ */
+.macro restore_vcpu_mte_context reg_1:req
+	add	x1, \reg_1, #VCPU_MTE
+	ldp	x2, x3, [x1], #16
+	msr	tfsr_el1, x2
+	msr	gcr_el1, x3
+	ldp	x2, x3, [x1]
+	msr	rgsr_el1, x2
+	msr	tfsre0_el1, x3
+.endm
+
+/**
  * The following is the exception table. A pointer to it will be stored in
  * register vbar_el2.
  */
@@ -655,11 +668,8 @@ other_world_loop:
 #endif
 
 #if ENABLE_MTE
-	/* Clearing MTE context. */
-	msr rgsr_el1, xzr
-	msr tfsr_el1, xzr
-	msr tfsr_el2, xzr
-	msr tfsre0_el1, xzr
+	restore_vcpu_mte_context x19
+	/* Omit ISB as SMC following is a context synchronizing event. */
 #endif
 
 	/*
@@ -695,11 +705,17 @@ other_world_loop:
 	stp x16, x17, [x19, #VCPU_REGS + 8 * 16]
 
 #if BRANCH_PROTECTION
+	/*
+	 * Pointer authentication keys need not be saved as EL3 takes care
+	 * of saving them upon context switch.
+	 * Restore Normal World APIA key.
+	 */
 	pauth_restore_hypervisor_key x0 x1
 #endif
 
 #if ENABLE_MTE
-	mte_restore_hypervisor_state x0
+	mov x18, x19
+	bl mte_save_vcpu_and_restore_hyp_state
 #endif
 
 	/* Save 'other world VM' EL1 registers. */
@@ -821,14 +837,7 @@ vcpu_restore_volatile_and_run:
 #endif
 
 #if ENABLE_MTE
-	/* Restore vCPU MTE state. */
-	add	x1, x0, #VCPU_MTE
-	ldp	x2, x3, [x1], #16
-	msr	tfsr_el1, x2
-	msr	gcr_el1, x3
-	ldp	x2, x3, [x1]
-	msr	rgsr_el1, x2
-	msr	tfsre0_el1, x3
+	restore_vcpu_mte_context x0
 	/* Omit ISB as ERET following is a context synchronizing event. */
 #endif
 
