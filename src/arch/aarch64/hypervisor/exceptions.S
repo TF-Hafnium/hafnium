@@ -119,6 +119,16 @@
 .endm
 
 /**
+ * Check if VHE support is enabled, equivalent to has_vhe_support(). If
+ * supported, branch to the label provided.
+ */
+.macro vhe_support_check tmp_reg:req, _lbl:req
+	mrs \tmp_reg, id_aa64mmfr1_el1
+	tst \tmp_reg, #(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT)
+	b.ne \_lbl
+.endm
+
+/**
  * The following is the exception table. A pointer to it will be stored in
  * register vbar_el2.
  */
@@ -256,31 +266,17 @@ system_register_access:
 	b vcpu_restore_nonvolatile_and_run
 
 /**
- * Switch to a new vCPU.
+ * Save system registers of the execution context.
  *
- * All volatile registers from the old vCPU have already been saved. We need
- * to save only non-volatile ones from the old vCPU, and restore all from the
- * new one.
- *
- * x0 is a pointer to the new vCPU.
+ * NOTE: x1 holds pointer to current vCPU or the vCPU tracking the normal world
+ * context in case of SPMC.
  */
-vcpu_switch:
-	/* Save non-volatile registers. */
-	mrs x1, tpidr_el2
-	stp x19, x20, [x1, #VCPU_REGS + 8 * 19]
-	stp x21, x22, [x1, #VCPU_REGS + 8 * 21]
-	stp x23, x24, [x1, #VCPU_REGS + 8 * 23]
-	stp x25, x26, [x1, #VCPU_REGS + 8 * 25]
-	stp x27, x28, [x1, #VCPU_REGS + 8 * 27]
-
-	/* Save lazy state. */
+save_sys_registers:
 	/* Use x28 as the base */
 	add x28, x1, #VCPU_LAZY
 
 	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
-	mrs x19, id_aa64mmfr1_el1
-	tst x19, #(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT)
-	b.ne vhe_save
+	vhe_support_check x19, vhe_save
 
 	mrs x24, sctlr_el1
 	mrs x25, cpacr_el1
@@ -393,6 +389,164 @@ skip_vhe_save:
 	mrs x10, cnthctl_el2
 	mrs x11, par_el1
 	stp x10, x11, [x28], #16
+
+	ret
+
+/**
+ * Restore system registers of the execution context.
+ *
+ * NOTE: x1 holds pointer to target vCPU.
+ */
+restore_sys_registers:
+	/* Use x28 as the base. */
+	add x28, x1, #VCPU_LAZY
+
+	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
+	vhe_support_check x19, vhe_restore
+
+	ldp x24, x25, [x28], #16
+	msr sctlr_el1, x24
+	msr cpacr_el1, x25
+
+	ldp x2, x3, [x28], #16
+	msr ttbr0_el1, x2
+	msr ttbr1_el1, x3
+
+	ldp x4, x5, [x28], #16
+	msr tcr_el1, x4
+	msr esr_el1, x5
+
+	ldp x6, x7, [x28], #16
+	msr afsr0_el1, x6
+	msr afsr1_el1, x7
+
+	ldp x8, x9, [x28], #16
+	msr far_el1, x8
+	msr mair_el1, x9
+
+	ldp x10, x11, [x28], #16
+	msr vbar_el1, x10
+	msr contextidr_el1, x11
+
+	ldp x12, x13, [x28], #16
+	msr amair_el1, x12
+	msr cntkctl_el1, x13
+
+	ldp x14, x15, [x28], #16
+	msr elr_el1, x14
+	msr spsr_el1, x15
+	b skip_vhe_restore
+
+vhe_restore:
+	ldp x24, x25, [x28], #16
+	msr MSR_SCTLR_EL12, x24
+	msr MSR_CPACR_EL12, x25
+
+	ldp x2, x3, [x28], #16
+	msr MSR_TTBR0_EL12, x2
+	msr MSR_TTBR1_EL12, x3
+
+	ldp x4, x5, [x28], #16
+	msr MSR_TCR_EL12, x4
+	msr MSR_ESR_EL12, x5
+
+	ldp x6, x7, [x28], #16
+	msr MSR_AFSR0_EL12, x6
+	msr MSR_AFSR1_EL12, x7
+
+	ldp x8, x9, [x28], #16
+	msr MSR_FAR_EL12, x8
+	msr MSR_MAIR_EL12, x9
+
+	ldp x10, x11, [x28], #16
+	msr MSR_VBAR_EL12, x10
+	msr MSR_CONTEXTIDR_EL12, x11
+
+	ldp x12, x13, [x28], #16
+	msr MSR_AMAIR_EL12, x12
+	msr MSR_CNTKCTL_EL12, x13
+
+	ldp x14, x15, [x28], #16
+	msr MSR_ELR_EL12, x14
+	msr MSR_SPSR_EL12, x15
+
+skip_vhe_restore:
+	ldp x16, x17, [x28], #16
+	msr vmpidr_el2, x16
+	msr csselr_el1, x17
+
+	ldp x18, x19, [x28], #16
+	msr actlr_el1, x18
+	msr tpidr_el0, x19
+
+	ldp x20, x21, [x28], #16
+	msr tpidrro_el0, x20
+	msr tpidr_el1, x21
+
+	ldp x22, x23, [x28], #16
+	msr sp_el0, x22
+	msr sp_el1, x23
+
+	ldp x24, x25, [x28], #16
+	msr vtcr_el2, x24
+	msr vttbr_el2, x25
+
+	ldp x26, x27, [x28], #16
+#if SECURE_WORLD == 1
+	msr MSR_VSTCR_EL2, x26
+	msr MSR_VSTTBR_EL2, x27
+#endif
+
+	ldp x4, x5, [x28], #16
+	msr mdcr_el2, x4
+	msr mdscr_el1, x5
+
+	ldp x6, x7, [x28], #16
+	msr pmccfiltr_el0, x6
+	msr pmcr_el0, x7
+
+	ldp x8, x9, [x28], #16
+	/*
+	 * NOTE: Writing 0s to pmcntenset_el0's bits do not alter their values.
+	 * To reset them, clear the register by writing to pmcntenclr_el0.
+	 */
+	mov x27, #0xffffffff
+	msr pmcntenclr_el0, x27
+	msr pmcntenset_el0, x8
+
+	/*
+	 * NOTE: Writing 0s to pmintenset_el1's bits do not alter their values.
+	 * To reset them, clear the register by writing to pmintenclr_el1.
+	 */
+	msr pmintenclr_el1, x27
+	msr pmintenset_el1, x9
+
+	ldp x10, x11, [x28], #16
+	msr cnthctl_el2, x10
+	msr par_el1, x11
+
+	ret
+
+/**
+ * Switch to a new vCPU.
+ *
+ * All volatile registers from the old vCPU have already been saved. We need
+ * to save only non-volatile ones from the old vCPU, and restore all from the
+ * new one.
+ *
+ * x0 is a pointer to the new vCPU.
+ */
+vcpu_switch:
+	/* Save non-volatile registers. */
+	mrs x1, tpidr_el2
+	stp x19, x20, [x1, #VCPU_REGS + 8 * 19]
+	stp x21, x22, [x1, #VCPU_REGS + 8 * 21]
+	stp x23, x24, [x1, #VCPU_REGS + 8 * 23]
+	stp x25, x26, [x1, #VCPU_REGS + 8 * 25]
+	stp x27, x28, [x1, #VCPU_REGS + 8 * 27]
+
+	/* Save lazy state. */
+	bl save_sys_registers
 
 #if BRANCH_PROTECTION
 	add x2, x1, #(VCPU_PAC + 16)
@@ -561,7 +715,7 @@ other_world_loop:
 
 	/* Intentional fallthrough. */
 
-	/* Update pointer to current vCPU. */
+	/* Update pointer to the next vCPU being resumed. */
 0:	msr tpidr_el2, x0
 
 	/* Restore peripheral registers. */
@@ -588,135 +742,10 @@ other_world_loop:
 	/* Intentional fallthrough. */
 
 vcpu_restore_lazy_and_run:
+	mov x1, x0
+
 	/* Restore lazy registers. */
-	/* Use x28 as the base. */
-	add x28, x0, #VCPU_LAZY
-
-	/* Check if VHE support is enabled, equivalent to has_vhe_support(). */
-	mrs x19, id_aa64mmfr1_el1
-	tst x19, #(ID_AA64MMFR1_EL1_VH_MASK << ID_AA64MMFR1_EL1_VH_SHIFT)
-	b.ne vhe_restore
-
-	ldp x24, x25, [x28], #16
-	msr sctlr_el1, x24
-	msr cpacr_el1, x25
-
-	ldp x2, x3, [x28], #16
-	msr ttbr0_el1, x2
-	msr ttbr1_el1, x3
-
-	ldp x4, x5, [x28], #16
-	msr tcr_el1, x4
-	msr esr_el1, x5
-
-	ldp x6, x7, [x28], #16
-	msr afsr0_el1, x6
-	msr afsr1_el1, x7
-
-	ldp x8, x9, [x28], #16
-	msr far_el1, x8
-	msr mair_el1, x9
-
-	ldp x10, x11, [x28], #16
-	msr vbar_el1, x10
-	msr contextidr_el1, x11
-
-	ldp x12, x13, [x28], #16
-	msr amair_el1, x12
-	msr cntkctl_el1, x13
-
-	ldp x14, x15, [x28], #16
-	msr elr_el1, x14
-	msr spsr_el1, x15
-	b skip_vhe_restore
-
-vhe_restore:
-	ldp x24, x25, [x28], #16
-	msr MSR_SCTLR_EL12, x24
-	msr MSR_CPACR_EL12, x25
-
-	ldp x2, x3, [x28], #16
-	msr MSR_TTBR0_EL12, x2
-	msr MSR_TTBR1_EL12, x3
-
-	ldp x4, x5, [x28], #16
-	msr MSR_TCR_EL12, x4
-	msr MSR_ESR_EL12, x5
-
-	ldp x6, x7, [x28], #16
-	msr MSR_AFSR0_EL12, x6
-	msr MSR_AFSR1_EL12, x7
-
-	ldp x8, x9, [x28], #16
-	msr MSR_FAR_EL12, x8
-	msr MSR_MAIR_EL12, x9
-
-	ldp x10, x11, [x28], #16
-	msr MSR_VBAR_EL12, x10
-	msr MSR_CONTEXTIDR_EL12, x11
-
-	ldp x12, x13, [x28], #16
-	msr MSR_AMAIR_EL12, x12
-	msr MSR_CNTKCTL_EL12, x13
-
-	ldp x14, x15, [x28], #16
-	msr MSR_ELR_EL12, x14
-	msr MSR_SPSR_EL12, x15
-
-skip_vhe_restore:
-	ldp x16, x17, [x28], #16
-	msr vmpidr_el2, x16
-	msr csselr_el1, x17
-
-	ldp x18, x19, [x28], #16
-	msr actlr_el1, x18
-	msr tpidr_el0, x19
-
-	ldp x20, x21, [x28], #16
-	msr tpidrro_el0, x20
-	msr tpidr_el1, x21
-
-	ldp x22, x23, [x28], #16
-	msr sp_el0, x22
-	msr sp_el1, x23
-
-	ldp x24, x25, [x28], #16
-	msr vtcr_el2, x24
-	msr vttbr_el2, x25
-
-	ldp x26, x27, [x28], #16
-#if SECURE_WORLD == 1
-	msr MSR_VSTCR_EL2, x26
-	msr MSR_VSTTBR_EL2, x27
-#endif
-
-	ldp x4, x5, [x28], #16
-	msr mdcr_el2, x4
-	msr mdscr_el1, x5
-
-	ldp x6, x7, [x28], #16
-	msr pmccfiltr_el0, x6
-	msr pmcr_el0, x7
-
-	ldp x8, x9, [x28], #16
-	/*
-	 * NOTE: Writing 0s to pmcntenset_el0's bits do not alter their values.
-	 * To reset them, clear the register by writing to pmcntenclr_el0.
-	 */
-	mov x27, #0xffffffff
-	msr pmcntenclr_el0, x27
-	msr pmcntenset_el0, x8
-
-	/*
-	 * NOTE: Writing 0s to pmintenset_el1's bits do not alter their values.
-	 * To reset them, clear the register by writing to pmintenclr_el1.
-	 */
-	msr pmintenclr_el1, x27
-	msr pmintenset_el1, x9
-
-	ldp x10, x11, [x28], #16
-	msr cnthctl_el2, x10
-	msr par_el1, x11
+	bl restore_sys_registers
 
 #if BRANCH_PROTECTION
 	add x2, x0, #(VCPU_PAC + 16)
