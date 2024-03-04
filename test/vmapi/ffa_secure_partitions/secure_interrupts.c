@@ -532,7 +532,7 @@ static void sp_route_interrupt_to_secondary_vcpu_base(
  * Test a Secure Partition can request the SPMC to reconfigure an interrupt to
  * be routed to a secondary vCPU.
  */
-TEST(secure_interrupts, sp_route_interrupt_to_secondary_vcpu)
+TEST_LONG_RUNNING(secure_interrupts, sp_route_interrupt_to_secondary_vcpu)
 {
 	struct secondary_cpu_entry_args args = {.lock = SPINLOCK_INIT};
 	struct mailbox_buffers mb = set_up_mailbox();
