@@ -1984,6 +1984,11 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	if (header.offset != FFA_RXTX_HEADER_SIZE) {
+		dlog_error("Indirect msg payload must follow the header.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
 	/*
 	 * Check if the message has to be forwarded to the SPMC, in
 	 * this case return, the SPMC will handle the buffer copy.
