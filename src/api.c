@@ -2037,7 +2037,7 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 
 	/* Check the size of transfer. */
 	msg_size = FFA_RXTX_HEADER_SIZE + header.size;
-	if ((msg_size > FFA_PARTITION_MSG_PAYLOAD_MAX) ||
+	if ((msg_size > FFA_MSG_PAYLOAD_MAX) ||
 	    (header.size > FFA_PARTITION_MSG_PAYLOAD_MAX)) {
 		dlog_error("Message is too big.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
