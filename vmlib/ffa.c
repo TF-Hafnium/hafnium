@@ -72,8 +72,7 @@ void ffa_memory_access_init(struct ffa_memory_access *receiver,
 		.composite_memory_region_offset = 0ULL,
 		.impdef = impdef_val != NULL
 				  ? *impdef_val
-				  : (struct ffa_memory_access_impdef){{0ULL,
-								       0ULL}},
+				  : ffa_memory_access_impdef_init(0, 0),
 		receiver->reserved_0 = 0ULL,
 	};
 }

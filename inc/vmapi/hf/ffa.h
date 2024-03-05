@@ -1102,6 +1102,12 @@ struct ffa_memory_access_impdef {
 	uint64_t val[2];
 };
 
+static inline struct ffa_memory_access_impdef ffa_memory_access_impdef_init(
+	uint64_t impdef_hi, uint64_t impdef_lo)
+{
+	return (struct ffa_memory_access_impdef){{impdef_hi, impdef_lo}};
+}
+
 /**
  * This corresponds to table 10.16 of the FF-A v1.1 EAC0 specification,
  * "Endpoint memory access descriptor".

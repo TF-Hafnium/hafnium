@@ -266,7 +266,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	 * Use the sender id as the impdef value so we can use this in later
 	 * testing.
 	 */
-	struct ffa_memory_access_impdef impdef_val = {{sender, sender + 1}};
+	struct ffa_memory_access_impdef impdef_val =
+		ffa_memory_access_impdef_init(sender, sender + 1);
 
 	ffa_memory_access_init(&receiver_send_permissions, recipient,
 			       send_data_access, send_instruction_access, 0,
@@ -306,7 +307,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	struct ffa_partition_msg *retrieve_message;
 	bool not_specify_memory_type = share_func == FFA_MEM_DONATE_32 ||
 				       (share_func == FFA_MEM_LEND_32);
-	struct ffa_memory_access_impdef impdef_val = {{sender, sender + 1}};
+	struct ffa_memory_access_impdef impdef_val =
+		ffa_memory_access_impdef_init(sender, sender + 1);
 
 	/* Send everything except the last constituent in the first fragment. */
 	remaining_constituent_count = ffa_memory_region_init_single_receiver(

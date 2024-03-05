@@ -62,8 +62,8 @@ static void check_cannot_send_memory(
 	size_t m = 0;
 
 	for (i = 0; i < ARRAY_SIZE(vms); ++i) {
-		struct ffa_memory_access_impdef impdef_val = {
-			{vms[i], vms[i] + 1}};
+		struct ffa_memory_access_impdef impdef_val =
+			ffa_memory_access_impdef_init(vms[i], vms[i] + 1);
 		/* Optionally skip one VM as the send would succeed. */
 		if (vms[i] == avoid_vm) {
 			continue;
@@ -2711,6 +2711,10 @@ TEST(memory_sharing, ffa_validate_impdef_equal)
 		{.address = (uint64_t)pages, .page_count = 2},
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
+	struct ffa_memory_access_impdef primary_vm_impdef_val =
+		ffa_memory_access_impdef_init(0xAAAA, 0xBBBB);
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(0xCCCC, 0xDDDD);
 
 	SERVICE_SELECT(service1_info->vm_id,
 		       "ffa_memory_share_fail_invalid_parameters", mb.send);
@@ -2728,9 +2732,7 @@ TEST(memory_sharing, ffa_validate_impdef_equal)
 					  : FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE,
-				  &((struct ffa_memory_access_impdef){
-					  {0xAAAA, 0xBBBB}}),
-				  NULL, &msg_size),
+				  &primary_vm_impdef_val, NULL, &msg_size),
 			  0);
 
 		ret = send_function[i](msg_size, msg_size);
@@ -2743,8 +2745,7 @@ TEST(memory_sharing, ffa_validate_impdef_equal)
 			0, 0, FFA_DATA_ACCESS_RW,
 			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			FFA_MEMORY_INNER_SHAREABLE,
-			&((struct ffa_memory_access_impdef){{0xCCCC, 0xDDDD}}));
+			FFA_MEMORY_INNER_SHAREABLE, &service1_impdef_val);
 
 		EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
@@ -3142,18 +3143,20 @@ TEST(memory_sharing, mem_share_multiple_borrowers)
 	struct ffa_memory_access receivers[2];
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(service1_info->vm_id,
+					      service1_info->vm_id + 1);
+	struct ffa_memory_access_impdef service2_impdef_val =
+		ffa_memory_access_impdef_init(service2_info->vm_id,
+					      service2_info->vm_id + 1);
 
 	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service1_info->vm_id, service1_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service1_impdef_val);
 
 	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service2_info->vm_id, service2_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service2_impdef_val);
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3197,18 +3200,20 @@ TEST(memory_sharing, mem_share_bypass_multiple_borrowers)
 	struct ffa_memory_access receivers[2];
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(service1_info->vm_id,
+					      service1_info->vm_id + 1);
+	struct ffa_memory_access_impdef service2_impdef_val =
+		ffa_memory_access_impdef_init(service2_info->vm_id,
+					      service2_info->vm_id + 1);
 
 	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service1_info->vm_id, service1_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service1_impdef_val);
 
 	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service2_info->vm_id, service2_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service2_impdef_val);
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3250,18 +3255,20 @@ TEST(memory_sharing, mem_share_bypass_multiple_borrowers_wrong_receiver_count)
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_msg *retrieve_message = mb.send;
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(service1_info->vm_id,
+					      service1_info->vm_id + 1);
+	struct ffa_memory_access_impdef service2_impdef_val =
+		ffa_memory_access_impdef_init(service2_info->vm_id,
+					      service2_info->vm_id + 1);
 
 	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service1_info->vm_id, service1_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service1_impdef_val);
 
 	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service2_info->vm_id, service2_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service2_impdef_val);
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3313,6 +3320,13 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 	 */
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(service1_info->vm_id,
+					      service1_info->vm_id + 1);
+	struct ffa_memory_access_impdef service2_impdef_val =
+		ffa_memory_access_impdef_init(service2_info->vm_id,
+					      service2_info->vm_id + 1);
+
 	SERVICE_SELECT(service1_info->vm_id, "memory_increment_relinquish",
 		       mb.send);
 	SERVICE_SELECT(service2_info->vm_id, "memory_increment_relinquish",
@@ -3320,15 +3334,11 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 
 	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service1_info->vm_id, service1_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service1_impdef_val);
 
 	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service2_info->vm_id, service2_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service2_impdef_val);
 
 	lend_and_check_memory_increment(&mb, receivers, ARRAY_SIZE(receivers),
 					2, false, false);
@@ -3362,18 +3372,20 @@ TEST_PRECONDITION(memory_sharing, fail_if_multi_receiver_donate,
 	struct ffa_memory_access receivers[2];
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(service1_info->vm_id,
+					      service1_info->vm_id + 1);
+	struct ffa_memory_access_impdef service2_impdef_val =
+		ffa_memory_access_impdef_init(service2_info->vm_id,
+					      service2_info->vm_id + 1);
 
 	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service1_info->vm_id, service1_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service1_impdef_val);
 
 	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service2_info->vm_id, service2_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service2_impdef_val);
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3404,16 +3416,16 @@ static void fail_multiple_receiver_mem_share_lend(
 	};
 	struct ffa_memory_access receivers[2];
 	uint32_t msg_size;
+	struct ffa_memory_access_impdef receiver1_impdef_val =
+		ffa_memory_access_impdef_init(receiver_id1, receiver_id1 + 1);
+	struct ffa_memory_access_impdef receiver2_impdef_val =
+		ffa_memory_access_impdef_init(receiver_id2, receiver_id2 + 1);
 
 	ffa_memory_access_init(&receivers[0], receiver_id1, data_access1,
-			       instruction_access1, 0,
-			       &((struct ffa_memory_access_impdef){
-				       {receiver_id1, receiver_id1 + 1}}));
+			       instruction_access1, 0, &receiver1_impdef_val);
 
 	ffa_memory_access_init(&receivers[1], receiver_id2, data_access2,
-			       instruction_access2, 0,
-			       &((struct ffa_memory_access_impdef){
-				       {receiver_id2, receiver_id2 + 1}}));
+			       instruction_access2, 0, &receiver2_impdef_val);
 
 	ffa_memory_region_init(
 		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
@@ -3493,18 +3505,20 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 	struct ffa_memory_access receivers[2];
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(service1_info->vm_id,
+					      service1_info->vm_id + 1);
+	struct ffa_memory_access_impdef service2_impdef_val =
+		ffa_memory_access_impdef_init(service2_info->vm_id,
+					      service2_info->vm_id + 1);
 
 	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service1_info->vm_id, service1_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service1_impdef_val);
 
 	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service2_info->vm_id, service2_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service2_impdef_val);
 
 	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
 		ffa_id_t vm_id = receivers[i].receiver_permissions.receiver;
@@ -3638,6 +3652,9 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_0)
 	struct ffa_partition_msg *retrieve_message = mb.send;
 	ffa_memory_handle_t handle;
 	uint8_t *ptr = pages;
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(service1_info->vm_id,
+					      service1_info->vm_id + 1);
 
 	SERVICE_SELECT(service1_info->vm_id, "retrieve_ffa_v1_0", mb.send);
 
@@ -3647,9 +3664,7 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_0)
 
 	ffa_memory_access_init(
 		&receiver_v_cur, service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service1_info->vm_id, service1_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service1_impdef_val);
 
 	/* Initialize memory sharing test according to v1.1. */
 	ffa_memory_region_init((struct ffa_memory_region *)mb.send,
@@ -4173,6 +4188,12 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish_multiple_borrowers)
 	struct ffa_memory_access receivers[2];
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(service1_info->vm_id,
+					      service1_info->vm_id + 1);
+	struct ffa_memory_access_impdef service2_impdef_val =
+		ffa_memory_access_impdef_init(service2_info->vm_id,
+					      service2_info->vm_id + 1);
 
 	SERVICE_SELECT(service1_info->vm_id,
 		       "memory_increment_relinquish_with_clear", mb.send);
@@ -4185,15 +4206,11 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish_multiple_borrowers)
 
 	ffa_memory_access_init(
 		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service1_info->vm_id, service1_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service1_impdef_val);
 
 	ffa_memory_access_init(
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
-		&((struct ffa_memory_access_impdef){
-			{service2_info->vm_id, service2_info->vm_id + 1}}));
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service2_impdef_val);
 
 	lend_and_check_memory_increment(&mb, receivers, ARRAY_SIZE(receivers),
 					1, true, true);
