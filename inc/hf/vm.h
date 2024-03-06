@@ -315,6 +315,8 @@ struct vm *vm_find_index(uint16_t index);
 struct vm_locked vm_lock(struct vm *vm);
 struct two_vm_locked vm_lock_both(struct vm *vm1, struct vm *vm2);
 void vm_unlock(struct vm_locked *locked);
+struct two_vm_locked vm_lock_both_in_order(struct vm_locked vm1,
+					   struct vm *vm2);
 struct vcpu *vm_get_vcpu(struct vm *vm, ffa_vcpu_index_t vcpu_index);
 struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_id_t for_vm);
 ffa_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry);

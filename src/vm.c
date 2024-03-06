@@ -8,6 +8,7 @@
 
 #include "hf/vm.h"
 
+#include "hf/arch/spinlock.h"
 #include "hf/arch/vm.h"
 
 #include "hf/api.h"
@@ -207,6 +208,34 @@ struct two_vm_locked vm_lock_both(struct vm *vm1, struct vm *vm2)
 	dual_lock.vm2.vm = vm2;
 
 	return dual_lock;
+}
+
+/**
+ * Locks two VMs ensuring that the locking order is according to the locks'
+ * addresses, given `vm1` is already locked.
+ */
+struct two_vm_locked vm_lock_both_in_order(struct vm_locked vm1, struct vm *vm2)
+{
+	struct spinlock *sl1 = &vm1.vm->lock;
+	struct spinlock *sl2 = &vm2->lock;
+
+	/*
+	 * Use `sl_lock`/`sl_unlock` directly rather than
+	 * `vm_lock`/`vm_unlock` because `vm_unlock` sets the vm field
+	 * to NULL.
+	 */
+	if (sl1 < sl2) {
+		sl_lock(sl2);
+	} else {
+		sl_unlock(sl1);
+		sl_lock(sl2);
+		sl_lock(sl1);
+	}
+
+	return (struct two_vm_locked){
+		.vm1 = vm1,
+		.vm2 = (struct vm_locked){.vm = vm2},
+	};
 }
 
 /**
