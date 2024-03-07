@@ -859,9 +859,11 @@ static void vcpu_update_virtual_interrupts(struct vcpu *next)
 static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 			    struct vcpu **next)
 {
+	const uint32_t func = args.func;
+
 	/* Do not expect PSCI calls emitted from within the secure world. */
 #if SECURE_WORLD == 0
-	if (psci_handler(vcpu, args.func, args.arg1, args.arg2, args.arg3,
+	if (psci_handler(vcpu, func, args.arg1, args.arg2, args.arg3,
 			 &vcpu->regs.r[0], next)) {
 		return true;
 	}
@@ -879,6 +881,13 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 			plat_ffa_sri_trigger_if_delayed(vcpu->cpu);
 		}
 #endif
+		if (func != FFA_VERSION_32) {
+			struct vm_locked vm_locked = vm_lock(vcpu->vm);
+
+			vm_locked.vm->ffa_version_negotiated = true;
+			vm_unlock(&vm_locked);
+		}
+
 		arch_regs_set_retval(&vcpu->regs, args);
 		vcpu_update_virtual_interrupts(*next);
 		return true;

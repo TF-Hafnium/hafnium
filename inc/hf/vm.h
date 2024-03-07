@@ -203,6 +203,14 @@ struct vm {
 	ffa_id_t id;
 	struct ffa_uuid uuids[PARTITION_MAX_UUIDS];
 	enum ffa_version ffa_version;
+
+	/*
+	 * Whether this FF-A instance has negotiated an FF-A version through a
+	 * call to FFA_VERSION. Once the version has been negotiated, it is an
+	 * error to attempt to change it through another call to FFA_VERSION.
+	 */
+	bool ffa_version_negotiated;
+
 	struct smc_whitelist smc_whitelist;
 
 	/** See api.c for the partial ordering on locks. */

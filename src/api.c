@@ -2439,13 +2439,23 @@ int64_t api_interrupt_inject(ffa_id_t target_vm_id,
 	return ret;
 }
 
-/** Returns the version of the implemented FF-A specification. */
+/**
+ * Negotiate the FF-A version to be used for this FF-A instance.
+ * See section 13.2 of the FF-A v1.2 ALP1 spec.
+ *
+ * Returns Hafnium's version number (`FFA_VERSION_COMPILED`) on success.
+ * Returns `FFA_NOT_SUPPORTED` on error:
+ * - The version is invalid (highest bit set).
+ * - The requested version is incompatible.
+ * - The version has already been negotiated and cannot be changed.
+ */
 struct ffa_value api_ffa_version(struct vcpu *current,
 				 enum ffa_version requested_version)
 {
 	static_assert(sizeof(enum ffa_version) == 4,
 		      "enum ffa_version must be 4 bytes wide");
 
+	const struct ffa_value error = {.func = (uint32_t)FFA_NOT_SUPPORTED};
 	struct vm_locked current_vm_locked;
 
 	if (!ffa_version_is_valid(requested_version)) {
@@ -2453,21 +2463,36 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 			"FFA_VERSION: requested version %#x is invalid "
 			"(highest bit must be zero)\n",
 			requested_version);
-		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
+		return error;
 	}
 
 	if (!ffa_versions_are_compatible(requested_version,
 					 FFA_VERSION_COMPILED)) {
-		dlog_verbose("Version %x incompatible with %x\n",
-			     requested_version, FFA_VERSION_COMPILED);
-		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
+		dlog_error(
+			"FFA_VERSION: requested version v%u.%u is not "
+			"compatible with v%u.%u\n",
+			ffa_version_get_major(requested_version),
+			ffa_version_get_minor(requested_version),
+			ffa_version_get_major(FFA_VERSION_COMPILED),
+			ffa_version_get_minor(FFA_VERSION_COMPILED));
+		return error;
 	}
 
 	current_vm_locked = vm_lock(current->vm);
+
+	if (current_vm_locked.vm->ffa_version_negotiated &&
+	    requested_version != current_vm_locked.vm->ffa_version) {
+		vm_unlock(&current_vm_locked);
+		dlog_error(
+			"FFA_VERSION: Cannot change FF-A version after other "
+			"FF-A calls have been made\n");
+		return error;
+	}
+
 	current_vm_locked.vm->ffa_version = requested_version;
 	vm_unlock(&current_vm_locked);
 
-	return ((struct ffa_value){.func = FFA_VERSION_COMPILED});
+	return (struct ffa_value){.func = (uint32_t)FFA_VERSION_COMPILED};
 }
 
 /**
