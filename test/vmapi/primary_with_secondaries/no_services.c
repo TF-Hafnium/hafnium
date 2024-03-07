@@ -71,14 +71,13 @@ TEST(ffa_partition_info_get, three_secondary_vms)
 	/* Check that the expected partition information is returned. */
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-	/* Confirm there are 3 secondary VMs as well as this primary VM. */
+	/* Confirm there are 3 FF-A partitions, one with 2 UUIDs. */
 	EXPECT_EQ(ret.arg2, 4);
-	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
 
 	/* The first two secondary VMs should have 1 vCPU, the other one 2. */
+	EXPECT_EQ(partitions[0].vcpu_count, 8);
 	EXPECT_EQ(partitions[1].vcpu_count, 8);
 	EXPECT_EQ(partitions[2].vcpu_count, 8);
-	EXPECT_EQ(partitions[3].vcpu_count, 8);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
@@ -126,14 +125,13 @@ TEST(ffa_partition_info_get, get_v1_0_descriptor)
 	/* Check that the expected partition information is returned. */
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-	/* Confirm there are 3 secondary VMs as well as this primary VM. */
-	EXPECT_EQ(ret.arg2, 4);
-	EXPECT_EQ(partitions[0].vm_id, hf_vm_get_id());
 
-	/* The first two secondary VMs should have 1 vCPU, the other one 2. */
+	/* Confirm there are 3 secondary VMs, one with 2 UUIDs. */
+	EXPECT_EQ(ret.arg2, 4);
+
+	EXPECT_EQ(partitions[0].vcpu_count, 8);
 	EXPECT_EQ(partitions[1].vcpu_count, 8);
 	EXPECT_EQ(partitions[2].vcpu_count, 8);
-	EXPECT_EQ(partitions[3].vcpu_count, 8);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }

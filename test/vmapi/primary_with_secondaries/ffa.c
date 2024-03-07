@@ -62,20 +62,13 @@ TEST(ffa, ffa_partition_info)
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	vm_count = ret.arg2;
-	EXPECT_EQ(vm_count, 4);
+	EXPECT_EQ(vm_count,
+		  4); /* 3 FF-A partitions, 1 partition with 2 UUIDs. */
 
 	for (uint16_t index = 0; index < vm_count; ++index) {
 		ffa_id_t vm_id = partitions[index].vm_id;
 		EXPECT_GE(vm_id, (ffa_id_t)HF_PRIMARY_VM_ID);
 		EXPECT_LE(vm_id, (ffa_id_t)SERVICE_VM3);
-
-		/*
-		 * NOTE: The ordering is NOT specified by the spec, but is an
-		 * artifact of how it's implemented in Hafnium. If that changes
-		 * the following EXPECT could fail.
-		 */
-		EXPECT_EQ(vm_id, index + 1);
-
 		EXPECT_GE(partitions[index].vcpu_count, 1);
 	}
 
