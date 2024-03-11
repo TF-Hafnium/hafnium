@@ -485,6 +485,41 @@ TEST(ffa_console_log, invalid_parameters)
 }
 
 /**
+ * Validate FFA_CONSOLE_LOG sends a message.
+ */
+TEST(ffa_console_log_extended_reg, successfull_msg_send)
+{
+	/* This does not fit in 16x32 bits, only 16x64 */
+	char msg_long[] =
+		"aaaaaaaaaaaaaa16"
+		"aaaaaaaaaaaaaa32"
+		"aaaaaaaaaaaaaa48"
+		"aaaaaaaaaaaaaa64"
+		"aaaaaaaaaaaaaa80"
+		"aaaaaaaaaaaaaa96"
+		"aaaaaaaaaaaaa112"
+		"aaaaaaaaaaaa127"; /* plus 1 for the trailing '\0' */
+
+	static_assert(sizeof(msg_long) == 128,
+		      "msg_long should be 128 bytes long");
+
+	EXPECT_EQ(ffa_console_log_64_extended(msg_long, sizeof(msg_long)).func,
+		  FFA_SUCCESS_32);
+}
+
+/**
+ * Validate FFA_CONSOLE_LOG reports invalid parameters on inadequate message.
+ */
+TEST(ffa_console_log_extended_reg, invalid_parameters)
+{
+	/* Expecting INVALID_PARAMETERS on zero-length message */
+	EXPECT_FFA_ERROR(ffa_console_log_64_extended("abc", 0),
+			 FFA_INVALID_PARAMETERS);
+	EXPECT_FFA_ERROR(ffa_console_log_64_extended("abc", 16 * 8 + 1),
+			 FFA_INVALID_PARAMETERS);
+}
+
+/**
  * Validate a S-EL1 partition can enable/disable alignment checks.
  */
 TEST(arch_features, vm_unaligned_access)

@@ -708,7 +708,25 @@ static inline struct ffa_value ffa_console_log_64(const char *src, size_t size)
 		.func = FFA_CONSOLE_LOG_64,
 		.arg1 = size,
 	};
-	memcpy_s(&req.arg2, sizeof(uint64_t) * 6, src, size);
+	const size_t destsz = sizeof(uint64_t) * 6;
+	const size_t count = size > destsz ? destsz : size;
+
+	memcpy_s(&req.arg2, destsz, src, count);
 
 	return ffa_call(req);
+}
+
+static inline struct ffa_value ffa_console_log_64_extended(const char *src,
+							   size_t size)
+{
+	struct ffa_value req = {
+		.func = FFA_CONSOLE_LOG_64,
+		.arg1 = size,
+	};
+	const size_t destsz = sizeof(uint64_t) * 16;
+	const size_t count = size > destsz ? destsz : size;
+
+	memcpy_s(&req.arg2, destsz, src, count);
+
+	return ffa_call_ext(req);
 }
