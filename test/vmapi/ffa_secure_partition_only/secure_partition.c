@@ -189,8 +189,7 @@ TEST(ffa_features, succeeds_feature_ids)
 	EXPECT_EQ(ffa_feature_intid(ret), HF_NOTIFICATION_PENDING_INTID);
 
 	ret = ffa_features(FFA_FEATURE_SRI);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_feature_intid(ret), HF_SCHEDULE_RECEIVER_INTID);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_FEATURE_MEI);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
