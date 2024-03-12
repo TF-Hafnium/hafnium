@@ -1138,14 +1138,6 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 	ret = plat_ffa_msg_wait_prepare(current_locked, next);
 out:
 	vcpu_unlock(&current_locked);
-
-	if (ret.func != FFA_ERROR_32) {
-		struct vm_locked vm_locked = vm_lock(current->vm);
-
-		api_release_mailbox(vm_locked, NULL);
-		vm_unlock(&vm_locked);
-	}
-
 	return ret;
 }
 
