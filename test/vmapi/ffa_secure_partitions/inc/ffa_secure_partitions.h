@@ -68,3 +68,4 @@ void waitms(uint64_t ms);
 bool sp1_fail_at_boot(void);
 bool sp2_fail_at_boot(void);
 bool sp3_fail_at_boot(void);
+bool service2_is_el0(void);

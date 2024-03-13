@@ -13,6 +13,7 @@
 #include "hf/arch/vm/interrupts.h"
 
 #include "hf/dlog.h"
+#include "hf/ffa.h"
 
 #include "vmapi/hf/call.h"
 
@@ -118,4 +119,17 @@ struct ffa_value sp_trigger_espi_cmd(ffa_id_t source, uint32_t espi_id)
 	}
 
 	return sp_success(own_id, source, 0);
+}
+
+struct ffa_value sp_ffa_features_cmd(ffa_id_t source, uint32_t feature_func_id)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+
+	res = ffa_call((struct ffa_value){
+		.func = FFA_FEATURES_32,
+		.arg1 = feature_func_id,
+	});
+	return ffa_msg_send_direct_resp(own_id, source, res.func, res.arg2, 0,
+					0, 0);
 }

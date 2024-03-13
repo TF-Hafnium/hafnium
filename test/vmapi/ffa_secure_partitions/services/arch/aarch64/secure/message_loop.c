@@ -126,6 +126,9 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_TRIGGER_ESPI_CMD:
 		res = sp_trigger_espi_cmd(ffa_sender(res), (uint32_t)res.arg4);
 		break;
+	case SP_FFA_FEATURES_CMD:
+		res = sp_ffa_features_cmd(ffa_sender(res), res.arg4);
+		break;
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT

@@ -37,3 +37,12 @@ bool service2_is_up_sp(void)
 
 	return (service2_info->vcpu_count == 1);
 }
+
+/*
+ * Currently we are using the vCPU count set to 0 for service 2 as being an
+ * indication it is S-EL0 partition.
+ */
+bool service2_is_el0(void)
+{
+	return service2_is_up_sp();
+}

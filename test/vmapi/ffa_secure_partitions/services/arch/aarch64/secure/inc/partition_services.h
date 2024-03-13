@@ -521,3 +521,14 @@ static inline struct ffa_value sp_trigger_espi_cmd_send(ffa_id_t source,
 }
 
 struct ffa_value sp_trigger_espi_cmd(ffa_id_t source, uint32_t espi_id);
+
+#define SP_FFA_FEATURES_CMD 0x65737070U
+
+static inline struct ffa_value sp_ffa_features_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver, uint32_t feature_func_id)
+{
+	return ffa_msg_send_direct_req(sender, receiver, SP_FFA_FEATURES_CMD,
+				       feature_func_id, 0, 0, 0);
+}
+
+struct ffa_value sp_ffa_features_cmd(ffa_id_t source, uint32_t feature_func_id);
