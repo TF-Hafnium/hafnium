@@ -1286,8 +1286,7 @@ TEST(memory_sharing, donate_vms)
  * Test that once device memory has been lent it is not longer accessible to
  * the original owner.
  */
-TEST_PRECONDITION(memory_sharing,
-		  lend_device_memory_between_sps_and_lose_access,
+TEST_PRECONDITION(memory_sharing, lend_device_memory_and_lose_access,
 		  service1_and_service2_are_secure)
 {
 	struct ffa_value run_res;
@@ -1349,6 +1348,64 @@ TEST_PRECONDITION(memory_sharing, lend_device_memory_between_sps_and_reclaim,
 
 	/* Check the service2 can no longer access the memory it was lent. */
 	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
+}
+
+/**
+ * Test device memory can be lent from NWd to an endpoint.
+ * Then test that once the service has relinquished ownership it can no longer
+ * access the memory. This device memory shared is UART2.
+ */
+TEST(memory_sharing, lend_device_memory_to_sp_and_reclaim)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	/* Lend the UART2 device region. */
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)0x1c0b0000, .page_count = 1},
+	};
+	ffa_memory_handle_t handle;
+	volatile uint8_t *ptr;
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_memory_lend_relinquish_device", mb.send);
+
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	ptr = (uint8_t *)constituents[0].address;
+
+	/* Try to write to the memory before sharing. */
+	*ptr = 'h';
+	*ptr = 'e';
+	*ptr = 'l';
+	*ptr = 'l';
+	*ptr = 'o';
+	*ptr = '\n';
+
+	/* Lend memory to the next VM. */
+	handle = send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), service1_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_DEVICE_MEM,
+		FFA_MEMORY_DEV_NGNRNE, FFA_MEMORY_DEV_NGNRNE);
+
+	/* Receive memory, access it and relinquish it in service1. */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	ASSERT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	*ptr = 'h';
+	*ptr = 'i';
+	*ptr = '\n';
+
+	/*
+	 * Check service1 can no longer access the memory it was lent and
+	 * relinquished.
+	 */
+	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 

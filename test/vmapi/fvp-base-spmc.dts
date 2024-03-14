@@ -87,12 +87,15 @@
 		reg = <0x0 0x90000000 0x70000000>;
 	};
 
-	/*
-	 * Maps UART (0x1c090000) and Trusted Watchdog (0x2a490000) memory ranges.
-	 */
 	memory@2 {
 		device_type = "device-memory";
-		reg = <0x0 0x1c090000 0xd0000>, /* Uart */
-		      <0x0 0x2a490000 0x10000>; /* Watchdog */
+		reg = <0x0 0x1c090000 0x20000>, /* UART0-1 */
+		      <0x0 0x2a490000 0x10000>, /* Trusted Watchdog */
+		      <0x0 0x1c130000 0x10000>; /* Dummy for boot_fail tests. */
+	};
+
+	memory@3 {
+		device_type = "ns-device-memory";
+		reg = <0x0 0x1c0b0000 0x20000>; /* UART2-3 */
 	};
 };

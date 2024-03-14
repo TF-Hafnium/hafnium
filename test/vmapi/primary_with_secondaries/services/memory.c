@@ -359,6 +359,8 @@ TEST_SERVICE(ffa_memory_lend_relinquish_device)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		first_ptr = (uint8_t *)constituents[0].address;
 
+		update_mm_security_state(composite, memory_region->attributes);
+
 		/*
 		 * Check that we can read and write every page that was shared.
 		 */
