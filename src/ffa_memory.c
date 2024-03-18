@@ -719,16 +719,12 @@ static struct ffa_value ffa_send_check_transition(
 		return ret;
 	}
 
-	/*
-	 * Device memory regions can only be lent from SP to SP and to a single
-	 * borrower.
-	 */
+	/* Device memory regions can only be lent a single borrower. */
 	if ((*orig_from_mode & MM_MODE_D) != 0U &&
-	    !(share_func == FFA_MEM_LEND_32 && !ffa_is_vm_id(from.vm->id) &&
-	      receivers_count == 1)) {
+	    !(share_func == FFA_MEM_LEND_32 && receivers_count == 1)) {
 		dlog_verbose(
-			"Device memory can only be lent, from the secure world "
-			"and to a single borrower (mode is %#x).\n",
+			"Device memory can only be lent to a single borrower "
+			"(mode is %#x).\n",
 			*orig_from_mode);
 		return ffa_error(FFA_DENIED);
 	}
