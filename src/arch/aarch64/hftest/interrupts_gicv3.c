@@ -44,14 +44,13 @@ void interrupt_gic_setup(void)
 	}
 
 	/* Put interrupts into non-secure group 1. */
-	dlog_info("GICR_IGROUPR0 was %x\n", 0xffffffff,
-		  io_read32(GICR_IGROUPR0));
+	dlog_info("GICR_IGROUPR0 was %x\n", io_read32(GICR_IGROUPR0));
 	io_write32(GICR_IGROUPR0, 0xffffffff);
 	dlog_info("wrote %x to GICR_IGROUPR0, got back %x\n", 0xffffffff,
 		  io_read32(GICR_IGROUPR0));
 	/* Enable non-secure group 1. */
 	write_msr(ICC_IGRPEN1_EL1, 0x00000001);
-	dlog_info("wrote %x to ICC_IGRPEN1_EL1, got back %x\n", 0x00000001,
+	dlog_info("wrote %x to ICC_IGRPEN1_EL1, got back %lx\n", 0x00000001,
 		  read_msr(ICC_IGRPEN1_EL1));
 }
 

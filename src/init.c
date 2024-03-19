@@ -104,7 +104,7 @@ void one_time_init(void)
 	}
 
 	for (i = 0; i < params->mem_ranges_count; ++i) {
-		dlog_info("Memory range:  %#x - %#x\n",
+		dlog_info("Memory range:  %#lx - %#lx\n",
 			  pa_addr(params->mem_ranges[i].begin),
 			  pa_addr(params->mem_ranges[i].end) - 1);
 	}
@@ -117,7 +117,7 @@ void one_time_init(void)
 	 * passed to Hafnium entry point is the manifest address.
 	 */
 	if (pa_addr(params->initrd_begin)) {
-		dlog_info("Ramdisk range: %#x - %#x\n",
+		dlog_info("Ramdisk range: %#lx - %#lx\n",
 			  pa_addr(params->initrd_begin),
 			  pa_addr(params->initrd_end) - 1);
 
@@ -139,8 +139,9 @@ void one_time_init(void)
 		manifest_it = fdt.buf;
 	}
 
-	dlog_verbose("Manifest range: %#x - %#x (%d bytes)\n", manifest_it.next,
-		     manifest_it.limit, manifest_it.limit - manifest_it.next);
+	dlog_verbose("Manifest range: %p - %p (%ld bytes)\n",
+		     (void *)manifest_it.next, (void *)manifest_it.limit,
+		     manifest_it.limit - manifest_it.next);
 	if (!is_aligned(manifest_it.next, 4)) {
 		panic("Manifest not aligned.");
 	}

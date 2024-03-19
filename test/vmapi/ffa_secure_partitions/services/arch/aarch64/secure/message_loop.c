@@ -26,7 +26,7 @@ static struct ffa_value handle_direct_req2_cmd(struct ffa_value res)
 	} else {
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
-			   "0x%x is not a valid command from %x\n",
+			   "0x%lx is not a valid command from %x\n",
 			   res.arg4, ffa_sender(res));
 		abort();
 	}
@@ -133,7 +133,7 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
-			   "0x%x is not a valid command from %x\n",
+			   "0x%lx is not a valid command from %x\n",
 			   res.arg3, ffa_sender(res));
 		abort();
 	}
@@ -175,7 +175,7 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 		} else {
 			HFTEST_LOG_FAILURE();
 			HFTEST_LOG(HFTEST_LOG_INDENT
-				   "0x%x is not a valid function\n",
+				   "0x%lx is not a valid function\n",
 				   res.func);
 			abort();
 		}

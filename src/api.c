@@ -806,7 +806,7 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	if (vm_count == 0 || vm_count > ARRAY_SIZE(partitions)) {
 		dlog_verbose(
 			"Invalid parameters. vm_count = %d (must not be zero "
-			"or > %d)\n",
+			"or > %lu)\n",
 			vm_count, ARRAY_SIZE(partitions));
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -1585,7 +1585,7 @@ struct ffa_value api_vm_configure_pages(
 
 	/* Hafnium only supports a fixed size of RX/TX buffers. */
 	if (page_count != HF_MAILBOX_SIZE / FFA_PAGE_SIZE) {
-		dlog_error("%s: Page count must be %d, it is %d\n", __func__,
+		dlog_error("%s: Page count must be %zu, it is %d\n", __func__,
 			   HF_MAILBOX_SIZE / FFA_PAGE_SIZE, page_count);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -3241,7 +3241,7 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	 */
 	if (fragment_length_v1_1 > MM_PPOOL_ENTRY_SIZE) {
 		dlog_verbose(
-			"Translation of FF-A v1.0 descriptors for over %u is "
+			"Translation of FF-A v1.0 descriptors for over %lu is "
 			"unsupported.",
 			MM_PPOOL_ENTRY_SIZE);
 		return ffa_error(FFA_NOT_SUPPORTED);
@@ -3405,7 +3405,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 				      memory_region->memory_access_desc_size) {
 		dlog_verbose(
 			"Initial fragment length %d smaller than header size "
-			"%d.\n",
+			"%lu.\n",
 			fragment_length,
 			sizeof(struct ffa_memory_region) +
 				memory_region->memory_access_desc_size);
@@ -3746,7 +3746,7 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	if (fragment_length > HF_MAILBOX_SIZE ||
 	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
 		dlog_verbose(
-			"Fragment length %d larger than mailbox size %d.\n",
+			"Fragment length %d larger than mailbox size %zu.\n",
 			fragment_length, HF_MAILBOX_SIZE);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -3906,7 +3906,7 @@ struct ffa_value api_ffa_notification_update_bindings(
 	}
 
 	if (notifications == 0U) {
-		dlog_verbose("No notifications have been specified %x.\n",
+		dlog_verbose("No notifications have been specified %lx.\n",
 			     notifications);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -3943,7 +3943,7 @@ struct ffa_value api_ffa_notification_update_bindings(
 		    receiver_locked, ffa_is_vm_id(sender_vm_id), id_to_validate,
 		    notifications)) {
 		dlog_verbose(
-			"Sender %x not permitted to set notifications %x to "
+			"Sender %x not permitted to set notifications %lx to "
 			"%x.\n",
 			sender_vm_id, notifications, receiver_vm_id);
 		ret = ffa_error(FFA_DENIED);
@@ -3957,7 +3957,7 @@ struct ffa_value api_ffa_notification_update_bindings(
 	if (vm_are_notifications_pending(receiver_locked,
 					 ffa_is_vm_id(sender_vm_id),
 					 notifications)) {
-		dlog_verbose("Notifications within '%x' pending.\n",
+		dlog_verbose("Notifications within '%lx' pending.\n",
 			     notifications);
 		ret = ffa_error(FFA_DENIED);
 		goto out;
@@ -4043,7 +4043,7 @@ struct ffa_value api_ffa_notification_set(
 	if (vm_notifications_validate_binding(
 		    receiver_locked, ffa_is_vm_id(sender_vm_id), sender_vm_id,
 		    notifications, !is_per_vcpu)) {
-		dlog_verbose("Notifications in %x are %s\n", notifications,
+		dlog_verbose("Notifications in %lx are %s\n", notifications,
 			     !is_per_vcpu ? "global" : "per-vCPU");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -4072,7 +4072,7 @@ struct ffa_value api_ffa_notification_set(
 		receiver_locked, ffa_is_vm_id(sender_vm_id), notifications,
 		vcpu_id, is_per_vcpu);
 
-	dlog_verbose("Set the notifications: %x.\n", notifications);
+	dlog_verbose("Set the notifications: %lx.\n", notifications);
 
 	if ((FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) == 0) {
 		dlog_verbose("SRI was NOT delayed. vcpu: %u!\n",
@@ -4155,7 +4155,8 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 	    (receiver_locked.vm->vcpu_count != 1 &&
 	     cpu_index(current->cpu) != vcpu_id)) {
 		dlog_verbose(
-			"Invalid VCPU ID %u. vcpu count %u current core: %u!\n",
+			"Invalid VCPU ID %u. vcpu count %u current core: "
+			"%zu!\n",
 			vcpu_id, receiver_locked.vm->vcpu_count,
 			cpu_index(current->cpu));
 		ret = ffa_error(FFA_INVALID_PARAMETERS);

@@ -29,7 +29,7 @@ struct ffa_value arch_memory_protect(paddr_t begin, paddr_t end,
 	if (!is_arch_feat_rme_supported()) {
 		dlog_verbose(
 			"%s: memory protect services rely on RME feature. "
-			"Memory is not protected %x\n",
+			"Memory is not protected %lx\n",
 			__func__, pa_addr(begin));
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
@@ -46,7 +46,7 @@ struct ffa_value arch_memory_protect(paddr_t begin, paddr_t end,
 		/* Denied the operation due to state of memory. */
 		paddr_t last_protected = pa_init(ret.arg1);
 
-		dlog_verbose("%s: denied to update PAS. Last: %x\n", __func__,
+		dlog_verbose("%s: denied to update PAS. Last: %lx\n", __func__,
 			     pa_addr(last_protected));
 
 		/* If PAS update failed from first region. */

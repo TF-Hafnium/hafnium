@@ -139,7 +139,7 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 	sl_lock(&args.lock);
 
 	for (size_t i = 1; i < MAX_CPUS - 1; i++) {
-		HFTEST_LOG("Booting CPU %u", i);
+		HFTEST_LOG("Booting CPU %zu", i);
 
 		/*
 		 * If receiver is an S-EL0 partition it is expected to have one
@@ -155,7 +155,7 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 		/* Wait for CPU to release the lock. */
 		sl_lock(&args.lock);
 
-		HFTEST_LOG("Done with CPU %u", i);
+		HFTEST_LOG("Done with CPU %zu", i);
 	}
 }
 

@@ -428,7 +428,8 @@ static enum manifest_return_code parse_vm_common(const struct fdt_node *node,
 	}
 
 	if (uint32list_has_next(&smcs)) {
-		dlog_warning("%s SMC whitelist too long.\n", vm->debug_name);
+		dlog_warning("%s SMC whitelist too long.\n",
+			     vm->debug_name.data);
 	}
 
 	TRY(read_bool(node, "smc_whitelist_permissive",
@@ -502,7 +503,7 @@ void dump_memory_ranges(const struct mem_range *ranges,
 				 PAGE_SIZE) /
 			PAGE_SIZE;
 
-		dlog("  [%x - %x (%u pages)]\n", begin, end, page_count);
+		dlog("  [%lx - %lx (%zu pages)]\n", begin, end, page_count);
 	}
 }
 
@@ -557,13 +558,14 @@ static enum manifest_return_code check_and_record_memory_used(
 
 	if (page_count == 0U) {
 		dlog_error(
-			"Empty memory region defined with base address: %#x.\n",
+			"Empty memory region defined with base address: "
+			"%#lx.\n",
 			base_address);
 		return MANIFEST_ERROR_MEM_REGION_EMPTY;
 	}
 
 	if (!is_aligned(base_address, PAGE_SIZE)) {
-		dlog_error("base_address (%#x) is not aligned to page size.\n",
+		dlog_error("base_address (%#lx) is not aligned to page size.\n",
 			   base_address);
 		return MANIFEST_ERROR_MEM_REGION_UNALIGNED;
 	}
@@ -619,14 +621,14 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		TRY(read_optional_uint64(mem_node, "base-address",
 					 MANIFEST_INVALID_ADDRESS,
 					 &mem_regions[i].base_address));
-		dlog_verbose("      Base address: %#x\n",
+		dlog_verbose("      Base address: %#lx\n",
 			     mem_regions[i].base_address);
 
 		TRY(read_optional_uint64(mem_node, "relative-address",
 					 MANIFEST_INVALID_ADDRESS,
 					 &relative_address));
 		if (relative_address != MANIFEST_INVALID_ADDRESS) {
-			dlog_verbose("      Relative address:  %#x\n",
+			dlog_verbose("      Relative address:  %#lx\n",
 				     relative_address);
 		}
 
@@ -838,7 +840,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 		TRY(read_uint64(dev_node, "base-address",
 				&dev_regions[i].base_address));
-		dlog_verbose("      Base address: %#x\n",
+		dlog_verbose("      Base address: %#lx\n",
 			     dev_regions[i].base_address);
 
 		TRY(read_uint32(dev_node, "pages-count",
@@ -960,7 +962,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 				assert(info != NULL);
 				info->mpidr = mpidr;
 				info->mpidr_valid = true;
-				dlog_verbose("        MPIDR = %#x\n", mpidr);
+				dlog_verbose("        MPIDR = %#lx\n", mpidr);
 			}
 		}
 
@@ -1173,7 +1175,7 @@ static bool map_dma_device_id_to_stream_ids(struct manifest_vm *vm)
 			if (!find_dma_device_id_from_dev_region_nodes(
 				    vm, sid, &device_id)) {
 				dlog_verbose(
-					"Stream ID not found in any device "
+					"Stream ID %d not found in any device "
 					"region node of partition manifest\n",
 					sid);
 				return false;
@@ -1255,11 +1257,11 @@ enum manifest_return_code parse_ffa_manifest(
 
 	TRY(read_optional_uint64(&root, "load-address", 0,
 				 &vm->partition.load_addr));
-	dlog_verbose("  Load address %#x\n", vm->partition.load_addr);
+	dlog_verbose("  Load address %#lx\n", vm->partition.load_addr);
 
 	TRY(read_optional_uint64(&root, "entrypoint-offset", 0,
 				 &vm->partition.ep_offset));
-	dlog_verbose("  Entry point offset %#x\n", vm->partition.ep_offset);
+	dlog_verbose("  Entry point offset %#zx\n", vm->partition.ep_offset);
 
 	TRY(read_optional_uint32(&root, "gp-register-num",
 				 DEFAULT_BOOT_GP_REGISTER,
@@ -1273,7 +1275,7 @@ enum manifest_return_code parse_ffa_manifest(
 	TRY(read_optional_uint16(&root, "boot-order", DEFAULT_BOOT_ORDER,
 				 &vm->partition.boot_order));
 	if (vm->partition.boot_order != DEFAULT_BOOT_ORDER) {
-		dlog_verbose("  Boot order %#u\n", vm->partition.boot_order);
+		dlog_verbose("  Boot order %u\n", vm->partition.boot_order);
 	}
 
 	if (!check_boot_order(vm->partition.boot_order)) {

@@ -375,7 +375,7 @@ static bool smmuv3_xlat_support(struct smmuv3_driver *smmuv3)
 		smmuv3->prop.ias = ias_aarch32;
 	}
 
-	dlog_verbose("SMMUv3: Input Addr: %d-bits, Output Addr: %d-bits\n",
+	dlog_verbose("SMMUv3: Input Addr: %lu-bits, Output Addr: %lu-bits\n",
 		     smmuv3->prop.ias, smmuv3->prop.oas);
 
 	/*
@@ -695,7 +695,7 @@ static inline uint32_t find_offset_next_wr_idx(struct smmuv3_driver *smmuv3,
 static inline void push_entry_to_cmdq(uint64_t *cmdq_entry,
 				      const uint64_t *cmd_dword)
 {
-	dlog_verbose("SMMUv3: Writing command to: %p\n", cmdq_entry);
+	dlog_verbose("SMMUv3: Writing command to: %p\n", (void *)cmdq_entry);
 
 	for (unsigned int i = 0; i < CMD_SIZE_DW; i++) {
 		cmdq_entry[i] = cmd_dword[i];

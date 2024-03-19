@@ -115,7 +115,7 @@ TEST(linux, socket_echo_hafnium)
 		FAIL("Socket send() failed: %s", strerror(errno));
 		return;
 	}
-	HFTEST_LOG("Packet with length %d sent.", send_len);
+	HFTEST_LOG("Packet with length %zu sent.", send_len);
 
 	/* Receive a response, which should be an echo of the sent packet. */
 	recv_len = recv(socket_id, resp_buf, sizeof(resp_buf) - 1, 0);
@@ -124,7 +124,7 @@ TEST(linux, socket_echo_hafnium)
 		FAIL("Socket recv() failed: %s", strerror(errno));
 		return;
 	}
-	HFTEST_LOG("Packet with length %d received.", recv_len);
+	HFTEST_LOG("Packet with length %zd received.", recv_len);
 
 	EXPECT_EQ(recv_len, send_len);
 	EXPECT_EQ(memcmp(send_buf, resp_buf, send_len), 0);

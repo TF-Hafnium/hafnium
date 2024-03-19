@@ -122,7 +122,7 @@ static bool link_rxtx_to_mailbox(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
-	dlog_verbose("  mailbox: send = %#x, recv = %#x\n",
+	dlog_verbose("  mailbox: send = %p, recv = %p\n",
 		     vm_locked.vm->mailbox.send, vm_locked.vm->mailbox.recv);
 
 	return true;
@@ -401,7 +401,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		goto out;
 	}
 
-	dlog_info("Loaded primary VM with %u vCPUs, entry at %#x.\n",
+	dlog_info("Loaded primary VM with %u vCPUs, entry at %#lx.\n",
 		  vm->vcpu_count, pa_addr(primary_begin));
 
 	/* Mark the first VM vCPU to be the first booted vCPU. */
@@ -448,8 +448,8 @@ static bool load_secondary_fdt(struct mm_stage1_locked stage1_locked,
 
 	if (allocated_size > fdt_max_size) {
 		dlog_error(
-			"FDT allocated space (%u) is more than the specified "
-			"maximum to use (%u).\n",
+			"FDT allocated space (%zu) is more than the specified "
+			"maximum to use (%zu).\n",
 			allocated_size, fdt_max_size);
 		return false;
 	}
@@ -457,7 +457,7 @@ static bool load_secondary_fdt(struct mm_stage1_locked stage1_locked,
 	/* Load the FDT to the end of the VM's allocated memory space. */
 	*fdt_addr = pa_init(pa_addr(pa_sub(end, allocated_size)));
 
-	dlog_info("Loading secondary FDT of allocated size %u at 0x%x.\n",
+	dlog_info("Loading secondary FDT of allocated size %zu at 0x%lx.\n",
 		  allocated_size, pa_addr(*fdt_addr));
 
 	if (!copy_to_unmapped(stage1_locked, *fdt_addr, &fdt, ppool)) {
@@ -601,8 +601,8 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 			return false;
 		}
 
-		dlog_verbose("Memory region %#x - %#x allocated.\n",
-			     region_begin, region_end);
+		dlog_verbose("Memory region %#lx - %#lx allocated.\n",
+			     pa_addr(region_begin), pa_addr(region_end));
 
 		j++;
 	}
@@ -798,7 +798,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		goto out;
 	}
 
-	dlog_info("Loaded with %u vCPUs, entry at %#x.\n",
+	dlog_info("Loaded with %u vCPUs, entry at %#lx.\n",
 		  manifest_vm->secondary.vcpu_count, pa_addr(mem_begin));
 
 	vcpu = vm_get_vcpu(vm, 0);
@@ -1007,7 +1007,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 		}
 
 		dlog_info("Loading VM id %#x: %s.\n", vm_id,
-			  manifest_vm->debug_name);
+			  manifest_vm->debug_name.data);
 
 		mem_size = align_up(manifest_vm->secondary.mem_size, PAGE_SIZE);
 
@@ -1021,7 +1021,8 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 						params->mem_ranges_count,
 						mem_size, &secondary_mem_begin,
 						&secondary_mem_end)) {
-			dlog_error("Not enough memory (%u bytes).\n", mem_size);
+			dlog_error("Not enough memory (%lu bytes).\n",
+				   mem_size);
 			continue;
 		}
 

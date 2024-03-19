@@ -431,7 +431,7 @@ TEST(ffa_boot_info, parse_fdt)
 
 	ASSERT_TRUE(fdt_info != NULL);
 
-	HFTEST_LOG("FF-A Manifest Address: %x", fdt_info->content);
+	HFTEST_LOG("FF-A Manifest Address: %lx", fdt_info->content);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	fdt_ptr = (void*)fdt_info->content;
 
@@ -441,7 +441,7 @@ TEST(ffa_boot_info, parse_fdt)
 
 	EXPECT_TRUE(fdt_is_compatible(&root, "arm,ffa-manifest-1.0"));
 	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &ffa_version));
-	HFTEST_LOG("FF-A Version: %x", ffa_version);
+	HFTEST_LOG("FF-A Version: %lx", ffa_version);
 	ASSERT_EQ(ffa_version, MAKE_FFA_VERSION(1, 2));
 }
 

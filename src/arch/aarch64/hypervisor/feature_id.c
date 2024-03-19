@@ -274,7 +274,8 @@ bool feature_id_process_access(struct vcpu *vcpu, uintreg_t esr)
 	if (!ISS_IS_READ(esr)) {
 		dlog_notice(
 			"Unsupported feature ID register write: "
-			"op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, rt=%d.\n",
+			"op0=%lu, op1=%lu, crn=%lu, crm=%lu, op2=%lu, "
+			"rt=%lu.\n",
 			GET_ISS_OP0(esr), GET_ISS_OP1(esr), GET_ISS_CRN(esr),
 			GET_ISS_CRM(esr), GET_ISS_OP2(esr), GET_ISS_RT(esr));
 		return true;
@@ -292,7 +293,8 @@ bool feature_id_process_access(struct vcpu *vcpu, uintreg_t esr)
 		value = 0;
 		dlog_notice(
 			"Unsupported feature ID register read: "
-			"op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, rt=%d.\n",
+			"op0=%lu, op1=%lu, crn=%lu, crm=%lu, op2=%lu, "
+			"rt=%lu.\n",
 			GET_ISS_OP0(esr), GET_ISS_OP1(esr), GET_ISS_CRN(esr),
 			GET_ISS_CRM(esr), GET_ISS_OP2(esr), GET_ISS_RT(esr));
 		break;

@@ -523,8 +523,9 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
 						     next_state);
 		break;
 	default:
-		dlog_error("Illegal Runtime Model specified by SP%x on CPU%x\n",
-			   current->vm->id, cpu_index(current->cpu));
+		dlog_error(
+			"Illegal Runtime Model specified by SP%x on CPU%zx\n",
+			current->vm->id, cpu_index(current->cpu));
 		allowed = false;
 		break;
 	}
@@ -1163,7 +1164,7 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 	}
 
 	if (vm->vcpu_count > 1 && vcpu_idx != cpu_index(current->cpu)) {
-		dlog_verbose("vcpu_idx (%d) != pcpu index (%d)\n", vcpu_idx,
+		dlog_verbose("vcpu_idx (%d) != pcpu index (%zu)\n", vcpu_idx,
 			     cpu_index(current->cpu));
 		return false;
 	}
@@ -1933,7 +1934,7 @@ void plat_ffa_sri_state_set(enum plat_ffa_sri_state state)
 
 static void plat_ffa_send_schedule_receiver_interrupt(struct cpu *cpu)
 {
-	dlog_verbose("Setting Schedule Receiver SGI %u on core: %u\n",
+	dlog_verbose("Setting Schedule Receiver SGI %u on core: %zu\n",
 		     HF_SCHEDULE_RECEIVER_INTID, cpu_index(cpu));
 
 	plat_interrupts_send_sgi(HF_SCHEDULE_RECEIVER_INTID, cpu, false);
@@ -2714,7 +2715,7 @@ struct ffa_value plat_ffa_other_world_mem_reclaim(
 	(void)page_pool;
 	(void)to;
 
-	dlog_verbose("Invalid handle %#x for FFA_MEM_RECLAIM.\n", handle);
+	dlog_verbose("Invalid handle %#lx for FFA_MEM_RECLAIM.\n", handle);
 	return ffa_error(FFA_INVALID_PARAMETERS);
 }
 

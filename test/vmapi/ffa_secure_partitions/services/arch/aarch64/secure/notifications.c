@@ -59,7 +59,7 @@ struct ffa_value sp_notif_unbind_cmd(ffa_id_t test_source,
 	struct ffa_value res;
 	ffa_id_t own_id = hf_vm_get_id();
 
-	dlog_verbose("Unbind notifications %x, from sender: %x\n", bitmap,
+	dlog_verbose("Unbind notifications %lx, from sender: %x\n", bitmap,
 		     notif_sender);
 
 	res = ffa_notification_unbind(notif_sender, own_id, bitmap);

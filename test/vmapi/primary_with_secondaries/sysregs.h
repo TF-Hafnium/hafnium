@@ -13,7 +13,7 @@
 #include "../msr.h"
 #include "test/hftest.h"
 
-#define TRY_READ(REG) dlog(#REG "=%#x\n", read_msr(REG))
+#define TRY_READ(REG) dlog(#REG "=%#lx\n", read_msr(REG))
 
 #define CHECK_READ(REG, VALUE)       \
 	do {                         \

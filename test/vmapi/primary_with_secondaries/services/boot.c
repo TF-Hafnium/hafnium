@@ -141,7 +141,7 @@ TEST_SERVICE(boot_memory_manifest)
 		uint64_t checksum = 0;
 		mem_region = &ctx->partition_manifest.mem_regions[i];
 
-		HFTEST_LOG("Accessing memory: %#x - %u pages - %#x attributes",
+		HFTEST_LOG("Accessing memory: %#lx - %u pages - %#x attributes",
 			   mem_region->base_address, mem_region->page_count,
 			   mem_region->attributes);
 

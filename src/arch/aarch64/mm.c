@@ -791,7 +791,7 @@ bool arch_mm_init(paddr_t table)
 	/* Check the physical address range. */
 	if (!pa_bits) {
 		dlog_error(
-			"Unsupported value of id_aa64mmfr0_el1.PARange: %x\n",
+			"Unsupported value of id_aa64mmfr0_el1.PARange: %lx\n",
 			pa_range);
 		return false;
 	}

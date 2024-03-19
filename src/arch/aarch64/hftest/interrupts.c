@@ -43,10 +43,10 @@ noreturn static bool default_sync_current_exception(void)
 
 	switch (esr >> 26) {
 	case 0x25: /* EC = 100101, Data abort. */
-		dlog("Data abort: pc=%#x, esr=%#x, ec=%#x", elr, esr,
+		dlog("Data abort: pc=%#lx, esr=%#lx, ec=%#lx", elr, esr,
 		     esr >> 26);
 		if (!(esr & (1U << 10))) { /* Check FnV bit. */
-			dlog(", far=%#x", read_msr(far_el1));
+			dlog(", far=%#lx", read_msr(far_el1));
 		} else {
 			dlog(", far=invalid");
 		}
@@ -55,8 +55,8 @@ noreturn static bool default_sync_current_exception(void)
 		break;
 
 	default:
-		dlog("Unknown current sync exception pc=%#x, esr=%#x, "
-		     "ec=%#x\n",
+		dlog("Unknown current sync exception pc=%#lx, esr=%#lx, "
+		     "ec=%#lx\n",
 		     elr, esr, esr >> 26);
 	}
 

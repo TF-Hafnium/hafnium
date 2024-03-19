@@ -20,12 +20,12 @@
 #define HFTEST_MAX_TESTS 50
 
 /*
- * Log with the HFTEST_LOG_PREFIX and a new line. The zero is added so there is
- * always at least one variadic argument.
+ * Log with the HFTEST_LOG_PREFIX and a new line. The newline is passed as
+ * an argument so there is always at least one variadic argument.
  */
-#define HFTEST_LOG(...) HFTEST_LOG_IMPL(__VA_ARGS__, 0)
+#define HFTEST_LOG(...) HFTEST_LOG_IMPL(__VA_ARGS__, "\n")
 #define HFTEST_LOG_IMPL(format, ...) \
-	dlog("%s" format "\n", HFTEST_LOG_PREFIX, __VA_ARGS__)
+	dlog(HFTEST_LOG_PREFIX format "%s", __VA_ARGS__)
 
 /* Helper to wrap the argument in quotes. */
 #define HFTEST_STR(str) #str
@@ -191,49 +191,46 @@ struct hftest_test {
 
 /* _Generic formatting doesn't seem to be supported so doing this manually. */
 /* clang-format off */
-
-/*
- * dlog format specifier for types. Note, these aren't the standard specifiers
- * for the types.
- */
-#define hftest_dlog_format(x)                 \
-	_Generic((x),                         \
-		bool:                   "%u", \
-		char:                   "%c", \
-		signed char:            "%d", \
-		unsigned char:          "%u", \
-		signed short:           "%d", \
-		unsigned short:         "%u", \
-		signed int:             "%d", \
-		unsigned int:           "%u", \
-		signed long int:        "%d", \
-		unsigned long int:      "%u", \
-		signed long long int:   "%d", \
-		unsigned long long int: "%u")
-
-/* clang-format on */
-
 #define HFTEST_LOG_FAILURE() \
 	dlog(HFTEST_LOG_PREFIX "Failure: %s:%u\n", __FILE__, __LINE__);
 
 #ifdef HFTEST_OPTIMIZE_FOR_SIZE
 #define HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op)
 #else /* HFTEST_OPTIMIZE_FOR_SIZE */
-#define HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op)                                \
-	do {                                                                   \
-		char lhs_fmt[] = HFTEST_LOG_PREFIX "lhs = %_ (%#x)\n";         \
-		char rhs_fmt[] = HFTEST_LOG_PREFIX "rhs = %_ (%#x)\n";         \
-		const size_t index = sizeof(HFTEST_LOG_PREFIX "lhs = %_") - 2; \
-		lhs_fmt[index] = hftest_dlog_format(lhs)[1];                   \
-		rhs_fmt[index] = hftest_dlog_format(rhs)[1];                   \
-		dlog(HFTEST_LOG_PREFIX "assertion failed: `%s %s %s`\n", #lhs, \
-		     #op, #rhs);                                               \
-		dlog(lhs_fmt, lhs_value, lhs_value);                           \
-		dlog(rhs_fmt, rhs_value, rhs_value);                           \
-		dlog("\n");                                                    \
+#define HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op)                                    \
+	do {                                                                           \
+		dlog(HFTEST_LOG_PREFIX "assertion failed: `%s %s %s`\n", #lhs, #op, #rhs); \
+		dlog(_Generic(lhs_value,                                                   \
+			bool:               HFTEST_LOG_PREFIX "lhs = %hhu (%#02hhx)",          \
+			char:               HFTEST_LOG_PREFIX "lhs = '%c' (%#02hhx)",          \
+			signed char:        HFTEST_LOG_PREFIX "lhs = %hhd (%#02hhx)",          \
+			unsigned char:      HFTEST_LOG_PREFIX "lhs = %hhu (%#02hhx)",          \
+			signed short:       HFTEST_LOG_PREFIX "lhs = %hd (%#04hx)",            \
+			unsigned short:     HFTEST_LOG_PREFIX "lhs = %hu (%#04hx)",            \
+			signed int:         HFTEST_LOG_PREFIX "lhs = %d (%#08x)",              \
+			unsigned int:       HFTEST_LOG_PREFIX "lhs = %u (%#08x)",              \
+			signed long:        HFTEST_LOG_PREFIX "lhs = %ld (%#016lx)",            \
+			unsigned long:      HFTEST_LOG_PREFIX "lhs = %lu (%#016lx)",            \
+			signed long long:   HFTEST_LOG_PREFIX "lhs = %lld (%#016llx)",         \
+			unsigned long long: HFTEST_LOG_PREFIX "lhs = %llu (%#016llx)"          \
+		), lhs_value, lhs_value);                                                  \
+		dlog(_Generic(rhs_value,                                                   \
+			bool:               HFTEST_LOG_PREFIX "rhs = %hhu (%#02hhx)",          \
+			char:               HFTEST_LOG_PREFIX "rhs = '%c' (%#02hhx)",          \
+			signed char:        HFTEST_LOG_PREFIX "rhs = %hhd (%#02hhx)",          \
+			unsigned char:      HFTEST_LOG_PREFIX "rhs = %hhu (%#02hhx)",          \
+			signed short:       HFTEST_LOG_PREFIX "rhs = %hd (%#04hx)",            \
+			unsigned short:     HFTEST_LOG_PREFIX "rhs = %hu (%#04hx)",            \
+			signed int:         HFTEST_LOG_PREFIX "rhs = %d (%#08x)",              \
+			unsigned int:       HFTEST_LOG_PREFIX "rhs = %u (%#08x)",              \
+			signed long:        HFTEST_LOG_PREFIX "rhs = %ld (%#016lx)",            \
+			unsigned long:      HFTEST_LOG_PREFIX "rhs = %lu (%#016lx)",            \
+			signed long long:   HFTEST_LOG_PREFIX "rhs = %lld (%#016llx)",         \
+			unsigned long long: HFTEST_LOG_PREFIX "rhs = %llu (%#016llx)"          \
+		), rhs_value, rhs_value);                                                  \
 	} while (0)
-
 #endif /* HFTEST_OPTIMIZE_FOR_SIZE */
+/* clang-format on */
 
 #ifdef HFTEST_OPTIMIZE_FOR_SIZE
 #define HFTEST_LOG_ASSERT_STRING_DETAILS(lhs, rhs, op)

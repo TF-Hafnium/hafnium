@@ -157,9 +157,9 @@ bool fdt_find_memory_ranges(const struct fdt *fdt,
 				++mem_range_index;
 			} else {
 				dlog_error(
-					"Found %s range %u in FDT but only %u "
-					"supported, ignoring additional range "
-					"of size %u.\n",
+					"Found %s range %zu in FDT but only "
+					"%zu supported, ignoring additional "
+					"range of size %zu.\n",
 					string_data(device_type),
 					mem_range_index, mem_range_limit, len);
 			}

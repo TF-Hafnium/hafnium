@@ -254,8 +254,8 @@ bool sync_current_exception(uintreg_t elr, uintreg_t spsr)
 		/* Handle Granule Protection Fault. */
 		if (is_arch_feat_rme_supported() && dfsc == DFSC_GPF) {
 			dlog_verbose(
-				"Granule Protection Fault: esr=%#x, ec=%#x, "
-				"far=%#x, elr=%#x\n",
+				"Granule Protection Fault: esr=%#lx, ec=%#lx, "
+				"far=%#lx, elr=%#lx\n",
 				esr, ec, far, elr);
 
 			/*
@@ -282,21 +282,21 @@ bool sync_current_exception(uintreg_t elr, uintreg_t spsr)
 
 		if (!(esr & (1U << 10))) { /* Check FnV bit. */
 			dlog_error(
-				"Data abort: pc=%#x, esr=%#x, ec=%#x, "
-				"far=%#x\n",
+				"Data abort: pc=%#lx, esr=%#lx, ec=%#lx, "
+				"far=%#lx\n",
 				elr, esr, ec, far);
 
 		} else {
 			dlog_error(
-				"Data abort: pc=%#x, esr=%#x, ec=%#x, "
+				"Data abort: pc=%#lx, esr=%#lx, ec=%#lx, "
 				"far=invalid\n",
 				elr, esr, ec);
 		}
 	} break;
 	default:
 		dlog_error(
-			"Unknown current sync exception pc=%#x, esr=%#x, "
-			"ec=%#x\n",
+			"Unknown current sync exception pc=%#lx, esr=%#lx, "
+			"ec=%#lx\n",
 			elr, esr, ec);
 		break;
 	}
@@ -428,7 +428,7 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 		default:
 			dlog_error(
 				"FF-A PSCI framework message not handled "
-				"%#x %#x %#x %#x\n",
+				"%#lx %#lx %#lx %#lx\n",
 				args->func, args->arg1, args->arg2, args->arg3);
 			psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
 		}
@@ -453,7 +453,7 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 		return true;
 	}
 	default:
-		dlog_error("FF-A framework message not handled %#x\n",
+		dlog_error("FF-A framework message not handled %#lx\n",
 			   args->arg2);
 
 		/*
@@ -1078,8 +1078,9 @@ static void inject_el1_sysreg_trap_exception(struct vcpu *vcpu,
 	char *direction_str = ISS_IS_READ(esr_el2) ? "read" : "write";
 
 	dlog_notice(
-		"Trapped access to system register %s: op0=%d, op1=%d, crn=%d, "
-		"crm=%d, op2=%d, rt=%d.\n",
+		"Trapped access to system register %s: op0=%lu, op1=%lu, "
+		"crn=%lu, "
+		"crm=%lu, op2=%lu, rt=%lu.\n",
 		direction_str, GET_ISS_OP0(esr_el2), GET_ISS_OP1(esr_el2),
 		GET_ISS_CRN(esr_el2), GET_ISS_CRM(esr_el2),
 		GET_ISS_OP2(esr_el2), GET_ISS_RT(esr_el2));
@@ -1429,8 +1430,8 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 
 	default:
 		dlog_notice(
-			"Unknown lower sync exception pc=%#x, esr=%#x, "
-			"ec=%#x\n",
+			"Unknown lower sync exception pc=%#lx, esr=%#lx, "
+			"ec=%#lx\n",
 			vcpu->regs.pc, esr, ec);
 		break;
 	}

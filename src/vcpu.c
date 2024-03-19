@@ -188,11 +188,11 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 
 	if (!resume) {
 		dlog_warning(
-			"Stage-%d page fault: pc=%#x, vmid=%#x, vcpu=%u, "
-			"vaddr=%#x, ipaddr=%#x, mode=%#x %#x\n",
-			current->vm->el0_partition ? 1 : 2, f->pc, vm->id,
-			vcpu_index(current), f->vaddr, f->ipaddr, f->mode,
-			mode);
+			"Stage-%d page fault: pc=%#lx, vmid=%#x, vcpu=%u, "
+			"vaddr=%#lx, ipaddr=%#lx, mode=%#x %#x\n",
+			current->vm->el0_partition ? 1 : 2, va_addr(f->pc),
+			vm->id, vcpu_index(current), va_addr(f->vaddr),
+			ipa_addr(f->ipaddr), f->mode, mode);
 	}
 
 	return resume;

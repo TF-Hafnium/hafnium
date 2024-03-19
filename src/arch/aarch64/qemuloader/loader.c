@@ -104,7 +104,7 @@ noreturn void kmain(struct fdt_header *fdt)
 		panic("Invalid FW_CFG features.");
 	}
 
-	dlog_info("Initrd start %#x, size %#x\n", initrd_start, initrd_size);
+	dlog_info("Initrd start %#lx, size %#x\n", initrd_start, initrd_size);
 	if (initrd_size != 0 &&
 	    fw_cfg_read_dma(FW_CFG_INITRD_DATA, initrd_start, initrd_size)) {
 		panic("FW_CFG DMA failed.");
@@ -117,7 +117,7 @@ noreturn void kmain(struct fdt_header *fdt)
 	kernel_start = align_up(initrd_start + initrd_size, LINUX_ALIGNMENT) +
 		       LINUX_OFFSET;
 	kernel_size = fw_cfg_read_uint32(FW_CFG_KERNEL_SIZE);
-	dlog_info("Kernel start %#x, size %#x\n", kernel_start, kernel_size);
+	dlog_info("Kernel start %#lx, size %#x\n", kernel_start, kernel_size);
 	if (kernel_size == 0) {
 		panic("Invalid kernel size.");
 	}

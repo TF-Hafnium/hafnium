@@ -574,7 +574,7 @@ static void mm_dump_table_recursive(struct mm_page_table *table, uint8_t level,
 			continue;
 		}
 
-		dlog("%*s%x: %x\n", 4 * (max_level - level), "", i,
+		dlog("%*s%lx: %lx\n", 4 * (max_level - level), "", i,
 		     table->entries[i]);
 
 		if (arch_mm_pte_is_table(table->entries[i], level)) {
@@ -1109,13 +1109,13 @@ bool mm_init(struct mpool *ppool)
 	/* Locking is not enabled yet so fake it, */
 	struct mm_stage1_locked stage1_locked = mm_stage1_lock_unsafe();
 
-	dlog_info("text: %#x - %#x\n", pa_addr(layout_text_begin()),
+	dlog_info("text: %#lx - %#lx\n", pa_addr(layout_text_begin()),
 		  pa_addr(layout_text_end()));
-	dlog_info("rodata: %#x - %#x\n", pa_addr(layout_rodata_begin()),
+	dlog_info("rodata: %#lx - %#lx\n", pa_addr(layout_rodata_begin()),
 		  pa_addr(layout_rodata_end()));
-	dlog_info("data: %#x - %#x\n", pa_addr(layout_data_begin()),
+	dlog_info("data: %#lx - %#lx\n", pa_addr(layout_data_begin()),
 		  pa_addr(layout_data_end()));
-	dlog_info("stacks: %#x - %#x\n", pa_addr(layout_stacks_begin()),
+	dlog_info("stacks: %#lx - %#lx\n", pa_addr(layout_stacks_begin()),
 		  pa_addr(layout_stacks_end()));
 
 	/* ASID 0 is reserved for use by the hypervisor. */

@@ -281,9 +281,9 @@ bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
 	 * VM's requests should be forwarded to the SPMC, if receiver is an SP.
 	 */
 	if (!vm_id_is_current_world(receiver_vm_id)) {
-		dlog_verbose("%s calling SPMC %#x %#x %#x %#x %#x\n", __func__,
-			     args.func, args.arg1, args.arg2, args.arg3,
-			     args.arg4);
+		dlog_verbose("%s calling SPMC %#lx %#lx %#lx %#lx %#lx\n",
+			     __func__, args.func, args.arg1, args.arg2,
+			     args.arg3, args.arg4);
 		if (args.func == FFA_MSG_SEND_DIRECT_REQ_64 ||
 		    args.func == FFA_MSG_SEND_DIRECT_REQ_32) {
 			*ret = arch_other_world_call(args);
@@ -392,7 +392,7 @@ bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
 		if (ffa_func_id(*ret) != FFA_SUCCESS_32) {
 			dlog_verbose(
 				"Failed forwarding FFA_MSG_SEND2_32 to the "
-				"SPMC, got error (%d).\n",
+				"SPMC, got error (%lu).\n",
 				ret->arg2);
 		}
 
@@ -1373,7 +1373,7 @@ static struct ffa_value ffa_memory_other_world_send(
 		if (ret.arg3 != fragment_length) {
 			dlog_warning(
 				"%s: got unexpected fragment offset for %s "
-				"from other world (expected %d, got %d)\n",
+				"from other world (expected %d, got %lu)\n",
 				__func__, ffa_func_name(FFA_MEM_FRAG_RX_32),
 				fragment_length, ret.arg3);
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -1546,7 +1546,7 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 
 	share_state = get_share_state(share_states, handle);
 	if (share_state == NULL) {
-		dlog_verbose("Unable to find share state for handle %#x.\n",
+		dlog_verbose("Unable to find share state for handle %#lx.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -1558,7 +1558,7 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 	if (vm_id_is_current_world(to_locked.vm->id) &&
 	    to_locked.vm->id != memory_region->sender) {
 		dlog_verbose(
-			"VM %#x attempted to reclaim memory handle %#x "
+			"VM %#x attempted to reclaim memory handle %#lx "
 			"originally sent by VM %#x.\n",
 			to_locked.vm->id, handle, memory_region->sender);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -1567,7 +1567,7 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 
 	if (!share_state->sending_complete) {
 		dlog_verbose(
-			"Memory with handle %#x not fully sent, can't "
+			"Memory with handle %#lx not fully sent, can't "
 			"reclaim.\n",
 			handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -1591,7 +1591,7 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 		/* Check that all VMs have relinquished. */
 		if (share_state->retrieved_fragment_count[i] != 0) {
 			dlog_verbose(
-				"Tried to reclaim memory handle %#x "
+				"Tried to reclaim memory handle %#lx "
 				"that has not been relinquished by all "
 				"borrowers(%x).\n",
 				handle, receiver_permissions.receiver);
@@ -1650,7 +1650,7 @@ struct ffa_value plat_ffa_other_world_mem_reclaim(
 	struct two_vm_locked vm_to_from_lock;
 
 	if (!ffa_tee_enabled) {
-		dlog_verbose("Invalid handle %#x for FFA_MEM_RECLAIM.\n",
+		dlog_verbose("Invalid handle %#lx for FFA_MEM_RECLAIM.\n",
 			     handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -1788,8 +1788,8 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 				dlog_verbose(
 					"other_world didn't successfully "
 					"complete "
-					"memory send operation; returned %#x "
-					"(%d). Rolling back.\n",
+					"memory send operation; returned %#lx "
+					"(%lu). Rolling back.\n",
 					ret.func, ret.arg2);
 
 				/*
@@ -1828,7 +1828,7 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 				dlog_verbose(
 					"other_world didn't successfully abort "
 					"failed memory send operation; "
-					"returned %#x %d).\n",
+					"returned %#lx %lu).\n",
 					other_world_ret.func,
 					other_world_ret.arg2);
 			}
@@ -1854,9 +1854,9 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 		    ffa_frag_sender(ret) != from_locked.vm->id) {
 			dlog_verbose(
 				"Got unexpected result from forwarding "
-				"FFA_MEM_FRAG_TX to other_world: %#x (handle "
-				"%#x, offset %d, sender %d); expected "
-				"FFA_MEM_FRAG_RX (handle %#x, offset %d, "
+				"FFA_MEM_FRAG_TX to other_world: %#lx (handle "
+				"%#lx, offset %lu, sender %d); expected "
+				"FFA_MEM_FRAG_RX (handle %#lx, offset %d, "
 				"sender %d).\n",
 				ret.func, ffa_frag_handle(ret), ret.arg3,
 				ffa_frag_sender(ret), handle,

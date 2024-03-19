@@ -180,8 +180,8 @@ bool perfmon_process_access(struct vcpu *vcpu, ffa_id_t vm_id, uintreg_t esr)
 			dlog_notice(
 				"Unsupported performance monitor register "
 				"read: "
-				"op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, "
-				"rt=%d.\n",
+				"op0=%lu, op1=%lu, crn=%lu, crm=%lu, op2=%lu, "
+				"rt=%lu.\n",
 				GET_ISS_OP0(esr), GET_ISS_OP1(esr),
 				GET_ISS_CRN(esr), GET_ISS_CRM(esr),
 				GET_ISS_OP2(esr), GET_ISS_RT(esr));
@@ -207,9 +207,8 @@ bool perfmon_process_access(struct vcpu *vcpu, ffa_id_t vm_id, uintreg_t esr)
 		default:
 			dlog_notice(
 				"Unsupported performance monitor register "
-				"write: "
-				"op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, "
-				"rt=%d.\n",
+				"write: op0=%lu, op1=%lu, crn=%lu, crm=%lu, "
+				"op2=%lu, rt=%lu.\n",
 				GET_ISS_OP0(esr), GET_ISS_OP1(esr),
 				GET_ISS_CRN(esr), GET_ISS_CRM(esr),
 				GET_ISS_OP2(esr), GET_ISS_RT(esr));

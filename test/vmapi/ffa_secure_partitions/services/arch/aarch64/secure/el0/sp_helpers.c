@@ -71,7 +71,7 @@ struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 struct ffa_value handle_ffa_run(struct ffa_value res)
 {
 	HFTEST_LOG_FAILURE();
-	HFTEST_LOG(HFTEST_LOG_INDENT "0x%x is not a valid function\n",
+	HFTEST_LOG(HFTEST_LOG_INDENT "0x%lx is not a valid function\n",
 		   res.func);
 	abort();
 }

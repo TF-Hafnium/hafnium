@@ -163,8 +163,8 @@ bool debug_el1_process_access(struct vcpu *vcpu, ffa_id_t vm_id, uintreg_t esr)
 			value = vcpu->regs.r[rt_register];
 			dlog_notice(
 				"Unsupported debug system register read: "
-				"op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, "
-				"rt=%d.\n",
+				"op0=%lu, op1=%lu, crn=%lu, crm=%lu, op2=%lu, "
+				"rt=%lu.\n",
 				GET_ISS_OP0(esr), GET_ISS_OP1(esr),
 				GET_ISS_CRN(esr), GET_ISS_CRM(esr),
 				GET_ISS_OP2(esr), GET_ISS_RT(esr));
@@ -190,8 +190,8 @@ bool debug_el1_process_access(struct vcpu *vcpu, ffa_id_t vm_id, uintreg_t esr)
 		default:
 			dlog_notice(
 				"Unsupported debug system register write: "
-				"op0=%d, op1=%d, crn=%d, crm=%d, op2=%d, "
-				"rt=%d.\n",
+				"op0=%lu, op1=%lu, crn=%lu, crm=%lu, op2=%lu, "
+				"rt=%lu.\n",
 				GET_ISS_OP0(esr), GET_ISS_OP1(esr),
 				GET_ISS_CRN(esr), GET_ISS_CRM(esr),
 				GET_ISS_OP2(esr), GET_ISS_RT(esr));

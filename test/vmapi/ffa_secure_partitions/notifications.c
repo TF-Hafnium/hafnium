@@ -200,7 +200,7 @@ static void base_per_cpu_notifications_test(void (*cpu_entry)(uintptr_t arg))
 	sl_lock(&lock);
 
 	for (size_t i = 1; i < MAX_CPUS - 1; i++) {
-		HFTEST_LOG("Notifications signaling VM to SP. Booting CPU %u.",
+		HFTEST_LOG("Notifications signaling VM to SP. Booting CPU %zu.",
 			   i);
 
 		args.vcpu_id = i;
@@ -212,7 +212,7 @@ static void base_per_cpu_notifications_test(void (*cpu_entry)(uintptr_t arg))
 		/* Wait for CPU to release the lock. */
 		sl_lock(&lock);
 
-		HFTEST_LOG("Done with CPU %u\n", i);
+		HFTEST_LOG("Done with CPU %zu\n", i);
 	}
 }
 

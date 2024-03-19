@@ -158,13 +158,13 @@ TEST_PRECONDITION_LONG_RUNNING(ffa_call_chain, disallow_migration_blocked_sp,
 		uintptr_t id;
 
 		id = hftest_get_cpu_id(i);
-		HFTEST_LOG("Booting CPU %u - %x", i, id);
+		HFTEST_LOG("Booting CPU %zu - %lx", i, id);
 
 		EXPECT_EQ(hftest_cpu_start(id, migrate_busy_up_sp,
 					   (uintptr_t)&args),
 			  true);
 
-		HFTEST_LOG("Done with CPU %u", i);
+		HFTEST_LOG("Done with CPU %zu", i);
 	}
 
 	/*

@@ -23,8 +23,8 @@ static void test_memory_size(size_t mem_size)
 	const size_t expected_mem_size = 0x100000;
 
 	if (mem_size != expected_mem_size) {
-		FAIL("Memory size passed to VM entry %u is not expected size of"
-		     "%u.",
+		FAIL("Memory size passed to VM entry %zu is not expected size "
+		     "of %zu.",
 		     mem_size, expected_mem_size);
 	}
 }

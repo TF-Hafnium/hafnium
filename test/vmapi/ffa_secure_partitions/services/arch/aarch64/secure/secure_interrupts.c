@@ -120,7 +120,7 @@ struct ffa_value sp_twdog_cmd(ffa_id_t test_source, uint64_t time)
 {
 	ffa_id_t own_id = hf_vm_get_id();
 
-	HFTEST_LOG("Starting TWDOG: %u ms", time);
+	HFTEST_LOG("Starting TWDOG: %lu ms", time);
 	sp805_twdog_refresh();
 	sp805_twdog_start((time * ARM_SP805_TWDG_CLK_HZ) / 1000);
 
@@ -162,10 +162,8 @@ static bool is_expected_sp_response(struct ffa_value ret,
 	}
 
 	if (sp_resp_value(ret) != expected_resp || ret.arg4 != arg) {
-		HFTEST_LOG(
-			"Expected response %x and %x; "
-			"Obtained %x and %x",
-			expected_resp, arg, sp_resp_value(ret), ret.arg4);
+		HFTEST_LOG("Expected response %x and %x; Obtained %x and %lx",
+			   expected_resp, arg, sp_resp_value(ret), ret.arg4);
 		return false;
 	}
 
@@ -193,7 +191,7 @@ struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
 	time_lapsed = sp_sleep_active_wait(sleep_ms);
 
 	/* Lapsed time should be at least equal to sleep time. */
-	HFTEST_LOG("Sleep complete: %u", time_lapsed);
+	HFTEST_LOG("Sleep complete: %lu", time_lapsed);
 
 	if (func == FFA_MSG_SEND_DIRECT_REQ2_64) {
 		uint64_t msg[] = {0, time_lapsed};

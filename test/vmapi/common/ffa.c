@@ -658,7 +658,7 @@ void dump_boot_info(struct ffa_boot_info_header *boot_info_header)
 		return;
 	}
 
-	HFTEST_LOG("SP boot info (%x):", (uintptr_t)boot_info_header);
+	HFTEST_LOG("SP boot info (%lx):", (uintptr_t)boot_info_header);
 	HFTEST_LOG("  Signature: %x", boot_info_header->signature);
 	HFTEST_LOG("  Version: %x", boot_info_header->version);
 	HFTEST_LOG("  Blob Size: %u", boot_info_header->info_blob_size);
@@ -680,7 +680,7 @@ void dump_boot_info(struct ffa_boot_info_header *boot_info_header)
 		HFTEST_LOG("        Content Format: %x",
 			   ffa_boot_info_content_format(&boot_info_desc[i]));
 		HFTEST_LOG("      Size: %u", boot_info_desc[i].size);
-		HFTEST_LOG("      Value: %x", boot_info_desc[i].content);
+		HFTEST_LOG("      Value: %lx", boot_info_desc[i].content);
 	}
 }
 

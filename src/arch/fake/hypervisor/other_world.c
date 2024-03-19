@@ -14,6 +14,6 @@
 
 struct ffa_value arch_other_world_call(struct ffa_value args)
 {
-	dlog_error("Attempted to call TEE function %#x\n", args.func);
+	dlog_error("Attempted to call TEE function %#lx\n", args.func);
 	return ffa_error(FFA_NOT_SUPPORTED);
 }

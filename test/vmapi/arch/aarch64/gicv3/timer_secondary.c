@@ -149,8 +149,8 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 	 */
 
 	if (ret.func != expected_code && ret.func != FFA_INTERRUPT_32) {
-		FAIL("Expected run to return FFA_INTERRUPT or %#x, but "
-		     "got %#x",
+		FAIL("Expected run to return FFA_INTERRUPT or %#lx, but "
+		     "got %#lx",
 		     expected_code, ret.func);
 	}
 
@@ -164,7 +164,7 @@ static void timer_secondary(const char message[], uint64_t expected_code)
 		if (expected_code == HF_FFA_RUN_WAIT_FOR_INTERRUPT ||
 		    expected_code == FFA_MSG_WAIT_32) {
 			EXPECT_NE(ret.arg2, FFA_SLEEP_INDEFINITE);
-			dlog("%d ns remaining\n", ret.arg2);
+			dlog("%lu ns remaining\n", ret.arg2);
 		}
 		ret = ffa_run(SERVICE_VM1, 0);
 	}
@@ -287,7 +287,7 @@ TEST(timer_secondary, wfi_very_long)
 	for (size_t i = 0; i < 20; ++i) {
 		ret = ffa_run(SERVICE_VM1, 0);
 		EXPECT_EQ(ret.func, HF_FFA_RUN_WAIT_FOR_INTERRUPT);
-		dlog("Primary looping until timer fires; %d ns "
+		dlog("Primary looping until timer fires; %lu ns "
 		     "remaining\n",
 		     ret.arg2);
 	}

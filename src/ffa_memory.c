@@ -277,10 +277,17 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 		return;
 	}
 
-	dlog("from VM %#x, attributes %#x, flags %#x, handle %#x "
-	     "tag %u, memory access descriptor size %u, to %u "
+	dlog("from VM %#x, attributes (shareability = %s, cacheability = %s, "
+	     "type = %s, security = %s), flags %#x, handle %#lx "
+	     "tag %lu, memory access descriptor size %u, to %u "
 	     "recipients [",
-	     memory_region->sender, memory_region->attributes,
+	     memory_region->sender,
+	     ffa_memory_shareability_name(
+		     memory_region->attributes.shareability),
+	     ffa_memory_cacheability_name(
+		     memory_region->attributes.cacheability),
+	     ffa_memory_type_name(memory_region->attributes.type),
+	     ffa_memory_security_name(memory_region->attributes.security),
 	     memory_region->flags, memory_region->handle, memory_region->tag,
 	     memory_region->memory_access_desc_size,
 	     memory_region->receiver_count);
@@ -290,15 +297,19 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 		if (i != 0) {
 			dlog(", ");
 		}
-		dlog("Receiver %#x: %#x (offset %u)",
+		dlog("Receiver %#x: permissions (%s, %s) (offset %u)",
 		     receiver->receiver_permissions.receiver,
-		     receiver->receiver_permissions.permissions,
+		     ffa_data_access_name(receiver->receiver_permissions
+						  .permissions.data_access),
+		     ffa_instruction_access_name(
+			     receiver->receiver_permissions.permissions
+				     .instruction_access),
 		     receiver->composite_memory_region_offset);
 		/* The impdef field is only present from v1.2 and later */
 		if (ffa_version_from_memory_access_desc_size(
 			    memory_region->memory_access_desc_size) >=
 		    MAKE_FFA_VERSION(1, 2)) {
-			dlog(", impdef: %#x %#x", receiver->impdef.val[0],
+			dlog(", impdef: %#lx %#lx", receiver->impdef.val[0],
 			     receiver->impdef.val[1]);
 		}
 	}
@@ -331,7 +342,7 @@ void dump_share_states(void)
 				dlog("invalid share_func %#x",
 				     share_states[i].share_func);
 			}
-			dlog(" %#x (", share_states[i].memory_region->handle);
+			dlog(" %#lx (", share_states[i].memory_region->handle);
 			dump_memory_region(share_states[i].memory_region);
 			if (share_states[i].sending_complete) {
 				dlog("): fully sent");
@@ -432,9 +443,10 @@ static struct ffa_value constituents_get_mode(
 			 */
 			if (!vm_mem_get_mode(vm, begin, end, &current_mode)) {
 				dlog_verbose(
-					"%s: constituent memory range %#x..%#x "
+					"%s: constituent memory range "
+					"%#lx..%#lx "
 					"not mapped with the same mode\n",
-					__func__, begin, end);
+					__func__, begin.ipa, end.ipa);
 				return ffa_error(FFA_DENIED);
 			}
 
@@ -447,7 +459,7 @@ static struct ffa_value constituents_get_mode(
 			} else if (current_mode != *orig_mode) {
 				dlog_verbose(
 					"%s: expected mode %#x but was %#x for "
-					"%d pages at %#x.\n",
+					"%d pages at %#lx.\n",
 					__func__, *orig_mode, current_mode,
 					fragments[i][j].page_count,
 					ipa_addr(begin));
@@ -624,9 +636,9 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 			if (receiver_v1_0->reserved_0 != 0) {
 				dlog_verbose(
 					"Reserved field in the memory access "
-					" descriptor must be zero "
-					" Currently reciever %d has a reserved "
-					" field with a value of %d\n",
+					"descriptor must be zero. Currently "
+					"reciever %zu has a reserved field "
+					"with a value of %lu\n",
 					i, receiver_v1_0->reserved_0);
 				return false;
 			}
@@ -645,9 +657,9 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 			if (receiver->reserved_0 != 0) {
 				dlog_verbose(
 					"Reserved field in the memory access "
-					" descriptor must be zero "
-					" Currently reciever %d has a reserved "
-					" field with a value of %d\n",
+					"descriptor must be zero. Currently "
+					"reciever %zu has a reserved field "
+					"with a value of %lu\n",
 					i, receiver->reserved_0);
 				return false;
 			}
@@ -657,8 +669,8 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 		composite_offset = receiver->composite_memory_region_offset;
 		if (composite_offset != composite_offset_0) {
 			dlog_verbose(
-				"Composite offset %x differs from %x in index "
-				"%u\n",
+				"Composite offset %x differs from %x in "
+				"index\n",
 				composite_offset, composite_offset_0);
 			return false;
 		}
@@ -975,7 +987,7 @@ static struct ffa_value ffa_region_group_check_actions(
 	if (!vm_identity_prepare(vm_locked, pa_begin, pa_end, mode, ppool)) {
 		dlog_verbose(
 			"%s: memory can't be mapped to %x due to lack of "
-			"memory. Base: %lx end: %x\n",
+			"memory. Base: %lx end: %lx\n",
 			__func__, vm_locked.vm->id, pa_addr(pa_begin),
 			pa_addr(pa_end));
 		return ffa_error(FFA_NO_MEMORY);
@@ -1077,7 +1089,7 @@ static void ffa_region_group_fragments_revert_protect(
 				pa_from_ipa(ipa_init(constituent->address));
 			paddr_t pa_end = pa_add(pa_begin, size);
 
-			dlog_verbose("%s: reverting fragment %x size %x\n",
+			dlog_verbose("%s: reverting fragment %lx size %zx\n",
 				     __func__, pa_addr(pa_begin), size);
 
 			if (constituent == end) {
@@ -1317,8 +1329,8 @@ static bool ffa_memory_check_overlap(
 
 	if (current_size == 0 ||
 	    current_size > UINT64_MAX - ipa_addr(current_begin)) {
-		dlog_verbose("Invalid page count. Addr: %x page_count: %x\n",
-			     current_begin, current_page_count);
+		dlog_verbose("Invalid page count. Addr: %zx page_count: %x\n",
+			     current_begin.ipa, current_page_count);
 		return false;
 	}
 
@@ -1333,9 +1345,9 @@ static bool ffa_memory_check_overlap(
 
 			if (size == 0 || size > UINT64_MAX - ipa_addr(begin)) {
 				dlog_verbose(
-					"Invalid page count. Addr: %x "
+					"Invalid page count. Addr: %lx "
 					"page_count: %x\n",
-					begin, page_count);
+					begin.ipa, page_count);
 				return false;
 			}
 
@@ -1349,8 +1361,8 @@ static bool ffa_memory_check_overlap(
 			    is_memory_range_within(current_begin, current_end,
 						   begin, end)) {
 				dlog_verbose(
-					"Overlapping memory ranges: %#x - %#x "
-					"with %#x - %#x\n",
+					"Overlapping memory ranges: %#lx - "
+					"%#lx with %#lx - %#lx\n",
 					ipa_addr(begin), ipa_addr(end),
 					ipa_addr(current_begin),
 					ipa_addr(current_end));
@@ -1853,9 +1865,8 @@ struct ffa_value ffa_memory_send_validate(
 		sizeof(struct ffa_composite_memory_region);
 
 	if (fragment_length < minimum_first_fragment_length) {
-		dlog_verbose("Fragment length %u too short (min %u).\n",
-			     (size_t)fragment_length,
-			     minimum_first_fragment_length);
+		dlog_verbose("Fragment length %u too short (min %zu).\n",
+			     fragment_length, minimum_first_fragment_length);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -1874,7 +1885,7 @@ struct ffa_value ffa_memory_send_validate(
 
 	if (fragment_length > memory_share_length) {
 		dlog_verbose(
-			"Fragment length %u greater than total length %u.\n",
+			"Fragment length %zu greater than total length %zu.\n",
 			(size_t)fragment_length, (size_t)memory_share_length);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -1905,7 +1916,7 @@ struct ffa_value ffa_memory_send_validate(
 		     sizeof(struct ffa_composite_memory_region) +
 		     sizeof(struct ffa_memory_region_constituent);
 	if (min_length > memory_share_length) {
-		dlog_verbose("Share too short: got %u but minimum is %u.\n",
+		dlog_verbose("Share too short: got %zu but minimum is %zu.\n",
 			     (size_t)memory_share_length, (size_t)min_length);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -1924,7 +1935,7 @@ struct ffa_value ffa_memory_send_validate(
 	     fragment_length - sizeof(struct ffa_composite_memory_region))) {
 		dlog_verbose(
 			"Invalid composite memory region descriptor offset "
-			"%u.\n",
+			"%zu.\n",
 			(size_t)composite_memory_region_offset);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -1949,7 +1960,7 @@ struct ffa_value ffa_memory_send_validate(
 	    ((constituents_length /
 	      sizeof(struct ffa_memory_region_constituent)) !=
 	     composite->constituent_count)) {
-		dlog_verbose("Invalid length %u or composite offset %u.\n",
+		dlog_verbose("Invalid length %zu or composite offset %zu.\n",
 			     (size_t)memory_share_length,
 			     (size_t)composite_memory_region_offset);
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -2156,7 +2167,7 @@ struct ffa_value ffa_memory_send_continue_validate(
 	share_state = get_share_state(share_states, handle);
 	if (share_state == NULL) {
 		dlog_verbose(
-			"Invalid handle %#x for memory send continuation.\n",
+			"Invalid handle %#lx for memory send continuation.\n",
 			handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -2170,7 +2181,7 @@ struct ffa_value ffa_memory_send_continue_validate(
 
 	if (share_state->sending_complete) {
 		dlog_verbose(
-			"Sending of memory handle %#x is already complete.\n",
+			"Sending of memory handle %#lx is already complete.\n",
 			handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -2181,7 +2192,7 @@ struct ffa_value ffa_memory_send_continue_validate(
 		 * probably be increased.
 		 */
 		dlog_warning(
-			"Too many fragments for memory share with handle %#x; "
+			"Too many fragments for memory share with handle %#lx; "
 			"only %d supported.\n",
 			handle, MAX_FRAGMENTS);
 		/* Free share state, as it's not possible to complete it. */
@@ -2853,8 +2864,8 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 				dlog_verbose(
 					"Impdef value in memory send does not "
 					"match retrieve request value "
-					"send value %#x %#x retrieve request "
-					"value %#x %#x\n",
+					"send value %#lx %#lx retrieve request "
+					"value %#lx %#lx\n",
 					receiver->impdef.val[0],
 					receiver->impdef.val[1],
 					retrieve_request_receiver->impdef
@@ -2958,7 +2969,7 @@ static struct ffa_value ffa_memory_retrieve_validate(
 
 	if (retrieve_request->sender != memory_region->sender) {
 		dlog_verbose(
-			"Memory with handle %#x not fully sent, can't "
+			"Memory with handle %#lx not fully sent, can't "
 			"retrieve.\n",
 			memory_region->handle);
 		return ffa_error(FFA_DENIED);
@@ -3010,7 +3021,7 @@ static struct ffa_value ffa_memory_retrieve_validate(
 				 FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK)) {
 		dlog_verbose(
 			"Incorrect transaction type %#x for "
-			"FFA_MEM_RETRIEVE_REQ, expected %#x for handle %#x.\n",
+			"FFA_MEM_RETRIEVE_REQ, expected %#x for handle %#lx.\n",
 			transaction_type,
 			memory_region->flags &
 				FFA_MEMORY_REGION_TRANSACTION_TYPE_MASK,
@@ -3020,8 +3031,8 @@ static struct ffa_value ffa_memory_retrieve_validate(
 
 	if (retrieve_request->tag != memory_region->tag) {
 		dlog_verbose(
-			"Incorrect tag %d for FFA_MEM_RETRIEVE_REQ, expected "
-			"%d for handle %#x.\n",
+			"Incorrect tag %lu for FFA_MEM_RETRIEVE_REQ, expected "
+			"%lu for handle %#lx.\n",
 			retrieve_request->tag, memory_region->tag,
 			retrieve_request->handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -3033,7 +3044,7 @@ static struct ffa_value ffa_memory_retrieve_validate(
 	if (*receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
 			"Incorrect receiver VM ID %d for "
-			"FFA_MEM_RETRIEVE_REQ, for handle %#x.\n",
+			"FFA_MEM_RETRIEVE_REQ, for handle %#lx.\n",
 			to_id, memory_region->handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -3134,7 +3145,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 
 	if (!share_state->sending_complete) {
 		dlog_verbose(
-			"Memory with handle %#x not fully sent, can't "
+			"Memory with handle %#lx not fully sent, can't "
 			"retrieve.\n",
 			handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -3267,7 +3278,7 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 
 	if (share_state->hypervisor_fragment_count != 0U) {
 		dlog_verbose(
-			"Memory with handle %#x already retrieved by "
+			"Memory with handle %#lx already retrieved by "
 			"the hypervisor.\n",
 			handle);
 		return ffa_error(FFA_DENIED);
@@ -3332,7 +3343,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	share_states = share_states_lock();
 	share_state = get_share_state(share_states, handle);
 	if (share_state == NULL) {
-		dlog_verbose("Invalid handle %#x for FFA_MEM_RETRIEVE_REQ.\n",
+		dlog_verbose("Invalid handle %#lx for FFA_MEM_RETRIEVE_REQ.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -3426,7 +3437,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	share_states = share_states_lock();
 	share_state = get_share_state(share_states, handle);
 	if (share_state == NULL) {
-		dlog_verbose("Invalid handle %#x for FFA_MEM_FRAG_RX.\n",
+		dlog_verbose("Invalid handle %#lx for FFA_MEM_FRAG_RX.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -3437,7 +3448,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 
 	if (!share_state->sending_complete) {
 		dlog_verbose(
-			"Memory with handle %#x not fully sent, can't "
+			"Memory with handle %#lx not fully sent, can't "
 			"retrieve.\n",
 			handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -3461,7 +3472,8 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		if (receiver_index == memory_region->receiver_count) {
 			dlog_verbose(
 				"Caller of FFA_MEM_FRAG_RX (%x) is not a "
-				"borrower to memory sharing transaction (%x)\n",
+				"borrower to memory sharing transaction "
+				"(%lx)\n",
 				to_locked.vm->id, handle);
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
 			goto out;
@@ -3472,7 +3484,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		    share_state->retrieved_fragment_count[receiver_index] >=
 			    share_state->fragment_count) {
 			dlog_verbose(
-				"Retrieval of memory with handle %#x not yet "
+				"Retrieval of memory with handle %#lx not yet "
 				"started or already completed (%d/%d fragments "
 				"retrieved).\n",
 				handle,
@@ -3490,7 +3502,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		    share_state->hypervisor_fragment_count >=
 			    share_state->fragment_count) {
 			dlog_verbose(
-				"Retrieve of memory with handle %x not "
+				"Retrieve of memory with handle %lx not "
 				"started from hypervisor.\n",
 				handle);
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -3500,7 +3512,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		if (memory_region->sender != sender_vm_id) {
 			dlog_verbose(
 				"Sender ID (%x) is not as expected for memory "
-				"handle %x\n",
+				"handle %lx\n",
 				sender_vm_id, handle);
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
 			goto out;
@@ -3609,7 +3621,7 @@ struct ffa_value ffa_memory_relinquish(
 	share_states = share_states_lock();
 	share_state = get_share_state(share_states, handle);
 	if (share_state == NULL) {
-		dlog_verbose("Invalid handle %#x for FFA_MEM_RELINQUISH.\n",
+		dlog_verbose("Invalid handle %#lx for FFA_MEM_RELINQUISH.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -3617,7 +3629,7 @@ struct ffa_value ffa_memory_relinquish(
 
 	if (!share_state->sending_complete) {
 		dlog_verbose(
-			"Memory with handle %#x not fully sent, can't "
+			"Memory with handle %#lx not fully sent, can't "
 			"relinquish.\n",
 			handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -3633,7 +3645,7 @@ struct ffa_value ffa_memory_relinquish(
 	if (receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
 			"VM ID %d tried to relinquish memory region "
-			"with handle %#x and it is not a valid borrower.\n",
+			"with handle %#lx and it is not a valid borrower.\n",
 			from_locked.vm->id, handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -3642,7 +3654,7 @@ struct ffa_value ffa_memory_relinquish(
 	if (share_state->retrieved_fragment_count[receiver_index] !=
 	    share_state->fragment_count) {
 		dlog_verbose(
-			"Memory with handle %#x not yet fully "
+			"Memory with handle %#lx not yet fully "
 			"retrieved, "
 			"receiver %x can't relinquish.\n",
 			handle, from_locked.vm->id);
@@ -3734,7 +3746,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 
 	share_state = get_share_state(share_states, handle);
 	if (share_state == NULL) {
-		dlog_verbose("Invalid handle %#x for FFA_MEM_RECLAIM.\n",
+		dlog_verbose("Invalid handle %#lx for FFA_MEM_RECLAIM.\n",
 			     handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -3746,7 +3758,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	if (vm_id_is_current_world(to_locked.vm->id) &&
 	    to_locked.vm->id != memory_region->sender) {
 		dlog_verbose(
-			"VM %#x attempted to reclaim memory handle %#x "
+			"VM %#x attempted to reclaim memory handle %#lx "
 			"originally sent by VM %#x.\n",
 			to_locked.vm->id, handle, memory_region->sender);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -3755,7 +3767,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 
 	if (!share_state->sending_complete) {
 		dlog_verbose(
-			"Memory with handle %#x not fully sent, can't "
+			"Memory with handle %#lx not fully sent, can't "
 			"reclaim.\n",
 			handle);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -3765,7 +3777,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
 		if (share_state->retrieved_fragment_count[i] != 0) {
 			dlog_verbose(
-				"Tried to reclaim memory handle %#x "
+				"Tried to reclaim memory handle %#lx "
 				"that has not been relinquished by all "
 				"borrowers(%x).\n",
 				handle,
