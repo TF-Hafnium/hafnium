@@ -329,12 +329,15 @@ void dump_share_states(void)
 	for (i = 0; i < MAX_MEM_SHARES; ++i) {
 		if (share_states[i].share_func != 0) {
 			switch (share_states[i].share_func) {
+			case FFA_MEM_SHARE_64:
 			case FFA_MEM_SHARE_32:
 				dlog("SHARE");
 				break;
+			case FFA_MEM_LEND_64:
 			case FFA_MEM_LEND_32:
 				dlog("LEND");
 				break;
+			case FFA_MEM_DONATE_64:
 			case FFA_MEM_DONATE_32:
 				dlog("DONATE");
 				break;
@@ -687,9 +690,11 @@ static enum ffa_map_action ffa_mem_send_get_map_action(
 	bool all_receivers_from_current_world, ffa_id_t sender_id,
 	uint32_t mem_func_id)
 {
-	bool protect_memory =
-		(mem_func_id != FFA_MEM_SHARE_32 &&
-		 all_receivers_from_current_world && ffa_is_vm_id(sender_id));
+	const bool is_memory_share_abi = mem_func_id == FFA_MEM_SHARE_32 ||
+					 mem_func_id == FFA_MEM_SHARE_64;
+	const bool protect_memory =
+		(!is_memory_share_abi && all_receivers_from_current_world &&
+		 ffa_is_vm_id(sender_id));
 
 	return protect_memory ? MAP_ACTION_CHECK_PROTECT : MAP_ACTION_CHECK;
 }
@@ -722,6 +727,8 @@ static struct ffa_value ffa_send_check_transition(
 	struct ffa_value ret;
 	bool all_receivers_from_current_world = true;
 	uint32_t receivers_count = memory_region->receiver_count;
+	const bool is_memory_lend = (share_func == FFA_MEM_LEND_32) ||
+				    (share_func == FFA_MEM_LEND_64);
 
 	ret = constituents_get_mode(from, orig_from_mode, fragments,
 				    fragment_constituent_counts,
@@ -733,7 +740,7 @@ static struct ffa_value ffa_send_check_transition(
 
 	/* Device memory regions can only be lent a single borrower. */
 	if ((*orig_from_mode & MM_MODE_D) != 0U &&
-	    !(share_func == FFA_MEM_LEND_32 && receivers_count == 1)) {
+	    !(is_memory_lend && receivers_count == 1)) {
 		dlog_verbose(
 			"Device memory can only be lent to a single borrower "
 			"(mode is %#x).\n",
@@ -793,14 +800,15 @@ static struct ffa_value ffa_send_check_transition(
 	/* Find the appropriate new mode. */
 	*from_mode = ~state_mask & *orig_from_mode;
 	switch (share_func) {
+	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32:
 		*from_mode |= MM_MODE_INVALID | MM_MODE_UNOWNED;
 		break;
-
+	case FFA_MEM_LEND_64:
 	case FFA_MEM_LEND_32:
 		*from_mode |= MM_MODE_INVALID;
 		break;
-
+	case FFA_MEM_SHARE_64:
 	case FFA_MEM_SHARE_32:
 		*from_mode |= MM_MODE_SHARED;
 		break;
@@ -944,14 +952,15 @@ struct ffa_value ffa_retrieve_check_transition(
 	}
 
 	switch (share_func) {
+	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32:
 		*to_mode |= 0;
 		break;
-
+	case FFA_MEM_LEND_64:
 	case FFA_MEM_LEND_32:
 		*to_mode |= MM_MODE_UNOWNED;
 		break;
-
+	case FFA_MEM_SHARE_64:
 	case FFA_MEM_SHARE_32:
 		*to_mode |= MM_MODE_UNOWNED | MM_MODE_SHARED;
 		break;
@@ -1978,7 +1987,8 @@ struct ffa_value ffa_memory_send_validate(
 	 * access to the memory.
 	 */
 	if ((memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR) &&
-	    share_func == FFA_MEM_SHARE_32) {
+	    (share_func == FFA_MEM_SHARE_32 ||
+	     share_func == FFA_MEM_SHARE_64)) {
 		dlog_verbose("Memory can't be cleared while being shared.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -2053,7 +2063,8 @@ struct ffa_value ffa_memory_send_validate(
 					FFA_INSTRUCTION_ACCESS_RESERVED));
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
-		if (share_func == FFA_MEM_SHARE_32) {
+		if (share_func == FFA_MEM_SHARE_32 ||
+		    share_func == FFA_MEM_SHARE_64) {
 			if (data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
 				dlog_verbose(
 					"Invalid data access permissions %s "
@@ -2076,7 +2087,8 @@ struct ffa_value ffa_memory_send_validate(
 				receiver_permissions.permissions = permissions;
 			}
 		}
-		if (share_func == FFA_MEM_LEND_32 &&
+		if ((share_func == FFA_MEM_LEND_32 ||
+		     share_func == FFA_MEM_LEND_64) &&
 		    data_access == FFA_DATA_ACCESS_NOT_SPECIFIED) {
 			dlog_verbose(
 				"Invalid data access permissions %s for "
@@ -2087,7 +2099,8 @@ struct ffa_value ffa_memory_send_validate(
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
-		if (share_func == FFA_MEM_DONATE_32 &&
+		if ((share_func == FFA_MEM_DONATE_32 ||
+		     share_func == FFA_MEM_DONATE_64) &&
 		    data_access != FFA_DATA_ACCESS_NOT_SPECIFIED) {
 			dlog_verbose(
 				"Invalid data access permissions %s for "
@@ -2117,7 +2130,8 @@ struct ffa_value ffa_memory_send_validate(
 	 */
 	type = memory_region->attributes.type;
 	if (share_func == FFA_MEM_DONATE_32 ||
-	    (share_func == FFA_MEM_LEND_32 &&
+	    share_func == FFA_MEM_DONATE_64 ||
+	    ((share_func == FFA_MEM_LEND_32 || share_func == FFA_MEM_LEND_64) &&
 	     memory_region->receiver_count == 1)) {
 		if (type != FFA_MEMORY_NOT_SPECIFIED_MEM) {
 			dlog_verbose(
@@ -2271,13 +2285,16 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 
 	/* Set flag for share function, ready to be retrieved later. */
 	switch (share_func) {
+	case FFA_MEM_SHARE_64:
 	case FFA_MEM_SHARE_32:
 		memory_region->flags |=
 			FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE;
 		break;
+	case FFA_MEM_LEND_64:
 	case FFA_MEM_LEND_32:
 		memory_region->flags |= FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND;
 		break;
+	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32:
 		memory_region->flags |=
 			FFA_MEMORY_REGION_TRANSACTION_TYPE_DONATE;
@@ -2416,7 +2433,8 @@ static void ffa_memory_retrieve_complete(
 	struct share_states_locked share_states,
 	struct ffa_memory_share_state *share_state, struct mpool *page_pool)
 {
-	if (share_state->share_func == FFA_MEM_DONATE_32) {
+	if (share_state->share_func == FFA_MEM_DONATE_32 ||
+	    share_state->share_func == FFA_MEM_DONATE_64) {
 		/*
 		 * Memory that has been donated can't be relinquished,
 		 * so no need to keep the share state around.
@@ -2619,6 +2637,7 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 	 * instruction permissions it wishes to receive.
 	 */
 	switch (share_func) {
+	case FFA_MEM_SHARE_64:
 	case FFA_MEM_SHARE_32:
 		if (requested_instruction_access !=
 		    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
@@ -2629,6 +2648,7 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 		break;
+	case FFA_MEM_LEND_64:
 	case FFA_MEM_LEND_32:
 		/*
 		 * For operations with multiple borrowers only permit XN
@@ -2649,6 +2669,7 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 			break;
 		}
 		/* Fall through if the operation targets a single borrower. */
+	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32:
 		if (!multiple_borrowers &&
 		    requested_instruction_access ==
@@ -3070,7 +3091,8 @@ static struct ffa_value ffa_memory_retrieve_validate(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (share_func == FFA_MEM_SHARE_32 &&
+	if ((share_func == FFA_MEM_SHARE_32 ||
+	     share_func == FFA_MEM_SHARE_64) &&
 	    (retrieve_request->flags &
 	     (FFA_MEMORY_REGION_FLAG_CLEAR |
 	      FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH)) != 0U) {
@@ -3693,7 +3715,8 @@ struct ffa_value ffa_memory_relinquish(
 	 * Clear is not allowed for memory that was shared, as the
 	 * original sender still has access to the memory.
 	 */
-	if (clear && share_state->share_func == FFA_MEM_SHARE_32) {
+	if (clear && (share_state->share_func == FFA_MEM_SHARE_32 ||
+		      share_state->share_func == FFA_MEM_SHARE_64)) {
 		dlog_verbose("Memory which was shared can't be cleared.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;

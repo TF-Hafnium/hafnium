@@ -653,12 +653,16 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 				    current, next);
 		return true;
 	case FFA_MEM_DONATE_32:
+	case FFA_MEM_DONATE_64:
 	case FFA_MEM_LEND_32:
+	case FFA_MEM_LEND_64:
 	case FFA_MEM_SHARE_32:
+	case FFA_MEM_SHARE_64:
 		*args = api_ffa_mem_send(func, args->arg1, args->arg2,
 					 ipa_init(args->arg3), args->arg4,
 					 current);
 		return true;
+	case FFA_MEM_RETRIEVE_REQ_64:
 	case FFA_MEM_RETRIEVE_REQ_32:
 		*args = api_ffa_mem_retrieve_req(args->arg1, args->arg2,
 						 ipa_init(args->arg3),

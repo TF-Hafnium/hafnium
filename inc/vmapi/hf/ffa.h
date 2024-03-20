@@ -67,9 +67,13 @@
 #define FFA_MSG_SEND_DIRECT_RESP_32         0x84000070
 #define FFA_MSG_SEND_DIRECT_RESP_64         0xC4000070
 #define FFA_MEM_DONATE_32                   0x84000071
+#define FFA_MEM_DONATE_64                   0xC4000071
 #define FFA_MEM_LEND_32                     0x84000072
+#define FFA_MEM_LEND_64                     0xC4000072
 #define FFA_MEM_SHARE_32                    0x84000073
+#define FFA_MEM_SHARE_64                    0xC4000073
 #define FFA_MEM_RETRIEVE_REQ_32             0x84000074
+#define FFA_MEM_RETRIEVE_REQ_64             0xC4000074
 #define FFA_MEM_RETRIEVE_RESP_32            0x84000075
 #define FFA_MEM_RELINQUISH_32               0x84000076
 #define FFA_MEM_RECLAIM_32                  0x84000077
@@ -175,6 +179,14 @@ static inline const char *ffa_func_name(uint32_t func)
 		return "FFA_MEM_SHARE_32";
 	case FFA_MEM_RETRIEVE_REQ_32:
 		return "FFA_MEM_RETRIEVE_REQ_32";
+	case FFA_MEM_DONATE_64:
+		return "FFA_MEM_DONATE_64";
+	case FFA_MEM_LEND_64:
+		return "FFA_MEM_LEND_64";
+	case FFA_MEM_SHARE_64:
+		return "FFA_MEM_SHARE_64";
+	case FFA_MEM_RETRIEVE_REQ_64:
+		return "FFA_MEM_RETRIEVE_REQ_64";
 	case FFA_MEM_RETRIEVE_RESP_32:
 		return "FFA_MEM_RETRIEVE_RESP_32";
 	case FFA_MEM_RELINQUISH_32:

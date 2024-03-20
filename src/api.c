@@ -2502,6 +2502,7 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	}
 
 	if (feature_function_id != FFA_MEM_RETRIEVE_REQ_32 &&
+	    feature_function_id != FFA_MEM_RETRIEVE_REQ_64 &&
 	    input_property != 0U) {
 		dlog_verbose(
 			"input_property must be zero.\ninput_property = %u.\n",
@@ -2522,9 +2523,12 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	case FFA_ID_GET_32:
 	case FFA_MSG_WAIT_32:
 	case FFA_RUN_32:
+	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32:
 	case FFA_MEM_LEND_32:
+	case FFA_MEM_LEND_64:
 	case FFA_MEM_SHARE_32:
+	case FFA_MEM_SHARE_64:
 	case FFA_MEM_RETRIEVE_RESP_32:
 	case FFA_MEM_RELINQUISH_32:
 	case FFA_MEM_RECLAIM_32:
@@ -2577,6 +2581,7 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 		};
 	}
 
+	case FFA_MEM_RETRIEVE_REQ_64:
 	case FFA_MEM_RETRIEVE_REQ_32:
 		if ((input_property & FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_MASK) !=
 		    0U) {
@@ -3105,13 +3110,16 @@ static bool api_memory_region_check_flags(
 	struct ffa_memory_region *memory_region, uint32_t share_func)
 {
 	switch (share_func) {
+	case FFA_MEM_SHARE_64:
 	case FFA_MEM_SHARE_32:
 		if ((memory_region->flags & FFA_MEMORY_REGION_FLAG_CLEAR) !=
 		    0U) {
 			return false;
 		}
 		/* Intentional fall-through */
+	case FFA_MEM_LEND_64:
 	case FFA_MEM_LEND_32:
+	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32: {
 		/* Bits 31:2 Must Be Zero. */
 		ffa_memory_receiver_flags_t to_mask =
@@ -3426,7 +3434,8 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		goto out;
 	}
 
-	if (share_func == FFA_MEM_DONATE_32 &&
+	if ((share_func == FFA_MEM_DONATE_32 ||
+	     share_func == FFA_MEM_DONATE_64) &&
 	    memory_region->receiver_count != 1U) {
 		dlog_verbose(
 			"FFA_MEM_DONATE only supports one recipient. "

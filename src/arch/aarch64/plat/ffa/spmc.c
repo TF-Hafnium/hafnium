@@ -258,8 +258,11 @@ bool plat_ffa_is_memory_send_valid(ffa_id_t receiver_vm_id, uint32_t share_func)
 	 * SPs can only share/lend/donate to another SP.
 	 */
 	switch (share_func) {
+	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32:
+	case FFA_MEM_LEND_64:
 	case FFA_MEM_LEND_32:
+	case FFA_MEM_SHARE_64:
 	case FFA_MEM_SHARE_32:
 		/* SP to VM not allowed, VM to VM should not end up here */
 		result = vm_id_is_current_world(receiver_vm_id);
