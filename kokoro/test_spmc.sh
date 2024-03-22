@@ -20,8 +20,8 @@ execute_test() {
   shift
 
   command="${runner[@]} $@" # The rest of arguments are extra parameters
-  ${command}
   if [ "$CODE_COVERAGE" = true ];then
+    ${command} || true
     move_log_files ${WORKSPACE} trace_folder
     # If one of the parameters of the executed command was spmc or hypervisor
     # we need to extract the path to the binary to get the elf files
@@ -31,6 +31,8 @@ execute_test() {
     if [[ "${command}" =~ ^.+?--hypervisor[[:space:]]([^[:space:]]+?).+$ ]]; then
       append_elf_file "${WORKSPACE}/$(dirname ${BASH_REMATCH[1]})/hafnium.elf" $trace_folder
     fi
+  else
+    ${command}
   fi
 
 }
