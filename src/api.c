@@ -4387,8 +4387,7 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 	 */
 	CHECK(receiver_locked.vm != NULL);
 
-	if (receiver_locked.vm->vcpu_count <= vcpu_id ||
-	    (vm_is_mp(current->vm) && cpu_index(current->cpu) != vcpu_id)) {
+	if (receiver_locked.vm->vcpu_count <= vcpu_id) {
 		dlog_verbose(
 			"Invalid VCPU ID %u. vcpu count %u current core: "
 			"%zu!\n",
