@@ -46,7 +46,7 @@ struct ffa_value sp_req_echo_cmd(ffa_id_t test_source, uint32_t val1,
 	return sp_success(own_id, test_source, 0);
 }
 
-struct ffa_value sp_req_echo_denied_cmd(ffa_id_t test_source)
+struct ffa_value sp_req_echo_busy_cmd(ffa_id_t test_source)
 {
 	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value res;
@@ -54,9 +54,9 @@ struct ffa_value sp_req_echo_denied_cmd(ffa_id_t test_source)
 	if (!ffa_is_vm_id(test_source)) {
 		res = ffa_msg_send_direct_req(own_id, test_source, 0, 0, 0, 0,
 					      0);
-		EXPECT_FFA_ERROR(res, FFA_DENIED);
+		EXPECT_FFA_ERROR(res, FFA_BUSY);
 	} else {
-		res = sp_req_echo_denied_cmd_send(own_id, own_id + 1);
+		res = sp_req_echo_busy_cmd_send(own_id, own_id + 1);
 
 		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 		EXPECT_EQ(sp_resp(res), SP_SUCCESS);
