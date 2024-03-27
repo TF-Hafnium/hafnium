@@ -3365,8 +3365,8 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 
 		to = vm_find(receiver_id);
 
-		if (vm_id_is_current_world(receiver_id) &&
-		    (to == NULL || to == from)) {
+		if ((vm_id_is_current_world(receiver_id) && to == NULL) ||
+		    to == from) {
 			dlog_verbose("%s: invalid receiver.\n", __func__);
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
 			goto out;
