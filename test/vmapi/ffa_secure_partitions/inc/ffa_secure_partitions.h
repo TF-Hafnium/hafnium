@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "hf/mm.h"
+
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 

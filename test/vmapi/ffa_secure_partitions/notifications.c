@@ -185,7 +185,6 @@ static void cpu_entry_sp_to_vm_signaling(uintptr_t arg)
 static void base_per_cpu_notifications_test(void (*cpu_entry)(uintptr_t arg))
 {
 	struct spinlock lock = SPINLOCK_INIT;
-	alignas(4096) static uint8_t other_stack[MAX_CPUS - 1][4096];
 	struct notif_cpu_entry_args args = {.lock = &lock};
 	struct ffa_partition_info sp;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -206,9 +205,7 @@ static void base_per_cpu_notifications_test(void (*cpu_entry)(uintptr_t arg))
 
 		args.vcpu_id = i;
 
-		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i),
-					   other_stack[i - 1],
-					   sizeof(other_stack[0]), cpu_entry,
+		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i), cpu_entry,
 					   (uintptr_t)&args),
 			  true);
 

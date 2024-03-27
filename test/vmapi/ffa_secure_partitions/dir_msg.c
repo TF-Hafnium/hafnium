@@ -22,8 +22,6 @@
 
 #define SP_SLEEP_LONG 2000U
 
-alignas(4096) static uint8_t secondary_ec_stack[MAX_CPUS - 1][PAGE_SIZE];
-
 struct secondary_cpu_entry_args {
 	ffa_id_t receiver_id;
 	ffa_vcpu_count_t vcpu_count;
@@ -162,11 +160,9 @@ TEST_PRECONDITION_LONG_RUNNING(ffa_call_chain, disallow_migration_blocked_sp,
 		id = hftest_get_cpu_id(i);
 		HFTEST_LOG("Booting CPU %u - %x", i, id);
 
-		EXPECT_EQ(
-			hftest_cpu_start(id, secondary_ec_stack[i - 1],
-					 sizeof(secondary_ec_stack[0]),
-					 migrate_busy_up_sp, (uintptr_t)&args),
-			true);
+		EXPECT_EQ(hftest_cpu_start(id, migrate_busy_up_sp,
+					   (uintptr_t)&args),
+			  true);
 
 		HFTEST_LOG("Done with CPU %u", i);
 	}

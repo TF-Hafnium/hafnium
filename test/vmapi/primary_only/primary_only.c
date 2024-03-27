@@ -81,7 +81,6 @@ static void vm_cpu_entry(uintptr_t arg)
 TEST(cpus, start)
 {
 	struct spinlock lock = SPINLOCK_INIT;
-	alignas(4096) static uint8_t other_stack[4096];
 
 	/* Start secondary while holding lock. */
 	sl_lock(&lock);
@@ -92,8 +91,7 @@ TEST(cpus, start)
 	 * MAX_CPUS - index internally. Since legacy VMs do not follow this
 	 * convention, index 7 is passed into `hftest_cpu_get_id`.
 	 */
-	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(7), other_stack,
-				   sizeof(other_stack), vm_cpu_entry,
+	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(7), vm_cpu_entry,
 				   (uintptr_t)&lock),
 		  true);
 
@@ -128,7 +126,6 @@ static void vm_cpu_entry_stop(uintptr_t arg)
 TEST(cpus, stop)
 {
 	struct spinlock lock = SPINLOCK_INIT;
-	alignas(4096) static uint8_t other_stack[4096];
 
 	/**
 	 * `hftest_get_cpu_id` function makes the assumption that cpus are
@@ -142,7 +139,6 @@ TEST(cpus, stop)
 	sl_lock(&lock);
 	dlog("Starting second CPU.\n");
 	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(secondary_cpu_index),
-				   other_stack, sizeof(other_stack),
 				   vm_cpu_entry_stop, (uintptr_t)&lock),
 		  true);
 
@@ -158,7 +154,6 @@ TEST(cpus, stop)
 
 	dlog("Starting second CPU again.\n");
 	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(secondary_cpu_index),
-				   other_stack, sizeof(other_stack),
 				   vm_cpu_entry_stop, (uintptr_t)&lock),
 		  true);
 

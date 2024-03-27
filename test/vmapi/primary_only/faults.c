@@ -57,7 +57,6 @@ TEAR_DOWN(faults)
 TEST(faults, spurious_due_to_configure)
 {
 	struct state s;
-	alignas(4096) static uint8_t other_stack[4096];
 
 	sl_init(&s.lock);
 	s.done = false;
@@ -71,10 +70,9 @@ TEST(faults, spurious_due_to_configure)
 	 * MAX_CPUS - index internally. Since legacy VMs do not follow this
 	 * convention, index 7 is passed into `hftest_cpu_get_id`.
 	 */
-	EXPECT_EQ(
-		hftest_cpu_start(hftest_get_cpu_id(7), other_stack,
-				 sizeof(other_stack), rx_reader, (uintptr_t)&s),
-		true);
+	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(7), rx_reader,
+				   (uintptr_t)&s),
+		  true);
 
 	/* Wait for CPU to release the lock. */
 	sl_lock(&s.lock);

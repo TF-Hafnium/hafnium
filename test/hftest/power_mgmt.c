@@ -55,18 +55,18 @@ static noreturn void cpu_entry(uintptr_t arg)
 	arch_cpu_stop();
 }
 
-bool hftest_cpu_start(uintptr_t id, void *stack, size_t stack_size,
-		      void (*entry)(uintptr_t arg), uintptr_t arg)
+bool hftest_cpu_start(uintptr_t id, void (*entry)(uintptr_t arg), uintptr_t arg)
 {
 	struct cpu_start_state s;
 	struct arch_cpu_start_state s_arch;
+	size_t stack_size = sizeof(secondary_ec_stack[0]);
 
 	/*
 	 * Config for arch_cpu_start() which will start a new CPU and
 	 * immediately jump to cpu_entry(). This function must guarantee that
 	 * the state struct is not be freed until cpu_entry() is called.
 	 */
-	s_arch.initial_sp = (uintptr_t)stack + stack_size;
+	s_arch.initial_sp = (uintptr_t)secondary_ec_stack + stack_size;
 	s_arch.entry = cpu_entry;
 	s_arch.arg = (uintptr_t)&s;
 

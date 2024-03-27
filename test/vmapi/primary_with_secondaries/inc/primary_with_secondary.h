@@ -96,5 +96,3 @@ bool hypervisor_only(void);
 
 /* Helpers common to the setup. */
 bool exception_received(struct ffa_value* run_res, const void* recv_buf);
-
-extern uint8_t secondary_ec_stack[MAX_CPUS - 1][PAGE_SIZE];

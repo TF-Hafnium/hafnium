@@ -93,7 +93,6 @@ TEAR_DOWN(vcpu_state)
  */
 TEST_LONG_RUNNING(vcpu_state, concurrent_save_restore)
 {
-	alignas(4096) static char stack[4096];
 	static struct mailbox_buffers mb;
 	struct cpu_state state;
 
@@ -112,8 +111,8 @@ TEST_LONG_RUNNING(vcpu_state, concurrent_save_restore)
 	 * MAX_CPUS - index internally. Since legacy VMs do not follow this
 	 * convention, index 7 is passed into `hftest_cpu_get_id`.
 	 */
-	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(7), stack, sizeof(stack),
-				     vm_cpu_entry, (uintptr_t)&state));
+	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(7), vm_cpu_entry,
+				     (uintptr_t)&state));
 
 	/* Run on a loop until the secondary VM is done. */
 	EXPECT_TRUE(run_loop(&mb));

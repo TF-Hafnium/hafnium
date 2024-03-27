@@ -19,8 +19,6 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
-alignas(4096) static uint8_t secondary_ec_stack[MAX_CPUS - 1][4096];
-
 struct pwr_mgt_cpu_entry_args {
 	ffa_id_t receiver_id;
 	ffa_vcpu_count_t vcpu_count;
@@ -150,9 +148,7 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 		 */
 		args.vcpu_id = (ffa_vcpu_index_t)i;
 
-		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i),
-					   secondary_ec_stack[i - 1],
-					   sizeof(secondary_ec_stack[0]), entry,
+		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i), entry,
 					   (uintptr_t)&args),
 			  true);
 

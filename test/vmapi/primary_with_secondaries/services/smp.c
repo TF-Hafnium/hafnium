@@ -23,12 +23,6 @@
 
 #define ARG_VALUE 42
 
-/*
- * Secondary VM that starts a second vCPU and then sends messages from both.
- */
-
-alignas(4096) static char stack[4096];
-
 /** Send a message back to the primary. */
 void send_message(const char *message, uint32_t size)
 {
@@ -62,8 +56,7 @@ TEST_SERVICE(smp)
 
 	/* Start second vCPU. */
 	dlog("Secondary starting second vCPU.\n");
-	ASSERT_TRUE(hftest_cpu_start(1, stack, sizeof(stack), vm_cpu_entry,
-				     ARG_VALUE));
+	ASSERT_TRUE(hftest_cpu_start(1, vm_cpu_entry, ARG_VALUE));
 	dlog("Secondary started second vCPU.\n");
 
 	/* Check that vCPU statuses are as expected. */

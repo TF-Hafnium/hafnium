@@ -24,8 +24,6 @@
 #define LAST_SECONDARY_VCPU_ID (MAX_CPUS - 1)
 #define MID_SECONDARY_VCPU_ID (MAX_CPUS / 2)
 
-alignas(4096) static uint8_t secondary_ec_stack[MAX_CPUS - 1][PAGE_SIZE];
-
 struct secondary_cpu_entry_args {
 	ffa_id_t receiver_id;
 	ffa_vcpu_count_t vcpu_count;
@@ -551,9 +549,7 @@ static void sp_route_interrupt_to_secondary_vcpu_base(
 		args.vcpu_id = i;
 		HFTEST_LOG("Booting CPU %u - %x", i, cpu_id);
 
-		EXPECT_EQ(hftest_cpu_start(cpu_id, secondary_ec_stack[i - 1],
-					   sizeof(secondary_ec_stack[0]),
-					   cpu_entry_sp_sleep_loop,
+		EXPECT_EQ(hftest_cpu_start(cpu_id, cpu_entry_sp_sleep_loop,
 					   (uintptr_t)&args),
 			  true);
 
