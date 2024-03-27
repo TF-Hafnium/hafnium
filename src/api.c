@@ -2720,13 +2720,6 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	current_locked = vcpus_locked.vcpu1;
 	receiver_vcpu_locked = vcpus_locked.vcpu2;
 
-	if (!plat_ffa_check_runtime_state_transition(
-		    current_locked, sender_vm_id, HF_INVALID_VM_ID,
-		    receiver_vcpu_locked, args.func, &next_state)) {
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
 	/*
 	 * If destination vCPU is executing or already received an
 	 * FFA_MSG_SEND_DIRECT_REQ then return to caller hinting recipient is
@@ -2739,6 +2732,13 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	    !receiver_vcpu->regs_available) {
 		dlog_verbose("Receiver is busy with another request.\n");
 		ret = ffa_error(FFA_BUSY);
+		goto out;
+	}
+
+	if (!plat_ffa_check_runtime_state_transition(
+		    current_locked, sender_vm_id, HF_INVALID_VM_ID,
+		    receiver_vcpu_locked, args.func, &next_state)) {
+		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
 
