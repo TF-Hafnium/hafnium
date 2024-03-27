@@ -2791,8 +2791,10 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 
 		permissions_RO = (ffa_get_data_access_attr(*permissions) ==
 				  FFA_DATA_ACCESS_RO);
-		clear_memory_flags = (retrieve_request->flags &
-				      FFA_MEMORY_REGION_FLAG_CLEAR) != 0U;
+		clear_memory_flags =
+			(retrieve_request->flags &
+			 (FFA_MEMORY_REGION_FLAG_CLEAR |
+			  FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH)) != 0U;
 
 		/*
 		 * Can't request PM to clear memory if only provided

@@ -2938,14 +2938,28 @@ TEST(memory_sharing, ffa_validate_retrieve_req_clear_flag_if_RO)
 	/*
 	 * Prepare retrieve request with RO, and setting flag to clear memory.
 	 * Should fail at the receiver's FFA_MEM_RETRIEVE call.
+	 * Using the FFA_MEMORY_REGION_FLAG_CLEAR.
 	 */
 	send_retrieve_request_single_receiver(
 		mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
 		FFA_MEMORY_REGION_FLAG_CLEAR, FFA_DATA_ACCESS_RO,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_INSTRUCTION_ACCESS_NX, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL);
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/*
+	 * Using the FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH flag.
+	 */
+	send_retrieve_request_single_receiver(
+		mb.send, handle, HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
+		FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH, FFA_DATA_ACCESS_RO,
+		FFA_INSTRUCTION_ACCESS_NX, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL);
+
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/* Reclaiming memory. */
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 }
 
