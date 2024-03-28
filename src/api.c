@@ -3457,8 +3457,13 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		return ffa_error(FFA_NO_MEMORY);
 	}
 
-	memcpy_s(allocated_entry, MM_PPOOL_ENTRY_SIZE, from_msg,
-		 fragment_length);
+	if (!memcpy_trapped(allocated_entry, MM_PPOOL_ENTRY_SIZE, from_msg,
+			    fragment_length)) {
+		dlog_error(
+			"%s: Failed to copy FF-A memory region descriptor.\n",
+			__func__);
+		return ffa_error(FFA_ABORTED);
+	}
 
 	if (!ffa_memory_region_sanity_check(allocated_entry, ffa_version,
 					    fragment_length, true)) {
@@ -3622,7 +3627,15 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	 * Copy the retrieve request descriptor to an internal buffer, so that
 	 * the caller can't change it underneath us.
 	 */
-	memcpy_s(retrieve_msg, message_buffer_size, to_msg, length);
+	if (!memcpy_trapped(retrieve_msg, message_buffer_size, to_msg,
+			    length)) {
+		dlog_error(
+			"%s: Failed to copy FF-A retrieve request "
+			"descriptor.\n",
+			__func__);
+		ret = ffa_error(FFA_ABORTED);
+		goto out;
+	}
 
 	if ((vm_is_mailbox_other_world_owned(to_locked) &&
 	     !plat_ffa_acquire_receiver_rx(to_locked, &ret)) ||
@@ -3707,7 +3720,14 @@ struct ffa_value api_ffa_mem_relinquish(struct vcpu *current)
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
-	memcpy_s(relinquish_request, message_buffer_size, from_msg, length);
+
+	if (!memcpy_trapped(relinquish_request, message_buffer_size, from_msg,
+			    length)) {
+		dlog_error("%s: Failed to copy FF-A relinquish request.\n",
+			   __func__);
+		ret = ffa_error(FFA_ABORTED);
+		goto out;
+	}
 
 	if (sizeof(struct ffa_mem_relinquish) +
 		    relinquish_request->endpoint_count * sizeof(ffa_id_t) !=
@@ -3840,7 +3860,12 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 		dlog_verbose("Failed to allocate fragment copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
 	}
-	memcpy_s(fragment_copy, MM_PPOOL_ENTRY_SIZE, from_msg, fragment_length);
+
+	if (!memcpy_trapped(fragment_copy, MM_PPOOL_ENTRY_SIZE, from_msg,
+			    fragment_length)) {
+		dlog_error("%s: Failed to copy fragment.\n", __func__);
+		return ffa_error(FFA_ABORTED);
+	}
 
 	/*
 	 * Hafnium doesn't support fragmentation of memory retrieve requests
