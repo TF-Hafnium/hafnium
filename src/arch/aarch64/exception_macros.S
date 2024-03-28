@@ -58,6 +58,45 @@
 .endm
 
 /**
+ * Restores the volatile registers from the stack.
+ *
+ * Register x0: if false restores elr_elx if true retains the value of elr_elx.
+ * This enables exception handlers to indicate whether they have changed the
+ * value of elr_elx (e.g., to skip the faulting instruction).
+ */
+.macro restore_from_stack_and_return elx:req
+restore_from_stack_and_return_\elx:
+
+	/* Restore registers x2-x18, x29 & x30. */
+	ldp x2, x3, [sp, #8 * 2]
+	ldp x4, x5, [sp, #8 * 4]
+	ldp x6, x7, [sp, #8 * 6]
+	ldp x8, x9, [sp, #8 * 8]
+	ldp x10, x11, [sp, #8 * 10]
+	ldp x12, x13, [sp, #8 * 12]
+	ldp x14, x15, [sp, #8 * 14]
+	ldp x16, x17, [sp, #8 * 16]
+	ldr x18, [sp, #8 * 18]
+	ldp x29, x30, [sp, #8 * 20]
+
+	cbnz x0, skip_restore_elr_\elx
+
+	/* Restore register elr_elx using x1 as scratch. */
+	ldr x1, [sp, #8 * 22]
+	msr elr_\elx, x1
+
+skip_restore_elr_\elx:
+	/* Restore register spsr_elx using x1 as scratch. */
+	ldr x1, [sp, #8 * 23]
+	msr spsr_\elx, x1
+
+	/* Restore x0 & x1, and release stack space. */
+	ldp x0, x1, [sp], #8 * 24
+
+	b exception_handler_return
+.endm
+
+/**
  * Helper macros for SIMD vectors save/restore operations.
  */
 .macro simd_op_vectors op:req reg:req
@@ -150,7 +189,7 @@
 .macro current_exception_spx elx:req handler:req
 	save_volatile_to_stack \elx
 	bl \handler
-	b restore_from_stack_and_return
+	b restore_from_stack_and_return_\elx
 .endm
 
 /**
