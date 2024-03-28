@@ -10,6 +10,7 @@
 
 #include "hf/arch/cpu.h"
 #include "hf/arch/ffa.h"
+#include "hf/arch/memcpy_trapped.h"
 #include "hf/arch/mm.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
@@ -448,8 +449,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		if (buffer_size > HF_MAILBOX_SIZE) {
 			dlog_error(
 				"Partition information does not fit in the "
-				"VM's RX "
-				"buffer.\n");
+				"VM's RX buffer.\n");
 			return ffa_error(FFA_NO_MEMORY);
 		}
 
@@ -469,6 +469,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 	} else {
 		partition_info_size = sizeof(struct ffa_partition_info);
 		buffer_size = partition_info_size * vm_count;
+
 		if (buffer_size > HF_MAILBOX_SIZE) {
 			dlog_error(
 				"Partition information does not fit in the "
@@ -477,10 +478,17 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 			return ffa_error(FFA_NO_MEMORY);
 		}
 
-		/* Populate the VM's RX buffer with the partition information.
+		/*
+		 * Populate the VM's RX buffer with the partition information.
 		 */
-		memcpy_s(vm->mailbox.recv, HF_MAILBOX_SIZE, partitions,
-			 buffer_size);
+		if (!memcpy_trapped(vm->mailbox.recv, HF_MAILBOX_SIZE,
+				    partitions, buffer_size)) {
+			dlog_error(
+				"%s: Failed to copy ffa_partition_info "
+				"descriptor\n",
+				__func__);
+			return ffa_error(FFA_ABORTED);
+		}
 	}
 
 	vm->mailbox.recv_size = buffer_size;
