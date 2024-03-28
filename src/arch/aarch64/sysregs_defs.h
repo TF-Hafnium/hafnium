@@ -104,6 +104,17 @@
 #define GET_ESR_IL(esr) ((esr) & (1 << 25))
 
 /**
+ * Gets the Data Fault Status Code ISS[5:0].
+ */
+#define GET_ESR_ISS_DFSC(iss) ((iss) & (0x3FU))
+
+/**
+ * Define DFSC due to Granule protection fault if this is an RME
+ * enabled platform.
+ */
+#define DFSC_GPF UINT64_C(0x28)
+
+/**
  * ESR code for an Unknown Reason exception.
  */
 #define EC_UNKNOWN UINT64_C(0x0)
@@ -156,7 +167,7 @@
 /**
  * Mask for ISS bits in ESR_ELx registers.
  */
-#define ISS_MASK ((UINT64_C(0x1) << 22) - UINT64_C(0x1))
+#define ISS_MASK ((UINT64_C(0x1) << 25) - UINT64_C(0x1))
 
 #define GET_ESR_ISS(esr) (ISS_MASK & (esr))
 
