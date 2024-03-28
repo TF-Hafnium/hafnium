@@ -150,7 +150,7 @@
 .balign 0x800
 vector_table_el2:
 sync_cur_sp0:
-	noreturn_current_exception_sp0 el2 sync_current_exception_noreturn
+	noreturn_current_exception_sp0 el2 sync_current_exception
 
 .balign 0x80
 irq_cur_sp0:
@@ -166,7 +166,7 @@ serr_cur_sp0:
 
 .balign 0x80
 sync_cur_spx:
-	noreturn_current_exception_spx el2 sync_current_exception_noreturn
+	current_exception_spx el2 sync_current_exception
 
 .balign 0x80
 irq_cur_spx:
@@ -213,6 +213,15 @@ serr_lower_32:
 	lower_exception serr_lower
 
 .balign 0x40
+
+
+/**
+ * Instantiate code path for restoring stack and returning.
+ */
+restore_from_stack_and_return el2
+
+exception_handler_return:
+	eret_with_sb
 
 /**
  * pauth_save_vcpu_and_restore_hyp_key

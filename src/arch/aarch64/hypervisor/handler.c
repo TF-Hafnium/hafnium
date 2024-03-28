@@ -11,6 +11,7 @@
 #include "hf/arch/barriers.h"
 #include "hf/arch/gicv3.h"
 #include "hf/arch/init.h"
+#include "hf/arch/memcpy_trapped.h"
 #include "hf/arch/mmu.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/smc.h"
@@ -232,7 +233,12 @@ noreturn void serr_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 	panic("SError from current exception level.");
 }
 
-noreturn void sync_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
+/**
+ * Returns true if ELR_EL2 is not to be restored from stack.
+ * Currently function doesn't return false, as for all other cases
+ * panics.
+ */
+bool sync_current_exception(uintreg_t elr, uintreg_t spsr)
 {
 	uintreg_t esr = read_msr(esr_el2);
 	uintreg_t ec = GET_ESR_EC(esr);
@@ -240,21 +246,53 @@ noreturn void sync_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 	(void)spsr;
 
 	switch (ec) {
-	case EC_DATA_ABORT_SAME_EL:
+	case EC_DATA_ABORT_SAME_EL: {
+		uint64_t iss = GET_ESR_ISS(esr);
+		uint64_t dfsc = GET_ESR_ISS_DFSC(iss);
+		uint64_t far = read_msr(far_el2);
+
+		/* Handle Granule Protection Fault. */
+		if (is_arch_feat_rme_supported() && dfsc == DFSC_GPF) {
+			dlog_verbose(
+				"Granule Protection Fault: esr=%#x, ec=%#x, "
+				"far=%#x, elr=%#x\n",
+				esr, ec, far, elr);
+
+			/*
+			 * Change ELR_EL2 only if failed whilst either
+			 * reading or writing within 'memcpy_trapped'.
+			 */
+			if (elr == (uintptr_t)memcpy_trapped_read ||
+			    elr == (uintptr_t)memcpy_trapped_write) {
+				dlog_verbose(
+					"GPF due to data abort on %s.\n",
+					(elr == (uintptr_t)memcpy_trapped_read)
+						? "read"
+						: "write");
+
+				/*
+				 * Update the ELR_EL2 with the return
+				 * address, to return error from the
+				 * call to 'memcpy_trapped'.
+				 */
+				write_msr(ELR_EL2, memcpy_trapped_aborted);
+				return true;
+			}
+		}
+
 		if (!(esr & (1U << 10))) { /* Check FnV bit. */
 			dlog_error(
 				"Data abort: pc=%#x, esr=%#x, ec=%#x, "
 				"far=%#x\n",
-				elr, esr, ec, read_msr(far_el2));
+				elr, esr, ec, far);
+
 		} else {
 			dlog_error(
 				"Data abort: pc=%#x, esr=%#x, ec=%#x, "
 				"far=invalid\n",
 				elr, esr, ec);
 		}
-
-		break;
-
+	} break;
 	default:
 		dlog_error(
 			"Unknown current sync exception pc=%#x, esr=%#x, "

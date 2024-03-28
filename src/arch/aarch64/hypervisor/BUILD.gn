@@ -27,6 +27,7 @@ source_set("hypervisor") {
   sources = [
     "exceptions.S",
     "hypervisor_entry.S",
+    "memcpy_trapped.S",
     "plat_entry.S",
   ]
 
