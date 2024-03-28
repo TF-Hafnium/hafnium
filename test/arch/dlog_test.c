@@ -150,7 +150,7 @@ TEST(dlog, hexadecimal_unsigned_int_format_specifier)
  */
 TEST(dlog, pointer_format_specifier)
 {
-	assert_format("Hello 0000000000000000\n", "Hello %p\n", 0);
-	assert_format("Hello 123456789abcdef0\n", "Hello %p\n",
+	assert_format("Hello 0x0000000000000000\n", "Hello %p\n", 0);
+	assert_format("Hello 0x123456789abcdef0\n", "Hello %p\n",
 		      0x123456789abcdef0);
 }

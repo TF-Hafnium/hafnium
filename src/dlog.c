@@ -15,20 +15,26 @@
 #include "hf/std.h"
 #include "hf/stdout.h"
 
-/* Keep macro alignment */
+enum { DLOG_MAX_STRING_LENGTH = 64 };
+
+/* Keep fields aligned */
 /* clang-format off */
-
-#define FLAG_SPACE 0x01
-#define FLAG_ZERO  0x02
-#define FLAG_MINUS 0x04
-#define FLAG_PLUS  0x08
-#define FLAG_ALT   0x10
-#define FLAG_UPPER 0x20
-#define FLAG_NEG   0x40
-
-#define DLOG_MAX_STRING_LENGTH 64
-
+struct format_flags {
+	bool minus	: 1;
+	bool plus	: 1;
+	bool space	: 1;
+	bool alt	: 1;
+	bool zero	: 1;
+	bool upper	: 1;
+	bool neg	: 1;
+};
 /* clang-format on */
+
+enum format_base {
+	base8 = 8,
+	base10 = 10,
+	base16 = 16,
+};
 
 static bool dlog_lock_enabled = false;
 static struct spinlock sl = SPINLOCK_INIT;
@@ -76,14 +82,17 @@ static void dlog_putchar(char c)
 }
 
 /**
- * Prints a raw string to the debug log and returns its length.
+ * Prints a literal string (i.e. '%' is not interpreted specially) to the debug
+ * log.
+ *
+ * Returns number of characters written.
  */
 static size_t print_raw_string(const char *str)
 {
 	const char *c = str;
 
-	while (*c != '\0') {
-		dlog_putchar(*c++);
+	for (; *c != '\0'; c++) {
+		dlog_putchar(*c);
 	}
 
 	return c - str;
@@ -100,8 +109,9 @@ static size_t print_raw_string(const char *str)
  *
  * Returns number of characters written.
  */
-static size_t print_string(const char *str, const char *suffix, size_t width,
-			   int flags, char fill)
+static size_t print_string(const char *str, const char *suffix,
+			   size_t min_width, struct format_flags flags,
+			   char fill)
 {
 	size_t chars_written = 0;
 	size_t len = suffix - str;
@@ -112,10 +122,10 @@ static size_t print_string(const char *str, const char *suffix, size_t width,
 		dlog_putchar(*str++);
 	}
 
-	if (flags & FLAG_MINUS) {
+	if (flags.minus) {
 		/* Left-aligned. Print suffix, then print padding if needed. */
 		len += print_raw_string(suffix);
-		while (len < width) {
+		while (len < min_width) {
 			chars_written++;
 			dlog_putchar(' ');
 			len++;
@@ -125,7 +135,7 @@ static size_t print_string(const char *str, const char *suffix, size_t width,
 
 	/* Fill until we reach the desired length. */
 	len += strnlen_s(suffix, DLOG_MAX_STRING_LENGTH);
-	while (len < width) {
+	while (len < min_width) {
 		chars_written++;
 		dlog_putchar(fill);
 		len++;
@@ -137,92 +147,123 @@ static size_t print_string(const char *str, const char *suffix, size_t width,
 }
 
 /**
- * Prints a number to the debug log. The caller specifies the base, its minimum
- * width and printf-style flags.
+ * Prints an integer to the debug log. The caller specifies the base, its
+ * minimum width and printf-style flags.
  *
  * Returns number of characters written.
  */
-static size_t print_num(size_t v, size_t base, size_t width, int flags)
+static size_t print_int(size_t value, enum format_base base, size_t min_width,
+			struct format_flags flags)
 {
 	static const char *digits_lower = "0123456789abcdefx";
 	static const char *digits_upper = "0123456789ABCDEFX";
-	const char *d = (flags & FLAG_UPPER) ? digits_upper : digits_lower;
+	const char *digits = flags.upper ? digits_upper : digits_lower;
 	char buf[DLOG_MAX_STRING_LENGTH];
 	char *ptr = &buf[sizeof(buf) - 1];
 	char *num;
 	*ptr = '\0';
 	do {
 		--ptr;
-		*ptr = d[v % base];
-		v /= base;
-	} while (v);
+		*ptr = digits[value % base];
+		value /= base;
+	} while (value);
 
 	/* Num stores where the actual number begins. */
 	num = ptr;
 
 	/* Add prefix if requested. */
-	if (flags & FLAG_ALT) {
+	if (flags.alt) {
 		switch (base) {
-		case 16:
+		case base16:
 			ptr -= 2;
 			ptr[0] = '0';
-			ptr[1] = d[16];
+			ptr[1] = digits[16];
 			break;
 
-		case 8:
+		case base8:
 			ptr--;
 			*ptr = '0';
+			break;
+
+		case base10:
+			/* do nothing */
 			break;
 		}
 	}
 
 	/* Add sign if requested. */
-	if (flags & FLAG_NEG) {
+	if (flags.neg) {
 		*--ptr = '-';
-	} else if (flags & FLAG_PLUS) {
+	} else if (flags.plus) {
 		*--ptr = '+';
-	} else if (flags & FLAG_SPACE) {
+	} else if (flags.space) {
 		*--ptr = ' ';
 	}
-	if (flags & FLAG_ZERO) {
-		return print_string(ptr, num, width, flags, '0');
-	} else {
-		return print_string(ptr, ptr, width, flags, ' ');
+	return print_string(ptr, num, min_width, flags, flags.zero ? '0' : ' ');
+}
+
+/**
+ * Parses the optional flags field of a printf-style format. Returns a pointer
+ * to the first non-flag character in the string.
+ */
+static const char *parse_flags(const char *fmt, struct format_flags *flags)
+{
+	for (;; fmt++) {
+		switch (*fmt) {
+		case '-':
+			flags->minus = true;
+			break;
+
+		case '+':
+			flags->plus = true;
+			break;
+
+		case ' ':
+			flags->space = true;
+			break;
+
+		case '#':
+			flags->alt = true;
+			break;
+
+		case '0':
+			flags->zero = true;
+			break;
+
+		default:
+			return fmt;
+		}
 	}
 }
 
 /**
- * Parses the optional flags field of a printf-style format. It returns the spot
- * on the string where a non-flag character was found.
+ * Parses the optional minimum width field of a printf-style format.
+ * If the width is negative, `flags.minus` is set.
+ *
+ * Returns a pointer to the first non-digit character in the string.
  */
-static const char *parse_flags(const char *p, int *flags)
+static const char *parse_min_width(const char *fmt, va_list args,
+				   struct format_flags *flags, int *min_width)
 {
-	for (;;) {
-		switch (*p) {
-		case ' ':
-			*flags |= FLAG_SPACE;
-			break;
+	int width = 0;
 
-		case '0':
-			*flags |= FLAG_ZERO;
-			break;
-
-		case '-':
-			*flags |= FLAG_MINUS;
-			break;
-
-		case '+':
-			*flags |= FLAG_PLUS;
-
-		case '#':
-			*flags |= FLAG_ALT;
-			break;
-
-		default:
-			return p;
+	/* Read minimum width from arguments. */
+	if (*fmt == '*') {
+		fmt++;
+		width = va_arg(args, int);
+		if (width < 0) {
+			width = -width;
+			flags->minus = true;
 		}
-		p++;
+	} else {
+		for (; *fmt >= '0' && *fmt <= '9'; fmt++) {
+			width = (width * 10) + (*fmt - '0');
+		}
 	}
+
+	*min_width = width;
+
+	return fmt;
 }
 
 /**
@@ -232,124 +273,115 @@ static const char *parse_flags(const char *p, int *flags)
  */
 size_t vdlog(const char *fmt, va_list args)
 {
-	const char *p;
-	size_t w;
 	size_t chars_written = 0;
-	int flags;
-	char buf[2];
 
 	lock();
 
-	for (p = fmt; *p; p++) {
-		switch (*p) {
+	while (*fmt != '\0') {
+		switch (*fmt) {
 		default:
 			chars_written++;
-			dlog_putchar(*p);
+			dlog_putchar(*fmt);
+			fmt++;
 			break;
 
-		case '%':
-			/* Read optional flags. */
-			flags = 0;
-			p = parse_flags(p + 1, &flags) - 1;
+		case '%': {
+			struct format_flags flags = {0};
+			int min_width = 0;
 
-			/* Read the minimum width, if one is specified. */
-			w = 0;
-			while (p[1] >= '0' && p[1] <= '9') {
-				w = (w * 10) + (p[1] - '0');
-				p++;
-			}
-
-			/* Read minimum width from arguments. */
-			if (w == 0 && p[1] == '*') {
-				int v = va_arg(args, int);
-
-				if (v >= 0) {
-					w = v;
-				} else {
-					w = -v;
-					flags |= FLAG_MINUS;
-				}
-				p++;
-			}
+			fmt++;
+			fmt = parse_flags(fmt, &flags);
+			fmt = parse_min_width(fmt, args, &flags, &min_width);
 
 			/* Handle the format specifier. */
-			switch (p[1]) {
+			switch (*fmt) {
+			case '%':
+				fmt++;
+				chars_written++;
+				dlog_putchar('%');
+				break;
+
+			case 'c': {
+				char str[2] = {va_arg(args, int), 0};
+
+				fmt++;
+				chars_written += print_string(
+					str, str, min_width, flags, ' ');
+				break;
+			}
+
 			case 's': {
 				char *str = va_arg(args, char *);
 
-				chars_written +=
-					print_string(str, str, w, flags, ' ');
-				p++;
-			} break;
+				fmt++;
+				chars_written += print_string(
+					str, str, min_width, flags, ' ');
+				break;
+			}
 
 			case 'd':
 			case 'i': {
 				int v = va_arg(args, int);
+				fmt++;
 
 				if (v < 0) {
-					flags |= FLAG_NEG;
+					flags.neg = true;
 					v = -v;
 				}
 
-				chars_written +=
-					print_num((size_t)v, 10, w, flags);
-				p++;
-			} break;
+				chars_written += print_int((size_t)v, base10,
+							   min_width, flags);
+				break;
+			}
 
 			case 'X':
-				flags |= FLAG_UPPER;
-				chars_written += print_num(va_arg(args, size_t),
-							   16, w, flags);
-				p++;
+				fmt++;
+				flags.upper = true;
+				chars_written +=
+					print_int(va_arg(args, size_t), base16,
+						  min_width, flags);
 				break;
 
 			case 'p':
-				chars_written += print_num(
-					va_arg(args, size_t), 16,
-					sizeof(size_t) * 2, FLAG_ZERO);
-				p++;
+				fmt++;
+				min_width = sizeof(size_t) * 2 + 2;
+				flags.zero = true;
+				flags.alt = true;
+
+				chars_written +=
+					print_int(va_arg(args, uintptr_t),
+						  base16, min_width, flags);
 				break;
 
 			case 'x':
-				chars_written += print_num(va_arg(args, size_t),
-							   16, w, flags);
-				p++;
+				fmt++;
+				chars_written +=
+					print_int(va_arg(args, size_t), base16,
+						  min_width, flags);
 				break;
 
 			case 'u':
-				chars_written += print_num(va_arg(args, size_t),
-							   10, w, flags);
-				p++;
+				fmt++;
+				chars_written +=
+					print_int(va_arg(args, size_t), base10,
+						  min_width, flags);
 				break;
 
 			case 'o':
-				chars_written += print_num(va_arg(args, size_t),
-							   8, w, flags);
-				p++;
-				break;
-
-			case 'c':
-				buf[1] = 0;
-				buf[0] = va_arg(args, int);
+				fmt++;
 				chars_written +=
-					print_string(buf, buf, w, flags, ' ');
-				p++;
-				break;
-
-			case '%':
-				chars_written++;
-				dlog_putchar('%');
-				p++;
+					print_int(va_arg(args, size_t), base8,
+						  min_width, flags);
 				break;
 
 			default:
 				chars_written = -1;
 				goto out;
 			}
-
-			break;
+		}
 		}
 	}
+
 out:
 	stdout_flush();
 	unlock();
@@ -358,6 +390,15 @@ out:
 
 /**
  * Prints the given format string to the debug log.
+ *
+ * The format string supported is the same as described in
+ * https://en.cppreference.com/w/c/io/fprintf, with the following exceptions:
+ * - Floating-point formatters (`%f`, `%F`, `%e`, `%E`, `%a`, `%A`, `%g`, `%G`,
+ *   `%L`) are not supported because floats are not used in Hafnium and
+ *   formatting them is too complicated.
+ * - `%n` is not supported because it is rarely used and potentially dangerous.
+ * - Precision modifiers (`%.*` and `%.` followed by an integer) are not
+ *   supported.
  *
  * Returns number of characters written, or `-1` if format string is invalid.
  */
