@@ -103,8 +103,7 @@ TEST(dlog, unsigned_int_format_specifier)
 	assert_format("Hello 1234567890\n", "Hello %u\n", 1234567890);
 
 	assert_format("Hello 4294967295\n", "Hello %u\n", UINT_MAX);
-	assert_format("Hello 4294967296\n", "Hello %u\n",
-		      ((uint64_t)UINT_MAX) + 1);
+	assert_format("Hello 0\n", "Hello %u\n", ((uint64_t)UINT_MAX) + 1);
 
 	assert_format("Hello 2147483648\n", "Hello %u\n", INT_MIN);
 }
@@ -119,8 +118,7 @@ TEST(dlog, octal_unsigned_int_format_specifier)
 	assert_format("Hello 12345670\n", "Hello %o\n", 012345670);
 
 	assert_format("Hello 37777777777\n", "Hello %o\n", UINT_MAX);
-	assert_format("Hello 40000000000\n", "Hello %o\n",
-		      ((uint64_t)UINT_MAX) + 1);
+	assert_format("Hello 0\n", "Hello %o\n", ((uint64_t)UINT_MAX) + 1);
 
 	assert_format("Hello 20000000000\n", "Hello %o\n", INT_MIN);
 }

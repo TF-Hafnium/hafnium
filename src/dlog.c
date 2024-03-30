@@ -12,6 +12,7 @@
 #include <stddef.h>
 
 #include "hf/spinlock.h"
+#include "hf/static_assert.h"
 #include "hf/std.h"
 #include "hf/stdout.h"
 
@@ -35,6 +36,30 @@ enum format_base {
 	base10 = 10,
 	base16 = 16,
 };
+
+enum format_length {
+	length8 = 8,
+	length16 = 16,
+	length32 = 32,
+	length64 = 64,
+};
+
+static_assert(sizeof(char) == sizeof(uint8_t),
+	      "dlog expects char to be 8 bits wide");
+static_assert(sizeof(short) == sizeof(uint16_t),
+	      "dlog expects short to be 16 bits wide");
+static_assert(sizeof(int) == sizeof(uint32_t),
+	      "dlog expects int to be 32 bits wide");
+static_assert(sizeof(long) == sizeof(uint64_t),
+	      "dlog expects long to be 64 bits wide");
+static_assert(sizeof(long long) == sizeof(uint64_t),
+	      "dlog expects long long to be 64 bits wide");
+static_assert(sizeof(intmax_t) == sizeof(uint64_t),
+	      "dlog expects intmax_t to be 64 bits wide");
+static_assert(sizeof(size_t) == sizeof(uint64_t),
+	      "dlog expects size_t to be 64 bits wide");
+static_assert(sizeof(ptrdiff_t) == sizeof(uint64_t),
+	      "dlog expects ptrdiff_t to be 64 bits wide");
 
 static bool dlog_lock_enabled = false;
 static struct spinlock sl = SPINLOCK_INIT;
@@ -237,6 +262,49 @@ static const char *parse_flags(const char *fmt, struct format_flags *flags)
 }
 
 /**
+ * Parses the optional length modifier field of a printf-style format.
+ *
+ * Returns a pointer to the first non-length modifier character in the string.
+ */
+static const char *parse_length_modifier(const char *fmt,
+					 enum format_length *length)
+{
+	switch (*fmt) {
+	case 'h':
+		fmt++;
+		if (*fmt == 'h') {
+			fmt++;
+			*length = length8;
+		} else {
+			*length = length16;
+		}
+		break;
+	case 'l':
+		fmt++;
+		if (*fmt == 'l') {
+			fmt++;
+			*length = length64;
+		} else {
+			*length = length64;
+		}
+		break;
+
+	case 'j':
+	case 'z':
+	case 't':
+		fmt++;
+		*length = length64;
+		break;
+
+	default:
+		*length = length32;
+		break;
+	}
+
+	return fmt;
+}
+
+/**
  * Parses the optional minimum width field of a printf-style format.
  * If the width is negative, `flags.minus` is set.
  *
@@ -267,6 +335,68 @@ static const char *parse_min_width(const char *fmt, va_list args,
 }
 
 /**
+ * Reinterpret an unsigned 64-bit integer as a potentially shorter unsigned
+ * integer according to the length modifier.
+ * Returns an unsigned integer suitable for passing to `print_int`.
+ */
+uint64_t reinterpret_unsigned_int(enum format_length length, uint64_t value)
+{
+	switch (length) {
+	case length8:
+		return (uint8_t)value;
+	case length16:
+		return (uint16_t)value;
+	case length32:
+		return (uint32_t)value;
+	case length64:
+		return value;
+	}
+}
+
+/**
+ * Reinterpret an unsigned 64-bit integer as a potentially shorter signed
+ * integer according to the length modifier.
+ *
+ * Returns an *unsigned* integer suitable for passing to `print_int`. If the
+ * reinterpreted value is negative, `flags.neg` is set and the absolute value is
+ * returned.
+ */
+uint64_t reinterpret_signed_int(enum format_length length, uint64_t value,
+				struct format_flags *flags)
+{
+	int64_t signed_value = (int64_t)reinterpret_unsigned_int(length, value);
+
+	switch (length) {
+	case length8:
+		if ((int8_t)signed_value < 0) {
+			flags->neg = true;
+			signed_value = (-signed_value) & 0xFF;
+		}
+		break;
+	case length16:
+		if ((int16_t)signed_value < 0) {
+			flags->neg = true;
+			signed_value = (-signed_value) & 0xFFFF;
+		}
+		break;
+	case length32:
+		if ((int32_t)signed_value < 0) {
+			flags->neg = true;
+			signed_value = (-signed_value) & 0xFFFFFFFF;
+		}
+		break;
+	case length64:
+		if ((int64_t)signed_value < 0) {
+			flags->neg = true;
+			signed_value = -signed_value;
+		}
+		break;
+	}
+
+	return signed_value;
+}
+
+/**
  * Same as "dlog", except that arguments are passed as a va_list
  *
  * Returns number of characters written, or `-1` if format string is invalid.
@@ -288,10 +418,13 @@ size_t vdlog(const char *fmt, va_list args)
 		case '%': {
 			struct format_flags flags = {0};
 			int min_width = 0;
+			enum format_length length = length32;
+			uint64_t value;
 
 			fmt++;
 			fmt = parse_flags(fmt, &flags);
 			fmt = parse_min_width(fmt, args, &flags, &min_width);
+			fmt = parse_length_modifier(fmt, &length);
 
 			/* Handle the format specifier. */
 			switch (*fmt) {
@@ -321,57 +454,62 @@ size_t vdlog(const char *fmt, va_list args)
 
 			case 'd':
 			case 'i': {
-				int v = va_arg(args, int);
 				fmt++;
+				value = va_arg(args, uint64_t);
+				value = reinterpret_signed_int(length, value,
+							       &flags);
 
-				if (v < 0) {
-					flags.neg = true;
-					v = -v;
-				}
-
-				chars_written += print_int((size_t)v, base10,
+				chars_written += print_int(value, base10,
 							   min_width, flags);
 				break;
 			}
 
-			case 'X':
+			case 'o':
 				fmt++;
-				flags.upper = true;
-				chars_written +=
-					print_int(va_arg(args, size_t), base16,
-						  min_width, flags);
-				break;
+				value = va_arg(args, uint64_t);
+				value = reinterpret_unsigned_int(length, value);
 
-			case 'p':
-				fmt++;
-				min_width = sizeof(size_t) * 2 + 2;
-				flags.zero = true;
-				flags.alt = true;
-
-				chars_written +=
-					print_int(va_arg(args, uintptr_t),
-						  base16, min_width, flags);
+				chars_written += print_int(value, base8,
+							   min_width, flags);
 				break;
 
 			case 'x':
 				fmt++;
-				chars_written +=
-					print_int(va_arg(args, size_t), base16,
-						  min_width, flags);
+				value = va_arg(args, uint64_t);
+				value = reinterpret_unsigned_int(length, value);
+
+				chars_written += print_int(value, base16,
+							   min_width, flags);
+				break;
+
+			case 'X':
+				fmt++;
+				flags.upper = true;
+				value = va_arg(args, uint64_t);
+				value = reinterpret_unsigned_int(length, value);
+
+				chars_written += print_int(value, base16,
+							   min_width, flags);
 				break;
 
 			case 'u':
 				fmt++;
-				chars_written +=
-					print_int(va_arg(args, size_t), base10,
-						  min_width, flags);
+				value = va_arg(args, uint64_t);
+				value = reinterpret_unsigned_int(length, value);
+
+				chars_written += print_int(value, base10,
+							   min_width, flags);
 				break;
 
-			case 'o':
+			case 'p':
 				fmt++;
-				chars_written +=
-					print_int(va_arg(args, size_t), base8,
-						  min_width, flags);
+				value = va_arg(args, uint64_t);
+				min_width = sizeof(size_t) * 2 + 2;
+				flags.zero = true;
+				flags.alt = true;
+
+				chars_written += print_int(value, base16,
+							   min_width, flags);
 				break;
 
 			default:
