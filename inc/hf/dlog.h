@@ -28,7 +28,7 @@ extern size_t dlog_buffer_offset;
 extern char dlog_buffer[];
 
 void dlog_enable_lock(void);
-size_t dlog(const char *fmt, ...);
+__attribute__((format(printf, 1, 2))) size_t dlog(const char *fmt, ...);
 size_t vdlog(const char *fmt, va_list args);
 
 /*
