@@ -243,7 +243,6 @@ bool sync_current_exception(uintreg_t elr, uintreg_t spsr)
 {
 	uintreg_t esr = read_msr(esr_el2);
 	uintreg_t ec = GET_ESR_EC(esr);
-
 	(void)spsr;
 
 	switch (ec) {
@@ -281,6 +280,16 @@ bool sync_current_exception(uintreg_t elr, uintreg_t spsr)
 			}
 		}
 
+#if ENABLE_MTE
+		if (dfsc == DFSC_SYNC_TAG_CHECK_FAULT) {
+			dlog_error(
+				"Data abort due to synchronous tag check "
+				"fault: pc=%#lx, esr=%#lx, ec=%#lx, "
+				"far=%#lx, dfsc = %#lx\n",
+				elr, esr, ec, far, dfsc);
+		}
+		break;
+#endif
 		if (!GET_ESR_FNV(esr)) {
 			dlog_error(
 				"Data abort: pc=%#lx, esr=%#lx, ec=%#lx, "

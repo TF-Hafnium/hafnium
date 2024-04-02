@@ -120,6 +120,12 @@
 #define DFSC_GPF UINT64_C(0x28)
 
 /**
+ * Data Fault Status Code for Synchronous Tag Check Fault.
+ * Applies when FEAT_MTE2 is implemented.
+ */
+#define DFSC_SYNC_TAG_CHECK_FAULT UINT64_C(0x11)
+
+/**
  * ESR code for an Unknown Reason exception.
  */
 #define EC_UNKNOWN UINT64_C(0x0)
