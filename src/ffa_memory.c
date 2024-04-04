@@ -8,8 +8,7 @@
 
 #include "hf/ffa_memory.h"
 
-#include <stdint.h>
-
+#include "hf/arch/memcpy_trapped.h"
 #include "hf/arch/mm.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
@@ -3281,16 +3280,35 @@ static struct ffa_value ffa_partition_retrieve_request(
 	/*
 	 * Prepare the memory region descriptor for the retrieve response.
 	 * Provide the pointer to the receiver tracked in the share state
-	 * strucutures.
+	 * structures.
+	 * At this point the retrieve request descriptor from the partition
+	 * has been processed. The `retrieve_request` is expected to be in
+	 * a region that is handled by the SPMC/Hyp. Reuse the same buffer to
+	 * prepare the retrieve response before copying it to the RX buffer of
+	 * the caller.
 	 */
 	CHECK(ffa_retrieved_memory_region_init(
-		to_locked.vm->mailbox.recv, to_locked.vm->ffa_version,
-		HF_MAILBOX_SIZE, memory_region->sender, attributes,
-		memory_region->flags, handle, permissions, receiver, 1,
-		memory_access_desc_size, composite->page_count,
-		composite->constituent_count, share_state->fragments[0],
+		retrieve_request, to_locked.vm->ffa_version, HF_MAILBOX_SIZE,
+		memory_region->sender, attributes, memory_region->flags, handle,
+		permissions, receiver, 1, memory_access_desc_size,
+		composite->page_count, composite->constituent_count,
+		share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
 		&fragment_length));
+
+	/*
+	 * Copy the message from the buffer into the partition's mailbox.
+	 * The operation might fail unexpectedly due to change in PAS address
+	 * space, or improper values to the sizes of the structures.
+	 */
+	if (!memcpy_trapped(to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
+			    retrieve_request, fragment_length)) {
+		dlog_error(
+			"%s: aborted the copy of response to RX buffer of "
+			"%x.\n",
+			__func__, to_locked.vm->id);
+		return ffa_error(FFA_ABORTED);
+	}
 
 	if (is_retrieve_complete) {
 		ffa_memory_retrieve_complete(share_states, share_state,
@@ -3368,16 +3386,33 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 
 	receiver = ffa_memory_region_get_receiver(memory_region, 0);
 
+	/*
+	 * At this point the `retrieve_request` is expected to be in a section
+	 * managed by the hypervisor.
+	 */
 	CHECK(ffa_retrieved_memory_region_init(
-		to_locked.vm->mailbox.recv, to_locked.vm->ffa_version,
-		HF_MAILBOX_SIZE, memory_region->sender, attributes,
-		memory_region->flags, handle,
+		retrieve_request, to_locked.vm->ffa_version, HF_MAILBOX_SIZE,
+		memory_region->sender, attributes, memory_region->flags, handle,
 		receiver->receiver_permissions.permissions, receiver,
 		memory_region->receiver_count, memory_access_desc_size,
 		composite->page_count, composite->constituent_count,
 		share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
 		&fragment_length));
+
+	/*
+	 * Copy the message from the buffer into the hypervisor's mailbox.
+	 * The operation might fail unexpectedly due to change in PAS, or
+	 * improper values for the sizes of the structures.
+	 */
+	if (!memcpy_trapped(to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
+			    retrieve_request, fragment_length)) {
+		dlog_error(
+			"%s: aborted the copy of response to RX buffer of "
+			"%x.\n",
+			__func__, to_locked.vm->id);
+		return ffa_error(FFA_ABORTED);
+	}
 
 	return ffa_memory_retrieve_resp(total_length, fragment_length);
 }
