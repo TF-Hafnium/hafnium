@@ -3988,8 +3988,21 @@ struct ffa_value api_ffa_mem_frag_rx(ffa_memory_handle_t handle,
 		goto out;
 	}
 
-	ret = ffa_memory_retrieve_continue(to_locked, handle, fragment_offset,
-					   sender_vm_id, &api_page_pool);
+	/*
+	 * Whilst copying the fragments, initialize the remaining constituents
+	 * in the CPU's internal structure, and later copy from the CPU buffer
+	 * into the partition's RX buffer. In the case SPMC is doing a retrieve
+	 * request for a VM/Hypervisor in an RME enabled system, there is no
+	 * guarantee the RX buffer is in the NS PAS. Accessing the buffer with
+	 * the wrong security state attribute would then result in an GPF.
+	 * The fragment is initialized in an internal buffer, and is later
+	 * copied to the RX buffer using the 'memcpy_trapped' which allows to
+	 * smoothly terminate the operation if the access has been preempted by
+	 * a GPF exception.
+	 */
+	ret = ffa_memory_retrieve_continue(
+		to_locked, handle, fragment_offset, sender_vm_id,
+		cpu_get_buffer(current->cpu), &api_page_pool);
 out:
 	vm_unlock(&to_locked);
 	return ret;

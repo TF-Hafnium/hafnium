@@ -3653,6 +3653,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 					      ffa_memory_handle_t handle,
 					      uint32_t fragment_offset,
 					      ffa_id_t sender_vm_id,
+					      void *retrieve_continue_page,
 					      struct mpool *page_pool)
 {
 	struct ffa_memory_region *memory_region;
@@ -3694,7 +3695,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	/*
 	 * If retrieve request from the hypervisor has been initiated in the
 	 * given share_state, continue it, else assume it is a continuation of
-	 * retrieve request from a NWd VM.
+	 * retrieve request from a partition.
 	 */
 	continue_ffa_hyp_mem_retrieve_req =
 		(to_locked.vm->id == HF_HYPERVISOR_VM_ID) &&
@@ -3715,10 +3716,11 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 			goto out;
 		}
 
-		if (share_state->retrieved_fragment_count[receiver_index] ==
-			    0 ||
-		    share_state->retrieved_fragment_count[receiver_index] >=
-			    share_state->fragment_count) {
+		fragment_index =
+			share_state->retrieved_fragment_count[receiver_index];
+
+		if (fragment_index == 0 ||
+		    fragment_index >= share_state->fragment_count) {
 			dlog_verbose(
 				"Retrieval of memory with handle %#lx not yet "
 				"started or already completed (%d/%d fragments "
@@ -3730,13 +3732,11 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
 			goto out;
 		}
-
-		fragment_index =
-			share_state->retrieved_fragment_count[receiver_index];
 	} else {
-		if (share_state->hypervisor_fragment_count == 0 ||
-		    share_state->hypervisor_fragment_count >=
-			    share_state->fragment_count) {
+		fragment_index = share_state->hypervisor_fragment_count;
+
+		if (fragment_index == 0 ||
+		    fragment_index >= share_state->fragment_count) {
 			dlog_verbose(
 				"Retrieve of memory with handle %lx not "
 				"started from hypervisor.\n",
@@ -3753,8 +3753,6 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
 			goto out;
 		}
-
-		fragment_index = share_state->hypervisor_fragment_count;
 
 		receiver_index = 0;
 	}
@@ -3790,11 +3788,26 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	assert(plat_ffa_acquire_receiver_rx(to_locked, &ret));
 
 	remaining_constituent_count = ffa_memory_fragment_init(
-		to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
-		share_state->fragments[fragment_index],
+		(struct ffa_memory_region_constituent *)retrieve_continue_page,
+		HF_MAILBOX_SIZE, share_state->fragments[fragment_index],
 		share_state->fragment_constituent_counts[fragment_index],
 		&fragment_length);
 	CHECK(remaining_constituent_count == 0);
+
+	/*
+	 * Return FFA_ERROR(FFA_ABORTED) in case the access to the partition's
+	 * RX buffer results in a GPF exception. Could happen if the retrieve
+	 * request is for a VM or the Hypervisor retrieve request, if the PAS
+	 * has been changed externally.
+	 */
+	if (!memcpy_trapped(to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
+			    retrieve_continue_page, fragment_length)) {
+		dlog_error(
+			"%s: aborted copying fragment to RX buffer of %#x.\n",
+			__func__, to_locked.vm->id);
+		ret = ffa_error(FFA_ABORTED);
+		goto out;
+	}
 
 	to_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
 	to_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
