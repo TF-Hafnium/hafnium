@@ -1700,38 +1700,64 @@ out:
 	return ret;
 }
 
-static void api_get_rxtx_description(struct vm *current_vm, ipaddr_t *send,
-				     ipaddr_t *recv, uint32_t *page_count,
-				     ffa_id_t *owner_vm_id)
+/**
+ * Read the buffer addresses and VM ID of an FFA_RXTX_MAP request. Handles
+ * forwarded messages by reading from the hypervisor's TX buffer.
+ *
+ * Returns the VM/SP ID on success.
+ *
+ * Returns `HF_INVALID_VM_ID` when the arguments provided via the ABI
+ * FFA_RXTX_MAP indicate the SPMC should retrieve the RXTX description from the
+ * Hypervisor RXTX buffers, and the hypervisor hasn't given its own RXTX buffers
+ * for the SPMC to map.
+ */
+static ffa_id_t api_get_rxtx_description(struct vm *current_vm, ipaddr_t *send,
+					 ipaddr_t *recv, uint32_t *page_count)
 {
+	bool forwarded;
+	struct vm_locked vm_locked;
+	ffa_id_t owner_vm_id;
+	struct ffa_endpoint_rx_tx_descriptor *endpoint_desc;
+	struct ffa_composite_memory_region *rx_region;
+	struct ffa_composite_memory_region *tx_region;
+
 	/*
 	 * If the message has been forwarded the effective addresses are in
 	 * hypervisor's TX buffer.
 	 */
-	bool forwarded = (current_vm->id == HF_OTHER_WORLD_ID) &&
-			 (ipa_addr(*send) == 0) && (ipa_addr(*recv) == 0) &&
-			 (*page_count == 0);
+	forwarded = (current_vm->id == HF_OTHER_WORLD_ID) &&
+		    (ipa_addr(*send) == 0) && (ipa_addr(*recv) == 0) &&
+		    (*page_count == 0);
 
 	if (forwarded) {
-		struct vm_locked vm_locked = vm_lock(current_vm);
-		struct ffa_endpoint_rx_tx_descriptor *endpoint_desc =
-			(struct ffa_endpoint_rx_tx_descriptor *)
-				vm_locked.vm->mailbox.send;
-		struct ffa_composite_memory_region *rx_region =
-			ffa_enpoint_get_rx_memory_region(endpoint_desc);
-		struct ffa_composite_memory_region *tx_region =
-			ffa_enpoint_get_tx_memory_region(endpoint_desc);
+		vm_locked = vm_lock(current_vm);
+		endpoint_desc = (struct ffa_endpoint_rx_tx_descriptor *)
+					vm_locked.vm->mailbox.send;
 
-		*owner_vm_id = endpoint_desc->endpoint_id;
+		if (endpoint_desc == NULL) {
+			dlog_error(
+				"Trying to access RXTX description, but "
+				"hypervisor has not provided RXTX buffers\n");
+			vm_unlock(&vm_locked);
+			return HF_INVALID_VM_ID;
+		}
+
+		rx_region = ffa_endpoint_get_rx_memory_region(endpoint_desc);
+		tx_region = ffa_endpoint_get_tx_memory_region(endpoint_desc);
+
+		owner_vm_id = endpoint_desc->endpoint_id;
 		*recv = ipa_init(rx_region->constituents[0].address);
 		*send = ipa_init(tx_region->constituents[0].address);
 		*page_count = rx_region->constituents[0].page_count;
 
 		vm_unlock(&vm_locked);
 	} else {
-		*owner_vm_id = current_vm->id;
+		owner_vm_id = current_vm->id;
 	}
+
+	return owner_vm_id;
 }
+
 /**
  * Configures the VM to send/receive data through the specified pages. The pages
  * must not be shared. Locking of the page tables combined with a local memory
@@ -1761,8 +1787,11 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	 * Get the original buffer addresses and VM ID in case of forwarded
 	 * message.
 	 */
-	api_get_rxtx_description(current->vm, &send, &recv, &page_count,
-				 &owner_vm_id);
+	owner_vm_id = api_get_rxtx_description(current->vm, &send, &recv,
+					       &page_count);
+	if (owner_vm_id == HF_INVALID_VM_ID) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	owner_vm_locked = plat_ffa_vm_find_locked_create(owner_vm_id);
 	if (owner_vm_locked.vm == NULL) {

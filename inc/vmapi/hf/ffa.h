@@ -1380,14 +1380,14 @@ struct ffa_endpoint_rx_tx_descriptor {
 };
 
 static inline struct ffa_composite_memory_region *
-ffa_enpoint_get_rx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
+ffa_endpoint_get_rx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
 {
 	return (struct ffa_composite_memory_region *)((uintptr_t)desc +
 						      desc->rx_offset);
 }
 
 static inline struct ffa_composite_memory_region *
-ffa_enpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
+ffa_endpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
 {
 	return (struct ffa_composite_memory_region *)((uintptr_t)desc +
 						      desc->tx_offset);
