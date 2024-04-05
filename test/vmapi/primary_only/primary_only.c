@@ -176,12 +176,9 @@ TEAR_DOWN(ffa)
 /** Ensures that the Hafnium FF-A version is reported as expected. */
 TEST(ffa, ffa_version)
 {
-	const uint16_t major_revision = 1;
-	const uint16_t minor_revision = 2;
-	const uint32_t current_version =
-		(int32_t)MAKE_FFA_VERSION(major_revision, minor_revision);
-	const int32_t older_compatible_version_0 = MAKE_FFA_VERSION(1, 0);
-	const int32_t older_compatible_version_1 = MAKE_FFA_VERSION(1, 1);
+	const enum ffa_version current_version = FFA_VERSION_COMPILED;
+	const enum ffa_version older_compatible_version_0 = FFA_VERSION_1_0;
+	const enum ffa_version older_compatible_version_1 = FFA_VERSION_1_1;
 
 	EXPECT_EQ(ffa_version(current_version), current_version);
 	EXPECT_EQ(ffa_version(older_compatible_version_0), current_version);
@@ -287,8 +284,17 @@ TEST(ffa, ffa_features)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
-#if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
-TEST(ffa, ffa_v_1_1_features)
+static bool v1_1_or_later(void)
+{
+	return FFA_VERSION_COMPILED >= FFA_VERSION_1_1;
+}
+
+static bool v1_2_or_later(void)
+{
+	return FFA_VERSION_COMPILED >= FFA_VERSION_1_2;
+}
+
+TEST_PRECONDITION(ffa, ffa_v_1_1_features, v1_1_or_later)
 {
 	struct ffa_value ret;
 	ret = ffa_features(FFA_MEM_PERM_GET_32);
@@ -306,10 +312,8 @@ TEST(ffa, ffa_v_1_1_features)
 	ret = ffa_features(FFA_MSG_SEND2_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
-#endif
 
-#if (MAKE_FFA_VERSION(1, 2) <= FFA_VERSION_COMPILED)
-TEST(ffa, ffa_v_1_2_features)
+TEST_PRECONDITION(ffa, ffa_v_1_2_features, v1_2_or_later)
 {
 	struct ffa_value ret;
 
@@ -328,7 +332,6 @@ TEST(ffa, ffa_v_1_2_features)
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP2_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
-#endif
 
 /**
  * Ensures that FFA_FEATURES returns not supported for a bogus FID or

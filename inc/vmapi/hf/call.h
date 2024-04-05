@@ -446,10 +446,12 @@ static inline int64_t hf_interrupt_reconfigure_target_cpu(
 }
 
 /** Obtains the Hafnium's version of the implemented FF-A specification. */
-static inline uint32_t ffa_version(uint32_t requested_version)
+static inline enum ffa_version ffa_version(enum ffa_version requested_version)
 {
-	return ffa_call((struct ffa_value){.func = FFA_VERSION_32,
-					   .arg1 = requested_version})
+	return ffa_call((struct ffa_value){
+				.func = FFA_VERSION_32,
+				.arg1 = (uint32_t)requested_version,
+			})
 		.func;
 }
 

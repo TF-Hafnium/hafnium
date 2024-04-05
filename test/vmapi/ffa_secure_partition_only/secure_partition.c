@@ -40,7 +40,6 @@ TEST(hf_vm_get_id, secure_partition_id)
 TEST(ffa_features, succeeds_ffa_call_ids)
 {
 	struct ffa_value ret;
-	struct ffa_features_rxtx_map_params rxtx_map_params;
 
 	ret = ffa_features(FFA_ERROR_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -138,8 +137,22 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 
 	ret = ffa_features(FFA_NOTIFICATION_INFO_GET_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
 
-#if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
+static bool v1_1_or_later(void)
+{
+	return FFA_VERSION_COMPILED >= FFA_VERSION_1_1;
+}
+
+static bool v1_2_or_later(void)
+{
+	return FFA_VERSION_COMPILED >= FFA_VERSION_1_2;
+}
+
+TEST_PRECONDITION(ffa_features, succeeds_ffa_call_ids_v1_1, v1_1_or_later)
+{
+	struct ffa_value ret;
+
 	ret = ffa_features(FFA_MEM_PERM_GET_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
@@ -154,8 +167,13 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 
 	ret = ffa_features(FFA_MSG_SEND2_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-#endif
-#if (MAKE_FFA_VERSION(1, 2) <= FFA_VERSION_COMPILED)
+}
+
+TEST_PRECONDITION(ffa_features, succeeds_ffa_call_ids_v1_2, v1_2_or_later)
+{
+	struct ffa_value ret;
+	struct ffa_features_rxtx_map_params rxtx_map_params;
+
 	ret = ffa_features(FFA_CONSOLE_LOG_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
@@ -179,7 +197,6 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	EXPECT_EQ((uint16_t)rxtx_map_params.mbz, 0);
 	EXPECT_EQ((uint16_t)rxtx_map_params.max_buf_size,
 		  FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT);
-#endif
 }
 
 /** Validates return for FFA_FEATURES provided a valid feature ID. */
@@ -211,7 +228,7 @@ TEST(ffa_features, fails_if_feature_id_wrong)
  */
 TEST(ffa_features, fails_if_parameter_wrong_and_v_1_1)
 {
-	ffa_version(MAKE_FFA_VERSION(1, 1));
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
 
 	EXPECT_FFA_ERROR(
 		ffa_features_with_input_property(FFA_MEM_RETRIEVE_REQ_32, 0),
@@ -222,7 +239,7 @@ TEST(ffa_features, does_not_fail_if_parameter_wrong_and_v_1_0)
 {
 	struct ffa_value ret;
 
-	ffa_version(MAKE_FFA_VERSION(1, 0));
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_COMPILED);
 
 	ret = ffa_features_with_input_property(FFA_MEM_RETRIEVE_REQ_32, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -442,7 +459,7 @@ TEST(ffa_boot_info, parse_fdt)
 	EXPECT_TRUE(fdt_is_compatible(&root, "arm,ffa-manifest-1.0"));
 	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &ffa_version));
 	HFTEST_LOG("FF-A Version: %lx", ffa_version);
-	ASSERT_EQ(ffa_version, MAKE_FFA_VERSION(1, 2));
+	ASSERT_EQ(ffa_version, FFA_VERSION_1_2);
 }
 
 /*
@@ -1017,7 +1034,7 @@ TEST(ffa, ffa_partition_info_v1_0)
 	 * Set ffa_version to v1.0 and test the correct descriptor is
 	 * returned
 	 */
-	ffa_version(MAKE_FFA_VERSION(1, 0));
+	ffa_version(FFA_VERSION_1_0);
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	/* There should only be the primary VM in this test. */

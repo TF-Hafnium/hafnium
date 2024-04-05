@@ -202,7 +202,7 @@ struct smc_whitelist {
 struct vm {
 	ffa_id_t id;
 	struct ffa_uuid uuids[PARTITION_MAX_UUIDS];
-	uint32_t ffa_version;
+	enum ffa_version ffa_version;
 	struct smc_whitelist smc_whitelist;
 
 	/** See api.c for the partial ordering on locks. */

@@ -188,13 +188,13 @@ TEST(ffa, ffa_partition_info_get_v1_0_descriptors)
 	struct ffa_value ret;
 	const struct ffa_partition_info_v1_0 *partitions_v1_0;
 	struct ffa_uuid uuid;
-	uint32_t version;
+	enum ffa_version version;
 
 	/*
 	 * First call FF-A version to tell the SPMC our version
 	 * is v1.0.
 	 */
-	version = ffa_version(MAKE_FFA_VERSION(1, 0));
+	version = ffa_version(FFA_VERSION_1_0);
 	EXPECT_EQ(version, FFA_VERSION_COMPILED);
 
 	/* Setup the mailbox (which holds the RX buffer). */

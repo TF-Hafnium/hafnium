@@ -422,7 +422,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 	uint32_t vm_count)
 {
 	struct vm *vm = vm_locked.vm;
-	uint32_t version = vm->ffa_version;
+	enum ffa_version version = vm->ffa_version;
 	uint32_t partition_info_size;
 	uint32_t buffer_size;
 	struct ffa_value ret;
@@ -442,7 +442,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		return ffa_error(FFA_BUSY);
 	}
 
-	if (version == MAKE_FFA_VERSION(1, 0)) {
+	if (version == FFA_VERSION_1_0) {
 		struct ffa_partition_info_v1_0 *recv_mailbox = vm->mailbox.recv;
 
 		partition_info_size = sizeof(struct ffa_partition_info_v1_0);
@@ -930,16 +930,16 @@ struct ffa_value api_ffa_id_get(const struct vcpu *current)
  */
 struct ffa_value api_ffa_spm_id_get(void)
 {
-#if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
-	/*
-	 * Return the SPMC ID that was fetched during FF-A
-	 * initialization.
-	 */
-	return (struct ffa_value){.func = FFA_SUCCESS_32,
-				  .arg2 = arch_ffa_spmc_id_get()};
-#else
+	if (FFA_VERSION_1_1 <= FFA_VERSION_COMPILED) {
+		/*
+		 * Return the SPMC ID that was fetched during FF-A
+		 * initialization.
+		 */
+		return (struct ffa_value){.func = FFA_SUCCESS_32,
+					  .arg2 = arch_ffa_spmc_id_get()};
+	}
+
 	return ffa_error(FFA_NOT_SUPPORTED);
-#endif
 }
 
 /**
@@ -1125,7 +1125,7 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (current->vm->ffa_version >= MAKE_FFA_VERSION(1, 2) &&
+	if (current->vm->ffa_version >= FFA_VERSION_1_2 &&
 	    !api_extended_args_are_zero(args)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -2441,26 +2441,23 @@ int64_t api_interrupt_inject(ffa_id_t target_vm_id,
 
 /** Returns the version of the implemented FF-A specification. */
 struct ffa_value api_ffa_version(struct vcpu *current,
-				 uint32_t requested_version)
+				 enum ffa_version requested_version)
 {
+	static_assert(sizeof(enum ffa_version) == 4,
+		      "enum ffa_version must be 4 bytes wide");
+
 	struct vm_locked current_vm_locked;
 
-	/*
-	 * Ensure that both major and minor revision representation occupies at
-	 * most 15 bits.
-	 */
-	static_assert(0x8000 > FFA_VERSION_MAJOR,
-		      "Major revision representation takes more than 15 bits.");
-	static_assert(0x10000 > FFA_VERSION_MINOR,
-		      "Minor revision representation takes more than 16 bits.");
-	if (requested_version & FFA_VERSION_RESERVED_BIT) {
-		/* Invalid encoding, return an error. */
+	if (!ffa_version_is_valid(requested_version)) {
+		dlog_error(
+			"FFA_VERSION: requested version %#x is invalid "
+			"(highest bit must be zero)\n",
+			requested_version);
 		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
 	}
 
-	if ((requested_version >> FFA_VERSION_MAJOR_OFFSET) !=
-		    FFA_VERSION_MAJOR ||
-	    requested_version > FFA_VERSION_COMPILED) {
+	if (!ffa_versions_are_compatible(requested_version,
+					 FFA_VERSION_COMPILED)) {
 		dlog_verbose("Version %x incompatible with %x\n",
 			     requested_version, FFA_VERSION_COMPILED);
 		return (struct ffa_value){.func = (uint32_t)FFA_NOT_SUPPORTED};
@@ -2500,7 +2497,7 @@ struct ffa_value api_ffa_feature_success(uint32_t arg2)
 struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 				  uint32_t input_property, struct vcpu *current)
 {
-	const uint32_t ffa_version = current->vm->ffa_version;
+	const enum ffa_version ffa_version = current->vm->ffa_version;
 	const bool el0_partition = current->vm->el0_partition;
 	const bool is_feature =
 		IS_BIT_UNSET(function_or_feature_id, FFA_FEATURES_FEATURE_BIT);
@@ -2554,7 +2551,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
-#if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
+
 	/* FF-A v1.1 features. */
 	case FFA_SPM_ID_GET_32:
 	case FFA_NOTIFICATION_BITMAP_CREATE_32:
@@ -2569,24 +2566,33 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 	case FFA_MEM_PERM_GET_64:
 	case FFA_MEM_PERM_SET_64:
 	case FFA_MSG_SEND2_32:
-#endif
-#if (MAKE_FFA_VERSION(1, 2) <= FFA_VERSION_COMPILED)
+		if (FFA_VERSION_1_1 > FFA_VERSION_COMPILED) {
+			return arch_ffa_features(function_or_feature_id);
+		}
+
 	/* FF-A v1.2 features. */
 	case FFA_CONSOLE_LOG_32:
 	case FFA_CONSOLE_LOG_64:
 	case FFA_PARTITION_INFO_GET_REGS_64:
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
-#endif
+		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
+			return arch_ffa_features(function_or_feature_id);
+		}
+
 		return api_ffa_feature_success(0);
 
 	case FFA_RXTX_MAP_64: {
+		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
+			return arch_ffa_features(function_or_feature_id);
+		}
+
 		uint32_t arg2 = 0;
 		struct ffa_features_rxtx_map_params params = {
 			.min_buf_size = FFA_RXTX_MAP_MIN_BUF_4K,
 			.mbz = 0,
 			.max_buf_size =
-				(ffa_version >= MAKE_FFA_VERSION(1, 2))
+				(ffa_version >= FFA_VERSION_1_2)
 					? FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT
 					: 0,
 		};
@@ -2597,6 +2603,10 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 
 	case FFA_MEM_RETRIEVE_REQ_64:
 	case FFA_MEM_RETRIEVE_REQ_32: {
+		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
+			return arch_ffa_features(function_or_feature_id);
+		}
+
 		if (ANY_BITS_SET(input_property,
 				 FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_HI_BIT,
 				 FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_LO_BIT) ||
@@ -2612,8 +2622,9 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 				input_property);
 		}
 
-		if (ffa_version >= MAKE_FFA_VERSION(1, 1) &&
-		    IS_BIT_UNSET(input_property, FFA_FEATURES_NS_SUPPORT_BIT)) {
+		if (ffa_version >= FFA_VERSION_1_1 &&
+		    (input_property &
+		     FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT) == 0U) {
 			dlog_error("FFA_FEATURES: NS bit support must be 1\n");
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
@@ -2624,7 +2635,6 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 			FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT);
 	}
 
-#if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
 	/* Check support of a feature provided respective feature ID. */
 
 	/*
@@ -2632,6 +2642,10 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 	 * the virtual FF-A instances.
 	 */
 	case FFA_FEATURE_NPI:
+		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
+			return arch_ffa_features(function_or_feature_id);
+		}
+
 		if (el0_partition) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
@@ -2641,17 +2655,25 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 		return api_ffa_feature_success(HF_NOTIFICATION_PENDING_INTID);
 
 	case FFA_FEATURE_MEI:
+		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
+			return arch_ffa_features(function_or_feature_id);
+		}
+
 		if (!vm_id_is_current_world(current->vm->id)) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 		return api_ffa_feature_success(HF_MANAGED_EXIT_INTID);
 
 	case FFA_FEATURE_SRI:
+		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
+			return arch_ffa_features(function_or_feature_id);
+		}
+
 		if (!ffa_is_vm_id(current->vm->id)) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 		return api_ffa_feature_success(HF_SCHEDULE_RECEIVER_INTID);
-#endif
+
 	/* Platform specific feature support. */
 	default:
 		return arch_ffa_features(function_or_feature_id);
@@ -3007,7 +3029,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
-		if (current->vm->ffa_version >= MAKE_FFA_VERSION(1, 2) &&
+		if (current->vm->ffa_version >= FFA_VERSION_1_2 &&
 		    !api_extended_args_are_zero(&args)) {
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
@@ -3198,7 +3220,7 @@ static void api_ffa_memory_region_v1_1_from_v1_0(
  */
 static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	void *allocated, uint32_t *fragment_length, uint32_t *total_length,
-	uint32_t ffa_version, bool send_transaction)
+	enum ffa_version ffa_version, bool send_transaction)
 {
 	struct ffa_memory_region_v1_0 *memory_region_v1_0;
 	struct ffa_memory_region *memory_region_v1_1 = NULL;
@@ -3215,11 +3237,11 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	assert(fragment_length != NULL);
 	assert(total_length != NULL);
 
-	if (ffa_version >= MAKE_FFA_VERSION(1, 1)) {
+	if (ffa_version >= FFA_VERSION_1_1) {
 		return (struct ffa_value){.func = FFA_SUCCESS_32};
 	}
 
-	if (ffa_version != MAKE_FFA_VERSION(1, 0)) {
+	if (ffa_version != FFA_VERSION_1_0) {
 		dlog_verbose("%s: Unsupported FF-A version %x\n", __func__,
 			     ffa_version);
 		return ffa_error(FFA_NOT_SUPPORTED);
@@ -3362,7 +3384,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	struct ffa_memory_region *memory_region = NULL;
 	struct ffa_value ret;
 	bool targets_other_world = false;
-	uint32_t ffa_version;
+	enum ffa_version ffa_version;
 
 	if (ipa_addr(address) != 0 || page_count != 0) {
 		/*
@@ -3534,7 +3556,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	struct ffa_memory_region *retrieve_request = NULL;
 	uint32_t message_buffer_size;
 	struct ffa_value ret;
-	uint32_t ffa_version;
+	enum ffa_version ffa_version;
 
 	if (ipa_addr(address) != 0 || page_count != 0) {
 		/*
@@ -4552,7 +4574,7 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 {
 	/* Maximum number of characters is 128: 16 registers of 8 bytes each. */
 	char chars[128] = {0};
-	const bool v1_2 = current->vm->ffa_version >= MAKE_FFA_VERSION(1, 2);
+	const bool v1_2 = current->vm->ffa_version >= FFA_VERSION_1_2;
 	const bool log32 = args.func == FFA_CONSOLE_LOG_32;
 
 	/*

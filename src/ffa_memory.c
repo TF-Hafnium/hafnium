@@ -308,7 +308,7 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 		/* The impdef field is only present from v1.2 and later */
 		if (ffa_version_from_memory_access_desc_size(
 			    memory_region->memory_access_desc_size) >=
-		    MAKE_FFA_VERSION(1, 2)) {
+		    FFA_VERSION_1_2) {
 			dlog(", impdef: %#lx %#lx", receiver->impdef.val[0],
 			     receiver->impdef.val[1]);
 		}
@@ -474,7 +474,7 @@ static struct ffa_value constituents_get_mode(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-uint32_t ffa_version_from_memory_access_desc_size(
+enum ffa_version ffa_version_from_memory_access_desc_size(
 	uint32_t memory_access_desc_size)
 {
 	switch (memory_access_desc_size) {
@@ -484,9 +484,9 @@ uint32_t ffa_version_from_memory_access_desc_size(
 	 * size field so return v1.1.
 	 */
 	case sizeof(struct ffa_memory_access_v1_0):
-		return MAKE_FFA_VERSION(1, 1);
+		return FFA_VERSION_1_1;
 	case sizeof(struct ffa_memory_access):
-		return MAKE_FFA_VERSION(1, 2);
+		return FFA_VERSION_1_2;
 	}
 	return 0;
 }
@@ -497,15 +497,15 @@ uint32_t ffa_version_from_memory_access_desc_size(
  */
 static bool receiver_size_and_offset_valid_for_version(
 	uint32_t receivers_size, uint32_t receivers_offset,
-	uint32_t ffa_version)
+	enum ffa_version ffa_version)
 {
 	/*
 	 * Check that the version that the memory access descriptor size belongs
 	 * to is compatible with the FF-A version we believe the sender to be.
 	 */
-	uint32_t expected_ffa_version =
+	enum ffa_version expected_ffa_version =
 		ffa_version_from_memory_access_desc_size(receivers_size);
-	if (!FFA_VERSIONS_ARE_COMPATIBLE(expected_ffa_version, ffa_version)) {
+	if (!ffa_versions_are_compatible(expected_ffa_version, ffa_version)) {
 		return false;
 	}
 
@@ -514,8 +514,8 @@ static bool receiver_size_and_offset_valid_for_version(
 	 * memory access descriptor size.
 	 */
 	switch (expected_ffa_version) {
-	case MAKE_FFA_VERSION(1, 1):
-	case MAKE_FFA_VERSION(1, 2):
+	case FFA_VERSION_1_1:
+	case FFA_VERSION_1_2:
 		return receivers_offset == sizeof(struct ffa_memory_region);
 	default:
 		return false;
@@ -528,7 +528,7 @@ static bool receiver_size_and_offset_valid_for_version(
  * and reserved fields are 0.
  */
 bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
-				    uint32_t ffa_version,
+				    enum ffa_version ffa_version,
 				    uint32_t fragment_length,
 				    bool send_transaction)
 {
@@ -538,7 +538,7 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 	struct ffa_memory_region_v1_0 *memory_region_v1_0 =
 		(struct ffa_memory_region_v1_0 *)memory_region;
 
-	if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
+	if (ffa_version == FFA_VERSION_1_0) {
 		/* Check the reserved fields are 0. */
 		if (memory_region_v1_0->reserved_0 != 0 ||
 		    memory_region_v1_0->reserved_1 != 0) {
@@ -591,7 +591,7 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 	 * The composite offset values must be the same for all recievers so
 	 * check the first one is valid and then they are all the same.
 	 */
-	receiver = ffa_version == MAKE_FFA_VERSION(1, 0)
+	receiver = ffa_version == FFA_VERSION_1_0
 			   ? (struct ffa_memory_access *)&memory_region_v1_0
 				     ->receivers[0]
 			   : ffa_memory_region_get_receiver(memory_region, 0);
@@ -632,7 +632,7 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 	for (size_t i = 0; i < memory_region->receiver_count; i++) {
 		uint32_t composite_offset;
 
-		if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
+		if (ffa_version == FFA_VERSION_1_0) {
 			struct ffa_memory_access_v1_0 *receiver_v1_0 =
 				&memory_region_v1_0->receivers[i];
 			/* Check reserved fields are 0 */
@@ -2477,7 +2477,7 @@ static void ffa_memory_retrieve_complete(
  * the first fragment.
  */
 static bool ffa_retrieved_memory_region_init(
-	void *response, uint32_t ffa_version, size_t response_max_size,
+	void *response, enum ffa_version ffa_version, size_t response_max_size,
 	ffa_id_t sender, ffa_memory_attributes_t attributes,
 	ffa_memory_region_flags_t flags, ffa_memory_handle_t handle,
 	ffa_memory_access_permissions_t permissions,
@@ -2495,7 +2495,7 @@ static bool ffa_retrieved_memory_region_init(
 
 	assert(response != NULL);
 
-	if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
+	if (ffa_version == FFA_VERSION_1_0) {
 		struct ffa_memory_region_v1_0 *retrieve_response =
 			(struct ffa_memory_region_v1_0 *)response;
 		struct ffa_memory_access_v1_0 *receiver;
@@ -2896,10 +2896,10 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 		 */
 		if (ffa_version_from_memory_access_desc_size(
 			    memory_region->memory_access_desc_size) >=
-			    MAKE_FFA_VERSION(1, 2) &&
+			    FFA_VERSION_1_2 &&
 		    ffa_version_from_memory_access_desc_size(
 			    retrieve_request->memory_access_desc_size) >=
-			    MAKE_FFA_VERSION(1, 2)) {
+			    FFA_VERSION_1_2) {
 			if (receiver->impdef.val[0] !=
 				    retrieve_request_receiver->impdef.val[0] ||
 			    receiver->impdef.val[1] !=
@@ -3309,11 +3309,11 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 	assert(to_locked.vm->id == HF_HYPERVISOR_VM_ID);
 
 	switch (to_locked.vm->ffa_version) {
-	case MAKE_FFA_VERSION(1, 2):
+	case FFA_VERSION_1_2:
 		memory_access_desc_size = sizeof(struct ffa_memory_access);
 		break;
-	case MAKE_FFA_VERSION(1, 0):
-	case MAKE_FFA_VERSION(1, 1):
+	case FFA_VERSION_1_0:
+	case FFA_VERSION_1_1:
 		memory_access_desc_size = sizeof(struct ffa_memory_access_v1_0);
 		break;
 	default:
@@ -3420,19 +3420,19 @@ out:
  */
 static uint32_t ffa_memory_retrieve_expected_offset_per_ffa_version(
 	struct ffa_memory_region *memory_region,
-	uint32_t retrieved_constituents_count, uint32_t ffa_version)
+	uint32_t retrieved_constituents_count, enum ffa_version ffa_version)
 {
 	uint32_t expected_fragment_offset;
 	uint32_t composite_constituents_offset;
 
-	if (ffa_version >= MAKE_FFA_VERSION(1, 1)) {
+	if (ffa_version >= FFA_VERSION_1_1) {
 		/*
 		 * Hafnium operates memory regions in FF-A v1.1 format, so we
 		 * can retrieve the constituents offset from descriptor.
 		 */
 		composite_constituents_offset =
 			ffa_composite_constituent_offset(memory_region, 0);
-	} else if (ffa_version == MAKE_FFA_VERSION(1, 0)) {
+	} else if (ffa_version == FFA_VERSION_1_0) {
 		/*
 		 * If retriever is FF-A v1.0, determine the composite offset
 		 * as it is expected to have been configured in the

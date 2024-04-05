@@ -30,7 +30,7 @@ static bool ffa_tee_enabled;
 
 bool vm_supports_indirect_messages(struct vm *vm)
 {
-	return vm->ffa_version >= MAKE_FFA_VERSION(1, 1) &&
+	return vm->ffa_version >= FFA_VERSION_1_1 &&
 	       vm_supports_messaging_method(vm, FFA_PARTITION_INDIRECT_MSG);
 }
 

@@ -105,7 +105,7 @@ TEST(ffa_partition_info_get, get_v1_0_descriptor)
 	struct ffa_uuid uuid;
 
 	/* Set ffa_version to v1.0. */
-	ffa_version(MAKE_FFA_VERSION(1, 0));
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_COMPILED);
 
 	/* A Null UUID requests information for all partitions. */
 	ffa_uuid_init(0, 0, 0, 0, &uuid);

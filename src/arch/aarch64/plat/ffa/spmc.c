@@ -179,24 +179,17 @@ void plat_ffa_log_init(void)
 /** Returns information on features specific to the SWd. */
 struct ffa_value plat_ffa_features(uint32_t function_feature_id)
 {
-	struct ffa_value ret;
-
-	switch (function_feature_id) {
-#if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
-	case FFA_SECONDARY_EP_REGISTER_64:
-		ret = (struct ffa_value){.func = FFA_SUCCESS_32};
-		break;
-	case FFA_FEATURE_MEI:
-		ret = api_ffa_feature_success(HF_MANAGED_EXIT_INTID);
-		break;
-#endif
-	default:
-		ret = ffa_error(FFA_NOT_SUPPORTED);
-		break;
+	if (FFA_VERSION_1_1 <= FFA_VERSION_COMPILED) {
+		switch (function_feature_id) {
+		case FFA_SECONDARY_EP_REGISTER_64:
+			return (struct ffa_value){.func = FFA_SUCCESS_32};
+		case FFA_FEATURE_MEI:
+			return api_ffa_feature_success(HF_MANAGED_EXIT_INTID);
+		}
 	}
 
 	/* There are no features only supported in the SWd */
-	return ret;
+	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
 struct ffa_value plat_ffa_spmc_id_get(void)
@@ -578,12 +571,12 @@ bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
 {
 	uint16_t sender_method;
 	uint16_t receiver_method;
-	uint32_t sender_ffa_version = sender_vm->ffa_version;
-	uint32_t receiver_ffa_version = receiver_vm->ffa_version;
+	enum ffa_version sender_ffa_version = sender_vm->ffa_version;
+	enum ffa_version receiver_ffa_version = receiver_vm->ffa_version;
 
 	/* Check if version supports messaging function. */
-	if ((func == FFA_MSG_SEND_DIRECT_REQ2_64) &&
-	    (sender_ffa_version < MAKE_FFA_VERSION(1, 2))) {
+	if (func == FFA_MSG_SEND_DIRECT_REQ2_64 &&
+	    sender_ffa_version < FFA_VERSION_1_2) {
 		dlog_verbose(
 			"Sender version does not allow usage of func id "
 			"0x%x.\n",
@@ -591,8 +584,8 @@ bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
 		return false;
 	}
 
-	if ((func == FFA_MSG_SEND_DIRECT_REQ2_64) &&
-	    (receiver_ffa_version < MAKE_FFA_VERSION(1, 2))) {
+	if (func == FFA_MSG_SEND_DIRECT_REQ2_64 &&
+	    receiver_ffa_version < FFA_VERSION_1_2) {
 		dlog_verbose(
 			"Receiver version does not allow usage of func id "
 			"0x%x.\n",

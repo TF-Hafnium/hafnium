@@ -17,7 +17,7 @@ bool is_ffa_hypervisor_retrieve_request(struct ffa_memory_region *request,
 					struct vm_locked to_locked);
 
 bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
-				    uint32_t ffa_version,
+				    enum ffa_version ffa_version,
 				    uint32_t fragment_length,
 				    bool send_transaction);
 

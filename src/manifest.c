@@ -21,6 +21,7 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/fdt.h"
+#include "hf/ffa.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/sp_pkg.h"
@@ -1029,8 +1030,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 static enum manifest_return_code sanity_check_ffa_manifest(
 	struct manifest_vm *vm)
 {
-	uint16_t ffa_version_major;
-	uint16_t ffa_version_minor;
+	enum ffa_version ffa_version;
 	enum manifest_return_code ret_code = MANIFEST_SUCCESS;
 	const char *error_string = "specified in manifest is unsupported";
 	uint32_t k = 0;
@@ -1039,14 +1039,11 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 			    FFA_PARTITION_DIRECT_REQ2_SEND)) != 0;
 
 	/* ensure that the SPM version is compatible */
-	ffa_version_major = (vm->partition.ffa_version & 0xffff0000) >>
-			    FFA_VERSION_MAJOR_OFFSET;
-	ffa_version_minor = vm->partition.ffa_version & 0xffff;
-
-	if (ffa_version_major != FFA_VERSION_MAJOR ||
-	    ffa_version_minor > FFA_VERSION_MINOR) {
+	ffa_version = vm->partition.ffa_version;
+	if (!ffa_versions_are_compatible(ffa_version, FFA_VERSION_COMPILED)) {
 		dlog_error("FF-A partition manifest version %s: %u.%u\n",
-			   error_string, ffa_version_major, ffa_version_minor);
+			   error_string, ffa_version_get_major(ffa_version),
+			   ffa_version_get_minor(ffa_version));
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
@@ -1071,7 +1068,7 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if (vm->partition.ffa_version < MAKE_FFA_VERSION(1, 2) && using_req2) {
+	if (vm->partition.ffa_version < FFA_VERSION_1_2 && using_req2) {
 		dlog_error("Messaging method %s: %x\n", error_string,
 			   vm->partition.messaging_method);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
@@ -1239,8 +1236,8 @@ enum manifest_return_code parse_ffa_manifest(
 
 	TRY(read_uint32(&root, "ffa-version", &vm->partition.ffa_version));
 	dlog_verbose("  Expected FF-A version %u.%u\n",
-		     vm->partition.ffa_version >> 16,
-		     vm->partition.ffa_version & 0xffff);
+		     ffa_version_get_major(vm->partition.ffa_version),
+		     ffa_version_get_minor(vm->partition.ffa_version));
 
 	TRY(read_uint16(&root, "execution-ctx-count",
 			&vm->partition.execution_ctx_count));

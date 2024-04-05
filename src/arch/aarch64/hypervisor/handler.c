@@ -653,7 +653,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		 * runtime state of the calling partition by setting
 		 * the extended registers (x8-x17) to zero.
 		 */
-		if (current->vm->ffa_version >= MAKE_FFA_VERSION(1, 2) &&
+		if (current->vm->ffa_version >= FFA_VERSION_1_2 &&
 		    !api_extended_args_are_zero(args)) {
 			*args = ffa_error(FFA_INVALID_PARAMETERS);
 			return false;

@@ -10,29 +10,61 @@
 
 #include "hf/types.h"
 
-#define FFA_VERSION_MAJOR 0x1
-#define FFA_VERSION_MAJOR_OFFSET 16
-#define FFA_VERSION_MAJOR_MASK 0x7FFF
-#define FFA_VERSION_MINOR 0x2
-#define FFA_VERSION_MINOR_OFFSET 0
-#define FFA_VERSION_MINOR_MASK 0xFFFF
+/**
+ * The version number of a Firmware Framework implementation is a 31-bit
+ * unsigned integer, with the upper 15 bits denoting the major revision,
+ * and the lower 16 bits denoting the minor revision.
+ *
+ * See FF-A specification v1.2 ALP1, section 13.2.1.
+ */
+enum ffa_version {
+	FFA_VERSION_1_0 = 0x10000,
+	FFA_VERSION_1_1 = 0x10001,
+	FFA_VERSION_1_2 = 0x10002,
+	FFA_VERSION_COMPILED = FFA_VERSION_1_2,
+};
 
-#define MAKE_FFA_VERSION(major, minor)                                    \
-	((((major)&FFA_VERSION_MAJOR_MASK) << FFA_VERSION_MAJOR_OFFSET) | \
-	 (((minor)&FFA_VERSION_MINOR_MASK) << FFA_VERSION_MINOR_OFFSET))
-#define FFA_VERSION_COMPILED \
-	MAKE_FFA_VERSION(FFA_VERSION_MAJOR, FFA_VERSION_MINOR)
+#define FFA_VERSION_MBZ_BIT (1U << 31U)
+#define FFA_VERSION_MAJOR_SHIFT (16U)
+#define FFA_VERSION_MAJOR_MASK (0x7FFFU)
+#define FFA_VERSION_MINOR_SHIFT (0U)
+#define FFA_VERSION_MINOR_MASK (0xFFFFU)
+
+/** Return true if the version is valid (i.e. bit 31 is 0). */
+static inline bool ffa_version_is_valid(uint32_t version)
+{
+	return (version & FFA_VERSION_MBZ_BIT) == 0;
+}
+
+/** Construct a version from a pair of major and minor components. */
+static inline enum ffa_version make_ffa_version(uint16_t major, uint16_t minor)
+{
+	return (enum ffa_version)((major << FFA_VERSION_MAJOR_SHIFT) |
+				  (minor << FFA_VERSION_MINOR_SHIFT));
+}
+
+/** Get the major component of the version. */
+static inline uint16_t ffa_version_get_major(enum ffa_version version)
+{
+	return (version >> FFA_VERSION_MAJOR_SHIFT) & FFA_VERSION_MAJOR_MASK;
+}
+
+/** Get the minor component of the version. */
+static inline uint16_t ffa_version_get_minor(enum ffa_version version)
+{
+	return (version >> FFA_VERSION_MINOR_SHIFT) & FFA_VERSION_MINOR_MASK;
+}
 
 /**
  * Check major versions are equal and the minor version of the caller is
  * less than or equal to the minor version of the callee.
  */
-#define FFA_VERSIONS_ARE_COMPATIBLE(v_caller, v_callee)                        \
-	((((v_caller >> FFA_VERSION_MAJOR_OFFSET) & FFA_VERSION_MAJOR_MASK) == \
-	  ((v_callee >> FFA_VERSION_MAJOR_OFFSET) &                            \
-	   FFA_VERSION_MAJOR_MASK)) &&                                         \
-	 (((v_caller >> FFA_VERSION_MINOR_OFFSET) & FFA_VERSION_MINOR_MASK) <= \
-	  ((v_callee >> FFA_VERSION_MINOR_OFFSET) & FFA_VERSION_MINOR_MASK)))
+static inline bool ffa_versions_are_compatible(enum ffa_version caller,
+					       enum ffa_version callee)
+{
+	return ffa_version_get_major(caller) == ffa_version_get_major(callee) &&
+	       ffa_version_get_minor(caller) <= ffa_version_get_minor(callee);
+}
 
 /* clang-format off */
 
@@ -1241,14 +1273,7 @@ struct ffa_mem_relinquish {
  * Returns the first FF-A version that matches the memory access descriptor
  * size.
  */
-uint32_t ffa_version_from_memory_access_desc_size(
-	uint32_t memory_access_desc_size);
-
-/**
- * Returns the first FF-A version that matches the memory access descriptor
- * size.
- */
-uint32_t ffa_version_from_memory_access_desc_size(
+enum ffa_version ffa_version_from_memory_access_desc_size(
 	uint32_t memory_access_desc_size);
 
 /**

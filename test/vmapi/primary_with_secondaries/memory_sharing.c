@@ -2755,7 +2755,7 @@ TEST(memory_sharing, ffa_validate_memory_access_reserved_mbz)
 	}
 
 	/* Run test for v1.0 mem access descriptors. */
-	EXPECT_NE(ffa_version(MAKE_FFA_VERSION(1, 0)), FFA_ERROR_32);
+	EXPECT_NE(ffa_version(FFA_VERSION_1_0), FFA_ERROR_32);
 
 	ffa_memory_access_init_v1_0(&receiver_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
@@ -3846,7 +3846,7 @@ TEST(memory_sharing, share_ffa_v1_0_to_current_version)
 		&msg_size);
 
 	/* Set current version to FF-A v1.0. */
-	EXPECT_NE(ffa_version(MAKE_FFA_VERSION(1, 0)), FFA_ERROR_32);
+	EXPECT_NE(ffa_version(FFA_VERSION_1_0), FFA_ERROR_32);
 
 	ret = ffa_mem_share(msg_size, msg_size);
 
@@ -4000,7 +4000,7 @@ TEST(memory_sharing, share_ffa_v1_1_to_current_version)
 		&msg_size);
 
 	/* Set current version to FF-A v1.1. */
-	EXPECT_NE(ffa_version(MAKE_FFA_VERSION(1, 1)), FFA_ERROR_32);
+	EXPECT_NE(ffa_version(FFA_VERSION_1_1), FFA_ERROR_32);
 
 	ret = ffa_mem_share(msg_size, msg_size);
 
@@ -4216,7 +4216,7 @@ TEST(memory_sharing, force_fragmented_ffa_v1_0)
 	uint8_t *ptr = pages;
 
 	/* Set current version to FF-A v1.0. */
-	EXPECT_NE(ffa_version(MAKE_FFA_VERSION(1, 0)), FFA_ERROR_32);
+	EXPECT_NE(ffa_version(FFA_VERSION_1_0), FFA_ERROR_32);
 
 	SERVICE_SELECT(service1_info->vm_id, "retrieve_ffa_v1_0", mb.send);
 
