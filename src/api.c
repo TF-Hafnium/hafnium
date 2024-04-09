@@ -2012,7 +2012,16 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	 * unsafe memory which could be 'corrupted' between safety checks and
 	 * final buffer copy.
 	 */
-	memcpy_s(&header, FFA_RXTX_HEADER_SIZE, from_msg, FFA_RXTX_HEADER_SIZE);
+	if (!memcpy_trapped(&header, FFA_RXTX_HEADER_SIZE, from_msg,
+			    FFA_RXTX_HEADER_SIZE)) {
+		dlog_error(
+			"%s: Failed to copy message from sender's(%x) TX "
+			"buffer.\n",
+			__func__, sender_locked.vm->id);
+		ret = ffa_error(FFA_ABORTED);
+		goto out_unlock_sender;
+	}
+
 	sender_id = ffa_rxtx_header_sender(&header);
 	receiver_id = ffa_rxtx_header_receiver(&header);
 
@@ -2100,7 +2109,16 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	}
 
 	/* Copy data. */
-	memcpy_s(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX, from_msg, msg_size);
+	if (!memcpy_trapped(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX, from_msg,
+			    msg_size)) {
+		dlog_error(
+			"%s: Failed to copy message to receiver's(%x) RX "
+			"buffer.\n",
+			__func__, to->id);
+		ret = ffa_error(FFA_ABORTED);
+		goto out;
+	}
+
 	to->mailbox.recv_size = msg_size;
 	to->mailbox.recv_sender = sender_id;
 	to->mailbox.recv_func = FFA_MSG_SEND2_32;
