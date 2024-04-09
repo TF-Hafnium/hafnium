@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include <libfdt.h>
+
 #include "hf/check.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
@@ -18,6 +20,8 @@
 
 #include "gicv3_helpers.h"
 #include "msr.h"
+
+#define MAX_CHIPS 16
 
 #define GICD_SIZE (0x10000)
 
@@ -46,7 +50,6 @@
 
 struct gicv3_driver {
 	uintptr_t dist_base;
-	uintptr_t base_redist_frame;
 	uintptr_t all_redist_frames[MAX_CPUS];
 	struct spinlock lock;
 };
@@ -146,7 +149,7 @@ uint32_t gicv3_get_interrupt_type(uint32_t id, uint32_t proc_num)
 void gicv3_enable_interrupt(uint32_t id, uint32_t proc_num)
 {
 	CHECK(plat_gicv3_driver.dist_base != 0U);
-	CHECK(plat_gicv3_driver.base_redist_frame != 0U);
+	CHECK(plat_gicv3_driver.all_redist_frames[proc_num] != 0U);
 	CHECK(proc_num < MAX_CPUS);
 
 	/*
@@ -174,7 +177,7 @@ void gicv3_enable_interrupt(uint32_t id, uint32_t proc_num)
 void gicv3_disable_interrupt(uint32_t id, uint32_t proc_num)
 {
 	CHECK(plat_gicv3_driver.dist_base != 0U);
-	CHECK(plat_gicv3_driver.base_redist_frame != 0U);
+	CHECK(plat_gicv3_driver.all_redist_frames[proc_num] != 0U);
 	CHECK(proc_num < MAX_CPUS);
 
 	/*
@@ -294,6 +297,103 @@ void gicv3_end_of_interrupt(uint32_t id)
 	write_msr(ICC_EOIR1_EL1, id);
 }
 
+/**
+ * A copy from libfdt. Dependency of `fdt_redistributor_regions_cells`
+ */
+static int fdt_cells(const void *fdt, int nodeoffset, const char *name)
+{
+	const fdt32_t *c;
+	uint32_t val;
+	int len;
+
+	c = fdt_getprop(fdt, nodeoffset, name, &len);
+	if (!c) {
+		return len;
+	}
+	if (len != sizeof(*c)) {
+		return -FDT_ERR_BADNCELLS;
+	}
+	val = fdt32_to_cpu(*c);
+	if (val > FDT_MAX_NCELLS) {
+		return -FDT_ERR_BADNCELLS;
+	}
+	return (int)val;
+}
+
+static int fdt_redistributor_regions_cells(const void *fdt, int nodeoffset)
+{
+	int val;
+
+	val = fdt_cells(fdt, nodeoffset, "#redistributor-regions");
+	if (val == -FDT_ERR_NOTFOUND) {
+		return 1;
+	}
+	return val;
+}
+
+/**
+ * Retrieves redistributor count for a bus represented in the device tree.
+ * Result is value of '#redistributor-regions' at `node`.
+ * If '#redistributor-regions' is not found, the default value is 1 cell.
+ * Returns true on success, false if an error occurred.
+ */
+static bool fdt_redistributor_regions(const struct fdt_node *node,
+				      uint32_t *count)
+{
+	int c = fdt_redistributor_regions_cells(fdt_base(&node->fdt),
+						node->offset);
+	if (c < 0) {
+		return false;
+	}
+	*count = (uint64_t)c;
+	return true;
+}
+
+static bool fdt_find_gics(const struct fdt *fdt,
+			  struct mem_range *gic_mem_ranges, uint32_t *gic_count)
+{
+	struct fdt_node n;
+	struct memiter data;
+	size_t addr_size;
+	size_t size_size;
+	uint8_t rdist_reg_idx = 0;
+
+	if (!fdt_find_node(fdt, "/interrupt-controller", &n) ||
+	    !fdt_address_size(&n, &addr_size) ||
+	    !fdt_size_size(&n, &size_size) ||
+	    !fdt_redistributor_regions(&n, gic_count)) {
+		dlog_info(
+			"Unable to find '/interrupt-controller. Using default "
+			"configuration.'\n");
+		/*
+		 * Initialise the default GICD, GICR memory ranges and GIC count
+		 */
+		gic_mem_ranges[0].begin = pa_init(GICD_BASE);
+		gic_mem_ranges[0].end = pa_init(GICD_BASE + GICD_SIZE);
+		gic_mem_ranges[1].begin = pa_init(GICR_BASE);
+		gic_mem_ranges[1].end = pa_init(
+			GICR_BASE + GICR_FRAMES * GIC_REDIST_SIZE_PER_PE);
+		*gic_count = 1;
+		return true;
+	}
+	if (!fdt_read_property(&n, "reg", &data)) {
+		dlog_error("Unable to read property 'reg'\n");
+		return false;
+	}
+	/* Traverse all memory ranges within this node. */
+	while (memiter_size(&data)) {
+		uintpaddr_t addr;
+		size_t len;
+
+		CHECK(fdt_parse_number(&data, addr_size, &addr));
+		CHECK(fdt_parse_number(&data, size_size, &len));
+		gic_mem_ranges[rdist_reg_idx].begin = pa_init(addr);
+		gic_mem_ranges[rdist_reg_idx].end = pa_init(addr + len);
+		rdist_reg_idx++;
+	}
+	return true;
+}
+
 uint64_t read_gicr_typer_reg(uintptr_t gicr_frame_addr)
 {
 	return io_read64(IO64_C(gicr_frame_addr + GICR_TYPER));
@@ -329,15 +429,20 @@ static inline uint32_t gicr_affinity_to_core_pos(uint64_t typer_reg)
 	return arch_affinity_to_core_pos(reg);
 }
 
-static inline void populate_redist_base_addrs(void)
+static inline void populate_redist_base_addrs(struct mem_range *gic_mem_ranges,
+					      uint32_t num_gic_rdist)
 {
 	uintptr_t current_rdist_frame;
 	uint64_t typer_reg;
 	uint32_t core_idx;
+	uint32_t gicr_idx = 0;
 
-	current_rdist_frame = plat_gicv3_driver.base_redist_frame;
+	/*
+	 * GICR mem range starts from index 1. GICD mem range is index 0.
+	 */
+	current_rdist_frame = gic_mem_ranges[gicr_idx + 1].begin.pa;
 
-	while (true) {
+	while (gicr_idx < num_gic_rdist) {
 		typer_reg = read_gicr_typer_reg(current_rdist_frame);
 		core_idx = gicr_affinity_to_core_pos(typer_reg);
 
@@ -351,9 +456,12 @@ static inline void populate_redist_base_addrs(void)
 				current_rdist_frame;
 		}
 
-		/* Check if this is the last frame. */
+		/* Check if this is the last GICR frame for the specific chip */
 		if (typer_reg & REDIST_LAST_FRAME_MASK) {
-			return;
+			gicr_idx++;
+			current_rdist_frame =
+				gic_mem_ranges[gicr_idx + 1].begin.pa;
+			continue;
 		}
 
 		current_rdist_frame += GIC_REDIST_FRAMES_OFFSET;
@@ -471,12 +579,14 @@ unsigned int gicv3_get_espi_limit(uintptr_t gicd_base)
 #endif /* GIC_EXT_INTID */
 
 bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
-		       struct mpool *ppool)
+		       struct mpool *ppool, struct mem_range *gic_mem_ranges,
+		       uint32_t num_gic_rdist)
 {
 	void *base_addr;
 	uint32_t gic_version;
 	uint32_t reg_pidr;
 	uint32_t typer_reg;
+	uint32_t gicr_idx;
 
 	base_addr = mm_identity_map(stage1_locked, pa_init(GICD_BASE),
 				    pa_init(GICD_BASE + GICD_SIZE),
@@ -487,23 +597,27 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 	}
 
 	plat_gicv3_driver.dist_base = (uintptr_t)base_addr;
-
-	base_addr = mm_identity_map(
-		stage1_locked, pa_init(GICR_BASE),
-		pa_init(GICR_BASE + GICR_FRAMES * GIC_REDIST_SIZE_PER_PE),
-		MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool);
-
-	if (base_addr == NULL) {
-		dlog_error("Could not map GICv3 into Hafnium memory map\n");
-		return false;
-	}
-
 	typer_reg = read_gicd_typer_reg(plat_gicv3_driver.dist_base);
 
 	/* Ensure GIC implementation supports two security states. */
 	CHECK((typer_reg & TYPER_SEC_EXTN) == TYPER_SEC_EXTN);
 
-	plat_gicv3_driver.base_redist_frame = (uintptr_t)base_addr;
+	for (gicr_idx = 0; gicr_idx < num_gic_rdist; gicr_idx++) {
+		/*
+		 * GICR mem range starts from index 1. GICD mem range is index 0
+		 */
+		base_addr = mm_identity_map(
+			stage1_locked, gic_mem_ranges[gicr_idx + 1].begin,
+			gic_mem_ranges[gicr_idx + 1].end,
+			MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool);
+
+		if (base_addr == NULL) {
+			dlog_error(
+				"Could not map GICv3 into Hafnium memory "
+				"map\n");
+			return false;
+		}
+	}
 
 	/* Check GIC version reported by the Peripheral register. */
 	reg_pidr = gicd_read_pidr2(plat_gicv3_driver.dist_base);
@@ -514,7 +628,7 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 #elif GIC_VERSION == 4
 	CHECK(gic_version == ARCH_REV_GICV4);
 #endif
-	populate_redist_base_addrs();
+	populate_redist_base_addrs(gic_mem_ranges, num_gic_rdist);
 
 #if GIC_EXT_INTID
 	CHECK((typer_reg & TYPER_ESPI) == TYPER_ESPI);
@@ -527,9 +641,20 @@ bool plat_interrupts_controller_driver_init(
 	const struct fdt *fdt, struct mm_stage1_locked stage1_locked,
 	struct mpool *ppool)
 {
-	(void)fdt;
+	struct mem_range gic_mem_ranges[MAX_CHIPS];
+	uint32_t num_gic_rdist;
+	uint32_t chip_idx = 0;
 
-	if (!gicv3_driver_init(stage1_locked, ppool)) {
+	while (chip_idx < MAX_CHIPS) {
+		gic_mem_ranges[chip_idx].begin = pa_init(0);
+		gic_mem_ranges[chip_idx].end = pa_init(0);
+		chip_idx++;
+	}
+
+	fdt_find_gics(fdt, gic_mem_ranges, &num_gic_rdist);
+
+	if (!gicv3_driver_init(stage1_locked, ppool, gic_mem_ranges,
+			       num_gic_rdist)) {
 		dlog_error("Failed to initialize GICv3 driver\n");
 		return false;
 	}

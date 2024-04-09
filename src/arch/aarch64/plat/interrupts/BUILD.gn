@@ -13,4 +13,5 @@ source_set("absent") {
 source_set("gicv3") {
   public_configs = [ "//src/arch/${plat_arch}:config" ]
   sources = [ "gicv3.c" ]
+  deps = [ "//third_party/dtc:libfdt" ]
 }

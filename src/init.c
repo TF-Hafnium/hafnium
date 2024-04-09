@@ -160,15 +160,15 @@ void one_time_init(void)
 		panic("Could not initialize IOMMUs.");
 	}
 
-	if (!fdt_unmap(&fdt, mm_stage1_locked, &ppool)) {
-		panic("Unable to unmap FDT.");
-	}
-
 	cpu_module_init(params->cpu_ids, params->cpu_count);
 
 	if (!plat_interrupts_controller_driver_init(&fdt, mm_stage1_locked,
 						    &ppool)) {
 		panic("Could not initialize Interrupt Controller driver.");
+	}
+
+	if (!fdt_unmap(&fdt, mm_stage1_locked, &ppool)) {
+		panic("Unable to unmap FDT.");
 	}
 
 	/* Load all VMs. */
