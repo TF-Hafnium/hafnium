@@ -12,6 +12,7 @@
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/std.h"
+#include "hf/stdout.h"
 
 #include "vmapi/hf/call.h"
 
@@ -116,6 +117,7 @@ static void hftest_parse_ffa_manifest(struct hftest_context *ctx,
 	ASSERT_TRUE(fdt_read_number(&root, "load-address",
 				    &ctx->partition_manifest.load_addr));
 	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &number));
+	ctx->partition_manifest.ffa_version = number;
 
 	EXPECT_TRUE(fdt_read_property(&root, "uuid", &uuid));
 
@@ -295,6 +297,7 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 		 * manifest for the SP.
 		 */
 		hftest_parse_ffa_manifest(ctx, &fdt);
+		stdout_init(ctx->partition_manifest.ffa_version);
 
 		/* TODO: Determine memory size referring to the SP Pkg. */
 		ctx->memory_size = 1048576;

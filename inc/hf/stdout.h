@@ -8,10 +8,13 @@
 
 #pragma once
 
+#include <stdint.h>
+
 /**
  * Print one character to standard output.
  * This is intentionally called differently from functions in <stdio.h> so as to
  * avoid clashes when linking against libc.
  */
+void stdout_init(uint32_t ffa_version);
 void stdout_putchar(char c);
 void stdout_flush(void);
