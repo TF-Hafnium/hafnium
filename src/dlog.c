@@ -32,6 +32,7 @@ struct format_flags {
 /* clang-format on */
 
 enum format_base {
+	base2 = 2,
 	base8 = 8,
 	base10 = 10,
 	base16 = 16,
@@ -180,8 +181,8 @@ static size_t print_string(const char *str, const char *suffix,
 static size_t print_int(size_t value, enum format_base base, size_t min_width,
 			struct format_flags flags)
 {
-	static const char *digits_lower = "0123456789abcdefx";
-	static const char *digits_upper = "0123456789ABCDEFX";
+	static const char *digits_lower = "0123456789abcdefxb";
+	static const char *digits_upper = "0123456789ABCDEFXB";
 	const char *digits = flags.upper ? digits_upper : digits_lower;
 	char buf[DLOG_MAX_STRING_LENGTH];
 	char *ptr = &buf[sizeof(buf) - 1];
@@ -203,6 +204,12 @@ static size_t print_int(size_t value, enum format_base base, size_t min_width,
 			ptr -= 2;
 			ptr[0] = '0';
 			ptr[1] = digits[16];
+			break;
+
+		case base2:
+			ptr -= 2;
+			ptr[0] = '0';
+			ptr[1] = digits[17];
 			break;
 
 		case base8:
@@ -463,6 +470,25 @@ size_t vdlog(const char *fmt, va_list args)
 							   min_width, flags);
 				break;
 			}
+
+			case 'b':
+				fmt++;
+				value = va_arg(args, uint64_t);
+				value = reinterpret_unsigned_int(length, value);
+
+				chars_written += print_int(value, base2,
+							   min_width, flags);
+				break;
+
+			case 'B':
+				fmt++;
+				flags.upper = true;
+				value = va_arg(args, uint64_t);
+				value = reinterpret_unsigned_int(length, value);
+
+				chars_written += print_int(value, base2,
+							   min_width, flags);
+				break;
 
 			case 'o':
 				fmt++;
