@@ -2612,11 +2612,26 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 
 #if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
 	/* Check support of a feature provided respective feature ID. */
+
+	/*
+	 * For NPI and MEI, report the IDs as supported only to partitions at
+	 * the virtual FF-A instances.
+	 */
 	case FFA_FEATURE_NPI:
 		if (el0_partition) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
+		if (!vm_id_is_current_world(current->vm->id)) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
 		return api_ffa_feature_success(HF_NOTIFICATION_PENDING_INTID);
+
+	case FFA_FEATURE_MEI:
+		if (!vm_id_is_current_world(current->vm->id)) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+		return api_ffa_feature_success(HF_MANAGED_EXIT_INTID);
+
 	case FFA_FEATURE_SRI:
 		if (!ffa_is_vm_id(current->vm->id)) {
 			return ffa_error(FFA_NOT_SUPPORTED);
