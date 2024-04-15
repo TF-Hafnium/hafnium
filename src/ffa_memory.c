@@ -3687,8 +3687,7 @@ struct ffa_value ffa_memory_relinquish(
 		goto out;
 	}
 
-	if (clear && receiver_permissions.instruction_access == 0 &&
-	    receiver_permissions.data_access == FFA_DATA_ACCESS_RO) {
+	if (clear && receiver_permissions.data_access == FFA_DATA_ACCESS_RO) {
 		dlog_verbose("%s: RO memory can't use clear memory flag.\n",
 			     __func__);
 		ret = ffa_error(FFA_DENIED);
