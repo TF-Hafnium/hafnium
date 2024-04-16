@@ -49,7 +49,7 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 	bool sve = is_arch_feat_sve_supported();
 	bool sme = is_arch_feat_sme_supported();
 	bool fa64 = is_arch_feat_sme_fa64_supported();
-	bool sm = false;
+	bool streaming_mode = false;
 	bool hint;
 	uint32_t cpu_id;
 
@@ -74,7 +74,8 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 		 */
 		arch_sme_svcr_set(ns_simd_ctx[cpu_id].svcr);
 
-		sm = (ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == MSR_SVCR_SM;
+		streaming_mode =
+			(ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == MSR_SVCR_SM;
 
 		/*
 		 * Streaming SVE vector length is determined by SMCR_EL2.LEN
@@ -102,7 +103,7 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 	 * Omit restoring the SVE state, if only SME is implemented (and
 	 * SVE is not implemented) and Streaming SVE is disabled.
 	 */
-	if ((sve || sme) && !hint && !(!sve && sme && !sm)) {
+	if ((sve || sme) && !hint && !(!sve && sme && !streaming_mode)) {
 		/*
 		 * Restore FFR register before predicates,
 		 * if SVE only is implemented, or both SVE and SME are
@@ -110,8 +111,8 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 		 * or both SME and FEAT_SME_FA64 are implemented and
 		 * Streaming SVE is enabled.
 		 */
-		if ((sve && !sme) || (sve && sme && !sm) ||
-		    (sme && fa64 && sm)) {
+		if ((sve && !sme) || (sve && sme && !streaming_mode) ||
+		    (sme && fa64 && streaming_mode)) {
 			__asm__ volatile(
 				".arch_extension sve;"
 				"ldr p0, [%0];"
@@ -127,7 +128,8 @@ void plat_restore_ns_simd_context(struct vcpu *vcpu)
 		 * is disabled,
 		 * or SME is implemented and Streaming SVE is enabled.
 		 */
-		if ((sve && !sme) || (sve && sme && !sm) || (sme && sm)) {
+		if ((sve && !sme) || (sve && sme && !streaming_mode) ||
+		    (sme && streaming_mode)) {
 			/* Restore predicate registers. */
 			__asm__ volatile(
 				".arch_extension sve;"
@@ -232,7 +234,7 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 	bool sve = is_arch_feat_sve_supported();
 	bool sme = is_arch_feat_sme_supported();
 	bool fa64 = is_arch_feat_sme_fa64_supported();
-	bool sm = false;
+	bool streaming_mode = false;
 	bool hint;
 
 	assert(vcpu->vm->id == HF_HYPERVISOR_VM_ID);
@@ -258,7 +260,8 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 		/* Save ZA array and SSVE enable state. */
 		ns_simd_ctx[cpu_id].svcr = arch_sme_svcr_get();
 
-		sm = (ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == MSR_SVCR_SM;
+		streaming_mode =
+			(ns_simd_ctx[cpu_id].svcr & MSR_SVCR_SM) == MSR_SVCR_SM;
 	}
 
 	if (sve) {
@@ -284,14 +287,15 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 	 * Omit saving the SVE state, if only SME is implemented (and SVE is not
 	 * implemented) and Streaming SVE is disabled.
 	 */
-	if ((sve || sme) && !hint && !(!sve && sme && !sm)) {
+	if ((sve || sme) && !hint && !(!sve && sme && !streaming_mode)) {
 		/*
 		 * Save predicates if SVE only is implemented,
 		 * or both SME and SVE are implemented and Streaming SVE
 		 * is disabled,
 		 * or SME is implemented and Streaming SVE is enabled.
 		 */
-		if ((sve && !sme) || (sve && sme && !sm) || (sme && sm)) {
+		if ((sve && !sme) || (sve && sme && !streaming_mode) ||
+		    (sme && streaming_mode)) {
 			/* Save predicate registers. */
 			__asm__ volatile(
 				".arch_extension sve;"
@@ -323,8 +327,8 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 		 * is disabled, or both SME and FEAT_SME_FA64 are implemented
 		 * and Streaming SVE is enabled.
 		 */
-		if ((sve && !sme) || (sve && sme && !sm) ||
-		    (sme && fa64 && sm)) {
+		if ((sve && !sme) || (sve && sme && !streaming_mode) ||
+		    (sme && fa64 && streaming_mode)) {
 			__asm__ volatile(
 				".arch_extension sve;"
 				"rdffr p0.b;"
@@ -338,7 +342,8 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 		 * Save SVE/Streaming SVE vectors (similar conditions as
 		 * predicates above).
 		 */
-		if ((sve && !sme) || (sve && sme && !sm) || (sme && sm)) {
+		if ((sve && !sme) || (sve && sme && !streaming_mode) ||
+		    (sme && streaming_mode)) {
 			__asm__ volatile(
 				".arch_extension sve;"
 				"str z0, [%0, #0, MUL VL];"
@@ -398,7 +403,7 @@ void plat_save_ns_simd_context(struct vcpu *vcpu)
 	 */
 
 	if (sme) {
-		if (sm) {
+		if (streaming_mode) {
 			/*
 			 * SVCR.SM=1 indicates active Streaming SVE mode.
 			 * It is preferable to disable it to save power.
