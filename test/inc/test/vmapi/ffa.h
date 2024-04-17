@@ -73,7 +73,11 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	uint32_t receivers_send_count,
 	struct ffa_memory_access receivers_retrieve[],
 	uint32_t receivers_retrieve_count, ffa_memory_region_flags_t send_flags,
-	ffa_memory_region_flags_t retrieve_flags);
+	ffa_memory_region_flags_t retrieve_flags,
+	enum ffa_memory_type send_memory_type,
+	enum ffa_memory_type receive_memory_type,
+	enum ffa_memory_cacheability send_cacheability,
+	enum ffa_memory_cacheability receive_cacheability);
 ffa_memory_handle_t send_memory_and_retrieve_request(
 	uint32_t share_func, void *tx_buffer, ffa_id_t sender,
 	ffa_id_t recipient, struct ffa_memory_region_constituent constituents[],
@@ -82,7 +86,11 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	enum ffa_data_access send_data_access,
 	enum ffa_data_access retrieve_data_access,
 	enum ffa_instruction_access send_instruction_access,
-	enum ffa_instruction_access retrieve_instruction_access);
+	enum ffa_instruction_access retrieve_instruction_access,
+	enum ffa_memory_type send_memory_type,
+	enum ffa_memory_type receive_memory_type,
+	enum ffa_memory_cacheability send_cacheability,
+	enum ffa_memory_cacheability receive_cacheability);
 ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 	uint32_t share_func, void *tx_buffer, ffa_id_t sender,
 	ffa_id_t recipient, struct ffa_memory_region_constituent constituents[],

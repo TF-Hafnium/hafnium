@@ -200,7 +200,7 @@ static void check_cannot_donate_memory(
 				  vms[i], constituents, constituent_count, 0, 0,
 				  FFA_DATA_ACCESS_NOT_SPECIFIED,
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-				  FFA_MEMORY_NORMAL_MEM,
+				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
 				  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
 				  &msg_size),
@@ -543,7 +543,9 @@ TEST(memory_sharing, concurrent)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
@@ -588,7 +590,9 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_DATA_ACCESS_RW,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -651,7 +655,9 @@ TEST(memory_sharing, lend_relinquish)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 
@@ -699,7 +705,9 @@ TEST(memory_sharing, lend_fragmented_relinquish)
 		service1_info->vm_id, constituents_lend_fragmented_relinquish,
 		ARRAY_SIZE(constituents_lend_fragmented_relinquish), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 
@@ -783,7 +791,9 @@ TEST(memory_sharing, donate_relinquish)
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/*
 	 * Let the service access the memory, and try and fail to relinquish it.
@@ -821,7 +831,9 @@ TEST_PRECONDITION(memory_sharing, give_and_get_back, hypervisor_only)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_DONATE,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be returned, and retrieve it. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -864,7 +876,9 @@ TEST(memory_sharing, lend_and_get_back)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND, FFA_DATA_ACCESS_RW,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_X, FFA_MEMORY_NOT_SPECIFIED_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -901,7 +915,9 @@ TEST(memory_sharing, relend_after_return)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -913,7 +929,9 @@ TEST(memory_sharing, relend_after_return)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Observe the service doesn't fault when accessing the memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -945,7 +963,9 @@ TEST(memory_sharing, lend_elsewhere_after_return)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -957,7 +977,9 @@ TEST(memory_sharing, lend_elsewhere_after_return)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service2_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
@@ -1077,7 +1099,9 @@ TEST(memory_sharing, donate_check_upper_bounds)
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -1100,7 +1124,9 @@ TEST(memory_sharing, donate_check_upper_bounds)
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
 		service2_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service2_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -1139,7 +1165,9 @@ TEST(memory_sharing, donate_check_lower_bounds)
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -1162,7 +1190,9 @@ TEST(memory_sharing, donate_check_lower_bounds)
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
 		service2_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service2_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -1196,7 +1226,9 @@ TEST(memory_sharing, donate_and_donate_elsewhere)
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/*
 	 * Run service1 such it can retrieve memory, and donate it to
@@ -1279,7 +1311,9 @@ TEST(memory_sharing, donate_twice)
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be received. */
 	ret = ffa_run(service1_info->vm_id, 0);
@@ -1329,7 +1363,8 @@ TEST_PRECONDITION(memory_sharing, donate_to_self, hypervisor_only)
 			  ARRAY_SIZE(constituents), 0, 0,
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
@@ -1420,7 +1455,8 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 			  ARRAY_SIZE(constituents), 0, 0,
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
@@ -1431,7 +1467,8 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 			  ARRAY_SIZE(constituents), 0, 0,
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
@@ -1442,7 +1479,8 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 			  ARRAY_SIZE(constituents), 0, 0,
 			  FFA_DATA_ACCESS_NOT_SPECIFIED,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
@@ -1452,7 +1490,9 @@ TEST_PRECONDITION(memory_sharing, donate_invalid_source, hypervisor_only)
 		FFA_MEM_DONATE_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Receive and return memory from VM1. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1497,7 +1537,7 @@ TEST_PRECONDITION(memory_sharing, give_and_get_back_unaligned, hypervisor_only)
 					constituents, ARRAY_SIZE(constituents),
 					0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-					FFA_MEMORY_NORMAL_MEM,
+					FFA_MEMORY_NOT_SPECIFIED_MEM,
 					FFA_MEMORY_CACHE_WRITE_BACK,
 					FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
 					&msg_size),
@@ -1511,7 +1551,7 @@ TEST_PRECONDITION(memory_sharing, give_and_get_back_unaligned, hypervisor_only)
 					constituents, ARRAY_SIZE(constituents),
 					0, 0, FFA_DATA_ACCESS_RW,
 					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-					FFA_MEMORY_NORMAL_MEM,
+					FFA_MEMORY_NOT_SPECIFIED_MEM,
 					FFA_MEMORY_CACHE_WRITE_BACK,
 					FFA_MEMORY_INNER_SHAREABLE, NULL, NULL,
 					&msg_size),
@@ -1550,7 +1590,8 @@ TEST(memory_sharing, lend_invalid_source)
 			  service2_info->vm_id, constituents,
 			  ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			  FFA_MEMORY_NOT_SPECIFIED_MEM,
+			  FFA_MEMORY_CACHE_WRITE_BACK,
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
@@ -1560,7 +1601,9 @@ TEST(memory_sharing, lend_invalid_source)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Receive and return memory from VM1. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1598,7 +1641,9 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1616,7 +1661,9 @@ TEST(memory_sharing, lend_relinquish_X_RW)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1652,7 +1699,9 @@ TEST(memory_sharing, share_X)
 		FFA_MEM_SHARE_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the secondary VM fail to retrieve the memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1674,7 +1723,9 @@ TEST(memory_sharing, share_X)
 		FFA_MEM_SHARE_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the secondary VM fail to retrieve the memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1717,7 +1768,9 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1741,7 +1794,9 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1784,7 +1839,9 @@ TEST(memory_sharing, share_relinquish_clear)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be received, fail to be cleared, and then returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1830,7 +1887,9 @@ TEST_PRECONDITION(memory_sharing, lend_relinquish_RW_X, service1_is_vm)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Attempt to execute from memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1845,7 +1904,9 @@ TEST_PRECONDITION(memory_sharing, lend_relinquish_RW_X, service1_is_vm)
 			ARRAY_SIZE(constituents), 0, 0, FFA_DATA_ACCESS_RW,
 			FFA_DATA_ACCESS_RW,
 			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-			FFA_INSTRUCTION_ACCESS_NX);
+			FFA_INSTRUCTION_ACCESS_NX, FFA_MEMORY_NOT_SPECIFIED_MEM,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_CACHE_WRITE_BACK);
 
 		run_res = ffa_run(service1_info->vm_id, 0);
 		EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -1887,7 +1948,9 @@ TEST_PRECONDITION(memory_sharing, lend_relinquish_RO_X, service1_is_vm)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Attempt to execute from memory. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -1898,8 +1961,9 @@ TEST_PRECONDITION(memory_sharing, lend_relinquish_RO_X, service1_is_vm)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -1934,7 +1998,9 @@ TEST(memory_sharing, lend_donate)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -2003,7 +2069,9 @@ TEST(memory_sharing, share_donate)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -2075,7 +2143,9 @@ TEST(memory_sharing, lend_twice)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -2150,7 +2220,9 @@ TEST(memory_sharing, share_twice)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 
 	/* Let the memory be accessed. */
 	run_res = ffa_run(service1_info->vm_id, 0);
@@ -2215,7 +2287,9 @@ TEST(memory_sharing, lend_clear)
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents),
 		FFA_MEMORY_REGION_FLAG_CLEAR, 0, FFA_DATA_ACCESS_RO,
 		FFA_DATA_ACCESS_RO, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_X, FFA_MEMORY_NOT_SPECIFIED_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 	/* Take it back again. */
 	ffa_mem_reclaim(handle, 0);
 
@@ -2296,7 +2370,9 @@ TEST(memory_sharing, ffa_lend_check_upper_bounds)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -2319,7 +2395,9 @@ TEST(memory_sharing, ffa_lend_check_upper_bounds)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service2_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service2_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -2358,7 +2436,9 @@ TEST(memory_sharing, ffa_lend_check_lower_bounds)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service1_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -2381,7 +2461,9 @@ TEST(memory_sharing, ffa_lend_check_lower_bounds)
 		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID,
 		service2_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
 		0, FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X);
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	run_res = ffa_run(service2_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
@@ -3556,7 +3638,9 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
 		constituents_lend_fragmented_relinquish,
 		ARRAY_SIZE(constituents_lend_fragmented_relinquish), receivers,
 		ARRAY_SIZE(receivers), receivers, ARRAY_SIZE(receivers), 0,
-		FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND);
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
 
 	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
 		ffa_id_t vm_id = receivers[i].receiver_permissions.receiver;
@@ -4356,7 +4440,10 @@ TEST(memory_sharing, retrieve_instruction_access_not_specified)
 			 * Not specified retrieve request instruction
 			 * permissions.
 			 */
-			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED);
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+			FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_CACHE_WRITE_BACK);
 		EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 		ffa_mem_reclaim(handle, 0);
 	}

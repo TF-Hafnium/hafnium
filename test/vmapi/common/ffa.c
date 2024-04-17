@@ -149,7 +149,11 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	uint32_t receivers_send_count,
 	struct ffa_memory_access receivers_retrieve[],
 	uint32_t receivers_retrieve_count, ffa_memory_region_flags_t send_flags,
-	ffa_memory_region_flags_t retrieve_flags)
+	ffa_memory_region_flags_t retrieve_flags,
+	enum ffa_memory_type send_memory_type,
+	enum ffa_memory_type receive_memory_type,
+	enum ffa_memory_cacheability send_cacheability,
+	enum ffa_memory_cacheability receive_cacheability)
 {
 	uint32_t total_length;
 	uint32_t fragment_length;
@@ -159,9 +163,6 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	uint32_t remaining_constituent_count;
 	uint32_t i;
 	struct ffa_partition_msg *retrieve_message = tx_buffer;
-	bool not_specify_memory_type =
-		share_func == FFA_MEM_DONATE_32 ||
-		(share_func == FFA_MEM_LEND_32 && receivers_send_count == 1);
 	uint64_t allocator_mask;
 	bool contains_secure_receiver = false;
 
@@ -170,9 +171,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 		tx_buffer, HF_MAILBOX_SIZE, sender, receivers_send,
 		receivers_send_count, sizeof(struct ffa_memory_access),
 		constituents, constituent_count, 0, send_flags,
-		not_specify_memory_type ? FFA_MEMORY_NOT_SPECIFIED_MEM
-					: FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
+		send_memory_type, send_cacheability, FFA_MEMORY_INNER_SHAREABLE,
 		&total_length, &fragment_length);
 
 	if (remaining_constituent_count == 0) {
@@ -222,7 +221,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 		(struct ffa_memory_region *)retrieve_message->payload, handle,
 		sender, receivers_retrieve, receivers_retrieve_count,
 		sizeof(struct ffa_memory_access), 0, retrieve_flags,
-		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		receive_memory_type, receive_cacheability,
 		FFA_MEMORY_INNER_SHAREABLE);
 
 	for (i = 0; i < receivers_send_count; i++) {
@@ -258,7 +257,11 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	enum ffa_data_access send_data_access,
 	enum ffa_data_access retrieve_data_access,
 	enum ffa_instruction_access send_instruction_access,
-	enum ffa_instruction_access retrieve_instruction_access)
+	enum ffa_instruction_access retrieve_instruction_access,
+	enum ffa_memory_type send_memory_type,
+	enum ffa_memory_type receive_memory_type,
+	enum ffa_memory_cacheability send_cacheability,
+	enum ffa_memory_cacheability receive_cacheability)
 {
 	struct ffa_memory_access receiver_send_permissions;
 	struct ffa_memory_access receiver_retrieve_permissions;
@@ -280,7 +283,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 	return send_memory_and_retrieve_request_multi_receiver(
 		share_func, tx_buffer, sender, constituents, constituent_count,
 		&receiver_send_permissions, 1, &receiver_retrieve_permissions,
-		1, send_flags, retrieve_flags);
+		1, send_flags, retrieve_flags, send_memory_type,
+		receive_memory_type, send_cacheability, receive_cacheability);
 }
 
 /*
