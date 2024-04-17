@@ -15,6 +15,28 @@
 
 #include "test/hftest.h"
 
+/*
+ * The MIN/MAX macros are bound to 64-bit variables to ensure the values are
+ * passed to `dlog` as 64-bit integers. This tests that length modifiers like
+ * `%hh`, `%h` and `%u` correctly read only the lower 8/16/32 bits of the value
+ * passed in.
+ */
+const uint64_t u8_max = UINT8_MAX;
+const uint64_t i8_min = INT8_MIN;
+const uint64_t i8_max = INT8_MAX;
+
+const uint64_t u16_max = UINT16_MAX;
+const uint64_t i16_min = INT16_MIN;
+const uint64_t i16_max = INT16_MAX;
+
+const uint64_t u32_max = UINT32_MAX;
+const uint64_t i32_min = INT32_MIN;
+const uint64_t i32_max = INT32_MAX;
+
+const uint64_t u64_max = UINT64_MAX;
+const uint64_t i64_min = INT64_MIN;
+const uint64_t i64_max = INT64_MAX;
+
 #define assert_format(expected, ...) \
 	assert_format_impl(expected, sizeof(expected), __VA_ARGS__)
 
@@ -82,15 +104,13 @@ TEST(dlog, int_format_specifier)
 	assert_format("Hello 0\n", "Hello %d\n", 0);
 	assert_format("Hello 1234\n", "Hello %d\n", 1234);
 
-	assert_format("Hello 2147483647\n", "Hello %d\n", INT_MAX);
-	assert_format("Hello -2147483648\n", "Hello %d\n", INT_MIN);
+	assert_format("Hello 2147483647\n", "Hello %d\n", i32_max);
+	assert_format("Hello -2147483648\n", "Hello %d\n", i32_min);
 
-	assert_format("Hello -1\n", "Hello %d\n", UINT_MAX);
+	assert_format("Hello -1\n", "Hello %d\n", u32_max);
 
-	assert_format("Hello -2147483648\n", "Hello %d\n",
-		      ((int64_t)INT_MAX) + 1);
-	assert_format("Hello 2147483647\n", "Hello %d\n",
-		      ((int64_t)INT_MIN) - 1);
+	assert_format("Hello -2147483648\n", "Hello %d\n", i32_max + 1);
+	assert_format("Hello 2147483647\n", "Hello %d\n", i32_min - 1);
 }
 
 /**
@@ -102,10 +122,10 @@ TEST(dlog, unsigned_int_format_specifier)
 	assert_format("Hello 0\n", "Hello %u\n", 0);
 	assert_format("Hello 1234567890\n", "Hello %u\n", 1234567890);
 
-	assert_format("Hello 4294967295\n", "Hello %u\n", UINT_MAX);
-	assert_format("Hello 0\n", "Hello %u\n", ((uint64_t)UINT_MAX) + 1);
+	assert_format("Hello 4294967295\n", "Hello %u\n", u32_max);
+	assert_format("Hello 0\n", "Hello %u\n", u32_max + 1);
 
-	assert_format("Hello 2147483648\n", "Hello %u\n", INT_MIN);
+	assert_format("Hello 2147483648\n", "Hello %u\n", i32_min);
 }
 
 /**
@@ -117,10 +137,10 @@ TEST(dlog, octal_unsigned_int_format_specifier)
 	assert_format("Hello 0\n", "Hello %o\n", 0);
 	assert_format("Hello 12345670\n", "Hello %o\n", 012345670);
 
-	assert_format("Hello 37777777777\n", "Hello %o\n", UINT_MAX);
-	assert_format("Hello 0\n", "Hello %o\n", ((uint64_t)UINT_MAX) + 1);
+	assert_format("Hello 37777777777\n", "Hello %o\n", u32_max);
+	assert_format("Hello 0\n", "Hello %o\n", u32_max + 1);
 
-	assert_format("Hello 20000000000\n", "Hello %o\n", INT_MIN);
+	assert_format("Hello 20000000000\n", "Hello %o\n", i32_min);
 }
 
 /**
@@ -151,4 +171,90 @@ TEST(dlog, pointer_format_specifier)
 	assert_format("Hello 0x0000000000000000\n", "Hello %p\n", 0);
 	assert_format("Hello 0x123456789abcdef0\n", "Hello %p\n",
 		      0x123456789abcdef0);
+}
+
+TEST(dlog, unsigned_length_modifiers)
+{
+	assert_format("Hello 0\n", "Hello %hhu\n", 0);
+	assert_format("Hello 255\n", "Hello %hhu\n", u8_max);
+	assert_format("Hello 0\n", "Hello %hhu\n", u8_max + 1);
+
+	assert_format("Hello 0\n", "Hello %hu\n", 0);
+	assert_format("Hello 255\n", "Hello %hu\n", u8_max);
+	assert_format("Hello 256\n", "Hello %hu\n", u8_max + 1);
+	assert_format("Hello 65535\n", "Hello %hu\n", u16_max);
+	assert_format("Hello 0\n", "Hello %hu\n", u16_max + 1);
+
+	assert_format("Hello 0\n", "Hello %lu\n", 0);
+	assert_format("Hello 255\n", "Hello %lu\n", u8_max);
+	assert_format("Hello 256\n", "Hello %lu\n", u8_max + 1);
+	assert_format("Hello 65535\n", "Hello %lu\n", u16_max);
+	assert_format("Hello 65536\n", "Hello %lu\n", u16_max + 1);
+	assert_format("Hello 4294967295\n", "Hello %lu\n", u32_max);
+	assert_format("Hello 4294967296\n", "Hello %lu\n", u32_max + 1);
+	assert_format("Hello 18446744073709551615\n", "Hello %lu\n", u64_max);
+	assert_format("Hello 0\n", "Hello %lu\n", u64_max + 1);
+
+	assert_format("Hello 0\n", "Hello %llu\n", 0);
+	assert_format("Hello 255\n", "Hello %llu\n", u8_max);
+	assert_format("Hello 256\n", "Hello %llu\n", u8_max + 1);
+	assert_format("Hello 65535\n", "Hello %llu\n", u16_max);
+	assert_format("Hello 65536\n", "Hello %llu\n", u16_max + 1);
+	assert_format("Hello 4294967295\n", "Hello %llu\n", u32_max);
+	assert_format("Hello 4294967296\n", "Hello %llu\n", u32_max + 1);
+	assert_format("Hello 18446744073709551615\n", "Hello %llu\n", u64_max);
+	assert_format("Hello 0\n", "Hello %llu\n", u64_max + 1);
+}
+
+TEST(dlog, signed_length_modifiers)
+{
+	assert_format("Hello 0\n", "Hello %hhd\n", 0);
+	assert_format("Hello -1\n", "Hello %hhd\n", u8_max);
+	assert_format("Hello 0\n", "Hello %hhd\n", u8_max + 1);
+	assert_format("Hello 127\n", "Hello %hhd\n", i8_max);
+	assert_format("Hello -128\n", "Hello %hhd\n", i8_min);
+
+	assert_format("Hello 0\n", "Hello %hd\n", 0);
+	assert_format("Hello 255\n", "Hello %hd\n", u8_max);
+	assert_format("Hello 256\n", "Hello %hd\n", u8_max + 1);
+	assert_format("Hello 127\n", "Hello %hd\n", i8_max);
+	assert_format("Hello -128\n", "Hello %hd\n", i8_min);
+	assert_format("Hello -1\n", "Hello %hd\n", u16_max);
+	assert_format("Hello 0\n", "Hello %hd\n", u16_max + 1);
+	assert_format("Hello 32767\n", "Hello %hd\n", i16_max);
+	assert_format("Hello -32768\n", "Hello %hd\n", i16_min);
+
+	assert_format("Hello 0\n", "Hello %ld\n", 0);
+	assert_format("Hello 255\n", "Hello %ld\n", u8_max);
+	assert_format("Hello 256\n", "Hello %ld\n", u8_max + 1);
+	assert_format("Hello 127\n", "Hello %ld\n", i8_max);
+	assert_format("Hello -128\n", "Hello %ld\n", i8_min);
+	assert_format("Hello 65535\n", "Hello %ld\n", u16_max);
+	assert_format("Hello 65536\n", "Hello %ld\n", u16_max + 1);
+	assert_format("Hello 32767\n", "Hello %ld\n", i16_max);
+	assert_format("Hello -32768\n", "Hello %ld\n", i16_min);
+	assert_format("Hello 4294967295\n", "Hello %ld\n", u32_max);
+	assert_format("Hello 4294967296\n", "Hello %ld\n", u32_max + 1);
+	assert_format("Hello 2147483647\n", "Hello %ld\n", i32_max);
+	assert_format("Hello -2147483648\n", "Hello %ld\n", i32_min);
+	assert_format("Hello -1\n", "Hello %ld\n", u64_max);
+	assert_format("Hello 9223372036854775807\n", "Hello %ld\n", i64_max);
+	assert_format("Hello -9223372036854775808\n", "Hello %ld\n", i64_min);
+
+	assert_format("Hello 0\n", "Hello %lld\n", 0);
+	assert_format("Hello 255\n", "Hello %lld\n", u8_max);
+	assert_format("Hello 256\n", "Hello %lld\n", u8_max + 1);
+	assert_format("Hello 127\n", "Hello %lld\n", i8_max);
+	assert_format("Hello -128\n", "Hello %lld\n", i8_min);
+	assert_format("Hello 65535\n", "Hello %lld\n", u16_max);
+	assert_format("Hello 65536\n", "Hello %lld\n", u16_max + 1);
+	assert_format("Hello 32767\n", "Hello %lld\n", i16_max);
+	assert_format("Hello -32768\n", "Hello %lld\n", i16_min);
+	assert_format("Hello 4294967295\n", "Hello %lld\n", u32_max);
+	assert_format("Hello 4294967296\n", "Hello %lld\n", u32_max + 1);
+	assert_format("Hello 2147483647\n", "Hello %lld\n", i32_max);
+	assert_format("Hello -2147483648\n", "Hello %lld\n", i32_min);
+	assert_format("Hello -1\n", "Hello %lld\n", u64_max);
+	assert_format("Hello 9223372036854775807\n", "Hello %lld\n", i64_max);
+	assert_format("Hello -9223372036854775808\n", "Hello %lld\n", i64_min);
 }
