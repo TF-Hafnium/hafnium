@@ -144,6 +144,25 @@ TEST(dlog, octal_unsigned_int_format_specifier)
 }
 
 /**
+ * Test formatting of a format string with a binary `unsigned int` format
+ * specifier (`%b`)
+ */
+TEST(dlog, binary_unsigned_int_format_specifier)
+{
+	assert_format("Hello 0\n", "Hello %b\n", 0);
+	assert_format("Hello 11111111111111111111111111111111\n", "Hello %b\n",
+		      u32_max);
+
+	assert_format("Hello 0b0\n", "Hello %#b\n", 0);
+	assert_format("Hello 0b11111111111111111111111111111111\n",
+		      "Hello %#b\n", u32_max);
+
+	assert_format("Hello 0B0\n", "Hello %#B\n", 0);
+	assert_format("Hello 0B11111111111111111111111111111111\n",
+		      "Hello %#B\n", u32_max);
+}
+
+/**
  * Test formatting of a format string with a hexadecimal `unsigned int` format
  * specifier (`%x`)
  */
