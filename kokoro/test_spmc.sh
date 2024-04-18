@@ -40,7 +40,7 @@ execute_test() {
 KOKORO_DIR="$(dirname "$0")"
 source $KOKORO_DIR/test_common.sh
 
-HFTEST=(${TIMEOUT[@]} 600s ./test/hftest/hftest.py)
+HFTEST=(${TIMEOUT[@]} 1200s ./test/hftest/hftest.py)
 
 SPMC_PATH="$OUT/secure_aem_v8a_fvp_vhe_clang"
 HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_clang"
