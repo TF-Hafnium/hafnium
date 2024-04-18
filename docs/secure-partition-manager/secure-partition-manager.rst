@@ -95,7 +95,6 @@ implemented and the SPMC is located at S-EL2, for Arm's FVP platform:
     SPD=spmd \
     ARM_ARCH_MINOR=5 \
     BRANCH_PROTECTION=1 \
-    CTX_INCLUDE_PAUTH_REGS=1 \
     ENABLE_FEAT_MTE2=1 \
     BL32=<path-to-hafnium-binary> \
     BL33=<path-to-bl33-binary> \
@@ -113,7 +112,6 @@ implemented, the SPMC is located at S-EL2, and enabling secure boot:
     SPD=spmd \
     ARM_ARCH_MINOR=5 \
     BRANCH_PROTECTION=1 \
-    CTX_INCLUDE_PAUTH_REGS=1 \
     ENABLE_FEAT_MTE2=1 \
     BL32=<path-to-hafnium-binary> \
     BL33=<path-to-bl33-binary> \
