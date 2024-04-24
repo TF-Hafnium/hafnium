@@ -2809,7 +2809,16 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 		uint32_t mem_region_receiver_index;
 		bool permissions_RO;
 		bool clear_memory_flags;
-		bool found_to_id = current_receiver_id == to_vm_id;
+		/*
+		 * If the call is at the virtual FF-A instance the caller's
+		 * ID must match an entry in the memory access list.
+		 * In the SPMC, one of the specified receivers could be from
+		 * the NWd.
+		 */
+		bool found_to_id = vm_id_is_current_world(to_vm_id)
+					   ? (current_receiver_id == to_vm_id)
+					   : (!vm_id_is_current_world(
+						     current_receiver_id));
 
 		if (bypass_multi_receiver_check && !found_to_id) {
 			dlog_verbose(
@@ -3037,13 +3046,14 @@ static struct ffa_value ffa_memory_retrieve_validate(
 		for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
 			struct ffa_memory_access *receiver =
 				ffa_memory_region_get_receiver(retrieve_request,
-							       0);
+							       i);
 			assert(receiver != NULL);
 
-			to_id = receiver->receiver_permissions.receiver;
-
-			if (!vm_id_is_current_world(to_id)) {
+			if (!vm_id_is_current_world(
+				    receiver->receiver_permissions.receiver)) {
 				other_world_count++;
+				/* Set it to be used later. */
+				to_id = receiver->receiver_permissions.receiver;
 			}
 		}
 
