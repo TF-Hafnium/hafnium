@@ -3518,8 +3518,11 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	for (uint32_t i = 0U; i < memory_region->receiver_count; i++) {
 		struct ffa_memory_access *receiver =
 			ffa_memory_region_get_receiver(memory_region, i);
+		ffa_id_t receiver_id;
+
 		assert(receiver != NULL);
-		ffa_id_t receiver_id = receiver->receiver_permissions.receiver;
+
+		receiver_id = receiver->receiver_permissions.receiver;
 
 		to = vm_find(receiver_id);
 
@@ -3530,7 +3533,9 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 			goto out;
 		}
 
-		if (!plat_ffa_is_memory_send_valid(receiver_id, share_func)) {
+		if (!plat_ffa_is_memory_send_valid(
+			    receiver_id, from->id, share_func,
+			    memory_region->receiver_count > 1)) {
 			ret = ffa_error(FFA_DENIED);
 			goto out;
 		}

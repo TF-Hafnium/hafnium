@@ -240,29 +240,41 @@ bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	return false;
 }
 
-/**
- * Check validity of the FF-A memory send function attempt.
- */
-bool plat_ffa_is_memory_send_valid(ffa_id_t receiver_vm_id, uint32_t share_func)
+/** Check validity of the FF-A memory send function attempt. */
+bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
+				   uint32_t share_func, bool multiple_borrower)
 {
-	bool result = false;
+	bool result;
+	const bool is_receiver_sp = vm_id_is_current_world(receiver);
+	const bool is_sender_sp = vm_id_is_current_world(sender);
 
 	/*
 	 * SPs can only share/lend/donate to another SP.
+	 * VMs can send memory to SPs.
+	 * In a multiple borrower operation, VMs might provide descriptors
+	 * of other VMs.
+	 * Refer to the section 1.4 of the FF-A v1.2 Memory Management
+	 * supplement ALP0 specification.
 	 */
 	switch (share_func) {
 	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32:
 	case FFA_MEM_LEND_64:
 	case FFA_MEM_LEND_32:
+		result = is_receiver_sp;
+		break;
 	case FFA_MEM_SHARE_64:
 	case FFA_MEM_SHARE_32:
-		/* SP to VM not allowed, VM to VM should not end up here */
-		result = vm_id_is_current_world(receiver_vm_id);
+		result = (is_sender_sp && is_receiver_sp) ||
+			 (!is_sender_sp && !multiple_borrower &&
+			  is_receiver_sp) ||
+			 (!is_sender_sp && multiple_borrower);
+
 		if (!result) {
 			dlog_verbose(
-				"SPMC only supports memory sharing operations "
-				"for SPs as the receiver(s).\n");
+				"SPMC only supports memory operations to a "
+				"single SP, or multiple borrowers with mixed "
+				"world borrowers.\n");
 		}
 		break;
 	default:

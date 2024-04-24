@@ -188,7 +188,8 @@ bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 /**
  * Check validity of the FF-A memory send function attempt.
  */
-bool plat_ffa_is_memory_send_valid(ffa_id_t receiver_vm_id, uint32_t share_func)
+bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
+				   uint32_t share_func, bool multiple_borrower)
 {
 	/*
 	 * Currently memory interfaces are not forwarded from hypervisor to
@@ -197,7 +198,10 @@ bool plat_ffa_is_memory_send_valid(ffa_id_t receiver_vm_id, uint32_t share_func)
 	 */
 
 	(void)share_func;
-	(void)receiver_vm_id;
+	(void)receiver;
+	(void)sender;
+	(void)multiple_borrower;
+
 	return true;
 }
 

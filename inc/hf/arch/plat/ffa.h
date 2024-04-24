@@ -61,8 +61,8 @@ struct ffa_value plat_ffa_spmc_id_get(void);
 void plat_ffa_log_init(void);
 void plat_ffa_set_tee_enabled(bool tee_enabled);
 void plat_ffa_init(struct mpool *ppool);
-bool plat_ffa_is_memory_send_valid(ffa_id_t receiver_vm_id,
-				   uint32_t share_func);
+bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
+				   uint32_t share_func, bool multiple_borrower);
 
 bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 				      ffa_id_t sender_vm_id,
