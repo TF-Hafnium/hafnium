@@ -3229,6 +3229,37 @@ static struct ffa_value ffa_memory_retrieve_validate(
 	return ffa_memory_attributes_validate(retrieve_request->attributes);
 }
 
+/**
+ * Whilst processing the retrieve request, the operation could be aborted, and
+ * changes to page tables and the share state structures need to be reverted.
+ */
+static void ffa_partition_memory_retrieve_request_undo(
+	struct vm_locked from_locked,
+	struct ffa_memory_share_state *share_state, uint32_t receiver_index)
+{
+	/*
+	 * Currently this operation is expected for operations involving the
+	 * 'other_world' vm.
+	 */
+	assert(from_locked.vm->id == HF_OTHER_WORLD_ID);
+	assert(share_state->retrieved_fragment_count[receiver_index] > 0);
+
+	/* Decrement the retrieved fragment count for the given receiver. */
+	share_state->retrieved_fragment_count[receiver_index]--;
+}
+
+/**
+ * Whilst processing an hypervisor retrieve request the operation could be
+ * aborted. There were no updates to PTs in this case, so decrementing the
+ * fragment count retrieved by the hypervisor should be enough.
+ */
+static void ffa_hypervisor_memory_retrieve_request_undo(
+	struct ffa_memory_share_state *share_state)
+{
+	assert(share_state->hypervisor_fragment_count > 0);
+	share_state->hypervisor_fragment_count--;
+}
+
 static struct ffa_value ffa_partition_retrieve_request(
 	struct share_states_locked share_states,
 	struct ffa_memory_share_state *share_state, struct vm_locked to_locked,
@@ -3363,6 +3394,10 @@ static struct ffa_value ffa_partition_retrieve_request(
 			"%s: aborted the copy of response to RX buffer of "
 			"%x.\n",
 			__func__, to_locked.vm->id);
+
+		ffa_partition_memory_retrieve_request_undo(
+			to_locked, share_state, receiver_index);
+
 		return ffa_error(FFA_ABORTED);
 	}
 
@@ -3413,8 +3448,6 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 	}
 
 	share_state->hypervisor_fragment_count = 1;
-
-	ffa_memory_retrieve_complete_from_hyp(share_state);
 
 	/* VMs acquire the RX buffer from SPMC. */
 	CHECK(plat_ffa_acquire_receiver_rx(to_locked, &ret));
@@ -3467,8 +3500,13 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 			"%s: aborted the copy of response to RX buffer of "
 			"%x.\n",
 			__func__, to_locked.vm->id);
+
+		ffa_hypervisor_memory_retrieve_request_undo(share_state);
+
 		return ffa_error(FFA_ABORTED);
 	}
+
+	ffa_memory_retrieve_complete_from_hyp(share_state);
 
 	return ffa_memory_retrieve_resp(total_length, fragment_length);
 }
