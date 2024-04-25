@@ -3961,13 +3961,18 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 
 	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
 		if (share_state->retrieved_fragment_count[i] != 0) {
+			struct ffa_memory_access *receiver =
+				ffa_memory_region_get_receiver(memory_region,
+							       i);
+
+			assert(receiver != NULL);
+			(void)receiver;
 			dlog_verbose(
 				"Tried to reclaim memory handle %#lx "
 				"that has not been relinquished by all "
 				"borrowers(%x).\n",
 				handle,
-				ffa_memory_region_get_receiver(memory_region, i)
-					->receiver_permissions.receiver);
+				receiver->receiver_permissions.receiver);
 			ret = ffa_error(FFA_DENIED);
 			goto out;
 		}
