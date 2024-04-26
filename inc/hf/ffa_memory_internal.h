@@ -131,6 +131,7 @@ struct ffa_memory_share_state {
  * Actions that can be taken by function `ffa_region_group_identity_map`.
  */
 enum ffa_map_action {
+	MAP_ACTION_NONE,
 	MAP_ACTION_CHECK,
 	MAP_ACTION_CHECK_PROTECT,
 	MAP_ACTION_COMMIT,

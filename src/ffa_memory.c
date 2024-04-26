@@ -834,12 +834,29 @@ static struct ffa_value ffa_relinquish_check_transition(
 	struct vm_locked from, uint32_t *orig_from_mode,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t *from_mode)
+	uint32_t *from_mode, enum ffa_map_action *map_action)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 	uint32_t orig_from_state;
 	struct ffa_value ret;
+
+	assert(map_action != NULL);
+	if (vm_id_is_current_world(from.vm->id)) {
+		*map_action = MAP_ACTION_COMMIT;
+	} else {
+		/*
+		 * No need to check the attributes of caller.
+		 * The assumption is that the retrieve request of the receiver
+		 * also used the MAP_ACTION_NONE, and no update was done to the
+		 * page tables. When the receiver is not at the secure virtual
+		 * instance SPMC doesn't manage its S2 translation (i.e. when
+		 * the receiver is a VM).
+		 */
+		*map_action = MAP_ACTION_NONE;
+
+		return (struct ffa_value){.func = FFA_SUCCESS_32};
+	}
 
 	ret = constituents_get_mode(from, orig_from_mode, fragments,
 				    fragment_constituent_counts,
@@ -939,6 +956,12 @@ struct ffa_value ffa_retrieve_check_transition(
 			*map_action = MAP_ACTION_COMMIT_UNPROTECT;
 		}
 	} else {
+		if (!vm_id_is_current_world(to.vm->id)) {
+			assert(map_action != NULL);
+			*map_action = MAP_ACTION_NONE;
+			return (struct ffa_value){.func = FFA_SUCCESS_32};
+		}
+
 		/*
 		 * If the retriever is from virtual FF-A instance:
 		 * Ensure the retriever has the expected state. We don't care
@@ -1622,23 +1645,31 @@ struct ffa_value ffa_retrieve_check_update(
 	}
 
 	/*
-	 * Create a local pool so any freed memory can't be used by another
-	 * thread. This is to ensure the original mapping can be restored if the
-	 * clear fails.
+	 * Create a local pool so any freed memory can't be used by
+	 * another thread. This is to ensure the original mapping can be
+	 * restored if the clear fails.
 	 */
 	mpool_init_with_fallback(&local_page_pool, page_pool);
 
 	/*
-	 * First reserve all required memory for the new page table entries in
-	 * the recipient page tables without committing, to make sure the entire
-	 * operation will succeed without exhausting the page pool.
+	 * Memory retrieves from the NWd VMs don't require update to S2 PTs on
+	 * retrieve request.
 	 */
-	ret = ffa_region_group_identity_map(
-		to_locked, fragments, fragment_constituent_counts,
-		fragment_count, to_mode, page_pool, MAP_ACTION_CHECK, NULL);
-	if (ret.func == FFA_ERROR_32) {
-		/* TODO: partial defrag of failed range. */
-		goto out;
+	if (map_action != MAP_ACTION_NONE) {
+		/*
+		 * First reserve all required memory for the new page table
+		 * entries in the recipient page tables without committing, to
+		 * make sure the entire operation will succeed without
+		 * exhausting the page pool.
+		 */
+		ret = ffa_region_group_identity_map(
+			to_locked, fragments, fragment_constituent_counts,
+			fragment_count, to_mode, page_pool, MAP_ACTION_CHECK,
+			NULL);
+		if (ret.func == FFA_ERROR_32) {
+			/* TODO: partial defrag of failed range. */
+			goto out;
+		}
 	}
 
 	/* Clear the memory so no VM or device can see the previous contents. */
@@ -1651,19 +1682,25 @@ struct ffa_value ffa_retrieve_check_update(
 		goto out;
 	}
 
-	/*
-	 * Complete the transfer by mapping the memory into the recipient. This
-	 * won't allocate because the transaction was already prepared above, so
-	 * it doesn't need to use the `local_page_pool`.
-	 */
-	CHECK(ffa_region_group_identity_map(
-		      to_locked, fragments, fragment_constituent_counts,
-		      fragment_count, to_mode, page_pool, map_action, NULL)
-		      .func == FFA_SUCCESS_32);
+	if (map_action != MAP_ACTION_NONE) {
+		/*
+		 * Complete the transfer by mapping the memory into the
+		 * recipient. This won't allocate because the transaction was
+		 * already prepared above, so it doesn't need to use the
+		 * `local_page_pool`.
+		 */
+		CHECK(ffa_region_group_identity_map(to_locked, fragments,
+						    fragment_constituent_counts,
+						    fragment_count, to_mode,
+						    page_pool, map_action, NULL)
+			      .func == FFA_SUCCESS_32);
 
-	/* Return the mode used in mapping the memory in retriever's PT. */
-	if (response_mode != NULL) {
-		*response_mode = to_mode;
+		/*
+		 * Return the mode used in mapping the memory in retriever's PT.
+		 */
+		if (response_mode != NULL) {
+			*response_mode = to_mode;
+		}
 	}
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
@@ -1684,16 +1721,19 @@ static struct ffa_value ffa_relinquish_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	struct mpool *page_pool, bool clear)
+	uint32_t sender_orig_mode, struct mpool *page_pool, bool clear)
 {
 	uint32_t orig_from_mode;
+	uint32_t clearing_mode;
 	uint32_t from_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
+	enum ffa_map_action map_action;
 
 	ret = ffa_relinquish_check_transition(
 		from_locked, &orig_from_mode, fragments,
-		fragment_constituent_counts, fragment_count, &from_mode);
+		fragment_constituent_counts, fragment_count, &from_mode,
+		&map_action);
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition for relinquish.\n");
 		return ret;
@@ -1706,48 +1746,64 @@ static struct ffa_value ffa_relinquish_check_update(
 	 */
 	mpool_init_with_fallback(&local_page_pool, page_pool);
 
-	/*
-	 * First reserve all required memory for the new page table entries
-	 * without committing, to make sure the entire operation will succeed
-	 * without exhausting the page pool.
-	 */
-	ret = ffa_region_group_identity_map(
-		from_locked, fragments, fragment_constituent_counts,
-		fragment_count, from_mode, page_pool, MAP_ACTION_CHECK, NULL);
-	if (ret.func == FFA_ERROR_32) {
-		goto out;
-	}
+	if (map_action != MAP_ACTION_NONE) {
+		clearing_mode = orig_from_mode;
 
-	/*
-	 * Update the mapping for the sender. This won't allocate because the
-	 * transaction was already prepared above, but may free pages in the
-	 * case that a whole block is being unmapped that was previously
-	 * partially mapped.
-	 */
-	CHECK(ffa_region_group_identity_map(
-		      from_locked, fragments, fragment_constituent_counts,
-		      fragment_count, from_mode, &local_page_pool,
-		      MAP_ACTION_COMMIT, NULL)
-		      .func == FFA_SUCCESS_32);
+		/*
+		 * First reserve all required memory for the new page table
+		 * entries without committing, to make sure the entire operation
+		 * will succeed without exhausting the page pool.
+		 */
+		ret = ffa_region_group_identity_map(
+			from_locked, fragments, fragment_constituent_counts,
+			fragment_count, from_mode, page_pool, MAP_ACTION_CHECK,
+			NULL);
+		if (ret.func == FFA_ERROR_32) {
+			goto out;
+		}
+
+		/*
+		 * Update the mapping for the sender. This won't allocate
+		 * because the transaction was already prepared above, but may
+		 * free pages in the case that a whole block is being unmapped
+		 * that was previously partially mapped.
+		 */
+		CHECK(ffa_region_group_identity_map(from_locked, fragments,
+						    fragment_constituent_counts,
+						    fragment_count, from_mode,
+						    &local_page_pool,
+						    MAP_ACTION_COMMIT, NULL)
+			      .func == FFA_SUCCESS_32);
+	} else {
+		/*
+		 * If the `map_action` is set to `MAP_ACTION_NONE`, S2 PTs
+		 * were not updated on retrieve/relinquish. These were updating
+		 * only the `share_state` structures. As such, use the sender's
+		 * original mode.
+		 */
+		clearing_mode = sender_orig_mode;
+	}
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear &&
-	    !ffa_clear_memory_constituents(orig_from_mode, fragments,
+	    !ffa_clear_memory_constituents(clearing_mode, fragments,
 					   fragment_constituent_counts,
 					   fragment_count, page_pool)) {
-		/*
-		 * On failure, roll back by returning memory to the sender. This
-		 * may allocate pages which were previously freed into
-		 * `local_page_pool` by the call above, but will never allocate
-		 * more pages than that so can never fail.
-		 */
-		CHECK(ffa_region_group_identity_map(
-			      from_locked, fragments,
-			      fragment_constituent_counts, fragment_count,
-			      orig_from_mode, &local_page_pool,
-			      MAP_ACTION_COMMIT, NULL)
-			      .func == FFA_SUCCESS_32);
-
+		if (map_action != MAP_ACTION_NONE) {
+			/*
+			 * On failure, roll back by returning memory to the
+			 * sender. This may allocate pages which were previously
+			 * freed into `local_page_pool` by the call above, but
+			 * will never allocate more pages than that so can never
+			 * fail.
+			 */
+			CHECK(ffa_region_group_identity_map(
+				      from_locked, fragments,
+				      fragment_constituent_counts,
+				      fragment_count, orig_from_mode,
+				      &local_page_pool, MAP_ACTION_COMMIT, NULL)
+				      .func == FFA_SUCCESS_32);
+		}
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
@@ -3799,7 +3855,8 @@ struct ffa_value ffa_memory_relinquish(
 	ret = ffa_relinquish_check_update(
 		from_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
-		share_state->fragment_count, page_pool, clear);
+		share_state->fragment_count, share_state->sender_orig_mode,
+		page_pool, clear);
 
 	if (ret.func == FFA_SUCCESS_32) {
 		/*
