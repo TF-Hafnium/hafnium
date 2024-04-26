@@ -39,9 +39,8 @@ static_assert((PAGE_SIZE % STACK_ALIGN) == 0,
  * TOCTOU issues while Hafnium performs actions on information that would
  * otherwise be re-writable by the VM.
  *
- * Each buffer is owned by a single CPU. The buffer can only be used for
- * ffa_msg_send. The information stored in the buffer is only valid during the
- * ffa_msg_send request is performed.
+ * Each buffer is owned by a single CPU. Can be used when handling FF-A memory
+ * management ABIs, and FF-A Indirect Messaging.
  */
 alignas(PAGE_SIZE) static uint8_t cpu_message_buffer[MAX_CPUS][PAGE_SIZE];
 

@@ -3682,15 +3682,118 @@ out:
 	return ret;
 }
 
+/**
+ * Copies the memory relinquish descriptor from the partition's TX buffer, to
+ * the buffer of the local CPU. Do it safely, and return error if:
+ * - FFA_ABORTED: if the `memcpy_trapped` fails.
+ * - FFA_INVALID_PARAMETERS: if the size of the full memory relinquish
+ * descriptor doesn't fit the local CPU buffer.
+ *
+ * Returns FFA_SUCCESS if copying goes well, and sets 'out_relinquish'
+ * to the address of the cpu buffer with the relinquish descriptor.
+ */
+static struct ffa_value api_get_ffa_mem_relinquish_descriptor(
+	struct vcpu *current, const void *from_msg,
+	struct ffa_mem_relinquish **out_relinquish)
+{
+	struct ffa_mem_relinquish *relinquish_request;
+	uint32_t from_msg_size;
+	uint32_t total_from_msg_size;
+	uint32_t dst_size;
+	vaddr_t dst;
+	vaddr_t src;
+
+	assert(from_msg != NULL);
+	assert(out_relinquish != NULL);
+
+	/*
+	 * Copy the relinquish descriptor to an internal buffer, so that the
+	 * caller can't change it underneath us.
+	 */
+	relinquish_request =
+		(struct ffa_mem_relinquish *)cpu_get_buffer(current->cpu);
+
+	/* Set the destination for the copy. */
+	dst = va_from_ptr(relinquish_request);
+	src = va_from_ptr(from_msg);
+
+	dst_size = cpu_get_buffer_size(current->cpu);
+
+	/* Only copy the size to start with. */
+	from_msg_size = sizeof(struct ffa_mem_relinquish);
+	total_from_msg_size = from_msg_size;
+
+	if (!memcpy_trapped(ptr_from_va(dst), dst_size, ptr_from_va(src),
+			    from_msg_size)) {
+		dlog_error(
+			"%s: Failed to copy FF-A memory relinquish "
+			"descriptor.\n",
+			__func__);
+		return ffa_error(FFA_ABORTED);
+	}
+
+	if (relinquish_request->endpoint_count != 1) {
+		dlog_error("%s: relinquish descriptor must have 1 endpoint\n",
+			   __func__);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * Increment the `dst` to the position right after the copied header.
+	 * Increment the `src` to point at the list of endpoints.
+	 *
+	 * Calculate the new `dst_size` which is the size of the allocated cpu
+	 * buffer, minus the size of the copied memory relinquish header.
+	 *
+	 * Only after the above: determine the new `from_msg_size` in accordance
+	 * to the endpoint count.
+	 */
+	dst = va_add(dst, from_msg_size);
+	src = va_add(src, from_msg_size);
+
+	/*
+	 * Check if it is safe to copy the rest of the message.
+	 * This also serves as a santiy check to 'endpoint_count'.
+	 * The size of what is left in the descriptor, based on endpoint_count,
+	 * shall not be bigger than the size of the mailbox minus the size of
+	 * the header which was previously copied in this function.
+	 */
+	dst_size -= from_msg_size;
+	from_msg_size = relinquish_request->endpoint_count * sizeof(ffa_id_t);
+	total_from_msg_size += from_msg_size;
+
+	if (total_from_msg_size > HF_MAILBOX_SIZE ||
+	    total_from_msg_size > dst_size) {
+		dlog_verbose(
+			"Relinquish message too long. Endpoint count: %u\n",
+			relinquish_request->endpoint_count);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Copy the remaining fragment. */
+	if (!memcpy_trapped(ptr_from_va(dst), dst_size, ptr_from_va(src),
+			    from_msg_size)) {
+		dlog_error("%s: Failed to copy FF-A relinquish request.\n",
+			   __func__);
+		return ffa_error(FFA_ABORTED);
+	}
+
+	/*
+	 * Set the output address for the relinquish descriptor to the current
+	 * cpu's buffer.
+	 */
+	*out_relinquish = relinquish_request;
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
 struct ffa_value api_ffa_mem_relinquish(struct vcpu *current)
 {
 	struct vm *from = current->vm;
 	struct vm_locked from_locked;
 	const void *from_msg;
-	struct ffa_mem_relinquish *relinquish_request;
-	uint32_t message_buffer_size;
 	struct ffa_value ret;
-	uint32_t length;
+	struct ffa_mem_relinquish *relinquish_request;
 
 	from_locked = vm_lock(from);
 	from_msg = from->mailbox.send;
@@ -3701,46 +3804,17 @@ struct ffa_value api_ffa_mem_relinquish(struct vcpu *current)
 		goto out;
 	}
 
+	ret = api_get_ffa_mem_relinquish_descriptor(current, from_msg,
+						    &relinquish_request);
+
 	/*
-	 * Calculate length from relinquish descriptor before copying. We will
-	 * check again later to make sure it hasn't changed.
+	 * If the descriptor was safely copied, continue with the handling of
+	 * the retrieve request.
 	 */
-	length = sizeof(struct ffa_mem_relinquish) +
-		 ((struct ffa_mem_relinquish *)from_msg)->endpoint_count *
-			 sizeof(ffa_id_t);
-	/*
-	 * Copy the relinquish descriptor to an internal buffer, so that the
-	 * caller can't change it underneath us.
-	 */
-	relinquish_request =
-		(struct ffa_mem_relinquish *)cpu_get_buffer(current->cpu);
-	message_buffer_size = cpu_get_buffer_size(current->cpu);
-	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
-		dlog_verbose("Relinquish message too long.\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
+	if (ret.func == FFA_SUCCESS_32) {
+		ret = ffa_memory_relinquish(from_locked, relinquish_request,
+					    &api_page_pool);
 	}
-
-	if (!memcpy_trapped(relinquish_request, message_buffer_size, from_msg,
-			    length)) {
-		dlog_error("%s: Failed to copy FF-A relinquish request.\n",
-			   __func__);
-		ret = ffa_error(FFA_ABORTED);
-		goto out;
-	}
-
-	if (sizeof(struct ffa_mem_relinquish) +
-		    relinquish_request->endpoint_count * sizeof(ffa_id_t) !=
-	    length) {
-		dlog_verbose(
-			"Endpoint count changed while copying to internal "
-			"buffer.\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	ret = ffa_memory_relinquish(from_locked, relinquish_request,
-				    &api_page_pool);
 
 out:
 	vm_unlock(&from_locked);
