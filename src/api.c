@@ -474,8 +474,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		if (buffer_size > HF_MAILBOX_SIZE) {
 			dlog_error(
 				"Partition information does not fit in the "
-				"VM's RX "
-				"buffer.\n");
+				"VM's RX buffer.\n");
 			return ffa_error(FFA_NO_MEMORY);
 		}
 
@@ -3273,8 +3272,7 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	}
 
 	dlog_verbose(
-		"Updating memory transaction descriptor "
-		" from v1.0 to v1.1.\n");
+		"Updating memory transaction descriptor from v1.0 to v1.1.\n");
 
 	memory_region_v1_0 = (struct ffa_memory_region_v1_0 *)allocated;
 
@@ -3508,8 +3506,8 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	     share_func == FFA_MEM_DONATE_64) &&
 	    memory_region->receiver_count != 1U) {
 		dlog_verbose(
-			"FFA_MEM_DONATE only supports one recipient. "
-			"Specified %u\n",
+			"FFA_MEM_DONATE only supports one recipient. Specified "
+			"%u\n",
 			memory_region->receiver_count);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;

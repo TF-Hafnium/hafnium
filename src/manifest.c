@@ -1376,8 +1376,8 @@ enum manifest_return_code parse_ffa_manifest(
 	} else if (vm->partition.other_s_interrupts_action >
 		   OTHER_S_INT_ACTION_SIGNALED) {
 		dlog_error(
-			"Illegal value specified for the field"
-			" 'other-s-interrupts-action': %u\n",
+			"Illegal value specified for the field "
+			"'other-s-interrupts-action': %u\n",
 			vm->partition.other_s_interrupts_action);
 		return MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION;
 	}
@@ -1496,8 +1496,8 @@ static enum manifest_return_code parse_ffa_partition_package(
 
 	if (vm->partition.load_addr != load_address) {
 		dlog_warning(
-			"Partition's load address at its manifest differs"
-			" from specified in partition's package.\n");
+			"Partition's load address at its manifest differs from "
+			"specified in partition's package.\n");
 		vm->partition.load_addr = load_address;
 	}
 

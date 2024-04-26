@@ -2970,8 +2970,8 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 				    retrieve_request_receiver->impdef.val[1]) {
 				dlog_verbose(
 					"Impdef value in memory send does not "
-					"match retrieve request value "
-					"send value %#lx %#lx retrieve request "
+					"match retrieve request value send "
+					"value %#lx %#lx retrieve request "
 					"value %#lx %#lx\n",
 					receiver->impdef.val[0],
 					receiver->impdef.val[1],
@@ -3114,8 +3114,7 @@ static struct ffa_value ffa_memory_retrieve_validate(
 
 		if (other_world_count > 1) {
 			dlog_verbose(
-				"Support one receiver from the other "
-				"world.\n");
+				"Support one receiver from the other world.\n");
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 	}
@@ -3785,8 +3784,8 @@ struct ffa_value ffa_memory_relinquish(
 
 	if (relinquish_request->endpoint_count != 1) {
 		dlog_verbose(
-			"Stream endpoints not supported (got %d "
-			"endpoints on FFA_MEM_RELINQUISH, expected 1).\n",
+			"Stream endpoints not supported (got %d endpoints on "
+			"FFA_MEM_RELINQUISH, expected 1).\n",
 			relinquish_request->endpoint_count);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -3794,8 +3793,8 @@ struct ffa_value ffa_memory_relinquish(
 	if (vm_id_is_current_world(from_locked.vm->id) &&
 	    relinquish_request->endpoints[0] != from_locked.vm->id) {
 		dlog_verbose(
-			"VM ID %d in relinquish message doesn't match "
-			"calling VM ID %d.\n",
+			"VM ID %d in relinquish message doesn't match calling "
+			"VM ID %d.\n",
 			relinquish_request->endpoints[0], from_locked.vm->id);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -3838,8 +3837,7 @@ struct ffa_value ffa_memory_relinquish(
 	if (share_state->retrieved_fragment_count[receiver_index] !=
 	    share_state->fragment_count) {
 		dlog_verbose(
-			"Memory with handle %#lx not yet fully "
-			"retrieved, "
+			"Memory with handle %#lx not yet fully retrieved, "
 			"receiver %x can't relinquish.\n",
 			handle, from_locked.vm->id);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -3969,9 +3967,8 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 			assert(receiver != NULL);
 			(void)receiver;
 			dlog_verbose(
-				"Tried to reclaim memory handle %#lx "
-				"that has not been relinquished by all "
-				"borrowers(%x).\n",
+				"Tried to reclaim memory handle %#lx that has "
+				"not been relinquished by all borrowers(%x).\n",
 				handle,
 				receiver->receiver_permissions.receiver);
 			ret = ffa_error(FFA_DENIED);
