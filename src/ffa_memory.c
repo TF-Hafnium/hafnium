@@ -3791,7 +3791,8 @@ struct ffa_value ffa_memory_relinquish(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (relinquish_request->endpoints[0] != from_locked.vm->id) {
+	if (vm_id_is_current_world(from_locked.vm->id) &&
+	    relinquish_request->endpoints[0] != from_locked.vm->id) {
 		dlog_verbose(
 			"VM ID %d in relinquish message doesn't match "
 			"calling VM ID %d.\n",
@@ -3823,7 +3824,7 @@ struct ffa_value ffa_memory_relinquish(
 	CHECK(memory_region != NULL);
 
 	receiver_index = ffa_memory_region_get_receiver_index(
-		memory_region, from_locked.vm->id);
+		memory_region, relinquish_request->endpoints[0]);
 
 	if (receiver_index == memory_region->receiver_count) {
 		dlog_verbose(
