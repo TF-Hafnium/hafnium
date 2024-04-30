@@ -27,6 +27,8 @@ struct spinlock {
 
 static inline void sl_init(struct spinlock *l)
 {
+	(void)l;
+
 #if !defined(__cplusplus)
 	*l = SPINLOCK_INIT;
 #endif

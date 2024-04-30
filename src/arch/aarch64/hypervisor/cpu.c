@@ -59,6 +59,9 @@ static void lor_disable(void)
 
 static void gic_regs_reset(struct arch_regs *r, bool is_primary)
 {
+	(void)r;
+	(void)is_primary;
+
 #if GIC_VERSION == 3 || GIC_VERSION == 4
 	uint32_t ich_hcr = 0;
 	uint32_t icc_sre_el2 =

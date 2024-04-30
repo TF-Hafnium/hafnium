@@ -35,6 +35,9 @@ bool hftest_mm_get_mode(const void *base, size_t size, uint32_t *mode)
 
 void hftest_mm_identity_map(const void *base, size_t size, uint32_t mode)
 {
+	(void)base;
+	(void)size;
+	(void)mode;
 }
 
 void hftest_mm_vcpu_init(void)

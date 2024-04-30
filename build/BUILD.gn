@@ -10,10 +10,11 @@ import("//build/toolchain/platform.gni")
 config("compiler_defaults") {
   cflags = [
     "-gdwarf-4",
-    "-Wall",
     "-O2",
 
-    #"-Wextra",
+    "-Wall",
+    "-Wextra",
+    "-Wno-sign-compare",
     "-Wpedantic",
     "-Werror",
 
@@ -22,7 +23,10 @@ config("compiler_defaults") {
 
   cflags_c = [ "-std=c11" ]
 
-  cflags_cc = [ "-std=c++2a" ]
+  cflags_cc = [
+    "-std=c++2a",
+    "-Wno-extra",
+  ]
 }
 
 # Platform configuration.

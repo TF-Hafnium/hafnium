@@ -1392,6 +1392,10 @@ bool plat_iommu_unmap_iommus(struct vm_locked vm_locked, struct mpool *ppool)
 void plat_iommu_identity_map(struct vm_locked vm_locked, paddr_t begin,
 			     paddr_t end, uint32_t mode)
 {
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)mode;
 }
 
 bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
