@@ -41,7 +41,8 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 {
 	hftest_set_dir_req_source_id(ffa_sender(res));
 
-	switch (res.arg3) {
+	enum sp_cmd cmd = res.arg3;
+	switch (cmd) {
 	case SP_ECHO_CMD:
 		res = sp_echo_cmd(ffa_sender(res), res.arg3, res.arg4, res.arg5,
 				  res.arg6, res.arg7);
