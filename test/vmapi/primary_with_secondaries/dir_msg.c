@@ -722,6 +722,7 @@ TEST_PRECONDITION(direct_message, fail_if_cyclic_dependency_v1_2,
  * Send a direct message request via FFA_MSG_SEND_DIR_REQ2 to each of the target
  * partition's UUIDs and  verify that sent info is echoed back.
  */
+// NOLINTNEXTLINE(readability-function-size)
 TEST_PRECONDITION(direct_message, ffa_send_direct_message_req2_multiple_uuids,
 		  service1_and_service2_are_secure)
 {
@@ -832,6 +833,7 @@ TEST(direct_message, ffa_direct_msg_check_abi_pairs_nwd_to_sp)
  * Run twice to cover the reverse scenario - SP enters waiting state with
  * FFA_MSG_SEND_DIRECT_RESP2 and is resumed by FFA_MSG_SEND_DIRECT_REQ.
  */
+// NOLINTNEXTLINE(readability-function-size)
 TEST(direct_message, ffa_direct_message_req2_after_req)
 {
 	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,

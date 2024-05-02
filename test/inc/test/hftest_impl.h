@@ -219,13 +219,20 @@ struct hftest_test {
 #ifdef HFTEST_OPTIMIZE_FOR_SIZE
 #define HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op)
 #else /* HFTEST_OPTIMIZE_FOR_SIZE */
-#define HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op)                              \
-	dlog(HFTEST_LOG_PREFIX HFTEST_LOG_INDENT "%s %s %s (%s=", #lhs, #op, \
-	     #rhs, #lhs);                                                    \
-	dlog(hftest_dlog_format(lhs), lhs_value);                            \
-	dlog(", %s=", #rhs);                                                 \
-	dlog(hftest_dlog_format(rhs), rhs_value);                            \
-	dlog(")\n");
+#define HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op)                                \
+	do {                                                                   \
+		char lhs_fmt[] = HFTEST_LOG_PREFIX "lhs = %_ (%#x)\n";         \
+		char rhs_fmt[] = HFTEST_LOG_PREFIX "rhs = %_ (%#x)\n";         \
+		const size_t index = sizeof(HFTEST_LOG_PREFIX "lhs = %_") - 2; \
+		lhs_fmt[index] = hftest_dlog_format(lhs)[1];                   \
+		rhs_fmt[index] = hftest_dlog_format(rhs)[1];                   \
+		dlog(HFTEST_LOG_PREFIX "assertion failed: `%s %s %s`\n", #lhs, \
+		     #op, #rhs);                                               \
+		dlog(lhs_fmt, lhs_value, lhs_value);                           \
+		dlog(rhs_fmt, rhs_value, rhs_value);                           \
+		dlog("\n");                                                    \
+	} while (0)
+
 #endif /* HFTEST_OPTIMIZE_FOR_SIZE */
 
 #define HFTEST_ASSERT_OP(lhs, rhs, op, fatal)                              \
