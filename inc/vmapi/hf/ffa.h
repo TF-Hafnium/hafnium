@@ -106,16 +106,18 @@
  * FF-A error codes.
  * Don't forget to update `ffa_error_name` if you add a new one.
  */
-#define FFA_NOT_SUPPORTED      INT32_C(-1)
-#define FFA_INVALID_PARAMETERS INT32_C(-2)
-#define FFA_NO_MEMORY          INT32_C(-3)
-#define FFA_BUSY               INT32_C(-4)
-#define FFA_INTERRUPTED        INT32_C(-5)
-#define FFA_DENIED             INT32_C(-6)
-#define FFA_RETRY              INT32_C(-7)
-#define FFA_ABORTED            INT32_C(-8)
-#define FFA_NO_DATA            INT32_C(-9)
-#define FFA_NOT_READY          INT32_C(-10)
+enum ffa_error {
+	FFA_NOT_SUPPORTED      = -1,
+	FFA_INVALID_PARAMETERS = -2,
+	FFA_NO_MEMORY          = -3,
+	FFA_BUSY               = -4,
+	FFA_INTERRUPTED        = -5,
+	FFA_DENIED             = -6,
+	FFA_RETRY              = -7,
+	FFA_ABORTED            = -8,
+	FFA_NO_DATA            = -9,
+	FFA_NOT_READY          = -10,
+};
 
 /* clang-format on */
 
@@ -234,7 +236,7 @@ static inline const char *ffa_func_name(uint32_t func)
 }
 
 /* Return the name of the error code. */
-static inline const char *ffa_error_name(int32_t error)
+static inline const char *ffa_error_name(enum ffa_error error)
 {
 	switch (error) {
 	case FFA_NOT_SUPPORTED:
@@ -255,9 +257,10 @@ static inline const char *ffa_error_name(int32_t error)
 		return "FFA_ABORTED";
 	case FFA_NO_DATA:
 		return "FFA_NO_DATA";
-	default:
-		return "UNKNOWN";
+	case FFA_NOT_READY:
+		return "FFA_NOT_READY";
 	}
+	return "UNKNOWN";
 }
 
 /**
@@ -624,9 +627,9 @@ static inline uint32_t ffa_func_id(struct ffa_value args)
 	return args.func;
 }
 
-static inline int32_t ffa_error_code(struct ffa_value val)
+static inline enum ffa_error ffa_error_code(struct ffa_value val)
 {
-	return (int32_t)val.arg2;
+	return (enum ffa_error)val.arg2;
 }
 
 static inline ffa_id_t ffa_sender(struct ffa_value args)
