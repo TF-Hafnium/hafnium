@@ -1017,7 +1017,12 @@ TEST(ffa, ffa_partition_info)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
-TEST(ffa, ffa_partition_info_v1_0)
+SET_UP(ffa_v1_0)
+{
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_COMPILED);
+}
+
+TEST(ffa_v1_0, ffa_partition_info_v1_0)
 {
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
@@ -1031,10 +1036,8 @@ TEST(ffa, ffa_partition_info_v1_0)
 	mb = set_up_mailbox();
 	partitions = mb.recv;
 	/*
-	 * Set ffa_version to v1.0 and test the correct descriptor is
-	 * returned
+	 * Test the correct descriptor is returned
 	 */
-	ffa_version(FFA_VERSION_1_0);
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	/* There should only be the primary VM in this test. */
@@ -1051,4 +1054,69 @@ TEST(ffa, ffa_partition_info_v1_0)
 
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Major and minor versions match exactly, so they are compatible.
+ */
+TEST(ffa_version, succeeds_current_version)
+{
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+}
+
+/**
+ * Major versions are equal, and caller's minor version is < callee's minor
+ * version, so they are compatible.
+ */
+TEST(ffa_version, succeeds_older_compatible_version)
+{
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
+}
+
+/**
+ * Highest bit must be unset.
+ */
+TEST(ffa_version, fails_highest_bit_set)
+{
+	EXPECT_EQ((enum ffa_error)ffa_version(-1), FFA_NOT_SUPPORTED);
+}
+
+/**
+ * Caller's major version is < callee's major version, so they are incompatible.
+ */
+TEST(ffa_version, fails_major_version_too_low)
+{
+	EXPECT_EQ((enum ffa_error)ffa_version(make_ffa_version(0, 1)),
+		  FFA_NOT_SUPPORTED);
+}
+
+/**
+ * Caller's major version is > callee's major version, so they are incompatible.
+ */
+TEST(ffa_version, fails_major_version_too_high)
+{
+	EXPECT_EQ((enum ffa_error)ffa_version(make_ffa_version(2, 0)),
+		  FFA_NOT_SUPPORTED);
+}
+
+/**
+ * Major versions are equal, but caller's minor version is > callee's minor
+ * version, so they are incompatible.
+ */
+TEST(ffa_version, fails_minor_version_too_high)
+{
+	EXPECT_EQ((enum ffa_error)ffa_version(make_ffa_version(1, 3)),
+		  FFA_NOT_SUPPORTED);
+}
+
+/**
+ * Version is compatible, but version has already been negotiated and other ABI
+ * calls have been made, so the version cannot be changed.
+ */
+TEST(ffa_version, fails_change_after_other_abis_used)
+{
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_features(FFA_VERSION_32).func, FFA_SUCCESS_32);
+	EXPECT_EQ((enum ffa_error)ffa_version(FFA_VERSION_1_1),
+		  FFA_NOT_SUPPORTED);
 }
