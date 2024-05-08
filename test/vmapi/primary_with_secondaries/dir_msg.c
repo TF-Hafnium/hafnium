@@ -1032,10 +1032,10 @@ static void cpu_entry_echo_mp(uintptr_t arg)
 		echo_test_req2(args->receiver_id, args->receiver_uuid);
 	}
 
+	HFTEST_LOG("Done with secondary core...");
+
 	/* Signal to primary core that test is complete.*/
 	semaphore_signal(&args->sync);
-
-	HFTEST_LOG("Done with secondary core...");
 
 	arch_cpu_stop();
 }
