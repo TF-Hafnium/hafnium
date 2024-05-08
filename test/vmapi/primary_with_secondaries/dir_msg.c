@@ -1014,7 +1014,7 @@ static void cpu_entry_echo_mp(uintptr_t arg)
 
 	ASSERT_TRUE(args != NULL);
 
-	HFTEST_LOG("Within secondary core... %u\n", args->vcpu_id);
+	HFTEST_LOG("Within secondary core... %u", args->vcpu_id);
 
 	service_vcpu_id = (args->receiver_vcpu_count > 1) ? args->vcpu_id : 0;
 
@@ -1035,7 +1035,7 @@ static void cpu_entry_echo_mp(uintptr_t arg)
 	/* Signal to primary core that test is complete.*/
 	semaphore_signal(&args->sync);
 
-	HFTEST_LOG("Done with secondary core...\n");
+	HFTEST_LOG("Done with secondary core...");
 
 	arch_cpu_stop();
 }
@@ -1063,7 +1063,7 @@ TEST_PRECONDITION(direct_message, echo_mp, service1_is_not_vm)
 	 */
 	semaphore_init(&args.sync);
 
-	HFTEST_LOG("Starting secondary core...\n");
+	HFTEST_LOG("Starting secondary core...");
 
 	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(vcpu_id),
 				     cpu_entry_echo_mp, (uintptr_t)&args));
@@ -1071,7 +1071,7 @@ TEST_PRECONDITION(direct_message, echo_mp, service1_is_not_vm)
 	/* Wait for secondary core to return before finishing the test. */
 	semaphore_wait(&args.sync);
 
-	HFTEST_LOG("Finished the test...\n");
+	HFTEST_LOG("Finished the test...");
 }
 
 /**
@@ -1097,7 +1097,7 @@ TEST_PRECONDITION(direct_message, echo_mp_req2, service1_is_not_vm)
 	 */
 	semaphore_init(&args.sync);
 
-	HFTEST_LOG("Starting secondary core...\n");
+	HFTEST_LOG("Starting secondary core...");
 
 	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(vcpu_id),
 				     cpu_entry_echo_mp, (uintptr_t)&args));
@@ -1105,5 +1105,5 @@ TEST_PRECONDITION(direct_message, echo_mp_req2, service1_is_not_vm)
 	/* Wait for secondary core to return before finishing the test. */
 	semaphore_wait(&args.sync);
 
-	HFTEST_LOG("Finished the test...\n");
+	HFTEST_LOG("Finished the test...");
 }
