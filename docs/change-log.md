@@ -1,5 +1,119 @@
 # Change Log
 
+## v2.11
+### Highlights
+
+* FF-A v1.2 (continued adoption):
+    * Direct messaging:
+        * New ABIs `FFA_MSG_SEND_DIRECT_REQ2` and `FFA_MSG_SEND_DIRECT_RESP2`.
+        * Support extended register set and use of service UUID.
+    * Memory management:
+        * ABIs support the impdef field in memory access descriptor.
+        * Lend device memory from an SP to another SP, and from a VM to an SP.
+    * Setup and discovery:
+        * Support multiple UUIDs per SP, both in manifest parsing and
+          `FFA_PARTITION_INFO_GET`.
+        * The `FFA_FEATURES` ABI reports RX/TX buffer max size.
+    * Support extended set of registers with `FFA_CONSOLE_LOG` for v1.2 SPs.
+
+* Runtime support:
+    * Trap SP access to AMU counters.
+    * SIMD context:
+	* Refactored Advanced SIMD/SVE save and restore operations.
+        * Introduce context save and restore of SME registers.
+        * Leverage the SMCCC SVE hint bit mask.
+        * Trap SP access to SVE/SME registers.
+    * Realm Management Extension support:
+        * On `FFA_MEM_DONATE` or `FFA_MEM_LEND` from VM/OS Kernel to SPs, change the physical
+          address space of the memory regions from non-secure to secure.
+        * On `FFA_MEM_RECLAIM`, if memory's address space was changed from non-secure to secure
+          address space, revert physical address space change (from secure to non-secure).
+        * The SPMC can handle a Granule Protection Fault: exception handler refactored
+          to trap the new `memcpy_trapped` function, which returns error if copy failed due to GPF.
+        * FFA_PARTITION_INFO_GET and FFA_MSG_SEND2 interfaces return FFA_ERROR(FFA_ABORTED) in case
+          of hitting a Granule Protection Fault.
+    * SMMUv3:
+        * Support for static DMA isolation of upstream devices.
+        * Access from DMA capable devices are only permitted to specific memory regions
+          via dedicated DMA properties in the memory region node of an partition manifest.
+    * SPMC saves and restores the NS-EL1 system registers context, to help reduce memory from
+      EL3 monitor.
+    * GICv3 driver to support two security states for interrupts.
+
+* Hardware architecture support:
+    * New platform build for RD fremont.
+    * TC platform remapped the UART devices.
+
+* Tests, scripts and testing framework:
+    * TF-A prebuilt image used in Hafnium tests updated to support v1.2 interfaces.
+    * S-EL0 partitions bumped to FF-A v1.2 version in general functionality tests.
+    * The `SERVICE_SELECT_MP` macro was added to allow for tests to target a different vCPU
+      than the primary vCPU.
+    * Various new tests added to cover the newly added functionalities.
+
+* Bug fixes:
+    * FF-A memory management:
+        * `FFA_MEM_RELINQUISH` returns `FFA_ERROR(FFA_DENIED)`, if clear memory flag is used
+          when borrower's permission is RO.
+        * `FFA_MEM_RETRIEVE_REQ` returns `FFA_ERROR(FFA_DENIED)` if sender ID is not correct in
+          memory region descriptor.
+        * Hypervisor retrieve request updated to support FF-A v1.2 descriptors and avoid
+          conflicting checks with normal retrieve requests from FF-A endpoints.
+        * `FFA_MEM_RETRIEVE_REQ` returns `FFA_ERROR(FFA_INVALID_PARAMETERS)` if receiver count
+          is zero in memory region descriptor.
+    * Interrupt handling:
+        * Secure interrupt implicit completion flag reset in the runtime model for `FFA_RUN`.
+        * Intercept `FFA_MSG_SEND_DIRECT_RESP/FFA_MSG_SEND_DIRECT_RESP2` and `FFA_MSG_WAIT` if SP
+          relinquishes CPU cycles with pending secure interrupts.
+        * Ignore spurious interrupt 1023 when SP is executing.
+        * Unwind call chain when intercepting a direct response, to avoid SPs crashing.
+    * Check that platform exists before building.
+    * `FFA_FEATURES` interface:
+        * SPMC returns `FFA_ERROR(FFA_NOT_SUPPORTED)` if func ID is `FFA_EL3_INTR_HANDLE`, and
+          call is from hyperviosr/OS kernel.
+        * SPMC returns `FFA_ERROR(FFA_NOT_SUPPORTED)` if feature ID is `SRI`, and call is from SP.
+        * SPMC returns `FFA_ERROR(FFA_NOT_SUPPORTED)` if feature ID is `NPI` or `ME`, and call is
+          from Hypervisor/OS Kernel.
+    * FF-A notifications:
+        * Return error code `FFA_INVALID_PARAMETERS` when provided invalid partition IDs
+          in `FFA_NOTIFICATION_BITMAP_CREATE/DESTROY` and `FFA_NOTIFICATION_BIND/UNBIND`.
+        * Return error `FFA_INVALID_PARAMETERS` to `FFA_NOTIFICATION_SET` if flags that
+          Must Be Zero are not.
+        * The vCPU argument must be zero in `FFA_NOTIFICATION_SET` for global notifications,
+          else return error `FFA_INVALID_PARAMETERS`.
+    * FF-A Indirect messaging:
+        * Fix the checks to messages offset and total size.
+        * Validate that SPMC has mapped the hypervisor/OS Kernel RX/TX buffers before
+          accessing the buffers.
+    * The handling of `FFA_MSG_WAIT` shall not change the SPMC's internal state of the
+      RX buffer.
+    * The interfaces `FFA_MEM_PERM_SET/GET` return error `FFA_DENIED` if used after
+      SP's initializing.
+    * The `kokoro/test_spmc.sh` terminates when hitting a failure for runs that are not
+      collecting coverage data.
+    * Device memory regions are mapped with attributes nGnRnE.
+
+* Misc:
+    * Building multiple targets with a single command with PLATFORM variable, providing
+      multiple targets separated by ','.
+    * Dropped the clang toolchain from the 'prebuilts' submodule to save repository space.
+    * Dropped implementation of `HF_INTERRUPT_INJECT` out of SPMC implementation, as it was
+      designed for Hypervisor and has no use in the SPMC.
+    * Code static checks were separated into a dedicated script.
+    * The interfaces `FFA_RXTX_MAP` and `FFA_RXTX_UNMAP` are restricted to NS memory provided
+      in the SPMC manifest.
+    * Improved handling of device region nodes in SP manifest:
+        * The ranges specified were restricted to those specified in the designated nodes of
+          the SPMC manifest.
+        * Check overlaps with other memory regions in the system, such as partitions address
+          space.
+    * Avoid tracking the sender ID and descriptor size for memory management ABIs, in
+      Hafnium's mailbox internal structures.
+    * Helpers to log the names of FF-A ABIs and FF-A error codes.
+    * Increase timeout for tests in `kokoro/test_spmc.sh` to cater for CI speed.
+    * Use bitfield structures for permissions and attributes from the FF-A memory access
+      descriptors.
+
 ## v2.10
 ### Highlights
 
