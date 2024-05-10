@@ -960,9 +960,6 @@ uint64_t arch_mm_get_pa_range(void)
 
 	/* Downgrade PA size from 52 to 48 bits (FEAT_LPA workaround). */
 	if (pa_range == 6) {
-		dlog_verbose(
-			"52-bit PA size not supported,"
-			" falling back to 48-bit\n");
 		pa_range = 5;
 	}
 
