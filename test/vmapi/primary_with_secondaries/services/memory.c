@@ -1310,63 +1310,6 @@ TEST_SERVICE(share_ffa_v1_1)
 	ffa_yield();
 }
 
-TEST_SERVICE(retrieve_ffa_v1_0)
-{
-	uint8_t *ptr = NULL;
-	uint32_t msg_size;
-	size_t i;
-	void *recv_buf = SERVICE_RECV_BUFFER();
-	void *send_buf = SERVICE_SEND_BUFFER();
-	struct ffa_memory_region_v1_0 *memory_region =
-		(struct ffa_memory_region_v1_0 *)retrieve_buffer;
-	struct ffa_composite_memory_region *composite;
-	const struct ffa_partition_msg *retrv_message =
-		(struct ffa_partition_msg *)recv_buf;
-	struct ffa_value ret;
-	uint32_t fragment_length;
-	uint32_t total_length;
-	uint32_t memory_region_max_size = HF_MAILBOX_SIZE;
-
-	/* Set Version to v1.0. */
-	ffa_version(FFA_VERSION_1_0);
-
-	receive_indirect_message(send_buf, HF_MAILBOX_SIZE, recv_buf, NULL);
-
-	msg_size = retrv_message->header.size;
-	ret = ffa_mem_retrieve_req(msg_size, msg_size);
-	EXPECT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
-	fragment_length = ret.arg2;
-	total_length = ret.arg1;
-
-	memcpy_s(memory_region, memory_region_max_size, recv_buf,
-		 fragment_length);
-
-	/* Copy first fragment. */
-	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
-
-	memory_region_desc_from_rx_fragments(
-		fragment_length, total_length, memory_region->handle,
-		memory_region, recv_buf, memory_region_max_size);
-
-	/* Retrieved all the fragments. */
-	ffa_yield();
-
-	/* Point to the whole copied structure. */
-	composite = ffa_memory_region_get_composite_v1_0(memory_region, 0);
-
-	update_mm_security_state(composite, ffa_memory_attributes_extend(
-						    memory_region->attributes));
-
-	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	ptr = (uint8_t *)composite->constituents[0].address;
-
-	for (i = 0; i < PAGE_SIZE; ++i) {
-		++ptr[i];
-	}
-
-	ffa_yield();
-}
-
 TEST_SERVICE(retrieve_ffa_v1_1)
 {
 	uint8_t *ptr = NULL;

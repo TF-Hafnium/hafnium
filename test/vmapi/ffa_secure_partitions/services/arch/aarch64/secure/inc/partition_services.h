@@ -181,6 +181,7 @@ enum sp_cmd {
 	SP_TRIGGER_ESPI_CMD,
 
 	SP_FFA_FEATURES_CMD,
+	SP_FFA_MEM_RETRIEVE_CMD,
 };
 
 /**
@@ -604,3 +605,16 @@ static inline struct ffa_value sp_ffa_features_cmd_send(
 }
 
 struct ffa_value sp_ffa_features_cmd(ffa_id_t source, uint32_t feature_func_id);
+
+static inline struct ffa_value sp_ffa_mem_retrieve_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver, ffa_memory_handle_t handle,
+	enum ffa_version ffa_version)
+{
+	return ffa_msg_send_direct_req(sender, receiver,
+				       SP_FFA_MEM_RETRIEVE_CMD, handle,
+				       ffa_version, 0, 0);
+}
+
+struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
+					 ffa_memory_handle_t handle,
+					 enum ffa_version ffa_version);

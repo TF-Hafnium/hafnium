@@ -46,6 +46,7 @@ source_set("partition_services") {
     ":common",
     "//src/arch/aarch64:smc",
     "//test/vmapi/common:ffa",
+    "//vmlib",
   ]
 }
 

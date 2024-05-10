@@ -36,6 +36,7 @@ vm_kernel("vm_primary") {
   sources = [
     "dir_msg.c",
     "interrupts.c",
+    "memory_sharing.c",
     "notifications.c",
     "power_mgt.c",
     "secure_interrupts.c",
@@ -51,6 +52,7 @@ vm_kernel("vm_primary") {
     "//test/vmapi/arch/${plat_arch}/gicv3:gicv3_setup",
     "//test/vmapi/common:ffa",
     "//test/vmapi/common/arch/aarch64:exception_handler",
+    "//vmlib",
   ]
 }
 

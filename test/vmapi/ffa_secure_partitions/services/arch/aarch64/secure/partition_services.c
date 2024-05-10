@@ -9,13 +9,15 @@
 #include "partition_services.h"
 
 #include "hf/arch/irq.h"
+#include "hf/arch/mmu.h"
 #include "hf/arch/types.h"
 #include "hf/arch/vm/interrupts.h"
 
-#include "hf/dlog.h"
 #include "hf/ffa.h"
+#include "hf/mm.h"
 
 #include "vmapi/hf/call.h"
+#include "vmapi/hf/ffa_v1_0.h"
 
 #include "../smc.h"
 #include "test/hftest.h"
@@ -132,4 +134,167 @@ struct ffa_value sp_ffa_features_cmd(ffa_id_t source, uint32_t feature_func_id)
 	});
 	return ffa_msg_send_direct_resp(own_id, source, res.func, res.arg2, 0,
 					0, 0);
+}
+
+static uint8_t retrieve_buffer[PAGE_SIZE * 2];
+
+/*
+ * Update security state on S1 page table based on attributes
+ * set in the memory region structure.
+ */
+static void update_mm_security_state(
+	struct ffa_composite_memory_region *composite,
+	ffa_memory_attributes_t attributes)
+{
+	if (attributes.security == FFA_MEMORY_SECURITY_NON_SECURE &&
+	    !ffa_is_vm_id(hf_vm_get_id())) {
+		for (uint32_t i = 0; i < composite->constituent_count; i++) {
+			uint32_t mode;
+
+			if (!hftest_mm_get_mode(
+				    // NOLINTNEXTLINE(performance-no-int-to-ptr)
+				    (const void *)composite->constituents[i]
+					    .address,
+				    FFA_PAGE_SIZE * composite->constituents[i]
+							    .page_count,
+				    &mode)) {
+				FAIL("Couldn't get the mode of the "
+				     "composite.\n");
+			}
+
+			hftest_mm_identity_map(
+				// NOLINTNEXTLINE(performance-no-int-to-ptr)
+				(const void *)composite->constituents[i]
+					.address,
+				FFA_PAGE_SIZE *
+					composite->constituents[i].page_count,
+				mode | MM_MODE_NS);
+		}
+	}
+}
+
+static struct ffa_value retrieve_v1_0(ffa_id_t sender_id,
+				      ffa_memory_handle_t handle)
+{
+	ffa_id_t receiver_id = hf_vm_get_id();
+	void *rx_buffer = SERVICE_RECV_BUFFER();
+	void *tx_buffer = SERVICE_SEND_BUFFER();
+	struct ffa_memory_access_v1_0 receiver_v1_0;
+	struct ffa_composite_memory_region *composite;
+	struct ffa_memory_region_v1_0 *memory_region_v1_0 =
+		(struct ffa_memory_region_v1_0 *)retrieve_buffer;
+	uint8_t *ptr;
+	struct ffa_value ret;
+	uint32_t fragment_length;
+	uint32_t total_length;
+	uint32_t msg_size;
+	uint32_t memory_region_max_size = HF_MAILBOX_SIZE;
+
+	ffa_memory_access_init_v1_0(&receiver_v1_0, receiver_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+	msg_size = ffa_memory_retrieve_request_init_v1_0(
+		tx_buffer, handle, sender_id, &receiver_v1_0, 1, 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+	ret = ffa_mem_retrieve_req(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
+	fragment_length = ret.arg2;
+	total_length = ret.arg1;
+
+	memcpy_s(memory_region_v1_0, memory_region_max_size, rx_buffer,
+		 fragment_length);
+
+	/* Copy first fragment. */
+	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
+	memory_region_desc_from_rx_fragments(
+		fragment_length, total_length, memory_region_v1_0->handle,
+		memory_region_v1_0, rx_buffer, memory_region_max_size);
+	composite = ffa_memory_region_get_composite_v1_0(memory_region_v1_0, 0);
+	update_mm_security_state(
+		composite,
+		ffa_memory_attributes_extend(memory_region_v1_0->attributes));
+
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	ptr = (uint8_t *)composite->constituents[0].address;
+	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
+		++ptr[i];
+	}
+
+	/* Retrieved all the fragments. */
+	return sp_success(receiver_id, sender_id, ret.func);
+}
+
+static struct ffa_value retrieve_v1_2_or_later(ffa_id_t sender_id,
+					       ffa_memory_handle_t handle)
+{
+	ffa_id_t receiver_id = hf_vm_get_id();
+	void *rx_buffer = SERVICE_RECV_BUFFER();
+	void *tx_buffer = SERVICE_SEND_BUFFER();
+	struct ffa_memory_access receiver_v1_1;
+	struct ffa_composite_memory_region *composite;
+	struct ffa_memory_region *memory_region_v1_1 =
+		(struct ffa_memory_region *)retrieve_buffer;
+	uint8_t *ptr;
+	struct ffa_value ret;
+	uint32_t fragment_length;
+	uint32_t total_length;
+	uint32_t msg_size;
+	uint32_t memory_region_max_size = HF_MAILBOX_SIZE;
+
+	struct ffa_memory_access_impdef impdef =
+		ffa_memory_access_impdef_init(receiver_id, receiver_id + 1);
+	ffa_memory_access_init(&receiver_v1_1, receiver_id, FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+			       &impdef);
+	msg_size = ffa_memory_retrieve_request_init(
+		tx_buffer, handle, sender_id, &receiver_v1_1, 1,
+		sizeof(struct ffa_memory_access), 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+	ret = ffa_mem_retrieve_req(msg_size, msg_size);
+	EXPECT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);
+	fragment_length = ret.arg2;
+	total_length = ret.arg1;
+
+	memcpy_s(memory_region_v1_1, memory_region_max_size, rx_buffer,
+		 fragment_length);
+
+	/* Copy first fragment. */
+	ASSERT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+
+	memory_region_desc_from_rx_fragments(
+		fragment_length, total_length, memory_region_v1_1->handle,
+		memory_region_v1_1, rx_buffer, memory_region_max_size);
+	composite = ffa_memory_region_get_composite(memory_region_v1_1, 0);
+	update_mm_security_state(composite, memory_region_v1_1->attributes);
+
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	ptr = (uint8_t *)composite->constituents[0].address;
+	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
+		++ptr[i];
+	}
+
+	/* Retrieved all the fragments. */
+	return sp_success(receiver_id, sender_id, ret.func);
+}
+
+struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
+					 ffa_memory_handle_t handle,
+					 enum ffa_version ffa_version)
+{
+	switch (ffa_version) {
+	case FFA_VERSION_1_0:
+		return retrieve_v1_0(sender_id, handle);
+	case FFA_VERSION_1_1:
+	case FFA_VERSION_1_2:
+		return retrieve_v1_2_or_later(sender_id, handle);
+	}
+	panic("Unknown version %#x\n", ffa_version);
 }

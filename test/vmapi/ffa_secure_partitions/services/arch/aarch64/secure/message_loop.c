@@ -130,10 +130,14 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_FFA_FEATURES_CMD:
 		res = sp_ffa_features_cmd(ffa_sender(res), res.arg4);
 		break;
+	case SP_FFA_MEM_RETRIEVE_CMD:
+		res = sp_ffa_mem_retrieve_cmd(ffa_sender(res), res.arg4,
+					      res.arg5);
+		break;
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
-			   "0x%lx is not a valid command from %x\n",
+			   "%#lx is not a valid command from %x\n",
 			   res.arg3, ffa_sender(res));
 		abort();
 	}
