@@ -381,7 +381,17 @@ void send_target_id(ffa_id_t receiver, ffa_id_t target, void *send)
 
 SET_UP(memory_sharing)
 {
-	ffa_version(FFA_VERSION_COMPILED);
+	ASSERT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+}
+
+SET_UP(memory_sharing_v1_0)
+{
+	ASSERT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_COMPILED);
+}
+
+SET_UP(memory_sharing_v1_1)
+{
+	ASSERT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
 }
 
 /**
@@ -2714,7 +2724,7 @@ TEST_PRECONDITION(memory_sharing, ffa_validate_attributes, hypervisor_only)
  * descriptor is not 0. This is checked for both v1.0 and v1.1 memory access
  * descriptors as the position of the reserved_0 moves.
  */
-TEST(memory_sharing, ffa_validate_memory_access_reserved_mbz)
+TEST(memory_sharing_v1_1, ffa_validate_memory_access_reserved_mbz)
 {
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
@@ -2726,7 +2736,6 @@ TEST(memory_sharing, ffa_validate_memory_access_reserved_mbz)
 		ffa_mem_donate,
 	};
 	struct ffa_memory_access *receiver;
-	struct ffa_memory_access_v1_0 receiver_v1_0;
 
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)pages, .page_count = 2},
@@ -2753,9 +2762,25 @@ TEST(memory_sharing, ffa_validate_memory_access_reserved_mbz)
 		EXPECT_EQ(ret.func, FFA_ERROR_32);
 		EXPECT_TRUE(ffa_error_code(ret) == FFA_INVALID_PARAMETERS);
 	}
+}
 
-	/* Run test for v1.0 mem access descriptors. */
-	EXPECT_NE(ffa_version(FFA_VERSION_1_0), FFA_ERROR_32);
+TEST(memory_sharing_v1_0, ffa_validate_memory_access_reserved_mbz)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value (*send_function[])(uint32_t, uint32_t) = {
+		ffa_mem_share,
+		ffa_mem_lend,
+		ffa_mem_donate,
+	};
+	struct ffa_memory_access_v1_0 receiver_v1_0;
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
 
 	ffa_memory_access_init_v1_0(&receiver_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
@@ -3818,7 +3843,7 @@ TEST(memory_sharing, lend_fragmented_relinquish_multi_receiver)
  * the correct memory access descriptor size in the memory region
  * descriptor passes as expected.
  */
-TEST(memory_sharing, share_ffa_v1_1_to_current_version)
+TEST(memory_sharing_v1_1, share_ffa_v1_1_to_current_version)
 {
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
