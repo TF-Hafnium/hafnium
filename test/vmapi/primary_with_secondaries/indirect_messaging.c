@@ -23,7 +23,7 @@ SET_UP(indirect_messaging)
 	 * Call FFA_VERSION to inform the hypervisor of the compiled FF-A
 	 * Version.
 	 */
-	ffa_version(FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
 }
 
 /**

@@ -3886,7 +3886,7 @@ TEST(memory_sharing_v1_1, share_ffa_v1_1_to_current_version)
 		&msg_size);
 
 	/* Set current version to FF-A v1.1. */
-	EXPECT_NE(ffa_version(FFA_VERSION_1_1), FFA_ERROR_32);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
 
 	ret = ffa_mem_share(msg_size, msg_size);
 
