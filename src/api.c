@@ -17,6 +17,7 @@
 #include "hf/arch/timer.h"
 #include "hf/arch/vm.h"
 
+#include "hf/bits.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa_internal.h"
@@ -2473,44 +2474,62 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 }
 
 /**
- * Helper for success return of FFA_FEATURES, for when it is used to query
- * an interrupt ID.
+ * Helper for success return of FFA_FEATURES.
  */
 struct ffa_value api_ffa_feature_success(uint32_t arg2)
 {
 	return (struct ffa_value){
-		.func = FFA_SUCCESS_32, .arg1 = 0U, .arg2 = arg2};
+		.func = FFA_SUCCESS_32,
+		.arg1 = 0U,
+		.arg2 = arg2,
+	};
 }
 
 /**
  * Discovery function returning information about the implementation of optional
- * FF-A interfaces.
+ * FF-A interfaces. See section 13.3 of the FF-A v1.2 ALP1 spec.
+ *
+ * `function_or_feature_id` is interpreted as either a function ID or a feature
+ * ID, depending on the value of bit 31.
+ * When it is a feature ID, bits [30:8] MBZ and input_property MBZ.
+ *
+ * Returns `FFA_SUCCESS` if the interface is supported.
+ * Returns `FFA_NOT_SUPPORTED` if the interface is not supported or the
+ * parameters are invalid.
  */
-struct ffa_value api_ffa_features(uint32_t feature_function_id,
+struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 				  uint32_t input_property, struct vcpu *current)
 {
 	const uint32_t ffa_version = current->vm->ffa_version;
 	const bool el0_partition = current->vm->el0_partition;
+	const bool is_feature =
+		IS_BIT_UNSET(function_or_feature_id, FFA_FEATURES_FEATURE_BIT);
 
-	/*
-	 * According to table 13.8 of FF-A v1.1 Beta 0 spec, bits [30:8] MBZ
-	 * if using a feature ID.
-	 */
-	if ((feature_function_id & FFA_FEATURES_FUNC_ID_MASK) == 0U &&
-	    (feature_function_id & ~FFA_FEATURES_FEATURE_ID_MASK) != 0U) {
-		return ffa_error(FFA_NOT_SUPPORTED);
+	if (is_feature) {
+		if (ANY_BITS_SET(function_or_feature_id,
+				 FFA_FEATURES_FEATURE_MBZ_HI_BIT,
+				 FFA_FEATURES_FEATURE_MBZ_LO_BIT)) {
+			dlog_error(
+				"FFA_FEATURES: feature ID %#x is invalid (bits "
+				"[%u:%u] must be zero)\n",
+				function_or_feature_id,
+				FFA_FEATURES_FEATURE_MBZ_HI_BIT,
+				FFA_FEATURES_FEATURE_MBZ_LO_BIT);
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
 	}
 
-	if (feature_function_id != FFA_MEM_RETRIEVE_REQ_32 &&
-	    feature_function_id != FFA_MEM_RETRIEVE_REQ_64 &&
+	if (function_or_feature_id != FFA_MEM_RETRIEVE_REQ_32 &&
+	    function_or_feature_id != FFA_MEM_RETRIEVE_REQ_32 &&
 	    input_property != 0U) {
-		dlog_verbose(
-			"input_property must be zero.\ninput_property = %u.\n",
+		dlog_error(
+			"FFA_FEATURES: input_property must be 0 "
+			"(input_property = %#x)\n",
 			input_property);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	switch (feature_function_id) {
+	switch (function_or_feature_id) {
 	/* Check support of the given Function ID. */
 	case FFA_ERROR_32:
 	case FFA_SUCCESS_32:
@@ -2562,7 +2581,8 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
 #endif
-		return (struct ffa_value){.func = FFA_SUCCESS_32};
+		return api_ffa_feature_success(0);
+
 	case FFA_RXTX_MAP_64: {
 		uint32_t arg2 = 0;
 		struct ffa_features_rxtx_map_params params = {
@@ -2575,36 +2595,38 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 		};
 
 		memcpy_s(&arg2, sizeof(arg2), &params, sizeof(params));
-		return (struct ffa_value){
-			.func = FFA_SUCCESS_32,
-			.arg2 = arg2,
-		};
+		return api_ffa_feature_success(arg2);
 	}
 
 	case FFA_MEM_RETRIEVE_REQ_64:
-	case FFA_MEM_RETRIEVE_REQ_32:
-		if ((input_property & FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_MASK) !=
-		    0U) {
-			dlog_verbose(
-				"Bits[31:2] and Bit[0] of input_property must "
-				"be zero.\ninput_property = %u.\n",
+	case FFA_MEM_RETRIEVE_REQ_32: {
+		if (ANY_BITS_SET(input_property,
+				 FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_HI_BIT,
+				 FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_LO_BIT) ||
+		    IS_BIT_SET(input_property,
+			       FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_BIT)) {
+			dlog_warning(
+				"FFA_FEATURES: Bits[%u:%u] and Bit[%u] of "
+				"input_property should be 0 (input_property = "
+				"%#x)\n",
+				FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_HI_BIT,
+				FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_LO_BIT,
+				FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_BIT,
 				input_property);
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
-		if (ffa_version >= MAKE_FFA_VERSION(1, 1)) {
-			if ((input_property &
-			     FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT) == 0U) {
-				dlog_verbose("NS bit support must be 1.\n");
-				return ffa_error(FFA_INVALID_PARAMETERS);
-			}
+		if (ffa_version >= MAKE_FFA_VERSION(1, 1) &&
+		    IS_BIT_UNSET(input_property, FFA_FEATURES_NS_SUPPORT_BIT)) {
+			dlog_error("FFA_FEATURES: NS bit support must be 1\n");
+			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
 		return api_ffa_feature_success(
 			FFA_FEATURES_MEM_RETRIEVE_REQ_BUFFER_SUPPORT |
-			(input_property &
-			 FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT) |
+			FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT |
 			FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT);
+	}
 
 #if (MAKE_FFA_VERSION(1, 1) <= FFA_VERSION_COMPILED)
 	/* Check support of a feature provided respective feature ID. */
@@ -2636,7 +2658,7 @@ struct ffa_value api_ffa_features(uint32_t feature_function_id,
 #endif
 	/* Platform specific feature support. */
 	default:
-		return arch_ffa_features(feature_function_id);
+		return arch_ffa_features(function_or_feature_id);
 	}
 }
 

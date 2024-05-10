@@ -276,37 +276,40 @@ static inline const char *ffa_error_name(enum ffa_error error)
 }
 
 /**
- * FF-A Feature ID, to be used with interface FFA_FEATURES.
- * As defined in the FF-A v1.1 Beta specification, table 13.10, in section
- * 13.2.
+ * Defined in Table 3.1 in the FF-A v.1.2 memory management supplement.
+ * Input properties:
+ * - Bits[31:2] and Bit[0] are reserved (SBZ).
+ * Output properties:
+ * - Bit[0]: dynamically allocated buffer support.
+ * - Bit[1]: NS bit handling.
+ * - Bit[2]: support for retrieval by hypervisor.
+ * - Bits[31:3] are reserved (MBZ).
  */
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_BUFFER_SUPPORT (0U << 0U)
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT (1U << 1U)
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT (1U << 2U)
 
-#define FFA_FEATURES_FUNC_ID_MASK (UINT32_C(1) << 31)
-#define FFA_FEATURES_FEATURE_ID_MASK UINT32_C(0x7F)
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_HI_BIT (31U)
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_LO_BIT (2U)
+#define FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_BIT (0U)
 
-/**
- * Defined in Table 13.14 in the FF-A v.1.1 REL0 specification.
- * Bits[31:2] and Bit[0] of input are reserved (must be zero).
- * Bit[0]: dynamically allocated buffer support.
- * Bit[1]: NS bit handling.
- * Bit[2]: support for retrieval by hypervisor.
- */
-#define FFA_FEATURES_MEM_RETRIEVE_REQ_BUFFER_SUPPORT 0
-#define FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT (UINT32_C(1) << 1)
-#define FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT (UINT32_C(1) << 2)
-#define FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_MASK            \
-	(~(FFA_FEATURES_MEM_RETRIEVE_REQ_BUFFER_SUPPORT | \
-	   FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT |     \
-	   FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT))
+enum ffa_feature_id {
+	/* Query interrupt ID of Notification Pending Interrupt. */
+	FFA_FEATURE_NPI = 1,
 
-/* Query interrupt ID of Notification Pending Interrupt. */
-#define FFA_FEATURE_NPI 0x1U
+	/* Query interrupt ID of Schedule Receiver Interrupt. */
+	FFA_FEATURE_SRI = 2,
 
-/* Query interrupt ID of Schedule Receiver Interrupt. */
-#define FFA_FEATURE_SRI 0x2U
+	/* Query interrupt ID of the Managed Exit Interrupt. */
+	FFA_FEATURE_MEI = 3,
+};
 
-/* Query interrupt ID of the Managed Exit Interrupt. */
-#define FFA_FEATURE_MEI 0x3U
+/** Constants for bitmasks used in FFA_FEATURES. */
+#define FFA_FEATURES_FEATURE_BIT (31U)
+#define FFA_FEATURES_FEATURE_MBZ_HI_BIT (30U)
+#define FFA_FEATURES_FEATURE_MBZ_LO_BIT (8U)
+
+#define FFA_FEATURES_NS_SUPPORT_BIT (1U)
 
 /* FF-A function specific constants. */
 #define FFA_MSG_RECV_BLOCK 0x1
@@ -1370,8 +1373,10 @@ struct ffa_features_rxtx_map_params {
 	uint16_t max_buf_size : 16;
 };
 
-#define FFA_RXTX_MAP_MIN_BUF_4K 0
-#define FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT 1
+enum ffa_features_rxtx_map_buf_size {
+	FFA_RXTX_MAP_MIN_BUF_4K = 0,
+	FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT = 1,
+};
 
 static inline struct ffa_features_rxtx_map_params ffa_features_rxtx_map_params(
 	struct ffa_value args)
