@@ -671,6 +671,15 @@ boot (that is prior to NWd is booted) or run-time.
 The SPMC calling FFA_FEATURES at secure physical FF-A instance always get
 FFA_SUCCESS from the SPMD.
 
+S-EL1 partitions calling FFA_FEATURES at virtual FF-A instance with NPI and MEI
+interrupt feature IDs get FFA_SUCCESS.
+
+S-EL0 partitions are not supported for NPI: ``FFA_NOT_SUPPORTED`` will be
+returned.
+
+Physical FF-A instances are not supported for NPI and MEI: ``FFA_NOT_SUPPORTED``
+will be returned.
+
 The request made by an Hypervisor or OS kernel is forwarded to the SPMC and
 the response relayed back to the NWd.
 
@@ -694,6 +703,9 @@ The FFA_RXTX_UNMAP unmaps the RX/TX pair from the translation regime of the
 caller, either it being the Hypervisor or OS kernel, as well as a secure
 partition, and restores them in the VM's translation regime so that they can be
 used for memory sharing operations from the normal world again.
+
+The minimum and maximum buffer sizes supported by the FF-A instance can be
+queried by calling ``FFA_FEATURES`` with the ``FFA_RXTX_MAP`` function ID.
 
 FFA_PARTITION_INFO_GET
 ~~~~~~~~~~~~~~~~~~~~~~
