@@ -10,9 +10,6 @@
 
 #include "hf/ffa.h"
 
-/** Returns information on features that are specific to the arch */
-struct ffa_value arch_ffa_features(uint32_t function_id);
-
 /** Returns the SPMC ID. */
 ffa_id_t arch_ffa_spmc_id_get(void);
 

@@ -34,19 +34,6 @@ bool vm_supports_indirect_messages(struct vm *vm)
 	       vm_supports_messaging_method(vm, FFA_PARTITION_INDIRECT_MSG);
 }
 
-/** Returns information on features specific to the NWd. */
-struct ffa_value plat_ffa_features(uint32_t function_feature_id)
-{
-	switch (function_feature_id) {
-	case FFA_MSG_POLL_32:
-	case FFA_YIELD_32:
-	case FFA_MSG_SEND_32:
-		return (struct ffa_value){.func = FFA_SUCCESS_32};
-	default:
-		return ffa_error(FFA_NOT_SUPPORTED);
-	}
-}
-
 struct ffa_value plat_ffa_spmc_id_get(void)
 {
 	if (ffa_tee_enabled) {

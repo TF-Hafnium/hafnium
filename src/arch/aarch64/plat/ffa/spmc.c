@@ -176,24 +176,6 @@ void plat_ffa_log_init(void)
 	dlog_info("Initializing Hafnium (SPMC)\n");
 }
 
-/** Returns information on features specific to the SWd. */
-struct ffa_value plat_ffa_features(uint32_t function_feature_id)
-{
-	if (FFA_VERSION_1_1 <= FFA_VERSION_COMPILED) {
-		switch (function_feature_id) {
-		case FFA_SECONDARY_EP_REGISTER_64:
-			return (struct ffa_value){.func = FFA_SUCCESS_32};
-		case FFA_FEATURE_MEI:
-			return api_ffa_feature_success(HF_MANAGED_EXIT_INTID);
-		default:
-			return ffa_error(FFA_NOT_SUPPORTED);
-		}
-	}
-
-	/* There are no features only supported in the SWd */
-	return ffa_error(FFA_NOT_SUPPORTED);
-}
-
 struct ffa_value plat_ffa_spmc_id_get(void)
 {
 	/*

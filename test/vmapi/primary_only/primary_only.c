@@ -237,19 +237,19 @@ TEST(ffa, ffa_features)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MSG_POLL_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_MSG_WAIT_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_YIELD_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_RUN_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MSG_SEND_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_MEM_DONATE_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);

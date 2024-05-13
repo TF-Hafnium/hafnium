@@ -2593,7 +2593,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 	case FFA_MEM_PERM_SET_64:
 	case FFA_MSG_SEND2_32:
 		if (FFA_VERSION_1_1 > FFA_VERSION_COMPILED) {
-			return arch_ffa_features(function_or_feature_id);
+			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
 	/* FF-A v1.2 features. */
@@ -2603,14 +2603,14 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
-			return arch_ffa_features(function_or_feature_id);
+			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
 		return api_ffa_feature_success(0);
 
 	case FFA_RXTX_MAP_64: {
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
-			return arch_ffa_features(function_or_feature_id);
+			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
 		uint32_t arg2 = 0;
@@ -2630,7 +2630,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 	case FFA_MEM_RETRIEVE_REQ_64:
 	case FFA_MEM_RETRIEVE_REQ_32: {
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
-			return arch_ffa_features(function_or_feature_id);
+			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
 		if (ANY_BITS_SET(input_property,
@@ -2670,7 +2670,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 	 */
 	case FFA_FEATURE_NPI:
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
-			return arch_ffa_features(function_or_feature_id);
+			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
 		if (el0_partition) {
@@ -2683,7 +2683,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 
 	case FFA_FEATURE_MEI:
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
-			return arch_ffa_features(function_or_feature_id);
+			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
 		if (!vm_id_is_current_world(current->vm->id)) {
@@ -2693,7 +2693,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 
 	case FFA_FEATURE_SRI:
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
-			return arch_ffa_features(function_or_feature_id);
+			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
 		if (!ffa_is_vm_id(current->vm->id)) {
@@ -2703,7 +2703,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 
 	/* Platform specific feature support. */
 	default:
-		return arch_ffa_features(function_or_feature_id);
+		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 }
 

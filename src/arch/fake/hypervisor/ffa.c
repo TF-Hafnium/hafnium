@@ -14,12 +14,6 @@
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
-struct ffa_value arch_ffa_features(uint32_t function_id)
-{
-	(void)function_id;
-	return ffa_error(FFA_NOT_SUPPORTED);
-}
-
 ffa_id_t arch_ffa_spmc_id_get(void)
 {
 	return HF_SPMC_VM_ID;
