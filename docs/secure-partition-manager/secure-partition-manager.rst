@@ -649,6 +649,7 @@ As part of the FF-A v1.2 support, the following interfaces were added:
 - ``FFA_PARTITION_INFO_GET_REGS``
 - ``FFA_MSG_SEND_DIRECT_REQ2``
 - ``FFA_MSG_SEND_DIRECT_RESP2``
+- ``FFA_CONSOLE_LOG``
 
 FFA_VERSION
 ~~~~~~~~~~~
@@ -898,6 +899,15 @@ notification for the receiver, to inform it about a message in the RX buffer.
 The handling of framework notifications is similar to that of
 global notifications. Binding of these is not necessary, as these are
 reserved to be used by the hypervisor or SPMC.
+
+FFA_CONSOLE_LOG
+~~~~~~~~~~~~~~~
+
+``FFA_CONSOLE_LOG`` allows debug logging to the UART console.
+Characters are packed into registers:
+  - `w2-w7` (|SMCCC| 32-bit)
+  - `x2-x7` (|SMCCC| 64-bit, before v1.2)
+  - `x2-x17` (|SMCCC| 64-bit, v1.2 or later)
 
 Paravirtualized interfaces
 --------------------------
