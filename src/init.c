@@ -69,7 +69,7 @@ void one_time_init(void)
 	struct string manifest_fname = STRING_INIT("manifest.dtb");
 	struct fdt fdt;
 	enum manifest_return_code manifest_ret;
-	struct boot_params params;
+	struct boot_params *params;
 	struct boot_params_update update;
 	struct memiter cpio;
 	struct memiter manifest_it;
@@ -91,14 +91,22 @@ void one_time_init(void)
 		panic("Unable to map FDT.");
 	}
 
-	if (!boot_flow_get_params(&params, &fdt)) {
+	static_assert(sizeof(struct boot_params) <= MM_PPOOL_ENTRY_SIZE,
+		      "The sizeof boot params must fit an entry of the mpool.");
+	params = (struct boot_params *)mpool_alloc(&ppool);
+
+	if (params == NULL) {
+		panic("Could not use memory pool to allocate boot params.");
+	}
+
+	if (!boot_flow_get_params(params, &fdt)) {
 		panic("Could not parse boot params.");
 	}
 
-	for (i = 0; i < params.mem_ranges_count; ++i) {
+	for (i = 0; i < params->mem_ranges_count; ++i) {
 		dlog_info("Memory range:  %#x - %#x\n",
-			  pa_addr(params.mem_ranges[i].begin),
-			  pa_addr(params.mem_ranges[i].end) - 1);
+			  pa_addr(params->mem_ranges[i].begin),
+			  pa_addr(params->mem_ranges[i].end) - 1);
 	}
 
 	/*
@@ -108,21 +116,21 @@ void one_time_init(void)
 	 * shall be looked up from the ramdisk. If zero, assume the address
 	 * passed to Hafnium entry point is the manifest address.
 	 */
-	if (pa_addr(params.initrd_begin)) {
+	if (pa_addr(params->initrd_begin)) {
 		dlog_info("Ramdisk range: %#x - %#x\n",
-			  pa_addr(params.initrd_begin),
-			  pa_addr(params.initrd_end) - 1);
+			  pa_addr(params->initrd_begin),
+			  pa_addr(params->initrd_end) - 1);
 
 		/* Map initrd in, and initialise cpio parser. */
-		initrd = mm_identity_map(mm_stage1_locked, params.initrd_begin,
-					 params.initrd_end, MM_MODE_R, &ppool);
+		initrd = mm_identity_map(mm_stage1_locked, params->initrd_begin,
+					 params->initrd_end, MM_MODE_R, &ppool);
 		if (!initrd) {
 			panic("Unable to map initrd.");
 		}
 
-		memiter_init(
-			&cpio, initrd,
-			pa_difference(params.initrd_begin, params.initrd_end));
+		memiter_init(&cpio, initrd,
+			     pa_difference(params->initrd_begin,
+					   params->initrd_end));
 
 		if (!cpio_get_file(&cpio, &manifest_fname, &manifest_it)) {
 			panic("Could not find manifest in initrd.");
@@ -138,7 +146,7 @@ void one_time_init(void)
 	}
 
 	manifest_ret = manifest_init(mm_stage1_locked, &manifest, &manifest_it,
-				     &params, &ppool);
+				     params, &ppool);
 
 	if (manifest_ret != MANIFEST_SUCCESS) {
 		panic("Could not parse manifest: %s.",
@@ -155,7 +163,7 @@ void one_time_init(void)
 		panic("Unable to unmap FDT.");
 	}
 
-	cpu_module_init(params.cpu_ids, params.cpu_count);
+	cpu_module_init(params->cpu_ids, params->cpu_count);
 
 	if (!plat_interrupts_controller_driver_init(&fdt, mm_stage1_locked,
 						    &ppool)) {
@@ -164,7 +172,7 @@ void one_time_init(void)
 
 	/* Load all VMs. */
 	update.reserved_ranges_count = 0;
-	if (!load_vms(mm_stage1_locked, manifest, &cpio, &params, &update,
+	if (!load_vms(mm_stage1_locked, manifest, &cpio, params, &update,
 		      &ppool)) {
 		panic("Unable to load VMs.");
 	}
@@ -173,6 +181,9 @@ void one_time_init(void)
 			      &ppool)) {
 		panic("Unable to update boot flow.");
 	}
+
+	/* Free space allocated for the boot parameters. */
+	mpool_free(&ppool, params);
 
 	/* Now manifest parsing has completed free the resourses used. */
 	manifest_deinit(&ppool);
