@@ -215,7 +215,7 @@ TEST(ffa_features, fails_if_parameter_wrong_and_v_1_1)
 
 	EXPECT_FFA_ERROR(
 		ffa_features_with_input_property(FFA_MEM_RETRIEVE_REQ_32, 0),
-		FFA_INVALID_PARAMETERS);
+		FFA_NOT_SUPPORTED);
 }
 
 TEST(ffa_features, does_not_fail_if_parameter_wrong_and_v_1_0)

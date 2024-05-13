@@ -2517,16 +2517,13 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 				FFA_FEATURES_FEATURE_MBZ_LO_BIT);
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
-	}
-
-	if (function_or_feature_id != FFA_MEM_RETRIEVE_REQ_32 &&
-	    function_or_feature_id != FFA_MEM_RETRIEVE_REQ_32 &&
-	    input_property != 0U) {
-		dlog_error(
-			"FFA_FEATURES: input_property must be 0 "
-			"(input_property = %#x)\n",
-			input_property);
-		return ffa_error(FFA_INVALID_PARAMETERS);
+		if (input_property != 0) {
+			dlog_error(
+				"FFA_FEATURES: input_property must be 0 "
+				"(input_property = %#x)\n",
+				input_property);
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
 	}
 
 	switch (function_or_feature_id) {
@@ -2613,13 +2610,12 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 				FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_LO_BIT,
 				FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_BIT,
 				input_property);
-			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
 		if (ffa_version >= MAKE_FFA_VERSION(1, 1) &&
 		    IS_BIT_UNSET(input_property, FFA_FEATURES_NS_SUPPORT_BIT)) {
 			dlog_error("FFA_FEATURES: NS bit support must be 1\n");
-			return ffa_error(FFA_INVALID_PARAMETERS);
+			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
 		return api_ffa_feature_success(
