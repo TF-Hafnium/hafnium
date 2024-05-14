@@ -201,37 +201,44 @@ SPMC to run at S-EL2. SPs run at S-EL1 or S-EL0.
         binary_size = <0x60000>;
     };
 
-- *spmc_id* defines the endpoint ID value that SPMC can query through
+* *spmc_id* defines the endpoint ID value that SPMC can query through
   ``FFA_ID_GET``.
-- *maj_ver/min_ver*. SPMD checks provided FF-A version versus its internal
+* *maj_ver/min_ver*. SPMD checks provided FF-A version versus its internal
   version and aborts if not matching.
-- *exec_state* defines the SPMC execution state (AArch64 or AArch32).
+* *exec_state* defines the SPMC execution state (AArch64 or AArch32).
   Notice Hafnium used as a SPMC only supports AArch64.
-- *load_address* and *binary_size* are mostly used to verify secondary
+* *load_address* and *binary_size* are mostly used to verify secondary
   entry points fit into the loaded binary image.
-- *entrypoint* defines the cold boot primary core entry point used by
+* *entrypoint* defines the cold boot primary core entry point used by
   SPMD (currently matches ``BL32_BASE``) to enter the SPMC.
 
 Other nodes in the manifest are consumed by Hafnium in the secure world.
 A sample can be found at `[7]`_:
 
-- The *hypervisor* node describes SPs. *is_ffa_partition* boolean attribute
-  indicates a FF-A compliant SP. The *load_address* field specifies the load
+* The *hypervisor* node describes SPs. *is_ffa_partition* boolean attribute
+  indicates a |FF-A| compliant SP. The *load_address* field specifies the load
   address at which BL2 loaded the SP package.
-- The *cpus* node provides the platform topology and allows MPIDR to VMPIDR mapping.
+* The *cpus* node provides the platform topology and allows MPIDR to VMPIDR mapping.
   Note the primary core is declared first, then secondary cores are declared
   in reverse order.
-- The *memory* nodes provide platform information on the ranges of memory
+* The *memory* nodes provide platform information on the ranges of memory
   available for use by SPs at runtime. These ranges relate to either
-  secure or non-secure memory, depending on the *device_type* field.
-  If the field specifies "memory" the range is secure, else if it specifies
-  "ns-memory" the memory is non-secure. The system integrator must exclude
-  the memory used by other components that are not SPs, such as the monitor,
-  or the SPMC itself, the OS Kernel/Hypervisor, or other NWd VMs.
-  The SPMC  limits the SP's address space such that they can only refer to memory
-  inside of those ranges, either by defining memory region nodes in their manifest
-  as well as memory starting at the load address until the limit defined by the memory
-  size. Thus, the SPMC prevents rogue SPs from tampering with memory from other
+  normal or device and secure or non-secure memory, depending on the *device_type*
+  field. The system integrator must exclude the memory used by other components
+  that are not SPs, such as the monitor, or the SPMC itself, the OS Kernel/Hypervisor,
+  NWd VMs, or peripherals that shall not be used by any of the SPs. The following are
+  the supported *device_type* fields:
+
+   * "memory": normal secure memory.
+   * "ns-memory": normal non-secure memory.
+   * "device-memory": device secure memory.
+   * "ns-device-memory": device non-secure memory.
+
+  The SPMC limits the SP's address space such that they can only refer to memory
+  inside of those ranges, either by defining memory region or device region nodes in
+  their manifest as well as memory starting at the load address until the limit
+  defined by the memory size. The SPMC also checks for overlaps between the regions.
+  Thus, the SPMC prevents rogue SPs from tampering with memory from other
   components.
 
 .. code:: shell
@@ -244,6 +251,19 @@ A sample can be found at `[7]`_:
 	memory@1 {
 		device_type = "ns-memory";
 		reg = <0x0 0x90010000 0x70000000>;
+	};
+
+	memory@2 {
+		device_type = "device-memory";
+		reg = <0x0 0x1c090000 0x0 0x40000>, /* UART */
+		      <0x0 0x2bfe0000 0x0 0x20000>, /* SMMUv3TestEngine */
+		      <0x0 0x2a490000 0x0 0x20000>, /* SP805 Trusted Watchdog */
+		      <0x0 0x1c130000 0x0 0x10000>; /* Virtio block device */
+	};
+
+	memory@3 {
+		device_type = "ns-device-memory";
+		reg = <0x0 0x1C1F0000 0x0 0x10000>; /* LCD */
 	};
 
 Above find an example representation of the referred memory description. The
