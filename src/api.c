@@ -2781,7 +2781,9 @@ static struct ffa_value ffa_features_feature(enum ffa_feature_id feature,
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
-
+		if (el0_partition) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
 		if (!vm_id_is_current_world(current->vm->id)) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
