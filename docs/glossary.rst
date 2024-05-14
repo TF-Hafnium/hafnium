@@ -98,6 +98,9 @@ You can find additional definitions in the `Arm Glossary`_.
    PA
       Physical Address
 
+   PAS
+      Physical Address Space
+
    PE
       Processing Element
 
@@ -117,6 +120,9 @@ You can find additional definitions in the `Arm Glossary`_.
       Reliability, Availability, and Serviceability extensions. A mandatory
       extension for the Armv8.2 architecture and later. An optional extension to
       the base Armv8 architecture.
+
+   RME
+      Realm Manage Extension
 
    ROP
       Return-Oriented Programming

@@ -40,7 +40,7 @@ for Arm A class devices, executing at EL3. It includes the implementation of the
 |SPMD|, which manages the world-switch, to relay the FF-A calls to the |SPMC|.
 
 TF-A also serves as the system bootlader, and it was used in the reference
-implemenation for the SPMC and SPs.
+implementation for the SPMC and SPs.
 SPs may be signed by different parties (SiP, OEM/ODM, TOS vendor, etc.).
 Thus they are supplied as distinct signed entities within the FIP flash
 image. The FIP image itself is not signed hence this provides the ability
@@ -1048,8 +1048,9 @@ The notifications receipt support is enabled in the partition FF-A manifest.
 Memory Sharing
 --------------
 
-Hafnium implements the following memory sharing interfaces as described in
-Chapter 11 of the FF-A 1.2 ALP0 specification:
+The Hafnium implementation aligns with FF-A v1.2 ALP0 specification,
+'FF-A Memory Management Protocol' supplement `[11]`_. Hafnium supports
+the following ABIs:
 
  - ``FFA_MEM_SHARE`` - for shared access between lender and borrower.
  - ``FFA_MEM_LEND`` - borrower to obtain exclusive access, though lender
@@ -1081,24 +1082,28 @@ Hafnium also supports memory sharing operations between the normal world and the
 secure world. If there is an SP involved, the SPMC allocates data to track the
 state of the operation.
 
-The SPMC is also the designated allocator for the memory handle. The hypervisor
-or OS kernel has the possibility to rely on the SPMC to maintain the state
-of the operation, thus saving memory.
 An SP can not share, lend or donate memory to the NWd.
 
-The SPMC supports the hypervisor retrieve request, as defined by the FF-A
-v1.1 EAC0 specification, in section 16.4.3. The intent is to aid with operations
-that the hypervisor must do for a VM retriever. For example, when handling
-an FFA_MEM_RECLAIM, if the hypervisor relies on SPMC to keep the state
-of the operation, the hypervisor retrieve request can be used to obtain
-that state information, do the necessary validations, and update stage 2
-memory translation.
+The SPMC is also the designated allocator for the memory handle, when borrowers
+include at least an SP. The SPMC doesn't support the hypervisor to be allocator
+to the memory handle.
 
 Hafnium also supports memory lend and share targetting multiple borrowers.
 This is the case for a lender SP to multiple SPs, and for a lender VM to
 multiple endpoints (from both secure world and normal world). If there is
 at least one borrower VM, the hypervisor is in charge of managing its
-stage 2 translation on a successful memory retrieve.
+stage 2 translation on a successful memory retrieve. However, the hypervisor could
+rely on the SPMC to keep track of the state of the operation, namely:
+if all fragments to the memory descriptors have been sent, and if the retrievers
+are still using the memory at any given moment. In this case, the hypervisor might
+need to request the SPMC to obtain a description of the used memory regions.
+For example, when handling an ``FFA_MEM_RECLAIM`` the hypervisor retrieve request
+can be used to obtain that state information, do the necessary validations,
+and update stage-2 memory translation of the lender.
+Hafnium currently only supports one borrower from the NWd, in a multiple borrower
+scenario as described. If there is only a single borrower VM, the SPMC will
+return error to the lender on call to either share, lend or donate ABIs.
+
 The semantics of ``FFA_MEM_DONATE`` implies ownership transmission,
 which should target only one partition.
 
@@ -1131,6 +1136,16 @@ to a single borrower. The device memory region used in the transaction must have
 been decalared in the SPMC manifest as described above. Memory defined in a device
 region node is given the attributes Device-nGnRnE, since this is the most restrictive
 memory type the memory must be lent with these attrbutes as well.
+
+In |RME| enabled platforms, there is the ability to change the |PAS|
+of a given memory region `[12]`_. The SPMC can leverage this feature to fulfill the
+semantics of the ``FFA_MEM_LEND`` and ``FFA_MEM_DONATE`` from the NWd into the SWd.
+Currently, there is the implementation for the FVP platform to issue a
+platform-specific SMC call to the EL3 monitor to change the PAS of the regions being
+lent/donated. This shall guarantee the NWd can't tamper with the memory whilst
+the SWd software expects exclusive access. For any other platform, the API under
+the 'src/memory_protect' module can be redefined to leverage an equivalent platform
+specific mechanism. For reference, check the `SPMC FVP build configuration`_.
 
 PE MMU configuration
 --------------------
@@ -1499,6 +1514,12 @@ Hafnium supports the following architecture extensions for security hardening:
   check failure on load/stores. A random seed is generated at boot time and
   restored upon entry into Hafnium. MTE system registers are saved/restored in
   vCPU contexts permitting MTE usage from VMs/SPs.
+- Realm Management Extension (FEAT_RME): can be deployed in platforms that leverage
+  RME for physical address isolation. The SPMC is capable of recovering from a
+  Granule Protection Fault, if inadvertently accessing a region with the wrong security
+  state setting. Also, the ability to change dynamically the physical address space of
+  a region, can be used to enhance the handling of ``FFA_MEM_LEND`` and ``FFA_MEM_DONATE``.
+  More details in the section about `Memory Sharing`_.
 
 SMMUv3 support in Hafnium
 -------------------------
@@ -1666,6 +1687,8 @@ References
 
 .. _TF-A project: https://trustedfirmware-a.readthedocs.io/en/latest/
 
+.. _SPMC FVP build configuration: https://github.com/TF-Hafnium/hafnium-project-reference/blob/main/BUILD.gn#L143
+
 .. _[1]:
 
 [1] `Arm Firmware Framework for Arm A-profile <https://developer.arm.com/docs/den0077/latest>`__
@@ -1706,6 +1729,14 @@ Client <https://developer.arm.com/documentation/den0006/d/>`__
 .. _[10]:
 
 [10] https://trustedfirmware-a.readthedocs.io/en/latest/getting_started/build-options.html#
+
+ .. _[11]:
+
+[11] https://developer.arm.com/documentation/den0140/a
+
+ .. _[12]:
+
+[12] https://developer.arm.com/documentation/den0129/latest/
 
 --------------
 
