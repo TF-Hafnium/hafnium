@@ -1103,6 +1103,13 @@ This requires special care from the system integrator to configure the memory ra
 correctly, such that any SP can't be given access and interfere with execution of
 other components. More information in the :ref:`Threat Model`.
 
+Hafnium SPMC supports memory management transactions for device memory regions.
+Currently this is limited to only the ``FFA_MEM_LEND`` interface and
+to a single borrower. The device memory region used in the transaction must have
+been decalared in the SPMC manifest as described above. Memory defined in a device
+region node is given the attributes Device-nGnRnE, since this is the most restrictive
+memory type the memory must be lent with these attrbutes as well.
+
 PE MMU configuration
 --------------------
 
