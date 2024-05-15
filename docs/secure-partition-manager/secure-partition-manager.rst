@@ -713,6 +713,10 @@ The returned value depends on the caller:
 - SP: the SPMC returns its own implemented version.
 - SPMC at S-EL1/S-EL2: the SPMD returns its own implemented version.
 
+The FF-A version can only be changed by calls to ``FFA_VERSION`` before other
+calls to other FF-A ABIs have been made. Calls to ``FFA_VERSION`` after
+subsequent ABI calls will fail.
+
 FFA_FEATURES
 ~~~~~~~~~~~~
 
