@@ -1498,6 +1498,77 @@ element of the data flow diagram.
 |                        | partition is deactivated as soon as it triggers.   |
 +------------------------+----------------------------------------------------+
 
++------------------------+----------------------------------------------------+
+| ID                     | 33                                                 |
++========================+====================================================+
+| ``Threat``             | **A rogue NWd FF-A endpoint could provide an RXTX  |
+|                        | buffer pair from a wrong physical address space.** |
+|                        | The NWd FF-A endpoint is expected to provide RXTX  |
+|                        | buffers in the non-secure physical address space.  |
+|                        | The SPMC maps them as non-secure memory in its S1  |
+|                        | page tables.                                       |
+|                        | In an attempt to attack the state of the SPMC or   |
+|                        | other SPs, the NWd FF-A endpoint could provide     |
+|                        | an address in the secure PAS. In this case, an     |
+|                        | access to the secure memory results in a           |
+|                        | synchronous data abort.                            |
+|                        | In Armv9 platforms, the NWd FF-A endpoint could    |
+|                        | also provide root memory or realm memory. In this  |
+|                        | case an access from the SPMC would result in a     |
+|                        | Granule Protection Fault.                          |
+|                        | In all cases, there could be an explicit attempt   |
+|                        | from the NWd FF-A endpoint to tamper with SPMC     |
+|                        | execution.                                         |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1, DF5                                           |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC                                               |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SPMC state, SP state                               |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | S-Endpoint                                         |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Tampering, Denial of Service                       |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | High (4)         | High (4)        |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | Medium (3)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | Medium (12)      | Medium (12)     |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | The non-secure memory that the SWd is expected to  |
+|                        | use should be configured in the SPMC's manifest.   |
+|                        | The SPMC can't validate the physical address       |
+|                        | of the provided ranges. That responsibility is     |
+|                        | reserved to the EL3 monitor of the system. The     |
+|                        | ranges are provided by the system integrator in the|
+|                        | SPMC manifest. The contents of the manifest are    |
+|                        | integral due to the secure boot process.           |
+|                        | In an Armv8 platform, if there is a                |
+|                        | misconfiguration and any access results in a data  |
+|                        | abort, the TF-A SPMC has no way to recover from    |
+|                        | this. In an Armv9 platform, if there is a          |
+|                        | misconfiguration or the addresses get updated in   |
+|                        | runtime by using the RME system architecture       |
+|                        | features, the SPMC's access originates a Granule   |
+|                        | Protection Fault.                                  |
+|                        | In this case, the threat is mitigated by using     |
+|                        | a special function whose access is conceived for   |
+|                        | possibly getting trapped and to return error.      |
+|                        | The scenarios in which the SPMC is prone to such   |
+|                        | attacks are:                                       |
+|                        | - Indirect messaging targetting or from a VM.      |
+|                        | - Memory sharing when exchanging memory regions    |
+|                        | descriptors with the hypervisor/OS Kernel.         |
+|                        | - FFA_PARTITION_INFO_GET via buffers.              |
+|                        | In these scenarios, the SPMC is able to detect the |
+|                        | fault, recover, and relinquish smoothly, returning |
+|                        | error FFA_ABORTED back to the caller FF-A endpoint.|
++------------------------+----------------------------------------------------+
+
 --------------
 
 *Copyright (c) 2023, Arm Limited. All rights reserved.*
