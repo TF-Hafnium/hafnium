@@ -358,14 +358,15 @@ element of the data flow diagram.
 +------------------------+------------------+---------------+-----------------+
 | ``Total Risk Rating``  | High (12)        | High (12)     |                 |
 +------------------------+------------------+---------------+-----------------+
-| ``Mitigations``        | A platform may prefer assigning boot time,         |
-|                        | statically alocated memory regions through the SMMU|
-|                        | configuration and page tables. The FF-A v1.1       |
-|                        | specification provisions this capability through   |
-|                        | static DMA isolation.                              |
-|                        | The TF-A SPMC does not mitigate this threat.       |
-|                        | It will adopt the static DMA isolation approach in |
-|                        | a future release.                                  |
+| ``Mitigations``        | Hafnium SPMC mitigates this threat by enforcing    |
+|                        | static dma isolation. Under this model, every      |
+|                        | partition uses its manifest to specify the memory  |
+|                        | regions in its physical address space that it      |
+|                        | intends to make visible to each DMA device with    |
+|                        | specific memory attributes.                        |
+|                        | The SPMC enforces access control to make sure a DMA|
+|                        | device cannot access a memory region unless        |
+|                        | explicitly specified in partition manifest.        |
 +------------------------+----------------------------------------------------+
 
 +------------------------+----------------------------------------------------+
