@@ -61,6 +61,12 @@ You can find additional definitions in the `Arm Glossary`_.
    GIC
       Generic Interrupt Controller
 
+   GPF
+      Granlue Protection Fault
+
+   GPT
+      Granule Protection Table
+
    ISA
       Instruction Set Architecture
 

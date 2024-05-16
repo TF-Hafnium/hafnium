@@ -1569,6 +1569,70 @@ element of the data flow diagram.
 |                        | error FFA_ABORTED back to the caller FF-A endpoint.|
 +------------------------+----------------------------------------------------+
 
++------------------------+----------------------------------------------------+
+| ID                     | 34                                                 |
++========================+====================================================+
+| ``Threat``             | **A rogue NWd FF-A endpoint could attempt to       |
+|                        | share/lend/donate a memory region with the wrong   |
+|                        | security state attribute.**                        |
+|                        | The attacker could attempt to corrupt the state of |
+|                        | the SP.                                            |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1, DF5                                           |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC                                               |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SPMC state, SP state, CPU cycles                   |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | S-Endpoint                                         |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Tampering, Denial of Service                       |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | High (4)         | High (4)        |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | Medium (3)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | Medium (12)      | Medium (12)     |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | The platform owner must configure the NS/S regions |
+|                        | that the secure world is allowed to use during     |
+|                        | runtime in the SPMC's manifest.                    |
+|                        | This configuration must be coherent with that of   |
+|                        | platform's memory map, and its PAS setup.          |
+|                        | The EL3 monitor can configure the PAS:             |
+|                        | - In Armv8-A platforms, e.g. by leveraging the     |
+|                        | TZC.                                               |
+|                        | - In Armv9-A platforms, by configuring the GPT     |
+|                        | following the `RME system architecture`_.          |
+|                        | The SPMC doesn't allow the NWd to share/lend/donate|
+|                        | NS memory outside of the ranges specified in the   |
+|                        | manifest.                                          |
+|                        | If the operation is a lend/donate from the NWd to  |
+|                        | an SP or multiple SPs, the platform can leverage   |
+|                        | the ability to change the PAS in runtime to        |
+|                        | enforce the semantics of the lend/donate operation.|
+|                        | The SPMC implementation, for the FVP platform      |
+|                        | leverages the RME architecture to dynamically      |
+|                        | change the PAS from NS to S. In case the update    |
+|                        | fails because the region is not on NS PAS, the     |
+|                        | SPMC returns error back to the NWd caller.         |
+|                        | For the share operation, the SPMC will check that  |
+|                        | is within the NS ranges from the manifest, but     |
+|                        | won't attest that the PAS is correctly set by      |
+|                        | EL3 monitor. The impact of a GPF in a partition    |
+|                        | depends on its EL:                                 |
+|                        | * S-EL1: the SP should handle the GPF, recover     |
+|                        | and relinquish access to the memory.               |
+|                        | * S-EL0: the GPF would trap onto SPMC, which sets  |
+|                        | the SP in an aborted state.                        |
+|                        | Platform owners are encouraged to implement a      |
+|                        | similar interface for the SPMC to leverage,        |
+|                        | equivalent to that detailed for the FVP platform.  |
++------------------------+----------------------------------------------------+
+
 --------------
 
 *Copyright (c) 2023, Arm Limited. All rights reserved.*
@@ -1576,4 +1640,4 @@ element of the data flow diagram.
 .. _Arm Firmware Framework for Arm A-profile: https://developer.arm.com/docs/den0077/latest
 .. _Generic TF-A threat model: https://trustedfirmware-a.readthedocs.io/en/latest/threat_model/threat_model.html
 .. _FF-A ACS: https://github.com/ARM-software/ff-a-acs/releases
-
+.. _RME system architecture: https://developer.arm.com/documentation/den0129/latest/
