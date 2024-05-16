@@ -201,6 +201,9 @@ END
 
 )
   comma=","
+  parent="$(basename "$(dirname "$elf_file")")"
+  mkdir -p ${CODE_COVERAGE_FOLDER}/${parent}
+  cp $elf_file ${CODE_COVERAGE_FOLDER}/${parent}/.
   done
 
 cat <<EOF > "${CONFIG_JSON}"
@@ -217,6 +220,8 @@ cat <<EOF > "${CONFIG_JSON}"
       "sources": $(get_scm_sources),
       "workspace": "${1:-$WORKSPACE}",
       "output_file": "${INTERMEDIATE_LAYER_FILE}",
+      "include_only": "${INCLUDE_FILES}",
+      "exclude": "${EXCLUDE_FILES}",
       "metadata": "${2}"
       },
   "elfs": [
