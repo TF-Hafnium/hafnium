@@ -13,9 +13,11 @@
 /* clang-format off */
 
 /* The following are PSCI version codes. */
-#define PSCI_VERSION_0_2 0x00000002
-#define PSCI_VERSION_1_0 0x00010000
-#define PSCI_VERSION_1_1 0x00010001
+enum psci_version {
+	PSCI_VERSION_0_2 = 0x00000002,
+	PSCI_VERSION_1_0 = 0x00010000,
+	PSCI_VERSION_1_1 = 0x00010001,
+};
 
 /* The following are function identifiers for PSCI. */
 #define PSCI_VERSION                 0x84000000
@@ -41,18 +43,20 @@
 #define PSCI_MEM_PROTECT_CHECK_RANGE 0x84000014
 
 /* The following are return codes for PSCI. */
-#define PSCI_RETURN_ON_PENDING         2
-#define PSCI_RETURN_OFF                1
-#define PSCI_RETURN_ON                 0
-#define PSCI_RETURN_SUCCESS            0
-#define PSCI_ERROR_NOT_SUPPORTED       SMCCC_ERROR_UNKNOWN
-#define PSCI_ERROR_INVALID_PARAMETERS  (-2)
-#define PSCI_ERROR_DENIED              (-3)
-#define PSCI_ERROR_ALREADY_ON          (-4)
-#define PSCI_ERROR_ON_PENDING          (-5)
-#define PSCI_ERROR_INTERNAL_FAILURE    (-6)
-#define PSCI_ERROR_NOT_PRESENT         (-7)
-#define PSCI_ERROR_DISABLE             (-8)
-#define PSCI_ERROR_INVALID_ADDRESS     (-9)
+enum psci_return_code {
+	PSCI_RETURN_ON_PENDING         = 2,
+	PSCI_RETURN_OFF                = 1,
+	PSCI_RETURN_ON                 = 0,
+	PSCI_RETURN_SUCCESS            = 0,
+	PSCI_ERROR_NOT_SUPPORTED       = SMCCC_ERROR_UNKNOWN,
+	PSCI_ERROR_INVALID_PARAMETERS  = -2,
+	PSCI_ERROR_DENIED              = -3,
+	PSCI_ERROR_ALREADY_ON          = -4,
+	PSCI_ERROR_ON_PENDING          = -5,
+	PSCI_ERROR_INTERNAL_FAILURE    = -6,
+	PSCI_ERROR_NOT_PRESENT         = -7,
+	PSCI_ERROR_DISABLE             = -8,
+	PSCI_ERROR_INVALID_ADDRESS     = -9,
+};
 
 /* clang-format on */
