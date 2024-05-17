@@ -937,9 +937,10 @@ FFA_CONSOLE_LOG
 
 ``FFA_CONSOLE_LOG`` allows debug logging to the UART console.
 Characters are packed into registers:
-  - `w2-w7` (|SMCCC| 32-bit)
-  - `x2-x7` (|SMCCC| 64-bit, before v1.2)
-  - `x2-x17` (|SMCCC| 64-bit, v1.2 or later)
+
+- `w2-w7` (|SMCCC| 32-bit)
+- `x2-x7` (|SMCCC| 64-bit, before v1.2)
+- `x2-x17` (|SMCCC| 64-bit, v1.2 or later)
 
 Paravirtualized interfaces
 --------------------------
