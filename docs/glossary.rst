@@ -139,6 +139,9 @@ You can find additional definitions in the `Arm Glossary`_.
    SEA
       Synchronous External Abort
 
+   SIMD
+      Single Instruction Multiple Data
+
    SiP
       Silicon Provider
 
@@ -168,6 +171,9 @@ You can find additional definitions in the `Arm Glossary`_.
 
    SVE
       Scalable Vector Extension
+
+   SME
+      Scalable Matrix Extension
 
    SWd
       Secure World

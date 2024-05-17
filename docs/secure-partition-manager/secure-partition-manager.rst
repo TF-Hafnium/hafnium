@@ -1542,6 +1542,102 @@ Hafnium supports the following architecture extensions for security hardening:
   a region, can be used to enhance the handling of ``FFA_MEM_LEND`` and ``FFA_MEM_DONATE``.
   More details in the section about `Memory Sharing`_.
 
+SIMD support
+------------
+
+In this section, the generic term |SIMD| is used to refer to vector and matrix
+processing units offered by the Arm architecture. This concerns the optional
+architecture extensions: Advanced SIMD (formerly FPU / NEON) / |SVE| / |SME|.
+
+The SPMC preserves the |SIMD| state according to the |SMCCC| (ARM DEN 0028F
+1.5F section 10 Appendix C: SME, SVE, SIMD and FP live state preservation by
+the |SMCCC| implementation).
+
+The SPMC implements the |SIMD| support in the following way:
+
+- SPs are allowed to use Advanced SIMD instructions and manipulate
+  the Advanced SIMD state.
+- The SPMC saves and restores vCPU Advanced SIMD state when switching vCPUs.
+- SPs are restricted from using |SVE| and |SME| instructions and manipulating
+  associated system registers and state. Doing so, traps to the same or higher
+  EL.
+- Entry from the normal world into the SPMC and exit from the SPMC to the normal
+  world preserve the |SIMD| state.
+- Corollary to the above, the normal world is free to use any of the referred
+  |SIMD| extensions and emit FF-A SMCs. The SPMC as a callee preserves the live
+  |SIMD| state according to the rules mentioned in the |SMCCC|.
+- This is also true for the case of a secure interrupt pre-empting the normal
+  world while it is currently processing |SIMD| instructions.
+- |SVE| and |SME| traps are enabled while S-EL2/1/0 run. Traps are temporarily
+  disabled on the narrow window of the context save/restore operation within
+  S-EL2. Traps are enabled again after those operations.
+
+Supported configurations
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The SPMC assumes Advanced SIMD is always implemented (despite being an Arm
+optional architecture extension). The SPMC dynamically detects whether |SVE|
+and |SME| are implemented in the platform, then saves and restores the |SIMD|
+state according to the different combinations:
+
++--------------+--------------------+--------------------+---------------+
+| FEAT_AdvSIMD | FEAT_SVE/FEAT_SVE2 | FEAT_SME/FEAT_SME2 | FEAT_SME_FA64 |
++--------------+--------------------+--------------------+---------------+
+|      Y       |         N          |        N           |        N      |
++--------------+--------------------+--------------------+---------------+
+|      Y       |         Y          |        N           |        N      |
++--------------+--------------------+--------------------+---------------+
+|      Y       |         Y          |        Y           |        N      |
++--------------+--------------------+--------------------+---------------+
+|      Y       |         Y          |        Y           |        Y      |
++--------------+--------------------+--------------------+---------------+
+|      Y       |         N          |        Y           |        N      |
++--------------+--------------------+--------------------+---------------+
+|      Y       |         N          |        Y           |        Y      |
++--------------+--------------------+--------------------+---------------+
+
+Y: architectural feature implemented
+N: architectural feature not implemented
+
+SIMD save/restore operations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The SPMC considers the following SIMD registers state:
+
+- Advanced SIMD consists of 32 ``Vn`` 128b vectors. Vector's lower 128b is
+  shared with the larger |SVE| / |SME| variable length vectors.
+- |SVE| consists of 32 ``Zn`` variable length vectors, ``Px`` predicates,
+  ``FFR`` fault status register.
+- |SME| when Streaming SVE is enabled consists of 32 ``Zn`` variable length
+  vectors, ``Px`` predicates, ``FFR`` fault status register (when FEAT_SME_FA64
+  extension is implemented and enabled), ZA array (when enabled).
+- Status and control registers (FPCR/FPSR) common to all above.
+
+For the purpose of supporting the maximum vector length (or Streaming SVE
+vector length) supported by the architecture, the SPMC sets ``SCR_EL2.LEN``
+and ``SMCR_EL2.LEN`` to the maximum permitted value (2048 bits). This makes
+save/restore operations independent from the vector length constrained by EL3
+(by ``ZCR_EL3``), or the ``ZCR_EL2.LEN`` value set by the normal world itself.
+
+For performance reasons, the normal world might let the secure world know it
+doesn't depend on the |SVE| or |SME| live state while doing an SMC. It does
+so by setting the |SMCCC| SVE hint bit. In which case, the secure world limits
+the normal world context save/restore operations to the Advanced SIMD state
+even if either one of |SVE| or |SME|, or both, are implemented.
+
+The following additional design choices were made related to SME save/restore
+operations:
+
+- When FEAT_SME_FA64 is implemented, ``SMCR_EL2.FA64`` is set and FFR register
+  saved/restored when Streaming SVE mode is enabled.
+- For power saving reasons, if Streaming SVE mode is enabled while entering the
+  SPMC, this state is recorded, Streaming SVE state saved and the mode disabled.
+  Streaming SVE is enabled again while restoring the SME state on exiting the
+  SPMC.
+- The ZA array state is left untouched while the SPMC runs. As neither SPMC
+  and SPs alter the ZA array state, this is a conservative approach in terms
+  of memory footprint consumption.
+
 SMMUv3 support in Hafnium
 -------------------------
 
