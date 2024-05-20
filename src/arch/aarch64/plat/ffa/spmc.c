@@ -1187,7 +1187,7 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 	target_locked = vcpus_locked.vcpu2;
 
 	/* Only the primary VM can turn ON a vCPU that is currently OFF. */
-	if (current->vm->id != HF_PRIMARY_VM_ID &&
+	if (!vm_is_primary(current->vm) &&
 	    target_vcpu->state == VCPU_STATE_OFF) {
 		run_ret->arg2 = FFA_DENIED;
 		ret = false;

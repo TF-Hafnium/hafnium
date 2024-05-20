@@ -83,7 +83,7 @@ static void gic_regs_reset(struct arch_regs *r, bool is_primary)
 void arch_regs_reset(struct vcpu *vcpu)
 {
 	ffa_id_t vm_id = vcpu->vm->id;
-	bool is_primary = vm_id == HF_PRIMARY_VM_ID;
+	bool is_primary = vm_is_primary(vcpu->vm);
 	cpu_id_t vcpu_id = is_primary ? vcpu->cpu->id : vcpu_index(vcpu);
 
 	paddr_t table = vcpu->vm->ptable.root;

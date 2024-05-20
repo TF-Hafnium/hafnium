@@ -102,7 +102,7 @@ void complete_saving_state(struct vcpu *vcpu)
 	 * This is used to emulate the virtual timer for the primary in case it
 	 * should fire while the secondary is running.
 	 */
-	if (vcpu->vm->id == HF_PRIMARY_VM_ID) {
+	if (vm_is_primary(vcpu->vm)) {
 		/*
 		 * Clear timer control register before copying compare value, to
 		 * avoid a spurious timer interrupt. This could be a problem if
@@ -148,7 +148,7 @@ void begin_restoring_state(struct vcpu *vcpu)
 	 * timer which was being used to emulate the EL0 virtual timer, as the
 	 * virtual timer is now running for the primary again.
 	 */
-	if (vcpu->vm->id == HF_PRIMARY_VM_ID) {
+	if (vm_is_primary(vcpu->vm)) {
 		write_msr(cnthp_ctl_el2, 0);
 		write_msr(cnthp_cval_el2, 0);
 	}

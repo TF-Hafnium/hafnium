@@ -328,7 +328,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
-	if (vm->id != HF_PRIMARY_VM_ID) {
+	if (!vm_is_primary(vm)) {
 		dlog_error("Primary VM was not given correct ID.\n");
 		return false;
 	}

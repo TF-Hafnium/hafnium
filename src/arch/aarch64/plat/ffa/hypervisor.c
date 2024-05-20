@@ -220,8 +220,7 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 	 * a different sender.
 	 */
 	return sender_vm_id != receiver_vm_id &&
-	       sender_vm_id == current_vm_id &&
-	       current_vm_id == HF_PRIMARY_VM_ID;
+	       sender_vm_id == current_vm_id && vm_is_primary(current->vm);
 }
 
 /**
@@ -435,7 +434,7 @@ ffa_partition_properties_t plat_ffa_partition_properties(
 	if (!vm_id_is_current_world(vm_id)) {
 		result &= ~FFA_PARTITION_INDIRECT_MSG;
 	}
-	if (target->id == HF_PRIMARY_VM_ID) {
+	if (vm_is_primary(target)) {
 		result &= ~FFA_PARTITION_DIRECT_REQ_RECV;
 	} else {
 		result &= ~FFA_PARTITION_DIRECT_REQ_SEND;
@@ -824,7 +823,7 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 	(void)vcpu_idx;
 
 	/* Only the primary VM can switch vCPUs. */
-	if (current_locked.vcpu->vm->id != HF_PRIMARY_VM_ID) {
+	if (!vm_is_primary(current_locked.vcpu->vm)) {
 		run_ret->arg2 = FFA_DENIED;
 		return false;
 	}
@@ -1062,7 +1061,7 @@ struct ffa_value plat_ffa_msg_recv(bool block,
 	 * The primary VM will receive messages as a status code from running
 	 * vCPUs and must not call this function.
 	 */
-	if (vm->id == HF_PRIMARY_VM_ID) {
+	if (vm_is_primary(vm)) {
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
@@ -1485,7 +1484,7 @@ static struct ffa_value deliver_msg(struct vm_locked to, ffa_id_t from_id,
 	};
 
 	/* Messages for the primary VM are delivered directly. */
-	if (to.vm->id == HF_PRIMARY_VM_ID) {
+	if (vm_is_primary(to.vm)) {
 		/*
 		 * Only tell the primary VM the size and other details if the
 		 * message is for it, to avoid leaking data about messages for
@@ -2125,7 +2124,7 @@ int64_t plat_ffa_mailbox_waiter_get(ffa_id_t vm_id, const struct vcpu *current)
 	struct vm *waiting_vm;
 
 	/* Only primary VMs are allowed to call this function. */
-	if (current->vm->id != HF_PRIMARY_VM_ID) {
+	if (!vm_is_primary(current->vm)) {
 		return -1;
 	}
 

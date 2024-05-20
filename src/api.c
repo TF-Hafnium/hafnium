@@ -318,7 +318,7 @@ struct ffa_value api_yield(struct vcpu *current, struct vcpu **next,
 		timeout_high = (uint32_t)args->arg3 & 0xFFFFFFFF;
 	}
 
-	if (current->vm->id == HF_PRIMARY_VM_ID) {
+	if (vm_is_primary(current->vm)) {
 		/* NOOP on the primary as it makes the scheduling decisions. */
 		return ret;
 	}
@@ -392,7 +392,7 @@ struct vcpu *api_abort(struct vcpu *current)
 	dlog_notice("Aborting VM %#x vCPU %u\n", current->vm->id,
 		    vcpu_index(current));
 
-	if (current->vm->id == HF_PRIMARY_VM_ID) {
+	if (vm_is_primary(current->vm)) {
 		/* TODO: what to do when the primary aborts? */
 		for (;;) {
 			/* Do nothing. */
@@ -994,7 +994,7 @@ int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
 		goto out;
 	}
 
-	if (current->vm->id == HF_PRIMARY_VM_ID) {
+	if (vm_is_primary(current->vm)) {
 		/*
 		 * If the call came from the primary VM, let it know that it
 		 * should run or kick the target vCPU.
@@ -4447,7 +4447,8 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 	 * In the SPM, following check passes if call has been forwarded from
 	 * the hypervisor.
 	 */
-	if (current->vm->id != HF_PRIMARY_VM_ID) {
+
+	if (!vm_is_primary(current->vm)) {
 		dlog_verbose(
 			"Only the receiver's scheduler can use this "
 			"interface\n");

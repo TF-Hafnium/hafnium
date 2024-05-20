@@ -969,7 +969,7 @@ struct ffa_value ffa_retrieve_check_transition(
 		 * are both valid representations of the !O-NA state.
 		 */
 		if (vm_id_is_current_world(to.vm->id) &&
-		    to.vm->id != HF_PRIMARY_VM_ID &&
+		    !vm_is_primary(to.vm) &&
 		    (orig_to_mode & MM_MODE_UNMAPPED_MASK) !=
 			    MM_MODE_UNMAPPED_MASK) {
 			return ffa_error(FFA_DENIED);

@@ -432,6 +432,12 @@ static inline bool vm_is_mp(const struct vm *vm)
 	return vm->vcpu_count > 1;
 }
 
+/* Return true if `vm` is the primary VM. */
+static inline bool vm_is_primary(const struct vm *vm)
+{
+	return vm->id == HF_PRIMARY_VM_ID;
+}
+
 struct interrupt_descriptor *vm_interrupt_set_target_mpidr(
 	struct vm_locked vm_locked, uint32_t id, uint32_t target_mpidr);
 struct interrupt_descriptor *vm_interrupt_set_sec_state(

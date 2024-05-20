@@ -387,7 +387,7 @@ bool psci_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		  uintreg_t arg1, uintreg_t arg2, uintreg_t *ret,
 		  struct vcpu **next)
 {
-	if (vcpu->vm->id == HF_PRIMARY_VM_ID) {
+	if (vm_is_primary(vcpu->vm)) {
 		return psci_primary_vm_handler(vcpu, func, arg0, arg1, arg2,
 					       ret);
 	}
