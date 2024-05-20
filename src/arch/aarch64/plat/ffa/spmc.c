@@ -1171,7 +1171,7 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 		return false;
 	}
 
-	if (vm->vcpu_count > 1 && vcpu_idx != cpu_index(current->cpu)) {
+	if (vm_is_mp(vm) && vcpu_idx != cpu_index(current->cpu)) {
 		dlog_verbose("vcpu_idx (%d) != pcpu index (%zu)\n", vcpu_idx,
 			     cpu_index(current->cpu));
 		return false;
@@ -2988,8 +2988,7 @@ int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
 		 * any other physical CPU except the one it is currently
 		 * running on.
 		 */
-		if ((vm->vcpu_count == 1) &&
-		    (value != cpu_index(current->cpu))) {
+		if (vm_is_up(vm) && value != cpu_index(current->cpu)) {
 			dlog_verbose(
 				"Illegal target PE index specified by current "
 				"UP SP\n");

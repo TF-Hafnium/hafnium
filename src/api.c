@@ -102,7 +102,7 @@ struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current)
 
 	CHECK((vm != NULL) && (current != NULL));
 
-	if (vm->vcpu_count == 1) {
+	if (vm_is_up(vm)) {
 		vcpu = vm_get_vcpu(vm, 0);
 	} else if (current_cpu_index < vm->vcpu_count) {
 		vcpu = vm_get_vcpu(vm, current_cpu_index);
@@ -3983,7 +3983,7 @@ struct ffa_value api_ffa_secondary_ep_register(ipaddr_t entry_point,
 	 * (DEN0077A FF-A v1.1 Beta0 Table 18.29) or the VM is UP.
 	 */
 	if (!plat_ffa_is_secondary_ep_register_supported() ||
-	    current->vm->vcpu_count == 1) {
+	    vm_is_up(current->vm)) {
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
@@ -4328,8 +4328,7 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 	CHECK(receiver_locked.vm != NULL);
 
 	if (receiver_locked.vm->vcpu_count <= vcpu_id ||
-	    (receiver_locked.vm->vcpu_count != 1 &&
-	     cpu_index(current->cpu) != vcpu_id)) {
+	    (vm_is_mp(current->vm) && cpu_index(current->cpu) != vcpu_id)) {
 		dlog_verbose(
 			"Invalid VCPU ID %u. vcpu count %u current core: "
 			"%zu!\n",

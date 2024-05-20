@@ -74,7 +74,7 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	/* Initialize SRI for running core. */
 	plat_ffa_sri_init(c);
 
-	vcpu = vm_get_vcpu(vm, (vm->vcpu_count == 1) ? 0 : cpu_index(c));
+	vcpu = vm_get_vcpu(vm, vm_is_up(vm) ? 0 : cpu_index(c));
 	vcpu_locked = vcpu_lock(vcpu);
 
 	if (vcpu->rt_model != RTM_SP_INIT &&

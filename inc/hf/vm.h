@@ -420,6 +420,18 @@ static inline bool vm_power_management_cpu_off_requested(struct vm *vm)
 		(UINT32_C(1) << VM_POWER_MANAGEMENT_CPU_OFF_SHIFT)) != 0;
 }
 
+/* Return true if `vm` is a UP. */
+static inline bool vm_is_up(const struct vm *vm)
+{
+	return vm->vcpu_count == 1;
+}
+
+/* Return true if `vm` is a MP. */
+static inline bool vm_is_mp(const struct vm *vm)
+{
+	return vm->vcpu_count > 1;
+}
+
 struct interrupt_descriptor *vm_interrupt_set_target_mpidr(
 	struct vm_locked vm_locked, uint32_t id, uint32_t target_mpidr);
 struct interrupt_descriptor *vm_interrupt_set_sec_state(
