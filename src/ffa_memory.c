@@ -2137,7 +2137,7 @@ struct ffa_value ffa_memory_send_validate(
 				"for sending memory, expected %s.\n",
 				ffa_instruction_access_name(instruction_access),
 				ffa_instruction_access_name(
-					FFA_INSTRUCTION_ACCESS_RESERVED));
+					FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED));
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 		if (share_func == FFA_MEM_SHARE_32 ||
