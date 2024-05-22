@@ -138,41 +138,6 @@ struct ffa_value sp_ffa_features_cmd(ffa_id_t source, uint32_t feature_func_id)
 
 static uint8_t retrieve_buffer[PAGE_SIZE * 2];
 
-/*
- * Update security state on S1 page table based on attributes
- * set in the memory region structure.
- */
-static void update_mm_security_state(
-	struct ffa_composite_memory_region *composite,
-	ffa_memory_attributes_t attributes)
-{
-	if (attributes.security == FFA_MEMORY_SECURITY_NON_SECURE &&
-	    !ffa_is_vm_id(hf_vm_get_id())) {
-		for (uint32_t i = 0; i < composite->constituent_count; i++) {
-			uint32_t mode;
-
-			if (!hftest_mm_get_mode(
-				    // NOLINTNEXTLINE(performance-no-int-to-ptr)
-				    (const void *)composite->constituents[i]
-					    .address,
-				    FFA_PAGE_SIZE * composite->constituents[i]
-							    .page_count,
-				    &mode)) {
-				FAIL("Couldn't get the mode of the "
-				     "composite.\n");
-			}
-
-			hftest_mm_identity_map(
-				// NOLINTNEXTLINE(performance-no-int-to-ptr)
-				(const void *)composite->constituents[i]
-					.address,
-				FFA_PAGE_SIZE *
-					composite->constituents[i].page_count,
-				mode | MM_MODE_NS);
-		}
-	}
-}
-
 static struct ffa_value retrieve_v1_0(ffa_id_t sender_id,
 				      ffa_memory_handle_t handle)
 {

@@ -154,3 +154,6 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 bool ffa_partition_info_regs_get_part_info(
 	struct ffa_value args, uint8_t idx,
 	struct ffa_partition_info *partition_info);
+
+void update_mm_security_state(struct ffa_composite_memory_region *composite,
+			      ffa_memory_attributes_t attributes);

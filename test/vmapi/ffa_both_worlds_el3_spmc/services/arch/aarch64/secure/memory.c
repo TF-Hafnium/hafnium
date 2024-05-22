@@ -22,37 +22,6 @@
 
 static uint8_t retrieve_buffer[PAGE_SIZE * 2];
 
-static void update_mm_security_state(
-	struct ffa_composite_memory_region *composite,
-	ffa_memory_attributes_t attributes)
-{
-	if (attributes.security == FFA_MEMORY_SECURITY_NON_SECURE &&
-	    !ffa_is_vm_id(hf_vm_get_id())) {
-		for (uint32_t i = 0; i < composite->constituent_count; i++) {
-			uint32_t mode;
-
-			if (!hftest_mm_get_mode(
-				    // NOLINTNEXTLINE(performance-no-int-to-ptr)
-				    (const void *)composite->constituents[i]
-					    .address,
-				    FFA_PAGE_SIZE * composite->constituents[i]
-							    .page_count,
-				    &mode)) {
-				FAIL("Couldn't get the mode of the "
-				     "composite.\n");
-			}
-
-			hftest_mm_identity_map(
-				// NOLINTNEXTLINE(performance-no-int-to-ptr)
-				(const void *)composite->constituents[i]
-					.address,
-				FFA_PAGE_SIZE *
-					composite->constituents[i].page_count,
-				mode | MM_MODE_NS);
-		}
-	}
-}
-
 static void memory_increment(struct ffa_memory_region *memory_region)
 {
 	size_t i;

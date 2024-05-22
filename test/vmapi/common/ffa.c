@@ -8,6 +8,8 @@
 
 #include "hf/ffa.h"
 
+#include "hf/arch/mmu.h"
+
 #include "hf/check.h"
 #include "hf/mm.h"
 #include "hf/static_assert.h"
@@ -828,4 +830,38 @@ bool ffa_partition_info_regs_get_part_info(
 	partition_info->uuid.uuid[3] = (uuid_high >> 32) & 0xFFFFFFFF;
 
 	return true;
+}
+
+/*
+ * Update security state on S1 page table based on attributes
+ * set in the memory region structure.
+ */
+void update_mm_security_state(struct ffa_composite_memory_region *composite,
+			      ffa_memory_attributes_t attributes)
+{
+	if (attributes.security == FFA_MEMORY_SECURITY_NON_SECURE &&
+	    !ffa_is_vm_id(hf_vm_get_id())) {
+		for (uint32_t i = 0; i < composite->constituent_count; i++) {
+			uint32_t mode;
+
+			if (!hftest_mm_get_mode(
+				    // NOLINTNEXTLINE(performance-no-int-to-ptr)
+				    (const void *)composite->constituents[i]
+					    .address,
+				    FFA_PAGE_SIZE * composite->constituents[i]
+							    .page_count,
+				    &mode)) {
+				FAIL("Couldn't get the mode of the "
+				     "composite.\n");
+			}
+
+			hftest_mm_identity_map(
+				// NOLINTNEXTLINE(performance-no-int-to-ptr)
+				(const void *)composite->constituents[i]
+					.address,
+				FFA_PAGE_SIZE *
+					composite->constituents[i].page_count,
+				mode | MM_MODE_NS);
+		}
+	}
 }

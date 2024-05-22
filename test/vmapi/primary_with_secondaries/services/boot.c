@@ -46,24 +46,24 @@ static uintptr_t get_load_address(struct hftest_context* ctx)
 	return (uintptr_t)&text_begin[0];
 }
 
-static void update_mm_security_state(void* address, size_t page_count,
-				     uint32_t attributes)
+static void update_region_security_state(struct memory_region* mem_region)
 {
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	void* address = (void*)mem_region->base_address;
+	size_t page_count = mem_region->page_count;
+	uint32_t attributes = mem_region->attributes;
+
 	uint32_t mode = 0;
 	uint32_t extra_attributes =
 		(attributes & MANIFEST_REGION_ATTR_SECURITY) != 0 ? MM_MODE_NS
 								  : 0U;
 
-	if (!hftest_mm_get_mode(
-		    // NOLINTNEXTLINE(performance-no-int-to-ptr)
-		    address, FFA_PAGE_SIZE * page_count, &mode)) {
+	if (!hftest_mm_get_mode(address, FFA_PAGE_SIZE * page_count, &mode)) {
 		FAIL("Memory range has different modes.\n");
 	}
 
-	hftest_mm_identity_map(
-		// NOLINTNEXTLINE(performance-no-int-to-ptr)
-		(const void*)address, FFA_PAGE_SIZE * page_count,
-		mode | extra_attributes);
+	hftest_mm_identity_map(address, FFA_PAGE_SIZE * page_count,
+			       mode | extra_attributes);
 }
 
 TEST_SERVICE(boot_memory)
@@ -150,8 +150,7 @@ TEST_SERVICE(boot_memory_manifest)
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		mem_ptr = (uint8_t*)mem_region->base_address;
 
-		update_mm_security_state(mem_ptr, mem_region->page_count,
-					 mem_region->attributes);
+		update_region_security_state(mem_region);
 		for (size_t i = 0; i < mem_region->page_count * PAGE_SIZE;
 		     ++i) {
 			mem_ptr[i] = (uint8_t)i / 2;
