@@ -26,8 +26,8 @@ extern size_t dlog_buffer_offset;
 extern char dlog_buffer[];
 
 void dlog_enable_lock(void);
-void dlog(const char *fmt, ...);
-void vdlog(const char *fmt, va_list args);
+size_t dlog(const char *fmt, ...);
+size_t vdlog(const char *fmt, va_list args);
 
 /*
  * The do { ... } while (0) syntax is used to ensure that callers of

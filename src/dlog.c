@@ -11,7 +11,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "hf/ffa.h"
 #include "hf/spinlock.h"
 #include "hf/std.h"
 #include "hf/stdout.h"
@@ -98,14 +97,18 @@ static size_t print_raw_string(const char *str)
  * where the suffix begins. This is used when printing right-aligned numbers
  * with a zero fill; for example, -10 with width 4 should be padded to -010,
  * so suffix would point to index one of the "-10" string .
+ *
+ * Returns number of characters written.
  */
-static void print_string(const char *str, const char *suffix, size_t width,
-			 int flags, char fill)
+static size_t print_string(const char *str, const char *suffix, size_t width,
+			   int flags, char fill)
 {
+	size_t chars_written = 0;
 	size_t len = suffix - str;
 
 	/* Print the string up to the beginning of the suffix. */
 	while (str != suffix) {
+		chars_written++;
 		dlog_putchar(*str++);
 	}
 
@@ -113,28 +116,33 @@ static void print_string(const char *str, const char *suffix, size_t width,
 		/* Left-aligned. Print suffix, then print padding if needed. */
 		len += print_raw_string(suffix);
 		while (len < width) {
+			chars_written++;
 			dlog_putchar(' ');
 			len++;
 		}
-		return;
+		return chars_written;
 	}
 
 	/* Fill until we reach the desired length. */
 	len += strnlen_s(suffix, DLOG_MAX_STRING_LENGTH);
 	while (len < width) {
+		chars_written++;
 		dlog_putchar(fill);
 		len++;
 	}
 
 	/* Now print the rest of the string. */
-	print_raw_string(suffix);
+	chars_written += print_raw_string(suffix);
+	return chars_written;
 }
 
 /**
  * Prints a number to the debug log. The caller specifies the base, its minimum
  * width and printf-style flags.
+ *
+ * Returns number of characters written.
  */
-static void print_num(size_t v, size_t base, size_t width, int flags)
+static size_t print_num(size_t v, size_t base, size_t width, int flags)
 {
 	static const char *digits_lower = "0123456789abcdefx";
 	static const char *digits_upper = "0123456789ABCDEFX";
@@ -177,9 +185,9 @@ static void print_num(size_t v, size_t base, size_t width, int flags)
 		*--ptr = ' ';
 	}
 	if (flags & FLAG_ZERO) {
-		print_string(ptr, num, width, flags, '0');
+		return print_string(ptr, num, width, flags, '0');
 	} else {
-		print_string(ptr, ptr, width, flags, ' ');
+		return print_string(ptr, ptr, width, flags, ' ');
 	}
 }
 
@@ -244,11 +252,14 @@ void dlog_flush_vm_buffer(ffa_id_t id, char buffer[], size_t length)
 
 /**
  * Same as "dlog", except that arguments are passed as a va_list
+ *
+ * Returns number of characters written, or `-1` if format string is invalid.
  */
-void vdlog(const char *fmt, va_list args)
+size_t vdlog(const char *fmt, va_list args)
 {
 	const char *p;
 	size_t w;
+	size_t chars_written = 0;
 	int flags;
 	char buf[2];
 
@@ -257,6 +268,7 @@ void vdlog(const char *fmt, va_list args)
 	for (p = fmt; *p; p++) {
 		switch (*p) {
 		default:
+			chars_written++;
 			dlog_putchar(*p);
 			break;
 
@@ -290,7 +302,8 @@ void vdlog(const char *fmt, va_list args)
 			case 's': {
 				char *str = va_arg(args, char *);
 
-				print_string(str, str, w, flags, ' ');
+				chars_written +=
+					print_string(str, str, w, flags, ' ');
 				p++;
 			} break;
 
@@ -303,66 +316,83 @@ void vdlog(const char *fmt, va_list args)
 					v = -v;
 				}
 
-				print_num((size_t)v, 10, w, flags);
+				chars_written +=
+					print_num((size_t)v, 10, w, flags);
 				p++;
 			} break;
 
 			case 'X':
 				flags |= FLAG_UPPER;
-				print_num(va_arg(args, size_t), 16, w, flags);
+				chars_written += print_num(va_arg(args, size_t),
+							   16, w, flags);
 				p++;
 				break;
 
 			case 'p':
-				print_num(va_arg(args, size_t), 16,
-					  sizeof(size_t) * 2, FLAG_ZERO);
+				chars_written += print_num(
+					va_arg(args, size_t), 16,
+					sizeof(size_t) * 2, FLAG_ZERO);
 				p++;
 				break;
 
 			case 'x':
-				print_num(va_arg(args, size_t), 16, w, flags);
+				chars_written += print_num(va_arg(args, size_t),
+							   16, w, flags);
 				p++;
 				break;
 
 			case 'u':
-				print_num(va_arg(args, size_t), 10, w, flags);
+				chars_written += print_num(va_arg(args, size_t),
+							   10, w, flags);
 				p++;
 				break;
 
 			case 'o':
-				print_num(va_arg(args, size_t), 8, w, flags);
+				chars_written += print_num(va_arg(args, size_t),
+							   8, w, flags);
 				p++;
 				break;
 
 			case 'c':
 				buf[1] = 0;
 				buf[0] = va_arg(args, int);
-				print_string(buf, buf, w, flags, ' ');
+				chars_written +=
+					print_string(buf, buf, w, flags, ' ');
 				p++;
 				break;
 
 			case '%':
+				chars_written++;
+				dlog_putchar('%');
+				p++;
 				break;
 
 			default:
-				dlog_putchar('%');
+				chars_written = -1;
+				goto out;
 			}
 
 			break;
 		}
 	}
+out:
 	stdout_flush();
 	unlock();
+	return chars_written;
 }
 
 /**
  * Prints the given format string to the debug log.
+ *
+ * Returns number of characters written, or `-1` if format string is invalid.
  */
-void dlog(const char *fmt, ...)
+size_t dlog(const char *fmt, ...)
 {
+	size_t chars_written = 0;
 	va_list args;
 
 	va_start(args, fmt);
-	vdlog(fmt, args);
+	chars_written = vdlog(fmt, args);
 	va_end(args);
+	return chars_written;
 }
