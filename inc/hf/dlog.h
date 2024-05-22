@@ -75,5 +75,3 @@ size_t vdlog(const char *fmt, va_list args);
 			dlog("VERBOSE: " __VA_ARGS__); \
 		}                                      \
 	} while (0)
-
-void dlog_flush_vm_buffer(ffa_id_t id, char buffer[], size_t length);

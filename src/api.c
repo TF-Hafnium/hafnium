@@ -4507,6 +4507,16 @@ out:
 }
 
 /**
+ * Send the contents of the given VM's log buffer to the log, preceded
+ * by the VM ID and followed by a newline.
+ */
+void api_flush_vm_buffer(ffa_id_t id, char *buffer, size_t length)
+{
+	buffer[length] = '\0';
+	dlog("%s %x: %s\n", ffa_is_vm_id(id) ? "VM" : "SP", id, buffer);
+}
+
+/**
  * Implements FF-A v1.2 FFA_CONSOLE_LOG ABI for buffered logging.
  */
 struct ffa_value api_ffa_console_log(const struct ffa_value args,
@@ -4582,9 +4592,9 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 		}
 
 		if (flush) {
-			dlog_flush_vm_buffer(vm_locked.vm->id,
-					     vm_locked.vm->log_buffer,
-					     vm_locked.vm->log_buffer_length);
+			api_flush_vm_buffer(vm_locked.vm->id,
+					    vm_locked.vm->log_buffer,
+					    vm_locked.vm->log_buffer_length);
 			vm_locked.vm->log_buffer_length = 0;
 		}
 	}

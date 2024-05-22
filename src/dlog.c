@@ -226,31 +226,6 @@ static const char *parse_flags(const char *p, int *flags)
 }
 
 /**
- * Send the contents of the given VM's log buffer to the log, preceded by the VM
- * ID and followed by a newline.
- */
-void dlog_flush_vm_buffer(ffa_id_t id, char buffer[], size_t length)
-{
-	lock();
-
-	if (ffa_is_vm_id(id)) {
-		print_raw_string("VM ");
-	} else {
-		print_raw_string("SP ");
-	}
-	print_num(id, 16, 0, 0);
-	print_raw_string(": ");
-
-	for (size_t i = 0; i < length; ++i) {
-		dlog_putchar(buffer[i]);
-		buffer[i] = '\0';
-	}
-	dlog_putchar('\n');
-
-	unlock();
-}
-
-/**
  * Same as "dlog", except that arguments are passed as a va_list
  *
  * Returns number of characters written, or `-1` if format string is invalid.
