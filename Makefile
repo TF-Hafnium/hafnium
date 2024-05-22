@@ -68,7 +68,7 @@ CHECKPATCH := $(CURDIR)/third_party/linux/scripts/checkpatch.pl \
 CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c\|src/arch/aarch64/hypervisor/feature_id.c"
 
 OUT ?= out/$(PROJECT)
-OUT_DIR = out/$(PROJECT)
+OUT_DIR = $(OUT)
 
 .PHONY: all
 all: $(OUT_DIR)/build.ninja
@@ -94,7 +94,7 @@ clean:
 
 .PHONY: clobber
 clobber:
-	rm -rf $(OUT)
+	rm -rf $(OUT_DIR)
 
 # see .clang-format.
 .PHONY: format
@@ -140,7 +140,7 @@ update-prebuilts: prebuilts/linux-aarch64/linux/vmlinuz
 
 prebuilts/linux-aarch64/linux/vmlinuz: $(OUT_DIR)/build.ninja
 	@$(NINJA) -C $(OUT_DIR) "third_party/linux"
-	cp out/reference/obj/third_party/linux/linux.bin $@
+	cp $(OUT_DIR)/obj/third_party/linux/linux.bin $@
 
 .PHONY: list
 list:
