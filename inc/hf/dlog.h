@@ -15,12 +15,14 @@
 
 #define DLOG_BUFFER_SIZE 8192
 
-#define LOG_LEVEL_NONE UINT32_C(0)
-#define LOG_LEVEL_ERROR UINT32_C(1)
-#define LOG_LEVEL_NOTICE UINT32_C(2)
-#define LOG_LEVEL_WARNING UINT32_C(3)
-#define LOG_LEVEL_INFO UINT32_C(4)
-#define LOG_LEVEL_VERBOSE UINT32_C(5)
+enum log_level {
+	LOG_LEVEL_NONE = 0,
+	LOG_LEVEL_ERROR = 1,
+	LOG_LEVEL_NOTICE = 2,
+	LOG_LEVEL_WARNING = 3,
+	LOG_LEVEL_INFO = 4,
+	LOG_LEVEL_VERBOSE = 5,
+};
 
 extern size_t dlog_buffer_offset;
 extern char dlog_buffer[];
