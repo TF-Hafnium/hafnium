@@ -720,7 +720,7 @@ static struct ffa_value ffa_send_check_transition(
 	struct ffa_memory_region *memory_region, uint32_t *orig_from_mode,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t *from_mode, enum ffa_map_action *map_action)
+	uint32_t *from_mode, enum ffa_map_action *map_action, bool zero)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
@@ -753,6 +753,17 @@ static struct ffa_value ffa_send_check_transition(
 	 * memory.
 	 */
 	if ((*orig_from_mode & state_mask) != 0) {
+		return ffa_error(FFA_DENIED);
+	}
+
+	/*
+	 * Memory cannot be zeroed during the lend/donate operation if the
+	 * sender only has RO access.
+	 */
+	if ((*orig_from_mode & MM_MODE_W) == 0 && zero == true) {
+		dlog_verbose(
+			"Cannot zero memory when the sender doesn't have "
+			"write access\n");
 		return ffa_error(FFA_DENIED);
 	}
 
@@ -1452,7 +1463,7 @@ static struct ffa_value ffa_send_check_update(
 	ret = ffa_send_check_transition(
 		from_locked, share_func, memory_region, &orig_from_mode,
 		fragments, fragment_constituent_counts, fragment_count,
-		&from_mode, &map_action);
+		&from_mode, &map_action, clear);
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose("Invalid transition for send.\n");
 		return ret;
@@ -1583,6 +1594,17 @@ struct ffa_value ffa_retrieve_check_update(
 			dlog_verbose("Fragment not properly aligned.\n");
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
+	}
+
+	/*
+	 * Ensure the sender has write permissions if the memory needs to be
+	 * cleared.
+	 */
+	if ((sender_orig_mode & MM_MODE_W) == 0 && clear == true) {
+		dlog_verbose(
+			"Cannot zero memory when the sender does not have "
+			"write access\n");
+		return ffa_error(FFA_DENIED);
 	}
 
 	/*
