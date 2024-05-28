@@ -16,10 +16,7 @@ struct list_entry {
 	struct list_entry *prev;
 };
 
-#define LIST_INIT(l)                   \
-	{                              \
-		.next = &l, .prev = &l \
-	}
+#define LIST_INIT(l) {.next = &l, .prev = &l}
 #define CONTAINER_OF(ptr, type, field) \
 	((type *)((char *)ptr - offsetof(type, field)))
 

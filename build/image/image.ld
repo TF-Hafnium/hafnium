@@ -89,8 +89,6 @@ SECTIONS
 		KEEP(*(SORT(.hftest.*)))
 	}
 	hftest_end = .;
-	ASSERT((SIZEOF(.hftest) == (DEFINED(hftest_enable) ? SIZEOF(.hftest) : 0)),
-	       "Error: Image includes .hftest section but not HFTEST_ENABLE().")
 	rodata_size = ABSOLUTE(. - rodata_begin);
 	. = ALIGN(4096);
 	rodata_end = .;

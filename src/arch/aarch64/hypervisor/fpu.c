@@ -13,14 +13,17 @@
 void arch_fpu_state_save_to_vcpu(struct vcpu *vcpu)
 {
 	__asm__ volatile(
+		".arch_extension fp;"
 		"mrs %0, fpsr;"
-		"mrs %1, fpcr"
+		"mrs %1, fpcr;"
+		".arch_extension nofp;"
 		: "=r"(vcpu->regs.fpsr), "=r"(vcpu->regs.fpcr));
 }
 
 void arch_fpu_regs_save_to_vcpu(struct vcpu *vcpu)
 {
 	__asm__ volatile(
+		".arch_extension fp;"
 		"stp q0, q1, [%0], #32;"
 		"stp q2, q3, [%0], #32;"
 		"stp q4, q5, [%0], #32;"
@@ -36,7 +39,8 @@ void arch_fpu_regs_save_to_vcpu(struct vcpu *vcpu)
 		"stp q24, q25, [%0], #32;"
 		"stp q26, q27, [%0], #32;"
 		"stp q28, q29, [%0], #32;"
-		"stp q30, q31, [%0], #32"
+		"stp q30, q31, [%0], #32;"
+		".arch_extension nofp;"
 		:
 		: "r"(&vcpu->regs.fp));
 }
@@ -50,8 +54,10 @@ void arch_fpu_save_to_vcpu(struct vcpu *vcpu)
 void arch_fpu_state_restore_from_vcpu(struct vcpu *vcpu)
 {
 	__asm__ volatile(
+		".arch_extension fp;"
 		"msr fpsr, %0;"
-		"msr fpcr, %1"
+		"msr fpcr, %1;"
+		".arch_extension nofp;"
 		:
 		: "r"(vcpu->regs.fpsr), "r"(vcpu->regs.fpcr));
 }
@@ -59,6 +65,7 @@ void arch_fpu_state_restore_from_vcpu(struct vcpu *vcpu)
 void arch_fpu_regs_restore_from_vcpu(struct vcpu *vcpu)
 {
 	__asm__ volatile(
+		".arch_extension fp;"
 		"ldp q0, q1, [%0], #32;"
 		"ldp q2, q3, [%0], #32;"
 		"ldp q4, q5, [%0], #32;"
@@ -74,7 +81,8 @@ void arch_fpu_regs_restore_from_vcpu(struct vcpu *vcpu)
 		"ldp q24, q25, [%0], #32;"
 		"ldp q26, q27, [%0], #32;"
 		"ldp q28, q29, [%0], #32;"
-		"ldp q30, q31, [%0], #32"
+		"ldp q30, q31, [%0], #32;"
+		".arch_extension nofp;"
 		:
 		: "r"(&vcpu->regs.fp));
 }

@@ -2984,7 +2984,7 @@ TEST(memory_sharing_v1_1, ffa_validate_memory_access_reserved_mbz)
 			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
 		  0);
 
-	receiver = ffa_memory_region_get_receiver((void *)mb.send, 0);
+	receiver = ffa_memory_region_get_receiver(mb.send, 0);
 	receiver->reserved_0 = 0xFFFFFFFF;
 
 	for (unsigned int i = 0; i < ARRAY_SIZE(send_function); i++) {

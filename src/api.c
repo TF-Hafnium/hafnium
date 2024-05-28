@@ -4723,6 +4723,7 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 	 * 64bit and less than v1.2: 6 registers
 	 * 64bit and v1.2 or greater: 16 registers
 	 */
+	/* NOLINTNEXTLINE(readability-avoid-nested-conditional-operator) */
 	const size_t registers_max = log32 ? 6 : (v1_2 ? 16 : 6);
 	const size_t chars_max =
 		registers_max * (log32 ? sizeof(uint32_t) : sizeof(uint64_t));

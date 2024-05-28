@@ -31,7 +31,7 @@ int strncmp(const char *a, const char *b, size_t n);
 #if __has_builtin(__builtin_is_aligned)
 #define is_aligned(v, a) __builtin_is_aligned((v), (a))
 #else
-#define is_aligned(v, a) (((uintptr_t)(v) & ((a)-1)) == 0)
+#define is_aligned(v, a) (((uintptr_t)(v) & ((a) - 1)) == 0)
 #endif
 
 /**
@@ -40,7 +40,7 @@ int strncmp(const char *a, const char *b, size_t n);
 #if __has_builtin(__builtin_align_up)
 #define align_up(v, a) __builtin_align_up((v), (a))
 #else
-#define align_up(v, a) (((uintptr_t)(v) + ((a)-1)) & ~((a)-1))
+#define align_up(v, a) (((uintptr_t)(v) + ((a) - 1)) & ~((a) - 1))
 #endif
 
 /**
@@ -49,7 +49,7 @@ int strncmp(const char *a, const char *b, size_t n);
 #if __has_builtin(__builtin_align_down)
 #define align_down(v, a) __builtin_align_down((v), (a))
 #else
-#define align_down(v, a) ((uintptr_t)(v) & ~((a)-1))
+#define align_down(v, a) ((uintptr_t)(v) & ~((a) - 1))
 #endif
 
 #ifndef be16toh

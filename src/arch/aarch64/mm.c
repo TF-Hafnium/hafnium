@@ -857,8 +857,7 @@ bool arch_mm_init(paddr_t table)
 		nsa_nsw = 0;
 	}
 
-	arch_mm_config = (struct arch_mm_config)
-	{
+	arch_mm_config = (struct arch_mm_config){
 		.ttbr0_el2 = pa_addr(table),
 
 		.vtcr_el2 = (1U << 31) |       /* RES1. */
@@ -879,11 +878,11 @@ bool arch_mm_init(paddr_t table)
 		 * 0xf0 -> Tagged Normal, Inner/Outer Write-Back,
 		 *         Read/Write-Alloc non-transient memory.
 		 */
-			.mair_el2 = (0 << (8 * STAGE1_DEVICEINDX)) |
+		.mair_el2 = (0 << (8 * STAGE1_DEVICEINDX)) |
 #if ENABLE_MTE
-				    (0xf0 << (8 * STAGE1_STACKINDX)) |
+			    (0xf0 << (8 * STAGE1_STACKINDX)) |
 #endif
-				    (0xff << (8 * STAGE1_NORMALINDX)),
+			    (0xff << (8 * STAGE1_NORMALINDX)),
 
 		.sctlr_el2 = get_sctlr_el2_value(false),
 		.vstcr_el2 = (1U << 31) |	    /* RES1. */

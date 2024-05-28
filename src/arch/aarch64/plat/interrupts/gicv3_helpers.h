@@ -35,22 +35,23 @@
  */
 #if GIC_EXT_INTID
 /* GICv3.1 */
-#define GICD_OFFSET_8(REG, id)                                  \
-	(((id) <= MAX_SPI_ID) ? GICD_##REG##R + (uintptr_t)(id) \
-			      : GICD_##REG##RE + (uintptr_t)(id)-MIN_ESPI_ID)
+#define GICD_OFFSET_8(REG, id)                     \
+	(((id) <= MAX_SPI_ID)                      \
+		 ? GICD_##REG##R + (uintptr_t)(id) \
+		 : GICD_##REG##RE + (uintptr_t)(id) - MIN_ESPI_ID)
 
-#define GICD_OFFSET(REG, id)                                                \
-	(((id) <= MAX_SPI_ID)                                               \
-		 ? GICD_##REG##R + (((uintptr_t)(id) >> REG##R_SHIFT) << 2) \
-		 : GICD_##REG##RE +                                         \
-			   ((((uintptr_t)(id)-MIN_ESPI_ID) >> REG##R_SHIFT) \
+#define GICD_OFFSET(REG, id)                                                  \
+	(((id) <= MAX_SPI_ID)                                                 \
+		 ? GICD_##REG##R + (((uintptr_t)(id) >> REG##R_SHIFT) << 2)   \
+		 : GICD_##REG##RE +                                           \
+			   ((((uintptr_t)(id) - MIN_ESPI_ID) >> REG##R_SHIFT) \
 			    << 2))
 
-#define GICD_OFFSET_64(REG, id)                                             \
-	(((id) <= MAX_SPI_ID)                                               \
-		 ? GICD_##REG##R + (((uintptr_t)(id) >> REG##R_SHIFT) << 3) \
-		 : GICD_##REG##RE +                                         \
-			   ((((uintptr_t)(id)-MIN_ESPI_ID) >> REG##R_SHIFT) \
+#define GICD_OFFSET_64(REG, id)                                               \
+	(((id) <= MAX_SPI_ID)                                                 \
+		 ? GICD_##REG##R + (((uintptr_t)(id) >> REG##R_SHIFT) << 3)   \
+		 : GICD_##REG##RE +                                           \
+			   ((((uintptr_t)(id) - MIN_ESPI_ID) >> REG##R_SHIFT) \
 			    << 3))
 
 #else /* GICv3 */

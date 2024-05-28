@@ -17,13 +17,13 @@ infrastructure:
 
 .. code:: shell
 
-   https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-x86_64-linux-gnu-ubuntu-22.04.tar.xz
+   https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
 
 - For a AArch64 Ubuntu host,
 
 .. code:: shell
 
-   https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-aarch64-linux-gnu.tar.xz
+   https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-aarch64-linux-gnu.tar.xz
 
 .. note::
 
@@ -39,7 +39,7 @@ The PATH environment variable shall be adjusted to contain the LLVM/clang direct
 
 .. code:: shell
 
-   PATH=<toolchain_dir>/clang+llvm-17.0.6-x86_64-linux-gnu-ubuntu-22.04/bin:$PATH
+   PATH=<toolchain_dir>/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH
 
 Dependencies
 ------------

@@ -618,8 +618,8 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 		bool comp_offset_lt_transaction_descriptor_size =
 			composite_offset_0 <
 			(sizeof(struct ffa_memory_region) +
-			 (uint32_t)(memory_region->memory_access_desc_size *
-				    memory_region->receiver_count));
+			 (size_t)(memory_region->memory_access_desc_size *
+				  memory_region->receiver_count));
 		bool comp_offset_with_comp_gt_fragment_length =
 			composite_offset_0 +
 				sizeof(struct ffa_composite_memory_region) >
@@ -3621,8 +3621,8 @@ static uint32_t ffa_memory_retrieve_expected_offset_per_ffa_version(
 		composite_constituents_offset +
 		retrieved_constituents_count *
 			sizeof(struct ffa_memory_region_constituent) -
-		(uint32_t)(memory_region->memory_access_desc_size *
-			   (memory_region->receiver_count - 1));
+		(size_t)(memory_region->memory_access_desc_size *
+			 (memory_region->receiver_count - 1));
 
 	return expected_fragment_offset;
 }

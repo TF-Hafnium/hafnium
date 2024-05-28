@@ -676,6 +676,7 @@ static inline uint32_t ffa_func_id(struct ffa_value args)
 
 static inline enum ffa_error ffa_error_code(struct ffa_value val)
 {
+	/* NOLINTNEXTLINE(EnumCastOutOfRange) */
 	return (enum ffa_error)val.arg2;
 }
 

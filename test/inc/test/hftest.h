@@ -117,12 +117,6 @@
 #define SERVICE_MEMORY_SIZE() HFTEST_SERVICE_MEMORY_SIZE()
 
 /*
- * This must be used exactly once in a test image to signal to the linker that
- * the .hftest section is allowed to be included in the generated image.
- */
-#define HFTEST_ENABLE() __attribute__((used)) int hftest_enable
-
-/*
  * Prefixed to log lines from tests for easy filtering in the console.
  */
 #define HFTEST_LOG_PREFIX "[hftest] "

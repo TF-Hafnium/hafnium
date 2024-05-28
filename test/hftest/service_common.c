@@ -22,8 +22,6 @@
 #include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
-HFTEST_ENABLE();
-
 extern struct hftest_test hftest_begin[];
 extern struct hftest_test hftest_end[];
 

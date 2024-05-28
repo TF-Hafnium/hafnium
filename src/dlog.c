@@ -393,7 +393,7 @@ uint64_t reinterpret_signed_int(enum format_length length, uint64_t value,
 		}
 		break;
 	case length64:
-		if ((int64_t)signed_value < 0) {
+		if (signed_value < 0) {
 			flags->neg = true;
 			signed_value = -signed_value;
 		}

@@ -19,8 +19,6 @@
 #define HFTEST_CTRL_JSON_START "[hftest_ctrl:json_start]"
 #define HFTEST_CTRL_JSON_END "[hftest_ctrl:json_end]"
 
-HFTEST_ENABLE();
-
 static struct hftest_test hftest_constructed[HFTEST_MAX_TESTS];
 static size_t hftest_count;
 static struct hftest_test *hftest_list;
