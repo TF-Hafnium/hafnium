@@ -147,7 +147,7 @@
 /* Context for tests. */
 struct hftest_context {
 	uint32_t failures;
-	noreturn void (*abort)(void);
+	void (*abort)(void);
 
 	/* These are used in primary VMs. */
 	const struct fdt *fdt;

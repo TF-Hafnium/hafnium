@@ -17,13 +17,13 @@ infrastructure:
 
 .. code:: shell
 
-   https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+   https://github.com/llvm/llvm-project/releases/download/llvmorg-16.0.4/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04.tar.xz
 
 - For a AArch64 Ubuntu host,
 
 .. code:: shell
 
-   https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/clang+llvm-15.0.6-aarch64-linux-gnu.tar.xz
+   https://github.com/llvm/llvm-project/releases/download/llvmorg-16.0.4/clang+llvm-16.0.4-aarch64-linux-gnu.tar.xz
 
 .. note::
 
@@ -39,7 +39,7 @@ The PATH environment variable shall be adjusted to contain the LLVM/clang direct
 
 .. code:: shell
 
-   PATH=<toolchain_dir>/clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH
+   PATH=<toolchain_dir>/clang+llvm-16.0.4-x86_64-linux-gnu-ubuntu-22.04/bin:$PATH
 
 Dependencies
 ------------
@@ -101,4 +101,3 @@ its location and the Python version, with the command:
 .. _Sphinx: http://www.sphinx-doc.org/en/master/
 .. _Poetry: https://python-poetry.org/docs/
 .. _pip: https://pip.pypa.io/en/stable/
-
