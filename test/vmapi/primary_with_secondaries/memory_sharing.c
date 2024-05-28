@@ -270,27 +270,30 @@ static void memory_send_reclaim(uint32_t msg_size,
  * incremented or zeroed.
  */
 static void lend_and_check_memory_increment(
-	struct mailbox_buffers *mb, struct ffa_memory_access receivers[],
-	uint32_t receivers_count, uint32_t number_of_retrieves,
-	bool zero_memory_after_relinquish, bool expect_zeroed)
+	struct mailbox_buffers *mb,
+	struct ffa_memory_region_constituent constituents[],
+	uint32_t constituent_count,
+	struct ffa_memory_access receivers_send_permissions[],
+	struct ffa_memory_access receivers_retrieve_permissions[],
+	uint32_t receivers_count, enum ffa_memory_type send_memory_type,
+	enum ffa_memory_type receive_memory_type,
+	enum ffa_memory_cacheability memory_cacheability,
+	uint32_t number_of_retrieves, bool zero_memory_after_relinquish,
+	bool expect_zeroed)
 {
 	struct ffa_value ret;
 	ffa_memory_handle_t handle;
 	struct ffa_memory_region *mem_region =
 		(struct ffa_memory_region *)mb->send;
-	struct ffa_memory_region_constituent constituents[] = {
-		{.address = (uint64_t)pages, .page_count = 2},
-		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
-	};
 	uint32_t msg_size;
 	uint8_t *ptr = pages;
 
-	ffa_memory_region_init(
-		mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID, receivers,
-		receivers_count, sizeof(struct ffa_memory_access), constituents,
-		ARRAY_SIZE(constituents), 0, 0, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL,
-		&msg_size);
+	ffa_memory_region_init(mem_region, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			       receivers_send_permissions, receivers_count,
+			       sizeof(struct ffa_memory_access), constituents,
+			       constituent_count, 0, 0, send_memory_type,
+			       memory_cacheability, FFA_MEMORY_INNER_SHAREABLE,
+			       NULL, &msg_size);
 
 	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
 		ptr[i] = i;
@@ -304,21 +307,21 @@ static void lend_and_check_memory_increment(
 	for (uint32_t j = 0; j < number_of_retrieves; j++) {
 		for (uint32_t k = 0; k < receivers_count; k++) {
 			ffa_id_t recipient =
-				receivers[k].receiver_permissions.receiver;
+				receivers_retrieve_permissions[k]
+					.receiver_permissions.receiver;
 			struct ffa_partition_msg *retrieve_message = mb->send;
 
 			/* Set flag to clear memory after relinquish. */
 			msg_size = ffa_memory_retrieve_request_init(
 				(struct ffa_memory_region *)
 					retrieve_message->payload,
-				handle, HF_PRIMARY_VM_ID, receivers,
-				receivers_count,
+				handle, HF_PRIMARY_VM_ID,
+				receivers_retrieve_permissions, receivers_count,
 				sizeof(struct ffa_memory_access), 0,
 				FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND |
 					(zero_memory_after_relinquish &
 					 FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH),
-				FFA_MEMORY_NORMAL_MEM,
-				FFA_MEMORY_CACHE_WRITE_BACK,
+				receive_memory_type, memory_cacheability,
 				FFA_MEMORY_INNER_SHAREABLE);
 			EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
@@ -336,7 +339,8 @@ static void lend_and_check_memory_increment(
 
 		for (uint32_t k = 0; k < receivers_count; k++) {
 			ffa_id_t recipient =
-				receivers[k].receiver_permissions.receiver;
+				receivers_retrieve_permissions[k]
+					.receiver_permissions.receiver;
 			/* Run borrower such that it can write to memory. */
 			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
 			/* Run borrower such that it relinquishes its access. */
@@ -1326,6 +1330,57 @@ TEST_PRECONDITION(memory_sharing, lend_device_memory_and_lose_access,
 }
 
 /**
+ * Test that normal memory can be lent as device memory and that once the memory
+ * has been lent it is no longer accessible to the original owner.
+ */
+TEST_PRECONDITION(memory_sharing, lend_normal_memory_as_device_and_lose_access,
+		  service1_and_service2_are_secure)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)&pages, .page_count = 1},
+	};
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_lend_normal_memory_as_device_secondary_and_fault",
+		       mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_receive", mb.send);
+
+	/* Lend normal memory to Service2 SP and retrieve as device memory. */
+	send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), service2_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_DEVICE_MEM,
+		FFA_MEMORY_DEV_NGNRNE, FFA_MEMORY_DEV_NGNRNE);
+
+	/* Ensure that memory in service2 remains the same. */
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Run the same test for SP->SP memory lend. */
+	/* Let the memory be sent from service1 to service2. */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Receive memory in service2. */
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Try to access memory in service1. */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
+
+	/* Ensure that memory in service2 remains the same. */
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+}
+
+/**
  * Test that device memory can be shared from one SP to another and both can
  * access it whilst they share it.
  * The device memory shared is UART1 MMIO address space so the output can be
@@ -1417,6 +1472,86 @@ TEST(memory_sharing, lend_device_memory_to_sp_and_reclaim)
 	 */
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
+}
+
+/*
+ * Check that memory lent as device memory is maintained during the lend
+ * and reliquish operations. The memory is set by the owner, lent, incremented
+ * by the borrower and relinquish. The expected values are checked when
+ * the owner regains access to the memory.
+ */
+TEST(memory_sharing, mem_lend_relinquish_reclaim_normal_memory_as_device)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_access receiver_send_permissions;
+	struct ffa_memory_access receiver_retrieve_permissions;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	/* Lend the UART2 device region. */
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)&pages, .page_count = 1},
+	};
+	struct ffa_memory_access_impdef impdef_val =
+		ffa_memory_access_impdef_init(0, 0);
+
+	SERVICE_SELECT(service1_info->vm_id, "memory_increment_relinquish",
+		       mb.send);
+
+	ffa_memory_access_init(&receiver_send_permissions, service1_info->vm_id,
+			       FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+			       &impdef_val);
+	ffa_memory_access_init(&receiver_retrieve_permissions,
+			       service1_info->vm_id, FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NX, 0, &impdef_val);
+
+	lend_and_check_memory_increment(
+		&mb, constituents, ARRAY_SIZE(constituents),
+		&receiver_send_permissions, &receiver_retrieve_permissions, 1,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_DEVICE_MEM,
+		FFA_MEMORY_DEV_NGNRNE, 1, false, false);
+}
+
+/**
+ * Check that memory lent as device memory is zeroed when the Zero memory
+ * flag is set during relinquish.
+ */
+TEST(memory_sharing, mem_lend_zero_memory_after_relinquish_device_memory)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_access receiver_send_permissions;
+	struct ffa_memory_access receiver_retrieve_permissions;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	/* Lend the UART2 device region. */
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)&pages, .page_count = 1},
+	};
+	struct ffa_memory_access_impdef impdef_val =
+		ffa_memory_access_impdef_init(0, 0);
+
+	SERVICE_SELECT(
+		service1_info->vm_id,
+		"memory_increment_relinquish_with_clear_check_not_zeroed",
+		mb.send);
+
+	ffa_memory_access_init(&receiver_send_permissions, service1_info->vm_id,
+			       FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+			       &impdef_val);
+	ffa_memory_access_init(&receiver_retrieve_permissions,
+			       service1_info->vm_id, FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NX, 0, &impdef_val);
+
+	lend_and_check_memory_increment(
+		&mb, constituents, ARRAY_SIZE(constituents),
+		&receiver_send_permissions, &receiver_retrieve_permissions, 1,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_DEVICE_MEM,
+		FFA_MEMORY_DEV_NGNRNE, 1, false, true);
+
+	lend_and_check_memory_increment(
+		&mb, constituents, ARRAY_SIZE(constituents),
+		&receiver_send_permissions, &receiver_retrieve_permissions, 1,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_DEVICE_MEM,
+		FFA_MEMORY_DEV_NGNRNE, 1, true, true);
 }
 
 /**
@@ -3582,6 +3717,10 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_memory_access receivers[2];
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
 	/*
 	 * To prove the receiver can relinquish and retrieve whilst sender
 	 * didn't reclaim.
@@ -3608,8 +3747,11 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service2_impdef_val);
 
-	lend_and_check_memory_increment(&mb, receivers, ARRAY_SIZE(receivers),
-					2, false, false);
+	lend_and_check_memory_increment(
+		&mb, constituents, ARRAY_SIZE(constituents), receivers,
+		receivers, ARRAY_SIZE(receivers), FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK, 2, false,
+		false);
 
 	/*
 	 * Try lending with the Zero memory flag set.
@@ -3617,8 +3759,11 @@ TEST(memory_sharing, mem_lend_relinquish_reclaim_multiple_borrowers)
 	 * request should take priority so even with this set we
 	 * should still see the pointer values incremented.
 	 */
-	lend_and_check_memory_increment(&mb, receivers, ARRAY_SIZE(receivers),
-					2, true, false);
+	lend_and_check_memory_increment(
+		&mb, constituents, ARRAY_SIZE(constituents), receivers,
+		receivers, ARRAY_SIZE(receivers), FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK, 2, true,
+		false);
 }
 
 /**
@@ -4239,6 +4384,10 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish_multiple_borrowers)
 	struct ffa_memory_access_impdef service2_impdef_val =
 		ffa_memory_access_impdef_init(service2_info->vm_id,
 					      service2_info->vm_id + 1);
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
 
 	SERVICE_SELECT(service1_info->vm_id,
 		       "memory_increment_relinquish_with_clear", mb.send);
@@ -4257,8 +4406,11 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish_multiple_borrowers)
 		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service2_impdef_val);
 
-	lend_and_check_memory_increment(&mb, receivers, ARRAY_SIZE(receivers),
-					1, true, true);
+	lend_and_check_memory_increment(
+		&mb, constituents, ARRAY_SIZE(constituents), receivers,
+		receivers, ARRAY_SIZE(receivers), FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK, 1, true,
+		true);
 
 	/*
 	 * Try lending without the Zero memory flag set.
@@ -4266,8 +4418,11 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish_multiple_borrowers)
 	 * request should take priority so we should still see the
 	 * memory zeroed.
 	 */
-	lend_and_check_memory_increment(&mb, receivers, ARRAY_SIZE(receivers),
-					1, false, true);
+	lend_and_check_memory_increment(
+		&mb, constituents, ARRAY_SIZE(constituents), receivers,
+		receivers, ARRAY_SIZE(receivers), FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK, 1, false,
+		true);
 }
 
 TEST_PRECONDITION(memory_sharing, fail_inconsistent_page_count, hypervisor_only)
