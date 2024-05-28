@@ -378,6 +378,8 @@ static inline uint32_t ffa_memory_permissions_to_mode(
 		break;
 	case FFA_DATA_ACCESS_RESERVED:
 		panic("Tried to convert FFA_DATA_ACCESS_RESERVED.");
+	default:
+		panic("Unknown data access %#x\n", permissions.data_access);
 	}
 
 	switch (permissions.instruction_access) {
@@ -391,6 +393,9 @@ static inline uint32_t ffa_memory_permissions_to_mode(
 		break;
 	case FFA_INSTRUCTION_ACCESS_RESERVED:
 		panic("Tried to convert FFA_INSTRUCTION_ACCESS_RESVERVED.");
+	default:
+		panic("Unknown instruction access %#x\n",
+		      permissions.instruction_access);
 	}
 
 	/* Set the security state bit if necessary. */
@@ -487,8 +492,9 @@ enum ffa_version ffa_version_from_memory_access_desc_size(
 		return FFA_VERSION_1_1;
 	case sizeof(struct ffa_memory_access):
 		return FFA_VERSION_1_2;
+	default:
+		return 0;
 	}
-	return 0;
 }
 
 /**
@@ -2383,6 +2389,10 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 		memory_region->flags |=
 			FFA_MEMORY_REGION_TRANSACTION_TYPE_DONATE;
 		break;
+	default:
+		dlog_verbose("Unknown share func %#x (%s)\n", share_func,
+			     ffa_func_name(share_func));
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	share_states = share_states_lock();

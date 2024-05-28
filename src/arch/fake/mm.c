@@ -28,7 +28,7 @@
 #define PTE_ADDR_MASK (~(PTE_ATTR_MODE_MASK | (UINT64_C(1) << PAGE_BITS) - 1))
 
 /* Offset the bits of each level so they can't be misued. */
-#define PTE_LEVEL_SHIFT(lvl) ((lvl)*2)
+#define PTE_LEVEL_SHIFT(lvl) ((lvl) * 2)
 
 pte_t arch_mm_absent_pte(uint8_t level)
 {

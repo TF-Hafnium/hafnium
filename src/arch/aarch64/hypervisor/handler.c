@@ -805,9 +805,12 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_ERROR_32:
 		*args = plat_ffa_error_32(current, next, args->arg2);
 		return true;
-	}
 
-	return false;
+	default:
+		dlog_verbose("Unsupported function %#x (%s)\n", func,
+			     ffa_func_name(func));
+		return false;
+	}
 }
 
 /**

@@ -334,8 +334,8 @@ template("aarch64_common_toolchain") {
 template("aarch64_toolchain") {
   aarch64_common_toolchain("${target_name}") {
     forward_variables_from(invoker, "*")
-    target = "aarch64-none-eabi"
-    tool_prefix = "aarch64-linux-gnu-"
+    target = "aarch64-none-elf"
+    tool_prefix = "aarch64-none-elf-"
     platform_name = target_name
   }
 }

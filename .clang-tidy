@@ -1,4 +1,4 @@
-Checks: 'readability-*,-readability-identifier-length,portability-*,performance-*,misc-*,bugprone-*,-bugprone-easily-swappable-parameters,modernize-*,google-runtime-int,-modernize-deprecated-headers,-clang-analyzer-valist.Uninitialized,-readability-magic-numbers, -readability-function-cognitive-complexity,-modernize-macro-to-enum,-misc-redundant-expression,-readability-suspicious-call-argument'
+Checks: 'readability-*,-readability-identifier-length,portability-*,performance-*,misc-*,bugprone-*,-bugprone-easily-swappable-parameters,modernize-*,google-runtime-int,-modernize-deprecated-headers,-clang-analyzer-valist.Uninitialized,-readability-magic-numbers, -readability-function-cognitive-complexity,-modernize-macro-to-enum,-misc-redundant-expression,-readability-suspicious-call-argument,-misc-include-cleaner'
 HeaderFilterRegex: '^(?!third_party).+'
 FormatStyle: file
 WarningsAsErrors: '*'

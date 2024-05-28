@@ -61,7 +61,7 @@
 /**
  * Isolate bits `[hi:lo]` of `value`.
  */
-#define GET_BITS(value, hi, lo) ((value)&GET_BITS_MASK(hi, lo))
+#define GET_BITS(value, hi, lo) ((value) & GET_BITS_MASK(hi, lo))
 
 /**
  * Return true if any bits `[lo:hi]` of `value` are 1.

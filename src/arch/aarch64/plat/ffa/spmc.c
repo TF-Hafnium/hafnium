@@ -185,6 +185,8 @@ struct ffa_value plat_ffa_features(uint32_t function_feature_id)
 			return (struct ffa_value){.func = FFA_SUCCESS_32};
 		case FFA_FEATURE_MEI:
 			return api_ffa_feature_success(HF_MANAGED_EXIT_INTID);
+		default:
+			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 	}
 

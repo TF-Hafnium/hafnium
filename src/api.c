@@ -1973,11 +1973,12 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	struct vm_locked sender_locked;
 	const void *from_msg;
 	struct ffa_value ret;
-	struct ffa_partition_rxtx_header header;
 	ffa_id_t sender_id;
 	ffa_id_t receiver_id;
 	uint32_t msg_size;
 	ffa_notifications_bitmap_t rx_buffer_full;
+
+	alignas(8) struct ffa_partition_rxtx_header header;
 
 	/* Only Hypervisor can set `sender_vm_id` when forwarding messages. */
 	if (from->id != HF_HYPERVISOR_VM_ID && sender_vm_id != 0) {
