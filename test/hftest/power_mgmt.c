@@ -16,7 +16,7 @@
 #include "test/hftest.h"
 
 struct cpu_start_state {
-	void (*entry)(uintptr_t arg);
+	cpu_entry_point *entry;
 	uintreg_t arg;
 	struct spinlock lock;
 };
@@ -55,7 +55,7 @@ static noreturn void cpu_entry(uintptr_t arg)
 	arch_cpu_stop();
 }
 
-bool hftest_cpu_start(uintptr_t id, void (*entry)(uintptr_t arg), uintptr_t arg)
+bool hftest_cpu_start(uintptr_t id, cpu_entry_point *entry, uintptr_t arg)
 {
 	struct cpu_start_state s;
 	struct arch_cpu_start_state s_arch;

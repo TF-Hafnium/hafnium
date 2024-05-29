@@ -17,6 +17,7 @@
 #include "hf/dlog.h"
 #include "hf/fdt.h"
 #include "hf/memiter.h"
+#include "hf/spinlock.h"
 
 /*
  * Define a set up function to be run before every test in a test suite.
@@ -184,6 +185,12 @@ bool hftest_cpu_start(uintptr_t id, void (*entry)(uintptr_t arg),
 		      uintptr_t arg);
 
 uintptr_t hftest_get_cpu_id(size_t index);
+
+/*
+ * The type of CPU entry points: a function that takes one `uintptr_t` argument
+ * and returns `void`.
+ */
+typedef void(cpu_entry_point)(uintptr_t);
 
 noreturn void hftest_service_main(const void *fdt_ptr);
 

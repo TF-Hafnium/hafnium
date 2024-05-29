@@ -21,6 +21,12 @@ enum power_status {
 	POWER_STATUS_ON_PENDING,
 };
 
+/*
+ * The type of CPU entry points: a function that takes one `uintreg_t` argument
+ * and returns `void`.
+ */
+typedef void(arch_cpu_entry_point)(uintreg_t arg);
+
 /**
  * Holds temporary state used to set up the environment on which CPUs will
  * start executing.
@@ -29,7 +35,7 @@ enum power_status {
  */
 struct arch_cpu_start_state {
 	uintptr_t initial_sp;
-	void (*entry)(uintreg_t arg);
+	arch_cpu_entry_point* entry;
 	uintreg_t arg;
 };
 
