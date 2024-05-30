@@ -109,6 +109,11 @@
 #define GET_ESR_ISS_DFSC(iss) ((iss) & (0x3FU))
 
 /**
+ * Gets the FAR not Valid bit
+ */
+#define GET_ESR_FNV(esr) ((esr) & (1 << 10U))
+
+/**
  * Define DFSC due to Granule protection fault if this is an RME
  * enabled platform.
  */

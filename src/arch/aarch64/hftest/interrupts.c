@@ -13,6 +13,7 @@
 #include "hf/dlog.h"
 
 #include "msr.h"
+#include "sysregs_defs.h"
 #include "test/hftest.h"
 
 extern uint8_t vector_table_el1;
@@ -42,10 +43,10 @@ noreturn static bool default_sync_current_exception(void)
 	uintreg_t elr = read_msr(elr_el1);
 
 	switch (esr >> 26) {
-	case 0x25: /* EC = 100101, Data abort. */
+	case EC_DATA_ABORT_SAME_EL: /* EC = 100101, Data abort. */
 		dlog("Data abort: pc=%#lx, esr=%#lx, ec=%#lx", elr, esr,
 		     esr >> 26);
-		if (!(esr & (1U << 10))) { /* Check FnV bit. */
+		if (!GET_ESR_FNV(esr)) {
 			dlog(", far=%#lx", read_msr(far_el1));
 		} else {
 			dlog(", far=invalid");

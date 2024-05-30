@@ -36,6 +36,7 @@
 #include "psci_handler.h"
 #include "smc.h"
 #include "sysregs.h"
+#include "sysregs_defs.h"
 
 /**
  * Hypervisor Fault Address Register Non-Secure.
@@ -280,7 +281,7 @@ bool sync_current_exception(uintreg_t elr, uintreg_t spsr)
 			}
 		}
 
-		if (!(esr & (1U << 10))) { /* Check FnV bit. */
+		if (!GET_ESR_FNV(esr)) {
 			dlog_error(
 				"Data abort: pc=%#lx, esr=%#lx, ec=%#lx, "
 				"far=%#lx\n",
@@ -1303,7 +1304,7 @@ static struct vcpu_fault_info fault_info_init(uintreg_t esr,
 	 * Check the FnV bit, which is only valid if dfsc/ifsc is 010000. It
 	 * indicates that we cannot rely on far_el2.
 	 */
-	if (fsc == 0x10 && esr & (1U << 10)) {
+	if (fsc == 0x10 && GET_ESR_FNV(esr)) {
 		r.vaddr = va_init(0);
 		r.ipaddr = ipa_init(hpfar_el2_fipa);
 	} else {
