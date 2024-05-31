@@ -297,10 +297,18 @@ template("aarch64_common_toolchain") {
       forward_variables_from(invoker.toolchain_args, "*")
     }
 
+    extra_cflags += " -march=armv8.5-a"
+
     if (defined(toolchain_args.enable_mte)) {
-      extra_cflags += " -march=armv8.5-a+memtag"
-      extra_cflags += " -fsanitize=memtag"
-      extra_defines += " -DENABLE_MTE"
+      assert(
+          toolchain_args.enable_mte == "1" || toolchain_args.enable_mte == "0",
+          "Illegal value specified for \"enable_mte\"")
+
+      extra_defines += " -DENABLE_MTE=${toolchain_args.enable_mte}"
+      if (toolchain_args.enable_mte == "1") {
+        extra_cflags += "+memtag"
+        extra_cflags += " -fsanitize=memtag"
+      }
     }
   }
 }
