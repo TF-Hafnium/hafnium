@@ -186,6 +186,10 @@ TEST_SERVICE(memory_increment_relinquish_with_clear_check_not_zeroed)
 
 TEST_SERVICE(memory_increment_check_mem_attr)
 {
+	enum ffa_memory_type type;
+	enum ffa_memory_shareability shareability;
+	enum ffa_memory_cacheability cacheability;
+
 	/* Loop, writing message to the shared memory. */
 	for (;;) {
 		size_t i;
@@ -213,12 +217,12 @@ TEST_SERVICE(memory_increment_check_mem_attr)
 		 * Validate retrieve response contains the memory attributes
 		 * hafnium implements.
 		 */
-		ASSERT_EQ(memory_region->attributes.type,
-			  FFA_MEMORY_NORMAL_MEM);
-		ASSERT_EQ(memory_region->attributes.shareability,
-			  FFA_MEMORY_INNER_SHAREABLE);
-		ASSERT_EQ(memory_region->attributes.cacheability,
-			  FFA_MEMORY_CACHE_WRITE_BACK);
+		type = memory_region->attributes.type;
+		shareability = memory_region->attributes.shareability;
+		cacheability = memory_region->attributes.cacheability;
+		ASSERT_EQ(type, FFA_MEMORY_NORMAL_MEM);
+		ASSERT_EQ(shareability, FFA_MEMORY_INNER_SHAREABLE);
+		ASSERT_EQ(cacheability, FFA_MEMORY_CACHE_WRITE_BACK);
 
 		/* Increment each byte of memory. */
 		for (i = 0; i < PAGE_SIZE; ++i) {

@@ -174,9 +174,10 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	ret = ffa_features(FFA_RXTX_MAP_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	rxtx_map_params = ffa_features_rxtx_map_params(ret);
-	EXPECT_EQ(rxtx_map_params.min_buf_size, FFA_RXTX_MAP_MIN_BUF_4K);
-	EXPECT_EQ(rxtx_map_params.mbz, 0);
-	EXPECT_EQ(rxtx_map_params.max_buf_size,
+	EXPECT_EQ((uint8_t)rxtx_map_params.min_buf_size,
+		  FFA_RXTX_MAP_MIN_BUF_4K);
+	EXPECT_EQ((uint16_t)rxtx_map_params.mbz, 0);
+	EXPECT_EQ((uint16_t)rxtx_map_params.max_buf_size,
 		  FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT);
 #endif
 }

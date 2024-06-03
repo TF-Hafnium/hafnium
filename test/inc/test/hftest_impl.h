@@ -189,47 +189,8 @@ struct hftest_test {
 	hftest_test_precondition precondition;
 };
 
-/*
- * This union can store any of the primitive types supported by the assertion
- * macros.
- *
- * It does not include pointers as comparison of pointers is not often needed
- * and could be a mistake for string comparison. If pointer comparison is needed
- * and explicit assertion such as ASSERT_PTR_EQ() would be more appropriate.
- */
-union hftest_any {
-	bool b;
-	char c;
-	signed char sc;
-	unsigned char uc;
-	signed short ss;
-	unsigned short us;
-	signed int si;
-	unsigned int ui;
-	signed long int sli;
-	unsigned long int uli;
-	signed long long int slli;
-	unsigned long long int ulli;
-};
-
 /* _Generic formatting doesn't seem to be supported so doing this manually. */
 /* clang-format off */
-
-/* Select the union member to match the type of the expression. */
-#define hftest_any_get(any, x)                      \
-	_Generic((x),                               \
-		bool:                   (any).b,    \
-		char:                   (any).c,    \
-		signed char:            (any).sc,   \
-		unsigned char:          (any).uc,   \
-		signed short:           (any).ss,   \
-		unsigned short:         (any).us,   \
-		signed int:             (any).si,   \
-		unsigned int:           (any).ui,   \
-		signed long int:        (any).sli,  \
-		unsigned long int:      (any).uli,  \
-		signed long long int:   (any).slli, \
-		unsigned long long int: (any).ulli)
 
 /*
  * dlog format specifier for types. Note, these aren't the standard specifiers
@@ -261,20 +222,17 @@ union hftest_any {
 #define HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op)                              \
 	dlog(HFTEST_LOG_PREFIX HFTEST_LOG_INDENT "%s %s %s (%s=", #lhs, #op, \
 	     #rhs, #lhs);                                                    \
-	dlog(hftest_dlog_format(lhs), hftest_any_get(lhs_value, lhs));       \
+	dlog(hftest_dlog_format(lhs), lhs_value);                            \
 	dlog(", %s=", #rhs);                                                 \
-	dlog(hftest_dlog_format(rhs), hftest_any_get(rhs_value, rhs));       \
+	dlog(hftest_dlog_format(rhs), rhs_value);                            \
 	dlog(")\n");
 #endif /* HFTEST_OPTIMIZE_FOR_SIZE */
 
 #define HFTEST_ASSERT_OP(lhs, rhs, op, fatal)                              \
 	do {                                                               \
-		union hftest_any lhs_value;                                \
-		union hftest_any rhs_value;                                \
-		hftest_any_get(lhs_value, lhs) = (lhs);                    \
-		hftest_any_get(rhs_value, rhs) = (rhs);                    \
-		if (!(hftest_any_get(lhs_value, lhs)                       \
-			      op hftest_any_get(rhs_value, rhs))) {        \
+		__typeof(lhs) lhs_value = lhs;                             \
+		__typeof(rhs) rhs_value = rhs;                             \
+		if (!(lhs_value op rhs_value)) {                           \
 			struct hftest_context *ctx = hftest_get_context(); \
 			++ctx->failures;                                   \
 			HFTEST_LOG_FAILURE();                              \

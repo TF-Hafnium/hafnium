@@ -60,6 +60,9 @@ static void memory_increment(struct ffa_memory_region *memory_region)
 	struct ffa_memory_access *receiver =
 		ffa_memory_region_get_receiver(memory_region, 0);
 	uint8_t *ptr;
+	enum ffa_memory_shareability shareability;
+	enum ffa_memory_cacheability cacheability;
+
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
@@ -72,10 +75,10 @@ static void memory_increment(struct ffa_memory_region *memory_region)
 	 * Validate retrieve response contains the memory attributes
 	 * hafnium implements.
 	 */
-	ASSERT_EQ(memory_region->attributes.shareability,
-		  FFA_MEMORY_INNER_SHAREABLE);
-	ASSERT_EQ(memory_region->attributes.cacheability,
-		  FFA_MEMORY_CACHE_WRITE_BACK);
+	shareability = memory_region->attributes.shareability;
+	cacheability = memory_region->attributes.cacheability;
+	ASSERT_EQ(shareability, FFA_MEMORY_INNER_SHAREABLE);
+	ASSERT_EQ(cacheability, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	update_mm_security_state(composite, memory_region->attributes);
 
