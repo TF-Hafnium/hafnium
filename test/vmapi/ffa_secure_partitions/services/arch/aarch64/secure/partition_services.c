@@ -113,7 +113,7 @@ struct ffa_value sp_trigger_espi_cmd(ffa_id_t source, uint32_t espi_id)
 	 */
 	res = smc32(0x82000100, espi_id, 0, 0, 0, 0, 0, 0);
 
-	if (res.func == SMCCC_ERROR_UNKNOWN) {
+	if ((int64_t)res.func == SMCCC_ERROR_UNKNOWN) {
 		HFTEST_LOG("SiP SMC call not supported");
 		sp_error(own_id, source, 0);
 	}

@@ -36,7 +36,7 @@ TEST(arch_tee, init)
 	 * TODO(qwandor): Remove this UNKNOWN check once we have a build of TF-A
 	 * which supports FF-A memory sharing.
 	 */
-	if (ret.func != SMCCC_ERROR_UNKNOWN) {
+	if ((int64_t)ret.func != SMCCC_ERROR_UNKNOWN) {
 		ASSERT_EQ(func, FFA_SUCCESS_32);
 	}
 }

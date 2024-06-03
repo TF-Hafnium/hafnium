@@ -48,7 +48,7 @@ TEST_SERVICE(sip_call_trigger_spi)
 	 */
 	res = smc32(0x82000100, interrupt_id, 0, 0, 0, 0, 0, 0);
 
-	EXPECT_NE(res.func, SMCCC_ERROR_UNKNOWN);
+	EXPECT_NE((int64_t)res.func, SMCCC_ERROR_UNKNOWN);
 
 	/* Give back control to PVM. */
 	ffa_yield();

@@ -2893,7 +2893,7 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	current_locked = vcpu_lock(current);
 	rt_model = current_locked.vcpu->rt_model;
 
-	if (error_code == FFA_ABORTED && rt_model == RTM_SP_INIT) {
+	if (error_code == (uint32_t)FFA_ABORTED && rt_model == RTM_SP_INIT) {
 		dlog_error("Aborting SP %#x from vCPU %u\n", current->vm->id,
 			   vcpu_index(current));
 

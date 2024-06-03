@@ -183,7 +183,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 					(uintreg_t)&cpu_entry, (uintreg_t)c, 0,
 					0, 0, SMCCC_CALLER_HYPERVISOR);
 			*ret = smc_res.func;
-		} while (*ret == PSCI_ERROR_ALREADY_ON);
+		} while (*ret == (uintreg_t)PSCI_ERROR_ALREADY_ON);
 
 		if (*ret != PSCI_RETURN_SUCCESS) {
 			cpu_off(c);

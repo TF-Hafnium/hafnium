@@ -284,7 +284,7 @@ TEST(timer_secondary, wfi_very_long)
 	 * Let the secondary handle the message and set the timer.
 	 */
 	last_interrupt_id = 0;
-	for (int i = 0; i < 20; ++i) {
+	for (size_t i = 0; i < 20; ++i) {
 		ret = ffa_run(SERVICE_VM1, 0);
 		EXPECT_EQ(ret.func, HF_FFA_RUN_WAIT_FOR_INTERRUPT);
 		dlog("Primary looping until timer fires; %d ns "

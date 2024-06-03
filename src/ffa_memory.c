@@ -614,7 +614,7 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 		}
 	}
 
-	for (int i = 0; i < memory_region->receiver_count; i++) {
+	for (size_t i = 0; i < memory_region->receiver_count; i++) {
 		uint32_t composite_offset;
 
 		if (ffa_version == MAKE_FFA_VERSION(1, 0)) {

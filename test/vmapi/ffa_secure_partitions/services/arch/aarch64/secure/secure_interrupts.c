@@ -161,12 +161,11 @@ static bool is_expected_sp_response(struct ffa_value ret,
 		return false;
 	}
 
-	if (sp_resp_value(ret) != expected_resp || (uint32_t)ret.arg4 != arg) {
+	if (sp_resp_value(ret) != expected_resp || ret.arg4 != arg) {
 		HFTEST_LOG(
 			"Expected response %x and %x; "
 			"Obtained %x and %x",
-			expected_resp, arg, sp_resp_value(ret),
-			(int32_t)ret.arg4);
+			expected_resp, arg, sp_resp_value(ret), ret.arg4);
 		return false;
 	}
 

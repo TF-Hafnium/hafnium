@@ -41,7 +41,7 @@ static struct ffa_value mailbox_receive_retry_v1_0(void)
 		irq();
 		received = ffa_msg_wait();
 	} while (received.func == FFA_ERROR_32 &&
-		 received.arg2 == FFA_INTERRUPTED);
+		 received.arg2 == (uint32_t)FFA_INTERRUPTED);
 
 	return received;
 }

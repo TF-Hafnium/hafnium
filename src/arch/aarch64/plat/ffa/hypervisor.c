@@ -786,7 +786,7 @@ void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 		(struct ffa_value){.func = FFA_RXTX_UNMAP_32,
 				   .arg1 = id << FFA_RXTX_ALLOCATOR_SHIFT});
 	func = ret.func & ~SMCCC_CONVENTION_MASK;
-	if (ret.func == SMCCC_ERROR_UNKNOWN) {
+	if (ret.func == (uint64_t)SMCCC_ERROR_UNKNOWN) {
 		panic("Unknown error forwarding RXTX_UNMAP.\n");
 	} else if (func == FFA_ERROR_32) {
 		panic("Error %d forwarding RX/TX buffers.\n", ret.arg2);

@@ -237,6 +237,8 @@ struct hftest_test {
 
 #define HFTEST_ASSERT_OP(lhs, rhs, op, fatal)                              \
 	do {                                                               \
+		_Pragma("clang diagnostic push");                          \
+		_Pragma("clang diagnostic ignored \"-Wsign-compare\"");    \
 		__typeof(lhs) lhs_value = lhs;                             \
 		__typeof(rhs) rhs_value = rhs;                             \
 		if (!(lhs_value op rhs_value)) {                           \
@@ -248,6 +250,7 @@ struct hftest_test {
 				ctx->abort();                              \
 			}                                                  \
 		}                                                          \
+		_Pragma("clang diagnostic pop");                           \
 	} while (0)
 
 #define HFTEST_FAIL(fatal, ...)                                        \

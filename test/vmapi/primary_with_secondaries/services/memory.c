@@ -1296,14 +1296,14 @@ TEST_SERVICE(share_ffa_v1_1)
 	/* Run service2 for it to fetch the memory. */
 	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ptr[i] = i;
 	}
 
 	/* Run service2 for it to increment the memory. */
 	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		EXPECT_EQ(ptr[i], i + 1);
 	}
 

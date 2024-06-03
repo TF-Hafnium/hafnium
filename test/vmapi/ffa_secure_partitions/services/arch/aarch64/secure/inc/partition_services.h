@@ -50,9 +50,9 @@ static inline int sp_get_cmd(struct ffa_value res)
 	return (int)res.arg3;
 }
 
-static inline int sp_resp_value(struct ffa_value res)
+static inline uint32_t sp_resp_value(struct ffa_value res)
 {
-	return (int)res.arg4;
+	return res.arg4;
 }
 
 enum sp_cmd {

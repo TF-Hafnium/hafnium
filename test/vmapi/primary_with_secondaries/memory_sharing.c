@@ -33,7 +33,7 @@ static void check_cannot_send_memory(
 	struct mailbox_buffers mb,
 	struct ffa_value (*send_function)(uint32_t, uint32_t),
 	struct ffa_memory_region_constituent constituents[],
-	int constituent_count, int32_t avoid_vm)
+	int constituent_count, uint32_t avoid_vm)
 {
 	enum ffa_data_access data_access[] = {
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RO,
@@ -180,7 +180,7 @@ static void check_cannot_share_memory(
 static void check_cannot_donate_memory(
 	struct mailbox_buffers mb,
 	struct ffa_memory_region_constituent constituents[],
-	int constituent_count, int32_t avoid_vm)
+	int constituent_count, uint32_t avoid_vm)
 {
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
@@ -515,7 +515,7 @@ TEST(memory_sharing, share_retrieve_memory_type_not_specified)
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		EXPECT_EQ(pages[i], 'b');
 	}
 }
@@ -550,14 +550,14 @@ TEST(memory_sharing, concurrent)
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		pages[i] = i;
 	}
 
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		uint8_t value = i + 1;
 
 		EXPECT_EQ(pages[i], value);
@@ -598,7 +598,7 @@ TEST(memory_sharing, share_concurrently_and_get_back)
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
 
@@ -665,7 +665,7 @@ TEST(memory_sharing, lend_relinquish)
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 	/* Ensure that the secondary VM accessed the region. */
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
 
@@ -716,7 +716,7 @@ TEST(memory_sharing, lend_fragmented_relinquish)
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
 	/* Ensure that the secondary VM accessed the region. */
-	for (int i = 0; i < PAGE_SIZE * FRAGMENTED_SHARE_PAGE_COUNT; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE * FRAGMENTED_SHARE_PAGE_COUNT; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
 
@@ -758,7 +758,7 @@ TEST(memory_sharing, lend_force_fragmented_relinquish)
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 	/* Ensure that the secondary VM accessed the region. */
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
 
@@ -842,7 +842,7 @@ TEST_PRECONDITION(memory_sharing, give_and_get_back, hypervisor_only)
 					       HF_MAILBOX_SIZE),
 		  service1_info->vm_id);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'c');
 	}
 
@@ -886,7 +886,7 @@ TEST(memory_sharing, lend_and_get_back)
 
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'd');
 	}
 
@@ -1018,7 +1018,7 @@ TEST_PRECONDITION(memory_sharing, give_memory_and_lose_access, service1_is_vm)
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
 
@@ -1058,7 +1058,7 @@ TEST_PRECONDITION(memory_sharing, lend_memory_and_lose_access, service1_is_vm)
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	ptr = (uint8_t *)composite->constituents[0].address;
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 0);
 	}
 
@@ -1664,7 +1664,7 @@ TEST_PRECONDITION(memory_sharing, give_and_get_back_unaligned, hypervisor_only)
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
 
 	/* Check for unaligned pages for either constituent. */
-	for (int i = 0; i < PAGE_SIZE; i++) {
+	for (size_t i = 0; i < PAGE_SIZE; i++) {
 		for (int j = 0; i < PAGE_SIZE; i++) {
 			/* Skip the case they're both aligned. */
 			if (i == 0 && j == 0) {
@@ -1855,7 +1855,7 @@ TEST(memory_sharing, share_X)
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Ensure we still have access. */
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'b');
 		ptr[i]++;
 	}
@@ -1879,7 +1879,7 @@ TEST(memory_sharing, share_X)
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Ensure we still have access. */
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'b');
 		ptr[i]++;
 	}
@@ -1924,7 +1924,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Ensure we still have access. */
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'b');
 	}
 
@@ -1950,7 +1950,7 @@ TEST(memory_sharing, share_relinquish_NX_RW)
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Ensure we still have access. */
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		ASSERT_EQ(ptr[i], 'b');
 		ptr[i]++;
 	}
@@ -2155,7 +2155,7 @@ TEST(memory_sharing, lend_donate)
 
 	/* Ensure we can't donate any sub section of memory to another VM. */
 	constituents[0].page_count = 1;
-	for (int i = 1; i < PAGE_SIZE * 2; i++) {
+	for (size_t i = 1; i < PAGE_SIZE * 2; i++) {
 		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
 		EXPECT_EQ(ffa_memory_region_init_single_receiver(
 				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
@@ -2230,7 +2230,7 @@ TEST(memory_sharing, share_donate)
 
 	/* Ensure we can't donate any sub section of memory to another VM. */
 	constituents[0].page_count = 1;
-	for (int i = 1; i < PAGE_SIZE * 2; i++) {
+	for (size_t i = 1; i < PAGE_SIZE * 2; i++) {
 		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
 		EXPECT_EQ(ffa_memory_region_init_single_receiver(
 				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
@@ -2322,7 +2322,7 @@ TEST(memory_sharing, lend_twice)
 
 	/* Attempt to lend again with different permissions. */
 	constituents[0].page_count = 1;
-	for (int i = 0; i < 2; i++) {
+	for (size_t i = 0; i < 2; i++) {
 		constituents[0].address = (uint64_t)pages + i * PAGE_SIZE;
 		EXPECT_EQ(ffa_memory_region_init_single_receiver(
 				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
@@ -2391,7 +2391,7 @@ TEST(memory_sharing, share_twice)
 
 	/* Attempt to share again with different permissions. */
 	constituents[0].page_count = 1;
-	for (int i = 0; i < 2; i++) {
+	for (size_t i = 0; i < 2; i++) {
 		constituents[0].address = (uint64_t)pages + i * PAGE_SIZE;
 		EXPECT_EQ(ffa_memory_region_init_single_receiver(
 				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
@@ -3360,7 +3360,7 @@ void memory_retrieve_multiple_borrower_base(void *send, ffa_id_t recipient,
 
 	EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		/* Should have been incremented by each receiver. */
 		uint8_t value = i + 1;
 		EXPECT_EQ(ptr[i], value);
@@ -3874,7 +3874,7 @@ TEST(memory_sharing, share_ffa_v1_0_to_current_version)
 	/* Run service1 for it access memory. */
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		/* Should have been incremented by each receiver. */
 		uint8_t value = i + 1;
 		EXPECT_EQ(ptr[i], value);
@@ -4028,7 +4028,7 @@ TEST(memory_sharing, share_ffa_v1_1_to_current_version)
 	/* Run service2 for it access memory. */
 	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
 
-	for (int i = 0; i < PAGE_SIZE; ++i) {
+	for (size_t i = 0; i < PAGE_SIZE; ++i) {
 		/* Should have been incremented by each receiver. */
 		uint8_t value = i + 1;
 		EXPECT_EQ(ptr[i], value);

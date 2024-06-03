@@ -159,7 +159,8 @@ bool mpool_add_chunk(struct mpool *p, void *begin, size_t size)
 	new_end = (void *)align_down((char *)begin + size, p->entry_size);
 
 	/* Nothing to do if there isn't enough room for an entry. */
-	if (new_begin >= new_end || new_end - new_begin < p->entry_size) {
+	if (new_begin >= new_end ||
+	    (size_t)(new_end - new_begin) < p->entry_size) {
 		return false;
 	}
 
@@ -302,7 +303,7 @@ void *mpool_alloc_contiguous_no_fallback(struct mpool *p, size_t count,
 			 * Add back the space consumed by the alignment
 			 * requirement, if it's big enough to fit an entry.
 			 */
-			if (start - (char *)chunk >= p->entry_size) {
+			if ((size_t)(start - (char *)chunk) >= p->entry_size) {
 				chunk->next_chunk = *prev;
 				*prev = chunk;
 				chunk->limit = (struct mpool_chunk *)start;

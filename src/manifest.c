@@ -1122,7 +1122,7 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	}
 
 	/* GP register is restricted to one of x0 - x3. */
-	if (vm->partition.gp_register_num != -1 &&
+	if (vm->partition.gp_register_num != DEFAULT_BOOT_GP_REGISTER &&
 	    vm->partition.gp_register_num > 3) {
 		dlog_error("GP register number %s: %u\n", error_string,
 			   vm->partition.gp_register_num);
