@@ -99,7 +99,9 @@ bool ffa_boot_info_node(struct fdt_node *boot_info_node, vaddr_t pkg_address,
 		(struct ffa_boot_info_header *)ptr_from_va(pkg_address);
 	const size_t boot_info_size = sp_pkg_get_boot_info_size(pkg_header);
 	const size_t max_boot_info_desc_count =
-		boot_info_size / sizeof(struct ffa_boot_info_desc);
+		(boot_info_size -
+		 offsetof(struct ffa_boot_info_header, boot_info)) /
+		sizeof(struct ffa_boot_info_desc);
 
 	assert(boot_info_node != NULL);
 	assert(pkg_header != NULL);
