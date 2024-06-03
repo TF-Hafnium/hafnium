@@ -10,24 +10,36 @@
 
 #if !defined(__cplusplus)
 
+#include <stdint.h>
+
+#include "hf/dlog.h"
 #include "hf/panic.h"
 
 #ifndef PLAT_LOG_LEVEL_ASSERT
 #define PLAT_LOG_LEVEL_ASSERT LOG_LEVEL
 #endif
 
-#if ENABLE_ASSERTIONS
-#if PLAT_LOG_LEVEL_ASSERT >= LOG_LEVEL_VERBOSE
-#define assert(e) \
-	((e) ? (void)0 : panic("ASSERT: %s:%d:%s\n", __FILE__, __LINE__, #e))
-#elif PLAT_LOG_LEVEL_ASSERT >= LOG_LEVEL_INFO
-#define assert(e) ((e) ? (void)0 : panic("ASSERT: %s:%d\n", __FILE__, __LINE__))
-#else
-#define assert(e) ((e) ? (void)0 : panic("ASSERT\n"))
-#endif
-#else
-#define assert(e) ((void)0)
-#endif /* ENABLE_ASSERTIONS */
+#define assert(e) assert_impl(e, __FILE__, __LINE__, #e)
+
+static inline void assert_impl(bool cond, const char *file, uint32_t line,
+			       const char *expr)
+{
+	if (!ENABLE_ASSERTIONS) {
+		return;
+	}
+
+	if (cond) {
+		return;
+	}
+
+	if (PLAT_LOG_LEVEL_ASSERT >= LOG_LEVEL_VERBOSE) {
+		panic("ASSERT: %s:%d:%s\n", file, line, expr);
+	} else if (PLAT_LOG_LEVEL_ASSERT >= LOG_LEVEL_INFO) {
+		panic("ASSERT: %s:%d\n", file, line);
+	} else {
+		panic("ASSERT\n");
+	}
+}
 
 #else
 #include <assert.h>
