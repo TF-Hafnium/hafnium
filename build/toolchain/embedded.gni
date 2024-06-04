@@ -279,8 +279,17 @@ template("aarch64_common_toolchain") {
       extra_defines += " -DGIC_EXT_INTID=${invoker.gic_enable_espi}"
     }
     if (defined(invoker.branch_protection)) {
-      extra_cflags += " -mbranch-protection=${invoker.branch_protection}"
-      extra_defines += " -DBRANCH_PROTECTION=1"
+      assert(invoker.branch_protection == "none" ||
+                 invoker.branch_protection == "standard" ||
+                 invoker.branch_protection == "pac-ret" ||
+                 invoker.branch_protection == "pac-ret+leaf" ||
+                 invoker.branch_protection == "bti",
+             "Unsupported branch protect feature specified")
+
+      if (invoker.branch_protection != "none") {
+        extra_cflags += " -mbranch-protection=${invoker.branch_protection}"
+        extra_defines += " -DBRANCH_PROTECTION=1"
+      }
     }
 
     toolchain_args = {
