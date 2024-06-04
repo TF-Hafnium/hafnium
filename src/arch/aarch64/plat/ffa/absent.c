@@ -586,7 +586,7 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu current_locked,
 }
 
 struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
-				   uint32_t error_code)
+				   enum ffa_error error_code)
 {
 	(void)current;
 	(void)next;

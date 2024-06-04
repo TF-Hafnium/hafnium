@@ -27,7 +27,7 @@ static inline struct ffa_value sp_success(ffa_id_t sender, ffa_id_t receiver,
 }
 
 static inline struct ffa_value sp_error(ffa_id_t sender, ffa_id_t receiver,
-					uint32_t error_code)
+					enum ffa_error error_code)
 {
 	return ffa_msg_send_direct_resp(sender, receiver, SP_ERROR, error_code,
 					0, 0, 0);

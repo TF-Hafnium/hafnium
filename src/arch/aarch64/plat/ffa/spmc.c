@@ -2882,7 +2882,7 @@ ffa_memory_attributes_t plat_ffa_memory_security_mode(
  * of FF-A 1.2 spec.
  */
 struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
-				   uint32_t error_code)
+				   enum ffa_error error_code)
 {
 	struct vcpu_locked current_locked;
 	struct vm_locked vm_locked;
@@ -2893,7 +2893,7 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	current_locked = vcpu_lock(current);
 	rt_model = current_locked.vcpu->rt_model;
 
-	if (error_code == (uint32_t)FFA_ABORTED && rt_model == RTM_SP_INIT) {
+	if (error_code == FFA_ABORTED && rt_model == RTM_SP_INIT) {
 		dlog_error("Aborting SP %#x from vCPU %u\n", current->vm->id,
 			   vcpu_index(current));
 

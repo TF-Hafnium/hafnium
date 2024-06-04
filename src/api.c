@@ -1045,17 +1045,18 @@ struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 /**
  * Change the state of mailbox to empty, such that the ownership is given to the
  * Partition manager.
- * Returns true if the mailbox was reset successfully, false otherwise.
+ * Returns FFA_SUCCESS if the mailbox was reset successfully, FFA_ERROR
+ * otherwise.
  */
-static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
+static struct ffa_value api_release_mailbox(struct vm_locked vm_locked)
 {
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
 	ffa_id_t vm_id = vm_locked.vm->id;
-	int32_t error_code_to_ret = 0;
 
 	switch (vm_locked.vm->mailbox.state) {
 	case MAILBOX_STATE_EMPTY:
 		dlog_verbose("Mailbox of %x is empty.\n", vm_id);
-		error_code_to_ret = FFA_DENIED;
+		ret = ffa_error(FFA_DENIED);
 		break;
 	case MAILBOX_STATE_FULL:
 		/* Check it doesn't have pending RX full notifications. */
@@ -1064,7 +1065,7 @@ static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
 				"Mailbox of endpoint %x has pending "
 				"messages.\n",
 				vm_id);
-			error_code_to_ret = FFA_DENIED;
+			ret = ffa_error(FFA_DENIED);
 		}
 		break;
 	case MAILBOX_STATE_OTHER_WORLD_OWNED:
@@ -1076,23 +1077,19 @@ static bool api_release_mailbox(struct vm_locked vm_locked, int32_t *error_code)
 		 */
 		if (vm_id_is_current_world(vm_id)) {
 			dlog_verbose(
-				"Mailbox of endpoint %x in a wrongful state.\n",
+				"Mailbox of endpoint %x is in an incorrect "
+				"state.\n",
 				vm_id);
-			error_code_to_ret = FFA_ABORTED;
+			ret = ffa_error(FFA_ABORTED);
 		}
 		break;
 	}
 
-	if (error_code_to_ret != 0) {
-		if (error_code != NULL) {
-			*error_code = error_code_to_ret;
-		}
-		return false;
+	if (ret.func == FFA_SUCCESS_32) {
+		vm_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
 	}
 
-	vm_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
-
-	return true;
+	return ret;
 }
 
 /*
@@ -2170,7 +2167,6 @@ struct ffa_value api_ffa_rx_release(ffa_id_t receiver_id, struct vcpu *current)
 	ffa_id_t current_vm_id = current_vm->id;
 	ffa_id_t release_vm_id;
 	struct ffa_value ret;
-	int32_t error_code;
 
 	/* `receiver_id` can be set only at Non-Secure Physical interface. */
 	if (vm_id_is_current_world(current_vm_id) && (receiver_id != 0)) {
@@ -2200,12 +2196,7 @@ struct ffa_value api_ffa_rx_release(ffa_id_t receiver_id, struct vcpu *current)
 		goto out;
 	}
 
-	if (!api_release_mailbox(vm_locked, &error_code)) {
-		ret = ffa_error(error_code);
-		goto out;
-	}
-
-	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+	ret = api_release_mailbox(vm_locked);
 
 out:
 	vm_unlock(&vm_locked);

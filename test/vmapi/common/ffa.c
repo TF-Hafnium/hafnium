@@ -592,7 +592,7 @@ ffa_id_t retrieve_memory_from_message(
  */
 ffa_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 						  void *send_buf,
-						  int32_t expected_error)
+						  enum ffa_error expected_error)
 {
 	uint32_t msg_size;
 	struct ffa_value ret;

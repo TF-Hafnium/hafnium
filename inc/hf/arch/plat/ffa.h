@@ -347,7 +347,7 @@ ffa_memory_attributes_t plat_ffa_memory_security_mode(
  * Implemented for SPMC in RTM_SP_INIT runtime model.
  */
 struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
-				   uint32_t error_code);
+				   enum ffa_error error_code);
 
 bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id);
 

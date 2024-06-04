@@ -131,9 +131,8 @@ ffa_id_t retrieve_memory_from_message(
 	void *recv_buf, void *send_buf, ffa_memory_handle_t *handle,
 	struct ffa_memory_region *memory_region_ret,
 	size_t memory_region_max_size);
-ffa_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
-						  void *send_buf,
-						  int32_t expected_error);
+ffa_id_t retrieve_memory_from_message_expect_fail(
+	void *recv_buf, void *send_buf, enum ffa_error expected_error);
 
 ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
 				      struct ffa_partition_info *info,
