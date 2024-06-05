@@ -79,6 +79,12 @@
 #define ASSERT_GE(x, y) HFTEST_ASSERT_OP(x, y, >=, true)
 #define ASSERT_GT(x, y) HFTEST_ASSERT_OP(x, y, >, true)
 
+#define ASSERT_STRING_EQ(x, y) HFTEST_ASSERT_STRING_OP(x, y, ==, true)
+#define EXPECT_STRING_EQ(x, y) HFTEST_ASSERT_STRING_OP(x, y, ==, false)
+
+#define ASSERT_STRING_NE(x, y) HFTEST_ASSERT_STRING_OP(x, y, !=, true)
+#define EXPECT_STRING_NE(x, y) HFTEST_ASSERT_STRING_OP(x, y, !=, false)
+
 #define ASSERT_TRUE(x) ASSERT_EQ(x, true)
 #define ASSERT_FALSE(x) ASSERT_EQ(x, false)
 

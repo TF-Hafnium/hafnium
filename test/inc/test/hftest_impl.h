@@ -235,6 +235,20 @@ struct hftest_test {
 
 #endif /* HFTEST_OPTIMIZE_FOR_SIZE */
 
+#ifdef HFTEST_OPTIMIZE_FOR_SIZE
+#define HFTEST_LOG_ASSERT_STRING_DETAILS(lhs, rhs, op)
+#else /* HFTEST_OPTIMIZE_FOR_SIZE */
+#define HFTEST_LOG_ASSERT_STRING_DETAILS(lhs, rhs, op)                         \
+	do {                                                                   \
+		dlog(HFTEST_LOG_PREFIX "assertion failed: `%s %s %s`\n", #lhs, \
+		     #op, #rhs);                                               \
+		dlog(HFTEST_LOG_PREFIX "lhs = \"%s\"\n", lhs_value);           \
+		dlog(HFTEST_LOG_PREFIX "rhs = \"%s\"\n", rhs_value);           \
+		dlog("\n");                                                    \
+	} while (0)
+
+#endif /* HFTEST_OPTIMIZE_FOR_SIZE */
+
 #define HFTEST_ASSERT_OP(lhs, rhs, op, fatal)                              \
 	do {                                                               \
 		__typeof(lhs) lhs_value = lhs;                             \
@@ -244,6 +258,21 @@ struct hftest_test {
 			++ctx->failures;                                   \
 			HFTEST_LOG_FAILURE();                              \
 			HFTEST_LOG_ASSERT_DETAILS(lhs, rhs, op);           \
+			if (fatal) {                                       \
+				ctx->abort();                              \
+			}                                                  \
+		}                                                          \
+	} while (0)
+
+#define HFTEST_ASSERT_STRING_OP(lhs, rhs, op, fatal)                       \
+	do {                                                               \
+		char *lhs_value = (lhs);                                   \
+		char *rhs_value = (rhs);                                   \
+		if (!(strncmp(lhs_value, rhs_value, RSIZE_MAX) op 0)) {    \
+			struct hftest_context *ctx = hftest_get_context(); \
+			++ctx->failures;                                   \
+			HFTEST_LOG_FAILURE();                              \
+			HFTEST_LOG_ASSERT_STRING_DETAILS(lhs, rhs, op);    \
 			if (fatal) {                                       \
 				ctx->abort();                              \
 			}                                                  \
