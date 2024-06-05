@@ -235,6 +235,11 @@ template("aarch64_common_toolchain") {
          "\"max_cpus\" must be defined for ${target_name}.")
   assert(defined(invoker.max_vms),
          "\"max_vms\" must be defined for ${target_name}.")
+  assert(defined(invoker.gic_version),
+         "\"gic_version\" must be defined for ${target_name}.")
+  if (invoker.gic_version < 2 || invoker.gic_version >= 5) {
+    assert(false, "Unsupported gic_version ${invoker.gic_version}")
+  }
   if (invoker.gic_version == 3 || invoker.gic_version == 4) {
     assert(defined(invoker.gicd_base_address),
            "\"gicd_base_address\" must be defined for ${target_name}.")
@@ -243,6 +248,7 @@ template("aarch64_common_toolchain") {
     assert(defined(invoker.gicr_frames),
            "\"gicr_frames\" must be defined for ${target_name}.")
   }
+
   assert(defined(invoker.platform_name),
          "\"platform_name\" must be defined for ${target_name}.")
 
@@ -276,6 +282,9 @@ template("aarch64_common_toolchain") {
       extra_defines += " -DGICD_BASE=${invoker.gicd_base_address} -DGICR_BASE=${invoker.gicr_base_address} -DGICR_FRAMES=${invoker.gicr_frames}"
     }
     if (defined(invoker.gic_enable_espi)) {
+      assert(invoker.gic_enable_espi == 1 || invoker.gic_enable_espi == 0,
+             "Illegal value specified for \"gic_enable_espi\"")
+
       extra_defines += " -DGIC_EXT_INTID=${invoker.gic_enable_espi}"
     }
     if (defined(invoker.branch_protection)) {
