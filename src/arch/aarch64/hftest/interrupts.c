@@ -41,11 +41,11 @@ noreturn static bool default_sync_current_exception(void)
 {
 	uintreg_t esr = read_msr(esr_el1);
 	uintreg_t elr = read_msr(elr_el1);
+	uintreg_t ec = GET_ESR_EC(esr);
 
-	switch (esr >> 26) {
+	switch (ec) {
 	case EC_DATA_ABORT_SAME_EL: /* EC = 100101, Data abort. */
-		dlog("Data abort: pc=%#lx, esr=%#lx, ec=%#lx", elr, esr,
-		     esr >> 26);
+		dlog("Data abort: pc=%#lx, esr=%#lx, ec=%#lx", elr, esr, ec);
 		if (!GET_ESR_FNV(esr)) {
 			dlog(", far=%#lx", read_msr(far_el1));
 		} else {
@@ -58,7 +58,7 @@ noreturn static bool default_sync_current_exception(void)
 	default:
 		dlog("Unknown current sync exception pc=%#lx, esr=%#lx, "
 		     "ec=%#lx\n",
-		     elr, esr, esr >> 26);
+		     elr, esr, ec);
 	}
 
 	for (;;) {
