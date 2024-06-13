@@ -177,12 +177,6 @@ struct ffa_value ffa_memory_send_continue_validate(
 	struct share_states_locked share_states, ffa_memory_handle_t handle,
 	struct ffa_memory_share_state **share_state_ret, ffa_id_t from_vm_id,
 	struct mpool *page_pool);
-struct ffa_value ffa_retrieve_check_transition(
-	struct vm_locked to, uint32_t share_func,
-	struct ffa_memory_region_constituent **fragments,
-	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t memory_to_attributes, uint32_t *to_mode, bool memory_protected,
-	enum ffa_map_action *map_action);
 
 struct ffa_value ffa_retrieve_check_update(
 	struct vm_locked to_locked,

@@ -361,7 +361,6 @@ void dump_share_states(void)
 	sl_unlock(&share_states_lock_instance);
 }
 
-/* TODO: Add device attributes: GRE, cacheability, shareability. */
 static inline uint32_t ffa_memory_permissions_to_mode(
 	ffa_memory_access_permissions_t permissions, uint32_t default_mode)
 {
@@ -398,6 +397,8 @@ static inline uint32_t ffa_memory_permissions_to_mode(
 	if ((default_mode & plat_ffa_other_world_mode()) != 0) {
 		mode |= plat_ffa_other_world_mode();
 	}
+
+	mode |= default_mode & MM_MODE_D;
 
 	return mode;
 }
@@ -737,6 +738,19 @@ static struct ffa_value ffa_send_check_transition(
 		return ret;
 	}
 
+	/*
+	 * Check requested memory type is valid with the memory type of the
+	 * owner. E.g. they follow the memory type precedence where Normal
+	 * memory is more permissive than device and therefore device memory
+	 * can only be shared as device memory.
+	 */
+	if (memory_region->attributes.type == FFA_MEMORY_NORMAL_MEM &&
+	    (*orig_from_mode & MM_MODE_D) != 0U) {
+		dlog_verbose(
+			"Send device memory as Normal memory is not allowed\n");
+		return ffa_error(FFA_DENIED);
+	}
+
 	/* Device memory regions can only be lent a single borrower. */
 	if ((*orig_from_mode & MM_MODE_D) != 0U &&
 	    !(is_memory_lend && receivers_count == 1)) {
@@ -863,13 +877,6 @@ static struct ffa_value ffa_relinquish_check_transition(
 				    fragment_count);
 	if (ret.func != FFA_SUCCESS_32) {
 		return ret;
-	}
-
-	/* Ensure the address range is normal memory and not a device. */
-	if (*orig_from_mode & MM_MODE_D) {
-		dlog_verbose("Can't relinquish device memory (mode is %#x).\n",
-			     *orig_from_mode);
-		return ffa_error(FFA_DENIED);
 	}
 
 	/*
@@ -3318,6 +3325,21 @@ static struct ffa_value ffa_partition_retrieve_request(
 
 	memory_to_mode = ffa_memory_permissions_to_mode(
 		permissions, share_state->sender_orig_mode);
+
+	/*
+	 * Check requested memory type is valid with the memory type of the
+	 * owner. E.g. they follow the memory type precedence where Normal
+	 * memory is more permissive than device and therefore device memory
+	 * can only be shared as device memory.
+	 */
+	if (retrieve_request->attributes.type == FFA_MEMORY_NORMAL_MEM &&
+	    ((share_state->sender_orig_mode & MM_MODE_D) != 0U ||
+	     memory_region->attributes.type == FFA_MEMORY_DEVICE_MEM)) {
+		dlog_verbose(
+			"Retrieving device memory as Normal memory is not "
+			"allowed\n");
+		return ffa_error(FFA_DENIED);
+	}
 
 	ret = ffa_retrieve_check_update(
 		to_locked, share_state->fragments,
