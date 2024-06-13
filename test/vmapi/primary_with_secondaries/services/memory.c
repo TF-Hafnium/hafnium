@@ -394,6 +394,38 @@ TEST_SERVICE(ffa_memory_lend_relinquish_device)
 }
 
 /**
+ * Validate the lent device memory cannot be retrieve as normal memory as this
+ * breaks the memory type precedence rules given in the FF-A v1.2 ALP0
+ * specification section 11.10.4.
+ */
+TEST_SERVICE(ffa_lend_device_memory_to_sp_as_normal)
+{
+	void *send_buf = SERVICE_SEND_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_partition_info *service2_info = service2(recv_buf);
+	struct hftest_context *ctx = hftest_get_context();
+	uintptr_t device_mem_base_addr =
+		ctx->partition_manifest.dev_regions[0].base_address;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)device_mem_base_addr, .page_count = 1},
+	};
+
+	/*
+	 * Lend device memory to next VM with the memory type in the retrieve
+	 * request set to Normal memory. This should fail.
+	 */
+	send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), service2_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_DEV_NGNRNE, FFA_MEMORY_CACHE_WRITE_BACK);
+
+	ffa_yield();
+}
+
+/**
  * Attempt to lend device memory to another SP, reclaim it and check the
  * SP we can access it again.
  * The device memory shared is UART1 so the output can be viewed in the test

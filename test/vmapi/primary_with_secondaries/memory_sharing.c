@@ -1521,7 +1521,6 @@ TEST(memory_sharing, mem_lend_zero_memory_after_relinquish_device_memory)
 	struct ffa_memory_access receiver_send_permissions;
 	struct ffa_memory_access receiver_retrieve_permissions;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
-	/* Lend the UART2 device region. */
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)&pages, .page_count = 1},
 	};
@@ -1552,6 +1551,56 @@ TEST(memory_sharing, mem_lend_zero_memory_after_relinquish_device_memory)
 		&receiver_send_permissions, &receiver_retrieve_permissions, 1,
 		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_DEVICE_MEM,
 		FFA_MEMORY_DEV_NGNRNE, 1, true, true);
+}
+
+/**
+ * Validate that lent device memory cannot be retrieve as normal memory as this
+ * breaks the memory type precedence rules given in section 1.10.4 of the
+ * FF-A Memory Management Protocol v1.2 ALP0 document. */
+TEST_PRECONDITION(memory_sharing, lend_device_memory_as_normal_fails,
+		  service1_and_service2_are_secure)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	/* Lend the UART2 device region. */
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)0x1c0b0000, .page_count = 1},
+	};
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_lend_device_memory_to_sp_as_normal", mb.send);
+
+	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_share_fail_denied",
+		       mb.send);
+
+	/*
+	 * Lend device memory to next VM with the memory type in the retrieve
+	 * request set to Normal memory. This should fail.
+	 */
+	send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), service2_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_DEV_NGNRNE, FFA_MEMORY_CACHE_WRITE_BACK);
+
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/*
+	 * Run the same test for SP->SP memory send.
+	 * First run service1 so it lends memory and sends retrieve request to
+	 * service2.
+	 */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Run service2 to try retrieve the memory, this should fail. */
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }
 
 /**
