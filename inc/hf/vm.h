@@ -199,6 +199,11 @@ struct smc_whitelist {
 	bool permissive;
 };
 
+struct log_buffer {
+	char chars[LOG_BUFFER_SIZE];
+	uint16_t len;
+};
+
 struct vm {
 	ffa_id_t id;
 	struct ffa_uuid uuids[PARTITION_MAX_UUIDS];
@@ -242,8 +247,7 @@ struct vm {
 		bool npi_injected;
 	} notifications;
 
-	char log_buffer[LOG_BUFFER_SIZE];
-	uint16_t log_buffer_length;
+	struct log_buffer log_buffer;
 
 	/**
 	 * Wait entries to be used when waiting on other VM mailboxes. See

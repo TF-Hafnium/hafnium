@@ -4687,10 +4687,11 @@ out:
  * Send the contents of the given VM's log buffer to the log, preceded
  * by the VM ID and followed by a newline.
  */
-void api_flush_vm_buffer(ffa_id_t id, char *buffer, size_t length)
+void api_flush_log_buffer(ffa_id_t id, struct log_buffer *buffer)
 {
-	buffer[length] = '\0';
-	dlog("%s %x: %s\n", ffa_is_vm_id(id) ? "VM" : "SP", id, buffer);
+	buffer->chars[buffer->len] = '\0';
+	dlog("%s %x: %s\n", ffa_is_vm_id(id) ? "VM" : "SP", id, buffer->chars);
+	buffer->len = 0;
 }
 
 /**
@@ -4755,6 +4756,8 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 	}
 
 	vm_locked = vm_lock(current->vm);
+	struct log_buffer *log_buffer = &current->vm->log_buffer;
+
 	for (size_t i = 0; i < chars_count; i++) {
 		bool flush = false;
 		const char c = chars[i];
@@ -4762,17 +4765,12 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 		if (c == '\n' || c == '\0') {
 			flush = true;
 		} else {
-			vm_locked.vm->log_buffer
-				[vm_locked.vm->log_buffer_length++] = c;
-			flush = (vm_locked.vm->log_buffer_length ==
-				 LOG_BUFFER_SIZE);
+			log_buffer->chars[log_buffer->len++] = c;
+			flush = log_buffer->len == LOG_BUFFER_SIZE;
 		}
 
 		if (flush) {
-			api_flush_vm_buffer(vm_locked.vm->id,
-					    vm_locked.vm->log_buffer,
-					    vm_locked.vm->log_buffer_length);
-			vm_locked.vm->log_buffer_length = 0;
+			api_flush_log_buffer(vm_locked.vm->id, log_buffer);
 		}
 	}
 
