@@ -1381,6 +1381,52 @@ TEST_PRECONDITION(memory_sharing, lend_normal_memory_as_device_and_lose_access,
 }
 
 /**
+ * Test that normal memory lent with the device memory type cannot
+ * be retrieved with the normal memory type as this breaks precedence rules.
+ */
+TEST(memory_sharing, lend_normal_as_device_to_multiple)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_memory_access receivers[2];
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_access_impdef impdef_val =
+		ffa_memory_access_impdef_init(0, 0);
+
+	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_share_fail_denied",
+		       mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_share_fail_denied",
+		       mb.send);
+
+	ffa_memory_access_init(
+		&receivers[0], service1_info->vm_id, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &impdef_val);
+
+	ffa_memory_access_init(
+		&receivers[1], service2_info->vm_id, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &impdef_val);
+
+	/*
+	 * Lend the memory as device memory and set the memory type in the
+	 * retrieve request to normal memory. This should fail.
+	 */
+	send_memory_and_retrieve_request_multi_receiver(
+		FFA_MEM_LEND_32, mb.send, HF_PRIMARY_VM_ID, constituents,
+		ARRAY_SIZE(constituents), receivers, ARRAY_SIZE(receivers),
+		receivers, ARRAY_SIZE(receivers), 0, 0, FFA_MEMORY_DEVICE_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_DEV_NGNRNE,
+		FFA_MEMORY_CACHE_WRITE_BACK);
+
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+}
+
+/**
  * Test that device memory can be shared from one SP to another and both can
  * access it whilst they share it.
  * The device memory shared is UART1 MMIO address space so the output can be
