@@ -22,7 +22,6 @@
 #include "vmapi/hf/ffa.h"
 
 #define MAX_SMCS 32
-#define LOG_BUFFER_SIZE 256
 #define VM_MANIFEST_MAX_INTERRUPTS 32
 
 /** Action for Other-Secure interrupts by SPMC. */
@@ -199,11 +198,6 @@ struct smc_whitelist {
 	bool permissive;
 };
 
-struct log_buffer {
-	char chars[LOG_BUFFER_SIZE];
-	uint16_t len;
-};
-
 struct vm {
 	ffa_id_t id;
 	struct ffa_uuid uuids[PARTITION_MAX_UUIDS];
@@ -246,8 +240,6 @@ struct vm {
 		bool enabled;
 		bool npi_injected;
 	} notifications;
-
-	struct log_buffer log_buffer;
 
 	/**
 	 * Wait entries to be used when waiting on other VM mailboxes. See

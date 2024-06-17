@@ -29,6 +29,7 @@
 #include "hf/spinlock.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
+#include "hf/vcpu.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/call.h"
@@ -4684,7 +4685,7 @@ out:
 }
 
 /**
- * Send the contents of the given VM's log buffer to the log, preceded
+ * Send the contents of the given vCPU's log buffer to the log, preceded
  * by the VM ID and followed by a newline.
  */
 void api_flush_log_buffer(ffa_id_t id, struct log_buffer *buffer)
@@ -4714,7 +4715,8 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 	const size_t chars_max =
 		registers_max * (log32 ? sizeof(uint32_t) : sizeof(uint64_t));
 	const size_t chars_count = args.arg1;
-	struct vm_locked vm_locked;
+	struct vcpu_locked vcpu_locked;
+	struct log_buffer *log_buffer;
 
 	assert(args.func == FFA_CONSOLE_LOG_32 ||
 	       args.func == FFA_CONSOLE_LOG_64);
@@ -4755,8 +4757,8 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 		}
 	}
 
-	vm_locked = vm_lock(current->vm);
-	struct log_buffer *log_buffer = &current->vm->log_buffer;
+	vcpu_locked = vcpu_lock(current);
+	log_buffer = &current->log_buffer;
 
 	for (size_t i = 0; i < chars_count; i++) {
 		bool flush = false;
@@ -4770,10 +4772,10 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 		}
 
 		if (flush) {
-			api_flush_log_buffer(vm_locked.vm->id, log_buffer);
+			api_flush_log_buffer(current->vm->id, log_buffer);
 		}
 	}
 
-	vm_unlock(&vm_locked);
+	vcpu_unlock(&vcpu_locked);
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }

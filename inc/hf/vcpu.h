@@ -101,6 +101,13 @@ struct call_chain {
 	struct vcpu *next_node;
 };
 
+#define LOG_BUFFER_SIZE 256
+
+struct log_buffer {
+	char chars[LOG_BUFFER_SIZE];
+	uint16_t len;
+};
+
 struct vcpu {
 	struct spinlock lock;
 
@@ -115,6 +122,8 @@ struct vcpu {
 	struct vm *vm;
 	struct arch_regs regs;
 	struct interrupts interrupts;
+
+	struct log_buffer log_buffer;
 
 	/*
 	 * Determine whether the 'regs' field is available for use. This is set
