@@ -17,9 +17,15 @@
 
 #define FFA_VERSION_RESERVED_BIT (UINT32_C(1) << 31)
 
+/**
+ * The helper functions prepares the FFA_ERROR 32-bit ABI.
+ * The enum is cast to a uint32_t because it must be zero-extended to 64 bits,
+ * not sign-extended.
+ */
 static inline struct ffa_value ffa_error(enum ffa_error error_code)
 {
-	return (struct ffa_value){.func = FFA_ERROR_32, .arg2 = error_code};
+	return (struct ffa_value){.func = FFA_ERROR_32,
+				  .arg2 = (uint32_t)error_code};
 }
 
 struct ffa_value ffa_msg_recv_return(const struct vm *receiver);
