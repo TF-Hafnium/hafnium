@@ -273,6 +273,37 @@ page size. The first secure range defined in the node below has base address
 `0x0 0x6000000` and size `0x2000000`; following there is another range with
 base address `0x0 0xff000000` and size `0x1000000`.
 
+* The *interrupt-controller* node contains the address ranges of GICD and GICR
+so that non-contiguous GICR frames can be probed during boot flow. The GICD
+address is defined in the first cell, followed by the GICR addresses.
+"redistributor-regions" is used to define the number of GICR addresses.
+
+This node is optional. When absent, the default configuration assumes there is
+one redistributor region. The default GICD memory range is from ``GICD_BASE``
+to ``GICD_BASE + GICD_SIZE``. The default GICR memory range is from
+``GICR_BASE`` to ``GICR_BASE + GICR_FRAMES * GIC_REDIST_SIZE_PER_PE``.
+
+.. code:: shell
+
+	gic: interrupt-controller@0x30000000 {
+		compatible = "arm,gic-v3";
+		#address-cells = <2>;
+		#size-cells = <1>;
+		#redistributor-regions = <4>;
+		reg = <0x00 0x30000000 0x10000>,	// GICD
+		      <0x00 0x301C0000 0x400000>,	// GICR 0: Chip 0
+		      <0x10 0x301C0000 0x400000>,	// GICR 1: Chip 1
+		      <0x20 0x301C0000 0x400000>,	// GICR 2: Chip 2
+		      <0x30 0x301C0000 0x400000>;	// GICR 3: Chip 3
+	};
+
+The above is an example representation of the referred interrupt controller
+description. The cells are made up of three values. The first two 32-bit values
+make up a 64-bit value representing the address of the GIC redistributor. The
+third value represents the size of this region. In this example,
+redistributor-regions states there are 4 GICR cells. The address of GICR 0 is
+`0x00301C0000` and the size of that region is `0x400000`.
+
 Secure Partitions Configuration
 -------------------------------
 
