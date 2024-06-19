@@ -4283,6 +4283,7 @@ struct ffa_value api_ffa_notification_set(
 	const uint32_t flags_mbz =
 		~(FFA_NOTIFICATIONS_FLAG_PER_VCPU |
 		  FFA_NOTIFICATIONS_FLAG_DELAY_SRI | (0xFFFFU << 16));
+	const bool delay_sri = (FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) != 0U;
 
 	if ((flags_mbz & flags) != 0U) {
 		dlog_verbose("%s: caller shouldn't set bits that MBZ.\n",
@@ -4306,6 +4307,17 @@ struct ffa_value api_ffa_notification_set(
 
 	if (notifications == 0U) {
 		dlog_verbose("No notifications have been specified.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/*
+	 * The 'Delay Schedule Receiver interrupt flag' only applies to the
+	 * secure virtual FF-A instance.
+	 */
+	if (!vm_id_is_current_world(sender_vm_id) && delay_sri) {
+		dlog_verbose(
+			"The delay SRI flag can only be set at the secure "
+			"virtual FF-A instance.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -4370,7 +4382,7 @@ struct ffa_value api_ffa_notification_set(
 
 	dlog_verbose("Set the notifications: %lx.\n", notifications);
 
-	if ((FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) == 0) {
+	if (!delay_sri) {
 		dlog_verbose("SRI was NOT delayed. vcpu: %u!\n",
 			     vcpu_index(current));
 		plat_ffa_sri_trigger_not_delayed(current->cpu);

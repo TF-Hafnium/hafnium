@@ -493,7 +493,7 @@ bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
 	*ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_NOTIFICATION_SET_32,
 		.arg1 = (sender_vm_id << 16) | receiver_vm_id,
-		.arg2 = flags,
+		.arg2 = flags & ~FFA_NOTIFICATIONS_FLAG_DELAY_SRI,
 		.arg3 = (uint32_t)(bitmap),
 		.arg4 = (uint32_t)(bitmap >> 32),
 	});
