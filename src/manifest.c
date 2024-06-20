@@ -583,6 +583,45 @@ static enum manifest_return_code check_and_record_memory_used(
 	return MANIFEST_ERROR_MEM_REGION_OVERLAP;
 }
 
+static enum manifest_return_code parse_common_fields_mem_dev_region_node(
+	struct fdt_node *ffa_node, struct dma_device_properties *dma_prop)
+{
+	uint32_t j = 0;
+	struct uint32list_iter list;
+
+	TRY(read_optional_uint32(ffa_node, "smmu-id", MANIFEST_INVALID_ID,
+				 &dma_prop->smmu_id));
+	if (dma_prop->smmu_id != MANIFEST_INVALID_ID) {
+		dlog_verbose("      smmu-id:  %u\n", dma_prop->smmu_id);
+	}
+
+	TRY(read_optional_uint32list(ffa_node, "stream-ids", &list));
+	dlog_verbose("      Stream IDs assigned:\n");
+
+	j = 0;
+	while (uint32list_has_next(&list)) {
+		if (j == PARTITION_MAX_STREAMS_PER_DEVICE) {
+			return MANIFEST_ERROR_STREAM_IDS_OVERFLOW;
+		}
+
+		TRY(uint32list_get_next(&list, &dma_prop->stream_ids[j]));
+		dlog_verbose("        %u\n", dma_prop->stream_ids[j]);
+		j++;
+	}
+	if (j == 0) {
+		dlog_verbose("        None\n");
+	} else if (dma_prop->smmu_id == MANIFEST_INVALID_ID) {
+		/*
+		 * SMMU ID must be specified if the partition specifies
+		 * Stream IDs for any device upstream of SMMU.
+		 */
+		return MANIFEST_ERROR_MISSING_SMMU_ID;
+	}
+	dma_prop->stream_count = j;
+
+	return MANIFEST_SUCCESS;
+}
+
 static enum manifest_return_code parse_ffa_memory_region_node(
 	struct fdt_node *mem_node, uintptr_t load_address,
 	struct memory_region *mem_regions, uint16_t *count, struct rx_tx *rxtx,
@@ -685,41 +724,8 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 			manifest_data->mem_regions,
 			&manifest_data->mem_regions_index));
 
-		TRY(read_optional_uint32(mem_node, "smmu-id",
-					 MANIFEST_INVALID_ID,
-					 &mem_regions[i].dma_prop.smmu_id));
-		if (mem_regions[i].dma_prop.smmu_id != MANIFEST_INVALID_ID) {
-			dlog_verbose("      smmu-id:  %u\n",
-				     mem_regions[i].dma_prop.smmu_id);
-		}
-
-		TRY(read_optional_uint32list(mem_node, "stream-ids", &list));
-		dlog_verbose("      Stream IDs assigned:\n");
-
-		j = 0;
-		while (uint32list_has_next(&list)) {
-			if (j == PARTITION_MAX_STREAMS_PER_DEVICE) {
-				return MANIFEST_ERROR_STREAM_IDS_OVERFLOW;
-			}
-
-			TRY(uint32list_get_next(
-				&list, &mem_regions[i].dma_prop.stream_ids[j]));
-			dlog_verbose("        %u\n",
-				     mem_regions[i].dma_prop.stream_ids[j]);
-			j++;
-		}
-		if (j == 0) {
-			dlog_verbose("        None\n");
-		} else if (mem_regions[i].dma_prop.smmu_id ==
-			   MANIFEST_INVALID_ID) {
-			/*
-			 * SMMU ID must be specified if the partition specifies
-			 * Stream IDs for any device upstream of SMMU.
-			 */
-			return MANIFEST_ERROR_MISSING_SMMU_ID;
-		}
-
-		mem_regions[i].dma_prop.stream_count = j;
+		TRY(parse_common_fields_mem_dev_region_node(
+			mem_node, &mem_regions[i].dma_prop));
 
 		TRY(read_optional_uint32list(
 			mem_node, "stream-ids-access-permissions", &list));
@@ -812,7 +818,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 	uint16_t i = 0;
 	uint32_t j = 0;
 	struct interrupt_bitmap allocated_intids = manifest_data->intids;
-	static uint8_t dma_device_id = 0;
+	uint8_t dma_device_id = 0;
 
 	dlog_verbose("  Partition Device Regions\n");
 
@@ -964,34 +970,10 @@ static enum manifest_return_code parse_ffa_device_region_node(
 			}
 		}
 
-		TRY(read_optional_uint32(dev_node, "smmu-id",
-					 MANIFEST_INVALID_ID,
-					 &dev_regions[i].dma_prop.smmu_id));
+		TRY(parse_common_fields_mem_dev_region_node(
+			dev_node, &dev_regions[i].dma_prop));
+
 		if (dev_regions[i].dma_prop.smmu_id != MANIFEST_INVALID_ID) {
-			dlog_verbose("      smmu-id:  %u\n",
-				     dev_regions[i].dma_prop.smmu_id);
-		}
-
-		TRY(read_optional_uint32list(dev_node, "stream-ids", &list));
-		dlog_verbose("      Stream IDs assigned:\n");
-
-		j = 0;
-		while (uint32list_has_next(&list)) {
-			if (j == PARTITION_MAX_STREAMS_PER_DEVICE) {
-				return MANIFEST_ERROR_STREAM_IDS_OVERFLOW;
-			}
-
-			TRY(uint32list_get_next(
-				&list, &dev_regions[i].dma_prop.stream_ids[j]));
-			dlog_verbose("        %u\n",
-				     dev_regions[i].dma_prop.stream_ids[j]);
-			j++;
-		}
-
-		if (j == 0) {
-			dlog_verbose("        None\n");
-		} else if (dev_regions[i].dma_prop.smmu_id !=
-			   MANIFEST_INVALID_ID) {
 			dev_regions[i].dma_prop.dma_device_id = dma_device_id++;
 			*dma_device_count = dma_device_id;
 
@@ -1001,15 +983,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 			dlog_verbose("      dma peripheral device id:  %u\n",
 				     dev_regions[i].dma_prop.dma_device_id);
-		} else {
-			/*
-			 * SMMU ID must be specified if the partition specifies
-			 * Stream IDs for any device upstream of SMMU.
-			 */
-			return MANIFEST_ERROR_MISSING_SMMU_ID;
 		}
-
-		dev_regions[i].dma_prop.stream_count = j;
 
 		TRY(read_bool(dev_node, "exclusive-access",
 			      &dev_regions[i].exclusive_access));
