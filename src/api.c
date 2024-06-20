@@ -2587,10 +2587,6 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 	case FFA_NOTIFICATION_SET_32:
 	case FFA_NOTIFICATION_GET_32:
 	case FFA_NOTIFICATION_INFO_GET_64:
-	case FFA_MEM_PERM_GET_32:
-	case FFA_MEM_PERM_SET_32:
-	case FFA_MEM_PERM_GET_64:
-	case FFA_MEM_PERM_SET_64:
 	case FFA_MSG_SEND2_32:
 		if (FFA_VERSION_1_1 > FFA_VERSION_COMPILED) {
 			return ffa_error(FFA_NOT_SUPPORTED);
@@ -2606,6 +2602,21 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
+		return api_ffa_feature_success(0);
+
+	/* These functions are only supported on S-EL0 partitions. */
+	case FFA_MEM_PERM_GET_32:
+	case FFA_MEM_PERM_SET_32:
+	case FFA_MEM_PERM_GET_64:
+	case FFA_MEM_PERM_SET_64:
+		if (!(vm_id_is_current_world(current->vm->id) &&
+		      el0_partition)) {
+			dlog_verbose(
+				"FFA_FEATURE: %s is only supported on S-EL0 "
+				"partitions\n",
+				ffa_func_name(function_or_feature_id));
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
 		return api_ffa_feature_success(0);
 
 	case FFA_RXTX_MAP_64: {

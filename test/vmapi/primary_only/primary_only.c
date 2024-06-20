@@ -301,16 +301,16 @@ TEST_PRECONDITION(ffa, ffa_v_1_1_features, v1_1_or_later)
 {
 	struct ffa_value ret;
 	ret = ffa_features(FFA_MEM_PERM_GET_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_MEM_PERM_SET_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_MEM_PERM_GET_64);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_MEM_PERM_SET_64);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_MSG_SEND2_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
