@@ -285,6 +285,9 @@ TEST(ffa, ffa_features)
 
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_SECONDARY_EP_REGISTER_64);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
 static bool v1_1_or_later(void)

@@ -353,3 +353,30 @@ TEST_PRECONDITION(ffa, npi_not_supported, service2_is_el0)
 	EXPECT_EQ(res.arg3, FFA_ERROR_32);
 	EXPECT_EQ((int32_t)res.arg4, FFA_NOT_SUPPORTED);
 }
+
+TEST_PRECONDITION(ffa, secondary_ep_register_supported, service2_is_mp_sp)
+{
+	const ffa_id_t own_id = hf_vm_get_id();
+	/* SP is expected to be S-EL0 partition */
+	const ffa_id_t receiver_id = SP_ID(2);
+	struct ffa_value res;
+
+	res = sp_ffa_features_cmd_send(own_id, receiver_id,
+				       FFA_SECONDARY_EP_REGISTER_64);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, FFA_SUCCESS_32);
+}
+
+TEST_PRECONDITION(ffa, secondary_ep_register_not_supported, service2_is_up_sp)
+{
+	const ffa_id_t own_id = hf_vm_get_id();
+	/* SP is expected to be S-EL0 partition */
+	const ffa_id_t receiver_id = SP_ID(2);
+	struct ffa_value res;
+
+	res = sp_ffa_features_cmd_send(own_id, receiver_id,
+				       FFA_SECONDARY_EP_REGISTER_64);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, FFA_ERROR_32);
+	EXPECT_EQ((int32_t)res.arg4, FFA_NOT_SUPPORTED);
+}

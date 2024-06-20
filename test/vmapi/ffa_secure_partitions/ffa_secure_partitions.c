@@ -39,6 +39,18 @@ bool service2_is_up_sp(void)
 }
 
 /*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service1 partition is an MP SP.
+ */
+bool service2_is_mp_sp(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	return (service2_info->vcpu_count > 1);
+}
+
+/*
  * Currently we are using the vCPU count set to 0 for service 2 as being an
  * indication it is S-EL0 partition.
  */

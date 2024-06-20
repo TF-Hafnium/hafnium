@@ -2619,6 +2619,21 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 		}
 		return api_ffa_feature_success(0);
 
+	case FFA_SECONDARY_EP_REGISTER_64:
+		if (FFA_VERSION_COMPILED < FFA_VERSION_1_1) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+
+		if (!(vm_id_is_current_world(current->vm->id) &&
+		      current->vm->vcpu_count > 1)) {
+			dlog_verbose(
+				"FFA_FEATURE: %s is only supported on SPs with "
+				"more than 1 vCPU\n",
+				ffa_func_name(function_or_feature_id));
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+		return api_ffa_feature_success(0);
+
 	case FFA_RXTX_MAP_64: {
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
 			return ffa_error(FFA_NOT_SUPPORTED);
