@@ -1409,7 +1409,7 @@ bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
 	unsigned int i;
 	unsigned int j;
 
-	struct device_region upstream_peripheral;
+	struct dma_device_properties upstream_peripheral;
 	uint16_t vm_id;
 	struct mm_ptable *iommu_ptable;
 	struct mm_ptable *iommu_ptable_ns;
@@ -1434,7 +1434,8 @@ bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
 
 	/* Iterate through device region nodes described in vm manifest */
 	for (i = 0; i < manifest_vm->partition.dev_region_count; i++) {
-		upstream_peripheral = manifest_vm->partition.dev_regions[i];
+		upstream_peripheral =
+			manifest_vm->partition.dev_regions[i].dma_prop;
 
 		if (upstream_peripheral.smmu_id != MANIFEST_INVALID_ID &&
 		    upstream_peripheral.smmu_id != arm_smmuv3.smmu_id) {

@@ -737,7 +737,7 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 			dlog_verbose("        %u\n", permissions);
 
 			if (j == 0) {
-				mem_regions[i].dma_prop.dma_access_permissions =
+				mem_regions[i].dma_access_permissions =
 					permissions;
 			}
 
@@ -746,7 +746,7 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 			 * the same access permissions.
 			 */
 			if (permissions !=
-			    mem_regions[i].dma_prop.dma_access_permissions) {
+			    mem_regions[i].dma_access_permissions) {
 				return MANIFEST_ERROR_MISMATCH_DMA_ACCESS_PERMISSIONS;
 			}
 
@@ -761,7 +761,7 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 
 		if (j > 0) {
 			/* Filter the dma access permissions. */
-			mem_regions[i].dma_prop.dma_access_permissions &=
+			mem_regions[i].dma_access_permissions &=
 				MANIFEST_REGION_ALL_ATTR_MASK;
 		}
 
@@ -966,10 +966,10 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 		TRY(read_optional_uint32(dev_node, "smmu-id",
 					 MANIFEST_INVALID_ID,
-					 &dev_regions[i].smmu_id));
-		if (dev_regions[i].smmu_id != MANIFEST_INVALID_ID) {
+					 &dev_regions[i].dma_prop.smmu_id));
+		if (dev_regions[i].dma_prop.smmu_id != MANIFEST_INVALID_ID) {
 			dlog_verbose("      smmu-id:  %u\n",
-				     dev_regions[i].smmu_id);
+				     dev_regions[i].dma_prop.smmu_id);
 		}
 
 		TRY(read_optional_uint32list(dev_node, "stream-ids", &list));
@@ -981,17 +981,18 @@ static enum manifest_return_code parse_ffa_device_region_node(
 				return MANIFEST_ERROR_STREAM_IDS_OVERFLOW;
 			}
 
-			TRY(uint32list_get_next(&list,
-						&dev_regions[i].stream_ids[j]));
+			TRY(uint32list_get_next(
+				&list, &dev_regions[i].dma_prop.stream_ids[j]));
 			dlog_verbose("        %u\n",
-				     dev_regions[i].stream_ids[j]);
+				     dev_regions[i].dma_prop.stream_ids[j]);
 			j++;
 		}
 
 		if (j == 0) {
 			dlog_verbose("        None\n");
-		} else if (dev_regions[i].smmu_id != MANIFEST_INVALID_ID) {
-			dev_regions[i].dma_device_id = dma_device_id++;
+		} else if (dev_regions[i].dma_prop.smmu_id !=
+			   MANIFEST_INVALID_ID) {
+			dev_regions[i].dma_prop.dma_device_id = dma_device_id++;
 			*dma_device_count = dma_device_id;
 
 			if (*dma_device_count > PARTITION_MAX_DMA_DEVICES) {
@@ -999,7 +1000,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 			}
 
 			dlog_verbose("      dma peripheral device id:  %u\n",
-				     dev_regions[i].dma_device_id);
+				     dev_regions[i].dma_prop.dma_device_id);
 		} else {
 			/*
 			 * SMMU ID must be specified if the partition specifies
@@ -1008,7 +1009,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 			return MANIFEST_ERROR_MISSING_SMMU_ID;
 		}
 
-		dev_regions[i].stream_count = j;
+		dev_regions[i].dma_prop.stream_count = j;
 
 		TRY(read_bool(dev_node, "exclusive-access",
 			      &dev_regions[i].exclusive_access));
@@ -1139,9 +1140,9 @@ static bool find_dma_device_id_from_dev_region_nodes(
 		struct device_region dev_region =
 			manifest_vm->partition.dev_regions[i];
 
-		for (uint8_t j = 0; j < dev_region.stream_count; j++) {
-			if (sid == dev_region.stream_ids[j]) {
-				*device_id = dev_region.dma_device_id;
+		for (uint8_t j = 0; j < dev_region.dma_prop.stream_count; j++) {
+			if (sid == dev_region.dma_prop.stream_ids[j]) {
+				*device_id = dev_region.dma_prop.dma_device_id;
 				return true;
 			}
 		}

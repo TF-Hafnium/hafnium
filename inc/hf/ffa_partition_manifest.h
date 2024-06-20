@@ -71,8 +71,6 @@ struct dma_device_properties {
 	uint8_t stream_count;
 	/** List of Stream IDs assigned to device - optional */
 	uint32_t stream_ids[PARTITION_MAX_STREAMS_PER_DEVICE];
-	/** Instruction and data access permissions - optional */
-	uint32_t dma_access_permissions;
 };
 
 /**
@@ -93,6 +91,8 @@ struct memory_region {
 	uint32_t attributes;
 	/** DMA device properties - optional */
 	struct dma_device_properties dma_prop;
+	/** Instruction and data access permissions for DMA device - optional */
+	uint32_t dma_access_permissions;
 };
 
 struct interrupt_info {
@@ -117,14 +117,8 @@ struct device_region {
 	struct interrupt_info interrupts[PARTITION_MAX_INTERRUPTS_PER_DEVICE];
 	/** Count of physical interrupts - optional */
 	uint8_t interrupt_count;
-	/** SMMU ID - optional */
-	uint32_t smmu_id;
-	/** IMPDEF id tracking DMA peripheral device - optional */
-	uint8_t dma_device_id;
-	/** Count of Stream IDs assigned to device - optional */
-	uint8_t stream_count;
-	/** List of Stream IDs assigned to device - optional */
-	uint32_t stream_ids[PARTITION_MAX_STREAMS_PER_DEVICE];
+	/** DMA device properties - optional */
+	struct dma_device_properties dma_prop;
 	/** Exclusive access to an endpoint - optional */
 	bool exclusive_access;
 	/** Name of Device region - optional */
