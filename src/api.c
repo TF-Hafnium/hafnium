@@ -2634,6 +2634,20 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 		}
 		return api_ffa_feature_success(0);
 
+	/*
+	 * This function is restricted to the secure virtual FF-A instance (i.e.
+	 * only report success to SPs).
+	 */
+	case FFA_YIELD_32:
+		if (!vm_id_is_current_world(current->vm->id)) {
+			dlog_verbose(
+				"FFA_FEATURES: %s is only supported at secure "
+				"virtual FF-A instance\n",
+				ffa_func_name(FFA_YIELD_32));
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+		return api_ffa_feature_success(0);
+
 	case FFA_RXTX_MAP_64: {
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
 			return ffa_error(FFA_NOT_SUPPORTED);

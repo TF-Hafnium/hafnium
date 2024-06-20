@@ -243,7 +243,7 @@ TEST(ffa, ffa_features)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_YIELD_32);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_RUN_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -284,6 +284,9 @@ TEST(ffa, ffa_features)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_YIELD_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_SECONDARY_EP_REGISTER_64);

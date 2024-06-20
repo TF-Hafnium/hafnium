@@ -260,7 +260,7 @@ TEST(ffa_features, fails_func_id_not_supported)
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_YIELD_32);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MSG_SEND_32);
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
