@@ -2508,48 +2508,14 @@ struct ffa_value api_ffa_feature_success(uint32_t arg2)
 	};
 }
 
-/**
- * Discovery function returning information about the implementation of optional
- * FF-A interfaces. See section 13.3 of the FF-A v1.2 ALP1 spec.
- *
- * `function_or_feature_id` is interpreted as either a function ID or a feature
- * ID, depending on the value of bit 31.
- * When it is a feature ID, bits [30:8] MBZ and input_property MBZ.
- *
- * Returns `FFA_SUCCESS` if the interface is supported.
- * Returns `FFA_NOT_SUPPORTED` if the interface is not supported or the
- * parameters are invalid.
- */
-struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
-				  uint32_t input_property, struct vcpu *current)
+static struct ffa_value ffa_features_function(uint32_t func,
+					      uint32_t input_property,
+					      struct vcpu *current)
 {
 	const enum ffa_version ffa_version = current->vm->ffa_version;
 	const bool el0_partition = current->vm->el0_partition;
-	const bool is_feature =
-		IS_BIT_UNSET(function_or_feature_id, FFA_FEATURES_FEATURE_BIT);
 
-	if (is_feature) {
-		if (ANY_BITS_SET(function_or_feature_id,
-				 FFA_FEATURES_FEATURE_MBZ_HI_BIT,
-				 FFA_FEATURES_FEATURE_MBZ_LO_BIT)) {
-			dlog_verbose(
-				"FFA_FEATURES: feature ID %#x is invalid (bits "
-				"[%u:%u] must be zero)\n",
-				function_or_feature_id,
-				FFA_FEATURES_FEATURE_MBZ_HI_BIT,
-				FFA_FEATURES_FEATURE_MBZ_LO_BIT);
-			return ffa_error(FFA_NOT_SUPPORTED);
-		}
-		if (input_property != 0) {
-			dlog_verbose(
-				"FFA_FEATURES: input_property must be 0 "
-				"(input_property = %#x)\n",
-				input_property);
-			return ffa_error(FFA_NOT_SUPPORTED);
-		}
-	}
-
-	switch (function_or_feature_id) {
+	switch (func) {
 	/* Check support of the given Function ID. */
 	case FFA_ERROR_32:
 	case FFA_SUCCESS_32:
@@ -2614,7 +2580,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 			dlog_verbose(
 				"FFA_FEATURE: %s is only supported on S-EL0 "
 				"partitions\n",
-				ffa_func_name(function_or_feature_id));
+				ffa_func_name(func));
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 		return api_ffa_feature_success(0);
@@ -2629,7 +2595,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 			dlog_verbose(
 				"FFA_FEATURE: %s is only supported on SPs with "
 				"more than 1 vCPU\n",
-				ffa_func_name(function_or_feature_id));
+				ffa_func_name(func));
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 		return api_ffa_feature_success(0);
@@ -2702,6 +2668,35 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 			FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT);
 	}
 
+	default:
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+}
+
+static struct ffa_value ffa_features_feature(enum ffa_feature_id feature,
+					     uint32_t input_property,
+					     struct vcpu *current)
+{
+	const bool el0_partition = current->vm->el0_partition;
+
+	if (ANY_BITS_SET(feature, FFA_FEATURES_FEATURE_MBZ_HI_BIT,
+			 FFA_FEATURES_FEATURE_MBZ_LO_BIT)) {
+		dlog_verbose(
+			"FFA_FEATURES: feature ID %#x is invalid (bits [%u:%u] "
+			"must be zero)\n",
+			feature, FFA_FEATURES_FEATURE_MBZ_HI_BIT,
+			FFA_FEATURES_FEATURE_MBZ_LO_BIT);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+	if (input_property != 0) {
+		dlog_verbose(
+			"FFA_FEATURES: input_property must be 0 "
+			"(input_property = %#x)\n",
+			input_property);
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	switch (feature) {
 	/* Check support of a feature provided respective feature ID. */
 
 	/*
@@ -2745,6 +2740,28 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 	default:
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
+}
+
+/**
+ * Discovery function returning information about the implementation of optional
+ * FF-A interfaces. See section 13.3 of the FF-A v1.2 ALP1 spec.
+ *
+ * `function_or_feature_id` is interpreted as either a function ID or a feature
+ * ID, depending on the value of bit 31.
+ * When it is a feature ID, bits [30:8] MBZ and input_property MBZ.
+ *
+ * Returns `FFA_SUCCESS` if the interface is supported.
+ * Returns `FFA_NOT_SUPPORTED` if the interface is not supported or the
+ * parameters are invalid.
+ */
+struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
+				  uint32_t input_property, struct vcpu *current)
+{
+	return IS_BIT_UNSET(function_or_feature_id, FFA_FEATURES_FEATURE_BIT)
+		       ? ffa_features_feature(function_or_feature_id,
+					      input_property, current)
+		       : ffa_features_function(function_or_feature_id,
+					       input_property, current);
 }
 
 /**
