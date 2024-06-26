@@ -145,19 +145,27 @@ TEST_SERVICE(boot_memory_manifest)
 			   mem_region->base_address, mem_region->page_count,
 			   mem_region->attributes);
 
-		EXPECT_NE(mem_region->attributes & (MM_MODE_R | MM_MODE_W), 0);
+		ASSERT_NE(mem_region->attributes & MM_MODE_R, 0);
 
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		mem_ptr = (uint8_t*)mem_region->base_address;
 
 		update_region_security_state(mem_region);
-		for (size_t i = 0; i < mem_region->page_count * PAGE_SIZE;
-		     ++i) {
-			mem_ptr[i] = (uint8_t)i / 2;
-			checksum += (uint64_t)mem_ptr[i];
-		}
 
-		ASSERT_NE(checksum, 0);
+		if ((mem_region->attributes & MM_MODE_W) != 0) {
+			for (size_t i = 0;
+			     i < mem_region->page_count * PAGE_SIZE; ++i) {
+				mem_ptr[i] = (uint8_t)i / 2;
+				checksum += (uint64_t)mem_ptr[i];
+			}
+
+			ASSERT_NE(checksum, 0);
+		} else {
+			for (size_t i = 0;
+			     i < mem_region->page_count * PAGE_SIZE; ++i) {
+				ASSERT_NE(mem_ptr[i], 0);
+			}
+		}
 	}
 	ffa_yield();
 }
