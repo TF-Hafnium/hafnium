@@ -47,6 +47,13 @@
 			pages-count = <1>;
 			attributes = <0x3>; /* read-write */
 		};
+
+		ro-secure-memory {
+			base-address = <0x00000000 0x7200000>;
+			pages-count = <1>;
+			attributes = <0x1>; /* read-only */
+		};
+
 		ns-memory {
 			base-address = <0x00000000 0x9001F000>;
 			pages-count = <1>;

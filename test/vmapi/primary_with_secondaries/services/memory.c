@@ -1428,3 +1428,84 @@ TEST_SERVICE(invalid_memory_share)
 
 	ffa_yield();
 }
+
+/**
+ * Try lend and donate RO memory with the Zero Memory Flag set.
+ * This should fail.
+ */
+TEST_SERVICE(ffa_memory_fail_clear_ro_memory_on_lend_or_donate)
+{
+	void *send_buf = SERVICE_SEND_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_partition_info *service2_info = service2(recv_buf);
+	struct ffa_memory_access receiver;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)0x7200000, .page_count = 1},
+	};
+	struct ffa_memory_access_impdef impdef_val =
+		ffa_memory_access_impdef_init(0, 0);
+	uint32_t msg_size;
+
+	/*
+	 * Check that FFA_DENIED is returned for lend transaction.
+	 */
+	ffa_memory_access_init(
+		&receiver, service2_info->vm_id, FFA_DATA_ACCESS_RO,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &impdef_val);
+
+	ffa_memory_region_init(
+		(struct ffa_memory_region *)send_buf, HF_MAILBOX_SIZE,
+		hf_vm_get_id(), &receiver, 1, sizeof(struct ffa_memory_access),
+		constituents, 1, 0, FFA_MEMORY_REGION_FLAG_CLEAR,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size);
+
+	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
+
+	/*
+	 * Check that FFA_DENIED is returned for donate transaction.
+	 */
+	ffa_memory_access_init(
+		&receiver, service2_info->vm_id, FFA_DATA_ACCESS_NOT_SPECIFIED,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &impdef_val);
+
+	ffa_memory_region_init(
+		(struct ffa_memory_region *)send_buf, HF_MAILBOX_SIZE,
+		hf_vm_get_id(), &receiver, 1, sizeof(struct ffa_memory_access),
+		constituents, 1, 0, FFA_MEMORY_REGION_FLAG_CLEAR,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size);
+
+	EXPECT_FFA_ERROR(ffa_mem_donate(msg_size, msg_size), FFA_DENIED);
+
+	ffa_yield();
+}
+
+/**
+ * Try lend and donate RO memory and then retrieve with the Zero Memory Flag
+ * set. This should fail.
+ */
+TEST_SERVICE(ffa_memory_fail_clear_ro_memory_on_retrieve)
+{
+	void *send_buf = SERVICE_SEND_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_partition_info *service2_info = service2(recv_buf);
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)0x7200000, .page_count = 1},
+	};
+
+	/*
+	 * Check when FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH flag is set in
+	 * retrieve request for RO memory, FFA_DENIED is returned.
+	 */
+	send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), service2_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0,
+		FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH, FFA_DATA_ACCESS_RO,
+		FFA_DATA_ACCESS_RO, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+		FFA_INSTRUCTION_ACCESS_NX, FFA_MEMORY_NOT_SPECIFIED_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
+
+	ffa_yield();
+}

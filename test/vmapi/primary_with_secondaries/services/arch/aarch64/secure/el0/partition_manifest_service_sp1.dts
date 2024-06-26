@@ -37,6 +37,16 @@
 		ffa_mem_perm_set_ro;
 	};
 
+	memory-regions {
+		compatible = "arm,ffa-manifest-memory-regions";
+
+		ro-secure-memory {
+			base-address = <0x00000000 0x7200000>;
+			pages-count = <1>;
+			attributes = <0x1>; /* read-only */
+		};
+	};
+
 	device-regions {
 		compatible = "arm,ffa-manifest-device-regions";
 

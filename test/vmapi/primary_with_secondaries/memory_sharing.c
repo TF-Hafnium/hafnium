@@ -4661,3 +4661,47 @@ TEST_PRECONDITION(memory_sharing, invalid_from_sp, service1_is_not_vm)
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }
+
+/**
+ * Validate that memory marked as read only for the sender cannot have
+ * the Zero Memory flag set during a memory lend or donate call.
+ */
+TEST_PRECONDITION(memory_sharing, cannot_zero_ro_memory_on_lend_or_donate,
+		  service1_and_service2_are_secure)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_memory_fail_clear_ro_memory_on_lend_or_donate",
+		       mb.send);
+
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+}
+
+/**
+ * Validate that memory marked as read only for the sender cannot
+ * have the Zero Memory flag set during the retrieve request.
+ */
+TEST_PRECONDITION(memory_sharing, cannot_zero_ro_memory_on_retrieve,
+		  service1_and_service2_are_secure)
+{
+	struct ffa_value run_res;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_memory_fail_clear_ro_memory_on_retrieve", mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_share_fail_denied",
+		       mb.send);
+
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Run service 2 to check request fails as expected. */
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+}
