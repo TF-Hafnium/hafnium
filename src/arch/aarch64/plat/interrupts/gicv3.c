@@ -370,9 +370,10 @@ void gicv3_distif_init(void)
 	return;
 
 	/* Enable G1S and G1NS interrupts. */
-	gicd_write_ctlr(
+	gicd_set_ctlr(
 		plat_gicv3_driver.dist_base,
-		CTLR_ENABLE_G1NS_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ARE_S_BIT);
+		CTLR_ENABLE_G1NS_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ARE_S_BIT,
+		RWP_TRUE);
 }
 
 void gicv3_rdistif_init(uint32_t core_pos)
