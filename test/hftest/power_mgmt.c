@@ -9,6 +9,7 @@
 #include "hf/arch/vm/power_mgmt.h"
 
 #include "hf/arch/mm.h"
+#include "hf/arch/types.h"
 
 #include "hf/mm.h"
 #include "hf/spinlock.h"
@@ -55,7 +56,7 @@ static noreturn void cpu_entry(uintptr_t arg)
 	arch_cpu_stop();
 }
 
-bool hftest_cpu_start(uintptr_t id, cpu_entry_point *entry, uintptr_t arg)
+bool hftest_cpu_start(cpu_id_t id, cpu_entry_point *entry, uintptr_t arg)
 {
 	struct cpu_start_state s;
 	struct arch_cpu_start_state s_arch;

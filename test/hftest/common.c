@@ -298,7 +298,7 @@ static uintptr_t vcpu_index_to_id(size_t index)
 /**
  * Get the ID of the CPU with the given index.
  */
-uintptr_t hftest_get_cpu_id(size_t index)
+cpu_id_t hftest_get_cpu_id(size_t index)
 {
 	struct boot_params params;
 	const struct fdt *fdt = hftest_get_context()->fdt;

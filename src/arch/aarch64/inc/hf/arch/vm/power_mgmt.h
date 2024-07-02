@@ -35,7 +35,7 @@ typedef void(arch_cpu_entry_point)(uintreg_t arg);
  */
 struct arch_cpu_start_state {
 	uintptr_t initial_sp;
-	arch_cpu_entry_point* entry;
+	arch_cpu_entry_point *entry;
 	uintreg_t arg;
 };
 

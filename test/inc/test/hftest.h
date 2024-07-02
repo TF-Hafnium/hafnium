@@ -13,6 +13,8 @@
 #include <stdint.h>
 #include <stdnoreturn.h>
 
+#include "hf/arch/types.h"
+
 #include "hf/call.h"
 #include "hf/dlog.h"
 #include "hf/fdt.h"
@@ -181,10 +183,9 @@ void hftest_device_exit_test_environment(void);
  * with the provided argument. It is a wrapper around the generic cpu_start()
  * and takes care of MMU initialization.
  */
-bool hftest_cpu_start(uintptr_t id, void (*entry)(uintptr_t arg),
-		      uintptr_t arg);
+bool hftest_cpu_start(cpu_id_t id, void (*entry)(uintptr_t arg), uintptr_t arg);
 
-uintptr_t hftest_get_cpu_id(size_t index);
+cpu_id_t hftest_get_cpu_id(size_t index);
 
 /*
  * The type of CPU entry points: a function that takes one `uintptr_t` argument
