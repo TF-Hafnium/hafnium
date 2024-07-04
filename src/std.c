@@ -15,24 +15,6 @@ void *memset(void *s, int c, size_t n);
 void *memcpy(void *dst, const void *src, size_t n);
 void *memmove(void *dst, const void *src, size_t n);
 
-/*
- * As per the C11 specification, mem*_s() operations fill the destination buffer
- * if runtime constraint validation fails, assuming that `dest` and `destsz`
- * are both valid.
- */
-#define CHECK_OR_FILL(cond, dest, destsz, ch)                               \
-	do {                                                                \
-		if (!(cond)) {                                              \
-			if ((dest) != NULL && (destsz) <= RSIZE_MAX) {      \
-				memset_s((dest), (destsz), (ch), (destsz)); \
-			}                                                   \
-			panic("%s failed: " #cond, __func__);               \
-		}                                                           \
-	} while (0)
-
-#define CHECK_OR_ZERO_FILL(cond, dest, destsz) \
-	CHECK_OR_FILL(cond, dest, destsz, '\0')
-
 void memset_s(void *dest, rsize_t destsz, int ch, rsize_t count)
 {
 	if (dest == NULL || destsz > RSIZE_MAX) {
@@ -53,21 +35,21 @@ void memcpy_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
 	uintptr_t d = (uintptr_t)dest;
 	uintptr_t s = (uintptr_t)src;
 
-	CHECK_OR_ZERO_FILL(dest != NULL, dest, destsz);
-	CHECK_OR_ZERO_FILL(src != NULL, dest, destsz);
+	CHECK(dest != NULL);
+	CHECK(src != NULL);
 
 	/* Check count <= destsz <= RSIZE_MAX. */
-	CHECK_OR_ZERO_FILL(destsz <= RSIZE_MAX, dest, destsz);
-	CHECK_OR_ZERO_FILL(count <= destsz, dest, destsz);
+	CHECK(destsz <= RSIZE_MAX);
+	CHECK(count <= destsz);
 
 	/*
 	 * Buffer overlap test.
 	 * case a) `d < s` implies `s >= d+count`
 	 * case b) `d > s` implies `d >= s+count`
 	 */
-	CHECK_OR_ZERO_FILL(d != s, dest, destsz);
-	CHECK_OR_ZERO_FILL(d < s || d >= (s + count), dest, destsz);
-	CHECK_OR_ZERO_FILL(d > s || s >= (d + count), dest, destsz);
+	CHECK(d != s);
+	CHECK(d < s || d >= (s + count));
+	CHECK(d > s || s >= (d + count));
 
 	/*
 	 * Clang analyzer doesn't like us calling unsafe memory functions, so
@@ -79,12 +61,12 @@ void memcpy_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
 
 void memmove_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
 {
-	CHECK_OR_ZERO_FILL(dest != NULL, dest, destsz);
-	CHECK_OR_ZERO_FILL(src != NULL, dest, destsz);
+	CHECK(dest != NULL);
+	CHECK(src != NULL);
 
 	/* Check count <= destsz <= RSIZE_MAX. */
-	CHECK_OR_ZERO_FILL(destsz <= RSIZE_MAX, dest, destsz);
-	CHECK_OR_ZERO_FILL(count <= destsz, dest, destsz);
+	CHECK(destsz <= RSIZE_MAX);
+	CHECK(count <= destsz);
 
 	/*
 	 * Clang analyzer doesn't like us calling unsafe memory functions, so
