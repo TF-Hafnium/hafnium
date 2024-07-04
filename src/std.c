@@ -12,7 +12,7 @@
 
 /* Declare unsafe functions locally so they are not available globally. */
 void *memset(void *s, int c, size_t n);
-void *memcpy(void *dst, const void *src, size_t n);
+void *memcpy(void *restrict dst, const void *src, size_t n);
 void *memmove(void *dst, const void *src, size_t n);
 
 void memset_s(void *dest, rsize_t destsz, int ch, rsize_t count)
