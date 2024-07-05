@@ -2532,7 +2532,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 		if (ANY_BITS_SET(function_or_feature_id,
 				 FFA_FEATURES_FEATURE_MBZ_HI_BIT,
 				 FFA_FEATURES_FEATURE_MBZ_LO_BIT)) {
-			dlog_error(
+			dlog_verbose(
 				"FFA_FEATURES: feature ID %#x is invalid (bits "
 				"[%u:%u] must be zero)\n",
 				function_or_feature_id,
@@ -2541,7 +2541,7 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 		if (input_property != 0) {
-			dlog_error(
+			dlog_verbose(
 				"FFA_FEATURES: input_property must be 0 "
 				"(input_property = %#x)\n",
 				input_property);
@@ -2651,7 +2651,8 @@ struct ffa_value api_ffa_features(uint32_t function_or_feature_id,
 		if (ffa_version >= FFA_VERSION_1_1 &&
 		    (input_property &
 		     FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT) == 0U) {
-			dlog_error("FFA_FEATURES: NS bit support must be 1\n");
+			dlog_verbose(
+				"FFA_FEATURES: NS bit support must be 1\n");
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
