@@ -1715,6 +1715,9 @@ TEST_F(manifest, ffa_valid)
 				.Property("relative-address", "<0x7100000>")
 				.Property("pages-count", "<4>")
 				.Property("attributes", "<3>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<0 1>")
+				.Property("stream-ids-access-permissions", "<0x3 0x3>")
 			.EndChild()
 			.StartChild("test-memory-ns")
 				.Description("test-memory")
@@ -1776,6 +1779,10 @@ TEST_F(manifest, ffa_valid)
 	ASSERT_EQ(vm->partition.mem_regions[0].base_address, 0x7100000);
 	ASSERT_EQ(vm->partition.mem_regions[0].page_count, 4);
 	ASSERT_EQ(vm->partition.mem_regions[0].attributes, 3);
+	ASSERT_EQ(vm->partition.mem_regions[0].dma_prop.smmu_id, 1);
+	ASSERT_EQ(vm->partition.mem_regions[0].dma_prop.stream_ids[0], 0);
+	ASSERT_EQ(vm->partition.mem_regions[0].dma_prop.stream_ids[1], 1);
+	ASSERT_EQ(vm->partition.mem_regions[0].dma_access_permissions, 3);
 	ASSERT_EQ(vm->partition.mem_regions[1].attributes, (8 | 3));
 
 	ASSERT_EQ(vm->partition.rxtx.available, true);
@@ -2175,5 +2182,189 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
 	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
 		  MANIFEST_SUCCESS);
+}
+
+/*
+ * Tests to trigger various error conditions while parsing dma related
+ * properties of memory region nodes.
+ */
+TEST_F(manifest, ffa_memory_region_invalid_dma_properties)
+{
+	struct_manifest *m;
+
+	/*
+	 * SMMU ID must be specified if the partition specifies Stream IDs for
+	 * any device upstream of SMMU.
+	 */
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("stream-ids", "<0 1>")
+				.Property("interrupts", "<2 3>, <4 5>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MISSING_SMMU_ID);
+	manifest_dealloc();
+
+	/*
+	 * All stream ids belonging to a dma device must specify the same access
+	 * permissions.
+	 */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<0 1>")
+				.Property("stream-ids-access-permissions", "<0x3 0xb>")
+				.Property("interrupts", "<2 3>, <4 5>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MISMATCH_DMA_ACCESS_PERMISSIONS);
+	manifest_dealloc();
+
+	/*
+	 * DMA device stream ID count exceeds predefined limit.
+	 */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<0 1 4 9 12 >")
+				.Property("stream-ids-access-permissions", "<0x3 0x3 0x3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_STREAM_IDS_OVERFLOW);
+	manifest_dealloc();
+
+	/*
+	 * DMA access permissions count exceeds predefined limit
+	 */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<0 1>")
+				.Property("stream-ids-access-permissions", "<0x3 0x3 0x3 0x3 0x3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_DMA_ACCESS_PERMISSIONS_OVERFLOW);
+}
+
+/*
+ * Tests to trigger various error conditions while parsing dma related
+ * properties of device region nodes.
+ */
+TEST_F(manifest, ffa_device_region_invalid_dma_properties)
+{
+	struct_manifest *m;
+
+	/*
+	 * SMMU ID must be specified if the partition specifies Stream IDs for
+	 * any device upstream of SMMU.
+	 */
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device")
+				.Description("test-device")
+				.Property("base-address", "<0x24000000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("stream-ids", "<0 1>")
+				.Property("interrupts", "<2 3>, <4 5>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MISSING_SMMU_ID);
+	manifest_dealloc();
+
+	/*
+	 *  Dma devices defined through device region nodes exceed predefined
+	 * limit.
+	 */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("device-regions")
+			.Compatible({ "arm,ffa-manifest-device-regions" })
+			.StartChild("test-device-0")
+				.Description("test-device-0")
+				.Property("base-address", "<0x27000000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<0 1>")
+			.EndChild()
+			.StartChild("test-device-1")
+				.Description("test-device-1")
+				.Property("base-address", "<0x25000000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<2 3>")
+			.EndChild()
+			.StartChild("test-device-2")
+				.Description("test-device-2")
+				.Property("base-address", "<0x26000000>")
+				.Property("pages-count", "<16>")
+				.Property("attributes", "<3>")
+				.Property("smmu-id", "<1>")
+				.Property("stream-ids", "<4 5>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_DMA_DEVICE_OVERFLOW);
 }
 } /* namespace */
