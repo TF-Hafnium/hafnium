@@ -148,8 +148,9 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 		 */
 		args.vcpu_id = (ffa_vcpu_index_t)i;
 
-		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i), entry,
-					   (uintptr_t)&args),
+		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i),
+					   hftest_get_secondary_ec_stack(i),
+					   entry, (uintptr_t)&args),
 			  true);
 
 		/* Wait for CPU to release the lock. */

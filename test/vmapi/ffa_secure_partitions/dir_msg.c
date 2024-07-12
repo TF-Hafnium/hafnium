@@ -160,9 +160,10 @@ TEST_PRECONDITION_LONG_RUNNING(ffa_call_chain, disallow_migration_blocked_sp,
 		id = hftest_get_cpu_id(i);
 		HFTEST_LOG("Booting CPU %zu - %lx", i, id);
 
-		EXPECT_EQ(hftest_cpu_start(id, migrate_busy_up_sp,
-					   (uintptr_t)&args),
-			  true);
+		EXPECT_EQ(
+			hftest_cpu_start(id, hftest_get_secondary_ec_stack(i),
+					 migrate_busy_up_sp, (uintptr_t)&args),
+			true);
 
 		HFTEST_LOG("Done with CPU %zu", i);
 	}

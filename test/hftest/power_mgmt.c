@@ -22,12 +22,6 @@ struct cpu_start_state {
 	struct spinlock lock;
 };
 
-/*
- * Stack for secondary execution contexts.
- * Used in tests for MP partitions where multicore functionality is tested.
- */
-alignas(PAGE_SIZE) uint8_t secondary_ec_stack[MAX_CPUS - 1][PAGE_SIZE];
-
 static noreturn void cpu_entry(uintptr_t arg)
 {
 	/*
@@ -56,18 +50,18 @@ static noreturn void cpu_entry(uintptr_t arg)
 	arch_cpu_stop();
 }
 
-bool hftest_cpu_start(cpu_id_t id, cpu_entry_point *entry, uintptr_t arg)
+bool hftest_cpu_start(cpu_id_t id, const uint8_t *secondary_ec_stack,
+		      cpu_entry_point *entry, uintptr_t arg)
 {
 	struct cpu_start_state s;
 	struct arch_cpu_start_state s_arch;
-	size_t stack_size = sizeof(secondary_ec_stack[0]);
 
 	/*
 	 * Config for arch_cpu_start() which will start a new CPU and
 	 * immediately jump to cpu_entry(). This function must guarantee that
 	 * the state struct is not be freed until cpu_entry() is called.
 	 */
-	s_arch.initial_sp = (uintptr_t)secondary_ec_stack + stack_size;
+	s_arch.initial_sp = (uintptr_t)secondary_ec_stack;
 	s_arch.entry = cpu_entry;
 	s_arch.arg = (uintptr_t)&s;
 

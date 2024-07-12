@@ -205,8 +205,9 @@ static void base_per_cpu_notifications_test(void (*cpu_entry)(uintptr_t arg))
 
 		args.vcpu_id = i;
 
-		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i), cpu_entry,
-					   (uintptr_t)&args),
+		EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(i),
+					   hftest_get_secondary_ec_stack(i),
+					   cpu_entry, (uintptr_t)&args),
 			  true);
 
 		/* Wait for CPU to release the lock. */

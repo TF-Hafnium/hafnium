@@ -183,9 +183,12 @@ void hftest_device_exit_test_environment(void);
  * with the provided argument. It is a wrapper around the generic cpu_start()
  * and takes care of MMU initialization.
  */
-bool hftest_cpu_start(cpu_id_t id, void (*entry)(uintptr_t arg), uintptr_t arg);
+bool hftest_cpu_start(cpu_id_t id, const uint8_t *secondary_ec_stack,
+		      void (*entry)(uintptr_t arg), uintptr_t arg);
 
 cpu_id_t hftest_get_cpu_id(size_t index);
+
+uint8_t *hftest_get_secondary_ec_stack(size_t id);
 
 /*
  * The type of CPU entry points: a function that takes one `uintptr_t` argument

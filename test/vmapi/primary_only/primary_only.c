@@ -91,8 +91,9 @@ TEST(cpus, start)
 	 * MAX_CPUS - index internally. Since legacy VMs do not follow this
 	 * convention, index 7 is passed into `hftest_cpu_get_id`.
 	 */
-	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(7), vm_cpu_entry,
-				   (uintptr_t)&lock),
+	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(7),
+				   hftest_get_secondary_ec_stack(0),
+				   vm_cpu_entry, (uintptr_t)&lock),
 		  true);
 
 	/* Wait for CPU to release the lock. */
@@ -139,6 +140,7 @@ TEST(cpus, stop)
 	sl_lock(&lock);
 	dlog("Starting second CPU.\n");
 	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(secondary_cpu_index),
+				   hftest_get_secondary_ec_stack(0),
 				   vm_cpu_entry_stop, (uintptr_t)&lock),
 		  true);
 
@@ -154,6 +156,7 @@ TEST(cpus, stop)
 
 	dlog("Starting second CPU again.\n");
 	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(secondary_cpu_index),
+				   hftest_get_secondary_ec_stack(0),
 				   vm_cpu_entry_stop, (uintptr_t)&lock),
 		  true);
 

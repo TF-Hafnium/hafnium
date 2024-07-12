@@ -549,8 +549,9 @@ static void sp_route_interrupt_to_secondary_vcpu_base(
 		args.vcpu_id = i;
 		HFTEST_LOG("Booting CPU %u - %lx", i, cpu_id);
 
-		EXPECT_EQ(hftest_cpu_start(cpu_id, cpu_entry_sp_sleep_loop,
-					   (uintptr_t)&args),
+		EXPECT_EQ(hftest_cpu_start(
+				  cpu_id, hftest_get_secondary_ec_stack(i),
+				  cpu_entry_sp_sleep_loop, (uintptr_t)&args),
 			  true);
 
 		/* Wait for CPU to release the lock. */

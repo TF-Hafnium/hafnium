@@ -27,6 +27,8 @@ static struct hftest_test *hftest_list;
 
 static struct hftest_context global_context;
 
+static alignas(PAGE_SIZE) uint8_t secondary_ec_stack[MAX_CPUS][PAGE_SIZE];
+
 struct hftest_context *hftest_get_context(void)
 {
 	return &global_context;
@@ -293,6 +295,12 @@ static uintptr_t vcpu_index_to_id(size_t index)
 {
 	/* For now we use indices as IDs for vCPUs. */
 	return index;
+}
+
+uint8_t *hftest_get_secondary_ec_stack(size_t id)
+{
+	assert(id < MAX_CPUS);
+	return secondary_ec_stack[id];
 }
 
 /**

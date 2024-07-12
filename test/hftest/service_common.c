@@ -29,6 +29,14 @@ extern struct hftest_test hftest_end[];
 
 static struct hftest_context global_context;
 
+static alignas(PAGE_SIZE) uint8_t secondary_ec_stack[MAX_CPUS][PAGE_SIZE];
+
+uint8_t *hftest_get_secondary_ec_stack(size_t id)
+{
+	assert(id < MAX_CPUS);
+	return secondary_ec_stack[id];
+}
+
 struct hftest_context *hftest_get_context(void)
 {
 	return &global_context;

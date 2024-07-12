@@ -1068,6 +1068,7 @@ TEST_PRECONDITION(direct_message, echo_mp, service1_is_not_vm)
 	HFTEST_LOG("Starting secondary core...");
 
 	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(vcpu_id),
+				     hftest_get_secondary_ec_stack(vcpu_id),
 				     cpu_entry_echo_mp, (uintptr_t)&args));
 
 	/* Wait for secondary core to return before finishing the test. */
@@ -1102,6 +1103,7 @@ TEST_PRECONDITION(direct_message, echo_mp_req2, service1_is_not_vm)
 	HFTEST_LOG("Starting secondary core...");
 
 	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(vcpu_id),
+				     hftest_get_secondary_ec_stack(vcpu_id - 1),
 				     cpu_entry_echo_mp, (uintptr_t)&args));
 
 	/* Wait for secondary core to return before finishing the test. */

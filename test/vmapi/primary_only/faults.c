@@ -70,7 +70,8 @@ TEST(faults, spurious_due_to_configure)
 	 * MAX_CPUS - index internally. Since legacy VMs do not follow this
 	 * convention, index 7 is passed into `hftest_cpu_get_id`.
 	 */
-	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(7), rx_reader,
+	EXPECT_EQ(hftest_cpu_start(hftest_get_cpu_id(7),
+				   hftest_get_secondary_ec_stack(0), rx_reader,
 				   (uintptr_t)&s),
 		  true);
 
