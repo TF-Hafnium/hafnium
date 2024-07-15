@@ -796,12 +796,22 @@ class TestRunner:
         test suites."""
         out = self.driver.run("json", "json", self.force_long_running)
         hf_out = self.extract_hftest_lines(out)
-        hf_out = hf_out[hf_out.index(HFTEST_CTRL_JSON_START) + 1
+        try:
+            hf_out = hf_out[hf_out.index(HFTEST_CTRL_JSON_START) + 1
                         :hf_out.index(HFTEST_CTRL_JSON_END)];
+        except ValueError as e:
+            print("Unable to find JSON control string:")
+            print(f"out={out}")
+            print(f"hf_out={hf_out}")
+            raise e
+
         hf_out = "\n".join(hf_out)
         try:
             return json.loads(hf_out)
         except ValueError as e:
+            print("Unable to parse JSON:")
+            print(f"out={out}")
+            print(f"hf_out={hf_outout}")
             print(out)
             raise e
 
