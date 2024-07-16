@@ -41,6 +41,8 @@ HFTEST_CTRL_JSON_END = "[hftest_ctrl:json_end]"
 HFTEST_CTRL_GET_COMMAND_LINE = "[hftest_ctrl:get_command_line]"
 HFTEST_CTRL_FINISHED = "[hftest_ctrl:finished]"
 
+HFTEST_CTRL_JSON_REGEX = re.compile("^(VM|SP)0x[0-9a-fA-F]+@0x[0-9a-fA-F]+: ")
+
 HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
 DTC_SCRIPT = os.path.join(HF_ROOT, "build", "image", "dtc.py")
@@ -784,7 +786,7 @@ class TestRunner:
         lines_to_process = lines_to_process[hftest_start : hftest_end]
 
         for line in lines_to_process:
-            match = re.search(f"^(VM|SP) \d+: ", line)
+            match = HFTEST_CTRL_JSON_REGEX.search(line)
             if match is not None:
                 line = line[match.end():]
             if line.startswith(HFTEST_LOG_PREFIX):

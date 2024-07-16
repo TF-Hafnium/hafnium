@@ -4688,10 +4688,21 @@ out:
  * Send the contents of the given vCPU's log buffer to the log, preceded
  * by the VM ID and followed by a newline.
  */
-void api_flush_log_buffer(ffa_id_t id, struct log_buffer *buffer)
+void api_flush_log_buffer(struct vcpu_locked *vcpu_locked)
 {
+	/*
+	 * NOTE: This line is parsed by `hftest.py`.
+	 * If you change the format, make sure to update
+	 * `HFTEST_CTRL_JSON_REGEX` as well.
+	 */
+	struct vcpu *vcpu = vcpu_locked->vcpu;
+	struct log_buffer *buffer = &vcpu->log_buffer;
+	ffa_id_t vm_id = vcpu->vm->id;
+	ffa_id_t vcpu_id = vcpu_index(vcpu);
+
 	buffer->chars[buffer->len] = '\0';
-	dlog("%s %x: %s\n", ffa_is_vm_id(id) ? "VM" : "SP", id, buffer->chars);
+	dlog("%s%#x@%#x: %s\n", ffa_is_vm_id(vm_id) ? "VM" : "SP", vm_id,
+	     vcpu_id, buffer->chars);
 	buffer->len = 0;
 }
 
@@ -4772,7 +4783,7 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 		}
 
 		if (flush) {
-			api_flush_log_buffer(current->vm->id, log_buffer);
+			api_flush_log_buffer(&vcpu_locked);
 		}
 	}
 

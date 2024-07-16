@@ -10,6 +10,7 @@
 
 #include "hf/cpu.h"
 #include "hf/mpool.h"
+#include "hf/vcpu.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/call.h"
@@ -154,7 +155,7 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current);
 struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 				      uint32_t mem_perm, struct vcpu *current);
 
-void api_flush_log_buffer(ffa_id_t id, struct log_buffer *buffer);
+void api_flush_log_buffer(struct vcpu_locked *vcpu_locked);
 struct ffa_value api_ffa_console_log(const struct ffa_value args,
 				     struct vcpu *current);
 
