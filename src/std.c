@@ -9,6 +9,7 @@
 #include "hf/std.h"
 
 #include "hf/check.h"
+#include "hf/panic.h"
 
 /* Declare unsafe functions locally so they are not available globally. */
 void *memset(void *s, int c, size_t n);
@@ -30,26 +31,52 @@ void memset_s(void *dest, rsize_t destsz, int ch, rsize_t count)
 	memset(dest, ch, (count <= destsz ? count : destsz));
 }
 
-void memcpy_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
+/* Check the preconditions for memcpy and panic if they are not upheld. */
+void memcpy_check_preconditions(void *dest, rsize_t destsz, const void *src,
+				rsize_t count, size_t alignment)
 {
 	uintptr_t d = (uintptr_t)dest;
 	uintptr_t s = (uintptr_t)src;
 
-	CHECK(dest != NULL);
-	CHECK(src != NULL);
+	if (dest == NULL) {
+		panic("memcpy: dest == NULL\n");
+	}
+	if (src == NULL) {
+		panic("memcpy: src == NULL\n");
+	}
 
 	/* Check count <= destsz <= RSIZE_MAX. */
-	CHECK(destsz <= RSIZE_MAX);
-	CHECK(count <= destsz);
+	if (destsz > RSIZE_MAX) {
+		panic("memcpy: destsz > RSIZE_MAX (%u > %u)\n", destsz,
+		      RSIZE_MAX);
+	}
+	if (count > destsz) {
+		panic("memcpy: destsz > count (%u > %u)\n", destsz, count);
+	}
 
 	/*
 	 * Buffer overlap test.
 	 * case a) `d < s` implies `s >= d+count`
 	 * case b) `d > s` implies `d >= s+count`
 	 */
-	CHECK(d != s);
-	CHECK(d < s || d >= (s + count));
-	CHECK(d > s || s >= (d + count));
+	if (d == s || !(d < s || d >= (s + count)) ||
+	    !(d > s || s >= (d + count))) {
+		panic("memcpy: dest and src overlap\n");
+	}
+
+	if (!is_aligned(dest, alignment)) {
+		panic("memcpy: dest not aligned (%p %% %u == %u)\n", dest,
+		      alignment, d % alignment);
+	}
+	if (!is_aligned(src, alignment)) {
+		panic("memcpy: src not aligned (%p %% %u == %u)\n", src,
+		      alignment, s % alignment);
+	}
+}
+
+void memcpy_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
+{
+	memcpy_check_preconditions(dest, destsz, src, count, 1);
 
 	/*
 	 * Clang analyzer doesn't like us calling unsafe memory functions, so
@@ -61,12 +88,21 @@ void memcpy_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
 
 void memmove_s(void *dest, rsize_t destsz, const void *src, rsize_t count)
 {
-	CHECK(dest != NULL);
-	CHECK(src != NULL);
+	if (dest == NULL) {
+		panic("memove: dest == NULL\n");
+	}
+	if (src == NULL) {
+		panic("memove: src == NULL\n");
+	}
 
 	/* Check count <= destsz <= RSIZE_MAX. */
-	CHECK(destsz <= RSIZE_MAX);
-	CHECK(count <= destsz);
+	if (destsz > RSIZE_MAX) {
+		panic("memmove: destsz > RSIZE_MAX (%u > %u)\n", destsz,
+		      RSIZE_MAX);
+	}
+	if (count > destsz) {
+		panic("memmove: count > destsz (%u > %u)\n", count, destsz);
+	}
 
 	/*
 	 * Clang analyzer doesn't like us calling unsafe memory functions, so

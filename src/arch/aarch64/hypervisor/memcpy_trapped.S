@@ -28,18 +28,15 @@
  * - x0: 0 if failed to copy, 1 otherwise.
  */
 memcpy_trapped:
-	/* If source size is bigger than destination size, abort. */
-	cmp x3, x1
-	b.hi memcpy_trapped_aborted
+	/* Save frame pointer and link register */
+	stp x29, x30, [sp, #-16]!
 
-	/* Return error if destination size is 0. */
-	cbz x1, memcpy_trapped_aborted
+	/* Set alignment argument to 8 */
+	mov x4, #8
+	bl memcpy_check_preconditions
 
-	/* Return error if destination is null. */
-	cbz x0, memcpy_trapped_aborted
-
-	/* Return error if source is null. */
-	cbz x2, memcpy_trapped_aborted
+	/* Restore FP and LR */
+	ldp x29, x30, [sp], #16
 
 	/* Check if source size is aligned to 8 bytes. */
 	and x4, x3, #(8-1)
