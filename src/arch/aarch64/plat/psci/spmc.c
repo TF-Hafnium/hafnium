@@ -101,6 +101,7 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 
 	vcpu_secondary_reset_and_start(vcpu_locked, vcpu->vm->secondary_ep,
 				       0ULL);
+	vcpu_set_running(vcpu_locked, NULL);
 
 	/* vCPU restarts in runtime model for SP initialization. */
 	vcpu->rt_model = RTM_SP_INIT;

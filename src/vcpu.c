@@ -261,17 +261,19 @@ void vcpu_update_boot(struct vcpu *vcpu)
 
 /**
  * Sets the vcpu in the VCPU_STATE_RUNNING.
- * With that, its register are set as "not available". In case the vCPU
- * was priorly in a waiting state it takes the arguments provided,
- * and writes them to the gp register state.
+ * With that, its register are set as "not available".
+ * If there are registers to be written to vCPU's context, do so.
+ * However, this action is restricted to WAITING and BLOCKED states,
+ * as such, assert accordingly.
  */
 void vcpu_set_running(struct vcpu_locked target_locked, struct ffa_value *args)
 {
 	struct vcpu *target_vcpu = target_locked.vcpu;
 
-	if (target_locked.vcpu->state == VCPU_STATE_WAITING) {
+	if (args != NULL) {
 		CHECK(target_vcpu->regs_available);
-		assert(args != NULL);
+		assert(target_vcpu->state == VCPU_STATE_WAITING ||
+		       target_vcpu->state == VCPU_STATE_BLOCKED);
 
 		arch_regs_set_retval(&target_vcpu->regs, *args);
 	}
