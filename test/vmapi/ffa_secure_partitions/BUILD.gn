@@ -397,3 +397,39 @@ partitions_json("ffa_both_world_partitions_boot_fail_test_sp3") {
 
   json_file = "ffa_both_world_partitions_boot_fail_test_sp3.json"
 }
+
+# This test setup differs from ffa_both_world_partitions_test with Second
+# service being an UP S-EL1 partition.
+partitions_json("ffa_both_world_partitions_sel1_up_test") {
+  testonly = true
+
+  sps = [
+    [
+      "service_sp_first_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_first.dts",
+      "services/arch/aarch64/secure:service_sp_first_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_first",
+    ],
+    [
+      "service_sp_second_package_up.img",
+      "services/arch/aarch64/secure/manifest_service_sp_second_up.dts",
+      "services/arch/aarch64/secure:service_sp_second_package_up",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_second_up",
+    ],
+    [
+      "service_sp_third_package.img",
+      "services/arch/aarch64/secure/manifest_service_sp_third.dts",
+      "services/arch/aarch64/secure:service_sp_third_package",
+      "services/arch/aarch64/secure:partition_manifest_service_sp_third",
+    ],
+  ]
+
+  vms = [ [
+        "vm_primary_test_package.img",
+        "manifest.dts",
+        ":vm_primary_test_package",
+        ":vm_primary_test_package",
+      ] ]
+
+  json_file = "ffa_both_world_partitions_sel1_up_test.json"
+}

@@ -1,0 +1,69 @@
+/*
+ * Copyright 2024 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "arm,ffa-manifest-1.0";
+	debug_name = "SP UP Service Second EL1";
+
+	/* Properties */
+	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
+	uuid = <0xa609f132 0x6b4f 0x4c14 0x9489>;
+	execution-ctx-count = <1>; /* An UP Secure Partition. */
+	exception-level = <2>; /* S-EL1 */
+	execution-state = <0>; /* AARCH64 */
+	load-address = <0x6380000>;
+	entrypoint-offset = <0x2000>;
+	xlat-granule = <0>; /* 4KiB */
+	messaging-method = <0x607>; /* Supports direct (both APIs) and indirect messages. */
+	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
+	boot-order = <2>;
+	notification-support; /* Receipt of notifications. */
+	gp-register-num = <0>;
+
+	/* Boot Info */
+	boot-info {
+		compatible = "arm,ffa-manifest-boot-info";
+		ffa_manifest;
+	};
+
+	device-regions {
+		compatible = "arm,ffa-manifest-device-regions";
+
+		sec_wdog {
+			/* SP805 Trusted Watchdog Module */
+			base-address = <0x00000000 0x2a490000>;
+			pages-count = <32>; /* Two 64KB pages */
+			attributes = <0x3>; /* read-write */
+			interrupts = <56 0x900>;
+		};
+
+		ap_refclk_base1 {
+			/* AP_REFCLK Generic System timer */
+			base-address = <0x00000000 0x2a830000>;
+			pages-count = <1>; /* One 4KB page */
+			attributes = <0x3>; /* read-write */
+			interrupts = <58 0x900>;
+		};
+
+		espi_test_node {
+			/*
+			 * A dummy device region node representing a fake
+			 * peripheral. Explicitly used to specify properties of
+			 * interrupt 5000, in the extended SPI range, used for
+			 * testing purposes. All the properties below except
+			 * `interrupts` are irrelevant.
+			 */
+			base-address = <0x00000000 0x1c130000>;
+			pages-count = <1>; /* One 4KB page */
+			attributes = <0x1>; /* read-only */
+			interrupts = <5000 0x900>;
+		};
+	};
+};

@@ -1,0 +1,20 @@
+/*
+ * Copyright 2024 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/ {
+	hypervisor {
+		compatible = "hafnium,hafnium";
+		vm1 {
+			is_ffa_partition;
+			load_address = <0x6380000>;
+			debug_name = "SP UP Service Second";
+			vcpu_count = <1>;
+			mem_size = <0x100000>;
+		};
+	};
+};

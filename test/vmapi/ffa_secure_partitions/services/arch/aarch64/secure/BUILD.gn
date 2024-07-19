@@ -161,6 +161,11 @@ manifest("partition_manifest_service_sp_second") {
   output = "partition_manifest_service_sp_second.dtb"
 }
 
+manifest("partition_manifest_service_sp_second_up") {
+  source = "partition_manifest_service_sp_second_up.dts"
+  output = "partition_manifest_service_sp_second_up.dtb"
+}
+
 manifest("partition_manifest_service_sp_third") {
   source = "partition_manifest_service_sp_third.dts"
   output = "partition_manifest_service_sp_third.dtb"
@@ -190,6 +195,19 @@ partition_package("service_sp_second_package") {
         ":secure_partitions_services",
       ] ]
   output = "service_sp_second_package.img"
+}
+
+partition_package("service_sp_second_package_up") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_service_sp_second_up.dtb",
+        "secure_partitions_services.bin",
+        ":partition_manifest_service_sp_second_up",
+        ":secure_partitions_services",
+      ] ]
+  output = "service_sp_second_package_up.img"
 }
 
 partition_package("service_sp_third_package") {

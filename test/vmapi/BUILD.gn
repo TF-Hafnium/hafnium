@@ -18,6 +18,7 @@ group("partitions") {
     "ffa_secure_partitions:ffa_both_world_partitions_boot_fail_test_sp1",
     "ffa_secure_partitions:ffa_both_world_partitions_boot_fail_test_sp2",
     "ffa_secure_partitions:ffa_both_world_partitions_boot_fail_test_sp3",
+    "ffa_secure_partitions:ffa_both_world_partitions_sel1_up_test",
     "ffa_secure_partitions:ffa_both_world_partitions_test",
     "ffa_secure_partitions:ffa_both_world_partitions_vhe_test",
     "primary_with_secondaries:primary_with_sp",

@@ -113,6 +113,9 @@ execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
                  --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_vhe_test.json
 
+execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+                 --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_sel1_up_test.json
+
 if [ "$CODE_COVERAGE" = true ]; then
   create_configuration_file
   generate_intermediate_layer
