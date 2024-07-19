@@ -21,6 +21,9 @@
 #define NS_ACTION_ME 1
 #define NS_ACTION_SIGNALED 2
 
+/** Maximum number of pending virtual interrupts in the queue per vCPU. */
+#define VINT_QUEUE_MAX 5
+
 enum vcpu_state {
 	/** The vCPU is switched off. */
 	VCPU_STATE_OFF,
@@ -69,6 +72,16 @@ enum schedule_mode {
 	SPMC_MODE,
 };
 
+/*
+ * This queue is implemented as a circular buffer. The entries are managed on
+ * a First In First Out basis.
+ */
+struct interrupt_queue {
+	uint32_t vint_buffer[VINT_QUEUE_MAX];
+	uint16_t head;
+	uint16_t tail;
+};
+
 struct interrupts {
 	/** Bitfield keeping track of which interrupts are enabled. */
 	struct interrupt_bitmap interrupt_enabled;
@@ -84,6 +97,11 @@ struct interrupts {
 	 */
 	uint32_t enabled_and_pending_irq_count;
 	uint32_t enabled_and_pending_fiq_count;
+
+	/**
+	 * Partition Manager maintains a queue of pending virtual interrupts.
+	 */
+	struct interrupt_queue vint_q;
 };
 
 struct vcpu_fault_info {
@@ -397,3 +415,12 @@ void vcpu_set_processing_interrupt(struct vcpu_locked vcpu_locked,
 				   uint32_t intid,
 				   struct vcpu_locked preempted_locked);
 void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked);
+bool vcpu_interrupt_queue_push(struct vcpu_locked vcpu_locked,
+			       uint32_t vint_id);
+bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked,
+			      uint32_t *vint_id);
+bool vcpu_interrupt_queue_peek(struct vcpu_locked vcpu_locked,
+			       uint32_t *vint_id);
+bool vcpu_is_interrupt_in_queue(struct vcpu_locked vcpu_locked,
+				uint32_t vint_id);
+bool vcpu_is_interrupt_queue_empty(struct vcpu_locked vcpu_locked);

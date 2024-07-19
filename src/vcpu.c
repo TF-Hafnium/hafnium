@@ -355,3 +355,169 @@ void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked)
 	target_vcpu->scheduling_mode = SPMC_MODE;
 	target_vcpu->rt_model = RTM_SEC_INTERRUPT;
 }
+
+static uint16_t queue_increment_index(uint16_t current_idx)
+{
+	/* Look at the next index. Wrap around if necessary. */
+	if (current_idx == VINT_QUEUE_MAX - 1) {
+		return 0;
+	}
+
+	return current_idx + 1;
+}
+
+static bool is_queue_empty(struct interrupt_queue *q)
+{
+	if (q->head == q->tail) {
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Queue the pending virtual interrupt for target vCPU.
+ *
+ * Returns true if successful in pushing a new entry to the queue, or false
+ * otherwise.
+ */
+bool vcpu_interrupt_queue_push(struct vcpu_locked vcpu_locked, uint32_t vint_id)
+{
+	struct interrupt_queue *q;
+	uint16_t new_tail;
+
+	assert(vint_id != HF_INVALID_INTID);
+
+	q = &vcpu_locked.vcpu->interrupts.vint_q;
+
+	/*
+	 * A new entry is pushed at the tail of the queue. Upon successful
+	 * push operation, the tail increments or wraps around.
+	 */
+	new_tail = queue_increment_index(q->tail);
+
+	/* If new_tail reaches head of the queue, then the queue is full. */
+	if (new_tail == q->head) {
+		return false;
+	}
+
+	/* Add the virtual interrupt to the queue. */
+	q->vint_buffer[q->tail] = vint_id;
+	q->tail = new_tail;
+
+	return true;
+}
+
+/**
+ * Remove an entry from the specified vCPU's queue at the head.
+ *
+ * Returns true if successful in removing the entry, or false otherwise.
+ */
+bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked, uint32_t *vint_id)
+{
+	struct interrupt_queue *q;
+	uint16_t new_head;
+
+	assert(vint_id != NULL);
+
+	q = &vcpu_locked.vcpu->interrupts.vint_q;
+
+	/* Check if queue is empty. */
+	if (is_queue_empty(q)) {
+		return false;
+	}
+
+	/*
+	 * An entry is removed from the head of the queue. Once successful, the
+	 * head is incremented or wrapped around if needed.
+	 */
+	new_head = queue_increment_index(q->head);
+	*vint_id = q->vint_buffer[q->head];
+	q->head = new_head;
+
+	return true;
+}
+
+/**
+ * Look for the first pending virtual interrupt from the vcpu's queue. Note
+ * that the entry is not removed from the queue.
+ *
+ * Returns true if a valid entry exists in the queue, or false otherwise.
+ */
+bool vcpu_interrupt_queue_peek(struct vcpu_locked vcpu_locked,
+			       uint32_t *vint_id)
+{
+	struct interrupt_queue *q;
+	uint32_t queued_vint;
+
+	assert(vint_id != NULL);
+
+	q = &vcpu_locked.vcpu->interrupts.vint_q;
+
+	/* Check if queue is empty. */
+	if (is_queue_empty(q)) {
+		return false;
+	}
+
+	queued_vint = q->vint_buffer[q->head];
+	assert(queued_vint != HF_INVALID_INTID);
+
+	*vint_id = queued_vint;
+	return true;
+}
+
+/**
+ * Find if a specific virtual interrupt exists in the specified vCPU's queue.
+ *
+ * Returns true if such an entry exists in the queue, or false otherwise.
+ */
+bool vcpu_is_interrupt_in_queue(struct vcpu_locked vcpu_locked,
+				uint32_t vint_id)
+{
+	struct interrupt_queue *q;
+	uint16_t next;
+
+	assert(vint_id != HF_INVALID_INTID);
+
+	q = &vcpu_locked.vcpu->interrupts.vint_q;
+
+	/* Check if the queue is empty. */
+	if (is_queue_empty(q)) {
+		return false;
+	}
+
+	next = q->head;
+	while (true) {
+		/* Match found. */
+		if (q->vint_buffer[next] == vint_id) {
+			return true;
+		}
+
+		next = queue_increment_index(next);
+
+		/* Reached the end of queue. */
+		if (next == q->tail) {
+			break;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Check if there are any entries in the interrupt queue.
+ *
+ * Returns true if queue is empty, or false otherwise.
+ */
+bool vcpu_is_interrupt_queue_empty(struct vcpu_locked vcpu_locked)
+{
+	struct interrupt_queue *q;
+
+	q = &vcpu_locked.vcpu->interrupts.vint_q;
+
+	if (is_queue_empty(q)) {
+		return true;
+	}
+
+	return false;
+}
