@@ -1499,28 +1499,44 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 	/* Secure interrupt signaling and queuing for S-EL0 SP. */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
-		/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
-		dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
-			     target_vcpu->vm->id);
+		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
+			/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
+			dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
+				     target_vcpu->vm->id);
 
-		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
+			vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
 
-		vcpu_set_running(target_vcpu_locked,
-				 &(struct ffa_value){.func = FFA_INTERRUPT_32,
-						     .arg2 = intid});
+			vcpu_set_running(
+				target_vcpu_locked,
+				&(struct ffa_value){.func = FFA_INTERRUPT_32,
+						    .arg2 = intid});
 
-		/*
-		 * If the execution was in NWd as well, set the vCPU
-		 * in preempted state as well.
-		 */
-		vcpu_set_processing_interrupt(target_vcpu_locked, intid,
-					      current_locked);
+			/*
+			 * If the execution was in NWd as well, set the vCPU
+			 * in preempted state as well.
+			 */
+			vcpu_set_processing_interrupt(target_vcpu_locked, intid,
+						      current_locked);
 
-		/* Switch to target vCPU responsible for this interrupt. */
-		next = target_vcpu;
+			/* Switch to target vCPU responsible for this interrupt.
+			 */
+			next = target_vcpu;
+		} else {
+			dlog_verbose("S-EL0: Secure interrupt queued: %x\n",
+				     target_vcpu->vm->id);
+			/*
+			 * The target vcpu has migrated to a different physical
+			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
+			 * resumes current vCPU.
+			 */
+			next = NULL;
+			plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked,
+							    intid);
+		}
 		break;
 	case VCPU_STATE_BLOCKED:
 	case VCPU_STATE_PREEMPTED:
+	case VCPU_STATE_RUNNING:
 		dlog_verbose("S-EL0: Secure interrupt queued: %x\n",
 			     target_vcpu->vm->id);
 		/*
@@ -1530,20 +1546,6 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		next = NULL;
 		plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked, intid);
 		break;
-	case VCPU_STATE_RUNNING:
-		/*
-		 * TODO: We do not support signaling virtual interrupt to a
-		 * target vCPU that is in RUNNING state on another physical CPU.
-		 */
-		if (current_locked.vcpu == target_vcpu_locked.vcpu) {
-			dlog_verbose("S-EL0: Secure interrupt queued: %x\n",
-				     target_vcpu->vm->id);
-
-			next = NULL;
-			plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked,
-							    intid);
-			break;
-		}
 	default:
 		panic("Secure interrupt cannot be signaled to target SP\n");
 		break;
