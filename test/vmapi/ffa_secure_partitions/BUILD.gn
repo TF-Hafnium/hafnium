@@ -19,6 +19,20 @@ source_set("ffa_secure_partitions") {
     "//src/arch/${plat_arch}:config",
   ]
 
+  defines = [ "SP2_EL=1" ]
+  sources = [ "ffa_secure_partitions.c" ]
+
+  deps = [ "//test/vmapi/common:ffa" ]
+}
+
+source_set("ffa_secure_partitions_vhe") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/${plat_arch}:config",
+  ]
+
+  defines = [ "SP2_EL=0" ]
   sources = [ "ffa_secure_partitions.c" ]
 
   deps = [ "//test/vmapi/common:ffa" ]
@@ -72,6 +86,50 @@ partition_package("vm_primary_test_package") {
         ":vm_primary",
       ] ]
   output = "vm_primary_test_package.img"
+}
+
+# VM that will control execution of tests in a VM-to-SP set-up with an S-EL0
+# partition as Service2
+vm_kernel("vm_primary_vhe") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "services/arch/${plat_arch}/secure:config",
+    "//src/arch/${plat_arch}:arch_config",
+  ]
+
+  sources = [
+    "dir_msg.c",
+    "interrupts.c",
+    "notifications.c",
+    "power_mgt.c",
+    "secure_interrupts.c",
+    "setup_and_discovery.c",
+    "smccc.c",
+  ]
+
+  deps = [
+    ":ffa_secure_partitions_vhe",
+    "//src/arch/${plat_arch}/hftest:interrupts_gicv3",
+    "//src/arch/${plat_arch}/hftest:power_mgmt",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/arch/${plat_arch}/gicv3:gicv3_setup",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
+  ]
+}
+
+partition_package("vm_primary_test_package_vhe") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_nwd_primary.dtb",
+        "vm_primary_vhe.bin",
+        ":vm_primary_manifest",
+        ":vm_primary_vhe",
+      ] ]
+  output = "vm_primary_test_package_vhe.img"
 }
 
 # VM that will control execution of tests in a VM-to-SP set-up
@@ -195,10 +253,10 @@ partitions_json("ffa_both_world_partitions_vhe_test") {
   ]
 
   vms = [ [
-        "vm_primary_test_package.img",
+        "vm_primary_test_package_vhe.img",
         "manifest.dts",
-        ":vm_primary_test_package",
-        ":vm_primary_test_package",
+        ":vm_primary_test_package_vhe",
+        ":vm_primary_test_package_vhe",
       ] ]
 
   json_file = "ffa_both_world_partitions_vhe_test.json"

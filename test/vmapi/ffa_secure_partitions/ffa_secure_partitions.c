@@ -28,7 +28,7 @@ static struct mailbox_buffers get_precondition_mailbox(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
- * Check that service1 partition is an UP SP.
+ * Check that service2 partition is an UP SP.
  */
 bool service2_is_up_sp(void)
 {
@@ -51,10 +51,10 @@ bool service2_is_mp_sp(void)
 }
 
 /*
- * Currently we are using the vCPU count set to 0 for service 2 as being an
- * indication it is S-EL0 partition.
+ * The following is a precondition function, for the current system set-up.
+ * Check that service2 partition is an S-EL0 SP.
  */
 bool service2_is_el0(void)
 {
-	return service2_is_up_sp();
+	return (SP2_EL == 0);
 }
