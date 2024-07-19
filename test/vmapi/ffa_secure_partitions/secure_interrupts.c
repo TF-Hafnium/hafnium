@@ -744,3 +744,117 @@ TEST(secure_interrupts, sp_queue_virtual_interrupts)
 
 	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
 }
+
+static void cpu_entry_target_vcpu_waiting(uintptr_t arg)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_value res;
+	struct secondary_cpu_entry_args *args =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct secondary_cpu_entry_args *)arg;
+
+	assert(args->vcpu_count == 1);
+
+	if (args->vcpu_id == LAST_SECONDARY_VCPU_ID) {
+		const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777,
+					0x88889999};
+
+		/*
+		 * One round of FFA_RUN is required execution contextx of
+		 * secondary Secure Partitions.
+		 */
+		res = ffa_run(args->receiver_id, (ffa_vcpu_index_t)0);
+		EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
+
+		/*
+		 * The direct request message makes the vcpu of target SP to
+		 * migrate to this CPU i.e., last secondary CPU.
+		 */
+		enable_trigger_trusted_wdog_timer(own_id, args->receiver_id,
+						  80);
+
+		/*
+		 * Sleep for 100 ms. This ensures secure wdog timer triggers
+		 * during this time (on primary CPU) and SPMC queues the
+		 * virtual interrupt for target vcpu.
+		 */
+		waitms(100);
+
+		/*
+		 * Send a dummy direct request message to target vcpu to give
+		 * an opportunity for SPMC to signal the pending interrupt.
+		 */
+		res = sp_echo_cmd_send(own_id, args->receiver_id, msg[0],
+				       msg[1], msg[2], msg[3]);
+
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+		EXPECT_EQ(res.arg4, msg[0]);
+		EXPECT_EQ(res.arg5, msg[1]);
+		EXPECT_EQ(res.arg6, msg[2]);
+		EXPECT_EQ(res.arg7, msg[3]);
+
+		/* Check for the last serviced secure virtual interrupt. */
+		res = sp_get_last_interrupt_cmd_send(own_id, args->receiver_id);
+
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+		EXPECT_EQ(sp_resp_value(res), IRQ_TWDOG_INTID);
+	}
+
+	/* Releases the lock passed in. */
+	sl_unlock(&args->lock);
+	arch_cpu_stop();
+}
+
+static void run_test_secure_interrupt_targets_migrated_vcpu(
+	void (*cpu_entry)(uintptr_t arg))
+{
+	struct ffa_value res;
+	struct secondary_cpu_entry_args args = {.lock = SPINLOCK_INIT};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *receiver_info = service2(mb.recv);
+	ffa_id_t receiver_id = receiver_info->vm_id;
+
+	args.receiver_id = receiver_id;
+	args.vcpu_count = receiver_info->vcpu_count;
+
+	if (args.vcpu_count > 1) {
+		return;
+	}
+
+	/* Start secondary EC while holding lock. */
+	sl_lock(&args.lock);
+
+	for (ffa_vcpu_index_t i = 1; i < MAX_CPUS; i++) {
+		uintptr_t cpu_id;
+
+		cpu_id = hftest_get_cpu_id(i);
+		args.vcpu_id = i;
+		HFTEST_LOG("Booting CPU %u - %lx", i, cpu_id);
+
+		EXPECT_EQ(hftest_cpu_start(cpu_id,
+					   hftest_get_secondary_ec_stack(i),
+					   cpu_entry, (uintptr_t)&args),
+			  true);
+
+		/* Wait for CPU to release the lock. */
+		sl_lock(&args.lock);
+
+		HFTEST_LOG("Done with CPU %u", i);
+	}
+
+	/* Send request to the SP to sleep. */
+	res = sp_sleep_cmd_send(hf_vm_get_id(), receiver_id, SP_SLEEP_TIME, 0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+}
+
+/**
+ * Test to validate queueing of pending virtual interrupt targeting a vCPU in
+ * waiting state after migrating to a secondary core.
+ */
+TEST_PRECONDITION_LONG_RUNNING(secure_interrupts, target_vcpu_migrated_waiting,
+			       service2_is_up_sp)
+{
+	run_test_secure_interrupt_targets_migrated_vcpu(
+		cpu_entry_target_vcpu_waiting);
+}
