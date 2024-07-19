@@ -852,6 +852,58 @@ static void cpu_entry_target_vcpu_running(uintptr_t arg)
 	arch_cpu_stop();
 }
 
+static void cpu_entry_target_vcpu_blocked(uintptr_t arg)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_value res;
+	struct secondary_cpu_entry_args *args =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct secondary_cpu_entry_args *)arg;
+
+	assert(args->vcpu_count == 1);
+
+	if (args->vcpu_id == LAST_SECONDARY_VCPU_ID) {
+		/*
+		 * One round of FFA_RUN is required execution contextx of
+		 * secondary Secure Partitions.
+		 */
+		res = ffa_run(args->receiver_id, (ffa_vcpu_index_t)0);
+		EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
+
+		/*
+		 * The direct request message makes the vcpu of target SP to
+		 * migrate to this CPU i.e., last secondary CPU.
+		 */
+		enable_trigger_trusted_wdog_timer(own_id, args->receiver_id,
+						  80);
+
+		/*
+		 * Send command to target SP to send command to companion SP to
+		 * sleep there by putting target SP's execution context in
+		 * BLOCKED state.
+		 */
+		res = sp_fwd_sleep_cmd_send(own_id, args->receiver_id, SP_ID(1),
+					    100, 0);
+
+		/*
+		 * Secure interrupt should trigger during this time, SP will
+		 * handle the trusted watchdog timer interrupt.
+		 */
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+		EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+		/* Check for the last serviced secure virtual interrupt. */
+		res = sp_get_last_interrupt_cmd_send(own_id, args->receiver_id);
+
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+		EXPECT_EQ(sp_resp_value(res), IRQ_TWDOG_INTID);
+	}
+
+	/* Releases the lock passed in. */
+	sl_unlock(&args->lock);
+	arch_cpu_stop();
+}
+
 static void run_test_secure_interrupt_targets_migrated_vcpu(
 	void (*cpu_entry)(uintptr_t arg))
 {
@@ -915,4 +967,15 @@ TEST_PRECONDITION_LONG_RUNNING(secure_interrupts, target_vcpu_migrated_running,
 {
 	run_test_secure_interrupt_targets_migrated_vcpu(
 		cpu_entry_target_vcpu_running);
+}
+
+/**
+ * Test to validate queueing of pending virtual interrupt targeting a vCPU in
+ * blocked state after migrating to a secondary core.
+ */
+TEST_PRECONDITION_LONG_RUNNING(secure_interrupts, target_vcpu_migrated_blocked,
+			       service2_is_up_sp)
+{
+	run_test_secure_interrupt_targets_migrated_vcpu(
+		cpu_entry_target_vcpu_blocked);
 }
