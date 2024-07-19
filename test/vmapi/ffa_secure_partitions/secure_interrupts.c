@@ -672,3 +672,75 @@ TEST(secure_interrupts, sp_running_generic_timer_interrupt)
 
 	check_and_disable_generic_timer(own_id, receiver_id);
 }
+
+/**
+ * Test to validate SPMC can queue more than one pending virtual interrupt for
+ * target vCPU of an SP. A NS interrupt causess the Service2 SP to be put in
+ * preempted state thereby leading to queueing of virtual secure interrupts.
+ * Two secure physical interrupts are used in this scenario to make SPMC queue
+ * virtual interrupts, one from Trusted Watchtog timer and another from AP
+ * REFCLK generic timer.
+ */
+TEST(secure_interrupts, sp_queue_virtual_interrupts)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_id_t receiver_id = service2_info->vm_id;
+
+	gicv3_system_setup();
+	interrupt_enable(PHYSICAL_TIMER_IRQ, true);
+	interrupt_set_priority(PHYSICAL_TIMER_IRQ, 0x80);
+	interrupt_set_edge_triggered(PHYSICAL_TIMER_IRQ, true);
+	interrupt_set_priority_mask(0xff);
+	arch_irq_enable();
+
+	/* Set physical timer for 20 ms and enable. */
+	write_msr(CNTP_TVAL_EL0, ns_to_ticks(20000000));
+	write_msr(CNTP_CTL_EL0, CNTx_CTL_ENABLE_MASK);
+
+	enable_trigger_generic_timer(own_id, receiver_id, 150);
+	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 200);
+
+	/* Send request to receiver SP to sleep. */
+	res = sp_sleep_cmd_send(own_id, receiver_id, 50, 0);
+
+	/* SP is pre-empted by the non-secure timer interrupt. */
+	EXPECT_EQ(res.func, FFA_INTERRUPT_32);
+
+	/* VM id/vCPU index are passed through arg1. */
+	EXPECT_EQ(res.arg1, ffa_vm_vcpu(receiver_id, 0));
+
+	/* Waiting for interrupt to be serviced in normal world. */
+	while (last_interrupt_id == 0) {
+		EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
+		EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
+		EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
+		EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+	}
+
+	/* Check that we got the interrupt. */
+	EXPECT_EQ(last_interrupt_id, PHYSICAL_TIMER_IRQ);
+
+	/* Check timer status. */
+	EXPECT_EQ(read_msr(CNTP_CTL_EL0),
+		  CNTx_CTL_ISTS_MASK | CNTx_CTL_ENABLE_MASK);
+
+	/*
+	 * NS Interrupt has been serviced and receiver SP is now in PREEMPTED
+	 * state. Wait for trusted watchdog timer and generic timer interrupt
+	 * to be fired. SPMC queues the two secure virtual interrupts.
+	 */
+	waitms(NS_SLEEP_TIME);
+
+	/*
+	 * Resume the SP to complete the busy loop, handle the secure virtual
+	 * interrupts and return with success.
+	 */
+	res = ffa_run(ffa_vm_id(res), ffa_vcpu_index(res));
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, SP_SUCCESS);
+
+	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
+}
