@@ -1155,7 +1155,8 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 		return false;
 	}
 
-	if (vm_is_mp(vm) && vcpu_idx != cpu_index(current->cpu)) {
+	if (vm_is_mp(vm) && vm_is_mp(current->vm) &&
+	    vcpu_idx != cpu_index(current->cpu)) {
 		dlog_verbose("vcpu_idx (%d) != pcpu index (%zu)\n", vcpu_idx,
 			     cpu_index(current->cpu));
 		return false;
@@ -1229,9 +1230,9 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 			 * intermediate these execution contexts and resumes the
 			 * SP execution context that was originally preempted.
 			 */
+			*next = current->preempted_vcpu;
 			if (target_vcpu != current->preempted_vcpu) {
 				dlog_verbose("Skipping intermediate vCPUs\n");
-				*next = current->preempted_vcpu;
 			}
 			/*
 			 * This flag should not have been set by SPMC when it
@@ -1569,28 +1570,51 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 	/* Secure interrupt signaling and queuing for S-EL1 SP. */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
-		/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
-		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
-		/*
-		 * Ideally, we have to mask non-secure interrupts here
-		 * since the spec mandates that SPMC should make sure SPMC
-		 * scheduled call chain cannot be preempted by a non-secure
-		 * interrupt. However, our current design takes care of it
-		 * implicitly.
-		 */
-		vcpu_set_running(target_vcpu_locked,
-				 &(struct ffa_value){
-					 .func = FFA_INTERRUPT_32,
-					 .arg2 = intid,
-				 });
+		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
+			/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
+			vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
+			/*
+			 * Ideally, we have to mask non-secure interrupts here
+			 * since the spec mandates that SPMC should make sure
+			 * SPMC scheduled call chain cannot be preempted by a
+			 * non-secure interrupt. However, our current design
+			 * takes care of it implicitly.
+			 */
+			vcpu_set_running(target_vcpu_locked,
+					 &(struct ffa_value){
+						 .func = FFA_INTERRUPT_32,
+						 .arg2 = intid,
+					 });
 
-		vcpu_set_processing_interrupt(target_vcpu_locked, intid,
-					      current_locked);
-		next = target_vcpu;
+			vcpu_set_processing_interrupt(target_vcpu_locked, intid,
+						      current_locked);
+			next = target_vcpu;
+		} else {
+			/*
+			 * The target vcpu has migrated to a different physical
+			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
+			 * resumes current vCPU.
+			 */
+			assert(target_vcpu->vm->vcpu_count == 1);
+			dlog_verbose("S-EL1: Secure interrupt queued: %x\n",
+				     target_vcpu->vm->id);
+			next = NULL;
+			plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked,
+							    intid);
+		}
 		break;
 	case VCPU_STATE_BLOCKED:
-		/* If the execution is in the Normal World. */
-		if (current->vm->id == HF_OTHER_WORLD_ID) {
+		if (target_vcpu->cpu != current_locked.vcpu->cpu) {
+			/*
+			 * The target vcpu has migrated to a different physical
+			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
+			 * resumes current vCPU.
+			 */
+			assert(target_vcpu->vm->vcpu_count == 1);
+			next = NULL;
+			plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked,
+							    intid);
+		} else if (current->vm->id == HF_OTHER_WORLD_ID) {
 			/*
 			 * When secure interrupt triggers while execution is in
 			 * normal world, the target vCPU cannot be in BLOCKED
@@ -1632,36 +1656,46 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 						      current_locked);
 
 			next = target_vcpu;
-			break;
 		}
+		break;
 	case VCPU_STATE_PREEMPTED:
-		/*
-		 * We do not resume a target vCPU that has been already
-		 * pre-empted by an interrupt. Make the vIRQ pending for target
-		 * SP(i.e., queue the interrupt) and continue to resume current
-		 * vCPU. Refer to section 8.3.2.1 bullet 3 in the FF-A v1.1
-		 * EAC0 spec.
-		 */
-		next = NULL;
-
-		if (current->vm->id == HF_OTHER_WORLD_ID) {
+		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
 			/*
-			 * The target vCPU must have been preempted by a non
-			 * secure interrupt. It could not have been preempted by
-			 * a secure interrupt as current SPMC implementation
-			 * does not allow secure interrupt prioritization.
-			 * Moreover, the target vCPU should have been in Normal
-			 * World scheduled mode as SPMC scheduled mode call
-			 * chain cannot be preempted by a non secure interrupt.
+			 * We do not resume a target vCPU that has been already
+			 * pre-empted by an interrupt. Make the vIRQ pending for
+			 * target SP(i.e., queue the interrupt) and continue to
+			 * resume current vCPU. Refer to section 8.3.2.1 bullet
+			 * 3 in the FF-A v1.1 EAC0 spec.
 			 */
-			CHECK(target_vcpu->scheduling_mode == NWD_MODE);
+
+			if (current->vm->id == HF_OTHER_WORLD_ID) {
+				/*
+				 * The target vCPU must have been preempted by a
+				 * non secure interrupt. It could not have been
+				 * preempted by a secure interrupt as current
+				 * SPMC implementation does not allow secure
+				 * interrupt prioritization. Moreover, the
+				 * target vCPU should have been in Normal World
+				 * scheduled mode as SPMC scheduled mode call
+				 * chain cannot be preempted by a non secure
+				 * interrupt.
+				 */
+				CHECK(target_vcpu->scheduling_mode == NWD_MODE);
+			}
+		} else {
+			/*
+			 * The target vcpu has migrated to a different physical
+			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
+			 * resumes current vCPU.
+			 */
+			assert(target_vcpu->vm->vcpu_count == 1);
 		}
+
+		next = NULL;
 		plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked, intid);
 		break;
 	case VCPU_STATE_RUNNING:
 		if (current == target_vcpu) {
-			next = NULL;
-
 			/*
 			 * This is the special scenario where the current
 			 * running execution context also happens to be the
@@ -1671,10 +1705,17 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * file for the description of this variable.
 			 */
 			current->implicit_completion_signal = true;
-			plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked,
-							    intid);
-			break;
+		} else {
+			/*
+			 * The target vcpu has migrated to a different physical
+			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
+			 * resumes current vCPU.
+			 */
+			assert(target_vcpu->vm->vcpu_count == 1);
 		}
+		next = NULL;
+		plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked, intid);
+		break;
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 		/* WFI is no-op for SP. Fall through. */
 	default:
@@ -1695,11 +1736,6 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
  * When PEs executing in the Normal World, and secure interrupts trigger,
  * execution is trapped into EL3. SPMD then routes the interrupt to SPMC
  * through FFA_INTERRUPT_32 ABI synchronously using eret conduit.
- * TODO: The current design makes the assumption that the target vCPU
- * of a secure interrupt is pinned to the same physical CPU on which the
- * secure interrupt triggered. The target vCPU has to be resumed on the current
- * CPU in order for it to service the virtual interrupt. This design limitation
- * simplifies the interrupt management implementation in SPMC.
  */
 void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 {
