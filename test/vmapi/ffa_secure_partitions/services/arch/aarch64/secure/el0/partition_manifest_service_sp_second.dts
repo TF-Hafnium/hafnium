@@ -43,5 +43,13 @@
 			attributes = <0x3>; /* read-write */
 			interrupts = <56 0x900>;
 		};
+
+		ap_refclk_base1 {
+			/* AP_REFCLK Generic System timer */
+			base-address = <0x00000000 0x2a830000>;
+			pages-count = <1>; /* One 4KB page */
+			attributes = <0x3>; /* read-write */
+			interrupts = <58 0x900>;
+		};
 	};
 };
