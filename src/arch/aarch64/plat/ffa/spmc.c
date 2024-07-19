@@ -1317,33 +1317,32 @@ out:
 int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 				      struct vcpu *current)
 {
+	struct vcpu_locked current_locked;
+	int ret = 0;
+
+	current_locked = vcpu_lock(current);
 	if (vint_id >= HF_NUM_INTIDS) {
-		return -1;
+		ret = -1;
+		goto out;
 	}
 
 	/*
 	 * Current implementation maps virtual interrupt to physical interrupt.
 	 */
 	if (pint_id != vint_id) {
-		return -1;
-	}
-
-	/*
-	 * Deny the de-activation request if not currently processing a
-	 * secure interrupt. panic() is not appropriate as it could be
-	 * abused by a rogue SP to create Denial-of-service.
-	 */
-	if (!current->processing_secure_interrupt) {
-		dlog_error("Cannot deactivate secure interrupt: %d\n", pint_id);
-		return -1;
+		ret = -1;
+		goto out;
 	}
 
 	/*
 	 * A malicious SP could de-activate an interrupt that does not belong to
 	 * it. Return error to indicate failure.
 	 */
-	if (current->current_sec_interrupt_id != pint_id) {
-		return -1;
+	if (current->current_sec_interrupt_id != vint_id &&
+	    !vcpu_is_interrupt_in_queue(current_locked, vint_id)) {
+		dlog_error("Unknown interrupt being deactivated %u\n", vint_id);
+		ret = -1;
+		goto out;
 	}
 
 	if (!current->secure_interrupt_deactivated) {
@@ -1368,7 +1367,18 @@ int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 		current->implicit_completion_signal = false;
 	}
 
-	return 0;
+	/*
+	 * Now that the virtual interrupt has been serviced and deactivated,
+	 * remove it from the queue, if it was pending.
+	 */
+	if (vcpu_is_interrupt_in_queue(current_locked, vint_id)) {
+		uint32_t int_id;
+		vcpu_interrupt_queue_pop(current_locked, &int_id);
+		assert(vint_id == int_id);
+	}
+out:
+	vcpu_unlock(&current_locked);
+	return ret;
 }
 
 static void plat_ffa_disable_vm_interrupts(struct vm_locked vm_locked)
@@ -1437,13 +1447,42 @@ static void plat_ffa_mask_interrupts(struct vcpu_locked target_vcpu_locked)
 	 * TODO: Design limitation. Current implementation does not support
 	 * handling a secure interrupt while currently handling a secure
 	 * interrupt. Temporarily mask all interrupts to disallow high priority
-	 * interrupts from pre-empting current interrupt processing. Hence,
-	 * SPMC does not queue more than one virtual interrupt per each vCPU.
+	 * interrupts from pre-empting current interrupt processing.
 	 */
 	priority_mask = plat_interrupts_get_priority_mask();
 	plat_interrupts_set_priority_mask(0x0);
 
 	vcpu_save_interrupt_priority(target_vcpu_locked, priority_mask);
+}
+
+/*
+ * Queue the pending virtual interrupt for target vcpu and deactivate the
+ * corresponding physical interrupt. Necessary fields tracking the secure
+ * interrupt processing are set accordingly.
+ */
+static void plat_ffa_queue_vint_deactivate_pint(
+	struct vcpu_locked target_vcpu_locked, uint32_t intid)
+{
+	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
+
+	/*
+	 * End the interrupt to drop the running priority. It also deactivates
+	 * the physical interrupt.
+	 */
+	plat_interrupts_end_of_interrupt(intid);
+	target_vcpu->secure_interrupt_deactivated = true;
+
+	vcpu_set_processing_interrupt(target_vcpu_locked, intid,
+				      (struct vcpu_locked){.vcpu = NULL});
+
+	/* Queue the pending virtual interrupt for target vcpu. */
+	if (!vcpu_interrupt_queue_push(target_vcpu_locked, intid)) {
+		panic("Exhausted interrupt queue for vcpu of SP: %x\n",
+		      target_vcpu->vm->id);
+	}
+
+	/* Restore mask. */
+	plat_interrupts_set_priority_mask(target_vcpu->priority_mask);
 }
 
 /**
@@ -1489,17 +1528,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		 * vCPU.
 		 */
 		next = NULL;
-
-		/*
-		 * De-activate the interrupt. If not, it could trigger
-		 * again after resuming current vCPU.
-		 */
-		plat_interrupts_end_of_interrupt(intid);
-		target_vcpu->secure_interrupt_deactivated = true;
-
-		vcpu_set_processing_interrupt(
-			target_vcpu_locked, intid,
-			(struct vcpu_locked){.vcpu = NULL});
+		plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked, intid);
 		break;
 	case VCPU_STATE_RUNNING:
 		/*
@@ -1507,17 +1536,12 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		 * target vCPU that is in RUNNING state on another physical CPU.
 		 */
 		if (current_locked.vcpu == target_vcpu_locked.vcpu) {
-			/*
-			 * End the interrupt to drop the running priority. It
-			 * also deactivates the physical interrupt.
-			 */
-			plat_interrupts_end_of_interrupt(intid);
-			target_vcpu->secure_interrupt_deactivated = true;
+			dlog_verbose("S-EL0: Secure interrupt queued: %x\n",
+				     target_vcpu->vm->id);
 
-			vcpu_set_processing_interrupt(
-				target_vcpu_locked, intid,
-				(struct vcpu_locked){.vcpu = NULL});
 			next = NULL;
+			plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked,
+							    intid);
 			break;
 		}
 	default:
@@ -1546,7 +1570,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 		/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
 		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
 		/*
-		 * TODO: Ideally, we have to mask non-secure interrupts here
+		 * Ideally, we have to mask non-secure interrupts here
 		 * since the spec mandates that SPMC should make sure SPMC
 		 * scheduled call chain cannot be preempted by a non-secure
 		 * interrupt. However, our current design takes care of it
@@ -1566,12 +1590,10 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 		/* If the execution is in the Normal World. */
 		if (current->vm->id == HF_OTHER_WORLD_ID) {
 			/*
-			 * TODO: Current design has the following limitation.
-			 * All endpoints with multiple execution contexts have
-			 * their contexts pinned to corresponding PEs.
-			 * Assuming no UP migratable execution contexts, under
-			 * the current design, the target vCPU cannot be in
-			 * BLOCKED state.
+			 * When secure interrupt triggers while execution is in
+			 * normal world, the target vCPU cannot be in BLOCKED
+			 * state since there can only be one Nwd scheduled call
+			 * chain on this CPU.
 			 */
 			panic("Target vCPU cannot be in blocked state\n");
 		} else {
@@ -1632,23 +1654,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 */
 			CHECK(target_vcpu->scheduling_mode == NWD_MODE);
 		}
-
-		/*
-		 * De-activate the interrupt. If not, it could trigger again
-		 * after resuming current vCPU.
-		 */
-		plat_interrupts_end_of_interrupt(intid);
-		target_vcpu->secure_interrupt_deactivated = true;
-
-		/*
-		 * Refer the embedded comment in vcpu.h file for description of
-		 * this variable.
-		 */
-		target_vcpu->implicit_completion_signal = true;
-
-		vcpu_set_processing_interrupt(
-			target_vcpu_locked, intid,
-			(struct vcpu_locked){.vcpu = NULL});
+		plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked, intid);
 		break;
 	case VCPU_STATE_RUNNING:
 		if (current == target_vcpu) {
@@ -1657,27 +1663,14 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			/*
 			 * This is the special scenario where the current
 			 * running execution context also happens to be the
-			 * target of the secure interrupt. In this case the it
+			 * target of the secure interrupt. In this case, it
 			 * needs to signal completion of secure interrupt
 			 * implicitly. Refer to the embedded comment in vcpu.h
 			 * file for the description of this variable.
 			 */
 			current->implicit_completion_signal = true;
-
-			/*
-			 * End the interrupt to drop the running priority. It
-			 * also deactivates the physical interrupt.
-			 */
-			plat_interrupts_end_of_interrupt(intid);
-			target_vcpu->secure_interrupt_deactivated = true;
-
-			/*
-			 * If the target vCPU is the running vCPU, no other
-			 * context needs to be resumed on interrupt completion.
-			 */
-			vcpu_set_processing_interrupt(
-				target_vcpu_locked, intid,
-				(struct vcpu_locked){.vcpu = NULL});
+			plat_ffa_queue_vint_deactivate_pint(target_vcpu_locked,
+							    intid);
 			break;
 		}
 	case VCPU_STATE_BLOCKED_INTERRUPT:
@@ -2156,8 +2149,9 @@ static bool plat_ffa_helper_intercept_call(struct vcpu_locked current_locked,
 	 * Check if there are any pending virtual secure interrupts to be
 	 * handled.
 	 */
-	if (vcpu_interrupt_count_get(current_locked) > 0 &&
-	    current->processing_secure_interrupt) {
+	if (!vcpu_is_interrupt_queue_empty(current_locked)) {
+		assert(vcpu_interrupt_count_get(current_locked) > 0 &&
+		       current->processing_secure_interrupt);
 		if (!is_ffa_msg_wait) {
 			dlog_verbose(
 				"Intercepting FFA_MSG_SEND_DIRECT_RESP call to "
@@ -2169,7 +2163,8 @@ static bool plat_ffa_helper_intercept_call(struct vcpu_locked current_locked,
 			/* Save direct response message args. */
 			current->direct_resp_ffa_value = to_ret;
 		} else {
-			assert(current->rt_model == RTM_FFA_RUN);
+			assert(current->rt_model == RTM_FFA_RUN ||
+			       current->rt_model == RTM_SEC_INTERRUPT);
 
 			dlog_verbose(
 				"Intercepting FFA_MSG_WAIT call to signal "
@@ -2177,6 +2172,15 @@ static bool plat_ffa_helper_intercept_call(struct vcpu_locked current_locked,
 				current->vm->id);
 
 			current->msg_wait_intercepted = true;
+		}
+
+		/* Take an entry from the pending virtual interrupt queue. */
+		if (!vcpu_interrupt_queue_peek(
+			    current_locked,
+			    &current->current_sec_interrupt_id)) {
+			panic("No pending virtual interrupt found for vcpu of "
+			      "SP: %x\n",
+			      current->vm->id);
 		}
 
 		/*
@@ -2256,9 +2260,6 @@ static struct ffa_value plat_ffa_helper_resume_intercepted_call(
 
 	plat_ffa_vcpu_allow_interrupts(current);
 
-	/* Reset the flag now. */
-	current->direct_resp_intercepted = false;
-
 	if (is_ffa_msg_wait) {
 		/* Resume intercepted FFA_MSG_WAIT call. */
 		dlog_verbose("Resuming intercepted FFA_MSG_WAIT from: %x\n",
@@ -2275,6 +2276,9 @@ static struct ffa_value plat_ffa_helper_resume_intercepted_call(
 
 		return (struct ffa_value){.func = FFA_INTERRUPT_32};
 	}
+
+	/* Reset the flag now. */
+	current->direct_resp_intercepted = false;
 
 	/* Replay the direct response message. */
 	receiver_vm_id = current->direct_request_origin.vm_id;
@@ -2386,7 +2390,8 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 	}
 
 	/* Check if an earlier invocation of FFA_MSG_WAIT was intercepted. */
-	if (current->msg_wait_intercepted) {
+	if (current->msg_wait_intercepted &&
+	    !current->direct_resp_intercepted) {
 		return plat_ffa_resume_msg_wait(current_locked, next);
 	}
 
