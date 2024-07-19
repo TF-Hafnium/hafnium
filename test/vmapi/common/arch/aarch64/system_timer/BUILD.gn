@@ -1,0 +1,24 @@
+# Copyright 2024 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+
+config("config") {
+  include_dirs = [ "//test/vmapi/common/arch/aarch64/inc/" ]
+}
+
+source_set("system_timer") {
+  testonly = true
+  public_configs = [ ":config" ]
+  sources = [ "system_timer.c" ]
+}
+
+source_set("ap_refclk") {
+  testonly = true
+  public_configs = [ ":config" ]
+  sources = [ "ap_refclk_generic_timer.c" ]
+  deps = [ ":system_timer" ]
+}

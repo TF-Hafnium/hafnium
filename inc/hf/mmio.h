@@ -22,6 +22,16 @@ static inline uint32_t mmio_read32_offset(void *addr, uint32_t offset)
 	return io_read32(io32_c((uintpaddr_t)addr, offset));
 }
 
+static inline uint64_t mmio_read64(void *addr)
+{
+	return io_read64(IO64_C((uintpaddr_t)addr));
+}
+
+static inline uint64_t mmio_read64_offset(void *addr, uint32_t offset)
+{
+	return io_read64(io64_c((uintpaddr_t)addr, offset));
+}
+
 static inline void mmio_write32(void *addr, uint32_t data)
 {
 	io_write32(IO32_C((uintpaddr_t)addr), data);
