@@ -176,6 +176,11 @@ enum sp_cmd {
 
 	SP_FFA_FEATURES_CMD,
 	SP_FFA_MEM_RETRIEVE_CMD,
+
+	/**
+	 * Request to start generic timer.
+	 */
+	SP_GENERIC_TIMER_START_CMD,
 };
 
 /**
@@ -599,3 +604,16 @@ static inline struct ffa_value sp_ffa_mem_retrieve_cmd_send(
 struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
 					 ffa_memory_handle_t handle,
 					 enum ffa_version ffa_version);
+
+/**
+ * Request to start generic timer.
+ */
+static inline struct ffa_value sp_generic_timer_cmd_send(ffa_id_t source,
+							 ffa_id_t dest,
+							 uint64_t time)
+{
+	return ffa_msg_send_direct_req(source, dest, SP_GENERIC_TIMER_START_CMD,
+				       time, 0, 0, 0);
+}
+
+struct ffa_value sp_generic_timer_cmd(ffa_id_t source, uint64_t time);

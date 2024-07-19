@@ -134,6 +134,9 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		res = sp_ffa_mem_retrieve_cmd(ffa_sender(res), res.arg4,
 					      res.arg5);
 		break;
+	case SP_GENERIC_TIMER_START_CMD:
+		res = sp_generic_timer_cmd(ffa_sender(res), res.arg4);
+		break;
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT

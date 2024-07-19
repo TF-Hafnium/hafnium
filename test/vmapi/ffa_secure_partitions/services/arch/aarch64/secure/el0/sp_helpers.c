@@ -8,6 +8,7 @@
 
 #include "sp_helpers.h"
 
+#include "ap_refclk_generic_timer.h"
 #include "partition_services.h"
 #include "sp805.h"
 #include "test/abort.h"
@@ -42,16 +43,31 @@ struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 	 */
 	intid = hf_interrupt_get();
 
-	ASSERT_EQ(intid, IRQ_TWDOG_INTID);
 	ASSERT_EQ(res.arg1, 0);
 	ASSERT_EQ(res.arg2, intid);
 
-	/*
-	 * Interrupt triggered due to Trusted watchdog timer expiry.
-	 * Clear the interrupt and stop the timer.
-	 */
-	HFTEST_LOG("S-EL0 vIRQ: Trusted WatchDog timer stopped: %u", intid);
-	sp805_twdog_stop();
+	switch (intid) {
+	case IRQ_TWDOG_INTID: {
+		/*
+		 * Interrupt triggered due to Trusted watchdog timer expiry.
+		 * Clear the interrupt and stop the timer.
+		 */
+		HFTEST_LOG("S-EL0 vIRQ: Trusted WatchDog timer stopped: %u",
+			   intid);
+		sp805_twdog_stop();
+		break;
+	}
+	case IRQ_AP_REFCLK_BASE1_INTID: {
+		HFTEST_LOG("S-EL0 vIRQ: AP_REFCLK timer stopped: %u", intid);
+		cancel_ap_refclk_timer();
+		break;
+	}
+	default:
+		HFTEST_LOG_FAILURE();
+		HFTEST_LOG(HFTEST_LOG_INDENT "Unsupported interrupt id: %u\n",
+			   intid);
+		abort();
+	}
 
 	/* Perform secure interrupt de-activation. */
 	ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
@@ -64,6 +80,7 @@ struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 		ASSERT_EQ(ret.func, FFA_SUCCESS_32);
 		HFTEST_LOG("Resuming secure interrupt handling");
 	}
+
 	exception_handler_set_last_interrupt(intid);
 	return ffa_msg_wait();
 }

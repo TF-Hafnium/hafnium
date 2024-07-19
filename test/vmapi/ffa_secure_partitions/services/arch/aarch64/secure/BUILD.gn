@@ -10,6 +10,7 @@ config("config") {
   include_dirs = [
     "inc",
     "//test/inc",
+    "//test/vmapi/common/arch/aarch64/inc/",
     "//test/vmapi/common/arch/aarch64/secure/inc",
   ]
 }
@@ -132,6 +133,7 @@ vm_kernel("secure_partitions_services") {
     "//test/hftest:hftest_secure_service",
     "//test/vmapi/common/arch/aarch64:exception_handler",
     "//test/vmapi/common/arch/aarch64/secure:sp805",
+    "//test/vmapi/common/arch/aarch64/system_timer:ap_refclk",
     "//vmlib/${plat_arch}:call",
   ]
 }

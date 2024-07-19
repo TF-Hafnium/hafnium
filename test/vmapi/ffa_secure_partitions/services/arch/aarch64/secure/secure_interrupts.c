@@ -13,9 +13,11 @@
 
 #include "vmapi/hf/call.h"
 
+#include "ap_refclk_generic_timer.h"
 #include "partition_services.h"
 #include "sp805.h"
 #include "sp_helpers.h"
+#include "test/abort.h"
 #include "test/hftest.h"
 #include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
@@ -54,6 +56,23 @@ static void send_managed_exit_response(ffa_id_t dir_req_source_id)
 	HFTEST_LOG("Resuming the suspended command");
 }
 
+static void deactivate_interrupt_and_yield(uint32_t intid)
+{
+	/* Perform secure interrupt de-activation. */
+	ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+
+	if (yield_while_handling_sec_interrupt) {
+		struct ffa_value ret;
+		HFTEST_LOG("Yield cycles while handling secure interrupt");
+		ret = ffa_yield();
+
+		ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+		HFTEST_LOG("Resuming secure interrupt handling");
+	}
+
+	exception_handler_set_last_interrupt(intid);
+}
+
 static void irq_current(void)
 {
 	uint32_t intid;
@@ -61,13 +80,14 @@ static void irq_current(void)
 
 	intid = hf_interrupt_get();
 
-	if (intid == HF_MANAGED_EXIT_INTID) {
+	switch (intid) {
+	case HF_MANAGED_EXIT_INTID: {
 		HFTEST_LOG("vIRQ: Sending ME response to %x",
 			   dir_req_source_id);
 		send_managed_exit_response(dir_req_source_id);
-	} else {
-		ASSERT_EQ(intid, IRQ_TWDOG_INTID);
-
+		break;
+	}
+	case IRQ_TWDOG_INTID: {
 		/*
 		 * Interrupt triggered due to Trusted watchdog timer expiry.
 		 * Clear the interrupt and stop the timer.
@@ -75,20 +95,25 @@ static void irq_current(void)
 		HFTEST_LOG("Trusted WatchDog timer stopped: %u", intid);
 		sp805_twdog_stop();
 
-		/* Perform secure interrupt de-activation. */
-		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+		deactivate_interrupt_and_yield(intid);
+		break;
+	}
+	case IRQ_AP_REFCLK_BASE1_INTID: {
+		/*
+		 * Interrupt triggered due to AP_REFCLK Generic timer expiry.
+		 * Clear the interrupt and stop the timer.
+		 */
+		HFTEST_LOG("AP_REFCLK timer stopped: %u", intid);
+		cancel_ap_refclk_timer();
 
-		if (yield_while_handling_sec_interrupt) {
-			struct ffa_value ret;
-			HFTEST_LOG(
-				"Yield cycles while handling secure interrupt");
-			ret = ffa_yield();
-
-			ASSERT_EQ(ret.func, FFA_SUCCESS_32);
-			HFTEST_LOG("Resuming secure interrupt handling");
-		}
-
-		exception_handler_set_last_interrupt(intid);
+		deactivate_interrupt_and_yield(intid);
+		break;
+	}
+	default:
+		HFTEST_LOG_FAILURE();
+		HFTEST_LOG(HFTEST_LOG_INDENT "Unsupported interrupt id: %u\n",
+			   intid);
+		abort();
 	}
 }
 
@@ -113,6 +138,11 @@ struct ffa_value sp_virtual_interrupt_cmd(ffa_id_t test_source,
 	exception_setup(irq_current, NULL);
 	sp_enable_irq();
 
+	/* Initialize the AP REFCLK Generic timer. */
+	if (interrupt_id == IRQ_AP_REFCLK_BASE1_INTID) {
+		init_ap_refclk_timer();
+	}
+
 	return sp_success(own_id, test_source, 0);
 }
 
@@ -125,6 +155,16 @@ struct ffa_value sp_twdog_cmd(ffa_id_t test_source, uint64_t time)
 	sp805_twdog_start((time * ARM_SP805_TWDG_CLK_HZ) / 1000);
 
 	return sp_success(own_id, test_source, time);
+}
+
+struct ffa_value sp_generic_timer_cmd(ffa_id_t test_source, uint64_t time_ms)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+
+	HFTEST_LOG("Starting Generic Timer: %lu ms", time_ms);
+	program_ap_refclk_timer(time_ms);
+
+	return sp_success(own_id, test_source, time_ms);
 }
 
 struct ffa_value sp_get_last_interrupt_cmd(ffa_id_t test_source)
