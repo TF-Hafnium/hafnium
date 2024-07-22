@@ -717,18 +717,19 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 
 /**
  * If the receivers for the memory management operation are all from the
- * secure world and this isn't a FFA_MEM_SHARE, then request memory security
- * state update by returning MAP_ACTION_CHECK_PROTECT.
+ * secure world, the memory is not device memory (as it isn't covered by the
+ * granule page table) and this isn't a FFA_MEM_SHARE, then request memory
+ * security state update by returning MAP_ACTION_CHECK_PROTECT.
  */
 static enum ffa_map_action ffa_mem_send_get_map_action(
 	bool all_receivers_from_current_world, ffa_id_t sender_id,
-	uint32_t mem_func_id)
+	uint32_t mem_func_id, bool is_normal_memory)
 {
 	const bool is_memory_share_abi = mem_func_id == FFA_MEM_SHARE_32 ||
 					 mem_func_id == FFA_MEM_SHARE_64;
 	const bool protect_memory =
 		(!is_memory_share_abi && all_receivers_from_current_world &&
-		 ffa_is_vm_id(sender_id));
+		 ffa_is_vm_id(sender_id) && is_normal_memory);
 
 	return protect_memory ? MAP_ACTION_CHECK_PROTECT : MAP_ACTION_CHECK;
 }
@@ -853,7 +854,8 @@ static struct ffa_value ffa_send_check_transition(
 	}
 
 	*map_action = ffa_mem_send_get_map_action(
-		all_receivers_from_current_world, from.vm->id, share_func);
+		all_receivers_from_current_world, from.vm->id, share_func,
+		(*orig_from_mode & MM_MODE_D) == 0U);
 
 	/* Find the appropriate new mode. */
 	*from_mode = ~state_mask & *orig_from_mode;
