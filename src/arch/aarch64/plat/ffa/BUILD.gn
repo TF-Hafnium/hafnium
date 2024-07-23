@@ -22,7 +22,10 @@ source_set("hypervisor") {
     ":hypervisor_config",
   ]
   deps = [ "//vmlib/${plat_arch}:smc_call" ]
-  sources = [ "hypervisor.c" ]
+  sources = [
+    "hypervisor.c",
+    "hypervisor/direct_messaging.c",
+  ]
 }
 
 source_set("spmc") {
@@ -36,5 +39,6 @@ source_set("spmc") {
   sources = [
     "//src/arch/aarch64/hypervisor/simd.c",
     "spmc.c",
+    "spmc/direct_messaging.c",
   ]
 }

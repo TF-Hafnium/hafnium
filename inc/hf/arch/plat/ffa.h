@@ -10,7 +10,6 @@
 
 #include "hf/addr.h"
 #include "hf/ffa.h"
-#include "hf/ffa_memory_internal.h"
 #include "hf/manifest.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
@@ -23,19 +22,6 @@ void plat_ffa_set_tee_enabled(bool tee_enabled);
 void plat_ffa_init(struct mpool *ppool);
 bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
 				   uint32_t share_func, bool multiple_borrower);
-
-bool plat_ffa_is_direct_request_valid(struct vcpu *current,
-				      ffa_id_t sender_vm_id,
-				      ffa_id_t receiver_vm_id);
-bool plat_ffa_is_direct_response_valid(struct vcpu *current,
-				       ffa_id_t sender_vm_id,
-				       ffa_id_t receiver_vm_id);
-bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
-					  struct vm *receiver_vm,
-					  uint32_t func);
-bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
-				     struct ffa_value args,
-				     struct ffa_value *ret);
 
 bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 				 struct ffa_value *ret);
@@ -254,13 +240,6 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
 struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current);
 void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
 					 struct vcpu_locked target_locked);
-
-void plat_ffa_wind_call_chain_ffa_direct_req(
-	struct vcpu_locked current_locked,
-	struct vcpu_locked receiver_vcpu_locked, ffa_id_t sender_vm_id);
-
-void plat_ffa_unwind_call_chain_ffa_direct_resp(
-	struct vcpu_locked current_locked, struct vcpu_locked next_locked);
 
 void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 					struct vm_locked vm_locked);
