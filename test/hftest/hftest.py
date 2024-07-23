@@ -157,6 +157,7 @@ DriverArgs = collections.namedtuple("DriverArgs", [
         "partitions",
         "global_run_name",
         "coverage_plugin",
+        "disable_visualisation"
     ])
 
 # State shared between the common Driver class and its subclasses during
@@ -347,6 +348,7 @@ class FvpDriver(Driver, ABC):
             debug = False, show_output = False):
         """Generate command line arguments for FVP."""
         show_output = debug or show_output
+        disable_visualisation = self.args.disable_visualisation is True
         time_limit = "100s" if is_long_running else "40s"
         fvp_args = []
 
@@ -406,12 +408,17 @@ class FvpDriver(Driver, ABC):
 
         if not show_output:
             fvp_args += [
-                "-C", "bp.vis.disable_visualisation=true",
                 "-C", "bp.terminal_0.start_telnet=false",
                 "-C", "bp.terminal_1.start_telnet=false",
                 "-C", "bp.terminal_2.start_telnet=false",
                 "-C", "bp.terminal_3.start_telnet=false",
                 "-C", "bp.ve_sysregs.exit_on_shutdown=1",
+            ]
+            disable_visualisation = True
+
+        if disable_visualisation:
+            fvp_args += [
+                "-C", "bp.vis.disable_visualisation=true"
             ]
 
         if debug:
@@ -1001,6 +1008,7 @@ def Main():
         help="Selects the CPU configuration for the run environment.")
     parser.add_argument("--tfa", action="store_true")
     parser.add_argument("--coverage_plugin", default="")
+    parser.add_argument("--disable_visualisation", action="store_true")
     args = parser.parse_args()
 
     # Create class which will manage all test artifacts.
@@ -1043,7 +1051,7 @@ def Main():
     # Create a driver for the platform we want to test on.
     driver_args = DriverArgs(artifacts, args.hypervisor, args.spmc, initrd,
                              vm_args, args.cpu, partitions, global_run_name,
-                             args.coverage_plugin)
+                             args.coverage_plugin, args.disable_visualisation)
 
     if args.el3_spmc:
         # So far only FVP supports tests for SPMC.
