@@ -78,4 +78,9 @@
 			interrupts = <56 0x900>;
 		};
 	};
+
+	hftest-service-setup {
+		compatible = "arm,hftest";
+		send_espi_rtm_init;
+	};
 };

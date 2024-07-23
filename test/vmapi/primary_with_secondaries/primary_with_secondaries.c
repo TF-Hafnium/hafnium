@@ -135,3 +135,15 @@ bool exception_received(struct ffa_value *run_res, const void *recv_buf)
 	       (run_res->func == FFA_ERROR_32 &&
 		ffa_error_code(*run_res) == FFA_ABORTED);
 }
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service2 partition is an MP SP.
+ */
+bool service2_is_mp_sp(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	return (service2_info->vcpu_count > 1);
+}

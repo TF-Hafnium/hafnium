@@ -56,3 +56,24 @@ TEST_PRECONDITION(secure_interrupts, preempted_by_secure_interrupt,
 	EXPECT_EQ(echo_payload, delay);
 	EXPECT_EQ(echo_sender, service1_info->vm_id);
 }
+
+/**
+ * This test expects SP1 to have pended an interrupt for SP2, before SP2 has
+ * booted, following the boot protocol.
+ *
+ * TODO: Make this test applicable to S-EL0 and S-EL1 UP partitions.
+ */
+TEST_PRECONDITION(secure_interrupts, handle_interrupt_rtm_init,
+		  service2_is_mp_sp)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	SERVICE_SELECT(service2_info->vm_id, "check_interrupt_rtm_init_handled",
+		       mb.send);
+
+	/* Schedule message receiver through FFA_RUN interface. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}

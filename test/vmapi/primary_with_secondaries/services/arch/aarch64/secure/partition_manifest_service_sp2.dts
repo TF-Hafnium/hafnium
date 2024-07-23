@@ -32,4 +32,26 @@
 		compatible = "arm,ffa-manifest-boot-info";
 		ffa_manifest;
 	};
+
+	device-regions {
+		compatible = "arm,ffa-manifest-device-regions";
+
+		espi_test_node {
+			/*
+			 * A dummy device region node representing a fake
+			 * peripheral. Explicitly used to specify properties of
+			 * interrupt 5000, used for testing purposes.
+			 * All the properties below except `interrupts` are irrelevant.
+			 */
+			base-address = <0x00000000 0x1c130000>;
+			pages-count = <1>; /* One 4KB page */
+			attributes = <0x1>; /* read-only */
+			interrupts = <5000 0x900>;
+		};
+	};
+
+	hftest-service-setup {
+		compatible = "arm,hftest";
+		handle_interrupt_rtm_init;
+	};
 };

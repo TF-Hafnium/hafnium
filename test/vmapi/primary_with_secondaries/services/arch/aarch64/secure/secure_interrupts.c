@@ -23,6 +23,11 @@
 #define PLAT_ARM_TWDOG_SIZE 0x20000
 #define ITERATIONS_PER_MS 15000
 
+#define RTM_INIT_ESPI_ID 5000U
+#define PLAT_FVP_SEND_ESPI 0x82000100U
+
+static bool rtm_init_espi_handled;
+
 static inline void sp_wait_loop(uint32_t ms)
 {
 	uint64_t iterations = (uint64_t)ms * ITERATIONS_PER_MS;
@@ -61,9 +66,7 @@ static void irq_handler(void)
 	if (intid == HF_NOTIFICATION_PENDING_INTID) {
 		/* RX buffer full notification. */
 		HFTEST_LOG("Received notification pending interrupt.");
-	} else {
-		ASSERT_EQ(intid, IRQ_TWDOG_INTID);
-
+	} else if (intid == IRQ_TWDOG_INTID) {
 		/*
 		 * Interrupt triggered due to Trusted watchdog timer expiry.
 		 * Clear the interrupt and stop the timer.
@@ -73,6 +76,12 @@ static void irq_handler(void)
 
 		/* Perform secure interrupt de-activation. */
 		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+	} else if (intid == RTM_INIT_ESPI_ID) {
+		HFTEST_LOG("interrupt id: %u", intid);
+		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+		rtm_init_espi_handled = true;
+	} else {
+		panic("%s: unknown interrupt id.", __func__);
 	}
 }
 
@@ -151,4 +160,49 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 
 	/* Secure interrupt has been serviced by now. Relinquish cycles. */
 	ffa_msg_wait();
+}
+
+/**
+ * To help testing the handling of secure interrupts during runtime
+ * model init.
+ * The ESPI interrupt used in this context is assigned to another
+ * SP.
+ */
+SERVICE_SET_UP(send_espi_rtm_init)
+{
+	struct ffa_value res;
+
+	res = smc32(PLAT_FVP_SEND_ESPI, RTM_INIT_ESPI_ID, 0, 0, 0, 0, 0, 0);
+
+	if ((int64_t)res.func == SMCCC_ERROR_UNKNOWN) {
+		HFTEST_LOG("SiP SMC call not supported");
+	}
+}
+
+/**
+ * Handle interrupt during runtime model init.
+ */
+SERVICE_SET_UP(handle_interrupt_rtm_init)
+{
+	/*
+	 * Setup handling of known interrupts including Secure Watchdog timer
+	 * interrupt and NPI.
+	 */
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+	EXPECT_EQ(hf_interrupt_enable(RTM_INIT_ESPI_ID, true, 0), 0);
+
+	/* Disable such that it doesn't affect Hftest framework. */
+	interrupts_disable();
+}
+
+/**
+ * Check that the interrupt has been handled at runtime initialisation.
+ * Service to execute in runtime model of FFA_RUN.
+ */
+TEST_SERVICE(check_interrupt_rtm_init_handled)
+{
+	/* Check if the interrupt during initialisation has been handled. */
+	EXPECT_TRUE(rtm_init_espi_handled);
+	ffa_yield();
 }
