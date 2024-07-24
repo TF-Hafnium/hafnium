@@ -7,6 +7,7 @@
  */
 
 #include "hf/arch/plat/ffa.h"
+#include "hf/arch/plat/ffa/notifications.h"
 #include "hf/arch/plat/psci.h"
 
 #include "hf/api.h"

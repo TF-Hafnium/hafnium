@@ -9,6 +9,7 @@
 #include "hf/ffa.h"
 
 #include "hf/arch/plat/ffa.h"
+#include "hf/arch/plat/ffa/notifications.h"
 
 #include "hf/ffa_internal.h"
 #include "hf/vcpu.h"

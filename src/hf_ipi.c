@@ -8,7 +8,7 @@
 
 #include "hf/hf_ipi.h"
 
-#include "hf/arch/plat/ffa.h"
+#include "hf/arch/plat/ffa/notifications.h"
 
 #include "hf/cpu.h"
 #include "hf/plat/interrupts.h"

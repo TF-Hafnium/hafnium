@@ -14,6 +14,7 @@
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/ffa/direct_messaging.h"
+#include "hf/arch/plat/ffa/notifications.h"
 #include "hf/arch/vm.h"
 
 #include "hf/api.h"
