@@ -182,7 +182,10 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->uuids[i] = current_uuid;
 	}
 
-	/* Populate the interrupt descriptor for current VM. */
+	/*
+	 * Populate the interrupt descriptor for current VM.
+	 * They can be enabled in runtime using HF_INTERRUPT_ENABLE.
+	 */
 	for (uint16_t i = 0; i < PARTITION_MAX_DEVICE_REGIONS; i++) {
 		dev_region = manifest_vm->partition.dev_regions[i];
 
@@ -197,15 +200,11 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 			vm_locked.vm->interrupt_desc[k] = int_desc;
 			assert(int_desc.enabled);
 
-			/*
-			 * Configure the physical interrupts allocated for this
-			 * VM in its partition manifest.
-			 */
-			plat_interrupts_configure_interrupt(int_desc);
 			k++;
 			CHECK(k <= VM_MANIFEST_MAX_INTERRUPTS);
 		}
 	}
+
 	dlog_verbose("VM has %d physical interrupts defined in manifest.\n", k);
 
 	if (manifest_vm->is_ffa_partition) {

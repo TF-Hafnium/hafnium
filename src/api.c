@@ -2259,6 +2259,21 @@ out:
 	return ret;
 }
 
+/*
+ * Returns true if intid relates with either of those:
+ * - NPI
+ * - ME
+ * - Virtual Timer.
+ *
+ * These are VIs with no expected interrupt descriptor.
+ */
+static bool api_is_maintenance_virtual_interrupt(uint32_t intid)
+{
+	return intid == HF_NOTIFICATION_PENDING_INTID ||
+	       intid == HF_MANAGED_EXIT_INTID ||
+	       intid == HF_VIRTUAL_TIMER_INTID;
+}
+
 /**
  * Enables or disables a given interrupt ID for the calling vCPU.
  *
@@ -2269,12 +2284,30 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 {
 	struct vcpu_locked current_locked;
 	struct interrupts *interrupts = &current->interrupts;
+	struct interrupt_descriptor *int_desc = NULL;
+	struct vm *vm = current->vm;
+	struct vm_locked vm_locked;
+
+	int64_t ret = -1;
 
 	if (intid >= HF_NUM_INTIDS) {
 		return -1;
 	}
 
+	vm_locked = vm_lock(vm);
 	current_locked = vcpu_lock(current);
+
+	int_desc = vm_interrupt_set_enable(vm_locked, intid, enable);
+
+	if (!api_is_maintenance_virtual_interrupt(intid)) {
+		if (int_desc == NULL) {
+			dlog_error("%s: invalid interrupt ID.\n", __func__);
+			goto out;
+		}
+
+		plat_interrupts_configure_interrupt(*int_desc);
+	}
+
 	if (enable) {
 		/*
 		 * If it is pending and was not enabled before, increment the
@@ -2285,6 +2318,7 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 			vcpu_interrupt_count_increment(current_locked,
 						       interrupts, intid);
 		}
+
 		vcpu_virt_interrupt_set_enabled(interrupts, intid);
 		vcpu_virt_interrupt_set_type(interrupts, intid, type);
 	} else {
@@ -2301,8 +2335,13 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 					     INTERRUPT_TYPE_IRQ);
 	}
 
+	ret = 0;
+
+out:
+	vm_unlock(&vm_locked);
 	vcpu_unlock(&current_locked);
-	return 0;
+
+	return ret;
 }
 
 static void api_interrupt_clear_decrement(struct vcpu_locked locked_vcpu,
