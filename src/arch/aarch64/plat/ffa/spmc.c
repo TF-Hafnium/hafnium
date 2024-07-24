@@ -9,7 +9,6 @@
 #include "hf/arch/ffa.h"
 #include "hf/arch/gicv3.h"
 #include "hf/arch/host_timer.h"
-#include "hf/arch/mmu.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/ffa/vm.h"
 #include "hf/arch/sve.h"
@@ -21,7 +20,6 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
-#include "hf/ffa_memory.h"
 #include "hf/hf_ipi.h"
 #include "hf/interrupt_desc.h"
 #include "hf/plat/interrupts.h"
@@ -33,7 +31,6 @@
 
 #include "./spmc/vm.h"
 #include "smc.h"
-#include "sysregs.h"
 
 void plat_ffa_log_init(void)
 {
@@ -68,50 +65,6 @@ bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	(void)ret;
 
 	return false;
-}
-
-/** Check validity of the FF-A memory send function attempt. */
-bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
-				   uint32_t share_func, bool multiple_borrower)
-{
-	bool result;
-	const bool is_receiver_sp = vm_id_is_current_world(receiver);
-	const bool is_sender_sp = vm_id_is_current_world(sender);
-
-	/*
-	 * SPs can only share/lend/donate to another SP.
-	 * VMs can send memory to SPs.
-	 * In a multiple borrower operation, VMs might provide descriptors
-	 * of other VMs.
-	 * Refer to the section 1.4 of the FF-A v1.2 Memory Management
-	 * supplement ALP0 specification.
-	 */
-	switch (share_func) {
-	case FFA_MEM_DONATE_64:
-	case FFA_MEM_DONATE_32:
-	case FFA_MEM_LEND_64:
-	case FFA_MEM_LEND_32:
-		result = is_receiver_sp;
-		break;
-	case FFA_MEM_SHARE_64:
-	case FFA_MEM_SHARE_32:
-		result = (is_sender_sp && is_receiver_sp) ||
-			 (!is_sender_sp && !multiple_borrower &&
-			  is_receiver_sp) ||
-			 (!is_sender_sp && multiple_borrower);
-
-		if (!result) {
-			dlog_verbose(
-				"SPMC only supports memory operations to a "
-				"single SP, or multiple borrowers with mixed "
-				"world borrowers.\n");
-		}
-		break;
-	default:
-		result = false;
-	}
-
-	return result;
 }
 
 static bool is_predecessor_in_call_chain(struct vcpu_locked current_locked,
@@ -408,24 +361,6 @@ void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 	(void)vm_locked;
 }
 
-ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
-{
-	return (index & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK) |
-	       FFA_MEMORY_HANDLE_ALLOCATOR_SPMC;
-}
-
-bool plat_ffa_memory_handle_allocated_by_current_world(
-	ffa_memory_handle_t handle)
-{
-	return (handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK) ==
-	       FFA_MEMORY_HANDLE_ALLOCATOR_SPMC;
-}
-
-uint32_t plat_ffa_other_world_mode(void)
-{
-	return MM_MODE_NS;
-}
-
 ffa_partition_properties_t plat_ffa_partition_properties(
 	ffa_id_t caller_id, const struct vm *target)
 {
@@ -454,18 +389,6 @@ ffa_partition_properties_t plat_ffa_partition_properties(
 					    : dir_msg_mask;
 
 	return result & final_mask;
-}
-
-bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current)
-{
-	/* FFA_MEM_PERM_SET/GET is only valid before SPs are initialized */
-	return has_vhe_support() && (current->rt_model == RTM_SP_INIT);
-}
-
-bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
-{
-	/* FFA_MEM_PERM_SET/GET is only valid before SPs are initialized */
-	return has_vhe_support() && (current->rt_model == RTM_SP_INIT);
 }
 
 /**
@@ -1760,44 +1683,6 @@ static void plat_ffa_enable_virtual_maintenance_interrupts(
 	}
 }
 
-struct ffa_value plat_ffa_other_world_mem_send(
-	struct vm *from, uint32_t share_func,
-	struct ffa_memory_region **memory_region, uint32_t length,
-	uint32_t fragment_length, struct mpool *page_pool)
-{
-	struct ffa_value ret;
-	struct vm_locked from_locked = vm_lock(from);
-
-	ret = ffa_memory_send(from_locked, *memory_region, length,
-			      fragment_length, share_func, page_pool);
-	/*
-	 * ffa_memory_send takes ownership of the memory_region, so
-	 * make sure we don't free it.
-	 */
-	*memory_region = NULL;
-
-	vm_unlock(&from_locked);
-
-	return ret;
-}
-
-/*
- * SPMC handles its memory share requests internally, so no forwarding of the
- * request is required.
- */
-struct ffa_value plat_ffa_other_world_mem_reclaim(
-	struct vm *to, ffa_memory_handle_t handle,
-	ffa_memory_region_flags_t flags, struct mpool *page_pool)
-{
-	(void)handle;
-	(void)flags;
-	(void)page_pool;
-	(void)to;
-
-	dlog_verbose("Invalid handle %#lx for FFA_MEM_RECLAIM.\n", handle);
-	return ffa_error(FFA_INVALID_PARAMETERS);
-}
-
 /**
  * Enable relevant virtual interrupts for Secure Partitions.
  * For all SPs, any applicable virtual maintenance interrupts are enabled.
@@ -1834,19 +1719,6 @@ void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 	}
 
 	plat_ffa_enable_virtual_maintenance_interrupts(current_locked);
-}
-
-struct ffa_value plat_ffa_other_world_mem_send_continue(
-	struct vm *from, void *fragment, uint32_t fragment_length,
-	ffa_memory_handle_t handle, struct mpool *page_pool)
-{
-	(void)from;
-	(void)fragment;
-	(void)fragment_length;
-	(void)handle;
-	(void)page_pool;
-
-	return ffa_error(FFA_INVALID_PARAMETERS);
 }
 
 struct ffa_value plat_ffa_msg_send(ffa_id_t sender_vm_id,
@@ -1934,22 +1806,6 @@ struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 	}
 
 	return ret_args;
-}
-
-/**
- * Update the memory region attributes with the security state bit based on the
- * supplied mode.
- */
-ffa_memory_attributes_t plat_ffa_memory_security_mode(
-	ffa_memory_attributes_t attributes, uint32_t mode)
-{
-	ffa_memory_attributes_t ret = attributes;
-
-	if ((mode & MM_MODE_NS) != 0) {
-		ret.security = FFA_MEMORY_SECURITY_NON_SECURE;
-	}
-
-	return ret;
 }
 
 /*
