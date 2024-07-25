@@ -107,7 +107,7 @@ void send_fragmented_memory_region(
 	struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t remaining_constituent_count,
 	uint32_t sent_length, uint32_t total_length,
-	ffa_memory_handle_t *handle, uint64_t allocator_mask)
+	ffa_memory_handle_t *handle, enum ffa_memory_handle_allocator allocator)
 {
 	const ffa_memory_handle_t INVALID_FRAGMENT_HANDLE = 0xffffffffffffffff;
 	ffa_memory_handle_t fragment_handle = INVALID_FRAGMENT_HANDLE;
@@ -138,7 +138,7 @@ void send_fragmented_memory_region(
 	EXPECT_EQ(sent_length, total_length);
 	EXPECT_EQ(send_ret->func, FFA_SUCCESS_32);
 	*handle = ffa_mem_success_handle(*send_ret);
-	EXPECT_EQ(*handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK, allocator_mask);
+	EXPECT_EQ(ffa_memory_handle_allocator(*handle), allocator);
 	if (fragment_handle != INVALID_FRAGMENT_HANDLE) {
 		EXPECT_EQ(*handle, fragment_handle);
 	}
@@ -165,7 +165,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	uint32_t remaining_constituent_count;
 	uint32_t i;
 	struct ffa_partition_msg *retrieve_message = tx_buffer;
-	uint64_t allocator_mask;
+	enum ffa_memory_handle_allocator allocator;
 	bool contains_secure_receiver = false;
 
 	/* Send the first fragment of the memory. */
@@ -210,14 +210,14 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	 * the allocator will be the SPMC.
 	 * Else, it will be the hypervisor.
 	 */
-	allocator_mask = (!ffa_is_vm_id(sender) || contains_secure_receiver)
-				 ? FFA_MEMORY_HANDLE_ALLOCATOR_SPMC
-				 : FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
+	allocator = (!ffa_is_vm_id(sender) || contains_secure_receiver)
+			    ? FFA_MEMORY_HANDLE_ALLOCATOR_SPMC
+			    : FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
 
 	send_fragmented_memory_region(
 		&ret, tx_buffer, constituents, constituent_count,
 		remaining_constituent_count, fragment_length, total_length,
-		&handle, allocator_mask);
+		&handle, allocator);
 
 	msg_size = ffa_memory_retrieve_request_init(
 		(struct ffa_memory_region *)retrieve_message->payload, handle,

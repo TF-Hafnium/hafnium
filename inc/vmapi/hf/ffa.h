@@ -621,13 +621,34 @@ typedef struct {
  */
 typedef uint64_t ffa_memory_handle_t;
 
-#define FFA_MEMORY_HANDLE_ALLOCATOR_MASK \
-	((ffa_memory_handle_t)(UINT64_C(1) << 63))
-#define FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR \
-	((ffa_memory_handle_t)(UINT64_C(1) << 63))
+enum ffa_memory_handle_allocator {
+	FFA_MEMORY_HANDLE_ALLOCATOR_SPMC = 0,
+	FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR = 1,
+};
 
-#define FFA_MEMORY_HANDLE_ALLOCATOR_SPMC (UINT64_C(0) << 63)
+#define FFA_MEMORY_HANDLE_ALLOCATOR_BIT UINT64_C(63)
+#define FFA_MEMORY_HANDLE_ALLOCATOR_MASK \
+	(UINT64_C(1) << FFA_MEMORY_HANDLE_ALLOCATOR_BIT)
 #define FFA_MEMORY_HANDLE_INVALID (~UINT64_C(0))
+
+static inline ffa_memory_handle_t ffa_memory_handle_make(
+	uint64_t index, enum ffa_memory_handle_allocator allocator)
+{
+	return index | ((uint64_t)allocator << FFA_MEMORY_HANDLE_ALLOCATOR_BIT);
+}
+
+static inline uint64_t ffa_memory_handle_index(ffa_memory_handle_t handle)
+{
+	return handle & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK;
+}
+
+static inline enum ffa_memory_handle_allocator ffa_memory_handle_allocator(
+	ffa_memory_handle_t handle)
+{
+	return ((handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK) != 0)
+		       ? FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR
+		       : FFA_MEMORY_HANDLE_ALLOCATOR_SPMC;
+}
 
 /**
  * A count of VMs. This has the same range as the VM IDs but we give it a

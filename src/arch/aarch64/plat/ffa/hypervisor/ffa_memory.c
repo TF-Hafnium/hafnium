@@ -18,6 +18,11 @@
 #include "hypervisor.h"
 #include "sysregs.h"
 
+enum ffa_memory_handle_allocator plat_ffa_memory_handle_allocator(void)
+{
+	return FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
+}
+
 static struct ffa_value ffa_other_world_mem_reclaim(
 	ffa_memory_handle_t handle, ffa_memory_region_flags_t flags)
 {
@@ -47,18 +52,6 @@ bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
 	(void)multiple_borrower;
 
 	return true;
-}
-
-ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
-{
-	return index | FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
-}
-
-bool plat_ffa_memory_handle_allocated_by_current_world(
-	ffa_memory_handle_t handle)
-{
-	return (handle & FFA_MEMORY_HANDLE_ALLOCATOR_MASK) ==
-	       FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
 }
 
 uint32_t plat_ffa_other_world_mode(void)

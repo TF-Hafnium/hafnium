@@ -161,19 +161,6 @@ bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
 	return false;
 }
 
-ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
-{
-	return index | FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
-}
-
-bool plat_ffa_memory_handle_allocated_by_current_world(
-	ffa_memory_handle_t handle)
-{
-	(void)handle;
-
-	return false;
-}
-
 uint32_t plat_ffa_other_world_mode(void)
 {
 	return 0U;

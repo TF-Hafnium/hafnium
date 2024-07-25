@@ -15,17 +15,27 @@
 bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
 				   uint32_t share_func, bool multiple_borrower);
 
+enum ffa_memory_handle_allocator plat_ffa_memory_handle_allocator(void);
+
 /**
  * Encodes memory handle according to section 5.10.2 of the FF-A v1.0 spec.
  */
-ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index);
+static inline ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
+{
+	return ffa_memory_handle_make(index,
+				      plat_ffa_memory_handle_allocator());
+}
 
 /**
  * Checks whether given handle was allocated by current world, according to
  * handle encoding rules.
  */
-bool plat_ffa_memory_handle_allocated_by_current_world(
-	ffa_memory_handle_t handle);
+static inline bool plat_ffa_memory_handle_allocated_by_current_world(
+	ffa_memory_handle_t handle)
+{
+	return ffa_memory_handle_allocator(handle) ==
+	       plat_ffa_memory_handle_allocator();
+}
 
 /**
  * For non-secure memory, retrieve the NS mode if the partition manager supports

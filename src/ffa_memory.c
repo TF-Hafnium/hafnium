@@ -70,14 +70,6 @@ static uint32_t ffa_composite_constituent_offset(
 }
 
 /**
- * Extracts the index from a memory handle allocated by Hafnium's current world.
- */
-uint64_t ffa_memory_handle_get_index(ffa_memory_handle_t handle)
-{
-	return handle & ~FFA_MEMORY_HANDLE_ALLOCATOR_MASK;
-}
-
-/**
  * Initialises the next available `struct ffa_memory_share_state`. If `handle`
  * is `FFA_MEMORY_HANDLE_INVALID` then allocates an appropriate handle,
  * otherwise uses the provided handle which is assumed to be globally unique.
@@ -161,7 +153,7 @@ struct ffa_memory_share_state *get_share_state(
 	 * handle is based on the index.
 	 */
 	if (plat_ffa_memory_handle_allocated_by_current_world(handle)) {
-		uint64_t index = ffa_memory_handle_get_index(handle);
+		uint64_t index = ffa_memory_handle_index(handle);
 
 		if (index < MAX_MEM_SHARES) {
 			share_state = &share_states.share_states[index];

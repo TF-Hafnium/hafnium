@@ -118,7 +118,8 @@ void send_fragmented_memory_region(
 	struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t remaining_constituent_count,
 	uint32_t sent_length, uint32_t total_length,
-	ffa_memory_handle_t *handle, uint64_t allocator_mask);
+	ffa_memory_handle_t *handle,
+	enum ffa_memory_handle_allocator allocator);
 void memory_region_desc_from_rx_fragments(uint32_t fragment_length,
 					  uint32_t total_length,
 					  ffa_memory_handle_t handle,

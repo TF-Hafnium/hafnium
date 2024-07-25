@@ -162,7 +162,7 @@ TEST(memory_sharing_v1_0, force_fragmented_ffa_v1_0)
 	uint32_t fragment_length;
 	uint32_t remaining_constituent_count;
 	ffa_memory_handle_t handle;
-	uint64_t allocator_mask;
+	enum ffa_memory_handle_allocator allocator;
 
 	/* Initialise the memory before giving it. */
 	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
@@ -194,12 +194,12 @@ TEST(memory_sharing_v1_0, force_fragmented_ffa_v1_0)
 
 	ASSERT_TRUE(!ffa_is_vm_id(sender_id) ||
 		    !ffa_is_vm_id(service1_info->vm_id));
-	allocator_mask = FFA_MEMORY_HANDLE_ALLOCATOR_SPMC;
+	allocator = FFA_MEMORY_HANDLE_ALLOCATOR_SPMC;
 
 	send_fragmented_memory_region(
 		&ret, mb.send, constituents, ARRAY_SIZE(constituents),
 		remaining_constituent_count, fragment_length, total_length,
-		&handle, allocator_mask);
+		&handle, allocator);
 
 	ret = sp_ffa_mem_retrieve_cmd_send(sender_id, receiver_id, handle,
 					   FFA_VERSION_1_0);
