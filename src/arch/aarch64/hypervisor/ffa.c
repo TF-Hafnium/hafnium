@@ -8,6 +8,8 @@
 
 #include "hf/arch/plat/ffa.h"
 
+#include "hf/arch/plat/ffa/setup_and_discovery.h"
+
 #include "hf/check.h"
 #include "hf/ffa.h"
 #include "hf/panic.h"

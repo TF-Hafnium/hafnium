@@ -14,6 +14,7 @@
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/ffa/ffa_memory.h"
 #include "hf/arch/plat/ffa/indirect_messaging.h"
+#include "hf/arch/plat/ffa/setup_and_discovery.h"
 
 #include "hf/addr.h"
 #include "hf/api.h"

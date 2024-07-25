@@ -28,6 +28,7 @@ source_set("hypervisor") {
     "hypervisor/ffa_memory.c",
     "hypervisor/indirect_messaging.c",
     "hypervisor/notifications.c",
+    "hypervisor/setup_and_discovery.c",
     "hypervisor/vm.c",
   ]
 }
@@ -47,6 +48,7 @@ source_set("spmc") {
     "spmc/ffa_memory.c",
     "spmc/indirect_messaging.c",
     "spmc/notifications.c",
+    "spmc/setup_and_discovery.c",
     "spmc/vm.c",
   ]
 }

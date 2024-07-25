@@ -15,6 +15,7 @@
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/ffa/direct_messaging.h"
 #include "hf/arch/plat/ffa/notifications.h"
+#include "hf/arch/plat/ffa/setup_and_discovery.h"
 #include "hf/arch/vm.h"
 
 #include "hf/api.h"

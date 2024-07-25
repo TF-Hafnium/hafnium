@@ -37,15 +37,6 @@ void plat_ffa_log_init(void)
 	dlog_info("Initializing Hafnium (SPMC)\n");
 }
 
-struct ffa_value plat_ffa_spmc_id_get(void)
-{
-	/*
-	 * Since we are running in the SPMC use FFA_ID_GET to fetch our
-	 * ID from the SPMD.
-	 */
-	return smc_ffa_call((struct ffa_value){.func = FFA_ID_GET_32});
-}
-
 void plat_ffa_set_tee_enabled(bool tee_enabled)
 {
 	(void)tee_enabled;
@@ -331,64 +322,6 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
 bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	return (vm_id >= EL3_SPMD_LP_ID_START && vm_id <= EL3_SPMD_LP_ID_END);
-}
-
-bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
-				 struct ffa_value *ret)
-{
-	(void)vm_locked;
-	(void)ret;
-
-	return false;
-}
-
-bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
-				  struct ffa_value *ret)
-{
-	(void)to_locked;
-	(void)ret;
-
-	return true;
-}
-
-void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
-{
-	(void)vm_locked;
-}
-
-void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
-{
-	(void)vm_locked;
-}
-
-ffa_partition_properties_t plat_ffa_partition_properties(
-	ffa_id_t caller_id, const struct vm *target)
-{
-	ffa_partition_properties_t result = target->messaging_method;
-	bool is_ffa_version_ge_v1_2 = (target->ffa_version >= FFA_VERSION_1_2);
-	ffa_partition_properties_t final_mask;
-	ffa_partition_properties_t dir_msg_mask = FFA_PARTITION_DIRECT_REQ_RECV;
-	ffa_partition_properties_t dir_msg2_mask =
-		FFA_PARTITION_DIRECT_REQ2_RECV;
-
-	/*
-	 * SPs support full direct messaging communication with other SPs,
-	 * and are allowed to only receive direct requests from the other world.
-	 * SPs cannot send direct requests to the other world.
-	 *
-	 * If caller is an SP, advertise that target can send messages.
-	 * If caller is a VM, advertise that target can't send messages.
-	 */
-	if (vm_id_is_current_world(caller_id)) {
-		dir_msg_mask |= FFA_PARTITION_DIRECT_REQ_SEND;
-		dir_msg2_mask |= FFA_PARTITION_DIRECT_REQ2_SEND;
-	}
-
-	/* Consider dir_msg2_mask if FFA_VERSION is 1.2 or above. */
-	final_mask = is_ffa_version_ge_v1_2 ? (dir_msg2_mask | dir_msg_mask)
-					    : dir_msg_mask;
-
-	return result & final_mask;
 }
 
 /**
@@ -1216,45 +1149,6 @@ bool plat_ffa_inject_notification_pending_interrupt(
 	}
 
 	return ret;
-}
-
-bool plat_ffa_partition_info_get_regs_forward_allowed(void)
-{
-	/*
-	 * Allow forwarding from the SPMC to SPMD unconditionally.
-	 */
-	return true;
-}
-
-/** Forward helper for FFA_PARTITION_INFO_GET. */
-void plat_ffa_partition_info_get_forward(  // NOLINTNEXTLINE
-	const struct ffa_uuid *uuid,	   // NOLINTNEXTLINE
-	const uint32_t flags,		   // NOLINTNEXTLINE
-	struct ffa_partition_info *partitions, ffa_vm_count_t *ret_count)
-{
-	/* The SPMC does not forward FFA_PARTITION_INFO_GET. */
-
-	(void)uuid;
-	(void)flags;
-	(void)partitions;
-	(void)ret_count;
-}
-
-void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
-				       paddr_t fdt_addr,
-				       size_t fdt_allocated_size,
-				       const struct manifest_vm *manifest_vm,
-				       const struct boot_params *boot_params,
-				       struct mpool *ppool)
-{
-	(void)boot_params;
-	(void)stage1_locked;
-	(void)fdt_addr;
-	(void)fdt_allocated_size;
-	(void)manifest_vm;
-	(void)ppool;
-	/* should never be called in SPMC */
-	CHECK(false);
 }
 
 /**

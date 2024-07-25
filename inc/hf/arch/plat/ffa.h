@@ -14,28 +14,9 @@
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
-/** Returns the SPMC ID. */
-struct ffa_value plat_ffa_spmc_id_get(void);
-
 void plat_ffa_log_init(void);
 void plat_ffa_set_tee_enabled(bool tee_enabled);
 void plat_ffa_init(struct mpool *ppool);
-
-bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
-				 struct ffa_value *ret);
-
-bool plat_ffa_acquire_receiver_rx(struct vm_locked locked,
-				  struct ffa_value *ret);
-
-void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked);
-
-void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked);
-
-/**
- * Return the FF-A partition info VM/SP properties given the VM id.
- */
-ffa_partition_properties_t plat_ffa_partition_properties(
-	ffa_id_t caller_id, const struct vm *target);
 
 /**
  * Forward normal world calls of FFA_RUN ABI to other world.
@@ -67,20 +48,6 @@ bool plat_ffa_inject_notification_pending_interrupt(
 bool plat_ffa_intercept_call(struct vcpu_locked current_locked,
 			     struct vcpu_locked next_locked,
 			     struct ffa_value *signal_interrupt);
-
-bool plat_ffa_partition_info_get_regs_forward_allowed(void);
-
-void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
-					 uint32_t flags,
-					 struct ffa_partition_info *partitions,
-					 ffa_vm_count_t *ret_count);
-
-void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
-				       paddr_t fdt_addr,
-				       size_t fdt_allocated_size,
-				       const struct manifest_vm *manifest_vm,
-				       const struct boot_params *boot_params,
-				       struct mpool *ppool);
 
 /**
  * Returns true if the FFA_SECONDARY_EP_REGISTER interface is supported at
