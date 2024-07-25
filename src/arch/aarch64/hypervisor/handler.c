@@ -315,35 +315,6 @@ bool sync_current_exception(uintreg_t elr, uintreg_t spsr)
 }
 
 /**
- * Sets or clears the VI bit in the HCR_EL2 register saved in the given
- * arch_regs.
- */
-static void set_virtual_irq(struct arch_regs *r, bool enable)
-{
-	if (enable) {
-		r->hyp_state.hcr_el2 |= HCR_EL2_VI;
-	} else {
-		r->hyp_state.hcr_el2 &= ~HCR_EL2_VI;
-	}
-}
-
-/**
- * Sets or clears the VI bit in the HCR_EL2 register.
- */
-static void set_virtual_irq_current(bool enable)
-{
-	struct vcpu *vcpu = current();
-	uintreg_t hcr_el2 = vcpu->regs.hyp_state.hcr_el2;
-
-	if (enable) {
-		hcr_el2 |= HCR_EL2_VI;
-	} else {
-		hcr_el2 &= ~HCR_EL2_VI;
-	}
-	vcpu->regs.hyp_state.hcr_el2 = hcr_el2;
-}
-
-/**
  * Sets or clears the VF bit in the HCR_EL2 register saved in the given
  * arch_regs.
  */
@@ -357,19 +328,16 @@ static void set_virtual_fiq(struct arch_regs *r, bool enable)
 }
 
 /**
- * Sets or clears the VF bit in the HCR_EL2 register.
+ * Sets or clears the VI bit in the HCR_EL2 register saved in the given
+ * arch_regs.
  */
-static void set_virtual_fiq_current(bool enable)
+static void set_virtual_irq(struct arch_regs *r, bool enable)
 {
-	struct vcpu *vcpu = current();
-	uintreg_t hcr_el2 = vcpu->regs.hyp_state.hcr_el2;
-
 	if (enable) {
-		hcr_el2 |= HCR_EL2_VF;
+		r->hyp_state.hcr_el2 |= HCR_EL2_VI;
 	} else {
-		hcr_el2 &= ~HCR_EL2_VF;
+		r->hyp_state.hcr_el2 &= ~HCR_EL2_VI;
 	}
-	vcpu->regs.hyp_state.hcr_el2 = hcr_el2;
 }
 
 #if SECURE_WORLD == 1
@@ -813,42 +781,28 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 
 /**
  * Set or clear VI/VF bits according to pending interrupts.
+ * If `vcpu` is NULL, the function will set it to the currently running
+ * vCPU.
  */
-static void vcpu_update_virtual_interrupts(struct vcpu *next)
+static void vcpu_update_virtual_interrupts(struct vcpu *vcpu)
 {
 	struct vcpu_locked vcpu_locked;
 
-	if (next == NULL) {
-		if (current()->vm->el0_partition) {
-			return;
-		}
-
-		/*
-		 * Not switching vCPUs, set the bit for the current vCPU
-		 * directly in the register.
-		 */
-		vcpu_locked = vcpu_lock(current());
-		set_virtual_irq_current(
-			vcpu_interrupt_irq_count_get(vcpu_locked) > 0);
-		set_virtual_fiq_current(
-			vcpu_interrupt_fiq_count_get(vcpu_locked) > 0);
-		vcpu_unlock(&vcpu_locked);
-	} else if (vm_id_is_current_world(next->vm->id)) {
-		if (next->vm->el0_partition) {
-			return;
-		}
-		/*
-		 * About to switch vCPUs, set the bit for the vCPU to which we
-		 * are switching in the saved copy of the register.
-		 */
-
-		vcpu_locked = vcpu_lock(next);
-		set_virtual_irq(&next->regs,
-				vcpu_interrupt_irq_count_get(vcpu_locked) > 0);
-		set_virtual_fiq(&next->regs,
-				vcpu_interrupt_fiq_count_get(vcpu_locked) > 0);
-		vcpu_unlock(&vcpu_locked);
+	if (vcpu == NULL) {
+		vcpu = current();
 	}
+
+	/* Only update to those at the virtual instance. */
+	if (vcpu->vm->el0_partition || !vm_id_is_current_world(vcpu->vm->id)) {
+		return;
+	}
+
+	vcpu_locked = vcpu_lock(vcpu);
+	set_virtual_irq(&vcpu->regs,
+			vcpu_interrupt_irq_count_get(vcpu_locked) > 0);
+	set_virtual_fiq(&vcpu->regs,
+			vcpu_interrupt_fiq_count_get(vcpu_locked) > 0);
+	vcpu_unlock(&vcpu_locked);
 }
 
 /**
@@ -890,6 +844,12 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 		}
 
 		arch_regs_set_retval(&vcpu->regs, args);
+
+		/*
+		 * In case there has been an update after handling the last
+		 * ff-a call, update the next vCPU directly in the
+		 * register.
+		 */
 		vcpu_update_virtual_interrupts(*next);
 		return true;
 	}
@@ -1163,6 +1123,10 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 		dlog_verbose("Unsupported function %#lx\n", args.func);
 	}
 
+	/*
+	 * In case there has been an update after handling the last
+	 * hypervisor call, update the next vCPU directly in the register.
+	 */
 	vcpu_update_virtual_interrupts(next);
 
 	return next;
