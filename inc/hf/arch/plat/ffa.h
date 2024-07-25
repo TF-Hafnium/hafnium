@@ -35,12 +35,6 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 			 struct ffa_value *run_ret, struct vcpu **next);
 
 /**
- * Returns true if the FFA_SECONDARY_EP_REGISTER interface is supported at
- * the virtual FF-A instance.
- */
-bool plat_ffa_is_secondary_ep_register_supported(void);
-
-/**
  * Perform checks for the state transition being requested by the Partition
  * based on it's runtime model and return false if an illegal transition is
  * being performed.

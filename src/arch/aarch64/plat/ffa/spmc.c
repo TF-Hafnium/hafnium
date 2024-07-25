@@ -595,15 +595,6 @@ static struct ffa_value plat_ffa_preempted_vcpu_resume(
 	return ffa_ret;
 }
 
-/**
- * Returns FFA_SUCCESS as FFA_SECONDARY_EP_REGISTER is supported at the
- * secure virtual FF-A instance.
- */
-bool plat_ffa_is_secondary_ep_register_supported(void)
-{
-	return true;
-}
-
 static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 {
 	static bool spmc_booted = false;

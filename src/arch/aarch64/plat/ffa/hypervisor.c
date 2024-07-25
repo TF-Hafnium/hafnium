@@ -172,15 +172,6 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 }
 
 /**
- * Returns FFA_ERROR as FFA_SECONDARY_EP_REGISTER is not supported at the
- * non-secure FF-A instances.
- */
-bool plat_ffa_is_secondary_ep_register_supported(void)
-{
-	return false;
-}
-
-/**
  * The invocation of FFA_MSG_WAIT at non-secure virtual FF-A instance is made
  * to be compliant with version v1.0 of the FF-A specification. It serves as
  * a blocking call.
