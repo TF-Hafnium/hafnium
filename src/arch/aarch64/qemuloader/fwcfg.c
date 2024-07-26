@@ -61,6 +61,7 @@ bool fw_cfg_read_dma(uint16_t key, uintptr_t destination, uint32_t length)
 
 	io_write16(FW_CFG_SELECTOR, htobe16(key));
 	io_write64(FW_CFG_DMA, htobe64(access_address));
+	data_sync_barrier();
 
 	do {
 		control = access.control;
