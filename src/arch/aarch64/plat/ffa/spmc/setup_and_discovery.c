@@ -8,9 +8,7 @@
 
 #include "hf/arch/plat/ffa/setup_and_discovery.h"
 
-#include "hf/api.h"
 #include "hf/ffa.h"
-#include "hf/ffa_internal.h"
 #include "hf/manifest.h"
 #include "hf/vm.h"
 
@@ -44,17 +42,17 @@ bool plat_ffa_partition_info_get_regs_forward_allowed(void)
 }
 
 /** Forward helper for FFA_PARTITION_INFO_GET. */
-void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
-					 uint32_t flags,
-					 struct ffa_partition_info *partitions,
-					 ffa_vm_count_t *ret_count)
+ffa_vm_count_t plat_ffa_partition_info_get_forward(
+	const struct ffa_uuid *uuid, uint32_t flags,
+	struct ffa_partition_info *partitions, ffa_vm_count_t vm_count)
 {
 	/* The SPMC does not forward FFA_PARTITION_INFO_GET. */
 
 	(void)uuid;
 	(void)flags;
 	(void)partitions;
-	(void)ret_count;
+
+	return vm_count;
 }
 
 void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,

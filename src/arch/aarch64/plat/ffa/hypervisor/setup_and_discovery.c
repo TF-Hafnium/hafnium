@@ -12,7 +12,6 @@
 #include "hf/arch/plat/ffa/vm.h"
 
 #include "hf/ffa.h"
-#include "hf/ffa_internal.h"
 #include "hf/manifest.h"
 #include "hf/vm.h"
 
@@ -126,15 +125,13 @@ bool plat_ffa_partition_info_get_regs_forward_allowed(void)
  * Forward helper for FFA_PARTITION_INFO_GET.
  * Emits FFA_PARTITION_INFO_GET from Hypervisor to SPMC if allowed.
  */
-void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
-					 uint32_t flags,
-					 struct ffa_partition_info *partitions,
-					 ffa_vm_count_t *ret_count)
+ffa_vm_count_t plat_ffa_partition_info_get_forward(
+	const struct ffa_uuid *uuid, uint32_t flags,
+	struct ffa_partition_info *partitions, ffa_vm_count_t vm_count)
 {
 	const struct vm *tee = vm_find(HF_TEE_VM_ID);
 	struct ffa_partition_info *tee_partitions;
 	ffa_vm_count_t tee_partitions_count;
-	ffa_vm_count_t vm_count = *ret_count;
 	struct ffa_value ret;
 
 	CHECK(tee != NULL);
@@ -145,7 +142,7 @@ void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
 	 * declared as such in the Hypervisor manifest.
 	 */
 	if (!plat_ffa_is_tee_enabled()) {
-		return;
+		return vm_count;
 	}
 
 	ret = arch_other_world_call(
@@ -159,13 +156,13 @@ void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
 		dlog_verbose(
 			"Failed forwarding FFA_PARTITION_INFO_GET to "
 			"the SPMC.\n");
-		return;
+		return vm_count;
 	}
 
 	tee_partitions_count = ffa_partition_info_get_count(ret);
 	if (tee_partitions_count == 0 || tee_partitions_count > MAX_VMS) {
 		dlog_verbose("Invalid number of SPs returned by the SPMC.\n");
-		return;
+		return vm_count;
 	}
 
 	if ((flags & FFA_PARTITION_COUNT_FLAG_MASK) ==
@@ -185,7 +182,7 @@ void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
 		CHECK(ret.func == FFA_SUCCESS_32);
 	}
 
-	*ret_count = vm_count;
+	return vm_count;
 }
 
 void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,

@@ -26,10 +26,9 @@ void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked);
 
 bool plat_ffa_partition_info_get_regs_forward_allowed(void);
 
-void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
-					 uint32_t flags,
-					 struct ffa_partition_info *partitions,
-					 ffa_vm_count_t *ret_count);
+ffa_vm_count_t plat_ffa_partition_info_get_forward(
+	const struct ffa_uuid *uuid, uint32_t flags,
+	struct ffa_partition_info *partitions, ffa_vm_count_t vm_count);
 
 void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 				       paddr_t fdt_addr,

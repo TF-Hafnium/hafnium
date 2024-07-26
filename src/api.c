@@ -894,7 +894,8 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	 * - If UUID is non-Null and vm_count is zero it means there is no such
 	 * partition identified in the system.
 	 */
-	plat_ffa_partition_info_get_forward(uuid, flags, partitions, &vm_count);
+	vm_count = plat_ffa_partition_info_get_forward(uuid, flags, partitions,
+						       vm_count);
 
 	/*
 	 * Unrecognized UUID: does not match any of the VMs (or SPs)

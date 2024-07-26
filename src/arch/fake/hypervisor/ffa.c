@@ -395,15 +395,16 @@ bool plat_ffa_partition_info_get_regs_forward(	// NOLINTNEXTLINE
 	return true;
 }
 
-void plat_ffa_partition_info_get_forward(  // NOLINTNEXTLINE
-	const struct ffa_uuid *uuid,	   // NOLINTNEXTLINE
-	const uint32_t flags,		   // NOLINTNEXTLINE
-	struct ffa_partition_info *partitions, ffa_vm_count_t *ret_count)
+ffa_vm_count_t plat_ffa_partition_info_get_forward(  // NOLINTNEXTLINE
+	const struct ffa_uuid *uuid,		     // NOLINTNEXTLINE
+	uint32_t flags,				     // NOLINTNEXTLINE
+	struct ffa_partition_info *partitions, ffa_vm_count_t vm_count)
 {
 	(void)uuid;
 	(void)flags;
 	(void)partitions;
-	(void)ret_count;
+
+	return vm_count;
 }
 
 bool plat_ffa_is_secondary_ep_register_supported(void)

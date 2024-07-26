@@ -30,7 +30,6 @@
 #include "vmapi/hf/ffa.h"
 
 #include "./spmc/vm.h"
-#include "smc.h"
 
 void plat_ffa_log_init(void)
 {

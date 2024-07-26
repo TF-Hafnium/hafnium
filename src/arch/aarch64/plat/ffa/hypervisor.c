@@ -11,7 +11,6 @@
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/ffa/indirect_messaging.h"
 #include "hf/arch/plat/ffa/setup_and_discovery.h"
-#include "hf/arch/plat/ffa/vm.h"
 
 #include "hf/api.h"
 #include "hf/dlog.h"
@@ -20,8 +19,6 @@
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 #include "hf/vm_ids.h"
-
-#include "smc.h"
 
 static bool ffa_tee_enabled = false;
 
