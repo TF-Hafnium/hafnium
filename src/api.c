@@ -4702,8 +4702,7 @@ void api_flush_log_buffer(struct vcpu_locked *vcpu_locked)
 	ffa_id_t vcpu_id = vcpu_index(vcpu);
 
 	buffer->chars[buffer->len] = '\0';
-	dlog("%s%#x@%#x: %s\n", ffa_is_vm_id(vm_id) ? "VM" : "SP", vm_id,
-	     vcpu_id, buffer->chars);
+	dlog("[%x %u] %s\n", vm_id, vcpu_id, buffer->chars);
 	buffer->len = 0;
 }
 

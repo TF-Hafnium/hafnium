@@ -41,7 +41,7 @@ HFTEST_CTRL_JSON_END = "[hftest_ctrl:json_end]"
 HFTEST_CTRL_GET_COMMAND_LINE = "[hftest_ctrl:get_command_line]"
 HFTEST_CTRL_FINISHED = "[hftest_ctrl:finished]"
 
-HFTEST_CTRL_JSON_REGEX = re.compile("^(VM|SP)0x[0-9a-fA-F]+@0x[0-9a-fA-F]+: ")
+HFTEST_CTRL_JSON_REGEX = re.compile("^\\[[0-9a-fA-F]+ [0-9a-fA-F]+\\] ")
 
 HF_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__))))
