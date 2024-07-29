@@ -13,7 +13,7 @@
 
 /* Return values for the test commands. */
 #define SP_SUCCESS 0
-#define SP_ERROR -1
+#define SP_ERROR (-1)
 
 /* Various fields encoded in `options` parameter. */
 #define OPTIONS_MASK_INTERRUPTS (1 << 0)

@@ -111,9 +111,9 @@
 		.suite = #suite_name,                                       \
 		.kind = HFTEST_KIND_TEST,                                   \
 		.name = #test_name,                                         \
-		.is_long_running = long_running,                            \
+		.is_long_running = (long_running),                          \
 		.fn = HFTEST_TEST_FN(suite_name, test_name),                \
-		.precondition = precon_fn,                                  \
+		.precondition = (precon_fn),                                \
 	};                                                                  \
 	static void __attribute__((constructor)) HFTEST_TEST_CONSTRUCTOR(   \
 		suite_name, test_name)(void)                                \
@@ -181,6 +181,7 @@ enum hftest_kind {
  * functions contained in the image allowing the image to inspect the tests it
  * contains.
  */
+/* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct hftest_test {
 	const char *suite;
 	enum hftest_kind kind;
@@ -266,6 +267,7 @@ struct hftest_test {
 	do {                                                               \
 		char *lhs_value = (lhs);                                   \
 		char *rhs_value = (rhs);                                   \
+		/* NOLINTNEXTLINE(bugprone-macro-parentheses) */           \
 		if (!(strncmp(lhs_value, rhs_value, RSIZE_MAX) op 0)) {    \
 			struct hftest_context *ctx = hftest_get_context(); \
 			++ctx->failures;                                   \

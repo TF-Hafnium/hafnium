@@ -166,6 +166,7 @@ static inline vaddr_t va_from_ptr(const void *p)
  */
 static inline void *ptr_from_va(vaddr_t va)
 {
+	/* NOLINTNEXTLINE(performance-no-int-to-ptr) */
 	return (void *)va_addr(va);
 }
 

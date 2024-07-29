@@ -20,7 +20,7 @@
 
 /* Return values for the test commands. */
 #define SP_SUCCESS 0
-#define SP_ERROR -1
+#define SP_ERROR (-1)
 
 static inline struct ffa_value sp_success(ffa_id_t sender, ffa_id_t receiver,
 					  uint64_t val)

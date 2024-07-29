@@ -54,14 +54,14 @@
 #define DEFINE_SIZEOF(sym, type)                                 \
 	void gen_header__##sym(void)                             \
 	{                                                        \
-		static_assert(sizeof(type) == sym,               \
+		static_assert(sizeof(type) == (sym),             \
 			      "Generated struct size mismatch"); \
 	}
 
 #define DEFINE_OFFSETOF(sym, type, field)                          \
 	void gen_header__##sym(void)                               \
 	{                                                          \
-		static_assert(offsetof(type, field) == sym,        \
+		static_assert(offsetof(type, field) == (sym),      \
 			      "Generated struct offset mismatch"); \
 	}
 

@@ -198,6 +198,7 @@ struct smc_whitelist {
 	bool permissive;
 };
 
+/* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct vm {
 	ffa_id_t id;
 	struct ffa_uuid uuids[PARTITION_MAX_UUIDS];
@@ -382,14 +383,13 @@ ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 void vm_notifications_info_get_pending(
 	struct vm_locked vm_locked, bool is_from_vm, uint16_t *ids,
 	uint32_t *ids_count, uint32_t *lists_sizes, uint32_t *lists_count,
-	const uint32_t ids_max_count,
+	uint32_t ids_max_count,
 	enum notifications_info_get_state *info_get_state);
 bool vm_notifications_pending_not_retrieved_by_scheduler(void);
 bool vm_is_notifications_pending_count_zero(void);
 bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 			       uint32_t *ids_count, uint32_t *lists_sizes,
-			       uint32_t *lists_count,
-			       const uint32_t ids_max_count);
+			       uint32_t *lists_count, uint32_t ids_max_count);
 bool vm_supports_messaging_method(struct vm *vm, uint16_t messaging_method);
 void vm_notifications_set_npi_injected(struct vm_locked vm_locked,
 				       bool npi_injected);

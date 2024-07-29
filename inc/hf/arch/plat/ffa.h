@@ -199,7 +199,7 @@ bool plat_ffa_notification_info_get_call(struct ffa_value *ret);
 bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 					uint32_t *lists_sizes,
 					uint32_t *lists_count,
-					const uint32_t ids_count_max);
+					uint32_t ids_count_max);
 
 /** Helper to set SRI current state. */
 void plat_ffa_sri_state_set(enum plat_ffa_sri_state state);
@@ -226,7 +226,7 @@ void plat_ffa_sri_init(struct cpu *cpu);
 void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
 					    uint32_t *lists_sizes,
 					    uint32_t *lists_count,
-					    const uint32_t ids_count_max);
+					    uint32_t ids_count_max);
 
 bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current);
 bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current);
@@ -255,7 +255,7 @@ bool plat_ffa_inject_notification_pending_interrupt(
 bool plat_ffa_partition_info_get_regs_forward_allowed(void);
 
 void plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
-					 const uint32_t flags,
+					 uint32_t flags,
 					 struct ffa_partition_info *partitions,
 					 ffa_vm_count_t *ret_count);
 

@@ -10,11 +10,12 @@
 
 #define STACK_SIZE (8192)
 
-#if !defined(__ASSEMBLER__)
+#ifndef __ASSEMBLER__
 
 #include "hf/arch/cpu.h"
 
 /* TODO: Fix alignment such that `cpu` structs are in different cache lines. */
+/* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct cpu {
 	/** CPU identifier. Doesn't have to be contiguous. */
 	cpu_id_t id;

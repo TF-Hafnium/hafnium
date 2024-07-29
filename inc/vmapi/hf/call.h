@@ -19,6 +19,7 @@
 int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3);
 struct ffa_value ffa_call(struct ffa_value args);
 struct ffa_value ffa_call_ext(struct ffa_value args);
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
 void memcpy_s(void *dest, size_t destsz, const void *src, size_t count);
 
 /**

@@ -67,15 +67,15 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 				 uint32_t requested_version);
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					    const struct ffa_uuid *uuid,
-					    const uint32_t flags);
+					    uint32_t flags);
 bool api_ffa_fill_partition_info_from_regs(
 	struct ffa_value ret, uint16_t start_index,
 	struct ffa_partition_info *partitions, uint16_t partitions_len,
 	ffa_vm_count_t *ret_count);
 struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 						 const struct ffa_uuid *uuid,
-						 const uint16_t start_index,
-						 const uint16_t tag);
+						 uint16_t start_index,
+						 uint16_t tag);
 struct ffa_value api_ffa_id_get(const struct vcpu *current);
 struct ffa_value api_ffa_spm_id_get(void);
 struct ffa_value api_ffa_feature_success(uint32_t arg2);
@@ -156,7 +156,7 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 				      uint32_t mem_perm, struct vcpu *current);
 
 void api_flush_log_buffer(struct vcpu_locked *vcpu_locked);
-struct ffa_value api_ffa_console_log(const struct ffa_value args,
+struct ffa_value api_ffa_console_log(struct ffa_value args,
 				     struct vcpu *current);
 
 void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,

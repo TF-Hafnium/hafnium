@@ -8,4 +8,4 @@
 
 #pragma once
 
-#define __section(S) __attribute__((__section__(#S)))
+#define section(S) __attribute__((__section__(#S)))

@@ -13,8 +13,10 @@
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
 int memcmp(const void *a, const void *b, size_t n);
 
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
 int strncmp(const char *a, const char *b, size_t n);
 
 #define ctz(x) __builtin_ctz(x)

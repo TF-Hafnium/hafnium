@@ -10,8 +10,8 @@
 
 #include "hf/arch/std.h"
 
-#define MAX(x, y) (x > y ? x : y)
-#define MIN(x, y) (x < y ? x : y)
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
 
 typedef size_t rsize_t;
 
@@ -29,10 +29,15 @@ typedef size_t rsize_t;
  * These functions don't return errno_t as per the specification and implicitly
  * have a constraint handler that panics.
  */
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
 void memset_s(void *dest, rsize_t destsz, int ch, rsize_t count);
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
 void memcpy_s(void *dest, rsize_t destsz, const void *src, rsize_t count);
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
 void memmove_s(void *dest, rsize_t destsz, const void *src, rsize_t count);
 
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
 void *memchr(const void *ptr, int ch, size_t count);
 
+/* NOLINTNEXTLINE(readability-redundant-declaration) */
 size_t strnlen_s(const char *str, size_t strsz);

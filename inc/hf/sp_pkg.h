@@ -39,7 +39,7 @@ struct sp_pkg_header {
 static inline size_t sp_pkg_get_mem_size(struct sp_pkg_header *sp_pkg)
 {
 	assert(SIZE_MAX - sp_pkg->img_offset >= (size_t)sp_pkg->img_size);
-	return (size_t)(sp_pkg->img_offset + sp_pkg->img_size);
+	return (sp_pkg->img_offset + sp_pkg->img_size);
 }
 
 /** Get the size of the boot information descriptors section. */

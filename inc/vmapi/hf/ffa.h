@@ -970,7 +970,7 @@ struct ffa_boot_info_header {
  * FF-A v1.1 specification restricts the number of notifications to a maximum
  * of 64. Following all possible bitmaps.
  */
-#define FFA_NOTIFICATION_MASK(ID) (UINT64_C(1) << ID)
+#define FFA_NOTIFICATION_MASK(ID) (UINT64_C(1) << (ID))
 
 typedef uint64_t ffa_notifications_bitmap_t;
 
@@ -1071,7 +1071,7 @@ static inline ffa_vcpu_index_t ffa_notifications_get_vcpu(struct ffa_value args)
  */
 #define FFA_NOTIFICATIONS_LISTS_COUNT_SHIFT 0x7U
 #define FFA_NOTIFICATIONS_LISTS_COUNT_MASK 0x1fU
-#define FFA_NOTIFICATIONS_LIST_SHIFT(l) (2 * (l - 1) + 12)
+#define FFA_NOTIFICATIONS_LIST_SHIFT(l) (2 * ((l) - 1) + 12)
 #define FFA_NOTIFICATIONS_LIST_SIZE_MASK 0x3U
 
 static inline uint32_t ffa_notification_info_get_lists_count(
@@ -1308,10 +1308,10 @@ static inline struct ffa_memory_access *ffa_memory_region_get_receiver(
 		return NULL;
 	}
 
-	return (struct ffa_memory_access *)((uint8_t *)memory_region +
-					    memory_region->receivers_offset +
-					    (receiver_index *
-					     memory_access_desc_size));
+	return (struct ffa_memory_access
+			*)((uint8_t *)memory_region +
+			   (size_t)memory_region->receivers_offset +
+			   (size_t)(receiver_index * memory_access_desc_size));
 }
 
 /**
@@ -1443,14 +1443,14 @@ struct ffa_endpoint_rx_tx_descriptor {
 static inline struct ffa_composite_memory_region *
 ffa_endpoint_get_rx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
 {
-	return (struct ffa_composite_memory_region *)((uintptr_t)desc +
+	return (struct ffa_composite_memory_region *)((char *)desc +
 						      desc->rx_offset);
 }
 
 static inline struct ffa_composite_memory_region *
 ffa_endpoint_get_tx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
 {
-	return (struct ffa_composite_memory_region *)((uintptr_t)desc +
+	return (struct ffa_composite_memory_region *)((char *)desc +
 						      desc->tx_offset);
 }
 

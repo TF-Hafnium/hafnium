@@ -40,7 +40,7 @@ struct string {
  * Macro to initialize `struct string` from a string constant.
  * Triggers a compilation error if the string does not fit into the buffer.
  */
-#define STRING_INIT(str) ((struct string){.data = str})
+#define STRING_INIT(str) ((struct string){.data = (str)})
 
 enum string_return_code string_init(struct string *str,
 				    const struct memiter *data);

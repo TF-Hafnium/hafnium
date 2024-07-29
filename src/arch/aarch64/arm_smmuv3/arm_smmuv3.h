@@ -11,7 +11,7 @@
 
 #define EXTRACT(data, shift, mask) (((data) >> (shift)) & (mask))
 #define ALL_1s(n) ((1ULL << (n)) - 1)
-#define GEN_MASK(MSB, LSB) ((ALL_1s(MSB - LSB + 1)) << (LSB))
+#define GEN_MASK(MSB, LSB) ((ALL_1s((MSB) - (LSB) + 1)) << (LSB))
 #define COMPOSE(value, shift, mask) (((value) & (mask)) << (shift))
 
 /* Offset of SMMUv3 registers */
