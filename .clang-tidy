@@ -1,4 +1,23 @@
-Checks: 'readability-*,-readability-identifier-length,portability-*,performance-*,misc-*,bugprone-*,-bugprone-easily-swappable-parameters,modernize-*,google-runtime-int,-modernize-deprecated-headers,-clang-analyzer-valist.Uninitialized,-readability-magic-numbers, -readability-function-cognitive-complexity,-modernize-macro-to-enum,-misc-redundant-expression,-readability-suspicious-call-argument,-misc-include-cleaner,-clang-analyzer-optin.core.EnumCastOutOfRange'
+Checks: >
+  bugprone-*,
+  google-runtime-int,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -clang-analyzer-optin.core.EnumCastOutOfRange,
+  -clang-analyzer-valist.Uninitialized,
+  -misc-include-cleaner,
+  -misc-redundant-expression,
+  -modernize-deprecated-headers,
+  -modernize-macro-to-enum,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-suspicious-call-argument,
+
 HeaderFilterRegex: '^(?!third_party).+'
 FormatStyle: file
 WarningsAsErrors: '*'
