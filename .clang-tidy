@@ -19,7 +19,11 @@ Checks: >
   -readability-magic-numbers,
   -readability-suspicious-call-argument,
 
-HeaderFilterRegex: '^(?!third_party).+'
+
+# TODO: replace with `ExcludeHeaderFilterRegex: '^third_party/.*'` when
+# clang-tidy 19 is released
+HeaderFilterRegex: '^(inc|src|test|vmlib).+'
+
 FormatStyle: file
 WarningsAsErrors: '*'
 CheckOptions:
