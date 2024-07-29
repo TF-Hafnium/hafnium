@@ -1,5 +1,6 @@
 Checks: >
   bugprone-*,
+  clang-analyzer-*,
   google-runtime-int,
   misc-*,
   modernize-*,

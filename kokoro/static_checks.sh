@@ -11,13 +11,6 @@ source "$(dirname ${BASH_SOURCE[0]})/../build/bash/common.inc"
 # Set all environment variables
 init_build
 
-make check
-if is_repo_dirty
-then
-	echo "Run \`make check\' locally to fix this."
-	exit 1
-fi
-
 #
 # Make sure the code looks good.
 #

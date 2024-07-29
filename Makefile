@@ -124,14 +124,6 @@ tidy: $(OUT_DIR)/build.ninja
 	@find src/ \( -name \*.c \) | xargs clang-tidy -p $(OUT_DIR) -fix
 	@find test/ \( -name \*.c \) | xargs clang-tidy -p $(OUT_DIR) -fix
 
-.PHONY: check
-check: $(OUT_DIR)/build.ninja
-	@$(NINJA) -C $(OUT_DIR)
-	@echo "Checking..."
-	# TODO: enable for c++ tests as it currently gives spurious errors.
-	@find src/ \( -name \*.c \) | xargs clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
-	@find test/ \( -name \*.c \) | xargs clang-check -p $(OUT_DIR) -analyze -fix-what-you-can
-
 .PHONY: license
 license:
 	@find build/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts -o -name \*.ld | xargs -n1 python3 build/license.py --style c
