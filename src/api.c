@@ -4480,9 +4480,9 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 	}
 
 	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_SP) != 0U) {
-		if (!plat_ffa_notifications_get_from_sp(
-			    receiver_locked, vcpu_id, &sp_notifications,
-			    &ret)) {
+		ret = plat_ffa_notifications_get_from_sp(
+			receiver_locked, vcpu_id, &sp_notifications);
+		if (ret.func == FFA_ERROR_32) {
 			dlog_verbose("Failed to get notifications from sps.");
 			goto out;
 		}
@@ -4495,9 +4495,10 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 
 	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) != 0U ||
 	    (flags & FFA_NOTIFICATION_FLAG_BITMAP_SPM) != 0U) {
-		if (!plat_ffa_notifications_get_framework_notifications(
-			    receiver_locked, &framework_notifications, flags,
-			    vcpu_id, &ret)) {
+		ret = plat_ffa_notifications_get_framework_notifications(
+			receiver_locked, &framework_notifications, flags,
+			vcpu_id);
+		if (ret.func == FFA_ERROR_32) {
 			dlog_verbose(
 				"Failed to get notifications from "
 				"framework.\n");

@@ -43,8 +43,9 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 }
 
 bool plat_ffa_notifications_update_bindings_forward(
-	ffa_id_t receiver_id, ffa_id_t sender_id, uint32_t flags,
-	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret)
+	ffa_id_t receiver_id, ffa_id_t sender_id,
+	ffa_notification_flags_t flags, ffa_notifications_bitmap_t bitmap,
+	bool is_bind, struct ffa_value *ret)
 {
 	CHECK(ret != NULL);
 
@@ -103,7 +104,8 @@ bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
 }
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_id_t receiver_id, uint32_t flags)
+					ffa_id_t receiver_id,
+					ffa_notification_flags_t flags)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
@@ -226,62 +228,62 @@ void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
 		 sizeof(ret.arg3) * FFA_NOTIFICATIONS_INFO_GET_REGS_RET);
 }
 
-bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
-					ffa_vcpu_index_t vcpu_id,
-					ffa_notifications_bitmap_t *from_sp,
-					struct ffa_value *ret)
+struct ffa_value plat_ffa_notifications_get_from_sp(
+	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
+	ffa_notifications_bitmap_t *from_sp)
 {
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
 	ffa_id_t receiver_id = receiver_locked.vm->id;
 
-	assert(from_sp != NULL && ret != NULL);
+	assert(from_sp != NULL);
 
-	*ret = arch_other_world_call((struct ffa_value){
+	ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_NOTIFICATION_GET_32,
 		.arg1 = (vcpu_id << 16) | receiver_id,
 		.arg2 = FFA_NOTIFICATION_FLAG_BITMAP_SP,
 	});
 
-	if (ret->func == FFA_ERROR_32) {
-		return false;
+	if (ret.func == FFA_ERROR_32) {
+		return ret;
 	}
 
-	*from_sp = ffa_notification_get_from_sp(*ret);
+	*from_sp = ffa_notification_get_from_sp(ret);
 
-	return true;
+	return ret;
 }
 
-bool plat_ffa_notifications_get_framework_notifications(
+struct ffa_value plat_ffa_notifications_get_framework_notifications(
 	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_fwk,
-	uint32_t flags, ffa_vcpu_index_t vcpu_id, struct ffa_value *ret)
+	ffa_notification_flags_t flags, ffa_vcpu_index_t vcpu_id)
 {
+	struct ffa_value ret = {.func = FFA_SUCCESS_32};
 	ffa_id_t receiver_id = receiver_locked.vm->id;
 	ffa_notifications_bitmap_t spm_notifications = 0;
 
 	(void)flags;
 
 	assert(from_fwk != NULL);
-	assert(ret != NULL);
 
 	/* Get SPMC notifications. */
 	if (plat_ffa_is_tee_enabled()) {
-		*ret = arch_other_world_call((struct ffa_value){
+		ret = arch_other_world_call((struct ffa_value){
 			.func = FFA_NOTIFICATION_GET_32,
 			.arg1 = (vcpu_id << 16) | receiver_id,
 			.arg2 = FFA_NOTIFICATION_FLAG_BITMAP_SPM,
 		});
 
-		if (ffa_func_id(*ret) == FFA_ERROR_32) {
-			return false;
+		if (ffa_func_id(ret) == FFA_ERROR_32) {
+			return ret;
 		}
 
-		spm_notifications = ffa_notification_get_from_framework(*ret);
+		spm_notifications = ffa_notification_get_from_framework(ret);
 	}
 
 	/* Merge notifications from SPMC and Hypervisor. */
 	*from_fwk = spm_notifications |
 		    vm_notifications_framework_get_pending(receiver_locked);
 
-	return true;
+	return ret;
 }
 
 /**

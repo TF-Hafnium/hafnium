@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "hf/ffa.h"
 #include "hf/vm.h"
 
 struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
@@ -17,29 +18,31 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 					  ffa_id_t sender_id,
 					  ffa_id_t receiver_id);
 bool plat_ffa_notifications_update_bindings_forward(
-	ffa_id_t receiver_id, ffa_id_t sender_id, uint32_t flags,
-	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret);
+	ffa_id_t receiver_id, ffa_id_t sender_id,
+	ffa_notification_flags_t flags, ffa_notifications_bitmap_t bitmap,
+	bool is_bind, struct ffa_value *ret);
 
 bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 					ffa_id_t sender_id,
 					ffa_id_t receiver_id);
 
 bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
-				       ffa_id_t receiver_vm_id, uint32_t flags,
+				       ffa_id_t receiver_vm_id,
+				       ffa_notification_flags_t flags,
 				       ffa_notifications_bitmap_t bitmap,
 				       struct ffa_value *ret);
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_id_t receiver_id, uint32_t flags);
+					ffa_id_t receiver_id,
+					ffa_notification_flags_t flags);
 
-bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
-					ffa_vcpu_index_t vcpu_id,
-					ffa_notifications_bitmap_t *from_sp,
-					struct ffa_value *ret);
+struct ffa_value plat_ffa_notifications_get_from_sp(
+	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
+	ffa_notifications_bitmap_t *from_sp);
 
-bool plat_ffa_notifications_get_framework_notifications(
+struct ffa_value plat_ffa_notifications_get_framework_notifications(
 	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_fwk,
-	uint32_t flags, ffa_vcpu_index_t vcpu_id, struct ffa_value *ret);
+	ffa_notification_flags_t flags, ffa_vcpu_index_t vcpu_id);
 
 /**
  * Creates a bitmap for the VM of the given ID.
@@ -59,14 +62,6 @@ bool plat_ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
  * Destroys the notifications bitmap for the given VM ID.
  */
 struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_id_t vm_id);
-
-/**
- * Helper to get the struct notifications, depending on the sender's id.
- */
-struct notifications *plat_ffa_vm_get_notifications_senders_world(
-	struct vm_locked, ffa_id_t sender_id);
-
-bool plat_ffa_notification_info_get_call(struct ffa_value *ret);
 
 /**
  * Helper to send SRI and safely update `ffa_sri_state`, if there has been

@@ -190,8 +190,9 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 }
 
 bool plat_ffa_notifications_update_bindings_forward(
-	ffa_id_t receiver_id, ffa_id_t sender_id, uint32_t flags,
-	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret)
+	ffa_id_t receiver_id, ffa_id_t sender_id,
+	ffa_notification_flags_t flags, ffa_notifications_bitmap_t bitmap,
+	bool is_bind, struct ffa_value *ret)
 {
 	(void)ret;
 	(void)receiver_id;
@@ -215,7 +216,8 @@ bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 }
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_id_t receiver_id, uint32_t flags)
+					ffa_id_t receiver_id,
+					ffa_notification_flags_t flags)
 {
 	(void)flags;
 	(void)current;
@@ -223,33 +225,31 @@ bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 	return false;
 }
 
-bool plat_ffa_notifications_get_from_sp(
+struct ffa_value plat_ffa_notifications_get_from_sp(
 	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
-	const ffa_notifications_bitmap_t *from_sp, struct ffa_value *ret)
+	const ffa_notifications_bitmap_t *from_sp)
 {
 	(void)receiver_locked;
 	(void)vcpu_id;
 	(void)from_sp;
-	(void)ret;
 
-	return false;
+	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-bool plat_ffa_notifications_get_framework_notifications(
-	struct vm_locked receiver_locked,
-	ffa_notifications_bitmap_t *from_fwk,  // NOLINT
-	uint32_t flags, struct ffa_value *ret)
+struct ffa_value plat_ffa_notifications_get_framework_notifications(
+	struct vm_locked receiver_locked,  // NOLINTNEXTLINE
+	ffa_notifications_bitmap_t *from_fwk, ffa_notification_flags_t flags)
 {
 	(void)receiver_locked;
 	(void)from_fwk;
 	(void)flags;
-	(void)ret;
 
-	return false;
+	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
 bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
-				       ffa_id_t receiver_vm_id, uint32_t flags,
+				       ffa_id_t receiver_vm_id,
+				       ffa_notification_flags_t flags,
 				       ffa_notifications_bitmap_t bitmap,
 				       struct ffa_value *ret)
 {
@@ -396,7 +396,7 @@ bool plat_ffa_inject_notification_pending_interrupt(
 }
 
 bool plat_ffa_partition_info_get_forward(const struct ffa_uuid *uuid,
-					 const uint32_t flags,
+					 const ffa_notification_flags_t flags,
 					 const ffa_vm_count_t *ret_count)
 {
 	(void)uuid;

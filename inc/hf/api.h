@@ -129,16 +129,19 @@ struct ffa_value api_ffa_notification_bitmap_destroy(ffa_id_t vm_id,
 						     struct vcpu *current);
 
 struct ffa_value api_ffa_notification_update_bindings(
-	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id,
+	ffa_notification_flags_t flags,
 	ffa_notifications_bitmap_t notifications, bool is_bind,
 	struct vcpu *current);
 
 struct ffa_value api_ffa_notification_set(
-	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
+	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id,
+	ffa_notification_flags_t flags,
 	ffa_notifications_bitmap_t notifications, struct vcpu *current);
 
 struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
-					  uint16_t vcpu_id, uint32_t flags,
+					  uint16_t vcpu_id,
+					  ffa_notification_flags_t flags,
 					  struct vcpu *current);
 
 struct ffa_value api_ffa_notification_info_get(struct vcpu *current);

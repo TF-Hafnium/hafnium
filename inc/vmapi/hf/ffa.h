@@ -1098,26 +1098,28 @@ static inline ffa_notifications_bitmap_t ffa_notification_get_from_framework(
 	return ffa_notifications_bitmap((uint32_t)val.arg6, (uint32_t)val.arg7);
 }
 
-/**
- * Flags used in calls to FFA_NOTIFICATION_GET interface.
- */
+typedef uint32_t ffa_notification_flags_t;
+
+/** Flags used in calls to FFA_NOTIFICATION_BIND interface. */
+#define FFA_NOTIFICATIONS_FLAG_PER_VCPU (UINT32_C(1) << 0)
+
+/** Flags used in calls to FFA_NOTIFICATION_GET interface. */
 #define FFA_NOTIFICATION_FLAG_BITMAP_SP (UINT32_C(1) << 0)
 #define FFA_NOTIFICATION_FLAG_BITMAP_VM (UINT32_C(1) << 1)
 #define FFA_NOTIFICATION_FLAG_BITMAP_SPM (UINT32_C(1) << 2)
 #define FFA_NOTIFICATION_FLAG_BITMAP_HYP (UINT32_C(1) << 3)
 
-/* Flag to configure notification as being per vCPU. */
+/** Flags used in calls to FFA_NOTIFICATION_SET interface. */
 #define FFA_NOTIFICATIONS_FLAG_PER_VCPU (UINT32_C(1) << 0)
-
-/** Flag for FFA_NOTIFICATION_SET to delay Schedule Receiver Interrupt */
 #define FFA_NOTIFICATIONS_FLAG_DELAY_SRI (UINT32_C(1) << 1)
-
 #define FFA_NOTIFICATIONS_FLAGS_VCPU_ID(id) \
 	((((uint32_t)(id)) & UINT32_C(0xffff)) << 16)
+#define FFA_NOTIFICATIONS_FLAGS_GET_VCPU_ID(flags) \
+	((ffa_vcpu_index_t)((flags) >> 16))
 
 static inline ffa_vcpu_index_t ffa_notifications_get_vcpu(struct ffa_value args)
 {
-	return (ffa_vcpu_index_t)(args.arg1 >> 16 & 0xffffU);
+	return FFA_NOTIFICATIONS_FLAGS_GET_VCPU_ID(args.arg1);
 }
 
 /**

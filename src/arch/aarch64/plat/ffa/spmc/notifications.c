@@ -104,8 +104,9 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 }
 
 bool plat_ffa_notifications_update_bindings_forward(
-	ffa_id_t receiver_id, ffa_id_t sender_id, uint32_t flags,
-	ffa_notifications_bitmap_t bitmap, bool is_bind, struct ffa_value *ret)
+	ffa_id_t receiver_id, ffa_id_t sender_id,
+	ffa_notification_flags_t flags, ffa_notifications_bitmap_t bitmap,
+	bool is_bind, struct ffa_value *ret)
 {
 	(void)ret;
 	(void)receiver_id;
@@ -173,7 +174,8 @@ bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 }
 
 bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
-				       ffa_id_t receiver_vm_id, uint32_t flags,
+				       ffa_id_t receiver_vm_id,
+				       ffa_notification_flags_t flags,
 				       ffa_notifications_bitmap_t bitmap,
 				       struct ffa_value *ret)
 {
@@ -187,7 +189,8 @@ bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
 }
 
 bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_id_t receiver_id, uint32_t flags)
+					ffa_id_t receiver_id,
+					ffa_notification_flags_t flags)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 	/*
@@ -324,25 +327,21 @@ out:
 	return ret;
 }
 
-bool plat_ffa_notifications_get_from_sp(struct vm_locked receiver_locked,
-					ffa_vcpu_index_t vcpu_id,
-					ffa_notifications_bitmap_t *from_sp,
-					struct ffa_value *ret)
+struct ffa_value plat_ffa_notifications_get_from_sp(
+	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
+	ffa_notifications_bitmap_t *from_sp)
 {
-	(void)ret;
-
 	*from_sp = vm_notifications_partition_get_pending(receiver_locked,
 							  false, vcpu_id);
 
-	return true;
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-bool plat_ffa_notifications_get_framework_notifications(
+struct ffa_value plat_ffa_notifications_get_framework_notifications(
 	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_fwk,
-	uint32_t flags, ffa_vcpu_index_t vcpu_id, struct ffa_value *ret)
+	ffa_notification_flags_t flags, ffa_vcpu_index_t vcpu_id)
 {
 	assert(from_fwk != NULL);
-	assert(ret != NULL);
 
 	(void)vcpu_id;
 
@@ -351,13 +350,12 @@ bool plat_ffa_notifications_get_framework_notifications(
 		dlog_error(
 			"Notification get flag from hypervisor in call to SPMC "
 			"MBZ.\n");
-		*ret = ffa_error(FFA_INVALID_PARAMETERS);
-		return false;
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	*from_fwk = vm_notifications_framework_get_pending(receiver_locked);
 
-	return true;
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
 static void plat_ffa_send_schedule_receiver_interrupt(struct cpu *cpu)
