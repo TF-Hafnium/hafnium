@@ -663,14 +663,42 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 								  i);
 			assert(receiver != NULL);
 
-			if (receiver->reserved_0 != 0) {
-				dlog_verbose(
-					"Reserved field in the memory access "
-					"descriptor must be zero. Currently "
-					"reciever %zu has a reserved field "
-					"with a value of %lu\n",
-					i, receiver->reserved_0);
-				return false;
+			if (ffa_version == FFA_VERSION_1_1) {
+				/*
+				 * Since the reserved field is at the end of the
+				 * Endpoint Memory Access Descriptor we must
+				 * cast to ffa_memory_access_v1_0 as they match.
+				 * Since all fields except reserved in the
+				 * Endpoint Memory Access Descriptor have the
+				 * same offsets across all versions this cast is
+				 * not required when accessing other fields in
+				 * the future.
+				 */
+				struct ffa_memory_access_v1_0 *receiver_v1_0 =
+					(struct ffa_memory_access_v1_0 *)
+						receiver;
+				if (receiver_v1_0->reserved_0 != 0) {
+					dlog_verbose(
+						"Reserved field in the memory "
+						"access descriptor must be "
+						"zero. Currently reciever %zu "
+						"has a reserved field with a "
+						"value of %lu\n",
+						i, receiver_v1_0->reserved_0);
+					return false;
+				}
+
+			} else {
+				if (receiver->reserved_0 != 0) {
+					dlog_verbose(
+						"Reserved field in the memory "
+						"access descriptor must be "
+						"zero. Currently reciever %zu "
+						"has a reserved field with a "
+						"value of %lu\n",
+						i, receiver->reserved_0);
+					return false;
+				}
 			}
 		}
 
