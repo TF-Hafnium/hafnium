@@ -1507,6 +1507,13 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		 * target vCPU that is in RUNNING state on another physical CPU.
 		 */
 		if (current_locked.vcpu == target_vcpu_locked.vcpu) {
+			/*
+			 * End the interrupt to drop the running priority. It
+			 * also deactivates the physical interrupt.
+			 */
+			plat_interrupts_end_of_interrupt(intid);
+			target_vcpu->secure_interrupt_deactivated = true;
+
 			vcpu_set_processing_interrupt(
 				target_vcpu_locked, intid,
 				(struct vcpu_locked){.vcpu = NULL});
@@ -1656,6 +1663,13 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * file for the description of this variable.
 			 */
 			current->implicit_completion_signal = true;
+
+			/*
+			 * End the interrupt to drop the running priority. It
+			 * also deactivates the physical interrupt.
+			 */
+			plat_interrupts_end_of_interrupt(intid);
+			target_vcpu->secure_interrupt_deactivated = true;
 
 			/*
 			 * If the target vCPU is the running vCPU, no other
