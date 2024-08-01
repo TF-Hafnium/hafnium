@@ -1619,7 +1619,10 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * normal world, queue the virtual interrupt and resume
 			 * the current vCPU.
 			 */
-			panic("Target vCPU cannot be in blocked state\n");
+			next = NULL;
+			plat_ffa_queue_vint_deactivate_pint(
+				target_vcpu_locked, intid,
+				(struct vcpu_locked){.vcpu = NULL});
 		} else {
 			/*
 			 * Under the current design, there is only one possible
