@@ -430,7 +430,7 @@ static enum manifest_return_code parse_uuid_list(struct uint32list_iter *uuid,
 {
 	uint16_t j;
 
-	for (j = 0; j < PARTITION_MAX_UUIDS && uint32list_has_next(uuid); j++) {
+	for (j = 0; uint32list_has_next(uuid); j++) {
 		TRY(parse_uuid(uuid, &out[j]));
 
 		if (ffa_uuid_is_null(&out[j])) {
@@ -438,6 +438,10 @@ static enum manifest_return_code parse_uuid_list(struct uint32list_iter *uuid,
 		}
 		dlog_verbose("  UUID %#x-%x-%x-%x\n", out[j].uuid[0],
 			     out[j].uuid[1], out[j].uuid[2], out[j].uuid[3]);
+
+		if (j >= PARTITION_MAX_UUIDS) {
+			return MANIFEST_ERROR_TOO_MANY_UUIDS;
+		}
 	}
 
 	*len = j;
@@ -1735,6 +1739,9 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		       "default largest value";
 	case MANIFEST_ERROR_UUID_ALL_ZEROS:
 		return "UUID should not be NIL";
+	case MANIFEST_ERROR_TOO_MANY_UUIDS:
+		return "Manifest specifies more UUIDs than Hafnium has "
+		       "statically allocated space for";
 	case MANIFEST_ERROR_MISSING_SMMU_ID:
 		return "SMMU ID must be specified for the given Stream IDs";
 	case MANIFEST_ERROR_MISMATCH_DMA_ACCESS_PERMISSIONS:

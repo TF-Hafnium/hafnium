@@ -1979,6 +1979,35 @@ TEST_F(manifest, ffa_valid_multiple_uuids)
 	ASSERT_EQ(vm->partition.messaging_method, FFA_PARTITION_INDIRECT_MSG);
 	ASSERT_EQ(vm->partition.ns_interrupts_action, NS_ACTION_ME);
 }
+
+TEST_F(manifest, ffa_too_many_uuids)
+{
+	struct_manifest *m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10002>")
+		.Property("uuid",
+			 "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>,"
+			  "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1daaa>,"
+			  "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1daaa>,"
+			  "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1daaa>,"
+			  "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1daaa>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("messaging-method", "<4>")
+		.Property("ns-interrupts-action", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_TOO_MANY_UUIDS);
+}
+
 TEST_F(manifest, ffa_uuid_all_zeros)
 {
 	struct_manifest *m;
