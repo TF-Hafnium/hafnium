@@ -1391,6 +1391,16 @@ enum manifest_return_code parse_ffa_manifest(
 	}
 
 	TRY(read_optional_uint32(
+		&root, "vm-availability-messages", 0,
+		(uint32_t *)&vm->partition.vm_availability_messages));
+	dlog_verbose("vm-availability-messages=%#x\n",
+		     *(uint32_t *)&vm->partition.vm_availability_messages);
+
+	if (vm->partition.vm_availability_messages.mbz != 0) {
+		return MANIFEST_ERROR_VM_AVAILABILITY_MESSAGE_INVALID;
+	}
+
+	TRY(read_optional_uint32(
 		&root, "power-management-messages",
 		MANIFEST_POWER_MANAGEMENT_CPU_OFF_SUPPORTED |
 			MANIFEST_POWER_MANAGEMENT_CPU_ON_SUPPORTED,
@@ -1754,6 +1764,9 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_DMA_DEVICE_OVERFLOW:
 		return "Number of device regions with DMA peripheral exceeds "
 		       "limit.";
+	case MANIFEST_ERROR_VM_AVAILABILITY_MESSAGE_INVALID:
+		return "VM availability messages invalid (bits [31:2] must be "
+		       "zero)";
 	}
 
 	panic("Unexpected manifest return code.");

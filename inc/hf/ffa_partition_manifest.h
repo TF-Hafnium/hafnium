@@ -12,6 +12,7 @@
 
 #include "hf/addr.h"
 #include "hf/memiter.h"
+#include "hf/static_assert.h"
 #include "hf/string.h"
 
 #include "vmapi/hf/ffa.h"
@@ -150,6 +151,15 @@ struct rx_tx {
 	struct memory_region *tx_buffer;
 };
 
+struct vm_availability_messages {
+	bool vm_created : 1;
+	bool vm_destroyed : 1;
+	uint32_t mbz : 30;
+};
+
+static_assert(sizeof(struct vm_availability_messages) == sizeof(uint32_t),
+	      "vm_availability_messages must have same size as uint32_t");
+
 /**
  * Partition manifest as described in FF-A v1.0 spec section 3.1
  */
@@ -199,6 +209,11 @@ struct ffa_partition_manifest {
 	bool me_signal_virq;
 	/** optional - receipt of notifications. */
 	bool notification_support;
+	/**
+	 * optional - VM availability messages bitfield.
+	 */
+	struct vm_availability_messages vm_availability_messages;
+
 	/**
 	 * optional - power management messages bitfield.
 	 *

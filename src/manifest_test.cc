@@ -1059,6 +1059,133 @@ TEST_F(manifest, ffa_validate_interrupt_actions)
 		  MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION);
 }
 
+TEST_F(manifest, vm_availability_messages)
+{
+	struct manifest_vm *vm;
+	struct_manifest *m;
+	std::vector<char> dtb;
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<8>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("messaging-method", "<1>")
+		.Property("vm-availability-messages", "<0>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	vm = &m->vm[0];
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_created, 0);
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_destroyed, 0);
+	ASSERT_EQ(vm->partition.vm_availability_messages.mbz, 0);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<8>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("messaging-method", "<1>")
+		.Property("vm-availability-messages", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	vm = &m->vm[0];
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_created, 1);
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_destroyed, 0);
+	ASSERT_EQ(vm->partition.vm_availability_messages.mbz, 0);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<8>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("messaging-method", "<1>")
+		.Property("vm-availability-messages", "<2>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	vm = &m->vm[0];
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_created, 0);
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_destroyed, 1);
+	ASSERT_EQ(vm->partition.vm_availability_messages.mbz, 0);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<8>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("messaging-method", "<1>")
+		.Property("vm-availability-messages", "<3>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	vm = &m->vm[0];
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_created, 1);
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_destroyed, 1);
+	ASSERT_EQ(vm->partition.vm_availability_messages.mbz, 0);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<8>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("messaging-method", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	vm = &m->vm[0];
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_created, 0);
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_destroyed, 0);
+	ASSERT_EQ(vm->partition.vm_availability_messages.mbz, 0);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10001>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<8>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("messaging-method", "<2>")
+		.Property("vm-availability-messages", "<4>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_VM_AVAILABILITY_MESSAGE_INVALID);
+	vm = &m->vm[0];
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_created, 0);
+	ASSERT_EQ(vm->partition.vm_availability_messages.vm_destroyed, 0);
+	ASSERT_NE(vm->partition.vm_availability_messages.mbz, 0);
+	manifest_dealloc();
+}
+
 TEST_F(manifest, power_management)
 {
 	struct manifest_vm *vm;
