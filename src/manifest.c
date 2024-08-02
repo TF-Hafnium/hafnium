@@ -402,6 +402,48 @@ static enum manifest_return_code uint32list_get_next(
 	return MANIFEST_SUCCESS;
 }
 
+/**
+ * Parse a UUID from `uuid` into `out`.
+ * Returns `MANIFEST_SUCCESS` if parsing succeeded.
+ */
+static enum manifest_return_code parse_uuid(struct uint32list_iter *uuid,
+					    struct ffa_uuid *out)
+{
+	for (size_t i = 0; i < 4 && uint32list_has_next(uuid); i++) {
+		TRY(uint32list_get_next(uuid, &out->uuid[i]));
+	}
+
+	return MANIFEST_SUCCESS;
+}
+
+/**
+ * Parse a list of UUIDs from `uuid` into `out`.
+ * Writes the number of UUIDs parsed to `len`.
+ * Returns `MANIFEST_SUCCESS` if parsing succeeded.
+ * Returns `MANIFEST_ERROR_UUID_ALL_ZEROS` if any of the UUIDs are all zeros.
+ * Returns `MANIFEEST_ERROR_TOO_MANY_UUIDS` if there are more than
+ * `PARTITION_MAX_UUIDS`
+ */
+static enum manifest_return_code parse_uuid_list(struct uint32list_iter *uuid,
+						 struct ffa_uuid *out,
+						 uint16_t *len)
+{
+	uint16_t j;
+
+	for (j = 0; j < PARTITION_MAX_UUIDS && uint32list_has_next(uuid); j++) {
+		TRY(parse_uuid(uuid, &out[j]));
+
+		if (ffa_uuid_is_null(&out[j])) {
+			return MANIFEST_ERROR_UUID_ALL_ZEROS;
+		}
+		dlog_verbose("  UUID %#x-%x-%x-%x\n", out[j].uuid[0],
+			     out[j].uuid[1], out[j].uuid[2], out[j].uuid[3]);
+	}
+
+	*len = j;
+	return MANIFEST_SUCCESS;
+}
+
 static enum manifest_return_code parse_vm_common(const struct fdt_node *node,
 						 struct manifest_vm *vm,
 						 ffa_id_t vm_id)
@@ -1155,11 +1197,8 @@ enum manifest_return_code parse_ffa_manifest(
 	struct fdt *fdt, struct manifest_vm *vm,
 	struct fdt_node *boot_info_node, const struct boot_params *boot_params)
 {
-	unsigned int i = 0;
-	unsigned int j = 0;
 	struct uint32list_iter uuid;
 	uintpaddr_t load_address;
-	uint32_t uuid_word;
 	struct fdt_node root;
 	struct fdt_node ffa_node;
 	struct string rxtx_node_name = STRING_INIT("rx_tx-info");
@@ -1179,26 +1218,8 @@ enum manifest_return_code parse_ffa_manifest(
 
 	TRY(read_uint32list(&root, "uuid", &uuid));
 
-	while (uint32list_has_next(&uuid) && j < PARTITION_MAX_UUIDS) {
-		while (uint32list_has_next(&uuid) && i < 4) {
-			TRY(uint32list_get_next(&uuid, &uuid_word));
-			vm->partition.uuids[j].uuid[i] = uuid_word;
-			i++;
-		}
-
-		if (ffa_uuid_is_null(&vm->partition.uuids[j])) {
-			return MANIFEST_ERROR_UUID_ALL_ZEROS;
-		}
-		dlog_verbose("  UUID %#x-%x-%x-%x\n",
-			     vm->partition.uuids[j].uuid[0],
-			     vm->partition.uuids[j].uuid[1],
-			     vm->partition.uuids[j].uuid[2],
-			     vm->partition.uuids[j].uuid[3]);
-		j++;
-		i = 0;
-	}
-
-	vm->partition.uuid_count = j;
+	TRY(parse_uuid_list(&uuid, vm->partition.uuids,
+			    &vm->partition.uuid_count));
 	dlog_verbose("  Number of UUIDs %u\n", vm->partition.uuid_count);
 
 	TRY(read_uint32(&root, "ffa-version", &vm->partition.ffa_version));

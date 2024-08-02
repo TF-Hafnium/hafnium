@@ -812,8 +812,9 @@ static inline bool ffa_uuid_equal(const struct ffa_uuid *uuid1,
 
 static inline bool ffa_uuid_is_null(const struct ffa_uuid *uuid)
 {
-	return (uuid->uuid[0] == 0) && (uuid->uuid[1] == 0) &&
-	       (uuid->uuid[2] == 0) && (uuid->uuid[3] == 0);
+	struct ffa_uuid null = {0};
+
+	return ffa_uuid_equal(uuid, &null);
 }
 
 static inline void ffa_uuid_unpack_from_uint64(uint64_t uuid_lo,
