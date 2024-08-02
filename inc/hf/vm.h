@@ -211,6 +211,15 @@ struct vm {
 		bool npi_injected;
 	} notifications;
 
+	/**
+	 * Whether this partition is subscribed to receiving VM created/VM
+	 * destroyed messages.
+	 */
+	struct {
+		bool vm_created;
+		bool vm_destroyed;
+	} vm_availability_messages;
+
 	atomic_bool aborting;
 
 	/**

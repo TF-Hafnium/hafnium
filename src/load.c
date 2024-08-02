@@ -234,6 +234,13 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->notifications.enabled =
 			manifest_vm->partition.notification_support;
 
+		vm_locked.vm->vm_availability_messages.vm_created =
+			manifest_vm->partition.vm_availability_messages
+				.vm_created;
+		vm_locked.vm->vm_availability_messages.vm_destroyed =
+			manifest_vm->partition.vm_availability_messages
+				.vm_destroyed;
+
 		vm_locked.vm->boot_order = manifest_vm->partition.boot_order;
 
 		vm_locked.vm->boot_info.gp_register_num =

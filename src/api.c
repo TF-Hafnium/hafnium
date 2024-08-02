@@ -490,6 +490,19 @@ static ffa_partition_properties_t api_ffa_partitions_info_get_properties(
 		properties |= vm->messaging_method & FFA_PARTITION_INDIRECT_MSG;
 	}
 
+	/*
+	 * Only populate on calls from normal world,
+	 * and if SP supports receiving direct message requests.
+	 */
+	if (ffa_is_vm_id(caller_id) &&
+	    (properties & FFA_PARTITION_DIRECT_REQ_RECV) != 0) {
+		if (vm->vm_availability_messages.vm_created) {
+			properties |= FFA_PARTITION_VM_CREATED;
+		}
+		if (vm->vm_availability_messages.vm_destroyed) {
+			properties |= FFA_PARTITION_VM_DESTROYED;
+		}
+	}
 	return properties;
 }
 

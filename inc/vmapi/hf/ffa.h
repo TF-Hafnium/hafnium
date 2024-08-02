@@ -865,6 +865,18 @@ typedef uint32_t ffa_partition_properties_t;
 /** Partition property: partition can receive notifications. */
 #define FFA_PARTITION_NOTIFICATION (UINT32_C(1) << 3)
 
+/**
+ * Partition property: partition must be informed about each VM that is created
+ * by the Hypervisor.
+ */
+#define FFA_PARTITION_VM_CREATED (UINT32_C(1) << 6)
+
+/**
+ * Partition property: partition must be informed about each VM that is
+ * destroyed by the Hypervisor.
+ */
+#define FFA_PARTITION_VM_DESTROYED (UINT32_C(1) << 7)
+
 /** Partition property: partition runs in the AArch64 execution state. */
 #define FFA_PARTITION_AARCH64_EXEC (UINT32_C(1) << 8)
 
