@@ -9,7 +9,11 @@ readme = "readme.rst"
 [tool.poetry.dependencies]
 python = "^3.8"
 
-[tool.poetry.group.doc.dependencies]
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
 sphinx = "^5.3.0"
 myst-parser = "^0.18.1"
 sphinxcontrib-plantuml = "^0.24.1"

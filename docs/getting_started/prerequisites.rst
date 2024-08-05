@@ -80,11 +80,11 @@ Ubuntu):
     sudo apt install python3 python3-pip plantuml
     curl -sSL https://install.python-poetry.org | python3 -
 
-To install Python dependencies using Poetry:
+Run the command below to install using Poetry, Python dependencies to build the documentation:
 
 .. code:: shell
 
-    poetry install
+    poetry install --with docs
 
 Poetry will create a new virtual environment and install all dependencies listed
 in ``pyproject.toml``. You can get information about this environment, such as
