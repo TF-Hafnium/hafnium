@@ -3494,13 +3494,15 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		dlog_verbose("Failed to allocate memory region copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
 	}
+	memory_region = allocated_entry;
 
 	if (!memcpy_trapped(allocated_entry, MM_PPOOL_ENTRY_SIZE, from_msg,
 			    fragment_length)) {
 		dlog_error(
 			"%s: Failed to copy FF-A memory region descriptor.\n",
 			__func__);
-		return ffa_error(FFA_ABORTED);
+		ret = ffa_error(FFA_ABORTED);
+		goto out;
 	}
 
 	if (!ffa_memory_region_sanity_check(allocated_entry, ffa_version,
@@ -3514,8 +3516,6 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
-
-	memory_region = allocated_entry;
 
 	if (fragment_length < sizeof(struct ffa_memory_region) +
 				      memory_region->memory_access_desc_size) {
