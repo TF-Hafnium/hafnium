@@ -259,6 +259,15 @@ void vcpu_update_boot(struct vcpu *vcpu)
 	vcpu->next_boot = current;
 }
 
+void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
+				    uint32_t intid)
+{
+	struct interrupts *interrupts = &(vcpu_locked.vcpu->interrupts);
+
+	vcpu_virt_interrupt_clear_pending(interrupts, intid);
+	vcpu_interrupt_count_decrement(vcpu_locked, interrupts, intid);
+}
+
 /**
  * Sets the vcpu in the VCPU_STATE_RUNNING.
  * With that, its register are set as "not available".

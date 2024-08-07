@@ -2344,14 +2344,6 @@ out:
 	return ret;
 }
 
-static void api_interrupt_clear_decrement(struct vcpu_locked locked_vcpu,
-					  struct interrupts *interrupts,
-					  uint32_t intid)
-{
-	vcpu_virt_interrupt_clear_pending(interrupts, intid);
-	vcpu_interrupt_count_decrement(locked_vcpu, interrupts, intid);
-}
-
 /**
  * Returns the ID of the next pending interrupt for the calling vCPU, and
  * acknowledges it (i.e. marks it as no longer pending). Returns
@@ -2381,8 +2373,8 @@ uint32_t api_interrupt_get(struct vcpu_locked current_locked)
 			/*
 			 * Mark it as no longer pending and decrement the count.
 			 */
-			api_interrupt_clear_decrement(
-				current_locked, interrupts, first_interrupt);
+			vcpu_interrupt_clear_decrement(current_locked,
+						       first_interrupt);
 			break;
 		}
 	}
@@ -3228,9 +3220,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 
 		if (vcpu_is_virt_interrupt_pending(interrupts,
 						   HF_MANAGED_EXIT_INTID)) {
-			api_interrupt_clear_decrement(current_locked,
-						      interrupts,
-						      HF_MANAGED_EXIT_INTID);
+			vcpu_interrupt_clear_decrement(current_locked,
+						       HF_MANAGED_EXIT_INTID);
 		}
 	}
 
