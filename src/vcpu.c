@@ -506,3 +506,16 @@ bool vcpu_is_interrupt_queue_empty(struct vcpu_locked vcpu_locked)
 
 	return false;
 }
+
+/**
+ * When interrupt handling is complete the preempted_vcpu field should go back
+ * to NULL.
+ */
+void vcpu_secure_interrupt_complete(struct vcpu_locked vcpu_locked)
+{
+	struct vcpu *vcpu;
+
+	vcpu = vcpu_locked.vcpu;
+	vcpu->preempted_vcpu = NULL;
+	vcpu->implicit_completion_signal = false;
+}

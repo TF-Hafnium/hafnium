@@ -1116,19 +1116,6 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
 }
 
 /**
- * Indicate that secure interrupt processing is complete and clear corresponding
- * fields.
- */
-static void plat_ffa_reset_secure_interrupt_flags(
-	struct vcpu_locked current_locked)
-{
-	struct vcpu *current;
-
-	current = current_locked.vcpu;
-	current->preempted_vcpu = NULL;
-}
-
-/**
  * Check if current VM can resume target VM using FFA_RUN ABI.
  */
 bool plat_ffa_run_checks(struct vcpu_locked current_locked,
@@ -1247,7 +1234,7 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 			 * Clear fields corresponding to secure interrupt
 			 * handling.
 			 */
-			plat_ffa_reset_secure_interrupt_flags(current_locked);
+			vcpu_secure_interrupt_complete(current_locked);
 		}
 	}
 
@@ -1355,11 +1342,7 @@ int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 		/* Restore interrupt priority mask. */
 		plat_interrupts_set_priority_mask(current->priority_mask);
 
-		/*
-		 * Clear fields corresponding to secure interrupt
-		 * handling.
-		 */
-		current->implicit_completion_signal = false;
+		vcpu_secure_interrupt_complete(current_locked);
 	}
 
 	/*
@@ -1803,7 +1786,7 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 		plat_interrupts_end_of_interrupt(intid);
 
 		/* Clear fields corresponding to secure interrupt handling. */
-		plat_ffa_reset_secure_interrupt_flags(target_vcpu_locked);
+		vcpu_secure_interrupt_complete(target_vcpu_locked);
 		plat_ffa_disable_vm_interrupts(target_vm_locked);
 
 		/* Resume current vCPU. */
@@ -1871,7 +1854,7 @@ struct ffa_value plat_ffa_normal_world_resume(struct vcpu_locked current_locked,
 	struct vcpu *current = current_locked.vcpu;
 
 	/* Reset the fields tracking secure interrupt processing. */
-	plat_ffa_reset_secure_interrupt_flags(current_locked);
+	vcpu_secure_interrupt_complete(current_locked);
 
 	/* SPMC scheduled call chain is completely unwound. */
 	plat_ffa_exit_spmc_schedule_mode(current_locked);
@@ -1920,7 +1903,7 @@ static struct ffa_value plat_ffa_preempted_vcpu_resume(
 	target_locked = vcpus_locked.vcpu2;
 
 	/* Reset the fields tracking secure interrupt processing. */
-	plat_ffa_reset_secure_interrupt_flags(current_locked);
+	vcpu_secure_interrupt_complete(current_locked);
 
 	/* SPMC scheduled call chain is completely unwound. */
 	plat_ffa_exit_spmc_schedule_mode(current_locked);
@@ -2292,7 +2275,7 @@ static struct ffa_value plat_ffa_helper_resume_intercepted_call(
 	struct two_vcpu_locked vcpus_locked;
 
 	/* Reset the fields tracking secure interrupt processing. */
-	plat_ffa_reset_secure_interrupt_flags(current_locked);
+	vcpu_secure_interrupt_complete(current_locked);
 
 	/* SPMC scheduled call chain is completely unwound. */
 	plat_ffa_exit_spmc_schedule_mode(current_locked);
