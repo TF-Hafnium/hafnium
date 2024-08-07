@@ -1239,7 +1239,7 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 	}
 
 	/* Check if a vCPU of SP is being resumed. */
-	if ((target_vm_id & HF_VM_ID_WORLD_MASK) != 0) {
+	if (vm_id_is_current_world(target_vm_id)) {
 		/*
 		 * A call chain cannot span CPUs. The target vCPU can only be
 		 * resumed by FFA_RUN on present CPU.
