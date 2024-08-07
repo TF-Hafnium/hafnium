@@ -2264,6 +2264,22 @@ static void plat_ffa_vcpu_allow_interrupts(struct vcpu *current)
 	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
 }
 
+static struct ffa_value ffa_msg_wait_complete(struct vcpu_locked current_locked,
+					      struct vcpu **next)
+{
+	struct vcpu *current = current_locked.vcpu;
+
+	current->scheduling_mode = NONE;
+	current->rt_model = RTM_NONE;
+
+	/* Relinquish control back to the NWd. */
+	*next = api_switch_to_other_world(
+		current_locked, (struct ffa_value){.func = FFA_MSG_WAIT_32},
+		VCPU_STATE_WAITING);
+
+	return (struct ffa_value){.func = FFA_INTERRUPT_32};
+}
+
 static struct ffa_value plat_ffa_helper_resume_intercepted_call(
 	struct vcpu_locked current_locked, struct vcpu **next,
 	bool is_ffa_msg_wait)
@@ -2291,17 +2307,7 @@ static struct ffa_value plat_ffa_helper_resume_intercepted_call(
 		/* Resume intercepted FFA_MSG_WAIT call. */
 		dlog_verbose("Resuming intercepted FFA_MSG_WAIT from: %x\n",
 			     current->vm->id);
-
-		current->scheduling_mode = NONE;
-		current->rt_model = RTM_NONE;
-
-		/* Relinquish control back to the NWd. */
-		*next = api_switch_to_other_world(
-			current_locked,
-			(struct ffa_value){.func = FFA_MSG_WAIT_32},
-			VCPU_STATE_WAITING);
-
-		return (struct ffa_value){.func = FFA_INTERRUPT_32};
+		return ffa_msg_wait_complete(current_locked, next);
 	}
 
 	/* Reset the flag now. */
@@ -2468,15 +2474,7 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 	 * The vCPU of an SP on secondary CPUs will invoke FFA_MSG_WAIT
 	 * to indicate successful initialization to SPMC.
 	 */
-	current->scheduling_mode = NONE;
-	current->rt_model = RTM_NONE;
-
-	/* Relinquish control back to the NWd. */
-	*next = api_switch_to_other_world(
-		current_locked, (struct ffa_value){.func = FFA_MSG_WAIT_32},
-		VCPU_STATE_WAITING);
-
-	return ret_args;
+	return ffa_msg_wait_complete(current_locked, next);
 }
 
 struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
