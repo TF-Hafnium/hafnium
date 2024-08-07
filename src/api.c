@@ -2357,18 +2357,16 @@ static void api_interrupt_clear_decrement(struct vcpu_locked locked_vcpu,
  * acknowledges it (i.e. marks it as no longer pending). Returns
  * HF_INVALID_INTID if there are no pending interrupts.
  */
-uint32_t api_interrupt_get(struct vcpu *current)
+uint32_t api_interrupt_get(struct vcpu_locked current_locked)
 {
 	uint32_t i;
 	uint32_t first_interrupt = HF_INVALID_INTID;
-	struct vcpu_locked current_locked;
-	struct interrupts *interrupts = &current->interrupts;
+	struct interrupts *interrupts = &current_locked.vcpu->interrupts;
 
 	/*
 	 * Find the first enabled and pending interrupt ID, return it, and
 	 * deactivate it.
 	 */
-	current_locked = vcpu_lock(current);
 	for (i = 0; i < HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS; ++i) {
 		uint32_t enabled_and_pending =
 			interrupts->interrupt_enabled.bitmap[i] &
@@ -2389,7 +2387,6 @@ uint32_t api_interrupt_get(struct vcpu *current)
 		}
 	}
 
-	vcpu_unlock(&current_locked);
 	return first_interrupt;
 }
 

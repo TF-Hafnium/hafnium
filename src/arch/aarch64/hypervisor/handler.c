@@ -1114,10 +1114,14 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 						       args.arg3, vcpu);
 		break;
 
-	case HF_INTERRUPT_GET:
-		vcpu->regs.r[0] = api_interrupt_get(vcpu);
-		break;
+	case HF_INTERRUPT_GET: {
+		struct vcpu_locked current_locked;
 
+		current_locked = vcpu_lock(vcpu);
+		vcpu->regs.r[0] = plat_ffa_interrupt_get(current_locked);
+		vcpu_unlock(&current_locked);
+		break;
+	}
 	default:
 		vcpu->regs.r[0] = SMCCC_ERROR_UNKNOWN;
 		dlog_verbose("Unsupported function %#lx\n", args.func);

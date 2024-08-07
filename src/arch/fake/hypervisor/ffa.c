@@ -685,3 +685,10 @@ bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
 
 	return true;
 }
+
+uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)
+{
+	(void)current_locked;
+
+	return 0;
+}

@@ -3053,3 +3053,30 @@ void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
 	 */
 	plat_ffa_disable_vm_interrupts(vm_locked);
 }
+
+/* Returns the virtual interrupt id to be handled by SP. */
+uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)
+{
+	uint32_t int_id;
+
+	/*
+	 * If there are any virtual interrupts in the queue, return the first
+	 * entry. Else, return the pending interrupt from the bitmap.
+	 */
+	if (vcpu_interrupt_queue_peek(current_locked, &int_id)) {
+		struct interrupts *interrupts;
+
+		/*
+		 * Mark the virtual interrupt as no longer pending and decrement
+		 * the count.
+		 */
+		interrupts = &current_locked.vcpu->interrupts;
+		vcpu_virt_interrupt_clear_pending(interrupts, int_id);
+		vcpu_interrupt_count_decrement(current_locked, interrupts,
+					       int_id);
+
+		return int_id;
+	}
+
+	return api_interrupt_get(current_locked);
+}

@@ -36,7 +36,7 @@ struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu);
 
 int64_t api_interrupt_enable(uint32_t intid, bool enable,
 			     enum interrupt_type type, struct vcpu *current);
-uint32_t api_interrupt_get(struct vcpu *current);
+uint32_t api_interrupt_get(struct vcpu_locked current_locked);
 int64_t api_interrupt_inject(ffa_id_t target_vm_id,
 			     ffa_vcpu_index_t target_vcpu_idx, uint32_t intid,
 			     struct vcpu *current, struct vcpu **next);

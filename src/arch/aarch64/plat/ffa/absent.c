@@ -621,3 +621,8 @@ void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
 {
 	(void)vm_locked;
 }
+
+uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)
+{
+	return api_interrupt_get(current_locked);
+}
