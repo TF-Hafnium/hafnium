@@ -1224,7 +1224,7 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 			 * in WAITING or BLOCKED states. Refer the embedded
 			 * comment in vcpu.h file for further description.
 			 */
-			assert(!current->implicit_completion_signal);
+			assert(!current->requires_deactivate_call);
 
 			/* Restore interrupt priority mask. */
 			plat_interrupts_set_priority_mask(
@@ -1335,7 +1335,7 @@ int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 		goto out;
 	}
 
-	if (current->implicit_completion_signal) {
+	if (current->requires_deactivate_call) {
 		/* There is no preempted vCPU to resume. */
 		assert(current->preempted_vcpu == NULL);
 
@@ -1679,6 +1679,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 		plat_ffa_queue_vint_deactivate_pint(
 			target_vcpu_locked, intid,
 			(struct vcpu_locked){.vcpu = NULL});
+
 		break;
 	case VCPU_STATE_RUNNING:
 		if (current == target_vcpu) {
@@ -1690,7 +1691,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * implicitly. Refer to the embedded comment in vcpu.h
 			 * file for the description of this variable.
 			 */
-			current->implicit_completion_signal = true;
+
+			current->requires_deactivate_call = true;
 		} else {
 			/*
 			 * The target vcpu has migrated to a different physical
@@ -1755,7 +1757,7 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	 * signal should be false unless there was a bug in source code. Hence,
 	 * use assert rather than CHECK.
 	 */
-	assert(!target_vcpu->implicit_completion_signal);
+	assert(!target_vcpu->requires_deactivate_call);
 
 	if (target_vcpu == current) {
 		current_locked = vcpu_lock(current);
@@ -2159,7 +2161,7 @@ static void plat_ffa_run_in_sec_interrupt_rtm(
 	target_vcpu->scheduling_mode = SPMC_MODE;
 	target_vcpu->rt_model = RTM_SEC_INTERRUPT;
 	target_vcpu->state = VCPU_STATE_RUNNING;
-	target_vcpu->implicit_completion_signal = false;
+	target_vcpu->requires_deactivate_call = false;
 }
 
 static bool plat_ffa_helper_intercept_call(struct vcpu_locked current_locked,
@@ -2436,7 +2438,7 @@ struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
 		 * BLOCKED states. Refer the embedded comment in vcpu.h file
 		 * for further description.
 		 */
-		assert(!current->implicit_completion_signal);
+		assert(!current->requires_deactivate_call);
 
 		if (current->direct_resp_intercepted) {
 			return plat_ffa_resume_direct_response(current_locked,

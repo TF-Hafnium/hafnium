@@ -194,7 +194,7 @@ struct vcpu {
 	 * while running). This variable helps SPMC to keep a track of such
 	 * mechanism and perform appropriate bookkeeping.
 	 */
-	bool implicit_completion_signal;
+	bool requires_deactivate_call;
 
 	/** SP call chain. */
 	struct call_chain call_chain;

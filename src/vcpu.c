@@ -517,5 +517,5 @@ void vcpu_secure_interrupt_complete(struct vcpu_locked vcpu_locked)
 
 	vcpu = vcpu_locked.vcpu;
 	vcpu->preempted_vcpu = NULL;
-	vcpu->implicit_completion_signal = false;
+	vcpu->requires_deactivate_call = false;
 }
