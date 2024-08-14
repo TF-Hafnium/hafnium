@@ -1127,6 +1127,11 @@ static void api_ffa_msg_wait_rx_release(struct vcpu *current)
 	vm_unlock(&vm_locked);
 }
 
+static bool api_retain_rx_buffer_ownership(struct ffa_value args)
+{
+	return ((args.arg2 & FFA_MSG_WAIT_FLAG_RETAIN_RX) != 0U);
+}
+
 struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 				  struct ffa_value *args)
 {
@@ -1137,15 +1142,19 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 		.vcpu = NULL,
 	};
 
-	if (args->arg1 != 0U || args->arg2 != 0U || args->arg3 != 0U ||
-	    args->arg4 != 0U || args->arg5 != 0U || args->arg6 != 0U ||
-	    args->arg7 != 0U) {
+	if (args->arg1 != 0U || args->arg3 != 0U || args->arg4 != 0U ||
+	    args->arg5 != 0U || args->arg6 != 0U || args->arg7 != 0U) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (current->vm->ffa_version >= FFA_VERSION_1_2 &&
-	    !api_extended_args_are_zero(args)) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
+	if (current->vm->ffa_version >= FFA_VERSION_1_2) {
+		if (!api_extended_args_are_zero(args)) {
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+	} else {
+		if (args->arg2 != 0U) {
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
 	}
 
 	current_locked = vcpu_lock(current);
@@ -1169,7 +1178,8 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 out:
 	vcpu_unlock(&current_locked);
 
-	if (ret.func != FFA_ERROR_32) {
+	if (ret.func != FFA_ERROR_32 &&
+	    !api_retain_rx_buffer_ownership(*args)) {
 		api_ffa_msg_wait_rx_release(current);
 	}
 	return ret;

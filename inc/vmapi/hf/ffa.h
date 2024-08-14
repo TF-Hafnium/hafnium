@@ -358,6 +358,7 @@ enum ffa_feature_id {
 #define FFA_MEM_PERM_RW UINT32_C(0x5)
 #define FFA_MEM_PERM_RX UINT32_C(0x3)
 
+#define FFA_MSG_WAIT_FLAG_RETAIN_RX UINT32_C(0x1)
 /*
  * Defined in Table 13.34 in the FF-A v1.1 EAC0 specification.
  * The Partition count flag is used by FFA_PARTITION_INFO_GET to specify
