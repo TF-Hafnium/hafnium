@@ -807,8 +807,6 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		return true;
 
 	default:
-		dlog_verbose("Unsupported function %#x (%s)\n", func,
-			     ffa_func_name(func));
 		return false;
 	}
 }
@@ -1162,6 +1160,7 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 
 	default:
 		vcpu->regs.r[0] = SMCCC_ERROR_UNKNOWN;
+		dlog_verbose("Unsupported function %#lx\n", args.func);
 	}
 
 	vcpu_update_virtual_interrupts(next);
