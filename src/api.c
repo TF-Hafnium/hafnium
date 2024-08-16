@@ -1109,6 +1109,24 @@ bool api_extended_args_are_zero(struct ffa_value *args)
 	return true;
 }
 
+static void api_ffa_msg_wait_rx_release(struct vcpu *current)
+{
+	struct vm_locked vm_locked;
+
+	vm_locked = plat_ffa_vm_find_locked(current->vm->id);
+	if (vm_locked.vm == NULL) {
+		return;
+	}
+
+	api_release_mailbox(vm_locked);
+
+	if (vm_locked.vm->mailbox.state != MAILBOX_STATE_EMPTY) {
+		dlog_warning("Mailbox not released to producer\n");
+	}
+
+	vm_unlock(&vm_locked);
+}
+
 struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 				  struct ffa_value *args)
 {
@@ -1142,8 +1160,18 @@ struct ffa_value api_ffa_msg_wait(struct vcpu *current, struct vcpu **next,
 	       next_state == VCPU_STATE_WAITING);
 
 	ret = plat_ffa_msg_wait_prepare(current_locked, next);
+
+	/*
+	 * To maintain partial ordering of locks, release vCPU lock before
+	 * releasing the VM's RX buffer, a process which requires locking the
+	 * VM.
+	 */
 out:
 	vcpu_unlock(&current_locked);
+
+	if (ret.func != FFA_ERROR_32) {
+		api_ffa_msg_wait_rx_release(current);
+	}
 	return ret;
 }
 
