@@ -98,10 +98,10 @@ void interrupt_wait(void)
 
 void interrupts_enable(void)
 {
-	__asm__ volatile("msr DAIFSet, #0x3");
+	__asm__ volatile("msr DAIFClr, #0x3");
 }
 
 void interrupts_disable(void)
 {
-	__asm__ volatile("msr DAIFClr, #0x3");
+	__asm__ volatile("msr DAIFSet, #0x3");
 }
