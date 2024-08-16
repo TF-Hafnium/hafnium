@@ -1,0 +1,54 @@
+/*
+ * Copyright 2021 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+#include "hf/ffa.h"
+#include "hf/std.h"
+
+#include "vmapi/hf/call.h"
+
+#include "primary_with_secondary.h"
+#include "test/hftest.h"
+#include "test/vmapi/ffa.h"
+
+TEST_SERVICE(test_ffa_msg_wait_release_buffer)
+{
+	struct ffa_value ret;
+	struct ffa_uuid uuid;
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	uint64_t msg;
+
+	/* A Null UUID requests information for all partitions. */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	dlog_verbose("FFA_PARTITION_INFO_GET put the RX buffer FULL.");
+
+	/*
+	 * Subsequent call to FFA_PARTITION_INFO_GET should fail because buffer
+	 * is busy.
+	 */
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_FFA_ERROR(ret, FFA_BUSY);
+
+	dlog_verbose("FFA_PARTITION_INFO_GET attested the RX buffer is FULL.");
+
+	/* FFA_MSG_WAIT should release buffer. */
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	/* Read RX buffer and verify expected message payload. */
+	receive_indirect_message((void *)&msg, sizeof(msg), recv_buf, NULL);
+	EXPECT_EQ(msg, 0x123);
+
+	dlog_verbose(
+		"Attested that RX buffer was available to receive indirect "
+		"message.");
+
+	ffa_yield();
+}

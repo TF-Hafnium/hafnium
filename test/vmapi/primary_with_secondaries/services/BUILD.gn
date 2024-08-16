@@ -166,6 +166,18 @@ source_set("smccc") {
   sources = [ "smccc.c" ]
 }
 
+# Services related to RX buffer ownership.
+source_set("rx_ownership") {
+  testonly = true
+  public_configs = [
+    "..:config",
+    "//test/hftest:hftest_config",
+  ]
+  deps = [ "//test/vmapi/common:ffa" ]
+
+  sources = [ "rx_ownership.c" ]
+}
+
 # Group services together into VMs.
 vm_kernel("service_vm1") {
   testonly = true
@@ -182,6 +194,7 @@ vm_kernel("service_vm1") {
     ":receive_block",
     ":relay",
     ":run_waiting",
+    ":rx_ownership",
     ":smccc",
     ":unmapped",
     ":wfi",

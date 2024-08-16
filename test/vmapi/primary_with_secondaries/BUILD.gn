@@ -284,6 +284,7 @@ vm_kernel("primary_with_sp_test_vm") {
     "ffa_console_log.c",
     "indirect_messaging.c",
     "memory_sharing.c",
+    "rx_ownership.c",
     "secure_interrupts.c",
     "smccc.c",
   ]
