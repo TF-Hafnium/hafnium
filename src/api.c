@@ -508,61 +508,72 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 				  .arg3 = partition_info_size};
 }
 
-static void api_ffa_fill_partitions_info_array(
-	struct ffa_partition_info *partitions, size_t partitions_len,
-	const struct ffa_uuid *uuid, bool count_flag, ffa_id_t vm_id,
-	ffa_vm_count_t *vm_count_out)
+static void api_ffa_fill_partition_info(
+	struct ffa_partition_info *out_partition, struct vm *vm, ffa_id_t vm_id)
 {
-	ffa_vm_count_t vm_count = 0;
-	bool uuid_is_null = ffa_uuid_is_null(uuid);
+	out_partition->vm_id = vm->id;
+	out_partition->vcpu_count = vm->vcpu_count;
+	out_partition->properties = plat_ffa_partition_properties(vm_id, vm);
+	out_partition->properties |= vm_are_notifications_enabled(vm)
+					     ? FFA_PARTITION_NOTIFICATION
+					     : 0;
+	out_partition->properties |= FFA_PARTITION_AARCH64_EXEC;
+}
 
-	assert(vm_get_count() <= partitions_len);
+/**
+ * Find VMs with UUID matching `uuid_to_find` , and fill `out_partitions` with
+ * partition infos. Returns number of VMs that matched.
+ * A null UUID matches against any VM.
+ * If `count_flag` is true, no partition infos are written to `out_partitions`,
+ * only the number of VMs that matched is returned.
+ */
+static ffa_vm_count_t api_ffa_fill_partitions_info_array(
+	struct ffa_partition_info out_partitions[], size_t out_partitions_len,
+	const struct ffa_uuid *uuid_to_find, bool count_flag, ffa_id_t vm_id)
+{
+	ffa_vm_count_t vms_found = 0;
+	bool match_any = ffa_uuid_is_null(uuid_to_find);
+
+	assert(vm_get_count() <= out_partitions_len);
 
 	/*
 	 * Iterate through the VMs to find the ones with a matching
 	 * UUID. A Null UUID retrieves information for all VMs.
 	 */
-	for (ffa_vm_count_t index = 0; index < vm_get_count(); ++index) {
-		struct vm *vm = vm_find_index(index);
+	for (ffa_vm_count_t vm_idx = 0; vm_idx < vm_get_count(); vm_idx++) {
+		struct vm *vm = vm_find_index(vm_idx);
 
-		for (uint32_t i = 0; i < PARTITION_MAX_UUIDS; i++) {
+		for (size_t uuid_idx = 0; uuid_idx < PARTITION_MAX_UUIDS;
+		     uuid_idx++) {
+			struct ffa_uuid uuid = vm->uuids[uuid_idx];
+			struct ffa_partition_info *out_partition =
+				&out_partitions[vms_found];
+
 			/*
 			 * Null UUID indicates reaching the end of a
 			 * partition's array of UUIDs.
 			 */
-			if (ffa_uuid_is_null(&vm->uuids[i])) {
+			if (ffa_uuid_is_null(&uuid)) {
 				break;
 			}
-			if (uuid_is_null ||
-			    ffa_uuid_equal(uuid, &vm->uuids[i])) {
-				uint16_t array_index = vm_count;
 
-				++vm_count;
+			if (match_any || ffa_uuid_equal(uuid_to_find, &uuid)) {
+				vms_found++;
+
 				if (count_flag) {
 					continue;
 				}
 
-				partitions[array_index].vm_id = vm->id;
-				partitions[array_index].vcpu_count =
-					vm->vcpu_count;
-				partitions[array_index].properties =
-					plat_ffa_partition_properties(vm_id,
-								      vm);
-				partitions[array_index].properties |=
-					vm_are_notifications_enabled(vm)
-						? FFA_PARTITION_NOTIFICATION
-						: 0;
-				partitions[array_index].properties |=
-					FFA_PARTITION_AARCH64_EXEC;
-				if (uuid_is_null) {
-					partitions[array_index].uuid =
-						vm->uuids[i];
+				api_ffa_fill_partition_info(out_partition, vm,
+							    vm_id);
+				if (match_any) {
+					out_partition->uuid = uuid;
 				}
 			}
 		}
 	}
 
-	*vm_count_out = vm_count;
+	return vms_found;
 }
 
 static inline void api_ffa_pack_vmid_count_props(
@@ -764,9 +775,9 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 
 	memset_s(&partitions, sizeof(partitions), 0, sizeof(partitions));
 
-	api_ffa_fill_partitions_info_array(partitions, ARRAY_SIZE(partitions),
-					   uuid, false, current_vm->id,
-					   &vm_count);
+	vm_count = api_ffa_fill_partitions_info_array(
+		partitions, ARRAY_SIZE(partitions), uuid, false,
+		current_vm->id);
 
 	/* If UUID is Null vm_count must not be zero at this stage. */
 	CHECK(!uuid_is_null || vm_count != 0);
@@ -871,9 +882,9 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	api_ffa_fill_partitions_info_array(partitions, ARRAY_SIZE(partitions),
-					   uuid, count_flag, current_vm->id,
-					   &vm_count);
+	vm_count = api_ffa_fill_partitions_info_array(
+		partitions, ARRAY_SIZE(partitions), uuid, count_flag,
+		current_vm->id);
 
 	/* If UUID is Null vm_count must not be zero at this stage. */
 	CHECK(!uuid_is_null || vm_count != 0);
@@ -2891,28 +2902,38 @@ static struct ffa_value api_ffa_dir_msg_value(struct ffa_value args)
 	return args;
 }
 
+/**
+ * Return a pointer to the first UUID in `uuids` that is equal to
+ * `target_uuid`. If `target_uuid` is 0-0-0-0, it matches any UUID.
+ */
+static struct ffa_uuid *ffa_uuid_find(struct ffa_uuid *uuids,
+				      size_t uuids_count,
+				      struct ffa_uuid target_uuid)
+{
+	if (ffa_uuid_is_null(&target_uuid)) {
+		return &uuids[0];
+	}
+
+	for (size_t i = 0; i < uuids_count; i++) {
+		if (ffa_uuid_is_null(&uuids[i])) {
+			break;
+		}
+		if (ffa_uuid_equal(&target_uuid, &uuids[i])) {
+			return &uuids[i];
+		}
+	}
+	return NULL;
+}
+
 static bool api_ffa_dir_msg_req2_is_uuid_valid(struct vm *receiver_vm,
 					       struct ffa_value args)
 {
 	struct ffa_uuid target_uuid;
-	uint16_t i;
 
 	ffa_uuid_unpack_from_uint64(args.arg2, args.arg3, &target_uuid);
 
-	/* Allow for use of Nil UUID. */
-	if (ffa_uuid_is_null(&target_uuid)) {
-		return true;
-	}
-
-	for (i = 0; i < PARTITION_MAX_UUIDS; i++) {
-		if (ffa_uuid_is_null(&receiver_vm->uuids[i])) {
-			break;
-		}
-		if (ffa_uuid_equal(&target_uuid, &receiver_vm->uuids[i])) {
-			return true;
-		}
-	}
-	return false;
+	return ffa_uuid_find(receiver_vm->uuids, PARTITION_MAX_UUIDS,
+			     target_uuid) != NULL;
 }
 
 /**
