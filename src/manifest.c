@@ -1158,6 +1158,7 @@ enum manifest_return_code parse_ffa_manifest(
 	unsigned int i = 0;
 	unsigned int j = 0;
 	struct uint32list_iter uuid;
+	uintpaddr_t load_address;
 	uint32_t uuid_word;
 	struct fdt_node root;
 	struct fdt_node ffa_node;
@@ -1218,8 +1219,12 @@ enum manifest_return_code parse_ffa_manifest(
 		       (uint8_t *)&vm->partition.execution_state));
 	dlog_verbose("  Execution state %u\n", vm->partition.execution_state);
 
-	TRY(read_optional_uint64(&root, "load-address", 0,
-				 &vm->partition.load_addr));
+	TRY(read_optional_uint64(&root, "load-address", 0, &load_address));
+	if (vm->partition.load_addr != load_address) {
+		dlog_warning(
+			"Partition's load address at its manifest differs"
+			" from specified in partition's package.\n");
+	}
 	dlog_verbose("  Load address %#lx\n", vm->partition.load_addr);
 
 	TRY(read_optional_uint64(&root, "entrypoint-offset", 0,
@@ -1454,17 +1459,12 @@ static enum manifest_return_code parse_ffa_partition_package(
 		goto out;
 	}
 
+	vm->partition.load_addr = load_address;
+
 	ret = parse_ffa_manifest(&sp_fdt, vm, &boot_info_node, boot_params);
 	if (ret != MANIFEST_SUCCESS) {
 		dlog_error("Error parsing partition manifest.\n");
 		goto out;
-	}
-
-	if (vm->partition.load_addr != load_address) {
-		dlog_warning(
-			"Partition's load address at its manifest differs from "
-			"specified in partition's package.\n");
-		vm->partition.load_addr = load_address;
 	}
 
 	if (vm->partition.gp_register_num != DEFAULT_BOOT_GP_REGISTER) {

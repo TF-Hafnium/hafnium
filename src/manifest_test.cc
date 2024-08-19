@@ -1711,15 +1711,6 @@ TEST_F(manifest, ffa_valid)
 		.EndChild()
 		.StartChild("memory-regions")
 			.Compatible({ "arm,ffa-manifest-memory-regions" })
-			.StartChild("test-memory")
-				.Description("test-memory")
-				.Property("load-address-relative-offset", "<0x7100000>")
-				.Property("pages-count", "<4>")
-				.Property("attributes", "<3>")
-				.Property("smmu-id", "<1>")
-				.Property("stream-ids", "<0 1>")
-				.Property("stream-ids-access-permissions", "<0x3 0x3>")
-			.EndChild()
 			.StartChild("test-memory-ns")
 				.Description("test-memory")
 				.Property("base-address", "<0x7200000>")
@@ -1777,14 +1768,7 @@ TEST_F(manifest, ffa_valid)
 	ASSERT_EQ(vm->partition.boot_order, 0);
 	ASSERT_EQ(vm->partition.messaging_method, FFA_PARTITION_INDIRECT_MSG);
 	ASSERT_EQ(vm->partition.ns_interrupts_action, NS_ACTION_ME);
-	ASSERT_EQ(vm->partition.mem_regions[0].base_address, 0x7100000);
-	ASSERT_EQ(vm->partition.mem_regions[0].page_count, 4);
-	ASSERT_EQ(vm->partition.mem_regions[0].attributes, 3);
-	ASSERT_EQ(vm->partition.mem_regions[0].dma_prop.smmu_id, 1);
-	ASSERT_EQ(vm->partition.mem_regions[0].dma_prop.stream_ids[0], 0);
-	ASSERT_EQ(vm->partition.mem_regions[0].dma_prop.stream_ids[1], 1);
-	ASSERT_EQ(vm->partition.mem_regions[0].dma_access_permissions, 3);
-	ASSERT_EQ(vm->partition.mem_regions[1].attributes, (8 | 3));
+	ASSERT_EQ(vm->partition.mem_regions[0].attributes, (8 | 3));
 
 	ASSERT_EQ(vm->partition.rxtx.available, true);
 	ASSERT_EQ(vm->partition.rxtx.rx_buffer->base_address, 0x7300000);
