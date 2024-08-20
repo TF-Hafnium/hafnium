@@ -13,7 +13,11 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
+#include "test/semaphore.h"
 #include "test/vmapi/ffa.h"
+
+/* Used to coordinate between multiple vCPUs in multicore test. */
+static struct semaphore ffa_msg_wait_called;
 
 TEST_SERVICE(test_ffa_msg_wait_release_buffer)
 {
@@ -88,6 +92,34 @@ TEST_SERVICE(test_ffa_msg_wait_retain_buffer)
 	dlog_verbose(
 		"FFA_PARTITION_INFO_GET attested the RX buffer is FULL after "
 		"retention.");
+
+	ffa_yield();
+}
+
+TEST_SERVICE(read_rx_buffer)
+{
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	uint64_t msg;
+
+	/* Wait until FFA_MSG_WAIT has been called on other VCPU. */
+	semaphore_wait(&ffa_msg_wait_called);
+
+	/* Read RX buffer and verify expected message payload. */
+	receive_indirect_message((void *)&msg, sizeof(msg), recv_buf, NULL);
+	EXPECT_EQ(msg, 0x123);
+	ffa_yield();
+}
+
+TEST_SERVICE(call_ffa_msg_wait_retain_rx)
+{
+	struct ffa_value ret;
+	HFTEST_LOG("Call FFA_MSG_WAIT");
+
+	/* FFA_MSG_WAIT should retain buffer */
+	semaphore_init(&ffa_msg_wait_called);
+	semaphore_signal(&ffa_msg_wait_called);
+	ret = ffa_msg_wait_with_flags(FFA_MSG_WAIT_FLAG_RETAIN_RX);
+	EXPECT_EQ(ret.func, FFA_RUN_32);
 
 	ffa_yield();
 }
