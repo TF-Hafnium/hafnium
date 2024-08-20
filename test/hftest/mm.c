@@ -11,7 +11,7 @@
 #include "test/hftest.h"
 
 /* Number of pages reserved for page tables. Increase if necessary. */
-#define PTABLE_PAGES 5
+#define PTABLE_PAGES 10
 
 /**
  * Start address space mapping at 0x1000 for the mm to create a L2 table to

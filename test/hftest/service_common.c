@@ -102,8 +102,7 @@ void hftest_context_init(struct hftest_context *ctx, void *send, void *recv)
  * initialized.
  * TODO: Parse other fields as needed.
  */
-static void hftest_parse_ffa_manifest(struct hftest_context *ctx,
-				      struct fdt *fdt)
+void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 {
 	struct fdt_node root;
 	struct fdt_node ffa_node;
@@ -372,4 +371,31 @@ void hftest_set_dir_req_source_id(ffa_id_t id)
 {
 	struct hftest_context *ctx = hftest_get_context();
 	ctx->dir_req_source_id = id;
+}
+
+void hftest_map_device_regions(struct hftest_context *ctx)
+{
+	struct device_region *dev_region;
+	uint32_t dev_region_count;
+
+	/*
+	 * The running partition must have received and parsed its own
+	 * partition manifest by now.
+	 */
+	if (!ctx || !ctx->is_ffa_manifest_parsed) {
+		panic("Partition manifest not parsed.\n");
+	}
+
+	dev_region_count = ctx->partition_manifest.dev_region_count;
+
+	/* Map the MMIO address space of the devices. */
+	for (uint32_t i = 0; i < dev_region_count; i++) {
+		dev_region = &ctx->partition_manifest.dev_regions[i];
+
+		hftest_mm_identity_map(
+			// NOLINTNEXTLINE(performance-no-int-to-ptr)
+			(const void *)dev_region->base_address,
+			dev_region->page_count * PAGE_SIZE,
+			dev_region->attributes);
+	}
 }

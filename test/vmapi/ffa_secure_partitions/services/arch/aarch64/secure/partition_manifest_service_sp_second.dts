@@ -25,6 +25,13 @@
 	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
 	boot-order = <2>;
 	notification-support; /* Receipt of notifications. */
+	gp-register-num = <0>;
+
+	/* Boot Info */
+	boot-info {
+		compatible = "arm,ffa-manifest-boot-info";
+		ffa_manifest;
+	};
 
 	device-regions {
 		compatible = "arm,ffa-manifest-device-regions";

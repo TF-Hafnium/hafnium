@@ -63,11 +63,6 @@ static void enable_trigger_trusted_wdog_timer(ffa_id_t own_id,
 	/* Enable trusted watchdog interrupt as vIRQ in the secure side. */
 	enable_trusted_wdog_interrupt(own_id, receiver_id);
 
-	res = sp_twdog_map_cmd_send(own_id, receiver_id);
-
-	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
-
 	/*
 	 * Send a message to the SP through direct messaging requesting it to
 	 * start the trusted watchdog timer.

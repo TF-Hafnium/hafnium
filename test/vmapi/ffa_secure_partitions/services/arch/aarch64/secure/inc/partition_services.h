@@ -120,12 +120,6 @@ enum sp_cmd {
 	SP_TWDOG_START_CMD,
 
 	/**
-	 * Request SP to map MMIO region of Trusted Watchdog peripheral into
-	 * it's Stage-1 address space.
-	 */
-	SP_TWDOG_MAP_CMD,
-
-	/**
 	 * Request SP to return the last serviced secure virtual interrupt.
 	 */
 	SP_LAST_INTERRUPT_SERVICED_CMD,
@@ -429,19 +423,6 @@ static inline struct ffa_value sp_twdog_cmd_send(ffa_id_t source, ffa_id_t dest,
 }
 
 struct ffa_value sp_twdog_cmd(ffa_id_t source, uint64_t time);
-
-/**
- * Request SP to map MMIO region of Trusted Watchdog peripheral into it's
- * Stage-1 address space.
- */
-static inline struct ffa_value sp_twdog_map_cmd_send(ffa_id_t source,
-						     ffa_id_t dest)
-{
-	return ffa_msg_send_direct_req(source, dest, SP_TWDOG_MAP_CMD, 0, 0, 0,
-				       0);
-}
-
-struct ffa_value sp_twdog_map_cmd(ffa_id_t source);
 
 /**
  * Request SP to return the last serviced secure virtual interrupt.

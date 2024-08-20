@@ -6,6 +6,9 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/fdt_handler.h"
+#include "hf/mm.h"
+
 #include "vmapi/hf/call.h"
 
 #include "partition_services.h"
@@ -93,9 +96,6 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_TWDOG_START_CMD:
 		res = sp_twdog_cmd(ffa_sender(res), res.arg4);
 		break;
-	case SP_TWDOG_MAP_CMD:
-		res = sp_twdog_map_cmd(ffa_sender(res));
-		break;
 	case SP_LAST_INTERRUPT_SERVICED_CMD:
 		res = sp_get_last_interrupt_cmd(ffa_sender(res));
 		break;
@@ -154,13 +154,47 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
  */
 noreturn void test_main_sp(bool is_boot_vcpu)
 {
+	/* Use FF-A v1.1 EAC0 boot protocol to retrieve the FDT. */
+	static struct ffa_boot_info_desc* fdt_info;
 	struct mailbox_buffers mb;
 	struct hftest_context* ctx = hftest_get_context();
 	struct ffa_value res;
 
 	if (is_boot_vcpu) {
+		struct fdt fdt;
+		void* fdt_ptr;
+		struct ffa_boot_info_header* boot_info_header;
+
 		mb = set_up_mailbox();
 		hftest_context_init(ctx, mb.send, mb.recv);
+		boot_info_header = get_boot_info_header();
+
+		fdt_info = get_boot_info_desc(boot_info_header,
+					      FFA_BOOT_INFO_TYPE_STD,
+					      FFA_BOOT_INFO_TYPE_ID_FDT);
+
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		fdt_ptr = (void*)fdt_info->content;
+
+		if (!fdt_struct_from_ptr(fdt_ptr, &fdt)) {
+			HFTEST_LOG(HFTEST_LOG_INDENT
+				   "Unable to access the FDT");
+			abort();
+		}
+
+		hftest_parse_ffa_manifest(ctx, &fdt);
+
+		/*
+		 * Map MMIO address space of peripherals (such as secure
+		 * watchdog timer) described as device region nodes in partition
+		 * manifest.
+		 */
+		hftest_map_device_regions(ctx);
+	} else {
+		/*
+		 * Primary core should have initialized the fdt_info structure.
+		 */
+		assert(fdt_info != NULL);
 	}
 
 	res = ffa_msg_wait();

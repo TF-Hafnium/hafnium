@@ -206,3 +206,7 @@ void hftest_set_dir_req_source_id(ffa_id_t id);
 #include "hftest_impl.h"
 
 void hftest_context_init(struct hftest_context *ctx, void *send, void *recv);
+
+void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt);
+
+void hftest_map_device_regions(struct hftest_context *ctx);

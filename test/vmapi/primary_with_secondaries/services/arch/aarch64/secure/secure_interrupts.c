@@ -93,28 +93,13 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 	void *send_buf = SERVICE_SEND_BUFFER();
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct hftest_context *ctx = hftest_get_context();
-	struct device_region *dev_region;
-	uint32_t dev_region_count;
 
-	if (!ctx->is_ffa_manifest_parsed) {
-		panic("This test requires the running partition to have "
-		      "received and parsed its own FF-A manifest.\n");
-	}
-
-	dev_region_count = ctx->partition_manifest.dev_region_count;
-
-	ASSERT_TRUE(dev_region_count != 0U);
-
-	/* Map the MMIO address space of the devices. */
-	for (uint32_t i = 0; i < dev_region_count; i++) {
-		dev_region = &ctx->partition_manifest.dev_regions[i];
-
-		hftest_mm_identity_map(
-			// NOLINTNEXTLINE(performance-no-int-to-ptr)
-			(const void *)dev_region->base_address,
-			dev_region->page_count * PAGE_SIZE,
-			dev_region->attributes);
-	}
+	/*
+	 * Map MMIO address space of peripherals (such as secure
+	 * watchdog timer) described as device region nodes in partition
+	 * manifest.
+	 */
+	hftest_map_device_regions(ctx);
 
 	/*
 	 * Setup handling of known interrupts including Secure Watchdog timer
