@@ -25,6 +25,11 @@ extern struct hftest_test hftest_end[];
 
 void test_main_secondary(size_t mem_size);
 
+void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
+{
+	hftest_service_set_up(ctx, fdt);
+}
+
 noreturn void kmain(size_t mem_size)
 {
 	/*

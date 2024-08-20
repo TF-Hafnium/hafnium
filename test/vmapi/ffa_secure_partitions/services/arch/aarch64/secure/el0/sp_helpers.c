@@ -92,3 +92,8 @@ struct ffa_value handle_ffa_run(struct ffa_value res)
 		   res.func);
 	abort();
 }
+
+void sp_register_secondary_ep(struct hftest_context *ctx)
+{
+	(void)ctx;
+}

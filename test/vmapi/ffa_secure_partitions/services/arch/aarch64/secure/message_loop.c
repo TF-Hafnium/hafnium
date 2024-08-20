@@ -167,6 +167,7 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 		struct fdt fdt;
 		void* fdt_ptr;
 		struct ffa_boot_info_header* boot_info_header;
+		extern void secondary_ep_entry(void);
 
 		mb = set_up_mailbox();
 		hftest_context_init(ctx, mb.send, mb.recv);
@@ -193,6 +194,7 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 		 * manifest.
 		 */
 		hftest_map_device_regions(ctx);
+		sp_register_secondary_ep(ctx);
 	} else {
 		/*
 		 * Primary core should have initialized the fdt_info structure.

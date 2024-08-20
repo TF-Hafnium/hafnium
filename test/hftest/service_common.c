@@ -124,6 +124,8 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &number));
 	ctx->partition_manifest.ffa_version = number;
 
+	EXPECT_TRUE(fdt_read_number(&root, "execution-ctx-count", &number));
+	ctx->partition_manifest.execution_ctx_count = (uint16_t)number;
 	EXPECT_TRUE(fdt_read_property(&root, "uuid", &uuid));
 
 	/* Parse UUIDs and populate uuid count.*/
@@ -222,7 +224,7 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 	ctx->is_ffa_manifest_parsed = true;
 }
 
-static void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
+void hftest_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
 {
 	struct fdt_node node;
 	struct hftest_test *hftest_info;

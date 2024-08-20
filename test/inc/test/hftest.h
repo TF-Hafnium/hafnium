@@ -210,3 +210,7 @@ void hftest_context_init(struct hftest_context *ctx, void *send, void *recv);
 void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt);
 
 void hftest_map_device_regions(struct hftest_context *ctx);
+
+void hftest_service_set_up(struct hftest_context *ctx, struct fdt *fdt);
+
+void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt);

@@ -13,6 +13,11 @@
 
 alignas(4096) uint8_t kstack[4096];
 
+void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
+{
+	hftest_service_set_up(ctx, fdt);
+}
+
 noreturn void kmain(const void *fdt_ptr)
 {
 	hftest_service_main(fdt_ptr);
