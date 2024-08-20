@@ -52,3 +52,42 @@ TEST_SERVICE(test_ffa_msg_wait_release_buffer)
 
 	ffa_yield();
 }
+
+TEST_SERVICE(test_ffa_msg_wait_retain_buffer)
+{
+	struct ffa_value ret;
+	struct ffa_uuid uuid;
+
+	/* A Null UUID requests information for all partitions. */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	dlog_verbose("FFA_PARTITION_INFO_GET put the RX buffer FULL.");
+
+	/*
+	 * Subsequent call to FFA_PARTITION_INFO_GET should fail because buffer
+	 * is busy.
+	 */
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_FFA_ERROR(ret, FFA_BUSY);
+
+	dlog_verbose("FFA_PARTITION_INFO_GET attested the RX buffer is FULL.");
+
+	/* FFA_MSG_WAIT should retain buffer. */
+	ret = ffa_msg_wait_with_flags(FFA_MSG_WAIT_FLAG_RETAIN_RX);
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+	dlog_verbose("FFA_MSG_WAIT returned");
+
+	/*
+	 * Additional call to ffa_partition_info_get should fail since buffer
+	 * was retained.
+	 */
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_FFA_ERROR(ret, FFA_BUSY);
+	dlog_verbose(
+		"FFA_PARTITION_INFO_GET attested the RX buffer is FULL after "
+		"retention.");
+
+	ffa_yield();
+}

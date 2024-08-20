@@ -297,6 +297,10 @@ static inline struct ffa_value ffa_mem_frag_tx(ffa_memory_handle_t handle,
  *
  * The mailbox must be cleared before a new message can be received.
  *
+ * By default, FFA_MSG_WAIT will release the mailbox back to the SPMC. The
+ * FFA_MSG_WAIT_FLAG_RETAIN_RX flag can be used with `ffa_msg_wait_with_flags`
+ * function to override this default and allow the VM to retain the RX buffer.
+ *
  * If no message is immediately available and there are no enabled and pending
  * interrupts (irrespective of whether interrupts are enabled globally), then
  * this will block until a message is available or an enabled interrupt becomes
@@ -304,13 +308,18 @@ static inline struct ffa_value ffa_mem_frag_tx(ffa_memory_handle_t handle,
  * that a message becoming available is also treated like a wake-up event.
  *
  * Returns:
- *  - FFA_MSG_SEND if a message is successfully received.
  *  - FFA_ERROR FFA_NOT_SUPPORTED if called from the primary VM.
  *  - FFA_ERROR FFA_INTERRUPTED if an interrupt happened during the call.
  */
+static inline struct ffa_value ffa_msg_wait_with_flags(uint32_t flags)
+{
+	return ffa_call_ext(
+		(struct ffa_value){.func = FFA_MSG_WAIT_32, .arg2 = flags});
+}
+
 static inline struct ffa_value ffa_msg_wait(void)
 {
-	return ffa_call_ext((struct ffa_value){.func = FFA_MSG_WAIT_32});
+	return ffa_msg_wait_with_flags(0);
 }
 
 /**
