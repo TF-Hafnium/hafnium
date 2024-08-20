@@ -328,21 +328,6 @@ out:
 	vcpu_virt_interrupt_set_pending(interrupts, intid);
 }
 
-void vcpu_set_processing_interrupt(struct vcpu_locked vcpu_locked,
-				   uint32_t intid,
-				   struct vcpu_locked preempted_locked)
-{
-	struct vcpu *target_vcpu = vcpu_locked.vcpu;
-
-	if (preempted_locked.vcpu != NULL) {
-		target_vcpu->preempted_vcpu = preempted_locked.vcpu;
-		preempted_locked.vcpu->state = VCPU_STATE_PREEMPTED;
-	}
-
-	target_vcpu->processing_secure_interrupt = true;
-	target_vcpu->current_sec_interrupt_id = intid;
-}
-
 void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked)
 {
 	struct vcpu *target_vcpu = vcpu_locked.vcpu;

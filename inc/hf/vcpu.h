@@ -172,17 +172,6 @@ struct vcpu {
 	bool processing_managed_exit;
 
 	/**
-	 * Determine whether vCPU is currently handling secure interrupt.
-	 */
-	bool processing_secure_interrupt;
-	bool secure_interrupt_deactivated;
-
-	/**
-	 * INTID of the current secure interrupt being processed by this vCPU.
-	 */
-	uint32_t current_sec_interrupt_id;
-
-	/**
 	 * Track current vCPU which got pre-empted when secure interrupt
 	 * triggered.
 	 */
@@ -411,9 +400,6 @@ void vcpu_set_running(struct vcpu_locked target_locked, struct ffa_value *args);
 void vcpu_save_interrupt_priority(struct vcpu_locked vcpu_locked,
 				  uint8_t priority);
 void vcpu_interrupt_inject(struct vcpu_locked target_locked, uint32_t intid);
-void vcpu_set_processing_interrupt(struct vcpu_locked vcpu_locked,
-				   uint32_t intid,
-				   struct vcpu_locked preempted_locked);
 void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked);
 bool vcpu_interrupt_queue_push(struct vcpu_locked vcpu_locked,
 			       uint32_t vint_id);

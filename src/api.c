@@ -3212,7 +3212,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 		 * We have taken a implementation defined choice to not allow
 		 * Managed exit while a SP is processing a secure interrupt.
 		 */
-		CHECK(!current->processing_secure_interrupt);
+		CHECK(current->scheduling_mode != SPMC_MODE);
 
 		plat_interrupts_set_priority_mask(current->priority_mask);
 		/*
