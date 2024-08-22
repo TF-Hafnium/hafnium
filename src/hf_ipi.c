@@ -8,6 +8,8 @@
 
 #include "hf/hf_ipi.h"
 
+#include "hf/arch/plat/ffa.h"
+
 #include "hf/cpu.h"
 #include "hf/plat/interrupts.h"
 
@@ -59,6 +61,8 @@ void hf_ipi_send_interrupt(struct vm *vm, ffa_vcpu_index_t target_vcpu_index)
  * IPI IRQ specific handling for the secure interrupt for each vCPU state:
  *   - RUNNING: Continue secure interrupt handling as normal, injecting
  *   a virtual interrupt to the vCPU.
+ *   - WAITING: Mark the IPI as complete from the SPMC perspective and
+ *   trigger an SRI so the NWd can schedule to target vCPU to run.
  *   - Other states are not currently supported so exit the handler.
  * Returns True if the IPI SGI has been handled.
  * False if further secure interrupt handling is required.
@@ -70,6 +74,15 @@ bool hf_ipi_handle(struct vcpu_locked target_vcpu_locked)
 	switch (target_vcpu->state) {
 	case VCPU_STATE_RUNNING:
 		return false;
+	case VCPU_STATE_WAITING:
+		/*
+		 * We consider the IPI handled from an SPMC perspective
+		 * so inform the interrupt controller, this means other
+		 * interrupts may occur.
+		 */
+		plat_interrupts_end_of_interrupt(HF_IPI_INTID);
+		plat_ffa_sri_trigger_not_delayed(target_vcpu->cpu);
+		return true;
 	default:
 		dlog_verbose(
 			"IPIs not currently supported for when the target_vcpu "
