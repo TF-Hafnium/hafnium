@@ -281,3 +281,46 @@ TEST_SERVICE(receive_ipi_running)
 
 	ffa_yield();
 }
+
+/**
+ * Test service to validate IPI behaviour when target vCPU is in the waiting
+ * state.
+ * Transition to READY state is left out of this function. Transitioning
+ * into READY is used as synchronisation event for the "send_ipi" function.
+ * Given the purpose is to handle in a waiting state, leave transition to READY
+ * to external endpoint with same access to IPI state buffer.
+ *
+ * - Configures the IPI VI, and waits for a message.
+ * - Wakes up and attempts to initiate the IPI state in a shared buffer.
+ * - Goes into waiting state to fulfill purpose of the test.
+ * - Wakes up to attest IPI has been handled.
+ */
+TEST_SERVICE(receive_ipi_waiting_vcpu)
+{
+	struct ffa_value ret;
+
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	/* Enable the IPI. */
+	EXPECT_EQ(hf_interrupt_enable(HF_IPI_INTID, true, INTERRUPT_TYPE_IRQ),
+		  0);
+
+	dlog_verbose("Waiting memory to instanciate IPI state...\n");
+
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
+					   SERVICE_SEND_BUFFER());
+
+	dlog_verbose("Waiting for the IPI\n");
+
+	/* Get the vCPU into a waiting state before handling IPI. */
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	EXPECT_TRUE(hftest_ipi_state_is(HANDLED));
+
+	ffa_yield();
+}
