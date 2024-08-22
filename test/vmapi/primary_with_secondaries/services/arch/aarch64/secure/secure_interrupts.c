@@ -14,6 +14,7 @@
 #include "vmapi/hf/call.h"
 
 #include "../smc.h"
+#include "ipi_state.h"
 #include "sp805.h"
 #include "test/hftest.h"
 #include "test/vmapi/arch/exception_handler.h"
@@ -63,25 +64,35 @@ static void irq_handler(void)
 {
 	uint32_t intid = hf_interrupt_get();
 
-	if (intid == HF_NOTIFICATION_PENDING_INTID) {
+	switch (intid) {
+	case HF_NOTIFICATION_PENDING_INTID:
 		/* RX buffer full notification. */
-		HFTEST_LOG("Received notification pending interrupt.");
-	} else if (intid == IRQ_TWDOG_INTID) {
+		HFTEST_LOG("Received notification pending interrupt %u.",
+			   intid);
+		break;
+	case IRQ_TWDOG_INTID:
 		/*
 		 * Interrupt triggered due to Trusted watchdog timer expiry.
 		 * Clear the interrupt and stop the timer.
 		 */
-		HFTEST_LOG("Trusted WatchDog timer stopped: %u", intid);
+		HFTEST_LOG("Received Trusted WatchDog Interrupt: %u.", intid);
 		sp805_twdog_stop();
 
 		/* Perform secure interrupt de-activation. */
 		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
-	} else if (intid == RTM_INIT_ESPI_ID) {
+		break;
+	case RTM_INIT_ESPI_ID:
 		HFTEST_LOG("interrupt id: %u", intid);
 		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
 		rtm_init_espi_handled = true;
-	} else {
-		panic("%s: unknown interrupt id.", __func__);
+		break;
+	case HF_IPI_INTID:
+		HFTEST_LOG("Received Inter-Processor Interrupt %u.", intid);
+		ASSERT_TRUE(hftest_ipi_state_is(SENT));
+		hftest_ipi_state_set(HANDLED);
+		break;
+	default:
+		panic("Interrupt ID not recongnised\n");
 	}
 }
 
@@ -191,5 +202,82 @@ TEST_SERVICE(check_interrupt_rtm_init_handled)
 {
 	/* Check if the interrupt during initialisation has been handled. */
 	EXPECT_TRUE(rtm_init_espi_handled);
+	ffa_yield();
+}
+
+/**
+ * Test Service to send IPI to a designated vCPU ID.
+ * Expects the scheduling endpoint to orchestrate the CPUs
+ * and endpoints such that the IPI is sent at the right timing.
+ * Assumes the IPI state has been properly instantiated already.
+ *
+ * - Wakes up and parses the vCPU ID from RX buffer.
+ * - Loop IPI state until it gets to READY state.
+ * - Transitions the IPI state into SENT.
+ * - Sends the IPI to the target vCPU.
+ */
+TEST_SERVICE(send_ipi)
+{
+	ffa_vcpu_index_t vcpu;
+	struct ffa_value ret;
+
+	dlog_verbose("Receiving ID of target vCPU...");
+
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	receive_indirect_message((void *)&vcpu, sizeof(vcpu),
+				 SERVICE_RECV_BUFFER(), NULL);
+
+	dlog_verbose("Waiting for target vCPU %u to be ready.", vcpu);
+
+	/* Do nothing while IPI handler is not ready. */
+	while (!hftest_ipi_state_is(READY)) {
+	}
+
+	dlog_verbose("Sending IPI to vCPU %u", vcpu);
+
+	hftest_ipi_state_set(SENT);
+
+	hf_interrupt_send_ipi(vcpu);
+
+	ffa_yield();
+}
+
+/**
+ * Test service to valid IPI behaviour when target vCPU is in the running
+ * state.
+ * - Configures the IPI VI.
+ * - Yield back to the NWd, such that it can spawn 'send_ipi' in the source
+ *   vCPU.
+ * - Wakes up to transitioning the IPI state to READY.
+ * - Loop into waiting for IPI handler to set IPI state to HANDLED.
+ * - Terminates test by resetting to READY.
+ */
+TEST_SERVICE(receive_ipi_running)
+{
+	hftest_ipi_init_state_default();
+
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	/* Enable the inter-processor interrupt */
+	EXPECT_EQ(hf_interrupt_enable(HF_IPI_INTID, true, INTERRUPT_TYPE_IRQ),
+		  0);
+
+	/* Yield such that 'send_ipi' can be spawn. */
+	ffa_yield();
+
+	hftest_ipi_state_set(READY);
+
+	dlog_verbose("Waiting for the IPI\n");
+
+	/* Waiting for irq_handler to handle IPI. */
+	while (!hftest_ipi_state_is(HANDLED)) {
+		interrupt_wait();
+	}
+
+	hftest_ipi_state_set(READY);
+
 	ffa_yield();
 }
