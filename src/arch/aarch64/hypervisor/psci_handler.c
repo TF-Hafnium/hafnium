@@ -215,16 +215,6 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 }
 
 /**
- * Convert a PSCI CPU / affinity ID for a secondary VM to the corresponding vCPU
- * index.
- */
-ffa_vcpu_index_t vcpu_id_to_index(cpu_id_t vcpu_id)
-{
-	/* For now we use indices as IDs for the purposes of PSCI. */
-	return vcpu_id;
-}
-
-/**
  * Handles PSCI requests received via HVC or SMC instructions from a secondary
  * VM.
  *

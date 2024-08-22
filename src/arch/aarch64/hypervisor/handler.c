@@ -23,6 +23,7 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
+#include "hf/hf_ipi.h"
 #include "hf/panic.h"
 #include "hf/plat/interrupts.h"
 #include "hf/vm.h"
@@ -1085,6 +1086,10 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 	case HF_INTERRUPT_RECONFIGURE:
 		vcpu->regs.r[0] = plat_ffa_interrupt_reconfigure(
 			args.arg1, args.arg2, args.arg3, vcpu);
+		break;
+
+	case HF_INTERRUPT_SEND_IPI:
+		vcpu->regs.r[0] = api_hf_interrupt_send_ipi(args.arg1, vcpu);
 		break;
 #endif
 	case HF_INTERRUPT_ENABLE:

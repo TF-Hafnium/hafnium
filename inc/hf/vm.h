@@ -395,6 +395,15 @@ static inline bool vm_is_primary(const struct vm *vm)
 	return vm->id == HF_PRIMARY_VM_ID;
 }
 
+/**
+ * Convert a CPU ID for a secondary VM to the corresponding vCPU index.
+ */
+static inline ffa_vcpu_index_t vcpu_id_to_index(cpu_id_t vcpu_id)
+{
+	/* For now we use indices as IDs. */
+	return vcpu_id;
+}
+
 struct interrupt_descriptor *vm_interrupt_set_target_mpidr(
 	struct vm_locked vm_locked, uint32_t id, uint32_t target_mpidr);
 struct interrupt_descriptor *vm_interrupt_set_sec_state(

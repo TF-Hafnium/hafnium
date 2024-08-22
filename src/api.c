@@ -23,6 +23,7 @@
 #include "hf/ffa_internal.h"
 #include "hf/ffa_memory.h"
 #include "hf/ffa_v1_0.h"
+#include "hf/hf_ipi.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
 #include "hf/plat/interrupts.h"
@@ -2250,6 +2251,7 @@ out:
  * - NPI
  * - ME
  * - Virtual Timer.
+ * - IPI
  *
  * These are VIs with no expected interrupt descriptor.
  */
@@ -2257,7 +2259,7 @@ static bool api_is_maintenance_virtual_interrupt(uint32_t intid)
 {
 	return intid == HF_NOTIFICATION_PENDING_INTID ||
 	       intid == HF_MANAGED_EXIT_INTID ||
-	       intid == HF_VIRTUAL_TIMER_INTID;
+	       intid == HF_VIRTUAL_TIMER_INTID || intid == HF_IPI_INTID;
 }
 
 /**
@@ -4850,4 +4852,28 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 
 	vcpu_unlock(&vcpu_locked);
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
+/**
+ * Send an IPI interrupt to a target vcpu belonging to the
+ * sender that isn't itself.
+ */
+uint64_t api_hf_interrupt_send_ipi(uint32_t target_vcpu_id,
+				   struct vcpu *current)
+{
+	struct vm *vm = current->vm;
+	ffa_vcpu_index_t target_vcpu_index = vcpu_id_to_index(target_vcpu_id);
+
+	if (target_vcpu_index >= vm->vcpu_count &&
+	    target_vcpu_index == cpu_index(current->cpu)) {
+		dlog_verbose("Invalid vCPU %d for IPI.\n", target_vcpu_id);
+		return -1;
+	}
+
+	dlog_verbose("Injecting IPI to target vCPU%d for %#x\n", target_vcpu_id,
+		     vm->id);
+
+	hf_ipi_send_interrupt(vm, target_vcpu_index);
+
+	return 0;
 }

@@ -61,5 +61,11 @@ typedef uintptr_t hf_ipaddr_t;
 /** The virtual interrupt ID used for notification pending interrupt. */
 #define HF_NOTIFICATION_PENDING_INTID 5
 
+/**
+ * The interrupt ID (for both physical and virtual) used for
+ * the inter-processor interrupt.
+ */
+#define HF_IPI_INTID 9
+
 /** The physical interrupt ID use for the schedule receiver interrupt. */
 #define HF_SCHEDULE_RECEIVER_INTID 8

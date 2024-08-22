@@ -20,6 +20,7 @@
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
 #include "hf/ffa_memory.h"
+#include "hf/hf_ipi.h"
 #include "hf/interrupt_desc.h"
 #include "hf/plat/interrupts.h"
 #include "hf/std.h"
@@ -1448,38 +1449,49 @@ static void plat_ffa_disable_vm_interrupts(struct vm_locked vm_locked)
 	}
 }
 
-static struct vcpu *plat_ffa_find_target_vcpu(struct vcpu *current,
-					      uint32_t interrupt_id)
+static struct vcpu *plat_ffa_find_target_vcpu_secure_interrupt(
+	struct vcpu *current, uint32_t interrupt_id)
 {
-	bool target_vm_found = false;
-	struct vm *vm;
-	struct vcpu *target_vcpu;
-	struct interrupt_descriptor int_desc;
-
 	/*
-	 * Find which VM/SP owns this interrupt. We then find the corresponding
-	 * vCPU context for this CPU.
+	 * Find which VM/SP owns this interrupt. We then find the
+	 * corresponding vCPU context for this CPU.
 	 */
 	for (ffa_vm_count_t index = 0; index < vm_get_count(); ++index) {
-		vm = vm_find_index(index);
+		struct vm *vm = vm_find_index(index);
 
 		for (uint32_t j = 0; j < HF_NUM_INTIDS; j++) {
-			int_desc = vm->interrupt_desc[j];
+			struct interrupt_descriptor int_desc =
+				vm->interrupt_desc[j];
 
-			/* Interrupt descriptors are populated contiguously. */
+			/*
+			 * Interrupt descriptors are populated
+			 * contiguously.
+			 */
 			if (!int_desc.valid) {
 				break;
 			}
 			if (int_desc.interrupt_id == interrupt_id) {
-				target_vm_found = true;
-				goto out;
+				return api_ffa_get_vm_vcpu(vm, current);
 			}
 		}
 	}
-out:
-	CHECK(target_vm_found);
 
-	target_vcpu = api_ffa_get_vm_vcpu(vm, current);
+	return NULL;
+}
+
+static struct vcpu *plat_ffa_find_target_vcpu(struct vcpu *current,
+					      uint32_t interrupt_id)
+{
+	struct vcpu *target_vcpu;
+
+	switch (interrupt_id) {
+	case HF_IPI_INTID:
+		target_vcpu = hf_ipi_get_pending_target_vcpu(current->cpu);
+		break;
+	default:
+		target_vcpu = plat_ffa_find_target_vcpu_secure_interrupt(
+			current, interrupt_id);
+	}
 
 	/* The target vCPU for a secure interrupt cannot be NULL. */
 	CHECK(target_vcpu != NULL);
@@ -1866,26 +1878,38 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 		/* Resume current vCPU. */
 		*next = NULL;
 	} else {
-		/*
-		 * Do not currently support nested interrupts as such, masking
-		 * interrupts.
-		 */
-		plat_ffa_mask_interrupts(target_vcpu_locked);
-
 		/* Set the interrupt pending in the target vCPU. */
 		vcpu_interrupt_inject(target_vcpu_locked, intid);
 
-		/*
-		 * Either invoke the handler related to partitions from S-EL0 or
-		 * from S-EL1.
-		 */
-		*next = target_vcpu_locked.vcpu->vm->el0_partition
-				? plat_ffa_signal_secure_interrupt_sel0(
-					  current_locked, target_vcpu_locked,
-					  intid)
-				: plat_ffa_signal_secure_interrupt_sel1(
-					  current_locked, target_vcpu_locked,
-					  intid);
+		switch (intid) {
+		case HF_IPI_INTID:
+			if (hf_ipi_handle(target_vcpu_locked)) {
+				*next = NULL;
+				break;
+			}
+			/*
+			 * Fall through in the case handling has not been fully
+			 * completed.
+			 */
+		default:
+			/*
+			 * Do not currently support nested interrupts as such,
+			 * masking interrupts.
+			 */
+			plat_ffa_mask_interrupts(target_vcpu_locked);
+
+			/*
+			 * Either invoke the handler related to partitions from
+			 * S-EL0 or from S-EL1.
+			 */
+			*next = target_vcpu_locked.vcpu->vm->el0_partition
+					? plat_ffa_signal_secure_interrupt_sel0(
+						  current_locked,
+						  target_vcpu_locked, intid)
+					: plat_ffa_signal_secure_interrupt_sel1(
+						  current_locked,
+						  target_vcpu_locked, intid);
+		}
 	}
 
 	if (target_vcpu_locked.vcpu != NULL) {

@@ -19,6 +19,7 @@
 #define HF_INTERRUPT_GET               0xff04
 #define HF_INTERRUPT_DEACTIVATE	       0xff08
 #define HF_INTERRUPT_RECONFIGURE       0xff09
+#define HF_INTERRUPT_SEND_IPI	       0xff0a
 
 /* Custom FF-A-like calls returned from FFA_RUN. */
 #define HF_FFA_RUN_WAIT_FOR_INTERRUPT 0xff06

@@ -31,6 +31,9 @@ struct cpu {
 
 	/* In case there is a pending SRI for the NWd. */
 	bool is_sri_delayed;
+
+	/* Track pending IPIs. */
+	struct vcpu *ipi_target_vcpu;
 };
 
 void cpu_module_init(const cpu_id_t *cpu_ids, size_t count);
