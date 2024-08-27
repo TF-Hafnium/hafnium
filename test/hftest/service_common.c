@@ -309,7 +309,10 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 		ctx->memory_size = 1048576;
 	}
 
-	run_service_set_up(ctx, &fdt);
+	/* If boot vcpu, it means it is running in RTM_INIT. */
+	if (vcpu == 0) {
+		run_service_set_up(ctx, &fdt);
+	}
 
 	/* Receive the name of the service to run. */
 	ret = ffa_msg_wait();
