@@ -6,22 +6,6 @@
 
 import("//build/image/image.gni")
 
-# Service that can be interrupted.
-source_set("interruptible") {
-  testonly = true
-  public_configs = [
-    "//test/vmapi/primary_with_secondaries:config",
-    "//test/hftest:hftest_config",
-  ]
-
-  sources = [
-    "interruptible.c",
-    "interruptible_echo.c",
-  ]
-
-  deps = [ "//src/arch/aarch64/hftest/el0:interrupts" ]
-}
-
 # Service to exercise the FFA_MEM_PERM_GET and FFA_MEM_PERM_SET interfaces
 # for el0 partitions.
 source_set("mem_permissions") {
@@ -50,7 +34,6 @@ vm_kernel("service_el0_vm1") {
   testonly = true
 
   deps = [
-    ":interruptible",
     ":mem_permissions",
     ":receive_block",
     "//src/arch/${plat_arch}/hftest/el0:interrupts",

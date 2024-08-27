@@ -86,22 +86,6 @@ source_set("boot") {
   deps = [ "//test/vmapi/common:ffa" ]
 }
 
-# Service that can be interrupted.
-source_set("interruptible") {
-  testonly = true
-  public_configs = [
-    "..:config",
-    "//test/hftest:hftest_config",
-  ]
-
-  sources = [
-    "interruptible.c",
-    "interruptible_echo.c",
-  ]
-
-  deps = [ "//src/arch/aarch64/hftest:interrupts" ]
-}
-
 # Service to check that hf_mailbox_receive can't block when there are pending
 # interrupts.
 source_set("receive_block") {
@@ -193,7 +177,6 @@ vm_kernel("service_vm1") {
     ":echo",
     ":ffa_check",
     ":floating_point",
-    ":interruptible",
     ":memory",
     ":perfmon",
     ":receive_block",
@@ -216,7 +199,6 @@ vm_kernel("service_vm2") {
   deps = [
     ":echo",
     ":ffa_check",
-    ":interruptible",
     ":memory",
     ":relay",
     "//src/arch/aarch64/hftest:interrupts",
