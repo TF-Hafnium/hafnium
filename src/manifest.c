@@ -508,12 +508,10 @@ void dump_memory_ranges(const struct mem_range *ranges,
  */
 static enum manifest_return_code check_partition_memory_is_valid(
 	uintptr_t base_address, uint32_t page_count, uint32_t attributes,
-	const struct boot_params *params)
+	const struct boot_params *params, bool is_device_region)
 {
 	bool is_secure_region =
 		(attributes & MANIFEST_REGION_ATTR_SECURITY) == 0U;
-	bool is_device_region =
-		(attributes & MANIFEST_REGION_ATTR_MEMORY_TYPE_DEVICE) != 0U;
 	const struct mem_range *ranges_from_manifest;
 	size_t ranges_count;
 	bool within_ranges;
@@ -717,7 +715,7 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 
 		TRY(check_partition_memory_is_valid(
 			mem_regions[i].base_address, mem_regions[i].page_count,
-			mem_regions[i].attributes, boot_params));
+			mem_regions[i].attributes, boot_params, false));
 
 		TRY(check_and_record_memory_used(
 			mem_regions[i].base_address, mem_regions[i].page_count,
@@ -857,10 +855,6 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 		TRY(read_uint32(dev_node, "attributes",
 				&dev_regions[i].attributes));
-		/* Set the memory type attribute to device. */
-		dev_regions[i].attributes =
-			dev_regions[i].attributes |
-			MANIFEST_REGION_ATTR_MEMORY_TYPE_DEVICE;
 
 		/*
 		 * Check RWX permission attributes.
@@ -886,7 +880,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 
 		TRY(check_partition_memory_is_valid(
 			dev_regions[i].base_address, dev_regions[i].page_count,
-			dev_regions[i].attributes, boot_params));
+			dev_regions[i].attributes, boot_params, true));
 
 		TRY(read_optional_uint32list(dev_node, "interrupts", &list));
 		dlog_verbose("      Interrupt List:\n");
@@ -1609,7 +1603,7 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 
 			TRY(check_partition_memory_is_valid(
 				manifest->vm[i].partition.load_addr, page_count,
-				0, boot_params));
+				0, boot_params, false));
 
 			/*
 			 * Check if memory from load-address until (load-address

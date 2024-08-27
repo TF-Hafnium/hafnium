@@ -1795,7 +1795,7 @@ TEST_F(manifest, ffa_valid)
 
 	ASSERT_EQ(vm->partition.dev_regions[0].base_address, 0x24000000);
 	ASSERT_EQ(vm->partition.dev_regions[0].page_count, 16);
-	ASSERT_EQ(vm->partition.dev_regions[0].attributes, (16 | 3));
+	ASSERT_EQ(vm->partition.dev_regions[0].attributes, 3);
 	ASSERT_EQ(vm->partition.dev_regions[0].dma_prop.smmu_id, 1);
 	ASSERT_EQ(vm->partition.dev_regions[0].dma_prop.stream_ids[0], 0);
 	ASSERT_EQ(vm->partition.dev_regions[0].dma_prop.stream_ids[1], 1);
@@ -1804,7 +1804,7 @@ TEST_F(manifest, ffa_valid)
 	ASSERT_EQ(vm->partition.dev_regions[0].interrupts[1].id, 4);
 	ASSERT_EQ(vm->partition.dev_regions[0].interrupts[1].attributes, 5);
 	ASSERT_EQ(vm->partition.dev_regions[1].base_address, 0x20000000);
-	ASSERT_EQ(vm->partition.dev_regions[1].attributes, (16 | 8 | 1));
+	ASSERT_EQ(vm->partition.dev_regions[1].attributes, (8 | 1));
 }
 
 TEST_F(manifest, ffa_valid_interrupt_target_manifest)
@@ -1837,7 +1837,7 @@ TEST_F(manifest, ffa_valid_interrupt_target_manifest)
 
 	ASSERT_EQ(vm->partition.dev_regions[0].base_address, 0x24000000);
 	ASSERT_EQ(vm->partition.dev_regions[0].page_count, 16);
-	ASSERT_EQ(vm->partition.dev_regions[0].attributes, (16 | 3));
+	ASSERT_EQ(vm->partition.dev_regions[0].attributes, 3);
 	ASSERT_EQ(vm->partition.dev_regions[0].dma_prop.smmu_id, 1);
 	ASSERT_EQ(vm->partition.dev_regions[0].dma_prop.stream_ids[0], 0);
 	ASSERT_EQ(vm->partition.dev_regions[0].dma_prop.stream_ids[1], 1);
