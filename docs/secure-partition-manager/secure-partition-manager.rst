@@ -1741,9 +1741,8 @@ Currently, SMMUv3 driver in Hafnium only supports dependent peripheral devices.
 These DMA devices are dependent on PE endpoint to initiate and receive memory
 management transactions on their behalf. The acccess to the MMIO regions of
 any such device is assigned to the endpoint during boot.
-The :ref:`device node<device_region_node>` of the corresponding partition
-manifest must specify these additional properties for each peripheral device in
-the system:
+The `device node`_ of the corresponding partition manifest must specify these
+additional properties for each peripheral device in the system:
 
 -  smmu-id: This field helps to identify the SMMU instance that this device is
    upstream of.
@@ -1767,8 +1766,8 @@ DMA isolation
 Hafnium, with help of SMMUv3 driver, enables the support for static DMA
 isolation. The DMA device is explicitly granted access to a specific
 memory region only if the partition requests it by declaring the following
-properties of the DMA device in the :ref:`memory region node<memory_region_node>`
-of the partition manifest:
+properties of the DMA device in the `memory region node`_ of the partition
+manifest:
 
 -  smmu-id
 -  stream-ids
@@ -1836,6 +1835,10 @@ References
 .. _TF-A project: https://trustedfirmware-a.readthedocs.io/en/latest/
 
 .. _SPMC FVP build configuration: https://github.com/TF-Hafnium/hafnium-project-reference/blob/main/BUILD.gn#L143
+
+.. _device node: https://trustedfirmware-a.readthedocs.io/en/latest/components/ffa-manifest-binding.html#device-regions
+
+.. _memory region node: https://trustedfirmware-a.readthedocs.io/en/latest/components/ffa-manifest-binding.html#memory-regions
 
 .. _[1]:
 
