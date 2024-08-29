@@ -290,6 +290,16 @@ void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
 {
 	struct interrupts *interrupts = &(vcpu_locked.vcpu->interrupts);
 
+	/* Clear any specifics for the current intid. */
+	switch (intid) {
+	case HF_IPI_INTID:
+		vcpu_ipi_clear_info_get_retrieved(vcpu_locked);
+		break;
+	default:
+		/* Do no additional work. */
+		break;
+	}
+
 	vcpu_virt_interrupt_clear_pending(interrupts, intid);
 	vcpu_interrupt_count_decrement(vcpu_locked, interrupts, intid);
 }

@@ -814,32 +814,18 @@ ffa_notifications_bitmap_t vm_notifications_framework_get_pending(
 	return framework;
 }
 
-static void vm_notifications_state_info_get(
-	struct notifications_state *state, ffa_id_t vm_id, bool is_per_vcpu,
-	ffa_vcpu_index_t vcpu_id, uint16_t *ids, uint32_t *ids_count,
-	uint32_t *lists_sizes, uint32_t *lists_count,
-	const uint32_t ids_max_count,
+static bool vm_insert_notification_info_list(
+	ffa_id_t vm_id, bool is_per_vcpu, ffa_vcpu_index_t vcpu_id,
+	uint16_t *ids, uint32_t *ids_count, uint32_t *lists_sizes,
+	uint32_t *lists_count, const uint32_t ids_max_count,
 	enum notifications_info_get_state *info_get_state)
 {
-	ffa_notifications_bitmap_t pending_not_retrieved;
-
 	CHECK(*ids_count <= ids_max_count);
 	CHECK(*lists_count <= ids_max_count);
 
-	if (*info_get_state == FULL) {
-		return;
-	}
-
-	pending_not_retrieved = state->pending & ~state->info_get_retrieved;
-
-	/* No notifications pending that haven't been retrieved. */
-	if (pending_not_retrieved == 0U) {
-		return;
-	}
-
-	if (*ids_count == ids_max_count) {
+	if (*info_get_state == FULL || *ids_count == ids_max_count) {
 		*info_get_state = FULL;
-		return;
+		return false;
 	}
 
 	switch (*info_get_state) {
@@ -852,7 +838,7 @@ static void vm_notifications_state_info_get(
 		 */
 		if (is_per_vcpu && ids_max_count - *ids_count < 2) {
 			*info_get_state = FULL;
-			return;
+			return false;
 		}
 
 		*info_get_state = INSERTING;
@@ -888,9 +874,87 @@ static void vm_notifications_state_info_get(
 		panic("Notification info get action error!!\n");
 	}
 
+	return true;
+}
+
+/**
+ * Check if the notification is pending and hasn't being retrieved.
+ * If so attempt to add it to the notification info list.
+ * Returns true if successfully added to the list.
+ */
+static bool vm_notifications_state_info_get(
+	struct notifications_state *state, ffa_id_t vm_id, bool is_per_vcpu,
+	ffa_vcpu_index_t vcpu_id, uint16_t *ids, uint32_t *ids_count,
+	uint32_t *lists_sizes, uint32_t *lists_count,
+	const uint32_t ids_max_count,
+	enum notifications_info_get_state *info_get_state)
+{
+	ffa_notifications_bitmap_t pending_not_retrieved;
+
+	pending_not_retrieved = state->pending & ~state->info_get_retrieved;
+
+	/* No notifications pending that haven't been retrieved. */
+	if (pending_not_retrieved == 0U) {
+		return false;
+	}
+
+	if (!vm_insert_notification_info_list(
+		    vm_id, is_per_vcpu, vcpu_id, ids, ids_count, lists_sizes,
+		    lists_count, ids_max_count, info_get_state)) {
+		return false;
+	}
+
 	state->info_get_retrieved |= pending_not_retrieved;
 
 	vm_notifications_info_get_retrieved_count_add(pending_not_retrieved);
+
+	return true;
+}
+
+/**
+ * Check if the vcpu has a pending IPI that hasn't been retrieved.
+ * If so try add it to the notification info list.
+ * Returns true if successfully added to the list.
+ */
+static bool vm_ipi_state_info_get(
+	struct vcpu *vcpu, ffa_id_t vm_id, ffa_vcpu_index_t vcpu_id,
+	uint16_t *ids, uint32_t *ids_count, uint32_t *lists_sizes,
+	uint32_t *lists_count, const uint32_t ids_max_count,
+	enum notifications_info_get_state *info_get_state, bool per_vcpu_added)
+{
+	bool ret = true;
+	bool pending_not_retrieved;
+	struct vcpu_locked vcpu_locked = vcpu_lock(vcpu);
+	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
+
+	pending_not_retrieved =
+		vcpu_is_virt_interrupt_pending(interrupts, HF_IPI_INTID) &&
+		!vcpu_ipi_is_info_get_retrieved(vcpu_locked);
+
+	/* No notifications pending that haven't been retrieved. */
+	if (!pending_not_retrieved) {
+		ret = false;
+		goto out;
+	}
+
+	/*
+	 * If the per vCPU notification was added to the list we do not need
+	 * to add it again for the IPI.
+	 */
+	if (!per_vcpu_added &&
+	    !vm_insert_notification_info_list(
+		    vm_id, true, vcpu_id, ids, ids_count, lists_sizes,
+		    lists_count, ids_max_count, info_get_state)) {
+		ret = false;
+		goto out;
+	}
+
+	vcpu_ipi_set_info_get_retrieved(vcpu_locked);
+
+out:
+	vcpu_unlock(&vcpu_locked);
+
+	return ret;
 }
 
 /**
@@ -918,10 +982,23 @@ void vm_notifications_info_get_pending(
 					ids_max_count, info_get_state);
 
 	for (ffa_vcpu_count_t i = 0; i < vm_locked.vm->vcpu_count; i++) {
-		vm_notifications_state_info_get(
+		struct vcpu *vcpu = vm_get_vcpu(vm_locked.vm, i);
+		bool per_vcpu_added;
+
+		per_vcpu_added = vm_notifications_state_info_get(
 			&notifications->per_vcpu[i], vm_locked.vm->id, true, i,
 			ids, ids_count, lists_sizes, lists_count, ids_max_count,
 			info_get_state);
+		/*
+		 * IPIs can only be pending for partitions at the
+		 * current virtual FF-A instance.
+		 */
+		if (vm_id_is_current_world(vm_locked.vm->id)) {
+			vm_ipi_state_info_get(vcpu, vm_locked.vm->id, i, ids,
+					      ids_count, lists_sizes,
+					      lists_count, ids_max_count,
+					      info_get_state, per_vcpu_added);
+		}
 	}
 }
 

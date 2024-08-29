@@ -201,6 +201,12 @@ struct vcpu {
 	struct call_chain call_chain;
 
 	/**
+	 * Track if the pending IPI has been retrieved by
+	 * FFA_NOTIFICATION_INFO_GET.
+	 */
+	bool ipi_info_get_retrieved;
+
+	/**
 	 * Indicates if the current vCPU is running in SPMC scheduled
 	 * mode or Normal World scheduled mode.
 	 */
@@ -389,6 +395,29 @@ void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
 
 void vcpu_set_running(struct vcpu_locked target_locked,
 		      const struct ffa_value *args);
+
+static inline void vcpu_ipi_set_info_get_retrieved(
+	struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->ipi_info_get_retrieved = true;
+}
+
+static inline bool vcpu_ipi_is_info_get_retrieved(
+	struct vcpu_locked vcpu_locked)
+{
+	return vcpu_locked.vcpu->ipi_info_get_retrieved;
+}
+
+/**
+ * Clear the flag tracking if the IPI has been retrieved by
+ * FFA_NOTIFCATION_INFO_GET.
+ */
+static inline void vcpu_ipi_clear_info_get_retrieved(
+	struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->ipi_info_get_retrieved = false;
+}
+
 void vcpu_save_interrupt_priority(struct vcpu_locked vcpu_locked,
 				  uint8_t priority);
 void vcpu_interrupt_inject(struct vcpu_locked target_locked, uint32_t intid);
