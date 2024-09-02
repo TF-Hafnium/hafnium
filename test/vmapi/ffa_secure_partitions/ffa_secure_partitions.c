@@ -40,7 +40,7 @@ bool service2_is_up_sp(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
- * Check that service1 partition is an MP SP.
+ * Check that service2 partition is an MP SP.
  */
 bool service2_is_mp_sp(void)
 {

@@ -15,6 +15,7 @@
 #include "vmapi/hf/call.h"
 
 #include "ffa_endpoints.h"
+#include "ffa_secure_partitions.h"
 #include "partition_services.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
@@ -186,15 +187,11 @@ static void base_per_cpu_notifications_test(void (*cpu_entry)(uintptr_t arg))
 {
 	struct spinlock lock = SPINLOCK_INIT;
 	struct notif_cpu_entry_args args = {.lock = &lock};
-	struct ffa_partition_info sp;
 	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
 
-	EXPECT_EQ(get_ffa_partition_info(
-			  &(struct ffa_uuid){SP_SERVICE_SECOND_UUID}, &sp, 1,
-			  mb.recv),
-		  1);
-	args.sp_id = sp.vm_id;
-	args.is_sp_up = sp.vcpu_count == 1U;
+	args.sp_id = service2_info->vm_id;
+	args.is_sp_up = service2_info->vcpu_count == 1U;
 
 	/* Start secondary while holding lock. */
 	sl_lock(&lock);
@@ -217,7 +214,7 @@ static void base_per_cpu_notifications_test(void (*cpu_entry)(uintptr_t arg))
 	}
 }
 
-TEST(ffa_notifications, per_vcpu_vm_to_sp)
+TEST_PRECONDITION(ffa_notifications, per_vcpu_vm_to_sp, service2_is_mp_sp)
 {
 	base_per_cpu_notifications_test(cpu_entry_vm_to_sp_signaling);
 }
