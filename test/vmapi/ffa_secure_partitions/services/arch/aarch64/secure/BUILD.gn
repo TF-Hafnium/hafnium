@@ -35,6 +35,14 @@ source_set("discovery") {
   deps = [ ":common" ]
 }
 
+source_set("pauth") {
+  testonly = true
+  public_configs = [ ":config" ]
+  sources = [ "pauth.c" ]
+
+  deps = [ ":common" ]
+}
+
 source_set("partition_services") {
   testonly = true
   public_configs = [
@@ -93,6 +101,7 @@ source_set("message_loop") {
     ":discovery",
     ":notifications",
     ":partition_services",
+    ":pauth",
     ":power_mgt",
     ":secure_interrupts",
     "//test/vmapi/common:ffa",

@@ -102,6 +102,7 @@ vm_kernel("vm_primary_vhe") {
     "dir_msg.c",
     "interrupts.c",
     "notifications.c",
+    "pauth.c",
     "power_mgt.c",
     "secure_interrupts.c",
     "setup_and_discovery.c",

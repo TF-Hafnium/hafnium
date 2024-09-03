@@ -181,6 +181,7 @@ enum sp_cmd {
 	 * Request to start generic timer.
 	 */
 	SP_GENERIC_TIMER_START_CMD,
+	SP_PAUTH_FAULT_CMD,
 };
 
 /**
@@ -617,3 +618,12 @@ static inline struct ffa_value sp_generic_timer_cmd_send(ffa_id_t source,
 }
 
 struct ffa_value sp_generic_timer_cmd(ffa_id_t source, uint64_t time);
+
+static inline struct ffa_value sp_pauth_fault_cmd_send(ffa_id_t sender,
+						       ffa_id_t receiver)
+{
+	return ffa_msg_send_direct_req(sender, receiver, SP_PAUTH_FAULT_CMD, 0,
+				       0, 0, 0);
+}
+
+void sp_pauth_fault_cmd(void);

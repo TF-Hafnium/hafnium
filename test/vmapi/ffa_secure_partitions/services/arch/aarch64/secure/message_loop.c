@@ -137,6 +137,9 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_GENERIC_TIMER_START_CMD:
 		res = sp_generic_timer_cmd(ffa_sender(res), res.arg4);
 		break;
+	case SP_PAUTH_FAULT_CMD:
+		sp_pauth_fault_cmd();
+		break;
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
