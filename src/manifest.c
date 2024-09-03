@@ -655,9 +655,9 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		dlog_verbose("      Base address: %#lx\n",
 			     mem_regions[i].base_address);
 
-		TRY(read_optional_uint64(mem_node, "relative-address",
-					 MANIFEST_INVALID_ADDRESS,
-					 &relative_address));
+		TRY(read_optional_uint64(
+			mem_node, "load-address-relative-offset",
+			MANIFEST_INVALID_ADDRESS, &relative_address));
 		if (relative_address != MANIFEST_INVALID_ADDRESS) {
 			dlog_verbose("      Relative address:  %#lx\n",
 				     relative_address);

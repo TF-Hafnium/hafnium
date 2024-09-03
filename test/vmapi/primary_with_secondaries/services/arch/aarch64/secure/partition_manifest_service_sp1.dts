@@ -37,7 +37,7 @@
 		compatible = "arm,ffa-manifest-memory-regions";
 
 		test-memory {
-			relative-address = <0x300000>; /* effective address = 0x6780000 */
+			load-address-relative-offset = <0x300000>; /* effective address = 0x6780000 */
 			pages-count = <1>;
 			attributes = <0x3>;
 		};

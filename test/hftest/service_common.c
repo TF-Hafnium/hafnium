@@ -170,9 +170,10 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 
 			if (!fdt_read_number(&ffa_node, "base-address",
 					     &cur_region->base_address)) {
-				EXPECT_TRUE(fdt_read_number(&ffa_node,
-							    "relative-address",
-							    &number));
+				EXPECT_TRUE(fdt_read_number(
+					&ffa_node,
+					"load-address-relative-offset",
+					&number));
 				cur_region->base_address =
 					ctx->partition_manifest.load_addr +
 					number;
@@ -206,9 +207,10 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 
 			if (!fdt_read_number(&ffa_node, "base-address",
 					     &cur_region->base_address)) {
-				EXPECT_TRUE(fdt_read_number(&ffa_node,
-							    "relative-address",
-							    &number));
+				EXPECT_TRUE(fdt_read_number(
+					&ffa_node,
+					"load-address-relative-offset",
+					&number));
 				cur_region->base_address =
 					ctx->partition_manifest.load_addr +
 					number;

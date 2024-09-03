@@ -1248,7 +1248,8 @@ TEST_F(manifest, ffa_validate_mem_regions)
 		  MANIFEST_ERROR_MEM_REGION_EMPTY);
 	manifest_dealloc();
 
-	/* Mutually exclusive base-address and relative-address properties */
+	/* Mutually exclusive base-address and load-address-relative-offset
+	 * properties */
 	/* clang-format off */
 	dtb = ManifestDtBuilder()
 		.FfaValidManifest()
@@ -1258,7 +1259,7 @@ TEST_F(manifest, ffa_validate_mem_regions)
 			.StartChild("rx")
 				.Description("rx-buffer")
 				.Property("base-address", "<0x7300000>")
-				.Property("relative-address", "<0x7300000>")
+				.Property("load-address-relative-offset", "<0x7300000>")
 				.Property("pages-count", "<1>")
 				.Property("attributes", "<1>")
 			.EndChild()
@@ -1278,7 +1279,7 @@ TEST_F(manifest, ffa_validate_mem_regions)
 			.Label("rx")
 			.StartChild("rx")
 				.Description("rx-buffer")
-				.Property("relative-address", "<0xffffff00 0xffffff00>")
+				.Property("load-address-relative-offset", "<0xffffff00 0xffffff00>")
 				.Property("pages-count", "<1>")
 				.Property("attributes", "<1>")
 			.EndChild()
@@ -1712,7 +1713,7 @@ TEST_F(manifest, ffa_valid)
 			.Compatible({ "arm,ffa-manifest-memory-regions" })
 			.StartChild("test-memory")
 				.Description("test-memory")
-				.Property("relative-address", "<0x7100000>")
+				.Property("load-address-relative-offset", "<0x7100000>")
 				.Property("pages-count", "<4>")
 				.Property("attributes", "<3>")
 				.Property("smmu-id", "<1>")
