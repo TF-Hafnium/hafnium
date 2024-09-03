@@ -324,3 +324,38 @@ TEST_SERVICE(receive_ipi_waiting_vcpu)
 
 	ffa_yield();
 }
+
+/**
+ * Test Service to help with testing of IPI when the execution is
+ * in the SWd.
+ * - Waits for message to retrieve shared buffer where IPI state is
+ *   instanciated.
+ * - Waits to be resumed again and transition the IPI state into READY.
+ */
+TEST_SERVICE(set_ipi_ready)
+{
+	dlog_verbose("%s", __func__);
+
+	/* Ready to receive the memory. */
+	ffa_msg_wait();
+
+	/* Configures the ipi state */
+	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
+					   SERVICE_SEND_BUFFER());
+
+	dlog_verbose("IPI state ready\n");
+
+	/* Wait for next FFA_RUN to set ipi state to ready. */
+	ffa_msg_wait();
+
+	hftest_ipi_state_set(READY);
+
+	dlog_verbose("Set IPI ready\n");
+
+	while (!hftest_ipi_state_is(HANDLED)) {
+	}
+
+	ffa_yield();
+
+	FAIL("Do not expect getting to this point.\n");
+}
