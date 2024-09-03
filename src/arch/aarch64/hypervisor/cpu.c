@@ -25,6 +25,7 @@
 #include "feature_id.h"
 #include "msr.h"
 #include "perfmon.h"
+#include "plat/prng/prng.h"
 #include "sysregs.h"
 
 #if BRANCH_PROTECTION
@@ -80,6 +81,21 @@ static void gic_regs_reset(struct arch_regs *r, bool is_primary)
 #endif
 }
 
+static void pauth_el0_keys_reset(struct arch_regs *r)
+{
+	(void)r;
+
+#if BRANCH_PROTECTION
+	if (is_arch_feat_pauth_supported()) {
+		__uint128_t apia_key_for_el0 = plat_prng_get_number();
+
+		r->pac.apiakeylo_el1 =
+			(uint64_t)(apia_key_for_el0 & UINT64_MAX);
+		r->pac.apiakeyhi_el1 = (uint64_t)(apia_key_for_el0 >> 64);
+	}
+#endif
+}
+
 void arch_regs_reset(struct vcpu *vcpu)
 {
 	ffa_id_t vm_id = vcpu->vm->id;
@@ -130,6 +146,8 @@ void arch_regs_reset(struct vcpu *vcpu)
 	r->hyp_state.sctlr_el2 = get_sctlr_el2_value(vcpu->vm->el0_partition);
 	r->lazy.cnthctl_el2 = cnthctl;
 	if (vcpu->vm->el0_partition) {
+		pauth_el0_keys_reset(r);
+
 		CHECK(has_vhe_support());
 		/*
 		 * AArch64 hafnium only uses 8 bit ASIDs at the moment.

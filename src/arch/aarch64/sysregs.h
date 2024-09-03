@@ -105,3 +105,17 @@ static inline bool is_arch_feat_sme_fa64_supported(void)
 	return ((id_aa64smfr0_el1 >> ID_AA64SMFR0_EL1_FA64_SHIFT) &
 		ID_AA64SMFR0_EL1_FA64_MASK) == ID_AA64SMFR0_EL1_FA64_SUPPORTED;
 }
+
+/**
+ * Returns true if Pointer Authentication is implemented.
+ */
+static inline bool is_arch_feat_pauth_supported(void)
+{
+	uint64_t id_aa64isar1_el1 = read_msr(ID_AA64ISAR1_EL1);
+	uint64_t id_aa64isar2_el1 = read_msr(ID_AA64ISAR2_EL1);
+
+	return (((id_aa64isar1_el1 >> ID_AA64ISAR1_EL1_PAUTH_SHIFT) &
+		 ID_AA64ISAR1_EL1_PAUTH_MASK) |
+		((id_aa64isar2_el1 >> ID_AA64ISAR2_EL1_PAUTH_SHIFT) &
+		 ID_AA64ISAR2_EL1_PAUTH_MASK)) != 0U;
+}
