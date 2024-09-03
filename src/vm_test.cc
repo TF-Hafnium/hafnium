@@ -726,4 +726,174 @@ TEST_F(vm, vm_notifications_info_get_from_framework)
 	vm_unlock(&vm_locked);
 }
 
+/**
+ * Validates simple getting of notifications info for pending IPI.
+ */
+TEST_F(vm, vm_notifications_info_get_ipi)
+{
+	/*
+	 * Following set of variables that are also expected to be used when
+	 * handling ffa_notification_info_get.
+	 */
+	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t ids_count = 0;
+	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t lists_count = 0;
+	enum notifications_info_get_state current_state = INIT;
+	struct_vm *current_vm = vm_find_index(5);
+	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 1);
+	struct interrupts *interrupts = &target_vcpu->interrupts;
+	const bool is_from_vm = false;
+	struct vm_locked current_vm_locked = vm_lock(current_vm);
+
+	EXPECT_TRUE(current_vm->vcpu_count >= 2);
+
+	vcpu_virt_interrupt_set_pending(interrupts, HF_IPI_INTID);
+
+	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
+					  &ids_count, lists_sizes, &lists_count,
+					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
+					  &current_state);
+
+	EXPECT_EQ(ids_count, 2);
+	EXPECT_EQ(lists_count, 1);
+	EXPECT_EQ(lists_sizes[0], 1);
+	EXPECT_EQ(ids[0], current_vm->id);
+	EXPECT_EQ(ids[1], 1);
+	EXPECT_EQ(target_vcpu->ipi_info_get_retrieved, true);
+
+	/* Check it is not retrieved multiple times. */
+	current_state = INIT;
+	ids[0] = 0;
+	ids[1] = 0;
+	ids_count = 0;
+	lists_sizes[0] = 0;
+	lists_count = 0;
+
+	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
+					  &ids_count, lists_sizes, &lists_count,
+					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
+					  &current_state);
+	EXPECT_EQ(ids_count, 0);
+	EXPECT_EQ(lists_count, 0);
+	EXPECT_EQ(lists_sizes[0], 0);
+
+	vm_unlock(&current_vm_locked);
+}
+
+/**
+ * Validates simple getting of notifications info for pending with IPI when
+ * notification for the same vcpu is also pending.
+ */
+TEST_F(vm, vm_notifications_info_get_ipi_with_per_vcpu)
+{
+	/*
+	 * Following set of variables that are also expected to be used when
+	 * handling ffa_notification_info_get.
+	 */
+	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t ids_count = 0;
+	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t lists_count = 0;
+	enum notifications_info_get_state current_state = INIT;
+	struct_vm *current_vm = vm_find_index(5);
+	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 1);
+	struct interrupts *interrupts = &target_vcpu->interrupts;
+	const bool is_from_vm = false;
+	struct vm_locked current_vm_locked = vm_lock(current_vm);
+
+	EXPECT_TRUE(current_vm->vcpu_count >= 2);
+
+	vcpu_virt_interrupt_set_pending(interrupts, HF_IPI_INTID);
+
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
+					       true, 1, true);
+	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
+					  &ids_count, lists_sizes, &lists_count,
+					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
+					  &current_state);
+
+	EXPECT_EQ(ids_count, 2);
+	EXPECT_EQ(lists_count, 1);
+	EXPECT_EQ(lists_sizes[0], 1);
+	EXPECT_EQ(ids[0], current_vm->id);
+	EXPECT_EQ(ids[1], 1);
+	EXPECT_EQ(target_vcpu->ipi_info_get_retrieved, true);
+
+	/* Reset the state and values. */
+	current_state = INIT;
+	ids[0] = 0;
+	ids[1] = 0;
+	ids_count = 0;
+	lists_sizes[0] = 0;
+	lists_count = 0;
+
+	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
+					  &ids_count, lists_sizes, &lists_count,
+					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
+					  &current_state);
+	EXPECT_EQ(ids_count, 0);
+	EXPECT_EQ(lists_count, 0);
+	EXPECT_EQ(lists_sizes[0], 0);
+
+	vm_unlock(&current_vm_locked);
+}
+
+/**
+ * Validate that a mix of a pending IPI and notifcations are correctly
+ * reported across vcpus.
+ */
+TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus_and_ipi)
+{
+	struct_vm *current_vm = vm_find_index(5);
+	ffa_vcpu_count_t vcpu_count = current_vm->vcpu_count;
+	CHECK(vcpu_count > 1);
+
+	struct vm_locked current_vm_locked = vm_lock(current_vm);
+
+	/*
+	 * Following set of variables that are also expected to be used when
+	 * handling ffa_notification_info_get.
+	 */
+	const bool is_from_vm = false;
+	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t ids_count = 0;
+	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t lists_count = 0;
+	enum notifications_info_get_state current_state = INIT;
+	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 0);
+	struct interrupts *interrupts = &target_vcpu->interrupts;
+
+	vcpu_virt_interrupt_set_pending(interrupts, HF_IPI_INTID);
+
+	for (unsigned int i = 1; i < vcpu_count; i++) {
+		vm_notifications_partition_set_pending(
+			current_vm_locked, is_from_vm, FFA_NOTIFICATION_MASK(i),
+			i, true);
+	}
+
+	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
+					  &ids_count, lists_sizes, &lists_count,
+					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
+					  &current_state);
+
+	/*
+	 * This test has been conceived for the expected MAX_CPUS 4.
+	 * All VCPUs have notifications of the same VM, to be broken down in 2
+	 * lists with 3 VCPU IDs, and 1 VCPU ID respectively.
+	 * The list of IDs should look like: {<vm_id>, 0, 1, 2, <vm_id>, 3}.
+	 */
+	EXPECT_EQ(ids_count, 6U);
+	EXPECT_EQ(lists_count, 2U);
+	EXPECT_EQ(lists_sizes[0], 3);
+	EXPECT_EQ(lists_sizes[1], 1);
+	EXPECT_EQ(ids[0], current_vm->id);
+	EXPECT_EQ(ids[1], 0);
+	EXPECT_EQ(ids[2], 1);
+	EXPECT_EQ(ids[3], 2);
+	EXPECT_EQ(ids[4], current_vm->id);
+	EXPECT_EQ(ids[5], 3);
+
+	vm_unlock(&current_vm_locked);
+}
 } /* namespace */
