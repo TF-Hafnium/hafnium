@@ -776,9 +776,37 @@ static inline uint32_t ffa_feature_intid(struct ffa_value args)
 	return (uint32_t)args.arg2;
 }
 
-static inline uint32_t ffa_fwk_msg(struct ffa_value args)
+#define FFA_FRAMEWORK_MSG_BIT (UINT64_C(1) << 31)
+#define FFA_FRAMEWORK_MSG_FUNC_MASK UINT64_C(0xFF)
+
+/**
+ * Identifies the VM availability message. See section 18.3 of v1.2 FF-A
+ * specification.
+ */
+enum ffa_framework_msg_func {
+	FFA_FRAMEWORK_MSG_VM_CREATION_REQ = 4,
+	FFA_FRAMEWORK_MSG_VM_CREATION_RESP = 5,
+
+	FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ = 6,
+	FFA_FRAMEWORK_MSG_VM_DESTRUCTION_RESP = 7,
+};
+
+/** Get the `flags` field of a framework message */
+static inline uint32_t ffa_framework_msg_flags(struct ffa_value args)
 {
 	return (uint32_t)args.arg2;
+}
+
+/** Is `args` a framework message? */
+static inline bool ffa_is_framework_msg(struct ffa_value args)
+{
+	return (ffa_framework_msg_flags(args) & FFA_FRAMEWORK_MSG_BIT) != 0;
+}
+
+/** Get the function ID from a framework message */
+static inline uint32_t ffa_framework_msg_func(struct ffa_value args)
+{
+	return ffa_framework_msg_flags(args) & FFA_FRAMEWORK_MSG_FUNC_MASK;
 }
 
 /**

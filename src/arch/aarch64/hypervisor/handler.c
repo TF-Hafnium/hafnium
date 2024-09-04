@@ -27,6 +27,7 @@
 #include "hf/panic.h"
 #include "hf/plat/interrupts.h"
 #include "hf/vm.h"
+#include "hf/vm_ids.h"
 
 #include "vmapi/hf/call.h"
 
@@ -60,15 +61,17 @@
  */
 #define CLIENT_ID_MASK UINT64_C(0xffff)
 
-/*
- * Target function IDs for framework messages from the SPMD.
+/**
+ * Identifies SPMD specific framework messages. See section 18.2 of v1.2 FF-A
+ * specification.
  */
-#define SPMD_FWK_MSG_BIT (UINT64_C(1) << 31)
-#define SPMD_FWK_MSG_FUNC_MASK UINT64_C(0xFF)
-#define SPMD_FWK_MSG_PSCI_REQ UINT8_C(0x0)
-#define SPMD_FWK_MSG_PSCI_RESP UINT8_C(0x2)
-#define SPMD_FWK_MSG_FFA_VERSION_REQ UINT8_C(0x8)
-#define SPMD_FWK_MSG_FFA_VERSION_RESP UINT8_C(0x9)
+enum ffa_spmd_framework_msg_func {
+	SPMD_FRAMEWORK_MSG_PSCI_REQ = 0,
+	SPMD_FRAMEWORK_MSG_PSCI_RESP = 2,
+
+	SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ = 8,
+	SPMD_FRAMEWORK_MSG_FFA_VERSION_RESP = 9,
+};
 
 /**
  * Returns a reference to the currently executing vCPU.
@@ -342,26 +345,24 @@ static void set_virtual_irq(struct arch_regs *r, bool enable)
 }
 
 #if SECURE_WORLD == 1
-
 /**
- * Handle special direct messages from SPMD to SPMC. For now related to power
- * management only.
+ * Handle special direct messages from SPMD to SPMC.
  */
 static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 {
 	ffa_id_t sender = ffa_sender(*args);
 	ffa_id_t receiver = ffa_receiver(*args);
 	ffa_id_t current_vm_id = current->vm->id;
-	uint32_t fwk_msg = ffa_fwk_msg(*args);
-	uint8_t fwk_msg_func_id = fwk_msg & SPMD_FWK_MSG_FUNC_MASK;
+	enum ffa_spmd_framework_msg_func func =
+		(enum ffa_spmd_framework_msg_func)ffa_framework_msg_func(*args);
 
 	/*
 	 * Check if direct message request is originating from the SPMD,
 	 * directed to the SPMC and the message is a framework message.
 	 */
 	if (!(sender == HF_SPMD_VM_ID && receiver == HF_SPMC_VM_ID &&
-	      current_vm_id == HF_OTHER_WORLD_ID) ||
-	    (fwk_msg & SPMD_FWK_MSG_BIT) == 0) {
+	      current_vm_id == HF_OTHER_WORLD_ID &&
+	      ffa_is_framework_msg(*args))) {
 		return false;
 	}
 
@@ -371,9 +372,10 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 	 */
 	CHECK(current->vm->id == HF_HYPERVISOR_VM_ID);
 
-	switch (fwk_msg_func_id) {
-	case SPMD_FWK_MSG_PSCI_REQ: {
-		uint32_t psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
+	switch (func) {
+	case SPMD_FRAMEWORK_MSG_PSCI_REQ: {
+		enum psci_return_code psci_msg_response =
+			PSCI_ERROR_NOT_SUPPORTED;
 		struct vcpu *boot_vcpu = vcpu_get_boot_vcpu();
 		struct vm *vm = boot_vcpu->vm;
 		struct vcpu_locked vcpu_locked;
@@ -412,23 +414,16 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 			psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
 		}
 
-		*args = (struct ffa_value){
-			.func = FFA_MSG_SEND_DIRECT_RESP_32,
-			.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) | HF_SPMD_VM_ID,
-			.arg2 = SPMD_FWK_MSG_BIT | SPMD_FWK_MSG_PSCI_RESP,
-			.arg3 = psci_msg_response};
-
+		*args = ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+					       SPMD_FRAMEWORK_MSG_PSCI_RESP,
+					       psci_msg_response);
 		return true;
 	}
-	case SPMD_FWK_MSG_FFA_VERSION_REQ: {
+	case SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ: {
 		struct ffa_value ret = api_ffa_version(current, args->arg3);
-		*args = (struct ffa_value){
-			.func = FFA_MSG_SEND_DIRECT_RESP_32,
-			.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) | HF_SPMD_VM_ID,
-			/* Set bit 31 since this is a framework message. */
-			.arg2 = SPMD_FWK_MSG_BIT |
-				SPMD_FWK_MSG_FFA_VERSION_RESP,
-			.arg3 = ret.func};
+		*args = ffa_framework_msg_resp(
+			HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+			SPMD_FRAMEWORK_MSG_FFA_VERSION_RESP, ret.func);
 		return true;
 	}
 	default:
@@ -442,21 +437,11 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 		 * response to state that the message couldn't be handled.
 		 * An alternative would be to return FFA_ERROR.
 		 */
-		*args = (struct ffa_value){
-			.func = FFA_MSG_SEND_DIRECT_RESP_32,
-			.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) | HF_SPMD_VM_ID,
-			/* Set bit 31 since this is a framework message. */
-			.arg2 = SPMD_FWK_MSG_BIT | fwk_msg_func_id};
-
+		*args = ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+					       func, 0);
 		return true;
 	}
-
-	/* Should not reach this point. */
-	assert(false);
-
-	return false;
 }
-
 #endif
 
 /**
@@ -656,17 +641,12 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 					    current);
 		return true;
 	case FFA_MSG_SEND_DIRECT_REQ_64:
-	case FFA_MSG_SEND_DIRECT_REQ_32: {
+	case FFA_MSG_SEND_DIRECT_REQ_32:
 #if SECURE_WORLD == 1
 		if (spmd_handler(args, current)) {
 			return true;
 		}
 #endif
-		*args = api_ffa_msg_send_direct_req(ffa_sender(*args),
-						    ffa_receiver(*args), *args,
-						    current, next);
-		return true;
-	}
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
 		*args = api_ffa_msg_send_direct_req(ffa_sender(*args),
 						    ffa_receiver(*args), *args,

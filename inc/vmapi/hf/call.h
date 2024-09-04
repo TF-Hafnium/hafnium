@@ -475,6 +475,33 @@ static inline struct ffa_value ffa_msg_send_direct_req(
 	});
 }
 
+static inline struct ffa_value ffa_framework_msg_send_direct_req(
+	ffa_id_t sender_vm_id, ffa_id_t target_vm_id, uint32_t func,
+	ffa_id_t vm_id)
+{
+	return ffa_call((struct ffa_value){
+		.func = FFA_MSG_SEND_DIRECT_REQ_32,
+		.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id,
+		.arg2 = FFA_FRAMEWORK_MSG_BIT | func,
+		.arg5 = vm_id,
+	});
+}
+
+/** Create an `ffa_value` suitable for the response to a framework message. */
+static inline struct ffa_value ffa_framework_msg_resp(ffa_id_t sender_vm_id,
+						      ffa_id_t receiver_vm_id,
+						      uint32_t func,
+						      uint64_t arg3)
+{
+	return (struct ffa_value){
+		.func = FFA_MSG_SEND_DIRECT_RESP_32,
+		.arg1 = ((uint64_t)sender_vm_id << 16) | receiver_vm_id,
+		/* Set bit 31 since this is a framework message. */
+		.arg2 = FFA_FRAMEWORK_MSG_BIT | func,
+		.arg3 = arg3,
+	};
+}
+
 static inline struct ffa_value ffa_msg_send_direct_req2(
 	ffa_id_t sender_vm_id, ffa_id_t target_vm_id,
 	const struct ffa_uuid *uuid, const uint64_t *msg, size_t count)
