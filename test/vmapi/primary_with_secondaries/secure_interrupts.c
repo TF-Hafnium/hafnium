@@ -6,10 +6,14 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/irq.h"
+#include "hf/arch/vm/interrupts.h"
+#include "hf/arch/vm/interrupts_gicv3.h"
 #include "hf/arch/vm/power_mgmt.h"
 
 #include "vmapi/hf/call.h"
 
+#include "gicv3.h"
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
 #include "test/semaphore.h"
@@ -92,6 +96,32 @@ TEST_PRECONDITION(secure_interrupts, handle_interrupt_rtm_init,
 	/* Schedule message receiver through FFA_RUN interface. */
 	ret = ffa_run(service2_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}
+
+/**
+ * Setups up SRI and returns the interrupt ID.
+ */
+uint32_t enable_sri(void)
+{
+	struct ffa_value ret;
+	uint32_t sri_id;
+
+	dlog_verbose("Enabling the SRI");
+
+	gicv3_system_setup();
+
+	ret = ffa_features(FFA_FEATURE_SRI);
+
+	sri_id = ffa_feature_intid(ret);
+
+	interrupt_enable(sri_id, true);
+	interrupt_set_priority(sri_id, 0x10);
+	interrupt_set_edge_triggered(sri_id, false);
+	interrupt_set_priority_mask(0xff);
+
+	arch_irq_enable();
+
+	return sri_id;
 }
 
 /**

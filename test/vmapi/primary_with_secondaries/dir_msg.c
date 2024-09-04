@@ -42,8 +42,8 @@ static void echo_test(ffa_id_t target_id)
 				0x88889999};
 	struct ffa_value res;
 
-	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, target_id, msg[0],
-				      msg[1], msg[2], msg[3], msg[4]);
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), target_id, msg[0], msg[1],
+				      msg[2], msg[3], msg[4]);
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 
@@ -62,9 +62,8 @@ static void echo_test_req2(ffa_id_t target_id, struct ffa_uuid target_uuid)
 				0x44554455, 0x66776677};
 
 	struct ffa_value res;
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, target_id,
-				       &target_uuid, (const uint64_t *)&msg,
-				       ARRAY_SIZE(msg));
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), target_id, &target_uuid,
+				       (const uint64_t *)&msg, ARRAY_SIZE(msg));
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
 
@@ -100,7 +99,7 @@ TEST(direct_message, ffa_send_direct_message_req_yield_echo)
 		       "ffa_yield_direct_message_resp_echo", mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), service1_info->vm_id,
 				      msg[0], msg[1], msg[2], msg[3], msg[4]);
 
 	/*
@@ -251,8 +250,8 @@ TEST(direct_message, ffa_send_direct_message_req_invalid_dst)
 				0x88889999};
 	struct ffa_value res;
 
-	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, HF_PRIMARY_VM_ID,
-				      msg[0], msg[1], msg[2], msg[3], msg[4]);
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), HF_PRIMARY_VM_ID, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
 
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
@@ -270,8 +269,8 @@ TEST(direct_message, ffa_send_direct_message_resp_invalid)
 		       mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_resp(HF_PRIMARY_VM_ID, service1_info->vm_id,
-				       0, 0, 0, 0, 0);
+	res = ffa_msg_send_direct_resp(hf_vm_get_id(), service1_info->vm_id, 0,
+				       0, 0, 0, 0);
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
@@ -293,7 +292,7 @@ TEST(direct_message, ffa_secondary_direct_msg_req_invalid)
 		       mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), service1_info->vm_id, 0,
 				      0, 0, 0, 0);
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 }
@@ -312,7 +311,7 @@ TEST(direct_message, ffa_secondary_direct_msg_resp_invalid)
 		       mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), service1_info->vm_id, 0,
 				      0, 0, 0, 0);
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 }
@@ -332,7 +331,7 @@ TEST(direct_message, ffa_secondary_spoofed_response)
 		       "ffa_direct_msg_resp_invalid_sender_receiver", mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, service1_info->vm_id, 0,
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), service1_info->vm_id, 0,
 				      0, 0, 0, 0);
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 }
@@ -408,7 +407,7 @@ TEST(direct_message, ffa_send_direct_message_req2_yield_echo)
 		       "ffa_yield_direct_message_resp2_echo", mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service1_info->vm_id,
 				       &uuid, (const uint64_t *)&msg,
 				       ARRAY_SIZE(msg));
 
@@ -564,14 +563,14 @@ TEST(direct_message, ffa_send_direct_message_req2_invalid_uuid)
 	/* Non-existent UUID. */
 	ffa_uuid_init(1, 1, 1, 1, &uuid);
 
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service1_info->vm_id,
 				       &uuid, (const uint64_t *)&msg,
 				       ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 
 	/* UUID for a different partition than given FF-A id. */
 	uuid = SERVICE2;
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service1_info->vm_id,
 				       &uuid, (const uint64_t *)&msg,
 				       ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
@@ -592,7 +591,7 @@ TEST(direct_message, ffa_send_direct_message_resp2_invalid)
 		       "ffa_direct_message_req2_resp_echo", mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_resp2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = ffa_msg_send_direct_resp2(hf_vm_get_id(), service1_info->vm_id,
 					(const uint64_t *)&msg,
 					ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
@@ -618,12 +617,12 @@ TEST(direct_message, ffa_secondary_direct_msg_req2_invalid)
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_disallowed_direct_msg_req2",
 		       mb.send);
-	res = send_indirect_message(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = send_indirect_message(hf_vm_get_id(), service1_info->vm_id,
 				    mb.send, &own_uuid, sizeof(own_uuid), 0);
 	ASSERT_EQ(res.func, FFA_SUCCESS_32);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service1_info->vm_id,
 				       &service1_uuid, (const uint64_t *)&msg,
 				       ARRAY_SIZE(msg));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
@@ -645,7 +644,7 @@ TEST(direct_message, ffa_secondary_direct_msg_resp2_invalid)
 		       mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service1_info->vm_id,
 				       &service1_uuid, (uint64_t *)msg,
 				       ARRAY_SIZE(msg));
 
@@ -669,7 +668,7 @@ TEST(direct_message, ffa_secondary_spoofed_response2)
 		       "ffa_direct_msg_resp2_invalid_sender_receiver", mb.send);
 	ffa_run(service1_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service1_info->vm_id,
 				       &service1_uuid, (uint64_t *)msg,
 				       ARRAY_SIZE(msg));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
@@ -739,7 +738,7 @@ TEST_PRECONDITION(direct_message, ffa_send_direct_message_req2_multiple_uuids,
 		       "ffa_direct_message_req2_resp_loop", mb.send);
 	ffa_run(service2_info->vm_id, 0);
 
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service2_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service2_info->vm_id,
 				       &uuid, (const uint64_t *)&msg,
 				       ARRAY_SIZE(msg));
 
@@ -762,7 +761,7 @@ TEST_PRECONDITION(direct_message, ffa_send_direct_message_req2_multiple_uuids,
 
 	uuid = SERVICE2;
 
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service2_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service2_info->vm_id,
 				       &uuid, (const uint64_t *)&msg,
 				       ARRAY_SIZE(msg));
 
@@ -805,7 +804,7 @@ TEST(direct_message, ffa_direct_msg_check_abi_pairs_nwd_to_sp)
 	ffa_run(service1_info->vm_id, 0);
 
 	/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ2. */
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service1_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service1_info->vm_id,
 				       &uuid1, (const uint64_t *)&msg,
 				       ARRAY_SIZE(msg));
 
@@ -820,7 +819,7 @@ TEST(direct_message, ffa_direct_msg_check_abi_pairs_nwd_to_sp)
 	 * Send a direct request with FFA_MSG_SEND_DIRECT_REQ and expect
 	 * failure.
 	 */
-	res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID, service2_info->vm_id,
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), service2_info->vm_id,
 				      msg[0], msg[1], msg[2], msg[3], msg[4]);
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
@@ -851,7 +850,7 @@ TEST(direct_message, ffa_direct_message_req2_after_req)
 
 	for (uint32_t i = 0; i < 2; i++) {
 		/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ. */
-		res = ffa_msg_send_direct_req(HF_PRIMARY_VM_ID,
+		res = ffa_msg_send_direct_req(hf_vm_get_id(),
 					      service1_info->vm_id, msg[0],
 					      msg[1], msg[2], msg[3], msg[4]);
 
@@ -875,7 +874,7 @@ TEST(direct_message, ffa_direct_message_req2_after_req)
 
 		/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ2. */
 		res = ffa_msg_send_direct_req2(
-			HF_PRIMARY_VM_ID, service1_info->vm_id, &uuid1,
+			hf_vm_get_id(), service1_info->vm_id, &uuid1,
 			(const uint64_t *)&msg, ARRAY_SIZE(msg));
 
 		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
@@ -948,7 +947,7 @@ TEST_PRECONDITION(direct_message, ffa_msg_send_direct_req2_recv_not_supported,
 	const struct ffa_uuid service4_uuid = SERVICE4;
 
 	/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ2. */
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service3_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service3_info->vm_id,
 				       &service3_uuid, (const uint64_t *)&msg,
 				       ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_DENIED);
@@ -958,7 +957,7 @@ TEST_PRECONDITION(direct_message, ffa_msg_send_direct_req2_recv_not_supported,
 	ffa_run(service4_info->vm_id, 0);
 
 	/* Send a direct request with FFA_MSG_SEND_DIRECT_REQ2. */
-	res = ffa_msg_send_direct_req2(HF_PRIMARY_VM_ID, service4_info->vm_id,
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service4_info->vm_id,
 				       &service4_uuid, (const uint64_t *)&msg,
 				       ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_DENIED);

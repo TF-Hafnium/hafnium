@@ -194,7 +194,7 @@ vm_kernel("primary_with_secondaries_el0_test_vm") {
   testonly = true
   public_configs = [
     ":config",
-    "//src/arch/${plat_arch}:config",
+    "//src/arch/aarch64:config",
   ]
 
   sources = [
@@ -286,6 +286,7 @@ vm_kernel("primary_with_sp_test_vm") {
   public_configs = [
     ":config",
     "//src/arch/aarch64:config",
+    "services/arch/aarch64/secure:config",
   ]
 
   sources = [
@@ -302,8 +303,12 @@ vm_kernel("primary_with_sp_test_vm") {
   deps = [
     ":ipi_state",
     ":primary_with_secondaries",
-    "//src/arch/${plat_arch}/hftest:registers",
+    "//src/arch/aarch64:arch",
+    "//src/arch/aarch64/hftest:interrupts",
+    "//src/arch/aarch64/hftest:interrupts_gicv3",
+    "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/arch/aarch64/gicv3:gicv3_setup",
     "//test/vmapi/common:ffa",
     "//test/vmapi/common/arch/aarch64:exception_handler",
     "//vmlib",
@@ -379,6 +384,7 @@ vm_kernel("primary_with_sp_vhe_test_vm") {
   public_configs = [
     ":config",
     "//src/arch/aarch64:config",
+    "services/arch/aarch64/secure:config",
   ]
 
   sources = [
@@ -390,12 +396,15 @@ vm_kernel("primary_with_sp_vhe_test_vm") {
     "rx_ownership.c",
     "secure_interrupts.c",
   ]
-
   deps = [
     ":ipi_state",
     ":primary_with_secondaries",
-    "//src/arch/${plat_arch}/hftest:registers",
+    "//src/arch/aarch64:arch",
+    "//src/arch/aarch64/hftest:interrupts",
+    "//src/arch/aarch64/hftest:interrupts_gicv3",
+    "//src/arch/aarch64/hftest:registers",
     "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/arch/aarch64/gicv3:gicv3_setup",
     "//test/vmapi/common:ffa",
     "//test/vmapi/common/arch/aarch64:exception_handler",
     "//vmlib",
