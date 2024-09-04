@@ -25,7 +25,11 @@
 #include "test/vmapi/ffa.h"
 
 alignas(PAGE_SIZE) static uint8_t page[PAGE_SIZE];
-static uint8_t retrieve_buffer[PAGE_SIZE * 2];
+/**
+ * Used for memory sharing operations in both the memory sharing
+ * and IPI tests.
+ */
+uint8_t retrieve_buffer[PAGE_SIZE * 2];
 
 static void memory_increment(ffa_memory_handle_t *handle,
 			     bool check_not_cleared)

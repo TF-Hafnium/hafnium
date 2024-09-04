@@ -11,6 +11,16 @@ config("config") {
   include_dirs = [ "inc" ]
 }
 
+source_set("ipi_state") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:config",
+  ]
+  sources = [ "ipi_state.c" ]
+  deps = [ "//test/vmapi/common:ffa" ]
+}
+
 source_set("primary_with_secondaries") {
   testonly = true
   public_configs = [
@@ -290,6 +300,7 @@ vm_kernel("primary_with_sp_test_vm") {
   ]
 
   deps = [
+    ":ipi_state",
     ":primary_with_secondaries",
     "//src/arch/${plat_arch}/hftest:registers",
     "//test/hftest:hftest_primary_vm",
@@ -381,6 +392,7 @@ vm_kernel("primary_with_sp_vhe_test_vm") {
   ]
 
   deps = [
+    ":ipi_state",
     ":primary_with_secondaries",
     "//src/arch/${plat_arch}/hftest:registers",
     "//test/hftest:hftest_primary_vm",
