@@ -1025,7 +1025,7 @@ struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 			.arg1 = (receiver->mailbox.recv_sender << 16) |
 				receiver->id,
 			.arg3 = receiver->mailbox.recv_size};
-	case FFA_MSG_SEND2_32:
+	default:
 		return (struct ffa_value){
 			.func = FFA_RUN_32,
 			/*
@@ -1035,11 +1035,6 @@ struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 			 * other APIs (eg: FFA_NOTIFICATION_GET).
 			 */
 			.arg1 = receiver->id};
-	default:
-		/* This should never be reached, but return an error in case. */
-		dlog_error("Tried to return an invalid message function %#x\n",
-			   receiver->mailbox.recv_func);
-		return ffa_error(FFA_DENIED);
 	}
 }
 
