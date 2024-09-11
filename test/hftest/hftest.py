@@ -1031,7 +1031,7 @@ def Main():
     vm_args = args.vm_args or ""
 
     partitions = None
-    global_run_name = None
+    global_run_name = "arch"
     if args.driver == "fvp":
         if args.partitions_json is not None:
             partitions_dir = os.path.join(
@@ -1045,7 +1045,7 @@ def Main():
                 global_run_name = os.path.basename(args.hypervisor).split(".")[0]
 
     # Create class which will manage all test artifacts.
-    log_dir = os.path.join(args.log, test_set_up)
+    log_dir = os.path.join(os.path.join(args.log, test_set_up), global_run_name)
     artifacts = ArtifactsManager(log_dir)
 
     # Create a driver for the platform we want to test on.
