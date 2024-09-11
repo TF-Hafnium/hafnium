@@ -1087,6 +1087,7 @@ static inline ffa_vcpu_index_t ffa_notifications_get_vcpu(struct ffa_value args)
 #define FFA_NOTIFICATIONS_LISTS_COUNT_MASK 0x1fU
 #define FFA_NOTIFICATIONS_LIST_SHIFT(l) (2 * ((l) - 1) + 12)
 #define FFA_NOTIFICATIONS_LIST_SIZE_MASK 0x3U
+#define FFA_NOTIFICATIONS_LIST_MAX_SIZE 0x4U
 
 static inline uint32_t ffa_notification_info_get_lists_count(
 	struct ffa_value args)
@@ -1106,6 +1107,11 @@ static inline bool ffa_notification_info_get_more_pending(struct ffa_value args)
 {
 	return (args.arg2 & FFA_NOTIFICATIONS_INFO_GET_FLAG_MORE_PENDING) != 0U;
 }
+
+void ffa_notification_info_get_and_check(
+	const uint32_t expected_lists_count,
+	const uint32_t *const expected_lists_sizes,
+	const uint16_t *const expected_ids);
 
 /**
  * A set of contiguous pages which is part of a memory region. This corresponds

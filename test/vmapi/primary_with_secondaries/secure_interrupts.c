@@ -232,10 +232,11 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu, service1_is_mp_sp)
  *   vCPU0 terminates with FFA_MSG_WAIT, so it is in the waiting state.
  * - Start CPU1 and within it, invoke test service to send IPI. Test service
  *   waits for state machine to transition into READY state.
- * - NWd waits for the Schedule Reciever Interrupt and then runs Service1 vCPU0
- *   to handle the IPI.
+ * - NWd waits for the Schedule Reciever Interrupt, checks that Service1 vCPU0
+ *   is reported by FFA_NOTIFICATION_INFO_GET as having an IPI pending
+ *   and then runs Service1 vCPU0 to handle the IPI.
  * - vCPU0 is resumed to handle the IPI virtual interrupt. It should attest
- * state transitions into HANDLED from the interrupt handler.
+ *   state transitions into HANDLED from the interrupt handler.
  */
 TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd, service1_is_mp_sp)
 {
@@ -252,6 +253,8 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd, service1_is_mp_sp)
 		service1_info->vm_id,
 	};
 	uint32_t sri_id;
+	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
 
 	/* Get ready to handle SRI.  */
 	sri_id = enable_sri();
@@ -297,6 +300,14 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd, service1_is_mp_sp)
 		interrupt_wait();
 	}
 
+	/* Check the target vCPU 0 is returned by FFA_NOTIFICATION_INFO_GET. */
+	expected_lists_sizes[0] = 1;
+	expected_ids[0] = service1_info->vm_id;
+	expected_ids[1] = 0;
+
+	ffa_notification_info_get_and_check(1, expected_lists_sizes,
+					    expected_ids);
+
 	/* Resumes service1 in target vCPU 0 to handle IPI. */
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
@@ -321,10 +332,11 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd, service1_is_mp_sp)
  * - Resume Service2 vCPU0 so execution is in the Secure World. At this point,
  *   Service2 transitions IPI state to READY, and waits for the IPI state to be
  *   Handled.
- * - NWd vCPU0 is resumed by the Schedule Reciever Interrupt and then runs
- *   Service1 vCPU0 to handle the IPI.
- * - Service1 vCPU0 is resumed to handle the IPI virtual interrupt. It should
- *   attest state transitions into HANDLED from the interrupt handler.
+ * - NWd vCPU0 is resumed by the Schedule Reciever Interrupt checks that
+ *   Service1 vCPU0 is reported by FFA_NOTIFICATION_INFO_GET as having an IPI
+ *   pending, and then runs Service1 vCPU0 to handle the IPI.
+ * - Service1 vCPU0 is resumed to handle the IPI virtual interrupt.
+ *   It should attest state transitions into HANDLED from the interrupt handler.
  * - Service2 vCPU0 is then run to check that it successfully runs and completes
  *   after being interrupted.
  */
@@ -344,6 +356,8 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_swd, service1_is_mp_sp)
 		service2_info->vm_id,
 	};
 	uint32_t sri_id;
+	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
 
 	/* Get ready to handle SRI.  */
 	sri_id = enable_sri();
@@ -392,6 +406,14 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_swd, service1_is_mp_sp)
 	while (last_interrupt_id != sri_id) {
 		interrupt_wait();
 	}
+
+	/* Check the target vCPU 0 is returned by FFA_NOTIFICATION_INFO_GET. */
+	expected_lists_sizes[0] = 1;
+	expected_ids[0] = service1_info->vm_id;
+	expected_ids[1] = 0;
+
+	ffa_notification_info_get_and_check(1, expected_lists_sizes,
+					    expected_ids);
 
 	/* Resumes service1 in target vCPU 0 to handle IPI. */
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);

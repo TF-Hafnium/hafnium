@@ -869,3 +869,29 @@ void update_mm_security_state(struct ffa_composite_memory_region *composite,
 		}
 	}
 }
+
+/**
+ * Call FFA_NOTIFICATION_INFO_GET and check the reponse with the values
+ * expected.
+ */
+void ffa_notification_info_get_and_check(
+	const uint32_t expected_lists_count,
+	const uint32_t *const expected_lists_sizes,
+	const uint16_t *const expected_ids)
+{
+	struct ffa_value ret = ffa_notification_info_get();
+
+	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+	EXPECT_EQ(ffa_notification_info_get_lists_count(ret),
+		  expected_lists_count);
+
+	for (uint32_t i = 0; i < expected_lists_count; i++) {
+		EXPECT_EQ(ffa_notification_info_get_list_size(ret, i + 1),
+			  expected_lists_sizes[i]);
+	}
+
+	EXPECT_EQ(memcmp(&ret.arg3, expected_ids,
+			 sizeof(expected_ids[0] *
+				FFA_NOTIFICATIONS_INFO_GET_MAX_IDS)),
+		  0);
+}
