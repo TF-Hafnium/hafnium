@@ -126,6 +126,10 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 
 	EXPECT_TRUE(fdt_read_number(&root, "execution-ctx-count", &number));
 	ctx->partition_manifest.execution_ctx_count = (uint16_t)number;
+
+	EXPECT_TRUE(fdt_read_number(&root, "exception-level", &number));
+	ctx->partition_manifest.run_time_el = (uint16_t)number;
+
 	EXPECT_TRUE(fdt_read_property(&root, "uuid", &uuid));
 
 	/* Parse UUIDs and populate uuid count.*/
@@ -333,6 +337,12 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	ASSERT_TRUE(is_ffa_spm_buffer_full_notification(bitmap) ||
 		    is_ffa_hyp_buffer_full_notification(bitmap));
 	ASSERT_EQ(own_id, ffa_rxtx_header_receiver(&message->header));
+
+	if (ctx->is_ffa_manifest_parsed &&
+	    ctx->partition_manifest.run_time_el == S_EL1) {
+		ASSERT_EQ(hf_interrupt_get(), HF_NOTIFICATION_PENDING_INTID);
+	}
+
 	memiter_init(&args, message->payload, message->header.size);
 
 	/* Find service handler. */
