@@ -28,6 +28,18 @@
 #endif
 .endm
 
+.macro check_supported_pauth_alg
+	/* Expect pointer authentication is implemented. */
+	mrs	x1, id_aa64isar1_el1
+	and	x1, x1, #0xff0		/* API / APA */
+	mrs	x2, id_aa64isar2_el1
+	and	x2, x2, #0xf000		/* APA3 */
+	orr	x1, x1, x2
+	cmp	x1, #0
+	beq	.
+.endm
+
+
 /**
  * Called only on first boot after the image has been relocated and BSS zeroed.
  *
@@ -74,10 +86,7 @@ image_entry:
 	bl one_time_init_mm
 
 #if BRANCH_PROTECTION
-	/* Expect pointer authentication is implemented. */
-	mrs	x1, id_aa64isar1_el1
-	ands	x1, x1, #0xff0		/* API / APA */
-	beq	.
+	check_supported_pauth_alg
 
 	/* Gather a random number to use as pointer authentication key. */
 	bl	plat_prng_get_number
@@ -166,10 +175,7 @@ cpu_entry:
 #endif
 
 #if BRANCH_PROTECTION
-	/* Expect pointer authentication is implemented. */
-	mrs	x1, id_aa64isar1_el1
-	ands	x1, x1, #0xff0		/* API / APA */
-	beq	.
+	check_supported_pauth_alg
 #endif
 
 #if ENABLE_MTE
