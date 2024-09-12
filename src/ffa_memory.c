@@ -3055,25 +3055,6 @@ bool is_ffa_hypervisor_retrieve_request(struct ffa_memory_region *request)
 	return request->receiver_count == 0U;
 }
 
-/**
- * An FFA_MEM_RETRIEVE_REQ from the hypervisor must specify the handle of the
- * memory transaction it is querying and all other fields must be 0.
- */
-static bool ffa_memory_hypervisor_retrieve_request_validate(
-	struct ffa_memory_region *request)
-{
-	return request->sender == 0U &&
-	       request->attributes.shareability == 0U &&
-	       request->attributes.cacheability == 0U &&
-	       request->attributes.type == 0U &&
-	       request->attributes.security == 0U && request->flags == 0U &&
-	       request->tag == 0U && request->memory_access_desc_size == 0U &&
-	       request->receiver_count == 0U &&
-	       request->receivers_offset == 0U &&
-	       plat_ffa_memory_handle_allocated_by_current_world(
-		       request->handle);
-}
-
 /*
  * Helper to reset count of fragments retrieved by the hypervisor.
  */
@@ -3605,15 +3586,6 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	}
 
 	if (is_ffa_hypervisor_retrieve_request(retrieve_request)) {
-		if (!ffa_memory_hypervisor_retrieve_request_validate(
-			    retrieve_request)) {
-			dlog_verbose(
-				"All fields except the handle in the "
-				"memory access descriptor must be zero for a "
-				"hypervisor retrieve request.\n");
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out;
-		}
 		ret = ffa_hypervisor_retrieve_request(share_state, to_locked,
 						      retrieve_request);
 	} else {
