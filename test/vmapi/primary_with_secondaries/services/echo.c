@@ -72,7 +72,7 @@ TEST_SERVICE(echo_msg_send2_service)
 				 recv_buf, NULL);
 
 	/* From uuid to respective partition info. */
-	ASSERT_EQ(get_ffa_partition_info(&target_uuid, &target_info,
+	ASSERT_EQ(get_ffa_partition_info(target_uuid, &target_info,
 					 sizeof(target_info), recv_buf),
 		  1);
 

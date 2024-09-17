@@ -178,7 +178,7 @@ TEST_SERVICE(ffa_direct_message_req2_echo_services)
 		   target_uuid.uuid[3]);
 
 	/* From uuid to respective partition info. */
-	ASSERT_EQ(get_ffa_partition_info(&target_uuid, &target_info,
+	ASSERT_EQ(get_ffa_partition_info(target_uuid, &target_info,
 					 sizeof(target_info), recv_buf),
 		  1);
 
@@ -477,7 +477,7 @@ TEST_SERVICE(ffa_yield_direct_message_v_1_2_echo_services)
 				 recv_buf, NULL);
 
 	/* From uuid to respective partition info. */
-	ASSERT_EQ(get_ffa_partition_info(&target_uuid, &target_info,
+	ASSERT_EQ(get_ffa_partition_info(target_uuid, &target_info,
 					 sizeof(target_info), recv_buf),
 		  1);
 
@@ -752,7 +752,7 @@ TEST_SERVICE(version_does_not_support_req2)
 		   target_uuid.uuid[3]);
 
 	/* From uuid to respective partition info. */
-	ASSERT_EQ(get_ffa_partition_info(&target_uuid, &target_info,
+	ASSERT_EQ(get_ffa_partition_info(target_uuid, &target_info,
 					 sizeof(target_info), recv_buf),
 		  1);
 

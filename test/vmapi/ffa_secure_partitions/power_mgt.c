@@ -117,7 +117,7 @@ static void cpu_entry_check_cpu_idx_second_sp(uintptr_t arg)
 	cpu_entry_check_cpu_idx(arg);
 }
 
-static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
+static void base_cpu_start_test(struct ffa_uuid recv_uuid,
 				void (*entry)(uintptr_t arg),
 				bool skip_if_up_sp)
 {
@@ -163,26 +163,26 @@ static void base_cpu_start_test(struct ffa_uuid *recv_uuid,
 TEST(ffa_power_mgt, cpu_start_echo_second_sp)
 {
 	/* Second SP can be either S-EL0 or S-EL1 SP. */
-	base_cpu_start_test(&(struct ffa_uuid){SP_SERVICE_SECOND_UUID},
+	base_cpu_start_test((struct ffa_uuid){SP_SERVICE_SECOND_UUID},
 			    cpu_entry_echo_second_sp, false);
 }
 
 TEST(ffa_power_mgt, cpu_start_echo_first_sp)
 {
-	base_cpu_start_test(&(struct ffa_uuid){SP_SERVICE_FIRST_UUID},
+	base_cpu_start_test((struct ffa_uuid){SP_SERVICE_FIRST_UUID},
 			    cpu_entry_echo, false);
 }
 
 TEST(ffa_power_mgt, cpu_start_core_idx_second_sp)
 {
 	/* Test to be skipped for S-EL0 partition. */
-	base_cpu_start_test(&(struct ffa_uuid){SP_SERVICE_SECOND_UUID},
+	base_cpu_start_test((struct ffa_uuid){SP_SERVICE_SECOND_UUID},
 			    cpu_entry_check_cpu_idx_second_sp, true);
 }
 
 TEST(ffa_power_mgt, cpu_start_core_idx_first_sp)
 {
 	/* Test to be skipped for S-EL0 partition. */
-	base_cpu_start_test(&(struct ffa_uuid){SP_SERVICE_FIRST_UUID},
+	base_cpu_start_test((struct ffa_uuid){SP_SERVICE_FIRST_UUID},
 			    cpu_entry_check_cpu_idx, true);
 }

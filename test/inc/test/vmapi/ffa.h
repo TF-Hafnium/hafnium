@@ -31,7 +31,7 @@
 		static bool is_set = false;                                    \
 		struct ffa_uuid to_get_uuid = uuid;                            \
 		if (!is_set) {                                                 \
-			ASSERT_EQ(get_ffa_partition_info(&to_get_uuid,         \
+			ASSERT_EQ(get_ffa_partition_info(to_get_uuid,          \
 							 &partition, 1, recv), \
 				  1);                                          \
 			is_set = true;                                         \
@@ -134,9 +134,9 @@ ffa_id_t retrieve_memory_from_message(
 ffa_id_t retrieve_memory_from_message_expect_fail(
 	void *recv_buf, void *send_buf, enum ffa_error expected_error);
 
-ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
-				      struct ffa_partition_info *info,
-				      size_t info_size, void *recv);
+ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid uuid,
+				      struct ffa_partition_info infos[],
+				      size_t info_len, void *recv);
 
 struct ffa_boot_info_header *get_boot_info_header(void);
 void dump_boot_info(struct ffa_boot_info_header *boot_info_header);

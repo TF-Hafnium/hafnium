@@ -619,33 +619,40 @@ ffa_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 	return sender;
 }
 
-ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid *uuid,
-				      struct ffa_partition_info *info,
-				      size_t info_size, void *recv)
+/**
+ * Helper wrapper around `ffa_partition_info_get`.
+ * Fills `infos` array with partition information and returns number of
+ * partition infos written.
+ */
+ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid uuid,
+				      struct ffa_partition_info infos[],
+				      size_t info_len, void *recv)
 {
 	struct ffa_value ret;
 	struct ffa_partition_info *ret_info = recv;
+	size_t ret_len;
 
-	CHECK(uuid != NULL);
-	CHECK(info != NULL);
+	CHECK(infos != NULL);
 
-	ret = ffa_partition_info_get(uuid, 0);
+	ret = ffa_partition_info_get(&uuid, 0);
 
 	if (ffa_func_id(ret) != FFA_SUCCESS_32) {
 		return 0;
 	}
 
-	if (ret.arg2 != 0) {
-		size_t src_size = ret.arg2 * sizeof(struct ffa_partition_info);
-		size_t dest_size =
-			info_size * sizeof(struct ffa_partition_info);
+	ret_len = ret.arg2;
+	if (ret_len != 0) {
+		size_t src_size = ret_len * sizeof(struct ffa_partition_info);
+		size_t dest_size = info_len * sizeof(struct ffa_partition_info);
 
-		memcpy_s(info, dest_size, ret_info, src_size);
+		CHECK(info_len >= ret_len);
+
+		memcpy_s(infos, dest_size, ret_info, src_size);
 	}
 
 	ffa_rx_release();
 
-	return ret.arg2;
+	return ret_len;
 }
 
 /**
