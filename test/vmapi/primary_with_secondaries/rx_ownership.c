@@ -146,7 +146,7 @@ static void cpu_entry_mp(uintptr_t arg)
  * the RX buffer ownership still belongs to the SP.
  *	3. SP vCPU 1 reads buffer after FFA_MSG_WAIT call.
  */
-TEST_PRECONDITION(rx_ownership, ffa_msg_wait_race_success, service1_is_not_vm)
+TEST_PRECONDITION(rx_ownership, ffa_msg_wait_race_success, service1_is_mp_sp)
 {
 	struct mailbox_buffers mb_mp = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb_mp.recv);

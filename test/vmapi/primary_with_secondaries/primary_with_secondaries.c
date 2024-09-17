@@ -147,3 +147,24 @@ bool service2_is_mp_sp(void)
 
 	return (service2_info->vcpu_count > 1);
 }
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service1 partition is MP.
+ */
+bool service1_is_mp(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	return (service1_info->vcpu_count > 1);
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service1 partition is an MP SP.
+ */
+bool service1_is_mp_sp(void)
+{
+	return service1_is_not_vm() && service1_is_mp();
+}
