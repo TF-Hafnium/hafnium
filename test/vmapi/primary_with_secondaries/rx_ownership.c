@@ -185,3 +185,40 @@ TEST_PRECONDITION(rx_ownership, ffa_msg_wait_race_success, service1_is_mp_sp)
 
 	HFTEST_LOG("Finished the test...");
 }
+
+/**
+ * Test to verify that when an SP calls FFA_MSG_WAIT with the
+ * FFA_MSG_WAIT_FLAG_RETAIN_RX flag it does not relinquish ownership of its RX
+ * buffer back to the SPMC. Test sequence is as follows:
+ * 	1. PVM runs SP via FFA_RUN.
+ * 	2. SP calls FFA_PARTITION_INFO_GET to gain ownership of its RX buffer
+ * from the SPMC.
+ * 	3. SP calls FFA_MSG_WAIT with FFA_MSG_WAIT_FLAG_RETAIN_RX flag
+ * returning control back to PVM but keeping ownership of the RX buffer.
+ * 	4. PVM sends SP an indirect message to fill the RX buffer which will
+ * fails as SPMC does not have ownership of the buffer and cannot fill it.
+ */
+TEST_PRECONDITION(rx_ownership, ffa_msg_wait_retain_buffer_indirect_msg_fail,
+		  service1_is_not_vm)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value ret;
+	uint64_t msg = 0x123;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id, "test_ffa_msg_wait_retain_buffer",
+		       mb.send);
+
+	/* Run service to call FFA_PARTITION_INFO_GET, then FFA_MSG_WAIT. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/*
+	 * Run service again after FFA_MSG_WAIT (which should have retained
+	 * the buffer). Sending an indirect message should fail since buffer
+	 * was not released back to SPMC.
+	 */
+	ret = send_indirect_message(hf_vm_get_id(), service1_info->vm_id,
+				    mb.send, &msg, sizeof(msg), 0);
+	ASSERT_EQ(ret.func, FFA_ERROR_32);
+}
