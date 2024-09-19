@@ -455,6 +455,43 @@ TEST(secure_interrupts, sp_yield_sec_interrupt_handling)
 	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
 }
 
+/**
+ * Test that SPMC will queue secure virtual interrupt targeting an SP that
+ * entered blocked state through FFA_YIELD and further signals the pending
+ * virtual interrupt through FFA_INTERRUPT interface when target SP is resumed
+ * by normal world through FFA_RUN.
+ */
+TEST(secure_interrupts, sp_blocked_through_ffa_yield)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_id_t receiver_id = service2_info->vm_id;
+
+	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 50);
+
+	/* Send request to the SP to yield direct request. */
+	res = sp_sleep_cmd_send(own_id, receiver_id, 0, OPTIONS_YIELD_DIR_REQ);
+	EXPECT_EQ(res.func, FFA_YIELD_32);
+
+	/*
+	 * Sleep for 50 ms. This ensures secure wdog timer triggers during this
+	 * time.
+	 */
+	waitms(50);
+
+	/*
+	 * Resume the SP to complete the busy loop and service the virtual
+	 * interrupt.
+	 */
+	res = ffa_run(ffa_vm_id(res), ffa_vcpu_index(res));
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, SP_SUCCESS);
+
+	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
+}
+
 static void cpu_entry_sp_sleep_loop(uintptr_t arg)
 {
 	ffa_id_t own_id = hf_vm_get_id();

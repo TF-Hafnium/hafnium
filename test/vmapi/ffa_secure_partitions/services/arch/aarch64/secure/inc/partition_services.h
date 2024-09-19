@@ -18,6 +18,7 @@
 /* Various fields encoded in `options` parameter. */
 #define OPTIONS_MASK_INTERRUPTS (1 << 0)
 #define OPTIONS_HINT_INTERRUPTED (1 << 1)
+#define OPTIONS_YIELD_DIR_REQ (1 << 2)
 
 static inline struct ffa_value sp_success(ffa_id_t sender, ffa_id_t receiver,
 					  uint64_t val)

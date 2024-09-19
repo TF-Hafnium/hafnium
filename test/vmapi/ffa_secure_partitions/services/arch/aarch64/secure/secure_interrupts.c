@@ -204,6 +204,11 @@ static inline bool mask_interrupts(uint32_t options)
 	return ((options & OPTIONS_MASK_INTERRUPTS) != 0);
 }
 
+static inline bool yield_direct_request(uint32_t options)
+{
+	return ((options & OPTIONS_YIELD_DIR_REQ) != 0);
+}
+
 struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
 			      uint32_t options, uint64_t func)
 {
@@ -213,6 +218,10 @@ struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
 	if (mask_interrupts(options)) {
 		/* Mask virtual interrupts. */
 		sp_disable_irq();
+	}
+
+	if (yield_direct_request(options)) {
+		ffa_yield();
 	}
 
 	HFTEST_LOG("Request to sleep %x for %ums", own_id, sleep_ms);
