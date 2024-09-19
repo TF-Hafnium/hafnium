@@ -825,6 +825,18 @@ ID is not consistent:
    world ID",
 -  or initiated by an SP and thus origin endpoint ID must be a "secure world ID".
 
+FFA_MSG_WAIT
+~~~~~~~~~~~~
+
+FFA_MSG_WAIT is used to transition the calling execution context from the
+RUNNING state to the WAITING state, subject to the restrictions of the
+partition's current runtime model (see `Partition runtime models`_).
+
+Secondarily, an invocation of FFA_MSG_WAIT will relinquish ownership of the
+caller's RX buffer to the buffer's producer. FF-A v1.2 introduces the ability to
+optionally retain the buffer on an invocation of FFA_MSG_WAIT through use of a
+flag.
+
 
 FFA_MSG_SEND_DIRECT_REQ/FFA_MSG_SEND_DIRECT_RESP
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
