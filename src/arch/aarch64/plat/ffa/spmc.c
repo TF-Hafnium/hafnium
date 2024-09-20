@@ -15,6 +15,7 @@
 #include "hf/arch/vmid_base.h"
 
 #include "hf/api.h"
+#include "hf/bits.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
@@ -2963,4 +2964,98 @@ uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)
 	}
 
 	return api_interrupt_get(current_locked);
+}
+
+/**
+ * Check that the arguments to a VM availability message are correct.
+ * Returns `FFA_SUCCESS_32` if the arguments are correct.
+ * Returns `FFA_INVALID_PARAMETERS` if:
+ * - the receiver is not a valid VM
+ * - the receiver has not subscribed to the message type
+ */
+static struct ffa_value check_vm_availability_message(struct ffa_value args)
+{
+	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
+	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+	ffa_id_t receiver_id = ffa_receiver(args);
+	struct vm_locked receiver = vm_find_locked(receiver_id);
+
+	if (receiver.vm == NULL) {
+		dlog_verbose(
+			"VM availability messaging: could not find SP %#x\n",
+			receiver_id);
+		return ret;
+	}
+
+	/* only valid if receiver has subscribed */
+	if (func == FFA_FRAMEWORK_MSG_VM_CREATION_REQ &&
+	    !receiver.vm->vm_availability_messages.vm_created) {
+		dlog_verbose(
+			"VM availability messaging: SP %#x is not subscribed "
+			"to VM creation messages\n",
+			receiver_id);
+		goto out;
+	}
+
+	if (func == FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ &&
+	    !receiver.vm->vm_availability_messages.vm_destroyed) {
+		dlog_verbose(
+			"VM availability messaging: SP %#x is not subscribed "
+			"to VM destruction messages\n",
+			receiver_id);
+		goto out;
+	}
+
+	if (ANY_BITS_SET(args.arg5, FFA_VM_AVAILABILITY_MESSAGE_SBZ_HI,
+			 FFA_VM_AVAILABILITY_MESSAGE_SBZ_LO)) {
+		dlog_warning(
+			"VM availability messaging: bits[%u:%u] of w5 are "
+			"reserved and should be zero (w5=%#lx)\n",
+			FFA_VM_AVAILABILITY_MESSAGE_SBZ_HI,
+			FFA_VM_AVAILABILITY_MESSAGE_SBZ_LO, args.arg5);
+	}
+
+	if (args.arg6 != 0) {
+		dlog_warning(
+			"VM availability messaging: w6 is reserved and should "
+			"be zero (w6=%#lx)\n",
+			args.arg6);
+	}
+
+	if (args.arg7 != 0) {
+		dlog_warning(
+			"VM availability messaging: w7 is reserved and should "
+			"be zero (w7=%#lx)\n",
+			args.arg7);
+	}
+
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+
+out:
+
+	vm_unlock(&receiver);
+	return ret;
+}
+
+/**
+ * Handle framework messages: in particular, check VM availability messages are
+ * valid.
+ */
+bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
+{
+	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+
+	switch (func) {
+	case FFA_FRAMEWORK_MSG_VM_CREATION_REQ:
+	case FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ:
+		*ret = check_vm_availability_message(args);
+		if (ret->func != FFA_SUCCESS_32) {
+			return true;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return false;
 }

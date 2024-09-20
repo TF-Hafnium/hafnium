@@ -596,3 +596,11 @@ uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)
 {
 	return api_interrupt_get(current_locked);
 }
+
+bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
+{
+	(void)args;
+	(void)ret;
+
+	return false;
+}

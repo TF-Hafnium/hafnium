@@ -791,6 +791,9 @@ enum ffa_framework_msg_func {
 	FFA_FRAMEWORK_MSG_VM_DESTRUCTION_RESP = 7,
 };
 
+#define FFA_VM_AVAILABILITY_MESSAGE_SBZ_LO 16
+#define FFA_VM_AVAILABILITY_MESSAGE_SBZ_HI 31
+
 /** Get the `flags` field of a framework message */
 static inline uint32_t ffa_framework_msg_flags(struct ffa_value args)
 {
@@ -800,7 +803,9 @@ static inline uint32_t ffa_framework_msg_flags(struct ffa_value args)
 /** Is `args` a framework message? */
 static inline bool ffa_is_framework_msg(struct ffa_value args)
 {
-	return (ffa_framework_msg_flags(args) & FFA_FRAMEWORK_MSG_BIT) != 0;
+	return (args.func != FFA_MSG_SEND_DIRECT_REQ2_64) &&
+	       (args.func != FFA_MSG_SEND_DIRECT_RESP2_64) &&
+	       ((ffa_framework_msg_flags(args) & FFA_FRAMEWORK_MSG_BIT) != 0);
 }
 
 /** Get the function ID from a framework message */

@@ -2727,7 +2727,7 @@ static struct ffa_value api_ffa_value_copy32(struct ffa_value args)
 	return (struct ffa_value){
 		.func = (uint32_t)args.func,
 		.arg1 = (uint32_t)args.arg1,
-		.arg2 = (uint32_t)0,
+		.arg2 = (uint32_t)args.arg2,
 		.arg3 = (uint32_t)args.arg3,
 		.arg4 = (uint32_t)args.arg4,
 		.arg5 = (uint32_t)args.arg5,
@@ -2738,27 +2738,38 @@ static struct ffa_value api_ffa_value_copy32(struct ffa_value args)
 
 /**
  * Helper to copy direct message payload, depending on SMC used, direct
- * messaging interface used, and expected registers size.
+ * messaging interface used, and expected registers size. Can be used for both
+ * framework messages and standard messages.
  */
 static struct ffa_value api_ffa_dir_msg_value(struct ffa_value args)
 {
-	if (args.func == FFA_MSG_SEND_DIRECT_REQ_32 ||
-	    args.func == FFA_MSG_SEND_DIRECT_RESP_32) {
-		return api_ffa_value_copy32(args);
-	}
+	switch (args.func) {
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+		args = api_ffa_value_copy32(args);
+		if (!ffa_is_framework_msg(args)) {
+			args.arg2 = 0;
+		}
+		break;
 
-	if (args.func == FFA_MSG_SEND_DIRECT_REQ_64 ||
-	    args.func == FFA_MSG_SEND_DIRECT_RESP_64) {
-		args.arg2 = 0;
-	}
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+		if (!ffa_is_framework_msg(args)) {
+			args.arg2 = 0;
+		}
+		break;
 
-	if (args.func == FFA_MSG_SEND_DIRECT_REQ2_64) {
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
 		args.extended_val.valid = true;
-	}
+		break;
 
-	if (args.func == FFA_MSG_SEND_DIRECT_RESP2_64) {
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
 		args.arg2 = 0;
 		args.arg3 = 0;
+		break;
+	default:
+		panic("Invalid direct message function %#x\n", args.func);
+		break;
 	}
 
 	return args;
@@ -2827,8 +2838,16 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 
 	if ((args.func == FFA_MSG_SEND_DIRECT_REQ_32 ||
 	     args.func == FFA_MSG_SEND_DIRECT_REQ_64) &&
+	    !ffa_is_framework_msg(args) &&
 	    !api_ffa_dir_msg_is_arg2_zero(args)) {
+		dlog_verbose("Direct messaging: w2 must be zero (w2 = %#lx)\n",
+			     args.arg2);
 		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (ffa_is_framework_msg(args) &&
+	    plat_ffa_handle_framework_msg(args, &ret)) {
+		return ret;
 	}
 
 	if (!plat_ffa_is_direct_request_valid(current, sender_vm_id,
@@ -2838,6 +2857,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	}
 
 	if (plat_ffa_direct_request_forward(receiver_vm_id, args, &ret)) {
+		dlog_verbose("Direct message request forwarded\n");
 		return ret;
 	}
 
@@ -2861,6 +2881,7 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	 */
 	if (!plat_ffa_is_direct_request_supported(current->vm, receiver_vm,
 						  args.func)) {
+		dlog_verbose("Direct message request not supported\n");
 		return ffa_error(FFA_DENIED);
 	}
 
@@ -2930,8 +2951,6 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 	case VCPU_STATE_BLOCKED:
 	case VCPU_STATE_PREEMPTED:
-		dlog_verbose("Receiver's vCPU can't receive request (%u)!\n",
-			     vcpu_index(receiver_vcpu));
 		ret = ffa_error(FFA_BUSY);
 		goto out;
 	case VCPU_STATE_WAITING:
@@ -2958,6 +2977,8 @@ struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
 	receiver_vcpu->direct_request_origin.is_ffa_req2 =
 		(args.func == FFA_MSG_SEND_DIRECT_REQ2_64);
 	receiver_vcpu->direct_request_origin.vm_id = sender_vm_id;
+	receiver_vcpu->direct_request_origin.is_framework =
+		ffa_is_framework_msg(args);
 
 	arch_regs_set_retval(&receiver_vcpu->regs, api_ffa_dir_msg_value(args));
 
@@ -3057,6 +3078,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
 	struct two_vcpu_locked vcpus_locked;
 	bool received_req2;
+	bool req_framework;
+	bool resp_framework;
 
 	/*
 	 * If using FFA_MSG_SEND_DIRECT_RESP, the caller's
@@ -3064,7 +3087,10 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 	 *  - x8-x17 SBZ if caller's FF-A version >= FF-A v1.2
 	 */
 	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64) {
-		if (!api_ffa_dir_msg_is_arg2_zero(args)) {
+		if (!ffa_is_framework_msg(args) &&
+		    !api_ffa_dir_msg_is_arg2_zero(args)) {
+			dlog_verbose("%s: w2 Must Be Zero",
+				     ffa_func_name(args.func));
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 
@@ -3102,6 +3128,19 @@ struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
 		 * vCPU is not set.
 		 */
 		ret = ffa_error(FFA_DENIED);
+		goto out;
+	}
+
+	req_framework = current_locked.vcpu->direct_request_origin.is_framework;
+	resp_framework = ffa_is_framework_msg(args);
+
+	if (req_framework && !resp_framework) {
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		dlog_verbose(
+			"Mismatch in framework message bit: request was a %s "
+			"message, but response is a %s message\n",
+			req_framework ? "framework" : "non-framework",
+			resp_framework ? "framework" : "non-framework");
 		goto out;
 	}
 

@@ -264,26 +264,35 @@ bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
 				     struct ffa_value *ret)
 {
 	if (!ffa_tee_enabled) {
+		dlog_verbose("Not forwarding: ffa_tee_enabled is false\n");
 		return false;
 	}
 
 	/*
 	 * VM's requests should be forwarded to the SPMC, if receiver is an SP.
 	 */
-	if (!vm_id_is_current_world(receiver_vm_id)) {
-		dlog_verbose("%s calling SPMC %#lx %#lx %#lx %#lx %#lx\n",
-			     __func__, args.func, args.arg1, args.arg2,
-			     args.arg3, args.arg4);
-		if (args.func == FFA_MSG_SEND_DIRECT_REQ_64 ||
-		    args.func == FFA_MSG_SEND_DIRECT_REQ_32) {
-			*ret = arch_other_world_call(args);
-		} else if (args.func == FFA_MSG_SEND_DIRECT_REQ2_64) {
-			*ret = arch_other_world_call_ext(args);
-		}
-		return true;
+	if (vm_id_is_current_world(receiver_vm_id)) {
+		dlog_verbose(
+			"Not forwarding: receiver VM %#x is in the same "
+			"world\n",
+			receiver_vm_id);
+		return false;
 	}
 
-	return false;
+	switch (args.func) {
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+		*ret = arch_other_world_call(args);
+		break;
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
+		*ret = arch_other_world_call_ext(args);
+		break;
+	default:
+		panic("Invalid direct message function %#x\n", args.func);
+		break;
+	}
+
+	return true;
 }
 
 bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
@@ -2046,4 +2055,12 @@ void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
 uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)
 {
 	return api_interrupt_get(current_locked);
+}
+
+bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
+{
+	(void)args;
+	(void)ret;
+
+	return false;
 }

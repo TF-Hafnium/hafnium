@@ -162,11 +162,11 @@ struct vcpu {
 	 * a result of a prior direct request invocation.
 	 */
 	struct {
-		/**
-		 * Indicate whether request is via FFA_MSG_SEND_DIRECT_REQ2.
-		 */
-		bool is_ffa_req2;
 		ffa_id_t vm_id;
+		/** Indicate whether request is via FFA_MSG_SEND_DIRECT_REQ2. */
+		bool is_ffa_req2;
+		/** Indicate whether request is a framework message. */
+		bool is_framework;
 	} direct_request_origin;
 
 	/** Determine whether partition is currently handling managed exit. */
