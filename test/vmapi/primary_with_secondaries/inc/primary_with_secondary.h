@@ -81,6 +81,7 @@ struct ffa_partition_info* service4(void* recv);
 /* Precondition functions for this test setup. */
 bool service1_is_vm(void);
 bool service1_is_not_vm(void);
+bool service1_is_secure(void);
 bool service1_and_service2_are_secure(void);
 bool service1_service2_and_service3_are_secure(void);
 bool service1_is_mp_sp(void);

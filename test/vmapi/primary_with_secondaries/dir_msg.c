@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "hf/arch/vm/power_mgmt.h"
+#include "hf/arch/vmid_base.h"
 
 #include "hf/ffa.h"
 
@@ -1109,4 +1110,330 @@ TEST_PRECONDITION(direct_message, echo_mp_req2, service1_is_not_vm)
 	semaphore_wait(&args.sync);
 
 	HFTEST_LOG("Finished the test...");
+}
+
+/**
+ * Helper for sending a VM availability message and asserting on the response.
+ *
+ * NOTE: This is intended for hypervisor messages according to the spec, but we
+ * are using it from the primary VM because it is more convenient and we care
+ * about testing the SPMC component. Hypervisor implementation was changed to
+ * forward these requests from the PVM.
+ */
+void assert_vm_availability_message(
+	ffa_id_t sender_id, ffa_id_t receiver_id, ffa_id_t vm_id,
+	enum ffa_framework_msg_func framework_func, uint32_t response_ffa_func,
+	ffa_id_t response_sender_id, ffa_id_t response_receiver_id,
+	enum ffa_framework_msg_func response_framework_func,
+	enum ffa_error response_status)
+{
+	struct ffa_value res;
+
+	res = ffa_framework_msg_send_direct_req(sender_id, receiver_id,
+						framework_func, vm_id);
+
+	EXPECT_EQ(res.func, response_ffa_func);
+
+	/* sender and receiver endpoint IDs */
+	EXPECT_EQ(ffa_sender(res), response_receiver_id);
+	EXPECT_EQ(ffa_receiver(res), response_sender_id);
+
+	/* message flags */
+	EXPECT_EQ(res.arg2, FFA_FRAMEWORK_MSG_BIT | response_framework_func);
+
+	/* status code */
+	EXPECT_EQ((enum ffa_error)res.arg3, response_status);
+}
+
+/** Assert that a VM availability message is successful. */
+void assert_vm_availability_message_success(
+	ffa_id_t sender_id, ffa_id_t receiver_id, ffa_id_t vm_id,
+	enum ffa_framework_msg_func framework_func)
+{
+	assert_vm_availability_message(sender_id, receiver_id, vm_id,
+				       framework_func,
+				       FFA_MSG_SEND_DIRECT_RESP_32, sender_id,
+				       receiver_id, framework_func + 1, 0);
+}
+
+/**
+ * Assert that a VM availability message is successfully delivered to the SP,
+ * but the SP reponds with `FFA_INVALID_PARAMETERS` because of an invalid state
+ * transition.
+ */
+void assert_vm_availability_message_invalid_transition(
+	ffa_id_t sender_id, ffa_id_t receiver_id, ffa_id_t vm_id,
+	enum ffa_framework_msg_func framework_func)
+{
+	assert_vm_availability_message(
+		sender_id, receiver_id, vm_id, framework_func,
+		FFA_MSG_SEND_DIRECT_RESP_32, sender_id, receiver_id,
+		framework_func + 1, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Assert that a VM availability message is not delivered to the SP.
+ */
+void assert_vm_availability_message_not_delivered(
+	ffa_id_t sender_id, ffa_id_t receiver_id, ffa_id_t vm_id,
+	enum ffa_framework_msg_func framework_func)
+{
+	assert_vm_availability_message(sender_id, receiver_id, vm_id,
+				       framework_func, FFA_ERROR_32, 0, 0,
+				       FFA_INVALID_PARAMETERS, 0);
+}
+
+/**
+ * VM state: Unvailable
+ * Message: VM created
+ * New state: Available
+ */
+TEST_PRECONDITION(vm_availability_messaging, vm_unavailable_created,
+		  service1_is_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	ffa_id_t receiver_id = service1(mb.recv)->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	SERVICE_SELECT(receiver_id, "vm_availability_messaging", mb.send);
+	ffa_run(receiver_id, 0);
+
+	assert_vm_availability_message_success(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_CREATION_REQ);
+}
+
+/**
+ * VM state: Available
+ * Message: VM created
+ * New state: Error
+ */
+TEST_PRECONDITION(vm_availability_messaging, vm_available_created,
+		  service1_is_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	ffa_id_t receiver_id = service1(mb.recv)->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	SERVICE_SELECT(receiver_id, "vm_availability_messaging", mb.send);
+	ffa_run(receiver_id, 0);
+
+	assert_vm_availability_message_success(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_CREATION_REQ);
+
+	assert_vm_availability_message_invalid_transition(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_CREATION_REQ);
+}
+
+/**
+ * VM state: Unavailable
+ * Message: VM destroyed
+ * New state: Error
+ */
+TEST_PRECONDITION(vm_availability_messaging, vm_unavailable_destroyed,
+		  service1_is_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	ffa_id_t receiver_id = service1(mb.recv)->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	SERVICE_SELECT(receiver_id, "vm_availability_messaging", mb.send);
+	ffa_run(receiver_id, 0);
+
+	assert_vm_availability_message_invalid_transition(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ);
+}
+
+/**
+ * VM state: Available
+ * Message: VM destroyed
+ * New state: Unavailable
+ */
+TEST_PRECONDITION(vm_availability_messaging, vm_available_destroyed,
+		  service1_is_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	ffa_id_t receiver_id = service1(mb.recv)->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	SERVICE_SELECT(receiver_id, "vm_availability_messaging", mb.send);
+	ffa_run(receiver_id, 0);
+
+	assert_vm_availability_message_success(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_CREATION_REQ);
+
+	assert_vm_availability_message_success(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ);
+}
+
+/**
+ * VM state: Error
+ * Message: VM created
+ * New state: Error
+ */
+TEST_PRECONDITION(vm_availability_messaging, vm_error_created,
+		  service1_is_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	ffa_id_t receiver_id = service1(mb.recv)->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	SERVICE_SELECT(receiver_id, "vm_availability_messaging", mb.send);
+	ffa_run(receiver_id, 0);
+
+	assert_vm_availability_message_invalid_transition(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ);
+
+	assert_vm_availability_message_invalid_transition(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_CREATION_REQ);
+}
+
+/**
+ * VM state: Error
+ * Message: VM destroyed
+ * New state: Error
+ */
+TEST_PRECONDITION(vm_availability_messaging, vm_error_destroyed,
+		  service1_is_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	ffa_id_t receiver_id = service1(mb.recv)->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	SERVICE_SELECT(receiver_id, "vm_availability_messaging", mb.send);
+	ffa_run(receiver_id, 0);
+
+	assert_vm_availability_message_invalid_transition(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ);
+
+	assert_vm_availability_message_invalid_transition(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ);
+}
+
+/**
+ * Multiple SPs can receieve VM availability messages, and each SP has their own
+ * set of VM states.
+ */
+TEST_PRECONDITION(vm_availability_messaging, multiple_sps,
+		  service1_and_service2_are_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	ffa_id_t sp1 = service1(mb.recv)->vm_id;
+	ffa_id_t sp2 = service2(mb.recv)->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	SERVICE_SELECT(sp1, "vm_availability_messaging", mb.send);
+	ffa_run(sp1, 0);
+
+	SERVICE_SELECT(sp2, "vm_availability_messaging", mb.send);
+	ffa_run(sp2, 0);
+
+	assert_vm_availability_message_success(
+		sender_id, sp1, vm_id, FFA_FRAMEWORK_MSG_VM_CREATION_REQ);
+
+	assert_vm_availability_message_success(
+		sender_id, sp2, vm_id, FFA_FRAMEWORK_MSG_VM_CREATION_REQ);
+}
+
+/**
+ * If the SP is not subscribed, any VM availability message should not be
+ * delivered.
+ */
+TEST_PRECONDITION(vm_availability_messaging, sp_not_subscribed,
+		  service1_and_service2_are_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	struct ffa_partition_info *sp3_info = service3(mb.recv);
+	ffa_id_t receiver_id = sp3_info->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	EXPECT_EQ(sp3_info->properties & FFA_PARTITION_VM_CREATED, 0);
+	EXPECT_EQ(sp3_info->properties & FFA_PARTITION_VM_DESTROYED, 0);
+
+	SERVICE_SELECT(receiver_id, "vm_availability_messaging", mb.send);
+	ffa_run(receiver_id, 0);
+
+	assert_vm_availability_message_not_delivered(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_CREATION_REQ);
+
+	assert_vm_availability_message_not_delivered(
+		sender_id, receiver_id, vm_id,
+		FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ);
+}
+
+/*
+ * Check that SPs cannot send VM availability messages.
+ */
+TEST_PRECONDITION(vm_availability_messaging, sp_cannot_send_messages,
+		  service1_is_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	ffa_id_t receiver_id = service1(mb.recv)->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	struct ffa_value res;
+
+	SERVICE_SELECT(receiver_id, "vm_availability_messaging_send_from_sp",
+		       mb.send);
+	ffa_run(receiver_id, 0);
+
+	res = ffa_msg_send_direct_req(sender_id, receiver_id,
+				      FFA_FRAMEWORK_MSG_VM_CREATION_REQ, vm_id,
+				      0, 0, 0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, FFA_ERROR_32);
+	EXPECT_EQ((enum ffa_error)res.arg5, FFA_INVALID_PARAMETERS);
+
+	res = ffa_msg_send_direct_req(sender_id, receiver_id,
+				      FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ,
+				      vm_id, 0, 0, 0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, FFA_ERROR_32);
+	EXPECT_EQ((enum ffa_error)res.arg5, FFA_INVALID_PARAMETERS);
+}
+
+/*
+ * Check that SPs cannot send non-framework messages in response to a VM
+ * availability message.
+ */
+TEST_PRECONDITION(vm_availability_messaging,
+		  sp_cannot_send_non_framework_messages, service1_is_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t sender_id = hf_vm_get_id();
+	ffa_id_t receiver_id = service1(mb.recv)->vm_id;
+	ffa_id_t vm_id = VM_ID(1);
+
+	struct ffa_value res;
+
+	SERVICE_SELECT(receiver_id,
+		       "vm_availability_messaging_send_non_framework_from_sp",
+		       mb.send);
+	ffa_run(receiver_id, 0);
+
+	res = ffa_framework_msg_send_direct_req(
+		sender_id, receiver_id, FFA_FRAMEWORK_MSG_VM_CREATION_REQ,
+		vm_id);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, 0);
 }

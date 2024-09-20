@@ -6,10 +6,11 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/check.h"
 #include "hf/ffa.h"
-#include "hf/std.h"
 
 #include "vmapi/hf/call.h"
+#include "vmapi/hf/ffa.h"
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
@@ -803,4 +804,149 @@ TEST_SERVICE(ffa_direct_message_req2_resp_loop)
 			ffa_receiver(res), ffa_sender(res),
 			(const uint64_t *)msg, MAX_RESP_REGS);
 	}
+}
+
+/**
+ * Identifies the VM availiability message.
+ * See section 18.3 of v1.2 FF-A specification.
+ */
+enum ffa_vm_availability_message {
+	VM_MSG_CREATED,
+	VM_MSG_DESTROYED,
+};
+
+/**
+ * The state of a VM.
+ * See section 18.3.2.3 of v1.2 FF-A specification.
+ */
+enum ffa_vm_availability_state {
+	VM_STATE_UNAVAILABLE,
+	VM_STATE_AVAILABLE,
+	VM_STATE_ERROR,
+};
+
+/**
+ * In the scope of the VM availability messages, the test SP is maintaining the
+ * state of 4 VMs.
+ */
+static enum ffa_vm_availability_state vm_states[4] = {0};
+
+static enum ffa_vm_availability_state next_vm_availability_state(
+	enum ffa_vm_availability_state current_state,
+	enum ffa_vm_availability_message msg)
+{
+	/* clang-format off */
+	static const enum ffa_vm_availability_state table[3][2] = {
+		/* State                VM created          VM destoyed          */
+		/* VM unavailable  */ { VM_STATE_AVAILABLE, VM_STATE_ERROR       },
+		/* VM available    */ { VM_STATE_ERROR,     VM_STATE_UNAVAILABLE },
+		/* Error           */ { VM_STATE_ERROR,     VM_STATE_ERROR       },
+	};
+	/* clang-format on */
+
+	return table[current_state][msg];
+}
+
+/**
+ * Receive VM availability messages and update VM's state accordingly.
+ */
+TEST_SERVICE(vm_availability_messaging)
+{
+	struct ffa_value args = ffa_msg_wait();
+
+	for (;;) {
+		enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+		ffa_id_t sender_id = ffa_sender(args);
+		ffa_id_t receiver_id = ffa_receiver(args);
+		ffa_id_t vm_id = ffa_vm_availability_message_vm_id(args);
+		enum ffa_vm_availability_state current_state;
+		enum ffa_vm_availability_state new_state;
+		enum ffa_vm_availability_message msg;
+
+		switch (func) {
+		case FFA_FRAMEWORK_MSG_VM_CREATION_REQ:
+			msg = VM_MSG_CREATED;
+			break;
+		case FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ:
+			msg = VM_MSG_DESTROYED;
+			break;
+		default:
+			dlog_verbose("Unknown framework message func: %#x\n",
+				     func);
+			return;
+		}
+
+		current_state = vm_states[vm_id];
+		new_state = next_vm_availability_state(current_state, msg);
+		vm_states[vm_id] = new_state;
+
+		args = ffa_framework_message_send_direct_resp(
+			receiver_id, sender_id,
+			((msg == VM_MSG_CREATED)
+				 ? FFA_FRAMEWORK_MSG_VM_CREATION_RESP
+				 : FFA_FRAMEWORK_MSG_VM_DESTRUCTION_RESP),
+			(new_state != VM_STATE_ERROR) ? 0
+						      : FFA_INVALID_PARAMETERS);
+	}
+}
+
+/**
+ * Forward a framework message from primary VM, to demonstrate that SP cannot
+ * send framework messages.
+ */
+TEST_SERVICE(vm_availability_messaging_send_from_sp)
+{
+	struct ffa_value args = ffa_msg_wait();
+
+	for (;;) {
+		enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+		ffa_id_t sp_id = ffa_receiver(args);
+		ffa_id_t pvm_id = ffa_sender(args);
+		ffa_id_t vm_id = ffa_vm_availability_message_vm_id(args);
+
+		struct ffa_value ret = ffa_framework_msg_send_direct_req(
+			sp_id, pvm_id, func, vm_id);
+
+		/* Verify that the framework message request failed. */
+		ASSERT_EQ(ret.func, FFA_ERROR_32);
+		ASSERT_EQ(ret.arg3, 0);
+
+		/*
+		 * Send a valid response, so that the PVM is not blocked
+		 * forever.
+		 */
+		args = ffa_msg_send_direct_resp(sp_id, pvm_id, ret.func,
+						ret.arg1, ret.arg2, ret.arg3,
+						ret.arg4);
+	}
+}
+
+/**
+ * Forward a framework message from primary VM, to demonstrate that SP cannot
+ * send non-framework messages in response to framework messages.
+ */
+TEST_SERVICE(vm_availability_messaging_send_non_framework_from_sp)
+{
+	struct ffa_value args = ffa_msg_wait();
+	struct ffa_value ret;
+	uint32_t ffa_func = args.func;
+	ffa_id_t sp_id = ffa_receiver(args);
+	ffa_id_t pvm_id = ffa_sender(args);
+
+	ret = ffa_msg_send_direct_resp(sp_id, pvm_id, args.arg3, args.arg4,
+				       args.arg5, args.arg6, args.arg7);
+
+	/* Verify that the direct message response failed. */
+	ASSERT_EQ(ret.func, FFA_ERROR_32);
+	ASSERT_EQ((enum ffa_error)ret.arg2, FFA_DENIED);
+
+	/* Send a valid response, so that the VM is not blocked forever. */
+	args = ffa_framework_message_send_direct_resp(sp_id, pvm_id, ffa_func,
+						      0);
+	ASSERT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
+	EXPECT_EQ(ffa_sender(args), pvm_id);
+	EXPECT_EQ(ffa_receiver(args), sp_id);
+	EXPECT_EQ(args.arg2,
+		  FFA_FRAMEWORK_MSG_BIT | FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ);
+	ASSERT_EQ(args.arg3, 0);
 }

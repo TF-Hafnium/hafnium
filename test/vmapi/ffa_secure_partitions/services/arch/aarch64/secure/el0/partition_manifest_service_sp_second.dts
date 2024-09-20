@@ -22,6 +22,7 @@
   entrypoint-offset = <0x2000>;
   xlat-granule = <0>; /* 4KiB */
   messaging-method = <0x607>; /* Support direct (both APIs) and indirect messaging. */
+  vm-availability-messages = <0x03>; /* Supports VM created and VM destroyed messages. */
   ns-interrupts-action = <2>; /* NS interrupts are signaled */
   boot-order = <4>;
   notification-support; /* Receipt of notifications. */

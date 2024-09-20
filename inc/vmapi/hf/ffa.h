@@ -808,6 +808,15 @@ static inline bool ffa_is_framework_msg(struct ffa_value args)
 	       ((ffa_framework_msg_flags(args) & FFA_FRAMEWORK_MSG_BIT) != 0);
 }
 
+/**
+ * Get the ID of the VM that has been created/destroyed from VM availability
+ * message
+ */
+static inline ffa_id_t ffa_vm_availability_message_vm_id(struct ffa_value args)
+{
+	return args.arg5 & 0xFFFF;
+}
+
 /** Get the function ID from a framework message */
 static inline uint32_t ffa_framework_msg_func(struct ffa_value args)
 {

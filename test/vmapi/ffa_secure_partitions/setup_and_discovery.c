@@ -44,7 +44,9 @@ static void check_v1_1_partition_info_descriptors(
 	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[1].uuid, &uuid));
 	EXPECT_EQ(partitions[1].properties,
-		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_AARCH64_EXEC);
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_DIRECT_REQ_RECV |
+			  FFA_PARTITION_VM_CREATED |
+			  FFA_PARTITION_VM_DESTROYED);
 
 	/* Expect a secondary SP as third partition. */
 	EXPECT_EQ(partitions[2].vm_id, SP_ID(2));
@@ -56,6 +58,8 @@ static void check_v1_1_partition_info_descriptors(
 		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_INDIRECT_MSG |
 			  FFA_PARTITION_NOTIFICATION |
 			  FFA_PARTITION_AARCH64_EXEC |
+			  FFA_PARTITION_VM_CREATED |
+			  FFA_PARTITION_VM_DESTROYED |
 			  FFA_PARTITION_DIRECT_REQ2_RECV);
 
 	/* Expect a tertiary SP as fourth partition. */
@@ -234,6 +238,8 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_INDIRECT_MSG |
 			  FFA_PARTITION_NOTIFICATION |
 			  FFA_PARTITION_AARCH64_EXEC |
+			  FFA_PARTITION_VM_CREATED |
+			  FFA_PARTITION_VM_DESTROYED |
 			  FFA_PARTITION_DIRECT_REQ2_RECV);
 
 	/*
