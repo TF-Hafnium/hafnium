@@ -817,15 +817,27 @@ static inline bool ffa_uuid_is_null(const struct ffa_uuid *uuid)
 	return ffa_uuid_equal(uuid, &null);
 }
 
-static inline void ffa_uuid_unpack_from_uint64(uint64_t uuid_lo,
-					       uint64_t uuid_hi,
-					       struct ffa_uuid *uuid)
+static inline void ffa_uuid_from_u64x2(uint64_t uuid_lo, uint64_t uuid_hi,
+				       struct ffa_uuid *uuid)
 {
 	ffa_uuid_init((uint32_t)(uuid_lo & 0xFFFFFFFFU),
 		      (uint32_t)(uuid_lo >> 32),
 		      (uint32_t)(uuid_hi & 0xFFFFFFFFU),
 		      (uint32_t)(uuid_hi >> 32), uuid);
 }
+
+/**
+ * Split `uuid` into two u64s.
+ * This function writes to pointer parameters because C does not allow returning
+ * arrays from functions.
+ */
+static inline void ffa_uuid_to_u64x2(uint64_t *lo, uint64_t *hi,
+				     const struct ffa_uuid *uuid)
+{
+	*lo = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
+	*hi = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
+}
+
 /**
  * Flags to determine the partition properties, as required by
  * FFA_PARTITION_INFO_GET.

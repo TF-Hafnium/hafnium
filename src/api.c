@@ -585,15 +585,6 @@ static inline void api_ffa_pack_vmid_count_props(
 	*xn |= (uint64_t)properties << 32;
 }
 
-static inline void api_ffa_pack_uuid(uint64_t *xn_1, uint64_t *xn_2,
-				     struct ffa_uuid *uuid)
-{
-	*xn_1 = (uint64_t)uuid->uuid[0];
-	*xn_1 |= (uint64_t)uuid->uuid[1] << 32;
-	*xn_2 = (uint64_t)uuid->uuid[2];
-	*xn_2 |= (uint64_t)uuid->uuid[3] << 32;
-}
-
 /**
  * This function forwards the FFA_PARTITION_INFO_GET_REGS ABI to the other world
  * when hafnium is the hypervisor to determine the secure partitions. When
@@ -856,7 +847,7 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 					      partitions[idx].vcpu_count,
 					      partitions[idx].properties);
 		if (uuid_is_null) {
-			api_ffa_pack_uuid(xn_1, xn_2, &partitions[idx].uuid);
+			ffa_uuid_to_u64x2(xn_1, xn_2, &partitions[idx].uuid);
 		}
 		assert(arg_idx <= ARRAY_SIZE(arg_ptrs));
 	}
@@ -2930,7 +2921,7 @@ static bool api_ffa_dir_msg_req2_is_uuid_valid(struct vm *receiver_vm,
 {
 	struct ffa_uuid target_uuid;
 
-	ffa_uuid_unpack_from_uint64(args.arg2, args.arg3, &target_uuid);
+	ffa_uuid_from_u64x2(args.arg2, args.arg3, &target_uuid);
 
 	return ffa_uuid_find(receiver_vm->uuids, PARTITION_MAX_UUIDS,
 			     target_uuid) != NULL;

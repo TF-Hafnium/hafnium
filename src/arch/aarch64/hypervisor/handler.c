@@ -548,19 +548,10 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	}
 	case FFA_PARTITION_INFO_GET_REGS_64: {
 		struct ffa_uuid uuid;
-		uint32_t w0;
-		uint32_t w1;
-		uint32_t w2;
-		uint32_t w3;
 		uint16_t start_index;
 		uint16_t tag;
 
-		w0 = (uint32_t)(args->arg1 & 0xFFFFFFFF);
-		w1 = (uint32_t)(args->arg1 >> 32);
-		w2 = (uint32_t)(args->arg2 & 0xFFFFFFFF);
-		w3 = (uint32_t)(args->arg2 >> 32);
-		ffa_uuid_init(w0, w1, w2, w3, &uuid);
-
+		ffa_uuid_from_u64x2(args->arg1, args->arg2, &uuid);
 		start_index = args->arg3 & 0xFFFF;
 		tag = (args->arg3 >> 16) & 0xFFFF;
 		*args = api_ffa_partition_info_get_regs(current, &uuid,

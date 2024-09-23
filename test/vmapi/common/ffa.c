@@ -831,10 +831,7 @@ bool ffa_partition_info_regs_get_part_info(
 	partition_info->vm_id = info & 0xFFFF;
 	partition_info->vcpu_count = (info >> 16) & 0xFFFF;
 	partition_info->properties = (info >> 32);
-	partition_info->uuid.uuid[0] = uuid_lo & 0xFFFFFFFF;
-	partition_info->uuid.uuid[1] = (uuid_lo >> 32) & 0xFFFFFFFF;
-	partition_info->uuid.uuid[2] = uuid_high & 0xFFFFFFFF;
-	partition_info->uuid.uuid[3] = (uuid_high >> 32) & 0xFFFFFFFF;
+	ffa_uuid_from_u64x2(uuid_lo, uuid_high, &partition_info->uuid);
 
 	return true;
 }

@@ -48,10 +48,11 @@ static inline struct ffa_value ffa_partition_info_get_regs(
 	const struct ffa_uuid *uuid, const uint16_t start_index,
 	const uint16_t tag)
 {
-	uint64_t arg1 = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
-	uint64_t arg2 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
+	uint64_t arg1;
+	uint64_t arg2;
 	uint64_t arg3 = start_index | (uint64_t)tag << 16;
 
+	ffa_uuid_to_u64x2(&arg1, &arg2, uuid);
 	return ffa_call_ext((struct ffa_value){
 		.func = FFA_PARTITION_INFO_GET_REGS_64,
 		.arg1 = arg1,
@@ -542,8 +543,7 @@ static inline struct ffa_value ffa_msg_send_direct_req2(
 
 	args.func = FFA_MSG_SEND_DIRECT_REQ2_64;
 	args.arg1 = ((uint64_t)sender_vm_id << 16) | target_vm_id;
-	args.arg2 = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
-	args.arg3 = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
+	ffa_uuid_to_u64x2(&args.arg2, &args.arg3, uuid);
 
 	total_args = (sizeof(arg_ptrs) / sizeof(uint64_t *));
 

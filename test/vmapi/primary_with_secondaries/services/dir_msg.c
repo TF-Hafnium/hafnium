@@ -788,7 +788,7 @@ TEST_SERVICE(ffa_direct_message_req2_resp_loop)
 
 		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_REQ2_64);
 
-		ffa_uuid_unpack_from_uint64(res.arg2, res.arg3, &target_uuid);
+		ffa_uuid_from_u64x2(res.arg2, res.arg3, &target_uuid);
 
 		HFTEST_LOG("Target UUID: %X-%X-%X-%X", target_uuid.uuid[0],
 			   target_uuid.uuid[1], target_uuid.uuid[2],
