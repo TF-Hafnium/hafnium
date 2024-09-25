@@ -406,6 +406,21 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 		return true;
 	}
 }
+
+void spmc_exit_to_nwd(struct vcpu *owd_vcpu)
+{
+	struct vcpu *deadline_vcpu =
+		timer_find_vcpu_nearest_deadline(owd_vcpu->cpu);
+
+	/*
+	 * SPMC tracks a vCPU's timer deadline through its host timer such that
+	 * it can bring back execution from normal world to signal the timer
+	 * virtual interrupt to the SP's vCPU.
+	 */
+	if (deadline_vcpu != NULL) {
+		host_timer_track_deadline(&deadline_vcpu->regs.arch_timer);
+	}
+}
 #endif
 
 /**

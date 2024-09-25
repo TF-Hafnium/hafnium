@@ -651,6 +651,14 @@ other_world_loop:
 	mov x0, x19
 	bl plat_restore_ns_simd_context
 
+	/*
+	 * A helper utility that serves as a placeholder for SPMC to take
+	 * necessary actions before relinquishing CPU cycles to normal world
+	 * through SMC call.
+	 */
+	mov x0, x19
+	bl spmc_exit_to_nwd
+
 	/* Restore peripheral registers. */
 	add x2, x19, #VCPU_TIMER
 
@@ -658,9 +666,9 @@ other_world_loop:
 	vhe_support_check x1, vhe_timer_restore
 
 	/*
-	 * SPMC does not allow Secure Partitions to access EL1 Physical timer
-	 * registers. Hence, no need to save or restore them when entering or
-	 * leaving from/to normal world.
+	 * SPMC traps and emulates access to EL1 Physical timer registers from
+	 * Secure Partitions. Hence, no need to save or restore them when
+	 * entering or leaving from/to normal world.
 	 */
 	ldp x24, x25, [x2]
 	msr cntv_cval_el0, x24
