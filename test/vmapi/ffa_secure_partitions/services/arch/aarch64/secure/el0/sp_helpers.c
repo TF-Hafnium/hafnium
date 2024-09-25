@@ -21,12 +21,6 @@ extern bool yield_while_handling_sec_interrupt;
 extern bool preempt_interrupt_handling;
 extern bool initiate_spmc_call_chain;
 
-uint64_t sp_sleep_active_wait(uint32_t ms)
-{
-	sp_wait_loop(ms * ITERATIONS_PER_MS);
-	return ms;
-}
-
 void sp_enable_irq(void)
 {
 }

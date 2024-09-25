@@ -20,16 +20,24 @@
 #define CNTx_CTL_IMASK_MASK (UINT32_C(1) << 1)
 #define CNTx_CTL_ISTS_MASK (UINT32_C(1) << 2)
 
-static inline void timer_set(uint32_t ticks)
+static inline uint64_t timer_ms_to_ticks(uint64_t ms)
 {
-	has_vhe_support() ? write_msr(MSR_CNTV_TVAL_EL02, ticks)
-			  : write_msr(cntv_tval_el0, ticks);
+	return ms * read_msr(cntfrq_el0) / 1000;
+}
+
+static inline void timer_set(uint32_t ms)
+{
+	write_msr(cntp_tval_el0, timer_ms_to_ticks(ms));
 }
 
 static inline void timer_start(void)
 {
-	has_vhe_support() ? write_msr(MSR_CNTV_CTL_EL02, 0x00000001)
-			  : write_msr(cntv_ctl_el0, 0x00000001);
+	write_msr(cntp_ctl_el0, 0x1);
+}
+
+static inline void timer_disable(void)
+{
+	write_msr(cntp_ctl_el0, 0x0);
 }
 
 /**
