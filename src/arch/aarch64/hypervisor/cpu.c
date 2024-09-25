@@ -116,17 +116,17 @@ void arch_regs_reset(struct vcpu *vcpu)
 
 	cnthctl = 0;
 
-	if (is_primary) {
-		/*
-		 * cnthctl_el2 is redefined when VHE is enabled.
-		 * EL1PCTEN, don't trap phys cnt access.
-		 * EL1PCEN, don't trap phys timer access.
-		 */
-		if (has_vhe_support()) {
-			cnthctl |= (1U << 10) | (1U << 11);
-		} else {
-			cnthctl |= (1U << 0) | (1U << 1);
-		}
+	/*
+	 * EL0PTEN  = 0: Trap EL0 access to physical timer registers.
+	 * EL0PCTEN = 1: Don't trap EL0 access to physical counter and
+	 *               frequency register.
+	 * EL1PCEN  = 0: Trap EL1 access to physical timer registers.
+	 * EL1PCTEN = 1: Don't trap EL1 access to physical counter.
+	 */
+	if (vcpu->vm->el0_partition) {
+		cnthctl |= CNTHCTL_EL2_VHE_EL0PCTEN;
+	} else {
+		cnthctl |= CNTHCTL_EL2_VHE_EL1PCTEN;
 	}
 
 	r->hyp_state.cptr_el2 = get_cptr_el2_value();

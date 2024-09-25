@@ -765,3 +765,20 @@
 
 #define ID_AA64ISAR1_EL1_PAUTH_MASK UINT64_C(0xff) /* API/APA */
 #define ID_AA64ISAR2_EL1_PAUTH_MASK UINT64_C(0xf)  /* APA3 */
+
+/**
+ * Define configuration bits for the Counter-timer Hypervisor Control Register,
+ * CNTHCTL_EL2 when HCR_EL2.E2H is 1.
+ */
+
+/**
+ * Controls whether EL0 accesses to frequency register and physical counter
+ * register are trapped to EL2.
+ */
+#define CNTHCTL_EL2_VHE_EL0PCTEN (1 << 0)
+
+/**
+ * Controls whether EL1 accesses to frequency register and physical counter
+ * register are trapped to EL2.
+ */
+#define CNTHCTL_EL2_VHE_EL1PCTEN (1 << 10)

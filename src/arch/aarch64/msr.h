@@ -130,6 +130,16 @@
 #define MSR_ELR_EL12 S3_5_C4_C0_1
 
 /**
+ * Host(EL2/S-EL2) physical timer register encodings.
+ */
+#define MSR_CNTHP_CTL_EL2 S3_4_C14_C2_1
+#define MSR_CNTHP_CVAL_EL2 S3_4_C14_C2_2
+#define MSR_CNTHP_TVAL_EL2 S3_4_C14_C2_0
+#define MSR_CNTHPS_CTL_EL2 S3_4_C14_C5_1
+#define MSR_CNTHPS_CVAL_EL2 S3_4_C14_C5_2
+#define MSR_CNTHPS_TVAL_EL2 S3_4_C14_C5_0
+
+/**
  * FEAT_SME
  */
 

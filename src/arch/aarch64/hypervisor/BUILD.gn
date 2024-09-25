@@ -35,6 +35,7 @@ source_set("hypervisor") {
     "arch_init.c",
     "cpu.c",
     "debug_el1.c",
+    "el1_physical_timer.c",
     "feature_id.c",
     "ffa.c",
     "fpu.c",

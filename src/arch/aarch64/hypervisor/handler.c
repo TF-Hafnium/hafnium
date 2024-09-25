@@ -32,6 +32,7 @@
 #include "vmapi/hf/call.h"
 
 #include "debug_el1.h"
+#include "el1_physical_timer.h"
 #include "feature_id.h"
 #include "perfmon.h"
 #include "psci.h"
@@ -1373,6 +1374,11 @@ void handle_system_register_access(uintreg_t esr_el2)
 		}
 	} else if (feature_id_is_register_access(esr_el2)) {
 		if (!feature_id_process_access(vcpu, esr_el2)) {
+			inject_el1_sysreg_trap_exception(vcpu, esr_el2);
+			return;
+		}
+	} else if (el1_physical_timer_is_register_access(esr_el2)) {
+		if (!el1_physical_timer_process_access(vcpu, esr_el2)) {
 			inject_el1_sysreg_trap_exception(vcpu, esr_el2);
 			return;
 		}
