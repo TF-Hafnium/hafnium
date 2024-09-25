@@ -14,6 +14,8 @@
 
 #include "hf/arch/cpu.h"
 
+#include "hf/timer_mgmt.h"
+
 /* TODO: Fix alignment such that `cpu` structs are in different cache lines. */
 /* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct cpu {
@@ -34,6 +36,12 @@ struct cpu {
 
 	/* Track pending IPIs. */
 	struct vcpu *ipi_target_vcpu;
+
+	/**
+	 * A list of entries associated with vCPUs having pending timer
+	 * deadline.
+	 */
+	struct timer_pending_vcpu_list pending_timer_vcpus_list;
 };
 
 void cpu_module_init(const cpu_id_t *cpu_ids, size_t count);

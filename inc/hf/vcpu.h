@@ -218,6 +218,15 @@ struct vcpu {
 
 	/* List entry pointing to the next vCPU in the boot order list. */
 	struct list_entry boot_list_node;
+
+	/**
+	 * An entry in a list maintained by Hafnium for pending arch timers.
+	 * It exists in the list on behalf of its parent vCPU. The `prev` and
+	 * `next` fields point to the adjacent entries in the list. The list
+	 * itself is protected by a spinlock therefore timer entry is
+	 * safeguarded from concurrent accesses.
+	 */
+	struct list_entry timer_node;
 };
 
 /** Encapsulates a vCPU whose lock is held. */

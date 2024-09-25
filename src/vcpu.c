@@ -70,6 +70,7 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 	vcpu->direct_request_origin.vm_id = HF_INVALID_VM_ID;
 	vcpu->rt_model = RTM_SP_INIT;
 	list_init(&vcpu->boot_list_node);
+	list_init(&vcpu->timer_node);
 }
 
 /**
