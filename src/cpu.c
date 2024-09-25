@@ -90,6 +90,7 @@ void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 	j = cpu_count;
 	for (i = 0; i < cpu_count; ++i) {
 		struct cpu *c;
+		struct timer_pending_vcpu_list *timer_list;
 		cpu_id_t id = cpu_ids[i];
 
 		if (found_boot_cpu || id != boot_cpu_id) {
@@ -104,6 +105,15 @@ void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 
 		sl_init(&c->lock);
 		c->id = id;
+
+		timer_list = &c->pending_timer_vcpus_list;
+
+		/*
+		 * Initialize the list of vCPUs with pending arch timer for
+		 * each CPU. The root entry fields is configured such that
+		 * its `prev` and `next` fields point to itself.
+		 */
+		list_init(&(timer_list->root_entry));
 	}
 
 	if (!found_boot_cpu) {

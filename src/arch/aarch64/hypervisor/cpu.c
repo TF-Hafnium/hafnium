@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 #include "hf/arch/gicv3.h"
+#include "hf/arch/host_timer.h"
 #include "hf/arch/plat/psci.h"
 
 #include "hf/addr.h"
@@ -316,6 +317,12 @@ void arch_cpu_init(struct cpu *c)
 	isb();
 
 	plat_interrupts_controller_hw_init(c);
+
+	/*
+	 * Initialize the interrupt associated with S-EL2 physical timer for
+	 * running core.
+	 */
+	host_timer_init();
 }
 
 struct vcpu *arch_vcpu_resume(struct cpu *c)
