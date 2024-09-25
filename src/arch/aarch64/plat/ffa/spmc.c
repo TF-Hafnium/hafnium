@@ -8,6 +8,7 @@
 
 #include "hf/arch/ffa.h"
 #include "hf/arch/gicv3.h"
+#include "hf/arch/host_timer.h"
 #include "hf/arch/mmu.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
@@ -25,6 +26,7 @@
 #include "hf/interrupt_desc.h"
 #include "hf/plat/interrupts.h"
 #include "hf/std.h"
+#include "hf/timer_mgmt.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
@@ -1516,6 +1518,11 @@ static struct vcpu *plat_ffa_find_target_vcpu(struct vcpu *current,
 	case HF_IPI_INTID:
 		target_vcpu = hf_ipi_get_pending_target_vcpu(current->cpu);
 		break;
+	case ARM_EL1_VIRT_TIMER_PHYS_INT:
+		/* Fall through */
+	case ARM_EL1_PHYS_TIMER_PHYS_INT:
+		panic("Timer interrupt not expected to fire: %u\n",
+		      interrupt_id);
 	default:
 		target_vcpu = plat_ffa_find_target_vcpu_secure_interrupt(
 			current, interrupt_id);
@@ -1532,7 +1539,7 @@ static struct vcpu *plat_ffa_find_target_vcpu(struct vcpu *current,
  * tracking the secure interrupt processing are set accordingly.
  */
 static void plat_ffa_queue_vint(struct vcpu_locked target_vcpu_locked,
-				uint32_t intid,
+				uint32_t vint_id,
 				struct vcpu_locked current_locked)
 {
 	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
@@ -1544,7 +1551,7 @@ static void plat_ffa_queue_vint(struct vcpu_locked target_vcpu_locked,
 	}
 
 	/* Queue the pending virtual interrupt for target vcpu. */
-	if (!vcpu_interrupt_queue_push(target_vcpu_locked, intid)) {
+	if (!vcpu_interrupt_queue_push(target_vcpu_locked, vint_id)) {
 		panic("Exhausted interrupt queue for vcpu of SP: %x\n",
 		      target_vcpu->vm->id);
 	}
@@ -1556,7 +1563,7 @@ static void plat_ffa_queue_vint(struct vcpu_locked target_vcpu_locked,
  */
 static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 	struct vcpu_locked current_locked,
-	struct vcpu_locked target_vcpu_locked, uint32_t intid)
+	struct vcpu_locked target_vcpu_locked, uint32_t v_intid)
 {
 	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
 	struct vcpu *next;
@@ -1566,7 +1573,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 	case VCPU_STATE_WAITING:
 		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
 			struct ffa_value ret_interrupt =
-				api_ffa_interrupt_return(intid);
+				api_ffa_interrupt_return(v_intid);
 
 			/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
 			dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
@@ -1581,7 +1588,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 			 * If the execution was in NWd as well, set the vCPU
 			 * in preempted state as well.
 			 */
-			plat_ffa_queue_vint(target_vcpu_locked, intid,
+			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 					    current_locked);
 
 			/* Switch to target vCPU responsible for this interrupt.
@@ -1596,7 +1603,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 			 * resumes current vCPU.
 			 */
 			next = NULL;
-			plat_ffa_queue_vint(target_vcpu_locked, intid,
+			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 					    (struct vcpu_locked){.vcpu = NULL});
 		}
 		break;
@@ -1610,7 +1617,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		 * vCPU.
 		 */
 		next = NULL;
-		plat_ffa_queue_vint(target_vcpu_locked, intid,
+		plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 				    (struct vcpu_locked){.vcpu = NULL});
 		break;
 	default:
@@ -1627,7 +1634,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
  */
 static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 	struct vcpu_locked current_locked,
-	struct vcpu_locked target_vcpu_locked, uint32_t intid)
+	struct vcpu_locked target_vcpu_locked, uint32_t v_intid)
 {
 	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
 	struct vcpu *current = current_locked.vcpu;
@@ -1638,7 +1645,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 	case VCPU_STATE_WAITING:
 		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
 			struct ffa_value ret_interrupt =
-				api_ffa_interrupt_return(intid);
+				api_ffa_interrupt_return(v_intid);
 
 			/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
 			vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
@@ -1653,7 +1660,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 */
 			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
-			plat_ffa_queue_vint(target_vcpu_locked, intid,
+			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 					    current_locked);
 			next = target_vcpu;
 		} else {
@@ -1666,7 +1673,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			dlog_verbose("S-EL1: Secure interrupt queued: %x\n",
 				     target_vcpu->vm->id);
 			next = NULL;
-			plat_ffa_queue_vint(target_vcpu_locked, intid,
+			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 					    (struct vcpu_locked){.vcpu = NULL});
 		}
 		break;
@@ -1679,7 +1686,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 */
 			assert(target_vcpu->vm->vcpu_count == 1);
 			next = NULL;
-			plat_ffa_queue_vint(target_vcpu_locked, intid,
+			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 					    (struct vcpu_locked){.vcpu = NULL});
 		} else if (current->vm->id == HF_OTHER_WORLD_ID) {
 			/*
@@ -1688,7 +1695,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * the current vCPU.
 			 */
 			next = NULL;
-			plat_ffa_queue_vint(target_vcpu_locked, intid,
+			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 					    (struct vcpu_locked){.vcpu = NULL});
 		} else {
 			struct ffa_value ret_interrupt =
@@ -1720,7 +1727,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 */
 			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
-			plat_ffa_queue_vint(target_vcpu_locked, intid,
+			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 					    current_locked);
 
 			next = target_vcpu;
@@ -1760,7 +1767,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 		}
 
 		next = NULL;
-		plat_ffa_queue_vint(target_vcpu_locked, intid,
+		plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 				    (struct vcpu_locked){.vcpu = NULL});
 
 		break;
@@ -1785,7 +1792,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			assert(target_vcpu->vm->vcpu_count == 1);
 		}
 		next = NULL;
-		plat_ffa_queue_vint(target_vcpu_locked, intid,
+		plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 				    (struct vcpu_locked){.vcpu = NULL});
 		break;
 	case VCPU_STATE_BLOCKED_INTERRUPT:
@@ -1817,22 +1824,31 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	struct vcpu_locked current_locked;
 	uint32_t intid;
 	struct vm_locked target_vm_locked;
+	uint32_t v_intid;
 
 	/* Find pending interrupt id. This also activates the interrupt. */
 	intid = plat_interrupts_get_pending_interrupt_id();
+	v_intid = intid;
 
-	/*
-	 * Spurious interrupt ID indicating that there are no pending
-	 * interrupts to acknowledge. For such scenarios, resume the current
-	 * vCPU.
-	 */
-	if (intid == SPURIOUS_INTID_OTHER_WORLD) {
+	switch (intid) {
+	case ARM_SEL2_TIMER_PHYS_INT:
+		/* Disable the S-EL2 physical timer */
+		host_timer_disable();
+		target_vcpu = timer_find_target_vcpu(current);
+		v_intid = HF_VIRTUAL_TIMER_INTID;
+		break;
+	case SPURIOUS_INTID_OTHER_WORLD:
+		/*
+		 * Spurious interrupt ID indicating that there are no pending
+		 * interrupts to acknowledge. For such scenarios, resume the
+		 * current vCPU.
+		 */
 		*next = NULL;
 		return;
+	default:
+		target_vcpu = plat_ffa_find_target_vcpu(current, intid);
+		break;
 	}
-
-	target_vcpu = plat_ffa_find_target_vcpu(current, intid);
-	target_vm_locked = vm_lock(target_vcpu->vm);
 
 	/*
 	 * End the interrupt to drop the running priority. It also deactivates
@@ -1840,6 +1856,8 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	 * after resuming current vCPU.
 	 */
 	plat_interrupts_end_of_interrupt(intid);
+
+	target_vm_locked = vm_lock(target_vcpu->vm);
 
 	if (target_vcpu == current) {
 		current_locked = vcpu_lock(current);
@@ -1878,7 +1896,7 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 		assert(!target_vcpu->requires_deactivate_call);
 
 		/* Set the interrupt pending in the target vCPU. */
-		vcpu_interrupt_inject(target_vcpu_locked, intid);
+		vcpu_interrupt_inject(target_vcpu_locked, v_intid);
 
 		switch (intid) {
 		case HF_IPI_INTID:
@@ -1898,10 +1916,10 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 			*next = target_vcpu_locked.vcpu->vm->el0_partition
 					? plat_ffa_signal_secure_interrupt_sel0(
 						  current_locked,
-						  target_vcpu_locked, intid)
+						  target_vcpu_locked, v_intid)
 					: plat_ffa_signal_secure_interrupt_sel1(
 						  current_locked,
-						  target_vcpu_locked, intid);
+						  target_vcpu_locked, v_intid);
 		}
 	}
 

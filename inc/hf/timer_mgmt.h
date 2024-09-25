@@ -26,3 +26,7 @@ struct timer_pending_vcpu_list {
 };
 
 void timer_vcpu_manage(struct vcpu *vcpu);
+
+struct vcpu *timer_find_vcpu_nearest_deadline(struct cpu *cpu);
+
+struct vcpu *timer_find_target_vcpu(struct vcpu *current);
