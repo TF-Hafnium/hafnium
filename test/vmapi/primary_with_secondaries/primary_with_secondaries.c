@@ -77,11 +77,33 @@ bool service1_is_vm(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
+ * This is currently being used to skip memory sharing tests, when
+ * the service2 is an SP.
+ */
+bool service2_is_vm(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	return ffa_is_vm_id(service2_info->vm_id);
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
  * Check that service1 partition is an SP.
  */
 bool service1_is_not_vm(void)
 {
 	return !service1_is_vm();
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service1 partition is an SP.
+ */
+bool service2_is_not_vm(void)
+{
+	return !service2_is_vm();
 }
 
 /*
@@ -146,18 +168,6 @@ bool exception_received(struct ffa_value *run_res, const void *recv_buf)
 
 /*
  * The following is a precondition function, for the current system set-up.
- * Check that service2 partition is an MP SP.
- */
-bool service2_is_mp_sp(void)
-{
-	struct mailbox_buffers mb = get_precondition_mailbox();
-	struct ffa_partition_info *service2_info = service2(mb.recv);
-
-	return (service2_info->vcpu_count > 1);
-}
-
-/*
- * The following is a precondition function, for the current system set-up.
  * Check that service1 partition is MP.
  */
 bool service1_is_mp(void)
@@ -170,9 +180,39 @@ bool service1_is_mp(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
+ * Check that service2 partition is an MP SP.
+ */
+bool service2_is_mp(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	return (service2_info->vcpu_count > 1);
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
  * Check that service1 partition is an MP SP.
  */
 bool service1_is_mp_sp(void)
 {
 	return service1_is_not_vm() && service1_is_mp();
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service2 partition is an MP SP.
+ */
+bool service2_is_mp_sp(void)
+{
+	return service2_is_not_vm() && service2_is_mp();
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service1 and service2 partitions are MP SPs.
+ */
+bool service1_and_service2_are_mp_sp(void)
+{
+	return service1_is_mp_sp() && service2_is_mp_sp();
 }

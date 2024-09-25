@@ -86,6 +86,7 @@ bool service1_and_service2_are_secure(void);
 bool service1_service2_and_service3_are_secure(void);
 bool service1_is_mp_sp(void);
 bool service2_is_mp_sp(void);
+bool service1_and_service2_are_mp_sp(void);
 bool hypervisor_only(void);
 
 #define SERVICE_VM1 (HF_VM_ID_OFFSET + 1)
