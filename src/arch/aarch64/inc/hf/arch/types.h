@@ -51,6 +51,12 @@ struct float_reg {
 static_assert(sizeof(struct float_reg) == FLOAT_REG_BYTES,
 	      "Ensure float register type is 128 bits.");
 
+/** Timer CompareValue and control registers. */
+struct timer_state {
+	uintreg_t cval;
+	uintreg_t ctl;
+};
+
 /** Type to represent the register state of a vCPU. */
 struct arch_regs {
 	/* General purpose registers. */
@@ -127,12 +133,9 @@ struct arch_regs {
 #endif
 
 	/*
-	 * Peripheral registers, handled separately from other system registers.
+	 * Timer registers, handled separately from other system registers.
 	 */
-	struct {
-		uintreg_t cntv_cval_el0;
-		uintreg_t cntv_ctl_el0;
-	} peripherals;
+	struct timer_state arch_timer;
 
 #if BRANCH_PROTECTION
 	/* Pointer authentication keys */

@@ -83,79 +83,20 @@ static struct vcpu *current(void)
 }
 
 /**
- * Saves the state of per-vCPU peripherals, such as the virtual timer, and
+ * Saves the state of per-vCPU peripherals, such as the arch timer, and
  * informs the arch-independent sections that registers have been saved.
  */
 void complete_saving_state(struct vcpu *vcpu)
 {
-	if (has_vhe_support()) {
-		vcpu->regs.peripherals.cntv_cval_el0 =
-			read_msr(MSR_CNTV_CVAL_EL02);
-		vcpu->regs.peripherals.cntv_ctl_el0 =
-			read_msr(MSR_CNTV_CTL_EL02);
-	} else {
-		vcpu->regs.peripherals.cntv_cval_el0 = read_msr(cntv_cval_el0);
-		vcpu->regs.peripherals.cntv_ctl_el0 = read_msr(cntv_ctl_el0);
-	}
-
 	api_regs_state_saved(vcpu);
-
-	/*
-	 * If switching away from the primary, copy the current EL0 virtual
-	 * timer registers to the corresponding EL2 physical timer registers.
-	 * This is used to emulate the virtual timer for the primary in case it
-	 * should fire while the secondary is running.
-	 */
-	if (vm_is_primary(vcpu->vm)) {
-		/*
-		 * Clear timer control register before copying compare value, to
-		 * avoid a spurious timer interrupt. This could be a problem if
-		 * the interrupt is configured as edge-triggered, as it would
-		 * then be latched in.
-		 */
-		write_msr(cnthp_ctl_el2, 0);
-
-		if (has_vhe_support()) {
-			write_msr(cnthp_cval_el2, read_msr(MSR_CNTV_CVAL_EL02));
-			write_msr(cnthp_ctl_el2, read_msr(MSR_CNTV_CTL_EL02));
-		} else {
-			write_msr(cnthp_cval_el2, read_msr(cntv_cval_el0));
-			write_msr(cnthp_ctl_el2, read_msr(cntv_ctl_el0));
-		}
-	}
 }
 
 /**
- * Restores the state of per-vCPU peripherals, such as the virtual timer.
+ * Restores the state of per-vCPU peripherals, such as the arch timer.
  */
 void begin_restoring_state(struct vcpu *vcpu)
 {
-	/*
-	 * Clear timer control register before restoring compare value, to avoid
-	 * a spurious timer interrupt. This could be a problem if the interrupt
-	 * is configured as edge-triggered, as it would then be latched in.
-	 */
-	if (has_vhe_support()) {
-		write_msr(MSR_CNTV_CTL_EL02, 0);
-		write_msr(MSR_CNTV_CVAL_EL02,
-			  vcpu->regs.peripherals.cntv_cval_el0);
-		write_msr(MSR_CNTV_CTL_EL02,
-			  vcpu->regs.peripherals.cntv_ctl_el0);
-	} else {
-		write_msr(cntv_ctl_el0, 0);
-		write_msr(cntv_cval_el0, vcpu->regs.peripherals.cntv_cval_el0);
-		write_msr(cntv_ctl_el0, vcpu->regs.peripherals.cntv_ctl_el0);
-	}
-
-	/*
-	 * If we are switching (back) to the primary, disable the EL2 physical
-	 * timer which was being used to emulate the EL0 virtual timer, as the
-	 * virtual timer is now running for the primary again.
-	 */
-	if (vm_is_primary(vcpu->vm)) {
-		write_msr(cnthp_ctl_el2, 0);
-		write_msr(cnthp_cval_el2, 0);
-	}
+	(void)vcpu;
 }
 
 /**

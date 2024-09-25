@@ -13,29 +13,18 @@
 
 #include "hf/arch/types.h"
 
-bool arch_timer_pending(struct arch_regs *regs)
-{
-	/* TODO */
-	(void)regs;
-	return false;
-}
-
-void arch_timer_mask(struct arch_regs *regs)
-{
-	/* TODO */
-	(void)regs;
-}
-
 bool arch_timer_enabled(struct arch_regs *regs)
 {
-	/* TODO */
-	(void)regs;
-	return false;
+	return regs->arch_timer.ctl == 1;
 }
 
 uint64_t arch_timer_remaining_ns(struct arch_regs *regs)
 {
-	/* TODO */
-	(void)regs;
-	return 0;
+	/* For simplicity, we assume one tick is one nano second. */
+	return regs->arch_timer.cval;
+}
+
+bool arch_timer_expired(struct arch_regs *regs)
+{
+	return regs->arch_timer.cval == 0;
 }

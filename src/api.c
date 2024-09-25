@@ -1442,20 +1442,11 @@ struct ffa_value api_ffa_run(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	 * regs_available was true (and then set it to false) before returning
 	 * true.
 	 */
-	if (arch_timer_pending(&vcpu->regs)) {
+	if (arch_timer_expired(&vcpu->regs)) {
 		/* Make virtual timer interrupt pending. */
 		api_interrupt_inject_locked(vcpu_next_locked,
 					    HF_VIRTUAL_TIMER_INTID,
 					    vcpu_next_locked, NULL);
-
-		/*
-		 * Set the mask bit so the hardware interrupt doesn't fire
-		 * again. Ideally we wouldn't do this because it affects what
-		 * the secondary vCPU sees, but if we don't then we end up with
-		 * a loop of the interrupt firing each time we try to return to
-		 * the secondary vCPU.
-		 */
-		arch_timer_mask(&vcpu->regs);
 	}
 
 	/* Switch to the vCPU. */
@@ -2962,12 +2953,10 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 	}
 
 	/* Inject timer interrupt if any pending */
-	if (arch_timer_pending(&receiver_vcpu->regs)) {
+	if (arch_timer_expired(&receiver_vcpu->regs)) {
 		api_interrupt_inject_locked(receiver_vcpu_locked,
 					    HF_VIRTUAL_TIMER_INTID,
 					    current_locked, NULL);
-
-		arch_timer_mask(&receiver_vcpu->regs);
 	}
 
 	/* The receiver vCPU runs upon direct message invocation */

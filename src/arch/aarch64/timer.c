@@ -20,27 +20,24 @@
 #include "msr.h"
 #include "sysregs.h"
 
-#define CNTV_CTL_EL0_ENABLE (1u << 0)
-#define CNTV_CTL_EL0_IMASK (1u << 1)
-#define CNTV_CTL_EL0_ISTATUS (1u << 2)
-
-/**
- * Sets the bit to mask virtual timer interrupts.
+/*
+ * As part of support for arch timer functionality, Hafnium exposes partitions
+ * to EL1 Physical Timer (but traps and emulates the access behind the scenes
+ * using host timer).
  */
-void arch_timer_mask(struct arch_regs *regs)
-{
-	regs->peripherals.cntv_ctl_el0 |= CNTV_CTL_EL0_IMASK;
-}
+#define CNTx_CTL_EL0_ENABLE (UINT32_C(1) << 0)
+#define CNTx_CTL_EL0_IMASK (UINT32_C(1) << 1)
+#define CNTx_CTL_EL0_ISTATUS (UINT32_C(1) << 2)
 
 /**
- * Checks whether the virtual timer is enabled and its interrupt not masked.
+ * Checks whether the arch timer is enabled and its interrupt not masked.
  */
 bool arch_timer_enabled(struct arch_regs *regs)
 {
-	uintreg_t cntv_ctl_el0 = regs->peripherals.cntv_ctl_el0;
+	uintreg_t cntx_ctl_el0 = regs->arch_timer.ctl;
 
-	return (cntv_ctl_el0 & CNTV_CTL_EL0_ENABLE) &&
-	       !(cntv_ctl_el0 & CNTV_CTL_EL0_IMASK);
+	return (cntx_ctl_el0 & CNTx_CTL_EL0_ENABLE) &&
+	       !(cntx_ctl_el0 & CNTx_CTL_EL0_IMASK);
 }
 
 /**
@@ -52,28 +49,37 @@ static uint64_t ticks_to_ns(uint64_t ticks)
 }
 
 /**
- * Returns the number of ticks remaining on the virtual timer as stored in
+ * Returns the number of ticks remaining on the arch timer as stored in
  * the given `arch_regs`, or 0 if it has already expired. This is undefined if
  * the timer is not enabled.
  */
 static uint64_t arch_timer_remaining_ticks(struct arch_regs *regs)
 {
 	/*
-	 * Calculate the value from the saved CompareValue (cntv_cval_el0) and
-	 * the virtual count value.
+	 * Calculate the value from the saved CompareValue (cntx_cval_el0) and
+	 * the system count value.
 	 */
-	uintreg_t cntv_cval_el0 = regs->peripherals.cntv_cval_el0;
-	uintreg_t cntvct_el0 = read_msr(cntvct_el0);
+	uintreg_t cntx_cval_el0 = regs->arch_timer.cval;
 
-	if (cntv_cval_el0 >= cntvct_el0) {
-		return cntv_cval_el0 - cntvct_el0;
+	/*
+	 * Arm ARM recommends the use of ISB before reading CNTPCT_EL0 since
+	 * it could be read out of order. However, we skip ISB given the
+	 * performance overhead associated with it.
+	 * This does not have an adverse effect on timer functionality as in
+	 * the worst case this function could return a small non-zero value
+	 * even though the timer deadline has expired which is still fine.
+	 */
+	uintreg_t cntpct_el0 = read_msr(cntpct_el0);
+
+	if (cntx_cval_el0 >= cntpct_el0) {
+		return cntx_cval_el0 - cntpct_el0;
 	}
 
 	return 0;
 }
 
 /**
- * Returns the number of nanoseconds remaining on the virtual timer as stored in
+ * Returns the number of nanoseconds remaining on the arch timer as stored in
  * the given `arch_regs`, or 0 if it has already expired. This is undefined if
  * the timer is not enabled.
  */
@@ -86,13 +92,13 @@ uint64_t arch_timer_remaining_ns(struct arch_regs *regs)
  * Returns whether the timer is ready to fire: i.e. it is enabled, not masked,
  * and the condition is met.
  */
-bool arch_timer_pending(struct arch_regs *regs)
+bool arch_timer_expired(struct arch_regs *regs)
 {
 	if (!arch_timer_enabled(regs)) {
 		return false;
 	}
 
-	if (regs->peripherals.cntv_ctl_el0 & CNTV_CTL_EL0_ISTATUS) {
+	if ((regs->arch_timer.ctl & CNTx_CTL_EL0_ISTATUS) != 0U) {
 		return true;
 	}
 

@@ -22,7 +22,7 @@ DEFINE_OFFSETOF(VCPU_REGS, struct vcpu, regs)
 DEFINE_OFFSETOF(VCPU_LAZY, struct vcpu, regs.lazy)
 DEFINE_OFFSETOF(VCPU_FREGS, struct vcpu, regs.fp)
 DEFINE_OFFSETOF(VCPU_FPSR, struct vcpu, regs.fpsr)
-DEFINE_OFFSETOF(VCPU_TIMER, struct vcpu, regs.peripherals)
+DEFINE_OFFSETOF(VCPU_TIMER, struct vcpu, regs.arch_timer)
 #if BRANCH_PROTECTION
 DEFINE_OFFSETOF(VCPU_PAC, struct vcpu, regs.pac)
 #endif

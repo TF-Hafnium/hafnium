@@ -30,11 +30,22 @@ typedef uint64_t uintreg_t;
 /** The ID of a physical or virtual CPU. */
 typedef uint32_t cpu_id_t;
 
+/**
+ * Data structure to represent a fake timer peripheral. It has two registers:
+ * - a decrementing counter value and
+ * - a control register.
+ */
+struct timer_state {
+	uintreg_t cval;
+	uintreg_t ctl;
+};
+
 /** Type to represent the register state of a VM. */
 struct arch_regs {
 	uintreg_t arg[8];
 	cpu_id_t vcpu_id;
 	bool virtual_interrupt;
+	struct timer_state arch_timer;
 };
 
 /** Type of interrupts */
