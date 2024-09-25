@@ -67,7 +67,11 @@ CHECKPATCH := $(CHECKPATCH_SCRIPT) \
 # debug_el1.c : uses XMACROS, which checkpatch doesn't understand.
 # perfmon.c : uses XMACROS, which checkpatch doesn't understand.
 # feature_id.c : uses XMACROS, which checkpatch doesn't understand.
-CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c\|src/arch/aarch64/hypervisor/feature_id.c\|src/arch/aarch64/stack_protector.c\|src/arch/aarch64/inc/hf/arch/sve.h\|inc/hf/dlog.h\|inc/hf/arch/std.h\|inc/hf/panic.h\|inc/system/sys/cdefs.h\|inc/hf/bits.h"
+# el1_physical_timer.c : uses XMACROS, which checkpatch doesn't understand.
+CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c\|src/arch/aarch64/hypervisor/feature_id.c\|src/arch/aarch64/stack_protector.c\|src/arch/aarch64/inc/hf/arch/sve.h\|inc/hf/dlog.h\|inc/hf/arch/std.h\|inc/hf/panic.h\|inc/system/sys/cdefs.h\|inc/hf/bits.h\|src/arch/aarch64/hypervisor/el1_physical_timer.c"
+
+# el1_physical_timer.c : Use of macros causes a fail due to identical consecutive branches in switch.
+TIDY_IGNORE := "src/arch/aarch64/hypervisor/el1_physical_timer.c"
 
 OUT ?= out/$(PROJECT)
 OUT_DIR = $(OUT)
@@ -126,7 +130,7 @@ tidy: $(OUT_DIR)/build.ninja
 	@echo "Tidying..."
 	# TODO: enable readability-magic-numbers once there are fewer violations.
 	# TODO: enable for c++ tests as it currently gives spurious errors.
-	@find src/ test/ -name '*.c' | xargs run-clang-tidy -quiet -p $(OUT_DIR) -fix
+	@find src/ test/ -name '*.c' | grep -v $(TIDY_IGNORE) | xargs run-clang-tidy -quiet -p $(OUT_DIR) -fix
 
 .PHONY: license
 license:
