@@ -128,8 +128,38 @@ struct vcpu *timer_find_target_vcpu(struct vcpu *current)
 {
 	struct vcpu *target_vcpu;
 
+	/*
+	 * There are three possible scenarios here when execution was brought
+	 * back from NWd to SPMC as soon as host timer expired:
+	 * 1. The vCPU that was being tracked by SPMC on this CPUx has expired
+	 * timer. This will be the target vCPU.
+	 *
+	 * However, it is likely that this vCPU could have been migrated by
+	 * NWd driver to another CPU(lets say CPUy). The S-EL2 host timer on
+	 * CPUy will take care of signaling the virtual timer interrupt
+	 * eventually.
+	 *
+	 * 2. If there is another vCPU with expired timer in the list maintained
+	 *    by SPMC on present CPUx, SPMC will pick that vCPU to be
+	 *    target_vcpu.
+	 * 3. If none of the vCPUs have expired timer, simply resume the normal
+	 *    world i.e., target_vcpu will be NULL.
+	 */
 	if (current->vm->id == HF_OTHER_WORLD_ID) {
 		target_vcpu = timer_find_vcpu_nearest_deadline(current->cpu);
+		if (target_vcpu != NULL) {
+			if (arch_timer_remaining_ns(&target_vcpu->regs) == 0) {
+				/*
+				 * SPMC will either signal or queue the virtual
+				 * timer interrupt to the target vCPU. No
+				 * need to track this vcpu anymore.
+				 */
+				timer_list_remove_vcpu(current->cpu,
+						       target_vcpu);
+			} else {
+				target_vcpu = NULL;
+			}
+		}
 	} else {
 		target_vcpu = current;
 	}

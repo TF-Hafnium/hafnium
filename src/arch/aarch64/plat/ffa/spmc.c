@@ -1835,8 +1835,15 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 		/* Disable the S-EL2 physical timer */
 		host_timer_disable();
 		target_vcpu = timer_find_target_vcpu(current);
-		v_intid = HF_VIRTUAL_TIMER_INTID;
-		break;
+
+		if (target_vcpu != NULL) {
+			v_intid = HF_VIRTUAL_TIMER_INTID;
+			break;
+		}
+		/*
+		 * It is possible for target_vcpu to be NULL in case of spurious
+		 * timer interrupt. Fall through.
+		 */
 	case SPURIOUS_INTID_OTHER_WORLD:
 		/*
 		 * Spurious interrupt ID indicating that there are no pending
