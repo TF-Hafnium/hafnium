@@ -30,6 +30,7 @@
 #include "hf/spinlock.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
+#include "hf/timer_mgmt.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
@@ -1181,6 +1182,22 @@ out:
 }
 
 /**
+ * Inject virtual timer interrupt to next vCPU if its timer has expired.
+ */
+static void api_inject_arch_timer_interrupt(struct vcpu_locked current_locked,
+					    struct vcpu_locked next_locked)
+{
+	struct vcpu *next = next_locked.vcpu;
+
+	if (arch_timer_expired(&next->regs)) {
+		/* Make virtual timer interrupt pending. */
+		api_interrupt_inject_locked(next_locked, HF_VIRTUAL_TIMER_INTID,
+					    current_locked, NULL);
+		vcpu_interrupt_queue_push(next_locked, HF_VIRTUAL_TIMER_INTID);
+	}
+}
+
+/**
  * Prepares the vCPU to run by updating its state and fetching whether a return
  * value needs to be forced onto the vCPU.
  */
@@ -1434,19 +1451,6 @@ struct ffa_value api_ffa_run(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 
 	if (!api_vcpu_prepare_run(current_locked, vcpu_next_locked, &ret)) {
 		goto out_vcpu;
-	}
-
-	/*
-	 * Inject timer interrupt if timer has expired. It's safe to access
-	 * vcpu->regs here because api_vcpu_prepare_run already made sure that
-	 * regs_available was true (and then set it to false) before returning
-	 * true.
-	 */
-	if (arch_timer_expired(&vcpu->regs)) {
-		/* Make virtual timer interrupt pending. */
-		api_interrupt_inject_locked(vcpu_next_locked,
-					    HF_VIRTUAL_TIMER_INTID,
-					    vcpu_next_locked, NULL);
 	}
 
 	/* Switch to the vCPU. */
@@ -2952,12 +2956,8 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 		break;
 	}
 
-	/* Inject timer interrupt if any pending */
-	if (arch_timer_expired(&receiver_vcpu->regs)) {
-		api_interrupt_inject_locked(receiver_vcpu_locked,
-					    HF_VIRTUAL_TIMER_INTID,
-					    current_locked, NULL);
-	}
+	/* Inject timer interrupt if timer has expired. */
+	api_inject_arch_timer_interrupt(current_locked, receiver_vcpu_locked);
 
 	/* The receiver vCPU runs upon direct message invocation */
 	receiver_vcpu->cpu = current->cpu;
@@ -3204,6 +3204,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 	current_locked = vcpus_locked.vcpu1;
 	next_locked = vcpus_locked.vcpu2;
 
+	/* Inject timer interrupt if timer has expired. */
+	api_inject_arch_timer_interrupt(current_locked, next_locked);
 	plat_ffa_unwind_call_chain_ffa_direct_resp(current_locked, next_locked);
 
 	/*
