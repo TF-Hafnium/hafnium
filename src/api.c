@@ -1371,6 +1371,7 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 
 	plat_ffa_init_schedule_mode_ffa_run(current_locked, vcpu_next_locked);
 
+	timer_migrate_to_other_cpu(current_locked.vcpu->cpu, vcpu_next_locked);
 	vcpu->cpu = current_locked.vcpu->cpu;
 
 	vcpu_set_running(vcpu_next_locked, ffa_run_ret);
@@ -2958,6 +2959,7 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 
 	/* Inject timer interrupt if timer has expired. */
 	api_inject_arch_timer_interrupt(current_locked, receiver_vcpu_locked);
+	timer_migrate_to_other_cpu(current->cpu, receiver_vcpu_locked);
 
 	/* The receiver vCPU runs upon direct message invocation */
 	receiver_vcpu->cpu = current->cpu;

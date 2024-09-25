@@ -30,3 +30,6 @@ void timer_vcpu_manage(struct vcpu *vcpu);
 struct vcpu *timer_find_vcpu_nearest_deadline(struct cpu *cpu);
 
 struct vcpu *timer_find_target_vcpu(struct vcpu *current);
+
+void timer_migrate_to_other_cpu(struct cpu *to_cpu,
+				struct vcpu_locked migrate_vcpu_locked);

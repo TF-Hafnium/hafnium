@@ -136,3 +136,33 @@ struct vcpu *timer_find_target_vcpu(struct vcpu *current)
 
 	return target_vcpu;
 }
+
+void timer_migrate_to_other_cpu(struct cpu *to_cpu,
+				struct vcpu_locked migrate_vcpu_locked)
+{
+	struct cpu *from_cpu;
+	struct vcpu *migrate_vcpu;
+
+	assert(to_cpu != NULL);
+
+	migrate_vcpu = migrate_vcpu_locked.vcpu;
+	from_cpu = migrate_vcpu->cpu;
+
+	if (from_cpu != NULL && (to_cpu != from_cpu)) {
+		if (!list_empty(&migrate_vcpu->timer_node)) {
+			assert(arch_timer_enabled(&migrate_vcpu->regs));
+
+			/*
+			 * Remove vcpu from timer list maintained by SPMC for
+			 * old CPU.
+			 */
+			timer_list_remove_vcpu(from_cpu, migrate_vcpu);
+
+			/*
+			 * Add vcpu to timer list maintained by SPMC for new
+			 * CPU.
+			 */
+			timer_list_add_vcpu(to_cpu, migrate_vcpu);
+		}
+	}
+}
