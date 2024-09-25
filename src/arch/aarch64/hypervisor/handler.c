@@ -10,11 +10,13 @@
 
 #include "hf/arch/barriers.h"
 #include "hf/arch/gicv3.h"
+#include "hf/arch/host_timer.h"
 #include "hf/arch/init.h"
 #include "hf/arch/memcpy_trapped.h"
 #include "hf/arch/mmu.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/smc.h"
+#include "hf/arch/timer.h"
 #include "hf/arch/vmid_base.h"
 
 #include "hf/api.h"
@@ -26,6 +28,7 @@
 #include "hf/hf_ipi.h"
 #include "hf/panic.h"
 #include "hf/plat/interrupts.h"
+#include "hf/timer_mgmt.h"
 #include "hf/vm.h"
 #include "hf/vm_ids.h"
 
@@ -89,7 +92,17 @@ static struct vcpu *current(void)
  */
 void complete_saving_state(struct vcpu *vcpu)
 {
+	host_timer_save_arch_timer(&vcpu->regs.arch_timer);
+
+	timer_vcpu_manage(vcpu);
 	api_regs_state_saved(vcpu);
+
+	/*
+	 * Since switching away from current vCPU, disable the host physical
+	 * timer for now. If necessary, the host timer will be reconfigured
+	 * at appropriate time to track timer deadline of the vCPU.
+	 */
+	host_timer_disable();
 }
 
 /**
@@ -97,7 +110,16 @@ void complete_saving_state(struct vcpu *vcpu)
  */
 void begin_restoring_state(struct vcpu *vcpu)
 {
-	(void)vcpu;
+	/*
+	 * If a vCPU's timer has expired while it was de-scheduled, SPMC will
+	 * inject the virtual timer interrupt before resuming the vCPU.
+	 * If not, there is a live state and we need to configure the host timer
+	 * to track it again.
+	 */
+	if (arch_timer_enabled(&vcpu->regs) &&
+	    (arch_timer_remaining_ns(&vcpu->regs) != 0)) {
+		host_timer_track_deadline(&vcpu->regs.arch_timer);
+	}
 }
 
 /**

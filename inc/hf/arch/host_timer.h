@@ -8,7 +8,11 @@
 
 #pragma once
 
+#include "hf/arch/types.h"
+
 #include "hf/vcpu.h"
 
 void host_timer_disable(void);
 void host_timer_init(void);
+void host_timer_save_arch_timer(struct timer_state *timer);
+void host_timer_track_deadline(struct timer_state *timer);

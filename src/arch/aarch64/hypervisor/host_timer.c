@@ -51,3 +51,40 @@ void host_timer_init(void)
 	plat_interrupts_configure_interrupt(int_desc);
 #endif
 }
+
+/**
+ * Save the arch timer state being tracked by host timer.
+ */
+void host_timer_save_arch_timer(struct timer_state *timer)
+{
+#if SECURE_WORLD == 1
+	timer->cval = read_msr(MSR_CNTHPS_CVAL_EL2);
+	timer->ctl = read_msr(MSR_CNTHPS_CTL_EL2);
+#else
+	timer->cval = read_msr(MSR_CNTHP_CVAL_EL2);
+	timer->ctl = read_msr(MSR_CNTHP_CTL_EL2);
+#endif
+}
+
+/**
+ * Configure the host timer to track the arch timer deadline.
+ */
+void host_timer_track_deadline(struct timer_state *timer)
+{
+	/*
+	 * Clear timer control register before restoring compare value, to avoid
+	 * a spurious timer interrupt. This could be a problem if the interrupt
+	 * is configured as edge-triggered, as it would then be latched in.
+	 */
+#if SECURE_WORLD == 1
+	write_msr(cnthps_ctl_el2, 0);
+	write_msr(cnthps_cval_el2, timer->cval);
+	write_msr(cnthps_ctl_el2, timer->ctl);
+#else
+	write_msr(cnthp_ctl_el2, 0);
+	write_msr(cnthp_cval_el2, timer->cval);
+	write_msr(cnthp_ctl_el2, timer->ctl);
+#endif
+	/* Ensure that the write to ctl register has taken effect. */
+	isb();
+}
