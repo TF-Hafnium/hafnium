@@ -6,33 +6,12 @@
 
 import("//build/image/image.gni")
 
-# Service which loops forever.
-source_set("busy") {
-  testonly = true
-  public_configs = [ "//test/hftest:hftest_config" ]
-
-  sources = [ "busy.c" ]
-}
-
 # Service waiting for a direct message request.
 source_set("interrupts") {
   testonly = true
   public_configs = [ "//test/hftest:hftest_config" ]
 
   sources = [ "interrupts.c" ]
-}
-
-# Service which uses timers.
-source_set("timer") {
-  testonly = true
-  public_configs = [ "//test/hftest:hftest_config" ]
-
-  sources = [ "timer.c" ]
-
-  deps = [
-    "//src/arch/aarch64:arch",
-    "//src/arch/aarch64/hftest:interrupts",
-  ]
 }
 
 # Service which tries to access GICv3 system registers.
@@ -56,10 +35,8 @@ vm_kernel("gicv3_service_vm1") {
   testonly = true
 
   deps = [
-    ":busy",
     ":interrupts",
     ":systemreg",
-    ":timer",
     "//test/hftest:hftest_secondary_vm",
     "//test/vmapi/common:ffa",
     "//test/vmapi/common/arch/aarch64:exception_handler",

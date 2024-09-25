@@ -28,10 +28,8 @@ vm_kernel("gicv3_test_vm") {
   public_configs = [ ":config" ]
 
   sources = [
-    "busy_secondary.c",
     "gicv3.c",
     "interrupts.c",
-    "timer_secondary.c",
   ]
 
   deps = [
