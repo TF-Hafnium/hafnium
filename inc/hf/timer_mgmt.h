@@ -24,3 +24,5 @@
 struct timer_pending_vcpu_list {
 	struct list_entry root_entry;
 };
+
+void timer_vcpu_manage(struct vcpu *vcpu);
