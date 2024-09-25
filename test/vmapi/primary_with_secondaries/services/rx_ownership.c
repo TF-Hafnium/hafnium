@@ -123,3 +123,49 @@ TEST_SERVICE(call_ffa_msg_wait_retain_rx)
 
 	ffa_yield();
 }
+
+TEST_SERVICE(send_indirect_msg_to_sp_fail)
+{
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	void *send_buf = SERVICE_SEND_BUFFER();
+	ffa_id_t target_id;
+	uint64_t msg = 0x4321;
+	struct ffa_value ret;
+
+	/* Receive ID of service to send message to. */
+	receive_indirect_message((void *)&target_id, sizeof(target_id),
+				 recv_buf, NULL);
+
+	HFTEST_LOG("Attempting to send indirect message %lx to %x", msg,
+		   target_id);
+	ret = send_indirect_message(hf_vm_get_id(), target_id, send_buf, &msg,
+				    sizeof(msg), 0);
+	EXPECT_FFA_ERROR(ret, FFA_BUSY);
+	ffa_yield();
+}
+
+TEST_SERVICE(ffa_msg_wait_pending_indirect_message)
+{
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_value ret;
+	uint64_t msg;
+
+	/*
+	 * FFA_MSG_WAIT will attempt to release buffer.
+	 * RUNNING -> WAITING state transition should succeed, but
+	 * buffer release should fail due to pending indirect message
+	 * sent by PVM.
+	 */
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	/* Read RX buffer and verify expected message payload from PVM. */
+	receive_indirect_message((void *)&msg, sizeof(msg), recv_buf, NULL);
+	EXPECT_EQ(msg, 0x123);
+
+	dlog_verbose(
+		"Attested that RX buffer was available to receive indirect "
+		"message.");
+
+	ffa_yield();
+}

@@ -222,3 +222,55 @@ TEST_PRECONDITION(rx_ownership, ffa_msg_wait_retain_buffer_indirect_msg_fail,
 				    mb.send, &msg, sizeof(msg), 0);
 	ASSERT_EQ(ret.func, FFA_ERROR_32);
 }
+
+/**
+ * This test ensures that when an SP has a pending message in its RX buffer,
+ * a call to FFA_MSG_WAIT will not release the RX buffer to the producer, even
+ * if the FFA_MSG_WAIT_FLAG_RETAIN_RX flag is not used. The test sequence is as
+ * follows:
+ *	1. Send indirect message to SP1 to fill its RX buffer.
+ *	2. Run SP1. SP1 calls FFA_MSG_WAIT without flag, and enters the WAITING
+ * state, but does not release the RX buffer due to pending message.
+ *	3. Run SP2 to send indirect message to SP1 and attest that the send
+ * fails.
+ *	4. Return to SP1 and attest the message is same as originally sent by
+ * the PVM.
+ */
+TEST(rx_ownership, ffa_msg_wait_with_pending_message)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value ret;
+	uint64_t msg = 0x123;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_msg_wait_pending_indirect_message", mb.send);
+
+	/* Service2 to send indirect message to Service1. */
+	SERVICE_SELECT(service2_info->vm_id, "send_indirect_msg_to_sp_fail",
+		       mb.send);
+
+	/* Send indirect message to Service1. */
+	ret = send_indirect_message(hf_vm_get_id(), service1_info->vm_id,
+				    mb.send, &msg, sizeof(msg), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Run Service1 to call FFA_MSG_WAIT. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Send Service2 ID of Service1. */
+	ret = send_indirect_message(hf_vm_get_id(), service2_info->vm_id,
+				    mb.send, &service1_info->vm_id,
+				    sizeof(service1_info->vm_id), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Run Service2. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Run Service1 to read original message. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}
