@@ -8,6 +8,8 @@
 
 #include "sp_helpers.h"
 
+#include "hf/arch/vm/timer.h"
+
 #include "ap_refclk_generic_timer.h"
 #include "partition_services.h"
 #include "sp805.h"
@@ -29,7 +31,7 @@ void sp_disable_irq(void)
 {
 }
 
-struct ffa_value handle_ffa_interrupt(struct ffa_value res)
+struct ffa_value handle_interrupt(struct ffa_value res)
 {
 	uint32_t intid;
 	struct ffa_value ffa_ret;
@@ -83,6 +85,12 @@ struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 	case IRQ_AP_REFCLK_BASE1_INTID: {
 		HFTEST_LOG("S-EL0 vIRQ: AP_REFCLK timer stopped: %u", intid);
 		cancel_ap_refclk_timer();
+		break;
+	}
+	case HF_VIRTUAL_TIMER_INTID: {
+		/* Disable the EL1 arch timer. */
+		timer_disable();
+		HFTEST_LOG("EL1 physical timer stopped");
 		break;
 	}
 	default:

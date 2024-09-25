@@ -15,6 +15,15 @@ config("config") {
   ]
 }
 
+source_set("arch_timer") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "arch_timer.c" ]
+}
+
 source_set("common") {
   testonly = true
   public_configs = [
@@ -98,6 +107,7 @@ source_set("message_loop") {
   sources = [ "message_loop.c" ]
 
   deps = [
+    ":arch_timer",
     ":discovery",
     ":notifications",
     ":partition_services",

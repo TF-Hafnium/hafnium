@@ -196,6 +196,11 @@ enum sp_cmd {
 	 */
 	SP_GENERIC_TIMER_START_CMD,
 	SP_PAUTH_FAULT_CMD,
+
+	/**
+	 * Request to start arch timer and sleep as necessary.
+	 */
+	SP_ARCH_TIMER_CMD,
 };
 
 /**
@@ -669,3 +674,35 @@ static inline struct ffa_value sp_prepare_preempt_interrupt_handling_cmd_send(
 
 struct ffa_value sp_prepare_preempt_interrupt_handling_cmd(ffa_id_t source,
 							   bool preempt);
+
+/**
+ * Command to request SP to program timer with delay and sleep for the given
+ * time in ms.
+ */
+static inline struct ffa_value sp_program_arch_timer_sleep_cmd_send(
+	ffa_id_t source, ffa_id_t dest, uint32_t timer_delay,
+	uint32_t sleep_time, uint32_t fwd)
+{
+	return ffa_msg_send_direct_req(source, dest, SP_ARCH_TIMER_CMD,
+				       timer_delay, sleep_time, fwd, 0);
+}
+
+struct ffa_value sp_program_arch_timer_sleep_cmd(ffa_id_t source,
+						 uint32_t timer_delay_ms,
+						 uint32_t sleep_ms,
+						 uint32_t fwd);
+
+static inline uint32_t sp_get_arch_timer_delay(struct ffa_value ret)
+{
+	return (uint32_t)ret.arg4;
+}
+
+static inline uint32_t sp_get_arch_timer_sleep(struct ffa_value ret)
+{
+	return (uint32_t)ret.arg5;
+}
+
+static inline uint32_t sp_get_arch_timer_fwd_call(struct ffa_value ret)
+{
+	return (uint32_t)ret.arg6;
+}

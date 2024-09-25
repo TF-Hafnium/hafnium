@@ -147,6 +147,12 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		res = sp_prepare_preempt_interrupt_handling_cmd(ffa_sender(res),
 								res.arg4);
 		break;
+	case SP_ARCH_TIMER_CMD:
+		res = sp_program_arch_timer_sleep_cmd(
+			ffa_sender(res), sp_get_arch_timer_delay(res),
+			sp_get_arch_timer_sleep(res),
+			sp_get_arch_timer_fwd_call(res));
+		break;
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
@@ -223,7 +229,7 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 			res = handle_direct_req2_cmd(res);
 		} else if (res.func == FFA_INTERRUPT_32) {
 			HFTEST_LOG("Received FF-A interrupt.");
-			res = handle_ffa_interrupt(res);
+			res = handle_interrupt(res);
 		} else if (res.func == FFA_RUN_32) {
 			/*
 			 * Received FFA_RUN in waiting state, the endpoint

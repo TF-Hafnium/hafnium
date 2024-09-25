@@ -28,7 +28,7 @@ void sp_disable_irq(void)
 	arch_irq_disable();
 }
 
-struct ffa_value handle_ffa_interrupt(struct ffa_value res)
+struct ffa_value handle_interrupt(struct ffa_value res)
 {
 	/*
 	 * Received FFA_INTERRUPT in waiting state. The

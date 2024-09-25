@@ -8,6 +8,7 @@
 
 #include "hf/arch/irq.h"
 #include "hf/arch/vm/interrupts.h"
+#include "hf/arch/vm/timer.h"
 
 #include "hf/mm.h"
 
@@ -132,6 +133,15 @@ static void irq_current(void)
 		cancel_ap_refclk_timer();
 
 		deactivate_interrupt_and_yield(intid);
+		break;
+	}
+	case HF_VIRTUAL_TIMER_INTID: {
+		/* Disable the EL1 physical arch timer. */
+		timer_disable();
+		HFTEST_LOG("EL1 Physical timer stopped");
+		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+
+		exception_handler_set_last_interrupt(intid);
 		break;
 	}
 	default:
