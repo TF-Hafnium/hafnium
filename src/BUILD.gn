@@ -28,7 +28,6 @@ source_set("src_not_testable_yet") {
     "api.c",
     "cpio.c",
     "ffa_memory.c",
-    "hf_ipi.c",
     "init.c",
     "load.c",
     "main.c",
@@ -52,6 +51,7 @@ source_set("src_testable") {
   sources = [
     "boot_info.c",
     "cpu.c",
+    "hf_ipi.c",
     "manifest.c",
     "sp_pkg.c",
     "timer_mgmt.c",
@@ -74,6 +74,7 @@ source_set("src_testable") {
     "//vmlib",
     plat_boot_flow,
     plat_console,
+    plat_interrupts,
     plat_iommu,
     plat_memory_protect,
   ]
@@ -175,6 +176,7 @@ executable("unit_tests") {
     "cpu_test.cc",
     "fdt_handler_test.cc",
     "fdt_test.cc",
+    "ipi_test.cc",
     "manifest_test.cc",
     "mm_test.cc",
     "mpool_test.cc",

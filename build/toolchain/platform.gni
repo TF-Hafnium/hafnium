@@ -21,6 +21,9 @@ declare_args() {
   # IOMMU driver to be used for the platform, specified as build target.
   plat_iommu = ""
 
+  # Interrupts driver to be used for the platform, specified as build target.
+  plat_interrupts = "//src/arch/aarch64/plat/interrupts:absent"
+
   # Abstract the calls to platform memory protection functions.
   # E.g. FVP leverages RME if present to change PAS (S or NS) of given address.
   plat_memory_protect = ""

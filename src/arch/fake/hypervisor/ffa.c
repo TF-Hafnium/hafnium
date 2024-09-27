@@ -350,7 +350,7 @@ void ffa_notifications_sri_trigger_not_delayed(struct cpu *cpu)
 
 void ffa_notifications_sri_set_delayed(struct cpu *cpu)
 {
-	(void)cpu;
+	cpu->is_sri_delayed = true;
 }
 
 bool ffa_interrupts_inject_notification_pending_interrupt(
