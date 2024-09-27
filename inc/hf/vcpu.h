@@ -12,6 +12,7 @@
 
 #include "hf/addr.h"
 #include "hf/interrupt_desc.h"
+#include "hf/list.h"
 #include "hf/spinlock.h"
 
 #include "vmapi/hf/ffa.h"
@@ -230,7 +231,8 @@ struct vcpu {
 	/** Save direct response message args to be resumed later. */
 	struct ffa_value direct_resp_ffa_value;
 
-	struct vcpu *next_boot;
+	/* List entry pointing to the next vCPU in the boot order list. */
+	struct list_entry boot_list_node;
 };
 
 /** Encapsulates a vCPU whose lock is held. */
@@ -262,6 +264,7 @@ void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu);
 
 void vcpu_update_boot(struct vcpu *vcpu);
 struct vcpu *vcpu_get_boot_vcpu(void);
+struct vcpu *vcpu_get_next_boot(struct vcpu *vcpu);
 
 static inline bool vcpu_is_virt_interrupt_enabled(struct interrupts *interrupts,
 						  uint32_t intid)

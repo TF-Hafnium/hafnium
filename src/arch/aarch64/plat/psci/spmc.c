@@ -62,11 +62,14 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	struct vcpu_locked vcpu_locked;
 	struct vcpu_locked other_world_vcpu_locked;
 	struct vcpu *vcpu = vcpu_get_boot_vcpu();
-	struct vm *vm = vcpu->vm;
+	struct vm *vm;
 	struct vm *other_world_vm;
 	struct vcpu *other_world_vcpu;
 	struct two_vcpu_locked vcpus_locked;
 
+	assert(vcpu != NULL);
+
+	vm = vcpu->vm;
 	cpu_on(c);
 
 	arch_cpu_init(c);

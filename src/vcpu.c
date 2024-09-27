@@ -15,7 +15,7 @@
 #include "hf/std.h"
 #include "hf/vm.h"
 
-static struct vcpu *boot_vcpu;
+static struct list_entry boot_list = LIST_INIT(boot_list);
 
 /** GP register to be used to pass the current vCPU ID, at core bring up. */
 #define PHYS_CORE_IDX_GP_REG 4
@@ -69,7 +69,7 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 	vcpu->direct_request_origin.is_ffa_req2 = false;
 	vcpu->direct_request_origin.vm_id = HF_INVALID_VM_ID;
 	vcpu->rt_model = RTM_SP_INIT;
-	vcpu->next_boot = NULL;
+	list_init(&vcpu->boot_list_node);
 }
 
 /**
@@ -221,11 +221,34 @@ void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu)
 }
 
 /**
+ * The 'boot_list' is used as the start and end of the list.
+ * Start: the nodes it points to is the first vCPU to boot.
+ * End: the last node's next points to the entry.
+ */
+static bool vcpu_is_boot_list_end(struct vcpu *vcpu)
+{
+	return vcpu->boot_list_node.next == &boot_list;
+}
+
+/**
  * Gets the first partition to boot, according to Boot Protocol from FFA spec.
  */
 struct vcpu *vcpu_get_boot_vcpu(void)
 {
-	return boot_vcpu;
+	assert(!list_empty(&boot_list));
+
+	return CONTAINER_OF(boot_list.next, struct vcpu, boot_list_node);
+}
+
+/**
+ * Returns the next element in the boot order list, if there is one.
+ */
+struct vcpu *vcpu_get_next_boot(struct vcpu *vcpu)
+{
+	return vcpu_is_boot_list_end(vcpu)
+		       ? NULL
+		       : CONTAINER_OF(vcpu->boot_list_node.next, struct vcpu,
+				      boot_list_node);
 }
 
 /**
@@ -235,28 +258,31 @@ struct vcpu *vcpu_get_boot_vcpu(void)
 void vcpu_update_boot(struct vcpu *vcpu)
 {
 	struct vcpu *current = NULL;
-	struct vcpu *previous = NULL;
 
-	if (boot_vcpu == NULL) {
-		boot_vcpu = vcpu;
+	if (list_empty(&boot_list)) {
+		list_prepend(&boot_list, &vcpu->boot_list_node);
 		return;
 	}
 
-	current = boot_vcpu;
+	/*
+	 * When getting to this point the first insertion should have
+	 * been done.
+	 */
+	current = vcpu_get_boot_vcpu();
+	assert(current != NULL);
 
-	while (current != NULL &&
+	/*
+	 * Iterate until the position is found according to boot order, or
+	 * until we reach end of the list.
+	 */
+	while (!vcpu_is_boot_list_end(current) &&
 	       current->vm->boot_order <= vcpu->vm->boot_order) {
-		previous = current;
-		current = current->next_boot;
+		current = vcpu_get_next_boot(current);
 	}
 
-	if (previous != NULL) {
-		previous->next_boot = vcpu;
-	} else {
-		boot_vcpu = vcpu;
-	}
-
-	vcpu->next_boot = current;
+	current->vm->boot_order > vcpu->vm->boot_order
+		? list_prepend(&current->boot_list_node, &vcpu->boot_list_node)
+		: list_append(&current->boot_list_node, &vcpu->boot_list_node);
 }
 
 void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,

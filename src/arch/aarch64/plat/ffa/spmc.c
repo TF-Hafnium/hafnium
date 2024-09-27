@@ -2115,7 +2115,8 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 	 * Pick next vCPU to be booted. Once all SPs have booted
 	 * (next_boot is NULL), then return execution to NWd.
 	 */
-	vcpu_next = current->next_boot;
+	vcpu_next = vcpu_get_next_boot(current);
+
 	if (vcpu_next == NULL) {
 		dlog_notice("Finished initializing all VMs.\n");
 		spmc_booted = true;

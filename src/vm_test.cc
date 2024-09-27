@@ -10,6 +10,7 @@
 
 extern "C" {
 #include "hf/check.h"
+#include "hf/list.h"
 #include "hf/mpool.h"
 #include "hf/vm.h"
 }
@@ -96,8 +97,6 @@ TEST_F(vm, vm_boot_order)
 	struct_vcpu *vcpu;
 	std::list<struct_vm *> expected_final_order;
 
-	EXPECT_TRUE(vcpu_get_boot_vcpu() == NULL);
-
 	/*
 	 * Insertion when no call to "vcpu_update_boot" has been made yet.
 	 * The "boot_list" is expected to be empty.
@@ -156,7 +155,7 @@ TEST_F(vm, vm_boot_order)
 	     it != expected_final_order.end(); it++) {
 		EXPECT_TRUE(vcpu != NULL);
 		EXPECT_EQ((*it)->id, vcpu->vm->id);
-		vcpu = vcpu->next_boot;
+		vcpu = vcpu_get_next_boot(vcpu);
 	}
 }
 
