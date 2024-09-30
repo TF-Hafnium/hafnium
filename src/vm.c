@@ -70,8 +70,6 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 
 	memset_s(vm, sizeof(*vm), 0, sizeof(*vm));
 
-	list_init(&vm->mailbox.waiter_list);
-	list_init(&vm->mailbox.ready_list);
 	sl_init(&vm->lock);
 
 	vm->id = id;
@@ -88,13 +86,6 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 
 	if (!vm_init_mm(vm, ppool)) {
 		return NULL;
-	}
-
-	/* Initialise waiter entries. */
-	for (i = 0; i < MAX_VMS; i++) {
-		vm->wait_entries[i].waiting_vm = vm;
-		list_init(&vm->wait_entries[i].wait_links);
-		list_init(&vm->wait_entries[i].ready_links);
 	}
 
 	/* Do basic initialization of vCPUs. */
@@ -259,20 +250,6 @@ struct vcpu *vm_get_vcpu(struct vm *vm, ffa_vcpu_index_t vcpu_index)
 }
 
 /**
- * Gets `vm`'s wait entry for waiting on the `for_vm`.
- */
-struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_id_t for_vm)
-{
-	uint16_t index;
-
-	CHECK(for_vm >= HF_VM_ID_OFFSET);
-	index = for_vm - HF_VM_ID_OFFSET;
-	CHECK(index < MAX_VMS);
-
-	return &vm->wait_entries[index];
-}
-
-/**
  * Checks whether the given `to` VM's mailbox is currently busy.
  */
 bool vm_is_mailbox_busy(struct vm_locked to)
@@ -287,16 +264,6 @@ bool vm_is_mailbox_busy(struct vm_locked to)
 bool vm_is_mailbox_other_world_owned(struct vm_locked to)
 {
 	return to.vm->mailbox.state == MAILBOX_STATE_OTHER_WORLD_OWNED;
-}
-
-/**
- * Gets the ID of the VM which the given VM's wait entry is for.
- */
-ffa_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry)
-{
-	uint16_t index = entry - vm->wait_entries;
-
-	return index + HF_VM_ID_OFFSET;
 }
 
 /**

@@ -1077,14 +1077,6 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 
 	switch (args.func) {
 #if SECURE_WORLD == 0
-	case HF_MAILBOX_WRITABLE_GET:
-		vcpu->regs.r[0] = plat_ffa_mailbox_writable_get(vcpu);
-		break;
-
-	case HF_MAILBOX_WAITER_GET:
-		vcpu->regs.r[0] = plat_ffa_mailbox_waiter_get(args.arg1, vcpu);
-		break;
-
 	case HF_INTERRUPT_INJECT:
 		vcpu->regs.r[0] = api_interrupt_inject(args.arg1, args.arg2,
 						       args.arg3, vcpu, &next);

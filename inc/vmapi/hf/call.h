@@ -358,34 +358,6 @@ static inline struct ffa_value ffa_rx_release(void)
 }
 
 /**
- * Retrieves the next VM whose mailbox became writable. For a VM to be notified
- * by this function, the caller must have called api_mailbox_send before with
- * the notify argument set to true, and this call must have failed because the
- * mailbox was not available.
- *
- * It should be called repeatedly to retrieve a list of VMs.
- *
- * Returns -1 if no VM became writable, or the id of the VM whose mailbox
- * became writable.
- */
-static inline int64_t hf_mailbox_writable_get(void)
-{
-	return hf_call(HF_MAILBOX_WRITABLE_GET, 0, 0, 0);
-}
-
-/**
- * Retrieves the next VM waiting to be notified that the mailbox of the
- * specified VM became writable. Only primary VMs are allowed to call this.
- *
- * Returns -1 on failure or if there are no waiters; the VM id of the next
- * waiter otherwise.
- */
-static inline int64_t hf_mailbox_waiter_get(ffa_id_t vm_id)
-{
-	return hf_call(HF_MAILBOX_WAITER_GET, vm_id, 0, 0);
-}
-
-/**
  * Enables or disables a given interrupt ID.
  *
  * Returns 0 on success, or -1 if the intid is invalid.
@@ -414,27 +386,6 @@ static inline uint32_t hf_interrupt_get(void)
 static inline int64_t hf_interrupt_deactivate(uint32_t intid)
 {
 	return hf_call(HF_INTERRUPT_DEACTIVATE, intid, intid, 0);
-}
-
-/**
- * Injects a virtual interrupt of the given ID into the given target vCPU.
- * This doesn't cause the vCPU to actually be run immediately; it will be taken
- * when the vCPU is next run, which is up to the scheduler.
- *
- * Returns:
- *  - -1 on failure because the target VM or vCPU doesn't exist, the interrupt
- *    ID is invalid, or the current VM is not allowed to inject interrupts to
- *    the target VM.
- *  - 0 on success if no further action is needed.
- *  - 1 if it was called by the primary VM and the primary VM now needs to wake
- *    up or kick the target vCPU.
- */
-static inline int64_t hf_interrupt_inject(ffa_id_t target_vm_id,
-					  ffa_vcpu_index_t target_vcpu_idx,
-					  uint32_t intid)
-{
-	return hf_call(HF_INTERRUPT_INJECT, target_vm_id, target_vcpu_idx,
-		       intid);
 }
 
 /**

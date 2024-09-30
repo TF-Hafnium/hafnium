@@ -15,8 +15,6 @@
 /* clang-format off */
 
 /* TODO: Define constants below according to spec. */
-#define HF_MAILBOX_WRITABLE_GET        0xff01
-#define HF_MAILBOX_WAITER_GET          0xff02
 #define HF_INTERRUPT_ENABLE            0xff03
 #define HF_INTERRUPT_GET               0xff04
 #define HF_INTERRUPT_INJECT            0xff05

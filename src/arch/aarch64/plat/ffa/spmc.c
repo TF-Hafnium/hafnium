@@ -121,7 +121,6 @@ static struct vm_locked plat_ffa_nwd_vm_create(ffa_id_t vm_id)
 	 * extend of what's currently used by the SPMC (VM ID, waiter list).
 	 */
 	vm_locked.vm->id = vm_id;
-	list_init(&vm_locked.vm->mailbox.waiter_list);
 
 out:
 	nwd_vms_unlock(&nwd_vms_locked);
@@ -2709,21 +2708,6 @@ out:
 	vcpu_unlock(&current_locked);
 	vm_unlock(&vm_locked);
 	return ret;
-}
-
-int64_t plat_ffa_mailbox_waiter_get(ffa_id_t vm_id, const struct vcpu *current)
-{
-	(void)vm_id;
-	(void)current;
-
-	return -1;
-}
-
-int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current)
-{
-	(void)current;
-
-	return -1;
 }
 
 /**

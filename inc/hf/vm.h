@@ -75,23 +75,6 @@ enum mailbox_state {
 	MAILBOX_STATE_OTHER_WORLD_OWNED,
 };
 
-struct wait_entry {
-	/** The VM that is waiting for a mailbox to become writable. */
-	struct vm *waiting_vm;
-
-	/**
-	 * Links used to add entry to a VM's waiter_list. This is protected by
-	 * the notifying VM's lock.
-	 */
-	struct list_entry wait_links;
-
-	/**
-	 * Links used to add entry to a VM's ready_list. This is protected by
-	 * the waiting VM's lock.
-	 */
-	struct list_entry ready_links;
-};
-
 struct mailbox {
 	enum mailbox_state state;
 	void *recv;
@@ -108,20 +91,6 @@ struct mailbox {
 	 * `recv`.
 	 */
 	uint32_t recv_func;
-
-	/**
-	 * List of wait_entry structs representing VMs that want to be notified
-	 * when the mailbox becomes writable. Once the mailbox does become
-	 * writable, the entry is removed from this list and added to the
-	 * waiting VM's ready_list.
-	 */
-	struct list_entry waiter_list;
-
-	/**
-	 * List of wait_entry structs representing VMs whose mailboxes became
-	 * writable since the owner of the mailbox registers for notification.
-	 */
-	struct list_entry ready_list;
 };
 
 struct notifications_state {
@@ -242,12 +211,6 @@ struct vm {
 		bool npi_injected;
 	} notifications;
 
-	/**
-	 * Wait entries to be used when waiting on other VM mailboxes. See
-	 * comments on `struct wait_entry` for the lock discipline of these.
-	 */
-	struct wait_entry wait_entries[MAX_VMS];
-
 	atomic_bool aborting;
 
 	/**
@@ -323,8 +286,6 @@ void vm_unlock(struct vm_locked *locked);
 struct two_vm_locked vm_lock_both_in_order(struct vm_locked vm1,
 					   struct vm *vm2);
 struct vcpu *vm_get_vcpu(struct vm *vm, ffa_vcpu_index_t vcpu_index);
-struct wait_entry *vm_get_wait_entry(struct vm *vm, ffa_id_t for_vm);
-ffa_id_t vm_id_for_wait_entry(struct vm *vm, struct wait_entry *entry);
 bool vm_id_is_current_world(ffa_id_t vm_id);
 bool vm_is_mailbox_busy(struct vm_locked to);
 bool vm_is_mailbox_other_world_owned(struct vm_locked to);
