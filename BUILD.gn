@@ -19,10 +19,6 @@ group("test_root") {
   deps = [ "//project/${project}:test_root" ]
 }
 
-group("update_prebuilts") {
-  deps = [ "//third_party/linux" ]
-}
-
 group("default") {
   testonly = true
   deps = [
