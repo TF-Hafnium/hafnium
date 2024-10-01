@@ -94,6 +94,8 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct hftest_context *ctx = hftest_get_context();
 
+	dlog_verbose("sec_interrupt_preempt_msg from an S-EL1 partition.");
+
 	/*
 	 * Map MMIO address space of peripherals (such as secure
 	 * watchdog timer) described as device region nodes in partition

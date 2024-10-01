@@ -212,6 +212,7 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 			HFTEST_LOG("Received direct message request2");
 			res = handle_direct_req2_cmd(res);
 		} else if (res.func == FFA_INTERRUPT_32) {
+			HFTEST_LOG("Received FF-A interrupt.");
 			res = handle_ffa_interrupt(res);
 		} else if (res.func == FFA_RUN_32) {
 			res = handle_ffa_run(res);

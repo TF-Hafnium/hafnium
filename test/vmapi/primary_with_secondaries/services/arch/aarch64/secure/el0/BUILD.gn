@@ -12,10 +12,27 @@ config("config") {
       [ "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure/inc" ]
 }
 
+source_set("secure_interrupts") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
+    "//src/arch/aarch64:config",
+  ]
+  sources = [ "secure_interrupts.c" ]
+  deps = [
+    "//src/arch/aarch64:smc",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64/secure:sp805",
+  ]
+}
+
 vm_kernel("secure_service1") {
   testonly = true
 
   deps = [
+    ":secure_interrupts",
     "//src/arch/aarch64/hftest/el0:interrupts",
     "//src/arch/aarch64/hftest/el0:mm",
     "//test/hftest:hftest_sel0_partition_base",
@@ -28,7 +45,6 @@ vm_kernel("secure_service1") {
     "//test/vmapi/primary_with_secondaries/services:rx_ownership",
     "//test/vmapi/primary_with_secondaries/services/arch/aarch64/el0:mem_permissions",
     "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:message_loop",
-    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:secure_interrupts",
   ]
 }
 
