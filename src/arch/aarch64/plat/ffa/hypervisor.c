@@ -2134,8 +2134,8 @@ int64_t plat_ffa_mailbox_waiter_get(ffa_id_t vm_id, const struct vcpu *current)
 	waiting_locked = vm_lock(waiting_vm);
 
 	if (list_empty(&entry->ready_links)) {
-		list_append(&waiting_vm->mailbox.ready_list,
-			    &entry->ready_links);
+		list_prepend(&waiting_vm->mailbox.ready_list,
+			     &entry->ready_links);
 	}
 	vm_unlock(&waiting_locked);
 

@@ -27,7 +27,7 @@ static inline void list_init(struct list_entry *e)
 	e->prev = e;
 }
 
-static inline void list_append(struct list_entry *l, struct list_entry *e)
+static inline void list_prepend(struct list_entry *l, struct list_entry *e)
 {
 	e->next = l;
 	e->prev = l->prev;
@@ -36,7 +36,7 @@ static inline void list_append(struct list_entry *l, struct list_entry *e)
 	e->prev->next = e;
 }
 
-static inline void list_prepend(struct list_entry *l, struct list_entry *e)
+static inline void list_append(struct list_entry *l, struct list_entry *e)
 {
 	e->next = l->next;
 	e->prev = l;
