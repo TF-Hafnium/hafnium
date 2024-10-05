@@ -21,3 +21,13 @@ source_set("sp805") {
   ]
   sources = [ "sp805.c" ]
 }
+
+source_set("wdog") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  deps = [ ":sp805" ]
+  sources = [ "wdog.c" ]
+}
