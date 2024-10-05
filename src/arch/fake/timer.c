@@ -39,20 +39,3 @@ uint64_t arch_timer_remaining_ns(struct arch_regs *regs)
 	(void)regs;
 	return 0;
 }
-
-bool arch_timer_enabled_current(void)
-{
-	/* TODO */
-	return false;
-}
-
-void arch_timer_disable_current(void)
-{
-	/* TODO */
-}
-
-uint64_t arch_timer_remaining_ns_current(void)
-{
-	/* TODO */
-	return 0;
-}

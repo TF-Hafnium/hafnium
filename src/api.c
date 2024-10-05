@@ -151,39 +151,6 @@ struct vcpu *api_switch_to_primary(struct vcpu_locked current_locked,
 				   struct ffa_value primary_ret,
 				   enum vcpu_state secondary_state)
 {
-	/*
-	 * If the secondary is blocked but has a timer running, sleep until the
-	 * timer fires rather than indefinitely.
-	 */
-	switch (primary_ret.func) {
-	case HF_FFA_RUN_WAIT_FOR_INTERRUPT:
-	case FFA_MSG_WAIT_32: {
-		if (arch_timer_enabled_current()) {
-			uint64_t remaining_ns =
-				arch_timer_remaining_ns_current();
-
-			if (remaining_ns == 0) {
-				/*
-				 * Timer is pending, so the current vCPU should
-				 * be run again right away.
-				 */
-				primary_ret = (struct ffa_value){
-					.func = FFA_INTERRUPT_32};
-
-			} else {
-				primary_ret.arg2 = remaining_ns;
-			}
-		} else {
-			primary_ret.arg2 = FFA_SLEEP_INDEFINITE;
-		}
-		break;
-	}
-
-	default:
-		/* Do nothing. */
-		break;
-	}
-
 	return api_switch_to_vm(current_locked, primary_ret, secondary_state,
 				HF_PRIMARY_VM_ID);
 }
@@ -277,11 +244,6 @@ struct vcpu *api_vcpu_off(struct vcpu *current)
 	};
 
 	current_locked = vcpu_lock(current);
-	/*
-	 * Disable the timer, so the scheduler doesn't get told to call back
-	 * based on it.
-	 */
-	arch_timer_disable_current();
 
 	next = api_switch_to_primary(current_locked, ret, VCPU_STATE_OFF);
 	vcpu_unlock(&current_locked);
