@@ -39,6 +39,7 @@ source_set("hypervisor") {
     "ffa.c",
     "fpu.c",
     "handler.c",
+    "host_timer.c",
     "perfmon.c",
     "psci_handler.c",
     "sme.c",

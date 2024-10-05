@@ -306,6 +306,11 @@
 
 #endif /* GIC_EXT_INTID */
 
+/** PPIs associated with various peripheral timers. */
+#define ARM_SEL2_TIMER_PHYS_INT UINT32_C(20)
+#define ARM_EL1_VIRT_TIMER_PHYS_INT UINT32_C(27)
+#define ARM_EL1_PHYS_TIMER_PHYS_INT UINT32_C(30)
+
 static inline uint32_t get_highest_pending_g0_interrupt_id(void)
 {
 	return (uint32_t)read_msr(ICC_HPPIR0_EL1) & HPPIR0_EL1_INTID_MASK;
