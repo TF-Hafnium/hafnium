@@ -67,6 +67,7 @@ vm_kernel("vm_primary") {
     "//test/vmapi/arch/${plat_arch}/gicv3:gicv3_setup",
     "//test/vmapi/common:ffa",
     "//test/vmapi/common/arch/aarch64:exception_handler",
+    "//test/vmapi/common/arch/aarch64/sp805:wdog",
     "//vmlib",
   ]
 }
@@ -119,6 +120,7 @@ vm_kernel("vm_primary_vhe") {
     "//test/vmapi/arch/${plat_arch}/gicv3:gicv3_setup",
     "//test/vmapi/common:ffa",
     "//test/vmapi/common/arch/aarch64:exception_handler",
+    "//test/vmapi/common/arch/aarch64/sp805:wdog",
   ]
 }
 

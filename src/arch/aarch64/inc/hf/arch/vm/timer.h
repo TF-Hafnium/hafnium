@@ -39,11 +39,3 @@ static inline void timer_disable(void)
 {
 	write_msr(cntp_ctl_el0, 0x0);
 }
-
-/**
- * Converts a number of nanoseconds to the equivalent number of timer ticks.
- */
-static inline uint64_t ns_to_ticks(uint64_t ns)
-{
-	return ns * read_msr(cntfrq_el0) / NANOS_PER_UNIT;
-}

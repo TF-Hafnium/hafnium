@@ -18,6 +18,7 @@
 #include "partition_services.h"
 #include "sp_helpers.h"
 #include "twdog.h"
+#include "wdog.h"
 
 #define SP_SLEEP_TIME 400U
 #define NS_SLEEP_TIME 200U
@@ -300,15 +301,10 @@ TEST(secure_interrupts, sp_preempted)
 	const ffa_id_t receiver_id = service2_info->vm_id;
 
 	gicv3_system_setup();
-	interrupt_enable(PHYSICAL_TIMER_IRQ, true);
-	interrupt_set_priority(PHYSICAL_TIMER_IRQ, 0x80);
-	interrupt_set_edge_triggered(PHYSICAL_TIMER_IRQ, true);
-	interrupt_set_priority_mask(0xff);
-	arch_irq_enable();
+	setup_wdog_timer_interrupt();
 
-	/* Set physical timer for 20 ms and enable. */
-	write_msr(CNTP_TVAL_EL0, ns_to_ticks(20000000));
-	write_msr(CNTP_CTL_EL0, CNTx_CTL_ENABLE_MASK);
+	/* Set watchdog timer for 20 ms*/
+	start_wdog_timer(20);
 
 	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 200);
 
@@ -330,11 +326,10 @@ TEST(secure_interrupts, sp_preempted)
 	}
 
 	/* Check that we got the interrupt. */
-	EXPECT_EQ(last_interrupt_id, PHYSICAL_TIMER_IRQ);
+	EXPECT_EQ(last_interrupt_id, IRQ_WDOG_INTID);
 
-	/* Check timer status. */
-	EXPECT_EQ(read_msr(CNTP_CTL_EL0),
-		  CNTx_CTL_ISTS_MASK | CNTx_CTL_ENABLE_MASK);
+	/* Stop the watchdog timer. */
+	wdog_stop();
 
 	/*
 	 * NS Interrupt has been serviced and receiver SP is now in PREEMPTED
@@ -367,11 +362,7 @@ TEST(secure_interrupts, spmc_schedule_mode)
 	const ffa_id_t receiver_id = service2_info->vm_id;
 
 	gicv3_system_setup();
-	interrupt_enable(PHYSICAL_TIMER_IRQ, true);
-	interrupt_set_priority(PHYSICAL_TIMER_IRQ, 0x80);
-	interrupt_set_edge_triggered(PHYSICAL_TIMER_IRQ, true);
-	interrupt_set_priority_mask(0xff);
-	arch_irq_enable();
+	setup_wdog_timer_interrupt();
 
 	res = sp_prepare_spmc_call_chain_cmd_send(own_id, receiver_id, true);
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
@@ -379,9 +370,8 @@ TEST(secure_interrupts, spmc_schedule_mode)
 
 	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 10);
 
-	/* Set physical timer for 50 ms and enable. */
-	write_msr(CNTP_TVAL_EL0, ns_to_ticks(50000000));
-	write_msr(CNTP_CTL_EL0, CNTx_CTL_ENABLE_MASK);
+	/* Set physical timer for 50 ms. */
+	start_wdog_timer(50);
 
 	/*
 	 * Waiting for interrupt to be serviced in normal world. A non-zero
@@ -395,8 +385,11 @@ TEST(secure_interrupts, spmc_schedule_mode)
 		EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
 	}
 
+	/* Stop the watchdog timer. */
+	wdog_stop();
+
 	/* Check that we got the interrupt. */
-	EXPECT_EQ(last_interrupt_id, PHYSICAL_TIMER_IRQ);
+	EXPECT_EQ(last_interrupt_id, IRQ_WDOG_INTID);
 
 	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
 }
@@ -774,15 +767,10 @@ TEST(secure_interrupts, sp_queue_virtual_interrupts)
 	const ffa_id_t receiver_id = service2_info->vm_id;
 
 	gicv3_system_setup();
-	interrupt_enable(PHYSICAL_TIMER_IRQ, true);
-	interrupt_set_priority(PHYSICAL_TIMER_IRQ, 0x80);
-	interrupt_set_edge_triggered(PHYSICAL_TIMER_IRQ, true);
-	interrupt_set_priority_mask(0xff);
-	arch_irq_enable();
+	setup_wdog_timer_interrupt();
 
-	/* Set physical timer for 20 ms and enable. */
-	write_msr(CNTP_TVAL_EL0, ns_to_ticks(20000000));
-	write_msr(CNTP_CTL_EL0, CNTx_CTL_ENABLE_MASK);
+	/* Set watchdog timer for 20 ms*/
+	start_wdog_timer(20);
 
 	enable_trigger_generic_timer(own_id, receiver_id, 150);
 	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 200);
@@ -805,11 +793,10 @@ TEST(secure_interrupts, sp_queue_virtual_interrupts)
 	}
 
 	/* Check that we got the interrupt. */
-	EXPECT_EQ(last_interrupt_id, PHYSICAL_TIMER_IRQ);
+	EXPECT_EQ(last_interrupt_id, IRQ_WDOG_INTID);
 
-	/* Check timer status. */
-	EXPECT_EQ(read_msr(CNTP_CTL_EL0),
-		  CNTx_CTL_ISTS_MASK | CNTx_CTL_ENABLE_MASK);
+	/* Stop the watchdog timer. */
+	wdog_stop();
 
 	/*
 	 * NS Interrupt has been serviced and receiver SP is now in PREEMPTED

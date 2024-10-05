@@ -22,6 +22,7 @@
 #include "partition_services.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
+#include "wdog.h"
 
 #define TEST_SP_PREEMPTED_BY_NS_INTERRUPT_LOOP_COUNT UINT64_C(1000000)
 
@@ -35,33 +36,22 @@ TEAR_DOWN(interrupts)
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
-static void setup_physical_timer(void)
+void setup_wdog_timer_interrupt(void)
 {
-	interrupt_enable(PHYSICAL_TIMER_IRQ, true);
-	interrupt_set_priority(PHYSICAL_TIMER_IRQ, 0x80);
-	interrupt_set_edge_triggered(PHYSICAL_TIMER_IRQ, true);
+	interrupt_enable(IRQ_WDOG_INTID, true);
+	interrupt_set_priority(IRQ_WDOG_INTID, 0x80);
+	interrupt_set_edge_triggered(IRQ_WDOG_INTID, true);
 	interrupt_set_priority_mask(0xff);
 	arch_irq_enable();
 }
 
-static void start_physical_timer(uint32_t ns)
+void start_wdog_timer(uint32_t time_ms)
 {
-	/*
-	 * Check that no (SGI or PPI) interrupts are active or pending to start
-	 * with.
-	 */
-	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
-	EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
-
-	HFTEST_LOG("Starting timer\n");
-	/* Set physical timer for 20 ms and enable. */
-	write_msr(CNTP_TVAL_EL0, ns_to_ticks(ns));
-	write_msr(CNTP_CTL_EL0, CNTx_CTL_ENABLE_MASK);
+	HFTEST_LOG("Starting wdog timer\n");
+	wdog_start((time_ms * ARM_SP805_WDOG_CLK_HZ) / 1000);
 }
 
-static void check_physical_timer_interrupt_serviced(void)
+static void check_wdog_timer_interrupt_serviced(void)
 {
 	/* Waiting for interrupt to be serviced in normal world. */
 	while (last_interrupt_id == 0) {
@@ -73,11 +63,10 @@ static void check_physical_timer_interrupt_serviced(void)
 
 	/* Check that we got the interrupt. */
 	HFTEST_LOG("Checking for interrupt\n");
-	EXPECT_EQ(last_interrupt_id, PHYSICAL_TIMER_IRQ);
+	EXPECT_EQ(last_interrupt_id, IRQ_WDOG_INTID);
 
-	/* Check timer status. */
-	EXPECT_EQ(read_msr(CNTP_CTL_EL0),
-		  CNTx_CTL_ISTS_MASK | CNTx_CTL_ENABLE_MASK);
+	/* Stop the watchdog timer. */
+	wdog_stop();
 
 	/* There should again be no pending or active interrupts. */
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
@@ -102,8 +91,8 @@ TEST(interrupts, sp_preempted_by_ns_interrupt)
 	struct ffa_partition_info *receiver_info = service2(mb.recv);
 	const ffa_id_t receiver_id = receiver_info->vm_id;
 
-	setup_physical_timer();
-	start_physical_timer(20000000);
+	setup_wdog_timer_interrupt();
+	start_wdog_timer(20);
 
 	/* Send direct request to query SP to wait in a busy loop. */
 	res = sp_busy_loop_cmd_send(
@@ -116,7 +105,7 @@ TEST(interrupts, sp_preempted_by_ns_interrupt)
 	/* VM id/vCPU index are passed through arg1. */
 	EXPECT_EQ(res.arg1, ffa_vm_vcpu(receiver_id, 0));
 
-	check_physical_timer_interrupt_serviced();
+	check_wdog_timer_interrupt_serviced();
 
 	/* Resume the SP to complete the busy loop and return with success. */
 	res = ffa_run(ffa_vm_id(res), ffa_vcpu_index(res));
@@ -144,7 +133,7 @@ TEST(interrupts, sp_managed_exit)
 	struct ffa_partition_info *receiver_info = service1(mb.recv);
 	const ffa_id_t receiver_id = receiver_info->vm_id;
 
-	setup_physical_timer();
+	setup_wdog_timer_interrupt();
 
 	/* Enable SP to handle managed exit. */
 	res = sp_virtual_interrupt_cmd_send(own_id, receiver_id,
@@ -154,8 +143,7 @@ TEST(interrupts, sp_managed_exit)
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 
-	start_physical_timer(20000000);
-
+	start_wdog_timer(20);
 	/* Send direct request to query SP to wait in a busy loop. */
 	res = sp_busy_loop_cmd_send(
 		hf_vm_get_id(), receiver_id,
@@ -165,7 +153,7 @@ TEST(interrupts, sp_managed_exit)
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), HF_MANAGED_EXIT_INTID);
 
-	check_physical_timer_interrupt_serviced();
+	check_wdog_timer_interrupt_serviced();
 
 	/* Resume the SP to complete the busy loop and return with success. */
 	res = sp_resume_after_managed_exit_send(own_id, receiver_id);
