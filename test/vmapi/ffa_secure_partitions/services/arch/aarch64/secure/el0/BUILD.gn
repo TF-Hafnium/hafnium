@@ -32,7 +32,7 @@ vm_kernel("sel0_partition") {
     "//src/arch/aarch64/hftest/el0:interrupts",
     "//test/hftest:hftest_sel0_partition_base",
     "//test/vmapi/common/arch/aarch64/el0:exception_handler",
-    "//test/vmapi/common/arch/aarch64/secure:sp805",
+    "//test/vmapi/common/arch/aarch64/secure:twdog",
     "//test/vmapi/common/arch/aarch64/system_timer:ap_refclk",
     "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure:message_loop",
   ]

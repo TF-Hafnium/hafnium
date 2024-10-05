@@ -16,12 +16,12 @@
 
 #include "ap_refclk_generic_timer.h"
 #include "partition_services.h"
-#include "sp805.h"
 #include "sp_helpers.h"
 #include "test/abort.h"
 #include "test/hftest.h"
 #include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
+#include "twdog.h"
 
 bool yield_while_handling_sec_interrupt = false;
 bool initiate_spmc_call_chain = false;
@@ -95,7 +95,7 @@ static void irq_current(void)
 		 * Clear the interrupt and stop the timer.
 		 */
 		HFTEST_LOG("Trusted WatchDog timer stopped: %u", intid);
-		sp805_twdog_stop();
+		twdog_stop();
 
 		if (initiate_spmc_call_chain) {
 			HFTEST_LOG(
@@ -186,8 +186,8 @@ struct ffa_value sp_twdog_cmd(ffa_id_t test_source, uint64_t time)
 	ffa_id_t own_id = hf_vm_get_id();
 
 	HFTEST_LOG("Starting TWDOG: %lu ms", time);
-	sp805_twdog_refresh();
-	sp805_twdog_start((time * ARM_SP805_TWDG_CLK_HZ) / 1000);
+	twdog_refresh();
+	twdog_start((time * ARM_SP805_TWDG_CLK_HZ) / 1000);
 
 	return sp_success(own_id, test_source, time);
 }

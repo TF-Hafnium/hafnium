@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/std.h"
+
 /* SP805 register offset. */
 #define SP805_WDOG_LOAD_OFF 0x000
 #define SP805_WDOG_CTRL_OFF 0x008
@@ -23,13 +25,8 @@
 #define SP805_WDOG_CTRL_RESEN (1 << 1)
 #define SP805_WDOG_CTRL_INTEN (1 << 0)
 
-#define ARM_SP805_TWDG_CLK_HZ 32768
-#define SP805_TWDOG_BASE 0x2A490000
+void sp805_start(void *base, uint32_t wdog_cycles);
 
-/* Secure watchdog timer interrupt id. */
-#define IRQ_TWDOG_INTID 56
+void sp805_stop(void *base);
 
-/* Public APIs for trusted watchdog module. */
-void sp805_twdog_start(unsigned int wdog_cycles);
-void sp805_twdog_stop(void);
-void sp805_twdog_refresh(void);
+void sp805_refresh(void *base);

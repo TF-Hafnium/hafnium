@@ -8,9 +8,9 @@
 
 #include "vmapi/hf/call.h"
 
-#include "sp805.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
+#include "twdog.h"
 
 #define ITERATIONS_PER_MS 15000
 
@@ -55,8 +55,8 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 
 	/* Start the secure Watchdog timer. */
 	HFTEST_LOG("Starting TWDOG: %u ms", delay);
-	sp805_twdog_refresh();
-	sp805_twdog_start((delay * ARM_SP805_TWDG_CLK_HZ) / 1000);
+	twdog_refresh();
+	twdog_start((delay * ARM_SP805_TWDG_CLK_HZ) / 1000);
 
 	/* Wait for the interrupt to trigger. */
 	sp_wait_loop(delay + 50);

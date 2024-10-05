@@ -12,10 +12,10 @@
 
 #include "ap_refclk_generic_timer.h"
 #include "partition_services.h"
-#include "sp805.h"
 #include "test/abort.h"
 #include "test/hftest.h"
 #include "test/vmapi/arch/exception_handler.h"
+#include "twdog.h"
 
 #define ITERATIONS_PER_MS 15000
 
@@ -54,7 +54,7 @@ struct ffa_value handle_interrupt(struct ffa_value res)
 		 */
 		HFTEST_LOG("S-EL0 vIRQ: Trusted WatchDog timer stopped: %u",
 			   intid);
-		sp805_twdog_stop();
+		twdog_stop();
 
 		if (initiate_spmc_call_chain) {
 			HFTEST_LOG(
@@ -79,7 +79,6 @@ struct ffa_value handle_interrupt(struct ffa_value res)
 			 * triggers. */
 			sp_sleep_active_wait(5);
 		}
-
 		break;
 	}
 	case IRQ_AP_REFCLK_BASE1_INTID: {

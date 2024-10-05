@@ -151,7 +151,7 @@ vm_kernel("secure_partitions_services") {
     "//src/arch/aarch64/hftest:interrupts",
     "//test/hftest:hftest_secure_service",
     "//test/vmapi/common/arch/aarch64:exception_handler",
-    "//test/vmapi/common/arch/aarch64/secure:sp805",
+    "//test/vmapi/common/arch/aarch64/secure:twdog",
     "//test/vmapi/common/arch/aarch64/system_timer:ap_refclk",
     "//vmlib/${plat_arch}:call",
   ]

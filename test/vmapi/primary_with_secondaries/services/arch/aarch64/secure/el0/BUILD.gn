@@ -24,7 +24,7 @@ source_set("secure_interrupts") {
   deps = [
     "//src/arch/aarch64:smc",
     "//test/vmapi/common:ffa",
-    "//test/vmapi/common/arch/aarch64/secure:sp805",
+    "//test/vmapi/common/arch/aarch64/secure:twdog",
   ]
 }
 

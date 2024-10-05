@@ -34,7 +34,7 @@ static inline void sp805_write_wdog_lock(void *base, uint32_t value)
 	mmio_write32_offset(base, SP805_WDOG_LOCK_OFF, value);
 }
 
-static void sp805_wdog_start_(void *base, uint32_t wdog_cycles)
+void sp805_start(void *base, uint32_t wdog_cycles)
 {
 	/* Unlock to access the watchdog registers. */
 	sp805_write_wdog_lock(base, SP805_WDOG_UNLOCK_ACCESS);
@@ -50,7 +50,7 @@ static void sp805_wdog_start_(void *base, uint32_t wdog_cycles)
 	sp805_write_wdog_lock(base, 0x0);
 }
 
-static void sp805_wdog_stop_(void *base)
+void sp805_stop(void *base)
 {
 	/* Unlock to access the watchdog registers. */
 	sp805_write_wdog_lock(base, SP805_WDOG_UNLOCK_ACCESS);
@@ -62,7 +62,7 @@ static void sp805_wdog_stop_(void *base)
 	sp805_write_wdog_lock(base, 0x0);
 }
 
-static void sp805_wdog_refresh_(void *base)
+void sp805_refresh(void *base)
 {
 	/* Unlock to access the watchdog registers. */
 	sp805_write_wdog_lock(base, SP805_WDOG_UNLOCK_ACCESS);
@@ -75,19 +75,4 @@ static void sp805_wdog_refresh_(void *base)
 
 	/* Lock registers so that they can't be accidently overwritten. */
 	sp805_write_wdog_lock(base, 0x0);
-}
-
-void sp805_twdog_start(uint32_t wdog_cycles)
-{
-	sp805_wdog_start_((void *)SP805_TWDOG_BASE, wdog_cycles);
-}
-
-void sp805_twdog_stop(void)
-{
-	sp805_wdog_stop_((void *)SP805_TWDOG_BASE);
-}
-
-void sp805_twdog_refresh(void)
-{
-	sp805_wdog_refresh_((void *)SP805_TWDOG_BASE);
 }

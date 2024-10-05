@@ -8,18 +8,16 @@
 
 config("config") {
   include_dirs = [
-    "inc",
     "//test/inc",
     "//test/vmapi/common/arch/aarch64/inc",
   ]
 }
 
-source_set("twdog") {
+source_set("sp805") {
   testonly = true
   public_configs = [
     ":config",
     "//src/arch/aarch64:arch_config",
   ]
-  deps = [ "//test/vmapi/common/arch/aarch64/sp805:sp805" ]
-  sources = [ "twdog.c" ]
+  sources = [ "sp805.c" ]
 }

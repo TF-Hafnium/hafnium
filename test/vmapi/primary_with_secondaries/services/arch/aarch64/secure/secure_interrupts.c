@@ -19,6 +19,7 @@
 #include "test/hftest.h"
 #include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
+#include "twdog.h"
 
 #define PLAT_ARM_TWDOG_BASE 0x2a490000
 #define PLAT_ARM_TWDOG_SIZE 0x20000
@@ -76,7 +77,7 @@ static void irq_handler(void)
 		 * Clear the interrupt and stop the timer.
 		 */
 		HFTEST_LOG("Received Trusted WatchDog Interrupt: %u.", intid);
-		sp805_twdog_stop();
+		twdog_stop();
 
 		/* Perform secure interrupt de-activation. */
 		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
@@ -138,8 +139,8 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 
 	/* Start the secure Watchdog timer. */
 	HFTEST_LOG("Starting TWDOG: %u ms", delay);
-	sp805_twdog_refresh();
-	sp805_twdog_start((delay * ARM_SP805_TWDG_CLK_HZ) / 1000);
+	twdog_refresh();
+	twdog_start((delay * ARM_SP805_TWDG_CLK_HZ) / 1000);
 
 	/* Wait for the interrupt to trigger. */
 	sp_wait_loop(delay + 50);
