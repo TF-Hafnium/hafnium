@@ -71,11 +71,12 @@ void hf_ipi_send_interrupt(struct vm *vm, ffa_vcpu_index_t target_vcpu_index)
 
 /**
  * IPI IRQ specific handling for the secure interrupt for each vCPU state:
- *   - RUNNING: Continue secure interrupt handling as normal, injecting
- *   a virtual interrupt to the vCPU.
- *   - WAITING: Mark the IPI as complete from the SPMC perspective and
- *   trigger an SRI so the NWd can schedule to target vCPU to run.
- *   - Other states are not currently supported so exit the handler.
+ *   - WAITING: Trigger an SRI so the NWd can schedule to target vCPU to run.
+ *   - RUNNING:
+ *   - PREEMPTED/BLOCKED: Return and allow the normal secure interrupt handling
+ *   to handle the interrupt as usual.
+ * For all cases we must also mark the interrupt as complete from the
+ * SPMC perspective.
  * Returns True if the IPI SGI has been handled.
  * False if further secure interrupt handling is required.
  */
@@ -84,16 +85,21 @@ bool hf_ipi_handle(struct vcpu_locked target_vcpu_locked)
 	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
 
 	switch (target_vcpu->state) {
-	case VCPU_STATE_RUNNING:
-		return false;
 	case VCPU_STATE_WAITING:
 		plat_ffa_sri_trigger_not_delayed(target_vcpu->cpu);
 		return true;
+	case VCPU_STATE_RUNNING:
+	case VCPU_STATE_BLOCKED:
+	case VCPU_STATE_PREEMPTED:
+		/*
+		 * Let the normal secure interrupt handling handle the
+		 * interrupt as usual.
+		 */
+		return false;
 	default:
-		dlog_verbose(
-			"IPIs not currently supported for when the target_vcpu "
-			"is in the state %d\n",
-			target_vcpu->state);
+		dlog_error("Unexpected state: %u handling an IPI for [%x %u]",
+			   target_vcpu->state, target_vcpu->vm->id,
+			   vcpu_index(target_vcpu));
 		return true;
 	}
 }
