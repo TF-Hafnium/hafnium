@@ -112,7 +112,11 @@ TEST(ffa_notifications, signaling_from_sp_to_vm)
  */
 TEST(ffa_notifications, signaling_from_vm_to_sp)
 {
-	notif_signal_vm_to_sp(hf_vm_get_id(), SP_ID(1),
+	/*
+	 * This test can't communicate with SP_ID(1).
+	 * Target SP should be FF-A v1.1 or newer.
+	 */
+	notif_signal_vm_to_sp(hf_vm_get_id(), SP_ID(2),
 			      FFA_NOTIFICATION_MASK(35),
 			      FFA_NOTIFICATIONS_FLAG_DELAY_SRI);
 }

@@ -159,6 +159,8 @@ struct ffa_value plat_ffa_spmc_id_get(void)
 
 static void plat_ffa_vm_init(struct mpool *ppool)
 {
+	struct vm *other_world = vm_find(HF_OTHER_WORLD_ID);
+
 	/* Init NWd VMs structures for use of Notifications interfaces. */
 	for (uint32_t i = 0; i < nwd_vms_size; i++) {
 		/*
@@ -172,6 +174,9 @@ static void plat_ffa_vm_init(struct mpool *ppool)
 		nwd_vms[i].id = HF_INVALID_VM_ID;
 		nwd_vms[i].vcpu_count = MAX_CPUS;
 		vm_notifications_init(&nwd_vms[i], MAX_CPUS, ppool);
+
+		/* Give them the same version as the Hypervisor. */
+		nwd_vms[i].ffa_version = other_world->ffa_version;
 	}
 }
 
@@ -657,6 +662,22 @@ bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 	 * check if they are allowed to send indirect messages, but it's not a
 	 * security threat.
 	 */
+	if (sender_vm->ffa_version < FFA_VERSION_1_1) {
+		dlog_verbose(
+			"Sender %x FF-A version (%x) doesn't support Indirect "
+			"Message. FF-A v1.1 is needed.\n",
+			sender_vm->id, sender_vm->ffa_version);
+		return false;
+	}
+
+	if (receiver_vm->ffa_version < FFA_VERSION_1_1) {
+		dlog_verbose(
+			"Receiver %x FF-A version (%x) doesn't support "
+			"Indirect Message. FF-A v1.1 is needed.\n",
+			receiver_vm->id, receiver_vm->ffa_version);
+		return false;
+	}
+
 	if (vm_id_is_current_world(sender_vm->id)) {
 		if (!vm_supports_messaging_method(sender_vm,
 						  FFA_PARTITION_INDIRECT_MSG)) {

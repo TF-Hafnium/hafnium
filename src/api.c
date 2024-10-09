@@ -4192,6 +4192,14 @@ struct ffa_value api_ffa_notification_update_bindings(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	if (receiver_locked.vm->ffa_version < FFA_VERSION_1_1) {
+		dlog_verbose(
+			"%s: caller (%x) version should be GE to FF-A v1.1.\n",
+			__func__, receiver_locked.vm->id);
+		ret = ffa_error(FFA_NOT_SUPPORTED);
+		goto out;
+	}
+
 	if (!vm_locked_are_notifications_enabled(receiver_locked)) {
 		dlog_verbose("Notifications are not enabled.\n");
 		ret = ffa_error(FFA_NOT_SUPPORTED);
