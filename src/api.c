@@ -938,6 +938,7 @@ void api_regs_state_saved(struct vcpu *vcpu)
 	vcpu->regs_available = true;
 	sl_unlock(&vcpu->lock);
 }
+
 /**
  * Assuming that the arguments have already been checked by the caller, injects
  * a virtual interrupt of the given ID into the given target vCPU. This doesn't

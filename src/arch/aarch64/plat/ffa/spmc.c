@@ -732,27 +732,59 @@ struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
 	};
 }
 
+/**
+ * - A bind call cannot be from an SPMD logical partition or target an
+ * SPMD logical partition.
+ * - If bind call from SP, receiver's ID must be same as current VM ID.
+ * - If bind call from NWd, current VM ID must be same as Hypervisor ID,
+ * receiver's ID must be from NWd, and sender's ID from SWd.
+ */
 bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 					  ffa_id_t sender_id,
 					  ffa_id_t receiver_id)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
-	/**
-	 * SPMC:
-	 * - A bind call cannot be from an SPMD logical partition or target an
-	 * SPMD logical partition.
-	 * - If bind call from SP, receiver's ID must be same as current VM ID.
-	 * - If bind call from NWd, current VM ID must be same as Hypervisor ID,
-	 * receiver's ID must be from NWd, and sender's ID from SWd.
-	 */
-	return !plat_ffa_is_spmd_lp_id(sender_id) &&
-	       !plat_ffa_is_spmd_lp_id(receiver_id) &&
-	       sender_id != receiver_id &&
-	       (current_vm_id == receiver_id ||
-		(current_vm_id == HF_HYPERVISOR_VM_ID &&
-		 !vm_id_is_current_world(receiver_id) &&
-		 vm_id_is_current_world(sender_id)));
+	if (plat_ffa_is_spmd_lp_id(sender_id) ||
+	    plat_ffa_is_spmd_lp_id(receiver_id)) {
+		dlog_verbose(
+			"Notification bind: not permitted for logical SPs (%x "
+			"%x).\n",
+			sender_id, receiver_id);
+		return false;
+	}
+
+	if (sender_id == receiver_id) {
+		dlog_verbose(
+			"Notification set: sender can't target itself. (%x == "
+			"%x)\n",
+			sender_id, receiver_id);
+		return false;
+	}
+
+	/* Caller is an SP. */
+	if (vm_id_is_current_world(current_vm_id)) {
+		if (receiver_id != current_vm_id) {
+			dlog_verbose(
+				"Notification bind: caller (%x) must be the "
+				"receiver(%x).\n",
+				current_vm_id, receiver_id);
+			return false;
+		}
+	} else {
+		assert(current_vm_id == HF_HYPERVISOR_VM_ID);
+
+		if (!vm_id_is_current_world(sender_id) ||
+		    vm_id_is_current_world(receiver_id)) {
+			dlog_verbose(
+				"Notification bind: VM must specify itself as "
+				"receiver (%x), and SP as sender(%x).\n",
+				receiver_id, sender_id);
+			return false;
+		}
+	}
+
+	return true;
 }
 
 bool plat_ffa_notifications_update_bindings_forward(
@@ -769,28 +801,58 @@ bool plat_ffa_notifications_update_bindings_forward(
 
 	return false;
 }
-
+/*
+ * - A set call cannot be from an SPMD logical partition or target an
+ * SPMD logical partition.
+ * - If set call from SP, sender's ID must be the same as current.
+ * - If set call from NWd, current VM ID must be same as Hypervisor ID,
+ * and receiver must be an SP.
+ */
 bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 					ffa_id_t sender_id,
 					ffa_id_t receiver_id)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
-	/*
-	 * SPMC:
-	 * - A set call cannot be from an SPMD logical partition or target an
-	 * SPMD logical partition.
-	 * - If set call from SP, sender's ID must be the same as current.
-	 * - If set call from NWd, current VM ID must be same as Hypervisor ID,
-	 * and receiver must be an SP.
-	 */
-	return !plat_ffa_is_spmd_lp_id(sender_id) &&
-	       !plat_ffa_is_spmd_lp_id(receiver_id) &&
-	       sender_id != receiver_id &&
-	       (sender_id == current_vm_id ||
-		(current_vm_id == HF_HYPERVISOR_VM_ID &&
-		 !vm_id_is_current_world(sender_id) &&
-		 vm_id_is_current_world(receiver_id)));
+	if (plat_ffa_is_spmd_lp_id(sender_id) ||
+	    plat_ffa_is_spmd_lp_id(receiver_id)) {
+		dlog_verbose(
+			"Notification set: not permitted for logical SPs (%x "
+			"%x).\n",
+			sender_id, receiver_id);
+		return false;
+	}
+
+	if (sender_id == receiver_id) {
+		dlog_verbose(
+			"Notification set: sender can't target itself. (%x == "
+			"%x)\n",
+			sender_id, receiver_id);
+		return false;
+	}
+
+	if (vm_id_is_current_world(current_vm_id)) {
+		if (sender_id != current_vm_id) {
+			dlog_verbose(
+				"Notification set: caller (%x) must be the "
+				"sender(%x).\n",
+				current_vm_id, sender_id);
+			return false;
+		}
+	} else {
+		assert(current_vm_id == HF_HYPERVISOR_VM_ID);
+
+		if (vm_id_is_current_world(sender_id) ||
+		    !vm_id_is_current_world(receiver_id)) {
+			dlog_verbose(
+				"Notification set: sender (%x) must be a VM "
+				"and receiver (%x) an SP.\n",
+				sender_id, receiver_id);
+			return false;
+		}
+	}
+
+	return true;
 }
 
 bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
