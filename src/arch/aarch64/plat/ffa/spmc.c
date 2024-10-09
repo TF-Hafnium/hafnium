@@ -36,33 +36,6 @@
 /** Interrupt priority for the Schedule Receiver Interrupt. */
 #define SRI_PRIORITY 0x10U
 
-/** Encapsulates `sri_state` while the `sri_state_lock` is held. */
-struct sri_state_locked {
-	enum plat_ffa_sri_state *sri_state;
-};
-
-/** To globally keep track of the SRI handling. */
-static enum plat_ffa_sri_state sri_state = HANDLED;
-
-/** Lock to guard access to `sri_state`. */
-static struct spinlock sri_state_lock_instance = SPINLOCK_INIT;
-
-/** Locks `sri_state` guarding lock. */
-static struct sri_state_locked sri_state_lock(void)
-{
-	sl_lock(&sri_state_lock_instance);
-
-	return (struct sri_state_locked){.sri_state = &sri_state};
-}
-
-/** Unlocks `sri_state` guarding lock. */
-void sri_state_unlock(struct sri_state_locked sri_state_locked)
-{
-	assert(sri_state_locked.sri_state == &sri_state);
-	sri_state_locked.sri_state = NULL;
-	sl_unlock(&sri_state_lock_instance);
-}
-
 /**
  * The SPMC needs to keep track of some information about NWd VMs.
  * For the time being, only the notifications state structures.
@@ -1893,39 +1866,6 @@ static struct ffa_value plat_ffa_preempted_vcpu_resume(
 	return ffa_ret;
 }
 
-static void sri_state_set(struct sri_state_locked sri_state_locked,
-			  enum plat_ffa_sri_state state)
-{
-	assert(sri_state_locked.sri_state != NULL &&
-	       sri_state_locked.sri_state == &sri_state);
-
-	switch (*(sri_state_locked.sri_state)) {
-	case TRIGGERED:
-		/*
-		 * If flag to delay SRI is set, and SRI hasn't been
-		 * triggered state to delayed such that it is triggered
-		 * at context switch to the receiver scheduler.
-		 */
-		if (state == DELAYED) {
-			break;
-		}
-	case HANDLED:
-	case DELAYED:
-		*(sri_state_locked.sri_state) = state;
-		break;
-	default:
-		panic("Invalid SRI state\n");
-	}
-}
-
-void plat_ffa_sri_state_set(enum plat_ffa_sri_state state)
-{
-	struct sri_state_locked sri_state_locked = sri_state_lock();
-
-	sri_state_set(sri_state_locked, state);
-	sri_state_unlock(sri_state_locked);
-}
-
 static void plat_ffa_send_schedule_receiver_interrupt(struct cpu *cpu)
 {
 	dlog_verbose("Setting Schedule Receiver SGI %u on core: %zu\n",
@@ -1934,32 +1874,41 @@ static void plat_ffa_send_schedule_receiver_interrupt(struct cpu *cpu)
 	plat_interrupts_send_sgi(HF_SCHEDULE_RECEIVER_INTID, cpu, false);
 }
 
+static void plat_ffa_sri_set_delayed_internal(struct cpu *cpu, bool delayed)
+{
+	assert(cpu != NULL);
+	cpu->is_sri_delayed = delayed;
+}
+
+void plat_ffa_sri_set_delayed(struct cpu *cpu)
+{
+	plat_ffa_sri_set_delayed_internal(cpu, true);
+}
+
+static bool plat_ffa_is_sri_delayed(struct cpu *cpu)
+{
+	assert(cpu != NULL);
+	return cpu->is_sri_delayed;
+}
+
 void plat_ffa_sri_trigger_if_delayed(struct cpu *cpu)
 {
-	struct sri_state_locked sri_state_locked = sri_state_lock();
+	assert(cpu != NULL);
 
-	if (*(sri_state_locked.sri_state) == DELAYED) {
+	if (plat_ffa_is_sri_delayed(cpu)) {
 		plat_ffa_send_schedule_receiver_interrupt(cpu);
-		sri_state_set(sri_state_locked, TRIGGERED);
+		plat_ffa_sri_set_delayed_internal(cpu, false);
 	}
-
-	sri_state_unlock(sri_state_locked);
 }
 
 void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
 {
-	struct sri_state_locked sri_state_locked = sri_state_lock();
-
-	if (*(sri_state_locked.sri_state) == HANDLED) {
-		/*
-		 * If flag to delay SRI isn't set, trigger SRI such that the
-		 * receiver scheduler is aware there are pending notifications.
-		 */
-		plat_ffa_send_schedule_receiver_interrupt(cpu);
-		sri_state_set(sri_state_locked, TRIGGERED);
-	}
-
-	sri_state_unlock(sri_state_locked);
+	/*
+	 * If flag to delay SRI isn't set, trigger SRI such that the
+	 * receiver scheduler is aware there are pending notifications.
+	 */
+	plat_ffa_send_schedule_receiver_interrupt(cpu);
+	plat_ffa_sri_set_delayed_internal(cpu, false);
 }
 
 void plat_ffa_sri_init(struct cpu *cpu)

@@ -28,6 +28,9 @@ struct cpu {
 
 	/** Determines whether the CPU is currently on. */
 	bool is_on;
+
+	/* In case there is a pending SRI for the NWd. */
+	bool is_sri_delayed;
 };
 
 void cpu_module_init(const cpu_id_t *cpu_ids, size_t count);

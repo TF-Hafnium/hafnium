@@ -2138,7 +2138,7 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 				     vcpu_index(current));
 			plat_ffa_sri_trigger_not_delayed(current->cpu);
 		} else {
-			plat_ffa_sri_state_set(DELAYED);
+			plat_ffa_sri_set_delayed(current->cpu);
 		}
 	}
 
@@ -4426,7 +4426,7 @@ struct ffa_value api_ffa_notification_set(
 			     vcpu_index(current));
 		plat_ffa_sri_trigger_not_delayed(current->cpu);
 	} else {
-		plat_ffa_sri_state_set(DELAYED);
+		plat_ffa_sri_set_delayed(current->cpu);
 	}
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
@@ -4536,14 +4536,6 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 
 	ret = api_ffa_notification_get_success_return(
 		sp_notifications, vm_notifications, framework_notifications);
-
-	/*
-	 * If there are no more pending notifications, change `sri_state` to
-	 * handled.
-	 */
-	if (vm_is_notifications_pending_count_zero()) {
-		plat_ffa_sri_state_set(HANDLED);
-	}
 
 	if (!receiver_locked.vm->el0_partition &&
 	    !vm_are_global_notifications_pending(receiver_locked)) {
@@ -4662,8 +4654,6 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 		result = api_ffa_notification_info_get_success_return(
 			ids, ids_count, lists_sizes, lists_count);
 	}
-
-	plat_ffa_sri_state_set(HANDLED);
 
 	return result;
 }

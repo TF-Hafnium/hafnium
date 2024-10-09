@@ -846,11 +846,6 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	CHECK(false);
 }
 
-void plat_ffa_sri_state_set(enum plat_ffa_sri_state state)
-{
-	(void)state;
-}
-
 /**
  * An Hypervisor should send the SRI to the Primary Endpoint. Not implemented
  * as Hypervisor is only interesting for us for the sake of having a test
@@ -863,6 +858,15 @@ void plat_ffa_sri_trigger_if_delayed(struct cpu *cpu)
 }
 
 void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
+{
+	(void)cpu;
+}
+
+/**
+ * Track that in current CPU there was a notification set with delay SRI
+ * flag.
+ */
+void plat_ffa_sri_set_delayed(struct cpu *cpu)
 {
 	(void)cpu;
 }
