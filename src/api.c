@@ -470,16 +470,36 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 				  .arg3 = partition_info_size};
 }
 
+/**
+ * Set properties accoridng to the version of the partition, and the FF-A
+ * features it supports.
+ */
+static ffa_partition_properties_t api_ffa_partitions_info_get_properties(
+	ffa_id_t caller_id, struct vm *vm)
+{
+	ffa_partition_properties_t properties;
+
+	properties = plat_ffa_partition_properties(caller_id, vm);
+	properties |= FFA_PARTITION_AARCH64_EXEC;
+
+	if (vm->ffa_version >= FFA_VERSION_1_1) {
+		properties |= vm_are_notifications_enabled(vm)
+				      ? FFA_PARTITION_NOTIFICATION
+				      : 0;
+		properties |= vm->messaging_method & FFA_PARTITION_INDIRECT_MSG;
+	}
+
+	return properties;
+}
+
 static void api_ffa_fill_partition_info(
-	struct ffa_partition_info *out_partition, struct vm *vm, ffa_id_t vm_id)
+	struct ffa_partition_info *out_partition, struct vm *vm,
+	ffa_id_t caller_id)
 {
 	out_partition->vm_id = vm->id;
 	out_partition->vcpu_count = vm->vcpu_count;
-	out_partition->properties = plat_ffa_partition_properties(vm_id, vm);
-	out_partition->properties |= vm_are_notifications_enabled(vm)
-					     ? FFA_PARTITION_NOTIFICATION
-					     : 0;
-	out_partition->properties |= FFA_PARTITION_AARCH64_EXEC;
+	out_partition->properties =
+		api_ffa_partitions_info_get_properties(caller_id, vm);
 }
 
 /**
@@ -491,7 +511,8 @@ static void api_ffa_fill_partition_info(
  */
 static ffa_vm_count_t api_ffa_fill_partitions_info_array(
 	struct ffa_partition_info out_partitions[], size_t out_partitions_len,
-	const struct ffa_uuid *uuid_to_find, bool count_flag, ffa_id_t vm_id)
+	const struct ffa_uuid *uuid_to_find, bool count_flag,
+	ffa_id_t caller_id)
 {
 	ffa_vm_count_t vms_found = 0;
 	bool match_any = ffa_uuid_is_null(uuid_to_find);
@@ -527,7 +548,7 @@ static ffa_vm_count_t api_ffa_fill_partitions_info_array(
 				}
 
 				api_ffa_fill_partition_info(out_partition, vm,
-							    vm_id);
+							    caller_id);
 				if (match_any) {
 					out_partition->uuid = uuid;
 				}

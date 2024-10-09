@@ -114,7 +114,7 @@ uint32_t plat_ffa_other_world_mode(void);
  * Return the FF-A partition info VM/SP properties given the VM id.
  */
 ffa_partition_properties_t plat_ffa_partition_properties(
-	ffa_id_t vm_id, const struct vm *target);
+	ffa_id_t caller_id, const struct vm *target);
 
 /**
  * Get NWd VM's structure.

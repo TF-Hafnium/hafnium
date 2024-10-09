@@ -855,19 +855,33 @@ uint32_t plat_ffa_other_world_mode(void)
 }
 
 ffa_partition_properties_t plat_ffa_partition_properties(
-	ffa_id_t vm_id, const struct vm *target)
+	ffa_id_t caller_id, const struct vm *target)
 {
 	ffa_partition_properties_t result = target->messaging_method;
+	bool is_ffa_version_ge_v1_2 = (target->ffa_version >= FFA_VERSION_1_2);
+	ffa_partition_properties_t final_mask;
+	ffa_partition_properties_t dir_msg_mask = FFA_PARTITION_DIRECT_REQ_RECV;
+	ffa_partition_properties_t dir_msg2_mask =
+		FFA_PARTITION_DIRECT_REQ2_RECV;
+
 	/*
 	 * SPs support full direct messaging communication with other SPs,
 	 * and are allowed to only receive direct requests from the other world.
 	 * SPs cannot send direct requests to the other world.
+	 *
+	 * If caller is an SP, advertise that target can send messages.
+	 * If caller is a VM, advertise that target can't send messages.
 	 */
-	if (vm_id_is_current_world(vm_id)) {
-		return result & (FFA_PARTITION_DIRECT_REQ_RECV |
-				 FFA_PARTITION_DIRECT_REQ_SEND);
+	if (vm_id_is_current_world(caller_id)) {
+		dir_msg_mask |= FFA_PARTITION_DIRECT_REQ_SEND;
+		dir_msg2_mask |= FFA_PARTITION_DIRECT_REQ2_SEND;
 	}
-	return result & FFA_PARTITION_DIRECT_REQ_RECV;
+
+	/* Consider dir_msg2_mask if FFA_VERSION is 1.2 or above. */
+	final_mask = is_ffa_version_ge_v1_2 ? (dir_msg2_mask | dir_msg_mask)
+					    : dir_msg_mask;
+
+	return result & final_mask;
 }
 
 bool plat_ffa_vm_managed_exit_supported(struct vm *vm)

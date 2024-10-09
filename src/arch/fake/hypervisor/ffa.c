@@ -181,9 +181,9 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 }
 
 ffa_partition_properties_t plat_ffa_partition_properties(
-	ffa_id_t vm_id, const struct vm *target)
+	ffa_id_t caller_id, const struct vm *target)
 {
-	(void)vm_id;
+	(void)caller_id;
 	(void)target;
 	return 0;
 }
