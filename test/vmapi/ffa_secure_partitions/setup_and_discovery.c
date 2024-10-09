@@ -44,8 +44,7 @@ static void check_v1_1_partition_info_descriptors(
 	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[1].uuid, &uuid));
 	EXPECT_EQ(partitions[1].properties,
-		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
-			  FFA_PARTITION_DIRECT_REQ_RECV);
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_DIRECT_REQ_RECV);
 
 	/* Expect a secondary SP as third partition. */
 	EXPECT_EQ(partitions[2].vm_id, SP_ID(2));
@@ -55,7 +54,9 @@ static void check_v1_1_partition_info_descriptors(
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[2].uuid, &uuid));
 	EXPECT_EQ(partitions[2].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
-			  FFA_PARTITION_DIRECT_REQ_RECV);
+			  FFA_PARTITION_DIRECT_REQ_RECV |
+			  FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_DIRECT_REQ2_RECV);
 
 	/* Expect a tertiary SP as fourth partition. */
 	EXPECT_EQ(partitions[3].vm_id, SP_ID(3));
@@ -64,7 +65,8 @@ static void check_v1_1_partition_info_descriptors(
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[3].uuid, &uuid));
 	EXPECT_EQ(partitions[3].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
-			  FFA_PARTITION_DIRECT_REQ_RECV);
+			  FFA_PARTITION_DIRECT_REQ_RECV |
+			  FFA_PARTITION_INDIRECT_MSG);
 }
 
 TEST(ffa, ffa_partition_info_get_regs_sp_test)
@@ -230,7 +232,9 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 		    partitions[0].vcpu_count == 1);
 	EXPECT_EQ(partitions[0].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
-			  FFA_PARTITION_DIRECT_REQ_RECV);
+			  FFA_PARTITION_DIRECT_REQ_RECV |
+			  FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_DIRECT_REQ2_RECV);
 
 	/*
 	 * If a uuid is specified (not null) ensure the uuid returned in the
@@ -298,7 +302,7 @@ TEST(ffa, ffa_partition_info_get_v1_0_descriptors)
 	EXPECT_TRUE(partitions_v1_0[0].vcpu_count == 8 ||
 		    partitions_v1_0[0].vcpu_count == 1);
 	EXPECT_EQ(partitions_v1_0[0].properties,
-		  FFA_PARTITION_INDIRECT_MSG | FFA_PARTITION_DIRECT_REQ_SEND);
+		  FFA_PARTITION_DIRECT_REQ_SEND | FFA_PARTITION_INDIRECT_MSG);
 	EXPECT_EQ(partitions_v1_0[0].properties & FFA_PARTITION_v1_0_RES_MASK,
 		  0);
 
@@ -313,14 +317,16 @@ TEST(ffa, ffa_partition_info_get_v1_0_descriptors)
 	EXPECT_EQ(partitions_v1_0[2].vm_id, SP_ID(2));
 	EXPECT_TRUE(partitions_v1_0[2].vcpu_count == 8 ||
 		    partitions_v1_0[2].vcpu_count == 1);
-	EXPECT_EQ(partitions_v1_0[2].properties, FFA_PARTITION_DIRECT_REQ_RECV);
+	EXPECT_EQ(partitions_v1_0[2].properties,
+		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_INDIRECT_MSG);
 	EXPECT_EQ(partitions_v1_0[2].properties & FFA_PARTITION_v1_0_RES_MASK,
 		  0);
 
 	/* Expect a tertiary SP as fourth partition. */
 	EXPECT_EQ(partitions_v1_0[3].vm_id, SP_ID(3));
 	EXPECT_EQ(partitions_v1_0[3].vcpu_count, 8);
-	EXPECT_EQ(partitions_v1_0[3].properties, FFA_PARTITION_DIRECT_REQ_RECV);
+	EXPECT_EQ(partitions_v1_0[3].properties,
+		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_INDIRECT_MSG);
 	EXPECT_EQ(partitions_v1_0[3].properties & FFA_PARTITION_v1_0_RES_MASK,
 		  0);
 

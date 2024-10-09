@@ -56,8 +56,7 @@ static void sp_check_partition_info_get_regs_null_uuid(void)
 	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[0].uuid, &uuid));
 	EXPECT_EQ(partitions[0].properties,
-		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
-			  FFA_PARTITION_DIRECT_REQ_RECV |
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_DIRECT_REQ_RECV |
 			  FFA_PARTITION_DIRECT_REQ_SEND);
 
 	EXPECT_EQ(partitions[1].vm_id, SP_ID(2));
@@ -67,8 +66,11 @@ static void sp_check_partition_info_get_regs_null_uuid(void)
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[1].uuid, &uuid));
 	EXPECT_EQ(partitions[1].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_INDIRECT_MSG |
 			  FFA_PARTITION_DIRECT_REQ_RECV |
-			  FFA_PARTITION_DIRECT_REQ_SEND);
+			  FFA_PARTITION_DIRECT_REQ_SEND |
+			  FFA_PARTITION_DIRECT_REQ2_RECV |
+			  FFA_PARTITION_DIRECT_REQ2_SEND);
 
 	EXPECT_EQ(partitions[2].vm_id, SP_ID(3));
 	EXPECT_EQ(partitions[2].vcpu_count, 8);
@@ -76,6 +78,7 @@ static void sp_check_partition_info_get_regs_null_uuid(void)
 	EXPECT_TRUE(ffa_uuid_equal(&partitions[2].uuid, &uuid));
 	EXPECT_EQ(partitions[2].properties,
 		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_INDIRECT_MSG |
 			  FFA_PARTITION_DIRECT_REQ_RECV |
 			  FFA_PARTITION_DIRECT_REQ_SEND);
 }
@@ -116,7 +119,6 @@ static void sp_check_partition_info_get_regs_uuid(void)
 	ffa_uuid_init(0, 0, 0, 0, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions.uuid, &uuid));
 	EXPECT_EQ(partitions.properties, FFA_PARTITION_AARCH64_EXEC |
-						 FFA_PARTITION_NOTIFICATION |
 						 FFA_PARTITION_DIRECT_REQ_RECV |
 						 FFA_PARTITION_DIRECT_REQ_SEND);
 }
@@ -204,10 +206,13 @@ static void sp_check_partition_info_get_regs_start_idx(void)
 	EXPECT_TRUE(partitions.vcpu_count == 8 || partitions.vcpu_count == 1);
 	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partitions.uuid, &uuid));
-	EXPECT_EQ(partitions.properties, FFA_PARTITION_AARCH64_EXEC |
-						 FFA_PARTITION_NOTIFICATION |
-						 FFA_PARTITION_DIRECT_REQ_RECV |
-						 FFA_PARTITION_DIRECT_REQ_SEND);
+	EXPECT_EQ(partitions.properties,
+		  FFA_PARTITION_AARCH64_EXEC | FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_DIRECT_REQ_RECV |
+			  FFA_PARTITION_DIRECT_REQ_SEND |
+			  FFA_PARTITION_DIRECT_REQ2_RECV |
+			  FFA_PARTITION_DIRECT_REQ2_SEND);
 }
 
 struct ffa_value sp_check_partition_info_get_regs_cmd(ffa_id_t test_source)
