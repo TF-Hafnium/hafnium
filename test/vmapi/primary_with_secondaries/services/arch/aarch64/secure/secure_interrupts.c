@@ -360,3 +360,38 @@ TEST_SERVICE(set_ipi_ready)
 
 	FAIL("Do not expect getting to this point.\n");
 }
+
+TEST_SERVICE(receive_ipi_preempted)
+{
+	struct ffa_value ret;
+
+	hftest_ipi_init_state_default();
+
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	/* Enable the inter-processor interrupt */
+	EXPECT_EQ(hf_interrupt_enable(HF_IPI_INTID, true, INTERRUPT_TYPE_IRQ),
+		  0);
+
+	/* Yield such that 'send_ipi' can be spawn. */
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
+					   SERVICE_SEND_BUFFER());
+
+	dlog_verbose("Setup the IPI state.");
+
+	ffa_yield();
+
+	dlog_verbose("Waiting for the IPI. Should be preempted before.\n");
+
+	/* Waiting for irq_handler to handle IPI. */
+	while (!hftest_ipi_state_is(HANDLED)) {
+	}
+
+	hftest_ipi_state_set(READY);
+
+	ffa_yield();
+}
