@@ -361,7 +361,7 @@ TEST_SERVICE(set_ipi_ready)
 	FAIL("Do not expect getting to this point.\n");
 }
 
-TEST_SERVICE(receive_ipi_preempted)
+TEST_SERVICE(receive_ipi_preempted_or_blocked)
 {
 	struct ffa_value ret;
 

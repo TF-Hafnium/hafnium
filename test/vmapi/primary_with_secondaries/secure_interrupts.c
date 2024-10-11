@@ -499,7 +499,8 @@ TEST_PRECONDITION(ipi, receive_ipi_preempted_vcpu, service1_is_mp_sp)
 	/* Initialize semaphores to sync primary and secondary cores. */
 	semaphore_init(&vcpu1_args.work_done);
 
-	SERVICE_SELECT(service1_info->vm_id, "receive_ipi_preempted", mb.send);
+	SERVICE_SELECT(service1_info->vm_id, "receive_ipi_preempted_or_blocked",
+		       mb.send);
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
 
 	/* Setting buffer to control the IPI state. */
@@ -534,6 +535,75 @@ TEST_PRECONDITION(ipi, receive_ipi_preempted_vcpu, service1_is_mp_sp)
 
 	/*
 	 * The target vCPU should be in preempted state at this stage.
+	 * As such, signal the state machine that the "send_ipi" service
+	 * can invoke the 'hf_interrupt_send_ipi' interface.
+	 */
+	hftest_ipi_state_set(READY);
+
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Wait for secondary core to return before finishing the test. */
+	semaphore_wait(&vcpu1_args.work_done);
+}
+
+/**
+ * Test that Service1 can send IPI to vCPU0 from vCPU1, whilst vCPU0 is in
+ * blocked state.
+ *
+ * Test Sequence:
+ * - Bootstrap vCPU0 and share memory with it to instanciate the IPI state.
+ * - After setting the IPI state, Service1 should use FFA_YIELD to relinquish
+ *   cycles back to the normal world. This should leave the vCPU0 in blocked
+ *   state.
+ * - Start CPU1 and within it, invoke test service's vCPU1 to send IPI to vCPU0.
+ *   Test service waits for state machine to transition into READY state.
+ * - PVM sets IPI state to READY, and resumes service1 vCPU0 to handle the
+ *   IPI.
+ * - Service1 vCPU0 is resumed to handle the IPI virtual interrupt.
+ *   It should attest state transitions into HANDLED from the interrupt handler.
+ */
+TEST_PRECONDITION(ipi, receive_ipi_blocked_vcpu, service1_is_mp_sp)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ipi_cpu_entry_args vcpu1_args = {
+		.service_id = service1_info->vm_id,
+		.vcpu_count = service1_info->vcpu_count,
+		.vcpu_id = 1,
+		.target_vcpu_id = 0,
+		.mb = mb};
+	ffa_id_t memory_receivers[] = {
+		service1_info->vm_id,
+	};
+
+	/* Initialize semaphores to sync primary and secondary cores. */
+	semaphore_init(&vcpu1_args.work_done);
+
+	SERVICE_SELECT(service1_info->vm_id, "receive_ipi_preempted_or_blocked",
+		       mb.send);
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
+
+	/* Setting buffer to control the IPI state. */
+	hftest_ipi_state_share_page_and_init(
+		(uint64_t)ipi_state_page, memory_receivers,
+		ARRAY_SIZE(memory_receivers), mb.send);
+
+	/* Service1 to setup the IPI state. */
+	ret = ffa_run(service1_info->vm_id, 0);
+
+	/* Service1 left in blocked state in vCPU0. */
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Bring-up the core that sends the IPI. */
+	ASSERT_TRUE(hftest_cpu_start(
+		hftest_get_cpu_id(vcpu1_args.vcpu_id),
+		hftest_get_secondary_ec_stack(vcpu1_args.vcpu_id),
+		cpu_entry_send_ipi, (uintptr_t)&vcpu1_args));
+
+	/*
+	 * The target vCPU should be in blocked state at this stage.
 	 * As such, signal the state machine that the "send_ipi" service
 	 * can invoke the 'hf_interrupt_send_ipi' interface.
 	 */
