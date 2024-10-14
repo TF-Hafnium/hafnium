@@ -1076,12 +1076,7 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 	}
 
 	switch (args.func) {
-#if SECURE_WORLD == 0
-	case HF_INTERRUPT_INJECT:
-		vcpu->regs.r[0] = api_interrupt_inject(args.arg1, args.arg2,
-						       args.arg3, vcpu, &next);
-		break;
-#else
+#if SECURE_WORLD == 1
 	case HF_INTERRUPT_DEACTIVATE:
 		vcpu->regs.r[0] = plat_ffa_interrupt_deactivate(
 			args.arg1, args.arg2, vcpu);

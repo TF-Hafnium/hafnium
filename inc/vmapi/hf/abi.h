@@ -17,7 +17,6 @@
 /* TODO: Define constants below according to spec. */
 #define HF_INTERRUPT_ENABLE            0xff03
 #define HF_INTERRUPT_GET               0xff04
-#define HF_INTERRUPT_INJECT            0xff05
 #define HF_INTERRUPT_DEACTIVATE	       0xff08
 #define HF_INTERRUPT_RECONFIGURE       0xff09
 
