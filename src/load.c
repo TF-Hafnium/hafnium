@@ -133,25 +133,23 @@ static void infer_interrupt(struct interrupt_info interrupt,
 {
 	uint32_t attr = interrupt.attributes;
 
-	interrupt_desc_set_id(int_desc, interrupt.id);
-	interrupt_desc_set_priority(int_desc,
-				    (attr >> INT_DESC_PRIORITY_SHIFT) & 0xff);
+	int_desc->interrupt_id = interrupt.id;
+	int_desc->priority = (attr >> INT_INFO_ATTR_PRIORITY_SHIFT) & 0xff;
 
-	/* Refer to the comments in interrupt_descriptor struct definition. */
-	interrupt_desc_set_type_config_sec_state(
-		int_desc,
-		(((attr >> INT_DESC_TYPE_SHIFT) & 0x3) << 2) |
-			(((attr >> INT_DESC_CONFIG_SHIFT) & 0x1) << 1) |
-			((attr >> INT_DESC_SEC_STATE_SHIFT) & 0x1));
+	int_desc->type = (attr >> INT_INFO_ATTR_TYPE_SHIFT) & 0x3;
+	int_desc->config = (attr >> INT_INFO_ATTR_CONFIG_SHIFT) & 0x1;
+	int_desc->sec_state = (attr >> INT_INFO_ATTR_SEC_STATE_SHIFT) & 0x1;
 
 	if (interrupt.mpidr_valid) {
-		interrupt_desc_set_mpidr(int_desc, interrupt.mpidr);
+		int_desc->mpidr_valid = true;
+		int_desc->mpidr = interrupt.mpidr;
 	} else {
-		interrupt_desc_set_mpidr_invalid(int_desc);
+		int_desc->mpidr_valid = false;
+		int_desc->mpidr = 0;
 	}
 
-	interrupt_desc_set_valid(int_desc, true);
-	interrupt_desc_set_enabled(int_desc, true);
+	int_desc->valid = true;
+	int_desc->enabled = true;
 }
 
 /**

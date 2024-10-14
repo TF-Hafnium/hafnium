@@ -1026,7 +1026,8 @@ struct interrupt_descriptor *vm_interrupt_set_target_mpidr(
 	int_desc = vm_find_interrupt_descriptor(vm_locked, id);
 
 	if (int_desc != NULL) {
-		interrupt_desc_set_mpidr(int_desc, target_mpidr);
+		int_desc->mpidr_valid = true;
+		int_desc->mpidr = target_mpidr;
 	}
 
 	return int_desc;
@@ -1044,7 +1045,7 @@ struct interrupt_descriptor *vm_interrupt_set_sec_state(
 	int_desc = vm_find_interrupt_descriptor(vm_locked, id);
 
 	if (int_desc != NULL) {
-		interrupt_desc_set_sec_state(int_desc, sec_state);
+		int_desc->sec_state = sec_state;
 	}
 
 	return int_desc;
@@ -1061,7 +1062,7 @@ struct interrupt_descriptor *vm_interrupt_set_enable(struct vm_locked vm_locked,
 	int_desc = vm_find_interrupt_descriptor(vm_locked, id);
 
 	if (int_desc != NULL) {
-		interrupt_desc_set_enabled(int_desc, enable);
+		int_desc->enabled = enable;
 	}
 
 	return int_desc;

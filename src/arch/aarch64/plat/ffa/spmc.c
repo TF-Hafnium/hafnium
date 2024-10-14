@@ -2009,18 +2009,17 @@ void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
 
 void plat_ffa_sri_init(struct cpu *cpu)
 {
-	struct interrupt_descriptor sri_desc = {0};
+	/* Configure as Non Secure SGI. */
+	struct interrupt_descriptor sri_desc = {
+		.interrupt_id = HF_SCHEDULE_RECEIVER_INTID,
+		.type = INT_DESC_TYPE_SGI,
+		.sec_state = INT_DESC_SEC_STATE_NS,
+		.priority = SRI_PRIORITY,
+		.valid = true,
+	};
 
 	/* TODO: when supported, make the interrupt driver use cpu structure. */
 	(void)cpu;
-
-	interrupt_desc_set_id(&sri_desc, HF_SCHEDULE_RECEIVER_INTID);
-	interrupt_desc_set_priority(&sri_desc, SRI_PRIORITY);
-	interrupt_desc_set_valid(&sri_desc, true);
-
-	/* Configure Interrupt as Non-Secure. */
-	interrupt_desc_set_type_config_sec_state(&sri_desc,
-						 INT_DESC_TYPE_SGI << 2);
 
 	plat_interrupts_configure_interrupt(sri_desc);
 }
@@ -2629,7 +2628,7 @@ void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 			int_desc = vm_locked.vm->interrupt_desc[k];
 
 			/* Interrupt descriptors are populated contiguously. */
-			if (!interrupt_desc_get_valid(int_desc)) {
+			if (!int_desc.valid) {
 				break;
 			}
 			vcpu_virt_interrupt_set_enabled(interrupts,
@@ -2859,7 +2858,8 @@ int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
 		break;
 	case INT_RECONFIGURE_SEC_STATE:
 		/* Specify the new security state of the interrupt. */
-		if (value != INT_SEC_STATE_NS && value != INT_SEC_STATE_S) {
+		if (value != INT_DESC_SEC_STATE_NS &&
+		    value != INT_DESC_SEC_STATE_S) {
 			dlog_verbose(
 				"Illegal value %x specified while "
 				"reconfiguring interrupt %x\n",

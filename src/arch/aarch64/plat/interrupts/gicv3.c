@@ -724,23 +724,22 @@ void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 {
 	uint32_t core_idx = arch_find_core_pos();
 	uint32_t config = GIC_INTR_CFG_LEVEL;
-	uint32_t intr_num = interrupt_desc_get_id(int_desc);
+	uint32_t intr_num = int_desc.interrupt_id;
 
 	CHECK(core_idx < MAX_CPUS);
 	CHECK(IS_SGI_PPI(intr_num) || IS_SPI(intr_num));
 
 	/* Configure the interrupt as either G1S or G1NS. */
-	if (interrupt_desc_get_sec_state(int_desc) != 0) {
+	if (int_desc.sec_state != 0) {
 		gicv3_set_interrupt_type(intr_num, core_idx, INTR_GROUP1S);
 	} else {
 		gicv3_set_interrupt_type(intr_num, core_idx, INTR_GROUP1NS);
 	}
 
 	/* Program the interrupt priority. */
-	gicv3_set_interrupt_priority(intr_num, core_idx,
-				     interrupt_desc_get_priority(int_desc));
+	gicv3_set_interrupt_priority(intr_num, core_idx, int_desc.priority);
 
-	if (interrupt_desc_get_config(int_desc) == 0) {
+	if (int_desc.config == 0) {
 		/* Interrupt is edge-triggered. */
 		config = GIC_INTR_CFG_EDGE;
 	}
@@ -763,10 +762,9 @@ void plat_interrupts_configure_interrupt(struct interrupt_descriptor int_desc)
 	if (IS_SPI(intr_num)) {
 		uint64_t gic_affinity_val;
 
-		if (interrupt_desc_get_mpidr_valid(int_desc)) {
+		if (int_desc.mpidr_valid) {
 			gic_affinity_val = gicd_irouter_val_from_mpidr(
-				interrupt_desc_get_mpidr(int_desc),
-				GICV3_IRM_PE);
+				int_desc.mpidr, GICV3_IRM_PE);
 		} else {
 			gic_affinity_val = gicd_irouter_val_from_mpidr(
 				read_msr(MPIDR_EL1), 0U);
@@ -794,8 +792,7 @@ void plat_interrupts_reconfigure_interrupt(struct interrupt_descriptor int_desc)
 {
 	assert(int_desc.valid);
 
-	gicv3_disable_interrupt(interrupt_desc_get_id(int_desc),
-				arch_find_core_pos());
+	gicv3_disable_interrupt(int_desc.interrupt_id, arch_find_core_pos());
 
 	/*
 	 * Interrupt already disabled above. Proceed to (re)configure the

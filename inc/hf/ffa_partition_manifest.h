@@ -93,6 +93,21 @@ struct memory_region {
 	uint32_t dma_access_permissions;
 };
 
+/**
+ * Interrupts attibutes encoding in the manifest:
+ * Field                Bit(s)
+ * ---------------------------
+ * Priority             7:0
+ * Security_State       8
+ * Config(Edge/Level)   9
+ * Type(SPI/PPI/SGI)    11:10
+ * Reserved             31:12
+ */
+#define INT_INFO_ATTR_PRIORITY_SHIFT 0
+#define INT_INFO_ATTR_SEC_STATE_SHIFT 8
+#define INT_INFO_ATTR_CONFIG_SHIFT 9
+#define INT_INFO_ATTR_TYPE_SHIFT 10
+
 struct interrupt_info {
 	uint32_t id;
 	uint32_t attributes;
