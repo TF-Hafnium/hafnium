@@ -607,9 +607,21 @@ static void pauth_fault_helper(void)
 	FAIL("This should not be called\n");
 }
 
-/*
+/**
  * Trigger a Pointer Authentication Fault and verify that an exception
  * was generated.
+ *
+ * Note that the fault does not occur on the AUTIASP instruction but on the
+ * RET instruction. The AUTIASP instruction adds a PAC to the LR. Since the LR
+ * has been corrupted, the PAC will be faulty and the resulting value of LR will
+ * be an invalid VA causing the RET instruction to result in a translation
+ * fault.
+ *
+ * A PAC authentication instruction directly generating a PAC Fail exception
+ * requires implementation of FEAT_FPAC or FEAT_FPACCOMBINE.
+ *
+ * For more information, see section D8.10.4 `Faulting on pointer
+ * authentication`of ARM ARM DDI0487K.
  */
 TEST(arch_features, pauth_fault)
 {
