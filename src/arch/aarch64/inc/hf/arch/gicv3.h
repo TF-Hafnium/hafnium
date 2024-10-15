@@ -74,6 +74,12 @@
 
 #define GIC_PRI_MASK (0xff)
 
+/* Mask non-secure interrupts in Secure World. */
+#define SWD_MASK_NS_INT (0x80)
+
+/* Mask all interrupts in Secure World. */
+#define SWD_MASK_ALL_INT (0x0)
+
 /**
  * GICv3 and 3.1 specific Distributor interface register offsets and constants
  */

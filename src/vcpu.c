@@ -332,15 +332,6 @@ void vcpu_set_running(struct vcpu_locked target_locked,
 }
 
 /**
- * Saves the current interrupt priority.
- */
-void vcpu_save_interrupt_priority(struct vcpu_locked vcpu_locked,
-				  uint8_t priority)
-{
-	vcpu_locked.vcpu->priority_mask = priority;
-}
-
-/**
  * It injects a virtual interrupt in the vcpu if is enabled and is not pending.
  */
 void vcpu_interrupt_inject(struct vcpu_locked target_locked, uint32_t intid)

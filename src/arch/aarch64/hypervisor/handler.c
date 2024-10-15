@@ -1166,11 +1166,14 @@ struct vcpu *fiq_lower(void)
 	if (plat_ffa_vm_managed_exit_supported(current_vcpu->vm)) {
 		uint8_t pmr = plat_interrupts_get_priority_mask();
 
-		/* Mask all interrupts */
-		plat_interrupts_set_priority_mask(0x0);
+		/*
+		 * Mask non-secure interrupt from triggering again till the
+		 * vCPU completes the managed exit sequenece.
+		 */
+		plat_interrupts_set_priority_mask(SWD_MASK_NS_INT);
 
 		current_locked = vcpu_lock(current_vcpu);
-		current_vcpu->priority_mask = pmr;
+		current_vcpu->prev_interrupt_priority = pmr;
 		ret = api_interrupt_inject_locked(current_locked,
 						  HF_MANAGED_EXIT_INTID,
 						  current_locked, NULL);

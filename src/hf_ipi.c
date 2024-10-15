@@ -75,12 +75,6 @@ bool hf_ipi_handle(struct vcpu_locked target_vcpu_locked)
 	case VCPU_STATE_RUNNING:
 		return false;
 	case VCPU_STATE_WAITING:
-		/*
-		 * We consider the IPI handled from an SPMC perspective
-		 * so inform the interrupt controller, this means other
-		 * interrupts may occur.
-		 */
-		plat_interrupts_end_of_interrupt(HF_IPI_INTID);
 		plat_ffa_sri_trigger_not_delayed(target_vcpu->cpu);
 		return true;
 	default:
@@ -88,10 +82,6 @@ bool hf_ipi_handle(struct vcpu_locked target_vcpu_locked)
 			"IPIs not currently supported for when the target_vcpu "
 			"is in the state %d\n",
 			target_vcpu->state);
-		/*
-		 * Mark the interrupt as completed so it can be signalled again.
-		 */
-		plat_interrupts_end_of_interrupt(HF_IPI_INTID);
 		return true;
 	}
 }

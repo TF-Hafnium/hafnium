@@ -36,7 +36,7 @@
 #include "sysregs.h"
 
 /** Interrupt priority for the Schedule Receiver Interrupt. */
-#define SRI_PRIORITY 0x10U
+#define SRI_PRIORITY 0x80U
 
 /**
  * The SPMC needs to keep track of some information about NWd VMs.
@@ -1202,7 +1202,6 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 	bool ret = true;
 	struct vm *vm;
 	struct vcpu_locked target_locked;
-	uint8_t priority_mask;
 	struct two_vcpu_locked vcpus_locked;
 
 	vm = vm_find(target_vm_id);
@@ -1297,10 +1296,6 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 			 */
 			assert(!current->requires_deactivate_call);
 
-			/* Restore interrupt priority mask. */
-			plat_interrupts_set_priority_mask(
-				current->priority_mask);
-
 			/*
 			 * Clear fields corresponding to secure interrupt
 			 * handling.
@@ -1348,17 +1343,6 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 			 * preempted by a non secure interrupt.
 			 */
 			CHECK(target_vcpu->scheduling_mode == NWD_MODE);
-
-			/* Save current value of priority mask. */
-			priority_mask = plat_interrupts_get_priority_mask();
-			target_vcpu->priority_mask = priority_mask;
-
-			/*
-			 * Mask all interrupts to disallow high priority
-			 * interrupts from pre-empting current interrupt
-			 * processing.
-			 */
-			plat_interrupts_set_priority_mask(0x0);
 		}
 	}
 
@@ -1413,9 +1397,6 @@ int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
 	if (current->requires_deactivate_call) {
 		/* There is no preempted vCPU to resume. */
 		assert(current->preempted_vcpu == NULL);
-
-		/* Restore interrupt priority mask. */
-		plat_interrupts_set_priority_mask(current->priority_mask);
 
 		vcpu_secure_interrupt_complete(current_locked);
 	}
@@ -1500,39 +1481,16 @@ static struct vcpu *plat_ffa_find_target_vcpu(struct vcpu *current,
 	return target_vcpu;
 }
 
-static void plat_ffa_mask_interrupts(struct vcpu_locked target_vcpu_locked)
-{
-	uint8_t priority_mask;
-
-	/*
-	 * TODO: Design limitation. Current implementation does not support
-	 * handling a secure interrupt while currently handling a secure
-	 * interrupt. Temporarily mask all interrupts to disallow high priority
-	 * interrupts from pre-empting current interrupt processing.
-	 */
-	priority_mask = plat_interrupts_get_priority_mask();
-	plat_interrupts_set_priority_mask(0x0);
-
-	vcpu_save_interrupt_priority(target_vcpu_locked, priority_mask);
-}
-
 /*
- * Queue the pending virtual interrupt for target vcpu and deactivate the
- * corresponding physical interrupt. Necessary fields tracking the secure
- * interrupt processing are set accordingly.
+ * Queue the pending virtual interrupt for target vcpu. Necessary fields
+ * tracking the secure interrupt processing are set accordingly.
  */
-static void plat_ffa_queue_vint_deactivate_pint(
-	struct vcpu_locked target_vcpu_locked, uint32_t intid,
-	struct vcpu_locked current_locked)
+static void plat_ffa_queue_vint(struct vcpu_locked target_vcpu_locked,
+				uint32_t intid,
+				struct vcpu_locked current_locked)
 {
 	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
 	struct vcpu *preempted_vcpu = current_locked.vcpu;
-
-	/*
-	 * End the interrupt to drop the running priority. It also deactivates
-	 * the physical interrupt.
-	 */
-	plat_interrupts_end_of_interrupt(intid);
 
 	if (preempted_vcpu != NULL) {
 		target_vcpu->preempted_vcpu = preempted_vcpu;
@@ -1544,9 +1502,6 @@ static void plat_ffa_queue_vint_deactivate_pint(
 		panic("Exhausted interrupt queue for vcpu of SP: %x\n",
 		      target_vcpu->vm->id);
 	}
-
-	/* Restore mask. */
-	plat_interrupts_set_priority_mask(target_vcpu->priority_mask);
 }
 
 /**
@@ -1579,8 +1534,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 			 * If the execution was in NWd as well, set the vCPU
 			 * in preempted state as well.
 			 */
-			plat_ffa_queue_vint_deactivate_pint(
-				target_vcpu_locked, intid, current_locked);
+			plat_ffa_queue_vint(target_vcpu_locked, intid,
+					    current_locked);
 
 			/* Switch to target vCPU responsible for this interrupt.
 			 */
@@ -1594,9 +1549,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 			 * resumes current vCPU.
 			 */
 			next = NULL;
-			plat_ffa_queue_vint_deactivate_pint(
-				target_vcpu_locked, intid,
-				(struct vcpu_locked){.vcpu = NULL});
+			plat_ffa_queue_vint(target_vcpu_locked, intid,
+					    (struct vcpu_locked){.vcpu = NULL});
 		}
 		break;
 	case VCPU_STATE_BLOCKED:
@@ -1609,9 +1563,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 		 * vCPU.
 		 */
 		next = NULL;
-		plat_ffa_queue_vint_deactivate_pint(
-			target_vcpu_locked, intid,
-			(struct vcpu_locked){.vcpu = NULL});
+		plat_ffa_queue_vint(target_vcpu_locked, intid,
+				    (struct vcpu_locked){.vcpu = NULL});
 		break;
 	default:
 		panic("Secure interrupt cannot be signaled to target SP\n");
@@ -1651,8 +1604,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 */
 			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
-			plat_ffa_queue_vint_deactivate_pint(
-				target_vcpu_locked, intid, current_locked);
+			plat_ffa_queue_vint(target_vcpu_locked, intid,
+					    current_locked);
 			next = target_vcpu;
 		} else {
 			/*
@@ -1664,9 +1617,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			dlog_verbose("S-EL1: Secure interrupt queued: %x\n",
 				     target_vcpu->vm->id);
 			next = NULL;
-			plat_ffa_queue_vint_deactivate_pint(
-				target_vcpu_locked, intid,
-				(struct vcpu_locked){.vcpu = NULL});
+			plat_ffa_queue_vint(target_vcpu_locked, intid,
+					    (struct vcpu_locked){.vcpu = NULL});
 		}
 		break;
 	case VCPU_STATE_BLOCKED:
@@ -1678,9 +1630,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 */
 			assert(target_vcpu->vm->vcpu_count == 1);
 			next = NULL;
-			plat_ffa_queue_vint_deactivate_pint(
-				target_vcpu_locked, intid,
-				(struct vcpu_locked){.vcpu = NULL});
+			plat_ffa_queue_vint(target_vcpu_locked, intid,
+					    (struct vcpu_locked){.vcpu = NULL});
 		} else if (current->vm->id == HF_OTHER_WORLD_ID) {
 			/*
 			 * When secure interrupt triggers while execution is in
@@ -1688,9 +1639,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 * the current vCPU.
 			 */
 			next = NULL;
-			plat_ffa_queue_vint_deactivate_pint(
-				target_vcpu_locked, intid,
-				(struct vcpu_locked){.vcpu = NULL});
+			plat_ffa_queue_vint(target_vcpu_locked, intid,
+					    (struct vcpu_locked){.vcpu = NULL});
 		} else {
 			struct ffa_value ret_interrupt =
 				api_ffa_interrupt_return(0);
@@ -1721,8 +1671,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			 */
 			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
-			plat_ffa_queue_vint_deactivate_pint(
-				target_vcpu_locked, intid, current_locked);
+			plat_ffa_queue_vint(target_vcpu_locked, intid,
+					    current_locked);
 
 			next = target_vcpu;
 		}
@@ -1761,9 +1711,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 		}
 
 		next = NULL;
-		plat_ffa_queue_vint_deactivate_pint(
-			target_vcpu_locked, intid,
-			(struct vcpu_locked){.vcpu = NULL});
+		plat_ffa_queue_vint(target_vcpu_locked, intid,
+				    (struct vcpu_locked){.vcpu = NULL});
 
 		break;
 	case VCPU_STATE_RUNNING:
@@ -1787,9 +1736,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			assert(target_vcpu->vm->vcpu_count == 1);
 		}
 		next = NULL;
-		plat_ffa_queue_vint_deactivate_pint(
-			target_vcpu_locked, intid,
-			(struct vcpu_locked){.vcpu = NULL});
+		plat_ffa_queue_vint(target_vcpu_locked, intid,
+				    (struct vcpu_locked){.vcpu = NULL});
 		break;
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 		/* WFI is no-op for SP. Fall through. */
@@ -1838,11 +1786,11 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	target_vm_locked = vm_lock(target_vcpu->vm);
 
 	/*
-	 * SPMC has started handling a secure interrupt with a clean slate. This
-	 * signal should be false unless there was a bug in source code. Hence,
-	 * use assert rather than CHECK.
+	 * End the interrupt to drop the running priority. It also deactivates
+	 * the physical interrupt. If not, the interrupt could trigger again
+	 * after resuming current vCPU.
 	 */
-	assert(!target_vcpu->requires_deactivate_call);
+	plat_interrupts_end_of_interrupt(intid);
 
 	if (target_vcpu == current) {
 		current_locked = vcpu_lock(current);
@@ -1866,12 +1814,6 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	if (target_vcpu->state == VCPU_STATE_ABORTED ||
 	    atomic_load_explicit(&target_vcpu->vm->aborting,
 				 memory_order_relaxed)) {
-		/*
-		 * De-activate the interrupt. If not, it could trigger again
-		 * after resuming current vCPU.
-		 */
-		plat_interrupts_end_of_interrupt(intid);
-
 		/* Clear fields corresponding to secure interrupt handling. */
 		vcpu_secure_interrupt_complete(target_vcpu_locked);
 		plat_ffa_disable_vm_interrupts(target_vm_locked);
@@ -1879,6 +1821,13 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 		/* Resume current vCPU. */
 		*next = NULL;
 	} else {
+		/*
+		 * SPMC has started handling a secure interrupt with a clean
+		 * slate. This signal should be false unless there was a bug in
+		 * source code. Hence, use assert rather than CHECK.
+		 */
+		assert(!target_vcpu->requires_deactivate_call);
+
 		/* Set the interrupt pending in the target vCPU. */
 		vcpu_interrupt_inject(target_vcpu_locked, intid);
 
@@ -1893,12 +1842,6 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 			 * completed.
 			 */
 		default:
-			/*
-			 * Do not currently support nested interrupts as such,
-			 * masking interrupts.
-			 */
-			plat_ffa_mask_interrupts(target_vcpu_locked);
-
 			/*
 			 * Either invoke the handler related to partitions from
 			 * S-EL0 or from S-EL1.
@@ -1977,9 +1920,6 @@ static struct ffa_value plat_ffa_preempted_vcpu_resume(
 	vcpu_set_running(target_locked, NULL);
 
 	vcpu_unlock(&target_locked);
-
-	/* Restore interrupt priority mask. */
-	plat_interrupts_set_priority_mask(current->priority_mask);
 
 	/* The pre-empted vCPU should be run. */
 	*next = target_vcpu;

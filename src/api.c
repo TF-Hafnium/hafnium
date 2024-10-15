@@ -3176,15 +3176,10 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 	if (api_ffa_is_managed_exit_ongoing(current_locked)) {
 		struct interrupts *interrupts = &current->interrupts;
 
-		/*
-		 * Per FF-A v1.1 EAC0 section 8.3.1.2.1 rule 6, SPMC can signal
-		 * a secure interrupt to a SP that is performing managed exit.
-		 * We have taken a implementation defined choice to not allow
-		 * Managed exit while a SP is processing a secure interrupt.
-		 */
 		CHECK(current->scheduling_mode != SPMC_MODE);
 
-		plat_interrupts_set_priority_mask(current->priority_mask);
+		plat_interrupts_set_priority_mask(
+			current->prev_interrupt_priority);
 		/*
 		 * A SP may be signaled a managed exit but actually not trap
 		 * the virtual interrupt, probably because it has virtual

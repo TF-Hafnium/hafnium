@@ -179,12 +179,6 @@ struct vcpu {
 	struct vcpu *preempted_vcpu;
 
 	/**
-	 * Current value of the Priority Mask register which is saved/restored
-	 * during secure interrupt handling.
-	 */
-	uint8_t priority_mask;
-
-	/**
 	 * Per FF-A v1.1-Beta0 spec section 8.3, an SP can use multiple
 	 * mechanisms to signal completion of secure interrupt handling. SP
 	 * can invoke explicit FF-A ABIs, namely FFA_MSG_WAIT and FFA_RUN,
