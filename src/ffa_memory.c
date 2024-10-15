@@ -12,6 +12,7 @@
 #include "hf/arch/mm.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
+#include "hf/arch/plat/ffa/indirect_messaging.h"
 
 #include "hf/addr.h"
 #include "hf/api.h"

@@ -29,12 +29,6 @@ bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 bool plat_ffa_acquire_receiver_rx(struct vm_locked locked,
 				  struct ffa_value *ret);
 
-bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
-					struct vm_locked receiver_locked);
-
-bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
-				struct ffa_value *ret);
-
 struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
 	struct vcpu *current, ffa_id_t vm_id);
 
@@ -268,14 +262,6 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
 	struct vm *from, void *fragment, uint32_t fragment_length,
 	ffa_memory_handle_t handle, struct mpool *page_pool);
 
-/**
- * This FF-A v1.0 FFA_MSG_SEND interface.
- * Implemented for the Hypervisor, but not in the SPMC.
- */
-struct ffa_value plat_ffa_msg_send(ffa_id_t sender_vm_id,
-				   ffa_id_t receiver_vm_id, uint32_t size,
-				   struct vcpu *current, struct vcpu **next);
-
 struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
 					struct vcpu **next,
 					uint32_t timeout_low,
@@ -293,13 +279,6 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 
 bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id);
 
-struct ffa_value plat_ffa_msg_recv(bool block,
-				   struct vcpu_locked current_locked,
-				   struct vcpu **next);
-
-int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current);
-
-int64_t plat_ffa_mailbox_waiter_get(ffa_id_t vm_id, const struct vcpu *current);
 
 /**
  * Reconfigure the interrupt belonging to the current partition at runtime.

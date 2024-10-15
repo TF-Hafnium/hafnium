@@ -25,6 +25,7 @@ source_set("hypervisor") {
   sources = [
     "hypervisor.c",
     "hypervisor/direct_messaging.c",
+    "hypervisor/indirect_messaging.c",
   ]
 }
 
@@ -40,5 +41,6 @@ source_set("spmc") {
     "//src/arch/aarch64/hypervisor/simd.c",
     "spmc.c",
     "spmc/direct_messaging.c",
+    "spmc/indirect_messaging.c",
   ]
 }

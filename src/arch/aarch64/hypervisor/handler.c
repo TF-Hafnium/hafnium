@@ -15,6 +15,7 @@
 #include "hf/arch/memcpy_trapped.h"
 #include "hf/arch/mmu.h"
 #include "hf/arch/plat/ffa.h"
+#include "hf/arch/plat/ffa/indirect_messaging.h"
 #include "hf/arch/plat/smc.h"
 #include "hf/arch/timer.h"
 #include "hf/arch/vmid_base.h"

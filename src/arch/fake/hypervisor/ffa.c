@@ -628,21 +628,6 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-int64_t plat_ffa_mailbox_waiter_get(ffa_id_t vm_id, const struct vcpu *current)
-{
-	(void)vm_id;
-	(void)current;
-
-	return -1;
-}
-
-int64_t plat_ffa_mailbox_writable_get(const struct vcpu *current)
-{
-	(void)current;
-
-	return -1;
-}
-
 bool plat_ffa_partition_info_get_regs_forward_allowed(void)
 {
 	return false;
