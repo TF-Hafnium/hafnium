@@ -1063,3 +1063,40 @@ TEST_PRECONDITION_LONG_RUNNING(secure_interrupts, target_vcpu_migrated_blocked,
 	run_test_secure_interrupt_targets_migrated_vcpu(
 		cpu_entry_target_vcpu_blocked);
 }
+
+/**
+ * Test to validate SPMC can signal secure virtual interrupt to an SP that got
+ * preempted while currently handling a virtual interrupt.
+ */
+TEST(secure_interrupts, preempt_interrupt_handling)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_id_t receiver_id = service2_info->vm_id;
+
+	res = sp_prepare_preempt_interrupt_handling_cmd_send(own_id,
+							     receiver_id, true);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	configure_generic_timer_interrupt(own_id, receiver_id, true);
+	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 1);
+	waitms(5);
+
+	/* Check for the last serviced secure virtual interrupt. */
+	res = sp_get_last_interrupt_cmd_send(own_id, receiver_id);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/*
+	 * After the SP services the trusted watchdog timer interrupt, it shall
+	 * be resumed again by SPMC to signal generic timer interrupt.
+	 */
+	EXPECT_EQ(sp_resp_value(res), IRQ_AP_REFCLK_BASE1_INTID);
+
+	/* Disable Generic Timer interrupt. */
+	disable_generic_timer_interrupt(own_id, receiver_id);
+}
