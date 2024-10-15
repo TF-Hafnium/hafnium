@@ -1187,6 +1187,52 @@ bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
 }
 
 /**
+ * Enforce action of an SP in response to non-secure or other-secure interrupt
+ * by changing the priority mask. Effectively, physical interrupts shall not
+ * trigger which has the same effect as queueing interrupts.
+ */
+static void plat_ffa_vcpu_queue_interrupts(
+	struct vcpu_locked receiver_vcpu_locked)
+{
+	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
+	uint8_t current_priority;
+
+	/* Save current value of priority mask. */
+	current_priority = plat_interrupts_get_priority_mask();
+	receiver_vcpu->prev_interrupt_priority = current_priority;
+
+	if (receiver_vcpu->vm->other_s_interrupts_action ==
+		    OTHER_S_INT_ACTION_QUEUED ||
+	    receiver_vcpu->scheduling_mode == SPMC_MODE) {
+		/*
+		 * If secure interrupts not masked yet, mask them now. We could
+		 * enter SPMC scheduled mode when an EL3 SPMD Logical partition
+		 * sends a direct request, and we are making the IMPDEF choice
+		 * to mask interrupts when such a situation occurs. This keeps
+		 * design simple.
+		 */
+		if (current_priority > SWD_MASK_ALL_INT) {
+			plat_interrupts_set_priority_mask(SWD_MASK_ALL_INT);
+		}
+	} else if (receiver_vcpu->vm->ns_interrupts_action ==
+		   NS_ACTION_QUEUED) {
+		/* If non secure interrupts not masked yet, mask them now. */
+		if (current_priority > SWD_MASK_NS_INT) {
+			plat_interrupts_set_priority_mask(SWD_MASK_NS_INT);
+		}
+	}
+}
+
+/**
+ * If the interrupts were indeed masked by SPMC before an SP's vCPU was resumed,
+ * restore the priority mask thereby allowing the interrupts to be delivered.
+ */
+static void plat_ffa_vcpu_allow_interrupts(struct vcpu *current)
+{
+	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
+}
+
+/**
  * Check if current VM can resume target VM using FFA_RUN ABI.
  */
 bool plat_ffa_run_checks(struct vcpu_locked current_locked,
@@ -1527,6 +1573,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 				     target_vcpu->vm->id);
 
 			vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
+			plat_ffa_vcpu_queue_interrupts(target_vcpu_locked);
 
 			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
@@ -1595,6 +1642,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 
 			/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
 			vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
+			plat_ffa_vcpu_queue_interrupts(target_vcpu_locked);
+
 			/*
 			 * Ideally, we have to mask non-secure interrupts here
 			 * since the spec mandates that SPMC should make sure
@@ -1921,6 +1970,9 @@ static struct ffa_value plat_ffa_preempted_vcpu_resume(
 
 	vcpu_unlock(&target_locked);
 
+	/* Restore interrupt priority mask. */
+	plat_ffa_vcpu_allow_interrupts(current);
+
 	/* The pre-empted vCPU should be run. */
 	*next = target_vcpu;
 
@@ -2170,15 +2222,6 @@ bool plat_ffa_intercept_call(struct vcpu_locked current_locked,
 	return false;
 }
 
-/**
- * If the interrupts were indeed masked by SPMC before an SP's vCPU was resumed,
- * restore the priority mask thereby allowing the interrupts to be delivered.
- */
-static void plat_ffa_vcpu_allow_interrupts(struct vcpu *current)
-{
-	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
-}
-
 static struct ffa_value ffa_msg_wait_complete(struct vcpu_locked current_locked,
 					      struct vcpu **next)
 {
@@ -2356,42 +2399,6 @@ struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
 	sl_unlock(&current_vcpu->lock);
 
 	return next;
-}
-
-/**
- * Enforce action of an SP in response to non-secure or other-secure interrupt
- * by changing the priority mask, there by potentially queueing interrupts.
- */
-static void plat_ffa_vcpu_queue_interrupts(
-	struct vcpu_locked receiver_vcpu_locked)
-{
-	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
-	uint8_t current_priority;
-
-	/* Save current value of priority mask. */
-	current_priority = plat_interrupts_get_priority_mask();
-	receiver_vcpu->prev_interrupt_priority = current_priority;
-
-	if (receiver_vcpu->vm->other_s_interrupts_action ==
-		    OTHER_S_INT_ACTION_QUEUED ||
-	    receiver_vcpu->scheduling_mode == SPMC_MODE) {
-		/*
-		 * If secure interrupts not masked yet, mask them now. We could
-		 * enter SPMC scheduled mode when an EL3 SPMD Logical partition
-		 * sends a direct request, and we are making the IMPDEF choice
-		 * to mask interrupts when such a situation occurs. This keeps
-		 * design simple.
-		 */
-		if (current_priority > 0) {
-			plat_interrupts_set_priority_mask(0x0);
-		}
-	} else if (receiver_vcpu->vm->ns_interrupts_action ==
-		   NS_ACTION_QUEUED) {
-		/* If non secure interrupts not masked yet, mask them now. */
-		if (current_priority > 0x80) {
-			plat_interrupts_set_priority_mask(0x80);
-		}
-	}
 }
 
 /*
