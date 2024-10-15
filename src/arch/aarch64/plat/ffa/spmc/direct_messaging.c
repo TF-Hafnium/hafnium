@@ -46,22 +46,21 @@ bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
 	enum ffa_version receiver_ffa_version = receiver_vm->ffa_version;
 
 	/* Check if version supports messaging function. */
-	if (func == FFA_MSG_SEND_DIRECT_REQ2_64 &&
-	    sender_ffa_version < FFA_VERSION_1_2) {
-		dlog_verbose(
-			"Sender version does not allow usage of func id "
-			"0x%x.\n",
-			func);
-		return false;
-	}
+	if (func == FFA_MSG_SEND_DIRECT_REQ2_64) {
+		if (sender_ffa_version < FFA_VERSION_1_2) {
+			dlog_verbose(
+				"Sender version does not allow usage of %s\n",
+				ffa_func_name(func));
+			return false;
+		}
 
-	if (func == FFA_MSG_SEND_DIRECT_REQ2_64 &&
-	    receiver_ffa_version < FFA_VERSION_1_2) {
-		dlog_verbose(
-			"Receiver version does not allow usage of func id "
-			"0x%x.\n",
-			func);
-		return false;
+		if (receiver_ffa_version < FFA_VERSION_1_2) {
+			dlog_verbose(
+				"Receiver version does not allow usage of "
+				"%s\n",
+				ffa_func_name(func));
+			return false;
+		}
 	}
 
 	/*
@@ -77,17 +76,16 @@ bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
 
 	if (!vm_supports_messaging_method(sender_vm, sender_method)) {
 		dlog_verbose(
-			"Sender can't send direct message requests via func id "
-			"0x%x.\n",
-			func);
+			"Sender can't sender direct message requests via %s\n",
+			ffa_func_name(func));
 		return false;
 	}
 
 	if (!vm_supports_messaging_method(receiver_vm, receiver_method)) {
 		dlog_verbose(
 			"Receiver can't receive direct message requests via "
-			"func id 0x%x.\n",
-			func);
+			"%s\n",
+			ffa_func_name(func));
 		return false;
 	}
 
