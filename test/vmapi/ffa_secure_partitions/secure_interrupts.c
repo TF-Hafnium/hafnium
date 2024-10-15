@@ -354,6 +354,53 @@ TEST(secure_interrupts, sp_preempted)
 	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
 }
 
+/**
+ * Test to validate that an SPMC scheduled call chain cannot be preempted by a
+ * non-secure interrupt.
+ */
+TEST(secure_interrupts, spmc_schedule_mode)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_id_t receiver_id = service2_info->vm_id;
+
+	gicv3_system_setup();
+	interrupt_enable(PHYSICAL_TIMER_IRQ, true);
+	interrupt_set_priority(PHYSICAL_TIMER_IRQ, 0x80);
+	interrupt_set_edge_triggered(PHYSICAL_TIMER_IRQ, true);
+	interrupt_set_priority_mask(0xff);
+	arch_irq_enable();
+
+	res = sp_prepare_spmc_call_chain_cmd_send(own_id, receiver_id, true);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	enable_trigger_trusted_wdog_timer(own_id, receiver_id, 10);
+
+	/* Set physical timer for 50 ms and enable. */
+	write_msr(CNTP_TVAL_EL0, ns_to_ticks(50000000));
+	write_msr(CNTP_CTL_EL0, CNTx_CTL_ENABLE_MASK);
+
+	/*
+	 * Waiting for interrupt to be serviced in normal world. A non-zero
+	 * value indicates the interrupt service routine has been executed
+	 * upon delivery of interrupt to the CPU interface.
+	 */
+	while (last_interrupt_id == 0) {
+		EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
+		EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
+		EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
+		EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+	}
+
+	/* Check that we got the interrupt. */
+	EXPECT_EQ(last_interrupt_id, PHYSICAL_TIMER_IRQ);
+
+	check_and_disable_trusted_wdog_timer(own_id, receiver_id);
+}
+
 /*
  * Test Secure Partition runs to completion if it specifies action in response
  * to Other-S Interrupt as queued.
