@@ -42,23 +42,20 @@ bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 		return false;
 	}
 
-	if (vm_id_is_current_world(sender_vm->id)) {
-		if (!vm_supports_messaging_method(sender_vm,
-						  FFA_PARTITION_INDIRECT_MSG)) {
-			dlog_verbose("VM %#x can't send indirect messages.\n",
-				     sender_vm->id);
-			return false;
-		}
+	if (vm_id_is_current_world(sender_vm->id) &&
+	    !vm_supports_messaging_method(sender_vm,
+					  FFA_PARTITION_INDIRECT_MSG)) {
+		dlog_verbose("VM %#x can't send indirect messages.\n",
+			     sender_vm->id);
+		return false;
 	}
 
-	if (vm_id_is_current_world(receiver_vm->id)) {
-		if (!vm_supports_messaging_method(receiver_vm,
-						  FFA_PARTITION_INDIRECT_MSG)) {
-			dlog_verbose(
-				"VM %#x can't receive indirect messages.\n",
-				receiver_vm->id);
-			return false;
-		}
+	if (vm_id_is_current_world(receiver_vm->id) &&
+	    !vm_supports_messaging_method(receiver_vm,
+					  FFA_PARTITION_INDIRECT_MSG)) {
+		dlog_verbose("VM %#x can't receive indirect messages.\n",
+			     receiver_vm->id);
+		return false;
 	}
 
 	return true;

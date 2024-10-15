@@ -31,26 +31,28 @@ bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
 				struct ffa_value *ret)
 {
 	/* FFA_MSG_SEND2 is forwarded to SPMC when the receiver is an SP. */
-	if (!vm_id_is_current_world(receiver_vm_id)) {
-		/*
-		 * Set the sender in arg1 to allow the SPMC to retrieve
-		 * VM's TX buffer to copy in SP's RX buffer.
-		 */
-		*ret = arch_other_world_call((struct ffa_value){
-			.func = FFA_MSG_SEND2_32,
-			.arg1 = sender_vm_id << 16,
-		});
-		if (ffa_func_id(*ret) != FFA_SUCCESS_32) {
-			dlog_verbose(
-				"Failed forwarding FFA_MSG_SEND2_32 to the "
-				"SPMC, got error (%lu).\n",
-				ret->arg2);
-		}
-
-		return true;
+	if (vm_id_is_current_world(receiver_vm_id)) {
+		return false;
 	}
 
-	return false;
+	/*
+	 * Set the sender in arg1 to allow the SPMC to retrieve
+	 * VM's TX buffer to copy in SP's RX buffer.
+	 */
+	*ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_MSG_SEND2_32,
+		.arg1 = sender_vm_id << 16,
+	});
+
+	if (ffa_func_id(*ret) != FFA_SUCCESS_32) {
+		dlog_verbose(
+			"Failed forwarding FFA_MSG_SEND2_32 to the "
+			"SPMC, got error %s (%d).\n",
+			ffa_error_name(ffa_error_code(*ret)),
+			ffa_error_code(*ret));
+	}
+
+	return true;
 }
 
 /**
@@ -100,7 +102,6 @@ struct ffa_value plat_ffa_msg_recv(bool block,
 				   struct vcpu_locked current_locked,
 				   struct vcpu **next)
 {
-	bool is_direct_request_ongoing;
 	struct vm *vm = current_locked.vcpu->vm;
 	struct vcpu *current = current_locked.vcpu;
 	struct vm_locked vm_locked;
@@ -118,10 +119,7 @@ struct ffa_value plat_ffa_msg_recv(bool block,
 	 * Deny if vCPU is executing in context of an FFA_MSG_SEND_DIRECT_REQ
 	 * invocation.
 	 */
-	is_direct_request_ongoing =
-		is_ffa_direct_msg_request_ongoing(current_locked);
-
-	if (is_direct_request_ongoing) {
+	if (is_ffa_direct_msg_request_ongoing(current_locked)) {
 		return ffa_error(FFA_DENIED);
 	}
 
