@@ -227,6 +227,12 @@ struct vcpu {
 	 * safeguarded from concurrent accesses.
 	 */
 	struct list_entry timer_node;
+
+	/*
+	 * List entry pointing to the next vcpu with an IPI pending on the
+	 * same pinned CPU.
+	 */
+	struct list_entry ipi_list_node;
 };
 
 /** Encapsulates a vCPU whose lock is held. */

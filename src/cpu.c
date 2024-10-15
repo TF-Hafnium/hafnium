@@ -15,6 +15,7 @@
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/list.h"
 
 #include "vmapi/hf/call.h"
 
@@ -114,6 +115,13 @@ void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 		 * its `prev` and `next` fields point to itself.
 		 */
 		list_init(&(timer_list->root_entry));
+
+		/*
+		 * Initialize the list of vCPUs with pending IPIs for
+		 * each CPU. The root entry fields is configured such that
+		 * its `prev` and `next` fields point to itself.
+		 */
+		list_init(&c->pending_ipis);
 	}
 
 	if (!found_boot_cpu) {

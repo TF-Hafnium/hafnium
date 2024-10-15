@@ -71,6 +71,7 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 	vcpu->rt_model = RTM_SP_INIT;
 	list_init(&vcpu->boot_list_node);
 	list_init(&vcpu->timer_node);
+	list_init(&vcpu->ipi_list_node);
 }
 
 /**

@@ -115,7 +115,11 @@ static struct vcpu *plat_ffa_find_target_vcpu(struct vcpu *current,
 
 	switch (interrupt_id) {
 	case HF_IPI_INTID:
-		target_vcpu = hf_ipi_get_pending_target_vcpu(current->cpu);
+		/*
+		 * Get the next vCPU with a pending IPI. If all vCPUs
+		 * have had their IPIs handled this will return NULL.
+		 */
+		target_vcpu = hf_ipi_get_pending_target_vcpu(current);
 		break;
 	case ARM_EL1_VIRT_TIMER_PHYS_INT:
 		/* Fall through */
@@ -125,10 +129,10 @@ static struct vcpu *plat_ffa_find_target_vcpu(struct vcpu *current,
 	default:
 		target_vcpu = plat_ffa_find_target_vcpu_secure_interrupt(
 			current, interrupt_id);
-	}
 
-	/* The target vCPU for a secure interrupt cannot be NULL. */
-	CHECK(target_vcpu != NULL);
+		/* The target vCPU for a secure interrupt cannot be NULL. */
+		CHECK(target_vcpu != NULL);
+	}
 
 	return target_vcpu;
 }
@@ -526,6 +530,12 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 	 * after resuming current vCPU.
 	 */
 	plat_interrupts_end_of_interrupt(intid);
+
+	if (target_vcpu == NULL) {
+		/* No further handling required. Resume the current vCPU. */
+		*next = NULL;
+		return;
+	}
 
 	target_vm_locked = vm_lock(target_vcpu->vm);
 
