@@ -18,6 +18,8 @@
 #define ITERATIONS_PER_MS 15000
 
 extern bool yield_while_handling_sec_interrupt;
+extern bool preempt_interrupt_handling;
+extern bool initiate_spmc_call_chain;
 
 uint64_t sp_sleep_active_wait(uint32_t ms)
 {
@@ -36,6 +38,8 @@ void sp_disable_irq(void)
 struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 {
 	uint32_t intid;
+	struct ffa_value ffa_ret;
+	ffa_id_t own_id = hf_vm_get_id();
 
 	/*
 	 * Received FFA_INTERRUPT in waiting state with interrupt ID
@@ -55,6 +59,31 @@ struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 		HFTEST_LOG("S-EL0 vIRQ: Trusted WatchDog timer stopped: %u",
 			   intid);
 		sp805_twdog_stop();
+
+		if (initiate_spmc_call_chain) {
+			HFTEST_LOG(
+				"Initiating call chain in SPMC scheduled mode");
+			/*
+			 * The current SP sends a direct request message to
+			 * another SP to mimic a long SPMC scheduled call
+			 * chain.
+			 */
+			ffa_ret = sp_sleep_cmd_send(
+				own_id, sp_find_next_endpoint(own_id), 50, 0);
+			ASSERT_EQ(ffa_ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+		} else if (preempt_interrupt_handling) {
+			/*
+			 * Trigger the timer interrupt to mimic a physical
+			 * interrupt preempting the current virtual interrupt
+			 * handling.
+			 */
+			program_ap_refclk_timer(1);
+
+			/* Wait to make sure the generic timer interrupt
+			 * triggers. */
+			sp_sleep_active_wait(5);
+		}
+
 		break;
 	}
 	case IRQ_AP_REFCLK_BASE1_INTID: {

@@ -140,6 +140,13 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_PAUTH_FAULT_CMD:
 		sp_pauth_fault_cmd();
 		break;
+	case SP_PREPARE_SPMC_CALL_CHAIN_CMD:
+		res = sp_prepare_spmc_call_chain_cmd(ffa_sender(res), res.arg4);
+		break;
+	case SP_PREPARE_PREEMPT_INT_HANDLING:
+		res = sp_prepare_preempt_interrupt_handling_cmd(ffa_sender(res),
+								res.arg4);
+		break;
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT

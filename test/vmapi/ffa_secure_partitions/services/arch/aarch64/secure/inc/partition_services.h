@@ -56,6 +56,8 @@ static inline uint32_t sp_resp_value(struct ffa_value res)
 	return res.arg4;
 }
 
+ffa_id_t sp_find_next_endpoint(ffa_id_t self_id);
+
 enum sp_cmd {
 	/**
 	 * Command to request SP to echo payload back to the sender.
@@ -163,6 +165,17 @@ enum sp_cmd {
 	 * Command to request an SP to yield while handling a secure interrupt.
 	 */
 	SP_YIELD_SEC_INTERRUPT_HANDLING_CMD,
+
+	/**
+	 * Command to request an SP to prepare to initiate an SPMC call chain.
+	 */
+	SP_PREPARE_SPMC_CALL_CHAIN_CMD,
+
+	/**
+	 * Command to request an SP to prepare to preempt itself while handling
+	 * a virtual interrupt.
+	 */
+	SP_PREPARE_PREEMPT_INT_HANDLING,
 
 	/**
 	 * Command to request an SP to reconfigure the secure interrupt to be
@@ -628,3 +641,31 @@ static inline struct ffa_value sp_pauth_fault_cmd_send(ffa_id_t sender,
 }
 
 void sp_pauth_fault_cmd(void);
+
+/**
+ * Command to request an SP to prepare to initiate an SPMC call chain.
+ */
+static inline struct ffa_value sp_prepare_spmc_call_chain_cmd_send(
+	ffa_id_t source, ffa_id_t dest, bool initiate)
+{
+	return ffa_msg_send_direct_req(source, dest,
+				       SP_PREPARE_SPMC_CALL_CHAIN_CMD, initiate,
+				       0, 0, 0);
+}
+
+struct ffa_value sp_prepare_spmc_call_chain_cmd(ffa_id_t source, bool initiate);
+
+/**
+ * Command to request an SP to prepare to preempt itself while handling a
+ * virtual interrupt.
+ */
+static inline struct ffa_value sp_prepare_preempt_interrupt_handling_cmd_send(
+	ffa_id_t source, ffa_id_t dest, bool preempt)
+{
+	return ffa_msg_send_direct_req(source, dest,
+				       SP_PREPARE_PREEMPT_INT_HANDLING, preempt,
+				       0, 0, 0);
+}
+
+struct ffa_value sp_prepare_preempt_interrupt_handling_cmd(ffa_id_t source,
+							   bool preempt);

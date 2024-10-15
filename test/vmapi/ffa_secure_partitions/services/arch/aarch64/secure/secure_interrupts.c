@@ -22,10 +22,9 @@
 #include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
-#define PLAT_ARM_TWDOG_BASE 0x2a490000
-#define PLAT_ARM_TWDOG_SIZE 0x20000
-
 bool yield_while_handling_sec_interrupt = false;
+bool initiate_spmc_call_chain = false;
+bool preempt_interrupt_handling = false;
 
 static void send_managed_exit_response(ffa_id_t dir_req_source_id)
 {
@@ -76,7 +75,9 @@ static void deactivate_interrupt_and_yield(uint32_t intid)
 static void irq_current(void)
 {
 	uint32_t intid;
+	struct ffa_value ffa_ret;
 	ffa_id_t dir_req_source_id = hftest_get_dir_req_source_id();
+	ffa_id_t own_id = hf_vm_get_id();
 
 	intid = hf_interrupt_get();
 
@@ -94,6 +95,30 @@ static void irq_current(void)
 		 */
 		HFTEST_LOG("Trusted WatchDog timer stopped: %u", intid);
 		sp805_twdog_stop();
+
+		if (initiate_spmc_call_chain) {
+			HFTEST_LOG(
+				"Initiating call chain in SPMC scheduled mode");
+			/*
+			 * The current SP sends a direct request message to
+			 * another SP to mimic a long SPMC scheduled call
+			 * chain.
+			 */
+			ffa_ret = sp_sleep_cmd_send(
+				own_id, sp_find_next_endpoint(own_id), 50, 0);
+			ASSERT_EQ(ffa_ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+		} else if (preempt_interrupt_handling) {
+			/*
+			 * Trigger the timer interrupt to mimic a physical
+			 * interrupt preempting the current virtual interrupt
+			 * handling.
+			 */
+			program_ap_refclk_timer(1);
+
+			/* Wait to make sure the generic timer interrupt
+			 * triggers. */
+			sp_sleep_active_wait(5);
+		}
 
 		deactivate_interrupt_and_yield(intid);
 		break;
@@ -334,4 +359,21 @@ struct ffa_value sp_route_interrupt_to_target_vcpu_cmd(
 		"Request to route trusted wdog interrupt to target vCPU "
 		"denied\n");
 	return sp_error(own_id, source, 0);
+}
+
+struct ffa_value sp_prepare_spmc_call_chain_cmd(ffa_id_t source, bool initiate)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+
+	initiate_spmc_call_chain = initiate;
+	return sp_success(own_id, source, 0);
+}
+
+struct ffa_value sp_prepare_preempt_interrupt_handling_cmd(ffa_id_t source,
+							   bool preempt)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+
+	preempt_interrupt_handling = preempt;
+	return sp_success(own_id, source, 0);
 }
