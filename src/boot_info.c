@@ -102,6 +102,7 @@ bool ffa_boot_info_node(struct fdt_node *boot_info_node,
 		(boot_info_size -
 		 offsetof(struct ffa_boot_info_header, boot_info)) /
 		sizeof(struct ffa_boot_info_desc);
+	bool ret = false;
 
 	assert(boot_info_node != NULL);
 	assert(pkg != NULL);
@@ -127,7 +128,8 @@ bool ffa_boot_info_node(struct fdt_node *boot_info_node,
 		return false;
 	}
 
-	dlog_verbose("  FF-A Boot Info:\n");
+	dlog_verbose("  FF-A Boot Info: base %lx\n",
+		     (uintptr_t)ptr_from_va(va_from_pa(pkg->boot_info.begin)));
 
 	if (fdt_read_property(boot_info_node, "ffa_manifest", &data) &&
 	    memiter_size(&data) == 0U) {
@@ -135,7 +137,8 @@ bool ffa_boot_info_node(struct fdt_node *boot_info_node,
 		const uint32_t pm_size =
 			pa_difference(pkg->pm.begin, pkg->pm.end);
 
-		dlog_verbose("    FF-A Manifest\n");
+		dlog_verbose("    FF-A Manifest: %lx\n",
+			     ipa_addr(manifest_address));
 		boot_info_write_desc(boot_info_header,
 				     FFA_BOOT_INFO_FLAG_CONTENT_FORMAT_ADDR,
 				     true, FFA_BOOT_INFO_TYPE_ID_FDT, pm_size,
@@ -148,14 +151,40 @@ bool ffa_boot_info_node(struct fdt_node *boot_info_node,
 		 */
 		boot_info_header->info_blob_size += pm_size;
 
+		ret = true;
+	}
+
+	if (fdt_read_property(boot_info_node, "hob_list", &data) &&
+	    memiter_size(&data) == 0U) {
+		ipaddr_t hob_address = ipa_from_pa(pkg->hob.begin);
+		const uint32_t hob_size =
+			pa_difference(pkg->hob.begin, pkg->hob.end);
+
+		dlog_verbose("    Hob List: %lx, size: %x\n",
+			     ipa_addr(hob_address), hob_size);
+		boot_info_write_desc(boot_info_header,
+				     FFA_BOOT_INFO_FLAG_CONTENT_FORMAT_ADDR,
+				     true, FFA_BOOT_INFO_TYPE_ID_HOB, hob_size,
+				     ipa_addr(hob_address),
+				     max_boot_info_desc_count);
+
+		/*
+		 * Incrementing the size of the boot information blob with the
+		 * size of the partition's manifest.
+		 */
+		boot_info_header->info_blob_size += hob_size;
+
+		ret = true;
+	}
+
+	if (ret == true) {
 		/*
 		 * Flush the data cache in case partition initializes with
 		 * caches disabled.
 		 */
 		arch_mm_flush_dcache((void *)boot_info_header,
 				     boot_info_header->info_blob_size);
-		return true;
 	}
 
-	return false;
+	return ret;
 }
