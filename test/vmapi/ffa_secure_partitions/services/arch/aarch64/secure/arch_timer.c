@@ -17,6 +17,9 @@
 
 #define LAST_SP_ID 0x8003
 
+/* Periodic timer expiry. */
+uint32_t periodic_timer_ms = 10000;
+
 struct ffa_value sp_program_arch_timer_sleep_cmd(ffa_id_t source,
 						 uint32_t timer_delay_ms,
 						 uint32_t sleep_ms,
@@ -29,6 +32,7 @@ struct ffa_value sp_program_arch_timer_sleep_cmd(ffa_id_t source,
 	HFTEST_LOG("SP%x Request to fire timer after %ums and sleep %ums",
 		   own_id, timer_delay_ms, sleep_ms);
 
+	periodic_timer_ms = timer_delay_ms;
 	timer_set(timer_delay_ms);
 	timer_start();
 

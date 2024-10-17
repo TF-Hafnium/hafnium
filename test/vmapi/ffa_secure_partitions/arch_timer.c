@@ -17,6 +17,7 @@
 #include "partition_services.h"
 #include "sp805.h"
 #include "sp_helpers.h"
+#include "test/semaphore.h"
 #include "wdog.h"
 
 #define SP_SKIP_SLEEP 0U
@@ -536,4 +537,82 @@ TEST_PRECONDITION(arch_timer, migrate_blocked_vcpu_pending_timer,
 	sl_lock(&args.lock);
 
 	HFTEST_LOG("End of test");
+}
+
+struct multiple_sp_deadline_continuous_arguments {
+	const uint64_t service1_timer_period;
+	const uint64_t service2_timer_period;
+	const uint64_t service3_timer_period;
+	const uint64_t active_wait_timer;
+	uint32_t vcpu_id;
+	struct semaphore sync;
+	const ffa_id_t service1_id;
+	const ffa_id_t service2_id;
+	const ffa_id_t service3_id;
+	const bool service2_is_up;
+};
+
+void base_multiple_sp_deadline_continuous(
+	struct multiple_sp_deadline_continuous_arguments *args)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+
+	enable_arch_timer_virtual_interrupt_all_sp(own_id, args->service1_id,
+						   args->service2_id,
+						   args->service3_id);
+
+	res = sp_program_arch_timer_sleep_cmd_send(own_id, args->service1_id,
+						   args->service1_timer_period,
+						   SP_SKIP_SLEEP, 0);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	res = sp_program_arch_timer_sleep_cmd_send(own_id, args->service2_id,
+						   args->service2_timer_period,
+						   SP_SKIP_SLEEP, 0);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	res = sp_program_arch_timer_sleep_cmd_send(own_id, args->service3_id,
+						   args->service3_timer_period,
+						   SP_SKIP_SLEEP, 0);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/*
+	 * Any pending timer's deadline should expire during this time, SP will
+	 * handle the virtual timer interrupt.
+	 */
+	waitms(args->active_wait_timer);
+
+	check_arch_timer_virtual_interrupt_serviced_all_sp(
+		own_id, args->service1_id, args->service2_id,
+		args->service3_id);
+}
+
+/**
+ * Setup Periodic deadlines for all SPs. They should be serviced at some point.
+ */
+TEST_LONG_RUNNING(arch_timer, multiple_sp_periodic_deadline)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+
+	struct multiple_sp_deadline_continuous_arguments args = {
+		.service1_id = service1_info->vm_id,
+		.service1_timer_period = 50,
+		.service2_id = service2_info->vm_id,
+		.service2_timer_period = 25,
+		.service2_is_up = service2_info->vcpu_count == 1,
+		.service3_id = service3_info->vm_id,
+		.service3_timer_period = 100,
+		.active_wait_timer = 400};
+
+	base_multiple_sp_deadline_continuous(&args);
 }

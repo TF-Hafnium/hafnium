@@ -27,6 +27,12 @@ bool yield_while_handling_sec_interrupt = false;
 bool initiate_spmc_call_chain = false;
 bool preempt_interrupt_handling = false;
 
+/*
+ * This variable is set by the request that processes the arch timer commands
+ * from the PVM.
+ */
+extern uint32_t periodic_timer_ms;
+
 static void send_managed_exit_response(ffa_id_t dir_req_source_id)
 {
 	struct ffa_value ffa_ret;
@@ -138,10 +144,14 @@ static void irq_current(void)
 	case HF_VIRTUAL_TIMER_INTID: {
 		/* Disable the EL1 physical arch timer. */
 		timer_disable();
-		HFTEST_LOG("EL1 Physical timer stopped");
 		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
 
 		exception_handler_set_last_interrupt(intid);
+
+		/* Configure timer to expire periodically. */
+		timer_set(periodic_timer_ms);
+		timer_start();
+		HFTEST_LOG("EL1 Physical timer stopped and restarted");
 		break;
 	}
 	default:
