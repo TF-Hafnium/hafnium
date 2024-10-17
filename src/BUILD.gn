@@ -32,7 +32,6 @@ source_set("src_not_testable_yet") {
     "init.c",
     "load.c",
     "main.c",
-    "timer_mgmt.c",
   ]
   deps = [
     ":src_testable",
@@ -55,6 +54,7 @@ source_set("src_testable") {
     "cpu.c",
     "manifest.c",
     "sp_pkg.c",
+    "timer_mgmt.c",
     "vcpu.c",
   ]
 

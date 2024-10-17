@@ -12,6 +12,7 @@ extern "C" {
 #include "hf/check.h"
 #include "hf/list.h"
 #include "hf/mpool.h"
+#include "hf/timer_mgmt.h"
 #include "hf/vm.h"
 }
 
@@ -157,6 +158,82 @@ TEST_F(vm, vm_boot_order)
 		EXPECT_EQ((*it)->id, vcpu->vm->id);
 		vcpu = vcpu_get_next_boot(vcpu);
 	}
+}
+
+TEST_F(vm, vcpu_arch_timer)
+{
+	const cpu_id_t cpu_ids[2] = {0, 1};
+	struct_vcpu *vm0_vcpu;
+	struct_vcpu *vm1_vcpu;
+	struct_vcpu *deadline_vcpu;
+	struct_vcpu *target_vcpu;
+	struct vcpu_locked vcpu_locked;
+	struct cpu *cpu0;
+	struct cpu *cpu1;
+
+	/* Initialie CPU module with two physical CPUs. */
+	cpu_module_init(cpu_ids, 2);
+	cpu0 = cpu_find_index(0);
+	cpu1 = cpu_find_index(1);
+
+	/* Two UP endpoints are deployed for this test. */
+	CHECK(vm_get_count() >= 2);
+	vm0_vcpu = vm_get_vcpu(vm_find_index(0), 0);
+	vm1_vcpu = vm_get_vcpu(vm_find_index(1), 0);
+
+	/* The execution context of each VM is scheduled on CPU0. */
+	vm0_vcpu->cpu = cpu0;
+	vm1_vcpu->cpu = cpu0;
+
+	/*
+	 * Enable the timer peripheral for each vCPU and setup an arbitraty
+	 * countdown value.
+	 */
+	vm0_vcpu->regs.arch_timer.cval = 555555;
+	vm1_vcpu->regs.arch_timer.cval = 999999;
+	vm0_vcpu->regs.arch_timer.ctl = 1;
+	vm1_vcpu->regs.arch_timer.ctl = 1;
+
+	/* No vCPU is being tracked through either timer list. */
+	deadline_vcpu = timer_find_vcpu_nearest_deadline(cpu0);
+	EXPECT_TRUE(deadline_vcpu == NULL);
+	deadline_vcpu = timer_find_vcpu_nearest_deadline(cpu1);
+	EXPECT_TRUE(deadline_vcpu == NULL);
+
+	/* vCPU of VM0 and VM1 are being added to the list. */
+	timer_vcpu_manage(vm0_vcpu);
+	timer_vcpu_manage(vm1_vcpu);
+
+	deadline_vcpu = timer_find_vcpu_nearest_deadline(cpu0);
+	EXPECT_EQ(deadline_vcpu, vm0_vcpu);
+
+	/* Remove one of the vCPUs from the CPU0 list. */
+	vm0_vcpu->regs.arch_timer.cval = 0;
+	vm0_vcpu->regs.arch_timer.ctl = 0;
+	timer_vcpu_manage(vm0_vcpu);
+
+	/* This leaves one vCPU entry on CPU0 list. */
+	deadline_vcpu = timer_find_vcpu_nearest_deadline(cpu0);
+	EXPECT_EQ(deadline_vcpu, vm1_vcpu);
+
+	/* Attempt to migrate VM1 vCPU from CPU0 to CPU1. */
+	vcpu_locked = vcpu_lock(vm1_vcpu);
+	timer_migrate_to_other_cpu(cpu1, vcpu_locked);
+	vcpu_unlock(&vcpu_locked);
+
+	/*
+	 * After migration, ensure the list is empty on CPU0 but non-empty on
+	 * CPU1.
+	 */
+	deadline_vcpu = timer_find_vcpu_nearest_deadline(cpu0);
+	EXPECT_TRUE(deadline_vcpu == NULL);
+
+	/*
+	 * vCPU of VM1 is now running on CPU1. It must be the target vCPU when
+	 * the timer has expired.
+	 */
+	target_vcpu = timer_find_target_vcpu(vm1_vcpu);
+	EXPECT_EQ(target_vcpu, vm1_vcpu);
 }
 
 /**
