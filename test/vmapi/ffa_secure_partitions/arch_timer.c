@@ -616,3 +616,94 @@ TEST_LONG_RUNNING(arch_timer, multiple_sp_periodic_deadline)
 
 	base_multiple_sp_deadline_continuous(&args);
 }
+
+void cpu_entry_multiple_deadline_continuous_mp(uintptr_t args)
+{
+	struct ffa_value res;
+	struct multiple_sp_deadline_continuous_arguments *test =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct multiple_sp_deadline_continuous_arguments *)args;
+
+	/*
+	 * Execution context(s) of Secure Partitions on secondary CPUs need
+	 * cycles, to be allocated through FFA_RUN interface, to reach message
+	 * loop.
+	 */
+	if (!test->service2_is_up) {
+		res = ffa_run(test->service2_id, test->vcpu_id);
+		EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
+	}
+
+	res = ffa_run(test->service3_id, test->vcpu_id);
+	EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
+
+	base_multiple_sp_deadline_continuous(test);
+
+	semaphore_signal(&test->sync);
+}
+
+TEST_LONG_RUNNING(arch_timer, multiple_sp_periodic_deadline_mp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+	struct multiple_sp_deadline_continuous_arguments args[] = {
+		{.service1_id = service1_info->vm_id,
+		 .service1_timer_period = 50,
+		 .service2_id = service2_info->vm_id,
+		 .service2_timer_period = 25,
+		 .service2_is_up = service2_info->vcpu_count == 1,
+		 .service3_id = service3_info->vm_id,
+		 .service3_timer_period = 100,
+		 .active_wait_timer = 400},
+		{.service1_id = service1_info->vm_id,
+		 .service1_timer_period = 10,
+		 .service2_id = service2_info->vm_id,
+		 .service2_timer_period = 20,
+		 .service2_is_up = service2_info->vcpu_count == 1,
+		 .service3_id = service3_info->vm_id,
+		 .service3_timer_period = 30,
+		 .active_wait_timer = 100},
+		{.service1_id = service1_info->vm_id,
+		 .service1_timer_period = 20,
+		 .service2_id = service2_info->vm_id,
+		 .service2_timer_period = 40,
+		 .service2_is_up = service2_info->vcpu_count == 1,
+		 .service3_id = service3_info->vm_id,
+		 .service3_timer_period = 80,
+		 .active_wait_timer = 200},
+		{.service1_id = service1_info->vm_id,
+		 .service1_timer_period = 30,
+		 .service2_id = service2_info->vm_id,
+		 .service2_timer_period = 60,
+		 .service2_is_up = service2_info->vcpu_count == 1,
+		 .service3_id = service3_info->vm_id,
+		 .service3_timer_period = 90,
+		 .active_wait_timer = 300}};
+
+	for (size_t i = 0; i < ARRAY_SIZE(args); i++) {
+		uintptr_t id;
+		id = hftest_get_cpu_id(i + 1);
+
+		HFTEST_LOG("Booting CPU %zu - %lx", i + 1, id);
+
+		semaphore_init(&(args[i].sync));
+
+		args[i].vcpu_id = i + 1;
+
+		EXPECT_EQ(hftest_cpu_start(
+				  id, hftest_get_secondary_ec_stack(i + 1),
+				  cpu_entry_multiple_deadline_continuous_mp,
+				  (uintptr_t)&args[i]),
+			  true);
+
+		HFTEST_LOG("Done with CPU %zu", i);
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(args); i++) {
+		semaphore_wait(&args[i].sync);
+	}
+
+	HFTEST_LOG("Terminated the test.\n");
+}
