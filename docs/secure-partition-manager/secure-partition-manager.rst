@@ -762,26 +762,29 @@ used for memory sharing operations from the normal world again.
 The minimum and maximum buffer sizes supported by the FF-A instance can be
 queried by calling ``FFA_FEATURES`` with the ``FFA_RXTX_MAP`` function ID.
 
-FFA_PARTITION_INFO_GET
-~~~~~~~~~~~~~~~~~~~~~~
+FFA_PARTITION_INFO_GET/FFA_PARTITION_INFO_GET_REGS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Partition info get call can originate:
 
 - from SP to SPMC
 - from Hypervisor or OS kernel to SPMC. The request is relayed by the SPMD.
+- from SPMC to SPMD (FFA_PARTITION_INFO_GET_REGS only)
 
-FFA_PARTITION_INFO_GET_REGS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The primary use of the FFA_PARTITION_INFO_GET_REGS is to return partition
+information via registers as opposed to via RX/TX buffers and is useful in
+cases where sharing memory is difficult.
 
-This call can originate:
+The SPMC reports the features supported by an SP in accordance to the caller.
+E.g. SPs can't issue direct message requests to the Normal World. As such,
+even though SP may have enabled sending direct message requests in the manifest,
+the respective SP's properties information will hint that the SP doesn't support
+sending direct message requests.
 
-- from SP to SPMC
-- from SPMC to SPMD
-- from Hypervsior or OS kernel to SPMC. The request is relayed by the SPMD.
-
-The primary use of this ABI is to return partition information via registers
-as opposed to via RX/TX buffers and is useful in cases where sharing memory is
-difficult.
+The information is also filtered by FF-A version. E.g. indirect message support
+in Hafnium was added in FF-A v1.1. An FF-A v1.0 caller will not get indirect
+message support for an SP, even if the SP is v1.1 or higher, and has enabled
+indirect messaging in its manifest.
 
 FFA_ID_GET
 ~~~~~~~~~~
