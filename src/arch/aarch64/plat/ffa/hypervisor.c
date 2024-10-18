@@ -26,7 +26,17 @@
 #include "smc.h"
 #include "sysregs.h"
 
-static bool ffa_tee_enabled;
+static bool ffa_tee_enabled = false;
+
+bool plat_ffa_is_tee_enabled(void)
+{
+	return ffa_tee_enabled;
+}
+
+void plat_ffa_set_tee_enabled(bool tee_enabled)
+{
+	ffa_tee_enabled = tee_enabled;
+}
 
 bool vm_supports_indirect_messages(struct vm *vm)
 {
@@ -54,11 +64,6 @@ struct ffa_value plat_ffa_spmc_id_get(void)
 void plat_ffa_log_init(void)
 {
 	dlog_info("Initializing Hafnium (Hypervisor)\n");
-}
-
-void plat_ffa_set_tee_enabled(bool tee_enabled)
-{
-	ffa_tee_enabled = tee_enabled;
 }
 
 static void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send,
@@ -92,7 +97,7 @@ void plat_ffa_init(struct mpool *ppool)
 
 	(void)ppool;
 
-	if (!ffa_tee_enabled) {
+	if (!plat_ffa_is_tee_enabled()) {
 		return;
 	}
 
@@ -136,7 +141,7 @@ void plat_ffa_init(struct mpool *ppool)
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.send)),
 		HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
 
-	ffa_tee_enabled = true;
+	plat_ffa_set_tee_enabled(true);
 
 	/*
 	 * Hypervisor will write to secure world receive buffer, and will read

@@ -11,10 +11,15 @@ source_set("absent") {
   sources = [ "absent.c" ]
 }
 
+config("hypervisor_config") {
+  include_dirs = [ "inc" ]
+}
+
 source_set("hypervisor") {
   public_configs = [
     "//src/arch/${plat_arch}:config",
     "//src/arch/${plat_arch}:arch_config",
+    ":hypervisor_config",
   ]
   deps = [ "//vmlib/${plat_arch}:smc_call" ]
   sources = [ "hypervisor.c" ]
