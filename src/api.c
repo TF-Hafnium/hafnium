@@ -1181,6 +1181,10 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 	bool need_vm_lock;
 	struct two_vcpu_locked vcpus_locked;
 
+	const struct ffa_value ffa_run_abi =
+		(struct ffa_value){.func = FFA_RUN_32};
+	const struct ffa_value *ffa_run_ret = NULL;
+
 	/*
 	 * Check that the registers are available so that the vCPU can be run.
 	 *
@@ -1269,54 +1273,15 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 		}
 
 		assert(need_vm_lock == true);
-		if (!vm_locked.vm->el0_partition &&
-		    plat_ffa_inject_notification_pending_interrupt(
-			    vcpu_next_locked, current_locked, vm_locked)) {
-			/* TODO: setting a return value to override
-			 * the placeholder (FFA_ERROR(INTERRUPTED))
-			 * set by FFA_MSG_WAIT. FF-A v1.1 allows
-			 * FFA_MSG_WAIT to successfully return even if
-			 * it didn't receive a message. TFTF tests are
-			 * still expecting an FFA_ERROR instead,
-			 * should be fixed?
-			 */
-			arch_regs_set_retval(
-				&vcpu->regs,
-				(struct ffa_value){.func = FFA_RUN_32,
-						   // TODO: does it make sense
-						   // to set vCPU/receiver?
-						   .arg1 = 0});
-			break;
+		if (!vm_locked.vm->el0_partition) {
+			plat_ffa_inject_notification_pending_interrupt(
+				vcpu_next_locked, current_locked, vm_locked);
 		}
 
-		/*
-		 * A pending message allows the vCPU to run so the message can
-		 * be delivered directly.
-		 */
-		if (vcpu->vm->mailbox.state == MAILBOX_STATE_FULL) {
-			arch_regs_set_retval(&vcpu->regs,
-					     ffa_msg_recv_return(vcpu->vm));
-			break;
-		}
+		/* Provide reference to the return value. */
+		ffa_run_ret = &ffa_run_abi;
 
-		if (vcpu_interrupt_count_get(vcpu_next_locked) > 0) {
-			break;
-		}
-
-		if (arch_timer_enabled(&vcpu->regs)) {
-			timer_remaining_ns =
-				arch_timer_remaining_ns(&vcpu->regs);
-			if (timer_remaining_ns == 0) {
-				break;
-			}
-		} else {
-			dlog_verbose("Timer disabled\n");
-		}
-		run_ret->func = FFA_MSG_WAIT_32;
-		run_ret->arg1 = ffa_vm_vcpu(vcpu->vm->id, vcpu_index(vcpu));
-		run_ret->arg2 = timer_remaining_ns;
-		ret = false;
-		goto out;
+		break;
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 		if (need_vm_lock &&
 		    plat_ffa_inject_notification_pending_interrupt(
@@ -1375,21 +1340,14 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 
 	plat_ffa_init_schedule_mode_ffa_run(current_locked, vcpu_next_locked);
 
-	/* It has been decided that the vCPU should be run. */
 	vcpu->cpu = current_locked.vcpu->cpu;
-	vcpu->state = VCPU_STATE_RUNNING;
+
+	vcpu_set_running(vcpu_next_locked, ffa_run_ret);
 
 	if (vcpu_was_init_state) {
 		vcpu_set_phys_core_idx(vcpu);
 		vcpu_set_boot_info_gp_reg(vcpu);
 	}
-
-	/*
-	 * Mark the registers as unavailable now that we're about to reflect
-	 * them onto the real registers. This will also prevent another physical
-	 * CPU from trying to read these registers.
-	 */
-	vcpu->regs_available = false;
 
 	ret = true;
 

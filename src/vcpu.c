@@ -301,7 +301,8 @@ void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
  * However, this action is restricted to WAITING and BLOCKED states,
  * as such, assert accordingly.
  */
-void vcpu_set_running(struct vcpu_locked target_locked, struct ffa_value *args)
+void vcpu_set_running(struct vcpu_locked target_locked,
+		      const struct ffa_value *args)
 {
 	struct vcpu *target_vcpu = target_locked.vcpu;
 
