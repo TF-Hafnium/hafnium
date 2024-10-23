@@ -17,11 +17,13 @@
 #include "partition_services.h"
 #include "sp805.h"
 #include "sp_helpers.h"
+#include "wdog.h"
 
 #define SP_SKIP_SLEEP 0U
 #define SP_SLEEP_TIME 100U
 #define SP_SHORT_SLEEP 10U
 #define TIMER_DEADLINE 50U
+#define NS_SLEEP_TIME 200U
 
 #define FORWARD_TIMER_CMD 1
 
@@ -371,6 +373,76 @@ TEST_PRECONDITION_LONG_RUNNING(arch_timer, migrate_with_deadline,
 
 	/* Check for the last serviced secure virtual interrupt. */
 	res = sp_get_last_interrupt_cmd_send(own_id, companion_id);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/* Make sure virtual timer interrupt was serviced. */
+	EXPECT_EQ(sp_resp_value(res), HF_VIRTUAL_TIMER_INTID);
+}
+
+TEST(arch_timer, preempted_state)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_id_t receiver_id = service2_info->vm_id;
+
+	gicv3_system_setup();
+
+	/* Source of non-secure interrupt. */
+	setup_wdog_timer_interrupt();
+
+	/* Set watchdog timer for 20 ms. */
+	start_wdog_timer(20);
+
+	res = sp_virtual_interrupt_cmd_send(own_id, receiver_id,
+					    HF_VIRTUAL_TIMER_INTID, true, 0);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	res = sp_program_arch_timer_sleep_cmd_send(own_id, receiver_id, 200, 50,
+						   0);
+
+	/* SP is pre-empted by the non-secure watchdog interrupt. */
+	EXPECT_EQ(res.func, FFA_INTERRUPT_32);
+
+	/* VM id/vCPU index are passed through arg1. */
+	EXPECT_EQ(res.arg1, ffa_vm_vcpu(receiver_id, 0));
+
+	/* Waiting for interrupt to be serviced in normal world. */
+	while (last_interrupt_id == 0) {
+		EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
+		EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
+		EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
+		EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+	}
+
+	/* Check that we got the non-secure watchdog interrupt. */
+	EXPECT_EQ(last_interrupt_id, IRQ_WDOG_INTID);
+
+	/* Stop the watchdog timer. */
+	wdog_stop();
+
+	/*
+	 * NS Interrupt has been serviced and receiver SP is now in PREEMPTED
+	 * state. Wait for arch timer of SP to be fired. SPMC queues the secure
+	 * virtual interrupt.
+	 */
+	waitms(NS_SLEEP_TIME);
+
+	/*
+	 * Resume the SP to complete the busy loop, handle the secure virtual
+	 * interrupt and return with success.
+	 */
+	res = ffa_run(ffa_vm_id(res), ffa_vcpu_index(res));
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, SP_SUCCESS);
+
+	/* Check for the last serviced secure virtual interrupt. */
+	res = sp_get_last_interrupt_cmd_send(own_id, receiver_id);
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
