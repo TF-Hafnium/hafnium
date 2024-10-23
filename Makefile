@@ -138,7 +138,6 @@ license:
 	@find build/ -name \*.py -o -name \*.sh -o -name \*.inc -o -name Dockerfile* | xargs -n1 python3 build/license.py --style hash
 	@find kokoro/ -name \*.sh -o -name \*.cfg | xargs -n1 python3 build/license.py --style hash
 	@find test/ -name \*.py| xargs -n1 python3 build/license.py --style hash
-	@find . \( -path ./driver/linux -o -path ./third_party \) -prune -o \( -name \*.gn -o -name \*.gni \) -print | xargs -n1 python3 build/license.py --style hash
 
 .PHONY: list
 list:

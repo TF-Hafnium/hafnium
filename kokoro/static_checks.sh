@@ -45,13 +45,3 @@ then
 	echo "Run \`make license\' locally to fix this."
 	exit 1
 fi
-
-# Make sure the Linux driver maintains style. It's already built as
-# part of the tests.
-(
-unset CHECKPATCH &&
-export ARCH=arm64 &&
-export CROSS_COMPILE=aarch64-linux-gnu- &&
-cd driver/linux &&
-make HAFNIUM_PATH="${ROOT_DIR}" checkpatch
-)
