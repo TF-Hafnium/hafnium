@@ -135,13 +135,6 @@ license:
 	@find test/ -name \*.py| xargs -n1 python3 build/license.py --style hash
 	@find . \( -path ./driver/linux -o -path ./third_party \) -prune -o \( -name \*.gn -o -name \*.gni \) -print | xargs -n1 python3 build/license.py --style hash
 
-.PHONY: update-prebuilts
-update-prebuilts: prebuilts/linux-aarch64/linux/vmlinuz
-
-prebuilts/linux-aarch64/linux/vmlinuz: $(OUT_DIR)/build.ninja
-	@$(NINJA) -C $(OUT_DIR) "third_party/linux"
-	cp $(OUT_DIR)/obj/third_party/linux/linux.bin $@
-
 .PHONY: list
 list:
 	@build/check_platform_exists.py $(PROJECT)
