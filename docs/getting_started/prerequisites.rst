@@ -59,6 +59,18 @@ In addion, install the following python lib using `pip`_:
 
    pip3 install fdt
 
+The file kokoro/static_checks.sh runs a series of static code checks into Hafnium's codebase.
+Hafnium follows the linux kernel coding guidelines. As such, the static code checks using the
+'checkpatch.pl' script from linux source tree. To setup and download 'checkpatch.pl':
+
+.. code:: shell
+   ./build/setup_checkpatch.sh
+
+Then test it works with:
+
+.. code:: shell
+   make checkpatch
+
 Documentation
 ^^^^^^^^^^^^^
 
