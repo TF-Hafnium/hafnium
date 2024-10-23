@@ -381,6 +381,7 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd, service1_is_mp_sp)
 	ffa_id_t memory_receivers[] = {
 		service1_info->vm_id,
 	};
+	uint32_t receivers_ipi_state_indexes[] = {0};
 	uint32_t sri_id;
 	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
 	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
@@ -396,13 +397,12 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd, service1_is_mp_sp)
 	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
 
 	/* Share memory to setup the IPI state structure. */
-	hftest_ipi_state_share_page_and_init((uint64_t)ipi_state_page,
-					     memory_receivers, 1, mb.send);
+	hftest_ipi_state_share_page_and_init(
+		(uint64_t)ipi_state_page, memory_receivers,
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send);
 
-	/*
-	 * Resumes service1 in target vCPU0 to retrieve memory and configure the
-	 * IPI state.
-	 */
+	/* Run the service so it can enter the waiting state. */
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
 
@@ -424,7 +424,7 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd, service1_is_mp_sp)
 	/*
 	 * Set the state to READY such that vCPU1 injects IPI to target vCPU0.
 	 */
-	hftest_ipi_state_set(READY);
+	hftest_ipi_state_set_all_ready();
 
 	/* Wait for the SRI. */
 	while (last_interrupt_id != sri_id) {
@@ -486,6 +486,7 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_swd, service1_is_mp_sp)
 		service1_info->vm_id,
 		service2_info->vm_id,
 	};
+	uint32_t receivers_ipi_state_indexes[] = {0, 0};
 	uint32_t sri_id;
 	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
 	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
@@ -508,12 +509,10 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_swd, service1_is_mp_sp)
 
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)ipi_state_page, memory_receivers,
-		ARRAY_SIZE(memory_receivers), mb.send);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send);
 
-	/*
-	 * Resumes service1/2 in target vCPU to retrieve the memory, and
-	 * initialise the state.
-	 */
+	/* Run the services so they can enter the waiting state. */
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
 	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_MSG_WAIT_32);
 
@@ -593,6 +592,7 @@ TEST_PRECONDITION(ipi, receive_ipi_preempted_vcpu, service1_is_mp_sp)
 	ffa_id_t memory_receivers[] = {
 		service1_info->vm_id,
 	};
+	uint32_t receivers_ipi_state_indexes[] = {0};
 
 	/* Initialize semaphores to sync primary and secondary cores. */
 	semaphore_init(&vcpu1_args.work_done);
@@ -604,9 +604,10 @@ TEST_PRECONDITION(ipi, receive_ipi_preempted_vcpu, service1_is_mp_sp)
 	/* Setting buffer to control the IPI state. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)ipi_state_page, memory_receivers,
-		ARRAY_SIZE(memory_receivers), mb.send);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send);
 
-	/* Service1 to setup the IPI state. */
+	/* Run the service so it can enter the blocked state. */
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
@@ -636,7 +637,7 @@ TEST_PRECONDITION(ipi, receive_ipi_preempted_vcpu, service1_is_mp_sp)
 	 * As such, signal the state machine that the "send_ipi" service
 	 * can invoke the 'hf_interrupt_send_ipi' interface.
 	 */
-	hftest_ipi_state_set(READY);
+	hftest_ipi_state_set_all_ready();
 
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
@@ -672,9 +673,8 @@ TEST_PRECONDITION(ipi, receive_ipi_blocked_vcpu, service1_is_mp_sp)
 		.vcpu_id = 1,
 		.target_vcpu_id = 0,
 		.mb = mb};
-	ffa_id_t memory_receivers[] = {
-		service1_info->vm_id,
-	};
+	ffa_id_t memory_receivers[] = {service1_info->vm_id};
+	uint32_t receivers_ipi_state_indexes[] = {0};
 
 	/* Initialize semaphores to sync primary and secondary cores. */
 	semaphore_init(&vcpu1_args.work_done);
@@ -686,12 +686,11 @@ TEST_PRECONDITION(ipi, receive_ipi_blocked_vcpu, service1_is_mp_sp)
 	/* Setting buffer to control the IPI state. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)ipi_state_page, memory_receivers,
-		ARRAY_SIZE(memory_receivers), mb.send);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send);
 
-	/* Service1 to setup the IPI state. */
+	/* Run the service so it can enter the blocked state. */
 	ret = ffa_run(service1_info->vm_id, 0);
-
-	/* Service1 left in blocked state in vCPU0. */
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
 	/* Bring-up the core that sends the IPI. */
@@ -705,7 +704,7 @@ TEST_PRECONDITION(ipi, receive_ipi_blocked_vcpu, service1_is_mp_sp)
 	 * As such, signal the state machine that the "send_ipi" service
 	 * can invoke the 'hf_interrupt_send_ipi' interface.
 	 */
-	hftest_ipi_state_set(READY);
+	hftest_ipi_state_set_all_ready();
 
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
