@@ -306,9 +306,11 @@ struct hftest_test {
 		 * If service is a Secondary VM, let the service configure \
 		 * its mailbox and wait for a message.                     \
 		 */                                                        \
-		res = ffa_run(vm_id, vcpu_id);                             \
-		ASSERT_EQ(res.func, FFA_MSG_WAIT_32);                      \
-		ASSERT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);                 \
+		if (ffa_is_vm_id(vm_id)) {                                 \
+			res = ffa_run(vm_id, vcpu_id);                     \
+			ASSERT_EQ(res.func, FFA_MSG_WAIT_32);              \
+			ASSERT_EQ(res.arg2, FFA_SLEEP_INDEFINITE);         \
+		}                                                          \
                                                                            \
 		/*                                                         \
 		 * Send the selected service to run and let it be          \
