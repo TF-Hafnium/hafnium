@@ -56,7 +56,9 @@ PREBUILTS := $(CURDIR)/prebuilts/$(UNAME_S)-$(UNAME_M)
 GN ?= $(PREBUILTS)/gn/gn
 NINJA ?= $(PREBUILTS)/ninja/ninja
 
-CHECKPATCH := $(CURDIR)/third_party/linux/scripts/checkpatch.pl \
+CHECKPATCH_SCRIPT:=$(CURDIR)/out/checkpatch/checkpatch.pl
+
+CHECKPATCH := $(CHECKPATCH_SCRIPT) \
 	--ignore BRACES,SPDX_LICENSE_TAG,VOLATILE,SPLIT_STRING,AVOID_EXTERNS,USE_SPINLOCK_T,NEW_TYPEDEFS,INITIALISED_STATIC,FILE_PATH_CHANGES,EMBEDDED_FUNCTION_NAME,SINGLE_STATEMENT_DO_WHILE_MACRO,MACRO_WITH_FLOW_CONTROL,PREFER_PACKED,PREFER_ALIGNED,INDENTED_LABEL,SPACING,PREFER_PRINTF --quiet
 
 # Specifies the grep pattern for ignoring specific files in checkpatch.
@@ -65,7 +67,7 @@ CHECKPATCH := $(CURDIR)/third_party/linux/scripts/checkpatch.pl \
 # debug_el1.c : uses XMACROS, which checkpatch doesn't understand.
 # perfmon.c : uses XMACROS, which checkpatch doesn't understand.
 # feature_id.c : uses XMACROS, which checkpatch doesn't understand.
-CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c\|src/arch/aarch64/hypervisor/feature_id.c"
+CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c\|src/arch/aarch64/hypervisor/feature_id.c\|src/arch/aarch64/stack_protector.c\|src/arch/aarch64/inc/hf/arch/sve.h\|inc/hf/dlog.h\|inc/hf/arch/std.h\|inc/hf/panic.h\|inc/system/sys/cdefs.h\|inc/hf/bits.h"
 
 OUT ?= out/$(PROJECT)
 OUT_DIR = $(OUT)
@@ -108,11 +110,14 @@ format:
 	@find . \( -name \*.gn -o -name \*.gni \) | xargs -n1 $(GN) format
 
 .PHONY: checkpatch
-checkpatch:
-	@find src/ -name \*.c -o -name \*.h | grep -v $(CHECKPATCH_IGNORE) | xargs $(CHECKPATCH) -f
-	@find inc/ -name \*.c -o -name \*.h | grep -v $(CHECKPATCH_IGNORE) | xargs $(CHECKPATCH) -f
+checkpatch: $(CHECKPATCH_SCRIPT)
+	@find src/ -name \*.c -o -name \*.h | grep -v $(CHECKPATCH_IGNORE) | xargs $(CHECKPATCH) -f --no-tree
+	@find inc/ -name \*.c -o -name \*.h | grep -v $(CHECKPATCH_IGNORE) | xargs $(CHECKPATCH) -f --no-tree
 	# TODO: enable for test/
-	@find project/ -name \*.c -o -name \*.h | grep -v $(CHECKPATCH_IGNORE) | xargs $(CHECKPATCH) -f
+	@find project/ -name \*.c -o -name \*.h | grep -v $(CHECKPATCH_IGNORE) | xargs $(CHECKPATCH) -f --no-tree
+
+$(CHECKPATCH_SCRIPT):
+	@build/setup_checkpatch.sh
 
 # see .clang-tidy.
 .PHONY: tidy
