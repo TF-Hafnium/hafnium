@@ -1859,6 +1859,28 @@ All S-EL0 partitions must use AArch64. AArch32 S-EL0 partitions are not supporte
 Interrupt handling, Memory sharing, indirect messaging, and notifications features
 in context of S-EL0 partitions are supported.
 
+Support for arch timer and system counter
+-----------------------------------------
+Secure Partitions can configure the EL1 physical timer (CNTP_*_EL0) to generate
+a virtual interrupt in the future. SPs have access to CNTPCT_EL0 (system count
+value) and CNTFRQ_EL0 (frequency of the system count). Once the deadline set by
+the timer expires, the SPMC injects a virtual interrupt (ID=3) and resumes
+the SP's execution context at the earliest opportunity as allowed by the secure
+interrupt signaling rules outlined in the FF-A specification.  Hence, it is
+likely that time could have passed between the moment the deadline expired and
+the interrupt is subsequently signaled.
+
+Any access from an SP to EL1 physical timer registers is trapped and emulated
+by SPMC behind the scenes, though this is completely oblivious to the SP.
+This ensures that any EL1 physical timer deadline set by a normal world endpoint
+is not overriden by either SPs or SPMC.
+
+Note: As per Arm ARM, assuming no support for FEAT_ECV, S-EL1 has direct access
+to EL1 virtual timer registers but S-EL0 accesses are trapped to higher ELs.
+Consequently, any attempt by an S-EL0 partition to access EL1 virtual timer
+registers leads to a crash while such an attempt by S-EL1 partition effectively
+has no impact on its execution context.
+
 References
 ==========
 
