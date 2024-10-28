@@ -3050,6 +3050,79 @@ void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
 	}
 }
 
+static bool api_ffa_msg_send_direct_resp_validate_args(struct ffa_value args,
+						       struct vcpu *current)
+{
+	ffa_id_t sender_vm_id = ffa_sender(args);
+	ffa_id_t receiver_vm_id = ffa_receiver(args);
+
+	/*
+	 * If using FFA_MSG_SEND_DIRECT_RESP, the caller's
+	 *  - x2 MBZ for partition messages
+	 *  - x8-x17 SBZ if caller's FF-A version >= FF-A v1.2
+	 */
+	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64) {
+		if (!ffa_is_framework_msg(args) &&
+		    !api_ffa_dir_msg_is_arg2_zero(args)) {
+			dlog_verbose("%s: w2 Must Be Zero",
+				     ffa_func_name(args.func));
+			return false;
+		}
+
+		if (current->vm->ffa_version >= FFA_VERSION_1_2 &&
+		    !api_extended_args_are_zero(&args)) {
+			return false;
+		}
+	}
+
+	if (!plat_ffa_is_direct_response_valid(current, sender_vm_id,
+					       receiver_vm_id)) {
+		dlog_verbose("Invalid direct response call.\n");
+		return false;
+	}
+
+	return true;
+}
+
+static bool api_ffa_msg_send_direct_resp_validate_ongoing_request(
+	struct ffa_value args, struct vcpu_locked current_locked)
+{
+	bool req_framework =
+		current_locked.vcpu->direct_request_origin.is_framework;
+	bool resp_framework = ffa_is_framework_msg(args);
+	bool received_req2 =
+		current_locked.vcpu->direct_request_origin.is_ffa_req2;
+
+	if (!is_ffa_direct_msg_request_ongoing(current_locked)) {
+		return false;
+	}
+
+	if (req_framework && !resp_framework) {
+		dlog_verbose(
+			"Mismatch in framework message bit: request was a %s "
+			"message, but response is a %s message\n",
+			req_framework ? "framework" : "non-framework",
+			resp_framework ? "framework" : "non-framework");
+		return false;
+	}
+
+	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64 && received_req2) {
+		dlog_verbose(
+			"FFA_MSG_SEND_DIRECT_RESP must be used with "
+			"FFA_MSG_SEND_DIRECT_REQ\n");
+		return false;
+	}
+
+	if (args.func == FFA_MSG_SEND_DIRECT_RESP2_64 && !received_req2) {
+		dlog_verbose(
+			"FFA_MSG_SEND_DIRECT_RESP2 must be used with "
+			"FFA_MSG_SEND_DIRECT_REQ2\n");
+		return false;
+	}
+
+	return true;
+}
+
 /**
  * Send an FF-A direct message response.
  * This handler covers both FFA_MSG_SEND_DIRECT_RESP_32/64
@@ -3077,32 +3150,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 		(struct ffa_value){.func = FFA_INTERRUPT_32};
 	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
 	struct two_vcpu_locked vcpus_locked;
-	bool received_req2;
-	bool req_framework;
-	bool resp_framework;
 
-	/*
-	 * If using FFA_MSG_SEND_DIRECT_RESP, the caller's
-	 *  - x2 MBZ for partition messages
-	 *  - x8-x17 SBZ if caller's FF-A version >= FF-A v1.2
-	 */
-	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64) {
-		if (!ffa_is_framework_msg(args) &&
-		    !api_ffa_dir_msg_is_arg2_zero(args)) {
-			dlog_verbose("%s: w2 Must Be Zero",
-				     ffa_func_name(args.func));
-			return ffa_error(FFA_INVALID_PARAMETERS);
-		}
-
-		if (current->vm->ffa_version >= FFA_VERSION_1_2 &&
-		    !api_extended_args_are_zero(&args)) {
-			return ffa_error(FFA_INVALID_PARAMETERS);
-		}
-	}
-
-	if (!plat_ffa_is_direct_response_valid(current, sender_vm_id,
-					       receiver_vm_id)) {
-		dlog_verbose("Invalid direct response call.\n");
+	if (!api_ffa_msg_send_direct_resp_validate_args(args, current)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -3118,47 +3167,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 	assert(!vm_id_is_current_world(current->vm->id) ||
 	       next_state == VCPU_STATE_WAITING);
 
-	/*
-	 * Ensure the terminating FFA_MSG_SEND_DIRECT_REQ had a
-	 * defined originator.
-	 */
-	if (!is_ffa_direct_msg_request_ongoing(current_locked)) {
-		/*
-		 * Sending direct response but direct request origin
-		 * vCPU is not set.
-		 */
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	}
-
-	req_framework = current_locked.vcpu->direct_request_origin.is_framework;
-	resp_framework = ffa_is_framework_msg(args);
-
-	if (req_framework && !resp_framework) {
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		dlog_verbose(
-			"Mismatch in framework message bit: request was a %s "
-			"message, but response is a %s message\n",
-			req_framework ? "framework" : "non-framework",
-			resp_framework ? "framework" : "non-framework");
-		goto out;
-	}
-
-	received_req2 = current->direct_request_origin.is_ffa_req2;
-
-	if (args.func != FFA_MSG_SEND_DIRECT_RESP2_64 && received_req2) {
-		dlog_verbose(
-			"%s: FFA_MSG_SEND_DIRECT_RESP must be used with "
-			"FFA_MSG_SEND_DIRECT_REQ.\n",
-			__func__);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
-	} else if (args.func == FFA_MSG_SEND_DIRECT_RESP2_64 &&
-		   !received_req2) {
-		dlog_verbose(
-			"%s: FFA_MSG_SEND_DIRECT_RESP2 must be used with "
-			"FFA_MSG_SEND_DIRECT_REQ2.\n",
-			__func__);
+	if (!api_ffa_msg_send_direct_resp_validate_ongoing_request(
+		    args, current_locked)) {
 		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
