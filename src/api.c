@@ -2821,12 +2821,12 @@ static bool api_ffa_dir_msg_req2_is_uuid_valid(struct vm *receiver_vm,
  * range of registers (x4-x17, instead of x4-x7) to be used as part of the
  * message payload.
  */
-struct ffa_value api_ffa_msg_send_direct_req(ffa_id_t sender_vm_id,
-					     ffa_id_t receiver_vm_id,
-					     struct ffa_value args,
+struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 					     struct vcpu *current,
 					     struct vcpu **next)
 {
+	ffa_id_t sender_vm_id = ffa_sender(args);
+	ffa_id_t receiver_vm_id = ffa_receiver(args);
 	struct ffa_value ret;
 	struct vm *receiver_vm;
 	struct vm_locked receiver_locked;
@@ -3061,12 +3061,12 @@ void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
  * of registers (x4-x17, instead of x4-x7) to be used as part of the
  * message payload.
  */
-struct ffa_value api_ffa_msg_send_direct_resp(ffa_id_t sender_vm_id,
-					      ffa_id_t receiver_vm_id,
-					      struct ffa_value args,
+struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 					      struct vcpu *current,
 					      struct vcpu **next)
 {
+	ffa_id_t sender_vm_id = ffa_sender(args);
+	ffa_id_t receiver_vm_id = ffa_receiver(args);
 	struct vcpu_locked current_locked;
 	struct vcpu_locked next_locked = (struct vcpu_locked){
 		.vcpu = NULL,
