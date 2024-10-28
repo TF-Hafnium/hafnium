@@ -218,7 +218,13 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 			HFTEST_LOG("Received FF-A interrupt.");
 			res = handle_ffa_interrupt(res);
 		} else if (res.func == FFA_RUN_32) {
-			res = handle_ffa_run(res);
+			/*
+			 * Received FFA_RUN in waiting state, the endpoint
+			 * simply returns by FFA_MSG_WAIT.
+			 */
+			HFTEST_LOG("Received FFA_RUN...");
+			ASSERT_EQ(res.arg1, 0);
+			res = ffa_msg_wait();
 		} else {
 			HFTEST_LOG_FAILURE();
 			HFTEST_LOG(HFTEST_LOG_INDENT

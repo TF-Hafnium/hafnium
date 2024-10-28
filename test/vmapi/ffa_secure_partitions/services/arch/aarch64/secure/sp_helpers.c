@@ -64,13 +64,3 @@ struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 
 	return ffa_msg_wait();
 }
-
-struct ffa_value handle_ffa_run(struct ffa_value res)
-{
-	/*
-	 * Received FFA_RUN in waiting state, the endpoint
-	 * simply returns by FFA_MSG_WAIT.
-	 */
-	ASSERT_EQ(res.arg1, 0);
-	return ffa_msg_wait();
-}

@@ -85,14 +85,6 @@ struct ffa_value handle_ffa_interrupt(struct ffa_value res)
 	return ffa_msg_wait();
 }
 
-struct ffa_value handle_ffa_run(struct ffa_value res)
-{
-	HFTEST_LOG_FAILURE();
-	HFTEST_LOG(HFTEST_LOG_INDENT "0x%lx is not a valid function\n",
-		   res.func);
-	abort();
-}
-
 void sp_register_secondary_ep(struct hftest_context *ctx)
 {
 	(void)ctx;
