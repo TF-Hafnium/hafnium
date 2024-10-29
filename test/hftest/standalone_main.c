@@ -16,7 +16,7 @@
 #include "hftest_common.h"
 #include "test/hftest.h"
 
-alignas(4096) uint8_t kstack[4096];
+alignas(4096) uint8_t kstack[2 * 4096];
 
 extern struct hftest_test hftest_begin[];
 extern struct hftest_test hftest_end[];
