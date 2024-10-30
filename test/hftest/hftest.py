@@ -234,7 +234,7 @@ class QemuDriver(Driver):
 
     def gen_exec_args(self, test_args, is_long_running):
         """Generate command line arguments for QEMU."""
-        time_limit = "120s" if is_long_running else "10s"
+        time_limit = "120s" if is_long_running else "30s"
         # If no CPU configuration is selected, then test against the maximum
         # configuration, "max", supported by QEMU.
         if not self.args.cpu or self.args.cpu == "max":
@@ -349,7 +349,7 @@ class FvpDriver(Driver, ABC):
         """Generate command line arguments for FVP."""
         show_output = debug or show_output
         disable_visualisation = self.args.disable_visualisation is True
-        time_limit = "100s" if is_long_running else "40s"
+        time_limit = "150s" if is_long_running else "40s"
         fvp_args = []
 
         if not show_output:
