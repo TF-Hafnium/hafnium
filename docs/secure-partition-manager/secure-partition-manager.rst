@@ -853,6 +853,17 @@ and responses with the following rules:
 - An SP cannot send a direct request to an Hypervisor or OS kernel.
 - An Hypervisor or OS kernel can send a direct request to an SP.
 - An SP can send a direct response to an Hypervisor or OS kernel.
+- An SP cannot reply to a framework direct request with a non-framework direct response.
+
+The hypervisor can inform SPs when a VM is created or destroyed by sending **VM
+availability messages** via the ``FFA_MSG_SEND_DIRECT_REQ`` ABI.
+
+A SP subscribes to receiving VM created and/or VM destroyed messages by
+specifying the ``vm-availability-messages`` field in its manifest (see
+`ffa-manifest-binding`_). The SPM will only forward messages to the SP if the SP
+is subscribed to the message kind. The SP must reply with the corresponding
+direct message response (via the ``FFA_MSG_SEND_DIRECT_RESP`` ABI) after it has
+handled the message.
 
 FFA_MSG_SEND_DIRECT_REQ2/FFA_MSG_SEND_DIRECT_RESP2
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
