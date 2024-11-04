@@ -305,14 +305,26 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu, service1_is_mp_sp)
 		.vcpu_id = 1,
 		.target_vcpu_id = 0,
 		.mb = mb};
-
-	/* Initialize semaphores to sync primary and secondary cores. */
-	semaphore_init(&vcpu1_args.work_done);
+	ffa_id_t memory_receivers[] = {
+		service1_info->vm_id,
+	};
+	uint32_t receivers_ipi_state_indexes[] = {0};
 
 	SERVICE_SELECT(service1_info->vm_id, "receive_ipi_running", mb.send);
 
 	ret = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(ret.func, FFA_YIELD_32);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Share memory to setup the IPI state structure. */
+	hftest_ipi_state_share_page_and_init(
+		(uint64_t)ipi_state_page, memory_receivers,
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send);
+
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/* Initialize semaphores to sync primary and secondary cores. */
+	semaphore_init(&vcpu1_args.work_done);
 
 	/* Bring-up the core that sends the IPI. */
 	ASSERT_TRUE(hftest_cpu_start(
@@ -879,4 +891,125 @@ TEST_PRECONDITION(ipi, receive_ipi_multiple_services_to_same_cpu_waiting,
 	/* Resumes service2 in target vCPU 0 to handle IPI. */
 	ret = ffa_run(service2_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}
+
+/*
+ * Test that if Service1 sends an IPI to a running vCPU and Service2 sends
+ * and IPI to a waiting vCPU on the same physical CPU both witll receive the
+ * IPI.
+ * Test Sequence:
+ * - Initalize the GIC so that the SRI can be received later in the test.
+ * - Bootstrap vCPU0 Service1 to run the receive_ipi_running test service
+ *   and Service2 to run the receiver_ipi_waiting_vcpu test service.
+ * - Initialize and share the memory for the IPI state. Send each service
+ *   an index of the IPI state array to use, for test coordination.
+ * - Start CPU1 and within it, invoke Service1 to send IPI. Test service waits
+ *   for state machine to transition into READY state.
+ * - Start CPU2 and within it, invoke Service2 to send IPI. Test service waits
+ *   for state machine to transition into READY state.
+ * - Run Service1, the test service will set the IPI state for all services to
+ *   READY. Service1 should recieve the IPI state handle it (mark IPI state as
+ *   HANDLED) and yield.
+ * - NWd waits to receive the SRI SGI. Once it does it checks that Service2
+ *   vCPU0 is reported but FFA_NOTIFICATION_INFO_GET as having an IPI pending.
+ *   It then runs Service2 vCPU0 to handle the IPI.
+ * - Service2 vCPU0 resumes, handles the IPI (marks IPI state as HANDLED) and
+ *   yields.
+ */
+TEST_PRECONDITION(ipi, receive_ipi_multiple_services_to_same_cpu_running,
+		  service1_and_service2_are_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_value ret;
+	struct ipi_cpu_entry_args vcpu1_args = {
+		.service_id = service1_info->vm_id,
+		.vcpu_count = service1_info->vcpu_count,
+		.vcpu_id = 1,
+		.target_vcpu_id = 0,
+		.mb = mb};
+	struct ipi_cpu_entry_args vcpu2_args = {
+		.service_id = service2_info->vm_id,
+		.vcpu_count = service2_info->vcpu_count,
+		.vcpu_id = 2,
+		.target_vcpu_id = 0,
+		.mb = mb};
+	ffa_id_t memory_receivers[] = {
+		service1_info->vm_id,
+		service2_info->vm_id,
+	};
+
+	uint32_t receivers_ipi_state_indexes[] = {0, 1};
+	uint32_t sri_id;
+	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+
+	gicv3_system_setup();
+	/* Get ready to handle SRI. */
+	sri_id = enable_sri();
+
+	SERVICE_SELECT(service1_info->vm_id, "receive_ipi_running", mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "receive_ipi_waiting_vcpu",
+		       mb.send);
+
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Share memory to setup the IPI state structure. */
+	hftest_ipi_state_share_page_and_init(
+		(uint64_t)ipi_state_page, memory_receivers,
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send);
+
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+	/* Run the services so they enter the waiting state. */
+	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_MSG_WAIT_32);
+
+	/* Initialize semaphores to sync primary and secondary cores. */
+	semaphore_init(&vcpu1_args.work_done);
+	semaphore_init(&vcpu2_args.work_done);
+
+	/* Bring-up the core that sends the IPI. */
+	ASSERT_TRUE(hftest_cpu_start(
+		hftest_get_cpu_id(vcpu1_args.vcpu_id),
+		hftest_get_secondary_ec_stack(vcpu1_args.vcpu_id),
+		cpu_entry_send_ipi, (uintptr_t)&vcpu1_args));
+	ASSERT_TRUE(hftest_cpu_start(
+		hftest_get_cpu_id(vcpu2_args.vcpu_id),
+		hftest_get_secondary_ec_stack(vcpu2_args.vcpu_id),
+		cpu_entry_send_ipi, (uintptr_t)&vcpu2_args));
+
+	/*
+	 * Reset the last interrupt ID so we know the next SRI is relate to
+	 * the IPI handling.
+	 */
+	last_interrupt_id = 0;
+	/*
+	 * Run service1 which will set the ready state for both service1
+	 * and service2.
+	 */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Wait for the SRI. */
+	while (last_interrupt_id != sri_id) {
+		interrupt_wait();
+	}
+
+	/* Check the target vCPU 0 is returned by FFA_NOTIFICATION_INFO_GET. */
+	expected_lists_sizes[0] = 1;
+	expected_ids[0] = service2_info->vm_id;
+	expected_ids[1] = 0;
+	ffa_notification_info_get_and_check(1, expected_lists_sizes,
+					    expected_ids);
+
+	/* Resumes service2 in target vCPU 0 to handle IPI. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	semaphore_wait(&vcpu1_args.work_done);
+	semaphore_wait(&vcpu2_args.work_done);
 }

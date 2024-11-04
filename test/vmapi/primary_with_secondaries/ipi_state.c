@@ -14,13 +14,6 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
-/* Default global state for IPI. */
-static struct hftest_int_state ipi = {
-	.state = INIT,
-	.lock = SPINLOCK_INIT,
-	.category = SOFTWARE,
-};
-
 /*
  * Global IPI states used the functions below.
  */
@@ -53,12 +46,6 @@ void hftest_ipi_state_set_all_ready(void)
 	for (uint32_t i = 0; i < MAX_CPUS; i++) {
 		hftest_ipi_state_set_at_index(READY, i);
 	}
-}
-
-void hftest_ipi_init_state_default(void)
-{
-	ipi_states = &ipi;
-	current_ipi_state_index = 0;
 }
 
 static void hftest_ipi_init_state_through_ptr(uintptr_t addr)

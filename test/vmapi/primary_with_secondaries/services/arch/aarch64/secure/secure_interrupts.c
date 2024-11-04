@@ -102,7 +102,10 @@ static void irq_handler(void)
 		rtm_init_espi_handled = true;
 		break;
 	case HF_IPI_INTID:
-		HFTEST_LOG("Received Inter-Processor Interrupt %u.", intid);
+		HFTEST_LOG(
+			"Received Inter-Processor Interrupt %u, "
+			"partition %x.\n",
+			intid, hf_vm_get_id());
 		ASSERT_TRUE(hftest_ipi_state_is(SENT));
 		hftest_ipi_state_set(HANDLED);
 		break;
@@ -425,7 +428,7 @@ TEST_SERVICE(send_ipi_fails)
  */
 TEST_SERVICE(receive_ipi_running)
 {
-	hftest_ipi_init_state_default();
+	struct ffa_value ret;
 
 	exception_setup(irq_handler, NULL);
 	interrupts_enable();
@@ -434,10 +437,16 @@ TEST_SERVICE(receive_ipi_running)
 	EXPECT_EQ(hf_interrupt_enable(HF_IPI_INTID, true, INTERRUPT_TYPE_IRQ),
 		  0);
 
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
+					   SERVICE_SEND_BUFFER());
+
 	/* Yield such that 'send_ipi' can be spawn. */
 	ffa_yield();
 
-	hftest_ipi_state_set(READY);
+	hftest_ipi_state_set_all_ready();
 
 	dlog_verbose("Waiting for the IPI\n");
 
@@ -532,8 +541,6 @@ TEST_SERVICE(set_ipi_ready)
 TEST_SERVICE(receive_ipi_preempted_or_blocked)
 {
 	struct ffa_value ret;
-
-	hftest_ipi_init_state_default();
 
 	exception_setup(irq_handler, NULL);
 	interrupts_enable();

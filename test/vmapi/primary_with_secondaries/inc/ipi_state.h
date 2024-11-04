@@ -8,7 +8,6 @@
 
 #include "int_state.h"
 
-void hftest_ipi_init_state_default(void);
 void hftest_ipi_state_share_page_and_init(
 	uint64_t page, ffa_id_t receivers_ids[],
 	uint32_t receivers_ipi_state_indexes[], size_t receivers_count,
