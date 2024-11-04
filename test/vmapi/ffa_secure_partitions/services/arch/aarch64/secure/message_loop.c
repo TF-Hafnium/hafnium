@@ -222,20 +222,20 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 
 	while (1) {
 		if (res.func == FFA_MSG_SEND_DIRECT_REQ_32) {
-			HFTEST_LOG("Received direct message request");
+			dlog_verbose("Received direct message request");
 			res = handle_direct_req_cmd(res);
 		} else if (res.func == FFA_MSG_SEND_DIRECT_REQ2_64) {
-			HFTEST_LOG("Received direct message request2");
+			dlog_verbose("Received direct message request2");
 			res = handle_direct_req2_cmd(res);
 		} else if (res.func == FFA_INTERRUPT_32) {
-			HFTEST_LOG("Received FF-A interrupt.");
+			dlog_verbose("Received FF-A interrupt.");
 			res = handle_interrupt(res);
 		} else if (res.func == FFA_RUN_32) {
 			/*
 			 * Received FFA_RUN in waiting state, the endpoint
 			 * simply returns by FFA_MSG_WAIT.
 			 */
-			HFTEST_LOG("Received FFA_RUN...");
+			dlog_verbose("Received FFA_RUN...");
 			ASSERT_EQ(res.arg1, 0);
 			res = ffa_msg_wait();
 		} else {
