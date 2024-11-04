@@ -49,8 +49,8 @@ int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
 				    uint32_t intid,
 				    struct vcpu_locked current_locked,
 				    struct vcpu **next);
-uint64_t api_hf_interrupt_send_ipi(uint32_t target_vcpu_id,
-				   struct vcpu *current);
+int64_t api_hf_interrupt_send_ipi(uint32_t target_vcpu_id,
+				  struct vcpu *current);
 
 struct ffa_value api_ffa_msg_send(ffa_id_t sender_vm_id,
 				  ffa_id_t receiver_vm_id, uint32_t size,

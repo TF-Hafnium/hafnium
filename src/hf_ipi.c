@@ -28,6 +28,7 @@ void hf_ipi_init_interrupt(void)
 		.sec_state = INT_DESC_SEC_STATE_S,
 		.priority = IPI_PRIORITY,
 		.valid = true,
+		.enabled = true,
 	};
 
 	plat_interrupts_configure_interrupt(ipi_desc);
@@ -39,9 +40,16 @@ void hf_ipi_init_interrupt(void)
  */
 struct vcpu *hf_ipi_get_pending_target_vcpu(struct cpu *current)
 {
-	struct vcpu *ret = current->ipi_target_vcpu;
+	struct vcpu *ret;
+
+	sl_lock(&current->lock);
+
+	ret = current->ipi_target_vcpu;
 
 	current->ipi_target_vcpu = NULL;
+
+	sl_unlock(&current->lock);
+
 	return ret;
 }
 
@@ -53,7 +61,11 @@ void hf_ipi_send_interrupt(struct vm *vm, ffa_vcpu_index_t target_vcpu_index)
 	struct vcpu *target_vcpu = vm_get_vcpu(vm, target_vcpu_index);
 	struct cpu *target_cpu = target_vcpu->cpu;
 
+	sl_lock(&target_cpu->lock);
+
 	target_cpu->ipi_target_vcpu = target_vcpu;
+
+	sl_unlock(&target_cpu->lock);
 	plat_interrupts_send_sgi(HF_IPI_INTID, target_cpu, true);
 }
 

@@ -19,6 +19,7 @@
 #include "hf/addr.h"
 #include "hf/check.h"
 #include "hf/ffa.h"
+#include "hf/hf_ipi.h"
 #include "hf/plat/interrupts.h"
 #include "hf/std.h"
 #include "hf/vm.h"
@@ -323,6 +324,9 @@ void arch_cpu_init(struct cpu *c)
 	 * running core.
 	 */
 	host_timer_init();
+
+	/* Initialise IPIs for the current cpu. */
+	hf_ipi_init_interrupt();
 }
 
 struct vcpu *arch_vcpu_resume(struct cpu *c)

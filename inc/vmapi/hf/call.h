@@ -412,7 +412,7 @@ static inline int64_t hf_interrupt_reconfigure_target_cpu(
  */
 static inline int64_t hf_interrupt_send_ipi(ffa_vcpu_index_t target_vcpu_id)
 {
-	return hf_call(HF_INTERRUPT_SEND_IPI, (uint32_t)target_vcpu_id, 0, 0);
+	return hf_call(HF_INTERRUPT_SEND_IPI, (uint64_t)target_vcpu_id, 0, 0);
 }
 
 /** Obtains the Hafnium's version of the implemented FF-A specification. */

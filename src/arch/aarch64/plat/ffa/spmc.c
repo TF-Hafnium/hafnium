@@ -2058,6 +2058,7 @@ void plat_ffa_sri_init(struct cpu *cpu)
 		.sec_state = INT_DESC_SEC_STATE_NS,
 		.priority = SRI_PRIORITY,
 		.valid = true,
+		.enabled = true,
 	};
 
 	/* TODO: when supported, make the interrupt driver use cpu structure. */

@@ -4921,13 +4921,12 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
  * Send an IPI interrupt to a target vcpu belonging to the
  * sender that isn't itself.
  */
-uint64_t api_hf_interrupt_send_ipi(uint32_t target_vcpu_id,
-				   struct vcpu *current)
+int64_t api_hf_interrupt_send_ipi(uint32_t target_vcpu_id, struct vcpu *current)
 {
 	struct vm *vm = current->vm;
 	ffa_vcpu_index_t target_vcpu_index = vcpu_id_to_index(target_vcpu_id);
 
-	if (target_vcpu_index >= vm->vcpu_count &&
+	if (target_vcpu_index >= vm->vcpu_count ||
 	    target_vcpu_index == cpu_index(current->cpu)) {
 		dlog_verbose("Invalid vCPU %d for IPI.\n", target_vcpu_id);
 		return -1;

@@ -13,7 +13,6 @@
 #include "hf/check.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
-#include "hf/hf_ipi.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/types.h"
@@ -75,8 +74,6 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 
 	arch_cpu_init(c);
 
-	/* Initialize IPI for running core. */
-	hf_ipi_init_interrupt();
 	/* Initialize SRI for running core. */
 	plat_ffa_sri_init(c);
 
