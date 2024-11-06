@@ -450,3 +450,90 @@ TEST(arch_timer, preempted_state)
 	/* Make sure virtual timer interrupt was serviced. */
 	EXPECT_EQ(sp_resp_value(res), HF_VIRTUAL_TIMER_INTID);
 }
+
+static void cpu_entry_migrate_blocked_vpu(uintptr_t arg)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_value res;
+
+	struct secondary_cpu_entry_args *args =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct secondary_cpu_entry_args *)arg;
+
+	/*
+	 * Resume the blocked execution context by migrating it to CPU7.
+	 * This ensures it completes the previously programmed active sleep.
+	 */
+	res = ffa_run(args->receiver_id, 0);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg3, SP_SUCCESS);
+
+	/* Check for the last serviced secure virtual interrupt. */
+	res = sp_get_last_interrupt_cmd_send(own_id, args->receiver_id);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/*
+	 * The virtual timer interrupt should have been serviced by the
+	 * execution context by now since the deadline has expired.
+	 */
+	EXPECT_EQ(sp_resp_value(res), HF_VIRTUAL_TIMER_INTID);
+
+	/* Releases the lock passed in. */
+	sl_unlock(&args->lock);
+
+	arch_cpu_stop();
+}
+
+/**
+ * This test aims to migrate a blocked execution context of an SP with a
+ * pending timer to another physical CPU. The virtual timer interrupt shall
+ * be injected by SPMC to target execution context. At the end, the test checks
+ * if the virtual timer interrupt has been serviced.
+ */
+TEST_PRECONDITION(arch_timer, migrate_blocked_vcpu_pending_timer,
+		  service2_is_up_sp)
+{
+	struct ffa_value res;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_id_t up_receiver_id = service2_info->vm_id;
+	const ffa_vcpu_index_t vcpu_id = LAST_SECONDARY_VCPU_ID;
+	struct secondary_cpu_entry_args args = {.receiver_id = up_receiver_id,
+						.vcpu_id = vcpu_id};
+
+	res = sp_virtual_interrupt_cmd_send(own_id, up_receiver_id,
+					    HF_VIRTUAL_TIMER_INTID, true, 0);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	res = sp_program_arch_timer_sleep_cmd_send(
+		own_id, up_receiver_id, TIMER_DEADLINE, SP_SKIP_SLEEP, 0);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	/*
+	 * Send request to the SP to yield direct request. This effectively
+	 * puts the execution context in BLOCKED state.
+	 */
+	res = sp_sleep_cmd_send(own_id, up_receiver_id, TIMER_DEADLINE,
+				OPTIONS_YIELD_DIR_REQ);
+	EXPECT_EQ(res.func, FFA_YIELD_32);
+
+	/* Start secondary EC while holding lock. */
+	sl_lock(&args.lock);
+
+	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(vcpu_id),
+				     hftest_get_secondary_ec_stack(vcpu_id),
+				     cpu_entry_migrate_blocked_vpu,
+				     (uintptr_t)&args));
+
+	/* Wait for secondary CPU to release the lock. */
+	sl_lock(&args.lock);
+
+	HFTEST_LOG("End of test");
+}
