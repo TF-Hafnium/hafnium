@@ -246,6 +246,28 @@ TEST_SERVICE(send_ipi)
 }
 
 /**
+ * Test Service to send IPI to a designated vCPU ID where the send
+ * is expect to fail.
+ */
+TEST_SERVICE(send_ipi_fails)
+{
+	ffa_vcpu_index_t vcpu;
+	struct ffa_value ret;
+
+	dlog_verbose("Receiving ID of target vCPU...");
+
+	while (true) {
+		ret = ffa_msg_wait();
+		EXPECT_EQ(ret.func, FFA_RUN_32);
+
+		receive_indirect_message((void *)&vcpu, sizeof(vcpu),
+					 SERVICE_RECV_BUFFER(), NULL);
+
+		EXPECT_EQ(hf_interrupt_send_ipi(vcpu), -1);
+	}
+}
+
+/**
  * Test service to valid IPI behaviour when target vCPU is in the running
  * state.
  * - Configures the IPI VI.

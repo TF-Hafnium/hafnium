@@ -256,6 +256,40 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu, service1_is_mp_sp)
 }
 
 /**
+ * Test that a service cannot target an IPI to it's own vCPU or an invalid vCPU
+ * ID.
+ */
+TEST_PRECONDITION(ipi, receive_ipi_invalid_target_vcpus, service1_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value ret;
+	const ffa_id_t own_id = hf_vm_get_id();
+	ffa_vcpu_index_t target_vcpu_id = 0;
+
+	SERVICE_SELECT(service1_info->vm_id, "send_ipi_fails", mb.send);
+
+	/* Run service. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Send service it's own vCPU index. */
+	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
+				    &target_vcpu_id, sizeof(target_vcpu_id), 0);
+
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
+
+	target_vcpu_id = MAX_CPUS;
+	/* Send service an out of bounds vCPU index. */
+	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
+				    &target_vcpu_id, sizeof(target_vcpu_id), 0);
+
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
+}
+
+/**
  * Test that Service1 can send IPI to vCPU0 from vCPU1, whilst vCPU0 is in
  * waiting state and execution is in the normal world.
  * Test Sequence:
