@@ -26,6 +26,7 @@ source_set("hypervisor") {
     "hypervisor.c",
     "hypervisor/direct_messaging.c",
     "hypervisor/indirect_messaging.c",
+    "hypervisor/vm.c",
   ]
 }
 
@@ -42,5 +43,6 @@ source_set("spmc") {
     "spmc.c",
     "spmc/direct_messaging.c",
     "spmc/indirect_messaging.c",
+    "spmc/vm.c",
   ]
 }

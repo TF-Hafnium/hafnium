@@ -10,6 +10,7 @@
 #include "hf/arch/other_world.h"
 #include "hf/arch/plat/ffa.h"
 #include "hf/arch/plat/ffa/indirect_messaging.h"
+#include "hf/arch/plat/ffa/vm.h"
 
 #include "hf/api.h"
 #include "hf/dlog.h"
@@ -33,12 +34,6 @@ bool plat_ffa_is_tee_enabled(void)
 void plat_ffa_set_tee_enabled(bool tee_enabled)
 {
 	ffa_tee_enabled = tee_enabled;
-}
-
-bool vm_supports_indirect_messages(struct vm *vm)
-{
-	return vm->ffa_version >= FFA_VERSION_1_1 &&
-	       vm_supports_messaging_method(vm, FFA_PARTITION_INDIRECT_MSG);
 }
 
 struct ffa_value plat_ffa_spmc_id_get(void)
@@ -217,7 +212,7 @@ bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
 	struct vm *vm = vm_locked.vm;
 	ffa_id_t vm_id = vm->id;
 
-	if (!ffa_tee_enabled || !vm_supports_indirect_messages(vm)) {
+	if (!ffa_tee_enabled || !plat_ffa_vm_supports_indirect_messages(vm)) {
 		return false;
 	}
 
@@ -261,7 +256,8 @@ bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 	 * - The VM's version is not FF-A v1.1.
 	 * - If the mailbox ownership hasn't been transferred to the SPMC.
 	 */
-	if (!ffa_tee_enabled || !vm_supports_indirect_messages(to_locked.vm) ||
+	if (!ffa_tee_enabled ||
+	    !plat_ffa_vm_supports_indirect_messages(to_locked.vm) ||
 	    to_locked.vm->mailbox.state != MAILBOX_STATE_OTHER_WORLD_OWNED) {
 		return true;
 	}
@@ -326,13 +322,6 @@ ffa_partition_properties_t plat_ffa_partition_properties(
 		result &= ~FFA_PARTITION_DIRECT_REQ_SEND;
 	}
 	return result;
-}
-
-bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
-{
-	(void)vm;
-
-	return false;
 }
 
 bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
@@ -453,20 +442,6 @@ bool plat_ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
 	}
 
 	return true;
-}
-
-struct vm_locked plat_ffa_vm_find_locked(ffa_id_t vm_id)
-{
-	if (vm_id_is_current_world(vm_id) || vm_id == HF_OTHER_WORLD_ID) {
-		return vm_find_locked(vm_id);
-	}
-
-	return (struct vm_locked){.vm = NULL};
-}
-
-struct vm_locked plat_ffa_vm_find_locked_create(ffa_id_t vm_id)
-{
-	return plat_ffa_vm_find_locked(vm_id);
 }
 
 void plat_ffa_notification_info_get_forward(uint16_t *ids, uint32_t *ids_count,
@@ -600,20 +575,6 @@ bool plat_ffa_notifications_get_framework_notifications(
 	return true;
 }
 
-bool plat_ffa_vm_notifications_info_get(     // NOLINTNEXTLINE
-	uint16_t *ids, uint32_t *ids_count,  // NOLINTNEXTLINE
-	uint32_t *lists_sizes,		     // NOLINTNEXTLINE
-	uint32_t *lists_count, const uint32_t ids_count_max)
-{
-	(void)ids;
-	(void)ids_count;
-	(void)lists_sizes;
-	(void)lists_count;
-	(void)ids_count_max;
-
-	return false;
-}
-
 void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 {
 	struct vm *vm = vm_locked.vm;
@@ -624,7 +585,7 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 		return;
 	}
 
-	if (!vm_supports_indirect_messages(vm)) {
+	if (!plat_ffa_vm_supports_indirect_messages(vm)) {
 		return;
 	}
 
@@ -646,12 +607,6 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 	dlog_verbose("Mailbox of %x owned by SPMC.\n", vm_locked.vm->id);
 }
 
-void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
-{
-	/* Hypervisor never frees VM structs. */
-	(void)to_destroy_locked;
-}
-
 void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 {
 	struct ffa_value ret;
@@ -666,7 +621,7 @@ void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 		return;
 	}
 
-	if (!vm_supports_indirect_messages(vm_locked.vm)) {
+	if (!plat_ffa_vm_supports_indirect_messages(vm_locked.vm)) {
 		return;
 	}
 
@@ -1793,11 +1748,6 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	(void)error_code;
 	/* TODO: Interface not handled in hypervisor. */
 	return ffa_error(FFA_NOT_SUPPORTED);
-}
-
-void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
-{
-	(void)vm_locked;
 }
 
 uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)

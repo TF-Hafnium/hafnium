@@ -62,14 +62,7 @@ bool plat_ffa_notifications_get_framework_notifications(
 
 void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked);
 
-void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked);
-
 void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked);
-
-/**
- * Checks whether managed exit is supported by given SP.
- */
-bool plat_ffa_vm_managed_exit_supported(struct vm *vm);
 
 /**
  * Encodes memory handle according to section 5.10.2 of the FF-A v1.0 spec.
@@ -95,13 +88,6 @@ uint32_t plat_ffa_other_world_mode(void);
  */
 ffa_partition_properties_t plat_ffa_partition_properties(
 	ffa_id_t caller_id, const struct vm *target);
-
-/**
- * Get NWd VM's structure.
- */
-struct vm_locked plat_ffa_vm_find_locked(ffa_id_t vm_id);
-
-struct vm_locked plat_ffa_vm_find_locked_create(ffa_id_t vm_id);
 
 /**
  * Creates a bitmap for the VM of the given ID.
@@ -135,11 +121,6 @@ bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 			  struct ffa_value *ret);
 
 bool plat_ffa_notification_info_get_call(struct ffa_value *ret);
-
-bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
-					uint32_t *lists_sizes,
-					uint32_t *lists_count,
-					uint32_t ids_count_max);
 
 /**
  * Helper to send SRI and safely update `ffa_sri_state`, if there has been
@@ -285,11 +266,6 @@ bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id);
  */
 int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
 				       uint32_t value, struct vcpu *current);
-
-/**
- * Reclaim all resources belonging to VM in aborted state.
- */
-void plat_ffa_free_vm_resources(struct vm_locked vm_locked);
 
 void plat_save_ns_simd_context(struct vcpu *vcpu);
 
