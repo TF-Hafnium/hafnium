@@ -35,26 +35,6 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 			 struct ffa_value *run_ret, struct vcpu **next);
 
 /**
- * Perform checks for the state transition being requested by the Partition
- * based on it's runtime model and return false if an illegal transition is
- * being performed.
- */
-bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
-					     ffa_id_t vm_id,
-					     ffa_id_t receiver_vm_id,
-					     struct vcpu_locked locked_vcpu,
-					     uint32_t func,
-					     enum vcpu_state *next_state);
-
-void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
-					 struct vcpu_locked target_locked);
-
-struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					uint32_t timeout_low,
-					uint32_t timeout_high);
-
-/**
  * FF-A v1.2 FFA_ERROR interface.
  * Implemented for SPMC in RTM_SP_INIT runtime model.
  */
