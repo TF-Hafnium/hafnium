@@ -171,29 +171,6 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
 	return true;
 }
 
-void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
-{
-	(void)current;
-	(void)next;
-
-	/*
-	 * SPMD uses FFA_INTERRUPT ABI to convey secure interrupt to
-	 * SPMC. Execution should not reach hypervisor with this ABI.
-	 */
-	CHECK(false);
-}
-
-bool plat_ffa_inject_notification_pending_interrupt(
-	struct vcpu_locked target_locked, struct vcpu_locked current_locked,
-	struct vm_locked receiver_locked)
-{
-	(void)target_locked;
-	(void)current_locked;
-	(void)receiver_locked;
-
-	return false;
-}
-
 /**
  * Returns FFA_ERROR as FFA_SECONDARY_EP_REGISTER is not supported at the
  * non-secure FF-A instances.
@@ -259,24 +236,6 @@ bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	(void)vm_id;
 	return false;
-}
-
-/**
- * Enable relevant virtual interrupts for VMs.
- */
-void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
-					struct vm_locked vm_locked)
-{
-	struct vcpu *current;
-	struct interrupts *interrupts;
-
-	current = current_locked.vcpu;
-	interrupts = &current->interrupts;
-
-	if (vm_locked.vm->notifications.enabled) {
-		vcpu_virt_interrupt_set_enabled(interrupts,
-						HF_NOTIFICATION_PENDING_INTID);
-	}
 }
 
 /**
@@ -464,11 +423,6 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 	(void)error_code;
 	/* TODO: Interface not handled in hypervisor. */
 	return ffa_error(FFA_NOT_SUPPORTED);
-}
-
-uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)
-{
-	return api_interrupt_get(current_locked);
 }
 
 bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)

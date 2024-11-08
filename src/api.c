@@ -17,6 +17,7 @@
 #include "hf/arch/plat/ffa/direct_messaging.h"
 #include "hf/arch/plat/ffa/ffa_memory.h"
 #include "hf/arch/plat/ffa/indirect_messaging.h"
+#include "hf/arch/plat/ffa/interrupts.h"
 #include "hf/arch/plat/ffa/notifications.h"
 #include "hf/arch/plat/ffa/setup_and_discovery.h"
 #include "hf/arch/plat/ffa/vm.h"
