@@ -1688,36 +1688,26 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			next = NULL;
 			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 					    (struct vcpu_locked){.vcpu = NULL});
-		} else if (current->vm->id == HF_OTHER_WORLD_ID) {
-			/*
-			 * When secure interrupt triggers while execution is in
-			 * normal world, queue the virtual interrupt and resume
-			 * the current vCPU.
-			 */
-			next = NULL;
-			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
-					    (struct vcpu_locked){.vcpu = NULL});
-		} else {
+		} else if (is_predecessor_in_call_chain(current_locked,
+							target_vcpu_locked)) {
 			struct ffa_value ret_interrupt =
 				api_ffa_interrupt_return(0);
 
 			/*
-			 * Under the current design, there is only one possible
-			 * scenario in which target vCPU is in blocked state:
-			 * both the preempted and target vCPU are in NWd
-			 * scheduled call chain and is described in scenario 1
-			 * of Table 8.4 in EAC0 spec. SPMC leaves all
+			 * If the target vCPU ran earlier in the same call
+			 * chain as the current vCPU, SPMC leaves all
 			 * intermediate execution contexts in blocked state and
 			 * resumes the target vCPU for handling secure
 			 * interrupt.
+			 * Under the current design, there is only one possible
+			 * scenario in which this could happen: both the
+			 * preempted (i.e. current) and target vCPU are in the
+			 * same NWd scheduled call chain and is described in the
+			 * Scenario 1 of Table 8.4 in EAC0 spec.
 			 */
 			assert(current_locked.vcpu->scheduling_mode ==
 			       NWD_MODE);
 			assert(target_vcpu->scheduling_mode == NWD_MODE);
-
-			/* Both must be part of the same call chain. */
-			assert(is_predecessor_in_call_chain(
-				current_locked, target_vcpu_locked));
 
 			/*
 			 * The execution preempted the call chain that involved
@@ -1731,6 +1721,17 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 					    current_locked);
 
 			next = target_vcpu;
+		} else {
+			/*
+			 * The target vCPU cannot be resumed now because it is
+			 * in BLOCKED state (it yielded CPU cycles using
+			 * FFA_YIELD). SPMC queues the virtual interrupt and
+			 * resumes the current vCPU which could belong to either
+			 * a VM or a SP.
+			 */
+			next = NULL;
+			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
+					    (struct vcpu_locked){.vcpu = NULL});
 		}
 		break;
 	case VCPU_STATE_PREEMPTED:
