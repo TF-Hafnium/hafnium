@@ -157,3 +157,9 @@ bool ffa_partition_info_regs_get_part_info(
 
 void update_mm_security_state(struct ffa_composite_memory_region *composite,
 			      ffa_memory_attributes_t attributes);
+
+uint64_t get_shared_page_from_message(void *recv_buf, void *send_buf,
+				      void *retrieve_buffer);
+
+void share_page_with_endpoints(uint64_t page, ffa_id_t receivers_ids[],
+			       size_t receivers_count, void *send_buf);

@@ -895,3 +895,56 @@ void ffa_notification_info_get_and_check(
 				FFA_NOTIFICATIONS_INFO_GET_MAX_IDS)),
 		  0);
 }
+
+/**
+ * Various tests rely on shared variables among endpoints for test
+ * coordination. This utility is helpful for an endpoint to obtain
+ * the address of a shared page that holds the common variables.
+ */
+uint64_t get_shared_page_from_message(void *recv_buf, void *send_buf,
+				      void *retrieve_buffer)
+{
+	struct ffa_memory_region *memory_region =
+		(struct ffa_memory_region *)retrieve_buffer;
+	struct ffa_composite_memory_region *composite;
+
+	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
+				     HF_MAILBOX_SIZE);
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+
+	/* Expect memory is NS and needs to be updated. */
+	update_mm_security_state(composite, memory_region->attributes);
+
+	return composite->constituents[0].address;
+}
+
+/**
+ * Share a normal write-back cacheable page with other endpoints in the test.
+ * This page holds common variables used for test coordination. All receivers
+ * have read write permissions to the shared page.
+ */
+void share_page_with_endpoints(uint64_t page, ffa_id_t receivers_ids[],
+			       size_t receivers_count, void *send_buf)
+{
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = page, .page_count = 1},
+	};
+	struct ffa_memory_access receivers[2];
+
+	/* Currently tests don't need more than two. */
+	assert(receivers_count <= 2);
+
+	/* Provide same level of access to the receivers. */
+	for (size_t i = 0; i < receivers_count; i++) {
+		ffa_memory_access_init(
+			&receivers[i], receivers_ids[i], FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
+	}
+
+	send_memory_and_retrieve_request_multi_receiver(
+		FFA_MEM_SHARE_32, send_buf, HF_PRIMARY_VM_ID, constituents,
+		ARRAY_SIZE(constituents), receivers, receivers_count, receivers,
+		receivers_count, 0, 0, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_CACHE_WRITE_BACK);
+}

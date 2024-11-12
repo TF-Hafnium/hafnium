@@ -106,19 +106,11 @@ static void hftest_ipi_init_state_through_ptr(uintptr_t addr)
 
 void hftest_ipi_init_state_from_message(void *recv_buf, void *send_buf)
 {
-	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)retrieve_buffer;
-	struct ffa_composite_memory_region *composite;
+	uint64_t addr;
 
-	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
-				     HF_MAILBOX_SIZE);
-	composite = ffa_memory_region_get_composite(memory_region, 0);
-
-	/* Expect memory is NS and needs to be updated. */
-	update_mm_security_state(composite, memory_region->attributes);
-
-	hftest_ipi_init_state_through_ptr(
-		(uintptr_t)composite->constituents[0].address);
+	addr = get_shared_page_from_message(recv_buf, send_buf,
+					    retrieve_buffer);
+	hftest_ipi_init_state_through_ptr((uintptr_t)addr);
 }
 
 /* Function to share page for the ipi state structure. */
@@ -127,27 +119,8 @@ void hftest_ipi_state_share_page_and_init(uint64_t page,
 					  size_t receivers_count,
 					  void *send_buf)
 {
-	struct ffa_memory_region_constituent constituents[] = {
-		{.address = page, .page_count = 1},
-	};
-	struct ffa_memory_access receivers[2];
-
-	/* Currently tests don't need more than two. */
-	assert(receivers_count <= 2);
-
-	/* Provide same level of access to the receivers. */
-	for (size_t i = 0; i < receivers_count; i++) {
-		ffa_memory_access_init(
-			&receivers[i], receivers_ids[i], FFA_DATA_ACCESS_RW,
-			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
-	}
-
-	send_memory_and_retrieve_request_multi_receiver(
-		FFA_MEM_SHARE_32, send_buf, HF_PRIMARY_VM_ID, constituents,
-		ARRAY_SIZE(constituents), receivers, receivers_count, receivers,
-		receivers_count, 0, 0, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_CACHE_WRITE_BACK);
+	share_page_with_endpoints(page, receivers_ids, receivers_count,
+				  send_buf);
 
 	/* Initialize the state machine to the top of the page. */
 	hftest_ipi_init_state_through_ptr((uintptr_t)page);
