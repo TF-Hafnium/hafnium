@@ -1,0 +1,62 @@
+@startuml
+title IPI to a vCPU in the waiting state.
+
+autonumber
+
+participant "SPMC (CPU0)" as SPMC0
+participant "SP1 (vCPU0)" as SP1_0
+participant "FF-A Driver (CPU1)" as VM1_1
+participant "SPMC (CPU1)" as SPMC1
+participant "SP1 (vCPU1)" as SP1_1
+
+activate SP1_0
+SP1_0 -> SPMC0: HVC(HF_INTERRUPT_SEND_IPI, vCPU1)
+deactivate SP1_0
+activate SPMC0
+note over SPMC0: Track target VCPU (vCPU1) has pending IPI.
+<-SPMC0: send IPI SGI
+SPMC0->SP1_0: FFA_SUCCESS()
+
+-->SPMC1: IPI SGI
+activate SPMC1
+
+note over SPMC1: Find target vCPU and check if it's in the WAITING state.
+
+alt#Gold #LightBlue Case A: Running vCPU has a pending IPI.
+note over SPMC1: IPI VI set pending.
+note over SPMC1: Set the delayed Schedule Receiver Interrupt (SRI) flag.
+else #LightGray Case B: Running vCPU has no pending IPI.
+note over SPMC1: IPI VI set pending.
+<-SPMC1: send SRI SGI
+deactivate SPMC1
+end // ALT running vCPU with pending IPI.
+note across: Either immediately in the case there was no running vCPU with a pending IPI (Case A), or if there was (Case B), once the NWd is reentered.
+-->VM1_1: SRI SGI
+activate VM1_1
+VM1_1->SPMC1: FFA_NOTIFICATION_INFO_GET()
+activate SPMC1
+SPMC1->VM1_1: FFA_SUCCESS(List of Partitions and vCPUs)
+deactivate SPMC1
+VM1_1 -> SPMC1: FFA_RUN(SP1_ID, vCPU1_IDX)
+deactivate VM1_1
+activate SPMC1
+note over SPMC1: Check pending virtual interrupts.
+note over SPMC1: Inject virtual interrupt (HCR_EL2.VI =1)
+SPMC1->SP1_1: FFA_RUN(SP1_ID, vCPU1_IDX)
+
+deactivate SPMC1
+activate SP1_1
+-->SP1_1: IPI vIRQ
+
+group IRQ Handler
+box Interrupt Handler
+SP1_1->SPMC1: HVC(HF_INTERRUPT_GET)
+deactivate SP1_1
+activate SPMC1
+SPMC1->SP1_1: ERET(IPI_INTID)
+deactivate SPMC1
+activate SP1_1
+note over SP1_1: Handle IPI
+deactivate SP1_1
+end
+@enduml

@@ -1558,10 +1558,8 @@ Inter-Processor Interrupts
 Inter-Processor Interrupts (IPIs) are a mechanism for an SP to send an interrupt
 to to itself on another CPU in a multiprocessor system.
 
-Currently Hafnium only supports a single SP to send an IPI to each CPU at a time.
-This is described in the example below.
 If an SP wants to send an IPI from vCPU0 on CPU0 to vCPU1 on CPU1 it uses the HVC
-paravirtualized interface HF_INTERRUPT_SENT_IPI, specifying the ID of vCPU1 as the target.
+paravirtualized interface `HF_INTERRUPT_SEND_IPI`_, specifying the ID of vCPU1 as the target.
 The SPMC on CPU0 records the vCPU1 as the target vCPU the IPI is intended for, and requests
 the GIC to send a secure interrupt to the CPU1 (interrupt ID 9 has been assigned for IPIs).
 This secure interrupt is caught by the SPMC on CPU1 and enters the secure interrupt handler.
@@ -1572,12 +1570,65 @@ Here the handling of the IPI depends on the current state of the target vCPU1 as
 - WAITING: The IPI is injected to vCPU1 and an SRI is triggered to notify the Normal
   World scheduler the SP vCPU1 has a pending IPI and requires cycles to handle it.
   This SRI is received in the Normal World on CPU1, here the notifications interface
-  has been extended so that FFA_NOTIFICATION_INFO_GET will also return the SP ID and
+  has been extended so that `FFA_NOTIFICATION_INFO_GET`_ will also return the SP ID and
   vCPU ID of any vCPUs with pending IPIs. Using this information the Normal World can
   use FFA_RUN to allocate vCPU1 CPU cycles.
 - PREEMPTED/BLOCKED: Inject and queue the virtual interrupt for vCPU1. We know,
   for these states, the vCPU will eventually resumed by the Normal World Scheduler
   and the IPI virtual interrupt will then be serviced by the target vCPU.
+
+Supporting multiple services targeting vCPUs on the same CPU adds some complexity to the
+handling of IPIs. The intention behind the implementation choices is to fulfil the
+following requirements:
+
+1. All target vCPUs should receive an IPI.
+2. The running vCPU should be prioritized if it has a pending IPI, so that it isn’t
+   preempted by another vCPU, just to be later run again to handle its IPI.
+
+To achieve this, a queue of vCPUs with pending IPIs is maintained for each CPU.
+When handling the IPI SGI, the list of vCPUs with pending IPIs for the current CPU
+is emptied and each vCPU is handled as described above, fulfilling requirement 1.
+To ensure the running vCPU is prioritized, as specified in requirement 2, if there
+is a vCPU with a pending IPI in the WAITING state, and the current (running) vCPU
+also has a pending IPI, Hafnium will send the SRI at the next context switch to the
+NWd. This means the running vCPU can handle it's IPI before the NWd is interrupted
+by the SRI to schedule the waiting vCPUs. If the current (running) vCPU does not
+have a pending IPI the SRI is immediately sent.
+
+As an example this diagram shows the flow for an SP sending an IPI to a vCPU in the
+waiting state.
+
+.. image:: ../resources/diagrams/ipi_nwd_waiting_vcpu.png
+
+The transactions in the diagram above are as follows:
+
+1. SP1 running on vCPU0 sends the IPI targeting itself on vCPU1 using the
+   paravirtualised interface `HF_INTERRUPT_SEND_IPI`_.
+2. Hafnium records that there is a pending IPI for SP1 vCPU1 and triggers
+   an IPI SGI, via the interrupt controller, for CPU1.
+3. FFA_SUCCESS is returned to SP1 vCPU0 to show the IPI has been sent.
+4. The interrupt controller triggers the IPI SGI targeted at CPU1.
+   As described above, when handing the interrupt, the list of vCPUs on this CPU with
+   pending IPIs is traversed. In the case of this example SP1 vCPU1 will be in the list
+   and is in the WAITING state. If the current (RUNNING) vCPU also has a pending IPI then
+   the flow follows the Case A on the diagram. Set the IPI virtual interrupt
+   as pending on the target vCPU and set the delayed SRI flag for the current CPU.
+   Otherwise the flow follows the Case B: simply set the IPI virtual interrupt as pending
+   on the target vCPU.
+5. For the Case B the SPM sends the Schedule Receiver Interrupt (SRI) SGI through the
+   interrupt controller.
+6. In both cases the interrupt controller will eventually send an SRI SGI targeted
+   at CPU1. This will be received by the FF-A driver in the NWd.
+7. This FF-A driver can use `FFA_NOTIFICATION_INFO_GET`_ to find more information about the
+   cause of the SRI.
+8. For this test, the IPI targeted at SP1 vCPU1 so this is returned in the list of partitions
+   returned in FFA_SUCCESS.
+9. From the information given by `FFA_NOTIFICATION_INFO_GET`_, the FF-A driver knows to
+   allocate SP1 vCPU1 cycles to handle the IPI. It does this through FFA_RUN.
+10. Hafnium resumes the target vCPU and injects the IPI virtual interrupts.
+11. The execution is preempted to the IRQ handlers by the pending virtual interrupt.
+12. The SP calls HF_INTERRUPT_GET to obtain the respective interrupt ID.
+13. Hafnium return the IPI interrupt ID via eret. Handling can then continue as required.
 
 Power management
 ----------------
