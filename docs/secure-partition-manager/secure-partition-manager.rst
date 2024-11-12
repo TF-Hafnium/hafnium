@@ -1053,6 +1053,21 @@ commands:
      - Enable or disable the physical interrupt.
      - Value must be either 0 (Disable) or 1 (Enable).
 
+HF_INTERRUPT_SEND_IPI
+~~~~~~~~~~~~~~~~~~~~~
+Inter-Processor Interrupts (IPIs) are a mechanism for an SP to send an interrupt to
+itself on another CPU in a multiprocessor system. The details are described below
+in the section `Inter-Processor Interrupts`_.
+
+HF_INTERRUPT_SEND_IPI is the interface that the SP can use to trigger an IPI,
+giving the vCPU ID it wishes to target. 0 is returned if the IPI is successfully sent.
+Otherwise -1 is returned if the target vCPU ID was invalid (the current vCPU ID or
+greater than the vCPU count).
+
+The interface is only available through the HVC conduit for S-EL1 MP partitions. Since
+S-SEL0 or S-EL1 UP partitions only have a single vCPU they cannot target a different
+vCPU and therefore have no need for IPIs.
+
 SPMC-SPMD direct requests/responses
 -----------------------------------
 
@@ -1537,6 +1552,32 @@ in normal world.
      SPMD provides platform hook to handle Group0 secure interrupts. In the
      current design, SPMD expects the platform not to delegate handling to the
      NWd (such as through SDEI) while processing Group0 interrupts.
+
+Inter-Processor Interrupts
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Inter-Processor Interrupts (IPIs) are a mechanism for an SP to send an interrupt
+to to itself on another CPU in a multiprocessor system.
+
+Currently Hafnium only supports a single SP to send an IPI to each CPU at a time.
+This is described in the example below.
+If an SP wants to send an IPI from vCPU0 on CPU0 to vCPU1 on CPU1 it uses the HVC
+paravirtualized interface HF_INTERRUPT_SENT_IPI, specifying the ID of vCPU1 as the target.
+The SPMC on CPU0 records the vCPU1 as the target vCPU the IPI is intended for, and requests
+the GIC to send a secure interrupt to the CPU1 (interrupt ID 9 has been assigned for IPIs).
+This secure interrupt is caught by the SPMC on CPU1 and enters the secure interrupt handler.
+Here the handling of the IPI depends on the current state of the target vCPU1 as follows:
+
+- RUNNING: The IPI is injected to vCPU1 and normal secure interrupt handling handles
+  the IPI.
+- WAITING: The IPI is injected to vCPU1 and an SRI is triggered to notify the Normal
+  World scheduler the SP vCPU1 has a pending IPI and requires cycles to handle it.
+  This SRI is received in the Normal World on CPU1, here the notifications interface
+  has been extended so that FFA_NOTIFICATION_INFO_GET will also return the SP ID and
+  vCPU ID of any vCPUs with pending IPIs. Using this information the Normal World can
+  use FFA_RUN to allocate vCPU1 CPU cycles.
+- PREEMPTED/BLOCKED: Inject and queue the virtual interrupt for vCPU1. We know,
+  for these states, the vCPU will eventually resumed by the Normal World Scheduler
+  and the IPI virtual interrupt will then be serviced by the target vCPU.
 
 Power management
 ----------------

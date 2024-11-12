@@ -67,6 +67,9 @@ You can find additional definitions in the `Arm Glossary`_.
    GPT
       Granule Protection Table
 
+   IPI
+      Inter-Processor Interrupt
+
    ISA
       Instruction Set Architecture
 
