@@ -1633,6 +1633,85 @@ element of the data flow diagram.
 |                        | equivalent to that detailed for the FVP platform.  |
 +------------------------+----------------------------------------------------+
 
++------------------------+----------------------------------------------------+
+| ID                     | 35                                                 |
++========================+====================================================+
+| ``Threat``             | **A rogue SP could try use IPIs to steal cycles    |
+|                        | from other SPs.**                                  |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1,                                               |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC, FF-A Endpoint                                |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SPMC state, SP state, CPU cycles                   |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | S-Endpoint                                         |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Denial of Service                                  |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | High (4)         | High (4)        |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | Medium (3)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | Medium (12)      | Medium (12)     |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | When an IPI is received, if the target vCPU is     |
+|                        | in the RUNNING state, since the vCPU               |
+|                        | already has cycles it can use to handle the        |
+|                        | interrupt, the virtual interrupt is injected       |
+|                        | straight away.                                     |
+|                        | In the case the target vCPU is in the              |
+|                        | PREEMPTED/BLOCKED state, the IPI virtual interrupt |
+|                        | is simply pended. In both cases, it is implicit    |
+|                        | with the states that the vCPU will be resumed      |
+|                        | eventually. The virtual interrupt is injected and  |
+|                        | handled then.                                      |
+|                        | If the vCPU is in the WAITING state, it needs the  |
+|                        | scheduler to provide CPU cycles to it. To mitigate |
+|                        | the threat described above, the SPMC sends the SRI |
+|                        | SGI to inform the Normal World that the target     |
+|                        | vCPU has a pending IPI. It can then schedule time  |
+|                        | for the vCPU to handle the IPI virtual interrupt.  |
+|                        | This means the SP is unable to take cycles without |
+|                        | the knowledge of the Normal World Scheduler.       |
++------------------------+----------------------------------------------------+
+
++------------------------+----------------------------------------------------+
+| ID                     | 36                                                 |
++========================+====================================================+
+| ``Threat``             | **A rogue SP could try use IPIs to interrupt       |
+|                        | another SP.**                                      |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1                                                |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC, FF-A Endpoint                                |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SPMC state, SP state, CPU cycles                   |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | S-Endpoint                                         |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Denial of Service                                  |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | Medium (3)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | Low (2)          | Low (2)         |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | Medium (6)       | Medium (6)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | This is not possible. The ABI only allows an SP to |
+|                        | specify the target vCPU ID. Hafnium then directs   |
+|                        | the IPI to the vCPU with that ID, that belongs to  |
+|                        | the SP currently running on the source CPU. As     |
+|                        | such it is impossible for an SP to target another  |
+|                        | SP for an IPI.                                     |
++------------------------+----------------------------------------------------+
+
 --------------
 
 *Copyright (c) 2023, Arm Limited. All rights reserved.*
