@@ -37,6 +37,40 @@ int strncmp(const char *a, const char *b, size_t n);
  */
 #define align_down(v, a) __builtin_align_down((v), (a))
 
+/*
+ * Add operation together with checking whether the operation overflowed
+ * The result is '*res',
+ * return false on success and true on overflow
+ */
+#define add_overflow(a, b, res) __builtin_add_overflow((a), (b), (res))
+
+/*
+ * Round up a value to align with a given size and
+ * check whether overflow happens.
+ * The rounded value is '*res', return false on success and true on overflow.
+ */
+#define align_up_overflow(v, size, res)         \
+	__extension__({                         \
+		typedef __typeof(v) v_t;        \
+		v_t __v = (v);                  \
+		__typeof(size) __size = (size); \
+		__typeof(res) __res = (res);    \
+		*__res = align_up(__v, __size); \
+		__v > *__res;                   \
+	})
+
+/*
+ * Add a with b, then round up the result to align with a given size and
+ * check whether overflow happens.
+ * The rounded value is '*res', return false on success and true on overflow.
+ */
+#define add_with_round_up_overflow(a, b, size, res)                  \
+	(__extension__({                                             \
+		__typeof__(a) __add_res = 0;                         \
+		add_overflow((a), (b), &__add_res) ||                \
+			align_up_overflow(__add_res, (size), (res)); \
+	}))
+
 #ifndef be16toh
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 
