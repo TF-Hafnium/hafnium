@@ -36,6 +36,7 @@ source_set("src_not_testable_yet") {
     ":src_testable",
     "//project/${project}/${plat_name}",
     "//src/arch/${plat_arch}/hypervisor:other_world",
+    "//src/transfer_list:transfer_list",
     plat_boot_flow,
     plat_console,
     plat_iommu,
