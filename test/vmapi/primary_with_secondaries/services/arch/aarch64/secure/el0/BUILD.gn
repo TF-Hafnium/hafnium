@@ -7,15 +7,9 @@
 import("//build/image/image.gni")
 import("//test/hftest/args.gni")
 
-config("config") {
-  include_dirs =
-      [ "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure/inc" ]
-}
-
 source_set("secure_interrupts") {
   testonly = true
   public_configs = [
-    ":config",
     "//test/hftest:hftest_config",
     "//src/arch/aarch64:arch_config",
     "//src/arch/aarch64:config",
@@ -25,6 +19,7 @@ source_set("secure_interrupts") {
     "//src/arch/aarch64:smc",
     "//test/vmapi/common:ffa",
     "//test/vmapi/common/arch/aarch64/secure:twdog",
+    "//test/vmapi/primary_with_secondaries:interrupt_status",
   ]
 }
 
@@ -70,6 +65,7 @@ vm_kernel("secure_service2") {
   testonly = true
 
   deps = [
+    ":secure_interrupts",
     "//src/arch/aarch64/hftest/el0:interrupts",
     "//src/arch/aarch64/hftest/el0:mm",
     "//test/hftest:hftest_sel0_partition_base",

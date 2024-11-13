@@ -14,6 +14,7 @@
 #include "vmapi/hf/call.h"
 
 #include "gicv3.h"
+#include "interrupt_status.h"
 #include "ipi_state.h"
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
@@ -26,6 +27,7 @@
  * different endpoints.
  */
 alignas(PAGE_SIZE) static uint8_t ipi_state_page[PAGE_SIZE];
+alignas(PAGE_SIZE) static uint8_t twdog_interrupt_page[PAGE_SIZE];
 
 /**
  * Structure defined for usage in tests with multiple cores.
@@ -105,6 +107,68 @@ TEST_PRECONDITION(secure_interrupts, handle_interrupt_rtm_init,
 	/* Schedule message receiver through FFA_RUN interface. */
 	ret = ffa_run(service2_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}
+
+/**
+ * Test that SPMC will queue secure virtual interrupt targeting an SP that
+ * entered blocked state through FFA_YIELD while processing a direct request
+ * from a companion SP. This test also further ensures that SPMC signals the
+ * pending virtual interrupt through FFA_INTERRUPT interface when target SP is
+ * resumed by companion SP through FFA_RUN.
+ */
+TEST(secure_interrupts, sp_to_sp_yield_interrupt_queued)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_info *target_info = service1(mb.recv);
+	struct ffa_partition_info *companion_info = service2(mb.recv);
+	struct ffa_value ret;
+	ffa_id_t memory_receivers[] = {
+		target_info->vm_id,
+		companion_info->vm_id,
+	};
+
+	SERVICE_SELECT(target_info->vm_id, "yield_direct_req_service_twdog_int",
+		       mb.send);
+
+	/* Schedule the target SP through FFA_RUN interface. */
+	ret = ffa_run(target_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	SERVICE_SELECT(companion_info->vm_id,
+		       "send_direct_req_yielded_and_resumed", mb.send);
+
+	/*
+	 * Send an indirect message to convey the target SP responsible for
+	 * handling the secure interrupt from trusted watchdog timer.
+	 */
+	ret = send_indirect_message(own_id, companion_info->vm_id, mb.send,
+				    &(target_info->vm_id),
+				    sizeof(target_info->vm_id), 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Schedule companion SP through FFA_RUN interface. */
+	ret = ffa_run(companion_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/*
+	 * Share memory used for interrupt status coordination and initialize
+	 * the state.
+	 */
+	hftest_interrupt_status_share_page_and_init(
+		(uint64_t)twdog_interrupt_page, memory_receivers, 2, mb.send);
+
+	ret = ffa_run(companion_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	ret = ffa_run(target_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Allow companion SP to initiate a direct request to target SP. */
+	ret = ffa_run(companion_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	EXPECT_EQ(hftest_interrupt_status_get(), INTR_SERVICED);
 }
 
 /**

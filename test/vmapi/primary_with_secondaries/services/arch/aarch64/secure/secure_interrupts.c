@@ -7,6 +7,7 @@
  */
 
 #include "hf/arch/vm/interrupts.h"
+#include "hf/arch/vm/timer.h"
 
 #include "hf/ffa.h"
 #include "hf/mm.h"
@@ -14,6 +15,7 @@
 #include "vmapi/hf/call.h"
 
 #include "../smc.h"
+#include "interrupt_status.h"
 #include "ipi_state.h"
 #include "sp805.h"
 #include "test/hftest.h"
@@ -27,16 +29,28 @@
 
 #define RTM_INIT_ESPI_ID 5000U
 #define PLAT_FVP_SEND_ESPI 0x82000100U
+#define TWDOG_DELAY 50
 
 static bool rtm_init_espi_handled;
 
-static inline void sp_wait_loop(uint32_t ms)
+static inline uint64_t physicalcounter_read(void)
 {
-	uint64_t iterations = (uint64_t)ms * ITERATIONS_PER_MS;
+	isb();
+	return read_msr(cntpct_el0);
+}
 
-	for (volatile uint64_t loop = 0; loop < iterations; loop++) {
-		/* Wait */
+static inline uint64_t sp_wait(uint32_t ms)
+{
+	uint64_t timer_freq = read_msr(cntfrq_el0);
+
+	uint64_t time1 = physicalcounter_read();
+	volatile uint64_t time2 = time1;
+
+	while ((time2 - time1) < ((ms * timer_freq) / 1000U)) {
+		time2 = physicalcounter_read();
 	}
+
+	return ((time2 - time1) * 1000) / timer_freq;
 }
 
 TEST_SERVICE(sip_call_trigger_spi)
@@ -143,7 +157,7 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 	twdog_start((delay * ARM_SP805_TWDG_CLK_HZ) / 1000);
 
 	/* Wait for the interrupt to trigger. */
-	sp_wait_loop(delay + 50);
+	sp_wait(delay + 50);
 
 	/* Give back control to PVM. */
 	res = ffa_msg_wait();
@@ -204,6 +218,134 @@ TEST_SERVICE(check_interrupt_rtm_init_handled)
 	/* Check if the interrupt during initialisation has been handled. */
 	EXPECT_TRUE(rtm_init_espi_handled);
 	ffa_yield();
+}
+
+TEST_SERVICE(send_direct_req_yielded_and_resumed)
+{
+	struct ffa_value ret;
+	ffa_id_t target_vm_id;
+	void *send_buf = SERVICE_SEND_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	const uint32_t msg[] = {TWDOG_DELAY, 0, 0, 0, 0};
+
+	/* Obtain the ID of the target service through indirect message. */
+	receive_indirect_message((void *)&target_vm_id, sizeof(target_vm_id),
+				 recv_buf, NULL);
+
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	/* Get the shared page used for interrupt status coordination and track
+	 * it. */
+	hftest_interrupt_status_page_setup(recv_buf, send_buf);
+	EXPECT_EQ(hftest_interrupt_status_get(), INTR_RESET);
+
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	ret = ffa_msg_send_direct_req(hf_vm_get_id(), target_vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	/* The target SP is expected to yield its CPU cycles. */
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	EXPECT_EQ(hftest_interrupt_status_get(), INTR_PROGRAMMED);
+
+	/* Wait for TWDOG secure physical interrupt to trigger. */
+	sp_wait(TWDOG_DELAY + 5);
+
+	/*
+	 * SPMC would have queued the virtual interrupt for the target SP.
+	 * Hence the interrupt status should not have changed.
+	 */
+	EXPECT_EQ(hftest_interrupt_status_get(), INTR_PROGRAMMED);
+
+	ret = ffa_run(target_vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	/* The target SP must have serviced the interrupt by now. */
+	EXPECT_EQ(hftest_interrupt_status_get(), INTR_SERVICED);
+
+	ffa_msg_wait();
+	FAIL("Not expected to reach here");
+}
+
+static void twdog_irq_handler(void)
+{
+	uint32_t intid = hf_interrupt_get();
+
+	if (intid == IRQ_TWDOG_INTID) {
+		/*
+		 * Interrupt triggered due to Trusted watchdog timer expiry.
+		 * Clear the interrupt and stop the timer.
+		 */
+		HFTEST_LOG("Received Trusted WatchDog Interrupt: %u.", intid);
+		twdog_stop();
+
+		/* Update the shared interrupt status. */
+		hftest_interrupt_status_set(INTR_SERVICED);
+
+		/* Perform secure interrupt de-activation. */
+		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+	} else if (intid == HF_NOTIFICATION_PENDING_INTID) {
+		/* RX buffer full notification. */
+		HFTEST_LOG("Received notification pending interrupt %u.",
+			   intid);
+	} else {
+		panic("Invalid interrupt received: %u\n", intid);
+	}
+}
+
+TEST_SERVICE(yield_direct_req_service_twdog_int)
+{
+	struct ffa_value ret;
+	void *send_buf = SERVICE_SEND_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct hftest_context *ctx = hftest_get_context();
+
+	/*
+	 * Map MMIO address space of peripherals (such as secure
+	 * watchdog timer) described as device region nodes in partition
+	 * manifest.
+	 */
+	hftest_map_device_regions(ctx);
+
+	exception_setup(twdog_irq_handler, NULL);
+	interrupts_enable();
+
+	/* Enable the Secure Watchdog timer interrupt. */
+	EXPECT_EQ(hf_interrupt_enable(IRQ_TWDOG_INTID, true, 0), 0);
+
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	/* Get the shared page used for interrupt status coordination and track
+	 * it. */
+	hftest_interrupt_status_page_setup(recv_buf, send_buf);
+
+	/*
+	 * Ensure the status of the interrupt is correct before the test begins.
+	 */
+	EXPECT_EQ(hftest_interrupt_status_get(), INTR_RESET);
+
+	ret = ffa_msg_wait();
+
+	/* The companion SP sends a direct request message. */
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_REQ_32);
+
+	/* Program the trusted watcdog timer and yield to companion SP. */
+	HFTEST_LOG("Start TWDOG timer with a delay of %lu", ret.arg3);
+	twdog_start((ret.arg3 * ARM_SP805_TWDG_CLK_HZ) / 1000);
+
+	hftest_interrupt_status_set(INTR_PROGRAMMED);
+
+	/* Yield the direct request thereby moving to BLOCKED state. */
+	ffa_yield();
+
+	HFTEST_LOG("Completing the direct response");
+	ffa_msg_send_direct_resp(ffa_receiver(ret), ffa_sender(ret), ret.arg3,
+				 ret.arg4, ret.arg5, ret.arg6, ret.arg7);
+	FAIL("Not expected to reach here");
 }
 
 /**
