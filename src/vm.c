@@ -931,8 +931,12 @@ static bool vm_ipi_state_info_get(
 		vcpu_is_virt_interrupt_pending(interrupts, HF_IPI_INTID) &&
 		!vcpu_ipi_is_info_get_retrieved(vcpu_locked);
 
-	/* No notifications pending that haven't been retrieved. */
-	if (!pending_not_retrieved) {
+	/*
+	 * No notifications pending that haven't been retrieved or the vCPU is
+	 * not in the waiting state. Only report waiting vCPUs as this is the
+	 * only state that needs explicit cycles donated from the NWd.
+	 */
+	if (!pending_not_retrieved || vcpu->state != VCPU_STATE_WAITING) {
 		ret = false;
 		goto out;
 	}

@@ -121,7 +121,7 @@ TEST_F(vm, vm_boot_order)
 
 	/* Insertion of two in the middle of the boot list */
 	for (uint32_t i = 0; i < 2; i++) {
-		EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false, 0));
+		EXPECT_TRUE(vm_init_next(MAX_CPUS, &ppool, &vm_cur, false, 0));
 		vm_cur->boot_order = 2;
 		vcpu = vm_get_vcpu(vm_cur, 0);
 		vcpu_update_boot(vcpu);
@@ -805,6 +805,8 @@ TEST_F(vm, vm_notifications_info_get_from_framework)
 
 /**
  * Validates simple getting of notifications info for pending IPI.
+ * Also checks that vCPUs with pending IPIs are only reported if the
+ * vCPU is in the waiting state.
  */
 TEST_F(vm, vm_notifications_info_get_ipi)
 {
@@ -817,7 +819,7 @@ TEST_F(vm, vm_notifications_info_get_ipi)
 	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
 	uint32_t lists_count = 0;
 	enum notifications_info_get_state current_state = INIT;
-	struct_vm *current_vm = vm_find_index(5);
+	struct_vm *current_vm = vm_find_index(4);
 	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 1);
 	struct interrupts *interrupts = &target_vcpu->interrupts;
 	const bool is_from_vm = false;
@@ -826,6 +828,16 @@ TEST_F(vm, vm_notifications_info_get_ipi)
 	EXPECT_TRUE(current_vm->vcpu_count >= 2);
 
 	vcpu_virt_interrupt_set_pending(interrupts, HF_IPI_INTID);
+
+	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
+					  &ids_count, lists_sizes, &lists_count,
+					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
+					  &current_state);
+
+	EXPECT_EQ(ids_count, 0);
+	EXPECT_EQ(lists_count, 0);
+
+	target_vcpu->state = VCPU_STATE_WAITING;
 
 	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
 					  &ids_count, lists_sizes, &lists_count,
@@ -873,7 +885,7 @@ TEST_F(vm, vm_notifications_info_get_ipi_with_per_vcpu)
 	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
 	uint32_t lists_count = 0;
 	enum notifications_info_get_state current_state = INIT;
-	struct_vm *current_vm = vm_find_index(5);
+	struct_vm *current_vm = vm_find_index(4);
 	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 1);
 	struct interrupts *interrupts = &target_vcpu->interrupts;
 	const bool is_from_vm = false;
@@ -922,7 +934,7 @@ TEST_F(vm, vm_notifications_info_get_ipi_with_per_vcpu)
  */
 TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus_and_ipi)
 {
-	struct_vm *current_vm = vm_find_index(5);
+	struct_vm *current_vm = vm_find_index(4);
 	ffa_vcpu_count_t vcpu_count = current_vm->vcpu_count;
 	CHECK(vcpu_count > 1);
 
@@ -940,6 +952,8 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus_and_ipi)
 	enum notifications_info_get_state current_state = INIT;
 	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 0);
 	struct interrupts *interrupts = &target_vcpu->interrupts;
+
+	target_vcpu->state = VCPU_STATE_WAITING;
 
 	vcpu_virt_interrupt_set_pending(interrupts, HF_IPI_INTID);
 
