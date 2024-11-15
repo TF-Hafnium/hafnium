@@ -1,5 +1,140 @@
 # Change Log
 
+## v2.12
+### Highlights
+
+* FF-A v1.2 (continued adoption):
+    * Restrict use of the `FFA_VERSION` ABI: FF-A endpoint version is locked from the first
+      FF-A ABI call handled in the SPMC.
+    * `FFA_MSG_WAIT` ABI update:
+        * Transfer the ownership of RX buffer from consumer to producer.
+        * Bypass the mentioned transfer of ownership via dedicated flag.
+    * Support for VM availibility messages:
+        * Subscription through the FF-A manifest.
+        * Discovery through `FFA_PARTITION_INFO_GET` only at the NS FF-A instance.
+        * Relay the framework message to the subscribed partition.
+
+* Runtime support:
+    * `FFA_CONSOLE_LOG` ABI:
+       * SPMC adds the string `[<SP ID> <vCPU ID>]` to line logs from SPs.
+       * Console log for each partition is tracked per vCPU, to avoid corrupting the buffer
+         from concurrent logging from the same partition.
+    * Exceptions related to synchronous tag faults in S-EL2 are now logged.
+    * FF-A memory management:
+        * Support of the SMC64 ABI version of all FF-A memory management interfaces.
+        * Handle GPF exception caused by accessing non-secure RX/TX buffers in the handling
+          of FF-A memory management ABIs.
+        * Support for sharing and lending device memory.
+    * Allocate the boot parameters for Hafnium's initialisation functions in the memory
+      pool.
+    * Paravirtualized interface for sending IPI (`HF_INTERRUPT_SEND_IPI`).
+        * IPI injected straight away to target vCPUs in the running state.
+        * Sending `SRI` interrupt to the NWd, when the target vCPU is in the waiting state.
+        * Report the partitions and vCPUs which require CPU cycles to handle IPI through
+          `FFA_NOTIFICATION_INFO_GET`.
+        * If target vCPU is in blocked/preempted state, then pend/queue the virtual
+          interrupt.
+    * Secure Interrupt handling:
+        * Support for queueing secure interrupts.
+        * Support for S-EL1 UP SPs to handle interrupts.
+        * Support interrupts sent during runtime model for intialisation (`RTM_INIT`).
+    * Always eret `FFA_RUN` to the target SP, regardless of if it has pending messages,
+      secure interrupts or notifications.
+
+* Hardware architecture support:
+    * Architectural physical timer emulation for SPs.
+    * TC platform enabled branch protection feature.
+    * Support for platforms with non-linear GIC redistributor frames.
+    * Enabled S-EL0 partitions Pointer Authentication feature.
+
+* Tests, scripts, testing framework and build:
+    * Improved readability of the error messages for failed assertions.
+    * Enabled the build flags '-Wextra' and '-Wsign-compare'.
+    * Definition of assertion helpers to check content of strings.
+    * Using enum types for the FF-A ABIs, FF-A errors, and test SP service commands.
+    * Toolchain upgrade to clang-18.
+    * Improved performance of `clang-tidy`.
+    * Always expand the `assert` macro, to make sure arguments are type checked even
+      when `ENABLE_ASSERTIONS` is not enabled.
+    * Adopted `FFA_CONSOLE_LOG` ABI on `dlog` instances from SPs.
+    * Restricted the functions defined with `SERVICE_SETUP` macros to run on the primary
+      core.
+    * Support for using the generic timer in the test partitions.
+    * Support for using a watchdog timer from NWd test VMs.
+    * Added new system setup, loading S-EL1 UP partitions on top of SPMC.
+
+* Bug fixes:
+    * Incorrect calculation of number of FF-A boot information descriptors.
+    * FF-A memory management:
+        * Drop unnecessary check to instruction permissions in the handling of
+         `FFA_MEM_RELINQUISH`.
+        * Sender with no Write access to a given memory region is prevented from using
+          the clear/zero memory flags, in the descriptor to `FFA_MEM_LEND`, `FFA_MEM_SHARE`
+          or `FFA_MEM_DONATE`.
+        * Checks to the `impdef` field in the FF-A memory access descriptor done in accordance
+          to FF-A version.
+        * Consider the memory region descriptor format according to FF-A version, when
+          processing an hypervisor retrieve request.
+    * Platform build options:
+        * Attest the option `enable_mte` can only have legal values 0 or 1, to enable
+          and disable MTE feature use, respectively.
+        * Attest the options `gic_version` and `gic_enable_espi` are configured with
+          correct values, according to what is supported in Hafnium.
+        * Attest the option `branch_protection` can only be configured with values
+          `standard`, `pac-ret`, `pac-ret+leaf` and `bti`.
+    * FF-A Notifications:
+        * Set framework notifications only when recipient supports notifications.
+        * Delay SRI flag can only be used on `FFA_NOTIFICATION_SET` from SPs. Return
+          `FFA_ERROR(FFA_INVALID_PARAMETERS)` in invocations from the NWd that use it.
+        * Allow for a caller to invoke`FFA_NOTIFICATION_GET` specifying a vCPU ID different
+          than the calling vCPU.
+    * `FFA_FEATURES` ABI:
+        * Reports `FFA_YIELD` only to SPs.
+        * Reports `ME` and `NPI` VI Id to S-EL1 partitions only.
+        * Reports `FFA_SECONDARY_EP_REGISTER` to MP partitions only.
+        * Reports `FFA_MEM_PERM_SET/GET` to S-EL0 partitions only.
+    * The `FFA_PARTITION_INFO_GET(_REGS)` ABI reports the support of indirect message and direct
+      message request/response 2, considering the version of the caller.
+    * Prevent secure interrupt from preempting an SP in `SPMC` scheduled mode.
+    * Ensure the FF-A error codes are be 32-bit unsigned values.
+    * The error return for `FFA_FEATURES` ABI is restricted to `FFA_ERROR(FFA_NOT_SUPPORTED)`
+      according to the FF-A v1.2 specification.
+    * Ensure that accesses to `GICD_CTLR` register are complete by checking the state of
+      the bit RWP.
+    * Add check that manifest declared memory regions shouldn't overlap with SPMC address
+      space.
+    * First vCPU to boot ever from any SP was booting with the wrong vCPU state, fixed to
+      `VCPU_STATE_RUNNING`.
+    * Correctly define stack for the test SPs.
+    * Report error when there are too many UUIDs defined in the partition's FF-A manifest.
+    * Fix out of tree buid: use of `OUT` make argument such that the output directory can point
+      to another location other than out/project/reference.
+    * Memory regions specified with offset relative to partition's image position, rather than
+      partition package load-address.
+    * The SPMC enables a physical interrupt when the SP enables the respective virtual interrupt,
+      instead of enabling by default during load of owner SP.
+
+* Miscellaneous:
+    * Improved `dlog` functions with compile time type checking to the arguments of
+      logged strings.
+    * Reduced complexity of utility functions defined in `std.h`.
+    * The documentation of FF-A manifest bindings now refer to TF-A documentation as the common
+      resource for all reference SPMC implementations.
+    * Simplified the code for handling the preemption of `FFA_MSG_WAIT`/`FFA_MSG_SEND_DIRECT_RESP`
+      due to a pending interrupt.
+    * Dropped legacy code/tests:
+        * Legacy hypervisor tests for timer support in NWd VMs.
+        * Legacy hypervisor interface `HF_INTERRUPT_INJECT` and respective tests.
+        * Legacy hypervisor waiting list concept.
+        * The linux kernel tests in the Hafnium tests scripts. Hafnium driver code supports the
+          hypervisor runtime model not the SPMC.
+        * The linux kernel and hafnium driver submodules.
+        * Legacy hypervisor `FFA_RUN` ABI tests.
+    * Refactored the code enforcing the `boot-order` according to FF-A boot protocol to use
+      `list.h` header.
+    * Refactored the UUID packing/unpacking functions.
+    * Dropped the SRI state tracking within the SPMC, to simplify notifications code.
+
 ## v2.11
 ### Highlights
 
