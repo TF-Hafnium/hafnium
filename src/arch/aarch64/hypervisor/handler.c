@@ -254,7 +254,6 @@ bool sync_current_exception(uintreg_t elr, uintreg_t spsr)
 				"far=%#lx, dfsc = %#lx\n",
 				elr, esr, ec, far, dfsc);
 		}
-		break;
 #endif
 		if (!GET_ESR_FNV(esr)) {
 			dlog_error(
