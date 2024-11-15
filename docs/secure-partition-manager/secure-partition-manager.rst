@@ -860,7 +860,7 @@ availability messages** via the ``FFA_MSG_SEND_DIRECT_REQ`` ABI.
 
 A SP subscribes to receiving VM created and/or VM destroyed messages by
 specifying the ``vm-availability-messages`` field in its manifest (see
-`ffa-manifest-binding`_). The SPM will only forward messages to the SP if the SP
+`partition properties`_). The SPM will only forward messages to the SP if the SP
 is subscribed to the message kind. The SP must reply with the corresponding
 direct message response (via the ``FFA_MSG_SEND_DIRECT_RESP`` ABI) after it has
 handled the message.
@@ -1887,6 +1887,8 @@ References
 .. _TF-A project: https://trustedfirmware-a.readthedocs.io/en/latest/
 
 .. _SPMC FVP build configuration: https://github.com/TF-Hafnium/hafnium-project-reference/blob/main/BUILD.gn#L143
+
+.. _partition properties: https://trustedfirmware-a.readthedocs.io/en/latest/components/ffa-manifest-binding.html#partition-properties
 
 .. _device node: https://trustedfirmware-a.readthedocs.io/en/latest/components/ffa-manifest-binding.html#device-regions
 
