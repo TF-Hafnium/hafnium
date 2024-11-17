@@ -92,9 +92,10 @@ done <<< "$(env)"
 # Set environment variable informing the build that we are running inside
 # a container.
 ARGS+=(-e HAFNIUM_HERMETIC_BUILD=inside)
-# Bind-mount the Hafnium root directory. We mount it at the same absolute
-# location so that all paths match across the host and guest.
+# Bind-mount the Hafnium root directory and the FVP directory. We mount them at
+# the same absolute location so that all paths match across the host and guest.
 ARGS+=(-v "${ROOT_DIR}":"${ROOT_DIR}")
+ARGS+=(-v "${ROOT_DIR}/../fvp":"${ROOT_DIR}/../fvp")
 # Make all files outside of the Hafnium directory read-only to ensure that all
 # generated files are written there.
 ARGS+=(--read-only)

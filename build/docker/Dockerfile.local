@@ -15,7 +15,6 @@ ARG LOCAL_UID=1000
 ARG LOCAL_GID=1000
 
 RUN	addgroup \
-		--gid "${LOCAL_GID}" \
 		hafnium \
 	&& adduser \
 		-disabled-password \
