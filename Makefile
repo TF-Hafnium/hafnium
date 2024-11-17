@@ -114,6 +114,20 @@ doc:
 	@echo "  BUILD DOCUMENTATION"
 	make --no-print-directory -C docs html
 
+# Named `test_` rather than `test` because make will not run the target if the
+# `test` directory has not changed.
+.PHONY: test_
+test_: all
+	./kokoro/test.sh
+
+.PHONY: test_spmc
+test_spmc: all
+	./kokoro/test_spmc.sh
+
+.PHONY: test_el3_spmc
+test_el3_spmc: all
+	./kokoro/test_el3_spmc.sh
+
 .PHONY: clean
 clean:
 	@$(NINJA) -C $(OUT_DIR) -t clean
