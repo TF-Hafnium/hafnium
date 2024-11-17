@@ -38,9 +38,14 @@ IMAGE_ID="$(cat ${IID_FILE})"
 # Parse command line arguments
 INTERACTIVE=false
 ALLOW_PTRACE=false
+TTY=true
 while true
 do
 	case "${1:-}" in
+	--tty)
+	 	TTY=${2:-}
+		shift; shift
+		;;
 	-i)
 		INTERACTIVE=true
 		shift
@@ -51,7 +56,7 @@ do
 		;;
 	-*)
 		echo "ERROR: Unknown command line flag: $1" 1>&2
-		echo "Usage: $0 [-i] [-p] <command>"
+		echo "Usage: $0 [-i] [-p] [--tty true|false] <command>"
 		exit 1
 		;;
 	*)
@@ -62,7 +67,7 @@ done
 
 ARGS=()
 # Run with a pseduo-TTY for nicer logging.
-ARGS+=(-t)
+ARGS+=(--tty=${TTY})
 # Run interactive if this script was invoked with '-i'.
 if [ "${INTERACTIVE}" == "true" ]
 then

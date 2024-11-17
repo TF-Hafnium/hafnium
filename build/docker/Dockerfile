@@ -17,6 +17,7 @@ RUN apt-get update \
 		flex \
 		git \
 		clang \
+		clangd \
 		clang-tidy \
 		clang-format \
 		llvm \
