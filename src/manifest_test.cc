@@ -1297,13 +1297,14 @@ TEST_F(manifest, ffa_validate_rxtx_info)
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 }
 
-TEST_F(manifest, ffa_validate_mem_regions)
+TEST_F(manifest, ffa_validate_mem_regions_not_compatible)
 {
 	struct_manifest *m;
+	std::vector<char> dtb;
 
 	/* Not Compatible */
 	/* clang-format off */
-	std::vector<char>  dtb = ManifestDtBuilder()
+	dtb = ManifestDtBuilder()
 		.FfaValidManifest()
 		.StartChild("memory-regions")
 			.Compatible({ "foo,bar" })
@@ -1313,6 +1314,12 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_NOT_COMPATIBLE);
 	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_unavailable)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
 
 	/* Memory regions unavailable  */
 	/* clang-format off */
@@ -1326,6 +1333,12 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEMORY_REGION_NODE_EMPTY);
 	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_missing_properties)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
 
 	/* Missing Properties */
 	/* clang-format off */
@@ -1342,6 +1355,12 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_empty_region)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
 
 	/* Empty memory region */
 	/* clang-format off */
@@ -1374,6 +1393,12 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEM_REGION_EMPTY);
 	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_base_address_and_relative_offset)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
 
 	/* Mutually exclusive base-address and load-address-relative-offset
 	 * properties */
@@ -1396,6 +1421,13 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_BASE_ADDRESS_AND_RELATIVE_ADDRESS);
 	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_relative_address_overflow)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
+
 	/* Relative-address overflow*/
 	/* clang-format off */
 	dtb = ManifestDtBuilder()
@@ -1416,6 +1448,38 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_INTEGER_OVERFLOW);
 	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_relative_offset_valid)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
+
+	/* valid relative offset */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.Property("load-address", "<0xffffff00 0xffffff00>")
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("load-address-relative-offset", "<0x1000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_overlapping)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
 
 	/* Overlapping memory regions */
 	/* clang-format off */
@@ -1495,6 +1559,12 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
 	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_unaligned)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
 
 	/* Unaligned memory region */
 	/* clang-format off */
@@ -1522,6 +1592,12 @@ TEST_F(manifest, ffa_validate_mem_regions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEM_REGION_UNALIGNED);
 	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_different_rxtx_sizes)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
 
 	/* Different RXTX buffer sizes */
 	/* clang-format off */
