@@ -666,6 +666,56 @@ static enum manifest_return_code parse_common_fields_mem_dev_region_node(
 	return MANIFEST_SUCCESS;
 }
 
+/**
+ * Parse and validate a memory regions's base address.
+ *
+ * The base address can be specified either as an absolute address (with
+ * `base-address`) or as an offset from `load_address` (with
+ * `load-address-relative-offset`).
+
+ * Returns an error if:
+ * - Neither `base-address` or `load-address-relative-offset` are specified.
+ * - Both `base-address` and `load-address-relative-offset` are specified.
+ * - The effective address (`load-address-relative-offset` + `load_address`)
+ *   would overflow.
+ */
+static enum manifest_return_code parse_base_address(
+	struct fdt_node *mem_node, uintptr_t load_address,
+	struct memory_region *mem_region)
+{
+	uintptr_t relative_offset;
+	uintptr_t absolute_address;
+
+	bool is_relative;
+	bool is_absolute;
+
+	TRY(read_optional_uint64(mem_node, "base-address",
+				 MANIFEST_INVALID_ADDRESS, &absolute_address));
+
+	TRY(read_optional_uint64(mem_node, "load-address-relative-offset",
+				 MANIFEST_INVALID_ADDRESS, &relative_offset));
+
+	is_absolute = (absolute_address != MANIFEST_INVALID_ADDRESS);
+	is_relative = (relative_offset != MANIFEST_INVALID_ADDRESS);
+
+	if (!is_absolute && !is_relative) {
+		return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
+	}
+
+	if (is_absolute && is_relative) {
+		return MANIFEST_ERROR_BASE_ADDRESS_AND_RELATIVE_ADDRESS;
+	}
+
+	if (is_relative && relative_offset > UINT64_MAX - load_address) {
+		return MANIFEST_ERROR_INTEGER_OVERFLOW;
+	}
+
+	mem_region->base_address =
+		is_absolute ? absolute_address : load_address + relative_offset;
+
+	return MANIFEST_SUCCESS;
+}
+
 static enum manifest_return_code parse_ffa_memory_region_node(
 	struct fdt_node *mem_node, uintptr_t load_address,
 	struct memory_region *mem_regions, uint16_t *count, struct rx_tx *rxtx,
@@ -674,7 +724,6 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 	uint32_t phandle;
 	uint16_t i = 0;
 	uint32_t j = 0;
-	uintptr_t relative_address;
 	struct uint32list_iter list;
 
 	dlog_verbose("  Partition memory regions\n");
@@ -695,39 +744,8 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		dlog_verbose("      Name: %s\n",
 			     string_data(&mem_regions[i].name));
 
-		TRY(read_optional_uint64(mem_node, "base-address",
-					 MANIFEST_INVALID_ADDRESS,
-					 &mem_regions[i].base_address));
-		dlog_verbose("      Base address: %#lx\n",
-			     mem_regions[i].base_address);
-
-		TRY(read_optional_uint64(
-			mem_node, "load-address-relative-offset",
-			MANIFEST_INVALID_ADDRESS, &relative_address));
-		if (relative_address != MANIFEST_INVALID_ADDRESS) {
-			dlog_verbose("      Relative address:  %#lx\n",
-				     relative_address);
-		}
-
-		if (mem_regions[i].base_address == MANIFEST_INVALID_ADDRESS &&
-		    relative_address == MANIFEST_INVALID_ADDRESS) {
-			return MANIFEST_ERROR_PROPERTY_NOT_FOUND;
-		}
-
-		if (mem_regions[i].base_address != MANIFEST_INVALID_ADDRESS &&
-		    relative_address != MANIFEST_INVALID_ADDRESS) {
-			return MANIFEST_ERROR_BASE_ADDRESS_AND_RELATIVE_ADDRESS;
-		}
-
-		if (relative_address != MANIFEST_INVALID_ADDRESS &&
-		    relative_address > UINT64_MAX - load_address) {
-			return MANIFEST_ERROR_INTEGER_OVERFLOW;
-		}
-
-		if (relative_address != MANIFEST_INVALID_ADDRESS) {
-			mem_regions[i].base_address =
-				load_address + relative_address;
-		}
+		TRY(parse_base_address(mem_node, load_address,
+				       &mem_regions[i]));
 
 		TRY(read_uint32(mem_node, "pages-count",
 				&mem_regions[i].page_count));
