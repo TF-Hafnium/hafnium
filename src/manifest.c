@@ -601,7 +601,7 @@ static enum manifest_return_code check_and_record_memory_used(
 	uintptr_t base_address, uint32_t page_count,
 	struct mem_range *mem_ranges, size_t *mem_regions_index)
 {
-	bool overlap_of_regions;
+	paddr_t begin;
 
 	if (!is_aligned(base_address, PAGE_SIZE)) {
 		dlog_error("base_address (%#lx) is not aligned to page size.\n",
@@ -609,21 +609,19 @@ static enum manifest_return_code check_and_record_memory_used(
 		return MANIFEST_ERROR_MEM_REGION_UNALIGNED;
 	}
 
-	overlap_of_regions = is_memory_region_within_ranges(
-		base_address, page_count, mem_ranges, *mem_regions_index);
-
-	if (!overlap_of_regions) {
-		paddr_t begin = pa_init(base_address);
-
-		mem_ranges[*mem_regions_index].begin = begin;
-		mem_ranges[*mem_regions_index].end =
-			pa_add(begin, page_count * PAGE_SIZE - 1);
-		(*mem_regions_index)++;
-
-		return MANIFEST_SUCCESS;
+	if (is_memory_region_within_ranges(base_address, page_count, mem_ranges,
+					   *mem_regions_index)) {
+		return MANIFEST_ERROR_MEM_REGION_OVERLAP;
 	}
 
-	return MANIFEST_ERROR_MEM_REGION_OVERLAP;
+	begin = pa_init(base_address);
+
+	mem_ranges[*mem_regions_index].begin = begin;
+	mem_ranges[*mem_regions_index].end =
+		pa_add(begin, page_count * PAGE_SIZE - 1);
+	(*mem_regions_index)++;
+
+	return MANIFEST_SUCCESS;
 }
 
 static enum manifest_return_code parse_common_fields_mem_dev_region_node(
@@ -711,6 +709,7 @@ static enum manifest_return_code parse_base_address(
 
 	mem_region->base_address =
 		is_absolute ? absolute_address : load_address + relative_offset;
+	mem_region->is_relative = is_relative;
 
 	return MANIFEST_SUCCESS;
 }
@@ -814,6 +813,20 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		TRY(check_partition_memory_is_valid(
 			mem_regions[i].base_address, mem_regions[i].page_count,
 			mem_regions[i].attributes, boot_params, false));
+
+		/*
+		 * Memory regions are not allowed to overlap with
+		 * `load_address`, unless the memory region is relative.
+		 */
+		if (!mem_regions[i].is_relative) {
+			struct mem_range range =
+				make_mem_range(mem_regions[i].base_address,
+					       mem_regions[i].page_count);
+
+			if (mem_range_contains(range, load_address)) {
+				return MANIFEST_ERROR_MEM_REGION_OVERLAP;
+			}
+		}
 
 		TRY(check_and_record_memory_used(
 			mem_regions[i].base_address, mem_regions[i].page_count,
@@ -1278,8 +1291,9 @@ enum manifest_return_code parse_ffa_manifest(
 	TRY(read_optional_uint64(&root, "load-address", 0, &load_address));
 	if (vm->partition.load_addr != load_address) {
 		dlog_warning(
-			"Partition's load address at its manifest differs"
-			" from specified in partition's package.\n");
+			"Partition's `load_address` (%#lx) in its manifest "
+			"differs from `load-address` (%#lx) in its package\n",
+			vm->partition.load_addr, load_address);
 	}
 	dlog_verbose("  Load address %#lx\n", vm->partition.load_addr);
 

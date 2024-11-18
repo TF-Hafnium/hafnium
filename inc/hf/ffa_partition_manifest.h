@@ -84,6 +84,8 @@ struct memory_region {
 	 * for S-EL1 partitions - optional.
 	 */
 	uintptr_t base_address;
+	/** True if `load-address-relative-offset` was specified. */
+	bool is_relative;
 	/** Page count - mandatory */
 	uint32_t page_count;
 	/** Memory attributes - mandatory */

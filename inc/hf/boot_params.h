@@ -8,21 +8,10 @@
 
 #pragma once
 
-#include <stdbool.h>
-
-#include "hf/arch/cpu.h"
-
-#include "hf/fdt.h"
-#include "hf/mm.h"
-#include "hf/mpool.h"
+#include "hf/mem_range.h"
 
 #define MAX_MEM_RANGES 20
 #define MAX_DEVICE_MEM_RANGES 10
-
-struct mem_range {
-	paddr_t begin;
-	paddr_t end;
-};
 
 struct boot_params {
 	cpu_id_t cpu_ids[MAX_CPUS];

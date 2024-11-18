@@ -444,6 +444,32 @@ class manifest : public ::testing::Test
 		return manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
 	}
 
+	enum manifest_return_code ffa_manifest_from_spkg(
+		struct_manifest **m, Partition_package *spkg)
+	{
+		struct memiter it;
+		struct mm_stage1_locked mm_stage1_locked;
+		struct boot_params params;
+
+		boot_params_init(&params, spkg);
+
+		/* clang-format off */
+		std::vector<char> core_dtb = ManifestDtBuilder()
+			.StartChild("hypervisor")
+				.Compatible()
+				.StartChild("vm1")
+					.DebugName("primary_vm")
+					.FfaPartition()
+					.LoadAddress((uint64_t)spkg)
+				.EndChild()
+			.EndChild()
+			.Build(true);
+		/* clang-format on */
+		memiter_init(&it, core_dtb.data(), core_dtb.size());
+
+		return manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+	}
+
 	enum manifest_return_code ffa_manifest_from_vec(
 		struct_manifest **m, const std::vector<char> &vec)
 	{
@@ -1527,6 +1553,32 @@ TEST_F(manifest, ffa_validate_mem_regions_overlapping)
 			.Label("rx")
 			.StartChild("rx")
 				.Description("rx-buffer")
+				.Property("load-address-relative-offset", "<0x0>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("load-address-relative-offset", "<0x0>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
 				.Property("base-address", "<0x7300000>")
 				.Property("pages-count", "<2>")
 				.Property("attributes", "<1>")
@@ -1569,6 +1621,92 @@ TEST_F(manifest, ffa_validate_mem_regions_overlapping)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+	manifest_dealloc();
+
+	/* clang-format off */
+	Partition_package spkg(dtb);
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Integer64Property("base-address", (uint64_t)&spkg,true)
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+		.EndChild()
+		.Build(true);
+	/* clang-format on */
+	spkg.init(dtb);
+	ASSERT_EQ(ffa_manifest_from_spkg(&m, &spkg),
+		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
+	manifest_dealloc();
+}
+
+TEST_F(manifest, ffa_validate_mem_regions_overlapping_allowed)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
+
+	/*
+	 * Mem regions are allowed to overlap with parent `load-address` if the
+	 * `load-address-relative-offset` was specified.
+	 */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("load-address-relative-offset", "<0x1000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	ASSERT_EQ(m->vm[0].partition.mem_regions[0].is_relative, true);
+	ASSERT_EQ(m->vm[0].partition.mem_regions[0].base_address,
+		  m->vm[0].partition.load_addr + 0x1000);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x7300000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+			.Label("tx")
+			.StartChild("tx")
+				.Description("tx-buffer")
+				.Property("load-address-relative-offset", "<0x1000>")
+				.Property("pages-count", "<2>")
+				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	ASSERT_EQ(m->vm[0].partition.mem_regions[1].is_relative, true);
+	ASSERT_EQ(m->vm[0].partition.mem_regions[1].base_address,
+		  m->vm[0].partition.load_addr + 0x1000);
 	manifest_dealloc();
 }
 
