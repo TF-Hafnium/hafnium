@@ -22,6 +22,7 @@
 #include "hf/dlog.h"
 #include "hf/fdt.h"
 #include "hf/ffa.h"
+#include "hf/ffa_partition_manifest.h"
 #include "hf/layout.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
@@ -716,6 +717,50 @@ static enum manifest_return_code parse_base_address(
 	return MANIFEST_SUCCESS;
 }
 
+/**
+ * Parse and validate a memory region/device region's attributes.
+ * Returns an error if:
+ * - Memory region attributes are not `R` or `RW` or `RX`.
+ * - Device region attributes are not `R` or `RW`.
+ * NOTE: Security attribute is not checked by this function, it is checked in
+ * the load phase.
+ */
+static enum manifest_return_code parse_ffa_region_attributes(
+	struct fdt_node *node, uint32_t *out_attributes, bool is_device)
+{
+	uint32_t attributes;
+
+	TRY(read_uint32(node, "attributes", out_attributes));
+
+	attributes = *out_attributes &
+		     (MANIFEST_REGION_ATTR_READ | MANIFEST_REGION_ATTR_WRITE |
+		      MANIFEST_REGION_ATTR_EXEC);
+
+	if (is_device) {
+		switch (attributes) {
+		case MANIFEST_REGION_ATTR_READ:
+		case MANIFEST_REGION_ATTR_READ | MANIFEST_REGION_ATTR_WRITE:
+			break;
+		default:
+			return MANIFEST_ERROR_INVALID_MEM_PERM;
+		}
+	} else {
+		switch (attributes) {
+		case MANIFEST_REGION_ATTR_READ:
+		case MANIFEST_REGION_ATTR_READ | MANIFEST_REGION_ATTR_WRITE:
+		case MANIFEST_REGION_ATTR_READ | MANIFEST_REGION_ATTR_EXEC:
+			break;
+		default:
+			return MANIFEST_ERROR_INVALID_MEM_PERM;
+		}
+	}
+
+	/* Filter region attributes. */
+	*out_attributes &= MANIFEST_REGION_ALL_ATTR_MASK;
+
+	return MANIFEST_SUCCESS;
+}
+
 static enum manifest_return_code parse_ffa_memory_region_node(
 	struct fdt_node *mem_node, uintptr_t load_address,
 	struct memory_region *mem_regions, uint16_t *count, struct rx_tx *rxtx,
@@ -752,28 +797,8 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		dlog_verbose("      Pages_count: %u\n",
 			     mem_regions[i].page_count);
 
-		TRY(read_uint32(mem_node, "attributes",
-				&mem_regions[i].attributes));
-
-		/*
-		 * Check RWX permission attributes.
-		 * Security attribute is checked at load phase.
-		 */
-		uint32_t permissions = mem_regions[i].attributes &
-				       (MANIFEST_REGION_ATTR_READ |
-					MANIFEST_REGION_ATTR_WRITE |
-					MANIFEST_REGION_ATTR_EXEC);
-		if (permissions != MANIFEST_REGION_ATTR_READ &&
-		    permissions != (MANIFEST_REGION_ATTR_READ |
-				    MANIFEST_REGION_ATTR_WRITE) &&
-		    permissions != (MANIFEST_REGION_ATTR_READ |
-				    MANIFEST_REGION_ATTR_EXEC)) {
-			return MANIFEST_ERROR_INVALID_MEM_PERM;
-		}
-
-		/* Filter memory region attributes. */
-		mem_regions[i].attributes &= MANIFEST_REGION_ALL_ATTR_MASK;
-
+		TRY(parse_ffa_region_attributes(
+			mem_node, &mem_regions[i].attributes, false));
 		dlog_verbose("      Attributes: %#x\n",
 			     mem_regions[i].attributes);
 
@@ -917,28 +942,8 @@ static enum manifest_return_code parse_ffa_device_region_node(
 			manifest_data->mem_regions,
 			&manifest_data->mem_regions_index));
 
-		TRY(read_uint32(dev_node, "attributes",
-				&dev_regions[i].attributes));
-
-		/*
-		 * Check RWX permission attributes.
-		 * Security attribute is checked at load phase.
-		 */
-		uint32_t permissions = dev_regions[i].attributes &
-				       (MANIFEST_REGION_ATTR_READ |
-					MANIFEST_REGION_ATTR_WRITE |
-					MANIFEST_REGION_ATTR_EXEC);
-
-		if (permissions != MANIFEST_REGION_ATTR_READ &&
-		    permissions != (MANIFEST_REGION_ATTR_READ |
-				    MANIFEST_REGION_ATTR_WRITE)) {
-			return MANIFEST_ERROR_INVALID_MEM_PERM;
-		}
-
-		/* Filter device region attributes. */
-		dev_regions[i].attributes = dev_regions[i].attributes &
-					    MANIFEST_REGION_ALL_ATTR_MASK;
-
+		TRY(parse_ffa_region_attributes(
+			dev_node, &dev_regions[i].attributes, true));
 		dlog_verbose("      Attributes: %#x\n",
 			     dev_regions[i].attributes);
 
