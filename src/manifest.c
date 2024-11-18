@@ -597,14 +597,6 @@ static enum manifest_return_code check_and_record_memory_used(
 {
 	bool overlap_of_regions;
 
-	if (page_count == 0U) {
-		dlog_error(
-			"Empty memory region defined with base address: "
-			"%#lx.\n",
-			base_address);
-		return MANIFEST_ERROR_MEM_REGION_EMPTY;
-	}
-
 	if (!is_aligned(base_address, PAGE_SIZE)) {
 		dlog_error("base_address (%#lx) is not aligned to page size.\n",
 			   base_address);
@@ -761,6 +753,18 @@ static enum manifest_return_code parse_ffa_region_attributes(
 	return MANIFEST_SUCCESS;
 }
 
+static enum manifest_return_code parse_page_count(struct fdt_node *node,
+						  uint32_t *page_count)
+{
+	TRY(read_uint32(node, "pages-count", page_count));
+
+	if (*page_count == 0) {
+		return MANIFEST_ERROR_MEM_REGION_EMPTY;
+	}
+
+	return MANIFEST_SUCCESS;
+}
+
 static enum manifest_return_code parse_ffa_memory_region_node(
 	struct fdt_node *mem_node, uintptr_t load_address,
 	struct memory_region *mem_regions, uint16_t *count, struct rx_tx *rxtx,
@@ -792,8 +796,7 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		TRY(parse_base_address(mem_node, load_address,
 				       &mem_regions[i]));
 
-		TRY(read_uint32(mem_node, "pages-count",
-				&mem_regions[i].page_count));
+		TRY(parse_page_count(mem_node, &mem_regions[i].page_count));
 		dlog_verbose("      Pages_count: %u\n",
 			     mem_regions[i].page_count);
 
@@ -932,8 +935,7 @@ static enum manifest_return_code parse_ffa_device_region_node(
 		dlog_verbose("      Base address: %#lx\n",
 			     dev_regions[i].base_address);
 
-		TRY(read_uint32(dev_node, "pages-count",
-				&dev_regions[i].page_count));
+		TRY(parse_page_count(dev_node, &dev_regions[i].page_count));
 		dlog_verbose("      Pages_count: %u\n",
 			     dev_regions[i].page_count);
 
