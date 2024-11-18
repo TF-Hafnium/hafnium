@@ -507,20 +507,26 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
-static bool is_memory_region_within_ranges(uintptr_t base_address,
+static bool mem_range_contains(struct mem_range range, uintptr_t address)
+{
+	return pa_addr(range.begin) <= address && address <= pa_addr(range.end);
+}
+
+/**
+ * Return true if the region described by `region_start` and `page_count`
+ * overlaps with any of `ranges`.
+ */
+static bool is_memory_region_within_ranges(uintptr_t region_start,
 					   uint32_t page_count,
-					   const struct mem_range *ranges,
-					   const size_t ranges_size)
+					   const struct mem_range ranges[],
+					   size_t ranges_size)
 {
 	uintptr_t region_end =
-		base_address + ((uintptr_t)page_count * PAGE_SIZE - 1);
+		region_start + ((uintptr_t)page_count * PAGE_SIZE - 1);
 
 	for (size_t i = 0; i < ranges_size; i++) {
-		uintptr_t base = (uintptr_t)pa_addr(ranges[i].begin);
-		uintptr_t end = (uintptr_t)pa_addr(ranges[i].end);
-
-		if ((base_address >= base && base_address <= end) ||
-		    (region_end >= base && region_end <= end)) {
+		if (mem_range_contains(ranges[i], region_start) ||
+		    mem_range_contains(ranges[i], region_end)) {
 			return true;
 		}
 	}
