@@ -1721,8 +1721,6 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Success";
 	case MANIFEST_ERROR_FILE_SIZE:
 		return "Total size in header does not match file size";
-	case MANIFEST_ERROR_MALFORMED_DTB:
-		return "Malformed device tree blob";
 	case MANIFEST_ERROR_NO_ROOT_NODE:
 		return "Could not find root node in manifest";
 	case MANIFEST_ERROR_NO_HYPERVISOR_FDT_NODE:
@@ -1766,8 +1764,6 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "Memory region is not aligned to a page boundary";
 	case MANIFEST_ERROR_INVALID_MEM_PERM:
 		return "Memory permission should be RO, RW or RX";
-	case MANIFEST_ERROR_ARGUMENTS_LIST_EMPTY:
-		return "Arguments-list node should have at least one argument";
 	case MANIFEST_ERROR_INTERRUPT_ID_REPEATED:
 		return "Interrupt ID already assigned to another endpoint";
 	case MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION:
@@ -1781,10 +1777,6 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_MEMORY_MISSING:
 		return "Memory nodes must be defined in the SPMC manifest "
 		       "('memory' and 'ns-memory')";
-	case MANIFEST_ERROR_PARTITION_ADDRESS_OVERLAP:
-		return "Partition's memory [load address: load address + "
-		       "memory size[ overlap with other allocated "
-		       "regions";
 	case MANIFEST_ERROR_MEM_REGION_INVALID:
 		return "Invalid memory region range";
 	case MANIFEST_ERROR_DEVICE_MEM_REGION_INVALID:
