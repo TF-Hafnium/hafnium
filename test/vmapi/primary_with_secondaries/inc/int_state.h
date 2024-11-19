@@ -58,3 +58,5 @@ void hftest_int_state_init(struct hftest_int_state *track,
 			   enum int_category category);
 
 uint64_t hftest_int_state_page_setup(void *recv_buf, void *send_buf);
+
+void hftest_int_state_page_relinquish(void *send_buf);

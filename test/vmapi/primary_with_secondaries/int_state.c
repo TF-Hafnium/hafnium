@@ -20,6 +20,8 @@
  */
 extern uint8_t retrieve_buffer[PAGE_SIZE * 2];
 
+ffa_memory_handle_t memory_handle;
+
 bool hftest_int_state_is(struct hftest_int_state *track,
 			 enum int_state to_check)
 {
@@ -105,7 +107,14 @@ uint64_t hftest_int_state_page_setup(void *recv_buf, void *send_buf)
 {
 	uint64_t addr;
 
-	addr = get_shared_page_from_message(recv_buf, send_buf,
-					    retrieve_buffer);
+	addr = get_shared_page_from_message(recv_buf, send_buf, retrieve_buffer,
+					    &memory_handle);
 	return addr;
+}
+
+void hftest_int_state_page_relinquish(void *send_buf)
+{
+	ffa_mem_relinquish_init(send_buf, memory_handle, 0, hf_vm_get_id());
+
+	EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
 }

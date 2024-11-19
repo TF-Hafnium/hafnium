@@ -83,15 +83,16 @@ void hftest_ipi_init_state_from_message(void *recv_buf, void *send_buf)
  * ipi_state_indexes stores the index for the ipi_states array each receiver
  * listed in the receiver_ids list should use for test coordination.
  */
-void hftest_ipi_state_share_page_and_init(
+ffa_memory_handle_t hftest_ipi_state_share_page_and_init(
 	uint64_t page, ffa_id_t receivers_ids[],
 	uint32_t receivers_ipi_state_indexes[], size_t receivers_count,
-	void *send_buf)
+	void *send_buf, uint32_t vcpu_id)
 {
 	struct ffa_value ret;
+	ffa_memory_handle_t handle;
 
-	share_page_with_endpoints(page, receivers_ids, receivers_count,
-				  send_buf);
+	handle = share_page_with_endpoints(page, receivers_ids, receivers_count,
+					   send_buf);
 
 	/* Initialize the state machine to the top of the page. */
 	hftest_ipi_init_state_through_ptr((uintptr_t)page);
@@ -101,7 +102,7 @@ void hftest_ipi_state_share_page_and_init(
 		 * Resume service in target vCPU0 to retrieve memory and
 		 * configure the IPI state.
 		 */
-		ret = ffa_run(receivers_ids[i], 0);
+		ret = ffa_run(receivers_ids[i], vcpu_id);
 		EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
 
 		/*
@@ -115,6 +116,14 @@ void hftest_ipi_state_share_page_and_init(
 
 		ASSERT_EQ(ret.func, FFA_SUCCESS_32);
 
-		EXPECT_EQ(ffa_run(receivers_ids[i], 0).func, FFA_MSG_WAIT_32);
+		EXPECT_EQ(ffa_run(receivers_ids[i], vcpu_id).func,
+			  FFA_MSG_WAIT_32);
 	}
+
+	return handle;
+}
+
+void hftest_ipi_state_page_relinquish(void *send_buf)
+{
+	hftest_int_state_page_relinquish(send_buf);
 }

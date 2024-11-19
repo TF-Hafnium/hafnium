@@ -902,7 +902,8 @@ void ffa_notification_info_get_and_check(
  * the address of a shared page that holds the common variables.
  */
 uint64_t get_shared_page_from_message(void *recv_buf, void *send_buf,
-				      void *retrieve_buffer)
+				      void *retrieve_buffer,
+				      ffa_memory_handle_t *handle)
 {
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
@@ -910,6 +911,11 @@ uint64_t get_shared_page_from_message(void *recv_buf, void *send_buf,
 
 	retrieve_memory_from_message(recv_buf, send_buf, NULL, memory_region,
 				     HF_MAILBOX_SIZE);
+
+	if (handle != NULL) {
+		*handle = memory_region->handle;
+	}
+
 	composite = ffa_memory_region_get_composite(memory_region, 0);
 
 	/* Expect memory is NS and needs to be updated. */
@@ -923,8 +929,10 @@ uint64_t get_shared_page_from_message(void *recv_buf, void *send_buf,
  * This page holds common variables used for test coordination. All receivers
  * have read write permissions to the shared page.
  */
-void share_page_with_endpoints(uint64_t page, ffa_id_t receivers_ids[],
-			       size_t receivers_count, void *send_buf)
+ffa_memory_handle_t share_page_with_endpoints(uint64_t page,
+					      ffa_id_t receivers_ids[],
+					      size_t receivers_count,
+					      void *send_buf)
 {
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = page, .page_count = 1},
@@ -941,7 +949,7 @@ void share_page_with_endpoints(uint64_t page, ffa_id_t receivers_ids[],
 			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
 	}
 
-	send_memory_and_retrieve_request_multi_receiver(
+	return send_memory_and_retrieve_request_multi_receiver(
 		FFA_MEM_SHARE_32, send_buf, HF_PRIMARY_VM_ID, constituents,
 		ARRAY_SIZE(constituents), receivers, receivers_count, receivers,
 		receivers_count, 0, 0, FFA_MEMORY_NORMAL_MEM,

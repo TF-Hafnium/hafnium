@@ -500,6 +500,9 @@ TEST_SERVICE(receive_ipi_waiting_vcpu)
 
 	EXPECT_TRUE(hftest_ipi_state_is(HANDLED));
 
+	/* Relinquish IPI state memory. */
+	hftest_ipi_state_page_relinquish(SERVICE_SEND_BUFFER());
+
 	ffa_yield();
 }
 
