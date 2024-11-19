@@ -7,9 +7,8 @@
  */
 
 #include <array>
-#include <cstdio>
+#include <format>
 #include <span>
-#include <sstream>
 
 #include <gmock/gmock.h>
 
@@ -210,7 +209,7 @@ class ManifestDtBuilder
 
 	ManifestDtBuilder &LoadAddress(uint64_t value)
 	{
-		return Integer64Property("load_address", value);
+		return Integer64Property("load_address", value, true);
 	}
 
 	ManifestDtBuilder &FfaPartition()
@@ -250,11 +249,10 @@ class ManifestDtBuilder
 
 	ManifestDtBuilder &FfaLoadAddress(uint64_t value)
 	{
-		Integer64Property("load-address", value);
+		Integer64Property("load-address", value, true);
 		return *this;
 	}
 
-       private:
 	ManifestDtBuilder &StringProperty(const std::string_view &name,
 					  const std::string_view &value)
 	{
@@ -282,19 +280,32 @@ class ManifestDtBuilder
 	}
 
 	ManifestDtBuilder &IntegerProperty(const std::string_view &name,
-					   uint32_t value)
+					   uint32_t value, bool hex = false)
 	{
-		dts_ << name << " = <" << value << ">;" << std::endl;
+		std::ostream_iterator<char> out(dts_);
+
+		if (hex) {
+			std::format_to(out, "{} = <{:#08x}>;\n", name, value);
+		} else {
+			std::format_to(out, "{} = <{}>;\n", name, value);
+		}
 		return *this;
 	}
 
 	ManifestDtBuilder &Integer64Property(const std::string_view &name,
-					     uint64_t value)
+					     uint64_t value, bool hex = false)
 	{
 		uint32_t high = value >> 32;
 		uint32_t low = (uint32_t)value;
-		dts_ << name << " = <" << high << " " << low << ">;"
-		     << std::endl;
+		std::ostream_iterator<char> out(dts_);
+
+		if (hex) {
+			std::format_to(out, "{} = <{:#08x} {:#08x}>;\n", name,
+				       high, low);
+		} else {
+			std::format_to(out, "{} = <{} {}>;\n", name, high, low);
+		}
+
 		return *this;
 	}
 
