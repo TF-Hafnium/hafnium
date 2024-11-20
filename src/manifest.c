@@ -794,9 +794,9 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 		dlog_verbose("    Memory Region[%u]\n", i);
 
 		TRY(read_optional_string(mem_node, "description",
-					 &mem_regions[i].name));
-		dlog_verbose("      Name: %s\n",
-			     string_data(&mem_regions[i].name));
+					 &mem_regions[i].description));
+		dlog_verbose("      Description: %s\n",
+			     string_data(&mem_regions[i].description));
 
 		TRY(parse_base_address(mem_node, load_address,
 				       &mem_regions[i]));

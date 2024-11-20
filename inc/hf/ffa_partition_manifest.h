@@ -78,7 +78,7 @@ struct dma_device_properties {
  * device that has access to this memory region.
  */
 struct memory_region {
-	struct string name;
+	struct string description;
 	/**
 	 * Specify PA, VA for S-EL0 partitions or IPA
 	 * for S-EL1 partitions - optional.
