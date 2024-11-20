@@ -43,15 +43,15 @@ const uint64_t i64_max = INT64_MAX;
 static void assert_format_impl(char* expected, size_t expected_len,
 			       const char* fmt, ...)
 {
-	va_list args;
+	struct va_list_wrapper args;
 	size_t chars_written;
 
 	memset_s(dlog_buffer, DLOG_BUFFER_SIZE, 0, DLOG_BUFFER_SIZE);
 	dlog_buffer_offset = 0;
 
-	va_start(args, fmt);
-	chars_written = vdlog(fmt, args);
-	va_end(args);
+	va_start(args.va, fmt);
+	chars_written = vdlog(fmt, &args);
+	va_end(args.va);
 
 	ASSERT_NE(chars_written, (size_t)-1);
 	ASSERT_EQ(chars_written, expected_len - 1);
@@ -276,4 +276,46 @@ TEST(dlog, signed_length_modifiers)
 	assert_format("Hello -1\n", "Hello %lld\n", u64_max);
 	assert_format("Hello 9223372036854775807\n", "Hello %lld\n", i64_max);
 	assert_format("Hello -9223372036854775808\n", "Hello %lld\n", i64_min);
+}
+
+TEST(dlog, min_width)
+{
+	assert_format("Hello a\n", "Hello %0s\n", "a");
+	assert_format("Hello a\n", "Hello %1s\n", "a");
+	assert_format("Hello  a\n", "Hello %2s\n", "a");
+	assert_format("Hello   a\n", "Hello %3s\n", "a");
+	assert_format("Hello    a\n", "Hello %4s\n", "a");
+
+	assert_format("Hello ab\n", "Hello %0s\n", "ab");
+	assert_format("Hello ab\n", "Hello %1s\n", "ab");
+	assert_format("Hello ab\n", "Hello %2s\n", "ab");
+	assert_format("Hello  ab\n", "Hello %3s\n", "ab");
+	assert_format("Hello   ab\n", "Hello %4s\n", "ab");
+
+	assert_format("Hello abc\n", "Hello %0s\n", "abc");
+	assert_format("Hello abc\n", "Hello %1s\n", "abc");
+	assert_format("Hello abc\n", "Hello %2s\n", "abc");
+	assert_format("Hello abc\n", "Hello %3s\n", "abc");
+	assert_format("Hello  abc\n", "Hello %4s\n", "abc");
+}
+
+TEST(dlog, min_width_arg)
+{
+	assert_format("Hello a\n", "Hello %*s\n", 0, "a");
+	assert_format("Hello a\n", "Hello %*s\n", 1, "a");
+	assert_format("Hello  a\n", "Hello %*s\n", 2, "a");
+	assert_format("Hello   a\n", "Hello %*s\n", 3, "a");
+	assert_format("Hello    a\n", "Hello %*s\n", 4, "a");
+
+	assert_format("Hello ab\n", "Hello %*s\n", 0, "ab");
+	assert_format("Hello ab\n", "Hello %*s\n", 1, "ab");
+	assert_format("Hello ab\n", "Hello %*s\n", 2, "ab");
+	assert_format("Hello  ab\n", "Hello %*s\n", 3, "ab");
+	assert_format("Hello   ab\n", "Hello %*s\n", 4, "ab");
+
+	assert_format("Hello abc\n", "Hello %*s\n", 0, "abc");
+	assert_format("Hello abc\n", "Hello %*s\n", 1, "abc");
+	assert_format("Hello abc\n", "Hello %*s\n", 2, "abc");
+	assert_format("Hello abc\n", "Hello %*s\n", 3, "abc");
+	assert_format("Hello  abc\n", "Hello %*s\n", 4, "abc");
 }

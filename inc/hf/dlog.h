@@ -27,9 +27,40 @@ enum log_level {
 extern size_t dlog_buffer_offset;
 extern char dlog_buffer[];
 
+/**
+ * This struct is a workaround to allow passing `va_list` by pointer on x86_64.
+ * On x86_64, `va_list` is an array, and in C arrays are weird.
+ *
+ * In particular, function parameters of array types are really pointers: the
+ * functions `void f(char[1])` and `void f(char*)` are identical (see
+ * https://en.cppreference.com/w/c/language/array). But this does not apply to
+ * function parameters of type pointer to array: the functions `void
+ * f(char(*)[1])` and `void f(char**)` are not identical.
+ *
+ * Therefore in the body of `by_value`, `args` has type `__va_list_tag *`.
+ * The call to `by_pointer` will cause a compile error, as `&args` has type
+ * `va_list_tag **` but `by_pointer` expects `va_list (*)[1]`.
+ *
+ * ```
+ * typedef va_list __va_list_tag[1];
+ *
+ * void by_pointer(va_list *args) {}
+ *
+ * void by_value(va_list args) {
+ *    by_pointer(&args);
+ * }
+ * ```
+ *
+ * The workaround to prevent array to pointer decay is to wrap the array in a
+ * struct, since structs do not decay to pointers.
+ */
+struct va_list_wrapper {
+	va_list va;
+};
+
 void dlog_enable_lock(void);
 __attribute__((format(printf, 1, 2))) size_t dlog(const char *fmt, ...);
-size_t vdlog(const char *fmt, va_list args);
+size_t vdlog(const char *fmt, struct va_list_wrapper *args);
 
 /*
  * The do { ... } while (0) syntax is used to ensure that callers of

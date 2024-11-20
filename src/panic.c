@@ -20,13 +20,13 @@
  */
 noreturn void panic(const char *fmt, ...)
 {
-	va_list args;
+	struct va_list_wrapper args;
 
 	dlog("Panic: ");
 
-	va_start(args, fmt);
-	vdlog(fmt, args);
-	va_end(args);
+	va_start(args.va, fmt);
+	vdlog(fmt, &args);
+	va_end(args.va);
 
 	dlog("\n");
 

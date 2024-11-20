@@ -317,7 +317,8 @@ static const char *parse_length_modifier(const char *fmt,
  *
  * Returns a pointer to the first non-digit character in the string.
  */
-static const char *parse_min_width(const char *fmt, va_list args,
+static const char *parse_min_width(const char *fmt,
+				   struct va_list_wrapper *args,
 				   struct format_flags *flags, int *min_width)
 {
 	int width = 0;
@@ -325,7 +326,7 @@ static const char *parse_min_width(const char *fmt, va_list args,
 	/* Read minimum width from arguments. */
 	if (*fmt == '*') {
 		fmt++;
-		width = va_arg(args, int);
+		width = va_arg(args->va, int);
 		if (width < 0) {
 			width = -width;
 			flags->minus = true;
@@ -408,7 +409,7 @@ uint64_t reinterpret_signed_int(enum format_length length, uint64_t value,
  *
  * Returns number of characters written, or `-1` if format string is invalid.
  */
-size_t vdlog(const char *fmt, va_list args)
+size_t vdlog(const char *fmt, struct va_list_wrapper *args)
 {
 	size_t chars_written = 0;
 
@@ -442,7 +443,7 @@ size_t vdlog(const char *fmt, va_list args)
 				break;
 
 			case 'c': {
-				char str[2] = {va_arg(args, int), 0};
+				char str[2] = {va_arg(args->va, int), '\0'};
 
 				fmt++;
 				chars_written += print_string(
@@ -451,7 +452,7 @@ size_t vdlog(const char *fmt, va_list args)
 			}
 
 			case 's': {
-				char *str = va_arg(args, char *);
+				char *str = va_arg(args->va, char *);
 
 				fmt++;
 				chars_written += print_string(
@@ -462,7 +463,7 @@ size_t vdlog(const char *fmt, va_list args)
 			case 'd':
 			case 'i': {
 				fmt++;
-				value = va_arg(args, uint64_t);
+				value = va_arg(args->va, uint64_t);
 				value = reinterpret_signed_int(length, value,
 							       &flags);
 
@@ -473,7 +474,7 @@ size_t vdlog(const char *fmt, va_list args)
 
 			case 'b':
 				fmt++;
-				value = va_arg(args, uint64_t);
+				value = va_arg(args->va, uint64_t);
 				value = reinterpret_unsigned_int(length, value);
 
 				chars_written += print_int(value, base2,
@@ -483,7 +484,7 @@ size_t vdlog(const char *fmt, va_list args)
 			case 'B':
 				fmt++;
 				flags.upper = true;
-				value = va_arg(args, uint64_t);
+				value = va_arg(args->va, uint64_t);
 				value = reinterpret_unsigned_int(length, value);
 
 				chars_written += print_int(value, base2,
@@ -492,7 +493,7 @@ size_t vdlog(const char *fmt, va_list args)
 
 			case 'o':
 				fmt++;
-				value = va_arg(args, uint64_t);
+				value = va_arg(args->va, uint64_t);
 				value = reinterpret_unsigned_int(length, value);
 
 				chars_written += print_int(value, base8,
@@ -501,7 +502,7 @@ size_t vdlog(const char *fmt, va_list args)
 
 			case 'x':
 				fmt++;
-				value = va_arg(args, uint64_t);
+				value = va_arg(args->va, uint64_t);
 				value = reinterpret_unsigned_int(length, value);
 
 				chars_written += print_int(value, base16,
@@ -511,7 +512,7 @@ size_t vdlog(const char *fmt, va_list args)
 			case 'X':
 				fmt++;
 				flags.upper = true;
-				value = va_arg(args, uint64_t);
+				value = va_arg(args->va, uint64_t);
 				value = reinterpret_unsigned_int(length, value);
 
 				chars_written += print_int(value, base16,
@@ -520,7 +521,7 @@ size_t vdlog(const char *fmt, va_list args)
 
 			case 'u':
 				fmt++;
-				value = va_arg(args, uint64_t);
+				value = va_arg(args->va, uint64_t);
 				value = reinterpret_unsigned_int(length, value);
 
 				chars_written += print_int(value, base10,
@@ -529,7 +530,7 @@ size_t vdlog(const char *fmt, va_list args)
 
 			case 'p':
 				fmt++;
-				value = va_arg(args, uint64_t);
+				value = va_arg(args->va, uint64_t);
 				min_width = sizeof(size_t) * 2 + 2;
 				flags.zero = true;
 				flags.alt = true;
@@ -569,10 +570,10 @@ out:
 size_t dlog(const char *fmt, ...)
 {
 	size_t chars_written = 0;
-	va_list args;
+	struct va_list_wrapper args;
 
-	va_start(args, fmt);
-	chars_written = vdlog(fmt, args);
-	va_end(args);
+	va_start(args.va, fmt);
+	chars_written = vdlog(fmt, &args);
+	va_end(args.va);
 	return chars_written;
 }
