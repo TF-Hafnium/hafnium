@@ -14,11 +14,11 @@
 #include "vmapi/hf/call.h"
 
 #include "gicv3.h"
-#include "interrupt_status.h"
 #include "ipi_state.h"
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
 #include "test/semaphore.h"
+#include "twdog_state.h"
 #include "wdog.h"
 
 /**
@@ -155,8 +155,8 @@ TEST(secure_interrupts, sp_to_sp_yield_interrupt_queued)
 	 * Share memory used for interrupt status coordination and initialize
 	 * the state.
 	 */
-	hftest_interrupt_status_share_page_and_init(
-		(uint64_t)twdog_interrupt_page, memory_receivers, 2, mb.send);
+	hftest_twdog_state_share_page_and_init((uint64_t)twdog_interrupt_page,
+					       memory_receivers, 2, mb.send);
 
 	ret = ffa_run(companion_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
@@ -168,7 +168,7 @@ TEST(secure_interrupts, sp_to_sp_yield_interrupt_queued)
 	ret = ffa_run(companion_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
 
-	EXPECT_EQ(hftest_interrupt_status_get(), INTR_SERVICED);
+	ASSERT_TRUE(hftest_twdog_state_is(HANDLED));
 }
 
 /**

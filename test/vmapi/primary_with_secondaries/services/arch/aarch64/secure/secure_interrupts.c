@@ -15,13 +15,13 @@
 #include "vmapi/hf/call.h"
 
 #include "../smc.h"
-#include "interrupt_status.h"
 #include "ipi_state.h"
 #include "sp805.h"
 #include "test/hftest.h"
 #include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 #include "twdog.h"
+#include "twdog_state.h"
 
 #define PLAT_ARM_TWDOG_BASE 0x2a490000
 #define PLAT_ARM_TWDOG_SIZE 0x20000
@@ -235,10 +235,12 @@ TEST_SERVICE(send_direct_req_yielded_and_resumed)
 	ret = ffa_msg_wait();
 	EXPECT_EQ(ret.func, FFA_RUN_32);
 
-	/* Get the shared page used for interrupt status coordination and track
-	 * it. */
-	hftest_interrupt_status_page_setup(recv_buf, send_buf);
-	EXPECT_EQ(hftest_interrupt_status_get(), INTR_RESET);
+	/*
+	 * Get the shared page used for interrupt status coordination and track
+	 * it.
+	 */
+	hftest_twdog_state_page_setup(recv_buf, send_buf);
+	ASSERT_TRUE(hftest_twdog_state_is(INIT));
 
 	ret = ffa_msg_wait();
 	EXPECT_EQ(ret.func, FFA_RUN_32);
@@ -249,7 +251,7 @@ TEST_SERVICE(send_direct_req_yielded_and_resumed)
 	/* The target SP is expected to yield its CPU cycles. */
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
-	EXPECT_EQ(hftest_interrupt_status_get(), INTR_PROGRAMMED);
+	ASSERT_TRUE(hftest_twdog_state_is(SENT));
 
 	/* Wait for TWDOG secure physical interrupt to trigger. */
 	sp_wait(TWDOG_DELAY + 5);
@@ -258,13 +260,13 @@ TEST_SERVICE(send_direct_req_yielded_and_resumed)
 	 * SPMC would have queued the virtual interrupt for the target SP.
 	 * Hence the interrupt status should not have changed.
 	 */
-	EXPECT_EQ(hftest_interrupt_status_get(), INTR_PROGRAMMED);
+	ASSERT_TRUE(hftest_twdog_state_is(SENT));
 
 	ret = ffa_run(target_vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
 
 	/* The target SP must have serviced the interrupt by now. */
-	EXPECT_EQ(hftest_interrupt_status_get(), INTR_SERVICED);
+	ASSERT_TRUE(hftest_twdog_state_is(HANDLED));
 
 	ffa_msg_wait();
 	FAIL("Not expected to reach here");
@@ -283,7 +285,7 @@ static void twdog_irq_handler(void)
 		twdog_stop();
 
 		/* Update the shared interrupt status. */
-		hftest_interrupt_status_set(INTR_SERVICED);
+		hftest_twdog_state_set(HANDLED);
 
 		/* Perform secure interrupt de-activation. */
 		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
@@ -319,30 +321,32 @@ TEST_SERVICE(yield_direct_req_service_twdog_int)
 	ret = ffa_msg_wait();
 	EXPECT_EQ(ret.func, FFA_RUN_32);
 
-	/* Get the shared page used for interrupt status coordination and track
-	 * it. */
-	hftest_interrupt_status_page_setup(recv_buf, send_buf);
+	/*
+	 * Get the shared page used for interrupt status coordination and track
+	 * it.
+	 */
+	hftest_twdog_state_page_setup(recv_buf, send_buf);
 
 	/*
 	 * Ensure the status of the interrupt is correct before the test begins.
 	 */
-	EXPECT_EQ(hftest_interrupt_status_get(), INTR_RESET);
+	ASSERT_TRUE(hftest_twdog_state_is(INIT));
 
 	ret = ffa_msg_wait();
 
 	/* The companion SP sends a direct request message. */
 	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_REQ_32);
 
-	/* Program the trusted watcdog timer and yield to companion SP. */
-	HFTEST_LOG("Start TWDOG timer with a delay of %lu", ret.arg3);
+	/* Program the trusted watchdog timer and yield to companion SP. */
+	dlog_verbose("Start TWDOG timer with a delay of %lu\n", ret.arg3);
 	twdog_start((ret.arg3 * ARM_SP805_TWDG_CLK_HZ) / 1000);
 
-	hftest_interrupt_status_set(INTR_PROGRAMMED);
+	hftest_twdog_state_set(SENT);
 
 	/* Yield the direct request thereby moving to BLOCKED state. */
 	ffa_yield();
 
-	HFTEST_LOG("Completing the direct response");
+	dlog_verbose("Completing the direct response.\n");
 	ffa_msg_send_direct_resp(ffa_receiver(ret), ffa_sender(ret), ret.arg3,
 				 ret.arg4, ret.arg5, ret.arg6, ret.arg7);
 	FAIL("Not expected to reach here");

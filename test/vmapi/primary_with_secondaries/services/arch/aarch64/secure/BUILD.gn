@@ -39,8 +39,8 @@ source_set("secure_interrupts") {
     "//test/vmapi/common:ffa",
     "//test/vmapi/common/arch/aarch64/secure:twdog",
     "//test/vmapi/common/arch/aarch64/system_timer:ap_refclk",
-    "//test/vmapi/primary_with_secondaries:interrupt_status",
     "//test/vmapi/primary_with_secondaries:ipi_state",
+    "//test/vmapi/primary_with_secondaries:twdog_state",
   ]
 }
 
