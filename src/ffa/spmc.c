@@ -353,54 +353,79 @@ void plat_ffa_vcpu_allow_interrupts(struct vcpu *current)
 
 bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 {
-	static bool spmc_booted = false;
 	struct vcpu *vcpu_next = NULL;
 	struct vcpu *current = current_locked.vcpu;
 	struct vm *next_vm;
 	size_t cpu_indx = cpu_index(current->cpu);
 
-	if (spmc_booted) {
+	if (current->cpu->last_sp_initialized) {
 		return false;
 	}
-
-	assert(current->rt_model == RTM_SP_INIT);
 
 	if (!atomic_load_explicit(&current->vm->aborting,
 				  memory_order_relaxed)) {
 		/* vCPU has just returned from successful initialization. */
-		dlog_info("Initialized VM: %#x, boot_order: %u\n",
-			  current->vm->id, current->vm->boot_order);
+		dlog_verbose(
+			"Initialized execution context of VM: %#x on CPU: %zu, "
+			"boot_order: %u\n",
+			current->vm->id, cpu_index(current->cpu),
+			current->vm->boot_order);
+	}
+
+	if (cpu_index(current_locked.vcpu->cpu) == PRIMARY_CPU_IDX) {
+		next_vm = vm_get_next_boot(current->vm);
+	} else {
+		/* SP boot chain on secondary CPU. */
+		next_vm = vm_get_next_boot_secondary_core(current->vm);
 	}
 
 	current->state = VCPU_STATE_WAITING;
-
-	/*
-	 * Pick next SP's vCPU to be booted. Once all SPs have booted
-	 * (next_boot is NULL), then return execution to NWd.
-	 */
-	next_vm = vm_get_next_boot(current->vm);
-
-	if (next_vm == NULL) {
-		dlog_notice("Finished initializing all VMs.\n");
-		spmc_booted = true;
-		return false;
-	}
-
 	current->rt_model = RTM_NONE;
 	current->scheduling_mode = NONE;
 
+	/*
+	 * Pick next SP's vCPU to be booted. Once all SPs have booted
+	 * (next_vm is NULL), then return execution to NWd.
+	 */
+	if (next_vm == NULL) {
+		current->cpu->last_sp_initialized = true;
+		goto out;
+	}
+
 	vcpu_next = vm_get_vcpu(next_vm, cpu_indx);
-	CHECK(vcpu_next->rt_model == RTM_SP_INIT);
-	arch_regs_reset(vcpu_next);
-	vcpu_next->cpu = current->cpu;
-	vcpu_next->state = VCPU_STATE_RUNNING;
-	vcpu_next->regs_available = false;
-	vcpu_set_phys_core_idx(vcpu_next);
-	vcpu_set_boot_info_gp_reg(vcpu_next);
 
-	*next = vcpu_next;
+	/*
+	 * An SP's execution context needs to be bootstrapped if:
+	 * - It has never been initialized before.
+	 * - Or it was turned off when the CPU, on which it was pinned, was
+	 *   powered down.
+	 */
+	if (vcpu_next->rt_model == RTM_SP_INIT ||
+	    vcpu_next->state == VCPU_STATE_OFF) {
+		vcpu_next->rt_model = RTM_SP_INIT;
+		arch_regs_reset(vcpu_next);
+		vcpu_next->cpu = current->cpu;
+		vcpu_next->state = VCPU_STATE_RUNNING;
+		vcpu_next->regs_available = false;
+		vcpu_set_phys_core_idx(vcpu_next);
+		arch_regs_set_pc_arg(&vcpu_next->regs,
+				     vcpu_next->vm->secondary_ep, 0ULL);
 
-	return true;
+		if (cpu_index(current_locked.vcpu->cpu) == PRIMARY_CPU_IDX) {
+			/*
+			 * Boot information is passed by the SPMC to the SP's
+			 * execution context only on the primary CPU.
+			 */
+			vcpu_set_boot_info_gp_reg(vcpu_next);
+		}
+
+		*next = vcpu_next;
+
+		return true;
+	}
+out:
+	dlog_notice("Finished bootstrapping all SPs on CPU%lx\n", cpu_indx);
+	return false;
 }
 
 /**

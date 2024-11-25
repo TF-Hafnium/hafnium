@@ -306,6 +306,63 @@ static void set_virtual_irq(struct arch_regs *r, bool enable)
 }
 
 #if SECURE_WORLD == 1
+/*
+ * TODO: the power management event reached the SPMC. In a later iteration, the
+ * power management event can be passed to the SP by resuming it.
+ */
+static struct ffa_value handle_psci_framework_msg(struct ffa_value *args,
+						  struct vcpu *current)
+{
+	enum psci_return_code psci_msg_response;
+	uint64_t psci_func = args->arg3;
+
+	switch (psci_func) {
+	case PSCI_CPU_OFF: {
+		/*
+		 * Mark all the vCPUs pinned on this CPU as OFF. Note that the
+		 * vCPU of an UP SP is not turned off since SPMC can migrate it
+		 * to an online CPU when needed.
+		 */
+		for (ffa_vm_count_t index = 0; index < vm_get_count();
+		     ++index) {
+			struct vm *vm = vm_find_index(index);
+
+			if (vm->vcpu_count > 1) {
+				struct vcpu *vcpu;
+				struct vcpu_locked vcpu_locked;
+
+				vcpu = vm_get_vcpu(vm, cpu_index(current->cpu));
+				vcpu_locked = vcpu_lock(vcpu);
+				vcpu->state = VCPU_STATE_OFF;
+				vcpu_unlock(&vcpu_locked);
+				dlog_verbose("SP%u turned OFF on CPU%zu\n",
+					     vm->id, cpu_index(current->cpu));
+			}
+		}
+
+		/*
+		 * Mark the CPU as turned off and reset the field tracking if
+		 * all the pinned vCPUs have been booted on this CPU.
+		 */
+		cpu_off(current->cpu);
+		current->cpu->last_sp_initialized = false;
+		psci_msg_response = PSCI_RETURN_SUCCESS;
+
+		break;
+	}
+	default:
+		dlog_error(
+			"FF-A PSCI framework message not handled "
+			"%#lx %#lx %#lx %#lx\n",
+			args->func, args->arg1, args->arg2, args->arg3);
+		psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
+	}
+
+	return ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+				      SPMD_FRAMEWORK_MSG_PSCI_RESP,
+				      psci_msg_response);
+}
+
 /**
  * Handle special direct messages from SPMD to SPMC.
  */
@@ -335,48 +392,7 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 
 	switch (func) {
 	case SPMD_FRAMEWORK_MSG_PSCI_REQ: {
-		enum psci_return_code psci_msg_response =
-			PSCI_ERROR_NOT_SUPPORTED;
-		struct vm *vm = vm_get_boot_vm();
-		struct vcpu_locked vcpu_locked;
-
-		/*
-		 * TODO: the power management event reached the SPMC.
-		 * In a later iteration, the power management event can
-		 * be passed to the SP by resuming it.
-		 */
-		switch (args->arg3) {
-		case PSCI_CPU_OFF: {
-			if (vm_power_management_cpu_off_requested(vm) == true) {
-				struct vcpu *vcpu;
-
-				/* Allow only S-EL1 MP SPs to reach here. */
-				CHECK(vm->el0_partition == false);
-				CHECK(vm->vcpu_count > 1);
-
-				vcpu = vm_get_vcpu(vm, vcpu_index(current));
-				vcpu_locked = vcpu_lock(vcpu);
-				vcpu->state = VCPU_STATE_OFF;
-				vcpu_unlock(&vcpu_locked);
-				cpu_off(vcpu->cpu);
-				dlog_verbose("cpu%u off notification!\n",
-					     vcpu_index(vcpu));
-			}
-
-			psci_msg_response = PSCI_RETURN_SUCCESS;
-			break;
-		}
-		default:
-			dlog_error(
-				"FF-A PSCI framework message not handled "
-				"%#lx %#lx %#lx %#lx\n",
-				args->func, args->arg1, args->arg2, args->arg3);
-			psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
-		}
-
-		*args = ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
-					       SPMD_FRAMEWORK_MSG_PSCI_RESP,
-					       psci_msg_response);
+		*args = handle_psci_framework_msg(args, current);
 		return true;
 	}
 	case SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ: {

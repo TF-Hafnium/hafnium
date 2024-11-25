@@ -54,15 +54,73 @@ void plat_psci_cpu_suspend(uint32_t power_state)
 	(void)power_state;
 }
 
+/** Switch to the normal world vCPU pinned on this physical CPU now. */
+static struct vcpu *plat_psci_switch_to_other_world(struct cpu *c)
+{
+	struct vcpu_locked other_world_vcpu_locked;
+	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
+	struct vcpu *other_world_vcpu;
+
+	CHECK(other_world_vm != NULL);
+
+	other_world_vcpu = vm_get_vcpu(other_world_vm, cpu_index(c));
+
+	CHECK(other_world_vcpu != NULL);
+
+	other_world_vcpu_locked = vcpu_lock(other_world_vcpu);
+
+	/*
+	 * Return FFA_MSG_WAIT_32 to indicate to SPMD that SPMC
+	 * has successfully finished initialization on this
+	 * CPU.
+	 */
+	arch_regs_set_retval(&other_world_vcpu->regs,
+			     (struct ffa_value){.func = FFA_MSG_WAIT_32});
+
+	other_world_vcpu->state = VCPU_STATE_WAITING;
+	vcpu_unlock(&other_world_vcpu_locked);
+
+	return other_world_vcpu;
+}
+
+/**
+ * Check if there is at least one SP whose execution context needs to be
+ * bootstrapped on this physical CPU.
+ */
+static struct vm *plat_psci_get_boot_vm(struct cpu *c)
+{
+	struct vm *boot_vm;
+
+	if (cpu_index(c) == PRIMARY_CPU_IDX) {
+		boot_vm = vm_get_boot_vm();
+
+		/*
+		 * On the primary CPU, at least one SP will exist whose
+		 * execution context shall be bootstrapped.
+		 */
+		CHECK(boot_vm != NULL);
+	} else {
+		boot_vm = vm_get_boot_vm_secondary_core();
+
+		/*
+		 * It is possible that no SP might exist that needs its
+		 * execution context to be bootstrapped on secondary CPU. This
+		 * can happen if all the SPs in the system are UP partitions and
+		 * hence, have no vCPUs pinned to secondary CPUs.
+		 */
+		if (boot_vm != NULL) {
+			assert(boot_vm->vcpu_count > 1);
+		}
+	}
+
+	return boot_vm;
+}
+
 struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 {
 	struct vcpu_locked vcpu_locked;
-	struct vcpu_locked other_world_vcpu_locked;
-	struct vcpu *vcpu;
-	struct vm *vm = vm_get_boot_vm();
-	struct vm *other_world_vm;
-	struct vcpu *other_world_vcpu;
-	struct two_vcpu_locked vcpus_locked;
+	struct vm *boot_vm;
+	struct vcpu *boot_vcpu;
 
 	cpu_on(c);
 
@@ -71,47 +129,42 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	/* Initialize SRI for running core. */
 	ffa_notifications_sri_init(c);
 
-	vcpu = vm_get_vcpu(vm, vm_is_up(vm) ? 0 : cpu_index(c));
+	boot_vm = plat_psci_get_boot_vm(c);
 
-	assert(vcpu != NULL);
-
-	vcpu_locked = vcpu_lock(vcpu);
-
-	if (vcpu->rt_model != RTM_SP_INIT) {
-		other_world_vm = vm_find(HF_OTHER_WORLD_ID);
-		CHECK(other_world_vm != NULL);
-		other_world_vcpu = vm_get_vcpu(other_world_vm, cpu_index(c));
-		vcpu_unlock(&vcpu_locked);
-
-		/* Lock both vCPUs at once to avoid deadlock. */
-		vcpus_locked = vcpu_lock_both(vcpu, other_world_vcpu);
-		vcpu_locked = vcpus_locked.vcpu1;
-		other_world_vcpu_locked = vcpus_locked.vcpu2;
-
-		vcpu = api_switch_to_other_world(
-			other_world_vcpu_locked,
-			(struct ffa_value){.func = FFA_MSG_WAIT_32},
-			VCPU_STATE_WAITING);
-		vcpu_unlock(&other_world_vcpu_locked);
-		goto exit;
+	if (boot_vm == NULL) {
+		return plat_psci_switch_to_other_world(c);
 	}
 
-	vcpu->cpu = c;
+	/* Obtain the vCPU for the boot SP on this CPU. */
+	boot_vcpu = vm_get_vcpu(boot_vm, cpu_index(c));
 
-	vcpu_secondary_reset_and_start(vcpu_locked, vcpu->vm->secondary_ep,
+	/* Lock the vCPU to update its fields. */
+	vcpu_locked = vcpu_lock(boot_vcpu);
+
+	/* Pin the vCPU to this CPU. */
+	boot_vcpu->cpu = c;
+
+	vcpu_secondary_reset_and_start(vcpu_locked, boot_vcpu->vm->secondary_ep,
 				       0ULL);
+
+	/* Set the vCPU's state to RUNNING. */
 	vcpu_set_running(vcpu_locked, NULL);
 
 	/* vCPU restarts in runtime model for SP initialization. */
-	vcpu->rt_model = RTM_SP_INIT;
+	boot_vcpu->rt_model = RTM_SP_INIT;
 
 	/* Set the designated GP register with the core linear id. */
-	vcpu_set_phys_core_idx(vcpu);
+	vcpu_set_phys_core_idx(boot_vcpu);
 
-	vcpu_set_boot_info_gp_reg(vcpu);
+	if (cpu_index(c) == PRIMARY_CPU_IDX) {
+		/*
+		 * Boot information is passed by the SPMC to the SP's execution
+		 * context only on the primary CPU.
+		 */
+		vcpu_set_boot_info_gp_reg(boot_vcpu);
+	}
 
-exit:
 	vcpu_unlock(&vcpu_locked);
 
-	return vcpu;
+	return boot_vcpu;
 }

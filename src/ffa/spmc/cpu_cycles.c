@@ -97,8 +97,6 @@ bool ffa_cpu_cycles_run_checks(struct vcpu_locked current_locked,
 		goto out;
 	}
 
-	vcpu_secondary_reset_and_start(target_locked, vm->secondary_ep, 0);
-
 	if (vm_id_is_current_world(current->vm->id)) {
 		/*
 		 * Refer FF-A v1.1 EAC0 spec section 8.3.2.2.1
