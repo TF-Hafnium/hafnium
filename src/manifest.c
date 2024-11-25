@@ -1445,11 +1445,9 @@ enum manifest_return_code parse_ffa_manifest(
 		return MANIFEST_ERROR_VM_AVAILABILITY_MESSAGE_INVALID;
 	}
 
-	TRY(read_optional_uint32(
-		&root, "power-management-messages",
-		MANIFEST_POWER_MANAGEMENT_CPU_OFF_SUPPORTED |
-			MANIFEST_POWER_MANAGEMENT_CPU_ON_SUPPORTED,
-		&vm->partition.power_management));
+	TRY(read_optional_uint32(&root, "power-management-messages",
+				 MANIFEST_POWER_MANAGEMENT_CPU_OFF_SUPPORTED,
+				 &vm->partition.power_management));
 	vm->partition.power_management &= MANIFEST_POWER_MANAGEMENT_ALL_MASK;
 	if (vm->partition.execution_ctx_count == 1 ||
 	    vm->partition.run_time_el == S_EL0 ||

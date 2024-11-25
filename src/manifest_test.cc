@@ -1228,47 +1228,9 @@ TEST_F(manifest, power_management)
 	struct manifest_vm *vm;
 	struct_manifest *m;
 
-	/* S-EL1 partition power management field can set bit 0. */
+	/* S-EL1 partition power management field can only set bit 0. */
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
-		.Compatible({ "arm,ffa-manifest-1.0" })
-		.Property("ffa-version", "<0x10001>")
-		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
-		.Property("execution-ctx-count", "<8>")
-		.Property("exception-level", "<2>")
-		.Property("execution-state", "<0>")
-		.Property("entrypoint-offset", "<0x00002000>")
-		.Property("messaging-method", "<1>")
-		.Property("power-management-messages", "<1>")
-		.Build();
-	/* clang-format on */
-	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
-	vm = &m->vm[0];
-	ASSERT_EQ(vm->partition.power_management, 1);
-	manifest_dealloc();
-
-	/* S-EL1 partition power management field can set bit 3. */
-	/* clang-format off */
-	dtb = ManifestDtBuilder()
-		.Compatible({ "arm,ffa-manifest-1.0" })
-		.Property("ffa-version", "<0x10001>")
-		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
-		.Property("execution-ctx-count", "<8>")
-		.Property("exception-level", "<2>")
-		.Property("execution-state", "<0>")
-		.Property("entrypoint-offset", "<0x00002000>")
-		.Property("messaging-method", "<1>")
-		.Property("power-management-messages", "<8>")
-		.Build();
-	/* clang-format on */
-	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
-	vm = &m->vm[0];
-	ASSERT_EQ(vm->partition.power_management, 8);
-	manifest_dealloc();
-
-	/* S-EL1 partition power management field can only set bits 0 and 3. */
-	/* clang-format off */
-	dtb = ManifestDtBuilder()
 		.Compatible({ "arm,ffa-manifest-1.0" })
 		.Property("ffa-version", "<0x10001>")
 		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
@@ -1282,7 +1244,7 @@ TEST_F(manifest, power_management)
 	/* clang-format on */
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
 	vm = &m->vm[0];
-	ASSERT_EQ(vm->partition.power_management, 9);
+	ASSERT_EQ(vm->partition.power_management, 1);
 	manifest_dealloc();
 
 	/* S-EL0 partition power management field is forced to 0. */

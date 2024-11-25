@@ -33,7 +33,6 @@
  * notified about.
  */
 #define VM_POWER_MANAGEMENT_CPU_OFF_SHIFT (0)
-#define VM_POWER_MANAGEMENT_CPU_ON_SHIFT (3)
 
 /**
  * The state of an RX buffer, as defined by FF-A v1.1 EAC0 specification.
@@ -368,16 +367,6 @@ void vm_notifications_set_npi_injected(struct vm_locked vm_locked,
 				       bool npi_injected);
 bool vm_notifications_is_npi_injected(struct vm_locked vm_locked);
 void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu);
-
-/**
- * Returns true if the VM requested to receive cpu on power management
- * events.
- */
-static inline bool vm_power_management_cpu_on_requested(struct vm *vm)
-{
-	return (vm->power_management &
-		(UINT32_C(1) << VM_POWER_MANAGEMENT_CPU_ON_SHIFT)) != 0;
-}
 
 /**
  * Returns true if the VM requested to receive cpu off power management

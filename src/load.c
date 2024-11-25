@@ -667,7 +667,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	struct vm_locked vm_locked;
 	struct vcpu_locked vcpu_locked;
 	struct vcpu *vcpu;
-	ipaddr_t secondary_entry;
+	ipaddr_t partition_primary_ep;
 	bool ret;
 	paddr_t fdt_addr;
 	bool has_fdt;
@@ -752,7 +752,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	}
 
 	if (!vm_identity_map(vm_locked, mem_begin, mem_end, map_mode, ppool,
-			     &secondary_entry)) {
+			     &partition_primary_ep)) {
 		dlog_error("Unable to initialise memory.\n");
 		ret = false;
 		goto out;
@@ -765,9 +765,15 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			ret = false;
 			goto out;
 		}
+		partition_primary_ep = ipa_add(
+			partition_primary_ep, manifest_vm->partition.ep_offset);
 
-		secondary_entry = ipa_add(secondary_entry,
-					  manifest_vm->partition.ep_offset);
+		/*
+		 * If MP endpoints dont specify the entrypoint for secondary
+		 * execution contexts, FF-A spec advises SPMC to reuse the
+		 * entrypoint computed for primary execution context.
+		 */
+		vm->secondary_ep = partition_primary_ep;
 	}
 
 	/*
@@ -810,16 +816,16 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	vcpu_locked = vcpu_lock(vcpu);
 
 	if (has_fdt) {
-		vcpu_secondary_reset_and_start(vcpu_locked, secondary_entry,
-					       pa_addr(fdt_addr));
+		vcpu_secondary_reset_and_start(
+			vcpu_locked, partition_primary_ep, pa_addr(fdt_addr));
 	} else {
 		/*
 		 * Without an FDT, secondary VMs expect the memory size to be
 		 * passed in register x0, which is what
 		 * vcpu_secondary_reset_and_start does in this case.
 		 */
-		vcpu_secondary_reset_and_start(vcpu_locked, secondary_entry,
-					       mem_size);
+		vcpu_secondary_reset_and_start(vcpu_locked,
+					       partition_primary_ep, mem_size);
 	}
 
 	vcpu_unlock(&vcpu_locked);

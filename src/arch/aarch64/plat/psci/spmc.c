@@ -77,8 +77,7 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 
 	vcpu_locked = vcpu_lock(vcpu);
 
-	if (vcpu->rt_model != RTM_SP_INIT &&
-	    vm_power_management_cpu_on_requested(vm) == false) {
+	if (vcpu->rt_model != RTM_SP_INIT) {
 		other_world_vm = vm_find(HF_OTHER_WORLD_ID);
 		CHECK(other_world_vm != NULL);
 		other_world_vcpu = vm_get_vcpu(other_world_vm, cpu_index(c));
