@@ -425,4 +425,6 @@ struct interrupt_descriptor *vm_interrupt_set_enable(struct vm_locked vm_locked,
 
 void vm_update_boot(struct vm *vm);
 struct vm *vm_get_boot_vm(void);
+struct vm *vm_get_boot_vm_secondary_core(void);
 struct vm *vm_get_next_boot(struct vm *vm);
+struct vm *vm_get_next_boot_secondary_core(struct vm *vm);

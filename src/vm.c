@@ -1177,6 +1177,22 @@ struct vm *vm_get_boot_vm(void)
 }
 
 /**
+ * Gets the first MP partition to boot on a secondary CPU, as per the boot
+ * order from FF-A spec.
+ * If every SP in the system is an UP partition, this function returns NULL.
+ */
+struct vm *vm_get_boot_vm_secondary_core(void)
+{
+	struct vm *vm = vm_get_boot_vm();
+
+	if (vm_is_up(vm)) {
+		return vm_get_next_boot_secondary_core(vm);
+	}
+
+	return vm;
+}
+
+/**
  * Returns the next element in the boot order list, if there is one.
  */
 struct vm *vm_get_next_boot(struct vm *vm)
@@ -1185,6 +1201,26 @@ struct vm *vm_get_next_boot(struct vm *vm)
 		       ? NULL
 		       : CONTAINER_OF(vm->boot_list_node.next, struct vm,
 				      boot_list_node);
+}
+
+/**
+ * Returns the next element representing an MP endpoint in the boot order list,
+ * if there is one.
+ */
+struct vm *vm_get_next_boot_secondary_core(struct vm *vm)
+{
+	struct vm *vm_next;
+
+	assert(vm != NULL);
+
+	vm_next = vm_get_next_boot(vm);
+
+	/* Keep searching until an MP endpoint is found. */
+	while (vm_next != NULL && vm_is_up(vm_next)) {
+		vm_next = vm_get_next_boot(vm_next);
+	}
+
+	return vm_next;
 }
 
 /**
