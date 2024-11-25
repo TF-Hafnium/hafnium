@@ -3405,8 +3405,8 @@ static struct ffa_value ffa_partition_retrieve_request(
 	 * Set the security state in the memory retrieve response attributes
 	 * if specified by the target mode.
 	 */
-	attributes = plat_ffa_memory_security_mode(memory_region->attributes,
-						   retrieve_mode);
+	attributes = plat_ffa_memory_add_security_bit_from_mode(
+		memory_region->attributes, retrieve_mode);
 
 	/*
 	 * Constituents which we received in the first fragment should
@@ -3525,7 +3525,7 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 	 * Set the security state in the memory retrieve response attributes
 	 * if specified by the target mode.
 	 */
-	attributes = plat_ffa_memory_security_mode(
+	attributes = plat_ffa_memory_add_security_bit_from_mode(
 		memory_region->attributes, share_state->sender_orig_mode);
 
 	receiver = ffa_memory_region_get_receiver(memory_region, 0);

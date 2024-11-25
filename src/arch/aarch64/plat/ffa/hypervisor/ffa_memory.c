@@ -18,6 +18,17 @@
 #include "hypervisor.h"
 #include "sysregs.h"
 
+static struct ffa_value ffa_other_world_mem_reclaim(
+	ffa_memory_handle_t handle, ffa_memory_region_flags_t flags)
+{
+	return arch_other_world_call((struct ffa_value){
+		.func = FFA_MEM_RECLAIM_32,
+		.arg1 = (uint32_t)handle,
+		.arg2 = (uint32_t)(handle >> 32),
+		.arg3 = flags,
+	});
+}
+
 /**
  * Check validity of the FF-A memory send function attempt.
  */
@@ -81,10 +92,11 @@ static struct ffa_value memory_send_other_world_forward(
 
 	other_world_locked.vm->mailbox.recv_func = share_func;
 	other_world_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
-	ret = arch_other_world_call(
-		(struct ffa_value){.func = share_func,
-				   .arg1 = memory_share_length,
-				   .arg2 = fragment_length});
+	ret = arch_other_world_call((struct ffa_value){
+		.func = share_func,
+		.arg1 = memory_share_length,
+		.arg2 = fragment_length,
+	});
 	/*
 	 * After the call to the other world completes it must have finished
 	 * reading its RX buffer, so it is ready for another message.
@@ -159,11 +171,7 @@ static struct ffa_value ffa_memory_other_world_send(
 				     __func__);
 			ret = ffa_error(FFA_NO_MEMORY);
 
-			reclaim_ret = arch_other_world_call((struct ffa_value){
-				.func = FFA_MEM_RECLAIM_32,
-				.arg1 = (uint32_t)handle,
-				.arg2 = (uint32_t)(handle >> 32),
-				.arg3 = 0});
+			reclaim_ret = ffa_other_world_mem_reclaim(handle, 0);
 			assert(reclaim_ret.func == FFA_SUCCESS_32);
 			goto out;
 		}
@@ -177,11 +185,7 @@ static struct ffa_value ffa_memory_other_world_send(
 				__func__, ffa_func_name(ret.func),
 				ffa_error_name(ffa_error_code(ret)));
 
-			reclaim_ret = arch_other_world_call((struct ffa_value){
-				.func = FFA_MEM_RECLAIM_32,
-				.arg1 = (uint32_t)handle,
-				.arg2 = (uint32_t)(handle >> 32),
-				.arg3 = 0});
+			reclaim_ret = ffa_other_world_mem_reclaim(handle, 0);
 			assert(reclaim_ret.func == FFA_SUCCESS_32);
 			goto out;
 		}
@@ -213,16 +217,6 @@ static struct ffa_value ffa_memory_other_world_send(
 				ffa_error_name(ffa_error_code(ret)));
 			goto out;
 		}
-		if (ret.func != FFA_MEM_FRAG_RX_32) {
-			dlog_warning(
-				"%s: got unexpected response to %s "
-				"from other world (expected %s, got %s)\n",
-				__func__, ffa_func_name(share_func),
-				ffa_func_name(FFA_MEM_FRAG_RX_32),
-				ffa_func_name(ret.func));
-			ret = ffa_error(FFA_INVALID_PARAMETERS);
-			goto out;
-		}
 		if (ret.arg3 != fragment_length) {
 			dlog_warning(
 				"%s: got unexpected fragment offset for %s "
@@ -250,11 +244,7 @@ static struct ffa_value ffa_memory_other_world_send(
 				     __func__);
 			ret = ffa_error(FFA_NO_MEMORY);
 
-			reclaim_ret = arch_other_world_call((struct ffa_value){
-				.func = FFA_MEM_RECLAIM_32,
-				.arg1 = (uint32_t)handle,
-				.arg2 = (uint32_t)(handle >> 32),
-				.arg3 = 0});
+			reclaim_ret = ffa_other_world_mem_reclaim(handle, 0);
 			assert(reclaim_ret.func == FFA_SUCCESS_32);
 			goto out;
 		}
@@ -402,11 +392,7 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 	 * structures. This can fail if the SPs haven't finished using the
 	 * memory.
 	 */
-	ret = arch_other_world_call(
-		(struct ffa_value){.func = FFA_MEM_RECLAIM_32,
-				   .arg1 = (uint32_t)handle,
-				   .arg2 = (uint32_t)(handle >> 32),
-				   .arg3 = flags});
+	ret = ffa_other_world_mem_reclaim(handle, flags);
 
 	if (ret.func != FFA_SUCCESS_32) {
 		dlog_verbose(
@@ -612,10 +598,7 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 		} else {
 			/* Abort sending to other_world. */
 			struct ffa_value other_world_ret =
-				arch_other_world_call((struct ffa_value){
-					.func = FFA_MEM_RECLAIM_32,
-					.arg1 = (uint32_t)handle,
-					.arg2 = (uint32_t)(handle >> 32)});
+				ffa_other_world_mem_reclaim(handle, 0);
 
 			if (other_world_ret.func != FFA_SUCCESS_32) {
 				/*
@@ -708,7 +691,7 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
 	return ret;
 }
 
-ffa_memory_attributes_t plat_ffa_memory_security_mode(
+ffa_memory_attributes_t plat_ffa_memory_add_security_bit_from_mode(
 	ffa_memory_attributes_t attributes, uint32_t mode)
 {
 	(void)mode;

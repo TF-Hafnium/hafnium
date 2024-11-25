@@ -11,6 +11,7 @@
 #include "hf/ffa.h"
 #include "hf/vm.h"
 
+/** Check validity of the FF-A memory send function attempt. */
 bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
 				   uint32_t share_func, bool multiple_borrower);
 
@@ -60,5 +61,8 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
 	struct vm *from, void *fragment, uint32_t fragment_length,
 	ffa_memory_handle_t handle, struct mpool *page_pool);
 
-ffa_memory_attributes_t plat_ffa_memory_security_mode(
+/*
+ * Set the security bit in `attributes` if specified by `mode`.
+ */
+ffa_memory_attributes_t plat_ffa_memory_add_security_bit_from_mode(
 	ffa_memory_attributes_t attributes, uint32_t mode);

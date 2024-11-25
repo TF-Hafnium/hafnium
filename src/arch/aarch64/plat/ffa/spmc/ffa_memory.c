@@ -20,7 +20,6 @@
 bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
 				   uint32_t share_func, bool multiple_borrower)
 {
-	bool result;
 	const bool is_receiver_sp = vm_id_is_current_world(receiver);
 	const bool is_sender_sp = vm_id_is_current_world(sender);
 
@@ -37,14 +36,13 @@ bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
 	case FFA_MEM_DONATE_32:
 	case FFA_MEM_LEND_64:
 	case FFA_MEM_LEND_32:
-		result = is_receiver_sp;
-		break;
+		return is_receiver_sp;
 	case FFA_MEM_SHARE_64:
-	case FFA_MEM_SHARE_32:
-		result = (is_sender_sp && is_receiver_sp) ||
-			 (!is_sender_sp && !multiple_borrower &&
-			  is_receiver_sp) ||
-			 (!is_sender_sp && multiple_borrower);
+	case FFA_MEM_SHARE_32: {
+		bool result = (is_sender_sp && is_receiver_sp) ||
+			      (!is_sender_sp && !multiple_borrower &&
+			       is_receiver_sp) ||
+			      (!is_sender_sp && multiple_borrower);
 
 		if (!result) {
 			dlog_verbose(
@@ -52,12 +50,11 @@ bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
 				"single SP, or multiple borrowers with mixed "
 				"world borrowers.\n");
 		}
-		break;
-	default:
-		result = false;
+		return result;
 	}
-
-	return result;
+	default:
+		return false;
+	}
 }
 
 ffa_memory_handle_t plat_ffa_memory_handle_make(uint64_t index)
@@ -145,7 +142,7 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
  * Update the memory region attributes with the security state bit based on the
  * supplied mode.
  */
-ffa_memory_attributes_t plat_ffa_memory_security_mode(
+ffa_memory_attributes_t plat_ffa_memory_add_security_bit_from_mode(
 	ffa_memory_attributes_t attributes, uint32_t mode)
 {
 	ffa_memory_attributes_t ret = attributes;
