@@ -95,7 +95,7 @@ TEST_F(vm, vm_unmap_hypervisor_not_mapped)
 TEST_F(vm, vm_boot_order)
 {
 	struct_vm *vm_cur;
-	struct_vcpu *vcpu;
+	struct_vm *vm;
 	std::list<struct_vm *> expected_final_order;
 
 	/*
@@ -104,27 +104,24 @@ TEST_F(vm, vm_boot_order)
 	 */
 	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false, 0));
 	vm_cur->boot_order = 3;
-	vcpu = vm_get_vcpu(vm_cur, 0);
-	vcpu_update_boot(vcpu);
+	vm_update_boot(vm_cur);
 	expected_final_order.push_back(vm_cur);
 
-	EXPECT_EQ(vcpu_get_boot_vcpu()->vm->id, vm_cur->id);
+	EXPECT_EQ(vm_get_boot_vm()->id, vm_cur->id);
 
 	/* Insertion at the head of the boot list */
 	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false, 0));
 	vm_cur->boot_order = 1;
-	vcpu = vm_get_vcpu(vm_cur, 0);
-	vcpu_update_boot(vcpu);
+	vm_update_boot(vm_cur);
 	expected_final_order.push_back(vm_cur);
 
-	EXPECT_EQ(vcpu_get_boot_vcpu()->vm->id, vm_cur->id);
+	EXPECT_EQ(vm_get_boot_vm()->id, vm_cur->id);
 
 	/* Insertion of two in the middle of the boot list */
 	for (uint32_t i = 0; i < 2; i++) {
 		EXPECT_TRUE(vm_init_next(MAX_CPUS, &ppool, &vm_cur, false, 0));
 		vm_cur->boot_order = 2;
-		vcpu = vm_get_vcpu(vm_cur, 0);
-		vcpu_update_boot(vcpu);
+		vm_update_boot(vm_cur);
 		expected_final_order.push_back(vm_cur);
 	}
 
@@ -136,8 +133,7 @@ TEST_F(vm, vm_boot_order)
 	 */
 	vm_cur = vm_find(1);
 	EXPECT_FALSE(vm_cur == NULL);
-	vcpu = vm_get_vcpu(vm_cur, 0);
-	vcpu_update_boot(vcpu);
+	vm_update_boot(vm_cur);
 	expected_final_order.push_back(vm_cur);
 
 	/*
@@ -151,12 +147,12 @@ TEST_F(vm, vm_boot_order)
 	expected_final_order.sort(vm::BootOrderSmallerThan);
 
 	std::list<struct_vm *>::iterator it;
-	vcpu = vcpu_get_boot_vcpu();
+	vm = vm_get_boot_vm();
 	for (it = expected_final_order.begin();
 	     it != expected_final_order.end(); it++) {
-		EXPECT_TRUE(vcpu != NULL);
-		EXPECT_EQ((*it)->id, vcpu->vm->id);
-		vcpu = vcpu_get_next_boot(vcpu);
+		EXPECT_TRUE(vm != NULL);
+		EXPECT_EQ((*it)->id, vm->id);
+		vm = vm_get_next_boot(vm);
 	}
 }
 

@@ -28,6 +28,12 @@ static struct vm other_world;
 static ffa_vm_count_t vm_count;
 
 /**
+ * The `boot_list` is a special entry in the circular linked list maintained by
+ * the partition manager and serves as both the start and end of the list.
+ */
+static struct list_entry boot_list = LIST_INIT(boot_list);
+
+/**
  * Counters on the status of notifications in the system. It helps to improve
  * the information retrieved by the receiver scheduler.
  */
@@ -94,6 +100,7 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 	}
 
 	vm_notifications_init(vm, vcpu_count, ppool);
+	list_init(&vm->boot_list_node);
 	return vm;
 }
 
@@ -1147,4 +1154,69 @@ struct interrupt_descriptor *vm_interrupt_set_enable(struct vm_locked vm_locked,
 	}
 
 	return int_desc;
+}
+
+/**
+ * The 'boot_list' is used as the start and end of the list.
+ * Start: the nodes it points to is the first VM to boot.
+ * End: the last node's next points to the entry.
+ */
+static bool vm_is_boot_list_end(struct vm *vm)
+{
+	return vm->boot_list_node.next == &boot_list;
+}
+
+/**
+ * Gets the first partition to boot, according to Boot Protocol from FF-A spec.
+ */
+struct vm *vm_get_boot_vm(void)
+{
+	assert(!list_empty(&boot_list));
+
+	return CONTAINER_OF(boot_list.next, struct vm, boot_list_node);
+}
+
+/**
+ * Returns the next element in the boot order list, if there is one.
+ */
+struct vm *vm_get_next_boot(struct vm *vm)
+{
+	return vm_is_boot_list_end(vm)
+		       ? NULL
+		       : CONTAINER_OF(vm->boot_list_node.next, struct vm,
+				      boot_list_node);
+}
+
+/**
+ * Insert in boot list, sorted by `boot_order` parameter in the vm structure
+ * and rooted in `first_boot_vm`.
+ */
+void vm_update_boot(struct vm *vm)
+{
+	struct vm *current_vm = NULL;
+
+	if (list_empty(&boot_list)) {
+		list_prepend(&boot_list, &vm->boot_list_node);
+		return;
+	}
+
+	/*
+	 * When getting to this point the first insertion should have
+	 * been done.
+	 */
+	current_vm = vm_get_boot_vm();
+	assert(current_vm != NULL);
+
+	/*
+	 * Iterate until the position is found according to boot order, or
+	 * until we reach end of the list.
+	 */
+	while (!vm_is_boot_list_end(current_vm) &&
+	       current_vm->boot_order <= vm->boot_order) {
+		current_vm = vm_get_next_boot(current_vm);
+	}
+
+	current_vm->boot_order > vm->boot_order
+		? list_prepend(&current_vm->boot_list_node, &vm->boot_list_node)
+		: list_append(&current_vm->boot_list_node, &vm->boot_list_node);
 }

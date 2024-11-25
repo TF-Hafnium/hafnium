@@ -337,8 +337,7 @@ static bool spmd_handler(struct ffa_value *args, struct vcpu *current)
 	case SPMD_FRAMEWORK_MSG_PSCI_REQ: {
 		enum psci_return_code psci_msg_response =
 			PSCI_ERROR_NOT_SUPPORTED;
-		struct vcpu *boot_vcpu = vcpu_get_boot_vcpu();
-		struct vm *vm = boot_vcpu->vm;
+		struct vm *vm = vm_get_boot_vm();
 		struct vcpu_locked vcpu_locked;
 
 		/*

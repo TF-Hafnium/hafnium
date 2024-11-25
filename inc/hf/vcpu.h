@@ -216,9 +216,6 @@ struct vcpu {
 	/** Partition Runtime Model. */
 	enum partition_runtime_model rt_model;
 
-	/* List entry pointing to the next vCPU in the boot order list. */
-	struct list_entry boot_list_node;
-
 	/**
 	 * An entry in a list maintained by Hafnium for pending arch timers.
 	 * It exists in the list on behalf of its parent vCPU. The `prev` and
@@ -261,10 +258,6 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 
 void vcpu_set_phys_core_idx(struct vcpu *vcpu);
 void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu);
-
-void vcpu_update_boot(struct vcpu *vcpu);
-struct vcpu *vcpu_get_boot_vcpu(void);
-struct vcpu *vcpu_get_next_boot(struct vcpu *vcpu);
 
 static inline bool vcpu_is_virt_interrupt_enabled(struct interrupts *interrupts,
 						  uint32_t intid)

@@ -356,6 +356,8 @@ bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 	static bool spmc_booted = false;
 	struct vcpu *vcpu_next = NULL;
 	struct vcpu *current = current_locked.vcpu;
+	struct vm *next_vm;
+	size_t cpu_indx = cpu_index(current->cpu);
 
 	if (spmc_booted) {
 		return false;
@@ -373,12 +375,12 @@ bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 	current->state = VCPU_STATE_WAITING;
 
 	/*
-	 * Pick next vCPU to be booted. Once all SPs have booted
+	 * Pick next SP's vCPU to be booted. Once all SPs have booted
 	 * (next_boot is NULL), then return execution to NWd.
 	 */
-	vcpu_next = vcpu_get_next_boot(current);
+	next_vm = vm_get_next_boot(current->vm);
 
-	if (vcpu_next == NULL) {
+	if (next_vm == NULL) {
 		dlog_notice("Finished initializing all VMs.\n");
 		spmc_booted = true;
 		return false;
@@ -387,6 +389,7 @@ bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 	current->rt_model = RTM_NONE;
 	current->scheduling_mode = NONE;
 
+	vcpu_next = vm_get_vcpu(next_vm, cpu_indx);
 	CHECK(vcpu_next->rt_model == RTM_SP_INIT);
 	arch_regs_reset(vcpu_next);
 	vcpu_next->cpu = current->cpu;

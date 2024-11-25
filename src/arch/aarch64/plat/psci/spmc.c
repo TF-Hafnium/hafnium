@@ -58,15 +58,12 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 {
 	struct vcpu_locked vcpu_locked;
 	struct vcpu_locked other_world_vcpu_locked;
-	struct vcpu *vcpu = vcpu_get_boot_vcpu();
-	struct vm *vm;
+	struct vcpu *vcpu;
+	struct vm *vm = vm_get_boot_vm();
 	struct vm *other_world_vm;
 	struct vcpu *other_world_vcpu;
 	struct two_vcpu_locked vcpus_locked;
 
-	assert(vcpu != NULL);
-
-	vm = vcpu->vm;
 	cpu_on(c);
 
 	arch_cpu_init(c);
@@ -75,6 +72,9 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	ffa_notifications_sri_init(c);
 
 	vcpu = vm_get_vcpu(vm, vm_is_up(vm) ? 0 : cpu_index(c));
+
+	assert(vcpu != NULL);
+
 	vcpu_locked = vcpu_lock(vcpu);
 
 	if (vcpu->rt_model != RTM_SP_INIT &&

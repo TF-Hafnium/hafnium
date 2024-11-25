@@ -266,6 +266,9 @@ struct vm {
 
 	/** Interrupt descriptor */
 	struct interrupt_descriptor interrupt_desc[VM_MANIFEST_MAX_INTERRUPTS];
+
+	/* List entry pointing to the next VM in the boot order list. */
+	struct list_entry boot_list_node;
 };
 
 /** Encapsulates a VM whose lock is held. */
@@ -419,3 +422,7 @@ struct interrupt_descriptor *vm_interrupt_set_sec_state(
 	struct vm_locked vm_locked, uint32_t id, uint32_t sec_state);
 struct interrupt_descriptor *vm_interrupt_set_enable(struct vm_locked vm_locked,
 						     uint32_t id, bool enable);
+
+void vm_update_boot(struct vm *vm);
+struct vm *vm_get_boot_vm(void);
+struct vm *vm_get_next_boot(struct vm *vm);
