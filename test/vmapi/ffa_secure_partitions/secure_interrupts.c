@@ -545,19 +545,6 @@ static void cpu_entry_sp_sleep_loop(uintptr_t arg)
 	struct secondary_cpu_entry_args *args =
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		(struct secondary_cpu_entry_args *)arg;
-	bool is_receiver_up_sp = args->vcpu_count == 1;
-
-	/*
-	 * Execution context(s) of secondary Secure Partitions need CPU cycles
-	 * to be allocated through FFA_RUN interface to reach message loop.
-	 */
-	if (is_receiver_up_sp) {
-		res = ffa_run(args->receiver_id, (ffa_vcpu_index_t)0);
-	} else {
-		res = ffa_run(args->receiver_id, args->vcpu_id);
-	}
-
-	EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
 
 	/* Prepare for the trusted watchdog interrupt routed to target vCPU. */
 	if (args->vcpu_id == args->target_vcpu_id) {
@@ -837,13 +824,6 @@ static void cpu_entry_target_vcpu_waiting(uintptr_t arg)
 
 	if (args->vcpu_id == LAST_SECONDARY_VCPU_ID) {
 		/*
-		 * One round of FFA_RUN is required execution contextx of
-		 * secondary Secure Partitions.
-		 */
-		res = ffa_run(args->receiver_id, (ffa_vcpu_index_t)0);
-		EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
-
-		/*
 		 * The direct request message makes the vcpu of target SP to
 		 * migrate to this CPU i.e., last secondary CPU.
 		 */
@@ -881,13 +861,6 @@ static void cpu_entry_target_vcpu_running(uintptr_t arg)
 	assert(args->vcpu_count == 1);
 
 	if (args->vcpu_id == LAST_SECONDARY_VCPU_ID) {
-		/*
-		 * One round of FFA_RUN is required execution contextx of
-		 * secondary Secure Partitions.
-		 */
-		res = ffa_run(args->receiver_id, (ffa_vcpu_index_t)0);
-		EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
-
 		/*
 		 * The direct request message makes the vcpu of target SP to
 		 * migrate to this CPU i.e., last secondary CPU.
@@ -928,13 +901,6 @@ static void cpu_entry_target_vcpu_blocked(uintptr_t arg)
 	assert(args->vcpu_count == 1);
 
 	if (args->vcpu_id == LAST_SECONDARY_VCPU_ID) {
-		/*
-		 * One round of FFA_RUN is required execution contextx of
-		 * secondary Secure Partitions.
-		 */
-		res = ffa_run(args->receiver_id, (ffa_vcpu_index_t)0);
-		EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
-
 		/*
 		 * The direct request message makes the vcpu of target SP to
 		 * migrate to this CPU i.e., last secondary CPU.

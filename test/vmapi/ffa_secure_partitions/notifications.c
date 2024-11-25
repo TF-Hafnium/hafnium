@@ -123,24 +123,12 @@ TEST(ffa_notifications, signaling_from_vm_to_sp)
 
 static void cpu_entry_vm_to_sp_signaling(uintptr_t arg)
 {
-	struct ffa_value res;
 	struct notif_cpu_entry_args *test_args =
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		(struct notif_cpu_entry_args *)arg;
 	ffa_vcpu_index_t sp_vcpu_id = test_args->is_sp_up
 					      ? ((ffa_vcpu_index_t)0)
 					      : test_args->vcpu_id;
-
-	/*
-	 * Make receiver SP reach message loop.
-	 * TODO: the FFA_RUN ABI only needs to be called for the MP UP endpoints
-	 * to bootstrap the EC in the current core. Though there is an issue
-	 * with the current FFA_RUN implementation: it returns back to the
-	 * caller with FFA_MSG_WAIT interface, without resuming the target
-	 * SP. When fixing the FFA_RUN issue, this bit of code needs addressing.
-	 */
-	res = ffa_run(test_args->sp_id, sp_vcpu_id);
-	EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
 
 	notif_signal_vm_to_sp(
 		hf_vm_get_id(), test_args->sp_id,
@@ -156,24 +144,9 @@ static void cpu_entry_vm_to_sp_signaling(uintptr_t arg)
 
 static void cpu_entry_sp_to_vm_signaling(uintptr_t arg)
 {
-	struct ffa_value res;
 	struct notif_cpu_entry_args *test_args =
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		(struct notif_cpu_entry_args *)arg;
-	ffa_vcpu_index_t sp_vcpu_id = test_args->is_sp_up
-					      ? ((ffa_vcpu_index_t)0)
-					      : test_args->vcpu_id;
-
-	/*
-	 * Make sender SP reach message loop.
-	 * TODO: the FFA_RUN ABI only needs to be called for the MP UP endpoints
-	 * to bootstrap the EC in the current core. Though there is an issue
-	 * with the current FFA_RUN implementation: it returns back to the
-	 * caller with FFA_MSG_WAIT interface, without resuming the target
-	 * SP. When fixing the FFA_RUN issue, this bit of code needs addressing.
-	 */
-	res = ffa_run(test_args->sp_id, sp_vcpu_id);
-	EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
 
 	notif_signal_sp_to_vm(
 		test_args->sp_id, hf_vm_get_id(),

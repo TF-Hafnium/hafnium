@@ -54,23 +54,6 @@ static void cpu_entry_echo(uintptr_t arg)
 
 static void cpu_entry_echo_second_sp(uintptr_t arg)
 {
-	struct pwr_mgt_cpu_entry_args *args =
-		// NOLINTNEXTLINE(performance-no-int-to-ptr)
-		(struct pwr_mgt_cpu_entry_args *)arg;
-	struct ffa_value res;
-	ffa_vcpu_index_t vcpu_id = args->vcpu_count == 1 ? 0 : args->vcpu_id;
-
-	/*
-	 * Second SP needs FFA_RUN before communicating with it.
-	 * TODO: the FFA_RUN ABI only needs to be called for the MP UP endpoints
-	 * to bootstrap the EC in the current core. Though there is an issue
-	 * with the current FFA_RUN implementation: it returns back to the
-	 * caller with FFA_MSG_WAIT interface, without resuming the target
-	 * SP. When fixing the FFA_RUN issue, this bit of code needs addressing.
-	 */
-	res = ffa_run(args->receiver_id, vcpu_id);
-	EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
-
 	cpu_entry_echo(arg);
 }
 
@@ -101,19 +84,6 @@ static void cpu_entry_check_cpu_idx(uintptr_t arg)
 
 static void cpu_entry_check_cpu_idx_second_sp(uintptr_t arg)
 {
-	struct pwr_mgt_cpu_entry_args *args =
-		// NOLINTNEXTLINE(performance-no-int-to-ptr)
-		(struct pwr_mgt_cpu_entry_args *)arg;
-	struct ffa_value res;
-
-	/*
-	 * Make the receiver VM reach the message loop in the respective EC.
-	 * This function is meant to be used if the receiver is an MP FF-A
-	 * endpoint.
-	 */
-	res = ffa_run(args->receiver_id, args->vcpu_id);
-	EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
-
 	cpu_entry_check_cpu_idx(arg);
 }
 

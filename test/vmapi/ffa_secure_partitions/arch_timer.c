@@ -622,23 +622,9 @@ TEST_LONG_RUNNING(arch_timer, multiple_sp_periodic_deadline)
 
 void cpu_entry_multiple_deadline_continuous_mp(uintptr_t args)
 {
-	struct ffa_value res;
 	struct multiple_sp_deadline_continuous_arguments *test =
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		(struct multiple_sp_deadline_continuous_arguments *)args;
-
-	/*
-	 * Execution context(s) of Secure Partitions on secondary CPUs need
-	 * cycles, to be allocated through FFA_RUN interface, to reach message
-	 * loop.
-	 */
-	if (!test->service2_is_up) {
-		res = ffa_run(test->service2_id, test->vcpu_id);
-		EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
-	}
-
-	res = ffa_run(test->service3_id, test->vcpu_id);
-	EXPECT_EQ(ffa_func_id(res), FFA_MSG_WAIT_32);
 
 	base_multiple_sp_deadline_continuous(test);
 

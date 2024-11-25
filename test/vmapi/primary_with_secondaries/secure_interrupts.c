@@ -268,18 +268,6 @@ static void cpu_entry_send_ipi(uintptr_t arg)
 		target_vcpu_ids[i] = MAX_CPUS;
 	}
 
-	/*
-	 *
-	 * TODO: Drop this bit of code once SPMC boots all secondary vCPUs.
-	 * This is needed  for now. The first SP (SP_ID(1)) is Bootstrapped
-	 * along with secondary cores, which allows it to reach the message
-	 * loop. The same doesn't happen for other SPs.
-	 */
-	if (args->service_id != SP_ID(1)) {
-		ret = ffa_run(args->service_id, args->vcpu_id);
-		EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
-	}
-
 	SERVICE_SELECT_MP(args->service_id, "send_ipi", args->mb.send,
 			  args->vcpu_id);
 
