@@ -14,8 +14,8 @@
 
 project = "Hafnium"
 author = "Hafnium contributors"
-version = "2.9.0"
-release = "2.9.0"
+version = "2.12.0"
+release = "2.12.0"
 
 # -- General configuration ---------------------------------------------------
 
