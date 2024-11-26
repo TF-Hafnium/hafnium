@@ -106,19 +106,13 @@ clobber:
 .PHONY: format
 format:
 	@echo "Formatting..."
-	@find src/ -name \*.c -o -name \*.cc -o -name \*.h | xargs -r clang-format -style file -i
-	@find inc/ -name \*.c -o -name \*.cc -o -name \*.h | xargs -r clang-format -style file -i
-	@find test/ -name \*.c -o -name \*.cc -o -name \*.h | xargs -r clang-format -style file -i
-	@find project/ -name \*.c -o -name \*.cc -o -name \*.h | xargs -r clang-format -style file -i
-	@find vmlib/ -name \*.c -o -name \*.cc -o -name \*.h | xargs -r clang-format -style file -i
-	@find . \( -name \*.gn -o -name \*.gni \) | xargs -n1 $(GN) format
+	@find src/ inc/ test/ project/ vmlib/ -name '*.c' -o -name '*.cc' -o -name '*.h' | xargs -n1 -P0 clang-format -style file -i
+	@find . -name '*.gn' -o -name '*.gni' | xargs -n1 -P0 $(GN) format
 
 .PHONY: checkpatch
 checkpatch: $(CHECKPATCH_SCRIPT)
-	@find src/ -name \*.c -o -name \*.h | grep -v $(CHECKPATCH_IGNORE) | xargs $(CHECKPATCH) -f --no-tree
-	@find inc/ -name \*.c -o -name \*.h | grep -v $(CHECKPATCH_IGNORE) | xargs $(CHECKPATCH) -f --no-tree
 	# TODO: enable for test/
-	@find project/ -name \*.c -o -name \*.h | grep -v $(CHECKPATCH_IGNORE) | xargs $(CHECKPATCH) -f --no-tree
+	@find src/ inc/ project/ -name '*.c' -o -name '*.h' | grep -v $(CHECKPATCH_IGNORE) | xargs -n1 -P0 $(CHECKPATCH) -f --no-tree
 
 $(CHECKPATCH_SCRIPT):
 	@build/setup_checkpatch.sh
@@ -136,14 +130,8 @@ tidy: $(OUT_DIR)/build.ninja
 # `LICENSE` file has not changed.
 .PHONY: license_
 license_:
-	@find build/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts -o -name \*.ld | xargs -n1 python3 build/license.py --style c
-	@find inc/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python3 build/license.py --style c
-	@find src/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python3 build/license.py --style c
-	@find test/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python3 build/license.py --style c
-	@find vmlib/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python3 build/license.py --style c
-	@find build/ -name \*.py -o -name \*.sh -o -name \*.inc -o -name Dockerfile* | xargs -n1 python3 build/license.py --style hash
-	@find kokoro/ -name \*.sh -o -name \*.cfg | xargs -n1 python3 build/license.py --style hash
-	@find test/ -name \*.py| xargs -n1 python3 build/license.py --style hash
+	@find build/ inc/ src/ test/ vmlib/ -name '*.S' -o -name '*.c' -o -name '*.cc' -o -name '*.h' -o -name '*.dts' -o -name '*.ld' | xargs -n1 python3 build/license.py --style c
+	@find build/ kokoro/ test/ -name '*.py' -o -name '*.sh' -o -name '*.inc' -o -name 'Dockerfile*' | xargs -n1 python3 build/license.py --style hash
 
 .PHONY: list
 list:
