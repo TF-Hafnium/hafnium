@@ -7,6 +7,7 @@
  */
 
 #include "hf/dlog.h"
+#include "hf/ffa.h"
 
 #include "vmapi/hf/call.h"
 
@@ -72,4 +73,47 @@ TEST_PRECONDITION(boot, memory_manifest, service1_is_not_vm)
 	run_res = ffa_run(service1_info->vm_id, 0);
 
 	EXPECT_FALSE(exception_received(&run_res, mb.recv));
+}
+
+TEST_PRECONDITION(boot, memory_manifest_relative, service1_is_not_vm)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value run_res;
+
+	SERVICE_SELECT(service1_info->vm_id, "boot_memory_manifest_relative",
+		       mb.send);
+	run_res = ffa_run(service1_info->vm_id, 0);
+
+	EXPECT_EQ(exception_received(&run_res, mb.recv), false);
+}
+
+TEST_PRECONDITION(boot, memory_manifest_relative_test_memory_ro,
+		  service1_is_not_vm)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value run_res;
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "boot_memory_manifest_relative_test_memory_ro", mb.send);
+	run_res = ffa_run(service1_info->vm_id, 0);
+
+	/* data abort exception expected due to accessing RO memory */
+	EXPECT_EQ(exception_received(&run_res, mb.recv), true);
+}
+
+TEST_PRECONDITION(boot, memory_manifest_relative_ro_secure_memory,
+		  service1_is_not_vm)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value run_res;
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "boot_memory_manifest_ro_secure_memory", mb.send);
+	run_res = ffa_run(service1_info->vm_id, 0);
+
+	/* data abort exception expected due to accessing RO memory */
+	EXPECT_EQ(exception_received(&run_res, mb.recv), true);
 }

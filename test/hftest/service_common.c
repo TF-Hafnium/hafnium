@@ -7,12 +7,14 @@
  */
 
 #include "hf/check.h"
+#include "hf/fdt.h"
 #include "hf/fdt_handler.h"
 #include "hf/ffa.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/std.h"
 #include "hf/stdout.h"
+#include "hf/string.h"
 
 #include "vmapi/hf/call.h"
 
@@ -109,6 +111,7 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 	struct string mem_region_node_name = STRING_INIT("memory-regions");
 	struct string dev_region_node_name = STRING_INIT("device-regions");
 	struct memiter uuid;
+	struct memiter description;
 	uint32_t uuid_word = 0;
 	uint16_t j = 0;
 	uint16_t i = 0;
@@ -177,6 +180,14 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 				cur_region->base_address =
 					ctx->partition_manifest.load_addr +
 					number;
+				cur_region->is_relative = true;
+			}
+
+			if (fdt_read_property(&ffa_node, "description",
+					      &description)) {
+				EXPECT_EQ(string_init(&cur_region->description,
+						      &description),
+					  STRING_SUCCESS);
 			}
 
 			EXPECT_TRUE(fdt_read_number(&ffa_node, "attributes",
