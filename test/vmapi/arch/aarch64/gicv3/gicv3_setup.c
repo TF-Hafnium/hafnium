@@ -30,7 +30,8 @@ void gicv3_system_setup(void)
 	const uint32_t mode = MM_MODE_R | MM_MODE_W | MM_MODE_D;
 	hftest_mm_identity_map((void *)GICD_BASE, PAGE_SIZE, mode);
 	hftest_mm_identity_map((void *)GICR_BASE, PAGE_SIZE, mode);
-	hftest_mm_identity_map((void *)IO32_C(SGI_BASE).ptr, PAGE_SIZE, mode);
+	hftest_mm_identity_map((void *)IO32_C(GICR_BASE + SGI_BASE).ptr,
+			       PAGE_SIZE, mode);
 
 	exception_setup(irq, NULL);
 	interrupt_gic_setup();

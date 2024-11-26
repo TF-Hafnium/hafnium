@@ -299,6 +299,9 @@ TEST(secure_interrupts, sp_preempted)
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 	const ffa_id_t receiver_id = service2_info->vm_id;
+	uint64_t rdist_addr = interrupt_get_gic_rdist_addr();
+	io32_t gicr_ispendr0 = IO32_C(rdist_addr + GICR_ISPENDR0);
+	io32_t gicr_isactiver0 = IO32_C(rdist_addr + GICR_ISACTIVER0);
 
 	gicv3_system_setup();
 	setup_wdog_timer_interrupt();
@@ -320,9 +323,9 @@ TEST(secure_interrupts, sp_preempted)
 	/* Waiting for interrupt to be serviced in normal world. */
 	while (last_interrupt_id == 0) {
 		EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
-		EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
+		EXPECT_EQ(io_read32(gicr_ispendr0), 0);
 		EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-		EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+		EXPECT_EQ(io_read32(gicr_isactiver0), 0);
 	}
 
 	/* Check that we got the interrupt. */
@@ -360,6 +363,9 @@ TEST(secure_interrupts, spmc_schedule_mode)
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 	const ffa_id_t receiver_id = service2_info->vm_id;
+	uint64_t rdist_addr = interrupt_get_gic_rdist_addr();
+	io32_t gicr_ispendr0 = IO32_C(rdist_addr + GICR_ISPENDR0);
+	io32_t gicr_isactiver0 = IO32_C(rdist_addr + GICR_ISACTIVER0);
 
 	gicv3_system_setup();
 	setup_wdog_timer_interrupt();
@@ -380,9 +386,9 @@ TEST(secure_interrupts, spmc_schedule_mode)
 	 */
 	while (last_interrupt_id == 0) {
 		EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
-		EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
+		EXPECT_EQ(io_read32(gicr_ispendr0), 0);
 		EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-		EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+		EXPECT_EQ(io_read32(gicr_isactiver0), 0);
 	}
 
 	/* Stop the watchdog timer. */
@@ -765,6 +771,9 @@ TEST(secure_interrupts, sp_queue_virtual_interrupts)
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service2_info = service2(mb.recv);
 	const ffa_id_t receiver_id = service2_info->vm_id;
+	uint64_t rdist_addr = interrupt_get_gic_rdist_addr();
+	io32_t gicr_ispendr0 = IO32_C(rdist_addr + GICR_ISPENDR0);
+	io32_t gicr_isactiver0 = IO32_C(rdist_addr + GICR_ISACTIVER0);
 
 	gicv3_system_setup();
 	setup_wdog_timer_interrupt();
@@ -787,9 +796,9 @@ TEST(secure_interrupts, sp_queue_virtual_interrupts)
 	/* Waiting for interrupt to be serviced in normal world. */
 	while (last_interrupt_id == 0) {
 		EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
-		EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
+		EXPECT_EQ(io_read32(gicr_ispendr0), 0);
 		EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-		EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+		EXPECT_EQ(io_read32(gicr_isactiver0), 0);
 	}
 
 	/* Check that we got the interrupt. */

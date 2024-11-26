@@ -47,6 +47,10 @@ TEAR_DOWN(interrupts_ffa_direct_msg)
 
 TEST(interrupts, enable_sgi)
 {
+	uint64_t rdist_addr = interrupt_get_gic_rdist_addr();
+	io32_t gicr_ispendr0 = IO32_C(rdist_addr + GICR_ISPENDR0);
+	io32_t gicr_isactiver0 = IO32_C(rdist_addr + GICR_ISACTIVER0);
+
 	/* Interrupt IDs 0 to 15 are SGIs. */
 	uint8_t intid = 3;
 	interrupt_set_priority_mask(0xff);
@@ -54,9 +58,9 @@ TEST(interrupts, enable_sgi)
 	arch_irq_enable();
 	interrupt_enable_all(true);
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
+	EXPECT_EQ(io_read32(gicr_ispendr0), 0);
 	EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+	EXPECT_EQ(io_read32(gicr_isactiver0), 0);
 
 	/* Send ourselves the SGI. */
 	last_interrupt_id = 0xffffffff;
@@ -68,22 +72,26 @@ TEST(interrupts, enable_sgi)
 	EXPECT_EQ(last_interrupt_id, intid);
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
 	EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+	EXPECT_EQ(io_read32(gicr_isactiver0), 0);
 }
 
 TEST(interrupts, disable_sgi)
 {
 	/* Interrupt IDs 0 to 15 are SGIs. */
 	uint8_t intid = 3;
+	uint64_t rdist_addr = interrupt_get_gic_rdist_addr();
+	io32_t gicr_ispendr0 = IO32_C(rdist_addr + GICR_ISPENDR0);
+	io32_t gicr_isactiver0 = IO32_C(rdist_addr + GICR_ISACTIVER0);
+
 	interrupt_enable_all(true);
 	interrupt_enable(intid, false);
 	interrupt_set_priority_mask(0xff);
 	interrupt_set_priority(intid, 0x80);
 	arch_irq_enable();
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
+	EXPECT_EQ(io_read32(gicr_ispendr0), 0);
 	EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+	EXPECT_EQ(io_read32(gicr_isactiver0), 0);
 
 	/* Send ourselves the SGI. */
 	last_interrupt_id = 0xffffffff;
@@ -94,9 +102,9 @@ TEST(interrupts, disable_sgi)
 	/* Check that we didn't get it, but it is pending (and not active). */
 	EXPECT_EQ(last_interrupt_id, 0xffffffff);
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISPENDR0), 0x1 << intid);
+	EXPECT_EQ(io_read32(gicr_ispendr0), 0x1 << intid);
 	EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+	EXPECT_EQ(io_read32(gicr_isactiver0), 0);
 }
 
 /**
@@ -107,6 +115,9 @@ TEST(interrupts, disable_sgi)
 TEST(interrupts_ffa_direct_msg, secondary_interrupted_by_sgi)
 {
 	struct ffa_value res;
+	uint64_t rdist_addr = interrupt_get_gic_rdist_addr();
+	io32_t gicr_ispendr0 = IO32_C(rdist_addr + GICR_ISPENDR0);
+	io32_t gicr_isactiver0 = IO32_C(rdist_addr + GICR_ISACTIVER0);
 
 	/* Let the secondary get started and wait for a message. */
 	res = ffa_run(SERVICE_VM1, 0);
@@ -115,9 +126,9 @@ TEST(interrupts_ffa_direct_msg, secondary_interrupted_by_sgi)
 
 	/* Check that no interrupts are active or pending to start with. */
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISPENDR0), 0);
+	EXPECT_EQ(io_read32(gicr_ispendr0), 0);
 	EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+	EXPECT_EQ(io_read32(gicr_isactiver0), 0);
 
 	/* Send ourselves the SGI. */
 	last_interrupt_id = 0xffffffff;
@@ -138,7 +149,7 @@ TEST(interrupts_ffa_direct_msg, secondary_interrupted_by_sgi)
 	EXPECT_EQ(last_interrupt_id, 1);
 	EXPECT_EQ(io_read32_array(GICD_ISPENDR, 0), 0);
 	EXPECT_EQ(io_read32_array(GICD_ISACTIVER, 0), 0);
-	EXPECT_EQ(io_read32(GICR_ISACTIVER0), 0);
+	EXPECT_EQ(io_read32(gicr_isactiver0), 0);
 
 	/*
 	 * Resume the secondary VM for it to send the direct message

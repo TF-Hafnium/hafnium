@@ -21,7 +21,6 @@
 /* clang-format off */
 
 #define GIC_PRI_MASK 0xff
-#define SGI_BASE (GICR_BASE + 0x10000)
 
 #define GICD_CTLR       IO32_C(GICD_BASE + 0x0000)
 #define GICD_ISENABLER  IO32_ARRAY_C(GICD_BASE + 0x0100, 32)
@@ -33,20 +32,25 @@
 #define GICD_IPRIORITYR IO8_ARRAY_C(GICD_BASE + 0x0400, 1020)
 #define GICD_ITARGETSR  IO8_ARRAY_C(GICD_BASE + 0x0800, 1020)
 #define GICD_ICFGR      IO32_ARRAY_C(GICD_BASE + 0x0c00, 64)
-#define GICR_WAKER      IO32_C(GICR_BASE + 0x0014)
-#define GICR_IGROUPR0   IO32_C(SGI_BASE + 0x0080)
-#define GICR_ISENABLER0 IO32_C(SGI_BASE + 0x0100)
-#define GICR_ICENABLER0 IO32_C(SGI_BASE + 0x0180)
-#define GICR_ISPENDR0   IO32_C(SGI_BASE + 0x0200)
-#define GICR_ICPENDR0   IO32_C(SGI_BASE + 0x0280)
-#define GICR_ISACTIVER0 IO32_C(SGI_BASE + 0x0300)
-#define GICR_IPRIORITYR IO8_ARRAY_C(SGI_BASE + 0x0400, 32)
-#define GICR_ICFGR      IO32_ARRAY_C(SGI_BASE + 0x0c00, 32)
+
+#define SGI_BASE (0x10000)
+
+#define GICR_WAKER      (0x0014)
+#define GICR_IGROUPR0   (SGI_BASE + 0x0080)
+#define GICR_ISENABLER0 (SGI_BASE + 0x0100)
+#define GICR_ICENABLER0 (SGI_BASE + 0x0180)
+#define GICR_ISPENDR0   (SGI_BASE + 0x0200)
+#define GICR_ICPENDR0   (SGI_BASE + 0x0280)
+#define GICR_ISACTIVER0 (SGI_BASE + 0x0300)
+#define GICR_IPRIORITYR (SGI_BASE + 0x0400)
+#define GICR_ICFGR      (SGI_BASE + 0x0c00)
 
 /* PPIs INTIDs 16-31 */
 #define MAX_PPI_ID (31)
 
 /* clang-format on */
+
+uint64_t interrupt_get_gic_rdist_addr(void);
 
 void interrupt_gic_setup(void);
 void interrupt_enable(uint32_t intid, bool enable);
