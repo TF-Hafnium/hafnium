@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Copyright 2024 The Hafnium Authors.
 #
@@ -39,7 +39,7 @@ fi
 # Make sure all the files have a license.
 #
 
-make license
+make license_
 if is_repo_dirty
 then
 	echo "Run \`make license\' locally to fix this."

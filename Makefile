@@ -130,10 +130,12 @@ tidy: $(OUT_DIR)/build.ninja
 	@echo "Tidying..."
 	# TODO: enable readability-magic-numbers once there are fewer violations.
 	# TODO: enable for c++ tests as it currently gives spurious errors.
-	@find src/ test/ -name '*.c' | grep -v $(TIDY_IGNORE) | xargs run-clang-tidy -quiet -p $(OUT_DIR) -fix
+	@find src/ test/ -name '*.c' | grep -v $(TIDY_IGNORE) | xargs run-clang-tidy -quiet -p $(OUT_DIR) -fix 2> /dev/null # silence useless "999 warnings generated." messages
 
-.PHONY: license
-license:
+# Named `license_` rather than `license_` because make will not run the target if the
+# `LICENSE` file has not changed.
+.PHONY: license_
+license_:
 	@find build/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts -o -name \*.ld | xargs -n1 python3 build/license.py --style c
 	@find inc/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python3 build/license.py --style c
 	@find src/ -name \*.S -o -name \*.c -o -name \*.cc -o -name \*.h -o -name \*.dts | xargs -n1 python3 build/license.py --style c
