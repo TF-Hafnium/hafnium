@@ -67,9 +67,7 @@ CHECKPATCH_IGNORE_LINTS :="\
 	INITIALISED_STATIC,\
 	MACRO_WITH_FLOW_CONTROL,\
 	NEW_TYPEDEFS,\
-	PREFER_ALIGNED,\
-	PREFER_PACKED,\
-	PREFER_PRINTF,\
+	PREFER_DEFINED_ATTRIBUTE_MACRO,\
 	SINGLE_STATEMENT_DO_WHILE_MACRO,\
 	SPACING,\
 	SPDX_LICENSE_TAG,\
@@ -90,7 +88,7 @@ CHECKPATCH := $(CHECKPATCH_SCRIPT) \
 # perfmon.c : uses XMACROS, which checkpatch doesn't understand.
 # feature_id.c : uses XMACROS, which checkpatch doesn't understand.
 # el1_physical_timer.c : uses XMACROS, which checkpatch doesn't understand.
-CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c\|src/arch/aarch64/hypervisor/feature_id.c\|src/arch/aarch64/stack_protector.c\|src/arch/aarch64/inc/hf/arch/sve.h\|inc/hf/dlog.h\|inc/hf/arch/std.h\|inc/hf/panic.h\|inc/system/sys/cdefs.h\|inc/hf/bits.h\|src/arch/aarch64/hypervisor/el1_physical_timer.c"
+CHECKPATCH_IGNORE := "src/arch/aarch64/hypervisor/debug_el1.c\|src/arch/aarch64/hypervisor/perfmon.c\|src/arch/aarch64/hypervisor/feature_id.c\|src/arch/aarch64/stack_protector.c\|src/arch/aarch64/hypervisor/el1_physical_timer.c"
 
 # el1_physical_timer.c : Use of macros causes a fail due to identical consecutive branches in switch.
 TIDY_IGNORE := "src/arch/aarch64/hypervisor/el1_physical_timer.c"

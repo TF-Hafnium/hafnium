@@ -6,19 +6,6 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stdbool.h>
-#include <stdint.h>
-
-#if defined(__ASSEMBLY__)
-#define STATIC_ASSERT(expr, msg) 0
-#else
-#define STATIC_ASSERT(expr, msg)          \
-	__extension__({                   \
-		static_assert(expr, msg); \
-		0;                        \
-	})
-#endif
-
 /**
  * NOTE: The below macroos use the notation `[hi:lo]` to mean the bits
  * from `lo` up-to and including `hi`. This matches the notation used in the
@@ -34,9 +21,12 @@
 /**
  * Isolate the `n`th bit of `value`.
  */
-#define GET_BIT(value, n)                             \
-	(STATIC_ASSERT((n) < 64, "n out of bounds") + \
-	 ((value) & (UINT64_C(1) << (n))))
+
+#define GET_BIT(value, n)                                   \
+	__extension__({                                     \
+		static_assert((n) < 64, "n out of bounds"); \
+		((value) & (UINT64_C(1) << (n)));           \
+	})
 
 /**
  * Return true if the `n`th bit of `value` is 1.
@@ -52,11 +42,14 @@
  * Return a mask suitable for isolating bits `[hi:lo]` of a 64-bit
  * integer.
  */
-#define GET_BITS_MASK(hi, lo)                              \
-	(STATIC_ASSERT((hi) < 64, "hi out of bounds") +    \
-	 STATIC_ASSERT((hi) >= (lo), "hi must be >= lo") + \
-	 (((~UINT64_C(0)) - (UINT64_C(1) << (lo)) + 1) &   \
-	  (~UINT64_C(0) >> (64 - 1 - (hi)))))
+
+#define GET_BITS_MASK(hi, lo)                                    \
+	__extension__({                                          \
+		static_assert((hi) < 64, "hi out of bounds");    \
+		static_assert((hi) >= (lo), "hi must be >= lo"); \
+		(((~UINT64_C(0)) - (UINT64_C(1) << (lo)) + 1) &  \
+		 (~UINT64_C(0) >> (64 - 1 - (hi))));             \
+	})
 
 /**
  * Isolate bits `[hi:lo]` of `value`.

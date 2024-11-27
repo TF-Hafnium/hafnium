@@ -21,38 +21,21 @@ int strncmp(const char *a, const char *b, size_t n);
 
 #define ctz(x) __builtin_ctz(x)
 
-/* Compatibility with old compilers */
-#ifndef __has_builtin
-#define __has_builtin(x) 0
-#endif
-
 /**
  * Check whether the value `v` is aligned to the boundary `a`,
  * with `a` power of 2.
  */
-#if __has_builtin(__builtin_is_aligned)
 #define is_aligned(v, a) __builtin_is_aligned((v), (a))
-#else
-#define is_aligned(v, a) (((uintptr_t)(v) & ((a) - 1)) == 0)
-#endif
 
 /**
  * Align up the value `v` to the boundary `a`, with `a` power of 2.
  */
-#if __has_builtin(__builtin_align_up)
 #define align_up(v, a) __builtin_align_up((v), (a))
-#else
-#define align_up(v, a) (((uintptr_t)(v) + ((a) - 1)) & ~((a) - 1))
-#endif
 
 /**
  * Align down the value `v` to the boundary `a`, with `a` power of 2.
  */
-#if __has_builtin(__builtin_align_down)
 #define align_down(v, a) __builtin_align_down((v), (a))
-#else
-#define align_down(v, a) ((uintptr_t)(v) & ~((a) - 1))
-#endif
 
 #ifndef be16toh
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
