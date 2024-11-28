@@ -25,8 +25,6 @@
 /** Interrupt priority for the Schedule Receiver Interrupt. */
 #define SRI_PRIORITY UINT32_C(0xf0)
 
-bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id);
-
 struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
 	struct vcpu *current, ffa_id_t vm_id)
 {

@@ -6,7 +6,7 @@
 
 declare_args() {
   # FF-A hooks to be used for the platform, specified as build target.
-  plat_ffa = "//src/arch/aarch64/plat/ffa:absent"
+  ffa_role = "//src/arch/aarch64/plat/ffa:absent"
 
   # PSCI hooks to be used for the platform, specified as build target.
   plat_psci = "//src/arch/aarch64/plat/psci:hypervisor"

@@ -53,7 +53,7 @@ source_set("hypervisor") {
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64:entry",
     "//src/arch/aarch64:smc",
-    plat_ffa,
+    ffa_role,
     plat_interrupts,
     plat_prng,
     plat_psci,
