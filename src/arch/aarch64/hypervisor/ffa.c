@@ -6,12 +6,10 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/plat/ffa.h"
-
-#include "hf/arch/plat/ffa/setup_and_discovery.h"
+#include "hf/ffa.h"
 
 #include "hf/check.h"
-#include "hf/ffa.h"
+#include "hf/ffa/setup_and_discovery.h"
 #include "hf/panic.h"
 #include "hf/vm_ids.h"
 

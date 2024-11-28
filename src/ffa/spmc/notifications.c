@@ -6,15 +6,14 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/plat/ffa/notifications.h"
+#include "hf/ffa/notifications.h"
 
 #include <stdint.h>
-
-#include "hf/arch/plat/ffa/vm.h"
 
 #include "hf/check.h"
 #include "hf/cpu.h"
 #include "hf/ffa.h"
+#include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
 #include "hf/plat/interrupts.h"
 #include "hf/types.h"

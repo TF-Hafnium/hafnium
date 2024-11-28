@@ -8,13 +8,12 @@
 
 #include "hf/arch/ffa.h"
 #include "hf/arch/other_world.h"
-#include "hf/arch/plat/ffa.h"
-#include "hf/arch/plat/ffa/indirect_messaging.h"
-#include "hf/arch/plat/ffa/setup_and_discovery.h"
 
 #include "hf/api.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
+#include "hf/ffa/indirect_messaging.h"
+#include "hf/ffa/setup_and_discovery.h"
 #include "hf/ffa_internal.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"

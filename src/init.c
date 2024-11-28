@@ -11,9 +11,6 @@
 #include <stdalign.h>
 #include <stddef.h>
 
-#include "hf/arch/other_world.h"
-#include "hf/arch/plat/ffa.h"
-
 #include "hf/api.h"
 #include "hf/boot_flow.h"
 #include "hf/boot_params.h"
@@ -21,6 +18,7 @@
 #include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/fdt_handler.h"
+#include "hf/ffa.h"
 #include "hf/load.h"
 #include "hf/manifest.h"
 #include "hf/mm.h"
@@ -31,9 +29,6 @@
 #include "hf/plat/interrupts.h"
 #include "hf/plat/iommu.h"
 #include "hf/std.h"
-#include "hf/vm.h"
-
-#include "vmapi/hf/call.h"
 
 alignas(MM_PPOOL_ENTRY_SIZE) char ptable_buf[MM_PPOOL_ENTRY_SIZE * HEAP_PAGES];
 

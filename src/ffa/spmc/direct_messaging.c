@@ -6,10 +6,9 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/plat/ffa/direct_messaging.h"
+#include "hf/ffa/direct_messaging.h"
 
-#include "hf/arch/plat/ffa.h"
-
+#include "hf/ffa.h"
 #include "hf/vm.h"
 
 bool plat_ffa_is_direct_request_valid(struct vcpu *current,

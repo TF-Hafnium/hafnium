@@ -9,8 +9,8 @@
 #include "hf/ffa_memory.h"
 
 #include "hf/arch/mmu.h"
-#include "hf/arch/plat/ffa/ffa_memory.h"
 
+#include "hf/ffa/ffa_memory.h"
 #include "hf/ffa_internal.h"
 #include "hf/vm.h"
 

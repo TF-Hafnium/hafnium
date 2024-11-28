@@ -6,12 +6,12 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/plat/ffa/setup_and_discovery.h"
+#include "hf/ffa/setup_and_discovery.h"
 
 #include "hf/arch/other_world.h"
-#include "hf/arch/plat/ffa/vm.h"
 
 #include "hf/ffa.h"
+#include "hf/ffa/vm.h"
 #include "hf/manifest.h"
 #include "hf/vm.h"
 

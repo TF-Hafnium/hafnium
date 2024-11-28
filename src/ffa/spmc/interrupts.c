@@ -10,10 +10,10 @@
 
 #include "hf/arch/gicv3.h"
 #include "hf/arch/host_timer.h"
-#include "hf/arch/plat/ffa/vm.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
+#include "hf/ffa/vm.h"
 #include "hf/hf_ipi.h"
 #include "hf/vm.h"
 

@@ -7,9 +7,9 @@
  */
 
 #include "hf/arch/other_world.h"
-#include "hf/arch/plat/ffa/indirect_messaging.h"
 
 #include "hf/api.h"
+#include "hf/ffa/indirect_messaging.h"
 #include "hf/vcpu.h"
 
 bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,

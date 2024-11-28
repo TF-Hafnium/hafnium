@@ -14,6 +14,7 @@
 #include "hf/ffa.h"
 #include "hf/ffa_partition_manifest.h"
 #include "hf/memiter.h"
+#include "hf/static_assert.h"
 #include "hf/string.h"
 #include "hf/vm.h"
 

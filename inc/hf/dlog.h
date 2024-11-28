@@ -11,8 +11,6 @@
 #include <stdarg.h>
 #include <stddef.h>
 
-#include "hf/ffa.h"
-
 #define DLOG_BUFFER_SIZE 8192
 
 enum log_level {

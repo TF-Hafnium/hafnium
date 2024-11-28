@@ -12,11 +12,6 @@
 
 #include "hf/arch/init.h"
 #include "hf/arch/other_world.h"
-#include "hf/arch/plat/ffa.h"
-#include "hf/arch/plat/ffa/direct_messaging.h"
-#include "hf/arch/plat/ffa/interrupts.h"
-#include "hf/arch/plat/ffa/notifications.h"
-#include "hf/arch/plat/ffa/setup_and_discovery.h"
 #include "hf/arch/vm.h"
 
 #include "hf/api.h"
@@ -24,18 +19,19 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/fdt_patch.h"
+#include "hf/ffa/interrupts.h"
+#include "hf/ffa/notifications.h"
+#include "hf/ffa/setup_and_discovery.h"
 #include "hf/layout.h"
 #include "hf/manifest.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
-#include "hf/plat/interrupts.h"
 #include "hf/plat/iommu.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
-#include "vmapi/hf/call.h"
 #include "vmapi/hf/ffa.h"
 
 /**

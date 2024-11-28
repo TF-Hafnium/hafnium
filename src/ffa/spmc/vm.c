@@ -8,10 +8,10 @@
 
 #include "hf/vm.h"
 
-#include "hf/arch/plat/ffa/vm.h"
 #include "hf/arch/std.h"
 
 #include "hf/check.h"
+#include "hf/ffa/vm.h"
 #include "hf/plat/interrupts.h"
 
 /**

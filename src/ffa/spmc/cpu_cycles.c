@@ -7,11 +7,11 @@
  */
 
 #include "hf/arch/gicv3.h"
-#include "hf/arch/plat/ffa.h"
-#include "hf/arch/plat/ffa/interrupts.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
+#include "hf/ffa.h"
+#include "hf/ffa/interrupts.h"
 #include "hf/plat/interrupts.h"
 #include "hf/vm.h"
 

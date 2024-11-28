@@ -6,7 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/plat/ffa/ffa_memory.h"
+#include "hf/ffa/ffa_memory.h"
 
 #include "hf/arch/other_world.h"
 

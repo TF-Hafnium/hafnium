@@ -6,7 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/plat/ffa/power_management.h"
+#include "hf/ffa/power_management.h"
 
 /**
  * Returns FFA_ERROR as FFA_SECONDARY_EP_REGISTER is not supported at the

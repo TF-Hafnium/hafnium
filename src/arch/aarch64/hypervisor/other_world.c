@@ -9,7 +9,6 @@
 #include "hf/arch/other_world.h"
 
 #include "hf/arch/mmu.h"
-#include "hf/arch/plat/ffa.h"
 
 #include "hf/check.h"
 #include "hf/dlog.h"

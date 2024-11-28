@@ -8,11 +8,8 @@
 
 #pragma once
 
-#include "hf/addr.h"
-#include "hf/ffa.h"
-#include "hf/manifest.h"
+#include "hf/mpool.h"
 #include "hf/vcpu.h"
-#include "hf/vm.h"
 
 void plat_ffa_log_init(void);
 void plat_ffa_set_tee_enabled(bool tee_enabled);

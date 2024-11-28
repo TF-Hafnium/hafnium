@@ -6,7 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/plat/ffa/notifications.h"
+#include "hf/ffa/notifications.h"
 
 #include "hf/arch/other_world.h"
 

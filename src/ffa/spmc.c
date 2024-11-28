@@ -8,8 +8,6 @@
 
 #include "hf/arch/ffa.h"
 #include "hf/arch/gicv3.h"
-#include "hf/arch/plat/ffa.h"
-#include "hf/arch/plat/ffa/vm.h"
 #include "hf/arch/sve.h"
 
 #include "hf/api.h"
@@ -17,6 +15,7 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
+#include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
 #include "hf/plat/interrupts.h"
 #include "hf/vcpu.h"

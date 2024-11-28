@@ -6,17 +6,13 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include "hf/arch/plat/ffa.h"
-#include "hf/arch/plat/ffa/notifications.h"
 #include "hf/arch/plat/psci.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/cpu.h"
-#include "hf/dlog.h"
+#include "hf/ffa/notifications.h"
 #include "hf/vm.h"
-
-#include "vmapi/hf/types.h"
 
 #include "psci.h"
 
