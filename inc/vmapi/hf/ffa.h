@@ -396,7 +396,64 @@ static inline bool ffa_is_vm_id(ffa_id_t id)
 }
 
 /**
- * Partition message header as specified by table 6.2 from FF-A v1.1 EAC0
+ * Holds the UUID in a struct that is mappable directly to the SMCC calling
+ * convention, which is used for FF-A calls.
+ *
+ * Refer to table 84 of the FF-A 1.0 EAC specification as well as section 5.3
+ * of the SMCC Spec 1.2.
+ */
+struct ffa_uuid {
+	uint32_t uuid[4];
+};
+
+static inline void ffa_uuid_init(uint32_t w0, uint32_t w1, uint32_t w2,
+				 uint32_t w3, struct ffa_uuid *uuid)
+{
+	uuid->uuid[0] = w0;
+	uuid->uuid[1] = w1;
+	uuid->uuid[2] = w2;
+	uuid->uuid[3] = w3;
+}
+
+static inline bool ffa_uuid_equal(const struct ffa_uuid *uuid1,
+				  const struct ffa_uuid *uuid2)
+{
+	return (uuid1->uuid[0] == uuid2->uuid[0]) &&
+	       (uuid1->uuid[1] == uuid2->uuid[1]) &&
+	       (uuid1->uuid[2] == uuid2->uuid[2]) &&
+	       (uuid1->uuid[3] == uuid2->uuid[3]);
+}
+
+static inline bool ffa_uuid_is_null(const struct ffa_uuid *uuid)
+{
+	struct ffa_uuid null = {0};
+
+	return ffa_uuid_equal(uuid, &null);
+}
+
+static inline void ffa_uuid_from_u64x2(uint64_t uuid_lo, uint64_t uuid_hi,
+				       struct ffa_uuid *uuid)
+{
+	ffa_uuid_init((uint32_t)(uuid_lo & 0xFFFFFFFFU),
+		      (uint32_t)(uuid_lo >> 32),
+		      (uint32_t)(uuid_hi & 0xFFFFFFFFU),
+		      (uint32_t)(uuid_hi >> 32), uuid);
+}
+
+/**
+ * Split `uuid` into two u64s.
+ * This function writes to pointer parameters because C does not allow returning
+ * arrays from functions.
+ */
+static inline void ffa_uuid_to_u64x2(uint64_t *lo, uint64_t *hi,
+				     const struct ffa_uuid *uuid)
+{
+	*lo = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
+	*hi = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
+}
+
+/**
+ * Partition message header as specified by table 7.1 from FF-A v1.3 ALP0
  * specification.
  */
 struct ffa_partition_rxtx_header {
@@ -835,63 +892,6 @@ static inline ffa_id_t ffa_vm_availability_message_vm_id(struct ffa_value args)
 static inline uint32_t ffa_framework_msg_func(struct ffa_value args)
 {
 	return ffa_framework_msg_flags(args) & FFA_FRAMEWORK_MSG_FUNC_MASK;
-}
-
-/**
- * Holds the UUID in a struct that is mappable directly to the SMCC calling
- * convention, which is used for FF-A calls.
- *
- * Refer to table 84 of the FF-A 1.0 EAC specification as well as section 5.3
- * of the SMCC Spec 1.2.
- */
-struct ffa_uuid {
-	uint32_t uuid[4];
-};
-
-static inline void ffa_uuid_init(uint32_t w0, uint32_t w1, uint32_t w2,
-				 uint32_t w3, struct ffa_uuid *uuid)
-{
-	uuid->uuid[0] = w0;
-	uuid->uuid[1] = w1;
-	uuid->uuid[2] = w2;
-	uuid->uuid[3] = w3;
-}
-
-static inline bool ffa_uuid_equal(const struct ffa_uuid *uuid1,
-				  const struct ffa_uuid *uuid2)
-{
-	return (uuid1->uuid[0] == uuid2->uuid[0]) &&
-	       (uuid1->uuid[1] == uuid2->uuid[1]) &&
-	       (uuid1->uuid[2] == uuid2->uuid[2]) &&
-	       (uuid1->uuid[3] == uuid2->uuid[3]);
-}
-
-static inline bool ffa_uuid_is_null(const struct ffa_uuid *uuid)
-{
-	struct ffa_uuid null = {0};
-
-	return ffa_uuid_equal(uuid, &null);
-}
-
-static inline void ffa_uuid_from_u64x2(uint64_t uuid_lo, uint64_t uuid_hi,
-				       struct ffa_uuid *uuid)
-{
-	ffa_uuid_init((uint32_t)(uuid_lo & 0xFFFFFFFFU),
-		      (uint32_t)(uuid_lo >> 32),
-		      (uint32_t)(uuid_hi & 0xFFFFFFFFU),
-		      (uint32_t)(uuid_hi >> 32), uuid);
-}
-
-/**
- * Split `uuid` into two u64s.
- * This function writes to pointer parameters because C does not allow returning
- * arrays from functions.
- */
-static inline void ffa_uuid_to_u64x2(uint64_t *lo, uint64_t *hi,
-				     const struct ffa_uuid *uuid)
-{
-	*lo = (uint64_t)uuid->uuid[1] << 32 | uuid->uuid[0];
-	*hi = (uint64_t)uuid->uuid[3] << 32 | uuid->uuid[2];
 }
 
 /**
