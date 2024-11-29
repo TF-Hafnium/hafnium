@@ -2013,8 +2013,8 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 		goto out_unlock_sender;
 	}
 
-	sender_id = ffa_rxtx_header_sender(&header);
-	receiver_id = ffa_rxtx_header_receiver(&header);
+	sender_id = header.sender;
+	receiver_id = header.receiver;
 
 	/* Ensure Sender IDs from API and from message header match. */
 	if (msg_sender_id != sender_id) {

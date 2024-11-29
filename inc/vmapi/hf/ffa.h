@@ -404,14 +404,15 @@ struct ffa_partition_rxtx_header {
 	uint32_t reserved;
 	/* Offset from the beginning of the buffer to the message payload. */
 	uint32_t offset;
-	/* Sender(Bits[31:16]) and Receiver(Bits[15:0]) endpoint IDs. */
-	uint32_t sender_receiver;
+	/* Receiver endpoint ID. */
+	ffa_id_t receiver;
+	/* Sender endpoint ID. */
+	ffa_id_t sender;
 	/* Size of message in buffer. */
 	uint32_t size;
 };
 
 #define FFA_RXTX_HEADER_SIZE sizeof(struct ffa_partition_rxtx_header)
-#define FFA_RXTX_SENDER_SHIFT (0x10U)
 #define FFA_RXTX_ALLOCATOR_SHIFT 16
 
 static inline void ffa_rxtx_header_init(
@@ -421,21 +422,9 @@ static inline void ffa_rxtx_header_init(
 	header->flags = 0;
 	header->reserved = 0;
 	header->offset = FFA_RXTX_HEADER_SIZE;
-	header->sender_receiver =
-		(uint32_t)(receiver | (sender << FFA_RXTX_SENDER_SHIFT));
+	header->sender = sender;
+	header->receiver = receiver;
 	header->size = size;
-}
-
-static inline ffa_id_t ffa_rxtx_header_sender(
-	const struct ffa_partition_rxtx_header *h)
-{
-	return (ffa_id_t)(h->sender_receiver >> FFA_RXTX_SENDER_SHIFT);
-}
-
-static inline ffa_id_t ffa_rxtx_header_receiver(
-	const struct ffa_partition_rxtx_header *h)
-{
-	return (ffa_id_t)(h->sender_receiver);
 }
 
 /* The maximum length possible for a single message. */

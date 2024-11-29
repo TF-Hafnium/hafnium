@@ -82,7 +82,7 @@ void mailbox_receive_retry(void *buffer, size_t buffer_size, void *recv,
 	memcpy_s(header, sizeof(*header), message,
 		 sizeof(struct ffa_partition_rxtx_header));
 
-	sender = ffa_rxtx_header_sender(header);
+	sender = header->sender;
 
 	if (is_ffa_hyp_buffer_full_notification(fwk_notif)) {
 		EXPECT_TRUE(ffa_is_vm_id(sender));
@@ -91,7 +91,7 @@ void mailbox_receive_retry(void *buffer, size_t buffer_size, void *recv,
 	}
 
 	/* Check receiver ID against own ID. */
-	ASSERT_EQ(ffa_rxtx_header_receiver(header), own_id);
+	ASSERT_EQ(header->sender, own_id);
 	ASSERT_LE(header->size, buffer_size);
 
 	payload = (const uint32_t *)message->payload;
@@ -437,8 +437,8 @@ static struct ffa_partition_msg *get_mailbox_message(void *recv)
 		return NULL;
 	}
 
-	sender = ffa_rxtx_header_sender(&(msg->header));
-	receiver = ffa_rxtx_header_receiver(&(msg->header));
+	sender = msg->header.sender;
+	receiver = msg->header.receiver;
 
 	EXPECT_EQ(receiver, own_id);
 
@@ -556,7 +556,7 @@ ffa_id_t retrieve_memory_from_message(
 
 	ASSERT_TRUE(retrv_message != NULL);
 
-	sender = ffa_rxtx_header_sender(&retrv_message->header);
+	sender = retrv_message->header.sender;
 	msg_size = retrv_message->header.size;
 
 	retrieve_request = (struct ffa_memory_region *)retrv_message->payload;
@@ -605,7 +605,7 @@ ffa_id_t retrieve_memory_from_message_expect_fail(void *recv_buf,
 
 	ASSERT_TRUE(retrv_message != NULL);
 
-	sender = ffa_rxtx_header_sender(&retrv_message->header);
+	sender = retrv_message->header.sender;
 	msg_size = retrv_message->header.size;
 
 	retrieve_request = (struct ffa_memory_region *)retrv_message->payload;
@@ -769,7 +769,7 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 	memcpy_s(&header, sizeof(header), message,
 		 sizeof(struct ffa_partition_rxtx_header));
 
-	source_vm_id = ffa_rxtx_header_sender(&header);
+	source_vm_id = header.sender;
 
 	if (is_ffa_hyp_buffer_full_notification(fwk_notif)) {
 		EXPECT_TRUE(ffa_is_vm_id(source_vm_id));
@@ -778,7 +778,7 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 	}
 
 	/* Check receiver ID against own ID. */
-	ASSERT_EQ(ffa_rxtx_header_receiver(&header), own_id);
+	ASSERT_EQ(header.receiver, own_id);
 	ASSERT_LE(header.size, buffer_size);
 
 	payload = (const uint32_t *)message->payload;

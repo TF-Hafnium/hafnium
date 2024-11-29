@@ -349,7 +349,7 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	bitmap = ffa_notification_get_from_framework(ret);
 	ASSERT_TRUE(is_ffa_spm_buffer_full_notification(bitmap) ||
 		    is_ffa_hyp_buffer_full_notification(bitmap));
-	ASSERT_EQ(own_id, ffa_rxtx_header_receiver(&message->header));
+	ASSERT_EQ(own_id, message->header.receiver);
 
 	if (ctx->is_ffa_manifest_parsed &&
 	    ctx->partition_manifest.run_time_el == S_EL1) {
