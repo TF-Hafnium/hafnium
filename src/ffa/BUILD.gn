@@ -30,7 +30,6 @@ source_set("hypervisor") {
     "hypervisor/indirect_messaging.c",
     "hypervisor/interrupts.c",
     "hypervisor/notifications.c",
-    "hypervisor/power_management.c",
     "hypervisor/setup_and_discovery.c",
     "hypervisor/vm.c",
   ]
@@ -53,7 +52,6 @@ source_set("spmc") {
     "spmc/indirect_messaging.c",
     "spmc/interrupts.c",
     "spmc/notifications.c",
-    "spmc/power_management.c",
     "spmc/setup_and_discovery.c",
     "spmc/vm.c",
   ]

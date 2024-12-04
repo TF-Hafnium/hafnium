@@ -11,9 +11,9 @@
 #include "hf/ffa.h"
 #include "hf/vm.h"
 
-bool plat_ffa_is_direct_request_valid(struct vcpu *current,
-				      ffa_id_t sender_vm_id,
-				      ffa_id_t receiver_vm_id)
+bool ffa_direct_msg_is_direct_request_valid(struct vcpu *current,
+					    ffa_id_t sender_vm_id,
+					    ffa_id_t receiver_vm_id)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
@@ -36,8 +36,9 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
  * sender supports sending direct messaging requests, in accordance to their
  * respective configurations at the partition's FF-A manifest.
  */
-bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
-					  struct vm *receiver_vm, uint32_t func)
+bool ffa_direct_msg_is_direct_request_supported(struct vm *sender_vm,
+						struct vm *receiver_vm,
+						uint32_t func)
 {
 	uint16_t sender_method;
 	uint16_t receiver_method;
@@ -92,9 +93,9 @@ bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
 }
 
 /** Check validity of a FF-A direct message response. */
-bool plat_ffa_is_direct_response_valid(struct vcpu *current,
-				       ffa_id_t sender_vm_id,
-				       ffa_id_t receiver_vm_id)
+bool ffa_direct_msg_is_direct_response_valid(struct vcpu *current,
+					     ffa_id_t sender_vm_id,
+					     ffa_id_t receiver_vm_id)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
@@ -107,9 +108,9 @@ bool plat_ffa_is_direct_response_valid(struct vcpu *current,
 	       vm_id_is_current_world(sender_vm_id);
 }
 
-bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
-				     struct ffa_value args,
-				     struct ffa_value *ret)
+bool ffa_direct_msg_direct_request_forward(ffa_id_t receiver_vm_id,
+					   struct ffa_value args,
+					   struct ffa_value *ret)
 {
 	/*
 	 * SPs are not supposed to issue requests to VMs.

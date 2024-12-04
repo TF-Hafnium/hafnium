@@ -18,18 +18,18 @@ void plat_ffa_init(struct mpool *ppool);
 /**
  * Forward normal world calls of FFA_RUN ABI to other world.
  */
-bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
-			  struct ffa_value *ret);
+bool ffa_cpu_cycles_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+				struct ffa_value *ret);
 
-struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
-					   struct vcpu **next);
+struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
+	struct vcpu_locked current_locked, struct vcpu **next);
 
 /**
  * Check if current SP can resume target VM/SP using FFA_RUN ABI.
  */
-bool plat_ffa_run_checks(struct vcpu_locked current_locked,
-			 ffa_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
-			 struct ffa_value *run_ret, struct vcpu **next);
+bool ffa_cpu_cycles_run_checks(struct vcpu_locked current_locked,
+			       ffa_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
+			       struct ffa_value *run_ret, struct vcpu **next);
 
 /**
  * FF-A v1.2 FFA_ERROR interface.

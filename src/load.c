@@ -260,7 +260,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vcpu_update_boot(vm_get_vcpu(vm_locked.vm, 0));
 
 		if (vm_locked_are_notifications_enabled(vm_locked) &&
-		    !plat_ffa_notifications_bitmap_create_call(
+		    !ffa_notifications_bitmap_create_call(
 			    vm_locked.vm->id, vm_locked.vm->vcpu_count)) {
 			return false;
 		}
@@ -711,7 +711,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		}
 
 		if (manifest_vm->is_ffa_partition) {
-			plat_ffa_parse_partition_manifest(
+			ffa_setup_parse_partition_manifest(
 				stage1_locked, fdt_addr, fdt_allocated_size,
 				manifest_vm, boot_params, ppool);
 		}
@@ -836,7 +836,8 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	for (n = 0; n < manifest_vm->secondary.vcpu_count; n++) {
 		vcpu = vm_get_vcpu(vm, n);
 		vcpu_locked = vcpu_lock(vcpu);
-		plat_ffa_enable_virtual_interrupts(vcpu_locked, vm_locked);
+		ffa_interrupts_enable_virtual_interrupts(vcpu_locked,
+							 vm_locked);
 		vcpu_unlock(&vcpu_locked);
 	}
 

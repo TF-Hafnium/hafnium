@@ -15,8 +15,8 @@
  * to their configurations in the respective partition's FF-A manifest.
  * Note: check is done at virtual FF-A instance only.
  */
-bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
-					struct vm_locked receiver_locked)
+bool ffa_indirect_msg_is_supported(struct vm_locked sender_locked,
+				   struct vm_locked receiver_locked)
 {
 	struct vm *sender_vm = sender_locked.vm;
 	struct vm *receiver_vm = receiver_locked.vm;
@@ -60,8 +60,9 @@ bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 
 	return true;
 }
-bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
-				struct ffa_value *ret)
+bool ffa_indirect_msg_send2_forward(ffa_id_t receiver_vm_id,
+				    ffa_id_t sender_vm_id,
+				    struct ffa_value *ret)
 {
 	/* SPMC never needs to forward a FFA_MSG_SEND2, it always handles it. */
 	(void)receiver_vm_id;

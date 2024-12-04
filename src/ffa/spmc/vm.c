@@ -73,7 +73,7 @@ static struct vm_locked plat_ffa_nwd_vm_find_locked(
  * If a VM with the ID already exists return it.
  * Return NULL if it can't allocate a new VM.
  */
-struct vm_locked plat_ffa_nwd_vm_create(ffa_id_t vm_id)
+struct vm_locked ffa_vm_nwd_create(ffa_id_t vm_id)
 {
 	struct vm_locked vm_locked;
 	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
@@ -106,7 +106,7 @@ out:
 	return vm_locked;
 }
 
-void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
+void ffa_vm_destroy(struct vm_locked to_destroy_locked)
 {
 	struct vm *vm = to_destroy_locked.vm;
 	/*
@@ -121,7 +121,7 @@ void plat_ffa_vm_destroy(struct vm_locked to_destroy_locked)
 	}
 }
 
-void plat_ffa_vm_init(struct mpool *ppool)
+void ffa_vm_init(struct mpool *ppool)
 {
 	struct vm *other_world = vm_find(HF_OTHER_WORLD_ID);
 
@@ -144,12 +144,12 @@ void plat_ffa_vm_init(struct mpool *ppool)
 	}
 }
 
-bool plat_ffa_vm_managed_exit_supported(struct vm *vm)
+bool ffa_vm_managed_exit_supported(struct vm *vm)
 {
 	return (vm->ns_interrupts_action == NS_ACTION_ME);
 }
 
-struct vm_locked plat_ffa_vm_find_locked(ffa_id_t vm_id)
+struct vm_locked ffa_vm_find_locked(ffa_id_t vm_id)
 {
 	struct vm_locked to_ret_locked;
 
@@ -166,19 +166,18 @@ struct vm_locked plat_ffa_vm_find_locked(ffa_id_t vm_id)
 	return to_ret_locked;
 }
 
-struct vm_locked plat_ffa_vm_find_locked_create(ffa_id_t vm_id)
+struct vm_locked ffa_vm_find_locked_create(ffa_id_t vm_id)
 {
 	if (vm_id_is_current_world(vm_id) || vm_id == HF_OTHER_WORLD_ID) {
 		return vm_find_locked(vm_id);
 	}
 
-	return plat_ffa_nwd_vm_create(vm_id);
+	return ffa_vm_nwd_create(vm_id);
 }
 
-bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
-					uint32_t *lists_sizes,
-					uint32_t *lists_count,
-					const uint32_t ids_count_max)
+bool ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
+				   uint32_t *lists_sizes, uint32_t *lists_count,
+				   const uint32_t ids_count_max)
 {
 	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
 	struct vm_locked other_world_locked = vm_find_locked(HF_OTHER_WORLD_ID);
@@ -215,7 +214,7 @@ bool plat_ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
 	return list_full_and_more_pending;
 }
 
-void plat_ffa_disable_vm_interrupts(struct vm_locked vm_locked)
+void ffa_vm_disable_interrupts(struct vm_locked vm_locked)
 {
 	uint32_t core_pos = arch_find_core_pos();
 
@@ -237,10 +236,10 @@ void plat_ffa_disable_vm_interrupts(struct vm_locked vm_locked)
 /**
  * Reclaim all resources belonging to VM in aborted state.
  */
-void plat_ffa_free_vm_resources(struct vm_locked vm_locked)
+void ffa_vm_free_resources(struct vm_locked vm_locked)
 {
 	/*
 	 * Gracefully disable all interrupts belonging to SP.
 	 */
-	plat_ffa_disable_vm_interrupts(vm_locked);
+	ffa_vm_disable_interrupts(vm_locked);
 }

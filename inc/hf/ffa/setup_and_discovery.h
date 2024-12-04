@@ -9,40 +9,44 @@
 #pragma once
 
 #include "hf/addr.h"
-#include "hf/ffa.h"
-#include "hf/ffa_memory_internal.h"
 #include "hf/manifest.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
 /** Returns the SPMC ID. */
-struct ffa_value plat_ffa_spmc_id_get(void);
+struct ffa_value ffa_setup_spmc_id_get(void);
 
-void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send, uint64_t page_count);
+/**
+ * Returns true if the FFA_SECONDARY_EP_REGISTER interface is supported at
+ * the virtual FF-A instance.
+ */
+bool ffa_setup_is_secondary_ep_register_supported(void);
 
-void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked);
+void ffa_setup_rxtx_map_spmc(paddr_t recv, paddr_t send, uint64_t page_count);
 
-void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked);
+void ffa_setup_rxtx_map_forward(struct vm_locked vm_locked);
 
-bool plat_ffa_partition_info_get_regs_forward_allowed(void);
+void ffa_setup_rxtx_unmap_forward(struct vm_locked vm_locked);
 
-ffa_vm_count_t plat_ffa_partition_info_get_forward(
+bool ffa_setup_partition_info_get_regs_forward_allowed(void);
+
+ffa_vm_count_t ffa_setup_partition_info_get_forward(
 	const struct ffa_uuid *uuid, uint32_t flags,
 	struct ffa_partition_info *partitions, ffa_vm_count_t vm_count);
 
-void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
-				       paddr_t fdt_addr,
-				       size_t fdt_allocated_size,
-				       const struct manifest_vm *manifest_vm,
-				       const struct boot_params *boot_params,
-				       struct mpool *ppool);
+void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
+					paddr_t fdt_addr,
+					size_t fdt_allocated_size,
+					const struct manifest_vm *manifest_vm,
+					const struct boot_params *boot_params,
+					struct mpool *ppool);
 
 /** Return the FF-A partition info VM/SP properties given the VM id. */
-ffa_partition_properties_t plat_ffa_partition_properties(
+ffa_partition_properties_t ffa_setup_partition_properties(
 	ffa_id_t caller_id, const struct vm *target);
 
-bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
-				 struct ffa_value *ret);
-
-bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
+bool ffa_setup_rx_release_forward(struct vm_locked vm_locked,
 				  struct ffa_value *ret);
+
+bool ffa_setup_acquire_receiver_rx(struct vm_locked to_locked,
+				   struct ffa_value *ret);

@@ -24,8 +24,8 @@
 /** Interrupt priority for the Schedule Receiver Interrupt. */
 #define SRI_PRIORITY UINT32_C(0xf0)
 
-struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
-	struct vcpu *current, ffa_id_t vm_id)
+struct ffa_value ffa_notifications_is_bitmap_access_valid(struct vcpu *current,
+							  ffa_id_t vm_id)
 {
 	/**
 	 * Create/Destroy interfaces to be called by the hypervisor, into the
@@ -52,9 +52,8 @@ struct ffa_value plat_ffa_is_notifications_bitmap_access_valid(
  * - If bind call from NWd, current VM ID must be same as Hypervisor ID,
  * receiver's ID must be from NWd, and sender's ID from SWd.
  */
-bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
-					  ffa_id_t sender_id,
-					  ffa_id_t receiver_id)
+bool ffa_notifications_is_bind_valid(struct vcpu *current, ffa_id_t sender_id,
+				     ffa_id_t receiver_id)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
@@ -100,7 +99,7 @@ bool plat_ffa_is_notifications_bind_valid(struct vcpu *current,
 	return true;
 }
 
-bool plat_ffa_notifications_update_bindings_forward(
+bool ffa_notifications_update_bindings_forward(
 	ffa_id_t receiver_id, ffa_id_t sender_id,
 	ffa_notification_flags_t flags, ffa_notifications_bitmap_t bitmap,
 	bool is_bind, struct ffa_value *ret)
@@ -123,9 +122,8 @@ bool plat_ffa_notifications_update_bindings_forward(
  * - If set call from NWd, current VM ID must be same as Hypervisor ID,
  * and receiver must be an SP.
  */
-bool plat_ffa_is_notification_set_valid(struct vcpu *current,
-					ffa_id_t sender_id,
-					ffa_id_t receiver_id)
+bool ffa_notifications_is_set_valid(struct vcpu *current, ffa_id_t sender_id,
+				    ffa_id_t receiver_id)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
@@ -170,11 +168,11 @@ bool plat_ffa_is_notification_set_valid(struct vcpu *current,
 	return true;
 }
 
-bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
-				       ffa_id_t receiver_vm_id,
-				       ffa_notification_flags_t flags,
-				       ffa_notifications_bitmap_t bitmap,
-				       struct ffa_value *ret)
+bool ffa_notifications_set_forward(ffa_id_t sender_vm_id,
+				   ffa_id_t receiver_vm_id,
+				   ffa_notification_flags_t flags,
+				   ffa_notifications_bitmap_t bitmap,
+				   struct ffa_value *ret)
 {
 	(void)sender_vm_id;
 	(void)receiver_vm_id;
@@ -185,9 +183,8 @@ bool plat_ffa_notification_set_forward(ffa_id_t sender_vm_id,
 	return false;
 }
 
-bool plat_ffa_is_notification_get_valid(struct vcpu *current,
-					ffa_id_t receiver_id,
-					ffa_notification_flags_t flags)
+bool ffa_notifications_is_get_valid(struct vcpu *current, ffa_id_t receiver_id,
+				    ffa_notification_flags_t flags)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 	/*
@@ -214,8 +211,8 @@ bool plat_ffa_is_notification_get_valid(struct vcpu *current,
 	return caller_and_receiver_valid && flags_valid;
 }
 
-void plat_ffa_notification_info_get_forward(  // NOLINTNEXTLINE
-	uint16_t *ids, uint32_t *ids_count,   // NOLINTNEXTLINE
+void ffa_notifications_info_get_forward(     // NOLINTNEXTLINE
+	uint16_t *ids, uint32_t *ids_count,  // NOLINTNEXTLINE
 	uint32_t *lists_sizes, uint32_t *lists_count,
 	const uint32_t ids_count_max)
 {
@@ -226,8 +223,8 @@ void plat_ffa_notification_info_get_forward(  // NOLINTNEXTLINE
 	(void)ids_count_max;
 }
 
-struct ffa_value plat_ffa_notifications_bitmap_create(
-	ffa_id_t vm_id, ffa_vcpu_count_t vcpu_count)
+struct ffa_value ffa_notifications_bitmap_create(ffa_id_t vm_id,
+						 ffa_vcpu_count_t vcpu_count)
 {
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 	struct vm_locked vm_locked;
@@ -254,7 +251,7 @@ struct ffa_value plat_ffa_notifications_bitmap_create(
 		vm_locked.vm->notifications.enabled = true;
 	} else {
 		/* Else should regard with NWd VM ID. */
-		vm_locked = plat_ffa_nwd_vm_create(vm_id);
+		vm_locked = ffa_vm_nwd_create(vm_id);
 
 		/* If received NULL, there are no slots for VM creation. */
 		if (vm_locked.vm == NULL) {
@@ -279,8 +276,8 @@ out:
 	return ret;
 }
 
-bool plat_ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
-					       ffa_vcpu_count_t vcpu_count)
+bool ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
+					  ffa_vcpu_count_t vcpu_count)
 {
 	(void)vm_id;
 	(void)vcpu_count;
@@ -288,10 +285,10 @@ bool plat_ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
 	return true;
 }
 
-struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_id_t vm_id)
+struct ffa_value ffa_notifications_bitmap_destroy(ffa_id_t vm_id)
 {
 	struct ffa_value ret = {.func = FFA_SUCCESS_32};
-	struct vm_locked to_destroy_locked = plat_ffa_vm_find_locked(vm_id);
+	struct vm_locked to_destroy_locked = ffa_vm_find_locked(vm_id);
 
 	if (to_destroy_locked.vm == NULL) {
 		dlog_verbose("Bitmap not created for VM: %u\n", vm_id);
@@ -315,7 +312,7 @@ struct ffa_value plat_ffa_notifications_bitmap_destroy(ffa_id_t vm_id)
 	vm_notifications_init(to_destroy_locked.vm,
 			      to_destroy_locked.vm->vcpu_count, NULL);
 	if (vm_id != HF_OTHER_WORLD_ID) {
-		plat_ffa_vm_destroy(to_destroy_locked);
+		ffa_vm_destroy(to_destroy_locked);
 	}
 
 out:
@@ -324,7 +321,7 @@ out:
 	return ret;
 }
 
-struct ffa_value plat_ffa_notifications_get_from_sp(
+struct ffa_value ffa_notifications_get_from_sp(
 	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
 	ffa_notifications_bitmap_t *from_sp)
 {
@@ -334,7 +331,7 @@ struct ffa_value plat_ffa_notifications_get_from_sp(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-struct ffa_value plat_ffa_notifications_get_framework_notifications(
+struct ffa_value ffa_notifications_get_framework_notifications(
 	struct vm_locked receiver_locked, ffa_notifications_bitmap_t *from_fwk,
 	ffa_notification_flags_t flags, ffa_vcpu_index_t vcpu_id)
 {
@@ -363,15 +360,16 @@ static void plat_ffa_send_schedule_receiver_interrupt(struct cpu *cpu)
 	plat_interrupts_send_sgi(HF_SCHEDULE_RECEIVER_INTID, cpu, false);
 }
 
-static void plat_ffa_sri_set_delayed_internal(struct cpu *cpu, bool delayed)
+static void ffa_notifications_sri_set_delayed_internal(struct cpu *cpu,
+						       bool delayed)
 {
 	assert(cpu != NULL);
 	cpu->is_sri_delayed = delayed;
 }
 
-void plat_ffa_sri_set_delayed(struct cpu *cpu)
+void ffa_notifications_sri_set_delayed(struct cpu *cpu)
 {
-	plat_ffa_sri_set_delayed_internal(cpu, true);
+	ffa_notifications_sri_set_delayed_internal(cpu, true);
 }
 
 static bool plat_ffa_is_sri_delayed(struct cpu *cpu)
@@ -380,27 +378,27 @@ static bool plat_ffa_is_sri_delayed(struct cpu *cpu)
 	return cpu->is_sri_delayed;
 }
 
-void plat_ffa_sri_trigger_if_delayed(struct cpu *cpu)
+void ffa_notifications_sri_trigger_if_delayed(struct cpu *cpu)
 {
 	assert(cpu != NULL);
 
 	if (plat_ffa_is_sri_delayed(cpu)) {
 		plat_ffa_send_schedule_receiver_interrupt(cpu);
-		plat_ffa_sri_set_delayed_internal(cpu, false);
+		ffa_notifications_sri_set_delayed_internal(cpu, false);
 	}
 }
 
-void plat_ffa_sri_trigger_not_delayed(struct cpu *cpu)
+void ffa_notifications_sri_trigger_not_delayed(struct cpu *cpu)
 {
 	/*
 	 * If flag to delay SRI isn't set, trigger SRI such that the
 	 * receiver scheduler is aware there are pending notifications.
 	 */
 	plat_ffa_send_schedule_receiver_interrupt(cpu);
-	plat_ffa_sri_set_delayed_internal(cpu, false);
+	ffa_notifications_sri_set_delayed_internal(cpu, false);
 }
 
-void plat_ffa_sri_init(struct cpu *cpu)
+void ffa_notifications_sri_init(struct cpu *cpu)
 {
 	/* Configure as Non Secure SGI. */
 	struct interrupt_descriptor sri_desc = {

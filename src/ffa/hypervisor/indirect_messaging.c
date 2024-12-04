@@ -14,8 +14,8 @@
 #include "hf/ffa_internal.h"
 #include "hf/vm.h"
 
-bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
-					struct vm_locked receiver_locked)
+bool ffa_indirect_msg_is_supported(struct vm_locked sender_locked,
+				   struct vm_locked receiver_locked)
 {
 	(void)sender_locked;
 	(void)receiver_locked;
@@ -27,8 +27,9 @@ bool plat_ffa_is_indirect_msg_supported(struct vm_locked sender_locked,
 	return true;
 }
 
-bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
-				struct ffa_value *ret)
+bool ffa_indirect_msg_send2_forward(ffa_id_t receiver_vm_id,
+				    ffa_id_t sender_vm_id,
+				    struct ffa_value *ret)
 {
 	/* FFA_MSG_SEND2 is forwarded to SPMC when the receiver is an SP. */
 	if (vm_id_is_current_world(receiver_vm_id)) {
@@ -59,7 +60,7 @@ bool plat_ffa_msg_send2_forward(ffa_id_t receiver_vm_id, ffa_id_t sender_vm_id,
  * Checks whether the vCPU's attempt to wait for a message has already been
  * interrupted or whether it is allowed to block.
  */
-static bool plat_ffa_msg_recv_block_interrupted(
+static bool ffa_indirect_msg_recv_block_interrupted(
 	struct vcpu_locked current_locked)
 {
 	bool interrupted;
@@ -98,9 +99,9 @@ static bool plat_ffa_return_pending_messages(struct vm_locked vm_locked,
  *
  * No new messages can be received until the mailbox has been cleared.
  */
-struct ffa_value plat_ffa_msg_recv(bool block,
-				   struct vcpu_locked current_locked,
-				   struct vcpu **next)
+struct ffa_value ffa_indirect_msg_recv(bool block,
+				       struct vcpu_locked current_locked,
+				       struct vcpu **next)
 {
 	struct vm *vm = current_locked.vcpu->vm;
 	struct vcpu *current = current_locked.vcpu;
@@ -143,7 +144,7 @@ struct ffa_value plat_ffa_msg_recv(bool block,
 	 * that time to FFA_SUCCESS.
 	 */
 	return_code = ffa_error(FFA_INTERRUPTED);
-	if (plat_ffa_msg_recv_block_interrupted(current_locked)) {
+	if (ffa_indirect_msg_recv_block_interrupted(current_locked)) {
 		goto out;
 	}
 

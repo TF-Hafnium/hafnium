@@ -85,7 +85,7 @@ bool hf_ipi_handle(struct vcpu_locked target_vcpu_locked)
 
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
-		plat_ffa_sri_trigger_not_delayed(target_vcpu->cpu);
+		ffa_notifications_sri_trigger_not_delayed(target_vcpu->cpu);
 		return true;
 	case VCPU_STATE_RUNNING:
 	case VCPU_STATE_BLOCKED:

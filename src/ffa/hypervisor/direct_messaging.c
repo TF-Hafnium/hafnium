@@ -18,9 +18,9 @@
 /**
  * Check validity of a FF-A direct message request.
  */
-bool plat_ffa_is_direct_request_valid(struct vcpu *current,
-				      ffa_id_t sender_vm_id,
-				      ffa_id_t receiver_vm_id)
+bool ffa_direct_msg_is_direct_request_valid(struct vcpu *current,
+					    ffa_id_t sender_vm_id,
+					    ffa_id_t receiver_vm_id)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
@@ -33,8 +33,9 @@ bool plat_ffa_is_direct_request_valid(struct vcpu *current,
 	       sender_vm_id == current_vm_id && vm_is_primary(current->vm);
 }
 
-bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
-					  struct vm *receiver_vm, uint32_t func)
+bool ffa_direct_msg_is_direct_request_supported(struct vm *sender_vm,
+						struct vm *receiver_vm,
+						uint32_t func)
 {
 	(void)sender_vm;
 	(void)receiver_vm;
@@ -50,9 +51,9 @@ bool plat_ffa_is_direct_request_supported(struct vm *sender_vm,
 /**
  * Check validity of a FF-A direct message response.
  */
-bool plat_ffa_is_direct_response_valid(struct vcpu *current,
-				       ffa_id_t sender_vm_id,
-				       ffa_id_t receiver_vm_id)
+bool ffa_direct_msg_is_direct_response_valid(struct vcpu *current,
+					     ffa_id_t sender_vm_id,
+					     ffa_id_t receiver_vm_id)
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
@@ -65,9 +66,9 @@ bool plat_ffa_is_direct_response_valid(struct vcpu *current,
 	       receiver_vm_id == HF_PRIMARY_VM_ID;
 }
 
-bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
-				     struct ffa_value args,
-				     struct ffa_value *ret)
+bool ffa_direct_msg_direct_request_forward(ffa_id_t receiver_vm_id,
+					   struct ffa_value args,
+					   struct ffa_value *ret)
 {
 	if (!plat_ffa_is_tee_enabled()) {
 		dlog_verbose("Not forwarding: ffa_tee_enabled is false\n");
@@ -101,7 +102,7 @@ bool plat_ffa_direct_request_forward(ffa_id_t receiver_vm_id,
 	return true;
 }
 
-void plat_ffa_wind_call_chain_ffa_direct_req(
+void ffa_direct_msg_wind_call_chain_ffa_direct_req(
 	struct vcpu_locked current_locked,
 	struct vcpu_locked receiver_vcpu_locked, ffa_id_t sender_vm_id)
 {
@@ -111,7 +112,7 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
 	(void)sender_vm_id;
 }
 
-void plat_ffa_unwind_call_chain_ffa_direct_resp(
+void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	struct vcpu_locked current_locked, struct vcpu_locked next_locked)
 {
 	/* Calls chains not supported in the Hypervisor/VMs. */

@@ -548,7 +548,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_yield(current, next, args);
 		return true;
 	case FFA_MSG_SEND_32:
-		*args = plat_ffa_msg_send(
+		*args = ffa_indirect_msg_send(
 			ffa_sender(*args), ffa_receiver(*args),
 			ffa_msg_send_size(*args), current, next);
 		return true;
@@ -564,7 +564,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		struct vcpu_locked current_locked;
 
 		current_locked = vcpu_lock(current);
-		*args = plat_ffa_msg_recv(false, current_locked, next);
+		*args = ffa_indirect_msg_recv(false, current_locked, next);
 		vcpu_unlock(&current_locked);
 		return true;
 	}
@@ -697,7 +697,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 			return true;
 		}
 
-		plat_ffa_handle_secure_interrupt(current, next);
+		ffa_interrupts_handle_secure_interrupt(current, next);
 
 		/*
 		 * If the next vCPU belongs to an SP, the next time the NWd
@@ -778,7 +778,7 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 		 */
 		if ((*next != NULL && (*next)->vm->id == HF_OTHER_WORLD_ID) ||
 		    (*next == NULL && vcpu->vm->id == HF_OTHER_WORLD_ID)) {
-			plat_ffa_sri_trigger_if_delayed(vcpu->cpu);
+			ffa_notifications_sri_trigger_if_delayed(vcpu->cpu);
 		}
 #endif
 		if (func != FFA_VERSION_32) {
@@ -1032,12 +1032,12 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 	switch (args.func) {
 #if SECURE_WORLD == 1
 	case HF_INTERRUPT_DEACTIVATE:
-		vcpu->regs.r[0] = plat_ffa_interrupt_deactivate(
-			args.arg1, args.arg2, vcpu);
+		vcpu->regs.r[0] =
+			ffa_interrupts_deactivate(args.arg1, args.arg2, vcpu);
 		break;
 
 	case HF_INTERRUPT_RECONFIGURE:
-		vcpu->regs.r[0] = plat_ffa_interrupt_reconfigure(
+		vcpu->regs.r[0] = ffa_interrupts_reconfigure(
 			args.arg1, args.arg2, args.arg3, vcpu);
 		break;
 
@@ -1054,7 +1054,7 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 		struct vcpu_locked current_locked;
 
 		current_locked = vcpu_lock(vcpu);
-		vcpu->regs.r[0] = plat_ffa_interrupt_get(current_locked);
+		vcpu->regs.r[0] = ffa_interrupts_get(current_locked);
 		vcpu_unlock(&current_locked);
 		break;
 	}
@@ -1077,7 +1077,7 @@ struct vcpu *irq_lower(void)
 #if SECURE_WORLD == 1
 	struct vcpu *next = NULL;
 
-	plat_ffa_handle_secure_interrupt(current(), &next);
+	ffa_interrupts_handle_secure_interrupt(current(), &next);
 
 	/*
 	 * Since we are in interrupt context, set the bit for the
@@ -1140,7 +1140,7 @@ struct vcpu *fiq_lower(void)
 	 */
 	assert(current_vcpu->vm->ns_interrupts_action != NS_ACTION_QUEUED);
 
-	if (plat_ffa_vm_managed_exit_supported(current_vcpu->vm)) {
+	if (ffa_vm_managed_exit_supported(current_vcpu->vm)) {
 		uint8_t pmr = plat_interrupts_get_priority_mask();
 
 		/*
@@ -1177,7 +1177,7 @@ struct vcpu *fiq_lower(void)
 	 * Unwind Normal World Scheduled Call chain in response to NS
 	 * Interrupt.
 	 */
-	return plat_ffa_unwind_nwd_call_chain_interrupt(current_vcpu);
+	return ffa_interrupts_unwind_nwd_call_chain(current_vcpu);
 #else
 	return irq_lower();
 #endif

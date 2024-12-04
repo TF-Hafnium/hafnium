@@ -89,7 +89,7 @@ struct ffa_memory_share_state *allocate_share_state(
 
 			if (handle == FFA_MEMORY_HANDLE_INVALID) {
 				memory_region->handle =
-					plat_ffa_memory_handle_make(i);
+					ffa_memory_make_handle(i);
 			} else {
 				memory_region->handle = handle;
 			}
@@ -146,7 +146,7 @@ struct ffa_memory_share_state *get_share_state(
 	 * First look for a share_state allocated by us, in which case the
 	 * handle is based on the index.
 	 */
-	if (plat_ffa_memory_handle_allocated_by_current_world(handle)) {
+	if (ffa_memory_is_handle_allocated_by_current_world(handle)) {
 		uint64_t index = ffa_memory_handle_index(handle);
 
 		if (index < MAX_MEM_SHARES) {
@@ -388,8 +388,8 @@ static inline uint32_t ffa_memory_permissions_to_mode(
 	}
 
 	/* Set the security state bit if necessary. */
-	if ((default_mode & plat_ffa_other_world_mode()) != 0) {
-		mode |= plat_ffa_other_world_mode();
+	if ((default_mode & ffa_memory_get_other_world_mode()) != 0) {
+		mode |= ffa_memory_get_other_world_mode();
 	}
 
 	mode |= default_mode & MM_MODE_D;
@@ -1012,7 +1012,7 @@ struct ffa_value ffa_retrieve_check_transition(
 		 * allow the secure access from the SP.
 		 */
 		if (memory_protected) {
-			*to_mode &= ~plat_ffa_other_world_mode();
+			*to_mode &= ~ffa_memory_get_other_world_mode();
 		}
 	}
 
@@ -1297,10 +1297,11 @@ static bool clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool,
 	 */
 	bool ret;
 	struct mm_stage1_locked stage1_locked = mm_lock_stage1();
-	void *ptr = mm_identity_map(stage1_locked, begin, end,
-				    MM_MODE_W | (extra_mode_attributes &
-						 plat_ffa_other_world_mode()),
-				    ppool);
+	void *ptr =
+		mm_identity_map(stage1_locked, begin, end,
+				MM_MODE_W | (extra_mode_attributes &
+					     ffa_memory_get_other_world_mode()),
+				ppool);
 	size_t size = pa_difference(begin, end);
 
 	if (!ptr) {
@@ -1571,9 +1572,10 @@ static struct ffa_value ffa_send_check_update(
 	 * perform a non-secure memory access. In such case `clean_mode` takes
 	 * the same mode as `orig_from_mode`.
 	 */
-	clean_mode = (memory_protected != NULL && *memory_protected)
-			     ? orig_from_mode & ~plat_ffa_other_world_mode()
-			     : orig_from_mode;
+	clean_mode =
+		(memory_protected != NULL && *memory_protected)
+			? orig_from_mode & ~ffa_memory_get_other_world_mode()
+			: orig_from_mode;
 
 	/* Clear the memory so no VM or device can see the previous contents. */
 	if (clear && !ffa_clear_memory_constituents(
@@ -3380,7 +3382,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 		share_state->fragment_count;
 
 	/* VMs acquire the RX buffer from SPMC. */
-	CHECK(plat_ffa_acquire_receiver_rx(to_locked, &ret));
+	CHECK(ffa_setup_acquire_receiver_rx(to_locked, &ret));
 
 	/*
 	 * Copy response to RX buffer of caller and deliver the message.
@@ -3392,7 +3394,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 	 * Set the security state in the memory retrieve response attributes
 	 * if specified by the target mode.
 	 */
-	attributes = plat_ffa_memory_add_security_bit_from_mode(
+	attributes = ffa_memory_add_security_bit_from_mode(
 		memory_region->attributes, retrieve_mode);
 
 	/*
@@ -3492,7 +3494,7 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 	share_state->hypervisor_fragment_count = 1;
 
 	/* VMs acquire the RX buffer from SPMC. */
-	CHECK(plat_ffa_acquire_receiver_rx(to_locked, &ret));
+	CHECK(ffa_setup_acquire_receiver_rx(to_locked, &ret));
 
 	/*
 	 * Copy response to RX buffer of caller and deliver the message.
@@ -3512,7 +3514,7 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 	 * Set the security state in the memory retrieve response attributes
 	 * if specified by the target mode.
 	 */
-	attributes = plat_ffa_memory_add_security_bit_from_mode(
+	attributes = ffa_memory_add_security_bit_from_mode(
 		memory_region->attributes, share_state->sender_orig_mode);
 
 	receiver = ffa_memory_region_get_receiver(memory_region, 0);
@@ -3774,7 +3776,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	 * When hafnium is the hypervisor, acquire the RX buffer of a VM, that
 	 * is currently ownder by the SPMC.
 	 */
-	assert(plat_ffa_acquire_receiver_rx(to_locked, &ret));
+	assert(ffa_setup_acquire_receiver_rx(to_locked, &ret));
 
 	remaining_constituent_count = ffa_memory_fragment_init(
 		(struct ffa_memory_region_constituent *)retrieve_continue_page,

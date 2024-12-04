@@ -10,7 +10,7 @@
 
 #include "hf/arch/other_world.h"
 
-#include "hf/ffa.h"
+#include "hf/check.h"
 #include "hf/ffa/vm.h"
 #include "hf/manifest.h"
 #include "hf/vm.h"
@@ -18,7 +18,7 @@
 #include "hypervisor.h"
 #include "smc.h"
 
-struct ffa_value plat_ffa_spmc_id_get(void)
+struct ffa_value ffa_setup_spmc_id_get(void)
 {
 	if (plat_ffa_is_tee_enabled()) {
 		/*
@@ -35,7 +35,16 @@ struct ffa_value plat_ffa_spmc_id_get(void)
 				  .arg2 = FFA_NOT_SUPPORTED};
 }
 
-void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send, uint64_t page_count)
+/**
+ * Returns FFA_ERROR as FFA_SECONDARY_EP_REGISTER is not supported at the
+ * non-secure FF-A instances.
+ */
+bool ffa_setup_is_secondary_ep_register_supported(void)
+{
+	return false;
+}
+
+void ffa_setup_rxtx_map_spmc(paddr_t recv, paddr_t send, uint64_t page_count)
 {
 	struct ffa_value ret;
 
@@ -46,7 +55,7 @@ void plat_ffa_rxtx_map_spmc(paddr_t recv, paddr_t send, uint64_t page_count)
 	CHECK(ret.func == FFA_SUCCESS_32);
 }
 
-void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
+void ffa_setup_rxtx_map_forward(struct vm_locked vm_locked)
 {
 	struct vm *vm = vm_locked.vm;
 	struct vm *other_world;
@@ -56,7 +65,7 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 		return;
 	}
 
-	if (!plat_ffa_vm_supports_indirect_messages(vm)) {
+	if (!ffa_vm_supports_indirect_messages(vm)) {
 		return;
 	}
 
@@ -71,14 +80,14 @@ void plat_ffa_rxtx_map_forward(struct vm_locked vm_locked)
 		vm->id, (uintptr_t)vm->mailbox.recv,
 		(uintptr_t)vm->mailbox.send);
 
-	plat_ffa_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
+	ffa_setup_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
 
 	vm_locked.vm->mailbox.state = MAILBOX_STATE_OTHER_WORLD_OWNED;
 
 	dlog_verbose("Mailbox of %x owned by SPMC.\n", vm_locked.vm->id);
 }
 
-void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
+void ffa_setup_rxtx_unmap_forward(struct vm_locked vm_locked)
 {
 	struct ffa_value ret;
 	uint64_t func;
@@ -92,7 +101,7 @@ void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 		return;
 	}
 
-	if (!plat_ffa_vm_supports_indirect_messages(vm_locked.vm)) {
+	if (!ffa_vm_supports_indirect_messages(vm_locked.vm)) {
 		return;
 	}
 
@@ -112,7 +121,7 @@ void plat_ffa_rxtx_unmap_forward(struct vm_locked vm_locked)
 	}
 }
 
-bool plat_ffa_partition_info_get_regs_forward_allowed(void)
+bool ffa_setup_partition_info_get_regs_forward_allowed(void)
 {
 	/*
 	 * Allow forwarding from the Hypervisor if TEE or SPMC exists and
@@ -125,7 +134,7 @@ bool plat_ffa_partition_info_get_regs_forward_allowed(void)
  * Forward helper for FFA_PARTITION_INFO_GET.
  * Emits FFA_PARTITION_INFO_GET from Hypervisor to SPMC if allowed.
  */
-ffa_vm_count_t plat_ffa_partition_info_get_forward(
+ffa_vm_count_t ffa_setup_partition_info_get_forward(
 	const struct ffa_uuid *uuid, uint32_t flags,
 	struct ffa_partition_info *partitions, ffa_vm_count_t vm_count)
 {
@@ -185,12 +194,12 @@ ffa_vm_count_t plat_ffa_partition_info_get_forward(
 	return vm_count;
 }
 
-void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
-				       paddr_t fdt_addr,
-				       size_t fdt_allocated_size,
-				       const struct manifest_vm *manifest_vm,
-				       const struct boot_params *boot_params,
-				       struct mpool *ppool)
+void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
+					paddr_t fdt_addr,
+					size_t fdt_allocated_size,
+					const struct manifest_vm *manifest_vm,
+					const struct boot_params *boot_params,
+					struct mpool *ppool)
 {
 	struct fdt partition_fdt;
 
@@ -214,7 +223,7 @@ void plat_ffa_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 		       pa_add(fdt_addr, fdt_allocated_size), ppool) == true);
 }
 
-ffa_partition_properties_t plat_ffa_partition_properties(
+ffa_partition_properties_t ffa_setup_partition_properties(
 	ffa_id_t caller_id, const struct vm *target)
 {
 	ffa_partition_properties_t result = target->messaging_method;
@@ -234,14 +243,14 @@ ffa_partition_properties_t plat_ffa_partition_properties(
 	return result;
 }
 
-bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
-				 struct ffa_value *ret)
+bool ffa_setup_rx_release_forward(struct vm_locked vm_locked,
+				  struct ffa_value *ret)
 {
 	struct vm *vm = vm_locked.vm;
 	ffa_id_t vm_id = vm->id;
 
 	if (!plat_ffa_is_tee_enabled() ||
-	    !plat_ffa_vm_supports_indirect_messages(vm)) {
+	    !ffa_vm_supports_indirect_messages(vm)) {
 		return false;
 	}
 
@@ -274,8 +283,8 @@ bool plat_ffa_rx_release_forward(struct vm_locked vm_locked,
  *
  * Returns true if the ownership belongs to the hypervisor.
  */
-bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
-				  struct ffa_value *ret)
+bool ffa_setup_acquire_receiver_rx(struct vm_locked to_locked,
+				   struct ffa_value *ret)
 {
 	struct ffa_value other_world_ret;
 
@@ -286,7 +295,7 @@ bool plat_ffa_acquire_receiver_rx(struct vm_locked to_locked,
 	 * - If the mailbox ownership hasn't been transferred to the SPMC.
 	 */
 	if (!plat_ffa_is_tee_enabled() ||
-	    !plat_ffa_vm_supports_indirect_messages(to_locked.vm) ||
+	    !ffa_vm_supports_indirect_messages(to_locked.vm) ||
 	    to_locked.vm->mailbox.state != MAILBOX_STATE_OTHER_WORLD_OWNED) {
 		return true;
 	}

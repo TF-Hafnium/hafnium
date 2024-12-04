@@ -18,8 +18,8 @@
 void plat_ffa_vcpu_allow_interrupts(struct vcpu *current);
 bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next);
 
-bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
-			  struct ffa_value *ret)
+bool ffa_cpu_cycles_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+				struct ffa_value *ret)
 {
 	(void)vm_id;
 	(void)vcpu_idx;
@@ -31,9 +31,9 @@ bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 /**
  * Check if current VM can resume target VM using FFA_RUN ABI.
  */
-bool plat_ffa_run_checks(struct vcpu_locked current_locked,
-			 ffa_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
-			 struct ffa_value *run_ret, struct vcpu **next)
+bool ffa_cpu_cycles_run_checks(struct vcpu_locked current_locked,
+			       ffa_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
+			       struct ffa_value *run_ret, struct vcpu **next)
 {
 	/*
 	 * Under the Partition runtime model specified in FF-A v1.1-Beta0 spec,
@@ -299,8 +299,8 @@ static bool plat_ffa_msg_wait_intercept(struct vcpu_locked current_locked,
 	 * vCPU. Intercept call will set `ret` to FFA_INTERRUPT and the
 	 * respective interrupt id.
 	 */
-	if (plat_ffa_intercept_call(both_vcpu_locks.vcpu1,
-				    both_vcpu_locks.vcpu2, ffa_ret)) {
+	if (ffa_interrupts_intercept_call(both_vcpu_locks.vcpu1,
+					  both_vcpu_locks.vcpu2, ffa_ret)) {
 		*next = NULL;
 		ret = true;
 	}
@@ -316,8 +316,8 @@ static bool plat_ffa_msg_wait_intercept(struct vcpu_locked current_locked,
  * from RUNNING to WAITING for the following Partition runtime models:
  * RTM_FFA_RUN, RTM_SEC_INTERRUPT, RTM_SP_INIT.
  */
-struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
-					   struct vcpu **next)
+struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
+	struct vcpu_locked current_locked, struct vcpu **next)
 {
 	struct ffa_value ret = api_ffa_interrupt_return(0);
 	struct vcpu *current = current_locked.vcpu;
@@ -417,8 +417,8 @@ static void plat_ffa_vcpu_queue_interrupts(
  * Initialize the scheduling mode and/or Partition Runtime model of the target
  * SP upon being resumed by an FFA_RUN ABI.
  */
-void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
-					 struct vcpu_locked target_locked)
+void ffa_cpu_cycles_init_schedule_mode_ffa_runeld_prepare(
+	struct vcpu_locked current_locked, struct vcpu_locked target_locked)
 {
 	struct vcpu *vcpu = target_locked.vcpu;
 	struct vcpu *current = current_locked.vcpu;
@@ -454,10 +454,10 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
  * execution context by the SPMC to handle secure virtual interrupt, then
  * FFA_YIELD invocation is essentially a no-op.
  */
-struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					uint32_t timeout_low,
-					uint32_t timeout_high)
+struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
+					      struct vcpu **next,
+					      uint32_t timeout_low,
+					      uint32_t timeout_high)
 {
 	struct ffa_value ret_args = (struct ffa_value){.func = FFA_SUCCESS_32};
 	struct vcpu *current = current_locked.vcpu;

@@ -23,8 +23,8 @@
  *
  * Returns 0 on success, or -1 otherwise.
  */
-int64_t plat_ffa_interrupt_deactivate(uint32_t pint_id, uint32_t vint_id,
-				      struct vcpu *current)
+int64_t ffa_interrupts_deactivate(uint32_t pint_id, uint32_t vint_id,
+				  struct vcpu *current)
 {
 	struct vcpu_locked current_locked;
 	uint32_t int_id;
@@ -478,7 +478,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
  * execution is trapped into EL3. SPMD then routes the interrupt to SPMC
  * through FFA_INTERRUPT_32 ABI synchronously using eret conduit.
  */
-void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
+void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
+					    struct vcpu **next)
 {
 	struct vcpu *target_vcpu;
 	struct vcpu_locked target_vcpu_locked =
@@ -552,7 +553,7 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 				 memory_order_relaxed)) {
 		/* Clear fields corresponding to secure interrupt handling. */
 		vcpu_secure_interrupt_complete(target_vcpu_locked);
-		plat_ffa_disable_vm_interrupts(target_vm_locked);
+		ffa_vm_disable_interrupts(target_vm_locked);
 
 		/* Resume current vCPU. */
 		*next = NULL;
@@ -600,7 +601,7 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	vm_unlock(&target_vm_locked);
 }
 
-bool plat_ffa_inject_notification_pending_interrupt(
+bool ffa_interrupts_inject_notification_pending_interrupt(
 	struct vcpu_locked target_locked, struct vcpu_locked current_locked,
 	struct vm_locked receiver_locked)
 {
@@ -629,7 +630,7 @@ bool plat_ffa_inject_notification_pending_interrupt(
 	return ret;
 }
 
-struct vcpu *plat_ffa_unwind_nwd_call_chain_interrupt(struct vcpu *current_vcpu)
+struct vcpu *ffa_interrupts_unwind_nwd_call_chain(struct vcpu *current_vcpu)
 {
 	struct vcpu *next;
 	struct two_vcpu_locked both_vcpu_locked;
@@ -702,7 +703,7 @@ static void plat_ffa_enable_virtual_maintenance_interrupts(
 	interrupts = &current->interrupts;
 	vm = current->vm;
 
-	if (plat_ffa_vm_managed_exit_supported(vm)) {
+	if (ffa_vm_managed_exit_supported(vm)) {
 		vcpu_virt_interrupt_set_enabled(interrupts,
 						HF_MANAGED_EXIT_INTID);
 		/*
@@ -734,8 +735,8 @@ static void plat_ffa_enable_virtual_maintenance_interrupts(
  * interface early during the boot stage as an S-EL0 SP need not call
  * HF_INTERRUPT_ENABLE hypervisor ABI explicitly.
  */
-void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
-					struct vm_locked vm_locked)
+void ffa_interrupts_enable_virtual_interrupts(struct vcpu_locked current_locked,
+					      struct vm_locked vm_locked)
 {
 	struct vcpu *current;
 	struct interrupts *interrupts;
@@ -773,8 +774,8 @@ void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
  * - Change the security state of the interrupt.
  * - Enable or disable the physical interrupt.
  */
-int64_t plat_ffa_interrupt_reconfigure(uint32_t int_id, uint32_t command,
-				       uint32_t value, struct vcpu *current)
+int64_t ffa_interrupts_reconfigure(uint32_t int_id, uint32_t command,
+				   uint32_t value, struct vcpu *current)
 {
 	struct vm *vm = current->vm;
 	struct vm_locked vm_locked;
@@ -862,7 +863,7 @@ out_unlock:
 }
 
 /* Returns the virtual interrupt id to be handled by SP. */
-uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)
+uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
 {
 	uint32_t int_id;
 

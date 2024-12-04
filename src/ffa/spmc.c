@@ -38,7 +38,7 @@ void plat_ffa_set_tee_enabled(bool tee_enabled)
 void plat_ffa_init(struct mpool *ppool)
 {
 	arch_ffa_init();
-	plat_ffa_vm_init(ppool);
+	ffa_vm_init(ppool);
 }
 
 static bool is_predecessor_in_call_chain(struct vcpu_locked current_locked,
@@ -252,12 +252,10 @@ static bool plat_ffa_check_rtm_sp_init(struct vcpu_locked locked_vcpu,
  * the current vcpu would transition upon the FF-A ABI invocation as determined
  * by the Partition runtime model.
  */
-bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
-					     ffa_id_t vm_id,
-					     ffa_id_t receiver_vm_id,
-					     struct vcpu_locked locked_vcpu,
-					     uint32_t func,
-					     enum vcpu_state *next_state)
+bool ffa_cpu_cycles_check_runtime_state_transition(
+	struct vcpu_locked current_locked, ffa_id_t vm_id,
+	ffa_id_t receiver_vm_id, struct vcpu_locked locked_vcpu, uint32_t func,
+	enum vcpu_state *next_state)
 {
 	bool allowed = false;
 	struct vcpu *current = current_locked.vcpu;
@@ -421,9 +419,9 @@ static void plat_ffa_run_in_sec_interrupt_rtm(
 	target_vcpu->requires_deactivate_call = false;
 }
 
-bool plat_ffa_intercept_call(struct vcpu_locked current_locked,
-			     struct vcpu_locked next_locked,
-			     struct ffa_value *signal_interrupt)
+bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
+				   struct vcpu_locked next_locked,
+				   struct ffa_value *signal_interrupt)
 {
 	uint32_t intid;
 
@@ -462,7 +460,7 @@ bool plat_ffa_intercept_call(struct vcpu_locked current_locked,
  * invocation of FFA_MSG_SEND_DIRECT_REQ or FFA_MSG_SEND_DIRECT_REQ2 (FF-A v1.2)
  * ABI.
  */
-void plat_ffa_wind_call_chain_ffa_direct_req(
+void ffa_direct_msg_wind_call_chain_ffa_direct_req(
 	struct vcpu_locked current_locked,
 	struct vcpu_locked receiver_vcpu_locked, ffa_id_t sender_vm_id)
 {
@@ -498,7 +496,7 @@ void plat_ffa_wind_call_chain_ffa_direct_req(
  * we need to return other world's id so that the SPMC can
  * return to the SPMD.
  */
-void plat_ffa_unwind_call_chain_ffa_direct_resp(
+void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	struct vcpu_locked current_locked, struct vcpu_locked next_locked)
 {
 	struct vcpu *next = next_locked.vcpu;
@@ -521,9 +519,9 @@ void plat_ffa_unwind_call_chain_ffa_direct_resp(
 	}
 }
 
-struct ffa_value plat_ffa_msg_send(ffa_id_t sender_vm_id,
-				   ffa_id_t receiver_vm_id, uint32_t size,
-				   struct vcpu *current, struct vcpu **next)
+struct ffa_value ffa_indirect_msg_send(ffa_id_t sender_vm_id,
+				       ffa_id_t receiver_vm_id, uint32_t size,
+				       struct vcpu *current, struct vcpu **next)
 {
 	(void)sender_vm_id;
 	(void)receiver_vm_id;
@@ -560,7 +558,7 @@ struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
 		atomic_store_explicit(&current->vm->aborting, true,
 				      memory_order_relaxed);
 
-		plat_ffa_free_vm_resources(vm_locked);
+		ffa_vm_free_resources(vm_locked);
 
 		if (sp_boot_next(current_locked, next)) {
 			goto out;

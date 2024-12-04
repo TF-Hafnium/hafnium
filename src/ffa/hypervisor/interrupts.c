@@ -10,7 +10,8 @@
 #include "hf/check.h"
 #include "hf/vm.h"
 
-void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
+void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
+					    struct vcpu **next)
 {
 	(void)current;
 	(void)next;
@@ -22,7 +23,7 @@ void plat_ffa_handle_secure_interrupt(struct vcpu *current, struct vcpu **next)
 	CHECK(false);
 }
 
-bool plat_ffa_inject_notification_pending_interrupt(
+bool ffa_interrupts_inject_notification_pending_interrupt(
 	struct vcpu_locked target_locked, struct vcpu_locked current_locked,
 	struct vm_locked receiver_locked)
 {
@@ -36,8 +37,8 @@ bool plat_ffa_inject_notification_pending_interrupt(
 /**
  * Enable relevant virtual interrupts for VMs.
  */
-void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
-					struct vm_locked vm_locked)
+void ffa_interrupts_enable_virtual_interrupts(struct vcpu_locked current_locked,
+					      struct vm_locked vm_locked)
 {
 	struct vcpu *current;
 	struct interrupts *interrupts;
@@ -51,7 +52,7 @@ void plat_ffa_enable_virtual_interrupts(struct vcpu_locked current_locked,
 	}
 }
 
-uint32_t plat_ffa_interrupt_get(struct vcpu_locked current_locked)
+uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
 {
 	return api_interrupt_get(current_locked);
 }

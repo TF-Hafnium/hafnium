@@ -18,7 +18,7 @@
 #include "hypervisor.h"
 #include "sysregs.h"
 
-enum ffa_memory_handle_allocator plat_ffa_memory_handle_allocator(void)
+enum ffa_memory_handle_allocator ffa_memory_get_handle_allocator(void)
 {
 	return FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
 }
@@ -37,8 +37,8 @@ static struct ffa_value ffa_other_world_mem_reclaim(
 /**
  * Check validity of the FF-A memory send function attempt.
  */
-bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
-				   uint32_t share_func, bool multiple_borrower)
+bool ffa_memory_is_send_valid(ffa_id_t receiver, ffa_id_t sender,
+			      uint32_t share_func, bool multiple_borrower)
 {
 	/*
 	 * Currently memory interfaces are not forwarded from hypervisor to
@@ -54,18 +54,18 @@ bool plat_ffa_is_memory_send_valid(ffa_id_t receiver, ffa_id_t sender,
 	return true;
 }
 
-uint32_t plat_ffa_other_world_mode(void)
+uint32_t ffa_memory_get_other_world_mode(void)
 {
 	return 0U;
 }
 
-bool plat_ffa_is_mem_perm_get_valid(const struct vcpu *current)
+bool ffa_memory_is_mem_perm_get_valid(const struct vcpu *current)
 {
 	(void)current;
 	return has_vhe_support();
 }
 
-bool plat_ffa_is_mem_perm_set_valid(const struct vcpu *current)
+bool ffa_memory_is_mem_perm_set_valid(const struct vcpu *current)
 {
 	(void)current;
 	return has_vhe_support();
@@ -263,7 +263,7 @@ out_err:
 	return ret;
 }
 
-struct ffa_value plat_ffa_other_world_mem_send(
+struct ffa_value ffa_memory_other_world_mem_send(
 	struct vm *from, uint32_t share_func,
 	struct ffa_memory_region **memory_region, uint32_t length,
 	uint32_t fragment_length, struct mpool *page_pool)
@@ -417,7 +417,7 @@ out:
 	return ret;
 }
 
-struct ffa_value plat_ffa_other_world_mem_reclaim(
+struct ffa_value ffa_memory_other_world_mem_reclaim(
 	struct vm *to, ffa_memory_handle_t handle,
 	ffa_memory_region_flags_t flags, struct mpool *page_pool)
 {
@@ -655,7 +655,7 @@ out:
 	return ret;
 }
 
-struct ffa_value plat_ffa_other_world_mem_send_continue(
+struct ffa_value ffa_memory_other_world_mem_send_continue(
 	struct vm *from, void *fragment, uint32_t fragment_length,
 	ffa_memory_handle_t handle, struct mpool *page_pool)
 {
@@ -684,7 +684,7 @@ struct ffa_value plat_ffa_other_world_mem_send_continue(
 	return ret;
 }
 
-ffa_memory_attributes_t plat_ffa_memory_add_security_bit_from_mode(
+ffa_memory_attributes_t ffa_memory_add_security_bit_from_mode(
 	ffa_memory_attributes_t attributes, uint32_t mode)
 {
 	(void)mode;

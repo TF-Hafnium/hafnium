@@ -70,7 +70,7 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	/* Reset the registers to give a clean start for vCPU. */
 	arch_regs_reset(vcpu);
 
-	/* TODO: call plat_ffa_sri_init? */
+	/* TODO: call ffa_notifications_sri_init? */
 
 	return vcpu;
 }

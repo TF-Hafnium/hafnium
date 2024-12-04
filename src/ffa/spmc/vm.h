@@ -10,8 +10,8 @@
 
 #include "hf/vm.h"
 
-void plat_ffa_vm_init(struct mpool *ppool);
+void ffa_vm_init(struct mpool *ppool);
 
-struct vm_locked plat_ffa_nwd_vm_create(ffa_id_t vm_id);
+struct vm_locked ffa_vm_nwd_create(ffa_id_t vm_id);
 
-void plat_ffa_disable_vm_interrupts(struct vm_locked vm_locked);
+void ffa_vm_disable_interrupts(struct vm_locked vm_locked);

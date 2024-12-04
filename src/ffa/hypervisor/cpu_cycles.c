@@ -12,8 +12,8 @@
 #include "hf/ffa/indirect_messaging.h"
 #include "hf/vcpu.h"
 
-bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
-			  struct ffa_value *ret)
+bool ffa_cpu_cycles_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
+				struct ffa_value *ret)
 {
 	/*
 	 * VM's requests should be forwarded to the SPMC, if target is an SP.
@@ -30,9 +30,9 @@ bool plat_ffa_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 /**
  * Check if current VM can resume target VM/SP using FFA_RUN ABI.
  */
-bool plat_ffa_run_checks(struct vcpu_locked current_locked,
-			 ffa_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
-			 struct ffa_value *run_ret, struct vcpu **next)
+bool ffa_cpu_cycles_run_checks(struct vcpu_locked current_locked,
+			       ffa_id_t target_vm_id, ffa_vcpu_index_t vcpu_idx,
+			       struct ffa_value *run_ret, struct vcpu **next)
 {
 	(void)next;
 	(void)vcpu_idx;
@@ -56,18 +56,16 @@ bool plat_ffa_run_checks(struct vcpu_locked current_locked,
  * to be compliant with version v1.0 of the FF-A specification. It serves as
  * a blocking call.
  */
-struct ffa_value plat_ffa_msg_wait_prepare(struct vcpu_locked current_locked,
-					   struct vcpu **next)
+struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
+	struct vcpu_locked current_locked, struct vcpu **next)
 {
-	return plat_ffa_msg_recv(true, current_locked, next);
+	return ffa_indirect_msg_recv(true, current_locked, next);
 }
 
-bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
-					     ffa_id_t vm_id,
-					     ffa_id_t receiver_vm_id,
-					     struct vcpu_locked receiver_locked,
-					     uint32_t func,
-					     enum vcpu_state *next_state)
+bool ffa_cpu_cycles_check_runtime_state_transition(
+	struct vcpu_locked current_locked, ffa_id_t vm_id,
+	ffa_id_t receiver_vm_id, struct vcpu_locked receiver_locked,
+	uint32_t func, enum vcpu_state *next_state)
 {
 	(void)current_locked;
 	(void)vm_id;
@@ -95,8 +93,8 @@ bool plat_ffa_check_runtime_state_transition(struct vcpu_locked current_locked,
 	}
 }
 
-void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
-					 struct vcpu_locked target_locked)
+void ffa_cpu_cycles_init_schedule_mode_ffa_runeld_prepare(
+	struct vcpu_locked current_locked, struct vcpu_locked target_locked)
 {
 	/* Scheduling mode not supported in the Hypervisor/VMs. */
 	(void)current_locked;
@@ -107,10 +105,10 @@ void plat_ffa_init_schedule_mode_ffa_run(struct vcpu_locked current_locked,
  * Prepare to yield execution back to the VM that allocated cpu cycles and move
  * to BLOCKED state.
  */
-struct ffa_value plat_ffa_yield_prepare(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					uint32_t timeout_low,
-					uint32_t timeout_high)
+struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
+					      struct vcpu **next,
+					      uint32_t timeout_low,
+					      uint32_t timeout_high)
 {
 	struct vcpu *current = current_locked.vcpu;
 	struct ffa_value ret = {

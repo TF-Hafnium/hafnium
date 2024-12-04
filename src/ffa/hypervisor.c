@@ -94,7 +94,7 @@ void plat_ffa_init(struct mpool *ppool)
 	 * perspective and vice-versa.
 	 */
 	dlog_verbose("Setting up buffers for TEE.\n");
-	plat_ffa_rxtx_map_spmc(
+	ffa_setup_rxtx_map_spmc(
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.recv)),
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.send)),
 		HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
@@ -120,9 +120,9 @@ void plat_ffa_init(struct mpool *ppool)
 	dlog_verbose("TEE finished setting up buffers.\n");
 }
 
-bool plat_ffa_intercept_call(struct vcpu_locked current_locked,
-			     struct vcpu_locked next_locked,
-			     struct ffa_value *signal_interrupt)
+bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
+				   struct vcpu_locked next_locked,
+				   struct ffa_value *signal_interrupt)
 {
 	(void)current_locked;
 	(void)next_locked;
@@ -200,9 +200,9 @@ static struct ffa_value deliver_msg(struct vm_locked to, ffa_id_t from_id,
  * If the recipient's receive buffer is busy, it can optionally register the
  * caller to be notified when the recipient's receive buffer becomes available.
  */
-struct ffa_value plat_ffa_msg_send(ffa_id_t sender_vm_id,
-				   ffa_id_t receiver_vm_id, uint32_t size,
-				   struct vcpu *current, struct vcpu **next)
+struct ffa_value ffa_indirect_msg_send(ffa_id_t sender_vm_id,
+				       ffa_id_t receiver_vm_id, uint32_t size,
+				       struct vcpu *current, struct vcpu **next)
 {
 	struct vm *from = current->vm;
 	struct vm *to;
