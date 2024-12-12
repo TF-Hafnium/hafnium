@@ -2048,7 +2048,7 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 	 * unsafe memory which could be 'corrupted' between safety checks and
 	 * final buffer copy.
 	 */
-	if (!memcpy_trapped(&header, FFA_RXTX_HEADER_SIZE, sender_tx_buffer,
+	if (!memcpy_trapped(&header, sizeof(header), sender_tx_buffer,
 			    FFA_RXTX_HEADER_SIZE)) {
 		dlog_error(
 			"%s: Failed to copy message from sender's(%x) TX "

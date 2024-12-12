@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "hf/static_assert.h"
 #include "hf/types.h"
 
 /**
@@ -457,8 +458,10 @@ static inline void ffa_uuid_to_u64x2(uint64_t *lo, uint64_t *hi,
  * specification.
  */
 struct ffa_partition_rxtx_header {
-	uint32_t flags; /* MBZ */
-	uint32_t reserved;
+	/* Reserved (SBZ). */
+	uint32_t flags;
+	/* Reserved (SBZ). */
+	uint32_t reserved_1;
 	/* Offset from the beginning of the buffer to the message payload. */
 	uint32_t offset;
 	/* Receiver endpoint ID. */
@@ -467,34 +470,88 @@ struct ffa_partition_rxtx_header {
 	ffa_id_t sender;
 	/* Size of message in buffer. */
 	uint32_t size;
+	/* Reserved (SBZ). Added in v1.2. */
+	uint32_t reserved_2;
+	/* UUID identifying the communication protocol. Added in v1.2. */
+	struct ffa_uuid uuid;
 };
 
+#define FFA_RXTX_HEADER_SIZE_V1_1 \
+	offsetof(struct ffa_partition_rxtx_header, reserved_2)
 #define FFA_RXTX_HEADER_SIZE sizeof(struct ffa_partition_rxtx_header)
 #define FFA_RXTX_ALLOCATOR_SHIFT 16
 
 /**
- * Initialize a partition message header, with the default values for `flags`
- * and `offset`.
+ * Initialize a partition message header, with the default values for `flags`,
+ * `offset` and `uuid` and the v1.1 payload offset.
+ */
+static inline void ffa_rxtx_header_init_v1_1(
+	struct ffa_partition_rxtx_header *header, ffa_id_t sender,
+	ffa_id_t receiver, uint32_t payload_size)
+{
+	header->flags = 0;
+	header->reserved_1 = 0;
+	header->offset = FFA_RXTX_HEADER_SIZE_V1_1;
+	header->sender = sender;
+	header->receiver = receiver;
+	header->size = payload_size;
+	header->reserved_2 = 0;
+	header->uuid = (struct ffa_uuid){0};
+}
+
+/**
+ * Initialize a partition message header, with the default values for `flags`,
+ * `offset` and `uuid`.
  */
 static inline void ffa_rxtx_header_init(
 	struct ffa_partition_rxtx_header *header, ffa_id_t sender,
 	ffa_id_t receiver, uint32_t payload_size)
 {
 	header->flags = 0;
-	header->reserved = 0;
+	header->reserved_1 = 0;
 	header->offset = FFA_RXTX_HEADER_SIZE;
 	header->sender = sender;
 	header->receiver = receiver;
 	header->size = payload_size;
+	header->reserved_2 = 0;
+	header->uuid = (struct ffa_uuid){0};
+}
+
+/**
+ * Initialize a partition message header, with the default values for `flags`
+ * and `offset`.
+ */
+static inline void ffa_rxtx_header_init_with_uuid(
+	struct ffa_partition_rxtx_header *header, ffa_id_t sender,
+	ffa_id_t receiver, uint32_t size, struct ffa_uuid uuid)
+{
+	header->flags = 0;
+	header->reserved_1 = 0;
+	header->offset = FFA_RXTX_HEADER_SIZE;
+	header->sender = sender;
+	header->receiver = receiver;
+	header->size = size;
+	header->reserved_2 = 0;
+	header->uuid = uuid;
 }
 
 /* The maximum length possible for a single message. */
+#define FFA_PARTITION_MSG_PAYLOAD_MAX_V1_1 \
+	(HF_MAILBOX_SIZE - FFA_RXTX_HEADER_SIZE_V1_1)
 #define FFA_PARTITION_MSG_PAYLOAD_MAX (HF_MAILBOX_SIZE - FFA_RXTX_HEADER_SIZE)
 
 struct ffa_partition_msg {
 	struct ffa_partition_rxtx_header header;
+	/**
+	 * Prefer using `ffa_partition_msg_payload` to accessing this field
+	 * directly, because the offset does not necessarily correspond to the
+	 * offset of this field.
+	 */
 	char payload[FFA_PARTITION_MSG_PAYLOAD_MAX];
 };
+
+static_assert(sizeof(struct ffa_partition_msg) == HF_MAILBOX_SIZE,
+	      "FF-A message size must match mailbox size");
 
 /* The maximum length possible for a single message. */
 #define FFA_MSG_PAYLOAD_MAX HF_MAILBOX_SIZE
