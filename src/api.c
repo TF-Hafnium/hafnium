@@ -1964,20 +1964,49 @@ out:
 
 static struct ffa_value api_ffa_msg_send2_copy_data(
 	struct ffa_partition_rxtx_header *header, struct vm *receiver_vm,
-	const void *sender_tx_buffer)
+	struct vm_locked sender_locked)
 {
+	const void *sender_tx_buffer = sender_locked.vm->mailbox.send;
 	uint32_t total_size;
+	uint32_t min_offset;
 
-	if (header->offset != FFA_RXTX_HEADER_SIZE) {
-		dlog_error("Indirect msg payload must follow the header.\n");
+	switch (sender_locked.vm->ffa_version) {
+	case FFA_VERSION_1_0:
+		dlog_verbose("Indirect messaging not supported in v1.0\n");
+		return ffa_error(FFA_NOT_SUPPORTED);
+	case FFA_VERSION_1_1:
+		min_offset = FFA_RXTX_HEADER_SIZE_V1_1;
+		break;
+	default:
+		min_offset = FFA_RXTX_HEADER_SIZE;
+		break;
+	}
+
+	if (header->offset < min_offset) {
+		dlog_error(
+			"Indirect message payload overlaps with header (%u < "
+			"%u, version = %#x)\n",
+			header->offset, min_offset,
+			sender_locked.vm->ffa_version);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	/* Check the size of transfer. */
-	total_size = header->offset + header->size;
-	if ((total_size > FFA_MSG_PAYLOAD_MAX) ||
-	    (header->size > FFA_PARTITION_MSG_PAYLOAD_MAX)) {
-		dlog_error("Message is too big.\n");
+	/*
+	 * Check the size of transfer.
+	 * Check for overflow in the sum so that very large offsets and/or sizes
+	 * do not pass the check.
+	 */
+	if (add_overflow(header->offset, header->size, &total_size)) {
+		dlog_error(
+			"Overflow calculating message size (offset = %u, size "
+			"= %u)\n",
+			header->offset, header->size);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (total_size > FFA_MSG_PAYLOAD_MAX) {
+		dlog_error("Message is too big (%u > %zu)\n", total_size,
+			   FFA_MSG_PAYLOAD_MAX);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -1985,7 +2014,7 @@ static struct ffa_value api_ffa_msg_send2_copy_data(
 	if (!memcpy_trapped(receiver_vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
 			    sender_tx_buffer, total_size)) {
 		dlog_error(
-			"%s: Failed to copy message to receiver's(%x) RX "
+			"%s: Failed to copy message to receiver's (%x) RX "
 			"buffer.\n",
 			__func__, receiver_vm->id);
 		return ffa_error(FFA_ABORTED);
@@ -2047,6 +2076,9 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 	 * Copy message header as safety measure to avoid multiple accesses to
 	 * unsafe memory which could be 'corrupted' between safety checks and
 	 * final buffer copy.
+	 * This includes the UUID added in v1.2. Messages that do not specify a
+	 * UUID (v1.1 or earlier) will leave the UUID unspecified, so this is
+	 * backwards compatible.
 	 */
 	if (!memcpy_trapped(&header, sizeof(header), sender_tx_buffer,
 			    FFA_RXTX_HEADER_SIZE)) {
@@ -2133,9 +2165,7 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 		goto out_unlock_both;
 	}
 
-	/* Check the size of transfer. */
-	ret = api_ffa_msg_send2_copy_data(&header, receiver_vm,
-					  sender_tx_buffer);
+	ret = api_ffa_msg_send2_copy_data(&header, receiver_vm, sender_locked);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out_unlock_both;
 	}
