@@ -1952,6 +1952,43 @@ out:
 	return ret;
 }
 
+static struct ffa_value api_ffa_msg_send2_copy_data(
+	struct ffa_partition_rxtx_header *header, struct vm *receiver_vm,
+	const void *sender_tx_buffer)
+{
+	uint32_t total_size;
+
+	if (header->offset != FFA_RXTX_HEADER_SIZE) {
+		dlog_error("Indirect msg payload must follow the header.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Check the size of transfer. */
+	total_size = header->offset + header->size;
+	if ((total_size > FFA_MSG_PAYLOAD_MAX) ||
+	    (header->size > FFA_PARTITION_MSG_PAYLOAD_MAX)) {
+		dlog_error("Message is too big.\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Copy data. */
+	if (!memcpy_trapped(receiver_vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
+			    sender_tx_buffer, total_size)) {
+		dlog_error(
+			"%s: Failed to copy message to receiver's(%x) RX "
+			"buffer.\n",
+			__func__, receiver_vm->id);
+		return ffa_error(FFA_ABORTED);
+	}
+
+	receiver_vm->mailbox.recv_size = total_size;
+	receiver_vm->mailbox.recv_sender = header->sender;
+	receiver_vm->mailbox.recv_func = FFA_MSG_SEND2_32;
+	receiver_vm->mailbox.state = MAILBOX_STATE_FULL;
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
 /**
  * Copies data from the sender's send buffer to the recipient's receive buffer
  * and notifies the receiver.
@@ -1967,7 +2004,6 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 	struct ffa_value ret;
 	ffa_id_t header_sender_id;
 	ffa_id_t header_receiver_id;
-	uint32_t total_size;
 
 	alignas(8) struct ffa_partition_rxtx_header header;
 
@@ -2039,12 +2075,6 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 		goto out_unlock_sender;
 	}
 
-	if (header.offset != FFA_RXTX_HEADER_SIZE) {
-		dlog_error("Indirect msg payload must follow the header.\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out_unlock_sender;
-	}
-
 	/*
 	 * Check if the message has to be forwarded to the SPMC, in
 	 * this case return, the SPMC will handle the buffer copy.
@@ -2094,29 +2124,11 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 	}
 
 	/* Check the size of transfer. */
-	total_size = header.offset + header.size;
-	if ((total_size > FFA_MSG_PAYLOAD_MAX) ||
-	    (header.size > FFA_PARTITION_MSG_PAYLOAD_MAX)) {
-		dlog_error("Message is too big.\n");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
+	ret = api_ffa_msg_send2_copy_data(&header, receiver_vm,
+					  sender_tx_buffer);
+	if (ret.func != FFA_SUCCESS_32) {
 		goto out_unlock_both;
 	}
-
-	/* Copy data. */
-	if (!memcpy_trapped(receiver_vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
-			    sender_tx_buffer, total_size)) {
-		dlog_error(
-			"%s: Failed to copy message to receiver's(%x) RX "
-			"buffer.\n",
-			__func__, receiver_vm->id);
-		ret = ffa_error(FFA_ABORTED);
-		goto out_unlock_both;
-	}
-
-	receiver_vm->mailbox.recv_size = total_size;
-	receiver_vm->mailbox.recv_sender = header_sender_id;
-	receiver_vm->mailbox.recv_func = FFA_MSG_SEND2_32;
-	receiver_vm->mailbox.state = MAILBOX_STATE_FULL;
 
 	/*
 	 * Set framework notifications, only if the SP has enabled
