@@ -1956,24 +1956,23 @@ out:
  * Copies data from the sender's send buffer to the recipient's receive buffer
  * and notifies the receiver.
  */
-struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
+struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 				   struct vcpu *current)
 {
-	struct vm *from = current->vm;
-	struct vm *to;
-	struct vm_locked to_locked;
-	ffa_id_t msg_sender_id;
+	struct vm *current_vm = current->vm;
+	struct vm *receiver_vm;
+	struct vm_locked receiver_locked;
 	struct vm_locked sender_locked;
-	const void *from_msg;
+	const void *sender_tx_buffer;
 	struct ffa_value ret;
-	ffa_id_t sender_id;
-	ffa_id_t receiver_id;
-	uint32_t msg_size;
+	ffa_id_t header_sender_id;
+	ffa_id_t header_receiver_id;
+	uint32_t total_size;
 
 	alignas(8) struct ffa_partition_rxtx_header header;
 
 	/* Only Hypervisor can set `sender_vm_id` when forwarding messages. */
-	if (from->id != HF_HYPERVISOR_VM_ID && sender_vm_id != 0) {
+	if (current_vm->id != HF_HYPERVISOR_VM_ID && sender_id != 0) {
 		dlog_error("Sender VM ID must be zero.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -1982,18 +1981,18 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	 * Get message sender's mailbox, which can be different to the `from` vm
 	 * when the message is forwarded.
 	 */
-	msg_sender_id = (sender_vm_id != 0) ? sender_vm_id : from->id;
-	sender_locked = ffa_vm_find_locked(msg_sender_id);
+	sender_id = (sender_id != 0) ? sender_id : current_vm->id;
+	sender_locked = ffa_vm_find_locked(sender_id);
 	if (sender_locked.vm == NULL) {
 		dlog_error("Cannot send message from VM ID %#x, not found.\n",
-			   msg_sender_id);
+			   sender_id);
 		return ffa_error(FFA_DENIED);
 	}
 
-	from_msg = sender_locked.vm->mailbox.send;
-	if (from_msg == NULL) {
+	sender_tx_buffer = sender_locked.vm->mailbox.send;
+	if (sender_tx_buffer == NULL) {
 		dlog_error("Cannot retrieve TX buffer for VM ID %#x.\n",
-			   msg_sender_id);
+			   sender_id);
 		ret = ffa_error(FFA_DENIED);
 		goto out_unlock_sender;
 	}
@@ -2003,7 +2002,7 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	 * unsafe memory which could be 'corrupted' between safety checks and
 	 * final buffer copy.
 	 */
-	if (!memcpy_trapped(&header, FFA_RXTX_HEADER_SIZE, from_msg,
+	if (!memcpy_trapped(&header, FFA_RXTX_HEADER_SIZE, sender_tx_buffer,
 			    FFA_RXTX_HEADER_SIZE)) {
 		dlog_error(
 			"%s: Failed to copy message from sender's(%x) TX "
@@ -2013,52 +2012,55 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 		goto out_unlock_sender;
 	}
 
-	sender_id = header.sender;
-	receiver_id = header.receiver;
+	header_sender_id = header.sender;
+	header_receiver_id = header.receiver;
 
 	/* Ensure Sender IDs from API and from message header match. */
-	if (msg_sender_id != sender_id) {
+	if (sender_id != header_sender_id) {
 		dlog_error(
 			"Message sender VM ID (%#x) doesn't match header's VM "
 			"ID (%#x).\n",
-			msg_sender_id, sender_id);
+			sender_id, header_sender_id);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out_unlock_sender;
 	}
 
 	/* Disallow reflexive requests as this suggests an error in the VM. */
-	if (receiver_id == sender_id) {
+	if (header_receiver_id == header_sender_id) {
 		dlog_error("Sender and receive VM IDs must be different.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out_unlock_sender;
 	}
 
 	/* `flags` can be set only at secure virtual FF-A instances. */
-	if (ffa_is_vm_id(sender_id) && (flags != 0)) {
+	if (ffa_is_vm_id(header_sender_id) && flags != 0) {
 		dlog_error("flags must be zero.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out_unlock_sender;
 	}
 
 	if (header.offset != FFA_RXTX_HEADER_SIZE) {
 		dlog_error("Indirect msg payload must follow the header.\n");
-		return ffa_error(FFA_INVALID_PARAMETERS);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out_unlock_sender;
 	}
 
 	/*
 	 * Check if the message has to be forwarded to the SPMC, in
 	 * this case return, the SPMC will handle the buffer copy.
 	 */
-	if (ffa_indirect_msg_send2_forward(receiver_id, sender_id, &ret)) {
+	if (ffa_indirect_msg_send2_forward(header_receiver_id, header_sender_id,
+					   &ret)) {
 		goto out_unlock_sender;
 	}
 
 	/* Ensure the receiver VM exists. */
-	to_locked = ffa_vm_find_locked(receiver_id);
-	to = to_locked.vm;
+	receiver_locked = ffa_vm_find_locked(header_receiver_id);
+	receiver_vm = receiver_locked.vm;
 
-	if (to == NULL) {
+	if (receiver_vm == NULL) {
 		dlog_error("Cannot deliver message to VM %#x, not found.\n",
-			   receiver_id);
+			   header_receiver_id);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out_unlock_sender;
 	}
@@ -2068,52 +2070,53 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	 * Sender is the VM/SP who originally sent the message, not the
 	 * hypervisor possibly relaying it.
 	 */
-	if (!ffa_indirect_msg_is_supported(sender_locked, to_locked)) {
+	if (!ffa_indirect_msg_is_supported(sender_locked, receiver_locked)) {
 		dlog_verbose("VM %#x doesn't support indirect message\n",
-			     sender_id);
+			     header_sender_id);
 		ret = ffa_error(FFA_DENIED);
-		goto out;
+		goto out_unlock_both;
 	}
 
-	if (vm_is_mailbox_busy(to_locked)) {
+	if (vm_is_mailbox_busy(receiver_locked)) {
 		dlog_error(
 			"Cannot deliver message to VM %#x, RX buffer not "
 			"ready.\n",
-			receiver_id);
+			header_receiver_id);
 		ret = ffa_error(FFA_BUSY);
-		goto out;
+		goto out_unlock_both;
 	}
 
 	/* Acquire receiver's RX buffer. */
-	if (!ffa_setup_acquire_receiver_rx(to_locked, &ret)) {
-		dlog_error("Failed to acquire RX buffer for VM %#x\n", to->id);
-		goto out;
+	if (!ffa_setup_acquire_receiver_rx(receiver_locked, &ret)) {
+		dlog_error("Failed to acquire RX buffer for VM %#x\n",
+			   receiver_vm->id);
+		goto out_unlock_both;
 	}
 
 	/* Check the size of transfer. */
-	msg_size = FFA_RXTX_HEADER_SIZE + header.size;
-	if ((msg_size > FFA_MSG_PAYLOAD_MAX) ||
+	total_size = header.offset + header.size;
+	if ((total_size > FFA_MSG_PAYLOAD_MAX) ||
 	    (header.size > FFA_PARTITION_MSG_PAYLOAD_MAX)) {
 		dlog_error("Message is too big.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
+		goto out_unlock_both;
 	}
 
 	/* Copy data. */
-	if (!memcpy_trapped(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX, from_msg,
-			    msg_size)) {
+	if (!memcpy_trapped(receiver_vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
+			    sender_tx_buffer, total_size)) {
 		dlog_error(
 			"%s: Failed to copy message to receiver's(%x) RX "
 			"buffer.\n",
-			__func__, to->id);
+			__func__, receiver_vm->id);
 		ret = ffa_error(FFA_ABORTED);
-		goto out;
+		goto out_unlock_both;
 	}
 
-	to->mailbox.recv_size = msg_size;
-	to->mailbox.recv_sender = sender_id;
-	to->mailbox.recv_func = FFA_MSG_SEND2_32;
-	to->mailbox.state = MAILBOX_STATE_FULL;
+	receiver_vm->mailbox.recv_size = total_size;
+	receiver_vm->mailbox.recv_sender = header_sender_id;
+	receiver_vm->mailbox.recv_func = FFA_MSG_SEND2_32;
+	receiver_vm->mailbox.state = MAILBOX_STATE_FULL;
 
 	/*
 	 * Set framework notifications, only if the SP has enabled
@@ -2121,14 +2124,14 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 	 * If VMs have provided the RX buffer it is implied they already
 	 * support indirect messaging, and therefore framework notifications.
 	 */
-	if (ffa_is_vm_id(to_locked.vm->id) ||
-	    vm_are_notifications_enabled(to_locked.vm)) {
+	if (ffa_is_vm_id(receiver_locked.vm->id) ||
+	    vm_are_notifications_enabled(receiver_locked.vm)) {
 		ffa_notifications_bitmap_t rx_buffer_full =
-			ffa_is_vm_id(sender_id)
+			ffa_is_vm_id(header_sender_id)
 				? FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK
 				: FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK;
 
-		vm_notifications_framework_set_pending(to_locked,
+		vm_notifications_framework_set_pending(receiver_locked,
 						       rx_buffer_full);
 
 		if ((FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) == 0) {
@@ -2142,8 +2145,8 @@ struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
-out:
-	vm_unlock(&to_locked);
+out_unlock_both:
+	vm_unlock(&receiver_locked);
 
 out_unlock_sender:
 	vm_unlock(&sender_locked);

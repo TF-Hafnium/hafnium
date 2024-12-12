@@ -55,7 +55,7 @@ int64_t api_hf_interrupt_send_ipi(uint32_t target_vcpu_id,
 struct ffa_value api_ffa_msg_send(ffa_id_t sender_vm_id,
 				  ffa_id_t receiver_vm_id, uint32_t size,
 				  struct vcpu *current, struct vcpu **next);
-struct ffa_value api_ffa_msg_send2(ffa_id_t sender_vm_id, uint32_t flags,
+struct ffa_value api_ffa_msg_send2(ffa_id_t sender_id, uint32_t flags,
 				   struct vcpu *current);
 struct ffa_value api_ffa_rx_release(ffa_id_t receiver_id, struct vcpu *current);
 struct ffa_value api_ffa_rx_acquire(ffa_id_t receiver_id, struct vcpu *current);
