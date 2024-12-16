@@ -108,6 +108,7 @@ static void irq_handler(void)
 			intid, hf_vm_get_id());
 		ASSERT_TRUE(hftest_ipi_state_is(SENT));
 		hftest_ipi_state_set(HANDLED);
+		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
 		break;
 	default:
 		panic("Interrupt ID not recongnised\n");
@@ -461,6 +462,97 @@ TEST_SERVICE(receive_ipi_running)
 }
 
 /**
+ * Test service to check that secure interrupts do not interfere with IPIs and
+ * vice versa.
+ * - Configures the IPI VI.
+ * - Yield back to the NWd, such that it can spawn 'send_ipi' in the source
+ *   vCPU.
+ * - Wakes up and triggers a TWDOG secure interrupt.
+ * - Once this is received transition the IPI state to READY.
+ * - Loop into waiting for IPI handler to set IPI state to HANDLED.
+ * - Sets the IPI state to READY for any future tests.
+ * - Triggers another TWDOG secure interrupt to ensure this is also received as
+ * normal.
+ */
+TEST_SERVICE(receive_ipi_running_with_secure_interrupts)
+{
+	struct ffa_value ret;
+	uint32_t delay = 50;
+
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	/* Enable the Secure Watchdog timer interrupt. */
+	EXPECT_EQ(hf_interrupt_enable(IRQ_TWDOG_INTID, true, 0), 0);
+	/* Enable the inter-processor interrupt. */
+	EXPECT_EQ(hf_interrupt_enable(HF_IPI_INTID, true, INTERRUPT_TYPE_IRQ),
+		  0);
+
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
+					   SERVICE_SEND_BUFFER());
+
+	/* Yield such that 'send_ipi' can be spawn. */
+	ffa_yield();
+
+	/* Throw a secure interrupt other than the IPI. */
+	twdog_refresh();
+	twdog_start((delay * ARM_SP805_TWDG_CLK_HZ) / 1000);
+
+	/* Wait for the interrupt to trigger. */
+	sp_wait(delay + 50);
+
+	hftest_ipi_state_set_all_ready();
+
+	dlog_verbose("Waiting for the IPI\n");
+
+	/* Waiting for irq_handler to handle IPI. */
+	while (!hftest_ipi_state_is(HANDLED)) {
+		interrupt_wait();
+	}
+
+	hftest_ipi_state_set(READY);
+
+	/* Throw a secure interrupt other than the IPI. */
+	twdog_refresh();
+	twdog_start((delay * ARM_SP805_TWDG_CLK_HZ) / 1000);
+
+	/* Wait for the interrupt to trigger. */
+	sp_wait(delay + 50);
+
+	ffa_yield();
+}
+
+/*
+ * IRQ Handler for IPIs to target vCPUs in the WAITING state. In this case
+ * the SP is not required to deactivate the interrupt.
+ * TODO: Consolidate with the generic IRQ handler once the secure interrupt
+ * reworking is done.
+ */
+static void ipi_waiting_irq_handler(void)
+{
+	uint32_t intid = hf_interrupt_get();
+
+	switch (intid) {
+	case HF_NOTIFICATION_PENDING_INTID:
+		/* RX buffer full notification. */
+		HFTEST_LOG("Received notification pending interrupt %u.",
+			   intid);
+		break;
+	case HF_IPI_INTID:
+		HFTEST_LOG("Received inter-processor interrupt %u, vm %x.",
+			   intid, hf_vm_get_id());
+		ASSERT_TRUE(hftest_ipi_state_is(SENT));
+		hftest_ipi_state_set(HANDLED);
+		break;
+	default:
+		panic("Invalid interrupt received: %u\n", intid);
+	}
+}
+
+/**
  * Test service to validate IPI behaviour when target vCPU is in the waiting
  * state.
  * Transition to READY state is left out of this function. Transitioning
@@ -477,7 +569,7 @@ TEST_SERVICE(receive_ipi_waiting_vcpu)
 {
 	struct ffa_value ret;
 
-	exception_setup(irq_handler, NULL);
+	exception_setup(ipi_waiting_irq_handler, NULL);
 	interrupts_enable();
 
 	/* Enable the IPI. */

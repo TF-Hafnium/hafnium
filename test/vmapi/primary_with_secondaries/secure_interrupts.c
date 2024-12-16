@@ -347,6 +347,70 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu, service1_is_mp_sp)
 	semaphore_wait(&vcpu1_args.work_done);
 }
 
+/*
+ * Test that secure interrupts do not interfere with the receipt of IPIs and
+ * vice versa. Test Sequence:
+ * - Bootstrap vCPU0 in the respective test service, such that it can initialise
+ *   the IPI state.
+ * - Service1 vCPU0 terminates and leaves the IPI state not READY.
+ * - Start CPU1 and within it, invoke test service to send IPI. Test service
+ * waits for state machine to transition into READY state.
+ * - Resume Service1 vCPU0 such that it can set IPI state to READY.
+ *
+ * Failure in this test would be captured by timeout as Service1 vCPU0 would
+ * hang waiting for the IPI.
+ */
+TEST_PRECONDITION(ipi, receive_ipi_running_vcpu_with_secure_interrupts,
+		  service1_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value ret;
+	struct ipi_cpu_entry_args vcpu1_args = {
+		.service_id = service1_info->vm_id,
+		.vcpu_count = service1_info->vcpu_count,
+		.vcpu_id = 1,
+		.target_vcpu_id = 0,
+		.mb = mb};
+	ffa_id_t memory_receivers[] = {
+		service1_info->vm_id,
+	};
+	uint32_t receivers_ipi_state_indexes[] = {0};
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "receive_ipi_running_with_secure_interrupts", mb.send);
+
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Share memory to setup the IPI state structure. */
+	hftest_ipi_state_share_page_and_init(
+		(uint64_t)ipi_state_page, memory_receivers,
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send, 0);
+
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+
+	/* Initialize semaphores to sync primary and secondary cores. */
+	semaphore_init(&vcpu1_args.work_done);
+
+	/* Bring-up the core that sends the IPI. */
+	ASSERT_TRUE(hftest_cpu_start(
+		hftest_get_cpu_id(vcpu1_args.vcpu_id),
+		hftest_get_secondary_ec_stack(vcpu1_args.vcpu_id),
+		cpu_entry_send_ipi, (uintptr_t)&vcpu1_args));
+
+	/*
+	 * Resumes service1 in target vCPU0 so it sets IPI state to READY and
+	 * handles IPI.
+	 */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Wait for secondary core to return before finishing the test. */
+	semaphore_wait(&vcpu1_args.work_done);
+}
+
 /**
  * Test that a service cannot target an IPI to it's own vCPU or an invalid vCPU
  * ID.
@@ -545,6 +609,45 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd_non_primary_cpu,
 
 		semaphore_wait(&receiver_vcpu_args.work_done);
 	}
+}
+
+/*
+ * Test that IPIs and NWd interrupts don't interfere with each other.
+ * Trigger a NWd interrupt using the watchdog, once received run the
+ * usual IPI waiting workload. Then once again trigger a NWd interrupt.
+ * All should be recieved as normal.
+ */
+TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd_with_nwd_interrupt,
+		  service1_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ipi_cpu_entry_args vcpu1_args = {
+		.service_id = service1_info->vm_id,
+		.vcpu_count = service1_info->vcpu_count,
+		.vcpu_id = 1,
+		.target_vcpu_id = 0,
+		.mb = mb};
+
+	gicv3_system_setup();
+	setup_wdog_timer_interrupt();
+
+	last_interrupt_id = 0;
+
+	start_wdog_timer(20);
+
+	check_wdog_timer_interrupt_serviced();
+
+	ipi_nwd_waiting_test(0, &vcpu1_args);
+
+	/* Wait for secondary core to return before finishing the test. */
+	semaphore_wait(&vcpu1_args.work_done);
+
+	last_interrupt_id = 0;
+
+	start_wdog_timer(20);
+
+	check_wdog_timer_interrupt_serviced();
 }
 
 /**
