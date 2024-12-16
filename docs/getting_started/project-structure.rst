@@ -20,7 +20,8 @@ The source tree is organised as follows:
     ├── inc
     │   ├── hf
     │   │   ├── arch
-    │   │   └── plat
+    │   │   ├── plat
+    │   │   └── ffa
     │   ├── system
     │   └── vmapi
     │       └── hf
@@ -29,6 +30,7 @@ The source tree is organised as follows:
     ├── project
     ├── src
     │   ├── arch
+    │   └── ffa
     ├── test
     │   ├── arch
     │   ├── hftest
@@ -60,6 +62,8 @@ The source tree is organised as follows:
         separate implementations per platform. This includes details of the boot
         flow, and a UART driver for the debug log console.
 
+      - `ffa`: Interface for FF-A features.
+
    - `system`: which are included by the `stdatomic.h` which we use from
      Android Clang but not really needed, so we use dummy empty versions.
 
@@ -80,6 +84,8 @@ The source tree is organised as follows:
 - `src`: Source code for Hafnium itself in C and assembly, and unit tests in C++.
 
   - `arch`: Implementation of architecture-dependent modules.
+
+  - `ffa`: Abstraction over SPMC/hypervisor specific implementation details of FF-A features.
 
 - `test`: Integration tests
 
