@@ -121,17 +121,21 @@ TEST(indirect_messaging, unread_message)
 	EXPECT_FFA_ERROR(ret, FFA_BUSY);
 }
 
-static void msg_send2_invalid_parameters(ffa_id_t sender, ffa_id_t receiver,
-					 uint32_t size, void *send, void *recv)
+/**
+ * Send an indirect message (`FFA_MSG_SEND2`) and assert that it returned an
+ * `FFA_INVALID_PARAMETERS` error.
+ */
+static void msg_send2_invalid_parameters(
+	struct ffa_partition_rxtx_header header, struct mailbox_buffers mb)
 {
 	struct ffa_value ret;
 	struct ffa_partition_msg *message;
-	struct ffa_partition_info *service1_info = service1(recv);
+	struct ffa_partition_info *service1_info = service1(mb.recv);
 
-	SERVICE_SELECT(service1_info->vm_id, "ffa_indirect_msg_error", send);
+	SERVICE_SELECT(service1_info->vm_id, "ffa_indirect_msg_error", mb.send);
 
-	message = (struct ffa_partition_msg *)send;
-	ffa_rxtx_header_init(&message->header, sender, receiver, size);
+	message = mb.send;
+	message->header = header;
 
 	/* The header is expected to be invalid, do not set any payload. */
 
@@ -145,9 +149,12 @@ TEST(indirect_messaging, non_existing_sender)
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_partition_rxtx_header header = {
+		.sender = service1_info->vm_id,
+		.receiver = service2_info->vm_id,
+	};
 
-	msg_send2_invalid_parameters(service2_info->vm_id, service1_info->vm_id,
-				     0, mb.send, mb.recv);
+	msg_send2_invalid_parameters(header, mb);
 }
 
 /** Sender sends message with another sender VM IDs. */
@@ -156,9 +163,12 @@ TEST(indirect_messaging, corrupted_sender)
 	struct mailbox_buffers mb = set_up_mailbox();
 	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_rxtx_header header = {
+		.sender = service1_info->vm_id,
+		.receiver = own_id,
+	};
 
-	msg_send2_invalid_parameters(service1_info->vm_id, own_id, 0, mb.send,
-				     mb.recv);
+	msg_send2_invalid_parameters(header, mb);
 }
 
 /** Sender sends message to itself. */
@@ -166,8 +176,12 @@ TEST(indirect_messaging, self_message)
 {
 	struct mailbox_buffers mb = set_up_mailbox();
 	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_rxtx_header header = {
+		.sender = own_id,
+		.receiver = own_id,
+	};
 
-	msg_send2_invalid_parameters(own_id, own_id, 0, mb.send, mb.recv);
+	msg_send2_invalid_parameters(header, mb);
 }
 
 /** Sender sends message with invalid size. */
@@ -176,9 +190,13 @@ TEST(indirect_messaging, invalid_size)
 	struct mailbox_buffers mb = set_up_mailbox();
 	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_rxtx_header header = {
+		.sender = own_id,
+		.receiver = service1_info->vm_id,
+		.size = 1024 * 1024,
+	};
 
-	msg_send2_invalid_parameters(own_id, service1_info->vm_id, 1024 * 1024,
-				     mb.send, mb.recv);
+	msg_send2_invalid_parameters(header, mb);
 }
 
 /**
