@@ -19,8 +19,6 @@
 
 #include "vmapi/hf/call.h"
 
-#include "system/sys/cdefs.h"
-
 /**
  * The stacks to be used by the CPUs.
  *

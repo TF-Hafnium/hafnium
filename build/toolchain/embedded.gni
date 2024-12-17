@@ -112,11 +112,8 @@ template("embedded_clang_toolchain") {
                              "extra_ldflags",
                            ])
 
-    # TODO: Remove //inc/system if we can stop using the version of stdatomic.h
-    # from the Android prebuilt Clang.
     extra_cflags += " -target ${invoker.target} -fcolor-diagnostics -nostdinc" +
-                    " -isystem ${toolchain_lib}/include" + " -isystem " +
-                    rebase_path("//inc/system")
+                    " -isystem ${toolchain_lib}/include"
     extra_ldflags += " -O2 --icf=all --fatal-warnings --color-diagnostics"
 
     toolchain_args = {

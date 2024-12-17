@@ -20,7 +20,6 @@ The source tree is organised as follows:
     │   │   ├── arch
     │   │   ├── plat
     │   │   └── ffa
-    │   ├── system
     │   └── vmapi
     │       └── hf
     ├── kokoro
@@ -61,9 +60,6 @@ The source tree is organised as follows:
         flow, and a UART driver for the debug log console.
 
       - `ffa`: Interface for FF-A features.
-
-   - `system`: which are included by the `stdatomic.h` which we use from
-     Android Clang but not really needed, so we use dummy empty versions.
 
    - `vmapi/hf`: for the interface exposed to partitions.
 
