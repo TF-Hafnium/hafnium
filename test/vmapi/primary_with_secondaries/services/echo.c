@@ -24,7 +24,7 @@ static void check_npi(void)
 	HFTEST_LOG("Received notification pending interrupt.");
 }
 
-TEST_SERVICE(echo_msg_send2)
+TEST_SERVICE(echo_msg_send2_v1_1)
 {
 	void *send_buf = SERVICE_SEND_BUFFER();
 	void *recv_buf = SERVICE_RECV_BUFFER();
@@ -34,18 +34,47 @@ TEST_SERVICE(echo_msg_send2)
 	arch_irq_enable();
 
 	for (;;) {
-		uint32_t payload;
+		char payload[255] = {0};
 		ffa_id_t echo_sender;
 
 		echo_sender = receive_indirect_message(
 				      &payload, sizeof(payload), recv_buf)
 				      .sender;
 
-		HFTEST_LOG("Message received: %#x", payload);
+		HFTEST_LOG("Message received: %s", payload);
 
 		/* Echo message back. */
-		send_indirect_message(hf_vm_get_id(), echo_sender, send_buf,
-				      &payload, sizeof(payload), 0);
+		send_indirect_message_v1_1(hf_vm_get_id(), echo_sender,
+					   send_buf, &payload, sizeof(payload),
+					   0);
+
+		/* Give back control to PVM. */
+		ffa_yield();
+	}
+}
+
+TEST_SERVICE(echo_msg_send2_v1_2)
+{
+	void *send_buf = SERVICE_SEND_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_partition_rxtx_header header;
+
+	/* Setup handling of NPI, to handle RX buffer full notification. */
+	exception_setup(check_npi, NULL);
+	arch_irq_enable();
+
+	for (;;) {
+		char payload[255] = {0};
+
+		header = receive_indirect_message(payload, sizeof(payload),
+						  recv_buf);
+
+		HFTEST_LOG("Message received: %s", payload);
+
+		/* Echo message back. */
+		send_indirect_message_with_uuid(
+			hf_vm_get_id(), header.sender, send_buf, payload,
+			sizeof(payload), header.uuid, 0);
 
 		/* Give back control to PVM. */
 		ffa_yield();
@@ -58,9 +87,9 @@ TEST_SERVICE(echo_msg_send2_service)
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_uuid target_uuid;
 	struct ffa_partition_info target_info;
-	uint32_t echo_payload;
+	uint8_t echo_payload[255] = {0};
 	ffa_id_t echo_sender;
-	const uint32_t payload = 0xBEEFU;
+	const uint8_t payload[255] = "hello world\n";
 	struct ffa_value ret;
 	const ffa_id_t own_id = hf_vm_get_id();
 
@@ -88,7 +117,7 @@ TEST_SERVICE(echo_msg_send2_service)
 					       sizeof(echo_payload), recv_buf)
 			      .sender;
 
-	HFTEST_LOG("Message received: %#x", echo_payload);
+	HFTEST_LOG("Message received: %s", echo_payload);
 
 	EXPECT_EQ(echo_sender, target_info.vm_id);
 

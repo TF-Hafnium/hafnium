@@ -634,6 +634,12 @@ ffa_vm_count_t get_ffa_partition_info(struct ffa_uuid uuid,
 	ret = ffa_partition_info_get(&uuid, 0);
 
 	if (ffa_func_id(ret) != FFA_SUCCESS_32) {
+		dlog_verbose(
+			"Could not find partition info for %#x-%#x-%#x-%#x: "
+			"%#x (%s)\n",
+			uuid.uuid[0], uuid.uuid[1], uuid.uuid[2], uuid.uuid[3],
+			ffa_error_code(ret),
+			ffa_error_name(ffa_error_code(ret)));
 		return 0;
 	}
 
@@ -720,18 +726,55 @@ struct ffa_boot_info_desc *get_boot_info_desc(
 	return NULL;
 }
 
-struct ffa_value send_indirect_message(ffa_id_t from, ffa_id_t to, void *send,
-				       const void *payload, size_t payload_size,
-				       uint32_t send_flags)
+struct ffa_value send_indirect_message(ffa_id_t sender, ffa_id_t receiver,
+				       void *send_buf, const void *payload,
+				       size_t payload_size, uint32_t send_flags)
 {
-	struct ffa_partition_msg *message = (struct ffa_partition_msg *)send;
+	struct ffa_partition_msg *message = send_buf;
 
 	/* Initialize message header. */
-	ffa_rxtx_header_init(&message->header, from, to, payload_size);
+	ffa_rxtx_header_init(&message->header, sender, receiver, payload_size);
 
 	/* Fill TX buffer with payload. */
-	memcpy_s(message->payload, FFA_PARTITION_MSG_PAYLOAD_MAX, payload,
-		 payload_size);
+	memcpy_s(ffa_partition_msg_payload(message),
+		 FFA_PARTITION_MSG_PAYLOAD_MAX, payload, payload_size);
+
+	/* Send the message. */
+	return ffa_msg_send2(send_flags);
+}
+
+struct ffa_value send_indirect_message_v1_1(ffa_id_t sender, ffa_id_t receiver,
+					    void *send_buf, const void *payload,
+					    size_t payload_size,
+					    uint32_t send_flags)
+{
+	struct ffa_partition_msg *message = send_buf;
+
+	/* Initialize message header. */
+	ffa_rxtx_header_init_v1_1(&message->header, sender, receiver,
+				  payload_size);
+
+	/* Fill TX buffer with payload. */
+	memcpy_s(ffa_partition_msg_payload(message),
+		 FFA_PARTITION_MSG_PAYLOAD_MAX_V1_1, payload, payload_size);
+
+	/* Send the message. */
+	return ffa_msg_send2(send_flags);
+}
+
+struct ffa_value send_indirect_message_with_uuid(
+	ffa_id_t sender, ffa_id_t receiver, void *send_buf, const void *payload,
+	size_t payload_size, struct ffa_uuid uuid, uint32_t send_flags)
+{
+	struct ffa_partition_msg *message = send_buf;
+
+	/* Initialize message header. */
+	ffa_rxtx_header_init_with_uuid(&message->header, sender, receiver,
+				       payload_size, uuid);
+
+	/* Fill TX buffer with payload. */
+	memcpy_s(ffa_partition_msg_payload(message),
+		 FFA_PARTITION_MSG_PAYLOAD_MAX, payload, payload_size);
 
 	/* Send the message. */
 	return ffa_msg_send2(send_flags);
@@ -777,7 +820,16 @@ struct ffa_partition_rxtx_header receive_indirect_message(void *payload,
 	ASSERT_LE(header.size, payload_size);
 
 	/* Get message to free the RX buffer. */
-	memcpy_s(payload, payload_size, message->payload, header.size);
+	memcpy_s(payload, payload_size,
+		 ffa_partition_msg_payload_const(message), header.size);
+
+	/*
+	 * If it is a 1.1 message, the UUID will overlap with the payload, so
+	 * zero the UUID field after copying the payload.
+	 */
+	if (header.offset < FFA_RXTX_HEADER_SIZE) {
+		header.uuid = (struct ffa_uuid){0};
+	}
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 

@@ -146,9 +146,19 @@ struct ffa_boot_info_desc *get_boot_info_desc(
 	struct ffa_boot_info_header *boot_info_heade, uint8_t type,
 	uint8_t type_id);
 
-struct ffa_value send_indirect_message(ffa_id_t from, ffa_id_t to, void *send,
-				       const void *payload, size_t payload_size,
+struct ffa_value send_indirect_message(ffa_id_t sender, ffa_id_t receiver,
+				       void *send_buf, const void *payload,
+				       size_t payload_size,
 				       uint32_t send_flags);
+
+struct ffa_value send_indirect_message_v1_1(ffa_id_t sender, ffa_id_t receiver,
+					    void *send_buf, const void *payload,
+					    size_t payload_size,
+					    uint32_t send_flags);
+
+struct ffa_value send_indirect_message_with_uuid(
+	ffa_id_t sender, ffa_id_t receiver, void *send_buf, const void *payload,
+	size_t payload_size, struct ffa_uuid uuid, uint32_t send_flags);
 
 struct ffa_partition_rxtx_header receive_indirect_message(void *payload,
 							  size_t payload_size,

@@ -16,9 +16,19 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+SET_UP(indirect_messaging_v1_0)
+{
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_COMPILED);
+}
+
 SET_UP(indirect_messaging_v1_1)
 {
 	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
+}
+
+SET_UP(indirect_messaging_v1_2)
+{
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_COMPILED);
 }
 
 SET_UP(indirect_messaging)
@@ -30,43 +40,143 @@ SET_UP(indirect_messaging)
 	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
 }
 
-static bool v1_1_or_earlier(void)
+bool v1_0_or_earlier(void)
+{
+	return FFA_VERSION_COMPILED <= FFA_VERSION_1_0;
+}
+
+bool v1_1_or_earlier(void)
 {
 	return FFA_VERSION_COMPILED <= FFA_VERSION_1_1;
 }
 
+void indirect_messaging_test(struct mailbox_buffers mb, ffa_id_t receiver,
+			     enum ffa_version sender_version,
+			     enum ffa_version receiver_version,
+			     struct ffa_uuid send_uuid,
+			     struct ffa_uuid expected_uuid)
+{
+	ffa_id_t sender = hf_vm_get_id();
+	const char send_payload[255] = "hello world";
+	char recv_payload[255] = {0};
+	struct ffa_value ret;
+
+	struct ffa_partition_rxtx_header recv_header;
+
+	if (receiver_version >= FFA_VERSION_1_2) {
+		SERVICE_SELECT(receiver, "echo_msg_send2_v1_2", mb.send);
+	} else {
+		SERVICE_SELECT(receiver, "echo_msg_send2_v1_1", mb.send);
+	}
+
+	if (sender_version >= FFA_VERSION_1_2) {
+		ret = send_indirect_message_with_uuid(
+			sender, receiver, mb.send, &send_payload,
+			sizeof(send_payload), send_uuid, 0);
+	} else {
+		ret = send_indirect_message_v1_1(sender, receiver, mb.send,
+						 &send_payload,
+						 sizeof(send_payload), 0);
+	}
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_run(receiver, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	recv_header = receive_indirect_message(&recv_payload,
+					       sizeof(recv_payload), mb.recv);
+
+	if (receiver_version >= FFA_VERSION_1_2) {
+		for (size_t i = 0; i < 4; i++) {
+			EXPECT_EQ(recv_header.uuid.uuid[i],
+				  expected_uuid.uuid[i]);
+		}
+	}
+
+	EXPECT_STREQ(recv_payload, send_payload);
+	EXPECT_EQ(recv_header.receiver, sender);
+	EXPECT_EQ(recv_header.sender, receiver);
+}
+
 /**
- * Send and receive the same message from the echo VM using
- * FFA v1.1 FFA_MSG_SEND2 ABI.
+ * A v1.0 sender should get an `FFA_NOT_SUPPORTED` error.
  */
-TEST(indirect_messaging, echo)
+TEST_PRECONDITION(indirect_messaging_v1_0, v1_0_not_supported, hypervisor_only)
 {
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
-	const uint32_t payload = 0xAA55AA55;
-	uint32_t echo_payload;
-	ffa_id_t echo_sender;
-	ffa_id_t own_id = hf_vm_get_id();
-	struct ffa_partition_info *service1_info = service1(mb.recv);
+	const char payload[255] = "hello world";
+	ffa_id_t sender = hf_vm_get_id();
+	ffa_id_t receiver = service1(mb.recv)->vm_id;
 
-	SERVICE_SELECT(service1_info->vm_id, "echo_msg_send2", mb.send);
+	EXPECT_EQ(ffa_is_vm_id(receiver), true);
+	ret = ffa_run(receiver, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+	EXPECT_EQ(ret.arg2, FFA_SLEEP_INDEFINITE);
 
-	/* Send the message. */
-	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
-				    &payload, sizeof(payload), 0);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	ret = send_indirect_message(sender, receiver, mb.send, &payload,
+				    sizeof(payload), 0);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+}
 
-	/* Schedule message receiver. */
-	ret = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(ret.func, FFA_YIELD_32);
+/**
+ * Send a v1.1 message to a v1.1 receiver. UUID should be zeroed.
+ */
+TEST_PRECONDITION(indirect_messaging_v1_1, echo_v1_1_to_v1_1, hypervisor_only)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t receiver = service3(mb.recv)->vm_id;
 
-	echo_sender = receive_indirect_message(&echo_payload,
-					       sizeof(echo_payload), mb.recv)
-			      .sender;
+	indirect_messaging_test(mb, receiver, FFA_VERSION_1_1, FFA_VERSION_1_1,
+				(struct ffa_uuid){0}, (struct ffa_uuid){0});
+}
 
-	HFTEST_LOG("Message echoed back: %#x", echo_payload);
-	EXPECT_EQ(echo_payload, payload);
-	EXPECT_EQ(echo_sender, service1_info->vm_id);
+/**
+ * Send a v1.1 message to a v1.2 receiver. UUID should be zeroed.
+ */
+TEST_PRECONDITION(indirect_messaging_v1_1, echo_v1_1_to_v1_2, hypervisor_only)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t receiver = service1(mb.recv)->vm_id;
+
+	indirect_messaging_test(mb, receiver, FFA_VERSION_1_1, FFA_VERSION_1_2,
+				(struct ffa_uuid){0}, (struct ffa_uuid){0});
+}
+
+/**
+ * Send a v1.2 message to a v1.2 receiver. UUID should be preserved.
+ */
+TEST(indirect_messaging_v1_2, echo_v1_2_to_v1_2)
+{
+	struct ffa_uuid uuid = {
+		0xAAAAAAAA,
+		0xBBBBBBBB,
+		0xCCCCCCCC,
+		0xDDDDDDDD,
+	};
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t receiver = service1(mb.recv)->vm_id;
+
+	indirect_messaging_test(mb, receiver, FFA_VERSION_1_2, FFA_VERSION_1_2,
+				uuid, uuid);
+}
+
+/**
+ * Send a v1.2 message to a v1.1 receiver. UUID should be dropped.
+ */
+TEST_PRECONDITION(indirect_messaging_v1_2, echo_v1_2_to_v1_1, hypervisor_only)
+{
+	struct ffa_uuid uuid = {
+		0xAAAAAAAA,
+		0xBBBBBBBB,
+		0xCCCCCCCC,
+		0xDDDDDDDD,
+	};
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t receiver = service3(mb.recv)->vm_id;
+
+	indirect_messaging_test(mb, receiver, FFA_VERSION_1_2, FFA_VERSION_1_1,
+				uuid, uuid);
 }
 
 /** Sender haven't mapped TX buffer. */
@@ -321,12 +431,12 @@ TEST(indirect_messaging, services_echo)
 	const struct ffa_uuid service2_uuid = SERVICE2;
 	const ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_value ret;
-	const uint32_t payload = 0xAA55AA55;
-	uint32_t echo_payload;
+	const char payload[255] = "hello from v1.2";
+	char echo_payload[255] = {0};
 	ffa_id_t echo_sender;
 
 	SERVICE_SELECT(service1_info->vm_id, "echo_msg_send2_service", mb.send);
-	SERVICE_SELECT(service2_info->vm_id, "echo_msg_send2", mb.send);
+	SERVICE_SELECT(service2_info->vm_id, "echo_msg_send2_v1_2", mb.send);
 
 	/* Send to service1 the uuid of the target for its message. */
 	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
@@ -350,21 +460,21 @@ TEST(indirect_messaging, services_echo)
 	 * correctly.
 	 */
 	ret = send_indirect_message(own_id, service2_info->vm_id, mb.send,
-				    &payload, sizeof(payload), 0);
+				    payload, sizeof(payload), 0);
 	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
 
 	/* Run service2 to echo message back to PVM. */
 	ret = ffa_run(service2_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
-	echo_sender = receive_indirect_message(&echo_payload,
+	echo_sender = receive_indirect_message(echo_payload,
 					       sizeof(echo_payload), mb.recv)
 			      .sender;
 
-	HFTEST_LOG("Message received: %#x", echo_payload);
+	HFTEST_LOG("Message received: %s", echo_payload);
 
 	EXPECT_EQ(echo_sender, service2_info->vm_id);
-	EXPECT_EQ(echo_payload, payload);
+	EXPECT_STREQ(echo_payload, payload);
 }
 
 TEAR_DOWN(indirect_messaging)
