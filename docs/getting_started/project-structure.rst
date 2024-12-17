@@ -15,8 +15,6 @@ The source tree is organised as follows:
 
     ├── build
     ├── docs
-    ├── driver
-    │   └── linux
     ├── inc
     │   ├── hf
     │   │   ├── arch
@@ -94,8 +92,6 @@ The source tree is organised as follows:
    - `hftest`: A simple test framework that supports running tests standalone on bare
      metal, in partitions under Hafnium. Also as user-space binaries under Linux, but these are
      not yet integrated with system where Hafnium is the SPMC.
-
-   - `linux`: Tests which are run in a Linux partition under Hafnium as normal world hypervisor.
 
    - `vmapi`: Tests which are run in minimal test partitions under Hafnium.
 
