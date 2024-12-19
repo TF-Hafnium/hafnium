@@ -9,13 +9,17 @@
 #include <stdint.h>
 
 #include "hf/ffa.h"
-#include "hf/std.h"
 
 #include "vmapi/hf/call.h"
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
+
+SET_UP(indirect_messaging_v1_1)
+{
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
+}
 
 SET_UP(indirect_messaging)
 {
@@ -24,6 +28,11 @@ SET_UP(indirect_messaging)
 	 * Version.
 	 */
 	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+}
+
+static bool v1_1_or_earlier(void)
+{
+	return FFA_VERSION_COMPILED <= FFA_VERSION_1_1;
 }
 
 /**
@@ -143,6 +152,25 @@ static void msg_send2_invalid_parameters(
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 }
 
+/**
+ * Send an indirect message (`FFA_MSG_SEND2`) and assert that it succeeds.
+ */
+static void msg_send2_valid_parameters(struct ffa_partition_rxtx_header header,
+				       struct mailbox_buffers mb)
+{
+	struct ffa_value ret;
+	struct ffa_partition_msg *message;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	SERVICE_SELECT(service1_info->vm_id, "ffa_indirect_msg_error", mb.send);
+
+	message = mb.send;
+	message->header = header;
+
+	ret = ffa_msg_send2(0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
+
 /** Sender sends message with a non existing VM IDs. */
 TEST(indirect_messaging, non_existing_sender)
 {
@@ -194,6 +222,86 @@ TEST(indirect_messaging, invalid_size)
 		.sender = own_id,
 		.receiver = service1_info->vm_id,
 		.size = 1024 * 1024,
+	};
+
+	msg_send2_invalid_parameters(header, mb);
+}
+
+/**
+ * v1.1 message where payload overlaps with the `payload.size` field should
+ * fail.
+ */
+TEST(indirect_messaging_v1_1, payload_overlap)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_rxtx_header header = {
+		.sender = own_id,
+		.receiver = service1_info->vm_id,
+		.size = 1024,
+		.offset = offsetof(struct ffa_partition_rxtx_header, size),
+	};
+
+	msg_send2_invalid_parameters(header, mb);
+}
+
+/**
+ * v1.1 message with gap between the header and the payload should not fail.
+ * This will fail for v1.2 or later.
+ */
+TEST_PRECONDITION(indirect_messaging_v1_1, payload_gap, v1_1_or_earlier)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_rxtx_header header = {
+		.sender = own_id,
+		.receiver = service1_info->vm_id,
+		.size = 1024,
+		.offset = offsetof(struct ffa_partition_rxtx_header, uuid),
+	};
+
+	msg_send2_valid_parameters(header, mb);
+
+	header.offset = offsetof(struct ffa_partition_rxtx_header, reserved_2);
+	msg_send2_valid_parameters(header, mb);
+}
+
+/**
+ * v1.2 message where payload overlaps with the `payload.size` or the
+ * `payload.uuid` fields should fail.
+ */
+TEST(indirect_messaging_v1_2, payload_overlap)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_rxtx_header header = {
+		.sender = own_id,
+		.receiver = service1_info->vm_id,
+		.size = 1024,
+		.offset = offsetof(struct ffa_partition_rxtx_header, size),
+	};
+
+	msg_send2_invalid_parameters(header, mb);
+	header.offset = offsetof(struct ffa_partition_rxtx_header, uuid);
+}
+
+/**
+ * v1.2 message where where `payload.offset + payload.size` overflows should
+ * fail.
+ */
+TEST(indirect_messaging_v1_2, size_plus_offset_overflow)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_rxtx_header header = {
+		.sender = own_id,
+		.receiver = service1_info->vm_id,
+		.size = -1,
+		.offset = FFA_RXTX_HEADER_SIZE,
 	};
 
 	msg_send2_invalid_parameters(header, mb);
