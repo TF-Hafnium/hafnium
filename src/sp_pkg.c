@@ -72,9 +72,10 @@ static bool sp_pkg_init_v2(struct mm_stage1_locked stage1_locked,
 			   paddr_t pkg_start, struct sp_pkg_header *header,
 			   struct mpool *ppool)
 {
-	paddr_t pkg_end = pa_add(pkg_start, PAGE_SIZE);
-
 	assert(header != NULL);
+	(void)pkg_start;
+	(void)ppool;
+	(void)stage1_locked;
 
 	if (header->pm_offset % PAGE_SIZE != 0 ||
 	    header->img_offset % PAGE_SIZE != 0) {
@@ -99,22 +100,6 @@ static bool sp_pkg_init_v2(struct mm_stage1_locked stage1_locked,
 		return false;
 	}
 
-	/*
-	 * Remap section up to pm as RW, to allow for writing of boot info
-	 * descriptors, if the SP specified boot info in its manifest.
-	 */
-	if (header->pm_offset > PAGE_SIZE) {
-		pkg_end = pa_add(pkg_start, header->pm_offset);
-	}
-
-	CHECK(mm_identity_map(stage1_locked, pkg_start, pkg_end,
-			      MM_MODE_R | MM_MODE_W, ppool) != NULL);
-
-	/* Map partition manifest as read-only. */
-	CHECK(mm_identity_map(stage1_locked, pkg_end,
-			      pa_add(pkg_end, header->pm_size), MM_MODE_R,
-			      ppool));
-
 	return true;
 }
 
@@ -126,21 +111,13 @@ static bool sp_pkg_init_v2(struct mm_stage1_locked stage1_locked,
 bool sp_pkg_init(struct mm_stage1_locked stage1_locked, paddr_t pkg_start,
 		 struct sp_pkg_header *header, struct mpool *ppool)
 {
-	paddr_t pkg_end = pa_add(pkg_start, PAGE_SIZE);
-	void *pkg;
-
-	/* Firstly, map a single page of package header. */
-	pkg = mm_identity_map(stage1_locked, pkg_start, pkg_end, MM_MODE_R,
-			      ppool);
-	assert(pkg != NULL);
-
-	memcpy_s(header, sizeof(struct sp_pkg_header), pkg,
+	/*
+	 * Assumes the page the first page of the package, has been mapped
+	 * already.
+	 */
+	memcpy_s(header, sizeof(struct sp_pkg_header),
+		 ptr_from_va(va_from_pa(pkg_start)),
 		 sizeof(struct sp_pkg_header));
-
-	if (header->magic != SP_PKG_HEADER_MAGIC) {
-		dlog_error("Invalid package magic.\n");
-		goto exit_unmap;
-	}
 
 	switch (header->version) {
 	case SP_PKG_HEADER_VERSION_1:
@@ -154,26 +131,9 @@ bool sp_pkg_init(struct mm_stage1_locked stage1_locked, paddr_t pkg_start,
 		}
 		break;
 	default:
-		dlog_error("Unrecognized Partition Pkg format.\n");
+		dlog_error("%s: Unrecognized Secure Partition Pkg format.\n",
+			   __func__);
 	}
 
-exit_unmap:
-	CHECK(mm_unmap(stage1_locked, pkg_start, pkg_end, ppool));
-
 	return false;
-}
-
-/**
- * Unmap SP Pkg from Hafnium's address space.
- */
-void sp_pkg_deinit(struct mm_stage1_locked stage1_locked, vaddr_t pkg_start,
-		   struct sp_pkg_header *header, struct mpool *ppool)
-{
-	paddr_t to_unmap_end;
-
-	to_unmap_end = pa_from_va(
-		va_add(pkg_start, header->pm_offset + header->pm_size));
-
-	CHECK(mm_unmap(stage1_locked, pa_from_va(pkg_start), to_unmap_end,
-		       ppool));
 }

@@ -91,20 +91,24 @@ static void boot_info_write_desc(struct ffa_boot_info_header *header,
  * Looks for the FF-A manifest boot information node, and writes the
  * requested information into the boot info memory.
  */
-bool ffa_boot_info_node(struct fdt_node *boot_info_node, vaddr_t pkg_address,
-			struct sp_pkg_header *pkg_header)
+bool ffa_boot_info_node(struct fdt_node *boot_info_node,
+			struct partition_pkg *pkg)
 {
 	struct memiter data;
-	struct ffa_boot_info_header *boot_info_header =
-		(struct ffa_boot_info_header *)ptr_from_va(pkg_address);
-	const size_t boot_info_size = sp_pkg_get_boot_info_size(pkg_header);
+	struct ffa_boot_info_header *boot_info_header;
+	const size_t boot_info_size =
+		pa_difference(pkg->boot_info.begin, pkg->boot_info.end);
 	const size_t max_boot_info_desc_count =
 		(boot_info_size -
 		 offsetof(struct ffa_boot_info_header, boot_info)) /
 		sizeof(struct ffa_boot_info_desc);
 
 	assert(boot_info_node != NULL);
-	assert(pkg_header != NULL);
+	assert(pkg != NULL);
+
+	boot_info_header = (struct ffa_boot_info_header *)ptr_from_va(
+		va_from_pa(pkg->boot_info.begin));
+
 	assert(boot_info_header != NULL);
 
 	/*
@@ -127,21 +131,22 @@ bool ffa_boot_info_node(struct fdt_node *boot_info_node, vaddr_t pkg_address,
 
 	if (fdt_read_property(boot_info_node, "ffa_manifest", &data) &&
 	    memiter_size(&data) == 0U) {
-		ipaddr_t manifest_address = ipa_init(
-			va_addr(va_add(pkg_address, pkg_header->pm_offset)));
+		ipaddr_t manifest_address = ipa_from_pa(pkg->pm.begin);
+		const uint32_t pm_size =
+			pa_difference(pkg->pm.begin, pkg->pm.end);
 
 		dlog_verbose("    FF-A Manifest\n");
-		boot_info_write_desc(
-			boot_info_header,
-			FFA_BOOT_INFO_FLAG_CONTENT_FORMAT_ADDR, true,
-			FFA_BOOT_INFO_TYPE_ID_FDT, pkg_header->pm_size,
-			ipa_addr(manifest_address), max_boot_info_desc_count);
+		boot_info_write_desc(boot_info_header,
+				     FFA_BOOT_INFO_FLAG_CONTENT_FORMAT_ADDR,
+				     true, FFA_BOOT_INFO_TYPE_ID_FDT, pm_size,
+				     ipa_addr(manifest_address),
+				     max_boot_info_desc_count);
 
 		/*
 		 * Incrementing the size of the boot information blob with the
 		 * size of the partition's manifest.
 		 */
-		boot_info_header->info_blob_size += pkg_header->pm_size;
+		boot_info_header->info_blob_size += pm_size;
 
 		/*
 		 * Flush the data cache in case partition initializes with

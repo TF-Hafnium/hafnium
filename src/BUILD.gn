@@ -54,6 +54,7 @@ source_set("src_testable") {
     "cpu.c",
     "hf_ipi.c",
     "manifest.c",
+    "partition_pkg.c",
     "sp_pkg.c",
     "timer_mgmt.c",
     "vcpu.c",

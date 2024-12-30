@@ -27,7 +27,7 @@
 #include "hf/mem_range.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
-#include "hf/sp_pkg.h"
+#include "hf/partition_pkg.h"
 #include "hf/static_assert.h"
 #include "hf/std.h"
 
@@ -1490,11 +1490,12 @@ static enum manifest_return_code parse_ffa_partition_package(
 {
 	enum manifest_return_code ret = MANIFEST_ERROR_NOT_COMPATIBLE;
 	uintpaddr_t load_address;
-	struct sp_pkg_header header;
+	struct partition_pkg pkg;
 	struct fdt sp_fdt;
-	vaddr_t pkg_start;
-	vaddr_t manifest_address;
+	void *pm_ptr;
+	size_t pm_size;
 	struct fdt_node boot_info_node;
+	size_t total_mem_size;
 
 	/*
 	 * This must have been hinted as being an FF-A partition,
@@ -1511,23 +1512,25 @@ static enum manifest_return_code parse_ffa_partition_package(
 
 	assert(load_address != 0U);
 
-	if (!sp_pkg_init(stage1_locked, pa_init(load_address), &header,
-			 ppool)) {
+	if (!partition_pkg_init(stage1_locked, pa_init(load_address), &pkg,
+				ppool)) {
 		return ret;
 	}
 
-	pkg_start = va_init(load_address);
+	total_mem_size = pa_difference(pkg.total.begin, pkg.total.end);
 
 	if (vm_id != HF_PRIMARY_VM_ID &&
-	    sp_pkg_get_mem_size(&header) >= vm->secondary.mem_size) {
-		dlog_error("Invalid package header or DT size.\n");
+	    total_mem_size > (size_t)vm->secondary.mem_size) {
+		dlog_error("Partition pkg size %zx bigger than expected: %x\n",
+			   total_mem_size, (uint32_t)vm->secondary.mem_size);
 		goto out;
 	}
 
-	manifest_address = va_add(va_init(load_address), header.pm_offset);
-	if (!fdt_init_from_ptr(&sp_fdt, ptr_from_va(manifest_address),
-			       header.pm_size)) {
-		dlog_error("manifest.c: FDT failed validation.\n");
+	pm_ptr = ptr_from_va(va_from_pa(pkg.pm.begin));
+
+	pm_size = pa_difference(pkg.pm.begin, pkg.pm.end);
+	if (!fdt_init_from_ptr(&sp_fdt, pm_ptr, pm_size)) {
+		dlog_error("%s: FDT failed validation.\n", __func__);
 		goto out;
 	}
 
@@ -1539,15 +1542,27 @@ static enum manifest_return_code parse_ffa_partition_package(
 		goto out;
 	}
 
-	if (vm->partition.gp_register_num != DEFAULT_BOOT_GP_REGISTER) {
-		if (header.version == SP_PKG_HEADER_VERSION_2 &&
-		    vm->partition.boot_info &&
-		    !ffa_boot_info_node(&boot_info_node, pkg_start, &header)) {
-			dlog_error("Failed to process boot information.\n");
+	/* Partition subscribed to boot information. */
+	if (vm->partition.gp_register_num != DEFAULT_BOOT_GP_REGISTER &&
+	    vm->partition.boot_info) {
+		/* Its package should have available space for it. */
+		if (pa_addr(pkg.boot_info.begin) == 0U) {
+			dlog_warning(
+				"Partition Package %s doesn't have boot info "
+				"space.\n",
+				vm->debug_name.data);
+		} else {
+			if (!ffa_boot_info_node(&boot_info_node, &pkg)) {
+				dlog_error(
+					"Failed to process boot "
+					"information.\n");
+			}
 		}
 	}
+
 out:
-	sp_pkg_deinit(stage1_locked, pkg_start, &header, ppool);
+	partition_pkg_deinit(stage1_locked, &pkg, ppool);
+
 	return ret;
 }
 

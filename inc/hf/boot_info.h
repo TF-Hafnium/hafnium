@@ -10,10 +10,10 @@
 
 #include "hf/fdt.h"
 #include "hf/ffa.h"
-#include "hf/sp_pkg.h"
+#include "hf/partition_pkg.h"
 
 #define FFA_BOOT_INFO_SIG 0xFFAU
 #define FFA_BOOT_INFO_VERSION 0x10001U
 
-bool ffa_boot_info_node(struct fdt_node *boot_info_node, vaddr_t pkg_address,
-			struct sp_pkg_header *pkg_header);
+bool ffa_boot_info_node(struct fdt_node *boot_info_node,
+			struct partition_pkg *pkg);
