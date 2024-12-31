@@ -3803,6 +3803,67 @@ TEST(memory_sharing, mem_share_bypass_multiple_borrowers_wrong_receiver_count)
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 }
 
+/*
+ * Check that setting the bypass multiple borrowers check flag when there is
+ * only a single receiver for the share operation returns INVALID_PARAMETERS.
+ */
+TEST(memory_sharing, mem_share_bypass_multiple_borrowers_single_receiver_fails)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	uint32_t msg_size;
+	ffa_memory_handle_t handle;
+	struct ffa_memory_region *mem_region =
+		(struct ffa_memory_region *)mb.send;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 2},
+		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
+	};
+	struct ffa_memory_access receiver;
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_partition_msg *retrieve_message = mb.send;
+	struct ffa_memory_access_impdef service1_impdef_val =
+		ffa_memory_access_impdef_init(service1_info->vm_id,
+					      service1_info->vm_id + 1);
+	ffa_memory_access_init(
+		&receiver, service1_info->vm_id, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, &service1_impdef_val);
+
+	ffa_memory_region_init(mem_region, HF_MAILBOX_SIZE, hf_vm_get_id(),
+			       &receiver, 1, sizeof(struct ffa_memory_access),
+			       constituents, ARRAY_SIZE(constituents), 0, 0,
+			       FFA_MEMORY_NORMAL_MEM,
+			       FFA_MEMORY_CACHE_WRITE_BACK,
+			       FFA_MEMORY_INNER_SHAREABLE, &msg_size, NULL);
+
+	ret = ffa_mem_share(msg_size, msg_size);
+
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	handle = ffa_mem_success_handle(ret);
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_memory_share_fail_invalid_parameters", mb.send);
+
+	msg_size = ffa_memory_retrieve_request_init(
+		(struct ffa_memory_region *)retrieve_message->payload, handle,
+		own_id, &receiver, 1, sizeof(struct ffa_memory_access), 0,
+		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE |
+			FFA_MEMORY_REGION_FLAG_BYPASS_BORROWERS_CHECK,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE);
+
+	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+
+	ffa_rxtx_header_init(own_id, service1_info->vm_id, msg_size,
+			     &retrieve_message->header);
+
+	ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
+
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
+}
+
 /**
  * Validate that sender can specify multiple borrowers to memory lend
  * operation. All receivers will increment the content of the first page and
