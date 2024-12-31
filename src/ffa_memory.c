@@ -2879,8 +2879,16 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 		if (retrieve_request->receiver_count != 1) {
 			dlog_verbose(
 				"Set bypass multiple borrower check, receiver "
-				"list must be sized 1 (%x)\n",
+				"list must be sized 1 in the retrieve request "
+				"not %x.\n",
 				memory_region->receiver_count);
+			return ffa_error(FFA_INVALID_PARAMETERS);
+		}
+		if (memory_region->receiver_count == 1) {
+			dlog_verbose(
+				"Setting the bypass multiple borrower check "
+				"flag for a transaction with a single borrower "
+				"is not allowed.\n");
 			return ffa_error(FFA_INVALID_PARAMETERS);
 		}
 	}
