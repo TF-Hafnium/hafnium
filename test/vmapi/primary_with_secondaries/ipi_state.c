@@ -22,6 +22,23 @@ static struct hftest_int_state *ipi_states;
  * The index into the ipi state array the service is currently using.
  */
 static uint32_t current_ipi_state_index;
+/*
+ * When sharing the same ipi state to multiple CPUs it must only be initialized
+ * once. This bool tracks if the state has already been initializzed.
+ */
+atomic_bool ipi_state_initialized = false;
+
+static bool is_ipi_state_initialized(void)
+{
+	return atomic_load_explicit(&ipi_state_initialized,
+				    memory_order_relaxed);
+}
+
+static void set_ipi_state_initialized(void)
+{
+	atomic_store_explicit(&ipi_state_initialized, true,
+			      memory_order_relaxed);
+}
 
 bool hftest_ipi_state_is(enum int_state to_check)
 {
@@ -32,7 +49,11 @@ bool hftest_ipi_state_is(enum int_state to_check)
 static void hftest_ipi_state_set_at_index(enum int_state to_set,
 					  uint32_t ipi_state_index)
 {
-	hftest_int_state_set(&ipi_states[ipi_state_index], to_set);
+	struct hftest_int_state *ipi_state = &ipi_states[ipi_state_index];
+	hftest_int_state_set(ipi_state, to_set);
+	if (to_set == INIT) {
+		hftest_int_state_reset_interrupt_count(ipi_state);
+	}
 }
 
 void hftest_ipi_state_set(enum int_state to_set)
@@ -40,11 +61,24 @@ void hftest_ipi_state_set(enum int_state to_set)
 	hftest_ipi_state_set_at_index(to_set, current_ipi_state_index);
 }
 
+uint32_t hftest_ipi_state_get_interrupt_count(void)
+{
+	return hftest_int_state_get_interrupt_count(
+		&ipi_states[current_ipi_state_index]);
+}
+
 /* Set the state of all the IPI States to READY. */
 void hftest_ipi_state_set_all_ready(void)
 {
 	for (uint32_t i = 0; i < MAX_CPUS; i++) {
 		hftest_ipi_state_set_at_index(READY, i);
+	}
+}
+
+void hftest_ipi_state_reset_all(void)
+{
+	for (uint32_t i = 0; i < MAX_CPUS; i++) {
+		hftest_ipi_state_set_at_index(INIT, i);
 	}
 }
 
@@ -64,6 +98,11 @@ void hftest_ipi_init_state_from_message(void *recv_buf, void *send_buf)
 	uint64_t addr;
 	struct ffa_value ret;
 
+	if (is_ipi_state_initialized()) {
+		HFTEST_LOG("IPI state already initialized for this service.\n");
+		return;
+	}
+
 	addr = hftest_int_state_page_setup(recv_buf, send_buf);
 	hftest_ipi_init_state_through_ptr((uintptr_t)addr);
 	ret = ffa_msg_wait();
@@ -73,6 +112,8 @@ void hftest_ipi_init_state_from_message(void *recv_buf, void *send_buf)
 	receive_indirect_message((void *)&current_ipi_state_index,
 				 sizeof(current_ipi_state_index), recv_buf,
 				 NULL);
+
+	set_ipi_state_initialized();
 
 	ret = ffa_msg_wait();
 	EXPECT_EQ(ret.func, FFA_RUN_32);
@@ -90,6 +131,10 @@ ffa_memory_handle_t hftest_ipi_state_share_page_and_init(
 {
 	struct ffa_value ret;
 	ffa_memory_handle_t handle;
+
+	if (is_ipi_state_initialized()) {
+		return FFA_MEMORY_HANDLE_INVALID;
+	}
 
 	handle = share_page_with_endpoints(page, receivers_ids, receivers_count,
 					   send_buf);
@@ -119,6 +164,8 @@ ffa_memory_handle_t hftest_ipi_state_share_page_and_init(
 		EXPECT_EQ(ffa_run(receivers_ids[i], vcpu_id).func,
 			  FFA_MSG_WAIT_32);
 	}
+
+	set_ipi_state_initialized();
 
 	return handle;
 }

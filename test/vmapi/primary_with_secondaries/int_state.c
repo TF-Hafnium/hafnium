@@ -44,50 +44,78 @@ void hftest_int_state_set(struct hftest_int_state *track, enum int_state to_set)
 	category = track->category;
 	sl_lock(&track->lock);
 
-	/* The transitions supported depend on the category of the interrupt. */
-	switch (track->state) {
-	case INIT:
-		if (category == SOFTWARE && to_set != READY) {
-			panic("%s: current state: INIT expected next state: "
-			      "READY.",
-			      __func__);
-		} else if (category == HARDWARE && to_set != SENT) {
-			panic("%s: current state: INIT expected next state: "
-			      "SENT.",
-			      __func__);
-		}
-		break;
-	case READY:
-		if (category == HARDWARE) {
-			panic("%s: READY state is illegal for HARDWARE "
-			      "interrupt.",
-			      __func__);
+	/* Always allow the test to be reset back to INIT. */
+	if (to_set != INIT) {
+		/* The transitions supported depend on the category of the
+		 * interrupt. */
+		switch (track->state) {
+		case INIT:
+			if (category == SOFTWARE && to_set != READY) {
+				panic("%s: current state: INIT expected next "
+				      "state: READY.",
+				      __func__);
+			} else if (category == HARDWARE && to_set != SENT) {
+				panic("%s: current state: INIT expected next "
+				      "state: SENT.",
+				      __func__);
+			}
+			break;
+		case READY:
+			if (category == HARDWARE) {
+				panic("%s: READY state is illegal for HARDWARE "
+				      "interrupt.",
+				      __func__);
 
-		} else if (to_set != SENT) {
-			panic("%s: current state: READY expected next state: "
-			      "SENT.",
-			      __func__);
+			} else if (to_set != SENT) {
+				panic("%s: current state: READY expected next "
+				      "state: SENT.",
+				      __func__);
+			}
+			break;
+		case SENT:
+			if (to_set != HANDLED) {
+				panic("%s: current state: SENT expected next "
+				      "state: HANDLED.",
+				      __func__);
+			}
+			break;
+		case HANDLED:
+			if (to_set != READY && to_set != HANDLED) {
+				panic("%s: current state: HANDLED expected "
+				      "next state: READY or HANDLED.",
+				      __func__);
+			}
+			break;
+		default:
+			panic("%s: unknown state %u", __func__, track->state);
 		}
-		break;
-	case SENT:
-		if (to_set != HANDLED) {
-			panic("%s: current state: SENT expected next state: "
-			      "HANDLED.",
-			      __func__);
-		}
-		break;
-	case HANDLED:
-		if (to_set != READY) {
-			panic("%s: current state: HANDLED expected next state: "
-			      "READY.",
-			      __func__);
-		}
-		break;
-	default:
-		panic("%s: unknown state %u", __func__, track->state);
 	}
 
 	track->state = to_set;
+	if (to_set == HANDLED) {
+		track->interrupt_count++;
+	}
+
+	sl_unlock(&track->lock);
+}
+
+uint32_t hftest_int_state_get_interrupt_count(struct hftest_int_state *track)
+{
+	uint32_t interrupt_count;
+	sl_lock(&track->lock);
+
+	interrupt_count = track->interrupt_count;
+
+	sl_unlock(&track->lock);
+
+	return interrupt_count;
+}
+
+void hftest_int_state_reset_interrupt_count(struct hftest_int_state *track)
+{
+	sl_lock(&track->lock);
+
+	track->interrupt_count = 0;
 
 	sl_unlock(&track->lock);
 }

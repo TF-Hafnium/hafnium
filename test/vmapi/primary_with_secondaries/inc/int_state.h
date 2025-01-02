@@ -46,6 +46,7 @@ struct hftest_int_state {
 	enum int_state state;
 	struct spinlock lock;
 	enum int_category category;
+	uint32_t interrupt_count;
 };
 
 bool hftest_int_state_is(struct hftest_int_state *track,
@@ -56,6 +57,9 @@ void hftest_int_state_set(struct hftest_int_state *track,
 
 void hftest_int_state_init(struct hftest_int_state *track,
 			   enum int_category category);
+
+uint32_t hftest_int_state_get_interrupt_count(struct hftest_int_state *track);
+void hftest_int_state_reset_interrupt_count(struct hftest_int_state *track);
 
 uint64_t hftest_int_state_page_setup(void *recv_buf, void *send_buf);
 

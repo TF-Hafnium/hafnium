@@ -15,6 +15,8 @@ ffa_memory_handle_t hftest_ipi_state_share_page_and_init(
 void hftest_ipi_init_state_from_message(void *recv_buf, void *send_buf);
 bool hftest_ipi_state_is(enum int_state to_check);
 void hftest_ipi_state_set(enum int_state to_set);
+uint32_t hftest_ipi_state_get_interrupt_count(void);
 void hftest_ipi_state_set_all_ready(void);
+void hftest_ipi_state_reset_all(void);
 
 void hftest_ipi_state_page_relinquish(void *send_buf);

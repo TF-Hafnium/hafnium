@@ -1158,6 +1158,8 @@ static inline ffa_vcpu_index_t ffa_notifications_get_vcpu(struct ffa_value args)
 #define FFA_NOTIFICATIONS_LIST_SHIFT(l) (2 * ((l) - 1) + 12)
 #define FFA_NOTIFICATIONS_LIST_SIZE_MASK 0x3U
 #define FFA_NOTIFICATIONS_LIST_MAX_SIZE 0x4U
+#define FFA_NOTIFICATIONS_LIST_MAX_VCPU_IDS \
+	(FFA_NOTIFICATIONS_LIST_MAX_SIZE - 1)
 
 static inline uint32_t ffa_notification_info_get_lists_count(
 	struct ffa_value args)

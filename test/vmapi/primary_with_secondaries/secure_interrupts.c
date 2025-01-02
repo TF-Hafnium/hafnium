@@ -37,7 +37,8 @@ struct ipi_cpu_entry_args {
 	ffa_id_t service_id;
 	ffa_vcpu_count_t vcpu_count;
 	ffa_vcpu_index_t vcpu_id;
-	ffa_vcpu_index_t target_vcpu_id;
+	ffa_vcpu_index_t target_vcpu_ids[MAX_CPUS];
+	ffa_vcpu_count_t target_vcpu_count;
 	struct mailbox_buffers mb;
 	struct semaphore work_done;
 };
@@ -247,9 +248,24 @@ static void cpu_entry_send_ipi(uintptr_t arg)
 		(struct ipi_cpu_entry_args *)arg;
 	struct ffa_value ret;
 	const ffa_id_t own_id = hf_vm_get_id();
+	ffa_vcpu_index_t target_vcpu_ids[MAX_CPUS];
 
 	ASSERT_TRUE(args != NULL);
 	ASSERT_TRUE(args->vcpu_count > 1);
+	ASSERT_TRUE(args->target_vcpu_count > 0 &&
+		    args->target_vcpu_count < MAX_CPUS);
+
+	/*
+	 * Populate the target_vcpus ID. To prevent sending a count with the
+	 * array of target vCPU IDs set any unused fields to an invalid ID
+	 * (MAX_CPUS).
+	 */
+	for (int i = 0; i < args->target_vcpu_count; i++) {
+		target_vcpu_ids[i] = args->target_vcpu_ids[i];
+	}
+	for (int i = args->target_vcpu_count; i < MAX_CPUS; i++) {
+		target_vcpu_ids[i] = MAX_CPUS;
+	}
 
 	/*
 	 *
@@ -272,8 +288,8 @@ static void cpu_entry_send_ipi(uintptr_t arg)
 
 	/* Send it the target vCPU ID. */
 	ret = send_indirect_message(own_id, args->service_id, args->mb.send,
-				    &args->target_vcpu_id,
-				    sizeof(args->target_vcpu_id), 0);
+				    target_vcpu_ids, sizeof(target_vcpu_ids),
+				    0);
 
 	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_run(args->service_id, args->vcpu_id).func, FFA_YIELD_32);
@@ -307,7 +323,8 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu, service1_is_mp_sp)
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
 		.vcpu_id = 1,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 	ffa_id_t memory_receivers[] = {
 		service1_info->vm_id,
@@ -370,7 +387,8 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu_with_secure_interrupts,
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
 		.vcpu_id = 1,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 	ffa_id_t memory_receivers[] = {
 		service1_info->vm_id,
@@ -471,10 +489,13 @@ static void ipi_nwd_waiting_test(
 	};
 	uint32_t receivers_ipi_state_indexes[] = {0};
 	struct ffa_value ret;
-	ffa_memory_handle_t handle;
 	uint32_t sri_id;
-	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	ffa_vcpu_count_t target_vcpu_count =
+		sender_cpu_entry_args->target_vcpu_count;
+	uint32_t expected_list_count = 0;
+	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {
+		0xFFFF};
+	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0xFFFF};
 
 	HFTEST_LOG("IPI Waiting in NWd test from CPU %d to CPU %d\n",
 		   sender_cpu_entry_args->vcpu_id, vcpu_id);
@@ -491,7 +512,7 @@ static void ipi_nwd_waiting_test(
 	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
 
 	/* Share memory to setup the IPI state structure. */
-	handle = hftest_ipi_state_share_page_and_init(
+	hftest_ipi_state_share_page_and_init(
 		(uint64_t)ipi_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, vcpu_id);
@@ -520,20 +541,36 @@ static void ipi_nwd_waiting_test(
 		interrupt_wait();
 	}
 
-	/* Check the target vCPU 0 is returned by FFA_NOTIFICATION_INFO_GET. */
-	expected_lists_sizes[0] = 1;
-	expected_ids[0] = service_id;
-	expected_ids[1] = sender_cpu_entry_args->target_vcpu_id;
+	/* Check the target vCPUs are returned by FFA_NOTIFICATION_INFO_GET. */
+	for (; expected_list_count <
+	       target_vcpu_count / FFA_NOTIFICATIONS_LIST_MAX_VCPU_IDS;
+	     expected_list_count++) {
+		expected_lists_sizes[expected_list_count] =
+			FFA_NOTIFICATIONS_LIST_MAX_VCPU_IDS;
+	}
+	expected_lists_sizes[expected_list_count++] =
+		target_vcpu_count % FFA_NOTIFICATIONS_LIST_MAX_VCPU_IDS;
+	for (uint32_t i = 0; i < target_vcpu_count + expected_list_count; i++) {
+		/*
+		 * Every 4th element we start a new list so must specifiy the
+		 * service id again.
+		 */
+		if (i % FFA_NOTIFICATIONS_LIST_MAX_SIZE == 0) {
+			expected_ids[i] = service_id;
+		} else {
+			ffa_vcpu_index_t index_without_service_ids =
+				i - ((i / FFA_NOTIFICATIONS_LIST_MAX_SIZE) + 1);
+			expected_ids[i] = sender_cpu_entry_args->target_vcpu_ids
+						  [index_without_service_ids];
+		}
+	}
 
-	ffa_notification_info_get_and_check(1, expected_lists_sizes,
-					    expected_ids);
+	ffa_notification_info_get_and_check(expected_list_count,
+					    expected_lists_sizes, expected_ids);
 
 	/* Resumes service on target vCPU to handle IPI. */
 	ret = ffa_run(service_id, vcpu_id);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
-
-	/* Reclaim the IPI state memory region. */
-	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 }
 
 /**
@@ -548,7 +585,8 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd, service1_is_mp_sp)
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
 		.vcpu_id = 1,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 
 	ipi_nwd_waiting_test(0, &vcpu1_args);
@@ -569,10 +607,16 @@ static void cpu_entry_receive_ipi_waiting(uintptr_t arg)
 		.service_id = args->service_id,
 		.vcpu_count = args->vcpu_count,
 		.vcpu_id = args->vcpu_id + 1,
-		.target_vcpu_id = args->target_vcpu_id,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = args->target_vcpu_count,
 		.mb = args->mb};
 
 	assert(args->vcpu_id < MAX_CPUS - 1);
+	assert(args->target_vcpu_count < MAX_CPUS);
+
+	for (int i = 0; i < args->target_vcpu_count; i++) {
+		sender_vcpu_args.target_vcpu_ids[i] = args->target_vcpu_ids[i];
+	}
 
 	ipi_nwd_waiting_test(args->vcpu_id, &sender_vcpu_args);
 
@@ -594,7 +638,8 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd_non_primary_cpu,
 			.service_id = service1_info->vm_id,
 			.vcpu_count = service1_info->vcpu_count,
 			.vcpu_id = i,
-			.target_vcpu_id = i,
+			.target_vcpu_ids = {i},
+			.target_vcpu_count = 1,
 			.mb = mb};
 
 		/* Initalize semaphores to sync primary and secondary cores. */
@@ -608,6 +653,7 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd_non_primary_cpu,
 			(uintptr_t)&receiver_vcpu_args));
 
 		semaphore_wait(&receiver_vcpu_args.work_done);
+		hftest_ipi_state_reset_all();
 	}
 }
 
@@ -626,7 +672,8 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_nwd_with_nwd_interrupt,
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
 		.vcpu_id = 1,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 
 	gicv3_system_setup();
@@ -683,7 +730,8 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_swd, service1_is_mp_sp)
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
 		.vcpu_id = 1,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 	ffa_id_t memory_receivers[] = {
 		service1_info->vm_id,
@@ -790,7 +838,8 @@ TEST_PRECONDITION(ipi, receive_ipi_preempted_vcpu, service1_is_mp_sp)
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
 		.vcpu_id = 1,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 	ffa_id_t memory_receivers[] = {
 		service1_info->vm_id,
@@ -874,7 +923,8 @@ TEST_PRECONDITION(ipi, receive_ipi_blocked_vcpu, service1_is_mp_sp)
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
 		.vcpu_id = 1,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 	ffa_id_t memory_receivers[] = {service1_info->vm_id};
 	uint32_t receivers_ipi_state_indexes[] = {0};
@@ -951,13 +1001,15 @@ TEST_PRECONDITION(ipi, receive_ipi_multiple_services_to_same_cpu_waiting,
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
 		.vcpu_id = 1,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 	struct ipi_cpu_entry_args vcpu2_args = {
 		.service_id = service2_info->vm_id,
 		.vcpu_count = service2_info->vcpu_count,
 		.vcpu_id = 2,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 	ffa_id_t memory_receivers[] = {
 		service1_info->vm_id,
@@ -1106,13 +1158,15 @@ TEST_PRECONDITION(ipi, receive_ipi_multiple_services_to_same_cpu_running,
 		.service_id = service1_info->vm_id,
 		.vcpu_count = service1_info->vcpu_count,
 		.vcpu_id = 1,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 	struct ipi_cpu_entry_args vcpu2_args = {
 		.service_id = service2_info->vm_id,
 		.vcpu_count = service2_info->vcpu_count,
 		.vcpu_id = 2,
-		.target_vcpu_id = 0,
+		.target_vcpu_ids = {0},
+		.target_vcpu_count = 1,
 		.mb = mb};
 	ffa_id_t memory_receivers[] = {
 		service1_info->vm_id,
@@ -1191,4 +1245,62 @@ TEST_PRECONDITION(ipi, receive_ipi_multiple_services_to_same_cpu_running,
 
 	semaphore_wait(&vcpu1_args.work_done);
 	semaphore_wait(&vcpu2_args.work_done);
+}
+
+/*
+ * Check that a single service can send an IPI to two vCPUs and both
+ * successfully recieve it.
+ */
+TEST_PRECONDITION(ipi, receive_ipi_one_service_to_two_vcpus, service1_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_value ret;
+	struct ipi_cpu_entry_args receiver_vcpu1_args = {
+		.service_id = service1_info->vm_id,
+		.vcpu_count = service1_info->vcpu_count,
+		.vcpu_id = 1,
+		.target_vcpu_ids = {0, 1},
+		.target_vcpu_count = 2,
+		.mb = mb};
+	ffa_id_t memory_receivers[] = {
+		service1_info->vm_id,
+	};
+	uint32_t receivers_ipi_state_indexes[] = {0};
+
+	SERVICE_SELECT(service1_info->vm_id, "receive_ipi_waiting_vcpu",
+		       mb.send);
+
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Share memory to setup the IPI state structure. */
+	hftest_ipi_state_share_page_and_init(
+		(uint64_t)ipi_state_page, memory_receivers,
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send, 0);
+
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
+
+	/* Initialize semaphores to sync primary and secondary cores. */
+	semaphore_init(&receiver_vcpu1_args.work_done);
+
+	last_interrupt_id = 0;
+
+	/*
+	 * Bring-up another core to also receive the IPI. Test coorindation will
+	 * be done on this core.
+	 */
+	ASSERT_TRUE(hftest_cpu_start(
+		hftest_get_cpu_id(receiver_vcpu1_args.vcpu_id),
+		hftest_get_secondary_ec_stack(receiver_vcpu1_args.vcpu_id),
+		cpu_entry_receive_ipi_waiting,
+		(uintptr_t)&receiver_vcpu1_args));
+
+	/* Wait for secondary core to return before finishing the test. */
+	semaphore_wait(&receiver_vcpu1_args.work_done);
+
+	/* Resumes service on target vCPU to handle IPI. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
 }

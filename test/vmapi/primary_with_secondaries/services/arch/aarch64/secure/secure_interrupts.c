@@ -32,6 +32,7 @@
 #define TWDOG_DELAY 50
 
 static bool rtm_init_espi_handled;
+static bool multiple_interrupts_expected;
 
 static inline uint64_t physicalcounter_read(void)
 {
@@ -369,7 +370,7 @@ TEST_SERVICE(yield_direct_req_service_twdog_int)
  */
 TEST_SERVICE(send_ipi)
 {
-	ffa_vcpu_index_t vcpu;
+	ffa_vcpu_index_t target_vcpu_ids[MAX_CPUS];
 	struct ffa_value ret;
 
 	dlog_verbose("Receiving ID of target vCPU...");
@@ -377,20 +378,27 @@ TEST_SERVICE(send_ipi)
 	ret = ffa_msg_wait();
 	EXPECT_EQ(ret.func, FFA_RUN_32);
 
-	receive_indirect_message((void *)&vcpu, sizeof(vcpu),
-				 SERVICE_RECV_BUFFER(), NULL);
+	receive_indirect_message((void *)&target_vcpu_ids,
+				 sizeof(target_vcpu_ids), SERVICE_RECV_BUFFER(),
+				 NULL);
 
-	dlog_verbose("Waiting for target vCPU %u to be ready.", vcpu);
+	dlog_verbose("Waiting for target vCPUs to be ready.");
 
 	/* Do nothing while IPI handler is not ready. */
 	while (!hftest_ipi_state_is(READY)) {
 	}
 
-	dlog_verbose("Sending IPI to vCPU %u", vcpu);
-
 	hftest_ipi_state_set(SENT);
 
-	hf_interrupt_send_ipi(vcpu);
+	/* Send IPIs until the first invalid ID. */
+	for (int i = 0; i < MAX_CPUS; i++) {
+		if (target_vcpu_ids[i] == MAX_CPUS) {
+			break;
+		}
+		dlog_verbose("Sending IPI to vCPU %u", target_vcpu_ids[i]);
+		hf_interrupt_send_ipi(target_vcpu_ids[i]);
+		multiple_interrupts_expected = i > 0;
+	}
 
 	ffa_yield();
 }
@@ -544,7 +552,10 @@ static void ipi_waiting_irq_handler(void)
 	case HF_IPI_INTID:
 		HFTEST_LOG("Received inter-processor interrupt %u, vm %x.",
 			   intid, hf_vm_get_id());
-		ASSERT_TRUE(hftest_ipi_state_is(SENT));
+		ASSERT_TRUE(hftest_ipi_state_is(SENT) ||
+			    (hftest_ipi_state_is(HANDLED) &&
+			     hftest_ipi_state_get_interrupt_count() > 0 &&
+			     multiple_interrupts_expected));
 		hftest_ipi_state_set(HANDLED);
 		break;
 	default:
@@ -591,9 +602,6 @@ TEST_SERVICE(receive_ipi_waiting_vcpu)
 	EXPECT_EQ(ret.func, FFA_RUN_32);
 
 	EXPECT_TRUE(hftest_ipi_state_is(HANDLED));
-
-	/* Relinquish IPI state memory. */
-	hftest_ipi_state_page_relinquish(SERVICE_SEND_BUFFER());
 
 	ffa_yield();
 }
