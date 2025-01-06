@@ -69,7 +69,7 @@ VM_NODE_REGEX = "vm[1-9]"
 QEMU_CPU_MAX = "max,pauth-impdef=true"
 
 def read_file(path):
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8", errors="backslashreplace") as f:
         return f.read()
 
 def write_file(path, to_write, append=False):
