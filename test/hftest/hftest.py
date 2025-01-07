@@ -349,7 +349,13 @@ class FvpDriver(Driver, ABC):
         """Generate command line arguments for FVP."""
         show_output = debug or show_output
         disable_visualisation = self.args.disable_visualisation is True
-        time_limit = "150s" if is_long_running else "40s"
+
+        time_limit = "40s"
+        if self.cov_plugin is None:
+            time_limit = "150s" if is_long_running else time_limit
+        else:
+            time_limit = "300s" if is_long_running else "80s"
+
         fvp_args = []
 
         if not show_output:
