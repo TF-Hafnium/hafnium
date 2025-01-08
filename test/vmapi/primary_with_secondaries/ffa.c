@@ -22,6 +22,12 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+SET_UP(ffa)
+{
+	/* Ensure the VM sets its ffa_version to the lastest for testing. */
+	ASSERT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+}
+
 TEAR_DOWN(ffa)
 {
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);

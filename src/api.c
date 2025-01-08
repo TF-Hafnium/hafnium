@@ -532,7 +532,7 @@ static void api_ffa_fill_partition_info(
 static ffa_vm_count_t api_ffa_fill_partitions_info_array(
 	struct ffa_partition_info out_partitions[], size_t out_partitions_len,
 	const struct ffa_uuid *uuid_to_find, bool count_flag,
-	ffa_id_t caller_id)
+	ffa_id_t caller_id, enum ffa_version caller_version)
 {
 	ffa_vm_count_t vms_found = 0;
 	bool match_any = ffa_uuid_is_null(uuid_to_find);
@@ -571,6 +571,16 @@ static ffa_vm_count_t api_ffa_fill_partitions_info_array(
 							    caller_id);
 				if (match_any) {
 					out_partition->uuid = uuid;
+				}
+
+				/*
+				 * Multiple UUIDs for a partition was only
+				 * introduced in FF-A v1.2, so for any version
+				 * less than v1.2 return only one UUID per
+				 * partition.
+				 */
+				if (caller_version < FFA_VERSION_1_2) {
+					break;
 				}
 			}
 		}
@@ -770,8 +780,8 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	memset_s(&partitions, sizeof(partitions), 0, sizeof(partitions));
 
 	vm_count = api_ffa_fill_partitions_info_array(
-		partitions, ARRAY_SIZE(partitions), uuid, false,
-		current_vm->id);
+		partitions, ARRAY_SIZE(partitions), uuid, false, current_vm->id,
+		current_vm->ffa_version);
 
 	/* If UUID is Null vm_count must not be zero at this stage. */
 	CHECK(!uuid_is_null || vm_count != 0);
@@ -878,7 +888,7 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 
 	vm_count = api_ffa_fill_partitions_info_array(
 		partitions, ARRAY_SIZE(partitions), uuid, count_flag,
-		current_vm->id);
+		current_vm->id, current_vm->ffa_version);
 
 	/* If UUID is Null vm_count must not be zero at this stage. */
 	CHECK(!uuid_is_null || vm_count != 0);

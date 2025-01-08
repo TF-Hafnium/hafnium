@@ -47,6 +47,9 @@ TEAR_DOWN(ffa_partition_info_get)
  */
 TEST(ffa_partition_info_get, three_secondary_vms)
 {
+	/* Set ffa_version to v1.2. */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_COMPILED);
+
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
 	const struct ffa_partition_info *partitions;
@@ -126,8 +129,11 @@ TEST(ffa_partition_info_get, get_v1_0_descriptor)
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
-	/* Confirm there are 3 secondary VMs, one with 2 UUIDs. */
-	EXPECT_EQ(ret.arg2, 4);
+	/*
+	 * Confirm there are 3 secondary VMs, since we are v1.0 we only expect
+	 * one UUID per VM.
+	 */
+	EXPECT_EQ(ret.arg2, 3);
 
 	EXPECT_EQ(partitions[0].vcpu_count, 8);
 	EXPECT_EQ(partitions[1].vcpu_count, 8);
