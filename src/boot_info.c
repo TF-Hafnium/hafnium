@@ -20,13 +20,14 @@
  * Initializes the ffa_boot_info_header in accordance to the specification.
  */
 static void ffa_boot_info_header_init(struct ffa_boot_info_header *header,
-				      size_t blob_size)
+				      size_t blob_size,
+				      enum ffa_version vm_ffa_version)
 {
 	assert(header != NULL);
 	assert(blob_size != 0U);
 
 	header->signature = FFA_BOOT_INFO_SIG;
-	header->version = FFA_BOOT_INFO_VERSION;
+	header->version = vm_ffa_version;
 	header->info_blob_size = blob_size;
 	header->desc_size = sizeof(struct ffa_boot_info_desc);
 	header->desc_count = 0;
@@ -92,7 +93,8 @@ static void boot_info_write_desc(struct ffa_boot_info_header *header,
  * requested information into the boot info memory.
  */
 bool ffa_boot_info_node(struct fdt_node *boot_info_node,
-			struct partition_pkg *pkg)
+			struct partition_pkg *pkg,
+			enum ffa_version vm_ffa_version)
 {
 	struct memiter data;
 	struct ffa_boot_info_header *boot_info_header;
@@ -121,7 +123,8 @@ bool ffa_boot_info_node(struct fdt_node *boot_info_node,
 	 * descriptors. The size of boot info contents to be incremented,
 	 * depending on the info specified in the partition's FF-A manifest.
 	 */
-	ffa_boot_info_header_init(boot_info_header, boot_info_size);
+	ffa_boot_info_header_init(boot_info_header, boot_info_size,
+				  vm_ffa_version);
 
 	if (!fdt_is_compatible(boot_info_node, "arm,ffa-manifest-boot-info")) {
 		dlog_verbose("The node 'boot-info' is not compatible.\n");

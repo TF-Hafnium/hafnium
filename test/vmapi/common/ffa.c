@@ -708,7 +708,6 @@ struct ffa_boot_info_desc *get_boot_info_desc(
 	assert(boot_info_header != NULL);
 
 	ASSERT_EQ(boot_info_header->signature, 0xFFAU);
-	ASSERT_GE(boot_info_header->version, 0x10001U);
 	ASSERT_EQ(boot_info_header->desc_size,
 		  sizeof(struct ffa_boot_info_desc));
 	ASSERT_EQ((uintptr_t)boot_info_header + boot_info_header->desc_offset,

@@ -1552,7 +1552,8 @@ static enum manifest_return_code parse_ffa_partition_package(
 				"space.\n",
 				vm->debug_name.data);
 		} else {
-			if (!ffa_boot_info_node(&boot_info_node, &pkg)) {
+			if (!ffa_boot_info_node(&boot_info_node, &pkg,
+						vm->partition.ffa_version)) {
 				dlog_error(
 					"Failed to process boot "
 					"information.\n");
