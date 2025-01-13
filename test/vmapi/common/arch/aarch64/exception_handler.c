@@ -68,8 +68,8 @@ void exception_handler_send_exception_count(void)
 	 * allows to detect the caller to a running test service. This may
 	 * eventually become to be another endpoint, different from primary VM.
 	 */
-	ffa_rxtx_header_init(hf_vm_get_id(), HF_PRIMARY_VM_ID, sizeof(int),
-			     &exception_msg->header);
+	ffa_rxtx_header_init(&exception_msg->header, hf_vm_get_id(),
+			     HF_PRIMARY_VM_ID, sizeof(int));
 	memcpy_s(exception_msg->payload, FFA_MSG_PAYLOAD_MAX,
 		 (const void *)&exception_handler_exception_count,
 		 sizeof(exception_handler_exception_count));

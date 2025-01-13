@@ -239,8 +239,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 		 * can use it to retrieve the memory.
 		 */
 		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-		ffa_rxtx_header_init(sender, receiver->receiver, msg_size,
-				     &retrieve_message->header);
+		ffa_rxtx_header_init(&retrieve_message->header, sender,
+				     receiver->receiver, msg_size);
 		ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 	}
 
@@ -368,8 +368,8 @@ ffa_memory_handle_t send_memory_and_retrieve_request_force_fragmented(
 		retrieve_instruction_access, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
 		&impdef_val);
-	ffa_rxtx_header_init(sender, recipient, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, sender, recipient,
+			     msg_size);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 	ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 
@@ -413,8 +413,8 @@ void send_retrieve_request(
 
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
-	ffa_rxtx_header_init(sender, recipient, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, sender, recipient,
+			     msg_size);
 
 	ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 }
@@ -730,7 +730,7 @@ struct ffa_value send_indirect_message(ffa_id_t from, ffa_id_t to, void *send,
 	struct ffa_partition_msg *message = (struct ffa_partition_msg *)send;
 
 	/* Initialize message header. */
-	ffa_rxtx_header_init(from, to, payload_size, &message->header);
+	ffa_rxtx_header_init(&message->header, from, to, payload_size);
 
 	/* Fill TX buffer with payload. */
 	memcpy_s(message->payload, FFA_PARTITION_MSG_PAYLOAD_MAX, payload,

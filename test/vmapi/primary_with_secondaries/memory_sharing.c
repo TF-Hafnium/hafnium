@@ -329,9 +329,9 @@ static void lend_and_check_memory_increment(
 			 * Send the appropriate retrieve request to the VM so
 			 * that it can use it to retrieve the memory.
 			 */
-			ffa_rxtx_header_init(hf_vm_get_id(), recipient,
-					     msg_size,
-					     &retrieve_message->header);
+			ffa_rxtx_header_init(&retrieve_message->header,
+					     hf_vm_get_id(), recipient,
+					     msg_size);
 			EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 			/* Run borrower such that it can retrieve memory. */
 			EXPECT_EQ(ffa_run(recipient, 0).func, FFA_YIELD_32);
@@ -3795,8 +3795,8 @@ TEST(memory_sharing, mem_share_bypass_multiple_borrowers_wrong_receiver_count)
 
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
-	ffa_rxtx_header_init(own_id, service1_info->vm_id, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, own_id,
+			     service1_info->vm_id, msg_size);
 
 	ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 
@@ -3856,8 +3856,8 @@ TEST(memory_sharing, mem_share_bypass_multiple_borrowers_single_receiver_fails)
 
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
-	ffa_rxtx_header_init(own_id, service1_info->vm_id, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, own_id,
+			     service1_info->vm_id, msg_size);
 
 	ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 
@@ -4201,8 +4201,8 @@ TEST(memory_sharing_v1_1, share_ffa_v1_1_to_current_version)
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-	ffa_rxtx_header_init(hf_vm_get_id(), service2_info->vm_id, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, hf_vm_get_id(),
+			     service2_info->vm_id, msg_size);
 	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 
 	/* Run service2 for it to fetch memory, and then use memory. */
@@ -4283,8 +4283,8 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_1)
 		sizeof(struct ffa_memory_access_v1_0), 0,
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
-	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, hf_vm_get_id(),
+			     service1_info->vm_id, msg_size);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
@@ -4375,8 +4375,8 @@ TEST(memory_sharing, fail_fragmented_if_retrieve_before_sent)
 		FFA_DATA_ACCESS_NOT_SPECIFIED,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL);
-	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, hf_vm_get_id(),
+			     service1_info->vm_id, msg_size);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 
@@ -4437,8 +4437,8 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish)
 
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
-	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, hf_vm_get_id(),
+			     service1_info->vm_id, msg_size);
 	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 	/* Run to retrieve memory. */
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
@@ -4496,8 +4496,8 @@ TEST(memory_sharing, lend_zero_memory_after_relinquish)
 
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
-	ffa_rxtx_header_init(hf_vm_get_id(), service1_info->vm_id, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, hf_vm_get_id(),
+			     service1_info->vm_id, msg_size);
 	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 	/* Run to retrieve memory. */
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);

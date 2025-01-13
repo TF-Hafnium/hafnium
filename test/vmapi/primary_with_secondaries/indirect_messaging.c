@@ -131,7 +131,7 @@ static void msg_send2_invalid_parameters(ffa_id_t sender, ffa_id_t receiver,
 	SERVICE_SELECT(service1_info->vm_id, "ffa_indirect_msg_error", send);
 
 	message = (struct ffa_partition_msg *)send;
-	ffa_rxtx_header_init(sender, receiver, size, &message->header);
+	ffa_rxtx_header_init(&message->header, sender, receiver, size);
 
 	/* The header is expected to be invalid, do not set any payload. */
 

@@ -1326,8 +1326,8 @@ TEST_SERVICE(share_ffa_v1_1)
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
-	ffa_rxtx_header_init(hf_vm_get_id(), service2_info->vm_id, msg_size,
-			     &retrieve_message->header);
+	ffa_rxtx_header_init(&retrieve_message->header, hf_vm_get_id(),
+			     service2_info->vm_id, msg_size);
 	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 
 	/* Run service2 for it to fetch the memory. */
