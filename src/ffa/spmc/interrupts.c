@@ -584,8 +584,7 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 }
 
 bool ffa_interrupts_inject_notification_pending_interrupt(
-	struct vcpu_locked target_locked, struct vcpu_locked current_locked,
-	struct vm_locked receiver_locked)
+	struct vcpu_locked target_locked, struct vm_locked receiver_locked)
 {
 	struct vm *next_vm = target_locked.vcpu->vm;
 	bool ret = false;
@@ -602,9 +601,8 @@ bool ffa_interrupts_inject_notification_pending_interrupt(
 		     receiver_locked, vcpu_index(target_locked.vcpu)) ||
 	     (vm_are_global_notifications_pending(receiver_locked) &&
 	      !vm_notifications_is_npi_injected(receiver_locked)))) {
-		api_interrupt_inject_locked(target_locked,
-					    HF_NOTIFICATION_PENDING_INTID,
-					    current_locked, NULL);
+		vcpu_interrupt_inject(target_locked,
+				      HF_NOTIFICATION_PENDING_INTID);
 		vm_notifications_set_npi_injected(receiver_locked, true);
 		ret = true;
 	}

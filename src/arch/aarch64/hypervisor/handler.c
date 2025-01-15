@@ -1134,7 +1134,6 @@ struct vcpu *fiq_lower(void)
 #if SECURE_WORLD == 1
 	struct vcpu_locked current_locked;
 	struct vcpu *current_vcpu = current();
-	int64_t ret;
 	uint32_t intid;
 
 	intid = get_highest_pending_g0_interrupt_id();
@@ -1166,12 +1165,7 @@ struct vcpu *fiq_lower(void)
 
 		current_locked = vcpu_lock(current_vcpu);
 		current_vcpu->prev_interrupt_priority = pmr;
-		ret = api_interrupt_inject_locked(current_locked,
-						  HF_MANAGED_EXIT_INTID,
-						  current_locked, NULL);
-		if (ret != 0) {
-			panic("Failed to inject managed exit interrupt\n");
-		}
+		vcpu_interrupt_inject(current_locked, HF_MANAGED_EXIT_INTID);
 
 		/* Entering managed exit sequence. */
 		current_vcpu->processing_managed_exit = true;

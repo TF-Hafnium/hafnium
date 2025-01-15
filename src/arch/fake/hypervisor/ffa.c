@@ -354,11 +354,9 @@ void ffa_notifications_sri_set_delayed(struct cpu *cpu)
 }
 
 bool ffa_interrupts_inject_notification_pending_interrupt(
-	struct vcpu_locked target_locked, struct vcpu_locked current_locked,
-	struct vm_locked receiver_locked)
+	struct vcpu_locked target_locked, struct vm_locked receiver_locked)
 {
 	(void)target_locked;
-	(void)current_locked;
 	(void)receiver_locked;
 
 	return false;

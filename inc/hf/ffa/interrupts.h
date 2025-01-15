@@ -19,8 +19,7 @@ int64_t ffa_interrupts_deactivate(uint32_t pint_id, uint32_t vint_id,
 void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 					    struct vcpu **next);
 bool ffa_interrupts_inject_notification_pending_interrupt(
-	struct vcpu_locked next_locked, struct vcpu_locked current_locked,
-	struct vm_locked receiver_locked);
+	struct vcpu_locked next_locked, struct vm_locked receiver_locked);
 
 bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
 				   struct vcpu_locked next_locked,

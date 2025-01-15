@@ -278,23 +278,13 @@ void vcpu_interrupt_inject(struct vcpu_locked target_locked, uint32_t intid)
 	 * if it is enabled and was not previously pending. Otherwise we can
 	 * skip everything except setting the pending bit.
 	 */
-	if (!(vcpu_is_virt_interrupt_enabled(interrupts, intid) &&
-	      !vcpu_is_virt_interrupt_pending(interrupts, intid))) {
-		goto out;
+	if ((vcpu_is_virt_interrupt_enabled(interrupts, intid) &&
+	     !vcpu_is_virt_interrupt_pending(interrupts, intid))) {
+		/* Increment the count. */
+		vcpu_interrupt_count_increment(target_locked, interrupts,
+					       intid);
 	}
 
-	/* Increment the count. */
-	vcpu_interrupt_count_increment(target_locked, interrupts, intid);
-
-	/*
-	 * Only need to update state if there was not already an
-	 * interrupt enabled and pending.
-	 */
-	if (vcpu_interrupt_count_get(target_locked) != 1) {
-		goto out;
-	}
-
-out:
 	/* Either way, make it pending. */
 	vcpu_virt_interrupt_set_pending(interrupts, intid);
 }

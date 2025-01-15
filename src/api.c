@@ -971,65 +971,6 @@ void api_regs_state_saved(struct vcpu *vcpu)
 }
 
 /**
- * Assuming that the arguments have already been checked by the caller, injects
- * a virtual interrupt of the given ID into the given target vCPU. This doesn't
- * cause the vCPU to actually be run immediately; it will be taken when the vCPU
- * is next run, which is up to the scheduler.
- *
- * Returns:
- *  - 0 on success if no further action is needed.
- *  - 1 if it was called by the primary VM and the primary VM now needs to wake
- *    up or kick the target vCPU.
- */
-int64_t api_interrupt_inject_locked(struct vcpu_locked target_locked,
-				    uint32_t intid,
-				    struct vcpu_locked current_locked,
-				    struct vcpu **next)
-{
-	struct vcpu *target_vcpu = target_locked.vcpu;
-	struct vcpu *current = current_locked.vcpu;
-	struct interrupts *interrupts = &target_vcpu->interrupts;
-	int64_t ret = 0;
-
-	/*
-	 * We only need to change state and (maybe) trigger a virtual interrupt
-	 * if it is enabled and was not previously pending. Otherwise we can
-	 * skip everything except setting the pending bit.
-	 */
-	if (!(vcpu_is_virt_interrupt_enabled(interrupts, intid) &&
-	      !vcpu_is_virt_interrupt_pending(interrupts, intid))) {
-		goto out;
-	}
-
-	/* Increment the count. */
-	vcpu_interrupt_count_increment(target_locked, interrupts, intid);
-
-	/*
-	 * Only need to update state if there was not already an
-	 * interrupt enabled and pending.
-	 */
-	if (vcpu_interrupt_count_get(target_locked) != 1) {
-		goto out;
-	}
-
-	if (vm_is_primary(current->vm)) {
-		/*
-		 * If the call came from the primary VM, let it know that it
-		 * should run or kick the target vCPU.
-		 */
-		ret = 1;
-	} else if (current != target_vcpu && next != NULL) {
-		*next = api_wake_up_locked(current_locked, target_vcpu);
-	}
-
-out:
-	/* Either way, make it pending. */
-	vcpu_virt_interrupt_set_pending(interrupts, intid);
-
-	return ret;
-}
-
-/**
  * Constructs the return value from a successful FFA_MSG_WAIT call, when used
  * with FFA_MSG_SEND_32.
  */
@@ -1200,15 +1141,13 @@ out:
 /**
  * Inject virtual timer interrupt to next vCPU if its timer has expired.
  */
-static void api_inject_arch_timer_interrupt(struct vcpu_locked current_locked,
-					    struct vcpu_locked next_locked)
+static void api_inject_arch_timer_interrupt(struct vcpu_locked next_locked)
 {
 	struct vcpu *next = next_locked.vcpu;
 
 	if (arch_timer_expired(&next->regs)) {
 		/* Make virtual timer interrupt pending. */
-		api_interrupt_inject_locked(next_locked, HF_VIRTUAL_TIMER_INTID,
-					    current_locked, NULL);
+		vcpu_interrupt_inject(next_locked, HF_VIRTUAL_TIMER_INTID);
 		vcpu_interrupt_queue_push(next_locked, HF_VIRTUAL_TIMER_INTID);
 	}
 }
@@ -1322,7 +1261,7 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 		assert(need_vm_lock == true);
 		if (!vm_locked.vm->el0_partition) {
 			ffa_interrupts_inject_notification_pending_interrupt(
-				vcpu_next_locked, current_locked, vm_locked);
+				vcpu_next_locked, vm_locked);
 		}
 
 		/* Provide reference to the return value. */
@@ -1332,7 +1271,7 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 		if (need_vm_lock &&
 		    ffa_interrupts_inject_notification_pending_interrupt(
-			    vcpu_next_locked, current_locked, vm_locked)) {
+			    vcpu_next_locked, vm_locked)) {
 			assert(vcpu_interrupt_count_get(vcpu_next_locked) > 0);
 			break;
 		}
@@ -1372,7 +1311,7 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 		/* Check NPI is to be injected here. */
 		if (need_vm_lock) {
 			ffa_interrupts_inject_notification_pending_interrupt(
-				vcpu_next_locked, current_locked, vm_locked);
+				vcpu_next_locked, vm_locked);
 		}
 		break;
 	default:
@@ -3021,7 +2960,7 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 	}
 
 	/* Inject timer interrupt if timer has expired. */
-	api_inject_arch_timer_interrupt(current_locked, receiver_vcpu_locked);
+	api_inject_arch_timer_interrupt(receiver_vcpu_locked);
 	timer_migrate_to_other_cpu(current->cpu, receiver_vcpu_locked);
 
 	/* The receiver vCPU runs upon direct message invocation */
@@ -3054,7 +2993,7 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 		 * to receiver_vcpu.
 		 */
 		ffa_interrupts_inject_notification_pending_interrupt(
-			receiver_vcpu_locked, current_locked, receiver_locked);
+			receiver_vcpu_locked, receiver_locked);
 	}
 
 	/*
@@ -3270,7 +3209,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 	next_locked = vcpus_locked.vcpu2;
 
 	/* Inject timer interrupt if timer has expired. */
-	api_inject_arch_timer_interrupt(current_locked, next_locked);
+	api_inject_arch_timer_interrupt(next_locked);
 	ffa_direct_msg_unwind_call_chain_ffa_direct_resp(current_locked,
 							 next_locked);
 
