@@ -103,7 +103,7 @@ TEST_SERVICE(smccc_ffa_direct_request_callee_preserved)
 
 	/* Retrieve FF-A ID of the target endpoint. */
 	receive_indirect_message((void *)&target_id, sizeof(target_id),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	HFTEST_LOG("Echo test with: %x", target_id);
 

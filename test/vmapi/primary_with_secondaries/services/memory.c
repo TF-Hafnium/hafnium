@@ -567,8 +567,9 @@ TEST_SERVICE(ffa_memory_return)
 	ffa_id_t sender;
 	struct ffa_composite_memory_region *composite;
 
-	receive_indirect_message(&target_id, sizeof(target_id), recv_buf,
-				 &sender);
+	sender = receive_indirect_message(&target_id, sizeof(target_id),
+					  recv_buf)
+			 .sender;
 
 	ffa_yield();
 
@@ -737,8 +738,9 @@ TEST_SERVICE(ffa_donate_twice)
 	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region_constituent constituent;
 
-	receive_indirect_message(&target_id, sizeof(target_id), recv_buf,
-				 &sender);
+	sender = receive_indirect_message(&target_id, sizeof(target_id),
+					  recv_buf)
+			 .sender;
 
 	ffa_yield();
 	EXPECT_EQ(retrieve_memory_from_message(recv_buf, send_buf, NULL,
@@ -1367,7 +1369,7 @@ TEST_SERVICE(retrieve_ffa_v1_1)
 	/* Set version to v1.1. */
 	ffa_version(FFA_VERSION_1_1);
 
-	receive_indirect_message(send_buf, HF_MAILBOX_SIZE, recv_buf, NULL);
+	receive_indirect_message(send_buf, HF_MAILBOX_SIZE, recv_buf);
 	msg_size = retrv_message->header.size;
 	ret = ffa_mem_retrieve_req(msg_size, msg_size);
 	EXPECT_EQ(ret.func, FFA_MEM_RETRIEVE_RESP_32);

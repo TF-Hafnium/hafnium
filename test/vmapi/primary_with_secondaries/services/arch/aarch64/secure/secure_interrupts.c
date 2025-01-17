@@ -62,7 +62,7 @@ TEST_SERVICE(sip_call_trigger_spi)
 
 	/* Retrieve interrupt ID to be triggered. */
 	receive_indirect_message((void *)&interrupt_id, sizeof(interrupt_id),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	/*
 	 * The SiP function ID 0x82000100 must have been added to the SMC
@@ -144,8 +144,8 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 	/* Enable the Secure Watchdog timer interrupt. */
 	EXPECT_EQ(hf_interrupt_enable(IRQ_TWDOG_INTID, true, 0), 0);
 
-	receive_indirect_message((void *)&delay, sizeof(delay), recv_buf,
-				 &echo_sender);
+	echo_sender = receive_indirect_message(&delay, sizeof(delay), recv_buf)
+			      .sender;
 
 	HFTEST_LOG("Message received: %#x", delay);
 
@@ -235,7 +235,7 @@ TEST_SERVICE(send_direct_req_yielded_and_resumed)
 
 	/* Obtain the ID of the target service through indirect message. */
 	receive_indirect_message((void *)&target_vm_id, sizeof(target_vm_id),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	ret = ffa_msg_wait();
 	EXPECT_EQ(ret.func, FFA_RUN_32);
@@ -378,9 +378,8 @@ TEST_SERVICE(send_ipi)
 	ret = ffa_msg_wait();
 	EXPECT_EQ(ret.func, FFA_RUN_32);
 
-	receive_indirect_message((void *)&target_vcpu_ids,
-				 sizeof(target_vcpu_ids), SERVICE_RECV_BUFFER(),
-				 NULL);
+	receive_indirect_message(&target_vcpu_ids, sizeof(target_vcpu_ids),
+				 SERVICE_RECV_BUFFER());
 
 	dlog_verbose("Waiting for target vCPUs to be ready.");
 
@@ -419,7 +418,7 @@ TEST_SERVICE(send_ipi_fails)
 		EXPECT_EQ(ret.func, FFA_RUN_32);
 
 		receive_indirect_message((void *)&vcpu, sizeof(vcpu),
-					 SERVICE_RECV_BUFFER(), NULL);
+					 SERVICE_RECV_BUFFER());
 
 		EXPECT_EQ(hf_interrupt_send_ipi(vcpu), -1);
 	}

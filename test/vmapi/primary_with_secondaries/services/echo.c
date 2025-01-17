@@ -37,8 +37,9 @@ TEST_SERVICE(echo_msg_send2)
 		uint32_t payload;
 		ffa_id_t echo_sender;
 
-		receive_indirect_message((void *)&payload, sizeof(payload),
-					 recv_buf, &echo_sender);
+		echo_sender = receive_indirect_message(
+				      &payload, sizeof(payload), recv_buf)
+				      .sender;
 
 		HFTEST_LOG("Message received: %#x", payload);
 
@@ -69,7 +70,7 @@ TEST_SERVICE(echo_msg_send2_service)
 
 	/* Retrieve uuid of target endpoint. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	/* From uuid to respective partition info. */
 	ASSERT_EQ(get_ffa_partition_info(target_uuid, &target_info,
@@ -83,8 +84,9 @@ TEST_SERVICE(echo_msg_send2_service)
 
 	ffa_yield();
 
-	receive_indirect_message(&echo_payload, sizeof(echo_payload), recv_buf,
-				 &echo_sender);
+	echo_sender = receive_indirect_message(&echo_payload,
+					       sizeof(echo_payload), recv_buf)
+			      .sender;
 
 	HFTEST_LOG("Message received: %#x", echo_payload);
 

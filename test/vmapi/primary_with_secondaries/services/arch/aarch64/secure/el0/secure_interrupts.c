@@ -60,8 +60,8 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 	/* Enable the Secure Watchdog timer interrupt. */
 	EXPECT_EQ(hf_interrupt_enable(IRQ_TWDOG_INTID, true, 0), 0);
 
-	receive_indirect_message((void *)&delay, sizeof(delay), recv_buf,
-				 &echo_sender);
+	echo_sender = receive_indirect_message(&delay, sizeof(delay), recv_buf)
+			      .sender;
 
 	HFTEST_LOG("Message received: %#x", delay);
 
@@ -100,7 +100,7 @@ TEST_SERVICE(send_direct_req_yielded_and_resumed)
 				0x88889999};
 
 	receive_indirect_message((void *)&target_vm_id, sizeof(target_vm_id),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	ret = ffa_msg_wait();
 	EXPECT_EQ(ret.func, FFA_RUN_32);

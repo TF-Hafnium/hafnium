@@ -47,7 +47,7 @@ TEST_SERVICE(test_ffa_msg_wait_release_buffer)
 	EXPECT_EQ(ret.func, FFA_RUN_32);
 
 	/* Read RX buffer and verify expected message payload. */
-	receive_indirect_message((void *)&msg, sizeof(msg), recv_buf, NULL);
+	receive_indirect_message((void *)&msg, sizeof(msg), recv_buf);
 	EXPECT_EQ(msg, 0x123);
 
 	dlog_verbose(
@@ -105,7 +105,7 @@ TEST_SERVICE(read_rx_buffer)
 	semaphore_wait(&ffa_msg_wait_called);
 
 	/* Read RX buffer and verify expected message payload. */
-	receive_indirect_message((void *)&msg, sizeof(msg), recv_buf, NULL);
+	receive_indirect_message((void *)&msg, sizeof(msg), recv_buf);
 	EXPECT_EQ(msg, 0x123);
 	ffa_yield();
 }
@@ -134,7 +134,7 @@ TEST_SERVICE(send_indirect_msg_to_sp_fail)
 
 	/* Receive ID of service to send message to. */
 	receive_indirect_message((void *)&target_id, sizeof(target_id),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	HFTEST_LOG("Attempting to send indirect message %lx to %x", msg,
 		   target_id);
@@ -160,7 +160,7 @@ TEST_SERVICE(ffa_msg_wait_pending_indirect_message)
 	EXPECT_EQ(ret.func, FFA_RUN_32);
 
 	/* Read RX buffer and verify expected message payload from PVM. */
-	receive_indirect_message((void *)&msg, sizeof(msg), recv_buf, NULL);
+	receive_indirect_message((void *)&msg, sizeof(msg), recv_buf);
 	EXPECT_EQ(msg, 0x123);
 
 	dlog_verbose(

@@ -61,7 +61,7 @@ TEST_PRECONDITION(secure_interrupts, preempted_by_secure_interrupt,
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	const uint32_t delay = 100;
-	const uint32_t echo_payload;
+	uint32_t echo_payload;
 	ffa_id_t echo_sender;
 	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
@@ -81,8 +81,9 @@ TEST_PRECONDITION(secure_interrupts, preempted_by_secure_interrupt,
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
 
-	receive_indirect_message((void *)&echo_payload, sizeof(echo_payload),
-				 mb.recv, &echo_sender);
+	echo_sender = receive_indirect_message(&echo_payload,
+					       sizeof(echo_payload), mb.recv)
+			      .sender;
 
 	HFTEST_LOG("Message echoed back: %#x", echo_payload);
 	EXPECT_EQ(echo_payload, delay);

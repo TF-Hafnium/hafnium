@@ -141,7 +141,7 @@ TEST_SERVICE(ffa_direct_message_echo_services)
 
 	/* Retrieve FF-A ID of the target endpoint. */
 	receive_indirect_message((void *)&target_id, sizeof(target_id),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	HFTEST_LOG("Echo test with: %x", target_id);
 
@@ -172,7 +172,7 @@ TEST_SERVICE(ffa_direct_message_req2_echo_services)
 
 	/* Retrieve uuid of target endpoint. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	HFTEST_LOG("Target UUID: %X-%X-%X-%X", target_uuid.uuid[0],
 		   target_uuid.uuid[1], target_uuid.uuid[2],
@@ -219,7 +219,7 @@ TEST_SERVICE(ffa_yield_direct_message_echo_services)
 
 	/* Retrieve FF-A ID of the target endpoint. */
 	receive_indirect_message((void *)&target_id, sizeof(target_id),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	HFTEST_LOG("Echo test with: %x", target_id);
 
@@ -398,7 +398,7 @@ TEST_SERVICE(ffa_direct_message_v_1_2_cycle_denied)
 
 	/* Retrieve uuid of target endpoint. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	/* Wait for direct request. */
 	args = ffa_msg_wait();
@@ -439,7 +439,7 @@ TEST_SERVICE(ffa_direct_message_cycle_req_req2_denied)
 
 	/* Retrieve uuid of target endpoint. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	/* Wait for direct request. */
 	args = ffa_msg_wait();
@@ -475,7 +475,7 @@ TEST_SERVICE(ffa_yield_direct_message_v_1_2_echo_services)
 
 	/* Retrieve FF-A ID of the target endpoint. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	/* From uuid to respective partition info. */
 	ASSERT_EQ(get_ffa_partition_info(target_uuid, &target_info,
@@ -584,7 +584,7 @@ TEST_SERVICE(ffa_disallowed_direct_msg_req2)
 
 	/* Retrieve uuid of NWd PVM. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	service1_info = service1(recv_buf);
 
@@ -746,7 +746,7 @@ TEST_SERVICE(version_does_not_support_req2)
 
 	/* Retrieve uuid of target endpoint. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
-				 recv_buf, NULL);
+				 recv_buf);
 
 	HFTEST_LOG("Target UUID: %X-%X-%X-%X", target_uuid.uuid[0],
 		   target_uuid.uuid[1], target_uuid.uuid[2],

@@ -44,7 +44,7 @@ TEST(indirect_messaging, echo)
 	struct ffa_value ret;
 	struct mailbox_buffers mb = set_up_mailbox();
 	const uint32_t payload = 0xAA55AA55;
-	const uint32_t echo_payload;
+	uint32_t echo_payload;
 	ffa_id_t echo_sender;
 	ffa_id_t own_id = hf_vm_get_id();
 	struct ffa_partition_info *service1_info = service1(mb.recv);
@@ -60,8 +60,9 @@ TEST(indirect_messaging, echo)
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
-	receive_indirect_message((void *)&echo_payload, sizeof(echo_payload),
-				 mb.recv, &echo_sender);
+	echo_sender = receive_indirect_message(&echo_payload,
+					       sizeof(echo_payload), mb.recv)
+			      .sender;
 
 	HFTEST_LOG("Message echoed back: %#x", echo_payload);
 	EXPECT_EQ(echo_payload, payload);
@@ -356,8 +357,9 @@ TEST(indirect_messaging, services_echo)
 	ret = ffa_run(service2_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
-	receive_indirect_message(&echo_payload, sizeof(echo_payload), mb.recv,
-				 &echo_sender);
+	echo_sender = receive_indirect_message(&echo_payload,
+					       sizeof(echo_payload), mb.recv)
+			      .sender;
 
 	HFTEST_LOG("Message received: %#x", echo_payload);
 
@@ -425,7 +427,7 @@ TEST(indirect_messaging, relay)
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
 	/* Ensure the message is intact. */
-	receive_indirect_message(response, sizeof(response), mb.recv, NULL);
+	receive_indirect_message(response, sizeof(response), mb.recv);
 	EXPECT_EQ(memcmp(&response[sizeof(ffa_id_t)], expected_message,
 			 sizeof(expected_message)),
 		  0);

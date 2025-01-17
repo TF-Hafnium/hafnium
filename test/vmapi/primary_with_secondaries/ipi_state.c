@@ -110,8 +110,7 @@ void hftest_ipi_init_state_from_message(void *recv_buf, void *send_buf)
 
 	/* Receive the index of the ipi state array the service should use. */
 	receive_indirect_message((void *)&current_ipi_state_index,
-				 sizeof(current_ipi_state_index), recv_buf,
-				 NULL);
+				 sizeof(current_ipi_state_index), recv_buf);
 
 	set_ipi_state_initialized();
 

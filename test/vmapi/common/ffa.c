@@ -737,8 +737,9 @@ struct ffa_value send_indirect_message(ffa_id_t from, ffa_id_t to, void *send,
 	return ffa_msg_send2(send_flags);
 }
 
-void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
-			      ffa_id_t *sender)
+struct ffa_partition_rxtx_header receive_indirect_message(void *payload,
+							  size_t payload_size,
+							  const void *recv_buf)
 {
 	const struct ffa_partition_msg *message;
 	struct ffa_partition_rxtx_header header;
@@ -747,7 +748,7 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 	ffa_notifications_bitmap_t fwk_notif;
 	const ffa_id_t own_id = hf_vm_get_id();
 
-	EXPECT_LE(buffer_size, FFA_MSG_PAYLOAD_MAX);
+	EXPECT_LE(payload_size, FFA_MSG_PAYLOAD_MAX);
 
 	/* Check notification */
 	ret = ffa_notification_get(own_id, 0,
@@ -761,10 +762,8 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 		FAIL("Expected Rx buffer full notification.");
 	}
 
-	message = (const struct ffa_partition_msg *)recv;
-	memcpy_s(&header, sizeof(header), message,
-		 sizeof(struct ffa_partition_rxtx_header));
-
+	message = (const struct ffa_partition_msg *)recv_buf;
+	header = message->header;
 	source_vm_id = header.sender;
 
 	if (is_ffa_hyp_buffer_full_notification(fwk_notif)) {
@@ -775,17 +774,14 @@ void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
 
 	/* Check receiver ID against own ID. */
 	ASSERT_EQ(header.receiver, own_id);
-	ASSERT_LE(header.size, buffer_size);
+	ASSERT_LE(header.size, payload_size);
 
 	/* Get message to free the RX buffer. */
-	memcpy_s(buffer, buffer_size, ffa_partition_msg_payload_const(message),
-		 header.size);
+	memcpy_s(payload, payload_size, message->payload, header.size);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 
-	if (sender != NULL) {
-		*sender = source_vm_id;
-	}
+	return header;
 }
 
 bool ffa_partition_info_regs_get_part_info(

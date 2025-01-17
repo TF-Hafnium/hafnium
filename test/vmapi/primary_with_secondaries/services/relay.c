@@ -34,8 +34,9 @@ TEST_SERVICE(relay)
 		void *recv_buf = SERVICE_RECV_BUFFER();
 		void *send_buf = SERVICE_SEND_BUFFER();
 
-		receive_indirect_message(message, sizeof(message), recv_buf,
-					 &sender);
+		sender = receive_indirect_message(message, sizeof(message),
+						  recv_buf)
+				 .sender;
 
 		chain = (ffa_id_t *)message;
 		next_id = le16toh(*chain);

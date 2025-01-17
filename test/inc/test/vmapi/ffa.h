@@ -150,8 +150,9 @@ struct ffa_value send_indirect_message(ffa_id_t from, ffa_id_t to, void *send,
 				       const void *payload, size_t payload_size,
 				       uint32_t send_flags);
 
-void receive_indirect_message(void *buffer, size_t buffer_size, void *recv,
-			      ffa_id_t *sender);
+struct ffa_partition_rxtx_header receive_indirect_message(void *payload,
+							  size_t payload_size,
+							  const void *recv_buf);
 
 bool ffa_partition_info_regs_get_part_info(
 	struct ffa_value args, uint8_t idx,
