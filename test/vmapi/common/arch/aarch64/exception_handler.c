@@ -9,6 +9,7 @@
 #include "test/vmapi/arch/exception_handler.h"
 
 #include "hf/dlog.h"
+#include "hf/ffa.h"
 
 #include "vmapi/hf/call.h"
 
@@ -70,8 +71,8 @@ void exception_handler_send_exception_count(void)
 	 */
 	ffa_rxtx_header_init(&exception_msg->header, hf_vm_get_id(),
 			     HF_PRIMARY_VM_ID, sizeof(int));
-	memcpy_s(exception_msg->payload, FFA_MSG_PAYLOAD_MAX,
-		 (const void *)&exception_handler_exception_count,
+	memcpy_s(ffa_partition_msg_payload(exception_msg), FFA_MSG_PAYLOAD_MAX,
+		 &exception_handler_exception_count,
 		 sizeof(exception_handler_exception_count));
 	EXPECT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
 	ffa_yield();
@@ -84,7 +85,8 @@ int exception_handler_receive_exception_count(const void *recv_buf)
 {
 	struct ffa_partition_msg *exception_msg =
 		(struct ffa_partition_msg *)recv_buf;
-	int exception_count = *((const int *)exception_msg->payload);
+	int exception_count =
+		*((const int *)ffa_partition_msg_payload_const(exception_msg));
 	struct ffa_value ret;
 	ffa_notifications_bitmap_t fwk_notif;
 

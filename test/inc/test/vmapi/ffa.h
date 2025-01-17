@@ -64,7 +64,8 @@ struct mailbox_buffers {
 
 struct mailbox_buffers set_up_mailbox(void);
 void mailbox_unmap_buffers(struct mailbox_buffers *mb);
-void mailbox_receive_retry(void *buffer, size_t buffer_size, void *recv,
+void mailbox_receive_retry(void *payload, size_t payload_size,
+			   const void *recv_buf,
 			   struct ffa_partition_rxtx_header *header);
 ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	uint32_t share_func, void *tx_buffer, ffa_id_t sender,

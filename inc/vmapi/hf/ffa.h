@@ -553,6 +553,21 @@ struct ffa_partition_msg {
 static_assert(sizeof(struct ffa_partition_msg) == HF_MAILBOX_SIZE,
 	      "FF-A message size must match mailbox size");
 
+/**
+ * Get the partition message's payload, according to the header's `offset`
+ * field.
+ */
+static inline void *ffa_partition_msg_payload(struct ffa_partition_msg *msg)
+{
+	return (char *)msg + msg->header.offset;
+}
+
+static inline const void *ffa_partition_msg_payload_const(
+	const struct ffa_partition_msg *msg)
+{
+	return (const char *)msg + msg->header.offset;
+}
+
 /* The maximum length possible for a single message. */
 #define FFA_MSG_PAYLOAD_MAX HF_MAILBOX_SIZE
 

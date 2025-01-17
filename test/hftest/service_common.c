@@ -287,7 +287,7 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 	struct fdt fdt;
 	const ffa_id_t own_id = hf_vm_get_id();
 	ffa_notifications_bitmap_t bitmap;
-	struct ffa_partition_msg *message;
+	const struct ffa_partition_msg *message;
 	uint32_t vcpu = get_current_vcpu_index();
 
 	ctx = hftest_get_context();
@@ -356,7 +356,8 @@ noreturn void hftest_service_main(const void *fdt_ptr)
 		ASSERT_EQ(hf_interrupt_get(), HF_NOTIFICATION_PENDING_INTID);
 	}
 
-	memiter_init(&args, message->payload, message->header.size);
+	memiter_init(&args, ffa_partition_msg_payload_const(message),
+		     message->header.size);
 
 	/* Find service handler. */
 	service = find_service(&args);
