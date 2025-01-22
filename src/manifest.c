@@ -24,6 +24,7 @@
 #include "hf/ffa.h"
 #include "hf/ffa_partition_manifest.h"
 #include "hf/layout.h"
+#include "hf/mem_range.h"
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/sp_pkg.h"
@@ -507,11 +508,6 @@ static enum manifest_return_code parse_vm(struct fdt_node *node,
 	return MANIFEST_SUCCESS;
 }
 
-static bool mem_range_contains(struct mem_range range, uintptr_t address)
-{
-	return pa_addr(range.begin) <= address && address <= pa_addr(range.end);
-}
-
 /**
  * Return true if the region described by `region_start` and `page_count`
  * overlaps with any of `ranges`.
@@ -521,12 +517,10 @@ static bool is_memory_region_within_ranges(uintptr_t region_start,
 					   const struct mem_range ranges[],
 					   size_t ranges_size)
 {
-	uintptr_t region_end =
-		region_start + ((uintptr_t)page_count * PAGE_SIZE - 1);
+	struct mem_range region = make_mem_range(region_start, page_count);
 
 	for (size_t i = 0; i < ranges_size; i++) {
-		if (mem_range_contains(ranges[i], region_start) ||
-		    mem_range_contains(ranges[i], region_end)) {
+		if (mem_range_overlaps(ranges[i], region)) {
 			return true;
 		}
 	}
@@ -823,7 +817,7 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 				make_mem_range(mem_regions[i].base_address,
 					       mem_regions[i].page_count);
 
-			if (mem_range_contains(range, load_address)) {
+			if (mem_range_contains_address(range, load_address)) {
 				return MANIFEST_ERROR_MEM_REGION_OVERLAP;
 			}
 		}
