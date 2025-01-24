@@ -836,9 +836,6 @@ static void cpu_entry_target_vcpu_waiting(uintptr_t arg)
 	assert(args->vcpu_count == 1);
 
 	if (args->vcpu_id == LAST_SECONDARY_VCPU_ID) {
-		const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777,
-					0x88889999};
-
 		/*
 		 * One round of FFA_RUN is required execution contextx of
 		 * secondary Secure Partitions.
@@ -854,24 +851,12 @@ static void cpu_entry_target_vcpu_waiting(uintptr_t arg)
 						  80);
 
 		/*
-		 * Sleep for 100 ms. This ensures secure wdog timer triggers
-		 * during this time (on primary CPU) and SPMC queues the
-		 * virtual interrupt for target vcpu.
+		 * Sleep for 200 ms. This ensures secure wdog timer triggers
+		 * during this time (on primary CPU) and SPMC shall signal the
+		 * virtual interrupt to target vcpu by resuming it on primary
+		 * CPU.
 		 */
-		waitms(100);
-
-		/*
-		 * Send a dummy direct request message to target vcpu to give
-		 * an opportunity for SPMC to signal the pending interrupt.
-		 */
-		res = sp_echo_cmd_send(own_id, args->receiver_id, msg[0],
-				       msg[1], msg[2], msg[3]);
-
-		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
-		EXPECT_EQ(res.arg4, msg[0]);
-		EXPECT_EQ(res.arg5, msg[1]);
-		EXPECT_EQ(res.arg6, msg[2]);
-		EXPECT_EQ(res.arg7, msg[3]);
+		waitms(200);
 
 		/* Check for the last serviced secure virtual interrupt. */
 		res = sp_get_last_interrupt_cmd_send(own_id, args->receiver_id);
