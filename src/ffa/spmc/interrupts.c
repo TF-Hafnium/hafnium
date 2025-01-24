@@ -210,43 +210,37 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 
 	/* Secure interrupt signaling and queuing for S-EL0 SP. */
 	switch (target_vcpu->state) {
-	case VCPU_STATE_WAITING:
-		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
-			struct ffa_value ret_interrupt =
-				api_ffa_interrupt_return(v_intid);
+	case VCPU_STATE_WAITING: {
+		struct ffa_value ret_interrupt =
+			api_ffa_interrupt_return(v_intid);
 
-			/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
-			dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
-				     target_vcpu->vm->id);
+		/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
+		dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
+			     target_vcpu->vm->id);
 
-			vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
-			plat_ffa_vcpu_queue_interrupts(target_vcpu_locked);
+		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
+		plat_ffa_vcpu_queue_interrupts(target_vcpu_locked);
 
-			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
+		vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
-			/*
-			 * If the execution was in NWd as well, set the vCPU
-			 * in preempted state as well.
-			 */
-			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
-					    current_locked);
+		/*
+		 * If the execution was in NWd as well, set the vCPU
+		 * in preempted state as well.
+		 */
+		plat_ffa_queue_vint(target_vcpu_locked, v_intid,
+				    current_locked);
 
-			/* Switch to target vCPU responsible for this interrupt.
-			 */
-			next = target_vcpu;
-		} else {
-			dlog_verbose("S-EL0: Secure interrupt queued: %x\n",
-				     target_vcpu->vm->id);
-			/*
-			 * The target vcpu has migrated to a different physical
-			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
-			 * resumes current vCPU.
-			 */
-			next = NULL;
-			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
-					    (struct vcpu_locked){.vcpu = NULL});
-		}
+		/*
+		 * The target vcpu could have migrated to a different physical
+		 * CPU. SPMC will migrate it to current physical CPU and resume
+		 * it.
+		 */
+		target_vcpu->cpu = current_locked.vcpu->cpu;
+
+		/* Switch to target vCPU responsible for this interrupt. */
+		next = target_vcpu;
 		break;
+	}
 	case VCPU_STATE_BLOCKED:
 	case VCPU_STATE_PREEMPTED:
 	case VCPU_STATE_RUNNING:
@@ -307,41 +301,38 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 
 	/* Secure interrupt signaling and queuing for S-EL1 SP. */
 	switch (target_vcpu->state) {
-	case VCPU_STATE_WAITING:
-		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
-			struct ffa_value ret_interrupt =
-				api_ffa_interrupt_return(v_intid);
+	case VCPU_STATE_WAITING: {
+		struct ffa_value ret_interrupt =
+			api_ffa_interrupt_return(v_intid);
 
-			/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
-			vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
-			plat_ffa_vcpu_queue_interrupts(target_vcpu_locked);
+		/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
+		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
+		plat_ffa_vcpu_queue_interrupts(target_vcpu_locked);
 
+		/*
+		 * Ideally, we have to mask non-secure interrupts here
+		 * since the spec mandates that SPMC should make sure
+		 * SPMC scheduled call chain cannot be preempted by a
+		 * non-secure interrupt. However, our current design
+		 * takes care of it implicitly.
+		 */
+		vcpu_set_running(target_vcpu_locked, &ret_interrupt);
+
+		plat_ffa_queue_vint(target_vcpu_locked, v_intid,
+				    current_locked);
+		next = target_vcpu;
+
+		if (target_vcpu->cpu != current_locked.vcpu->cpu) {
 			/*
-			 * Ideally, we have to mask non-secure interrupts here
-			 * since the spec mandates that SPMC should make sure
-			 * SPMC scheduled call chain cannot be preempted by a
-			 * non-secure interrupt. However, our current design
-			 * takes care of it implicitly.
-			 */
-			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
-
-			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
-					    current_locked);
-			next = target_vcpu;
-		} else {
-			/*
-			 * The target vcpu has migrated to a different physical
-			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
-			 * resumes current vCPU.
+			 * The target vcpu could have migrated to a different
+			 * physical CPU. SPMC will migrate it to current
+			 * physical CPU and resume it.
 			 */
 			assert(target_vcpu->vm->vcpu_count == 1);
-			dlog_verbose("S-EL1: Secure interrupt queued: %x\n",
-				     target_vcpu->vm->id);
-			next = NULL;
-			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
-					    (struct vcpu_locked){.vcpu = NULL});
+			target_vcpu->cpu = current_locked.vcpu->cpu;
 		}
 		break;
+	}
 	case VCPU_STATE_BLOCKED:
 		if (target_vcpu->cpu != current_locked.vcpu->cpu) {
 			/*
