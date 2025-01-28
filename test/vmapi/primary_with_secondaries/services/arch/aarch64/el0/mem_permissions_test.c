@@ -7,7 +7,6 @@
  */
 
 #include "hf/mm.h"
-#include "hf/std.h"
 
 #include "vmapi/hf/call.h"
 
@@ -27,6 +26,49 @@ extern uint8_t volatile stacks_begin[];
 extern uint8_t volatile stacks_end[];
 extern uint8_t volatile image_end[];
 
+static void expect_get_valid(uintvaddr_t base_va, uint64_t perm)
+{
+	struct ffa_value res = ffa_mem_perm_get(base_va);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+	EXPECT_EQ(res.arg2, perm);
+}
+
+static void expect_get_invalid(uintvaddr_t base_va)
+{
+	struct ffa_value res = ffa_mem_perm_get(base_va);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
+
+static void expect_set_valid(uintvaddr_t base_va, uint32_t page_count,
+			     uint64_t perm)
+{
+	struct ffa_value res = ffa_mem_perm_set(base_va, page_count, perm);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+}
+
+static void expect_set_invalid(uintvaddr_t base_va, uint32_t page_count,
+			       uint64_t perm)
+{
+	struct ffa_value res = ffa_mem_perm_set(base_va, page_count, perm);
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Assert that every page in the range `start` to `end` has the expected
+ * permissions.
+ */
+static void test_perm_get_range(volatile uint8_t* start, volatile uint8_t* end,
+				uint32_t perm)
+{
+	const uint32_t num_pages = align_up(end - start, PAGE_SIZE) / PAGE_SIZE;
+	uintvaddr_t base_va = (uintvaddr_t)align_down(start, PAGE_SIZE);
+
+	for (size_t i = 0; i < num_pages; i++) {
+		expect_get_valid(base_va, perm);
+		base_va += PAGE_SIZE;
+	}
+}
+
 /**
  * ffa_mem_perm_set_ro must be run separately from ffa_mem_perm_get and
  * ffa_mem_perm_set as ffa_mem_perm_set_ro changes the memory permissions
@@ -39,38 +81,14 @@ extern uint8_t volatile image_end[];
  */
 SERVICE_SET_UP(ffa_mem_perm_get)
 {
-	uint64_t num_pages = 0;
-	uint64_t base_va = 0;
 	/* Hafnium may use rx/tx buffers so one page may be marked as RO. */
 	uint32_t num_ro_pages_in_data = 0;
 
-	num_pages = align_up((text_end - text_begin), PAGE_SIZE) / PAGE_SIZE;
-	base_va = (uint64_t)align_down(text_begin, PAGE_SIZE);
+	const uint32_t num_pages =
+		align_up(data_end - data_begin, PAGE_SIZE) / PAGE_SIZE;
+	uintvaddr_t base_va = (uintvaddr_t)align_down(data_begin, PAGE_SIZE);
 
-	while (num_pages != 0U) {
-		struct ffa_value res = ffa_mem_perm_get(base_va);
-		EXPECT_EQ(res.func, FFA_SUCCESS_32);
-		EXPECT_EQ(res.arg2, FFA_MEM_PERM_RX);
-		base_va += PAGE_SIZE;
-		num_pages--;
-	}
-
-	num_pages =
-		align_up((rodata_end - rodata_begin), PAGE_SIZE) / PAGE_SIZE;
-	base_va = (uint64_t)align_down(rodata_begin, PAGE_SIZE);
-
-	while (num_pages != 0) {
-		struct ffa_value res = ffa_mem_perm_get(base_va);
-		EXPECT_EQ(res.func, FFA_SUCCESS_32);
-		EXPECT_EQ(res.arg2, FFA_MEM_PERM_RO);
-		base_va += PAGE_SIZE;
-		num_pages--;
-	}
-
-	num_pages = align_up((data_end - data_begin), PAGE_SIZE) / PAGE_SIZE;
-	base_va = (uint64_t)align_down(data_begin, PAGE_SIZE);
-
-	while (num_pages != 0) {
+	for (size_t i = 0; i < num_pages; i++) {
 		struct ffa_value res = ffa_mem_perm_get(base_va);
 		EXPECT_EQ(res.func, FFA_SUCCESS_32);
 		if (res.arg2 == FFA_MEM_PERM_RO) {
@@ -83,41 +101,17 @@ SERVICE_SET_UP(ffa_mem_perm_get)
 			EXPECT_EQ(res.arg2, FFA_MEM_PERM_RW);
 		}
 		base_va += PAGE_SIZE;
-		num_pages--;
 	}
 	EXPECT_EQ(num_ro_pages_in_data, 1);
 
-	num_pages =
-		align_up((stacks_end - stacks_begin), PAGE_SIZE) / PAGE_SIZE;
-	base_va = (uint64_t)align_down(stacks_begin, PAGE_SIZE);
-
-	while (num_pages != 0) {
-		struct ffa_value res = ffa_mem_perm_get(base_va);
-		EXPECT_EQ(res.func, FFA_SUCCESS_32);
-		EXPECT_EQ(res.arg2, FFA_MEM_PERM_RW);
-		base_va += PAGE_SIZE;
-		num_pages--;
-	}
-
-	num_pages = align_up((image_end - data_end), PAGE_SIZE) / PAGE_SIZE;
-	base_va = (uint64_t)align_down(data_end, PAGE_SIZE);
-
-	while (num_pages != 0) {
-		struct ffa_value res = ffa_mem_perm_get(base_va);
-		EXPECT_EQ(res.func, FFA_SUCCESS_32);
-		EXPECT_EQ(res.arg2, FFA_MEM_PERM_RW);
-		base_va += PAGE_SIZE;
-		num_pages--;
-	}
+	test_perm_get_range(text_begin, text_end, FFA_MEM_PERM_RX);
+	test_perm_get_range(rodata_begin, rodata_end, FFA_MEM_PERM_RO);
+	test_perm_get_range(stacks_begin, stacks_end, FFA_MEM_PERM_RW);
+	test_perm_get_range(data_end, image_end, FFA_MEM_PERM_RW);
 
 	/* Check that permissions on an invalid address returns error. */
-	struct ffa_value res = ffa_mem_perm_get(0xDEADBEEF);
-	EXPECT_EQ(res.func, FFA_ERROR_32);
-	EXPECT_EQ(ffa_error_code(res), FFA_INVALID_PARAMETERS);
-
-	res = ffa_mem_perm_get(0x0);
-	EXPECT_EQ(res.func, FFA_ERROR_32);
-	EXPECT_EQ(ffa_error_code(res), FFA_INVALID_PARAMETERS);
+	expect_get_invalid(0xDEADBEEF);
+	expect_get_invalid(0x0);
 }
 
 /**
@@ -129,61 +123,33 @@ SERVICE_SET_UP(ffa_mem_perm_get)
  */
 SERVICE_SET_UP(ffa_mem_perm_set)
 {
-	uint64_t num_pages = 0;
-	uint64_t base_va = 0;
+	uintvaddr_t base_va = (uintvaddr_t)align_down(data_begin, PAGE_SIZE);
+	expect_get_valid(base_va, FFA_MEM_PERM_RW);
 
-	num_pages = 1;
-	base_va = (uint64_t)align_down(data_begin, PAGE_SIZE);
-	struct ffa_value res = ffa_mem_perm_get(base_va);
-	EXPECT_EQ(res.func, FFA_SUCCESS_32);
-	EXPECT_EQ(res.arg2, FFA_MEM_PERM_RW);
+	expect_set_valid(base_va, 1, FFA_MEM_PERM_RO);
+	expect_get_valid(base_va, FFA_MEM_PERM_RO);
 
-	res = ffa_mem_perm_set(base_va, num_pages, FFA_MEM_PERM_RO);
-	EXPECT_EQ(res.func, FFA_SUCCESS_32);
-
-	res = ffa_mem_perm_get(base_va);
-	EXPECT_EQ(res.func, FFA_SUCCESS_32);
-	EXPECT_EQ(res.arg2, FFA_MEM_PERM_RO);
-
-	res = ffa_mem_perm_set(base_va, num_pages, FFA_MEM_PERM_RW);
-	EXPECT_EQ(res.func, FFA_SUCCESS_32);
-
-	res = ffa_mem_perm_get(base_va);
-	EXPECT_EQ(res.func, FFA_SUCCESS_32);
-	EXPECT_EQ(res.arg2, FFA_MEM_PERM_RW);
+	expect_set_valid(base_va, 1, FFA_MEM_PERM_RW);
+	expect_get_valid(base_va, FFA_MEM_PERM_RW);
 
 	/* Ensure permission for invalid pages cannot be changed. */
-	res = ffa_mem_perm_set(0xDEADBEEF, 0x1000, FFA_MEM_PERM_RX);
-	EXPECT_EQ(res.func, FFA_ERROR_32);
-	EXPECT_EQ(ffa_error_code(res), FFA_INVALID_PARAMETERS);
-
-	res = ffa_mem_perm_set(0x0, 0x1000, FFA_MEM_PERM_RX);
-	EXPECT_EQ(res.func, FFA_ERROR_32);
-	EXPECT_EQ(ffa_error_code(res), FFA_INVALID_PARAMETERS);
+	expect_set_invalid(0xDEADBEEF, 0x1000, FFA_MEM_PERM_RX);
+	expect_set_invalid(0x0, 0x1000, FFA_MEM_PERM_RX);
 
 	/**
 	 * Ensure permissions cannot be changed for an unaligned, but valid
 	 * address.
 	 */
-	base_va = (uint64_t)align_down(data_begin, PAGE_SIZE);
-	res = ffa_mem_perm_set((base_va + 1), 1, FFA_MEM_PERM_RX);
-	EXPECT_EQ(res.func, FFA_ERROR_32);
-	EXPECT_EQ(ffa_error_code(res), FFA_INVALID_PARAMETERS);
+	expect_set_invalid(base_va + 1, 1, FFA_MEM_PERM_RX);
 
 	/**
 	 * Ensure permissions cannot be changed for valid address that crosses
 	 * boundary into invalid address.
 	 */
-	base_va = (uint64_t)align_down(data_begin, PAGE_SIZE);
-	res = ffa_mem_perm_set(base_va, 256, FFA_MEM_PERM_RX);
-	EXPECT_EQ(res.func, FFA_ERROR_32);
-	EXPECT_EQ(ffa_error_code(res), FFA_INVALID_PARAMETERS);
+	expect_set_invalid(base_va, 256, FFA_MEM_PERM_RX);
 
 	/* Ensure permissions cannot be changed using invalid attributes. */
-	base_va = (uint64_t)align_down(data_begin, PAGE_SIZE);
-	res = ffa_mem_perm_set(base_va, 1, 0x1);
-	EXPECT_EQ(res.func, FFA_ERROR_32);
-	EXPECT_EQ(ffa_error_code(res), FFA_INVALID_PARAMETERS);
+	expect_set_invalid(base_va, 1, 0x1);
 }
 
 /**
@@ -195,21 +161,11 @@ SERVICE_SET_UP(ffa_mem_perm_set)
  */
 SERVICE_SET_UP(ffa_mem_perm_set_ro)
 {
-	uint64_t num_pages = 0;
-	uint64_t base_va = 0;
+	uintvaddr_t base_va = (uintvaddr_t)align_down(data_begin, PAGE_SIZE);
+	expect_get_valid(base_va, FFA_MEM_PERM_RW);
 
-	num_pages = 1;
-	base_va = (uint64_t)align_down(data_begin, PAGE_SIZE);
-	struct ffa_value res = ffa_mem_perm_get(base_va);
-	EXPECT_EQ(res.func, FFA_SUCCESS_32);
-	EXPECT_EQ(res.arg2, FFA_MEM_PERM_RW);
-
-	res = ffa_mem_perm_set(base_va, num_pages, FFA_MEM_PERM_RO);
-	EXPECT_EQ(res.func, FFA_SUCCESS_32);
-
-	res = ffa_mem_perm_get(base_va);
-	EXPECT_EQ(res.func, FFA_SUCCESS_32);
-	EXPECT_EQ(res.arg2, FFA_MEM_PERM_RO);
+	expect_set_valid(base_va, 1, FFA_MEM_PERM_RO);
+	expect_get_valid(base_va, FFA_MEM_PERM_RO);
 }
 
 /**
