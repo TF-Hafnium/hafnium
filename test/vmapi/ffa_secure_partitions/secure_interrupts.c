@@ -62,7 +62,11 @@ static void enable_trigger_trusted_wdog_timer(ffa_id_t own_id,
 {
 	struct ffa_value res;
 
-	/* Enable trusted watchdog interrupt as vIRQ in the secure side. */
+	/*
+	 * Enable trusted watchdog virtual interrupt as vIRQ for target SP.
+	 * SPMC takes this as a hint to enable the corresponding secure physical
+	 * interrupt and configures it to be routed to current CPU.
+	 */
 	enable_trusted_wdog_interrupt(own_id, receiver_id);
 
 	/*
@@ -642,6 +646,13 @@ TEST_LONG_RUNNING(secure_interrupts, sp_route_interrupt_to_secondary_vcpu)
 	args.vcpu_count = service2_info->vcpu_count;
 
 	/*
+	 * Enable trusted watchdog virtual interrupt as vIRQ for target SP.
+	 * SPMC takes this as a hint to enable the corresponding secure physical
+	 * interrupt and configures it to be routed to current (primary) CPU.
+	 */
+	enable_trusted_wdog_interrupt(hf_vm_get_id(), receiver_id);
+
+	/*
 	 * Reconfigure the twdog interrupt to be routed to last secondary
 	 * execution context of SP.
 	 */
@@ -827,8 +838,10 @@ static void cpu_entry_target_vcpu_waiting(uintptr_t arg)
 		 * The direct request message makes the vcpu of target SP to
 		 * migrate to this CPU i.e., last secondary CPU.
 		 */
-		enable_trigger_trusted_wdog_timer(own_id, args->receiver_id,
-						  80);
+		res = sp_twdog_cmd_send(own_id, args->receiver_id, 80);
+
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+		EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 
 		/*
 		 * Sleep for 200 ms. This ensures secure wdog timer triggers
@@ -865,8 +878,10 @@ static void cpu_entry_target_vcpu_running(uintptr_t arg)
 		 * The direct request message makes the vcpu of target SP to
 		 * migrate to this CPU i.e., last secondary CPU.
 		 */
-		enable_trigger_trusted_wdog_timer(own_id, args->receiver_id,
-						  80);
+		res = sp_twdog_cmd_send(own_id, args->receiver_id, 80);
+
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+		EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 
 		/* Send request to the SP to sleep. */
 		res = sp_sleep_cmd_send(own_id, args->receiver_id, 100, 0);
@@ -905,8 +920,10 @@ static void cpu_entry_target_vcpu_blocked(uintptr_t arg)
 		 * The direct request message makes the vcpu of target SP to
 		 * migrate to this CPU i.e., last secondary CPU.
 		 */
-		enable_trigger_trusted_wdog_timer(own_id, args->receiver_id,
-						  80);
+		res = sp_twdog_cmd_send(own_id, args->receiver_id, 80);
+
+		EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+		EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 
 		/*
 		 * Send command to target SP to send command to companion SP to
@@ -946,6 +963,13 @@ static void run_test_secure_interrupt_targets_migrated_vcpu(
 
 	args.receiver_id = receiver_id;
 	args.vcpu_count = receiver_info->vcpu_count;
+
+	/*
+	 * Enable trusted watchdog virtual interrupt as vIRQ for target SP.
+	 * SPMC takes this as a hint to enable the corresponding secure physical
+	 * interrupt and configures it to be routed to current (primary) CPU.
+	 */
+	enable_trusted_wdog_interrupt(hf_vm_get_id(), receiver_id);
 
 	if (args.vcpu_count > 1) {
 		return;
