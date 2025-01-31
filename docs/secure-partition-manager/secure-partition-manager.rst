@@ -576,8 +576,8 @@ The aggregate of both the boot info structures and the data itself is designated
 the boot information blob, and is passed to a Partition as a contiguous memory
 region.
 
-Currently, the SPM implementation supports the FDT type which is used to pass the
-partition's DTB manifest.
+Currently, the SPM implementation supports the FDT type, which is used to pass the
+partition's DTB manifest, and the Hand-off Block (HOB) list type.
 
 The region for the boot information blob is allocated through the SP package.
 
@@ -587,6 +587,9 @@ To adjust the space allocated for the boot information blob, the json descriptio
 of the SP (see section `Secure Partitions Layout File`_) shall be updated to contain
 the manifest offset. If no offset is provided the manifest offset defaults to 0x1000,
 which is the page size in the Hafnium SPMC.
+
+Currently, the SPM implementation does not yet support specifying the offset for the
+HOB list in the json description of the SP. A default value of 0x2000 is used.
 
 The configuration of the boot protocol is done in the SPs manifest. As defined by
 the specification, the manifest field 'gp-register-num' configures the GP register
@@ -602,11 +605,18 @@ to be listed in a designated DT node:
       ffa_manifest;
   };
 
+.. code:: shell
+
+  boot-info {
+      compatible = "arm,ffa-manifest-boot-info";
+      hob_list;
+  };
+
 The whole secure partition package image (see `Secure Partition packages`_) is
 mapped to the SP secure EL1&0 Stage-2 translation regime. As such, the SP can
 retrieve the address for the boot information blob in the designated GP register,
 process the boot information header and descriptors, access its own manifest
-DTB blob and extract its partition manifest properties.
+DTB blob or HOB list and extract its properties.
 
 SPMC Runtime
 ============
