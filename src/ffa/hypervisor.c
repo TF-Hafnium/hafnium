@@ -134,16 +134,6 @@ bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
 	return false;
 }
 
-struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
-				   enum ffa_error error_code)
-{
-	(void)current;
-	(void)next;
-	(void)error_code;
-	/* TODO: Interface not handled in hypervisor. */
-	return ffa_error(FFA_NOT_SUPPORTED);
-}
-
 bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
 {
 	(void)args;

@@ -10,6 +10,7 @@
 
 #include "hf/api.h"
 #include "hf/ffa/indirect_messaging.h"
+#include "hf/ffa_internal.h"
 #include "hf/vcpu.h"
 
 bool ffa_cpu_cycles_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
@@ -124,4 +125,14 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 	*next = api_switch_to_primary(current_locked, ret, VCPU_STATE_BLOCKED);
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}
+
+struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
+				   enum ffa_error error_code)
+{
+	(void)current;
+	(void)next;
+	(void)error_code;
+	/* TODO: Interface not handled in hypervisor. */
+	return ffa_error(FFA_NOT_SUPPORTED);
 }

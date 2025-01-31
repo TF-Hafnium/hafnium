@@ -22,6 +22,7 @@
 #include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
+#include "hf/ffa/cpu_cycles.h"
 #include "hf/ffa/indirect_messaging.h"
 #include "hf/ffa/interrupts.h"
 #include "hf/ffa/notifications.h"

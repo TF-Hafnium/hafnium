@@ -12,11 +12,12 @@
 #include "hf/check.h"
 #include "hf/ffa.h"
 #include "hf/ffa/interrupts.h"
+#include "hf/ffa/vm.h"
+#include "hf/ffa_internal.h"
 #include "hf/plat/interrupts.h"
 #include "hf/vm.h"
 
 void plat_ffa_vcpu_allow_interrupts(struct vcpu *current);
-bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next);
 
 bool ffa_cpu_cycles_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 				struct ffa_value *ret)
@@ -308,6 +309,83 @@ static bool plat_ffa_msg_wait_intercept(struct vcpu_locked current_locked,
 	return ret;
 }
 
+static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
+{
+	struct vcpu *vcpu_next = NULL;
+	struct vcpu *current = current_locked.vcpu;
+	struct vm *next_vm;
+	size_t cpu_indx = cpu_index(current->cpu);
+
+	if (current->cpu->last_sp_initialized) {
+		return false;
+	}
+
+	if (!atomic_load_explicit(&current->vm->aborting,
+				  memory_order_relaxed)) {
+		/* vCPU has just returned from successful initialization. */
+		dlog_verbose(
+			"Initialized execution context of VM: %#x on CPU: %zu, "
+			"boot_order: %u\n",
+			current->vm->id, cpu_index(current->cpu),
+			current->vm->boot_order);
+	}
+
+	if (cpu_index(current_locked.vcpu->cpu) == PRIMARY_CPU_IDX) {
+		next_vm = vm_get_next_boot(current->vm);
+	} else {
+		/* SP boot chain on secondary CPU. */
+		next_vm = vm_get_next_boot_secondary_core(current->vm);
+	}
+
+	current->state = VCPU_STATE_WAITING;
+	current->rt_model = RTM_NONE;
+	current->scheduling_mode = NONE;
+
+	/*
+	 * Pick next SP's vCPU to be booted. Once all SPs have booted
+	 * (next_vm is NULL), then return execution to NWd.
+	 */
+	if (next_vm == NULL) {
+		current->cpu->last_sp_initialized = true;
+		goto out;
+	}
+
+	vcpu_next = vm_get_vcpu(next_vm, cpu_indx);
+
+	/*
+	 * An SP's execution context needs to be bootstrapped if:
+	 * - It has never been initialized before.
+	 * - Or it was turned off when the CPU, on which it was pinned, was
+	 *   powered down.
+	 */
+	if (vcpu_next->rt_model == RTM_SP_INIT ||
+	    vcpu_next->state == VCPU_STATE_OFF) {
+		vcpu_next->rt_model = RTM_SP_INIT;
+		arch_regs_reset(vcpu_next);
+		vcpu_next->cpu = current->cpu;
+		vcpu_next->state = VCPU_STATE_RUNNING;
+		vcpu_next->regs_available = false;
+		vcpu_set_phys_core_idx(vcpu_next);
+		arch_regs_set_pc_arg(&vcpu_next->regs,
+				     vcpu_next->vm->secondary_ep, 0ULL);
+
+		if (cpu_index(current_locked.vcpu->cpu) == PRIMARY_CPU_IDX) {
+			/*
+			 * Boot information is passed by the SPMC to the SP's
+			 * execution context only on the primary CPU.
+			 */
+			vcpu_set_boot_info_gp_reg(vcpu_next);
+		}
+
+		*next = vcpu_next;
+
+		return true;
+	}
+out:
+	dlog_notice("Finished bootstrapping all SPs on CPU%lx\n", cpu_indx);
+	return false;
+}
+
 /**
  * The invocation of FFA_MSG_WAIT at secure virtual FF-A instance is compliant
  * with FF-A v1.1 EAC0 specification. It only performs the state transition
@@ -518,4 +596,314 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 	}
 
 	return ret_args;
+}
+
+static bool is_predecessor_in_call_chain(struct vcpu_locked current_locked,
+					 struct vcpu_locked target_locked)
+{
+	struct vcpu *prev_node;
+	struct vcpu *current = current_locked.vcpu;
+	struct vcpu *target = target_locked.vcpu;
+
+	assert(current != NULL);
+	assert(target != NULL);
+
+	prev_node = current->call_chain.prev_node;
+
+	while (prev_node != NULL) {
+		if (prev_node == target) {
+			return true;
+		}
+
+		/* The target vCPU is not it's immediate predecessor. */
+		prev_node = prev_node->call_chain.prev_node;
+	}
+
+	/* Search terminated. Reached start of call chain. */
+	return false;
+}
+
+/**
+ * Validates the Runtime model for FFA_RUN. Refer to section 7.2 of the FF-A
+ * v1.1 EAC0 spec.
+ */
+static bool plat_ffa_check_rtm_ffa_run(struct vcpu_locked current_locked,
+				       struct vcpu_locked locked_vcpu,
+				       uint32_t func,
+				       enum vcpu_state *next_state)
+{
+	switch (func) {
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
+		/* Fall through. */
+	case FFA_RUN_32: {
+		/* Rules 1,2 section 7.2 EAC0 spec. */
+		if (is_predecessor_in_call_chain(current_locked, locked_vcpu)) {
+			return false;
+		}
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	}
+	case FFA_MSG_WAIT_32:
+		/* Rule 4 section 7.2 EAC0 spec. Fall through. */
+		*next_state = VCPU_STATE_WAITING;
+		return true;
+	case FFA_YIELD_32:
+		/* Rule 5 section 7.2 EAC0 spec. */
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
+		/* Rule 3 section 7.2 EAC0 spec. Fall through. */
+	default:
+		/* Deny state transitions by default. */
+		return false;
+	}
+}
+
+/**
+ * Validates the Runtime model for FFA_MSG_SEND_DIRECT_REQ and
+ * FFA_MSG_SEND_DIRECT_REQ2. Refer to section 8.3 of the FF-A
+ * v1.2 spec.
+ */
+static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu_locked current_locked,
+					   struct vcpu_locked locked_vcpu,
+					   ffa_id_t receiver_vm_id,
+					   uint32_t func,
+					   enum vcpu_state *next_state)
+{
+	switch (func) {
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
+		/* Fall through. */
+	case FFA_RUN_32: {
+		/* Rules 1,2. */
+		if (is_predecessor_in_call_chain(current_locked, locked_vcpu)) {
+			return false;
+		}
+
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	}
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32: {
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
+		/* Rule 3. */
+		if (current_locked.vcpu->direct_request_origin.vm_id ==
+		    receiver_vm_id) {
+			*next_state = VCPU_STATE_WAITING;
+			return true;
+		}
+
+		return false;
+	}
+	case FFA_YIELD_32:
+		/* Rule 3, section 8.3 of FF-A v1.2 spec. */
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	case FFA_MSG_WAIT_32:
+		/* Rule 4. Fall through. */
+	default:
+		/* Deny state transitions by default. */
+		return false;
+	}
+}
+
+/**
+ * Validates the Runtime model for Secure interrupt handling. Refer to section
+ * 8.4 of the FF-A v1.2 ALP0 spec.
+ */
+static bool plat_ffa_check_rtm_sec_interrupt(struct vcpu_locked current_locked,
+					     struct vcpu_locked locked_vcpu,
+					     uint32_t func,
+					     enum vcpu_state *next_state)
+{
+	struct vcpu *current = current_locked.vcpu;
+	struct vcpu *vcpu = locked_vcpu.vcpu;
+
+	CHECK(current->scheduling_mode == SPMC_MODE);
+
+	switch (func) {
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64:
+		/* Rule 3. */
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	case FFA_RUN_32: {
+		/* Rule 6. */
+		if (vcpu->state == VCPU_STATE_PREEMPTED) {
+			*next_state = VCPU_STATE_BLOCKED;
+			return true;
+		}
+
+		return false;
+	}
+	case FFA_MSG_WAIT_32:
+		/* Rule 2. */
+		*next_state = VCPU_STATE_WAITING;
+		return true;
+	case FFA_YIELD_32:
+		/* Rule 3, section 8.4 of FF-A v1.2 spec. */
+		*next_state = VCPU_STATE_BLOCKED;
+		return true;
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
+		/* Rule 5. Fall through. */
+	default:
+		/* Deny state transitions by default. */
+		return false;
+	}
+}
+
+/**
+ * Validates the Runtime model for SP initialization. Refer to section
+ * 8.3 of the FF-A v1.2 ALP0 spec.
+ */
+static bool plat_ffa_check_rtm_sp_init(struct vcpu_locked locked_vcpu,
+				       uint32_t func,
+				       enum vcpu_state *next_state)
+{
+	switch (func) {
+	case FFA_MSG_SEND_DIRECT_REQ_64:
+	case FFA_MSG_SEND_DIRECT_REQ_32:
+	case FFA_MSG_SEND_DIRECT_REQ2_64: {
+		struct vcpu *vcpu = locked_vcpu.vcpu;
+
+		assert(vcpu != NULL);
+		/* Rule 1. */
+		if (vcpu->rt_model != RTM_SP_INIT) {
+			*next_state = VCPU_STATE_BLOCKED;
+			return true;
+		}
+
+		return false;
+	}
+	case FFA_MSG_WAIT_32:
+		/* Rule 2. Fall through. */
+	case FFA_ERROR_32:
+		/* Rule 3. */
+		*next_state = VCPU_STATE_WAITING;
+		return true;
+	case FFA_YIELD_32:
+		/* Rule 4. Fall through. */
+	case FFA_RUN_32:
+		/* Rule 6. Fall through. */
+	case FFA_MSG_SEND_DIRECT_RESP_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_RESP2_64:
+		/* Rule 5. Fall through. */
+	default:
+		/* Deny state transitions by default. */
+		return false;
+	}
+}
+
+/**
+ * Check if the runtime model (state machine) of the current SP supports the
+ * given FF-A ABI invocation. If yes, next_state represents the state to which
+ * the current vcpu would transition upon the FF-A ABI invocation as determined
+ * by the Partition runtime model.
+ */
+bool ffa_cpu_cycles_check_runtime_state_transition(
+	struct vcpu_locked current_locked, ffa_id_t vm_id,
+	ffa_id_t receiver_vm_id, struct vcpu_locked locked_vcpu, uint32_t func,
+	enum vcpu_state *next_state)
+{
+	bool allowed = false;
+	struct vcpu *current = current_locked.vcpu;
+
+	assert(current != NULL);
+
+	/* Perform state transition checks only for Secure Partitions. */
+	if (!vm_id_is_current_world(vm_id)) {
+		return true;
+	}
+
+	switch (current->rt_model) {
+	case RTM_FFA_RUN:
+		allowed = plat_ffa_check_rtm_ffa_run(
+			current_locked, locked_vcpu, func, next_state);
+		break;
+	case RTM_FFA_DIR_REQ:
+		allowed = plat_ffa_check_rtm_ffa_dir_req(
+			current_locked, locked_vcpu, receiver_vm_id, func,
+			next_state);
+		break;
+	case RTM_SEC_INTERRUPT:
+		allowed = plat_ffa_check_rtm_sec_interrupt(
+			current_locked, locked_vcpu, func, next_state);
+		break;
+	case RTM_SP_INIT:
+		allowed = plat_ffa_check_rtm_sp_init(locked_vcpu, func,
+						     next_state);
+		break;
+	default:
+		dlog_error(
+			"Illegal Runtime Model specified by SP%x on CPU%zx\n",
+			current->vm->id, cpu_index(current->cpu));
+		allowed = false;
+		break;
+	}
+
+	if (!allowed) {
+		dlog_verbose("State transition denied\n");
+	}
+
+	return allowed;
+}
+
+/*
+ * Handle FFA_ERROR_32 call according to the given error code.
+ *
+ * Error codes other than FFA_ABORTED, and cases of FFA_ABORTED not
+ * in RTM_SP_INIT runtime model, not implemented. Refer to section 8.5
+ * of FF-A 1.2 spec.
+ */
+struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
+				   enum ffa_error error_code)
+{
+	struct vcpu_locked current_locked;
+	struct vm_locked vm_locked;
+	enum partition_runtime_model rt_model;
+	struct ffa_value ret = api_ffa_interrupt_return(0);
+
+	vm_locked = vm_lock(current->vm);
+	current_locked = vcpu_lock(current);
+	rt_model = current_locked.vcpu->rt_model;
+
+	if (error_code == FFA_ABORTED && rt_model == RTM_SP_INIT) {
+		dlog_error("Aborting SP %#x from vCPU %u\n", current->vm->id,
+			   vcpu_index(current));
+
+		atomic_store_explicit(&current->vm->aborting, true,
+				      memory_order_relaxed);
+
+		ffa_vm_free_resources(vm_locked);
+
+		if (sp_boot_next(current_locked, next)) {
+			goto out;
+		}
+
+		/*
+		 * Relinquish control back to the NWd. Return
+		 * FFA_MSG_WAIT_32 to indicate to SPMD that SPMC
+		 * has successfully finished initialization.
+		 */
+		*next = api_switch_to_other_world(
+			current_locked,
+			(struct ffa_value){.func = FFA_MSG_WAIT_32},
+			VCPU_STATE_ABORTED);
+
+		goto out;
+	}
+	ret = ffa_error(FFA_NOT_SUPPORTED);
+out:
+	vcpu_unlock(&current_locked);
+	vm_unlock(&vm_locked);
+	return ret;
 }

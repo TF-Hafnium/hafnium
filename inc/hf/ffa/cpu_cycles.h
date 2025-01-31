@@ -45,3 +45,6 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 					      struct vcpu **next,
 					      uint32_t timeout_low,
 					      uint32_t timeout_high);
+
+struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
+				   enum ffa_error error_code);
