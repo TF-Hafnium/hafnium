@@ -116,17 +116,3 @@ void plat_ffa_init(struct mpool *ppool)
 
 	dlog_verbose("TEE finished setting up buffers.\n");
 }
-
-bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
-{
-	(void)vm_id;
-	return false;
-}
-
-bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
-{
-	(void)args;
-	(void)ret;
-
-	return false;
-}

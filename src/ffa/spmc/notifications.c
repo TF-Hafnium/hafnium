@@ -13,6 +13,7 @@
 #include "hf/check.h"
 #include "hf/cpu.h"
 #include "hf/ffa.h"
+#include "hf/ffa/direct_messaging.h"
 #include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
 #include "hf/plat/interrupts.h"

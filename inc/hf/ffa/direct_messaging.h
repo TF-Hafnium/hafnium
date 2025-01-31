@@ -35,3 +35,8 @@ void ffa_direct_msg_wind_call_chain_ffa_direct_req(
 
 void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	struct vcpu_locked current_locked, struct vcpu_locked next_locked);
+
+bool plat_ffa_handle_framework_msg(struct ffa_value args,
+				   struct ffa_value *ret);
+
+bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id);
