@@ -217,7 +217,7 @@ A sample can be found at `[7]`_:
 
 * The *hypervisor* node describes SPs. *is_ffa_partition* boolean attribute
   indicates a |FF-A| compliant SP. The *load_address* field specifies the load
-  address at which BL2 loaded the SP package.
+  address at which BL2 loaded the partition package.
 * The *cpus* node provides the platform topology and allows MPIDR to VMPIDR mapping.
   Note the primary core is declared first, then secondary cores are declared
   in reverse order.
@@ -332,18 +332,28 @@ following SP types:
 Secure Partition packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Secure partitions are bundled as independent package files consisting
-of:
+Secure partitions are bundled as independent package files. Current supported
+partition package types are a Secure Partition Package or a Transfer List Package.
+
+The partition package type can be specified in the SP Layout of the SP (see section
+`Secure Partitions Layout File`_).
+
+A Secure Partition package is an implementation defined format that includes:
 
 - a header
 - a DTB
 - an image payload
 
+A Transfer List (TL) package type should include an entry for the image and an entry for the DTB
+using the Transfer Entry format. The TL package can also use other Transfer Entry types to include
+optional platform-specific boot information to be passed to the SP, such as a HOB list. More
+information on Transfer Lists can be found in the `Firmware Handoff specification`_.
+
 The header starts with a magic value and offset values to SP DTB and
-image payload. Each SP package is loaded independently by BL2 loader
+image payload. Each partition package is loaded independently by BL2 loader
 and verified for authenticity and integrity.
 
-The SP package identified by its UUID (matching FF-A uuid property) is
+The partition package identified by its UUID (matching FF-A uuid property) is
 inserted as a single entry into the FIP at end of the TF-A build flow
 as shown:
 
@@ -368,11 +378,11 @@ Secure Partitions Layout File
 
 A json-formatted description file is passed to the build flow specifying paths
 to the SP binary image and associated DTS partition manifest file. The latter
-is processed by the dtc compiler to generate a DTB fed into the SP package.
+is processed by the dtc compiler to generate a DTB fed into the partition package.
 Each partition can be configured with the following fields:
 
 :code:`image`
-  - Specifies the filename and offset of the image within the SP package.
+  - Specifies the filename and offset of the image within the partition package.
   - Can be written as :code:`"image": { "file": "path", "offset": 0x1234 }` to
     give both :code:`image.file` and :code:`image.offset` values explicitly, or
     can be written as :code:`"image": "path"` to give :code:`image.file` and value
@@ -382,12 +392,12 @@ Each partition can be configured with the following fields:
     - Specifies the filename of the image.
 
   :code:`image.offset`
-    - Specifies the offset of the image within the SP package.
+    - Specifies the offset of the image within the partiton package.
     - Must be 4KB aligned, because that is the translation granule supported by Hafnium SPMC.
     - Optional. Defaults to :code:`0x4000`.
 
 :code:`pm`
-  - Specifies the filename and offset of the partition manifest within the SP package.
+  - Specifies the filename and offset of the partition manifest within the partition package.
   - Can be written as :code:`"pm": { "file": "path", "offset": 0x1234 }` to
     give both :code:`pm.file` and :code:`pm.offset` values explicitly, or
     can be written as :code:`"pm": "path"` to give :code:`pm.file` and value
@@ -397,13 +407,13 @@ Each partition can be configured with the following fields:
     - Specifies the filename of the partition manifest.
 
   :code:`pm.offset`
-    - Specifies the offset of the partition manifest within the SP package.
+    - Specifies the offset of the partition manifest within the partition package.
     - Must be 4KB aligned, because that is the translation granule supported by Hafnium SPMC.
     - Optional. Defaults to :code:`0x1000`.
 
 :code:`image.offset` and :code:`pm.offset` can be leveraged to support SPs with
 S1 translation granules that differ from 4KB, and to configure the regions
-allocated within the SP package, as well as to comply with the requirements for
+allocated within the partition package, as well as to comply with the requirements for
 the implementation of the boot information protocol (see `Passing boot data to
 the SP`_ for more details).
 
@@ -419,6 +429,14 @@ the SP`_ for more details).
 :code:`physical-load-address`
   - Specifies the :code:`load_address` field of the generated DTS fragment.
   - Optional. Defaults to the value of the :code:`load-address` from the DTS partition manifest.
+
+:code:`package`
+  - Specifies the package type of the partition package.
+  - Optional. Defaults to the value of :code:`sp_pkg`.
+
+:code:`size`
+  - Specifies the size in bytes of the partition package.
+  - Optional. Defaults to :code:`0x100000`.
 
 .. code:: shell
 
@@ -445,7 +463,9 @@ the SP`_ for more details).
                 "file": "tee3.dts",
                 "offset":"0x6000"
              },
-            "owner": "Plat"
+            "owner": "Plat",
+            "package": "tl_pkg",
+            "size": "0x100000"
         },
     }
 
@@ -496,7 +516,7 @@ secondary physical core entry point physical address by the use of the
 `FFA_SECONDARY_EP_REGISTER`_ interface (SMC invocation from the SPMC to the SPMD
 at secure physical FF-A instance).
 
-The SPMC then creates secure partitions base on SP packages and manifests. Each
+The SPMC then creates secure partitions based on partition packages and manifests. Each
 secure partition is launched in sequence (`SP Boot order`_) on their "primary"
 execution context. If the primary boot physical core linear id is N, an MP SP is
 started using EC[N] on PE[N] (see `Platform topology`_). If the partition is a
@@ -579,7 +599,7 @@ region.
 Currently, the SPM implementation supports the FDT type, which is used to pass the
 partition's DTB manifest, and the Hand-off Block (HOB) list type.
 
-The region for the boot information blob is allocated through the SP package.
+The region for the boot information blob is allocated through the partition package.
 
 .. image:: ../resources/diagrams/partition-package.png
 
@@ -1995,6 +2015,8 @@ References
 .. _device node: https://trustedfirmware-a.readthedocs.io/en/latest/components/ffa-manifest-binding.html#device-regions
 
 .. _memory region node: https://trustedfirmware-a.readthedocs.io/en/latest/components/ffa-manifest-binding.html#memory-regions
+
+.. _Firmware Handoff specification: https://github.com/FirmwareHandoff/firmware_handoff/
 
 .. _[1]:
 
