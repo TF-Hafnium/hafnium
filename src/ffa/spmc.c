@@ -547,19 +547,6 @@ void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	}
 }
 
-struct ffa_value ffa_indirect_msg_send(ffa_id_t sender_vm_id,
-				       ffa_id_t receiver_vm_id, uint32_t size,
-				       struct vcpu *current, struct vcpu **next)
-{
-	(void)sender_vm_id;
-	(void)receiver_vm_id;
-	(void)size;
-	(void)current;
-	(void)next;
-
-	return ffa_error(FFA_NOT_SUPPORTED);
-}
-
 /*
  * Handle FFA_ERROR_32 call according to the given error code.
  *

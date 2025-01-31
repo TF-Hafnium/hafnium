@@ -8,6 +8,7 @@
 
 #include "hf/ffa/indirect_messaging.h"
 
+#include "hf/ffa_internal.h"
 #include "hf/vm.h"
 
 /**
@@ -69,4 +70,17 @@ bool ffa_indirect_msg_send2_forward(ffa_id_t receiver_vm_id,
 	(void)sender_vm_id;
 	(void)ret;
 	return false;
+}
+
+struct ffa_value ffa_indirect_msg_send(ffa_id_t sender_vm_id,
+				       ffa_id_t receiver_vm_id, uint32_t size,
+				       struct vcpu *current, struct vcpu **next)
+{
+	(void)sender_vm_id;
+	(void)receiver_vm_id;
+	(void)size;
+	(void)current;
+	(void)next;
+
+	return ffa_error(FFA_NOT_SUPPORTED);
 }

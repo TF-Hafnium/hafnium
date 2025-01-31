@@ -9,15 +9,12 @@
 #include "hf/arch/ffa.h"
 #include "hf/arch/other_world.h"
 
-#include "hf/api.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
-#include "hf/ffa/indirect_messaging.h"
 #include "hf/ffa/setup_and_discovery.h"
 #include "hf/ffa_internal.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
-#include "hf/vm_ids.h"
 
 static bool ffa_tee_enabled = false;
 
@@ -135,158 +132,6 @@ bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	(void)vm_id;
 	return false;
-}
-
-/**
- * Notifies the `to` VM about the message currently in its mailbox, possibly
- * with the help of the primary VM.
- */
-static struct ffa_value deliver_msg(struct vm_locked to, ffa_id_t from_id,
-				    struct vcpu_locked current_locked,
-				    struct vcpu **next)
-{
-	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
-	struct ffa_value primary_ret = {
-		.func = FFA_MSG_SEND_32,
-		.arg1 = ((uint32_t)from_id << 16) | to.vm->id,
-	};
-
-	/* Messages for the primary VM are delivered directly. */
-	if (vm_is_primary(to.vm)) {
-		/*
-		 * Only tell the primary VM the size and other details if the
-		 * message is for it, to avoid leaking data about messages for
-		 * other VMs.
-		 */
-		primary_ret = ffa_msg_recv_return(to.vm);
-
-		*next = api_switch_to_primary(current_locked, primary_ret,
-					      VCPU_STATE_BLOCKED);
-		return ret;
-	}
-
-	to.vm->mailbox.state = MAILBOX_STATE_FULL;
-
-	/* Messages for the TEE are sent on via the dispatcher. */
-	if (to.vm->id == HF_TEE_VM_ID) {
-		struct ffa_value call = ffa_msg_recv_return(to.vm);
-
-		ret = arch_other_world_call(call);
-		/*
-		 * After the call to the TEE completes it must have finished
-		 * reading its RX buffer, so it is ready for another message.
-		 */
-		to.vm->mailbox.state = MAILBOX_STATE_EMPTY;
-		/*
-		 * Don't return to the primary VM in this case, as the TEE is
-		 * not (yet) scheduled via FF-A.
-		 */
-		return ret;
-	}
-
-	/* Return to the primary VM directly or with a switch. */
-	if (from_id != HF_PRIMARY_VM_ID) {
-		*next = api_switch_to_primary(current_locked, primary_ret,
-					      VCPU_STATE_BLOCKED);
-	}
-
-	return ret;
-}
-
-/*
- * Copies data from the sender's send buffer to the recipient's receive buffer
- * and notifies the recipient.
- *
- * If the recipient's receive buffer is busy, it can optionally register the
- * caller to be notified when the recipient's receive buffer becomes available.
- */
-struct ffa_value ffa_indirect_msg_send(ffa_id_t sender_vm_id,
-				       ffa_id_t receiver_vm_id, uint32_t size,
-				       struct vcpu *current, struct vcpu **next)
-{
-	struct vm *from = current->vm;
-	struct vm *to;
-	struct vm_locked to_locked;
-	const void *from_msg;
-	struct ffa_value ret;
-	struct vcpu_locked current_locked;
-	bool is_direct_request_ongoing;
-
-	/* Ensure sender VM ID corresponds to the current VM. */
-	if (sender_vm_id != from->id) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Disallow reflexive requests as this suggests an error in the VM. */
-	if (receiver_vm_id == from->id) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Limit the size of transfer. */
-	if (size > FFA_MSG_PAYLOAD_MAX) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/* Ensure the receiver VM exists. */
-	to = vm_find(receiver_vm_id);
-	if (to == NULL) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
-	/*
-	 * Deny if vCPU is executing in context of an FFA_MSG_SEND_DIRECT_REQ
-	 * invocation.
-	 */
-	current_locked = vcpu_lock(current);
-	is_direct_request_ongoing =
-		is_ffa_direct_msg_request_ongoing(current_locked);
-
-	if (is_direct_request_ongoing) {
-		ret = ffa_error(FFA_DENIED);
-		goto out_current;
-	}
-
-	/*
-	 * Check that the sender has configured its send buffer. If the tx
-	 * mailbox at from_msg is configured (i.e. from_msg != NULL) then it can
-	 * be safely accessed after releasing the lock since the tx mailbox
-	 * address can only be configured once.
-	 * A VM's lock must be acquired before any of its vCPU's lock. Hence,
-	 * unlock current vCPU and acquire it immediately after its VM's lock.
-	 */
-	vcpu_unlock(&current_locked);
-	sl_lock(&from->lock);
-	current_locked = vcpu_lock(current);
-	from_msg = from->mailbox.send;
-	sl_unlock(&from->lock);
-
-	if (from_msg == NULL) {
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out_current;
-	}
-
-	to_locked = vm_lock(to);
-
-	if (vm_is_mailbox_busy(to_locked)) {
-		ret = ffa_error(FFA_BUSY);
-		goto out;
-	}
-
-	/* Copy data. */
-	memcpy_s(to->mailbox.recv, FFA_MSG_PAYLOAD_MAX, from_msg, size);
-	to->mailbox.recv_size = size;
-	to->mailbox.recv_sender = sender_vm_id;
-	to->mailbox.recv_func = FFA_MSG_SEND_32;
-	to->mailbox.state = MAILBOX_STATE_FULL;
-	ret = deliver_msg(to_locked, sender_vm_id, current_locked, next);
-
-out:
-	vm_unlock(&to_locked);
-
-out_current:
-	vcpu_unlock(&current_locked);
-
-	return ret;
 }
 
 struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
