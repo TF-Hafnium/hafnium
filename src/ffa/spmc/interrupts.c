@@ -889,3 +889,58 @@ uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
 
 	return api_interrupt_get(current_locked);
 }
+
+/**
+ * Run the vCPU in SPMC schedule mode under the runtime model for secure
+ * interrupt handling.
+ */
+static void plat_ffa_run_in_sec_interrupt_rtm(
+	struct vcpu_locked target_vcpu_locked)
+{
+	struct vcpu *target_vcpu;
+
+	target_vcpu = target_vcpu_locked.vcpu;
+
+	/* Mark the registers as unavailable now. */
+	target_vcpu->regs_available = false;
+	target_vcpu->scheduling_mode = SPMC_MODE;
+	target_vcpu->rt_model = RTM_SEC_INTERRUPT;
+	target_vcpu->state = VCPU_STATE_RUNNING;
+	target_vcpu->requires_deactivate_call = false;
+}
+
+bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
+				   struct vcpu_locked next_locked,
+				   struct ffa_value *signal_interrupt)
+{
+	uint32_t intid;
+
+	/*
+	 * Check if there are any pending virtual secure interrupts to be
+	 * handled.
+	 */
+	if (vcpu_interrupt_queue_peek(current_locked, &intid)) {
+		/*
+		 * Prepare to signal virtual secure interrupt to S-EL0/S-EL1 SP
+		 * in WAITING state. Refer to FF-A v1.2 Table 9.1 and Table 9.2
+		 * case 1.
+		 */
+		*signal_interrupt = api_ffa_interrupt_return(intid);
+
+		/*
+		 * Prepare to resume this partition's vCPU in SPMC
+		 * schedule mode to handle virtual secure interrupt.
+		 */
+		plat_ffa_run_in_sec_interrupt_rtm(current_locked);
+
+		current_locked.vcpu->preempted_vcpu = next_locked.vcpu;
+		next_locked.vcpu->state = VCPU_STATE_PREEMPTED;
+
+		dlog_verbose("%s: Pending interrup, intercepting FF-A call.\n",
+			     __func__);
+
+		return true;
+	}
+
+	return false;
+}

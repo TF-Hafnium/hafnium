@@ -117,17 +117,6 @@ void plat_ffa_init(struct mpool *ppool)
 	dlog_verbose("TEE finished setting up buffers.\n");
 }
 
-bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
-				   struct vcpu_locked next_locked,
-				   struct ffa_value *signal_interrupt)
-{
-	(void)current_locked;
-	(void)next_locked;
-	(void)signal_interrupt;
-
-	return false;
-}
-
 bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	(void)vm_id;

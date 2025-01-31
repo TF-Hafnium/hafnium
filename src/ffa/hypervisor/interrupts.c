@@ -56,3 +56,14 @@ uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
 {
 	return api_interrupt_get(current_locked);
 }
+
+bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
+				   struct vcpu_locked next_locked,
+				   struct ffa_value *signal_interrupt)
+{
+	(void)current_locked;
+	(void)next_locked;
+	(void)signal_interrupt;
+
+	return false;
+}
