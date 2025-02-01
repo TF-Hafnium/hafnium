@@ -15,6 +15,7 @@
 #include "hf/arch/other_world.h"
 #include "hf/arch/timer.h"
 
+#include "hf/addr.h"
 #include "hf/bits.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
@@ -4569,13 +4570,23 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 	return result;
 }
 
-struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)
+struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, uint32_t page_count,
+				      struct vcpu *current)
 {
 	struct vm_locked vm_locked;
 	struct ffa_value ret;
 	bool mode_ret;
 	uint32_t mode;
-	vaddr_t end_addr = va_add(base_addr, PAGE_SIZE);
+	vaddr_t end_addr;
+
+	/**
+	 * The size of the memory region is calculated as (page_count + 1) *
+	 * granule size to ensure backwards compatability: v1.2 or earlier
+	 * callers, who leave `arg2` as 0, will get the correct behaviour
+	 * (querying a single page).
+	 */
+	page_count += 1;
+	end_addr = va_add(base_addr, page_count * PAGE_SIZE);
 
 	if (!ffa_memory_is_mem_perm_get_valid(current)) {
 		dlog_error("FFA_MEM_PERM_GET: not allowed\n");
@@ -4605,8 +4616,10 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)
 	mode_ret =
 		mm_get_mode(&vm_locked.vm->ptable, base_addr, end_addr, &mode);
 	if (!mode_ret || (mode & MM_MODE_INVALID)) {
-		dlog_error("FFA_MEM_PERM_GET: cannot find page at %#016lx\n",
-			   va_addr(base_addr));
+		dlog_error(
+			"FFA_MEM_PERM_GET: cannot find permission for range "
+			"%#016lx - %#016lx\n",
+			va_addr(base_addr), va_addr(end_addr));
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -4624,7 +4637,8 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)
 
 	ret = (struct ffa_value){
 		.func = FFA_SUCCESS_32,
-		.arg3 = 1,
+		/* Same logic as for the input page count. */
+		.arg3 = page_count - 1,
 	};
 
 	if (mode & MM_MODE_W) {

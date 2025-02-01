@@ -685,7 +685,8 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		return true;
 	case FFA_MEM_PERM_GET_32:
 	case FFA_MEM_PERM_GET_64:
-		*args = api_ffa_mem_perm_get(va_init(args->arg1), current);
+		*args = api_ffa_mem_perm_get(va_init(args->arg1), args->arg2,
+					     current);
 		return true;
 	case FFA_NOTIFICATION_SET_32:
 		*args = api_ffa_notification_set(

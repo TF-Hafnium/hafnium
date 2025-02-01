@@ -668,10 +668,19 @@ static inline struct ffa_value ffa_notification_info_get(void)
 	});
 }
 
-static inline struct ffa_value ffa_mem_perm_get(uint64_t base_va)
+static inline struct ffa_value ffa_mem_perm_get(uint64_t base_va,
+						uint32_t page_count)
 {
-	return ffa_call((struct ffa_value){.func = FFA_MEM_PERM_GET_32,
-					   .arg1 = base_va});
+	return ffa_call((struct ffa_value){
+		.func = FFA_MEM_PERM_GET_32,
+		.arg1 = base_va,
+		/**
+		 * The handler for `FFA_MEM_PERM_GET` calculates the size of the
+		 * region as (page_count + 1) * granule size. So we must pass in
+		 * page_count - 1.
+		 */
+		.arg2 = page_count - 1,
+	});
 }
 
 static inline struct ffa_value ffa_mem_perm_set(uint64_t base_va,
