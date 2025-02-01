@@ -72,11 +72,13 @@
 /* The mask for a mode that is considered unmapped. */
 #define MM_MODE_UNMAPPED_MASK (MM_MODE_INVALID | MM_MODE_UNOWNED)
 
-#define MM_FLAG_COMMIT  0x01
-#define MM_FLAG_UNMAP   0x02
-#define MM_FLAG_STAGE1  0x04
-
 /* clang-format on */
+
+struct mm_flags {
+	bool commit : 1;
+	bool unmap : 1;
+	bool stage1 : 1;
+};
 
 #define MM_PPOOL_ENTRY_SIZE sizeof(struct mm_page_table)
 
@@ -108,9 +110,9 @@ struct mm_stage1_locked {
 
 void mm_vm_enable_invalidation(void);
 
-bool mm_ptable_init(struct mm_ptable *ptable, uint16_t id, int flags,
-		    struct mpool *ppool);
-ptable_addr_t mm_ptable_addr_space_end(int flags);
+bool mm_ptable_init(struct mm_ptable *ptable, uint16_t id,
+		    struct mm_flags flags, struct mpool *ppool);
+ptable_addr_t mm_ptable_addr_space_end(struct mm_flags flags);
 
 bool mm_vm_init(struct mm_ptable *ptable, uint16_t id, struct mpool *ppool);
 void mm_vm_fini(const struct mm_ptable *ptable, struct mpool *ppool);

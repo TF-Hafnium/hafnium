@@ -53,14 +53,16 @@ bool hftest_mm_init(void)
 		HFTEST_FAIL(true, "Failed to add buffer to page-table pool.");
 	}
 
-	if (!mm_ptable_init(&ptable, 0, MM_FLAG_STAGE1, &ppool)) {
+	if (!mm_ptable_init(&ptable, 0, (struct mm_flags){.stage1 = true},
+			    &ppool)) {
 		HFTEST_FAIL(true, "Unable to allocate memory for page table.");
 	}
 
 	stage1_locked = hftest_mm_get_stage1();
 	mm_identity_map(stage1_locked,
 			pa_init((uintptr_t)HFTEST_STAGE1_START_ADDRESS),
-			pa_init(mm_ptable_addr_space_end(MM_FLAG_STAGE1)),
+			pa_init(mm_ptable_addr_space_end(
+				(struct mm_flags){.stage1 = true})),
 			MM_MODE_R | MM_MODE_W | MM_MODE_X, &ppool);
 
 	arch_vm_mm_enable(ptable.root);

@@ -92,11 +92,12 @@ bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool)
 		 * DMA device that is upstream of given VM. This is necessary
 		 * to enforce static DMA isolation.
 		 */
-		ret = ret &&
-		      mm_ptable_init(&vm->iommu_ptables[k], vm->id, 0, ppool);
+		ret = ret && mm_ptable_init(&vm->iommu_ptables[k], vm->id,
+					    (struct mm_flags){0}, ppool);
 #if SECURE_WORLD == 1
-		ret = ret && mm_ptable_init(&vm->arch.iommu_ptables_ns[k],
-					    vm->id, 0, ppool);
+		ret = ret &&
+		      mm_ptable_init(&vm->arch.iommu_ptables_ns[k], vm->id,
+				     (struct mm_flags){0}, ppool);
 #endif
 		if (!ret) {
 			dlog_error(
@@ -115,8 +116,8 @@ bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool)
 	bool ret;
 
 	if (vm->el0_partition) {
-		return mm_ptable_init(&vm->ptable, vm->id, MM_FLAG_STAGE1,
-				      ppool);
+		return mm_ptable_init(&vm->ptable, vm->id,
+				      (struct mm_flags){.stage1 = true}, ppool);
 	}
 
 	ret = mm_vm_init(&vm->ptable, vm->id, ppool);
