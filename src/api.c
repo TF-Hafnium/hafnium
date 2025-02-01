@@ -4577,16 +4577,22 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)
 {
 	struct vm_locked vm_locked;
-	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
-	bool mode_ret = false;
-	uint32_t mode = 0;
+	struct ffa_value ret;
+	bool mode_ret;
+	uint32_t mode;
+	vaddr_t end_addr = va_add(base_addr, PAGE_SIZE);
 
 	if (!ffa_memory_is_mem_perm_get_valid(current)) {
+		dlog_error("FFA_MEM_PERM_GET: not allowed\n");
 		return ffa_error(FFA_DENIED);
 	}
 
-	if (!(current->vm->el0_partition)) {
-		return ffa_error(FFA_DENIED);
+	if (!is_aligned(va_addr(base_addr), PAGE_SIZE)) {
+		dlog_error(
+			"FFA_MEM_PERM_GET: base addr %#016lx is not page "
+			"aligned\n",
+			va_addr(base_addr));
+		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	vm_locked = vm_lock(current->vm);
@@ -4601,9 +4607,11 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)
 	 * the API must return true AND the returned mode must not have
 	 * MM_MODE_INVALID set.
 	 */
-	mode_ret = mm_get_mode(&vm_locked.vm->ptable, base_addr,
-			       va_add(base_addr, PAGE_SIZE), &mode);
+	mode_ret =
+		mm_get_mode(&vm_locked.vm->ptable, base_addr, end_addr, &mode);
 	if (!mode_ret || (mode & MM_MODE_INVALID)) {
+		dlog_error("FFA_MEM_PERM_GET: cannot find page at %#016lx\n",
+			   va_addr(base_addr));
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -4619,14 +4627,14 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)
 	CHECK((mode & (MM_MODE_NG | MM_MODE_USER)) ==
 	      (MM_MODE_NG | MM_MODE_USER));
 
+	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+
 	if (mode & MM_MODE_W) {
 		/* No memory should be writeable but not readable. */
 		CHECK(mode & MM_MODE_R);
-		ret = (struct ffa_value){.func = FFA_SUCCESS_32,
-					 .arg2 = (uint32_t)(FFA_MEM_PERM_RW)};
+		ret.arg2 = (uint32_t)(FFA_MEM_PERM_RW);
 	} else if (mode & MM_MODE_R) {
-		ret = (struct ffa_value){.func = FFA_SUCCESS_32,
-					 .arg2 = (uint32_t)(FFA_MEM_PERM_RX)};
+		ret.arg2 = (uint32_t)(FFA_MEM_PERM_RX);
 		if (!(mode & MM_MODE_X)) {
 			ret.arg2 = (uint32_t)(FFA_MEM_PERM_RO);
 		}
@@ -4641,25 +4649,35 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 {
 	struct vm_locked vm_locked;
 	struct ffa_value ret;
-	bool mode_ret = false;
+	bool mode_ret;
 	uint32_t original_mode;
 	uint32_t new_mode;
 	struct mpool local_page_pool;
+	vaddr_t end_addr = va_add(base_addr, page_count * PAGE_SIZE);
 
 	if (!ffa_memory_is_mem_perm_set_valid(current)) {
+		dlog_error("FFA_MEM_PERM_SET: not allowed\n");
 		return ffa_error(FFA_DENIED);
 	}
 
-	if (!(current->vm->el0_partition)) {
+	if (!current->vm->el0_partition) {
+		dlog_error("FFA_MEM_PERM_SET: VM %#x is not an EL0 partition\n",
+			   current->vm->id);
 		return ffa_error(FFA_DENIED);
 	}
 
 	if (!is_aligned(va_addr(base_addr), PAGE_SIZE)) {
+		dlog_error(
+			"FFA_MEM_PERM_SET: base addr %#016lx is not page "
+			"aligned\n",
+			va_addr(base_addr));
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
 	if ((mem_perm != FFA_MEM_PERM_RW) && (mem_perm != FFA_MEM_PERM_RO) &&
 	    (mem_perm != FFA_MEM_PERM_RX)) {
+		dlog_error("FFA_MEM_PERM_SET: invalid permissions %#x\n",
+			   mem_perm);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -4690,12 +4708,19 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 			       va_add(base_addr, page_count * PAGE_SIZE),
 			       &original_mode);
 	if (!mode_ret || (original_mode & MM_MODE_INVALID)) {
+		dlog_error(
+			"FFA_MEM_PERM_SET: range %#016lx - %#016lx is not "
+			"mapped\n",
+			va_addr(base_addr), va_addr(end_addr));
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
 
 	/* Device memory cannot be marked as executable */
 	if ((original_mode & MM_MODE_D) && (mem_perm == FFA_MEM_PERM_RX)) {
+		dlog_error(
+			"FFA_MEM_PERM_SET: cannot set device memory as "
+			"executable\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -4714,10 +4739,14 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	 * Safe to re-map memory, since we know the requested permissions are
 	 * valid, and the memory requested to be re-mapped is also valid.
 	 */
-	if (!mm_identity_prepare(
-		    &vm_locked.vm->ptable, pa_from_va(base_addr),
-		    pa_from_va(va_add(base_addr, page_count * PAGE_SIZE)),
-		    new_mode, &local_page_pool)) {
+	if (!mm_identity_prepare(&vm_locked.vm->ptable, pa_from_va(base_addr),
+				 pa_from_va(end_addr), new_mode,
+				 &local_page_pool)) {
+		dlog_error(
+			"FFA_MEM_PERM_SET: remapping memory range %#016lx - "
+			"%#016lx failed\n",
+			va_addr(base_addr), va_addr(end_addr));
+
 		/*
 		 * Defrag the table into the local page pool.
 		 * mm_identity_prepare could have allocated or freed pages to
@@ -4733,22 +4762,18 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 		 */
 		CHECK(mm_identity_prepare(
 			&vm_locked.vm->ptable, pa_from_va(base_addr),
-			pa_from_va(va_add(base_addr, page_count * PAGE_SIZE)),
-			original_mode, &local_page_pool));
-		mm_identity_commit(
-			&vm_locked.vm->ptable, pa_from_va(base_addr),
-			pa_from_va(va_add(base_addr, page_count * PAGE_SIZE)),
-			original_mode, &local_page_pool);
+			pa_from_va(end_addr), original_mode, &local_page_pool));
+		mm_identity_commit(&vm_locked.vm->ptable, pa_from_va(base_addr),
+				   pa_from_va(end_addr), original_mode,
+				   &local_page_pool);
 
 		mm_stage1_defrag(&vm_locked.vm->ptable, &api_page_pool);
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
-	mm_identity_commit(
-		&vm_locked.vm->ptable, pa_from_va(base_addr),
-		pa_from_va(va_add(base_addr, page_count * PAGE_SIZE)), new_mode,
-		&local_page_pool);
+	mm_identity_commit(&vm_locked.vm->ptable, pa_from_va(base_addr),
+			   pa_from_va(end_addr), new_mode, &local_page_pool);
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 

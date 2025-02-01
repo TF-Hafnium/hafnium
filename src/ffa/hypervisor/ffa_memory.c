@@ -61,7 +61,12 @@ uint32_t ffa_memory_get_other_world_mode(void)
 
 bool ffa_memory_is_mem_perm_get_valid(const struct vcpu *current)
 {
-	(void)current;
+	if (!current->vm->el0_partition) {
+		dlog_error("FFA_MEM_PERM_GET: VM %#x is not an EL0 partition\n",
+			   current->vm->id);
+		return false;
+	}
+
 	return has_vhe_support();
 }
 
