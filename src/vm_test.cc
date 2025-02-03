@@ -415,6 +415,14 @@ TEST_F(vm, vm_notifications_set_and_get)
 	 */
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
 					       per_vcpu, vcpu_idx, true);
+
+	/*
+	 * Duplicate call to check that the state of the counters doesn't alter
+	 * because of it.
+	 */
+	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
+					       per_vcpu, vcpu_idx, true);
+
 	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
 
 	ret = vm_notifications_partition_get_pending(current_vm_locked,

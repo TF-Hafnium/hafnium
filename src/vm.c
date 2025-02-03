@@ -718,8 +718,16 @@ bool vm_notifications_validate_per_vcpu(struct vm_locked vm_locked,
 static void vm_notifications_state_set(struct notifications_state *state,
 				       ffa_notifications_bitmap_t notifications)
 {
-	state->pending |= notifications;
-	vm_notifications_pending_count_add(notifications);
+	/*
+	 * Exclude notifications which are already pending, to avoid
+	 * leaving the pending counter in a wrongful state.
+	 */
+	ffa_notifications_bitmap_t to_set =
+		(state->pending & notifications) ^ notifications;
+
+	/* Change the state of the pending notifications. */
+	state->pending |= to_set;
+	vm_notifications_pending_count_add(to_set);
 }
 
 void vm_notifications_partition_set_pending(
