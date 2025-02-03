@@ -1435,5 +1435,7 @@ TEST_PRECONDITION(vm_availability_messaging,
 		vm_id);
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg2,
+		  FFA_FRAMEWORK_MSG_BIT | FFA_FRAMEWORK_MSG_VM_CREATION_RESP);
 	EXPECT_EQ(res.arg3, 0);
 }

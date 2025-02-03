@@ -929,10 +929,21 @@ TEST_SERVICE(vm_availability_messaging_send_non_framework_from_sp)
 {
 	struct ffa_value args = ffa_msg_wait();
 	struct ffa_value ret;
-	uint32_t ffa_func = args.func;
+	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+	enum ffa_framework_msg_func func_resp = func;
 	ffa_id_t sp_id = ffa_receiver(args);
 	ffa_id_t pvm_id = ffa_sender(args);
 
+	if (func == FFA_FRAMEWORK_MSG_VM_CREATION_REQ) {
+		func_resp = FFA_FRAMEWORK_MSG_VM_CREATION_RESP;
+	} else if (func == FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ) {
+		func_resp = FFA_FRAMEWORK_MSG_VM_DESTRUCTION_RESP;
+	} else {
+		FAIL("Unsupported framework message function%#x received",
+		     func);
+	}
+
+	/* Attempt to send a standard direct response message. */
 	ret = ffa_msg_send_direct_resp(sp_id, pvm_id, args.arg3, args.arg4,
 				       args.arg5, args.arg6, args.arg7);
 
@@ -940,13 +951,10 @@ TEST_SERVICE(vm_availability_messaging_send_non_framework_from_sp)
 	ASSERT_EQ(ret.func, FFA_ERROR_32);
 	ASSERT_EQ((enum ffa_error)ret.arg2, FFA_DENIED);
 
-	/* Send a valid response, so that the VM is not blocked forever. */
-	args = ffa_framework_message_send_direct_resp(sp_id, pvm_id, ffa_func,
-						      0);
-	ASSERT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
-	EXPECT_EQ(ffa_sender(args), pvm_id);
-	EXPECT_EQ(ffa_receiver(args), sp_id);
-	EXPECT_EQ(args.arg2,
-		  FFA_FRAMEWORK_MSG_BIT | FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ);
-	ASSERT_EQ(args.arg3, 0);
+	/*
+	 * Send a valid framework direct response message, so that the VM is not
+	 * blocked forever.
+	 */
+	ffa_framework_message_send_direct_resp(sp_id, pvm_id, func_resp, 0);
+	FAIL("Direct response not expected to return");
 }
