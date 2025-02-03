@@ -394,21 +394,34 @@ TEST_F(vm, vm_notifications_set_and_get)
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
 					       global, 0ull, false);
 
+	EXPECT_EQ(notifications->global.pending, global);
+
+	/* Counter should track pending notifications. */
+	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
+
 	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, 0ull);
 	EXPECT_EQ(ret, global);
 	EXPECT_EQ(notifications->global.pending, 0ull);
 
 	/*
+	 * After getting the pending notifications, the pending count should
+	 * be zeroed.
+	 */
+	EXPECT_TRUE(vm_is_notifications_pending_count_zero());
+
+	/*
 	 * Validate get notifications bitmap for per-vCPU notifications.
 	 */
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
 					       per_vcpu, vcpu_idx, true);
+	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
 
 	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, vcpu_idx);
 	EXPECT_EQ(ret, per_vcpu);
 	EXPECT_EQ(notifications->per_vcpu[vcpu_idx].pending, 0ull);
+	EXPECT_TRUE(vm_is_notifications_pending_count_zero());
 
 	/*
 	 * Validate that getting notifications for a specific vCPU also returns
@@ -416,14 +429,17 @@ TEST_F(vm, vm_notifications_set_and_get)
 	 */
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
 					       per_vcpu, vcpu_idx, true);
+
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
 					       global, 0ull, false);
+	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
 
 	ret = vm_notifications_partition_get_pending(current_vm_locked,
 						     is_from_vm, vcpu_idx);
 	EXPECT_EQ(ret, per_vcpu | global);
 	EXPECT_EQ(notifications->per_vcpu[vcpu_idx].pending, 0ull);
 	EXPECT_EQ(notifications->global.pending, 0ull);
+	EXPECT_TRUE(vm_is_notifications_pending_count_zero());
 
 	/** Undo the binding */
 	vm_notifications_update_bindings(current_vm_locked, is_from_vm, 0ull,
