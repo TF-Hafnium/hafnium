@@ -53,28 +53,28 @@ bool arch_mm_is_block_allowed(mm_level_t level)
 	return true;
 }
 
-bool arch_mm_pte_is_present(pte_t pte, mm_level_t level)
+enum mm_pte_type arch_mm_pte_type(pte_t pte, mm_level_t level)
 {
-	return arch_mm_pte_is_valid(pte, level) ||
-	       !(((pte << PTE_LEVEL_SHIFT(level)) >> PTE_ATTR_MODE_SHIFT) &
-		 MM_MODE_UNOWNED);
-}
+	bool invalid =
+		(((pte << PTE_LEVEL_SHIFT(level)) >> PTE_ATTR_MODE_SHIFT) &
+		 MM_MODE_INVALID) != 0;
+	bool unowned =
+		(((pte << PTE_LEVEL_SHIFT(level)) >> PTE_ATTR_MODE_SHIFT) &
+		 MM_MODE_UNOWNED) != 0;
+	bool table = ((pte << PTE_LEVEL_SHIFT(level)) & PTE_TABLE) != 0;
 
-bool arch_mm_pte_is_valid(pte_t pte, mm_level_t level)
-{
-	return !(((pte << PTE_LEVEL_SHIFT(level)) >> PTE_ATTR_MODE_SHIFT) &
-		 MM_MODE_INVALID);
-}
+	if (invalid) {
+		if (unowned) {
+			return PTE_TYPE_ABSENT;
+		}
+		return PTE_TYPE_INVALID_BLOCK;
+	}
 
-bool arch_mm_pte_is_block(pte_t pte, mm_level_t level)
-{
-	return arch_mm_pte_is_present(pte, level) &&
-	       !arch_mm_pte_is_table(pte, level);
-}
+	if (table) {
+		return PTE_TYPE_TABLE;
+	}
 
-bool arch_mm_pte_is_table(pte_t pte, mm_level_t level)
-{
-	return (pte << PTE_LEVEL_SHIFT(level)) & PTE_TABLE;
+	return PTE_TYPE_VALID_BLOCK;
 }
 
 paddr_t arch_mm_clear_pa(paddr_t pa)
@@ -82,14 +82,21 @@ paddr_t arch_mm_clear_pa(paddr_t pa)
 	return pa_init(pa_addr(pa) & PTE_ADDR_MASK);
 }
 
-paddr_t arch_mm_block_from_pte(pte_t pte, mm_level_t level)
+paddr_t pte_addr(pte_t pte, mm_level_t level)
 {
 	return pa_init((pte << PTE_LEVEL_SHIFT(level)) & PTE_ADDR_MASK);
 }
 
+paddr_t arch_mm_block_from_pte(pte_t pte, mm_level_t level)
+{
+	assert(arch_mm_pte_is_block(pte, level));
+	return pte_addr(pte, level);
+}
+
 paddr_t arch_mm_table_from_pte(pte_t pte, mm_level_t level)
 {
-	return pa_init((pte << PTE_LEVEL_SHIFT(level)) & PTE_ADDR_MASK);
+	assert(arch_mm_pte_is_table(pte, level));
+	return pte_addr(pte, level);
 }
 
 mm_attr_t arch_mm_pte_attrs(pte_t pte, mm_level_t level)

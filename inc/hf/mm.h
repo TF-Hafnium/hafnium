@@ -22,6 +22,22 @@ typedef uint64_t mm_attr_t;
 typedef uint8_t mm_level_t;
 typedef uint16_t mm_asid_t;
 
+/*
+ * A page table entry (PTE) will take one of the following forms:
+ *
+ *  1. absent        : There is no mapping.
+ *  2. invalid block : Represents a block that is not in the address space.
+ *  3. valid block   : Represents a block that is in the address space.
+ *  4. table         : Represents a reference to a table of PTEs.
+ * See Arm ARM, D8.3 (Translation table descriptor formats).
+ */
+enum mm_pte_type {
+	PTE_TYPE_ABSENT,
+	PTE_TYPE_INVALID_BLOCK,
+	PTE_TYPE_VALID_BLOCK,
+	PTE_TYPE_TABLE,
+};
+
 /* Keep macro alignment */
 /* clang-format off */
 

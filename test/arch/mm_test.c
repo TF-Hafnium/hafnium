@@ -59,6 +59,7 @@ TEST(arch_mm, absent_properties)
 
 		absent_pte = arch_mm_absent_pte(level);
 
+		EXPECT_EQ(arch_mm_pte_type(absent_pte, level), PTE_TYPE_ABSENT);
 		EXPECT_FALSE(arch_mm_pte_is_present(absent_pte, level));
 		EXPECT_FALSE(arch_mm_pte_is_valid(absent_pte, level));
 		EXPECT_FALSE(arch_mm_pte_is_block(absent_pte, level));
@@ -83,6 +84,8 @@ TEST(arch_mm, invalid_block_properties)
 		block_pte = arch_mm_block_pte(level, pa_init(PAGE_SIZE * 19),
 					      attrs);
 
+		EXPECT_EQ(arch_mm_pte_type(block_pte, level),
+			  PTE_TYPE_INVALID_BLOCK);
 		EXPECT_TRUE(arch_mm_pte_is_present(block_pte, level));
 		EXPECT_FALSE(arch_mm_pte_is_valid(block_pte, level));
 		EXPECT_TRUE(arch_mm_pte_is_block(block_pte, level));
@@ -107,6 +110,8 @@ TEST(arch_mm, valid_block_properties)
 		block_pte = arch_mm_block_pte(
 			level, pa_init(PAGE_SIZE * 12345678U), attrs);
 
+		EXPECT_EQ(arch_mm_pte_type(block_pte, level),
+			  PTE_TYPE_VALID_BLOCK);
 		EXPECT_TRUE(arch_mm_pte_is_present(block_pte, level));
 		EXPECT_TRUE(arch_mm_pte_is_valid(block_pte, level));
 		EXPECT_TRUE(arch_mm_pte_is_block(block_pte, level));
@@ -130,6 +135,7 @@ TEST(arch_mm, table_properties)
 		table_pte = arch_mm_table_pte(level,
 					      pa_init(PAGE_SIZE * 999999999U));
 
+		EXPECT_EQ(arch_mm_pte_type(table_pte, level), PTE_TYPE_TABLE);
 		EXPECT_TRUE(arch_mm_pte_is_present(table_pte, level));
 		EXPECT_TRUE(arch_mm_pte_is_valid(table_pte, level));
 		EXPECT_FALSE(arch_mm_pte_is_block(table_pte, level));

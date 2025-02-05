@@ -16,15 +16,6 @@
 
 #include "vmapi/hf/ffa.h"
 
-/*
- * A page table entry (PTE) will take one of the following forms:
- *
- *  1. absent        : There is no mapping.
- *  2. invalid block : Represents a block that is not in the address space.
- *  3. valid block   : Represents a block that is in the address space.
- *  4. table         : Represents a reference to a table of PTEs.
- */
-
 /**
  * Creates an absent PTE.
  */
@@ -40,34 +31,67 @@ pte_t arch_mm_table_pte(mm_level_t level, paddr_t pa);
  */
 pte_t arch_mm_block_pte(mm_level_t level, paddr_t pa, mm_attr_t attrs);
 
+enum mm_pte_type arch_mm_pte_type(pte_t pte, mm_level_t level);
+
 /**
  * Checks whether a block is allowed at the given level of the page table.
  */
 bool arch_mm_is_block_allowed(mm_level_t level);
 
+static inline bool arch_mm_pte_is_absent(pte_t pte, mm_level_t level)
+{
+	return arch_mm_pte_type(pte, level) == PTE_TYPE_ABSENT;
+}
+
 /**
  * Determines if a PTE is present i.e. it contains information and therefore
  * needs to exist in the page table. Any non-absent PTE is present.
  */
-bool arch_mm_pte_is_present(pte_t pte, mm_level_t level);
+static inline bool arch_mm_pte_is_present(pte_t pte, mm_level_t level)
+{
+	return !arch_mm_pte_is_absent(pte, level);
+}
 
 /**
  * Determines if a PTE is valid i.e. it can affect the address space. Tables and
  * valid blocks fall into this category. Invalid blocks do not as they hold
  * information about blocks that are not in the address space.
  */
-bool arch_mm_pte_is_valid(pte_t pte, mm_level_t level);
+static inline bool arch_mm_pte_is_valid(pte_t pte, mm_level_t level)
+{
+	switch (arch_mm_pte_type(pte, level)) {
+	case PTE_TYPE_ABSENT:
+	case PTE_TYPE_INVALID_BLOCK:
+		return false;
+	case PTE_TYPE_VALID_BLOCK:
+	case PTE_TYPE_TABLE:
+		return true;
+	}
+}
 
 /**
  * Determines if a PTE is a block and represents an address range, valid or
  * invalid.
  */
-bool arch_mm_pte_is_block(pte_t pte, mm_level_t level);
+static inline bool arch_mm_pte_is_block(pte_t pte, mm_level_t level)
+{
+	switch (arch_mm_pte_type(pte, level)) {
+	case PTE_TYPE_ABSENT:
+	case PTE_TYPE_TABLE:
+		return false;
+	case PTE_TYPE_INVALID_BLOCK:
+	case PTE_TYPE_VALID_BLOCK:
+		return true;
+	}
+}
 
 /**
  * Determines if a PTE represents a reference to a table of PTEs.
  */
-bool arch_mm_pte_is_table(pte_t pte, mm_level_t level);
+static inline bool arch_mm_pte_is_table(pte_t pte, mm_level_t level)
+{
+	return arch_mm_pte_type(pte, level) == PTE_TYPE_TABLE;
+}
 
 /**
  * Clears the bits of an address that are ignored by the page table. In effect,
@@ -91,7 +115,7 @@ paddr_t arch_mm_table_from_pte(pte_t pte, mm_level_t level);
 mm_attr_t arch_mm_pte_attrs(pte_t pte, mm_level_t level);
 
 /**
- * Merges the attributes of a block into those of its containing table.
+ * Merges the attributes of a block into those of its parent table.
  */
 mm_attr_t arch_mm_combine_table_entry_attrs(mm_attr_t table_attrs,
 					    mm_attr_t block_attrs);

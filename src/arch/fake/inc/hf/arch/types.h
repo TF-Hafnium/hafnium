@@ -15,7 +15,10 @@
 #define PAGE_LEVEL_BITS 9
 #define STACK_ALIGN 64
 
-/** The type of a page table entry (PTE). */
+/**
+ * The type of a page table entry (PTE).
+ * Also sometimes called a "translation table descriptor" in the Arm ARM.
+ */
 typedef uint64_t pte_t;
 
 /** Integer type large enough to hold a physical address. */

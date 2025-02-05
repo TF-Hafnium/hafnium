@@ -189,44 +189,25 @@ bool arch_mm_is_block_allowed(mm_level_t level)
 	return level <= 2;
 }
 
-/**
- * Determines if the given pte is present, i.e., if it is valid or it is invalid
- * but still holds state about the memory so needs to be present in the table.
- */
-bool arch_mm_pte_is_present(pte_t pte, mm_level_t level)
+enum mm_pte_type arch_mm_pte_type(pte_t pte, mm_level_t level)
 {
-	return arch_mm_pte_is_valid(pte, level) || (pte & STAGE2_SW_OWNED) != 0;
-}
+	bool invalid = (pte & PTE_VALID) == 0;
+	bool unowned = (pte & STAGE2_SW_OWNED) == 0;
+	bool table = level != 0 && (pte & PTE_TABLE) != 0;
 
-/**
- * Determines if the given pte is valid, i.e., if it points to another table,
- * to a page, or a block of pages that can be accessed.
- */
-bool arch_mm_pte_is_valid(pte_t pte, mm_level_t level)
-{
-	(void)level;
-	return (pte & PTE_VALID) != 0;
-}
+	if (invalid) {
+		if (unowned) {
+			return PTE_TYPE_ABSENT;
+		}
 
-/**
- * Determines if the given pte references a block of pages.
- */
-bool arch_mm_pte_is_block(pte_t pte, mm_level_t level)
-{
-	/* We count pages at level 0 as blocks. */
-	return arch_mm_is_block_allowed(level) &&
-	       (level == 0 ? (pte & PTE_LEVEL0_BLOCK) != 0
-			   : arch_mm_pte_is_present(pte, level) &&
-				     !arch_mm_pte_is_table(pte, level));
-}
+		return PTE_TYPE_INVALID_BLOCK;
+	}
 
-/**
- * Determines if the given pte references another table.
- */
-bool arch_mm_pte_is_table(pte_t pte, mm_level_t level)
-{
-	return level != 0 && arch_mm_pte_is_valid(pte, level) &&
-	       (pte & PTE_TABLE) != 0;
+	if (table) {
+		return PTE_TYPE_TABLE;
+	}
+
+	return PTE_TYPE_VALID_BLOCK;
 }
 
 static uint64_t pte_addr(pte_t pte)
@@ -250,6 +231,8 @@ paddr_t arch_mm_clear_pa(paddr_t pa)
 paddr_t arch_mm_block_from_pte(pte_t pte, mm_level_t level)
 {
 	(void)level;
+
+	assert(arch_mm_pte_is_block(pte, level));
 	return pa_init(pte_addr(pte));
 }
 
@@ -260,6 +243,8 @@ paddr_t arch_mm_block_from_pte(pte_t pte, mm_level_t level)
 paddr_t arch_mm_table_from_pte(pte_t pte, mm_level_t level)
 {
 	(void)level;
+
+	assert(arch_mm_pte_is_table(pte, level));
 	return pa_init(pte_addr(pte));
 }
 
