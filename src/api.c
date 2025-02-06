@@ -2329,35 +2329,7 @@ out:
  */
 uint32_t api_interrupt_get(struct vcpu_locked current_locked)
 {
-	uint32_t i;
-	uint32_t first_interrupt = HF_INVALID_INTID;
-	struct interrupts *interrupts = &current_locked.vcpu->interrupts;
-
-	/*
-	 * Find the first enabled and pending interrupt ID, return it, and
-	 * deactivate it.
-	 */
-	for (i = 0; i < HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS; ++i) {
-		uint32_t enabled_and_pending =
-			interrupts->interrupt_enabled.bitmap[i] &
-			interrupts->interrupt_pending.bitmap[i];
-
-		if (enabled_and_pending != 0) {
-			uint8_t bit_index = ctz(enabled_and_pending);
-
-			first_interrupt =
-				i * INTERRUPT_REGISTER_BITS + bit_index;
-
-			/*
-			 * Mark it as no longer pending and decrement the count.
-			 */
-			vcpu_interrupt_clear_decrement(current_locked,
-						       first_interrupt);
-			break;
-		}
-	}
-
-	return first_interrupt;
+	return vcpu_virt_interrupt_get_pending_and_enabled(current_locked);
 }
 
 /**

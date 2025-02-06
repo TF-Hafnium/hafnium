@@ -639,13 +639,6 @@ bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
 	return true;
 }
 
-uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
-{
-	(void)current_locked;
-
-	return 0;
-}
-
 bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
 					 struct ffa_value *ret)
 {

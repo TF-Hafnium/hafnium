@@ -1069,7 +1069,7 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 		struct vcpu_locked current_locked;
 
 		current_locked = vcpu_lock(vcpu);
-		vcpu->regs.r[0] = ffa_interrupts_get(current_locked);
+		vcpu->regs.r[0] = api_interrupt_get(current_locked);
 		vcpu_unlock(&current_locked);
 		break;
 	}

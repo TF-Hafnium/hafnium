@@ -36,5 +36,3 @@ void ffa_interrupts_unmask(struct vcpu *current);
  */
 int64_t ffa_interrupts_reconfigure(uint32_t int_id, uint32_t command,
 				   uint32_t value, struct vcpu *current);
-
-uint32_t ffa_interrupts_get(struct vcpu_locked current_locked);

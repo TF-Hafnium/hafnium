@@ -781,12 +781,6 @@ out_unlock:
 	return ret;
 }
 
-/* Returns the virtual interrupt id to be handled by SP. */
-uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
-{
-	return vcpu_virt_interrupt_get_pending_and_enabled(current_locked);
-}
-
 /**
  * Run the vCPU in SPMC schedule mode under the runtime model for secure
  * interrupt handling.

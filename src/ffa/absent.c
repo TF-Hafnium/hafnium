@@ -576,11 +576,6 @@ void ffa_vm_free_resources(struct vm_locked vm_locked)
 	(void)vm_locked;
 }
 
-uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
-{
-	return api_interrupt_get(current_locked);
-}
-
 bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
 					 struct ffa_value *ret)
 {
