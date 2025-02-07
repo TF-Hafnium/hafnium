@@ -310,6 +310,15 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 	struct vcpu *current = current_locked.vcpu;
 	struct vcpu *next = NULL;
 
+	/*
+	 * The target vcpu has migrated to a different physical
+	 * CPU. Hence, it cannot be resumed on this CPU, SPMC
+	 * resumes current vCPU.
+	 */
+	if (target_vcpu->cpu != current_locked.vcpu->cpu) {
+		assert(target_vcpu->vm->vcpu_count == 1);
+	}
+
 	/* Secure interrupt signaling and queuing for S-EL1 SP. */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING: {
@@ -339,25 +348,15 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 			 * physical CPU. SPMC will migrate it to current
 			 * physical CPU and resume it.
 			 */
-			assert(target_vcpu->vm->vcpu_count == 1);
 			target_vcpu->cpu = current_locked.vcpu->cpu;
 		}
 		break;
 	}
 	case VCPU_STATE_BLOCKED:
-		if (target_vcpu->cpu != current_locked.vcpu->cpu) {
-			/*
-			 * The target vcpu has migrated to a different physical
-			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
-			 * resumes current vCPU.
-			 */
-			assert(target_vcpu->vm->vcpu_count == 1);
-			next = NULL;
-			ffa_interrupts_queue_vint(
-				target_vcpu_locked, v_intid,
-				(struct vcpu_locked){.vcpu = NULL});
-		} else if (ffa_direct_msg_precedes_in_call_chain(
-				   current_locked, target_vcpu_locked)) {
+
+		if (target_vcpu->cpu == current_locked.vcpu->cpu &&
+		    ffa_direct_msg_precedes_in_call_chain(current_locked,
+							  target_vcpu_locked)) {
 			struct ffa_value ret_interrupt =
 				api_ffa_interrupt_return(0);
 
@@ -387,11 +386,14 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 
 			ffa_interrupts_queue_vint(target_vcpu_locked, v_intid,
 						  current_locked);
-
 			next = target_vcpu;
 		} else {
 			/*
-			 * The target vCPU cannot be resumed now because it is
+			 * Either:
+			 * - The target vCPU has migrated to a different
+			 * physical CPU. Hence, it cannot be resumed on this
+			 * CPU, SPMC resumes current vCPU.
+			 * - The target vCPU cannot be resumed now because it is
 			 * in BLOCKED state (it yielded CPU cycles using
 			 * FFA_YIELD). SPMC queues the virtual interrupt and
 			 * resumes the current vCPU which could belong to either
@@ -404,36 +406,27 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 		}
 		break;
 	case VCPU_STATE_PREEMPTED:
-		if (target_vcpu->cpu == current_locked.vcpu->cpu) {
+		/*
+		 * We do not resume a target vCPU that has been already
+		 * pre-empted by an interrupt. Make the vIRQ pending for
+		 * target SP(i.e., queue the interrupt) and continue to
+		 * resume current vCPU. Refer to section 8.3.2.1 bullet
+		 * 3 in the FF-A v1.1 EAC0 spec.
+		 */
+		if (target_vcpu->cpu == current_locked.vcpu->cpu &&
+		    current->vm->id == HF_OTHER_WORLD_ID) {
 			/*
-			 * We do not resume a target vCPU that has been already
-			 * pre-empted by an interrupt. Make the vIRQ pending for
-			 * target SP(i.e., queue the interrupt) and continue to
-			 * resume current vCPU. Refer to section 8.3.2.1 bullet
-			 * 3 in the FF-A v1.1 EAC0 spec.
+			 * The target vCPU must have been preempted by a
+			 * non secure interrupt. It could not have been
+			 * preempted by a secure interrupt as current
+			 * SPMC implementation does not allow secure
+			 * interrupt prioritization. Moreover, the
+			 * target vCPU should have been in Normal World
+			 * scheduled mode as SPMC scheduled mode call
+			 * chain cannot be preempted by a non secure
+			 * interrupt.
 			 */
-
-			if (current->vm->id == HF_OTHER_WORLD_ID) {
-				/*
-				 * The target vCPU must have been preempted by a
-				 * non secure interrupt. It could not have been
-				 * preempted by a secure interrupt as current
-				 * SPMC implementation does not allow secure
-				 * interrupt prioritization. Moreover, the
-				 * target vCPU should have been in Normal World
-				 * scheduled mode as SPMC scheduled mode call
-				 * chain cannot be preempted by a non secure
-				 * interrupt.
-				 */
-				CHECK(target_vcpu->scheduling_mode == NWD_MODE);
-			}
-		} else {
-			/*
-			 * The target vcpu has migrated to a different physical
-			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
-			 * resumes current vCPU.
-			 */
-			assert(target_vcpu->vm->vcpu_count == 1);
+			CHECK(target_vcpu->scheduling_mode == NWD_MODE);
 		}
 
 		next = NULL;
@@ -451,16 +444,9 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 			 * implicitly. Refer to the embedded comment in vcpu.h
 			 * file for the description of this variable.
 			 */
-
 			current->requires_deactivate_call = true;
-		} else {
-			/*
-			 * The target vcpu has migrated to a different physical
-			 * CPU. Hence, it cannot be resumed on this CPU, SPMC
-			 * resumes current vCPU.
-			 */
-			assert(target_vcpu->vm->vcpu_count == 1);
 		}
+
 		next = NULL;
 		ffa_interrupts_queue_vint(target_vcpu_locked, v_intid,
 					  (struct vcpu_locked){.vcpu = NULL});
