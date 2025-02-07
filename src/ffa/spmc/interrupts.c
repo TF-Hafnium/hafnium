@@ -130,10 +130,11 @@ static void ffa_interrupts_set_preempted_vcpu(
 	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
 	struct vcpu *preempted_vcpu = current_locked.vcpu;
 
-	if (preempted_vcpu != NULL) {
-		target_vcpu->preempted_vcpu = preempted_vcpu;
-		preempted_vcpu->state = VCPU_STATE_PREEMPTED;
-	}
+	assert(target_vcpu != NULL);
+	assert(preempted_vcpu != NULL);
+
+	target_vcpu->preempted_vcpu = preempted_vcpu;
+	preempted_vcpu->state = VCPU_STATE_PREEMPTED;
 }
 
 /**
@@ -232,53 +233,14 @@ static struct vcpu *interrupt_resume_waiting(
 }
 
 /**
- * Handles the secure interrupt according to the target vCPU's state
- * in the case the owner of the interrupt is an S-EL0 partition.
+ * Handles the secure interrupt according to the target vCPU's state.
+ * Returns the next vCPU to resume accordingly.
+ * If it returns NULL, the current vCPU shall be resumed.
+ * This might be if the target vCPU is the current vCPU, or if the
+ * target vCPU is not in a state in which it can be resumed to handle
+ * the secure interrupt.
  */
-static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel0(
-	struct vcpu_locked current_locked,
-	struct vcpu_locked target_vcpu_locked, uint32_t v_intid)
-{
-	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
-	struct vcpu *next;
-
-	/* Secure interrupt signaling and queuing for S-EL0 SP. */
-	switch (target_vcpu->state) {
-	case VCPU_STATE_WAITING:
-
-		/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
-		dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
-			     target_vcpu->vm->id);
-
-		next = interrupt_resume_waiting(current_locked,
-						target_vcpu_locked, v_intid);
-		break;
-	case VCPU_STATE_BLOCKED:
-	case VCPU_STATE_PREEMPTED:
-	case VCPU_STATE_RUNNING:
-		dlog_verbose("S-EL0: Secure interrupt queued: %x\n",
-			     target_vcpu->vm->id);
-		/*
-		 * The target vCPU cannot be resumed, SPMC resumes current
-		 * vCPU.
-		 */
-		next = NULL;
-		ffa_interrupts_set_preempted_vcpu(
-			target_vcpu_locked, (struct vcpu_locked){.vcpu = NULL});
-		break;
-	default:
-		panic("Secure interrupt cannot be signaled to target SP\n");
-		break;
-	}
-
-	return next;
-}
-
-/**
- * Handles the secure interrupt according to the target vCPU's state
- * in the case the owner of the interrupt is an S-EL1 partition.
- */
-static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
+static struct vcpu *ffa_interrupts_signal_secure_interrupt(
 	struct vcpu_locked current_locked,
 	struct vcpu_locked target_vcpu_locked, uint32_t v_intid)
 {
@@ -295,15 +257,15 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 		assert(target_vcpu->vm->vcpu_count == 1);
 	}
 
-	/* Secure interrupt signaling and queuing for S-EL1 SP. */
+	/* Secure interrupt signaling and queuing for SP. */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
 		next = interrupt_resume_waiting(current_locked,
 						target_vcpu_locked, v_intid);
 		break;
 	case VCPU_STATE_BLOCKED:
-
-		if (target_vcpu->cpu == current_locked.vcpu->cpu &&
+		if (!target_vcpu->vm->el0_partition &&
+		    target_vcpu->cpu == current_locked.vcpu->cpu &&
 		    ffa_direct_msg_precedes_in_call_chain(current_locked,
 							  target_vcpu_locked)) {
 			struct ffa_value ret_interrupt =
@@ -336,23 +298,22 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 			ffa_interrupts_set_preempted_vcpu(target_vcpu_locked,
 							  current_locked);
 			next = target_vcpu;
-		} else {
-			/*
-			 * Either:
-			 * - The target vCPU has migrated to a different
-			 * physical CPU. Hence, it cannot be resumed on this
-			 * CPU, SPMC resumes current vCPU.
-			 * - The target vCPU cannot be resumed now because it is
-			 * in BLOCKED state (it yielded CPU cycles using
-			 * FFA_YIELD). SPMC queues the virtual interrupt and
-			 * resumes the current vCPU which could belong to either
-			 * a VM or a SP.
-			 */
-			next = NULL;
-			ffa_interrupts_set_preempted_vcpu(
-				target_vcpu_locked,
-				(struct vcpu_locked){.vcpu = NULL});
+			break;
 		}
+
+		/*
+		 * `next` is NULL.
+		 * Either:
+		 * - EL0 paritition can't be resumed when in blocked state.
+		 * - The target vCPU has migrated to a different
+		 * physical CPU. Hence, it cannot be resumed on this
+		 * CPU, SPMC resumes current vCPU.
+		 * - The target vCPU cannot be resumed now because it is
+		 * in BLOCKED state (it yielded CPU cycles using
+		 * FFA_YIELD). SPMC queues the virtual interrupt and
+		 * resumes the current vCPU which could belong to either
+		 * a VM or a SP.
+		 */
 		break;
 	case VCPU_STATE_PREEMPTED:
 		/*
@@ -362,7 +323,8 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 		 * resume current vCPU. Refer to section 8.3.2.1 bullet
 		 * 3 in the FF-A v1.1 EAC0 spec.
 		 */
-		if (target_vcpu->cpu == current_locked.vcpu->cpu &&
+		if (!target_vcpu->vm->el0_partition &&
+		    target_vcpu->cpu == current_locked.vcpu->cpu &&
 		    current->vm->id == HF_OTHER_WORLD_ID) {
 			/*
 			 * The target vCPU must have been preempted by a
@@ -377,16 +339,11 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 			 */
 			CHECK(target_vcpu->scheduling_mode == NWD_MODE);
 		}
-
-		next = NULL;
-		ffa_interrupts_set_preempted_vcpu(
-			target_vcpu_locked, (struct vcpu_locked){.vcpu = NULL});
-
 		break;
 	case VCPU_STATE_RUNNING:
-		next = NULL;
-		ffa_interrupts_set_preempted_vcpu(
-			target_vcpu_locked, (struct vcpu_locked){.vcpu = NULL});
+		/*
+		 * Interrupt has been injected in the vCPU state.
+		 */
 		break;
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 		/* WFI is no-op for SP. Fall through. */
@@ -495,13 +452,8 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 			 * Either invoke the handler related to partitions from
 			 * S-EL0 or from S-EL1.
 			 */
-			*next = target_vcpu_locked.vcpu->vm->el0_partition
-					? ffa_interrupts_signal_secure_interrupt_sel0(
-						  current_locked,
-						  target_vcpu_locked, v_intid)
-					: ffa_interrupts_signal_secure_interrupt_sel1(
-						  current_locked,
-						  target_vcpu_locked, v_intid);
+			*next = ffa_interrupts_signal_secure_interrupt(
+				current_locked, target_vcpu_locked, v_intid);
 		}
 	}
 
