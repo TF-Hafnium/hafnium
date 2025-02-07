@@ -128,13 +128,6 @@ bool ffa_cpu_cycles_run_checks(struct vcpu_locked current_locked,
 			if (target_vcpu != current->preempted_vcpu) {
 				dlog_verbose("Skipping intermediate vCPUs\n");
 			}
-			/*
-			 * This flag should not have been set by SPMC when it
-			 * signaled the virtual interrupt to the SP while SP was
-			 * in WAITING or BLOCKED states. Refer the embedded
-			 * comment in vcpu.h file for further description.
-			 */
-			assert(!current->requires_deactivate_call);
 
 			/*
 			 * Clear fields corresponding to secure interrupt

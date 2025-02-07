@@ -477,7 +477,6 @@ void vcpu_secure_interrupt_complete(struct vcpu_locked vcpu_locked)
 
 	vcpu = vcpu_locked.vcpu;
 	vcpu->preempted_vcpu = NULL;
-	vcpu->requires_deactivate_call = false;
 }
 
 void vcpu_virt_interrupt_enable(struct vcpu_locked vcpu_locked,

@@ -106,9 +106,6 @@ struct ffa_value handle_interrupt(struct ffa_value res)
 		abort();
 	}
 
-	/* Perform secure interrupt de-activation. */
-	ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
-
 	if (yield_while_handling_sec_interrupt) {
 		struct ffa_value ret;
 		HFTEST_LOG("Yield cycles while handling secure interrupt");

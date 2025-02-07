@@ -178,19 +178,6 @@ struct vcpu {
 	 */
 	struct vcpu *preempted_vcpu;
 
-	/**
-	 * Per FF-A v1.1-Beta0 spec section 8.3, an SP can use multiple
-	 * mechanisms to signal completion of secure interrupt handling. SP
-	 * can invoke explicit FF-A ABIs, namely FFA_MSG_WAIT and FFA_RUN,
-	 * when in WAITING/BLOCKED state respectively, but has to perform
-	 * implicit signal completion mechanism by dropping the priority
-	 * of the virtual secure interrupt when SPMC signaled the virtual
-	 * interrupt in PREEMPTED state(The vCPU was preempted by a Self S-Int
-	 * while running). This variable helps SPMC to keep a track of such
-	 * mechanism and perform appropriate bookkeeping.
-	 */
-	bool requires_deactivate_call;
-
 	/** SP call chain. */
 	struct call_chain call_chain;
 

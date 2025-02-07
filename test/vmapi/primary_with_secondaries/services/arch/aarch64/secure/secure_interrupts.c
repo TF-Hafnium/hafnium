@@ -94,22 +94,25 @@ static void irq_handler(void)
 		HFTEST_LOG("Received Trusted WatchDog Interrupt: %u.", intid);
 		twdog_stop();
 
-		/* Perform secure interrupt de-activation. */
+		/*
+		 * Keep the call to hf_interrupt_deactive although it is
+		 * deprecated to test backwards compatibility.
+		 */
 		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
+		/* Perform secure interrupt de-activation. */
 		break;
 	case RTM_INIT_ESPI_ID:
 		HFTEST_LOG("interrupt id: %u", intid);
-		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
 		rtm_init_espi_handled = true;
 		break;
 	case HF_IPI_INTID:
-		HFTEST_LOG(
-			"Received Inter-Processor Interrupt %u, "
-			"partition %x.\n",
-			intid, hf_vm_get_id());
-		ASSERT_TRUE(hftest_ipi_state_is(SENT));
+		HFTEST_LOG("Received inter-processor interrupt %u, vm %x.",
+			   intid, hf_vm_get_id());
+		ASSERT_TRUE(hftest_ipi_state_is(SENT) ||
+			    (hftest_ipi_state_is(HANDLED) &&
+			     hftest_ipi_state_get_interrupt_count() > 0 &&
+			     multiple_interrupts_expected));
 		hftest_ipi_state_set(HANDLED);
-		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
 		break;
 	default:
 		panic("Interrupt ID not recongnised\n");
@@ -300,7 +303,6 @@ static void twdog_irq_handler(void)
 		hftest_twdog_state_set(HANDLED);
 
 		/* Perform secure interrupt de-activation. */
-		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
 	} else if (intid == HF_NOTIFICATION_PENDING_INTID) {
 		/* RX buffer full notification. */
 		HFTEST_LOG("Received notification pending interrupt %u.",
@@ -546,36 +548,6 @@ TEST_SERVICE(receive_ipi_running_with_secure_interrupts)
 	ffa_yield();
 }
 
-/*
- * IRQ Handler for IPIs to target vCPUs in the WAITING state. In this case
- * the SP is not required to deactivate the interrupt.
- * TODO: Consolidate with the generic IRQ handler once the secure interrupt
- * reworking is done.
- */
-static void ipi_waiting_irq_handler(void)
-{
-	uint32_t intid = hf_interrupt_get();
-
-	switch (intid) {
-	case HF_NOTIFICATION_PENDING_INTID:
-		/* RX buffer full notification. */
-		HFTEST_LOG("Received notification pending interrupt %u.",
-			   intid);
-		break;
-	case HF_IPI_INTID:
-		HFTEST_LOG("Received inter-processor interrupt %u, vm %x.",
-			   intid, hf_vm_get_id());
-		ASSERT_TRUE(hftest_ipi_state_is(SENT) ||
-			    (hftest_ipi_state_is(HANDLED) &&
-			     hftest_ipi_state_get_interrupt_count() > 0 &&
-			     multiple_interrupts_expected));
-		hftest_ipi_state_set(HANDLED);
-		break;
-	default:
-		panic("Invalid interrupt received: %u\n", intid);
-	}
-}
-
 /**
  * Test service to validate IPI behaviour when target vCPU is in the waiting
  * state.
@@ -593,7 +565,7 @@ TEST_SERVICE(receive_ipi_waiting_vcpu)
 {
 	struct ffa_value ret;
 
-	exception_setup(ipi_waiting_irq_handler, NULL);
+	exception_setup(irq_handler, NULL);
 	interrupts_enable();
 
 	/* Enable the IPI. */

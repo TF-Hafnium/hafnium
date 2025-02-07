@@ -19,9 +19,9 @@
 #include "hf/vm.h"
 
 /**
- * Drops the current interrupt priority and deactivate the given interrupt ID
- * for the calling vCPU.
- *
+ * This function has been deprecated and it's contents moved into
+ * api_interrupt_get in order to align the bitmap and queue for tracking
+ * interupts.
  * Returns 0 on success, or -1 otherwise.
  */
 int64_t ffa_interrupts_deactivate(uint32_t pint_id, uint32_t vint_id,
@@ -29,20 +29,8 @@ int64_t ffa_interrupts_deactivate(uint32_t pint_id, uint32_t vint_id,
 {
 	(void)pint_id;
 	(void)vint_id;
-	int ret = 0;
-	struct vcpu_locked current_locked;
-
-	current_locked = vcpu_lock(current);
-
-	if (current->requires_deactivate_call) {
-		/* There is no preempted vCPU to resume. */
-		assert(current->preempted_vcpu == NULL);
-
-		vcpu_secure_interrupt_complete(current_locked);
-	}
-
-	vcpu_unlock(&current_locked);
-	return ret;
+	(void)current;
+	return 0;
 }
 
 static struct vcpu *ffa_interrupts_find_target_vcpu_secure_interrupt(
@@ -405,18 +393,6 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 
 		break;
 	case VCPU_STATE_RUNNING:
-		if (current == target_vcpu) {
-			/*
-			 * This is the special scenario where the current
-			 * running execution context also happens to be the
-			 * target of the secure interrupt. In this case, it
-			 * needs to signal completion of secure interrupt
-			 * implicitly. Refer to the embedded comment in vcpu.h
-			 * file for the description of this variable.
-			 */
-			current->requires_deactivate_call = true;
-		}
-
 		next = NULL;
 		ffa_interrupts_set_preempted_vcpu(
 			target_vcpu_locked, (struct vcpu_locked){.vcpu = NULL});
@@ -510,13 +486,6 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 		/* Resume current vCPU. */
 		*next = NULL;
 	} else {
-		/*
-		 * SPMC has started handling a secure interrupt with a clean
-		 * slate. This signal should be false unless there was a bug in
-		 * source code. Hence, use assert rather than CHECK.
-		 */
-		assert(!target_vcpu->requires_deactivate_call);
-
 		/* Set the interrupt pending in the target vCPU. */
 		vcpu_virt_interrupt_inject(target_vcpu_locked, v_intid);
 
@@ -834,7 +803,6 @@ static void ffa_interrupts_run_in_sec_interrupt_rtm(
 	target_vcpu->scheduling_mode = SPMC_MODE;
 	target_vcpu->rt_model = RTM_SEC_INTERRUPT;
 	target_vcpu->state = VCPU_STATE_RUNNING;
-	target_vcpu->requires_deactivate_call = false;
 }
 
 bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
