@@ -9,6 +9,8 @@
 #include <gmock/gmock.h>
 
 extern "C" {
+#include "hf/arch/mm.h"
+
 #include "hf/check.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"

@@ -1435,7 +1435,7 @@ out:
 /**
  * Check that the mode indicates memory that is valid, owned and exclusive.
  */
-static bool api_mode_valid_owned_and_exclusive(uint32_t mode)
+static bool api_mode_valid_owned_and_exclusive(mm_mode_t mode)
 {
 	return (mode & (MM_MODE_D | MM_MODE_INVALID | MM_MODE_UNOWNED |
 			MM_MODE_SHARED)) == 0;
@@ -1447,7 +1447,7 @@ static bool api_mode_valid_owned_and_exclusive(uint32_t mode)
 static struct ffa_value api_vm_configure_stage1(
 	struct mm_stage1_locked mm_stage1_locked, struct vm_locked vm_locked,
 	paddr_t pa_send_begin, paddr_t pa_send_end, paddr_t pa_recv_begin,
-	paddr_t pa_recv_end, uint32_t extra_attributes,
+	paddr_t pa_recv_end, mm_mode_t extra_mode,
 	struct mpool *local_page_pool)
 {
 	struct ffa_value ret;
@@ -1457,7 +1457,7 @@ static struct ffa_value api_vm_configure_stage1(
 	 */
 	vm_locked.vm->mailbox.send =
 		mm_identity_map(mm_stage1_locked, pa_send_begin, pa_send_end,
-				MM_MODE_R | extra_attributes, local_page_pool);
+				MM_MODE_R | extra_mode, local_page_pool);
 	if (!vm_locked.vm->mailbox.send) {
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1469,7 +1469,7 @@ static struct ffa_value api_vm_configure_stage1(
 	 */
 	vm_locked.vm->mailbox.recv =
 		mm_identity_map(mm_stage1_locked, pa_recv_begin, pa_recv_end,
-				MM_MODE_W | extra_attributes, local_page_pool);
+				MM_MODE_W | extra_mode, local_page_pool);
 	if (!vm_locked.vm->mailbox.recv) {
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto fail_undo_send;
@@ -1514,9 +1514,9 @@ struct ffa_value api_vm_configure_pages(
 	paddr_t pa_send_end;
 	paddr_t pa_recv_begin;
 	paddr_t pa_recv_end;
-	uint32_t orig_send_mode = 0;
-	uint32_t orig_recv_mode = 0;
-	uint32_t extra_attributes;
+	mm_mode_t orig_send_mode = 0;
+	mm_mode_t orig_recv_mode = 0;
+	mm_mode_t extra_mode;
 
 	/* We only allow these to be setup once. */
 	if (vm_locked.vm->mailbox.send || vm_locked.vm->mailbox.recv) {
@@ -1585,8 +1585,8 @@ struct ffa_value api_vm_configure_pages(
 		}
 
 		/* Take memory ownership away from the VM and mark as shared. */
-		uint32_t mode = MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R |
-				MM_MODE_W;
+		mm_mode_t mode = MM_MODE_UNOWNED | MM_MODE_SHARED | MM_MODE_R |
+				 MM_MODE_W;
 		if (vm_locked.vm->el0_partition) {
 			mode |= MM_MODE_USER | MM_MODE_NG;
 		}
@@ -1623,8 +1623,8 @@ struct ffa_value api_vm_configure_pages(
 		}
 	}
 
-	/* Get extra send/recv pages mapping attributes for the given VM ID. */
-	extra_attributes = arch_mm_extra_attributes_from_vm(vm_locked.vm->id);
+	/* Get extra send/recv pages mapping mode for the given VM ID. */
+	extra_mode = arch_mm_extra_mode_from_vm(vm_locked.vm->id);
 
 	/*
 	 * For EL0 partitions, since both the partition and the hypervisor code
@@ -1638,12 +1638,12 @@ struct ffa_value api_vm_configure_pages(
 	 * other partitions buffers through cached translations.
 	 */
 	if (vm_locked.vm->el0_partition) {
-		extra_attributes |= MM_MODE_NG;
+		extra_mode |= MM_MODE_NG;
 	}
 
-	ret = api_vm_configure_stage1(
-		mm_stage1_locked, vm_locked, pa_send_begin, pa_send_end,
-		pa_recv_begin, pa_recv_end, extra_attributes, local_page_pool);
+	ret = api_vm_configure_stage1(mm_stage1_locked, vm_locked,
+				      pa_send_begin, pa_send_end, pa_recv_begin,
+				      pa_recv_end, extra_mode, local_page_pool);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto fail_undo_send_and_recv;
 	}
@@ -4649,8 +4649,8 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	struct vm_locked vm_locked;
 	struct ffa_value ret;
 	bool mode_ret;
-	uint32_t original_mode;
-	uint32_t new_mode;
+	mm_mode_t original_mode;
+	mm_mode_t new_mode;
 	struct mpool local_page_pool;
 	vaddr_t end_addr = va_add(base_addr, page_count * PAGE_SIZE);
 

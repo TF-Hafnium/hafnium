@@ -353,7 +353,7 @@ void dump_share_states(void)
 static inline uint32_t ffa_memory_permissions_to_mode(
 	ffa_memory_access_permissions_t permissions, uint32_t default_mode)
 {
-	uint32_t mode = 0;
+	mm_mode_t mode = 0;
 
 	switch (permissions.data_access) {
 	case FFA_DATA_ACCESS_RO:
@@ -403,7 +403,7 @@ static inline uint32_t ffa_memory_permissions_to_mode(
  * an appropriate FF-A error if not.
  */
 static struct ffa_value constituents_get_mode(
-	struct vm_locked vm, uint32_t *orig_mode,
+	struct vm_locked vm, mm_mode_t *orig_mode,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count)
 {
@@ -741,12 +741,12 @@ static enum ffa_map_action ffa_mem_send_get_map_action(
  */
 static struct ffa_value ffa_send_check_transition(
 	struct vm_locked from, uint32_t share_func,
-	struct ffa_memory_region *memory_region, uint32_t *orig_from_mode,
+	struct ffa_memory_region *memory_region, mm_mode_t *orig_from_mode,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t *from_mode, enum ffa_map_action *map_action, bool zero)
+	mm_mode_t *from_mode, enum ffa_map_action *map_action, bool zero)
 {
-	const uint32_t state_mask =
+	const mm_mode_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 	struct ffa_value ret;
 	bool all_receivers_from_current_world = true;
@@ -870,10 +870,10 @@ static struct ffa_value ffa_send_check_transition(
 }
 
 static struct ffa_value ffa_relinquish_check_transition(
-	struct vm_locked from, uint32_t *orig_from_mode,
+	struct vm_locked from, mm_mode_t *orig_from_mode,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t *from_mode, enum ffa_map_action *map_action)
+	mm_mode_t *from_mode, enum ffa_map_action *map_action)
 {
 	const uint32_t state_mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
@@ -941,10 +941,10 @@ struct ffa_value ffa_retrieve_check_transition(
 	struct vm_locked to, uint32_t share_func,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t sender_orig_mode, uint32_t *to_mode, bool memory_protected,
+	mm_mode_t sender_orig_mode, mm_mode_t *to_mode, bool memory_protected,
 	enum ffa_map_action *map_action)
 {
-	uint32_t orig_to_mode;
+	mm_mode_t orig_to_mode;
 	struct ffa_value ret;
 
 	ret = constituents_get_mode(to, &orig_to_mode, fragments,
@@ -1052,7 +1052,7 @@ struct ffa_value ffa_retrieve_check_transition(
  */
 static struct ffa_value ffa_region_group_check_actions(
 	struct vm_locked vm_locked, paddr_t pa_begin, paddr_t pa_end,
-	struct mpool *ppool, uint32_t mode, enum ffa_map_action action,
+	struct mpool *ppool, mm_mode_t mode, enum ffa_map_action action,
 	bool *memory_protected)
 {
 	struct ffa_value ret;
@@ -1120,7 +1120,7 @@ static struct ffa_value ffa_region_group_check_actions(
 
 static void ffa_region_group_commit_actions(struct vm_locked vm_locked,
 					    paddr_t pa_begin, paddr_t pa_end,
-					    struct mpool *ppool, uint32_t mode,
+					    struct mpool *ppool, mm_mode_t mode,
 					    enum ffa_map_action action)
 {
 	switch (action) {
@@ -1215,7 +1215,7 @@ struct ffa_value ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t mode, struct mpool *ppool, enum ffa_map_action action,
+	mm_mode_t mode, struct mpool *ppool, enum ffa_map_action action,
 	bool *memory_protected)
 {
 	uint32_t i;
@@ -1287,7 +1287,7 @@ struct ffa_value ffa_region_group_identity_map(
  * flushed from the cache so the memory has been cleared across the system.
  */
 static bool clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool,
-			 uint32_t extra_mode_attributes)
+			 mm_mode_t extra_mode)
 {
 	/*
 	 * TODO: change this to a CPU local single page window rather than a
@@ -1297,11 +1297,10 @@ static bool clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool,
 	 */
 	bool ret;
 	struct mm_stage1_locked stage1_locked = mm_lock_stage1();
-	void *ptr =
-		mm_identity_map(stage1_locked, begin, end,
-				MM_MODE_W | (extra_mode_attributes &
-					     ffa_memory_get_other_world_mode()),
-				ppool);
+	void *ptr = mm_identity_map(
+		stage1_locked, begin, end,
+		MM_MODE_W | (extra_mode & ffa_memory_get_other_world_mode()),
+		ppool);
 	size_t size = pa_difference(begin, end);
 
 	if (!ptr) {
@@ -1329,7 +1328,7 @@ out:
  * flushed from the cache so the memory has been cleared across the system.
  */
 static bool ffa_clear_memory_constituents(
-	uint32_t security_state_mode,
+	mm_mode_t security_state_mode,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	struct mpool *page_pool)
@@ -1470,13 +1469,13 @@ static struct ffa_value ffa_send_check_update(
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t composite_total_page_count, uint32_t share_func,
 	struct ffa_memory_region *memory_region, struct mpool *page_pool,
-	uint32_t *orig_from_mode_ret, bool *memory_protected)
+	mm_mode_t *orig_from_mode_ret, bool *memory_protected)
 {
 	uint32_t i;
 	uint32_t j;
-	uint32_t orig_from_mode;
-	uint32_t clean_mode;
-	uint32_t from_mode;
+	mm_mode_t orig_from_mode;
+	mm_mode_t clean_mode;
+	mm_mode_t from_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
 	uint32_t constituents_total_page_count = 0;
@@ -1632,11 +1631,12 @@ struct ffa_value ffa_retrieve_check_update(
 	struct vm_locked to_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t sender_orig_mode, uint32_t share_func, bool clear,
-	struct mpool *page_pool, uint32_t *response_mode, bool memory_protected)
+	mm_mode_t sender_orig_mode, uint32_t share_func, bool clear,
+	struct mpool *page_pool, mm_mode_t *response_mode,
+	bool memory_protected)
 {
 	uint32_t i;
-	uint32_t to_mode;
+	mm_mode_t to_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
 	enum ffa_map_action map_action = MAP_ACTION_COMMIT;
@@ -1755,11 +1755,11 @@ static struct ffa_value ffa_relinquish_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t sender_orig_mode, struct mpool *page_pool, bool clear)
+	mm_mode_t sender_orig_mode, struct mpool *page_pool, bool clear)
 {
-	uint32_t orig_from_mode;
-	uint32_t clearing_mode;
-	uint32_t from_mode;
+	mm_mode_t orig_from_mode;
+	mm_mode_t clearing_mode;
+	mm_mode_t from_mode;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
 	enum ffa_map_action map_action;
@@ -1866,7 +1866,7 @@ out:
 struct ffa_value ffa_memory_send_complete(
 	struct vm_locked from_locked, struct share_states_locked share_states,
 	struct ffa_memory_share_state *share_state, struct mpool *page_pool,
-	uint32_t *orig_from_mode_ret)
+	mm_mode_t *orig_from_mode_ret)
 {
 	struct ffa_memory_region *memory_region = share_state->memory_region;
 	struct ffa_composite_memory_region *composite;
@@ -3304,7 +3304,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 	uint32_t retrieve_request_length, struct mpool *page_pool)
 {
 	ffa_memory_access_permissions_t permissions = {0};
-	uint32_t memory_to_mode;
+	mm_mode_t memory_to_mode;
 	struct ffa_value ret;
 	struct ffa_composite_memory_region *composite;
 	uint32_t total_length;
@@ -3317,7 +3317,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 	struct ffa_memory_access *receiver;
 	ffa_memory_handle_t handle = retrieve_request->handle;
 	ffa_memory_attributes_t attributes = {0};
-	uint32_t retrieve_mode = 0;
+	mm_mode_t retrieve_mode = 0;
 	struct ffa_memory_region *memory_region = share_state->memory_region;
 
 	if (!share_state->sending_complete) {

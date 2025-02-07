@@ -8,6 +8,8 @@
 
 #include "hf/arch/vm/mm.h"
 
+#include "hf/arch/mm.h"
+
 /**
  * MM support is not done at EL0.
  * Define dummy functions for EL0 targets.
@@ -26,7 +28,7 @@ void arch_vm_mm_reset(void)
 {
 }
 
-uint32_t arch_mm_extra_attributes_from_vm(ffa_id_t id)
+mm_mode_t arch_mm_extra_mode_from_vm(ffa_id_t id)
 {
 	(void)id;
 	return 0;

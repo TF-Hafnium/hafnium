@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include "hf/arch/mm.h"
+
 #include "hf/mm.h"
 
 /** Arch-specific information about a VM. */

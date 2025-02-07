@@ -11,10 +11,10 @@
 /** AArch64-specific mapping modes */
 
 /** Mapping mode defining MMU Stage-1 block/page non-secure bit */
-#define MM_MODE_NS UINT32_C(0x0080)
+#define MM_MODE_NS (1U << 7)
 
 /** Page mapping mode for tagged normal memory. */
-#define MM_MODE_T UINT32_C(0x0400)
+#define MM_MODE_T (1U << 10)
 
 #define tlbi(op)                               \
 	do {                                   \

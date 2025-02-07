@@ -9,8 +9,11 @@
 #include <gmock/gmock.h>
 
 extern "C" {
+#include "hf/arch/mm.h"
+
 #include "hf/check.h"
 #include "hf/hf_ipi.h"
+#include "hf/mm.h"
 }
 
 #include <map>
@@ -32,7 +35,7 @@ using struct_vm_locked = struct vm_locked;
  */
 
 constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
-const int TOP_LEVEL = arch_mm_stage2_max_level();
+const mm_level_t TOP_LEVEL = arch_mm_stage2_max_level();
 class ipi : public ::testing::Test
 {
        protected:

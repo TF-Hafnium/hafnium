@@ -13,6 +13,7 @@
 #include "hf/ffa/init.h"
 #include "hf/ffa_internal.h"
 #include "hf/ffa_memory_internal.h"
+#include "hf/mm.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -54,7 +55,7 @@ bool ffa_memory_is_send_valid(ffa_id_t receiver, ffa_id_t sender,
 	return true;
 }
 
-uint32_t ffa_memory_get_other_world_mode(void)
+mm_mode_t ffa_memory_get_other_world_mode(void)
 {
 	return 0U;
 }
@@ -690,7 +691,7 @@ struct ffa_value ffa_memory_other_world_mem_send_continue(
 }
 
 ffa_memory_attributes_t ffa_memory_add_security_bit_from_mode(
-	ffa_memory_attributes_t attributes, uint32_t mode)
+	ffa_memory_attributes_t attributes, mm_mode_t mode)
 {
 	(void)mode;
 

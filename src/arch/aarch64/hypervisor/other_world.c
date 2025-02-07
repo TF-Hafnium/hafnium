@@ -14,6 +14,7 @@
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
+#include "hf/mm.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
@@ -148,10 +149,10 @@ struct ffa_value arch_other_world_vm_configure_rxtx_map(
 	paddr_t pa_recv_end)
 {
 	struct ffa_value ret;
-	uint32_t send_mode;
-	uint32_t recv_mode;
+	mm_mode_t send_mode;
+	mm_mode_t recv_mode;
 	struct vm_locked other_world_locked;
-	const uint32_t expected_mode =
+	const mm_mode_t expected_mode =
 		MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS;
 
 	other_world_locked = lock_other_world(vm_locked);

@@ -13,6 +13,7 @@
 #include "hf/addr.h"
 #include "hf/interrupt_desc.h"
 #include "hf/list.h"
+#include "hf/mm.h"
 #include "hf/spinlock.h"
 
 #include "vmapi/hf/ffa.h"
@@ -110,7 +111,7 @@ struct vcpu_fault_info {
 	ipaddr_t ipaddr;
 	vaddr_t vaddr;
 	vaddr_t pc;
-	uint32_t mode;
+	mm_mode_t mode;
 };
 
 struct call_chain {

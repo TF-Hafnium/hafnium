@@ -44,7 +44,7 @@ bool plat_iommu_unmap_iommus(struct vm_locked vm_locked, struct mpool *ppool);
  * that read and write modes are enforced by the IOMMU driver.
  */
 void plat_iommu_identity_map(struct vm_locked vm_locked, paddr_t begin,
-			     paddr_t end, uint32_t mode);
+			     paddr_t end, mm_mode_t mode);
 
 /**
  * Configure IOMMU to perform address translation of memory transactions on the

@@ -297,7 +297,7 @@ bool vm_id_is_current_world(ffa_id_t vm_id)
  *
  */
 bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-		     uint32_t mode, struct mpool *ppool, ipaddr_t *ipa)
+		     mm_mode_t mode, struct mpool *ppool, ipaddr_t *ipa)
 {
 	if (!vm_identity_prepare(vm_locked, begin, end, mode, ppool)) {
 		return false;
@@ -319,7 +319,7 @@ bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
  * made.
  */
 bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-			 uint32_t mode, struct mpool *ppool)
+			 mm_mode_t mode, struct mpool *ppool)
 {
 	return arch_vm_identity_prepare(vm_locked, begin, end, mode, ppool);
 }
@@ -330,7 +330,7 @@ bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
  * this condition.
  */
 void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-			uint32_t mode, struct mpool *ppool, ipaddr_t *ipa)
+			mm_mode_t mode, struct mpool *ppool, ipaddr_t *ipa)
 {
 	arch_vm_identity_commit(vm_locked, begin, end, mode, ppool, ipa);
 }
@@ -380,13 +380,13 @@ bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool)
  * is a vm or a el0 partition.
  */
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
-		     uint32_t *mode)
+		     mm_mode_t *mode)
 {
 	return arch_vm_mem_get_mode(vm_locked, begin, end, mode);
 }
 
 bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, uint32_t mode, struct mpool *ppool,
+			      paddr_t end, mm_mode_t mode, struct mpool *ppool,
 			      ipaddr_t *ipa, uint8_t dma_device_id)
 {
 	return arch_vm_iommu_mm_identity_map(vm_locked, begin, end, mode, ppool,

@@ -13,6 +13,7 @@
  */
 #pragma once
 
+#include "hf/mm.h"
 #define MAX_MEM_SHARES 100
 
 #include <stdbool.h>
@@ -92,7 +93,7 @@ struct ffa_memory_share_state {
 	 * This is used to reset the original configuration when sender invokes
 	 * FFA_MEM_RECLAIM_32.
 	 */
-	uint32_t sender_orig_mode;
+	mm_mode_t sender_orig_mode;
 
 	/**
 	 * True if all the fragments of this sharing request have been sent and
@@ -172,7 +173,7 @@ struct ffa_value ffa_memory_send_validate(
 struct ffa_value ffa_memory_send_complete(
 	struct vm_locked from_locked, struct share_states_locked share_states,
 	struct ffa_memory_share_state *share_state, struct mpool *page_pool,
-	uint32_t *orig_from_mode_ret);
+	mm_mode_t *orig_from_mode_ret);
 struct ffa_value ffa_memory_send_continue_validate(
 	struct share_states_locked share_states, ffa_memory_handle_t handle,
 	struct ffa_memory_share_state **share_state_ret, ffa_id_t from_vm_id,
@@ -182,14 +183,14 @@ struct ffa_value ffa_retrieve_check_update(
 	struct vm_locked to_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t sender_orig_mode, uint32_t share_func, bool clear,
-	struct mpool *page_pool, uint32_t *response_mode,
+	mm_mode_t sender_orig_mode, uint32_t share_func, bool clear,
+	struct mpool *page_pool, mm_mode_t *response_mode,
 	bool memory_protected);
 struct ffa_value ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	uint32_t mode, struct mpool *ppool, enum ffa_map_action action,
+	mm_mode_t mode, struct mpool *ppool, enum ffa_map_action action,
 	bool *memory_protected);
 bool memory_region_receivers_from_other_world(
 	struct ffa_memory_region *memory_region);

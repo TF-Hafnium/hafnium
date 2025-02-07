@@ -38,7 +38,7 @@ TEST(arch_mm, block_allowed_at_level0)
 TEST(arch_mm, max_level_stage1)
 {
 	uint32_t pa_bits = arch_mm_get_pa_bits(arch_mm_get_pa_range());
-	uint8_t max_level;
+	mm_attr_t max_level;
 
 	arch_mm_stage1_max_level_set(pa_bits);
 	max_level = arch_mm_stage1_max_level();
@@ -54,7 +54,7 @@ TEST(arch_mm, max_level_stage1)
  */
 TEST(arch_mm, absent_properties)
 {
-	for (uint8_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
 		pte_t absent_pte;
 
 		absent_pte = arch_mm_absent_pte(level);
@@ -71,8 +71,8 @@ TEST(arch_mm, absent_properties)
  */
 TEST(arch_mm, invalid_block_properties)
 {
-	for (uint8_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
-		uint64_t attrs = arch_mm_mode_to_stage2_attrs(MM_MODE_INVALID);
+	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+		mm_attr_t attrs = arch_mm_mode_to_stage2_attrs(MM_MODE_INVALID);
 		pte_t block_pte;
 
 		/* Test doesn't apply if a block is not allowed. */
@@ -95,8 +95,8 @@ TEST(arch_mm, invalid_block_properties)
  */
 TEST(arch_mm, valid_block_properties)
 {
-	for (uint8_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
-		uint64_t attrs = arch_mm_mode_to_stage2_attrs(0);
+	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+		mm_attr_t attrs = arch_mm_mode_to_stage2_attrs(0);
 		pte_t block_pte;
 
 		/* Test doesn't apply if a block is not allowed. */
@@ -119,7 +119,7 @@ TEST(arch_mm, valid_block_properties)
  */
 TEST(arch_mm, table_properties)
 {
-	for (uint8_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
 		pte_t table_pte;
 
 		/* Test doesn't apply to level 0 as there can't be a table. */
@@ -143,9 +143,9 @@ TEST(arch_mm, table_properties)
  */
 TEST(arch_mm, block_addr_and_attrs_preserved)
 {
-	for (uint8_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
 		paddr_t addr;
-		uint64_t attrs;
+		mm_attr_t attrs;
 		pte_t block_pte;
 
 		/* Test doesn't apply if a block is not allowed. */

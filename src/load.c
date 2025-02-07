@@ -479,9 +479,9 @@ static bool load_secondary_fdt(struct mm_stage1_locked stage1_locked,
 /**
  * Convert the manifest memory region attributes to mode consumed by mm layer.
  */
-static uint32_t memory_region_attributes_to_mode(uint32_t attributes)
+static mm_mode_t memory_region_attributes_to_mode(uint32_t attributes)
 {
-	uint32_t mode = 0U;
+	mm_mode_t mode = 0U;
 
 	if ((attributes & MANIFEST_REGION_ATTR_READ) != 0U) {
 		mode |= MM_MODE_R;
@@ -499,7 +499,7 @@ static uint32_t memory_region_attributes_to_mode(uint32_t attributes)
 	       (mode == (MM_MODE_R | MM_MODE_X)));
 
 	if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0U) {
-		mode |= arch_mm_extra_attributes_from_vm(HF_HYPERVISOR_VM_ID);
+		mode |= arch_mm_extra_mode_from_vm(HF_HYPERVISOR_VM_ID);
 	}
 
 	return mode;
@@ -508,9 +508,9 @@ static uint32_t memory_region_attributes_to_mode(uint32_t attributes)
 /**
  * Convert the manifest device region attributes to mode consumed by mm layer.
  */
-static uint32_t device_region_attributes_to_mode(uint32_t attributes)
+static mm_mode_t device_region_attributes_to_mode(uint32_t attributes)
 {
-	uint32_t mode = 0U;
+	mm_mode_t mode = 0U;
 
 	if ((attributes & MANIFEST_REGION_ATTR_READ) != 0U) {
 		mode |= MM_MODE_R;
@@ -523,7 +523,7 @@ static uint32_t device_region_attributes_to_mode(uint32_t attributes)
 	assert((mode == (MM_MODE_R | MM_MODE_W)) || (mode == MM_MODE_R));
 
 	if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0U) {
-		mode |= arch_mm_extra_attributes_from_vm(HF_HYPERVISOR_VM_ID);
+		mode |= arch_mm_extra_mode_from_vm(HF_HYPERVISOR_VM_ID);
 	}
 
 	return mode | MM_MODE_D;
@@ -541,7 +541,7 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 	paddr_t region_begin;
 	paddr_t region_end;
 	size_t size;
-	uint32_t map_mode;
+	mm_mode_t map_mode;
 	uint32_t attributes;
 
 	/* Map memory-regions */
@@ -673,7 +673,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	bool has_fdt;
 	size_t kernel_size = 0;
 	const size_t mem_size = pa_difference(mem_begin, mem_end);
-	uint32_t map_mode;
+	mm_mode_t map_mode;
 	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0 ||
 				manifest_vm->partition.run_time_el == EL0;
 	size_t n;

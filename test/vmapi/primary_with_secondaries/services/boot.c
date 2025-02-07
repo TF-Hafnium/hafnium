@@ -53,17 +53,17 @@ static void update_region_security_state(struct memory_region* mem_region)
 	size_t page_count = mem_region->page_count;
 	uint32_t attributes = mem_region->attributes;
 
-	uint32_t mode = 0;
-	uint32_t extra_attributes =
-		(attributes & MANIFEST_REGION_ATTR_SECURITY) != 0 ? MM_MODE_NS
-								  : 0U;
+	mm_mode_t mode = 0;
+	mm_mode_t extra_mode = (attributes & MANIFEST_REGION_ATTR_SECURITY) != 0
+				       ? MM_MODE_NS
+				       : 0U;
 
 	if (!hftest_mm_get_mode(address, FFA_PAGE_SIZE * page_count, &mode)) {
 		FAIL("Memory range has different modes.\n");
 	}
 
 	hftest_mm_identity_map(address, FFA_PAGE_SIZE * page_count,
-			       mode | extra_attributes);
+			       mode | extra_mode);
 }
 
 TEST_SERVICE(boot_memory)

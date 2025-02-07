@@ -130,7 +130,7 @@ bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool)
 }
 
 bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, uint32_t mode, struct mpool *ppool)
+			      paddr_t end, mm_mode_t mode, struct mpool *ppool)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->ptable;
 
@@ -148,7 +148,7 @@ bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
 }
 
 void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
-			     paddr_t end, uint32_t mode, struct mpool *ppool,
+			     paddr_t end, mm_mode_t mode, struct mpool *ppool,
 			     ipaddr_t *ipa)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->ptable;
@@ -180,7 +180,7 @@ bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 		   struct mpool *ppool)
 {
 	bool ret;
-	uint32_t mode = MM_MODE_UNMAPPED_MASK;
+	mm_mode_t mode = MM_MODE_UNMAPPED_MASK;
 
 	ret = vm_identity_map(vm_locked, begin, end, mode, ppool, NULL);
 
@@ -209,7 +209,7 @@ void arch_vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
 }
 
 bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
-			  ipaddr_t end, uint32_t *mode)
+			  ipaddr_t end, mm_mode_t *mode)
 {
 	bool ret;
 
@@ -222,8 +222,8 @@ bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 	ret = mm_vm_get_mode(&vm_locked.vm->ptable, begin, end, mode);
 
 #if SECURE_WORLD == 1
-	uint32_t mode2;
-	const uint32_t mask =
+	mm_mode_t mode2;
+	const mm_mode_t mask =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 
 	/* If the region is fully unmapped in the secure IPA space. */
@@ -243,7 +243,7 @@ bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 }
 
 static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, paddr_t begin,
-				     paddr_t end, uint32_t mode,
+				     paddr_t end, mm_mode_t mode,
 				     struct mpool *ppool, uint8_t dma_device_id)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->iommu_ptables[dma_device_id];
@@ -258,7 +258,7 @@ static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, paddr_t begin,
 }
 
 static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, paddr_t begin,
-				    paddr_t end, uint32_t mode,
+				    paddr_t end, mm_mode_t mode,
 				    struct mpool *ppool, ipaddr_t *ipa,
 				    uint8_t dma_device_id)
 {
@@ -274,7 +274,7 @@ static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, paddr_t begin,
 }
 
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-				   paddr_t end, uint32_t mode,
+				   paddr_t end, mm_mode_t mode,
 				   struct mpool *ppool, ipaddr_t *ipa,
 				   uint8_t dma_device_id)
 {

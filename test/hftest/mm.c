@@ -70,7 +70,7 @@ bool hftest_mm_init(void)
 	return true;
 }
 
-bool hftest_mm_get_mode(const void *base, size_t size, uint32_t *mode)
+bool hftest_mm_get_mode(const void *base, size_t size, mm_mode_t *mode)
 {
 	vaddr_t start = va_from_ptr(base);
 	vaddr_t end = va_add(start, size);
@@ -81,7 +81,7 @@ bool hftest_mm_get_mode(const void *base, size_t size, uint32_t *mode)
 	return mm_get_mode(stage1_locked.ptable, start, end, mode);
 }
 
-void hftest_mm_identity_map(const void *base, size_t size, uint32_t mode)
+void hftest_mm_identity_map(const void *base, size_t size, mm_mode_t mode)
 {
 	struct mm_stage1_locked stage1_locked = hftest_mm_get_stage1();
 	paddr_t start = pa_from_va(va_from_ptr(base));

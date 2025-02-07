@@ -543,7 +543,7 @@ bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool)
 }
 
 bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, uint32_t mode, struct mpool *ppool)
+			      paddr_t end, mm_mode_t mode, struct mpool *ppool)
 {
 	(void)vm_locked;
 	(void)begin;
@@ -555,7 +555,7 @@ bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
 }
 
 void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
-			     paddr_t end, uint32_t mode, struct mpool *ppool,
+			     paddr_t end, mm_mode_t mode, struct mpool *ppool,
 			     ipaddr_t *ipa)
 {
 	(void)vm_locked;
@@ -584,7 +584,7 @@ void arch_vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
 }
 
 bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
-			  ipaddr_t end, uint32_t *mode)	 // NOLINT
+			  ipaddr_t end, mm_mode_t *mode)  // NOLINT
 {
 	(void)vm_locked;
 	(void)begin;
@@ -595,7 +595,7 @@ bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 }
 
 ffa_memory_attributes_t ffa_memory_add_security_bit_from_mode(
-	ffa_memory_attributes_t attributes, uint32_t mode)
+	ffa_memory_attributes_t attributes, mm_mode_t mode)
 {
 	(void)mode;
 
@@ -624,7 +624,7 @@ void ffa_vm_free_resources(struct vm_locked vm_locked)
 }
 
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-				   paddr_t end, uint32_t mode,
+				   paddr_t end, mm_mode_t mode,
 				   struct mpool *ppool, ipaddr_t *ipa,
 				   struct dma_device_properties *dma_prop)
 {

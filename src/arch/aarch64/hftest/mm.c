@@ -9,6 +9,7 @@
 #include "hf/mm.h"
 
 #include "hf/arch/barriers.h"
+#include "hf/arch/mm.h"
 #include "hf/arch/vm/mm.h"
 
 #include "hf/dlog.h"

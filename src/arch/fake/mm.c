@@ -15,9 +15,9 @@
  * to memory. The flags are shifted to avoid equality of modes and attributes.
  */
 #define PTE_ATTR_MODE_SHIFT 48
-#define PTE_ATTR_MODE_MASK                                              \
-	((uint64_t)(MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_D |     \
-		    MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED) \
+#define PTE_ATTR_MODE_MASK                                               \
+	((mm_attr_t)(MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_D |     \
+		     MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED) \
 	 << PTE_ATTR_MODE_SHIFT)
 
 /* The bit to distinguish a table from a block is the highest of the page bits.
@@ -30,49 +30,49 @@
 /* Offset the bits of each level so they can't be misued. */
 #define PTE_LEVEL_SHIFT(lvl) ((lvl) * 2)
 
-pte_t arch_mm_absent_pte(uint8_t level)
+pte_t arch_mm_absent_pte(mm_level_t level)
 {
-	return ((uint64_t)(MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED)
+	return ((mm_attr_t)(MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED)
 		<< PTE_ATTR_MODE_SHIFT) >>
 	       PTE_LEVEL_SHIFT(level);
 }
 
-pte_t arch_mm_table_pte(uint8_t level, paddr_t pa)
+pte_t arch_mm_table_pte(mm_level_t level, paddr_t pa)
 {
 	return (pa_addr(pa) | PTE_TABLE) >> PTE_LEVEL_SHIFT(level);
 }
 
-pte_t arch_mm_block_pte(uint8_t level, paddr_t pa, uint64_t attrs)
+pte_t arch_mm_block_pte(mm_level_t level, paddr_t pa, mm_attr_t attrs)
 {
 	return (pa_addr(pa) | attrs) >> PTE_LEVEL_SHIFT(level);
 }
 
-bool arch_mm_is_block_allowed(uint8_t level)
+bool arch_mm_is_block_allowed(mm_level_t level)
 {
 	(void)level;
 	return true;
 }
 
-bool arch_mm_pte_is_present(pte_t pte, uint8_t level)
+bool arch_mm_pte_is_present(pte_t pte, mm_level_t level)
 {
 	return arch_mm_pte_is_valid(pte, level) ||
 	       !(((pte << PTE_LEVEL_SHIFT(level)) >> PTE_ATTR_MODE_SHIFT) &
 		 MM_MODE_UNOWNED);
 }
 
-bool arch_mm_pte_is_valid(pte_t pte, uint8_t level)
+bool arch_mm_pte_is_valid(pte_t pte, mm_level_t level)
 {
 	return !(((pte << PTE_LEVEL_SHIFT(level)) >> PTE_ATTR_MODE_SHIFT) &
 		 MM_MODE_INVALID);
 }
 
-bool arch_mm_pte_is_block(pte_t pte, uint8_t level)
+bool arch_mm_pte_is_block(pte_t pte, mm_level_t level)
 {
 	return arch_mm_pte_is_present(pte, level) &&
 	       !arch_mm_pte_is_table(pte, level);
 }
 
-bool arch_mm_pte_is_table(pte_t pte, uint8_t level)
+bool arch_mm_pte_is_table(pte_t pte, mm_level_t level)
 {
 	return (pte << PTE_LEVEL_SHIFT(level)) & PTE_TABLE;
 }
@@ -82,28 +82,28 @@ paddr_t arch_mm_clear_pa(paddr_t pa)
 	return pa_init(pa_addr(pa) & PTE_ADDR_MASK);
 }
 
-paddr_t arch_mm_block_from_pte(pte_t pte, uint8_t level)
+paddr_t arch_mm_block_from_pte(pte_t pte, mm_level_t level)
 {
 	return pa_init((pte << PTE_LEVEL_SHIFT(level)) & PTE_ADDR_MASK);
 }
 
-paddr_t arch_mm_table_from_pte(pte_t pte, uint8_t level)
+paddr_t arch_mm_table_from_pte(pte_t pte, mm_level_t level)
 {
 	return pa_init((pte << PTE_LEVEL_SHIFT(level)) & PTE_ADDR_MASK);
 }
 
-uint64_t arch_mm_pte_attrs(pte_t pte, uint8_t level)
+mm_attr_t arch_mm_pte_attrs(pte_t pte, mm_level_t level)
 {
 	return (pte << PTE_LEVEL_SHIFT(level)) & PTE_ATTR_MODE_MASK;
 }
 
-uint64_t arch_mm_combine_table_entry_attrs(uint64_t table_attrs,
-					   uint64_t block_attrs)
+mm_attr_t arch_mm_combine_table_entry_attrs(mm_attr_t table_attrs,
+					    mm_attr_t block_attrs)
 {
 	return table_attrs | block_attrs;
 }
 
-void arch_mm_invalidate_stage1_range(uint16_t asid, vaddr_t va_begin,
+void arch_mm_invalidate_stage1_range(ffa_id_t asid, vaddr_t va_begin,
 				     vaddr_t va_end)
 {
 	(void)asid;
@@ -112,7 +112,7 @@ void arch_mm_invalidate_stage1_range(uint16_t asid, vaddr_t va_begin,
 	/* There's no modelling of the stage-1 TLB. */
 }
 
-void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
+void arch_mm_invalidate_stage2_range(ffa_id_t vmid, ipaddr_t va_begin,
 				     ipaddr_t va_end, bool non_secure)
 {
 	(void)vmid;
@@ -135,12 +135,12 @@ void arch_mm_stage1_max_level_set(uint32_t pa_bits)
 	(void)pa_bits;
 }
 
-uint8_t arch_mm_stage1_max_level(void)
+mm_level_t arch_mm_stage1_max_level(void)
 {
 	return 2;
 }
 
-uint8_t arch_mm_stage2_max_level(void)
+mm_level_t arch_mm_stage2_max_level(void)
 {
 	return 2;
 }
@@ -156,22 +156,22 @@ uint8_t arch_mm_stage2_root_table_count(void)
 	return 4;
 }
 
-uint64_t arch_mm_mode_to_stage1_attrs(uint32_t mode)
+mm_attr_t arch_mm_mode_to_stage1_attrs(mm_mode_t mode)
 {
-	return ((uint64_t)mode << PTE_ATTR_MODE_SHIFT) & PTE_ATTR_MODE_MASK;
+	return ((mm_attr_t)mode << PTE_ATTR_MODE_SHIFT) & PTE_ATTR_MODE_MASK;
 }
 
-uint64_t arch_mm_mode_to_stage2_attrs(uint32_t mode)
+mm_attr_t arch_mm_mode_to_stage2_attrs(mm_mode_t mode)
 {
-	return ((uint64_t)mode << PTE_ATTR_MODE_SHIFT) & PTE_ATTR_MODE_MASK;
+	return ((mm_attr_t)mode << PTE_ATTR_MODE_SHIFT) & PTE_ATTR_MODE_MASK;
 }
 
-uint32_t arch_mm_stage2_attrs_to_mode(uint64_t attrs)
+mm_mode_t arch_mm_stage2_attrs_to_mode(mm_attr_t attrs)
 {
 	return attrs >> PTE_ATTR_MODE_SHIFT;
 }
 
-uint32_t arch_mm_stage1_attrs_to_mode(uint64_t attrs)
+mm_mode_t arch_mm_stage1_attrs_to_mode(mm_attr_t attrs)
 {
 	return attrs >> PTE_ATTR_MODE_SHIFT;
 }
@@ -191,7 +191,7 @@ bool arch_mm_init(paddr_t table)
 	return true;
 }
 
-uint32_t arch_mm_extra_attributes_from_vm(ffa_id_t id)
+mm_mode_t arch_mm_extra_mode_from_vm(ffa_id_t id)
 {
 	(void)id;
 

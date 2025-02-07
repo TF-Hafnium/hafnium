@@ -1212,7 +1212,7 @@ noreturn struct vcpu *serr_lower(void)
  */
 static struct vcpu_fault_info fault_info_init(uintreg_t esr,
 					      const struct vcpu *vcpu,
-					      uint32_t mode)
+					      mm_mode_t mode)
 {
 	uint32_t fsc = esr & 0x3f;
 	struct vcpu_fault_info r;

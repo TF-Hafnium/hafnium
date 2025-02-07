@@ -9,6 +9,7 @@
 #pragma once
 
 #include "hf/ffa.h"
+#include "hf/mm.h"
 #include "hf/vm.h"
 
 /** Check validity of the FF-A memory send function attempt. */
@@ -41,7 +42,7 @@ static inline bool ffa_memory_is_handle_allocated_by_current_world(
  * it. The SPMC will return MM_MODE_NS, and the hypervisor 0 as it only deals
  * with NS accesses by default.
  */
-uint32_t ffa_memory_get_other_world_mode(void);
+mm_mode_t ffa_memory_get_other_world_mode(void);
 
 bool ffa_memory_is_mem_perm_get_valid(const struct vcpu *current);
 bool ffa_memory_is_mem_perm_set_valid(const struct vcpu *current);
@@ -74,4 +75,4 @@ struct ffa_value ffa_memory_other_world_mem_send_continue(
  * Set the security bit in `attributes` if specified by `mode`.
  */
 ffa_memory_attributes_t ffa_memory_add_security_bit_from_mode(
-	ffa_memory_attributes_t attributes, uint32_t mode);
+	ffa_memory_attributes_t attributes, mm_mode_t mode);

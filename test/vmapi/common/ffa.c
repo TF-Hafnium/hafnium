@@ -888,7 +888,7 @@ void update_mm_security_state(struct ffa_composite_memory_region *composite,
 	if (attributes.security == FFA_MEMORY_SECURITY_NON_SECURE &&
 	    !ffa_is_vm_id(hf_vm_get_id())) {
 		for (uint32_t i = 0; i < composite->constituent_count; i++) {
-			uint32_t mode;
+			mm_mode_t mode;
 
 			if (!hftest_mm_get_mode(
 				    // NOLINTNEXTLINE(performance-no-int-to-ptr)

@@ -24,7 +24,7 @@ bool hftest_mm_init(void)
 }
 
 // NOLINTNEXTLINE
-bool hftest_mm_get_mode(const void *base, size_t size, uint32_t *mode)
+bool hftest_mm_get_mode(const void *base, size_t size, mm_mode_t *mode)
 {
 	(void)base;
 	(void)size;
@@ -33,7 +33,7 @@ bool hftest_mm_get_mode(const void *base, size_t size, uint32_t *mode)
 	return true;
 }
 
-void hftest_mm_identity_map(const void *base, size_t size, uint32_t mode)
+void hftest_mm_identity_map(const void *base, size_t size, mm_mode_t mode)
 {
 	(void)base;
 	(void)size;
