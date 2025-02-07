@@ -16,7 +16,6 @@
 
 #include "hf/check.h"
 #include "hf/dlog.h"
-#include "hf/ffa.h"
 #include "hf/layout.h"
 #include "hf/plat/console.h"
 #include "hf/static_assert.h"
@@ -423,33 +422,11 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
 
 /**
  * Updates the page table from the root to map the given address range to a
- * physical range using the provided (architecture-specific) attributes. Or if
- * `flags.unmap` is set, unmap the given range instead.
- */
-static bool mm_map_root(struct mm_ptable *ptable, ptable_addr_t begin,
-			ptable_addr_t end, mm_attr_t attrs,
-			mm_level_t root_level, struct mm_flags flags,
-			struct mpool *ppool)
-{
-	struct mm_page_table *child_table = &mm_page_table_from_pa(
-		ptable->root)[mm_index(begin, root_level)];
-
-	while (begin < end) {
-		if (!mm_map_level(ptable, begin, end, attrs, child_table,
-				  root_level - 1, flags, ppool)) {
-			return false;
-		}
-		begin = mm_start_of_next_block(begin, root_level);
-		child_table++;
-	}
-
-	return true;
-}
-
-/**
- * Updates the given table such that the given physical address range is mapped
- * or not mapped into the address space with the architecture-agnostic mode
- * provided. Only commits the change if `flags.commit` is set.
+ * physical range using the provided (architecture-specific) attributes.
+ *
+ * Flags:
+ * - `flags.unmap`: unmap the given range instead of mapping it.
+ * - `flags.commit`: the change is only committed if this flag is set.
  */
 static bool mm_ptable_identity_map(struct mm_ptable *ptable, paddr_t pa_begin,
 				   paddr_t pa_end, mm_attr_t attrs,
@@ -459,6 +436,8 @@ static bool mm_ptable_identity_map(struct mm_ptable *ptable, paddr_t pa_begin,
 	ptable_addr_t ptable_end = mm_ptable_addr_space_end(flags);
 	ptable_addr_t end = mm_round_up_to_page(pa_addr(pa_end));
 	ptable_addr_t begin = pa_addr(arch_mm_clear_pa(pa_begin));
+	struct mm_page_table *root_table = &mm_page_table_from_pa(
+		ptable->root)[mm_index(begin, root_level)];
 
 	/*
 	 * Assert condition to communicate the API constraint of mm_max_level(),
@@ -471,8 +450,13 @@ static bool mm_ptable_identity_map(struct mm_ptable *ptable, paddr_t pa_begin,
 		end = ptable_end;
 	}
 
-	if (!mm_map_root(ptable, begin, end, attrs, root_level, flags, ppool)) {
-		return false;
+	while (begin < end) {
+		if (!mm_map_level(ptable, begin, end, attrs, root_table,
+				  root_level - 1, flags, ppool)) {
+			return false;
+		}
+		begin = mm_start_of_next_block(begin, root_level);
+		root_table++;
 	}
 
 	/*
