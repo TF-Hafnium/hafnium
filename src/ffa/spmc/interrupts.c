@@ -181,6 +181,56 @@ void ffa_interrupts_mask(struct vcpu_locked receiver_vcpu_locked)
 	}
 }
 
+static struct vcpu *interrupt_resume_waiting(
+	struct vcpu_locked current_locked,
+	struct vcpu_locked target_vcpu_locked, uint32_t v_intid)
+{
+	struct vcpu *next = NULL;
+	struct ffa_value ret_interrupt = api_ffa_interrupt_return(v_intid);
+	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
+
+	/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
+	vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
+	ffa_interrupts_mask(target_vcpu_locked);
+
+	if (target_vcpu_locked.vcpu->vm->el0_partition) {
+		/*
+		 * Since S-EL0 partitions will not receive the interrupt through
+		 * a vIRQ signal in addition to the FFA_INTERRUPT ERET, make the
+		 * interrupt no longer pending at this point.
+		 */
+		uint32_t pending_intid =
+			vcpu_virt_interrupt_get_pending_and_enabled(
+				target_vcpu_locked);
+		assert(pending_intid == v_intid);
+	}
+
+	/*
+	 * Ideally, we have to mask non-secure interrupts here
+	 * since the spec mandates that SPMC should make sure
+	 * SPMC scheduled call chain cannot be preempted by a
+	 * non-secure interrupt. However, our current design
+	 * takes care of it implicitly.
+	 */
+	vcpu_set_running(target_vcpu_locked, &ret_interrupt);
+
+	ffa_interrupts_set_preempted_vcpu(target_vcpu_locked, current_locked);
+
+	next = target_vcpu;
+
+	if (target_vcpu->cpu != current_locked.vcpu->cpu) {
+		/*
+		 * The target vcpu could have migrated to a different
+		 * physical CPU. SPMC will migrate it to current
+		 * physical CPU and resume it.
+		 */
+		assert(target_vcpu->vm->vcpu_count == 1);
+		target_vcpu->cpu = current_locked.vcpu->cpu;
+	}
+
+	return next;
+}
+
 /**
  * Handles the secure interrupt according to the target vCPU's state
  * in the case the owner of the interrupt is an S-EL0 partition.
@@ -194,47 +244,15 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel0(
 
 	/* Secure interrupt signaling and queuing for S-EL0 SP. */
 	switch (target_vcpu->state) {
-	case VCPU_STATE_WAITING: {
-		struct ffa_value ret_interrupt =
-			api_ffa_interrupt_return(v_intid);
-		uint32_t pending_intid;
+	case VCPU_STATE_WAITING:
 
 		/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
 		dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
 			     target_vcpu->vm->id);
 
-		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
-		ffa_interrupts_mask(target_vcpu_locked);
-
-		/*
-		 * Since S-EL0 partitions will not receive the interrupt through
-		 * a vIRQ signal in addition to the FFA_INTERRUPT ERET, make the
-		 * interrupt no longer pending at this point.
-		 */
-		pending_intid = vcpu_virt_interrupt_get_pending_and_enabled(
-			target_vcpu_locked);
-		assert(pending_intid == v_intid);
-
-		vcpu_set_running(target_vcpu_locked, &ret_interrupt);
-
-		/*
-		 * If the execution was in NWd as well, set the vCPU
-		 * in preempted state as well.
-		 */
-		ffa_interrupts_set_preempted_vcpu(target_vcpu_locked,
-						  current_locked);
-
-		/*
-		 * The target vcpu could have migrated to a different physical
-		 * CPU. SPMC will migrate it to current physical CPU and resume
-		 * it.
-		 */
-		target_vcpu->cpu = current_locked.vcpu->cpu;
-
-		/* Switch to target vCPU responsible for this interrupt. */
-		next = target_vcpu;
+		next = interrupt_resume_waiting(current_locked,
+						target_vcpu_locked, v_intid);
 		break;
-	}
 	case VCPU_STATE_BLOCKED:
 	case VCPU_STATE_PREEMPTED:
 	case VCPU_STATE_RUNNING:
@@ -279,37 +297,10 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 
 	/* Secure interrupt signaling and queuing for S-EL1 SP. */
 	switch (target_vcpu->state) {
-	case VCPU_STATE_WAITING: {
-		struct ffa_value ret_interrupt =
-			api_ffa_interrupt_return(v_intid);
-
-		/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
-		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
-		ffa_interrupts_mask(target_vcpu_locked);
-
-		/*
-		 * Ideally, we have to mask non-secure interrupts here
-		 * since the spec mandates that SPMC should make sure
-		 * SPMC scheduled call chain cannot be preempted by a
-		 * non-secure interrupt. However, our current design
-		 * takes care of it implicitly.
-		 */
-		vcpu_set_running(target_vcpu_locked, &ret_interrupt);
-
-		ffa_interrupts_set_preempted_vcpu(target_vcpu_locked,
-						  current_locked);
-		next = target_vcpu;
-
-		if (target_vcpu->cpu != current_locked.vcpu->cpu) {
-			/*
-			 * The target vcpu could have migrated to a different
-			 * physical CPU. SPMC will migrate it to current
-			 * physical CPU and resume it.
-			 */
-			target_vcpu->cpu = current_locked.vcpu->cpu;
-		}
+	case VCPU_STATE_WAITING:
+		next = interrupt_resume_waiting(current_locked,
+						target_vcpu_locked, v_intid);
 		break;
-	}
 	case VCPU_STATE_BLOCKED:
 
 		if (target_vcpu->cpu == current_locked.vcpu->cpu &&
