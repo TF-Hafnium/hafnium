@@ -20,6 +20,7 @@
 #include "hf/layout.h"
 #include "hf/plat/console.h"
 #include "hf/static_assert.h"
+#include "hf/std.h"
 
 /**
  * This file has functions for managing the level 1 and 2 page tables used by
@@ -66,7 +67,7 @@ static struct mm_page_table *mm_page_table_from_pa(paddr_t pa)
  */
 static ptable_addr_t mm_round_down_to_page(ptable_addr_t addr)
 {
-	return addr & ~((ptable_addr_t)(PAGE_SIZE - 1));
+	return align_down(addr, PAGE_SIZE);
 }
 
 /**
@@ -74,7 +75,7 @@ static ptable_addr_t mm_round_down_to_page(ptable_addr_t addr)
  */
 static ptable_addr_t mm_round_up_to_page(ptable_addr_t addr)
 {
-	return mm_round_down_to_page(addr + PAGE_SIZE - 1);
+	return align_up(addr, PAGE_SIZE);
 }
 
 /**
@@ -87,22 +88,12 @@ static size_t mm_entry_size(mm_level_t level)
 }
 
 /**
- * Gets the address of the start of the next block of the given size. The size
- * must be a power of two.
+ * Gets the address of the start of the next block of the given level.
  */
 static ptable_addr_t mm_start_of_next_block(ptable_addr_t addr,
-					    size_t block_size)
+					    mm_level_t level)
 {
-	return (addr + block_size) & ~(block_size - 1);
-}
-
-/**
- * Gets the physical address of the start of the next block of the given size.
- * The size must be a power of two.
- */
-static paddr_t mm_pa_start_of_next_block(paddr_t pa, size_t block_size)
-{
-	return pa_init((pa_addr(pa) + block_size) & ~(block_size - 1));
+	return align_up(addr + 1, mm_entry_size(level));
 }
 
 /**
@@ -357,7 +348,7 @@ static struct mm_page_table *mm_populate_table_pte(
  */
 // NOLINTNEXTLINE(misc-no-recursion)
 static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
-			 ptable_addr_t end, paddr_t pa, mm_attr_t attrs,
+			 ptable_addr_t end, mm_attr_t attrs,
 			 struct mm_page_table *child_table, mm_level_t level,
 			 struct mm_flags flags, struct mpool *ppool)
 {
@@ -386,7 +377,7 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
 			 */
 		} else if ((end - begin) >= entry_size &&
 			   (unmap || arch_mm_is_block_allowed(level)) &&
-			   (begin & (entry_size - 1)) == 0) {
+			   is_aligned(begin, entry_size)) {
 			/*
 			 * If the entire entry is within the region we want to
 			 * map, map/unmap the whole entry.
@@ -394,8 +385,9 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
 			if (commit) {
 				pte_t new_pte =
 					unmap ? arch_mm_absent_pte(level)
-					      : arch_mm_block_pte(level, pa,
-								  attrs);
+					      : arch_mm_block_pte(
+							level, pa_init(begin),
+							attrs);
 				mm_replace_entry(ptable, begin, pte, new_pte,
 						 level, flags, non_secure,
 						 ppool);
@@ -416,14 +408,13 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
 			 * Recurse to map/unmap the appropriate entries within
 			 * the subtable.
 			 */
-			if (!mm_map_level(ptable, begin, end, pa, attrs, nt,
+			if (!mm_map_level(ptable, begin, end, attrs, nt,
 					  level - 1, flags, ppool)) {
 				return false;
 			}
 		}
 
-		begin = mm_start_of_next_block(begin, entry_size);
-		pa = mm_pa_start_of_next_block(pa, entry_size);
+		begin = mm_start_of_next_block(begin, level);
 		pte++;
 	}
 
@@ -440,16 +431,15 @@ static bool mm_map_root(struct mm_ptable *ptable, ptable_addr_t begin,
 			mm_level_t root_level, struct mm_flags flags,
 			struct mpool *ppool)
 {
-	size_t root_table_size = mm_entry_size(root_level);
 	struct mm_page_table *child_table = &mm_page_table_from_pa(
 		ptable->root)[mm_index(begin, root_level)];
 
 	while (begin < end) {
-		if (!mm_map_level(ptable, begin, end, pa_init(begin), attrs,
-				  child_table, root_level - 1, flags, ppool)) {
+		if (!mm_map_level(ptable, begin, end, attrs, child_table,
+				  root_level - 1, flags, ppool)) {
 			return false;
 		}
-		begin = mm_start_of_next_block(begin, root_table_size);
+		begin = mm_start_of_next_block(begin, root_level);
 		child_table++;
 	}
 
@@ -831,8 +821,7 @@ static void mm_ptable_defrag(struct mm_ptable *ptable, struct mm_flags flags,
 			mm_ptable_defrag_entry(ptable, block_addr,
 					       &(tables[i].entries[j]), level,
 					       flags, non_secure, ppool);
-			block_addr = mm_start_of_next_block(
-				block_addr, mm_entry_size(level));
+			block_addr = mm_start_of_next_block(block_addr, level);
 		}
 	}
 
@@ -858,7 +847,6 @@ static bool mm_ptable_get_attrs_level(const struct mm_page_table *table,
 {
 	const pte_t *pte = &table->entries[mm_index(begin, level)];
 	ptable_addr_t level_end = mm_level_end(begin, level);
-	size_t entry_size = mm_entry_size(level);
 
 	/* Cap end so that we don't go over the current level max. */
 	if (end > level_end) {
@@ -885,7 +873,7 @@ static bool mm_ptable_get_attrs_level(const struct mm_page_table *table,
 			}
 		}
 
-		begin = mm_start_of_next_block(begin, entry_size);
+		begin = mm_start_of_next_block(begin, level);
 		pte++;
 	}
 
@@ -907,9 +895,7 @@ static bool mm_get_attrs(const struct mm_ptable *ptable, ptable_addr_t begin,
 {
 	mm_level_t max_level = mm_max_level(flags);
 	mm_level_t root_level = max_level + 1;
-	size_t root_table_size = mm_entry_size(root_level);
-	ptable_addr_t ptable_end =
-		mm_root_table_count(flags) * mm_entry_size(root_level);
+	ptable_addr_t ptable_end = mm_ptable_addr_space_end(flags);
 	struct mm_page_table *table;
 	bool got_attrs = false;
 
@@ -930,7 +916,7 @@ static bool mm_get_attrs(const struct mm_ptable *ptable, ptable_addr_t begin,
 		}
 
 		got_attrs = true;
-		begin = mm_start_of_next_block(begin, root_table_size);
+		begin = mm_start_of_next_block(begin, root_level);
 		table++;
 	}
 
