@@ -110,17 +110,44 @@ static struct vcpu *ffa_interrupts_find_target_vcpu_secure_interrupt(
 }
 
 static struct vcpu *ffa_interrupts_find_target_vcpu(struct vcpu *current,
-						    uint32_t interrupt_id)
+						    uint32_t interrupt_id,
+						    uint32_t *v_intid)
 {
 	struct vcpu *target_vcpu;
 
+	assert(current != NULL);
+	assert(v_intid != NULL);
+
+	*v_intid = interrupt_id;
+
 	switch (interrupt_id) {
+	case SPURIOUS_INTID_OTHER_WORLD:
+		/*
+		 * Spurious interrupt ID indicating that there are no pending
+		 * interrupts to acknowledge. For such scenarios, resume the
+		 * current vCPU.
+		 */
+		target_vcpu = NULL;
+		break;
 	case HF_IPI_INTID:
 		/*
 		 * Get the next vCPU with a pending IPI. If all vCPUs
 		 * have had their IPIs handled this will return NULL.
 		 */
 		target_vcpu = hf_ipi_get_pending_target_vcpu(current);
+		break;
+	case ARM_SEL2_TIMER_PHYS_INT:
+		/* Disable the S-EL2 physical timer */
+		host_timer_disable();
+		target_vcpu = timer_find_target_vcpu(current);
+
+		if (target_vcpu != NULL) {
+			*v_intid = HF_VIRTUAL_TIMER_INTID;
+		}
+		/*
+		 * It is possible for target_vcpu to be NULL in case of spurious
+		 * timer interrupt.
+		 */
 		break;
 	case ARM_EL1_VIRT_TIMER_PHYS_INT:
 		/* Fall through */
@@ -474,39 +501,21 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 	intid = plat_interrupts_get_pending_interrupt_id();
 	v_intid = intid;
 
-	switch (intid) {
-	case ARM_SEL2_TIMER_PHYS_INT:
-		/* Disable the S-EL2 physical timer */
-		host_timer_disable();
-		target_vcpu = timer_find_target_vcpu(current);
-
-		if (target_vcpu != NULL) {
-			v_intid = HF_VIRTUAL_TIMER_INTID;
-			break;
-		}
-		/*
-		 * It is possible for target_vcpu to be NULL in case of spurious
-		 * timer interrupt. Fall through.
-		 */
-	case SPURIOUS_INTID_OTHER_WORLD:
-		/*
-		 * Spurious interrupt ID indicating that there are no pending
-		 * interrupts to acknowledge. For such scenarios, resume the
-		 * current vCPU.
-		 */
-		*next = NULL;
-		return;
-	default:
-		target_vcpu = ffa_interrupts_find_target_vcpu(current, intid);
-		break;
-	}
+	/* Get the target vCPU and get the virtual interrupt ID. */
+	target_vcpu = ffa_interrupts_find_target_vcpu(current, intid, &v_intid);
 
 	/*
-	 * End the interrupt to drop the running priority. It also deactivates
-	 * the physical interrupt. If not, the interrupt could trigger again
-	 * after resuming current vCPU.
+	 * Spurious interrupt ID indicates there is no pending interrupt to
+	 * acknowledge so we do not need to call end of interrupt.
 	 */
-	plat_interrupts_end_of_interrupt(intid);
+	if (v_intid != SPURIOUS_INTID_OTHER_WORLD) {
+		/*
+		 * End the interrupt to drop the running priority. It also
+		 * deactivates the physical interrupt. If not, the interrupt
+		 * could trigger again after resuming current vCPU.
+		 */
+		plat_interrupts_end_of_interrupt(intid);
+	}
 
 	if (target_vcpu == NULL) {
 		/* No further handling required. Resume the current vCPU. */
