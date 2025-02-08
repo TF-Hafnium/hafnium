@@ -435,7 +435,7 @@ static bool mm_ptable_identity_map(struct mm_ptable *ptable, paddr_t pa_begin,
 	mm_level_t root_level = mm_max_level(flags) + 1;
 	ptable_addr_t ptable_end = mm_ptable_addr_space_end(flags);
 	ptable_addr_t end = mm_round_up_to_page(pa_addr(pa_end));
-	ptable_addr_t begin = pa_addr(arch_mm_clear_pa(pa_begin));
+	ptable_addr_t begin = mm_round_down_to_page(pa_addr(pa_begin));
 	struct mm_page_table *root_table = &mm_page_table_from_pa(
 		ptable->root)[mm_index(begin, root_level)];
 

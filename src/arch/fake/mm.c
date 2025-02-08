@@ -77,12 +77,7 @@ enum mm_pte_type arch_mm_pte_type(pte_t pte, mm_level_t level)
 	return PTE_TYPE_VALID_BLOCK;
 }
 
-paddr_t arch_mm_clear_pa(paddr_t pa)
-{
-	return pa_init(pa_addr(pa) & PTE_ADDR_MASK);
-}
-
-paddr_t pte_addr(pte_t pte, mm_level_t level)
+static paddr_t pte_addr(pte_t pte, mm_level_t level)
 {
 	return pa_init((pte << PTE_LEVEL_SHIFT(level)) & PTE_ADDR_MASK);
 }

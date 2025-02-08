@@ -94,12 +94,6 @@ static inline bool arch_mm_pte_is_table(pte_t pte, mm_level_t level)
 }
 
 /**
- * Clears the bits of an address that are ignored by the page table. In effect,
- * the address is rounded down to the start of the corresponding PTE range.
- */
-paddr_t arch_mm_clear_pa(paddr_t pa);
-
-/**
  * Extracts the start address of the PTE range.
  */
 paddr_t arch_mm_block_from_pte(pte_t pte, mm_level_t level);

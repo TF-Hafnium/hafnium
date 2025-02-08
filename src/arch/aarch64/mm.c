@@ -216,15 +216,6 @@ static uint64_t pte_addr(pte_t pte)
 }
 
 /**
- * Clears the given physical address, i.e., clears the bits of the address that
- * are not used in the pte.
- */
-paddr_t arch_mm_clear_pa(paddr_t pa)
-{
-	return pa_init(pte_addr(pa_addr(pa)));
-}
-
-/**
  * Extracts the physical address of the block referred to by the given page
  * table entry.
  */
