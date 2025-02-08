@@ -13,13 +13,13 @@
 #include "test/hftest.h"
 
 /** There must be at least two levels in the page table. */
-#define MAX_LEVEL_LOWER_BOUND 1
+#define ROOT_LEVEL_LOWER_BOUND 2
 
 /**
  * This is the number of levels that are tested and is constrained as it
  * controls the depth of recursion in the memory management code.
  */
-#define MAX_LEVEL_UPPER_BOUND 3
+#define ROOT_LEVEL_UPPER_BOUND 4
 
 /* TODO: work out how to run these test against the host fake arch. */
 
@@ -33,18 +33,18 @@ TEST(arch_mm, block_allowed_at_level0)
 }
 
 /**
- * The maximum level must be within acceptable bounds.
+ * The root level must be within acceptable bounds.
  */
-TEST(arch_mm, max_level_stage1)
+TEST(arch_mm, root_level_stage1)
 {
 	uint32_t pa_bits = arch_mm_get_pa_bits(arch_mm_get_pa_range());
-	mm_attr_t max_level;
+	mm_attr_t root_level;
 
-	arch_mm_stage1_max_level_set(pa_bits);
-	max_level = arch_mm_stage1_max_level();
+	arch_mm_stage1_root_level_set(pa_bits);
+	root_level = arch_mm_stage1_root_level();
 
-	EXPECT_GE(max_level, MAX_LEVEL_LOWER_BOUND);
-	EXPECT_LE(max_level, MAX_LEVEL_UPPER_BOUND);
+	EXPECT_GE(root_level, ROOT_LEVEL_LOWER_BOUND);
+	EXPECT_LE(root_level, ROOT_LEVEL_UPPER_BOUND);
 }
 
 /* TODO: initialize arch_mm and check max level of stage-2. */
@@ -54,7 +54,7 @@ TEST(arch_mm, max_level_stage1)
  */
 TEST(arch_mm, absent_properties)
 {
-	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+	for (mm_level_t level = 0; level <= ROOT_LEVEL_UPPER_BOUND; level++) {
 		pte_t absent_pte;
 
 		absent_pte = arch_mm_absent_pte(level);
@@ -72,7 +72,7 @@ TEST(arch_mm, absent_properties)
  */
 TEST(arch_mm, invalid_block_properties)
 {
-	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+	for (mm_level_t level = 0; level <= ROOT_LEVEL_UPPER_BOUND; level++) {
 		mm_attr_t attrs = arch_mm_mode_to_stage2_attrs(MM_MODE_INVALID);
 		pte_t block_pte;
 
@@ -98,7 +98,7 @@ TEST(arch_mm, invalid_block_properties)
  */
 TEST(arch_mm, valid_block_properties)
 {
-	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+	for (mm_level_t level = 0; level <= ROOT_LEVEL_UPPER_BOUND; level++) {
 		mm_attr_t attrs = arch_mm_mode_to_stage2_attrs(0);
 		pte_t block_pte;
 
@@ -124,7 +124,7 @@ TEST(arch_mm, valid_block_properties)
  */
 TEST(arch_mm, table_properties)
 {
-	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+	for (mm_level_t level = 0; level <= ROOT_LEVEL_UPPER_BOUND; level++) {
 		pte_t table_pte;
 
 		/* Test doesn't apply to level 0 as there can't be a table. */
@@ -149,7 +149,7 @@ TEST(arch_mm, table_properties)
  */
 TEST(arch_mm, block_addr_and_attrs_preserved)
 {
-	for (mm_level_t level = 0; level <= MAX_LEVEL_UPPER_BOUND; level++) {
+	for (mm_level_t level = 0; level <= ROOT_LEVEL_UPPER_BOUND; level++) {
 		paddr_t addr;
 		mm_attr_t attrs;
 		pte_t block_pte;

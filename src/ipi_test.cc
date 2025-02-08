@@ -35,7 +35,6 @@ using struct_vm_locked = struct vm_locked;
  */
 
 constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
-const mm_level_t TOP_LEVEL = arch_mm_stage2_max_level();
 class ipi : public ::testing::Test
 {
        protected:

@@ -137,8 +137,8 @@ struct arch_mm_config {
 	uintreg_t vstcr_el2;
 } arch_mm_config;
 
-static mm_level_t mm_s1_max_level;
-static mm_level_t mm_s2_max_level;
+static mm_level_t mm_s1_root_level;
+static mm_level_t mm_s2_root_level;
 static uint8_t mm_s2_root_table_count;
 
 /**
@@ -677,27 +677,27 @@ mm_mode_t arch_mm_stage2_attrs_to_mode(mm_attr_t attrs)
 	return mode;
 }
 
-void arch_mm_stage1_max_level_set(uint32_t pa_bits)
+void arch_mm_stage1_root_level_set(uint32_t pa_bits)
 {
 	/* Maximum supported PA range in bits is 48 */
 	CHECK(pa_bits <= 48);
 
 	if (pa_bits >= 40) {
-		mm_s1_max_level = 3;
+		mm_s1_root_level = 4;
 	} else {
-		/* Setting to 2 covers physical memory upto 512GB */
-		mm_s1_max_level = 2;
+		/* Setting to 3 covers physical memory upto 512GB */
+		mm_s1_root_level = 3;
 	}
 }
 
-mm_level_t arch_mm_stage1_max_level(void)
+mm_level_t arch_mm_stage1_root_level(void)
 {
-	return mm_s1_max_level;
+	return mm_s1_root_level;
 }
 
-mm_level_t arch_mm_stage2_max_level(void)
+mm_level_t arch_mm_stage2_root_level(void)
 {
-	return mm_s2_max_level;
+	return mm_s2_root_level;
 }
 
 uint8_t arch_mm_stage1_root_table_count(void)
@@ -780,22 +780,18 @@ bool arch_mm_init(paddr_t table)
 	 * of bits. The value is chosen to give the shallowest tree by making
 	 * use of concatenated translation tables.
 	 *
-	 *  - 0 => start at level 1
-	 *  - 1 => start at level 2
-	 *  - 2 => start at level 3
 	 */
 	if (pa_bits >= 44) {
-		sl0 = 2;
-		mm_s2_max_level = 3;
+		mm_s2_root_level = 4;
 	} else if (pa_bits >= 35) {
-		sl0 = 1;
-		mm_s2_max_level = 2;
+		mm_s2_root_level = 3;
 	} else {
-		sl0 = 0;
-		mm_s2_max_level = 1;
+		mm_s2_root_level = 2;
 	}
 
-	arch_mm_stage1_max_level_set(pa_bits);
+	sl0 = mm_s2_root_level - 2;
+
+	arch_mm_stage1_root_level_set(pa_bits);
 
 	/*
 	 * Since the shallowest possible tree is used, the maximum number of
@@ -811,11 +807,11 @@ bool arch_mm_init(paddr_t table)
 
 	dlog_info(
 		"Stage 2 has %d page table levels with %d pages at the root.\n",
-		mm_s2_max_level + 1, mm_s2_root_table_count);
+		mm_s2_root_level + 1, mm_s2_root_table_count);
 
 	dlog_info(
 		"Stage 1 has %d page table levels with %d pages at the root.\n",
-		mm_s1_max_level + 1, arch_mm_stage1_root_table_count());
+		mm_s1_root_level + 1, arch_mm_stage1_root_table_count());
 
 	/*
 	 * If the PE implements S-EL2 then VTCR_EL2.NSA/NSW bits are significant

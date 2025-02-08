@@ -136,17 +136,17 @@ void arch_mm_flush_dcache(void *base, size_t size);
 /**
  * Sets the maximum level allowed in the page table for stage-1.
  */
-void arch_mm_stage1_max_level_set(uint32_t pa_bits);
+void arch_mm_stage1_root_level_set(uint32_t pa_bits);
 
 /**
  * Gets the maximum level allowed in the page table for stage-1.
  */
-mm_level_t arch_mm_stage1_max_level(void);
+mm_level_t arch_mm_stage1_root_level(void);
 
 /**
  * Gets the maximum level allowed in the page table for stage-2.
  */
-mm_level_t arch_mm_stage2_max_level(void);
+mm_level_t arch_mm_stage2_root_level(void);
 
 /**
  * Gets the number of concatenated page tables used at the root for stage-1.

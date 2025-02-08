@@ -37,7 +37,7 @@ using ::testing::Truly;
 using ::mm_test::get_ptable;
 
 constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 16;
-const mm_level_t TOP_LEVEL = arch_mm_stage2_max_level();
+const mm_level_t TOP_LEVEL = arch_mm_stage2_root_level() - 1;
 const paddr_t VM_MEM_END = pa_init(0x200'0000'0000);
 
 /**

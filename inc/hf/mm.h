@@ -19,6 +19,23 @@
 
 typedef uint32_t mm_mode_t;
 typedef uint64_t mm_attr_t;
+
+/**
+ * The level of a page table entry (i.e. how deep into the recursive tree
+ * structure it is). See also Arm ARM, table D8-14.
+ *
+ * - `level == 4`: table entries (root)
+ * - `level == 3`: table or block entries
+ * - `level == 2`: table or block entries
+ * - `level == 1`: table or block entries
+ * - `level == 0`: page entries
+ *
+ * NOTE: The Arm ARM uses levels in the opposite order to our code: in the Arm
+ * ARM, levels start at 0 (or -1 if 52 bits of PA are used, but that is not
+ * supported by Hafnium) and page entries are at level 3. We go in the opposite
+ * direction: levels start at 3 or 4 and page entries are at level 0. This is
+ * because it makes the arithmetic and bit manipulation easier.
+ */
 typedef uint8_t mm_level_t;
 typedef uint16_t mm_asid_t;
 

@@ -58,7 +58,7 @@ bool arch_vm_mm_init(void)
 	 * Limit PA bits to HFTEST_S1_PA_BITS. Using the pa_bits reported by
 	 * arch_mm_get_pa_range requires an increase in page pool size.
 	 */
-	arch_mm_stage1_max_level_set(HFTEST_S1_PA_BITS);
+	arch_mm_stage1_root_level_set(HFTEST_S1_PA_BITS);
 
 	/*
 	 * Preserve initial values of the system registers in case we want to

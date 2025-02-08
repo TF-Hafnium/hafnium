@@ -131,20 +131,20 @@ void arch_mm_flush_dcache(void *base, size_t size)
 	/* There's no modelling of the cache. */
 }
 
-void arch_mm_stage1_max_level_set(uint32_t pa_bits)
+void arch_mm_stage1_root_level_set(uint32_t pa_bits)
 {
-	/* Not required to set this value as its hardcoded to 2 */
+	/* Not required to set this value as it's hardcoded to 3 */
 	(void)pa_bits;
 }
 
-mm_level_t arch_mm_stage1_max_level(void)
+mm_level_t arch_mm_stage1_root_level(void)
 {
-	return 2;
+	return 3;
 }
 
-mm_level_t arch_mm_stage2_max_level(void)
+mm_level_t arch_mm_stage2_root_level(void)
 {
-	return 2;
+	return 3;
 }
 
 uint8_t arch_mm_stage1_root_table_count(void)
