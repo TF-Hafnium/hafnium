@@ -570,21 +570,41 @@ static bool mm_ptable_identity_update(struct mm_ptable *ptable,
  */
 // NOLINTNEXTLINE(misc-no-recursion)
 static void mm_dump_table_recursive(const struct mm_page_table *ptable,
-				    mm_level_t level, mm_level_t max_level)
+				    mm_level_t level, uint8_t depth)
 {
 	for (size_t i = 0; i < MM_PTE_PER_PAGE; i++) {
-		if (!arch_mm_pte_is_present(ptable->entries[i], level)) {
+		pte_t entry = ptable->entries[i];
+
+		if (arch_mm_pte_is_absent(entry, level)) {
 			continue;
 		}
 
-		dlog("%*s%lx: %lx\n", 4 * (max_level - level), "", i,
-		     ptable->entries[i]);
+		dlog("%*s[level=%u, index=%zu]: ", depth * 2, "", level, i);
 
-		if (arch_mm_pte_is_table(ptable->entries[i], level)) {
-			mm_dump_table_recursive(
-				mm_page_table_from_pa(arch_mm_table_from_pte(
-					ptable->entries[i], level)),
-				level - 1, max_level);
+		switch (arch_mm_pte_type(entry, level)) {
+		case PTE_TYPE_ABSENT: {
+			/* Do nothing */
+			break;
+		}
+		case PTE_TYPE_INVALID_BLOCK: {
+			dlog("INVALID_BLOCK(%#lx)\n", entry);
+			break;
+		}
+		case PTE_TYPE_VALID_BLOCK: {
+			dlog("VALID_BLOCK(%#lx)\n", entry);
+			break;
+		}
+		case PTE_TYPE_TABLE: {
+			const struct mm_page_table *child_table =
+				mm_page_table_from_pa(
+					arch_mm_table_from_pte(entry, level));
+
+			dlog("TABLE(%#lx)\n", entry);
+
+			mm_dump_table_recursive(child_table, level - 1,
+						depth + 1);
+			break;
+		}
 		}
 	}
 }
