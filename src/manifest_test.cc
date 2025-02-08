@@ -17,6 +17,7 @@ extern "C" {
 
 #include "hf/boot_params.h"
 #include "hf/manifest.h"
+#include "hf/mm.h"
 #include "hf/sp_pkg.h"
 }
 
@@ -434,22 +435,26 @@ class manifest : public ::testing::Test
 		struct_manifest **m, const std::vector<char> &vec)
 	{
 		struct memiter it;
-		struct mm_stage1_locked mm_stage1_locked;
+		struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
 		struct boot_params params;
+		enum manifest_return_code ret;
 
 		boot_params_init(&params, nullptr);
 
 		memiter_init(&it, vec.data(), vec.size());
 
-		return manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+		ret = manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+		mm_unlock_stage1(&mm_stage1_locked);
+		return ret;
 	}
 
 	enum manifest_return_code ffa_manifest_from_spkg(
 		struct_manifest **m, Partition_package *spkg)
 	{
 		struct memiter it;
-		struct mm_stage1_locked mm_stage1_locked;
+		struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
 		struct boot_params params;
+		enum manifest_return_code ret;
 
 		boot_params_init(&params, spkg);
 
@@ -467,16 +472,19 @@ class manifest : public ::testing::Test
 		/* clang-format on */
 		memiter_init(&it, core_dtb.data(), core_dtb.size());
 
-		return manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+		ret = manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+		mm_unlock_stage1(&mm_stage1_locked);
+		return ret;
 	}
 
 	enum manifest_return_code ffa_manifest_from_vec(
 		struct_manifest **m, const std::vector<char> &vec)
 	{
 		struct memiter it;
-		struct mm_stage1_locked mm_stage1_locked;
+		struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
 		Partition_package spkg(vec);
 		struct boot_params params;
+		enum manifest_return_code ret;
 
 		boot_params_init(&params, &spkg);
 
@@ -494,7 +502,9 @@ class manifest : public ::testing::Test
 		/* clang-format on */
 		memiter_init(&it, core_dtb.data(), core_dtb.size());
 
-		return manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+		ret = manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+		mm_unlock_stage1(&mm_stage1_locked);
+		return ret;
 	}
 };
 
@@ -2183,7 +2193,7 @@ TEST_F(manifest, ffa_boot_order_not_unique)
 {
 	struct_manifest *m;
 	struct memiter it;
-	struct mm_stage1_locked mm_stage1_locked;
+	struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
 	struct boot_params params;
 	Partition_package spkg_1;
 	Partition_package spkg_2;
@@ -2249,6 +2259,8 @@ TEST_F(manifest, ffa_boot_order_not_unique)
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
 	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
 		  MANIFEST_ERROR_INVALID_BOOT_ORDER);
+
+	mm_unlock_stage1(&mm_stage1_locked);
 }
 
 TEST_F(manifest, ffa_valid_multiple_uuids)
@@ -2354,7 +2366,7 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 {
 	struct_manifest *m;
 	struct memiter it;
-	struct mm_stage1_locked mm_stage1_locked;
+	struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
 	struct boot_params params;
 	Partition_package spkg_1;
 	Partition_package spkg_2;
@@ -2510,6 +2522,8 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
 	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
 		  MANIFEST_SUCCESS);
+
+	mm_unlock_stage1(&mm_stage1_locked);
 }
 
 /*

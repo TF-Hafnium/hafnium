@@ -110,10 +110,14 @@ enum mm_pte_type {
 
 /* clang-format on */
 
+/**
+ * Flags for page table operations.
+ * - commit: Commit the given range rather than preparing it.
+ * - unmap: Unmap the given range rather than mapping it.
+ */
 struct mm_flags {
 	bool commit : 1;
 	bool unmap : 1;
-	bool stage1 : 1;
 };
 
 #define MM_PPOOL_ENTRY_SIZE sizeof(struct mm_page_table)
@@ -141,6 +145,8 @@ struct mm_ptable {
 	 * there can be up to 16 root tables, but we only use 4.
 	 */
 	struct mm_page_table *root_tables;
+	/** If true, the PT is a stage1 PT, otherwise it is a stage2 PT. */
+	bool stage1 : 1;
 };
 
 /** The type of addresses stored in the page table. */
@@ -153,9 +159,9 @@ struct mm_stage1_locked {
 
 void mm_vm_enable_invalidation(void);
 
-bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id,
-		    struct mm_flags flags, struct mpool *ppool);
-ptable_addr_t mm_ptable_addr_space_end(struct mm_flags flags);
+bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id, bool stage1,
+		    struct mpool *ppool);
+ptable_addr_t mm_ptable_addr_space_end(const struct mm_ptable *ptable);
 
 bool mm_vm_init(struct mm_ptable *ptable, mm_asid_t id, struct mpool *ppool);
 void mm_vm_fini(const struct mm_ptable *ptable, struct mpool *ppool);

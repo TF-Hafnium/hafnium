@@ -93,11 +93,10 @@ bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool)
 		 * to enforce static DMA isolation.
 		 */
 		ret = ret && mm_ptable_init(&vm->iommu_ptables[k], vm->id,
-					    (struct mm_flags){0}, ppool);
+					    false, ppool);
 #if SECURE_WORLD == 1
-		ret = ret &&
-		      mm_ptable_init(&vm->arch.iommu_ptables_ns[k], vm->id,
-				     (struct mm_flags){0}, ppool);
+		ret = ret && mm_ptable_init(&vm->arch.iommu_ptables_ns[k],
+					    vm->id, false, ppool);
 #endif
 		if (!ret) {
 			dlog_error(
@@ -116,8 +115,7 @@ bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool)
 	bool ret;
 
 	if (vm->el0_partition) {
-		return mm_ptable_init(&vm->ptable, vm->id,
-				      (struct mm_flags){.stage1 = true}, ppool);
+		return mm_ptable_init(&vm->ptable, vm->id, true, ppool);
 	}
 
 	ret = mm_vm_init(&vm->ptable, vm->id, ppool);
