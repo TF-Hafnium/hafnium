@@ -52,10 +52,10 @@ size_t mm_entry_size(int level)
 /**
  * Checks whether the address is mapped in the address space.
  */
-bool mm_vm_is_mapped(struct mm_ptable *t, ipaddr_t ipa)
+bool mm_vm_is_mapped(struct mm_ptable *ptable, ipaddr_t ipa)
 {
 	uint32_t mode;
-	return mm_vm_get_mode(t, ipa, ipa_add(ipa, 1), &mode) &&
+	return mm_vm_get_mode(ptable, ipa, ipa_add(ipa, 1), &mode) &&
 	       (mode & MM_MODE_INVALID) == 0;
 }
 

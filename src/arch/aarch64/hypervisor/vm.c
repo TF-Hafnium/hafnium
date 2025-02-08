@@ -131,26 +131,26 @@ bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool)
 bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
 			      paddr_t end, uint32_t mode, struct mpool *ppool)
 {
-	struct mm_ptable *table = &vm_locked.vm->ptable;
+	struct mm_ptable *ptable = &vm_locked.vm->ptable;
 
 	if (vm_locked.vm->el0_partition) {
-		return mm_identity_prepare(table, begin, end, mode, ppool);
+		return mm_identity_prepare(ptable, begin, end, mode, ppool);
 	}
 
 #if SECURE_WORLD == 1
 	if (0 != (mode & MM_MODE_NS)) {
-		table = &vm_locked.vm->arch.ptable_ns;
+		ptable = &vm_locked.vm->arch.ptable_ns;
 	}
 #endif
 
-	return mm_vm_identity_prepare(table, begin, end, mode, ppool);
+	return mm_vm_identity_prepare(ptable, begin, end, mode, ppool);
 }
 
 void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
 			     paddr_t end, uint32_t mode, struct mpool *ppool,
 			     ipaddr_t *ipa)
 {
-	struct mm_ptable *table = &vm_locked.vm->ptable;
+	struct mm_ptable *ptable = &vm_locked.vm->ptable;
 
 	if (vm_locked.vm->el0_partition) {
 		mm_identity_commit(&vm_locked.vm->ptable, begin, end, mode,
@@ -167,11 +167,11 @@ void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
 	} else {
 #if SECURE_WORLD == 1
 		if (0 != (mode & MM_MODE_NS)) {
-			table = &vm_locked.vm->arch.ptable_ns;
+			ptable = &vm_locked.vm->arch.ptable_ns;
 		}
 #endif
 
-		mm_vm_identity_commit(table, begin, end, mode, ppool, ipa);
+		mm_vm_identity_commit(ptable, begin, end, mode, ppool, ipa);
 	}
 }
 
@@ -245,15 +245,15 @@ static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, paddr_t begin,
 				     paddr_t end, uint32_t mode,
 				     struct mpool *ppool, uint8_t dma_device_id)
 {
-	struct mm_ptable *table = &vm_locked.vm->iommu_ptables[dma_device_id];
+	struct mm_ptable *ptable = &vm_locked.vm->iommu_ptables[dma_device_id];
 
 #if SECURE_WORLD == 1
 	if (0 != (mode & MM_MODE_NS)) {
-		table = &vm_locked.vm->arch.iommu_ptables_ns[dma_device_id];
+		ptable = &vm_locked.vm->arch.iommu_ptables_ns[dma_device_id];
 	}
 #endif
 
-	return mm_vm_identity_prepare(table, begin, end, mode, ppool);
+	return mm_vm_identity_prepare(ptable, begin, end, mode, ppool);
 }
 
 static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, paddr_t begin,
@@ -261,15 +261,15 @@ static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, paddr_t begin,
 				    struct mpool *ppool, ipaddr_t *ipa,
 				    uint8_t dma_device_id)
 {
-	struct mm_ptable *table = &vm_locked.vm->iommu_ptables[dma_device_id];
+	struct mm_ptable *ptable = &vm_locked.vm->iommu_ptables[dma_device_id];
 
 #if SECURE_WORLD == 1
 	if (0 != (mode & MM_MODE_NS)) {
-		table = &vm_locked.vm->arch.iommu_ptables_ns[dma_device_id];
+		ptable = &vm_locked.vm->arch.iommu_ptables_ns[dma_device_id];
 	}
 #endif
 
-	mm_vm_identity_commit(table, begin, end, mode, ppool, ipa);
+	mm_vm_identity_commit(ptable, begin, end, mode, ppool, ipa);
 }
 
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
