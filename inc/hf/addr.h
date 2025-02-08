@@ -170,6 +170,11 @@ static inline void *ptr_from_va(vaddr_t va)
 	return (void *)va_addr(va);
 }
 
+static inline void *ptr_from_pa(paddr_t pa)
+{
+	return ptr_from_va(va_from_pa(pa));
+}
+
 /**
  * Advances a virtual address.
  */

@@ -62,10 +62,8 @@ bool mm_vm_is_mapped(struct mm_ptable *ptable, ipaddr_t ipa)
 /**
  * Get an STL representation of the page table.
  */
-std::span<pte_t, MM_PTE_PER_PAGE> get_table(paddr_t pa)
+std::span<pte_t, MM_PTE_PER_PAGE> get_table(struct mm_page_table *table)
 {
-	auto table = reinterpret_cast<struct mm_page_table *>(
-		ptr_from_va(va_from_pa(pa)));
 	return std::span<pte_t, MM_PTE_PER_PAGE>(table->entries,
 						 std::end(table->entries));
 }
@@ -1066,8 +1064,7 @@ std::vector<std::span<pte_t, MM_PTE_PER_PAGE>> get_ptable(
 	std::vector<std::span<pte_t, MM_PTE_PER_PAGE>> all;
 	const uint8_t root_table_count = arch_mm_stage2_root_table_count();
 	for (uint8_t i = 0; i < root_table_count; ++i) {
-		all.push_back(get_table(
-			pa_init((uintpaddr_t)&ptable.root_tables[i])));
+		all.push_back(get_table(&ptable.root_tables[i]));
 	}
 	return all;
 }

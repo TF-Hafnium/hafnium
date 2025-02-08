@@ -15,6 +15,7 @@
 #include "hf/arch/std.h"
 #include "hf/arch/types.h"
 
+#include "hf/addr.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 
@@ -211,9 +212,9 @@ enum mm_pte_type arch_mm_pte_type(pte_t pte, mm_level_t level)
 	return PTE_TYPE_VALID_BLOCK;
 }
 
-static uint64_t pte_addr(pte_t pte)
+static paddr_t pte_addr(pte_t pte)
 {
-	return pte & PTE_ADDR_MASK;
+	return pa_init(pte & PTE_ADDR_MASK);
 }
 
 /**
@@ -225,19 +226,18 @@ paddr_t arch_mm_block_from_pte(pte_t pte, mm_level_t level)
 	(void)level;
 
 	assert(arch_mm_pte_is_block(pte, level));
-	return pa_init(pte_addr(pte));
+	return pte_addr(pte);
 }
 
 /**
- * Extracts the physical address of the page table referred to by the given page
- * table entry.
+ * Extracts the page table referred to by the given page table entry.
  */
-paddr_t arch_mm_table_from_pte(pte_t pte, mm_level_t level)
+struct mm_page_table *arch_mm_table_from_pte(pte_t pte, mm_level_t level)
 {
 	(void)level;
 
 	assert(arch_mm_pte_is_table(pte, level));
-	return pa_init(pte_addr(pte));
+	return ptr_from_pa(pte_addr(pte));
 }
 
 /**

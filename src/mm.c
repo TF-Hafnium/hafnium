@@ -54,14 +54,6 @@ void mm_vm_enable_invalidation(void)
 }
 
 /**
- * Get the page table from the physical address.
- */
-static struct mm_page_table *mm_page_table_from_pa(paddr_t pa)
-{
-	return ptr_from_va(va_from_pa(pa));
-}
-
-/**
  * Rounds an address down to a page boundary.
  */
 static ptable_addr_t mm_round_down_to_page(ptable_addr_t addr)
@@ -191,7 +183,7 @@ static void mm_free_page_pte(pte_t pte, mm_level_t level, struct mpool *ppool)
 	}
 
 	/* Recursively free any subtables. */
-	table = mm_page_table_from_pa(arch_mm_table_from_pte(pte, level));
+	table = arch_mm_table_from_pte(pte, level);
 	for (size_t i = 0; i < MM_PTE_PER_PAGE; ++i) {
 		mm_free_page_pte(table->entries[i], level - 1, ppool);
 	}
@@ -312,7 +304,7 @@ static struct mm_page_table *mm_populate_table_pte(
 
 	/* Just return pointer to table if it's already populated. */
 	if (arch_mm_pte_is_table(v, level)) {
-		return mm_page_table_from_pa(arch_mm_table_from_pte(v, level));
+		return arch_mm_table_from_pte(v, level);
 	}
 
 	/* Allocate a new table. */
@@ -587,9 +579,9 @@ static void mm_dump_table_entry(pte_t entry, mm_level_t level, uint32_t indent)
 	indent += 1;
 	{
 		mm_attr_t attrs = arch_mm_pte_attrs(entry, level);
-		paddr_t addr = arch_mm_table_from_pte(entry, level);
 		const struct mm_page_table *child_table =
-			mm_page_table_from_pa(addr);
+			arch_mm_table_from_pte(entry, level);
+		paddr_t addr = pa_init((uintpaddr_t)child_table);
 
 		dlog_indent(indent, ".pte   = %#016lx,\n", entry);
 		dlog_indent(indent, ".attrs = %#016lx,\n", attrs);
@@ -694,7 +686,7 @@ static pte_t mm_merge_table_pte(pte_t table_pte, mm_level_t level)
 	mm_attr_t combined_attrs;
 	paddr_t block_address;
 
-	table = mm_page_table_from_pa(arch_mm_table_from_pte(table_pte, level));
+	table = arch_mm_table_from_pte(table_pte, level);
 
 	if (!arch_mm_pte_is_present(table->entries[0], level - 1)) {
 		return arch_mm_absent_pte(level);
@@ -735,8 +727,7 @@ static void mm_ptable_defrag_entry(struct mm_ptable *ptable,
 		return;
 	}
 
-	child_table =
-		mm_page_table_from_pa(arch_mm_table_from_pte(*entry, level));
+	child_table = arch_mm_table_from_pte(*entry, level);
 
 	/* Defrag the first entry in the table and use it as the base entry. */
 	static_assert(MM_PTE_PER_PAGE >= 1, "There must be at least one PTE.");
@@ -857,10 +848,8 @@ static bool mm_ptable_get_attrs_level(const struct mm_page_table *table,
 	while (begin < end) {
 		if (arch_mm_pte_is_table(*pte, level)) {
 			if (!mm_ptable_get_attrs_level(
-				    mm_page_table_from_pa(
-					    arch_mm_table_from_pte(*pte,
-								   level)),
-				    begin, end, level - 1, got_attrs, attrs)) {
+				    arch_mm_table_from_pte(*pte, level), begin,
+				    end, level - 1, got_attrs, attrs)) {
 				return false;
 			}
 			got_attrs = true;

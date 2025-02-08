@@ -99,9 +99,9 @@ static inline bool arch_mm_pte_is_table(pte_t pte, mm_level_t level)
 paddr_t arch_mm_block_from_pte(pte_t pte, mm_level_t level);
 
 /**
- * Extracts the address of the table referenced by the PTE.
+ * Extracts the table referenced by the PTE.
  */
-paddr_t arch_mm_table_from_pte(pte_t pte, mm_level_t level);
+struct mm_page_table *arch_mm_table_from_pte(pte_t pte, mm_level_t level);
 
 /**
  * Extracts the attributes of the PTE.

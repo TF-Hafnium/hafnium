@@ -88,10 +88,10 @@ paddr_t arch_mm_block_from_pte(pte_t pte, mm_level_t level)
 	return pte_addr(pte, level);
 }
 
-paddr_t arch_mm_table_from_pte(pte_t pte, mm_level_t level)
+struct mm_page_table *arch_mm_table_from_pte(pte_t pte, mm_level_t level)
 {
 	assert(arch_mm_pte_is_table(pte, level));
-	return pte_addr(pte, level);
+	return ptr_from_pa(pte_addr(pte, level));
 }
 
 mm_attr_t arch_mm_pte_attrs(pte_t pte, mm_level_t level)
