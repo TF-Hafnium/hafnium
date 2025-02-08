@@ -96,10 +96,10 @@ bool arch_vm_mm_init(void)
 	return true;
 }
 
-void arch_vm_mm_enable(paddr_t table)
+void arch_vm_mm_enable(const struct mm_ptable *ptable)
 {
 	/* Configure translation management registers. */
-	write_msr(ttbr0_el1, pa_addr(table));
+	write_msr(ttbr0_el1, ptable->root_tables);
 	write_msr(mair_el1, mm_mair_el1);
 	write_msr(tcr_el1, mm_tcr_el1);
 

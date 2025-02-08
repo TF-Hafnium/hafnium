@@ -1067,7 +1067,7 @@ std::vector<std::span<pte_t, MM_PTE_PER_PAGE>> get_ptable(
 	const uint8_t root_table_count = arch_mm_stage2_root_table_count();
 	for (uint8_t i = 0; i < root_table_count; ++i) {
 		all.push_back(get_table(
-			pa_add(ptable.root, i * sizeof(struct mm_page_table))));
+			pa_init((uintpaddr_t)&ptable.root_tables[i])));
 	}
 	return all;
 }

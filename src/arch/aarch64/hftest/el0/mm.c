@@ -10,6 +10,8 @@
 
 #include "hf/arch/mm.h"
 
+#include "hf/mm.h"
+
 /**
  * MM support is not done at EL0.
  * Define dummy functions for EL0 targets.
@@ -19,9 +21,9 @@ bool arch_vm_mm_init(void)
 	return true;
 }
 
-void arch_vm_mm_enable(paddr_t table)
+void arch_vm_mm_enable(const struct mm_ptable *ptable)
 {
-	(void)table;
+	(void)ptable;
 }
 
 void arch_vm_mm_reset(void)

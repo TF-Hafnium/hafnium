@@ -65,7 +65,7 @@ bool hftest_mm_init(void)
 				(struct mm_flags){.stage1 = true})),
 			MM_MODE_R | MM_MODE_W | MM_MODE_X, &ppool);
 
-	arch_vm_mm_enable(ptable.root);
+	arch_vm_mm_enable(&ptable);
 
 	return true;
 }
@@ -95,5 +95,5 @@ void hftest_mm_identity_map(const void *base, size_t size, mm_mode_t mode)
 
 void hftest_mm_vcpu_init(void)
 {
-	arch_vm_mm_enable(ptable.root);
+	arch_vm_mm_enable(&ptable);
 }

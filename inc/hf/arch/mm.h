@@ -186,7 +186,7 @@ mm_mode_t arch_mm_stage1_attrs_to_mode(mm_attr_t attrs);
 /**
  * Initializes the arch specific memory management.
  */
-bool arch_mm_init(paddr_t table);
+bool arch_mm_init(const struct mm_ptable *ptable);
 
 /**
  * Return the arch specific mm mode for send/recv pages of given VM ID.

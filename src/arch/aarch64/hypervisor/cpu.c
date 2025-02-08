@@ -15,6 +15,7 @@
 #include "hf/arch/gicv3.h"
 #include "hf/arch/host_timer.h"
 #include "hf/arch/plat/psci.h"
+#include "hf/arch/types.h"
 
 #include "hf/addr.h"
 #include "hf/check.h"
@@ -104,7 +105,7 @@ void arch_regs_reset(struct vcpu *vcpu)
 	bool is_primary = vm_is_primary(vcpu->vm);
 	cpu_id_t vcpu_id = is_primary ? vcpu->cpu->id : vcpu_index(vcpu);
 
-	paddr_t table = vcpu->vm->ptable.root;
+	paddr_t table = pa_init((uintpaddr_t)vcpu->vm->ptable.root_tables);
 	struct arch_regs *r = &vcpu->regs;
 	uintreg_t pc = r->pc;
 	uintreg_t arg = r->r[0];
@@ -177,8 +178,9 @@ void arch_regs_reset(struct vcpu *vcpu)
 		 * vttbr_el2 points to the NS S2 root PT.
 		 * vsttbr_el2 points to secure S2 root PT.
 		 */
-		r->lazy.vttbr_el2 = pa_addr(vcpu->vm->arch.ptable_ns.root) |
-				    ((uint64_t)vm_id << 48);
+		r->lazy.vttbr_el2 =
+			(uintpaddr_t)(vcpu->vm->arch.ptable_ns.root_tables) |
+			((uint64_t)vm_id << 48);
 		r->lazy.vstcr_el2 = arch_mm_get_vstcr_el2();
 		r->lazy.vsttbr_el2 = pa_addr(table);
 #endif

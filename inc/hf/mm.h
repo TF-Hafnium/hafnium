@@ -132,8 +132,15 @@ struct mm_ptable {
 	 * the hypervisor.
 	 */
 	mm_asid_t id;
-	/** Address of the root of the page table. */
-	paddr_t root;
+	/**
+	 * Address of the root tables.
+	 * At stage 1, concatenated tables are not used, so there is only one
+	 * root table.
+	 * At stage 2, concatenated tables are used, so there are multiple root
+	 * tables (given by `arch_mm_root_table_count()`). The Arm ARM says
+	 * there can be up to 16 root tables, but we only use 4.
+	 */
+	struct mm_page_table *root_tables;
 };
 
 /** The type of addresses stored in the page table. */

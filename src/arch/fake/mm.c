@@ -186,10 +186,10 @@ bool arch_stack_mm_init(struct mm_stage1_locked stage1_locked,
 	return true;
 }
 
-bool arch_mm_init(paddr_t table)
+bool arch_mm_init(const struct mm_ptable *ptable)
 {
 	/* No initialization required. */
-	(void)table;
+	(void)ptable;
 	return true;
 }
 

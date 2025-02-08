@@ -215,18 +215,18 @@ ptable_addr_t mm_ptable_addr_space_end(struct mm_flags flags)
 bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id,
 		    struct mm_flags flags, struct mpool *ppool)
 {
-	struct mm_page_table *tables;
+	struct mm_page_table *root_tables;
 	uint8_t root_table_count = mm_root_table_count(flags);
 	mm_level_t root_level = mm_root_level(flags);
 
-	tables = mm_alloc_page_tables(root_table_count, ppool);
-	if (tables == NULL) {
+	root_tables = mm_alloc_page_tables(root_table_count, ppool);
+	if (root_tables == NULL) {
 		return false;
 	}
 
 	for (size_t i = 0; i < root_table_count; i++) {
 		for (size_t j = 0; j < MM_PTE_PER_PAGE; j++) {
-			tables[i].entries[j] =
+			root_tables[i].entries[j] =
 				arch_mm_absent_pte(root_level - 1);
 		}
 	}
@@ -235,7 +235,7 @@ bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id,
 	 * TODO: halloc could return a virtual or physical address if mm not
 	 * enabled?
 	 */
-	ptable->root = pa_init((uintpaddr_t)tables);
+	ptable->root_tables = root_tables;
 	ptable->id = id;
 	return true;
 }
@@ -246,18 +246,18 @@ bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id,
 static void mm_ptable_fini(const struct mm_ptable *ptable,
 			   struct mm_flags flags, struct mpool *ppool)
 {
-	struct mm_page_table *tables = mm_page_table_from_pa(ptable->root);
+	struct mm_page_table *root_tables = ptable->root_tables;
 	mm_level_t root_level = mm_root_level(flags);
 	uint8_t root_table_count = mm_root_table_count(flags);
 
 	for (size_t i = 0; i < root_table_count; ++i) {
 		for (size_t j = 0; j < MM_PTE_PER_PAGE; ++j) {
-			mm_free_page_pte(tables[i].entries[j], root_level - 1,
-					 ppool);
+			mm_free_page_pte(root_tables[i].entries[j],
+					 root_level - 1, ppool);
 		}
 	}
 
-	mpool_add_chunk(ppool, tables,
+	mpool_add_chunk(ppool, root_tables,
 			sizeof(struct mm_page_table) * root_table_count);
 }
 
@@ -450,8 +450,8 @@ static bool mm_ptable_identity_map(struct mm_ptable *ptable, paddr_t pa_begin,
 	ptable_addr_t ptable_end = mm_ptable_addr_space_end(flags);
 	ptable_addr_t end = mm_round_up_to_page(pa_addr(pa_end));
 	ptable_addr_t begin = mm_round_down_to_page(pa_addr(pa_begin));
-	struct mm_page_table *root_table = &mm_page_table_from_pa(
-		ptable->root)[mm_index(begin, root_level)];
+	struct mm_page_table *root_table =
+		&ptable->root_tables[mm_index(begin, root_level)];
 
 	/*
 	 * Assert condition to communicate the API constraint of
@@ -650,7 +650,7 @@ static void mm_dump_entries(const pte_t *entries, mm_level_t level,
 static void mm_ptable_dump(const struct mm_ptable *ptable,
 			   struct mm_flags flags)
 {
-	struct mm_page_table *root_tables = mm_page_table_from_pa(ptable->root);
+	struct mm_page_table *root_tables = ptable->root_tables;
 	mm_level_t root_level = mm_root_level(flags);
 	uint8_t root_table_count = mm_root_table_count(flags);
 	uint32_t indent = 0;
@@ -806,7 +806,7 @@ static void mm_ptable_defrag_entry(struct mm_ptable *ptable,
 static void mm_ptable_defrag(struct mm_ptable *ptable, struct mm_flags flags,
 			     bool non_secure, struct mpool *ppool)
 {
-	struct mm_page_table *tables = mm_page_table_from_pa(ptable->root);
+	struct mm_page_table *root_tables = ptable->root_tables;
 	mm_level_t root_level = mm_root_level(flags);
 	uint8_t root_table_count = mm_root_table_count(flags);
 	ptable_addr_t block_addr = 0;
@@ -818,7 +818,7 @@ static void mm_ptable_defrag(struct mm_ptable *ptable, struct mm_flags flags,
 	for (size_t i = 0; i < root_table_count; ++i) {
 		for (size_t j = 0; j < MM_PTE_PER_PAGE; ++j) {
 			mm_ptable_defrag_entry(
-				ptable, block_addr, &(tables[i].entries[j]),
+				ptable, block_addr, &root_tables[i].entries[j],
 				root_level - 1, flags, non_secure, ppool);
 			block_addr = mm_start_of_next_block(block_addr,
 							    root_level - 1);
@@ -895,7 +895,7 @@ static bool mm_get_attrs(const struct mm_ptable *ptable, ptable_addr_t begin,
 {
 	mm_level_t root_level = mm_root_level(flags);
 	ptable_addr_t ptable_end = mm_ptable_addr_space_end(flags);
-	struct mm_page_table *table;
+	struct mm_page_table *root_table;
 	bool got_attrs = false;
 
 	begin = mm_round_down_to_page(begin);
@@ -906,10 +906,9 @@ static bool mm_get_attrs(const struct mm_ptable *ptable, ptable_addr_t begin,
 		return false;
 	}
 
-	table = &mm_page_table_from_pa(
-		ptable->root)[mm_index(begin, root_level)];
+	root_table = &ptable->root_tables[mm_index(begin, root_level)];
 	while (begin < end) {
-		if (!mm_ptable_get_attrs_level(table, begin, end,
+		if (!mm_ptable_get_attrs_level(root_table, begin, end,
 					       root_level - 1, got_attrs,
 					       attrs)) {
 			return false;
@@ -917,7 +916,7 @@ static bool mm_get_attrs(const struct mm_ptable *ptable, ptable_addr_t begin,
 
 		got_attrs = true;
 		begin = mm_start_of_next_block(begin, root_level);
-		table++;
+		root_table++;
 	}
 
 	return got_attrs;
@@ -1219,7 +1218,7 @@ bool mm_init(struct mpool *ppool)
 	}
 
 	/* Initialize arch_mm before calling below mapping routines */
-	if (!arch_mm_init(ptable.root)) {
+	if (!arch_mm_init(&ptable)) {
 		return false;
 	}
 

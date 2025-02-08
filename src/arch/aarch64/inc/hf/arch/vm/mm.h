@@ -11,7 +11,7 @@
 #include "hf/mm.h"
 
 bool arch_vm_mm_init(void);
-void arch_vm_mm_enable(paddr_t table);
+void arch_vm_mm_enable(const struct mm_ptable *ptable);
 
 /**
  * Reset MMU-related system registers. Must be called after arch_vm_mm_init().

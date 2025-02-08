@@ -13,6 +13,7 @@
 #include "hf/arch/mm.h"
 #include "hf/arch/mmu.h"
 #include "hf/arch/std.h"
+#include "hf/arch/types.h"
 
 #include "hf/check.h"
 #include "hf/dlog.h"
@@ -749,7 +750,7 @@ mm_attr_t arch_mm_combine_table_entry_attrs(mm_attr_t table_attrs,
 /**
  * This is called early in initialization without MMU or caches enabled.
  */
-bool arch_mm_init(paddr_t table)
+bool arch_mm_init(const struct mm_ptable *ptable)
 {
 	uint64_t mm_features = read_msr(id_aa64mmfr0_el1);
 	uint64_t pe_features = read_msr(id_aa64pfr0_el1);
@@ -831,7 +832,7 @@ bool arch_mm_init(paddr_t table)
 	}
 
 	arch_mm_config = (struct arch_mm_config){
-		.ttbr0_el2 = pa_addr(table),
+		.ttbr0_el2 = (uintpaddr_t)ptable->root_tables,
 
 		.vtcr_el2 = (1U << 31) |       /* RES1. */
 			    (nsa_nsw << 29) |  /* NSA/NSW. */

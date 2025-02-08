@@ -8,6 +8,8 @@
 
 #include "arm_smmuv3.h"
 
+#include "hf/arch/types.h"
+
 #include "hf/dlog.h"
 #include "hf/io.h"
 #include "hf/panic.h"
@@ -1281,14 +1283,14 @@ static bool smmuv3_config_ste_stg2(struct smmuv3_driver *smmuv3, uint16_t vm_id,
 	uint64_t vsttbr;
 
 	/* BITS 243:196 */
-	vttbr = (pa_addr(iommu_ptable_ns[dma_device_id].root) &
+	vttbr = ((uintpaddr_t)(iommu_ptable_ns[dma_device_id].root_tables) &
 		 GEN_MASK(51, 4)) >>
 		4;
 
 	/* BITS 435:388 */
-	vsttbr =
-		(pa_addr(iommu_ptable[dma_device_id].root) & GEN_MASK(51, 4)) >>
-		4;
+	vsttbr = ((uintpaddr_t)(iommu_ptable[dma_device_id].root_tables) &
+		  GEN_MASK(51, 4)) >>
+		 4;
 
 	/* STRW is S-EL2*/
 	ste_data[1] = COMPOSE(STW_SEL2, STE_STW_SHIFT, STE_STW_MASK);
@@ -1309,7 +1311,8 @@ static bool smmuv3_config_ste_stg2(struct smmuv3_driver *smmuv3, uint16_t vm_id,
 	(void)iommu_ptable_ns;
 
 	/* BITS 243:196 */
-	vttbr = (pa_addr(iommu_ptable[dma_device_id].root) & GEN_MASK(51, 4)) >>
+	vttbr = ((uintpaddr_t)(iommu_ptable[dma_device_id].root_tables) &
+		 GEN_MASK(51, 4)) >>
 		4;
 
 	/* STRW is EL2*/
