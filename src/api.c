@@ -3112,6 +3112,12 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 		goto out;
 	}
 
+	if (ffa_is_framework_msg(args) &&
+	    ffa_direct_msg_handle_framework_msg_resp(args, &ret, current_locked,
+						     next)) {
+		goto out;
+	}
+
 	if (api_ffa_is_managed_exit_ongoing(current_locked)) {
 		CHECK(current->scheduling_mode != SPMC_MODE);
 

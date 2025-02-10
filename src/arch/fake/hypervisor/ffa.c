@@ -651,3 +651,16 @@ bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
 
 	return false;
 }
+
+bool ffa_direct_msg_handle_framework_msg_resp(struct ffa_value args,
+					      struct ffa_value *ret,
+					      struct vcpu_locked current_locked,
+					      struct vcpu **next)
+{
+	(void)args;
+	(void)ret;
+	(void)current_locked;
+	(void)next;
+
+	return false;
+}

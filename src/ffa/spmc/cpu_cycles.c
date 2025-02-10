@@ -579,6 +579,26 @@ static bool ffa_cpu_cycles_check_rtm_ffa_dir_req(
 	struct vcpu_locked current_locked, struct vcpu_locked locked_vcpu,
 	ffa_id_t receiver_vm_id, uint32_t func, enum vcpu_state *next_state)
 {
+	/*
+	 * SPMC denies invocation if the SP's vCPU is processing a PSCI power
+	 * management operation.
+	 */
+	if (current_locked.vcpu->pwr_mgmt_op != PWR_MGMT_NONE) {
+		switch (func) {
+		case FFA_MSG_SEND_DIRECT_REQ_64:
+		case FFA_MSG_SEND_DIRECT_REQ_32:
+		case FFA_MSG_SEND_DIRECT_REQ2_64:
+		case FFA_RUN_32:
+		case FFA_YIELD_32:
+			dlog_verbose(
+				"State transition denied during power "
+				"management operation\n");
+			return false;
+		default:
+			break;
+		}
+	}
+
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:

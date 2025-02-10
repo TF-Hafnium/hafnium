@@ -582,3 +582,130 @@ bool ffa_direct_msg_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	return (vm_id >= EL3_SPMD_LP_ID_START && vm_id <= EL3_SPMD_LP_ID_END);
 }
+
+static struct ffa_value handle_sp_cpu_off_framework_resp(
+	struct ffa_value args, struct vcpu_locked current_locked,
+	struct vcpu **next)
+{
+	struct ffa_value ffa_ret;
+	struct ffa_value ret;
+	uint32_t psci_error_code;
+	struct vcpu *current = current_locked.vcpu;
+
+	/* A placeholder return code. */
+	ret = api_ffa_interrupt_return(0);
+
+	psci_error_code = (uint32_t)args.arg3;
+
+	/*
+	 * Section 18.2.4 of the FF-A v1.2 REL0 spec states that SPMC must
+	 * return DENIED to SPMD even if a single SP returns error to SPMC.
+	 * Upon receiving the DENIED status, SPMD (TF-A) will panic and reset
+	 * the system.
+	 */
+	if (psci_error_code != PSCI_RETURN_SUCCESS) {
+		ffa_ret = ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+						 FFA_FRAMEWORK_MSG_PSCI_RESP,
+						 PSCI_ERROR_DENIED);
+
+		*next = api_switch_to_vm(current_locked, ffa_ret,
+					 VCPU_STATE_OFF, HF_OTHER_WORLD_ID);
+
+		dlog_verbose(
+			"SP%#x denied CPU_OFF power management operation\n",
+			current->vm->id);
+		return ret;
+	}
+
+	/*
+	 * Reset fields tracking PSCI operation through framework message in
+	 * direct response.
+	 */
+	current->pwr_mgmt_op = PWR_MGMT_NONE;
+	vcpu_dir_req_reset_state(current_locked);
+
+	/* Turn off the vCPU.*/
+	current->state = VCPU_STATE_OFF;
+	dlog_verbose("SPMC turned off vCPU%zu of SP%#x\n",
+		     cpu_index(current->cpu), current->vm->id);
+
+	/*
+	 * No vCPU left that needs to be informed about power management
+	 * operation. Send SUCCESS as status code through direct response
+	 * framework message to SPMD.
+	 */
+	ffa_ret = psci_cpu_off_success_fwk_resp(current->cpu);
+
+	/*
+	 * The framework message is conveyed to SPMD(EL3) from SPMC. So the next
+	 * vCPU's VM id must match the other world VM id.
+	 */
+	*next = api_switch_to_vm(current_locked, ffa_ret, VCPU_STATE_OFF,
+				 HF_OTHER_WORLD_ID);
+
+	dlog_verbose("SPMC: Sent PSCI Success to SPMD\n");
+	return ret;
+}
+
+/**
+ * Handle direct response with PSCI framework message from SP.
+ */
+static struct ffa_value handle_psci_framework_msg_resp(
+	struct ffa_value args, struct vcpu_locked current_locked,
+	struct vcpu **next)
+{
+	struct ffa_value ret;
+	struct vcpu *current = current_locked.vcpu;
+
+	switch (current->pwr_mgmt_op) {
+	case PWR_MGMT_CPU_OFF:
+		return handle_sp_cpu_off_framework_resp(args, current_locked,
+							next);
+	default:
+		/*
+		 * At the moment, SPMC only supports informing Secure Partitions
+		 * about PSCI CPU_OFF operation. Consequently, it does not
+		 * expect to receive framework message through
+		 * FFA_FRAMEWORK_MSG_PSCI_RESP from the SP if the SP's vCPU is
+		 * not known to be processing PSCI CPU_OFF operation.
+		 */
+		dlog_error(
+			"Unexpected framework direct response message received "
+			"from SP%x\n",
+			current->vm->id);
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		return ret;
+	}
+}
+
+/**
+ * Handle framework message in a dierct response from an SP.
+ * Returns true if the framework message is completely handled.
+ * Else false if further handling is required.
+ */
+bool ffa_direct_msg_handle_framework_msg_resp(struct ffa_value args,
+					      struct ffa_value *ret,
+					      struct vcpu_locked current_locked,
+					      struct vcpu **next)
+{
+	enum ffa_framework_msg_func func = ffa_framework_msg_get_func(args);
+
+	switch (func) {
+	case FFA_FRAMEWORK_MSG_PSCI_RESP:
+		*ret = handle_psci_framework_msg_resp(args, current_locked,
+						      next);
+		return true;
+	case FFA_FRAMEWORK_MSG_VM_CREATION_RESP:
+	case FFA_FRAMEWORK_MSG_VM_DESTRUCTION_RESP:
+		return false;
+	default:
+		dlog_error(
+			"Unsupported framework message %x sent through direct "
+			"response by SP:%x\n",
+			(uint32_t)func, current_locked.vcpu->vm->id);
+		*ret = ffa_error(FFA_INVALID_PARAMETERS);
+		return true;
+	}
+
+	return false;
+}
