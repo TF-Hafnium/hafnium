@@ -1178,6 +1178,12 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
+	if (vm->partition.run_time_el == S_EL0 &&
+	    (vm->partition.sri_policy.intr_while_waiting ||
+	     vm->partition.sri_policy.intr_pending_entry_wait)) {
+		ret_code = MANIFEST_ERROR_SRI_POLICY_NOT_SUPPORTED;
+	}
+
 	return ret_code;
 }
 
@@ -1358,7 +1364,6 @@ enum manifest_return_code parse_ffa_manifest(
 	if (managed_exit_field_present) {
 		vm->partition.ns_interrupts_action = NS_ACTION_ME;
 	}
-
 	if (vm->partition.ns_interrupts_action != NS_ACTION_QUEUED &&
 	    vm->partition.ns_interrupts_action != NS_ACTION_ME &&
 	    vm->partition.ns_interrupts_action != NS_ACTION_SIGNALED) {
@@ -1386,6 +1391,28 @@ enum manifest_return_code parse_ffa_manifest(
 			      &vm->partition.me_signal_virq));
 		if (vm->partition.me_signal_virq) {
 			dlog_verbose("  Managed Exit signaled through vIRQ\n");
+		}
+	}
+
+	TRY(read_optional_uint8(&root, "sri-interrupts-policy", 0,
+				(uint8_t *)&vm->partition.sri_policy));
+
+	if (vm->partition.sri_policy.mbz != 0U) {
+		return MANIFEST_ERROR_ILLEGAL_SRI_POLICY;
+	}
+
+	dlog_verbose("  SRI Trigger Policy.\n");
+	if (!vm->partition.sri_policy.intr_while_waiting &&
+	    !vm->partition.sri_policy.intr_pending_entry_wait) {
+		dlog_verbose("    Not trigged in interrupt handling.\n");
+	} else {
+		if (vm->partition.sri_policy.intr_while_waiting) {
+			dlog_verbose("    On interrupts while waiting.\n");
+		}
+		if (vm->partition.sri_policy.intr_pending_entry_wait) {
+			dlog_verbose(
+				"    On entry to wait while interrupts "
+				"pending.\n");
 		}
 	}
 
@@ -1775,8 +1802,12 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_INTERRUPT_ID_REPEATED:
 		return "Interrupt ID already assigned to another endpoint";
 	case MANIFEST_ERROR_ILLEGAL_NS_INT_ACTION:
-		return "Illegal value specidied for the field: Action in "
+		return "Illegal value specified for the field: Action in "
 		       "response to NS Interrupt";
+	case MANIFEST_ERROR_ILLEGAL_SRI_POLICY:
+		return "Illegal value specified for the field: SRI Policy";
+	case MANIFEST_ERROR_SRI_POLICY_NOT_SUPPORTED:
+		return "S-EL0 Partitions do not support the SRI trigger policy";
 	case MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST:
 		return "Interrupt ID is not in the list of interrupts";
 	case MANIFEST_ERROR_ILLEGAL_OTHER_S_INT_ACTION:

@@ -55,6 +55,27 @@ enum execution_state { AARCH64 = 0, AARCH32 };
 
 enum xlat_granule { PAGE_4KB = 0, PAGE_16KB, PAGE_64KB };
 
+struct sri_interrupts_policy {
+	/**
+	 * When the partition is in waiting state at the moment one
+	 * of its interrupts fires, the SPMC will trigger an SRI
+	 * to the scheduler to explicitly provide CPU cycles, such that
+	 * the interrupt can be handled.
+	 */
+	bool intr_while_waiting : 1;
+
+	/**
+	 * If the SP is trying to go into a waiting state and it has
+	 * pending interrupts, leave interrupts pended and trigger
+	 * SRI to the scheduler of the system to explicitly provide
+	 * CPU cycles at a later instance, such that the interrupt
+	 * can be handled.
+	 */
+	bool intr_pending_entry_wait : 1;
+
+	uint8_t mbz : 6;
+};
+
 /**
  * Properties of the DMA capable device upstream of an SMMU as specified in the
  * memory region description of the partition manifest.
@@ -209,6 +230,10 @@ struct ffa_partition_manifest {
 	bool me_signal_virq;
 	/** optional - receipt of notifications. */
 	bool notification_support;
+
+	/** optional - request the scheduler cycles to handle interrupts. */
+	struct sri_interrupts_policy sri_policy;
+
 	/**
 	 * optional - VM availability messages bitfield.
 	 */

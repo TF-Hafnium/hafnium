@@ -2189,6 +2189,56 @@ TEST_F(manifest, ffa_invalid_interrupt_target_manifest)
 		  MANIFEST_ERROR_INTERRUPT_ID_NOT_IN_LIST);
 }
 
+TEST_F(manifest, sri_policy)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.Property("sri-interrupts-policy", "<0x0>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.Property("sri-interrupts-policy", "<0x1>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.Property("sri-interrupts-policy", "<0x2>")
+		.Build();
+	/* clang-format on */
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.Property("sri-interrupts-policy", "<0x3>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.Property("sri-interrupts-policy", "<0xF>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_ILLEGAL_SRI_POLICY);
+}
+
 TEST_F(manifest, ffa_boot_order_not_unique)
 {
 	struct_manifest *m;
