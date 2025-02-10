@@ -941,15 +941,24 @@ static inline uint32_t ffa_feature_intid(struct ffa_value args)
 #define FFA_FRAMEWORK_MSG_FUNC_MASK UINT64_C(0xFF)
 
 /**
- * Identifies the VM availability message. See section 18.3 of v1.2 FF-A
+ * Identifies FF-A framework messages. See sections 18.2 and 18.3 of v1.2 FF-A
  * specification.
  */
 enum ffa_framework_msg_func {
+	/* Power management framework messages. */
+	FFA_FRAMEWORK_MSG_PSCI_REQ = 0,
+	FFA_FRAMEWORK_MSG_PSCI_RESP = 2,
+
+	/* The VM availability messages. */
 	FFA_FRAMEWORK_MSG_VM_CREATION_REQ = 4,
 	FFA_FRAMEWORK_MSG_VM_CREATION_RESP = 5,
-
 	FFA_FRAMEWORK_MSG_VM_DESTRUCTION_REQ = 6,
 	FFA_FRAMEWORK_MSG_VM_DESTRUCTION_RESP = 7,
+
+	SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ = 8,
+	SPMD_FRAMEWORK_MSG_FFA_VERSION_RESP = 9,
+
+	FFA_FRAMEWORK_MSG_INVALID = 0xFF,
 };
 
 #define FFA_VM_AVAILABILITY_MESSAGE_SBZ_LO 16

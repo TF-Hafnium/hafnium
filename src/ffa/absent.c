@@ -577,10 +577,14 @@ void ffa_vm_free_resources(struct vm_locked vm_locked)
 }
 
 bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
-					 struct ffa_value *ret)
+					 struct ffa_value *ret,
+					 struct vcpu *current,
+					 struct vcpu **next)
 {
 	(void)args;
 	(void)ret;
+	(void)current;
+	(void)next;
 
 	return false;
 }

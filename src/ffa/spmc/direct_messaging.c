@@ -9,11 +9,15 @@
 #include "hf/ffa/direct_messaging.h"
 
 #include "hf/arch/gicv3.h"
+#include "hf/arch/host_timer.h"
 
+#include "hf/api.h"
 #include "hf/bits.h"
 #include "hf/ffa/interrupts.h"
 #include "hf/ffa_internal.h"
 #include "hf/plat/interrupts.h"
+
+#include "psci.h"
 
 bool ffa_direct_msg_is_direct_request_valid(struct vcpu *current,
 					    ffa_id_t sender_vm_id,
@@ -286,12 +290,155 @@ out:
 	return ret;
 }
 
+void spmc_exit_to_nwd(struct vcpu *owd_vcpu)
+{
+	struct vcpu *deadline_vcpu =
+		timer_find_vcpu_nearest_deadline(owd_vcpu->cpu);
+
+	/*
+	 * SPMC tracks a vCPU's timer deadline through its host timer such that
+	 * it can bring back execution from normal world to signal the timer
+	 * virtual interrupt to the SP's vCPU.
+	 */
+	if (deadline_vcpu != NULL) {
+		host_timer_track_deadline(&deadline_vcpu->regs.arch_timer);
+	}
+}
+
+/*
+ * TODO: the power management event reached the SPMC. In a later iteration, the
+ * power management event can be passed to the SP by resuming it.
+ */
+static struct ffa_value handle_psci_framework_msg(struct ffa_value args,
+						  struct vcpu *current,
+						  struct vcpu **next)
+{
+	(void)next;
+	enum psci_return_code psci_msg_response;
+	uint64_t psci_func = args.arg3;
+
+	switch (psci_func) {
+	case PSCI_CPU_OFF: {
+		/*
+		 * Mark all the vCPUs pinned on this CPU as OFF. Note that the
+		 * vCPU of an UP SP is not turned off since SPMC can migrate it
+		 * to an online CPU when needed.
+		 */
+		for (ffa_vm_count_t index = 0; index < vm_get_count();
+		     ++index) {
+			struct vm *vm = vm_find_index(index);
+
+			if (vm->vcpu_count > 1) {
+				struct vcpu *vcpu;
+				struct vcpu_locked vcpu_locked;
+
+				vcpu = vm_get_vcpu(vm, cpu_index(current->cpu));
+				vcpu_locked = vcpu_lock(vcpu);
+				vcpu->state = VCPU_STATE_OFF;
+				vcpu_unlock(&vcpu_locked);
+				dlog_verbose("SP%u turned OFF on CPU%zu\n",
+					     vm->id, cpu_index(current->cpu));
+			}
+		}
+
+		/*
+		 * Mark the CPU as turned off and reset the field tracking if
+		 * all the pinned vCPUs have been booted on this CPU.
+		 */
+		cpu_off(current->cpu);
+		current->cpu->last_sp_initialized = false;
+		psci_msg_response = PSCI_RETURN_SUCCESS;
+
+		break;
+	}
+	default:
+		dlog_error(
+			"FF-A PSCI framework message not handled "
+			"%#lx %#lx %#lx %#lx\n",
+			args.func, args.arg1, args.arg2, args.arg3);
+		psci_msg_response = PSCI_ERROR_NOT_SUPPORTED;
+	}
+
+	return ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+				      FFA_FRAMEWORK_MSG_PSCI_RESP,
+				      psci_msg_response);
+}
+
 /**
- * Handle framework messages: in particular, check VM availability messages are
- * valid.
+ * Handle special direct messages from SPMD to SPMC.
+ */
+static void handle_spmd_to_spmc_framework_msg(struct ffa_value args,
+					      struct vcpu *current,
+					      struct ffa_value *ret,
+					      struct vcpu **next)
+{
+	ffa_id_t sender = ffa_sender(args);
+	ffa_id_t receiver = ffa_receiver(args);
+	ffa_id_t current_vm_id = current->vm->id;
+	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+
+	assert(ffa_is_framework_msg(args));
+
+	/*
+	 * Check if direct message request is originating from the SPMD,
+	 * directed to the SPMC and the message is a framework message.
+	 */
+	if (!(sender == HF_SPMD_VM_ID && receiver == HF_SPMC_VM_ID &&
+	      current_vm_id == HF_OTHER_WORLD_ID)) {
+		dlog_verbose(
+			"Power Management message: Invalid Sender ID: %#x or "
+			"Receiver ID: %#x\n",
+			sender, receiver);
+		*ret = ffa_error(FFA_INVALID_PARAMETERS);
+		return;
+	}
+
+	/*
+	 * The framework message is conveyed by EL3/SPMD to SPMC so the
+	 * current VM id must match to the other world VM id.
+	 */
+	CHECK(current->vm->id == HF_HYPERVISOR_VM_ID);
+
+	switch (func) {
+	case FFA_FRAMEWORK_MSG_PSCI_REQ: {
+		*ret = handle_psci_framework_msg(args, current, next);
+		return;
+	}
+	case SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ: {
+		struct ffa_value version_ret =
+			api_ffa_version(current, args.arg3);
+		*ret = ffa_framework_msg_resp(
+			HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+			SPMD_FRAMEWORK_MSG_FFA_VERSION_RESP, version_ret.func);
+		return;
+	}
+	default:
+		dlog_error("FF-A framework message not handled %#lx\n",
+			   args.arg2);
+
+		/*
+		 * TODO: the framework message that was conveyed by a direct
+		 * request is not handled although we still want to complete
+		 * by a direct response. However, there is no defined error
+		 * response to state that the message couldn't be handled.
+		 * An alternative would be to return FFA_ERROR.
+		 */
+		*ret = ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+					      func, 0);
+		return;
+	}
+}
+
+/**
+ * Handle framework messages related to VM availability, PSCI power management,
+ * and FF-A version discovery.
+ * Returns true if the framework message is handled.
+ * Else false if further handling is required.
  */
 bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
-					 struct ffa_value *ret)
+					 struct ffa_value *ret,
+					 struct vcpu *current,
+					 struct vcpu **next)
 {
 	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
 
@@ -303,8 +450,16 @@ bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
 			return true;
 		}
 		break;
+	case FFA_FRAMEWORK_MSG_PSCI_REQ:
+	case SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ:
+		handle_spmd_to_spmc_framework_msg(args, current, ret, next);
+		return true;
 	default:
-		break;
+		dlog_verbose(
+			"Unknown function ID specified with framework "
+			"message\n");
+		*ret = ffa_error(FFA_INVALID_PARAMETERS);
+		return true;
 	}
 
 	return false;

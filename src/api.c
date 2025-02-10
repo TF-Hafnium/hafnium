@@ -2797,7 +2797,7 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 	}
 
 	if (ffa_is_framework_msg(args) &&
-	    ffa_direct_msg_handle_framework_msg(args, &ret)) {
+	    ffa_direct_msg_handle_framework_msg(args, &ret, current, next)) {
 		return ret;
 	}
 

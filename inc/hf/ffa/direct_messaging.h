@@ -37,7 +37,9 @@ void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	struct vcpu_locked current_locked, struct vcpu_locked next_locked);
 
 bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
-					 struct ffa_value *ret);
+					 struct ffa_value *ret,
+					 struct vcpu *current,
+					 struct vcpu **next);
 
 bool ffa_direct_msg_precedes_in_call_chain(struct vcpu_locked current_locked,
 					   struct vcpu_locked target_locked);
