@@ -317,16 +317,6 @@ static void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
 {
 	struct interrupts *interrupts = &(vcpu_locked.vcpu->interrupts);
 
-	/* Clear any specifics for the current intid. */
-	switch (intid) {
-	case HF_IPI_INTID:
-		vcpu_ipi_clear_info_get_retrieved(vcpu_locked);
-		break;
-	default:
-		/* Do no additional work. */
-		break;
-	}
-
 	/*
 	 * Mark the virtual interrupt as no longer pending and decrement
 	 * the interrupt count if it is enabled.
@@ -582,6 +572,15 @@ uint32_t vcpu_virt_interrupt_get_pending_and_enabled(
 	if (vint_id != HF_INVALID_INTID) {
 		vcpu_interrupt_queue_pop(vcpu_locked);
 		vcpu_interrupt_clear_decrement(vcpu_locked, vint_id);
+
+		/*
+		 * Resetting the state of the interrupts_info_get_retrieved,
+		 * so the interrupts pending in the vCPU can be included in the
+		 * FFA_NOTIFICATION_INFO_GET list.
+		 * Resetting now as this functions clears the state of the
+		 * virtual interrupt.
+		 */
+		vcpu_locked.vcpu->interrupts_info_get_retrieved = false;
 	}
 
 	return vint_id;

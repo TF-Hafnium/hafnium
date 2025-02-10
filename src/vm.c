@@ -927,53 +927,58 @@ static bool vm_notifications_state_info_get(
 }
 
 /**
- * Check if the vcpu has a pending IPI that hasn't been retrieved.
- * If so try add it to the notification info list.
+ * Insert partition information and vCPU ID in the return to notification
+ * information, if the vCPU has pending interrupts that need explicit CPU
+ * cycles from the scheduler to the partition.
+ *
+ * This can be if:
+ * - Partition has configured in the partition manifest an SRI policy, and
+ *   it is in the waiting state.
+ * - If it has pending IPIs, and it is in the waiting state.
+ *
  * Returns true if successfully added to the list.
  */
-static bool vm_ipi_state_info_get(
+static void vm_interrupts_info_get(
 	struct vcpu *vcpu, ffa_id_t vm_id, ffa_vcpu_index_t vcpu_id,
 	uint16_t *ids, uint32_t *ids_count, uint32_t *lists_sizes,
 	uint32_t *lists_count, const uint32_t ids_max_count,
 	enum notifications_info_get_state *info_get_state, bool per_vcpu_added)
+
 {
-	bool ret = true;
-	bool pending_not_retrieved;
 	struct vcpu_locked vcpu_locked = vcpu_lock(vcpu);
-	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
-
-	pending_not_retrieved =
-		vcpu_is_virt_interrupt_pending(interrupts, HF_IPI_INTID) &&
-		!vcpu_ipi_is_info_get_retrieved(vcpu_locked);
+	struct vm *vm = vcpu->vm;
+	bool sri_interrupts_policy_configured =
+		vm->sri_policy.intr_while_waiting ||
+		vm->sri_policy.intr_pending_entry_wait;
 
 	/*
-	 * No notifications pending that haven't been retrieved or the vCPU is
-	 * not in the waiting state. Only report waiting vCPUs as this is the
-	 * only state that needs explicit cycles donated from the NWd.
+	 * If the information about interrupts in the current vCPU has been
+	 * retrieved or there are no pending interrupts, skip inserting an
+	 * element in the list.
 	 */
-	if (!pending_not_retrieved || vcpu->state != VCPU_STATE_WAITING) {
-		ret = false;
+	if (vcpu->interrupts_info_get_retrieved ||
+	    vcpu_virt_interrupt_count_get(vcpu_locked) == 0U) {
 		goto out;
 	}
 
 	/*
-	 * If the per vCPU notification was added to the list we do not need
-	 * to add it again for the IPI.
+	 * Report for any interrupt that is pending if partition is in the
+	 * waiting state, and either:
+	 * - The target partition is configured with an SRI policy.
+	 * - There are pending IPI and the SP in the waiting state.
 	 */
-	if (!per_vcpu_added &&
-	    !vm_insert_notification_info_list(
-		    vm_id, true, vcpu_id, ids, ids_count, lists_sizes,
-		    lists_count, ids_max_count, info_get_state)) {
-		ret = false;
-		goto out;
+	if (vcpu->state == VCPU_STATE_WAITING &&
+	    (sri_interrupts_policy_configured ||
+	     vcpu_is_virt_interrupt_pending(&vcpu->interrupts, HF_IPI_INTID))) {
+		if (per_vcpu_added ||
+		    vm_insert_notification_info_list(
+			    vm_id, true, vcpu_id, ids, ids_count, lists_sizes,
+			    lists_count, ids_max_count, info_get_state)) {
+			vcpu->interrupts_info_get_retrieved = true;
+		}
 	}
-
-	vcpu_ipi_set_info_get_retrieved(vcpu_locked);
-
 out:
 	vcpu_unlock(&vcpu_locked);
-
-	return ret;
 }
 
 /**
@@ -1013,10 +1018,10 @@ void vm_notifications_info_get_pending(
 		 * current virtual FF-A instance.
 		 */
 		if (vm_id_is_current_world(vm_locked.vm->id)) {
-			vm_ipi_state_info_get(vcpu, vm_locked.vm->id, i, ids,
-					      ids_count, lists_sizes,
-					      lists_count, ids_max_count,
-					      info_get_state, per_vcpu_added);
+			vm_interrupts_info_get(vcpu, vm_locked.vm->id, i, ids,
+					       ids_count, lists_sizes,
+					       lists_count, ids_max_count,
+					       info_get_state, per_vcpu_added);
 		}
 	}
 }
@@ -1050,8 +1055,8 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 
 	/*
 	 * State transitions to FULL when trying to insert a new ID in the
-	 * list and there is not more space. This means there are notifications
-	 * pending, whose info is not retrieved.
+	 * list and there is not more space. This means there are
+	 * notifications pending, whose info is not retrieved.
 	 */
 	return current_state == FULL;
 }

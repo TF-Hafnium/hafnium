@@ -852,6 +852,7 @@ TEST_F(vm, vm_notifications_info_get_ipi)
 
 	vcpu_locked = vcpu_lock(target_vcpu);
 	vcpu_virt_interrupt_inject(vcpu_locked, HF_IPI_INTID);
+	vcpu_virt_interrupt_enable(vcpu_locked, HF_IPI_INTID, true);
 	vcpu_unlock(&vcpu_locked);
 
 	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
@@ -874,7 +875,7 @@ TEST_F(vm, vm_notifications_info_get_ipi)
 	EXPECT_EQ(lists_sizes[0], 1);
 	EXPECT_EQ(ids[0], current_vm->id);
 	EXPECT_EQ(ids[1], 1);
-	EXPECT_EQ(target_vcpu->ipi_info_get_retrieved, true);
+	EXPECT_EQ(target_vcpu->interrupts_info_get_retrieved, true);
 
 	/* Check it is not retrieved multiple times. */
 	current_state = INIT;
@@ -891,6 +892,14 @@ TEST_F(vm, vm_notifications_info_get_ipi)
 	EXPECT_EQ(ids_count, 0);
 	EXPECT_EQ(lists_count, 0);
 	EXPECT_EQ(lists_sizes[0], 0);
+
+	vcpu_locked = vcpu_lock(target_vcpu);
+
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  HF_IPI_INTID);
+	EXPECT_FALSE(vcpu_locked.vcpu->interrupts_info_get_retrieved);
+
+	vcpu_unlock(&vcpu_locked);
 
 	vm_unlock(&current_vm_locked);
 }
@@ -920,6 +929,7 @@ TEST_F(vm, vm_notifications_info_get_ipi_with_per_vcpu)
 
 	vcpu_locked = vcpu_lock(target_vcpu);
 	vcpu_virt_interrupt_inject(vcpu_locked, HF_IPI_INTID);
+	vcpu_virt_interrupt_enable(vcpu_locked, HF_IPI_INTID, true);
 	vcpu_unlock(&vcpu_locked);
 
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
@@ -934,7 +944,7 @@ TEST_F(vm, vm_notifications_info_get_ipi_with_per_vcpu)
 	EXPECT_EQ(lists_sizes[0], 1);
 	EXPECT_EQ(ids[0], current_vm->id);
 	EXPECT_EQ(ids[1], 1);
-	EXPECT_EQ(target_vcpu->ipi_info_get_retrieved, true);
+	EXPECT_EQ(target_vcpu->interrupts_info_get_retrieved, true);
 
 	/* Reset the state and values. */
 	current_state = INIT;
@@ -951,6 +961,11 @@ TEST_F(vm, vm_notifications_info_get_ipi_with_per_vcpu)
 	EXPECT_EQ(ids_count, 0);
 	EXPECT_EQ(lists_count, 0);
 	EXPECT_EQ(lists_sizes[0], 0);
+
+	vcpu_locked = vcpu_lock(target_vcpu);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  HF_IPI_INTID);
+	vcpu_unlock(&vcpu_locked);
 
 	vm_unlock(&current_vm_locked);
 }
@@ -984,6 +999,7 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus_and_ipi)
 
 	vcpu_locked = vcpu_lock(target_vcpu);
 	vcpu_virt_interrupt_inject(vcpu_locked, HF_IPI_INTID);
+	vcpu_virt_interrupt_enable(vcpu_locked, HF_IPI_INTID, true);
 	vcpu_unlock(&vcpu_locked);
 
 	for (unsigned int i = 1; i < vcpu_count; i++) {
@@ -1014,6 +1030,80 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus_and_ipi)
 	EXPECT_EQ(ids[4], current_vm->id);
 	EXPECT_EQ(ids[5], 3);
 
+	vcpu_locked = vcpu_lock(target_vcpu);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  HF_IPI_INTID);
+	vcpu_unlock(&vcpu_locked);
+
 	vm_unlock(&current_vm_locked);
+}
+
+TEST_F(vm, pending_interrupts_info_retrieved)
+{
+	struct_vm *test_vm = vm_find_index(4);
+	struct_vcpu *vcpu = vm_get_vcpu(test_vm, 1);
+	const uint32_t intid = HF_NUM_INTIDS - 2;
+	struct vm_locked test_vm_locked;
+	struct vcpu_locked vcpu_locked;
+
+	/*
+	 *
+	 * Following set of variables that are also expected to be used when
+	 * handling ffa_notification_info_get.
+	 * For this 'ids_count' has been initialized such that it indicates
+	 * there is no space in the list for a per-vCPU notification (VM ID and
+	 * VCPU ID).
+	 */
+	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t ids_count = 0;
+	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint32_t lists_count = 0;
+	enum notifications_info_get_state current_state = INIT;
+
+	/*
+	 * Make it such the FF-A and vCPU ID are included in the list,
+	 * when invoking notification info get.
+	 */
+	test_vm->sri_policy.intr_while_waiting = true;
+
+	vcpu_locked = vcpu_lock(vcpu);
+
+	/* Check this is starting from a clean state. */
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
+	EXPECT_FALSE(vcpu->interrupts_info_get_retrieved);
+
+	/* Enable and get pending. */
+	vcpu_virt_interrupt_enable(vcpu_locked, intid, true);
+
+	vcpu_virt_interrupt_inject(vcpu_locked, intid);
+
+	vcpu->state = VCPU_STATE_WAITING;
+
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 1);
+
+	/* Free resource. */
+	vcpu_unlock(&vcpu_locked);
+
+	test_vm_locked = vm_lock(test_vm);
+
+	vm_notifications_info_get_pending(test_vm_locked, true, ids, &ids_count,
+					  lists_sizes, &lists_count,
+					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
+					  &current_state);
+
+	/* Assert the information flag as been retrieved. */
+	EXPECT_TRUE(vcpu->interrupts_info_get_retrieved);
+
+	vm_unlock(&test_vm_locked);
+
+	/*  Pop to clear test and attest intid is returned. */
+	vcpu_locked = vcpu_lock(vcpu);
+
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  intid);
+
+	EXPECT_FALSE(vcpu_locked.vcpu->interrupts_info_get_retrieved);
+
+	vcpu_unlock(&vcpu_locked);
 }
 } /* namespace */
