@@ -590,6 +590,7 @@ static struct ffa_value handle_sp_cpu_off_framework_resp(
 	struct ffa_value ffa_ret;
 	struct ffa_value ret;
 	uint32_t psci_error_code;
+	struct vm *next_vm;
 	struct vcpu *current = current_locked.vcpu;
 
 	/* A placeholder return code. */
@@ -628,6 +629,29 @@ static struct ffa_value handle_sp_cpu_off_framework_resp(
 	current->state = VCPU_STATE_OFF;
 	dlog_verbose("SPMC turned off vCPU%zu of SP%#x\n",
 		     cpu_index(current->cpu), current->vm->id);
+
+	/*
+	 * Find the next SP's vCPU which shall receive the power management
+	 * CPU_OFF broadcast request.
+	 */
+	next_vm = vm_get_next_boot(current->vm);
+
+	if (next_vm != NULL) {
+		struct vcpu *target_vcpu;
+
+		target_vcpu = find_next_vcpu_to_inform(next_vm, current->cpu);
+		if (target_vcpu != NULL) {
+			build_psci_off_frmk_msg(target_vcpu);
+
+			/*
+			 * Switch to this vCPU now to give it an opportunity to
+			 * process the PSCI operation.
+			 */
+			*next = target_vcpu;
+
+			return ret;
+		}
+	}
 
 	/*
 	 * No vCPU left that needs to be informed about power management
