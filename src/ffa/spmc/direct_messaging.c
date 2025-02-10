@@ -229,7 +229,7 @@ bool ffa_direct_msg_precedes_in_call_chain(struct vcpu_locked current_locked,
 static struct ffa_value check_vm_availability_message(struct ffa_value args)
 {
 	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
-	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+	enum ffa_framework_msg_func func = ffa_framework_msg_get_func(args);
 	ffa_id_t receiver_id = ffa_receiver(args);
 	struct vm_locked receiver = vm_find_locked(receiver_id);
 
@@ -306,6 +306,39 @@ void spmc_exit_to_nwd(struct vcpu *owd_vcpu)
 }
 
 /*
+ * Mark all the vCPUs pinned on this CPU as OFF. Note that the vCPU of an UP
+ * SP is not turned off since SPMC can migrate it to an online CPU when needed.
+ * Return direct response framework message with SUCCESS status code.
+ */
+static struct ffa_value psci_cpu_off_success_fwk_resp(struct cpu *cpu)
+{
+	dlog_verbose("send CPU_OFF success code to SPMD");
+	for (ffa_vm_count_t index = 0; index < vm_get_count(); ++index) {
+		struct vm *vm = vm_find_index(index);
+
+		if (vm_is_mp(vm)) {
+			struct vcpu *vcpu;
+
+			/* At this point, it is safe to mark the vCPU as OFF. */
+			vcpu = vm_get_vcpu(vm, cpu_index(cpu));
+			vcpu->state = VCPU_STATE_OFF;
+			dlog_verbose("SP%x turned OFF on CPU%zu\n", vm->id,
+				     cpu_index(cpu));
+		}
+	}
+
+	/*
+	 * Mark the CPU as turned off and reset the field tracking if
+	 * all the pinned vCPUs have been booted on this CPU.
+	 */
+	cpu_off(cpu);
+
+	return ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+				      FFA_FRAMEWORK_MSG_PSCI_RESP,
+				      PSCI_RETURN_SUCCESS);
+}
+
+/*
  * TODO: the power management event reached the SPMC. In a later iteration, the
  * power management event can be passed to the SP by resuming it.
  */
@@ -319,37 +352,7 @@ static struct ffa_value handle_psci_framework_msg(struct ffa_value args,
 
 	switch (psci_func) {
 	case PSCI_CPU_OFF: {
-		/*
-		 * Mark all the vCPUs pinned on this CPU as OFF. Note that the
-		 * vCPU of an UP SP is not turned off since SPMC can migrate it
-		 * to an online CPU when needed.
-		 */
-		for (ffa_vm_count_t index = 0; index < vm_get_count();
-		     ++index) {
-			struct vm *vm = vm_find_index(index);
-
-			if (vm->vcpu_count > 1) {
-				struct vcpu *vcpu;
-				struct vcpu_locked vcpu_locked;
-
-				vcpu = vm_get_vcpu(vm, cpu_index(current->cpu));
-				vcpu_locked = vcpu_lock(vcpu);
-				vcpu->state = VCPU_STATE_OFF;
-				vcpu_unlock(&vcpu_locked);
-				dlog_verbose("SP%u turned OFF on CPU%zu\n",
-					     vm->id, cpu_index(current->cpu));
-			}
-		}
-
-		/*
-		 * Mark the CPU as turned off and reset the field tracking if
-		 * all the pinned vCPUs have been booted on this CPU.
-		 */
-		cpu_off(current->cpu);
-		current->cpu->last_sp_initialized = false;
-		psci_msg_response = PSCI_RETURN_SUCCESS;
-
-		break;
+		return psci_cpu_off_success_fwk_resp(current->cpu);
 	}
 	default:
 		dlog_error(
@@ -375,7 +378,7 @@ static void handle_spmd_to_spmc_framework_msg(struct ffa_value args,
 	ffa_id_t sender = ffa_sender(args);
 	ffa_id_t receiver = ffa_receiver(args);
 	ffa_id_t current_vm_id = current->vm->id;
-	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+	enum ffa_framework_msg_func func = ffa_framework_msg_get_func(args);
 
 	assert(ffa_is_framework_msg(args));
 
@@ -440,7 +443,7 @@ bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
 					 struct vcpu *current,
 					 struct vcpu **next)
 {
-	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+	enum ffa_framework_msg_func func = ffa_framework_msg_get_func(args);
 
 	switch (func) {
 	case FFA_FRAMEWORK_MSG_VM_CREATION_REQ:

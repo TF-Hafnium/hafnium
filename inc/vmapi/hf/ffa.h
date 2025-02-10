@@ -988,7 +988,7 @@ static inline ffa_id_t ffa_vm_availability_message_vm_id(struct ffa_value args)
 }
 
 /** Get the function ID from a framework message */
-static inline uint32_t ffa_framework_msg_func(struct ffa_value args)
+static inline uint32_t ffa_framework_msg_get_func(struct ffa_value args)
 {
 	return ffa_framework_msg_flags(args) & FFA_FRAMEWORK_MSG_FUNC_MASK;
 }

@@ -173,6 +173,7 @@ void cpu_off(struct cpu *c)
 {
 	sl_lock(&c->lock);
 	c->is_on = false;
+	c->last_sp_initialized = false;
 	sl_unlock(&c->lock);
 }
 

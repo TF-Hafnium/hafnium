@@ -871,7 +871,8 @@ TEST_SERVICE(vm_availability_messaging)
 	struct ffa_value args = ffa_msg_wait();
 
 	for (;;) {
-		enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+		enum ffa_framework_msg_func func =
+			ffa_framework_msg_get_func(args);
 		ffa_id_t sender_id = ffa_sender(args);
 		ffa_id_t receiver_id = ffa_receiver(args);
 		ffa_id_t vm_id = ffa_vm_availability_message_vm_id(args);
@@ -915,7 +916,8 @@ TEST_SERVICE(vm_availability_messaging_send_from_sp)
 	struct ffa_value args = ffa_msg_wait();
 
 	for (;;) {
-		enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
+		enum ffa_framework_msg_func func =
+			ffa_framework_msg_get_func(args);
 		ffa_id_t sp_id = ffa_receiver(args);
 		ffa_id_t pvm_id = ffa_sender(args);
 		ffa_id_t vm_id = ffa_vm_availability_message_vm_id(args);
@@ -945,8 +947,8 @@ TEST_SERVICE(vm_availability_messaging_send_non_framework_from_sp)
 {
 	struct ffa_value args = ffa_msg_wait();
 	struct ffa_value ret;
-	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
-	enum ffa_framework_msg_func func_resp = func;
+	enum ffa_framework_msg_func func = ffa_framework_msg_get_func(args);
+	enum ffa_framework_msg_func func_resp = FFA_FRAMEWORK_MSG_INVALID;
 	ffa_id_t sp_id = ffa_receiver(args);
 	ffa_id_t pvm_id = ffa_sender(args);
 
