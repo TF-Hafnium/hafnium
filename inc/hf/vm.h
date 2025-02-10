@@ -240,6 +240,12 @@ struct vm {
 	uint8_t ns_interrupts_action;
 
 	/**
+	 * Whether the SRI is used for requesting CPU cycles for a partition to
+	 * handle interrupts.
+	 */
+	struct sri_interrupts_policy sri_policy;
+
+	/**
 	 * Action specified by a Partition through the manifest in response to
 	 * Other-S-Int.
 	 */

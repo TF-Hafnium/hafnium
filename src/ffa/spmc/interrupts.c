@@ -14,6 +14,7 @@
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/ffa/direct_messaging.h"
+#include "hf/ffa/notifications.h"
 #include "hf/ffa/vm.h"
 #include "hf/hf_ipi.h"
 #include "hf/vm.h"
@@ -260,8 +261,18 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt(
 	/* Secure interrupt signaling and queuing for SP. */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
-		next = interrupt_resume_waiting(current_locked,
-						target_vcpu_locked, v_intid);
+		if (!target_vcpu->vm->sri_policy.intr_while_waiting) {
+			next = interrupt_resume_waiting(
+				current_locked, target_vcpu_locked, v_intid);
+		} else {
+			dlog_verbose(
+				"%s: SP is waiting, SRI delayed due to "
+				"interrupt. Partition %x, vcpu %x, interrupt "
+				"%x\n",
+				__func__, target_vcpu->vm->id,
+				vcpu_index(target_vcpu), v_intid);
+			ffa_notifications_sri_set_delayed(target_vcpu->cpu);
+		}
 		break;
 	case VCPU_STATE_BLOCKED:
 		if (!target_vcpu->vm->el0_partition &&

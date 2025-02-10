@@ -256,6 +256,8 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 				ipa_init(manifest_vm->partition.load_addr);
 		}
 
+		vm_locked.vm->sri_policy = manifest_vm->partition.sri_policy;
+
 		/* Updating boot list according to boot_order */
 		vm_update_boot(vm_locked.vm);
 
