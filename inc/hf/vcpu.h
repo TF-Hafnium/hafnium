@@ -74,6 +74,13 @@ enum schedule_mode {
 	SPMC_MODE,
 };
 
+enum power_mgmt_operation {
+	PWR_MGMT_NONE = 0,
+	/** Power off the CPU. */
+	PWR_MGMT_CPU_OFF,
+	/** No other operations are supported at the moment. */
+};
+
 /*
  * This queue is implemented as a circular buffer. The entries are managed on
  * a First In First Out basis.
@@ -219,6 +226,12 @@ struct vcpu {
 	 * same pinned CPU.
 	 */
 	struct list_entry ipi_list_node;
+
+	/*
+	 * Denotes which power management operation message is being currently
+	 * handled by this vCPU.
+	 */
+	enum power_mgmt_operation pwr_mgmt_op;
 };
 
 /** Encapsulates a vCPU whose lock is held. */
@@ -313,3 +326,8 @@ void vcpu_virt_interrupt_inject(struct vcpu_locked vcpu_locked,
 				uint32_t vint_id);
 void vcpu_virt_interrupt_clear(struct vcpu_locked vcpu_locked,
 			       uint32_t vint_id);
+
+void vcpu_dir_req_set_state(struct vcpu_locked target_locked, bool is_ffa_req2,
+			    ffa_id_t sender_vm_id, struct ffa_value args);
+
+void vcpu_dir_req_reset_state(struct vcpu_locked vcpu_locked);

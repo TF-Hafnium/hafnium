@@ -305,6 +305,86 @@ void spmc_exit_to_nwd(struct vcpu *owd_vcpu)
 	}
 }
 
+void build_psci_off_frmk_msg(struct vcpu *target_vcpu)
+{
+	struct vcpu_locked target_locked;
+
+	/*
+	 * Build a Framework Direct Request message as described in the Table
+	 * 18.6 of the FF-A v1.2 REL0 specification.
+	 */
+	struct ffa_value args = {
+		/* Direct request message. */
+		.func = FFA_MSG_SEND_DIRECT_REQ_32,
+
+		/* Populate sender and receiver endpoint IDs. */
+		.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) | target_vcpu->vm->id,
+
+		/*
+		 * Message Flags: Framework message and Power management
+		 * operation.
+		 */
+		.arg2 = FFA_FRAMEWORK_MSG_BIT | FFA_FRAMEWORK_MSG_PSCI_REQ,
+
+		/* PSCI function. */
+		.arg3 = (uint64_t)PSCI_CPU_OFF,
+
+		/*
+		 * SPMC does not populate the rest of the parameters for PSCI
+		 * function propagated to the target SP.
+		 */
+	};
+
+	target_locked = vcpu_lock(target_vcpu);
+	vcpu_dir_req_set_state(target_locked, false, HF_SPMC_VM_ID, args);
+	target_vcpu->pwr_mgmt_op = PWR_MGMT_CPU_OFF;
+
+	/*
+	 * The SP's vCPU runs in SPMC scheduled mode under FFA_DIR_MSG_REQ
+	 * partition runtime model.
+	 */
+	target_vcpu->scheduling_mode = SPMC_MODE;
+	target_vcpu->rt_model = RTM_FFA_DIR_REQ;
+
+	vcpu_unlock(&target_locked);
+}
+
+/*
+ * Find the next vCPU of an SP that has subscribed to power management message,
+ * and is in WAITING state.
+ */
+static struct vcpu *find_next_vcpu_to_inform(struct vm *next_vm,
+					     struct cpu *cpu)
+{
+	struct vm *vm = next_vm;
+	struct vcpu *vcpu = NULL;
+
+	while (vm != NULL) {
+		/*
+		 * Inform the MP SP about the power management operation
+		 * only if it subscribed to it explicitly.
+		 */
+		if (!vm_is_up(vm) &&
+		    vm_power_management_cpu_off_requested(vm)) {
+			vcpu = vm_get_vcpu(vm, cpu_index(cpu));
+			/*
+			 * The partition's execution context must be in WAITING
+			 * state to receive a fresh direct request message.
+			 */
+			if (vcpu->state == VCPU_STATE_WAITING) {
+				dlog_verbose(
+					"Found SP subscribed to PSCI CPU_OFF "
+					"message: %x\n",
+					vcpu->vm->id);
+				break;
+			}
+		}
+		vm = vm_get_next_boot(vm);
+	}
+
+	return vcpu;
+}
+
 /*
  * Mark all the vCPUs pinned on this CPU as OFF. Note that the vCPU of an UP
  * SP is not turned off since SPMC can migrate it to an online CPU when needed.
@@ -339,19 +419,49 @@ static struct ffa_value psci_cpu_off_success_fwk_resp(struct cpu *cpu)
 }
 
 /*
- * TODO: the power management event reached the SPMC. In a later iteration, the
- * power management event can be passed to the SP by resuming it.
+ * The power management event reached the SPMC. The power management event can
+ * be passed to an SP by resuming it provided the SP subscribes to the message
+ * through its partition manifest.
  */
 static struct ffa_value handle_psci_framework_msg(struct ffa_value args,
 						  struct vcpu *current,
 						  struct vcpu **next)
 {
-	(void)next;
 	enum psci_return_code psci_msg_response;
 	uint64_t psci_func = args.arg3;
 
 	switch (psci_func) {
 	case PSCI_CPU_OFF: {
+		struct vm *vm = vm_get_boot_vm();
+		struct vcpu *target_vcpu =
+			find_next_vcpu_to_inform(vm, current->cpu);
+
+		/*
+		 * Mask all secure interrupts to make sure SPs are not
+		 * interrupted while handling power management message. Note
+		 * that there is no need to unmask later since the CPU is
+		 * eventually shut down.
+		 */
+		plat_interrupts_set_priority_mask(SWD_MASK_ALL_INT);
+
+		if (target_vcpu != NULL) {
+			build_psci_off_frmk_msg(target_vcpu);
+
+			/*
+			 * Switch to this vCPU now to give it an opportunity to
+			 * process the PSCI operation.
+			 */
+			*next = target_vcpu;
+
+			/* A placeholder return code. */
+			return api_ffa_interrupt_return(0);
+		}
+
+		/*
+		 * No pinned vCPU is ready to receive PSCI CPU_OFF msg. Hence,
+		 * send SUCCESS status code to SPMD through direct response
+		 * framework message.
+		 */
 		return psci_cpu_off_success_fwk_resp(current->cpu);
 	}
 	default:

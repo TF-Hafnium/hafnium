@@ -642,3 +642,38 @@ void vcpu_virt_interrupt_clear(struct vcpu_locked vcpu_locked, uint32_t vint_id)
 		}
 	}
 }
+
+/**
+ * Prepare the target vCPU to run after receiving direct request ABI.
+ */
+void vcpu_dir_req_set_state(struct vcpu_locked target_locked, bool is_ffa_req2,
+			    ffa_id_t sender_vm_id, struct ffa_value args)
+{
+	struct vcpu *target_vcpu = target_locked.vcpu;
+
+	target_vcpu->state = VCPU_STATE_RUNNING;
+	target_vcpu->regs_available = false;
+	target_vcpu->direct_request_origin.is_ffa_req2 = is_ffa_req2;
+	target_vcpu->direct_request_origin.vm_id = sender_vm_id;
+	target_vcpu->direct_request_origin.is_framework =
+		ffa_is_framework_msg(args);
+
+	arch_regs_set_retval(&target_vcpu->regs, args);
+}
+
+/**
+ * Clear direct request origin vm_id and request type for the target vCPU.
+ * Also, the scheduling mode and partition runtime model are reset.
+ */
+void vcpu_dir_req_reset_state(struct vcpu_locked vcpu_locked)
+{
+	struct vcpu *vcpu = vcpu_locked.vcpu;
+
+	/* Clear direct request origin vm_id and request type. */
+	vcpu->direct_request_origin.vm_id = HF_INVALID_VM_ID;
+	vcpu->direct_request_origin.is_framework = false;
+
+	/* Reset runtime model and scheduling mode. */
+	vcpu->scheduling_mode = NONE;
+	vcpu->rt_model = RTM_NONE;
+}

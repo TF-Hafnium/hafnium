@@ -2918,15 +2918,9 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 
 	/* The receiver vCPU runs upon direct message invocation */
 	receiver_vcpu->cpu = current->cpu;
-	receiver_vcpu->state = VCPU_STATE_RUNNING;
-	receiver_vcpu->regs_available = false;
-	receiver_vcpu->direct_request_origin.is_ffa_req2 =
-		(args.func == FFA_MSG_SEND_DIRECT_REQ2_64);
-	receiver_vcpu->direct_request_origin.vm_id = sender_vm_id;
-	receiver_vcpu->direct_request_origin.is_framework =
-		ffa_is_framework_msg(args);
-
-	arch_regs_set_retval(&receiver_vcpu->regs, api_ffa_dir_msg_value(args));
+	vcpu_dir_req_set_state(receiver_vcpu_locked,
+			       (args.func == FFA_MSG_SEND_DIRECT_REQ2_64),
+			       sender_vm_id, api_ffa_dir_msg_value(args));
 
 	assert(!vm_id_is_current_world(current->vm->id) ||
 	       next_state == VCPU_STATE_BLOCKED);
