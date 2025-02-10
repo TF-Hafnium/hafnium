@@ -11,13 +11,12 @@
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/ffa.h"
+#include "hf/ffa/direct_messaging.h"
 #include "hf/ffa/interrupts.h"
 #include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
 #include "hf/plat/interrupts.h"
 #include "hf/vm.h"
-
-void plat_ffa_vcpu_allow_interrupts(struct vcpu *current);
 
 bool ffa_cpu_cycles_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 				struct ffa_value *ret)
@@ -250,7 +249,7 @@ static struct ffa_value plat_ffa_preempted_vcpu_resume(
 	vcpu_unlock(&target_locked);
 
 	/* Restore interrupt priority mask. */
-	plat_ffa_vcpu_allow_interrupts(current);
+	ffa_interrupts_unmask(current);
 
 	/* The pre-empted vCPU should be run. */
 	*next = target_vcpu;
@@ -424,7 +423,7 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 		 * allow the interrupts(if they were masked earlier) before
 		 * returning control to NWd.
 		 */
-		plat_ffa_vcpu_allow_interrupts(current);
+		ffa_interrupts_unmask(current);
 		break;
 	case RTM_FFA_RUN:
 		ret = ffa_msg_wait_complete(current_locked, next);
@@ -438,7 +437,7 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 		 * allow the interrupts(if they were masked earlier) before
 		 * returning control to NWd.
 		 */
-		plat_ffa_vcpu_allow_interrupts(current);
+		ffa_interrupts_unmask(current);
 
 		break;
 	default:
@@ -450,43 +449,6 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 	vcpu_unlock(&current_locked);
 
 	return ret;
-}
-
-/**
- * Enforce action of an SP in response to non-secure or other-secure interrupt
- * by changing the priority mask. Effectively, physical interrupts shall not
- * trigger which has the same effect as queueing interrupts.
- */
-static void plat_ffa_vcpu_queue_interrupts(
-	struct vcpu_locked receiver_vcpu_locked)
-{
-	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
-	uint8_t current_priority;
-
-	/* Save current value of priority mask. */
-	current_priority = plat_interrupts_get_priority_mask();
-	receiver_vcpu->prev_interrupt_priority = current_priority;
-
-	if (receiver_vcpu->vm->other_s_interrupts_action ==
-		    OTHER_S_INT_ACTION_QUEUED ||
-	    receiver_vcpu->scheduling_mode == SPMC_MODE) {
-		/*
-		 * If secure interrupts not masked yet, mask them now. We could
-		 * enter SPMC scheduled mode when an EL3 SPMD Logical partition
-		 * sends a direct request, and we are making the IMPDEF choice
-		 * to mask interrupts when such a situation occurs. This keeps
-		 * design simple.
-		 */
-		if (current_priority > SWD_MASK_ALL_INT) {
-			plat_interrupts_set_priority_mask(SWD_MASK_ALL_INT);
-		}
-	} else if (receiver_vcpu->vm->ns_interrupts_action ==
-		   NS_ACTION_QUEUED) {
-		/* If non secure interrupts not masked yet, mask them now. */
-		if (current_priority > SWD_MASK_NS_INT) {
-			plat_interrupts_set_priority_mask(SWD_MASK_NS_INT);
-		}
-	}
 }
 
 /*
@@ -521,7 +483,7 @@ void ffa_cpu_cycles_init_schedule_mode_ffa_runeld_prepare(
 		      vcpu->state == VCPU_STATE_BLOCKED);
 	}
 
-	plat_ffa_vcpu_queue_interrupts(target_locked);
+	ffa_interrupts_mask(target_locked);
 }
 
 /*
@@ -592,35 +554,10 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 	 * masked earlier).
 	 */
 	if (*next != NULL) {
-		plat_ffa_vcpu_allow_interrupts(current);
+		ffa_interrupts_unmask(current);
 	}
 
 	return ret_args;
-}
-
-static bool is_predecessor_in_call_chain(struct vcpu_locked current_locked,
-					 struct vcpu_locked target_locked)
-{
-	struct vcpu *prev_node;
-	struct vcpu *current = current_locked.vcpu;
-	struct vcpu *target = target_locked.vcpu;
-
-	assert(current != NULL);
-	assert(target != NULL);
-
-	prev_node = current->call_chain.prev_node;
-
-	while (prev_node != NULL) {
-		if (prev_node == target) {
-			return true;
-		}
-
-		/* The target vCPU is not it's immediate predecessor. */
-		prev_node = prev_node->call_chain.prev_node;
-	}
-
-	/* Search terminated. Reached start of call chain. */
-	return false;
 }
 
 /**
@@ -639,7 +576,8 @@ static bool plat_ffa_check_rtm_ffa_run(struct vcpu_locked current_locked,
 		/* Fall through. */
 	case FFA_RUN_32: {
 		/* Rules 1,2 section 7.2 EAC0 spec. */
-		if (is_predecessor_in_call_chain(current_locked, locked_vcpu)) {
+		if (ffa_direct_msg_precedes_in_call_chain(current_locked,
+							  locked_vcpu)) {
 			return false;
 		}
 		*next_state = VCPU_STATE_BLOCKED;
@@ -681,7 +619,8 @@ static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu_locked current_locked,
 		/* Fall through. */
 	case FFA_RUN_32: {
 		/* Rules 1,2. */
-		if (is_predecessor_in_call_chain(current_locked, locked_vcpu)) {
+		if (ffa_direct_msg_precedes_in_call_chain(current_locked,
+							  locked_vcpu)) {
 			return false;
 		}
 
@@ -864,8 +803,9 @@ bool ffa_cpu_cycles_check_runtime_state_transition(
  * in RTM_SP_INIT runtime model, not implemented. Refer to section 8.5
  * of FF-A 1.2 spec.
  */
-struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
-				   enum ffa_error error_code)
+struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
+					 struct vcpu **next,
+					 enum ffa_error error_code)
 {
 	struct vcpu_locked current_locked;
 	struct vm_locked vm_locked;

@@ -6,6 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/api.h"
 #include "hf/ffa.h"
 #include "hf/ffa_internal.h"
 #include "hf/manifest.h"
@@ -26,7 +27,7 @@ ffa_partition_properties_t ffa_setup_partition_properties(
 	return 0;
 }
 
-void plat_ffa_log_init(void)
+void ffa_init_log(void)
 {
 }
 
@@ -35,7 +36,7 @@ void plat_ffa_set_tee_enabled(bool tee_enabled)
 	(void)tee_enabled;
 }
 
-void plat_ffa_init(struct mpool *ppool)
+void ffa_init(struct mpool *ppool)
 {
 	(void)ppool;
 }
@@ -463,7 +464,7 @@ void ffa_direct_msg_wind_call_chain_ffa_direct_req(
 	(void)sender_vm_id;
 }
 
-bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
+bool ffa_direct_msg_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	(void)vm_id;
 	return false;
@@ -582,7 +583,8 @@ uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
 	return api_interrupt_get(current_locked);
 }
 
-bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
+bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
+					 struct ffa_value *ret)
 {
 	(void)args;
 	(void)ret;

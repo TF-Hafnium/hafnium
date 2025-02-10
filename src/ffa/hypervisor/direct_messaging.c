@@ -69,7 +69,7 @@ bool ffa_direct_msg_direct_request_forward(ffa_id_t receiver_vm_id,
 					   struct ffa_value args,
 					   struct ffa_value *ret)
 {
-	if (!plat_ffa_is_tee_enabled()) {
+	if (!ffa_init_is_tee_enabled()) {
 		dlog_verbose("Not forwarding: ffa_tee_enabled is false\n");
 		return false;
 	}
@@ -119,7 +119,8 @@ void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	(void)next_locked;
 }
 
-bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
+bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
+					 struct ffa_value *ret)
 {
 	(void)args;
 	(void)ret;
@@ -127,7 +128,7 @@ bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
 	return false;
 }
 
-bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
+bool ffa_direct_msg_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	(void)vm_id;
 	return false;

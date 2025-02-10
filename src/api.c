@@ -2905,7 +2905,7 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 	}
 
 	if (ffa_is_framework_msg(args) &&
-	    plat_ffa_handle_framework_msg(args, &ret)) {
+	    ffa_direct_msg_handle_framework_msg(args, &ret)) {
 		return ret;
 	}
 
@@ -3080,7 +3080,7 @@ void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
 				       struct ffa_value to_ret,
 				       bool is_nwd_call_chain)
 {
-	if (plat_ffa_is_spmd_lp_id(receiver_vm_id) ||
+	if (ffa_direct_msg_is_spmd_lp_id(receiver_vm_id) ||
 	    !vm_id_is_current_world(receiver_vm_id)) {
 		*next = api_switch_to_other_world(current_locked, to_ret,
 						  VCPU_STATE_WAITING);
@@ -4518,12 +4518,12 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 
 	/*
 	 * This check assumes receiver is the current VM, and has been enforced
-	 * by `plat_ffa_is_notifications_get_valid`.
+	 * by `ffa_notifications_is_get_valid`.
 	 */
 	receiver_locked = ffa_vm_find_locked(receiver_vm_id);
 
 	/*
-	 * `plat_ffa_is_notifications_get_valid` ensures following is never
+	 * `ffa_notifications_is_get_valid` ensures following is never
 	 * true.
 	 */
 	CHECK(receiver_locked.vm != NULL);

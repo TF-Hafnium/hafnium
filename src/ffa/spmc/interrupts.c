@@ -13,6 +13,7 @@
 
 #include "hf/api.h"
 #include "hf/check.h"
+#include "hf/ffa/direct_messaging.h"
 #include "hf/ffa/vm.h"
 #include "hf/hf_ipi.h"
 #include "hf/vm.h"
@@ -161,12 +162,20 @@ static void plat_ffa_queue_vint(struct vcpu_locked target_vcpu_locked,
 }
 
 /**
+ * If the interrupts were indeed masked by SPMC before an SP's vCPU was resumed,
+ * restore the priority mask thereby allowing the interrupts to be delivered.
+ */
+void ffa_interrupts_unmask(struct vcpu *current)
+{
+	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
+}
+
+/**
  * Enforce action of an SP in response to non-secure or other-secure interrupt
  * by changing the priority mask. Effectively, physical interrupts shall not
  * trigger which has the same effect as queueing interrupts.
  */
-static void plat_ffa_vcpu_queue_interrupts(
-	struct vcpu_locked receiver_vcpu_locked)
+void ffa_interrupts_mask(struct vcpu_locked receiver_vcpu_locked)
 {
 	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
 	uint8_t current_priority;
@@ -219,7 +228,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 			     target_vcpu->vm->id);
 
 		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
-		plat_ffa_vcpu_queue_interrupts(target_vcpu_locked);
+		ffa_interrupts_mask(target_vcpu_locked);
 
 		vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
@@ -262,31 +271,6 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel0(
 	return next;
 }
 
-static bool is_predecessor_in_call_chain(struct vcpu_locked current_locked,
-					 struct vcpu_locked target_locked)
-{
-	struct vcpu *prev_node;
-	struct vcpu *current = current_locked.vcpu;
-	struct vcpu *target = target_locked.vcpu;
-
-	assert(current != NULL);
-	assert(target != NULL);
-
-	prev_node = current->call_chain.prev_node;
-
-	while (prev_node != NULL) {
-		if (prev_node == target) {
-			return true;
-		}
-
-		/* The target vCPU is not it's immediate predecessor. */
-		prev_node = prev_node->call_chain.prev_node;
-	}
-
-	/* Search terminated. Reached start of call chain. */
-	return false;
-}
-
 /**
  * Handles the secure interrupt according to the target vCPU's state
  * in the case the owner of the interrupt is an S-EL1 partition.
@@ -307,7 +291,7 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 
 		/* FF-A v1.1 EAC0 Table 8.2 case 1 and Table 12.10. */
 		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
-		plat_ffa_vcpu_queue_interrupts(target_vcpu_locked);
+		ffa_interrupts_mask(target_vcpu_locked);
 
 		/*
 		 * Ideally, we have to mask non-secure interrupts here
@@ -344,8 +328,8 @@ static struct vcpu *plat_ffa_signal_secure_interrupt_sel1(
 			next = NULL;
 			plat_ffa_queue_vint(target_vcpu_locked, v_intid,
 					    (struct vcpu_locked){.vcpu = NULL});
-		} else if (is_predecessor_in_call_chain(current_locked,
-							target_vcpu_locked)) {
+		} else if (ffa_direct_msg_precedes_in_call_chain(
+				   current_locked, target_vcpu_locked)) {
 			struct ffa_value ret_interrupt =
 				api_ffa_interrupt_return(0);
 

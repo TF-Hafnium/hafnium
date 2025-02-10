@@ -12,18 +12,18 @@
 #include "hf/ffa/vm.h"
 #include "hf/mpool.h"
 
-void plat_ffa_log_init(void)
+void ffa_init_log(void)
 {
 	dlog_info("Initializing Hafnium (SPMC)\n");
 }
 
-void plat_ffa_init(struct mpool *ppool)
+void ffa_init(struct mpool *ppool)
 {
 	arch_ffa_init();
 	ffa_vm_init(ppool);
 }
 
-void plat_ffa_set_tee_enabled(bool tee_enabled)
+void ffa_init_set_tee_enabled(bool tee_enabled)
 {
 	(void)tee_enabled;
 }

@@ -132,7 +132,7 @@ bool ffa_notifications_bitmap_create_call(ffa_id_t vm_id,
 {
 	struct ffa_value ret;
 
-	if (plat_ffa_is_tee_enabled()) {
+	if (ffa_init_is_tee_enabled()) {
 		ret = arch_other_world_call((struct ffa_value){
 			.func = FFA_NOTIFICATION_BITMAP_CREATE_32,
 			.arg1 = vm_id,
@@ -261,7 +261,7 @@ struct ffa_value ffa_notifications_get_framework_notifications(
 	assert(from_fwk != NULL);
 
 	/* Get SPMC notifications. */
-	if (plat_ffa_is_tee_enabled()) {
+	if (ffa_init_is_tee_enabled()) {
 		ret = arch_other_world_call((struct ffa_value){
 			.func = FFA_NOTIFICATION_GET_32,
 			.arg1 = (vcpu_id << 16) | receiver_id,

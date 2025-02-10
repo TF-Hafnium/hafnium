@@ -18,7 +18,7 @@ ffa_id_t arch_ffa_spmc_id_get(void)
 	return HF_SPMC_VM_ID;
 }
 
-void plat_ffa_log_init(void)
+void ffa_init_log(void)
 {
 }
 
@@ -449,7 +449,7 @@ void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	(void)next_locked;
 }
 
-bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
+bool ffa_direct_msg_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	(void)vm_id;
 	return false;
@@ -604,8 +604,9 @@ ffa_memory_attributes_t ffa_memory_add_security_bit_from_mode(
 	return attributes;
 }
 
-struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
-				   enum ffa_error error_code)
+struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
+					 struct vcpu **next,
+					 enum ffa_error error_code)
 {
 	(void)current;
 	(void)next;
@@ -647,7 +648,8 @@ uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
 	return 0;
 }
 
-bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
+bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
+					 struct ffa_value *ret)
 {
 	(void)args;
 	(void)ret;

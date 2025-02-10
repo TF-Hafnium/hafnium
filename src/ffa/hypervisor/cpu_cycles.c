@@ -127,8 +127,9 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-struct ffa_value plat_ffa_error_32(struct vcpu *current, struct vcpu **next,
-				   enum ffa_error error_code)
+struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
+					 struct vcpu **next,
+					 enum ffa_error error_code)
 {
 	(void)current;
 	(void)next;

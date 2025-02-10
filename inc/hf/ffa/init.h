@@ -10,8 +10,8 @@
 
 #include "hf/mpool.h"
 
-void plat_ffa_log_init(void);
-void plat_ffa_init(struct mpool *ppool);
+void ffa_init_log(void);
+void ffa_init(struct mpool *ppool);
 
-bool plat_ffa_is_tee_enabled(void);
-void plat_ffa_set_tee_enabled(bool tee_enabled);
+bool ffa_init_is_tee_enabled(void);
+void ffa_init_set_tee_enabled(bool tee_enabled);

@@ -17,22 +17,22 @@
 
 static bool ffa_tee_enabled = false;
 
-bool plat_ffa_is_tee_enabled(void)
+bool ffa_init_is_tee_enabled(void)
 {
 	return ffa_tee_enabled;
 }
 
-void plat_ffa_set_tee_enabled(bool tee_enabled)
+void ffa_init_set_tee_enabled(bool tee_enabled)
 {
 	ffa_tee_enabled = tee_enabled;
 }
 
-void plat_ffa_log_init(void)
+void ffa_init_log(void)
 {
 	dlog_info("Initializing Hafnium (Hypervisor)\n");
 }
 
-void plat_ffa_init(struct mpool *ppool)
+void ffa_init(struct mpool *ppool)
 {
 	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
 	struct ffa_value ret;
@@ -51,7 +51,7 @@ void plat_ffa_init(struct mpool *ppool)
 
 	(void)ppool;
 
-	if (!plat_ffa_is_tee_enabled()) {
+	if (!ffa_init_is_tee_enabled()) {
 		return;
 	}
 
@@ -95,7 +95,7 @@ void plat_ffa_init(struct mpool *ppool)
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.send)),
 		HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
 
-	plat_ffa_set_tee_enabled(true);
+	ffa_init_set_tee_enabled(true);
 
 	/*
 	 * Hypervisor will write to secure world receive buffer, and will read

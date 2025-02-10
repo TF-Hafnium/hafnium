@@ -11,6 +11,7 @@
 #include "hf/arch/gicv3.h"
 
 #include "hf/bits.h"
+#include "hf/ffa/interrupts.h"
 #include "hf/ffa_internal.h"
 #include "hf/plat/interrupts.h"
 
@@ -30,7 +31,7 @@ bool ffa_direct_msg_is_direct_request_valid(struct vcpu *current,
 	       vm_id_is_current_world(receiver_vm_id) &&
 	       (sender_vm_id == current_vm_id ||
 		(current_vm_id == HF_HYPERVISOR_VM_ID &&
-		 (plat_ffa_is_spmd_lp_id(sender_vm_id) ||
+		 (ffa_direct_msg_is_spmd_lp_id(sender_vm_id) ||
 		  !vm_id_is_current_world(sender_vm_id))));
 }
 
@@ -125,15 +126,6 @@ bool ffa_direct_msg_direct_request_forward(ffa_id_t receiver_vm_id,
 	return false;
 }
 
-/**
- * If the interrupts were indeed masked by SPMC before an SP's vCPU was resumed,
- * restore the priority mask thereby allowing the interrupts to be delivered.
- */
-void plat_ffa_vcpu_allow_interrupts(struct vcpu *current)
-{
-	plat_interrupts_set_priority_mask(current->prev_interrupt_priority);
-}
-
 /*
  * Unwind the present call chain upon the invocation of
  * FFA_MSG_SEND_DIRECT_RESP ABI. The function also returns
@@ -155,7 +147,7 @@ void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	current->rt_model = RTM_NONE;
 
 	/* Allow interrupts if they were masked earlier. */
-	plat_ffa_vcpu_allow_interrupts(current);
+	ffa_interrupts_unmask(current);
 
 	if (!vm_id_is_current_world(receiver_vm_id)) {
 		/* End of NWd scheduled call chain. */
@@ -163,43 +155,6 @@ void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	} else {
 		/* Removing a node from an existing call chain. */
 		vcpu_call_chain_remove_node(current_locked, next_locked);
-	}
-}
-
-/**
- * Enforce action of an SP in response to non-secure or other-secure interrupt
- * by changing the priority mask. Effectively, physical interrupts shall not
- * trigger which has the same effect as queueing interrupts.
- */
-static void plat_ffa_vcpu_queue_interrupts(
-	struct vcpu_locked receiver_vcpu_locked)
-{
-	struct vcpu *receiver_vcpu = receiver_vcpu_locked.vcpu;
-	uint8_t current_priority;
-
-	/* Save current value of priority mask. */
-	current_priority = plat_interrupts_get_priority_mask();
-	receiver_vcpu->prev_interrupt_priority = current_priority;
-
-	if (receiver_vcpu->vm->other_s_interrupts_action ==
-		    OTHER_S_INT_ACTION_QUEUED ||
-	    receiver_vcpu->scheduling_mode == SPMC_MODE) {
-		/*
-		 * If secure interrupts not masked yet, mask them now. We could
-		 * enter SPMC scheduled mode when an EL3 SPMD Logical partition
-		 * sends a direct request, and we are making the IMPDEF choice
-		 * to mask interrupts when such a situation occurs. This keeps
-		 * design simple.
-		 */
-		if (current_priority > SWD_MASK_ALL_INT) {
-			plat_interrupts_set_priority_mask(SWD_MASK_ALL_INT);
-		}
-	} else if (receiver_vcpu->vm->ns_interrupts_action ==
-		   NS_ACTION_QUEUED) {
-		/* If non secure interrupts not masked yet, mask them now. */
-		if (current_priority > SWD_MASK_NS_INT) {
-			plat_interrupts_set_priority_mask(SWD_MASK_NS_INT);
-		}
 	}
 }
 
@@ -225,14 +180,39 @@ void ffa_direct_msg_wind_call_chain_ffa_direct_req(
 	if (!vm_id_is_current_world(sender_vm_id)) {
 		/* Start of NWd scheduled call chain. */
 		receiver_vcpu->scheduling_mode = NWD_MODE;
-	} else if (plat_ffa_is_spmd_lp_id(sender_vm_id)) {
+	} else if (ffa_direct_msg_is_spmd_lp_id(sender_vm_id)) {
 		receiver_vcpu->scheduling_mode = SPMC_MODE;
 	} else {
 		/* Adding a new node to an existing call chain. */
 		vcpu_call_chain_extend(current_locked, receiver_vcpu_locked);
 		receiver_vcpu->scheduling_mode = current->scheduling_mode;
 	}
-	plat_ffa_vcpu_queue_interrupts(receiver_vcpu_locked);
+	ffa_interrupts_mask(receiver_vcpu_locked);
+}
+
+bool ffa_direct_msg_precedes_in_call_chain(struct vcpu_locked current_locked,
+					   struct vcpu_locked target_locked)
+{
+	struct vcpu *prev_node;
+	struct vcpu *current = current_locked.vcpu;
+	struct vcpu *target = target_locked.vcpu;
+
+	assert(current != NULL);
+	assert(target != NULL);
+
+	prev_node = current->call_chain.prev_node;
+
+	while (prev_node != NULL) {
+		if (prev_node == target) {
+			return true;
+		}
+
+		/* The target vCPU is not it's immediate predecessor. */
+		prev_node = prev_node->call_chain.prev_node;
+	}
+
+	/* Search terminated. Reached start of call chain. */
+	return false;
 }
 
 /**
@@ -310,7 +290,8 @@ out:
  * Handle framework messages: in particular, check VM availability messages are
  * valid.
  */
-bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
+bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
+					 struct ffa_value *ret)
 {
 	enum ffa_framework_msg_func func = ffa_framework_msg_func(args);
 
@@ -329,7 +310,7 @@ bool plat_ffa_handle_framework_msg(struct ffa_value args, struct ffa_value *ret)
 	return false;
 }
 
-bool plat_ffa_is_spmd_lp_id(ffa_id_t vm_id)
+bool ffa_direct_msg_is_spmd_lp_id(ffa_id_t vm_id)
 {
 	return (vm_id >= EL3_SPMD_LP_ID_START && vm_id <= EL3_SPMD_LP_ID_END);
 }

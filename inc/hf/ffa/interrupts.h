@@ -30,7 +30,8 @@ struct vcpu *ffa_interrupts_unwind_nwd_call_chain(struct vcpu *current);
 
 void ffa_interrupts_enable_virtual_interrupts(struct vcpu_locked current_locked,
 					      struct vm_locked vm_locked);
-
+void ffa_interrupts_mask(struct vcpu_locked receiver_vcpu_locked);
+void ffa_interrupts_unmask(struct vcpu *current);
 /**
  * Reconfigure the interrupt belonging to the current partition at runtime.
  */

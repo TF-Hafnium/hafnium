@@ -58,8 +58,8 @@ bool ffa_notifications_is_bind_valid(struct vcpu *current, ffa_id_t sender_id,
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
-	if (plat_ffa_is_spmd_lp_id(sender_id) ||
-	    plat_ffa_is_spmd_lp_id(receiver_id)) {
+	if (ffa_direct_msg_is_spmd_lp_id(sender_id) ||
+	    ffa_direct_msg_is_spmd_lp_id(receiver_id)) {
 		dlog_verbose(
 			"Notification bind: not permitted for logical SPs (%x "
 			"%x).\n",
@@ -128,8 +128,8 @@ bool ffa_notifications_is_set_valid(struct vcpu *current, ffa_id_t sender_id,
 {
 	ffa_id_t current_vm_id = current->vm->id;
 
-	if (plat_ffa_is_spmd_lp_id(sender_id) ||
-	    plat_ffa_is_spmd_lp_id(receiver_id)) {
+	if (ffa_direct_msg_is_spmd_lp_id(sender_id) ||
+	    ffa_direct_msg_is_spmd_lp_id(receiver_id)) {
 		dlog_verbose(
 			"Notification set: not permitted for logical SPs (%x "
 			"%x).\n",
@@ -195,7 +195,7 @@ bool ffa_notifications_is_get_valid(struct vcpu *current, ffa_id_t receiver_id,
 	 *  notifications target to a VM.
 	 */
 	bool caller_and_receiver_valid =
-		(!plat_ffa_is_spmd_lp_id(receiver_id) &&
+		(!ffa_direct_msg_is_spmd_lp_id(receiver_id) &&
 		 (current_vm_id == receiver_id)) ||
 		(current_vm_id == HF_HYPERVISOR_VM_ID &&
 		 !vm_id_is_current_world(receiver_id));

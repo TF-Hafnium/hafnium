@@ -425,7 +425,7 @@ struct ffa_value ffa_memory_other_world_mem_reclaim(
 	struct vm *from = vm_find(HF_TEE_VM_ID);
 	struct two_vm_locked vm_to_from_lock;
 
-	if (!plat_ffa_is_tee_enabled()) {
+	if (!ffa_init_is_tee_enabled()) {
 		dlog_verbose("Invalid handle %#lx for FFA_MEM_RECLAIM.\n",
 			     handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);

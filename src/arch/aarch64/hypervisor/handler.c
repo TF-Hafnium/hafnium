@@ -731,7 +731,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_console_log(*args, current);
 		return true;
 	case FFA_ERROR_32:
-		*args = plat_ffa_error_32(current, next, args->arg2);
+		*args = ffa_cpu_cycles_error_32(current, next, args->arg2);
 		return true;
 
 	default:

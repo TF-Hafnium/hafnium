@@ -20,7 +20,7 @@
 
 struct ffa_value ffa_setup_spmc_id_get(void)
 {
-	if (plat_ffa_is_tee_enabled()) {
+	if (ffa_init_is_tee_enabled()) {
 		/*
 		 * Fetch the SPMC ID from the SPMD using FFA_SPM_ID_GET.
 		 * DEN0077A FF-A v1.1 Beta0 section 13.9.2
@@ -60,7 +60,7 @@ void ffa_setup_rxtx_map_forward(struct vm_locked vm_locked)
 	struct vm *vm = vm_locked.vm;
 	struct vm *other_world;
 
-	if (!plat_ffa_is_tee_enabled()) {
+	if (!ffa_init_is_tee_enabled()) {
 		vm_locked.vm->mailbox.state = MAILBOX_STATE_EMPTY;
 		return;
 	}
@@ -97,7 +97,7 @@ void ffa_setup_rxtx_unmap_forward(struct vm_locked vm_locked)
 
 	id = vm_locked.vm->id;
 
-	if (!plat_ffa_is_tee_enabled()) {
+	if (!ffa_init_is_tee_enabled()) {
 		return;
 	}
 
@@ -127,7 +127,7 @@ bool ffa_setup_partition_info_get_regs_forward_allowed(void)
 	 * Allow forwarding from the Hypervisor if TEE or SPMC exists and
 	 * declared as such in the Hypervisor manifest.
 	 */
-	return plat_ffa_is_tee_enabled();
+	return ffa_init_is_tee_enabled();
 }
 
 /*
@@ -150,7 +150,7 @@ ffa_vm_count_t ffa_setup_partition_info_get_forward(
 	 * Allow forwarding from the Hypervisor if TEE or SPMC exists and
 	 * declared as such in the Hypervisor manifest.
 	 */
-	if (!plat_ffa_is_tee_enabled()) {
+	if (!ffa_init_is_tee_enabled()) {
 		return vm_count;
 	}
 
@@ -249,7 +249,7 @@ bool ffa_setup_rx_release_forward(struct vm_locked vm_locked,
 	struct vm *vm = vm_locked.vm;
 	ffa_id_t vm_id = vm->id;
 
-	if (!plat_ffa_is_tee_enabled() ||
+	if (!ffa_init_is_tee_enabled() ||
 	    !ffa_vm_supports_indirect_messages(vm)) {
 		return false;
 	}
@@ -294,7 +294,7 @@ bool ffa_setup_acquire_receiver_rx(struct vm_locked to_locked,
 	 * - The VM's version is not FF-A v1.1.
 	 * - If the mailbox ownership hasn't been transferred to the SPMC.
 	 */
-	if (!plat_ffa_is_tee_enabled() ||
+	if (!ffa_init_is_tee_enabled() ||
 	    !ffa_vm_supports_indirect_messages(to_locked.vm) ||
 	    to_locked.vm->mailbox.state != MAILBOX_STATE_OTHER_WORLD_OWNED) {
 		return true;
