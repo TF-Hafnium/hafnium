@@ -10,10 +10,9 @@
 
 #include "hf/arch/other_world.h"
 
+#include "hf/ffa/init.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
-
-#include "hypervisor.h"
 
 /**
  * Check validity of a FF-A direct message request.

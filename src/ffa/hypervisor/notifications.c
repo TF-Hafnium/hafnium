@@ -10,11 +10,10 @@
 
 #include "hf/arch/other_world.h"
 
+#include "hf/ffa/init.h"
 #include "hf/ffa_internal.h"
 #include "hf/std.h"
 #include "hf/vm.h"
-
-#include "hypervisor.h"
 
 /**
  * Check validity of the calls:

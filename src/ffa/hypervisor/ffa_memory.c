@@ -10,12 +10,12 @@
 
 #include "hf/arch/other_world.h"
 
+#include "hf/ffa/init.h"
 #include "hf/ffa_internal.h"
 #include "hf/ffa_memory_internal.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
-#include "hypervisor.h"
 #include "sysregs.h"
 
 enum ffa_memory_handle_allocator ffa_memory_get_handle_allocator(void)

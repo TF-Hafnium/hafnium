@@ -11,11 +11,11 @@
 #include "hf/arch/other_world.h"
 
 #include "hf/check.h"
+#include "hf/ffa/init.h"
 #include "hf/ffa/vm.h"
 #include "hf/manifest.h"
 #include "hf/vm.h"
 
-#include "hypervisor.h"
 #include "smc.h"
 
 struct ffa_value ffa_setup_spmc_id_get(void)

@@ -11,6 +11,7 @@
 #include "hf/arch/other_world.h"
 
 #include "hf/api.h"
+#include "hf/ffa/init.h"
 #include "hf/ffa_internal.h"
 #include "hf/vm.h"
 

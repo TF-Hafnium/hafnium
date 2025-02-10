@@ -19,6 +19,7 @@
 #include "hf/dlog.h"
 #include "hf/fdt_handler.h"
 #include "hf/ffa.h"
+#include "hf/ffa/init.h"
 #include "hf/load.h"
 #include "hf/manifest.h"
 #include "hf/mm.h"
