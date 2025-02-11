@@ -22,12 +22,11 @@
 #include "wdog.h"
 
 /**
- * Where the ipi_state struct is stored for the IPI tests.
+ * Where the int_state struct is stored for the interrupt tests.
  * Used to track the IPI state across different threads in
  * different endpoints.
  */
-alignas(PAGE_SIZE) static uint8_t ipi_state_page[PAGE_SIZE];
-alignas(PAGE_SIZE) static uint8_t twdog_interrupt_page[PAGE_SIZE];
+alignas(PAGE_SIZE) static uint8_t interrupt_state_page[PAGE_SIZE];
 
 /**
  * Structure defined for usage in tests with multiple cores.
@@ -157,7 +156,7 @@ TEST(secure_interrupts, sp_to_sp_yield_interrupt_queued)
 	 * Share memory used for interrupt status coordination and initialize
 	 * the state.
 	 */
-	hftest_twdog_state_share_page_and_init((uint64_t)twdog_interrupt_page,
+	hftest_twdog_state_share_page_and_init((uint64_t)interrupt_state_page,
 					       memory_receivers, 2, mb.send);
 
 	ret = ffa_run(companion_info->vm_id, 0);
@@ -327,7 +326,7 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu, service1_is_mp_sp)
 
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
-		(uint64_t)ipi_state_page, memory_receivers,
+		(uint64_t)interrupt_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, 0);
 
@@ -392,7 +391,7 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu_with_secure_interrupts,
 
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
-		(uint64_t)ipi_state_page, memory_receivers,
+		(uint64_t)interrupt_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, 0);
 
@@ -502,7 +501,7 @@ static void ipi_nwd_waiting_test(
 
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
-		(uint64_t)ipi_state_page, memory_receivers,
+		(uint64_t)interrupt_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, vcpu_id);
 
@@ -748,7 +747,7 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_swd, service1_is_mp_sp)
 	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_MSG_WAIT_32);
 
 	hftest_ipi_state_share_page_and_init(
-		(uint64_t)ipi_state_page, memory_receivers,
+		(uint64_t)interrupt_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, 0);
 
@@ -844,7 +843,7 @@ TEST_PRECONDITION(ipi, receive_ipi_preempted_vcpu, service1_is_mp_sp)
 
 	/* Setting buffer to control the IPI state. */
 	hftest_ipi_state_share_page_and_init(
-		(uint64_t)ipi_state_page, memory_receivers,
+		(uint64_t)interrupt_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, 0);
 
@@ -927,7 +926,7 @@ TEST_PRECONDITION(ipi, receive_ipi_blocked_vcpu, service1_is_mp_sp)
 
 	/* Setting buffer to control the IPI state. */
 	hftest_ipi_state_share_page_and_init(
-		(uint64_t)ipi_state_page, memory_receivers,
+		(uint64_t)interrupt_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, 0);
 
@@ -1024,7 +1023,7 @@ TEST_PRECONDITION(ipi, receive_ipi_multiple_services_to_same_cpu_waiting,
 
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
-		(uint64_t)ipi_state_page, memory_receivers,
+		(uint64_t)interrupt_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, 0);
 
@@ -1182,7 +1181,7 @@ TEST_PRECONDITION(ipi, receive_ipi_multiple_services_to_same_cpu_running,
 
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
-		(uint64_t)ipi_state_page, memory_receivers,
+		(uint64_t)interrupt_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, 0);
 
@@ -1265,7 +1264,7 @@ TEST_PRECONDITION(ipi, receive_ipi_one_service_to_two_vcpus, service1_is_mp_sp)
 
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
-		(uint64_t)ipi_state_page, memory_receivers,
+		(uint64_t)interrupt_state_page, memory_receivers,
 		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
 		mb.send, 0);
 
@@ -1292,4 +1291,107 @@ TEST_PRECONDITION(ipi, receive_ipi_one_service_to_two_vcpus, service1_is_mp_sp)
 	/* Resumes service on target vCPU to handle IPI. */
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}
+
+/**
+ * Target SP is waiting state when interrupt fires, so the SPMC sends SRI to
+ * the NWd for the scheduler to explicitly provide CPU cycles.
+ * The sequence is due to 'sri-interrupts-policy' field in the respective
+ * manifest.
+ *
+ * The test uses ESPI interrupts, and a platform specific ABI to trigger
+ * interrupts in the ESPI range:
+ * - Service1 is configured in a way it can use the aforementioned platform
+ *   ABI.
+ * - Service2 is assigned with a dummy device, which is configured with
+ * interrupt in ESPI range.
+ * - Reused the hf_ipi_state_* abstractions given they fulfill the needful
+ *   for this test.
+ *
+ * Test sequence:
+ * - PVM creates an interrupt state structure, which can be used to synchronise
+ *    between endpoints on the state of the interrupt. It also configures itself
+ *    to use the GIC and handle the SRI interrupt.
+ * - PMV bootstraps Service1 to `send_espi_interrupt` and Service2 to
+ *   `receive_interrupt_waiting_vcpu_sri_triggered`.
+ * - PVM shares the state with both service1 and service2.
+ * - Service1 is resumed to put it in the state to trigger ESPI.
+ * - Service2 is resumed to be ready to handle the ESPI. It also calls
+ *   FFA_MSG_WAIT to be set in waiting state when interrupt is triggered.
+ */
+TEST_PRECONDITION(secure_interrupts, sri_triggered_due_to_secure_interrupt,
+		  service1_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	uint32_t sri_id;
+	uint32_t expected_list_count = 1;
+	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	ffa_id_t memory_receivers[] = {service1_info->vm_id,
+				       service2_info->vm_id};
+	uint32_t receivers_ipi_state_indexes[] = {0};
+	struct ffa_value ret;
+
+	/* Get ready to handle SRI.  */
+	gicv3_system_setup();
+	sri_id = enable_sri();
+
+	/* Init vCPU which will handle interrupt. */
+	SERVICE_SELECT(service2_info->vm_id,
+		       "receive_interrupt_waiting_vcpu_sri_triggered", mb.send);
+
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Init vCPU which will send interrupt. */
+	SERVICE_SELECT(service1_info->vm_id, "send_espi_interrupt", mb.send);
+
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Share the interrupt state with both services. */
+	hftest_ipi_state_share_page_and_init(
+		(uint64_t)interrupt_state_page, memory_receivers,
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send, 0);
+
+	/* Resume Service2 so it can prepare itself to handle the ESPI. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/*
+	 * Resume Service1 to attest Service2 is ready, and prepare to
+	 * send ESPI.
+	 */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	last_interrupt_id = 0;
+
+	/* FFA_RUN Service1 to send eSPI. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Wait for SRI. */
+	while (last_interrupt_id != sri_id) {
+		interrupt_wait();
+	}
+
+	/*
+	 * Check that service2, vCPU 0 are returned by
+	 * FFA_NOTIFICATION_INFO_GET.
+	 */
+	expected_lists_sizes[0] = 1;
+	expected_ids[0] = service2_info->vm_id;
+	expected_ids[1] = 0;
+
+	ffa_notification_info_get_and_check(expected_list_count,
+					    expected_lists_sizes, expected_ids);
+
+	EXPECT_FALSE(hftest_ipi_state_is(HANDLED));
+
+	/* Resumes service2 in target vCPU 0 to handle the ESPI. */
+	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
 }

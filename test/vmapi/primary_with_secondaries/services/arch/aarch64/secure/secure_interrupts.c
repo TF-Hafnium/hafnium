@@ -26,12 +26,13 @@
 #define PLAT_ARM_TWDOG_BASE 0x2a490000
 #define PLAT_ARM_TWDOG_SIZE 0x20000
 #define ITERATIONS_PER_MS 15000
-
-#define RTM_INIT_ESPI_ID 5000U
+#define RTM_INIT_ESPI_ID 5000
 #define PLAT_FVP_SEND_ESPI 0x82000100U
 #define TWDOG_DELAY 50
 
 static bool rtm_init_espi_handled;
+
+uint32_t espi_id = RTM_INIT_ESPI_ID;
 static bool multiple_interrupts_expected;
 
 static inline uint64_t physicalcounter_read(void)
@@ -83,15 +84,15 @@ static void irq_handler(void)
 	switch (intid) {
 	case HF_NOTIFICATION_PENDING_INTID:
 		/* RX buffer full notification. */
-		HFTEST_LOG("Received notification pending interrupt %u.",
-			   intid);
+		dlog_verbose("Received notification pending interrupt %u.",
+			     intid);
 		break;
 	case IRQ_TWDOG_INTID:
 		/*
 		 * Interrupt triggered due to Trusted watchdog timer expiry.
 		 * Clear the interrupt and stop the timer.
 		 */
-		HFTEST_LOG("Received Trusted WatchDog Interrupt: %u.", intid);
+		dlog_info("Received Trusted WatchDog Interrupt: %u.", intid);
 		twdog_stop();
 
 		/*
@@ -102,12 +103,13 @@ static void irq_handler(void)
 		/* Perform secure interrupt de-activation. */
 		break;
 	case RTM_INIT_ESPI_ID:
-		HFTEST_LOG("interrupt id: %u", intid);
+		dlog_info("Receive ESPI interrupt: %u", intid);
+		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
 		rtm_init_espi_handled = true;
 		break;
 	case HF_IPI_INTID:
-		HFTEST_LOG("Received inter-processor interrupt %u, vm %x.",
-			   intid, hf_vm_get_id());
+		dlog_info("Received inter-processor interrupt %u, vm %x.",
+			  intid, hf_vm_get_id());
 		ASSERT_TRUE(hftest_ipi_state_is(SENT) ||
 			    (hftest_ipi_state_is(HANDLED) &&
 			     hftest_ipi_state_get_interrupt_count() > 0 &&
@@ -116,6 +118,26 @@ static void irq_handler(void)
 		break;
 	default:
 		panic("Interrupt ID not recongnised\n");
+	}
+}
+
+/**
+ * The interrupt handler for the tests in which an eSPI was used along with
+ * interrupt state structures.
+ */
+void espi_state_irq_handler(void)
+{
+	uint32_t intid = hf_interrupt_get();
+
+	if (intid == HF_NOTIFICATION_PENDING_INTID) {
+		/* RX buffer full notification. */
+		dlog_verbose("Received notification pending interrupt %u.",
+			     intid);
+	} else if (intid == espi_id) {
+		dlog_info("Receive ESPI interrupt: %u", intid);
+		hftest_ipi_state_set(HANDLED);
+	} else {
+		panic("Interrupt ID %u not expected\n", intid);
 	}
 }
 
@@ -183,6 +205,17 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 	ffa_msg_wait();
 }
 
+static void send_espi(uint32_t espi_id)
+{
+	struct ffa_value res;
+
+	res = smc32(PLAT_FVP_SEND_ESPI, espi_id, 0, 0, 0, 0, 0, 0);
+
+	if ((int64_t)res.func == SMCCC_ERROR_UNKNOWN) {
+		dlog_error("SiP SMC call not supported");
+	}
+}
+
 /**
  * To help testing the handling of secure interrupts during runtime
  * model init.
@@ -191,13 +224,7 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
  */
 SERVICE_SET_UP(send_espi_rtm_init)
 {
-	struct ffa_value res;
-
-	res = smc32(PLAT_FVP_SEND_ESPI, RTM_INIT_ESPI_ID, 0, 0, 0, 0, 0, 0);
-
-	if ((int64_t)res.func == SMCCC_ERROR_UNKNOWN) {
-		HFTEST_LOG("SiP SMC call not supported");
-	}
+	send_espi(espi_id);
 }
 
 /**
@@ -206,12 +233,12 @@ SERVICE_SET_UP(send_espi_rtm_init)
 SERVICE_SET_UP(handle_interrupt_rtm_init)
 {
 	/*
-	 * Setup handling of known interrupts including Secure Watchdog timer
-	 * interrupt and NPI.
+	 * Setup handling of known interrupts including Secure Watchdog
+	 * timer interrupt and NPI.
 	 */
 	exception_setup(irq_handler, NULL);
 	interrupts_enable();
-	EXPECT_EQ(hf_interrupt_enable(RTM_INIT_ESPI_ID, true, 0), 0);
+	EXPECT_EQ(hf_interrupt_enable(espi_id, true, 0), 0);
 
 	/* Disable such that it doesn't affect Hftest framework. */
 	interrupts_disable();
@@ -664,4 +691,98 @@ TEST_SERVICE(receive_ipi_preempted_or_blocked)
 	hftest_ipi_state_set(READY);
 
 	ffa_yield();
+}
+
+/**
+ * Service to test that interrupts are handled when fired while in the
+ * waiting state.
+ * - Configures the irq handler. IRQ is enabled in
+ * SERVICE_SET_UP(handle_interrupt_rtm_init).
+ * - Goes to waiting state so it can receive the interrupt state structure.
+ * - Wakes up and configures the state to ready, such that sender can trigger
+ *   the ESPI.
+ * - FFA_MSG_WAIT invoked to put the SP in waiting state. At this point,
+ *   PVM should resume sender for triggering the ESPI.
+ * - Service wakes up expecting to handle the interrupt, attests interrupt
+ *   state is HANDLED, which indicates execution has reached the IRQ
+ *   handler.
+ */
+TEST_SERVICE(receive_interrupt_waiting_vcpu_sri_triggered)
+{
+	exception_setup(espi_state_irq_handler, NULL);
+	interrupts_enable();
+
+	dlog_info("Enabled ESPI. Waiting for interrupt state.");
+
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	/* Configures the Interrupt state. */
+	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
+					   SERVICE_SEND_BUFFER());
+
+	hftest_ipi_state_set(READY);
+
+	dlog_info("Received the interrupt state. Waiting for interrupt.");
+
+	/* Set vCPU in waiting. */
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	/* Attest that ESPI is handled. */
+	dlog_info("Woke up. Waiting for ESPI to be handled.");
+
+	while (!hftest_ipi_state_is(HANDLED)) {
+	}
+
+	ffa_yield();
+
+	FAIL("Do not expect getting to this point.");
+}
+
+/**
+ * Service function to trigger an ESPI. This is to test the case
+ * in which an SP configured itself to be given CPU cycles by the
+ * scheduler to handle interrupts, when in waiting state/getting
+ * into waiting state.
+ * - Wakes up and sets up interrupt handler for acknowledgin NPI.
+ * - FFA_MSG_WAIT so it can receive the interrupt state.
+ * - Wakes up, retrieves the memory region with the interrupt state.
+ * - Calls again FFA_MSG_WAIT so it can trigger ESPI.
+ * - Wakes up, waits for the interrupt state to be READY. Once that
+ *   is the case, sent the ESPI and set sate to SENT.
+ * - Terminates the test.
+ */
+TEST_SERVICE(send_espi_interrupt)
+{
+	uint32_t to_send_espi = espi_id;
+
+	dlog_info("Waiting for interrupt state.");
+
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	/* Configures the Interrupt state. */
+	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
+					   SERVICE_SEND_BUFFER());
+
+	dlog_info("Interrupt state obtained. Waiting to send eSPI.");
+
+	/* Wait for next FFA_RUN to set ESPI. */
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	dlog_info("Wake up to send eSPI.");
+
+	/* Do nothing while ESPI handler is not ready. */
+	while (!hftest_ipi_state_is(READY)) {
+	}
+
+	/* Set ESPI and transition the state to 'SENT'. */
+	hftest_ipi_state_set(SENT);
+
+	send_espi(to_send_espi);
+
+	ffa_yield();
+
+	FAIL("Do not expect getting to this point.");
 }

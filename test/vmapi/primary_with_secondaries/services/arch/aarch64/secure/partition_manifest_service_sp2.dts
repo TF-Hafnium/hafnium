@@ -28,6 +28,12 @@
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
 
+	/*
+	 * Trigger SRI when in the waiting state, before signling secure
+	 * interrupts.
+	 */
+	sri-interrupts-policy = <1>;
+
 	/* Boot Info */
 	boot-info {
 		compatible = "arm,ffa-manifest-boot-info";
