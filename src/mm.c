@@ -564,49 +564,95 @@ static bool mm_ptable_identity_update(struct mm_ptable *ptable,
 	return true;
 }
 
-/**
- * Writes the given table to the debug log, calling itself recursively to
- * write sub-tables.
- */
-// NOLINTNEXTLINE(misc-no-recursion)
-static void mm_dump_table_recursive(const struct mm_page_table *ptable,
-				    mm_level_t level, uint8_t depth)
+static void mm_dump_entries(const pte_t *entries, mm_level_t level,
+			    uint32_t indent);
+
+static void mm_dump_block_entry(pte_t entry, mm_level_t level, uint32_t indent)
 {
+	mm_attr_t attrs = arch_mm_pte_attrs(entry, level);
+	paddr_t addr = arch_mm_block_from_pte(entry, level);
+
+	if (arch_mm_pte_is_valid(entry, level)) {
+		if (level == 0) {
+			dlog("page {\n");
+		} else {
+			dlog("block {\n");
+		}
+	} else {
+		dlog("invalid_block {\n");
+	}
+
+	indent += 1;
+	{
+		dlog_indent(indent, ".addr  = %#016lx\n", pa_addr(addr));
+		dlog_indent(indent, ".attrs = %#016lx\n", attrs);
+	}
+	indent -= 1;
+	dlog_indent(indent, "}");
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+static void mm_dump_table_entry(pte_t entry, mm_level_t level, uint32_t indent)
+{
+	dlog("table {\n");
+	indent += 1;
+	{
+		mm_attr_t attrs = arch_mm_pte_attrs(entry, level);
+		paddr_t addr = arch_mm_table_from_pte(entry, level);
+		const struct mm_page_table *child_table =
+			mm_page_table_from_pa(addr);
+
+		dlog_indent(indent, ".pte   = %#016lx,\n", entry);
+		dlog_indent(indent, ".attrs = %#016lx,\n", attrs);
+		dlog_indent(indent, ".addr  = %#016lx,\n", pa_addr(addr));
+		dlog_indent(indent, ".entries = ");
+		mm_dump_entries(child_table->entries, level - 1, indent);
+		dlog(",\n");
+	}
+	indent -= 1;
+	dlog_indent(indent, "}");
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+static void mm_dump_entry(pte_t entry, mm_level_t level, uint32_t indent)
+{
+	switch (arch_mm_pte_type(entry, level)) {
+	case PTE_TYPE_ABSENT:
+		dlog("absent {}");
+		break;
+	case PTE_TYPE_INVALID_BLOCK:
+	case PTE_TYPE_VALID_BLOCK: {
+		mm_dump_block_entry(entry, level, indent);
+		break;
+	}
+	case PTE_TYPE_TABLE: {
+		mm_dump_table_entry(entry, level, indent);
+		break;
+	}
+	}
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+static void mm_dump_entries(const pte_t *entries, mm_level_t level,
+			    uint32_t indent)
+{
+	dlog("{\n");
+	indent += 1;
+
 	for (size_t i = 0; i < MM_PTE_PER_PAGE; i++) {
-		pte_t entry = ptable->entries[i];
+		pte_t entry = entries[i];
 
 		if (arch_mm_pte_is_absent(entry, level)) {
 			continue;
 		}
 
-		dlog("%*s[level=%u, index=%zu]: ", depth * 2, "", level, i);
-
-		switch (arch_mm_pte_type(entry, level)) {
-		case PTE_TYPE_ABSENT: {
-			/* Do nothing */
-			break;
-		}
-		case PTE_TYPE_INVALID_BLOCK: {
-			dlog("INVALID_BLOCK(%#lx)\n", entry);
-			break;
-		}
-		case PTE_TYPE_VALID_BLOCK: {
-			dlog("VALID_BLOCK(%#lx)\n", entry);
-			break;
-		}
-		case PTE_TYPE_TABLE: {
-			const struct mm_page_table *child_table =
-				mm_page_table_from_pa(
-					arch_mm_table_from_pte(entry, level));
-
-			dlog("TABLE(%#lx)\n", entry);
-
-			mm_dump_table_recursive(child_table, level - 1,
-						depth + 1);
-			break;
-		}
-		}
+		dlog_indent(indent, "[level = %u, index = %zu] = ", level, i);
+		mm_dump_entry(entry, level, indent);
+		dlog(",\n");
 	}
+
+	indent -= 1;
+	dlog_indent(indent, "}");
 }
 
 /**
@@ -615,13 +661,36 @@ static void mm_dump_table_recursive(const struct mm_page_table *ptable,
 static void mm_ptable_dump(const struct mm_ptable *ptable,
 			   struct mm_flags flags)
 {
-	struct mm_page_table *tables = mm_page_table_from_pa(ptable->root);
-	mm_level_t max_level = mm_max_level(flags);
+	struct mm_page_table *root_tables = mm_page_table_from_pa(ptable->root);
+	mm_level_t root_level = mm_max_level(flags) + 1;
 	uint8_t root_table_count = mm_root_table_count(flags);
+	uint32_t indent = 0;
 
-	for (size_t i = 0; i < root_table_count; ++i) {
-		mm_dump_table_recursive(&tables[i], max_level, max_level);
+	dlog_indent(indent, "mm_ptable {\n");
+	indent += 1;
+	{
+		dlog_indent(indent, ".stage = %s,\n",
+			    flags.stage1 ? "stage1" : "stage2");
+		dlog_indent(indent, ".id = %hu,\n", ptable->id);
+		dlog_indent(indent, ".root_tables = {\n");
+
+		indent += 1;
+		{
+			for (size_t i = 0; i < root_table_count; ++i) {
+				dlog_indent(
+					indent,
+					"[level = %u, index = %zu].entries = ",
+					root_level, i);
+				mm_dump_entries(root_tables[i].entries,
+						root_level - 1, indent);
+				dlog(",\n");
+			}
+		}
+		indent -= 1;
+		dlog_indent(indent, "},\n");
 	}
+	indent -= 1;
+	dlog_indent(indent, "}\n");
 }
 
 /**

@@ -31,7 +31,6 @@ using struct_vcpu = struct vcpu;
 using struct_vm_locked = struct vm_locked;
 
 constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
-const int TOP_LEVEL = arch_mm_stage2_max_level();
 class vcpu : public ::testing::Test
 {
        protected:

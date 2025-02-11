@@ -104,3 +104,10 @@ size_t vdlog(const char *fmt, struct va_list_wrapper *args);
 			dlog("VERBOSE: " __VA_ARGS__); \
 		}                                      \
 	} while (0)
+
+/** Print to debug log, with `indent` amount of indentation. */
+#define dlog_indent(indent, ...)               \
+	do {                                   \
+		dlog("%*s", (indent) * 2, ""); \
+		dlog(__VA_ARGS__);             \
+	} while (0)
