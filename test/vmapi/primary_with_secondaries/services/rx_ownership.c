@@ -6,6 +6,9 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/irq.h"
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/ffa.h"
 #include "hf/std.h"
 
@@ -14,6 +17,7 @@
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
 #include "test/semaphore.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 /* Used to coordinate between multiple vCPUs in multicore test. */
@@ -115,6 +119,10 @@ TEST_SERVICE(call_ffa_msg_wait_retain_rx)
 	struct ffa_value ret;
 	HFTEST_LOG("Call FFA_MSG_WAIT");
 
+	/* Setup handling of NPI, to handle RX buffer full notification. */
+	exception_setup(check_npi, NULL);
+	arch_irq_enable();
+
 	/* FFA_MSG_WAIT should retain buffer */
 	semaphore_init(&ffa_msg_wait_called);
 	semaphore_signal(&ffa_msg_wait_called);
@@ -149,6 +157,10 @@ TEST_SERVICE(ffa_msg_wait_pending_indirect_message)
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_value ret;
 	uint64_t msg;
+
+	/* Setup handling of NPI, to handle RX buffer full notification. */
+	exception_setup(check_npi, NULL);
+	arch_irq_enable();
 
 	/*
 	 * FFA_MSG_WAIT will attempt to release buffer.

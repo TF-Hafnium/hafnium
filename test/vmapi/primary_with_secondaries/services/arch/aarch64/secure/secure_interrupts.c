@@ -233,6 +233,13 @@ TEST_SERVICE(send_direct_req_yielded_and_resumed)
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	const uint32_t msg[] = {TWDOG_DELAY, 0, 0, 0, 0};
 
+	/*
+	 * Set up the irq handler to handle the NPIs recieved from direct
+	 * messaging.
+	 */
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
 	/* Obtain the ID of the target service through indirect message. */
 	receive_indirect_message((void *)&target_vm_id, sizeof(target_vm_id),
 				 recv_buf);
@@ -410,6 +417,13 @@ TEST_SERVICE(send_ipi_fails)
 {
 	ffa_vcpu_index_t vcpu;
 	struct ffa_value ret;
+
+	/*
+	 * Set up the irq handler to handle the NPIs recieved from direct
+	 * messaging.
+	 */
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
 
 	dlog_verbose("Receiving ID of target vCPU...");
 
@@ -615,6 +629,13 @@ TEST_SERVICE(receive_ipi_waiting_vcpu)
 TEST_SERVICE(set_ipi_ready)
 {
 	dlog_verbose("%s", __func__);
+
+	/*
+	 * Set up the irq handler to handle the NPIs recieved from direct
+	 * messaging.
+	 */
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
 
 	/* Ready to receive the memory. */
 	ffa_msg_wait();

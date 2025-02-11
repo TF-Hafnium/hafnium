@@ -6,6 +6,9 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/irq.h"
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/check.h"
 #include "hf/ffa.h"
 
@@ -14,6 +17,7 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 #define MAX_RESP_REGS (MAX_MSG_SIZE / sizeof(uint64_t))
@@ -396,6 +400,10 @@ TEST_SERVICE(ffa_direct_message_v_1_2_cycle_denied)
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_uuid target_uuid;
 
+	/* Setup handling of NPI, to handle RX buffer full notification. */
+	exception_setup(check_npi, NULL);
+	arch_irq_enable();
+
 	/* Retrieve uuid of target endpoint. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
 				 recv_buf);
@@ -436,6 +444,10 @@ TEST_SERVICE(ffa_direct_message_cycle_req_req2_denied)
 	const uint64_t invalid_msg[] = {1, 2, 3, 4, 5};
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_uuid target_uuid;
+
+	/* Setup handling of NPI, to handle RX buffer full notification. */
+	exception_setup(check_npi, NULL);
+	arch_irq_enable();
 
 	/* Retrieve uuid of target endpoint. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),
@@ -581,6 +593,10 @@ TEST_SERVICE(ffa_disallowed_direct_msg_req2)
 	struct ffa_partition_info *service1_info;
 	uint64_t msg[MAX_RESP_REGS] = {0};
 	struct ffa_uuid target_uuid;
+
+	/* Setup handling of NPI, to handle RX buffer full notification. */
+	exception_setup(check_npi, NULL);
+	arch_irq_enable();
 
 	/* Retrieve uuid of NWd PVM. */
 	receive_indirect_message((void *)&target_uuid, sizeof(target_uuid),

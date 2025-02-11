@@ -95,6 +95,10 @@ static void irq_current(void)
 		send_managed_exit_response(dir_req_source_id);
 		break;
 	}
+	case HF_NOTIFICATION_PENDING_INTID: {
+		HFTEST_LOG("Notification Pending Interrupt received.\n");
+		break;
+	}
 	case IRQ_TWDOG_INTID: {
 		/*
 		 * Interrupt triggered due to Trusted watchdog timer expiry.

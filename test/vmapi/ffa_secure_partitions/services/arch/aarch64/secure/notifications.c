@@ -6,11 +6,15 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/dlog.h"
 
 #include "vmapi/hf/call.h"
 
 #include "partition_services.h"
+#include "test/hftest.h"
+#include "test/vmapi/arch/exception_handler.h"
 
 struct ffa_value sp_notif_set_cmd(ffa_id_t test_source, ffa_id_t notif_receiver,
 				  uint32_t flags,
@@ -48,6 +52,12 @@ struct ffa_value sp_notif_bind_cmd(ffa_id_t test_source, ffa_id_t notif_sender,
 	ffa_id_t own_id = hf_vm_get_id();
 
 	res = ffa_notification_bind(notif_sender, own_id, flags, bitmap);
+
+	/*
+	 * Register handler to log when notification pending interrupts are
+	 * thrown.
+	 */
+	exception_setup(check_npi, NULL);
 
 	return sp_check_ffa_return_resp(test_source, own_id, res);
 }

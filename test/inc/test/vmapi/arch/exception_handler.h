@@ -8,7 +8,10 @@
 
 #pragma once
 
+#include "vmapi/hf/call.h"
 #include "vmapi/hf/ffa.h"
+
+#include "test/hftest.h"
 
 ffa_vcpu_index_t get_current_vcpu_index(void);
 
@@ -35,3 +38,11 @@ int exception_handler_receive_exception_count(const void *recv_buf);
 void exception_handler_set_last_interrupt(uint32_t int_id);
 
 uint32_t exception_handler_get_last_interrupt(void);
+
+static inline void check_npi(void)
+{
+	uint32_t intid = hf_interrupt_get();
+	ASSERT_EQ(intid, HF_NOTIFICATION_PENDING_INTID);
+	HFTEST_LOG("Received notification pending interrupt.");
+	exception_handler_set_last_interrupt(intid);
+}

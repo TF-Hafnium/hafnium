@@ -39,18 +39,15 @@ void sp_disable_irq(void)
 
 struct ffa_value handle_interrupt(struct ffa_value res)
 {
-	uint32_t intid;
-	struct ffa_value ffa_ret;
-	ffa_id_t own_id = hf_vm_get_id();
-
 	/*
 	 * Received FFA_INTERRUPT in waiting state with interrupt ID
 	 * passed in arg2.
 	 */
-	intid = hf_interrupt_get();
+	uint32_t intid = res.arg2;
+	struct ffa_value ffa_ret;
+	ffa_id_t own_id = hf_vm_get_id();
 
 	ASSERT_EQ(res.arg1, 0);
-	ASSERT_EQ(res.arg2, intid);
 
 	switch (intid) {
 	case IRQ_TWDOG_INTID: {

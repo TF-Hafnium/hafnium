@@ -18,12 +18,6 @@
 #include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
-static void check_npi(void)
-{
-	ASSERT_EQ(hf_interrupt_get(), HF_NOTIFICATION_PENDING_INTID);
-	HFTEST_LOG("Received notification pending interrupt.");
-}
-
 TEST_SERVICE(echo_msg_send2_v1_1)
 {
 	void *send_buf = SERVICE_SEND_BUFFER();
