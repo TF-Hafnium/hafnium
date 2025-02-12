@@ -752,45 +752,60 @@ bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
 				   struct vcpu_locked next_locked,
 				   struct ffa_value *signal_interrupt)
 {
+	uint32_t intid;
+	struct vm *current_vm = current_locked.vcpu->vm;
+
+	/* No pending interrupts, no need to intercept or trigger SRI. */
+	if (vcpu_virt_interrupt_count_get(current_locked) == 0U) {
+		return false;
+	}
+
+	/*
+	 * Do not intercept the call.
+	 * Let the partition go into waiting state as planned.
+	 * Pend the SRI on the next world switch to the NWd.
+	 */
+	if (current_vm->sri_policy.intr_pending_entry_wait) {
+		dlog_verbose(
+			"Partition entry to wait. Interrupts pending. Send "
+			"SRI.\n");
+		ffa_notifications_sri_set_delayed(current_locked.vcpu->cpu);
+		return false;
+	}
+
 	/*
 	 * Since S-EL0 partitions will not receive the interrupt through a vIRQ
 	 * signal in addition to the FFA_INTERRUPT ERET, make the interrupt no
 	 * longer pending at this point. Otherwise keep it as pending for
 	 * when the S-EL1 parition calls hf_interrupt_get.
 	 */
-	uint32_t intid = current_locked.vcpu->vm->el0_partition
-				 ? vcpu_virt_interrupt_get_pending_and_enabled(
-					   current_locked)
-				 : vcpu_virt_interrupt_peek_pending_and_enabled(
-					   current_locked);
+	intid = current_locked.vcpu->vm->el0_partition
+			? vcpu_virt_interrupt_get_pending_and_enabled(
+				  current_locked)
+			: vcpu_virt_interrupt_peek_pending_and_enabled(
+				  current_locked);
 
 	/*
-	 * Check if there are any pending virtual secure interrupts to be
-	 * handled.
+	 * At this point there are interrupts pending, and the partition
+	 * didn't configure an SRI policy for handling interrupts.
+	 *
+	 * Prepare to signal virtual secure interrupt to S-EL0/S-EL1 SP
+	 * in WAITING state. Refer to FF-A v1.2 Table 9.1 and Table 9.2
+	 * case 1.
 	 */
-	if (intid != HF_INVALID_INTID) {
-		/*
-		 * Prepare to signal virtual secure interrupt to S-EL0/S-EL1 SP
-		 * in WAITING state. Refer to FF-A v1.2 Table 9.1 and Table 9.2
-		 * case 1.
-		 */
-		*signal_interrupt = api_ffa_interrupt_return(intid);
+	*signal_interrupt = api_ffa_interrupt_return(intid);
 
-		/*
-		 * Prepare to resume this partition's vCPU in SPMC
-		 * schedule mode to handle virtual secure interrupt.
-		 */
-		ffa_interrupts_run_in_sec_interrupt_rtm(current_locked);
+	/*
+	 * Prepare to resume this partition's vCPU in SPMC
+	 * schedule mode to handle virtual secure interrupt.
+	 */
+	ffa_interrupts_run_in_sec_interrupt_rtm(current_locked);
 
-		current_locked.vcpu->preempted_vcpu = next_locked.vcpu;
-		next_locked.vcpu->state = VCPU_STATE_PREEMPTED;
+	current_locked.vcpu->preempted_vcpu = next_locked.vcpu;
+	next_locked.vcpu->state = VCPU_STATE_PREEMPTED;
 
-		dlog_verbose(
-			"%s: Pending interrupt %d, intercepting FF-A call.\n",
-			__func__, intid);
+	dlog_verbose("%s: Pending interrupt %d, intercepting FF-A call.\n",
+		     __func__, intid);
 
-		return true;
-	}
-
-	return false;
+	return true;
 }

@@ -3161,9 +3161,10 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 							 next_locked);
 
 	/*
-	 * Check if there is a pending secure interrupt.
-	 * If there is, return back to the caller with FFA_INTERRUPT,
-	 * and set the `next` vcpu in a preempted state.
+	 * Check if there is a pending interrupt, and if the partition
+	 * is expects to notify the scheduler or resume straight away.
+	 * Either trigger SRI for later donation of CPU cycles, or
+	 * eret `FFA_INTERRUPT` back to the caller.
 	 */
 	if (ffa_interrupts_intercept_call(current_locked, next_locked,
 					  &signal_interrupt)) {

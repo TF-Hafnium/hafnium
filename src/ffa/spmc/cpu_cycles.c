@@ -265,10 +265,10 @@ static bool ffa_cpu_cycles_msg_wait_intercept(struct vcpu_locked current_locked,
 	both_vcpu_locks = vcpu_lock_both(current, *next);
 
 	/*
-	 * Check if there are any pending secure virtual interrupts to
-	 * be handled. The `next` should have a pointer to the current
-	 * vCPU. Intercept call will set `ret` to FFA_INTERRUPT and the
-	 * respective interrupt id.
+	 * Check if there is a pending interrupt, and if the partition
+	 * is expects to notify the scheduler or resume straight away.
+	 * Either trigger SRI for later donation of CPU cycles, or
+	 * eret `FFA_INTERRUPT` back to the caller.
 	 */
 	if (ffa_interrupts_intercept_call(both_vcpu_locks.vcpu1,
 					  both_vcpu_locks.vcpu2, ffa_ret)) {
