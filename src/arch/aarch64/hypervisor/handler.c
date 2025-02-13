@@ -759,9 +759,9 @@ static void vcpu_update_virtual_interrupts(struct vcpu *vcpu)
 
 	vcpu_locked = vcpu_lock(vcpu);
 	set_virtual_irq(&vcpu->regs,
-			vcpu_interrupt_irq_count_get(vcpu_locked) > 0);
+			vcpu_virt_interrupt_irq_count_get(vcpu_locked) > 0);
 	set_virtual_fiq(&vcpu->regs,
-			vcpu_interrupt_fiq_count_get(vcpu_locked) > 0);
+			vcpu_virt_interrupt_fiq_count_get(vcpu_locked) > 0);
 	vcpu_unlock(&vcpu_locked);
 }
 

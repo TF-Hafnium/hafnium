@@ -111,7 +111,7 @@ bool ffa_cpu_cycles_run_checks(struct vcpu_locked current_locked,
 			 * Deny the state transition if the SP didnt perform the
 			 * deactivation of the secure virtual interrupt.
 			 */
-			if (vcpu_interrupt_count_get(current_locked) > 0) {
+			if (vcpu_virt_interrupt_count_get(current_locked) > 0) {
 				run_ret->arg2 = FFA_DENIED;
 				ret = false;
 				goto out;

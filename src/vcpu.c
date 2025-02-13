@@ -219,6 +219,80 @@ void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu)
 	}
 }
 
+static void vcpu_virt_interrupt_set_pending(struct interrupts *interrupts,
+					    uint32_t intid)
+{
+	interrupt_bitmap_set_value(&interrupts->interrupt_pending, intid);
+}
+
+static void vcpu_virt_interrupt_clear_pending(struct interrupts *interrupts,
+					      uint32_t intid)
+{
+	interrupt_bitmap_clear_value(&interrupts->interrupt_pending, intid);
+}
+
+static void vcpu_irq_count_increment(struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count++;
+}
+
+static void vcpu_irq_count_decrement(struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count--;
+}
+
+static void vcpu_fiq_count_increment(struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count++;
+}
+
+static void vcpu_fiq_count_decrement(struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count--;
+}
+
+static void vcpu_interrupt_count_increment(struct vcpu_locked vcpu_locked,
+					   uint32_t intid)
+{
+	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
+
+	if (vcpu_virt_interrupt_get_type(interrupts, intid) ==
+	    INTERRUPT_TYPE_IRQ) {
+		vcpu_irq_count_increment(vcpu_locked);
+	} else {
+		vcpu_fiq_count_increment(vcpu_locked);
+	}
+}
+
+static void vcpu_interrupt_count_decrement(struct vcpu_locked vcpu_locked,
+					   uint32_t intid)
+{
+	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
+
+	if (vcpu_virt_interrupt_get_type(interrupts, intid) ==
+	    INTERRUPT_TYPE_IRQ) {
+		vcpu_irq_count_decrement(vcpu_locked);
+	} else {
+		vcpu_fiq_count_decrement(vcpu_locked);
+	}
+}
+
+uint32_t vcpu_virt_interrupt_irq_count_get(struct vcpu_locked vcpu_locked)
+{
+	return vcpu_locked.vcpu->interrupts.enabled_and_pending_irq_count;
+}
+
+uint32_t vcpu_virt_interrupt_fiq_count_get(struct vcpu_locked vcpu_locked)
+{
+	return vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count;
+}
+
+uint32_t vcpu_virt_interrupt_count_get(struct vcpu_locked vcpu_locked)
+{
+	return vcpu_virt_interrupt_irq_count_get(vcpu_locked) +
+	       vcpu_virt_interrupt_fiq_count_get(vcpu_locked);
+}
+
 void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
 				    uint32_t intid)
 {
@@ -234,8 +308,12 @@ void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
 		break;
 	}
 
+	/*
+	 * Mark the virtual interrupt as no longer pending and decrement
+	 * the interrupt count.
+	 */
 	vcpu_virt_interrupt_clear_pending(interrupts, intid);
-	vcpu_interrupt_count_decrement(vcpu_locked, interrupts, intid);
+	vcpu_interrupt_count_decrement(vcpu_locked, intid);
 }
 
 /**
@@ -402,6 +480,33 @@ void vcpu_secure_interrupt_complete(struct vcpu_locked vcpu_locked)
 	vcpu->requires_deactivate_call = false;
 }
 
+void vcpu_virt_interrupt_enable(struct vcpu_locked vcpu_locked,
+				uint32_t vint_id, bool enable)
+{
+	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
+
+	if (enable) {
+		/*
+		 * If it is pending and was not enabled before, increment the
+		 * count.
+		 */
+		if (vcpu_is_virt_interrupt_pending(interrupts, vint_id) &&
+		    !vcpu_is_virt_interrupt_enabled(interrupts, vint_id)) {
+			vcpu_interrupt_count_increment(vcpu_locked, vint_id);
+		}
+		vcpu_virt_interrupt_set_enabled(interrupts, vint_id);
+	} else {
+		/*
+		 * If it is pending and was enabled before, decrement the count.
+		 */
+		if (vcpu_is_virt_interrupt_pending(interrupts, vint_id) &&
+		    vcpu_is_virt_interrupt_enabled(interrupts, vint_id)) {
+			vcpu_interrupt_count_decrement(vcpu_locked, vint_id);
+		}
+		vcpu_virt_interrupt_clear_enabled(interrupts, vint_id);
+	}
+}
+
 /*
  * Find and return the first intid that is pending and enabled, the interrupt
  * struct for this intid will be at the head of the list so can be popped.
@@ -414,7 +519,7 @@ uint32_t vcpu_virt_interrupt_peek_pending_and_enabled(
 	uint32_t vint_id = HF_INVALID_INTID;
 	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
 	uint32_t pending_and_enabled_count =
-		vcpu_interrupt_count_get(vcpu_locked);
+		vcpu_virt_interrupt_count_get(vcpu_locked);
 
 	/* First check there is a pending and enabled interrupt to return. */
 	if (pending_and_enabled_count == 0) {
@@ -480,7 +585,6 @@ void vcpu_virt_interrupt_inject(struct vcpu_locked vcpu_locked,
 	vcpu_virt_interrupt_set_pending(interrupts, vint_id);
 
 	if (vcpu_is_virt_interrupt_enabled(interrupts, vint_id)) {
-		vcpu_interrupt_count_increment(vcpu_locked, interrupts,
-					       vint_id);
+		vcpu_interrupt_count_increment(vcpu_locked, vint_id);
 	}
 }

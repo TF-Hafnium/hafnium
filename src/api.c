@@ -1271,12 +1271,13 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 		if (need_vm_lock &&
 		    ffa_interrupts_inject_notification_pending_interrupt(
 			    vcpu_next_locked, vm_locked)) {
-			assert(vcpu_interrupt_count_get(vcpu_next_locked) > 0);
+			assert(vcpu_virt_interrupt_count_get(vcpu_next_locked) >
+			       0);
 			break;
 		}
 
 		/* Allow virtual interrupts to be delivered. */
-		if (vcpu_interrupt_count_get(vcpu_next_locked) > 0) {
+		if (vcpu_virt_interrupt_count_get(vcpu_next_locked) > 0) {
 			break;
 		}
 
@@ -2306,32 +2307,11 @@ int64_t api_interrupt_enable(uint32_t intid, bool enable,
 		plat_interrupts_configure_interrupt(*int_desc);
 	}
 
-	if (enable) {
-		/*
-		 * If it is pending and was not enabled before, increment the
-		 * count.
-		 */
-		if (vcpu_is_virt_interrupt_pending(interrupts, intid) &&
-		    !vcpu_is_virt_interrupt_enabled(interrupts, intid)) {
-			vcpu_interrupt_count_increment(current_locked,
-						       interrupts, intid);
-		}
-
-		vcpu_virt_interrupt_set_enabled(interrupts, intid);
-		vcpu_virt_interrupt_set_type(interrupts, intid, type);
-	} else {
-		/*
-		 * If it is pending and was enabled before, decrement the count.
-		 */
-		if (vcpu_is_virt_interrupt_pending(interrupts, intid) &&
-		    vcpu_is_virt_interrupt_enabled(interrupts, intid)) {
-			vcpu_interrupt_count_decrement(current_locked,
-						       interrupts, intid);
-		}
-		vcpu_virt_interrupt_clear_enabled(interrupts, intid);
-		vcpu_virt_interrupt_set_type(interrupts, intid,
-					     INTERRUPT_TYPE_IRQ);
-	}
+	/*
+	 * The type must be set first so that the correct count is modfied.
+	 */
+	vcpu_virt_interrupt_set_type(interrupts, intid, type);
+	vcpu_virt_interrupt_enable(current_locked, intid, enable);
 
 	ret = 0;
 

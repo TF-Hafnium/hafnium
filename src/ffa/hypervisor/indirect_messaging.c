@@ -70,7 +70,7 @@ static bool ffa_indirect_msg_recv_block_interrupted(
 	 * Don't block if there are enabled and pending interrupts, to match
 	 * behaviour of wait_for_interrupt.
 	 */
-	interrupted = (vcpu_interrupt_count_get(current_locked) > 0);
+	interrupted = (vcpu_virt_interrupt_count_get(current_locked) > 0);
 
 	return interrupted;
 }
