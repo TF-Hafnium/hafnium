@@ -353,7 +353,7 @@ struct ffa_value ffa_notifications_get_framework_notifications(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
-static void plat_ffa_send_schedule_receiver_interrupt(struct cpu *cpu)
+static void ffa_notifications_send_schedule_receiver_interrupt(struct cpu *cpu)
 {
 	dlog_verbose("Setting Schedule Receiver SGI %u on core: %zu\n",
 		     HF_SCHEDULE_RECEIVER_INTID, cpu_index(cpu));
@@ -373,7 +373,7 @@ void ffa_notifications_sri_set_delayed(struct cpu *cpu)
 	ffa_notifications_sri_set_delayed_internal(cpu, true);
 }
 
-static bool plat_ffa_is_sri_delayed(struct cpu *cpu)
+static bool ffa_notifications_is_sri_delayed(struct cpu *cpu)
 {
 	assert(cpu != NULL);
 	return cpu->is_sri_delayed;
@@ -383,8 +383,8 @@ void ffa_notifications_sri_trigger_if_delayed(struct cpu *cpu)
 {
 	assert(cpu != NULL);
 
-	if (plat_ffa_is_sri_delayed(cpu)) {
-		plat_ffa_send_schedule_receiver_interrupt(cpu);
+	if (ffa_notifications_is_sri_delayed(cpu)) {
+		ffa_notifications_send_schedule_receiver_interrupt(cpu);
 		ffa_notifications_sri_set_delayed_internal(cpu, false);
 	}
 }
@@ -395,7 +395,7 @@ void ffa_notifications_sri_trigger_not_delayed(struct cpu *cpu)
 	 * If flag to delay SRI isn't set, trigger SRI such that the
 	 * receiver scheduler is aware there are pending notifications.
 	 */
-	plat_ffa_send_schedule_receiver_interrupt(cpu);
+	ffa_notifications_send_schedule_receiver_interrupt(cpu);
 	ffa_notifications_sri_set_delayed_internal(cpu, false);
 }
 

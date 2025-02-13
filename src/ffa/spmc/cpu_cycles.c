@@ -194,7 +194,8 @@ out:
 /**
  * SPMC scheduled call chain is completely unwound.
  */
-static void plat_ffa_exit_spmc_schedule_mode(struct vcpu_locked current_locked)
+static void ffa_cpu_cycles_exit_spmc_schedule_mode(
+	struct vcpu_locked current_locked)
 {
 	struct vcpu *current;
 
@@ -215,7 +216,7 @@ static void plat_ffa_exit_spmc_schedule_mode(struct vcpu_locked current_locked)
  *
  * SPM then resumes the original SP that was initially pre-empted.
  */
-static struct ffa_value plat_ffa_preempted_vcpu_resume(
+static struct ffa_value ffa_cpu_cycles_preempted_vcpu_resume(
 	struct vcpu_locked current_locked, struct vcpu **next)
 {
 	struct ffa_value ffa_ret = (struct ffa_value){.func = FFA_MSG_WAIT_32};
@@ -239,7 +240,7 @@ static struct ffa_value plat_ffa_preempted_vcpu_resume(
 	vcpu_secure_interrupt_complete(current_locked);
 
 	/* SPMC scheduled call chain is completely unwound. */
-	plat_ffa_exit_spmc_schedule_mode(current_locked);
+	ffa_cpu_cycles_exit_spmc_schedule_mode(current_locked);
 	assert(current->call_chain.prev_node == NULL);
 
 	current->state = VCPU_STATE_WAITING;
@@ -276,9 +277,9 @@ static struct ffa_value ffa_msg_wait_complete(struct vcpu_locked current_locked,
 /**
  * Deals with the common case of intercepting an FFA_MSG_WAIT call.
  */
-static bool plat_ffa_msg_wait_intercept(struct vcpu_locked current_locked,
-					struct vcpu **next,
-					struct ffa_value *ffa_ret)
+static bool ffa_cpu_cycles_msg_wait_intercept(struct vcpu_locked current_locked,
+					      struct vcpu **next,
+					      struct ffa_value *ffa_ret)
 {
 	struct two_vcpu_locked both_vcpu_locks;
 	struct vcpu *current = current_locked.vcpu;
@@ -402,8 +403,8 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 		if (!sp_boot_next(current_locked, next)) {
 			ret = ffa_msg_wait_complete(current_locked, next);
 
-			if (plat_ffa_msg_wait_intercept(current_locked, next,
-							&ret)) {
+			if (ffa_cpu_cycles_msg_wait_intercept(current_locked,
+							      next, &ret)) {
 			}
 		}
 		break;
@@ -412,9 +413,10 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 		 * Either resume the preempted SP or complete the FFA_MSG_WAIT.
 		 */
 		assert(current->preempted_vcpu != NULL);
-		plat_ffa_preempted_vcpu_resume(current_locked, next);
+		ffa_cpu_cycles_preempted_vcpu_resume(current_locked, next);
 
-		if (plat_ffa_msg_wait_intercept(current_locked, next, &ret)) {
+		if (ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
+						      &ret)) {
 			break;
 		}
 
@@ -428,7 +430,8 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 	case RTM_FFA_RUN:
 		ret = ffa_msg_wait_complete(current_locked, next);
 
-		if (plat_ffa_msg_wait_intercept(current_locked, next, &ret)) {
+		if (ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
+						      &ret)) {
 			break;
 		}
 
@@ -564,10 +567,10 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
  * Validates the Runtime model for FFA_RUN. Refer to section 7.2 of the FF-A
  * v1.1 EAC0 spec.
  */
-static bool plat_ffa_check_rtm_ffa_run(struct vcpu_locked current_locked,
-				       struct vcpu_locked locked_vcpu,
-				       uint32_t func,
-				       enum vcpu_state *next_state)
+static bool ffa_cpu_cycles_check_rtm_ffa_run(struct vcpu_locked current_locked,
+					     struct vcpu_locked locked_vcpu,
+					     uint32_t func,
+					     enum vcpu_state *next_state)
 {
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
@@ -606,11 +609,9 @@ static bool plat_ffa_check_rtm_ffa_run(struct vcpu_locked current_locked,
  * FFA_MSG_SEND_DIRECT_REQ2. Refer to section 8.3 of the FF-A
  * v1.2 spec.
  */
-static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu_locked current_locked,
-					   struct vcpu_locked locked_vcpu,
-					   ffa_id_t receiver_vm_id,
-					   uint32_t func,
-					   enum vcpu_state *next_state)
+static bool ffa_cpu_cycles_check_rtm_ffa_dir_req(
+	struct vcpu_locked current_locked, struct vcpu_locked locked_vcpu,
+	ffa_id_t receiver_vm_id, uint32_t func, enum vcpu_state *next_state)
 {
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
@@ -655,10 +656,9 @@ static bool plat_ffa_check_rtm_ffa_dir_req(struct vcpu_locked current_locked,
  * Validates the Runtime model for Secure interrupt handling. Refer to section
  * 8.4 of the FF-A v1.2 ALP0 spec.
  */
-static bool plat_ffa_check_rtm_sec_interrupt(struct vcpu_locked current_locked,
-					     struct vcpu_locked locked_vcpu,
-					     uint32_t func,
-					     enum vcpu_state *next_state)
+static bool ffa_cpu_cycles_check_rtm_sec_interrupt(
+	struct vcpu_locked current_locked, struct vcpu_locked locked_vcpu,
+	uint32_t func, enum vcpu_state *next_state)
 {
 	struct vcpu *current = current_locked.vcpu;
 	struct vcpu *vcpu = locked_vcpu.vcpu;
@@ -703,9 +703,9 @@ static bool plat_ffa_check_rtm_sec_interrupt(struct vcpu_locked current_locked,
  * Validates the Runtime model for SP initialization. Refer to section
  * 8.3 of the FF-A v1.2 ALP0 spec.
  */
-static bool plat_ffa_check_rtm_sp_init(struct vcpu_locked locked_vcpu,
-				       uint32_t func,
-				       enum vcpu_state *next_state)
+static bool ffa_cpu_cycles_check_rtm_sp_init(struct vcpu_locked locked_vcpu,
+					     uint32_t func,
+					     enum vcpu_state *next_state)
 {
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
@@ -765,21 +765,21 @@ bool ffa_cpu_cycles_check_runtime_state_transition(
 
 	switch (current->rt_model) {
 	case RTM_FFA_RUN:
-		allowed = plat_ffa_check_rtm_ffa_run(
+		allowed = ffa_cpu_cycles_check_rtm_ffa_run(
 			current_locked, locked_vcpu, func, next_state);
 		break;
 	case RTM_FFA_DIR_REQ:
-		allowed = plat_ffa_check_rtm_ffa_dir_req(
+		allowed = ffa_cpu_cycles_check_rtm_ffa_dir_req(
 			current_locked, locked_vcpu, receiver_vm_id, func,
 			next_state);
 		break;
 	case RTM_SEC_INTERRUPT:
-		allowed = plat_ffa_check_rtm_sec_interrupt(
+		allowed = ffa_cpu_cycles_check_rtm_sec_interrupt(
 			current_locked, locked_vcpu, func, next_state);
 		break;
 	case RTM_SP_INIT:
-		allowed = plat_ffa_check_rtm_sp_init(locked_vcpu, func,
-						     next_state);
+		allowed = ffa_cpu_cycles_check_rtm_sp_init(locked_vcpu, func,
+							   next_state);
 		break;
 	default:
 		dlog_error(

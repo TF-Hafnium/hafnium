@@ -54,7 +54,7 @@ static void nwd_vms_unlock(struct nwd_vms_locked *vms)
 	sl_unlock(&nwd_vms_lock_instance);
 }
 
-static struct vm_locked plat_ffa_nwd_vm_find_locked(
+static struct vm_locked ffa_vm_nwd_find_locked(
 	struct nwd_vms_locked nwd_vms_locked, ffa_id_t vm_id)
 {
 	assert(nwd_vms_locked.nwd_vms != NULL);
@@ -81,14 +81,13 @@ struct vm_locked ffa_vm_nwd_create(ffa_id_t vm_id)
 	CHECK(!vm_id_is_current_world(vm_id));
 
 	/* Check if a VM with `vm_id` already exists and returns it. */
-	vm_locked = plat_ffa_nwd_vm_find_locked(nwd_vms_locked, vm_id);
+	vm_locked = ffa_vm_nwd_find_locked(nwd_vms_locked, vm_id);
 	if (vm_locked.vm != NULL) {
 		goto out;
 	}
 
 	/* Get first empty slot in `nwd_vms` to create VM. */
-	vm_locked =
-		plat_ffa_nwd_vm_find_locked(nwd_vms_locked, HF_INVALID_VM_ID);
+	vm_locked = ffa_vm_nwd_find_locked(nwd_vms_locked, HF_INVALID_VM_ID);
 	if (vm_locked.vm == NULL) {
 		/* NULL means there are no slots in `nwd_vms`. */
 		goto out;
@@ -159,7 +158,7 @@ struct vm_locked ffa_vm_find_locked(ffa_id_t vm_id)
 
 	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
 
-	to_ret_locked = plat_ffa_nwd_vm_find_locked(nwd_vms_locked, vm_id);
+	to_ret_locked = ffa_vm_nwd_find_locked(nwd_vms_locked, vm_id);
 
 	nwd_vms_unlock(&nwd_vms_locked);
 

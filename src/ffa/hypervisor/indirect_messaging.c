@@ -79,8 +79,8 @@ static bool ffa_indirect_msg_recv_block_interrupted(
  * Returns true if there is something in the return code, either a v1.0
  * FFA_MSG_SEND, or an FFA_ERROR.
  */
-static bool plat_ffa_return_pending_messages(struct vm_locked vm_locked,
-					     struct ffa_value *ret)
+static bool ffa_indirect_msg_return_pending_messages(struct vm_locked vm_locked,
+						     struct ffa_value *ret)
 {
 	/* Return pending messages without blocking. */
 	if (vm_locked.vm->mailbox.state == MAILBOX_STATE_FULL) {
@@ -129,7 +129,7 @@ struct ffa_value ffa_indirect_msg_recv(bool block,
 	vm_locked = vm_lock(vm);
 	current_locked = vcpu_lock(current);
 
-	if (plat_ffa_return_pending_messages(vm_locked, &return_code)) {
+	if (ffa_indirect_msg_return_pending_messages(vm_locked, &return_code)) {
 		goto out;
 	}
 
