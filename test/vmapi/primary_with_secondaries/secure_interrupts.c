@@ -1304,20 +1304,32 @@ TEST_PRECONDITION(ipi, receive_ipi_one_service_to_two_vcpus, service1_is_mp_sp)
  * - Service1 is configured in a way it can use the aforementioned platform
  *   ABI.
  * - Service2 is assigned with a dummy device, which is configured with
- * interrupt in ESPI range.
+ *   interrupt in ESPI range.
  * - Reused the hf_ipi_state_* abstractions given they fulfill the needful
  *   for this test.
  *
  * Test sequence:
  * - PVM creates an interrupt state structure, which can be used to synchronise
- *    between endpoints on the state of the interrupt. It also configures itself
- *    to use the GIC and handle the SRI interrupt.
+ *   between endpoints on the state of the interrupt. It also configures itself
+ *   to use the GIC and handle the SRI interrupt.
  * - PMV bootstraps Service1 to `send_espi_interrupt` and Service2 to
  *   `receive_interrupt_waiting_vcpu_sri_triggered`.
  * - PVM shares the state with both service1 and service2.
- * - Service1 is resumed to put it in the state to trigger ESPI.
  * - Service2 is resumed to be ready to handle the ESPI. It also calls
  *   FFA_MSG_WAIT to be set in waiting state when interrupt is triggered.
+ * - Service1 is resumed to put itself in a state from which it can
+ *   receive the ESPI ID to trigger.
+ * - Send the ESPI ID to Service1, and resume it.
+ * - Service1 returns without triggering ESPI. This is so the SRI due indirect
+ *   messaging is handled first.
+ * - Service1 is resumed such that it can trigger ESPI. The SPMC should send
+ *   SRI to the NWd.
+ * - Service1 terminates.
+ * - PVM resumes, waiting for the SRI.
+ * - PVM invokes FFA_NOTIFICATION_INFO_GET, attest the return.
+ * - PVM resumes Service2 to handle the EPSI.
+ * - Service2 resumes, execution should reach the IRQ handler.
+ * - Service2 attests interrupt has been handled and terminates.
  */
 TEST_PRECONDITION(secure_interrupts, sri_triggered_due_to_secure_interrupt,
 		  service1_is_mp_sp)
@@ -1333,6 +1345,11 @@ TEST_PRECONDITION(secure_interrupts, sri_triggered_due_to_secure_interrupt,
 				       service2_info->vm_id};
 	uint32_t receivers_ipi_state_indexes[] = {0};
 	struct ffa_value ret;
+	/*
+	 * Interrupt ID assigned to device `espi_test_node`, in manifest
+	 * of service2.
+	 */
+	const uint32_t espi_id = 5000;
 
 	/* Get ready to handle SRI.  */
 	gicv3_system_setup();
@@ -1368,9 +1385,23 @@ TEST_PRECONDITION(secure_interrupts, sri_triggered_due_to_secure_interrupt,
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
 
+	/* Send interrupt ID to service1. */
+	ret = send_indirect_message(hf_vm_get_id(), service1_info->vm_id,
+				    mb.send, (void *)&espi_id, sizeof(espi_id),
+				    0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* FFA_RUN service1 to retrieve the interrupt state. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
 	last_interrupt_id = 0;
 
-	/* FFA_RUN Service1 to send eSPI. */
+	/*
+	 * Rerunning now such that the SRI due to indirect messaging
+	 * is now resolved. At this point the SRI can only be due to
+	 * eSPI given no messages are being exchanged.
+	 */
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
@@ -1394,4 +1425,134 @@ TEST_PRECONDITION(secure_interrupts, sri_triggered_due_to_secure_interrupt,
 
 	/* Resumes service2 in target vCPU 0 to handle the ESPI. */
 	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
+}
+
+/**
+ * Target SP goes into waiting state whith interrupt pending, so the SPMC sends
+ * SRI to the NWd for the scheduler to explicitly provide CPU cycles at a later
+ * instance. The sequence is due to 'sri-interrupts-policy' field in the
+ * respective manifest.
+ *
+ * The test uses ESPI interrupts, and a platform specific ABI to trigger
+ * interrupts in the ESPI range:
+ * - Service1 is configured in a way it can use the aforementioned platform
+ *   ABI.
+ * - Service3 is assigned with a dummy device, which is configured with
+ * interrupt in ESPI range.
+ * - Reused the hf_ipi_state_* abstractions given they fulfill the needful
+ *   for this test.
+ *
+ * Test sequence:
+ * - PVM creates an interrupt state structure, which can be used to synchronise
+ *   between endpoints on the state of the interrupt. It also configures itself
+ *   to use the GIC and handle the SRI interrupt.
+ * - PMV bootstraps Service1 to `send_espi_interrupt` and Service3 to
+ *   `receive_interrupt_sri_triggered_into_waiting`.
+ * - PVM shares the state with both service1 and service3.
+ * - Service3 is resumed, so it is ready to handle the ESPI. It masks
+ *   interrupts such when it is next resumed, execution doesn't reach IRQ
+ *   handler.
+ * - Service1 is resumed to put itself in a state from which it can
+ *   receive the ESPI ID to trigger.
+ * - Send the ESPI ID to Service1, and resume it.
+ * - Service1 returns without triggering ESPI. This is so the SRI due
+ *   indirect messaging is handled first.
+ * - PVM resumes, handles SRI from indirect messaging and resumes Service1 to
+ *   trigger the ESPI.
+ * - Service1 resumes, triggers ESPI and terminates.
+ * - Service3 is resumed with interrupts pending. It calls FFA_MSG_WAIT.
+ *   This should trigger the SRI for the PVM.
+ * - PVM resumes, attesting it handled the SRI. It calls
+ * FFA_NOTIFICATION_INFO_GET and resumes Service3.
+ * - Service3 resumes, unmaks interrupts. Execution should reach the interrupt
+ *   handler. Attest the interrupt state is "HANDLED" and terminates.
+ */
+TEST_PRECONDITION(secure_interrupts,
+		  sri_triggered_due_to_secure_interrupt_transition_waiting,
+		  service1_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+	uint32_t sri_id;
+	uint32_t expected_list_count = 1;
+	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	ffa_id_t memory_receivers[] = {service1_info->vm_id,
+				       service3_info->vm_id};
+	uint32_t receivers_ipi_state_indexes[] = {0};
+	struct ffa_value ret;
+	/*
+	 * Interrupt ID assigned to device `espi_test_node`, in manifest
+	 * of service2.
+	 */
+	const uint32_t espi_id = 5001;
+
+	/* Get ready to handle SRI.  */
+	gicv3_system_setup();
+	sri_id = enable_sri();
+
+	/* Init vCPU which will send interrupt. */
+	SERVICE_SELECT(service1_info->vm_id, "send_espi_interrupt", mb.send);
+
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Init vCPU which will handle interrupt. */
+	SERVICE_SELECT(service3_info->vm_id,
+		       "receive_interrupt_sri_triggered_into_waiting", mb.send);
+
+	ret = ffa_run(service3_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Share the interrupt state with both. */
+	hftest_ipi_state_share_page_and_init(
+		(uint64_t)interrupt_state_page, memory_receivers,
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
+		mb.send, 0);
+
+	/* FFA_RUN service3 ready for eSPI triggering. */
+	ret = ffa_run(service3_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* FFA_RUN service1 to retrieve the interrupt state. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Send interrupt ID to sender service. */
+	ret = send_indirect_message(hf_vm_get_id(), service1_info->vm_id,
+				    mb.send, (void *)&espi_id, sizeof(espi_id),
+				    0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* FFA_RUN service1 to retrieve the interrupt state. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* FFA_RUN service1 to send ESPI. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Expecting the SRI to trigger now. */
+	last_interrupt_id = 0;
+
+	dlog_info("Resuming %x it should trigger SRI.", service3_info->vm_id);
+
+	ret = ffa_run(service3_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	while (last_interrupt_id != sri_id) {
+		interrupt_wait();
+	}
+
+	/* Check the target vCPU 0 is returned by FFA_NOTIFICATION_INFO_GET. */
+	expected_lists_sizes[0] = 1;
+	expected_ids[0] = service3_info->vm_id;
+	expected_ids[1] = 0;
+
+	ffa_notification_info_get_and_check(expected_list_count,
+					    expected_lists_sizes, expected_ids);
+
+	/* Resumes service3 in target vCPU 0 to handle IPI. */
+	EXPECT_EQ(ffa_run(service3_info->vm_id, 0).func, FFA_YIELD_32);
 }

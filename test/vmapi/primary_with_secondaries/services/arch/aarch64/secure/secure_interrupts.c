@@ -33,6 +33,7 @@
 static bool rtm_init_espi_handled;
 
 uint32_t espi_id = RTM_INIT_ESPI_ID;
+
 static bool multiple_interrupts_expected;
 
 static inline uint64_t physicalcounter_read(void)
@@ -711,6 +712,7 @@ TEST_SERVICE(receive_interrupt_waiting_vcpu_sri_triggered)
 {
 	exception_setup(espi_state_irq_handler, NULL);
 	interrupts_enable();
+	EXPECT_EQ(hf_interrupt_enable(espi_id, true, 0), 0);
 
 	dlog_info("Enabled ESPI. Waiting for interrupt state.");
 
@@ -739,21 +741,95 @@ TEST_SERVICE(receive_interrupt_waiting_vcpu_sri_triggered)
 }
 
 /**
+ * Service function to test SRI is triggered when SP goes back into
+ * waiting state with pending interrupts.
+ * - Configures the respective IRQ handler.
+ * - Enables ESPI 5001.
+ * - Unmasks interrupts, so it can acknowledg the NPI.
+ * - Goes into waiting state to receive interrupt state structure.
+ * - Wakes up and retrieves the memory with the shared state structure.
+ * - Sets the state to ready since it can now handle interrupts.
+ * - Masks interrupts such that the next time it resumes, the interrupt
+ *   will remain pending.
+ * - Wakes up with FFA_INTERRUPT. Do not call hf_interrupt_get and go back
+ *   to wait.
+ * - Wake up and attest the state is "SENT".
+ * - With interrupt pending go back to waiting state.
+ * - Wake up and enable interrupts. The ESPI shall be handled. Attest by
+ *   checking interrupt state is Handled.
+ * - Terminates the test.
+ */
+TEST_SERVICE(receive_interrupt_sri_triggered_into_waiting)
+{
+	/*
+	 * Interrupt assigned to service3, who is excepted to run this
+	 * test.
+	 */
+	espi_id = 5001;
+	exception_setup(espi_state_irq_handler, NULL);
+
+	EXPECT_EQ(hf_interrupt_enable(espi_id, true, 0), 0);
+
+	/* So it handles the NPI. */
+	interrupts_enable();
+
+	dlog_info("Waiting for interrupt state.");
+
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	/* Configures the interrupt state. */
+	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
+					   SERVICE_SEND_BUFFER());
+
+	hftest_ipi_state_set(READY);
+
+	/* Now NPI is handled, disable interrupts. */
+	interrupts_disable();
+
+	dlog_info("Received the interrupt state. Masked Interrupts.");
+
+	/* It will be entered with FFA_INTERRUPT_32. */
+	EXPECT_EQ(ffa_msg_wait().func, FFA_INTERRUPT_32);
+
+	/* Go back straight to sleep. This should trigger the SRI. */
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	EXPECT_TRUE(hftest_ipi_state_is(SENT));
+
+	dlog_info("The ESPI has been sent. Next FFA_MSG_WAIT to trigger SRI.");
+
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	dlog_info("Woke up to handle ESPI.");
+
+	interrupts_enable();
+
+	while (!hftest_ipi_state_is(HANDLED)) {
+	}
+
+	dlog_info("End of test.");
+
+	ffa_yield();
+
+	FAIL("Do not expect getting to this point.");
+}
+
+/**
  * Service function to trigger an ESPI. This is to test the case
  * in which an SP configured itself to be given CPU cycles by the
  * scheduler to handle interrupts, when in waiting state/getting
  * into waiting state.
- * - Wakes up and sets up interrupt handler for acknowledgin NPI.
+ * - Sets up interrupt handler for acknowledgin NPI.
  * - FFA_MSG_WAIT so it can receive the interrupt state.
  * - Wakes up, retrieves the memory region with the interrupt state.
- * - Calls again FFA_MSG_WAIT so it can trigger ESPI.
+ * - Calls again FFA_MSG_WAIT so it receives the ESPI ID to trigger.
  * - Wakes up, waits for the interrupt state to be READY. Once that
  *   is the case, sent the ESPI and set sate to SENT.
  * - Terminates the test.
  */
 TEST_SERVICE(send_espi_interrupt)
 {
-	uint32_t to_send_espi = espi_id;
+	uint32_t to_send_espi;
 
 	dlog_info("Waiting for interrupt state.");
 
@@ -766,7 +842,14 @@ TEST_SERVICE(send_espi_interrupt)
 	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
 					   SERVICE_SEND_BUFFER());
 
-	dlog_info("Interrupt state obtained. Waiting to send eSPI.");
+	dlog_info("Interrupt state obtained. Waiting for interrupt ID.");
+
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	receive_indirect_message(&to_send_espi, sizeof(to_send_espi),
+				 SERVICE_RECV_BUFFER());
+
+	dlog_info("Interrupt ID %u\n", to_send_espi);
 
 	/* Wait for next FFA_RUN to set ESPI. */
 	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
