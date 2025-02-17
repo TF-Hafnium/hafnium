@@ -19,10 +19,10 @@ volatile uint32_t last_interrupt_id = 0;
 static void irq(void)
 {
 	uint32_t interrupt_id = interrupt_get_and_acknowledge();
-	HFTEST_LOG("primary IRQ %d from current\n", interrupt_id);
+	dlog_verbose("primary IRQ %d from current\n", interrupt_id);
 	last_interrupt_id = interrupt_id;
 	interrupt_end(interrupt_id);
-	HFTEST_LOG("primary IRQ %d ended\n", interrupt_id);
+	dlog_verbose("primary IRQ %d ended\n", interrupt_id);
 }
 
 void gicv3_system_setup(void)
