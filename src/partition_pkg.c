@@ -67,8 +67,6 @@ static bool partition_pkg_from_sp_pkg(struct mm_stage1_locked stage1_locked,
 	pkg->hob.begin = pa_init(0);
 	pkg->hob.end = pa_init(0);
 
-	dump_partition_package(pkg);
-
 	/* Map the whole package as RO. */
 	CHECK(mm_identity_map(stage1_locked, pkg->total.begin, pkg->total.end,
 			      MM_MODE_R, ppool) != NULL);
@@ -180,8 +178,6 @@ static bool partition_pkg_from_tl(struct mm_stage1_locked stage1_locked,
 	 */
 	pkg->boot_info.begin = pkg_start;
 	pkg->boot_info.end = pa_add(pkg_start, PAGE_SIZE);
-
-	dump_partition_package(pkg);
 
 	return true;
 }
