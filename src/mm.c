@@ -847,20 +847,33 @@ static bool mm_ptable_get_attrs_level(const struct mm_page_table *table,
 
 	/* Check that each entry is owned. */
 	while (begin < end) {
-		if (arch_mm_pte_is_table(*pte, level)) {
-			if (!mm_ptable_get_attrs_level(
-				    arch_mm_table_from_pte(*pte, level), begin,
-				    end, level - 1, got_attrs, attrs)) {
+		switch (arch_mm_pte_type(*pte, level)) {
+		case PTE_TYPE_TABLE: {
+			const struct mm_page_table *child_table =
+				arch_mm_table_from_pte(*pte, level);
+			bool child_ret = mm_ptable_get_attrs_level(
+				child_table, begin, end, level - 1, got_attrs,
+				attrs);
+
+			if (!child_ret) {
 				return false;
 			}
 			got_attrs = true;
-		} else {
-			if (!got_attrs) {
-				*attrs = arch_mm_pte_attrs(*pte, level);
-				got_attrs = true;
-			} else if (arch_mm_pte_attrs(*pte, level) != *attrs) {
+			break;
+		}
+
+		case PTE_TYPE_ABSENT:
+		case PTE_TYPE_INVALID_BLOCK:
+		case PTE_TYPE_VALID_BLOCK: {
+			mm_attr_t block_attrs = arch_mm_pte_attrs(*pte, level);
+
+			if (got_attrs && block_attrs != *attrs) {
 				return false;
 			}
+			got_attrs = true;
+			*attrs = block_attrs;
+			break;
+		}
 		}
 
 		begin = mm_start_of_next_block(begin, level);
