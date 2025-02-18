@@ -838,6 +838,22 @@ static void mm_ptable_defrag(struct mm_ptable *ptable, bool non_secure,
 	arch_mm_sync_table_writes();
 }
 
+struct mm_get_attrs_state {
+	/**
+	 * The attributes the range is mapped with.
+	 * Only valid if `got_attrs` is true.
+	 */
+	mm_attr_t attrs;
+	/**
+	 * The address of the first page that does not match the attributes of
+	 * the pages before it in the range.
+	 * Only valid if `got_mismatch` is true.
+	 */
+	ptable_addr_t mismatch;
+	bool got_attrs : 1;
+	bool got_mismatch : 1;
+};
+
 /**
  * Gets the attributes applied to the given range of stage-2 addresses at the
  * given level.
@@ -850,10 +866,9 @@ static void mm_ptable_defrag(struct mm_ptable *ptable, bool non_secure,
  * Returns true if the whole range has the same attributes and false otherwise.
  */
 // NOLINTNEXTLINE(misc-no-recursion)
-static bool mm_ptable_get_attrs_level(const struct mm_page_table *table,
-				      ptable_addr_t begin, ptable_addr_t end,
-				      mm_level_t level, bool got_attrs,
-				      mm_attr_t *attrs)
+static struct mm_get_attrs_state mm_ptable_get_attrs_level(
+	const struct mm_page_table *table, ptable_addr_t begin,
+	ptable_addr_t end, mm_level_t level, struct mm_get_attrs_state state)
 {
 	const pte_t *pte = &table->entries[mm_index(begin, level)];
 	ptable_addr_t level_end = mm_level_end(begin, level);
@@ -864,19 +879,13 @@ static bool mm_ptable_get_attrs_level(const struct mm_page_table *table,
 	}
 
 	/* Check that each entry is owned. */
-	while (begin < end) {
+	while (begin < end && !state.got_mismatch) {
 		switch (arch_mm_pte_type(*pte, level)) {
 		case PTE_TYPE_TABLE: {
 			const struct mm_page_table *child_table =
 				arch_mm_table_from_pte(*pte, level);
-			bool child_ret = mm_ptable_get_attrs_level(
-				child_table, begin, end, level - 1, got_attrs,
-				attrs);
-
-			if (!child_ret) {
-				return false;
-			}
-			got_attrs = true;
+			state = mm_ptable_get_attrs_level(
+				child_table, begin, end, level - 1, state);
 			break;
 		}
 
@@ -885,11 +894,14 @@ static bool mm_ptable_get_attrs_level(const struct mm_page_table *table,
 		case PTE_TYPE_VALID_BLOCK: {
 			mm_attr_t block_attrs = arch_mm_pte_attrs(*pte, level);
 
-			if (got_attrs && block_attrs != *attrs) {
-				return false;
+			if (state.got_attrs && block_attrs != state.attrs) {
+				state.mismatch = begin;
+				state.got_mismatch = true;
+				continue;
 			}
-			got_attrs = true;
-			*attrs = block_attrs;
+
+			state.got_attrs = true;
+			state.attrs = block_attrs;
 			break;
 		}
 		}
@@ -899,7 +911,7 @@ static bool mm_ptable_get_attrs_level(const struct mm_page_table *table,
 	}
 
 	/* The entry is a valid block. */
-	return got_attrs;
+	return state;
 }
 
 /**
@@ -910,13 +922,14 @@ static bool mm_ptable_get_attrs_level(const struct mm_page_table *table,
  *
  * Returns true if the whole range has the same attributes and false otherwise.
  */
-static bool mm_get_attrs(const struct mm_ptable *ptable, ptable_addr_t begin,
-			 ptable_addr_t end, mm_attr_t *attrs)
+static struct mm_get_attrs_state mm_get_attrs(const struct mm_ptable *ptable,
+					      ptable_addr_t begin,
+					      ptable_addr_t end)
 {
 	mm_level_t root_level = mm_root_level(ptable);
 	ptable_addr_t ptable_end = mm_ptable_addr_space_end(ptable);
 	struct mm_page_table *root_table;
-	bool got_attrs = false;
+	struct mm_get_attrs_state state = {0};
 
 	if (begin >= end) {
 		dlog_verbose(
@@ -930,23 +943,19 @@ static bool mm_get_attrs(const struct mm_ptable *ptable, ptable_addr_t begin,
 
 	/* Fail if the addresses are out of range. */
 	if (end > ptable_end) {
-		return false;
+		return state;
 	}
 
 	root_table = &ptable->root_tables[mm_index(begin, root_level)];
-	while (begin < end) {
-		if (!mm_ptable_get_attrs_level(root_table, begin, end,
-					       root_level - 1, got_attrs,
-					       attrs)) {
-			return false;
-		}
+	while (begin < end && !state.got_mismatch) {
+		state = mm_ptable_get_attrs_level(root_table, begin, end,
+						  root_level - 1, state);
 
-		got_attrs = true;
 		begin = mm_start_of_next_block(begin, root_level);
 		root_table++;
 	}
 
-	return got_attrs;
+	return state;
 }
 
 bool mm_vm_init(struct mm_ptable *ptable, mm_asid_t id, struct mpool *ppool)
@@ -1120,15 +1129,17 @@ void mm_vm_defrag(struct mm_ptable *ptable, struct mpool *ppool,
 bool mm_vm_get_mode(const struct mm_ptable *ptable, ipaddr_t begin,
 		    ipaddr_t end, mm_mode_t *mode)
 {
-	mm_attr_t attrs;
-	bool ret;
+	struct mm_get_attrs_state ret;
+	bool success;
 
-	ret = mm_get_attrs(ptable, ipa_addr(begin), ipa_addr(end), &attrs);
-	if (ret) {
-		*mode = arch_mm_stage2_attrs_to_mode(attrs);
+	ret = mm_get_attrs(ptable, ipa_addr(begin), ipa_addr(end));
+	success = ret.got_attrs && !ret.got_mismatch;
+
+	if (success && mode != NULL) {
+		*mode = arch_mm_stage2_attrs_to_mode(ret.attrs);
 	}
 
-	return ret;
+	return success;
 }
 
 /**
@@ -1140,16 +1151,19 @@ bool mm_vm_get_mode(const struct mm_ptable *ptable, ipaddr_t begin,
 bool mm_get_mode(const struct mm_ptable *ptable, vaddr_t begin, vaddr_t end,
 		 mm_mode_t *mode)
 {
-	mm_attr_t attrs;
-	bool ret;
+	struct mm_get_attrs_state ret;
+	bool success;
 
 	assert(ptable->stage1);
-	ret = mm_get_attrs(ptable, va_addr(begin), va_addr(end), &attrs);
-	if (ret) {
-		*mode = arch_mm_stage1_attrs_to_mode(attrs);
+
+	ret = mm_get_attrs(ptable, va_addr(begin), va_addr(end));
+	success = ret.got_attrs && !ret.got_mismatch;
+
+	if (success && mode != NULL) {
+		*mode = arch_mm_stage1_attrs_to_mode(ret.attrs);
 	}
 
-	return ret;
+	return success;
 }
 
 static struct mm_stage1_locked mm_stage1_lock_unsafe(void)
