@@ -448,7 +448,7 @@ bool ffa_cpu_cycles_check_runtime_state_transition(
 	return true;
 }
 
-void ffa_cpu_cycles_init_schedule_mode_ffa_runeld_prepare(
+void ffa_cpu_cycles_init_schedule_mode_ffa_run(
 	struct vcpu_locked current_locked, struct vcpu_locked target_locked)
 {
 	(void)current_locked;

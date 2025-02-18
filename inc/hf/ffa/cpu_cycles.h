@@ -38,7 +38,7 @@ bool ffa_cpu_cycles_check_runtime_state_transition(
 	ffa_id_t receiver_vm_id, struct vcpu_locked locked_vcpu, uint32_t func,
 	enum vcpu_state *next_state);
 
-void ffa_cpu_cycles_init_schedule_mode_ffa_runeld_prepare(
+void ffa_cpu_cycles_init_schedule_mode_ffa_run(
 	struct vcpu_locked current_locked, struct vcpu_locked target_locked);
 
 struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,

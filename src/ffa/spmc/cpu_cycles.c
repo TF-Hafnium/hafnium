@@ -458,7 +458,7 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
  * Initialize the scheduling mode and/or Partition Runtime model of the target
  * SP upon being resumed by an FFA_RUN ABI.
  */
-void ffa_cpu_cycles_init_schedule_mode_ffa_runeld_prepare(
+void ffa_cpu_cycles_init_schedule_mode_ffa_run(
 	struct vcpu_locked current_locked, struct vcpu_locked target_locked)
 {
 	struct vcpu *vcpu = target_locked.vcpu;

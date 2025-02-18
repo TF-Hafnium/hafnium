@@ -1385,8 +1385,8 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 		goto out;
 	}
 
-	ffa_cpu_cycles_init_schedule_mode_ffa_runeld_prepare(current_locked,
-							     vcpu_next_locked);
+	ffa_cpu_cycles_init_schedule_mode_ffa_run(current_locked,
+						  vcpu_next_locked);
 
 	timer_migrate_to_other_cpu(current_locked.vcpu->cpu, vcpu_next_locked);
 	vcpu->cpu = current_locked.vcpu->cpu;
