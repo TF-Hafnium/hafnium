@@ -456,7 +456,25 @@ static bool mm_ptable_identity_map(struct mm_ptable *ptable, paddr_t pa_begin,
 
 	/* Cap end to stay within the bounds of the page table. */
 	if (end > ptable_end) {
+		dlog_verbose(
+			"ptable_map: input range end falls outside of ptable "
+			"address space (%#016lx > %#016lx), capping to ptable "
+			"address space end\n",
+			end, ptable_end);
 		end = ptable_end;
+	}
+
+	if (begin >= end) {
+		dlog_verbose(
+			"ptable_map: input range is backwards (%#016lx >= "
+			"%#016lx), request will have no effect\n",
+			begin, end);
+	} else if (pa_addr(pa_begin) >= pa_addr(pa_end)) {
+		dlog_verbose(
+			"ptable_map: input range was backwards (%#016lx >= "
+			"%#016lx), but due to rounding the range %#016lx to "
+			"%#016lx will be mapped\n",
+			begin, end, pa_addr(pa_begin), pa_addr(pa_end));
 	}
 
 	while (begin < end) {
@@ -899,6 +917,13 @@ static bool mm_get_attrs(const struct mm_ptable *ptable, ptable_addr_t begin,
 	ptable_addr_t ptable_end = mm_ptable_addr_space_end(ptable);
 	struct mm_page_table *root_table;
 	bool got_attrs = false;
+
+	if (begin >= end) {
+		dlog_verbose(
+			"mm_get: input range is backwards (%#016lx >= "
+			"%#016lx)\n",
+			begin, end);
+	}
 
 	begin = mm_round_down_to_page(begin);
 	end = mm_round_up_to_page(end);

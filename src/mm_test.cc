@@ -300,8 +300,11 @@ TEST_F(mm, map_already_mapped)
 /**
  * Mapping a reverse range, i.e. the end comes before the start, is treated as
  * an empty range so no mappings are made.
+ *
+ * This serves as a form of documentation of behaviour rather than a
+ * requirement. Check whether any code relies on this before changing it.
  */
-TEST_F(mm, map_reverse_range)
+TEST_F(mm, map_reverse_range_quirk)
 {
 	constexpr mm_mode_t mode = 0;
 	ipaddr_t ipa = ipa_init(-1);
@@ -320,7 +323,7 @@ TEST_F(mm, map_reverse_range)
  * This serves as a form of documentation of behaviour rather than a
  * requirement. Check whether any code relies on this before changing it.
  */
-TEST_F(mm, map_reverse_range_quirk)
+TEST_F(mm, map_reverse_range_rounded_quirk)
 {
 	constexpr mm_mode_t mode = 0;
 	ipaddr_t ipa = ipa_init(-1);
@@ -922,8 +925,11 @@ TEST_F(mm, is_mapped_out_of_range)
 /**
  * The mode of unmapped addresses can be retrieved and is set to invalid,
  * unowned and shared.
+ *
+ * This serves as a form of documentation of behaviour rather than a
+ * requirement. Check whether any code relies on this before changing it.
  */
-TEST_F(mm, get_mode_empty)
+TEST_F(mm, get_mode_empty_quirk)
 {
 	constexpr int default_mode =
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
