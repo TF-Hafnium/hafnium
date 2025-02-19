@@ -185,8 +185,15 @@ void mm_vm_defrag(struct mm_ptable *ptable, struct mpool *ppool,
 void mm_vm_dump(const struct mm_ptable *ptable);
 bool mm_vm_get_mode(const struct mm_ptable *ptable, ipaddr_t begin,
 		    ipaddr_t end, mm_mode_t *mode);
+
+bool mm_vm_get_mode_partial(const struct mm_ptable *ptable, ipaddr_t begin,
+			    ipaddr_t end, mm_mode_t *mode, ipaddr_t *end_ret);
+
 bool mm_get_mode(const struct mm_ptable *ptable, vaddr_t begin, vaddr_t end,
 		 mm_mode_t *mode);
+
+bool mm_get_mode_partial(const struct mm_ptable *ptable, vaddr_t begin,
+			 vaddr_t end, mm_mode_t *mode, vaddr_t *end_ret);
 
 struct mm_stage1_locked mm_lock_ptable_unsafe(struct mm_ptable *ptable);
 struct mm_stage1_locked mm_lock_stage1(void);

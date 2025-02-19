@@ -1142,6 +1142,26 @@ bool mm_vm_get_mode(const struct mm_ptable *ptable, ipaddr_t begin,
 	return success;
 }
 
+bool mm_vm_get_mode_partial(const struct mm_ptable *ptable, ipaddr_t begin,
+			    ipaddr_t end, mm_mode_t *mode, ipaddr_t *end_ret)
+{
+	struct mm_get_attrs_state ret;
+	bool success;
+
+	ret = mm_get_attrs(ptable, ipa_addr(begin), ipa_addr(end));
+	success = ret.got_attrs;
+
+	if (success && mode != NULL) {
+		*mode = arch_mm_stage2_attrs_to_mode(ret.attrs);
+	}
+
+	if (success && end_ret != NULL) {
+		*end_ret = ret.mismatch ? ipa_init(ret.mismatch) : end;
+	}
+
+	return success;
+}
+
 /**
  * Gets the mode of the given range of virtual addresses if they
  * are mapped with the same mode.
@@ -1161,6 +1181,28 @@ bool mm_get_mode(const struct mm_ptable *ptable, vaddr_t begin, vaddr_t end,
 
 	if (success && mode != NULL) {
 		*mode = arch_mm_stage1_attrs_to_mode(ret.attrs);
+	}
+
+	return success;
+}
+
+bool mm_get_mode_partial(const struct mm_ptable *ptable, vaddr_t begin,
+			 vaddr_t end, mm_mode_t *mode, vaddr_t *end_ret)
+{
+	struct mm_get_attrs_state ret;
+	bool success;
+
+	assert(ptable->stage1);
+
+	ret = mm_get_attrs(ptable, va_addr(begin), va_addr(end));
+	success = ret.got_attrs;
+
+	if (success && mode != NULL) {
+		*mode = arch_mm_stage1_attrs_to_mode(ret.attrs);
+	}
+
+	if (success && end_ret != NULL) {
+		*end_ret = ret.mismatch ? va_init(ret.mismatch) : end;
 	}
 
 	return success;

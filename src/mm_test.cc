@@ -980,6 +980,66 @@ TEST_F(mm, get_mode_pages_across_tables)
 	EXPECT_THAT(read_mode, Eq(mode));
 }
 
+TEST_F(mm, get_mode_partial)
+{
+	constexpr mm_mode_t mode0 = MM_MODE_R;
+	constexpr mm_mode_t mode1 = MM_MODE_W;
+	constexpr mm_mode_t mode2 = MM_MODE_X;
+
+	mm_mode_t ret_mode;
+
+	const paddr_t page0_start = pa_init(0);
+	const paddr_t page0_end = pa_init(PAGE_SIZE * 1);
+	const paddr_t page1_start = pa_init(PAGE_SIZE * 1);
+	const paddr_t page1_end = pa_init(PAGE_SIZE * 2);
+	const paddr_t page2_start = pa_init(PAGE_SIZE * 2);
+	const paddr_t page2_end = pa_init(PAGE_SIZE * 3);
+	ipaddr_t end_ret;
+
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, page0_start, page0_end, mode0,
+				       &ppool, nullptr));
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, page1_start, page1_end, mode1,
+				       &ppool, nullptr));
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, page2_start, page2_end, mode2,
+				       &ppool, nullptr));
+
+	EXPECT_TRUE(mm_vm_get_mode(&ptable, ipa_from_pa(page0_start),
+				   ipa_from_pa(page0_end), &ret_mode));
+	EXPECT_THAT(ret_mode, Eq(mode0));
+
+	EXPECT_TRUE(mm_vm_get_mode(&ptable, ipa_from_pa(page1_start),
+				   ipa_from_pa(page1_end), &ret_mode));
+	EXPECT_THAT(ret_mode, Eq(mode1));
+
+	EXPECT_TRUE(mm_vm_get_mode(&ptable, ipa_from_pa(page2_start),
+				   ipa_from_pa(page2_end), &ret_mode));
+	EXPECT_THAT(ret_mode, Eq(mode2));
+
+	EXPECT_FALSE(mm_vm_get_mode(&ptable, ipa_from_pa(page0_start),
+				    ipa_from_pa(page2_end), nullptr));
+	EXPECT_FALSE(mm_vm_get_mode(&ptable, ipa_from_pa(page0_start),
+				    ipa_from_pa(page1_end), nullptr));
+
+	EXPECT_TRUE(mm_vm_get_mode_partial(&ptable, ipa_from_pa(page0_start),
+					   ipa_from_pa(page1_end), &ret_mode,
+					   &end_ret));
+	EXPECT_EQ(ipa_addr(end_ret), ipa_addr(ipa_from_pa(page1_start)));
+	EXPECT_EQ(ret_mode, mode0);
+
+	EXPECT_TRUE(mm_vm_get_mode_partial(&ptable, ipa_from_pa(page1_start),
+					   ipa_from_pa(page2_end), &ret_mode,
+					   &end_ret));
+	EXPECT_EQ(ipa_addr(end_ret), ipa_addr(ipa_from_pa(page2_start)));
+	EXPECT_EQ(ret_mode, mode1);
+
+	EXPECT_TRUE(mm_vm_get_mode_partial(
+		&ptable, ipa_from_pa(page2_start),
+		ipa_from_pa(pa_add(page2_end, 2 * PAGE_SIZE)), &ret_mode,
+		&end_ret));
+	EXPECT_EQ(ipa_addr(end_ret), ipa_addr(ipa_from_pa(page2_end)));
+	EXPECT_EQ(ret_mode, mode2);
+}
+
 /**
  * Anything out of range fail to retrieve the mode.
  */
