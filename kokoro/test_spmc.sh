@@ -39,8 +39,11 @@ execute_test() {
 
 USE_PARITY=false
 CODE_COVERAGE=false
+RUN_TO_COMPLETION=false
 
-USAGE="Use --parity to run EL3 SPMC testsuite; --code-coverage to enable code coverage"
+USAGE="Use --parity to run EL3 SPMC testsuite;"
+USAGE+=" --code-coverage to enable code coverage;"
+USAGE+=" --run-to-completion to avoid stopping on test setups that fail, maximizing test run."
 
 while test $# -gt 0
 do
@@ -48,6 +51,8 @@ do
     --parity) USE_PARITY=true
       ;;
     --code-coverage) CODE_COVERAGE=true
+      ;;
+    --run-to-completion) RUN_TO_COMPLETION=true
       ;;
     -h) echo $USAGE
 	exit 1
@@ -65,6 +70,10 @@ done
 
 KOKORO_DIR="$(dirname "$0")"
 source $KOKORO_DIR/test_common.sh
+
+if [ $RUN_TO_COMPLETION = true ]; then
+	set +e
+fi
 
 # Code coverage expected to slow down execution for a bit.
 HFTEST_TIMEOUT="1200s"
