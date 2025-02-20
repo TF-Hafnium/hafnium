@@ -746,6 +746,8 @@ static void ffa_interrupts_run_in_sec_interrupt_rtm(
 	target_vcpu->scheduling_mode = SPMC_MODE;
 	target_vcpu->rt_model = RTM_SEC_INTERRUPT;
 	target_vcpu->state = VCPU_STATE_RUNNING;
+
+	ffa_interrupts_mask(target_vcpu_locked);
 }
 
 bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
