@@ -4604,17 +4604,17 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, uint32_t page_count,
 	vm_locked = vm_lock(current->vm);
 
 	/*
-	 * mm_get_mode is used to check if the given base_addr page is already
-	 * mapped. If the page is unmapped, return error. If the page is mapped
-	 * appropriate attributes are returned to the caller. Note that
+	 * mm_get_mode_partial is used to check if the given base_addr page is
+	 * already mapped. If the page is unmapped, return error. If the page is
+	 * mapped appropriate attributes are returned to the caller. Note that
 	 * mm_get_mode returns true if the address is in the valid VA range as
 	 * supported by the architecture and MMU configurations, as opposed to
 	 * whether a page is mapped or not. For a page to be known as mapped,
 	 * the API must return true AND the returned mode must not have
 	 * MM_MODE_INVALID set.
 	 */
-	mode_ret =
-		mm_get_mode(&vm_locked.vm->ptable, base_addr, end_addr, &mode);
+	mode_ret = mm_get_mode_partial(&vm_locked.vm->ptable, base_addr,
+				       end_addr, &mode, &end_addr);
 	if (!mode_ret || (mode & MM_MODE_INVALID)) {
 		dlog_error(
 			"FFA_MEM_PERM_GET: cannot find permission for range "
@@ -4623,6 +4623,7 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, uint32_t page_count,
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
+	page_count = (va_addr(end_addr) - va_addr(base_addr)) / PAGE_SIZE;
 
 	/* No memory should be marked RWX */
 	CHECK((mode & (MM_MODE_R | MM_MODE_W | MM_MODE_X)) !=
