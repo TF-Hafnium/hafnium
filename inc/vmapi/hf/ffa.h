@@ -355,9 +355,15 @@ enum ffa_feature_id {
 
 #define FFA_SLEEP_INDEFINITE 0
 
-#define FFA_MEM_PERM_RO UINT32_C(0x7)
-#define FFA_MEM_PERM_RW UINT32_C(0x5)
-#define FFA_MEM_PERM_RX UINT32_C(0x3)
+/*
+ * The type of memory permissions used by `FFA_MEM_PERM_GET` and
+ * `FFA_MEM_PERM_SET`.
+ */
+enum ffa_mem_perm {
+	FFA_MEM_PERM_RO = 0x7,
+	FFA_MEM_PERM_RW = 0x5,
+	FFA_MEM_PERM_RX = 0x3,
+};
 
 #define FFA_MSG_WAIT_FLAG_RETAIN_RX UINT32_C(0x1)
 /*

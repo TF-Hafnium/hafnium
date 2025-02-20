@@ -676,7 +676,7 @@ static inline struct ffa_value ffa_mem_perm_get(uint64_t base_va)
 
 static inline struct ffa_value ffa_mem_perm_set(uint64_t base_va,
 						uint32_t page_count,
-						uint32_t mem_perm)
+						enum ffa_mem_perm mem_perm)
 {
 	return ffa_call((struct ffa_value){.func = FFA_MEM_PERM_SET_32,
 					   .arg1 = base_va,

@@ -4627,16 +4627,19 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, struct vcpu *current)
 	CHECK((mode & (MM_MODE_NG | MM_MODE_USER)) ==
 	      (MM_MODE_NG | MM_MODE_USER));
 
-	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+	ret = (struct ffa_value){
+		.func = FFA_SUCCESS_32,
+		.arg3 = 1,
+	};
 
 	if (mode & MM_MODE_W) {
 		/* No memory should be writeable but not readable. */
 		CHECK(mode & MM_MODE_R);
-		ret.arg2 = (uint32_t)(FFA_MEM_PERM_RW);
+		ret.arg2 = FFA_MEM_PERM_RW;
 	} else if (mode & MM_MODE_R) {
-		ret.arg2 = (uint32_t)(FFA_MEM_PERM_RX);
+		ret.arg2 = FFA_MEM_PERM_RX;
 		if (!(mode & MM_MODE_X)) {
-			ret.arg2 = (uint32_t)(FFA_MEM_PERM_RO);
+			ret.arg2 = FFA_MEM_PERM_RO;
 		}
 	}
 out:
@@ -4645,7 +4648,8 @@ out:
 }
 
 struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
-				      uint32_t mem_perm, struct vcpu *current)
+				      enum ffa_mem_perm mem_perm,
+				      struct vcpu *current)
 {
 	struct vm_locked vm_locked;
 	struct ffa_value ret;
@@ -4674,8 +4678,17 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if ((mem_perm != FFA_MEM_PERM_RW) && (mem_perm != FFA_MEM_PERM_RO) &&
-	    (mem_perm != FFA_MEM_PERM_RX)) {
+	switch (mem_perm) {
+	case FFA_MEM_PERM_RO:
+		new_mode = MM_MODE_R | MM_MODE_USER | MM_MODE_NG;
+		break;
+	case FFA_MEM_PERM_RW:
+		new_mode = MM_MODE_R | MM_MODE_W | MM_MODE_USER | MM_MODE_NG;
+		break;
+	case FFA_MEM_PERM_RX:
+		new_mode = MM_MODE_R | MM_MODE_X | MM_MODE_USER | MM_MODE_NG;
+		break;
+	default:
 		dlog_error("FFA_MEM_PERM_SET: invalid permissions %#x\n",
 			   mem_perm);
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -4723,16 +4736,6 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 			"executable\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
-	}
-
-	new_mode = MM_MODE_USER | MM_MODE_NG;
-
-	if (mem_perm == FFA_MEM_PERM_RW) {
-		new_mode |= MM_MODE_R | MM_MODE_W;
-	} else if (mem_perm == FFA_MEM_PERM_RX) {
-		new_mode |= MM_MODE_R | MM_MODE_X;
-	} else if (mem_perm == FFA_MEM_PERM_RO) {
-		new_mode |= MM_MODE_R;
 	}
 
 	/*

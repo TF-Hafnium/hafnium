@@ -26,7 +26,7 @@ extern uint8_t volatile stacks_begin[];
 extern uint8_t volatile stacks_end[];
 extern uint8_t volatile image_end[];
 
-static void expect_get_valid(uintvaddr_t base_va, uint64_t perm)
+static void expect_get_valid(uintvaddr_t base_va, enum ffa_mem_perm perm)
 {
 	struct ffa_value res = ffa_mem_perm_get(base_va);
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
@@ -40,14 +40,14 @@ static void expect_get_invalid(uintvaddr_t base_va)
 }
 
 static void expect_set_valid(uintvaddr_t base_va, uint32_t page_count,
-			     uint64_t perm)
+			     enum ffa_mem_perm perm)
 {
 	struct ffa_value res = ffa_mem_perm_set(base_va, page_count, perm);
 	EXPECT_EQ(res.func, FFA_SUCCESS_32);
 }
 
 static void expect_set_invalid(uintvaddr_t base_va, uint32_t page_count,
-			       uint64_t perm)
+			       enum ffa_mem_perm perm)
 {
 	struct ffa_value res = ffa_mem_perm_set(base_va, page_count, perm);
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
@@ -58,7 +58,7 @@ static void expect_set_invalid(uintvaddr_t base_va, uint32_t page_count,
  * permissions.
  */
 static void test_perm_get_range(volatile uint8_t* start, volatile uint8_t* end,
-				uint32_t perm)
+				enum ffa_mem_perm perm)
 {
 	const uint32_t num_pages = align_up(end - start, PAGE_SIZE) / PAGE_SIZE;
 	uintvaddr_t base_va = (uintvaddr_t)align_down(start, PAGE_SIZE);
