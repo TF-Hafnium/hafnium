@@ -36,6 +36,8 @@ uint32_t espi_id = RTM_INIT_ESPI_ID;
 
 static bool multiple_interrupts_expected;
 
+static bool arch_timer_expired;
+
 static inline uint64_t physicalcounter_read(void)
 {
 	isb();
@@ -735,6 +737,49 @@ TEST_SERVICE(receive_interrupt_waiting_vcpu_sri_triggered)
 	while (!hftest_ipi_state_is(HANDLED)) {
 	}
 
+	ffa_yield();
+
+	FAIL("Do not expect getting to this point.");
+}
+
+void arch_timer_irq_handler(void)
+{
+	uint32_t intid = hf_interrupt_get();
+
+	switch (intid) {
+	case HF_NOTIFICATION_PENDING_INTID:
+		/* RX buffer full notification. */
+		dlog_verbose("Received notification pending interrupt %u.",
+			     intid);
+		break;
+	case HF_VIRTUAL_TIMER_INTID:
+		dlog_info("Receive Arch Timer interrupt.");
+		arch_timer_expired = true;
+		timer_disable();
+		break;
+	default:
+		panic("Interrupt ID not recongnised\n");
+	}
+}
+
+TEST_SERVICE(receive_interrupt_sri_triggered_into_waiting_arch_timer)
+{
+	exception_setup(arch_timer_irq_handler, NULL);
+	interrupts_enable();
+	EXPECT_EQ(hf_interrupt_enable(HF_VIRTUAL_TIMER_INTID, true, 0), 0);
+
+	dlog_info("Starting arch timer.");
+
+	timer_set(50);
+	timer_start();
+
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	dlog_info("Woke up");
+
+	ASSERT_TRUE(arch_timer_expired);
+
+	/* Attest it has been handled. */
 	ffa_yield();
 
 	FAIL("Do not expect getting to this point.");

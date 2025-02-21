@@ -1556,3 +1556,60 @@ TEST_PRECONDITION(secure_interrupts,
 	/* Resumes service3 in target vCPU 0 to handle IPI. */
 	EXPECT_EQ(ffa_run(service3_info->vm_id, 0).func, FFA_YIELD_32);
 }
+
+/**
+ * Target SP is in waiting state when arch timer interrupt fires, so the SPMC
+ * sends SRI to the NWd for the scheduler to explicitly provide CPU cycles. The
+ * sequence is due to 'sri-interrupts-policy' field in the respective manifest:
+ * - PVM configures itself to handle the SRI.
+ * - PVM gives cycles to Service2.
+ * - Service2 configures the arch timer, and goes to WAITING state via
+ *   FFA_MSG_WAIT.
+ * - PVM waits for the SRI to trigger.
+ * - Once it does, calls FFA_NOTIFICATION_INFO_GET. Attest Service2 is part of
+ * the list.
+ * - Gives cycles to Service2.
+ * - Service2 wakes up and handles arch timer interrupt.
+ */
+TEST_PRECONDITION(arch_timer, sri_triggered_due_to_arch_timer,
+		  service2_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	uint32_t sri_id;
+	uint32_t expected_list_count = 1;
+	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	struct ffa_value ret;
+
+	/* Get ready to handle SRI.  */
+	gicv3_system_setup();
+	sri_id = enable_sri();
+
+	/* Init vCPU which will send interrupt. */
+	SERVICE_SELECT(
+		service2_info->vm_id,
+		"receive_interrupt_sri_triggered_into_waiting_arch_timer",
+		mb.send);
+
+	/* Expecting the SRI to trigger now. */
+	last_interrupt_id = 0;
+
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	while (last_interrupt_id != sri_id) {
+		interrupt_wait();
+	}
+
+	/* Check the target vCPU 0 is returned by FFA_NOTIFICATION_INFO_GET. */
+	expected_lists_sizes[0] = 1;
+	expected_ids[0] = service2_info->vm_id;
+	expected_ids[1] = 0;
+
+	ffa_notification_info_get_and_check(expected_list_count,
+					    expected_lists_sizes, expected_ids);
+
+	/* Resumes service2 in target vCPU 0 to handle IPI. */
+	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
+}
