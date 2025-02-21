@@ -1843,6 +1843,44 @@ TEST_PRECONDITION(secure_interrupts, burst_secure_interrupts, service3_is_mp_sp)
 	ffa_notification_info_get_and_check(expected_list_count,
 					    expected_lists_sizes, expected_ids);
 
-	/* Resumes service3 in target vCPU 0 to handle the secure_interrupts. */
+	/* Resumes service3 in target vCPU 0 to handle the secure interrupts. */
+	EXPECT_EQ(ffa_run(service3_info->vm_id, 0).func, FFA_YIELD_32);
+}
+
+/**
+ * Trigger IPI targetting itself, with interrupts unmasked.
+ */
+TEST_PRECONDITION(ipi, self_ipi_sri_triggered, service3_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+	uint32_t sri_id;
+	uint32_t expected_list_count = 1;
+	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+
+	/* Get ready to handle SRI. */
+	gicv3_system_setup();
+	sri_id = enable_sri();
+
+	/* Init vCPU which will send interrupt. */
+	SERVICE_SELECT(service3_info->vm_id, "self_ipi_sri_triggered", mb.send);
+
+	last_interrupt_id = 0;
+
+	EXPECT_EQ(ffa_run(service3_info->vm_id, 0).func, FFA_MSG_WAIT_32);
+
+	while (last_interrupt_id != sri_id) {
+	}
+
+	/* Check the target vCPU 0 is returned by FFA_NOTIFICATION_INFO_GET. */
+	expected_lists_sizes[0] = 1;
+	expected_ids[0] = service3_info->vm_id;
+	expected_ids[1] = 0;
+
+	ffa_notification_info_get_and_check(expected_list_count,
+					    expected_lists_sizes, expected_ids);
+
+	/* Resumes service3 in target vCPU 0 to handle IPI. */
 	EXPECT_EQ(ffa_run(service3_info->vm_id, 0).func, FFA_YIELD_32);
 }

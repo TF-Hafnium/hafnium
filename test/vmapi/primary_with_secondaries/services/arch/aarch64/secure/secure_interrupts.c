@@ -1149,3 +1149,33 @@ TEST_SERVICE(receive_interrupt_burst)
 
 	FAIL("Do not expect getting to this point.");
 }
+
+TEST_SERVICE(self_ipi_sri_triggered)
+{
+	interrupts_disable();
+	exception_setup(self_ipi_irq_hander, NULL);
+
+	/* Enable the inter-processor interrupt */
+	EXPECT_EQ(hf_interrupt_enable(HF_IPI_INTID, true, INTERRUPT_TYPE_IRQ),
+		  0);
+
+	dlog_info("Triggering the IPI to self. Interrupts masked.");
+
+	hf_interrupt_send_ipi(0);
+
+	/* Expect wake up with FFA_RUN. */
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	dlog_info("Woke up. Unmasking interrupts.");
+
+	/* Triggering the IPI to itself. */
+	interrupts_enable();
+
+	/* Waiting for self_ipi_irq_hander to handle IPI. */
+	while (!self_ipi_triggered) {
+	}
+
+	ffa_yield();
+
+	FAIL("Do not expect getting to this point.");
+}

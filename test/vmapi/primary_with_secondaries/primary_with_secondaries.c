@@ -90,8 +90,7 @@ bool service2_is_vm(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
- * This is currently being used to skip memory sharing tests, when
- * the service3 is an SP.
+ * This is currently being used to skip tests, when the service3 is a VM.
  */
 bool service3_is_vm(void)
 {
