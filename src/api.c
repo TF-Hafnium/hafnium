@@ -4960,8 +4960,7 @@ int64_t api_hf_interrupt_send_ipi(uint32_t target_vcpu_id, struct vcpu *current)
 	struct vm *vm = current->vm;
 	ffa_vcpu_index_t target_vcpu_index = vcpu_id_to_index(target_vcpu_id);
 
-	if (target_vcpu_index >= vm->vcpu_count ||
-	    target_vcpu_index == cpu_index(current->cpu)) {
+	if (target_vcpu_index >= vm->vcpu_count) {
 		dlog_verbose("Invalid vCPU %d for IPI.\n", target_vcpu_id);
 		return -1;
 	}
@@ -4969,7 +4968,19 @@ int64_t api_hf_interrupt_send_ipi(uint32_t target_vcpu_id, struct vcpu *current)
 	dlog_verbose("Injecting IPI to target vCPU%d for %#x\n", target_vcpu_id,
 		     vm->id);
 
-	hf_ipi_send_interrupt(vm, target_vcpu_index);
+	/*
+	 * If the SP is targeting the current vCPU, inject the IPI VI,
+	 * to avoid trapping into Hafnium.
+	 */
+	if (target_vcpu_index == cpu_index(current->cpu)) {
+		struct vcpu_locked current_locked = vcpu_lock(current);
+
+		vcpu_virt_interrupt_inject(current_locked, HF_IPI_INTID);
+
+		vcpu_unlock(&current_locked);
+	} else {
+		hf_ipi_send_interrupt(vm, target_vcpu_index);
+	}
 
 	return 0;
 }
