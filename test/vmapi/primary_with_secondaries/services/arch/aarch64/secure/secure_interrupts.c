@@ -914,3 +914,46 @@ TEST_SERVICE(send_espi_interrupt)
 
 	FAIL("Do not expect getting to this point.");
 }
+
+static bool self_ipi_triggered;
+
+static void self_ipi_irq_hander(void)
+{
+	uint32_t intid = hf_interrupt_get();
+
+	switch (intid) {
+	case HF_NOTIFICATION_PENDING_INTID:
+		/* RX buffer full notification. */
+		dlog_verbose("Received notification pending interrupt %u.",
+			     intid);
+		break;
+	case HF_IPI_INTID:
+		dlog_info("Received inter-processor interrupt %u, vm %x.",
+			  intid, hf_vm_get_id());
+		self_ipi_triggered = true;
+		break;
+	default:
+		panic("Interrupt ID not recongnised\n");
+	}
+}
+
+TEST_SERVICE(self_ipi)
+{
+	exception_setup(self_ipi_irq_hander, NULL);
+	interrupts_enable();
+
+	/* Enable the inter-processor interrupt */
+	EXPECT_EQ(hf_interrupt_enable(HF_IPI_INTID, true, INTERRUPT_TYPE_IRQ),
+		  0);
+
+	/* Get the ID here. */
+	hf_interrupt_send_ipi(0);
+
+	/* Waiting for self_ipi_irq_hander to handle IPI. */
+	while (!self_ipi_triggered) {
+	}
+
+	ffa_yield();
+
+	FAIL("Do not expect getting to this point.");
+}

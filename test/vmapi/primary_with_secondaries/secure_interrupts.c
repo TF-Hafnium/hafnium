@@ -427,20 +427,13 @@ TEST_PRECONDITION(ipi, receive_ipi_invalid_target_vcpus, service1_is_mp_sp)
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_value ret;
 	const ffa_id_t own_id = hf_vm_get_id();
-	ffa_vcpu_index_t target_vcpu_id = 0;
+	ffa_vcpu_index_t target_vcpu_id = MAX_CPUS;
 
 	SERVICE_SELECT(service1_info->vm_id, "send_ipi_fails", mb.send);
 
 	/* Run service. */
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
-
-	/* Send service it's own vCPU index. */
-	ret = send_indirect_message(own_id, service1_info->vm_id, mb.send,
-				    &target_vcpu_id, sizeof(target_vcpu_id), 0);
-
-	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
 
 	target_vcpu_id = MAX_CPUS;
 	/* Send service an out of bounds vCPU index. */
@@ -1612,4 +1605,18 @@ TEST_PRECONDITION(arch_timer, sri_triggered_due_to_arch_timer,
 
 	/* Resumes service2 in target vCPU 0 to handle IPI. */
 	EXPECT_EQ(ffa_run(service2_info->vm_id, 0).func, FFA_YIELD_32);
+}
+
+/**
+ * Trigger IPI targetting itself, with interrupts unmasked.
+ */
+TEST_PRECONDITION(ipi, self_ipi, service1_is_mp_sp)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	/* Init vCPU which will send interrupt. */
+	SERVICE_SELECT(service1_info->vm_id, "self_ipi", mb.send);
+
+	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 }
