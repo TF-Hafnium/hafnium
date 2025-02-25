@@ -64,4 +64,7 @@ declare_args() {
 
   # The number of virtual interrupt IDs which are supported
   plat_num_virtual_interrupts_ids = 64
+
+  # The version of the FF-A specification to implement. Leave empty to use the latest version.
+  ffa_version = ""
 }
