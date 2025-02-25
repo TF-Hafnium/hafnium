@@ -841,13 +841,15 @@ TEST_F(vm, vm_notifications_info_get_ipi)
 	enum notifications_info_get_state current_state = INIT;
 	struct_vm *current_vm = vm_find_index(4);
 	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 1);
-	struct interrupts *interrupts = &target_vcpu->interrupts;
+	struct vcpu_locked vcpu_locked;
 	const bool is_from_vm = false;
 	struct vm_locked current_vm_locked = vm_lock(current_vm);
 
 	EXPECT_TRUE(current_vm->vcpu_count >= 2);
 
-	vcpu_virt_interrupt_set_pending(interrupts, HF_IPI_INTID);
+	vcpu_locked = vcpu_lock(target_vcpu);
+	vcpu_virt_interrupt_inject(vcpu_locked, HF_IPI_INTID);
+	vcpu_unlock(&vcpu_locked);
 
 	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
 					  &ids_count, lists_sizes, &lists_count,
@@ -907,13 +909,15 @@ TEST_F(vm, vm_notifications_info_get_ipi_with_per_vcpu)
 	enum notifications_info_get_state current_state = INIT;
 	struct_vm *current_vm = vm_find_index(4);
 	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 1);
-	struct interrupts *interrupts = &target_vcpu->interrupts;
+	struct vcpu_locked vcpu_locked;
 	const bool is_from_vm = false;
 	struct vm_locked current_vm_locked = vm_lock(current_vm);
 
 	EXPECT_TRUE(current_vm->vcpu_count >= 2);
 
-	vcpu_virt_interrupt_set_pending(interrupts, HF_IPI_INTID);
+	vcpu_locked = vcpu_lock(target_vcpu);
+	vcpu_virt_interrupt_inject(vcpu_locked, HF_IPI_INTID);
+	vcpu_unlock(&vcpu_locked);
 
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
 					       true, 1, true);
@@ -971,11 +975,13 @@ TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus_and_ipi)
 	uint32_t lists_count = 0;
 	enum notifications_info_get_state current_state = INIT;
 	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 0);
-	struct interrupts *interrupts = &target_vcpu->interrupts;
+	struct vcpu_locked vcpu_locked;
 
 	target_vcpu->state = VCPU_STATE_WAITING;
 
-	vcpu_virt_interrupt_set_pending(interrupts, HF_IPI_INTID);
+	vcpu_locked = vcpu_lock(target_vcpu);
+	vcpu_virt_interrupt_inject(vcpu_locked, HF_IPI_INTID);
+	vcpu_unlock(&vcpu_locked);
 
 	for (unsigned int i = 1; i < vcpu_count; i++) {
 		vm_notifications_partition_set_pending(

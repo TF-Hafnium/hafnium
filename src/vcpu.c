@@ -265,30 +265,6 @@ void vcpu_set_running(struct vcpu_locked target_locked,
 	target_vcpu->state = VCPU_STATE_RUNNING;
 }
 
-/**
- * It injects a virtual interrupt in the vcpu if is enabled and is not pending.
- */
-void vcpu_interrupt_inject(struct vcpu_locked target_locked, uint32_t intid)
-{
-	struct vcpu *target_vcpu = target_locked.vcpu;
-	struct interrupts *interrupts = &target_vcpu->interrupts;
-
-	/*
-	 * We only need to change state and (maybe) trigger a virtual interrupt
-	 * if it is enabled and was not previously pending. Otherwise we can
-	 * skip everything except setting the pending bit.
-	 */
-	if ((vcpu_is_virt_interrupt_enabled(interrupts, intid) &&
-	     !vcpu_is_virt_interrupt_pending(interrupts, intid))) {
-		/* Increment the count. */
-		vcpu_interrupt_count_increment(target_locked, interrupts,
-					       intid);
-	}
-
-	/* Either way, make it pending. */
-	vcpu_virt_interrupt_set_pending(interrupts, intid);
-}
-
 void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked)
 {
 	struct vcpu *target_vcpu = vcpu_locked.vcpu;
@@ -327,7 +303,8 @@ static bool is_queue_empty(struct interrupt_queue *q)
  * Returns true if successful in pushing a new entry to the queue, or false
  * otherwise.
  */
-bool vcpu_interrupt_queue_push(struct vcpu_locked vcpu_locked, uint32_t vint_id)
+static bool vcpu_interrupt_queue_push(struct vcpu_locked vcpu_locked,
+				      uint32_t vint_id)
 {
 	struct interrupt_queue *q;
 	uint16_t new_tail;
@@ -356,10 +333,10 @@ bool vcpu_interrupt_queue_push(struct vcpu_locked vcpu_locked, uint32_t vint_id)
 
 /**
  * Remove an entry from the specified vCPU's queue at the head.
- *
  * Returns true if successful in removing the entry, or false otherwise.
  */
-bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked, uint32_t *vint_id)
+static bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked,
+				     uint32_t *vint_id)
 {
 	struct interrupt_queue *q;
 	uint16_t new_head;
@@ -390,8 +367,8 @@ bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked, uint32_t *vint_id)
  *
  * Returns true if a valid entry exists in the queue, or false otherwise.
  */
-bool vcpu_interrupt_queue_peek(struct vcpu_locked vcpu_locked,
-			       uint32_t *vint_id)
+static bool vcpu_interrupt_queue_peek(struct vcpu_locked vcpu_locked,
+				      uint32_t *vint_id)
 {
 	struct interrupt_queue *q;
 	uint32_t queued_vint;
@@ -413,62 +390,6 @@ bool vcpu_interrupt_queue_peek(struct vcpu_locked vcpu_locked,
 }
 
 /**
- * Find if a specific virtual interrupt exists in the specified vCPU's queue.
- *
- * Returns true if such an entry exists in the queue, or false otherwise.
- */
-bool vcpu_is_interrupt_in_queue(struct vcpu_locked vcpu_locked,
-				uint32_t vint_id)
-{
-	struct interrupt_queue *q;
-	uint16_t next;
-
-	assert(vint_id != HF_INVALID_INTID);
-
-	q = &vcpu_locked.vcpu->interrupts.vint_q;
-
-	/* Check if the queue is empty. */
-	if (is_queue_empty(q)) {
-		return false;
-	}
-
-	next = q->head;
-	while (true) {
-		/* Match found. */
-		if (q->vint_buffer[next] == vint_id) {
-			return true;
-		}
-
-		next = queue_increment_index(next);
-
-		/* Reached the end of queue. */
-		if (next == q->tail) {
-			break;
-		}
-	}
-
-	return false;
-}
-
-/**
- * Check if there are any entries in the interrupt queue.
- *
- * Returns true if queue is empty, or false otherwise.
- */
-bool vcpu_is_interrupt_queue_empty(struct vcpu_locked vcpu_locked)
-{
-	struct interrupt_queue *q;
-
-	q = &vcpu_locked.vcpu->interrupts.vint_q;
-
-	if (is_queue_empty(q)) {
-		return true;
-	}
-
-	return false;
-}
-
-/**
  * When interrupt handling is complete the preempted_vcpu field should go back
  * to NULL.
  */
@@ -479,4 +400,87 @@ void vcpu_secure_interrupt_complete(struct vcpu_locked vcpu_locked)
 	vcpu = vcpu_locked.vcpu;
 	vcpu->preempted_vcpu = NULL;
 	vcpu->requires_deactivate_call = false;
+}
+
+/*
+ * Find and return the first intid that is pending and enabled, the interrupt
+ * struct for this intid will be at the head of the list so can be popped.
+ * Intid returned in the vint_id argument.
+ * True returned if a pending and enabled interrupt is found. False otherwise.
+ */
+uint32_t vcpu_virt_interrupt_peek_pending_and_enabled(
+	struct vcpu_locked vcpu_locked)
+{
+	uint32_t vint_id = HF_INVALID_INTID;
+	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
+	uint32_t pending_and_enabled_count =
+		vcpu_interrupt_count_get(vcpu_locked);
+
+	/* First check there is a pending and enabled interrupt to return. */
+	if (pending_and_enabled_count == 0) {
+		return HF_INVALID_INTID;
+	}
+
+	/*
+	 * We know here there is a pending and enabled interrupt in
+	 * the queue. So push any interrupts that are not enabled to
+	 * the back of the queue until we reach the first enabled one.
+	 */
+	while (vcpu_interrupt_queue_peek(vcpu_locked, &vint_id) &&
+	       !vcpu_is_virt_interrupt_enabled(interrupts, vint_id)) {
+		/* Push disabled interrupt to the back of the queue. */
+		vcpu_interrupt_queue_pop(vcpu_locked, &vint_id);
+		vcpu_interrupt_queue_push(vcpu_locked, vint_id);
+	}
+
+	assert(vint_id != HF_INVALID_INTID);
+
+	return vint_id;
+}
+
+/*
+ * Get the next pending and enabled virtual interrupt ID.
+ * Pops from the queue and clears the bitmap.
+ */
+uint32_t vcpu_virt_interrupt_get_pending_and_enabled(
+	struct vcpu_locked vcpu_locked)
+{
+	uint32_t vint_id =
+		vcpu_virt_interrupt_peek_pending_and_enabled(vcpu_locked);
+
+	if (vint_id != HF_INVALID_INTID) {
+		vcpu_interrupt_queue_pop(vcpu_locked, &vint_id);
+		vcpu_interrupt_clear_decrement(vcpu_locked, vint_id);
+	}
+
+	return vint_id;
+}
+
+/*
+ * Set a virtual interrupt to pending. Add it to the queue and set the bitmap.
+ */
+void vcpu_virt_interrupt_inject(struct vcpu_locked vcpu_locked,
+				uint32_t vint_id)
+{
+	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
+
+	/*
+	 * An interrupt can only be pending once so return if it is
+	 * already pending.
+	 */
+	if (vcpu_is_virt_interrupt_pending(interrupts, vint_id)) {
+		return;
+	}
+
+	/* Push to the queue and set the bitmap. */
+	if (!vcpu_interrupt_queue_push(vcpu_locked, vint_id)) {
+		panic("Exhausted interrupt queue for vCPU %d of SP %#x\n",
+		      vcpu_locked.vcpu->cpu->id, vcpu_locked.vcpu->vm->id);
+	}
+	vcpu_virt_interrupt_set_pending(interrupts, vint_id);
+
+	if (vcpu_is_virt_interrupt_enabled(interrupts, vint_id)) {
+		vcpu_interrupt_count_increment(vcpu_locked, interrupts,
+					       vint_id);
+	}
 }

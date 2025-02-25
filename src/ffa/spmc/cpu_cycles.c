@@ -111,7 +111,7 @@ bool ffa_cpu_cycles_run_checks(struct vcpu_locked current_locked,
 			 * Deny the state transition if the SP didnt perform the
 			 * deactivation of the secure virtual interrupt.
 			 */
-			if (!vcpu_is_interrupt_queue_empty(current_locked)) {
+			if (vcpu_interrupt_count_get(current_locked) > 0) {
 				run_ret->arg2 = FFA_DENIED;
 				ret = false;
 				goto out;
@@ -156,33 +156,6 @@ bool ffa_cpu_cycles_run_checks(struct vcpu_locked current_locked,
 			run_ret->arg2 = FFA_DENIED;
 			ret = false;
 			goto out;
-		}
-
-		if (!vcpu_is_interrupt_queue_empty(target_locked)) {
-			/*
-			 * Consider the following scenarios: a secure interrupt
-			 * triggered in normal world and is targeted to an SP.
-			 * Scenario A): The target SP's vCPU was preempted by a
-			 *              non secure interrupt.
-			 * Scenario B): The target SP's vCPU was in blocked
-			 *              state after it yielded CPU cycles to
-			 *              normal world using FFA_YIELD.
-			 * In both the scenarios, SPMC would have injected a
-			 * virtual interrupt and set the appropriate flags after
-			 * de-activating the secure physical interrupt. SPMC did
-			 * not resume the target vCPU at that moment.
-			 */
-			assert(target_vcpu->state == VCPU_STATE_PREEMPTED ||
-			       target_vcpu->state == VCPU_STATE_BLOCKED);
-			assert(vcpu_interrupt_count_get(target_locked) > 0);
-
-			/*
-			 * This check is to ensure the target SP vCPU could
-			 * only be a part of NWd scheduled call chain. FF-A v1.1
-			 * spec prohibits an SPMC scheduled call chain to be
-			 * preempted by a non secure interrupt.
-			 */
-			CHECK(target_vcpu->scheduling_mode == NWD_MODE);
 		}
 	}
 

@@ -173,7 +173,7 @@ static bool hf_ipi_handle_list_element(struct vcpu_locked target_vcpu_locked,
 
 	assert(ipi_sri_action != NULL);
 
-	vcpu_interrupt_inject(target_vcpu_locked, HF_IPI_INTID);
+	vcpu_virt_interrupt_inject(target_vcpu_locked, HF_IPI_INTID);
 
 	switch (target_vcpu->state) {
 	case VCPU_STATE_RUNNING:
@@ -225,17 +225,6 @@ static bool hf_ipi_handle_list_element(struct vcpu_locked target_vcpu_locked,
 			 */
 			*ipi_sri_action = IPI_SRI_ACTION_NOT_DELAYED;
 			ret = false;
-		} else {
-			/*
-			 * Queue the pending virtual interrupt for
-			 * target vcpu.
-			 */
-			if (!vcpu_interrupt_queue_push(target_vcpu_locked,
-						       HF_IPI_INTID)) {
-				panic("Exhausted interrupt queue for vcpu of "
-				      "SP: %x interrupt: %u\n",
-				      target_vcpu->vm->id, HF_IPI_INTID);
-			}
 		}
 		break;
 	default:

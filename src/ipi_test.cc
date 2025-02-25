@@ -62,12 +62,20 @@ class ipi : public ::testing::Test
 
 			running_vcpu->cpu = cpu;
 			running_vcpu->state = VCPU_STATE_RUNNING;
+			vcpu_virt_interrupt_set_enabled(
+				&running_vcpu->interrupts, HF_IPI_INTID);
 			waiting_vcpu->cpu = cpu;
 			waiting_vcpu->state = VCPU_STATE_WAITING;
+			vcpu_virt_interrupt_set_enabled(
+				&waiting_vcpu->interrupts, HF_IPI_INTID);
 			blocked_vcpu->cpu = cpu;
 			blocked_vcpu->state = VCPU_STATE_BLOCKED;
+			vcpu_virt_interrupt_set_enabled(
+				&blocked_vcpu->interrupts, HF_IPI_INTID);
 			preempted_vcpu->cpu = cpu;
 			preempted_vcpu->state = VCPU_STATE_PREEMPTED;
+			vcpu_virt_interrupt_set_enabled(
+				&preempted_vcpu->interrupts, HF_IPI_INTID);
 
 			list_init(&cpu->pending_ipis);
 		}
@@ -311,15 +319,11 @@ TEST_F(ipi, multiple_services_to_same_cpu_full_handle)
 		for (size_t j = 0; j < MAX_CPUS; j++) {
 			/* Check the IPI interrupt is pending. */
 			struct vcpu *vcpu = vm_get_vcpu(test_service[i], j);
-			EXPECT_TRUE(vcpu_is_virt_interrupt_pending(
-				&vcpu->interrupts, HF_IPI_INTID));
-			if (vcpu->state == VCPU_STATE_BLOCKED ||
-			    vcpu->state == VCPU_STATE_PREEMPTED) {
-				vcpu_locked = vcpu_lock(vcpu);
-				EXPECT_TRUE(vcpu_is_interrupt_in_queue(
-					vcpu_locked, HF_IPI_INTID));
-				vcpu_unlock(&vcpu_locked);
-			}
+			vcpu_locked = vcpu_lock(vcpu);
+			EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(
+					  vcpu_locked),
+				  HF_IPI_INTID);
+			vcpu_unlock(&vcpu_locked);
 		}
 		vm_unlock(&vm_locked);
 	}

@@ -422,17 +422,14 @@ static inline void vcpu_ipi_clear_info_get_retrieved(
 
 void vcpu_save_interrupt_priority(struct vcpu_locked vcpu_locked,
 				  uint8_t priority);
-void vcpu_interrupt_inject(struct vcpu_locked target_locked, uint32_t intid);
-void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked);
 
-bool vcpu_interrupt_queue_push(struct vcpu_locked vcpu_locked,
-			       uint32_t vint_id);
-bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked,
-			      uint32_t *vint_id);
-bool vcpu_interrupt_queue_peek(struct vcpu_locked vcpu_locked,
-			       uint32_t *vint_id);
-bool vcpu_is_interrupt_in_queue(struct vcpu_locked vcpu_locked,
+uint32_t vcpu_virt_interrupt_peek_pending_and_enabled(
+	struct vcpu_locked vcpu_locked);
+uint32_t vcpu_virt_interrupt_get_pending_and_enabled(
+	struct vcpu_locked vcpu_locked);
+void vcpu_virt_interrupt_inject(struct vcpu_locked vcpu_locked,
 				uint32_t vint_id);
-bool vcpu_is_interrupt_queue_empty(struct vcpu_locked vcpu_locked);
+
+void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked);
 
 void vcpu_secure_interrupt_complete(struct vcpu_locked vcpu_locked);

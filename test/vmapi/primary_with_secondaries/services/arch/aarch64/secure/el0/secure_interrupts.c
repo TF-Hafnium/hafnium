@@ -84,7 +84,7 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 	EXPECT_EQ(res.func, FFA_INTERRUPT_32);
 
 	/* S-EL0 partitions require this to be disabled after the FF-A call. */
-	ASSERT_EQ(hf_interrupt_deactivate(IRQ_TWDOG_INTID), 0);
+	ASSERT_EQ(hf_interrupt_get(), IRQ_TWDOG_INTID);
 
 	/* Secure interrupt has been serviced by now. Relinquish cycles. */
 	ffa_msg_wait();
@@ -186,7 +186,7 @@ TEST_SERVICE(yield_direct_req_service_twdog_int)
 	EXPECT_EQ(ret.func, FFA_INTERRUPT_32);
 
 	/* S-EL0 partitions require this to be disabled after the FF-A call. */
-	ASSERT_EQ(hf_interrupt_deactivate(IRQ_TWDOG_INTID), 0);
+	ASSERT_EQ(hf_interrupt_get(), IRQ_TWDOG_INTID);
 	twdog_stop();
 
 	/* Update the status of interrupt as serviced. */

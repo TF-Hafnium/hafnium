@@ -1165,7 +1165,8 @@ struct vcpu *fiq_lower(void)
 
 		current_locked = vcpu_lock(current_vcpu);
 		current_vcpu->prev_interrupt_priority = pmr;
-		vcpu_interrupt_inject(current_locked, HF_MANAGED_EXIT_INTID);
+		vcpu_virt_interrupt_inject(current_locked,
+					   HF_MANAGED_EXIT_INTID);
 
 		/* Entering managed exit sequence. */
 		current_vcpu->processing_managed_exit = true;

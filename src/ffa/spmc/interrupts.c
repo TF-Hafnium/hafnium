@@ -27,39 +27,12 @@
 int64_t ffa_interrupts_deactivate(uint32_t pint_id, uint32_t vint_id,
 				  struct vcpu *current)
 {
-	struct vcpu_locked current_locked;
-	uint32_t int_id;
+	(void)pint_id;
+	(void)vint_id;
 	int ret = 0;
+	struct vcpu_locked current_locked;
 
 	current_locked = vcpu_lock(current);
-	if (vint_id >= HF_NUM_INTIDS) {
-		ret = -1;
-		goto out;
-	}
-
-	/*
-	 * Current implementation maps virtual interrupt to physical interrupt.
-	 */
-	if (pint_id != vint_id) {
-		ret = -1;
-		goto out;
-	}
-
-	/*
-	 * A malicious SP could de-activate an interrupt that does not belong to
-	 * it. Return error to indicate failure.
-	 */
-	if (!vcpu_interrupt_queue_peek(current_locked, &int_id)) {
-		dlog_error("No virtual interrupt to be deactivated\n");
-		ret = -1;
-		goto out;
-	}
-
-	if (int_id != vint_id) {
-		dlog_error("Unknown interrupt being deactivated %u\n", vint_id);
-		ret = -1;
-		goto out;
-	}
 
 	if (current->requires_deactivate_call) {
 		/* There is no preempted vCPU to resume. */
@@ -68,13 +41,6 @@ int64_t ffa_interrupts_deactivate(uint32_t pint_id, uint32_t vint_id,
 		vcpu_secure_interrupt_complete(current_locked);
 	}
 
-	/*
-	 * Now that the virtual interrupt has been serviced and deactivated,
-	 * remove it from the queue, if it was pending.
-	 */
-	vcpu_interrupt_queue_pop(current_locked, &int_id);
-	assert(vint_id == int_id);
-out:
 	vcpu_unlock(&current_locked);
 	return ret;
 }
@@ -166,12 +132,12 @@ static struct vcpu *ffa_interrupts_find_target_vcpu(struct vcpu *current,
 }
 
 /*
- * Queue the pending virtual interrupt for target vcpu. Necessary fields
- * tracking the secure interrupt processing are set accordingly.
+ * If the current vCPU is being preempted, record this in the target vCPU
+ * and set the current states to VCPU_STATE_PREEMPTED.
  */
-static void ffa_interrupts_queue_vint(struct vcpu_locked target_vcpu_locked,
-				      uint32_t vint_id,
-				      struct vcpu_locked current_locked)
+static void ffa_interrupts_set_preempted_vcpu(
+	struct vcpu_locked target_vcpu_locked,
+	struct vcpu_locked current_locked)
 {
 	struct vcpu *target_vcpu = target_vcpu_locked.vcpu;
 	struct vcpu *preempted_vcpu = current_locked.vcpu;
@@ -179,12 +145,6 @@ static void ffa_interrupts_queue_vint(struct vcpu_locked target_vcpu_locked,
 	if (preempted_vcpu != NULL) {
 		target_vcpu->preempted_vcpu = preempted_vcpu;
 		preempted_vcpu->state = VCPU_STATE_PREEMPTED;
-	}
-
-	/* Queue the pending virtual interrupt for target vcpu. */
-	if (!vcpu_interrupt_queue_push(target_vcpu_locked, vint_id)) {
-		panic("Exhausted interrupt queue for vcpu of SP: %x\n",
-		      target_vcpu->vm->id);
 	}
 }
 
@@ -263,8 +223,8 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel0(
 		 * If the execution was in NWd as well, set the vCPU
 		 * in preempted state as well.
 		 */
-		ffa_interrupts_queue_vint(target_vcpu_locked, v_intid,
-					  current_locked);
+		ffa_interrupts_set_preempted_vcpu(target_vcpu_locked,
+						  current_locked);
 
 		/*
 		 * The target vcpu could have migrated to a different physical
@@ -287,8 +247,8 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel0(
 		 * vCPU.
 		 */
 		next = NULL;
-		ffa_interrupts_queue_vint(target_vcpu_locked, v_intid,
-					  (struct vcpu_locked){.vcpu = NULL});
+		ffa_interrupts_set_preempted_vcpu(
+			target_vcpu_locked, (struct vcpu_locked){.vcpu = NULL});
 		break;
 	default:
 		panic("Secure interrupt cannot be signaled to target SP\n");
@@ -338,8 +298,8 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 		 */
 		vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
-		ffa_interrupts_queue_vint(target_vcpu_locked, v_intid,
-					  current_locked);
+		ffa_interrupts_set_preempted_vcpu(target_vcpu_locked,
+						  current_locked);
 		next = target_vcpu;
 
 		if (target_vcpu->cpu != current_locked.vcpu->cpu) {
@@ -384,8 +344,8 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 			 */
 			vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
-			ffa_interrupts_queue_vint(target_vcpu_locked, v_intid,
-						  current_locked);
+			ffa_interrupts_set_preempted_vcpu(target_vcpu_locked,
+							  current_locked);
 			next = target_vcpu;
 		} else {
 			/*
@@ -400,8 +360,8 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 			 * a VM or a SP.
 			 */
 			next = NULL;
-			ffa_interrupts_queue_vint(
-				target_vcpu_locked, v_intid,
+			ffa_interrupts_set_preempted_vcpu(
+				target_vcpu_locked,
 				(struct vcpu_locked){.vcpu = NULL});
 		}
 		break;
@@ -430,8 +390,8 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 		}
 
 		next = NULL;
-		ffa_interrupts_queue_vint(target_vcpu_locked, v_intid,
-					  (struct vcpu_locked){.vcpu = NULL});
+		ffa_interrupts_set_preempted_vcpu(
+			target_vcpu_locked, (struct vcpu_locked){.vcpu = NULL});
 
 		break;
 	case VCPU_STATE_RUNNING:
@@ -448,8 +408,8 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel1(
 		}
 
 		next = NULL;
-		ffa_interrupts_queue_vint(target_vcpu_locked, v_intid,
-					  (struct vcpu_locked){.vcpu = NULL});
+		ffa_interrupts_set_preempted_vcpu(
+			target_vcpu_locked, (struct vcpu_locked){.vcpu = NULL});
 		break;
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 		/* WFI is no-op for SP. Fall through. */
@@ -548,7 +508,7 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 		assert(!target_vcpu->requires_deactivate_call);
 
 		/* Set the interrupt pending in the target vCPU. */
-		vcpu_interrupt_inject(target_vcpu_locked, v_intid);
+		vcpu_virt_interrupt_inject(target_vcpu_locked, v_intid);
 
 		switch (intid) {
 		case HF_IPI_INTID:
@@ -601,8 +561,8 @@ bool ffa_interrupts_inject_notification_pending_interrupt(
 		     receiver_locked, vcpu_index(target_locked.vcpu)) ||
 	     (vm_are_global_notifications_pending(receiver_locked) &&
 	      !vm_notifications_is_npi_injected(receiver_locked)))) {
-		vcpu_interrupt_inject(target_locked,
-				      HF_NOTIFICATION_PENDING_INTID);
+		vcpu_virt_interrupt_inject(target_locked,
+					   HF_NOTIFICATION_PENDING_INTID);
 		vm_notifications_set_npi_injected(receiver_locked, true);
 		ret = true;
 	}
@@ -845,28 +805,7 @@ out_unlock:
 /* Returns the virtual interrupt id to be handled by SP. */
 uint32_t ffa_interrupts_get(struct vcpu_locked current_locked)
 {
-	uint32_t int_id;
-
-	/*
-	 * If there are any virtual interrupts in the queue, return the first
-	 * entry. Else, return the pending interrupt from the bitmap.
-	 */
-	if (vcpu_interrupt_queue_peek(current_locked, &int_id)) {
-		struct interrupts *interrupts;
-
-		/*
-		 * Mark the virtual interrupt as no longer pending and decrement
-		 * the count.
-		 */
-		interrupts = &current_locked.vcpu->interrupts;
-		vcpu_virt_interrupt_clear_pending(interrupts, int_id);
-		vcpu_interrupt_count_decrement(current_locked, interrupts,
-					       int_id);
-
-		return int_id;
-	}
-
-	return api_interrupt_get(current_locked);
+	return vcpu_virt_interrupt_get_pending_and_enabled(current_locked);
 }
 
 /**
@@ -892,13 +831,14 @@ bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
 				   struct vcpu_locked next_locked,
 				   struct ffa_value *signal_interrupt)
 {
-	uint32_t intid;
+	uint32_t intid =
+		vcpu_virt_interrupt_peek_pending_and_enabled(current_locked);
 
 	/*
 	 * Check if there are any pending virtual secure interrupts to be
 	 * handled.
 	 */
-	if (vcpu_interrupt_queue_peek(current_locked, &intid)) {
+	if (intid != HF_INVALID_INTID) {
 		/*
 		 * Prepare to signal virtual secure interrupt to S-EL0/S-EL1 SP
 		 * in WAITING state. Refer to FF-A v1.2 Table 9.1 and Table 9.2
@@ -915,8 +855,9 @@ bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
 		current_locked.vcpu->preempted_vcpu = next_locked.vcpu;
 		next_locked.vcpu->state = VCPU_STATE_PREEMPTED;
 
-		dlog_verbose("%s: Pending interrup, intercepting FF-A call.\n",
-			     __func__);
+		dlog_verbose(
+			"%s: Pending interrupt %d, intercepting FF-A call.\n",
+			__func__, intid);
 
 		return true;
 	}

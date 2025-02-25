@@ -1147,8 +1147,7 @@ static void api_inject_arch_timer_interrupt(struct vcpu_locked next_locked)
 
 	if (arch_timer_expired(&next->regs)) {
 		/* Make virtual timer interrupt pending. */
-		vcpu_interrupt_inject(next_locked, HF_VIRTUAL_TIMER_INTID);
-		vcpu_interrupt_queue_push(next_locked, HF_VIRTUAL_TIMER_INTID);
+		vcpu_virt_interrupt_inject(next_locked, HF_VIRTUAL_TIMER_INTID);
 	}
 }
 
