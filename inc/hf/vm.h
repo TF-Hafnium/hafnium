@@ -207,7 +207,6 @@ struct vm {
 		struct notifications from_sp;
 		struct notifications_state framework;
 		bool enabled;
-		bool npi_injected;
 	} notifications;
 
 	/**
@@ -363,9 +362,6 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 			       uint32_t *ids_count, uint32_t *lists_sizes,
 			       uint32_t *lists_count, uint32_t ids_max_count);
 bool vm_supports_messaging_method(struct vm *vm, uint16_t messaging_method);
-void vm_notifications_set_npi_injected(struct vm_locked vm_locked,
-				       bool npi_injected);
-bool vm_notifications_is_npi_injected(struct vm_locked vm_locked);
 void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu);
 
 /**

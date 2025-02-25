@@ -4458,11 +4458,6 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 	ret = api_ffa_notification_get_success_return(
 		sp_notifications, vm_notifications, framework_notifications);
 
-	if (!receiver_locked.vm->el0_partition &&
-	    !vm_are_global_notifications_pending(receiver_locked)) {
-		vm_notifications_set_npi_injected(receiver_locked, false);
-	}
-
 out:
 	vm_unlock(&receiver_locked);
 

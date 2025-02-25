@@ -474,18 +474,15 @@ bool ffa_interrupts_inject_notification_pending_interrupt(
 	/*
 	 * Inject the NPI if:
 	 * - The targeted VM ID is from this world (i.e. if it is an SP).
-	 * - The partition has global pending notifications and an NPI hasn't
-	 * been injected yet.
-	 * - There are pending per-vCPU notifications in the next vCPU.
+	 * - The partition has global pending notifications or there are
+	 *   pending per-vCPU notifications in the next vCPU.
 	 */
 	if (vm_id_is_current_world(next_vm->id) &&
 	    (vm_are_per_vcpu_notifications_pending(
 		     receiver_locked, vcpu_index(target_locked.vcpu)) ||
-	     (vm_are_global_notifications_pending(receiver_locked) &&
-	      !vm_notifications_is_npi_injected(receiver_locked)))) {
+	     vm_are_global_notifications_pending(receiver_locked))) {
 		vcpu_virt_interrupt_inject(target_locked,
 					   HF_NOTIFICATION_PENDING_INTID);
-		vm_notifications_set_npi_injected(receiver_locked, true);
 		ret = true;
 	}
 

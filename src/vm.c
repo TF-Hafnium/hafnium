@@ -1064,17 +1064,6 @@ bool vm_supports_messaging_method(struct vm *vm, uint16_t msg_method)
 	return (vm->messaging_method & msg_method) != 0;
 }
 
-void vm_notifications_set_npi_injected(struct vm_locked vm_locked,
-				       bool npi_injected)
-{
-	vm_locked.vm->notifications.npi_injected = npi_injected;
-}
-
-bool vm_notifications_is_npi_injected(struct vm_locked vm_locked)
-{
-	return vm_locked.vm->notifications.npi_injected;
-}
-
 /**
  * Sets the designated GP register that the VM expects to receive the boot
  * info's address.
