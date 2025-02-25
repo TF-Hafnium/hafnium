@@ -471,17 +471,18 @@ static inline void populate_redist_base_addrs(struct mem_range *gic_mem_ranges,
 /**
  * Currently, TF-A has complete access to GIC driver and configures
  * GIC Distributor, GIC Re-distributor and CPU interfaces as needed.
+ * This function only enables G1S interrupts if not already enabled.
  */
 void gicv3_distif_init(void)
 {
-	/* TODO: Currently, we skip this. */
-	return;
+	uint32_t ctlr;
 
-	/* Enable G1S and G1NS interrupts. */
-	gicd_set_ctlr(
-		plat_gicv3_driver.dist_base,
-		CTLR_ENABLE_G1NS_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ARE_S_BIT,
-		RWP_TRUE);
+	/* Enable G1S interrupts if not enabled */
+	ctlr = gicd_read_ctlr(plat_gicv3_driver.dist_base);
+	if (!(ctlr & CTLR_ENABLE_G1S_BIT)) {
+		gicd_write_ctlr(plat_gicv3_driver.dist_base,
+				ctlr | CTLR_ENABLE_G1S_BIT);
+	}
 }
 
 void gicv3_rdistif_init(uint32_t core_pos)
