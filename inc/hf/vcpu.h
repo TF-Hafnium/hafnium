@@ -335,7 +335,6 @@ static inline void vcpu_fiq_count_decrement(struct vcpu_locked vcpu_locked)
 {
 	vcpu_locked.vcpu->interrupts.enabled_and_pending_fiq_count--;
 }
-
 static inline void vcpu_interrupt_count_increment(
 	struct vcpu_locked vcpu_locked, struct interrupts *interrupts,
 	uint32_t intid)

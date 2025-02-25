@@ -209,6 +209,7 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel0(
 	case VCPU_STATE_WAITING: {
 		struct ffa_value ret_interrupt =
 			api_ffa_interrupt_return(v_intid);
+		uint32_t pending_intid;
 
 		/* FF-A v1.1 EAC0 Table 8.1 case 1 and Table 12.10. */
 		dlog_verbose("S-EL0: Secure interrupt signaled: %x\n",
@@ -216,6 +217,15 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt_sel0(
 
 		vcpu_enter_secure_interrupt_rtm(target_vcpu_locked);
 		ffa_interrupts_mask(target_vcpu_locked);
+
+		/*
+		 * Since S-EL0 partitions will not receive the interrupt through
+		 * a vIRQ signal in addition to the FFA_INTERRUPT ERET, make the
+		 * interrupt no longer pending at this point.
+		 */
+		pending_intid = vcpu_virt_interrupt_get_pending_and_enabled(
+			target_vcpu_locked);
+		assert(pending_intid == v_intid);
 
 		vcpu_set_running(target_vcpu_locked, &ret_interrupt);
 
@@ -831,8 +841,17 @@ bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
 				   struct vcpu_locked next_locked,
 				   struct ffa_value *signal_interrupt)
 {
-	uint32_t intid =
-		vcpu_virt_interrupt_peek_pending_and_enabled(current_locked);
+	/*
+	 * Since S-EL0 partitions will not receive the interrupt through a vIRQ
+	 * signal in addition to the FFA_INTERRUPT ERET, make the interrupt no
+	 * longer pending at this point. Otherwise keep it as pending for
+	 * when the S-EL1 parition calls hf_interrupt_get.
+	 */
+	uint32_t intid = current_locked.vcpu->vm->el0_partition
+				 ? vcpu_virt_interrupt_get_pending_and_enabled(
+					   current_locked)
+				 : vcpu_virt_interrupt_peek_pending_and_enabled(
+					   current_locked);
 
 	/*
 	 * Check if there are any pending virtual secure interrupts to be
