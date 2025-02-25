@@ -74,6 +74,26 @@ If you wish to change the value of the make variables you may need to first use:
 
 So the `args.gn` file will be regenerated with the new values.
 
+Using Docker
+^^^^^^^^^^^^
+
+We provide a Docker container to ensure a consistent development environment or
+to enable building on non-Linux platforms (eg MacOS). Build the container with
+`./build/docker/build.sh`. You can run commands in the container with
+`./build/run_in_container.sh -i bash`:
+
+.. code :: shell
+   ./build/docker/build.sh
+   ./build/run_in_container.sh -i bash
+   make
+
+Alternatively, the Makefile will automatically use the Docker container
+if the environment variable `HAFNIUM_HERMETIC_BUILD` is set to `true`:
+
+.. code :: shell
+   ./build/docker/build.sh
+   HAFNIUM_HERMETIC_BUILD=true make
+
 Hafnium Documentation
 ^^^^^^^^^^^^^^^^^^^^^
 
