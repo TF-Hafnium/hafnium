@@ -375,9 +375,8 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 		if (!sp_boot_next(current_locked, next)) {
 			ret = ffa_msg_wait_complete(current_locked, next);
 
-			if (ffa_cpu_cycles_msg_wait_intercept(current_locked,
-							      next, &ret)) {
-			}
+			ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
+							  &ret);
 		}
 		break;
 	case RTM_SEC_INTERRUPT:
@@ -387,32 +386,29 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 		assert(current->preempted_vcpu != NULL);
 		ffa_cpu_cycles_preempted_vcpu_resume(current_locked, next);
 
-		if (ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
-						      &ret)) {
-			break;
+		if (!ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
+						       &ret)) {
+			/*
+			 * If CPU cycles were allocated through FFA_RUN
+			 * interface, allow the interrupts(if they were masked
+			 * earlier) before returning control to NWd.
+			 */
+			ffa_interrupts_unmask(current);
 		}
 
-		/*
-		 * If CPU cycles were allocated through FFA_RUN interface,
-		 * allow the interrupts(if they were masked earlier) before
-		 * returning control to NWd.
-		 */
-		ffa_interrupts_unmask(current);
 		break;
 	case RTM_FFA_RUN:
 		ret = ffa_msg_wait_complete(current_locked, next);
 
-		if (ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
-						      &ret)) {
-			break;
+		if (!ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
+						       &ret)) {
+			/*
+			 * If CPU cycles were allocated through FFA_RUN
+			 * interface, allow the interrupts(if they were masked
+			 * earlier) before returning control to NWd.
+			 */
+			ffa_interrupts_unmask(current);
 		}
-
-		/*
-		 * If CPU cycles were allocated through FFA_RUN interface,
-		 * allow the interrupts(if they were masked earlier) before
-		 * returning control to NWd.
-		 */
-		ffa_interrupts_unmask(current);
 
 		break;
 	default:
