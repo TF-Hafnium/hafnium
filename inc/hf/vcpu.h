@@ -23,7 +23,7 @@
 #define NS_ACTION_SIGNALED 2
 
 /** Maximum number of pending virtual interrupts in the queue per vCPU. */
-#define VINT_QUEUE_MAX 5
+#define VINT_QUEUE_MAX 10
 
 enum vcpu_state {
 	/** The vCPU is switched off. */
