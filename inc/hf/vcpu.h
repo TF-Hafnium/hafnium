@@ -81,6 +81,7 @@ struct interrupt_queue {
 	uint32_t vint_buffer[VINT_QUEUE_MAX];
 	uint16_t head;
 	uint16_t tail;
+	size_t queued_vint_count;
 };
 
 struct interrupts {

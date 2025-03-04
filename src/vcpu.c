@@ -385,13 +385,22 @@ static uint16_t queue_increment_index(uint16_t current_idx)
 	return current_idx + 1;
 }
 
+/**
+ * If tail reaches head of the queue, and the count of queued interrupts
+ * 0, then the queue is empty.
+ */
 static bool is_queue_empty(struct interrupt_queue *q)
 {
-	if (q->head == q->tail) {
-		return true;
-	}
+	return q->head == q->tail && q->queued_vint_count == 0U;
+}
 
-	return false;
+/**
+ * If tail reaches head of the queue, and the count of queued interrupts
+ * matches the size of the buffer, then the queue is full.
+ */
+static bool is_queue_full(struct interrupt_queue *q)
+{
+	return q->head == q->tail && q->queued_vint_count == VINT_QUEUE_MAX;
 }
 
 /**
@@ -416,14 +425,16 @@ static bool vcpu_interrupt_queue_push(struct vcpu_locked vcpu_locked,
 	 */
 	new_tail = queue_increment_index(q->tail);
 
-	/* If new_tail reaches head of the queue, then the queue is full. */
-	if (new_tail == q->head) {
+	if (is_queue_full(q)) {
 		return false;
 	}
 
 	/* Add the virtual interrupt to the queue. */
 	q->vint_buffer[q->tail] = vint_id;
 	q->tail = new_tail;
+
+	assert(q->queued_vint_count < VINT_QUEUE_MAX);
+	q->queued_vint_count++;
 
 	return true;
 }
@@ -454,6 +465,9 @@ static bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked,
 	new_head = queue_increment_index(q->head);
 	*vint_id = q->vint_buffer[q->head];
 	q->head = new_head;
+
+	assert(q->queued_vint_count > 0);
+	q->queued_vint_count--;
 
 	return true;
 }
