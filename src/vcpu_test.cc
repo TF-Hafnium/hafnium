@@ -51,7 +51,7 @@ class vcpu : public ::testing::Test
 					TEST_HEAP_SIZE);
 		}
 
-		test_vm = vm_init(HF_VM_ID_OFFSET, 1, &ppool, false, 0);
+		test_vm = vm_init(HF_VM_ID_OFFSET, 8, &ppool, false, 0);
 		test_vcpu = vm_get_vcpu(test_vm, 0);
 		vcpu_locked = vcpu_lock(test_vcpu);
 		interrupts = &test_vcpu->interrupts;
@@ -200,5 +200,168 @@ TEST_F(vcpu, pending_interrupts_not_enabled_are_not_returned)
 	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
 		  HF_INVALID_INTID);
 	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
+}
+
+/**
+ * Check the queue state from disabling some interrupts. And then reenabling.
+ */
+TEST_F(vcpu, injecting_getting_interrupts_multiple_times)
+{
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
+
+	/* Pend the interrupts, and check the count is incremented. */
+	vcpu_virt_interrupt_inject(vcpu_locked, first_intid);
+	vcpu_virt_interrupt_inject(vcpu_locked, second_intid);
+
+	for (uint32_t i = 0; i < VINT_QUEUE_MAX * 3; i++) {
+		uint32_t it_intid = vcpu_virt_interrupt_get_pending_and_enabled(
+			vcpu_locked);
+		uint32_t peek_intid =
+			vcpu_virt_interrupt_peek_pending_and_enabled(
+				vcpu_locked);
+
+		EXPECT_NE(it_intid, HF_INVALID_INTID);
+		/*
+		 * Sequence to validate the `first_intid` and `second_intid`
+		 * are retrieved and left pending as expected.
+		 */
+		if (i % 2 == 0) {
+			EXPECT_EQ(it_intid, first_intid);
+			EXPECT_EQ(peek_intid, second_intid);
+		} else {
+			EXPECT_EQ(it_intid, second_intid);
+			EXPECT_EQ(peek_intid, first_intid);
+		}
+		EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 1);
+		vcpu_virt_interrupt_inject(vcpu_locked, it_intid);
+		EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 2);
+	}
+
+	EXPECT_NE(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  HF_INVALID_INTID);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 1);
+	EXPECT_NE(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  HF_INVALID_INTID);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
+}
+
+/*
+ * Test that each interrupt ID is only set to pending and the count is
+ * incremented once.
+ */
+TEST_F(vcpu, pending_interrupt_is_only_added_once)
+{
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
+
+	/* Pend the interrupt, and check the count is incremented. */
+	vcpu_virt_interrupt_inject(vcpu_locked, first_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 1);
+
+	/* Inject the same interrupt the count should not be incremented. */
+	vcpu_virt_interrupt_inject(vcpu_locked, first_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 1);
+
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  first_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  HF_INVALID_INTID);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
+}
+
+/* Check that an cleared interrupts are made to be no longer pending. */
+TEST_F(vcpu, pending_interrupts_can_be_cleared)
+{
+	/*
+	 * Pend the interrupts, check the count is incremented, the pending
+	 * interrupts are returned correctly and this causes the count to
+	 * return to 0.
+	 */
+	vcpu_virt_interrupt_inject(vcpu_locked, first_intid);
+	vcpu_virt_interrupt_inject(vcpu_locked, second_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 2);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  first_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  second_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
+
+	/* Again pend the interrupts. */
+	vcpu_virt_interrupt_inject(vcpu_locked, first_intid);
+	vcpu_virt_interrupt_inject(vcpu_locked, second_intid);
+
+	/* Remove the first interrupt. */
+	vcpu_virt_interrupt_clear(vcpu_locked, first_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 1);
+
+	/*
+	 * Check that the first interrupt is cleared.
+	 * The second intid should be returned and then the invalid
+	 * intid to show there are no more pending and enabled interrupts.
+	 */
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  second_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  HF_INVALID_INTID);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
+
+	/* Inject the interrupts again. */
+	vcpu_virt_interrupt_inject(vcpu_locked, first_intid);
+	vcpu_virt_interrupt_inject(vcpu_locked, second_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 2);
+
+	/* Remove the second interrupt. */
+	vcpu_virt_interrupt_clear(vcpu_locked, second_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 1);
+
+	/*
+	 * Check that it is now returned as a pending interrupt and is the only
+	 * interrupt pending.
+	 */
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  first_intid);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
+		  HF_INVALID_INTID);
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
+}
+
+/*
+ * Check that when an interrupt is cleared space is create for a new
+ * interrupt to be injected. In addition that after clearing interrupts
+ * the FIFO policy of the remaining interrupts is maintainted.
+ */
+TEST_F(vcpu, pending_interrupts_clear_full_list)
+{
+	/* Fill the interrupt queue for the vCPU. */
+	for (int i = 0; i < VINT_QUEUE_MAX; i++) {
+		vcpu_virt_interrupt_enable(vcpu_locked, i, true);
+		vcpu_virt_interrupt_inject(vcpu_locked, i);
+	}
+
+	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), VINT_QUEUE_MAX);
+
+	/* Check clearing an interrupt clears space for another interrupt. */
+	vcpu_virt_interrupt_clear(vcpu_locked, 2);
+
+	vcpu_virt_interrupt_enable(vcpu_locked, VINT_QUEUE_MAX, true);
+	vcpu_virt_interrupt_inject(vcpu_locked, VINT_QUEUE_MAX);
+
+	/* Check disabled interrupts are also cleared. */
+	vcpu_virt_interrupt_enable(vcpu_locked, 1, false);
+	vcpu_virt_interrupt_clear(vcpu_locked, 1);
+
+	vcpu_virt_interrupt_inject(vcpu_locked, VINT_QUEUE_MAX + 1);
+	/*
+	 * Enable the interrupt after injecting it to ensure it will be returned
+	 * by vcpu_virt_interrupt_get_pending_and_enabled but is correctly
+	 * injected when disabled.
+	 */
+	vcpu_virt_interrupt_enable(vcpu_locked, VINT_QUEUE_MAX + 1, true);
+
+	/* Get the interrupts to check the FIFO order is maintained. */
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked), 0);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked), 3);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked), 4);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked), 5);
+	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked), 6);
 }
 } /* namespace */
