@@ -605,8 +605,11 @@ void vcpu_virt_interrupt_inject(struct vcpu_locked vcpu_locked,
 
 	/* Push to the queue and set the bitmap. */
 	if (!vcpu_interrupt_queue_push(vcpu_locked, vint_id)) {
-		panic("Exhausted interrupt queue for vCPU %d of SP %#x\n",
-		      vcpu_locked.vcpu->cpu->id, vcpu_locked.vcpu->vm->id);
+		dlog_verbose(
+			"Exhausted interrupt queue for vCPU %u of SP %#x\n",
+			vcpu_index(vcpu_locked.vcpu), vcpu_locked.vcpu->vm->id);
+		assert(false);
+		return;
 	}
 	vcpu_virt_interrupt_set_pending(interrupts, vint_id);
 
