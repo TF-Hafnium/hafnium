@@ -445,19 +445,17 @@ static bool vcpu_interrupt_queue_push(struct vcpu_locked vcpu_locked,
  * Remove an entry from the specified vCPU's queue at the head.
  * Returns true if successful in removing the entry, or false otherwise.
  */
-static bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked,
-				     uint32_t *vint_id)
+static uint32_t vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked)
 {
 	struct interrupt_queue *q;
 	uint16_t new_head;
-
-	assert(vint_id != NULL);
+	uint32_t vint_id;
 
 	q = &vcpu_locked.vcpu->interrupts.vint_q;
 
 	/* Check if queue is empty. */
 	if (is_queue_empty(q)) {
-		return false;
+		return HF_INVALID_INTID;
 	}
 
 	/*
@@ -465,13 +463,13 @@ static bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked,
 	 * head is incremented or wrapped around if needed.
 	 */
 	new_head = queue_increment_index(q->head);
-	*vint_id = q->vint_buffer[q->head];
+	vint_id = q->vint_buffer[q->head];
 	q->head = new_head;
 
 	assert(q->queued_vint_count > 0);
 	q->queued_vint_count--;
 
-	return true;
+	return vint_id;
 }
 
 /**
@@ -480,26 +478,22 @@ static bool vcpu_interrupt_queue_pop(struct vcpu_locked vcpu_locked,
  *
  * Returns true if a valid entry exists in the queue, or false otherwise.
  */
-static bool vcpu_interrupt_queue_peek(struct vcpu_locked vcpu_locked,
-				      uint32_t *vint_id)
+static uint32_t vcpu_interrupt_queue_peek(struct vcpu_locked vcpu_locked)
 {
 	struct interrupt_queue *q;
 	uint32_t queued_vint;
-
-	assert(vint_id != NULL);
 
 	q = &vcpu_locked.vcpu->interrupts.vint_q;
 
 	/* Check if queue is empty. */
 	if (is_queue_empty(q)) {
-		return false;
+		return HF_INVALID_INTID;
 	}
 
 	queued_vint = q->vint_buffer[q->head];
 	assert(queued_vint != HF_INVALID_INTID);
 
-	*vint_id = queued_vint;
-	return true;
+	return queued_vint;
 }
 
 /**
@@ -543,14 +537,12 @@ void vcpu_virt_interrupt_enable(struct vcpu_locked vcpu_locked,
 
 /*
  * Find and return the first intid that is pending and enabled, the interrupt
- * struct for this intid will be at the head of the list so can be popped.
- * Intid returned in the vint_id argument.
- * True returned if a pending and enabled interrupt is found. False otherwise.
+ * struct for this intid will be at the head of the list so can be popped later.
  */
 uint32_t vcpu_virt_interrupt_peek_pending_and_enabled(
 	struct vcpu_locked vcpu_locked)
 {
-	uint32_t vint_id = HF_INVALID_INTID;
+	uint32_t vint_id;
 	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
 	uint32_t pending_and_enabled_count =
 		vcpu_virt_interrupt_count_get(vcpu_locked);
@@ -565,11 +557,11 @@ uint32_t vcpu_virt_interrupt_peek_pending_and_enabled(
 	 * the queue. So push any interrupts that are not enabled to
 	 * the back of the queue until we reach the first enabled one.
 	 */
-	while (vcpu_interrupt_queue_peek(vcpu_locked, &vint_id) &&
-	       !vcpu_is_virt_interrupt_enabled(interrupts, vint_id)) {
-		/* Push disabled interrupt to the back of the queue. */
-		vcpu_interrupt_queue_pop(vcpu_locked, &vint_id);
+	vint_id = vcpu_interrupt_queue_peek(vcpu_locked);
+	while (!vcpu_is_virt_interrupt_enabled(interrupts, vint_id)) {
+		vcpu_interrupt_queue_pop(vcpu_locked);
 		vcpu_interrupt_queue_push(vcpu_locked, vint_id);
+		vint_id = vcpu_interrupt_queue_peek(vcpu_locked);
 	}
 
 	assert(vint_id != HF_INVALID_INTID);
@@ -588,7 +580,7 @@ uint32_t vcpu_virt_interrupt_get_pending_and_enabled(
 		vcpu_virt_interrupt_peek_pending_and_enabled(vcpu_locked);
 
 	if (vint_id != HF_INVALID_INTID) {
-		vcpu_interrupt_queue_pop(vcpu_locked, &vint_id);
+		vcpu_interrupt_queue_pop(vcpu_locked);
 		vcpu_interrupt_clear_decrement(vcpu_locked, vint_id);
 	}
 
@@ -634,18 +626,17 @@ void vcpu_virt_interrupt_clear(struct vcpu_locked vcpu_locked, uint32_t vint_id)
 	}
 
 	for (uint32_t i = 0; i < queued_vint_count; i++) {
-		uint32_t intid;
+		uint32_t intid = vcpu_interrupt_queue_pop(vcpu_locked);
 
-		vcpu_interrupt_queue_pop(vcpu_locked, &intid);
-		vcpu_interrupt_clear_decrement(vcpu_locked, intid);
-
-		/*
-		 * If the interrupt is not the one we wish to remove, inject
-		 * it again. We must remove and inject all interrupts to ensure
-		 * the FIFO ordering is maintained.
-		 */
-		if (intid != vint_id) {
-			vcpu_virt_interrupt_inject(vcpu_locked, intid);
+		if (intid == vint_id) {
+			vcpu_interrupt_clear_decrement(vcpu_locked, intid);
+		} else {
+			/*
+			 * If the interrupt is not the one we wish to remove,
+			 * inject it again. We must pop and push all interrupts
+			 * to ensure the FIFO ordering is maintained.
+			 */
+			vcpu_interrupt_queue_push(vcpu_locked, intid);
 		}
 	}
 }
