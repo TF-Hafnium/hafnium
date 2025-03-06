@@ -261,9 +261,6 @@ static inline void vcpu_call_chain_remove_node(struct vcpu_locked vcpu1_locked,
 	vcpu2_locked.vcpu->call_chain.next_node = NULL;
 }
 
-void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
-				    uint32_t intid);
-
 void vcpu_set_running(struct vcpu_locked target_locked,
 		      const struct ffa_value *args);
 
@@ -335,3 +332,5 @@ uint32_t vcpu_virt_interrupt_get_pending_and_enabled(
 	struct vcpu_locked vcpu_locked);
 void vcpu_virt_interrupt_inject(struct vcpu_locked vcpu_locked,
 				uint32_t vint_id);
+void vcpu_virt_interrupt_clear(struct vcpu_locked vcpu_locked,
+			       uint32_t vint_id);

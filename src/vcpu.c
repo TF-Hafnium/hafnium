@@ -312,8 +312,8 @@ uint32_t vcpu_virt_interrupt_count_get(struct vcpu_locked vcpu_locked)
 	       vcpu_virt_interrupt_fiq_count_get(vcpu_locked);
 }
 
-void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
-				    uint32_t intid)
+static void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
+					   uint32_t intid)
 {
 	struct interrupts *interrupts = &(vcpu_locked.vcpu->interrupts);
 
@@ -329,10 +329,12 @@ void vcpu_interrupt_clear_decrement(struct vcpu_locked vcpu_locked,
 
 	/*
 	 * Mark the virtual interrupt as no longer pending and decrement
-	 * the interrupt count.
+	 * the interrupt count if it is enabled.
 	 */
 	vcpu_virt_interrupt_clear_pending(interrupts, intid);
-	vcpu_interrupt_count_decrement(vcpu_locked, intid);
+	if (vcpu_is_virt_interrupt_enabled(interrupts, intid)) {
+		vcpu_interrupt_count_decrement(vcpu_locked, intid);
+	}
 }
 
 /**
@@ -618,5 +620,32 @@ void vcpu_virt_interrupt_inject(struct vcpu_locked vcpu_locked,
 
 	if (vcpu_is_virt_interrupt_enabled(interrupts, vint_id)) {
 		vcpu_interrupt_count_increment(vcpu_locked, vint_id);
+	}
+}
+
+void vcpu_virt_interrupt_clear(struct vcpu_locked vcpu_locked, uint32_t vint_id)
+{
+	struct interrupts *interrupts = &vcpu_locked.vcpu->interrupts;
+	uint32_t queued_vint_count = interrupts->vint_q.queued_vint_count;
+
+	/* See if interrupt is pending and therefore needs to be cleared. */
+	if (!vcpu_is_virt_interrupt_pending(interrupts, vint_id)) {
+		return;
+	}
+
+	for (uint32_t i = 0; i < queued_vint_count; i++) {
+		uint32_t intid;
+
+		vcpu_interrupt_queue_pop(vcpu_locked, &intid);
+		vcpu_interrupt_clear_decrement(vcpu_locked, intid);
+
+		/*
+		 * If the interrupt is not the one we wish to remove, inject
+		 * it again. We must remove and inject all interrupts to ensure
+		 * the FIFO ordering is maintained.
+		 */
+		if (intid != vint_id) {
+			vcpu_virt_interrupt_inject(vcpu_locked, intid);
+		}
 	}
 }

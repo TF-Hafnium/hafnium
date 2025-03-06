@@ -232,6 +232,12 @@ static struct ffa_value ffa_msg_wait_complete(struct vcpu_locked current_locked,
 	current->scheduling_mode = NONE;
 	current->rt_model = RTM_NONE;
 
+	/*
+	 * We no longer need to do a managed exit so clear the interrupt if
+	 * needed.
+	 */
+	vcpu_virt_interrupt_clear(current_locked, HF_MANAGED_EXIT_INTID);
+
 	/* Relinquish control back to the NWd. */
 	*next = api_switch_to_other_world(
 		current_locked, (struct ffa_value){.func = FFA_MSG_WAIT_32},

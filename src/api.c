@@ -3118,8 +3118,6 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 	}
 
 	if (api_ffa_is_managed_exit_ongoing(current_locked)) {
-		struct interrupts *interrupts = &current->interrupts;
-
 		CHECK(current->scheduling_mode != SPMC_MODE);
 
 		plat_interrupts_set_priority_mask(
@@ -3134,11 +3132,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 		 */
 		current->processing_managed_exit = false;
 
-		if (vcpu_is_virt_interrupt_pending(interrupts,
-						   HF_MANAGED_EXIT_INTID)) {
-			vcpu_interrupt_clear_decrement(current_locked,
-						       HF_MANAGED_EXIT_INTID);
-		}
+		vcpu_virt_interrupt_clear(current_locked,
+					  HF_MANAGED_EXIT_INTID);
 	}
 
 	/* Clear direct request origin vm_id and request type for the caller. */
