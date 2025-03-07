@@ -58,26 +58,43 @@ class ipi : public ::testing::Test
 			struct vcpu *blocked_vcpu = vm_get_vcpu(test_vm[2], i);
 			struct vcpu *preempted_vcpu =
 				vm_get_vcpu(test_vm[3], i);
+			struct vcpu_locked running_locked =
+				vcpu_lock(running_vcpu);
+			struct vcpu_locked waiting_locked =
+				vcpu_lock(waiting_vcpu);
+			struct vcpu_locked blocked_locked =
+				vcpu_lock(blocked_vcpu);
+			struct vcpu_locked preempted_locked =
+				vcpu_lock(preempted_vcpu);
+
 			struct cpu *cpu = cpu_find_index(i);
 
 			running_vcpu->cpu = cpu;
 			running_vcpu->state = VCPU_STATE_RUNNING;
-			vcpu_virt_interrupt_set_enabled(
-				&running_vcpu->interrupts, HF_IPI_INTID);
+			vcpu_virt_interrupt_enable(running_locked, HF_IPI_INTID,
+						   true);
+
 			waiting_vcpu->cpu = cpu;
 			waiting_vcpu->state = VCPU_STATE_WAITING;
-			vcpu_virt_interrupt_set_enabled(
-				&waiting_vcpu->interrupts, HF_IPI_INTID);
+			vcpu_virt_interrupt_enable(waiting_locked, HF_IPI_INTID,
+						   true);
+
 			blocked_vcpu->cpu = cpu;
 			blocked_vcpu->state = VCPU_STATE_BLOCKED;
-			vcpu_virt_interrupt_set_enabled(
-				&blocked_vcpu->interrupts, HF_IPI_INTID);
+			vcpu_virt_interrupt_enable(blocked_locked, HF_IPI_INTID,
+						   true);
+
 			preempted_vcpu->cpu = cpu;
 			preempted_vcpu->state = VCPU_STATE_PREEMPTED;
-			vcpu_virt_interrupt_set_enabled(
-				&preempted_vcpu->interrupts, HF_IPI_INTID);
+			vcpu_virt_interrupt_enable(preempted_locked,
+						   HF_IPI_INTID, true);
 
 			list_init(&cpu->pending_ipis);
+
+			vcpu_unlock(&running_locked);
+			vcpu_unlock(&waiting_locked);
+			vcpu_unlock(&blocked_locked);
+			vcpu_unlock(&preempted_locked);
 		}
 	}
 };

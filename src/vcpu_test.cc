@@ -39,23 +39,31 @@ class vcpu : public ::testing::Test
 	const uint32_t second_intid = HF_NUM_INTIDS - 1;
 	struct_vm *test_vm;
 	struct_vcpu *test_vcpu;
+	struct vcpu_locked vcpu_locked;
 	struct interrupts *interrupts;
 
 	void SetUp() override
 	{
-		if (test_heap) {
-			return;
+		if (!test_heap) {
+			test_heap = std::make_unique<uint8_t[]>(TEST_HEAP_SIZE);
+			mpool_init(&ppool, sizeof(struct mm_page_table));
+			mpool_add_chunk(&ppool, test_heap.get(),
+					TEST_HEAP_SIZE);
 		}
-		test_heap = std::make_unique<uint8_t[]>(TEST_HEAP_SIZE);
-		mpool_init(&ppool, sizeof(struct mm_page_table));
-		mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
+
 		test_vm = vm_init(HF_VM_ID_OFFSET, 1, &ppool, false, 0);
 		test_vcpu = vm_get_vcpu(test_vm, 0);
+		vcpu_locked = vcpu_lock(test_vcpu);
 		interrupts = &test_vcpu->interrupts;
 
 		/* Enable the interrupts used in testing. */
-		vcpu_virt_interrupt_set_enabled(interrupts, first_intid);
-		vcpu_virt_interrupt_set_enabled(interrupts, second_intid);
+		vcpu_virt_interrupt_enable(vcpu_locked, first_intid, true);
+		vcpu_virt_interrupt_enable(vcpu_locked, second_intid, true);
+	}
+
+	void TearDown() override
+	{
+		vcpu_unlock(&vcpu_locked);
 	}
 };
 
@@ -67,8 +75,6 @@ std::unique_ptr<uint8_t[]> vcpu::test_heap;
  */
 TEST_F(vcpu, pending_interrupts_are_fetched)
 {
-	struct vcpu_locked vcpu_locked = vcpu_lock(test_vcpu);
-
 	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
 
 	/* Pend the interrupts, and check the count is incremented. */
@@ -117,8 +123,6 @@ TEST_F(vcpu, pending_interrupts_are_fetched)
 	EXPECT_FALSE(vcpu_is_virt_interrupt_pending(interrupts, second_intid));
 	EXPECT_FALSE(vcpu_is_virt_interrupt_pending(interrupts, first_intid));
 	EXPECT_EQ(vcpu_virt_interrupt_irq_count_get(vcpu_locked), 0);
-
-	vcpu_unlock(&vcpu_locked);
 }
 
 /*
@@ -127,8 +131,6 @@ TEST_F(vcpu, pending_interrupts_are_fetched)
  */
 TEST_F(vcpu, pending_interrupts_not_enabled_are_not_returned)
 {
-	struct vcpu_locked vcpu_locked = vcpu_lock(test_vcpu);
-
 	/*
 	 * Pend the interrupts, check the count is incremented, the pending
 	 * interrupts are returned correctly and this causes the count to
@@ -198,7 +200,5 @@ TEST_F(vcpu, pending_interrupts_not_enabled_are_not_returned)
 	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
 		  HF_INVALID_INTID);
 	EXPECT_EQ(vcpu_virt_interrupt_count_get(vcpu_locked), 0);
-
-	vcpu_unlock(&vcpu_locked);
 }
 } /* namespace */

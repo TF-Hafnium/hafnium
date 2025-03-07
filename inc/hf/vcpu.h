@@ -295,25 +295,6 @@ void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked);
 
 void vcpu_secure_interrupt_complete(struct vcpu_locked vcpu_locked);
 
-static inline bool vcpu_is_virt_interrupt_enabled(struct interrupts *interrupts,
-						  uint32_t intid)
-{
-	return interrupt_bitmap_get_value(&interrupts->interrupt_enabled,
-					  intid) == 1U;
-}
-
-static inline void vcpu_virt_interrupt_set_enabled(
-	struct interrupts *interrupts, uint32_t intid)
-{
-	interrupt_bitmap_set_value(&interrupts->interrupt_enabled, intid);
-}
-
-static inline void vcpu_virt_interrupt_clear_enabled(
-	struct interrupts *interrupts, uint32_t intid)
-{
-	interrupt_bitmap_clear_value(&interrupts->interrupt_enabled, intid);
-}
-
 static inline bool vcpu_is_virt_interrupt_pending(struct interrupts *interrupts,
 						  uint32_t intid)
 {

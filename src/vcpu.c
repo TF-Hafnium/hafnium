@@ -219,6 +219,25 @@ void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu)
 	}
 }
 
+static bool vcpu_is_virt_interrupt_enabled(struct interrupts *interrupts,
+					   uint32_t intid)
+{
+	return interrupt_bitmap_get_value(&interrupts->interrupt_enabled,
+					  intid) == 1U;
+}
+
+static void vcpu_virt_interrupt_set_enabled(struct interrupts *interrupts,
+					    uint32_t intid)
+{
+	interrupt_bitmap_set_value(&interrupts->interrupt_enabled, intid);
+}
+
+static void vcpu_virt_interrupt_clear_enabled(struct interrupts *interrupts,
+					      uint32_t intid)
+{
+	interrupt_bitmap_clear_value(&interrupts->interrupt_enabled, intid);
+}
+
 static void vcpu_virt_interrupt_set_pending(struct interrupts *interrupts,
 					    uint32_t intid)
 {

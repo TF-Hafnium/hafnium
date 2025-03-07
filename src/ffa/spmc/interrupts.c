@@ -563,8 +563,8 @@ static void ffa_interrupts_enable_virtual_maintenance_interrupts(
 	vm = current->vm;
 
 	if (ffa_vm_managed_exit_supported(vm)) {
-		vcpu_virt_interrupt_set_enabled(interrupts,
-						HF_MANAGED_EXIT_INTID);
+		vcpu_virt_interrupt_enable(current_locked,
+					   HF_MANAGED_EXIT_INTID, true);
 		/*
 		 * SPMC decides the interrupt type for Managed exit signal based
 		 * on the partition manifest.
@@ -581,8 +581,8 @@ static void ffa_interrupts_enable_virtual_maintenance_interrupts(
 	}
 
 	if (vm->notifications.enabled) {
-		vcpu_virt_interrupt_set_enabled(interrupts,
-						HF_NOTIFICATION_PENDING_INTID);
+		vcpu_virt_interrupt_enable(current_locked,
+					   HF_NOTIFICATION_PENDING_INTID, true);
 	}
 }
 
@@ -598,11 +598,9 @@ void ffa_interrupts_enable_virtual_interrupts(struct vcpu_locked current_locked,
 					      struct vm_locked vm_locked)
 {
 	struct vcpu *current;
-	struct interrupts *interrupts;
 	struct vm *vm;
 
 	current = current_locked.vcpu;
-	interrupts = &current->interrupts;
 	vm = current->vm;
 	assert(vm == vm_locked.vm);
 
@@ -616,8 +614,8 @@ void ffa_interrupts_enable_virtual_interrupts(struct vcpu_locked current_locked,
 			if (!int_desc.valid) {
 				break;
 			}
-			vcpu_virt_interrupt_set_enabled(interrupts,
-							int_desc.interrupt_id);
+			vcpu_virt_interrupt_enable(current_locked,
+						   int_desc.interrupt_id, true);
 		}
 	}
 

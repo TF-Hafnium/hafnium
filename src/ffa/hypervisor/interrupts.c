@@ -38,15 +38,9 @@ bool ffa_interrupts_inject_notification_pending_interrupt(
 void ffa_interrupts_enable_virtual_interrupts(struct vcpu_locked current_locked,
 					      struct vm_locked vm_locked)
 {
-	struct vcpu *current;
-	struct interrupts *interrupts;
-
-	current = current_locked.vcpu;
-	interrupts = &current->interrupts;
-
 	if (vm_locked.vm->notifications.enabled) {
-		vcpu_virt_interrupt_set_enabled(interrupts,
-						HF_NOTIFICATION_PENDING_INTID);
+		vcpu_virt_interrupt_enable(current_locked,
+					   HF_NOTIFICATION_PENDING_INTID, true);
 	}
 }
 
