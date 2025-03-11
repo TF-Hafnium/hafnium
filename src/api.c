@@ -4570,6 +4570,29 @@ struct ffa_value api_ffa_notification_info_get(struct vcpu *current)
 	return result;
 }
 
+/*
+ * Calculate the end of the memory range (`base_addr + page_count * PAGE_SIZE`)
+ * and write the result to `*res`.
+ * Returns whether any of the intermediate operations overflowed.
+ */
+static bool api_memory_range_end(vaddr_t base_addr, uint32_t page_count,
+				 vaddr_t *res)
+{
+	uint64_t range_size;
+	uintvaddr_t end_addr;
+
+	if (mul_overflow(page_count, PAGE_SIZE, &range_size)) {
+		return true;
+	}
+
+	if (add_overflow(va_addr(base_addr), range_size, &end_addr)) {
+		return true;
+	}
+
+	*res = va_init(end_addr);
+	return false;
+}
+
 struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, uint32_t page_count,
 				      struct vcpu *current)
 {
@@ -4584,9 +4607,21 @@ struct ffa_value api_ffa_mem_perm_get(vaddr_t base_addr, uint32_t page_count,
 	 * granule size to ensure backwards compatability: v1.2 or earlier
 	 * callers, who leave `arg2` as 0, will get the correct behaviour
 	 * (querying a single page).
+	 *
+	 * Any overflow will be caught by the check against zero.
 	 */
 	page_count += 1;
-	end_addr = va_add(base_addr, page_count * PAGE_SIZE);
+
+	/* Empty ranges should be disallowed, as should ranges that overflow */
+	if (page_count == 0) {
+		dlog_error("FFA_MEM_PERM_GET: page_count was zero\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (api_memory_range_end(base_addr, page_count, &end_addr)) {
+		dlog_error("FFA_MEM_PERM_GET: overflow calculating end_addr\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	if (!ffa_memory_is_mem_perm_get_valid(current)) {
 		dlog_error("FFA_MEM_PERM_GET: not allowed\n");
@@ -4667,7 +4702,7 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	mm_mode_t original_mode;
 	mm_mode_t new_mode;
 	struct mpool local_page_pool;
-	vaddr_t end_addr = va_add(base_addr, page_count * PAGE_SIZE);
+	vaddr_t end_addr;
 
 	if (!ffa_memory_is_mem_perm_set_valid(current)) {
 		dlog_error("FFA_MEM_PERM_SET: not allowed\n");
@@ -4685,6 +4720,17 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 			"FFA_MEM_PERM_SET: base addr %#016lx is not page "
 			"aligned\n",
 			va_addr(base_addr));
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Empty ranges should be disallowed, as should ranges that overflow */
+	if (page_count == 0) {
+		dlog_error("FFA_MEM_PERM_SET: page_count was zero\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (api_memory_range_end(base_addr, page_count, &end_addr)) {
+		dlog_error("FFA_MEM_PERM_SET: overflow calculating end_addr\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 

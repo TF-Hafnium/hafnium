@@ -175,10 +175,6 @@ SERVICE_SET_UP(ffa_mem_perm_get)
 			    FFA_MEM_PERM_RW);
 	test_perm_get_range(data_end, image_end, image_end, FFA_MEM_PERM_RW);
 
-	/* Check that permissions on an invalid address returns error. */
-	expect_get_invalid((uintvaddr_t)text_begin + 1, 1);
-	expect_get_invalid(0xDEADBEEF, 1);
-	expect_get_invalid(0x0, 1);
 	expect_get_valid((uintvaddr_t)text_end - PAGE_SIZE, 2, 1,
 			 FFA_MEM_PERM_RX);
 
@@ -188,6 +184,12 @@ SERVICE_SET_UP(ffa_mem_perm_get)
 
 	/* Failure: unaligned base address */
 	expect_get_invalid((uintvaddr_t)text_begin + 1, 1);
+
+	/* Failure: empty range */
+	expect_get_invalid((uintvaddr_t)text_begin, 0);
+
+	/* Failure: overflow */
+	expect_get_invalid(UINT64_MAX, 1);
 }
 
 /**
@@ -208,21 +210,21 @@ SERVICE_SET_UP(ffa_mem_perm_set)
 	expect_set_valid(base_va, 1, FFA_MEM_PERM_RW);
 	expect_get_full_valid(base_va, 1, FFA_MEM_PERM_RW);
 
-	/* Ensure permission for invalid pages cannot be changed. */
-	expect_set_invalid(0xDEADBEEF, 0x1000, FFA_MEM_PERM_RX);
-	expect_set_invalid(0x0, 0x1000, FFA_MEM_PERM_RX);
+	/* Failure: unmapped base address */
+	expect_set_invalid(0x0, 1, FFA_MEM_PERM_RX);
+	expect_set_invalid(0xDEADBEEF, 1, FFA_MEM_PERM_RX);
 
-	/**
-	 * Ensure permissions cannot be changed for an unaligned, but valid
-	 * address.
-	 */
+	/* Failure: unaligned base address */
 	expect_set_invalid(base_va + 1, 1, FFA_MEM_PERM_RX);
 
-	/**
-	 * Ensure permissions cannot be changed for valid address that crosses
-	 * boundary into invalid address.
-	 */
+	/* Failure: base address is valid, but end address is invalid */
 	expect_set_invalid(base_va, 256, FFA_MEM_PERM_RX);
+
+	/* Failure: empty range */
+	expect_set_invalid((uintvaddr_t)text_begin, 0, FFA_MEM_PERM_RX);
+
+	/* Failure: overflow */
+	expect_set_invalid(UINT64_MAX, 1, FFA_MEM_PERM_RX);
 
 	/* Failure: invalid attributes */
 	expect_set_invalid(base_va, 1, 0x1);

@@ -38,11 +38,16 @@ int strncmp(const char *a, const char *b, size_t n);
 #define align_down(v, a) __builtin_align_down((v), (a))
 
 /*
- * Add operation together with checking whether the operation overflowed
- * The result is '*res',
- * return false on success and true on overflow
+ * Calculate the sum `a + b` and write the result to `*res`.
+ * Returns whether the operation overflowed.
  */
 #define add_overflow(a, b, res) __builtin_add_overflow((a), (b), (res))
+
+/*
+ * Calculate product `a * b` and write the result to `*res`.
+ * Returns whether the operation overflowed.
+ */
+#define mul_overflow(a, b, res) __builtin_mul_overflow((a), (b), (res))
 
 /*
  * Round up a value to align with a given size and
