@@ -6,23 +6,15 @@
 
 FROM ubuntu:24.04
 
-# Install dependencies. Clear APT cache at the end to save space.
+# Install dependencies.
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update \
-	&& apt-get install -y \
-		bc                             `# for Linux headers` \
-		bison \
+
+RUN apt-get update
+RUN apt-get install -y \
 		build-essential \
 		cpio \
 		flex \
 		git \
-		clang \
-		clangd \
-		clang-tidy \
-		clang-format \
-		llvm \
-		lld \
-		libc++-dev \
 		device-tree-compiler \
 		wget                           `# for setup_checkpatch.sh` \
 		libpixman-1-0                  `# for QEMU` \
@@ -31,9 +23,35 @@ RUN apt-get update \
 		libssl-dev                     `# for Linux headers` \
 		python3                        `# for all build scripts` \
 		python3-serial                 `# for hftest.py` \
-		python3-pip                    `# for hftest.py` \
-		strace                         `# for strace_open.sh` \
-	&& pip3 install --break-system-packages fdt && rm -rf /var/lib/apt/lists/*
+		python3-pip                    `# for hftest.py`
+
+
+RUN pip3 install --break-system-packages fdt
+
+# Install Clang and LLVM.
+# Use the packages from LLVM's repository rather than the default Ubuntu
+# repository so we can control the exact version.
+ENV LLVM_VERSION=20
+RUN wget https://apt.llvm.org/llvm-snapshot.gpg.key -O /etc/apt/keyrings/llvm-snapshot.key
+RUN echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.key] http://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" > /etc/apt/sources.list.d/llvm.list
+RUN echo "deb-src [signed-by=/etc/apt/keyrings/llvm-snapshot.key] http://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
+RUN apt-get update
+RUN apt-get install -y \
+		clang-$LLVM_VERSION \
+		clangd-$LLVM_VERSION \
+		clang-tidy-$LLVM_VERSION \
+		clang-format-$LLVM_VERSION \
+		llvm-$LLVM_VERSION \
+		lld-$LLVM_VERSION \
+		libc++-$LLVM_VERSION-dev
+
+# LLVM binaries are present in `/usr/bin` as `clang-20`, `clang-tidy-20`, etc.
+# But we want them to be available as `clang`, `clang-tidy`, etc.
+# So we create symlinks for them.
+RUN for f in /usr/lib/llvm-$LLVM_VERSION/bin/*; do ln -s "$f" /usr/local/bin; done
+
+# Clear APT cache to save space.
+RUN rm -rf /var/lib/apt/lists/*
 
 ARG LOCAL_UID=1000
 ARG LOCAL_GID=1000
