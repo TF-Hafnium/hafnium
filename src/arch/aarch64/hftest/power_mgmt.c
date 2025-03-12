@@ -48,11 +48,12 @@ noreturn void arch_cpu_stop(void)
 	}
 }
 
-static_assert(POWER_STATUS_ON == PSCI_RETURN_ON,
+static_assert((uint32_t)POWER_STATUS_ON == (uint32_t)PSCI_RETURN_ON,
 	      "power_status enum values must match PSCI return values.");
-static_assert(POWER_STATUS_OFF == PSCI_RETURN_OFF,
+static_assert((uint32_t)POWER_STATUS_OFF == (uint32_t)PSCI_RETURN_OFF,
 	      "power_status enum values must match PSCI return values.");
-static_assert(POWER_STATUS_ON_PENDING == PSCI_RETURN_ON_PENDING,
+static_assert((uint32_t)POWER_STATUS_ON_PENDING ==
+		      (uint32_t)PSCI_RETURN_ON_PENDING,
 	      "power_status enum values must match PSCI return values.");
 
 /**
