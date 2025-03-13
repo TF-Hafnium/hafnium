@@ -25,11 +25,11 @@
  * Reads a system register, supported by the current assembler, and returns the
  * result.
  */
-#define read_msr(name)                                              \
-	__extension__({                                             \
-		uintreg_t __v;                                      \
-		__asm__ volatile("mrs %0, " str(name) : "=r"(__v)); \
-		__v;                                                \
+#define read_msr(name)                                             \
+	__extension__({                                            \
+		uintreg_t _v;                                      \
+		__asm__ volatile("mrs %0, " str(name) : "=r"(_v)); \
+		_v;                                                \
 	})
 
 /**

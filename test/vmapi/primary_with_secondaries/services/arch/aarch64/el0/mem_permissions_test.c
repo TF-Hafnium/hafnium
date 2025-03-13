@@ -62,6 +62,11 @@ static void expect_set_invalid(uintvaddr_t base_va, uint32_t page_count,
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
+static uint32_t range_page_count(volatile uint8_t* start, volatile uint8_t* end)
+{
+	return align_up(end - start, PAGE_SIZE) / PAGE_SIZE;
+}
+
 /**
  * Assert that every page in the range `start` to `expected_end` has the
  * expected permissions.
@@ -72,9 +77,9 @@ static void test_perm_get_range(volatile uint8_t* start, volatile uint8_t* end,
 {
 	assert(start <= end);
 
-	const uint32_t num_pages = align_up(end - start, PAGE_SIZE) / PAGE_SIZE;
+	const uint32_t num_pages = range_page_count(start, end);
 	const uint32_t expected_num_pages =
-		align_up(expected_end - start, PAGE_SIZE) / PAGE_SIZE;
+		range_page_count(start, expected_end);
 	uintvaddr_t base_va = (uintvaddr_t)align_down(start, PAGE_SIZE);
 
 	if (num_pages > 0) {
@@ -98,6 +103,13 @@ static void test_perm_get_range_full(volatile uint8_t* start,
 	test_perm_get_range(start, end, end, perm);
 }
 
+static void print_range(const char* name, volatile uint8_t* start,
+			volatile uint8_t* end)
+{
+	dlog_verbose("%s: %p - %p (%u pages)\n", name, (void*)start, (void*)end,
+		     range_page_count(start, end));
+}
+
 /**
  * ffa_mem_perm_set_ro must be run separately from ffa_mem_perm_get and
  * ffa_mem_perm_set as ffa_mem_perm_set_ro changes the memory permissions
@@ -113,23 +125,16 @@ SERVICE_SET_UP(ffa_mem_perm_get)
 	/* Hafnium may use rx/tx buffers so one page may be marked as RO. */
 	uint32_t num_ro_pages_in_data = 0;
 
-	const uint32_t num_pages =
-		align_up(data_end - data_begin, PAGE_SIZE) / PAGE_SIZE;
+	const uint32_t num_pages = range_page_count(data_begin, data_end);
 	uintvaddr_t base_va = (uintvaddr_t)align_down(data_begin, PAGE_SIZE);
 	volatile uint8_t* rx_start = NULL;
 	volatile uint8_t* tx_start = NULL;
 	volatile uint8_t* rx_end = NULL;
 
-	dlog_verbose("text: %p - %p (%zu pages)\n", (void*)text_begin,
-		     (void*)text_end, (text_end - text_begin) / PAGE_SIZE);
-	dlog_verbose("rodata: %p - %p (%zu pages)\n", (void*)rodata_begin,
-		     (void*)rodata_end,
-		     (rodata_end - rodata_begin) / PAGE_SIZE);
-	dlog_verbose("data: %p - %p (%zu pages)\n", (void*)data_begin,
-		     (void*)data_end, (data_end - data_begin) / PAGE_SIZE);
-	dlog_verbose("stacks: %p - %p (%zu pages)\n", (void*)stacks_begin,
-		     (void*)stacks_end,
-		     (stacks_begin - stacks_end) / PAGE_SIZE);
+	print_range("text", text_begin, text_end);
+	print_range("rodata", rodata_begin, rodata_end);
+	print_range("data", data_begin, data_end);
+	print_range("stacks", stacks_begin, stacks_end);
 
 	for (size_t i = 0; i < num_pages; i++) {
 		struct ffa_value res = ffa_mem_perm_get(base_va, 1);

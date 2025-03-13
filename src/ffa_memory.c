@@ -1474,7 +1474,7 @@ static struct ffa_value ffa_send_check_update(
 	uint32_t j;
 	mm_mode_t orig_from_mode;
 	mm_mode_t clean_mode;
-	mm_mode_t from_mode;
+	mm_mode_t from_mode = 0;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
 	uint32_t constituents_total_page_count = 0;
@@ -1758,7 +1758,7 @@ static struct ffa_value ffa_relinquish_check_update(
 {
 	mm_mode_t orig_from_mode;
 	mm_mode_t clearing_mode;
-	mm_mode_t from_mode;
+	mm_mode_t from_mode = 0;
 	struct mpool local_page_pool;
 	struct ffa_value ret;
 	enum ffa_map_action map_action;

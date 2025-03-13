@@ -56,6 +56,8 @@ void kmain(struct ffa_boot_info_header* boot_info_blob)
 	 */
 	exception_setup(NULL, NULL);
 
+	// FIXME: find a way of doing this that isn't UB
+	// NOLINTNEXTLINE(clang-analyzer-security.PointerSub)
 	hftest_use_list(hftest_begin, hftest_end - hftest_begin);
 
 	hftest_command(&fdt);

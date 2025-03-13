@@ -17,12 +17,10 @@ Checks: >
   -readability-function-cognitive-complexity,
   -readability-identifier-length,
   -readability-magic-numbers,
+  -readability-math-missing-parentheses,
   -readability-suspicious-call-argument,
 
-
-# TODO: replace with `ExcludeHeaderFilterRegex: '^third_party/.*'` when
-# clang-tidy 19 is released
-HeaderFilterRegex: '^(inc|src|test|vmlib).+'
+ExcludeHeaderFilterRegex: '^third_party/.*'
 
 FormatStyle: file
 WarningsAsErrors: '*'

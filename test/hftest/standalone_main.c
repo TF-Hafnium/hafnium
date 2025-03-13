@@ -40,6 +40,8 @@ void kmain(const void *fdt_ptr)
 	 */
 	exception_setup(NULL, NULL);
 
+	// FIXME: find a way of doing this that isn't UB
+	// NOLINTNEXTLINE(clang-analyzer-security.PointerSub)
 	hftest_use_list(hftest_begin, hftest_end - hftest_begin);
 
 	if (!fdt_size_from_header(fdt_ptr, &fdt_len) ||
