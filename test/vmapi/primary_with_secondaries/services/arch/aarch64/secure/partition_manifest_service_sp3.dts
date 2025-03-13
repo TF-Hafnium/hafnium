@@ -31,6 +31,9 @@
 	 */
 	sri-interrupts-policy = <2>;
 
+	ns-interrupts-action = <1>; /* Managed exit is supported. */
+	managed-exit-virq;
+
 	/* Boot Info */
 	boot-info {
 		compatible = "arm,ffa-manifest-boot-info";

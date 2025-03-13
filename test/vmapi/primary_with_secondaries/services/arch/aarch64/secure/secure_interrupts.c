@@ -37,6 +37,7 @@
 #define SERVICE3_ESPI_ID_END 5010
 
 static bool rtm_init_espi_handled;
+static bool managed_exit_handled;
 /**
  * Indicates if to send the next eSPI interrupt
  * when handling one of the espi_test_node interrupts.
@@ -109,12 +110,23 @@ static void irq_handler(void)
 {
 	uint32_t intid = hf_interrupt_get();
 	struct ffa_value ret;
+	ffa_id_t own_id = hf_vm_get_id();
 
 	switch (intid) {
 	case HF_NOTIFICATION_PENDING_INTID:
 		/* RX buffer full notification. */
 		dlog_verbose("Received notification pending interrupt %u.",
 			     intid);
+		break;
+	case HF_MANAGED_EXIT_INTID:
+		HFTEST_LOG("Received managed exit interrupt. %u.", intid);
+
+		managed_exit_handled = true;
+
+		ret = ffa_msg_send_direct_resp(
+			own_id, hftest_get_dir_req_source_id(), 0, 0, 0, 0, 0);
+		EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_REQ_32);
+		EXPECT_EQ(ret.arg3, 0);
 		break;
 	case IRQ_TWDOG_INTID:
 		/*
@@ -164,7 +176,7 @@ static void irq_handler(void)
 		break;
 	case HF_IPI_INTID:
 		dlog_info("Received inter-processor interrupt %u, vm %x.",
-			  intid, hf_vm_get_id());
+			  intid, own_id);
 		ASSERT_TRUE(hftest_ipi_state_is(SENT) ||
 			    (hftest_ipi_state_is(HANDLED) &&
 			     hftest_ipi_state_get_interrupt_count() > 0 &&
@@ -923,7 +935,6 @@ TEST_SERVICE(send_espi_interrupt)
 	interrupts_enable();
 
 	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
-
 	/* Configures the Interrupt state. */
 	hftest_ipi_init_state_from_message(SERVICE_RECV_BUFFER(),
 					   SERVICE_SEND_BUFFER());
@@ -1032,4 +1043,46 @@ TEST_SERVICE(receive_back_to_back_interrupts)
 	EXPECT_EQ(hf_interrupt_get(), HF_INVALID_INTID);
 
 	ffa_yield();
+}
+
+/**
+ * Used to test managed exit.
+ * The interrupt is enabled based on arg3 in the direct request,
+ * and then the SP enters a busy loop while waiting for the Arch Timer
+ * in the NWd to trigger its interrupt. After the loop, we check whether
+ * the interrupt handler was entered, depending on if the ME interrupt
+ * was enabled, and then return to the NWd. This process is repeated
+ * so we can verify that interrupts do not accumulate when the ME interrupt
+ * is masked.
+ */
+TEST_SERVICE(sp_managed_exit_loop)
+{
+	bool me_enabled;
+	struct ffa_value ret;
+
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	/* Return to the NWd for the Arch Timer to be started. */
+	ret = ffa_msg_wait();
+
+	while (true) {
+		EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_REQ_32);
+		me_enabled = ret.arg3;
+
+		hftest_set_dir_req_source_id(ffa_sender(ret));
+
+		EXPECT_EQ(hf_interrupt_enable(HF_MANAGED_EXIT_INTID, me_enabled,
+					      0),
+			  0);
+
+		/* Enter busy loop to wait for NWd interrupt. */
+		sp_wait(20);
+
+		EXPECT_EQ(managed_exit_handled, me_enabled);
+
+		ret = ffa_msg_send_direct_resp(hf_vm_get_id(),
+					       hftest_get_dir_req_source_id(),
+					       0, 0, 0, 0, 0);
+	}
 }

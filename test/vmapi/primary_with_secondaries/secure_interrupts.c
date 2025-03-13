@@ -10,6 +10,7 @@
 #include "hf/arch/vm/interrupts.h"
 #include "hf/arch/vm/interrupts_gicv3.h"
 #include "hf/arch/vm/power_mgmt.h"
+#include "hf/arch/vm/timer.h"
 
 #include "vmapi/hf/call.h"
 
@@ -41,6 +42,9 @@ struct ipi_cpu_entry_args {
 	struct mailbox_buffers mb;
 	struct semaphore work_done;
 };
+
+#define ARCH_TIMER_INTID 26
+static bool arch_timer_handled;
 
 /*
  * Test secure interrupt handling while the Secure Partition runs in FFA_RUN
@@ -1673,4 +1677,128 @@ TEST_PRECONDITION(secure_interrupts, back_to_back_nwd_return, service3_is_mp_sp)
 	} while (ret.func == FFA_MSG_WAIT_32);
 
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}
+
+/**
+ * Interrupt handler to mark an arch timer interrupt as handled.
+ */
+void arch_timer_irq_handler(void)
+{
+	uint32_t intid = interrupt_get_and_acknowledge();
+	switch (intid) {
+	case HF_SCHEDULE_RECEIVER_INTID:
+		HFTEST_LOG("SRI received.\n");
+		break;
+	case ARCH_TIMER_INTID:
+		HFTEST_LOG("Arch Timer Interrupt received.\n");
+		arch_timer_handled = true;
+		break;
+	default:
+		panic("Unexpected interrupt %d\n", intid);
+	}
+	interrupt_end(intid);
+}
+
+static void setup_arch_timer(void)
+{
+	gicv3_system_setup();
+	exception_setup(arch_timer_irq_handler, NULL);
+	interrupt_enable(ARCH_TIMER_INTID, true);
+	interrupt_set_priority(ARCH_TIMER_INTID, 0x80);
+	interrupt_set_edge_triggered(ARCH_TIMER_INTID, true);
+	interrupt_set_priority_mask(0xff);
+	arch_irq_enable();
+}
+
+/**
+ * Start the timer and send a direct request to the SP so that it is running
+ * when the Arch timer interrupt is received, causing a managed exit. If the
+ * managed exit interrupt is enabled for the SP, the first direct response will
+ * come from the interrupt handler, so a second direct request must be sent to
+ * allow the SP to finish the loop.
+ */
+static void check_managed_exit(ffa_id_t target_id, bool me_enabled)
+{
+	struct ffa_value ret;
+	ffa_id_t own_id = hf_vm_get_id();
+
+	arch_timer_handled = false;
+	HFTEST_LOG("Starting timer\n");
+	timer_set(20);
+	timer_start();
+
+	/*
+	 * Send a direct message so the interrupt enters the busy loop.
+	 * Arg 3 tells the SP that if managed exit interrupt is enabled.
+	 */
+	ret = ffa_msg_send_direct_req(own_id, target_id, me_enabled, 0, 0, 0,
+				      0);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	/*
+	 * If the managed exit interrupt is enabled the first direct response
+	 * was from the interrupt handler so send another direct request so
+	 * the SP can finish the loop.
+	 */
+	if (me_enabled) {
+		ret = ffa_msg_send_direct_req(own_id, target_id, 0, 0, 0, 0, 0);
+		/*
+		 * Expect a direct response from the SP once the busy loop has
+		 * ended.
+		 */
+		EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	}
+
+	/*
+	 * Check the interrupt handler in the NWd was entered and
+	 * handled the arch timer interrupt.
+	 */
+	EXPECT_TRUE(arch_timer_handled);
+}
+
+/**
+ * Test that a managed exit interrupt is correctly raised when
+ * a NWd interrupt (provided by the arch timer) is received while
+ * an SP with managed exit support is in the running state.
+ */
+TEST(managed_exit, sp_managed_exit)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+
+	setup_arch_timer();
+
+	SERVICE_SELECT(service3_info->vm_id, "sp_managed_exit_loop", mb.send);
+
+	/* Run the SP so it can setup the interrupt handler. */
+	EXPECT_EQ(ffa_run(service3_info->vm_id, 0).func, FFA_MSG_WAIT_32);
+
+	check_managed_exit(service3_info->vm_id, true);
+}
+
+/**
+ * Test that if a managed exit interrupt is thrown while the SP has
+ * the interrupt masked, the managed exit interrupt will be cleared
+ * when the SP returns to the NWd through a direct response.
+ */
+TEST(managed_exit, sp_managed_exit_interrupts_disabled)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+
+	setup_arch_timer();
+
+	SERVICE_SELECT(service3_info->vm_id, "sp_managed_exit_loop", mb.send);
+
+	/* Run the SP so it can setup the interrupt handler. */
+	EXPECT_EQ(ffa_run(service3_info->vm_id, 0).func, FFA_MSG_WAIT_32);
+
+	/*
+	 * Run the tests interrupt queue size + 1 times to ensure the Managed
+	 * exit is correctly cleared when returning to the NWd, even if the vIRQ
+	 * is not fired to the SP.
+	 */
+	for (int i = 0; i <= VINT_QUEUE_MAX; i++) {
+		check_managed_exit(service3_info->vm_id, false);
+	}
 }
