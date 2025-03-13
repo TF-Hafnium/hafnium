@@ -3091,9 +3091,8 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 		.vcpu = NULL,
 	};
 	enum vcpu_state next_state = VCPU_STATE_RUNNING;
+	/* Prepare return interrupt if caller goes back to waiting state. */
 	struct ffa_value ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
-	struct ffa_value signal_interrupt =
-		(struct ffa_value){.func = FFA_INTERRUPT_32};
 	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
 	struct two_vcpu_locked vcpus_locked;
 
@@ -3167,9 +3166,7 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 	 * Either trigger SRI for later donation of CPU cycles, or
 	 * eret `FFA_INTERRUPT` back to the caller.
 	 */
-	if (ffa_interrupts_intercept_call(current_locked, next_locked,
-					  &signal_interrupt)) {
-		ret = signal_interrupt;
+	if (ffa_interrupts_intercept_call(current_locked, next_locked, &ret)) {
 		*next = NULL;
 	}
 

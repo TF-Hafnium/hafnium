@@ -23,7 +23,7 @@ bool ffa_interrupts_inject_notification_pending_interrupt(
 
 bool ffa_interrupts_intercept_call(struct vcpu_locked current_locked,
 				   struct vcpu_locked next_locked,
-				   struct ffa_value *signal_interrupt);
+				   struct ffa_value *interrupt_ret);
 
 struct vcpu *ffa_interrupts_unwind_nwd_call_chain(struct vcpu *current);
 
