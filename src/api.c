@@ -350,18 +350,6 @@ struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
 }
 
 /**
- * Aborts the vCPU and triggers its VM to terminate fully.
- */
-struct vcpu *api_terminate_vm(struct vcpu *current)
-{
-	struct vcpu *next;
-
-	ffa_partition_abort(current, &next);
-
-	return next;
-}
-
-/**
  * An execution context of a partition invokes FFA_ABORT ABI upon encountering
  * a fatal error and enters ABORTED state. SPMC then takes necessary steps
  * based on the abort action specified by the partition through its manifest.

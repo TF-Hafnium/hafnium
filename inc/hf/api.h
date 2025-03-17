@@ -36,7 +36,6 @@ struct vcpu *api_switch_to_primary(struct vcpu_locked current_locked,
 struct vcpu *api_preempt(struct vcpu *current);
 struct vcpu *api_wait_for_interrupt(struct vcpu *current);
 struct vcpu *api_vcpu_off(struct vcpu *current);
-struct vcpu *api_terminate_vm(struct vcpu *current);
 struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu);
 
 int64_t api_interrupt_enable(uint32_t intid, bool enable,

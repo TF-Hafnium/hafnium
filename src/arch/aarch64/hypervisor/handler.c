@@ -1210,7 +1210,8 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 			 * page.
 			 */
 			if (!resume || ((esr & 0x3f) == 0x21)) {
-				return api_terminate_vm(vcpu);
+				ffa_partition_abort(vcpu, &new_vcpu);
+				return new_vcpu;
 			}
 		}
 
@@ -1233,7 +1234,8 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 
 		if (is_el0_partition) {
 			dlog_warning("Instruction abort on EL0 partition\n");
-			return api_terminate_vm(vcpu);
+			ffa_partition_abort(vcpu, &new_vcpu);
+			return new_vcpu;
 		}
 
 		/* Inform the EL1 of the instruction abort. */
@@ -1247,7 +1249,8 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 	case EC_HVC:
 		if (is_el0_partition) {
 			dlog_warning("Unexpected HVC Trap on EL0 partition\n");
-			return api_terminate_vm(vcpu);
+			ffa_partition_abort(vcpu, &new_vcpu);
+			return new_vcpu;
 		}
 		return hvc_handler(vcpu);
 
@@ -1277,7 +1280,8 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 	}
 
 	if (is_el0_partition) {
-		return api_terminate_vm(vcpu);
+		ffa_partition_abort(vcpu, &new_vcpu);
+		return new_vcpu;
 	}
 
 	/*
@@ -1297,6 +1301,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 struct vcpu *handle_system_register_access(uintreg_t esr_el2)
 {
 	struct vcpu *vcpu = current();
+	struct vcpu *new_vcpu = NULL;
 	ffa_id_t vm_id = vcpu->vm->id;
 	uintreg_t ec = GET_ESR_EC(esr_el2);
 	bool is_el0_partition = vcpu->vm->el0_partition;
@@ -1331,7 +1336,8 @@ struct vcpu *handle_system_register_access(uintreg_t esr_el2)
 			dlog_warning(
 				"Unexpected system register access by EL0 "
 				"partition\n");
-			return api_terminate_vm(vcpu);
+			ffa_partition_abort(vcpu, &new_vcpu);
+			return new_vcpu;
 		}
 
 		inject_el1_sysreg_trap_exception(vcpu, esr_el2);
