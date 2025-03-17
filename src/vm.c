@@ -531,7 +531,7 @@ bool vm_are_per_vcpu_notifications_pending(struct vm_locked vm_locked,
 
 bool vm_are_notifications_enabled(struct vm *vm)
 {
-	return vm->notifications.enabled == true;
+	return vm->notifications.enabled;
 }
 
 bool vm_locked_are_notifications_enabled(struct vm_locked vm_locked)
@@ -1064,9 +1064,9 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 /**
  * Checks VM's messaging method support.
  */
-bool vm_supports_messaging_method(struct vm *vm, uint16_t msg_method)
+bool vm_supports_messaging_method(struct vm *vm, uint16_t messaging_method)
 {
-	return (vm->messaging_method & msg_method) != 0;
+	return (vm->messaging_method & messaging_method) != 0;
 }
 
 /**

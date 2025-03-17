@@ -14,9 +14,11 @@ Checks: >
   -misc-redundant-expression,
   -modernize-deprecated-headers,
   -modernize-macro-to-enum,
+  -modernize-use-nullptr,
   -readability-function-cognitive-complexity,
   -readability-identifier-length,
   -readability-magic-numbers,
+  -readability-implicit-bool-conversion,
   -readability-math-missing-parentheses,
   -readability-suspicious-call-argument,
 

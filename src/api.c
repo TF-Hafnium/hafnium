@@ -655,12 +655,8 @@ static bool api_ffa_partition_info_get_regs_forward(
 			 * NOT_SUPPORTED, that is not an error. If there are no
 			 * secure partitions the SPMC returns NOT_SUPPORTED.
 			 */
-			if ((ffa_func_id(ret) == FFA_ERROR_32) &&
-			    (ffa_error_code(ret) == FFA_NOT_SUPPORTED)) {
-				return true;
-			}
-
-			return false;
+			return (ffa_func_id(ret) == FFA_ERROR_32) &&
+			       (ffa_error_code(ret) == FFA_NOT_SUPPORTED);
 		}
 
 		if (!api_ffa_fill_partition_info_from_regs(
@@ -1114,14 +1110,16 @@ static struct ffa_value api_release_mailbox(struct vm_locked vm_locked)
  */
 bool api_extended_args_are_zero(struct ffa_value *args)
 {
-	if (args->extended_val.arg8 != 0U || args->extended_val.arg9 != 0U ||
-	    args->extended_val.arg10 != 0U || args->extended_val.arg11 != 0U ||
-	    args->extended_val.arg12 != 0U || args->extended_val.arg13 != 0U ||
-	    args->extended_val.arg14 != 0U || args->extended_val.arg15 != 0U ||
-	    args->extended_val.arg16 != 0U || args->extended_val.arg17 != 0U) {
-		return false;
-	}
-	return true;
+	return (args->extended_val.arg8 == 0U &&
+		args->extended_val.arg9 == 0U &&
+		args->extended_val.arg10 == 0U &&
+		args->extended_val.arg11 == 0U &&
+		args->extended_val.arg12 == 0U &&
+		args->extended_val.arg13 == 0U &&
+		args->extended_val.arg14 == 0U &&
+		args->extended_val.arg15 == 0U &&
+		args->extended_val.arg16 == 0U &&
+		args->extended_val.arg17 == 0U);
 }
 
 static void api_ffa_msg_wait_rx_release(struct vcpu *current)

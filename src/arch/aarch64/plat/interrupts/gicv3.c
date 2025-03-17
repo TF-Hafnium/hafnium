@@ -578,10 +578,7 @@ static bool fdt_find_gics(const struct fdt *fdt,
 				.end.pa;
 	}
 	/* Check if SPI ID ranges overlap in any order */
-	if (!valid_spi_ranges(*gicd_count)) {
-		return false;
-	}
-	return true;
+	return valid_spi_ranges(*gicd_count);
 }
 
 uint64_t read_gicr_typer_reg(uintptr_t gicr_frame_addr)

@@ -52,8 +52,8 @@ static void ffa_boot_info_desc_init(struct ffa_boot_info_desc *info_desc,
 	 */
 	memset_s(info_desc, FFA_BOOT_INFO_NAME_LEN, 0, FFA_BOOT_INFO_NAME_LEN);
 
-	info_desc->type = std_type == true ? FFA_BOOT_INFO_TYPE_STD
-					   : FFA_BOOT_INFO_TYPE_IMPDEF;
+	info_desc->type =
+		std_type ? FFA_BOOT_INFO_TYPE_STD : FFA_BOOT_INFO_TYPE_IMPDEF;
 	info_desc->type <<= FFA_BOOT_INFO_TYPE_SHIFT;
 	info_desc->type |= (type_id & FFA_BOOT_INFO_TYPE_ID_MASK);
 
@@ -183,7 +183,7 @@ bool ffa_boot_info_node(struct fdt_node *boot_info_node,
 		ret = true;
 	}
 
-	if (ret == true) {
+	if (ret) {
 		/*
 		 * Flush the data cache in case partition initializes with
 		 * caches disabled.

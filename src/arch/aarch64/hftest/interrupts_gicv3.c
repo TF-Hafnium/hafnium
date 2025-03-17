@@ -47,11 +47,7 @@ uint64_t interrupt_get_gic_rdist_addr(void)
 bool is_ppi_sgi(uint32_t id)
 {
 	/* SGIs: 0-15, PPIs: 16-31. */
-	if (id <= MAX_PPI_ID) {
-		return true;
-	}
-
-	return false;
+	return id <= MAX_PPI_ID;
 }
 
 void interrupt_gic_setup(void)

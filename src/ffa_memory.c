@@ -796,7 +796,7 @@ static struct ffa_value ffa_send_check_transition(
 	 * Memory cannot be zeroed during the lend/donate operation if the
 	 * sender only has RO access.
 	 */
-	if ((*orig_from_mode & MM_MODE_W) == 0 && zero == true) {
+	if ((*orig_from_mode & MM_MODE_W) == 0 && zero) {
 		dlog_verbose(
 			"Cannot zero memory when the sender doesn't have "
 			"write access\n");
@@ -1655,7 +1655,7 @@ struct ffa_value ffa_retrieve_check_update(
 	 * Ensure the sender has write permissions if the memory needs to be
 	 * cleared.
 	 */
-	if ((sender_orig_mode & MM_MODE_W) == 0 && clear == true) {
+	if ((sender_orig_mode & MM_MODE_W) == 0 && clear) {
 		dlog_verbose(
 			"Cannot zero memory when the sender does not have "
 			"write access\n");

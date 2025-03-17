@@ -225,13 +225,13 @@ bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 		MM_MODE_INVALID | MM_MODE_UNOWNED | MM_MODE_SHARED;
 
 	/* If the region is fully unmapped in the secure IPA space. */
-	if ((ret == true) && ((*mode & mask) == mask)) {
+	if (ret && ((*mode & mask) == mask)) {
 		/* Look up the non-secure IPA space. */
 		ret = mm_vm_get_mode(&vm_locked.vm->arch.ptable_ns, begin, end,
 				     &mode2);
 
 		/* If region is fully mapped in the non-secure IPA space. */
-		if ((ret == true) && ((mode2 & mask) != mask)) {
+		if (ret && ((mode2 & mask) != mask)) {
 			*mode = mode2;
 		}
 	}
