@@ -273,6 +273,18 @@ struct vm {
 
 	/* List entry pointing to the next VM in the boot order list. */
 	struct list_entry boot_list_node;
+
+	/**
+	 * Abort action taken by SPMC if the vCPU of this partition encounters
+	 * a fatal error.
+	 */
+	enum abort_action abort_action;
+
+	/**
+	 * Whether the partition supports all the states defined in the
+	 * Partition Lifecycle guidance.
+	 */
+	bool lifecycle_support;
 };
 
 /** Encapsulates a VM whose lock is held. */

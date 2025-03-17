@@ -243,6 +243,12 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->boot_info.gp_register_num =
 			manifest_vm->partition.gp_register_num;
 
+		vm_locked.vm->lifecycle_support =
+			manifest_vm->partition.lifecycle_support;
+
+		vm_locked.vm->abort_action =
+			manifest_vm->partition.abort_action;
+
 		if (manifest_vm->partition.boot_info) {
 			/*
 			 * If the partition expects the boot information blob

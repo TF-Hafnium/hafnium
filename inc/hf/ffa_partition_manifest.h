@@ -54,6 +54,30 @@ enum execution_state { AARCH64 = 0, AARCH32 };
 
 enum xlat_granule { PAGE_4KB = 0, PAGE_16KB, PAGE_64KB };
 
+/**
+ * Refer section 7.3 of the FF-A v1.3 ALP2 specification.
+ */
+enum abort_action {
+	/** Keep vCPU in STOPPED state. */
+	ACTION_STOP = 0,
+
+	/** Transition vCPU to NULL state. */
+	ACTION_DESTROY = 1,
+
+	/** Transition vCPU to STARTING state. */
+	ACTION_RESTART = 2,
+
+	/** SPMC aborts itself and informs SPMD. */
+	ACTION_PROPAGATE = 3,
+
+	/**
+	 * SPMC takes implementation defined action if not specified explicitly.
+	 */
+	ACTION_IMP_DEF,
+
+	/** No other actions supported. */
+};
+
 struct sri_interrupts_policy {
 	/**
 	 * When the partition is in waiting state at the moment one
@@ -267,4 +291,12 @@ struct ffa_partition_manifest {
 
 	/** optional - action in response to Other-Secure interrupt */
 	uint8_t other_s_interrupts_action;
+
+	/** optional - SP lifecycle supported. */
+	bool lifecycle_support;
+
+	/** optional - Action in response to FFA_ABORT if SP lifecycle
+	 * supported.
+	 */
+	uint8_t abort_action;
 };

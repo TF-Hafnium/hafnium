@@ -1257,6 +1257,7 @@ enum manifest_return_code parse_ffa_manifest(
 	struct string dev_region_node_name = STRING_INIT("device-regions");
 	struct string boot_info_node_name = STRING_INIT("boot-info");
 	bool managed_exit_field_present = false;
+	enum manifest_return_code ret;
 
 	if (!fdt_find_node(fdt, "/", &root)) {
 		return MANIFEST_ERROR_NO_ROOT_NODE;
@@ -1508,6 +1509,50 @@ enum manifest_return_code parse_ffa_manifest(
 
 	if (!map_dma_device_id_to_stream_ids(vm)) {
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	TRY(read_bool(&root, "lifecycle-support",
+		      &vm->partition.lifecycle_support));
+
+	if (vm->partition.lifecycle_support) {
+		if (vm->partition.execution_ctx_count > 1) {
+			/* Lifecycle support is restricted to UP SP. */
+			return MANIFEST_ERROR_ILLEGAL_LIFECYCLE_SUPPORT;
+		}
+
+		dlog_verbose("  Partition lifecycle support enabled\n");
+	}
+
+	ret = read_uint8(&root, "abort-action", (&vm->partition.abort_action));
+
+	if (ret == MANIFEST_ERROR_PROPERTY_NOT_FOUND) {
+		/*
+		 * SPMC does implementation defined abort handling for legacy
+		 * partitions.
+		 */
+		vm->partition.abort_action = ACTION_IMP_DEF;
+	} else {
+		/*
+		 * An SP manifest can specify abort action only if it supports
+		 * partition lifecycle transitions.
+		 */
+		if (!vm->partition.lifecycle_support) {
+			dlog_error(
+				"Abort action not supported for this "
+				"partition.\n");
+			return MANIFEST_ERROR_ILLEGAL_ABORT_ACTION;
+		}
+
+		/*
+		 * Ensure the abort action specified is supported by
+		 * Hafnium.
+		 */
+		if (vm->partition.abort_action >= ACTION_IMP_DEF) {
+			dlog_error(
+				"Abort action not supported by "
+				"Hafnium.\n");
+			return MANIFEST_ERROR_ILLEGAL_ABORT_ACTION;
+		}
 	}
 
 	return sanity_check_ffa_manifest(vm);
@@ -1846,6 +1891,11 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_VM_AVAILABILITY_MESSAGE_INVALID:
 		return "VM availability messages invalid (bits [31:2] must be "
 		       "zero)";
+	case MANIFEST_ERROR_ILLEGAL_LIFECYCLE_SUPPORT:
+		return "Lifecycle support cannot be enabled for MP SP";
+	case MANIFEST_ERROR_ILLEGAL_ABORT_ACTION:
+		return "Abort action not supported if SP lifecycle is not "
+		       "supported";
 	}
 
 	panic("Unexpected manifest return code.");
