@@ -13,7 +13,6 @@
 #include "hf/io.h"
 #include "hf/panic.h"
 #include "hf/plat/interrupts.h"
-#include "hf/static_assert.h"
 #include "hf/types.h"
 
 #define BIT_32(nr) (UINT32_C(1) << (nr))

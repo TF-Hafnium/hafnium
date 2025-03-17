@@ -8,8 +8,6 @@
 
 #include "hf/arch/vm/power_mgmt.h"
 
-#include "hf/static_assert.h"
-
 #include "vmapi/hf/call.h"
 
 #include "psci.h"

@@ -11,7 +11,6 @@
 
 #include "hf/ffa_v1_0.h"
 #include "hf/mm.h"
-#include "hf/static_assert.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"

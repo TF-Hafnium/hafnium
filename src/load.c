@@ -28,7 +28,6 @@
 #include "hf/mm.h"
 #include "hf/plat/console.h"
 #include "hf/plat/iommu.h"
-#include "hf/static_assert.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 

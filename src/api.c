@@ -34,7 +34,6 @@
 #include "hf/hf_ipi.h"
 #include "hf/mm.h"
 #include "hf/plat/interrupts.h"
-#include "hf/static_assert.h"
 #include "hf/std.h"
 #include "hf/timer_mgmt.h"
 #include "hf/vcpu.h"

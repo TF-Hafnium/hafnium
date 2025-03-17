@@ -49,8 +49,6 @@
  * the auto-generated header file (included using a command-line flag).
  */
 
-#include "hf/static_assert.h"
-
 #define DEFINE_SIZEOF(sym, type)                                 \
 	void gen_header__##sym(void)                             \
 	{                                                        \

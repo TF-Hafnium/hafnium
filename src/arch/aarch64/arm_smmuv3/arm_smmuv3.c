@@ -13,7 +13,6 @@
 #include "hf/dlog.h"
 #include "hf/io.h"
 #include "hf/panic.h"
-#include "hf/static_assert.h"
 
 #define MAX_ATTEMPTS 50000
 

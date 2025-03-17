@@ -12,7 +12,6 @@
 
 #include "hf/addr.h"
 #include "hf/memiter.h"
-#include "hf/static_assert.h"
 #include "hf/string.h"
 
 #include "vmapi/hf/ffa.h"

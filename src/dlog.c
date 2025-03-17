@@ -12,7 +12,6 @@
 #include <stddef.h>
 
 #include "hf/spinlock.h"
-#include "hf/static_assert.h"
 #include "hf/std.h"
 #include "hf/stdout.h"
 

@@ -18,7 +18,6 @@
 #include "hf/dlog.h"
 #include "hf/layout.h"
 #include "hf/plat/console.h"
-#include "hf/static_assert.h"
 #include "hf/std.h"
 
 /**

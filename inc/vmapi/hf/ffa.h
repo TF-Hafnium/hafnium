@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include "hf/static_assert.h"
 #include "hf/types.h"
 
 /**

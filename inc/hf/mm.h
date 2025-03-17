@@ -15,7 +15,6 @@
 
 #include "hf/addr.h"
 #include "hf/mpool.h"
-#include "hf/static_assert.h"
 
 typedef uint32_t mm_mode_t;
 typedef uint64_t mm_attr_t;

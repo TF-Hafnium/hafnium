@@ -28,7 +28,6 @@
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/partition_pkg.h"
-#include "hf/static_assert.h"
 #include "hf/std.h"
 
 #define TRY(expr)                                            \

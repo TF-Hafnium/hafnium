@@ -11,8 +11,6 @@
 #include <stdalign.h>
 #include <stdint.h>
 
-#include "hf/static_assert.h"
-
 #define PAGE_BITS 12
 #define PAGE_LEVEL_BITS 9
 #define STACK_ALIGN 16

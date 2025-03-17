@@ -18,7 +18,6 @@
 #include <linux/string.h>
 #else
 #include "hf/assert.h"
-#include "hf/static_assert.h"
 #include "hf/std.h"
 #endif
 

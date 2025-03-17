@@ -16,7 +16,6 @@
 #include "hf/io.h"
 #include "hf/panic.h"
 #include "hf/plat/interrupts.h"
-#include "hf/static_assert.h"
 #include "hf/types.h"
 
 #include "gicv3_helpers.h"

@@ -8,7 +8,6 @@
 
 #include "hf/string.h"
 
-#include "hf/static_assert.h"
 #include "hf/std.h"
 
 void string_init_empty(struct string *str)

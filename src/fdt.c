@@ -10,8 +10,6 @@
 
 #include <libfdt.h>
 
-#include "hf/static_assert.h"
-
 /** Returns pointer to the FDT buffer. */
 const void *fdt_base(const struct fdt *fdt)
 {
