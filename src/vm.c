@@ -1089,7 +1089,7 @@ void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu)
 static struct interrupt_descriptor *vm_find_interrupt_descriptor(
 	struct vm_locked vm_locked, uint32_t id)
 {
-	for (uint32_t i = 0; i < HF_NUM_INTIDS; i++) {
+	for (uint32_t i = 0; i < VM_MANIFEST_MAX_INTERRUPTS; i++) {
 		/* Interrupt descriptors are populated contiguously. */
 		if (!vm_locked.vm->interrupt_desc[i].valid) {
 			break;

@@ -44,7 +44,7 @@ static struct vcpu *ffa_interrupts_find_target_vcpu_secure_interrupt(
 	for (ffa_vm_count_t index = 0; index < vm_get_count(); ++index) {
 		struct vm *vm = vm_find_index(index);
 
-		for (uint32_t j = 0; j < HF_NUM_INTIDS; j++) {
+		for (uint32_t j = 0; j < VM_MANIFEST_MAX_INTERRUPTS; j++) {
 			struct interrupt_descriptor int_desc =
 				vm->interrupt_desc[j];
 

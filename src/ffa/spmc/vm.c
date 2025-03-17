@@ -221,7 +221,7 @@ void ffa_vm_disable_interrupts(struct vm_locked vm_locked)
 	dlog_verbose("Interrupts belonging to SP %x disabled\n",
 		     vm_locked.vm->id);
 
-	for (uint32_t i = 0; i < HF_NUM_INTIDS; i++) {
+	for (uint32_t i = 0; i < VM_MANIFEST_MAX_INTERRUPTS; i++) {
 		struct interrupt_descriptor int_desc;
 
 		int_desc = vm_locked.vm->interrupt_desc[i];
