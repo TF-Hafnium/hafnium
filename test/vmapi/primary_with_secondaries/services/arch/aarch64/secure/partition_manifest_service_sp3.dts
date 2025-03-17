@@ -44,14 +44,49 @@
 			/*
 			 * A dummy device region node representing a fake
 			 * peripheral. Explicitly used to specify properties of
-			 * interrupt 5000, used for testing purposes.
+			 * eSPIs, used for interrupt tests.
 			 * All the properties below except `interrupts` are irrelevant.
 			 */
 			base-address = <0x00000000 0x1c140000>;
 			pages-count = <1>; /* One 4KB page */
 			attributes = <0x1>; /* read-only */
-			interrupts = <5001 0x900>;
+			interrupts = <5001 0x900>, /* Attributes = Secure SPI. */
+				     <5002 0x900>,
+				     <5003 0x900>,
+				     <5004 0x900>;
 		};
+
+		espi_test_node2 {
+			/*
+			 * A dummy device region node representing a fake
+			 * peripheral. Explicitly used to specify properties of
+			 * eSPIs, used for the back to back interrupt test.
+			 * All the properties below except `interrupts` are irrelevant.
+			 */
+			base-address = <0x00000000 0x1c150000>;
+			pages-count = <1>; /* One 4KB page */
+			attributes = <0x1>; /* read-only */
+			interrupts = <5005 0x900>, /* Attributes = Secure SPI. */
+				     <5006 0x900>,
+				     <5007 0x900>,
+				     <5008 0x900>;
+		};
+
+		espi_test_node3 {
+			/*
+			 * A dummy device region node representing a fake
+			 * peripheral. Explicitly used to specify properties of
+			 * eSPIs, used for the back to back interrupt test.
+			 * All the properties below except `interrupts` are irrelevant.
+			 */
+			base-address = <0x00000000 0x1c160000>;
+			pages-count = <1>; /* One 4KB page */
+			attributes = <0x1>; /* read-only */
+			interrupts = <5009 0x900>, /* Attributes = Secure SPI. */
+				     <5010 0x900>;
+		};
+
+
 	};
 
 };

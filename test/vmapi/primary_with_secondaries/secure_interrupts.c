@@ -1620,3 +1620,57 @@ TEST_PRECONDITION(ipi, self_ipi, service1_is_mp_sp)
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 }
+
+/**
+ * Test that interrupts thrown back to back whilst the last interrupt is being
+ * handled are all received.
+ */
+TEST_PRECONDITION(secure_interrupts, back_to_back_secure_interrupts,
+		  service3_is_mp_sp)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	bool nwd_return = false;
+
+	SERVICE_SELECT(service3_info->vm_id, "receive_back_to_back_interrupts",
+		       mb.send);
+
+	/* Tell the SP not to return to the NWd during interrupt handling. */
+	ret = send_indirect_message(own_id, service3_info->vm_id, mb.send,
+				    &nwd_return, sizeof(nwd_return), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_run(service3_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}
+
+/**
+ * Test that if we throw an interrupt whilst handling the one and return to the
+ * NWd all the interrupts will be handled.
+ */
+TEST_PRECONDITION(secure_interrupts, back_to_back_nwd_return, service3_is_mp_sp)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	bool nwd_return = true;
+
+	SERVICE_SELECT(service3_info->vm_id, "receive_back_to_back_interrupts",
+		       mb.send);
+
+	/* Tell the SP to return to the NWd during interrupt handling. */
+	ret = send_indirect_message(own_id, service3_info->vm_id, mb.send,
+				    &nwd_return, sizeof(nwd_return), 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
+	do {
+		ret = ffa_run(service3_info->vm_id, 0);
+		EXPECT_TRUE(ret.func == FFA_MSG_WAIT_32 ||
+			    ret.func == FFA_YIELD_32);
+	} while (ret.func == FFA_MSG_WAIT_32);
+
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}

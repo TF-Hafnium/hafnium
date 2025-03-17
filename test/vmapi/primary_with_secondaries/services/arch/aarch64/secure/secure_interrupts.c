@@ -29,8 +29,24 @@
 #define RTM_INIT_ESPI_ID 5000
 #define PLAT_FVP_SEND_ESPI 0x82000100U
 #define TWDOG_DELAY 50
+/**
+ * Range of eSPIs registered to the espi_test_node devices
+ * for service3.
+ */
+#define SERVICE3_ESPI_ID_START 5001
+#define SERVICE3_ESPI_ID_END 5010
 
 static bool rtm_init_espi_handled;
+/**
+ * Indicates if to send the next eSPI interrupt
+ * when handling one of the espi_test_node interrupts.
+ */
+static bool send_back_to_back_interrupts;
+/**
+ * Indicates if to return to the NWd during the back
+ * to back tests.
+ */
+static bool back_to_back_nwd_return;
 
 uint32_t espi_id = RTM_INIT_ESPI_ID;
 
@@ -58,23 +74,32 @@ static inline uint64_t sp_wait(uint32_t ms)
 	return ((time2 - time1) * 1000) / timer_freq;
 }
 
+/**
+ * Utilizes FVP specific SMC call to pend an eSPI interrupt. The
+ * SiP function ID 0x82000100 must have been added to SMC whitelist
+ * for the SP that invokes it.
+ */
+static void send_espi(uint32_t espi_id)
+{
+	struct ffa_value res;
+
+	res = smc32(PLAT_FVP_SEND_ESPI, espi_id, 0, 0, 0, 0, 0, 0);
+
+	if ((int64_t)res.func == SMCCC_ERROR_UNKNOWN) {
+		dlog_error("SiP SMC call not supported");
+	}
+}
+
 TEST_SERVICE(sip_call_trigger_spi)
 {
 	void *recv_buf = SERVICE_RECV_BUFFER();
-	struct ffa_value res;
 	uint32_t interrupt_id;
 
 	/* Retrieve interrupt ID to be triggered. */
 	receive_indirect_message((void *)&interrupt_id, sizeof(interrupt_id),
 				 recv_buf);
 
-	/*
-	 * The SiP function ID 0x82000100 must have been added to the SMC
-	 * whitelist of the SP that invokes it.
-	 */
-	res = smc32(0x82000100, interrupt_id, 0, 0, 0, 0, 0, 0);
-
-	EXPECT_NE((int64_t)res.func, SMCCC_ERROR_UNKNOWN);
+	send_espi(interrupt_id);
 
 	/* Give back control to PVM. */
 	ffa_yield();
@@ -83,6 +108,7 @@ TEST_SERVICE(sip_call_trigger_spi)
 static void irq_handler(void)
 {
 	uint32_t intid = hf_interrupt_get();
+	struct ffa_value ret;
 
 	switch (intid) {
 	case HF_NOTIFICATION_PENDING_INTID:
@@ -109,6 +135,32 @@ static void irq_handler(void)
 		dlog_info("Receive ESPI interrupt: %u", intid);
 		ASSERT_EQ(hf_interrupt_deactivate(intid), 0);
 		rtm_init_espi_handled = true;
+		break;
+	case SERVICE3_ESPI_ID_START:
+	case SERVICE3_ESPI_ID_START + 1:
+	case SERVICE3_ESPI_ID_START + 2:
+	case SERVICE3_ESPI_ID_START + 3:
+	case SERVICE3_ESPI_ID_START + 4:
+	case SERVICE3_ESPI_ID_START + 5:
+	case SERVICE3_ESPI_ID_START + 6:
+	case SERVICE3_ESPI_ID_START + 7:
+	case SERVICE3_ESPI_ID_START + 8:
+	case SERVICE3_ESPI_ID_START + 9:
+	case SERVICE3_ESPI_ID_START + VINT_QUEUE_MAX:
+		dlog_info("ESPI interrupt received %u", intid);
+
+		if (send_back_to_back_interrupts &&
+		    intid != SERVICE3_ESPI_ID_END) {
+			send_espi(intid + 1);
+
+			if (back_to_back_nwd_return) {
+				ret = ffa_msg_wait();
+				EXPECT_EQ(ret.func, FFA_RUN_32);
+			} else {
+				/* Wait for the interrupt to trigger. */
+				sp_wait(20);
+			}
+		}
 		break;
 	case HF_IPI_INTID:
 		dlog_info("Received inter-processor interrupt %u, vm %x.",
@@ -206,17 +258,6 @@ TEST_SERVICE(sec_interrupt_preempt_msg)
 
 	/* Secure interrupt has been serviced by now. Relinquish cycles. */
 	ffa_msg_wait();
-}
-
-static void send_espi(uint32_t espi_id)
-{
-	struct ffa_value res;
-
-	res = smc32(PLAT_FVP_SEND_ESPI, espi_id, 0, 0, 0, 0, 0, 0);
-
-	if ((int64_t)res.func == SMCCC_ERROR_UNKNOWN) {
-		dlog_error("SiP SMC call not supported");
-	}
 }
 
 /**
@@ -810,7 +851,7 @@ TEST_SERVICE(receive_interrupt_sri_triggered_into_waiting)
 	 * Interrupt assigned to service3, who is excepted to run this
 	 * test.
 	 */
-	espi_id = 5001;
+	espi_id = SERVICE3_ESPI_ID_START;
 	exception_setup(espi_state_irq_handler, NULL);
 
 	EXPECT_EQ(hf_interrupt_enable(espi_id, true, 0), 0);
@@ -956,4 +997,39 @@ TEST_SERVICE(self_ipi)
 	ffa_yield();
 
 	FAIL("Do not expect getting to this point.");
+}
+
+/**
+ * Test that back to back interrupts received whilst the last interrupt is
+ * being handled are all received.
+ * - Enable the eSPIs.
+ * - Send the first eSPI.
+ * - The interrupt handler will send the next eSPI until the last eSPI is
+ *   received.
+ */
+TEST_SERVICE(receive_back_to_back_interrupts)
+{
+	void *recv_buf = SERVICE_RECV_BUFFER();
+
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	send_back_to_back_interrupts = true;
+
+	for (int i = SERVICE3_ESPI_ID_START; i <= SERVICE3_ESPI_ID_END; i++) {
+		EXPECT_EQ(hf_interrupt_enable(i, true, 0), 0);
+	}
+
+	/* Retrieve interrupt ID to be triggered. */
+	receive_indirect_message((void *)&back_to_back_nwd_return,
+				 sizeof(back_to_back_nwd_return), recv_buf);
+
+	send_espi(SERVICE3_ESPI_ID_START);
+
+	sp_wait(20);
+
+	/* Check interrupt queue is empty. */
+	EXPECT_EQ(hf_interrupt_get(), HF_INVALID_INTID);
+
+	ffa_yield();
 }

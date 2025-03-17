@@ -90,6 +90,19 @@ bool service2_is_vm(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
+ * This is currently being used to skip memory sharing tests, when
+ * the service3 is an SP.
+ */
+bool service3_is_vm(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+
+	return ffa_is_vm_id(service3_info->vm_id);
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
  * Check that service1 partition is an SP.
  */
 bool service1_is_not_vm(void)
@@ -99,11 +112,20 @@ bool service1_is_not_vm(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
- * Check that service1 partition is an SP.
+ * Check that service2 partition is an SP.
  */
 bool service2_is_not_vm(void)
 {
 	return !service2_is_vm();
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service3 partition is an SP.
+ */
+bool service3_is_not_vm(void)
+{
+	return !service3_is_vm();
 }
 
 /*
@@ -192,6 +214,18 @@ bool service2_is_mp(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
+ * Check that service3 partition is an MP SP.
+ */
+bool service3_is_mp(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+
+	return (service3_info->vcpu_count > 1);
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
  * Check that service1 partition is an MP SP.
  */
 bool service1_is_mp_sp(void)
@@ -206,6 +240,15 @@ bool service1_is_mp_sp(void)
 bool service2_is_mp_sp(void)
 {
 	return service2_is_not_vm() && service2_is_mp();
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service3 partition is an MP SP.
+ */
+bool service3_is_mp_sp(void)
+{
+	return service3_is_not_vm() && service3_is_mp();
 }
 
 /*

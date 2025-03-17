@@ -92,7 +92,8 @@
 		reg = <0x0 0x1c090000 0x20000>, /* UART0-1 */
 		      <0x0 0x2a830000 0x1000>,  /* AP_REFCLK CNTBase1*/
 		      <0x0 0x2a490000 0x10000>, /* Trusted Watchdog */
-		      <0x0 0x1c130000 0x10000>; /* Dummy for boot_fail tests. */
+		      <0x0 0x1c130000 0x30000>; /* Virtuo devices. Used as a dummy
+		      				   device for tests that use eSPIs. */
 	};
 
 	memory@3 {
