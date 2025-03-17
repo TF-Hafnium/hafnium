@@ -157,3 +157,6 @@ void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
 				       bool is_nwd_call_chain);
 
 bool api_extended_args_are_zero(struct ffa_value *args);
+
+struct ffa_value api_ffa_abort(struct vcpu *current, struct vcpu **next,
+			       struct ffa_value *args);

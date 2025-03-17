@@ -833,3 +833,18 @@ out:
 	vm_unlock(&vm_locked);
 	return ret;
 }
+
+struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked current_locked,
+					     struct vcpu **next)
+{
+	struct ffa_value to_ret = ffa_error(FFA_ABORTED);
+	enum vcpu_state next_state = VCPU_STATE_ABORTED;
+
+	/*
+	 * Relinquish control back to the NWd.
+	 * TODO: Support for abort actions will be added in further patches.
+	 */
+	*next = api_switch_to_primary(current_locked, to_ret, next_state);
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
+}

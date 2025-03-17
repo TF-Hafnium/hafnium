@@ -585,7 +585,10 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 	case FFA_ERROR_32:
 		*args = ffa_cpu_cycles_error_32(current, next, args->arg2);
 		return true;
-
+	case FFA_ABORT_32:
+	case FFA_ABORT_64:
+		*args = api_ffa_abort(current, next, args);
+		return true;
 	default:
 		return false;
 	}
@@ -1108,6 +1111,48 @@ static struct vcpu_fault_info fault_info_init(uintreg_t esr,
 	}
 
 	return r;
+}
+
+/**
+ * Aborts execution of a partition when a fatal error occurs on a vCPU and
+ * triggers the SPMC to reclaim all resources allocated to it.
+ */
+struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next)
+{
+	struct vm_locked vm_locked;
+	struct ffa_value ret;
+	struct vcpu_locked current_locked;
+
+	dlog_notice("Aborting VM %#x vCPU %u\n", current->vm->id,
+		    vcpu_index(current));
+
+	vm_locked = vm_lock(current->vm);
+
+	atomic_store_explicit(&current->vm->aborting, true,
+			      memory_order_relaxed);
+	current_locked = vcpu_lock(current);
+
+	/*
+	 * A partition exection is in ABORTED state after it encounters a fatal
+	 * error.
+	 */
+	current->state = VCPU_STATE_ABORTED;
+
+	/*
+	 * SPMC de-allocates and/or uninitializes all the resources allocated
+	 * to the partition.
+	 */
+	ffa_vm_free_resources(vm_locked);
+	vm_unlock(&vm_locked);
+
+	/*
+	 * SPMC performs necessary operations based on the abort action for
+	 * SP.
+	 */
+	ret = ffa_cpu_cycles_abort(current_locked, next);
+	vcpu_unlock(&current_locked);
+
+	return ret;
 }
 
 struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)

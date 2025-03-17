@@ -10,6 +10,7 @@
 
 #include "hf/api.h"
 #include "hf/ffa/indirect_messaging.h"
+#include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
 #include "hf/vcpu.h"
 
@@ -136,4 +137,15 @@ struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 	(void)error_code;
 	/* TODO: Interface not handled in hypervisor. */
 	return ffa_error(FFA_NOT_SUPPORTED);
+}
+
+struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked *current_locked,
+				      struct vcpu **next)
+{
+	struct ffa_value to_ret = ffa_error(FFA_ABORTED);
+
+	*next = api_switch_to_primary(*current_locked, to_ret,
+				      VCPU_STATE_ABORTED);
+
+	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }

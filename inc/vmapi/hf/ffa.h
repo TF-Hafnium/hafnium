@@ -150,6 +150,13 @@ enum ffa_function : uint32_t {
 	FFA_EL3_INTR_HANDLE_32              = 0x8400008C,
 	FFA_MSG_SEND_DIRECT_REQ2_64         = 0xC400008D,
 	FFA_MSG_SEND_DIRECT_RESP2_64        = 0xC400008E,
+
+	/*
+	 * FF-A v1.3 ALP2 spec introduces a new ABI to abort a partition when
+	 * it's execution context encounters a fatal error.
+	 */
+	FFA_ABORT_32                        = 0x84000090,
+	FFA_ABORT_64                        = 0xC4000090,
 };
 
 /**
@@ -297,6 +304,10 @@ static inline const char *ffa_func_name(enum ffa_function func)
 		return "FFA_MSG_SEND_DIRECT_REQ2_64";
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
 		return "FFA_MSG_SEND_DIRECT_REQ2_64 ";
+	case FFA_ABORT_32:
+		return "FFA_ABORT_32";
+	case FFA_ABORT_64:
+		return "FFA_ABORT_64";
 	}
 	return "UNKNOWN";
 }

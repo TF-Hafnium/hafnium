@@ -354,26 +354,37 @@ struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
  */
 struct vcpu *api_terminate_vm(struct vcpu *current)
 {
-	struct ffa_value ret = ffa_error(FFA_ABORTED);
-	struct vcpu_locked current_locked;
 	struct vcpu *next;
-	struct vm_locked vm_locked;
 
-	dlog_notice("Terminating VM %#x vCPU %u\n", current->vm->id,
-		    vcpu_index(current));
-
-	atomic_store_explicit(&current->vm->aborting, true,
-			      memory_order_relaxed);
-
-	vm_locked = vm_lock(current->vm);
-	ffa_vm_free_resources(vm_locked);
-	vm_unlock(&vm_locked);
-
-	current_locked = vcpu_lock(current);
-	next = api_switch_to_primary(current_locked, ret, VCPU_STATE_ABORTED);
-	vcpu_unlock(&current_locked);
+	ffa_partition_abort(current, &next);
 
 	return next;
+}
+
+/**
+ * An execution context of a partition invokes FFA_ABORT ABI upon encountering
+ * a fatal error and enters ABORTED state. SPMC then takes necessary steps
+ * based on the abort action specified by the partition through its manifest.
+ */
+struct ffa_value api_ffa_abort(struct vcpu *current, struct vcpu **next,
+			       struct ffa_value *args)
+{
+	assert(args != NULL);
+
+	if (ffa_is_vm_id(current->vm->id)) {
+		dlog_error("FFA_ABORT ABI not supported in NWd.\n");
+		return ffa_error(FFA_NOT_SUPPORTED);
+	}
+
+	if (args->arg1 != 0U || args->arg3 != 0U || args->arg4 != 0U ||
+	    args->arg5 != 0U || args->arg6 != 0U || args->arg7 != 0U) {
+		dlog_error(
+			"Parameters passed through registers X1 and X3-X7 "
+			"must be zero\n");
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	return ffa_partition_abort(current, next);
 }
 
 /*
@@ -2555,10 +2566,6 @@ static struct ffa_value ffa_features_function(uint32_t func,
 		}
 		return api_ffa_feature_success(0);
 
-	/*
-	 * This function is restricted to the secure virtual FF-A instance (i.e.
-	 * only report success to SPs).
-	 */
 	case FFA_YIELD_32:
 		if (!vm_id_is_current_world(current->vm->id)) {
 			dlog_verbose(
@@ -2614,6 +2621,21 @@ static struct ffa_value ffa_features_function(uint32_t func,
 			FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT |
 			FFA_FEATURES_MEM_RETRIEVE_REQ_HYPERVISOR_SUPPORT);
 	}
+
+	/*
+	 * This function is restricted to the secure virtual FF-A instance (i.e.
+	 * only report success to SPs).
+	 */
+	case FFA_ABORT_32:
+	case FFA_ABORT_64:
+		if (ffa_is_vm_id(current->vm->id)) {
+			dlog_verbose(
+				"FFA_FEATURES: %s is only supported at secure "
+				"virtual FF-A instance\n",
+				ffa_func_name(FFA_YIELD_32));
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+		return api_ffa_feature_success(0);
 
 	default:
 		return ffa_error(FFA_NOT_SUPPORTED);
