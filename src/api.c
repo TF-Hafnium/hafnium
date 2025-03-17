@@ -350,24 +350,17 @@ struct vcpu *api_wake_up(struct vcpu *current, struct vcpu *target_vcpu)
 }
 
 /**
- * Aborts the vCPU and triggers its VM to abort fully.
+ * Aborts the vCPU and triggers its VM to terminate fully.
  */
-struct vcpu *api_abort(struct vcpu *current)
+struct vcpu *api_terminate_vm(struct vcpu *current)
 {
 	struct ffa_value ret = ffa_error(FFA_ABORTED);
 	struct vcpu_locked current_locked;
 	struct vcpu *next;
 	struct vm_locked vm_locked;
 
-	dlog_notice("Aborting VM %#x vCPU %u\n", current->vm->id,
+	dlog_notice("Terminating VM %#x vCPU %u\n", current->vm->id,
 		    vcpu_index(current));
-
-	if (vm_is_primary(current->vm)) {
-		/* TODO: what to do when the primary aborts? */
-		for (;;) {
-			/* Do nothing. */
-		}
-	}
 
 	atomic_store_explicit(&current->vm->aborting, true,
 			      memory_order_relaxed);
