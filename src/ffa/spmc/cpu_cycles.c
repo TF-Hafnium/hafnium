@@ -560,6 +560,11 @@ static bool ffa_cpu_cycles_check_rtm_ffa_run(struct vcpu_locked current_locked,
 		/* Rule 5 section 7.2 EAC0 spec. */
 		*next_state = VCPU_STATE_BLOCKED;
 		return true;
+	case FFA_ABORT_32:
+	case FFA_ABORT_64:
+		/* Rule I0072 in section 7.2.4 of FF-A v1.3 ALP2 spec. */
+		*next_state = VCPU_STATE_ABORTED;
+		return true;
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
@@ -630,6 +635,11 @@ static bool ffa_cpu_cycles_check_rtm_ffa_dir_req(
 		/* Rule 3, section 8.3 of FF-A v1.2 spec. */
 		*next_state = VCPU_STATE_BLOCKED;
 		return true;
+	case FFA_ABORT_32:
+	case FFA_ABORT_64:
+		/* Rule I0072 in section 7.2.4 of FF-A v1.3 ALP2 spec. */
+		*next_state = VCPU_STATE_ABORTED;
+		return true;
 	case FFA_MSG_WAIT_32:
 		/* Rule 4. Fall through. */
 	default:
@@ -675,6 +685,11 @@ static bool ffa_cpu_cycles_check_rtm_sec_interrupt(
 		/* Rule 3, section 8.4 of FF-A v1.2 spec. */
 		*next_state = VCPU_STATE_BLOCKED;
 		return true;
+	case FFA_ABORT_32:
+	case FFA_ABORT_64:
+		/* Rule I0072 in section 7.2.4 of FF-A v1.3 ALP2 spec. */
+		*next_state = VCPU_STATE_ABORTED;
+		return true;
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
@@ -689,7 +704,8 @@ static bool ffa_cpu_cycles_check_rtm_sec_interrupt(
  * Validates the Runtime model for SP initialization. Refer to section
  * 8.3 of the FF-A v1.2 ALP0 spec.
  */
-static bool ffa_cpu_cycles_check_rtm_sp_init(struct vcpu_locked locked_vcpu,
+static bool ffa_cpu_cycles_check_rtm_sp_init(struct vcpu_locked current_locked,
+					     struct vcpu_locked locked_vcpu,
 					     uint32_t func,
 					     enum vcpu_state *next_state)
 {
@@ -709,10 +725,21 @@ static bool ffa_cpu_cycles_check_rtm_sp_init(struct vcpu_locked locked_vcpu,
 		return false;
 	}
 	case FFA_MSG_WAIT_32:
-		/* Rule 2. Fall through. */
-	case FFA_ERROR_32:
-		/* Rule 3. */
+		/* Rule 2. */
 		*next_state = VCPU_STATE_WAITING;
+		return true;
+	case FFA_ERROR_32:
+		/* Refer rule I0096 in FF-A v1.3 ALP2 spec.  */
+		if (current_locked.vcpu->vm->ffa_version > FFA_VERSION_1_2) {
+			return false;
+		}
+
+		*next_state = VCPU_STATE_WAITING;
+		return true;
+	case FFA_ABORT_32:
+	case FFA_ABORT_64:
+		/* Rule I0072 in section 7.2.4 of FF-A v1.3 ALP2 spec. */
+		*next_state = VCPU_STATE_ABORTED;
 		return true;
 	case FFA_YIELD_32:
 		/* Rule 4. Fall through. */
@@ -764,8 +791,8 @@ bool ffa_cpu_cycles_check_runtime_state_transition(
 			current_locked, locked_vcpu, func, next_state);
 		break;
 	case RTM_SP_INIT:
-		allowed = ffa_cpu_cycles_check_rtm_sp_init(locked_vcpu, func,
-							   next_state);
+		allowed = ffa_cpu_cycles_check_rtm_sp_init(
+			current_locked, locked_vcpu, func, next_state);
 		break;
 	default:
 		dlog_error(
