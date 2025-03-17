@@ -23,7 +23,7 @@ config("compiler_defaults") {
     "-fstack-protector-all",
   ]
 
-  cflags_c = [ "-std=c11" ]
+  cflags_c = [ "-std=c23" ]
 
   cflags_cc = [
     "-std=c++2a",
