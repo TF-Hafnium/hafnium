@@ -224,8 +224,8 @@ static struct ffa_value ffa_cpu_cycles_preempted_vcpu_resume(
 	return ffa_ret;
 }
 
-static struct ffa_value ffa_msg_wait_complete(struct vcpu_locked current_locked,
-					      struct vcpu **next)
+static void ffa_msg_wait_complete(struct vcpu_locked current_locked,
+				  struct vcpu **next)
 {
 	struct vcpu *current = current_locked.vcpu;
 
@@ -242,8 +242,6 @@ static struct ffa_value ffa_msg_wait_complete(struct vcpu_locked current_locked,
 	*next = api_switch_to_other_world(
 		current_locked, (struct ffa_value){.func = FFA_MSG_WAIT_32},
 		VCPU_STATE_WAITING);
-
-	return api_ffa_interrupt_return(0);
 }
 
 /**
@@ -373,7 +371,7 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 	switch (current->rt_model) {
 	case RTM_SP_INIT:
 		if (!sp_boot_next(current_locked, next)) {
-			ret = ffa_msg_wait_complete(current_locked, next);
+			ffa_msg_wait_complete(current_locked, next);
 
 			ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
 							  &ret);
@@ -398,7 +396,7 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 
 		break;
 	case RTM_FFA_RUN:
-		ret = ffa_msg_wait_complete(current_locked, next);
+		ffa_msg_wait_complete(current_locked, next);
 
 		if (!ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
 						       &ret)) {
