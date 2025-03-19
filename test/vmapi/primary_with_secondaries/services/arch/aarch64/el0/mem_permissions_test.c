@@ -62,7 +62,7 @@ static void expect_set_invalid(uintvaddr_t base_va, uint32_t page_count,
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
-static uint32_t range_page_count(volatile uint8_t* start, volatile uint8_t* end)
+static uint32_t range_page_count(volatile uint8_t *start, volatile uint8_t *end)
 {
 	return align_up(end - start, PAGE_SIZE) / PAGE_SIZE;
 }
@@ -71,8 +71,8 @@ static uint32_t range_page_count(volatile uint8_t* start, volatile uint8_t* end)
  * Assert that every page in the range `start` to `expected_end` has the
  * expected permissions.
  */
-static void test_perm_get_range(volatile uint8_t* start, volatile uint8_t* end,
-				volatile uint8_t* expected_end,
+static void test_perm_get_range(volatile uint8_t *start, volatile uint8_t *end,
+				volatile uint8_t *expected_end,
 				enum ffa_mem_perm perm)
 {
 	assert(start <= end);
@@ -96,18 +96,18 @@ static void test_perm_get_range(volatile uint8_t* start, volatile uint8_t* end,
  * Assert that every page in the range `start` to `end` has the expected
  * permissions.
  */
-static void test_perm_get_range_full(volatile uint8_t* start,
-				     volatile uint8_t* end,
+static void test_perm_get_range_full(volatile uint8_t *start,
+				     volatile uint8_t *end,
 				     enum ffa_mem_perm perm)
 {
 	test_perm_get_range(start, end, end, perm);
 }
 
-static void print_range(const char* name, volatile uint8_t* start,
-			volatile uint8_t* end)
+static void print_range(const char *name, volatile uint8_t *start,
+			volatile uint8_t *end)
 {
-	dlog_verbose("%s: %p - %p (%u pages)\n", name, (void*)start, (void*)end,
-		     range_page_count(start, end));
+	dlog_verbose("%s: %p - %p (%u pages)\n", name, (void *)start,
+		     (void *)end, range_page_count(start, end));
 }
 
 /**
@@ -127,9 +127,9 @@ SERVICE_SET_UP(ffa_mem_perm_get)
 
 	const uint32_t num_pages = range_page_count(data_begin, data_end);
 	uintvaddr_t base_va = (uintvaddr_t)align_down(data_begin, PAGE_SIZE);
-	volatile uint8_t* rx_start = NULL;
-	volatile uint8_t* tx_start = NULL;
-	volatile uint8_t* rx_end = NULL;
+	volatile uint8_t *rx_start = NULL;
+	volatile uint8_t *tx_start = NULL;
+	volatile uint8_t *rx_end = NULL;
 
 	print_range("text", text_begin, text_end);
 	print_range("rodata", rodata_begin, rodata_end);
@@ -147,7 +147,7 @@ SERVICE_SET_UP(ffa_mem_perm_get)
 			num_ro_pages_in_data++;
 
 			/* NOLINTNEXTLINE(performance-no-int-to-ptr)*/
-			rx_start = (volatile uint8_t*)base_va;
+			rx_start = (volatile uint8_t *)base_va;
 			rx_end = rx_start + PAGE_SIZE;
 			tx_start = rx_start - PAGE_SIZE;
 		} else {

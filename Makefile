@@ -143,6 +143,12 @@ format:
 	@find src/ inc/ test/ project/ vmlib/ -name '*.c' -o -name '*.cc' -o -name '*.h' | xargs -n1 -P0 clang-format -style file -i
 	@find . -name '*.gn' -o -name '*.gni' | xargs -n1 -P0 $(GN) format
 
+.PHONY: check-format
+check-format:
+	@echo "Formatting..."
+	@find src/ inc/ test/ project/ vmlib/ -name '*.c' -o -name '*.cc' -o -name '*.h' | xargs -n1 -P0 clang-format -style file -i --dry-run --Werror
+	@find . -name '*.gn' -o -name '*.gni' | xargs -n1 -P0 $(GN) format --dry-run || echo "Build files are not formatted correctly"
+
 .PHONY: checkpatch
 checkpatch: $(CHECKPATCH_SCRIPT)
 	# TODO: enable for test/

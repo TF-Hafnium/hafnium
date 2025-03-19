@@ -15,13 +15,7 @@ init_build
 # Make sure the code looks good.
 #
 
-make format
-if is_repo_dirty
-then
-	echo "Run \`make format\' locally to fix this."
-	exit 1
-fi
-
+make check-format
 make checkpatch
 
 #

@@ -36,11 +36,11 @@
  * before the tests. This order simplifies test discovery in the running image.
  */
 #define HFTEST_SET_UP_SECTION(suite_name) \
-	HFTEST_STR(.hftest.suite.suite_name .1set_up)
+	HFTEST_STR(.hftest.suite.suite_name.1set_up)
 #define HFTEST_TEAR_DOWN_SECTION(suite_name) \
-	HFTEST_STR(.hftest.suite.suite_name .1tear_down)
+	HFTEST_STR(.hftest.suite.suite_name.1tear_down)
 #define HFTEST_TEST_SECTION(suite_name, test_name) \
-	HFTEST_STR(.hftest.suite.suite_name .2test.test_name)
+	HFTEST_STR(.hftest.suite.suite_name.2test.test_name)
 #define HFTEST_SERVICE_SET_UP_SECTION(service_name) \
 	HFTEST_STR(.hftest.service_set_up.service_name)
 #define HFTEST_SERVICE_SECTION(service_name) \
