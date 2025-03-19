@@ -25,7 +25,6 @@ typedef phys_addr_t hf_ipaddr_t;
 
 #else
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 

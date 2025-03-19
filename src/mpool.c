@@ -8,8 +8,6 @@
 
 #include "hf/mpool.h"
 
-#include <stdbool.h>
-
 #include "hf/arch/std.h"
 
 struct mpool_chunk {

@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include <stdalign.h>
 #include <stdint.h>
 
 #define PAGE_BITS 12

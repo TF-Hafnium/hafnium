@@ -8,7 +8,6 @@
 
 #include "hf/arch/init.h"
 
-#include <stdalign.h>
 #include <stddef.h>
 
 #include "hf/api.h"

@@ -8,8 +8,6 @@
 
 #include "hf/load.h"
 
-#include <stdbool.h>
-
 #include "hf/arch/init.h"
 #include "hf/arch/other_world.h"
 #include "hf/arch/vm.h"

@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include <stdbool.h>
-
 #include "hf/vcpu.h"
 
 /**

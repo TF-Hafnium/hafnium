@@ -6,7 +6,6 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #define FW_CFG_ID 0x01

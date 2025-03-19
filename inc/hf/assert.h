@@ -10,7 +10,6 @@
 
 #if !defined(__cplusplus)
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #include "hf/dlog.h"

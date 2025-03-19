@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #define PAGE_BITS 12

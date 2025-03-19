@@ -8,8 +8,6 @@
 
 #include "hf/cpu.h"
 
-#include <stdalign.h>
-
 #include "hf/arch/cache.h"
 
 #include "hf/api.h"

@@ -8,7 +8,6 @@
 
 #include "hf/arch/vm/interrupts_gicv3.h"
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #include "hf/cpu.h"

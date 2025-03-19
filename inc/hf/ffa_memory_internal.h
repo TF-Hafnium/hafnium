@@ -16,7 +16,6 @@
 #include "hf/mm.h"
 #define MAX_MEM_SHARES 100
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #include "hf/check.h"

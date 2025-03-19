@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include <stdbool.h>
-
 #include "hf/memiter.h"
 #include "hf/string.h"
 

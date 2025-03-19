@@ -8,7 +8,6 @@
 
 #include "hf/arch/timer.h"
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #include "hf/arch/types.h"

@@ -6,7 +6,6 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stdalign.h>
 #include <stdint.h>
 
 #include "hf/ffa_v1_0.h"

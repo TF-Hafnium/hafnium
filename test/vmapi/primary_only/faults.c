@@ -6,8 +6,6 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stdalign.h>
-
 #include "hf/arch/vm/power_mgmt.h"
 
 #include "hf/mm.h"

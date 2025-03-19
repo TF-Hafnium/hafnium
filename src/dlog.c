@@ -8,7 +8,6 @@
 
 #include "hf/dlog.h"
 
-#include <stdbool.h>
 #include <stddef.h>
 
 #include "hf/spinlock.h"

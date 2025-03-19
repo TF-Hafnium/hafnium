@@ -8,7 +8,6 @@
 
 #include "fwcfg.h"
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #include "hf/arch/std.h"

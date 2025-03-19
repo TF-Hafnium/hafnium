@@ -8,7 +8,5 @@
 
 #pragma once
 
-#include <stdbool.h>
-
 void fill_fp_registers(double value);
 bool check_fp_register(double value);

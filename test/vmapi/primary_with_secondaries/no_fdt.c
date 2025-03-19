@@ -11,7 +11,6 @@
  * than a pointer to the FDT.
  */
 
-#include <stdalign.h>
 #include <stdint.h>
 
 #include "hf/mm.h"
