@@ -8,6 +8,4 @@
 
 #pragma once
 
-#include <stdnoreturn.h>
-
-noreturn void abort(void);
+[[noreturn]] void abort(void);

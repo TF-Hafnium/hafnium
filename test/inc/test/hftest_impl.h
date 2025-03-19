@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include <stdnoreturn.h>
-
 #include "hf/fdt.h"
 #include "hf/ffa.h"
 #include "hf/ffa_partition_manifest.h"

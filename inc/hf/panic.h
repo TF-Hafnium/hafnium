@@ -8,4 +8,4 @@
 
 #pragma once
 
-__attribute__((__noreturn__)) void panic(const char *fmt, ...);
+[[noreturn]] void panic(const char *fmt, ...);

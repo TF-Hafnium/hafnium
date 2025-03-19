@@ -10,7 +10,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <stdnoreturn.h>
 
 #include "hf/arch/types.h"
 
@@ -158,7 +157,7 @@ void hftest_ctrl_reboot(void);
 void hftest_command(struct fdt *fdt);
 
 /** Reboot the device. */
-noreturn void hftest_device_reboot(void);
+[[noreturn]] void hftest_device_reboot(void);
 
 /**
  * Device-specific operation to escape from the test environment.
@@ -189,7 +188,7 @@ uint8_t *hftest_get_secondary_ec_stack(size_t id);
  */
 typedef void(cpu_entry_point)(uintptr_t);
 
-noreturn void hftest_service_main(const void *fdt_ptr);
+[[noreturn]] void hftest_service_main(const void *fdt_ptr);
 
 /*
  * Return the field tracking the source of the direct request message.

@@ -7,7 +7,6 @@
  */
 
 #include <stdint.h>
-#include <stdnoreturn.h>
 
 #include "hf/panic.h"
 
@@ -28,7 +27,7 @@ uint64_t __attribute__((used)) __stack_chk_guard = 0x72afaf72bad0feed;
  * Called when the stack canary is invalid. The stack can no longer be trusted
  * so this function must not return.
  */
-noreturn void __stack_chk_fail(void)
+[[noreturn]] void __stack_chk_fail(void)
 {
 	panic("stack corruption");
 }

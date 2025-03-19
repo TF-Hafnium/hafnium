@@ -10,7 +10,7 @@
 
 #include <sys/reboot.h>
 
-noreturn void arch_power_off(void)
+[[noreturn]] void arch_power_off(void)
 {
 	reboot(RB_POWER_OFF);
 	for (;;) {

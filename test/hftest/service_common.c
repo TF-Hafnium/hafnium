@@ -59,7 +59,7 @@ static void uint32list_get_next(struct memiter *list, uint32_t *out)
 	*out = (uint32_t)num;
 }
 
-noreturn void abort(void)
+[[noreturn]] void abort(void)
 {
 	HFTEST_LOG("Service contained failures.");
 	/* Cause a fault, as a secondary/SP can't power down the machine. */
@@ -278,7 +278,7 @@ void hftest_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
 	}
 }
 
-noreturn void hftest_service_main(const void *fdt_ptr)
+[[noreturn]] void hftest_service_main(const void *fdt_ptr)
 {
 	struct hftest_context *ctx;
 	struct memiter args;

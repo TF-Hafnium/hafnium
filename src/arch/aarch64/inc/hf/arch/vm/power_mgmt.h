@@ -10,7 +10,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <stdnoreturn.h>
 
 #include "hf/arch/types.h"
 
@@ -40,8 +39,8 @@ struct arch_cpu_start_state {
 
 bool arch_cpu_start(uintptr_t id, struct arch_cpu_start_state *s);
 
-noreturn void arch_cpu_stop(void);
+[[noreturn]] void arch_cpu_stop(void);
 enum power_status arch_cpu_status(cpu_id_t cpu_id);
 
-noreturn void arch_power_off(void);
-noreturn void arch_reboot(void);
+[[noreturn]] void arch_power_off(void);
+[[noreturn]] void arch_reboot(void);

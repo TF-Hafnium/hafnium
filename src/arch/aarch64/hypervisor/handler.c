@@ -6,8 +6,6 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stdnoreturn.h>
-
 #include "hf/arch/barriers.h"
 #include "hf/arch/gicv3.h"
 #include "hf/arch/host_timer.h"
@@ -165,7 +163,7 @@ void maybe_invalidate_tlb(struct vcpu *vcpu)
 	}
 }
 
-noreturn void irq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
+[[noreturn]] void irq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 {
 	(void)elr;
 	(void)spsr;
@@ -173,7 +171,7 @@ noreturn void irq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 	panic("IRQ from current exception level.");
 }
 
-noreturn void fiq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
+[[noreturn]] void fiq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 {
 	(void)elr;
 	(void)spsr;
@@ -181,7 +179,7 @@ noreturn void fiq_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 	panic("FIQ from current exception level.");
 }
 
-noreturn void serr_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
+[[noreturn]] void serr_current_exception_noreturn(uintreg_t elr, uintreg_t spsr)
 {
 	(void)elr;
 	(void)spsr;
@@ -1047,7 +1045,7 @@ struct vcpu *fiq_lower(void)
 #endif
 }
 
-noreturn struct vcpu *serr_lower(void)
+[[noreturn]] struct vcpu *serr_lower(void)
 {
 	/*
 	 * SError exceptions should be isolated and handled by the responsible

@@ -38,7 +38,7 @@ bool arch_cpu_start(uintptr_t id, struct arch_cpu_start_state *state)
 /**
  * Stops the current CPU.
  */
-noreturn void arch_cpu_stop(void)
+[[noreturn]] void arch_cpu_stop(void)
 {
 	smc32(PSCI_CPU_OFF, 0, 0, 0, 0, 0, 0, SMCCC_CALLER_HYPERVISOR);
 	for (;;) {
@@ -75,7 +75,7 @@ enum power_status arch_cpu_status(cpu_id_t cpu_id)
 /**
  * Shuts down the system or exits emulation.
  */
-noreturn void arch_power_off(void)
+[[noreturn]] void arch_power_off(void)
 {
 	smc32(PSCI_SYSTEM_OFF, 0, 0, 0, 0, 0, 0, SMCCC_CALLER_HYPERVISOR);
 	for (;;) {
@@ -86,7 +86,7 @@ noreturn void arch_power_off(void)
 /**
  * Restarts the system.
  */
-noreturn void arch_reboot(void)
+[[noreturn]] void arch_reboot(void)
 {
 	smc32(PSCI_SYSTEM_RESET, 0, 0, 0, 0, 0, 0, SMCCC_CALLER_HYPERVISOR);
 	for (;;) {

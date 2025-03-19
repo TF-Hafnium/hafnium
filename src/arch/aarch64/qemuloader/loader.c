@@ -7,7 +7,6 @@
  */
 
 #include <stdint.h>
-#include <stdnoreturn.h>
 
 #include "hf/arch/std.h"
 
@@ -25,8 +24,8 @@ alignas(4096) uint8_t kstack[4096];
 
 typedef void entry_point(struct fdt_header *, uint64_t, uint64_t, uint64_t);
 
-static noreturn void jump_to_kernel(struct fdt_header *fdt,
-				    entry_point *kernel_entry)
+[[noreturn]] static void jump_to_kernel(struct fdt_header *fdt,
+					entry_point *kernel_entry)
 {
 	kernel_entry(fdt, 0, 0, 0);
 
@@ -83,7 +82,7 @@ static bool update_fdt(struct fdt_header *fdt, uintptr_t initrd_start,
 	return true;
 }
 
-noreturn void kmain(struct fdt_header *fdt)
+[[noreturn]] void kmain(struct fdt_header *fdt)
 {
 	uintptr_t kernel_start;
 	uint32_t kernel_size;

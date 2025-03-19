@@ -104,7 +104,7 @@ void hftest_json(void)
 /**
  * Logs a failure message and shut down.
  */
-noreturn void abort(void)
+[[noreturn]] void abort(void)
 {
 	HFTEST_LOG("FAIL");
 	arch_power_off();

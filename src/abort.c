@@ -16,7 +16,7 @@
  *
  * TODO: Should this also reset the system?
  */
-noreturn void abort(void)
+[[noreturn]] void abort(void)
 {
 	/* TODO: Block all CPUs. */
 	for (;;) {

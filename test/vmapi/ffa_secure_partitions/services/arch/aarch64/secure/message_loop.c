@@ -192,7 +192,7 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
  * Message loop to add tests to be controlled by the control partition(depends
  * on the test set-up).
  */
-noreturn void test_main_sp(bool is_boot_vcpu)
+[[noreturn]] void test_main_sp(bool is_boot_vcpu)
 {
 	/* Use FF-A v1.1 EAC0 boot protocol to retrieve the FDT. */
 	static struct ffa_boot_info_desc* fdt_info;

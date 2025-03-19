@@ -18,7 +18,7 @@
  *
  * TODO: Determine if we want to omit strings on non-debug builds.
  */
-noreturn void panic(const char *fmt, ...)
+[[noreturn]] void panic(const char *fmt, ...)
 {
 	struct va_list_wrapper args;
 

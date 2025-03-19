@@ -22,7 +22,7 @@ struct cpu_start_state {
 	struct spinlock lock;
 };
 
-static noreturn void cpu_entry(uintptr_t arg)
+[[noreturn]] static void cpu_entry(uintptr_t arg)
 {
 	/*
 	 * The function prototype must match the entry function so we permit the

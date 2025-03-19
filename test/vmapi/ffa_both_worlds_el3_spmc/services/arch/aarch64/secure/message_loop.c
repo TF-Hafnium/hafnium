@@ -62,7 +62,7 @@ static struct ffa_value handle_direct_req_cmd(struct mailbox_buffers mb,
  * Message loop to add tests to be controlled by the control partition(depends
  * on the test set-up).
  */
-noreturn void test_main_sp(bool is_boot_vcpu)
+[[noreturn]] void test_main_sp(bool is_boot_vcpu)
 {
 	struct hftest_context* ctx = hftest_get_context();
 	struct ffa_value res;

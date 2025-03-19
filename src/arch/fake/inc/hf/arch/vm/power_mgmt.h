@@ -8,6 +8,4 @@
 
 #pragma once
 
-#include <stdnoreturn.h>
-
-noreturn void arch_power_off(void);
+[[noreturn]] void arch_power_off(void);

@@ -24,7 +24,7 @@ struct ffa_boot_info_header* get_boot_info_header(void)
 	return boot_info_header;
 }
 
-static noreturn void hftest_wait(void)
+[[noreturn]] static void hftest_wait(void)
 {
 	for (;;) {
 		interrupt_wait();

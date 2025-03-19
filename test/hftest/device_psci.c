@@ -10,7 +10,7 @@
 
 #include "test/hftest.h"
 
-noreturn void hftest_device_reboot(void)
+[[noreturn]] void hftest_device_reboot(void)
 {
 	arch_reboot();
 }

@@ -34,7 +34,7 @@ void run_service_set_up(struct hftest_context* ctx, struct fdt* fdt)
 	hftest_service_set_up(ctx, fdt);
 }
 
-noreturn void kmain(struct ffa_boot_info_header* boot_info_blob)
+[[noreturn]] void kmain(struct ffa_boot_info_header* boot_info_blob)
 {
 	boot_info_header = boot_info_blob;
 

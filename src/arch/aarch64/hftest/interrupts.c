@@ -37,7 +37,7 @@ bool irq_current(void)
 	return false;
 }
 
-noreturn static bool default_sync_current_exception(void)
+[[noreturn]] static bool default_sync_current_exception(void)
 {
 	uintreg_t esr = read_msr(esr_el1);
 	uintreg_t elr = read_msr(elr_el1);

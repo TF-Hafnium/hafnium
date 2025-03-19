@@ -22,7 +22,7 @@ void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
 	hftest_service_set_up(ctx, fdt);
 }
 
-noreturn void kmain(const void *fdt_ptr)
+[[noreturn]] void kmain(const void *fdt_ptr)
 {
 	/*
 	 * Initialize the stage-1 MMU and identity-map the entire address space.
