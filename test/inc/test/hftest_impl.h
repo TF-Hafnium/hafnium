@@ -230,8 +230,8 @@ struct hftest_test {
 
 #define HFTEST_ASSERT_OP(lhs, rhs, op, fatal)                              \
 	do {                                                               \
-		__typeof(lhs) lhs_value = lhs;                             \
-		__typeof(rhs) rhs_value = rhs;                             \
+		typeof(lhs) lhs_value = lhs;                               \
+		typeof(rhs) rhs_value = rhs;                               \
 		if (!(lhs_value op rhs_value)) {                           \
 			struct hftest_context *ctx = hftest_get_context(); \
 			++ctx->failures;                                   \

@@ -56,10 +56,9 @@ int strncmp(const char *a, const char *b, size_t n);
  */
 #define align_up_overflow(v, size, res)         \
 	__extension__({                         \
-		typedef __typeof(v) v_t;        \
-		v_t __v = (v);                  \
-		__typeof(size) __size = (size); \
-		__typeof(res) __res = (res);    \
+		typeof(v) __v = (v);            \
+		typeof(size) __size = (size);   \
+		typeof(res) __res = (res);      \
 		*__res = align_up(__v, __size); \
 		__v > *__res;                   \
 	})
@@ -71,7 +70,7 @@ int strncmp(const char *a, const char *b, size_t n);
  */
 #define add_with_round_up_overflow(a, b, size, res)                  \
 	(__extension__({                                             \
-		__typeof__(a) __add_res = 0;                         \
+		typeof(a) __add_res = 0;                             \
 		add_overflow((a), (b), &__add_res) ||                \
 			align_up_overflow(__add_res, (size), (res)); \
 	}))
