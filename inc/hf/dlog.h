@@ -57,7 +57,7 @@ struct va_list_wrapper {
 };
 
 void dlog_enable_lock(void);
-__attribute__((format(printf, 1, 2))) size_t dlog(const char *fmt, ...);
+[[gnu::format(printf, 1, 2)]] size_t dlog(const char *fmt, ...);
 size_t vdlog(const char *fmt, struct va_list_wrapper *args);
 
 /*

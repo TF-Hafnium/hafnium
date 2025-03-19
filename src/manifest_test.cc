@@ -362,10 +362,9 @@ class manifest : public ::testing::Test
 	class Partition_package
 	{
 	       public:
-		__attribute__((aligned(PAGE_SIZE))) struct sp_pkg_header spkg;
-		__attribute__((
-			aligned(PAGE_SIZE))) char manifest_dtb[PAGE_SIZE] = {};
-		__attribute__((aligned(PAGE_SIZE))) char img[PAGE_SIZE] = {};
+		alignas(PAGE_SIZE) struct sp_pkg_header spkg;
+		alignas(PAGE_SIZE) char manifest_dtb[PAGE_SIZE] = {};
+		alignas(PAGE_SIZE) char img[PAGE_SIZE] = {};
 
 		Partition_package(const std::vector<char> &vec)
 		{

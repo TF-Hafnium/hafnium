@@ -21,7 +21,7 @@
  * is a global variable and there are multiple CPUs executing concurrently, this
  * value cannot change after being initialized.
  */
-uint64_t __attribute__((used)) __stack_chk_guard = 0x72afaf72bad0feed;
+[[gnu::used]] uint64_t __stack_chk_guard = 0x72afaf72bad0feed;
 
 /**
  * Called when the stack canary is invalid. The stack can no longer be trusted
@@ -32,7 +32,7 @@ uint64_t __attribute__((used)) __stack_chk_guard = 0x72afaf72bad0feed;
 	panic("stack corruption");
 }
 
-void __attribute__((no_stack_protector)) stack_protector_init(void)
+[[gnu::no_stack_protector]] void stack_protector_init(void)
 {
 	/* The prng function is executed with the hardcoded stack guard. */
 	__stack_chk_guard = (uint64_t)plat_prng_get_number();
