@@ -25,9 +25,6 @@ struct ffa_boot_info_header* get_boot_info_header(void)
 	return boot_info_header;
 }
 
-extern struct hftest_test hftest_begin[];
-extern struct hftest_test hftest_end[];
-
 static noreturn void hftest_wait(void)
 {
 	for (;;) {
@@ -55,10 +52,6 @@ void kmain(struct ffa_boot_info_header* boot_info_blob)
 	 * exceptions are logged.
 	 */
 	exception_setup(NULL, NULL);
-
-	// FIXME: find a way of doing this that isn't UB
-	// NOLINTNEXTLINE(clang-analyzer-security.PointerSub)
-	hftest_use_list(hftest_begin, hftest_end - hftest_begin);
 
 	hftest_command(&fdt);
 

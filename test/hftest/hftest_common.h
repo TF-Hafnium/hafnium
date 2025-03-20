@@ -9,11 +9,6 @@
 #include "hf/fdt.h"
 #include "hf/memiter.h"
 
-#include "test/hftest_impl.h"
-
-void hftest_use_registered_list(void);
-void hftest_use_list(struct hftest_test list[], size_t count);
-
 void hftest_json(void);
 void hftest_run(struct memiter suite_name, struct memiter test_name,
 		const struct fdt *fdt);

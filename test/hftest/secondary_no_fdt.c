@@ -20,9 +20,6 @@
 
 alignas(4096) uint8_t kstack[4096];
 
-extern struct hftest_test hftest_begin[];
-extern struct hftest_test hftest_end[];
-
 void test_main_secondary(size_t mem_size);
 
 void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)

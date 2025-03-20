@@ -70,36 +70,26 @@
 	hftest_test_ctor_##suite_name##_##test_name
 
 /* Register test functions. */
-#define HFTEST_SET_UP(suite_name)                                           \
-	static void HFTEST_SET_UP_FN(suite_name)(void);                     \
-	const struct hftest_test __attribute__((used))                      \
-	__attribute__((section(HFTEST_SET_UP_SECTION(                       \
-		suite_name)))) HFTEST_SET_UP_STRUCT(suite_name) = {         \
-		.suite = #suite_name,                                       \
-		.kind = HFTEST_KIND_SET_UP,                                 \
-		.fn = HFTEST_SET_UP_FN(suite_name),                         \
-	};                                                                  \
-	static void __attribute__((constructor)) HFTEST_SET_UP_CONSTRUCTOR( \
-		suite_name)(void)                                           \
-	{                                                                   \
-		hftest_register(HFTEST_SET_UP_STRUCT(suite_name));          \
-	}                                                                   \
+#define HFTEST_SET_UP(suite_name)                                   \
+	static void HFTEST_SET_UP_FN(suite_name)(void);             \
+	const struct hftest_test __attribute__((used))              \
+	__attribute__((section(HFTEST_SET_UP_SECTION(               \
+		suite_name)))) HFTEST_SET_UP_STRUCT(suite_name) = { \
+		.suite = #suite_name,                               \
+		.kind = HFTEST_KIND_SET_UP,                         \
+		.fn = HFTEST_SET_UP_FN(suite_name),                 \
+	};                                                          \
 	static void HFTEST_SET_UP_FN(suite_name)(void)
 
-#define HFTEST_TEAR_DOWN(suite_name)                                           \
-	static void HFTEST_TEAR_DOWN_FN(suite_name)(void);                     \
-	const struct hftest_test __attribute__((used))                         \
-	__attribute__((section(HFTEST_TEAR_DOWN_SECTION(                       \
-		suite_name)))) HFTEST_TEAR_DOWN_STRUCT(suite_name) = {         \
-		.suite = #suite_name,                                          \
-		.kind = HFTEST_KIND_TEAR_DOWN,                                 \
-		.fn = HFTEST_TEAR_DOWN_FN(suite_name),                         \
-	};                                                                     \
-	static void __attribute__((constructor)) HFTEST_TEAR_DOWN_CONSTRUCTOR( \
-		suite_name)(void)                                              \
-	{                                                                      \
-		hftest_register(HFTEST_TEAR_DOWN_STRUCT(suite_name));          \
-	}                                                                      \
+#define HFTEST_TEAR_DOWN(suite_name)                                   \
+	static void HFTEST_TEAR_DOWN_FN(suite_name)(void);             \
+	const struct hftest_test __attribute__((used))                 \
+	__attribute__((section(HFTEST_TEAR_DOWN_SECTION(               \
+		suite_name)))) HFTEST_TEAR_DOWN_STRUCT(suite_name) = { \
+		.suite = #suite_name,                                  \
+		.kind = HFTEST_KIND_TEAR_DOWN,                         \
+		.fn = HFTEST_TEAR_DOWN_FN(suite_name),                 \
+	};                                                             \
 	static void HFTEST_TEAR_DOWN_FN(suite_name)(void)
 
 #define HFTEST_TEST(suite_name, test_name, long_running, precon_fn)         \
@@ -115,11 +105,6 @@
 		.fn = HFTEST_TEST_FN(suite_name, test_name),                \
 		.precondition = (precon_fn),                                \
 	};                                                                  \
-	static void __attribute__((constructor)) HFTEST_TEST_CONSTRUCTOR(   \
-		suite_name, test_name)(void)                                \
-	{                                                                   \
-		hftest_register(HFTEST_TEST_STRUCT(suite_name, test_name)); \
-	}                                                                   \
 	static void HFTEST_TEST_FN(suite_name, test_name)(void)
 
 #define HFTEST_SERVICE_SET_UP(service_name)                                   \
@@ -330,5 +315,3 @@ struct hftest_test {
 #define HFTEST_SERVICE_SEND_BUFFER() hftest_get_context()->send
 #define HFTEST_SERVICE_RECV_BUFFER() hftest_get_context()->recv
 #define HFTEST_SERVICE_MEMORY_SIZE() hftest_get_context()->memory_size
-
-void hftest_register(struct hftest_test test);

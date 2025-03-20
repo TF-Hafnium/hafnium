@@ -18,9 +18,6 @@
 
 alignas(4096) uint8_t kstack[2 * 4096];
 
-extern struct hftest_test hftest_begin[];
-extern struct hftest_test hftest_end[];
-
 void kmain(const void *fdt_ptr)
 {
 	struct fdt fdt;
@@ -39,10 +36,6 @@ void kmain(const void *fdt_ptr)
 	 * exceptions are logged.
 	 */
 	exception_setup(NULL, NULL);
-
-	// FIXME: find a way of doing this that isn't UB
-	// NOLINTNEXTLINE(clang-analyzer-security.PointerSub)
-	hftest_use_list(hftest_begin, hftest_end - hftest_begin);
 
 	if (!fdt_size_from_header(fdt_ptr, &fdt_len) ||
 	    !fdt_init_from_ptr(&fdt, fdt_ptr, fdt_len)) {

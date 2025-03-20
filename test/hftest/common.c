@@ -19,11 +19,10 @@
 #define HFTEST_CTRL_JSON_START "[hftest_ctrl:json_start]"
 #define HFTEST_CTRL_JSON_END "[hftest_ctrl:json_end]"
 
-static struct hftest_test hftest_constructed[HFTEST_MAX_TESTS];
-static size_t hftest_count;
-static struct hftest_test *hftest_list;
-
 static struct hftest_context global_context;
+
+extern struct hftest_test hftest_begin[];
+extern struct hftest_test hftest_end[];
 
 static alignas(PAGE_SIZE) uint8_t secondary_ec_stack[MAX_CPUS][PAGE_SIZE];
 
@@ -33,43 +32,11 @@ struct hftest_context *hftest_get_context(void)
 }
 
 /**
- * Adds the given test information to the global list, to be used by
- * `hftest_use_registered_list`.
- */
-void hftest_register(struct hftest_test test)
-{
-	if (hftest_count < HFTEST_MAX_TESTS) {
-		hftest_constructed[hftest_count++] = test;
-	} else {
-		HFTEST_FAIL(true, "Too many tests");
-	}
-}
-
-/**
- * Uses the list of tests registered by `hftest_register(...)` as the ones to
- * run.
- */
-void hftest_use_registered_list(void)
-{
-	hftest_list = hftest_constructed;
-}
-
-/**
- * Uses the given list of tests as the ones to run.
- */
-void hftest_use_list(struct hftest_test list[], size_t count)
-{
-	hftest_list = list;
-	hftest_count = count;
-}
-
-/**
  * Writes out a JSON structure describing the available tests.
  */
 void hftest_json(void)
 {
 	const char *suite = NULL;
-	size_t i;
 	size_t tests_in_suite = 0;
 
 	/* Wrap the JSON in tags for the hftest script to use. */
@@ -77,8 +44,8 @@ void hftest_json(void)
 
 	HFTEST_LOG("{");
 	HFTEST_LOG("  \"suites\": [");
-	for (i = 0; i < hftest_count; ++i) {
-		struct hftest_test *test = &hftest_list[i];
+	for (struct hftest_test *test = hftest_begin; test < hftest_end;
+	     ++test) {
 		if (test->suite != suite) {
 			/* Close out previously open suite. */
 			if (tests_in_suite) {
@@ -183,13 +150,11 @@ static void run_test(hftest_test_fn set_up, hftest_test_fn test,
 void hftest_run(struct memiter suite_name, struct memiter test_name,
 		const struct fdt *fdt)
 {
-	size_t i;
 	hftest_test_fn suite_set_up = NULL;
 	hftest_test_fn suite_tear_down = NULL;
 
-	for (i = 0; i < hftest_count; ++i) {
-		struct hftest_test *test = &hftest_list[i];
-
+	for (struct hftest_test *test = hftest_begin; test < hftest_end;
+	     ++test) {
 		/* Check if this test is part of the suite we want. */
 		if (memiter_iseq(&suite_name, test->suite)) {
 			switch (test->kind) {
