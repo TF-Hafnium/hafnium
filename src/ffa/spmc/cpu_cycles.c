@@ -542,7 +542,7 @@ static bool ffa_cpu_cycles_check_rtm_ffa_run(struct vcpu_locked current_locked,
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
-		/* Fall through. */
+		[[fallthrough]];
 	case FFA_RUN_32: {
 		/* Rules 1,2 section 7.2 EAC0 spec. */
 		if (ffa_direct_msg_precedes_in_call_chain(current_locked,
@@ -603,7 +603,7 @@ static bool ffa_cpu_cycles_check_rtm_ffa_dir_req(
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
-		/* Fall through. */
+		[[fallthrough]];
 	case FFA_RUN_32: {
 		/* Rules 1,2. */
 		if (ffa_direct_msg_precedes_in_call_chain(current_locked,
@@ -615,8 +615,8 @@ static bool ffa_cpu_cycles_check_rtm_ffa_dir_req(
 		return true;
 	}
 	case FFA_MSG_SEND_DIRECT_RESP_64:
-	case FFA_MSG_SEND_DIRECT_RESP_32: {
-	case FFA_MSG_SEND_DIRECT_RESP2_64:
+	case FFA_MSG_SEND_DIRECT_RESP_32:
+	case FFA_MSG_SEND_DIRECT_RESP2_64: {
 		/* Rule 3. */
 		if (current_locked.vcpu->direct_request_origin.vm_id ==
 		    receiver_vm_id) {

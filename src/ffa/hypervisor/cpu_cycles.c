@@ -75,7 +75,7 @@ bool ffa_cpu_cycles_check_runtime_state_transition(
 
 	switch (func) {
 	case FFA_YIELD_32:
-		/* Fall through. */
+		[[fallthrough]];
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
@@ -83,7 +83,7 @@ bool ffa_cpu_cycles_check_runtime_state_transition(
 		*next_state = VCPU_STATE_BLOCKED;
 		return true;
 	case FFA_MSG_WAIT_32:
-		/* Fall through. */
+		[[fallthrough]];
 	case FFA_MSG_SEND_DIRECT_RESP_64:
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 	case FFA_MSG_SEND_DIRECT_RESP2_64:

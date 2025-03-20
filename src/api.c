@@ -3245,7 +3245,7 @@ static bool api_memory_region_check_flags(
 		    0U) {
 			return false;
 		}
-		/* Intentional fall-through */
+		[[fallthrough]];
 	case FFA_MEM_LEND_64:
 	case FFA_MEM_LEND_32:
 	case FFA_MEM_DONATE_64:

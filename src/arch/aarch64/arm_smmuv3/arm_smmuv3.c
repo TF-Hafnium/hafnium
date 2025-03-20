@@ -139,7 +139,7 @@ static bool smmuv3_identify_features(struct smmuv3_driver *smmuv3)
 	switch (EXTRACT(idr0, ST_LEVEL_SHIFT, ST_LEVEL_MASK)) {
 	case (TWO_LVL_STR_TABLE):
 		smmuv3->prop.lvl2_str_table = true;
-		/* Fall through */
+		[[fallthrough]];
 	case (LINEAR_STR_TABLE):
 		smmuv3->prop.linear_str_table = true;
 		break;

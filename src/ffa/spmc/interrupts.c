@@ -105,7 +105,7 @@ static struct vcpu *ffa_interrupts_find_target_vcpu(struct vcpu *current,
 		 */
 		break;
 	case ARM_EL1_VIRT_TIMER_PHYS_INT:
-		/* Fall through */
+		[[fallthrough]];
 	case ARM_EL1_PHYS_TIMER_PHYS_INT:
 		panic("Timer interrupt not expected to fire: %u\n",
 		      interrupt_id);
@@ -468,6 +468,7 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 			 * Fall through in the case handling has not been fully
 			 * completed.
 			 */
+			[[fallthrough]];
 		default:
 			/*
 			 * Either invoke the handler related to partitions from

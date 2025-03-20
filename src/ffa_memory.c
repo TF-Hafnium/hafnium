@@ -1129,6 +1129,7 @@ static void ffa_region_group_commit_actions(struct vm_locked vm_locked,
 		 * unprotecting memory that it had protected before.
 		 */
 		CHECK(arch_memory_unprotect(pa_begin, pa_end));
+		[[fallthrough]];
 	case MAP_ACTION_COMMIT:
 		vm_identity_commit(vm_locked, pa_begin, pa_end, mode, ppool,
 				   NULL);
@@ -2726,7 +2727,7 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 			}
 			break;
 		}
-		/* Intentional fall-through. */
+		[[fallthrough]];
 	case FFA_DATA_ACCESS_RO:
 		if (requested_data_access == FFA_DATA_ACCESS_NOT_SPECIFIED ||
 		    requested_data_access == FFA_DATA_ACCESS_RO) {
@@ -2782,7 +2783,7 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 			}
 			break;
 		}
-		/* Fall through if the operation targets a single borrower. */
+		[[fallthrough]];
 	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32:
 		if (!multiple_borrowers &&
@@ -2814,6 +2815,7 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 		 * Fall through if requested permissions are less
 		 * permissive than those provided by the sender.
 		 */
+		[[fallthrough]];
 	case FFA_INSTRUCTION_ACCESS_NX:
 		if (requested_instruction_access ==
 			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED ||

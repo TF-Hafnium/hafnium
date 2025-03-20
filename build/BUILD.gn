@@ -19,7 +19,7 @@ config("compiler_defaults") {
 
     # Extra warnings that are not included in `-Wall`, `-Wextra`, or `-Wpedantic`:
     "-Wshift-sign-overflow",
-
+    "-Wimplicit-fallthrough",
     "-fstack-protector-all",
   ]
 
