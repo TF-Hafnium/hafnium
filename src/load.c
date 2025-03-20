@@ -970,7 +970,6 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	struct vm *primary;
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	struct vm_locked primary_vm_locked;
-	size_t i;
 	bool success = true;
 
 	/**
@@ -1000,7 +999,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 		 params->mem_ranges, sizeof(params->mem_ranges));
 
 	/* Round the last addresses down to the page size. */
-	for (i = 0; i < params->mem_ranges_count; ++i) {
+	for (size_t i = 0UL; i < params->mem_ranges_count; ++i) {
 		mem_ranges_available[i].end = pa_init(align_down(
 			pa_addr(mem_ranges_available[i].end), PAGE_SIZE));
 	}
@@ -1008,9 +1007,9 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	primary = vm_find(HF_PRIMARY_VM_ID);
 	primary_vm_locked = vm_lock(primary);
 
-	for (i = 0; i < manifest->vm_count; ++i) {
+	for (size_t i = 0UL; i < manifest->vm_count; ++i) {
 		const struct manifest_vm *manifest_vm = &manifest->vm[i];
-		ffa_id_t vm_id = HF_VM_ID_OFFSET + i;
+		ffa_id_t vm_id = (ffa_id_t)(HF_VM_ID_OFFSET + i);
 		uint64_t mem_size;
 		paddr_t secondary_mem_begin;
 		paddr_t secondary_mem_end;
