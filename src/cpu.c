@@ -141,7 +141,7 @@ void cpu_module_init(const cpu_id_t *cpu_ids, size_t count)
 
 size_t cpu_index(struct cpu *c)
 {
-	return c - cpus;
+	return (size_t)(c - cpus);
 }
 
 /*

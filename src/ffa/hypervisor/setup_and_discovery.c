@@ -34,8 +34,10 @@ struct ffa_value ffa_setup_spmc_id_get(void)
 			(struct ffa_value){.func = FFA_SPM_ID_GET_32});
 	}
 
-	return (struct ffa_value){.func = FFA_ERROR_32,
-				  .arg2 = FFA_NOT_SUPPORTED};
+	return (struct ffa_value){
+		.func = FFA_ERROR_32,
+		.arg2 = FFA_NOT_SUPPORTED,
+	};
 }
 
 /**
@@ -109,9 +111,10 @@ void ffa_setup_rxtx_unmap_forward(struct vm_locked vm_locked)
 	}
 
 	/* Hypervisor always forwards forward RXTX_UNMAP to SPMC. */
-	ret = arch_other_world_call(
-		(struct ffa_value){.func = FFA_RXTX_UNMAP_32,
-				   .arg1 = id << FFA_RXTX_ALLOCATOR_SHIFT});
+	ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_RXTX_UNMAP_32,
+		.arg1 = (uint64_t)id << FFA_RXTX_ALLOCATOR_SHIFT,
+	});
 	func = ret.func & ~SMCCC_CONVENTION_MASK;
 	if (ret.func == (uint64_t)SMCCC_ERROR_UNKNOWN) {
 		panic("Unknown error forwarding RXTX_UNMAP.\n");

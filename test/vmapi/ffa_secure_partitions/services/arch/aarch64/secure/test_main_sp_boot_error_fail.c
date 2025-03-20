@@ -12,6 +12,8 @@
  * SP reports a failure during initialization by calling FFA_ERROR
  * instead of FFA_MSG_WAIT.
  */
+#include "hf/ffa_internal.h"
+
 #include "vmapi/hf/call.h"
 
 #include "test/hftest.h"
@@ -20,5 +22,5 @@
 void test_main_sp(bool is_boot_vcpu)
 {
 	(void)is_boot_vcpu;
-	ffa_call((struct ffa_value){.func = FFA_ERROR_32, .arg2 = FFA_ABORTED});
+	ffa_call(ffa_error(FFA_ABORTED));
 }

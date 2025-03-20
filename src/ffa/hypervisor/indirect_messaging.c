@@ -44,7 +44,7 @@ bool ffa_indirect_msg_send2_forward(ffa_id_t receiver_vm_id,
 	 */
 	*ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_MSG_SEND2_32,
-		.arg1 = sender_vm_id << 16,
+		.arg1 = (uint64_t)sender_vm_id << 16,
 	});
 
 	if (ffa_func_id(*ret) != FFA_SUCCESS_32) {

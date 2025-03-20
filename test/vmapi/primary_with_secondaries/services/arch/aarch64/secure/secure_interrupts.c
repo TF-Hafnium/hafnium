@@ -1016,7 +1016,8 @@ TEST_SERVICE(receive_back_to_back_interrupts)
 
 	send_back_to_back_interrupts = true;
 
-	for (int i = SERVICE3_ESPI_ID_START; i <= SERVICE3_ESPI_ID_END; i++) {
+	for (uint32_t i = SERVICE3_ESPI_ID_START; i <= SERVICE3_ESPI_ID_END;
+	     i++) {
 		EXPECT_EQ(hf_interrupt_enable(i, true, 0), 0);
 	}
 
@@ -1100,14 +1101,16 @@ TEST_SERVICE(receive_interrupt_burst)
 	ASSERT_EQ(SERVICE3_ESPI_ID_END - SERVICE3_ESPI_ID_START,
 		  VINT_QUEUE_MAX - 1);
 
-	for (int i = SERVICE3_ESPI_ID_START; i <= SERVICE3_ESPI_ID_END; i++) {
+	for (uint32_t i = SERVICE3_ESPI_ID_START; i <= SERVICE3_ESPI_ID_END;
+	     i++) {
 		EXPECT_EQ(hf_interrupt_enable(i, true, 0), 0);
 	}
 
 	interrupts_disable();
 
 	/* Fill the queue with eSPI interrupts. */
-	for (int i = SERVICE3_ESPI_ID_START; i <= SERVICE3_ESPI_ID_END; i++) {
+	for (uint32_t i = SERVICE3_ESPI_ID_START; i <= SERVICE3_ESPI_ID_END;
+	     i++) {
 		send_espi(i);
 	}
 

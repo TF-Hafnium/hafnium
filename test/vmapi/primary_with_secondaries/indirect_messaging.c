@@ -411,7 +411,7 @@ TEST(indirect_messaging_v1_2, size_plus_offset_overflow)
 	struct ffa_partition_rxtx_header header = {
 		.sender = own_id,
 		.receiver = service1_info->vm_id,
-		.size = -1,
+		.size = UINT32_C(-1),
 		.offset = FFA_RXTX_HEADER_SIZE,
 	};
 

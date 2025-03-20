@@ -79,7 +79,7 @@ static bool cpio_next(struct memiter *iter, const char **name,
 	*contents = lit.next;
 
 	len = (size_t)h->filesize[0] << 16 | h->filesize[1];
-	if (!memiter_advance(&lit, (len + 1) & ~1)) {
+	if (!memiter_advance(&lit, (len + 1) & ~1UL)) {
 		return false;
 	}
 

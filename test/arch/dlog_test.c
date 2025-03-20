@@ -21,21 +21,21 @@
  * `%hh`, `%h` and `%u` correctly read only the lower 8/16/32 bits of the value
  * passed in.
  */
-const uint64_t u8_max = UINT8_MAX;
-const uint64_t i8_min = INT8_MIN;
-const uint64_t i8_max = INT8_MAX;
+const uint64_t u8_max = (uint64_t)UINT8_MAX;
+const uint64_t i8_min = (uint64_t)INT8_MIN;
+const uint64_t i8_max = (uint64_t)INT8_MAX;
 
-const uint64_t u16_max = UINT16_MAX;
-const uint64_t i16_min = INT16_MIN;
-const uint64_t i16_max = INT16_MAX;
+const uint64_t u16_max = (uint64_t)UINT16_MAX;
+const uint64_t i16_min = (uint64_t)INT16_MIN;
+const uint64_t i16_max = (uint64_t)INT16_MAX;
 
-const uint64_t u32_max = UINT32_MAX;
-const uint64_t i32_min = INT32_MIN;
-const uint64_t i32_max = INT32_MAX;
+const uint64_t u32_max = (uint64_t)UINT32_MAX;
+const uint64_t i32_min = (uint64_t)INT32_MIN;
+const uint64_t i32_max = (uint64_t)INT32_MAX;
 
-const uint64_t u64_max = UINT64_MAX;
-const uint64_t i64_min = INT64_MIN;
-const uint64_t i64_max = INT64_MAX;
+const uint64_t u64_max = (uint64_t)UINT64_MAX;
+const uint64_t i64_min = (uint64_t)INT64_MIN;
+const uint64_t i64_max = (uint64_t)INT64_MAX;
 
 #define assert_format(expected, ...) \
 	assert_format_impl(expected, sizeof(expected), __VA_ARGS__)

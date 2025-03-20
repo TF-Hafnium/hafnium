@@ -1547,19 +1547,19 @@ typedef uint32_t ffa_memory_region_flags_t;
  * Clear memory region contents after unmapping it from the sender and before
  * mapping it for any receiver.
  */
-#define FFA_MEMORY_REGION_FLAG_CLEAR 0x1
+#define FFA_MEMORY_REGION_FLAG_CLEAR 0x1U
 
 /**
  * Whether the hypervisor may time slice the memory sharing or retrieval
  * operation.
  */
-#define FFA_MEMORY_REGION_FLAG_TIME_SLICE 0x2
+#define FFA_MEMORY_REGION_FLAG_TIME_SLICE 0x2U
 
 /**
  * Whether the hypervisor should clear the memory region after the receiver
  * relinquishes it or is aborted.
  */
-#define FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH 0x4
+#define FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH 0x4U
 
 /**
  * On retrieve request, bypass the multi-borrower check.

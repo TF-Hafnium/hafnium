@@ -52,7 +52,7 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	       struct boot_params_update *p)
 {
 	void *fdt;
-	int buf_size;
+	size_t buf_size;
 	int off;
 	bool ret = false;
 	bool rsv;
@@ -87,7 +87,7 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	}
 
 	/* Allow some extra room for the modifications to the FDT. */
-	if (fdt_open_into(fdt, fdt, buf_size) != 0) {
+	if (fdt_open_into(fdt, fdt, (int)buf_size) != 0) {
 		dlog_error("FDT failed to open_into.\n");
 		goto out_unmap_fdt;
 	}

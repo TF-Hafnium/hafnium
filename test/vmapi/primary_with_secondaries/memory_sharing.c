@@ -33,7 +33,7 @@ static void check_cannot_send_memory(
 	struct mailbox_buffers mb,
 	struct ffa_value (*send_function)(uint32_t, uint32_t),
 	struct ffa_memory_region_constituent constituents[],
-	int constituent_count, uint32_t avoid_vm)
+	size_t constituent_count, uint32_t avoid_vm)
 {
 	enum ffa_data_access data_access[] = {
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RO,
@@ -152,7 +152,7 @@ static void check_cannot_send_memory(
 static void check_cannot_lend_memory(
 	struct mailbox_buffers mb,
 	struct ffa_memory_region_constituent constituents[],
-	int constituent_count, int32_t avoid_vm)
+	size_t constituent_count, uint32_t avoid_vm)
 
 {
 	check_cannot_send_memory(mb, ffa_mem_lend, constituents,
@@ -165,7 +165,7 @@ static void check_cannot_lend_memory(
 static void check_cannot_share_memory(
 	struct mailbox_buffers mb,
 	struct ffa_memory_region_constituent constituents[],
-	int constituent_count, int32_t avoid_vm)
+	size_t constituent_count, uint32_t avoid_vm)
 
 {
 	check_cannot_send_memory(mb, ffa_mem_share, constituents,
@@ -180,7 +180,7 @@ static void check_cannot_share_memory(
 static void check_cannot_donate_memory(
 	struct mailbox_buffers mb,
 	struct ffa_memory_region_constituent constituents[],
-	int constituent_count, uint32_t avoid_vm)
+	size_t constituent_count, uint32_t avoid_vm)
 {
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 	struct ffa_partition_info *service2_info = service2(mb.recv);
@@ -636,11 +636,11 @@ TEST(memory_sharing, cannot_share_device_memory)
 	SERVICE_SELECT(service2_info->vm_id, "ffa_memory_return", mb.send);
 
 	check_cannot_lend_memory(mb, constituents, ARRAY_SIZE(constituents),
-				 -1);
+				 UINT32_C(-1));
 	check_cannot_share_memory(mb, constituents, ARRAY_SIZE(constituents),
-				  -1);
+				  UINT32_C(-1));
 	check_cannot_donate_memory(mb, constituents, ARRAY_SIZE(constituents),
-				   -1);
+				   UINT32_C(-1));
 }
 
 /**
@@ -1721,11 +1721,11 @@ TEST(memory_sharing, donate_twice)
 
 	/* Fail to share memory again with any VM. */
 	check_cannot_share_memory(mb, constituents, ARRAY_SIZE(constituents),
-				  -1);
+				  UINT32_C(-1));
 	check_cannot_lend_memory(mb, constituents, ARRAY_SIZE(constituents),
-				 -1);
+				 UINT32_C(-1));
 	check_cannot_donate_memory(mb, constituents, ARRAY_SIZE(constituents),
-				   -1);
+				   UINT32_C(-1));
 	/* Fail to relinquish memory from any VM. */
 	check_cannot_relinquish_memory(mb, handle);
 
@@ -2555,10 +2555,10 @@ TEST(memory_sharing, lend_twice)
 
 	/* Attempt to lend the same area of memory. */
 	check_cannot_lend_memory(mb, constituents, ARRAY_SIZE(constituents),
-				 -1);
+				 UINT32_C(-1));
 	/* Attempt to share the same area of memory. */
 	check_cannot_share_memory(mb, constituents, ARRAY_SIZE(constituents),
-				  -1);
+				  UINT32_C(-1));
 	/* Fail to donate to VM apart from VM1. */
 	check_cannot_donate_memory(mb, constituents, ARRAY_SIZE(constituents),
 				   service1_info->vm_id);
@@ -2570,7 +2570,8 @@ TEST(memory_sharing, lend_twice)
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 	check_cannot_lend_memory(mb, constituents_subsection,
-				 ARRAY_SIZE(constituents_subsection), -1);
+				 ARRAY_SIZE(constituents_subsection),
+				 UINT32_C(-1));
 	check_cannot_donate_memory(mb, constituents_subsection,
 				   ARRAY_SIZE(constituents_subsection),
 				   service1_info->vm_id);
@@ -2635,9 +2636,9 @@ TEST(memory_sharing, share_twice)
 	 * should fail.
 	 */
 	check_cannot_share_memory(mb, constituents, ARRAY_SIZE(constituents),
-				  -1);
+				  UINT32_C(-1));
 	check_cannot_lend_memory(mb, constituents, ARRAY_SIZE(constituents),
-				 -1);
+				 UINT32_C(-1));
 	/* Fail to donate to VM apart from VM1. */
 	check_cannot_donate_memory(mb, constituents, ARRAY_SIZE(constituents),
 				   service1_info->vm_id);
@@ -5185,6 +5186,7 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_reclaim,
  * memory that is lent to service1 with multiple calls
  * needed to retrieve all information.
  */
+// NOLINTNEXTLINE(readability-function-size)
 TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 		  service1_has_ns_mem_and_sel1)
 {
@@ -5557,6 +5559,7 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_sel0,
  * memory that is lent to service1 with different
  * permissions.
  */
+// NOLINTNEXTLINE(readability-function-size)
 TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_multi_perm,
 		  service1_has_ns_mem_and_sel1)
 {
@@ -5877,6 +5880,7 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_lent_info_multi_rec,
  * different permissions making sure to call with each
  * service as the target ID.
  */
+// NOLINTNEXTLINE(readability-function-size)
 TEST_PRECONDITION(ffa_ns_res_info_get, get_target_lent_info_multi_rec,
 		  service1_has_ns_mem_and_sel1)
 {

@@ -316,7 +316,7 @@ static void smc_forwarder(const struct vm *vm, struct ffa_value *args)
 	uintreg_t arg7 = args->arg7;
 
 	if (smc_is_blocked(vm, args->func)) {
-		args->func = SMCCC_ERROR_UNKNOWN;
+		args->func = (uint64_t)SMCCC_ERROR_UNKNOWN;
 		return;
 	}
 
@@ -906,34 +906,35 @@ static bool paravirtualised_interface_handler(struct ffa_value args,
 	switch (args.func) {
 #if SECURE_WORLD == 1
 	case HF_INTERRUPT_DEACTIVATE:
-		vcpu->regs.r[0] =
-			ffa_interrupts_deactivate(args.arg1, args.arg2, vcpu);
+		vcpu->regs.r[0] = (uint64_t)ffa_interrupts_deactivate(
+			args.arg1, args.arg2, vcpu);
 		break;
 
 	case HF_INTERRUPT_RECONFIGURE:
-		vcpu->regs.r[0] = ffa_interrupts_reconfigure(
+		vcpu->regs.r[0] = (uint64_t)ffa_interrupts_reconfigure(
 			args.arg1, args.arg2, args.arg3, vcpu);
 		break;
 
 	case HF_INTERRUPT_SEND_IPI:
-		vcpu->regs.r[0] = api_hf_interrupt_send_ipi(args.arg1, vcpu);
+		vcpu->regs.r[0] =
+			(uint64_t)api_hf_interrupt_send_ipi(args.arg1, vcpu);
 		break;
 #endif
 	case HF_INTERRUPT_ENABLE:
-		vcpu->regs.r[0] = api_interrupt_enable(args.arg1, args.arg2,
-						       args.arg3, vcpu);
+		vcpu->regs.r[0] = (uint64_t)api_interrupt_enable(
+			args.arg1, args.arg2, args.arg3, vcpu);
 		break;
 
 	case HF_INTERRUPT_GET: {
 		struct vcpu_locked current_locked;
 
 		current_locked = vcpu_lock(vcpu);
-		vcpu->regs.r[0] = api_interrupt_get(current_locked);
+		vcpu->regs.r[0] = (uint64_t)api_interrupt_get(current_locked);
 		vcpu_unlock(&current_locked);
 		break;
 	}
 	default:
-		vcpu->regs.r[0] = SMCCC_ERROR_UNKNOWN;
+		vcpu->regs.r[0] = (uint64_t)SMCCC_ERROR_UNKNOWN;
 		dlog_verbose("Unsupported function %#lx\n", args.func);
 	}
 

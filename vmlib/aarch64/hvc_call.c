@@ -25,7 +25,7 @@ int64_t hf_call(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3)
 		: /* Clobber registers. */
 		"x4", "x5", "x6", "x7");
 
-	return r0;
+	return (int64_t)r0;
 }
 
 struct ffa_value ffa_call_ext(struct ffa_value args)

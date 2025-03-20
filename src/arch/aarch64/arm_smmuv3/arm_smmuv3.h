@@ -92,8 +92,8 @@
 #define CERROR_ATC_INV_SYNC 3
 
 /* Bit fields related to command format */
-#define OP_SHIFT (0)
-#define OP_MASK (0xFF)
+#define OP_SHIFT UINT64_C(0)
+#define OP_MASK UINT64_C(0xFF)
 #define SSEC_SHIFT (10)
 #define SSEC_MASK (1)
 #define CMD_SID_SHIFT 32
@@ -165,22 +165,22 @@
 #define STE_SIZE_DW ((size_t)(STE_SIZE / 8))
 
 /* Global ByPass Attribute fields */
-#define BYPASS_GBPA 0
-#define INCOMING_CFG 0
-#define UPDATE_SHIFT 31
-#define UPDATE_MASK 0x1
-#define ABORT_SHIFT 20
-#define ABORT_MASK 0x1
-#define INSTCFG_SHIFT 18
-#define INSTCFG_MASK 0x3
-#define PRIVCFG_SHIFT 16
-#define PRIVCFG_MASK 0x3
-#define SHCFG_SHIFT 12
-#define SHCFG_MASK 0x3
-#define ALLOCFG_SHIFT 8
-#define ALLOCFG_MASK 0xF
-#define MTCFG_SHIFT 4
-#define MTCFG_MASK 0x1
+#define BYPASS_GBPA UINT32_C(0)
+#define INCOMING_CFG UINT32_C(0)
+#define UPDATE_SHIFT UINT32_C(31)
+#define UPDATE_MASK UINT32_C(0x1)
+#define ABORT_SHIFT UINT32_C(20)
+#define ABORT_MASK UINT32_C(0x1)
+#define INSTCFG_SHIFT UINT32_C(18)
+#define INSTCFG_MASK UINT32_C(0x3)
+#define PRIVCFG_SHIFT UINT32_C(16)
+#define PRIVCFG_MASK UINT32_C(0x3)
+#define SHCFG_SHIFT UINT32_C(12)
+#define SHCFG_MASK UINT32_C(0x3)
+#define ALLOCFG_SHIFT UINT32_C(8)
+#define ALLOCFG_MASK UINT32_C(0xF)
+#define MTCFG_SHIFT UINT32_C(4)
+#define MTCFG_MASK UINT32_C(0x1)
 
 /* Global Error register fields */
 #define SFM_ERR_MASK (1 << 8)
@@ -202,12 +202,12 @@
 #define AF_DISABLED 1ULL
 #define PTW_DEVICE_FAULT 1ULL
 
-#define WRAP_1DW 64
-#define WRAP_2DW 128
-#define WRAP_3DW 192
-#define WRAP_4DW 256
-#define WRAP_6DW 384
-#define STE_CFG_SHIFT 1
+#define WRAP_1DW UINT64_C(64)
+#define WRAP_2DW UINT64_C(128)
+#define WRAP_3DW UINT64_C(192)
+#define WRAP_4DW UINT64_C(256)
+#define WRAP_6DW UINT64_C(384)
+#define STE_CFG_SHIFT UINT64_C(1)
 #define STE_CFG_MASK 0x7
 #define STE_STW_SHIFT (94 - WRAP_1DW)
 #define STE_STW_MASK 0x3
@@ -224,7 +224,7 @@
 #define STE_INSTCFG_SHIFT (114 - WRAP_1DW)
 #define STE_INSTCFG_MASK 0x3
 #define STE_VMID_SHIFT (128 - WRAP_2DW)
-#define STE_VMID_MASK 0xffff
+#define STE_VMID_MASK UINT64_C(0xffff)
 #define STE_S2T0SZ_SHIFT (160 - WRAP_2DW)
 #define STE_S2T0SZ_MASK 0x3f
 #define STE_S2SL0_SHIFT (166 - WRAP_2DW)

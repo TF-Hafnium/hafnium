@@ -888,7 +888,7 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 
 	ret.func = FFA_SUCCESS_64;
 	ret.arg2 = (sizeof(struct ffa_partition_info) & 0xFFFF) << 48;
-	ret.arg2 |= ((uint64_t)curr_idx) << 16;
+	ret.arg2 |= (uint64_t)curr_idx << 16;
 	ret.arg2 |= max_idx;
 
 	if (num_entries_to_ret > 1) {
@@ -1045,7 +1045,7 @@ struct ffa_value ffa_msg_recv_return(const struct vm *receiver)
 	case FFA_MSG_SEND_32:
 		return (struct ffa_value){
 			.func = FFA_MSG_SEND_32,
-			.arg1 = ((uint64_t)(receiver->mailbox.recv_sender)
+			.arg1 = ((uint64_t)receiver->mailbox.recv_sender
 				 << 16) |
 				receiver->id,
 			.arg3 = receiver->mailbox.recv_size};
@@ -5612,7 +5612,7 @@ struct ffa_value api_ffa_ns_res_info_get(struct vcpu *current,
 	struct ffa_value ret;
 	struct vm_locked from_locked;
 	uint32_t current_size;
-	uint32_t remaining_size;
+	uint32_t remaining_size = 0;
 	ffa_id_t target_id = ffa_ns_res_info_get_target_id(args);
 	uint16_t resource_type = ffa_ns_res_info_get_resource_type(args);
 	uint8_t request_type = ffa_ns_res_info_get_request_type(args);

@@ -404,7 +404,7 @@ static bool smmuv3_xlat_support(struct smmuv3_driver *smmuv3)
 	 */
 	if (smmuv3->prop.broadcast_TLB) {
 		/* Clear and program PTM bit*/
-		data_cr2 &= ~(COMPOSE(1, PTM_SHIFT, PTM_MASK));
+		data_cr2 &= ~(COMPOSE(1U, PTM_SHIFT, PTM_MASK));
 		data_cr2 |= COMPOSE(PTM_ENABLE, PTM_SHIFT, PTM_MASK);
 		mmio_write32_offset(smmuv3->base_addr, offset, data_cr2);
 	}

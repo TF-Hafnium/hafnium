@@ -3587,7 +3587,7 @@ static struct ffa_value ffa_memory_retrieve_validate(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if ((retrieve_request->flags & ~0x7FF) != 0U) {
+	if ((retrieve_request->flags & ~0x7FFU) != 0U) {
 		dlog_verbose(
 			"Bits 31-10 must be zero in memory region's flags.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -3690,20 +3690,17 @@ static struct ffa_value ffa_partition_retrieve_request(
 	bool is_retrieve_complete = false;
 	uint32_t receiver_index;
 	struct ffa_memory_access *receiver;
-	ffa_memory_handle_t handle;
 	ffa_memory_attributes_t attributes = {0};
 	mm_mode_t retrieve_mode = 0;
 	struct ffa_memory_region *memory_region = share_state->memory_region;
 
 	assert(retrieve_request != NULL);
 
-	handle = retrieve_request->handle;
-
 	if (!share_state->sending_complete) {
 		dlog_verbose(
 			"Memory with handle %#lx not fully sent, can't "
 			"retrieve.\n",
-			handle);
+			retrieve_request->handle);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 

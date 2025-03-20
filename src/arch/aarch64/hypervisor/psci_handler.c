@@ -51,7 +51,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 	 */
 
 	if (plat_psci_version_get() == 0) {
-		*ret = SMCCC_ERROR_UNKNOWN;
+		*ret = (uintreg_t)SMCCC_ERROR_UNKNOWN;
 		return (func & SMCCC_SERVICE_CALL_MASK) ==
 		       SMCCC_STANDARD_SECURE_SERVICE_CALL;
 	}
@@ -95,7 +95,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 
 		default:
 			/* Everything else is unsupported. */
-			*ret = PSCI_ERROR_NOT_SUPPORTED;
+			*ret = (uintreg_t)PSCI_ERROR_NOT_SUPPORTED;
 			break;
 		}
 		break;
@@ -115,12 +115,12 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 	case PSCI_AFFINITY_INFO:
 		c = cpu_find(arg0);
 		if (!c) {
-			*ret = PSCI_ERROR_INVALID_PARAMETERS;
+			*ret = (uintreg_t)PSCI_ERROR_INVALID_PARAMETERS;
 			break;
 		}
 
 		if (arg1 != 0) {
-			*ret = PSCI_ERROR_NOT_SUPPORTED;
+			*ret = (uintreg_t)PSCI_ERROR_NOT_SUPPORTED;
 			break;
 		}
 
@@ -158,12 +158,12 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 	case PSCI_CPU_ON:
 		c = cpu_find(arg0);
 		if (!c) {
-			*ret = PSCI_ERROR_INVALID_PARAMETERS;
+			*ret = (uintreg_t)PSCI_ERROR_INVALID_PARAMETERS;
 			break;
 		}
 
 		if (cpu_on(c)) {
-			*ret = PSCI_ERROR_ALREADY_ON;
+			*ret = (uintreg_t)PSCI_ERROR_ALREADY_ON;
 			break;
 		}
 
@@ -204,7 +204,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 	case PSCI_MEM_PROTECT:
 	case PSCI_MEM_PROTECT_CHECK_RANGE:
 		/* Block all other known PSCI calls. */
-		*ret = PSCI_ERROR_NOT_SUPPORTED;
+		*ret = (uintreg_t)PSCI_ERROR_NOT_SUPPORTED;
 		break;
 
 	default:
@@ -253,7 +253,7 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 
 		default:
 			/* Everything else is unsupported. */
-			*ret = PSCI_ERROR_NOT_SUPPORTED;
+			*ret = (uintreg_t)PSCI_ERROR_NOT_SUPPORTED;
 			break;
 		}
 		break;
@@ -268,12 +268,12 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 
 		if (lowest_affinity_level != 0) {
 			/* Affinity levels greater than 0 not supported. */
-			*ret = PSCI_ERROR_INVALID_PARAMETERS;
+			*ret = (uintreg_t)PSCI_ERROR_INVALID_PARAMETERS;
 			break;
 		}
 
 		if (target_vcpu_index >= vm->vcpu_count) {
-			*ret = PSCI_ERROR_INVALID_PARAMETERS;
+			*ret = (uintreg_t)PSCI_ERROR_INVALID_PARAMETERS;
 			break;
 		}
 
@@ -299,7 +299,7 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		 * Should never return to the caller, but in case it somehow
 		 * does.
 		 */
-		*ret = PSCI_ERROR_DENIED;
+		*ret = (uintreg_t)PSCI_ERROR_DENIED;
 		/* Tell the scheduler not to run the vCPU again. */
 		*next = api_vcpu_off(vcpu);
 		break;
@@ -317,7 +317,7 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 		bool vcpu_was_off;
 
 		if (target_vcpu_index >= vm->vcpu_count) {
-			*ret = PSCI_ERROR_INVALID_PARAMETERS;
+			*ret = (uintreg_t)PSCI_ERROR_INVALID_PARAMETERS;
 			break;
 		}
 
@@ -335,7 +335,7 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 			*next = api_wake_up(vcpu, target_vcpu);
 			*ret = PSCI_RETURN_SUCCESS;
 		} else {
-			*ret = PSCI_ERROR_ALREADY_ON;
+			*ret = (uintreg_t)PSCI_ERROR_ALREADY_ON;
 		}
 
 		break;
@@ -357,7 +357,7 @@ bool psci_secondary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 	case PSCI_MEM_PROTECT:
 	case PSCI_MEM_PROTECT_CHECK_RANGE:
 		/* Block all other known PSCI calls. */
-		*ret = PSCI_ERROR_NOT_SUPPORTED;
+		*ret = (uintreg_t)PSCI_ERROR_NOT_SUPPORTED;
 		break;
 
 	default:

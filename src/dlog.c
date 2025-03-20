@@ -119,7 +119,7 @@ static size_t print_raw_string(const char *str)
 		dlog_putchar(*c);
 	}
 
-	return c - str;
+	return (size_t)(c - str);
 }
 
 /**
@@ -138,7 +138,7 @@ static size_t print_string(const char *str, const char *suffix,
 			   char fill)
 {
 	size_t chars_written = 0;
-	size_t len = suffix - str;
+	size_t len = (size_t)(suffix - str);
 
 	/* Print the string up to the beginning of the suffix. */
 	while (str != suffix) {
@@ -317,7 +317,8 @@ static const char *parse_length_modifier(const char *fmt,
  */
 static const char *parse_min_width(const char *fmt,
 				   struct va_list_wrapper *args,
-				   struct format_flags *flags, int *min_width)
+				   struct format_flags *flags,
+				   size_t *min_width)
 {
 	int width = 0;
 
@@ -335,7 +336,7 @@ static const char *parse_min_width(const char *fmt,
 		}
 	}
 
-	*min_width = width;
+	*min_width = (size_t)width;
 
 	return fmt;
 }
@@ -399,7 +400,7 @@ uint64_t reinterpret_signed_int(enum format_length length, uint64_t value,
 		break;
 	}
 
-	return signed_value;
+	return (uint64_t)signed_value;
 }
 
 /**
@@ -423,7 +424,7 @@ size_t vdlog(const char *fmt, struct va_list_wrapper *args)
 
 		case '%': {
 			struct format_flags flags = {0};
-			int min_width = 0;
+			size_t min_width = 0;
 			enum format_length length = length32;
 			uint64_t value;
 
@@ -538,7 +539,7 @@ size_t vdlog(const char *fmt, struct va_list_wrapper *args)
 				break;
 
 			default:
-				chars_written = -1;
+				chars_written = (size_t)-1;
 				goto out;
 			}
 		}

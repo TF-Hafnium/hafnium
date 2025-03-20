@@ -1144,7 +1144,9 @@ TEST(ffa_version, succeeds_older_compatible_version)
  */
 TEST(ffa_version, fails_highest_bit_set)
 {
-	EXPECT_EQ((enum ffa_error)ffa_version(-1), FFA_NOT_SUPPORTED);
+	EXPECT_EQ((enum ffa_error)ffa_version(FFA_VERSION_COMPILED |
+					      FFA_VERSION_MBZ_BIT),
+		  FFA_NOT_SUPPORTED);
 }
 
 /**

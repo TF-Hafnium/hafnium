@@ -908,7 +908,7 @@ TEST_SERVICE(vm_availability_messaging)
 			((msg == VM_MSG_CREATED)
 				 ? FFA_FRAMEWORK_MSG_VM_CREATION_RESP
 				 : FFA_FRAMEWORK_MSG_VM_DESTRUCTION_RESP),
-			(new_state != VM_STATE_ERROR) ? 0
+			(new_state != VM_STATE_ERROR) ? 0U
 						      : FFA_INVALID_PARAMETERS);
 	}
 }

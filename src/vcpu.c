@@ -89,7 +89,7 @@ void vcpu_prepare(struct vcpu_locked vcpu, ipaddr_t entry, uintreg_t arg)
 
 ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu)
 {
-	size_t index = vcpu - vcpu->vm->vcpus;
+	size_t index = (size_t)(vcpu - vcpu->vm->vcpus);
 
 	CHECK(index < UINT16_MAX);
 	return index;

@@ -48,7 +48,7 @@ enum psci_return_code : uint32_t {
 	PSCI_RETURN_OFF                = 1,
 	PSCI_RETURN_ON                 = 0,
 	PSCI_RETURN_SUCCESS            = 0,
-	PSCI_ERROR_NOT_SUPPORTED       = SMCCC_ERROR_UNKNOWN,
+	PSCI_ERROR_NOT_SUPPORTED       = (uint32_t)SMCCC_ERROR_UNKNOWN,
 	PSCI_ERROR_INVALID_PARAMETERS  = -2,
 	PSCI_ERROR_DENIED              = -3,
 	PSCI_ERROR_ALREADY_ON          = -4,

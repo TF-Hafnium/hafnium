@@ -21,7 +21,7 @@
 #define SP805_WDOG_UNLOCK_ACCESS 0x1ACCE551
 
 /* The register field definitions. */
-#define SP805_WDOG_CTRL_MASK 0x03
+#define SP805_WDOG_CTRL_MASK 0x03U
 #define SP805_WDOG_CTRL_RESEN (1 << 1)
 #define SP805_WDOG_CTRL_INTEN (1 << 0)
 

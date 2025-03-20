@@ -54,7 +54,7 @@ bool ffa_notifications_update_bindings_forward(
 		*ret = arch_other_world_call((struct ffa_value){
 			.func = is_bind ? FFA_NOTIFICATION_BIND_32
 					: FFA_NOTIFICATION_UNBIND_32,
-			.arg1 = (sender_id << 16) | (receiver_id),
+			.arg1 = ((uint64_t)sender_id << 16) | (receiver_id),
 			.arg2 = is_bind ? flags : 0U,
 			.arg3 = (uint32_t)(bitmap),
 			.arg4 = (uint32_t)(bitmap >> 32),
@@ -87,7 +87,7 @@ bool ffa_notifications_set_forward(ffa_id_t sender_vm_id,
 
 	*ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_NOTIFICATION_SET_32,
-		.arg1 = (sender_vm_id << 16) | receiver_vm_id,
+		.arg1 = ((uint64_t)sender_vm_id << 16) | receiver_vm_id,
 		.arg2 = flags & ~FFA_NOTIFICATIONS_FLAG_DELAY_SRI,
 		.arg3 = (uint32_t)(bitmap),
 		.arg4 = (uint32_t)(bitmap >> 32),
@@ -235,7 +235,7 @@ struct ffa_value ffa_notifications_get_from_sp(
 
 	ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_NOTIFICATION_GET_32,
-		.arg1 = (vcpu_id << 16) | receiver_id,
+		.arg1 = ((uint64_t)vcpu_id << 16) | receiver_id,
 		.arg2 = FFA_NOTIFICATION_FLAG_BITMAP_SP,
 	});
 
@@ -264,7 +264,7 @@ struct ffa_value ffa_notifications_get_framework_notifications(
 	if (ffa_init_is_tee_enabled()) {
 		ret = arch_other_world_call((struct ffa_value){
 			.func = FFA_NOTIFICATION_GET_32,
-			.arg1 = (vcpu_id << 16) | receiver_id,
+			.arg1 = ((uint64_t)vcpu_id << 16) | receiver_id,
 			.arg2 = FFA_NOTIFICATION_FLAG_BITMAP_SPM,
 		});
 

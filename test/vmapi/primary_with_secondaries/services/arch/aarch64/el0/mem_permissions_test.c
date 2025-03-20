@@ -62,9 +62,13 @@ static void expect_set_invalid(uintvaddr_t base_va, uint32_t page_count,
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
 
-static uint32_t range_page_count(volatile uint8_t *start, volatile uint8_t *end)
+static uint32_t range_page_count(const volatile uint8_t *start,
+				 const volatile uint8_t *end)
 {
-	return align_up(end - start, PAGE_SIZE) / PAGE_SIZE;
+	uintptr_t start_addr = (uintptr_t)start;
+	uintptr_t end_addr = (uintptr_t)end;
+
+	return (uint32_t)align_up(end_addr - start_addr, PAGE_SIZE) / PAGE_SIZE;
 }
 
 /**
