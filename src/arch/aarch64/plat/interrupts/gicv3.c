@@ -7,6 +7,7 @@
  */
 
 #include <libfdt.h>
+#include <stdint.h>
 
 #include "hf/check.h"
 #include "hf/cpu.h"
@@ -539,7 +540,8 @@ void gicv3_send_sgi(uint32_t sgi_id, bool send_to_all, uint64_t mpidr_target,
 			((aff1 & SGIR_AFF_MASK) << SGIR_AFF1_SHIFT);
 
 		/* Construct the SGI target affinity. */
-		sgir |= ((1U << aff0) & SGIR_TGT_MASK) << SGIR_TGT_SHIFT;
+		sgir |= ((UINT64_C(1) << aff0) & SGIR_TGT_MASK)
+			<< SGIR_TGT_SHIFT;
 	}
 
 	/* Populate the Interrupt Routing Mode field. */

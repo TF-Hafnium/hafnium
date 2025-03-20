@@ -102,7 +102,7 @@ static bool check_boot_order(uint16_t boot_order)
 	}
 
 	i = boot_order / BOOT_ORDER_ENTRY_BITS;
-	boot_order_mask = 1 << (boot_order % BOOT_ORDER_ENTRY_BITS);
+	boot_order_mask = UINT64_C(1) << (boot_order % BOOT_ORDER_ENTRY_BITS);
 
 	if ((boot_order_mask & manifest_data->boot_order_values[i]) != 0U) {
 		dlog_error("Boot order must be a unique value.");
