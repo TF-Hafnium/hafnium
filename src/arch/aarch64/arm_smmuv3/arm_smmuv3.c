@@ -78,7 +78,7 @@ static void smmuv3_disabled_translation(struct smmuv3_driver *smmuv3)
 	gbpa_reg =
 		gbpa_reg | COMPOSE(INCOMING_CFG, ALLOCFG_SHIFT, ALLOCFG_MASK);
 	gbpa_reg = gbpa_reg | COMPOSE(INCOMING_CFG, MTCFG_SHIFT, MTCFG_MASK);
-	gbpa_update_set = (1 << UPDATE_SHIFT);
+	gbpa_update_set = (UINT32_C(1) << UPDATE_SHIFT);
 
 	offset = find_offset(S_GBPA, GBPA);
 
@@ -87,7 +87,7 @@ static void smmuv3_disabled_translation(struct smmuv3_driver *smmuv3)
 			    gbpa_reg | gbpa_update_set);
 
 	if (!smmuv3_poll(smmuv3->base_addr, offset, gbpa_reg,
-			 (1 << UPDATE_SHIFT))) {
+			 (UINT32_C(1) << UPDATE_SHIFT))) {
 		panic("SMMUv3: Failed to update Gloal Bypass Attribute\n");
 	}
 }

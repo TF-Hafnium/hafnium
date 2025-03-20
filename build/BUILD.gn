@@ -17,6 +17,9 @@ config("compiler_defaults") {
     "-Wpedantic",
     "-Werror",
 
+    # Extra warnings that are not included in `-Wall`, `-Wextra`, or `-Wpedantic`:
+    "-Wshift-sign-overflow",
+
     "-fstack-protector-all",
   ]
 

@@ -146,7 +146,7 @@
 #define OAS_RES 7
 #define PTM_ENABLE 0
 
-#define SECURE_IMPL_MASK (1 << 31)
+#define SECURE_IMPL_MASK (UINT32_C(1) << 31)
 #define SEL2_STG2_SUPPORT (1 << 29)
 #define CMDQEN_MASK (1 << 3)
 #define EVTQEN_MASK (1 << 2)
