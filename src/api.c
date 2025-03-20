@@ -3193,7 +3193,7 @@ static bool api_memory_region_check_flags(
 	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32: {
 		/* Bits 31:2 Must Be Zero. */
-		ffa_memory_receiver_flags_t to_mask =
+		ffa_memory_region_flags_t to_mask =
 			~(FFA_MEMORY_REGION_FLAG_CLEAR |
 			  FFA_MEMORY_REGION_FLAG_TIME_SLICE);
 
