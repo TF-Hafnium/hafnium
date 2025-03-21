@@ -4949,7 +4949,9 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 		if (c == '\n' || c == '\0') {
 			flush = true;
 		} else {
-			log_buffer->chars[log_buffer->len++] = c;
+			log_buffer->chars[log_buffer->len] = c;
+			log_buffer->len++;
+			assert(log_buffer->len <= LOG_BUFFER_SIZE);
 			flush = log_buffer->len == LOG_BUFFER_SIZE;
 		}
 
