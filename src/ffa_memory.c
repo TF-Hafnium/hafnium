@@ -562,9 +562,8 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 		if (!receiver_size_and_offset_valid_for_version(
 			    receivers_size, receivers_offset, ffa_version)) {
 			dlog_verbose(
-				"Invalid memory access descriptor size %d, "
-				" or receiver offset %d, "
-				"for FF-A version %#x\n",
+				"Invalid memory access descriptor size %d, or "
+				"receiver offset %d, for FF-A version %#x\n",
 				receivers_size, receivers_offset, ffa_version);
 			return false;
 		}
