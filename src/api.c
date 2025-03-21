@@ -3464,7 +3464,6 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		dlog_verbose("Failed to allocate memory region copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
 	}
-	memory_region = allocated_entry;
 
 	if (!memcpy_trapped(allocated_entry, MM_PPOOL_ENTRY_SIZE, from_msg,
 			    fragment_length)) {
@@ -3475,6 +3474,10 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		goto out;
 	}
 
+	/*
+	 * Out-of-bounds accesses should be eliminated by the sanity checks
+	 * below.
+	 */
 	if (!ffa_memory_region_sanity_check(allocated_entry, ffa_version,
 					    fragment_length, true)) {
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -3486,6 +3489,8 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
+
+	memory_region = allocated_entry;
 
 	if (fragment_length < sizeof(struct ffa_memory_region) +
 				      memory_region->memory_access_desc_size) {
@@ -3695,6 +3700,11 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 	}
 
 	if (!is_ffa_hypervisor_retrieve_request(retrieve_msg)) {
+		/*
+		 * The checks from function below should guarantee there are no
+		 * invalid values, and the accesses that follow can't be out of
+		 * bounds.
+		 */
 		if (!ffa_memory_region_sanity_check(retrieve_msg, ffa_version,
 						    fragment_length, false)) {
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
