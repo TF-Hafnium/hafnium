@@ -612,42 +612,44 @@ static inline struct ffa_value ffa_msg_send_direct_resp2(ffa_id_t sender_vm_id,
 	return ffa_call_ext(args);
 }
 
+static inline struct ffa_value ffa_notification_args(
+	uint32_t func, ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id,
+	uint32_t flags, ffa_notifications_bitmap_t bitmap)
+{
+	return (struct ffa_value){
+		.func = func,
+		.arg1 = ((uint64_t)sender_vm_id << 16) | (receiver_vm_id),
+		.arg2 = flags,
+		.arg3 = (uint32_t)(bitmap),
+		.arg4 = (uint32_t)(bitmap >> 32),
+	};
+}
+
 static inline struct ffa_value ffa_notification_bind(
 	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t bitmap)
 {
-	return ffa_call((struct ffa_value){
-		.func = FFA_NOTIFICATION_BIND_32,
-		.arg1 = (sender_vm_id << 16) | (receiver_vm_id),
-		.arg2 = flags,
-		.arg3 = (uint32_t)(bitmap),
-		.arg4 = (uint32_t)(bitmap >> 32),
-	});
+	return ffa_call(ffa_notification_args(FFA_NOTIFICATION_BIND_32,
+					      sender_vm_id, receiver_vm_id,
+					      flags, bitmap));
 }
 
 static inline struct ffa_value ffa_notification_unbind(
 	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id,
 	ffa_notifications_bitmap_t bitmap)
 {
-	return ffa_call((struct ffa_value){
-		.func = FFA_NOTIFICATION_UNBIND_32,
-		.arg1 = (sender_vm_id << 16) | (receiver_vm_id),
-		.arg3 = (uint32_t)(bitmap),
-		.arg4 = (uint32_t)(bitmap >> 32),
-	});
+	return ffa_call(ffa_notification_args(FFA_NOTIFICATION_UNBIND_32,
+					      sender_vm_id, receiver_vm_id, 0,
+					      bitmap));
 }
 
 static inline struct ffa_value ffa_notification_set(
 	ffa_id_t sender_vm_id, ffa_id_t receiver_vm_id, uint32_t flags,
 	ffa_notifications_bitmap_t bitmap)
 {
-	return ffa_call((struct ffa_value){
-		.func = FFA_NOTIFICATION_SET_32,
-		.arg1 = (sender_vm_id << 16) | (receiver_vm_id),
-		.arg2 = flags,
-		.arg3 = (uint32_t)(bitmap),
-		.arg4 = (uint32_t)(bitmap >> 32),
-	});
+	return ffa_call(ffa_notification_args(FFA_NOTIFICATION_SET_32,
+					      sender_vm_id, receiver_vm_id,
+					      flags, bitmap));
 }
 
 static inline struct ffa_value ffa_notification_get(ffa_id_t receiver_vm_id,
