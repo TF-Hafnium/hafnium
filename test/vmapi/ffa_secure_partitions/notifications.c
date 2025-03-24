@@ -241,7 +241,7 @@ TEST(ffa_notifications, fail_if_mbz_set_in_notification_set)
 				    FFA_NOTIFICATION_MASK(1));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_ERROR);
-	EXPECT_EQ((int32_t)sp_resp_value(res), FFA_INVALID_PARAMETERS);
+	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
 }
 
 /**
@@ -265,7 +265,7 @@ TEST(ffa_notifications, fail_if_global_notif_vcpu_not_zero)
 				    FFA_NOTIFICATION_MASK(1));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_ERROR);
-	EXPECT_EQ((int32_t)sp_resp_value(res), FFA_INVALID_PARAMETERS);
+	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
 }
 
 TEST(ffa_notifications, fail_if_global_notif_set_as_per_vcpu)
@@ -285,7 +285,7 @@ TEST(ffa_notifications, fail_if_global_notif_set_as_per_vcpu)
 				    FFA_NOTIFICATION_MASK(1));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_ERROR);
-	EXPECT_EQ((int32_t)sp_resp_value(res), FFA_INVALID_PARAMETERS);
+	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
 }
 
 TEST(ffa_notifications, fail_if_per_vcpu_notif_set_as_global)
@@ -305,7 +305,7 @@ TEST(ffa_notifications, fail_if_per_vcpu_notif_set_as_global)
 				    FFA_NOTIFICATION_MASK(1));
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(res), SP_ERROR);
-	EXPECT_EQ((int32_t)sp_resp_value(res), FFA_INVALID_PARAMETERS);
+	EXPECT_EQ(sp_resp_value(res), FFA_INVALID_PARAMETERS);
 }
 
 TEST(ffa_notifications, fail_if_mbz_set_in_notifications_bind)

@@ -2408,7 +2408,7 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	static_assert(sizeof(enum ffa_version) == 4,
 		      "enum ffa_version must be 4 bytes wide");
 
-	const struct ffa_value error = {.func = (uint32_t)FFA_NOT_SUPPORTED};
+	const struct ffa_value error = {.func = FFA_NOT_SUPPORTED};
 	struct vm_locked current_vm_locked;
 
 	uint16_t compiled_major = ffa_version_get_major(FFA_VERSION_COMPILED);
@@ -2456,7 +2456,7 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	current_vm_locked.vm->ffa_version = requested_version;
 	vm_unlock(&current_vm_locked);
 
-	return (struct ffa_value){.func = (uint32_t)FFA_VERSION_COMPILED};
+	return (struct ffa_value){.func = FFA_VERSION_COMPILED};
 }
 
 /**

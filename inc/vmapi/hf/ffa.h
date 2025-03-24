@@ -17,7 +17,7 @@
  *
  * See FF-A specification v1.2 ALP1, section 13.2.1.
  */
-enum ffa_version {
+enum ffa_version : uint32_t {
 	FFA_VERSION_1_0 = 0x10000,
 	FFA_VERSION_1_1 = 0x10001,
 	FFA_VERSION_1_2 = 0x10002,
@@ -155,18 +155,24 @@ enum ffa_function : uint32_t {
 /**
  * FF-A error codes.
  * Don't forget to update `ffa_error_name` if you add a new one.
+ *
+ * NOTE: Error codes have negative values, but we set the underlying type of the
+ * enum to `uint32_t` because it is more convenient to treat them as unsigned
+ * values: the SMCC calling convention specifies that signed 32 bit values must
+ * be zero-extended when passed in 64-bit registers (ie the upper 32 bits must
+ * be zero).
  */
-enum ffa_error {
-	FFA_NOT_SUPPORTED      = -1,
-	FFA_INVALID_PARAMETERS = -2,
-	FFA_NO_MEMORY          = -3,
-	FFA_BUSY               = -4,
-	FFA_INTERRUPTED        = -5,
-	FFA_DENIED             = -6,
-	FFA_RETRY              = -7,
-	FFA_ABORTED            = -8,
-	FFA_NO_DATA            = -9,
-	FFA_NOT_READY          = -10,
+enum ffa_error : uint32_t {
+	FFA_NOT_SUPPORTED      = UINT32_C(-1),
+	FFA_INVALID_PARAMETERS = UINT32_C(-2),
+	FFA_NO_MEMORY          = UINT32_C(-3),
+	FFA_BUSY               = UINT32_C(-4),
+	FFA_INTERRUPTED        = UINT32_C(-5),
+	FFA_DENIED             = UINT32_C(-6),
+	FFA_RETRY              = UINT32_C(-7),
+	FFA_ABORTED            = UINT32_C(-8),
+	FFA_NO_DATA            = UINT32_C(-9),
+	FFA_NOT_READY          = UINT32_C(-10),
 };
 
 /* clang-format on */
@@ -341,7 +347,7 @@ static inline const char *ffa_error_name(enum ffa_error error)
 #define FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_LO_BIT (2U)
 #define FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_BIT (0U)
 
-enum ffa_feature_id {
+enum ffa_feature_id : uint32_t {
 	/* Query interrupt ID of Notification Pending Interrupt. */
 	FFA_FEATURE_NPI = 1,
 
@@ -374,7 +380,7 @@ enum ffa_feature_id {
  * The type of memory permissions used by `FFA_MEM_PERM_GET` and
  * `FFA_MEM_PERM_SET`.
  */
-enum ffa_mem_perm {
+enum ffa_mem_perm : uint32_t {
 	FFA_MEM_PERM_RO = 0x7,
 	FFA_MEM_PERM_RW = 0x5,
 	FFA_MEM_PERM_RX = 0x3,
@@ -592,7 +598,7 @@ static inline const void *ffa_partition_msg_payload_const(
 /* The maximum length possible for a single message. */
 #define FFA_MSG_PAYLOAD_MAX HF_MAILBOX_SIZE
 
-enum ffa_data_access {
+enum ffa_data_access : uint8_t {
 	FFA_DATA_ACCESS_NOT_SPECIFIED,
 	FFA_DATA_ACCESS_RO,
 	FFA_DATA_ACCESS_RW,
@@ -613,7 +619,7 @@ static inline const char *ffa_data_access_name(enum ffa_data_access data_access)
 	}
 }
 
-enum ffa_instruction_access {
+enum ffa_instruction_access : uint8_t {
 	FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 	FFA_INSTRUCTION_ACCESS_NX,
 	FFA_INSTRUCTION_ACCESS_X,
@@ -635,7 +641,7 @@ static inline const char *ffa_instruction_access_name(
 	}
 }
 
-enum ffa_memory_type {
+enum ffa_memory_type : uint8_t {
 	FFA_MEMORY_NOT_SPECIFIED_MEM,
 	FFA_MEMORY_DEVICE_MEM,
 	FFA_MEMORY_NORMAL_MEM,
@@ -653,7 +659,7 @@ static inline const char *ffa_memory_type_name(enum ffa_memory_type type)
 	}
 }
 
-enum ffa_memory_cacheability {
+enum ffa_memory_cacheability : uint8_t {
 	FFA_MEMORY_CACHE_RESERVED = 0x0,
 	FFA_MEMORY_CACHE_NON_CACHEABLE = 0x1,
 	FFA_MEMORY_CACHE_RESERVED_1 = 0x2,
@@ -694,7 +700,7 @@ static inline const char *ffa_device_memory_cacheability_name(
 	}
 }
 
-enum ffa_memory_shareability {
+enum ffa_memory_shareability : uint8_t {
 	FFA_MEMORY_SHARE_NON_SHAREABLE,
 	FFA_MEMORY_SHARE_RESERVED,
 	FFA_MEMORY_OUTER_SHAREABLE,
@@ -721,7 +727,7 @@ static inline const char *ffa_memory_shareability_name(
  * Per section 10.10.4.1, NS bit is reserved for FFA_MEM_DONATE/LEND/SHARE
  * and FFA_MEM_RETRIEVE_REQUEST.
  */
-enum ffa_memory_security {
+enum ffa_memory_security : uint8_t {
 	FFA_MEMORY_SECURITY_UNSPECIFIED = 0,
 	FFA_MEMORY_SECURITY_SECURE = 0,
 	FFA_MEMORY_SECURITY_NON_SECURE,
@@ -739,21 +745,27 @@ static inline const char *ffa_memory_security_name(
 }
 
 typedef struct {
-	uint8_t data_access : 2;
-	uint8_t instruction_access : 2;
+	enum ffa_data_access data_access : 2;
+	enum ffa_instruction_access instruction_access : 2;
 } ffa_memory_access_permissions_t;
+
+static_assert(sizeof(ffa_memory_access_permissions_t) == sizeof(uint8_t),
+	      "ffa_memory_access_permissions_t must be 8 bits wide");
 
 /**
  * This corresponds to table 10.18 of the FF-A v1.1 EAC0 specification, "Memory
  * region attributes descriptor".
  */
 typedef struct {
-	uint8_t shareability : 2;
-	uint8_t cacheability : 2;
-	uint8_t type : 2;
-	uint8_t security : 2;
+	enum ffa_memory_shareability shareability : 2;
+	enum ffa_memory_cacheability cacheability : 2;
+	enum ffa_memory_type type : 2;
+	enum ffa_memory_security security : 2;
 	uint8_t : 8;
 } ffa_memory_attributes_t;
+
+static_assert(sizeof(ffa_memory_attributes_t) == sizeof(uint16_t),
+	      "ffa_memory_attributes_t must be 16 bits wide");
 
 /* FF-A v1.1 EAC0 states bit [15:7] Must Be Zero. */
 #define FFA_MEMORY_ATTRIBUTES_MBZ_MASK 0xFF80U
@@ -947,7 +959,7 @@ static inline uint32_t ffa_feature_intid(struct ffa_value args)
  * Identifies FF-A framework messages. See sections 18.2 and 18.3 of v1.2 FF-A
  * specification.
  */
-enum ffa_framework_msg_func {
+enum ffa_framework_msg_func : uint32_t {
 	/* Power management framework messages. */
 	FFA_FRAMEWORK_MSG_PSCI_REQ = 0,
 	FFA_FRAMEWORK_MSG_PSCI_RESP = 2,

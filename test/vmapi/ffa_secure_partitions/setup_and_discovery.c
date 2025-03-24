@@ -363,7 +363,7 @@ TEST_PRECONDITION(ffa, npi_not_supported, service2_is_el0)
 	res = sp_ffa_features_cmd_send(own_id, receiver_id, FFA_FEATURE_NPI);
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(res.arg3, FFA_ERROR_32);
-	EXPECT_EQ((int32_t)res.arg4, FFA_NOT_SUPPORTED);
+	EXPECT_EQ(res.arg4, FFA_NOT_SUPPORTED);
 }
 
 TEST_PRECONDITION(ffa, secondary_ep_register_supported, service2_is_mp_sp)
@@ -390,5 +390,5 @@ TEST_PRECONDITION(ffa, secondary_ep_register_not_supported, service2_is_up_sp)
 				       FFA_SECONDARY_EP_REGISTER_64);
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(res.arg3, FFA_ERROR_32);
-	EXPECT_EQ((int32_t)res.arg4, FFA_NOT_SUPPORTED);
+	EXPECT_EQ(res.arg4, FFA_NOT_SUPPORTED);
 }

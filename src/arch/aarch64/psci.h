@@ -13,7 +13,7 @@
 /* clang-format off */
 
 /* The following are PSCI version codes. */
-enum psci_version {
+enum psci_version : uint32_t {
 	PSCI_VERSION_0_2 = 0x00000002,
 	PSCI_VERSION_1_0 = 0x00010000,
 	PSCI_VERSION_1_1 = 0x00010001,
@@ -43,7 +43,7 @@ enum psci_version {
 #define PSCI_MEM_PROTECT_CHECK_RANGE 0x84000014
 
 /* The following are return codes for PSCI. */
-enum psci_return_code {
+enum psci_return_code : uint32_t {
 	PSCI_RETURN_ON_PENDING         = 2,
 	PSCI_RETURN_OFF                = 1,
 	PSCI_RETURN_ON                 = 0,

@@ -1178,9 +1178,9 @@ void assert_vm_availability_message_not_delivered(
 	ffa_id_t sender_id, ffa_id_t receiver_id, ffa_id_t vm_id,
 	enum ffa_framework_msg_func framework_func)
 {
-	assert_vm_availability_message(sender_id, receiver_id, vm_id,
-				       framework_func, FFA_ERROR_32, 0, 0,
-				       FFA_INVALID_PARAMETERS, 0);
+	assert_vm_availability_message(
+		sender_id, receiver_id, vm_id, framework_func, FFA_ERROR_32, 0,
+		0, (enum ffa_framework_msg_func)FFA_INVALID_PARAMETERS, 0);
 }
 
 /**

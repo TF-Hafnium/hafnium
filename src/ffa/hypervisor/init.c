@@ -66,7 +66,7 @@ void ffa_init(struct mpool *ppool)
 	 */
 	ret = arch_other_world_call((struct ffa_value){
 		.func = FFA_VERSION_32, .arg1 = FFA_VERSION_COMPILED});
-	if (ret.func == (uint32_t)FFA_NOT_SUPPORTED) {
+	if (ret.func == FFA_NOT_SUPPORTED) {
 		panic("Hypervisor and SPMC versions are not compatible.\n");
 	}
 

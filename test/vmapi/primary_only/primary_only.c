@@ -185,19 +185,17 @@ TEST(ffa, ffa_version)
 	EXPECT_EQ(ffa_version(current_version), current_version);
 	EXPECT_EQ(ffa_version(older_compatible_version_0), current_version);
 	EXPECT_EQ(ffa_version(older_compatible_version_1), current_version);
-	EXPECT_EQ((int32_t)ffa_version(0x0), FFA_NOT_SUPPORTED);
-	EXPECT_EQ((int32_t)ffa_version(0x1), FFA_NOT_SUPPORTED);
-	EXPECT_EQ((int32_t)ffa_version(0x10003), FFA_NOT_SUPPORTED);
-	EXPECT_EQ((int32_t)ffa_version(0xffff), FFA_NOT_SUPPORTED);
-	EXPECT_EQ((int32_t)ffa_version(0xfffffff), FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0x0), FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0x1), FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0x10003), FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0xffff), FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0xfffffff), FFA_NOT_SUPPORTED);
 }
 
 /** Ensures that an invalid call to FFA_VERSION gets an error back. */
 TEST(ffa, ffa_version_invalid)
 {
-	int32_t ret = (int32_t)ffa_version(0x80000000);
-
-	EXPECT_EQ(ret, FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0x80000000), FFA_NOT_SUPPORTED);
 }
 
 static bool v1_0_or_later(void)

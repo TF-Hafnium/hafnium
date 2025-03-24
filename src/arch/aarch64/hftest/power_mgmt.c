@@ -46,6 +46,7 @@ bool arch_cpu_start(uintptr_t id, struct arch_cpu_start_state *state)
 	}
 }
 
+/* NOLINTBEGIN(readability-redundant-casting) */
 static_assert((uint32_t)POWER_STATUS_ON == (uint32_t)PSCI_RETURN_ON,
 	      "power_status enum values must match PSCI return values.");
 static_assert((uint32_t)POWER_STATUS_OFF == (uint32_t)PSCI_RETURN_OFF,
@@ -53,6 +54,7 @@ static_assert((uint32_t)POWER_STATUS_OFF == (uint32_t)PSCI_RETURN_OFF,
 static_assert((uint32_t)POWER_STATUS_ON_PENDING ==
 		      (uint32_t)PSCI_RETURN_ON_PENDING,
 	      "power_status enum values must match PSCI return values.");
+/* NOLINTEND(readability-redundant-casting) */
 
 /**
  * Returns the power status of the given CPU.

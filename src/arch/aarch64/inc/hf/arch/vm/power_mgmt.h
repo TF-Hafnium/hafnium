@@ -13,7 +13,7 @@
 
 #include "hf/arch/types.h"
 
-enum power_status {
+enum power_status : uint32_t {
 	POWER_STATUS_ON,
 	POWER_STATUS_OFF,
 	POWER_STATUS_ON_PENDING,
