@@ -36,6 +36,7 @@
 #define SERVICE3_ESPI_ID_START 5001
 #define SERVICE3_ESPI_ID_END 5010
 
+static uint32_t last_interrupt_id;
 static bool rtm_init_espi_handled;
 static bool managed_exit_handled;
 /**
@@ -161,6 +162,11 @@ static void irq_handler(void)
 	case SERVICE3_ESPI_ID_START + VINT_QUEUE_MAX:
 		dlog_info("ESPI interrupt received %u", intid);
 
+		/*
+		 * Check the interrupts are handled in the order they were sent.
+		 */
+		ASSERT_EQ(last_interrupt_id + 1, intid);
+
 		if (send_back_to_back_interrupts &&
 		    intid != SERVICE3_ESPI_ID_END) {
 			send_espi(intid + 1);
@@ -186,6 +192,8 @@ static void irq_handler(void)
 	default:
 		panic("Interrupt ID not recongnised\n");
 	}
+
+	last_interrupt_id = intid;
 }
 
 /**
@@ -1035,6 +1043,12 @@ TEST_SERVICE(receive_back_to_back_interrupts)
 	receive_indirect_message((void *)&back_to_back_nwd_return,
 				 sizeof(back_to_back_nwd_return), recv_buf);
 
+	/*
+	 * Set last interrupt ID to 5000 so the first eSPI ID of 5001 will
+	 * pass the assert that interrupts are handled in the correct order.
+	 */
+	last_interrupt_id = 5000;
+
 	send_espi(SERVICE3_ESPI_ID_START);
 
 	sp_wait(20);
@@ -1085,4 +1099,53 @@ TEST_SERVICE(sp_managed_exit_loop)
 					       hftest_get_dir_req_source_id(),
 					       0, 0, 0, 0, 0);
 	}
+}
+
+/**
+ * Fill the interrupt queue with eSPIs whilst interrupts are disabled.
+ * For service3 when entering the waiting state this will case an SRI
+ * as the SP has interrupts pending. When we return back to the NWd
+ * enable interrupts and ensure all the eSPIs are handled and that
+ * they are handled in the order they were sent.
+ */
+TEST_SERVICE(receive_interrupt_burst)
+{
+	/*
+	 * Interrupt assigned to service3, who is excepted to run this
+	 * test.
+	 */
+	exception_setup(irq_handler, NULL);
+
+	ASSERT_EQ(SERVICE3_ESPI_ID_END - SERVICE3_ESPI_ID_START,
+		  VINT_QUEUE_MAX - 1);
+
+	for (int i = SERVICE3_ESPI_ID_START; i <= SERVICE3_ESPI_ID_END; i++) {
+		EXPECT_EQ(hf_interrupt_enable(i, true, 0), 0);
+	}
+
+	interrupts_disable();
+
+	/* Fill the queue with eSPI interrupts. */
+	for (int i = SERVICE3_ESPI_ID_START; i <= SERVICE3_ESPI_ID_END; i++) {
+		send_espi(i);
+	}
+
+	/* Go back straight to sleep. This should trigger the SRI. */
+	EXPECT_EQ(ffa_msg_wait().func, FFA_RUN_32);
+
+	dlog_info("Woke up to handle eSPIs.");
+
+	/*
+	 * Set last interrupt ID to 5000 so the first eSPI ID of 5001 will
+	 * pass the assert that interrupts are handled in the correct order.
+	 */
+	last_interrupt_id = 5000;
+
+	interrupts_enable();
+
+	dlog_info("End of test.");
+
+	ffa_yield();
+
+	FAIL("Do not expect getting to this point.");
 }

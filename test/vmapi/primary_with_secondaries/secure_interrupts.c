@@ -1802,3 +1802,47 @@ TEST(managed_exit, sp_managed_exit_interrupts_disabled)
 		check_managed_exit(service3_info->vm_id, false);
 	}
 }
+
+/**
+ * Test that if the queue of interrupts is filled for an SP that has it's
+ * interrupts disabled they will all be handled in the order they were recieved
+ * once interrupts are enabled. Use service3 for this test to check that the SRI
+ * is received once the interrupt enters the waiting state and the interrupts
+ * are reported via FFA_NOTIFICATION_INFO_GET.
+ */
+TEST_PRECONDITION(secure_interrupts, burst_secure_interrupts, service3_is_mp_sp)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+	uint32_t sri_id;
+	uint32_t expected_list_count = 1;
+	uint32_t expected_lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+	uint16_t expected_ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
+
+	/* Get ready to handle SRI.  */
+	gicv3_system_setup();
+	sri_id = enable_sri();
+
+	SERVICE_SELECT(service3_info->vm_id, "receive_interrupt_burst",
+		       mb.send);
+
+	ret = ffa_run(service3_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	while (last_interrupt_id != sri_id) {
+		interrupt_wait();
+	}
+
+	HFTEST_LOG("SRI received.\n");
+
+	/* Check the target vCPU 0 is returned by FFA_NOTIFICATION_INFO_GET. */
+	expected_lists_sizes[0] = 1;
+	expected_ids[0] = service3_info->vm_id;
+	expected_ids[1] = 0;
+	ffa_notification_info_get_and_check(expected_list_count,
+					    expected_lists_sizes, expected_ids);
+
+	/* Resumes service3 in target vCPU 0 to handle the secure_interrupts. */
+	EXPECT_EQ(ffa_run(service3_info->vm_id, 0).func, FFA_YIELD_32);
+}

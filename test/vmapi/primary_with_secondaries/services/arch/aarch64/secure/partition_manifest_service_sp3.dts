@@ -63,7 +63,7 @@
 			/*
 			 * A dummy device region node representing a fake
 			 * peripheral. Explicitly used to specify properties of
-			 * eSPIs, used for the back to back interrupt test.
+			 * eSPIs, used for the back to back and burst interrupt tests.
 			 * All the properties below except `interrupts` are irrelevant.
 			 */
 			base-address = <0x00000000 0x1c150000>;
@@ -79,7 +79,7 @@
 			/*
 			 * A dummy device region node representing a fake
 			 * peripheral. Explicitly used to specify properties of
-			 * eSPIs, used for the back to back interrupt test.
+			 * eSPIs, used for the back to back and burst interrupt tests.
 			 * All the properties below except `interrupts` are irrelevant.
 			 */
 			base-address = <0x00000000 0x1c160000>;
