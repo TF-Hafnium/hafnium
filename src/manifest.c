@@ -1091,9 +1091,13 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	/* ensure that the SPM version is compatible */
 	ffa_version = vm->partition.ffa_version;
 	if (!ffa_versions_are_compatible(ffa_version, FFA_VERSION_COMPILED)) {
-		dlog_error("FF-A partition manifest version %s: %u.%u\n",
-			   error_string, ffa_version_get_major(ffa_version),
-			   ffa_version_get_minor(ffa_version));
+		dlog_error(
+			"FF-A partition manifest version v%u.%u is not "
+			"compatible with compiled version v%u.%u\n",
+			ffa_version_get_major(ffa_version),
+			ffa_version_get_minor(ffa_version),
+			ffa_version_get_major(FFA_VERSION_COMPILED),
+			ffa_version_get_minor(FFA_VERSION_COMPILED));
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 

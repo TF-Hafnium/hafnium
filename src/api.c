@@ -2353,6 +2353,13 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	const struct ffa_value error = {.func = (uint32_t)FFA_NOT_SUPPORTED};
 	struct vm_locked current_vm_locked;
 
+	uint16_t compiled_major = ffa_version_get_major(FFA_VERSION_COMPILED);
+	uint16_t compiled_minor = ffa_version_get_minor(FFA_VERSION_COMPILED);
+	uint16_t requested_major;
+	uint16_t requested_minor;
+	uint16_t vm_major;
+	uint16_t vm_minor;
+
 	if (!ffa_version_is_valid(requested_version)) {
 		dlog_error(
 			"FFA_VERSION: requested version %#x is invalid "
@@ -2361,26 +2368,30 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 		return error;
 	}
 
+	requested_major = ffa_version_get_major(requested_version);
+	requested_minor = ffa_version_get_minor(requested_version);
+
 	if (!ffa_versions_are_compatible(requested_version,
 					 FFA_VERSION_COMPILED)) {
 		dlog_error(
 			"FFA_VERSION: requested version v%u.%u is not "
-			"compatible with v%u.%u\n",
-			ffa_version_get_major(requested_version),
-			ffa_version_get_minor(requested_version),
-			ffa_version_get_major(FFA_VERSION_COMPILED),
-			ffa_version_get_minor(FFA_VERSION_COMPILED));
+			"compatible with compiled version v%u.%u\n",
+			requested_major, requested_minor, compiled_major,
+			compiled_minor);
 		return error;
 	}
 
 	current_vm_locked = vm_lock(current->vm);
+	vm_major = ffa_version_get_major(current_vm_locked.vm->ffa_version);
+	vm_minor = ffa_version_get_minor(current_vm_locked.vm->ffa_version);
 
 	if (current_vm_locked.vm->ffa_version_negotiated &&
 	    requested_version != current_vm_locked.vm->ffa_version) {
 		vm_unlock(&current_vm_locked);
 		dlog_error(
-			"FFA_VERSION: Cannot change FF-A version after other "
-			"FF-A calls have been made\n");
+			"FFA_VERSION: Cannot change FF-A version from v%u.%u "
+			"to v%u.%u after other FF-A calls have been made\n",
+			vm_major, vm_minor, requested_major, requested_minor);
 		return error;
 	}
 
@@ -2406,9 +2417,6 @@ static struct ffa_value ffa_features_function(uint32_t func,
 					      uint32_t input_property,
 					      struct vcpu *current)
 {
-	const enum ffa_version ffa_version = current->vm->ffa_version;
-	const bool el0_partition = current->vm->el0_partition;
-
 	switch (func) {
 	/* Check support of the given Function ID. */
 	case FFA_ERROR_32:
@@ -2470,7 +2478,7 @@ static struct ffa_value ffa_features_function(uint32_t func,
 	case FFA_MEM_PERM_GET_64:
 	case FFA_MEM_PERM_SET_64:
 		if (!(vm_id_is_current_world(current->vm->id) &&
-		      el0_partition)) {
+		      current->vm->el0_partition)) {
 			dlog_verbose(
 				"FFA_FEATURE: %s is only supported on S-EL0 "
 				"partitions\n",
@@ -2518,7 +2526,7 @@ static struct ffa_value ffa_features_function(uint32_t func,
 			.min_buf_size = FFA_RXTX_MAP_MIN_BUF_4K,
 			.mbz = 0,
 			.max_buf_size =
-				(ffa_version >= FFA_VERSION_1_2)
+				(current->vm->ffa_version >= FFA_VERSION_1_2)
 					? FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT
 					: 0,
 		};
@@ -2548,7 +2556,7 @@ static struct ffa_value ffa_features_function(uint32_t func,
 				input_property);
 		}
 
-		if (ffa_version >= FFA_VERSION_1_1 &&
+		if (current->vm->ffa_version >= FFA_VERSION_1_1 &&
 		    (input_property &
 		     FFA_FEATURES_MEM_RETRIEVE_REQ_NS_SUPPORT) == 0U) {
 			dlog_verbose(
