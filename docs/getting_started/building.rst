@@ -45,7 +45,7 @@ resulting in:
 
 .. code:: shell
 
-    Supported platforms:  ['secure_rd_fremont', 'secure_rd_fremont_cfg1', 'secure_aem_v8a_fvp_vhe', 'aem_v8a_fvp_vhe', 'qemu_aarch64_vhe', 'secure_qemu_aarch64', 'rpi4', 'secure_tc']
+    Supported platforms:  ['secure_rd_fremont', 'secure_rd_fremont_cfg1', 'secure_aem_v8a_fvp_vhe', 'aem_v8a_fvp_vhe', 'aem_v8a_fvp_vhe_ffa_v1_1', 'qemu_aarch64_vhe', 'secure_qemu_aarch64', 'rpi4', 'secure_tc']
 
 Additional options
 ~~~~~~~~~~~~~~~~~~

@@ -12,7 +12,7 @@ source $KOKORO_DIR/test_common.sh
 
 HFTEST=(${TIMEOUT[@]} 1000s ./test/hftest/hftest.py)
 
-HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_clang"
+HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_ffa_v1_1_clang"
 
 HFTEST+=(--log "$LOG_DIR_BASE/el3_spmc")
 HFTEST+=(--el3_spmc  --driver=fvp)
@@ -22,7 +22,7 @@ ${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" --out_partitions "$OUT/
              --partitions_json test/vmapi/ffa_both_worlds_el3_spmc/ffa_both_world_partitions_test.json
 
 #Test Hafnium primary_only_test with EL3 SPMC and TSP SP
-${HFTEST[@]}  --out_initrd "$OUT/aem_v8a_fvp_vhe_vm_clang" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+${HFTEST[@]}  --out_initrd "$OUT/aem_v8a_fvp_vhe_ffa_v1_1_vm_clang" --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
                     --initrd test/vmapi/primary_only/primary_only_test
 
 #Test EL3 SPMC with S-EL1 SP based on Hafnium standalone secure SP
