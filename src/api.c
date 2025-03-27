@@ -2445,6 +2445,7 @@ static struct ffa_value ffa_features_function(uint32_t func,
 	case FFA_MSG_SEND_DIRECT_RESP_32:
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
+		return api_ffa_feature_success(0);
 
 	/* FF-A v1.1 features. */
 	case FFA_SPM_ID_GET_32:
@@ -2459,6 +2460,7 @@ static struct ffa_value ffa_features_function(uint32_t func,
 		if (FFA_VERSION_1_1 > FFA_VERSION_COMPILED) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
+		return api_ffa_feature_success(0);
 
 	/* FF-A v1.2 features. */
 	case FFA_CONSOLE_LOG_32:
@@ -2480,7 +2482,7 @@ static struct ffa_value ffa_features_function(uint32_t func,
 		if (!(vm_id_is_current_world(current->vm->id) &&
 		      current->vm->el0_partition)) {
 			dlog_verbose(
-				"FFA_FEATURE: %s is only supported on S-EL0 "
+				"FFA_FEATURES: %s is only supported on S-EL0 "
 				"partitions\n",
 				ffa_func_name(func));
 			return ffa_error(FFA_NOT_SUPPORTED);
@@ -2517,10 +2519,6 @@ static struct ffa_value ffa_features_function(uint32_t func,
 		return api_ffa_feature_success(0);
 
 	case FFA_RXTX_MAP_64: {
-		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
-			return ffa_error(FFA_NOT_SUPPORTED);
-		}
-
 		uint32_t arg2 = 0;
 		struct ffa_features_rxtx_map_params params = {
 			.min_buf_size = FFA_RXTX_MAP_MIN_BUF_4K,
@@ -2537,10 +2535,6 @@ static struct ffa_value ffa_features_function(uint32_t func,
 
 	case FFA_MEM_RETRIEVE_REQ_64:
 	case FFA_MEM_RETRIEVE_REQ_32: {
-		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
-			return ffa_error(FFA_NOT_SUPPORTED);
-		}
-
 		if (ANY_BITS_SET(input_property,
 				 FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_HI_BIT,
 				 FFA_FEATURES_MEM_RETRIEVE_REQ_MBZ_LO_BIT) ||

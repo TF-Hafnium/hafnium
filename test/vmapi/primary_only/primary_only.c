@@ -201,8 +201,23 @@ TEST(ffa, ffa_version_invalid)
 	EXPECT_EQ(ret, FFA_NOT_SUPPORTED);
 }
 
+static bool v1_0_or_later(void)
+{
+	return FFA_VERSION_COMPILED >= FFA_VERSION_1_0;
+}
+
+static bool v1_1_or_later(void)
+{
+	return FFA_VERSION_COMPILED >= FFA_VERSION_1_1;
+}
+
+static bool v1_2_or_later(void)
+{
+	return FFA_VERSION_COMPILED >= FFA_VERSION_1_2;
+}
+
 /** Ensures that FFA_FEATURES is reporting the expected interfaces. */
-TEST(ffa, ffa_features)
+TEST_PRECONDITION(ffa, ffa_v1_0_features, v1_0_or_later)
 {
 	struct ffa_value ret;
 
@@ -291,16 +306,6 @@ TEST(ffa, ffa_features)
 
 	ret = ffa_features(FFA_SECONDARY_EP_REGISTER_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-}
-
-static bool v1_1_or_later(void)
-{
-	return FFA_VERSION_COMPILED >= FFA_VERSION_1_1;
-}
-
-static bool v1_2_or_later(void)
-{
-	return FFA_VERSION_COMPILED >= FFA_VERSION_1_2;
 }
 
 TEST_PRECONDITION(ffa, ffa_v_1_1_features, v1_1_or_later)

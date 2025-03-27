@@ -95,16 +95,16 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MEM_PERM_GET_32);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MEM_PERM_SET_32);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MEM_PERM_GET_64);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MEM_PERM_SET_64);
-	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
 /** Validates error return for FFA_FEATURES provided a wrongful feature ID. */
@@ -310,7 +310,7 @@ TEST(ffa_boot_info, parse_fdt)
 	EXPECT_TRUE(fdt_is_compatible(&root, "arm,ffa-manifest-1.0"));
 	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &ffa_version));
 	HFTEST_LOG("FF-A Version: %lx", ffa_version);
-	ASSERT_EQ(ffa_version, FFA_VERSION_COMPILED);
+	ASSERT_EQ(ffa_version, FFA_VERSION_1_1);
 }
 
 /**
