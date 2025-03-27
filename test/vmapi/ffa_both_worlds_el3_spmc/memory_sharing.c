@@ -9,8 +9,10 @@
 #include <stdint.h>
 
 #include "hf/ffa.h"
+#include "hf/ffa_v1_0.h"
 #include "hf/mm.h"
 #include "hf/std.h"
+#include "hf/types.h"
 
 #include "vmapi/hf/call.h"
 
@@ -40,15 +42,21 @@ TEST(memory_sharing, share_retrieve_relinquish)
 	uint32_t retrieve_flags = 0;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
+	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service1_info->vm_id, constituents,
+			  (void *)receivers_v1_0, 1,
+			  sizeof(struct ffa_memory_access_v1_0), constituents,
 			  ARRAY_SIZE(constituents), tag, retrieve_flags,
-			  FFA_DATA_ACCESS_RW,
-			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 	ret = ffa_mem_share(msg_size, msg_size);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -78,15 +86,21 @@ TEST(memory_sharing, fail_on_share_twice)
 	uint32_t retrieve_flags = 0;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
+	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service1_info->vm_id, constituents,
+			  (void *)receivers_v1_0, 1,
+			  sizeof(struct ffa_memory_access_v1_0), constituents,
 			  ARRAY_SIZE(constituents), tag, retrieve_flags,
-			  FFA_DATA_ACCESS_RW,
-			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 	ret = ffa_mem_share(msg_size, msg_size);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -123,16 +137,22 @@ TEST(memory_sharing, lend_retrieve_relinquish)
 	uint32_t retrieve_flags = 0x0;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
+	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service1_info->vm_id, constituents,
+			  (void *)receivers_v1_0, 1,
+			  sizeof(struct ffa_memory_access_v1_0), constituents,
 			  ARRAY_SIZE(constituents), tag, retrieve_flags,
-			  FFA_DATA_ACCESS_RW,
-			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_lend(msg_size, msg_size);
@@ -166,16 +186,22 @@ TEST(memory_sharing, force_fragmented_share_retrieve_relinquish)
 	uint32_t retrieve_flags = 0;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
+	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service1_info->vm_id, constituents,
+			  (void *)receivers_v1_0, 1,
+			  sizeof(struct ffa_memory_access_v1_0), constituents,
 			  ARRAY_SIZE(constituents), tag, retrieve_flags,
-			  FFA_DATA_ACCESS_RW,
-			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size,
-			  &fragment_length),
+			  FFA_MEMORY_INNER_SHAREABLE, &fragment_length,
+			  &msg_size),
 		  0);
 	EXPECT_EQ(msg_size, fragment_length);
 	/* Don't include the last constituent in the first fragment. */
@@ -237,18 +263,25 @@ TEST(memory_sharing, ffa_validate_attributes)
 		{FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 		 FFA_MEMORY_OUTER_SHAREABLE}};
 
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
 	for (uint32_t i = 0; i < ARRAY_SIZE(invalid_attributes); ++i) {
+		ffa_memory_access_init_v1_0(
+			receivers_v1_0, service1_info->vm_id,
+			FFA_DATA_ACCESS_RO,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 		/* Prepare memory region, and set all flags */
-		EXPECT_EQ(ffa_memory_region_init_single_receiver(
+		EXPECT_EQ(ffa_memory_region_init(
 				  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
-				  service1_info->vm_id, constituents,
-				  ARRAY_SIZE(constituents), 0, 0,
-				  FFA_DATA_ACCESS_RO,
-				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+				  (void *)receivers_v1_0, 1,
+				  sizeof(struct ffa_memory_access_v1_0),
+				  constituents, ARRAY_SIZE(constituents), 0, 0,
 				  invalid_attributes[i].memory_type,
 				  invalid_attributes[i].memory_cacheability,
 				  invalid_attributes[i].memory_shareability,
-				  NULL, NULL, &msg_size),
+				  NULL, &msg_size),
 			  0);
 
 		/* Call the various mem send functions on the same region. */
@@ -279,15 +312,21 @@ TEST(memory_sharing, ffa_validate_mbz)
 		{.address = (uint64_t)pages + PAGE_SIZE * 3, .page_count = 1},
 	};
 
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
+	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_NOT_SPECIFIED,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 	/* Prepare memory region, and set all flags */
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
-			  service1_info->vm_id, constituents,
+			  (void *)receivers_v1_0, 1,
+			  sizeof(struct ffa_memory_access_v1_0), constituents,
 			  ARRAY_SIZE(constituents), 0, 0xffffffff,
-			  FFA_DATA_ACCESS_NOT_SPECIFIED,
-			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 
 	/* Using the same region, call the various mem send functions. */
@@ -315,16 +354,21 @@ TEST(memory_sharing, lend_reclaim)
 	uint32_t retrieve_flags = 0;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
+	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service1_info->vm_id, constituents,
+			  (void *)receivers_v1_0, 1,
+			  sizeof(struct ffa_memory_access_v1_0), constituents,
 			  ARRAY_SIZE(constituents), tag, retrieve_flags,
-			  FFA_DATA_ACCESS_RW,
-			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_lend(msg_size, msg_size);
@@ -352,16 +396,22 @@ TEST(memory_sharing, lend_reclaim_before_retrieve)
 	uint32_t retrieve_flags = 0;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
+	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service1_info->vm_id, constituents,
+			  (void *)receivers_v1_0, 1,
+			  sizeof(struct ffa_memory_access_v1_0), constituents,
 			  ARRAY_SIZE(constituents), tag, retrieve_flags,
-			  FFA_DATA_ACCESS_RW,
-			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NOT_SPECIFIED_MEM,
 			  FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_lend(msg_size, msg_size);
@@ -389,15 +439,21 @@ TEST(memory_sharing, share_reclaim)
 	uint32_t retrieve_flags = 0;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
+	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service1_info->vm_id, constituents,
+			  (void *)receivers_v1_0, 1,
+			  sizeof(struct ffa_memory_access_v1_0), constituents,
 			  ARRAY_SIZE(constituents), tag, retrieve_flags,
-			  FFA_DATA_ACCESS_RW,
-			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_share(msg_size, msg_size);
@@ -429,15 +485,21 @@ TEST(memory_sharing, share_reclaim_before_retrieve)
 	uint32_t retrieve_flags = 0;
 	struct ffa_partition_info *service1_info = service1(mb.recv);
 
+	/* v1.1 receivers match the fields from v1.0 */
+	struct ffa_memory_access_v1_0 receivers_v1_0[1];
+
+	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
+				    FFA_DATA_ACCESS_RW,
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
+	EXPECT_EQ(ffa_memory_region_init(
 			  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-			  service1_info->vm_id, constituents,
+			  (void *)receivers_v1_0, 1,
+			  sizeof(struct ffa_memory_access_v1_0), constituents,
 			  ARRAY_SIZE(constituents), tag, retrieve_flags,
-			  FFA_DATA_ACCESS_RW,
-			  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+			  FFA_MEMORY_INNER_SHAREABLE, NULL, &msg_size),
 		  0);
 
 	ret = ffa_mem_share(msg_size, msg_size);

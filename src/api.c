@@ -2579,8 +2579,6 @@ static struct ffa_value ffa_features_feature(enum ffa_feature_id feature,
 					     uint32_t input_property,
 					     struct vcpu *current)
 {
-	const bool el0_partition = current->vm->el0_partition;
-
 	if (ANY_BITS_SET(feature, FFA_FEATURES_FEATURE_MBZ_HI_BIT,
 			 FFA_FEATURES_FEATURE_MBZ_LO_BIT)) {
 		dlog_verbose(
@@ -2610,7 +2608,7 @@ static struct ffa_value ffa_features_feature(enum ffa_feature_id feature,
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 
-		if (el0_partition) {
+		if (current->vm->el0_partition) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 		if (!vm_id_is_current_world(current->vm->id)) {
@@ -2622,7 +2620,7 @@ static struct ffa_value ffa_features_feature(enum ffa_feature_id feature,
 		if (FFA_VERSION_1_2 > FFA_VERSION_COMPILED) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
-		if (el0_partition) {
+		if (current->vm->el0_partition) {
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 		if (!vm_id_is_current_world(current->vm->id)) {

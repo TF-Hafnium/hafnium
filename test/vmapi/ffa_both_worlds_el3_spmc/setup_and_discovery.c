@@ -195,7 +195,8 @@ TEST(ffa, ffa_partition_info_get_v1_0_descriptors)
 	 * is v1.0.
 	 */
 	version = ffa_version(FFA_VERSION_1_0);
-	EXPECT_EQ(version, FFA_VERSION_COMPILED);
+	EXPECT_NE(version, (uint32_t)FFA_NOT_SUPPORTED);
+	EXPECT_LE(version, FFA_VERSION_COMPILED);
 
 	/* Setup the mailbox (which holds the RX buffer). */
 	mb = set_up_mailbox();
