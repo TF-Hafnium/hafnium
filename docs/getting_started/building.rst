@@ -82,7 +82,8 @@ to enable building on non-Linux platforms (eg MacOS). Build the container with
 `./build/docker/build.sh`. You can run commands in the container with
 `./build/run_in_container.sh -i bash`:
 
-.. code :: shell
+.. code:: shell
+
    ./build/docker/build.sh
    ./build/run_in_container.sh -i bash
    make
@@ -90,7 +91,8 @@ to enable building on non-Linux platforms (eg MacOS). Build the container with
 Alternatively, the Makefile will automatically use the Docker container
 if the environment variable `HAFNIUM_HERMETIC_BUILD` is set to `true`:
 
-.. code :: shell
+.. code:: shell
+
    ./build/docker/build.sh
    HAFNIUM_HERMETIC_BUILD=true make
 
