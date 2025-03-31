@@ -27,6 +27,7 @@
 	ns-interrupts-action = <0>; /* Non secure interrupts are queued. */
 	other-s-interrupts-action = <0>; /* Other S-Interrupts are queued. */
 	gp-register-num = <0>;
+	power-management-messages = <1>; /* Support CPU_OFF power management message. */
 
 	/* Boot Info */
 	boot-info {

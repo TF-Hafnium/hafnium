@@ -40,6 +40,27 @@ static struct ffa_value handle_direct_req2_cmd(struct ffa_value res)
 	return res;
 }
 
+static struct ffa_value handle_direct_req_framework_msg(struct ffa_value args)
+{
+	struct ffa_value ret;
+	enum ffa_framework_msg_func func = ffa_framework_msg_get_func(args);
+
+	if (func == FFA_FRAMEWORK_MSG_PSCI_REQ) {
+		ffa_id_t own_id = hf_vm_get_id();
+
+		ret = ffa_framework_message_send_direct_resp(
+			own_id, HF_SPMC_VM_ID, FFA_FRAMEWORK_MSG_PSCI_RESP,
+			0ULL);
+	} else {
+		HFTEST_LOG_FAILURE();
+		HFTEST_LOG(HFTEST_LOG_INDENT
+			   "Unsupported framework message received");
+		abort();
+	}
+
+	return ret;
+}
+
 static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 {
 	hftest_set_dir_req_source_id(ffa_sender(res));
@@ -222,8 +243,16 @@ noreturn void test_main_sp(bool is_boot_vcpu)
 
 	while (1) {
 		if (res.func == FFA_MSG_SEND_DIRECT_REQ_32) {
-			dlog_verbose("Received direct message request");
-			res = handle_direct_req_cmd(res);
+			if (ffa_is_framework_msg(res)) {
+				dlog_verbose(
+					"Received framework message through "
+					"direct request\n");
+				res = handle_direct_req_framework_msg(res);
+			} else {
+				dlog_verbose(
+					"Received direct message request\n");
+				res = handle_direct_req_cmd(res);
+			}
 		} else if (res.func == FFA_MSG_SEND_DIRECT_REQ2_64) {
 			dlog_verbose("Received direct message request2");
 			res = handle_direct_req2_cmd(res);

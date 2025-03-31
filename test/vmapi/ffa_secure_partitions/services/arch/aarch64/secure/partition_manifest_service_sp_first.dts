@@ -35,6 +35,7 @@
 	boot-order = <1>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
+	power-management-messages = <1>; /* Support CPU_OFF power management message. */
 
 	/* Boot Info */
 	boot-info {
