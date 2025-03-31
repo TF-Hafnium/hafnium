@@ -133,7 +133,7 @@ static void irq_current(void)
 		/* Configure timer to expire periodically. */
 		timer_set(periodic_timer_ms);
 		timer_start();
-		HFTEST_LOG("EL1 Physical timer stopped and restarted");
+		dlog_verbose("EL1 Physical timer stopped and restarted");
 
 		break;
 	}

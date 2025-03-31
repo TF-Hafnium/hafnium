@@ -629,6 +629,7 @@ void cpu_entry_multiple_deadline_continuous_mp(uintptr_t args)
 	base_multiple_sp_deadline_continuous(test);
 
 	semaphore_signal(&test->sync);
+	arch_cpu_stop();
 }
 
 TEST_LONG_RUNNING(arch_timer, multiple_sp_periodic_deadline_mp)
@@ -669,7 +670,25 @@ TEST_LONG_RUNNING(arch_timer, multiple_sp_periodic_deadline_mp)
 		 .service2_is_up = service2_info->vcpu_count == 1,
 		 .service3_id = service3_info->vm_id,
 		 .service3_timer_period = 90,
-		 .active_wait_timer = 300}};
+		 .active_wait_timer = 300},
+		/*
+		 * Configure the architectural timers of the Service SPs to
+		 * periodically trigger at a higher frequency (i.e., shorter
+		 * intervals) to stress-test the handling of the CPU_OFF
+		 * power management message by the SPMC and/or SPs. The goal is
+		 * to ensure that any interrupts, generated while SPMC and/or
+		 * SP is handling a power management operation, do not
+		 * interfere with such operations, as the SPMC is expected to
+		 * mask all interrupts during such procedures.
+		 */
+		{.service1_id = service1_info->vm_id,
+		 .service1_timer_period = 1,
+		 .service2_id = service2_info->vm_id,
+		 .service2_timer_period = 1,
+		 .service2_is_up = service2_info->vcpu_count == 1,
+		 .service3_id = service3_info->vm_id,
+		 .service3_timer_period = 1,
+		 .active_wait_timer = 10}};
 
 	for (size_t i = 0; i < ARRAY_SIZE(args); i++) {
 		uintptr_t id;
