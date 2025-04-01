@@ -74,6 +74,22 @@ If you wish to change the value of the make variables you may need to first use:
 
 So the `args.gn` file will be regenerated with the new values.
 
+Troubleshoot(Clean Up Artifacts)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before building Hafnium, ensure the Clang toolchain is installed and available
+in your `PATH`. This is usually sufficient for a successful build.
+
+If you encounter errors related to missing or incompatible C library headers
+(e.g., after a failed build or toolchain update), clean up stale artifacts by running:
+
+.. code:: shell
+
+   make clobber
+
+This command removes previously generated build outputs, which can help resolve
+issues caused by outdated intermediate files. It's a useful troubleshooting step
+but not required for a fresh setup.
+
 Using Docker
 ^^^^^^^^^^^^
 
