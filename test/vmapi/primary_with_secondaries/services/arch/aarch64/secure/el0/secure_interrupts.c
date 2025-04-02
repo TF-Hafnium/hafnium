@@ -11,6 +11,7 @@
 
 #include "vmapi/hf/call.h"
 
+#include "sysregs.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 #include "twdog.h"
@@ -18,6 +19,11 @@
 
 #define ITERATIONS_PER_MS 15000
 #define TWDOG_DELAY 50
+
+/**
+ * Encoding for CTR_EL0 register. Used here for stress test only.
+ */
+#define MSR_CTR_EL0 S3_3_C0_C0_1
 
 static inline uint64_t physicalcounter_read(void)
 {
@@ -192,5 +198,11 @@ TEST_SERVICE(yield_direct_req_service_twdog_int)
 
 	/* Secure interrupt has been serviced by now. Relinquish cycles. */
 	ffa_msg_wait();
+	FAIL("Not expected to reach here");
+}
+
+TEST_SERVICE(sys_reg_access_trapped)
+{
+	dlog("CTR_EL0 =%lx\n", read_msr(MSR_CTR_EL0));
 	FAIL("Not expected to reach here");
 }
