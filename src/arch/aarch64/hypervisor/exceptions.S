@@ -283,6 +283,9 @@ system_register_access:
 	mrs x0, esr_el2
 	bl handle_system_register_access
 
+	/* Switch vCPU if requested by handler. */
+	cbnz x0, vcpu_switch
+
 	/* Continue running the same vCPU. */
 	mrs x0, tpidr_el2
 	b vcpu_restore_nonvolatile_and_run

@@ -1250,11 +1250,12 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
  * Handles EC = 011000, MSR, MRS instruction traps.
  * Returns non-null ONLY if the access failed and the vCPU is changing.
  */
-void handle_system_register_access(uintreg_t esr_el2)
+struct vcpu *handle_system_register_access(uintreg_t esr_el2)
 {
 	struct vcpu *vcpu = current();
 	ffa_id_t vm_id = vcpu->vm->id;
 	uintreg_t ec = GET_ESR_EC(esr_el2);
+	bool is_el0_partition = vcpu->vm->el0_partition;
 
 	CHECK(ec == EC_MSR);
 	/*
@@ -1264,28 +1265,36 @@ void handle_system_register_access(uintreg_t esr_el2)
 	if (debug_el1_is_register_access(esr_el2)) {
 		if (!debug_el1_process_access(vcpu, vm_id, esr_el2)) {
 			inject_el1_sysreg_trap_exception(vcpu, esr_el2);
-			return;
+			return NULL;
 		}
 	} else if (perfmon_is_register_access(esr_el2)) {
 		if (!perfmon_process_access(vcpu, vm_id, esr_el2)) {
 			inject_el1_sysreg_trap_exception(vcpu, esr_el2);
-			return;
+			return NULL;
 		}
 	} else if (feature_id_is_register_access(esr_el2)) {
 		if (!feature_id_process_access(vcpu, esr_el2)) {
 			inject_el1_sysreg_trap_exception(vcpu, esr_el2);
-			return;
+			return NULL;
 		}
 	} else if (el1_physical_timer_is_register_access(esr_el2)) {
 		if (!el1_physical_timer_process_access(vcpu, esr_el2)) {
 			inject_el1_sysreg_trap_exception(vcpu, esr_el2);
-			return;
+			return NULL;
 		}
 	} else {
+		if (is_el0_partition) {
+			dlog_warning(
+				"Unexpected system register access by EL0 "
+				"partition\n");
+			return api_abort(vcpu);
+		}
+
 		inject_el1_sysreg_trap_exception(vcpu, esr_el2);
-		return;
+		return NULL;
 	}
 
 	/* Instruction was fulfilled. Skip it and run the next one. */
 	vcpu->regs.pc += GET_NEXT_PC_INC(esr_el2);
+	return NULL;
 }
