@@ -44,7 +44,7 @@ void plat_psci_init(void)
 		(struct ffa_value){.func = FFA_SECONDARY_EP_REGISTER_64,
 				   .arg1 = (uintreg_t)&cpu_entry});
 
-	if (res.func != FFA_SUCCESS_64) {
+	if (res.func != FFA_SUCCESS_32 && res.func != FFA_SUCCESS_64) {
 		panic("FFA_SECONDARY_EP_REGISTER_64 failed");
 	}
 }
