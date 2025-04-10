@@ -217,7 +217,8 @@ template("embedded_platform_toolchain") {
 # Specialize for different architectures.
 
 template("aarch64_common_toolchain") {
-  assert(defined(invoker.cpu), "\"cpu\" must be defined for ${target_name}.")
+  assert(defined(invoker.march),
+         "\"march\" must be defined for ${target_name}.")
   assert(defined(invoker.target),
          "\"target\" must be defined for ${target_name}")
   assert(defined(invoker.tool_prefix),
@@ -262,7 +263,16 @@ template("aarch64_common_toolchain") {
     arch = "aarch64"
     target = invoker.target
     tool_prefix = invoker.tool_prefix
-    extra_cflags = "-mcpu=${invoker.cpu} -mstrict-align"
+    extra_cflags = "-mstrict-align"
+
+    # Define march_cflags for specifying the required -march architecture
+    # option passed by the platform to the compiler.
+    # Conditional statements below have opportunity to further amend
+    # the march_cflags variable depending on platform options (e.g. +memtag).
+    # The -march directive is consolidated at end of this template, by
+    # eventually appending it to extra_cflags.
+    march_cflags = "-march=${invoker.march}"
+
     if (defined(invoker.extra_cflags)) {
       extra_cflags += " ${invoker.extra_cflags}"
     }
@@ -313,8 +323,6 @@ template("aarch64_common_toolchain") {
       forward_variables_from(invoker.toolchain_args, "*")
     }
 
-    extra_cflags += " -march=armv8.5-a"
-
     if (defined(toolchain_args.enable_mte)) {
       assert(
           toolchain_args.enable_mte == "1" || toolchain_args.enable_mte == "0",
@@ -322,10 +330,12 @@ template("aarch64_common_toolchain") {
 
       extra_defines += " -DENABLE_MTE=${toolchain_args.enable_mte}"
       if (toolchain_args.enable_mte == "1") {
-        extra_cflags += "+memtag"
+        march_cflags += "+memtag"
         extra_cflags += " -fsanitize=memtag-stack"
       }
     }
+
+    extra_cflags += " ${march_cflags}"
   }
 }
 
@@ -342,6 +352,7 @@ template("aarch64_toolchains") {
   aarch64_toolchain("${target_name}") {
     forward_variables_from(invoker,
                            [
+                             "march",
                              "origin_address",
                              "boot_flow",
                              "console",
@@ -360,17 +371,17 @@ template("aarch64_toolchains") {
                              "toolchain_args",
                              "branch_protection",
                            ])
-    cpu = "${invoker.cpu}+nofp"
 
     # Add a macro so files can tell whether they are not being built for a VM.
     extra_defines = " -DVM_TOOLCHAIN=0"
-    extra_cflags = " -mgeneral-regs-only"
+    extra_cflags = " -mgeneral-regs-only -mno-implicit-float"
   }
 
   # Toolchain for building test VMs which run under Hafnium.
   aarch64_toolchain("${target_name}_vm") {
     forward_variables_from(invoker,
                            [
+                             "march",
                              "origin_address",
                              "gic_version",
                              "gic_enable_espi",
@@ -382,7 +393,7 @@ template("aarch64_toolchains") {
                              "console",
                              "branch_protection",
                            ])
-    cpu = "${invoker.cpu}+fp"
+
     boot_flow = "//src/arch/fake:boot_flow"
     iommu = "//src/iommu:absent"
     memory_alloc = "//test/hftest/memory_alloc:memory_alloc"
