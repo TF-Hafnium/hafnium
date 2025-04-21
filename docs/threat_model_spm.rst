@@ -1712,6 +1712,44 @@ element of the data flow diagram.
 |                        | SP for an IPI.                                     |
 +------------------------+----------------------------------------------------+
 
++------------------------+----------------------------------------------------+
+| ID                     | 37                                                 |
++========================+====================================================+
+| ``Threat``             | **A rogue Secure Partition, that subscribes to     |
+|                        | CPU_OFF power management message, could hog CPU    |
+|                        | cycles or deny the power management operation when |
+|                        | the SPMC resumes it to process PSCI CPU_OFF event, |
+|                        | thereby compromising the state of SPMC and         |
+|                        | rendering the system unresponsive.**               |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1, DF2                                           |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC, SPMD                                         |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SPMC state, CPU cycles                             |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | S-Endpoint                                         |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Tampering, Denial of Service                       |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | Medium (4)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | High (4)         | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | High (16)        | Medium (9)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | The TF-A SPMC does not provide full mitigation     |
+|                        | against such threats in order to keep the current  |
+|                        | implementation simple. When an SP sends DENIED     |
+|                        | status to SPMC in response to power management     |
+|                        | message, SPMC forwards the status to SPMD and      |
+|                        | panics, thereby causing a hard reset as the        |
+|                        | integrity of Secure World is no more guaranteed.   |
++------------------------+----------------------------------------------------+
+
 --------------
 
 *Copyright (c) 2023, Arm Limited. All rights reserved.*
