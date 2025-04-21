@@ -1690,11 +1690,27 @@ When using the SPMD as a Secure Payload Dispatcher:
   signaled to the SPMC through a power management framework message.
   It consists in a SPMD-to-SPMC direct request/response (`SPMC-SPMD direct
   requests/responses`_) conveying the event details and SPMC response.
-  The SPMD performs a synchronous entry into the SPMC. The SPMC is entered and
-  updates its internal state to reflect the physical core is being turned off.
-  In the current implementation no SP is resumed as a consequence. This behavior
-  ensures a minimal support for CPU hotplug e.g. when initiated by the NWd linux
-  userspace.
+  The SPMD performs a synchronous entry into the SPMC. Once the SPMC is entered:
+
+   * It updates the internal state to reflect the physical core is being turned
+     off.
+   * It relays the PSCI CPU_OFF power management operation as a framework direct
+     request message to the pinned execution context of the first MP SP
+     provided:
+
+       * The SP has subscribed to the CPU_OFF operation explicitly through its
+         partition manifest. Refer to `[6]`_ for details of corresponding FF-A
+         binding.
+       * The pinned execution context is in the WAITING state.
+
+   * Else, it sends a framework direct response to SPMD with success status code.
+   * SPMC receives the direct response from the SP for the direct request
+     framework message it had sent earlier.
+   * If the status code in the message from SP is not SUCCESS, then SPMC
+     sends a framework direct response to SPMD with DENIED status code. SPMD
+     will eventually panic and stop the execution.
+   * Else, SPMC continues to relay PSCI CPU_OFF power management operation to
+     other subscribed MP SPs.
 
 Arm architecture extensions for security hardening
 --------------------------------------------------
