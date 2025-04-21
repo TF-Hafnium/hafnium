@@ -541,20 +541,27 @@ woken up by the ``PSCI_CPU_ON`` service invocation. The TF-A SPD hook mechanism
 calls into the SPMD on the newly woken up physical core. Then the SPMC is
 entered at the secondary physical core entry point.
 
-In the current implementation, the first SP is resumed on the coresponding EC
-(the virtual CPU which matches the physical core). The implication is that the
-first SP must be a MP SP.
+As per secondary boot protocol described in section 18.2.2 of the FF-A v1.3ALP1
+specification, each pinned execution context of every MP SP is woken up by SPMC,
+thereby giving an opportunity to the MP SP's EC on secondary core to initialize
+itself. Upon successful initialization, the EC relinquishes CPU cycles through
+FFA_MSG_WAIT ABI and moves to WAITING state.
+
+Note that an UP SP does not have a pinned execution context. Hence, if a system
+only has UP SPs, then there are no pinned execution contexts to be resumed on
+secondary cores.
 
 In a linux based system, once secure and normal worlds are booted but prior to
 a NWd FF-A driver has been loaded:
 
-- The first SP has initialized all its ECs in response to primary core boot up
-  (at system initialization) and secondary core boot up (as a result of linux
-  invoking PSCI_CPU_ON for all secondary cores).
-- Other SPs have their first execution context initialized as a result of secure
-  world initialization on the primary boot core. Other ECs for those SPs have to
-  be run first through ffa_run to complete their initialization (which results
-  in the EC completing with FFA_MSG_WAIT).
+- Every MP SP has initialized its primary EC in response to primary core boot up
+  (at system initialization) and secondary ECs in response to secondary cores
+  boot up (as a result of linux invoking PSCI_CPU_ON for all secondary cores).
+  If there are multiple MP SPs deployed, the order in which their respective
+  ECs are woken up is determined by the boot-order field in the partition
+  manifests.
+- Every UP SP has its only EC initialized as a result of secure world
+  initialization on the primary boot core.
 
 Refer to `Power management`_ for further details.
 
