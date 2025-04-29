@@ -302,6 +302,7 @@ template("aarch64_common_toolchain") {
       plat_boot_flow = invoker.boot_flow
       plat_console = invoker.console
       plat_iommu = invoker.iommu
+      plat_memory_alloc = invoker.memory_alloc
       plat_memory_protect = invoker.memory_protect
       if (defined(invoker.stdout)) {
         stdout = invoker.stdout
@@ -345,6 +346,7 @@ template("aarch64_toolchains") {
                              "boot_flow",
                              "console",
                              "iommu",
+                             "memory_alloc",
                              "memory_protect",
                              "gic_version",
                              "gic_enable_espi",
@@ -383,6 +385,7 @@ template("aarch64_toolchains") {
     cpu = "${invoker.cpu}+fp"
     boot_flow = "//src/arch/fake:boot_flow"
     iommu = "//src/iommu:absent"
+    memory_alloc = "//src/memory_alloc:memory_alloc"
     memory_protect = "//src/memory_protect:absent"
     stdout = "//src/arch/aarch64/hftest:stdout"
 

@@ -29,5 +29,6 @@ embedded_clang_toolchain("aarch64_linux_clang") {
     plat_console = "//src/arch/fake:console"
     plat_iommu = "//src/iommu:absent"
     plat_memory_protect = "//src/memory_protect:absent"
+    plat_memory_alloc = "//src/memory_alloc:memory_alloc"
   }
 }

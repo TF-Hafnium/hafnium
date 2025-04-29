@@ -140,6 +140,7 @@ template("host_toolchain") {
         plat_console = "//src/arch/fake:console"
         plat_iommu = "//src/iommu:absent"
         plat_interrupts = "//src/arch/aarch64/plat/interrupts:absent"
+        plat_memory_alloc = "//src/memory_alloc:memory_alloc"
         plat_heap_pages = invoker.heap_pages
         plat_max_cpus = invoker.max_cpus
         plat_max_vms = invoker.max_vms
