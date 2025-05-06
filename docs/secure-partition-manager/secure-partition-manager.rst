@@ -275,13 +275,24 @@ base address `0x0 0xff000000` and size `0x1000000`.
 
 The interrupt-controller node contains the address ranges of GICD and GICR
 so that non-contiguous GICR frames can be probed during boot flow. The GICD
-address is defined in the first cell, followed by the GICR addresses.
+addresses are defined first in the cells, followed by the GICR addresses, then
+SPI ID ranges for all chips.
+"distributor-regions" is used to define the number of GICD addresses.
 "redistributor-regions" is used to define the number of GICR addresses.
+"spi_regions" is used to define the number of SPI ID ranges.
 
 This node is optional. When absent, the default configuration assumes there is
-one redistributor region. The default GICD memory range is from ``GICD_BASE``
-to ``GICD_BASE + GICD_SIZE``. The default GICR memory range is from
-``GICR_BASE`` to ``GICR_BASE + GICR_FRAMES * GIC_REDIST_SIZE_PER_PE``.
+one distributor, redistributor and SPI region.
+The default GICD memory range is from ``GICD_BASE`` to ``GICD_BASE + GICD_SIZE``.
+The default GICR memory range is from ``GICR_BASE`` to ``GICR_BASE + GICR_FRAMES * GIC_REDIST_SIZE_PER_PE``.
+All SPIs are directed to chip 0.
+
+To enable support on multi chip platforms, this node is mandatory. Each chip
+need to have one GICD memory range, one or more GICR memory ranges and one SPI ID range.
+
+The sum of `distributor-regions`, `redistributor-regions` and `spi-regions` must
+equal the number of entries in field `reg`.
+
 
 .. code:: shell
 
@@ -289,20 +300,25 @@ to ``GICD_BASE + GICD_SIZE``. The default GICR memory range is from
 		compatible = "arm,gic-v3";
 		#address-cells = <2>;
 		#size-cells = <1>;
-		#redistributor-regions = <4>;
-		reg = <0x00 0x30000000 0x10000>,	// GICD
+		#distributor-regions = <2>;
+		#redistributor-regions = <2>;
+		#spi-regions = <2>;
+		reg = <0x00 0x30000000 0x10000>,	// GICD 0: Chip 0
+		      <0x10 0x30000000 0x10000>,	// GICD 1: Chip 1
 		      <0x00 0x301C0000 0x400000>,	// GICR 0: Chip 0
 		      <0x10 0x301C0000 0x400000>,	// GICR 1: Chip 1
-		      <0x20 0x301C0000 0x400000>,	// GICR 2: Chip 2
-		      <0x30 0x301C0000 0x400000>;	// GICR 3: Chip 3
+		      <0x00 0x00000020 0x0001DF>,	// SPI: Chip 0
+		      <0x00 0x00000200 0x0001DF>;	// SPI: Chip 1
 	};
 
 The above is an example representation of the referred interrupt controller
 description. The cells are made up of three values. The first two 32-bit values
 make up a 64-bit value representing the address of the GIC redistributor. The
 third value represents the size of this region. In this example,
-redistributor-regions states there are 4 GICR cells. The address of GICR 0 is
-`0x00301C0000` and the size of that region is `0x400000`.
+redistributor-regions states there are 2 GICD cell, GICR cells and SPI cells.
+The address of GICD 0 is `0x0030000000` and the size of that region is `0x10000`.
+The address of GICR 0 is `0x00301C0000` and the size of that region is `0x400000`.
+The SPI block of Chip 0 starts from `0x20` and contains `0x1DF` SPIs.
 
 Secure Partitions Configuration
 -------------------------------
