@@ -1,0 +1,36 @@
+# Copyright 2025 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+%YAML 1.2
+---
+description: >-
+  Overlay to enable the Driver with Hafnium as normal world Hypervisor as well
+  as Hafnium as EL3 SPMC.
+  This overlay preloads the Hafnium Hypervisor and EL3SPMC its associated
+  artifacts directly into the FVP model.
+
+run:
+  params:
+    # Set RVBAR (Reset Vector Base Address Register) for all CPUs in both clusters
+    -C cluster0.cpu0.RVBAR: 0x4003000 #dec(67121152)
+    -C cluster0.cpu1.RVBAR: 0x4003000
+    -C cluster0.cpu2.RVBAR: 0x4003000
+    -C cluster0.cpu3.RVBAR: 0x4003000
+    -C cluster1.cpu0.RVBAR: 0x4003000
+    -C cluster1.cpu1.RVBAR: 0x4003000
+    -C cluster1.cpu2.RVBAR: 0x4003000
+    -C cluster1.cpu3.RVBAR: 0x4003000
+
+    # Load core artifacts required by Hafnium stack into cluster0 CPU0 memory space:
+    #  - EL3 SPMC firmware (BL31)
+    #  - Hafnium Hypervisor binary
+    #  - Device Tree Blob for Hafnium
+
+    # Note: Leading spaces are added to make each --data entry unique for Shrinkwrap.
+    #       Without this, only one value per key would be used due to YAML key overrides.
+    '--data cluster0.cpu0': prebuilts/linux-aarch64/trusted-firmware-a-el3-spmc/bl31.bin@0x4003000
+    ' --data cluster0.cpu0': out/reference/aem_v8a_fvp_vhe_ffa_v1_1_clang/hafnium.bin@0x80000000 # Spacing offset = 1
+    '  --data cluster0.cpu0': ${rtvar:HYPERVISOR_DTB}@0x82000000 # Spacing offset = 2

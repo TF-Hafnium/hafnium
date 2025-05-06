@@ -1,0 +1,54 @@
+
+# Copyright 2025 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+%YAML 1.2
+---
+description: >-
+  Overlay to enable the Driver with Hafnium as Hypervisor.
+  This overlay preloads the Hafnium Hypervisor and its associated artifacts
+  directly into the FVP model.
+
+run:
+  # Runtime variables with default values; can be overridden by overlays
+  rtvars:
+    HYPERVISOR:
+      type: path
+      value: ''
+
+    HYPERVISOR_DTB:
+      type: path
+      value: ''
+
+    INITRD:
+      type: path
+      value: ''
+
+    INITRD_START:
+      type: string
+      value: ''
+
+  params:
+    # Set RVBAR (Reset Vector Base Address Register) for all CPUs
+    -C cluster0.cpu0.RVBAR: 0x4020000
+    -C cluster0.cpu1.RVBAR: 0x4020000
+    -C cluster0.cpu2.RVBAR: 0x4020000
+    -C cluster0.cpu3.RVBAR: 0x4020000
+    -C cluster1.cpu0.RVBAR: 0x4020000
+    -C cluster1.cpu1.RVBAR: 0x4020000
+    -C cluster1.cpu2.RVBAR: 0x4020000
+    -C cluster1.cpu3.RVBAR: 0x4020000
+
+    # Load BL31 (EL3 SPMC) at RVBAR
+    '--data cluster0.cpu0': prebuilts/linux-aarch64/trusted-firmware-a/fvp/bl31.bin@0x4020000
+
+    # Load Hypervisor at 0x80000000
+    # Spacing offset = 1: makes key unique for Shrinkwrap & prevents key override
+    ' --data cluster0.cpu0': ${rtvar:HYPERVISOR}@0x80000000
+
+    # Load DTB at 0x82000000
+    # Spacing offset = 2: makes key unique for Shrinkwrap & prevents key override
+    '  --data cluster0.cpu0': ${rtvar:HYPERVISOR_DTB}@0x82000000

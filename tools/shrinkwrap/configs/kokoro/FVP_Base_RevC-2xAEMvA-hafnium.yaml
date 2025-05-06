@@ -1,0 +1,101 @@
+# Copyright 2025 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+%YAML 1.2
+---
+description: >-
+  Arm Architecture Base Model FVP configured with 8 CPUs across 2 clusters
+  (2x4) and 4GB DRAM. By default this contains the default settings and
+  arch features. Apply the test specific overlays fvp_hf_*.yaml to configure the
+  FVP for a specific test setup.
+
+run:
+  name: FVP_Base_RevC-2xAEMvA
+
+  # Runtime variables with default values; can be overridden by overlays
+  rtvars:
+    UART0_LOG:
+      type: path
+      value: ''
+
+    UART1_LOG:
+      type: path
+      value: ''
+
+    TELNET:
+      type: string
+      value: ''
+
+    DISABLE_VISUALISATION:
+      type: string
+      value: 0
+
+    EXIT_ON_SHUTDOWN:
+      type: string
+      value: 0
+
+  params:
+    # Basic dimensions for RAM and CPU.
+    -C bp.dram_size: 4
+    -C cluster0.NUM_CORES: 4
+    -C cluster1.NUM_CORES: 4
+
+    # These SMMU registers
+    -C pci.pci_smmuv3.mmu.SMMU_AIDR: 2
+    # Enable ASID16, for sharing process address spaces with devices
+    -C pci.pci_smmuv3.mmu.SMMU_IDR0: 0x0046123B
+    -C pci.pci_smmuv3.mmu.SMMU_IDR1: 0x00600002
+    # Enable FWB, Small TT, Range invalidation, and BBM level 2.
+    -C pci.pci_smmuv3.mmu.SMMU_IDR3: 0x1714
+    -C pci.pci_smmuv3.mmu.SMMU_IDR5: 0xFFFF0472
+    # Enable secure side, SEL2, 2-bit SID
+    -C pci.pci_smmuv3.mmu.SMMU_S_IDR1: 0xA0000002
+    -C pci.pci_smmuv3.mmu.SMMU_S_IDR2: 0
+    -C pci.pci_smmuv3.mmu.SMMU_S_IDR3: 0
+
+    # Misc FVP controls.
+    --stat: null
+    -C pctl.startup: 0.0.0.0
+    -C bp.secure_memory: 1
+    -C bp.vis.rate_limit-enable: false
+    -C bp.pl011_uart0.untimed_fifos: 1
+    -C bp.pl011_uart0.unbuffered_output: 1
+    -C bp.ve_sysregs.mmbSiteDefault: 0
+    -C cluster0.has_arm_v8-5: 1
+    -C cluster1.has_arm_v8-5: 1
+    -C cluster0.has_branch_target_exception: 1
+    -C cluster1.has_branch_target_exception: 1
+    -C cluster0.memory_tagging_support_level: 2
+    -C cluster1.memory_tagging_support_level: 2
+    -C bp.dram_metadata.is_enabled: 1
+    -C cluster0.gicv3.extended-interrupt-range-support: 1
+    -C cluster1.gicv3.extended-interrupt-range-support: 1
+    -C gic_distributor.extended-ppi-count: 64
+    -C gic_distributor.extended-spi-count: 1024
+    -C gic_distributor.ARE-fixed-to-one: 1
+
+    -C cluster0.cpu0.RVBAR: 0x4010000
+    -C cluster0.cpu1.RVBAR: 0x4010000
+    -C cluster0.cpu2.RVBAR: 0x4010000
+    -C cluster0.cpu3.RVBAR: 0x4010000
+    -C cluster1.cpu0.RVBAR: 0x4010000
+    -C cluster1.cpu1.RVBAR: 0x4010000
+    -C cluster1.cpu2.RVBAR: 0x4010000
+    -C cluster1.cpu3.RVBAR: 0x4010000
+
+    '--data cluster0.cpu0': prebuilts/linux-aarch64/trusted-firmware-a-spmd/fvp/bl31.bin@0x4010000
+
+    -C bp.pl011_uart0.out_file: ${rtvar:UART0_LOG}
+    -C bp.pl011_uart1.out_file: ${rtvar:UART1_LOG}
+
+    -C bp.terminal_0.start_telnet: ${rtvar:TELNET}
+    -C bp.terminal_1.start_telnet: ${rtvar:TELNET}
+    -C bp.terminal_2.start_telnet: ${rtvar:TELNET}
+    -C bp.terminal_3.start_telnet: ${rtvar:TELNET}
+
+    -C bp.ve_sysregs.exit_on_shutdown: ${rtvar:EXIT_ON_SHUTDOWN}
+
+    -C bp.vis.disable_visualisation: ${rtvar:DISABLE_VISUALISATION}

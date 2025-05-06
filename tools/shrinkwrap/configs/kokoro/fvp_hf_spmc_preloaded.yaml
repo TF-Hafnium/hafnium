@@ -1,0 +1,29 @@
+# Copyright 2025 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+%YAML 1.2
+---
+description: >-
+  Overlay to enable the Driver with Hafnium as SPMC.
+  This overlay preloads the Hafnium SPMC and its associated artifacts
+  directly into the FVP model.
+
+run:
+  rtvars:
+    SPMC_DTB:
+      type: path
+      value: ''
+
+  params:
+    # Load Hafnium SPMC binary at 0x06000000
+    # Spacing Offset 3: adds spacing to keep key unique for Shrinkwrap
+    '   --data cluster0.cpu0': out/reference/secure_aem_v8a_fvp_vhe_clang/hafnium.bin@0x6000000
+
+    # Load SPMC DTB at 0x0403F000
+    # Spacing Offset 4: prevents YAML key override
+    '    --data cluster0.cpu0': ${rtvar:SPMC_DTB}@0x403F000
+
+# Note: SPs inclusion is applied via overlay (dynamically generated) from hftest.py script.

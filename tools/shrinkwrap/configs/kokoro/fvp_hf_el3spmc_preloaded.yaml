@@ -1,0 +1,27 @@
+# Copyright 2025 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+%YAML 1.2
+---
+description: >-
+  Overlay to enable the Driver with Hafnium as EL3SPMC.
+  This overlay preloads the Hafnium EL3 SPMC and its associated artifacts
+  directly into the FVP model.
+
+run:
+  params:
+    # Set RVBAR (Reset Vector Base Address Register) for all CPUs
+    -C cluster0.cpu0.RVBAR: 0x4003000
+    -C cluster0.cpu1.RVBAR: 0x4003000
+    -C cluster0.cpu2.RVBAR: 0x4003000
+    -C cluster0.cpu3.RVBAR: 0x4003000
+    -C cluster1.cpu0.RVBAR: 0x4003000
+    -C cluster1.cpu1.RVBAR: 0x4003000
+    -C cluster1.cpu2.RVBAR: 0x4003000
+    -C cluster1.cpu3.RVBAR: 0x4003000
+
+    # Load BL31 (EL3 SPMC) at RVBAR
+    '--data cluster0.cpu0': prebuilts/linux-aarch64/trusted-firmware-a-el3-spmc/bl31.bin@0x4003000

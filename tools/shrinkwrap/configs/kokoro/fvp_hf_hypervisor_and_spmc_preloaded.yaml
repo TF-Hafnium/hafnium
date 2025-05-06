@@ -1,0 +1,53 @@
+
+# Copyright 2025 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+%YAML 1.2
+---
+description: >-
+  Overlay to enable the Driver with Hafnium as normal world Hypervisor as well
+  as Hafnium as SPMC.
+  This overlay preloads the Hafnium Hypervisor and SPMC its associated artifacts
+  directly into the FVP model.
+
+run:
+  # Runtime variables with default values; can be overridden by overlays
+  rtvars:
+    HYPERVISOR_DTB:
+      type: path
+      value: ''
+
+    INITRD:
+      type: path
+      value: ''
+
+    INITRD_START:
+      type: string
+      value: ''
+
+    SPMC_DTB:
+      type: path
+      value: ''
+
+  params:
+    # Load Hafnium binary at 0x88000000
+    # Spacing offset = 1: makes key unique for Shrinkwrap
+    ' --data cluster0.cpu0': out/reference/aem_v8a_fvp_vhe_clang/hafnium.bin@0x88000000
+
+    # Load Hypervisor DTB at 0x82000000
+    # Spacing offset = 2: makes key unique for Shrinkwrap & prevents key override
+    '  --data cluster0.cpu0': ${rtvar:HYPERVISOR_DTB}@0x82000000
+
+    # Load Hafnium SPMC binary at 0x06000000
+    # Spacing Offset 3: adds spacing to keep key unique for Shrinkwrap
+    '   --data cluster0.cpu0': out/reference/secure_aem_v8a_fvp_vhe_clang/hafnium.bin@0x6000000
+
+    # Load SPMC DTB at 0x0403F000
+    # Spacing Offset 4: prevents YAML key override
+    '    --data cluster0.cpu0': ${rtvar:SPMC_DTB}@0x403F000
+
+# Note:
+# VMs and SPs inclusion is applied via overlay (dynamically generated) from hftest.py script.

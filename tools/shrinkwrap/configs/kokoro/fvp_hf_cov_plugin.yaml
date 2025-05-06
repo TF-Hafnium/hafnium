@@ -1,0 +1,19 @@
+# Copyright 2025 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+%YAML 1.2
+---
+description: >-
+  Overlay to enable FVP coverage plugin.
+
+run:
+  rtvars:
+    COV_PLUGIN:
+      type: path
+      value: ''  # Filled dynamically at test runtime.
+
+  params:
+    --plugin: ${rtvar:COV_PLUGIN}
