@@ -98,6 +98,11 @@ void api_init(struct mpool *ppool)
 	mpool_init_from(&api_page_pool, ppool);
 }
 
+struct mpool *api_get_ppool(void)
+{
+	return &api_page_pool;
+}
+
 /**
  * Get target VM vCPU:
  * If VM is UP then return first vCPU.
@@ -1992,7 +1997,7 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 
 	vm->mailbox.send = NULL;
 	vm->mailbox.recv = NULL;
-	ffa_vm_destroy(vm_locked);
+	ffa_vm_nwd_free(vm_locked);
 
 	/* Forward buffer unmapping to SPMC if coming from a VM. */
 	ffa_setup_rxtx_unmap_forward(vm_locked);

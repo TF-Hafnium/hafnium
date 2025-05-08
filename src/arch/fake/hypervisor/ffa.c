@@ -76,7 +76,7 @@ bool ffa_cpu_cycles_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 	return false;
 }
 
-void ffa_vm_destroy(struct vm_locked to_destroy_locked)
+void ffa_vm_nwd_free(struct vm_locked to_destroy_locked)
 {
 	(void)to_destroy_locked;
 }
@@ -604,11 +604,13 @@ ffa_memory_attributes_t ffa_memory_add_security_bit_from_mode(
 
 struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 					 struct vcpu **next,
-					 enum ffa_error error_code)
+					 enum ffa_error error_code,
+					 struct mpool *ppool)
 {
 	(void)current;
 	(void)next;
 	(void)error_code;
+	(void)ppool;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
@@ -618,9 +620,10 @@ bool ffa_setup_partition_info_get_regs_forward_allowed(void)
 	return false;
 }
 
-void ffa_vm_free_resources(struct vm_locked vm_locked)
+void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
 {
 	(void)vm_locked;
+	(void)ppool;
 }
 
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,

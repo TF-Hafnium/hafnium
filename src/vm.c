@@ -480,6 +480,30 @@ void vm_notifications_init(struct vm *vm, ffa_vcpu_count_t vcpu_count,
 	vm_notifications_init_bindings(&vm->notifications.from_vm);
 }
 
+void vm_reset_notifications(struct vm_locked vm_locked, struct mpool *ppool)
+{
+	struct vm *vm = vm_locked.vm;
+
+	/* Clear from_vm notifications. */
+	struct notifications *from_vm = &vm->notifications.from_vm;
+
+	/* Clear from_sp notifications. */
+	struct notifications *from_sp = &vm->notifications.from_sp;
+
+	size_t notif_ppool_entries =
+		(align_up(sizeof(struct notifications_state) * (vm->vcpu_count),
+			  MM_PPOOL_ENTRY_SIZE) /
+		 MM_PPOOL_ENTRY_SIZE);
+
+	/*
+	 * Free the memory allocated to per_vcpu notifications state.
+	 * The other fields related to notifications need not be cleared
+	 * explicitly here as they will be zeroed during vm reinitialization.
+	 */
+	mpool_add_chunk(ppool, from_vm->per_vcpu, notif_ppool_entries);
+	mpool_add_chunk(ppool, from_sp->per_vcpu, notif_ppool_entries);
+}
+
 /**
  * Checks if there are pending notifications.
  */

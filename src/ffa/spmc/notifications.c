@@ -20,8 +20,6 @@
 #include "hf/types.h"
 #include "hf/vm.h"
 
-#include "./vm.h"
-
 /** Interrupt priority for the Schedule Receiver Interrupt. */
 #define SRI_PRIORITY UINT32_C(0xf0)
 
@@ -252,7 +250,7 @@ struct ffa_value ffa_notifications_bitmap_create(ffa_id_t vm_id,
 		vm_locked.vm->notifications.enabled = true;
 	} else {
 		/* Else should regard with NWd VM ID. */
-		vm_locked = ffa_vm_nwd_create(vm_id);
+		vm_locked = ffa_vm_nwd_alloc(vm_id);
 
 		/* If received NULL, there are no slots for VM creation. */
 		if (vm_locked.vm == NULL) {
@@ -313,7 +311,7 @@ struct ffa_value ffa_notifications_bitmap_destroy(ffa_id_t vm_id)
 	vm_notifications_init(to_destroy_locked.vm,
 			      to_destroy_locked.vm->vcpu_count, NULL);
 	if (vm_id != HF_OTHER_WORLD_ID) {
-		ffa_vm_destroy(to_destroy_locked);
+		ffa_vm_nwd_free(to_destroy_locked);
 	}
 
 out:

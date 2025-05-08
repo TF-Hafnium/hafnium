@@ -46,7 +46,8 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 
 struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 					 struct vcpu **next,
-					 enum ffa_error error_code);
+					 enum ffa_error error_code,
+					 struct mpool *ppool);
 
 struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked current_locked,
 				      struct vcpu **next);

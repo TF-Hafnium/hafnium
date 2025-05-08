@@ -583,7 +583,8 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_console_log(*args, current);
 		return true;
 	case FFA_ERROR_32:
-		*args = ffa_cpu_cycles_error_32(current, next, args->arg2);
+		*args = ffa_cpu_cycles_error_32(current, next, args->arg2,
+						api_get_ppool());
 		return true;
 	case FFA_ABORT_32:
 	case FFA_ABORT_64:
@@ -1141,7 +1142,7 @@ struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next)
 	 * SPMC de-allocates and/or uninitializes all the resources allocated
 	 * to the partition.
 	 */
-	ffa_vm_free_resources(vm_locked);
+	ffa_vm_free_resources(vm_locked, api_get_ppool());
 	vm_unlock(&vm_locked);
 
 	/*

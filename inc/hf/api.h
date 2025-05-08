@@ -22,6 +22,7 @@ static inline struct ffa_value api_ffa_interrupt_return(uint32_t id)
 }
 
 void api_init(struct mpool *ppool);
+struct mpool *api_get_ppool(void);
 struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current);
 void api_regs_state_saved(struct vcpu *vcpu);
 int64_t api_mailbox_writable_get(const struct vcpu *current);

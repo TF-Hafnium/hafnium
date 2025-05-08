@@ -10,6 +10,7 @@
 
 #include "hf/arch/std.h"
 
+#include "hf/api.h"
 #include "hf/check.h"
 #include "hf/ffa/vm.h"
 #include "hf/plat/interrupts.h"
@@ -73,7 +74,7 @@ static struct vm_locked ffa_vm_nwd_find_locked(
  * If a VM with the ID already exists return it.
  * Return NULL if it can't allocate a new VM.
  */
-struct vm_locked ffa_vm_nwd_create(ffa_id_t vm_id)
+struct vm_locked ffa_vm_nwd_alloc(ffa_id_t vm_id)
 {
 	struct vm_locked vm_locked;
 	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
@@ -105,7 +106,7 @@ out:
 	return vm_locked;
 }
 
-void ffa_vm_destroy(struct vm_locked to_destroy_locked)
+void ffa_vm_nwd_free(struct vm_locked to_destroy_locked)
 {
 	struct vm *vm = to_destroy_locked.vm;
 	/*
@@ -171,7 +172,7 @@ struct vm_locked ffa_vm_find_locked_create(ffa_id_t vm_id)
 		return vm_find_locked(vm_id);
 	}
 
-	return ffa_vm_nwd_create(vm_id);
+	return ffa_vm_nwd_alloc(vm_id);
 }
 
 bool ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,
@@ -235,10 +236,16 @@ void ffa_vm_disable_interrupts(struct vm_locked vm_locked)
 /**
  * Reclaim all resources belonging to VM in aborted state.
  */
-void ffa_vm_free_resources(struct vm_locked vm_locked)
+void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
 {
 	/*
 	 * Gracefully disable all interrupts belonging to SP.
 	 */
 	ffa_vm_disable_interrupts(vm_locked);
+
+	/*
+	 * Reset all notifications for this partition i.e. clear and unbind
+	 * them.
+	 */
+	vm_reset_notifications(vm_locked, ppool);
 }

@@ -357,6 +357,7 @@ bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
 
 void vm_notifications_init(struct vm *vm, ffa_vcpu_count_t vcpu_count,
 			   struct mpool *ppool);
+void vm_reset_notifications(struct vm_locked vm_locked, struct mpool *ppool);
 bool vm_mailbox_state_busy(struct vm_locked vm_locked);
 bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 				  ffa_notifications_bitmap_t notifications);

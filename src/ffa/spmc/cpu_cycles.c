@@ -843,7 +843,8 @@ bool ffa_cpu_cycles_check_runtime_state_transition(
  */
 struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 					 struct vcpu **next,
-					 enum ffa_error error_code)
+					 enum ffa_error error_code,
+					 struct mpool *ppool)
 {
 	struct vcpu_locked current_locked;
 	struct vm_locked vm_locked;
@@ -859,7 +860,7 @@ struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 			   vcpu_index(current));
 
 		CHECK(vm_set_state(vm_locked, VM_STATE_ABORTING));
-		ffa_vm_free_resources(vm_locked);
+		ffa_vm_free_resources(vm_locked, ppool);
 
 		if (sp_boot_next(current_locked, next)) {
 			goto out;

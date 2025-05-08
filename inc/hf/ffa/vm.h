@@ -14,7 +14,7 @@ void ffa_vm_disable_interrupts(struct vm_locked vm_locked);
 
 void ffa_vm_init(struct mpool *ppool);
 
-struct vm_locked ffa_vm_nwd_create(ffa_id_t vm_id);
+struct vm_locked ffa_vm_nwd_alloc(ffa_id_t vm_id);
 
 bool ffa_vm_supports_indirect_messages(struct vm *vm);
 
@@ -27,10 +27,10 @@ struct vm_locked ffa_vm_find_locked(ffa_id_t vm_id);
 
 struct vm_locked ffa_vm_find_locked_create(ffa_id_t vm_id);
 
-void ffa_vm_destroy(struct vm_locked to_destroy_locked);
+void ffa_vm_nwd_free(struct vm_locked to_destroy_locked);
 
 /** Reclaim all resources belonging to VM in aborted state. */
-void ffa_vm_free_resources(struct vm_locked vm_locked);
+void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool);
 
 /** Checks whether managed exit is supported by given SP. */
 bool ffa_vm_managed_exit_supported(struct vm *vm);

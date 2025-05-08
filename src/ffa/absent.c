@@ -105,7 +105,7 @@ void ffa_setup_rxtx_map_forward(struct vm_locked vm_locked)
 	(void)vm_locked;
 }
 
-void ffa_vm_destroy(struct vm_locked to_destroy_locked)
+void ffa_vm_nwd_free(struct vm_locked to_destroy_locked)
 {
 	(void)to_destroy_locked;
 }
@@ -571,9 +571,10 @@ bool ffa_setup_partition_info_get_regs_forward_allowed(void)
 	return false;
 }
 
-void ffa_vm_free_resources(struct vm_locked vm_locked)
+void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
 {
 	(void)vm_locked;
+	(void)ppool;
 }
 
 bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,

@@ -49,13 +49,14 @@ bool ffa_vm_notifications_info_get(	     // NOLINTNEXTLINE
 	return false;
 }
 
-void ffa_vm_destroy(struct vm_locked to_destroy_locked)
+void ffa_vm_nwd_free(struct vm_locked to_destroy_locked)
 {
 	/* Hypervisor never frees VM structs. */
 	(void)to_destroy_locked;
 }
 
-void ffa_vm_free_resources(struct vm_locked vm_locked)
+void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
 {
 	(void)vm_locked;
+	(void)ppool;
 }
