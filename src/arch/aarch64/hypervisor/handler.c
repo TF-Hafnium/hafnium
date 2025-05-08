@@ -1136,7 +1136,7 @@ struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next)
 	 * A partition exection is in ABORTED state after it encounters a fatal
 	 * error.
 	 */
-	current->state = VCPU_STATE_ABORTED;
+	CHECK(vcpu_state_set(current_locked, VCPU_STATE_ABORTED));
 
 	/*
 	 * SPMC de-allocates and/or uninitializes all the resources allocated
@@ -1144,6 +1144,12 @@ struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next)
 	 */
 	ffa_vm_free_resources(vm_locked);
 	vm_unlock(&vm_locked);
+
+	/*
+	 * Move the vCPU to STOPPED state as all its resources have been
+	 * reclaimed by SPMC by now.
+	 */
+	CHECK(vcpu_state_set(current_locked, VCPU_STATE_STOPPED));
 
 	/*
 	 * SPMC performs necessary operations based on the abort action for

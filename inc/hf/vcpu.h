@@ -352,3 +352,4 @@ void vcpu_dir_req_set_state(struct vcpu_locked target_locked, bool is_ffa_req2,
 			    ffa_id_t sender_vm_id, struct ffa_value args);
 
 void vcpu_dir_req_reset_state(struct vcpu_locked vcpu_locked);
+bool vcpu_state_set(struct vcpu_locked vcpu_locked, enum vcpu_state to);

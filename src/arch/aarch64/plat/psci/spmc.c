@@ -148,7 +148,7 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 				       0ULL);
 
 	/* Set the vCPU's state to STARTING. */
-	boot_vcpu->state = VCPU_STATE_STARTING;
+	CHECK(vcpu_state_set(vcpu_locked, VCPU_STATE_STARTING));
 	boot_vcpu->regs_available = false;
 
 	/* vCPU restarts in runtime model for SP initialization. */

@@ -143,7 +143,7 @@ struct vcpu *api_switch_to_vm(struct vcpu_locked current_locked,
 	arch_regs_set_retval(&next->regs, to_ret);
 
 	/* Set the current vCPU state. */
-	current_locked.vcpu->state = vcpu_state;
+	CHECK(vcpu_state_set(current_locked, vcpu_state));
 
 	return next;
 }
@@ -1319,7 +1319,8 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 			vcpu->rt_model = RTM_NONE;
 
 			vcpu_was_init_state = true;
-			vcpu->state = VCPU_STATE_STARTING;
+			CHECK(vcpu_state_set(vcpu_next_locked,
+					     VCPU_STATE_STARTING));
 			break;
 		}
 		*run_ret = ffa_error(FFA_BUSY);
@@ -1487,7 +1488,7 @@ struct ffa_value api_ffa_run(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 
 	assert(!vm_id_is_current_world(current->vm->id) ||
 	       next_state == VCPU_STATE_BLOCKED);
-	current->state = VCPU_STATE_BLOCKED;
+	CHECK(vcpu_state_set(current_locked, VCPU_STATE_BLOCKED));
 
 	/*
 	 * Set a placeholder return code to the scheduler. This will be
@@ -2970,7 +2971,8 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 				"Receiver VM %#x aborted, cannot run vCPU %u\n",
 				receiver_vcpu->vm->id,
 				vcpu_index(receiver_vcpu));
-			receiver_vcpu->state = VCPU_STATE_ABORTED;
+			CHECK(vcpu_state_set(receiver_vcpu_locked,
+					     VCPU_STATE_ABORTED));
 		}
 	}
 
@@ -3016,7 +3018,7 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 
 	assert(!vm_id_is_current_world(current->vm->id) ||
 	       next_state == VCPU_STATE_BLOCKED);
-	current->state = VCPU_STATE_BLOCKED;
+	CHECK(vcpu_state_set(current_locked, VCPU_STATE_BLOCKED));
 
 	ffa_direct_msg_wind_call_chain_ffa_direct_req(
 		current_locked, receiver_vcpu_locked, sender_vm_id);
@@ -3251,6 +3253,9 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 	api_inject_arch_timer_interrupt(next_locked);
 	ffa_direct_msg_unwind_call_chain_ffa_direct_resp(current_locked,
 							 next_locked);
+
+	/* Schedule the receiver's vCPU now. */
+	CHECK(vcpu_state_set(next_locked, VCPU_STATE_RUNNING));
 
 	/*
 	 * Check if there is a pending interrupt, and if the partition

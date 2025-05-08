@@ -135,7 +135,7 @@ static void ffa_interrupts_set_preempted_vcpu(
 	assert(preempted_vcpu != NULL);
 
 	target_vcpu->preempted_vcpu = preempted_vcpu;
-	preempted_vcpu->state = VCPU_STATE_PREEMPTED;
+	CHECK(vcpu_state_set(current_locked, VCPU_STATE_PREEMPTED));
 }
 
 /**
@@ -564,7 +564,7 @@ struct vcpu *ffa_interrupts_unwind_nwd_call_chain(struct vcpu *current_vcpu)
 
 	/* Removing a node from an existing call chain. */
 	current_vcpu->call_chain.prev_node = NULL;
-	current_vcpu->state = VCPU_STATE_PREEMPTED;
+	CHECK(vcpu_state_set(both_vcpu_locked.vcpu1, VCPU_STATE_PREEMPTED));
 
 	/*
 	 * SPMC applies the runtime model till when the vCPU transitions from

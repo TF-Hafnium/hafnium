@@ -626,7 +626,7 @@ static struct ffa_value handle_sp_cpu_off_framework_resp(
 	vcpu_dir_req_reset_state(current_locked);
 
 	/* Turn off the vCPU.*/
-	current->state = VCPU_STATE_OFF;
+	CHECK(vcpu_state_set(current_locked, VCPU_STATE_OFF));
 	dlog_verbose("SPMC turned off vCPU%zu of SP%#x\n",
 		     cpu_index(current->cpu), current->vm->id);
 

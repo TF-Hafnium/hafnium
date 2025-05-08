@@ -209,7 +209,7 @@ static struct ffa_value ffa_cpu_cycles_preempted_vcpu_resume(
 	ffa_cpu_cycles_exit_spmc_schedule_mode(current_locked);
 	assert(current->call_chain.prev_node == NULL);
 
-	current->state = VCPU_STATE_WAITING;
+	CHECK(vcpu_state_set(current_locked, VCPU_STATE_WAITING));
 
 	vcpu_set_running(target_locked, NULL);
 
@@ -307,7 +307,7 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 		next_vm = vm_get_next_boot_secondary_core(current->vm);
 	}
 
-	current->state = VCPU_STATE_WAITING;
+	CHECK(vcpu_state_set(current_locked, VCPU_STATE_WAITING));
 	current->rt_model = RTM_NONE;
 	current->scheduling_mode = NONE;
 
@@ -330,10 +330,13 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 	 */
 	if (vcpu_next->rt_model == RTM_SP_INIT ||
 	    vcpu_next->state == VCPU_STATE_OFF) {
+		struct vcpu_locked vcpu_next_locked;
+
+		vcpu_next_locked = vcpu_lock(vcpu_next);
 		vcpu_next->rt_model = RTM_SP_INIT;
 		arch_regs_reset(vcpu_next);
 		vcpu_next->cpu = current->cpu;
-		vcpu_next->state = VCPU_STATE_STARTING;
+		CHECK(vcpu_state_set(vcpu_next_locked, VCPU_STATE_STARTING));
 		vcpu_next->regs_available = false;
 		vcpu_set_phys_core_idx(vcpu_next);
 		arch_regs_set_pc_arg(&vcpu_next->regs,
@@ -347,6 +350,7 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 			vcpu_set_boot_info_gp_reg(vcpu_next);
 		}
 
+		vcpu_unlock(&vcpu_next_locked);
 		*next = vcpu_next;
 
 		return true;
@@ -487,6 +491,8 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 			*next = api_switch_to_other_world(current_locked, ret,
 							  VCPU_STATE_BLOCKED);
 		} else {
+			struct two_vcpu_locked vcpus_locked;
+
 			/*
 			 * Relinquish cycles to the SP that sent direct request
 			 * message to the current SP.
@@ -494,6 +500,14 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 			*next = api_switch_to_vm(
 				current_locked, ret, VCPU_STATE_BLOCKED,
 				current->direct_request_origin.vm_id);
+
+			vcpu_unlock(&current_locked);
+
+			/* Lock both vCPUs at once to avoid deadlock. */
+			vcpus_locked = vcpu_lock_both(current, *next);
+
+			vcpu_state_set(vcpus_locked.vcpu2, VCPU_STATE_RUNNING);
+			vcpu_unlock(&vcpus_locked.vcpu2);
 		}
 		break;
 	case RTM_SEC_INTERRUPT: {

@@ -84,7 +84,7 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 void vcpu_prepare(struct vcpu_locked vcpu, ipaddr_t entry, uintreg_t arg)
 {
 	arch_regs_set_pc_arg(&vcpu.vcpu->regs, entry, arg);
-	vcpu.vcpu->state = VCPU_STATE_CREATED;
+	CHECK(vcpu_state_set(vcpu, VCPU_STATE_CREATED));
 }
 
 ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu)
@@ -686,4 +686,147 @@ void vcpu_dir_req_reset_state(struct vcpu_locked vcpu_locked)
 	/* Reset runtime model and scheduling mode. */
 	vcpu->scheduling_mode = NONE;
 	vcpu->rt_model = RTM_NONE;
+}
+
+static inline const char *vcpu_state_print_name(enum vcpu_state state)
+{
+	switch (state) {
+	case VCPU_STATE_OFF:
+		return "VCPU_STATE_OFF";
+	case VCPU_STATE_RUNNING:
+		return "VCPU_STATE_RUNNING";
+	case VCPU_STATE_WAITING:
+		return "VCPU_STATE_WAITING";
+	case VCPU_STATE_BLOCKED:
+		return "VCPU_STATE_BLOCKED";
+	case VCPU_STATE_PREEMPTED:
+		return "VCPU_STATE_PREEMPTED";
+	case VCPU_STATE_BLOCKED_INTERRUPT:
+		return "VCPU_STATE_BLOCKED_INTERRUPT";
+	case VCPU_STATE_ABORTED:
+		return "VCPU_STATE_ABORTED";
+	case VCPU_STATE_NULL:
+		return "VCPU_STATE_NULL";
+	case VCPU_STATE_STOPPED:
+		return "VCPU_STATE_STOPPED";
+	case VCPU_STATE_CREATED:
+		return "VCPU_STATE_CREATED";
+	case VCPU_STATE_STARTING:
+		return "VCPU_STATE_STARTING";
+	case VCPU_STATE_STOPPING:
+		return "VCPU_STATE_STOPPING";
+	}
+}
+
+static bool vcpu_is_valid_transition_from_starting_running_state(
+	enum vcpu_state to_state)
+{
+	switch (to_state) {
+	case VCPU_STATE_WAITING:
+	case VCPU_STATE_BLOCKED:
+	case VCPU_STATE_PREEMPTED:
+	case VCPU_STATE_ABORTED:
+	case VCPU_STATE_STOPPING:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool vcpu_is_valid_transition_from_stopping_state(
+	enum vcpu_state to_state)
+{
+	switch (to_state) {
+	case VCPU_STATE_WAITING:
+	case VCPU_STATE_BLOCKED:
+	case VCPU_STATE_PREEMPTED:
+	case VCPU_STATE_ABORTED:
+	case VCPU_STATE_STOPPED:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool vcpu_state_set(struct vcpu_locked vcpu_locked, enum vcpu_state to_state)
+{
+	struct vcpu *vcpu = vcpu_locked.vcpu;
+	enum vcpu_state from_state = vcpu->state;
+	bool ret;
+
+	/*
+	 * SPMC can turn off a vCPU, irrespective of the present state, when it
+	 * receives CPU_OFF power management message from SPMD.
+	 */
+	if (ffa_is_vm_id(vcpu->vm->id) || from_state == to_state ||
+	    to_state == VCPU_STATE_OFF) {
+		ret = true;
+		goto out;
+	}
+
+	switch (from_state) {
+	case VCPU_STATE_OFF:
+		/*
+		 * When a CPU is powered on after previously being powered down,
+		 * the pinned vCPU of an SP moves from OFF to CREATED before
+		 * transitioning to STARTING state.
+		 */
+		ret = (to_state == VCPU_STATE_STARTING ||
+		       to_state == VCPU_STATE_CREATED);
+		break;
+	case VCPU_STATE_NULL:
+		ret = (to_state == VCPU_STATE_CREATED);
+		break;
+	case VCPU_STATE_CREATED:
+		ret = (to_state == VCPU_STATE_STARTING);
+		break;
+	case VCPU_STATE_STARTING:
+	case VCPU_STATE_RUNNING:
+		ret = vcpu_is_valid_transition_from_starting_running_state(
+			to_state);
+		break;
+	case VCPU_STATE_STOPPING:
+		ret = vcpu_is_valid_transition_from_stopping_state(to_state);
+		break;
+	case VCPU_STATE_WAITING:
+		/*
+		 * A transition of vCPU from WAITING to ABORTED is legal. One
+		 * such scenario is when the endpoint was aborted.
+		 */
+		ret = (to_state == VCPU_STATE_RUNNING ||
+		       to_state == VCPU_STATE_OFF ||
+		       to_state == VCPU_STATE_ABORTED);
+		break;
+	case VCPU_STATE_BLOCKED:
+	case VCPU_STATE_BLOCKED_INTERRUPT:
+	case VCPU_STATE_PREEMPTED:
+		ret = (to_state == VCPU_STATE_RUNNING);
+		break;
+	case VCPU_STATE_ABORTED:
+		ret = (to_state == VCPU_STATE_NULL ||
+		       to_state == VCPU_STATE_STOPPED);
+		break;
+	case VCPU_STATE_STOPPED:
+		/*
+		 * A legacy SP will be put in ABORTED state by SPMC if it
+		 * encounters a fatal error in runtime.
+		 */
+		ret = (to_state == VCPU_STATE_CREATED ||
+		       to_state == VCPU_STATE_NULL ||
+		       to_state == VCPU_STATE_ABORTED);
+		break;
+	}
+out:
+	if (!ret) {
+		dlog_error(
+			"Partition %#x vCPU %u: transition from %s to %s "
+			"failed.\n",
+			vcpu->vm->id, (uint32_t)cpu_index(vcpu->cpu),
+			vcpu_state_print_name(from_state),
+			vcpu_state_print_name(to_state));
+	} else {
+		vcpu->state = to_state;
+	}
+
+	return ret;
 }
