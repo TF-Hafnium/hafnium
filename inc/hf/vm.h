@@ -324,6 +324,7 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
 		  struct vm **new_vm, bool el0_partition,
 		  uint8_t dma_device_count);
+bool vm_reinit(struct vm *vm, struct mpool *ppool);
 ffa_vm_count_t vm_get_count(void);
 struct vm *vm_find(ffa_id_t id);
 struct vm_locked vm_find_locked(ffa_id_t id);

@@ -53,26 +53,14 @@ static bool vm_init_mm(struct vm *vm, struct mpool *ppool)
 	return arch_vm_init_mm(vm, ppool) && arch_vm_iommu_init_mm(vm, ppool);
 }
 
-struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
-		   struct mpool *ppool, bool el0_partition,
-		   uint8_t dma_device_count)
+static bool vm_init_helper(struct vm *vm, ffa_id_t id,
+			   ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
+			   bool el0_partition, uint8_t dma_device_count)
 {
 	uint32_t i;
-	struct vm *vm;
 	size_t vcpu_ppool_entries = (align_up(sizeof(struct vcpu) * vcpu_count,
 					      MM_PPOOL_ENTRY_SIZE) /
 				     MM_PPOOL_ENTRY_SIZE);
-
-	if (id == HF_OTHER_WORLD_ID) {
-		CHECK(el0_partition == false);
-		vm = &other_world;
-	} else {
-		uint16_t vm_index = id - HF_VM_ID_OFFSET;
-
-		CHECK(id >= HF_VM_ID_OFFSET);
-		CHECK(vm_index < ARRAY_SIZE(vms));
-		vm = &vms[vm_index];
-	}
 
 	memset_s(vm, sizeof(*vm), 0, sizeof(*vm));
 
@@ -81,6 +69,7 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 	vm->id = id;
 	vm->vcpu_count = vcpu_count;
 
+	/* Reallocate from memory pool */
 	vm->vcpus = (struct vcpu *)mpool_alloc_contiguous(
 		ppool, vcpu_ppool_entries, 1);
 	CHECK(vm->vcpus != NULL);
@@ -90,7 +79,8 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 	vm->dma_device_count = dma_device_count;
 
 	if (!vm_init_mm(vm, ppool)) {
-		return NULL;
+		dlog_error("Failed to (re)build page tables\n");
+		return false;
 	}
 
 	/*
@@ -103,7 +93,33 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 
 	vm_notifications_init(vm, vcpu_count, ppool);
 	list_init(&vm->boot_list_node);
-	return vm;
+
+	return true;
+}
+
+struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
+		   struct mpool *ppool, bool el0_partition,
+		   uint8_t dma_device_count)
+{
+	struct vm *vm;
+
+	if (id == HF_OTHER_WORLD_ID) {
+		CHECK(el0_partition == false);
+		vm = &other_world;
+	} else {
+		uint16_t vm_index = id - HF_VM_ID_OFFSET;
+
+		CHECK(id >= HF_VM_ID_OFFSET);
+		CHECK(vm_index < ARRAY_SIZE(vms));
+		vm = &vms[vm_index];
+	}
+
+	if (vm_init_helper(vm, id, vcpu_count, ppool, el0_partition,
+			   dma_device_count)) {
+		return vm;
+	}
+
+	return NULL;
 }
 
 bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
@@ -121,6 +137,32 @@ bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
 		return false;
 	}
 	++vm_count;
+
+	return true;
+}
+
+bool vm_reinit(struct vm *vm, struct mpool *ppool)
+{
+	size_t vcpu_ppool_entries;
+	bool ret;
+
+	CHECK(vm != NULL);
+
+	vcpu_ppool_entries = (align_up(sizeof(struct vcpu) * (vm->vcpu_count),
+				       MM_PPOOL_ENTRY_SIZE) /
+			      MM_PPOOL_ENTRY_SIZE);
+
+	/* Free the chunk of memory and add back to memory pool. */
+	assert(vm->vcpus != NULL);
+	mpool_add_chunk(ppool, vm->vcpus, vcpu_ppool_entries);
+
+	ret = vm_init_helper(vm, vm->id, vm->vcpu_count, ppool,
+			     vm->el0_partition, vm->dma_device_count);
+
+	if (!ret) {
+		dlog_error("Failed to re-initialize VM.\n");
+		return false;
+	}
 
 	return true;
 }

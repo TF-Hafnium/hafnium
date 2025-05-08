@@ -537,7 +537,6 @@ static mm_mode_t device_region_attributes_to_mode(uint32_t attributes)
 
 static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 				   const struct vm_locked vm_locked,
-				   const struct vm_locked primary_vm_locked,
 				   bool is_el0_partition, struct mpool *ppool)
 {
 #if LOG_LEVEL >= LOG_LEVEL_WARNING
@@ -602,15 +601,6 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 			return false;
 		}
 
-		/* Deny the primary VM access to this memory */
-		if (!vm_unmap(primary_vm_locked, region_begin, region_end,
-			      ppool)) {
-			dlog_error(
-				"Unable to unmap secondary VM memory-"
-				"region from primary VM.\n");
-			return false;
-		}
-
 		dlog_verbose("Memory region %#lx - %#lx allocated.\n",
 			     pa_addr(region_begin), pa_addr(region_end));
 
@@ -646,6 +636,51 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 				"device-region.\n");
 			return false;
 		}
+		j++;
+	}
+	return true;
+}
+
+/*
+ * Deny the primary VM access to memory and device regions of partitions.
+ * Returns true on success, false on any failures.
+ */
+static bool ffa_memory_deny_pvm_access(const struct manifest_vm *manifest_vm,
+				       const struct vm_locked primary_vm_locked,
+				       struct mpool *ppool)
+{
+	int j = 0;
+	paddr_t region_begin;
+	paddr_t region_end;
+	size_t size;
+
+	while (j < manifest_vm->partition.mem_region_count) {
+		struct memory_region mem_region;
+
+		mem_region = manifest_vm->partition.mem_regions[j];
+		size = mem_region.page_count * PAGE_SIZE;
+		region_begin = pa_init(mem_region.base_address);
+		region_end = pa_add(region_begin, size);
+
+		/* Deny the primary VM access to this memory */
+		if (!vm_unmap(primary_vm_locked, region_begin, region_end,
+			      ppool)) {
+			dlog_error(
+				"Unable to unmap secondary VM memory-"
+				"region from primary VM.\n");
+			return false;
+		}
+		j++;
+	}
+
+	j = 0;
+	while (j < manifest_vm->partition.dev_region_count) {
+		region_begin = pa_init(
+			manifest_vm->partition.dev_regions[j].base_address);
+		size = manifest_vm->partition.dev_regions[j].page_count *
+		       PAGE_SIZE;
+		region_end = pa_add(region_begin, size);
+
 		/* Deny primary VM access to this region */
 		if (!vm_unmap(primary_vm_locked, region_begin, region_end,
 			      ppool)) {
@@ -660,86 +695,31 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 }
 
 /*
- * Loads a secondary VM.
+ * Helper to initialize or reinitialize a FF-A compliant partition and map
+ * its regions in relevant translation regime.
+ * Returns true on success, false on any failures.
  */
-static bool load_secondary(struct mm_stage1_locked stage1_locked,
-			   struct vm_locked primary_vm_locked,
-			   paddr_t mem_begin, paddr_t mem_end,
-			   const struct manifest_vm *manifest_vm,
-			   const struct boot_params *boot_params,
-			   const struct memiter *cpio, struct mpool *ppool)
+static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
+			       paddr_t mem_begin, paddr_t mem_end,
+			       const struct manifest_vm *manifest_vm,
+			       struct mpool *ppool, struct vm *current_vm,
+			       ipaddr_t *primary_ep)
 {
-	struct vm *vm;
+	struct vm *vm = current_vm;
 	struct vm_locked vm_locked;
 	struct vcpu_locked vcpu_locked;
 	struct vcpu *vcpu;
 	ipaddr_t partition_primary_ep;
 	bool ret;
-	paddr_t fdt_addr;
-	bool has_fdt;
-	size_t kernel_size = 0;
-	const size_t mem_size = pa_difference(mem_begin, mem_end);
 	mm_mode_t map_mode;
 	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0 ||
 				manifest_vm->partition.run_time_el == EL0;
-	size_t n;
 
-	/*
-	 * Load the kernel if a filename is specified in the VM manifest.
-	 * For an FF-A partition, kernel_filename is undefined indicating
-	 * the partition package has already been loaded prior to Hafnium
-	 * booting.
-	 */
-	if (!string_is_empty(&manifest_vm->kernel_filename)) {
-		if (!load_kernel(stage1_locked, mem_begin, mem_end, manifest_vm,
-				 cpio, ppool, &kernel_size)) {
-			dlog_error("Unable to load kernel.\n");
-			return false;
-		}
-	}
-
-	has_fdt = !string_is_empty(&manifest_vm->secondary.fdt_filename);
-	if (has_fdt) {
-		/*
-		 * Ensure that the FDT does not overwrite the kernel or overlap
-		 * its page, for the FDT to start at a page boundary.
-		 */
-		const size_t fdt_max_size =
-			mem_size - align_up(kernel_size, PAGE_SIZE);
-
-		size_t fdt_allocated_size;
-
-		if (!load_secondary_fdt(stage1_locked, mem_end, fdt_max_size,
-					manifest_vm, cpio, ppool, &fdt_addr,
-					&fdt_allocated_size)) {
-			dlog_error("Unable to load FDT.\n");
-			return false;
-		}
-
-		if (manifest_vm->is_ffa_partition) {
-			ffa_setup_parse_partition_manifest(
-				stage1_locked, fdt_addr, fdt_allocated_size,
-				manifest_vm, boot_params, ppool);
-		}
-
-		if (!fdt_patch_mem(stage1_locked, fdt_addr, fdt_allocated_size,
-				   mem_begin, mem_end, ppool)) {
-			dlog_error("Unable to patch FDT.\n");
-			return false;
-		}
-	}
 	/*
 	 * An S-EL0 partition must contain only 1 vCPU (UP migratable) per the
 	 * FF-A 1.0 spec.
 	 */
 	CHECK(!is_el0_partition || manifest_vm->secondary.vcpu_count == 1);
-
-	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm,
-			  is_el0_partition,
-			  manifest_vm->partition.dma_device_count)) {
-		dlog_error("Unable to initialise VM.\n");
-		return false;
-	}
 
 	vm_locked = vm_lock(vm);
 
@@ -766,8 +746,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	if (manifest_vm->is_ffa_partition) {
 		if (!ffa_map_memory_regions(manifest_vm, vm_locked,
-					    primary_vm_locked, is_el0_partition,
-					    ppool)) {
+					    is_el0_partition, ppool)) {
 			ret = false;
 			goto out;
 		}
@@ -817,25 +796,6 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	dlog_info("Loaded with %u vCPUs, entry at %#lx.\n",
 		  manifest_vm->secondary.vcpu_count, pa_addr(mem_begin));
 
-	vcpu = vm_get_vcpu(vm, 0);
-
-	vcpu_locked = vcpu_lock(vcpu);
-
-	if (has_fdt) {
-		vcpu_secondary_reset_and_start(
-			vcpu_locked, partition_primary_ep, pa_addr(fdt_addr));
-	} else {
-		/*
-		 * Without an FDT, secondary VMs expect the memory size to be
-		 * passed in register x0, which is what
-		 * vcpu_secondary_reset_and_start does in this case.
-		 */
-		vcpu_secondary_reset_and_start(vcpu_locked,
-					       partition_primary_ep, mem_size);
-	}
-
-	vcpu_unlock(&vcpu_locked);
-
 	/*
 	 * For all vCPUs,
 	 * in a VM: enable the notification pending virtual interrupt if
@@ -845,7 +805,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	 *          the virtual interrupts IDs matching the secure physical
 	 *          interrupt IDs declared in device regions.
 	 */
-	for (n = 0; n < manifest_vm->secondary.vcpu_count; n++) {
+	for (size_t n = 0; n < manifest_vm->secondary.vcpu_count; n++) {
 		vcpu = vm_get_vcpu(vm, n);
 		vcpu_locked = vcpu_lock(vcpu);
 		ffa_interrupts_enable_virtual_interrupts(vcpu_locked,
@@ -853,13 +813,116 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		vcpu_unlock(&vcpu_locked);
 	}
 
+	if (primary_ep != NULL) {
+		*primary_ep = partition_primary_ep;
+	}
+
 	ret = true;
 	CHECK(vm_set_state(vm_locked, VM_STATE_CREATED));
-
 out:
 	vm_unlock(&vm_locked);
 
 	return ret;
+}
+
+/*
+ * Loads a Secure Partition or a secondary VM.
+ */
+static bool load_secondary(struct mm_stage1_locked stage1_locked,
+			   struct vm_locked primary_vm_locked,
+			   paddr_t mem_begin, paddr_t mem_end,
+			   const struct manifest_vm *manifest_vm,
+			   const struct boot_params *boot_params,
+			   const struct memiter *cpio, struct mpool *ppool)
+{
+	struct vm *vm;
+	struct vcpu_locked vcpu_locked;
+	struct vcpu *vcpu;
+	ipaddr_t partition_primary_ep;
+	paddr_t fdt_addr = pa_init(0);
+	bool has_fdt;
+	size_t kernel_size = 0;
+	const size_t mem_size = pa_difference(mem_begin, mem_end);
+	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0 ||
+				manifest_vm->partition.run_time_el == EL0;
+
+	/*
+	 * Load the kernel if a filename is specified in the VM manifest.
+	 * For an FF-A partition, kernel_filename is undefined indicating
+	 * the partition package has already been loaded prior to Hafnium
+	 * booting.
+	 */
+	if (!string_is_empty(&manifest_vm->kernel_filename)) {
+		if (!load_kernel(stage1_locked, mem_begin, mem_end, manifest_vm,
+				 cpio, ppool, &kernel_size)) {
+			dlog_error("Unable to load kernel.\n");
+			return false;
+		}
+	}
+
+	has_fdt = !string_is_empty(&manifest_vm->secondary.fdt_filename);
+	if (has_fdt) {
+		/*
+		 * Ensure that the FDT does not overwrite the kernel or overlap
+		 * its page, for the FDT to start at a page boundary.
+		 */
+		const size_t fdt_max_size =
+			mem_size - align_up(kernel_size, PAGE_SIZE);
+
+		size_t fdt_allocated_size;
+
+		if (!load_secondary_fdt(stage1_locked, mem_end, fdt_max_size,
+					manifest_vm, cpio, ppool, &fdt_addr,
+					&fdt_allocated_size)) {
+			dlog_error("Unable to load FDT.\n");
+			return false;
+		}
+
+		if (manifest_vm->is_ffa_partition) {
+			ffa_setup_parse_partition_manifest(
+				stage1_locked, fdt_addr, fdt_allocated_size,
+				manifest_vm, boot_params, ppool);
+		}
+
+		if (!fdt_patch_mem(stage1_locked, fdt_addr, fdt_allocated_size,
+				   mem_begin, mem_end, ppool)) {
+			dlog_error("Unable to patch FDT.\n");
+			return false;
+		}
+	}
+
+	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm,
+			  is_el0_partition,
+			  manifest_vm->partition.dma_device_count)) {
+		dlog_error("Unable to initialise VM.\n");
+		return false;
+	}
+
+	if (!load_ffa_partition(stage1_locked, mem_begin, mem_end, manifest_vm,
+				ppool, vm, &partition_primary_ep)) {
+		return false;
+	}
+
+	vcpu = vm_get_vcpu(vm, 0);
+	vcpu_locked = vcpu_lock(vcpu);
+
+	if (has_fdt) {
+		vcpu_secondary_reset_and_start(
+			vcpu_locked, partition_primary_ep, pa_addr(fdt_addr));
+	} else {
+		/*
+		 * Without an FDT, secondary VMs expect the memory size
+		 * to be passed in register x0, which is what
+		 * vcpu_secondary_reset_and_start does in this case.
+		 */
+		vcpu_secondary_reset_and_start(vcpu_locked,
+					       partition_primary_ep, mem_size);
+	}
+
+	vcpu_unlock(&vcpu_locked);
+
+	return ffa_memory_deny_pvm_access(manifest_vm, primary_vm_locked,
+					  ppool);
 }
 
 /**
