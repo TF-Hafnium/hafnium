@@ -238,7 +238,7 @@ bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id, bool stage1,
 /**
  * Frees all memory associated with the give page table.
  */
-static void mm_ptable_fini(const struct mm_ptable *ptable, struct mpool *ppool)
+void mm_ptable_fini(const struct mm_ptable *ptable, struct mpool *ppool)
 {
 	struct mm_page_table *root_tables = ptable->root_tables;
 	mm_level_t root_level = mm_root_level(ptable);

@@ -160,6 +160,8 @@ bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id, bool stage1,
 		    struct mpool *ppool);
 ptable_addr_t mm_ptable_addr_space_end(const struct mm_ptable *ptable);
 
+void mm_ptable_fini(const struct mm_ptable *ptable, struct mpool *ppool);
+
 bool mm_vm_init(struct mm_ptable *ptable, mm_asid_t id, struct mpool *ppool);
 void mm_vm_fini(const struct mm_ptable *ptable, struct mpool *ppool);
 

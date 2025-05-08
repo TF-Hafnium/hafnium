@@ -664,3 +664,15 @@ bool ffa_direct_msg_handle_framework_msg_resp(struct ffa_value args,
 
 	return false;
 }
+
+void arch_vm_fini_mm(struct vm *vm, struct mpool *ppool)
+{
+	(void)vm;
+	(void)ppool;
+}
+
+void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool)
+{
+	(void)vm;
+	(void)ppool;
+}

@@ -30,3 +30,5 @@ bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
 				   paddr_t end, mm_mode_t mode,
 				   struct mpool *ppool, ipaddr_t *ipa,
 				   uint8_t dma_device_id);
+void arch_vm_fini_mm(struct vm *vm, struct mpool *ppool);
+void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool);

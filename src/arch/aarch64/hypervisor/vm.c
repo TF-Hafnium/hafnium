@@ -300,3 +300,35 @@ bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
 
 	return true;
 }
+
+void arch_vm_fini_mm(struct vm *vm, struct mpool *ppool)
+{
+	if (vm->el0_partition) {
+		mm_ptable_fini(&vm->ptable, ppool);
+		return;
+	}
+
+	mm_vm_fini(&vm->ptable, ppool);
+
+#if SECURE_WORLD == 1
+	mm_vm_fini(&vm->arch.ptable_ns, ppool);
+#endif
+}
+
+void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool)
+{
+	if (vm->el0_partition) {
+		return;
+	}
+
+	for (uint8_t k = 0; k < vm->dma_device_count; k++) {
+		/*
+		 * Hafnium maintains an independent set of page tables for each
+		 * DMA device that is upstream of given VM.
+		 */
+		mm_ptable_fini(&vm->iommu_ptables[k], ppool);
+#if SECURE_WORLD == 1
+		mm_ptable_fini(&vm->arch.iommu_ptables_ns[k], ppool);
+#endif
+	}
+}

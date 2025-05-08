@@ -358,6 +358,15 @@ void vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
 }
 
 /**
+ * Free all page tables associated with a partition.
+ */
+void vm_free_ptables(struct vm *vm, struct mpool *ppool)
+{
+	arch_vm_fini_mm(vm, ppool);
+	arch_vm_iommu_fini_mm(vm, ppool);
+}
+
+/**
  * Unmaps the hypervisor pages from the given page table.
  */
 bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool)
