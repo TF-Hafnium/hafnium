@@ -147,8 +147,9 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	vcpu_secondary_reset_and_start(vcpu_locked, boot_vcpu->vm->secondary_ep,
 				       0ULL);
 
-	/* Set the vCPU's state to RUNNING. */
-	vcpu_set_running(vcpu_locked, NULL);
+	/* Set the vCPU's state to STARTING. */
+	boot_vcpu->state = VCPU_STATE_STARTING;
+	boot_vcpu->regs_available = false;
 
 	/* vCPU restarts in runtime model for SP initialization. */
 	boot_vcpu->rt_model = RTM_SP_INIT;

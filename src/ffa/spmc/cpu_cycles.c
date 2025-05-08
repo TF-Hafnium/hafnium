@@ -333,7 +333,7 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 		vcpu_next->rt_model = RTM_SP_INIT;
 		arch_regs_reset(vcpu_next);
 		vcpu_next->cpu = current->cpu;
-		vcpu_next->state = VCPU_STATE_RUNNING;
+		vcpu_next->state = VCPU_STATE_STARTING;
 		vcpu_next->regs_available = false;
 		vcpu_set_phys_core_idx(vcpu_next);
 		arch_regs_set_pc_arg(&vcpu_next->regs,
@@ -709,6 +709,8 @@ static bool ffa_cpu_cycles_check_rtm_sp_init(struct vcpu_locked current_locked,
 					     uint32_t func,
 					     enum vcpu_state *next_state)
 {
+	assert(current_locked.vcpu->state == VCPU_STATE_STARTING);
+
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:

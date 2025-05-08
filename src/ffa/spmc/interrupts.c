@@ -378,6 +378,7 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt(
 		}
 		break;
 	case VCPU_STATE_RUNNING:
+	case VCPU_STATE_STARTING:
 		/*
 		 * Interrupt has been injected in the vCPU state.
 		 */

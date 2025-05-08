@@ -1262,7 +1262,8 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 	 * until this has finished, so count this state as still running for the
 	 * purposes of this check.
 	 */
-	if (vcpu->state == VCPU_STATE_RUNNING || !vcpu->regs_available) {
+	if (vcpu->state == VCPU_STATE_RUNNING ||
+	    vcpu->state == VCPU_STATE_STARTING || !vcpu->regs_available) {
 		/*
 		 * vCPU is running on another pCPU.
 		 *
@@ -1276,39 +1277,56 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 	}
 
 	if (atomic_load_explicit(&vcpu->vm->aborting, memory_order_relaxed)) {
-		if (vcpu->state != VCPU_STATE_ABORTED) {
+		if (vcpu->state != VCPU_STATE_NULL &&
+		    vcpu->state != VCPU_STATE_STOPPED &&
+		    vcpu->state != VCPU_STATE_ABORTED) {
 			dlog_verbose("VM %#x was aborted, cannot run vCPU %u\n",
 				     vcpu->vm->id, vcpu_index(vcpu));
 			vcpu->state = VCPU_STATE_ABORTED;
 		}
-		*run_ret = ffa_error(FFA_ABORTED);
-		ret = false;
-		goto out;
 	}
 
 	switch (vcpu->state) {
+	case VCPU_STATE_ABORTED:
+		if (vcpu->vm->lifecycle_support) {
+			*run_ret = ffa_error(FFA_BUSY);
+		} else {
+			*run_ret = ffa_error(FFA_ABORTED);
+		}
+		ret = false;
+		goto out;
+	case VCPU_STATE_NULL:
+		*run_ret = ffa_error(FFA_INVALID_PARAMETERS);
+		ret = false;
+		goto out;
+	case VCPU_STATE_STOPPED:
+	case VCPU_STATE_STARTING:
+		*run_ret = ffa_error(FFA_BUSY);
+		[[fallthrough]];
 	case VCPU_STATE_RUNNING:
 	case VCPU_STATE_OFF:
-	case VCPU_STATE_ABORTED:
+		ret = false;
+		goto out;
+
+	case VCPU_STATE_CREATED:
+		/*
+		 * An initial FFA_RUN is necessary for vCPUs of secondary VMs
+		 * to reach the message wait loop. Note that vCPU(s) of Secure
+		 * Partitions don't need it.
+		 */
+		if (ffa_is_vm_id(vcpu->vm->id)) {
+			assert(vcpu->rt_model == RTM_SP_INIT);
+			vcpu->rt_model = RTM_NONE;
+
+			vcpu_was_init_state = true;
+			vcpu->state = VCPU_STATE_STARTING;
+			break;
+		}
+		*run_ret = ffa_error(FFA_BUSY);
 		ret = false;
 		goto out;
 
 	case VCPU_STATE_WAITING:
-		/*
-		 * An initial FFA_RUN is necessary for SP's secondary vCPUs to
-		 * reach the message wait loop.
-		 */
-		if (vcpu->rt_model == RTM_SP_INIT) {
-			/*
-			 * TODO: this should be removed, but omitting it makes
-			 * normal world arch gicv3 tests failing.
-			 */
-			vcpu->rt_model = RTM_NONE;
-
-			vcpu_was_init_state = true;
-			break;
-		}
-
 		assert(need_vm_lock == true);
 		if (!vm_locked.vm->el0_partition) {
 			ffa_interrupts_inject_notification_pending_interrupt(
@@ -1358,7 +1376,8 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 		goto out;
 
 	case VCPU_STATE_BLOCKED:
-		/* A blocked vCPU is run unconditionally. Fall through. */
+		/* A blocked vCPU is run unconditionally. */
+		[[fallthrough]];
 	case VCPU_STATE_PREEMPTED:
 		/* Check NPI is to be injected here. */
 		if (need_vm_lock) {
@@ -2944,26 +2963,38 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 
 	if (atomic_load_explicit(&receiver_vcpu->vm->aborting,
 				 memory_order_relaxed)) {
-		if (receiver_vcpu->state != VCPU_STATE_ABORTED) {
+		if (receiver_vcpu->state != VCPU_STATE_NULL &&
+		    receiver_vcpu->state != VCPU_STATE_ABORTED &&
+		    receiver_vcpu->state != VCPU_STATE_STOPPED) {
 			dlog_verbose(
 				"Receiver VM %#x aborted, cannot run vCPU %u\n",
 				receiver_vcpu->vm->id,
 				vcpu_index(receiver_vcpu));
 			receiver_vcpu->state = VCPU_STATE_ABORTED;
 		}
-
-		ret = ffa_error(FFA_ABORTED);
-		goto out;
 	}
 
 	switch (receiver_vcpu->state) {
+	case VCPU_STATE_ABORTED:
+		if (receiver_vcpu->vm->lifecycle_support) {
+			ret = ffa_error(FFA_BUSY);
+		} else {
+			ret = ffa_error(FFA_ABORTED);
+		}
+		goto out;
 	case VCPU_STATE_OFF:
 	case VCPU_STATE_RUNNING:
-	case VCPU_STATE_ABORTED:
+	case VCPU_STATE_STARTING:
+	case VCPU_STATE_CREATED:
 	case VCPU_STATE_BLOCKED_INTERRUPT:
 	case VCPU_STATE_BLOCKED:
 	case VCPU_STATE_PREEMPTED:
+	case VCPU_STATE_STOPPED:
+	case VCPU_STATE_STOPPING:
 		ret = ffa_error(FFA_BUSY);
+		goto out;
+	case VCPU_STATE_NULL:
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	case VCPU_STATE_WAITING:
 		/*

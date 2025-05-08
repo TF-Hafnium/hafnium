@@ -94,7 +94,10 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 		return NULL;
 	}
 
-	/* Do basic initialization of vCPUs. */
+	/*
+	 * Do basic initialization of vCPUs, i.e. All vCPUs of the partition
+	 * shall be in CREATED state.
+	 */
 	for (i = 0; i < vcpu_count; i++) {
 		vcpu_init(vm_get_vcpu(vm, i), vm);
 	}

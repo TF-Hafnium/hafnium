@@ -26,6 +26,9 @@
 /** Maximum number of pending virtual interrupts in the queue per vCPU. */
 #define VINT_QUEUE_MAX 10
 
+/**
+ * Refer section 7.2 of the FF-A v1.3 ALP2 specification.
+ */
 enum vcpu_state {
 	/** The vCPU is switched off. */
 	VCPU_STATE_OFF,
@@ -50,6 +53,24 @@ enum vcpu_state {
 
 	/** The vCPU has aborted. */
 	VCPU_STATE_ABORTED,
+
+	/** The vCPU is in NULL state. */
+	VCPU_STATE_NULL,
+
+	/** The vCPU has been stopped by partition manager. */
+	VCPU_STATE_STOPPED,
+
+	/**
+	 * The partition manager has allocated all required resources to
+	 * initialize the vCPU.
+	 */
+	VCPU_STATE_CREATED,
+
+	/** The vCPU has been allocated CPU cycles to initialize itself. */
+	VCPU_STATE_STARTING,
+
+	/** The vCPU is currently executing to stop itself. */
+	VCPU_STATE_STOPPING,
 };
 
 /** Refer to section 7 of the FF-A v1.1 EAC0 spec. */

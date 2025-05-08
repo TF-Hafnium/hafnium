@@ -63,12 +63,18 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 	sl_init(&vcpu->lock);
 	vcpu->regs_available = true;
 	vcpu->vm = vm;
-	vcpu->state = VCPU_STATE_OFF;
 	vcpu->direct_request_origin.is_ffa_req2 = false;
 	vcpu->direct_request_origin.vm_id = HF_INVALID_VM_ID;
 	vcpu->rt_model = RTM_SP_INIT;
 	list_init(&vcpu->timer_node);
 	list_init(&vcpu->ipi_list_node);
+
+	/*
+	 * Though resources have not been allocated to the partition yet, it is
+	 * safe to skip the NULL state for vCPU during cold boot and transition
+	 * directly to CREATED state.
+	 */
+	vcpu->state = VCPU_STATE_CREATED;
 }
 
 /**
