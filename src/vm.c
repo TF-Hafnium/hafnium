@@ -382,6 +382,56 @@ bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool)
 			ppool);
 }
 
+void vm_unmap_rxtx(struct vm_locked vm_locked, struct mpool *ppool)
+{
+	struct vm *vm = vm_locked.vm;
+	struct mm_stage1_locked mm_stage1_locked;
+	paddr_t send_pa_begin;
+	paddr_t send_pa_end;
+	paddr_t recv_pa_begin;
+	paddr_t recv_pa_end;
+
+	assert(vm != NULL);
+	assert(ppool != NULL);
+
+	if (vm->mailbox.send == NULL || vm->mailbox.recv == NULL) {
+		return;
+	}
+
+	/* Reset page table entries only for virtual FF-A instances. */
+	if (!vm_id_is_current_world(vm->id)) {
+		return;
+	}
+
+	/* Currently a mailbox size of 1 page is assumed. */
+	send_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.send));
+	send_pa_end = pa_add(send_pa_begin, HF_MAILBOX_SIZE);
+	recv_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.recv));
+	recv_pa_end = pa_add(recv_pa_begin, HF_MAILBOX_SIZE);
+
+	mm_stage1_locked = mm_lock_stage1();
+
+	/*
+	 * Set the memory region of the buffers back to the default mode
+	 * for the VM. Since this memory region was already mapped for
+	 * the RXTX buffers we can safely remap them.
+	 */
+	CHECK(vm_identity_map(vm_locked, send_pa_begin, send_pa_end,
+			      MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool, NULL));
+
+	CHECK(vm_identity_map(vm_locked, recv_pa_begin, recv_pa_end,
+			      MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool, NULL));
+
+	/* Unmap the buffers in the partition manager. */
+	CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end, ppool));
+	CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end, ppool));
+
+	vm->mailbox.send = NULL;
+	vm->mailbox.recv = NULL;
+
+	mm_unlock_stage1(&mm_stage1_locked);
+}
+
 /**
  * Gets the mode of the given range of ipa or va if they are mapped with the
  * same mode.

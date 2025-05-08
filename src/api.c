@@ -1862,6 +1862,8 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	owner_vm_id = api_get_rxtx_description(current->vm, &send, &recv,
 					       &page_count);
 	if (owner_vm_id == HF_INVALID_VM_ID) {
+		dlog_error("Cannot map RX/TX for invalid VM ID %#x.\n",
+			   owner_vm_id);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -1958,51 +1960,40 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 		goto out;
 	}
 
-	/* Currently a mailbox size of 1 page is assumed. */
-	send_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.send));
-	send_pa_end = pa_add(send_pa_begin, HF_MAILBOX_SIZE);
-	recv_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.recv));
-	recv_pa_end = pa_add(recv_pa_begin, HF_MAILBOX_SIZE);
+	vm_unmap_rxtx(vm_locked, &api_page_pool);
 
-	mm_stage1_locked = mm_lock_stage1();
+	if (!vm_id_is_current_world(owner_vm_id)) {
+		send_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.send));
+		send_pa_end = pa_add(send_pa_begin, HF_MAILBOX_SIZE);
+		recv_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.recv));
+		recv_pa_end = pa_add(recv_pa_begin, HF_MAILBOX_SIZE);
 
-	/* Reset stage 2 mapping only for virtual FF-A instances. */
-	if (vm_id_is_current_world(owner_vm_id)) {
-		/*
-		 * Set the memory region of the buffers back to the default mode
-		 * for the VM. Since this memory region was already mapped for
-		 * the RXTX buffers we can safely remap them.
-		 */
-		CHECK(vm_identity_map(vm_locked, send_pa_begin, send_pa_end,
-				      MM_MODE_R | MM_MODE_W | MM_MODE_X,
-				      &api_page_pool, NULL));
+		mm_stage1_locked = mm_lock_stage1();
 
-		CHECK(vm_identity_map(vm_locked, recv_pa_begin, recv_pa_end,
-				      MM_MODE_R | MM_MODE_W | MM_MODE_X,
-				      &api_page_pool, NULL));
-	} else {
 		ret = arch_other_world_vm_configure_rxtx_unmap(
 			vm_locked, &api_page_pool, send_pa_begin, send_pa_end,
 			recv_pa_begin, recv_pa_end);
 		if (ret.func != FFA_SUCCESS_32) {
+			mm_unlock_stage1(&mm_stage1_locked);
 			goto out;
 		}
+
+		/* Unmap the buffers in the partition manager. */
+		CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end,
+			       &api_page_pool));
+		CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end,
+			       &api_page_pool));
+
+		vm->mailbox.send = NULL;
+		vm->mailbox.recv = NULL;
+
+		mm_unlock_stage1(&mm_stage1_locked);
 	}
 
-	/* Unmap the buffers in the partition manager. */
-	CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end,
-		       &api_page_pool));
-	CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end,
-		       &api_page_pool));
-
-	vm->mailbox.send = NULL;
-	vm->mailbox.recv = NULL;
 	ffa_vm_nwd_free(vm_locked);
 
 	/* Forward buffer unmapping to SPMC if coming from a VM. */
 	ffa_setup_rxtx_unmap_forward(vm_locked);
-
-	mm_unlock_stage1(&mm_stage1_locked);
 
 out:
 	vm_unlock(&vm_locked);

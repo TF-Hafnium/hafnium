@@ -348,6 +348,7 @@ bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 void vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool);
 void vm_free_ptables(struct vm *vm, struct mpool *ppool);
 bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool);
+void vm_unmap_rxtx(struct vm_locked vm_locked, struct mpool *ppool);
 
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     mm_mode_t *mode);
