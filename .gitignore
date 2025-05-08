@@ -15,3 +15,5 @@ tags
 
 # Used to pin dependencies by Poetry tool
 poetry.lock
+
+.vscode
