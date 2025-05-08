@@ -1,5 +1,88 @@
 # Change Log
 
+## v2.13
+### Highlights
+
+* FF-A v1.3 (early adoption):
+    * The `FFA_MEM_PERM_GET` ABI was changed to return permissions over a range of pages. If the range
+      has varying permissions, it returns the last address to which the same permissions apply.
+
+* FF-A v1.2:
+    * Added support for the `FFA_MSG_SEND2` ABI to send indirect messages specifying a service UUID.
+
+* Runtime Support:
+    * Secure Partition Package format using a Transfer List, following the Firmware Hand-Off
+      specification:
+        * Transfer List library was added to the codebase.
+        * The legacy SP package format and TL are differentiated using a `magic` value.
+        * Unpacks the SP manifest and retrieves the SP binary from the TL.
+    * Passing the HOB structure to SP as boot information:
+        * TL package format leveraged to convey a HOB-like structure to the SPMC as part of the
+          corresponding SP package.
+        * FF-A boot information protocol used to propagate the HOB reference to the SP.
+    * Added ability to trigger SRI when handling an interrupt for an SP in a waiting state:
+        * New `sri-interrupts-policy` configuration in the SP manifest initiates this behavior.
+        * SPs are included in the return of `FFA_NOTIFICATION_INFO_GET` if they are in a waiting
+          state, have pending interrupts, and have configured the `sri-interrupts-policy` field.
+    * Allowed use of `HF_INTERRUPT_SEND_IPI` with the ID of the calling vCPU.
+    * Bootstrapped all secondary vCPUs from all MP SPs when bringing up secondary cores.
+    * Deprecated subscriptions to CPU power-on events for SPs.
+    * Unified the tracking of all virtual interrupts:
+        * Deprecated the `HF_INTERRUPT_DEACTIVATE` ABI for handling secure interrupts, as it wasn't
+          needed for others.
+        * Virtual interrupts returned in the order they were pended via `HF_INTERRUPT_GET`.
+        * Cleared the state of virtual interrupts when returning `FFA_INTERRUPT` to an S-EL0
+          partition.
+    * Unconditionally cleared the ME interrupt when the SP enters the waiting state.
+    * Multiple SPs can send an IPI targeting vCPUs pinned to the same physical core.
+    * SPs can subscribe to CPU power off event and SPMC informs it through a FF-A direct request
+      with a power management framework message.
+    * Allowed memory regions defined in the SP manifest using `load-address-relative-offset` to
+      overlap with the SP's address space — useful for setting permissions to specific regions.
+
+* Bug fixes:
+    * The `dlog` functions did not handle the `%*` format specifier. This is now supported.
+    * Corrected the Schedule Receiver Interrupt priority to fit within the 'non-secure' interrupt
+      priority range.
+    * Fixed an issue where, with MTE enabled, the synchronous exception handler did not cover all
+      exception codes.
+    * The `FFA_PARTITION_INFO_GET` ABI now provides partition information with multiple UUIDs only
+      to those using FF-A v1.2 or later.
+    * Previously, virtual interrupts targeting a vCPU in a waiting state (and migrated to another
+      physical CPU) were simply queued. Now, the vCPU is resumed on the target CPU and the interrupt
+      is signaled for handling.
+    * When the SPMC intercepts an `FFA_MSG_WAIT` or `FFA_MSG_SEND_DIRECT_RESP`/
+      `FFA_MSG_SEND_DIRECT_RESP2` and returns with `FFA_INTERRUPT`, it sets the SP in SPMC scheduled
+      mode and masks all other interrupts.
+    * In `FFA_MEM_RETRIEVE_REQ` ABI handling, if the flag to bypass multiple borrower checks is set,
+      then exactly one receiver is expected.
+    * Fixed incorrect reporting of pending notifications in `FFA_NOTIFICATION_INFO_GET` when none
+      remained.
+    * Enabled G1S interrupts if they were not previously enabled by EL3.
+    * Fixed a memory leak during FF-A memory share/lend/donate operations, where a page allocated
+      for the memory region descriptor could leak if a copy operation failed.
+    * Fixed misreporting in the `FFA_FEATURES` interface regarding support of certain ABIs based on
+      FF-A version.
+    * The SPMC now accepts either the 32-bit or 64-bit version of the `FFA_SUCCESS` ABI in response
+      to `FFA_SECONDARY_EP_REGISTER` from the SPMD.
+    * Added support for specifying `FFA_VERSION_COMPILED` in GN build system options.
+
+* Tests, scripts, testing framework and build:
+    * Increased test coverage for the IPI feature: non-primary CPUs, multiple IPIs pending on a CPU,
+      one-to-many tests, unit tests.
+    * Improved performance of static checks using `clang-tidy` and `checkpatch.pl`.
+    * `hftest.py` can now process logs with invalid UTF-8 bytes.
+    * `hftest.py` can use the `HAFNIUM_FVP` environment variable to locate the FVP binary for
+      spawning tests.
+    * Added a Hafnium Hypervisor target built with FF-A v1.1 for testing integration with EL3 SPMC.
+    * Revived Docker image to enable building the project on macOS.
+    * Modified `kokoro/test_spmc.sh` to optionally continue running all tests even if some fail.
+    * Added dedicated `make` rules for the various test scripts under `kokoro/*`.
+
+* Miscellaneous:
+    * The `ffa` module, encapsulating behavior specific to the Hypervisor and SPMC, was moved to
+      `src/ffa`. Files were split for a tidier and more modular implementation.
+
 ## v2.12
 ### Highlights
 
