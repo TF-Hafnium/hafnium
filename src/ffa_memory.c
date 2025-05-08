@@ -4059,3 +4059,11 @@ out:
 	share_states_unlock(&share_states);
 	return ret;
 }
+
+void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
+					      struct mpool *ppool)
+{
+	/* TODO */
+	(void)vm_locked;
+	(void)ppool;
+}

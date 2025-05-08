@@ -13,6 +13,7 @@
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/ffa/vm.h"
+#include "hf/ffa_memory.h"
 #include "hf/plat/interrupts.h"
 
 /**
@@ -248,4 +249,19 @@ void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
 	 * them.
 	 */
 	vm_reset_notifications(vm_locked, ppool);
+
+	/*
+	 * Reclaim all memory regions shared or lent by this partition.
+	 * Relinquish all memory regions shared with or lent to this partition
+	 * by other endpoints.
+	 */
+	ffa_memory_reclaim_relinquish_vm_regions(vm_locked, ppool);
+
+	/*
+	 * Unmap RX/TX buffer and all memory as well as device regions declared
+	 * by this partition in its manifest. This shall be done afer SPMC was
+	 * given the change to perform any reclaim or relinquish actions on
+	 * behalf of aborting partition.
+	 */
+	vm_unmap_memory_regions(vm_locked, ppool);
 }

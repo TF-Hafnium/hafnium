@@ -47,3 +47,6 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 				    ffa_memory_handle_t handle,
 				    ffa_memory_region_flags_t flags,
 				    struct mpool *page_pool);
+
+void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
+					      struct mpool *ppool);

@@ -432,6 +432,14 @@ void vm_unmap_rxtx(struct vm_locked vm_locked, struct mpool *ppool)
 	mm_unlock_stage1(&mm_stage1_locked);
 }
 
+void vm_unmap_memory_regions(struct vm_locked vm_locked, struct mpool *ppool)
+{
+	vm_unmap_rxtx(vm_locked, ppool);
+
+	/* Free all page table entries associated with current VM. */
+	vm_free_ptables(vm_locked.vm, ppool);
+}
+
 /**
  * Gets the mode of the given range of ipa or va if they are mapped with the
  * same mode.
