@@ -169,7 +169,7 @@ bool psci_primary_vm_handler(struct vcpu *vcpu, uint32_t func, uintreg_t arg0,
 
 		vcpu_target = vm_get_vcpu(vcpu->vm, cpu_index(c));
 		vcpu_locked = vcpu_lock(vcpu_target);
-		vcpu_on(vcpu_locked, ipa_init(arg1), arg2);
+		vcpu_prepare(vcpu_locked, ipa_init(arg1), arg2);
 		vcpu_unlock(&vcpu_locked);
 
 		/*

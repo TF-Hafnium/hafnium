@@ -417,7 +417,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	vm_update_boot(vm);
 
 	vcpu_locked = vcpu_lock(vm_get_vcpu(vm, 0));
-	vcpu_on(vcpu_locked, primary_entry, params->kernel_arg);
+	vcpu_prepare(vcpu_locked, primary_entry, params->kernel_arg);
 	vcpu_unlock(&vcpu_locked);
 	ret = true;
 

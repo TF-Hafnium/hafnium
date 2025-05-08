@@ -79,12 +79,12 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 
 /**
  * Initialise the registers for the given vCPU and set the state to
- * VCPU_STATE_WAITING. The caller must hold the vCPU lock while calling this.
+ * VCPU_STATE_CREATED. The caller must hold the vCPU lock while calling this.
  */
-void vcpu_on(struct vcpu_locked vcpu, ipaddr_t entry, uintreg_t arg)
+void vcpu_prepare(struct vcpu_locked vcpu, ipaddr_t entry, uintreg_t arg)
 {
 	arch_regs_set_pc_arg(&vcpu.vcpu->regs, entry, arg);
-	vcpu.vcpu->state = VCPU_STATE_WAITING;
+	vcpu.vcpu->state = VCPU_STATE_CREATED;
 }
 
 ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu)
@@ -101,10 +101,14 @@ ffa_vcpu_index_t vcpu_index(const struct vcpu *vcpu)
  * purposes of PSCI, because according to the PSCI specification (section
  * 5.7.1) a core is only considered to be off if it has been turned off
  * with a CPU_OFF call or hasn't yet been turned on with a CPU_ON call.
+ * Note that vCPU is considered to be off until it makes the transition
+ * to STARTING state.
  */
 bool vcpu_is_off(struct vcpu_locked vcpu)
 {
-	return (vcpu.vcpu->state == VCPU_STATE_OFF);
+	return (vcpu.vcpu->state == VCPU_STATE_OFF ||
+		vcpu.vcpu->state == VCPU_STATE_CREATED ||
+		vcpu.vcpu->state == VCPU_STATE_NULL);
 }
 
 /**
@@ -130,7 +134,7 @@ bool vcpu_secondary_reset_and_start(struct vcpu_locked vcpu_locked,
 		 * pCPU it is running on.
 		 */
 		arch_regs_reset(vcpu_locked.vcpu);
-		vcpu_on(vcpu_locked, entry, arg);
+		vcpu_prepare(vcpu_locked, entry, arg);
 	}
 
 	return vcpu_was_off;
