@@ -124,7 +124,7 @@ bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool)
 	ret = ret && mm_vm_init(&vm->arch.ptable_ns, vm->id, ppool);
 #endif
 
-	return ret && arch_vm_iommu_init_mm(vm, ppool);
+	return ret;
 }
 
 bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
