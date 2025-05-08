@@ -305,7 +305,7 @@ void spmc_exit_to_nwd(struct vcpu *owd_vcpu)
 	}
 }
 
-void build_psci_off_frmk_msg(struct vcpu *target_vcpu)
+static void build_psci_off_frmk_msg(struct vcpu *target_vcpu)
 {
 	struct vcpu_locked target_locked;
 
