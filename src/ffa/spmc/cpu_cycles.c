@@ -282,7 +282,8 @@ static bool ffa_cpu_cycles_msg_wait_intercept(struct vcpu_locked current_locked,
 	return ret;
 }
 
-static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
+static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next,
+			 enum vcpu_state to_state)
 {
 	struct vcpu *vcpu_next = NULL;
 	struct vcpu *current = current_locked.vcpu;
@@ -309,7 +310,7 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 		next_vm = vm_get_next_boot_secondary_core(current->vm);
 	}
 
-	CHECK(vcpu_state_set(current_locked, VCPU_STATE_WAITING));
+	CHECK(vcpu_state_set(current_locked, to_state));
 	current->rt_model = RTM_NONE;
 	current->scheduling_mode = NONE;
 
@@ -386,7 +387,7 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 
 	switch (current->rt_model) {
 	case RTM_SP_INIT:
-		if (!sp_boot_next(current_locked, next)) {
+		if (!sp_boot_next(current_locked, next, VCPU_STATE_WAITING)) {
 			ffa_msg_wait_complete(current_locked, next);
 
 			ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
@@ -866,7 +867,7 @@ struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 		CHECK(vm_set_state(vm_locked, VM_STATE_ABORTING));
 		ffa_vm_free_resources(vm_locked, ppool);
 
-		if (sp_boot_next(current_locked, next)) {
+		if (sp_boot_next(current_locked, next, VCPU_STATE_WAITING)) {
 			goto out;
 		}
 
@@ -946,6 +947,19 @@ static struct ffa_value abort_action_process(struct vcpu_locked current_locked,
 
 		ffa_cpu_cycles_preempted_vcpu_resume(current_locked, next,
 						     to_state);
+		break;
+	case RTM_SP_INIT:
+		if (!sp_boot_next(current_locked, next, to_state)) {
+			/*
+			 * Relinquish control back to the NWd. Return
+			 * FFA_MSG_WAIT_32 to indicate to SPMD that SPMC
+			 * has successfully finished initialization.
+			 */
+			*next = api_switch_to_other_world(
+				current_locked,
+				(struct ffa_value){.func = FFA_MSG_WAIT_32},
+				to_state);
+		}
 		break;
 	default:
 		CHECK(current->rt_model == RTM_FFA_RUN);
