@@ -30,9 +30,10 @@ void ffa_setup_rxtx_unmap_forward(struct vm_locked vm_locked);
 
 bool ffa_setup_partition_info_get_regs_forward_allowed(void);
 
-ffa_vm_count_t ffa_setup_partition_info_get_forward(
+size_t ffa_setup_partition_info_get_forward(
 	const struct ffa_uuid *uuid, uint32_t flags,
-	struct ffa_partition_info *partitions, ffa_vm_count_t vm_count);
+	struct ffa_partition_info *partitions, size_t partitions_max_len,
+	const size_t entries_count);
 
 void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 					paddr_t fdt_addr,

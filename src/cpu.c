@@ -16,6 +16,7 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/list.h"
+#include "hf/types.h"
 
 #include "vmapi/hf/call.h"
 
@@ -38,10 +39,11 @@ static_assert((PAGE_SIZE % STACK_ALIGN) == 0,
  * TOCTOU issues while Hafnium performs actions on information that would
  * otherwise be re-writable by the VM.
  *
- * Each buffer is owned by a single CPU. Can be used when handling FF-A memory
- * management ABIs, and FF-A Indirect Messaging.
+ * Each buffer is owned by a single CPU. Can be used when handling FF-A
+ * messages, from and to the SPMC. E.g. FF-A memory sharing, indirect messaging
+ * and partition info get.
  */
-alignas(PAGE_SIZE) static uint8_t cpu_message_buffer[MAX_CPUS][PAGE_SIZE];
+alignas(PAGE_SIZE) static uint8_t cpu_message_buffer[MAX_CPUS][HF_MAILBOX_SIZE];
 
 uint8_t *cpu_get_buffer(struct cpu *c)
 {

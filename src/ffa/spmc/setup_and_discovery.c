@@ -51,17 +51,23 @@ bool ffa_setup_partition_info_get_regs_forward_allowed(void)
 }
 
 /** Forward helper for FFA_PARTITION_INFO_GET. */
-ffa_vm_count_t ffa_setup_partition_info_get_forward(
+size_t ffa_setup_partition_info_get_forward(
 	const struct ffa_uuid *uuid, uint32_t flags,
-	struct ffa_partition_info *partitions, ffa_vm_count_t vm_count)
+	struct ffa_partition_info *partitions, const size_t partitions_max_len,
+	size_t entries_count)
 {
-	/* The SPMC does not forward FFA_PARTITION_INFO_GET. */
+	/*
+	 * The SPMC does not forward FFA_PARTITION_INFO_GET.
+	 * Discovery of LSPs should be done vai FFA_PARTITION_INFO_GET_REGS.
+	 * The SPMD doesn't access RXTX buffers.
+	 */
 
 	(void)uuid;
 	(void)flags;
 	(void)partitions;
+	(void)partitions_max_len;
 
-	return vm_count;
+	return entries_count;
 }
 
 void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,

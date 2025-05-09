@@ -390,7 +390,7 @@ struct vcpu *api_abort(struct vcpu *current)
  */
 static struct ffa_value send_versioned_partition_info_descriptors(
 	struct vm_locked vm_locked, struct ffa_partition_info *partitions,
-	uint32_t vm_count)
+	size_t entries_count)
 {
 	struct vm *vm = vm_locked.vm;
 	enum ffa_version version = vm->ffa_version;
@@ -417,7 +417,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		struct ffa_partition_info_v1_0 *recv_mailbox = vm->mailbox.recv;
 
 		partition_info_size = sizeof(struct ffa_partition_info_v1_0);
-		buffer_size = partition_info_size * vm_count;
+		buffer_size = partition_info_size * entries_count;
 		if (buffer_size > HF_MAILBOX_SIZE) {
 			dlog_error(
 				"Partition information does not fit in the "
@@ -425,7 +425,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 			return ffa_error(FFA_NO_MEMORY);
 		}
 
-		for (uint32_t i = 0; i < vm_count; i++) {
+		for (size_t i = 0; i < entries_count; i++) {
 			/*
 			 * Populate the VM's RX buffer with the partition
 			 * information. Clear properties bits that must be zero
@@ -440,7 +440,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 
 	} else {
 		partition_info_size = sizeof(struct ffa_partition_info);
-		buffer_size = partition_info_size * vm_count;
+		buffer_size = partition_info_size * entries_count;
 
 		if (buffer_size > HF_MAILBOX_SIZE) {
 			dlog_error(
@@ -474,7 +474,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 	 * and the size of the descriptors in w3.
 	 */
 	return (struct ffa_value){.func = FFA_SUCCESS_32,
-				  .arg2 = vm_count,
+				  .arg2 = entries_count,
 				  .arg3 = partition_info_size};
 }
 
@@ -526,19 +526,26 @@ static void api_ffa_fill_partition_info(
 /**
  * Find VMs with UUID matching `uuid_to_find` , and fill `out_partitions` with
  * partition infos. Returns number of VMs that matched.
- * A null UUID matches against any VM.
- * If `count_flag` is true, no partition infos are written to `out_partitions`,
- * only the number of VMs that matched is returned.
+ *
+ * A null UUID matches against any VM, all UUIDs from all partitions will be
+ * part of the return information if the version of the caller is higher or
+ * equal to v1.2. In addition, the return value indicates the number of entries
+ * populated in the partition info out buffer through the `entries_count`
+ * argument. If `count_flag` is true, no partition infos are written to
+ * `out_partitions`, only the number of VMs that matched is returned.
+ *
+ * If all goes well, function returns true.
+ * If there is no space to accomodate all the descriptors return false.
  */
-static ffa_vm_count_t api_ffa_fill_partitions_info_array(
-	struct ffa_partition_info out_partitions[], size_t out_partitions_len,
-	const struct ffa_uuid *uuid_to_find, bool count_flag,
-	ffa_id_t caller_id, enum ffa_version caller_version)
+static bool api_ffa_fill_partitions_info_array(
+	struct ffa_partition_info out_partitions[],
+	const size_t out_partitions_len, const struct ffa_uuid *uuid_to_find,
+	bool count_flag, ffa_id_t caller_id, enum ffa_version caller_version,
+	size_t *entries_count)
 {
-	ffa_vm_count_t vms_found = 0;
 	bool match_any = ffa_uuid_is_null(uuid_to_find);
 
-	assert(vm_get_count() <= out_partitions_len);
+	*entries_count = 0;
 
 	/*
 	 * Iterate through the VMs to find the ones with a matching
@@ -551,7 +558,7 @@ static ffa_vm_count_t api_ffa_fill_partitions_info_array(
 		     uuid_idx++) {
 			struct ffa_uuid uuid = vm->uuids[uuid_idx];
 			struct ffa_partition_info *out_partition =
-				&out_partitions[vms_found];
+				&out_partitions[*entries_count];
 
 			/*
 			 * Null UUID indicates reaching the end of a
@@ -562,7 +569,15 @@ static ffa_vm_count_t api_ffa_fill_partitions_info_array(
 			}
 
 			if (match_any || ffa_uuid_equal(uuid_to_find, &uuid)) {
-				vms_found++;
+				/*
+				 * If the number of entries surpasses the size
+				 * of `out_partitions`
+				 */
+				if (*entries_count > out_partitions_len) {
+					return false;
+				}
+
+				(*entries_count)++;
 
 				if (count_flag) {
 					continue;
@@ -587,7 +602,7 @@ static ffa_vm_count_t api_ffa_fill_partitions_info_array(
 		}
 	}
 
-	return vms_found;
+	return true;
 }
 
 static inline void api_ffa_pack_vmid_count_props(
@@ -614,7 +629,7 @@ static inline void api_ffa_pack_vmid_count_props(
 static bool api_ffa_partition_info_get_regs_forward(
 	const struct ffa_uuid *uuid, const uint16_t tag,
 	struct ffa_partition_info *partitions, uint16_t partitions_len,
-	ffa_vm_count_t *ret_count)
+	size_t *ret_count)
 {
 	(void)tag;
 	struct ffa_value ret;
@@ -657,10 +672,10 @@ static bool api_ffa_partition_info_get_regs_forward(
 
 bool api_ffa_fill_partition_info_from_regs(
 	struct ffa_value ret, uint16_t start_index,
-	struct ffa_partition_info *partitions, uint16_t partitions_len,
-	ffa_vm_count_t *ret_count)
+	struct ffa_partition_info *partitions, size_t partitions_max_len,
+	size_t *ret_count)
 {
-	uint16_t vm_count = *ret_count;
+	size_t entries_count = *ret_count;
 	uint16_t curr_index = 0;
 	uint8_t num_entries = 0;
 	uint8_t idx = 0;
@@ -683,7 +698,7 @@ bool api_ffa_fill_partition_info_from_regs(
 		&ret.extended_val.arg17,
 	};
 
-	if (vm_count > partitions_len) {
+	if (entries_count > partitions_max_len) {
 		return false;
 	}
 
@@ -708,7 +723,7 @@ bool api_ffa_fill_partition_info_from_regs(
 	assert(start_index <= curr_index);
 
 	num_entries = curr_index - start_index + 1;
-	if (num_entries > (partitions_len - vm_count) ||
+	if (num_entries > (partitions_max_len - entries_count) ||
 	    num_entries > MAX_INFO_REGS_ENTRIES_PER_CALL) {
 		return false;
 	}
@@ -718,20 +733,20 @@ bool api_ffa_fill_partition_info_from_regs(
 		uint64_t uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx++)]);
 		uint64_t uuid_high = *(arg_ptrs[(ptrdiff_t)(idx++)]);
 
-		partitions[vm_count].vm_id = info & 0xFFFF;
-		partitions[vm_count].vcpu_count = (info >> 16) & 0xFFFF;
-		partitions[vm_count].properties = (info >> 32);
-		partitions[vm_count].uuid.uuid[0] = uuid_lo & 0xFFFFFFFF;
-		partitions[vm_count].uuid.uuid[1] =
+		partitions[entries_count].vm_id = info & 0xFFFF;
+		partitions[entries_count].vcpu_count = (info >> 16) & 0xFFFF;
+		partitions[entries_count].properties = (info >> 32);
+		partitions[entries_count].uuid.uuid[0] = uuid_lo & 0xFFFFFFFF;
+		partitions[entries_count].uuid.uuid[1] =
 			(uuid_lo >> 32) & 0xFFFFFFFF;
-		partitions[vm_count].uuid.uuid[2] = uuid_high & 0xFFFFFFFF;
-		partitions[vm_count].uuid.uuid[3] =
+		partitions[entries_count].uuid.uuid[2] = uuid_high & 0xFFFFFFFF;
+		partitions[entries_count].uuid.uuid[3] =
 			(uuid_high >> 32) & 0xFFFFFFFF;
-		vm_count++;
+		entries_count++;
 		num_entries--;
 	}
 
-	*ret_count = vm_count;
+	*ret_count = entries_count;
 	return true;
 }
 
@@ -741,16 +756,18 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 						 const uint16_t tag)
 {
 	struct vm *current_vm = current->vm;
-	static struct ffa_partition_info partitions[2 * MAX_VMS];
+	struct ffa_partition_info *partitions;
+	size_t buffer_size;
+	size_t partitions_max_len;
 	bool uuid_is_null = ffa_uuid_is_null(uuid);
-	ffa_vm_count_t vm_count = 0;
+	size_t entries_count = 0;
 	struct ffa_value ret = ffa_error(FFA_INVALID_PARAMETERS);
 	uint16_t max_idx = 0;
 	uint16_t curr_idx = 0;
 	uint8_t num_entries_to_ret = 0;
 	uint8_t arg_idx = 3;
 
-	/* list of pointers to args in return value */
+	/* List of pointers to args in return value. */
 	uint64_t *arg_ptrs[] = {
 		&(ret).func,
 		&(ret).arg1,
@@ -772,20 +789,34 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 		&(ret).extended_val.arg17,
 	};
 
+	/* Use CPU buffer to temporarily save the descriptor. */
+	partitions = (struct ffa_partition_info *)cpu_get_buffer(current->cpu);
+
+	buffer_size = cpu_get_buffer_size(current->cpu);
+
+	/* Expect size to match that of the mailbox. */
+	assert(buffer_size == PAGE_SIZE);
+	assert(partitions != NULL);
+
 	/* TODO: Add support for using tags */
 	if (tag != 0) {
 		dlog_error("Tag not 0. Unsupported tag. %d\n", tag);
 		return ffa_error(FFA_RETRY);
 	}
 
-	memset_s(&partitions, sizeof(partitions), 0, sizeof(partitions));
+	partitions_max_len = buffer_size / sizeof(struct ffa_partition_info);
 
-	vm_count = api_ffa_fill_partitions_info_array(
-		partitions, ARRAY_SIZE(partitions), uuid, false, current_vm->id,
-		current_vm->ffa_version);
+	if (!api_ffa_fill_partitions_info_array(
+		    partitions, partitions_max_len, uuid, false, current_vm->id,
+		    current_vm->ffa_version, &entries_count)) {
+		dlog_verbose(
+			"%s: No memory to hold all partition information.\n",
+			__func__);
+		return ffa_error(FFA_NO_MEMORY);
+	}
 
-	/* If UUID is Null vm_count must not be zero at this stage. */
-	CHECK(!uuid_is_null || vm_count != 0);
+	/* If UUID is Null entries_count must not be zero at this stage. */
+	CHECK(!uuid_is_null || entries_count != 0);
 
 	/*
 	 * When running the Hypervisor:
@@ -799,16 +830,16 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	 * this would be a good place to optimize using strategies such as
 	 * caching info etc. For now, assuming this inefficiency is not a major
 	 * issue.
-	 * - If UUID is non-Null vm_count may be zero because the UUID matches
-	 * a secure partition and the query is forwarded to the SPMC.
+	 * - If UUID is non-Null entries_count may be zero because the UUID
+	 * matches a secure partition and the query is forwarded to the SPMC.
 	 * When running the SPMC:
-	 * - If UUID is non-Null and vm_count is zero it means there is no such
-	 * partition identified in the system.
+	 * - If UUID is non-Null and entries_count is zero it means there is no
+	 * such partition identified in the system.
 	 */
 	if (vm_id_is_current_world(current_vm->id)) {
 		if (!api_ffa_partition_info_get_regs_forward(
-			    uuid, tag, partitions, ARRAY_SIZE(partitions),
-			    &vm_count)) {
+			    uuid, tag, partitions, partitions_max_len,
+			    &entries_count)) {
 			dlog_error(
 				"Failed to forward "
 				"ffa_partition_info_get_regs.\n");
@@ -820,23 +851,25 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	 * Unrecognized UUID: does not match any of the VMs (or SPs)
 	 * and is not Null.
 	 */
-	if (vm_count == 0 || vm_count > ARRAY_SIZE(partitions)) {
+	if (entries_count == 0 || entries_count > partitions_max_len) {
 		dlog_verbose(
-			"Invalid parameters. vm_count = %d (must not be zero "
-			"or > %lu)\n",
-			vm_count, ARRAY_SIZE(partitions));
+			"Invalid parameters. entries_count = %zu (must not be "
+			"zero or > %lu)\n",
+			entries_count, partitions_max_len);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (start_index >= vm_count) {
+	if (start_index >= entries_count) {
 		dlog_error(
-			"start index = %d vm_count = %d (start_index must be "
-			"less than vm_count)\n",
-			start_index, vm_count);
+			"start index = %d entries_count = %zu (start_index "
+			"must "
+			"be "
+			"less than entries_count)\n",
+			start_index, entries_count);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	max_idx = vm_count - 1;
+	max_idx = entries_count - 1;
 	num_entries_to_ret = (max_idx - start_index) + 1;
 	num_entries_to_ret =
 		MIN(num_entries_to_ret, MAX_INFO_REGS_ENTRIES_PER_CALL);
@@ -874,11 +907,13 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					    const uint32_t flags)
 {
 	struct vm *current_vm = current->vm;
-	ffa_vm_count_t vm_count = 0;
+	size_t entries_count = 0;
 	bool count_flag = (flags & FFA_PARTITION_COUNT_FLAG_MASK) ==
 			  FFA_PARTITION_COUNT_FLAG;
 	bool uuid_is_null = ffa_uuid_is_null(uuid);
-	struct ffa_partition_info partitions[2 * MAX_VMS] = {0};
+	struct ffa_partition_info *partitions;
+	size_t buffer_size;
+	size_t partitions_max_len;
 	struct vm_locked vm_locked;
 	struct ffa_value ret;
 
@@ -887,31 +922,50 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	vm_count = api_ffa_fill_partitions_info_array(
-		partitions, ARRAY_SIZE(partitions), uuid, count_flag,
-		current_vm->id, current_vm->ffa_version);
+	/* Use CPU buffer to temporarily save the descriptor. */
+	partitions = (struct ffa_partition_info *)cpu_get_buffer(current->cpu);
 
-	/* If UUID is Null vm_count must not be zero at this stage. */
-	CHECK(!uuid_is_null || vm_count != 0);
+	buffer_size = cpu_get_buffer_size(current->cpu);
+
+	/* Expect size to match that of the mailbox. */
+	assert(buffer_size == PAGE_SIZE);
+	assert(partitions != NULL);
+
+	partitions_max_len = buffer_size / sizeof(struct ffa_partition_info);
+
+	if (!api_ffa_fill_partitions_info_array(
+		    partitions, partitions_max_len, uuid, count_flag,
+		    current_vm->id, current_vm->ffa_version, &entries_count)) {
+		dlog_verbose(
+			"%s: No memory to hold all partition information.\n",
+			__func__);
+		return ffa_error(FFA_NO_MEMORY);
+	}
+
+	/* If UUID is Null entries_count must not be zero at this stage. */
+	CHECK(!uuid_is_null || entries_count != 0);
 
 	/*
 	 * When running the Hypervisor:
 	 * - If UUID is Null the Hypervisor forwards the query to the SPMC for
 	 * it to fill with secure partitions information.
-	 * - If UUID is non-Null vm_count may be zero because the UUID matches
-	 * a secure partition and the query is forwarded to the SPMC.
+	 * - If UUID is non-Null entries_count may be zero because the UUID
+	 * matches a secure partition and the query is forwarded to the SPMC.
+	 * - If the Partitions returned from this call can't fit in the
+	 * partitions buffer, this call will only return information from VMs.
+	 *
 	 * When running the SPMC:
-	 * - If UUID is non-Null and vm_count is zero it means there is no such
-	 * partition identified in the system.
+	 * - If UUID is non-Null and entries_count is zero it means there is no
+	 * such partition identified in the system.
 	 */
-	vm_count = ffa_setup_partition_info_get_forward(uuid, flags, partitions,
-							vm_count);
+	entries_count = ffa_setup_partition_info_get_forward(
+		uuid, flags, partitions, partitions_max_len, entries_count);
 
 	/*
 	 * Unrecognized UUID: does not match any of the VMs (or SPs)
 	 * and is not Null.
 	 */
-	if (vm_count == 0) {
+	if (entries_count == 0) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -921,12 +975,12 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 	 */
 	if (count_flag) {
 		return (struct ffa_value){.func = FFA_SUCCESS_32,
-					  .arg2 = vm_count};
+					  .arg2 = entries_count};
 	}
 
 	vm_locked = vm_lock(current_vm);
 	ret = send_versioned_partition_info_descriptors(vm_locked, partitions,
-							vm_count);
+							entries_count);
 	vm_unlock(&vm_locked);
 	return ret;
 }
@@ -1476,8 +1530,8 @@ static struct ffa_value api_vm_configure_stage1(
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto fail_undo_send;
 	}
-
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
+
 	goto out;
 
 	/*

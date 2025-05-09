@@ -9,6 +9,7 @@
 #include "hf/ffa/setup_and_discovery.h"
 
 #include "hf/arch/other_world.h"
+#include "hf/arch/std.h"
 
 #include "hf/check.h"
 #include "hf/ffa/init.h"
@@ -134,24 +135,26 @@ bool ffa_setup_partition_info_get_regs_forward_allowed(void)
  * Forward helper for FFA_PARTITION_INFO_GET.
  * Emits FFA_PARTITION_INFO_GET from Hypervisor to SPMC if allowed.
  */
-ffa_vm_count_t ffa_setup_partition_info_get_forward(
+size_t ffa_setup_partition_info_get_forward(
 	const struct ffa_uuid *uuid, uint32_t flags,
-	struct ffa_partition_info *partitions, ffa_vm_count_t vm_count)
+	struct ffa_partition_info *partitions, const size_t partitions_max_len,
+	size_t entries_count)
 {
 	const struct vm *tee = vm_find(HF_TEE_VM_ID);
 	struct ffa_partition_info *tee_partitions;
-	ffa_vm_count_t tee_partitions_count;
+	size_t tee_partitions_count;
 	struct ffa_value ret;
+	size_t res;
 
 	CHECK(tee != NULL);
-	CHECK(vm_count < MAX_VMS);
+	CHECK(entries_count < MAX_VMS);
 
 	/*
 	 * Allow forwarding from the Hypervisor if TEE or SPMC exists and
 	 * declared as such in the Hypervisor manifest.
 	 */
 	if (!ffa_init_is_tee_enabled()) {
-		return vm_count;
+		return entries_count;
 	}
 
 	ret = arch_other_world_call(
@@ -165,24 +168,32 @@ ffa_vm_count_t ffa_setup_partition_info_get_forward(
 		dlog_verbose(
 			"Failed forwarding FFA_PARTITION_INFO_GET to "
 			"the SPMC.\n");
-		return vm_count;
+		return entries_count;
 	}
 
 	tee_partitions_count = ffa_partition_info_get_count(ret);
-	if (tee_partitions_count == 0 || tee_partitions_count > MAX_VMS) {
-		dlog_verbose("Invalid number of SPs returned by the SPMC.\n");
-		return vm_count;
+
+	/*
+	 * Check that the limit of the buffer can't be surpassed in the checks
+	 * below.
+	 */
+	if (tee_partitions_count == 0 ||
+	    add_overflow(tee_partitions_count, entries_count, &res) ||
+	    res > partitions_max_len) {
+		dlog_verbose(
+			"Invalid number of SPs returned by the "
+			"SPMC.\n");
+		return entries_count;
 	}
 
 	if ((flags & FFA_PARTITION_COUNT_FLAG_MASK) ==
 	    FFA_PARTITION_COUNT_FLAG) {
-		vm_count += tee_partitions_count;
+		entries_count = res;
 	} else {
 		tee_partitions = (struct ffa_partition_info *)tee->mailbox.send;
-		for (ffa_vm_count_t index = 0; index < tee_partitions_count;
-		     index++) {
-			partitions[vm_count] = tee_partitions[index];
-			++vm_count;
+		for (size_t index = 0; index < tee_partitions_count; index++) {
+			partitions[entries_count] = tee_partitions[index];
+			++entries_count;
 		}
 
 		/* Release the RX buffer. */
@@ -191,7 +202,7 @@ ffa_vm_count_t ffa_setup_partition_info_get_forward(
 		CHECK(ret.func == FFA_SUCCESS_32);
 	}
 
-	return vm_count;
+	return entries_count;
 }
 
 void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
