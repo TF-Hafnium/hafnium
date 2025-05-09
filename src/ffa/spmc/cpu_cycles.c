@@ -902,7 +902,37 @@ static struct ffa_value abort_action_process(struct vcpu_locked current_locked,
 	assert(to_state == VCPU_STATE_NULL || to_state == VCPU_STATE_STOPPED ||
 	       to_state == VCPU_STATE_ABORTED);
 
-	*next = api_switch_to_primary(current_locked, to_ret, to_state);
+	switch (current->rt_model) {
+	case RTM_FFA_DIR_REQ:
+		/*
+		 * Three possible scenarios here:
+		 * Scenario A: A normal world VM sent a direct request message
+		 * to SPx.
+		 * Scenario B: A secure world SP extended a normal world call
+		 * chain by sending a direct request message to SPx.
+		 * Scenario C: A secure interrupt, whose target is SPy,
+		 * preempted a VM/SP. SPy, while handling the secure virtual
+		 * interrupt, sent a direct request to SPx.
+		 *
+		 * Eventually, the vCPU of SPx (i.e. current) aborted while
+		 * handling the direct request message.
+		 */
+		struct vcpu_locked next_locked = (struct vcpu_locked){
+			.vcpu = NULL,
+		};
+		assert(current->direct_request_origin.vm_id !=
+		       HF_INVALID_VM_ID);
+
+		api_direct_resp_unwind_call_chain_resume_target(
+			&current_locked, next, &next_locked, to_ret, to_state);
+
+		vcpu_unlock(&next_locked);
+		break;
+		break;
+	default:
+		CHECK(current->rt_model == RTM_FFA_RUN);
+		*next = api_switch_to_primary(current_locked, to_ret, to_state);
+	}
 
 	current->scheduling_mode = NONE;
 	current->rt_model = RTM_NONE;

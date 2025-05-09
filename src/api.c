@@ -3103,27 +3103,27 @@ void api_ffa_resume_direct_resp_target(struct vcpu_locked current_locked,
 				       struct vcpu **next,
 				       ffa_id_t receiver_vm_id,
 				       struct ffa_value to_ret,
-				       bool is_nwd_call_chain)
+				       bool is_nwd_call_chain,
+				       enum vcpu_state to_state)
 {
 	if (ffa_direct_msg_is_spmd_lp_id(receiver_vm_id) ||
 	    !vm_id_is_current_world(receiver_vm_id)) {
 		*next = api_switch_to_other_world(current_locked, to_ret,
-						  VCPU_STATE_WAITING);
+						  to_state);
 
 		/* End of NWd scheduled call chain. */
 		assert(!is_nwd_call_chain ||
 		       (current_locked.vcpu->call_chain.prev_node == NULL));
 	} else if (receiver_vm_id == HF_PRIMARY_VM_ID) {
-		*next = api_switch_to_primary(current_locked, to_ret,
-					      VCPU_STATE_WAITING);
+		*next = api_switch_to_primary(current_locked, to_ret, to_state);
 	} else if (vm_id_is_current_world(receiver_vm_id)) {
 		/*
 		 * It is expected the receiver_vm_id to be from an SP, otherwise
 		 * 'ffa_direct_msg_is_direct_response_valid' should have
 		 * made function return error before getting to this point.
 		 */
-		*next = api_switch_to_vm(current_locked, to_ret,
-					 VCPU_STATE_WAITING, receiver_vm_id);
+		*next = api_switch_to_vm(current_locked, to_ret, to_state,
+					 receiver_vm_id);
 	} else {
 		panic("Invalid direct message response invocation");
 	}
@@ -3203,6 +3203,52 @@ static bool api_ffa_msg_send_direct_resp_validate_ongoing_request(
 }
 
 /**
+ * Unwind a direct message call chain and resume the target vCPU when sending a
+ * direct response.
+ */
+void api_direct_resp_unwind_call_chain_resume_target(
+	struct vcpu_locked *current_locked, struct vcpu **next,
+	struct vcpu_locked *next_locked, struct ffa_value to_ret,
+	enum vcpu_state to_state)
+{
+	struct two_vcpu_locked vcpus_locked;
+	struct vcpu *current;
+
+	/* Ensure caller and callee vCPUs are valid */
+	assert(current_locked != NULL && next_locked != NULL && next != NULL);
+
+	current = current_locked->vcpu;
+	assert(current->direct_request_origin.vm_id != HF_INVALID_VM_ID);
+
+	api_ffa_resume_direct_resp_target(*current_locked, next,
+					  current->direct_request_origin.vm_id,
+					  to_ret, false, to_state);
+
+	/* Clear direct request origin vm_id and request type for the caller. */
+	current->direct_request_origin.is_ffa_req2 = false;
+	current->direct_request_origin.vm_id = HF_INVALID_VM_ID;
+
+	/*
+	 * Unlock current vCPU to allow it to be locked together with next
+	 * vcpu.
+	 */
+	vcpu_unlock(current_locked);
+
+	/* Lock both vCPUs at once to avoid deadlock. */
+	vcpus_locked = vcpu_lock_both(current, *next);
+	*current_locked = vcpus_locked.vcpu1;
+	*next_locked = vcpus_locked.vcpu2;
+
+	/* Inject timer interrupt if timer has expired. */
+	api_inject_arch_timer_interrupt(*next_locked);
+	ffa_direct_msg_unwind_call_chain_ffa_direct_resp(*current_locked,
+							 *next_locked);
+
+	/* Schedule the receiver's vCPU now. */
+	CHECK(vcpu_state_set(*next_locked, VCPU_STATE_RUNNING));
+}
+
+/**
  * Send an FF-A direct message response.
  * This handler covers both FFA_MSG_SEND_DIRECT_RESP_32/64
  * and FFA_MSG_SEND_DIRECT_RESP2_64 (introduced in FF-A v1.2) with
@@ -3227,7 +3273,6 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 	/* Prepare return interrupt if caller goes back to waiting state. */
 	struct ffa_value ret = (struct ffa_value){.func = FFA_INTERRUPT_32};
 	struct ffa_value to_ret = api_ffa_dir_msg_value(args);
-	struct two_vcpu_locked vcpus_locked;
 
 	if (!api_ffa_msg_send_direct_resp_validate_args(args, current)) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -3276,31 +3321,9 @@ struct ffa_value api_ffa_msg_send_direct_resp(struct ffa_value args,
 					  HF_MANAGED_EXIT_INTID);
 	}
 
-	/* Clear direct request origin vm_id and request type for the caller. */
-	current->direct_request_origin.is_ffa_req2 = false;
-	current->direct_request_origin.vm_id = HF_INVALID_VM_ID;
-
-	api_ffa_resume_direct_resp_target(current_locked, next, receiver_vm_id,
-					  to_ret, false);
-
-	/*
-	 * Unlock current vCPU to allow it to be locked together with next
-	 * vcpu.
-	 */
-	vcpu_unlock(&current_locked);
-
-	/* Lock both vCPUs at once to avoid deadlock. */
-	vcpus_locked = vcpu_lock_both(current, *next);
-	current_locked = vcpus_locked.vcpu1;
-	next_locked = vcpus_locked.vcpu2;
-
-	/* Inject timer interrupt if timer has expired. */
-	api_inject_arch_timer_interrupt(next_locked);
-	ffa_direct_msg_unwind_call_chain_ffa_direct_resp(current_locked,
-							 next_locked);
-
-	/* Schedule the receiver's vCPU now. */
-	CHECK(vcpu_state_set(next_locked, VCPU_STATE_RUNNING));
+	api_direct_resp_unwind_call_chain_resume_target(&current_locked, next,
+							&next_locked, to_ret,
+							VCPU_STATE_WAITING);
 
 	/*
 	 * Check if there is a pending interrupt, and if the partition
