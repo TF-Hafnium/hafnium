@@ -355,6 +355,43 @@ out:
 }
 
 /**
+ * SPMC could have restarted the current vCPU if it had aborted earlier due to
+ * a fatal error. This current vCPU could have been a part of a call chain.
+ * SPMC resumes the halted vcpu now.
+ */
+static void resume_halted_vcpu_upon_restart(struct vcpu_locked current_locked,
+					    struct vcpu **next)
+{
+	struct vcpu *current = current_locked.vcpu;
+	struct vcpu *target_vcpu;
+	struct vcpu_locked target_locked;
+	struct two_vcpu_locked vcpus_locked;
+
+	CHECK(current->halted_vcpu != NULL);
+
+	target_vcpu = current->halted_vcpu;
+	vcpu_unlock(&current_locked);
+
+	/* Lock both vCPUs at once to avoid deadlock. */
+	vcpus_locked = vcpu_lock_both(current, target_vcpu);
+	current_locked = vcpus_locked.vcpu1;
+	target_locked = vcpus_locked.vcpu2;
+
+	/* Reset the relevant fields for current vCPU. */
+	current->halted_vcpu = NULL;
+	vcpu_reset_mode(current_locked);
+
+	/* The current vCPU now moves to WAITING state. */
+	CHECK(vcpu_state_set(current_locked, VCPU_STATE_WAITING));
+
+	vcpu_set_running(target_locked, NULL);
+	vcpu_unlock(&target_locked);
+
+	/* The pre-empted vCPU should be run. */
+	*next = target_vcpu;
+}
+
+/**
  * The invocation of FFA_MSG_WAIT at secure virtual FF-A instance is compliant
  * with FF-A v1.1 EAC0 specification. It only performs the state transition
  * from RUNNING to WAITING for the following Partition runtime models:
@@ -368,7 +405,12 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 
 	switch (current->rt_model) {
 	case RTM_SP_INIT:
-		if (!sp_boot_next(current_locked, next, VCPU_STATE_WAITING)) {
+		if (current_locked.vcpu->halted_vcpu != NULL) {
+			resume_halted_vcpu_upon_restart(current_locked, next);
+			dlog_info("Successfully restarted vCPU of SP: %#x\n",
+				  current->vm->id);
+		} else if (!sp_boot_next(current_locked, next,
+					 VCPU_STATE_WAITING)) {
 			ffa_msg_wait_complete(current_locked, next);
 
 			ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
