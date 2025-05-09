@@ -18,6 +18,8 @@
 #include "hf/plat/interrupts.h"
 #include "hf/vm.h"
 
+#include "smc.h"
+
 bool ffa_cpu_cycles_run_forward(ffa_id_t vm_id, ffa_vcpu_index_t vcpu_idx,
 				struct ffa_value *ret)
 {
@@ -885,17 +887,89 @@ out:
 	return ret;
 }
 
-struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked current_locked,
-					     struct vcpu **next)
+/*
+ * Perform appropriate operations based on the abort action specified by
+ * partition.
+ */
+static struct ffa_value abort_action_process(struct vcpu_locked current_locked,
+					     struct vcpu **next,
+					     enum vcpu_state to_state)
 {
+	struct ffa_value ret_args = (struct ffa_value){.func = FFA_SUCCESS_32};
+	struct vcpu *current = current_locked.vcpu;
 	struct ffa_value to_ret = ffa_error(FFA_ABORTED);
-	enum vcpu_state next_state = VCPU_STATE_ABORTED;
+
+	assert(to_state == VCPU_STATE_NULL || to_state == VCPU_STATE_STOPPED ||
+	       to_state == VCPU_STATE_ABORTED);
+
+	*next = api_switch_to_primary(current_locked, to_ret, to_state);
+
+	current->scheduling_mode = NONE;
+	current->rt_model = RTM_NONE;
 
 	/*
-	 * Relinquish control back to the NWd.
-	 * TODO: Support for abort actions will be added in further patches.
+	 * Before yielding CPU cycles, allow the interrupts(if they were
+	 * masked earlier).
 	 */
-	*next = api_switch_to_primary(current_locked, to_ret, next_state);
+	if (*next != NULL) {
+		ffa_interrupts_unmask(current);
+	}
+
+	return ret_args;
+}
+
+struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked *current_locked,
+				      struct vcpu **next)
+{
+	enum abort_action abort_action;
+
+	/*
+	 * Disable the current vCPU's arch timer and remove its corresponding
+	 * entry from timer list of current CPU.
+	 * The current vCPU does not have IPI list entry since it belongs to a
+	 * UP SP.
+	 */
+	current_locked->vcpu->regs.arch_timer.ctl = 0U;
+	timer_vcpu_manage(current_locked->vcpu);
+
+	abort_action = current_locked->vcpu->vm->abort_action;
+
+	switch (abort_action) {
+	case ACTION_PROPAGATE:
+		dlog_error(
+			"Propagating fatal error to SPMD through FFA_ABORT\n");
+
+		smc_ffa_call((struct ffa_value){.func = FFA_ABORT_32});
+
+		/*
+		 * The above FFA_ABORT invocation to SPMD is not expected to
+		 * return.
+		 */
+		panic("Not expected to return from FFA_ABORT to SPMD\n");
+
+		/* Not reachable. Return dummy status. */
+		return (struct ffa_value){.func = FFA_ERROR_32};
+	case ACTION_STOP:
+		return abort_action_process(*current_locked, next,
+					    VCPU_STATE_STOPPED);
+	case ACTION_DESTROY:
+		return abort_action_process(*current_locked, next,
+					    VCPU_STATE_NULL);
+	case ACTION_IMP_DEF:
+		/*
+		 * Implementation defined action allowed by spec.
+		 * Legacy partition: Destroy it or keep in aborted state?
+		 * Partition with lifecycle support: STOP it.
+		 */
+		if (current_locked->vcpu->vm->lifecycle_support) {
+			return abort_action_process(*current_locked, next,
+						    VCPU_STATE_STOPPED);
+		}
+		return abort_action_process(*current_locked, next,
+					    VCPU_STATE_ABORTED);
+	default:
+		panic("Unsupported abort action\n");
+	}
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }

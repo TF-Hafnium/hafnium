@@ -49,7 +49,7 @@ struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 					 enum ffa_error error_code,
 					 struct mpool *ppool);
 
-struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked current_locked,
+struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked *current_locked,
 				      struct vcpu **next);
 
 struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next);

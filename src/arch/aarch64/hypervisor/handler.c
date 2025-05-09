@@ -1143,6 +1143,19 @@ struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next)
 	 * to the partition.
 	 */
 	ffa_vm_free_resources(vm_locked, api_get_ppool());
+
+	/*
+	 * Remove VM's node from boot list if a partition aborts during runtime.
+	 * This facilitates booting other partitions according to boot order
+	 * even if this partition aborts during initialization.
+	 */
+	if (current->rt_model != RTM_SP_INIT) {
+		list_remove(&(vm_locked.vm->boot_list_node));
+	}
+
+	if (current->vm->abort_action == ACTION_DESTROY) {
+		vm_set_state(vm_locked, VM_STATE_NULL);
+	}
 	vm_unlock(&vm_locked);
 
 	/*
@@ -1155,7 +1168,7 @@ struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next)
 	 * SPMC performs necessary operations based on the abort action for
 	 * SP.
 	 */
-	ret = ffa_cpu_cycles_abort(current_locked, next);
+	ret = ffa_cpu_cycles_abort(&current_locked, next);
 	vcpu_unlock(&current_locked);
 
 	return ret;
