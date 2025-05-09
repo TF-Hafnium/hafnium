@@ -253,6 +253,18 @@ struct vcpu {
 	 * handled by this vCPU.
 	 */
 	enum power_mgmt_operation pwr_mgmt_op;
+
+	/**
+	 * This field is used by SPMC to keep track of an endpoints's vCPU that
+	 * was executing before the current vCPU aborted and eventually
+	 * restarted. Once the current vCPU successfully initializes itself upon
+	 * restart, SPMC will resume the halted vCPU.
+	 * Assuming SPx is the aborting partition, some common scenarios are:
+	 *  - SPy allocated CPU cycles to SPx (either FFA_RUN or a direct
+	 *    request message.
+	 *  - SPy was preempted by a secure interrupt whose target is SPx.
+	 */
+	struct vcpu *halted_vcpu;
 };
 
 /** Encapsulates a vCPU whose lock is held. */
@@ -281,6 +293,9 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 
 void vcpu_set_phys_core_idx(struct vcpu *vcpu);
 void vcpu_set_boot_info_gp_reg(struct vcpu *vcpu);
+
+void vcpu_bootstrap(const struct vcpu_locked locked, struct cpu *cpu,
+		    bool set_phys_idx);
 
 static inline void vcpu_call_chain_extend(struct vcpu_locked vcpu1_locked,
 					  struct vcpu_locked vcpu2_locked)
@@ -330,6 +345,13 @@ static inline void vcpu_virt_interrupt_set_type(struct interrupts *interrupts,
 	} else {
 		interrupt_bitmap_set_value(&interrupts->interrupt_type, intid);
 	}
+}
+
+/* Reset runtime model and scheduling mode. */
+static inline void vcpu_reset_mode(struct vcpu_locked vcpu_locked)
+{
+	vcpu_locked.vcpu->scheduling_mode = NONE;
+	vcpu_locked.vcpu->rt_model = RTM_NONE;
 }
 
 uint32_t vcpu_virt_interrupt_irq_count_get(struct vcpu_locked vcpu_locked);

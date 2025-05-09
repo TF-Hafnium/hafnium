@@ -15,6 +15,7 @@
 #include "hf/ffa/interrupts.h"
 #include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
+#include "hf/load.h"
 #include "hf/plat/interrupts.h"
 #include "hf/vm.h"
 
@@ -171,8 +172,7 @@ static void ffa_cpu_cycles_exit_spmc_schedule_mode(
 	assert(current->call_chain.next_node == NULL);
 	CHECK(current->scheduling_mode == SPMC_MODE);
 
-	current->scheduling_mode = NONE;
-	current->rt_model = RTM_NONE;
+	vcpu_reset_mode(current_locked);
 }
 
 /**
@@ -230,10 +230,7 @@ static struct ffa_value ffa_cpu_cycles_preempted_vcpu_resume(
 static void ffa_msg_wait_complete(struct vcpu_locked current_locked,
 				  struct vcpu **next)
 {
-	struct vcpu *current = current_locked.vcpu;
-
-	current->scheduling_mode = NONE;
-	current->rt_model = RTM_NONE;
+	vcpu_reset_mode(current_locked);
 
 	/*
 	 * We no longer need to do a managed exit so clear the interrupt if
@@ -311,8 +308,7 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next,
 	}
 
 	CHECK(vcpu_state_set(current_locked, to_state));
-	current->rt_model = RTM_NONE;
-	current->scheduling_mode = NONE;
+	vcpu_reset_mode(current_locked);
 
 	/*
 	 * Pick next SP's vCPU to be booted. Once all SPs have booted
@@ -346,22 +342,7 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next,
 
 		vm_unlock(&vm_locked);
 
-		vcpu_next->rt_model = RTM_SP_INIT;
-		arch_regs_reset(vcpu_next);
-		vcpu_next->cpu = current->cpu;
-		CHECK(vcpu_state_set(vcpu_next_locked, VCPU_STATE_STARTING));
-		vcpu_next->regs_available = false;
-		vcpu_set_phys_core_idx(vcpu_next);
-		arch_regs_set_pc_arg(&vcpu_next->regs,
-				     vcpu_next->vm->secondary_ep, 0ULL);
-
-		if (cpu_index(current_locked.vcpu->cpu) == PRIMARY_CPU_IDX) {
-			/*
-			 * Boot information is passed by the SPMC to the SP's
-			 * execution context only on the primary CPU.
-			 */
-			vcpu_set_boot_info_gp_reg(vcpu_next);
-		}
+		vcpu_bootstrap(vcpu_next_locked, current->cpu, true);
 
 		vcpu_unlock(&vcpu_next_locked);
 		*next = vcpu_next;
@@ -966,8 +947,7 @@ static struct ffa_value abort_action_process(struct vcpu_locked current_locked,
 		*next = api_switch_to_primary(current_locked, to_ret, to_state);
 	}
 
-	current->scheduling_mode = NONE;
-	current->rt_model = RTM_NONE;
+	vcpu_reset_mode(current_locked);
 
 	/*
 	 * Before yielding CPU cycles, allow the interrupts(if they were
@@ -1029,9 +1009,60 @@ struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked *current_locked,
 		}
 		return abort_action_process(*current_locked, next,
 					    VCPU_STATE_ABORTED);
+	case ACTION_RESTART: {
+		struct vcpu *halted_vcpu;
+		struct ffa_value ret;
+		struct vcpu *current = current_locked->vcpu;
+		struct cpu *cpu = current->cpu;
+		struct vm *vm = current->vm;
+		struct vm_locked vm_locked;
+
+		ret = abort_action_process(*current_locked, &halted_vcpu,
+					   VCPU_STATE_STOPPED);
+
+		/* This vCPU is going to be sanitized.*/
+		vcpu_unlock(current_locked);
+
+		/*
+		 * Re-initialize the current vCPU's partition i.e., move it from
+		 * STOPPED state to CREATED state by re-allocating resources.
+		 */
+		CHECK(load_reinit_partition(vm, api_get_ppool()));
+
+		vm_locked = vm_lock(vm);
+		assert(vm_read_state(vm) == VM_STATE_CREATED);
+		vm_set_state(vm_locked, VM_STATE_RUNNING);
+		vm_unlock(&vm_locked);
+
+		/*
+		 * Obtain the current vCPU as it has been purged earlier during
+		 * partition reinitialization.
+		 */
+		current = vm_get_vcpu(vm, cpu_index(cpu));
+
+		/* Bootstrap the restarted vCPU as on cold boot. */
+		*current_locked = vcpu_lock(current);
+		vcpu_bootstrap(*current_locked, cpu,
+			       (cpu_index(cpu) == PRIMARY_CPU_IDX));
+
+		/*
+		 * SPMC restarts the current vCPU (i.e., STARTING state) and
+		 * records the halted vcpu to be resumed once the current vCPU
+		 * re-initializes itself.
+		 */
+		*next = current;
+
+		/*
+		 * Keep a record of halted vCPU which will be resumed by SPMC
+		 * once current vCPU successfully reinitializes.
+		 */
+		current->halted_vcpu = halted_vcpu;
+		dlog_info("Ready to restart vcpu of SP:%#x\n",
+			  current_locked->vcpu->vm->id);
+
+		return ret;
+	}
 	default:
 		panic("Unsupported abort action\n");
 	}
-
-	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }

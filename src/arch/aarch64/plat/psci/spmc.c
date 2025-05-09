@@ -141,21 +141,8 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	/* Lock the vCPU to update its fields. */
 	vcpu_locked = vcpu_lock(boot_vcpu);
 
-	/* Pin the vCPU to this CPU. */
-	boot_vcpu->cpu = c;
-
-	vcpu_secondary_reset_and_start(vcpu_locked, boot_vcpu->vm->secondary_ep,
-				       0ULL);
-
-	/* Set the vCPU's state to STARTING. */
-	CHECK(vcpu_state_set(vcpu_locked, VCPU_STATE_STARTING));
-	boot_vcpu->regs_available = false;
-
-	/* vCPU restarts in runtime model for SP initialization. */
-	boot_vcpu->rt_model = RTM_SP_INIT;
-
-	/* Set the designated GP register with the core linear id. */
-	vcpu_set_phys_core_idx(boot_vcpu);
+	/* Bootstrap the SP vCPU on this CPU. */
+	vcpu_bootstrap(vcpu_locked, c, true);
 
 	if (cpu_index(c) == PRIMARY_CPU_IDX) {
 		struct vm_locked vm_locked;
@@ -165,12 +152,6 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 		vcpu_locked = vcpu_lock(boot_vcpu);
 		vm_set_state(vm_locked, VM_STATE_RUNNING);
 		vm_unlock(&vm_locked);
-
-		/*
-		 * Boot information is passed by the SPMC to the SP's execution
-		 * context only on the primary CPU.
-		 */
-		vcpu_set_boot_info_gp_reg(boot_vcpu);
 	}
 
 	vcpu_unlock(&vcpu_locked);

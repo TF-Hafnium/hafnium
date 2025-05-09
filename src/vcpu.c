@@ -682,10 +682,7 @@ void vcpu_dir_req_reset_state(struct vcpu_locked vcpu_locked)
 	/* Clear direct request origin vm_id and request type. */
 	vcpu->direct_request_origin.vm_id = HF_INVALID_VM_ID;
 	vcpu->direct_request_origin.is_framework = false;
-
-	/* Reset runtime model and scheduling mode. */
-	vcpu->scheduling_mode = NONE;
-	vcpu->rt_model = RTM_NONE;
+	vcpu_reset_mode(vcpu_locked);
 }
 
 static inline const char *vcpu_state_print_name(enum vcpu_state state)
@@ -829,4 +826,45 @@ out:
 	}
 
 	return ret;
+}
+
+/**
+ * Bootstrap an SP vCPU, either cold boot or restart.
+ */
+void vcpu_bootstrap(const struct vcpu_locked locked, struct cpu *cpu,
+		    bool set_phys_idx)
+{
+	struct vcpu *vcpu = locked.vcpu;
+
+	assert(vcpu != NULL);
+
+	/*
+	 * Set rt_model to RTM_SP_INIT and bind the vCPU to the given physical
+	 * CPU.
+	 */
+	vcpu->rt_model = RTM_SP_INIT;
+	vcpu->cpu = cpu;
+
+	/* Reset architectural registers*/
+	arch_regs_reset(vcpu);
+
+	/* Transition to STARTING state. Mark the registers as unavailable. */
+	CHECK(vcpu_state_set(locked, VCPU_STATE_STARTING));
+	vcpu->regs_available = false;
+
+	/* Set the designated GP register with the core linear id. */
+	if (set_phys_idx) {
+		vcpu_set_phys_core_idx(vcpu);
+	}
+
+	/* Set PC and argument to the secondary entry point. */
+	arch_regs_set_pc_arg(&vcpu->regs, vcpu->vm->secondary_ep, 0ULL);
+
+	/*
+	 * Boot information is passed by the SPMC to the SP's execution context
+	 * only on the primary CPU.
+	 */
+	if (cpu_index(cpu) == PRIMARY_CPU_IDX) {
+		vcpu_set_boot_info_gp_reg(vcpu);
+	}
 }

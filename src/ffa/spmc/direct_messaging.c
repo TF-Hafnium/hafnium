@@ -147,8 +147,7 @@ void ffa_direct_msg_unwind_call_chain_ffa_direct_resp(
 	struct vcpu *current = current_locked.vcpu;
 
 	assert(current->call_chain.next_node == NULL);
-	current->scheduling_mode = NONE;
-	current->rt_model = RTM_NONE;
+	vcpu_reset_mode(current_locked);
 
 	/* Allow interrupts if they were masked earlier. */
 	ffa_interrupts_unmask(current);
