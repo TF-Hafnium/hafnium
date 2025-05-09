@@ -185,7 +185,8 @@ static void ffa_cpu_cycles_exit_spmc_schedule_mode(
  * SPM then resumes the original SP that was initially pre-empted.
  */
 static struct ffa_value ffa_cpu_cycles_preempted_vcpu_resume(
-	struct vcpu_locked current_locked, struct vcpu **next)
+	struct vcpu_locked current_locked, struct vcpu **next,
+	enum vcpu_state to_state)
 {
 	struct ffa_value ffa_ret = (struct ffa_value){.func = FFA_MSG_WAIT_32};
 	struct vcpu *target_vcpu;
@@ -211,7 +212,7 @@ static struct ffa_value ffa_cpu_cycles_preempted_vcpu_resume(
 	ffa_cpu_cycles_exit_spmc_schedule_mode(current_locked);
 	assert(current->call_chain.prev_node == NULL);
 
-	CHECK(vcpu_state_set(current_locked, VCPU_STATE_WAITING));
+	CHECK(vcpu_state_set(current_locked, to_state));
 
 	vcpu_set_running(target_locked, NULL);
 
@@ -397,7 +398,8 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 		 * Either resume the preempted SP or complete the FFA_MSG_WAIT.
 		 */
 		assert(current->preempted_vcpu != NULL);
-		ffa_cpu_cycles_preempted_vcpu_resume(current_locked, next);
+		ffa_cpu_cycles_preempted_vcpu_resume(current_locked, next,
+						     VCPU_STATE_WAITING);
 
 		if (!ffa_cpu_cycles_msg_wait_intercept(current_locked, next,
 						       &ret)) {
@@ -928,6 +930,22 @@ static struct ffa_value abort_action_process(struct vcpu_locked current_locked,
 
 		vcpu_unlock(&next_locked);
 		break;
+	case RTM_SEC_INTERRUPT:
+		/*
+		 * Two possible scenarios here:
+		 * Scenario A: A secure interrupt, whose target is SPx,
+		 * preempted a normal world VM.
+		 * Scenario B: A secure interrupt, whose target is SPx,
+		 * preempted a secure world SP.
+		 *
+		 * Eventually, the vCPU of SPx (i.e., current) aborted while
+		 * handling the secure virtual interrupt.
+		 */
+		assert(current->call_chain.prev_node == NULL);
+		assert(current->preempted_vcpu != NULL);
+
+		ffa_cpu_cycles_preempted_vcpu_resume(current_locked, next,
+						     to_state);
 		break;
 	default:
 		CHECK(current->rt_model == RTM_FFA_RUN);
