@@ -31,6 +31,13 @@
 
 #include "vmapi/hf/ffa.h"
 
+static const struct manifest *partition_manager_manifest;
+
+const struct manifest *get_hypervisor_manifest(void)
+{
+	return partition_manager_manifest;
+}
+
 /**
  * Copies data to an unmapped location by mapping it for write, copying the
  * data, then unmapping it.
@@ -759,6 +766,9 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 		 * entrypoint computed for primary execution context.
 		 */
 		vm->secondary_ep = partition_primary_ep;
+		dlog_verbose(
+			"Backup for secondary ep of Endpoint:%#x is: %#lx\n",
+			vm->id, partition_primary_ep.ipa);
 	}
 
 	/*
@@ -1040,6 +1050,8 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	struct vm_locked primary_vm_locked;
 	bool success = true;
 
+	partition_manager_manifest = manifest;
+
 	/**
 	 * Only try to load the primary VM if it is supposed to be in this
 	 * world.
@@ -1140,4 +1152,50 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	return update_reserved_ranges(update, params->mem_ranges,
 				      mem_ranges_available,
 				      params->mem_ranges_count);
+}
+
+bool load_reinit_partition(struct vm *vm, struct mpool *ppool)
+{
+	const struct manifest_vm *manifest_vm;
+	paddr_t mem_begin;
+	paddr_t mem_end;
+	struct mm_stage1_locked stage1_locked;
+	bool ret = true;
+	const struct manifest *manager_manifest;
+
+	assert(vm->lifecycle_support);
+
+	dlog_verbose("Attempt to reiniatize the partition\n");
+
+	/*
+	 * Partition manifest not parsed again to obtain fields. Across reboot,
+	 * the partition manifest does not change.
+	 */
+	manager_manifest = get_hypervisor_manifest();
+	manifest_vm = &manager_manifest->vm[vm->id - HF_VM_ID_OFFSET];
+	assert(manifest_vm->is_ffa_partition);
+
+	mem_begin = pa_init(manifest_vm->partition.load_addr);
+	mem_end = pa_init(manifest_vm->partition.load_addr +
+			  align_up(manifest_vm->secondary.mem_size, PAGE_SIZE));
+
+	stage1_locked = mm_lock_stage1();
+
+	if (!vm_reinit(vm, ppool)) {
+		dlog_error("Unable to re-initialise vm.\n");
+		return false;
+	}
+
+	if (!load_ffa_partition(stage1_locked, mem_begin, mem_end, manifest_vm,
+				ppool, vm, NULL)) {
+		ret = false;
+		dlog_error("Unable to re-initialize Secure Partition: %#x\n",
+			   vm->id);
+	} else {
+		dlog_info("Secure Partition %#x re-initialized\n", vm->id);
+	}
+
+	mm_unlock_stage1(&stage1_locked);
+
+	return ret;
 }

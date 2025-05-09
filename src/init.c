@@ -179,11 +179,12 @@ void one_time_init(void)
 		panic("Unable to update boot flow.");
 	}
 
-	/* Free space allocated for the boot parameters. */
+	/*
+	 * Free space allocated for the boot parameters. However, the space
+	 * allocated for manifest shall not be freed as the properties are
+	 * needed when a partition is restarted.
+	 */
 	mpool_free(&ppool, params);
-
-	/* Now manifest parsing has completed free the resourses used. */
-	manifest_deinit(&ppool);
 
 	mm_unlock_stage1(&mm_stage1_locked);
 
