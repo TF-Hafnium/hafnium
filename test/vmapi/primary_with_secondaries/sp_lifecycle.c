@@ -129,6 +129,41 @@ TEST(sp_lifecycle, destroy_sp_upon_abort)
 }
 
 /**
+ * Send an indirect message to SP and allocate CPU cycles through FFA_RUN.
+ * Expect the SP to abort using FFA_ABORT. Any attempt to communicate with the
+ * SP shall return error status.
+ */
+TEST_PRECONDITION(sp_lifecycle, sp_abort_indirect_message, service1_is_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *target_sp_info = service1(mb.recv);
+	const uint32_t payload = 0xAABBCC;
+	ffa_id_t own_id = hf_vm_get_id();
+
+	SERVICE_SELECT(target_sp_info->vm_id, "sp_ffa_abort_indirect_message",
+		       mb.send);
+	res = ffa_run(target_sp_info->vm_id, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+
+	res = send_indirect_message(own_id, target_sp_info->vm_id, mb.send,
+				    &payload, sizeof(payload), 0);
+	ASSERT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Expect the target SP to abort while handling indirect message. */
+	res = ffa_run(target_sp_info->vm_id, 0);
+	EXPECT_FFA_ERROR(res, FFA_ABORTED);
+
+	/*
+	 * Attempt to communicate with target SP. SPMC shall return BUSY status.
+	 */
+	res = ffa_msg_send_direct_req(own_id, target_sp_info->vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_BUSY);
+}
+
+/**
  * This test aims to create a scenario where the target endpoint aborts
  * voluntarily while handling a direct request from an initiator endpoint. SPMC
  * shall return suitable error return status to initiator. To be robust, this

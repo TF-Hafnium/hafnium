@@ -59,6 +59,30 @@ TEST_SERVICE(sp_ffa_abort_dir_req)
 	FAIL("Not expected to return after FFA_ABORT");
 }
 
+TEST_SERVICE(sp_ffa_abort_indirect_message)
+{
+	struct ffa_value args;
+	uint32_t payload;
+	void *recv_buf = SERVICE_RECV_BUFFER();
+
+	/*
+	 * Setup handling of known interrupts including Secure Watchdog timer
+	 * interrupt and NPI.
+	 */
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	args = ffa_msg_wait();
+	EXPECT_EQ(args.func, FFA_RUN_32);
+
+	receive_indirect_message((void *)&payload, sizeof(payload), recv_buf);
+
+	HFTEST_LOG("Echo payload: %u", payload);
+	ffa_abort_32(0);
+
+	FAIL("Not expected to return after stopping");
+}
+
 TEST_SERVICE(sp_to_sp_dir_req_abort_start_another_dir_req)
 {
 	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
