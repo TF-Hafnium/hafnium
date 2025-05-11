@@ -25,7 +25,7 @@
 const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
 			0x88889999};
 
-/*
+/**
  * Send a direct request message to target SP and expect it to abort using
  * FFA_ABORT ABI. Perform the partition discovery via FFA_PARTITION_INFO_GET
  * interface both before and after the target SP is aborted. Any attempt to
@@ -126,4 +126,75 @@ TEST(sp_lifecycle, destroy_sp_upon_abort)
 
 	/* Service3 SP is no more discoverable after aborting. */
 	EXPECT_EQ(vm_count, 5);
+}
+
+/**
+ * This test aims to create a scenario where the target endpoint aborts
+ * voluntarily while handling a direct request from an initiator endpoint. SPMC
+ * shall return suitable error return status to initiator. To be robust, this
+ * test also configures the initiator endpoint to perform a handshake with a
+ * companion endpoint to ensure SPMC preserves the state of various endpoints in
+ * a system even after abort handling.
+ *
+ * Roles played by various endpoints to facilitate above test scenario:
+ *  Service1 SP - Target endpoint
+ *  Service2 SP - Initiator endpoint
+ *  Service3 SP - Companion endpoint
+ */
+TEST_PRECONDITION(sp_lifecycle, sp_abort_dir_req_from_sp,
+		  service1_and_service2_are_secure)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_sp_info = service1(mb.recv);
+	struct ffa_partition_info *initiator_info = service2(mb.recv);
+	struct ffa_partition_info *companion_info = service3(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_value res;
+
+	/*
+	 * Run target endpoint for it to wait for a request from Initiator
+	 * endpoint and then voluntarily abort its execution using FFA_ABORT.
+	 */
+	SERVICE_SELECT(target_sp_info->vm_id, "sp_ffa_abort_dir_req", mb.send);
+	ffa_run(target_sp_info->vm_id, 0);
+
+	/*
+	 * Run companion endpoint for it to wait for a request from initiator
+	 * endpoint.
+	 */
+	SERVICE_SELECT(companion_info->vm_id, "ffa_direct_message_resp_echo",
+		       mb.send);
+	ffa_run(companion_info->vm_id, 0);
+
+	/*
+	 * Initiator endpoint sends direct request to target endpoint and
+	 * expects it to be aborted.
+	 */
+	SERVICE_SELECT(initiator_info->vm_id,
+		       "sp_to_sp_dir_req_abort_start_another_dir_req", mb.send);
+
+	/*
+	 * Send to Initiator endpoint, the vm id of the target endpoint for its
+	 * message.
+	 */
+	res = send_indirect_message(own_id, initiator_info->vm_id, mb.send,
+				    &target_sp_info->vm_id,
+				    sizeof(target_sp_info->vm_id), 0);
+	ASSERT_EQ(res.func, FFA_SUCCESS_32);
+	ffa_run(initiator_info->vm_id, 0);
+
+	/*
+	 * Attempt to communicate with target SP. SPMC shall return BUSY status.
+	 */
+	res = ffa_msg_send_direct_req(own_id, target_sp_info->vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_BUSY);
+
+	/* Send to initiator_info the vm id of the companion for its message. */
+	res = send_indirect_message(own_id, initiator_info->vm_id, mb.send,
+				    &companion_info->vm_id,
+				    sizeof(companion_info->vm_id), 0);
+	ASSERT_EQ(res.func, FFA_SUCCESS_32);
+	ffa_run(initiator_info->vm_id, 0);
 }

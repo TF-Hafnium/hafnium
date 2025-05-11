@@ -58,3 +58,51 @@ TEST_SERVICE(sp_ffa_abort_dir_req)
 
 	FAIL("Not expected to return after FFA_ABORT");
 }
+
+TEST_SERVICE(sp_to_sp_dir_req_abort_start_another_dir_req)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_value res;
+	ffa_id_t target_id;
+	ffa_id_t companion_id;
+
+	/*
+	 * Setup handling of known interrupts including Secure Watchdog timer
+	 * interrupt and NPI.
+	 */
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	/* Retrieve FF-A ID of the target endpoint. */
+	receive_indirect_message((void *)&target_id, sizeof(target_id),
+				 recv_buf);
+
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), target_id, msg[0], msg[1],
+				      msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_ABORTED);
+
+	dlog_verbose("Yield to PVM\n");
+	ffa_yield();
+
+	receive_indirect_message((void *)&companion_id, sizeof(companion_id),
+				 recv_buf);
+
+	/* Retrieve FF-A ID of the companion endpoint. */
+	dlog_verbose("Echo test with: %x", companion_id);
+
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), companion_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+
+	EXPECT_EQ(res.arg3, msg[0]);
+	EXPECT_EQ(res.arg4, msg[1]);
+	EXPECT_EQ(res.arg5, msg[2]);
+	EXPECT_EQ(res.arg6, msg[3]);
+	EXPECT_EQ(res.arg7, msg[4]);
+
+	ffa_yield();
+}
