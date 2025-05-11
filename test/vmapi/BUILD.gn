@@ -23,6 +23,7 @@ group("partitions") {
     "ffa_secure_partitions:ffa_both_world_partitions_vhe_test",
     "primary_with_secondaries:primary_with_sp",
     "primary_with_secondaries:primary_with_sp_vhe",
+    "primary_with_secondaries:sp_lifecycle_support",
   ]
 }
 

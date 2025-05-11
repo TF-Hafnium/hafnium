@@ -26,6 +26,7 @@
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
 	lifecycle-support;
+	abort-action = <1>; /* Destroy */
 
 	/* Boot Info */
 	boot-info {

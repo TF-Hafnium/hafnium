@@ -22,7 +22,6 @@ vm_kernel("sp_lifecycle_service_el0") {
   testonly = true
 
   deps = [
-    ":abort_el0_sp",
     "//src/arch/aarch64/hftest/el0:interrupts",
     "//src/arch/aarch64/hftest/el0:mm",
     "//test/hftest:hftest_sel0_partition_base",

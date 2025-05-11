@@ -33,7 +33,6 @@ vm_kernel("sp_lifecycle_service_el1") {
   testonly = true
   deps = [
     ":abort_common",
-    ":abort_el1_sp",
     "//src/arch/aarch64/hftest:interrupts",
     "//src/arch/aarch64/hftest:mm",
     "//test/hftest:hftest_secure_service",
