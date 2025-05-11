@@ -39,6 +39,19 @@ static void irq_handler(void)
 	}
 }
 
+/**
+ * Exception handler used by an S-EL1 partition to voluntarily terminate
+ * execution upon fatal error.
+ */
+static bool exception_handler_abort_execution(void)
+{
+	dlog("Aborting after fatal synchronous exception\n");
+
+	ffa_abort_32(0);
+
+	return true;
+}
+
 TEST_SERVICE(sp_ffa_abort_dir_req)
 {
 	struct ffa_value args;
@@ -81,6 +94,24 @@ TEST_SERVICE(sp_ffa_abort_indirect_message)
 	ffa_abort_32(0);
 
 	FAIL("Not expected to return after stopping");
+}
+
+TEST_SERVICE(sp_fatal_error_sync_exception)
+{
+	struct ffa_value args = ffa_msg_wait();
+
+	exception_setup(NULL, exception_handler_abort_execution);
+
+	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
+
+	/*
+	 * Cause a synchronous exception by writing to an illegal address,
+	 * thereby emulating a fatal error for SP. This causes the SP to be
+	 * aborted.
+	 */
+	mmio_write32((void *)ILLEGAL_ADDR, 0x9999);
+
+	FAIL("Not expected to return after fatal error");
 }
 
 TEST_SERVICE(sp_to_sp_dir_req_abort_start_another_dir_req)

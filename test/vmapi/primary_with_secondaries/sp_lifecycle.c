@@ -164,6 +164,69 @@ TEST_PRECONDITION(sp_lifecycle, sp_abort_indirect_message, service1_is_secure)
 }
 
 /**
+ * Send a direct request message to S-EL0 target SP and expect it to abort upon
+ * encountering a fatal error due to a synchronous exception. Any attempt to
+ * communicate with the target SP shall return error status.
+ */
+TEST(sp_lifecycle, sel0_sp_abort_fatal_error)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *target_sp_info = service1(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+
+	SERVICE_SELECT(target_sp_info->vm_id, "sp_fatal_error_sync_exception",
+		       mb.send);
+	ffa_run(target_sp_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_req(own_id, target_sp_info->vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_ABORTED);
+
+	/* Attempt to communicate with target SP. */
+	res = ffa_msg_send_direct_req(own_id, target_sp_info->vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	/*
+	 * Since Service1 SP didn't specify any abort action explcitly, SPMC
+	 * put the partition in STOPPED state and return BUSY error status.
+	 */
+	EXPECT_FFA_ERROR(res, FFA_BUSY);
+}
+
+/**
+ * Same test as above except that the target endpoint is S-EL1 SP.
+ */
+TEST(sp_lifecycle, sel1_sp_abort_fatal_error)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_value res;
+	struct ffa_partition_info *target_sp_info = service3(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+
+	SERVICE_SELECT(target_sp_info->vm_id, "sp_fatal_error_sync_exception",
+		       mb.send);
+	ffa_run(target_sp_info->vm_id, 0);
+
+	res = ffa_msg_send_direct_req(own_id, target_sp_info->vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_ABORTED);
+
+	/* Attempt to communicate with target SP. */
+	res = ffa_msg_send_direct_req(own_id, target_sp_info->vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	/*
+	 * SPMC shall return INVALID PARAMETERS error status as the target SP
+	 * is going to be destroyed (since the abort action specified in the
+	 * manifest is DESTROY).
+	 */
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
+
+/**
  * This test aims to create a scenario where the target endpoint aborts
  * voluntarily while handling a direct request from an initiator endpoint. SPMC
  * shall return suitable error return status to initiator. To be robust, this
