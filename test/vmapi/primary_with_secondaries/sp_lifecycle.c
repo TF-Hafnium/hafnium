@@ -336,3 +336,62 @@ TEST_PRECONDITION(sp_lifecycle, sp_preempts_vm_aborts_spmc_mode,
 
 	EXPECT_FFA_ERROR(res, FFA_BUSY);
 }
+
+/**
+ * This test aims to create a scenario where a secure physical interrupt
+ * preempts a companion endpoint followed by the target endpoint aborting
+ * while handling the corresponding secure virtual interrupt.
+ */
+TEST_PRECONDITION(sp_lifecycle, sp_preempts_sp_aborts_spmc_mode,
+		  service1_is_secure)
+{
+	struct ffa_value res;
+	const uint32_t delay = 20;
+	const uint32_t wait = delay + 50;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_sp_info = service1(mb.recv);
+	struct ffa_partition_info *companion_info = service2(mb.recv);
+
+	SERVICE_SELECT(companion_info->vm_id, "sp_active_wait", mb.send);
+
+	/* Send an indirect message to convey the wait duration. */
+	res = send_indirect_message(own_id, companion_info->vm_id, mb.send,
+				    &wait, sizeof(wait), 0);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Schedule message receiver through FFA_RUN interface. */
+	res = ffa_run(companion_info->vm_id, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+
+	SERVICE_SELECT(target_sp_info->vm_id, "sp_ffa_abort_sec_int_handling",
+		       mb.send);
+
+	/*
+	 * Send an indirect message to convey the Secure Watchdog timer delay
+	 * which serves as the source of the secure interrupt.
+	 */
+	res = send_indirect_message(own_id, target_sp_info->vm_id, mb.send,
+				    &delay, sizeof(delay), 0);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Schedule message receiver through FFA_RUN interface. */
+	res = ffa_run(target_sp_info->vm_id, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+
+	/*
+	 * Schedule the companion SP which will be busy in active wait. The
+	 * secure interrupt will trigger in this window causing the companion
+	 * SP to be preempted.
+	 */
+	res = ffa_run(companion_info->vm_id, 0);
+	EXPECT_EQ(res.func, FFA_YIELD_32);
+
+	/*
+	 * Attempt to communicate with target SP. SPMC shall return BUSY status.
+	 */
+	res = ffa_msg_send_direct_req(own_id, target_sp_info->vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_BUSY);
+}

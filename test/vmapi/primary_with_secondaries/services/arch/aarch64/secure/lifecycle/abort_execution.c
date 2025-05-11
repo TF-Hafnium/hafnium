@@ -161,3 +161,27 @@ TEST_SERVICE(sp_to_sp_dir_req_abort_start_another_dir_req)
 
 	ffa_yield();
 }
+
+TEST_SERVICE(sp_active_wait)
+{
+	uint32_t waitms;
+	void *recv_buf = SERVICE_RECV_BUFFER();
+
+	/*
+	 * Setup handling of known interrupts including Secure Watchdog timer
+	 * interrupt and NPI.
+	 */
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	receive_indirect_message((void *)&waitms, sizeof(waitms), recv_buf);
+
+	ffa_msg_wait();
+
+	dlog_verbose("Start active wait of %ums\n", waitms);
+	sp_wait(waitms);
+	dlog_verbose("End active wait of %ums\n", waitms);
+
+	/* Yield cycles to PVM. */
+	ffa_yield();
+}
