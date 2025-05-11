@@ -1,0 +1,55 @@
+/*
+ * Copyright 2025 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "arm,ffa-manifest-1.0";
+	debug_name = "Service2 Lifecycle SP EL1";
+
+	/* Properties */
+	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
+        uuid = <0x5d45882e 0xf637 0xa720 0xe8669dc>,
+	       <0x6e56993f 0x0748 0xb831 0xf977aed>;
+	execution-ctx-count = <1>;
+	exception-level = <2>; /* S-EL1 */
+	execution-state = <0>; /* AARCH64 */
+	load-address = <0x6380000>;
+	entrypoint-offset = <0x2000>;
+	xlat-granule = <0>; /* 4KiB */
+	messaging-method = <0x607>; /* Supports direct (both APIs) and indirect requests. */
+	vm-availability-messages = <0x03>; /* Supports VM created and VM destroyed messages. */
+	boot-order = <2>;
+	notification-support; /* Receipt of notifications. */
+	gp-register-num = <0>;
+	lifecycle-support;
+	abort-action = <2>; /* Restart */
+
+	/* Boot Info */
+	boot-info {
+		compatible = "arm,ffa-manifest-boot-info";
+		ffa_manifest;
+	};
+
+	device-regions {
+		compatible = "arm,ffa-manifest-device-regions";
+
+		espi_test_node {
+			/*
+			 * A dummy device region node representing a fake
+			 * peripheral. Explicitly used to specify properties of
+			 * interrupt 5000, used for testing purposes.
+			 * All the properties below except `interrupts` are irrelevant.
+			 */
+			base-address = <0x00000000 0x1c130000>;
+			pages-count = <1>; /* One 4KB page */
+			attributes = <0x1>; /* read-only */
+			interrupts = <5000 0x900>;
+		};
+	};
+};

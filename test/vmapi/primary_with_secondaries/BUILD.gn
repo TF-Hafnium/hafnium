@@ -494,3 +494,82 @@ partitions_json("primary_with_sp_vhe") {
 
   json_file = "primary_with_sp_vhe.json"
 }
+
+vm_kernel("sp_lifecycle_support_test_vm") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:config",
+    "services/arch/aarch64/secure:config",
+  ]
+
+  sources = [ "sp_lifecycle.c" ]
+  deps = [
+    ":ipi_state",
+    ":primary_with_secondaries",
+    ":twdog_state",
+    "//src/arch/aarch64:arch",
+    "//src/arch/aarch64/hftest:interrupts",
+    "//src/arch/aarch64/hftest:interrupts_gicv3",
+    "//src/arch/aarch64/hftest:registers",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/arch/aarch64/gicv3:gicv3_setup",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
+    "//test/vmapi/common/arch/aarch64/sp805:wdog",
+    "//vmlib",
+  ]
+}
+
+partition_package("sp_lifecycle_support_test_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_nwd_primary.dtb",
+        "sp_lifecycle_support_test_vm.bin",
+        ":primary_with_sp_manifest",
+        ":sp_lifecycle_support_test_vm",
+      ] ]
+  output = "sp_lifecycle_support_test_package.img"
+}
+
+partitions_json("sp_lifecycle_support") {
+  testonly = true
+
+  sps = [
+    [
+      "service_sp1_partition_pkg.img",
+      "services/arch/aarch64/secure/lifecycle/el0/manifest_lifecycle_sp_service1.dts",
+      "services/arch/aarch64/secure/lifecycle/el0:service_sp1_partition_pkg",
+      "services/arch/aarch64/secure/lifecycle/el0:sp1_pm_lifecycle",
+    ],
+    [
+      "service_sp2_partition_pkg.img",
+      "services/arch/aarch64/secure/lifecycle/manifest_lifecycle_sp_service2.dts",
+      "services/arch/aarch64/secure/lifecycle:service_sp2_partition_pkg",
+      "services/arch/aarch64/secure/lifecycle:sp2_pm_lifecycle",
+    ],
+    [
+      "service_sp3_partition_pkg.img",
+      "services/arch/aarch64/secure/lifecycle/manifest_lifecycle_sp_service3.dts",
+      "services/arch/aarch64/secure/lifecycle:service_sp3_partition_pkg",
+      "services/arch/aarch64/secure/lifecycle:sp3_pm_lifecycle",
+    ],
+    [
+      "service_sp4_partition_pkg.img",
+      "services/arch/aarch64/secure/lifecycle/el0/manifest_lifecycle_sp_service4.dts",
+      "services/arch/aarch64/secure/lifecycle/el0:service_sp4_partition_pkg",
+      "services/arch/aarch64/secure/lifecycle/el0:sp4_pm_lifecycle",
+    ],
+  ]
+
+  vms = [ [
+        "sp_lifecycle_support_test_package.img",
+        "manifest_vm_sp.dts",
+        ":sp_lifecycle_support_test_package",
+        ":primary_with_sp_manifest",
+      ] ]
+
+  json_file = "sp_lifecycle_support.json"
+}

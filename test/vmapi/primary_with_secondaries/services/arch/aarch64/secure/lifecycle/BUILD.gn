@@ -1,0 +1,90 @@
+# Copyright 2025 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+import("//build/image/image.gni")
+import("//test/hftest/args.gni")
+
+source_set("abort_common") {
+  testonly = true
+  public_configs = [
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:config",
+    "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "abort_execution.c" ]
+  deps = [ "//test/vmapi/common:ffa" ]
+}
+
+source_set("abort_el1_sp") {
+  testonly = true
+  public_configs = [
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:config",
+    "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "abort_secure_interrupts.c" ]
+  deps = [ "//test/vmapi/common:ffa" ]
+}
+
+vm_kernel("sp_lifecycle_service_el1") {
+  testonly = true
+  deps = [
+    ":abort_common",
+    ":abort_el1_sp",
+    "//src/arch/aarch64/hftest:interrupts",
+    "//src/arch/aarch64/hftest:mm",
+    "//test/hftest:hftest_secure_service",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
+    "//test/vmapi/primary_with_secondaries:primary_with_secondaries",
+    "//test/vmapi/primary_with_secondaries/services:boot",
+    "//test/vmapi/primary_with_secondaries/services:echo",
+    "//test/vmapi/primary_with_secondaries/services:ffa_check",
+    "//test/vmapi/primary_with_secondaries/services:memory",
+    "//test/vmapi/primary_with_secondaries/services:relay",
+    "//test/vmapi/primary_with_secondaries/services:rx_ownership",
+    "//test/vmapi/primary_with_secondaries/services:smccc",
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:common",
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:message_loop",
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:secure_interrupts",
+    "//vmlib/${plat_arch}:call",
+  ]
+}
+
+manifest("sp2_pm_lifecycle") {
+  source = "sp2_pm_lifecycle.dts"
+  output = "sp2_pm_lifecycle.dtb"
+}
+
+manifest("sp3_pm_lifecycle") {
+  source = "sp3_pm_lifecycle.dts"
+  output = "sp3_pm_lifecycle.dtb"
+}
+
+partition_package("service_sp2_partition_pkg") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "sp2_pm_lifecycle.dtb",
+        "sp_lifecycle_service_el1.bin",
+        ":sp2_pm_lifecycle",
+        ":sp_lifecycle_service_el1",
+      ] ]
+  output = "service_sp2_partition_pkg.img"
+}
+
+partition_package("service_sp3_partition_pkg") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "sp3_pm_lifecycle.dtb",
+        "sp_lifecycle_service_el1.bin",
+        ":sp3_pm_lifecycle",
+        ":sp_lifecycle_service_el1",
+      ] ]
+  output = "service_sp3_partition_pkg.img"
+}
