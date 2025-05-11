@@ -296,3 +296,43 @@ TEST_PRECONDITION(sp_lifecycle, sp_abort_dir_req_from_sp,
 	ASSERT_EQ(res.func, FFA_SUCCESS_32);
 	ffa_run(initiator_info->vm_id, 0);
 }
+
+/**
+ * This test aims to create a scenario where the target endpoint aborts
+ * voluntarily while handling a secure virtual interrupt in SPMC schedule mode.
+ */
+TEST_PRECONDITION(sp_lifecycle, sp_preempts_vm_aborts_spmc_mode,
+		  service1_is_secure)
+{
+	struct ffa_value res;
+	const uint32_t delay = 20;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_sp_info = service1(mb.recv);
+
+	SERVICE_SELECT(target_sp_info->vm_id, "sp_ffa_abort_sec_int_handling",
+		       mb.send);
+
+	/*
+	 * Send an indirect message to convey the Secure Watchdog timer delay
+	 * which serves as the source of the secure interrupt.
+	 */
+	res = send_indirect_message(own_id, target_sp_info->vm_id, mb.send,
+				    &delay, sizeof(delay), 0);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Schedule message receiver through FFA_RUN interface. */
+	res = ffa_run(target_sp_info->vm_id, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+
+	/* Wait for the interrupt to trigger. */
+	waitms(delay + 50);
+
+	/*
+	 * Attempt to communicate with target SP. SPMC shall return BUSY status.
+	 */
+	res = ffa_msg_send_direct_req(own_id, target_sp_info->vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_BUSY);
+}
