@@ -17,6 +17,7 @@
 #include "../smc.h"
 #include "ipi_state.h"
 #include "sp805.h"
+#include "sp_helpers.h"
 #include "test/hftest.h"
 #include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
@@ -55,26 +56,6 @@ uint32_t espi_id = RTM_INIT_ESPI_ID;
 static bool multiple_interrupts_expected;
 
 static bool arch_timer_expired;
-
-static inline uint64_t physicalcounter_read(void)
-{
-	isb();
-	return read_msr(cntpct_el0);
-}
-
-static inline uint64_t sp_wait(uint32_t ms)
-{
-	uint64_t timer_freq = read_msr(cntfrq_el0);
-
-	uint64_t time1 = physicalcounter_read();
-	volatile uint64_t time2 = time1;
-
-	while ((time2 - time1) < ((ms * timer_freq) / 1000U)) {
-		time2 = physicalcounter_read();
-	}
-
-	return ((time2 - time1) * 1000) / timer_freq;
-}
 
 /**
  * Utilizes FVP specific SMC call to pend an eSPI interrupt. The

@@ -25,6 +25,15 @@ source_set("message_loop") {
   deps = [ "//test/vmapi/common:ffa" ]
 }
 
+source_set("common") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "common.c" ]
+}
+
 source_set("secure_interrupts") {
   testonly = true
   public_configs = [
@@ -47,6 +56,7 @@ source_set("secure_interrupts") {
 vm_kernel("secure_service") {
   testonly = true
   deps = [
+    ":common",
     ":message_loop",
     ":secure_interrupts",
     "//src/arch/aarch64/hftest:interrupts",

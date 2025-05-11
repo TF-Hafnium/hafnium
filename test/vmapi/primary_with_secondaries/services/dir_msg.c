@@ -64,7 +64,13 @@ static bool is_uuid_in_list(uint16_t uuid_count, struct ffa_uuid target_uuid,
 
 TEST_SERVICE(ffa_direct_message_resp_echo)
 {
-	struct ffa_value args = ffa_msg_wait();
+	struct ffa_value args;
+
+	/* Setup handling of NPI, to handle RX buffer full notification. */
+	exception_setup(check_npi, NULL);
+	arch_irq_enable();
+
+	args = ffa_msg_wait();
 
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ_32);
 

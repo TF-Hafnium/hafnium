@@ -11,6 +11,7 @@
 
 #include "vmapi/hf/call.h"
 
+#include "sp_helpers.h"
 #include "sysregs.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
@@ -24,26 +25,6 @@
  * Encoding for CTR_EL0 register. Used here for stress test only.
  */
 #define MSR_CTR_EL0 S3_3_C0_C0_1
-
-static inline uint64_t physicalcounter_read(void)
-{
-	isb();
-	return read_msr(cntpct_el0);
-}
-
-static inline uint64_t sp_wait(uint32_t ms)
-{
-	uint64_t timer_freq = read_msr(cntfrq_el0);
-
-	uint64_t time1 = physicalcounter_read();
-	volatile uint64_t time2 = time1;
-
-	while ((time2 - time1) < ((ms * timer_freq) / 1000U)) {
-		time2 = physicalcounter_read();
-	}
-
-	return ((time2 - time1) * 1000) / timer_freq;
-}
 
 TEST_SERVICE(sec_interrupt_preempt_msg)
 {

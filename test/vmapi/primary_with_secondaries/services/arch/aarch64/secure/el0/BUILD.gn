@@ -7,9 +7,16 @@
 import("//build/image/image.gni")
 import("//test/hftest/args.gni")
 
+config("config") {
+  include_dirs = [
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure/inc",
+  ]
+}
+
 source_set("secure_interrupts") {
   testonly = true
   public_configs = [
+    ":config",
     "//test/hftest:hftest_config",
     "//src/arch/aarch64:arch_config",
     "//src/arch/aarch64:config",
@@ -39,6 +46,7 @@ vm_kernel("secure_service1") {
     "//test/vmapi/primary_with_secondaries/services:relay",
     "//test/vmapi/primary_with_secondaries/services:rx_ownership",
     "//test/vmapi/primary_with_secondaries/services/arch/aarch64/el0:mem_permissions",
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:common",
     "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:message_loop",
   ]
 }
@@ -77,6 +85,7 @@ vm_kernel("secure_service2") {
     "//test/vmapi/primary_with_secondaries/services:relay",
     "//test/vmapi/primary_with_secondaries/services:rx_ownership",
     "//test/vmapi/primary_with_secondaries/services/arch/aarch64/el0:mem_permissions",
+    "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:common",
     "//test/vmapi/primary_with_secondaries/services/arch/aarch64/secure:message_loop",
   ]
 }
