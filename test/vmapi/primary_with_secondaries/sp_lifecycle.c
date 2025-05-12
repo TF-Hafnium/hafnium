@@ -546,3 +546,15 @@ TEST(sp_lifecycle, sel1_sp_restart_after_abort_dir_req)
 
 	base_restart_sp_after_abort_direct_req(target_sp_info, mb);
 }
+
+/**
+ * S-EL0 SP shall be restarted upon aborting. The test also ensures the
+ * framework state of various endpoints is not corrupted.
+ */
+TEST(sp_lifecycle, sel0_sp_restart_after_abort_dir_req)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_sp_info = service4(mb.recv);
+
+	base_restart_sp_after_abort_direct_req(target_sp_info, mb);
+}
