@@ -462,3 +462,87 @@ TEST(sp_lifecycle, sp_aborts_direct_req_in_spmc_mode)
 
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 }
+
+/**
+ * This test is orchestrated with help of two additional endpoints. The helper
+ * endpoint sends a direct request message to target endpoint and expects it to
+ * be aborted by target endpoint.
+ * The target endpoints restarts execution after aborting itself. It is now
+ * configured to run a new service. In order to perform robust checks on the
+ * state of target endpoint, this test leverages a companion endpoint to simply
+ * perform a echo handshake with target endpoint.
+ *
+ * Roles played by various endpoint to facilitate above test scenario:
+ *    Helper endpoint     - Service1 SP
+ *    Companion endpoint  - Service3 SP
+ *    Target endpoint     - Either Service2 SP or Service4 SP
+ */
+void base_restart_sp_after_abort_direct_req(
+	struct ffa_partition_info *target_sp_info, struct mailbox_buffers mb)
+{
+	struct ffa_partition_info *helper_info = service1(mb.recv);
+	struct ffa_partition_info *companion_info = service3(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_value res;
+
+	/*
+	 * Run target endpoint for it to wait for a request from helper endpoint
+	 * and then voluntarily abort its execution using FFA_ABORT.
+	 */
+	SERVICE_SELECT(target_sp_info->vm_id, "sp_ffa_abort_dir_req", mb.send);
+	ffa_run(target_sp_info->vm_id, 0);
+
+	/*
+	 * The helper endpoint sends direct request to target endpoint and
+	 * expects it to be aborted by target endpoint.
+	 */
+	SERVICE_SELECT(helper_info->vm_id, "sp_to_sp_dir_req_expect_to_abort",
+		       mb.send);
+
+	/* Send to helper endpoint the vm id of the target for its message. */
+	res = send_indirect_message(own_id, helper_info->vm_id, mb.send,
+				    &target_sp_info->vm_id,
+				    sizeof(target_sp_info->vm_id), 0);
+	ASSERT_EQ(res.func, FFA_SUCCESS_32);
+	ffa_run(helper_info->vm_id, 0);
+
+	/*
+	 * By this time, target endpoint should have restarted. Prepare it with
+	 * new workload which would be simply echoing direct message.
+	 */
+	dlog_verbose("Target endpoint should have restarted\n");
+
+	/*
+	 * Run target endpoint for it to wait for a request from helper
+	 * endpoint.
+	 */
+	SERVICE_SELECT(target_sp_info->vm_id, "ffa_direct_message_resp_echo",
+		       mb.send);
+	ffa_run(target_sp_info->vm_id, 0);
+
+	/* Companion endpoint requests echo from target endpoint. */
+	SERVICE_SELECT(companion_info->vm_id,
+		       "ffa_direct_message_echo_services", mb.send);
+
+	/*
+	 * Send to companion endpoint the vm id of the target for its message.
+	 */
+	res = send_indirect_message(own_id, companion_info->vm_id, mb.send,
+				    &target_sp_info->vm_id,
+				    sizeof(target_sp_info->vm_id), 0);
+	ASSERT_EQ(res.func, FFA_SUCCESS_32);
+
+	ffa_run(companion_info->vm_id, 0);
+}
+
+/**
+ * S-EL1 SP shall be restarted upon aborting. The test also ensures the
+ * framework state of various endpoints is not corrupted.
+ */
+TEST(sp_lifecycle, sel1_sp_restart_after_abort_dir_req)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_sp_info = service2(mb.recv);
+
+	base_restart_sp_after_abort_direct_req(target_sp_info, mb);
+}

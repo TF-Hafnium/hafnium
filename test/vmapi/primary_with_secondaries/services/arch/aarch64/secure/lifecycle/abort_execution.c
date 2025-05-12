@@ -162,6 +162,34 @@ TEST_SERVICE(sp_to_sp_dir_req_abort_start_another_dir_req)
 	ffa_yield();
 }
 
+TEST_SERVICE(sp_to_sp_dir_req_expect_to_abort)
+{
+	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct ffa_value res;
+	ffa_id_t target_id;
+
+	/*
+	 * Setup handling of known interrupts including Secure Watchdog timer
+	 * interrupt and NPI.
+	 */
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	/* Retrieve FF-A ID of the target endpoint. */
+	receive_indirect_message((void *)&target_id, sizeof(target_id),
+				 recv_buf);
+
+	res = ffa_msg_send_direct_req(hf_vm_get_id(), target_id, msg[0], msg[1],
+				      msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_ABORTED);
+
+	/* Yield cycles to PVM. */
+	ffa_yield();
+}
+
 TEST_SERVICE(sp_active_wait)
 {
 	uint32_t waitms;
