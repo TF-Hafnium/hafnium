@@ -573,7 +573,7 @@ static bool api_ffa_fill_partitions_info_array(
 				 * If the number of entries surpasses the size
 				 * of `out_partitions`
 				 */
-				if (*entries_count > out_partitions_len) {
+				if (*entries_count >= out_partitions_len) {
 					return false;
 				}
 
@@ -585,8 +585,15 @@ static bool api_ffa_fill_partitions_info_array(
 
 				api_ffa_fill_partition_info(out_partition, vm,
 							    caller_id);
+				/*
+				 * If the ABI has specified an UUID, then do not
+				 * write it
+				 */
 				if (match_any) {
 					out_partition->uuid = uuid;
+				} else {
+					out_partition->uuid =
+						(struct ffa_uuid){0};
 				}
 
 				/*
