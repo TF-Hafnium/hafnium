@@ -461,16 +461,46 @@ static bool fdt_spi_regions(const struct fdt_node *node, uint32_t *count)
  */
 static bool valid_spi_ranges(uint32_t gicd_count)
 {
-	uint32_t chip_id;
+	for (uint32_t i = 0; i < gicd_count; i++) {
+		uint32_t i_min =
+			plat_gicv3_driver.spi_ids_for_chip[i].spi_id_min;
+		uint32_t i_max =
+			plat_gicv3_driver.spi_ids_for_chip[i].spi_id_max;
 
-	for (chip_id = 1; chip_id < gicd_count; chip_id++) {
-		if (plat_gicv3_driver.spi_ids_for_chip[chip_id].spi_id_min <
-		    plat_gicv3_driver.spi_ids_for_chip[chip_id - 1].spi_id_max +
-			    1) {
+		/* Check if range i overlaps with j */
+		for (uint32_t j = i + 1; j < gicd_count; j++) {
+			uint32_t j_min = plat_gicv3_driver.spi_ids_for_chip[j]
+						 .spi_id_min;
+			uint32_t j_max = plat_gicv3_driver.spi_ids_for_chip[j]
+						 .spi_id_max;
+
+			if (((i_max >= j_min) && (i_max <= j_max)) ||
+			    ((i_min <= j_max) && (i_min >= j_min))) {
+				dlog_error(
+					"Invalid SPI range definition for chip "
+					"%u, "
+					"overlap with chip %u.\n",
+					i, j);
+				return false;
+			}
+		}
+
+		/* Ensure SPI range is within GIC specs */
+		if (!(((i_min >= 32) && (i_max <= 991)) ||
+		      ((i_min >= 4096) && (i_max <= 5119)))) {
 			dlog_error(
-				"Invalid SPI range definition for chip %u, "
-				"overlap with chip %u.\n",
-				chip_id, chip_id - 1);
+				"Invalid SPI range definition for chip %u. Not "
+				"within range 32-991 or 4096-5119.\n",
+				i);
+			return false;
+		}
+
+		/* Check if SPI range only contains blocks of 32 */
+		if (((i_max - i_min + 1) % 32 != 0U) || (i_min == i_max)) {
+			dlog_error(
+				"Invalid SPI range definition for chip %u. "
+				"Must be in steps of 32.\n",
+				i);
 			return false;
 		}
 	}
