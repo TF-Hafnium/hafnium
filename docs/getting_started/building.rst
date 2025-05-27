@@ -90,13 +90,14 @@ This command removes previously generated build outputs, which can help resolve
 issues caused by outdated intermediate files. It's a useful troubleshooting step
 but not required for a fresh setup.
 
+.. _Using_Docker:
+
 Using Docker
 ^^^^^^^^^^^^
 
-We provide a Docker container to ensure a consistent development environment or
-to enable building on non-Linux platforms (eg MacOS). Build the container with
-`./build/docker/build.sh`. You can run commands in the container with
-`./build/run_in_container.sh -i bash`:
+We provide a Docker container to ensure a consistent development environment.
+Build the container with `./build/docker/build.sh`. You can run commands in the
+container with `./build/run_in_container.sh -i bash`:
 
 .. code:: shell
 

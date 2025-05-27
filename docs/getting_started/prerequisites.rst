@@ -10,36 +10,19 @@ CI runs are done using Ubuntu 22.04 LTS (64-bit).
 Toolchain
 ---------
 
-The following toolchain is recommended for building Hafnium and the test
-infrastructure:
-
-- For a x86_64 Ubuntu host,
-
-.. code:: shell
-
-   https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-
-- For a AArch64 Ubuntu host,
-
-.. code:: shell
-
-   https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-aarch64-linux-gnu.tar.xz
+The clang-20 toolchain is recommended for building Hafnium and the test
+infrastructure. On Ubuntu, the toolchain can be installed from the LLVM apt
+repository (https://apt.llvm.org/).
 
 .. note::
 
-   Use of a native toolchain installed on the host (e.g. /usr/bin/clang) is
-   not supported.
-
-.. note::
-
-   Using a toolchain version greater, or significantly lesser than the one
+   Using a toolchain version greater than, or significantly lesser than the one
    specified is not guaranteed to work.
 
-The PATH environment variable shall be adjusted to contain the LLVM/clang directory, e.g.:
+.. note::
 
-.. code:: shell
-
-   PATH=<toolchain_dir>/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin:$PATH
+   You may also use the Docker container if you are unable to install the
+   toolchain on your host machine, see the :ref:`Using_Docker` section.
 
 Dependencies
 ------------
