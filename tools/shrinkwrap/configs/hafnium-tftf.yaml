@@ -1,0 +1,144 @@
+#
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Copyright HAFNIUM Contributors.
+#
+
+%YAML 1.2
+---
+description: >-
+  This configuration defines a complete software stack to test Trusted Firmware-A
+  (TF-A) and Hafnium (SPMC) at S-EL2 using TF-A-Tests, with TFTF as the main
+  test payload. It clones the TF-A and TFTF repositories into the Shrinkwrap
+  working directory (defined by the `SHRINKWRAP_BUILD` environment variable) and
+  uses a local Hafnium source via the `HAFNIUM_SRC` btvar.
+
+  ### Build Instructions
+  To build Hafnium along with TF-A and TFTF, run the following command from the Hafnium root directory:
+
+  .. code-block:: shell
+
+    shrinkwrap build --btvar=HAFNIUM_SRC=${PWD} hafnium-tftf.yaml --no-sync=hafnium
+
+  Before running the above, ensure the `SHRINKWRAP_CONFIG` environment variable
+  is set to point to the configs directory:
+
+  .. code-block:: shell
+
+    export SHRINKWRAP_CONFIG=${PWD}/tools/shrinkwrap/configs
+
+  By default, Shrinkwrap uses the Docker runtime. To run natively on the host system,
+  add `--runtime=null` between `shrinkwrap` and the sub-command. In this case,
+  users are responsible for manually configuring the environment (e.g.,
+  toolchains for TF-A, TFTF, Hafnium, and FVP must be in `PATH`):
+
+  .. code-block:: shell
+
+    shrinkwrap --runtime=null build --btvar=HAFNIUM_SRC=${PWD} hafnium-tftf.yaml --no-sync=hafnium
+
+  Also by default, Shrinkwrap resets all repos to their main branches during build,
+  which can discard uncommitted changes. To avoid this—especially for incremental
+  builds—use --no-sync=hafnium or --no-sync-all.
+
+  ### Run Instructions
+  Once built, you can run your configuration as follows:
+
+  .. code-block:: shell
+
+    shrinkwrap run hafnium-tftf.yaml
+
+  Similar to the build, To run directly on the host machine:
+
+  .. code-block:: shell
+
+    shrinkwrap --runtime=null run hafnium-tftf.yaml
+
+  In order to clean your workspace, which is recommended when trying to test
+  different configurations, you need to invoke the clean command on Shrinkwrap:
+
+  .. code-block:: shell
+
+    shrinkwrap clean hafnium-tftf.yaml --overlay=${PWD}/tools/shrinkwrap/configs/clean.yaml
+
+  The shrinkwrap clean command removes the specified YAML configuration from the
+  package folder but does not delete the repositories cloned under the build/ directory.
+  Note, that Shrinkwrap still requires valid, non-null paths for all repositories
+  during cleanup.
+
+  This config allows to tune some of the build and run options by the use of
+  btvar and rtvars respectively. Specifically, it can define the SHA/Branch of
+  the TFTF repository used for the tests by specifying the ``TFTF_REVISION``
+  btvar, which by default points to the ``master`` branch.
+
+layers:
+  - tftf-base.yaml
+  - tfa-base.yaml
+  - hafnium.yaml
+  - hafnium-base.yaml
+  - arch/v8.5.yaml
+  - FVP_Base_RevC-2xAEMvA-base.yaml
+
+concrete: true
+
+buildex:
+  btvars:
+    # Determines the branch or SHA to pull for TFTF repository
+    TFTF_REVISION:
+      type: string
+      value: master
+
+    # Determines the branch or SHA to pull for TF-A repository
+    TFA_REVISION:
+      type: string
+      value: master
+
+build:
+  tftf:
+    repo:
+      revision: ${btvar:TFTF_REVISION}
+
+    params:
+      ENABLE_REALM_PAYLOAD_TESTS: 0
+      TESTS: spm # Include only relevant tests for SPM
+
+    artifacts:
+      TFTF_BIN: ${param:builddir}/fvp/release/tftf.bin
+      EL3_PAYLOAD_BIN: ${param:builddir}/fvp/release/el3_payload.bin
+      NS_BL1U_BIN: ${param:builddir}/fvp/release/ns_bl1u.bin
+
+  tfa:
+    repo:
+      revision: ${btvar:TFA_REVISION}
+
+    params:
+      BL32: ${artifact:HAFNIUM}
+      BL33: ${artifact:TFTF_BIN}
+      SP_LAYOUT_FILE: ${artifact:SP_LAYOUT}
+      SPD: spmd
+      CTX_INCLUDE_EL2_REGS: 1
+      SPMD_SPM_AT_SEL2: 1
+      CTX_INCLUDE_PAUTH_REGS: 1
+      ENABLE_FEAT_MTE2: 1
+      BRANCH_PROTECTION: 1
+      GIC_EXT_INTID: 1
+      PLAT_TEST_SPM: 1
+      ARM_ARCH_MINOR: 5
+
+run:
+  rtvars:
+    CACHE_MODEL_ENABLED:
+      type: string
+      value: 0
+
+  params:
+    -C bp.secureflashloader.fname: ${artifact:BL1}
+    -C bp.flashloader0.fname: ${artifact:FIP}
+    '--data cluster0.cpu0': ${artifact:EL3_PAYLOAD_BIN}@0x80000000
+    ' --data cluster0.cpu0': ${artifact:NS_BL1U_BIN}@0x0beb8000
+    # Cache modelling settings
+    -C cache_state_modelled: ${rtvar:CACHE_MODEL_ENABLED}
+
+  terminals:
+    bp.terminal_0:
+      friendly: TF-A
+    bp.terminal_1:
+      friendly: HAFNIUM

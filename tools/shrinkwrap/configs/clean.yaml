@@ -1,0 +1,18 @@
+#
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Copyright HAFNIUM Contributors.
+#
+%YAML 1.2
+---
+description: >-
+  Shrinkwrap currently requires every repository to have a non-null path to run
+  the clean command, even if the path is wrong or not actually used.
+  In hafnium.yaml, the HAFNIUM_SRC variable is set to null, and since the clean
+  command doesn’t accept btvars, Shrinkwrap clean fails when used with
+  hafnium-tftf.yaml.
+  This overlay sets a dummy path for the HAFNIUM source directory so the clean
+  command can succeed.
+
+build:
+  hafnium:
+    sourcedir: /dev/null

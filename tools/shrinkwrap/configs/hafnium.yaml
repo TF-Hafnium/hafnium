@@ -1,0 +1,31 @@
+#
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Copyright HAFNIUM Contributors.
+#
+
+%YAML 1.2
+---
+description: >-
+  Overlay for building Hafnium with standard settings.
+  To use it, set the ``HAFNIUM_SRC`` variable to the absolute path of your local
+  Hafnium repo and set the host platform using ``HAFNIUM_CONFIG`` btvar.
+
+buildex:
+  btvars:
+    # Determines the HAFNIUM source root directory
+    HAFNIUM_SRC:
+      type: path
+      value: null
+
+    # Determines the HAFNIUM Configuration (a.k.a. platform) to build
+    HAFNIUM_CONFIG:
+      type: string
+      value: 'secure_aem_v8a_fvp_vhe'
+
+build:
+  hafnium:
+    sourcedir: ${btvar:HAFNIUM_SRC}
+
+    params:
+      PROJECT: reference
+      PLATFORM: ${btvar:HAFNIUM_CONFIG}
