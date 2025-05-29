@@ -56,6 +56,30 @@ Then test it works with:
 
    make checkpatch
 
+System and Python Packages for test infrastructure
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The `Shrinkwrap`_ tool is a core component of the hftest scripts and is included
+as a submodule. It relies on the following system packages to function correctly:
+
+.. code:: shell
+
+   sudo apt-get install -y git netcat-openbsd python3 python3-pip telnet
+
+Further, install the required Python packages:
+
+.. code:: shell
+
+   pip3 install --user fdt pyyaml termcolor tuxmake
+
+.. note::
+
+   These manual installation steps are not required if you're using the Docker
+   based test environment. All necessary dependencies—system packages,
+   Python modules, and Shrinkwrap environment configuration—are already
+   pre-installed and automated inside the Docker image provided by the
+   Hafnium repository (see :ref:`Using_Docker`).
+
 Documentation
 ^^^^^^^^^^^^^
 
@@ -93,8 +117,9 @@ its location and the Python version, with the command:
 
 --------------
 
-*Copyright (c) 2023, Arm Limited. All rights reserved.*
+*Copyright (c) 2023-2025, Arm Limited. All rights reserved.*
 
+.. _Shrinkwrap: https://shrinkwrap.docs.arm.com
 .. _Sphinx: http://www.sphinx-doc.org/en/master/
 .. _Poetry: https://python-poetry.org/docs/
 .. _pip: https://pip.pypa.io/en/stable/
