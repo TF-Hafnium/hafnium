@@ -26,6 +26,10 @@ import subprocess
 import yaml
 import shutil
 
+VM_PARAM_OFFSET = 5
+INITRD_PARAM_OFFSET = 8
+SP_PARAM_OFFSET = 10
+
 # Maps FVP driver configuration keys to their corresponding static Shrinkwrap overlays
 SHRINKWRAP_STATIC_OVERLAY_MAP = {
     "hypervisor": ["fvp_hf_hypervisor_preloaded.yaml"],

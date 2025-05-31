@@ -363,6 +363,63 @@ class FvpDriver(Driver, ABC):
            so should be implemented within derived driver"""
         pass
 
+    @abstractmethod
+    def get_shrinkwrap_runtime_overlay_config(
+            self, is_long_running, uart0_log_path, uart1_log_path, dt,
+            debug=False, show_output=False):
+        """
+        Constructs and returns the runtime overlay configuration for Shrinkwrap.
+
+        Returns:
+            Tuple[dict, dict]: A pair of (params, rtvars) dictionaries representing
+            FVP runtime arguments and variable bindings for Shrinkwrap overlays.
+        """
+        disable_visualisation = self.args.disable_visualisation is True
+        show_output = debug or show_output
+        if not show_output:
+            disable_visualisation = True
+
+        params = {}
+        if show_output:
+            time_limit = "150s" if is_long_running else "40s"
+            params["timeout --foreground"] = time_limit
+
+        rtvars = {
+            "UART0_LOG" : {
+                "type": "path",
+                "value": str(uart0_log_path)
+            },
+
+            "UART1_LOG" : {
+                "type": "path",
+                "value": str(uart1_log_path)
+            },
+
+            "TELNET" : {
+                "type": "string",
+                "value": "false" if not show_output else "true"
+            },
+
+            "EXIT_ON_SHUTDOWN" : {
+                "type": "string",
+                "value": "1" if not show_output else "0"
+            },
+
+            "DISABLE_VISUALISATION" : {
+                "type": "string",
+                "value": "true" if disable_visualisation else "false"
+            }
+        }
+
+        if self.cov_plugin is not None:
+            rtvars.update ({
+                "COV_PLUGIN" : {
+                "type": "path",
+                "value": str(self.cov_plugin)
+                }
+            })
+        return params, rtvars
+
     def run(self, run_name, test_args, is_long_running, debug = False,
             show_output = False):
         """ Run test """
@@ -426,6 +483,77 @@ class FvpDriverHypervisor(FvpDriver):
 
         append_file(dt.dts, to_append)
 
+    def get_shrinkwrap_runtime_overlay_config(
+            self, is_long_running, uart0_log_path, uart1_log_path, dt,
+            debug=False, show_output=False, call_base=True):
+        """Construct Shrinkwrap-compatible rtvars and params dictionaries."""
+        params = {}
+        rtvars = {}
+
+        # Include shared FVP configuration
+        if call_base:
+            params_base, rtvars_base = FvpDriver.get_shrinkwrap_runtime_overlay_config(
+                                            self, is_long_running, uart0_log_path,
+                                            uart1_log_path, dt, debug, show_output)
+            params.update(params_base)
+            rtvars.update(rtvars_base)
+
+        # Add VMs image and load address variables
+        data_entries = []
+        if self.vms_in_partitions_json:
+            img_ldadd = self.get_img_and_ldadd(self.args.partitions["VMs"])
+
+            # Collect rtvars and param values for all VMs
+            for i, (img, ldadd) in enumerate(img_ldadd):
+                vm_name = f"VM{i+1}"
+                img_var = f"{vm_name}_IMG"
+                addr_var = f"{vm_name}_ADDR"
+                rtvars.update({
+                    img_var: {
+                        "type": "path",
+                        "value": str(img)
+                    },
+                    addr_var: {
+                        "type": "string",
+                        "value": hex(ldadd)
+                    }
+                })
+                data_entries.append(f"${{rtvar:{img_var}}}@${{rtvar:{addr_var}}}")
+
+            # Add --data cluster0.cpu0 spaced param entries for VMs starting from offset=5
+            params.update(sw_util.ShrinkwrapManager.add_multi_param_with_spacing(
+                "--data cluster0.cpu0", data_entries, offset=sw_util.VM_PARAM_OFFSET))
+
+        # Add initrd data if specified
+        if self.args.initrd:
+            params.update(sw_util.ShrinkwrapManager.add_multi_param_with_spacing(
+                "--data cluster0.cpu0",
+                ["${rtvar:INITRD}@${rtvar:INITRD_START}"],
+                offset=sw_util.INITRD_PARAM_OFFSET  # Ensures offset doesn't overlap with VMs
+            ))
+
+        # Add rtvars referenced by static preloaded YAML overlays
+        static_rtvars = {
+            "HYPERVISOR": {
+                "type": "string",
+                "value": str(self.args.hypervisor)
+            },
+            "HYPERVISOR_DTB": {
+                "type": "string",
+                "value": str(dt.dtb)
+            },
+            "INITRD": {
+                "type": "path",
+                "value": str(self.args.initrd)
+            },
+            "INITRD_START": {
+                "type": "string",
+                "value": str(self.INITRD_START)
+            }
+        }
+        rtvars.update(static_rtvars)
+        return params, rtvars
+
 class FvpDriverSPMC(FvpDriver):
     """
     Driver which runs tests in Arm FVP emulator, with hafnium as SPMC
@@ -438,7 +566,7 @@ class FvpDriverSPMC(FvpDriver):
     def __init__(self, args, cpu_start_address=0x04010000, fvp_prebuilt_bl31=None):
         fvp_prebuilt_bl31 = os.path.join(FVP_PREBUILT_TFA_SPMD_ROOT, "bl31.bin") if fvp_prebuilt_bl31 is None else fvp_prebuilt_bl31
         super().__init__(args, cpu_start_address, fvp_prebuilt_bl31)
-
+        self.sps_in_partitions_json = args.partitions and args.partitions["SPs"]
         self._spmc_address = 0x6000000
         self._spmc_dtb_address = 0x0403f000
 
@@ -450,13 +578,69 @@ class FvpDriverSPMC(FvpDriver):
         append_file(dt.dts, to_append)
 
     def secure_ctrl_fvp_args(self, secure_ctrl):
-        fvp_args = ""
+        params = {}
         if secure_ctrl:
-            fvp_args = [
-                "-C", f"bp.pl011_uart0.in_file={FvpDriverSPMC.hftest_cmd_file.name}",
-                "-C", f"bp.pl011_uart0.shutdown_tag=\"{HFTEST_CTRL_FINISHED}\"",
-            ]
-        return fvp_args
+            params.update({
+                "-C bp.pl011_uart0.in_file": FvpDriverSPMC.hftest_cmd_file.name,
+                "-C bp.pl011_uart0.shutdown_tag": HFTEST_CTRL_FINISHED
+            })
+        return params
+
+    def get_shrinkwrap_runtime_overlay_config(
+            self, is_long_running, uart0_log_path, uart1_log_path, dt,
+            debug=False, show_output=False, secure_ctrl=True, call_base=True):
+        """Construct Shrinkwrap-compatible rtvars and params dictionaries."""
+        params = {}
+        rtvars = {}
+
+        # Add Base Class settings
+        if call_base:
+            params_base, rtvars_base = FvpDriver.get_shrinkwrap_runtime_overlay_config(
+                                            self, is_long_running,
+                                            uart0_log_path, uart1_log_path, dt,
+                                            debug, show_output)
+            params.update(params_base)
+            rtvars.update(rtvars_base)
+
+        # Add SP images and load address variables
+        sp_entries = []
+        if self.sps_in_partitions_json:
+            img_ldadd = self.get_img_and_ldadd(self.args.partitions["SPs"])
+            for i, (img, ldadd) in enumerate(img_ldadd):
+                sp_name = f"SP{i + 1}"
+                img_var = f"{sp_name}_IMG"
+                addr_var = f"{sp_name}_ADDR"
+
+                # Create rtvars
+                rtvars.update({
+                    img_var: {
+                        "type": "path",
+                        "value": str(img)
+                    },
+                    addr_var: {
+                        "type": "string",
+                        "value": hex(ldadd)
+                    }
+                })
+                # Construct value for --data cluster0.cpu0
+                sp_entries.append(f"${{rtvar:{img_var}}}@${{rtvar:{addr_var}}}")
+
+        # Generate a unique param key (YAML requires unique keys)
+        # Add --data cluster0.cpu0 spaced entries for SPs (offset=10)
+        if sp_entries:
+            params.update(sw_util.ShrinkwrapManager.add_multi_param_with_spacing(
+                "--data cluster0.cpu0", sp_entries, offset=sw_util.SP_PARAM_OFFSET))
+
+        # Add static rtvars like SPMC_DTB
+        rtvars["SPMC_DTB"] = {
+            "type": "string",
+            "value": str(dt.dtb)
+        }
+
+        # Add secure control UART parameters
+        secure_params = FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
+        params.update(secure_params)
+        return params, rtvars
 
     def run(self, run_name, test_args, is_long_running, debug = False, show_output = False):
         vm_args = join_if_not_None(self.args.vm_args, test_args)
@@ -489,6 +673,29 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
         FvpDriverHypervisor.gen_dts(self, dt["hypervisor"], test_args)
         FvpDriverSPMC.gen_dts(self, dt["spmc"], test_args)
 
+    def get_shrinkwrap_runtime_overlay_config(
+            self, is_long_running, uart0_log_path, uart1_log_path, dt,
+            debug=False, show_output=False):
+        """Generate command line arguments for FVP."""
+        # Get base FVP arguments
+        params_base, rtvars_base = FvpDriver.get_shrinkwrap_runtime_overlay_config(
+                                        self, is_long_running, uart0_log_path,
+                                        uart1_log_path, dt, debug, show_output)
+        # Get hypervisor-specific arguments
+        params_h, rtvars_h = FvpDriverHypervisor.get_shrinkwrap_runtime_overlay_config(
+                                        self, is_long_running, uart0_log_path,
+                                        uart1_log_path, dt["hypervisor"],
+                                        debug, show_output, call_base=False)
+        # Get SPMC-specific arguments
+        params_s, rtvars_s = FvpDriverSPMC.get_shrinkwrap_runtime_overlay_config(
+                                        self, is_long_running, uart0_log_path,
+                                        uart1_log_path, dt["spmc"],
+                                        debug, show_output, call_base=False)
+        # Merge all the rtvars and params
+        params = {**params_base, **params_h, **params_s}
+        rtvars = {**rtvars_base, **rtvars_h, **rtvars_s}
+        return params, rtvars
+
     def run(self, run_name, test_args, is_long_running, debug = False,
             show_output = False):
 
@@ -513,20 +720,73 @@ class FvpDriverEL3SPMC(FvpDriverSPMC):
         self._sp_dtb_address = 0x0403f000
 
     def sp_partition_manifest_fvp_args(self):
+        """Generate rtvars and params for SP image and manifest loading."""
+
         img_ldadd = self.get_img_and_ldadd(self.args.partitions["SPs"])
 
-        # Expect only one tuple with img and load address, as EL3 SPMC only supports
-        # one SP.
+        # Expect only one tuple with img and load address,
+        # as EL3 SPMC only supports only one SP.
         assert(len(img_ldadd) == 1)
         img, ldadd = img_ldadd[0]
-        fvp_args = ["--data", f"cluster0.cpu0={img}@{ldadd}"]
 
         # Even though FF-A manifest is part of the SP PKG we need to load at a specific
         # location. Fetch the respective dtb file and load at the following address.
         output_path = os.path.dirname(os.path.dirname(img))
-        partition_manifest = f"{output_path}/partition-manifest.dtb"
-        fvp_args += ["--data", f"cluster0.cpu0={partition_manifest}@{self._sp_dtb_address}"]
-        return fvp_args
+        partition_manifest = os.path.join(output_path, "partition-manifest.dtb")
+
+        # Runtime variables
+        rtvars = {
+            "SP_IMG": {
+                "type": "path",
+                "value": str(img)
+            },
+            "SP_ADDR": {
+                "type": "string",
+                "value": hex(ldadd)
+            },
+            "SP_DTB": {
+                "type": "path",
+                "value": str(partition_manifest)
+            },
+            "SP_DTB_ADDR": {
+                "type": "string",
+                "value": hex(self._sp_dtb_address)
+            }
+        }
+
+        param_values = [
+            "${rtvar:SP_IMG}@${rtvar:SP_ADDR}",
+            "${rtvar:SP_DTB}@${rtvar:SP_DTB_ADDR}"
+        ]
+        params = sw_util.ShrinkwrapManager.add_multi_param_with_spacing(
+                    "--data cluster0.cpu0", param_values, offset=sw_util.SP_PARAM_OFFSET)
+        return params, rtvars
+
+    def get_shrinkwrap_runtime_overlay_config(
+                self, is_long_running, uart0_log_path, uart1_log_path, dt,
+                secure_ctrl=True, debug=False, show_output=False,
+                call_base=True):
+        """Construct Shrinkwrap-compatible rtvars and params dictionaries."""
+        params = {}
+        rtvars = {}
+        # Add Base Class settings
+        if call_base:
+            params_base, rtvars_base = FvpDriver.get_shrinkwrap_runtime_overlay_config(
+                                            self, is_long_running,uart0_log_path,
+                                            uart1_log_path, dt, debug, show_output)
+            params.update(params_base)
+            rtvars.update(rtvars_base)
+        # Add secure control UART parameters
+        secure_params = FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
+        params.update(secure_params)
+
+        # SP image + manifest DTB
+        params_m, rtvars_m = self.sp_partition_manifest_fvp_args()
+
+        params.update(params_m)
+        rtvars.update(rtvars_m)
+        return params, rtvars
+
 class FvpDriverEL3SPMCBothWorlds(FvpDriverHypervisor, FvpDriverEL3SPMC):
     """
     Driver which runs tests in Arm FVP emulator, with EL3 as SPMC
@@ -539,6 +799,64 @@ class FvpDriverEL3SPMCBothWorlds(FvpDriverHypervisor, FvpDriverEL3SPMC):
 
         self._fvp_prebuilt_bl32 = os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl32.bin")
         self._fvp_prebuilt_dtb = os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "fdts/fvp_tsp_sp_manifest.dtb")
+
+    def get_shrinkwrap_runtime_overlay_config(
+            self, is_long_running, uart0_log_path, uart1_log_path, dt,
+            debug=False, show_output=False, secure_ctrl=True, call_base=True):
+        """Generate command line arguments for FVP."""
+        params = {}
+        rtvars = {}
+        # Add Base Class settings
+        params_base, rtvars_base = FvpDriver.get_shrinkwrap_runtime_overlay_config(
+                                        self, is_long_running,
+                                        uart0_log_path, uart1_log_path, dt,
+                                        debug, show_output)
+
+        params_h, rtvars_h = FvpDriverHypervisor.get_shrinkwrap_runtime_overlay_config(
+                                self, is_long_running, uart0_log_path,
+                                uart1_log_path, dt, debug, show_output, call_base=False)
+        # Merge all the rtvars and params
+        params = {**params_base, **params_h}
+        rtvars = {**rtvars_base, **rtvars_h}
+
+        # Add secure control UART parameters
+        secure_params = FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
+        params.update(secure_params)
+
+        if self.args.partitions is not None and self.args.partitions["SPs"] is not None:
+            # Step: SP image + manifest DTB
+            params_sp, rtvars_sp = FvpDriverEL3SPMC.sp_partition_manifest_fvp_args(self)
+            params.update(params_sp)
+            rtvars.update(rtvars_sp)
+        else:
+            # Use prebuilt TSP and TSP manifest if build does not specify SP
+            # EL3 SPMC expects SP to be loaded at 0xFF200000 and SP manifest at 0x0403F000
+            # Case: Fallback to prebuilt TSP image and manifest
+            rtvars.update ({
+                "PREBUILT_BL32": {
+                    "type": "path",
+                    "value": str(self._fvp_prebuilt_bl32)
+                },
+                "TSP_ADDR": {
+                    "type": "string",
+                    "value": "0xff200000"
+                },
+                "PREBUILT_DTB": {
+                    "type": "path",
+                    "value": str(self._fvp_prebuilt_dtb)
+                },
+                "SP_DTB_ADDR": {
+                    "type": "string",
+                    "value": hex(self._sp_dtb_address)
+                }
+            })
+            param_vals = [
+                "${rtvar:PREBUILT_BL32}@${rtvar:TSP_ADDR}",
+                "${rtvar:PREBUILT_DTB}@${rtvar:SP_DTB_ADDR}"
+            ]
+            params.update(sw_util.ShrinkwrapManager.add_multi_param_with_spacing(
+                "--data cluster0.cpu0", param_vals, offset=sw_util.SP_PARAM_OFFSET))
+        return params, rtvars
 
 class SerialDriver(Driver):
     """Driver which communicates with a device over the serial port."""
