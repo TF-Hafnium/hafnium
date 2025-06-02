@@ -550,6 +550,10 @@ static bool api_ffa_fill_partitions_info_array(
 	for (ffa_vm_count_t vm_idx = 0; vm_idx < vm_get_count(); vm_idx++) {
 		struct vm *vm = vm_find_index(vm_idx);
 
+		if (!vm_is_discoverable(vm)) {
+			continue;
+		}
+
 		for (size_t uuid_idx = 0; uuid_idx < PARTITION_MAX_UUIDS;
 		     uuid_idx++) {
 			struct ffa_uuid uuid = vm->uuids[uuid_idx];

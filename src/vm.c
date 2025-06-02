@@ -1490,3 +1490,11 @@ bool vm_set_state(struct vm_locked vm_locked, enum vm_state to_state)
 
 	return ret;
 }
+
+/**
+ * If a VM is not in NULL state, then it is discoverable.
+ */
+bool vm_is_discoverable(struct vm *vm)
+{
+	return vm_read_state(vm) != VM_STATE_NULL;
+}

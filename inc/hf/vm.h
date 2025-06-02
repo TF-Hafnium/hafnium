@@ -458,3 +458,4 @@ struct vm *vm_get_next_boot(struct vm *vm);
 struct vm *vm_get_next_boot_secondary_core(struct vm *vm);
 enum vm_state vm_read_state(struct vm *vm);
 bool vm_set_state(struct vm_locked vm_locked, enum vm_state to_state);
+bool vm_is_discoverable(struct vm *vm);
