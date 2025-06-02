@@ -81,3 +81,17 @@ TEST(ffa, ffa_partition_info)
 	ret = ffa_rx_release();
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
+
+/**
+ * FFA_ABORT interface is not supported for normal world endpoints.
+ */
+TEST(ffa, nwd_ffa_abort_unsupported)
+{
+	struct ffa_value res;
+
+	res = ffa_abort_32(0);
+	EXPECT_FFA_ERROR(res, FFA_NOT_SUPPORTED);
+
+	res = ffa_features(FFA_ABORT_32);
+	EXPECT_FFA_ERROR(res, FFA_NOT_SUPPORTED);
+}

@@ -748,3 +748,8 @@ static inline struct ffa_value ffa_console_log_64_extended(const char *src,
 
 	return ffa_call_ext(req);
 }
+
+static inline struct ffa_value ffa_abort_32(uint32_t val)
+{
+	return ffa_call((struct ffa_value){.func = FFA_ABORT_32, .arg2 = val});
+}

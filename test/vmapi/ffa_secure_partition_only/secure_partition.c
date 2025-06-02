@@ -137,6 +137,9 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 
 	ret = ffa_features(FFA_NOTIFICATION_INFO_GET_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_features(FFA_ABORT_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
 
 static bool v1_1_or_later(void)
