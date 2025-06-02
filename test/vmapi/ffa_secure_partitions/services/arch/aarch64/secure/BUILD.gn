@@ -117,14 +117,27 @@ source_set("message_loop") {
     "//test/vmapi/common:ffa",
   ]
 }
-source_set("test_main_sp_boot_fail") {
+
+source_set("test_main_sp_boot_error_fail") {
   testonly = true
   public_configs = [
     ":config",
     "//test/hftest:hftest_config",
     "//src/arch/aarch64:arch_config",
   ]
-  sources = [ "test_main_sp_boot_fail.c" ]
+  sources = [ "test_main_sp_boot_error_fail.c" ]
+
+  deps = [ "//vmlib/${plat_arch}:call" ]
+}
+
+source_set("test_main_sp_boot_abort_fail") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
+  ]
+  sources = [ "test_main_sp_boot_abort_fail.c" ]
 
   deps = [ "//vmlib/${plat_arch}:call" ]
 }
@@ -160,12 +173,23 @@ vm_kernel("secure_partitions_services") {
 # SP that will be controlled via communication/scheduling primitives by the
 # former SP.
 # Uses a modified boot flow to test SP initialization error handling.
-vm_kernel("secure_partitions_services_boot_fail_test") {
+vm_kernel("secure_partitions_services_boot_error_fail_test") {
   testonly = true
   public_configs = [ ":config" ]
 
   deps = [
-    ":test_main_sp_boot_fail",
+    ":test_main_sp_boot_error_fail",
+    "//test/hftest:hftest_secure_service",
+  ]
+}
+
+# Uses a modified boot flow to test SP initialization abort handling.
+vm_kernel("secure_partitions_services_boot_abort_fail_test") {
+  testonly = true
+  public_configs = [ ":config" ]
+
+  deps = [
+    ":test_main_sp_boot_abort_fail",
     "//test/hftest:hftest_secure_service",
   ]
 }
@@ -242,7 +266,7 @@ partition_package("service_sp_third_package") {
   output = "service_sp_third_package.img"
 }
 
-# The following partition packages (service_sp_<X>_package_boot_fail_test)
+# The following partition packages (service_sp_<X>_package_boot_<type>_fail_test)
 # are used in tests where the <X> service SP fails to initialize.
 #
 # These may be used in various combinations with the existing
@@ -259,11 +283,11 @@ partition_package("service_sp_first_package_boot_fail_test") {
   img_offset = "0x2000"
   files = [ [
         "partition_manifest_service_sp_first.dtb",
-        "secure_partitions_services_boot_fail_test.bin",
+        "secure_partitions_services_boot_abort_fail_test.bin",
         ":partition_manifest_service_sp_first",
-        ":secure_partitions_services_boot_fail_test",
+        ":secure_partitions_services_boot_abort_fail_test",
       ] ]
-  output = "service_sp_first_package_boot_fail_test.img"
+  output = "service_sp_first_package_boot_abort_fail_test.img"
 }
 
 partition_package("service_sp_second_package_boot_fail_test") {
@@ -272,11 +296,11 @@ partition_package("service_sp_second_package_boot_fail_test") {
   img_offset = "0x2000"
   files = [ [
         "partition_manifest_service_sp_second.dtb",
-        "secure_partitions_services_boot_fail_test.bin",
+        "secure_partitions_services_boot_error_fail_test.bin",
         ":partition_manifest_service_sp_second",
-        ":secure_partitions_services_boot_fail_test",
+        ":secure_partitions_services_boot_error_fail_test",
       ] ]
-  output = "service_sp_second_package_boot_fail_test.img"
+  output = "service_sp_second_package_boot_error_fail_test.img"
 }
 
 partition_package("service_sp_third_package_boot_fail_test") {
@@ -285,9 +309,9 @@ partition_package("service_sp_third_package_boot_fail_test") {
   img_offset = "0x2000"
   files = [ [
         "partition_manifest_service_sp_third.dtb",
-        "secure_partitions_services_boot_fail_test.bin",
+        "secure_partitions_services_boot_error_fail_test.bin",
         ":partition_manifest_service_sp_third",
-        ":secure_partitions_services_boot_fail_test",
+        ":secure_partitions_services_boot_error_fail_test",
       ] ]
-  output = "service_sp_third_package_boot_fail_test.img"
+  output = "service_sp_third_package_boot_error_fail_test.img"
 }
