@@ -2758,4 +2758,124 @@ TEST_F(manifest, ffa_device_region_invalid_dma_properties)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_DMA_DEVICE_OVERFLOW);
 }
+
+TEST_F(manifest, validate_sp_lifecycle_support)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
+
+	/* Lifecycle support only allowed for UP SP. */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10002>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("messaging-method", "<1>")
+		.BooleanProperty("lifecycle-support")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	manifest_dealloc();
+
+	/* Lifecycle support not allowed for MP SP. */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10002>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<8>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("messaging-method", "<1>")
+		.BooleanProperty("lifecycle-support")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_ILLEGAL_LIFECYCLE_SUPPORT);
+	manifest_dealloc();
+}
+
+TEST_F(manifest, validate_sp_abort_actions)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
+
+	/*
+	 * Abort action can only be specified if lifecycle support is
+	 * enabled.
+	 */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.Property("abort-action", "<0>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_ILLEGAL_ABORT_ACTION);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.BooleanProperty("lifecycle-support")
+		.Property("abort-action", "<0>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.BooleanProperty("lifecycle-support")
+		.Property("abort-action", "<1>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.BooleanProperty("lifecycle-support")
+		.Property("abort-action", "<2>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.BooleanProperty("lifecycle-support")
+		.Property("abort-action", "<3>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb), MANIFEST_SUCCESS);
+	manifest_dealloc();
+
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.BooleanProperty("lifecycle-support")
+		.Property("abort-action", "<0x4>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_ILLEGAL_ABORT_ACTION);
+	manifest_dealloc();
+}
 } /* namespace */
