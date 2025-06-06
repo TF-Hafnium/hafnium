@@ -16,6 +16,7 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/mm.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/sp_pkg.h"
 #include "hf/std.h"
 #include "hf/transfer_list.h"
@@ -39,12 +40,14 @@ static void dump_partition_package(struct partition_pkg *pkg)
 
 static bool partition_pkg_from_sp_pkg(struct mm_stage1_locked stage1_locked,
 				      paddr_t pkg_start,
-				      struct partition_pkg *pkg,
-				      struct mpool *ppool)
+				      struct partition_pkg *pkg)
 {
 	struct sp_pkg_header header;
-	bool ret = sp_pkg_init(stage1_locked, pkg_start, &header, ppool);
+	bool ret = sp_pkg_init(stage1_locked, pkg_start, &header);
 	size_t total_mem_size = sp_pkg_get_mem_size(&header);
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	pkg->total.begin = pkg_start;
 	pkg->total.end = pa_add(pkg_start, total_mem_size);
@@ -106,11 +109,13 @@ static bool partition_pkg_init_memory_range_from_te(
 }
 
 static bool partition_pkg_from_tl(struct mm_stage1_locked stage1_locked,
-				  paddr_t pkg_start, struct partition_pkg *pkg,
-				  struct mpool *ppool)
+				  paddr_t pkg_start, struct partition_pkg *pkg)
 {
 	struct transfer_list_header *tl = ptr_from_va(va_from_pa(pkg_start));
 	enum transfer_list_ops tl_res;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	dlog_verbose("%s: partition loaded in a transfer list.\n", __func__);
 
@@ -186,13 +191,15 @@ static bool partition_pkg_from_tl(struct mm_stage1_locked stage1_locked,
 }
 
 bool partition_pkg_init(struct mm_stage1_locked stage1_locked,
-			paddr_t pkg_start, struct partition_pkg *pkg,
-			struct mpool *ppool)
+			paddr_t pkg_start, struct partition_pkg *pkg)
 {
 	bool ret = false;
 	paddr_t pkg_first_page = pa_add(pkg_start, PAGE_SIZE);
 	uint32_t *magic;
 	void *mapped_ptr;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/* Firstly, map a single page to be able to read package header. */
 	mapped_ptr = mm_identity_map(stage1_locked, pkg_start, pkg_first_page,
@@ -208,14 +215,12 @@ bool partition_pkg_init(struct mm_stage1_locked stage1_locked,
 		 * Leave memory mapped in case it succeeded, to be cleared
 		 * later.
 		 */
-		if (!partition_pkg_from_sp_pkg(stage1_locked, pkg_start, pkg,
-					       ppool)) {
+		if (!partition_pkg_from_sp_pkg(stage1_locked, pkg_start, pkg)) {
 			goto out;
 		}
 		break;
 	case TRANSFER_LIST_SIGNATURE:
-		if (!partition_pkg_from_tl(stage1_locked, pkg_start, pkg,
-					   ppool)) {
+		if (!partition_pkg_from_tl(stage1_locked, pkg_start, pkg)) {
 			goto out;
 		}
 		break;
@@ -258,7 +263,11 @@ out:
 }
 
 void partition_pkg_deinit(struct mm_stage1_locked stage1_locked,
-			  struct partition_pkg *pkg, struct mpool *ppool)
+			  struct partition_pkg *pkg)
 {
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
+
 	CHECK(mm_unmap(stage1_locked, pkg->total.begin, pkg->total.end, ppool));
 }

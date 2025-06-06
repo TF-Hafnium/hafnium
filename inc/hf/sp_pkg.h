@@ -49,7 +49,7 @@ static inline size_t sp_pkg_get_boot_info_size(struct sp_pkg_header *sp_pkg)
 }
 
 bool sp_pkg_init(struct mm_stage1_locked stage1_locked, paddr_t pkg_start,
-		 struct sp_pkg_header *header, struct mpool *ppool);
+		 struct sp_pkg_header *header);
 
 void sp_pkg_deinit(struct mm_stage1_locked stage1_locked, vaddr_t pkg_start,
-		   struct sp_pkg_header *header, struct mpool *ppool);
+		   struct sp_pkg_header *header);

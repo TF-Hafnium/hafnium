@@ -15,6 +15,7 @@
 #include "hf/addr.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
 /**
@@ -23,11 +24,12 @@
  * - Image offset expected to be 4kb aligned, and to follow the pm manifest.
  */
 static bool sp_pkg_init_v1(struct mm_stage1_locked stage1_locked,
-			   paddr_t pkg_start, struct sp_pkg_header *header,
-			   struct mpool *ppool)
+			   paddr_t pkg_start, struct sp_pkg_header *header)
 {
 	size_t manifest_size;
+	struct mpool *ppool = memory_alloc_get_ppool();
 
+	assert(ppool != NULL);
 	assert(header != NULL);
 
 	/* Expect DTB to immediately follow header */
@@ -69,12 +71,10 @@ static bool sp_pkg_init_v1(struct mm_stage1_locked stage1_locked,
  * and can use the first chunk of memory for booting purposes.
  */
 static bool sp_pkg_init_v2(struct mm_stage1_locked stage1_locked,
-			   paddr_t pkg_start, struct sp_pkg_header *header,
-			   struct mpool *ppool)
+			   paddr_t pkg_start, struct sp_pkg_header *header)
 {
 	assert(header != NULL);
 	(void)pkg_start;
-	(void)ppool;
 	(void)stage1_locked;
 
 	if (header->pm_offset % PAGE_SIZE != 0 ||
@@ -109,7 +109,7 @@ static bool sp_pkg_init_v2(struct mm_stage1_locked stage1_locked,
  * well, otherwise returns false.
  */
 bool sp_pkg_init(struct mm_stage1_locked stage1_locked, paddr_t pkg_start,
-		 struct sp_pkg_header *header, struct mpool *ppool)
+		 struct sp_pkg_header *header)
 {
 	/*
 	 * Assumes the page the first page of the package, has been mapped
@@ -121,12 +121,12 @@ bool sp_pkg_init(struct mm_stage1_locked stage1_locked, paddr_t pkg_start,
 
 	switch (header->version) {
 	case SP_PKG_HEADER_VERSION_1:
-		if (sp_pkg_init_v1(stage1_locked, pkg_start, header, ppool)) {
+		if (sp_pkg_init_v1(stage1_locked, pkg_start, header)) {
 			return true;
 		}
 		break;
 	case SP_PKG_HEADER_VERSION_2:
-		if (sp_pkg_init_v2(stage1_locked, pkg_start, header, ppool)) {
+		if (sp_pkg_init_v2(stage1_locked, pkg_start, header)) {
 			return true;
 		}
 		break;

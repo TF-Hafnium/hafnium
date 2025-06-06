@@ -18,6 +18,7 @@ extern "C" {
 #include "hf/boot_params.h"
 #include "hf/manifest.h"
 #include "hf/mm.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/sp_pkg.h"
 }
 
@@ -29,8 +30,6 @@ using ::testing::IsEmpty;
 using ::testing::NotNull;
 
 using struct_manifest = struct manifest;
-
-constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 128;
 
 template <typename T>
 void exec(const char *program, const char *args[], const T &stdin,
@@ -335,9 +334,7 @@ class manifest : public ::testing::Test
 {
 	void SetUp() override
 	{
-		test_heap = std::make_unique<uint8_t[]>(TEST_HEAP_SIZE);
-		mpool_init(&ppool, MM_PPOOL_ENTRY_SIZE);
-		mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
+		memory_alloc_init();
 	}
 
 	void TearDown() override
@@ -345,14 +342,10 @@ class manifest : public ::testing::Test
 		manifest_dealloc();
 	}
 
-	std::unique_ptr<uint8_t[]> test_heap;
-
        protected:
-	struct mpool ppool;
-
 	void manifest_dealloc(void)
 	{
-		manifest_deinit(&ppool);
+		manifest_deinit();
 	}
 
        public:
@@ -442,7 +435,7 @@ class manifest : public ::testing::Test
 
 		memiter_init(&it, vec.data(), vec.size());
 
-		ret = manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+		ret = manifest_init(mm_stage1_locked, m, &it, &params);
 		mm_unlock_stage1(&mm_stage1_locked);
 		return ret;
 	}
@@ -471,7 +464,7 @@ class manifest : public ::testing::Test
 		/* clang-format on */
 		memiter_init(&it, core_dtb.data(), core_dtb.size());
 
-		ret = manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+		ret = manifest_init(mm_stage1_locked, m, &it, &params);
 		mm_unlock_stage1(&mm_stage1_locked);
 		return ret;
 	}
@@ -501,7 +494,7 @@ class manifest : public ::testing::Test
 		/* clang-format on */
 		memiter_init(&it, core_dtb.data(), core_dtb.size());
 
-		ret = manifest_init(mm_stage1_locked, m, &it, &params, &ppool);
+		ret = manifest_init(mm_stage1_locked, m, &it, &params);
 		mm_unlock_stage1(&mm_stage1_locked);
 		return ret;
 	}
@@ -2306,7 +2299,7 @@ TEST_F(manifest, ffa_boot_order_not_unique)
 
 	boot_params_init(&params, nullptr);
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
-	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
+	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params),
 		  MANIFEST_ERROR_INVALID_BOOT_ORDER);
 
 	mm_unlock_stage1(&mm_stage1_locked);
@@ -2492,7 +2485,7 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 	/* clang-format on */
 	boot_params_init(&params, &spkg_1);
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
-	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
+	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params),
 		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
 
 	manifest_dealloc();
@@ -2569,7 +2562,7 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 	/* clang-format on */
 	boot_params_init(&params, &spkg_1);
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
-	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params, &ppool),
+	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params),
 		  MANIFEST_SUCCESS);
 
 	mm_unlock_stage1(&mm_stage1_locked);

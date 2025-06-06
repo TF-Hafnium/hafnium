@@ -145,7 +145,7 @@ void one_time_init(void)
 	}
 
 	manifest_ret = manifest_init(mm_stage1_locked, &manifest, &manifest_it,
-				     params, ppool);
+				     params);
 
 	if (manifest_ret != MANIFEST_SUCCESS) {
 		panic("Could not parse manifest: %s.",

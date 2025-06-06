@@ -28,6 +28,7 @@
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/partition_pkg.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
 #define TRY(expr)                                            \
@@ -76,14 +77,6 @@ struct manifest_data {
 	uint64_t boot_order_values[BOOT_ORDER_MAP_ENTRIES];
 };
 
-/**
- * Calculate the number of entries in the ppool that are required to
- * store the manifest_data struct.
- */
-static const size_t manifest_data_ppool_entries =
-	(align_up(sizeof(struct manifest_data), MM_PPOOL_ENTRY_SIZE) /
-	 MM_PPOOL_ENTRY_SIZE);
-
 static struct manifest_data *manifest_data;
 
 static bool check_boot_order(uint16_t boot_order)
@@ -117,10 +110,9 @@ static bool check_boot_order(uint16_t boot_order)
  * Allocates and clear memory for the manifest data in the given memory pool.
  * Returns true if the memory is successfully allocated.
  */
-static bool manifest_data_init(struct mpool *ppool)
+static bool manifest_data_init(void)
 {
-	manifest_data = (struct manifest_data *)mpool_alloc_contiguous(
-		ppool, manifest_data_ppool_entries, 1);
+	manifest_data = memory_alloc(sizeof(struct manifest_data));
 
 	assert(manifest_data != NULL);
 
@@ -133,7 +125,7 @@ static bool manifest_data_init(struct mpool *ppool)
 /**
  * Frees the memory used for the manifest data in the given memory pool.
  */
-static void manifest_data_deinit(struct mpool *ppool)
+static void manifest_data_deinit(void)
 {
 	/**
 	 * Clear and return the memory used for the manifest_data struct to the
@@ -141,7 +133,8 @@ static void manifest_data_deinit(struct mpool *ppool)
 	 */
 	memset_s(manifest_data, sizeof(struct manifest_data), 0,
 		 sizeof(struct manifest_data));
-	mpool_add_chunk(ppool, manifest_data, manifest_data_ppool_entries);
+
+	memory_free(manifest_data, sizeof(struct manifest_data));
 }
 
 static inline size_t count_digits(ffa_id_t vm_id)
@@ -1561,7 +1554,7 @@ enum manifest_return_code parse_ffa_manifest(
 static enum manifest_return_code parse_ffa_partition_package(
 	struct mm_stage1_locked stage1_locked, struct fdt_node *node,
 	struct manifest_vm *vm, ffa_id_t vm_id,
-	const struct boot_params *boot_params, struct mpool *ppool)
+	const struct boot_params *boot_params)
 {
 	enum manifest_return_code ret = MANIFEST_ERROR_NOT_COMPATIBLE;
 	uintpaddr_t load_address;
@@ -1587,8 +1580,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 
 	assert(load_address != 0U);
 
-	if (!partition_pkg_init(stage1_locked, pa_init(load_address), &pkg,
-				ppool)) {
+	if (!partition_pkg_init(stage1_locked, pa_init(load_address), &pkg)) {
 		return ret;
 	}
 
@@ -1637,7 +1629,7 @@ static enum manifest_return_code parse_ffa_partition_package(
 	}
 
 out:
-	partition_pkg_deinit(stage1_locked, &pkg, ppool);
+	partition_pkg_deinit(stage1_locked, &pkg);
 
 	return ret;
 }
@@ -1648,8 +1640,7 @@ out:
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 					struct manifest **manifest_ret,
 					struct memiter *manifest_fdt,
-					struct boot_params *boot_params,
-					struct mpool *ppool)
+					struct boot_params *boot_params)
 {
 	struct manifest *manifest;
 	struct string vm_name;
@@ -1673,7 +1664,7 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 			   boot_params->ns_mem_ranges_count, true);
 
 	/* Allocate space in the ppool for the manifest data. */
-	if (!manifest_data_init(ppool)) {
+	if (!manifest_data_init()) {
 		panic("Unable to allocate manifest data.\n");
 	}
 
@@ -1754,7 +1745,7 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 		    !manifest->vm[i].is_hyp_loaded) {
 			TRY(parse_ffa_partition_package(stage1_locked, &vm_node,
 							&manifest->vm[i], vm_id,
-							boot_params, ppool));
+							boot_params));
 			size_t page_count =
 				align_up(manifest->vm[i].secondary.mem_size,
 					 PAGE_SIZE) /
@@ -1792,9 +1783,9 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
  * Free manifest data resources, called once manifest parsing has
  * completed and VMs are loaded.
  */
-void manifest_deinit(struct mpool *ppool)
+void manifest_deinit(void)
 {
-	manifest_data_deinit(ppool);
+	manifest_data_deinit();
 }
 
 const char *manifest_strerror(enum manifest_return_code ret_code)

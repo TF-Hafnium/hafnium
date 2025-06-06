@@ -30,8 +30,7 @@ struct partition_pkg {
 };
 
 bool partition_pkg_init(struct mm_stage1_locked stage1_locked,
-			paddr_t pkg_start, struct partition_pkg *pkg,
-			struct mpool *ppool);
+			paddr_t pkg_start, struct partition_pkg *pkg);
 
 void partition_pkg_deinit(struct mm_stage1_locked stage1_locked,
-			  struct partition_pkg *pkg, struct mpool *ppool);
+			  struct partition_pkg *pkg);
