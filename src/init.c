@@ -85,8 +85,7 @@ void one_time_init(void)
 
 	mm_stage1_locked = mm_lock_stage1();
 
-	if (!fdt_map(&fdt, mm_stage1_locked, plat_boot_flow_get_fdt_addr(),
-		     ppool)) {
+	if (!fdt_map(&fdt, mm_stage1_locked, plat_boot_flow_get_fdt_addr())) {
 		panic("Unable to map FDT.");
 	}
 
@@ -165,7 +164,7 @@ void one_time_init(void)
 		panic("Could not initialize Interrupt Controller driver.");
 	}
 
-	if (!fdt_unmap(&fdt, mm_stage1_locked, ppool)) {
+	if (!fdt_unmap(&fdt, mm_stage1_locked)) {
 		panic("Unable to unmap FDT.");
 	}
 

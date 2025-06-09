@@ -19,9 +19,8 @@
 
 bool fdt_struct_from_ptr(const void *fdt_ptr, struct fdt *fdt);
 bool fdt_map(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
-	     paddr_t fdt_addr, struct mpool *ppool);
-bool fdt_unmap(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
-	       struct mpool *ppool);
+	     paddr_t fdt_addr);
+bool fdt_unmap(struct fdt *fdt, struct mm_stage1_locked stage1_locked);
 bool fdt_find_cpus(const struct fdt *fdt, cpu_id_t *cpu_ids, size_t *cpu_count);
 bool fdt_find_memory_ranges(const struct fdt *fdt,
 			    const struct string *device_type,

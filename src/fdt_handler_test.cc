@@ -99,10 +99,10 @@ TEST(fdt, find_memory_ranges)
 	struct mm_stage1_locked mm_stage1_locked = mm_lock_stage1();
 	struct string memory = STRING_INIT("memory");
 	ASSERT_TRUE(fdt_map(&fdt, mm_stage1_locked,
-			    pa_init((uintpaddr_t)&test_dtb), &ppool));
+			    pa_init((uintpaddr_t)&test_dtb)));
 	fdt_find_memory_ranges(&fdt, &memory, params.mem_ranges,
 			       &params.mem_ranges_count, MAX_MEM_RANGES);
-	ASSERT_TRUE(fdt_unmap(&fdt, mm_stage1_locked, &ppool));
+	ASSERT_TRUE(fdt_unmap(&fdt, mm_stage1_locked));
 	mm_unlock_stage1(&mm_stage1_locked);
 
 	EXPECT_THAT(params.mem_ranges_count, Eq(3));

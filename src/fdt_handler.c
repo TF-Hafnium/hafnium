@@ -13,6 +13,7 @@
 #include "hf/dlog.h"
 #include "hf/fdt.h"
 #include "hf/mm.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
 /**
@@ -171,10 +172,13 @@ bool fdt_find_memory_ranges(const struct fdt *fdt,
 }
 
 bool fdt_map(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
-	     paddr_t fdt_addr, struct mpool *ppool)
+	     paddr_t fdt_addr)
 {
 	const void *fdt_ptr;
 	size_t fdt_len;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/* Map the fdt header in. */
 	fdt_ptr = mm_identity_map(stage1_locked, fdt_addr,
@@ -215,12 +219,13 @@ fail:
 	return false;
 }
 
-bool fdt_unmap(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
-	       struct mpool *ppool)
+bool fdt_unmap(struct fdt *fdt, struct mm_stage1_locked stage1_locked)
 {
 	paddr_t begin = pa_from_va(va_from_ptr(fdt_base(fdt)));
 	paddr_t end = pa_add(begin, fdt_size(fdt));
+	struct mpool *ppool = memory_alloc_get_ppool();
 
+	assert(ppool != NULL);
 	if (!mm_unmap(stage1_locked, begin, end, ppool)) {
 		return false;
 	}
