@@ -13,8 +13,7 @@
 #include "hf/vm.h"
 
 bool plat_interrupts_controller_driver_init(
-	const struct fdt *fdt, struct mm_stage1_locked stage1_locked,
-	struct mpool *ppool);
+	const struct fdt *fdt, struct mm_stage1_locked stage1_locked);
 void plat_interrupts_controller_hw_init(struct cpu *c);
 void plat_interrupts_set_priority_mask(uint8_t min_priority);
 uint8_t plat_interrupts_get_priority_mask(void);

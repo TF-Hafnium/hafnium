@@ -161,8 +161,7 @@ void one_time_init(void)
 
 	cpu_module_init(params->cpu_ids, params->cpu_count);
 
-	if (!plat_interrupts_controller_driver_init(&fdt, mm_stage1_locked,
-						    ppool)) {
+	if (!plat_interrupts_controller_driver_init(&fdt, mm_stage1_locked)) {
 		panic("Could not initialize Interrupt Controller driver.");
 	}
 

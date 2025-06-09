@@ -16,6 +16,7 @@
 #include "hf/io.h"
 #include "hf/panic.h"
 #include "hf/plat/interrupts.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/types.h"
 
 #include "gicv3_helpers.h"
@@ -770,8 +771,8 @@ unsigned int gicv3_get_espi_limit(uintptr_t gicd_base)
 #endif /* GIC_EXT_INTID */
 
 bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
-		       struct mpool *ppool, struct mem_range *gic_mem_ranges,
-		       uint32_t num_gic_dist, uint32_t num_gic_rdist)
+		       struct mem_range *gic_mem_ranges, uint32_t num_gic_dist,
+		       uint32_t num_gic_rdist)
 {
 	void *base_addr;
 	uint32_t gic_version;
@@ -779,6 +780,9 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 	uint32_t typer_reg;
 	uint32_t gicd_idx;
 	uint32_t gicr_idx;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	for (gicd_idx = 0; gicd_idx < num_gic_dist; gicd_idx++) {
 		base_addr = mm_identity_map(
@@ -843,8 +847,7 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 }
 
 bool plat_interrupts_controller_driver_init(
-	const struct fdt *fdt, struct mm_stage1_locked stage1_locked,
-	struct mpool *ppool)
+	const struct fdt *fdt, struct mm_stage1_locked stage1_locked)
 {
 	/*
 	 * Each chip has at most one distributor address cell and one spi range
@@ -866,8 +869,8 @@ bool plat_interrupts_controller_driver_init(
 	fdt_find_gics(fdt, gic_mem_ranges, &num_gic_dist, &num_gic_rdist);
 	plat_gicv3_driver.dist_count = num_gic_dist;
 
-	if (!gicv3_driver_init(stage1_locked, ppool, gic_mem_ranges,
-			       num_gic_dist, num_gic_rdist)) {
+	if (!gicv3_driver_init(stage1_locked, gic_mem_ranges, num_gic_dist,
+			       num_gic_rdist)) {
 		dlog_error("Failed to initialize GICv3 driver\n");
 		return false;
 	}
