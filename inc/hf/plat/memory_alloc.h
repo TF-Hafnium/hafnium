@@ -11,3 +11,6 @@
 void memory_alloc_init(void);
 void *memory_alloc(size_t size);
 void memory_free(void *begin, size_t size);
+
+/* Temporary function to help with code refactor. */
+struct mpool *memory_alloc_get_ppool(void);
