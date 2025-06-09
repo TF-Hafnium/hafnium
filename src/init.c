@@ -28,6 +28,7 @@
 #include "hf/plat/console.h"
 #include "hf/plat/interrupts.h"
 #include "hf/plat/iommu.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
 alignas(MM_PPOOL_ENTRY_SIZE) char ptable_buf[MM_PPOOL_ENTRY_SIZE * HEAP_PAGES];
@@ -47,6 +48,8 @@ void one_time_init_mm(void)
 	plat_console_init();
 
 	ffa_init_log();
+
+	memory_alloc_init();
 
 	mpool_init(&ppool, MM_PPOOL_ENTRY_SIZE);
 	mpool_add_chunk(&ppool, ptable_buf, sizeof(ptable_buf));
