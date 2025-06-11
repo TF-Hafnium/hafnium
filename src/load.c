@@ -26,6 +26,7 @@
 #include "hf/mm.h"
 #include "hf/plat/console.h"
 #include "hf/plat/iommu.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -47,12 +48,15 @@ const struct manifest *get_hypervisor_manifest(void)
  * so the data must be available without the cache.
  */
 static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
-			     struct memiter *from_it, struct mpool *ppool)
+			     struct memiter *from_it)
 {
+	struct mpool *ppool = memory_alloc_get_ppool();
 	const void *from = memiter_base(from_it);
 	size_t size = memiter_size(from_it);
 	paddr_t to_end = pa_add(to, size);
 	void *ptr;
+
+	assert(ppool != NULL);
 
 	ptr = mm_identity_map(stage1_locked, to, to_end, MM_MODE_W, ppool);
 	if (!ptr) {
@@ -74,8 +78,7 @@ static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
  */
 static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 			paddr_t end, const struct manifest_vm *manifest_vm,
-			const struct memiter *cpio, struct mpool *ppool,
-			size_t *kernel_size)
+			const struct memiter *cpio, size_t *kernel_size)
 {
 	struct memiter kernel;
 	size_t size;
@@ -92,7 +95,7 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
 		return false;
 	}
 
-	if (!copy_to_unmapped(stage1_locked, begin, &kernel, ppool)) {
+	if (!copy_to_unmapped(stage1_locked, begin, &kernel)) {
 		dlog_error("Unable to copy kernel.\n");
 		return false;
 	}
@@ -108,13 +111,15 @@ static bool load_kernel(struct mm_stage1_locked stage1_locked, paddr_t begin,
  * Link RX/TX buffers provided in partition manifest to mailbox
  */
 static bool link_rxtx_to_mailbox(struct mm_stage1_locked stage1_locked,
-				 struct vm_locked vm_locked, struct rx_tx rxtx,
-				 struct mpool *ppool)
+				 struct vm_locked vm_locked, struct rx_tx rxtx)
 {
 	struct ffa_value ret;
 	ipaddr_t send;
 	ipaddr_t recv;
 	uint32_t page_count;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	send = ipa_init(rxtx.tx_buffer->base_address);
 	recv = ipa_init(rxtx.rx_buffer->base_address);
@@ -162,12 +167,14 @@ static void infer_interrupt(struct interrupt_info interrupt,
  */
 static bool load_common(struct mm_stage1_locked stage1_locked,
 			struct vm_locked vm_locked,
-			const struct manifest_vm *manifest_vm,
-			struct mpool *ppool)
+			const struct manifest_vm *manifest_vm)
 {
 	struct device_region dev_region;
 	struct interrupt_info interrupt;
 	uint32_t k = 0;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	vm_locked.vm->smc_whitelist = manifest_vm->smc_whitelist;
 	vm_locked.vm->power_management =
@@ -213,9 +220,9 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->ffa_version = manifest_vm->partition.ffa_version;
 		/* Link rxtx buffers to mailbox */
 		if (manifest_vm->partition.rxtx.available) {
-			if (!link_rxtx_to_mailbox(stage1_locked, vm_locked,
-						  manifest_vm->partition.rxtx,
-						  ppool)) {
+			if (!link_rxtx_to_mailbox(
+				    stage1_locked, vm_locked,
+				    manifest_vm->partition.rxtx)) {
 				dlog_error(
 					"Unable to Link RX/TX buffer with "
 					"mailbox.\n");
@@ -296,7 +303,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 static bool load_primary(struct mm_stage1_locked stage1_locked,
 			 const struct manifest_vm *manifest_vm,
 			 const struct memiter *cpio,
-			 const struct boot_params *params, struct mpool *ppool)
+			 const struct boot_params *params)
 {
 	paddr_t primary_begin;
 	ipaddr_t primary_entry;
@@ -305,6 +312,9 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	struct vcpu_locked vcpu_locked;
 	size_t i;
 	bool ret;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	if (manifest_vm->is_ffa_partition && !manifest_vm->is_hyp_loaded) {
 		primary_begin = pa_init(manifest_vm->partition.load_addr);
@@ -332,7 +342,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	 */
 	if (!string_is_empty(&manifest_vm->kernel_filename)) {
 		if (!load_kernel(stage1_locked, primary_begin, primary_end,
-				 manifest_vm, cpio, ppool, NULL)) {
+				 manifest_vm, cpio, NULL)) {
 			dlog_error("Unable to load primary kernel.\n");
 			return false;
 		}
@@ -400,7 +410,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		}
 	}
 
-	if (!load_common(stage1_locked, vm_locked, manifest_vm, ppool)) {
+	if (!load_common(stage1_locked, vm_locked, manifest_vm)) {
 		ret = false;
 		goto out;
 	}
@@ -444,8 +454,8 @@ out:
 static bool load_secondary_fdt(struct mm_stage1_locked stage1_locked,
 			       paddr_t end, size_t fdt_max_size,
 			       const struct manifest_vm *manifest_vm,
-			       const struct memiter *cpio, struct mpool *ppool,
-			       paddr_t *fdt_addr, size_t *fdt_allocated_size)
+			       const struct memiter *cpio, paddr_t *fdt_addr,
+			       size_t *fdt_allocated_size)
 {
 	struct memiter fdt;
 	size_t allocated_size;
@@ -477,7 +487,7 @@ static bool load_secondary_fdt(struct mm_stage1_locked stage1_locked,
 	dlog_info("Loading secondary FDT of allocated size %zu at 0x%lx.\n",
 		  allocated_size, pa_addr(*fdt_addr));
 
-	if (!copy_to_unmapped(stage1_locked, *fdt_addr, &fdt, ppool)) {
+	if (!copy_to_unmapped(stage1_locked, *fdt_addr, &fdt)) {
 		dlog_error("Unable to copy FDT.\n");
 		return false;
 	}
@@ -544,7 +554,7 @@ static mm_mode_t device_region_attributes_to_mode(uint32_t attributes)
 
 static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 				   const struct vm_locked vm_locked,
-				   bool is_el0_partition, struct mpool *ppool)
+				   bool is_el0_partition)
 {
 #if LOG_LEVEL >= LOG_LEVEL_WARNING
 	const char *error_string = " region security state ignored for ";
@@ -555,6 +565,9 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 	size_t size;
 	mm_mode_t map_mode;
 	uint32_t attributes;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/* Map memory-regions */
 	while (j < manifest_vm->partition.mem_region_count) {
@@ -653,13 +666,15 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
  * Returns true on success, false on any failures.
  */
 static bool ffa_memory_deny_pvm_access(const struct manifest_vm *manifest_vm,
-				       const struct vm_locked primary_vm_locked,
-				       struct mpool *ppool)
+				       const struct vm_locked primary_vm_locked)
 {
 	int j = 0;
 	paddr_t region_begin;
 	paddr_t region_end;
 	size_t size;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	while (j < manifest_vm->partition.mem_region_count) {
 		struct memory_region mem_region;
@@ -709,8 +724,7 @@ static bool ffa_memory_deny_pvm_access(const struct manifest_vm *manifest_vm,
 static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 			       paddr_t mem_begin, paddr_t mem_end,
 			       const struct manifest_vm *manifest_vm,
-			       struct mpool *ppool, struct vm *current_vm,
-			       ipaddr_t *primary_ep)
+			       struct vm *current_vm, ipaddr_t *primary_ep)
 {
 	struct vm *vm = current_vm;
 	struct vm_locked vm_locked;
@@ -721,6 +735,9 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 	mm_mode_t map_mode;
 	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0 ||
 				manifest_vm->partition.run_time_el == EL0;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/*
 	 * An S-EL0 partition must contain only 1 vCPU (UP migratable) per the
@@ -753,7 +770,7 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 
 	if (manifest_vm->is_ffa_partition) {
 		if (!ffa_map_memory_regions(manifest_vm, vm_locked,
-					    is_el0_partition, ppool)) {
+					    is_el0_partition)) {
 			ret = false;
 			goto out;
 		}
@@ -798,7 +815,7 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 		plat_console_mm_init(mm_lock_ptable_unsafe(&vm->ptable), ppool);
 	}
 
-	if (!load_common(stage1_locked, vm_locked, manifest_vm, ppool)) {
+	if (!load_common(stage1_locked, vm_locked, manifest_vm)) {
 		ret = false;
 		goto out;
 	}
@@ -843,7 +860,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 			   paddr_t mem_begin, paddr_t mem_end,
 			   const struct manifest_vm *manifest_vm,
 			   const struct boot_params *boot_params,
-			   const struct memiter *cpio, struct mpool *ppool)
+			   const struct memiter *cpio)
 {
 	struct vm *vm;
 	struct vcpu_locked vcpu_locked;
@@ -855,6 +872,9 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	const size_t mem_size = pa_difference(mem_begin, mem_end);
 	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0 ||
 				manifest_vm->partition.run_time_el == EL0;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/*
 	 * Load the kernel if a filename is specified in the VM manifest.
@@ -864,7 +884,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	 */
 	if (!string_is_empty(&manifest_vm->kernel_filename)) {
 		if (!load_kernel(stage1_locked, mem_begin, mem_end, manifest_vm,
-				 cpio, ppool, &kernel_size)) {
+				 cpio, &kernel_size)) {
 			dlog_error("Unable to load kernel.\n");
 			return false;
 		}
@@ -882,7 +902,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		size_t fdt_allocated_size;
 
 		if (!load_secondary_fdt(stage1_locked, mem_end, fdt_max_size,
-					manifest_vm, cpio, ppool, &fdt_addr,
+					manifest_vm, cpio, &fdt_addr,
 					&fdt_allocated_size)) {
 			dlog_error("Unable to load FDT.\n");
 			return false;
@@ -891,7 +911,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		if (manifest_vm->is_ffa_partition) {
 			ffa_setup_parse_partition_manifest(
 				stage1_locked, fdt_addr, fdt_allocated_size,
-				manifest_vm, boot_params, ppool);
+				manifest_vm, boot_params);
 		}
 
 		if (!fdt_patch_mem(stage1_locked, fdt_addr, fdt_allocated_size,
@@ -909,7 +929,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	}
 
 	if (!load_ffa_partition(stage1_locked, mem_begin, mem_end, manifest_vm,
-				ppool, vm, &partition_primary_ep)) {
+				vm, &partition_primary_ep)) {
 		return false;
 	}
 
@@ -931,8 +951,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 
 	vcpu_unlock(&vcpu_locked);
 
-	return ffa_memory_deny_pvm_access(manifest_vm, primary_vm_locked,
-					  ppool);
+	return ffa_memory_deny_pvm_access(manifest_vm, primary_vm_locked);
 }
 
 /**
@@ -1013,11 +1032,13 @@ static bool update_reserved_ranges(struct boot_params_update *update,
 	return true;
 }
 
-static bool init_other_world_vm(const struct boot_params *params,
-				struct mpool *ppool)
+static bool init_other_world_vm(const struct boot_params *params)
 {
 	struct vm *other_world_vm;
 	size_t i;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/*
 	 * Initialise the dummy VM which represents the opposite world:
@@ -1043,14 +1064,17 @@ static bool init_other_world_vm(const struct boot_params *params,
 bool load_vms(struct mm_stage1_locked stage1_locked,
 	      const struct manifest *manifest, const struct memiter *cpio,
 	      const struct boot_params *params,
-	      struct boot_params_update *update, struct mpool *ppool)
+	      struct boot_params_update *update)
 {
+	struct mpool *ppool = memory_alloc_get_ppool();
 	struct vm *primary;
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	struct vm_locked primary_vm_locked;
 	bool success = true;
 
 	partition_manager_manifest = manifest;
+
+	assert(ppool != NULL);
 
 	/**
 	 * Only try to load the primary VM if it is supposed to be in this
@@ -1059,13 +1083,13 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	if (vm_id_is_current_world(HF_PRIMARY_VM_ID)) {
 		if (!load_primary(stage1_locked,
 				  &manifest->vm[HF_PRIMARY_VM_INDEX], cpio,
-				  params, ppool)) {
+				  params)) {
 			dlog_error("Unable to load primary VM.\n");
 			return false;
 		}
 	}
 
-	if (!init_other_world_vm(params, ppool)) {
+	if (!init_other_world_vm(params)) {
 		return false;
 	}
 
@@ -1120,7 +1144,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 
 		if (!load_secondary(stage1_locked, primary_vm_locked,
 				    secondary_mem_begin, secondary_mem_end,
-				    manifest_vm, params, cpio, ppool)) {
+				    manifest_vm, params, cpio)) {
 			dlog_error("Unable to load VM.\n");
 			continue;
 		}
@@ -1154,7 +1178,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 				      params->mem_ranges_count);
 }
 
-bool load_reinit_partition(struct vm *vm, struct mpool *ppool)
+bool load_reinit_partition(struct vm *vm)
 {
 	const struct manifest_vm *manifest_vm;
 	paddr_t mem_begin;
@@ -1162,7 +1186,9 @@ bool load_reinit_partition(struct vm *vm, struct mpool *ppool)
 	struct mm_stage1_locked stage1_locked;
 	bool ret = true;
 	const struct manifest *manager_manifest;
+	struct mpool *ppool = memory_alloc_get_ppool();
 
+	assert(ppool != NULL);
 	assert(vm->lifecycle_support);
 
 	dlog_verbose("Attempt to reiniatize the partition\n");
@@ -1187,7 +1213,7 @@ bool load_reinit_partition(struct vm *vm, struct mpool *ppool)
 	}
 
 	if (!load_ffa_partition(stage1_locked, mem_begin, mem_end, manifest_vm,
-				ppool, vm, NULL)) {
+				vm, NULL)) {
 		ret = false;
 		dlog_error("Unable to re-initialize Secure Partition: %#x\n",
 			   vm->id);

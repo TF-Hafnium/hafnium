@@ -16,6 +16,7 @@
 #include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
 #include "hf/manifest.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -211,10 +212,12 @@ void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 					paddr_t fdt_addr,
 					size_t fdt_allocated_size,
 					const struct manifest_vm *manifest_vm,
-					const struct boot_params *boot_params,
-					struct mpool *ppool)
+					const struct boot_params *boot_params)
 {
 	struct fdt partition_fdt;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/*
 	 * If the partition is an FF-A partition and is not

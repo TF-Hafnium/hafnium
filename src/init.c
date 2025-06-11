@@ -170,8 +170,8 @@ void one_time_init(void)
 
 	/* Load all VMs. */
 	update.reserved_ranges_count = 0;
-	if (!load_vms(mm_stage1_locked, manifest, &cpio, params, &update,
-		      ppool)) {
+
+	if (!load_vms(mm_stage1_locked, manifest, &cpio, params, &update)) {
 		panic("Unable to load VMs.");
 	}
 
