@@ -46,7 +46,7 @@ bool plat_boot_flow_get_initrd_range(const struct fdt *fdt, paddr_t *begin,
 bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,
 			   const struct manifest *manifest,
 			   struct boot_params_update *update,
-			   struct memiter *cpio, struct mpool *ppool)
+			   struct memiter *cpio)
 {
 	struct memiter primary_initrd;
 	const struct string *filename =
@@ -63,6 +63,5 @@ bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,
 	update->initrd_begin = pa_from_va(va_from_ptr(primary_initrd.next));
 	update->initrd_end = pa_from_va(va_from_ptr(primary_initrd.limit));
 
-	return fdt_patch(stage1_locked, plat_boot_flow_get_fdt_addr(), update,
-			 ppool);
+	return fdt_patch(stage1_locked, plat_boot_flow_get_fdt_addr(), update);
 }

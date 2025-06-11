@@ -21,5 +21,4 @@ bool plat_boot_flow_get_initrd_range(const struct fdt *fdt, paddr_t *begin,
 				     paddr_t *end);
 bool plat_boot_flow_update(struct mm_stage1_locked stage1_locked,
 			   const struct manifest *manifest,
-			   struct boot_params_update *update,
-			   struct memiter *cpio, struct mpool *ppool);
+			   struct boot_params_update *p, struct memiter *cpio);

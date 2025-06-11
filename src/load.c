@@ -915,7 +915,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		}
 
 		if (!fdt_patch_mem(stage1_locked, fdt_addr, fdt_allocated_size,
-				   mem_begin, mem_end, ppool)) {
+				   mem_begin, mem_end)) {
 			dlog_error("Unable to patch FDT.\n");
 			return false;
 		}

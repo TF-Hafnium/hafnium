@@ -16,6 +16,7 @@
 #include "hf/fdt_handler.h"
 #include "hf/layout.h"
 #include "hf/mm.h"
+#include "hf/plat/memory_alloc.h"
 
 static bool patch_uint(void *fdt, int off, const char *prop, uint64_t val)
 {
@@ -49,7 +50,7 @@ static bool add_mem_reservation(void *fdt, paddr_t begin, paddr_t end)
 }
 
 bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
-	       struct boot_params_update *p, struct mpool *ppool)
+	       struct boot_params_update *p)
 {
 	void *fdt;
 	int buf_size;
@@ -57,6 +58,9 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	bool ret = false;
 	bool rsv;
 	size_t i;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/* Map the fdt header in. */
 	fdt = mm_identity_map(stage1_locked, fdt_addr,
@@ -160,8 +164,7 @@ err_unmap_fdt_header:
 }
 
 bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
-		   size_t fdt_max_size, paddr_t mem_begin, paddr_t mem_end,
-		   struct mpool *ppool)
+		   size_t fdt_max_size, paddr_t mem_begin, paddr_t mem_end)
 {
 	int ret = 0;
 	uint64_t mem_start_addr = pa_addr(mem_begin);
@@ -169,6 +172,9 @@ bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	struct fdt_header *fdt;
 	int fdt_memory_node;
 	int root;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/* Map the fdt in r/w mode in preparation for updating it. */
 	fdt = mm_identity_map(stage1_locked, fdt_addr,
