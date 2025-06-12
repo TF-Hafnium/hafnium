@@ -8,10 +8,8 @@
 
 #pragma once
 
-#include "hf/mpool.h"
-
 void ffa_init_log(void);
-void ffa_init(struct mpool *ppool);
+void ffa_init(void);
 
 bool ffa_init_is_tee_enabled(void);
 void ffa_init_set_tee_enabled(bool tee_enabled);

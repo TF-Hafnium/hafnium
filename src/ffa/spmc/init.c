@@ -17,10 +17,10 @@ void ffa_init_log(void)
 	dlog_info("Initializing Hafnium (SPMC)\n");
 }
 
-void ffa_init(struct mpool *ppool)
+void ffa_init(void)
 {
 	arch_ffa_init();
-	ffa_vm_init(ppool);
+	ffa_vm_init();
 }
 
 void ffa_init_set_tee_enabled(bool tee_enabled)

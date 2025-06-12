@@ -12,6 +12,7 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa/setup_and_discovery.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
@@ -48,10 +49,13 @@ void ffa_init_version(void)
 	}
 }
 
-void ffa_init(struct mpool *ppool)
+void ffa_init(void)
 {
 	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
 	struct mm_stage1_locked mm_stage1_locked;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	/* This is a segment from TDRAM for the NS memory in the FVP platform.
 	 *
@@ -63,8 +67,6 @@ void ffa_init(struct mpool *ppool)
 	const uint64_t len = 0x60000000;
 	const paddr_t send_addr = pa_init(start + len - PAGE_SIZE * 1);
 	const paddr_t recv_addr = pa_init(start + len - PAGE_SIZE * 2);
-
-	(void)ppool;
 
 	if (!ffa_init_is_tee_enabled()) {
 		return;

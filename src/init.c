@@ -188,7 +188,7 @@ void one_time_init(void)
 	mm_vm_enable_invalidation();
 
 	/* Perform platform specfic FF-A initialization. */
-	ffa_init(ppool);
+	ffa_init();
 
 	/* Initialise the API page pool. ppool will be empty from now on. */
 	api_init(ppool);

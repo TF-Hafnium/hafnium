@@ -36,9 +36,8 @@ void plat_ffa_set_tee_enabled(bool tee_enabled)
 	(void)tee_enabled;
 }
 
-void ffa_init(struct mpool *ppool)
+void ffa_init(void)
 {
-	(void)ppool;
 }
 
 /**
@@ -411,14 +410,12 @@ bool plat_ffa_partition_info_get_regs_forward(	// NOLINTNEXTLINE
 void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 					paddr_t fdt_addr,
 					size_t fdt_allocated_size,
-					const struct manifest_vm *manifest_vm,
-					struct mpool *ppool)
+					const struct manifest_vm *manifest_vm)
 {
 	(void)stage1_locked;
 	(void)fdt_addr;
 	(void)fdt_allocated_size;
 	(void)manifest_vm;
-	(void)ppool;
 }
 
 struct ffa_value ffa_cpu_cycles_msg_wait_prepare(

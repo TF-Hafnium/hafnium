@@ -12,7 +12,7 @@
 
 void ffa_vm_disable_interrupts(struct vm_locked vm_locked);
 
-void ffa_vm_init(struct mpool *ppool);
+void ffa_vm_init(void);
 
 struct vm_locked ffa_vm_nwd_alloc(ffa_id_t vm_id);
 

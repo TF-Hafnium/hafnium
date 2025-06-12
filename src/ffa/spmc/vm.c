@@ -122,9 +122,8 @@ void ffa_vm_nwd_free(struct vm_locked to_destroy_locked)
 	}
 }
 
-void ffa_vm_init(struct mpool *ppool)
+void ffa_vm_init(void)
 {
-	(void)ppool;
 	struct vm *other_world = vm_find(HF_OTHER_WORLD_ID);
 
 	/* Init NWd VMs structures for use of Notifications interfaces. */
