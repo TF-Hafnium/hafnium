@@ -21,7 +21,7 @@ static inline struct ffa_value api_ffa_interrupt_return(uint32_t id)
 	return (struct ffa_value){.func = FFA_INTERRUPT_32, .arg2 = id};
 }
 
-void api_init(struct mpool *ppool);
+void api_init(void);
 struct mpool *api_get_ppool(void);
 struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current);
 void api_regs_state_saved(struct vcpu *vcpu);

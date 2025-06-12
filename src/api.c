@@ -34,6 +34,7 @@
 #include "hf/hf_ipi.h"
 #include "hf/mm.h"
 #include "hf/plat/interrupts.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 #include "hf/timer_mgmt.h"
 #include "hf/vcpu.h"
@@ -115,9 +116,9 @@ static struct mpool api_page_pool;
  * Initialises the API page pool by taking ownership of the contents of the
  * given page pool.
  */
-void api_init(struct mpool *ppool)
+void api_init(void)
 {
-	mpool_init_from(&api_page_pool, ppool);
+	mpool_init_from(&api_page_pool, memory_alloc_get_ppool());
 }
 
 struct mpool *api_get_ppool(void)
@@ -3573,8 +3574,7 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	 * Earlier we checked that the fragment_length_v1_1 would not be larger
 	 * than a page.
 	 */
-	memory_region_v1_1 =
-		(struct ffa_memory_region *)mpool_alloc(&api_page_pool);
+	memory_region_v1_1 = memory_alloc(PAGE_SIZE);
 	if (memory_region_v1_1 == NULL) {
 		return ffa_error(FFA_NO_MEMORY);
 	}
@@ -3697,7 +3697,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	 * pool. This prevents the sender from changing it underneath us, and
 	 * also lets us keep it around in the share state table if needed.
 	 */
-	allocated_entry = mpool_alloc(&api_page_pool);
+	allocated_entry = memory_alloc(PAGE_SIZE);
 	if (allocated_entry == NULL) {
 		dlog_verbose("Failed to allocate memory region copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
@@ -4245,7 +4245,9 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 		dlog_verbose("Invalid fragment length %d.\n", fragment_length);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
-	fragment_copy = mpool_alloc(&api_page_pool);
+
+	fragment_copy = memory_alloc(PAGE_SIZE);
+
 	if (fragment_copy == NULL) {
 		dlog_verbose("Failed to allocate fragment copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
