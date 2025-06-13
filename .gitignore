@@ -21,4 +21,7 @@ poetry.lock
 # Node.js dependencies
 node_modules/
 
+# Ignore Shrinkwrap related dynamic_overlay.yaml
+tools/shrinkwrap/configs/kokoro/fvp_hf_dynamic_overlay.yaml
+
 *__pycache__*
