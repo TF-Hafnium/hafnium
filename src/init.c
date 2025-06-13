@@ -31,9 +31,7 @@
 #include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
-alignas(MM_PPOOL_ENTRY_SIZE) char ptable_buf[MM_PPOOL_ENTRY_SIZE * HEAP_PAGES];
-
-static struct mpool ppool;
+struct mpool *ppool;
 
 /**
  * Performs one-time initialisation of memory management for the hypervisor.
@@ -51,10 +49,11 @@ void one_time_init_mm(void)
 
 	memory_alloc_init();
 
-	mpool_init(&ppool, MM_PPOOL_ENTRY_SIZE);
-	mpool_add_chunk(&ppool, ptable_buf, sizeof(ptable_buf));
+	ppool = memory_alloc_get_ppool();
 
-	if (!mm_init(&ppool)) {
+	assert(ppool != NULL);
+
+	if (!mm_init(ppool)) {
 		panic("mm_init failed");
 	}
 }
@@ -76,6 +75,8 @@ void one_time_init(void)
 	struct mm_stage1_locked mm_stage1_locked;
 	struct manifest *manifest;
 
+	assert(ppool != NULL);
+
 	arch_one_time_init();
 
 	/* Enable locks now that mm is initialised. */
@@ -85,16 +86,15 @@ void one_time_init(void)
 	mm_stage1_locked = mm_lock_stage1();
 
 	if (!fdt_map(&fdt, mm_stage1_locked, plat_boot_flow_get_fdt_addr(),
-		     &ppool)) {
+		     ppool)) {
 		panic("Unable to map FDT.");
 	}
 
-	static_assert(sizeof(struct boot_params) <= MM_PPOOL_ENTRY_SIZE,
-		      "The sizeof boot params must fit an entry of the mpool.");
-	params = (struct boot_params *)mpool_alloc(&ppool);
+	params = memory_alloc(sizeof(struct boot_params));
 
 	if (params == NULL) {
-		panic("Could not use memory pool to allocate boot params.");
+		panic("Could not use the memory allocator to allocate boot "
+		      "params.");
 	}
 
 	if (!boot_flow_get_params(params, &fdt)) {
@@ -121,7 +121,7 @@ void one_time_init(void)
 
 		/* Map initrd in, and initialise cpio parser. */
 		initrd = mm_identity_map(mm_stage1_locked, params->initrd_begin,
-					 params->initrd_end, MM_MODE_R, &ppool);
+					 params->initrd_end, MM_MODE_R, ppool);
 		if (!initrd) {
 			panic("Unable to map initrd.");
 		}
@@ -145,7 +145,7 @@ void one_time_init(void)
 	}
 
 	manifest_ret = manifest_init(mm_stage1_locked, &manifest, &manifest_it,
-				     params, &ppool);
+				     params, ppool);
 
 	if (manifest_ret != MANIFEST_SUCCESS) {
 		panic("Could not parse manifest: %s.",
@@ -155,39 +155,35 @@ void one_time_init(void)
 	ffa_init_set_tee_enabled(manifest->ffa_tee_enabled);
 	ffa_init_version();
 
-	if (!plat_iommu_init(&fdt, mm_stage1_locked, &ppool)) {
+	if (!plat_iommu_init(&fdt, mm_stage1_locked, ppool)) {
 		panic("Could not initialize IOMMUs.");
 	}
 
 	cpu_module_init(params->cpu_ids, params->cpu_count);
 
 	if (!plat_interrupts_controller_driver_init(&fdt, mm_stage1_locked,
-						    &ppool)) {
+						    ppool)) {
 		panic("Could not initialize Interrupt Controller driver.");
 	}
 
-	if (!fdt_unmap(&fdt, mm_stage1_locked, &ppool)) {
+	if (!fdt_unmap(&fdt, mm_stage1_locked, ppool)) {
 		panic("Unable to unmap FDT.");
 	}
 
 	/* Load all VMs. */
 	update.reserved_ranges_count = 0;
 	if (!load_vms(mm_stage1_locked, manifest, &cpio, params, &update,
-		      &ppool)) {
+		      ppool)) {
 		panic("Unable to load VMs.");
 	}
 
 	if (!boot_flow_update(mm_stage1_locked, manifest, &update, &cpio,
-			      &ppool)) {
+			      ppool)) {
 		panic("Unable to update boot flow.");
 	}
 
-	/*
-	 * Free space allocated for the boot parameters. However, the space
-	 * allocated for manifest shall not be freed as the properties are
-	 * needed when a partition is restarted.
-	 */
-	mpool_free(&ppool, params);
+	/* Free space allocated for the boot parameters. */
+	memory_free(params, sizeof(*params));
 
 	mm_unlock_stage1(&mm_stage1_locked);
 
@@ -195,10 +191,10 @@ void one_time_init(void)
 	mm_vm_enable_invalidation();
 
 	/* Perform platform specfic FF-A initialization. */
-	ffa_init(&ppool);
+	ffa_init(ppool);
 
 	/* Initialise the API page pool. ppool will be empty from now on. */
-	api_init(&ppool);
+	api_init(ppool);
 
 	dlog_info("Hafnium initialisation completed\n");
 }

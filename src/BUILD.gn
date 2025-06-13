@@ -78,6 +78,7 @@ source_set("src_testable") {
     plat_console,
     plat_interrupts,
     plat_iommu,
+    plat_memory_alloc,
     plat_memory_protect,
   ]
 }
@@ -91,6 +92,8 @@ source_set("mm") {
     "mm.c",
     "mpool.c",
   ]
+
+  deps = [ plat_memory_alloc ]
 }
 
 source_set("vm") {
