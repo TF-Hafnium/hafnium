@@ -14,3 +14,7 @@
 	path = third_party/googletest
 	url = https://git.trustedfirmware.org/hafnium/third_party/googletest
 	shallow = true
+[submodule "third_party/shrinkwrap"]
+	path = third_party/shrinkwrap
+	url = https://git.gitlab.arm.com/tooling/shrinkwrap.git
+	shallow = true
