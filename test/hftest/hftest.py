@@ -1045,6 +1045,8 @@ def Main():
     partitions = None
     global_run_name = "arch"
     if args.driver == "fvp":
+        if not os.path.isfile(FVP_BINARY):
+            raise Exception("Cannot find FVP binary.")
         if args.partitions_json is not None:
             partitions_dir = os.path.join(
                 args.out_partitions, "obj", args.partitions_json)
