@@ -79,6 +79,16 @@ then
 	echo "WARNING: Docker seccomp profile is disabled!" 1>&2
 	ARGS+=(--cap-add=SYS_PTRACE --security-opt seccomp=unconfined)
 fi
+
+if [ -z "${HAFNIUM_FVP-}" ]
+then
+	HAFNIUM_FVP_DIR="${ROOT_DIR}/../fvp"
+else
+	HAFNIUM_FVP_DIR=$(dirname "$HAFNIUM_FVP")
+fi
+
+echo "Using FVP in: ${HAFNIUM_FVP_DIR}"
+
 # Propagate "HAFNIUM_*" environment variables.
 # Note: Cannot use `env | while` because the loop would run inside a child
 # process and would not have any effect on variables in the parent.
@@ -100,7 +110,7 @@ ARGS+=(-e HAFNIUM_HERMETIC_BUILD=inside)
 # Bind-mount the Hafnium root directory and the FVP directory. We mount them at
 # the same absolute location so that all paths match across the host and guest.
 ARGS+=(-v "${ROOT_DIR}":"${ROOT_DIR}")
-ARGS+=(-v "${ROOT_DIR}/../fvp":"${ROOT_DIR}/../fvp")
+ARGS+=(-v "${HAFNIUM_FVP_DIR}":"${HAFNIUM_FVP_DIR}")
 # Make all files outside of the Hafnium directory read-only to ensure that all
 # generated files are written there.
 ARGS+=(--read-only)
