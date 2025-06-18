@@ -101,6 +101,50 @@ More details may be found in the `Gerrit Change-Ids documentation`_.
 .. _Gerrit Signed-off-by Lines guidelines: https://review.trustedfirmware.org/Documentation/user-signedoffby.html
 .. _quick summary: https://www.conventionalcommits.org/en/v1.0.0/#summary
 
+Commit Linting
+--------------
+
+`Commitlint`_ helps enforce the conventional commits specification by
+providing commit message linting capabilities.
+
+Navigate to the Hafnium root directory. Node Version Manager (nvm) is
+required to install the Node.js dependency for Commitlint. To install
+nvm run the following command:
+
+.. code:: shell
+
+  wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+
+To install Node.js, first reload the shell configuration to ensure that nvm is
+available.
+
+.. code:: shell
+
+  source ~/.bashrc
+
+Run the following command to install Node.js:
+
+.. code:: shell
+
+  nvm install 20
+
+To test that commit linting is working, navigate to the Hafnium root
+directory and run the following:
+
+.. code:: shell
+
+  make commitlint
+
+By default this will apply linting to the most recent commit message.
+
+Additionally, you can lint any range of commit messages by setting the ``COMMITLINT_FROM`` and ``COMMITLINT_TO`` arguments.
+An example of this is as follows:
+
+.. code:: shell
+
+  make commitlint COMMITLINT_FROM=HEAD~3 COMMITLINT_TO=HEAD
+
+.. _Commitlint: https://commitlint.js.org
 --------------
 
 *Copyright (c) 2023, Arm Limited and Contributors. All rights reserved.*
