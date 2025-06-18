@@ -17,3 +17,6 @@ tags
 poetry.lock
 
 .vscode
+
+# Node.js dependencies
+node_modules/
