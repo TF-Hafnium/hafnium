@@ -23,7 +23,9 @@ RUN apt-get install -y \
 		libssl-dev                     `# for Linux headers` \
 		python3                        `# for all build scripts` \
 		python3-serial                 `# for hftest.py` \
-		python3-venv                   `# for hftest.py`
+		python3-venv                   `# for hftest.py` \
+		nodejs                         `# for Commitlint` \
+		npm                            `# for Commitlint`
 
 # Install Clang and LLVM.
 # Use the packages from LLVM's repository rather than the default Ubuntu
@@ -49,6 +51,14 @@ RUN for f in /usr/lib/llvm-$LLVM_VERSION/bin/*; do ln -s "$f" /usr/local/bin; do
 
 # Clear APT cache to save space.
 RUN rm -rf /var/lib/apt/lists/*
+
+# To use git inside the docker image.
+# Create shared config and disable safe directory
+ENV GIT_CONFIG_GLOBAL=/opt/shared/.gitconfig
+RUN mkdir -p /opt/shared \
+	&& touch $GIT_CONFIG_GLOBAL \
+	&& git config --global --add safe.directory '*' \
+	&& chmod 644 $GIT_CONFIG_GLOBAL
 
 # Preparing for the python3 dependencies in a venv.
 # Adding the bin folder to path, so the respective pip

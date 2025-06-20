@@ -45,6 +45,11 @@ all:
 	@$(CURDIR)/build/run_in_container.sh make PROJECT=$(PROJECT) \
 		ENABLE_ASSERTIONS=$(ENABLE_ASSERTIONS) $@
 
+.PHONY: commitlint
+commitlint:
+	@$(CURDIR)/build/run_in_container.sh bash build/commitlint.sh \
+                $(COMMITLINT_FROM) $(COMMITLINT_TO)
+
 else  # HAFNIUM_HERMETIC_BUILD
 
 # Set path to prebuilts used in the build.
