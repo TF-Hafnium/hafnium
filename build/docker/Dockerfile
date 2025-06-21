@@ -25,7 +25,9 @@ RUN apt-get install -y \
 		python3-serial                 `# for hftest.py` \
 		python3-venv                   `# for hftest.py` \
 		nodejs                         `# for Commitlint` \
-		npm                            `# for Commitlint`
+		npm                            `# for Commitlint` \
+                netcat-openbsd \
+                telnet
 
 # Install Clang and LLVM.
 # Use the packages from LLVM's repository rather than the default Ubuntu
@@ -65,7 +67,7 @@ RUN mkdir -p /opt/shared \
 # tool is used.
 RUN python3 -m venv /opt/venv
 ENV PATH=/opt/venv/bin:${PATH}
-RUN pip3 install fdt
+RUN pip3 install fdt pyyaml termcolor tuxmake
 
 ARG LOCAL_UID=1000
 ARG LOCAL_GID=1000
