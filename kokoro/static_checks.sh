@@ -36,6 +36,6 @@ fi
 make license_
 if is_repo_dirty
 then
-	echo "Run \`make license\' locally to fix this."
+	echo "Run \`make license_\' locally to fix this."
 	exit 1
 fi
