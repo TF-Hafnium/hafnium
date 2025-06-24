@@ -11,6 +11,9 @@ TOOLCHAIN_LIB := $(shell clang --print-resource-dir)
 
 ENABLE_ASSERTIONS ?= 1
 
+COMMITLINT_FROM ?= HEAD~1
+COMMITLINT_TO ?= HEAD
+
 PLATFORM ?= default
 
 LIST_SEPARATOR := ,
@@ -176,5 +179,10 @@ license_:
 .PHONY: list
 list:
 	@build/check_platform_exists.py $(PROJECT)
+
+# Apply commit message linting using Commitlint.
+.PHONY: commitlint
+commitlint:
+	@build/commitlint.sh $(COMMITLINT_FROM) $(COMMITLINT_TO)
 
 endif  # HAFNIUM_HERMETIC_BUILD
