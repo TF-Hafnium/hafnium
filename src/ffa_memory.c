@@ -1594,8 +1594,8 @@ static struct ffa_value ffa_send_check_update(
 		CHECK(ffa_region_group_identity_map(
 			      from_locked, fragments,
 			      fragment_constituent_counts, fragment_count,
-			      orig_from_mode, &local_page_pool,
-			      MAP_ACTION_COMMIT, NULL)
+			      orig_from_mode, &local_page_pool, map_action,
+			      NULL)
 			      .func == FFA_SUCCESS_32);
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
