@@ -11,6 +11,7 @@ Getting Started
    coding-style
    commit-style
    project-structure
+   hafnium-tests
 
 --------------
 
