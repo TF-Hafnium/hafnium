@@ -1261,3 +1261,100 @@ void vm_update_boot(struct vm *vm)
 		? list_prepend(&current_vm->boot_list_node, &vm->boot_list_node)
 		: list_append(&current_vm->boot_list_node, &vm->boot_list_node);
 }
+
+/**
+ * Light weight read operation. Its safe to access the state without a lock.
+ * The atomic primitive ensures any update by another CPU to this field is
+ * visible.
+ */
+enum vm_state vm_read_state(struct vm *vm)
+{
+	return __atomic_load_n(&vm->state, __ATOMIC_ACQUIRE);
+}
+
+/* Internal helper. Not safe to write to the state field without a lock. */
+static void vm_write_state(struct vm *vm, enum vm_state new_state)
+{
+	__atomic_store_n(&vm->state, new_state, __ATOMIC_RELEASE);
+}
+
+static inline const char *vm_state_print_name(enum vm_state state)
+{
+	switch (state) {
+	case VM_STATE_NULL:
+		return "VM_STATE_NULL";
+	case VM_STATE_CREATED:
+		return "VM_STATE_CREATED";
+	case VM_STATE_RUNNING:
+		return "VM_STATE_RUNNING";
+	case VM_STATE_ABORTING:
+		return "VM_STATE_ABORTING";
+	}
+}
+
+/**
+ * Perform legal transitions between various states of a VM. The caller is
+ * expected to hold the VM's lock.
+ *
+ * The following state transitions are valid:
+ * NULL     -> CREATED   : Hafnium successfully initialized the VM.
+ * CREATED  -> RUNNING   : The first execution context has been allocated CPU
+ *                         cycles.
+ * RUNNING  -> ABORTING  : An execution context of VM encountered fatal error.
+ * ABORTING -> NULL      : Hafnium destroyed the VM.
+ * ABORTING -> CREATED   : Hafnium has reinitialized the VM with the aim of
+ *                         restarting it.
+ *
+ * Return true if the transition is valid and the state was updated, false
+ * otherwise.
+ */
+bool vm_set_state(struct vm_locked vm_locked, enum vm_state to_state)
+{
+	struct vm *vm = vm_locked.vm;
+	enum vm_state from_state;
+	bool ret = false;
+
+	assert(vm != NULL);
+	from_state = vm_read_state(vm);
+
+	if (to_state == from_state) {
+		return true;
+	}
+
+	switch (from_state) {
+	case VM_STATE_NULL:
+		if (to_state == VM_STATE_CREATED) {
+			ret = true;
+		}
+		break;
+	case VM_STATE_CREATED:
+		if (to_state == VM_STATE_RUNNING ||
+		    to_state == VM_STATE_ABORTING) {
+			ret = true;
+		}
+		break;
+	case VM_STATE_RUNNING:
+		if (to_state == VM_STATE_ABORTING) {
+			ret = true;
+		}
+		break;
+	case VM_STATE_ABORTING:
+		if (to_state == VM_STATE_NULL || to_state == VM_STATE_CREATED) {
+			ret = true;
+		}
+		break;
+	default:
+		ret = false;
+		break;
+	}
+
+	if (ret) {
+		vm_write_state(vm, to_state);
+	} else {
+		dlog_error("Partition %#x transition from %s to %s failed.\n",
+			   vm->id, vm_state_print_name(vm->state),
+			   vm_state_print_name(to_state));
+	}
+
+	return ret;
+}

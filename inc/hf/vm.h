@@ -166,11 +166,33 @@ struct smc_whitelist {
 	bool permissive;
 };
 
+/*
+ * Implementation defined states for a VM (or SP). Refer to `vm_set_state`
+ * helper for documentation of legal transitions.
+ */
+enum vm_state {
+	/* VM has not yet been created. This is the default value. */
+	VM_STATE_NULL,
+
+	/* VM has been created and initialized by partition manager. */
+	VM_STATE_CREATED,
+
+	/*
+	 * At least one execution context of the VM has been given CPU cycles to
+	 * initialize itself.
+	 */
+	VM_STATE_RUNNING,
+
+	/* The VM has been aborted due to a fatal error. */
+	VM_STATE_ABORTING,
+};
+
 /* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct vm {
 	ffa_id_t id;
 	struct ffa_uuid uuids[PARTITION_MAX_UUIDS];
 	enum ffa_version ffa_version;
+	enum vm_state state;
 
 	/*
 	 * Whether this FF-A instance has negotiated an FF-A version through a
@@ -431,3 +453,5 @@ struct vm *vm_get_boot_vm(void);
 struct vm *vm_get_boot_vm_secondary_core(void);
 struct vm *vm_get_next_boot(struct vm *vm);
 struct vm *vm_get_next_boot_secondary_core(struct vm *vm);
+enum vm_state vm_read_state(struct vm *vm);
+bool vm_set_state(struct vm_locked vm_locked, enum vm_state to_state);
