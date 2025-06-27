@@ -1128,8 +1128,7 @@ struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next)
 
 	vm_locked = vm_lock(current->vm);
 
-	atomic_store_explicit(&current->vm->aborting, true,
-			      memory_order_relaxed);
+	CHECK(vm_set_state(vm_locked, VM_STATE_ABORTING));
 	current_locked = vcpu_lock(current);
 
 	/*

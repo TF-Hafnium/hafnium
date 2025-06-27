@@ -158,6 +158,14 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	vcpu_set_phys_core_idx(boot_vcpu);
 
 	if (cpu_index(c) == PRIMARY_CPU_IDX) {
+		struct vm_locked vm_locked;
+
+		vcpu_unlock(&vcpu_locked);
+		vm_locked = vm_lock(boot_vm);
+		vcpu_locked = vcpu_lock(boot_vcpu);
+		vm_set_state(vm_locked, VM_STATE_RUNNING);
+		vm_unlock(&vm_locked);
+
 		/*
 		 * Boot information is passed by the SPMC to the SP's execution
 		 * context only on the primary CPU.

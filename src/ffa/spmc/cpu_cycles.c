@@ -290,8 +290,7 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 		return false;
 	}
 
-	if (!atomic_load_explicit(&current->vm->aborting,
-				  memory_order_relaxed)) {
+	if (vm_read_state(current->vm) != VM_STATE_ABORTING) {
 		/* vCPU has just returned from successful initialization. */
 		dlog_verbose(
 			"Initialized execution context of VM: %#x on CPU: %zu, "
@@ -300,7 +299,7 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 			current->vm->boot_order);
 	}
 
-	if (cpu_index(current_locked.vcpu->cpu) == PRIMARY_CPU_IDX) {
+	if (cpu_indx == PRIMARY_CPU_IDX) {
 		next_vm = vm_get_next_boot(current->vm);
 	} else {
 		/* SP boot chain on secondary CPU. */
@@ -331,8 +330,18 @@ static bool sp_boot_next(struct vcpu_locked current_locked, struct vcpu **next)
 	if (vcpu_next->rt_model == RTM_SP_INIT ||
 	    vcpu_next->state == VCPU_STATE_OFF) {
 		struct vcpu_locked vcpu_next_locked;
+		struct vm_locked vm_locked;
 
+		vm_locked = vm_lock(next_vm);
 		vcpu_next_locked = vcpu_lock(vcpu_next);
+
+		if (cpu_indx == PRIMARY_CPU_IDX &&
+		    vcpu_next->state == VCPU_STATE_CREATED) {
+			vm_set_state(vm_locked, VM_STATE_RUNNING);
+		}
+
+		vm_unlock(&vm_locked);
+
 		vcpu_next->rt_model = RTM_SP_INIT;
 		arch_regs_reset(vcpu_next);
 		vcpu_next->cpu = current->cpu;
@@ -849,9 +858,7 @@ struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 		dlog_error("Aborting SP %#x from vCPU %u\n", current->vm->id,
 			   vcpu_index(current));
 
-		atomic_store_explicit(&current->vm->aborting, true,
-				      memory_order_relaxed);
-
+		CHECK(vm_set_state(vm_locked, VM_STATE_ABORTING));
 		ffa_vm_free_resources(vm_locked);
 
 		if (sp_boot_next(current_locked, next)) {

@@ -463,8 +463,7 @@ void ffa_interrupts_handle_secure_interrupt(struct vcpu *current,
 	 * execution context is resumed.
 	 */
 	if (target_vcpu->state == VCPU_STATE_ABORTED ||
-	    atomic_load_explicit(&target_vcpu->vm->aborting,
-				 memory_order_relaxed)) {
+	    vm_read_state(target_vcpu->vm) == VM_STATE_ABORTING) {
 		/* Clear fields corresponding to secure interrupt handling. */
 		vcpu_secure_interrupt_complete(target_vcpu_locked);
 		ffa_vm_disable_interrupts(target_vm_locked);

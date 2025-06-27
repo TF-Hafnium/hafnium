@@ -1221,6 +1221,7 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 	const struct ffa_value ffa_run_abi =
 		(struct ffa_value){.func = FFA_RUN_32};
 	const struct ffa_value *ffa_run_ret = NULL;
+	enum vm_state target_vm_state;
 
 	/*
 	 * Check that the registers are available so that the vCPU can be run.
@@ -1235,6 +1236,7 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 
 	/* The VM needs to be locked to deliver mailbox messages. */
 	need_vm_lock = vcpu->state == VCPU_STATE_WAITING ||
+		       vcpu->state == VCPU_STATE_CREATED ||
 		       (!vcpu->vm->el0_partition &&
 			(vcpu->state == VCPU_STATE_BLOCKED_INTERRUPT ||
 			 vcpu->state == VCPU_STATE_BLOCKED ||
@@ -1249,6 +1251,41 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 		vcpus_locked = vcpu_lock_both(current, vcpu);
 		current_locked = vcpus_locked.vcpu1;
 		vcpu_next_locked = vcpus_locked.vcpu2;
+	}
+
+	target_vm_state = vm_read_state(vcpu->vm);
+
+	switch (target_vm_state) {
+	case VM_STATE_NULL:
+		*run_ret = ffa_error(FFA_INVALID_PARAMETERS);
+		ret = false;
+		goto out;
+	case VM_STATE_CREATED:
+		/*
+		 * An initial FFA_RUN is necessary for vCPUs of secondary VMs
+		 * to reach the message wait loop. Note that vCPU(s) of Secure
+		 * Partitions don't need it.
+		 */
+		if (ffa_is_vm_id(vcpu->vm->id)) {
+			break;
+		}
+		*run_ret = ffa_error(FFA_BUSY);
+		ret = false;
+		goto out;
+	case VM_STATE_ABORTING:
+		if (vcpu->state != VCPU_STATE_NULL &&
+		    vcpu->state != VCPU_STATE_STOPPED &&
+		    vcpu->state != VCPU_STATE_ABORTED) {
+			dlog_verbose("VM %#x was aborted, cannot run vCPU %u\n",
+				     vcpu->vm->id, vcpu_index(vcpu));
+			vcpu->state = VCPU_STATE_ABORTED;
+		}
+		[[fallthrough]];
+	case VM_STATE_RUNNING:
+		[[fallthrough]];
+	default:
+		/* Let the subsequent checks handle further conditions. */
+		break;
 	}
 
 	/*
@@ -1274,16 +1311,6 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 		*run_ret = ffa_error(FFA_BUSY);
 		ret = false;
 		goto out;
-	}
-
-	if (atomic_load_explicit(&vcpu->vm->aborting, memory_order_relaxed)) {
-		if (vcpu->state != VCPU_STATE_NULL &&
-		    vcpu->state != VCPU_STATE_STOPPED &&
-		    vcpu->state != VCPU_STATE_ABORTED) {
-			dlog_verbose("VM %#x was aborted, cannot run vCPU %u\n",
-				     vcpu->vm->id, vcpu_index(vcpu));
-			vcpu->state = VCPU_STATE_ABORTED;
-		}
 	}
 
 	switch (vcpu->state) {
@@ -1315,12 +1342,17 @@ static bool api_vcpu_prepare_run(struct vcpu_locked current_locked,
 		 * Partitions don't need it.
 		 */
 		if (ffa_is_vm_id(vcpu->vm->id)) {
+			size_t cpu_indx = cpu_index(current->cpu);
+
 			assert(vcpu->rt_model == RTM_SP_INIT);
 			vcpu->rt_model = RTM_NONE;
 
 			vcpu_was_init_state = true;
 			CHECK(vcpu_state_set(vcpu_next_locked,
 					     VCPU_STATE_STARTING));
+			if (cpu_indx == PRIMARY_CPU_IDX) {
+				vm_set_state(vm_locked, VM_STATE_RUNNING);
+			}
 			break;
 		}
 		*run_ret = ffa_error(FFA_BUSY);
@@ -2940,6 +2972,33 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 	current_locked = vcpus_locked.vcpu1;
 	receiver_vcpu_locked = vcpus_locked.vcpu2;
 
+	switch (vm_read_state(receiver_vm)) {
+	case VM_STATE_NULL:
+		ret = ffa_error(FFA_INVALID_PARAMETERS);
+		goto out;
+	case VM_STATE_CREATED:
+		ret = ffa_error(FFA_BUSY);
+		goto out;
+	case VM_STATE_ABORTING:
+		if (receiver_vcpu->state != VCPU_STATE_NULL &&
+		    receiver_vcpu->state != VCPU_STATE_ABORTED &&
+		    receiver_vcpu->state != VCPU_STATE_STOPPED) {
+			dlog_verbose(
+				"Receiver VM %#x aborted, cannot run vCPU %u\n",
+				receiver_vcpu->vm->id,
+				vcpu_index(receiver_vcpu));
+			CHECK(vcpu_state_set(receiver_vcpu_locked,
+					     VCPU_STATE_ABORTED));
+		}
+		/* Let the subsequent checks handle further conditions. */
+		break;
+	case VM_STATE_RUNNING:
+		[[fallthrough]];
+	default:
+		/* Let the subsequent checks handle further conditions. */
+		break;
+	}
+
 	/*
 	 * If destination vCPU is executing or already received an
 	 * FFA_MSG_SEND_DIRECT_REQ then return to caller hinting recipient is
@@ -2960,20 +3019,6 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 		    receiver_vcpu_locked, args.func, &next_state)) {
 		ret = ffa_error(FFA_DENIED);
 		goto out;
-	}
-
-	if (atomic_load_explicit(&receiver_vcpu->vm->aborting,
-				 memory_order_relaxed)) {
-		if (receiver_vcpu->state != VCPU_STATE_NULL &&
-		    receiver_vcpu->state != VCPU_STATE_ABORTED &&
-		    receiver_vcpu->state != VCPU_STATE_STOPPED) {
-			dlog_verbose(
-				"Receiver VM %#x aborted, cannot run vCPU %u\n",
-				receiver_vcpu->vm->id,
-				vcpu_index(receiver_vcpu));
-			CHECK(vcpu_state_set(receiver_vcpu_locked,
-					     VCPU_STATE_ABORTED));
-		}
 	}
 
 	switch (receiver_vcpu->state) {

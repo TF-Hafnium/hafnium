@@ -86,7 +86,6 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 	CHECK(vm->vcpus != NULL);
 
 	vm->mailbox.state = MAILBOX_STATE_EMPTY;
-	atomic_init(&vm->aborting, false);
 	vm->el0_partition = el0_partition;
 	vm->dma_device_count = dma_device_count;
 

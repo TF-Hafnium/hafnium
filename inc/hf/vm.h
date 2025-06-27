@@ -240,8 +240,6 @@ struct vm {
 		bool vm_destroyed;
 	} vm_availability_messages;
 
-	atomic_bool aborting;
-
 	/**
 	 * Booting parameters (FF-A SP partitions).
 	 */

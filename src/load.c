@@ -420,6 +420,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	vcpu_prepare(vcpu_locked, primary_entry, params->kernel_arg);
 	vcpu_unlock(&vcpu_locked);
 	ret = true;
+	CHECK(vm_set_state(vm_locked, VM_STATE_CREATED));
 
 out:
 	vm_unlock(&vm_locked);
@@ -853,6 +854,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	}
 
 	ret = true;
+	CHECK(vm_set_state(vm_locked, VM_STATE_CREATED));
 
 out:
 	vm_unlock(&vm_locked);
