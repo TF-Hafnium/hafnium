@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 
 import argparse
 from abc import ABC, abstractmethod
+import shrinkwrap_utils as sw_util
 import collections
 import datetime
 import importlib
@@ -297,6 +298,7 @@ class QemuDriver(Driver):
 
 class FvpDriver(Driver, ABC):
     """Base class for driver which runs tests in Arm FVP emulator."""
+    shrinkwrap_static_overlay_key = None  # default, overriden in subclasses
 
     def __init__(self, args, cpu_start_address, fvp_prebuilt_bl31):
         self.cov_plugin = args.coverage_plugin or None
@@ -342,108 +344,24 @@ class FvpDriver(Driver, ABC):
                 manifests += correct_vm_node(read_file(p["dts"]), i + 1)
         return manifests
 
+    def get_shrinkwrap_static_overlay(self):
+        key = self.shrinkwrap_static_overlay_key
+        if key is None:
+            raise ValueError(f"{type(self).__name__} did not define a shrinkwrap_overlay_key.")
+        try:
+            return sw_util.SHRINKWRAP_STATIC_OVERLAY_MAP[key]
+        except KeyError:
+            valid_keys = list(sw_util.SHRINKWRAP_STATIC_OVERLAY_MAP.keys())
+            raise ValueError(
+                f"No static overlays found for the key: '{key}' in SHRINKWRAP_STATIC_OVERLAY_MAP.\n"
+                f"Supported keys are: {valid_keys}"
+            )
+
     @abstractmethod
     def gen_dts(self, dt, test_args):
         """Abstract method to generate dts file. This specific to the use case
            so should be implemented within derived driver"""
         pass
-
-    @abstractmethod
-    def gen_fvp_args(
-            self, is_long_running, uart0_log_path, uart1_log_path, dt,
-            debug = False, show_output = False):
-        """Generate command line arguments for FVP."""
-        show_output = debug or show_output
-        disable_visualisation = self.args.disable_visualisation is True
-
-        time_limit = "40s"
-        if self.cov_plugin is None:
-            time_limit = "150s" if is_long_running else time_limit
-        else:
-            time_limit = "300s" if is_long_running else "80s"
-
-        fvp_args = []
-
-        if not show_output:
-            fvp_args = [
-                "timeout", "--foreground", time_limit,
-            ]
-
-        fvp_args += [
-            FVP_BINARY,
-            "-C", "pci.pci_smmuv3.mmu.SMMU_AIDR=2",
-            "-C", "pci.pci_smmuv3.mmu.SMMU_IDR0=0x0046123B",
-            "-C", "pci.pci_smmuv3.mmu.SMMU_IDR1=0x00600002",
-            "-C", "pci.pci_smmuv3.mmu.SMMU_IDR3=0x1714",
-            "-C", "pci.pci_smmuv3.mmu.SMMU_IDR5=0xFFFF0472",
-            "-C", "pci.pci_smmuv3.mmu.SMMU_S_IDR1=0xA0000002",
-            "-C", "pci.pci_smmuv3.mmu.SMMU_S_IDR2=0",
-            "-C", "pci.pci_smmuv3.mmu.SMMU_S_IDR3=0",
-            "-C", "pctl.startup=0.0.0.0",
-            "-C", "bp.secure_memory=1",
-            "-C", "cluster0.NUM_CORES=4",
-            "-C", "cluster1.NUM_CORES=4",
-            "-C", "cache_state_modelled=0",
-            "-C", "bp.vis.rate_limit-enable=false",
-            "-C", "bp.pl011_uart0.untimed_fifos=1",
-            "-C", "bp.pl011_uart0.unbuffered_output=1",
-            "-C", f"cluster0.cpu0.RVBAR={self._cpu_start_address}",
-            "-C", f"cluster0.cpu1.RVBAR={self._cpu_start_address}",
-            "-C", f"cluster0.cpu2.RVBAR={self._cpu_start_address}",
-            "-C", f"cluster0.cpu3.RVBAR={self._cpu_start_address}",
-            "-C", f"cluster1.cpu0.RVBAR={self._cpu_start_address}",
-            "-C", f"cluster1.cpu1.RVBAR={self._cpu_start_address}",
-            "-C", f"cluster1.cpu2.RVBAR={self._cpu_start_address}",
-            "-C", f"cluster1.cpu3.RVBAR={self._cpu_start_address}",
-            "--data",
-            f"cluster0.cpu0={self._fvp_prebuilt_bl31}@{self._cpu_start_address}",
-            "-C", "bp.ve_sysregs.mmbSiteDefault=0",
-            "-C", "cluster0.has_arm_v8-5=1",
-            "-C", "cluster1.has_arm_v8-5=1",
-            "-C", "cluster0.has_branch_target_exception=1",
-            "-C", "cluster1.has_branch_target_exception=1",
-            "-C", "cluster0.memory_tagging_support_level=2",
-            "-C", "cluster1.memory_tagging_support_level=2",
-            "-C", "bp.dram_metadata.is_enabled=1",
-            "-C", "cluster0.gicv3.extended-interrupt-range-support=1",
-            "-C", "cluster1.gicv3.extended-interrupt-range-support=1",
-            "-C", "gic_distributor.extended-ppi-count=64",
-            "-C", "gic_distributor.extended-spi-count=1024",
-            "-C", "gic_distributor.ARE-fixed-to-one=1",
-        ]
-
-        if uart0_log_path and uart1_log_path:
-            fvp_args += [
-                "-C", f"bp.pl011_uart0.out_file={uart0_log_path}",
-                "-C", f"bp.pl011_uart1.out_file={uart1_log_path}",
-            ]
-
-        if not show_output:
-            fvp_args += [
-                "-C", "bp.terminal_0.start_telnet=false",
-                "-C", "bp.terminal_1.start_telnet=false",
-                "-C", "bp.terminal_2.start_telnet=false",
-                "-C", "bp.terminal_3.start_telnet=false",
-                "-C", "bp.ve_sysregs.exit_on_shutdown=1",
-            ]
-            disable_visualisation = True
-
-        if disable_visualisation:
-            fvp_args += [
-                "-C", "bp.vis.disable_visualisation=true"
-            ]
-
-        if debug:
-            fvp_args += [
-                    "--iris-connect", "tcpserver,allowRemote",
-                    "-p",
-                    ]
-
-        if self.cov_plugin is not None:
-            fvp_args += [
-                "--plugin", self.cov_plugin
-            ]
-        return fvp_args
 
     def run(self, run_name, test_args, is_long_running, debug = False,
             show_output = False):
@@ -477,6 +395,7 @@ class FvpDriverHypervisor(FvpDriver):
     """
     INITRD_START= 0x84000000
     INITRD_END = 0x86000000 #Default value, however may change if initrd in args
+    shrinkwrap_static_overlay_key = "hypervisor"
 
     def __init__(self, args, hypervisor_address=0x80000000, hypervisor_dtb_address=0x82000000):
         fvp_prebuilt_bl31 = os.path.join(FVP_PREBUILTS_TFA_ROOT, "bl31.bin")
@@ -507,31 +426,6 @@ class FvpDriverHypervisor(FvpDriver):
 
         append_file(dt.dts, to_append)
 
-    def gen_fvp_args(
-            self, is_long_running, uart0_log_path, uart1_log_path, dt,
-            debug = False, show_output = False):
-        """Generate command line arguments for FVP."""
-        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt,
-                       debug, show_output)
-        fvp_args = FvpDriver.gen_fvp_args(*common_args)
-
-        fvp_args += [
-            "--data", f"cluster0.cpu0={dt.dtb}@{self._hypervisor_dtb_address}",
-            "--data", f"cluster0.cpu0={self.args.hypervisor}@{self._hypervisor_address}",
-        ]
-
-        if self.vms_in_partitions_json:
-            img_ldadd = self.get_img_and_ldadd(self.args.partitions["VMs"])
-            for img, ldadd in img_ldadd:
-                fvp_args += ["--data", f"cluster0.cpu0={img}@{hex(ldadd)}"]
-
-        if self.args.initrd:
-            fvp_args += [
-                "--data",
-                f"cluster0.cpu0={self.args.initrd}@{self.INITRD_START}"
-            ]
-        return fvp_args
-
 class FvpDriverSPMC(FvpDriver):
     """
     Driver which runs tests in Arm FVP emulator, with hafnium as SPMC
@@ -539,6 +433,7 @@ class FvpDriverSPMC(FvpDriver):
     FVP_PREBUILT_SECURE_DTS = os.path.join(
         HF_ROOT, "test", "vmapi", "fvp-base-spmc.dts")
     hftest_cmd_file = tempfile.NamedTemporaryFile(mode="w+")
+    shrinkwrap_static_overlay_key = "spmc"
 
     def __init__(self, args, cpu_start_address=0x04010000, fvp_prebuilt_bl31=None):
         fvp_prebuilt_bl31 = os.path.join(FVP_PREBUILT_TFA_SPMD_ROOT, "bl31.bin") if fvp_prebuilt_bl31 is None else fvp_prebuilt_bl31
@@ -563,27 +458,6 @@ class FvpDriverSPMC(FvpDriver):
             ]
         return fvp_args
 
-    def gen_fvp_args(
-        self, is_long_running, uart0_log_path, uart1_log_path, dt,
-        call_super = True, secure_ctrl = True, debug = False, show_output = False):
-        """Generate command line arguments for FVP."""
-        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt.dtb,
-                       debug, show_output)
-        fvp_args = FvpDriver.gen_fvp_args(*common_args) if call_super else []
-
-        fvp_args += [
-            "--data", f"cluster0.cpu0={dt.dtb}@{self._spmc_dtb_address}",
-            "--data", f"cluster0.cpu0={self.args.spmc}@{self._spmc_address}",
-        ]
-
-        fvp_args += FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
-
-        img_ldadd = self.get_img_and_ldadd(self.args.partitions["SPs"])
-        for img, ldadd in img_ldadd:
-            fvp_args += ["--data", f"cluster0.cpu0={img}@{hex(ldadd)}"]
-
-        return fvp_args
-
     def run(self, run_name, test_args, is_long_running, debug = False, show_output = False):
         vm_args = join_if_not_None(self.args.vm_args, test_args)
         FvpDriverSPMC.hftest_cmd_file.write(f"{vm_args}\n")
@@ -595,6 +469,8 @@ class FvpDriverSPMC(FvpDriver):
         FvpDriverSPMC.hftest_cmd_file.close()
 
 class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
+    shrinkwrap_static_overlay_key = "hypervisor_and_spmc"
+
     def __init__(self, args):
         FvpDriverHypervisor.__init__(self, args, hypervisor_address=0x88000000)
         FvpDriverSPMC.__init__(self, args)
@@ -613,16 +489,6 @@ class FvpDriverBothWorlds(FvpDriverHypervisor, FvpDriverSPMC):
         FvpDriverHypervisor.gen_dts(self, dt["hypervisor"], test_args)
         FvpDriverSPMC.gen_dts(self, dt["spmc"], test_args)
 
-    def gen_fvp_args(self, is_long_running, uart0_log_path, uart1_log_path, dt,
-                     debug = False, show_output = False):
-        """Generate command line arguments for FVP."""
-        common_args = (self, is_long_running, uart0_log_path, uart1_log_path)
-        fvp_args = FvpDriverHypervisor.gen_fvp_args(*common_args, dt["hypervisor"],
-                                                    debug, show_output)
-        fvp_args += FvpDriverSPMC.gen_fvp_args(*common_args, dt["spmc"], False,
-                                               False)
-        return fvp_args
-
     def run(self, run_name, test_args, is_long_running, debug = False,
             show_output = False):
 
@@ -637,6 +503,7 @@ class FvpDriverEL3SPMC(FvpDriverSPMC):
     """
     Driver which runs tests in Arm FVP emulator, with EL3 as SPMC
     """
+    shrinkwrap_static_overlay_key = "el3_spmc"
 
     def __init__(self, args):
         FvpDriverSPMC.__init__(
@@ -660,25 +527,11 @@ class FvpDriverEL3SPMC(FvpDriverSPMC):
         partition_manifest = f"{output_path}/partition-manifest.dtb"
         fvp_args += ["--data", f"cluster0.cpu0={partition_manifest}@{self._sp_dtb_address}"]
         return fvp_args
-
-    def gen_fvp_args(
-        self, is_long_running, uart0_log_path, uart1_log_path, dt,
-        call_super = True, secure_ctrl = True, debug = False, show_output = False):
-        """Generate command line arguments for FVP."""
-        common_args = (self, is_long_running, uart0_log_path, uart1_log_path, dt.dtb,
-                       debug, show_output)
-        fvp_args = FvpDriver.gen_fvp_args(*common_args) if call_super else []
-
-        fvp_args += FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
-
-        fvp_args += self.sp_partition_manifest_fvp_args()
-
-        return fvp_args
-
 class FvpDriverEL3SPMCBothWorlds(FvpDriverHypervisor, FvpDriverEL3SPMC):
     """
     Driver which runs tests in Arm FVP emulator, with EL3 as SPMC
     """
+    shrinkwrap_static_overlay_key = "hypervisor_el3_spmc"
 
     def __init__(self, args):
         FvpDriverHypervisor.__init__(self, args)
@@ -686,26 +539,6 @@ class FvpDriverEL3SPMCBothWorlds(FvpDriverHypervisor, FvpDriverEL3SPMC):
 
         self._fvp_prebuilt_bl32 = os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "bl32.bin")
         self._fvp_prebuilt_dtb = os.path.join(FVP_PREBUILTS_TFA_EL3_SPMC_ROOT, "fdts/fvp_tsp_sp_manifest.dtb")
-
-    def gen_fvp_args(
-        self, is_long_running, uart0_log_path, uart1_log_path, dt,
-        call_super = True, secure_ctrl = True, debug = False, show_output = False):
-        """Generate command line arguments for FVP."""
-
-        fvp_args = FvpDriverHypervisor.gen_fvp_args(self, is_long_running, uart0_log_path, uart1_log_path, dt,
-        debug, show_output)
-
-        fvp_args += FvpDriverSPMC.secure_ctrl_fvp_args(self, secure_ctrl)
-
-        if self.args.partitions is not None and self.args.partitions["SPs"] is not None:
-            fvp_args += FvpDriverEL3SPMC.sp_partition_manifest_fvp_args(self)
-        else :
-            # Use prebuilt TSP and TSP manifest if build does not specify SP
-            # EL3 SPMC expects SP to be loaded at 0xFF200000 and SP manifest at 0x0403F000
-            fvp_args += ["--data", f"cluster0.cpu0={self._fvp_prebuilt_bl32}@0xff200000"]
-            fvp_args += ["--data", f"cluster0.cpu0={self._fvp_prebuilt_dtb}@{self._sp_dtb_address}"]
-
-        return fvp_args
 
 class SerialDriver(Driver):
     """Driver which communicates with a device over the serial port."""

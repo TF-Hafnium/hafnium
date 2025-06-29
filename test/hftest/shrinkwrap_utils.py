@@ -26,6 +26,15 @@ import subprocess
 import yaml
 import shutil
 
+# Maps FVP driver configuration keys to their corresponding static Shrinkwrap overlays
+SHRINKWRAP_STATIC_OVERLAY_MAP = {
+    "hypervisor": ["fvp_hf_hypervisor_preloaded.yaml"],
+    "spmc": ["fvp_hf_spmc_preloaded.yaml"],
+    "hypervisor_and_spmc": ["fvp_hf_hypervisor_and_spmc_preloaded.yaml"],
+    "el3_spmc": ["fvp_hf_el3spmc_preloaded.yaml"],
+    "hypervisor_el3_spmc": ["fvp_hf_hypervisor_el3spmc_preloaded.yaml"]
+}
+
 class ShrinkwrapManager:
 
     CONFIG_SUBDIR = os.path.join("tools", "shrinkwrap", "configs", "kokoro")
