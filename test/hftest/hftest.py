@@ -198,14 +198,14 @@ class Driver:
         platform."""
         return DriverRunState(self.args.artifacts.create_file(run_name, ".log"))
 
-    def exec_logged(self, run_state, exec_args, cwd=None):
+    def exec_logged(self, run_state, exec_args, cwd=None, env=None):
         """Run a subprocess on behalf of a Driver subclass and append its
         stdout and stderr to the main log."""
         assert(run_state.ret_code == 0)
         with open(run_state.log_path, "a") as f:
             f.write("$ {}\r\n".format(" ".join(exec_args)))
             f.flush()
-            ret_code = subprocess.call(exec_args, stdout=f, stderr=f, cwd=cwd)
+            ret_code = subprocess.call(exec_args, stdout=f, stderr=f, cwd=cwd, env=env)
             if ret_code != 0:
                 run_state.set_ret_code(ret_code)
                 raise DriverRunException()
@@ -431,10 +431,35 @@ class FvpDriver(Driver, ABC):
         try:
             self.gen_dts(dt, test_args)
             self.compile_dt(run_state, dt)
-            fvp_args = self.gen_fvp_args(is_long_running, uart0_log_path,
-                                         uart1_log_path, dt, debug=debug,
-                                         show_output=show_output)
-            self.exec_logged(run_state, fvp_args)
+            # Setup Shrinkwrap Environment via ShrinkwrapManager helper
+            shrinkwrap = sw_util.ShrinkwrapManager(HF_ROOT)
+
+            # Perform the Shrinkwrap build (fvp_package) only once per test session
+            # This constructs the Shrinkwrap build command using:
+            # - The base FVP configuration
+            # - Static overlays for the selected driver setup (e.g.: Hypervisor/SPMC)
+            # - Optional overlays for debug mode and coverage plugins, if enabled
+            driver_overlays = self.get_shrinkwrap_static_overlay()
+            shrinkwrap.build_fvp_package_once(driver_overlays, debug=debug,
+                                        coverage=(self.cov_plugin is not None))
+
+            # Generate runtime configuration (rtvars and params)
+            params, rtvars = self.get_shrinkwrap_runtime_overlay_config(
+                                is_long_running, uart0_log_path, uart1_log_path,
+                                dt, debug=debug, show_output=show_output)
+
+            # Construct the dynamic runtime overlay
+            dynamic_overlay_path = shrinkwrap.get_dynamic_overlay_path()
+            shrinkwrap.write_overlay_yaml(dynamic_overlay_path, rtvars,
+                                        new_params=params, fvp_name=str(FVP_BINARY))
+
+            # Shrinkwrap_Run phase: Launch FVP through Shrinkwrap for each test.
+            # Invoke Shrinkwrap run phase using the combined overlays:
+            # - FVP package built thorough Static overlay.
+            # - Dynamic runtime overlay with resolved rtvars and test-specific data
+            # This completes FVP model construction and launches the test instance.
+            shrinkwrap.run_fvp(run_state, self.exec_logged, is_long_running,
+                               debug, show_output, cov_plugin=self.cov_plugin)
         except DriverRunException:
             pass
 

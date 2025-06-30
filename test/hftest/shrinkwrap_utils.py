@@ -109,12 +109,12 @@ class ShrinkwrapManager:
         """Ensure the Shrinkwrap kokoro config directory exists."""
         os.makedirs(self._get_config_dir(), exist_ok=True)
 
-    def get_dynamic_overlay_path(self, filename):
+    def get_dynamic_overlay_path(self, filename="fvp_hf_dynamic_overlay.yaml"):
         """Return the absolute path to the overlay YAML file in the kokoro config directory."""
         self.ensure_config_dir()
         return os.path.join(self._get_config_dir(), filename or self.DEFAULT_DYNAMIC_OVERLAY)
 
-    def write_overlay_yaml(self, overlay_path, rtvars, new_params=None, run_name=None):
+    def write_overlay_yaml(self, overlay_path, rtvars, new_params=None, fvp_name=None):
         """
         Write rtvars and optional params to a YAML overlay file.
         Args:
@@ -126,13 +126,14 @@ class ShrinkwrapManager:
         overlay = {"run": {"rtvars": rtvars}}
         if new_params:
             overlay["run"]["params"] = new_params
-        if run_name:
-            overlay["run"]["name"] = run_name
+        if fvp_name:
+            overlay["run"]["name"] = fvp_name
 
         with open(overlay_path, "w") as f:
             yaml.safe_dump(overlay, f, sort_keys=False)
 
     def get_shrinkwrap_cmd(self, env):
+        """Check for Shrinkwrap CLI availability and return its path."""
         path = shutil.which("shrinkwrap", path=env.get("PATH", ""))
         if not path:
             raise RuntimeError(
@@ -141,18 +142,75 @@ class ShrinkwrapManager:
             )
         return path
 
-    def build_fvp_package_once(self):
+    def build_fvp_package_once(self, overlays, debug=False, coverage=False):
         """
         Builds the Shrinkwrap FVP package using static YAML overlays,
         if not already built.
         This is a one-time setup performed per test session (i.e., per hftest.py invocation),
         and combines the base FVP model with test-specific static configuration overlays.
         """
-        pass
+        if getattr(self.__class__, "_fvp_package_built", False):
+            return
 
-    def run_fvp(self):
+        config_dir = self._get_config_dir()
+
+        # NOTE: Do NOT move or modify the build_cmd initialization block below.
+        # The base command (with FVP package) MUST be passed first,
+        # followed by all --overlay options (including loop-based and conditional ones).
+        # Changing this order may break Shrinkwrap's build semantics.
+        build_cmd = [
+            "shrinkwrap", "--runtime", "null", "build",
+            os.path.join(config_dir, "FVP_Base_RevC-2xAEMvA-hafnium.yaml")
+        ]
+        for overlay in overlays:
+            build_cmd += ["--overlay",  os.path.join(config_dir, overlay)]
+        if debug:
+            build_cmd += ["--overlay", os.path.join(config_dir, "fvp_hf_debug.yaml")]
+        if coverage:
+            build_cmd += ["--overlay", os.path.join(config_dir,"fvp_hf_cov_plugin.yaml")]
+
+        print("\nShrinkwrap BUILD CMD:\n", " ".join(build_cmd))
+        self.__class__._fvp_package_built = True
+
+        try:
+            subprocess.run(build_cmd, env=self.env, check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print("\u2705 Shrinkwrap build succeeded")
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError("\u274C Shrinkwrap build step failed") from e
+
+    def run_fvp(self, run_state, execute_logged_fn, is_long_running, debug,
+                show_output, cov_plugin, dynamic_overlay=None):
         """
         Executes Shrinkwrap 'run' using the prebuilt FVP package,
         overlaying the dynamically generated runtime YAML  and timeouts.
         """
-        pass
+        config_dir = self._get_config_dir()
+        show_output = debug or show_output
+        dynamic_overlay = dynamic_overlay or self.DEFAULT_DYNAMIC_OVERLAY
+
+        time_limit = "40s"
+        if cov_plugin is None:
+            time_limit = "150s" if is_long_running else time_limit
+        else:
+            time_limit = "300s" if is_long_running else "80s"
+
+        # NOTE: Keep this order — timeout first (if enabled), then Shrinkwrap
+        # run with FVP base package and dynamic overlay.
+        # Reordering may break execution or cause config issues.
+        run_cmd = []
+        if not show_output:
+            run_cmd += ["timeout", "--foreground", time_limit]
+
+        run_cmd += [
+            "shrinkwrap", "--runtime", "null", "run",
+            "FVP_Base_RevC-2xAEMvA-hafnium.yaml",
+            "--overlay", os.path.join(config_dir, dynamic_overlay)
+        ]
+        print("\nShrinkwrap RUN CMD:\n", " ".join(run_cmd))
+
+        try:
+            execute_logged_fn(run_state, run_cmd, env=self.env)
+            print("\u2705 Shrinkwrap run successful")
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError("\u274C Shrinkwrap run failed") from e
