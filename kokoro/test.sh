@@ -16,6 +16,7 @@ SKIP_LONG_RUNNING_TESTS=false
 SKIP_UNIT_TESTS=false
 ASSERT_DISABLED_BUILD=false
 DEFAULT_HFTEST_TIMEOUT="600s"
+HFTEST_LOG_LEVEL="INFO"  # Default log level
 
 while test $# -gt 0
 do
@@ -32,6 +33,8 @@ do
       ;;
     --assert-disabled-build) ASSERT_DISABLED_BUILD=true
       ;;
+    --debug) HFTEST_LOG_LEVEL="DEBUG"
+      ;;
     *) echo "Unexpected argument $1"
       exit 1
       ;;
@@ -45,6 +48,10 @@ source $KOKORO_DIR/test_common.sh
 
 # Run the tests with a timeout so they can't loop forever.
 HFTEST=(${TIMEOUT[@]} $DEFAULT_HFTEST_TIMEOUT ./test/hftest/hftest.py)
+
+# Add hftest loglevel argument
+HFTEST+=(--log-level "$HFTEST_LOG_LEVEL")
+
 HYPERVISOR_PATH="$OUT/"
 if [ $USE_FVP == true ]
 then

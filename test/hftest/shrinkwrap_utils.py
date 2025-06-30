@@ -25,6 +25,10 @@ import os
 import subprocess
 import yaml
 import shutil
+import logging
+
+# Inherits the config settings from global logger in hftest.py
+logger = logging.getLogger(__name__)
 
 VM_PARAM_OFFSET = 5
 INITRD_PARAM_OFFSET = 8
@@ -83,18 +87,17 @@ class ShrinkwrapManager:
         if shrinkwrap_binary not in env.get("PATH", ""):
             env["PATH"] = shrinkwrap_binary + os.pathsep + env.get("PATH", "")
 
-        # Validate shrinkwrap CLI exists and log its resolved path
+        # Validate shrinkwrap CLI exists
         try:
             resolved_path = self.get_shrinkwrap_cmd(env)
-            print (f"Shrinkwrap CLI found at: {resolved_path}")
         except RuntimeError:
             raise
 
         # Print the Shrinkwrap environment variables once for every test session(DEBUG only)
         if not getattr(ShrinkwrapManager.setup_env, "_has_printed", False):
-            print("Shrinkwrap environment variables set:")
+            logger.debug("Shrinkwrap environment variables set:")
             for key in ["SHRINKWRAP_CONFIG", "SHRINKWRAP_BUILD", "SHRINKWRAP_PACKAGE", "PATH"]:
-                print("  %s = %s", key, env[key])
+                logger.debug("  %s = %s", key, env[key])
             ShrinkwrapManager.setup_env._has_printed = True
         return env
 
@@ -169,13 +172,13 @@ class ShrinkwrapManager:
         if coverage:
             build_cmd += ["--overlay", os.path.join(config_dir,"fvp_hf_cov_plugin.yaml")]
 
-        print("\nShrinkwrap BUILD CMD:\n", " ".join(build_cmd))
+        logger.debug("Shrinkwrap BUILD CMD:\n%s", " ".join(build_cmd))
         self.__class__._fvp_package_built = True
 
         try:
             subprocess.run(build_cmd, env=self.env, check=True,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("\u2705 Shrinkwrap build succeeded")
+            logger.debug("\u2705 Shrinkwrap build succeeded")
         except subprocess.CalledProcessError as e:
             raise RuntimeError("\u274C Shrinkwrap build step failed") from e
 
@@ -207,10 +210,10 @@ class ShrinkwrapManager:
             "FVP_Base_RevC-2xAEMvA-hafnium.yaml",
             "--overlay", os.path.join(config_dir, dynamic_overlay)
         ]
-        print("\nShrinkwrap RUN CMD:\n", " ".join(run_cmd))
+        logger.debug("Shrinkwrap RUN CMD:\n%s", " ".join(run_cmd))
 
         try:
             execute_logged_fn(run_state, run_cmd, env=self.env)
-            print("\u2705 Shrinkwrap run successful")
+            logger.debug("\u2705 Shrinkwrap run successful")
         except subprocess.CalledProcessError as e:
             raise RuntimeError("\u274C Shrinkwrap run failed") from e

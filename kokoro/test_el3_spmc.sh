@@ -6,6 +6,29 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/BSD-3-Clause.
 
+# Default log level
+HFTEST_LOG_LEVEL="INFO"
+
+# Parse script arguments
+while test $# -gt 0
+do
+  case "$1" in
+    --debug)
+      HFTEST_LOG_LEVEL="DEBUG"
+      ;;
+    -h|--help)
+      echo "Usage: $0 [debug|info]"
+      exit 0
+      ;;
+    *)
+      echo "Unexpected argument $1"
+      echo "Run with -h or --help for usage."
+      exit 1
+      ;;
+  esac
+  shift
+done
+
 # TIMEOUT, PROJECT, OUT, LOG_DIR_BASE set in:
 KOKORO_DIR="$(dirname "$0")"
 source $KOKORO_DIR/test_common.sh
@@ -16,6 +39,9 @@ HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_ffa_v1_1_clang"
 
 HFTEST+=(--log "$LOG_DIR_BASE/el3_spmc")
 HFTEST+=(--el3_spmc  --driver=fvp)
+
+# Add hftest loglevel argument
+HFTEST+=(--log-level "$HFTEST_LOG_LEVEL")
 
 # Test Hafnium primary VM with EL3 SPMC and services SP
 ${HFTEST[@]} --hypervisor "$HYPERVISOR_PATH/hafnium.bin" --out_partitions "$OUT/secure_aem_v8a_fvp_vhe_vm_clang" \

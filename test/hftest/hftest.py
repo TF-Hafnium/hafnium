@@ -29,6 +29,7 @@ import time
 import fdt
 import platform
 import tempfile
+import logging
 
 MACHINE = platform.machine()
 
@@ -1197,7 +1198,22 @@ def Main():
     parser.add_argument("--tfa", action="store_true")
     parser.add_argument("--coverage_plugin", default="")
     parser.add_argument("--disable_visualisation", action="store_true")
+    parser.add_argument("--log-level", default=None,
+    help="Set the log level (DEBUG=10, INFO=20, WARNING=30, ERROR=40)")
     args = parser.parse_args()
+
+    # LoggingPriority: CLI > ENV > Default
+    logging_level_str = args.log_level or os.getenv("HFTEST_LOG_LEVEL", "INFO")
+    if logging_level_str.isdigit():
+        numeric_level = int(logging_level_str)
+    else:
+        numeric_level = logging.__dict__.get(logging_level_str.upper())
+
+    if type(numeric_level) != int:
+        raise ValueError(f"Error: Invalid log level '{logging_level_str}'")
+
+    logging.basicConfig(level=numeric_level, format="[%(levelname)s] %(message)s")
+    logging.info(f"Logging initialized with level: {logging.getLevelName(numeric_level)}")
 
     # Create class which will manage all test artifacts.
     if args.hypervisor and args.spmc:

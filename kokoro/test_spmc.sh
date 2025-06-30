@@ -40,6 +40,7 @@ execute_test() {
 USE_PARITY=false
 CODE_COVERAGE=false
 RUN_TO_COMPLETION=false
+HFTEST_LOG_LEVEL="INFO"  # Default log level
 
 USAGE="Use --parity to run EL3 SPMC testsuite;"
 USAGE+=" --code-coverage to enable code coverage;"
@@ -53,6 +54,8 @@ do
     --code-coverage) CODE_COVERAGE=true
       ;;
     --run-to-completion) RUN_TO_COMPLETION=true
+      ;;
+    --debug) HFTEST_LOG_LEVEL="DEBUG"
       ;;
     -h) echo $USAGE
 	exit 1
@@ -90,6 +93,9 @@ HFTEST+=(--out_partitions $OUT/secure_aem_v8a_fvp_vhe_vm_clang)
 HFTEST+=(--log "$LOG_DIR_BASE")
 
 HFTEST+=(--spmc "$SPMC_PATH/hafnium.bin" --driver=fvp)
+
+# Add hftest loglevel argument
+HFTEST+=(--log-level "$HFTEST_LOG_LEVEL")
 
 if [ "$CODE_COVERAGE" = true ]; then
   source $KOKORO_DIR/qa-code-coverage.sh
