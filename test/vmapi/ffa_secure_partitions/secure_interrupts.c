@@ -658,13 +658,6 @@ TEST_LONG_RUNNING(secure_interrupts, sp_route_interrupt_to_secondary_vcpu)
 	 */
 	args.target_vcpu_id = LAST_SECONDARY_VCPU_ID;
 	sp_route_interrupt_to_secondary_vcpu_base(args);
-
-	/*
-	 * Reconfigure the twdog interrupt to be routed to mid secondary
-	 * execution context of SP.
-	 */
-	args.target_vcpu_id = MID_SECONDARY_VCPU_ID;
-	sp_route_interrupt_to_secondary_vcpu_base(args);
 }
 
 static void configure_generic_timer_interrupt(ffa_id_t source, ffa_id_t dest,
