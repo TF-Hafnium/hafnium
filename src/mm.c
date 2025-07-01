@@ -1207,6 +1207,183 @@ bool mm_get_mode_partial(const struct mm_ptable *ptable, vaddr_t begin,
 	return success;
 }
 
+struct mm_get_range_by_mode_state {
+	/* Start address of range. */
+	ptable_addr_t begin;
+	/* End address of range. */
+	ptable_addr_t end;
+	/* Next starting address on subsequent calls. */
+	ptable_addr_t next_start_addr;
+	/* Mode collected from the range. */
+	mm_mode_t ptable_mode;
+	/* Mode was found in range. */
+	bool mode_found : 1;
+	/* Mismatch in mode was detected. */
+	bool mismatch : 1;
+};
+
+/**
+ * Recursively traverses page table looking for the mode provided,
+ * if found, continues until either a mismatch occurs or
+ * end-of-table is hit. Updates the passed in structure with the
+ * range and mode information.
+ */
+// NOLINTNEXTLINE(misc-no-recursion)
+void mm_get_range_by_mode_level(const struct mm_page_table *table,
+				mm_level_t level, mm_mode_t mode, bool stage1,
+				ptable_addr_t start_addr,
+				struct mm_get_range_by_mode_state *state)
+{
+	ptable_addr_t current_addr = start_addr;
+	const pte_t *pte = &table->entries[mm_index(current_addr, level)];
+	ptable_addr_t level_end = mm_level_end(current_addr, level);
+
+	/* Loop until the end of the table or a mismatch occurs. */
+	while ((current_addr < level_end) && !state->mismatch) {
+		/* If the table is invalid, continue. */
+		if (!arch_mm_pte_is_present(*pte, level)) {
+			/* If we had found a mode previously, mismatch. */
+			if (state->mode_found) {
+				state->mismatch = true;
+				state->next_start_addr = current_addr;
+				return;
+			}
+		} else if (arch_mm_pte_is_table(*pte, level - 1)) {
+			const struct mm_page_table *child_table =
+				arch_mm_table_from_pte(*pte, level);
+			mm_get_range_by_mode_level(child_table, level - 1, mode,
+						   stage1, current_addr, state);
+		} else {
+			/* Obtain the page-table entry attributes. */
+			mm_attr_t block_attrs = arch_mm_pte_attrs(*pte, level);
+			mm_mode_t curr_mode;
+
+			/* From the attributes, obtain the mode. */
+			if (stage1) {
+				curr_mode = arch_mm_stage1_attrs_to_mode(
+					block_attrs);
+			} else {
+				curr_mode = arch_mm_stage2_attrs_to_mode(
+					block_attrs);
+			}
+
+			/* Check if the mode matches. */
+			if ((!state->mode_found && (curr_mode & mode) != 0) ||
+			    (state->mode_found &&
+			     (state->ptable_mode == curr_mode))) {
+				paddr_t ptable_addr =
+					arch_mm_block_from_pte(*pte, level - 1);
+				dlog_verbose("Mode Found at PTE Addr: %lx\n",
+					     pa_addr(ptable_addr));
+
+				/*
+				 * If this is the first time finding the mode
+				 * initialize the state variables.
+				 */
+				if (!state->mode_found) {
+					state->begin = pa_addr(ptable_addr);
+					state->ptable_mode = curr_mode;
+					state->mode_found = true;
+				}
+
+				/* Update the end address. */
+				state->end = pa_addr(ptable_addr);
+			} else if (state->mode_found) {
+				state->mismatch = true;
+				state->next_start_addr = current_addr;
+				return;
+			}
+		}
+
+		current_addr = mm_start_of_next_block(current_addr, level);
+		pte++;
+	}
+}
+
+/**
+ * Stage2 version of the mm_get_range_by_mode function, initializes state
+ * before calling the recursive traversal function. Successful call finds
+ * the mode provided within a given range.
+ */
+bool mm_vm_get_range_by_mode(const struct mm_ptable *ptable, ipaddr_t *begin,
+			     ipaddr_t *end, mm_mode_t mode,
+			     ipaddr_t *start_addr, mm_mode_t *ptable_mode)
+{
+	mm_level_t root_level;
+	ptable_addr_t ptable_end;
+	ptable_addr_t current_addr;
+	struct mm_page_table *root_table;
+	struct mm_get_range_by_mode_state state = {0};
+
+	current_addr = ipa_addr(*start_addr);
+	root_level = mm_root_level(ptable);
+	ptable_end = mm_ptable_addr_space_end(ptable);
+	root_table = &ptable->root_tables[mm_index(ipa_addr(*start_addr),
+						   root_level)];
+
+	assert(!ptable->stage1);
+
+	while ((current_addr < ptable_end) && !state.mismatch) {
+		mm_get_range_by_mode_level(root_table, root_level, mode,
+					   ptable->stage1, current_addr,
+					   &state);
+
+		current_addr = mm_start_of_next_block(current_addr, root_level);
+		root_table++;
+	}
+
+	if (state.mode_found) {
+		*begin = ipa_init(state.begin);
+		*end = ipa_init(state.end);
+		*start_addr = ipa_init(state.next_start_addr);
+		*ptable_mode = state.ptable_mode;
+	}
+
+	return state.mode_found;
+}
+
+/**
+ * Stage1 version of the mm_get_range_by_mode function, initializes state
+ * before calling the recursive traversal function. Successful call finds
+ * the mode provided within a given range.
+ */
+bool mm_get_range_by_mode(const struct mm_ptable *ptable, vaddr_t *begin,
+			  vaddr_t *end, mm_mode_t mode, vaddr_t *start_addr,
+			  mm_mode_t *ptable_mode)
+{
+	mm_level_t root_level;
+	ptable_addr_t ptable_end;
+	ptable_addr_t current_addr;
+	struct mm_page_table *root_table;
+	struct mm_get_range_by_mode_state state = {0};
+
+	assert(ptable->stage1);
+
+	current_addr = va_addr(*start_addr);
+	root_level = mm_root_level(ptable);
+	ptable_end = mm_ptable_addr_space_end(ptable);
+	root_table = &ptable->root_tables[mm_index(va_addr(*start_addr),
+						   root_level)];
+
+	while ((current_addr < ptable_end) && !state.mismatch) {
+		mm_get_range_by_mode_level(root_table, root_level, mode,
+					   ptable->stage1, current_addr,
+					   &state);
+
+		current_addr = mm_start_of_next_block(current_addr, root_level);
+		root_table++;
+	}
+
+	if (state.mode_found) {
+		*begin = va_init(state.begin);
+		*end = va_init(state.end);
+		*start_addr = va_init(state.next_start_addr);
+		*ptable_mode = state.ptable_mode;
+	}
+
+	return state.mode_found;
+}
+
 static struct mm_stage1_locked mm_stage1_lock_unsafe(void)
 {
 	return (struct mm_stage1_locked){.ptable = &ptable};

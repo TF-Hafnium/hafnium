@@ -95,6 +95,7 @@ enum mm_pte_type {
 #define MM_MODE_INVALID (1U << 4)
 #define MM_MODE_UNOWNED (1U << 5)
 #define MM_MODE_SHARED  (1U << 6)
+#define MM_MODE_NS      (1U << 7)
 
 /* Map page as non-global. */
 #define MM_MODE_NG (1U << 8)
@@ -193,6 +194,14 @@ bool mm_get_mode(const struct mm_ptable *ptable, vaddr_t begin, vaddr_t end,
 
 bool mm_get_mode_partial(const struct mm_ptable *ptable, vaddr_t begin,
 			 vaddr_t end, mm_mode_t *mode, vaddr_t *end_ret);
+
+bool mm_vm_get_range_by_mode(const struct mm_ptable *ptable, ipaddr_t *begin,
+			     ipaddr_t *end, mm_mode_t mode,
+			     ipaddr_t *start_addr, mm_mode_t *ptable_mode);
+
+bool mm_get_range_by_mode(const struct mm_ptable *ptable, vaddr_t *begin,
+			  vaddr_t *end, mm_mode_t mode, vaddr_t *start_addr,
+			  mm_mode_t *ptable_mode);
 
 struct mm_stage1_locked mm_lock_ptable_unsafe(struct mm_ptable *ptable);
 struct mm_stage1_locked mm_lock_stage1(void);
