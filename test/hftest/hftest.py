@@ -1010,7 +1010,7 @@ class TestRunner:
         except ValueError as e:
             print("Unable to parse JSON:")
             print(f"out={out}")
-            print(f"hf_out={hf_outout}")
+            print(f"hf_out={hf_out}")
             print(out)
             raise e
 
