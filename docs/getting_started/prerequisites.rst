@@ -36,11 +36,11 @@ The following command install the dependencies for the Hafnium build:
 
    sudo apt install make libssl-dev flex bison python3 python3-serial python3-pip device-tree-compiler
 
-In addion, install the following python lib using `pip`_:
+In addition, install the following python libraries using `pip`_:
 
 .. code:: shell
 
-   pip3 install fdt
+   pip3 install fdt click
 
 The file kokoro/static_checks.sh runs a series of static code checks into Hafnium's codebase.
 Hafnium follows the linux kernel coding guidelines. As such, the static code checks using the
