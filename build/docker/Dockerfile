@@ -79,7 +79,7 @@ RUN mkdir -p /opt/shared \
 # tool is used.
 RUN python3 -m venv /opt/venv
 ENV PATH=/opt/venv/bin:${PATH}
-RUN pip3 install fdt pyyaml termcolor tuxmake
+RUN pip3 install fdt pyyaml termcolor tuxmake click
 
 #Poetry Installation
 ENV POETRY_HOME="/tools/poetry"
