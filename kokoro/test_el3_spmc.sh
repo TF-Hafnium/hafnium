@@ -33,7 +33,7 @@ done
 KOKORO_DIR="$(dirname "$0")"
 source $KOKORO_DIR/test_common.sh
 
-HFTEST=(${TIMEOUT[@]} 1000s ./test/hftest/hftest.py)
+HFTEST=(${TIMEOUT[@]} 1000s ./test/hftest/drivers/hftest.py)
 
 HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_ffa_v1_1_clang"
 

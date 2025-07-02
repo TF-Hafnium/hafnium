@@ -84,7 +84,7 @@ if [ "$CODE_COVERAGE" = true ]; then
 	HFTEST_TIMEOUT="2400s"
 fi
 
-HFTEST=(${TIMEOUT[@]} $HFTEST_TIMEOUT ./test/hftest/hftest.py)
+HFTEST=(${TIMEOUT[@]} $HFTEST_TIMEOUT ./test/hftest/drivers/hftest.py)
 
 SPMC_PATH="$OUT/secure_aem_v8a_fvp_vhe_clang"
 HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_clang"

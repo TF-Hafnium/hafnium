@@ -47,7 +47,7 @@ KOKORO_DIR="$(dirname "$0")"
 source $KOKORO_DIR/test_common.sh
 
 # Run the tests with a timeout so they can't loop forever.
-HFTEST=(${TIMEOUT[@]} $DEFAULT_HFTEST_TIMEOUT ./test/hftest/hftest.py)
+HFTEST=(${TIMEOUT[@]} $DEFAULT_HFTEST_TIMEOUT ./test/hftest/drivers/hftest.py)
 
 # Add hftest loglevel argument
 HFTEST+=(--log-level "$HFTEST_LOG_LEVEL")
