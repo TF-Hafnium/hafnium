@@ -84,7 +84,9 @@ if [ "$CODE_COVERAGE" = true ]; then
 	HFTEST_TIMEOUT="2400s"
 fi
 
-HFTEST=(${TIMEOUT[@]} $HFTEST_TIMEOUT ./test/hftest/drivers/hftest.py)
+DRIVER="fvp"
+
+HFTEST=(${TIMEOUT[@]} $HFTEST_TIMEOUT ./test/hftest/drivers/hftest.py $DRIVER)
 
 SPMC_PATH="$OUT/secure_aem_v8a_fvp_vhe_clang"
 HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_clang"
@@ -92,7 +94,7 @@ HFTEST+=(--out_partitions $OUT/secure_aem_v8a_fvp_vhe_vm_clang)
 
 HFTEST+=(--log "$LOG_DIR_BASE")
 
-HFTEST+=(--spmc "$SPMC_PATH/hafnium.bin" --driver=fvp)
+HFTEST+=(--spmc "$SPMC_PATH/hafnium.bin")
 
 # Add hftest loglevel argument
 HFTEST+=(--log-level "$HFTEST_LOG_LEVEL")

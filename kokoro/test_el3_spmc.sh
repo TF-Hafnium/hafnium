@@ -33,12 +33,14 @@ done
 KOKORO_DIR="$(dirname "$0")"
 source $KOKORO_DIR/test_common.sh
 
-HFTEST=(${TIMEOUT[@]} 1000s ./test/hftest/drivers/hftest.py)
+DRIVER="fvp"
+
+HFTEST=(${TIMEOUT[@]} 1000s ./test/hftest/drivers/hftest.py $DRIVER)
 
 HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_ffa_v1_1_clang"
 
 HFTEST+=(--log "$LOG_DIR_BASE/el3_spmc")
-HFTEST+=(--el3_spmc  --driver=fvp)
+HFTEST+=(--el3_spmc)
 
 # Add hftest loglevel argument
 HFTEST+=(--log-level "$HFTEST_LOG_LEVEL")

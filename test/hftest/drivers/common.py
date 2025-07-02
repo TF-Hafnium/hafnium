@@ -6,6 +6,7 @@
 
 import xml.etree.ElementTree as ET
 
+import click
 import collections
 import datetime
 import json
@@ -61,6 +62,22 @@ def correct_vm_node(dts: str, node_index : int):
     """ The vm node is being appended to the Partition Manager manifests.
     Ideally, these files would be reused accross various test set-ups."""
     return dts.replace(get_vm_node_from_manifest(dts), f"vm{node_index}")
+
+def shared_options(f):
+    f = click.option("--hypervisor")(f)
+    f = click.option("--log", required=True)(f)
+    f = click.option("--initrd")(f)
+    f = click.option("--out_initrd")(f)
+    f = click.option("--suite")(f)
+    f = click.option("--test")(f)
+    f = click.option("--vm_args")(f)
+    f = click.option("--skip-long-running-tests", is_flag=True)(f)
+    f = click.option("--force-long-running", is_flag=True)(f)
+    f = click.option("--debug", is_flag=True, help="Makes platforms stall waiting for debugger connection.")(f)
+    f = click.option("--show-output", is_flag=True)(f)
+    f = click.option("--disable_visualisation", is_flag=True)(f)
+    f = click.option("--log-level", help="Set the log level (DEBUG=10, INFO=20, WARNING=30, ERROR=40)")(f)
+    return f
 
 DT = collections.namedtuple("DT", ["dts", "dtb"])
 

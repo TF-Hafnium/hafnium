@@ -46,8 +46,15 @@ done
 KOKORO_DIR="$(dirname "$0")"
 source $KOKORO_DIR/test_common.sh
 
+if [ $USE_FVP == true ]
+then
+  DRIVER="fvp"
+else
+  DRIVER="qemu"
+fi
+
 # Run the tests with a timeout so they can't loop forever.
-HFTEST=(${TIMEOUT[@]} $DEFAULT_HFTEST_TIMEOUT ./test/hftest/drivers/hftest.py)
+HFTEST=(${TIMEOUT[@]} $DEFAULT_HFTEST_TIMEOUT ./test/hftest/drivers/hftest.py $DRIVER)
 
 # Add hftest loglevel argument
 HFTEST+=(--log-level "$HFTEST_LOG_LEVEL")
@@ -58,7 +65,6 @@ then
   HYPERVISOR_PATH+="aem_v8a_fvp_vhe_clang"
   HFTEST+=(--out_initrd "$OUT/aem_v8a_fvp_vhe_vm_clang")
   HFTEST+=(--out_partitions "$OUT/aem_v8a_fvp_vhe_vm_clang")
-  HFTEST+=(--driver=fvp)
 else
   HYPERVISOR_PATH+="qemu_aarch64_vhe_clang"
   HFTEST+=(--out_initrd "$OUT/qemu_aarch64_vhe_vm_clang")
