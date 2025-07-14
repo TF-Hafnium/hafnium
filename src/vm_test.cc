@@ -261,7 +261,7 @@ TEST_F(vm, vm_notifications_bind_diff_senders)
 		/* Validate bindings condition after initialization. */
 		EXPECT_TRUE(vm_notifications_validate_binding(
 			current_vm_locked, is_from_vm, HF_INVALID_VM_ID,
-			bitmaps[i], false));
+			bitmaps[i]));
 
 		/*
 		 * Validate bind related operations. For this test considering
@@ -269,30 +269,30 @@ TEST_F(vm, vm_notifications_bind_diff_senders)
 		 */
 		vm_notifications_update_bindings(current_vm_locked, is_from_vm,
 						 dummy_senders[i]->id,
-						 bitmaps[i], false);
+						 bitmaps[i]);
 
 		EXPECT_TRUE(vm_notifications_validate_binding(
 			current_vm_locked, is_from_vm, dummy_senders[i]->id,
-			bitmaps[i], false));
+			bitmaps[i]));
 
 		EXPECT_FALSE(vm_notifications_validate_binding(
 			current_vm_locked, is_from_vm, dummy_senders[1 - i]->id,
-			bitmaps[i], false));
+			bitmaps[i]));
 
 		EXPECT_FALSE(vm_notifications_validate_binding(
 			current_vm_locked, is_from_vm, dummy_senders[i]->id,
-			bitmaps[1 - i], false));
+			bitmaps[1 - i]));
 
 		EXPECT_FALSE(vm_notifications_validate_binding(
 			current_vm_locked, is_from_vm, dummy_senders[i]->id,
-			bitmaps[2], false));
+			bitmaps[2]));
 	}
 
 	/** Clean up bind for other tests. */
 	vm_notifications_update_bindings(current_vm_locked, is_from_vm, 0,
-					 bitmaps[0], false);
+					 bitmaps[0]);
 	vm_notifications_update_bindings(current_vm_locked, is_from_vm, 0,
-					 bitmaps[1], false);
+					 bitmaps[1]);
 
 	vm_unlock(&current_vm_locked);
 }
@@ -301,13 +301,12 @@ TEST_F(vm, vm_notifications_bind_diff_senders)
  * Validates updates and check functions for binding notifications, namely the
  * configuration of bindings of global and per-vCPU notifications.
  */
-TEST_F(vm, vm_notification_bind_per_vcpu_vs_global)
+TEST_F(vm, vm_notification_bind_global_only)
 {
 	struct_vm *current_vm;
 	struct vm_locked current_vm_locked;
 	struct_vm *dummy_sender;
 	ffa_notifications_bitmap_t global = 0x00000000FFFFFFFFU;
-	ffa_notifications_bitmap_t per_vcpu = ~global;
 	bool is_from_vm = true;
 
 	CHECK(vm_get_count() >= 2);
@@ -319,52 +318,23 @@ TEST_F(vm, vm_notification_bind_per_vcpu_vs_global)
 	current_vm_locked = vm_lock(current_vm);
 
 	vm_notifications_update_bindings(current_vm_locked, is_from_vm,
-					 dummy_sender->id, global, false);
-	vm_notifications_update_bindings(current_vm_locked, is_from_vm,
-					 dummy_sender->id, per_vcpu, true);
+					 dummy_sender->id, global);
 
 	/* Check validation of global notifications bindings. */
 	EXPECT_TRUE(vm_notifications_validate_binding(
-		current_vm_locked, is_from_vm, dummy_sender->id, global,
-		false));
+		current_vm_locked, is_from_vm, dummy_sender->id, global));
 
-	/* Check validation of per-vCPU notifications bindings. */
-	EXPECT_TRUE(vm_notifications_validate_binding(
-		current_vm_locked, is_from_vm, dummy_sender->id, per_vcpu,
-		true));
-
-	/**
-	 * Check that global notifications are not validated as per-vCPU, and
-	 * vice-versa.
-	 */
-	EXPECT_FALSE(vm_notifications_validate_binding(
-		current_vm_locked, is_from_vm, dummy_sender->id, global, true));
-	EXPECT_FALSE(vm_notifications_validate_binding(
-		current_vm_locked, is_from_vm, dummy_sender->id, per_vcpu,
-		false));
-	EXPECT_FALSE(vm_notifications_validate_binding(
-		current_vm_locked, is_from_vm, dummy_sender->id,
-		global | per_vcpu, true));
-	EXPECT_FALSE(vm_notifications_validate_binding(
-		current_vm_locked, is_from_vm, dummy_sender->id,
-		global | per_vcpu, false));
-
-	/** Undo the bindings */
+	/** Undo the binding */
 	vm_notifications_update_bindings(current_vm_locked, is_from_vm, 0,
-					 global, false);
-	EXPECT_TRUE(vm_notifications_validate_binding(
-		current_vm_locked, is_from_vm, 0, global, false));
-
-	vm_notifications_update_bindings(current_vm_locked, is_from_vm, 0,
-					 per_vcpu, false);
-	EXPECT_TRUE(vm_notifications_validate_binding(
-		current_vm_locked, is_from_vm, 0, per_vcpu, false));
+					 global);
+	EXPECT_TRUE(vm_notifications_validate_binding(current_vm_locked,
+						      is_from_vm, 0, global));
 
 	vm_unlock(&current_vm_locked);
 }
 
 /**
- * Validates accesses to notifications bitmaps.
+ * Validates accesses to global notifications bitmaps.
  */
 TEST_F(vm, vm_notifications_set_and_get)
 {
@@ -372,9 +342,7 @@ TEST_F(vm, vm_notifications_set_and_get)
 	struct vm_locked current_vm_locked;
 	struct_vm *dummy_sender;
 	ffa_notifications_bitmap_t global = 0x00000000FFFFFFFFU;
-	ffa_notifications_bitmap_t per_vcpu = ~global;
 	ffa_notifications_bitmap_t ret;
-	const unsigned int vcpu_idx = 0;
 	struct notifications *notifications;
 	const bool is_from_vm = true;
 
@@ -387,15 +355,13 @@ TEST_F(vm, vm_notifications_set_and_get)
 	current_vm_locked = vm_lock(current_vm);
 
 	vm_notifications_update_bindings(current_vm_locked, is_from_vm,
-					 dummy_sender->id, global, false);
-	vm_notifications_update_bindings(current_vm_locked, is_from_vm,
-					 dummy_sender->id, per_vcpu, true);
+					 dummy_sender->id, global);
 
 	/*
-	 * Validate get notifications bitmap for global notifications.
+	 * Validate set/get for global notifications.
 	 */
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       global, 0ull, false);
+					       global);
 
 	EXPECT_EQ(notifications->global.pending, global);
 
@@ -403,7 +369,7 @@ TEST_F(vm, vm_notifications_set_and_get)
 	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
 
 	ret = vm_notifications_partition_get_pending(current_vm_locked,
-						     is_from_vm, 0ull);
+						     is_from_vm);
 	EXPECT_EQ(ret, global);
 	EXPECT_EQ(notifications->global.pending, 0ull);
 
@@ -413,50 +379,9 @@ TEST_F(vm, vm_notifications_set_and_get)
 	 */
 	EXPECT_TRUE(vm_is_notifications_pending_count_zero());
 
-	/*
-	 * Validate get notifications bitmap for per-vCPU notifications.
-	 */
-	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       per_vcpu, vcpu_idx, true);
-
-	/*
-	 * Duplicate call to check that the state of the counters doesn't alter
-	 * because of it.
-	 */
-	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       per_vcpu, vcpu_idx, true);
-
-	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
-
-	ret = vm_notifications_partition_get_pending(current_vm_locked,
-						     is_from_vm, vcpu_idx);
-	EXPECT_EQ(ret, per_vcpu);
-	EXPECT_EQ(notifications->per_vcpu[vcpu_idx].pending, 0ull);
-	EXPECT_TRUE(vm_is_notifications_pending_count_zero());
-
-	/*
-	 * Validate that getting notifications for a specific vCPU also returns
-	 * global notifications.
-	 */
-	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       per_vcpu, vcpu_idx, true);
-
-	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       global, 0ull, false);
-	EXPECT_FALSE(vm_is_notifications_pending_count_zero());
-
-	ret = vm_notifications_partition_get_pending(current_vm_locked,
-						     is_from_vm, vcpu_idx);
-	EXPECT_EQ(ret, per_vcpu | global);
-	EXPECT_EQ(notifications->per_vcpu[vcpu_idx].pending, 0ull);
-	EXPECT_EQ(notifications->global.pending, 0ull);
-	EXPECT_TRUE(vm_is_notifications_pending_count_zero());
-
 	/** Undo the binding */
 	vm_notifications_update_bindings(current_vm_locked, is_from_vm, 0ull,
-					 global, false);
-	vm_notifications_update_bindings(current_vm_locked, is_from_vm, 0ull,
-					 per_vcpu, true);
+					 global);
 	vm_unlock(&current_vm_locked);
 }
 
@@ -487,8 +412,8 @@ TEST_F(vm, vm_notifications_info_get_global)
 			&current_vm->notifications.from_sp;
 		const bool is_from_vm = false;
 
-		vm_notifications_partition_set_pending(
-			current_vm_locked, is_from_vm, to_set, 0, false);
+		vm_notifications_partition_set_pending(current_vm_locked,
+						       is_from_vm, to_set);
 
 		vm_notifications_info_get_pending(
 			current_vm_locked, is_from_vm, ids, &ids_count,
@@ -514,7 +439,7 @@ TEST_F(vm, vm_notifications_info_get_global)
 		 * bitmaps.
 		 */
 		got = vm_notifications_partition_get_pending(current_vm_locked,
-							     is_from_vm, 0);
+							     is_from_vm);
 		EXPECT_EQ(got, to_set);
 
 		EXPECT_EQ(notifications->global.info_get_retrieved, 0U);
@@ -522,234 +447,6 @@ TEST_F(vm, vm_notifications_info_get_global)
 
 		vm_unlock(&current_vm_locked);
 	}
-}
-
-/**
- * Validates simple getting of notifications info for per-vCPU notifications.
- */
-TEST_F(vm, vm_notifications_info_get_per_vcpu)
-{
-	const ffa_notifications_bitmap_t per_vcpu = 0xFU;
-	ffa_notifications_bitmap_t got;
-
-	/*
-	 * Following set of variables that are also expected to be used when
-	 * handling ffa_notification_info_get.
-	 */
-	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t ids_count = 0;
-	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t lists_count = 0;
-	enum notifications_info_get_state current_state = INIT;
-
-	CHECK(vm_get_count() >= 2);
-
-	for (unsigned int i = 0; i < 2; i++) {
-		struct_vm *current_vm = vm_find_index(0);
-		struct vm_locked current_vm_locked = vm_lock(current_vm);
-		struct notifications *notifications =
-			&current_vm->notifications.from_sp;
-		const bool is_from_vm = false;
-
-		vm_notifications_partition_set_pending(
-			current_vm_locked, is_from_vm, per_vcpu, 0, true);
-
-		vm_notifications_info_get_pending(
-			current_vm_locked, is_from_vm, ids, &ids_count,
-			lists_sizes, &lists_count,
-			FFA_NOTIFICATIONS_INFO_GET_MAX_IDS, &current_state);
-
-		/*
-		 * Here the number of IDs and list count should be the same.
-		 * As we are testing with Global notifications, this is
-		 * expected.
-		 */
-		EXPECT_EQ(ids_count, (i + 1) * 2);
-		EXPECT_EQ(lists_count, i + 1);
-		EXPECT_EQ(lists_sizes[i], 1);
-		EXPECT_EQ(per_vcpu,
-			  notifications->per_vcpu[0].info_get_retrieved);
-
-		/* Action must be reset to initial state for each VM. */
-		current_state = INIT;
-
-		/*
-		 * Check that getting pending notifications gives the expected
-		 * return and cleans the 'pending' and 'info_get_retrieved'
-		 * bitmaps.
-		 */
-		got = vm_notifications_partition_get_pending(current_vm_locked,
-							     is_from_vm, 0);
-		EXPECT_EQ(got, per_vcpu);
-
-		EXPECT_EQ(notifications->per_vcpu[0].info_get_retrieved, 0U);
-		EXPECT_EQ(notifications->per_vcpu[0].pending, 0U);
-
-		vm_unlock(&current_vm_locked);
-	}
-}
-
-/**
- * Validate getting of notifications information if all VCPUs have notifications
- * pending.
- */
-TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus)
-{
-	struct_vm *current_vm = nullptr;
-	struct vm_locked current_vm_locked;
-	const ffa_vcpu_count_t vcpu_count = MAX_CPUS;
-	ffa_notifications_bitmap_t got;
-	const ffa_notifications_bitmap_t global = 0xF0000;
-
-	/*
-	 * Following set of variables that are also expected to be used when
-	 * handling ffa_notification_info_get.
-	 */
-	struct notifications *notifications;
-	const bool is_from_sp = false;
-	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t ids_count = 0;
-	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t lists_count = 0;
-	enum notifications_info_get_state current_state = INIT;
-
-	EXPECT_TRUE(vm_init_next(vcpu_count, &ppool, &current_vm, false, 0));
-	current_vm_locked = vm_lock(current_vm);
-	notifications = &current_vm->notifications.from_sp;
-
-	for (unsigned int i = 0; i < vcpu_count; i++) {
-		vm_notifications_partition_set_pending(
-			current_vm_locked, is_from_sp, FFA_NOTIFICATION_MASK(i),
-			i, true);
-	}
-
-	/*
-	 * Adding a global notification should not change the list of IDs,
-	 * because global notifications only require the VM ID to be included in
-	 * the list, at least once.
-	 */
-	vm_notifications_partition_set_pending(current_vm_locked, is_from_sp,
-					       global, 0, false);
-
-	vm_notifications_info_get_pending(current_vm_locked, is_from_sp, ids,
-					  &ids_count, lists_sizes, &lists_count,
-					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
-					  &current_state);
-
-	/*
-	 * This test has been conceived for the expected MAX_CPUS 4.
-	 * All VCPUs have notifications of the same VM, to be broken down in 2
-	 * lists with 3 VCPU IDs, and 1 VCPU ID respectively.
-	 * The list of IDs should look like: {<vm_id>, 0, 1, 2, <vm_id>, 3}.
-	 */
-	CHECK(MAX_CPUS == 4);
-	EXPECT_EQ(ids_count, 6U);
-	EXPECT_EQ(lists_count, 2U);
-	EXPECT_EQ(lists_sizes[0], 3);
-	EXPECT_EQ(lists_sizes[1], 1);
-
-	for (unsigned int i = 0; i < vcpu_count; i++) {
-		got = vm_notifications_partition_get_pending(current_vm_locked,
-							     is_from_sp, i);
-
-		/*
-		 * The first call to
-		 * vm_notifications_partition_get_pending should also
-		 * include the global notifications on the return.
-		 */
-		ffa_notifications_bitmap_t to_check =
-			(i != 0) ? FFA_NOTIFICATION_MASK(i)
-				 : FFA_NOTIFICATION_MASK(i) | global;
-
-		EXPECT_EQ(got, to_check);
-
-		EXPECT_EQ(notifications->per_vcpu[i].pending, 0);
-		EXPECT_EQ(notifications->per_vcpu[i].info_get_retrieved, 0);
-	}
-
-	vm_unlock(&current_vm_locked);
-}
-
-/**
- * Validate change of state from 'vm_notifications_info_get_pending', when the
- * list of IDs is full.
- */
-TEST_F(vm, vm_notifications_info_get_full_per_vcpu)
-{
-	struct_vm *current_vm = vm_find_index(0);
-	struct vm_locked current_vm_locked = vm_lock(current_vm);
-	struct notifications *notifications =
-		&current_vm->notifications.from_sp;
-	const bool is_from_vm = false;
-	ffa_notifications_bitmap_t got = 0;
-
-	/*
-	 * Following set of variables that are also expected to be used when
-	 * handling ffa_notification_info_get.
-	 * For this 'ids_count' has been initialized such that it indicates
-	 * there is no space in the list for a per-vCPU notification (VM ID and
-	 * VCPU ID).
-	 */
-	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t ids_count = FFA_NOTIFICATIONS_INFO_GET_MAX_IDS - 1;
-	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t lists_count = 10;
-	enum notifications_info_get_state current_state = INIT;
-	CHECK(vm_get_count() >= 2);
-
-	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       FFA_NOTIFICATION_MASK(1), 0,
-					       true);
-
-	/* Call function to get notifications info, with only per-vCPU set. */
-	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
-					  &ids_count, lists_sizes, &lists_count,
-					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
-					  &current_state);
-
-	/*
-	 * Verify that as soon as there isn't space to do the required
-	 * insertion in the list, the
-	 * 'vm_notifications_partition_get_pending' returns and changes
-	 * list state to FULL. In this case returning, because it would need to
-	 * add two IDs (VM ID and VCPU ID).
-	 */
-	EXPECT_EQ(current_state, FULL);
-	EXPECT_EQ(ids_count, FFA_NOTIFICATIONS_INFO_GET_MAX_IDS - 1);
-	EXPECT_EQ(notifications->per_vcpu[0].info_get_retrieved, 0U);
-
-	/*
-	 * At this point there is still room for the information of a global
-	 * notification (only VM ID to be added). Reset 'current_state'
-	 * for the insertion to happen at the last position of the array.
-	 */
-	current_state = INIT;
-
-	/* Setting global notification */
-	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       FFA_NOTIFICATION_MASK(2), 0,
-					       false);
-
-	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
-					  &ids_count, lists_sizes, &lists_count,
-					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
-					  &current_state);
-
-	/*
-	 * Now List must be full, the set global notification must be part of
-	 * 'info_get_retrieved', and the 'current_state' should be set to FULL
-	 * due to the pending per-vCPU notification in VCPU 0.
-	 */
-	EXPECT_EQ(ids_count, FFA_NOTIFICATIONS_INFO_GET_MAX_IDS);
-	EXPECT_EQ(current_state, FULL);
-	EXPECT_EQ(notifications->global.info_get_retrieved,
-		  FFA_NOTIFICATION_MASK(2));
-
-	got = vm_notifications_partition_get_pending(current_vm_locked,
-						     is_from_vm, 0);
-	EXPECT_EQ(got, FFA_NOTIFICATION_MASK(1) | FFA_NOTIFICATION_MASK(2));
-
-	vm_unlock(&current_vm_locked);
 }
 
 TEST_F(vm, vm_notifications_info_get_full_global)
@@ -779,8 +476,7 @@ TEST_F(vm, vm_notifications_info_get_full_global)
 
 	/* Set global notification. */
 	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       FFA_NOTIFICATION_MASK(10), 0,
-					       false);
+					       FFA_NOTIFICATION_MASK(10));
 
 	/* Get notifications info for the given notifications. */
 	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
@@ -795,7 +491,7 @@ TEST_F(vm, vm_notifications_info_get_full_global)
 	EXPECT_EQ(current_state, FULL);
 
 	got = vm_notifications_partition_get_pending(current_vm_locked,
-						     is_from_vm, 0);
+						     is_from_vm);
 	EXPECT_EQ(got, FFA_NOTIFICATION_MASK(10));
 
 	vm_unlock(&current_vm_locked);
@@ -899,140 +595,6 @@ TEST_F(vm, vm_notifications_info_get_ipi)
 		  HF_IPI_INTID);
 	EXPECT_FALSE(vcpu_locked.vcpu->interrupts_info_get_retrieved);
 
-	vcpu_unlock(&vcpu_locked);
-
-	vm_unlock(&current_vm_locked);
-}
-
-/**
- * Validates simple getting of notifications info for pending with IPI when
- * notification for the same vcpu is also pending.
- */
-TEST_F(vm, vm_notifications_info_get_ipi_with_per_vcpu)
-{
-	/*
-	 * Following set of variables that are also expected to be used when
-	 * handling ffa_notification_info_get.
-	 */
-	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t ids_count = 0;
-	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t lists_count = 0;
-	enum notifications_info_get_state current_state = INIT;
-	struct_vm *current_vm = vm_find_index(4);
-	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 1);
-	struct vcpu_locked vcpu_locked;
-	const bool is_from_vm = false;
-	struct vm_locked current_vm_locked = vm_lock(current_vm);
-
-	EXPECT_TRUE(current_vm->vcpu_count >= 2);
-
-	vcpu_locked = vcpu_lock(target_vcpu);
-	vcpu_virt_interrupt_inject(vcpu_locked, HF_IPI_INTID);
-	vcpu_virt_interrupt_enable(vcpu_locked, HF_IPI_INTID, true);
-	vcpu_unlock(&vcpu_locked);
-
-	vm_notifications_partition_set_pending(current_vm_locked, is_from_vm,
-					       true, 1, true);
-	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
-					  &ids_count, lists_sizes, &lists_count,
-					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
-					  &current_state);
-
-	EXPECT_EQ(ids_count, 2);
-	EXPECT_EQ(lists_count, 1);
-	EXPECT_EQ(lists_sizes[0], 1);
-	EXPECT_EQ(ids[0], current_vm->id);
-	EXPECT_EQ(ids[1], 1);
-	EXPECT_EQ(target_vcpu->interrupts_info_get_retrieved, true);
-
-	/* Reset the state and values. */
-	current_state = INIT;
-	ids[0] = 0;
-	ids[1] = 0;
-	ids_count = 0;
-	lists_sizes[0] = 0;
-	lists_count = 0;
-
-	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
-					  &ids_count, lists_sizes, &lists_count,
-					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
-					  &current_state);
-	EXPECT_EQ(ids_count, 0);
-	EXPECT_EQ(lists_count, 0);
-	EXPECT_EQ(lists_sizes[0], 0);
-
-	vcpu_locked = vcpu_lock(target_vcpu);
-	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
-		  HF_IPI_INTID);
-	vcpu_unlock(&vcpu_locked);
-
-	vm_unlock(&current_vm_locked);
-}
-
-/**
- * Validate that a mix of a pending IPI and notifcations are correctly
- * reported across vcpus.
- */
-TEST_F(vm, vm_notifications_info_get_per_vcpu_all_vcpus_and_ipi)
-{
-	struct_vm *current_vm = vm_find_index(4);
-	ffa_vcpu_count_t vcpu_count = current_vm->vcpu_count;
-	CHECK(vcpu_count > 1);
-
-	struct vm_locked current_vm_locked = vm_lock(current_vm);
-
-	/*
-	 * Following set of variables that are also expected to be used when
-	 * handling ffa_notification_info_get.
-	 */
-	const bool is_from_vm = false;
-	uint16_t ids[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t ids_count = 0;
-	uint32_t lists_sizes[FFA_NOTIFICATIONS_INFO_GET_MAX_IDS] = {0};
-	uint32_t lists_count = 0;
-	enum notifications_info_get_state current_state = INIT;
-	struct vcpu *target_vcpu = vm_get_vcpu(current_vm, 0);
-	struct vcpu_locked vcpu_locked;
-
-	target_vcpu->state = VCPU_STATE_WAITING;
-
-	vcpu_locked = vcpu_lock(target_vcpu);
-	vcpu_virt_interrupt_inject(vcpu_locked, HF_IPI_INTID);
-	vcpu_virt_interrupt_enable(vcpu_locked, HF_IPI_INTID, true);
-	vcpu_unlock(&vcpu_locked);
-
-	for (unsigned int i = 1; i < vcpu_count; i++) {
-		vm_notifications_partition_set_pending(
-			current_vm_locked, is_from_vm, FFA_NOTIFICATION_MASK(i),
-			i, true);
-	}
-
-	vm_notifications_info_get_pending(current_vm_locked, is_from_vm, ids,
-					  &ids_count, lists_sizes, &lists_count,
-					  FFA_NOTIFICATIONS_INFO_GET_MAX_IDS,
-					  &current_state);
-
-	/*
-	 * This test has been conceived for the expected MAX_CPUS 4.
-	 * All VCPUs have notifications of the same VM, to be broken down in 2
-	 * lists with 3 VCPU IDs, and 1 VCPU ID respectively.
-	 * The list of IDs should look like: {<vm_id>, 0, 1, 2, <vm_id>, 3}.
-	 */
-	EXPECT_EQ(ids_count, 6U);
-	EXPECT_EQ(lists_count, 2U);
-	EXPECT_EQ(lists_sizes[0], 3);
-	EXPECT_EQ(lists_sizes[1], 1);
-	EXPECT_EQ(ids[0], current_vm->id);
-	EXPECT_EQ(ids[1], 0);
-	EXPECT_EQ(ids[2], 1);
-	EXPECT_EQ(ids[3], 2);
-	EXPECT_EQ(ids[4], current_vm->id);
-	EXPECT_EQ(ids[5], 3);
-
-	vcpu_locked = vcpu_lock(target_vcpu);
-	EXPECT_EQ(vcpu_virt_interrupt_get_pending_and_enabled(vcpu_locked),
-		  HF_IPI_INTID);
 	vcpu_unlock(&vcpu_locked);
 
 	vm_unlock(&current_vm_locked);
