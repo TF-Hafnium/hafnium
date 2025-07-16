@@ -70,14 +70,23 @@ RUN pip3 install fdt
 ARG LOCAL_UID=1000
 ARG LOCAL_GID=1000
 
-RUN	addgroup \
-		--gid "${LOCAL_GID}" \
-		hafnium \
-	&& adduser \
-		-disabled-password \
-		-gecos "" \
-		--uid "${LOCAL_UID}" \
-		--shell "/bin/bash" \
-		--ingroup hafnium \
-		hafnium
+# Create group if needed
+RUN if ! getent group "${LOCAL_GID}" > /dev/null; then \
+      addgroup --gid "${LOCAL_GID}" hafnium; \
+    else \
+      echo "Group with GID ${LOCAL_GID} already exists. Reusing it."; \
+    fi
+
+# Create user if needed
+RUN if ! getent passwd "${LOCAL_UID}" > /dev/null; then \
+      adduser --disabled-password --gecos "" \
+        --uid "${LOCAL_UID}" \
+        --shell "/bin/bash" \
+        --gid "${LOCAL_GID}" \
+        hafnium; \
+    else \
+      echo "User with UID ${LOCAL_UID} already exists. Skipping user creation."; \
+    fi
+
+# Explicitly switch to 'hafnium' user if it now exists
 USER hafnium
