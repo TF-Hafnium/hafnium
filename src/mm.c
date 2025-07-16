@@ -18,7 +18,14 @@
 #include "hf/dlog.h"
 #include "hf/layout.h"
 #include "hf/plat/console.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
+
+/*
+ * TODO: Intermediate step to drop the dependency to mpool and use
+ * memory allocator abstraction first.
+ */
+static struct mpool *ppool;
 
 /**
  * This file has functions for managing the level 1 and 2 page tables used by
@@ -1451,10 +1458,13 @@ void mm_defrag(struct mm_stage1_locked stage1_locked, struct mpool *ppool)
 /**
  * Initialises memory management for the hypervisor itself.
  */
-bool mm_init(struct mpool *ppool)
+bool mm_init(void)
 {
 	/* Locking is not enabled yet so fake it, */
 	struct mm_stage1_locked stage1_locked = mm_stage1_lock_unsafe();
+	ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	dlog_info("text: %#lx - %#lx\n", pa_addr(layout_text_begin()),
 		  pa_addr(layout_text_end()));

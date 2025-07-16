@@ -31,7 +31,7 @@
 #include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
-struct mpool *ppool;
+static struct mpool *ppool;
 
 /**
  * Performs one-time initialisation of memory management for the hypervisor.
@@ -53,7 +53,7 @@ void one_time_init_mm(void)
 
 	assert(ppool != NULL);
 
-	if (!mm_init(ppool)) {
+	if (!mm_init()) {
 		panic("mm_init failed");
 	}
 }

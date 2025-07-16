@@ -91,7 +91,7 @@ TEST(fdt, find_memory_ranges)
 
 	mpool_init(&ppool, sizeof(struct mm_page_table));
 	mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
-	mm_init(&ppool);
+	mm_init();
 
 	struct fdt fdt;
 	struct boot_params params = {};
