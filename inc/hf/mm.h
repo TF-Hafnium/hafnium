@@ -157,31 +157,27 @@ struct mm_stage1_locked {
 
 void mm_vm_enable_invalidation(void);
 
-bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id, bool stage1,
-		    struct mpool *ppool);
+bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id, bool stage1);
 ptable_addr_t mm_ptable_addr_space_end(const struct mm_ptable *ptable);
 
-void mm_ptable_fini(const struct mm_ptable *ptable, struct mpool *ppool);
-
-bool mm_vm_init(struct mm_ptable *ptable, mm_asid_t id, struct mpool *ppool);
-void mm_vm_fini(const struct mm_ptable *ptable, struct mpool *ppool);
+void mm_ptable_fini(const struct mm_ptable *ptable);
+bool mm_vm_init(struct mm_ptable *ptable, mm_asid_t id);
+void mm_vm_fini(const struct mm_ptable *ptable);
 
 bool mm_identity_prepare(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
-			 mm_mode_t mode, struct mpool *ppool);
+			 mm_mode_t mode);
 void *mm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
-			 mm_mode_t mode, struct mpool *ppool);
+			 mm_mode_t mode);
 
 bool mm_vm_identity_map(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
-			mm_mode_t mode, struct mpool *ppool, ipaddr_t *ipa);
+			mm_mode_t mode, ipaddr_t *ipa);
 bool mm_vm_identity_prepare(struct mm_ptable *ptable, paddr_t begin,
-			    paddr_t end, mm_mode_t mode, struct mpool *ppool);
+			    paddr_t end, mm_mode_t mode);
 void mm_vm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
-			   mm_mode_t mode, struct mpool *ppool, ipaddr_t *ipa);
-bool mm_vm_unmap(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
-		 struct mpool *ppool);
-void mm_stage1_defrag(struct mm_ptable *ptable, struct mpool *ppool);
-void mm_vm_defrag(struct mm_ptable *ptable, struct mpool *ppool,
-		  bool non_secure);
+			   mm_mode_t mode, ipaddr_t *ipa);
+bool mm_vm_unmap(struct mm_ptable *ptable, paddr_t begin, paddr_t end);
+void mm_stage1_defrag(struct mm_ptable *ptable);
+void mm_vm_defrag(struct mm_ptable *ptable, bool non_secure);
 void mm_vm_dump(const struct mm_ptable *ptable);
 bool mm_vm_get_mode(const struct mm_ptable *ptable, ipaddr_t begin,
 		    ipaddr_t end, mm_mode_t *mode);
@@ -207,9 +203,9 @@ struct mm_stage1_locked mm_lock_ptable_unsafe(struct mm_ptable *ptable);
 struct mm_stage1_locked mm_lock_stage1(void);
 void mm_unlock_stage1(struct mm_stage1_locked *lock);
 void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
-		      paddr_t end, mm_mode_t mode, struct mpool *ppool);
-bool mm_unmap(struct mm_stage1_locked stage1_locked, paddr_t begin, paddr_t end,
-	      struct mpool *ppool);
-void mm_defrag(struct mm_stage1_locked stage1_locked, struct mpool *ppool);
+		      paddr_t end, mm_mode_t mode);
+bool mm_unmap(struct mm_stage1_locked stage1_locked, paddr_t begin,
+	      paddr_t end);
+void mm_defrag(struct mm_stage1_locked stage1_locked);
 
 bool mm_init(void);
