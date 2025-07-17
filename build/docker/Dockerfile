@@ -54,6 +54,17 @@ RUN for f in /usr/lib/llvm-$LLVM_VERSION/bin/*; do ln -s "$f" /usr/local/bin; do
 # Clear APT cache to save space.
 RUN rm -rf /var/lib/apt/lists/*
 
+# Install GNU Arm Toolchain (v14.2.rel1) for AArch64
+ARG GNU_TOOLCHAIN_VERSION=14.2.rel1
+ARG GNU_TOOLCHAIN_DIR=/opt/gcc-arm
+
+COPY gnu_installation.sh /tmp/gnu_installation.sh
+RUN /tmp/gnu_installation.sh $GNU_TOOLCHAIN_VERSION $GNU_TOOLCHAIN_DIR
+
+# Add GNU toolchain binaries to /usr/local/bin via symlinks for global access
+RUN TOOLCHAIN_DIR=$(find ${GNU_TOOLCHAIN_DIR} -maxdepth 1 -type d -name "arm-gnu-toolchain-*") && \
+    ln -s $TOOLCHAIN_DIR/bin/* /usr/local/bin
+
 # To use git inside the docker image.
 # Create shared config and disable safe directory
 ENV GIT_CONFIG_GLOBAL=/opt/shared/.gitconfig
