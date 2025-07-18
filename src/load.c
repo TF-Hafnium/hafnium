@@ -20,6 +20,7 @@
 #include "hf/ffa/interrupts.h"
 #include "hf/ffa/notifications.h"
 #include "hf/ffa/setup_and_discovery.h"
+#include "hf/ffa_partition_manifest.h"
 #include "hf/layout.h"
 #include "hf/manifest.h"
 #include "hf/memiter.h"
@@ -50,15 +51,12 @@ const struct manifest *get_hypervisor_manifest(void)
 static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
 			     struct memiter *from_it)
 {
-	struct mpool *ppool = memory_alloc_get_ppool();
 	const void *from = memiter_base(from_it);
 	size_t size = memiter_size(from_it);
 	paddr_t to_end = pa_add(to, size);
 	void *ptr;
 
-	assert(ppool != NULL);
-
-	ptr = mm_identity_map(stage1_locked, to, to_end, MM_MODE_W, ppool);
+	ptr = mm_identity_map(stage1_locked, to, to_end, MM_MODE_W);
 	if (!ptr) {
 		return false;
 	}
@@ -66,7 +64,7 @@ static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
 	memcpy_s(ptr, size, from, size);
 	arch_mm_flush_dcache(ptr, size);
 
-	CHECK(mm_unmap(stage1_locked, to, to_end, ppool));
+	CHECK(mm_unmap(stage1_locked, to, to_end));
 
 	return true;
 }
@@ -117,16 +115,13 @@ static bool link_rxtx_to_mailbox(struct mm_stage1_locked stage1_locked,
 	ipaddr_t send;
 	ipaddr_t recv;
 	uint32_t page_count;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	send = ipa_init(rxtx.tx_buffer->base_address);
 	recv = ipa_init(rxtx.rx_buffer->base_address);
 	page_count = rxtx.tx_buffer->page_count;
 
 	ret = api_vm_configure_pages(stage1_locked, vm_locked, send, recv,
-				     page_count, ppool);
+				     page_count);
 	if (ret.func != FFA_SUCCESS_32) {
 		return false;
 	}
@@ -172,9 +167,6 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	struct device_region dev_region;
 	struct interrupt_info interrupt;
 	uint32_t k = 0;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	vm_locked.vm->smc_whitelist = manifest_vm->smc_whitelist;
 	vm_locked.vm->power_management =
@@ -289,7 +281,7 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	arch_vm_features_set(vm_locked.vm);
 
 	if (!plat_iommu_attach_peripheral(stage1_locked, vm_locked, manifest_vm,
-					  ppool)) {
+					  memory_alloc_get_ppool())) {
 		dlog_error("Unable to attach upstream peripheral device\n");
 		return false;
 	}
@@ -312,9 +304,6 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	struct vcpu_locked vcpu_locked;
 	size_t i;
 	bool ret;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	if (manifest_vm->is_ffa_partition && !manifest_vm->is_hyp_loaded) {
 		primary_begin = pa_init(manifest_vm->partition.load_addr);
@@ -348,7 +337,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		}
 	}
 
-	if (!vm_init_next(MAX_CPUS, ppool, &vm, false,
+	if (!vm_init_next(MAX_CPUS, &vm, false,
 			  manifest_vm->partition.dma_device_count)) {
 		dlog_error("Unable to initialise primary VM.\n");
 		return false;
@@ -374,7 +363,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		if (!vm_identity_map(
 			    vm_locked, pa_init(0),
 			    pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
-			    MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
+			    MM_MODE_R | MM_MODE_W | MM_MODE_D, NULL)) {
 			dlog_error(
 				"Unable to initialise address space for "
 				"primary VM.\n");
@@ -387,8 +376,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 	for (i = 0; i < params->mem_ranges_count; ++i) {
 		if (!vm_identity_map(vm_locked, params->mem_ranges[i].begin,
 				     params->mem_ranges[i].end,
-				     MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool,
-				     NULL)) {
+				     MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL)) {
 			dlog_error(
 				"Unable to initialise memory for primary "
 				"VM.\n");
@@ -399,10 +387,10 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 
 	/* Map device memory as such to prevent execution, speculation etc. */
 	for (i = 0; i < params->device_mem_ranges_count; ++i) {
-		if (!vm_identity_map(
-			    vm_locked, params->device_mem_ranges[i].begin,
-			    params->device_mem_ranges[i].end,
-			    MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool, NULL)) {
+		if (!vm_identity_map(vm_locked,
+				     params->device_mem_ranges[i].begin,
+				     params->device_mem_ranges[i].end,
+				     MM_MODE_R | MM_MODE_W | MM_MODE_D, NULL)) {
 			dlog("Unable to initialise device memory for primary "
 			     "VM.\n");
 			ret = false;
@@ -415,13 +403,13 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		goto out;
 	}
 
-	if (!vm_unmap_hypervisor(vm_locked, ppool)) {
+	if (!vm_unmap_hypervisor(vm_locked)) {
 		dlog_error("Unable to unmap hypervisor from primary VM.\n");
 		ret = false;
 		goto out;
 	}
 
-	if (!plat_iommu_unmap_iommus(vm_locked, ppool)) {
+	if (!plat_iommu_unmap_iommus(vm_locked, memory_alloc_get_ppool())) {
 		dlog_error("Unable to unmap IOMMUs from primary VM.\n");
 		ret = false;
 		goto out;
@@ -565,9 +553,6 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 	size_t size;
 	mm_mode_t map_mode;
 	uint32_t attributes;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	/* Map memory-regions */
 	while (j < manifest_vm->partition.mem_region_count) {
@@ -597,7 +582,7 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 		}
 
 		if (!vm_identity_map(vm_locked, region_begin, region_end,
-				     map_mode, ppool, NULL)) {
+				     map_mode, NULL)) {
 			dlog_error(
 				"Unable to map secondary VM "
 				"memory-region.\n");
@@ -613,8 +598,8 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 		 */
 		if (mem_region.dma_prop.stream_count > 0 &&
 		    !vm_iommu_mm_identity_map(
-			    vm_locked, region_begin, region_end, map_mode,
-			    ppool, NULL, mem_region.dma_prop.dma_device_id)) {
+			    vm_locked, region_begin, region_end, map_mode, NULL,
+			    mem_region.dma_prop.dma_device_id)) {
 			dlog_error(
 				"Unable to map memory-region in the page "
 				"tables of DMA device.\n");
@@ -650,7 +635,7 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 		}
 
 		if (!vm_identity_map(vm_locked, region_begin, region_end,
-				     map_mode, ppool, NULL)) {
+				     map_mode, NULL)) {
 			dlog_error(
 				"Unable to map secondary VM "
 				"device-region.\n");
@@ -672,9 +657,6 @@ static bool ffa_memory_deny_pvm_access(const struct manifest_vm *manifest_vm,
 	paddr_t region_begin;
 	paddr_t region_end;
 	size_t size;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	while (j < manifest_vm->partition.mem_region_count) {
 		struct memory_region mem_region;
@@ -685,8 +667,7 @@ static bool ffa_memory_deny_pvm_access(const struct manifest_vm *manifest_vm,
 		region_end = pa_add(region_begin, size);
 
 		/* Deny the primary VM access to this memory */
-		if (!vm_unmap(primary_vm_locked, region_begin, region_end,
-			      ppool)) {
+		if (!vm_unmap(primary_vm_locked, region_begin, region_end)) {
 			dlog_error(
 				"Unable to unmap secondary VM memory-"
 				"region from primary VM.\n");
@@ -704,8 +685,7 @@ static bool ffa_memory_deny_pvm_access(const struct manifest_vm *manifest_vm,
 		region_end = pa_add(region_begin, size);
 
 		/* Deny primary VM access to this region */
-		if (!vm_unmap(primary_vm_locked, region_begin, region_end,
-			      ppool)) {
+		if (!vm_unmap(primary_vm_locked, region_begin, region_end)) {
 			dlog_error(
 				"Unable to unmap secondary VM device-"
 				"region from primary VM.\n");
@@ -735,9 +715,6 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 	mm_mode_t map_mode;
 	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0 ||
 				manifest_vm->partition.run_time_el == EL0;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	/*
 	 * An S-EL0 partition must contain only 1 vCPU (UP migratable) per the
@@ -761,7 +738,7 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 		map_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 	}
 
-	if (!vm_identity_map(vm_locked, mem_begin, mem_end, map_mode, ppool,
+	if (!vm_identity_map(vm_locked, mem_begin, mem_end, map_mode,
 			     &partition_primary_ep)) {
 		dlog_error("Unable to initialise memory.\n");
 		ret = false;
@@ -798,21 +775,18 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 	 */
 	if (is_el0_partition) {
 		CHECK(vm_identity_map(vm_locked, layout_text_begin(),
-				      layout_text_end(), MM_MODE_X, ppool,
-				      NULL));
+				      layout_text_end(), MM_MODE_X, NULL));
 
 		CHECK(vm_identity_map(vm_locked, layout_rodata_begin(),
-				      layout_rodata_end(), MM_MODE_R, ppool,
-				      NULL));
+				      layout_rodata_end(), MM_MODE_R, NULL));
 
 		CHECK(vm_identity_map(vm_locked, layout_data_begin(),
 				      layout_data_end(), MM_MODE_R | MM_MODE_W,
-				      ppool, NULL));
+				      NULL));
 
-		CHECK(arch_stack_mm_init(mm_lock_ptable_unsafe(&vm->ptable),
-					 ppool));
+		CHECK(arch_stack_mm_init(mm_lock_ptable_unsafe(&vm->ptable)));
 
-		plat_console_mm_init(mm_lock_ptable_unsafe(&vm->ptable), ppool);
+		plat_console_mm_init(mm_lock_ptable_unsafe(&vm->ptable));
 	}
 
 	if (!load_common(stage1_locked, vm_locked, manifest_vm)) {
@@ -872,9 +846,6 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 	const size_t mem_size = pa_difference(mem_begin, mem_end);
 	bool is_el0_partition = manifest_vm->partition.run_time_el == S_EL0 ||
 				manifest_vm->partition.run_time_el == EL0;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	/*
 	 * Load the kernel if a filename is specified in the VM manifest.
@@ -921,7 +892,7 @@ static bool load_secondary(struct mm_stage1_locked stage1_locked,
 		}
 	}
 
-	if (!vm_init_next(manifest_vm->secondary.vcpu_count, ppool, &vm,
+	if (!vm_init_next(manifest_vm->secondary.vcpu_count, &vm,
 			  is_el0_partition,
 			  manifest_vm->partition.dma_device_count)) {
 		dlog_error("Unable to initialise VM.\n");
@@ -1036,16 +1007,13 @@ static bool init_other_world_vm(const struct boot_params *params)
 {
 	struct vm *other_world_vm;
 	size_t i;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	/*
 	 * Initialise the dummy VM which represents the opposite world:
 	 * -TrustZone (or the SPMC) when running the Hypervisor
 	 * -the Hypervisor when running TZ/SPMC
 	 */
-	other_world_vm = vm_init(HF_OTHER_WORLD_ID, MAX_CPUS, ppool, false, 0);
+	other_world_vm = vm_init(HF_OTHER_WORLD_ID, MAX_CPUS, false, 0);
 	CHECK(other_world_vm != NULL);
 
 	for (i = 0; i < MAX_CPUS; i++) {
@@ -1055,7 +1023,7 @@ static bool init_other_world_vm(const struct boot_params *params)
 		vcpu->cpu = cpu;
 	}
 
-	return arch_other_world_vm_init(other_world_vm, params, ppool);
+	return arch_other_world_vm_init(other_world_vm, params);
 }
 
 /*
@@ -1066,15 +1034,12 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 	      const struct boot_params *params,
 	      struct boot_params_update *update)
 {
-	struct mpool *ppool = memory_alloc_get_ppool();
 	struct vm *primary;
 	struct mem_range mem_ranges_available[MAX_MEM_RANGES];
 	struct vm_locked primary_vm_locked;
 	bool success = true;
 
 	partition_manager_manifest = manifest;
-
-	assert(ppool != NULL);
 
 	/**
 	 * Only try to load the primary VM if it is supposed to be in this
@@ -1151,7 +1116,7 @@ bool load_vms(struct mm_stage1_locked stage1_locked,
 
 		/* Deny the primary VM access to this memory. */
 		if (!vm_unmap(primary_vm_locked, secondary_mem_begin,
-			      secondary_mem_end, ppool)) {
+			      secondary_mem_end)) {
 			dlog_error(
 				"Unable to unmap secondary VM from primary "
 				"VM.\n");
@@ -1186,9 +1151,7 @@ bool load_reinit_partition(struct vm *vm)
 	struct mm_stage1_locked stage1_locked;
 	bool ret = true;
 	const struct manifest *manager_manifest;
-	struct mpool *ppool = memory_alloc_get_ppool();
 
-	assert(ppool != NULL);
 	assert(vm->lifecycle_support);
 
 	dlog_verbose("Attempt to reiniatize the partition\n");
@@ -1207,7 +1170,7 @@ bool load_reinit_partition(struct vm *vm)
 
 	stage1_locked = mm_lock_stage1();
 
-	if (!vm_reinit(vm, ppool)) {
+	if (!vm_reinit(vm)) {
 		dlog_error("Unable to re-initialise vm.\n");
 		return false;
 	}

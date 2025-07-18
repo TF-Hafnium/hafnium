@@ -1076,7 +1076,7 @@ struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked *current_locked,
 		 * Re-initialize the current vCPU's partition i.e., move it from
 		 * STOPPED state to CREATED state by re-allocating resources.
 		 */
-		CHECK(load_reinit_partition(vm, api_get_ppool()));
+		CHECK(load_reinit_partition(vm));
 
 		vm_locked = vm_lock(vm);
 		assert(vm_read_state(vm) == VM_STATE_CREATED);
