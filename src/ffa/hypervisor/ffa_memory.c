@@ -14,6 +14,7 @@
 #include "hf/ffa_internal.h"
 #include "hf/ffa_memory_internal.h"
 #include "hf/mm.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -122,7 +123,7 @@ static struct ffa_value memory_send_other_world_forward(
 static struct ffa_value ffa_memory_other_world_send(
 	struct vm_locked from_locked, struct vm_locked to_locked,
 	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
-	uint32_t fragment_length, uint32_t share_func, struct mpool *page_pool)
+	uint32_t fragment_length, uint32_t share_func)
 {
 	ffa_memory_handle_t handle;
 	struct share_states_locked share_states;
@@ -176,7 +177,7 @@ static struct ffa_value ffa_memory_other_world_send(
 		}
 
 		ret = ffa_memory_send_complete(from_locked, share_states,
-					       share_state, page_pool,
+					       share_state,
 					       &share_state->sender_orig_mode);
 		if (ret.func != FFA_SUCCESS_32) {
 			dlog_verbose(
@@ -264,7 +265,7 @@ out:
 	share_states_unlock(&share_states);
 out_err:
 	if (memory_region != NULL) {
-		mpool_free(page_pool, memory_region);
+		memory_free(memory_region, PAGE_SIZE);
 	}
 	return ret;
 }
@@ -272,7 +273,7 @@ out_err:
 struct ffa_value ffa_memory_other_world_mem_send(
 	struct vm *from, uint32_t share_func,
 	struct ffa_memory_region **memory_region, uint32_t length,
-	uint32_t fragment_length, struct mpool *page_pool)
+	uint32_t fragment_length)
 {
 	struct vm *to;
 	struct ffa_value ret;
@@ -293,8 +294,7 @@ struct ffa_value ffa_memory_other_world_mem_send(
 	} else {
 		ret = ffa_memory_other_world_send(
 			vm_to_from_lock.vm2, vm_to_from_lock.vm1,
-			*memory_region, length, fragment_length, share_func,
-			page_pool);
+			*memory_region, length, fragment_length, share_func);
 		/*
 		 * ffa_other_world_memory_send takes ownership of the
 		 * memory_region, so make sure we don't free it.
@@ -319,7 +319,7 @@ struct ffa_value ffa_memory_other_world_mem_send(
  */
 static struct ffa_value ffa_memory_other_world_reclaim(
 	struct vm_locked to_locked, ffa_memory_handle_t handle,
-	ffa_memory_region_flags_t flags, struct mpool *page_pool)
+	ffa_memory_region_flags_t flags)
 {
 	struct share_states_locked share_states;
 	struct ffa_memory_share_state *share_state;
@@ -410,11 +410,10 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, share_state->sender_orig_mode,
-		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool,
-		NULL, false);
+		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, NULL, false);
 
 	if (ret.func == FFA_SUCCESS_32) {
-		share_state_free(share_states, share_state, page_pool);
+		share_state_free(share_states, share_state);
 		dlog_verbose("Freed share state after successful reclaim.\n");
 	}
 
@@ -425,7 +424,7 @@ out:
 
 struct ffa_value ffa_memory_other_world_mem_reclaim(
 	struct vm *to, ffa_memory_handle_t handle,
-	ffa_memory_region_flags_t flags, struct mpool *page_pool)
+	ffa_memory_region_flags_t flags)
 {
 	struct ffa_value ret;
 	struct vm *from = vm_find(HF_TEE_VM_ID);
@@ -439,8 +438,8 @@ struct ffa_value ffa_memory_other_world_mem_reclaim(
 
 	vm_to_from_lock = vm_lock_both(to, from);
 
-	ret = ffa_memory_other_world_reclaim(vm_to_from_lock.vm1, handle, flags,
-					     page_pool);
+	ret = ffa_memory_other_world_reclaim(vm_to_from_lock.vm1, handle,
+					     flags);
 
 	vm_unlock(&vm_to_from_lock.vm1);
 	vm_unlock(&vm_to_from_lock.vm2);
@@ -493,17 +492,15 @@ static struct ffa_value memory_send_continue_other_world_forward(
  */
 static struct ffa_value ffa_memory_other_world_send_continue(
 	struct vm_locked from_locked, struct vm_locked to_locked,
-	void *fragment, uint32_t fragment_length, ffa_memory_handle_t handle,
-	struct mpool *page_pool)
+	void *fragment, uint32_t fragment_length, ffa_memory_handle_t handle)
 {
 	struct share_states_locked share_states = share_states_lock();
 	struct ffa_memory_share_state *share_state;
 	struct ffa_value ret;
 	struct ffa_memory_region *memory_region;
 
-	ret = ffa_memory_send_continue_validate(share_states, handle,
-						&share_state,
-						from_locked.vm->id, page_pool);
+	ret = ffa_memory_send_continue_validate(
+		share_states, handle, &share_state, from_locked.vm->id);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out_free_fragment;
 	}
@@ -542,15 +539,13 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 
 	/* Check whether the memory send operation is now ready to complete. */
 	if (share_state_sending_complete(share_states, share_state)) {
-		struct mpool local_page_pool;
-
 		/*
 		 * Use a local page pool so that we can roll back if necessary.
 		 */
-		mpool_init_with_fallback(&local_page_pool, page_pool);
-
+		// TODO: think about this case.
+		//
 		ret = ffa_memory_send_complete(from_locked, share_states,
-					       share_state, &local_page_pool,
+					       share_state,
 					       &share_state->sender_orig_mode);
 
 		if (ret.func == FFA_SUCCESS_32) {
@@ -579,7 +574,7 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 				 * operation, so roll back the page table update
 				 * for the VM. This can't fail because it won't
 				 * try to allocate more memory than was freed
-				 * into the `local_page_pool` by
+				 * into the `local_` by
 				 * `ffa_send_check_update` in the initial
 				 * update.
 				 */
@@ -590,7 +585,6 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 						      ->fragment_constituent_counts,
 					      share_state->fragment_count,
 					      share_state->sender_orig_mode,
-					      &local_page_pool,
 					      MAP_ACTION_COMMIT, NULL)
 					      .func == FFA_SUCCESS_32);
 			}
@@ -617,7 +611,7 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 			 */
 		}
 
-		mpool_fini(&local_page_pool);
+		// mpool_fini(&local_);
 	} else {
 		uint32_t next_fragment_offset =
 			share_state_next_fragment_offset(share_states,
@@ -641,7 +635,7 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 				ffa_frag_sender(ret), handle,
 				next_fragment_offset, from_locked.vm->id);
 			/* Free share state. */
-			share_state_free(share_states, share_state, page_pool);
+			share_state_free(share_states, share_state);
 			ret = ffa_error(FFA_INVALID_PARAMETERS);
 			goto out;
 		}
@@ -654,7 +648,7 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 	goto out;
 
 out_free_fragment:
-	mpool_free(page_pool, fragment);
+	memory_free(fragment, PAGE_SIZE);
 
 out:
 	share_states_unlock(&share_states);
@@ -663,7 +657,7 @@ out:
 
 struct ffa_value ffa_memory_other_world_mem_send_continue(
 	struct vm *from, void *fragment, uint32_t fragment_length,
-	ffa_memory_handle_t handle, struct mpool *page_pool)
+	ffa_memory_handle_t handle)
 {
 	struct ffa_value ret;
 	struct vm *to = vm_find(HF_TEE_VM_ID);
@@ -678,7 +672,7 @@ struct ffa_value ffa_memory_other_world_mem_send_continue(
 
 	ret = ffa_memory_other_world_send_continue(
 		vm_to_from_lock.vm2, vm_to_from_lock.vm1, fragment,
-		fragment_length, handle, page_pool);
+		fragment_length, handle);
 	/*
 	 * `ffa_memory_other_world_send_continue` takes ownership of the
 	 * fragment_copy, so we don't need to free it here.

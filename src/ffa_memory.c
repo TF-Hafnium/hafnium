@@ -23,6 +23,7 @@
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/panic.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/plat/memory_protect.h"
 #include "hf/std.h"
 #include "hf/vm.h"
@@ -173,15 +174,17 @@ struct ffa_memory_share_state *get_share_state(
 
 /** Marks a share state as unallocated. */
 void share_state_free(struct share_states_locked share_states,
-		      struct ffa_memory_share_state *share_state,
-		      struct mpool *page_pool)
+		      struct ffa_memory_share_state *share_state)
 {
 	uint32_t i;
+	struct mpool *ppool = memory_alloc_get_ppool();
+
+	assert(ppool != NULL);
 
 	assert(share_states.share_states != NULL);
 	share_state->share_func = 0;
 	share_state->sending_complete = false;
-	mpool_free(page_pool, share_state->memory_region);
+	mpool_free(ppool, share_state->memory_region);
 	/*
 	 * First fragment is part of the same page as the `memory_region`, so it
 	 * doesn't need to be freed separately.
@@ -189,7 +192,7 @@ void share_state_free(struct share_states_locked share_states,
 	share_state->fragments[0] = NULL;
 	share_state->fragment_constituent_counts[0] = 0;
 	for (i = 1; i < share_state->fragment_count; ++i) {
-		mpool_free(page_pool, share_state->fragments[i]);
+		mpool_free(ppool, share_state->fragments[i]);
 		share_state->fragments[i] = NULL;
 		share_state->fragment_constituent_counts[i] = 0;
 	}
@@ -1053,13 +1056,12 @@ struct ffa_value ffa_retrieve_check_transition(
  */
 static struct ffa_value ffa_region_group_check_actions(
 	struct vm_locked vm_locked, paddr_t pa_begin, paddr_t pa_end,
-	struct mpool *ppool, mm_mode_t mode, enum ffa_map_action action,
-	bool *memory_protected)
+	mm_mode_t mode, enum ffa_map_action action, bool *memory_protected)
 {
 	struct ffa_value ret;
 	bool is_memory_protected;
 
-	if (!vm_identity_prepare(vm_locked, pa_begin, pa_end, mode, ppool)) {
+	if (!vm_identity_prepare(vm_locked, pa_begin, pa_end, mode)) {
 		dlog_verbose(
 			"%s: memory can't be mapped to %x due to lack of "
 			"memory. Base: %lx end: %lx\n",
@@ -1121,7 +1123,7 @@ static struct ffa_value ffa_region_group_check_actions(
 
 static void ffa_region_group_commit_actions(struct vm_locked vm_locked,
 					    paddr_t pa_begin, paddr_t pa_end,
-					    struct mpool *ppool, mm_mode_t mode,
+					    mm_mode_t mode,
 					    enum ffa_map_action action)
 {
 	switch (action) {
@@ -1133,8 +1135,7 @@ static void ffa_region_group_commit_actions(struct vm_locked vm_locked,
 		CHECK(arch_memory_unprotect(pa_begin, pa_end));
 		[[fallthrough]];
 	case MAP_ACTION_COMMIT:
-		vm_identity_commit(vm_locked, pa_begin, pa_end, mode, ppool,
-				   NULL);
+		vm_identity_commit(vm_locked, pa_begin, pa_end, mode, NULL);
 		break;
 	default:
 		panic("%s: invalid action to process %x\n", __func__, action);
@@ -1217,8 +1218,7 @@ struct ffa_value ffa_region_group_identity_map(
 	struct vm_locked vm_locked,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	mm_mode_t mode, struct mpool *ppool, enum ffa_map_action action,
-	bool *memory_protected)
+	mm_mode_t mode, enum ffa_map_action action, bool *memory_protected)
 {
 	uint32_t i;
 	uint32_t j;
@@ -1252,8 +1252,8 @@ struct ffa_value ffa_region_group_identity_map(
 
 			if (action <= MAP_ACTION_CHECK_PROTECT) {
 				ret = ffa_region_group_check_actions(
-					vm_locked, pa_begin, pa_end, ppool,
-					mode, action, memory_protected);
+					vm_locked, pa_begin, pa_end, mode,
+					action, memory_protected);
 
 				if (ret.func == FFA_ERROR_32 &&
 				    ffa_error_code(ret) == FFA_DENIED) {
@@ -1270,8 +1270,8 @@ struct ffa_value ffa_region_group_identity_map(
 			} else if (action >= MAP_ACTION_COMMIT &&
 				   action < MAP_ACTION_MAX) {
 				ffa_region_group_commit_actions(
-					vm_locked, pa_begin, pa_end, ppool,
-					mode, action);
+					vm_locked, pa_begin, pa_end, mode,
+					action);
 				ret = (struct ffa_value){
 					.func = FFA_SUCCESS_32};
 			} else {
@@ -1288,8 +1288,7 @@ struct ffa_value ffa_region_group_identity_map(
  * Clears a region of physical memory by overwriting it with zeros. The data is
  * flushed from the cache so the memory has been cleared across the system.
  */
-static bool clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool,
-			 mm_mode_t extra_mode)
+static bool clear_memory(paddr_t begin, paddr_t end, mm_mode_t extra_mode)
 {
 	/*
 	 * TODO: change this to a CPU local single page window rather than a
@@ -1301,8 +1300,7 @@ static bool clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool,
 	struct mm_stage1_locked stage1_locked = mm_lock_stage1();
 	void *ptr = mm_identity_map(
 		stage1_locked, begin, end,
-		MM_MODE_W | (extra_mode & ffa_memory_get_other_world_mode()),
-		ppool);
+		MM_MODE_W | (extra_mode & ffa_memory_get_other_world_mode()));
 	size_t size = pa_difference(begin, end);
 
 	if (!ptr) {
@@ -1311,7 +1309,7 @@ static bool clear_memory(paddr_t begin, paddr_t end, struct mpool *ppool,
 
 	memset_s(ptr, size, 0, size);
 	arch_mm_flush_dcache(ptr, size);
-	mm_unmap(stage1_locked, begin, end, ppool);
+	mm_unmap(stage1_locked, begin, end);
 
 	ret = true;
 	goto out;
@@ -1332,10 +1330,8 @@ out:
 static bool ffa_clear_memory_constituents(
 	mm_mode_t security_state_mode,
 	struct ffa_memory_region_constituent **fragments,
-	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	struct mpool *page_pool)
+	const uint32_t *fragment_constituent_counts, uint32_t fragment_count)
 {
-	struct mpool local_page_pool;
 	uint32_t i;
 	bool ret = false;
 
@@ -1344,7 +1340,7 @@ static bool ffa_clear_memory_constituents(
 	 * thread. This is to ensure each constituent that is mapped can be
 	 * unmapped again afterwards.
 	 */
-	mpool_init_with_fallback(&local_page_pool, page_pool);
+	// TODO: think about this case if it is needed.
 
 	/* Iterate over the memory region constituents within each fragment. */
 	for (i = 0; i < fragment_count; ++i) {
@@ -1356,8 +1352,7 @@ static bool ffa_clear_memory_constituents(
 				pa_from_ipa(ipa_init(fragments[i][j].address));
 			paddr_t end = pa_add(begin, size);
 
-			if (!clear_memory(begin, end, &local_page_pool,
-					  security_state_mode)) {
+			if (!clear_memory(begin, end, security_state_mode)) {
 				/*
 				 * api_clear_memory will defrag on failure, so
 				 * no need to do it here.
@@ -1370,7 +1365,7 @@ static bool ffa_clear_memory_constituents(
 	ret = true;
 
 out:
-	mpool_fini(&local_page_pool);
+	// mpool_fini(&local_page_pool);
 	return ret;
 }
 
@@ -1470,15 +1465,14 @@ static struct ffa_value ffa_send_check_update(
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	uint32_t composite_total_page_count, uint32_t share_func,
-	struct ffa_memory_region *memory_region, struct mpool *page_pool,
-	mm_mode_t *orig_from_mode_ret, bool *memory_protected)
+	struct ffa_memory_region *memory_region, mm_mode_t *orig_from_mode_ret,
+	bool *memory_protected)
 {
 	uint32_t i;
 	uint32_t j;
 	mm_mode_t orig_from_mode;
 	mm_mode_t clean_mode;
 	mm_mode_t from_mode = 0;
-	struct mpool local_page_pool;
 	struct ffa_value ret;
 	uint32_t constituents_total_page_count = 0;
 	enum ffa_map_action map_action = MAP_ACTION_CHECK;
@@ -1534,7 +1528,7 @@ static struct ffa_value ffa_send_check_update(
 	 * thread. This is to ensure the original mapping can be restored if the
 	 * clear fails.
 	 */
-	mpool_init_with_fallback(&local_page_pool, page_pool);
+	// TODO: Revisit this aspect.
 
 	/*
 	 * First reserve all required memory for the new page table entries
@@ -1545,8 +1539,7 @@ static struct ffa_value ffa_send_check_update(
 	 */
 	ret = ffa_region_group_identity_map(
 		from_locked, fragments, fragment_constituent_counts,
-		fragment_count, from_mode, page_pool, map_action,
-		memory_protected);
+		fragment_count, from_mode, map_action, memory_protected);
 	if (ret.func == FFA_ERROR_32) {
 		goto out;
 	}
@@ -1559,8 +1552,7 @@ static struct ffa_value ffa_send_check_update(
 	 */
 	CHECK(ffa_region_group_identity_map(
 		      from_locked, fragments, fragment_constituent_counts,
-		      fragment_count, from_mode, &local_page_pool,
-		      MAP_ACTION_COMMIT, NULL)
+		      fragment_count, from_mode, MAP_ACTION_COMMIT, NULL)
 		      .func == FFA_SUCCESS_32);
 
 	/*
@@ -1579,24 +1571,17 @@ static struct ffa_value ffa_send_check_update(
 			: orig_from_mode;
 
 	/* Clear the memory so no VM or device can see the previous contents. */
-	if (clear && !ffa_clear_memory_constituents(
-			     clean_mode, fragments, fragment_constituent_counts,
-			     fragment_count, page_pool)) {
+	if (clear && !ffa_clear_memory_constituents(clean_mode, fragments,
+						    fragment_constituent_counts,
+						    fragment_count)) {
 		map_action = (memory_protected != NULL && *memory_protected)
 				     ? MAP_ACTION_COMMIT_UNPROTECT
 				     : MAP_ACTION_COMMIT;
 
-		/*
-		 * On failure, roll back by returning memory to the sender. This
-		 * may allocate pages which were previously freed into
-		 * `local_page_pool` by the call above, but will never allocate
-		 * more pages than that so can never fail.
-		 */
 		CHECK(ffa_region_group_identity_map(
 			      from_locked, fragments,
 			      fragment_constituent_counts, fragment_count,
-			      orig_from_mode, &local_page_pool, map_action,
-			      NULL)
+			      orig_from_mode, map_action, NULL)
 			      .func == FFA_SUCCESS_32);
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1605,13 +1590,13 @@ static struct ffa_value ffa_send_check_update(
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
-	mpool_fini(&local_page_pool);
+	// mpool_fini(&local_page_pool);
 
 	/*
 	 * Tidy up the page table by reclaiming failed mappings (if there was an
 	 * error) or merging entries into blocks where possible (on success).
 	 */
-	vm_ptable_defrag(from_locked, page_pool);
+	vm_ptable_defrag(from_locked);
 
 	return ret;
 }
@@ -1634,12 +1619,10 @@ struct ffa_value ffa_retrieve_check_update(
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
 	mm_mode_t sender_orig_mode, uint32_t share_func, bool clear,
-	struct mpool *page_pool, mm_mode_t *response_mode,
-	bool memory_protected)
+	mm_mode_t *response_mode, bool memory_protected)
 {
 	uint32_t i;
 	mm_mode_t to_mode;
-	struct mpool local_page_pool;
 	struct ffa_value ret;
 	enum ffa_map_action map_action = MAP_ACTION_COMMIT;
 
@@ -1685,8 +1668,7 @@ struct ffa_value ffa_retrieve_check_update(
 	 * another thread. This is to ensure the original mapping can be
 	 * restored if the clear fails.
 	 */
-	mpool_init_with_fallback(&local_page_pool, page_pool);
-
+	// TODO; think about this aspect.
 	/*
 	 * Memory retrieves from the NWd VMs don't require update to S2 PTs on
 	 * retrieve request.
@@ -1700,8 +1682,7 @@ struct ffa_value ffa_retrieve_check_update(
 		 */
 		ret = ffa_region_group_identity_map(
 			to_locked, fragments, fragment_constituent_counts,
-			fragment_count, to_mode, page_pool, MAP_ACTION_CHECK,
-			NULL);
+			fragment_count, to_mode, MAP_ACTION_CHECK, NULL);
 		if (ret.func == FFA_ERROR_32) {
 			/* TODO: partial defrag of failed range. */
 			goto out;
@@ -1709,26 +1690,19 @@ struct ffa_value ffa_retrieve_check_update(
 	}
 
 	/* Clear the memory so no VM or device can see the previous contents. */
-	if (clear &&
-	    !ffa_clear_memory_constituents(sender_orig_mode, fragments,
-					   fragment_constituent_counts,
-					   fragment_count, page_pool)) {
+	if (clear && !ffa_clear_memory_constituents(sender_orig_mode, fragments,
+						    fragment_constituent_counts,
+						    fragment_count)) {
 		dlog_verbose("Couldn't clear constituents.\n");
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
 	if (map_action != MAP_ACTION_NONE) {
-		/*
-		 * Complete the transfer by mapping the memory into the
-		 * recipient. This won't allocate because the transaction was
-		 * already prepared above, so it doesn't need to use the
-		 * `local_page_pool`.
-		 */
-		CHECK(ffa_region_group_identity_map(to_locked, fragments,
-						    fragment_constituent_counts,
-						    fragment_count, to_mode,
-						    page_pool, map_action, NULL)
+
+		CHECK(ffa_region_group_identity_map(
+			      to_locked, fragments, fragment_constituent_counts,
+			      fragment_count, to_mode, map_action, NULL)
 			      .func == FFA_SUCCESS_32);
 
 		/*
@@ -1742,13 +1716,13 @@ struct ffa_value ffa_retrieve_check_update(
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
-	mpool_fini(&local_page_pool);
+	// mpool_fini(&local_page_pool);
 
 	/*
 	 * Tidy up the page table by reclaiming failed mappings (if there was an
 	 * error) or merging entries into blocks where possible (on success).
 	 */
-	vm_ptable_defrag(to_locked, page_pool);
+	vm_ptable_defrag(to_locked);
 
 	return ret;
 }
@@ -1757,12 +1731,11 @@ static struct ffa_value ffa_relinquish_check_update(
 	struct vm_locked from_locked,
 	struct ffa_memory_region_constituent **fragments,
 	uint32_t *fragment_constituent_counts, uint32_t fragment_count,
-	mm_mode_t sender_orig_mode, struct mpool *page_pool, bool clear)
+	mm_mode_t sender_orig_mode, bool clear)
 {
 	mm_mode_t orig_from_mode;
 	mm_mode_t clearing_mode;
 	mm_mode_t from_mode = 0;
-	struct mpool local_page_pool;
 	struct ffa_value ret;
 	enum ffa_map_action map_action;
 
@@ -1780,7 +1753,7 @@ static struct ffa_value ffa_relinquish_check_update(
 	 * thread. This is to ensure the original mapping can be restored if the
 	 * clear fails.
 	 */
-	mpool_init_with_fallback(&local_page_pool, page_pool);
+	/* TODO: revisit this. */
 
 	if (map_action != MAP_ACTION_NONE) {
 		clearing_mode = orig_from_mode;
@@ -1792,8 +1765,7 @@ static struct ffa_value ffa_relinquish_check_update(
 		 */
 		ret = ffa_region_group_identity_map(
 			from_locked, fragments, fragment_constituent_counts,
-			fragment_count, from_mode, page_pool, MAP_ACTION_CHECK,
-			NULL);
+			fragment_count, from_mode, MAP_ACTION_CHECK, NULL);
 		if (ret.func == FFA_ERROR_32) {
 			goto out;
 		}
@@ -1807,7 +1779,6 @@ static struct ffa_value ffa_relinquish_check_update(
 		CHECK(ffa_region_group_identity_map(from_locked, fragments,
 						    fragment_constituent_counts,
 						    fragment_count, from_mode,
-						    &local_page_pool,
 						    MAP_ACTION_COMMIT, NULL)
 			      .func == FFA_SUCCESS_32);
 	} else {
@@ -1821,10 +1792,9 @@ static struct ffa_value ffa_relinquish_check_update(
 	}
 
 	/* Clear the memory so no VM or device can see the previous contents. */
-	if (clear &&
-	    !ffa_clear_memory_constituents(clearing_mode, fragments,
-					   fragment_constituent_counts,
-					   fragment_count, page_pool)) {
+	if (clear && !ffa_clear_memory_constituents(clearing_mode, fragments,
+						    fragment_constituent_counts,
+						    fragment_count)) {
 		if (map_action != MAP_ACTION_NONE) {
 			/*
 			 * On failure, roll back by returning memory to the
@@ -1832,12 +1802,13 @@ static struct ffa_value ffa_relinquish_check_update(
 			 * freed into `local_page_pool` by the call above, but
 			 * will never allocate more pages than that so can never
 			 * fail.
+			 * TODO: update comment.
 			 */
 			CHECK(ffa_region_group_identity_map(
 				      from_locked, fragments,
 				      fragment_constituent_counts,
 				      fragment_count, orig_from_mode,
-				      &local_page_pool, MAP_ACTION_COMMIT, NULL)
+				      MAP_ACTION_COMMIT, NULL)
 				      .func == FFA_SUCCESS_32);
 		}
 		ret = ffa_error(FFA_NO_MEMORY);
@@ -1847,13 +1818,13 @@ static struct ffa_value ffa_relinquish_check_update(
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
-	mpool_fini(&local_page_pool);
+	//	mpool_fini(&local_page_pool);
 
 	/*
 	 * Tidy up the page table by reclaiming failed mappings (if there was an
 	 * error) or merging entries into blocks where possible (on success).
 	 */
-	vm_ptable_defrag(from_locked, page_pool);
+	vm_ptable_defrag(from_locked);
 
 	return ret;
 }
@@ -1867,7 +1838,7 @@ out:
  */
 struct ffa_value ffa_memory_send_complete(
 	struct vm_locked from_locked, struct share_states_locked share_states,
-	struct ffa_memory_share_state *share_state, struct mpool *page_pool,
+	struct ffa_memory_share_state *share_state,
 	mm_mode_t *orig_from_mode_ret)
 {
 	struct ffa_memory_region *memory_region = share_state->memory_region;
@@ -1885,8 +1856,8 @@ struct ffa_value ffa_memory_send_complete(
 		from_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, composite->page_count,
-		share_state->share_func, memory_region, page_pool,
-		orig_from_mode_ret, &share_state->memory_protected);
+		share_state->share_func, memory_region, orig_from_mode_ret,
+		&share_state->memory_protected);
 	if (ret.func != FFA_SUCCESS_32) {
 		/*
 		 * Free share state, it failed to send so it can't be retrieved.
@@ -1894,7 +1865,7 @@ struct ffa_value ffa_memory_send_complete(
 		dlog_verbose("%s: failed to send check update: %s(%s)\n",
 			     __func__, ffa_func_name(ret.func),
 			     ffa_error_name(ffa_error_code(ret)));
-		share_state_free(share_states, share_state, page_pool);
+		share_state_free(share_states, share_state);
 		return ret;
 	}
 
@@ -2289,8 +2260,7 @@ struct ffa_value ffa_memory_send_validate(
  */
 struct ffa_value ffa_memory_send_continue_validate(
 	struct share_states_locked share_states, ffa_memory_handle_t handle,
-	struct ffa_memory_share_state **share_state_ret, ffa_id_t from_vm_id,
-	struct mpool *page_pool)
+	struct ffa_memory_share_state **share_state_ret, ffa_id_t from_vm_id)
 {
 	struct ffa_memory_share_state *share_state;
 	struct ffa_memory_region *memory_region;
@@ -2333,7 +2303,7 @@ struct ffa_value ffa_memory_send_continue_validate(
 			"only %d supported.\n",
 			handle, MAX_FRAGMENTS);
 		/* Free share state, as it's not possible to complete it. */
-		share_state_free(share_states, share_state, page_pool);
+		share_state_free(share_states, share_state);
 		return ffa_error(FFA_NO_MEMORY);
 	}
 
@@ -2386,8 +2356,7 @@ bool memory_region_receivers_from_other_world(
 struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				 struct ffa_memory_region *memory_region,
 				 uint32_t memory_share_length,
-				 uint32_t fragment_length, uint32_t share_func,
-				 struct mpool *page_pool)
+				 uint32_t fragment_length, uint32_t share_func)
 {
 	struct ffa_value ret;
 	struct share_states_locked share_states;
@@ -2402,7 +2371,8 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				       memory_share_length, fragment_length,
 				       share_func);
 	if (ret.func != FFA_SUCCESS_32) {
-		mpool_free(page_pool, memory_region);
+		/* TODO: revisit this. */
+		memory_free(memory_region, PAGE_SIZE);
 		return ret;
 	}
 
@@ -2440,7 +2410,8 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 					   FFA_MEMORY_HANDLE_INVALID);
 	if (share_state == NULL) {
 		dlog_verbose("Failed to allocate share state.\n");
-		mpool_free(page_pool, memory_region);
+		// TODO: revisit
+		memory_free(memory_region, PAGE_SIZE);
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
@@ -2448,7 +2419,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	if (fragment_length == memory_share_length) {
 		/* No more fragments to come, everything fit in one message. */
 		ret = ffa_memory_send_complete(
-			from_locked, share_states, share_state, page_pool,
+			from_locked, share_states, share_state,
 			&(share_state->sender_orig_mode));
 	} else {
 		/*
@@ -2490,8 +2461,7 @@ out:
 struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 					  void *fragment,
 					  uint32_t fragment_length,
-					  ffa_memory_handle_t handle,
-					  struct mpool *page_pool)
+					  ffa_memory_handle_t handle)
 {
 	struct share_states_locked share_states = share_states_lock();
 	struct ffa_memory_share_state *share_state;
@@ -2508,9 +2478,8 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 		goto out_free_fragment;
 	}
 
-	ret = ffa_memory_send_continue_validate(share_states, handle,
-						&share_state,
-						from_locked.vm->id, page_pool);
+	ret = ffa_memory_send_continue_validate(
+		share_states, handle, &share_state, from_locked.vm->id);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out_free_fragment;
 	}
@@ -2535,7 +2504,7 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 	/* Check whether the memory send operation is now ready to complete. */
 	if (share_state_sending_complete(share_states, share_state)) {
 		ret = ffa_memory_send_complete(
-			from_locked, share_states, share_state, page_pool,
+			from_locked, share_states, share_state,
 			&(share_state->sender_orig_mode));
 	} else {
 		ret = (struct ffa_value){
@@ -2548,7 +2517,8 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 	goto out;
 
 out_free_fragment:
-	mpool_free(page_pool, fragment);
+	/* TODO: revisit */
+	memory_free(fragment, PAGE_SIZE);
 
 out:
 	share_states_unlock(&share_states);
@@ -2558,7 +2528,7 @@ out:
 /** Clean up after the receiver has finished retrieving a memory region. */
 static void ffa_memory_retrieve_complete(
 	struct share_states_locked share_states,
-	struct ffa_memory_share_state *share_state, struct mpool *page_pool)
+	struct ffa_memory_share_state *share_state)
 {
 	if (share_state->share_func == FFA_MEM_DONATE_32 ||
 	    share_state->share_func == FFA_MEM_DONATE_64) {
@@ -2566,7 +2536,7 @@ static void ffa_memory_retrieve_complete(
 		 * Memory that has been donated can't be relinquished,
 		 * so no need to keep the share state around.
 		 */
-		share_state_free(share_states, share_state, page_pool);
+		share_state_free(share_states, share_state);
 		dlog_verbose("Freed share state for donate.\n");
 	}
 }
@@ -3678,7 +3648,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 	struct share_states_locked share_states,
 	struct ffa_memory_share_state *share_state, struct vm_locked to_locked,
 	struct ffa_memory_region *retrieve_request,
-	uint32_t retrieve_request_length, struct mpool *page_pool)
+	uint32_t retrieve_request_length)
 {
 	ffa_memory_access_permissions_t permissions = {0};
 	mm_mode_t memory_to_mode;
@@ -3762,7 +3732,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, memory_to_mode,
-		share_state->share_func, false, page_pool, &retrieve_mode,
+		share_state->share_func, false, &retrieve_mode,
 		share_state->memory_protected);
 
 	if (ret.func != FFA_SUCCESS_32) {
@@ -3827,8 +3797,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 	}
 
 	if (is_retrieve_complete) {
-		ffa_memory_retrieve_complete(share_states, share_state,
-					     page_pool);
+		ffa_memory_retrieve_complete(share_states, share_state);
 	}
 
 	return ffa_memory_retrieve_resp(total_length, fragment_length);
@@ -3900,8 +3869,7 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
-				     uint32_t retrieve_request_length,
-				     struct mpool *page_pool)
+				     uint32_t retrieve_request_length)
 {
 	ffa_memory_handle_t handle = retrieve_request->handle;
 	struct share_states_locked share_states;
@@ -3925,7 +3893,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	} else {
 		ret = ffa_partition_retrieve_request(
 			share_states, share_state, to_locked, retrieve_request,
-			retrieve_request_length, page_pool);
+			retrieve_request_length);
 	}
 
 	/* Track use of the RX buffer if the handling has succeeded. */
@@ -3987,8 +3955,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 					      ffa_memory_handle_t handle,
 					      uint32_t fragment_offset,
 					      ffa_id_t sender_vm_id,
-					      void *retrieve_continue_page,
-					      struct mpool *page_pool)
+					      void *retrieve_continue_page)
 {
 	struct ffa_memory_region *memory_region;
 	struct share_states_locked share_states;
@@ -4150,8 +4117,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 		share_state->retrieved_fragment_count[receiver_index]++;
 		if (share_state->retrieved_fragment_count[receiver_index] ==
 		    share_state->fragment_count) {
-			ffa_memory_retrieve_complete(share_states, share_state,
-						     page_pool);
+			ffa_memory_retrieve_complete(share_states, share_state);
 		}
 	} else {
 		share_state->hypervisor_fragment_count++;
@@ -4172,8 +4138,7 @@ out:
 static struct ffa_value reclaim_shared_state(
 	struct share_states_locked share_states_locked,
 	struct ffa_memory_share_state *share_state, struct vm_locked to_locked,
-	ffa_memory_handle_t handle, ffa_memory_region_flags_t flags,
-	struct mpool *page_pool)
+	ffa_memory_handle_t handle, ffa_memory_region_flags_t flags)
 {
 	struct ffa_value ret;
 	struct ffa_memory_region *memory_region;
@@ -4212,11 +4177,11 @@ static struct ffa_value reclaim_shared_state(
 		to_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, share_state->sender_orig_mode,
-		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool,
-		NULL, share_state->memory_protected);
+		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, NULL,
+		share_state->memory_protected);
 
 	if (ret.func == FFA_SUCCESS_32) {
-		share_state_free(share_states_locked, share_state, page_pool);
+		share_state_free(share_states_locked, share_state);
 		dlog_verbose("Freed share state after successful reclaim.\n");
 
 		/*
@@ -4235,7 +4200,7 @@ static struct ffa_value reclaim_shared_state(
 
 struct ffa_value ffa_memory_relinquish(
 	struct vm_locked from_locked,
-	struct ffa_mem_relinquish *relinquish_request, struct mpool *page_pool)
+	struct ffa_mem_relinquish *relinquish_request)
 {
 	ffa_memory_handle_t handle = relinquish_request->handle;
 	struct share_states_locked share_states;
@@ -4358,7 +4323,7 @@ struct ffa_value ffa_memory_relinquish(
 		from_locked, share_state->fragments,
 		share_state->fragment_constituent_counts,
 		share_state->fragment_count, share_state->sender_orig_mode,
-		page_pool, clear);
+		clear);
 
 	if (ret.func == FFA_SUCCESS_32) {
 		/*
@@ -4380,7 +4345,7 @@ struct ffa_value ffa_memory_relinquish(
 			owner_locked = both.vm2;
 			reclaim_ret = reclaim_shared_state(
 				share_states, share_state, owner_locked,
-				memory_region->handle, 0U, page_pool);
+				memory_region->handle, 0U);
 
 			assert(reclaim_ret.func == FFA_SUCCESS_32);
 
@@ -4402,8 +4367,7 @@ out:
  */
 struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 				    ffa_memory_handle_t handle,
-				    ffa_memory_region_flags_t flags,
-				    struct mpool *page_pool)
+				    ffa_memory_region_flags_t flags)
 {
 	struct share_states_locked share_states_locked;
 	struct ffa_memory_share_state *share_state;
@@ -4431,8 +4395,7 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	}
 
 	ret = reclaim_shared_state(share_states_locked, share_state, to_locked,
-				   handle, flags, page_pool);
-
+				   handle, flags);
 out:
 	share_states_unlock(&share_states_locked);
 	return ret;
@@ -4442,7 +4405,7 @@ out:
  * Helper to relinquish any regions borrowed by a partition on its behalf.
  */
 static void ffa_memory_relinquish_from_partition(
-	struct vm_locked vm_locked, struct mpool *ppool,
+	struct vm_locked vm_locked,
 	struct ffa_memory_share_state *share_state_itr)
 {
 	struct ffa_memory_region *memory_region;
@@ -4482,7 +4445,7 @@ static void ffa_memory_relinquish_from_partition(
 			vm_locked, share_state_itr->fragments,
 			share_state_itr->fragment_constituent_counts,
 			share_state_itr->fragment_count,
-			share_state_itr->sender_orig_mode, ppool, false);
+			share_state_itr->sender_orig_mode, false);
 
 		if (ret.func != FFA_SUCCESS_32) {
 			dlog_warning(
@@ -4504,7 +4467,7 @@ static void ffa_memory_relinquish_from_partition(
  * Helper to reclaim memory region owned by a partition.
  */
 static void ffa_memory_reclaim_from_partition(
-	struct vm_locked vm_locked, struct mpool *ppool,
+	struct vm_locked vm_locked,
 	struct share_states_locked share_states_locked,
 	struct ffa_memory_share_state *share_state_itr)
 {
@@ -4519,7 +4482,7 @@ static void ffa_memory_reclaim_from_partition(
 		share_state_itr->deferred_reclaim_pending = false;
 		ret = reclaim_shared_state(share_states_locked, share_state_itr,
 					   vm_locked, memory_region->handle,
-					   flags, ppool);
+					   flags);
 
 		if (ret.func != FFA_SUCCESS_32) {
 			dlog_verbose("Hafnium unable to reclaim\n");
@@ -4538,8 +4501,7 @@ static void ffa_memory_reclaim_from_partition(
  *   - Relinquishes any regions borrowed by the VM on its behalf.
  *   - Reclaims any regions owned by the VM.
  */
-void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
-					      struct mpool *ppool)
+void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked)
 {
 	struct share_states_locked share_states_locked;
 	struct ffa_memory_share_state *share_state_itr;
@@ -4553,10 +4515,10 @@ void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
 			continue;
 		}
 
-		ffa_memory_relinquish_from_partition(vm_locked, ppool,
+		ffa_memory_relinquish_from_partition(vm_locked,
 						     share_state_itr);
 		ffa_memory_reclaim_from_partition(
-			vm_locked, ppool, share_states_locked, share_state_itr);
+			vm_locked, share_states_locked, share_state_itr);
 	}
 
 	share_states_unlock(&share_states_locked);

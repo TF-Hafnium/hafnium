@@ -89,13 +89,13 @@ bool ffa_memory_is_mem_perm_set_valid(const struct vcpu *current)
 struct ffa_value ffa_memory_other_world_mem_send(
 	struct vm *from, uint32_t share_func,
 	struct ffa_memory_region **memory_region, uint32_t length,
-	uint32_t fragment_length, struct mpool *page_pool)
+	uint32_t fragment_length)
 {
 	struct ffa_value ret;
 	struct vm_locked from_locked = vm_lock(from);
 
 	ret = ffa_memory_send(from_locked, *memory_region, length,
-			      fragment_length, share_func, page_pool);
+			      fragment_length, share_func);
 	/*
 	 * ffa_memory_send takes ownership of the memory_region, so
 	 * make sure we don't free it.
@@ -113,11 +113,10 @@ struct ffa_value ffa_memory_other_world_mem_send(
  */
 struct ffa_value ffa_memory_other_world_mem_reclaim(
 	struct vm *to, ffa_memory_handle_t handle,
-	ffa_memory_region_flags_t flags, struct mpool *page_pool)
+	ffa_memory_region_flags_t flags)
 {
 	(void)handle;
 	(void)flags;
-	(void)page_pool;
 	(void)to;
 
 	dlog_verbose("Invalid handle %#lx for FFA_MEM_RECLAIM.\n", handle);
@@ -126,13 +125,12 @@ struct ffa_value ffa_memory_other_world_mem_reclaim(
 
 struct ffa_value ffa_memory_other_world_mem_send_continue(
 	struct vm *from, void *fragment, uint32_t fragment_length,
-	ffa_memory_handle_t handle, struct mpool *page_pool)
+	ffa_memory_handle_t handle)
 {
 	(void)from;
 	(void)fragment;
 	(void)fragment_length;
 	(void)handle;
-	(void)page_pool;
 
 	return ffa_error(FFA_INVALID_PARAMETERS);
 }

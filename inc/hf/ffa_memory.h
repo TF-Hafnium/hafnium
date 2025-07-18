@@ -8,7 +8,6 @@
 
 #pragma once
 
-#include "hf/mpool.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/ffa.h"
@@ -23,33 +22,28 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				 struct ffa_memory_region *memory_region,
 				 uint32_t memory_share_length,
-				 uint32_t fragment_length, uint32_t share_func,
-				 struct mpool *page_pool);
+				 uint32_t fragment_length, uint32_t share_func);
 struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 					  void *fragment,
 					  uint32_t fragment_length,
-					  ffa_memory_handle_t handle,
-					  struct mpool *page_pool);
+					  ffa_memory_handle_t handle);
 struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 				     struct ffa_memory_region *retrieve_request,
-				     uint32_t retrieve_request_length,
-				     struct mpool *page_pool);
+				     uint32_t retrieve_request_length);
 struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 					      ffa_memory_handle_t handle,
 					      uint32_t fragment_offset,
 					      ffa_id_t sender_vm_id,
-					      void *retrieve_continue_page,
-					      struct mpool *page_pool);
+					      void *retrieve_continue_page);
 struct ffa_value ffa_memory_relinquish(
 	struct vm_locked from_locked,
-	struct ffa_mem_relinquish *relinquish_request, struct mpool *page_pool);
+	struct ffa_mem_relinquish *relinquish_request);
 struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 				    ffa_memory_handle_t handle,
-				    ffa_memory_region_flags_t flags,
-				    struct mpool *page_pool);
+				    ffa_memory_region_flags_t flags);
 
-void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
-					      struct mpool *ppool);
+void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked);
+
 bool ffa_memory_get_share_states_info(struct ffa_address_map_desc *amd,
 				      ffa_id_t target_id,
 				      uint16_t *memory_index,
