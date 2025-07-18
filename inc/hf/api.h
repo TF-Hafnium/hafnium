@@ -9,7 +9,6 @@
 #pragma once
 
 #include "hf/cpu.h"
-#include "hf/mpool.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
@@ -22,7 +21,6 @@ static inline struct ffa_value api_ffa_interrupt_return(uint32_t id)
 }
 
 void api_init(void);
-struct mpool *api_get_ppool(void);
 struct vcpu *api_ffa_get_vm_vcpu(struct vm *vm, struct vcpu *current);
 void api_regs_state_saved(struct vcpu *vcpu);
 int64_t api_mailbox_writable_get(const struct vcpu *current);

@@ -110,20 +110,13 @@ static struct ffa_ns_res_info_get_state ffa_ns_res_state = {
 	.lock_instance = SPINLOCK_INIT,
 };
 
-static struct mpool api_page_pool;
-
 /**
  * Initialises the API page pool by taking ownership of the contents of the
  * given page pool.
  */
 void api_init(void)
 {
-	mpool_init_from(&api_page_pool, memory_alloc_get_ppool());
-}
-
-struct mpool *api_get_ppool(void)
-{
-	return &api_page_pool;
+	/* TODO: drop. */
 }
 
 /**
@@ -1583,8 +1576,7 @@ static bool api_mode_valid_owned_and_exclusive(mm_mode_t mode)
 static struct ffa_value api_vm_configure_stage1(
 	struct mm_stage1_locked mm_stage1_locked, struct vm_locked vm_locked,
 	paddr_t pa_send_begin, paddr_t pa_send_end, paddr_t pa_recv_begin,
-	paddr_t pa_recv_end, mm_mode_t extra_mode,
-	struct mpool *local_page_pool)
+	paddr_t pa_recv_end, mm_mode_t extra_mode)
 {
 	struct ffa_value ret;
 
@@ -1593,7 +1585,7 @@ static struct ffa_value api_vm_configure_stage1(
 	 */
 	vm_locked.vm->mailbox.send =
 		mm_identity_map(mm_stage1_locked, pa_send_begin, pa_send_end,
-				MM_MODE_R | extra_mode, local_page_pool);
+				MM_MODE_R | extra_mode);
 	if (!vm_locked.vm->mailbox.send) {
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1605,7 +1597,7 @@ static struct ffa_value api_vm_configure_stage1(
 	 */
 	vm_locked.vm->mailbox.recv =
 		mm_identity_map(mm_stage1_locked, pa_recv_begin, pa_recv_end,
-				MM_MODE_W | extra_mode, local_page_pool);
+				MM_MODE_W | extra_mode);
 	if (!vm_locked.vm->mailbox.recv) {
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto fail_undo_send;
@@ -1620,8 +1612,7 @@ static struct ffa_value api_vm_configure_stage1(
 	 */
 fail_undo_send:
 	vm_locked.vm->mailbox.send = NULL;
-	CHECK(mm_unmap(mm_stage1_locked, pa_send_begin, pa_send_end,
-		       local_page_pool));
+	CHECK(mm_unmap(mm_stage1_locked, pa_send_begin, pa_send_end));
 
 out:
 	return ret;
@@ -1642,8 +1633,7 @@ out:
 
 struct ffa_value api_vm_configure_pages(
 	struct mm_stage1_locked mm_stage1_locked, struct vm_locked vm_locked,
-	ipaddr_t send, ipaddr_t recv, uint32_t page_count,
-	struct mpool *local_page_pool)
+	ipaddr_t send, ipaddr_t recv, uint32_t page_count)
 {
 	struct ffa_value ret;
 	paddr_t pa_send_begin;
@@ -1728,7 +1718,7 @@ struct ffa_value api_vm_configure_pages(
 		}
 
 		if (!vm_identity_map(vm_locked, pa_send_begin, pa_send_end,
-				     mode, local_page_pool, NULL)) {
+				     mode, NULL)) {
 			dlog_error(
 				"Cannot allocate a new entry in stage 2 "
 				"translation table.\n");
@@ -1742,18 +1732,18 @@ struct ffa_value api_vm_configure_pages(
 		}
 
 		if (!vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
-				     mode, local_page_pool, NULL)) {
+				     mode, NULL)) {
 			/* TODO: partial defrag of failed range. */
 			/* Recover any memory consumed in failed mapping. */
 			dlog_error("%s: cannot map recv page\n", __func__);
-			vm_ptable_defrag(vm_locked, local_page_pool);
+			vm_ptable_defrag(vm_locked);
 			ret = ffa_error(FFA_NO_MEMORY);
 			goto fail_undo_send;
 		}
 	} else {
 		ret = arch_other_world_vm_configure_rxtx_map(
-			vm_locked, local_page_pool, pa_send_begin, pa_send_end,
-			pa_recv_begin, pa_recv_end);
+			vm_locked, pa_send_begin, pa_send_end, pa_recv_begin,
+			pa_recv_end);
 		if (ret.func != FFA_SUCCESS_32) {
 			goto out;
 		}
@@ -1779,7 +1769,7 @@ struct ffa_value api_vm_configure_pages(
 
 	ret = api_vm_configure_stage1(mm_stage1_locked, vm_locked,
 				      pa_send_begin, pa_send_end, pa_recv_begin,
-				      pa_recv_end, extra_mode, local_page_pool);
+				      pa_recv_end, extra_mode);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto fail_undo_send_and_recv;
 	}
@@ -1789,11 +1779,11 @@ struct ffa_value api_vm_configure_pages(
 
 fail_undo_send_and_recv:
 	CHECK(vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
-			      orig_recv_mode, local_page_pool, NULL));
+			      orig_recv_mode, NULL));
 
 fail_undo_send:
 	CHECK(vm_identity_map(vm_locked, pa_send_begin, pa_send_end,
-			      orig_send_mode, local_page_pool, NULL));
+			      orig_send_mode, NULL));
 
 out:
 	return ret;
@@ -1879,7 +1869,6 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	struct ffa_value ret;
 	struct vm_locked owner_vm_locked;
 	struct mm_stage1_locked mm_stage1_locked;
-	struct mpool local_page_pool;
 	ffa_id_t owner_vm_id;
 
 	/*
@@ -1906,12 +1895,12 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	 * thread. This is to ensure the original mapping can be restored if any
 	 * stage of the process fails.
 	 */
-	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
+	/* TODO: think about this case. */
 
 	mm_stage1_locked = mm_lock_stage1();
 
 	ret = api_vm_configure_pages(mm_stage1_locked, owner_vm_locked, send,
-				     recv, page_count, &local_page_pool);
+				     recv, page_count);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto exit;
 	}
@@ -1932,7 +1921,7 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	}
 
 exit:
-	mpool_fini(&local_page_pool);
+	// mpool_fini(&local_page_pool);
 	mm_unlock_stage1(&mm_stage1_locked);
 	vm_unlock(&owner_vm_locked);
 
@@ -1997,7 +1986,7 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 		goto out;
 	}
 
-	vm_unmap_rxtx(vm_locked, &api_page_pool);
+	vm_unmap_rxtx(vm_locked);
 
 	if (!vm_id_is_current_world(owner_vm_id)) {
 		send_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.send));
@@ -2008,18 +1997,16 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 		mm_stage1_locked = mm_lock_stage1();
 
 		ret = arch_other_world_vm_configure_rxtx_unmap(
-			vm_locked, &api_page_pool, send_pa_begin, send_pa_end,
-			recv_pa_begin, recv_pa_end);
+			vm_locked, send_pa_begin, send_pa_end, recv_pa_begin,
+			recv_pa_end);
 		if (ret.func != FFA_SUCCESS_32) {
 			mm_unlock_stage1(&mm_stage1_locked);
 			goto out;
 		}
 
 		/* Unmap the buffers in the partition manager. */
-		CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end,
-			       &api_page_pool));
-		CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end,
-			       &api_page_pool));
+		CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end));
+		CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end));
 
 		vm->mailbox.send = NULL;
 		vm->mailbox.recv = NULL;
@@ -3639,7 +3626,8 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	 */
 	memcpy_s(allocated, MM_PPOOL_ENTRY_SIZE, memory_region_v1_1,
 		 *fragment_length);
-	mpool_free(&api_page_pool, memory_region_v1_1);
+
+	memory_free(memory_region_v1_1, PAGE_SIZE);
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
@@ -3804,15 +3792,14 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	}
 
 	if (targets_other_world) {
-		ret = ffa_memory_other_world_mem_send(
-			from, share_func, &memory_region, length,
-			fragment_length, &api_page_pool);
+		ret = ffa_memory_other_world_mem_send(from, share_func,
+						      &memory_region, length,
+						      fragment_length);
 	} else {
 		struct vm_locked from_locked = vm_lock(from);
 
 		ret = ffa_memory_send(from_locked, memory_region, length,
-				      fragment_length, share_func,
-				      &api_page_pool);
+				      fragment_length, share_func);
 		/*
 		 * ffa_memory_send takes ownership of the memory_region, so
 		 * make sure we don't free it.
@@ -3824,7 +3811,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 
 out:
 	if (memory_region != NULL) {
-		mpool_free(&api_page_pool, memory_region);
+		memory_free(memory_region, PAGE_SIZE);
 	}
 
 	return ret;
@@ -3974,8 +3961,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 
 	if (ffa_memory_is_handle_allocated_by_current_world(
 		    retrieve_request->handle)) {
-		ret = ffa_memory_retrieve(to_locked, retrieve_request, length,
-					  &api_page_pool);
+		ret = ffa_memory_retrieve(to_locked, retrieve_request, length);
 	} else {
 		dlog_error("Invalid FF-A memory handle.\n");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -4115,8 +4101,7 @@ struct ffa_value api_ffa_mem_relinquish(struct vcpu *current)
 	 * the retrieve request.
 	 */
 	if (ret.func == FFA_SUCCESS_32) {
-		ret = ffa_memory_relinquish(from_locked, relinquish_request,
-					    &api_page_pool);
+		ret = ffa_memory_relinquish(from_locked, relinquish_request);
 	}
 
 out:
@@ -4134,13 +4119,11 @@ struct ffa_value api_ffa_mem_reclaim(ffa_memory_handle_t handle,
 	if (ffa_memory_is_handle_allocated_by_current_world(handle)) {
 		struct vm_locked to_locked = vm_lock(to);
 
-		ret = ffa_memory_reclaim(to_locked, handle, flags,
-					 &api_page_pool);
+		ret = ffa_memory_reclaim(to_locked, handle, flags);
 
 		vm_unlock(&to_locked);
 	} else {
-		ret = ffa_memory_other_world_mem_reclaim(to, handle, flags,
-							 &api_page_pool);
+		ret = ffa_memory_other_world_mem_reclaim(to, handle, flags);
 	}
 
 	return ret;
@@ -4188,9 +4171,9 @@ struct ffa_value api_ffa_mem_frag_rx(ffa_memory_handle_t handle,
 	 * smoothly terminate the operation if the access has been preempted by
 	 * a GPF exception.
 	 */
-	ret = ffa_memory_retrieve_continue(
-		to_locked, handle, fragment_offset, sender_vm_id,
-		cpu_get_buffer(current->cpu), &api_page_pool);
+	ret = ffa_memory_retrieve_continue(to_locked, handle, fragment_offset,
+					   sender_vm_id,
+					   cpu_get_buffer(current->cpu));
 out:
 	vm_unlock(&to_locked);
 	return ret;
@@ -4272,8 +4255,7 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 		struct vm_locked from_locked = vm_lock(from);
 
 		ret = ffa_memory_send_continue(from_locked, fragment_copy,
-					       fragment_length, handle,
-					       &api_page_pool);
+					       fragment_length, handle);
 		/*
 		 * `ffa_memory_send_continue` takes ownership of the
 		 * fragment_copy, so we don't need to free it here.
@@ -4281,8 +4263,7 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 		vm_unlock(&from_locked);
 	} else {
 		ret = ffa_memory_other_world_mem_send_continue(
-			from, fragment_copy, fragment_length, handle,
-			&api_page_pool);
+			from, fragment_copy, fragment_length, handle);
 	}
 
 	return ret;
@@ -4953,7 +4934,6 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	bool mode_ret;
 	mm_mode_t original_mode;
 	mm_mode_t new_mode;
-	struct mpool local_page_pool;
 	vaddr_t end_addr;
 
 	if (!ffa_memory_is_mem_perm_set_valid(current)) {
@@ -5007,7 +4987,7 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	 * thread. This is to ensure the original mapping can be restored if any
 	 * stage of the process fails.
 	 */
-	mpool_init_with_fallback(&local_page_pool, &api_page_pool);
+	/* TODO: think about this previous comment. */
 
 	vm_locked = vm_lock(current->vm);
 
@@ -5051,8 +5031,7 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	 * valid, and the memory requested to be re-mapped is also valid.
 	 */
 	if (!mm_identity_prepare(&vm_locked.vm->ptable, pa_from_va(base_addr),
-				 pa_from_va(end_addr), new_mode,
-				 &local_page_pool)) {
+				 pa_from_va(end_addr), new_mode)) {
 		dlog_error(
 			"FFA_MEM_PERM_SET: remapping memory range %#016lx - "
 			"%#016lx failed\n",
@@ -5063,7 +5042,7 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 		 * mm_identity_prepare could have allocated or freed pages to
 		 * split blocks or tables etc.
 		 */
-		mm_stage1_defrag(&vm_locked.vm->ptable, &local_page_pool);
+		mm_stage1_defrag(&vm_locked.vm->ptable);
 
 		/*
 		 * Guaranteed to succeed mapping with old mode since the mapping
@@ -5071,25 +5050,29 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 		 * that should have sufficient memory to go back to the original
 		 * state.
 		 */
-		CHECK(mm_identity_prepare(
-			&vm_locked.vm->ptable, pa_from_va(base_addr),
-			pa_from_va(end_addr), original_mode, &local_page_pool));
+		CHECK(mm_identity_prepare(&vm_locked.vm->ptable,
+					  pa_from_va(base_addr),
+					  pa_from_va(end_addr), original_mode));
 		mm_identity_commit(&vm_locked.vm->ptable, pa_from_va(base_addr),
-				   pa_from_va(end_addr), original_mode,
-				   &local_page_pool);
+				   pa_from_va(end_addr), original_mode);
 
-		mm_stage1_defrag(&vm_locked.vm->ptable, &api_page_pool);
+		mm_stage1_defrag(&vm_locked.vm->ptable);
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
 
 	mm_identity_commit(&vm_locked.vm->ptable, pa_from_va(base_addr),
-			   pa_from_va(end_addr), new_mode, &local_page_pool);
+			   pa_from_va(end_addr), new_mode);
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
-	mpool_fini(&local_page_pool);
+	/**
+	 * TODO: In this specific case should how should we consider giving back
+	 * to the base ppool.
+	 */
+	// mpool_fini(&local_page_pool);
+
 	vm_unlock(&vm_locked);
 
 	return ret;
@@ -5262,7 +5245,7 @@ static bool api_ffa_ns_res_info_get_acquire_amd(
 
 		/* Allocate a new page. */
 		ffa_ns_res_state.desc_fragments[*alloc_index] =
-			mpool_alloc(&api_page_pool);
+			memory_alloc(PAGE_SIZE);
 		if (ffa_ns_res_state.desc_fragments[*alloc_index] == NULL) {
 			dlog_error(
 				"%s: Failed to allocate AMD @ index: %d with "
@@ -5464,7 +5447,7 @@ static struct ffa_value api_ffa_ns_res_info_get_generate_data(
 
 	/* Allocate the resource descriptor. */
 	ffa_ns_res_state.desc_fragments[ffa_ns_res_state.alloc_index] =
-		mpool_alloc(&api_page_pool);
+		memory_alloc(PAGE_SIZE);
 	if (ffa_ns_res_state.desc_fragments[ffa_ns_res_state.alloc_index] ==
 	    NULL) {
 		dlog_error("%s: Failed to allocate resource descriptor\n",
@@ -5724,8 +5707,8 @@ void ffa_ns_res_info_get_state_reset(void)
 
 	for (uint8_t i = 0; i < FFA_NS_RES_INFO_GET_MAX_FRAGMENTS; i++) {
 		if (ffa_ns_res_state.desc_fragments[i] != NULL) {
-			mpool_free(&api_page_pool,
-				   ffa_ns_res_state.desc_fragments[i]);
+			memory_free(ffa_ns_res_state.desc_fragments[i],
+				    PAGE_SIZE);
 		}
 	}
 
