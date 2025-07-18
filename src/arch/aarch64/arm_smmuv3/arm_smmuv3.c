@@ -13,6 +13,7 @@
 #include "hf/dlog.h"
 #include "hf/io.h"
 #include "hf/panic.h"
+#include "hf/plat/memory_alloc.h"
 
 #define MAX_ATTEMPTS 50000
 
@@ -411,8 +412,7 @@ static bool smmuv3_xlat_support(struct smmuv3_driver *smmuv3)
 	return true;
 }
 
-static bool smmuv3_configure_cmdq(struct smmuv3_driver *smmuv3,
-				  struct mpool *pool)
+static bool smmuv3_configure_cmdq(struct smmuv3_driver *smmuv3)
 {
 	uint32_t cmdq_size;
 	uint64_t cmdq_base_reg;
@@ -422,8 +422,7 @@ static bool smmuv3_configure_cmdq(struct smmuv3_driver *smmuv3,
 	dlog_verbose("SMMUv3: Total CMDQ entries: %d\n",
 		     (1 << smmuv3->prop.cmdq_entries_log2));
 
-	q_base = mpool_alloc_contiguous(pool, (cmdq_size / FFA_PAGE_SIZE) + 1,
-					1);
+	q_base = memory_alloc((cmdq_size / FFA_PAGE_SIZE) + 1);
 
 	if (q_base == NULL) {
 		dlog_error(
@@ -464,8 +463,7 @@ static bool smmuv3_configure_cmdq(struct smmuv3_driver *smmuv3,
 	return true;
 }
 
-static bool smmuv3_configure_evtq(struct smmuv3_driver *smmuv3,
-				  struct mpool *pool)
+static bool smmuv3_configure_evtq(struct smmuv3_driver *smmuv3)
 {
 	uint32_t evtq_size;
 	uint32_t offset_evtq_base;
@@ -478,8 +476,7 @@ static bool smmuv3_configure_evtq(struct smmuv3_driver *smmuv3,
 	dlog_verbose("SMMUv3: Total EVTQ entries: %d\n",
 		     (1 << smmuv3->prop.evtq_entries_log2));
 
-	q_base = mpool_alloc_contiguous(pool, (evtq_size / FFA_PAGE_SIZE) + 1,
-					1);
+	q_base = memory_alloc((evtq_size / FFA_PAGE_SIZE) + 1);
 
 	if (q_base == NULL) {
 		dlog_error(
@@ -558,8 +555,7 @@ static void smmuv3_invalidate_stes(struct smmuv3_driver *smmuv3)
 	}
 }
 
-static bool smmuv3_configure_str_table(struct smmuv3_driver *smmuv3,
-				       struct mpool *pool)
+static bool smmuv3_configure_str_table(struct smmuv3_driver *smmuv3)
 {
 	uint32_t strtab_size;
 	uint32_t strtab_cfg_reg;
@@ -571,9 +567,7 @@ static bool smmuv3_configure_str_table(struct smmuv3_driver *smmuv3,
 	strtab_size = (1 << smmuv3->prop.stream_n_bits) * STE_SIZE;
 	dlog_verbose("SMMUv3 Total StreamTable entries: %d\n",
 		     (1 << smmuv3->prop.stream_n_bits));
-
-	tbl_base = mpool_alloc_contiguous(pool,
-					  (strtab_size / FFA_PAGE_SIZE) + 1, 1);
+	tbl_base = memory_alloc((strtab_size / FFA_PAGE_SIZE) + 1);
 
 	if (tbl_base == NULL) {
 		dlog_error(
@@ -609,18 +603,17 @@ static bool smmuv3_configure_str_table(struct smmuv3_driver *smmuv3,
 	return true;
 }
 
-static bool smmuv3_configure_queues(struct smmuv3_driver *smmuv3,
-				    struct mpool *pool)
+static bool smmuv3_configure_queues(struct smmuv3_driver *smmuv3)
 {
 	if (!smmuv3_queue_sizes(smmuv3)) {
 		return false;
 	}
 
-	if (!smmuv3_configure_cmdq(smmuv3, pool)) {
+	if (!smmuv3_configure_cmdq(smmuv3)) {
 		return false;
 	}
 
-	if (!smmuv3_configure_evtq(smmuv3, pool)) {
+	if (!smmuv3_configure_evtq(smmuv3)) {
 		return false;
 	}
 
@@ -1139,14 +1132,13 @@ static bool smmuv3_enable_init(struct smmuv3_driver *smmuv3)
 }
 
 bool smmuv3_driver_init(struct smmuv3_driver *smmuv3, uintpaddr_t base,
-			struct mm_stage1_locked stage1_locked,
-			struct mpool *ppool)
+			struct mm_stage1_locked stage1_locked)
 {
 	void *base_addr;
 
 	base_addr = mm_identity_map(stage1_locked, pa_init(base),
 				    pa_init(base + SMMUv3_MEM_SIZE),
-				    MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool);
+				    MM_MODE_R | MM_MODE_W | MM_MODE_D);
 	if (base_addr == NULL) {
 		dlog_error(
 			"SMMUv3: Could not map SMMU into Hafnium memory map\n");
@@ -1170,11 +1162,11 @@ bool smmuv3_driver_init(struct smmuv3_driver *smmuv3, uintpaddr_t base,
 		return false;
 	}
 
-	if (!smmuv3_configure_queues(smmuv3, ppool)) {
+	if (!smmuv3_configure_queues(smmuv3)) {
 		return false;
 	}
 
-	if (!smmuv3_configure_str_table(smmuv3, ppool)) {
+	if (!smmuv3_configure_str_table(smmuv3)) {
 		return false;
 	}
 
@@ -1368,12 +1360,11 @@ static bool smmuv3_configure_stream(struct smmuv3_driver *smmuv3,
 }
 
 bool plat_iommu_init(const struct fdt *fdt,
-		     struct mm_stage1_locked stage1_locked, struct mpool *ppool)
+		     struct mm_stage1_locked stage1_locked)
 {
 	(void)fdt;
 
-	if (!smmuv3_driver_init(&arm_smmuv3, SMMUv3_BASE, stage1_locked,
-				ppool)) {
+	if (!smmuv3_driver_init(&arm_smmuv3, SMMUv3_BASE, stage1_locked)) {
 		dlog_error("SMMUv3: Failed to initialize driver\n");
 		return false;
 	}
@@ -1383,10 +1374,9 @@ bool plat_iommu_init(const struct fdt *fdt,
 	return true;
 }
 
-bool plat_iommu_unmap_iommus(struct vm_locked vm_locked, struct mpool *ppool)
+bool plat_iommu_unmap_iommus(struct vm_locked vm_locked)
 {
 	(void)vm_locked;
-	(void)ppool;
 
 	return true;
 }
@@ -1402,11 +1392,9 @@ void plat_iommu_identity_map(struct vm_locked vm_locked, paddr_t begin,
 
 bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
 				  struct vm_locked vm_locked,
-				  const struct manifest_vm *manifest_vm,
-				  struct mpool *ppool)
+				  const struct manifest_vm *manifest_vm)
 {
 	(void)stage1_locked;
-	(void)ppool;
 
 	unsigned int i;
 	unsigned int j;

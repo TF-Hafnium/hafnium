@@ -154,7 +154,7 @@ void one_time_init(void)
 	ffa_init_set_tee_enabled(manifest->ffa_tee_enabled);
 	ffa_init_version();
 
-	if (!plat_iommu_init(&fdt, mm_stage1_locked, ppool)) {
+	if (!plat_iommu_init(&fdt, mm_stage1_locked)) {
 		panic("Could not initialize IOMMUs.");
 	}
 

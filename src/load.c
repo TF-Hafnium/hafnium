@@ -280,8 +280,8 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	/* Initialize architecture-specific features. */
 	arch_vm_features_set(vm_locked.vm);
 
-	if (!plat_iommu_attach_peripheral(stage1_locked, vm_locked, manifest_vm,
-					  memory_alloc_get_ppool())) {
+	if (!plat_iommu_attach_peripheral(stage1_locked, vm_locked,
+					  manifest_vm)) {
 		dlog_error("Unable to attach upstream peripheral device\n");
 		return false;
 	}
@@ -409,7 +409,7 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 		goto out;
 	}
 
-	if (!plat_iommu_unmap_iommus(vm_locked, memory_alloc_get_ppool())) {
+	if (!plat_iommu_unmap_iommus(vm_locked)) {
 		dlog_error("Unable to unmap IOMMUs from primary VM.\n");
 		ret = false;
 		goto out;

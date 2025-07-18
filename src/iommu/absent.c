@@ -9,19 +9,17 @@
 #include "hf/plat/iommu.h"
 
 bool plat_iommu_init(const struct fdt *fdt,
-		     struct mm_stage1_locked stage1_locked, struct mpool *ppool)
+		     struct mm_stage1_locked stage1_locked)
 {
 	(void)fdt;
 	(void)stage1_locked;
-	(void)ppool;
 
 	return true;
 }
 
-bool plat_iommu_unmap_iommus(struct vm_locked vm_locked, struct mpool *ppool)
+bool plat_iommu_unmap_iommus(struct vm_locked vm_locked)
 {
 	(void)vm_locked;
-	(void)ppool;
 
 	return true;
 }
@@ -37,13 +35,11 @@ void plat_iommu_identity_map(struct vm_locked vm_locked, paddr_t begin,
 
 bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
 				  struct vm_locked vm_locked,
-				  const struct manifest_vm *manifest_vm,
-				  struct mpool *ppool)
+				  const struct manifest_vm *manifest_vm)
 {
 	(void)stage1_locked;
 	(void)vm_locked;
 	(void)manifest_vm;
-	(void)ppool;
 
 	return true;
 }

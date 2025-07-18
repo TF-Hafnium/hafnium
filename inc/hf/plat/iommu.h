@@ -19,8 +19,7 @@
  * into the hypervisor's address space so they are accessible by the driver.
  */
 bool plat_iommu_init(const struct fdt *fdt,
-		     struct mm_stage1_locked stage1_locked,
-		     struct mpool *ppool);
+		     struct mm_stage1_locked stage1_locked);
 
 /**
  * Unmaps the address space used by the platform IOMMU driver from the VM so
@@ -30,7 +29,7 @@ bool plat_iommu_init(const struct fdt *fdt,
  * `plat_iommu_identity_map` being invoked to apply the change to the IOMMU
  * mapping as well. The module must ensure it can handle this reentrancy.
  */
-bool plat_iommu_unmap_iommus(struct vm_locked vm_locked, struct mpool *ppool);
+bool plat_iommu_unmap_iommus(struct vm_locked vm_locked);
 
 /**
  * Maps the address range with the given mode for the given VM in the IOMMU.
@@ -66,5 +65,4 @@ void plat_iommu_identity_map(struct vm_locked vm_locked, paddr_t begin,
  */
 bool plat_iommu_attach_peripheral(struct mm_stage1_locked stage1_locked,
 				  struct vm_locked vm_locked,
-				  const struct manifest_vm *manifest_vm,
-				  struct mpool *ppool);
+				  const struct manifest_vm *manifest_vm);
