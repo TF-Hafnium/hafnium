@@ -14,8 +14,8 @@
  * Set architecture-specific features for the specified VM.
  */
 void arch_vm_features_set(struct vm *vm);
-bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool);
-bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool);
+bool arch_vm_init_mm(struct vm *vm);
+bool arch_vm_iommu_init_mm(struct vm *vm);
 bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
 			      paddr_t end, mm_mode_t mode, struct mpool *ppool);
 void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,

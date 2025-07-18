@@ -257,7 +257,7 @@ void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
 	 * given the change to perform any reclaim or relinquish actions on
 	 * behalf of aborting partition.
 	 */
-	vm_unmap_memory_regions(vm_locked, ppool);
+	vm_unmap_memory_regions(vm_locked);
 }
 
 /**

@@ -54,8 +54,7 @@ struct ffa_value api_ffa_rx_release(ffa_id_t receiver_id, struct vcpu *current);
 struct ffa_value api_ffa_rx_acquire(ffa_id_t receiver_id, struct vcpu *current);
 struct ffa_value api_vm_configure_pages(
 	struct mm_stage1_locked mm_stage1_locked, struct vm_locked vm_locked,
-	ipaddr_t send, ipaddr_t recv, uint32_t page_count,
-	struct mpool *local_page_pool);
+	ipaddr_t send, ipaddr_t recv, uint32_t page_count);
 struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 				  uint32_t page_count, struct vcpu *current);
 struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id,

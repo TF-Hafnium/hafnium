@@ -317,13 +317,11 @@ struct two_vm_locked {
 	struct vm_locked vm2;
 };
 
-struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
-		   struct mpool *ppool, bool el0_partition,
+struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count, bool el0_partition,
 		   uint8_t dma_device_count);
-bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
-		  struct vm **new_vm, bool el0_partition,
-		  uint8_t dma_device_count);
-bool vm_reinit(struct vm *vm, struct mpool *ppool);
+bool vm_reinit(struct vm *vm);
+bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct vm **new_vm,
+		  bool el0_partition, uint8_t dma_device_count);
 ffa_vm_count_t vm_get_count(void);
 struct vm *vm_find(ffa_id_t id);
 struct vm_locked vm_find_locked(ffa_id_t id);
@@ -338,27 +336,25 @@ bool vm_id_is_current_world(ffa_id_t vm_id);
 bool vm_is_mailbox_busy(struct vm_locked to);
 bool vm_is_mailbox_other_world_owned(struct vm_locked to);
 bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-		     mm_mode_t mode, struct mpool *ppool, ipaddr_t *ipa);
+		     mm_mode_t mode, ipaddr_t *ipa);
 bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-			 mm_mode_t mode, struct mpool *ppool);
+			 mm_mode_t mode);
 void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-			mm_mode_t mode, struct mpool *ppool, ipaddr_t *ipa);
-bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-	      struct mpool *ppool);
-void vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool);
-void vm_free_ptables(struct vm *vm, struct mpool *ppool);
-bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool);
-void vm_unmap_rxtx(struct vm_locked vm_locked, struct mpool *ppool);
-void vm_unmap_memory_regions(struct vm_locked vm_locked, struct mpool *ppool);
+			mm_mode_t mode, ipaddr_t *ipa);
+void vm_free_ptables(struct vm *vm);
+void vm_unmap_rxtx(struct vm_locked vm_locked);
+void vm_unmap_memory_regions(struct vm_locked vm_locked);
+bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end);
+void vm_ptable_defrag(struct vm_locked vm_locked);
+bool vm_unmap_hypervisor(struct vm_locked vm_locked);
 
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     mm_mode_t *mode);
 bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, mm_mode_t mode, struct mpool *ppool,
-			      ipaddr_t *ipa, uint8_t dma_device_id);
+			      paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+			      uint8_t dma_device_id);
 
 void vm_notifications_init(struct vm *vm);
-void vm_reset_notifications(struct vm_locked vm_locked);
 bool vm_mailbox_state_busy(struct vm_locked vm_locked);
 bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 				  ffa_notifications_bitmap_t notifications);

@@ -19,6 +19,7 @@
 #include "hf/ffa.h"
 #include "hf/layout.h"
 #include "hf/plat/iommu.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/call.h"
@@ -48,19 +49,17 @@ static struct {
 	struct spinlock lock;
 } all_notifications_state;
 
-static bool vm_init_mm(struct vm *vm, struct mpool *ppool)
+static bool vm_init_mm(struct vm *vm)
 {
-	return arch_vm_init_mm(vm, ppool) && arch_vm_iommu_init_mm(vm, ppool);
+	return arch_vm_init_mm(vm) && arch_vm_iommu_init_mm(vm);
 }
 
 static bool vm_init_helper(struct vm *vm, ffa_id_t id,
-			   ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
-			   bool el0_partition, uint8_t dma_device_count)
+			   ffa_vcpu_count_t vcpu_count, bool el0_partition,
+			   uint8_t dma_device_count)
 {
 	uint32_t i;
-	size_t vcpu_ppool_entries = (align_up(sizeof(struct vcpu) * vcpu_count,
-					      MM_PPOOL_ENTRY_SIZE) /
-				     MM_PPOOL_ENTRY_SIZE);
+	size_t vcpus_size = sizeof(struct vcpu) * vcpu_count;
 
 	memset_s(vm, sizeof(*vm), 0, sizeof(*vm));
 
@@ -69,16 +68,15 @@ static bool vm_init_helper(struct vm *vm, ffa_id_t id,
 	vm->id = id;
 	vm->vcpu_count = vcpu_count;
 
-	/* Reallocate from memory pool */
-	vm->vcpus = (struct vcpu *)mpool_alloc_contiguous(
-		ppool, vcpu_ppool_entries, 1);
+	vm->vcpus = memory_alloc(vcpus_size);
+
 	CHECK(vm->vcpus != NULL);
 
 	vm->mailbox.state = MAILBOX_STATE_EMPTY;
 	vm->el0_partition = el0_partition;
 	vm->dma_device_count = dma_device_count;
 
-	if (!vm_init_mm(vm, ppool)) {
+	if (!vm_init_mm(vm)) {
 		dlog_error("Failed to (re)build page tables\n");
 		return false;
 	}
@@ -92,13 +90,13 @@ static bool vm_init_helper(struct vm *vm, ffa_id_t id,
 	}
 
 	vm_notifications_init(vm);
+
 	list_init(&vm->boot_list_node);
 
 	return true;
 }
 
-struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
-		   struct mpool *ppool, bool el0_partition,
+struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count, bool el0_partition,
 		   uint8_t dma_device_count)
 {
 	struct vm *vm;
@@ -114,7 +112,7 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 		vm = &vms[vm_index];
 	}
 
-	if (vm_init_helper(vm, id, vcpu_count, ppool, el0_partition,
+	if (vm_init_helper(vm, id, vcpu_count, el0_partition,
 			   dma_device_count)) {
 		return vm;
 	}
@@ -122,17 +120,16 @@ struct vm *vm_init(ffa_id_t id, ffa_vcpu_count_t vcpu_count,
 	return NULL;
 }
 
-bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
-		  struct vm **new_vm, bool el0_partition,
-		  uint8_t dma_device_count)
+bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct vm **new_vm,
+		  bool el0_partition, uint8_t dma_device_count)
 {
 	if (vm_count >= MAX_VMS) {
 		return false;
 	}
 
 	/* Generate IDs based on an offset, as low IDs e.g., 0, are reserved */
-	*new_vm = vm_init(vm_count + HF_VM_ID_OFFSET, vcpu_count, ppool,
-			  el0_partition, dma_device_count);
+	*new_vm = vm_init(vm_count + HF_VM_ID_OFFSET, vcpu_count, el0_partition,
+			  dma_device_count);
 	if (*new_vm == NULL) {
 		return false;
 	}
@@ -141,7 +138,7 @@ bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
 	return true;
 }
 
-bool vm_reinit(struct vm *vm, struct mpool *ppool)
+bool vm_reinit(struct vm *vm)
 {
 	size_t vcpu_ppool_size;
 	void *deferred_memory_ptr;
@@ -177,8 +174,8 @@ bool vm_reinit(struct vm *vm, struct mpool *ppool)
 		return false;
 	}
 
-	ret = vm_init_helper(vm, vm->id, vm->vcpu_count, ppool,
-			     vm->el0_partition, vm->dma_device_count);
+	ret = vm_init_helper(vm, vm->id, vm->vcpu_count, vm->el0_partition,
+			     vm->dma_device_count);
 
 	if (!ret) {
 		dlog_error("Failed to re-initialize VM.\n");
@@ -365,13 +362,13 @@ bool vm_id_is_current_world(ffa_id_t vm_id)
  *
  */
 bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-		     mm_mode_t mode, struct mpool *ppool, ipaddr_t *ipa)
+		     mm_mode_t mode, ipaddr_t *ipa)
 {
-	if (!vm_identity_prepare(vm_locked, begin, end, mode, ppool)) {
+	if (!vm_identity_prepare(vm_locked, begin, end, mode)) {
 		return false;
 	}
 
-	vm_identity_commit(vm_locked, begin, end, mode, ppool, ipa);
+	vm_identity_commit(vm_locked, begin, end, mode, ipa);
 
 	return true;
 }
@@ -387,9 +384,9 @@ bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
  * made.
  */
 bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-			 mm_mode_t mode, struct mpool *ppool)
+			 mm_mode_t mode)
 {
-	return arch_vm_identity_prepare(vm_locked, begin, end, mode, ppool);
+	return arch_vm_identity_prepare(vm_locked, begin, end, mode);
 }
 
 /**
@@ -398,9 +395,9 @@ bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
  * this condition.
  */
 void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-			mm_mode_t mode, struct mpool *ppool, ipaddr_t *ipa)
+			mm_mode_t mode, ipaddr_t *ipa)
 {
-	arch_vm_identity_commit(vm_locked, begin, end, mode, ppool, ipa);
+	arch_vm_identity_commit(vm_locked, begin, end, mode, ipa);
 }
 
 /**
@@ -409,46 +406,42 @@ void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
  * Returns true on success, or false if the update failed and no changes were
  * made.
  */
-bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-	      struct mpool *ppool)
+bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end)
 {
-	return arch_vm_unmap(vm_locked, begin, end, ppool);
+	return arch_vm_unmap(vm_locked, begin, end);
 }
 
 /**
  * Defrag page tables for an EL0 partition or for a VM.
  */
-void vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
+void vm_ptable_defrag(struct vm_locked vm_locked)
 {
-	arch_vm_ptable_defrag(vm_locked, ppool);
+	arch_vm_ptable_defrag(vm_locked);
 }
 
 /**
  * Free all page tables associated with a partition.
  */
-void vm_free_ptables(struct vm *vm, struct mpool *ppool)
+void vm_free_ptables(struct vm *vm)
 {
-	arch_vm_fini_mm(vm, ppool);
-	arch_vm_iommu_fini_mm(vm, ppool);
+	arch_vm_fini_mm(vm);
+	arch_vm_iommu_fini_mm(vm);
 }
 
 /**
  * Unmaps the hypervisor pages from the given page table.
  */
-bool vm_unmap_hypervisor(struct vm_locked vm_locked, struct mpool *ppool)
+bool vm_unmap_hypervisor(struct vm_locked vm_locked)
 {
 	/* TODO: If we add pages dynamically, they must be included here too. */
-	return vm_unmap(vm_locked, layout_text_begin(), layout_text_end(),
-			ppool) &&
-	       vm_unmap(vm_locked, layout_rodata_begin(), layout_rodata_end(),
-			ppool) &&
-	       vm_unmap(vm_locked, layout_data_begin(), layout_data_end(),
-			ppool) &&
-	       vm_unmap(vm_locked, layout_stacks_begin(), layout_stacks_end(),
-			ppool);
+	return vm_unmap(vm_locked, layout_text_begin(), layout_text_end()) &&
+	       vm_unmap(vm_locked, layout_rodata_begin(),
+			layout_rodata_end()) &&
+	       vm_unmap(vm_locked, layout_data_begin(), layout_data_end()) &&
+	       vm_unmap(vm_locked, layout_stacks_begin(), layout_stacks_end());
 }
 
-void vm_unmap_rxtx(struct vm_locked vm_locked, struct mpool *ppool)
+void vm_unmap_rxtx(struct vm_locked vm_locked)
 {
 	struct vm *vm = vm_locked.vm;
 	struct mm_stage1_locked mm_stage1_locked;
@@ -458,7 +451,6 @@ void vm_unmap_rxtx(struct vm_locked vm_locked, struct mpool *ppool)
 	paddr_t recv_pa_end;
 
 	assert(vm != NULL);
-	assert(ppool != NULL);
 
 	if (vm->mailbox.send == NULL || vm->mailbox.recv == NULL) {
 		return;
@@ -483,14 +475,14 @@ void vm_unmap_rxtx(struct vm_locked vm_locked, struct mpool *ppool)
 	 * the RXTX buffers we can safely remap them.
 	 */
 	CHECK(vm_identity_map(vm_locked, send_pa_begin, send_pa_end,
-			      MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool, NULL));
+			      MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL));
 
 	CHECK(vm_identity_map(vm_locked, recv_pa_begin, recv_pa_end,
-			      MM_MODE_R | MM_MODE_W | MM_MODE_X, ppool, NULL));
+			      MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL));
 
 	/* Unmap the buffers in the partition manager. */
-	CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end, ppool));
-	CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end, ppool));
+	CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end));
+	CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end));
 
 	vm->mailbox.send = NULL;
 	vm->mailbox.recv = NULL;
@@ -498,12 +490,12 @@ void vm_unmap_rxtx(struct vm_locked vm_locked, struct mpool *ppool)
 	mm_unlock_stage1(&mm_stage1_locked);
 }
 
-void vm_unmap_memory_regions(struct vm_locked vm_locked, struct mpool *ppool)
+void vm_unmap_memory_regions(struct vm_locked vm_locked)
 {
-	vm_unmap_rxtx(vm_locked, ppool);
+	vm_unmap_rxtx(vm_locked);
 
 	/* Free all page table entries associated with current VM. */
-	vm_free_ptables(vm_locked.vm, ppool);
+	vm_free_ptables(vm_locked.vm);
 }
 
 /**
@@ -521,11 +513,11 @@ bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 }
 
 bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, mm_mode_t mode, struct mpool *ppool,
-			      ipaddr_t *ipa, uint8_t dma_device_id)
+			      paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+			      uint8_t dma_device_id)
 {
-	return arch_vm_iommu_mm_identity_map(vm_locked, begin, end, mode, ppool,
-					     ipa, dma_device_id);
+	return arch_vm_iommu_mm_identity_map(vm_locked, begin, end, mode, ipa,
+					     dma_device_id);
 }
 
 bool vm_mailbox_state_busy(struct vm_locked vm_locked)
