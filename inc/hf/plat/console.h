@@ -15,8 +15,7 @@
 void plat_console_init(void);
 
 /** Initialises any memory mappings that the console driver needs. */
-void plat_console_mm_init(struct mm_stage1_locked stage1_locked,
-			  struct mpool *ppool);
+void plat_console_mm_init(struct mm_stage1_locked stage1_locked);
 
 /** Puts a single character on the console. This is a blocking call. */
 void plat_console_putchar(char c);

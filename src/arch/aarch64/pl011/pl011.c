@@ -8,7 +8,6 @@
 
 #include "hf/io.h"
 #include "hf/mm.h"
-#include "hf/mpool.h"
 #include "hf/plat/console.h"
 
 /* UART Data Register. */
@@ -86,13 +85,12 @@ void plat_console_init(void)
 #endif
 }
 
-void plat_console_mm_init(struct mm_stage1_locked stage1_locked,
-			  struct mpool *ppool)
+void plat_console_mm_init(struct mm_stage1_locked stage1_locked)
 {
 	/* Map page for UART. */
 	mm_identity_map(stage1_locked, pa_init(PL011_BASE),
 			pa_add(pa_init(PL011_BASE), PAGE_SIZE),
-			MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool);
+			MM_MODE_R | MM_MODE_W | MM_MODE_D);
 }
 
 /*
