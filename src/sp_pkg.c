@@ -15,7 +15,6 @@
 #include "hf/addr.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
-#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
 /**
@@ -27,9 +26,7 @@ static bool sp_pkg_init_v1(struct mm_stage1_locked stage1_locked,
 			   paddr_t pkg_start, struct sp_pkg_header *header)
 {
 	size_t manifest_size;
-	struct mpool *ppool = memory_alloc_get_ppool();
 
-	assert(ppool != NULL);
 	assert(header != NULL);
 
 	/* Expect DTB to immediately follow header */
@@ -59,7 +56,7 @@ static bool sp_pkg_init_v1(struct mm_stage1_locked stage1_locked,
 	if (manifest_size > PAGE_SIZE) {
 		CHECK(mm_identity_map(stage1_locked, pkg_start,
 				      pa_add(pkg_start, manifest_size),
-				      MM_MODE_R, ppool));
+				      MM_MODE_R));
 	}
 
 	return true;
