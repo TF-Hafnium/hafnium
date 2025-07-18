@@ -22,7 +22,6 @@
 #include "hf/load.h"
 #include "hf/manifest.h"
 #include "hf/mm.h"
-#include "hf/mpool.h"
 #include "hf/panic.h"
 #include "hf/plat/boot_flow.h"
 #include "hf/plat/console.h"
@@ -30,8 +29,6 @@
 #include "hf/plat/iommu.h"
 #include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
-
-static struct mpool *ppool;
 
 /**
  * Performs one-time initialisation of memory management for the hypervisor.
@@ -48,10 +45,6 @@ void one_time_init_mm(void)
 	ffa_init_log();
 
 	memory_alloc_init();
-
-	ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	if (!mm_init()) {
 		panic("mm_init failed");
@@ -74,8 +67,6 @@ void one_time_init(void)
 	size_t i;
 	struct mm_stage1_locked mm_stage1_locked;
 	struct manifest *manifest;
-
-	assert(ppool != NULL);
 
 	arch_one_time_init();
 
@@ -120,7 +111,7 @@ void one_time_init(void)
 
 		/* Map initrd in, and initialise cpio parser. */
 		initrd = mm_identity_map(mm_stage1_locked, params->initrd_begin,
-					 params->initrd_end, MM_MODE_R, ppool);
+					 params->initrd_end, MM_MODE_R);
 		if (!initrd) {
 			panic("Unable to map initrd.");
 		}
