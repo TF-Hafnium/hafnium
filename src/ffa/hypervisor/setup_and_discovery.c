@@ -16,7 +16,6 @@
 #include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
 #include "hf/manifest.h"
-#include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 #include "hf/vm.h"
 
@@ -215,9 +214,6 @@ void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 					const struct boot_params *boot_params)
 {
 	struct fdt partition_fdt;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	/*
 	 * If the partition is an FF-A partition and is not
@@ -227,8 +223,8 @@ void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 	 */
 	CHECK(manifest_vm->is_hyp_loaded);
 	CHECK(mm_identity_map(stage1_locked, fdt_addr,
-			      pa_add(fdt_addr, fdt_allocated_size), MM_MODE_R,
-			      ppool) != NULL);
+			      pa_add(fdt_addr, fdt_allocated_size),
+			      MM_MODE_R) != NULL);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	CHECK(fdt_init_from_ptr(&partition_fdt, (void *)pa_addr(fdt_addr),
 				fdt_allocated_size) == true);
@@ -236,7 +232,7 @@ void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 				 (struct manifest_vm *)manifest_vm, NULL,
 				 boot_params) == MANIFEST_SUCCESS);
 	CHECK(mm_unmap(stage1_locked, fdt_addr,
-		       pa_add(fdt_addr, fdt_allocated_size), ppool) == true);
+		       pa_add(fdt_addr, fdt_allocated_size)) == true);
 }
 
 ffa_partition_properties_t ffa_setup_partition_properties(
