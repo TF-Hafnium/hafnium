@@ -23,6 +23,7 @@
  */
 #define HFTEST_STAGE1_START_ADDRESS (0x1000)
 
+/* TODO: Drop all the mpool related things here. */
 alignas(alignof(struct mm_page_table)) static char ptable_buf
 	[sizeof(struct mm_page_table) * PTABLE_PAGES];
 
@@ -53,7 +54,7 @@ bool hftest_mm_init(void)
 		HFTEST_FAIL(true, "Failed to add buffer to page-table pool.");
 	}
 
-	if (!mm_ptable_init(&ptable, 0, true, &ppool)) {
+	if (!mm_ptable_init(&ptable, 0, true)) {
 		HFTEST_FAIL(true, "Unable to allocate memory for page table.");
 	}
 
@@ -61,7 +62,7 @@ bool hftest_mm_init(void)
 	mm_identity_map(stage1_locked,
 			pa_init((uintptr_t)HFTEST_STAGE1_START_ADDRESS),
 			pa_init(mm_ptable_addr_space_end(stage1_locked.ptable)),
-			MM_MODE_R | MM_MODE_W | MM_MODE_X, &ppool);
+			MM_MODE_R | MM_MODE_W | MM_MODE_X);
 
 	arch_vm_mm_enable(&ptable);
 
@@ -85,7 +86,7 @@ void hftest_mm_identity_map(const void *base, size_t size, mm_mode_t mode)
 	paddr_t start = pa_from_va(va_from_ptr(base));
 	paddr_t end = pa_add(start, size);
 
-	if (mm_identity_map(stage1_locked, start, end, mode, &ppool) != base) {
+	if (mm_identity_map(stage1_locked, start, end, mode) != base) {
 		FAIL("Could not add new page table mapping. Try increasing "
 		     "size of the page table buffer.");
 	}
