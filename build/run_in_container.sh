@@ -119,8 +119,19 @@ ARGS+=(--tmpfs /tmp)
 # Set working directory.
 ARGS+=(-w "${ROOT_DIR}")
 
+# Initialize Shrinkwrap environment before running the user-provided command
+# inside the container.
 echo "Running in container: $*" 1>&2
+
+# NOTE:
+# shrinkwrap_setup_env.sh is sourced here at runtime (not configured within the Dockerfile)
+# because it depends on host-mounted Hafnium repo paths that are only available
+# when the container is launched. This approach ensures compatibility with
+# the Hafnium developer Docker environment under build/docker/.
+CMD="export PATH=${HAFNIUM_FVP_DIR}/Base_RevC_AEMvA_pkg/models/Linux64_GCC-9.3:\$PATH && \
+     source tools/shrinkwrap/shrinkwrap_setup_env.sh && \
+     bash -c \"$*\""
 ${DOCKER} run \
-	${ARGS[@]} \
-	"${IMAGE_ID}" \
-	/bin/bash -c "$*"
+    "${ARGS[@]}" \
+    "${IMAGE_ID}" \
+    /bin/bash -c "$CMD"
