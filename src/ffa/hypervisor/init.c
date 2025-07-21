@@ -12,7 +12,6 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa/setup_and_discovery.h"
-#include "hf/plat/memory_alloc.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
@@ -53,10 +52,6 @@ void ffa_init(void)
 {
 	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
 	struct mm_stage1_locked mm_stage1_locked;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
-
 	/* This is a segment from TDRAM for the NS memory in the FVP platform.
 	 *
 	 * TODO: We ought to provide a better way to do this, if porting the
@@ -113,10 +108,10 @@ void ffa_init(void)
 	mm_stage1_locked = mm_lock_stage1();
 	CHECK(mm_identity_map(mm_stage1_locked, send_addr,
 			      pa_add(send_addr, PAGE_SIZE),
-			      MM_MODE_R | MM_MODE_SHARED, ppool) != NULL);
-	CHECK(mm_identity_map(
-		      mm_stage1_locked, recv_addr, pa_add(recv_addr, PAGE_SIZE),
-		      MM_MODE_R | MM_MODE_W | MM_MODE_SHARED, ppool) != NULL);
+			      MM_MODE_R | MM_MODE_SHARED) != NULL);
+	CHECK(mm_identity_map(mm_stage1_locked, recv_addr,
+			      pa_add(recv_addr, PAGE_SIZE),
+			      MM_MODE_R | MM_MODE_W | MM_MODE_SHARED) != NULL);
 	mm_unlock_stage1(&mm_stage1_locked);
 
 	dlog_verbose("TEE finished setting up buffers.\n");
