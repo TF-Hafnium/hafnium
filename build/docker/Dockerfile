@@ -27,7 +27,8 @@ RUN apt-get install -y \
 		nodejs                         `# for Commitlint` \
 		npm                            `# for Commitlint` \
                 netcat-openbsd \
-                telnet
+                telnet \
+		curl
 
 # Install Clang and LLVM.
 # Use the packages from LLVM's repository rather than the default Ubuntu
@@ -80,6 +81,14 @@ RUN python3 -m venv /opt/venv
 ENV PATH=/opt/venv/bin:${PATH}
 RUN pip3 install fdt pyyaml termcolor tuxmake
 
+#Poetry Installation
+ENV POETRY_HOME="/tools/poetry"
+ENV PATH="${POETRY_HOME}/bin:${PATH}"
+RUN curl -sSL https://install.python-poetry.org | python3 -
+
+# Ensure Poetry creates .venv inside the project directory.
+ENV POETRY_VIRTUALENVS_IN_PROJECT=true
+
 ARG LOCAL_UID=1000
 ARG LOCAL_GID=1000
 
@@ -103,3 +112,9 @@ RUN if ! getent passwd "${LOCAL_UID}" > /dev/null; then \
 
 # Explicitly switch to 'hafnium' user if it now exists
 USER hafnium
+
+# Set HOME to /tmp to ensure compatibility with Python tools like Poetry and
+# virtualenv, especially during TF-A builds that invoke them (e.g., sp_mk_generator.py).
+# This prevents permission errors when these tools attempt to create `.venv`
+# or write to `.cache` inside /home/hafnium, which may not be writable at build or runtime.
+ENV HOME=/tmp
