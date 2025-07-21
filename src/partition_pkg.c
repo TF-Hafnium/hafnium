@@ -16,7 +16,6 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/mm.h"
-#include "hf/plat/memory_alloc.h"
 #include "hf/sp_pkg.h"
 #include "hf/std.h"
 #include "hf/transfer_list.h"
@@ -45,9 +44,6 @@ static bool partition_pkg_from_sp_pkg(struct mm_stage1_locked stage1_locked,
 	struct sp_pkg_header header;
 	bool ret = sp_pkg_init(stage1_locked, pkg_start, &header);
 	size_t total_mem_size = sp_pkg_get_mem_size(&header);
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	pkg->total.begin = pkg_start;
 	pkg->total.end = pa_add(pkg_start, total_mem_size);
@@ -73,8 +69,7 @@ static bool partition_pkg_from_sp_pkg(struct mm_stage1_locked stage1_locked,
 	if (ret) {
 		/* Map the whole package as RO. */
 		CHECK(mm_identity_map(stage1_locked, pkg->total.begin,
-				      pkg->total.end, MM_MODE_R,
-				      ppool) != NULL);
+				      pkg->total.end, MM_MODE_R) != NULL);
 	}
 
 	return ret;
@@ -113,9 +108,6 @@ static bool partition_pkg_from_tl(struct mm_stage1_locked stage1_locked,
 {
 	struct transfer_list_header *tl = ptr_from_va(va_from_pa(pkg_start));
 	enum transfer_list_ops tl_res;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	dlog_verbose("%s: partition loaded in a transfer list.\n", __func__);
 
@@ -125,7 +117,7 @@ static bool partition_pkg_from_tl(struct mm_stage1_locked stage1_locked,
 
 	/* Map the whole TL as RO. */
 	CHECK(mm_identity_map(stage1_locked, pkg->total.begin, pkg->total.end,
-			      MM_MODE_R, ppool));
+			      MM_MODE_R));
 
 	tl_res = transfer_list_check_header(tl);
 
@@ -197,13 +189,10 @@ bool partition_pkg_init(struct mm_stage1_locked stage1_locked,
 	paddr_t pkg_first_page = pa_add(pkg_start, PAGE_SIZE);
 	uint32_t *magic;
 	void *mapped_ptr;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	/* Firstly, map a single page to be able to read package header. */
 	mapped_ptr = mm_identity_map(stage1_locked, pkg_start, pkg_first_page,
-				     MM_MODE_R, ppool);
+				     MM_MODE_R);
 	assert(mapped_ptr != NULL);
 	assert(pkg != NULL);
 
@@ -246,8 +235,8 @@ bool partition_pkg_init(struct mm_stage1_locked stage1_locked,
 	if (pa_addr(pkg->boot_info.begin) != 0U &&
 	    pa_addr(pkg->boot_info.end) != 0U) {
 		CHECK(mm_identity_map(stage1_locked, pkg->boot_info.begin,
-				      pkg->boot_info.end, MM_MODE_R | MM_MODE_W,
-				      ppool) != NULL);
+				      pkg->boot_info.end,
+				      MM_MODE_R | MM_MODE_W) != NULL);
 	}
 
 	ret = true;
@@ -255,8 +244,7 @@ bool partition_pkg_init(struct mm_stage1_locked stage1_locked,
 out:
 	/* If failing unmap the memory. */
 	if (!ret) {
-		CHECK(mm_unmap(stage1_locked, pkg_start, pkg_first_page,
-			       ppool));
+		CHECK(mm_unmap(stage1_locked, pkg_start, pkg_first_page));
 	}
 
 	return ret;
@@ -265,9 +253,5 @@ out:
 void partition_pkg_deinit(struct mm_stage1_locked stage1_locked,
 			  struct partition_pkg *pkg)
 {
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
-
-	CHECK(mm_unmap(stage1_locked, pkg->total.begin, pkg->total.end, ppool));
+	CHECK(mm_unmap(stage1_locked, pkg->total.begin, pkg->total.end));
 }
