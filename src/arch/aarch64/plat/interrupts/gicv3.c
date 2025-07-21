@@ -16,7 +16,6 @@
 #include "hf/io.h"
 #include "hf/panic.h"
 #include "hf/plat/interrupts.h"
-#include "hf/plat/memory_alloc.h"
 #include "hf/types.h"
 
 #include "gicv3_helpers.h"
@@ -780,15 +779,12 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 	uint32_t typer_reg;
 	uint32_t gicd_idx;
 	uint32_t gicr_idx;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	for (gicd_idx = 0; gicd_idx < num_gic_dist; gicd_idx++) {
-		base_addr = mm_identity_map(
-			stage1_locked, gic_mem_ranges[gicd_idx].begin,
-			gic_mem_ranges[gicd_idx].end,
-			MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool);
+		base_addr = mm_identity_map(stage1_locked,
+					    gic_mem_ranges[gicd_idx].begin,
+					    gic_mem_ranges[gicd_idx].end,
+					    MM_MODE_R | MM_MODE_W | MM_MODE_D);
 		if (base_addr == NULL) {
 			dlog_error(
 				"Could not map GICv3 into Hafnium memory "
@@ -831,7 +827,7 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 			stage1_locked,
 			gic_mem_ranges[gicr_idx + num_gic_dist].begin,
 			gic_mem_ranges[gicr_idx + num_gic_dist].end,
-			MM_MODE_R | MM_MODE_W | MM_MODE_D, ppool);
+			MM_MODE_R | MM_MODE_W | MM_MODE_D);
 
 		if (base_addr == NULL) {
 			dlog_error(
