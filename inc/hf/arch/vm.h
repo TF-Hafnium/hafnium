@@ -17,21 +17,18 @@ void arch_vm_features_set(struct vm *vm);
 bool arch_vm_init_mm(struct vm *vm);
 bool arch_vm_iommu_init_mm(struct vm *vm);
 bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, mm_mode_t mode, struct mpool *ppool);
+			      paddr_t end, mm_mode_t mode);
 void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
-			     paddr_t end, mm_mode_t mode, struct mpool *ppool,
-			     ipaddr_t *ipa);
-bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-		   struct mpool *ppool);
-void arch_vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool);
+			     paddr_t end, mm_mode_t mode, ipaddr_t *ipa);
+bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end);
+void arch_vm_ptable_defrag(struct vm_locked vm_locked);
 bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 			  ipaddr_t end, mm_mode_t *mode);
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-				   paddr_t end, mm_mode_t mode,
-				   struct mpool *ppool, ipaddr_t *ipa,
+				   paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
 				   uint8_t dma_device_id);
-void arch_vm_fini_mm(struct vm *vm, struct mpool *ppool);
-void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool);
+void arch_vm_fini_mm(struct vm *vm);
+void arch_vm_iommu_fini_mm(struct vm *vm);
 bool arch_vm_get_range_by_mode(struct vm_locked vm_locked, uintptr_t *begin,
 			       uintptr_t *end, mm_mode_t mode,
 			       uintptr_t *start_addr, mm_mode_t *ptable_mode);

@@ -73,7 +73,7 @@ void arch_vm_features_set(struct vm *vm)
  * control, with the help of IOMMU, for DMA accesses on behalf of a given
  * partition.
  */
-bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool)
+bool arch_vm_iommu_init_mm(struct vm *vm)
 {
 	bool ret = true;
 
@@ -92,11 +92,11 @@ bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool)
 		 * DMA device that is upstream of given VM. This is necessary
 		 * to enforce static DMA isolation.
 		 */
-		ret = ret && mm_ptable_init(&vm->iommu_ptables[k], vm->id,
-					    false, ppool);
+		ret = ret &&
+		      mm_ptable_init(&vm->iommu_ptables[k], vm->id, false);
 #if SECURE_WORLD == 1
 		ret = ret && mm_ptable_init(&vm->arch.iommu_ptables_ns[k],
-					    vm->id, false, ppool);
+					    vm->id, false);
 #endif
 		if (!ret) {
 			dlog_error(
@@ -110,30 +110,30 @@ bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool)
 	return ret;
 }
 
-bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool)
+bool arch_vm_init_mm(struct vm *vm)
 {
 	bool ret;
 
 	if (vm->el0_partition) {
-		return mm_ptable_init(&vm->ptable, vm->id, true, ppool);
+		return mm_ptable_init(&vm->ptable, vm->id, true);
 	}
 
-	ret = mm_vm_init(&vm->ptable, vm->id, ppool);
+	ret = mm_vm_init(&vm->ptable, vm->id);
 
 #if SECURE_WORLD == 1
-	ret = ret && mm_vm_init(&vm->arch.ptable_ns, vm->id, ppool);
+	ret = ret && mm_vm_init(&vm->arch.ptable_ns, vm->id);
 #endif
 
 	return ret;
 }
 
 bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, mm_mode_t mode, struct mpool *ppool)
+			      paddr_t end, mm_mode_t mode)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->ptable;
 
 	if (vm_locked.vm->el0_partition) {
-		return mm_identity_prepare(ptable, begin, end, mode, ppool);
+		return mm_identity_prepare(ptable, begin, end, mode);
 	}
 
 #if SECURE_WORLD == 1
@@ -142,18 +142,16 @@ bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
 	}
 #endif
 
-	return mm_vm_identity_prepare(ptable, begin, end, mode, ppool);
+	return mm_vm_identity_prepare(ptable, begin, end, mode);
 }
 
 void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
-			     paddr_t end, mm_mode_t mode, struct mpool *ppool,
-			     ipaddr_t *ipa)
+			     paddr_t end, mm_mode_t mode, ipaddr_t *ipa)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->ptable;
 
 	if (vm_locked.vm->el0_partition) {
-		mm_identity_commit(&vm_locked.vm->ptable, begin, end, mode,
-				   ppool);
+		mm_identity_commit(&vm_locked.vm->ptable, begin, end, mode);
 		if (ipa != NULL) {
 			/*
 			 * EL0 partitions are modeled as lightweight VM's, to
@@ -170,38 +168,37 @@ void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
 		}
 #endif
 
-		mm_vm_identity_commit(ptable, begin, end, mode, ppool, ipa);
+		mm_vm_identity_commit(ptable, begin, end, mode, ipa);
 	}
 }
 
-bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-		   struct mpool *ppool)
+bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end)
 {
 	bool ret;
 	mm_mode_t mode = MM_MODE_UNMAPPED_MASK;
 
-	ret = vm_identity_map(vm_locked, begin, end, mode, ppool, NULL);
+	ret = vm_identity_map(vm_locked, begin, end, mode, NULL);
 
 #if SECURE_WORLD == 1
-	ret = ret && vm_identity_map(vm_locked, begin, end, mode | MM_MODE_NS,
-				     ppool, NULL);
+	ret = ret &&
+	      vm_identity_map(vm_locked, begin, end, mode | MM_MODE_NS, NULL);
 #endif
 
 	return ret;
 }
 
-void arch_vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
+void arch_vm_ptable_defrag(struct vm_locked vm_locked)
 {
 	if (vm_locked.vm->el0_partition) {
-		mm_stage1_defrag(&vm_locked.vm->ptable, ppool);
+		mm_stage1_defrag(&vm_locked.vm->ptable);
 	} else {
-		mm_vm_defrag(&vm_locked.vm->ptable, ppool, false);
+		mm_vm_defrag(&vm_locked.vm->ptable, false);
 #if SECURE_WORLD == 1
 		/*
 		 * TODO: check if this can be better optimized (pass the
 		 * security state?).
 		 */
-		mm_vm_defrag(&vm_locked.vm->arch.ptable_ns, ppool, true);
+		mm_vm_defrag(&vm_locked.vm->arch.ptable_ns, true);
 #endif
 	}
 }
@@ -242,7 +239,7 @@ bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 
 static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, paddr_t begin,
 				     paddr_t end, mm_mode_t mode,
-				     struct mpool *ppool, uint8_t dma_device_id)
+				     uint8_t dma_device_id)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->iommu_ptables[dma_device_id];
 
@@ -252,12 +249,11 @@ static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, paddr_t begin,
 	}
 #endif
 
-	return mm_vm_identity_prepare(ptable, begin, end, mode, ppool);
+	return mm_vm_identity_prepare(ptable, begin, end, mode);
 }
 
 static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, paddr_t begin,
-				    paddr_t end, mm_mode_t mode,
-				    struct mpool *ppool, ipaddr_t *ipa,
+				    paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
 				    uint8_t dma_device_id)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->iommu_ptables[dma_device_id];
@@ -268,12 +264,11 @@ static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, paddr_t begin,
 	}
 #endif
 
-	mm_vm_identity_commit(ptable, begin, end, mode, ppool, ipa);
+	mm_vm_identity_commit(ptable, begin, end, mode, ipa);
 }
 
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-				   paddr_t end, mm_mode_t mode,
-				   struct mpool *ppool, ipaddr_t *ipa,
+				   paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
 				   uint8_t dma_device_id)
 {
 	/*
@@ -290,32 +285,32 @@ bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
 		return false;
 	}
 
-	if (!arch_vm_iommu_mm_prepare(vm_locked, begin, end, mode, ppool,
+	if (!arch_vm_iommu_mm_prepare(vm_locked, begin, end, mode,
 				      dma_device_id)) {
 		return false;
 	}
 
-	arch_vm_iommu_mm_commit(vm_locked, begin, end, mode, ppool, ipa,
+	arch_vm_iommu_mm_commit(vm_locked, begin, end, mode, ipa,
 				dma_device_id);
 
 	return true;
 }
 
-void arch_vm_fini_mm(struct vm *vm, struct mpool *ppool)
+void arch_vm_fini_mm(struct vm *vm)
 {
 	if (vm->el0_partition) {
-		mm_ptable_fini(&vm->ptable, ppool);
+		mm_ptable_fini(&vm->ptable);
 		return;
 	}
 
-	mm_vm_fini(&vm->ptable, ppool);
+	mm_vm_fini(&vm->ptable);
 
 #if SECURE_WORLD == 1
-	mm_vm_fini(&vm->arch.ptable_ns, ppool);
+	mm_vm_fini(&vm->arch.ptable_ns);
 #endif
 }
 
-void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool)
+void arch_vm_iommu_fini_mm(struct vm *vm)
 {
 	if (vm->el0_partition) {
 		return;
@@ -326,9 +321,9 @@ void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool)
 		 * Hafnium maintains an independent set of page tables for each
 		 * DMA device that is upstream of given VM.
 		 */
-		mm_ptable_fini(&vm->iommu_ptables[k], ppool);
+		mm_ptable_fini(&vm->iommu_ptables[k]);
 #if SECURE_WORLD == 1
-		mm_ptable_fini(&vm->arch.iommu_ptables_ns[k], ppool);
+		mm_ptable_fini(&vm->arch.iommu_ptables_ns[k]);
 #endif
 	}
 }
