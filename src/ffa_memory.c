@@ -3676,6 +3676,13 @@ static struct ffa_value ffa_partition_retrieve_request(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	if (share_state->deferred_reclaim_pending) {
+		dlog_verbose(
+			"Memory region marked for deferred reclaim. Denying "
+			"retrieve.\n");
+		return ffa_error(FFA_DENIED);
+	}
+
 	/*
 	 * Validate retrieve request, according to what was sent by the
 	 * sender. Function will output the `receiver_index` from the
@@ -4136,6 +4143,70 @@ out:
 	return ret;
 }
 
+static struct ffa_value reclaim_shared_state(
+	struct share_states_locked share_states_locked,
+	struct ffa_memory_share_state *share_state, struct vm_locked to_locked,
+	ffa_memory_handle_t handle, ffa_memory_region_flags_t flags,
+	struct mpool *page_pool)
+{
+	struct ffa_value ret;
+	struct ffa_memory_region *memory_region;
+
+	memory_region = share_state->memory_region;
+
+	CHECK(memory_region != NULL);
+
+	if (vm_id_is_current_world(to_locked.vm->id) &&
+	    to_locked.vm->id != memory_region->sender) {
+		dlog_verbose(
+			"VM %#x attempted to reclaim memory handle %#lx "
+			"originally sent by VM %#x.\n",
+			to_locked.vm->id, handle, memory_region->sender);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
+		if (share_state->retrieved_fragment_count[i] != 0) {
+			struct ffa_memory_access *receiver =
+				ffa_memory_region_get_receiver(memory_region,
+							       i);
+
+			assert(receiver != NULL);
+			(void)receiver;
+			dlog_verbose(
+				"Tried to reclaim memory handle %#lx that has "
+				"not been relinquished by all borrowers(%x).\n",
+				handle,
+				receiver->receiver_permissions.receiver);
+			return ffa_error(FFA_DENIED);
+		}
+	}
+
+	ret = ffa_retrieve_check_update(
+		to_locked, share_state->fragments,
+		share_state->fragment_constituent_counts,
+		share_state->fragment_count, share_state->sender_orig_mode,
+		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool,
+		NULL, share_state->memory_protected);
+
+	if (ret.func == FFA_SUCCESS_32) {
+		share_state_free(share_states_locked, share_state, page_pool);
+		dlog_verbose("Freed share state after successful reclaim.\n");
+
+		/*
+		 * If the caller is from the NWd, reset the state for
+		 * ffa_ns_res_info_get. This will free all current data, if
+		 * any, and cause an ABORT for any ongoing transactions.
+		 * This is because any current data is now considered stale.
+		 */
+		if (!ffa_is_vm_id(to_locked.vm->id)) {
+			ffa_ns_res_info_get_state_reset();
+		}
+	}
+
+	return ret;
+}
+
 struct ffa_value ffa_memory_relinquish(
 	struct vm_locked from_locked,
 	struct ffa_mem_relinquish *relinquish_request, struct mpool *page_pool)
@@ -4147,7 +4218,7 @@ struct ffa_value ffa_memory_relinquish(
 	bool clear;
 	struct ffa_value ret;
 	uint32_t receiver_index;
-	bool receivers_relinquished_memory;
+	bool other_receivers_relinquished_memory;
 	ffa_memory_access_permissions_t receiver_permissions = {0};
 
 	if (relinquish_request->endpoint_count != 1) {
@@ -4216,7 +4287,7 @@ struct ffa_value ffa_memory_relinquish(
 	 * Either clear if requested in relinquish call, or in a retrieve
 	 * request from one of the borrowers.
 	 */
-	receivers_relinquished_memory = true;
+	other_receivers_relinquished_memory = true;
 
 	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
 		struct ffa_memory_access *receiver =
@@ -4230,12 +4301,12 @@ struct ffa_value ffa_memory_relinquish(
 		}
 
 		if (share_state->retrieved_fragment_count[i] != 0U) {
-			receivers_relinquished_memory = false;
+			other_receivers_relinquished_memory = false;
 			break;
 		}
 	}
 
-	clear = receivers_relinquished_memory &&
+	clear = other_receivers_relinquished_memory &&
 		((relinquish_request->flags & FFA_MEMORY_REGION_FLAG_CLEAR) !=
 		 0U);
 
@@ -4269,6 +4340,27 @@ struct ffa_value ffa_memory_relinquish(
 		 * reclaimed (or retrieved again).
 		 */
 		share_state->retrieved_fragment_count[receiver_index] = 0;
+
+		if (other_receivers_relinquished_memory &&
+		    share_state->deferred_reclaim_pending) {
+			struct ffa_value reclaim_ret;
+			struct vm_locked owner_locked;
+			struct two_vm_locked both;
+			struct vm *owner_vm;
+
+			owner_vm = vm_find(memory_region->sender);
+			both = vm_lock_both_in_order(from_locked, owner_vm);
+
+			owner_locked = both.vm2;
+			reclaim_ret = reclaim_shared_state(
+				share_states, share_state, owner_locked,
+				memory_region->handle, 0U, page_pool);
+
+			assert(reclaim_ret.func == FFA_SUCCESS_32);
+
+			vm_unlock(&owner_locked);
+			share_state->deferred_reclaim_pending = false;
+		}
 	}
 
 out:
@@ -4287,32 +4379,18 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 				    ffa_memory_region_flags_t flags,
 				    struct mpool *page_pool)
 {
-	struct share_states_locked share_states;
+	struct share_states_locked share_states_locked;
 	struct ffa_memory_share_state *share_state;
-	struct ffa_memory_region *memory_region;
 	struct ffa_value ret;
 
 	dump_share_states();
 
-	share_states = share_states_lock();
+	share_states_locked = share_states_lock();
 
-	share_state = get_share_state(share_states, handle);
+	share_state = get_share_state(share_states_locked, handle);
 	if (share_state == NULL) {
 		dlog_verbose("Invalid handle %#lx for FFA_MEM_RECLAIM.\n",
 			     handle);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-	memory_region = share_state->memory_region;
-
-	CHECK(memory_region != NULL);
-
-	if (vm_id_is_current_world(to_locked.vm->id) &&
-	    to_locked.vm->id != memory_region->sender) {
-		dlog_verbose(
-			"VM %#x attempted to reclaim memory handle %#lx "
-			"originally sent by VM %#x.\n",
-			to_locked.vm->id, handle, memory_region->sender);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -4326,57 +4404,72 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 		goto out;
 	}
 
-	for (uint32_t i = 0; i < memory_region->receiver_count; i++) {
-		if (share_state->retrieved_fragment_count[i] != 0) {
-			struct ffa_memory_access *receiver =
-				ffa_memory_region_get_receiver(memory_region,
-							       i);
-
-			assert(receiver != NULL);
-			(void)receiver;
-			dlog_verbose(
-				"Tried to reclaim memory handle %#lx that has "
-				"not been relinquished by all borrowers(%x).\n",
-				handle,
-				receiver->receiver_permissions.receiver);
-			ret = ffa_error(FFA_DENIED);
-			goto out;
-		}
-	}
-
-	ret = ffa_retrieve_check_update(
-		to_locked, share_state->fragments,
-		share_state->fragment_constituent_counts,
-		share_state->fragment_count, share_state->sender_orig_mode,
-		FFA_MEM_RECLAIM_32, flags & FFA_MEM_RECLAIM_CLEAR, page_pool,
-		NULL, share_state->memory_protected);
-
-	if (ret.func == FFA_SUCCESS_32) {
-		share_state_free(share_states, share_state, page_pool);
-		dlog_verbose("Freed share state after successful reclaim.\n");
-
-		/*
-		 * If the caller is from the NWd, reset the state for
-		 * ffa_ns_res_info_get. This will free all current data, if
-		 * any, and cause an ABORT for any ongoing transactions.
-		 * This is because any current data is now considered stale.
-		 */
-		if (!ffa_is_vm_id(to_locked.vm->id)) {
-			ffa_ns_res_info_get_state_reset();
-		}
-	}
+	ret = reclaim_shared_state(share_states_locked, share_state, to_locked,
+				   handle, flags, page_pool);
 
 out:
-	share_states_unlock(&share_states);
+	share_states_unlock(&share_states_locked);
 	return ret;
 }
 
+/**
+ * Helper to reclaim memory region owned by a partition.
+ */
+static void ffa_memory_reclaim_from_partition(
+	struct vm_locked vm_locked, struct mpool *ppool,
+	struct share_states_locked share_states_locked,
+	struct ffa_memory_share_state *share_state_itr)
+{
+	uint32_t flags = 0U;
+	struct ffa_memory_region *memory_region;
+	struct ffa_value ret;
+
+	memory_region = share_state_itr->memory_region;
+	assert(memory_region != NULL);
+
+	if (memory_region->sender == vm_locked.vm->id) {
+		share_state_itr->deferred_reclaim_pending = false;
+		ret = reclaim_shared_state(share_states_locked, share_state_itr,
+					   vm_locked, memory_region->handle,
+					   flags, ppool);
+
+		if (ret.func != FFA_SUCCESS_32) {
+			dlog_verbose("Hafnium unable to reclaim\n");
+			share_state_itr->deferred_reclaim_pending = true;
+		}
+	}
+}
+
+/**
+ * Reclaim and relinquish all FF-A memory regions associated with a VM.
+ *
+ * When a partition (VM) aborts, the Secure Partition Manager must
+ * clean up any active memory management transactions involving the VM,
+ * whether the VM was a sender or a receiver. This helper iterates over
+ * all memory share states and:
+ *   - Relinquishes any regions borrowed by the VM on its behalf.
+ *   - Reclaims any regions owned by the VM.
+ */
 void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
 					      struct mpool *ppool)
 {
-	/* TODO */
-	(void)vm_locked;
-	(void)ppool;
+	struct share_states_locked share_states_locked;
+	struct ffa_memory_share_state *share_state_itr;
+
+	share_states_locked = share_states_lock();
+
+	for (uint32_t i = 0; i < MAX_MEM_SHARES; i++) {
+		share_state_itr = &share_states_locked.share_states[i];
+
+		if (share_state_itr->share_func == 0) {
+			continue;
+		}
+
+		ffa_memory_reclaim_from_partition(
+			vm_locked, ppool, share_states_locked, share_state_itr);
+	}
+
+	share_states_unlock(&share_states_locked);
 }
 
 /**

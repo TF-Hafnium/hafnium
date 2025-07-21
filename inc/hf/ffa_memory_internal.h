@@ -125,6 +125,13 @@ struct ffa_memory_share_state {
 	 * ownership and exclusive access.
 	 */
 	bool memory_protected;
+
+	/*
+	 * Indicates that a deferred reclaim is pending once all borrowers
+	 * have relinquished the memory region. It is set when an owner aborts
+	 * but SPM's attempt to reclaim the memory region fails.
+	 */
+	bool deferred_reclaim_pending;
 };
 
 /**
