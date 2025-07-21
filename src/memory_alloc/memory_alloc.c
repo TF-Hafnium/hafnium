@@ -34,7 +34,7 @@ void *memory_alloc(size_t size)
 	size_t count = (align_up(size, memory_alloc_pool.entry_size) /
 			memory_alloc_pool.entry_size);
 
-	return mpool_alloc_contiguous(&memory_alloc_pool, count, 1);
+	return mpool_alloc_contiguous(&memory_alloc_pool, count, count);
 }
 
 void memory_free(void *begin, size_t size)

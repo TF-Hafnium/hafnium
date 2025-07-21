@@ -21,12 +21,6 @@
 #include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
-/*
- * TODO: Intermediate step to drop the dependency to mpool and use
- * memory allocator abstraction first.
- */
-static struct mpool *ppool;
-
 /**
  * This file has functions for managing the level 1 and 2 page tables used by
  * Hafnium. There is a level 1 mapping used by Hafnium itself to access memory,
@@ -133,11 +127,7 @@ static size_t mm_index(ptable_addr_t addr, mm_level_t level)
  */
 static struct mm_page_table *mm_alloc_page_tables(size_t count)
 {
-	if (count == 1) {
-		return mpool_alloc(ppool);
-	}
-
-	return mpool_alloc_contiguous(ppool, count, count);
+	return memory_alloc(PAGE_SIZE * count);
 }
 
 /**
@@ -194,7 +184,7 @@ static void mm_free_page_pte(pte_t pte, mm_level_t level)
 	}
 
 	/* Free the table itself. */
-	mpool_free(ppool, table);
+	memory_free(table, PAGE_SIZE);
 }
 
 /**
@@ -256,8 +246,8 @@ void mm_ptable_fini(const struct mm_ptable *ptable)
 		}
 	}
 
-	mpool_add_chunk(ppool, root_tables,
-			sizeof(struct mm_page_table) * root_table_count);
+	memory_free(root_tables,
+		    sizeof(struct mm_page_table) * root_table_count);
 }
 
 /**
@@ -1440,9 +1430,6 @@ bool mm_init(void)
 {
 	/* Locking is not enabled yet so fake it, */
 	struct mm_stage1_locked stage1_locked = mm_stage1_lock_unsafe();
-
-	/* TODO: Drop and use memory alloc directly. */
-	ppool = memory_alloc_get_ppool();
 
 	dlog_info("text: %#lx - %#lx\n", pa_addr(layout_text_begin()),
 		  pa_addr(layout_text_end()));

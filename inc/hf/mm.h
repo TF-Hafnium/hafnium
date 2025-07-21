@@ -12,7 +12,6 @@
 #include <stdint.h>
 
 #include "hf/addr.h"
-#include "hf/mpool.h"
 
 typedef uint32_t mm_mode_t;
 typedef uint64_t mm_attr_t;
