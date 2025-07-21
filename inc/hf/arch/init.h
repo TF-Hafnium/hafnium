@@ -9,7 +9,6 @@
 #pragma once
 
 #include "hf/mm.h"
-#include "hf/mpool.h"
 
 /**
  * Performs arch specific boot time initialization.
@@ -24,5 +23,4 @@ void arch_one_time_init(void);
  * is mapped into the address space at the corresponding address range in the
  * architecture-specific mode.
  */
-bool arch_stack_mm_init(struct mm_stage1_locked stage1_locked,
-			struct mpool *ppool);
+bool arch_stack_mm_init(struct mm_stage1_locked stage1_locked);

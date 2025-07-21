@@ -25,16 +25,14 @@ void arch_one_time_init(void)
  * is mapped into the address space at the corresponding address range in the
  * architecture-specific mode.
  */
-bool arch_stack_mm_init(struct mm_stage1_locked stage1_locked,
-			struct mpool *ppool)
+bool arch_stack_mm_init(struct mm_stage1_locked stage1_locked)
 {
 #if ENABLE_MTE
 	return mm_identity_map(stage1_locked, layout_stacks_begin(),
 			       layout_stacks_end(),
-			       MM_MODE_R | MM_MODE_W | MM_MODE_T, ppool);
+			       MM_MODE_R | MM_MODE_W | MM_MODE_T);
 #else
 	return mm_identity_map(stage1_locked, layout_stacks_begin(),
-			       layout_stacks_end(), MM_MODE_R | MM_MODE_W,
-			       ppool);
+			       layout_stacks_end(), MM_MODE_R | MM_MODE_W);
 #endif
 }
