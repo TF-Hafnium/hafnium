@@ -2576,6 +2576,18 @@ static struct ffa_value ffa_features_function(uint32_t func,
 
 		return api_ffa_feature_success(0);
 
+	case FFA_NS_RES_INFO_GET:
+		if (FFA_VERSION_1_3 > FFA_VERSION_COMPILED) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+
+		/* Only discoverable if caller is from NWd */
+		if (!ffa_is_vm_id(current->vm->id)) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+
+		return api_ffa_feature_success(0);
+
 	/* These functions are only supported on S-EL0 partitions. */
 	case FFA_MEM_PERM_GET_32:
 	case FFA_MEM_PERM_SET_32:
