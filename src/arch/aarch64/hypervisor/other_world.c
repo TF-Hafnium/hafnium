@@ -21,8 +21,7 @@
 #include "smc.h"
 
 bool arch_other_world_vm_init(struct vm *other_world_vm,
-			      const struct boot_params *params,
-			      struct mpool *ppool)
+			      const struct boot_params *params)
 {
 	const char *err_msg =
 		"Unable to initialise address space for Other world VM.\n";
@@ -54,7 +53,7 @@ bool arch_other_world_vm_init(struct vm *other_world_vm,
 			    params->ns_mem_ranges[i].begin,
 			    params->ns_mem_ranges[i].end,
 			    MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
-			    ppool, NULL)) {
+			    NULL)) {
 			dlog_error("Normal Memory: %s", err_msg);
 			goto out;
 		}
@@ -70,7 +69,7 @@ bool arch_other_world_vm_init(struct vm *other_world_vm,
 			    params->ns_device_mem_ranges[i].begin,
 			    params->ns_device_mem_ranges[i].end,
 			    MM_MODE_R | MM_MODE_W | MM_MODE_D | MM_MODE_NS,
-			    ppool, NULL)) {
+			    NULL)) {
 			dlog_error("Device Memory: %s", err_msg);
 			goto out;
 		}
@@ -144,9 +143,8 @@ static void unlock_other_world(struct vm_locked owner_vm_locked,
  * page tables fails.
  */
 struct ffa_value arch_other_world_vm_configure_rxtx_map(
-	struct vm_locked vm_locked, struct mpool *local_page_pool,
-	paddr_t pa_send_begin, paddr_t pa_send_end, paddr_t pa_recv_begin,
-	paddr_t pa_recv_end)
+	struct vm_locked vm_locked, paddr_t pa_send_begin, paddr_t pa_send_end,
+	paddr_t pa_recv_begin, paddr_t pa_recv_end)
 {
 	struct ffa_value ret;
 	mm_mode_t send_mode;
@@ -193,15 +191,13 @@ struct ffa_value arch_other_world_vm_configure_rxtx_map(
 	 * being used in memory sharing operations from the NWd, or in further
 	 * `FFA_RXTX_MAP` calls.
 	 */
-	if (!vm_unmap(other_world_locked, pa_send_begin, pa_send_end,
-		      local_page_pool)) {
+	if (!vm_unmap(other_world_locked, pa_send_begin, pa_send_end)) {
 		dlog_error("%s: cannot unmap send page from NWd VM\n",
 			   __func__);
 		ret = ffa_error(FFA_ABORTED);
 		goto out_unlock;
 	}
-	if (!vm_unmap(other_world_locked, pa_recv_begin, pa_recv_end,
-		      local_page_pool)) {
+	if (!vm_unmap(other_world_locked, pa_recv_begin, pa_recv_end)) {
 		ret = ffa_error(FFA_ABORTED);
 		dlog_error("%s: cannot unmap recv page from NWd VM\n",
 			   __func__);
@@ -223,9 +219,8 @@ out_unlock:
  * tables fails.
  */
 struct ffa_value arch_other_world_vm_configure_rxtx_unmap(
-	struct vm_locked vm_locked, struct mpool *local_page_pool,
-	paddr_t pa_send_begin, paddr_t pa_send_end, paddr_t pa_recv_begin,
-	paddr_t pa_recv_end)
+	struct vm_locked vm_locked, paddr_t pa_send_begin, paddr_t pa_send_end,
+	paddr_t pa_recv_begin, paddr_t pa_recv_end)
 {
 	struct vm_locked other_world_locked = lock_other_world(vm_locked);
 
@@ -236,7 +231,7 @@ struct ffa_value arch_other_world_vm_configure_rxtx_unmap(
 	/* Remap to other world page tables. */
 	if (!vm_identity_map(other_world_locked, pa_send_begin, pa_send_end,
 			     MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
-			     local_page_pool, NULL)) {
+			     NULL)) {
 		dlog_error(
 			"%s: unable to remap send page to other world page "
 			"tables\n",
@@ -246,13 +241,12 @@ struct ffa_value arch_other_world_vm_configure_rxtx_unmap(
 
 	if (!vm_identity_map(other_world_locked, pa_recv_begin, pa_recv_end,
 			     MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
-			     local_page_pool, NULL)) {
+			     NULL)) {
 		dlog_error(
 			"%s: unable to remap recv page to other world page "
 			"tables\n",
 			__func__);
-		CHECK(vm_unmap(other_world_locked, pa_send_begin, pa_send_end,
-			       local_page_pool));
+		CHECK(vm_unmap(other_world_locked, pa_send_begin, pa_send_end));
 		return ffa_error(FFA_ABORTED);
 	}
 
