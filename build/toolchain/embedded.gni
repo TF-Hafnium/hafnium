@@ -389,8 +389,10 @@ template("aarch64_toolchains") {
     memory_protect = "//src/memory_protect:absent"
     stdout = "//src/arch/aarch64/hftest:stdout"
 
+    # Enable memory management operations.
+    heap_pages = 10
+
     # Nonsense values because they are required but shouldn't be used.
-    heap_pages = 0
     max_vms = 0
 
     # Add a macro so files can tell whether they are being built for a VM.

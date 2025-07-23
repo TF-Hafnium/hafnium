@@ -8,6 +8,8 @@
 
 #include "hf/arch/vm/mm.h"
 
+#include "hf/plat/memory_alloc.h"
+
 #include "test/hftest.h"
 
 /* Number of pages reserved for page tables. Increase if necessary. */
@@ -23,11 +25,6 @@
  */
 #define HFTEST_STAGE1_START_ADDRESS (0x1000)
 
-/* TODO: Drop all the mpool related things here. */
-alignas(alignof(struct mm_page_table)) static char ptable_buf
-	[sizeof(struct mm_page_table) * PTABLE_PAGES];
-
-static struct mpool ppool;
 static struct mm_ptable ptable;
 
 struct mm_stage1_locked hftest_mm_get_stage1(void)
@@ -37,7 +34,7 @@ struct mm_stage1_locked hftest_mm_get_stage1(void)
 
 struct mpool *hftest_mm_get_ppool(void)
 {
-	return &ppool;
+	return memory_alloc_get_ppool();
 }
 
 bool hftest_mm_init(void)
@@ -49,10 +46,7 @@ bool hftest_mm_init(void)
 		return false;
 	}
 
-	mpool_init(&ppool, sizeof(struct mm_page_table));
-	if (!mpool_add_chunk(&ppool, ptable_buf, sizeof(ptable_buf))) {
-		HFTEST_FAIL(true, "Failed to add buffer to page-table pool.");
-	}
+	memory_alloc_init();
 
 	if (!mm_ptable_init(&ptable, 0, true)) {
 		HFTEST_FAIL(true, "Unable to allocate memory for page table.");
