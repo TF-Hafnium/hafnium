@@ -111,6 +111,19 @@ ARGS+=(-e HAFNIUM_HERMETIC_BUILD=inside)
 # the same absolute location so that all paths match across the host and guest.
 ARGS+=(-v "${ROOT_DIR}":"${ROOT_DIR}")
 ARGS+=(-v "${HAFNIUM_FVP_DIR}":"${HAFNIUM_FVP_DIR}")
+
+# Mount TF-A and TF-A-Tests source directories for use in shrinkwrap
+# Allow overriding via environment variables.
+TFA_DIR="${TFA_DIR:-${ROOT_DIR}/../trusted-firmware-a}"
+TFTF_DIR="${TFTF_DIR:-${ROOT_DIR}/../tf-a-tests}"
+
+# Note:
+# By default, this setup assumes that TF-A and TF-A-Tests repositories are checked
+# out in directories adjacent to the Hafnium source tree.
+# You can override these paths by setting TFA_DIR and TFTF_DIR environment variables.
+ARGS+=(-v "${TFA_DIR}:${TFA_DIR}")
+ARGS+=(-v "${TFTF_DIR}:${TFTF_DIR}")
+
 # Make all files outside of the Hafnium directory read-only to ensure that all
 # generated files are written there.
 ARGS+=(--read-only)
