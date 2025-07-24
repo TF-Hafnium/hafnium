@@ -12,16 +12,13 @@ extern "C" {
 #include "hf/arch/mm.h"
 
 #include "hf/check.h"
-#include "hf/list.h"
 #include "hf/mm.h"
-#include "hf/mpool.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/timer_mgmt.h"
 #include "hf/vm.h"
 }
 
 #include <list>
-#include <memory>
-#include <span>
 #include <vector>
 
 #include "mm_test.hh"
@@ -38,27 +35,18 @@ using struct_vm = struct vm;
 using struct_vcpu = struct vcpu;
 using struct_vm_locked = struct vm_locked;
 
-constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
 const mm_level_t TOP_LEVEL = arch_mm_stage2_root_level() - 1;
 
 class vm : public ::testing::Test
 {
        protected:
-	static std::unique_ptr<uint8_t[]> test_heap;
-
-	struct mpool ppool;
-
 	void SetUp() override
 	{
-		if (!test_heap) {
-			/*
-			 * TODO: replace with direct use of stdlib allocator so
-			 * sanitizers are more effective.
-			 */
-			test_heap = std::make_unique<uint8_t[]>(TEST_HEAP_SIZE);
-			mpool_init(&ppool, sizeof(struct mm_page_table));
-			mpool_add_chunk(&ppool, test_heap.get(),
-					TEST_HEAP_SIZE);
+		static bool allocator_initialized = false;
+
+		if (!allocator_initialized) {
+			memory_alloc_init();
+			allocator_initialized = true;
 		}
 	}
 
@@ -69,8 +57,6 @@ class vm : public ::testing::Test
 	}
 };
 
-std::unique_ptr<uint8_t[]> vm::test_heap;
-
 /**
  * If nothing is mapped, unmapping the hypervisor has no effect.
  */
@@ -80,14 +66,14 @@ TEST_F(vm, vm_unmap_hypervisor_not_mapped)
 	struct vm_locked vm_locked;
 
 	/* TODO: check ptable usage (security state?) */
-	EXPECT_TRUE(vm_init_next(1, &ppool, &vm, false, 0));
+	EXPECT_TRUE(vm_init_next(1, &vm, false, 0));
 	vm_locked = vm_lock(vm);
-	ASSERT_TRUE(mm_vm_init(&vm->ptable, vm->id, &ppool));
-	EXPECT_TRUE(vm_unmap_hypervisor(vm_locked, &ppool));
+	ASSERT_TRUE(mm_vm_init(&vm->ptable, vm->id));
+	EXPECT_TRUE(vm_unmap_hypervisor(vm_locked));
 	EXPECT_THAT(
 		mm_test::get_ptable(vm->ptable),
 		AllOf(SizeIs(4), Each(Each(arch_mm_absent_pte(TOP_LEVEL)))));
-	mm_vm_fini(&vm->ptable, &ppool);
+	mm_vm_fini(&vm->ptable);
 	vm_unlock(&vm_locked);
 }
 
@@ -105,7 +91,7 @@ TEST_F(vm, vm_boot_order)
 	 * Insertion when no call to "vcpu_update_boot" has been made yet.
 	 * The "boot_list" is expected to be empty.
 	 */
-	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false, 0));
+	EXPECT_TRUE(vm_init_next(1, &vm_cur, false, 0));
 	vm_cur->boot_order = 3;
 	vm_update_boot(vm_cur);
 	expected_final_order.push_back(vm_cur);
@@ -113,7 +99,7 @@ TEST_F(vm, vm_boot_order)
 	EXPECT_EQ(vm_get_boot_vm()->id, vm_cur->id);
 
 	/* Insertion at the head of the boot list */
-	EXPECT_TRUE(vm_init_next(1, &ppool, &vm_cur, false, 0));
+	EXPECT_TRUE(vm_init_next(1, &vm_cur, false, 0));
 	vm_cur->boot_order = 1;
 	vm_update_boot(vm_cur);
 	expected_final_order.push_back(vm_cur);
@@ -122,7 +108,7 @@ TEST_F(vm, vm_boot_order)
 
 	/* Insertion of two in the middle of the boot list */
 	for (uint32_t i = 0; i < 2; i++) {
-		EXPECT_TRUE(vm_init_next(MAX_CPUS, &ppool, &vm_cur, false, 0));
+		EXPECT_TRUE(vm_init_next(MAX_CPUS, &vm_cur, false, 0));
 		vm_cur->boot_order = 2;
 		vm_update_boot(vm_cur);
 		expected_final_order.push_back(vm_cur);

@@ -14,6 +14,7 @@ extern "C" {
 #include "hf/check.h"
 #include "hf/hf_ipi.h"
 #include "hf/mm.h"
+#include "hf/plat/memory_alloc.h"
 }
 
 #include <map>
@@ -34,24 +35,18 @@ using struct_vm_locked = struct vm_locked;
  * IPI Test to check sent IPIs are correctly recorded as pending.
  */
 
-constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
 class ipi : public ::testing::Test
 {
        protected:
-	static std::unique_ptr<uint8_t[]> test_heap;
-	struct mpool ppool;
 	struct_vm *test_vm[4];
 	void SetUp() override
 	{
-		if (test_heap) {
-			return;
-		}
-		test_heap = std::make_unique<uint8_t[]>(TEST_HEAP_SIZE);
-		mpool_init(&ppool, sizeof(struct mm_page_table));
-		mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
+		/* Prepare the memory allocator for the VM module. */
+		memory_alloc_init();
+
 		for (size_t i = 0; i < std::size(test_vm); i++) {
 			test_vm[i] = vm_init(i + HF_VM_ID_OFFSET, MAX_CPUS,
-					     &ppool, false, 0);
+					     false, 0);
 		}
 
 		for (size_t i = 0; i < MAX_CPUS; i++) {
@@ -100,8 +95,6 @@ class ipi : public ::testing::Test
 		}
 	}
 };
-
-std::unique_ptr<uint8_t[]> ipi::test_heap;
 
 /**
  * Check that when an IPI is sent to vCPU0, vCPU0 is

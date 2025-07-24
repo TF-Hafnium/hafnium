@@ -11,17 +11,13 @@
 extern "C" {
 #include "hf/boot_params.h"
 #include "hf/fdt_handler.h"
-#include "hf/mpool.h"
+#include "hf/plat/memory_alloc.h"
 }
-
-#include <memory>
 
 namespace
 {
 using ::testing::Eq;
 using ::testing::NotNull;
-
-constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 10;
 
 /*
  * /dts-v1/;
@@ -86,11 +82,7 @@ constexpr uint8_t test_dtb[] = {
 
 TEST(fdt, find_memory_ranges)
 {
-	struct mpool ppool;
-	std::unique_ptr<uint8_t[]> test_heap(new uint8_t[TEST_HEAP_SIZE]);
-
-	mpool_init(&ppool, sizeof(struct mm_page_table));
-	mpool_add_chunk(&ppool, test_heap.get(), TEST_HEAP_SIZE);
+	memory_alloc_init();
 	mm_init();
 
 	struct fdt fdt;

@@ -12,6 +12,7 @@ extern "C" {
 #include "hf/arch/mm.h"
 
 #include "hf/check.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 }
@@ -30,12 +31,9 @@ using struct_vm = struct vm;
 using struct_vcpu = struct vcpu;
 using struct_vm_locked = struct vm_locked;
 
-constexpr size_t TEST_HEAP_SIZE = PAGE_SIZE * 64;
 class vcpu : public ::testing::Test
 {
        protected:
-	static std::unique_ptr<uint8_t[]> test_heap;
-	struct mpool ppool;
 	const uint32_t first_intid = HF_NUM_INTIDS - 2;
 	const uint32_t second_intid = HF_NUM_INTIDS - 1;
 	struct_vm *test_vm;
@@ -45,14 +43,10 @@ class vcpu : public ::testing::Test
 
 	void SetUp() override
 	{
-		if (!test_heap) {
-			test_heap = std::make_unique<uint8_t[]>(TEST_HEAP_SIZE);
-			mpool_init(&ppool, sizeof(struct mm_page_table));
-			mpool_add_chunk(&ppool, test_heap.get(),
-					TEST_HEAP_SIZE);
-		}
+		memory_alloc_init();
 
-		test_vm = vm_init(HF_VM_ID_OFFSET, 8, &ppool, false, 0);
+		test_vm = vm_init(HF_VM_ID_OFFSET, 8, false, 0);
+
 		test_vcpu = vm_get_vcpu(test_vm, 0);
 		vcpu_locked = vcpu_lock(test_vcpu);
 		interrupts = &test_vcpu->interrupts;
@@ -67,8 +61,6 @@ class vcpu : public ::testing::Test
 		vcpu_unlock(&vcpu_locked);
 	}
 };
-
-std::unique_ptr<uint8_t[]> vcpu::test_heap;
 
 /**
  * Check that interrupts that are set pending, can later be fetched
