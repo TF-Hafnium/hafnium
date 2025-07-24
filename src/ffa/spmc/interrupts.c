@@ -261,6 +261,22 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt(
 	/* Secure interrupt signaling and queuing for SP. */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
+		/*
+		 * regs_available == false indicates the vCPU context has not
+		 * yet been saved, even though state was just set to WAITING.
+		 * Between marking WAITING and calling api_regs_state_saved, the
+		 * vCPU is still logically RUNNING. Treating it as WAITING here
+		 * would open a narrow race where another SPMC on a different
+		 * CPU could steal the vCPU lock and resume execution
+		 * prematurely. To avoid this, bail out when regs_available is
+		 * false and let the vCPU continue until its registers are
+		 * saved.
+		 */
+		if (!target_vcpu->regs_available) {
+			/* Interrupt has been injected in the vCPU state. */
+			break;
+		}
+
 		if (!target_vcpu->vm->sri_policy.intr_while_waiting) {
 			uint32_t inject_int_id = interrupt_resume_waiting(
 				current_locked, target_vcpu_locked);
