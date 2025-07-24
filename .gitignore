@@ -20,3 +20,5 @@ poetry.lock
 
 # Node.js dependencies
 node_modules/
+
+*__pycache__*
