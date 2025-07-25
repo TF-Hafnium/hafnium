@@ -9,6 +9,7 @@
 #include "hf/cpu.h"
 
 #include "hf/arch/cache.h"
+#include "hf/arch/std.h"
 
 #include "hf/api.h"
 #include "hf/check.h"
@@ -191,4 +192,83 @@ struct cpu *cpu_find(cpu_id_t id)
 	}
 
 	return NULL;
+}
+
+/**
+ * Begin a rollback section. Any memory freed between
+ * memory_alloc_rollback_init() and memory_alloc_rollback_fini()
+ * is placed into the CPU-local rollback pool instead of being
+ * returned to the global allocator.
+ * This prevents other CPUs from reusing those pages before the operation
+ * completes, allowing Hafnium to safely undo partial page-table updates
+ * if needed.
+ */
+bool cpu_rollback_memory_init(struct cpu *c, struct mpool *pool)
+{
+	struct mpool *cpu_rb_pool;
+	bool res = false;
+
+	assert(c != NULL);
+	assert(pool != NULL);
+
+	/**
+	 * If rollback is already active, its fallback pool must
+	 * remain unchanged.
+	 */
+	if (!c->rollback_memory.is_init) {
+		cpu_rb_pool = &c->rollback_memory.rb_pool;
+		c->rollback_memory.is_init = true;
+		mpool_init_with_fallback(cpu_rb_pool, pool);
+		res = true;
+	}
+
+	return res;
+}
+
+/*
+ * Relinquishes all cached memory entries into the configured fallback
+ * memory pool.
+ * To be invoked when rollback is not needed anymore.
+ */
+bool cpu_rollback_memory_fini(struct cpu *c)
+{
+	bool res = false;
+
+	assert(c != NULL);
+
+	if (c->rollback_memory.is_init) {
+		c->rollback_memory.is_init = false;
+
+		mpool_fini(&c->rollback_memory.rb_pool);
+		res = true;
+	}
+
+	return res;
+}
+
+void *cpu_rollback_memory_alloc(struct cpu *c, size_t count)
+{
+	assert(c != NULL);
+
+	if (c->rollback_memory.is_init) {
+		dlog_verbose("%s: allocate from memory pool memory\n",
+			     __func__);
+		return mpool_alloc_contiguous(&c->rollback_memory.rb_pool,
+					      count, count);
+	}
+
+	return NULL;
+}
+
+bool cpu_rollback_memory_free(struct cpu *c, void *entry, size_t size)
+{
+	assert(c != NULL);
+
+	if (c->rollback_memory.is_init) {
+		dlog_verbose("%s: adding the rollback memory pool\n", __func__);
+		return mpool_add_chunk(&c->rollback_memory.rb_pool, entry,
+				       size);
+	}
+
+	return false;
 }

@@ -14,11 +14,11 @@
 
 #include "hf/arch/cpu.h"
 
+#include "hf/mpool.h"
 #include "hf/timer_mgmt.h"
 
 #define PRIMARY_CPU_IDX 0U
 
-/* TODO: Fix alignment such that `cpu` structs are in different cache lines. */
 /* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct cpu {
 	/** CPU identifier. Doesn't have to be contiguous. */
@@ -50,6 +50,19 @@ struct cpu {
 	 * has been initialized.
 	 */
 	bool last_sp_initialized;
+
+	/*
+	 * Per CPU rollback memory mechanism. In some cases, memory that is
+	 * freed shouldn't be made available at the global pool of memory to
+	 * allow for a rollback mechanism for whichever state structures are
+	 * allocated.
+	 * In such case, the memory allocator can use the rollback memory pools
+	 * for each CPU.
+	 */
+	struct {
+		bool is_init;
+		struct mpool rb_pool;
+	} rollback_memory;
 };
 
 void cpu_module_init(const cpu_id_t *cpu_ids, size_t count);
@@ -61,5 +74,12 @@ void cpu_off(struct cpu *c);
 struct cpu *cpu_find(cpu_id_t id);
 uint8_t *cpu_get_buffer(struct cpu *c);
 uint32_t cpu_get_buffer_size(struct cpu *c);
+/**
+ * Per-CPU rollback memory allocation.
+ */
+bool cpu_rollback_memory_init(struct cpu *c, struct mpool *pool);
+bool cpu_rollback_memory_fini(struct cpu *c);
+void *cpu_rollback_memory_alloc(struct cpu *c, size_t count);
+bool cpu_rollback_memory_free(struct cpu *c, void *entry, size_t size);
 
 #endif
