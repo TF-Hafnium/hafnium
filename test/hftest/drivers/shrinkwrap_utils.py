@@ -26,6 +26,7 @@ import subprocess
 import yaml
 import shutil
 import logging
+import re
 
 # Inherits the config settings from global logger in hftest.py
 logger = logging.getLogger(__name__)
@@ -210,10 +211,63 @@ class ShrinkwrapManager:
             "FVP_Base_RevC-2xAEMvA-hafnium.yaml",
             "--overlay", os.path.join(config_dir, dynamic_overlay)
         ]
+
         logger.debug("Shrinkwrap RUN CMD:\n%s", " ".join(run_cmd))
+
+        self.log_resolved_fvp_command(run_cmd, run_state.log_path)
 
         try:
             execute_logged_fn(run_state, run_cmd, env=self.env)
             logger.debug("\u2705 Shrinkwrap run successful")
         except subprocess.CalledProcessError as e:
             raise RuntimeError("\u274C Shrinkwrap run failed") from e
+
+    def log_resolved_fvp_command(self, run_cmd, log_path):
+        """
+        Extracts the actual FVP execution command line from Shrinkwrap's --dry-run
+        output and appends it to the test's UART log for traceability.
+
+        Note:
+        Shrinkwrap's `--dry-run` output includes more than just the FVP command-
+        it may contain shell boilerplate, git operations etc.
+        This function filters that output to extract only the actual FVP model
+        command for logging.
+        """
+        dry_run_cmd = run_cmd + ["--dry-run"]
+
+        try:
+            result = subprocess.run(dry_run_cmd, env=self.env, check=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output_lines = result.stdout.decode().splitlines()
+            fvp_cmd = []
+            capture_fvp_cmd = False
+
+            for line in output_lines:
+                trimmed_line = line.strip()
+
+                # Regex Logic:
+                # ^/ : Line start with a ( / )
+                #.*/FVP_   : Somewhere in the path, it must include 'FVP_' (e.g., FVP_Base_RevC...)
+                # .*  : can have additionl data after that FVP name
+                if re.match(r"^/.*/FVP_.*", trimmed_line):
+                    capture_fvp_cmd = True  # Start capturing
+
+                if capture_fvp_cmd:
+                    # Stop capturing if we hit an unrelated command or blank (optional)
+                    if (trimmed_line.startswith("#") or
+                        trimmed_line.startswith("git ") or
+                        trimmed_line == ""):
+                        break
+                    fvp_cmd.append(line)
+
+            if fvp_cmd:
+                with open(log_path, "a") as f:
+                    f.write("\n # SHRINKWRAP Resolved FVP Command:\n")
+                    for line in fvp_cmd:
+                        f.write(line + "\n")
+                    f.write("\n")
+            else:
+                logger.warning("No FVP command found in Shrinkwrap --dry-run output.")
+
+        except subprocess.CalledProcessError as e:
+            logger.warning("Shrinkwrap dry-run failed while logging FVP command: %s", e)
