@@ -1901,6 +1901,16 @@ struct ffa_value ffa_memory_send_complete(
 	share_state->sending_complete = true;
 	dlog_verbose("%s: marked sending complete.\n", __func__);
 
+	/*
+	 * If the caller is from the NWd, reset the state for
+	 * ffa_ns_res_info_get. This will free all current data, if
+	 * any, and cause an ABORT for any ongoing transactions.
+	 * This is because any current data is now considered stale.
+	 */
+	if (!ffa_is_vm_id(from_locked.vm->id)) {
+		ffa_ns_res_info_get_state_reset();
+	}
+
 	return ffa_mem_success(share_state->memory_region->handle);
 }
 
@@ -4321,6 +4331,16 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	if (ret.func == FFA_SUCCESS_32) {
 		share_state_free(share_states, share_state, page_pool);
 		dlog_verbose("Freed share state after successful reclaim.\n");
+
+		/*
+		 * If the caller is from the NWd, reset the state for
+		 * ffa_ns_res_info_get. This will free all current data, if
+		 * any, and cause an ABORT for any ongoing transactions.
+		 * This is because any current data is now considered stale.
+		 */
+		if (!ffa_is_vm_id(to_locked.vm->id)) {
+			ffa_ns_res_info_get_state_reset();
+		}
 	}
 
 out:

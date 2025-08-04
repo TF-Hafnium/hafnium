@@ -1920,6 +1920,16 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
+	/*
+	 * If the caller is from the NWd, reset the state for
+	 * ffa_ns_res_info_get. This will free all current data, if
+	 * any, and cause an ABORT for any ongoing transactions.
+	 * This is because any current data is now considered stale.
+	 */
+	if (!ffa_is_vm_id(current->vm->id)) {
+		ffa_ns_res_info_get_state_reset();
+	}
+
 exit:
 	mpool_fini(&local_page_pool);
 	mm_unlock_stage1(&mm_stage1_locked);
@@ -2020,6 +2030,16 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 
 	/* Forward buffer unmapping to SPMC if coming from a VM. */
 	ffa_setup_rxtx_unmap_forward(vm_locked);
+
+	/*
+	 * If the caller is from the NWd, reset the state for
+	 * ffa_ns_res_info_get. This will free all current data, if
+	 * any, and cause an ABORT for any ongoing transactions.
+	 * This is because any current data is now considered stale.
+	 */
+	if (!ffa_is_vm_id(current->vm->id)) {
+		ffa_ns_res_info_get_state_reset();
+	}
 
 out:
 	vm_unlock(&vm_locked);
