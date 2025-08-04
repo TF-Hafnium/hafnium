@@ -32,3 +32,6 @@ bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
 				   uint8_t dma_device_id);
 void arch_vm_fini_mm(struct vm *vm, struct mpool *ppool);
 void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool);
+bool arch_vm_get_range_by_mode(struct vm_locked vm_locked, uintptr_t *begin,
+			       uintptr_t *end, mm_mode_t mode,
+			       uintptr_t *start_addr, mm_mode_t *ptable_mode);

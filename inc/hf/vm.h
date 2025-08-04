@@ -459,3 +459,6 @@ struct vm *vm_get_next_boot_secondary_core(struct vm *vm);
 enum vm_state vm_read_state(struct vm *vm);
 bool vm_set_state(struct vm_locked vm_locked, enum vm_state to_state);
 bool vm_is_discoverable(struct vm *vm);
+bool vm_get_range_by_mode(struct vm_locked vm_locked, uintptr_t *begin,
+			  uintptr_t *end, mm_mode_t mode, uintptr_t *start_addr,
+			  mm_mode_t *ptable_mode);

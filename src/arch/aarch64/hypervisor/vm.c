@@ -332,3 +332,57 @@ void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool)
 #endif
 	}
 }
+
+bool arch_vm_get_range_by_mode(struct vm_locked vm_locked, uintptr_t *begin,
+			       uintptr_t *end, mm_mode_t mode,
+			       uintptr_t *start_addr, mm_mode_t *ptable_mode)
+{
+	bool success;
+
+	/*
+	 * Different page tables and address types depending on
+	 * partition exception level.
+	 */
+	if (vm_locked.vm->el0_partition) {
+		struct mm_ptable *ptable = &vm_locked.vm->ptable;
+		vaddr_t start_vaddr = va_init(*start_addr);
+		vaddr_t begin_vaddr;
+		vaddr_t end_vaddr;
+
+		success = mm_get_range_by_mode(ptable, &begin_vaddr, &end_vaddr,
+					       mode, &start_vaddr, ptable_mode);
+
+		if (success) {
+			*start_addr = va_addr(start_vaddr);
+			*begin = va_addr(begin_vaddr);
+			*end = va_addr(end_vaddr);
+		}
+	} else {
+		struct mm_ptable *ptable = &vm_locked.vm->ptable;
+		ipaddr_t start_ipaddr = ipa_init(*start_addr);
+		ipaddr_t begin_ipaddr;
+		ipaddr_t end_ipaddr;
+
+#if SECURE_WORLD == 1
+		/*
+		 * If the requested mode is NS, traverse the page
+		 * tables managing the NS IPA space of target SP.
+		 */
+		if ((mode & MM_MODE_NS) != 0U) {
+			ptable = &vm_locked.vm->arch.ptable_ns;
+		}
+#endif
+
+		success = mm_vm_get_range_by_mode(ptable, &begin_ipaddr,
+						  &end_ipaddr, mode,
+						  &start_ipaddr, ptable_mode);
+
+		if (success) {
+			*start_addr = ipa_addr(start_ipaddr);
+			*begin = ipa_addr(begin_ipaddr);
+			*end = ipa_addr(end_ipaddr);
+		}
+	}
+
+	return success;
+}

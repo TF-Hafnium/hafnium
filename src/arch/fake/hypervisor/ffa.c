@@ -679,3 +679,18 @@ void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool)
 	(void)vm;
 	(void)ppool;
 }
+
+bool arch_vm_get_range_by_mode(struct vm_locked vm_locked,
+			       const uintptr_t *begin, const uintptr_t *end,
+			       mm_mode_t mode, const uintptr_t *start_addr,
+			       const mm_mode_t *ptable_mode)
+{
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)mode;
+	(void)start_addr;
+	(void)ptable_mode;
+
+	return false;
+}

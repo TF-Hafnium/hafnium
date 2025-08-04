@@ -1498,3 +1498,11 @@ bool vm_is_discoverable(struct vm *vm)
 {
 	return vm_read_state(vm) != VM_STATE_NULL;
 }
+
+bool vm_get_range_by_mode(struct vm_locked vm_locked, uintptr_t *begin,
+			  uintptr_t *end, mm_mode_t mode, uintptr_t *start_addr,
+			  mm_mode_t *ptable_mode)
+{
+	return arch_vm_get_range_by_mode(vm_locked, begin, end, mode,
+					 start_addr, ptable_mode);
+}
