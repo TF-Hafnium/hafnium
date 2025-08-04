@@ -265,3 +265,95 @@ void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
 	 */
 	vm_unmap_memory_regions(vm_locked, ppool);
 }
+
+/**
+ * Traverses the NWd VMs and determines if any RX/TX buffers
+ * are mapped, if so, updates the provided address map descriptor.
+ * AMDs generated from this traversal will have the endpoint_id
+ * set to HF_SPMC_VM_ID to indicate that all SPs have potential
+ * access to these memory regions. The current index parameter
+ * is updated to allow for continuous traversal of the NWd VMs
+ * structure. The NWd ID parameter is used to determine which
+ * NWd VM is connected to the RX/TX buffer being reported.
+ */
+bool ffa_get_nwd_rxtx_buffer_info(struct ffa_address_map_desc *amd,
+				  bool check_rx_buffer, bool *buffer_mapped,
+				  uint16_t *curr_index, ffa_id_t *nwd_id)
+{
+	bool success = false;
+	struct nwd_vms_locked nwd_vms_locked;
+
+	/* Make sure we have valid parameters */
+	assert(amd != NULL);
+	assert(buffer_mapped != NULL);
+	assert(curr_index != NULL);
+	assert(nwd_id != NULL);
+
+	nwd_vms_locked = nwd_vms_lock();
+
+	/* Loop through the list of normal world vms. */
+	for (; *curr_index < nwd_vms_size; *curr_index += 1) {
+		ffa_amd_permissions_t permissions;
+		struct vm_locked vm_locked;
+
+		/* Make sure the vm we are checking is valid. */
+		if (nwd_vms[*curr_index].id == HF_INVALID_VM_ID) {
+			continue;
+		}
+
+		success = true;
+		vm_locked = vm_lock(&nwd_vms[*curr_index]);
+
+		/*
+		 * Determine if either buffer has been mapped. If so,
+		 * an AMD is guaranteed to be generated.
+		 */
+		*buffer_mapped = vm_locked.vm->mailbox.recv != NULL ||
+				 vm_locked.vm->mailbox.send != NULL;
+		if (*buffer_mapped) {
+			*nwd_id = vm_locked.vm->id;
+		}
+
+		/* If the RX or TX buffer is mapped */
+		if (check_rx_buffer && vm_locked.vm->mailbox.recv != NULL) {
+			/*
+			 * The RX buffer from the SPMC's perspective has R/W
+			 * permissions. Due to the fact that all SPs have
+			 * potential access to the RX buffer, it will have both
+			 * privileged and unprivileged permissions.
+			 */
+			permissions = ffa_memory_amd_permissions_from_mm_mode(
+				(MM_MODE_R | MM_MODE_W), true);
+
+			/* Setup the address map descriptor. */
+			ffa_ns_res_info_get_amd_init(
+				amd, (uintptr_t)vm_locked.vm->mailbox.recv,
+				(HF_MAILBOX_SIZE / FFA_PAGE_SIZE), permissions,
+				HF_SPMC_VM_ID,
+				FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+		} else if (vm_locked.vm->mailbox.send != NULL) {
+			/*
+			 * The TX buffer from the SPMC's perspective has R
+			 * permissions. Due to the fact that all SPs have
+			 * potential access to the TX buffer, it will have both
+			 * privileged and unprivileged permissions.
+			 */
+			permissions = ffa_memory_amd_permissions_from_mm_mode(
+				MM_MODE_R, true);
+
+			/* Setup the address map descriptor. */
+			ffa_ns_res_info_get_amd_init(
+				amd, (uintptr_t)vm_locked.vm->mailbox.send,
+				(HF_MAILBOX_SIZE / FFA_PAGE_SIZE), permissions,
+				HF_SPMC_VM_ID,
+				FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+		}
+
+		vm_unlock(&vm_locked);
+		break;
+	}
+
+	nwd_vms_unlock(&nwd_vms_locked);
+
+	return success;
+}

@@ -34,3 +34,11 @@ void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool);
 
 /** Checks whether managed exit is supported by given SP. */
 bool ffa_vm_managed_exit_supported(struct vm *vm);
+
+/**
+ * Traverses the nwd vms and determines if the RX/TX buffers
+ * are mapped, if so, updates the provided amd descriptor.
+ */
+bool ffa_get_nwd_rxtx_buffer_info(struct ffa_address_map_desc *amd,
+				  bool check_rx_buffer, bool *buffer_mapped,
+				  uint16_t *curr_index, ffa_id_t *nwd_id);
