@@ -5177,3 +5177,180 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_reclaim,
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
 }
+
+/**
+ * Use the FFA_NS_RES_INFO_GET to obtain the information
+ * memory that is lent to service1 with multiple calls
+ * needed to retrieve all information.
+ */
+TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
+		  service1_has_ns_mem_and_sel1)
+{
+	uint32_t current_size;
+	uint32_t remaining_size;
+	uint32_t remaining_amds;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_resource_info_desc_header *header = mb.recv;
+	struct ffa_address_map_desc *amd_array =
+		(struct ffa_address_map_desc
+			 *)((uint8_t *)mb.recv +
+			    sizeof(struct ffa_resource_info_desc_header));
+	uint8_t *ptr = pages;
+	ffa_memory_handle_t handle;
+	struct ffa_value ret;
+	uint32_t constituent_index;
+	uint8_t offset_index = 3;
+
+	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish",
+		       mb.send);
+
+	/* Initialise the memory before giving it. */
+	memset_s(ptr, sizeof(pages), 'b',
+		 PAGE_SIZE * FRAGMENTED_SHARE_PAGE_COUNT);
+
+	/* Lend all constituent pages to service1. */
+	for (uint32_t i = 0;
+	     i < ARRAY_SIZE(constituents_lend_fragmented_relinquish); ++i) {
+		constituents_lend_fragmented_relinquish[i].address =
+			(uint64_t)pages + i * PAGE_SIZE;
+		constituents_lend_fragmented_relinquish[i].page_count = 1;
+		constituents_lend_fragmented_relinquish[i].reserved = 0;
+	}
+
+	handle = send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), service1_info->vm_id,
+		constituents_lend_fragmented_relinquish,
+		ARRAY_SIZE(constituents_lend_fragmented_relinquish), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
+
+	/* Run the SP to acquire the lent pages. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	ret = ffa_ns_res_info_get(FFA_NS_RES_INFO_GET_REQ_START_FLAGS);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+
+	/* Acquire the resource information descriptor length info. */
+	current_size = (uint32_t)(ret.arg2 >> 32);
+	remaining_size = (uint32_t)ret.arg2;
+
+	/*
+	 * We expect 259 AMDs, 1 from service1's manifest, 256 from the
+	 * lent pages, and 2 from the RX/TX buffer AMDs.
+	 * In the first transaction, we expect 255 AMDs.
+	 */
+	EXPECT_EQ(current_size,
+		  sizeof(struct ffa_resource_info_desc_header) +
+			  (sizeof(struct ffa_address_map_desc) * 0xFF));
+	EXPECT_EQ(remaining_size, 0x40);
+
+	/* Validate the header contents. */
+	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
+	EXPECT_EQ(header->amd_count, 0x103);
+	EXPECT_EQ(header->amd_offset,
+		  sizeof(struct ffa_resource_info_desc_header));
+
+	dlog_info("Remaining Size: 0x%x\n", remaining_size);
+	dlog_info("Current Size: 0x%x\n", current_size);
+	dlog_info("\n");
+	dlog_info("Information:\n");
+	dlog_info("  Size: 0x%x\n", header->amd_size);
+	dlog_info("  Count: 0x%x\n", header->amd_count);
+	dlog_info("  Offset: 0x%x\n", header->amd_offset);
+
+	/* Validate the manifest AMD contents. */
+	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
+	EXPECT_EQ(amd_array[0].page_count, 1);
+	EXPECT_EQ(amd_array[0].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
+	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 0);
+
+	/* Validate the RX buffer AMD contents. */
+	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
+	EXPECT_EQ(amd_array[1].page_count, 1);
+	EXPECT_EQ(amd_array[1].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
+	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 1);
+
+	/* Validate the TX buffer AMD contents. */
+	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
+	EXPECT_EQ(amd_array[2].page_count, 1);
+	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
+	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 2);
+
+	/*
+	 * Validate and print the remaining AMDs, take into account
+	 * the header.
+	 */
+	remaining_amds =
+		(current_size / sizeof(struct ffa_address_map_desc)) - 1;
+	for (uint32_t i = offset_index; i < remaining_amds; i++) {
+		constituent_index = i - offset_index;
+		EXPECT_EQ(amd_array[i].base_address,
+			  constituents_lend_fragmented_relinquish
+				  [constituent_index]
+					  .address);
+		EXPECT_EQ(amd_array[i].page_count,
+			  constituents_lend_fragmented_relinquish
+				  [constituent_index]
+					  .page_count);
+		EXPECT_EQ(amd_array[i].permissions,
+			  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+		EXPECT_EQ(amd_array[i].endpoint_id, service1_info->vm_id);
+		EXPECT_EQ(amd_array[i].flags,
+			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+		print_amd(amd_array, i);
+	}
+
+	/* Invoke the command to obtain the remaining data. */
+	ret = ffa_ns_res_info_get(FFA_NS_RES_INFO_GET_REQ_CONT_FLAGS);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+
+	/* Acquire the resource information descriptor length info. */
+	current_size = (uint32_t)(ret.arg2 >> 32);
+	remaining_size = (uint32_t)ret.arg2;
+
+	/* We expect the remaining 4 AMDs. */
+	EXPECT_EQ(current_size, (sizeof(struct ffa_address_map_desc) * 4));
+	EXPECT_EQ(remaining_size, 0);
+
+	dlog_info("Remaining Size: 0x%x\n", remaining_size);
+	dlog_info("Current Size: 0x%x\n", current_size);
+	dlog_info("\n");
+
+	/* Point the AMD array to the base of the RX buffer. */
+	amd_array = (struct ffa_address_map_desc *)((uint8_t *)mb.recv);
+
+	/* Validate and print the remaining AMDs. */
+	remaining_amds = (current_size / sizeof(struct ffa_address_map_desc));
+	constituent_index++;
+	for (uint32_t i = 0; i < remaining_amds; i++) {
+		EXPECT_EQ(amd_array[i].base_address,
+			  constituents_lend_fragmented_relinquish
+				  [constituent_index + i]
+					  .address);
+		EXPECT_EQ(amd_array[i].page_count,
+			  constituents_lend_fragmented_relinquish
+				  [constituent_index + i]
+					  .page_count);
+		EXPECT_EQ(amd_array[i].permissions,
+			  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+		EXPECT_EQ(amd_array[i].endpoint_id, service1_info->vm_id);
+		EXPECT_EQ(amd_array[i].flags,
+			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+		print_amd(amd_array, i);
+	}
+
+	ret = ffa_mem_reclaim(handle, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
