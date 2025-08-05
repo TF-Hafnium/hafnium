@@ -158,6 +158,8 @@ enum ffa_function : uint32_t {
 	 */
 	FFA_ABORT_32                        = 0x84000090,
 	FFA_ABORT_64                        = 0xC4000090,
+	/* FF-A v1.3 */
+	FFA_NS_RES_INFO_GET                 = 0xC400008F,
 };
 
 /**
@@ -291,6 +293,10 @@ static inline const char *ffa_func_name(enum ffa_function func)
 		return "FFA_MEM_PERM_GET_64";
 	case FFA_MEM_PERM_SET_64:
 		return "FFA_MEM_PERM_SET_64";
+
+	/* FF-A v1.3 */
+	case FFA_NS_RES_INFO_GET:
+		return "FFA_NS_RES_INFO_GET";
 
 	/* Implementation-defined ABIs. */
 	case FFA_CONSOLE_LOG_32:
@@ -433,6 +439,14 @@ typedef uint16_t ffa_id_t;
 static inline bool ffa_is_vm_id(ffa_id_t id)
 {
 	return (FFA_ID_MASK & id) == FFA_VM_ID_MASK;
+}
+
+/**
+ * Helper to check if FF-A ID is a SP ID, managed by the hypervisor.
+ */
+static inline bool ffa_is_sp_id(ffa_id_t id)
+{
+	return (FFA_ID_MASK & id) == FFA_ID_MASK;
 }
 
 /**
@@ -915,6 +929,147 @@ static inline uint16_t ffa_partition_info_regs_get_desc_size(
 	struct ffa_value args)
 {
 	return (args.arg2 >> 48);
+}
+
+/* Request flags for FFA_NS_RES_INFO_GET. */
+#define FFA_NS_RES_INFO_GET_REQ_START_FLAGS 0x00
+#define FFA_NS_RES_INFO_GET_REQ_CONT_FLAGS 0x10
+
+/* Flag used to determine a valid endpoint ID. */
+#define FFA_NS_RES_INFO_GET_VALID_EP_FLAG 0x01
+
+/**
+ * Address map descripter permissions for unprivileged and privileged
+ * access to the memory which includes read, write, and execute
+ * permissions.
+ */
+typedef uint8_t ffa_amd_permissions_t;
+
+/**
+ * The following has the permission encodings according to tables 13.63
+ * of the FF-A v1.3 ALP2 specification.
+ * It defines that:
+ * - lower 4 bits relate to unprivileged permissions.
+ * - upper 4 bits relate to privileged permissions.
+ */
+enum ffa_amd_permissions : uint8_t {
+	/* Unprivileged Read. */
+	UNPRIV_R = ((uint8_t)1 << 0),
+	/* Unprivileged Write. */
+	UNPRIV_W = ((uint8_t)1 << 1),
+	/* Unprivileged Execute. */
+	UNPRIV_X = ((uint8_t)1 << 2),
+	/* Unprivileged Write. */
+	UNPRIV_RES = ((uint8_t)1 << 3),
+	/* Privileged Read. */
+	PRIV_R = ((uint8_t)1 << 4),
+	/* Privileged Write */
+	PRIV_W = ((uint8_t)1 << 5),
+	/* Privileged Execute. */
+	PRIV_X = ((uint8_t)1 << 6),
+	/* Privileged Reserved. */
+	PRIV_RES = ((uint8_t)1 << 7),
+};
+
+#pragma pack(1)
+/**
+ * Resource Information Descriptor Header
+ * Section 13.13: FFA_NS_RES_INFO_GET - Table 13.61
+ */
+struct ffa_resource_info_desc_header {
+	uint32_t amd_size;
+	uint32_t amd_count;
+	uint32_t amd_offset;
+	uint32_t reserved;
+};
+
+/**
+ * Address Map Descriptor
+ * Section 13.13: FFA_NS_RES_INFO_GET - Table 13.62
+ */
+struct ffa_address_map_desc {
+	uint64_t base_address;
+	uint32_t page_count;
+	ffa_amd_permissions_t permissions;
+	ffa_id_t endpoint_id;
+	uint8_t flags;
+};
+#pragma pack()
+
+/* Flag used to determine the access type. */
+#define FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG 0x00
+#define FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG 0x01
+
+/* Max number of AMDs that will fit within a page. */
+#define FFA_NS_RES_INFO_GET_MAX_AMDS_PER_PAGE \
+	(FFA_PAGE_SIZE / sizeof(struct ffa_address_map_desc))
+
+static_assert(sizeof(struct ffa_address_map_desc) == 16,
+	      "Unexpected address map descriptor size\n");
+
+/**
+ * Frees all allocated fragments and resets the state
+ * information for FFA_NS_RES_INFO_GET.
+ */
+void ffa_ns_res_info_get_state_reset(void);
+
+/* FFA_NS_RES_INFO_GET flags register valid bitmask. */
+#define FFA_TARGET_ID_VALID_MASK (0x01)
+
+/**
+ * Helper function to determine if a valid endpoint ID
+ * was specified.
+ */
+static inline bool ffa_ns_res_info_get_endpoint_valid(struct ffa_value args)
+{
+	return (args.arg2 & FFA_TARGET_ID_VALID_MASK);
+}
+
+/**
+ * Acquire the target ID but only if the valid flag is set
+ * Section 13.13: FFA_NS_RES_INFO_GET - Table 13.58 - Register x1 - Bits[15:0]
+ */
+static inline ffa_id_t ffa_ns_res_info_get_target_id(struct ffa_value args)
+{
+	/* Endpoint ID is only valid if the ID valid flag is set. */
+	return (ffa_ns_res_info_get_endpoint_valid(args)) ? (args.arg1 & 0xFFFF)
+							  : 0;
+}
+
+/* FFA_NS_RES_INFO_GET flags field resource type bitmask. */
+#define FFA_NS_RESOURCE_TYPE_MASK (0x0C)
+
+/**
+ * Acquire the resource type
+ * Section 13.13: FFA_NS_RES_INFO_GET - Table 13.58 - Register x2 - Bits[3:2]
+ */
+static inline uint32_t ffa_ns_res_info_get_resource_type(struct ffa_value args)
+{
+	return (args.arg2 & FFA_NS_RESOURCE_TYPE_MASK);
+}
+
+/* FFA_NS_RES_INFO_GET flags field request type bitmask. */
+#define FFA_REQUEST_TYPE_MASK (0x10)
+
+/**
+ * Acquire the request type
+ * Section 13.13: FFA_NS_RES_INFO_GET - Table 13.58 - Register x2 - Bit[4]
+ */
+static inline uint8_t ffa_ns_res_info_get_request_type(struct ffa_value args)
+{
+	return (args.arg2 & FFA_REQUEST_TYPE_MASK);
+}
+
+static inline void ffa_ns_res_info_get_amd_init(
+	struct ffa_address_map_desc *amd, uint64_t base_address,
+	uint32_t page_count, ffa_amd_permissions_t permissions, ffa_id_t id,
+	uint8_t flags)
+{
+	amd->base_address = base_address;
+	amd->page_count = page_count;
+	amd->permissions = permissions;
+	amd->endpoint_id = id;
+	amd->flags = flags;
 }
 
 static inline ffa_memory_handle_t ffa_assemble_handle(uint32_t a1, uint32_t a2)
