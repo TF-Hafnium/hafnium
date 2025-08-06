@@ -10,6 +10,7 @@
 
 #include "hf/arch/memcpy_trapped.h"
 #include "hf/arch/mm.h"
+#include "hf/arch/vm.h"
 
 #include "hf/addr.h"
 #include "hf/check.h"
@@ -4333,4 +4334,203 @@ void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
 	/* TODO */
 	(void)vm_locked;
 	(void)ppool;
+}
+
+/**
+ * Updates the AMD based on the receiver and constituent.
+ */
+static bool ffa_memory_init_amd_from_constituent(
+	struct ffa_address_map_desc *amd, struct ffa_memory_access *receiver,
+	struct ffa_composite_memory_region *composite,
+	const uint16_t *con_index)
+{
+	ffa_amd_permissions_t permissions;
+	uint32_t default_mode = 0;
+	uint32_t mode = ffa_memory_permissions_to_mode(
+		receiver->receiver_permissions.permissions, default_mode);
+	struct ffa_memory_region_constituent *constituent =
+		&composite->constituents[*con_index];
+	ffa_id_t vm_id = receiver->receiver_permissions.receiver;
+	struct vm *vm = vm_find(vm_id);
+	bool privileged = false;
+
+	/*
+	 * If the VM comes back NULL, it could mean that the sender
+	 * initiated a lend/share with multiple endpoints including
+	 * another NWd VM. If this is the case, skip setting up the
+	 * AMD.
+	 */
+	if (vm == NULL) {
+		return false;
+	}
+
+	/* If the vm is an el1 partition. */
+	privileged = !vm->el0_partition;
+
+	/* Set permissions. */
+	permissions = ffa_memory_amd_permissions_from_mm_mode(mode, privileged);
+
+	/* Setup the address map descriptor. */
+	ffa_ns_res_info_get_amd_init(
+		amd, constituent->address, constituent->page_count, permissions,
+		vm_id, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+
+	return true;
+}
+
+/**
+ * Traversal function for the share states structure. is called
+ * by ffa_memory_get_share_states_info to update the provided
+ * address map descriptor with relevant non-secure shared memory,
+ * if applicable. Traversal continues until a valid memory region
+ * is found or the end of the share states structure is reached.
+ * If a valid region is found, the amd is updated as well as the
+ * provided pointers to allow for continuous traversal.
+ */
+static bool ffa_memory_traverse_share_states(struct ffa_address_map_desc *amd,
+					     ffa_id_t target_id,
+					     uint32_t current_index,
+					     uint16_t *rec_index,
+					     uint16_t *con_index)
+{
+	bool success = false;
+	struct ffa_memory_region *mem_region =
+		share_states[current_index].memory_region;
+
+	/* Loop through all receivers. */
+	for (uint32_t i = *rec_index; i < mem_region->receiver_count; i++) {
+		struct ffa_memory_access *receiver =
+			ffa_memory_region_get_receiver(mem_region, i);
+		struct ffa_composite_memory_region *composite =
+			ffa_memory_region_get_composite(mem_region, i);
+
+		/* If there is a target_id, continue until found. */
+		if (target_id != 0 &&
+		    target_id != receiver->receiver_permissions.receiver) {
+			continue;
+		}
+
+		*rec_index = i;
+
+		/* Loop through all constituents of the receiver. */
+		while (*con_index < composite->constituent_count) {
+			/*
+			 * If the AMD was successfully updated, move onto the
+			 * next AMD, otherwise, continue looping.
+			 */
+			if (ffa_memory_init_amd_from_constituent(
+				    amd, receiver, composite, con_index)) {
+				success = true;
+				break;
+			}
+
+			*con_index += 1;
+		}
+
+		if (success) {
+			*con_index += 1;
+			break;
+		}
+
+		*con_index = 0;
+	}
+
+	if (!success) {
+		*rec_index = 0;
+	}
+
+	return success;
+}
+
+/**
+ * Updates the provided address map descriptor with shared
+ * non-secure memory, if applicable. If target_id is non-zero,
+ * will return information only for the provided endpoint.
+ * Depending on the number of relevant shared data this call will
+ * update the provided pointers to allow for continuous traversal
+ * of the share states structure until no relevant data is found
+ * or end of the structure is reached.
+ */
+bool ffa_memory_get_share_states_info(struct ffa_address_map_desc *amd,
+				      ffa_id_t target_id,
+				      uint16_t *memory_index,
+				      uint16_t *receiver_index,
+				      uint16_t *constituent_index)
+{
+	bool success = false;
+
+	/* Pointers should be valid. */
+	assert(amd != NULL);
+	assert(memory_index != NULL);
+	assert(receiver_index != NULL);
+	assert(constituent_index != NULL);
+
+	sl_lock(&share_states_lock_instance);
+
+	/* Start traversal at the last known index. */
+	for (uint32_t i = *memory_index; i < MAX_MEM_SHARES; i++) {
+		/* Look for a valid index. */
+		if ((share_states[i].share_func != 0) &&
+		    ffa_is_vm_id(share_states[i].memory_region->sender)) {
+			*memory_index = i;
+
+			success = ffa_memory_traverse_share_states(
+				amd, target_id, i, receiver_index,
+				constituent_index);
+
+			if (success) {
+				break;
+			}
+		}
+	}
+
+	sl_unlock(&share_states_lock_instance);
+
+	return success;
+}
+
+/**
+ * Translate then MM_MODE_* permissions obtained from the mm library, into the
+ * ffa_memory_access_permissions_t used in the FF-A AMD descriptor for
+ * FFA_NS_RES_INFO_GET return.
+ * This translation aligns with the tables 13.64 and 13.65 of the FF-A v1.3 ALP2
+ * specification.
+ * Privileged should be set for stage2 mappings, as they relate to S-EL1
+ * partitions, and unset for stage 1 mappings, as they relate to S-EL0
+ * partitions.
+ */
+ffa_amd_permissions_t ffa_memory_amd_permissions_from_mm_mode(mm_mode_t mode,
+							      bool privileged)
+{
+	ffa_amd_permissions_t result = 0;
+
+	/* Set unprivileged permissions. */
+	if ((mode & MM_MODE_R) != 0U) {
+		result |= UNPRIV_R;
+	}
+
+	if ((mode & MM_MODE_W) != 0U) {
+		result |= UNPRIV_W;
+	}
+
+	if ((mode & MM_MODE_X) != 0U) {
+		result |= UNPRIV_X;
+	}
+
+	/* If this is an S-EL1 partition, set privileged permissions. */
+	if (privileged) {
+		if ((mode & MM_MODE_R) != 0U) {
+			result |= PRIV_R;
+		}
+
+		if ((mode & MM_MODE_W) != 0U) {
+			result |= PRIV_W;
+		}
+
+		if ((mode & MM_MODE_X) != 0U) {
+			result |= PRIV_X;
+		}
+	}
+
+	return result;
 }

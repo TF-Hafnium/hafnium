@@ -50,3 +50,10 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 
 void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
 					      struct mpool *ppool);
+bool ffa_memory_get_share_states_info(struct ffa_address_map_desc *amd,
+				      ffa_id_t target_id,
+				      uint16_t *memory_index,
+				      uint16_t *receiver_index,
+				      uint16_t *constituent_index);
+ffa_amd_permissions_t ffa_memory_amd_permissions_from_mm_mode(mm_mode_t mode,
+							      bool privileged);
