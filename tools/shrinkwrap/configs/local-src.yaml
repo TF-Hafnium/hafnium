@@ -1,0 +1,29 @@
+#
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Copyright HAFNIUM Contributors.
+#
+
+%YAML 1.2
+---
+description: >-
+  Overlay for building Hafnium with locally checked-out sources of
+  TF-A, and TFTF.
+  Requires TFA_SRC, and TFTF_SRC btvars to be set externally.
+
+buildex:
+  btvars:
+    TFA_SRC:
+      type: path
+      value: null
+
+    TFTF_SRC:
+      type: path
+      value: null
+
+
+build:
+  tfa:
+    sourcedir: ${btvar:TFA_SRC}
+
+  tftf:
+    sourcedir: ${btvar:TFTF_SRC}
