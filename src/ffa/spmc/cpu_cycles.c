@@ -238,6 +238,7 @@ static void ffa_msg_wait_complete(struct vcpu_locked current_locked,
 	 * needed.
 	 */
 	vcpu_virt_interrupt_clear(current_locked, HF_MANAGED_EXIT_INTID);
+	current_locked.vcpu->processing_managed_exit = false;
 
 	/* Relinquish control back to the NWd. */
 	*next = api_switch_to_other_world(
