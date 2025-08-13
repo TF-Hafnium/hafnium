@@ -104,6 +104,11 @@ do
 		;;
 	esac
 done <<< "$(env)"
+
+# Forward PLATFORM to ensure it's preserved inside the container.
+if [ -n "${PLATFORM:-}" ]; then
+    ARGS+=(-e "PLATFORM=${PLATFORM}")
+fi
 # Set environment variable informing the build that we are running inside
 # a container.
 ARGS+=(-e HAFNIUM_HERMETIC_BUILD=inside)

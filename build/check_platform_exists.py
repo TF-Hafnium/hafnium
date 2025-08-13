@@ -25,7 +25,7 @@ def Main():
     project = sys.argv[1]
 
     platforms = []
-    reg = re.compile('aarch64_toolchains\("(\w*)')
+    reg = re.compile(r'aarch64_toolchains\("(\w*)')
     with open("project/" + project + "/BUILD.gn") as project_file:
         for line in project_file:
             platforms += reg.findall(line)

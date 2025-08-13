@@ -38,12 +38,12 @@ ifeq ($(HAFNIUM_HERMETIC_BUILD),true)
 # Need to define at least one non-default target.
 all:
 	@$(CURDIR)/build/run_in_container.sh make PROJECT=$(PROJECT) \
-		ENABLE_ASSERTIONS=$(ENABLE_ASSERTIONS) $@
+		PLATFORM=$(PLATFORM) ENABLE_ASSERTIONS=$(ENABLE_ASSERTIONS) $@
 
 # Catch-all target.
 .DEFAULT:
 	@$(CURDIR)/build/run_in_container.sh make PROJECT=$(PROJECT) \
-		ENABLE_ASSERTIONS=$(ENABLE_ASSERTIONS) $@
+		PLATFORM=$(PLATFORM) ENABLE_ASSERTIONS=$(ENABLE_ASSERTIONS) $@
 
 .PHONY: commitlint
 commitlint:
