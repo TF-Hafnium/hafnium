@@ -244,6 +244,7 @@ bool hf_ipi_handle(struct vcpu_locked target_vcpu_locked)
 {
 	enum ipi_sri_action ipi_sri_action = IPI_SRI_ACTION_INIT;
 	bool ret = true;
+	struct vcpu* current = target_vcpu_locked.vcpu;
 
 	ret = hf_ipi_handle_list_element(target_vcpu_locked, &ipi_sri_action);
 
@@ -251,13 +252,14 @@ bool hf_ipi_handle(struct vcpu_locked target_vcpu_locked)
 	 * Clear the pending ipi list, handling the ipi for the remaining
 	 * target vCPUs.
 	 */
-	for (struct vcpu *target_vcpu =
-		     hf_ipi_get_pending_target_vcpu(target_vcpu_locked.vcpu);
+	for (struct vcpu* target_vcpu = hf_ipi_get_pending_target_vcpu(current);
 	     target_vcpu != NULL;
 	     target_vcpu = hf_ipi_get_pending_target_vcpu(target_vcpu)) {
-		target_vcpu_locked = vcpu_lock(target_vcpu);
+		if (target_vcpu != current)
+			target_vcpu_locked = vcpu_lock(target_vcpu);
 		hf_ipi_handle_list_element(target_vcpu_locked, &ipi_sri_action);
-		vcpu_unlock(&target_vcpu_locked);
+		if (target_vcpu != current)
+			vcpu_unlock(&target_vcpu_locked);
 	}
 
 	return ret;
