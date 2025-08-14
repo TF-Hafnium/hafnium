@@ -374,6 +374,18 @@ enum ffa_feature_id : uint32_t {
 
 	/* Query interrupt ID of the Managed Exit Interrupt. */
 	FFA_FEATURE_MEI = 3,
+
+	/* FF-A v1.3: Notification features (per-vCPU optionality & counts). */
+	FFA_FEATURE_NOTIFICATION = 4,
+};
+
+/* FF-A v1.3 Notification feature flags (return value of FFA_FEATURES). */
+enum ffa_notification_feature_flags : uint32_t {
+	/* VM per-vCPU not supported */
+	FFA_NOTIFY_FEAT_NO_PER_VCPU_VM = (1U << 0),
+
+	/* SP per-vCPU not supported */
+	FFA_NOTIFY_FEAT_NO_PER_VCPU_SP = (1U << 1),
 };
 
 /** Constants for bitmasks used in FFA_FEATURES. */

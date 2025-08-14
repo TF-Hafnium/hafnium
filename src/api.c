@@ -2799,6 +2799,28 @@ static struct ffa_value ffa_features_feature(enum ffa_feature_id feature,
 		}
 		return api_ffa_feature_success(HF_SCHEDULE_RECEIVER_INTID);
 
+	case FFA_FEATURE_NOTIFICATION: {
+		/*
+		 * FF-A v1.3 Notification Features (Feature ID 0x4)
+		 *
+		 * Per-vCPU notifications are optional.
+		 *
+		 * Return value encoding (w2):
+		 * Bit[0]   = 1 (per-vCPU NOT supported for VMs)
+		 * Bit[1]   = 1 (per-vCPU NOT supported for SPs)
+		 * Bits[10:2], Bits[19:11] = 0 (MBZ at NS physical instance)
+		 * Bits[31:20] = 0 (MBZ)
+		 */
+		uint32_t notification_feature_flags = 0;
+
+		if (FFA_VERSION_1_3 > FFA_VERSION_COMPILED) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+
+		notification_feature_flags |= FFA_NOTIFY_FEAT_NO_PER_VCPU_VM;
+		notification_feature_flags |= FFA_NOTIFY_FEAT_NO_PER_VCPU_SP;
+		return api_ffa_feature_success(notification_feature_flags);
+	}
 	/* Platform specific feature support. */
 	default:
 		return ffa_error(FFA_NOT_SUPPORTED);
