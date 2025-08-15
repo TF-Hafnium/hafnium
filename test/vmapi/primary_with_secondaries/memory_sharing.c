@@ -4778,3 +4778,94 @@ TEST_PRECONDITION(memory_sharing, cannot_zero_ro_memory_on_retrieve,
 	run_res = ffa_run(service2_info->vm_id, 0);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 }
+
+/**
+ * Helper function to print the AMDs returned from FFA_NS_RES_INFO_GET.
+ */
+static void print_amd(struct ffa_address_map_desc *amd_array,
+		      uint32_t amd_index)
+{
+	dlog_info("  Entry: %u\n", amd_index);
+	dlog_info("    Base Addr: 0x%lx\n", amd_array[amd_index].base_address);
+	dlog_info("    Page count: 0x%x\n", amd_array[amd_index].page_count);
+	dlog_info("    Permissions: 0x%hhx\n",
+		  amd_array[amd_index].permissions);
+	dlog_info("    Endpoint ID: 0x%hx\n", amd_array[amd_index].endpoint_id);
+	dlog_info("    Flags: 0x%hhx\n", amd_array[amd_index].flags);
+}
+
+/**
+ * Use the FFA_NS_RES_INFO_GET to obtain information
+ * memory that is allocated to all secure partitions.
+ */
+TEST_PRECONDITION(ffa_ns_res_info_get, get_all_sp_info,
+		  service1_has_ns_mem_and_sel1)
+{
+	uint32_t current_size;
+	uint32_t remaining_size;
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	struct ffa_resource_info_desc_header *header = mb.recv;
+	struct ffa_address_map_desc *amd_array =
+		(struct ffa_address_map_desc
+			 *)((uint8_t *)mb.recv +
+			    sizeof(struct ffa_resource_info_desc_header));
+
+	/* Invoke the FFA_NS_RES_INFO_GET command. */
+	struct ffa_value ret =
+		ffa_ns_res_info_get(FFA_NS_RES_INFO_GET_REQ_START_FLAGS);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+
+	/* Acquire the resource information descriptor length info. */
+	current_size = (uint32_t)(ret.arg2 >> 32);
+	remaining_size = (uint32_t)ret.arg2;
+
+	/*
+	 * We expect three AMDs based on service1's manifest and the
+	 * RX/TX buffer for this test VM.
+	 */
+	EXPECT_EQ(current_size,
+		  sizeof(struct ffa_resource_info_desc_header) +
+			  (sizeof(struct ffa_address_map_desc) * 3));
+	EXPECT_EQ(remaining_size, 0);
+
+	/* Validate the header contents. */
+	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
+	EXPECT_EQ(header->amd_count, 3);
+	EXPECT_EQ(header->amd_offset,
+		  sizeof(struct ffa_resource_info_desc_header));
+
+	dlog_info("Remaining Size: 0x%x\n", remaining_size);
+	dlog_info("Current Size: 0x%x\n", current_size);
+	dlog_info("\n");
+	dlog_info("Information:\n");
+	dlog_info("  Size: 0x%x\n", header->amd_size);
+	dlog_info("  Count: 0x%x\n", header->amd_count);
+	dlog_info("  Offset: 0x%x\n", header->amd_offset);
+
+	/* Validate the manifest AMD contents. */
+	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
+	EXPECT_EQ(amd_array[0].page_count, 1);
+	EXPECT_EQ(amd_array[0].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
+	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 0);
+
+	/* Validate the RX buffer AMD contents. */
+	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
+	EXPECT_EQ(amd_array[1].page_count, 1);
+	EXPECT_EQ(amd_array[1].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
+	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 1);
+
+	/* Validate the TX buffer AMD contents. */
+	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
+	EXPECT_EQ(amd_array[2].page_count, 1);
+	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
+	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 2);
+}
