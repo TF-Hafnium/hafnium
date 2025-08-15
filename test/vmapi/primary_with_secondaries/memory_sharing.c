@@ -5354,3 +5354,52 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 	ret = ffa_mem_reclaim(handle, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 }
+
+/**
+ * Validates invalid parameter for the endpoint_id.
+ */
+TEST_PRECONDITION(ffa_ns_res_info_get, invalid_endpoint_id,
+		  all_services_are_secure)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	(void)mb;
+
+	/* 0xFFFF is not a valid endpoint ID. */
+	ret = ffa_ns_res_info_get_with_id(0xFFFF,
+					  (FFA_NS_RES_INFO_GET_REQ_START_FLAGS |
+					   FFA_NS_RES_INFO_GET_VALID_EP_FLAG));
+	EXPECT_EQ(ret.func, FFA_ERROR_32);
+	EXPECT_EQ(ret.arg2, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Validates invalid parameter for the resource_type.
+ */
+TEST_PRECONDITION(ffa_ns_res_info_get, invalid_resource_type,
+		  all_services_are_secure)
+{
+	struct ffa_value ret;
+
+	/* 0x0C is not a valid resource type. */
+	ret = ffa_ns_res_info_get(FFA_NS_RES_INFO_GET_REQ_START_FLAGS | 0x0C);
+	EXPECT_EQ(ret.func, FFA_ERROR_32);
+	EXPECT_EQ(ret.arg2, FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Validates that REQUEST_START must be called before
+ * REQUEST_CONT as there is no data generated.
+ */
+TEST_PRECONDITION(ffa_ns_res_info_get, no_data_generated,
+		  all_services_are_secure)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	(void)mb;
+
+	/* Start was not called before continue. */
+	ret = ffa_ns_res_info_get(FFA_NS_RES_INFO_GET_REQ_CONT_FLAGS);
+	EXPECT_EQ(ret.func, FFA_ERROR_32);
+	EXPECT_EQ(ret.arg2, FFA_ABORTED);
+}
