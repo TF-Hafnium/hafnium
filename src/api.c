@@ -3718,20 +3718,6 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 
 	memory_region = allocated_entry;
 
-	if (fragment_length < sizeof(struct ffa_memory_region) +
-				      memory_region->memory_access_desc_size *
-					      memory_region->receiver_count) {
-		dlog_verbose(
-			"Initial fragment length %d smaller than header size "
-			"%lu.\n",
-			fragment_length,
-			sizeof(struct ffa_memory_region) +
-				memory_region->memory_access_desc_size *
-					memory_region->receiver_count);
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
 	if (!api_memory_region_check_flags(memory_region, share_func)) {
 		dlog_verbose(
 			"Memory region reserved arguments must be zero.\n");

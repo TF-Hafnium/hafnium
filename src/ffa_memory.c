@@ -546,6 +546,8 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 				    bool send_transaction)
 {
 	uint32_t receiver_count;
+	uint32_t receivers_offset;
+	uint32_t receivers_size;
 	struct ffa_memory_access *receiver;
 	uint32_t composite_offset_0;
 	struct ffa_memory_region_v1_0 *memory_region_v1_0 =
@@ -560,10 +562,11 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 		}
 
 		receiver_count = memory_region_v1_0->receiver_count;
+		receivers_offset = sizeof(struct ffa_memory_region_v1_0);
+		receivers_size = sizeof(struct ffa_memory_access_v1_0);
 	} else {
-		uint32_t receivers_size =
-			memory_region->memory_access_desc_size;
-		uint32_t receivers_offset = memory_region->receivers_offset;
+		receivers_size = memory_region->memory_access_desc_size;
+		receivers_offset = memory_region->receivers_offset;
 
 		/* Check the reserved field is 0. */
 		if (memory_region->reserved[0] != 0 ||
@@ -595,6 +598,20 @@ bool ffa_memory_region_sanity_check(struct ffa_memory_region *memory_region,
 			"Receiver count must be 0 < receiver_count < %u "
 			"specified %u\n",
 			MAX_MEM_SHARE_RECIPIENTS, receiver_count);
+		return false;
+	}
+
+	/*
+	 * Check that the fragment is large enough to hold the entire receiver
+	 * array
+	 */
+	if (fragment_length <
+	    receivers_offset + receivers_size * receiver_count) {
+		dlog_verbose(
+			"Initial fragment length %d smaller than header size "
+			"%u.\n",
+			fragment_length,
+			receivers_offset + receivers_size * receiver_count);
 		return false;
 	}
 
