@@ -146,7 +146,7 @@ class ShrinkwrapManager:
             )
         return path
 
-    def build_fvp_package_once(self, overlays, debug=False, coverage=False):
+    def build_fvp_package_once(self, overlays):
         """
         Builds the Shrinkwrap FVP package using static YAML overlays,
         if not already built.
@@ -168,10 +168,6 @@ class ShrinkwrapManager:
         ]
         for overlay in overlays:
             build_cmd += ["--overlay",  os.path.join(config_dir, overlay)]
-        if debug:
-            build_cmd += ["--overlay", os.path.join(config_dir, "fvp_hf_debug.yaml")]
-        if coverage:
-            build_cmd += ["--overlay", os.path.join(config_dir,"fvp_hf_cov_plugin.yaml")]
 
         logger.debug("Shrinkwrap BUILD CMD:\n%s", " ".join(build_cmd))
         self.__class__._fvp_package_built = True
@@ -207,10 +203,14 @@ class ShrinkwrapManager:
             run_cmd += ["timeout", "--foreground", time_limit]
 
         run_cmd += [
-            "shrinkwrap", "--runtime", "null", "run",
-            "FVP_Base_RevC-2xAEMvA-hafnium.yaml",
-            "--overlay", os.path.join(config_dir, dynamic_overlay)
+            "shrinkwrap", "--runtime", "null", "run", "FVP_Base_RevC-2xAEMvA-hafnium.yaml"
         ]
+        if debug:
+            run_cmd += ["--overlay", os.path.join(config_dir, "fvp_hf_debug.yaml")]
+        if cov_plugin is not None:
+            run_cmd += ["--overlay", os.path.join(config_dir, "fvp_hf_cov_plugin.yaml")]
+        if dynamic_overlay:
+            run_cmd += ["--overlay", os.path.join(config_dir, dynamic_overlay)]
 
         logger.debug("Shrinkwrap RUN CMD:\n%s", " ".join(run_cmd))
 

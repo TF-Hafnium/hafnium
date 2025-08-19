@@ -137,9 +137,6 @@ class FvpDriver(Driver, ABC):
             disable_visualisation = True
 
         params = {}
-        if show_output:
-            time_limit = "150s" if is_long_running else "40s"
-            params["timeout --foreground"] = time_limit
 
         rtvars = {
             "UART0_LOG" : {
@@ -197,8 +194,7 @@ class FvpDriver(Driver, ABC):
             # - Static overlays for the selected driver setup (e.g.: Hypervisor/SPMC)
             # - Optional overlays for debug mode and coverage plugins, if enabled
             driver_overlays = self.get_shrinkwrap_static_overlay()
-            shrinkwrap.build_fvp_package_once(driver_overlays, debug=debug,
-                                        coverage=(self.cov_plugin is not None))
+            shrinkwrap.build_fvp_package_once(driver_overlays)
 
             # Generate runtime configuration (rtvars and params)
             params, rtvars = self.get_shrinkwrap_runtime_overlay_config(
