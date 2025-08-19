@@ -164,7 +164,7 @@ static struct ffa_value ffa_memory_other_world_send(
 		}
 
 		handle = ffa_mem_success_handle(ret);
-		share_state = allocate_share_state(
+		share_state = share_state_allocate(
 			share_states, share_func, memory_region,
 			fragment_offset_delta, fragment_length, handle);
 		if (share_state == NULL) {
@@ -237,7 +237,7 @@ static struct ffa_value ffa_memory_other_world_send(
 			goto out;
 		}
 		handle = ffa_frag_handle(ret);
-		share_state = allocate_share_state(
+		share_state = share_state_allocate(
 			share_states, share_func, memory_region,
 			fragment_offset_delta, fragment_length, handle);
 		if (share_state == NULL) {
@@ -333,11 +333,11 @@ static struct ffa_value ffa_memory_other_world_reclaim(
 	struct ffa_memory_region *memory_region;
 	struct ffa_value ret;
 
-	dump_share_states();
+	share_states_dump();
 
 	share_states = share_states_lock();
 
-	share_state = get_share_state(share_states, handle);
+	share_state = share_state_get(share_states, handle);
 	if (share_state == NULL) {
 		dlog_verbose("Unable to find share state for handle %#lx.\n",
 			     handle);

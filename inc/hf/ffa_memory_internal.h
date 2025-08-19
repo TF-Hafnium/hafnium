@@ -160,13 +160,13 @@ struct share_states_locked {
 	struct ffa_memory_share_state *share_states;
 };
 
-struct ffa_memory_share_state *allocate_share_state(
+struct ffa_memory_share_state *share_state_allocate(
 	struct share_states_locked share_states, uint32_t share_func,
 	struct ffa_memory_region *memory_region, int32_t fragment_offset_delta,
 	uint32_t fragment_length, ffa_memory_handle_t handle);
 struct share_states_locked share_states_lock(void);
 void share_states_unlock(struct share_states_locked *share_states);
-struct ffa_memory_share_state *get_share_state(
+struct ffa_memory_share_state *share_state_get(
 	struct share_states_locked share_states, ffa_memory_handle_t handle);
 void share_state_free(struct share_states_locked share_states,
 		      struct ffa_memory_share_state *share_state);
@@ -177,7 +177,7 @@ uint32_t share_state_next_fragment_offset(
 /** Checks whether the given share state has been fully sent. */
 bool share_state_sending_complete(struct share_states_locked share_states,
 				  struct ffa_memory_share_state *share_state);
-void dump_share_states(void);
+void share_states_dump(void);
 
 struct ffa_value ffa_memory_send_validate(
 	struct vm_locked from_locked, struct ffa_memory_region *memory_region,

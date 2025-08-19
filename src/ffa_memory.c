@@ -72,7 +72,7 @@ static uint32_t ffa_composite_constituent_offset(
  * Returns a pointer to the allocated `ffa_memory_share_state` on success or
  * `NULL` if none are available.
  */
-struct ffa_memory_share_state *allocate_share_state(
+struct ffa_memory_share_state *share_state_allocate(
 	struct share_states_locked share_states, uint32_t share_func,
 	struct ffa_memory_region *memory_region, int32_t fragment_offset_delta,
 	uint32_t fragment_length, ffa_memory_handle_t handle)
@@ -138,7 +138,7 @@ void share_states_unlock(struct share_states_locked *share_states)
  * If the given handle is a valid handle for an allocated share state then
  * returns a pointer to the share state. Otherwise returns NULL.
  */
-struct ffa_memory_share_state *get_share_state(
+struct ffa_memory_share_state *share_state_get(
 	struct share_states_locked share_states, ffa_memory_handle_t handle)
 {
 	struct ffa_memory_share_state *share_state;
@@ -323,7 +323,7 @@ static void dump_memory_region(struct ffa_memory_region *memory_region)
 	dlog("] at offset %u", memory_region->receivers_offset);
 }
 
-void dump_share_states(void)
+void share_states_dump(void)
 {
 	uint32_t i;
 
@@ -2317,7 +2317,7 @@ struct ffa_value ffa_memory_send_continue_validate(
 	 * Look up the share state by handle and make sure that the VM ID
 	 * matches.
 	 */
-	share_state = get_share_state(share_states, handle);
+	share_state = share_state_get(share_states, handle);
 	if (share_state == NULL) {
 		dlog_verbose(
 			"Invalid handle %#lx for memory send continuation.\n",
@@ -2452,7 +2452,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	 * failed then it would leave the memory in a state where nobody could
 	 * get it back.
 	 */
-	share_state = allocate_share_state(
+	share_state = share_state_allocate(
 		share_states, share_func, memory_region, fragment_offset_delta,
 		fragment_length, FFA_MEMORY_HANDLE_INVALID);
 	if (share_state == NULL) {
@@ -2496,7 +2496,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 
 out:
 	share_states_unlock(&share_states);
-	dump_share_states();
+	share_states_dump();
 
 	return ret;
 }
@@ -3926,10 +3926,10 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 	struct ffa_memory_share_state *share_state;
 	struct ffa_value ret;
 
-	dump_share_states();
+	share_states_dump();
 
 	share_states = share_states_lock();
-	share_state = get_share_state(share_states, handle);
+	share_state = share_state_get(share_states, handle);
 	if (share_state == NULL) {
 		dlog_verbose("Invalid handle %#lx for FFA_MEM_RETRIEVE_REQ.\n",
 			     handle);
@@ -3954,7 +3954,7 @@ struct ffa_value ffa_memory_retrieve(struct vm_locked to_locked,
 
 out:
 	share_states_unlock(&share_states);
-	dump_share_states();
+	share_states_dump();
 	return ret;
 }
 
@@ -4020,10 +4020,10 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	uint32_t receiver_index;
 	bool continue_ffa_hyp_mem_retrieve_req;
 
-	dump_share_states();
+	share_states_dump();
 
 	share_states = share_states_lock();
-	share_state = get_share_state(share_states, handle);
+	share_state = share_state_get(share_states, handle);
 	if (share_state == NULL) {
 		dlog_verbose("Invalid handle %#lx for FFA_MEM_FRAG_RX.\n",
 			     handle);
@@ -4181,7 +4181,7 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 
 out:
 	share_states_unlock(&share_states);
-	dump_share_states();
+	share_states_dump();
 	return ret;
 }
 
@@ -4279,10 +4279,10 @@ struct ffa_value ffa_memory_relinquish(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	dump_share_states();
+	share_states_dump();
 
 	share_states = share_states_lock();
-	share_state = get_share_state(share_states, handle);
+	share_state = share_state_get(share_states, handle);
 	if (share_state == NULL) {
 		dlog_verbose("Invalid handle %#lx for FFA_MEM_RELINQUISH.\n",
 			     handle);
@@ -4406,7 +4406,7 @@ struct ffa_value ffa_memory_relinquish(
 
 out:
 	share_states_unlock(&share_states);
-	dump_share_states();
+	share_states_dump();
 	return ret;
 }
 
@@ -4423,11 +4423,11 @@ struct ffa_value ffa_memory_reclaim(struct vm_locked to_locked,
 	struct ffa_memory_share_state *share_state;
 	struct ffa_value ret;
 
-	dump_share_states();
+	share_states_dump();
 
 	share_states_locked = share_states_lock();
 
-	share_state = get_share_state(share_states_locked, handle);
+	share_state = share_state_get(share_states_locked, handle);
 	if (share_state == NULL) {
 		dlog_verbose("Invalid handle %#lx for FFA_MEM_RECLAIM.\n",
 			     handle);
