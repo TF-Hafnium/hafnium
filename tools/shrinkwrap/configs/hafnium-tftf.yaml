@@ -102,7 +102,7 @@ build:
 
     artifacts:
       TFTF_BIN: ${param:builddir}/fvp/release/tftf.bin
-      EL3_PAYLOAD_BIN: ${param:builddir}/fvp/release/el3_payload.bin
+      EL3_PAYLOAD_BIN: ${param:builddir}/fvp/release/el3_payload/el3_payload.bin
       NS_BL1U_BIN: ${param:builddir}/fvp/release/ns_bl1u.bin
 
   tfa:
