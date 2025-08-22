@@ -24,6 +24,8 @@
 #define ILLEGAL_ADDR 5
 uint8_t sp_retrieve_buffer[PAGE_SIZE * 2];
 
+alignas(PAGE_SIZE) static uint8_t lend_page[PAGE_SIZE];
+
 static void irq_handler(void)
 {
 	uint32_t intid = hf_interrupt_get();
@@ -264,6 +266,65 @@ TEST_SERVICE(ffa_memory_retrieve_abort)
 	 * The partition encounters a fatal error while handling a memory
 	 * management transaction. It does not have the chance to
 	 * relinquish the access to memory region back to owner.
+	 */
+	ffa_abort_32(0);
+
+	FAIL("Not expected to return after aborting");
+}
+
+TEST_SERVICE(ffa_memory_retrieve_relinquish)
+{
+	ffa_memory_handle_t handle = memory_retrieve_and_access();
+	void *send_buf = SERVICE_SEND_BUFFER();
+
+	/* Give the memory back and notify the sender. */
+	ffa_mem_relinquish_init(send_buf, handle, 0, hf_vm_get_id());
+	EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_yield().func, FFA_SUCCESS_32);
+}
+
+/**
+ * Lend a normal memory page from this SP to a companion SP and then abort.
+ * The companion FF-A ID is provided by the primary via an indirect message.
+ * After the primary lends memory to this SP, we relay it to the companion via
+ * LEND and abort to exercise SPMC reclaim on behalf of the lender.
+ */
+TEST_SERVICE(ffa_lend_memory_to_companion_sp_and_abort)
+{
+	void *send_buf = SERVICE_SEND_BUFFER();
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	ffa_id_t companion_id;
+	struct ffa_value ret;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)&lend_page, .page_count = 1},
+	};
+
+	/*
+	 * Setup handling of known interrupts including Secure Watchdog timer
+	 * interrupt and NPI.
+	 */
+	exception_setup(irq_handler, NULL);
+	interrupts_enable();
+
+	/* Receive the companion endpoint to which we should lend. */
+	receive_indirect_message(&companion_id, sizeof(companion_id), recv_buf);
+
+	/* Lend a page to the companion and request it to retrieve. */
+	send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), companion_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
+
+	/* Give back control to PVM. */
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	/*
+	 * Abort without reclaiming the lent memory; SPMC should clean up on
+	 * behalf of this partition.
 	 */
 	ffa_abort_32(0);
 

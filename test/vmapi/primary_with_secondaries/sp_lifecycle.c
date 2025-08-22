@@ -640,3 +640,68 @@ TEST(sp_lifecycle, sel1_sp_abort_nwd_mem_lend)
 
 	base_sp_aborts_mem_lend_transaction(target_sp_info, companion_info, mb);
 }
+
+/**
+ * Check that SPMC can reclaim memory owned by an aborting partition.
+ *
+ * This test involves a target SP and a Companion SP. The target SP lends normal
+ * memory to Companion SP and aborts. Companion SP retrieves, uses and
+ * relinquishes the memory. The test ensures the Companion SP runs to
+ * completion.
+ */
+static void base_sp_lend_to_sp_then_abort_reclaim_by_spmc(
+	struct ffa_partition_info *target_info,
+	struct ffa_partition_info *companion_info, struct mailbox_buffers mb)
+{
+	struct ffa_value ret;
+	ffa_id_t companion_id = companion_info->vm_id;
+
+	/* Configure target SP to lend memory to Companion SP and then abort. */
+	SERVICE_SELECT(target_info->vm_id,
+		       "ffa_lend_memory_to_companion_sp_and_abort", mb.send);
+
+	/* Configure companion SP to retrieve then relinquish. */
+	SERVICE_SELECT(companion_info->vm_id, "ffa_memory_retrieve_relinquish",
+		       mb.send);
+
+	/*
+	 * Send companion ID to target SP so it can lend memory to Companion SP.
+	 */
+	ret = send_indirect_message(hf_vm_get_id(), target_info->vm_id, mb.send,
+				    &companion_id, sizeof(companion_id), 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Schedule target through FFA_RUN. It will lend to Companion SP. */
+	ret = ffa_run(target_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/*
+	 * Companion SP will have received retrieve; let it use and relinquish.
+	 */
+	ret = ffa_run(companion_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Run target SP to allow it to abort. */
+	ret = ffa_run(target_info->vm_id, 0);
+	EXPECT_FFA_ERROR(ret, FFA_ABORTED);
+}
+
+TEST(sp_lifecycle, sel0_sp_lend_to_sp_then_abort_reclaim_by_spmc)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_info = service1(mb.recv);
+	struct ffa_partition_info *companion_info = service3(mb.recv);
+
+	base_sp_lend_to_sp_then_abort_reclaim_by_spmc(target_info,
+						      companion_info, mb);
+}
+
+TEST(sp_lifecycle, sel1_sp_lend_to_sp_then_abort_reclaim_by_spmc)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_info = service3(mb.recv);
+	struct ffa_partition_info *companion_info = service1(mb.recv);
+
+	base_sp_lend_to_sp_then_abort_reclaim_by_spmc(target_info,
+						      companion_info, mb);
+}
