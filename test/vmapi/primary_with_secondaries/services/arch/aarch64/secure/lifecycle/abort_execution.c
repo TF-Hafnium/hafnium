@@ -22,6 +22,7 @@
 #include "twdog.h"
 
 #define ILLEGAL_ADDR 5
+uint8_t sp_retrieve_buffer[PAGE_SIZE * 2];
 
 static void irq_handler(void)
 {
@@ -212,4 +213,59 @@ TEST_SERVICE(sp_active_wait)
 
 	/* Yield cycles to PVM. */
 	ffa_yield();
+}
+
+static ffa_memory_handle_t memory_retrieve_and_access(void)
+{
+	size_t i;
+	ffa_memory_handle_t handle;
+
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	void *send_buf = SERVICE_SEND_BUFFER();
+
+	struct ffa_memory_region *memory_region =
+		(struct ffa_memory_region *)sp_retrieve_buffer;
+	struct ffa_composite_memory_region *composite;
+	struct ffa_memory_region_constituent *constituents;
+
+	exception_setup(NULL, exception_handler_yield_data_abort);
+	retrieve_memory_from_message(recv_buf, send_buf, &handle, memory_region,
+				     sizeof(sp_retrieve_buffer));
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+
+	/* ASSERT_TRUE isn't enough for clang-analyze. */
+	CHECK(composite != NULL);
+	constituents = composite->constituents;
+
+	update_mm_security_state(composite, memory_region->attributes);
+
+	/*
+	 * Check that we can read and write every page that was shared.
+	 */
+	for (i = 0; i < composite->constituent_count; ++i) {
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		uint8_t *ptr = (uint8_t *)constituents[i].address;
+		uint32_t count = constituents[i].page_count;
+		size_t j;
+
+		for (j = 0; j < PAGE_SIZE * count; ++j) {
+			ptr[j]++;
+		}
+	}
+
+	return handle;
+}
+
+TEST_SERVICE(ffa_memory_retrieve_abort)
+{
+	memory_retrieve_and_access();
+
+	/*
+	 * The partition encounters a fatal error while handling a memory
+	 * management transaction. It does not have the chance to
+	 * relinquish the access to memory region back to owner.
+	 */
+	ffa_abort_32(0);
+
+	FAIL("Not expected to return after aborting");
 }

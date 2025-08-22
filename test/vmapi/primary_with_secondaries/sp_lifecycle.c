@@ -25,6 +25,8 @@
 const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
 			0x88889999};
 
+alignas(PAGE_SIZE) static uint8_t pages[PAGE_SIZE];
+
 /**
  * Send a direct request message to target SP and expect it to abort using
  * FFA_ABORT ABI. Perform the partition discovery via FFA_PARTITION_INFO_GET
@@ -557,4 +559,84 @@ TEST(sp_lifecycle, sel0_sp_restart_after_abort_dir_req)
 	struct ffa_partition_info *target_sp_info = service4(mb.recv);
 
 	base_restart_sp_after_abort_direct_req(target_sp_info, mb);
+}
+
+/**
+ * Check that SPMC can relinquish memory on behalf of an aborting partition.
+ */
+void base_sp_aborts_mem_lend_transaction(
+	struct ffa_partition_info *target_sp_info,
+	struct ffa_partition_info *companion_info, struct mailbox_buffers mb)
+{
+	struct ffa_value run_res;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+	};
+	ffa_memory_handle_t handle;
+
+	SERVICE_SELECT(target_sp_info->vm_id, "ffa_memory_retrieve_abort",
+		       mb.send);
+	SERVICE_SELECT(companion_info->vm_id, "ffa_memory_lend_relinquish",
+		       mb.send);
+
+	/* Lend the memory initially. */
+	handle = send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), target_sp_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
+
+	/*
+	 * Let the memory be returned. The target partition is expected to
+	 * abort.
+	 */
+	run_res = ffa_run(target_sp_info->vm_id, 0);
+	EXPECT_FFA_ERROR(run_res, FFA_ABORTED);
+
+	/*
+	 * SPMC performs relinquishing on behalf of aborting partition. The
+	 * reclaim request by owner shall succeed.
+	 */
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	/* Share the memory with a different SP after it has been returned. */
+	handle = send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), companion_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
+
+	run_res = ffa_run(companion_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+}
+
+/**
+ * Check that SPMC can relinquish memory on behalf of an aborting S-EL0
+ * partition.
+ */
+TEST(sp_lifecycle, sel0_sp_abort_nwd_mem_lend)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_sp_info = service1(mb.recv);
+	struct ffa_partition_info *companion_info = service3(mb.recv);
+
+	base_sp_aborts_mem_lend_transaction(target_sp_info, companion_info, mb);
+}
+
+/**
+ * Check that SPMC can relinquish memory on behalf of an aborting S-EL1
+ * partition.
+ */
+TEST(sp_lifecycle, sel1_sp_abort_nwd_mem_lend)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_sp_info = service3(mb.recv);
+	struct ffa_partition_info *companion_info = service1(mb.recv);
+
+	base_sp_aborts_mem_lend_transaction(target_sp_info, companion_info, mb);
 }
