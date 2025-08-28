@@ -973,6 +973,7 @@ static inline uint32_t ffa_feature_intid(struct ffa_value args)
 enum ffa_framework_msg_func : uint32_t {
 	/* Power management framework messages. */
 	FFA_FRAMEWORK_MSG_PSCI_REQ = 0,
+	FFA_FRAMEWORK_MSG_PSCI_WARM_BOOT = 1,
 	FFA_FRAMEWORK_MSG_PSCI_RESP = 2,
 
 	/* The VM availability messages. */

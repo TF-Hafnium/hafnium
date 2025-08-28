@@ -517,6 +517,18 @@ static void handle_spmd_to_spmc_framework_msg(struct ffa_value args,
 		*ret = handle_psci_framework_msg(args, current, next);
 		return;
 	}
+	case FFA_FRAMEWORK_MSG_PSCI_WARM_BOOT:
+		/*
+		 * Hafnium does not support forwarding PSCI warm boot framework
+		 * messages to the SPs. However, it is still reasonable to
+		 * return SUCCESS, since no errors have occurred and this
+		 * guarantees that the EL3 firmware component receives a valid
+		 * response.
+		 */
+		*ret = ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
+					      FFA_FRAMEWORK_MSG_PSCI_RESP,
+					      PSCI_RETURN_SUCCESS);
+		return;
 	case SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ: {
 		struct ffa_value version_ret =
 			api_ffa_version(current, args.arg3);
@@ -564,6 +576,7 @@ bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
 		}
 		break;
 	case FFA_FRAMEWORK_MSG_PSCI_REQ:
+	case FFA_FRAMEWORK_MSG_PSCI_WARM_BOOT:
 	case SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ:
 		handle_spmd_to_spmc_framework_msg(args, current, ret, next);
 		return true;
