@@ -1120,7 +1120,7 @@ TEST(ffa_version, fails_major_version_too_high)
  */
 TEST(ffa_version, fails_minor_version_too_high)
 {
-	EXPECT_EQ((enum ffa_error)ffa_version(make_ffa_version(1, 3)),
+	EXPECT_EQ((enum ffa_error)ffa_version(FFA_VERSION_COMPILED + 1),
 		  FFA_NOT_SUPPORTED);
 }
 

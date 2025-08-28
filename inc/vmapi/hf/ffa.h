@@ -21,6 +21,7 @@ enum ffa_version : uint32_t {
 	FFA_VERSION_1_0 = 0x10000,
 	FFA_VERSION_1_1 = 0x10001,
 	FFA_VERSION_1_2 = 0x10002,
+	FFA_VERSION_1_3 = 0x10003,
 /*
  * Use the value of `FFA_VERSION` passed by the build system, otherwise default
  * to latest FF-A version.
@@ -28,13 +29,13 @@ enum ffa_version : uint32_t {
 #ifdef FFA_VERSION
 	FFA_VERSION_COMPILED = FFA_VERSION,
 #else
-	FFA_VERSION_COMPILED = FFA_VERSION_1_2,
+	FFA_VERSION_COMPILED = FFA_VERSION_1_3,
 #endif
 };
 
 static_assert((FFA_VERSION_1_0 <= FFA_VERSION_COMPILED) &&
-		      (FFA_VERSION_1_2 >= FFA_VERSION_COMPILED),
-	      "FFA_VERSION_COMPILED must be between v1.0 and v1.2");
+		      (FFA_VERSION_1_3 >= FFA_VERSION_COMPILED),
+	      "FFA_VERSION_COMPILED must be between v1.0 and v1.3");
 
 #define FFA_VERSION_MBZ_BIT (1U << 31U)
 #define FFA_VERSION_MAJOR_SHIFT (16U)

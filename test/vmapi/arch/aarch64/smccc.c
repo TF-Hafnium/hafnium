@@ -120,7 +120,7 @@ TEST(smccc, smccc_regs_callee_preserved)
 	struct ffa_value ret;
 
 	ret = test_ffa_smc(FFA_VERSION_32, 0x10001, 0, 0, 0, 0, 0, 0);
-	EXPECT_EQ(ret.func, 0x10002);
+	EXPECT_EQ(ret.func, FFA_VERSION_COMPILED);
 	EXPECT_EQ(ret.arg1, 0x0);
 	EXPECT_EQ(ret.arg2, 0x0);
 	EXPECT_EQ(ret.arg3, 0x0);

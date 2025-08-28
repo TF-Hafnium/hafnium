@@ -259,6 +259,7 @@ struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
 		return retrieve_v1_0(sender_id, handle);
 	case FFA_VERSION_1_1:
 	case FFA_VERSION_1_2:
+	case FFA_VERSION_1_3:
 		return retrieve_v1_2_or_later(sender_id, handle);
 	}
 	panic("Unknown version %#x\n", ffa_version);

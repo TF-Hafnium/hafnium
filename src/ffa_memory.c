@@ -511,6 +511,7 @@ static bool receiver_size_and_offset_valid_for_version(
 	switch (expected_ffa_version) {
 	case FFA_VERSION_1_1:
 	case FFA_VERSION_1_2:
+	case FFA_VERSION_1_3:
 		return receivers_offset == sizeof(struct ffa_memory_region);
 	default:
 		return false;
@@ -3482,6 +3483,7 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 
 	switch (to_locked.vm->ffa_version) {
 	case FFA_VERSION_1_2:
+	case FFA_VERSION_1_3:
 		memory_access_desc_size = sizeof(struct ffa_memory_access);
 		break;
 	case FFA_VERSION_1_0:
