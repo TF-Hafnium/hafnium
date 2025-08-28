@@ -34,9 +34,9 @@ struct ffa_value arch_memory_protect(paddr_t begin, paddr_t end,
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
-	ret = smc_ffa_call((struct ffa_value){.func = PLAT_PROTECT_MEM_64,
-					      .arg1 = pa_addr(begin),
-					      .arg2 = size});
+	ret = smc_ffa_call_ext((struct ffa_value){.func = PLAT_PROTECT_MEM_64,
+						  .arg1 = pa_addr(begin),
+						  .arg2 = size});
 
 	switch (ret.func) {
 	case SMCCC_OK:
@@ -83,9 +83,9 @@ bool arch_memory_unprotect(paddr_t begin, paddr_t end)
 	 */
 	assert(is_arch_feat_rme_supported());
 
-	ret = smc_ffa_call((struct ffa_value){.func = PLAT_UNPROTECT_MEM_64,
-					      .arg1 = pa_addr(begin),
-					      .arg2 = size});
+	ret = smc_ffa_call_ext((struct ffa_value){.func = PLAT_UNPROTECT_MEM_64,
+						  .arg1 = pa_addr(begin),
+						  .arg2 = size});
 
 	return ret.func == SMCCC_OK;
 }

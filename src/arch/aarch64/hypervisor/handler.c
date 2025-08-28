@@ -974,7 +974,8 @@ static void spmd_group0_intr_delegate(void)
 
 	dlog_verbose("Delegating Group0 interrupt to SPMD\n");
 
-	ret = smc_ffa_call((struct ffa_value){.func = FFA_EL3_INTR_HANDLE_32});
+	ret = smc_ffa_call_ext(
+		(struct ffa_value){.func = FFA_EL3_INTR_HANDLE_32});
 
 	/* Check if the Group0 interrupt was handled successfully. */
 	CHECK(ret.func == FFA_SUCCESS_32);

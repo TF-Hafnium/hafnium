@@ -20,7 +20,7 @@ struct ffa_value ffa_setup_spmc_id_get(void)
 	 * Since we are running in the SPMC use FFA_ID_GET to fetch our
 	 * ID from the SPMD.
 	 */
-	return smc_ffa_call((struct ffa_value){.func = FFA_ID_GET_32});
+	return smc_ffa_call_ext((struct ffa_value){.func = FFA_ID_GET_32});
 }
 
 /**

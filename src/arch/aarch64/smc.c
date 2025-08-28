@@ -138,12 +138,6 @@ struct ffa_value smc_ffa_call(struct ffa_value args)
 
 struct ffa_value smc_ffa_call_ext(struct ffa_value args)
 {
-	/* Only these FF-A v1.2 SMC functions allowed to use this helper. */
-	assert(args.func == FFA_PARTITION_INFO_GET_REGS_64 ||
-	       args.func == FFA_RUN_32 ||
-	       args.func == FFA_MSG_SEND_DIRECT_REQ2_64 ||
-	       args.func == FFA_MSG_SEND_DIRECT_RESP2_64);
-
 	return smc_internal_ext(
 		args.func, args.arg1, args.arg2, args.arg3, args.arg4,
 		args.arg5, args.arg6, args.arg7, args.extended_val.arg8,
