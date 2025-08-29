@@ -14,7 +14,8 @@
 
 	/* Properties */
 	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-	uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>;
+        uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>,
+	       <0xfed46119 0xb57c449f 0xa852c15f 0xd346b1fc>; /* Non-secure memory region uuid. */
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
