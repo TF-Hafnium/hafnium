@@ -20,6 +20,41 @@ SERVICE_PARTITION_INFO_GET(service3, SERVICE3)
 SERVICE_PARTITION_INFO_GET(service4, SERVICE4)
 
 /**
+ * This function serves to identify if test partitions support
+ * specific features for a given test. Partition manifest need to
+ * be maintained to have the uuid to identify the given test
+ * functionality.
+ */
+bool ffa_partition_id_supports_service(void *recv, ffa_id_t id,
+				       struct ffa_uuid *to_check)
+{
+	bool success = false;
+	struct ffa_value ret;
+	const struct ffa_partition_info *partitions = recv;
+	ffa_vm_count_t vm_count;
+
+	/* Get all partitions that have a given UUID in their manifest. */
+	ret = ffa_partition_info_get(to_check, 0);
+
+	if (ret.func == FFA_ERROR_32) {
+		return false;
+	}
+
+	vm_count = ret.arg2;
+
+	for (uint16_t index = 0; index < vm_count; ++index) {
+		if (partitions[index].vm_id == id) {
+			success = true;
+			break;
+		}
+	}
+
+	ffa_rx_release();
+
+	return success;
+}
+
+/**
  * Helper to setup mailbox for precondition functions.
  */
 static struct mailbox_buffers get_precondition_mailbox(void)
@@ -62,6 +97,46 @@ bool service1_service2_and_service3_are_secure(void)
 	       !ffa_is_vm_id(service2_info->vm_id) &&
 	       !ffa_is_vm_id(service3_info->vm_id);
 }
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that all services are secure.
+ */
+bool all_services_are_secure(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	const struct ffa_partition_info *partitions = mb.recv;
+	ffa_vm_count_t vm_count;
+	const struct ffa_uuid nil_uuid = {{0, 0, 0, 0}};
+	const ffa_id_t own_id = hf_vm_get_id();
+	bool success = true;
+	struct ffa_value ret;
+
+	/* Get all partitions that have a given UUID in their manifest. */
+	ret = ffa_partition_info_get(&nil_uuid, 0);
+
+	if (ret.func == FFA_ERROR_32) {
+		return false;
+	}
+
+	vm_count = ret.arg2;
+
+	for (uint16_t index = 0; index < vm_count; ++index) {
+		if (partitions[index].vm_id == own_id) {
+			continue;
+		}
+
+		if (ffa_is_vm_id(partitions[index].vm_id)) {
+			success = false;
+			break;
+		}
+	}
+
+	ffa_rx_release();
+
+	return success;
+}
+
 /*
  * The following is a precondition function, for the current system set-up.
  * This is currently being used to skip memory sharing tests, when
@@ -257,4 +332,50 @@ bool service3_is_mp_sp(void)
 bool service1_and_service2_are_mp_sp(void)
 {
 	return service1_is_mp_sp() && service2_is_mp_sp();
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service1 has a non-secure memory region.
+ */
+bool service1_has_ns_mem(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	return ffa_partition_id_supports_service(mb.recv, service1_info->vm_id,
+						 &SERVICE_NS_MEM);
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service1 is an S-EL0 partition.
+ */
+bool service1_is_sel0(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+
+	return ffa_partition_id_supports_service(mb.recv, service1_info->vm_id,
+						 &SERVICE_SEL0);
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service1 has a non-secure memory region and is an S-EL1
+ * partition.
+ */
+bool service1_has_ns_mem_and_sel1(void)
+{
+	return service1_has_ns_mem() && !service1_is_sel0();
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
+ * Check that service1 has a non-secure memory region and is an S-EL0
+ * partition.
+ */
+bool service1_has_ns_mem_and_sel0(void)
+{
+	return service1_has_ns_mem() && service1_is_sel0();
 }
