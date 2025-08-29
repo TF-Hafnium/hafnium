@@ -753,3 +753,17 @@ static inline struct ffa_value ffa_abort_32(uint32_t val)
 {
 	return ffa_call((struct ffa_value){.func = FFA_ABORT_32, .arg2 = val});
 }
+
+static inline struct ffa_value ffa_ns_res_info_get(uint8_t flags)
+{
+	return ffa_call((struct ffa_value){.func = FFA_NS_RES_INFO_GET,
+					   .arg2 = (uint64_t)flags});
+}
+
+static inline struct ffa_value ffa_ns_res_info_get_with_id(ffa_id_t sp_id,
+							   uint8_t flags)
+{
+	return ffa_call((struct ffa_value){.func = FFA_NS_RES_INFO_GET,
+					   .arg1 = (uint64_t)sp_id,
+					   .arg2 = (uint64_t)flags});
+}
