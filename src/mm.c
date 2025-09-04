@@ -294,6 +294,7 @@ static struct mm_page_table *mm_populate_table_pte(struct mm_ptable *ptable,
 {
 	struct mm_page_table *ntable;
 	pte_t v = *pte;
+	paddr_t curr_paddr;
 	pte_t new_pte;
 	size_t inc;
 	mm_level_t level_below = level - 1;
@@ -312,11 +313,12 @@ static struct mm_page_table *mm_populate_table_pte(struct mm_ptable *ptable,
 
 	/* Determine template for new pte and its increment. */
 	if (arch_mm_pte_is_block(v, level)) {
+		curr_paddr = arch_mm_block_from_pte(v, level);
 		inc = mm_entry_size(level_below);
-		new_pte = arch_mm_block_pte(level_below,
-					    arch_mm_block_from_pte(v, level),
+		new_pte = arch_mm_block_pte(level_below, curr_paddr,
 					    arch_mm_pte_attrs(v, level));
 	} else {
+		curr_paddr = pa_init(0);
 		inc = 0;
 		new_pte = arch_mm_absent_pte(level_below);
 	}
@@ -324,7 +326,13 @@ static struct mm_page_table *mm_populate_table_pte(struct mm_ptable *ptable,
 	/* Initialise entries in the new table. */
 	for (size_t i = 0; i < MM_PTE_PER_PAGE; i++) {
 		ntable->entries[i] = new_pte;
-		new_pte += inc;
+		/* Increment curr_paddr and create corresponding PTE. */
+		if (arch_mm_pte_is_block(v, level)) {
+			curr_paddr = pa_add(curr_paddr, inc);
+			new_pte =
+				arch_mm_block_pte(level_below, curr_paddr,
+						  arch_mm_pte_attrs(v, level));
+		}
 	}
 
 	/* Ensure initialisation is visible before updating the pte. */
