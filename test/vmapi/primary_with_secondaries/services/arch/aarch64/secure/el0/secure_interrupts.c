@@ -187,3 +187,56 @@ TEST_SERVICE(sys_reg_access_trapped)
 	dlog("CTR_EL0 =%lx\n", read_msr(MSR_CTR_EL0));
 	FAIL("Not expected to reach here");
 }
+
+TEST_SERVICE(sp_to_sp_dir_req_in_spmc_mode)
+{
+	struct ffa_value ret;
+	uint32_t delay;
+	ffa_id_t target_vm_id;
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct hftest_context *ctx = hftest_get_context();
+	const uint32_t msg[] = {TWDOG_DELAY, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999};
+
+	receive_indirect_message((void *)&target_vm_id, sizeof(target_vm_id),
+				 recv_buf);
+
+	dlog_verbose("Target endpoint identified: %#x", target_vm_id);
+	ret = ffa_msg_wait();
+	EXPECT_EQ(ret.func, FFA_RUN_32);
+
+	receive_indirect_message(&delay, sizeof(delay), recv_buf);
+
+	/*
+	 * Map MMIO address space of peripherals (such as secure
+	 * watchdog timer) described as device region nodes in partition
+	 * manifest.
+	 */
+	hftest_map_device_regions(ctx);
+
+	/* Enable the Secure Watchdog timer interrupt. */
+	EXPECT_EQ(hf_interrupt_enable(IRQ_TWDOG_INTID, true, 0), 0);
+
+	/* Start the secure Watchdog timer. */
+	HFTEST_LOG("Starting TWDOG: %u ms", delay);
+	twdog_start((delay * ARM_SP805_TWDG_CLK_HZ) / 1000);
+
+	/* Give back control to PVM. */
+	ret = ffa_msg_wait();
+
+	/* SPMC signals the secure interrupt through FFA_INTERRUPT interface. */
+	EXPECT_EQ(ret.func, FFA_INTERRUPT_32);
+	EXPECT_EQ(ret.arg2, IRQ_TWDOG_INTID);
+
+	/* Send direct request to target endpoint in SPMC scheduled mode. */
+	ret = ffa_msg_send_direct_req(hf_vm_get_id(), target_vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(ret, FFA_ABORTED);
+
+	/* S-EL0 partitions require this to be disabled after the FF-A call. */
+	twdog_stop();
+
+	/* Secure interrupt has been serviced by now. Relinquish cycles. */
+	ffa_msg_wait();
+}

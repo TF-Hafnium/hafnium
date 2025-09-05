@@ -395,3 +395,70 @@ TEST_PRECONDITION(sp_lifecycle, sp_preempts_sp_aborts_spmc_mode,
 
 	EXPECT_FFA_ERROR(res, FFA_BUSY);
 }
+
+/**
+ * This test aims to create a scenarios where a target endpoint aborts an
+ * direct request from another secure endpoint in SPMC schedule mode.
+ *
+ * Initiator Endpoint must be Service1 SP since it owns the Secure Watchdog
+ * timer interrupt.
+ */
+TEST(sp_lifecycle, sp_aborts_direct_req_in_spmc_mode)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *initiator_info = service1(mb.recv);
+	struct ffa_partition_info *target_sp_info = service3(mb.recv);
+	ffa_id_t own_id = hf_vm_get_id();
+	const uint32_t delay = 20;
+	struct ffa_value res;
+
+	/*
+	 * Run target endpoint for it to wait for a request from Initiator
+	 * endpoint and then voluntarily abort its execution using FFA_ABORT.
+	 */
+	SERVICE_SELECT(target_sp_info->vm_id, "sp_ffa_abort_dir_req", mb.send);
+	ffa_run(target_sp_info->vm_id, 0);
+
+	/*
+	 * Initiator endpoint runs in SPMC schedule mode in order to handle
+	 * secure virtual interrupt and further sends direct request to target
+	 * endpoint and expects it to be aborted.
+	 */
+	SERVICE_SELECT(initiator_info->vm_id, "sp_to_sp_dir_req_in_spmc_mode",
+		       mb.send);
+
+	/*
+	 * Send to Initiator endpoint, the vm id of the target endpoint for its
+	 * message.
+	 */
+	res = send_indirect_message(own_id, initiator_info->vm_id, mb.send,
+				    &target_sp_info->vm_id,
+				    sizeof(target_sp_info->vm_id), 0);
+	ASSERT_EQ(res.func, FFA_SUCCESS_32);
+
+	res = ffa_run(initiator_info->vm_id, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+
+	/*
+	 * Send an indirect message to convey the Secure Watchdog timer delay
+	 * which serves as the source of the secure interrupt.
+	 */
+	res = send_indirect_message(own_id, initiator_info->vm_id, mb.send,
+				    &delay, sizeof(delay), 0);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	/* Schedule message receiver through FFA_RUN interface. */
+	res = ffa_run(initiator_info->vm_id, 0);
+	EXPECT_EQ(res.func, FFA_MSG_WAIT_32);
+
+	/* Wait for the interrupt to trigger. */
+	waitms(delay + 50);
+
+	/*
+	 * Attempt to communicate with target SP. SPMC shall return BUSY status.
+	 */
+	res = ffa_msg_send_direct_req(own_id, target_sp_info->vm_id, msg[0],
+				      msg[1], msg[2], msg[3], msg[4]);
+
+	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
+}
