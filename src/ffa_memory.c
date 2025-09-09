@@ -4413,6 +4413,68 @@ out:
 }
 
 /**
+ * Helper to relinquish any regions borrowed by a partition on its behalf.
+ */
+static void ffa_memory_relinquish_from_partition(
+	struct vm_locked vm_locked, struct mpool *ppool,
+	struct ffa_memory_share_state *share_state_itr)
+{
+	struct ffa_memory_region *memory_region;
+	uint32_t receiver_index;
+	ffa_id_t aborted_vm_id = vm_locked.vm->id;
+	struct ffa_value ret;
+
+	assert(share_state_itr->share_func != 0);
+
+	if (!share_state_itr->sending_complete) {
+		return;
+	}
+
+	memory_region = share_state_itr->memory_region;
+
+	assert(memory_region != NULL);
+
+	/*
+	 * Skip if the aborting partition is the sender of a memory
+	 * management transaction which means it cannot be a borrower of the
+	 * memory region.
+	 */
+	if (memory_region->sender == aborted_vm_id) {
+		return;
+	}
+
+	/* Search if aborting endpoint is one of the borrowers. */
+	receiver_index = ffa_memory_region_get_receiver_index(memory_region,
+							      aborted_vm_id);
+
+	if (receiver_index == memory_region->receiver_count) {
+		return;
+	}
+
+	if (share_state_itr->retrieved_fragment_count[receiver_index] > 0) {
+		ret = ffa_relinquish_check_update(
+			vm_locked, share_state_itr->fragments,
+			share_state_itr->fragment_constituent_counts,
+			share_state_itr->fragment_count,
+			share_state_itr->sender_orig_mode, ppool, false);
+
+		if (ret.func != FFA_SUCCESS_32) {
+			dlog_warning(
+				"Hafnium could not relinquish handle %#lx on "
+				"behalf of aborting partition %d.\n",
+				memory_region->handle, aborted_vm_id);
+		}
+	}
+
+	/*
+	 * Irrespective of whether ffa_relinquish_check_update returns
+	 * error, reset the retrieved fragment count for the given
+	 * receiver.
+	 */
+	share_state_itr->retrieved_fragment_count[receiver_index] = 0;
+}
+
+/**
  * Helper to reclaim memory region owned by a partition.
  */
 static void ffa_memory_reclaim_from_partition(
@@ -4465,6 +4527,8 @@ void ffa_memory_reclaim_relinquish_vm_regions(struct vm_locked vm_locked,
 			continue;
 		}
 
+		ffa_memory_relinquish_from_partition(vm_locked, ppool,
+						     share_state_itr);
 		ffa_memory_reclaim_from_partition(
 			vm_locked, ppool, share_states_locked, share_state_itr);
 	}
