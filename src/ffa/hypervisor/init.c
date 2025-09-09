@@ -32,10 +32,25 @@ void ffa_init_log(void)
 	dlog_info("Initializing Hafnium (Hypervisor)\n");
 }
 
+/*
+ * Call FFA_VERSION so the SPMC can store the hypervisor's version. This may be
+ * useful if there is a mismatch of versions.
+ */
+void ffa_init_version(void)
+{
+	struct ffa_value ret;
+
+	ret = arch_other_world_call((struct ffa_value){
+		.func = FFA_VERSION_32, .arg1 = FFA_VERSION_COMPILED});
+	if (ret.func == FFA_NOT_SUPPORTED) {
+		panic("Hypervisor version 0x%x not compatible with SPMC.\n",
+		      FFA_VERSION_COMPILED);
+	}
+}
+
 void ffa_init(struct mpool *ppool)
 {
 	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
-	struct ffa_value ret;
 	struct mm_stage1_locked mm_stage1_locked;
 
 	/* This is a segment from TDRAM for the NS memory in the FVP platform.
@@ -58,17 +73,6 @@ void ffa_init(struct mpool *ppool)
 	CHECK(other_world_vm != NULL);
 
 	arch_ffa_init();
-
-	/*
-	 * Call FFA_VERSION so the SPMC can store the hypervisor's
-	 * version. This may be useful if there is a mismatch of
-	 * versions.
-	 */
-	ret = arch_other_world_call((struct ffa_value){
-		.func = FFA_VERSION_32, .arg1 = FFA_VERSION_COMPILED});
-	if (ret.func == FFA_NOT_SUPPORTED) {
-		panic("Hypervisor and SPMC versions are not compatible.\n");
-	}
 
 	/*
 	 * Setup TEE VM RX/TX buffers.

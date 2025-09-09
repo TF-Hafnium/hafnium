@@ -27,3 +27,12 @@ void ffa_init_set_tee_enabled(bool tee_enabled)
 {
 	(void)tee_enabled;
 }
+
+void ffa_init_version(void)
+{
+	/*
+	 * This stub is intentionally empty since SPMC does not have to
+	 * negotiate its version with other world. Hence, no need to invoke
+	 * FFA_VERSION at this instance.
+	 */
+}

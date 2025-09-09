@@ -15,3 +15,4 @@ void ffa_init(struct mpool *ppool);
 
 bool ffa_init_is_tee_enabled(void);
 void ffa_init_set_tee_enabled(bool tee_enabled);
+void ffa_init_version(void);
