@@ -4380,8 +4380,15 @@ struct ffa_value api_ffa_notification_update_bindings(
 	const ffa_id_t id_to_update = is_bind ? sender_vm_id : HF_INVALID_VM_ID;
 	const ffa_id_t id_to_validate =
 		is_bind ? HF_INVALID_VM_ID : sender_vm_id;
-	const uint32_t flags_mbz =
-		is_bind ? ~FFA_NOTIFICATIONS_FLAG_PER_VCPU : ~0U;
+	const uint32_t flags_mbz = ~0U;
+
+	/**
+	 * Per-vCPU delivery unsupported: must reject requests using the flag.
+	 */
+	if (is_per_vcpu) {
+		dlog_verbose("%s: per-vCPU flag not supported.\n", __func__);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	if ((flags_mbz & flags) != 0U) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
@@ -4467,7 +4474,7 @@ struct ffa_value api_ffa_notification_update_bindings(
 
 	vm_notifications_update_bindings(
 		receiver_locked, ffa_is_vm_id(sender_vm_id), id_to_update,
-		notifications, is_per_vcpu && is_bind);
+		notifications, /*is_per_vcpu=*/false);
 
 out:
 	vm_unlock(&receiver_locked);
@@ -4490,6 +4497,14 @@ struct ffa_value api_ffa_notification_set(
 		~(FFA_NOTIFICATIONS_FLAG_PER_VCPU |
 		  FFA_NOTIFICATIONS_FLAG_DELAY_SRI | (0xFFFFU << 16));
 	const bool delay_sri = (FFA_NOTIFICATIONS_FLAG_DELAY_SRI & flags) != 0U;
+
+	if (is_per_vcpu) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (vcpu_id != 0U) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
 
 	if ((flags_mbz & flags) != 0U) {
 		dlog_verbose("%s: caller shouldn't set bits that MBZ.\n",
@@ -4556,7 +4571,7 @@ struct ffa_value api_ffa_notification_set(
 	 */
 	if (vm_notifications_validate_binding(
 		    receiver_locked, ffa_is_vm_id(sender_vm_id), sender_vm_id,
-		    notifications, !is_per_vcpu)) {
+		    notifications, /*global*/ true)) {
 		dlog_verbose("Notifications in %lx are %s\n", notifications,
 			     !is_per_vcpu ? "global" : "per-vCPU");
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -4569,7 +4584,7 @@ struct ffa_value api_ffa_notification_set(
 	 */
 	if (!vm_notifications_validate_binding(
 		    receiver_locked, ffa_is_vm_id(sender_vm_id), sender_vm_id,
-		    notifications, is_per_vcpu)) {
+		    notifications, /*global*/ true)) {
 		dlog_verbose("Notifications bindings not valid.\n");
 		ret = ffa_error(FFA_DENIED);
 		goto out;
@@ -4584,7 +4599,7 @@ struct ffa_value api_ffa_notification_set(
 	/* Set notifications pending. */
 	vm_notifications_partition_set_pending(
 		receiver_locked, ffa_is_vm_id(sender_vm_id), notifications,
-		vcpu_id, is_per_vcpu);
+		vcpu_id, /*is_per_vcpu=*/false);
 
 	dlog_verbose("Set the notifications: %lx.\n", notifications);
 
