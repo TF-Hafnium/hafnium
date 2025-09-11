@@ -647,23 +647,6 @@ bool vm_are_fwk_notifications_pending(struct vm_locked vm_locked)
 	return vm_locked.vm->notifications.framework.pending != 0ULL;
 }
 
-/**
- * Checks if there are pending per-vCPU notifications, in a specific vCPU either
- * from SPs or from VMs.
- */
-bool vm_are_per_vcpu_notifications_pending(struct vm_locked vm_locked,
-					   ffa_vcpu_index_t vcpu_id)
-{
-	CHECK(vcpu_id < vm_locked.vm->vcpu_count);
-
-	return vm_get_notifications(vm_locked, true)
-			       ->per_vcpu[vcpu_id]
-			       .pending != 0ULL ||
-	       vm_get_notifications(vm_locked, false)
-			       ->per_vcpu[vcpu_id]
-			       .pending != 0ULL;
-}
-
 bool vm_are_notifications_enabled(struct vm *vm)
 {
 	return vm->notifications.enabled;
