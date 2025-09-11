@@ -776,18 +776,15 @@ bool vm_is_notifications_pending_count_zero(void)
 }
 
 /**
- * Checks that all provided notifications are bound to the specified sender, and
- * are per VCPU or global, as specified.
+ * Checks that all provided notifications are bound to the specified sender.
+ * Per-vCPU notifications are not supported.
  */
 bool vm_notifications_validate_binding(struct vm_locked vm_locked,
 				       bool is_from_vm, ffa_id_t sender_id,
-				       ffa_notifications_bitmap_t notifications,
-				       bool is_per_vcpu)
+				       ffa_notifications_bitmap_t notifications)
 {
-	return vm_notifications_validate_bound_sender(
-		       vm_locked, is_from_vm, sender_id, notifications) &&
-	       vm_notifications_validate_per_vcpu(vm_locked, is_from_vm,
-						  is_per_vcpu, notifications);
+	return vm_notifications_validate_bound_sender(vm_locked, is_from_vm,
+						      sender_id, notifications);
 }
 
 /**
@@ -796,8 +793,7 @@ bool vm_notifications_validate_binding(struct vm_locked vm_locked,
  */
 void vm_notifications_update_bindings(struct vm_locked vm_locked,
 				      bool is_from_vm, ffa_id_t sender_id,
-				      ffa_notifications_bitmap_t notifications,
-				      bool is_per_vcpu)
+				      ffa_notifications_bitmap_t notifications)
 {
 	CHECK(vm_locked.vm != NULL);
 	struct notifications *to_update =
@@ -807,16 +803,6 @@ void vm_notifications_update_bindings(struct vm_locked vm_locked,
 		if (vm_is_notification_bit_set(notifications, i)) {
 			to_update->bindings_sender_id[i] = sender_id;
 		}
-	}
-
-	/*
-	 * Set notifications if they are per VCPU, else clear them as they are
-	 * global.
-	 */
-	if (is_per_vcpu) {
-		to_update->bindings_per_vcpu |= notifications;
-	} else {
-		to_update->bindings_per_vcpu &= ~notifications;
 	}
 }
 
@@ -838,18 +824,6 @@ bool vm_notifications_validate_bound_sender(
 	return true;
 }
 
-bool vm_notifications_validate_per_vcpu(struct vm_locked vm_locked,
-					bool is_from_vm, bool is_per_vcpu,
-					ffa_notifications_bitmap_t notif)
-{
-	CHECK(vm_locked.vm != NULL);
-	struct notifications *to_check =
-		vm_get_notifications(vm_locked, is_from_vm);
-
-	return is_per_vcpu ? (~to_check->bindings_per_vcpu & notif) == 0U
-			   : (to_check->bindings_per_vcpu & notif) == 0U;
-}
-
 static void vm_notifications_state_set(struct notifications_state *state,
 				       ffa_notifications_bitmap_t notifications)
 {
@@ -867,18 +841,17 @@ static void vm_notifications_state_set(struct notifications_state *state,
 
 void vm_notifications_partition_set_pending(
 	struct vm_locked vm_locked, bool is_from_vm,
-	ffa_notifications_bitmap_t notifications, ffa_vcpu_index_t vcpu_id,
-	bool is_per_vcpu)
+	ffa_notifications_bitmap_t notifications)
 {
 	struct notifications *to_set;
 	struct notifications_state *state;
 
 	CHECK(vm_locked.vm != NULL);
-	CHECK(vcpu_id < vm_locked.vm->vcpu_count);
 
 	to_set = vm_get_notifications(vm_locked, is_from_vm);
 
-	state = is_per_vcpu ? &to_set->per_vcpu[vcpu_id] : &to_set->global;
+	/* Per-vCPU support removed; always set global notification state. */
+	state = &to_set->global;
 
 	vm_notifications_state_set(state, notifications);
 }

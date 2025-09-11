@@ -370,24 +370,18 @@ bool vm_are_per_vcpu_notifications_pending(struct vm_locked vm_locked,
 					   ffa_vcpu_index_t vcpu_id);
 bool vm_are_notifications_enabled(struct vm *vm);
 bool vm_locked_are_notifications_enabled(struct vm_locked vm_locked);
-bool vm_notifications_validate_per_vcpu(struct vm_locked vm_locked,
-					bool is_from_vm, bool is_per_vcpu,
-					ffa_notifications_bitmap_t notif);
 bool vm_notifications_validate_bound_sender(
 	struct vm_locked vm_locked, bool is_from_vm, ffa_id_t sender_id,
 	ffa_notifications_bitmap_t notifications);
-bool vm_notifications_validate_binding(struct vm_locked vm_locked,
-				       bool is_from_vm, ffa_id_t sender_id,
-				       ffa_notifications_bitmap_t notifications,
-				       bool is_per_vcpu);
+bool vm_notifications_validate_binding(
+	struct vm_locked vm_locked, bool is_from_vm, ffa_id_t sender_id,
+	ffa_notifications_bitmap_t notifications);
 void vm_notifications_update_bindings(struct vm_locked vm_locked,
 				      bool is_from_vm, ffa_id_t sender_id,
-				      ffa_notifications_bitmap_t notifications,
-				      bool is_per_vcpu);
+				      ffa_notifications_bitmap_t notifications);
 void vm_notifications_partition_set_pending(
 	struct vm_locked vm_locked, bool is_from_vm,
-	ffa_notifications_bitmap_t notifications, ffa_vcpu_index_t vcpu_id,
-	bool is_per_vcpu);
+	ffa_notifications_bitmap_t notifications);
 ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
 	struct vm_locked vm_locked, bool is_from_vm, ffa_vcpu_index_t vcpu_id);
 void vm_notifications_framework_set_pending(

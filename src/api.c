@@ -4472,9 +4472,9 @@ struct ffa_value api_ffa_notification_update_bindings(
 		goto out;
 	}
 
-	vm_notifications_update_bindings(
-		receiver_locked, ffa_is_vm_id(sender_vm_id), id_to_update,
-		notifications, /*is_per_vcpu=*/false);
+	vm_notifications_update_bindings(receiver_locked,
+					 ffa_is_vm_id(sender_vm_id),
+					 id_to_update, notifications);
 
 out:
 	vm_unlock(&receiver_locked);
@@ -4565,27 +4565,13 @@ struct ffa_value api_ffa_notification_set(
 	}
 
 	/*
-	 * Check the if the notifications are bound as global if per-vCPU flag
-	 * is set, or if they are bound as per-vCPU and caller setting as
-	 * global. In either case, return FFA_INVALID_PARAMETERS.
-	 */
-	if (vm_notifications_validate_binding(
-		    receiver_locked, ffa_is_vm_id(sender_vm_id), sender_vm_id,
-		    notifications, /*global*/ true)) {
-		dlog_verbose("Notifications in %lx are %s\n", notifications,
-			     !is_per_vcpu ? "global" : "per-vCPU");
-		ret = ffa_error(FFA_INVALID_PARAMETERS);
-		goto out;
-	}
-
-	/*
 	 * If notifications are not bound to the sender, they wouldn't be
 	 * enabled either for the receiver.
 	 */
-	if (!vm_notifications_validate_binding(
-		    receiver_locked, ffa_is_vm_id(sender_vm_id), sender_vm_id,
-		    notifications, /*global*/ true)) {
-		dlog_verbose("Notifications bindings not valid.\n");
+	if (!vm_notifications_validate_binding(receiver_locked,
+					       ffa_is_vm_id(sender_vm_id),
+					       sender_vm_id, notifications)) {
+		dlog_verbose("Notifications not bound to sender.\n");
 		ret = ffa_error(FFA_DENIED);
 		goto out;
 	}
@@ -4598,8 +4584,7 @@ struct ffa_value api_ffa_notification_set(
 
 	/* Set notifications pending. */
 	vm_notifications_partition_set_pending(
-		receiver_locked, ffa_is_vm_id(sender_vm_id), notifications,
-		vcpu_id, /*is_per_vcpu=*/false);
+		receiver_locked, ffa_is_vm_id(sender_vm_id), notifications);
 
 	dlog_verbose("Set the notifications: %lx.\n", notifications);
 
