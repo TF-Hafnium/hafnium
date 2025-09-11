@@ -1484,33 +1484,6 @@ enum manifest_return_code parse_ffa_manifest(
 	dlog_verbose("  Power management messages %#x\n",
 		     vm->partition.power_management);
 
-	/* Parse memory-regions */
-	ffa_node = root;
-	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
-		TRY(parse_ffa_memory_region_node(
-			&ffa_node, vm->partition.load_addr,
-			vm->partition.mem_regions,
-			&vm->partition.mem_region_count, &vm->partition.rxtx,
-			boot_params));
-	}
-	dlog_verbose("  Total %u memory regions found\n",
-		     vm->partition.mem_region_count);
-
-	/* Parse Device-regions */
-	ffa_node = root;
-	if (fdt_find_child(&ffa_node, &dev_region_node_name)) {
-		TRY(parse_ffa_device_region_node(
-			&ffa_node, vm->partition.dev_regions,
-			&vm->partition.dev_region_count,
-			&vm->partition.dma_device_count, boot_params));
-	}
-	dlog_verbose("  Total %u device regions found\n",
-		     vm->partition.dev_region_count);
-
-	if (!map_dma_device_id_to_stream_ids(vm)) {
-		return MANIFEST_ERROR_NOT_COMPATIBLE;
-	}
-
 	TRY(read_bool(&root, "lifecycle-support",
 		      &vm->partition.lifecycle_support));
 
@@ -1553,6 +1526,33 @@ enum manifest_return_code parse_ffa_manifest(
 				"Hafnium.\n");
 			return MANIFEST_ERROR_ILLEGAL_ABORT_ACTION;
 		}
+	}
+
+	/* Parse memory-regions */
+	ffa_node = root;
+	if (fdt_find_child(&ffa_node, &mem_region_node_name)) {
+		TRY(parse_ffa_memory_region_node(
+			&ffa_node, vm->partition.load_addr,
+			vm->partition.mem_regions,
+			&vm->partition.mem_region_count, &vm->partition.rxtx,
+			boot_params));
+	}
+	dlog_verbose("  Total %u memory regions found\n",
+		     vm->partition.mem_region_count);
+
+	/* Parse Device-regions */
+	ffa_node = root;
+	if (fdt_find_child(&ffa_node, &dev_region_node_name)) {
+		TRY(parse_ffa_device_region_node(
+			&ffa_node, vm->partition.dev_regions,
+			&vm->partition.dev_region_count,
+			&vm->partition.dma_device_count, boot_params));
+	}
+	dlog_verbose("  Total %u device regions found\n",
+		     vm->partition.dev_region_count);
+
+	if (!map_dma_device_id_to_stream_ids(vm)) {
+		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
 	return sanity_check_ffa_manifest(vm);

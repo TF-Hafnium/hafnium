@@ -27,9 +27,6 @@
 	gp-register-num = <0>;
 	abort-action = <2>; /* Restart */
 	lifecycle-support;
-	live-activation-support;
-	live-activation-register = <4>;
-        image-uuid = <0xabcd 0xabcd 0xabcd 0xabcd>;
 
 	/* Boot Info */
 	boot-info {

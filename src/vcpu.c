@@ -70,9 +70,9 @@ void vcpu_init(struct vcpu *vcpu, struct vm *vm)
 	list_init(&vcpu->ipi_list_node);
 
 	/*
-	 * Though resources have not been allocated to the partition yet, it is
-	 * safe to skip the NULL state for vCPU during cold boot and transition
-	 * directly to CREATED state.
+	 * After zero-initializing the vCPU, its state is VCPU_STATE_NULL.
+	 * Hence, no need to explicit set NULL state. We can directly
+	 * transition to VCPU_STATE_CREATED during cold boot.
 	 */
 	vcpu->state = VCPU_STATE_CREATED;
 }
