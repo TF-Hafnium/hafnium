@@ -237,7 +237,7 @@ void ffa_vm_disable_interrupts(struct vm_locked vm_locked)
 /**
  * Reclaim all resources belonging to VM in aborted state.
  */
-void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
+void ffa_vm_free_resources(struct vm_locked vm_locked)
 {
 	/*
 	 * Gracefully disable all interrupts belonging to SP.
@@ -249,7 +249,7 @@ void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
 	 * Relinquish all memory regions shared with or lent to this partition
 	 * by other endpoints.
 	 */
-	ffa_memory_reclaim_relinquish_vm_regions(vm_locked, ppool);
+	ffa_memory_reclaim_relinquish_vm_regions(vm_locked);
 
 	/*
 	 * Unmap RX/TX buffer and all memory as well as device regions declared

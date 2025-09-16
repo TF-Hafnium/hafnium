@@ -30,7 +30,7 @@ struct vm_locked ffa_vm_find_locked_create(ffa_id_t vm_id);
 void ffa_vm_nwd_free(struct vm_locked to_destroy_locked);
 
 /** Reclaim all resources belonging to VM in aborted state. */
-void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool);
+void ffa_vm_free_resources(struct vm_locked vm_locked);
 
 /** Checks whether managed exit is supported by given SP. */
 bool ffa_vm_managed_exit_supported(struct vm *vm);

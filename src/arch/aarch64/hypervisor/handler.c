@@ -1145,7 +1145,7 @@ struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next)
 	 * SPMC de-allocates and/or uninitializes all the resources allocated
 	 * to the partition.
 	 */
-	ffa_vm_free_resources(vm_locked, api_get_ppool());
+	ffa_vm_free_resources(vm_locked);
 
 	/*
 	 * Remove VM's node from boot list if a partition aborts during runtime.
