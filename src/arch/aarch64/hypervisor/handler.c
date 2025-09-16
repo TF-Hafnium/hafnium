@@ -583,8 +583,7 @@ static bool ffa_handler(struct ffa_value *args, struct vcpu *current,
 		*args = api_ffa_console_log(*args, current);
 		return true;
 	case FFA_ERROR_32:
-		*args = ffa_cpu_cycles_error_32(current, next, args->arg2,
-						api_get_ppool());
+		*args = ffa_cpu_cycles_error_32(current, next, args->arg2);
 		return true;
 	case FFA_ABORT_32:
 	case FFA_ABORT_64:

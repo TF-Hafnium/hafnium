@@ -17,6 +17,7 @@
 #include "hf/ffa_internal.h"
 #include "hf/load.h"
 #include "hf/plat/interrupts.h"
+#include "hf/plat/memory_alloc.h"
 #include "hf/vm.h"
 
 #include "smc.h"
@@ -409,9 +410,8 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 			resume_halted_vcpu_upon_restart(current_locked, next);
 
 			/* Free the pages used for old vCPU structures. */
-			CHECK(mpool_add_chunk(api_get_ppool(),
-					      current->vm->deferred_mem_ptr,
-					      current->vm->deferred_mem_size));
+			memory_free(current->vm->deferred_mem_ptr,
+					  current->vm->deferred_mem_size);
 
 			current->vm->deferred_mem_ptr = NULL;
 			current->vm->deferred_mem_size = 0;
@@ -878,8 +878,7 @@ bool ffa_cpu_cycles_check_runtime_state_transition(
  */
 struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 					 struct vcpu **next,
-					 enum ffa_error error_code,
-					 struct mpool *ppool)
+					 enum ffa_error error_code)
 {
 	struct vcpu_locked current_locked;
 	struct vm_locked vm_locked;
@@ -895,7 +894,7 @@ struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 			   vcpu_index(current));
 
 		CHECK(vm_set_state(vm_locked, VM_STATE_ABORTING));
-		ffa_vm_free_resources(vm_locked, ppool);
+		ffa_vm_free_resources(vm_locked);
 
 		if (sp_boot_next(current_locked, next, VCPU_STATE_WAITING)) {
 			goto out;
