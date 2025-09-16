@@ -124,6 +124,7 @@ void ffa_vm_nwd_free(struct vm_locked to_destroy_locked)
 
 void ffa_vm_init(struct mpool *ppool)
 {
+	(void)ppool;
 	struct vm *other_world = vm_find(HF_OTHER_WORLD_ID);
 
 	/* Init NWd VMs structures for use of Notifications interfaces. */
@@ -138,7 +139,7 @@ void ffa_vm_init(struct mpool *ppool)
 		 */
 		nwd_vms[i].id = HF_INVALID_VM_ID;
 		nwd_vms[i].vcpu_count = MAX_CPUS;
-		vm_notifications_init(&nwd_vms[i], MAX_CPUS, ppool);
+		vm_notifications_init(&nwd_vms[i]);
 
 		/* Give them the same version as the Hypervisor. */
 		nwd_vms[i].ffa_version = other_world->ffa_version;
@@ -243,12 +244,6 @@ void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
 	 * Gracefully disable all interrupts belonging to SP.
 	 */
 	ffa_vm_disable_interrupts(vm_locked);
-
-	/*
-	 * Reset all notifications for this partition i.e. clear and unbind
-	 * them.
-	 */
-	vm_reset_notifications(vm_locked, ppool);
 
 	/*
 	 * Reclaim all memory regions shared or lent by this partition.

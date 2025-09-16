@@ -351,9 +351,8 @@ bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
 			      paddr_t end, mm_mode_t mode, struct mpool *ppool,
 			      ipaddr_t *ipa, uint8_t dma_device_id);
 
-void vm_notifications_init(struct vm *vm, ffa_vcpu_count_t vcpu_count,
-			   struct mpool *ppool);
-void vm_reset_notifications(struct vm_locked vm_locked, struct mpool *ppool);
+void vm_notifications_init(struct vm *vm);
+void vm_reset_notifications(struct vm_locked vm_locked);
 bool vm_mailbox_state_busy(struct vm_locked vm_locked);
 bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 				  ffa_notifications_bitmap_t notifications);
@@ -374,7 +373,7 @@ void vm_notifications_partition_set_pending(
 	struct vm_locked vm_locked, bool is_from_vm,
 	ffa_notifications_bitmap_t notifications);
 ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
-	struct vm_locked vm_locked, bool is_from_vm, ffa_vcpu_index_t vcpu_id);
+	struct vm_locked vm_locked, bool is_from_vm);
 void vm_notifications_framework_set_pending(
 	struct vm_locked vm_locked, ffa_notifications_bitmap_t notifications);
 ffa_notifications_bitmap_t vm_notifications_framework_get_pending(

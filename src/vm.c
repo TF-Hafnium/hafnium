@@ -91,7 +91,7 @@ static bool vm_init_helper(struct vm *vm, ffa_id_t id,
 		vcpu_init(vm_get_vcpu(vm, i), vm);
 	}
 
-	vm_notifications_init(vm, vcpu_count, ppool);
+	vm_notifications_init(vm);
 	list_init(&vm->boot_list_node);
 
 	return true;
@@ -518,46 +518,6 @@ static struct notifications *vm_get_notifications(struct vm_locked vm_locked,
 }
 
 /*
- * Dynamically allocate per_vcpu_notifications structure for a given VM.
- */
-static void vm_notifications_init_per_vcpu_notifications(
-	struct vm *vm, ffa_vcpu_count_t vcpu_count, struct mpool *ppool)
-{
-	size_t notif_ppool_entries =
-		(align_up(sizeof(struct notifications_state) * vcpu_count,
-			  MM_PPOOL_ENTRY_SIZE) /
-		 MM_PPOOL_ENTRY_SIZE);
-
-	/*
-	 * Allow for function to be called on already initialized VMs but those
-	 * that require notification structure to be cleared.
-	 */
-	if (vm->notifications.from_sp.per_vcpu == NULL) {
-		assert(vm->notifications.from_vm.per_vcpu == NULL);
-		assert(vcpu_count != 0);
-		CHECK(ppool != NULL);
-		vm->notifications.from_sp.per_vcpu =
-			(struct notifications_state *)mpool_alloc_contiguous(
-				ppool, notif_ppool_entries, 1);
-		CHECK(vm->notifications.from_sp.per_vcpu != NULL);
-
-		vm->notifications.from_vm.per_vcpu =
-			(struct notifications_state *)mpool_alloc_contiguous(
-				ppool, notif_ppool_entries, 1);
-		CHECK(vm->notifications.from_vm.per_vcpu != NULL);
-	} else {
-		assert(vm->notifications.from_vm.per_vcpu != NULL);
-	}
-
-	memset_s(vm->notifications.from_sp.per_vcpu,
-		 sizeof(*(vm->notifications.from_sp.per_vcpu)) * vcpu_count, 0,
-		 sizeof(*(vm->notifications.from_sp.per_vcpu)) * vcpu_count);
-	memset_s(vm->notifications.from_vm.per_vcpu,
-		 sizeof(*(vm->notifications.from_vm.per_vcpu)) * vcpu_count, 0,
-		 sizeof(*(vm->notifications.from_vm.per_vcpu)) * vcpu_count);
-}
-
-/*
  * Initializes the notifications structure.
  */
 static void vm_notifications_init_bindings(struct notifications *notifications)
@@ -570,38 +530,11 @@ static void vm_notifications_init_bindings(struct notifications *notifications)
 /*
  * Initialize notification related structures for a VM.
  */
-void vm_notifications_init(struct vm *vm, ffa_vcpu_count_t vcpu_count,
-			   struct mpool *ppool)
+void vm_notifications_init(struct vm *vm)
 {
-	vm_notifications_init_per_vcpu_notifications(vm, vcpu_count, ppool);
-
 	/* Basic initialization of the notifications structure. */
 	vm_notifications_init_bindings(&vm->notifications.from_sp);
 	vm_notifications_init_bindings(&vm->notifications.from_vm);
-}
-
-void vm_reset_notifications(struct vm_locked vm_locked, struct mpool *ppool)
-{
-	struct vm *vm = vm_locked.vm;
-
-	/* Clear from_vm notifications. */
-	struct notifications *from_vm = &vm->notifications.from_vm;
-
-	/* Clear from_sp notifications. */
-	struct notifications *from_sp = &vm->notifications.from_sp;
-
-	size_t notif_ppool_entries =
-		(align_up(sizeof(struct notifications_state) * (vm->vcpu_count),
-			  MM_PPOOL_ENTRY_SIZE) /
-		 MM_PPOOL_ENTRY_SIZE);
-
-	/*
-	 * Free the memory allocated to per_vcpu notifications state.
-	 * The other fields related to notifications need not be cleared
-	 * explicitly here as they will be zeroed during vm reinitialization.
-	 */
-	mpool_add_chunk(ppool, from_vm->per_vcpu, notif_ppool_entries);
-	mpool_add_chunk(ppool, from_sp->per_vcpu, notif_ppool_entries);
 }
 
 /**
@@ -615,13 +548,6 @@ bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 	CHECK(vm_locked.vm != NULL);
 
 	to_check = vm_get_notifications(vm_locked, from_vm);
-
-	/* Check if there are pending per vcpu notifications */
-	for (uint32_t i = 0U; i < vm_locked.vm->vcpu_count; i++) {
-		if ((to_check->per_vcpu[i].pending & notifications) != 0U) {
-			return true;
-		}
-	}
 
 	/* Check if there are global pending notifications */
 	return (to_check->global.pending & notifications) != 0U;
@@ -884,21 +810,18 @@ static ffa_notifications_bitmap_t vm_notifications_state_get_pending(
 }
 
 /**
- * Get global and per-vCPU notifications for the given vCPU ID.
+ * Get global notifications for the given vCPU ID.
  */
 ffa_notifications_bitmap_t vm_notifications_partition_get_pending(
-	struct vm_locked vm_locked, bool is_from_vm, ffa_vcpu_index_t vcpu_id)
+	struct vm_locked vm_locked, bool is_from_vm)
 {
 	ffa_notifications_bitmap_t to_ret;
 	struct notifications *to_get;
 
 	assert(vm_locked.vm != NULL);
 	to_get = vm_get_notifications(vm_locked, is_from_vm);
-	assert(vcpu_id < vm_locked.vm->vcpu_count);
 
 	to_ret = vm_notifications_state_get_pending(&to_get->global);
-	to_ret |=
-		vm_notifications_state_get_pending(&to_get->per_vcpu[vcpu_id]);
 
 	return to_ret;
 }
@@ -1096,23 +1019,18 @@ void vm_notifications_info_get_pending(
 					ids_count, lists_sizes, lists_count,
 					ids_max_count, info_get_state);
 
-	for (ffa_vcpu_count_t i = 0; i < vm_locked.vm->vcpu_count; i++) {
-		struct vcpu *vcpu = vm_get_vcpu(vm_locked.vm, i);
-		bool per_vcpu_added;
-
-		per_vcpu_added = vm_notifications_state_info_get(
-			&notifications->per_vcpu[i], vm_locked.vm->id, true, i,
-			ids, ids_count, lists_sizes, lists_count, ids_max_count,
-			info_get_state);
-		/*
-		 * IPIs can only be pending for partitions at the
-		 * current virtual FF-A instance.
-		 */
-		if (vm_id_is_current_world(vm_locked.vm->id)) {
+	if (vm_id_is_current_world(vm_locked.vm->id)) {
+		for (ffa_vcpu_count_t i = 0; i < vm_locked.vm->vcpu_count;
+		     i++) {
+			struct vcpu *vcpu = vm_get_vcpu(vm_locked.vm, i);
+			/*
+			 * per_vcpu_added = false:
+			 * per-vCPU notifications unsupported.
+			 */
 			vm_interrupts_info_get(vcpu, vm_locked.vm->id, i, ids,
 					       ids_count, lists_sizes,
 					       lists_count, ids_max_count,
-					       info_get_state, per_vcpu_added);
+					       info_get_state, false);
 		}
 	}
 }

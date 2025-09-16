@@ -4685,7 +4685,7 @@ struct ffa_value api_ffa_notification_get(ffa_id_t receiver_vm_id,
 
 	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_VM) != 0U) {
 		vm_notifications = vm_notifications_partition_get_pending(
-			receiver_locked, true, vcpu_id);
+			receiver_locked, true);
 	}
 
 	if ((flags & FFA_NOTIFICATION_FLAG_BITMAP_HYP) != 0U ||

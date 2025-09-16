@@ -308,8 +308,7 @@ struct ffa_value ffa_notifications_bitmap_destroy(ffa_id_t vm_id)
 	}
 
 	to_destroy_locked.vm->notifications.enabled = false;
-	vm_notifications_init(to_destroy_locked.vm,
-			      to_destroy_locked.vm->vcpu_count, NULL);
+	vm_notifications_init(to_destroy_locked.vm);
 	if (vm_id != HF_OTHER_WORLD_ID) {
 		ffa_vm_nwd_free(to_destroy_locked);
 	}
@@ -324,8 +323,9 @@ struct ffa_value ffa_notifications_get_from_sp(
 	struct vm_locked receiver_locked, ffa_vcpu_index_t vcpu_id,
 	ffa_notifications_bitmap_t *from_sp)
 {
-	*from_sp = vm_notifications_partition_get_pending(receiver_locked,
-							  false, vcpu_id);
+	(void)vcpu_id;
+	*from_sp =
+		vm_notifications_partition_get_pending(receiver_locked, false);
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
