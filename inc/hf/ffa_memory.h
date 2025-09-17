@@ -51,3 +51,6 @@ bool ffa_memory_get_share_states_info(struct ffa_address_map_desc *amd,
 				      uint16_t *constituent_index);
 ffa_amd_permissions_t ffa_memory_amd_permissions_from_mm_mode(mm_mode_t mode,
 							      bool privileged);
+
+void *ffa_memory_fragment_alloc(void);
+void ffa_memory_fragment_free(void *ptr);

@@ -172,32 +172,46 @@ struct ffa_memory_share_state *get_share_state(
 	return NULL;
 }
 
+/* Allocate a page for the FF-A memory region descriptors. */
+void *ffa_memory_fragment_alloc(void)
+{
+	return memory_alloc(PAGE_SIZE);
+}
+
+/* Free a page for the FF-A memory region descriptors. */
+void ffa_memory_fragment_free(void *ptr)
+{
+	memory_free(ptr, PAGE_SIZE);
+}
+
 /** Marks a share state as unallocated. */
 void share_state_free(struct share_states_locked share_states,
 		      struct ffa_memory_share_state *share_state)
 {
 	uint32_t i;
-	struct mpool *ppool = memory_alloc_get_ppool();
-
-	assert(ppool != NULL);
 
 	assert(share_states.share_states != NULL);
+
 	share_state->share_func = 0;
 	share_state->sending_complete = false;
-	mpool_free(ppool, share_state->memory_region);
+
+	ffa_memory_fragment_free(share_state->memory_region);
+	share_state->memory_region = NULL;
+
 	/*
 	 * First fragment is part of the same page as the `memory_region`, so it
 	 * doesn't need to be freed separately.
 	 */
 	share_state->fragments[0] = NULL;
 	share_state->fragment_constituent_counts[0] = 0;
+
 	for (i = 1; i < share_state->fragment_count; ++i) {
-		mpool_free(ppool, share_state->fragments[i]);
+		ffa_memory_fragment_free(share_state->fragments[i]);
 		share_state->fragments[i] = NULL;
 		share_state->fragment_constituent_counts[i] = 0;
 	}
+
 	share_state->fragment_count = 0;
-	share_state->memory_region = NULL;
 	share_state->hypervisor_fragment_count = 0;
 }
 
@@ -2371,8 +2385,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				       memory_share_length, fragment_length,
 				       share_func);
 	if (ret.func != FFA_SUCCESS_32) {
-		/* TODO: revisit this. */
-		memory_free(memory_region, PAGE_SIZE);
+		ffa_memory_fragment_free(memory_region);
 		return ret;
 	}
 
@@ -2395,6 +2408,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	default:
 		dlog_verbose("Unknown share func %#x (%s)\n", share_func,
 			     ffa_func_name(share_func));
+		ffa_memory_fragment_free(memory_region);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -2410,14 +2424,18 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 					   FFA_MEMORY_HANDLE_INVALID);
 	if (share_state == NULL) {
 		dlog_verbose("Failed to allocate share state.\n");
-		// TODO: revisit
-		memory_free(memory_region, PAGE_SIZE);
 		ret = ffa_error(FFA_NO_MEMORY);
+		ffa_memory_fragment_free(memory_region);
 		goto out;
 	}
 
 	if (fragment_length == memory_share_length) {
-		/* No more fragments to come, everything fit in one message. */
+		/*
+		 * No more fragments to come, everything fit in one message.
+		 * The ffa_memory_send_complete frees the share state structure
+		 * in case of failure.
+		 * With that, it frees the memory region as well.
+		 */
 		ret = ffa_memory_send_complete(
 			from_locked, share_states, share_state,
 			&(share_state->sender_orig_mode));
@@ -2442,6 +2460,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 out:
 	share_states_unlock(&share_states);
 	dump_share_states();
+
 	return ret;
 }
 
@@ -2517,8 +2536,7 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 	goto out;
 
 out_free_fragment:
-	/* TODO: revisit */
-	memory_free(fragment, PAGE_SIZE);
+	ffa_memory_fragment_free(fragment);
 
 out:
 	share_states_unlock(&share_states);

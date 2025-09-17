@@ -3561,7 +3561,8 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	 * Earlier we checked that the fragment_length_v1_1 would not be larger
 	 * than a page.
 	 */
-	memory_region_v1_1 = memory_alloc(PAGE_SIZE);
+	memory_region_v1_1 = ffa_memory_fragment_alloc();
+
 	if (memory_region_v1_1 == NULL) {
 		return ffa_error(FFA_NO_MEMORY);
 	}
@@ -3581,7 +3582,9 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	for (uint32_t i = 0; i < memory_region_v1_1->receiver_count; i++) {
 		struct ffa_memory_access *receiver =
 			ffa_memory_region_get_receiver(memory_region_v1_1, i);
+
 		assert(receiver != NULL);
+
 		receiver->composite_memory_region_offset =
 			composite_offset_v1_1;
 	}
@@ -3627,7 +3630,7 @@ static struct ffa_value api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
 	memcpy_s(allocated, MM_PPOOL_ENTRY_SIZE, memory_region_v1_1,
 		 *fragment_length);
 
-	memory_free(memory_region_v1_1, PAGE_SIZE);
+	ffa_memory_fragment_free(memory_region_v1_1);
 
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
@@ -3685,7 +3688,8 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	 * pool. This prevents the sender from changing it underneath us, and
 	 * also lets us keep it around in the share state table if needed.
 	 */
-	allocated_entry = memory_alloc(PAGE_SIZE);
+	allocated_entry = ffa_memory_fragment_alloc();
+
 	if (allocated_entry == NULL) {
 		dlog_verbose("Failed to allocate memory region copy.\n");
 		return ffa_error(FFA_NO_MEMORY);
@@ -4229,7 +4233,7 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	fragment_copy = memory_alloc(PAGE_SIZE);
+	fragment_copy = ffa_memory_fragment_alloc();
 
 	if (fragment_copy == NULL) {
 		dlog_verbose("Failed to allocate fragment copy.\n");
