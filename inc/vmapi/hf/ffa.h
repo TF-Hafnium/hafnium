@@ -1508,6 +1508,7 @@ static inline struct ffa_memory_access *ffa_memory_region_get_receiver(
 {
 	uint32_t memory_access_desc_size =
 		memory_region->memory_access_desc_size;
+	size_t offset;
 
 	if (receiver_index >= memory_region->receiver_count) {
 		return NULL;
@@ -1521,16 +1522,37 @@ static inline struct ffa_memory_access *ffa_memory_region_get_receiver(
 		return NULL;
 	}
 
-	/* Check we cannot use receivers offset to cause overflow. */
-	if (memory_region->receivers_offset !=
+	/* Receivers offset shouldn't overlap with header. */
+	if (memory_region->receivers_offset <
 	    sizeof(struct ffa_memory_region)) {
 		return NULL;
 	}
 
-	return (struct ffa_memory_access
-			*)((uint8_t *)memory_region +
-			   (size_t)memory_region->receivers_offset +
-			   (size_t)(receiver_index * memory_access_desc_size));
+	/*
+	 * First calculate the offset for the receiver in the array of
+	 * receivers.
+	 */
+	offset = (size_t)receiver_index * memory_access_desc_size;
+
+	/*
+	 * Check if there is a chance of overflow when calculating the receivers
+	 * offset.
+	 */
+	if (SIZE_MAX - offset < memory_region->receivers_offset) {
+		return NULL;
+	}
+
+	offset += memory_region->receivers_offset;
+
+	/*
+	 * Check for overflows at the last computation from the base of the
+	 * memory region.
+	 */
+	if (SIZE_MAX - offset < (uintptr_t)memory_region) {
+		return NULL;
+	}
+
+	return (struct ffa_memory_access *)((uint8_t *)memory_region + offset);
 }
 
 /**

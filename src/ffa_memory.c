@@ -512,7 +512,7 @@ static bool receiver_size_and_offset_valid_for_version(
 	case FFA_VERSION_1_1:
 	case FFA_VERSION_1_2:
 	case FFA_VERSION_1_3:
-		return receivers_offset == sizeof(struct ffa_memory_region);
+		return receivers_offset >= sizeof(struct ffa_memory_region);
 	default:
 		return false;
 	}
