@@ -555,6 +555,55 @@ TEST_SERVICE(ffa_lend_device_memory_fails)
 	ffa_yield();
 }
 
+TEST_SERVICE(ffa_memory_return_delayed)
+{
+	uint8_t *ptr;
+	size_t i;
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	void *send_buf = SERVICE_SEND_BUFFER();
+	ffa_id_t target_id;
+	struct ffa_memory_region *memory_region =
+		(struct ffa_memory_region *)retrieve_buffer;
+	ffa_id_t sender;
+	struct ffa_composite_memory_region *composite;
+
+	sender = receive_indirect_message(&target_id, sizeof(target_id),
+					  recv_buf)
+			 .sender;
+
+	ffa_yield();
+
+	/* Expect same sender as the previous indirect message. */
+	EXPECT_EQ(retrieve_memory_from_message(recv_buf, send_buf, NULL,
+					       memory_region, HF_MAILBOX_SIZE),
+		  sender);
+
+	composite = ffa_memory_region_get_composite(memory_region, 0);
+
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	ptr = (uint8_t *)composite->constituents[0].address;
+
+	update_mm_security_state(composite, memory_region->attributes);
+
+	/* Check that one has access to the shared region. */
+	for (i = 0; i < PAGE_SIZE; ++i) {
+		ptr[i]++;
+	}
+
+	ffa_yield();
+
+	/* Give the memory back and notify the target_id. */
+	send_memory_and_retrieve_request(
+		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), target_id,
+		composite->constituents, composite->constituent_count, 0, 0,
+		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
+
+	ffa_yield();
+}
+
 TEST_SERVICE(ffa_memory_return)
 {
 	uint8_t *ptr;
@@ -805,6 +854,90 @@ TEST_SERVICE(ffa_memory_receive)
 
 		/* Ensure memory has not changed. */
 		EXPECT_EQ(ptr[0], 'd');
+		ffa_yield();
+	}
+}
+
+/**
+ * Service which simply retrieve memory, Yields back to sender and relinquishes
+ * memory once resumed again.
+ */
+TEST_SERVICE(ffa_memory_receive_relinquish)
+{
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	void *send_buf = SERVICE_SEND_BUFFER();
+
+	for (;;) {
+		struct ffa_memory_region *memory_region =
+			(struct ffa_memory_region *)retrieve_buffer;
+
+		ffa_msg_wait();
+
+		retrieve_memory_from_message(recv_buf, send_buf, NULL,
+					     memory_region, HF_MAILBOX_SIZE);
+
+		/* Yield back to sender. */
+		ffa_yield();
+
+		/* Give the memory back and notify the sender. */
+		ffa_mem_relinquish_init(send_buf, memory_region->handle, 0,
+					hf_vm_get_id());
+		EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
+
+		ffa_yield();
+	}
+}
+
+/**
+ * Expects to receive two pages back to back.
+ * In between operations it always gives execution back to the PVM.
+ * It makes no access to the memory.
+ * Sequence:
+ * - Start by waiting for the first message.
+ * - Retrieve 1st page and yield back to the sender.
+ * - Retrieve 2nd page and yield back to the sender.
+ * - Once resumed relinquishes access to the 1st page, and yield back to PVM.
+ * - Once resumed relinquishes access to the 2nd page, and yield back to PVM.
+ */
+TEST_SERVICE(ffa_memory_receive_relinquish_two_pages)
+{
+	void *recv_buf = SERVICE_RECV_BUFFER();
+	void *send_buf = SERVICE_SEND_BUFFER();
+	ffa_memory_handle_t handle1;
+	ffa_memory_handle_t handle2;
+
+	for (;;) {
+		struct ffa_memory_region *memory_region =
+			(struct ffa_memory_region *)retrieve_buffer;
+
+		dlog_notice("Waiting for the 1st page.");
+		ffa_msg_wait();
+
+		retrieve_memory_from_message(recv_buf, send_buf, NULL,
+					     memory_region, HF_MAILBOX_SIZE);
+		handle1 = memory_region->handle;
+
+		dlog_notice("Waiting for the 2nd page.");
+		ffa_yield();
+
+		retrieve_memory_from_message(recv_buf, send_buf, NULL,
+					     memory_region, HF_MAILBOX_SIZE);
+		handle2 = memory_region->handle;
+
+		ffa_yield();
+
+		dlog_notice("Relinquishing 1st page.");
+		/* Give the handle1 memory back and notify the sender. */
+		ffa_mem_relinquish_init(send_buf, handle1, 0, hf_vm_get_id());
+		EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
+
+		ffa_yield();
+		dlog_notice("Relinquishing 2nd page.");
+
+		/* Give the handle2 memory back and notify the sender. */
+		ffa_mem_relinquish_init(send_buf, handle2, 0, hf_vm_get_id());
+		EXPECT_EQ(ffa_mem_relinquish().func, FFA_SUCCESS_32);
+
 		ffa_yield();
 	}
 }
