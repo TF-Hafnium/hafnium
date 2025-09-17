@@ -215,6 +215,21 @@ TEST(ffa_features, succeeds_feature_ids)
 	ret = ffa_features(FFA_FEATURE_MEI);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	EXPECT_EQ(ffa_feature_intid(ret), HF_MANAGED_EXIT_INTID);
+
+	ret = ffa_features(FFA_FEATURE_NOTIFICATION);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	/**
+	 * The return value should have:
+	 * bit[0]=1 (VM per-vCPU unsupported),
+	 * bit[1]=1 (SP per-vCPU unsupported), and the rest 0
+	 */
+	uint32_t features = (uint32_t)ret.arg2;
+	EXPECT_TRUE((features & FFA_NOTIFY_FEAT_NO_PER_VCPU_VM) != 0);
+	EXPECT_TRUE((features & FFA_NOTIFY_FEAT_NO_PER_VCPU_SP) != 0);
+	/* All other bits 0 */
+	EXPECT_EQ(features & ~(FFA_NOTIFY_FEAT_NO_PER_VCPU_VM |
+			       FFA_NOTIFY_FEAT_NO_PER_VCPU_SP),
+		  0U);
 }
 
 /** Validates error return for FFA_FEATURES provided a wrongful feature ID. */
