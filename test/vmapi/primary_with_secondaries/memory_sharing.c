@@ -6135,3 +6135,16 @@ TEST_PRECONDITION(ffa_ns_res_info_get, no_data_generated,
 	EXPECT_EQ(ret.func, FFA_ERROR_32);
 	EXPECT_EQ(ret.arg2, FFA_ABORTED);
 }
+
+/**
+ * Validates that FFA_FEATURES supports FFA_ NS_RES_INFO_GET
+ * when invoked from the NWd.
+ */
+TEST_PRECONDITION(ffa_ns_res_info_get, call_ffa_features,
+		  all_services_are_secure)
+{
+	struct ffa_value ret;
+
+	ret = ffa_features(FFA_NS_RES_INFO_GET);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+}
