@@ -36,6 +36,8 @@ void kmain(const void *fdt_ptr)
 	 */
 	exception_setup(NULL, NULL);
 
+	dlog_enable_lock();
+
 	if (!fdt_size_from_header(fdt_ptr, &fdt_len) ||
 	    !fdt_init_from_ptr(&fdt, fdt_ptr, fdt_len)) {
 		HFTEST_LOG("Unable to init FDT.");
