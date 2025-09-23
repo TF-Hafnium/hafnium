@@ -361,7 +361,7 @@ void vcpu_set_running(struct vcpu_locked target_locked,
 	target_vcpu->regs_available = false;
 
 	/* We are about to resume target vCPU. */
-	target_vcpu->state = VCPU_STATE_RUNNING;
+	CHECK(vcpu_state_set(target_locked, VCPU_STATE_RUNNING));
 }
 
 void vcpu_enter_secure_interrupt_rtm(struct vcpu_locked vcpu_locked)
@@ -661,7 +661,7 @@ void vcpu_dir_req_set_state(struct vcpu_locked target_locked, bool is_ffa_req2,
 {
 	struct vcpu *target_vcpu = target_locked.vcpu;
 
-	target_vcpu->state = VCPU_STATE_RUNNING;
+	CHECK(vcpu_state_set(target_locked, VCPU_STATE_RUNNING));
 	target_vcpu->regs_available = false;
 	target_vcpu->direct_request_origin.is_ffa_req2 = is_ffa_req2;
 	target_vcpu->direct_request_origin.vm_id = sender_vm_id;

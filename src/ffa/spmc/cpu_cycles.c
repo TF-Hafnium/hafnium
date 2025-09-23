@@ -760,8 +760,6 @@ static bool ffa_cpu_cycles_check_rtm_sp_init(struct vcpu_locked current_locked,
 					     uint32_t func,
 					     enum vcpu_state *next_state)
 {
-	assert(current_locked.vcpu->state == VCPU_STATE_STARTING);
-
 	switch (func) {
 	case FFA_MSG_SEND_DIRECT_REQ_64:
 	case FFA_MSG_SEND_DIRECT_REQ_32:
