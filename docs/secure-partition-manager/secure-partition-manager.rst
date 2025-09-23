@@ -1170,15 +1170,27 @@ which FF-A endpoints have pending notifications. The receiver scheduler is
 called and informed by the FF-A driver, and it should allocate CPU cycles to the
 receiver.
 
-There are two types of notifications supported:
+The FF-A specification defines two types of notifications:
 
 - Global, which are targeted to an FF-A endpoint and can be handled within any
   of its execution contexts, as determined by the scheduler of the system.
-- Per-vCPU, which are targeted to a FF-A endpoint and to be handled within a
+- Per-vCPU, which are targeted to an FF-A endpoint and to be handled within a
   a specific execution context, as determined by the sender.
 
-The type of a notification is set when invoking FFA_NOTIFICATION_BIND to give
-permissions to the sender.
+.. note::
+   Hafnium implements **global notifications only**. Per-vCPU notifications,
+   introduced as an optional feature in FF-A v1.3, are **not supported**.
+   Attempts to use per-vCPU flags or non-zero vCPU IDs with
+   :c:func:`FFA_NOTIFICATION_BIND` or :c:func:`FFA_NOTIFICATION_SET` will be
+   rejected with ``FFA_INVALID_PARAMETERS``.
+   :c:func: `FFA_NOTIFICATION_INFO_GET` can still return per-vCPU information
+   for vCPUs that have pending interrupts (such as IPIs), even though per-vCPU
+   notifications are not supported.
+   See the `Inter-Processor Interrupts`_ section for more details.
+
+The type of a notification is determined by the flags used with
+``FFA_NOTIFICATION_BIND`` in the FF-A specification; however, in Hafnium only
+the global form is accepted.
 
 Notification signaling resorts to two interrupts:
 
