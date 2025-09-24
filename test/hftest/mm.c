@@ -32,11 +32,6 @@ struct mm_stage1_locked hftest_mm_get_stage1(void)
 	return (struct mm_stage1_locked){.ptable = &ptable};
 }
 
-struct mpool *hftest_mm_get_ppool(void)
-{
-	return memory_alloc_get_ppool();
-}
-
 bool hftest_mm_init(void)
 {
 	struct mm_stage1_locked stage1_locked;

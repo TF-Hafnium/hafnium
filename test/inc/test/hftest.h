@@ -140,9 +140,6 @@ void hftest_mm_vcpu_init(void);
  */
 struct mm_stage1_locked hftest_mm_get_stage1(void);
 
-/** Returns a pointer to the page-table pool. */
-struct mpool *hftest_mm_get_ppool(void);
-
 /**
  * Inform a host that this is the start of a test run and obtain the command
  * line arguments for it.

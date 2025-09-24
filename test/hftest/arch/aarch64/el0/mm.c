@@ -13,11 +13,6 @@ struct mm_stage1_locked hftest_mm_get_stage1(void)
 	return (struct mm_stage1_locked){.ptable = NULL};
 }
 
-struct mpool *hftest_mm_get_ppool(void)
-{
-	return NULL;
-}
-
 bool hftest_mm_init(void)
 {
 	return true;

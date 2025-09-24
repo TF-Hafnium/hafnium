@@ -17,11 +17,6 @@
 alignas(PAGE_SIZE) char memory_alloc_buf[PAGE_SIZE * HEAP_PAGES];
 static struct mpool memory_alloc_pool;
 
-struct mpool *memory_alloc_get_ppool(void)
-{
-	return &memory_alloc_pool;
-}
-
 void memory_alloc_init(void)
 {
 	mpool_init(&memory_alloc_pool, PAGE_SIZE);
