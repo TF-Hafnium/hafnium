@@ -21,7 +21,24 @@ run_tests ()
 		TEST_ARGS+=(--skip-long-running-tests)
 	fi
 
-	./kokoro/test.sh ${TEST_ARGS[@]}
+	# Local build scenario: both flags true -> run unit then QEMU.
+	if [ "${RUN_UNIT_ONLY:-false}" == "true" ] && [ "${RUN_QEMU_ONLY:-false}" == "true" ]
+	then
+		./kokoro/unit_tests.sh || exit 1
+		exec ./kokoro/test.sh "${TEST_ARGS[@]}"
+	fi
+
+	# Jenkins CI build: RUN_UNIT_ONLY=true  -> run just host unit tests
+	if [ "${RUN_UNIT_ONLY:-false}" == "true" ]
+	then
+		exec ./kokoro/unit_tests.sh
+	fi
+
+	# Jenkins CI build: RUN_QEMU_ONLY=true  -> run QEMU tests
+	if [ "${RUN_QEMU_ONLY:-false}" == "true" ]
+	then
+		exec ./kokoro/test.sh ${TEST_ARGS[@]}
+	fi
 }
 
 source "$(dirname ${BASH_SOURCE[0]})/../build/bash/common.inc"
@@ -50,6 +67,8 @@ else
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS true
 	default_value USE_TFA false
 	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD false
+	default_value RUN_UNIT_ONLY true
+	default_value RUN_QEMU_ONLY true
 fi
 
 # If HAFNIUM_HERMETIC_BUILD is "true", relaunch this script inside a container.

@@ -13,7 +13,6 @@ USE_FVP=false
 USE_TFA=false
 EL0_TEST_ONLY=false
 SKIP_LONG_RUNNING_TESTS=false
-SKIP_UNIT_TESTS=false
 ASSERT_DISABLED_BUILD=false
 DEFAULT_HFTEST_TIMEOUT="600s"
 HFTEST_LOG_LEVEL="INFO"  # Default log level
@@ -26,8 +25,6 @@ do
     --tfa) USE_TFA=true
       ;;
     --el0) EL0_TEST_ONLY=true
-      ;;
-    --skip-unit-tests) SKIP_UNIT_TESTS=true
       ;;
     --skip-long-running-tests) SKIP_LONG_RUNNING_TESTS=true
       ;;
@@ -76,15 +73,6 @@ fi
 if [ $SKIP_LONG_RUNNING_TESTS == true ]
 then
   HFTEST+=(--skip-long-running-tests)
-fi
-
-if [ $SKIP_UNIT_TESTS == false ]
-then
-# Run the host unit tests.
-mkdir -p "${LOG_DIR_BASE}/unit_tests"
-  ${TIMEOUT[@]} 30s "$OUT/host_fake_clang/unit_tests" \
-    --gtest_output="xml:${LOG_DIR_BASE}/unit_tests/sponge_log.xml" \
-    | tee "${LOG_DIR_BASE}/unit_tests/sponge_log.log"
 fi
 
 if [ $USE_FVP == false ]
