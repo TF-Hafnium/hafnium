@@ -983,11 +983,18 @@ TEST(memory_sharing, lend_elsewhere_after_return)
 
 	/* Let the memory be returned. */
 	run_res = ffa_run(service1_info->vm_id, 0);
-	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	/*
+	 * The lent memory has been reclaimed back. It should no longer be
+	 * accessible to Service1.
+	 */
+	run_res = ffa_run(service1_info->vm_id, 0);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 
 	/* Share the memory with a different VM after it has been returned. */
-	send_memory_and_retrieve_request(
+	handle = send_memory_and_retrieve_request(
 		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), service2_info->vm_id,
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
@@ -995,9 +1002,9 @@ TEST(memory_sharing, lend_elsewhere_after_return)
 		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
-	run_res = ffa_run(service1_info->vm_id, 0);
+	run_res = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
-	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 }
 
 /**
