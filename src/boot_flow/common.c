@@ -45,7 +45,7 @@ bool boot_flow_get_params(struct boot_params *p, const struct fdt *fdt)
  */
 bool boot_flow_update(struct mm_stage1_locked stage1_locked,
 		      const struct manifest *manifest,
-		      struct boot_params_update *p, struct memiter *cpio)
+		      struct boot_params_update *update, struct memiter *cpio)
 {
-	return plat_boot_flow_update(stage1_locked, manifest, p, cpio);
+	return plat_boot_flow_update(stage1_locked, manifest, update, cpio);
 }
