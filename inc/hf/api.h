@@ -166,3 +166,6 @@ void api_direct_resp_unwind_call_chain_resume_target(
 	struct vcpu_locked *current_locked, struct vcpu **next,
 	struct vcpu_locked *next_locked, struct ffa_value to_ret,
 	enum vcpu_state to_state);
+
+struct ffa_value api_ffa_ns_res_info_get(struct vcpu *current,
+					 struct ffa_value args);

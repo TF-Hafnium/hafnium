@@ -87,6 +87,28 @@ static_assert(MAX_INFO_REGS_ENTRIES_PER_CALL == 5,
 	      "FF-A v1.1 supports no more than 5 entries"
 	      " per FFA_PARTITION_INFO_GET_REGS64 calls");
 
+/**
+ * The size related to the descriptor fragments array for
+ * ffa_ns_res_info_get. Determines how many pages of AMDs we are
+ * able to store/allocate before determining we are out of resources.
+ */
+#define FFA_NS_RES_INFO_GET_MAX_FRAGMENTS (10)
+
+struct ffa_ns_res_info_get_state {
+	/* The current index to allocate a new page. */
+	uint8_t alloc_index;
+	/* The size that has been sent to the caller. */
+	uint32_t written_size;
+	/* Fragment array which holds the response data. */
+	void *desc_fragments[FFA_NS_RES_INFO_GET_MAX_FRAGMENTS];
+	/* Spinlock for the call. */
+	struct spinlock lock_instance;
+};
+
+static struct ffa_ns_res_info_get_state ffa_ns_res_state = {
+	.lock_instance = SPINLOCK_INIT,
+};
+
 static struct mpool api_page_pool;
 
 /**
@@ -5170,4 +5192,501 @@ int64_t api_hf_interrupt_send_ipi(uint32_t target_vcpu_id, struct vcpu *current)
 	}
 
 	return 0;
+}
+
+/**
+ * Allocates, if required, and returns the next AMD to
+ * be populated with information for ffa_ns_res_info_get.
+ */
+static bool api_ffa_ns_res_info_get_acquire_amd(
+	struct ffa_address_map_desc **amd, uint32_t amd_count)
+{
+	/* Need to take into account the header. */
+	uint8_t current_index =
+		(amd_count + 1) / FFA_NS_RES_INFO_GET_MAX_AMDS_PER_PAGE;
+	uint8_t *alloc_index = &ffa_ns_res_state.alloc_index;
+
+	/* We can only hold a limited number of pages. */
+	if (current_index >= FFA_NS_RES_INFO_GET_MAX_FRAGMENTS) {
+		dlog_error("%s: Max number of fragments reached!\n", __func__);
+		return false;
+	}
+
+	/* Check if we have reached a new index. */
+	if (current_index != *alloc_index) {
+		*alloc_index = current_index;
+
+		/* Allocate a new page. */
+		ffa_ns_res_state.desc_fragments[*alloc_index] =
+			mpool_alloc(&api_page_pool);
+		if (ffa_ns_res_state.desc_fragments[*alloc_index] == NULL) {
+			dlog_error(
+				"%s: Failed to allocate AMD @ index: %d with "
+				"amd_count: %d\n",
+				__func__, *alloc_index, amd_count);
+			return false;
+		}
+	}
+
+	/* Acquire the AMD array based on the count. */
+	*amd = (struct ffa_address_map_desc *)
+		       ffa_ns_res_state.desc_fragments[current_index];
+
+	/* Need to take into account the header. */
+	*amd += (amd_count + 1) % FFA_NS_RES_INFO_GET_MAX_AMDS_PER_PAGE;
+
+	return true;
+}
+
+/**
+ * Traverses the page table for the VM provided searching for
+ * memory regions marked as non-secure. If any are found, an
+ * AMD is updated with the appropriate information related to the
+ * VM and the memory region. This continues until no non-secure
+ * memory regions are found.
+ */
+static bool api_ffa_ns_res_info_get_vm_ns_memory(
+	struct vm_locked vm, struct ffa_resource_info_desc_header *header)
+{
+	bool success = true;
+	uintptr_t start_addr = 0;
+
+	while (success) {
+		mm_mode_t mode;
+		uintptr_t begin;
+		uintptr_t end;
+
+		success = vm_get_range_by_mode(vm, &begin, &end, MM_MODE_NS,
+					       &start_addr, &mode);
+
+		/*
+		 * Populate the AMD on success. We want to skip if
+		 * the mode is marked MM_MODE_UNOWNED. This prevents
+		 * us from creating duplicate AMDs when traversing
+		 * the share_states structure.
+		 */
+		if (success && ((mode & MM_MODE_UNOWNED) == 0)) {
+			ffa_amd_permissions_t permissions;
+			bool ret_val;
+			struct ffa_address_map_desc *amd;
+			uint64_t base_address = begin;
+			uint32_t page_count = ((end - begin) / PAGE_SIZE) + 1;
+			bool privileged = !vm.vm->el0_partition;
+
+			/* Set permissions. */
+			permissions = ffa_memory_amd_permissions_from_mm_mode(
+				mode, privileged);
+
+			/* Acquire the AMD. */
+			ret_val = api_ffa_ns_res_info_get_acquire_amd(
+				&amd, header->amd_count);
+			if (!ret_val) {
+				return false;
+			}
+
+			/* Setup the AMD. */
+			ffa_ns_res_info_get_amd_init(
+				amd, base_address, page_count, permissions,
+				vm.vm->id,
+				FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+			header->amd_count += 1;
+
+			dlog_verbose(
+				"%s: Valid base NS PA: %lx found in VM: %x\n",
+				__func__, base_address, vm.vm->id);
+		}
+	}
+
+	return true;
+}
+
+/**
+ * Traverses the share_states structure searching for non-secure
+ * memory currently in the process of being shared with VMs. If
+ * any are found, an AMD is updated with the appropriate information
+ * related to the VM and the memory region. This continues until no
+ * non-secure memory regions are found.
+ */
+static bool api_ffa_ns_res_info_get_shared_memory(
+	ffa_id_t target_id, struct ffa_resource_info_desc_header *header)
+{
+	bool success = true;
+	uint16_t memory_index = 0;
+	uint16_t receiver_index = 0;
+	uint16_t constituent_index = 0;
+
+	while (success) {
+		bool ret_val;
+		struct ffa_address_map_desc *amd;
+
+		/* Acquire the AMD. */
+		ret_val = api_ffa_ns_res_info_get_acquire_amd(
+			&amd, header->amd_count);
+		if (!ret_val) {
+			return false;
+		}
+
+		/* Upon success, AMD and indices will be updated. */
+		success = ffa_memory_get_share_states_info(
+			amd, target_id, &memory_index, &receiver_index,
+			&constituent_index);
+
+		if (success) {
+			header->amd_count += 1;
+
+			dlog_verbose(
+				"%s: Valid base NS PA: %lx shared w/ VM: %x\n",
+				__func__, amd->base_address, amd->endpoint_id);
+		}
+	}
+
+	return true;
+}
+
+/**
+ * Traverses NWd VMs searching for mapped RX/TX buffers. If any
+ * are mapped, an AMD is updated with the appropriate information
+ * related to the VM and the buffer. This continues until no mapped
+ * RX/TX buffers are found. Note that all NWd RX/TX buffers are
+ * indirectly accessible by all SPs, as such, the endpoint_id in
+ * the AMD is marked with HF_SPMC_VM_ID to indicate this.
+ */
+static bool api_ffa_ns_res_info_get_rx_tx_buffers(
+	struct ffa_resource_info_desc_header *header)
+{
+	bool success = true;
+	uint16_t current_index = 0;
+	bool check_rx_buffer = true;
+	bool buffer_mapped;
+
+	while (success) {
+		bool ret_val;
+		ffa_id_t nwd_id;
+		struct ffa_address_map_desc *amd;
+
+		/* Acquire the AMD. */
+		ret_val = api_ffa_ns_res_info_get_acquire_amd(
+			&amd, header->amd_count);
+		if (!ret_val) {
+			return false;
+		}
+
+		/* Acquire the RX/TX buffer information. */
+		success = ffa_get_nwd_rxtx_buffer_info(amd, check_rx_buffer,
+						       &buffer_mapped,
+						       &current_index, &nwd_id);
+
+		/* After checking the TX buffer we move onto the next VM. */
+		if (!check_rx_buffer) {
+			current_index++;
+		}
+
+		/*
+		 * After checking the RX buffer, we need to check the TX buffer.
+		 */
+		check_rx_buffer = !check_rx_buffer;
+
+		/*
+		 * Successful if there is a valid VM and the buffer was mapped.
+		 */
+		if (success && buffer_mapped) {
+			header->amd_count += 1;
+
+			dlog_verbose(
+				"%s: RX/TX Buffer: %lx mapped to NWd VM: %x\n",
+				__func__, amd->base_address, nwd_id);
+		}
+	}
+
+	return true;
+}
+
+/**
+ * Generates the data for ffa_ns_res_info_get. Responsible for calling
+ * the appropriate helper functions to traverse each of the relevant
+ * memory regions generating AMDs for all appropriate memory regions.
+ * Responsible for setting the resource descriptor header.
+ */
+static struct ffa_value api_ffa_ns_res_info_get_generate_data(
+	ffa_id_t target_id)
+{
+	bool success = true;
+	struct ffa_resource_info_desc_header *header;
+	bool id_found = false;
+
+	/* Indicies should be 0. */
+	assert(ffa_ns_res_state.alloc_index == 0 &&
+	       ffa_ns_res_state.written_size == 0);
+
+	/* Allocate the resource descriptor. */
+	ffa_ns_res_state.desc_fragments[ffa_ns_res_state.alloc_index] =
+		mpool_alloc(&api_page_pool);
+	if (ffa_ns_res_state.desc_fragments[ffa_ns_res_state.alloc_index] ==
+	    NULL) {
+		dlog_error("%s: Failed to allocate resource descriptor\n",
+			   __func__);
+		return ffa_error(FFA_NO_MEMORY);
+	}
+
+	/*
+	 * Initialize the resource descriptor header.
+	 * NOTE: Resource Descriptor Header = 128 bits = 16 bytes
+	 *       Address Map Descriptor = 128 bits = 16 bytes
+	 *       Resource Descriptor = Header + AMD[x] = 16 + (16 * x)
+	 *       1 Page = 4096 bytes, # of AMDs = 255 + 1 Header = 4k
+	 */
+	header = ffa_ns_res_state.desc_fragments[ffa_ns_res_state.alloc_index];
+	header->amd_size = sizeof(struct ffa_address_map_desc);
+	header->amd_count = 0;
+	header->amd_offset = sizeof(struct ffa_resource_info_desc_header);
+
+	/*
+	 * Iterate through the partitions state to inspect their page table
+	 * information.
+	 */
+	for (ffa_vm_count_t vm_idx = 0;
+	     ((vm_idx < vm_get_count()) && (!id_found)); vm_idx++) {
+		struct vm_locked vm_locked;
+		struct vm *vm = vm_find_index(vm_idx);
+
+		assert(vm != NULL);
+
+		vm_locked = vm_lock(vm);
+
+		dlog_verbose(
+			"%s: idx: %d, id: %x, vm_count: %d, target_id: %x\n",
+			__func__, vm_idx, vm_locked.vm->id, vm_get_count(),
+			target_id);
+
+		/*
+		 * If a specific target endpoint ID has been specified,
+		 * only look for that ID.
+		 */
+		id_found = (target_id != 0 && target_id == vm_locked.vm->id);
+
+		/* Traverse the page table if we have a valid ID. */
+		if (id_found || target_id == 0) {
+			success = api_ffa_ns_res_info_get_vm_ns_memory(
+				vm_locked, header);
+		}
+
+		vm_unlock(&vm_locked);
+
+		/*
+		 * If we ran into a memory issue during traversal, exit.
+		 */
+		if (!success) {
+			return ffa_error(FFA_NO_MEMORY);
+		}
+	}
+
+	/*
+	 * If the target endpoint ID was specified but couldn't be
+	 * found, invalid endpoint ID.
+	 */
+	if (!id_found && target_id != 0) {
+		dlog_error("%s: Invalid Endpoint ID: %x\n", __func__,
+			   target_id);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Iterate through the RX/TX buffers. */
+	success = api_ffa_ns_res_info_get_rx_tx_buffers(header);
+	if (!success) {
+		return ffa_error(FFA_NO_MEMORY);
+	}
+
+	/* Iterate through the share_states structure. */
+	success = api_ffa_ns_res_info_get_shared_memory(target_id, header);
+	if (!success) {
+		return ffa_error(FFA_NO_MEMORY);
+	}
+
+	return (struct ffa_value){.func = FFA_SUCCESS_64};
+}
+
+/**
+ * Copies the ffa_ns_res_info_get data from the internal
+ * descriptor fragments array, which holds the header and
+ * AMDs, to the caller's RX buffer. Note that multiple calls
+ * may be required to copy out all data.
+ */
+static struct ffa_value api_ffa_ns_res_info_get_copy_data(
+	struct vm_locked *from_locked, uint32_t *current_size,
+	uint32_t *remaining_size)
+{
+	struct ffa_resource_info_desc_header *header;
+	uint32_t total_size;
+	uint32_t amd_size;
+	void *rx_buffer;
+	uint8_t resp_index;
+
+	/* Header will always be at index 0. */
+	header = ffa_ns_res_state.desc_fragments[0];
+
+	/* Make sure we have data available. */
+	if (header == NULL) {
+		dlog_error("%s: No data has been generated\n", __func__);
+		return ffa_error(FFA_ABORTED);
+	}
+
+	/* Copy the contents of the descriptor to the RX buffer. */
+	rx_buffer = from_locked->vm->mailbox.recv;
+
+	/* Calculate the AMD size. */
+	if (mul_overflow(sizeof(struct ffa_address_map_desc), header->amd_count,
+			 &amd_size)) {
+		dlog_error("%s: Overflow occurred calulating amd_size\n",
+			   __func__);
+		return ffa_error(FFA_ABORTED);
+	}
+
+	/* Calculate the total size. */
+	if (add_overflow(sizeof(struct ffa_resource_info_desc_header), amd_size,
+			 &total_size)) {
+		dlog_error("%s: Overflow occurred calculating total_size\n",
+			   __func__);
+		return ffa_error(FFA_ABORTED);
+	}
+
+	/* Determine the size of the current transaction. */
+	*current_size = total_size - ffa_ns_res_state.written_size;
+	if (*current_size >= PAGE_SIZE) {
+		*current_size = PAGE_SIZE;
+	}
+
+	/* Calculate the current response index. */
+	resp_index = ffa_ns_res_state.written_size / PAGE_SIZE;
+
+	/* Update the rx buffer info. */
+	from_locked->vm->mailbox.recv_func = FFA_NS_RES_INFO_GET;
+	from_locked->vm->mailbox.recv_size = *current_size;
+	from_locked->vm->mailbox.recv_sender = HF_VM_ID_BASE;
+	if (!memcpy_trapped(rx_buffer, *current_size,
+			    ffa_ns_res_state.desc_fragments[resp_index],
+			    *current_size)) {
+		dlog_error("%s: Failed to copy to RX buffer of VM %x\n",
+			   __func__, from_locked->vm->id);
+		return ffa_error(FFA_ABORTED);
+	}
+
+	/* Determine if we are done sending data. */
+	ffa_ns_res_state.written_size += *current_size;
+	*remaining_size = total_size - ffa_ns_res_state.written_size;
+
+	return (struct ffa_value){.func = FFA_SUCCESS_64};
+}
+
+struct ffa_value api_ffa_ns_res_info_get(struct vcpu *current,
+					 struct ffa_value args)
+{
+	struct ffa_value ret;
+	struct vm_locked from_locked;
+	uint32_t current_size;
+	uint32_t remaining_size;
+	ffa_id_t target_id = ffa_ns_res_info_get_target_id(args);
+	uint16_t resource_type = ffa_ns_res_info_get_resource_type(args);
+	uint8_t request_type = ffa_ns_res_info_get_request_type(args);
+
+	/* Validate the target_id. */
+	if (target_id == 0 && ffa_ns_res_info_get_endpoint_valid(args)) {
+		dlog_error("%s: Valid flag set but target ID is 0\n", __func__);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (target_id != 0 && !ffa_is_sp_id(target_id)) {
+		dlog_error("%s: Invalid target ID\n", __func__);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Validate the resource type. */
+	if (resource_type > 0) {
+		dlog_error("%s: Invalid resource type\n", __func__);
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	/* Lock the spinlocks. */
+	sl_lock(&ffa_ns_res_state.lock_instance);
+	from_locked = vm_lock(current->vm);
+
+	/* Forward the call to the SPMC if needed. */
+	if (ffa_ns_res_info_get_forward(from_locked, args, &ret)) {
+		dlog_verbose("%s: Call has been forwarded\n", __func__);
+		goto unlock;
+	}
+
+	/* Determine if we need to generate the data. */
+	if (request_type == FFA_NS_RES_INFO_GET_REQ_START_FLAGS) {
+		ret = api_ffa_ns_res_info_get_generate_data(target_id);
+
+		/* If there was an issue generating the data, exit. */
+		if (ret.func != FFA_SUCCESS_64) {
+			dlog_error("%s: Failed to generate info\n", __func__);
+			goto unlock;
+		}
+	}
+
+	/* Acquire receiver's RX buffer. */
+	if (!ffa_setup_acquire_receiver_rx(from_locked, &ret)) {
+		dlog_error("%s: Failed to acquire RX buffer for VM %x\n",
+			   __func__, from_locked.vm->id);
+		ret = ffa_error(FFA_RETRY);
+		goto unlock;
+	}
+
+	/* Check if the mailbox is busy. */
+	if (vm_is_mailbox_busy(from_locked)) {
+		dlog_error("%s: RX buffer not ready\n", __func__);
+		ret = ffa_error(FFA_RETRY);
+		goto unlock;
+	}
+
+	/* Copy the data generated to the callers RX buffer. */
+	ret = api_ffa_ns_res_info_get_copy_data(&from_locked, &current_size,
+						&remaining_size);
+
+	/* If there was an issue copying the data, exit. */
+	if (ret.func != FFA_SUCCESS_64) {
+		dlog_error("%s: Failed to copy AMD descriptors\n", __func__);
+		goto unlock;
+	}
+
+	/* Update the sizes. */
+	ret.arg2 = ((uint64_t)current_size << 32) | remaining_size;
+
+unlock:
+	/* Unlock the spinlocks. */
+	vm_unlock(&from_locked);
+	sl_unlock(&ffa_ns_res_state.lock_instance);
+
+	/*
+	 * If there was any error or we are done sending data,
+	 * initialize state.
+	 */
+	if (ret.func != FFA_SUCCESS_64 || remaining_size == 0) {
+		ffa_ns_res_info_get_state_reset();
+	}
+
+	return ret;
+}
+
+/**
+ * Frees all allocated fragments and resets the state
+ * information for ffa_ns_res_info_get.
+ */
+void ffa_ns_res_info_get_state_reset(void)
+{
+	sl_lock(&ffa_ns_res_state.lock_instance);
+
+	for (uint8_t i = 0; i < FFA_NS_RES_INFO_GET_MAX_FRAGMENTS; i++) {
+		if (ffa_ns_res_state.desc_fragments[i] != NULL) {
+			mpool_free(&api_page_pool,
+				   ffa_ns_res_state.desc_fragments[i]);
+		}
+	}
+
+	ffa_ns_res_state.alloc_index = 0;
+	ffa_ns_res_state.written_size = 0;
+
+	sl_unlock(&ffa_ns_res_state.lock_instance);
 }
