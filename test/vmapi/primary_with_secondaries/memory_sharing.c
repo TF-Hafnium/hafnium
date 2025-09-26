@@ -1382,9 +1382,15 @@ TEST_PRECONDITION(memory_sharing, lend_normal_memory_as_device_and_lose_access,
 	run_res = ffa_run(service1_info->vm_id, 0);
 	EXPECT_TRUE(exception_received(&run_res, mb.recv));
 
-	/* Ensure that memory in service2 remains the same. */
-	run_res = ffa_run(service2_info->vm_id, 0);
-	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+	/*
+	 * It cannot be guaranteed that Service2 will have access to the memory
+	 * region that was being attempted to being lent by Service1. Consider
+	 * the scenario where Service1 is a S-EL0 partition. As soon as
+	 * Service1 SP tries to access memory it already lent, it would cause
+	 * an exception and eventually Service1 SP would be aborted.
+	 * Consequently, SPMC will reclaim the memory region which means the
+	 * memory retrieve request by Service2 will be unsuccessful.
+	 */
 }
 
 /**
