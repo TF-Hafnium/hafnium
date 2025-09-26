@@ -13,6 +13,7 @@
 #include "hf/arch/mmu.h"
 #include "hf/arch/plat/smc.h"
 #include "hf/arch/timer.h"
+#include "hf/arch/vcpu.h"
 #include "hf/arch/vmid_base.h"
 
 #include "hf/api.h"
@@ -61,15 +62,6 @@
  * The Client ID field within X7 for an SMC64 call.
  */
 #define CLIENT_ID_MASK UINT64_C(0xffff)
-
-/**
- * Returns a reference to the currently executing vCPU.
- */
-static struct vcpu *current(void)
-{
-	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	return (struct vcpu *)read_msr(tpidr_el2);
-}
 
 /**
  * Saves the state of per-vCPU peripherals, such as the arch timer, and
@@ -608,7 +600,7 @@ static void vcpu_update_virtual_interrupts(struct vcpu *vcpu)
 	struct vcpu_locked vcpu_locked;
 
 	if (vcpu == NULL) {
-		vcpu = current();
+		vcpu = arch_vcpu_get_current();
 	}
 
 	/* Only update to those at the virtual instance. */
@@ -951,7 +943,7 @@ struct vcpu *irq_lower(void)
 #if SECURE_WORLD == 1
 	struct vcpu *next = NULL;
 
-	ffa_interrupts_handle_secure_interrupt(current(), &next);
+	ffa_interrupts_handle_secure_interrupt(arch_vcpu_get_current(), &next);
 
 	/*
 	 * Since we are in interrupt context, set the bit for the
@@ -970,7 +962,7 @@ struct vcpu *irq_lower(void)
 	 *
 	 * TODO: Only switch when the interrupt isn't for the current VM.
 	 */
-	return api_preempt(current());
+	return api_preempt(arch_vcpu_get_current());
 #endif
 }
 
@@ -993,7 +985,7 @@ struct vcpu *fiq_lower(void)
 {
 #if SECURE_WORLD == 1
 	struct vcpu_locked current_locked;
-	struct vcpu *current_vcpu = current();
+	struct vcpu *current_vcpu = arch_vcpu_get_current();
 	uint32_t intid;
 
 	intid = get_highest_pending_g0_interrupt_id();
@@ -1179,7 +1171,7 @@ struct ffa_value ffa_partition_abort(struct vcpu *current, struct vcpu **next)
 
 struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 {
-	struct vcpu *vcpu = current();
+	struct vcpu *vcpu = arch_vcpu_get_current();
 	struct vcpu_fault_info info;
 	struct vcpu *new_vcpu = NULL;
 	uintreg_t ec = GET_ESR_EC(esr);
@@ -1322,7 +1314,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
  */
 struct vcpu *handle_system_register_access(uintreg_t esr_el2)
 {
-	struct vcpu *vcpu = current();
+	struct vcpu *vcpu = arch_vcpu_get_current();
 	struct vcpu *new_vcpu = NULL;
 	ffa_id_t vm_id = vcpu->vm->id;
 	uintreg_t ec = GET_ESR_EC(esr_el2);

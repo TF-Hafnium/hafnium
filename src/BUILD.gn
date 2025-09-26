@@ -56,7 +56,6 @@ source_set("src_testable") {
     "partition_pkg.c",
     "sp_pkg.c",
     "timer_mgmt.c",
-    "vcpu.c",
   ]
 
   deps = [
@@ -68,6 +67,7 @@ source_set("src_testable") {
     ":mm",
     ":panic",
     ":std",
+    ":vcpu",
     ":vm",
     "//src/arch/${plat_arch}:arch",
     "//src/arch/${plat_arch}/hypervisor",
@@ -99,6 +99,11 @@ source_set("mm") {
 source_set("vm") {
   public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
   sources = [ "vm.c" ]
+}
+
+source_set("vcpu") {
+  public_configs = [ "//src/arch/${plat_arch}:arch_config" ]
+  sources = [ "vcpu.c" ]
 }
 
 # Standard library functions.

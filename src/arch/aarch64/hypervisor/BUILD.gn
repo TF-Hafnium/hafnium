@@ -19,6 +19,12 @@ source_set("other_world") {
   deps = [ "//src:vm" ]
 }
 
+source_set("vcpu") {
+  public_configs = [ "//src/arch/aarch64:config" ]
+  sources = [ "vcpu.c" ]
+  deps = [ "//src:vcpu" ]
+}
+
 # Hypervisor specific code.
 source_set("hypervisor") {
   public_configs = [
@@ -51,6 +57,7 @@ source_set("hypervisor") {
 
   deps = [
     ":offsets",
+    ":vcpu",
     "//src/arch/aarch64:arch",
     "//src/arch/aarch64:entry",
     "//src/arch/aarch64:smc",

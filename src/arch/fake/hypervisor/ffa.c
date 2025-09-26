@@ -694,3 +694,8 @@ bool arch_vm_get_range_by_mode(struct vm_locked vm_locked,
 
 	return false;
 }
+
+struct vcpu *arch_vcpu_get_current(void)
+{
+	return NULL;
+}
