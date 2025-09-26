@@ -181,8 +181,5 @@ void one_time_init(void)
 	/* Perform platform specfic FF-A initialization. */
 	ffa_init();
 
-	/* Initialise the API page pool. ppool will be empty from now on. */
-	api_init();
-
 	dlog_info("Hafnium initialisation completed\n");
 }

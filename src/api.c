@@ -111,15 +111,6 @@ static struct ffa_ns_res_info_get_state ffa_ns_res_state = {
 };
 
 /**
- * Initialises the API page pool by taking ownership of the contents of the
- * given page pool.
- */
-void api_init(void)
-{
-	/* TODO: drop. */
-}
-
-/**
  * Get target VM vCPU:
  * If VM is UP then return first vCPU.
  * If VM is MP then return vCPU whose index matches current CPU index.
