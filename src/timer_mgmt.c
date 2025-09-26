@@ -10,11 +10,9 @@
 
 #include "hf/arch/timer.h"
 
-#include "hf/api.h"
-#include "hf/check.h"
 #include "hf/cpu.h"
-#include "hf/std.h"
 #include "hf/vcpu.h"
+#include "hf/vm.h"
 
 static void timer_list_add_vcpu(struct cpu *cpu, struct vcpu *vcpu)
 {

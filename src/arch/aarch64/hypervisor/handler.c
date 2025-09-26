@@ -16,6 +16,7 @@
 #include "hf/arch/vcpu.h"
 #include "hf/arch/vmid_base.h"
 
+#include "hf/abi.h"
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/cpu.h"

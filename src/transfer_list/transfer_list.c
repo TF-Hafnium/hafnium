@@ -14,10 +14,8 @@
 
 #include "hf/transfer_list.h"
 
-#include "hf/assert.h"
 #include "hf/dlog.h"
 #include "hf/std.h"
-#include "hf/string.h"
 
 void transfer_list_dump(struct transfer_list_header *tl)
 {

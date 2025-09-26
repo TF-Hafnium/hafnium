@@ -9,6 +9,7 @@
 #include "hf/ffa/indirect_messaging.h"
 
 #include "hf/ffa_internal.h"
+#include "hf/std.h"
 #include "hf/vm.h"
 
 /**

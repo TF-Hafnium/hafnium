@@ -21,7 +21,6 @@
 #include "hf/ffa_internal.h"
 #include "hf/ffa_memory_internal.h"
 #include "hf/mm.h"
-#include "hf/mpool.h"
 #include "hf/panic.h"
 #include "hf/plat/memory_alloc.h"
 #include "hf/plat/memory_protect.h"

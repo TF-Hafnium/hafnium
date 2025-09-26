@@ -13,6 +13,7 @@
 #include "hf/api.h"
 #include "hf/ffa/init.h"
 #include "hf/ffa_internal.h"
+#include "hf/std.h"
 #include "hf/vm.h"
 
 bool ffa_indirect_msg_is_supported(struct vm_locked sender_locked,

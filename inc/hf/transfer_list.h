@@ -17,8 +17,6 @@
 
 #include <stdint.h>
 
-#include "hf/arch/types.h"
-
 #define TRANSFER_LIST_SIGNATURE 0x4a0fb10bU
 #define TRANSFER_LIST_VERSION 0x0001U
 

@@ -8,11 +8,9 @@
 
 #pragma once
 
-#include "hf/cpu.h"
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
-#include "vmapi/hf/call.h"
 #include "vmapi/hf/ffa.h"
 
 static inline struct ffa_value api_ffa_interrupt_return(uint32_t id)

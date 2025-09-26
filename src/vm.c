@@ -11,18 +11,12 @@
 #include "hf/arch/spinlock.h"
 #include "hf/arch/vm.h"
 
-#include "hf/api.h"
-#include "hf/assert.h"
 #include "hf/check.h"
-#include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
 #include "hf/layout.h"
-#include "hf/plat/iommu.h"
 #include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
-
-#include "vmapi/hf/call.h"
 
 static struct vm vms[MAX_VMS];
 static struct vm other_world;

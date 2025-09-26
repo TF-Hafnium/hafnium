@@ -9,12 +9,9 @@
 #include "hf/fdt_handler.h"
 
 #include "hf/check.h"
-#include "hf/cpu.h"
 #include "hf/dlog.h"
 #include "hf/fdt.h"
 #include "hf/mm.h"
-#include "hf/plat/memory_alloc.h"
-#include "hf/std.h"
 
 /**
  * Initializes the FDT struct with the pointer to the FDT data (header) in

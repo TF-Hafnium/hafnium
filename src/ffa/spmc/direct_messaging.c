@@ -13,6 +13,7 @@
 
 #include "hf/api.h"
 #include "hf/bits.h"
+#include "hf/call.h"
 #include "hf/ffa/interrupts.h"
 #include "hf/ffa_internal.h"
 #include "hf/plat/interrupts.h"

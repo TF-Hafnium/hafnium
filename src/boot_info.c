@@ -10,11 +10,8 @@
 
 #include "hf/arch/mm.h"
 
-#include "hf/assert.h"
 #include "hf/dlog.h"
-#include "hf/ffa.h"
 #include "hf/memiter.h"
-#include "hf/mm.h"
 #include "hf/std.h"
 
 #include "vmapi/hf/ffa.h"

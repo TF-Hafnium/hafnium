@@ -10,14 +10,11 @@
 
 #include <stdint.h>
 
-#include "hf/arch/std.h"
-
 #include "hf/addr.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/mm.h"
 #include "hf/sp_pkg.h"
-#include "hf/std.h"
 #include "hf/transfer_list.h"
 
 static void dump_partition_package(struct partition_pkg *pkg)

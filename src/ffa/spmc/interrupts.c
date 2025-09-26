@@ -11,6 +11,7 @@
 #include "hf/arch/gicv3.h"
 #include "hf/arch/host_timer.h"
 
+#include "hf/abi.h"
 #include "hf/api.h"
 #include "hf/check.h"
 #include "hf/ffa/direct_messaging.h"
