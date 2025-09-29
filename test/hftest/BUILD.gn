@@ -272,11 +272,11 @@ source_set("mm") {
   sources = [ "mm.c" ]
 
   deps = [
+    "${plat_memory_alloc}",
     "//src:layout",
     "//src:mm",
     "//src/arch/${plat_arch}:arch",
     "//src/arch/${plat_arch}/hftest:mm",
-    "//src/memory_alloc:memory_alloc",
   ]
 }
 

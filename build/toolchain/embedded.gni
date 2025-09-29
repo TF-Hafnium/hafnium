@@ -385,7 +385,7 @@ template("aarch64_toolchains") {
     cpu = "${invoker.cpu}+fp"
     boot_flow = "//src/arch/fake:boot_flow"
     iommu = "//src/iommu:absent"
-    memory_alloc = "//src/memory_alloc:memory_alloc"
+    memory_alloc = "//test/hftest/memory_alloc:memory_alloc"
     memory_protect = "//src/memory_protect:absent"
     stdout = "//src/arch/aarch64/hftest:stdout"
 
