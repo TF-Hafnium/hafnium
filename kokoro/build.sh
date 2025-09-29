@@ -21,23 +21,42 @@ run_tests ()
 		TEST_ARGS+=(--skip-long-running-tests)
 	fi
 
-	# Local build scenario: both flags true -> run unit then QEMU.
-	if [ "${RUN_UNIT_ONLY:-false}" == "true" ] && [ "${RUN_QEMU_ONLY:-false}" == "true" ]
-	then
-		./kokoro/unit_tests.sh || exit 1
-		exec ./kokoro/test.sh "${TEST_ARGS[@]}"
-	fi
-
 	# Jenkins CI build: RUN_UNIT_ONLY=true  -> run just host unit tests
 	if [ "${RUN_UNIT_ONLY:-false}" == "true" ]
 	then
-		exec ./kokoro/unit_tests.sh
+		./kokoro/unit_tests.sh || exit 1
 	fi
 
 	# Jenkins CI build: RUN_QEMU_ONLY=true  -> run QEMU tests
 	if [ "${RUN_QEMU_ONLY:-false}" == "true" ]
 	then
-		exec ./kokoro/test.sh ${TEST_ARGS[@]}
+		./kokoro/test.sh "${TEST_ARGS[@]}" || exit 1
+	fi
+
+	# Jenkins CI build: RUN_SPMC_ONLY=true  -> run SPMC tests
+	if [ "${RUN_SPMC_ONLY:-false}" == "true" ]
+	then
+		./kokoro/test_spmc.sh || exit 1
+	fi
+
+	# Jenkins CI build: RUN_EL3_SPMC_ONLY=true  -> run EL3_SPMC tests
+	if [ "${RUN_EL3_SPMC_ONLY:-false}" == "true" ]
+	then
+		./kokoro/test_el3_spmc.sh || exit 1
+	fi
+
+	# Local/dev run: if no explicit *_ONLY flags are set, run all tests.
+	if [ "${RUN_UNIT_ONLY:-false}" == "false" ] \
+          && [ "${RUN_QEMU_ONLY:-false}" == "false" ] \
+          && [ "${RUN_SPMC_ONLY:-false}" == "false" ] \
+          && [ "${RUN_EL3_SPMC_ONLY:-false}" == "false" ]
+        then
+	# Run all the test scripts in a flow. This purely helps in developer
+	# testing of local Hafnium patches.
+		./kokoro/unit_tests.sh      || exit 1
+		./kokoro/test.sh "${TEST_ARGS[@]}" || exit 1
+		./kokoro/test_el3_spmc.sh   || exit 1
+		./kokoro/test_spmc.sh       || exit 1
 	fi
 }
 
@@ -67,16 +86,18 @@ else
 	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS true
 	default_value USE_TFA false
 	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD false
-	default_value RUN_UNIT_ONLY true
-	default_value RUN_QEMU_ONLY true
+	default_value RUN_SPMC_ONLY false
+	default_value RUN_EL3_SPMC_ONLY false
+	default_value RUN_UNIT_ONLY false
+	default_value RUN_QEMU_ONLY false
 fi
 
 # If HAFNIUM_HERMETIC_BUILD is "true", relaunch this script inside a container.
 # The 'run_in_container.sh' script will set the variable value to 'inside' to
 # avoid recursion.
-if [ "${HAFNIUM_HERMETIC_BUILD}" == "true" ]
+if [ "${HAFNIUM_HERMETIC_BUILD:-}" == "true" ]
 then
-	exec "${ROOT_DIR}/build/run_in_container.sh" "$(get_script_path)" $@
+	exec "${ROOT_DIR}/build/run_in_container.sh" "$(get_script_path)" "$@"
 fi
 
 USE_FVP=false
