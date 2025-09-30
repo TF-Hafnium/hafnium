@@ -35,12 +35,6 @@ function abs_path() {
 	return 0
 }
 
-# Returns true if the environment contains Kokoro build variables.
-function is_kokoro_build() {
-	[ -v KOKORO_JOB_NAME ]
-	return $?
-}
-
 # Returns true if the environment contains Jenkins build variables.
 function is_jenkins_build() {
 	[ -v JENKINS_HOME ]
@@ -117,31 +111,4 @@ function init_build() {
 	##
 
 	REPO="${ROOT_DIR}/prebuilts/generic/repo/repo"
-
-	##
-	## Workarounds for Kokoro+Repo builds.
-	##
-	if is_kokoro_build && is_repo_build
-	then
-		# Kokoro does not correctly initialize the `.repo` folder which
-		# causes `is_repo_dirty` checks to fail. We check out the
-		# manifest as one of the projects and use it to initialize the
-		# `.repo` folder here.
-		(cd "${ROOT_DIR}/.repo_manifest" && git branch master)
-		(cd "${ROOT_DIR}" && "${REPO}" init -u .repo_manifest)
-		# Kokoro does not support '<linkfile>' manifest tags. Parse the
-		# manifest and symlink files here.
-		"$(get_script_dir)/symlink_repo.py" "${ROOT_DIR}"
-	fi
-
-	##
-	## Temporary workaround for b/152398137 (all symlinks dirty on Kokoro).
-	## The `is_kokoro_build` check does not work inside container builds.
-	## Use an environment variable with HAFNIUM_ prefix to pass that
-	## information into the container (run_in_container.sh propagates them).
-	##
-	if is_kokoro_build
-	then
-		export HAFNIUM_IGNORE_SUBMODULE_STATUS=true
-	fi
 }

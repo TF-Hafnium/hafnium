@@ -66,14 +66,7 @@ source "$(dirname ${BASH_SOURCE[0]})/../build/bash/common.inc"
 init_build
 
 # Assign default values to variables.
-if is_kokoro_build
-then
-	# Default config for Kokoro builds.
-	default_value HAFNIUM_HERMETIC_BUILD true
-	default_value HAFNIUM_SKIP_LONG_RUNNING_TESTS false
-	default_value USE_TFA true
-	default_value HAFNIUM_RUN_ASSERT_DISABLED_BUILD true
-elif is_jenkins_build
+if is_jenkins_build
 then
 	# Default config for Jenkins builds.
 	default_value HAFNIUM_HERMETIC_BUILD false
