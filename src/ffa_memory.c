@@ -1340,21 +1340,20 @@ out:
 /**
  * Clears a region of physical memory by overwriting it with zeros. The data is
  * flushed from the cache so the memory has been cleared across the system.
+ *
+ * This function should be called with the rollback capability of the memory
+ * allocator.
  */
 static bool ffa_clear_memory_constituents(
 	mm_mode_t security_state_mode,
 	struct ffa_memory_region_constituent **fragments,
 	const uint32_t *fragment_constituent_counts, uint32_t fragment_count)
 {
+	/* Ensure rollback is already active */
+	assert(!memory_alloc_rollback_init());
+
 	uint32_t i;
 	bool ret = false;
-
-	/*
-	 * Create a local pool so any freed memory can't be used by another
-	 * thread. This is to ensure each constituent that is mapped can be
-	 * unmapped again afterwards.
-	 */
-	// TODO: think about this case if it is needed.
 
 	/* Iterate over the memory region constituents within each fragment. */
 	for (i = 0; i < fragment_count; ++i) {
@@ -1368,18 +1367,16 @@ static bool ffa_clear_memory_constituents(
 
 			if (!clear_memory(begin, end, security_state_mode)) {
 				/*
-				 * api_clear_memory will defrag on failure, so
-				 * no need to do it here.
+				 * clear_memory() already performs any required
+				 * page-table cleanup on failure.
 				 */
-				goto out;
+				return false;
 			}
 		}
 	}
 
 	ret = true;
 
-out:
-	// mpool_fini(&local_page_pool);
 	return ret;
 }
 
@@ -1538,11 +1535,14 @@ static struct ffa_value ffa_send_check_update(
 	}
 
 	/*
-	 * Create a local pool so any freed memory can't be used by another
-	 * thread. This is to ensure the original mapping can be restored if the
-	 * clear fails.
+	 * Begin a rollback section. Any memory freed between
+	 * memory_alloc_rollback_init() and memory_alloc_rollback_fini()
+	 * is held in the CPU-local rollback pool instead of being returned
+	 * to the global allocator. This ensures that the pages freed during
+	 * this operation cannot be reused by another CPU before the operation
+	 * completes, allowing the partial update to be rolled back safely.
 	 */
-	// TODO: Revisit this aspect.
+	CHECK(memory_alloc_rollback_init());
 
 	/*
 	 * First reserve all required memory for the new page table entries
@@ -1604,7 +1604,10 @@ static struct ffa_value ffa_send_check_update(
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
-	// mpool_fini(&local_page_pool);
+	/*
+	 * The rollback mechanism of the memory allocator is not needed anymore.
+	 */
+	CHECK(memory_alloc_rollback_fini());
 
 	/*
 	 * Tidy up the page table by reclaiming failed mappings (if there was an
@@ -1678,11 +1681,15 @@ struct ffa_value ffa_retrieve_check_update(
 	}
 
 	/*
-	 * Create a local pool so any freed memory can't be used by
-	 * another thread. This is to ensure the original mapping can be
-	 * restored if the clear fails.
+	 * Begin a rollback section. Any memory freed between
+	 * memory_alloc_rollback_init() and memory_alloc_rollback_fini()
+	 * is held in the CPU-local rollback pool instead of being returned
+	 * to the global allocator. This ensures that the pages freed during
+	 * this operation cannot be reused by another CPU before the operation
+	 * completes, allowing the partial update to be rolled back safely.
 	 */
-	// TODO; think about this aspect.
+	CHECK(memory_alloc_rollback_init());
+
 	/*
 	 * Memory retrieves from the NWd VMs don't require update to S2 PTs on
 	 * retrieve request.
@@ -1730,7 +1737,10 @@ struct ffa_value ffa_retrieve_check_update(
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
-	// mpool_fini(&local_page_pool);
+	/*
+	 * The rollback mechanism of the memory allocator is not needed anymore.
+	 */
+	CHECK(memory_alloc_rollback_fini());
 
 	/*
 	 * Tidy up the page table by reclaiming failed mappings (if there was an
@@ -1763,11 +1773,13 @@ static struct ffa_value ffa_relinquish_check_update(
 	}
 
 	/*
-	 * Create a local pool so any freed memory can't be used by another
-	 * thread. This is to ensure the original mapping can be restored if the
-	 * clear fails.
+	 * Initialise the memory allocator rollback mechanism, such that
+	 * another thread. This is to ensure the original mapping can be
+	 * restored if the clear fails.
+	 * Between now and memory_alloc_rollback_fini all memory freed
+	 * will be cached, to prevent other threads from using it.
 	 */
-	/* TODO: revisit this. */
+	CHECK(memory_alloc_rollback_init());
 
 	if (map_action != MAP_ACTION_NONE) {
 		clearing_mode = orig_from_mode;
@@ -1810,14 +1822,6 @@ static struct ffa_value ffa_relinquish_check_update(
 						    fragment_constituent_counts,
 						    fragment_count)) {
 		if (map_action != MAP_ACTION_NONE) {
-			/*
-			 * On failure, roll back by returning memory to the
-			 * sender. This may allocate pages which were previously
-			 * freed into `local_page_pool` by the call above, but
-			 * will never allocate more pages than that so can never
-			 * fail.
-			 * TODO: update comment.
-			 */
 			CHECK(ffa_region_group_identity_map(
 				      from_locked, fragments,
 				      fragment_constituent_counts,
@@ -1832,7 +1836,10 @@ static struct ffa_value ffa_relinquish_check_update(
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
-	//	mpool_fini(&local_page_pool);
+	/*
+	 * The rollback mechanism of the memory allocator is not needed anymore.
+	 */
+	CHECK(memory_alloc_rollback_fini());
 
 	/*
 	 * Tidy up the page table by reclaiming failed mappings (if there was an

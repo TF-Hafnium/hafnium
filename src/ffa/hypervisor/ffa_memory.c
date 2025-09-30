@@ -539,11 +539,6 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 
 	/* Check whether the memory send operation is now ready to complete. */
 	if (share_state_sending_complete(share_states, share_state)) {
-		/*
-		 * Use a local page pool so that we can roll back if necessary.
-		 */
-		// TODO: think about this case.
-		//
 		ret = ffa_memory_send_complete(from_locked, share_states,
 					       share_state,
 					       &share_state->sender_orig_mode);
@@ -611,7 +606,6 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 			 */
 		}
 
-		// mpool_fini(&local_);
 	} else {
 		uint32_t next_fragment_offset =
 			share_state_next_fragment_offset(share_states,
