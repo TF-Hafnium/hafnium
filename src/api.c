@@ -1882,11 +1882,14 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	}
 
 	/*
-	 * Create a local pool so any freed memory can't be used by another
-	 * thread. This is to ensure the original mapping can be restored if any
-	 * stage of the process fails.
+	 * Initialise the memory allocator rollback mechanism. Any memory freed
+	 * between this point and memory_alloc_rollback_fini() will be retained
+	 * in the CPU-local rollback pool rather than returned to the global
+	 * allocator.
+	 * This allows the original page-table state to be restored if a later
+	 * step in this operation fails.
 	 */
-	/* TODO: think about this case. */
+	CHECK(memory_alloc_rollback_init());
 
 	mm_stage1_locked = mm_lock_stage1();
 
@@ -1912,7 +1915,10 @@ struct ffa_value api_ffa_rxtx_map(ipaddr_t send, ipaddr_t recv,
 	}
 
 exit:
-	// mpool_fini(&local_page_pool);
+	/*
+	 * The rollback mechanism of the memory allocator is not needed anymore.
+	 */
+	CHECK(memory_alloc_rollback_fini());
 	mm_unlock_stage1(&mm_stage1_locked);
 	vm_unlock(&owner_vm_locked);
 
@@ -4978,11 +4984,14 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	}
 
 	/*
-	 * Create a local pool so any freed memory can't be used by another
-	 * thread. This is to ensure the original mapping can be restored if any
-	 * stage of the process fails.
+	 * Initialise the memory allocator rollback mechanism. Any memory freed
+	 * between this point and memory_alloc_rollback_fini() will be retained
+	 * in the CPU-local rollback pool rather than returned to the global
+	 * allocator.
+	 * This allows the original page-table state to be restored if a later
+	 * step in this operation fails.
 	 */
-	/* TODO: think about this previous comment. */
+	CHECK(memory_alloc_rollback_init());
 
 	vm_locked = vm_lock(current->vm);
 
@@ -5062,12 +5071,10 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 out:
-	/**
-	 * TODO: In this specific case should how should we consider giving back
-	 * to the base ppool.
+	/*
+	 * The rollback mechanism of the memory allocator is not needed anymore.
 	 */
-	// mpool_fini(&local_page_pool);
-
+	CHECK(memory_alloc_rollback_fini());
 	vm_unlock(&vm_locked);
 
 	return ret;
