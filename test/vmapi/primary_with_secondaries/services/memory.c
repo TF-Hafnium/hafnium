@@ -646,7 +646,7 @@ TEST_SERVICE(ffa_memory_return)
 		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), target_id,
 		composite->constituents, composite->constituent_count, 0, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
 		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
@@ -806,7 +806,7 @@ TEST_SERVICE(ffa_donate_twice)
 		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), target_id,
 		&constituent, 1, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_X, FFA_MEMORY_NOT_SPECIFIED_MEM,
+		FFA_INSTRUCTION_ACCESS_NX, FFA_MEMORY_NOT_SPECIFIED_MEM,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 		FFA_MEMORY_CACHE_WRITE_BACK);
 
@@ -1194,21 +1194,23 @@ TEST_SERVICE(ffa_lend_invalid_source)
 			send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
 			service2(recv_buf)->vm_id, composite->constituents,
 			composite->constituent_count, 0, 0, FFA_DATA_ACCESS_RW,
-			FFA_INSTRUCTION_ACCESS_X, FFA_MEMORY_NOT_SPECIFIED_MEM,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			FFA_MEMORY_NOT_SPECIFIED_MEM,
 			FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
 			NULL, NULL, &msg_size),
 		0);
 	EXPECT_FFA_ERROR(ffa_mem_lend(msg_size, msg_size), FFA_DENIED);
 
 	/* Ensure we cannot share from the primary to another secondary. */
-	EXPECT_EQ(ffa_memory_region_init_single_receiver(
-			  send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
-			  service2(recv_buf)->vm_id, composite->constituents,
-			  composite->constituent_count, 0, 0,
-			  FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_X,
-			  FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-			  FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
-		  0);
+	EXPECT_EQ(
+		ffa_memory_region_init_single_receiver(
+			send_buf, HF_MAILBOX_SIZE, HF_PRIMARY_VM_ID,
+			service2(recv_buf)->vm_id, composite->constituents,
+			composite->constituent_count, 0, 0, FFA_DATA_ACCESS_RW,
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
+			FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+			FFA_MEMORY_INNER_SHAREABLE, NULL, NULL, &msg_size),
+		0);
 	EXPECT_FFA_ERROR(ffa_mem_share(msg_size, msg_size), FFA_DENIED);
 
 	ffa_yield();
