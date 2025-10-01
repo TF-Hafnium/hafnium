@@ -3031,7 +3031,8 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 	enum ffa_data_access requested_data_access,
 	enum ffa_instruction_access sent_instruction_access,
 	enum ffa_instruction_access requested_instruction_access,
-	ffa_memory_access_permissions_t *permissions, bool multiple_borrowers)
+	ffa_memory_access_permissions_t *permissions, bool multiple_borrowers,
+	mm_mode_t sender_orig_mode)
 {
 	switch (sent_data_access) {
 	case FFA_DATA_ACCESS_NOT_SPECIFIED:
@@ -3102,15 +3103,35 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
 		[[fallthrough]];
 	case FFA_MEM_DONATE_64:
 	case FFA_MEM_DONATE_32:
-		if (!multiple_borrowers &&
-		    requested_instruction_access ==
+		if (!multiple_borrowers) {
+			if (requested_instruction_access ==
 			    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED) {
-			dlog_verbose(
-				"%s: for lend/donate with single borrower "
-				"instruction permissions must be speficified "
-				"by borrower\n",
-				__func__);
-			return ffa_error(FFA_INVALID_PARAMETERS);
+				dlog_verbose(
+					"%s: for lend/donate with single "
+					"borrower instruction permissions must "
+					"be speficified by borrower\n",
+					__func__);
+				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
+
+			/*
+			 * In a memory lend/donate when the memory is NS, SP
+			 * shall not be able to use X permissions.
+			 * If the update to the PAS address space is supported
+			 * then X permissions is allowed, as it will be changed
+			 * to Secure memory.
+			 */
+			if ((sender_orig_mode &
+			     ffa_memory_get_other_world_mode()) != 0U &&
+			    !arch_memory_protect_is_supported() &&
+			    requested_instruction_access ==
+				    FFA_INSTRUCTION_ACCESS_X) {
+				dlog_verbose(
+					"%s: X permissions is not permitted in "
+					"NS memory.\n",
+					__func__);
+				return ffa_error(FFA_INVALID_PARAMETERS);
+			}
 		}
 		break;
 	default:
@@ -3172,7 +3193,8 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	struct ffa_memory_region *memory_region,
 	struct ffa_memory_region *retrieve_request, ffa_id_t to_vm_id,
 	ffa_memory_access_permissions_t *permissions,
-	struct ffa_memory_access **receiver_ret, uint32_t func_id)
+	struct ffa_memory_access **receiver_ret, uint32_t func_id,
+	mm_mode_t sender_orig_mode)
 {
 	uint32_t retrieve_receiver_index;
 	bool bypass_multi_receiver_check =
@@ -3299,7 +3321,7 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 			sent_permissions.instruction_access,
 			requested_permissions.instruction_access,
 			found_to_id ? permissions : NULL,
-			region_receiver_count > 1);
+			region_receiver_count > 1, sender_orig_mode);
 
 		if (ret.func != FFA_SUCCESS_32) {
 			return ret;
@@ -3675,7 +3697,8 @@ static struct ffa_value ffa_partition_retrieve_request(
 	 */
 	ret = ffa_memory_retrieve_validate_memory_access_list(
 		memory_region, retrieve_request, receiver_id, &permissions,
-		&receiver, share_state->share_func);
+		&receiver, share_state->share_func,
+		share_state->sender_orig_mode);
 	if (ret.func != FFA_SUCCESS_32) {
 		return ret;
 	}
