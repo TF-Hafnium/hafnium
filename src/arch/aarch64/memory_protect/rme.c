@@ -89,3 +89,8 @@ bool arch_memory_unprotect(paddr_t begin, paddr_t end)
 
 	return ret.func == SMCCC_OK;
 }
+
+bool arch_memory_protect_is_supported(void)
+{
+	return is_arch_feat_rme_supported();
+}

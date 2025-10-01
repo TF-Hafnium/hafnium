@@ -28,3 +28,8 @@ bool arch_memory_unprotect(paddr_t begin, paddr_t end)
 
 	return true;
 }
+
+bool arch_memory_protect_is_supported(void)
+{
+	return false;
+}

@@ -19,3 +19,5 @@ struct ffa_value arch_memory_protect(paddr_t begin, paddr_t end,
 				     paddr_t *last_protected_pa);
 
 bool arch_memory_unprotect(paddr_t begin, paddr_t end);
+
+bool arch_memory_protect_is_supported(void);
