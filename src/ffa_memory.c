@@ -2851,6 +2851,7 @@ static struct ffa_value ffa_memory_retrieve_is_memory_access_valid(
  * - If set returns FFA_SUCCESS if the descriptor contains the permissions
  *   to the caller of FFA_MEM_RETRIEVE_REQ and they are valid. Other permissions
  *   are ignored, if provided.
+ * - Outputs permissions and receiver's memory access descriptor.
  */
 static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 	struct ffa_memory_region *memory_region,
@@ -2908,7 +2909,7 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 		ffa_id_t current_receiver_id =
 			retrieve_request_receiver->receiver_permissions
 				.receiver;
-		struct ffa_memory_access *receiver;
+		struct ffa_memory_access *sender_descriptor_receiver;
 		uint32_t mem_region_receiver_index;
 		bool permissions_RO;
 		bool clear_memory_flags;
@@ -2950,27 +2951,32 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 
 		if (mem_region_receiver_index ==
 		    memory_region->receiver_count) {
-			dlog_verbose("%s: receiver %x not found\n", __func__,
-				     current_receiver_id);
+			dlog_verbose(
+				"%s: receiver %x not found in descriptor from "
+				"the memory sender\n",
+				__func__, current_receiver_id);
 			return ffa_error(FFA_DENIED);
 		}
 
-		receiver = ffa_memory_region_get_receiver(
+		sender_descriptor_receiver = ffa_memory_region_get_receiver(
 			memory_region, mem_region_receiver_index);
-		assert(receiver != NULL);
+		assert(sender_descriptor_receiver != NULL);
 
-		sent_permissions = receiver->receiver_permissions.permissions;
+		sent_permissions = sender_descriptor_receiver
+					   ->receiver_permissions.permissions;
 
 		if (found_to_id) {
 			retrieve_receiver_index = i;
 
-			*receiver_ret = receiver;
+			*receiver_ret = sender_descriptor_receiver;
 		}
 
 		/*
 		 * Check if retrieve request memory access list is valid:
 		 * - The retrieve request complies with the specification.
 		 * - Permissions are within those specified by the sender.
+		 * - Update `permissions` with the permissions to set in the
+		 *   retriever's PTs.
 		 */
 		ret = ffa_memory_retrieve_is_memory_access_valid(
 			func_id, sent_permissions.data_access,
@@ -3012,17 +3018,19 @@ static struct ffa_value ffa_memory_retrieve_validate_memory_access_list(
 		    ffa_version_from_memory_access_desc_size(
 			    retrieve_request->memory_access_desc_size) >=
 			    FFA_VERSION_1_2) {
-			if (receiver->impdef.val[0] !=
+			if (sender_descriptor_receiver->impdef.val[0] !=
 				    retrieve_request_receiver->impdef.val[0] ||
-			    receiver->impdef.val[1] !=
+			    sender_descriptor_receiver->impdef.val[1] !=
 				    retrieve_request_receiver->impdef.val[1]) {
 				dlog_verbose(
 					"Impdef value in memory send does not "
 					"match retrieve request value send "
 					"value %#lx %#lx retrieve request "
 					"value %#lx %#lx\n",
-					receiver->impdef.val[0],
-					receiver->impdef.val[1],
+					sender_descriptor_receiver->impdef
+						.val[0],
+					sender_descriptor_receiver->impdef
+						.val[1],
 					retrieve_request_receiver->impdef
 						.val[0],
 					retrieve_request_receiver->impdef
@@ -3313,14 +3321,18 @@ static struct ffa_value ffa_partition_retrieve_request(
 	uint32_t fragment_length;
 	ffa_id_t receiver_id = to_locked.vm->id;
 	bool is_retrieve_complete = false;
-	const uint64_t memory_access_desc_size =
-		retrieve_request->memory_access_desc_size;
+	uint64_t memory_access_desc_size;
 	uint32_t receiver_index;
 	struct ffa_memory_access *receiver;
-	ffa_memory_handle_t handle = retrieve_request->handle;
+	ffa_memory_handle_t handle;
 	ffa_memory_attributes_t attributes = {0};
 	mm_mode_t retrieve_mode = 0;
 	struct ffa_memory_region *memory_region = share_state->memory_region;
+
+	assert(retrieve_request != NULL);
+
+	memory_access_desc_size = retrieve_request->memory_access_desc_size;
+	handle = retrieve_request->handle;
 
 	if (!share_state->sending_complete) {
 		dlog_verbose(
