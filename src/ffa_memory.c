@@ -3415,9 +3415,6 @@ static struct ffa_value ffa_partition_retrieve_request(
 	 * should never fail.
 	 */
 
-	/* Provide the permissions that had been provided. */
-	receiver->receiver_permissions.permissions = permissions;
-
 	/*
 	 * Prepare the memory region descriptor for the retrieve response.
 	 * Provide the pointer to the receiver tracked in the share state
