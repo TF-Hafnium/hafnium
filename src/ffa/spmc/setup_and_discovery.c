@@ -134,3 +134,13 @@ bool ffa_setup_acquire_receiver_rx(struct vm_locked to_locked,
 
 	return true;
 }
+
+bool ffa_ns_res_info_get_forward(struct vm_locked current_locked,
+				 struct ffa_value args, struct ffa_value *ret)
+{
+	(void)current_locked;
+	(void)args;
+	(void)ret;
+
+	return false;
+}

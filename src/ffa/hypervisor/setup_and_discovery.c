@@ -14,7 +14,9 @@
 #include "hf/check.h"
 #include "hf/ffa/init.h"
 #include "hf/ffa/vm.h"
+#include "hf/ffa_internal.h"
 #include "hf/manifest.h"
+#include "hf/std.h"
 #include "hf/vm.h"
 
 #include "smc.h"
@@ -323,4 +325,31 @@ bool ffa_setup_acquire_receiver_rx(struct vm_locked to_locked,
 	}
 
 	return other_world_ret.func == FFA_SUCCESS_32;
+}
+
+bool ffa_ns_res_info_get_forward(struct vm_locked current_locked,
+				 struct ffa_value args, struct ffa_value *ret)
+{
+	struct vm *vm = current_locked.vm;
+	struct vm_locked other_world_locked;
+
+	if (!ffa_is_vm_id(vm->id)) {
+		dlog_error("FFA_NS_RES_INFO_GET not supported\n");
+		*ret = ffa_error(FFA_NOT_SUPPORTED);
+		return true;
+	}
+
+	other_world_locked = vm_find_locked(HF_OTHER_WORLD_ID);
+	*ret = arch_other_world_call(args);
+
+	/*
+	 * Secure World's TX buffer is NWd world RX buffer.
+	 * Copy data from there to VM's buffer.
+	 */
+	memcpy_s(vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
+		 other_world_locked.vm->mailbox.send, FFA_MSG_PAYLOAD_MAX);
+
+	vm_unlock(&other_world_locked);
+
+	return true;
 }
