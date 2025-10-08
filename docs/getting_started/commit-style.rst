@@ -145,6 +145,7 @@ An example of this is as follows:
   make commitlint COMMITLINT_FROM=HEAD~3 COMMITLINT_TO=HEAD
 
 .. _Commitlint: https://commitlint.js.org
+
 --------------
 
 *Copyright (c) 2023, Arm Limited and Contributors. All rights reserved.*
