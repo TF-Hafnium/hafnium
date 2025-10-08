@@ -2057,6 +2057,27 @@ is not overriden by either SPs or SPMC.
    registers leads to a crash while such an attempt by S-EL1 partition effectively
    has no impact on its execution context.
 
+Partition Lifecycle support
+---------------------------
+Partition lifecycle describes the various states a vCPU of a partition goes
+through from when it is created till it is destroyed or restarted. Any state
+transition of a vCPU is explicitly managed by SPMC as per the rules described
+in Chapter 7 of the FF-A v1.3 ALP2 spec.
+
+It is important to note that the state of a SP's vCPU is maintained by SPMC
+but is invisible to any other entity outside of SPMC.
+
+SPMC uses partition lifecycle to enable the use case of fault handling
+when an SP encounters a fatal error during its execution. In addition to
+involuntary fatal errors, an SP can voluntarily abort its execution using the
+FFA_ABORT ABI.
+
+A v1.3 compliant SP declares support for partition lifecycle through its
+partition manifest. The FF-A spec allows SPs to optionally specify the action
+taken by SPMC if any vCPU encounters a fatal error or aborts execution
+voluntarily. Refer to the binding document `[6]`_ for the various abort
+actions supported by hafnium.
+
 References
 ==========
 
