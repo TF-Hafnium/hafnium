@@ -518,23 +518,20 @@ static struct notifications *vm_get_notifications(struct vm_locked vm_locked,
 }
 
 /*
- * Initializes the notifications structure.
- */
-static void vm_notifications_init_bindings(struct notifications *notifications)
-{
-	for (uint32_t i = 0U; i < MAX_FFA_NOTIFICATIONS; i++) {
-		notifications->bindings_sender_id[i] = HF_INVALID_VM_ID;
-	}
-}
-
-/*
  * Initialize notification related structures for a VM.
  */
 void vm_notifications_init(struct vm *vm)
 {
-	/* Basic initialization of the notifications structure. */
-	vm_notifications_init_bindings(&vm->notifications.from_sp);
-	vm_notifications_init_bindings(&vm->notifications.from_vm);
+	/* Basic initialization of the notifications structure.
+	 * Initialize bindings for SP->VM and VM->VM in a single pass.
+	 */
+	struct notifications *from_sp = &vm->notifications.from_sp;
+	struct notifications *from_vm = &vm->notifications.from_vm;
+
+	for (uint32_t i = 0U; i < MAX_FFA_NOTIFICATIONS; ++i) {
+		from_sp->bindings_sender_id[i] = HF_INVALID_VM_ID;
+		from_vm->bindings_sender_id[i] = HF_INVALID_VM_ID;
+	}
 }
 
 /**
