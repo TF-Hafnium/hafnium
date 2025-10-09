@@ -909,9 +909,8 @@ static bool vm_insert_notification_info_list(
  * Returns true if successfully added to the list.
  */
 static bool vm_notifications_state_info_get(
-	struct notifications_state *state, ffa_id_t vm_id, bool is_per_vcpu,
-	ffa_vcpu_index_t vcpu_id, uint16_t *ids, uint32_t *ids_count,
-	uint32_t *lists_sizes, uint32_t *lists_count,
+	struct notifications_state *state, ffa_id_t vm_id, uint16_t *ids,
+	uint32_t *ids_count, uint32_t *lists_sizes, uint32_t *lists_count,
 	const uint32_t ids_max_count,
 	enum notifications_info_get_state *info_get_state)
 {
@@ -924,9 +923,10 @@ static bool vm_notifications_state_info_get(
 		return false;
 	}
 
-	if (!vm_insert_notification_info_list(
-		    vm_id, is_per_vcpu, vcpu_id, ids, ids_count, lists_sizes,
-		    lists_count, ids_max_count, info_get_state)) {
+	/* Per-vCPU notifications deprecated: insert only the VM entry. */
+	if (!vm_insert_notification_info_list(vm_id, false, 0, ids, ids_count,
+					      lists_sizes, lists_count,
+					      ids_max_count, info_get_state)) {
 		return false;
 	}
 
@@ -1011,10 +1011,9 @@ void vm_notifications_info_get_pending(
 	 * Perform info get for global notifications, before doing it for
 	 * per-vCPU.
 	 */
-	vm_notifications_state_info_get(&notifications->global,
-					vm_locked.vm->id, false, 0, ids,
-					ids_count, lists_sizes, lists_count,
-					ids_max_count, info_get_state);
+	vm_notifications_state_info_get(
+		&notifications->global, vm_locked.vm->id, ids, ids_count,
+		lists_sizes, lists_count, ids_max_count, info_get_state);
 
 	if (vm_id_is_current_world(vm_locked.vm->id)) {
 		for (ffa_vcpu_count_t i = 0; i < vm_locked.vm->vcpu_count;
@@ -1045,9 +1044,9 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 
 	/* Get info of pending notifications from the framework. */
 	vm_notifications_state_info_get(&vm_locked.vm->notifications.framework,
-					vm_locked.vm->id, false, 0, ids,
-					ids_count, lists_sizes, lists_count,
-					ids_max_count, &current_state);
+					vm_locked.vm->id, ids, ids_count,
+					lists_sizes, lists_count, ids_max_count,
+					&current_state);
 
 	/* Get info of pending notifications from SPs. */
 	vm_notifications_info_get_pending(vm_locked, false, ids, ids_count,
