@@ -320,12 +320,9 @@ class FvpDriver(Driver, ABC):
         # Print error message if no tests were run as this is probably unexpected.
         # Return suitable error code.
         if runner_result.tests_run == 0:
-            print("Error: no tests match")
-            return 10
+            raise click.ClickException("Error: no tests match")
         elif runner_result.tests_failed > 0:
-            return 1
-        else:
-            return 0
+            raise click.ClickException(f"Error: tests {runner_result.tests_failed} failed")
 
 class FvpDriverHypervisor(FvpDriver):
     """
