@@ -113,7 +113,7 @@ TEST(memory_sharing_v1_0, share_ffa_v1_0_to_v1_2)
 
 	ffa_memory_access_init_v1_0(&receiver_v1_0, receiver_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	/* Initialize memory sharing test according to v1.0. */
 	remaining_constituent_count = ffa_memory_region_init_v1_0(
@@ -171,7 +171,7 @@ TEST(memory_sharing_v1_0, force_fragmented_ffa_v1_0)
 
 	ffa_memory_access_init_v1_0(&receiver_v1_0, receiver_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	/* Initialize memory sharing test according to v1.0. */
 	remaining_constituent_count = ffa_memory_region_init_v1_0(

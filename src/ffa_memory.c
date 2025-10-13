@@ -2748,6 +2748,9 @@ static bool ffa_hypervisor_retrieve_response_init(
 
 		assert(sender_receivers != NULL);
 
+		composite_offset =
+			sizeof(struct ffa_memory_region_v1_0) +
+			receiver_count * sizeof(struct ffa_memory_access_v1_0);
 		for (uint32_t i = 0; i < receiver_count; i++) {
 			ffa_id_t receiver_id =
 				sender_receivers[i]
@@ -2778,14 +2781,12 @@ static bool ffa_hypervisor_retrieve_response_init(
 				current_receiver, receiver_id,
 				current_permissions->data_access,
 				current_permissions->instruction_access,
-				recv_flags);
+				recv_flags, composite_offset);
 		}
 
 		composite_offset =
 			sizeof(struct ffa_memory_region_v1_0) +
 			receiver_count * sizeof(struct ffa_memory_access_v1_0);
-		sender_receivers->composite_memory_region_offset =
-			composite_offset;
 
 		composite_memory_region = ffa_memory_region_get_composite_v1_0(
 			retrieve_response_v1_0, 0);
@@ -2952,6 +2953,9 @@ static bool ffa_partition_retrieve_response_init(
 
 		assert(receivers_v1_0 != NULL);
 
+		composite_offset = sizeof(struct ffa_memory_region_v1_0) +
+				   sizeof(struct ffa_memory_access_v1_0);
+
 		/*
 		 * Initialized here as in memory retrieve responses we currently
 		 * expect one borrower to be specified.
@@ -2959,14 +2963,8 @@ static bool ffa_partition_retrieve_response_init(
 		ffa_memory_access_init_v1_0(
 			receivers_v1_0, receiver_id,
 			granted_permissions.data_access,
-			granted_permissions.instruction_access, recv_flags);
-
-		composite_offset = sizeof(struct ffa_memory_region_v1_0) +
-				   sizeof(struct ffa_memory_access_v1_0);
-
-		/* Init the composite offset. */
-		receivers_v1_0->composite_memory_region_offset =
-			composite_offset;
+			granted_permissions.instruction_access, recv_flags,
+			composite_offset);
 
 		composite_memory_region = ffa_memory_region_get_composite_v1_0(
 			retrieve_response_v1_0, 0);

@@ -157,7 +157,7 @@ static struct ffa_value retrieve_v1_0(ffa_id_t sender_id,
 
 	ffa_memory_access_init_v1_0(&receiver_v1_0, receiver_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 	msg_size = ffa_memory_retrieve_request_init_v1_0(
 		tx_buffer, handle, sender_id, &receiver_v1_0, 1, 0,
 		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,

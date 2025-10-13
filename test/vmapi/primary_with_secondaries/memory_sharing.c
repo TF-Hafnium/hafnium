@@ -3029,7 +3029,7 @@ TEST(memory_sharing_v1_0, ffa_validate_memory_access_reserved_mbz)
 
 	ffa_memory_access_init_v1_0(&receiver_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 	receiver_v1_0.reserved_0 = 0xFFFFFFFF;
 
 	/* Initialize memory sharing test according to v1.0. */
@@ -4180,14 +4180,14 @@ TEST(memory_sharing_v1_1, share_ffa_v1_1_to_current_version)
 
 	ffa_memory_access_init_v1_0(&receivers_v1_1[0], service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 	ffa_memory_access_init(&receivers_v_cur[0], service1_info->vm_id,
 			       FFA_DATA_ACCESS_RW,
 			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
 
 	ffa_memory_access_init_v1_0(&receivers_v1_1[1], service2_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 	ffa_memory_access_init(&receivers_v_cur[1], service2_info->vm_id,
 			       FFA_DATA_ACCESS_RW,
 			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
@@ -4266,13 +4266,13 @@ TEST(memory_sharing, share_ffa_current_version_to_v1_1)
 
 	ffa_memory_access_init_v1_0(&receivers_v1_1[0], service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 	ffa_memory_access_init(&receivers_v_cur[0], service1_info->vm_id,
 			       FFA_DATA_ACCESS_RW,
 			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);
 	ffa_memory_access_init_v1_0(&receivers_v1_1[1], service2_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 	ffa_memory_access_init(&receivers_v_cur[1], service2_info->vm_id,
 			       FFA_DATA_ACCESS_RW,
 			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, NULL);

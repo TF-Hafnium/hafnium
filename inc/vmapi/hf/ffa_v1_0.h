@@ -124,7 +124,8 @@ void ffa_memory_access_init_v1_0(struct ffa_memory_access_v1_0 *receiver,
 				 ffa_id_t receiver_id,
 				 enum ffa_data_access data_access,
 				 enum ffa_instruction_access instruction_access,
-				 ffa_memory_receiver_flags_t flags);
+				 ffa_memory_receiver_flags_t flags,
+				 uint32_t composite_offset);
 
 uint32_t ffa_memory_region_init_v1_0(
 	struct ffa_memory_region_v1_0 *memory_region,

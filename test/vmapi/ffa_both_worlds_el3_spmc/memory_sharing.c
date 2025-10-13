@@ -47,7 +47,7 @@ TEST(memory_sharing, share_retrieve_relinquish)
 
 	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
 	EXPECT_EQ(ffa_memory_region_init(
@@ -91,7 +91,7 @@ TEST(memory_sharing, fail_on_share_twice)
 
 	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
 	EXPECT_EQ(ffa_memory_region_init(
@@ -142,7 +142,7 @@ TEST(memory_sharing, lend_retrieve_relinquish)
 
 	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
 	EXPECT_EQ(ffa_memory_region_init(
@@ -191,7 +191,7 @@ TEST(memory_sharing, force_fragmented_share_retrieve_relinquish)
 
 	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
 	EXPECT_EQ(ffa_memory_region_init(
@@ -270,7 +270,7 @@ TEST(memory_sharing, ffa_validate_attributes)
 		ffa_memory_access_init_v1_0(
 			receivers_v1_0, service1_info->vm_id,
 			FFA_DATA_ACCESS_RO,
-			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+			FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 		/* Prepare memory region, and set all flags */
 		EXPECT_EQ(ffa_memory_region_init(
@@ -317,7 +317,7 @@ TEST(memory_sharing, ffa_validate_mbz)
 
 	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_NOT_SPECIFIED,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	/* Prepare memory region, and set all flags */
 	EXPECT_EQ(ffa_memory_region_init(
@@ -358,7 +358,7 @@ TEST(memory_sharing, lend_reclaim)
 
 	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
 	EXPECT_EQ(ffa_memory_region_init(
@@ -401,7 +401,7 @@ TEST(memory_sharing, lend_reclaim_before_retrieve)
 
 	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
 	EXPECT_EQ(ffa_memory_region_init(
@@ -444,7 +444,7 @@ TEST(memory_sharing, share_reclaim)
 
 	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
 	EXPECT_EQ(ffa_memory_region_init(
@@ -490,7 +490,7 @@ TEST(memory_sharing, share_reclaim_before_retrieve)
 
 	ffa_memory_access_init_v1_0(receivers_v1_0, service1_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	memset_s(pages, PAGE_SIZE, 0, PAGE_SIZE);
 	EXPECT_EQ(ffa_memory_region_init(

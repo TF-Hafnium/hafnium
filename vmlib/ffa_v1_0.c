@@ -29,7 +29,8 @@ void ffa_memory_access_init_v1_0(struct ffa_memory_access_v1_0 *receiver,
 				 ffa_id_t receiver_id,
 				 enum ffa_data_access data_access,
 				 enum ffa_instruction_access instruction_access,
-				 ffa_memory_receiver_flags_t flags)
+				 ffa_memory_receiver_flags_t flags,
+				 uint32_t composite_offset)
 {
 	ffa_memory_access_permissions_t permissions = {
 		.data_access = data_access,
@@ -43,7 +44,7 @@ void ffa_memory_access_init_v1_0(struct ffa_memory_access_v1_0 *receiver,
 				.permissions = permissions,
 				.flags = flags,
 			},
-		.composite_memory_region_offset = 0ULL,
+		.composite_memory_region_offset = composite_offset,
 		.reserved_0 = 0ULL,
 	};
 }

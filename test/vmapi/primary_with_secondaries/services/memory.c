@@ -1435,10 +1435,10 @@ TEST_SERVICE(share_ffa_v1_1)
 
 	ffa_memory_access_init_v1_0(&receivers_v1_1[0], service2_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 	ffa_memory_access_init_v1_0(&receivers_v1_1[1], service3_info->vm_id,
 				    FFA_DATA_ACCESS_RW,
-				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0);
+				    FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0, 0);
 
 	ffa_memory_region_init(
 		(struct ffa_memory_region *)send_buf, HF_MAILBOX_SIZE,
