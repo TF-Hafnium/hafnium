@@ -116,34 +116,31 @@ do
 done
 
 #
-# Build and run tests with asserts disabled if required.
+# Call 'make clean' and remove args.gn file to ensure the value of
+# enable_assertions is updated from the default.
+#
+make clean || true
+rm -f out/reference/build.ninja out/reference/args.gn
+
+#
+# Build & run tests with assertions disabled (single-mode invocation).
 #
 if [ "$HAFNIUM_RUN_ASSERT_DISABLED_BUILD" == "true" ]
 then
+
 	#
-	# Call 'make clean' and remove args.gn file to ensure the value of
-	# enable_assertions is updated from the default.
+	# Build and run with asserts disabled.
 	#
-	if [ -d "out/reference" ]; then
-		make clean
-		rm -f out/reference/build.ninja out/reference/args.gn
-	fi
+	echo "[build.sh] ENABLE_ASSERTIONS=0"
 
 	make PROJECT=reference ENABLE_ASSERTIONS=0
-
 	run_tests
+else
+	#
+	# Build and run with asserts enabled.
+	#
+	echo "[build.sh] ENABLE_ASSERTIONS=1"
 
-	#
-	# Call 'make clean' and remove args.gn file so future runs of make
-	# include assertions.
-	#
-	make clean
-	rm out/reference/build.ninja out/reference/args.gn
+	make PROJECT=reference ENABLE_ASSERTIONS=1
+	run_tests
 fi
-
-#
-# Build and run with asserts enabled.
-#
-
-make PROJECT=reference ENABLE_ASSERTIONS=1
-run_tests
