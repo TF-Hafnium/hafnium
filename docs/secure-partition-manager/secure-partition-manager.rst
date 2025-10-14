@@ -1178,6 +1178,7 @@ The FF-A specification defines two types of notifications:
   a specific execution context, as determined by the sender.
 
 .. note::
+
    Hafnium implements **global notifications only**. Per-vCPU notifications,
    introduced as an optional feature in FF-A v1.3, are **not supported**.
    Attempts to use per-vCPU flags or non-zero vCPU IDs with
@@ -2048,11 +2049,13 @@ by SPMC behind the scenes, though this is completely oblivious to the SP.
 This ensures that any EL1 physical timer deadline set by a normal world endpoint
 is not overriden by either SPs or SPMC.
 
-Note: As per Arm ARM, assuming no support for FEAT_ECV, S-EL1 has direct access
-to EL1 virtual timer registers but S-EL0 accesses are trapped to higher ELs.
-Consequently, any attempt by an S-EL0 partition to access EL1 virtual timer
-registers leads to a crash while such an attempt by S-EL1 partition effectively
-has no impact on its execution context.
+.. note::
+
+   As per Arm ARM, assuming no support for FEAT_ECV, S-EL1 has direct access
+   to EL1 virtual timer registers but S-EL0 accesses are trapped to higher ELs.
+   Consequently, any attempt by an S-EL0 partition to access EL1 virtual timer
+   registers leads to a crash while such an attempt by S-EL1 partition effectively
+   has no impact on its execution context.
 
 References
 ==========
