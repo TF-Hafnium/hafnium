@@ -26,8 +26,11 @@ RUN apt-get install -y \
 		python3-venv                   `# for hftest.py` \
 		nodejs                         `# for Commitlint` \
 		npm                            `# for Commitlint` \
-                netcat-openbsd \
-                telnet \
+		default-jre                    `# for docs build` \
+		graphviz                       `# for docs build` \
+		plantuml                       `# for docs build` \
+		netcat-openbsd \
+		telnet \
 		curl
 
 # Install Clang and LLVM.

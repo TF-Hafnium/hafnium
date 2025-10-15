@@ -146,8 +146,13 @@ echo "Running in container: $*" 1>&2
 # because it depends on host-mounted Hafnium repo paths that are only available
 # when the container is launched. This approach ensures compatibility with
 # the Hafnium developer Docker environment under build/docker/.
+#
+# Also ensure Sphinx/Myst/PlantUML plugin are present in this checkout’s Poetry venv.
+# Idempotent: if already installed, this is a quick no-op; otherwise it bootstraps once.
+# This makes 'poetry run make doc' work out of the box inside the dev container.
 CMD="export PATH=${HAFNIUM_FVP_DIR}/Base_RevC_AEMvA_pkg/models/Linux64_GCC-9.3:\$PATH && \
      source tools/shrinkwrap/shrinkwrap_setup_env.sh && \
+     poetry install --with docs --no-root && \
      bash -c \"$*\""
 ${DOCKER} run \
     "${ARGS[@]}" \
