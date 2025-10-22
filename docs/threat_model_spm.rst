@@ -1750,6 +1750,49 @@ element of the data flow diagram.
 |                        | integrity of Secure World is no more guaranteed.   |
 +------------------------+----------------------------------------------------+
 
++------------------------+----------------------------------------------------+
+| ID                     | 38                                                 |
++========================+====================================================+
+| ``Threat``             | **A rogue Secure Partition, that has partition     |
+|                        | lifecycle support, could attempt to stall the      |
+|                        | system. It could invoke FFA_ABORT ABI that could   |
+|                        | make the SPMC escalate the abort to SPMD, thereby  |
+|                        | forcing EL3 to panic or reset the system.**        |
++------------------------+----------------------------------------------------+
+| ``Diagram Elements``   | DF1, DF2                                           |
++------------------------+----------------------------------------------------+
+| ``Affected TF-A        | SPMC, SPMD                                         |
+| Components``           |                                                    |
++------------------------+----------------------------------------------------+
+| ``Assets``             | SPMC state, CPU cycles                             |
++------------------------+----------------------------------------------------+
+| ``Threat Agent``       | S-Endpoint                                         |
++------------------------+----------------------------------------------------+
+| ``Threat Type``        | Tampering, Denial of Service                       |
++------------------------+------------------+-----------------+---------------+
+| ``Application``        |   ``Server``     |   ``Mobile``    |               |
++------------------------+------------------+-----------------+---------------+
+| ``Impact``             | High (4)         | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Likelihood``         | Medium (3)       | Medium (3)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Total Risk Rating``  | High (12)        | Medium (9)      |               |
++------------------------+------------------+-----------------+---------------+
+| ``Mitigations``        | The TF-A SPMC mitigates this threat by allowing    |
+|                        | only the system integrator to specify an abort     |
+|                        | action on behalf of a partition through partition  |
+|                        | manifest. For faults associated with non-critical  |
+|                        | partitions, the system integrator shall use less   |
+|                        | invasive abort action such as DESTROY which does   |
+|                        | not impact the rest of the software components in  |
+|                        | the system.                                        |
+|                        | Moreover, PROPAGATE, the invasive action that      |
+|                        | forces the SPMC to escalate a fatal fault to EL3,  |
+|                        | is expected to be specified only for highly        |
+|                        | trusted Secure Partitions, thereby mitigating the  |
+|                        | threat of crashing the system.                     |
++------------------------+----------------------------------------------------+
+
 --------------
 
 *Copyright (c) 2023, Arm Limited. All rights reserved.*
