@@ -555,55 +555,6 @@ TEST_SERVICE(ffa_lend_device_memory_fails)
 	ffa_yield();
 }
 
-TEST_SERVICE(ffa_memory_return_delayed)
-{
-	uint8_t *ptr;
-	size_t i;
-	void *recv_buf = SERVICE_RECV_BUFFER();
-	void *send_buf = SERVICE_SEND_BUFFER();
-	ffa_id_t target_id;
-	struct ffa_memory_region *memory_region =
-		(struct ffa_memory_region *)retrieve_buffer;
-	ffa_id_t sender;
-	struct ffa_composite_memory_region *composite;
-
-	sender = receive_indirect_message(&target_id, sizeof(target_id),
-					  recv_buf)
-			 .sender;
-
-	ffa_yield();
-
-	/* Expect same sender as the previous indirect message. */
-	EXPECT_EQ(retrieve_memory_from_message(recv_buf, send_buf, NULL,
-					       memory_region, HF_MAILBOX_SIZE),
-		  sender);
-
-	composite = ffa_memory_region_get_composite(memory_region, 0);
-
-	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	ptr = (uint8_t *)composite->constituents[0].address;
-
-	update_mm_security_state(composite, memory_region->attributes);
-
-	/* Check that one has access to the shared region. */
-	for (i = 0; i < PAGE_SIZE; ++i) {
-		ptr[i]++;
-	}
-
-	ffa_yield();
-
-	/* Give the memory back and notify the target_id. */
-	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), target_id,
-		composite->constituents, composite->constituent_count, 0, 0,
-		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
-		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
-		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
-
-	ffa_yield();
-}
-
 TEST_SERVICE(ffa_memory_return)
 {
 	uint8_t *ptr;
