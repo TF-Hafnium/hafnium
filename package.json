@@ -1,5 +1,6 @@
 {
   "name": "hafnium",
+  "version": "2.13.0",
   "license": "BSD-3-Clause",
   "type": "module",
   "private": true,
