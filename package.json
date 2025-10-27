@@ -7,10 +7,70 @@
   "engines": {
     "node": ">=20"
   },
+  "scripts": {
+    "release": "commit-and-tag-version"
+  },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
     "commit-and-tag-version": "^12.6.0",
     "conventional-changelog-conventionalcommits": "^9.1.0"
+  },
+  "commit-and-tag-version": {
+    "header": "# Change Log & Release Notes\n\nThis document contains a summary of the new features, changes, fixes and known\nissues in each release of Hafnium.\n",
+    "infile": "docs/change-log.md",
+    "skip": {
+      "commit": true,
+      "tag": true
+    },
+    "types": [
+      {
+        "type": "feat",
+        "section": "Features"
+      },
+      {
+        "type": "perf",
+        "section": "Performance Improvements"
+      },
+      {
+        "type": "fix",
+        "section": "Bug Fixes"
+      },
+      {
+        "type": "refactor",
+        "section": "Code Refactoring"
+      },
+      {
+        "type": "test",
+        "section": "Tests & Framework"
+      },
+      {
+        "type": "build",
+        "section": "Build & CI"
+      },
+      {
+        "type": "ci",
+        "section": "Build & CI"
+      },
+      {
+        "type": "docs",
+        "section": "Documentation"
+      },
+      {
+        "type": "chore",
+        "section": "Maintenance & Chores"
+      },
+      {
+        "type": "revert",
+        "section": "Reverts"
+      },
+      {
+        "type": "style",
+        "section": "Code Style"
+      }
+    ],
+    "commitUrlFormat": "https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/{{hash}}",
+    "compareUrlFormat": "https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/tags/{{previousTag}}..refs/tags/{{currentTag}}",
+    "userUrlFormat": "https://github.com/{{user}}"
   }
 }
