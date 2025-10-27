@@ -8,6 +8,8 @@
   },
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
-    "@commitlint/config-conventional": "^19.0.0"
+    "@commitlint/config-conventional": "^19.0.0",
+    "commit-and-tag-version": "^12.6.0",
+    "conventional-changelog-conventionalcommits": "^9.1.0"
   }
 }
