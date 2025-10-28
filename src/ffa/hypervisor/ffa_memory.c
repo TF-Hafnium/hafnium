@@ -265,7 +265,7 @@ out:
 	share_states_unlock(&share_states);
 out_err:
 	if (memory_region != NULL) {
-		memory_free(memory_region, PAGE_SIZE);
+		CHECK(memory_free(memory_region, PAGE_SIZE));
 	}
 	return ret;
 }
@@ -642,7 +642,7 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 	goto out;
 
 out_free_fragment:
-	memory_free(fragment, PAGE_SIZE);
+	CHECK(memory_free(fragment, PAGE_SIZE));
 
 out:
 	share_states_unlock(&share_states);

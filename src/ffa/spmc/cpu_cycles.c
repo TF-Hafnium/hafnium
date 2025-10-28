@@ -410,8 +410,8 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 			resume_halted_vcpu_upon_restart(current_locked, next);
 
 			/* Free the pages used for old vCPU structures. */
-			memory_free(current->vm->deferred_mem_ptr,
-					  current->vm->deferred_mem_size);
+			CHECK(memory_free(current->vm->deferred_mem_ptr,
+					  current->vm->deferred_mem_size));
 
 			current->vm->deferred_mem_ptr = NULL;
 			current->vm->deferred_mem_size = 0;

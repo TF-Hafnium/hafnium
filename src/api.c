@@ -3812,7 +3812,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 
 out:
 	if (memory_region != NULL) {
-		memory_free(memory_region, PAGE_SIZE);
+		CHECK(memory_free(memory_region, PAGE_SIZE));
 	}
 
 	return ret;
@@ -5709,8 +5709,8 @@ void ffa_ns_res_info_get_state_reset(void)
 
 	for (uint8_t i = 0; i < FFA_NS_RES_INFO_GET_MAX_FRAGMENTS; i++) {
 		if (ffa_ns_res_state.desc_fragments[i] != NULL) {
-			memory_free(ffa_ns_res_state.desc_fragments[i],
-				    PAGE_SIZE);
+			CHECK(memory_free(ffa_ns_res_state.desc_fragments[i],
+					  PAGE_SIZE));
 		}
 	}
 

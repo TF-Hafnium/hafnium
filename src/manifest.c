@@ -134,7 +134,7 @@ static void manifest_data_deinit(void)
 	memset_s(manifest_data, sizeof(struct manifest_data), 0,
 		 sizeof(struct manifest_data));
 
-	memory_free(manifest_data, sizeof(struct manifest_data));
+	CHECK(memory_free(manifest_data, sizeof(struct manifest_data)));
 }
 
 static inline size_t count_digits(ffa_id_t vm_id)

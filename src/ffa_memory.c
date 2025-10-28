@@ -181,7 +181,7 @@ void *ffa_memory_fragment_alloc(void)
 /* Free a page for the FF-A memory region descriptors. */
 void ffa_memory_fragment_free(void *ptr)
 {
-	memory_free(ptr, PAGE_SIZE);
+	CHECK(memory_free(ptr, PAGE_SIZE));
 }
 
 /** Marks a share state as unallocated. */

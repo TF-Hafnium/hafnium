@@ -184,7 +184,7 @@ static void mm_free_page_pte(pte_t pte, mm_level_t level)
 	}
 
 	/* Free the table itself. */
-	memory_free(table, PAGE_SIZE);
+	CHECK(memory_free(table, PAGE_SIZE));
 }
 
 /**
@@ -246,8 +246,8 @@ void mm_ptable_fini(const struct mm_ptable *ptable)
 		}
 	}
 
-	memory_free(root_tables,
-		    sizeof(struct mm_page_table) * root_table_count);
+	CHECK(memory_free(root_tables,
+			  sizeof(struct mm_page_table) * root_table_count));
 }
 
 /**

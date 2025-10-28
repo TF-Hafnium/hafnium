@@ -13,6 +13,7 @@
 #include "hf/api.h"
 #include "hf/boot_flow.h"
 #include "hf/boot_params.h"
+#include "hf/check.h"
 #include "hf/cpio.h"
 #include "hf/cpu.h"
 #include "hf/dlog.h"
@@ -171,7 +172,7 @@ void one_time_init(void)
 	}
 
 	/* Free space allocated for the boot parameters. */
-	memory_free(params, sizeof(*params));
+	CHECK(memory_free(params, sizeof(*params)));
 
 	mm_unlock_stage1(&mm_stage1_locked);
 
