@@ -103,7 +103,6 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 					struct manifest **manifest_ret,
 					struct memiter *manifest_fdt,
 					struct boot_params *boot_params);
-void manifest_deinit(void);
 enum manifest_return_code parse_ffa_manifest(
 	struct fdt *fdt, struct manifest_vm *vm,
 	struct fdt_node *boot_info_node, const struct boot_params *boot_params);

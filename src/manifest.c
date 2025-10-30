@@ -112,29 +112,22 @@ static bool check_boot_order(uint16_t boot_order)
  */
 static bool manifest_data_init(void)
 {
-	manifest_data = memory_alloc(sizeof(struct manifest_data));
-
-	assert(manifest_data != NULL);
-
-	memset_s(manifest_data, sizeof(struct manifest_data), 0,
-		 sizeof(struct manifest_data));
-
-	return manifest_data != NULL;
-}
-
-/**
- * Frees the memory used for the manifest data in the given memory pool.
- */
-static void manifest_data_deinit(void)
-{
 	/**
-	 * Clear and return the memory used for the manifest_data struct to the
-	 * memory pool.
+	 * Allocate once and reuse on subsequent calls.
+	 * (Essential for unit tests).
 	 */
-	memset_s(manifest_data, sizeof(struct manifest_data), 0,
-		 sizeof(struct manifest_data));
+	if (manifest_data == NULL) {
+		manifest_data = memory_alloc(sizeof(struct manifest_data));
+		if (manifest_data == NULL) {
+			return false;
+		}
+	}
 
-	CHECK(memory_free(manifest_data, sizeof(struct manifest_data)));
+	/* Always start with a clean manifest state. */
+	memset_s(manifest_data, sizeof(*manifest_data), 0,
+		 sizeof(*manifest_data));
+
+	return true;
 }
 
 static inline size_t count_digits(ffa_id_t vm_id)
@@ -1777,15 +1770,6 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 	}
 
 	return MANIFEST_SUCCESS;
-}
-
-/**
- * Free manifest data resources, called once manifest parsing has
- * completed and VMs are loaded.
- */
-void manifest_deinit(void)
-{
-	manifest_data_deinit();
 }
 
 const char *manifest_strerror(enum manifest_return_code ret_code)

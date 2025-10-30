@@ -345,7 +345,6 @@ class manifest : public ::testing::Test
        protected:
 	void manifest_dealloc(void)
 	{
-		manifest_deinit();
 	}
 
        public:
