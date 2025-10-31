@@ -42,8 +42,8 @@ The section :ref:`Secure Partition Manager` provides important details about the
 For security information, check the :ref:`Threat Model` section, which documents identified
 vulnerabilities and respective mitigations.
 
-On our releases, the section :ref:`Change Log` will be updated to contain the summary of updates
-since previous releases.
+On our releases, the section :ref:`Change Log & Release Notes` will be updated
+to contain the summary of updates since previous releases.
 
 For support queries, get in touch and keep up-to-date:
 
