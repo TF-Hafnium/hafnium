@@ -1436,6 +1436,9 @@ The action of SPMC for a secure interrupt depends on: the state of the target
 execution context of the SP that is responsible for handling the interrupt;
 whether the interrupt triggered while execution was in normal world or secure
 world.
+In addition, if the target vCPU is in waiting state the SPMC may not take the action
+to proactively resume the SP. Instead, the SPMC may rely on the Scheduler of the system
+to explicitly provide CPU cycles to the SP.
 
 Secure interrupt signaling mechanisms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1468,6 +1471,31 @@ running in S-EL2.
 | RUNNING   | ERET,   | NA            | SPMC pends the vIRQ signal and resumes|
 |           | vIRQ    |               | execution context of SP through ERET. |
 +-----------+---------+---------------+---------------------------------------+
+
+Secure Interrupt Handling policy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Starting with the FF-A v1.3, the system integrator can specify the policy for handling
+secure interrupts in the following cases:
+
+  - the SP is in waiting state when the interrupts triggers.
+  - the SP tried to go back to the waiting state with pending interrupts. The interrupts
+    can be left pending due to implementation defined reasons.
+
+The SP can be configured in such a way the SPMC pends the Schedule
+Receiver Interrupt for the NWd, to inform the scheduler that the SP is in need
+of CPU cycles. In the first case, the SRI is pended when handling the respective IRQ,
+for the latter case, the SRI is triggered when doing the world switch to the NWd.
+The scheduler of the system should handle the SRI as it normally would
+in the flow of FF-A notifications, and it should invoke FFA_NOTIFICATION_INFO_GET.
+The SPMC will include the SP ID and the respective vCPU ID that needs to be resumed
+for handling of Secure Interrupts.
+
+If none of the policies are used, the SPMC will proactively inject a virtual
+interrupt into the SP's context following the secure interrupt signaling mechanisms.
+
+This policy is configured through `sri-interrupts-policy` field. See the
+FF-A manifest bindings documentation `[6]`_, for more information.
 
 Secure interrupt completion mechanisms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
