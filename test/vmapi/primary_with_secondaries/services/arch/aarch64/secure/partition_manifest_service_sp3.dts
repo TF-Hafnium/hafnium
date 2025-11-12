@@ -116,4 +116,24 @@
 		};
 	};
 
+	memory-regions {
+		compatible = "arm,ffa-manifest-memory-regions";
+
+		test-dma-memory-secure {
+			/*
+			 * A memory region that is mapped into the SMMUv3 test engine and
+			 * accessed by it to validate that Hafnium's static DMA mapping is working
+			 * correctly. This region was selected to be after the two secure memory
+			 * regions used by SP1 (at 0x7100000 and 0x7200000).
+			 */
+			description = "test-dma-memory-secure";
+			base-address = <0x00000000 0x7300000>;
+			pages-count = <8>;
+			attributes = <0x3>; /* read-write */
+			smmu-id = <0>;
+			stream-ids = <0x0 0x1>;
+			stream-ids-access-permissions = <0x3 0x3>;
+		};
+	};
+
 };
