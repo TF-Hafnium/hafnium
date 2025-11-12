@@ -101,7 +101,19 @@
 				     <5010 0x900>;
 		};
 
-
+		smmuv3-testengine {
+			/*
+			 * SMMUV3TestEngine
+			 * Logically, this is actually divided into two 16-page regions, but
+			 * Hafnium currently doesn't properly handle multiple device regions
+			 * with stream-ids specified.
+			 */
+			base-address = <0x00000000 0x2B500000>;
+			pages-count = <32>;
+			attributes = <0x3>;
+			smmu-id = <0>;
+			stream-ids = <0x0 0x1>;
+		};
 	};
 
 };
