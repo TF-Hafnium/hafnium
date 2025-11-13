@@ -341,10 +341,80 @@ exit_error:
 struct ffa_value lifecycle_msg_activation_finish_req(struct ffa_value args,
 						     struct vcpu **next)
 {
-	(void)args;
-	(void)next;
+	struct vcpu *target_vcpu;
+	struct vcpu_locked target_locked;
+	ffa_id_t target_endpoint_id;
+	uint64_t live_activation_request_status = FFA_SUCCESSFUL;
+	struct live_activation_tracker_locked tracker_locked;
+	struct live_activation_tracker *tracker;
+	struct vm *live_activate_vm;
 
-	return api_ffa_interrupt_return(0);
+	target_endpoint_id = (ffa_id_t)args.arg3;
+
+	live_activate_vm = vm_find(target_endpoint_id);
+
+	if (live_activate_vm == NULL ||
+	    !vm_id_is_current_world(target_endpoint_id)) {
+		dlog_error("Invalid target endpoint specified\n");
+		live_activation_request_status = FFA_INVALID_PARAMETERS;
+		goto exit_error_3;
+	}
+
+	if (!live_activate_vm->live_activation_support) {
+		dlog_error(
+			"Target endpoint does not support live activation\n");
+		live_activation_request_status = FFA_NOT_SUPPORTED;
+		goto exit_error_3;
+	}
+
+	/*
+	 * If the target endpoint is being aborted, reply with ABORTED response
+	 * status code.
+	 */
+	if (vm_read_state(live_activate_vm) == VM_STATE_ABORTING) {
+		dlog_error("Target endpoint aborting\n");
+		live_activation_request_status = FFA_ABORTED;
+		goto exit_error_3;
+	}
+
+	tracker_locked = live_activation_tracker_lock();
+	tracker = tracker_locked.tracker;
+
+	assert(tracker != NULL);
+
+	/* For an UP SP, the vCPU index is 0 irrespective of physical CPU. */
+	target_vcpu = vm_get_vcpu(live_activate_vm, 0);
+	target_locked = vcpu_lock(target_vcpu);
+
+	/*
+	 * A START_REQ should have been sent by SPMD LSP which would have given
+	 * the SPMC an opportunity to stop target SP and eventually move it to
+	 * CREATED state after preserving framework state.
+	 * If the target vCPU is not in CREATED state or is not undergoing live
+	 * activation currently, reply with DENIED response status code.
+	 */
+	if (!tracker->in_progress ||
+	    (tracker->partition_id != target_endpoint_id) ||
+	    (tracker->initiator_id != ffa_sender(args)) ||
+	    (target_vcpu->state != VCPU_STATE_CREATED) ||
+	    (live_activate_vm->lfa_progress != LFA_PHASE_START)) {
+		dlog_error(
+			"Target endpoint/SPMC not in a state to handle LFA\n");
+		live_activation_request_status = FFA_DENIED;
+		goto exit_error_2;
+	}
+
+	live_activate_vm->lfa_progress = LFA_PHASE_FINISH;
+
+exit_error_2:
+	vcpu_unlock(&target_locked);
+	live_activation_tracker_unlocked(&tracker_locked);
+exit_error_3:
+
+	return ffa_framework_msg_resp(
+		HF_SPMC_VM_ID, ffa_sender(args),
+		FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_FINISH_RESP,
+		live_activation_request_status, 0, 0);
 }
 
 static bool check_partition_stop_resp(struct vcpu_locked current_locked,
