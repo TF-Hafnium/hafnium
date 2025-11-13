@@ -50,7 +50,7 @@ static struct ffa_value handle_direct_req_framework_msg(struct ffa_value args)
 
 		ret = ffa_framework_message_send_direct_resp(
 			own_id, HF_SPMC_VM_ID, FFA_FRAMEWORK_MSG_PSCI_RESP,
-			0ULL);
+			0ULL, 0ULL, 0ULL);
 	} else {
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT

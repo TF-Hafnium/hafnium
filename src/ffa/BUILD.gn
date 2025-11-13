@@ -45,12 +45,14 @@ source_set("spmc") {
 
   sources = [
     "//src/arch/aarch64/hypervisor/simd.c",
+    "//src/live_activation_mgmt.c",
     "spmc/cpu_cycles.c",
     "spmc/direct_messaging.c",
     "spmc/ffa_memory.c",
     "spmc/indirect_messaging.c",
     "spmc/init.c",
     "spmc/interrupts.c",
+    "spmc/lifecycle_msg.c",
     "spmc/notifications.c",
     "spmc/setup_and_discovery.c",
     "spmc/vm.c",

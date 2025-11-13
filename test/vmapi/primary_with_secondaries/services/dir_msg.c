@@ -896,7 +896,8 @@ TEST_SERVICE(vm_availability_messaging)
 				 ? FFA_FRAMEWORK_MSG_VM_CREATION_RESP
 				 : FFA_FRAMEWORK_MSG_VM_DESTRUCTION_RESP),
 			(new_state != VM_STATE_ERROR) ? 0U
-						      : FFA_INVALID_PARAMETERS);
+						      : FFA_INVALID_PARAMETERS,
+			0, 0);
 	}
 }
 
@@ -966,6 +967,7 @@ TEST_SERVICE(vm_availability_messaging_send_non_framework_from_sp)
 	 * Send a valid framework direct response message, so that the VM is not
 	 * blocked forever.
 	 */
-	ffa_framework_message_send_direct_resp(sp_id, pvm_id, func_resp, 0);
+	ffa_framework_message_send_direct_resp(sp_id, pvm_id, func_resp, 0, 0,
+					       0);
 	FAIL("Direct response not expected to return");
 }

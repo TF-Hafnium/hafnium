@@ -13,10 +13,14 @@
 
 #include "hf/api.h"
 #include "hf/bits.h"
+#include "hf/boot_info.h"
 #include "hf/call.h"
 #include "hf/ffa/interrupts.h"
+#include "hf/ffa/lifecycle_msg.h"
 #include "hf/ffa_internal.h"
+#include "hf/live_activation_helper.h"
 #include "hf/plat/interrupts.h"
+#include "hf/std.h"
 
 #include "psci.h"
 
@@ -432,7 +436,7 @@ static struct ffa_value psci_cpu_off_success_fwk_resp(struct cpu *cpu)
 
 	return ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
 				      FFA_FRAMEWORK_MSG_PSCI_RESP,
-				      PSCI_RETURN_SUCCESS);
+				      PSCI_RETURN_SUCCESS, 0, 0);
 }
 
 /*
@@ -491,7 +495,56 @@ static struct ffa_value handle_psci_framework_msg(struct ffa_value args,
 
 	return ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
 				      FFA_FRAMEWORK_MSG_PSCI_RESP,
-				      psci_msg_response);
+				      psci_msg_response, 0, 0);
+}
+
+/**
+ * Handle special framework direct messages from SPMD LSP to SPMC.
+ */
+static void handle_spmd_lsp_to_spmc_framework_msg(struct ffa_value args,
+						  struct vcpu *current,
+						  struct ffa_value *ret,
+						  struct vcpu **next)
+{
+	ffa_id_t sender = ffa_sender(args);
+	ffa_id_t receiver = ffa_receiver(args);
+	ffa_id_t current_vm_id = current->vm->id;
+	enum ffa_framework_msg_func func = ffa_framework_msg_get_func(args);
+
+	assert(ffa_is_framework_msg(args));
+
+	/*
+	 * Check if direct message request is originating from the SPMD,
+	 * directed to the SPMC and the message is a framework message.
+	 */
+	if (!(ffa_direct_msg_is_spmd_lp_id(sender) &&
+	      receiver == HF_SPMC_VM_ID &&
+	      current_vm_id == HF_OTHER_WORLD_ID)) {
+		dlog_verbose(
+			"Framework message: Invalid Sender ID: %#x or "
+			"Receiver ID: %#x\n",
+			sender, receiver);
+		*ret = ffa_error(FFA_INVALID_PARAMETERS);
+		return;
+	}
+
+	/*
+	 * The framework message is conveyed by SPMD LSP to SPMC so the
+	 * current VM id must match to the range of SPMD LSP ids.
+	 */
+	CHECK(current->vm->id == HF_HYPERVISOR_VM_ID);
+
+	switch (func) {
+	case FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_START_REQ:
+		*ret = lifecycle_msg_activation_start_req(args, next);
+		return;
+	case FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_FINISH_REQ:
+		*ret = lifecycle_msg_activation_finish_req(args, next);
+		return;
+	default:
+		CHECK(false);
+		return;
+	}
 }
 
 /**
@@ -516,7 +569,7 @@ static void handle_spmd_to_spmc_framework_msg(struct ffa_value args,
 	if (!(sender == HF_SPMD_VM_ID && receiver == HF_SPMC_VM_ID &&
 	      current_vm_id == HF_OTHER_WORLD_ID)) {
 		dlog_verbose(
-			"Power Management message: Invalid Sender ID: %#x or "
+			"Framework message: Invalid Sender ID: %#x or "
 			"Receiver ID: %#x\n",
 			sender, receiver);
 		*ret = ffa_error(FFA_INVALID_PARAMETERS);
@@ -544,36 +597,26 @@ static void handle_spmd_to_spmc_framework_msg(struct ffa_value args,
 		 */
 		*ret = ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
 					      FFA_FRAMEWORK_MSG_PSCI_RESP,
-					      PSCI_RETURN_SUCCESS);
+					      PSCI_RETURN_SUCCESS, 0, 0);
 		return;
 	case SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ: {
 		struct ffa_value version_ret =
 			api_ffa_version(current, args.arg3);
 		*ret = ffa_framework_msg_resp(
 			HF_SPMC_VM_ID, HF_SPMD_VM_ID,
-			SPMD_FRAMEWORK_MSG_FFA_VERSION_RESP, version_ret.func);
+			SPMD_FRAMEWORK_MSG_FFA_VERSION_RESP, version_ret.func,
+			0, 0);
 		return;
 	}
 	default:
-		dlog_error("FF-A framework message not handled %#lx\n",
-			   args.arg2);
-
-		/*
-		 * TODO: the framework message that was conveyed by a direct
-		 * request is not handled although we still want to complete
-		 * by a direct response. However, there is no defined error
-		 * response to state that the message couldn't be handled.
-		 * An alternative would be to return FFA_ERROR.
-		 */
-		*ret = ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
-					      func, 0);
+		CHECK(false);
 		return;
 	}
 }
 
 /**
  * Handle framework messages related to VM availability, PSCI power management,
- * and FF-A version discovery.
+ * FF-A version discovery, and partition lifecycle management.
  * Returns true if the framework message is handled.
  * Else false if further handling is required.
  */
@@ -596,6 +639,10 @@ bool ffa_direct_msg_handle_framework_msg(struct ffa_value args,
 	case FFA_FRAMEWORK_MSG_PSCI_WARM_BOOT:
 	case SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ:
 		handle_spmd_to_spmc_framework_msg(args, current, ret, next);
+		return true;
+	case FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_START_REQ:
+	case FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_FINISH_REQ:
+		handle_spmd_lsp_to_spmc_framework_msg(args, current, ret, next);
 		return true;
 	default:
 		dlog_verbose(
@@ -637,7 +684,7 @@ static struct ffa_value handle_sp_cpu_off_framework_resp(
 	if (psci_error_code != PSCI_RETURN_SUCCESS) {
 		ffa_ret = ffa_framework_msg_resp(HF_SPMC_VM_ID, HF_SPMD_VM_ID,
 						 FFA_FRAMEWORK_MSG_PSCI_RESP,
-						 PSCI_ERROR_DENIED);
+						 PSCI_ERROR_DENIED, 0, 0);
 
 		*next = api_switch_to_vm(current_locked, ffa_ret,
 					 VCPU_STATE_OFF, HF_OTHER_WORLD_ID);
@@ -752,6 +799,10 @@ bool ffa_direct_msg_handle_framework_msg_resp(struct ffa_value args,
 	case FFA_FRAMEWORK_MSG_VM_CREATION_RESP:
 	case FFA_FRAMEWORK_MSG_VM_DESTRUCTION_RESP:
 		return false;
+	case FFA_FRAMEWORK_MSG_PARTITION_STOP_RESP:
+		*ret = lifecycle_msg_partition_stop_resp(args, current_locked,
+							 next);
+		return true;
 	default:
 		dlog_error(
 			"Unsupported framework message %x sent through direct "
