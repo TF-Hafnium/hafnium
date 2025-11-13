@@ -241,9 +241,76 @@ struct ffa_value lifecycle_msg_partition_stop_resp(
 	struct ffa_value args, struct vcpu_locked current_locked,
 	struct vcpu **next)
 {
-	(void)args;
-	(void)current_locked;
-	(void)next;
+	enum ffa_error lifecycle_request_status;
+	struct vcpu *current = current_locked.vcpu;
+	enum vcpu_state to_state;
+	struct ffa_value ffa_ret;
+	struct live_activation_tracker_locked tracker_locked;
+	struct live_activation_tracker *tracker;
+	ffa_id_t initiator_id;
 
+	/*
+	 * An SP is expected to send stop response partition message only when
+	 * SPMC has sent a stop request, with the goal of live activation. If
+	 * the SP sent a direct response in any other scenario, deny it.
+	 */
+	if (current->vm->lfa_progress != LFA_PHASE_START) {
+		return ffa_error(FFA_DENIED);
+	}
+
+	lifecycle_request_status = args.arg3;
+
+	tracker_locked = live_activation_tracker_lock();
+	tracker = tracker_locked.tracker;
+
+	assert(tracker != NULL);
+	assert(tracker->in_progress);
+	assert(tracker->partition_id == current->vm->id);
+
+	/*
+	 * Make note of initiator ID before potentially resetting the tracker.
+	 */
+	initiator_id = tracker->initiator_id;
+
+	if (lifecycle_request_status == FFA_SUCCESSFUL) {
+		struct vm_locked vm_locked;
+
+		dlog_verbose("SP%#x stopped for purpose of live activation\n",
+			     current->vm->id);
+
+		/* Unlock vCPU and lock it after VM. */
+		vcpu_unlock(&current_locked);
+		vm_locked = vm_lock(current->vm);
+		current_locked = vcpu_lock(current);
+		CHECK(vcpu_state_set(current_locked, VCPU_STATE_STOPPED));
+		vm_set_state(vm_locked, VM_STATE_HALTED);
+
+		vm_unlock(&vm_locked);
+	} else {
+		dlog_error("SP%#x failed to handle partition stop request\n",
+			   current->vm->id);
+		to_state = VCPU_STATE_WAITING;
+
+		/* Reset live firmware activation tracker. */
+		live_activation_tracker_reset(&tracker_locked);
+		current->vm->lfa_progress = LFA_PHASE_RESET;
+	}
+
+	/* Restore interrupt priority mask. */
+	ffa_interrupts_unmask(current);
+
+	ffa_ret = ffa_framework_msg_resp(
+		HF_SPMC_VM_ID, initiator_id,
+		FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_START_RESP,
+		lifecycle_request_status, 0, 0);
+
+	/* Reset the fields tracking the framework message. */
+	vcpu_dir_req_reset_state(current_locked);
+
+	/* Forward the response to SPMD EL3 LSP. */
+	*next = api_switch_to_other_world(current_locked, ffa_ret, to_state);
+	live_activation_tracker_unlocked(&tracker_locked);
+
+	/* A placeholder return code. */
 	return api_ffa_interrupt_return(0);
 }
