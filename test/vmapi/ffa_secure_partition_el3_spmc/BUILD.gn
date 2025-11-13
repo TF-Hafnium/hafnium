@@ -56,5 +56,6 @@ partitions_json("ffa_secure_partition_only_test") {
         ":ffa_secure_partition_only_partition_manifest",
       ] ]
   vms = []
+  activation_store = []
   json_file = "ffa_secure_partition_only_test.json"
 }

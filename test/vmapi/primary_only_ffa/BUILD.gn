@@ -45,5 +45,7 @@ partitions_json("primary_only_ffa_test") {
         ":primary_only_ffa_test_package",
         ":primary_only_ffa_partition_manifest",
       ] ]
+  activation_store = []
+
   json_file = "primary_only_ffa_test.json"
 }

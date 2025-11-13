@@ -87,5 +87,7 @@ partitions_json("ffa_both_world_partitions_test") {
         ":vm_primary_test_package",
       ] ]
 
+  activation_store = []
+
   json_file = "ffa_both_world_partitions_test.json"
 }

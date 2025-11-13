@@ -375,6 +375,7 @@ template("partitions_json") {
                              "testonly",
                              "sps",
                              "vms",
+                             "activation_store",
                            ])
 
     script = "//build/image/generate_partitions_json.py"
@@ -416,6 +417,23 @@ template("partitions_json") {
       args += [
         "--vm",
         "${img},${dts}",
+      ]
+    }
+
+    foreach(package, activation_store) {
+      deps += [
+        package[2],
+        package[3],
+      ]
+
+      package_dir = get_label_info(package[2], "name")
+      out_dir = get_label_info(package[2], "target_out_dir")
+      img = rebase_path(out_dir) + "/" + package_dir + "/" + package[0]
+
+      staging_addr = package[1]
+      args += [
+        "--package",
+        "${img},${staging_addr}",
       ]
     }
 

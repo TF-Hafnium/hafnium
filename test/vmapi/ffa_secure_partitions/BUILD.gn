@@ -264,6 +264,8 @@ partitions_json("ffa_both_world_partitions_vhe_test") {
         ":vm_primary_test_package_vhe",
       ] ]
 
+  activation_store = []
+
   json_file = "ffa_both_world_partitions_vhe_test.json"
 }
 
@@ -297,6 +299,8 @@ partitions_json("ffa_both_world_partitions_test") {
         ":vm_primary_test_package",
         ":vm_primary_test_package",
       ] ]
+
+  activation_store = []
 
   json_file = "ffa_both_world_partitions_test.json"
 }
@@ -332,6 +336,8 @@ partitions_json("ffa_both_world_partitions_boot_fail_test_sp1") {
         ":vm_primary_boot_fail_test_package_sp1",
       ] ]
 
+  activation_store = []
+
   json_file = "ffa_both_world_partitions_boot_fail_test_sp1.json"
 }
 
@@ -366,6 +372,8 @@ partitions_json("ffa_both_world_partitions_boot_fail_test_sp2") {
         ":vm_primary_boot_fail_test_package_sp2",
       ] ]
 
+  activation_store = []
+
   json_file = "ffa_both_world_partitions_boot_fail_test_sp2.json"
 }
 
@@ -399,6 +407,8 @@ partitions_json("ffa_both_world_partitions_boot_fail_test_sp3") {
         ":vm_primary_boot_fail_test_package_sp3",
         ":vm_primary_boot_fail_test_package_sp3",
       ] ]
+
+  activation_store = []
 
   json_file = "ffa_both_world_partitions_boot_fail_test_sp3.json"
 }
@@ -435,6 +445,8 @@ partitions_json("ffa_both_world_partitions_sel1_up_test") {
         ":vm_primary_test_package",
         ":vm_primary_test_package",
       ] ]
+
+  activation_store = []
 
   json_file = "ffa_both_world_partitions_sel1_up_test.json"
 }

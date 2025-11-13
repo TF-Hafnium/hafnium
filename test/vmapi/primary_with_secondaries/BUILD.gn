@@ -398,6 +398,8 @@ partitions_json("primary_with_sp") {
         ":primary_with_sp_manifest",
       ] ]
 
+  activation_store = []
+
   json_file = "primary_with_sp.json"
 }
 
@@ -492,6 +494,8 @@ partitions_json("primary_with_sp_vhe") {
         ":primary_with_sp_manifest",
       ] ]
 
+  activation_store = []
+
   json_file = "primary_with_sp_vhe.json"
 }
 
@@ -570,6 +574,8 @@ partitions_json("sp_lifecycle_support") {
         ":sp_lifecycle_support_test_package",
         ":primary_with_sp_manifest",
       ] ]
+
+  activation_store = []
 
   json_file = "sp_lifecycle_support.json"
 }
