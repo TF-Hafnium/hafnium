@@ -104,6 +104,9 @@ static bool partition_pkg_from_tl(struct mm_stage1_locked stage1_locked,
 				  paddr_t pkg_start, struct partition_pkg *pkg)
 {
 	struct transfer_list_header *tl = ptr_from_va(va_from_pa(pkg_start));
+	struct transfer_list_entry *te = NULL;
+	struct transfer_list_entry *last_te = NULL;
+	unsigned int img_entries_count = 0U;
 	enum transfer_list_ops tl_res;
 
 	dlog_verbose("%s: partition loaded in a transfer list.\n", __func__);
@@ -119,6 +122,47 @@ static bool partition_pkg_from_tl(struct mm_stage1_locked stage1_locked,
 	tl_res = transfer_list_check_header(tl);
 
 	if (tl_res == TL_OPS_NON || tl_res == TL_OPS_CUS) {
+		dlog_error("%s: unsupported transfer list type found\n",
+			   __func__);
+		return false;
+	}
+
+	/*
+	 * Ensure there is exactly one SP image (TL_TAG_FFA_SP_BINARY) and that
+	 * it is the last entry in the transfer list. Making the image last
+	 * allows the SP to expand/zero NOBITS (.bss, etc.) beyond the end of
+	 * the packaged image without overwriting any subsequent TL entries.
+	 */
+	while (true) {
+		te = transfer_list_next(tl, te);
+
+		if (te == NULL) {
+			break;
+		}
+
+		last_te = te;
+		if (te->tag_id == TL_TAG_FFA_SP_BINARY) {
+			img_entries_count++;
+		}
+	}
+
+	if (last_te == NULL) {
+		return false;
+	}
+
+	if (img_entries_count != 1U) {
+		dlog_error(
+			"%s: invalid number of partition image entries "
+			"in TL: %u\n",
+			__func__, img_entries_count);
+		return false;
+	}
+
+	if (last_te->tag_id != TL_TAG_FFA_SP_BINARY) {
+		dlog_error(
+			"%s: partition image must be the last TL "
+			"entry.\n",
+			__func__);
 		return false;
 	}
 
