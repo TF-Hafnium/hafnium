@@ -27,6 +27,8 @@ static_assert(sizeof(recv_page) == PAGE_SIZE, "Recv page is not a page.");
 static hf_ipaddr_t send_page_addr = (hf_ipaddr_t)send_page;
 static hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 
+#define MAX_INFO_REGS_ENTRIES_PER_CALL 2
+
 struct mailbox_buffers set_up_mailbox(void)
 {
 	ASSERT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
@@ -834,6 +836,54 @@ struct ffa_partition_rxtx_header receive_indirect_message(void *payload,
 	return header;
 }
 
+/**
+ * SPMC always return v1.3 partition info descriptor. This function helps a
+ * legacy endpoint to extract v1.1 compliant information into a local data
+ * structure i.e. partition_info from a v1.3 descriptor.
+ */
+bool ffa_partition_info_regs_v1_1_get_part_info(
+	struct ffa_value args, uint8_t idx,
+	struct ffa_partition_info_v1_1 *partition_info)
+{
+	/* list of pointers to args in return value */
+	uint64_t *arg_ptrs[15] = {
+		&args.arg3,
+		&args.arg4,
+		&args.arg5,
+		&args.arg6,
+		&args.arg7,
+		&args.extended_val.arg8,
+		&args.extended_val.arg9,
+		&args.extended_val.arg10,
+		&args.extended_val.arg11,
+		&args.extended_val.arg12,
+		&args.extended_val.arg13,
+		&args.extended_val.arg14,
+		&args.extended_val.arg15,
+		&args.extended_val.arg16,
+		&args.extended_val.arg17,
+	};
+
+	/*
+	 * Each partition information is encoded in 6 registers, so there can be
+	 * a maximum of 2 entries.
+	 */
+	if (idx >= MAX_INFO_REGS_ENTRIES_PER_CALL || !partition_info) {
+		return false;
+	}
+
+	uint64_t info = *(arg_ptrs[(ptrdiff_t)(idx * 6)]);
+	uint64_t uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 1]);
+	uint64_t uuid_high = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 2]);
+
+	partition_info->vm_id = info & 0xFFFF;
+	partition_info->vcpu_count = (info >> 16) & 0xFFFF;
+	partition_info->properties = (info >> 32);
+	ffa_uuid_from_u64x2(uuid_lo, uuid_high, &partition_info->uuid);
+
+	return true;
+}
+
 bool ffa_partition_info_regs_get_part_info(
 	struct ffa_value args, uint8_t idx,
 	struct ffa_partition_info *partition_info)
@@ -858,21 +908,23 @@ bool ffa_partition_info_regs_get_part_info(
 	};
 
 	/*
-	 * Each partition information is encoded in 3 registers, so there can be
-	 * a maximum of 5 entries.
+	 * Each partition's information is encoded in 6 registers, so there can
+	 * be a maximum of 2 entries.
 	 */
-	if (idx >= 5 || !partition_info) {
+	if (idx >= MAX_INFO_REGS_ENTRIES_PER_CALL || !partition_info) {
 		return false;
 	}
 
-	uint64_t info = *(arg_ptrs[(ptrdiff_t)(idx * 3)]);
-	uint64_t uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx * 3) + 1]);
-	uint64_t uuid_high = *(arg_ptrs[(ptrdiff_t)(idx * 3) + 2]);
+	uint64_t info = *(arg_ptrs[(ptrdiff_t)(idx * 6)]);
+	uint64_t uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 1]);
+	uint64_t uuid_high = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 2]);
+	uint64_t version_info = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 5]);
 
 	partition_info->vm_id = info & 0xFFFF;
 	partition_info->vcpu_count = (info >> 16) & 0xFFFF;
 	partition_info->properties = (info >> 32);
-	ffa_uuid_from_u64x2(uuid_lo, uuid_high, &partition_info->uuid);
+	ffa_uuid_from_u64x2(uuid_lo, uuid_high, &partition_info->protocol_uuid);
+	partition_info->partition_ffa_version = version_info & 0x7FFFFFFF;
 
 	return true;
 }
@@ -996,4 +1048,28 @@ ffa_memory_handle_t share_page_with_endpoints(uint64_t page,
 		receivers_count, 0, 0, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
 		FFA_MEMORY_CACHE_WRITE_BACK);
+}
+
+void partition_info_convert_to_v1_1_format(
+	const struct ffa_partition_info *incoming,
+	struct ffa_partition_info_v1_1 partition_info_v1_1[],
+	const struct ffa_value ret)
+{
+	uint32_t descriptor_count;
+	uint32_t descriptor_size;
+
+	descriptor_count = (uint32_t)ret.arg2;
+	descriptor_size = (uint32_t)ret.arg3;
+
+	EXPECT_EQ(descriptor_size, sizeof(struct ffa_partition_info));
+	EXPECT_GT(descriptor_count, 0U);
+	EXPECT_TRUE((incoming != NULL) && (partition_info_v1_1 != NULL));
+
+	for (size_t i = 0; i < descriptor_count; i++) {
+		partition_info_v1_1[i].vm_id = incoming[i].vm_id;
+		partition_info_v1_1[i].vcpu_count = incoming[i].vcpu_count;
+		partition_info_v1_1[i].properties =
+			incoming[i].properties & ~FFA_PARTITION_v1_1_RES_MASK;
+		partition_info_v1_1[i].uuid = incoming[i].protocol_uuid;
+	}
 }

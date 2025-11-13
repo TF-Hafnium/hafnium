@@ -51,6 +51,7 @@ TEST(ffa_partition_info_get, three_secondary_vms)
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
 	const struct ffa_partition_info *partitions;
+	struct ffa_partition_info_v1_1 partition_info_v1_1[5];
 	struct ffa_uuid uuid;
 
 	/* A Null UUID requests information for all partitions. */
@@ -72,13 +73,17 @@ TEST(ffa_partition_info_get, three_secondary_vms)
 	/* Check that the expected partition information is returned. */
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
 	/* Confirm there are 3 FF-A partitions, two with 2 UUIDs. */
 	EXPECT_EQ(ret.arg2, 5);
 
-	/* The first two secondary VMs should have 1 vCPU, the other one 2. */
-	EXPECT_EQ(partitions[0].vcpu_count, 8);
-	EXPECT_EQ(partitions[1].vcpu_count, 8);
-	EXPECT_EQ(partitions[2].vcpu_count, 8);
+	partition_info_convert_to_v1_1_format(partitions, partition_info_v1_1,
+					      ret);
+
+	/* Check for the correct vCPU count for each endpoint. */
+	EXPECT_EQ(partition_info_v1_1[0].vcpu_count, 8);
+	EXPECT_EQ(partition_info_v1_1[1].vcpu_count, 8);
+	EXPECT_EQ(partition_info_v1_1[2].vcpu_count, 8);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }

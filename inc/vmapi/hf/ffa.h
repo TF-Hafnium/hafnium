@@ -1243,16 +1243,37 @@ typedef uint32_t ffa_partition_properties_t;
 #define FFA_PARTITION_DIRECT_REQ2_SEND (UINT32_C(1) << 10)
 
 /**
+ * Bits[31:11] of partition properties must be zero for FF-A v1.1.
+ * This corresponds to table 6.2 "Partition information descriptor"
+ * in FF-A 1.2 REL0 specification.
+ */
+#define FFA_PARTITION_v1_1_RES_MASK (~(UINT32_C(0x7FF)))
+
+/**
  * Holds information returned for each partition by the FFA_PARTITION_INFO_GET
  * interface.
  * This corresponds to table 13.37 "Partition information descriptor"
  * in FF-A 1.1 EAC0 specification.
  */
-struct ffa_partition_info {
+struct ffa_partition_info_v1_1 {
 	ffa_id_t vm_id;
 	ffa_vcpu_count_t vcpu_count;
 	ffa_partition_properties_t properties;
 	struct ffa_uuid uuid;
+};
+
+/*
+ * This corresponds to table 6.1 "Partition information descriptor"
+ * in FF-A 1.3 ALP2 specification.
+ */
+struct ffa_partition_info {
+	ffa_id_t vm_id;
+	ffa_vcpu_count_t vcpu_count;
+	ffa_partition_properties_t properties;
+	struct ffa_uuid protocol_uuid;
+	struct ffa_uuid image_uuid;
+	uint32_t partition_ffa_version;
+	uint32_t reserved_0;
 };
 
 /** Length in bytes of the name in boot information descriptor. */

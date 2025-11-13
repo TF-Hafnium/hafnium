@@ -17,7 +17,7 @@
 #include "test/vmapi/ffa.h"
 
 static void check_v1_1_partition_info_descriptors(
-	const struct ffa_partition_info *partitions)
+	const struct ffa_partition_info_v1_1 *partitions)
 {
 	struct ffa_uuid uuid;
 
@@ -61,6 +61,7 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
 	const struct ffa_partition_info *partitions;
+	struct ffa_partition_info_v1_1 partition_info_v1_1[5];
 	struct ffa_uuid uuid;
 
 	/* Setup the mailbox (which holds the RX buffer). */
@@ -83,8 +84,11 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	 */
 	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
 
+	partition_info_convert_to_v1_1_format(partitions, partition_info_v1_1,
+					      ret);
+
 	/* Expect the PVM as first partition. */
-	check_v1_1_partition_info_descriptors(partitions);
+	check_v1_1_partition_info_descriptors(partition_info_v1_1);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
@@ -119,6 +123,7 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
 	const struct ffa_partition_info *partitions;
+	struct ffa_partition_info_v1_1 partition_info_v1_1[5];
 	struct ffa_uuid uuid;
 
 	/* Setup the mailbox (which holds the RX buffer). */
@@ -155,10 +160,12 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 	 */
 	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
 
+	partition_info_convert_to_v1_1_format(partitions, partition_info_v1_1,
+					      ret);
 	/* Expect a secure partition. */
-	EXPECT_EQ(partitions[0].vm_id, HF_SPMC_VM_ID + 1);
-	EXPECT_TRUE(partitions[0].vcpu_count == 8 ||
-		    partitions[0].vcpu_count == 1);
+	EXPECT_EQ(partition_info_v1_1[0].vm_id, HF_SPMC_VM_ID + 1);
+	EXPECT_TRUE(partition_info_v1_1[0].vcpu_count == 8 ||
+		    partition_info_v1_1[0].vcpu_count == 1);
 
 	/*
 	 * If a uuid is specified (not null) ensure the uuid returned in the

@@ -23,7 +23,7 @@ TEAR_DOWN(ffa)
 }
 
 static void check_v1_1_partition_info_descriptors(
-	const struct ffa_partition_info *partitions)
+	const struct ffa_partition_info_v1_1 *partitions)
 {
 	struct ffa_uuid uuid;
 
@@ -90,7 +90,7 @@ TEST(ffa, ffa_partition_info_get_regs_uuid_null)
 	struct ffa_value ret;
 	uint16_t start_index = 0;
 	struct ffa_uuid uuid;
-	struct ffa_partition_info partition_info[4];
+	struct ffa_partition_info_v1_1 partition_info[4];
 	uint16_t last_index;
 	uint16_t curr_index;
 	uint16_t tag;
@@ -113,14 +113,26 @@ TEST(ffa, ffa_partition_info_get_regs_uuid_null)
 
 	/* Expect four partitions, one VM (primary), three SPs) */
 	EXPECT_EQ(last_index, 3);
-	EXPECT_EQ(curr_index, 3);
+
+	/* Expect 2 descriptors to be returned per invocation. */
+	EXPECT_EQ(curr_index, 1);
 	EXPECT_EQ(tag, 0);
 	EXPECT_EQ(desc_size, sizeof(struct ffa_partition_info));
 
-	ffa_partition_info_regs_get_part_info(ret, 0, &partition_info[0]);
-	ffa_partition_info_regs_get_part_info(ret, 1, &partition_info[1]);
-	ffa_partition_info_regs_get_part_info(ret, 2, &partition_info[2]);
-	ffa_partition_info_regs_get_part_info(ret, 3, &partition_info[3]);
+	ffa_partition_info_regs_v1_1_get_part_info(ret, 0, &partition_info[0]);
+	ffa_partition_info_regs_v1_1_get_part_info(ret, 1, &partition_info[1]);
+
+	start_index = 2;
+	ret = ffa_partition_info_get_regs(&uuid, start_index, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+
+	last_index = ffa_partition_info_regs_get_last_idx(ret);
+	curr_index = ffa_partition_info_regs_get_curr_idx(ret);
+
+	EXPECT_EQ(last_index, 3);
+	EXPECT_EQ(curr_index, start_index + 1);
+	ffa_partition_info_regs_v1_1_get_part_info(ret, 0, &partition_info[2]);
+	ffa_partition_info_regs_v1_1_get_part_info(ret, 1, &partition_info[3]);
 
 	check_v1_1_partition_info_descriptors(partition_info);
 }
@@ -130,6 +142,7 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
 	const struct ffa_partition_info *partitions;
+	struct ffa_partition_info_v1_1 partition_info_v1_1[5];
 	struct ffa_uuid uuid;
 
 	/* Setup the mailbox (which holds the RX buffer). */
@@ -155,8 +168,11 @@ TEST(ffa, ffa_partition_info_get_uuid_null)
 	 */
 	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
 
+	partition_info_convert_to_v1_1_format(partitions, partition_info_v1_1,
+					      ret);
+
 	/* Expect the PVM as first partition. */
-	check_v1_1_partition_info_descriptors(partitions);
+	check_v1_1_partition_info_descriptors(partition_info_v1_1);
 
 	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
 }
@@ -193,7 +209,7 @@ TEST(ffa, ffa_partition_info_get_uuid_fixed)
 {
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
-	const struct ffa_partition_info *partitions;
+	const struct ffa_partition_info_v1_1 *partitions;
 	struct ffa_uuid uuid;
 
 	/* Setup the mailbox (which holds the RX buffer). */

@@ -20,7 +20,7 @@ static void sp_check_partition_info_get_regs_null_uuid(void)
 	struct ffa_value ret;
 	uint16_t start_index = 0;
 	struct ffa_uuid uuid;
-	struct ffa_partition_info partitions[3];
+	struct ffa_partition_info_v1_1 partitions[3];
 	uint16_t last_index;
 	uint16_t curr_index;
 	uint16_t tag;
@@ -43,13 +43,20 @@ static void sp_check_partition_info_get_regs_null_uuid(void)
 
 	/* Expect three partitions (3 SPs) */
 	EXPECT_EQ(last_index, 2);
-	EXPECT_EQ(curr_index, 2);
+
+	/* Expect 2 descriptors to be returned per invocation. */
+	EXPECT_EQ(curr_index, 1);
 	EXPECT_EQ(tag, 0);
 	EXPECT_EQ(desc_size, sizeof(struct ffa_partition_info));
 
-	ffa_partition_info_regs_get_part_info(ret, 0, &partitions[0]);
-	ffa_partition_info_regs_get_part_info(ret, 1, &partitions[1]);
-	ffa_partition_info_regs_get_part_info(ret, 2, &partitions[2]);
+	ffa_partition_info_regs_v1_1_get_part_info(ret, 0, &partitions[0]);
+	ffa_partition_info_regs_v1_1_get_part_info(ret, 1, &partitions[1]);
+
+	start_index = 2;
+	ret = ffa_partition_info_get_regs(&uuid, start_index, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+
+	ffa_partition_info_regs_v1_1_get_part_info(ret, 0, &partitions[2]);
 
 	EXPECT_EQ(partitions[0].vm_id, SP_ID(1));
 	EXPECT_EQ(partitions[0].vcpu_count, 8);
@@ -88,7 +95,7 @@ static void sp_check_partition_info_get_regs_uuid(void)
 	struct ffa_value ret;
 	uint16_t start_index = 0;
 	struct ffa_uuid uuid;
-	struct ffa_partition_info partitions;
+	struct ffa_partition_info_v1_1 partitions;
 	uint16_t last_index;
 	uint16_t curr_index;
 	uint16_t tag;
@@ -112,7 +119,7 @@ static void sp_check_partition_info_get_regs_uuid(void)
 	EXPECT_EQ(tag, 0);
 	EXPECT_EQ(desc_size, sizeof(struct ffa_partition_info));
 
-	ffa_partition_info_regs_get_part_info(ret, 0, &partitions);
+	ffa_partition_info_regs_v1_1_get_part_info(ret, 0, &partitions);
 
 	EXPECT_EQ(partitions.vm_id, SP_ID(1));
 	EXPECT_EQ(partitions.vcpu_count, 8);
@@ -174,7 +181,7 @@ static void sp_check_partition_info_get_regs_start_idx(void)
 {
 	struct ffa_value ret;
 	struct ffa_uuid uuid;
-	struct ffa_partition_info partitions;
+	struct ffa_partition_info_v1_1 partitions;
 	uint16_t last_index;
 	uint16_t curr_index;
 	uint16_t tag;
@@ -200,7 +207,7 @@ static void sp_check_partition_info_get_regs_start_idx(void)
 	EXPECT_EQ(tag, 0);
 	EXPECT_EQ(desc_size, sizeof(struct ffa_partition_info));
 
-	ffa_partition_info_regs_get_part_info(ret, 0, &partitions);
+	ffa_partition_info_regs_v1_1_get_part_info(ret, 0, &partitions);
 
 	EXPECT_EQ(partitions.vm_id, SP_ID(2));
 	EXPECT_TRUE(partitions.vcpu_count == 8 || partitions.vcpu_count == 1);

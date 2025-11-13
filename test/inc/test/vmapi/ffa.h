@@ -164,6 +164,10 @@ struct ffa_partition_rxtx_header receive_indirect_message(void *payload,
 							  size_t payload_size,
 							  const void *recv_buf);
 
+bool ffa_partition_info_regs_v1_1_get_part_info(
+	struct ffa_value args, uint8_t idx,
+	struct ffa_partition_info_v1_1 *partition_info);
+
 bool ffa_partition_info_regs_get_part_info(
 	struct ffa_value args, uint8_t idx,
 	struct ffa_partition_info *partition_info);
@@ -179,3 +183,8 @@ ffa_memory_handle_t share_page_with_endpoints(uint64_t page,
 					      ffa_id_t receivers_ids[],
 					      size_t receivers_count,
 					      void *send_buf);
+
+void partition_info_convert_to_v1_1_format(
+	const struct ffa_partition_info *incoming,
+	struct ffa_partition_info_v1_1 partition_info_v1_1[],
+	const struct ffa_value ret);

@@ -47,9 +47,12 @@
 static_assert(sizeof(struct ffa_partition_info_v1_0) == 8,
 	      "Partition information descriptor size doesn't match the one in "
 	      "the FF-A 1.0 EAC specification, Table 82.");
-static_assert(sizeof(struct ffa_partition_info) == 24,
+static_assert(sizeof(struct ffa_partition_info_v1_1) == 24,
 	      "Partition information descriptor size doesn't match the one in "
 	      "the FF-A 1.1 BETA0 EAC specification, Table 13.34.");
+static_assert(sizeof(struct ffa_partition_info) == 48,
+	      "Partition information descriptor size doesn't match the one in "
+	      "the FF-A 1.3 ALP2 specification, Table 6.1.");
 static_assert((sizeof(struct ffa_partition_info) & 7) == 0,
 	      "Partition information descriptor must be a multiple of 8 bytes"
 	      " for ffa_partition_info_get_regs to work correctly. Information"
@@ -80,12 +83,12 @@ static_assert(MM_PPOOL_ENTRY_SIZE >= HF_MAILBOX_SIZE,
  * of FFA_PARTITION_INFO_GET_REGS_64 is size in bytes, of available
  * registers/args in struct ffa_value divided by size of struct
  * ffa_partition_info. For this ABI, arg3-arg17 in ffa_value can be used, i.e.
- * 15 uint64_t fields. For FF-A v1.1, this value should be 5.
+ * 15 uint64_t fields. For FF-A v1.3, this value should be 2.
  */
 #define MAX_INFO_REGS_ENTRIES_PER_CALL \
 	((15 * sizeof(uint64_t)) / sizeof(struct ffa_partition_info))
-static_assert(MAX_INFO_REGS_ENTRIES_PER_CALL == 5,
-	      "FF-A v1.1 supports no more than 5 entries"
+static_assert(MAX_INFO_REGS_ENTRIES_PER_CALL == 2,
+	      "FF-A v1.3 supports no more than 2 entries"
 	      " per FFA_PARTITION_INFO_GET_REGS64 calls");
 
 /**
@@ -528,6 +531,7 @@ static void api_ffa_fill_partition_info(
 	out_partition->vcpu_count = vm->vcpu_count;
 	out_partition->properties = api_ffa_partitions_info_get_properties(
 		caller_id, vm, service_idx);
+	out_partition->reserved_0 = 0;
 }
 
 /**
@@ -602,9 +606,9 @@ static bool api_ffa_fill_partitions_info_array(
 				 * write it
 				 */
 				if (match_any) {
-					out_partition->uuid = uuid;
+					out_partition->protocol_uuid = uuid;
 				} else {
-					out_partition->uuid =
+					out_partition->protocol_uuid =
 						(struct ffa_uuid){0};
 				}
 
@@ -726,7 +730,7 @@ bool api_ffa_fill_partition_info_from_regs(
 
 	/*
 	 * Hafnium expects the size of the returned descriptor to be equal to
-	 * the size of the structure in the FF-A 1.1 specification. When future
+	 * the size of the structure in the FF-A 1.3 specification. When future
 	 * enhancements are made, this assert can be relaxed.
 	 */
 	assert(ffa_partition_info_regs_get_desc_size(ret) ==
@@ -747,16 +751,33 @@ bool api_ffa_fill_partition_info_from_regs(
 		uint64_t info = *(arg_ptrs[(ptrdiff_t)(idx++)]);
 		uint64_t uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx++)]);
 		uint64_t uuid_high = *(arg_ptrs[(ptrdiff_t)(idx++)]);
+		uint64_t image_uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx++)]);
+		uint64_t image_uuid_high = *(arg_ptrs[(ptrdiff_t)(idx++)]);
+		uint64_t version_info = *(arg_ptrs[(ptrdiff_t)(idx++)]);
 
 		partitions[entries_count].vm_id = info & 0xFFFF;
 		partitions[entries_count].vcpu_count = (info >> 16) & 0xFFFF;
 		partitions[entries_count].properties = (info >> 32);
-		partitions[entries_count].uuid.uuid[0] = uuid_lo & 0xFFFFFFFF;
-		partitions[entries_count].uuid.uuid[1] =
+		partitions[entries_count].protocol_uuid.uuid[0] =
+			uuid_lo & 0xFFFFFFFF;
+		partitions[entries_count].protocol_uuid.uuid[1] =
 			(uuid_lo >> 32) & 0xFFFFFFFF;
-		partitions[entries_count].uuid.uuid[2] = uuid_high & 0xFFFFFFFF;
-		partitions[entries_count].uuid.uuid[3] =
+		partitions[entries_count].protocol_uuid.uuid[2] =
+			uuid_high & 0xFFFFFFFF;
+		partitions[entries_count].protocol_uuid.uuid[3] =
 			(uuid_high >> 32) & 0xFFFFFFFF;
+		partitions[entries_count].image_uuid.uuid[0] =
+			image_uuid_lo & 0xFFFFFFFF;
+		partitions[entries_count].image_uuid.uuid[1] =
+			(image_uuid_lo >> 32) & 0xFFFFFFFF;
+		partitions[entries_count].image_uuid.uuid[2] =
+			image_uuid_high & 0xFFFFFFFF;
+		partitions[entries_count].image_uuid.uuid[3] =
+			(image_uuid_high >> 32) & 0xFFFFFFFF;
+
+		/* Bits 63:31 reserved. */
+		partitions[entries_count].partition_ffa_version =
+			version_info & 0x7FFFFFFF;
 		entries_count++;
 		num_entries--;
 	}
@@ -896,21 +917,28 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 	ret.arg2 |= (uint64_t)curr_idx << 16;
 	ret.arg2 |= max_idx;
 
-	if (num_entries_to_ret > 1) {
-		ret.extended_val.valid = 1;
-	}
+	ret.extended_val.valid = true;
 
 	for (uint16_t idx = start_index; idx <= curr_idx; ++idx) {
 		uint64_t *xn_0 = arg_ptrs[arg_idx++];
 		uint64_t *xn_1 = arg_ptrs[arg_idx++];
 		uint64_t *xn_2 = arg_ptrs[arg_idx++];
+		uint64_t *xn_3 = arg_ptrs[arg_idx++];
+		uint64_t *xn_4 = arg_ptrs[arg_idx++];
+		uint64_t *xn_5 = arg_ptrs[arg_idx++];
+		ffa_id_t vm_id;
 
-		api_ffa_pack_vmid_count_props(xn_0, partitions[idx].vm_id,
+		vm_id = partitions[idx].vm_id;
+
+		api_ffa_pack_vmid_count_props(xn_0, vm_id,
 					      partitions[idx].vcpu_count,
 					      partitions[idx].properties);
-		if (uuid_is_null) {
-			ffa_uuid_to_u64x2(xn_1, xn_2, &partitions[idx].uuid);
-		}
+
+		ffa_uuid_to_u64x2(xn_1, xn_2, &partitions[idx].protocol_uuid);
+		ffa_uuid_to_u64x2(xn_3, xn_4, &partitions[idx].image_uuid);
+
+		*xn_5 = partitions[idx].partition_ffa_version;
+
 		assert(arg_idx <= ARRAY_SIZE(arg_ptrs));
 	}
 
