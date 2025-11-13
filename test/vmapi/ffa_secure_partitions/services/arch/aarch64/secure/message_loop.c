@@ -11,11 +11,149 @@
 
 #include "vmapi/hf/call.h"
 
+#include "live_buffer.h"
 #include "partition_services.h"
 #include "sp_helpers.h"
 #include "test/abort.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
+
+#if LIVE_ACTIVATION_SUPPORT == 1
+
+const uint32_t msg[3] = {
+	0x4c4641,  // "LFA"
+	0x53504D,  // "SPM"
+	0x4c5342,  // "LSB" Live State Buffer
+};
+
+extern uint64_t shared_nwd_buffer_addr;
+
+/* Live state buffer passed to next image. */
+static struct live_buffer *live_state_buffer;
+
+static uint64_t live_buffer_addr_cached;
+
+static uint64_t live_buffer_size_cached;
+
+/* FDT of the partition manifest for live-buffer parsing. */
+static struct fdt *manifest_fdt;
+
+/**
+ * Locate the memory-region node for the live-state-buffer based on its phandle.
+ * Aborts on error.
+ */
+static struct fdt_node find_live_buffer_mem_region(void)
+{
+	struct fdt_node root;
+	struct fdt_node ffa_node;
+	uint32_t phandle = 0;
+	struct string info_name = STRING_INIT("live-state-buffer-info");
+	struct string regions_name = STRING_INIT("memory-regions");
+
+	if (manifest_fdt == NULL) {
+		dlog_error(
+			"Manifest FDT not initialized for live buffer "
+			"lookup\n");
+		abort();
+	}
+
+	if (!fdt_find_node(manifest_fdt, "/", &root)) {
+		abort();
+	}
+
+	ffa_node = root;
+	if (!fdt_find_child(&ffa_node, &info_name)) {
+		abort();
+	}
+
+	if (!fdt_read_number(&ffa_node, "live-state-buffer",
+			     (uint64_t *)&phandle)) {
+		abort();
+	}
+
+	if (!fdt_find_child(&root, &regions_name)) {
+		abort();
+	}
+
+	ffa_node = root;
+	if (!fdt_first_child(&ffa_node)) {
+		abort();
+	}
+
+	do {
+		uint64_t val = 0;
+		if (fdt_read_number(&ffa_node, "phandle", &val) &&
+		    (uint32_t)val == phandle) {
+			return ffa_node;
+		}
+	} while (fdt_next_sibling(&ffa_node));
+
+	dlog_error("Live state buffer region not found\n");
+	abort();
+}
+
+/**
+ * Read the live-state-buffer base address from the manifest FDT.
+ * Caches the result to avoid repeated parsing.
+ */
+static uint64_t get_live_buffer_addr(void)
+{
+	struct fdt_node region;
+	uint64_t base = 0;
+
+	if (live_buffer_addr_cached != 0) {
+		return live_buffer_addr_cached;
+	}
+
+	region = find_live_buffer_mem_region();
+	if (!fdt_read_number(&region, "base-address", &base) || base == 0) {
+		dlog_error("Live state buffer base-address not found\n");
+		abort();
+	}
+
+	live_buffer_addr_cached = base;
+
+	return base;
+}
+
+/**
+ * Read the live-state-buffer size in bytes from the manifest FDT.
+ * Caches the result to avoid repeated parsing.
+ */
+static uint64_t get_live_buffer_size(void)
+{
+	struct fdt_node region;
+	uint64_t pages = 0;
+	uint64_t size;
+
+	if (live_buffer_size_cached != 0) {
+		return live_buffer_size_cached;
+	}
+
+	region = find_live_buffer_mem_region();
+	if (!fdt_read_number(&region, "pages-count", &pages) || pages == 0) {
+		dlog_error("Live state buffer pages-count not found or zero\n");
+		abort();
+	}
+
+	size = pages * PAGE_SIZE;
+	live_buffer_size_cached = size;
+
+	return size;
+}
+
+static struct live_buffer *find_live_buffer(void)
+{
+	if (live_state_buffer == NULL) {
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		live_state_buffer =
+			(struct live_buffer *)(uintptr_t)get_live_buffer_addr();
+	}
+
+	return live_state_buffer;
+}
+
+#endif
 
 static struct ffa_value handle_direct_req2_cmd(struct ffa_value res)
 {
@@ -201,7 +339,8 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	struct ffa_value res;
 
 	if (is_boot_vcpu) {
-		struct fdt fdt;
+		/* Persistent FDT storage to support live activation lookup. */
+		static struct fdt fdt;
 		void *fdt_ptr;
 		struct ffa_boot_info_header *boot_info_header;
 		extern void secondary_ep_entry(void);
@@ -224,6 +363,11 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		}
 
 		hftest_parse_ffa_manifest(ctx, &fdt);
+
+#if LIVE_ACTIVATION_SUPPORT == 1
+		/* Save manifest FDT for live buffer lookup */
+		manifest_fdt = &fdt;
+#endif
 
 		/*
 		 * Map MMIO address space of peripherals (such as secure
