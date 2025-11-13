@@ -15,11 +15,22 @@ config("config") {
   ]
 }
 
+# Propagate LIVE_ACTIVATION_SUPPORT define to all SP source sets.
+config("live_activation_disabled") {
+  defines = [ "LIVE_ACTIVATION_SUPPORT=0" ]
+}
+
+# Propagate LIVE_ACTIVATION_SUPPORT define to all SP source sets.
+config("live_activation_enabled") {
+  defines = [ "LIVE_ACTIVATION_SUPPORT=1" ]
+}
+
 source_set("arch_timer") {
   testonly = true
   public_configs = [
     ":config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "arch_timer.c" ]
 }
@@ -29,6 +40,7 @@ source_set("common") {
   public_configs = [
     ":config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "common.c" ]
 }
@@ -38,6 +50,7 @@ source_set("discovery") {
   public_configs = [
     ":config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "discovery.c" ]
 
@@ -46,7 +59,10 @@ source_set("discovery") {
 
 source_set("pauth") {
   testonly = true
-  public_configs = [ ":config" ]
+  public_configs = [
+    ":config",
+    ":live_activation_disabled",
+  ]
   sources = [ "pauth.c" ]
 
   deps = [ ":common" ]
@@ -57,6 +73,7 @@ source_set("partition_services") {
   public_configs = [
     ":config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "partition_services.c" ]
 
@@ -73,6 +90,7 @@ source_set("notifications") {
   public_configs = [
     ":config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "notifications.c" ]
 
@@ -84,6 +102,7 @@ source_set("power_mgt") {
   public_configs = [
     ":config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "power_mgt.c" ]
 }
@@ -93,6 +112,7 @@ source_set("secure_interrupts") {
   public_configs = [
     ":config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "secure_interrupts.c" ]
 }
@@ -103,6 +123,7 @@ source_set("message_loop") {
     ":config",
     "//test/hftest:hftest_config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "message_loop.c" ]
 
@@ -124,6 +145,7 @@ source_set("test_main_sp_boot_error_fail") {
     ":config",
     "//test/hftest:hftest_config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "test_main_sp_boot_error_fail.c" ]
 
@@ -136,6 +158,7 @@ source_set("test_main_sp_boot_abort_fail") {
     ":config",
     "//test/hftest:hftest_config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "test_main_sp_boot_abort_fail.c" ]
 
@@ -147,6 +170,7 @@ source_set("sp_helpers") {
   public_configs = [
     ":config",
     "//src/arch/aarch64:arch_config",
+    ":live_activation_disabled",
   ]
   sources = [ "sp_helpers.c" ]
 }
@@ -314,4 +338,162 @@ partition_package("service_sp_third_package_boot_fail_test") {
         ":secure_partitions_services_boot_abort_fail_test",
       ] ]
   output = "service_sp_third_package_boot_error_fail_test.img"
+}
+
+source_set("arch_timer_lfa") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "arch_timer.c" ]
+}
+
+source_set("common_lfa") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "common.c" ]
+}
+
+source_set("discovery_lfa") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "discovery.c" ]
+
+  deps = [ ":common_lfa" ]
+}
+
+source_set("pauth_lfa") {
+  testonly = true
+  public_configs = [ ":config" ]
+  sources = [ "pauth.c" ]
+
+  deps = [ ":common_lfa" ]
+}
+
+source_set("partition_services_lfa") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "partition_services.c" ]
+
+  deps = [
+    ":common_lfa",
+    "//src/arch/aarch64:smc",
+    "//test/vmapi/common:ffa",
+    "//vmlib",
+  ]
+}
+
+source_set("notifications_lfa") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "notifications.c" ]
+
+  deps = [ ":common_lfa" ]
+}
+
+source_set("power_mgt_lfa") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "power_mgt.c" ]
+}
+
+source_set("secure_interrupts_lfa") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "secure_interrupts.c" ]
+}
+
+source_set("message_loop_lfa") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "//test/hftest:hftest_config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "message_loop.c" ]
+
+  deps = [
+    ":arch_timer_lfa",
+    ":discovery_lfa",
+    ":notifications_lfa",
+    ":partition_services_lfa",
+    ":pauth_lfa",
+    ":power_mgt_lfa",
+    ":secure_interrupts_lfa",
+    "//test/vmapi/common:ffa",
+  ]
+}
+
+source_set("sp_helpers_lfa") {
+  testonly = true
+
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "sp_helpers.c" ]
+}
+
+vm_kernel("sp_el1_live_activation") {
+  testonly = true
+  public_configs = [ ":config" ]
+
+  deps = [
+    ":message_loop_lfa",
+    ":sp_helpers_lfa",
+    "//src/arch/aarch64:arch",
+    "//src/arch/aarch64/hftest:interrupts",
+    "//test/hftest:hftest_secure_service",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
+    "//test/vmapi/common/arch/aarch64/secure:live_buffer",
+    "//test/vmapi/common/arch/aarch64/secure:twdog",
+    "//test/vmapi/common/arch/aarch64/system_timer:ap_refclk",
+    "//vmlib/${plat_arch}:call",
+  ]
+}
+
+manifest("partition_manifest_live_activate_first") {
+  source = "partition_manifest_live_activate_first.dts"
+  output = "partition_manifest_live_activate_first.dtb"
+}
+
+partition_package("sp_first_live_activation_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_live_activate_first.dtb",
+        "sp_el1_live_activation.bin",
+        ":partition_manifest_live_activate_first",
+        ":sp_el1_live_activation",
+      ] ]
+  output = "sp_first_live_activation.img"
 }

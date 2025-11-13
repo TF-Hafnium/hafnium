@@ -55,3 +55,52 @@ partition_package("service_sp_second_package") {
       ] ]
   output = "service_sp_second_el0_package.img"
 }
+
+# Propagate LIVE_ACTIVATION_SUPPORT define to all SP source sets.
+config("live_activation_enabled") {
+  defines = [ "LIVE_ACTIVATION_SUPPORT=1" ]
+}
+
+source_set("sp_helpers_lfa") {
+  testonly = true
+
+  public_configs = [
+    ":config",
+    "//src/arch/aarch64:arch_config",
+    ":live_activation_enabled",
+  ]
+  sources = [ "sp_helpers.c" ]
+}
+
+vm_kernel("sp_el0_live_activation") {
+  testonly = true
+
+  deps = [
+    ":sp_helpers_lfa",
+    "//src/arch/aarch64/hftest/el0:interrupts",
+    "//test/hftest:hftest_sel0_partition_base",
+    "//test/vmapi/common/arch/aarch64/el0:exception_handler",
+    "//test/vmapi/common/arch/aarch64/secure:live_buffer",
+    "//test/vmapi/common/arch/aarch64/secure:twdog",
+    "//test/vmapi/common/arch/aarch64/system_timer:ap_refclk",
+    "//test/vmapi/ffa_secure_partitions/services/arch/aarch64/secure:message_loop_lfa",
+  ]
+}
+
+manifest("partition_manifest_live_activate_second") {
+  source = "partition_manifest_live_activate_second.dts"
+  output = "partition_manifest_live_activate_second.dtb"
+}
+
+partition_package("sp_second_live_activation_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_live_activate_second.dtb",
+        "sp_el0_live_activation.bin",
+        ":partition_manifest_live_activate_second",
+        ":sp_el0_live_activation",
+      ] ]
+  output = "sp_second_live_activation.img"
+}
