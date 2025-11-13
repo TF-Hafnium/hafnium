@@ -87,3 +87,11 @@ source_set("pauth") {
   public_configs = [ "//src/arch/aarch64:config" ]
   sources = [ "pauth_macros.S" ]
 }
+
+source_set("lfa_driver") {
+  testonly = true
+  public_configs = [ "//src/arch/aarch64:config" ]
+  sources = [ "lfa_driver.c" ]
+
+  deps = [ "//src/arch/aarch64:smc" ]
+}
