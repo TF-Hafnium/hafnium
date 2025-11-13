@@ -189,6 +189,39 @@ static struct ffa_value handle_direct_req_framework_msg(struct ffa_value args)
 		ret = ffa_framework_message_send_direct_resp(
 			own_id, HF_SPMC_VM_ID, FFA_FRAMEWORK_MSG_PSCI_RESP,
 			0ULL, 0ULL, 0ULL);
+
+#if LIVE_ACTIVATION_SUPPORT == 1
+	} else if (func == FFA_FRAMEWORK_MSG_PARTITION_STOP_REQ) {
+		struct live_buffer *buffer;
+		ffa_id_t own_id;
+		uint32_t counter;
+
+		own_id = hf_vm_get_id();
+		buffer = find_live_buffer();
+
+		/*
+		 * This Secure Partition is being requested to stop with the
+		 * aim of live activation. Prepare the SP live state buffer.
+		 */
+		if (!live_buffer_is_valid(buffer)) {
+			HFTEST_LOG_FAILURE();
+			HFTEST_LOG(HFTEST_LOG_INDENT
+				   "SP Live state buffer corrupted.");
+			abort();
+		}
+
+		counter = live_buffer_get_counter(buffer);
+		live_buffer_set_token(buffer, msg[counter % 3]);
+		buffer->data = shared_nwd_buffer_addr;
+
+		EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+		HFTEST_LOG("Partition stop request received and ack");
+
+		ret = ffa_framework_message_send_direct_resp(
+			own_id, HF_SPMC_VM_ID,
+			FFA_FRAMEWORK_MSG_PARTITION_STOP_RESP, 0ULL,
+			get_live_buffer_addr(), get_live_buffer_size());
+#endif
 	} else {
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
