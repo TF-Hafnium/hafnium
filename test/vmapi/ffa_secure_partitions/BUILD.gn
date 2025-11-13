@@ -463,7 +463,10 @@ vm_kernel("vm_lfa_test") {
     "//src/arch/${plat_arch}:arch_config",
   ]
 
-  sources = [ "sp_live_activation.c" ]
+  sources = [
+    "partition_info_v1_3.c",
+    "sp_live_activation.c",
+  ]
 
   deps = [
     ":ffa_secure_partitions_vhe",
