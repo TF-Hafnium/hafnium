@@ -186,6 +186,12 @@ enum vm_state {
 	VM_STATE_HALTED,
 };
 
+enum live_activation_progress {
+	LFA_PHASE_RESET,
+	LFA_PHASE_START,
+	LFA_PHASE_FINISH,
+};
+
 /* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct vm {
 	ffa_id_t id;
@@ -321,6 +327,16 @@ struct vm {
 
 	/** Live activation status register. */
 	uint32_t live_activation_reg_num;
+
+	/** Track the progress of this partition's live activation. */
+	enum live_activation_progress lfa_progress;
+
+	/**
+	 * Physical base address of new (i.e. live activated) instance for this
+	 * partition.
+	 */
+	paddr_t new_instance_addr;
+	size_t new_instance_size;
 };
 
 /** Encapsulates a VM whose lock is held. */

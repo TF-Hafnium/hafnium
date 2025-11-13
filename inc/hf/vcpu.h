@@ -375,3 +375,4 @@ void vcpu_dir_req_set_state(struct vcpu_locked target_locked, bool is_ffa_req2,
 
 void vcpu_dir_req_reset_state(struct vcpu_locked vcpu_locked);
 bool vcpu_state_set(struct vcpu_locked vcpu_locked, enum vcpu_state to);
+bool vcpu_is_available(struct vcpu *vcpu);

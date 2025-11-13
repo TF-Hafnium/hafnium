@@ -173,6 +173,7 @@ enum ffa_function : uint32_t {
  * be zero).
  */
 enum ffa_error : uint32_t {
+	FFA_SUCCESSFUL         = UINT32_C(0),
 	FFA_NOT_SUPPORTED      = UINT32_C(-1),
 	FFA_INVALID_PARAMETERS = UINT32_C(-2),
 	FFA_NO_MEMORY          = UINT32_C(-3),
@@ -323,6 +324,8 @@ static inline const char *ffa_func_name(enum ffa_function func)
 static inline const char *ffa_error_name(enum ffa_error error)
 {
 	switch (error) {
+	case FFA_SUCCESSFUL:
+		return "FFA_SUCCESSFUL";
 	case FFA_NOT_SUPPORTED:
 		return "FFA_NOT_SUPPORTED";
 	case FFA_INVALID_PARAMETERS:
