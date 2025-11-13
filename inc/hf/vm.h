@@ -304,6 +304,17 @@ struct vm {
 	 * Partition Lifecycle guidance.
 	 */
 	bool lifecycle_support;
+
+	/** Whether this partition can undergo live activation. */
+	bool live_activation_support;
+
+	/**
+	 * Whether CPU rendezvous is needed for live activating this partition.
+	 */
+	bool live_activation_cpu_rendezvous;
+
+	/** Live activation status register. */
+	uint32_t live_activation_reg_num;
 };
 
 /** Encapsulates a VM whose lock is held. */

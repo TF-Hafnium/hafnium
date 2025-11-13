@@ -252,6 +252,14 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 		vm_locked.vm->abort_action =
 			manifest_vm->partition.abort_action;
 
+		vm_locked.vm->live_activation_support =
+			manifest_vm->partition.live_activation.enabled;
+
+		vm_locked.vm->live_activation_cpu_rendezvous = false;
+
+		vm_locked.vm->live_activation_reg_num =
+			manifest_vm->partition.live_activation.status_reg_num;
+
 		if (manifest_vm->partition.boot_info) {
 			/*
 			 * If the partition expects the boot information blob

@@ -515,6 +515,14 @@ static ffa_partition_properties_t api_ffa_partitions_info_get_properties(
 			      FFA_PARTITION_INDIRECT_MSG;
 	}
 
+	if (vm->ffa_version >= FFA_VERSION_1_3 && vm->live_activation_support) {
+		properties |= FFA_PARTITION_LIVE_ACTIVATION;
+
+		if (vm->live_activation_cpu_rendezvous) {
+			properties |= FFA_PARTITION_CPU_RENDEZVOUS;
+		}
+	}
+
 	/*
 	 * Only populate on calls from normal world,
 	 * and if SP supports receiving direct message requests.

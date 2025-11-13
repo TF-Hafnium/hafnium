@@ -1249,11 +1249,29 @@ typedef uint32_t ffa_partition_properties_t;
 #define FFA_PARTITION_DIRECT_REQ2_SEND (UINT32_C(1) << 10)
 
 /**
+ * Partition property: partition can undergo live activation.
+ */
+#define FFA_PARTITION_LIVE_ACTIVATION (UINT32_C(1) << 11)
+
+/**
+ * Partition property: partition requires CPU rendezvous to undergo live
+ * activation.
+ */
+#define FFA_PARTITION_CPU_RENDEZVOUS (UINT32_C(1) << 12)
+
+/**
  * Bits[31:11] of partition properties must be zero for FF-A v1.1.
  * This corresponds to table 6.2 "Partition information descriptor"
  * in FF-A 1.2 REL0 specification.
  */
 #define FFA_PARTITION_v1_1_RES_MASK (~(UINT32_C(0x7FF)))
+
+/**
+ * Bits[31:13] of partition properties must be zero for FF-A v1.3.
+ * This corresponds to table 8.25 "Partition information descriptor"
+ * in FF-A 1.3 ALP1 specification.
+ */
+#define FFA_PARTITION_v1_3_RES_MASK (~(UINT32_C(0x1FFF)))
 
 /**
  * Holds information returned for each partition by the FFA_PARTITION_INFO_GET
