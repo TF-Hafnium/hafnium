@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 VM_PARAM_OFFSET = 5
 INITRD_PARAM_OFFSET = 8
 SP_PARAM_OFFSET = 10
+PKG_PARAM_OFFSET = 15
 
 # Maps FVP driver configuration keys to their corresponding static Shrinkwrap overlays
 SHRINKWRAP_STATIC_OVERLAY_MAP = {

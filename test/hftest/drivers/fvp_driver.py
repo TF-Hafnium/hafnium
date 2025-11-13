@@ -101,6 +101,15 @@ class FvpDriver(Driver, ABC):
                 manifests += correct_vm_node(read_file(p["dts"]), i + 1)
         return manifests
 
+    def get_pkg_and_staging_addr(self, packages : dict):
+        ret = []
+        for p in packages or []:
+            addr = p.get("address")
+            if addr is None:
+                raise KeyError("Package entry missing 'address' field")
+            ret.append((p["img"], addr))
+        return ret
+
     def get_shrinkwrap_static_overlay(self):
         key = self.shrinkwrap_static_overlay_key
         if key is None:
@@ -448,6 +457,8 @@ class FvpDriverSPMC(FvpDriver):
         fvp_prebuilt_bl31 = os.path.join(FVP_PREBUILT_TFA_SPMD_ROOT, "bl31.bin") if fvp_prebuilt_bl31 is None else fvp_prebuilt_bl31
         super().__init__(args, cpu_start_address, fvp_prebuilt_bl31)
         self.sps_in_partitions_json = args.partitions and args.partitions["SPs"]
+        # Packages are optional and used in live activation scenarios
+        self.pkgs_in_partitions_json = args.partitions and args.partitions.get("Packages")
         self._spmc_address = 0x6000000
         self._spmc_dtb_address = 0x0403f000
 
@@ -511,6 +522,37 @@ class FvpDriverSPMC(FvpDriver):
         if sp_entries:
             params.update(sw_util.ShrinkwrapManager.add_multi_param_with_spacing(
                 "--data cluster0.cpu0", sp_entries, offset=sw_util.SP_PARAM_OFFSET))
+
+        # Add Live activation package images and load address variables
+        pkg_entries = []
+        if self.pkgs_in_partitions_json:
+            pkg_and_addr = self.get_pkg_and_staging_addr(self.args.partitions["Packages"])
+
+            # Collect rtvars and param values for all packages
+            for i, (pkg, addr) in enumerate(pkg_and_addr):
+                pkg_name = f"PKG{i + 1}"
+                pkg_img_var = f"{pkg_name}_IMG"
+                pkg_addr_var = f"{pkg_name}_ADDR"
+
+                # Create rtvars
+                rtvars.update({
+                    pkg_img_var: {
+                        "type": "path",
+                        "value": str(pkg)
+                    },
+                    pkg_addr_var: {
+                        "type": "string",
+                        "value": hex(addr)
+                    }
+                })
+                # Construct value for --data cluster0.cpu0
+                pkg_entries.append(f"${{rtvar:{pkg_img_var}}}@${{rtvar:{pkg_addr_var}}}")
+
+        # Generate a unique param key (YAML requires unique keys)
+        # Add --data cluster0.cpu0 spaced entries for Packages (offset=15)
+        if pkg_entries:
+            params.update(sw_util.ShrinkwrapManager.add_multi_param_with_spacing(
+                "--data cluster0.cpu0", pkg_entries, offset=sw_util.PKG_PARAM_OFFSET))
 
         # Add static rtvars like SPMC_DTB
         rtvars["SPMC_DTB"] = {

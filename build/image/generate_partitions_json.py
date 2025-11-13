@@ -56,10 +56,11 @@ def Main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--sp", action="append")
     parser.add_argument("--vm", action="append")
+    parser.add_argument("--package", action="append")
     parser.add_argument("--out", action="store", required=True)
     args = parser.parse_args()
 
-    #Arguments sanity check:
+    # Arguments sanity check: require at least one partition of any kind
     if args.vm is None and args.sp is None:
         raise Exception("Specify at least one VM (--vm) or one SP (--sp)")
 
@@ -68,6 +69,16 @@ def Main():
         partitions["SPs"] = list_of_partitions(args.sp)
     if args.vm is not None:
         partitions["VMs"] = list_of_partitions(args.vm)
+    if args.package is not None:
+        # Packages use staging address (address) instead of dts
+        def partition_info_pkg(img, staging_addr):
+            try:
+                addr = int(staging_addr, 0)
+            except ValueError:
+                raise Exception(f"Invalid staging address: {staging_addr}")
+            return {"img": img, "address": addr}
+        partitions["Packages"] = [partition_info_pkg(*split_partition_arg(p))
+                                  for p in args.package]
 
     json.dump(partitions, open(args.out, "w+"))
     return 0
