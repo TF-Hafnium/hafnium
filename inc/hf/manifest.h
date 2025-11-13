@@ -65,3 +65,5 @@ enum manifest_return_code parse_ffa_manifest(
 void manifest_dump(struct manifest_vm *vm);
 
 const char *manifest_strerror(enum manifest_return_code ret_code);
+
+struct manifest *get_hypervisor_manifest(void);

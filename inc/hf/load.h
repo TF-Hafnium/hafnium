@@ -18,8 +18,7 @@
 #include "hf/mm.h"
 #include "hf/mpool.h"
 
-bool load_vms(struct mm_stage1_locked stage1_locked,
-	      const struct manifest *manifest, const struct memiter *cpio,
-	      const struct boot_params *params,
+bool load_vms(struct mm_stage1_locked stage1_locked, struct manifest *manifest,
+	      const struct memiter *cpio, const struct boot_params *params,
 	      struct boot_params_update *update);
 bool load_reinit_partition(struct vm *vm);

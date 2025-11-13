@@ -33,9 +33,9 @@
 
 #include "vmapi/hf/ffa.h"
 
-static const struct manifest *partition_manager_manifest;
+static struct manifest *partition_manager_manifest;
 
-const struct manifest *get_hypervisor_manifest(void)
+struct manifest *get_hypervisor_manifest(void)
 {
 	return partition_manager_manifest;
 }
@@ -1034,9 +1034,8 @@ static bool init_other_world_vm(const struct boot_params *params)
 /*
  * Loads alls VMs from the manifest.
  */
-bool load_vms(struct mm_stage1_locked stage1_locked,
-	      const struct manifest *manifest, const struct memiter *cpio,
-	      const struct boot_params *params,
+bool load_vms(struct mm_stage1_locked stage1_locked, struct manifest *manifest,
+	      const struct memiter *cpio, const struct boot_params *params,
 	      struct boot_params_update *update)
 {
 	struct vm *primary;
@@ -1155,7 +1154,7 @@ bool load_reinit_partition(struct vm *vm)
 	paddr_t mem_end;
 	struct mm_stage1_locked stage1_locked;
 	bool ret = true;
-	const struct manifest *manager_manifest;
+	struct manifest *manager_manifest;
 
 	assert(vm->lifecycle_support);
 
