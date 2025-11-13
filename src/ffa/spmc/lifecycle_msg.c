@@ -18,10 +18,69 @@
 #include "hf/partition_pkg.h"
 #include "hf/std.h"
 
+static void build_frmk_msg_partition_stop_req(struct vcpu_locked target_locked,
+					      bool stop_to_live_activate)
+{
+	struct vcpu *target_vcpu = target_locked.vcpu;
+	uint32_t flags =
+		FFA_FRAMEWORK_MSG_BIT | FFA_FRAMEWORK_MSG_PARTITION_STOP_REQ;
+	uint32_t reason = stop_to_live_activate ? 1 : 0;
+
+	/*
+	 * Build a Framework direct request message requesting the vCPU to stop
+	 * in order to perform live activation.
+	 */
+	struct ffa_value args = {
+		/* Direct request message. */
+		.func = FFA_MSG_SEND_DIRECT_REQ_32,
+
+		/* Populate sender and receiver endpoint IDs. */
+		.arg1 = ((uint64_t)HF_SPMC_VM_ID << 16) | target_vcpu->vm->id,
+
+		/*
+		 * Message Flags: Framework message and partition stop request.
+		 */
+		.arg2 = (uint64_t)flags,
+
+		/* Stop request reason. */
+		.arg3 = (uint64_t)reason,
+
+		/* Rest of the arguments MBZ. */
+	};
+
+	vcpu_dir_req_set_state(target_locked, false, HF_SPMC_VM_ID, args);
+
+	/*
+	 * The SP's vCPU runs in SPMC scheduled mode under FFA_DIR_MSG_REQ
+	 * partition runtime model.
+	 */
+	target_vcpu->scheduling_mode = SPMC_MODE;
+	target_vcpu->rt_model = RTM_FFA_DIR_REQ;
+	CHECK(vcpu_state_set(target_locked, VCPU_STATE_STOPPING));
+}
+
+static void initiate_partition_stop_request(struct vcpu_locked target_locked,
+					    struct vcpu **next,
+					    bool stop_to_live_activate)
+{
+	build_frmk_msg_partition_stop_req(target_locked, stop_to_live_activate);
+
+	/*
+	 * Mask all interrupts to ensure the target partition is not
+	 * interrupted while handling the partition stop request message.
+	 */
+	ffa_interrupts_mask(target_locked);
+
+	/*
+	 * Switch to the target vCPU to give it an opportunity to process
+	 * the STOP request.
+	 */
+	*next = target_locked.vcpu;
+}
+
 struct ffa_value lifecycle_msg_activation_start_req(struct ffa_value args,
 						    struct vcpu **next)
 {
-	(void)next;
 	struct vcpu *target_vcpu;
 	struct vcpu_locked target_locked;
 	ffa_id_t target_endpoint_id;
@@ -120,6 +179,7 @@ struct ffa_value lifecycle_msg_activation_start_req(struct ffa_value args,
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
 		live_activation_request_status = FFA_SUCCESSFUL; /* Success */
+		initiate_partition_stop_request(target_locked, next, true);
 
 		/*
 		 * Make a note of the SPMD EL3 LSP which sent the start request
