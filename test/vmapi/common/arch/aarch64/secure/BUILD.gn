@@ -23,3 +23,9 @@ source_set("twdog") {
   deps = [ "//test/vmapi/common/arch/aarch64/sp805:sp805" ]
   sources = [ "twdog.c" ]
 }
+
+source_set("live_buffer") {
+  testonly = true
+  public_configs = [ ":config" ]
+  sources = [ "live_buffer.c" ]
+}
