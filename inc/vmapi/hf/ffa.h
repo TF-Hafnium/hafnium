@@ -920,6 +920,12 @@ static inline uint32_t ffa_partition_info_get_count(struct ffa_value args)
 	return args.arg2;
 }
 
+static inline uint32_t ffa_partition_info_get_descriptor_size(
+	struct ffa_value args)
+{
+	return args.arg3;
+}
+
 static inline uint16_t ffa_partition_info_regs_get_last_idx(
 	struct ffa_value args)
 {

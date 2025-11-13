@@ -448,6 +448,14 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		}
 
 	} else {
+		/*
+		 * If the client's ffa-version is greater than v1.0, then the
+		 * SPMC will not format the descriptor to match the client's
+		 * expectations. FF-A spec provides forward compatibility in
+		 * the response structures , whereby the client is expected
+		 * to appropriately interpret the descriptors in the return
+		 * response by looking at the size of the individual descriptor.
+		 */
 		partition_info_size = sizeof(struct ffa_partition_info);
 		buffer_size = partition_info_size * entries_count;
 

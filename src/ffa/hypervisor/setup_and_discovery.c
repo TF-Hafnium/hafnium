@@ -19,6 +19,8 @@
 #include "hf/std.h"
 #include "hf/vm.h"
 
+#include "vmapi/hf/ffa_v1_0.h"
+
 #include "smc.h"
 
 struct ffa_value ffa_setup_spmc_id_get(void)
@@ -146,10 +148,10 @@ size_t ffa_setup_partition_info_get_forward(
 	size_t entries_count)
 {
 	const struct vm *tee = vm_find(HF_TEE_VM_ID);
-	struct ffa_partition_info *tee_partitions;
 	size_t tee_partitions_count;
 	struct ffa_value ret;
 	size_t res;
+	uint32_t desc_size;
 
 	CHECK(tee != NULL);
 	CHECK(entries_count < MAX_VMS);
@@ -177,6 +179,9 @@ size_t ffa_setup_partition_info_get_forward(
 	}
 
 	tee_partitions_count = ffa_partition_info_get_count(ret);
+	desc_size = ffa_partition_info_get_descriptor_size(ret);
+	dlog_verbose("TEE partition count: %zu - desc_size: %u\n",
+		     tee_partitions_count, desc_size);
 
 	/*
 	 * Check that the limit of the buffer can't be surpassed in the checks
@@ -195,10 +200,72 @@ size_t ffa_setup_partition_info_get_forward(
 	    FFA_PARTITION_COUNT_FLAG) {
 		entries_count = res;
 	} else {
-		tee_partitions = (struct ffa_partition_info *)tee->mailbox.send;
-		for (size_t index = 0; index < tee_partitions_count; index++) {
-			partitions[entries_count] = tee_partitions[index];
-			++entries_count;
+		/*
+		 * SPMC writes the descriptors into the shared RX buffer, so the
+		 * data is available in the hypervisor's RX buffer. We normalize
+		 * each incoming descriptor into v1.3 compliant format by
+		 * selecting the v1.0, v1.1, or v1.3 format based on desc_size
+		 * and zero-filling fields that don't exist in older descriptor
+		 * versions.
+		 */
+		if (desc_size == sizeof(struct ffa_partition_info_v1_0)) {
+			const struct ffa_partition_info_v1_0 *tee_partitions =
+				(const struct ffa_partition_info_v1_0 *)
+					tee->mailbox.send;
+
+			for (size_t index = 0; index < tee_partitions_count;
+			     index++) {
+				partitions[entries_count].vm_id =
+					tee_partitions[index].vm_id;
+				partitions[entries_count].vcpu_count =
+					tee_partitions[index].vcpu_count;
+				partitions[entries_count].properties =
+					tee_partitions[index].properties;
+				partitions[entries_count].protocol_uuid =
+					(struct ffa_uuid){0};
+				partitions[entries_count].image_uuid =
+					(struct ffa_uuid){0};
+				partitions[entries_count]
+					.partition_ffa_version = 0;
+				partitions[entries_count].reserved_0 = 0;
+				++entries_count;
+			}
+		} else if (desc_size ==
+			   sizeof(struct ffa_partition_info_v1_1)) {
+			const struct ffa_partition_info_v1_1 *tee_partitions =
+				(const struct ffa_partition_info_v1_1 *)
+					tee->mailbox.send;
+
+			for (size_t index = 0; index < tee_partitions_count;
+			     index++) {
+				partitions[entries_count].vm_id =
+					tee_partitions[index].vm_id;
+				partitions[entries_count].vcpu_count =
+					tee_partitions[index].vcpu_count;
+				partitions[entries_count].properties =
+					tee_partitions[index].properties;
+				partitions[entries_count].protocol_uuid =
+					tee_partitions[index].uuid;
+				partitions[entries_count].image_uuid =
+					(struct ffa_uuid){0};
+				partitions[entries_count]
+					.partition_ffa_version = 0;
+				partitions[entries_count].reserved_0 = 0;
+				++entries_count;
+			}
+		} else if (desc_size == sizeof(struct ffa_partition_info)) {
+			const struct ffa_partition_info *tee_partitions =
+				(const struct ffa_partition_info *)
+					tee->mailbox.send;
+
+			for (size_t index = 0; index < tee_partitions_count;
+			     index++) {
+				partitions[entries_count] =
+					tee_partitions[index];
+				++entries_count;
+			}
+		} else {
+			CHECK(false);
 		}
 
 		/* Release the RX buffer. */
