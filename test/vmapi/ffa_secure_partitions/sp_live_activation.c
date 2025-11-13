@@ -28,6 +28,12 @@
 #define GUID_LOWER_SP2 (0xf8a9417e2721ffc3)
 #define GUID_HIGHER_SP2 (0x7434a3afa124af05)
 
+/* Forward declaration for share helper */
+static void share_page_with_target_sp(ffa_id_t receiver_id);
+
+alignas(PAGE_SIZE) static uint8_t
+	shared_pages[FRAGMENTED_SHARE_PAGE_COUNT * PAGE_SIZE];
+
 bool is_activation_pending(uint32_t flags)
 {
 	return (flags & LFA_FLAGS_ACTIVATION_PENDING) != 0U;
@@ -92,6 +98,69 @@ static bool find_component_id_by_guid(uint64_t guid_lower, uint64_t guid_higher,
 	return false;
 }
 
+static void share_page_with_target_sp(ffa_id_t receiver_id)
+{
+	struct ffa_value ret;
+	struct mailbox_buffers mb = set_up_mailbox();
+	const ffa_id_t sender_id = hf_vm_get_id();
+
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)shared_pages, .page_count = 1},
+	};
+
+	struct ffa_memory_access receiver_v1_2;
+	struct ffa_memory_access_impdef impdef =
+		ffa_memory_access_impdef_init(receiver_id, receiver_id + 1);
+
+	uint32_t total_length;
+	uint32_t fragment_length;
+	uint32_t remaining_constituent_count;
+	ffa_memory_handle_t handle;
+
+	/* Initialise the memory before giving it. */
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		shared_pages[i] = i;
+	}
+
+	ffa_memory_access_init(&receiver_v1_2, receiver_id, FFA_DATA_ACCESS_RW,
+			       FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, 0,
+			       &impdef);
+
+	remaining_constituent_count = ffa_memory_region_init(
+		mb.send, HF_MAILBOX_SIZE, sender_id, &receiver_v1_2, 1,
+		sizeof(struct ffa_memory_access), constituents,
+		ARRAY_SIZE(constituents), 0, 0, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE,
+		&fragment_length, &total_length);
+	EXPECT_EQ(remaining_constituent_count, 0);
+	EXPECT_EQ(fragment_length, total_length);
+
+	ret = ffa_mem_share(total_length, fragment_length);
+	handle = ffa_mem_success_handle(ret);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_NE(handle, FFA_MEMORY_HANDLE_INVALID);
+
+	(void)sp_ffa_mem_retrieve_cmd_send(sender_id, receiver_id, handle,
+					   FFA_VERSION_1_3);
+}
+
+/*
+ * Increment shared buffer and validate contents are equal to expected_val.
+ */
+static void increment_and_validate_shared_buffer(ffa_id_t own_id,
+						 ffa_id_t receiver_id,
+						 uint8_t expected_val)
+{
+	struct ffa_value res;
+	res = sp_increment_shared_buffer_cmd_send(own_id, receiver_id);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+
+	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
+		ASSERT_EQ(shared_pages[i], (uint8_t)(i + expected_val));
+	}
+}
+
 static void start_live_activation_sequence(uint32_t component_id)
 {
 	struct ffa_value res;
@@ -137,7 +206,11 @@ void base_live_activate_sp(ffa_id_t receiver_id, uint32_t component_id)
 	EXPECT_EQ(ffa_version(FFA_VERSION_1_3), FFA_VERSION_COMPILED);
 	check_echo(own_id, receiver_id);
 
+	/* Share a page with target SP. */
+	share_page_with_target_sp(receiver_id);
+	increment_and_validate_shared_buffer(own_id, receiver_id, 1);
 	start_live_activation_sequence(component_id);
+	increment_and_validate_shared_buffer(own_id, receiver_id, 2);
 }
 
 /**
