@@ -1,0 +1,68 @@
+/*
+ * Copyright 2026 The Hafnium Authors.
+ *
+ * Use of this source code is governed by a BSD-style
+ * license that can be found in the LICENSE file or at
+ * https://opensource.org/licenses/BSD-3-Clause.
+ */
+
+/dts-v1/;
+
+/ {
+	compatible = "arm,ffa-manifest-1.0";
+	debug_name = "Service1 SP Live activatable";
+
+	/* Properties */
+	ffa-version = <0x00010003>; /* 31:16 - Major, 15:0 - Minor */
+	uuid = <0x9458bb2d 0x353b4ee2 0xaa25710c 0x99b73ddc>;
+	execution-ctx-count = <1>;
+	exception-level = <2>; /* S-EL1 */
+	execution-state = <0>; /* AARCH64 */
+	load-address = <0x6480000>;
+	entrypoint-offset = <0x2000>;
+	xlat-granule = <0>; /* 4KiB */
+	messaging-method = <0x7>; /* Supports direct and indirect requests. */
+	vm-availability-messages = <0x03>; /* Supports VM created and VM destroyed messages. */
+	ns-interrupts-action = <1>; /* Managed exit is supported. */
+	managed-exit-virq;
+	boot-order = <1>;
+	notification-support; /* Receipt of notifications. */
+	gp-register-num = <0>;
+	power-management-messages = <1>; /* Support CPU_OFF power management message. */
+
+	/* Lifecycle support and Live activation fields. */
+	lifecycle-support;
+	abort-action = <1>; /* Destroy */
+	live-activation-support;
+	live-activation-register = <1>;
+
+	/*
+	 * Canonical format: f07b2a96-1d47-4d17-9ec8-86a64e253e5c
+	 * Hafnium/FF-A standard format:
+	 */
+	image-uuid = <0x962a7bf0 0x174d471d 0xa686c89e 0x5c3e254e>;
+
+	live-state-buffer-info {
+		compatible = "arm,ffa-manifest,live-state-buffer";
+		live-state-buffer = <&livestatebuffer>;
+	};
+
+	/* Boot Info */
+	boot-info {
+		compatible = "arm,ffa-manifest-boot-info";
+		ffa_manifest;
+	};
+
+	memory-regions {
+
+		compatible = "arm,ffa-manifest-memory-regions";
+
+		livestatebuffer: live-state-buffer {
+			description = "live-state-buffer";
+			base-address = <0x00000000 0x6780000>;
+			pages-count = <1>;
+			attributes = <0x3>; /* read-write */
+		};
+
+	};
+};

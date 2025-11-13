@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Hafnium Authors.
+ * Copyright 2026 The Hafnium Authors.
  *
  * Use of this source code is governed by a BSD-style
  * license that can be found in the LICENSE file or at
@@ -13,7 +13,7 @@
 	debug_name = "partition-manifest";
 
 	/* Properties */
-	ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
+	ffa-version = <0x00010003>; /* 31:16 - Major, 15:0 - Minor */
 	execution-ctx-count = <8>;
 	exception-level = <0>; /* EL1 */
 	execution-state = <0>; /* AARCH64 */
