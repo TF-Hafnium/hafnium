@@ -1091,10 +1091,10 @@ bool load_vms(struct mm_stage1_locked stage1_locked, struct manifest *manifest,
 			continue;
 		}
 
-		dlog_info("Loading VM id %#x: %s.\n", vm_id,
-			  manifest_vm->debug_name.data);
-
 		mem_size = align_up(manifest_vm->secondary.mem_size, PAGE_SIZE);
+
+		dlog_info("Loading VM id %#x: %s - mem_size: %lx.\n", vm_id,
+			  manifest_vm->debug_name.data, mem_size);
 
 		if (manifest_vm->is_ffa_partition &&
 		    !manifest->vm[i].is_hyp_loaded) {

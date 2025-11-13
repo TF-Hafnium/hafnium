@@ -446,7 +446,6 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 				partitions[i].properties &
 				~FFA_PARTITION_v1_0_RES_MASK;
 		}
-
 	} else {
 		/*
 		 * If the client's ffa-version is greater than v1.0, then the

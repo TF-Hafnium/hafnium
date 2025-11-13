@@ -1047,7 +1047,7 @@ TEST(ffa_enum_names, success_and_failure)
 
 	EXPECT_STREQ(ffa_error_name(FFA_NOT_SUPPORTED), "FFA_NOT_SUPPORTED");
 	EXPECT_STREQ(ffa_error_name(FFA_NO_DATA), "FFA_NO_DATA");
-	EXPECT_STREQ(ffa_error_name(0), "UNKNOWN");
+	EXPECT_STREQ(ffa_error_name(0), "FFA_SUCCESSFUL");
 }
 
 /**

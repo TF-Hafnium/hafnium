@@ -130,11 +130,14 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 
 struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 					 struct vcpu **next,
-					 enum ffa_error error_code)
+					 enum ffa_error error_code,
+					 struct mpool *ppool)
 {
 	(void)current;
 	(void)next;
 	(void)error_code;
+	(void)ppool;
+
 	/* TODO: Interface not handled in hypervisor. */
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
