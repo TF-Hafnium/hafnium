@@ -21,6 +21,7 @@ group("partitions") {
     "ffa_secure_partitions:ffa_both_world_partitions_sel1_up_test",
     "ffa_secure_partitions:ffa_both_world_partitions_test",
     "ffa_secure_partitions:ffa_both_world_partitions_vhe_test",
+    "ffa_secure_partitions:sp_live_activation_test",
     "primary_with_secondaries:primary_with_sp",
     "primary_with_secondaries:primary_with_sp_vhe",
     "primary_with_secondaries:sp_lifecycle_support",
