@@ -1724,12 +1724,20 @@ struct ffa_value api_vm_configure_pages(
 	mm_mode_t orig_recv_mode = 0;
 	mm_mode_t extra_mode;
 
-	/* We only allow these to be setup once. */
-	if (vm_locked.vm->mailbox.send || vm_locked.vm->mailbox.recv) {
-		dlog_error("%s: Mailboxes have already been setup for VM %#x\n",
-			   __func__, vm_locked.vm->id);
-		ret = ffa_error(FFA_DENIED);
-		goto out;
+	/*
+	 * Mailbox send/recv can only be set up once in the lifecycle of a
+	 * partition. However, during live activation, the partition is
+	 * allowed to setup a new pair of send and receive buffers.
+	 */
+	if (vm_locked.vm->lfa_progress != LFA_PHASE_FINISH) {
+		if (vm_locked.vm->mailbox.send || vm_locked.vm->mailbox.recv) {
+			dlog_error(
+				"%s: Mailboxes have already been setup for VM "
+				"%#x\n",
+				__func__, vm_locked.vm->id);
+			ret = ffa_error(FFA_DENIED);
+			goto out;
+		}
 	}
 
 	/* Hafnium only supports a fixed size of RX/TX buffers. */

@@ -704,3 +704,60 @@ struct ffa_value lifecycle_msg_partition_stop_resp(
 	/* A placeholder return code. */
 	return api_ffa_interrupt_return(0);
 }
+
+void lifecycle_sp_activation_complete(struct vcpu_locked current_locked,
+				      struct vcpu **next)
+{
+	struct vcpu *current = current_locked.vcpu;
+	struct vm *live_activate_vm;
+	struct vm_locked vm_locked;
+	struct ffa_value ffa_ret;
+	struct live_activation_tracker_locked tracker_locked;
+	struct live_activation_tracker *tracker;
+	ffa_id_t initiator_id;
+
+	assert(next != NULL && current != NULL);
+
+	/* Unlock vCPU and lock it after VM. */
+	live_activate_vm = current->vm;
+	vcpu_unlock(&current_locked);
+	vm_locked = vm_lock(live_activate_vm);
+	current_locked = vcpu_lock(current);
+
+	/* Update vcpu and VM state. */
+	vm_set_state(vm_locked, VM_STATE_RUNNING);
+	live_activate_vm->lfa_progress = LFA_PHASE_RESET;
+	vcpu_reset_mode(current_locked);
+
+	vm_unlock(&vm_locked);
+
+	tracker_locked = live_activation_tracker_lock();
+	tracker = tracker_locked.tracker;
+
+	assert(tracker != NULL);
+	assert(tracker->in_progress);
+	assert(tracker->partition_id == current->vm->id);
+
+	initiator_id = tracker->initiator_id;
+
+	/* Restore interrupt priority mask. */
+	ffa_interrupts_unmask(current);
+
+	/*
+	 * Send success status through framework direct
+	 * response to SPMD LSP which had originally
+	 * sent live activation framework request to SPMC.
+	 */
+	ffa_ret = ffa_framework_msg_resp(
+		HF_SPMC_VM_ID, initiator_id,
+		FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_FINISH_RESP, FFA_SUCCESSFUL,
+		0, 0);
+
+	*next = api_switch_to_other_world(current_locked, ffa_ret,
+					  VCPU_STATE_WAITING);
+
+	/* Reset live firmware activation tracker. */
+	live_activation_tracker_reset(&tracker_locked);
+
+	live_activation_tracker_unlocked(&tracker_locked);
+}

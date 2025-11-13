@@ -13,6 +13,7 @@
 #include "hf/ffa.h"
 #include "hf/ffa/direct_messaging.h"
 #include "hf/ffa/interrupts.h"
+#include "hf/ffa/lifecycle_msg.h"
 #include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
 #include "hf/load.h"
@@ -419,6 +420,8 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 
 			dlog_info("Successfully restarted vCPU of SP: %#x\n",
 				  current->vm->id);
+		} else if (current->vm->lfa_progress == LFA_PHASE_FINISH) {
+			lifecycle_sp_activation_complete(current_locked, next);
 		} else if (!sp_boot_next(current_locked, next,
 					 VCPU_STATE_WAITING)) {
 			ffa_msg_wait_complete(current_locked, next);
