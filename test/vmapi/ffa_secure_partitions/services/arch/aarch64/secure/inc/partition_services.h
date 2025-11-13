@@ -201,6 +201,11 @@ enum sp_cmd {
 	 * Request to start arch timer and sleep as necessary.
 	 */
 	SP_ARCH_TIMER_CMD,
+
+	/**
+	 * Request to increment data in a shared buffer.
+	 */
+	SP_INCREMENT_SHARED_BUFFER_CMD,
 };
 
 /**
@@ -706,3 +711,16 @@ static inline uint32_t sp_get_arch_timer_fwd_call(struct ffa_value ret)
 {
 	return (uint32_t)ret.arg6;
 }
+
+/**
+ * Command to request an SP to increment data in a buffer that was previously
+ * shared through FF-A memory management protocol.
+ */
+static inline struct ffa_value sp_increment_shared_buffer_cmd_send(
+	ffa_id_t source, ffa_id_t dest)
+{
+	return ffa_msg_send_direct_req(
+		source, dest, SP_INCREMENT_SHARED_BUFFER_CMD, 0, 0, 0, 0);
+}
+
+struct ffa_value sp_increment_shared_buffer_cmd(ffa_id_t sender_id_id);

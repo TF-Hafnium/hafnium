@@ -45,22 +45,6 @@ bool sp3_fail_at_boot(void)
 	return (FAILING_SP == 3);
 }
 
-static void nwd_to_sp_echo(ffa_id_t receiver_id)
-{
-	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
-	struct ffa_value res;
-	ffa_id_t own_id = hf_vm_get_id();
-
-	res = sp_echo_cmd_send(own_id, receiver_id, msg[0], msg[1], msg[2],
-			       msg[3]);
-
-	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
-
-	EXPECT_EQ(res.arg4, msg[0]);
-	EXPECT_EQ(res.arg5, msg[1]);
-	EXPECT_EQ(res.arg6, msg[2]);
-	EXPECT_EQ(res.arg7, msg[3]);
-}
 /**
  * This test uses a setup in which the SP providing service1 reports an error
  * during initialization. The test checks that the SP returns an error with
@@ -82,8 +66,8 @@ TEST_PRECONDITION(boot_fail, sp1_fails_to_init, sp1_fail_at_boot)
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_FFA_ERROR(ret, FFA_ABORTED);
 
-	nwd_to_sp_echo(service2_info->vm_id);
-	nwd_to_sp_echo(service3_info->vm_id);
+	check_echo(hf_vm_get_id(), service2_info->vm_id);
+	check_echo(hf_vm_get_id(), service3_info->vm_id);
 }
 
 /**
@@ -107,8 +91,8 @@ TEST_PRECONDITION(boot_fail, sp2_fails_to_init, sp2_fail_at_boot)
 	ret = ffa_run(service2_info->vm_id, 0);
 	EXPECT_FFA_ERROR(ret, FFA_ABORTED);
 
-	nwd_to_sp_echo(service1_info->vm_id);
-	nwd_to_sp_echo(service3_info->vm_id);
+	check_echo(hf_vm_get_id(), service1_info->vm_id);
+	check_echo(hf_vm_get_id(), service3_info->vm_id);
 }
 
 /**
@@ -135,8 +119,8 @@ TEST_PRECONDITION(boot_fail, secure_interrupt_targets_aborted_sp2,
 	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
 
-	nwd_to_sp_echo(service1_info->vm_id);
-	nwd_to_sp_echo(service3_info->vm_id);
+	check_echo(hf_vm_get_id(), service1_info->vm_id);
+	check_echo(hf_vm_get_id(), service3_info->vm_id);
 
 	/* The aborted SP shall not be resumed by a direct request message. */
 	ret = sp_get_last_interrupt_cmd_send(hf_vm_get_id(),
@@ -165,8 +149,8 @@ TEST_PRECONDITION(boot_fail, sp3_fails_to_init, sp3_fail_at_boot)
 	ret = ffa_run(service3_info->vm_id, 0);
 	EXPECT_FFA_ERROR(ret, FFA_ABORTED);
 
-	nwd_to_sp_echo(service1_info->vm_id);
-	nwd_to_sp_echo(service2_info->vm_id);
+	check_echo(hf_vm_get_id(), service1_info->vm_id);
+	check_echo(hf_vm_get_id(), service2_info->vm_id);
 }
 
 /**

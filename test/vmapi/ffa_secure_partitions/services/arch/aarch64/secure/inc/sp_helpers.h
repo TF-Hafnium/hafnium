@@ -15,3 +15,4 @@ void sp_enable_irq(void);
 void sp_disable_irq(void);
 struct ffa_value handle_interrupt(struct ffa_value res);
 void sp_register_secondary_ep(struct hftest_context *ctx);
+void sp_irq_current(void);

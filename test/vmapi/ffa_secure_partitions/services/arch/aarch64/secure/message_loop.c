@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/arch/vm/interrupts.h"
+
 #include "hf/fdt_handler.h"
 #include "hf/mm.h"
 
@@ -16,6 +18,7 @@
 #include "sp_helpers.h"
 #include "test/abort.h"
 #include "test/hftest.h"
+#include "test/vmapi/arch/exception_handler.h"
 #include "test/vmapi/ffa.h"
 
 #if LIVE_ACTIVATION_SUPPORT == 1
@@ -345,6 +348,9 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 			sp_get_arch_timer_sleep(res),
 			sp_get_arch_timer_fwd_call(res));
 		break;
+	case SP_INCREMENT_SHARED_BUFFER_CMD:
+		res = sp_increment_shared_buffer_cmd(ffa_sender(res));
+		break;
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT
@@ -475,6 +481,7 @@ void process_live_activation(bool live_activation_status)
 		hftest_map_device_regions(ctx);
 		sp_register_secondary_ep(ctx);
 
+		exception_setup(sp_irq_current, NULL);
 		process_live_activation(live_activation_status);
 	} else {
 		/*

@@ -15,6 +15,7 @@
 #include "vmapi/hf/call.h"
 
 #include "ffa_endpoints.h"
+#include "ffa_secure_partitions.h"
 #include "partition_services.h"
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
@@ -31,21 +32,12 @@ struct pwr_mgt_cpu_entry_args {
  */
 static void cpu_entry_echo(uintptr_t arg)
 {
-	ffa_id_t own_id = hf_vm_get_id();
 	const uint32_t msg[] = {SP_ECHO_CMD, 0x1, 0x2, 0x3, 0x4};
 	struct pwr_mgt_cpu_entry_args *args =
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
 		(struct pwr_mgt_cpu_entry_args *)arg;
-	struct ffa_value res;
 
-	res = sp_echo_cmd_send(own_id, args->receiver_id, msg[0], msg[1],
-			       msg[2], msg[3]);
-
-	EXPECT_EQ(ffa_func_id(res), FFA_MSG_SEND_DIRECT_RESP_32);
-	EXPECT_EQ(res.arg4, msg[0]);
-	EXPECT_EQ(res.arg5, msg[1]);
-	EXPECT_EQ(res.arg6, msg[2]);
-	EXPECT_EQ(res.arg7, msg[3]);
+	check_echo_payload(hf_vm_get_id(), args->receiver_id, msg);
 
 	/* Releases the lock passed in. */
 	sl_unlock(&args->lock);

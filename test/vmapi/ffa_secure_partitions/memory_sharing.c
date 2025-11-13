@@ -78,6 +78,10 @@ TEST(memory_sharing_v1_2, share_ffa_v1_2_to_v1_0)
 	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
 
+	ret = sp_increment_shared_buffer_cmd_send(sender_id, receiver_id);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
+
 	for (uint32_t i = 0; i < PAGE_SIZE; i++) {
 		uint8_t val = i + 1;
 		ASSERT_EQ(pages[i], val);
@@ -132,6 +136,10 @@ TEST(memory_sharing_v1_0, share_ffa_v1_0_to_v1_2)
 
 	ret = sp_ffa_mem_retrieve_cmd_send(sender_id, receiver_id, handle,
 					   FFA_VERSION_COMPILED);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
+
+	ret = sp_increment_shared_buffer_cmd_send(sender_id, receiver_id);
 	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
 
@@ -203,6 +211,10 @@ TEST(memory_sharing_v1_0, force_fragmented_ffa_v1_0)
 
 	ret = sp_ffa_mem_retrieve_cmd_send(sender_id, receiver_id, handle,
 					   FFA_VERSION_1_0);
+	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
+
+	ret = sp_increment_shared_buffer_cmd_send(sender_id, receiver_id);
 	EXPECT_EQ(ret.func, FFA_MSG_SEND_DIRECT_RESP_32);
 	EXPECT_EQ(sp_resp(ret), SP_SUCCESS);
 

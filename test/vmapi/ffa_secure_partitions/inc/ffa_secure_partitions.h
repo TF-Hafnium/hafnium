@@ -68,6 +68,9 @@ bool service2_is_up_sp(void);
 bool service2_is_mp_sp(void);
 uint64_t syscounter_read(void);
 void waitms(uint64_t ms);
+void check_echo(ffa_id_t sender_id, ffa_id_t receiver_id);
+void check_echo_payload(ffa_id_t sender_id, ffa_id_t receiver_id,
+			const uint32_t msg[4]);
 bool sp1_fail_at_boot(void);
 bool sp2_fail_at_boot(void);
 bool sp3_fail_at_boot(void);

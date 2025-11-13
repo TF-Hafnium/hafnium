@@ -62,7 +62,7 @@ static void send_managed_exit_response(ffa_id_t dir_req_source_id)
 	HFTEST_LOG("Resuming the suspended command");
 }
 
-static void irq_current(void)
+void sp_irq_current(void)
 {
 	uint32_t intid;
 	struct ffa_value ffa_ret;
@@ -177,7 +177,7 @@ struct ffa_value sp_virtual_interrupt_cmd(ffa_id_t test_source,
 	 * Register interrupt handler for virtual interrupt signaled by
 	 * SPMC through vIRQ.
 	 */
-	exception_setup(irq_current, NULL);
+	exception_setup(sp_irq_current, NULL);
 	sp_enable_irq();
 
 	/* Initialize the AP REFCLK Generic timer. */

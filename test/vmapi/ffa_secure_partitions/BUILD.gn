@@ -9,7 +9,11 @@ import("//src/arch/${plat_arch}/args.gni")
 import("//test/hftest/args.gni")
 
 config("config") {
-  include_dirs = [ "inc" ]
+  include_dirs = [
+    "inc",
+    "services/arch/${plat_arch}/secure/inc",
+    "//test/inc",
+  ]
 }
 
 source_set("ffa_secure_partitions") {

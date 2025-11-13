@@ -8,6 +8,10 @@
 
 #include "ffa_secure_partitions.h"
 
+#include "hf/ffa.h"
+
+#include "partition_services.h"
+
 SERVICE_PARTITION_INFO_GET(service1, SERVICE1)
 SERVICE_PARTITION_INFO_GET(service2, SERVICE2)
 SERVICE_PARTITION_INFO_GET(service3, SERVICE3)
@@ -57,4 +61,30 @@ bool service2_is_mp_sp(void)
 bool service2_is_el0(void)
 {
 	return (SP2_EL == 0);
+}
+
+/*
+ * Send echo command and verify direct response and payload.
+ */
+void check_echo_payload(ffa_id_t sender_id, ffa_id_t receiver_id,
+			const uint32_t msg[4])
+{
+	struct ffa_value res = sp_echo_cmd_send(sender_id, receiver_id, msg[0],
+						msg[1], msg[2], msg[3]);
+
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(res.arg4, msg[0]);
+	EXPECT_EQ(res.arg5, msg[1]);
+	EXPECT_EQ(res.arg6, msg[2]);
+	EXPECT_EQ(res.arg7, msg[3]);
+}
+
+/*
+ * Send echo command with default payload and verify response.
+ */
+void check_echo(ffa_id_t sender_id, ffa_id_t receiver_id)
+{
+	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
+
+	check_echo_payload(sender_id, receiver_id, msg);
 }

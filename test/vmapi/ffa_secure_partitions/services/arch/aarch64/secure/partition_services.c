@@ -23,6 +23,8 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+uint64_t shared_nwd_buffer_addr;
+
 struct ffa_value sp_echo_cmd(ffa_id_t receiver, uint32_t val1, uint32_t val2,
 			     uint32_t val3, uint32_t val4, uint32_t val5)
 {
@@ -148,7 +150,6 @@ static struct ffa_value retrieve_v1_0(ffa_id_t sender_id,
 	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region_v1_0 *memory_region_v1_0 =
 		(struct ffa_memory_region_v1_0 *)retrieve_buffer;
-	uint8_t *ptr;
 	struct ffa_value ret;
 	uint32_t fragment_length;
 	uint32_t total_length;
@@ -183,11 +184,7 @@ static struct ffa_value retrieve_v1_0(ffa_id_t sender_id,
 		composite,
 		ffa_memory_attributes_extend(memory_region_v1_0->attributes));
 
-	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	ptr = (uint8_t *)composite->constituents[0].address;
-	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
-		++ptr[i];
-	}
+	shared_nwd_buffer_addr = composite->constituents[0].address;
 
 	/* Retrieved all the fragments. */
 	return sp_success(receiver_id, sender_id, ret.func);
@@ -203,7 +200,6 @@ static struct ffa_value retrieve_v1_2_or_later(ffa_id_t sender_id,
 	struct ffa_composite_memory_region *composite;
 	struct ffa_memory_region *memory_region_v1_1 =
 		(struct ffa_memory_region *)retrieve_buffer;
-	uint8_t *ptr;
 	struct ffa_value ret;
 	uint32_t fragment_length;
 	uint32_t total_length;
@@ -240,11 +236,7 @@ static struct ffa_value retrieve_v1_2_or_later(ffa_id_t sender_id,
 	composite = ffa_memory_region_get_composite(memory_region_v1_1, 0);
 	update_mm_security_state(composite, memory_region_v1_1->attributes);
 
-	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	ptr = (uint8_t *)composite->constituents[0].address;
-	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
-		++ptr[i];
-	}
+	shared_nwd_buffer_addr = composite->constituents[0].address;
 
 	/* Retrieved all the fragments. */
 	return sp_success(receiver_id, sender_id, ret.func);
@@ -263,4 +255,30 @@ struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
 		return retrieve_v1_2_or_later(sender_id, handle);
 	}
 	panic("Unknown version %#x\n", ffa_version);
+}
+
+struct ffa_value sp_increment_shared_buffer_cmd(ffa_id_t sender_id)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+	uint8_t *ptr;
+
+	if (shared_nwd_buffer_addr == 0U) {
+		dlog_error("Shared buffer not found\n");
+		return sp_error(own_id, sender_id, 0);
+	}
+
+	hftest_mm_identity_map(
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(const void *)shared_nwd_buffer_addr, FFA_PAGE_SIZE,
+		MM_MODE_NS | MM_MODE_R | MM_MODE_W);
+
+	// NOLINTNEXTLINE(performance-no-int-to-ptr)
+	ptr = (uint8_t *)shared_nwd_buffer_addr;
+
+	for (uint32_t i = 0; i < PAGE_SIZE; ++i) {
+		++ptr[i];
+	}
+	dlog("shared access at %lx\n", shared_nwd_buffer_addr);
+
+	return sp_success(own_id, sender_id, 0);
 }
