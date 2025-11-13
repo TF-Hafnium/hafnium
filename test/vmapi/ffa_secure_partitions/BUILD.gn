@@ -454,3 +454,90 @@ partitions_json("ffa_both_world_partitions_sel1_up_test") {
 
   json_file = "ffa_both_world_partitions_sel1_up_test.json"
 }
+
+vm_kernel("vm_lfa_test") {
+  testonly = true
+  public_configs = [
+    ":config",
+    "services/arch/${plat_arch}/secure:config",
+    "//src/arch/${plat_arch}:arch_config",
+  ]
+
+  sources = [ "sp_live_activation.c" ]
+
+  deps = [
+    ":ffa_secure_partitions_vhe",
+    "//src/arch/${plat_arch}/hftest:interrupts_gicv3",
+    "//src/arch/${plat_arch}/hftest:power_mgmt",
+    "//src/arch/aarch64/hftest:lfa_driver",
+    "//test/hftest:hftest_primary_vm",
+    "//test/vmapi/arch/${plat_arch}/gicv3:gicv3_setup",
+    "//test/vmapi/common:ffa",
+    "//test/vmapi/common/arch/aarch64:exception_handler",
+    "//test/vmapi/common/arch/aarch64/sp805:wdog",
+    "//vmlib",
+  ]
+}
+
+partition_package("vm_lfa_test_package") {
+  testonly = true
+  pm_offset = "0x1000"
+  img_offset = "0x2000"
+  files = [ [
+        "partition_manifest_nwd_primary.dtb",
+        "vm_lfa_test.bin",
+        ":vm_primary_manifest",
+        ":vm_lfa_test",
+      ] ]
+
+  output = "vm_lfa_test_package.img"
+}
+
+partitions_json("sp_live_activation_test") {
+  testonly = true
+
+  sps = [
+    [
+      "sp_first_live_activation.img",
+      "services/arch/${plat_arch}/secure/manifest_live_activation_sp_first.dts",
+      "services/arch/${plat_arch}/secure:sp_first_live_activation_package",
+      "services/arch/${plat_arch}/secure:partition_manifest_live_activate_first",
+    ],
+    [
+      "sp_second_live_activation.img",
+      "services/arch/${plat_arch}/secure/el0/manifest_live_activation_sp_second.dts",
+      "services/arch/${plat_arch}/secure/el0:sp_second_live_activation_package",
+      "services//arch/${plat_arch}/secure/el0:partition_manifest_live_activate_second",
+    ],
+    [
+      "service_sp_third_package.img",
+      "services/arch/${plat_arch}/secure/manifest_service_sp_third.dts",
+      "services/arch/${plat_arch}/secure:service_sp_third_package",
+      "services/arch/${plat_arch}/secure:partition_manifest_service_sp_third",
+    ],
+  ]
+
+  vms = [ [
+        "vm_lfa_test_package.img",
+        "manifest.dts",
+        ":vm_lfa_test_package",
+        ":vm_lfa_test_package",
+      ] ]
+
+  activation_store = [
+    [
+      "sp_first_live_activation.img",
+      "0x7000000",
+      "services/arch/${plat_arch}/secure:sp_first_live_activation_package",
+      "services/arch/${plat_arch}/secure:partition_manifest_live_activate_first",
+    ],
+    [
+      "sp_second_live_activation.img",
+      "0x7100000",
+      "services/arch/${plat_arch}/secure/el0:sp_second_live_activation_package",
+      "services/arch/${plat_arch}/secure/el0:partition_manifest_live_activate_second",
+    ],
+  ]
+
+  json_file = "sp_live_activation_test.json"
+}

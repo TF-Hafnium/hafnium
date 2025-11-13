@@ -14,6 +14,11 @@
 			is_ffa_partition;
 			debug_name = "primary_ffa_test";
 			load_address = <0x90000000>;
+
+			/* LFA SMC calls */
+			smc_whitelist = <
+				0xc40002e0 0xc40002e1 0xc40002e2 0xc40002e3 0xc40002e4 0xc40002e5 0xc40002e6
+				>;
 		};
 	};
 };
