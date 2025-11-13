@@ -1329,6 +1329,8 @@ static inline const char *vm_state_print_name(enum vm_state state)
 		return "VM_STATE_RUNNING";
 	case VM_STATE_ABORTING:
 		return "VM_STATE_ABORTING";
+	case VM_STATE_HALTED:
+		return "VM_STATE_HALTED";
 	}
 }
 
@@ -1344,6 +1346,14 @@ static inline const char *vm_state_print_name(enum vm_state state)
  * ABORTING -> NULL      : Hafnium destroyed the VM.
  * ABORTING -> CREATED   : Hafnium has reinitialized the VM with the aim of
  *                         restarting it.
+ * RUNNING  -> HALTED    : Hafnium has stopped the VM with the aim of live
+ *                         activating it.
+ * HALTED   -> CREATED   : The VM is being given CPU cycles to live activate
+			   a newer image.
+ * HALTED   -> ABORTING  : Live activation of the VM failed and Hafnium is
+ *                         aborting the VM.
+ * CREATED  -> ABORTING  : The VM failed to initialize itself. Hafnium aborts
+ *                         the VM.
  *
  * Return true if the transition is valid and the state was updated, false
  * otherwise.
@@ -1374,12 +1384,19 @@ bool vm_set_state(struct vm_locked vm_locked, enum vm_state to_state)
 		}
 		break;
 	case VM_STATE_RUNNING:
-		if (to_state == VM_STATE_ABORTING) {
+		if (to_state == VM_STATE_ABORTING ||
+		    to_state == VM_STATE_HALTED) {
 			ret = true;
 		}
 		break;
 	case VM_STATE_ABORTING:
 		if (to_state == VM_STATE_NULL || to_state == VM_STATE_CREATED) {
+			ret = true;
+		}
+		break;
+	case VM_STATE_HALTED:
+		if (to_state == VM_STATE_CREATED ||
+		    to_state == VM_STATE_ABORTING) {
 			ret = true;
 		}
 		break;

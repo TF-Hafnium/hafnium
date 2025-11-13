@@ -178,6 +178,12 @@ enum vm_state {
 
 	/* The VM has been aborted due to a fatal error. */
 	VM_STATE_ABORTING,
+
+	/*
+	 * All execution contexts of the VM have been stopped with the aim of
+	 * live activation.
+	 */
+	VM_STATE_HALTED,
 };
 
 /* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */

@@ -834,6 +834,34 @@ out:
 }
 
 /**
+ * Query if a vCPU is available in the context of partition lifecycle.
+ */
+bool vcpu_is_available(struct vcpu *vcpu)
+{
+	enum vcpu_state state;
+
+	assert(vcpu != NULL);
+	state = vcpu->state;
+
+	/*
+	 * A vCPU becomes available when all of the following conditions are
+	 * true:
+	 *   - Partition manager has allocated and initialized all resources
+	 *     required by the vCPU to initialize itself.
+	 *   - The vCPU has initialized itself.
+	 */
+	switch (state) {
+	case VCPU_STATE_WAITING:
+	case VCPU_STATE_RUNNING:
+	case VCPU_STATE_BLOCKED:
+	case VCPU_STATE_PREEMPTED:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/**
  * Bootstrap an SP vCPU, either cold boot or restart.
  */
 void vcpu_bootstrap(const struct vcpu_locked locked, struct cpu *cpu,
