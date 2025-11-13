@@ -918,12 +918,16 @@ bool ffa_partition_info_regs_get_part_info(
 	uint64_t info = *(arg_ptrs[(ptrdiff_t)(idx * 6)]);
 	uint64_t uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 1]);
 	uint64_t uuid_high = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 2]);
+	uint64_t image_uuid_lo = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 3]);
+	uint64_t image_uuid_high = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 4]);
 	uint64_t version_info = *(arg_ptrs[(ptrdiff_t)(idx * 6) + 5]);
 
 	partition_info->vm_id = info & 0xFFFF;
 	partition_info->vcpu_count = (info >> 16) & 0xFFFF;
 	partition_info->properties = (info >> 32);
 	ffa_uuid_from_u64x2(uuid_lo, uuid_high, &partition_info->protocol_uuid);
+	ffa_uuid_from_u64x2(image_uuid_lo, image_uuid_high,
+			    &partition_info->image_uuid);
 	partition_info->partition_ffa_version = version_info & 0x7FFFFFFF;
 
 	return true;

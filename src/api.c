@@ -572,9 +572,27 @@ static bool api_ffa_fill_partitions_info_array(
 	 */
 	for (ffa_vm_count_t vm_idx = 0; vm_idx < vm_get_count(); vm_idx++) {
 		struct vm *vm = vm_find_index(vm_idx);
+		bool match_any_protocol_uuid = false;
+		bool matched_image_uuid = false;
+		struct ffa_uuid image_uuid = vm->image_uuid;
 
 		if (!vm_is_discoverable(vm)) {
 			continue;
+		}
+
+		/* Match against Non-null Image UUID */
+		if (!ffa_uuid_is_null(&image_uuid) &&
+		    ffa_uuid_equal(uuid_to_find, &image_uuid) &&
+		    caller_version >= FFA_VERSION_1_3) {
+			matched_image_uuid = true;
+		}
+
+		/*
+		 * Matching agaist Image UUID has equivalent effect as matching
+		 * against all protocol UUIDs.
+		 */
+		if (match_any || matched_image_uuid) {
+			match_any_protocol_uuid = true;
 		}
 
 		for (size_t service_idx = 0; service_idx < vm->service_count;
@@ -592,7 +610,8 @@ static bool api_ffa_fill_partitions_info_array(
 				break;
 			}
 
-			if (match_any || ffa_uuid_equal(uuid_to_find, &uuid)) {
+			if (match_any_protocol_uuid ||
+			    ffa_uuid_equal(uuid_to_find, &uuid)) {
 				/*
 				 * If the number of entries surpasses the size
 				 * of `out_partitions`
@@ -615,11 +634,28 @@ static bool api_ffa_fill_partitions_info_array(
 				 * write it
 				 */
 				if (match_any) {
+					/*
+					 * Populate Protocol UUID and Image UUID
+					 */
 					out_partition->protocol_uuid = uuid;
+					out_partition->image_uuid =
+						vm->image_uuid;
+				} else if (matched_image_uuid) {
+					/* Populate only Protocol UUID */
+					out_partition->protocol_uuid = uuid;
+					out_partition->image_uuid =
+						(struct ffa_uuid){0};
 				} else {
+					/* Populate only Image UUID */
 					out_partition->protocol_uuid =
 						(struct ffa_uuid){0};
+					out_partition->image_uuid =
+						vm->image_uuid;
 				}
+
+				/* Populate FF-A version. */
+				out_partition->partition_ffa_version =
+					vm->ffa_version;
 
 				/*
 				 * Multiple UUIDs for a partition was only
@@ -631,6 +667,9 @@ static bool api_ffa_fill_partitions_info_array(
 					break;
 				}
 			}
+		}
+		if (matched_image_uuid) {
+			break;
 		}
 	}
 
