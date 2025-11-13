@@ -338,6 +338,52 @@ exit_error:
 		live_activation_request_status, 0, 0);
 }
 
+/*
+ * Allocate resources to partition's new instance while not resetting the
+ * internal data structures tracking the endpoint. This ensures the framework
+ * state of the partition is preserved across live activation.
+ */
+static void alloc_cycles_to_live_activate_sp(struct vcpu_locked target_locked,
+					     struct vcpu **next)
+{
+	uint32_t live_activation_reg;
+	struct vcpu *target_vcpu = target_locked.vcpu;
+
+	/* Bootstrap the SP's vCPU with a new partition instance. */
+	target_vcpu->rt_model = RTM_SP_INIT;
+	arch_regs_reset(target_vcpu);
+	CHECK(vcpu_state_set(target_locked, VCPU_STATE_STARTING));
+	target_vcpu->regs_available = false;
+	arch_regs_set_pc_arg(&target_vcpu->regs, target_vcpu->vm->secondary_ep,
+			     0LL);
+	vcpu_set_boot_info_gp_reg(target_vcpu);
+
+	/* Populate live activation information register. */
+	live_activation_reg = target_vcpu->vm->live_activation_reg_num;
+	arch_regs_set_gp_reg(&target_vcpu->regs, 1, live_activation_reg);
+
+	/*
+	 * SPMC got CPU cycles through a direct request message from EL3 SP.
+	 * Since SPMC is now allocating CPU cycles to target SP, put it under
+	 * SPMC scheduling mode. This plays an important role in masking
+	 * interrupts as seen later.
+	 */
+	assert(target_vcpu->scheduling_mode == NONE);
+	target_vcpu->scheduling_mode = SPMC_MODE;
+
+	/*
+	 * When CPU cycles are being allocated by SPMC to target SP with the
+	 * aim of live activating it, SPMC shall mask all interrupts to avoid
+	 * the target partition from being preempted. This helps to ensure
+	 * atomicity and system integrity for live firmware activation of new
+	 * image.
+	 */
+	ffa_interrupts_mask(target_locked);
+
+	/* SPMC restarts the target_vcpu vCPU (i.e., STARTING state) */
+	*next = target_vcpu;
+}
+
 struct ffa_value lifecycle_msg_activation_finish_req(struct ffa_value args,
 						     struct vcpu **next)
 {
@@ -405,6 +451,7 @@ struct ffa_value lifecycle_msg_activation_finish_req(struct ffa_value args,
 	}
 
 	live_activate_vm->lfa_progress = LFA_PHASE_FINISH;
+	alloc_cycles_to_live_activate_sp(target_locked, next);
 
 exit_error_2:
 	vcpu_unlock(&target_locked);
