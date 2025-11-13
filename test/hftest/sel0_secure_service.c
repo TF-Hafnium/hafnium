@@ -27,18 +27,19 @@ struct ffa_boot_info_header *get_boot_info_header(void)
 	return boot_info_header;
 }
 
-void test_main_sp(bool);
+void test_main_sp(bool, bool);
 
 void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
 {
 	hftest_service_set_up(ctx, fdt);
 }
 
-[[noreturn]] void kmain(struct ffa_boot_info_header *boot_info_blob)
+[[noreturn]] void kmain(struct ffa_boot_info_header *boot_info_blob,
+			bool live_activation_status)
 {
 	boot_info_header = boot_info_blob;
 
-	test_main_sp(true);
+	test_main_sp(true, live_activation_status);
 
 	/* Do not expect to get to this point, so abort. */
 	abort();

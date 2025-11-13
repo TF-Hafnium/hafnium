@@ -27,7 +27,7 @@ struct ffa_boot_info_header *get_boot_info_header(void)
 
 alignas(4096) uint8_t kstack[MAX_CPUS][4096];
 
-void test_main_sp(bool);
+void test_main_sp(bool, bool);
 
 void sp_register_secondary_ep(struct hftest_context *ctx)
 {
@@ -48,7 +48,8 @@ void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
 	hftest_service_set_up(ctx, fdt);
 }
 
-[[noreturn]] void kmain(struct ffa_boot_info_header *boot_info_blob)
+[[noreturn]] void kmain(struct ffa_boot_info_header *boot_info_blob,
+			bool live_activation_status)
 {
 	/*
 	 * Initialize the stage-1 MMU and identity-map the entire address space.
@@ -61,7 +62,7 @@ void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
 
 	boot_info_header = boot_info_blob;
 
-	test_main_sp(true);
+	test_main_sp(true, live_activation_status);
 
 	/* Do not expect to get to this point, so abort. */
 	abort();

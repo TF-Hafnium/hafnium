@@ -326,11 +326,76 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	return res;
 }
 
+void process_live_activation(bool live_activation_status)
+{
+#if LIVE_ACTIVATION_SUPPORT == 1
+	struct live_buffer *buffer = find_live_buffer();
+	ffa_id_t sp_id = hf_vm_get_id();
+
+	/*
+	 * Old image i.e., the original image booted during cold boot
+	 * of the system. It will be the producer of live state buffer.
+	 */
+	if (!live_activation_status) {
+		live_buffer_init(buffer, sp_id);
+		HFTEST_LOG("Populate live buffer\n");
+	} else {
+		/*
+		 * Newer image after live activation. Attest live
+		 * state buffer produced by previous image.
+		 */
+		bool status = true;
+		uint64_t token = 0U;
+		uint32_t counter = 0U;
+
+		if (!live_buffer_is_valid(buffer)) {
+			HFTEST_LOG(HFTEST_LOG_INDENT
+				   "SP live state buffer corrupted");
+			status = false;
+			goto live_exit;
+		}
+
+		if (live_buffer_get_partition_id(buffer) != sp_id) {
+			HFTEST_LOG(HFTEST_LOG_INDENT
+				   "SP live state buffer corrupted");
+			status = false;
+			goto live_exit;
+		}
+
+		counter = live_buffer_get_counter(buffer);
+		token = live_buffer_get_token(buffer);
+		shared_nwd_buffer_addr = buffer->data;
+
+		if (token != msg[counter % 3]) {
+			HFTEST_LOG(HFTEST_LOG_INDENT
+				   "SP live state buffer corrupted");
+			status = false;
+			goto live_exit;
+		}
+
+	live_exit:
+		if (status) {
+			HFTEST_LOG("Live activation successful");
+			live_buffer_counter_inc(buffer);
+		} else {
+			abort();
+		}
+	}
+#else
+	if (live_activation_status) {
+		HFTEST_LOG(
+			"Partition image does not support live "
+			"activation");
+		abort();
+	}
+#endif
+}
+
 /**
  * Message loop to add tests to be controlled by the control partition(depends
  * on the test set-up).
  */
-[[noreturn]] void test_main_sp(bool is_boot_vcpu)
+[[noreturn]] void test_main_sp(bool is_boot_vcpu, bool live_activation_status)
 {
 	/* Use FF-A v1.1 EAC0 boot protocol to retrieve the FDT. */
 	static struct ffa_boot_info_desc *fdt_info;
@@ -376,6 +441,8 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		 */
 		hftest_map_device_regions(ctx);
 		sp_register_secondary_ep(ctx);
+
+		process_live_activation(live_activation_status);
 	} else {
 		/*
 		 * Primary core should have initialized the fdt_info structure.
