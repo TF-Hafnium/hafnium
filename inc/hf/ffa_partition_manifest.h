@@ -40,6 +40,9 @@
 #define DEFAULT_BOOT_ORDER 0xFFFF
 #define DEFAULT_BOOT_GP_REGISTER UINT32_C(-1)
 
+/** GP register used to pass the current vCPU ID at core bring up. */
+#define PHYS_CORE_IDX_GP_REG 4
+
 enum run_time_el {
 	EL1 = 0,
 	S_EL0,
@@ -201,6 +204,14 @@ struct vm_availability_messages {
 	uint32_t mbz : 30;
 };
 
+struct live_activation {
+	/* Live activation supported for this partition. */
+	bool enabled;
+
+	/** Live activation status register. From w0/x0 - w7/x7 */
+	uint32_t status_reg_num;
+};
+
 static_assert(sizeof(struct vm_availability_messages) == sizeof(uint32_t),
 	      "vm_availability_messages must have same size as uint32_t");
 
@@ -306,4 +317,7 @@ struct ffa_partition_manifest {
 	 * supported.
 	 */
 	uint8_t abort_action;
+
+	/** optional - SP live activation support. */
+	struct live_activation live_activation;
 };

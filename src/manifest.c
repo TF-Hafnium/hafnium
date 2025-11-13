@@ -1031,6 +1031,21 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_SRI_POLICY_NOT_SUPPORTED;
 	}
 
+	uint32_t live_activation_reg =
+		vm->partition.live_activation.status_reg_num;
+
+	/* Live activation information register is restricted to one of x0 - x7.
+	 */
+	if (vm->partition.live_activation.enabled &&
+	    live_activation_reg != DEFAULT_BOOT_GP_REGISTER &&
+	    (live_activation_reg > 7 ||
+	     live_activation_reg == vm->partition.gp_register_num ||
+	     /* GP X4 reserved for passing linear core index. */
+	     live_activation_reg == PHYS_CORE_IDX_GP_REG)) {
+		dlog_error("Live activation register number %s: %u\n",
+			   error_string, live_activation_reg);
+		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
 	return ret_code;
 }
 
@@ -1369,6 +1384,35 @@ enum manifest_return_code parse_ffa_manifest(
 				"Hafnium.\n");
 			return MANIFEST_ERROR_ILLEGAL_ABORT_ACTION;
 		}
+	}
+
+	TRY(read_bool(&root, "live-activation-support",
+		      &vm->partition.live_activation.enabled));
+
+	TRY(read_optional_uint32(
+		&root, "live-activation-register", DEFAULT_BOOT_GP_REGISTER,
+		&vm->partition.live_activation.status_reg_num));
+
+	if (vm->partition.live_activation.enabled) {
+		if (!vm->partition.lifecycle_support) {
+			dlog_error(
+				"Live activation needs partition lifecycle "
+				"support to be enabled\n");
+			return MANIFEST_ERROR_ILLEGAL_LIVE_ACTIVATION_SUPPORT;
+		}
+
+		dlog_verbose("  Partition supports live activation\n");
+
+		if (vm->partition.live_activation.status_reg_num ==
+		    DEFAULT_BOOT_GP_REGISTER) {
+			dlog_error(
+				"Live activation needs status register to be "
+				"specified\n");
+			return MANIFEST_ERROR_ILLEGAL_LIVE_ACTIVATION_SUPPORT;
+		}
+
+		dlog_verbose("  Partition live activation register : x%u\n",
+			     vm->partition.live_activation.status_reg_num);
 	}
 
 	/* Parse memory-regions */
@@ -1741,6 +1785,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		       "supported";
 	case MANIFEST_ERROR_NO_SERVICES:
 		return "At least one service must be defined in the manifest.";
+	case MANIFEST_ERROR_ILLEGAL_LIVE_ACTIVATION_SUPPORT:
+		return "Live activation support cannot be enabled";
 	}
 
 	panic("Unexpected manifest return code.");
