@@ -320,3 +320,153 @@ TEST(partition_info_v1_3, ffa_partition_info_get_regs_with_protocol_uuid)
 		      &image_uuid);
 	EXPECT_TRUE(ffa_uuid_equal(&partition.image_uuid, &image_uuid));
 }
+
+TEST(partition_info_v1_3, ffa_partition_info_get_with_image_uuid)
+{
+	struct mailbox_buffers mb;
+	struct ffa_value ret;
+	const struct ffa_partition_info *partitions;
+	struct ffa_uuid image_uuid;
+	struct ffa_uuid uuid;
+	enum ffa_version version;
+
+	version = ffa_version(FFA_VERSION_1_3);
+	EXPECT_EQ(version, FFA_VERSION_COMPILED);
+
+	/* Setup the mailbox (which holds the RX buffer). */
+	mb = set_up_mailbox();
+
+	partitions = mb.recv;
+
+	ffa_uuid_init(0x2721ffc3, 0xf8a9417e, 0xa124af05, 0x7434a3af,
+		      &image_uuid);
+
+	/* Check that expected partition information is returned. */
+	ret = ffa_partition_info_get(&image_uuid, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Expect two descriptors for the same SP (two protocol UUIDs). */
+	EXPECT_EQ(ret.arg2, 2);
+
+	/*
+	 * Check the partition info descriptor size returned in w3 is
+	 * correct.
+	 */
+	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
+
+	/* Expect the S-EL0 SP's properties to be returned. */
+	EXPECT_EQ(partitions[0].vm_id, SP_ID(2));
+	EXPECT_TRUE(partitions[0].vcpu_count == 1);
+
+	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[0].protocol_uuid, &uuid));
+
+	EXPECT_EQ(partitions[0].properties,
+		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_AARCH64_EXEC |
+			  FFA_PARTITION_VM_CREATED |
+			  FFA_PARTITION_VM_DESTROYED |
+			  FFA_PARTITION_DIRECT_REQ2_RECV |
+			  FFA_PARTITION_LIVE_ACTIVATION);
+
+	EXPECT_EQ(partitions[1].vm_id, SP_ID(2));
+	EXPECT_TRUE(partitions[1].vcpu_count == 1);
+
+	ffa_uuid_init(0x580940fa, 0x7e9d, 0x406f, 0x9aa2, &uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[1].protocol_uuid, &uuid));
+
+	EXPECT_EQ(partitions[1].properties,
+		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_AARCH64_EXEC |
+			  FFA_PARTITION_VM_CREATED |
+			  FFA_PARTITION_VM_DESTROYED |
+			  FFA_PARTITION_DIRECT_REQ2_RECV |
+			  FFA_PARTITION_LIVE_ACTIVATION);
+
+	/*
+	 * Image UUID must not be populated in partition descriptor when
+	 * specified as input to the ABI.
+	 */
+	ffa_uuid_init(0, 0, 0, 0, &image_uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[0].image_uuid, &image_uuid));
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[1].image_uuid, &image_uuid));
+}
+
+TEST(partition_info_v1_3, ffa_partition_info_get_regs_with_image_uuid)
+{
+	struct ffa_value ret;
+	struct ffa_partition_info partition_desc;
+	struct ffa_partition_info partition_desc2;
+	struct ffa_uuid image_uuid;
+	struct ffa_uuid uuid;
+	uint16_t start_index = 0;
+	uint16_t last_index;
+	uint16_t curr_index;
+	uint16_t tag;
+	uint16_t desc_size;
+
+	ffa_uuid_init(0x2721ffc3, 0xf8a9417e, 0xa124af05, 0x7434a3af,
+		      &image_uuid);
+
+	/* Check that expected partition information is returned. */
+	ret = ffa_partition_info_get_regs(&image_uuid, start_index, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+
+	last_index = ffa_partition_info_regs_get_last_idx(ret);
+	curr_index = ffa_partition_info_regs_get_curr_idx(ret);
+	tag = ffa_partition_info_regs_get_tag(ret);
+	desc_size = ffa_partition_info_regs_get_desc_size(ret);
+
+	/* Expect two descriptors for the same SP (two protocol UUIDs). */
+	EXPECT_EQ(last_index, 1);
+	EXPECT_EQ(curr_index, 1);
+	EXPECT_EQ(tag, 0);
+
+	/* Check the partition info descriptor size is correct. */
+	EXPECT_EQ(desc_size, sizeof(struct ffa_partition_info));
+
+	ffa_partition_info_regs_get_part_info(ret, 0, &partition_desc);
+	ffa_partition_info_regs_get_part_info(ret, 1, &partition_desc2);
+
+	/* Expect the S-EL0 SP's properties to be returned. */
+	EXPECT_EQ(partition_desc.vm_id, SP_ID(2));
+	EXPECT_TRUE(partition_desc.vcpu_count == 1);
+
+	ffa_uuid_init(0xa609f132, 0x6b4f, 0x4c14, 0x9489, &uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partition_desc.protocol_uuid, &uuid));
+
+	EXPECT_EQ(partition_desc.properties,
+		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_AARCH64_EXEC |
+			  FFA_PARTITION_VM_CREATED |
+			  FFA_PARTITION_VM_DESTROYED |
+			  FFA_PARTITION_DIRECT_REQ2_RECV |
+			  FFA_PARTITION_LIVE_ACTIVATION);
+
+	EXPECT_EQ(partition_desc2.vm_id, SP_ID(2));
+	EXPECT_TRUE(partition_desc2.vcpu_count == 1);
+
+	ffa_uuid_init(0x580940fa, 0x7e9d, 0x406f, 0x9aa2, &uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partition_desc2.protocol_uuid, &uuid));
+
+	EXPECT_EQ(partition_desc2.properties,
+		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_AARCH64_EXEC |
+			  FFA_PARTITION_VM_CREATED |
+			  FFA_PARTITION_VM_DESTROYED |
+			  FFA_PARTITION_DIRECT_REQ2_RECV |
+			  FFA_PARTITION_LIVE_ACTIVATION);
+
+	/*
+	 * Image UUID must not be populated in partition descriptor when
+	 * specified as input to the ABI.
+	 */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partition_desc.image_uuid, &uuid));
+
+	EXPECT_TRUE(ffa_uuid_equal(&partition_desc2.image_uuid, &uuid));
+}
