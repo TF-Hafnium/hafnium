@@ -161,6 +161,61 @@ static void increment_and_validate_shared_buffer(ffa_id_t own_id,
 	}
 }
 
+/*
+ * Helper function to bind notifications.
+ */
+static void setup_notifications(ffa_id_t own_id, ffa_id_t receiver_id,
+				uint32_t flags,
+				ffa_notifications_bitmap_t bitmap)
+{
+	struct ffa_value res;
+	res = sp_notif_bind_cmd_send(own_id, receiver_id, own_id,
+				     flags & FFA_NOTIFICATION_FLAG_PER_VCPU,
+				     bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+}
+
+/*
+ * Helper function to set notifications and get notification info.
+ */
+static void initiate_notifications(ffa_id_t own_id, ffa_id_t receiver_id,
+				   uint32_t flags,
+				   ffa_notifications_bitmap_t bitmap)
+{
+	struct ffa_value res;
+
+	res = ffa_notification_set(own_id, receiver_id, flags, bitmap);
+	EXPECT_EQ(res.func, FFA_SUCCESS_32);
+
+	res = ffa_notification_info_get();
+	EXPECT_EQ(res.func, FFA_SUCCESS_64);
+}
+
+/*
+ * Helper function to retrieve and unbind notifications, validating the bitmap.
+ */
+static void get_notifications(ffa_id_t own_id, ffa_id_t receiver_id,
+			      ffa_notifications_bitmap_t bitmap)
+{
+	struct ffa_value res;
+	res = sp_notif_get_cmd_send(own_id, receiver_id, 0,
+				    FFA_NOTIFICATION_FLAG_BITMAP_VM);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+	EXPECT_EQ(sp_notif_get_from_sp(res), 0);
+	EXPECT_EQ(sp_notif_get_from_vm(res), bitmap);
+}
+
+static void unbind_notifications(ffa_id_t own_id, ffa_id_t receiver_id,
+				 ffa_notifications_bitmap_t bitmap)
+{
+	struct ffa_value res;
+
+	res = sp_notif_unbind_cmd_send(own_id, receiver_id, own_id, bitmap);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+}
+
 static void start_live_activation_sequence(uint32_t component_id)
 {
 	struct ffa_value res;
@@ -198,9 +253,17 @@ static void start_live_activation_sequence(uint32_t component_id)
 /**
  * This helper drives live activation test and verifies that the SPMC preserves
  * framework state across activations of a secure partition.
+ * In summary, it:
+ *   - Shares a memory page with the partition.
+ *   - Performs an initial message exchange and notification setup.
+ *   - Triggers live activation for the specified component twice.
+ *   - After each activation, validates that shared memory contents and
+ *     notifications remain intact.
  */
 void base_live_activate_sp(ffa_id_t receiver_id, uint32_t component_id)
 {
+	uint32_t flags;
+	ffa_notifications_bitmap_t bitmap;
 	ffa_id_t own_id = hf_vm_get_id();
 
 	EXPECT_EQ(ffa_version(FFA_VERSION_1_3), FFA_VERSION_COMPILED);
@@ -209,8 +272,25 @@ void base_live_activate_sp(ffa_id_t receiver_id, uint32_t component_id)
 	/* Share a page with target SP. */
 	share_page_with_target_sp(receiver_id);
 	increment_and_validate_shared_buffer(own_id, receiver_id, 1);
+
+	flags = FFA_NOTIFICATIONS_FLAG_DELAY_SRI;
+	bitmap = FFA_NOTIFICATION_MASK(35);
+	setup_notifications(own_id, receiver_id, flags, bitmap);
+
+	/* First live activation */
+	initiate_notifications(own_id, receiver_id, flags, bitmap);
 	start_live_activation_sequence(component_id);
 	increment_and_validate_shared_buffer(own_id, receiver_id, 2);
+	get_notifications(own_id, receiver_id, bitmap);
+
+	/* Second live activation */
+	initiate_notifications(own_id, receiver_id, flags, bitmap);
+	start_live_activation_sequence(component_id);
+	increment_and_validate_shared_buffer(own_id, receiver_id, 3);
+	get_notifications(own_id, receiver_id, bitmap);
+
+	/* Clean up. */
+	unbind_notifications(own_id, receiver_id, bitmap);
 }
 
 /**
