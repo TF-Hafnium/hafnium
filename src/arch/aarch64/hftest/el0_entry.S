@@ -54,6 +54,8 @@ entry:
 	/* Save data (fdt pointer or mem size) passed by hypervisor. */
 	mov x10, x0
 
+	mov x11, x1
+
 	/* Set everything other than text as RW, so that relocations can succeed. */
 	ffa_mem_perm_set rodata_begin image_end 5
 
@@ -109,6 +111,7 @@ entry:
 	b 3b
 
 4:	mov x0, x10
+	mov x1, x11
 
 	/* Branch to the entry point for the specific image. */
 	b image_entry

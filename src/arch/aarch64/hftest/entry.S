@@ -21,8 +21,8 @@ image_entry:
 	isb
 
 #if BRANCH_PROTECTION
-	mrs x1, id_aa64isar1_el1
-	ands x1, x1, #0xff0		/* API / APA */
+	mrs x2, id_aa64isar1_el1
+	ands x2, x2, #0xff0		/* API / APA */
 	b.eq 0f
 
 	enable_pauth_el1 x30 39

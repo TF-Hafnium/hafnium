@@ -39,4 +39,5 @@ secondary_ep_entry:
 
 	/* Branch to message loop hinting a secondary vCPU. */
 	mov x0, xzr
+	mov x1, xzr
 	b test_main_sp
