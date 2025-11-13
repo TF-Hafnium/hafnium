@@ -185,6 +185,7 @@ struct vm {
 	ffa_id_t id;
 	uint16_t service_count;
 	struct service services[PARTITION_MAX_UUIDS];
+	struct ffa_uuid image_uuid;
 	enum ffa_version ffa_version;
 	enum vm_state state;
 

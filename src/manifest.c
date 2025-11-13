@@ -1107,6 +1107,7 @@ enum manifest_return_code parse_ffa_manifest(
 	struct fdt *fdt, struct manifest_vm *vm,
 	struct fdt_node *boot_info_node, const struct boot_params *boot_params)
 {
+	struct uint32list_iter image_uuid;
 	uintpaddr_t load_address;
 	struct fdt_node root;
 	struct fdt_node ffa_node;
@@ -1413,6 +1414,39 @@ enum manifest_return_code parse_ffa_manifest(
 
 		dlog_verbose("  Partition live activation register : x%u\n",
 			     vm->partition.live_activation.status_reg_num);
+
+		ret = read_uint32list(&root, "image-uuid", &image_uuid);
+
+		if (ret != MANIFEST_SUCCESS) {
+			dlog_error(
+				"Live activation support needs Image UUID to "
+				"be specified\n");
+			return ret;
+		}
+
+		ret = parse_flattened_uuid(&image_uuid,
+					   &vm->partition.image_uuid);
+		/* Ensure only a single image UUID is specified. */
+		if (uint32list_has_next(&image_uuid)) {
+			return MANIFEST_ERROR_TOO_MANY_IMAGE_UUIDS;
+		}
+
+		if (ret != MANIFEST_SUCCESS) {
+			dlog_error("Malformed Image UUID specified\n");
+			return ret;
+		}
+		if (ffa_uuid_is_null(&vm->partition.image_uuid)) {
+			return MANIFEST_ERROR_UUID_ALL_ZEROS;
+		}
+
+		/* Image UUID must be different from Protocol UUID(s) */
+		for (uint32_t k = 0; k < vm->partition.service_count; k++) {
+			if (ffa_uuid_equal(
+				    &vm->partition.image_uuid,
+				    &vm->partition.services[k].protocol_uuid)) {
+				return MANIFEST_ERROR_IMAGE_UUID_INVALID;
+			}
+		}
 	}
 
 	/* Parse memory-regions */
@@ -1613,6 +1647,7 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 	for (i = 0; i <= MAX_VMS; ++i) {
 		ffa_id_t vm_id = HF_VM_ID_OFFSET + i;
 		struct fdt_node vm_node = hyp_node;
+		const struct ffa_uuid *img_i;
 
 		generate_vm_node_name(&vm_name, vm_id - HF_VM_ID_BASE);
 		if (!fdt_find_child(&vm_node, &vm_name)) {
@@ -1661,6 +1696,23 @@ enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
 				manifest->vm[i].partition.load_addr, page_count,
 				manifest_data->mem_regions,
 				&manifest_data->mem_regions_index));
+
+			/*
+			 * Ensure each image UUID is unique across all SP
+			 * manifests.
+			 */
+			img_i = &manifest->vm[i].partition.image_uuid;
+
+			if (!ffa_uuid_is_null(img_i)) {
+				for (uint32_t j = 0; j < i; ++j) {
+					const struct ffa_uuid *img_j =
+						&manifest->vm[j]
+							 .partition.image_uuid;
+					if (ffa_uuid_equal(img_i, img_j)) {
+						return MANIFEST_ERROR_DUPLICATE_IMAGE_UUID;
+					}
+				}
+			}
 		} else {
 			TRY(parse_vm(&vm_node, &manifest->vm[i], vm_id));
 		}
@@ -1787,6 +1839,12 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		return "At least one service must be defined in the manifest.";
 	case MANIFEST_ERROR_ILLEGAL_LIVE_ACTIVATION_SUPPORT:
 		return "Live activation support cannot be enabled";
+	case MANIFEST_ERROR_IMAGE_UUID_INVALID:
+		return "Image UUID conflicts with a Protocol UUID";
+	case MANIFEST_ERROR_TOO_MANY_IMAGE_UUIDS:
+		return "Manifest specifies more than one image UUID";
+	case MANIFEST_ERROR_DUPLICATE_IMAGE_UUID:
+		return "Duplicate image UUID across secure partition manifests";
 	}
 
 	panic("Unexpected manifest return code.");

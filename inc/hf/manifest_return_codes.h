@@ -58,4 +58,9 @@ enum manifest_return_code {
 	MANIFEST_ERROR_ILLEGAL_ABORT_ACTION,
 	MANIFEST_ERROR_NO_SERVICES,
 	MANIFEST_ERROR_ILLEGAL_LIVE_ACTIVATION_SUPPORT,
+	MANIFEST_ERROR_IMAGE_UUID_INVALID,
+	/* Multiple image UUIDs defined in a single partition manifest */
+	MANIFEST_ERROR_TOO_MANY_IMAGE_UUIDS,
+	/* Duplicate image UUID across secure partition manifests */
+	MANIFEST_ERROR_DUPLICATE_IMAGE_UUID,
 };

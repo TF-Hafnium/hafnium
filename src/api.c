@@ -579,7 +579,8 @@ static bool api_ffa_fill_partitions_info_array(
 
 		for (size_t service_idx = 0; service_idx < vm->service_count;
 		     service_idx++) {
-			struct ffa_uuid uuid = vm->services[service_idx].uuid;
+			struct ffa_uuid uuid =
+				vm->services[service_idx].protocol_uuid;
 			struct ffa_partition_info *out_partition =
 				&out_partitions[*entries_count];
 
@@ -2987,7 +2988,8 @@ static bool api_ffa_dir_msg_req2_uuid_is_valid(struct vm *receiver_vm,
 	 * by the receiver endpoint.
 	 */
 	for (size_t i = 0; i < receiver_vm->service_count; i++) {
-		if (ffa_uuid_equal(uuid, &receiver_vm->services[i].uuid)) {
+		if (ffa_uuid_equal(uuid,
+				   &receiver_vm->services[i].protocol_uuid)) {
 			return true;
 		}
 	}

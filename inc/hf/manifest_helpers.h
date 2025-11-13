@@ -45,6 +45,9 @@ bool uint32list_has_next(const struct uint32list_iter *list);
 enum manifest_return_code uint32list_get_next(struct uint32list_iter *list,
 					      uint32_t *out);
 
+enum manifest_return_code parse_flattened_uuid(struct uint32list_iter *uuid,
+					       struct ffa_uuid *out);
+
 enum manifest_return_code parse_services(const struct fdt_node *node,
 					 struct service *services,
 					 uint16_t *service_count,

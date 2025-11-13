@@ -189,8 +189,8 @@ static enum manifest_return_code str_uuid_to_ffa_uuid(const char *str_uuid,
  * Parse a UUID in the uint32 list format from `uuid` into `out`.
  * Returns `MANIFEST_SUCCESS` if parsing succeeded.
  */
-static enum manifest_return_code parse_flattened_uuid(
-	struct uint32list_iter *uuid, struct ffa_uuid *out)
+enum manifest_return_code parse_flattened_uuid(struct uint32list_iter *uuid,
+					       struct ffa_uuid *out)
 {
 	for (size_t i = 0; i < 4 && uint32list_has_next(uuid); i++) {
 		TRY(uint32list_get_next(uuid, &out->uuid[i]));
@@ -261,7 +261,7 @@ static bool uuid_already_parsed(const struct service *services,
 				const struct ffa_uuid *uuid)
 {
 	for (uint16_t i = 0; i < service_count; i++) {
-		if (ffa_uuid_equal(&services[i].uuid, uuid)) {
+		if (ffa_uuid_equal(&services[i].protocol_uuid, uuid)) {
 			return true;
 		}
 	}
@@ -291,10 +291,11 @@ static enum manifest_return_code parse_services_v1_0(
 		if (*service_count == PARTITION_MAX_UUIDS) {
 			return MANIFEST_ERROR_TOO_MANY_UUIDS;
 		}
-		TRY(parse_flattened_uuid(&uuid,
-					 &services[*service_count].uuid));
-		if (uuid_already_parsed(services, *service_count,
-					&services[*service_count].uuid)) {
+		TRY(parse_flattened_uuid(
+			&uuid, &services[*service_count].protocol_uuid));
+		if (uuid_already_parsed(
+			    services, *service_count,
+			    &services[*service_count].protocol_uuid)) {
 			return MANIFEST_ERROR_DUPLICATE_UUID;
 		}
 		/*
@@ -374,10 +375,11 @@ static enum manifest_return_code parse_services_v1_1(
 		TRY(read_uint32list(&services_node, "messaging-method",
 				    &messaging_method));
 
-		TRY(parse_canonical_uuid(&uuid,
-					 &services[*service_count].uuid));
-		if (uuid_already_parsed(services, *service_count,
-					&services[*service_count].uuid)) {
+		TRY(parse_canonical_uuid(
+			&uuid, &services[*service_count].protocol_uuid));
+		if (uuid_already_parsed(
+			    services, *service_count,
+			    &services[*service_count].protocol_uuid)) {
 			return MANIFEST_ERROR_DUPLICATE_UUID;
 		}
 
@@ -403,9 +405,11 @@ enum manifest_return_code parse_services(const struct fdt_node *node,
 
 	dlog_verbose("  Service Count %u\n", *service_count);
 	for (int i = 0; i < *service_count; i++) {
-		dlog_verbose("  UUID %#x-%x-%x-%x\n", services[i].uuid.uuid[0],
-			     services[i].uuid.uuid[1], services[i].uuid.uuid[2],
-			     services[i].uuid.uuid[3]);
+		dlog_verbose("  UUID %#x-%x-%x-%x\n",
+			     services[i].protocol_uuid.uuid[0],
+			     services[i].protocol_uuid.uuid[1],
+			     services[i].protocol_uuid.uuid[2],
+			     services[i].protocol_uuid.uuid[3]);
 		dlog_verbose("  Messaging Methods %#x\n",
 			     services[i].messaging_method);
 	}

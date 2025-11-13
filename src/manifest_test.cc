@@ -1729,7 +1729,7 @@ TEST_F(manifest, ffa_valid)
 	vm = &m->vm[0];
 	ASSERT_EQ(vm->partition.ffa_version, 0x10000);
 	ASSERT_THAT(
-		std::span(vm->partition.services[0].uuid.uuid, 4),
+		std::span(vm->partition.services[0].protocol_uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
 	ASSERT_EQ(vm->partition.execution_ctx_count, 1);
 	ASSERT_EQ(vm->partition.run_time_el, S_EL1);
@@ -2005,12 +2005,12 @@ TEST_F(manifest, ffa_valid_multiple_uuids)
 	vm = &m->vm[0];
 	ASSERT_EQ(vm->partition.ffa_version, 0x10002);
 	ASSERT_THAT(
-		std::span(vm->partition.services[0].uuid.uuid, 4),
+		std::span(vm->partition.services[0].protocol_uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
 	ASSERT_EQ(vm->partition.services[0].messaging_method,
 		  FFA_PARTITION_INDIRECT_MSG);
 	ASSERT_THAT(
-		std::span(vm->partition.services[1].uuid.uuid, 4),
+		std::span(vm->partition.services[1].protocol_uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1daaa));
 	ASSERT_EQ(vm->partition.services[1].messaging_method,
 		  FFA_PARTITION_INDIRECT_MSG);
@@ -2209,12 +2209,12 @@ TEST_F(manifest, ffa_valid_multiple_uuids_different_messaging_methods)
 	vm = &m->vm[0];
 	ASSERT_EQ(vm->partition.ffa_version, 0x10002);
 	ASSERT_THAT(
-		std::span(vm->partition.services[0].uuid.uuid, 4),
+		std::span(vm->partition.services[0].protocol_uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
 	ASSERT_EQ(vm->partition.services[0].messaging_method,
 		  FFA_PARTITION_INDIRECT_MSG);
 	ASSERT_THAT(
-		std::span(vm->partition.services[1].uuid.uuid, 4),
+		std::span(vm->partition.services[1].protocol_uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1daaa));
 	ASSERT_EQ(vm->partition.services[1].messaging_method,
 		  FFA_PARTITION_INDIRECT_MSG | FFA_PARTITION_DIRECT_REQ_SEND);

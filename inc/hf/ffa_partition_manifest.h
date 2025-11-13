@@ -221,7 +221,7 @@ static_assert(sizeof(struct vm_availability_messages) == sizeof(uint32_t),
  */
 struct service {
 	uint16_t messaging_method;
-	struct ffa_uuid uuid;
+	struct ffa_uuid protocol_uuid;
 };
 
 /**
@@ -233,6 +233,8 @@ struct ffa_partition_manifest {
 	uint16_t service_count;
 	/* Services (uuid, messaging method pairs), at least one mandatory. */
 	struct service services[PARTITION_MAX_UUIDS];
+	/** Image UUID - optional */
+	struct ffa_uuid image_uuid;
 	/** Partition id - optional */
 	ffa_id_t id;
 	/** Aux ids for mem transactions - optional */

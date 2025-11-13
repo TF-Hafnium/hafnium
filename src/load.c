@@ -174,13 +174,14 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 
 	/* Populate array of services. */
 	for (uint16_t i = 0; i < manifest_vm->partition.service_count; i++) {
-		vm_locked.vm->services[i].uuid =
-			manifest_vm->partition.services[i].uuid;
+		vm_locked.vm->services[i].protocol_uuid =
+			manifest_vm->partition.services[i].protocol_uuid;
 		vm_locked.vm->services[i].messaging_method =
 			manifest_vm->partition.services[i].messaging_method;
 	}
 
 	vm_locked.vm->service_count = manifest_vm->partition.service_count;
+	vm_locked.vm->image_uuid = manifest_vm->partition.image_uuid;
 
 	/*
 	 * Populate the interrupt descriptor for current VM.

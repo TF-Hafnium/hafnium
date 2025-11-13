@@ -51,7 +51,7 @@ static bool is_uuid_in_list(uint16_t service_count, struct ffa_uuid target_uuid,
 	}
 
 	for (i = 0; i < service_count; i++) {
-		if (ffa_uuid_equal(&services[i].uuid, &target_uuid)) {
+		if (ffa_uuid_equal(&services[i].protocol_uuid, &target_uuid)) {
 			return true;
 		}
 	}

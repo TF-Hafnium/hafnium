@@ -32,7 +32,7 @@ bool arch_other_world_vm_init(struct vm *other_world_vm,
 	other_world_vm_locked = vm_lock(other_world_vm);
 
 	other_world_vm->service_count = 1;
-	other_world_vm->services[0].uuid = (struct ffa_uuid){0};
+	other_world_vm->services[0].protocol_uuid = (struct ffa_uuid){0};
 	/* Enabling all communication methods for the other world. */
 	other_world_vm->services[0].messaging_method =
 		FFA_PARTITION_DIRECT_REQ_SEND | FFA_PARTITION_DIRECT_REQ2_SEND;

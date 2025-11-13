@@ -1104,7 +1104,7 @@ bool vm_service_supports_messaging_method(struct vm *vm, struct ffa_uuid *uuid,
 	}
 
 	for (int i = 0; i < vm->service_count; i++) {
-		if (ffa_uuid_equal(&vm->services[i].uuid, uuid)) {
+		if (ffa_uuid_equal(&vm->services[i].protocol_uuid, uuid)) {
 			return (vm->services[i].messaging_method &
 				messaging_method) != 0;
 		}
