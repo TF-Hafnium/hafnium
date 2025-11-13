@@ -63,7 +63,7 @@ class FvpDriver(Driver, ABC):
             raise ValueError("FVP emulator does not support the --cpu option.")
         super().__init__(args)
         self._cpu_start_address = cpu_start_address
-        self._fvp_prebuilt_bl31 = fvp_prebuilt_bl31
+        self._fvp_prebuilt_bl31 = getattr(args, "bl31", None) or fvp_prebuilt_bl31
 
     def create_dt(self, run_name : str):
         """Create DT related files, and return respective paths in a tuple
@@ -174,6 +174,11 @@ class FvpDriver(Driver, ABC):
             }
         }
 
+        # If a BL31 override/default is present, ensure dynamic overlay overrides
+        # the base/static overlay to use the desired BL31 at the correct RVBAR.
+        if getattr(self, "_fvp_prebuilt_bl31", None):
+            params["--data cluster0.cpu0"] = f"${{rtvar:BL31}}@{hex(self._cpu_start_address)}"
+
         if self.cov_plugin is not None:
             rtvars.update ({
                 "COV_PLUGIN" : {
@@ -212,6 +217,15 @@ class FvpDriver(Driver, ABC):
 
             # Construct the dynamic runtime overlay
             dynamic_overlay_path = shrinkwrap.get_dynamic_overlay_path()
+
+            # Ensure BL31 path is propagated in overlays if available
+            if getattr(self, "_fvp_prebuilt_bl31", None):
+                rtvars.update({
+                    "BL31": {
+                        "type": "path",
+                        "value": str(self._fvp_prebuilt_bl31)
+                    }
+                })
             shrinkwrap.write_overlay_yaml(dynamic_overlay_path, rtvars,
                                         new_params=params, fvp_name=str(FVP_BINARY))
 
@@ -241,6 +255,13 @@ class FvpDriver(Driver, ABC):
         f = click.option("--partitions_json")(f)
         f = click.option("--out_partitions")(f)
         f = click.option("--coverage_plugin")(f)
+        f = click.option(
+            "--bl31",
+            metavar="BL31_PATH",
+            help=(
+                "Path to BL31 firmware binary to use instead of the default prebuilts"
+            ),
+        )(f)
         f = click.option("--el3_spmc", is_flag=True)(f)
         return f
 
@@ -308,6 +329,11 @@ class FvpDriver(Driver, ABC):
             driver = FvpDriverHypervisor(driver_args)
         else:
             raise Exception("No Hafnium image provided!\n")
+
+        bl31_override = options.get("bl31")
+        if bl31_override:
+            driver._fvp_prebuilt_bl31 = bl31_override
+
 
         # LoggingPriority: CLI > ENV > Default
         logging_level_str = options.get("log_level") or os.getenv("HFTEST_LOG_LEVEL", "INFO")
@@ -441,6 +467,11 @@ class FvpDriverHypervisor(FvpDriver):
                 "value": str(self.INITRD_START)
             }
         }
+
+        # If a BL31 override/default is present, ensure dynamic overlay overrides
+        # the base/static overlay to use the desired BL31 at the correct RVBAR.
+        if getattr(self, "_fvp_prebuilt_bl31", None):
+            params["--data cluster0.cpu0"] = f"${{rtvar:BL31}}@{hex(self._cpu_start_address)}"
         rtvars.update(static_rtvars)
         return params, rtvars
 
