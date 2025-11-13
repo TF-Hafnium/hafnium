@@ -210,6 +210,13 @@ struct live_activation {
 
 	/** Live activation status register. From w0/x0 - w7/x7 */
 	uint32_t status_reg_num;
+
+	/**
+	 * Make a note of phandle and the properties of the corresponding memory
+	 * region node describing the live state buffer.
+	 */
+	uint32_t live_buffer_phandle;
+	struct memory_region *live_state_buffer;
 };
 
 static_assert(sizeof(struct vm_availability_messages) == sizeof(uint32_t),

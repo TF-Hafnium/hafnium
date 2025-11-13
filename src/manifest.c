@@ -612,7 +612,8 @@ static enum manifest_return_code parse_page_count(struct fdt_node *node,
 static enum manifest_return_code parse_ffa_memory_region_node(
 	struct fdt_node *mem_node, uintptr_t load_address,
 	struct memory_region *mem_regions, uint16_t *count, struct rx_tx *rxtx,
-	const struct boot_params *boot_params)
+	const struct boot_params *boot_params,
+	struct live_activation *live_activation)
 {
 	uint32_t phandle;
 	uint16_t i = 0;
@@ -719,7 +720,7 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 				MANIFEST_REGION_ALL_ATTR_MASK;
 		}
 
-		if (rxtx->available) {
+		if (rxtx->available || live_activation->enabled) {
 			TRY(read_optional_uint32(
 				mem_node, "phandle",
 				(uint32_t)MANIFEST_INVALID_ADDRESS, &phandle));
@@ -729,6 +730,12 @@ static enum manifest_return_code parse_ffa_memory_region_node(
 			} else if (phandle == rxtx->tx_phandle) {
 				dlog_verbose("      Assigned as TX buffer\n");
 				rxtx->tx_buffer = &mem_regions[i];
+			} else if (phandle ==
+				   live_activation->live_buffer_phandle) {
+				dlog_verbose(
+					"     Assigned as Live state buffer\n");
+				live_activation->live_state_buffer =
+					&mem_regions[i];
 			}
 		}
 
@@ -1118,6 +1125,8 @@ enum manifest_return_code parse_ffa_manifest(
 	bool managed_exit_field_present = false;
 	enum manifest_return_code ret;
 	uint16_t manifest_version_minor;
+	struct string livestate_buffer_node_name =
+		STRING_INIT("live-state-buffer-info");
 
 	if (!fdt_find_node(fdt, "/", &root)) {
 		return MANIFEST_ERROR_NO_ROOT_NODE;
@@ -1447,6 +1456,40 @@ enum manifest_return_code parse_ffa_manifest(
 				return MANIFEST_ERROR_IMAGE_UUID_INVALID;
 			}
 		}
+
+		ffa_node = root;
+		if (fdt_find_child(&ffa_node, &livestate_buffer_node_name)) {
+			if (!fdt_is_compatible(
+				    &ffa_node,
+				    "arm,ffa-manifest,live-state-buffer")) {
+				return MANIFEST_ERROR_NOT_COMPATIBLE;
+			}
+
+			/*
+			 * Read only phandle for now, it will be used to update
+			 * buffers while parsing memory regions.
+			 */
+			ret = read_uint64(
+				&ffa_node, "live-state-buffer",
+				(uint64_t *)&vm->partition.live_activation
+					.live_buffer_phandle);
+
+			if (ret != MANIFEST_SUCCESS) {
+				dlog_error(
+					"Live state buffer not found in "
+					"partition manifest\n");
+				return MANIFEST_ERROR_NOT_COMPATIBLE;
+			}
+
+			dlog_verbose("Live state buffer phandle found at: %u\n",
+				     vm->partition.live_activation
+					     .live_buffer_phandle);
+		} else {
+			dlog_error(
+				"Live activation needs live state buffer to be "
+				"specified in memory region node\n");
+			return MANIFEST_ERROR_ILLEGAL_LIVE_ACTIVATION_SUPPORT;
+		}
 	}
 
 	/* Parse memory-regions */
@@ -1456,7 +1499,7 @@ enum manifest_return_code parse_ffa_manifest(
 			&ffa_node, vm->partition.load_addr,
 			vm->partition.mem_regions,
 			&vm->partition.mem_region_count, &vm->partition.rxtx,
-			boot_params));
+			boot_params, &vm->partition.live_activation));
 	}
 	dlog_verbose("  Total %u memory regions found\n",
 		     vm->partition.mem_region_count);

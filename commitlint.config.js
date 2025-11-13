@@ -30,8 +30,9 @@ export default {
         'iommu',
         'smmuv3',
 
-        // Partition lifecycle
+        // Partition lifecycle and live firmware activation
         'lifecycle',
+        'lfa',
 
         // Test framework
         'hftest',
