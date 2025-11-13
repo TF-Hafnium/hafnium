@@ -209,3 +209,114 @@ TEST(partition_info_v1_3, ffa_partition_info_get_regs_null_uuid)
 	check_partition_info_descriptors(partitions,
 					 (uint16_t)(last_index + 1));
 }
+
+TEST(partition_info_v1_3, ffa_partition_info_get_with_protocol_uuid)
+{
+	struct mailbox_buffers mb;
+	struct ffa_value ret;
+	const struct ffa_partition_info *partitions;
+	struct ffa_uuid image_uuid;
+	struct ffa_uuid uuid;
+	enum ffa_version version;
+
+	version = ffa_version(FFA_VERSION_1_3);
+	EXPECT_EQ(version, FFA_VERSION_COMPILED);
+
+	/* Setup the mailbox (which holds the RX buffer). */
+	mb = set_up_mailbox();
+
+	partitions = mb.recv;
+
+	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
+
+	/* Check that expected partition information is returned. */
+	ret = ffa_partition_info_get(&uuid, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Expect single Secure Partition. */
+	EXPECT_EQ(ret.arg2, 1);
+
+	/*
+	 * Check the partition info descriptor size returned in w3 is
+	 * correct.
+	 */
+	EXPECT_EQ(ret.arg3, sizeof(struct ffa_partition_info));
+
+	/* Expect a primary SP's properties to be returned. */
+	EXPECT_EQ(partitions[0].vm_id, SP_ID(1));
+	EXPECT_EQ(partitions[0].vcpu_count, 1);
+
+	/*
+	 * Protocol UUID must not be populated in partition descriptor when
+	 * specified as input to the ABI.
+	 */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[0].protocol_uuid, &uuid));
+	EXPECT_EQ(partitions[0].properties,
+		  FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_AARCH64_EXEC |
+			  FFA_PARTITION_INDIRECT_MSG |
+			  FFA_PARTITION_NOTIFICATION |
+			  FFA_PARTITION_VM_CREATED |
+			  FFA_PARTITION_VM_DESTROYED |
+			  FFA_PARTITION_LIVE_ACTIVATION);
+
+	ffa_uuid_init(0x962a7bf0, 0x174d471d, 0xa686c89e, 0x5c3e254e,
+		      &image_uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partitions[0].image_uuid, &image_uuid));
+}
+
+TEST(partition_info_v1_3, ffa_partition_info_get_regs_with_protocol_uuid)
+{
+	struct ffa_value ret;
+	struct ffa_partition_info partition;
+	struct ffa_uuid image_uuid;
+	struct ffa_uuid uuid;
+	uint16_t start_index = 0;
+	uint16_t last_index;
+	uint16_t curr_index;
+	uint16_t tag;
+	uint16_t desc_size;
+
+	ffa_uuid_init(0x9458bb2d, 0x353b4ee2, 0xaa25710c, 0x99b73ddc, &uuid);
+
+	/* Check that expected partition information is returned. */
+	ret = ffa_partition_info_get_regs(&uuid, start_index, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+
+	last_index = ffa_partition_info_regs_get_last_idx(ret);
+	curr_index = ffa_partition_info_regs_get_curr_idx(ret);
+	tag = ffa_partition_info_regs_get_tag(ret);
+	desc_size = ffa_partition_info_regs_get_desc_size(ret);
+
+	/* Expect single Secure Partition. */
+	EXPECT_EQ(last_index, 0);
+	EXPECT_EQ(curr_index, 0);
+	EXPECT_EQ(tag, 0);
+
+	/* Check the partition info descriptor size is correct. */
+	EXPECT_EQ(desc_size, sizeof(struct ffa_partition_info));
+
+	ffa_partition_info_regs_get_part_info(ret, 0, &partition);
+
+	/* Expect a primary SP's properties to be returned. */
+	EXPECT_EQ(partition.vm_id, SP_ID(1));
+	EXPECT_EQ(partition.vcpu_count, 1);
+
+	/*
+	 * Protocol UUID must not be populated in partition descriptor when
+	 * specified as input to the ABI.
+	 */
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partition.protocol_uuid, &uuid));
+	EXPECT_EQ(partition.properties, FFA_PARTITION_DIRECT_REQ_RECV |
+						FFA_PARTITION_AARCH64_EXEC |
+						FFA_PARTITION_INDIRECT_MSG |
+						FFA_PARTITION_NOTIFICATION |
+						FFA_PARTITION_VM_CREATED |
+						FFA_PARTITION_VM_DESTROYED |
+						FFA_PARTITION_LIVE_ACTIVATION);
+
+	ffa_uuid_init(0x962a7bf0, 0x174d471d, 0xa686c89e, 0x5c3e254e,
+		      &image_uuid);
+	EXPECT_TRUE(ffa_uuid_equal(&partition.image_uuid, &image_uuid));
+}
