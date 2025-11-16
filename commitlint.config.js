@@ -48,6 +48,7 @@ export default {
         'reference',
         'dtc',
         'gtest',
+        'prebuilts',
 
         // Fallback scope for any miscellaneous change
         'misc'

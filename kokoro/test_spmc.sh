@@ -186,6 +186,10 @@ execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
              --log "$LOG_DIR_BASE/sp_lifecycle_support" \
              --partitions_json test/vmapi/primary_with_secondaries/sp_lifecycle_support.json
 
+execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --partitions_json test/vmapi/ffa_secure_partitions/sp_live_activation_test.json \
+             --bl31 prebuilts/linux-aarch64/trusted-firmware-a-spmd-lsp/fvp/bl31.bin
+
 if [ "$CODE_COVERAGE" = true ]; then
   create_configuration_file
   generate_intermediate_layer
