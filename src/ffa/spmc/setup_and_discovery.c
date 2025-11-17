@@ -86,9 +86,10 @@ void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 }
 
 ffa_partition_properties_t ffa_setup_partition_properties(
-	ffa_id_t caller_id, const struct vm *target)
+	ffa_id_t caller_id, const struct vm *target, const size_t service_idx)
 {
-	ffa_partition_properties_t result = target->messaging_method;
+	ffa_partition_properties_t result =
+		target->services[service_idx].messaging_method;
 	bool is_ffa_version_ge_v1_2 = (target->ffa_version >= FFA_VERSION_1_2);
 	ffa_partition_properties_t final_mask;
 	ffa_partition_properties_t dir_msg_mask = FFA_PARTITION_DIRECT_REQ_RECV;

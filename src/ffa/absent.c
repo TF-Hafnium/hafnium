@@ -20,10 +20,11 @@ struct ffa_value ffa_setup_spmc_id_get(void)
 }
 
 ffa_partition_properties_t ffa_setup_partition_properties(
-	ffa_id_t caller_id, const struct vm *target)
+	ffa_id_t caller_id, const struct vm *target, const size_t service_idx)
 {
 	(void)caller_id;
 	(void)target;
+	(void)service_idx;
 	return 0;
 }
 
@@ -67,10 +68,12 @@ bool ffa_direct_msg_is_direct_request_valid(struct vcpu *current,
 
 bool ffa_direct_msg_is_direct_request_supported(struct vm *sender_vm,
 						struct vm *receiver_vm,
+						struct uuid *receiver_uuid,
 						uint32_t func)
 {
 	(void)sender_vm;
 	(void)receiver_vm;
+	(void)receiver_uuid;
 	(void)func;
 
 	return false;

@@ -172,16 +172,15 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 	vm_locked.vm->power_management =
 		manifest_vm->partition.power_management;
 
-	/* Populate array of UUIDs. */
-	for (uint16_t i = 0; i < PARTITION_MAX_UUIDS; i++) {
-		struct ffa_uuid current_uuid = manifest_vm->partition.uuids[i];
-
-		if (ffa_uuid_is_null(&current_uuid)) {
-			break;
-		}
-
-		vm_locked.vm->uuids[i] = current_uuid;
+	/* Populate array of services. */
+	for (uint16_t i = 0; i < manifest_vm->partition.service_count; i++) {
+		vm_locked.vm->services[i].uuid =
+			manifest_vm->partition.services[i].uuid;
+		vm_locked.vm->services[i].messaging_method =
+			manifest_vm->partition.services[i].messaging_method;
 	}
+
+	vm_locked.vm->service_count = manifest_vm->partition.service_count;
 
 	/*
 	 * Populate the interrupt descriptor for current VM.
@@ -221,9 +220,6 @@ static bool load_common(struct mm_stage1_locked stage1_locked,
 				return false;
 			}
 		}
-
-		vm_locked.vm->messaging_method =
-			manifest_vm->partition.messaging_method;
 
 		vm_locked.vm->ns_interrupts_action =
 			manifest_vm->partition.ns_interrupts_action;

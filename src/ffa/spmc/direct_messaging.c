@@ -47,6 +47,7 @@ bool ffa_direct_msg_is_direct_request_valid(struct vcpu *current,
  */
 bool ffa_direct_msg_is_direct_request_supported(struct vm *sender_vm,
 						struct vm *receiver_vm,
+						struct ffa_uuid *receiver_uuid,
 						uint32_t func)
 {
 	uint16_t sender_method;
@@ -90,12 +91,28 @@ bool ffa_direct_msg_is_direct_request_supported(struct vm *sender_vm,
 		return false;
 	}
 
-	if (!vm_supports_messaging_method(receiver_vm, receiver_method)) {
-		dlog_verbose(
-			"Receiver can't receive direct message requests via "
-			"%s\n",
-			ffa_func_name(func));
-		return false;
+	if (receiver_method == FFA_PARTITION_DIRECT_REQ2_RECV) {
+		if (!vm_service_supports_messaging_method(
+			    receiver_vm, receiver_uuid, receiver_method)) {
+			dlog_verbose(
+				"Receiver service %#08x-%08x-%08x-%08x "
+				"belonging to VM %#x can't receive direct "
+				"message "
+				"requests via %s\n",
+				receiver_uuid->uuid[0], receiver_uuid->uuid[1],
+				receiver_uuid->uuid[2], receiver_uuid->uuid[3],
+				receiver_vm->id, ffa_func_name(func));
+			return false;
+		}
+	} else {
+		if (!vm_supports_messaging_method(receiver_vm,
+						  receiver_method)) {
+			dlog_verbose(
+				"Receiver VM %#x can't receive direct message "
+				"requests via %s\n",
+				receiver_vm->id, ffa_func_name(func));
+			return false;
+		}
 	}
 
 	return true;

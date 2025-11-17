@@ -139,23 +139,24 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 	while (uint32list_has_next(&uuid) && j < PARTITION_MAX_UUIDS) {
 		while (uint32list_has_next(&uuid) && i < 4) {
 			uint32list_get_next(&uuid, &uuid_word);
-			ctx->partition_manifest.uuids[j].uuid[i] = uuid_word;
+			ctx->partition_manifest.services[j].uuid.uuid[i] =
+				uuid_word;
 			i++;
 		}
 
-		EXPECT_FALSE(
-			ffa_uuid_is_null(&ctx->partition_manifest.uuids[j]));
+		EXPECT_FALSE(ffa_uuid_is_null(
+			&ctx->partition_manifest.services[j].uuid));
 
 		dlog_verbose("  UUID %#x-%x-%x-%x\n",
-			     ctx->partition_manifest.uuids[j].uuid[0],
-			     ctx->partition_manifest.uuids[j].uuid[1],
-			     ctx->partition_manifest.uuids[j].uuid[2],
-			     ctx->partition_manifest.uuids[j].uuid[3]);
+			     ctx->partition_manifest.services[j].uuid.uuid[0],
+			     ctx->partition_manifest.services[j].uuid.uuid[1],
+			     ctx->partition_manifest.services[j].uuid.uuid[2],
+			     ctx->partition_manifest.services[j].uuid.uuid[3]);
 		j++;
 		i = 0;
 	}
 
-	ctx->partition_manifest.uuid_count = j;
+	ctx->partition_manifest.service_count = j;
 
 	ffa_node = root;
 

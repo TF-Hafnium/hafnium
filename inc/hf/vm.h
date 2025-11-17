@@ -183,7 +183,8 @@ enum vm_state {
 /* NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding) */
 struct vm {
 	ffa_id_t id;
-	struct ffa_uuid uuids[PARTITION_MAX_UUIDS];
+	uint16_t service_count;
+	struct service services[PARTITION_MAX_UUIDS];
 	enum ffa_version ffa_version;
 	enum vm_state state;
 
@@ -249,8 +250,6 @@ struct vm {
 		uint32_t gp_register_num;
 		ipaddr_t blob_addr;
 	} boot_info;
-
-	uint16_t messaging_method;
 
 	/**
 	 * Action specified by a Partition through the manifest in response to
@@ -391,6 +390,8 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
 			       uint32_t *ids_count, uint32_t *lists_sizes,
 			       uint32_t *lists_count, uint32_t ids_max_count);
 bool vm_supports_messaging_method(struct vm *vm, uint16_t messaging_method);
+bool vm_service_supports_messaging_method(struct vm *vm, struct ffa_uuid *uuid,
+					  uint16_t messaging_method);
 void vm_set_boot_info_gp_reg(struct vm *vm, struct vcpu *vcpu);
 
 /**

@@ -34,10 +34,12 @@ bool ffa_direct_msg_is_direct_request_valid(struct vcpu *current,
 
 bool ffa_direct_msg_is_direct_request_supported(struct vm *sender_vm,
 						struct vm *receiver_vm,
+						struct ffa_uuid *receiver_uuid,
 						uint32_t func)
 {
 	(void)sender_vm;
 	(void)receiver_vm;
+	(void)receiver_uuid;
 	(void)func;
 
 	/*

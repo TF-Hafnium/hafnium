@@ -486,18 +486,19 @@ static struct ffa_value send_versioned_partition_info_descriptors(
  * features it supports.
  */
 static ffa_partition_properties_t api_ffa_partitions_info_get_properties(
-	ffa_id_t caller_id, struct vm *vm)
+	ffa_id_t caller_id, struct vm *vm, size_t service_idx)
 {
 	ffa_partition_properties_t properties;
 
-	properties = ffa_setup_partition_properties(caller_id, vm);
+	properties = ffa_setup_partition_properties(caller_id, vm, service_idx);
 	properties |= FFA_PARTITION_AARCH64_EXEC;
 
 	if (vm->ffa_version >= FFA_VERSION_1_1) {
 		properties |= vm_are_notifications_enabled(vm)
 				      ? FFA_PARTITION_NOTIFICATION
 				      : 0;
-		properties |= vm->messaging_method & FFA_PARTITION_INDIRECT_MSG;
+		properties |= vm->services[service_idx].messaging_method &
+			      FFA_PARTITION_INDIRECT_MSG;
 	}
 
 	/*
@@ -518,12 +519,12 @@ static ffa_partition_properties_t api_ffa_partitions_info_get_properties(
 
 static void api_ffa_fill_partition_info(
 	struct ffa_partition_info *out_partition, struct vm *vm,
-	ffa_id_t caller_id)
+	size_t service_idx, ffa_id_t caller_id)
 {
 	out_partition->vm_id = vm->id;
 	out_partition->vcpu_count = vm->vcpu_count;
-	out_partition->properties =
-		api_ffa_partitions_info_get_properties(caller_id, vm);
+	out_partition->properties = api_ffa_partitions_info_get_properties(
+		caller_id, vm, service_idx);
 }
 
 /**
@@ -561,9 +562,9 @@ static bool api_ffa_fill_partitions_info_array(
 			continue;
 		}
 
-		for (size_t uuid_idx = 0; uuid_idx < PARTITION_MAX_UUIDS;
-		     uuid_idx++) {
-			struct ffa_uuid uuid = vm->uuids[uuid_idx];
+		for (size_t service_idx = 0; service_idx < vm->service_count;
+		     service_idx++) {
+			struct ffa_uuid uuid = vm->services[service_idx].uuid;
 			struct ffa_partition_info *out_partition =
 				&out_partitions[*entries_count];
 
@@ -591,6 +592,7 @@ static bool api_ffa_fill_partitions_info_array(
 				}
 
 				api_ffa_fill_partition_info(out_partition, vm,
+							    service_idx,
 							    caller_id);
 				/*
 				 * If the ABI has specified an UUID, then do not
@@ -2901,37 +2903,31 @@ static struct ffa_value api_ffa_dir_msg_value(struct ffa_value args)
 }
 
 /**
- * Return a pointer to the first UUID in `uuids` that is equal to
- * `target_uuid`. If `target_uuid` is 0-0-0-0, it matches any UUID.
+ * Check if the UUID specified through DIRECT_REQ2 message interface is
+ * valid.
  */
-static struct ffa_uuid *ffa_uuid_find(struct ffa_uuid *uuids,
-				      size_t uuids_count,
-				      struct ffa_uuid target_uuid)
+static bool api_ffa_dir_msg_req2_uuid_is_valid(struct vm *receiver_vm,
+					       struct ffa_uuid *uuid)
 {
-	if (ffa_uuid_is_null(&target_uuid)) {
-		return &uuids[0];
+	/*
+	 * If `uuid` is NULL (i.e., 0-0-0-0), return true thereby allowing a
+	 * DIRECT_REQ2 message to be relayed to receiver endpoint.
+	 */
+	if (ffa_uuid_is_null(uuid)) {
+		return true;
 	}
 
-	for (size_t i = 0; i < uuids_count; i++) {
-		if (ffa_uuid_is_null(&uuids[i])) {
-			break;
-		}
-		if (ffa_uuid_equal(&target_uuid, &uuids[i])) {
-			return &uuids[i];
+	/*
+	 * Check if the `uuid` matches any of the `service UUIDs` supported
+	 * by the receiver endpoint.
+	 */
+	for (size_t i = 0; i < receiver_vm->service_count; i++) {
+		if (ffa_uuid_equal(uuid, &receiver_vm->services[i].uuid)) {
+			return true;
 		}
 	}
-	return NULL;
-}
 
-static bool api_ffa_dir_msg_req2_is_uuid_valid(struct vm *receiver_vm,
-					       struct ffa_value args)
-{
-	struct ffa_uuid target_uuid;
-
-	ffa_uuid_from_u64x2(args.arg2, args.arg3, &target_uuid);
-
-	return ffa_uuid_find(receiver_vm->uuids, PARTITION_MAX_UUIDS,
-			     target_uuid) != NULL;
+	return false;
 }
 
 /**
@@ -2952,6 +2948,7 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 {
 	ffa_id_t sender_vm_id = ffa_sender(args);
 	ffa_id_t receiver_vm_id = ffa_receiver(args);
+	struct ffa_uuid receiver_uuid;
 	struct ffa_value ret;
 	struct vm *receiver_vm;
 	struct vm_locked receiver_locked;
@@ -2994,8 +2991,10 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
+	ffa_uuid_from_u64x2(args.arg2, args.arg3, &receiver_uuid);
+
 	if (args.func == FFA_MSG_SEND_DIRECT_REQ2_64 &&
-	    !api_ffa_dir_msg_req2_is_uuid_valid(receiver_vm, args)) {
+	    !api_ffa_dir_msg_req2_uuid_is_valid(receiver_vm, &receiver_uuid)) {
 		dlog_verbose("UUID unrecognized for this VM\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -3005,7 +3004,7 @@ struct ffa_value api_ffa_msg_send_direct_req(struct ffa_value args,
 	 * receiver supports receipt of direct message requests.
 	 */
 	if (!ffa_direct_msg_is_direct_request_supported(
-		    current->vm, receiver_vm, args.func)) {
+		    current->vm, receiver_vm, &receiver_uuid, args.func)) {
 		dlog_verbose("Direct message request not supported\n");
 		return ffa_error(FFA_DENIED);
 	}

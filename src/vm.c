@@ -1081,7 +1081,35 @@ bool vm_notifications_info_get(struct vm_locked vm_locked, uint16_t *ids,
  */
 bool vm_supports_messaging_method(struct vm *vm, uint16_t messaging_method)
 {
-	return (vm->messaging_method & messaging_method) != 0;
+	for (int i = 0; i < vm->service_count; i++) {
+		if ((vm->services[i].messaging_method & messaging_method) !=
+		    0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Checks a service within a VM supports a messaging method.
+ */
+bool vm_service_supports_messaging_method(struct vm *vm, struct ffa_uuid *uuid,
+					  uint16_t messaging_method)
+{
+	/*
+	 * If the UUID is NULL, check any service supports the messaging method.
+	 */
+	if (ffa_uuid_is_null(uuid)) {
+		return vm_supports_messaging_method(vm, messaging_method);
+	}
+
+	for (int i = 0; i < vm->service_count; i++) {
+		if (ffa_uuid_equal(&vm->services[i].uuid, uuid)) {
+			return (vm->services[i].messaging_method &
+				messaging_method) != 0;
+		}
+	}
+	return false;
 }
 
 /**

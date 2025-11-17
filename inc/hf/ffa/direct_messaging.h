@@ -23,6 +23,7 @@ bool ffa_direct_msg_is_direct_response_valid(struct vcpu *current,
 
 bool ffa_direct_msg_is_direct_request_supported(struct vm *sender_vm,
 						struct vm *receiver_vm,
+						struct ffa_uuid *receiver_uuid,
 						uint32_t func);
 
 bool ffa_direct_msg_direct_request_forward(ffa_id_t receiver_vm_id,

@@ -2072,7 +2072,7 @@ TEST_F(manifest, ffa_valid)
 	vm = &m->vm[0];
 	ASSERT_EQ(vm->partition.ffa_version, 0x10000);
 	ASSERT_THAT(
-		std::span(vm->partition.uuids[0].uuid, 4),
+		std::span(vm->partition.services[0].uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
 	ASSERT_EQ(vm->partition.execution_ctx_count, 1);
 	ASSERT_EQ(vm->partition.run_time_el, S_EL1);
@@ -2080,7 +2080,8 @@ TEST_F(manifest, ffa_valid)
 	ASSERT_EQ(vm->partition.ep_offset, 0x00002000);
 	ASSERT_EQ(vm->partition.xlat_granule, PAGE_4KB);
 	ASSERT_EQ(vm->partition.boot_order, 0);
-	ASSERT_EQ(vm->partition.messaging_method, FFA_PARTITION_INDIRECT_MSG);
+	ASSERT_EQ(vm->partition.services[0].messaging_method,
+		  FFA_PARTITION_INDIRECT_MSG);
 	ASSERT_EQ(vm->partition.ns_interrupts_action, NS_ACTION_ME);
 	ASSERT_EQ(vm->partition.mem_regions[0].attributes, (8 | 3));
 
@@ -2330,19 +2331,22 @@ TEST_F(manifest, ffa_valid_multiple_uuids)
 	vm = &m->vm[0];
 	ASSERT_EQ(vm->partition.ffa_version, 0x10002);
 	ASSERT_THAT(
-		std::span(vm->partition.uuids[0].uuid, 4),
+		std::span(vm->partition.services[0].uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1dacb));
 	ASSERT_THAT(
-		std::span(vm->partition.uuids[1].uuid, 4),
+		std::span(vm->partition.services[1].uuid.uuid, 4),
 		ElementsAre(0xb4b5671e, 0x4a904fe1, 0xb81ffb13, 0xdae1daaa));
-	ASSERT_EQ(vm->partition.uuid_count, 2);
+	ASSERT_EQ(vm->partition.service_count, 2);
 	ASSERT_EQ(vm->partition.execution_ctx_count, 1);
 	ASSERT_EQ(vm->partition.run_time_el, S_EL1);
 	ASSERT_EQ(vm->partition.execution_state, AARCH64);
 	ASSERT_EQ(vm->partition.ep_offset, 0x00002000);
 	ASSERT_EQ(vm->partition.xlat_granule, PAGE_4KB);
 	ASSERT_EQ(vm->partition.boot_order, 0);
-	ASSERT_EQ(vm->partition.messaging_method, FFA_PARTITION_INDIRECT_MSG);
+	ASSERT_EQ(vm->partition.services[0].messaging_method,
+		  FFA_PARTITION_INDIRECT_MSG);
+	ASSERT_EQ(vm->partition.services[1].messaging_method,
+		  FFA_PARTITION_INDIRECT_MSG);
 	ASSERT_EQ(vm->partition.ns_interrupts_action, NS_ACTION_ME);
 }
 

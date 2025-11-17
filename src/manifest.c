@@ -400,38 +400,46 @@ static enum manifest_return_code parse_uuid(struct uint32list_iter *uuid,
 		TRY(uint32list_get_next(uuid, &out->uuid[i]));
 	}
 
+	dlog_verbose("  UUID %#x-%x-%x-%x\n", out->uuid[0], out->uuid[1],
+		     out->uuid[2], out->uuid[3]);
+
+	if (ffa_uuid_is_null(out)) {
+		return MANIFEST_ERROR_UUID_ALL_ZEROS;
+	}
+
 	return MANIFEST_SUCCESS;
 }
 
 /**
- * Parse a list of UUIDs from `uuid` into `out`.
- * Writes the number of UUIDs parsed to `len`.
- * Returns `MANIFEST_SUCCESS` if parsing succeeded.
- * Returns `MANIFEST_ERROR_UUID_ALL_ZEROS` if any of the UUIDs are all zeros.
- * Returns `MANIFEEST_ERROR_TOO_MANY_UUIDS` if there are more than
- * `PARTITION_MAX_UUIDS`
+ * Parse the UUIDs and Messaging methods for VM services.
  */
-static enum manifest_return_code parse_uuid_list(struct uint32list_iter *uuid,
-						 struct ffa_uuid *out,
-						 uint16_t *len)
+static enum manifest_return_code parse_services(const struct fdt_node *node,
+						struct service *services,
+						uint16_t *service_count)
 {
-	uint16_t j;
+	struct uint32list_iter uuid;
+	uint16_t first_messaging_method_val;
 
-	for (j = 0; uint32list_has_next(uuid); j++) {
-		TRY(parse_uuid(uuid, &out[j]));
+	*service_count = 0;
 
-		if (ffa_uuid_is_null(&out[j])) {
-			return MANIFEST_ERROR_UUID_ALL_ZEROS;
-		}
-		dlog_verbose("  UUID %#x-%x-%x-%x\n", out[j].uuid[0],
-			     out[j].uuid[1], out[j].uuid[2], out[j].uuid[3]);
+	TRY(read_uint32list(node, "uuid", &uuid));
 
-		if (j >= PARTITION_MAX_UUIDS) {
+	while (uint32list_has_next(&uuid)) {
+		if (*service_count == PARTITION_MAX_UUIDS) {
 			return MANIFEST_ERROR_TOO_MANY_UUIDS;
 		}
+		TRY(parse_uuid(&uuid, &services[*service_count].uuid));
+
+		(*service_count)++;
 	}
 
-	*len = j;
+	/* All services are given the same messaging methods. */
+	TRY(read_uint16(node, "messaging-method", &first_messaging_method_val));
+	for (int i = 0; i < *service_count; i++) {
+		services[i].messaging_method = first_messaging_method_val;
+	}
+	dlog_verbose("  Messaging method %#x\n", first_messaging_method_val);
+
 	return MANIFEST_SUCCESS;
 }
 
@@ -1069,7 +1077,7 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	enum manifest_return_code ret_code = MANIFEST_SUCCESS;
 	const char *error_string = "specified in manifest is unsupported";
 	uint32_t k = 0;
-	bool using_req2 = (vm->partition.messaging_method &
+	bool using_req2 = (vm->partition.services[0].messaging_method &
 			   (FFA_PARTITION_DIRECT_REQ2_RECV |
 			    FFA_PARTITION_DIRECT_REQ2_SEND)) != 0;
 
@@ -1109,16 +1117,16 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 
 	if (vm->partition.ffa_version < FFA_VERSION_1_2 && using_req2) {
 		dlog_error("Messaging method %s: %x\n", error_string,
-			   vm->partition.messaging_method);
+			   vm->partition.services[0].messaging_method);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if ((vm->partition.messaging_method &
+	if ((vm->partition.services[0].messaging_method &
 	     ~(FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND |
 	       FFA_PARTITION_INDIRECT_MSG | FFA_PARTITION_DIRECT_REQ2_RECV |
 	       FFA_PARTITION_DIRECT_REQ2_SEND)) != 0U) {
 		dlog_error("Messaging method %s: %x\n", error_string,
-			   vm->partition.messaging_method);
+			   vm->partition.services[0].messaging_method);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
@@ -1234,7 +1242,6 @@ enum manifest_return_code parse_ffa_manifest(
 	struct fdt *fdt, struct manifest_vm *vm,
 	struct fdt_node *boot_info_node, const struct boot_params *boot_params)
 {
-	struct uint32list_iter uuid;
 	uintpaddr_t load_address;
 	struct fdt_node root;
 	struct fdt_node ffa_node;
@@ -1254,11 +1261,8 @@ enum manifest_return_code parse_ffa_manifest(
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	TRY(read_uint32list(&root, "uuid", &uuid));
-
-	TRY(parse_uuid_list(&uuid, vm->partition.uuids,
-			    &vm->partition.uuid_count));
-	dlog_verbose("  Number of UUIDs %u\n", vm->partition.uuid_count);
+	TRY(parse_services(&root, vm->partition.services,
+			   &vm->partition.service_count));
 
 	TRY(read_uint32(&root, "ffa-version", &vm->partition.ffa_version));
 	dlog_verbose("  Expected FF-A version %u.%u\n",
@@ -1333,10 +1337,6 @@ enum manifest_return_code parse_ffa_manifest(
 
 		vm->partition.rxtx.available = true;
 	}
-
-	TRY(read_uint16(&root, "messaging-method",
-			(uint16_t *)&vm->partition.messaging_method));
-	dlog_verbose("  Messaging method %u\n", vm->partition.messaging_method);
 
 	TRY(read_bool(&root, "managed-exit", &managed_exit_field_present));
 

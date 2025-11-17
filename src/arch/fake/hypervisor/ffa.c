@@ -46,10 +46,12 @@ bool ffa_direct_msg_is_direct_request_valid(struct vcpu *current,
 
 bool ffa_direct_msg_is_direct_request_supported(struct vm *sender_vm,
 						struct vm *receiver_vm,
+						struct ffa_uuid *receiver_uuid,
 						uint32_t func)
 {
 	(void)sender_vm;
 	(void)receiver_vm;
+	(void)receiver_uuid;
 	(void)func;
 
 	return false;
@@ -170,10 +172,11 @@ void ffa_setup_rxtx_map_forward(struct vm_locked vm_locked)
 }
 
 ffa_partition_properties_t ffa_setup_partition_properties(
-	ffa_id_t caller_id, const struct vm *target)
+	ffa_id_t caller_id, const struct vm *target, const size_t service_idx)
 {
 	(void)caller_id;
 	(void)target;
+	(void)service_idx;
 	return 0;
 }
 

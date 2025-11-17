@@ -204,15 +204,24 @@ struct vm_availability_messages {
 static_assert(sizeof(struct vm_availability_messages) == sizeof(uint32_t),
 	      "vm_availability_messages must have same size as uint32_t");
 
+/*
+ * Paring of UUID and messaging method to represent a service the SP provides.
+ * At least one service must be defined for an SP.
+ */
+struct service {
+	uint16_t messaging_method;
+	struct ffa_uuid uuid;
+};
+
 /**
  * Partition manifest as described in FF-A v1.0 spec section 3.1
  */
 struct ffa_partition_manifest {
 	/** FF-A expected version - mandatory */
 	enum ffa_version ffa_version;
-	/** UUID - at least one UUID mandatory */
-	uint16_t uuid_count;
-	struct ffa_uuid uuids[PARTITION_MAX_UUIDS];
+	uint16_t service_count;
+	/* Services (uuid, messaging method pairs), at least one mandatory. */
+	struct service services[PARTITION_MAX_UUIDS];
 	/** Partition id - optional */
 	ffa_id_t id;
 	/** Aux ids for mem transactions - optional */
@@ -245,8 +254,6 @@ struct ffa_partition_manifest {
 	/** Optional RX/TX buffers */
 	struct rx_tx rxtx;
 
-	/** mandatory - direct/indirect msg or both */
-	uint16_t messaging_method;
 	/** mandatory - action in response to non secure interrupt */
 	uint8_t ns_interrupts_action;
 	/** optional - managed exit signaled through vIRQ */
