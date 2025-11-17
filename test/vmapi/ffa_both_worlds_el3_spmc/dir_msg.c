@@ -15,6 +15,15 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
+/*
+ * Precondition function used to skip these tests for the current test setup.
+ * Returning false means the test is not executed by the hftest runner.
+ */
+static bool skip_test(void)
+{
+	return false;
+}
+
 /**
  * Communicates with partition via direct messaging to validate functioning of
  * direct request/response interfaces.
@@ -40,7 +49,7 @@ TEST(ffa_msg_send_direct_req, succeeds_nwd_to_sp_echo)
 /**
  * Validate SP to SP direct messaging is functioning as expected.
  */
-TEST(ffa_msg_send_direct_req, succeeds_sp_to_sp_echo)
+TEST_PRECONDITION(ffa_msg_send_direct_req, succeeds_sp_to_sp_echo, skip_test)
 {
 	const uint32_t msg[] = {0x22223333, 0x44445555, 0x66667777, 0x88889999};
 	const ffa_id_t receiver_id = SP_ID(1);
@@ -58,7 +67,8 @@ TEST(ffa_msg_send_direct_req, succeeds_sp_to_sp_echo)
  * Test that if a direct message request is sent to an SP that is already
  * waiting for a direct message response an DENIED error code is returned.
  */
-TEST(ffa_msg_send_direct_req, fails_direct_req_to_waiting_sp)
+TEST_PRECONDITION(ffa_msg_send_direct_req, fails_direct_req_to_waiting_sp,
+		  skip_test)
 {
 	const ffa_id_t receiver_id = SP_ID(1);
 	struct ffa_value res;

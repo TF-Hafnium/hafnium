@@ -63,6 +63,8 @@ run:
     -C bp.vis.rate_limit-enable: false
     -C bp.pl011_uart0.untimed_fifos: 1
     -C bp.pl011_uart0.unbuffered_output: 1
+    -C bp.pl011_uart1.untimed_fifos: 1
+    -C bp.pl011_uart1.unbuffered_output: 1
     -C bp.ve_sysregs.mmbSiteDefault: 0
     -C cluster0.has_arm_v8-5: 1
     -C cluster1.has_arm_v8-5: 1

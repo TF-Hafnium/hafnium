@@ -216,8 +216,11 @@ class FvpDriver(Driver, ABC):
         except DriverRunException:
             pass
 
-        # Append UART0 output to main log.
+        # Append UART outputs to the main run log with clear labels.
+        append_file(run_state.log_path, "\n===== UART0 Output =====\n")
         append_file(run_state.log_path, read_file(uart0_log_path))
+        append_file(run_state.log_path, "\n===== UART1 Output =====\n")
+        append_file(run_state.log_path, read_file(uart1_log_path))
         return self.finish_run(run_state)
 
     def finish(self):

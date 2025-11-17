@@ -175,8 +175,11 @@ class TestRunner:
             match = HFTEST_CTRL_JSON_REGEX.search(line)
             if match is not None:
                 line = line[match.end():]
-            if line.startswith(HFTEST_LOG_PREFIX):
-                lines.append(line[len(HFTEST_LOG_PREFIX):])
+            idx = line.find(HFTEST_LOG_PREFIX)
+            if idx != -1:
+            # Strip everything before "[hftest] "
+                stripped = line[idx + len(HFTEST_LOG_PREFIX):]
+                lines.append(stripped)
         return lines
 
     def get_test_json(self):
@@ -226,10 +229,15 @@ class TestRunner:
 
     def is_passed_test(self, test_out):
         """Parse the output of a test and return True if it passed."""
-        return \
-            len(test_out) > 0 and \
-            test_out[-1] == HFTEST_LOG_FINISHED and \
-            not any(l.startswith(HFTEST_LOG_FAILURE_PREFIX) for l in test_out)
+        """A test passes if the output contains a '[hftest] FINISHED' line and no
+        '[hftest] Failure:' lines. This definition is robust against multi-UART
+        output interleaving."""
+        if not test_out:
+            return False
+
+        has_finished = any(l == HFTEST_LOG_FINISHED for l in test_out)
+        has_failure = any(l.startswith(HFTEST_LOG_FAILURE_PREFIX) for l in test_out)
+        return has_finished and not has_failure
 
     def get_failure_message(self, test_out):
         """Parse the output of a test and return the message of the first
