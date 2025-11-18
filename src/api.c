@@ -5431,6 +5431,76 @@ static bool api_ffa_ns_res_info_get_rx_tx_buffers(
 }
 
 /**
+ * Checks the Hypervisor for mapped RX/TX buffers. If any
+ * are mapped, an AMD is generated for each mapped buffer.
+ */
+static bool api_ffa_ns_res_info_get_hypervisor_rx_tx_buffers(
+	struct ffa_resource_info_desc_header *header)
+{
+	bool ret_val;
+	struct ffa_address_map_desc *amd;
+	ffa_amd_permissions_t permissions;
+	struct vm *other_world_vm = vm_find(HF_OTHER_WORLD_ID);
+
+	/* Make sure the vm exists. */
+	if (other_world_vm == NULL) {
+		return false;
+	}
+
+	/* Check if the RX buffer is mapped. */
+	if (other_world_vm->mailbox.recv) {
+		/* Acquire the AMD. */
+		ret_val = api_ffa_ns_res_info_get_acquire_amd(
+			&amd, header->amd_count);
+		if (!ret_val) {
+			return false;
+		}
+
+		permissions = ffa_memory_amd_permissions_from_mm_mode(
+			(MM_MODE_R | MM_MODE_W), true);
+
+		/* Setup the address map descriptor. */
+		ffa_ns_res_info_get_amd_init(
+			amd, (uintptr_t)other_world_vm->mailbox.recv,
+			(HF_MAILBOX_SIZE / FFA_PAGE_SIZE), permissions,
+			other_world_vm->id,
+			FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+
+		header->amd_count += 1;
+
+		dlog_verbose("%s: RX Buffer: %lx mapped to Hypervisor: %x\n",
+			     __func__, amd->base_address, amd->endpoint_id);
+	}
+
+	/* Check if the TX buffer is mapped. */
+	if (other_world_vm->mailbox.send) {
+		/* Acquire the AMD. */
+		ret_val = api_ffa_ns_res_info_get_acquire_amd(
+			&amd, header->amd_count);
+		if (!ret_val) {
+			return false;
+		}
+
+		permissions = ffa_memory_amd_permissions_from_mm_mode(MM_MODE_R,
+								      true);
+
+		/* Setup the address map descriptor. */
+		ffa_ns_res_info_get_amd_init(
+			amd, (uintptr_t)other_world_vm->mailbox.send,
+			(HF_MAILBOX_SIZE / FFA_PAGE_SIZE), permissions,
+			other_world_vm->id,
+			FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+
+		header->amd_count += 1;
+
+		dlog_verbose("%s: TX Buffer: %lx mapped to Hypervisor: %x\n",
+			     __func__, amd->base_address, amd->endpoint_id);
+	}
+
+	return true;
+}
+
+/**
  * Generates the data for ffa_ns_res_info_get. Responsible for calling
  * the appropriate helper functions to traverse each of the relevant
  * memory regions generating AMDs for all appropriate memory regions.
@@ -5521,6 +5591,12 @@ static struct ffa_value api_ffa_ns_res_info_get_generate_data(
 
 	/* Iterate through the RX/TX buffers. */
 	success = api_ffa_ns_res_info_get_rx_tx_buffers(header);
+	if (!success) {
+		return ffa_error(FFA_NO_MEMORY);
+	}
+
+	/* Acquire the Hypervisor RX/TX buffers. */
+	success = api_ffa_ns_res_info_get_hypervisor_rx_tx_buffers(header);
 	if (!success) {
 		return ffa_error(FFA_NO_MEMORY);
 	}
