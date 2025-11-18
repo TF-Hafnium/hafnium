@@ -4839,17 +4839,18 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_sp_info,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect three AMDs based on service1's manifest and the
-	 * RX/TX buffer for this test VM.
+	 * We expect five AMDs, 1 from service1's manifest, 2 from
+	 * the RX/TX buffers of this test VM, and 2 from the RX/TX
+	 * buffers of the Hypervisor.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 3));
+			  (sizeof(struct ffa_address_map_desc) * 5));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 3);
+	EXPECT_EQ(header->amd_count, 5);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -4886,6 +4887,23 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_sp_info,
 	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
+
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
 }
 
 /**
@@ -4917,17 +4935,18 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_service1_info,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect three AMDs based on service1's manifest and the
-	 * RX/TX buffer for this test VM.
+	 * We expect five AMDs, 1 from service1's manifest, 2 from
+	 * the RX/TX buffers of this test VM, and 2 from the RX/TX
+	 * buffers of the Hypervisor.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 3));
+			  (sizeof(struct ffa_address_map_desc) * 5));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 3);
+	EXPECT_EQ(header->amd_count, 5);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -4964,6 +4983,23 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_service1_info,
 	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
+
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
 }
 
 /**
@@ -5022,17 +5058,18 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect four AMDs, 1 from service1's manifest, 1 from the
-	 * shared page, and 2 from the RX/TX buffer AMDs.
+	 * We expect six AMDs, 1 from service1's manifest, 1 from the
+	 * shared page, 2 from the RX/TX buffers of this test VM, and
+	 * 2 from the RX/TX buffers of the Hypervisor.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 4));
+			  (sizeof(struct ffa_address_map_desc) * 6));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 4);
+	EXPECT_EQ(header->amd_count, 6);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -5070,16 +5107,33 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info,
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
 
-	/* Validate the shared AMD contents. */
-	EXPECT_EQ(amd_array[3].base_address,
-		  constituents_lend_fragmented_relinquish[0].address);
-	EXPECT_EQ(amd_array[3].page_count,
-		  constituents_lend_fragmented_relinquish[0].page_count);
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
 	EXPECT_EQ(amd_array[3].permissions,
 		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
+
+	/* Validate the shared AMD contents. */
+	EXPECT_EQ(amd_array[5].base_address,
+		  constituents_lend_fragmented_relinquish[0].address);
+	EXPECT_EQ(amd_array[5].page_count,
+		  constituents_lend_fragmented_relinquish[0].page_count);
+	EXPECT_EQ(amd_array[5].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[5].endpoint_id, service1_info->vm_id);
+	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 5);
 
 	/* Reclaim the lent page. */
 	ret = ffa_mem_reclaim(handle, 0);
@@ -5147,17 +5201,18 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_reclaim,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect three AMDs based on service1's manifest and the
-	 * RX/TX buffer for this test VM.
+	 * We expect five AMDs, 1 from service1's manifest, 2 from
+	 * the RX/TX buffers of this test VM, and 2 from the RX/TX
+	 * buffers of the Hypervisor.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 3));
+			  (sizeof(struct ffa_address_map_desc) * 5));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 3);
+	EXPECT_EQ(header->amd_count, 5);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -5194,6 +5249,23 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_reclaim,
 	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
+
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
 }
 
 /**
@@ -5219,7 +5291,7 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 	ffa_memory_handle_t handle;
 	struct ffa_value ret;
 	uint32_t constituent_index;
-	uint8_t offset_index = 3;
+	uint8_t offset_index = 5;
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_lend_relinquish",
 		       mb.send);
@@ -5258,18 +5330,19 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect 259 AMDs, 1 from service1's manifest, 256 from the
-	 * lent pages, and 2 from the RX/TX buffer AMDs.
-	 * In the first transaction, we expect 255 AMDs.
+	 * We expect 261 AMDs, 1 from service1's manifest, 256 from the
+	 * lent pages, 2 from the RX/TX buffers of this test VM, and 2
+	 * from the RX/TX buffers of the Hypervisor. In the first
+	 * transaction, we expect 255 AMDs.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
 			  (sizeof(struct ffa_address_map_desc) * 0xFF));
-	EXPECT_EQ(remaining_size, 0x40);
+	EXPECT_EQ(remaining_size, 0x60);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 0x103);
+	EXPECT_EQ(header->amd_count, 0x105);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -5307,6 +5380,23 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
 
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
+
 	/*
 	 * Validate and print the remaining AMDs, take into account
 	 * the header.
@@ -5339,8 +5429,8 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 	current_size = (uint32_t)(ret.arg2 >> 32);
 	remaining_size = (uint32_t)ret.arg2;
 
-	/* We expect the remaining 4 AMDs. */
-	EXPECT_EQ(current_size, (sizeof(struct ffa_address_map_desc) * 4));
+	/* We expect the remaining 6 AMDs. */
+	EXPECT_EQ(current_size, (sizeof(struct ffa_address_map_desc) * 6));
 	EXPECT_EQ(remaining_size, 0);
 
 	dlog_info("Remaining Size: 0x%x\n", remaining_size);
@@ -5402,17 +5492,18 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_sp_info_sel0,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect three AMDs based on service1's manifest and the
-	 * RX/TX buffer for this test VM.
+	 * We expect five AMDs, 1 from service1's manifest, 2 from
+	 * the RX/TX buffers of this test VM, and 2 from the RX/TX
+	 * buffers of the Hypervisor.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 3));
+			  (sizeof(struct ffa_address_map_desc) * 5));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 3);
+	EXPECT_EQ(header->amd_count, 5);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -5448,6 +5539,23 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_sp_info_sel0,
 	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
+
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
 }
 
 /**
@@ -5507,17 +5615,18 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_sel0,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect four AMDs, 1 from service1's manifest, 1 from the
-	 * lent page, and 2 from the RX/TX buffer AMDs.
+	 * We expect six AMDs, 1 from service1's manifest, 1 from the
+	 * lent page, 2 from the RX/TX buffers of this test VM, and 2
+	 * from the RX/TX buffers of the Hypervisor.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 4));
+			  (sizeof(struct ffa_address_map_desc) * 6));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 4);
+	EXPECT_EQ(header->amd_count, 6);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -5554,15 +5663,32 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_sel0,
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
 
-	/* Validate the shared AMD contents. */
-	EXPECT_EQ(amd_array[3].base_address,
-		  constituents_lend_fragmented_relinquish[0].address);
-	EXPECT_EQ(amd_array[3].page_count,
-		  constituents_lend_fragmented_relinquish[0].page_count);
-	EXPECT_EQ(amd_array[3].permissions, (UNPRIV_R | UNPRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
+
+	/* Validate the shared AMD contents. */
+	EXPECT_EQ(amd_array[5].base_address,
+		  constituents_lend_fragmented_relinquish[0].address);
+	EXPECT_EQ(amd_array[5].page_count,
+		  constituents_lend_fragmented_relinquish[0].page_count);
+	EXPECT_EQ(amd_array[5].permissions, (UNPRIV_R | UNPRIV_W));
+	EXPECT_EQ(amd_array[5].endpoint_id, service1_info->vm_id);
+	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 5);
 
 	/* Reclaim the lent page. */
 	ret = ffa_mem_reclaim(handle, 0);
@@ -5648,17 +5774,18 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_multi_perm,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect five AMDs, 1 from service1's manifest, 2 from the
-	 * lent pages, and 2 from the RX/TX buffer AMDs.
+	 * We expect seven AMDs, 1 from service1's manifest, 2 from the
+	 * lent pages, 2 from the RX/TX buffers of this test VM, and 2
+	 * from the RX/TX buffers of the Hypervisor.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 5));
+			  (sizeof(struct ffa_address_map_desc) * 7));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 5);
+	EXPECT_EQ(header->amd_count, 7);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -5696,24 +5823,41 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_multi_perm,
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
 
-	/* Validate the shared AMD contents. */
-	EXPECT_EQ(amd_array[3].base_address,
-		  constituents_lend_fragmented_relinquish[0].address);
-	EXPECT_EQ(amd_array[3].page_count,
-		  constituents_lend_fragmented_relinquish[0].page_count);
-	EXPECT_EQ(amd_array[3].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[3].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-	EXPECT_EQ(amd_array[4].base_address,
-		  constituents_lend_fragmented_relinquish[1].address);
-	EXPECT_EQ(amd_array[4].page_count,
-		  constituents_lend_fragmented_relinquish[1].page_count);
-	EXPECT_EQ(amd_array[4].permissions,
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
 		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[4].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 4);
+
+	/* Validate the shared AMD contents. */
+	EXPECT_EQ(amd_array[5].base_address,
+		  constituents_lend_fragmented_relinquish[0].address);
+	EXPECT_EQ(amd_array[5].page_count,
+		  constituents_lend_fragmented_relinquish[0].page_count);
+	EXPECT_EQ(amd_array[5].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[5].endpoint_id, service1_info->vm_id);
+	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 5);
+	EXPECT_EQ(amd_array[6].base_address,
+		  constituents_lend_fragmented_relinquish[1].address);
+	EXPECT_EQ(amd_array[6].page_count,
+		  constituents_lend_fragmented_relinquish[1].page_count);
+	EXPECT_EQ(amd_array[6].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[6].endpoint_id, service1_info->vm_id);
+	EXPECT_EQ(amd_array[6].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 6);
 
 	/* Run the SP to relinquish access to page1. */
 	ret = ffa_run(service1_info->vm_id, 0);
@@ -5809,18 +5953,19 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_lent_info_multi_rec,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect five AMDs, 1 from service1's manifest, 2 from the
-	 * lent pages with service1 and service2, 2 from the RX/TX buffer
-	 * AMDs.
+	 * We expect seven AMDs, 1 from service1's manifest, 2 from the
+	 * lent pages with service1 and service2, 2 from the RX/TX
+	 * buffers of this test VM, and 2 from the RX/TX buffers of the
+	 * Hypervisor.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 5));
+			  (sizeof(struct ffa_address_map_desc) * 7));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 5);
+	EXPECT_EQ(header->amd_count, 7);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -5858,24 +6003,41 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_lent_info_multi_rec,
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
 
-	/* Validate the shared AMD contents. */
-	EXPECT_EQ(amd_array[3].base_address,
-		  constituents_lend_fragmented_relinquish[0].address);
-	EXPECT_EQ(amd_array[3].page_count,
-		  constituents_lend_fragmented_relinquish[0].page_count);
-	EXPECT_EQ(amd_array[3].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[3].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-	EXPECT_EQ(amd_array[4].base_address,
-		  constituents_lend_fragmented_relinquish[0].address);
-	EXPECT_EQ(amd_array[4].page_count,
-		  constituents_lend_fragmented_relinquish[0].page_count);
-	EXPECT_EQ(amd_array[4].permissions,
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
 		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[4].endpoint_id, service2_info->vm_id);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 4);
+
+	/* Validate the shared AMD contents. */
+	EXPECT_EQ(amd_array[5].base_address,
+		  constituents_lend_fragmented_relinquish[0].address);
+	EXPECT_EQ(amd_array[5].page_count,
+		  constituents_lend_fragmented_relinquish[0].page_count);
+	EXPECT_EQ(amd_array[5].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[5].endpoint_id, service1_info->vm_id);
+	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 5);
+	EXPECT_EQ(amd_array[6].base_address,
+		  constituents_lend_fragmented_relinquish[0].address);
+	EXPECT_EQ(amd_array[6].page_count,
+		  constituents_lend_fragmented_relinquish[0].page_count);
+	EXPECT_EQ(amd_array[6].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[6].endpoint_id, service2_info->vm_id);
+	EXPECT_EQ(amd_array[6].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 6);
 
 	/* Run the SPs to relinquish the lent page. */
 	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
@@ -5975,18 +6137,19 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_target_lent_info_multi_rec,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect four AMDs, 1 from service1's manifest, 1 from
-	 * the lent pages with service1, and 2 from the RX/TX
-	 * buffer AMDs.
+	 * We expect six AMDs, 1 from service1's manifest, 1 from
+	 * the lent pages with service1, 2 from the RX/TX
+	 * buffers of this test VM, and 2 from the RX/TX buffers of
+	 * the Hypervisor
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 4));
+			  (sizeof(struct ffa_address_map_desc) * 6));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 4);
+	EXPECT_EQ(header->amd_count, 6);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -6024,15 +6187,32 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_target_lent_info_multi_rec,
 	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
 
-	/* Validate the shared AMD contents. */
-	EXPECT_EQ(amd_array[3].base_address,
-		  constituents_lend_fragmented_relinquish[0].address);
-	EXPECT_EQ(amd_array[3].page_count,
-		  constituents_lend_fragmented_relinquish[0].page_count);
-	EXPECT_EQ(amd_array[3].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[3].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
+
+	/* Validate the shared AMD contents. */
+	EXPECT_EQ(amd_array[5].base_address,
+		  constituents_lend_fragmented_relinquish[0].address);
+	EXPECT_EQ(amd_array[5].page_count,
+		  constituents_lend_fragmented_relinquish[0].page_count);
+	EXPECT_EQ(amd_array[5].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[5].endpoint_id, service1_info->vm_id);
+	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 5);
 
 	/* Invoke the FFA_NS_RES_INFO_GET command with a target ID. */
 	ret = ffa_ns_res_info_get_with_id(
@@ -6046,17 +6226,18 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_target_lent_info_multi_rec,
 	remaining_size = (uint32_t)ret.arg2;
 
 	/*
-	 * We expect three AMDs, 1 from the shared pages with
-	 * service2 and 2 from the RX/TX buffer AMDs.
+	 * We expect five AMDs, 1 from the shared pages with
+	 * service2, 2 from the RX/TX buffers of this test VM, and 2
+	 * from the RX/TX buffers of the Hypervisor.
 	 */
 	EXPECT_EQ(current_size,
 		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 3));
+			  (sizeof(struct ffa_address_map_desc) * 5));
 	EXPECT_EQ(remaining_size, 0);
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 3);
+	EXPECT_EQ(header->amd_count, 5);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -6085,16 +6266,33 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_target_lent_info_multi_rec,
 	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 1);
 
-	/* Validate the shared AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address,
-		  constituents_lend_fragmented_relinquish[0].address);
-	EXPECT_EQ(amd_array[2].page_count,
-		  constituents_lend_fragmented_relinquish[0].page_count);
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[2].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[2].page_count, 1);
 	EXPECT_EQ(amd_array[2].permissions,
 		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[2].endpoint_id, service2_info->vm_id);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	EXPECT_EQ(amd_array[2].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 2);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
+
+	/* Validate the shared AMD contents. */
+	EXPECT_EQ(amd_array[4].base_address,
+		  constituents_lend_fragmented_relinquish[0].address);
+	EXPECT_EQ(amd_array[4].page_count,
+		  constituents_lend_fragmented_relinquish[0].page_count);
+	EXPECT_EQ(amd_array[4].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[4].endpoint_id, service2_info->vm_id);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
 
 	/* Run the SPs to relinquish the lent page. */
 	for (i = 0; i < ARRAY_SIZE(receivers); i++) {
