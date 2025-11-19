@@ -13,6 +13,7 @@
 
 #include "hf/arch/init.h"
 #include "hf/arch/mm.h"
+#include "hf/arch/types.h"
 
 #include "hf/check.h"
 #include "hf/dlog.h"
@@ -24,8 +25,7 @@
 /**
  * This file has functions for managing the level 1 and 2 page tables used by
  * Hafnium. There is a level 1 mapping used by Hafnium itself to access memory,
- * and then a level 2 mapping per VM. The design assumes that all page tables
- * contain only 1-1 mappings, aligned on the block boundaries.
+ * and then a level 2 mapping per VM.
  */
 
 /*
@@ -357,9 +357,9 @@ static struct mm_page_table *mm_populate_table_pte(struct mm_ptable *ptable,
  */
 // NOLINTNEXTLINE(misc-no-recursion)
 static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
-			 ptable_addr_t end, mm_attr_t attrs,
-			 struct mm_page_table *child_table, mm_level_t level,
-			 struct mm_flags flags)
+			 ptable_addr_t end, uintpaddr_t *paddr_begin,
+			 mm_attr_t attrs, struct mm_page_table *child_table,
+			 mm_level_t level, struct mm_flags flags)
 {
 	pte_t *pte = &child_table->entries[mm_index(begin, level)];
 	ptable_addr_t level_end = mm_level_end(begin, level);
@@ -377,16 +377,20 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
 	while (begin < end) {
 		if (unmap ? !arch_mm_pte_is_present(*pte, level)
 			  : arch_mm_pte_is_block(*pte, level) &&
-				    arch_mm_pte_attrs(*pte, level) == attrs) {
+				    arch_mm_pte_attrs(*pte, level) == attrs &&
+				    pa_addr(arch_mm_block_from_pte(
+					    *pte, level)) == *paddr_begin) {
 			/*
 			 * If the entry is already mapped with the right
-			 * attributes, or already absent in the case of
-			 * unmapping, no need to do anything; carry on to the
-			 * next entry.
+			 * paddr and attributes, or already absent in the case
+			 * of unmapping, no need to modify it; carry on
+			 * to the next entry.
 			 */
+			*paddr_begin += entry_size;
 		} else if ((end - begin) >= entry_size &&
 			   (unmap || arch_mm_is_block_allowed(level)) &&
-			   is_aligned(begin, entry_size)) {
+			   is_aligned(begin, entry_size) &&
+			   is_aligned(*paddr_begin, entry_size)) {
 			/*
 			 * If the entire entry is within the region we want to
 			 * map, map/unmap the whole entry.
@@ -395,11 +399,13 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
 				pte_t new_pte =
 					unmap ? arch_mm_absent_pte(level)
 					      : arch_mm_block_pte(
-							level, pa_init(begin),
+							level,
+							pa_init(*paddr_begin),
 							attrs);
 				mm_replace_entry(ptable, begin, pte, new_pte,
 						 level, non_secure);
 			}
+			*paddr_begin += entry_size;
 		} else {
 			/*
 			 * If the entry is already a subtable get it; otherwise
@@ -415,8 +421,8 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
 			 * Recurse to map/unmap the appropriate entries within
 			 * the subtable.
 			 */
-			if (!mm_map_level(ptable, begin, end, attrs, nt,
-					  level - 1, flags)) {
+			if (!mm_map_level(ptable, begin, end, paddr_begin,
+					  attrs, nt, level - 1, flags)) {
 				return false;
 			}
 		}
@@ -436,17 +442,22 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
  * - `flags.unmap`: unmap the given range instead of mapping it.
  * - `flags.commit`: the change is only committed if this flag is set.
  */
-static bool mm_ptable_identity_map(struct mm_ptable *ptable, paddr_t pa_begin,
-				   paddr_t pa_end, mm_attr_t attrs,
-				   struct mm_flags flags)
+static bool mm_ptable_map(struct mm_ptable *ptable, ptable_addr_t v_begin,
+			  ptable_addr_t v_end, uintpaddr_t p_begin,
+			  mm_attr_t attrs, struct mm_flags flags)
 {
 	mm_level_t root_level = mm_root_level(ptable);
 	ptable_addr_t ptable_end = mm_ptable_addr_space_end(ptable);
-	ptable_addr_t end = mm_round_up_to_page(pa_addr(pa_end));
-	ptable_addr_t begin = mm_round_down_to_page(pa_addr(pa_begin));
+	uint32_t pa_bits = arch_mm_get_pa_bits(arch_mm_get_pa_range());
+	uintpaddr_t paddr_max = (1ULL << pa_bits);
+	ptable_addr_t v_begin_aligned = mm_round_down_to_page(v_begin);
+	ptable_addr_t v_end_aligned = mm_round_up_to_page(v_end);
+	size_t mapping_size;
+	uintpaddr_t p_end;
 	struct mm_page_table *root_table =
-		&ptable->root_tables[mm_index(begin, root_level)];
+		&ptable->root_tables[mm_index(v_begin_aligned, root_level)];
 
+	p_begin = mm_round_down_to_page(p_begin);
 	/*
 	 * Assert condition to communicate the API constraint of
 	 * mm_root_level(), that isn't encoded in the types, to the static
@@ -455,34 +466,70 @@ static bool mm_ptable_identity_map(struct mm_ptable *ptable, paddr_t pa_begin,
 	assert(root_level >= 3);
 
 	/* Cap end to stay within the bounds of the page table. */
-	if (end > ptable_end) {
+	if (v_end_aligned > ptable_end) {
 		dlog_verbose(
 			"ptable_map: input range end falls outside of ptable "
 			"address space (%#016lx > %#016lx), capping to ptable "
 			"address space end\n",
-			end, ptable_end);
-		end = ptable_end;
+			v_end_aligned, ptable_end);
+		v_end_aligned = ptable_end;
 	}
 
-	if (begin >= end) {
+	if (v_begin_aligned >= v_end_aligned) {
 		dlog_verbose(
 			"ptable_map: input range is backwards (%#016lx >= "
 			"%#016lx), request will have no effect\n",
-			begin, end);
-	} else if (pa_addr(pa_begin) >= pa_addr(pa_end)) {
+			v_begin_aligned, v_end_aligned);
+	} else if (v_begin >= v_end) {
 		dlog_verbose(
 			"ptable_map: input range was backwards (%#016lx >= "
 			"%#016lx), but due to rounding the range %#016lx to "
 			"%#016lx will be mapped\n",
-			begin, end, pa_addr(pa_begin), pa_addr(pa_end));
+			v_begin, v_end, v_begin_aligned, v_end_aligned);
 	}
 
-	while (begin < end) {
-		if (!mm_map_level(ptable, begin, end, attrs, root_table,
-				  root_level - 1, flags)) {
+	/*
+	 * Make sure that the entire virtual range can be filled with valid
+	 * physical addresses
+	 */
+	if (v_begin_aligned < v_end_aligned && !flags.unmap) {
+		mapping_size = v_end_aligned - v_begin_aligned;
+
+		/*
+		 * Check that the mapping size won't overflow the p_end variable
+		 */
+		if (UINTPTR_MAX - mapping_size < p_begin) {
+			dlog_verbose(
+				"ptable_map: selected physical address range "
+				"overflows.\n");
 			return false;
 		}
-		begin = mm_start_of_next_block(begin, root_level);
+
+		p_end = p_begin + mapping_size;
+
+		/*
+		 * Check that the physical address is no larger than the maximum
+		 * address allowed for the system.
+		 */
+		if (p_end > paddr_max) {
+			dlog_verbose(
+				"ptable_map: Request with paddr range %#016lx "
+				"to %#016lx overflows the physical address "
+				"space.\n",
+				p_begin, p_end);
+			return false;
+		}
+	}
+
+	while (v_begin_aligned < v_end_aligned) {
+		if (!mm_map_level(ptable, v_begin_aligned, v_end_aligned,
+				  &p_begin, attrs, root_table, root_level - 1,
+				  flags)) {
+			return false;
+		}
+
+		v_begin_aligned =
+			mm_start_of_next_block(v_begin_aligned, root_level);
 		root_table++;
 	}
 
@@ -510,7 +557,8 @@ static bool mm_ptable_identity_prepare(struct mm_ptable *ptable,
 				       mm_attr_t attrs, struct mm_flags flags)
 {
 	flags.commit = false;
-	return mm_ptable_identity_map(ptable, pa_begin, pa_end, attrs, flags);
+	return mm_ptable_map(ptable, pa_addr(pa_begin), pa_addr(pa_end),
+			     pa_addr(pa_begin), attrs, flags);
 }
 
 /**
@@ -530,7 +578,8 @@ static void mm_ptable_identity_commit(struct mm_ptable *ptable,
 				      mm_attr_t attrs, struct mm_flags flags)
 {
 	flags.commit = true;
-	CHECK(mm_ptable_identity_map(ptable, pa_begin, pa_end, attrs, flags));
+	CHECK(mm_ptable_map(ptable, pa_addr(pa_begin), pa_addr(pa_end),
+			    pa_addr(pa_begin), attrs, flags));
 }
 
 /**
