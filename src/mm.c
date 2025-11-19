@@ -13,6 +13,7 @@
 
 #include "hf/arch/init.h"
 #include "hf/arch/mm.h"
+#include "hf/arch/std.h"
 #include "hf/arch/types.h"
 
 #include "hf/check.h"
@@ -773,14 +774,18 @@ static pte_t mm_merge_table_pte(pte_t table_pte, mm_level_t level)
  */
 // NOLINTNEXTLINE(misc-no-recursion)
 static void mm_ptable_defrag_entry(struct mm_ptable *ptable,
-				   ptable_addr_t base_addr, pte_t *entry,
+				   ptable_addr_t base_vaddr, pte_t *entry,
 				   mm_level_t level, bool non_secure)
 {
 	struct mm_page_table *child_table;
 	bool mergeable;
 	bool base_present;
+	bool present;
 	mm_attr_t base_attrs;
 	pte_t new_entry;
+	ptable_addr_t block_vaddr;
+	uintpaddr_t block_paddr;
+	uintpaddr_t base_paddr = 0;
 
 	if (!arch_mm_pte_is_table(*entry, level)) {
 		return;
@@ -791,28 +796,59 @@ static void mm_ptable_defrag_entry(struct mm_ptable *ptable,
 	/* Defrag the first entry in the table and use it as the base entry. */
 	static_assert(MM_PTE_PER_PAGE >= 1, "There must be at least one PTE.");
 
-	mm_ptable_defrag_entry(ptable, base_addr, &(child_table->entries[0]),
+	mm_ptable_defrag_entry(ptable, base_vaddr, &(child_table->entries[0]),
 			       level - 1, non_secure);
 
+	/*
+	 * There are three possibilities here.
+	 * 1. The entry is empty:  Try and merge it into a bigger empty entry
+	 * 2. The entry is a table: It could not be merged into a block.
+	 *    This means that any upper levels can't be merged into a block
+	 *    either, but we should still go through the other PTEs and defrag
+	 *    them as much as possible.
+	 * 3. The entry is a block: It was merged/already a block. We need to
+	 *    check if the whole table can be merged into a single block.
+	 *    For this to happen, the physical address of the first entry has to
+	 *    be aligned to the entry size of the next level up, and the
+	 *    remaining PTEs need to also be blocks that together form a
+	 *    physically contiguous region.
+	 */
+	mergeable = true;
+	if (arch_mm_pte_is_table(child_table->entries[0], level - 1)) {
+		mergeable = false;
+	}
+
+	/*
+	 * Check if the first entry is a block. If so, set base_paddr to
+	 * the paddr stored in the PTE.
+	 */
 	base_present =
 		arch_mm_pte_is_present(child_table->entries[0], level - 1);
+	if (base_present &&
+	    arch_mm_pte_is_block(child_table->entries[0], level - 1)) {
+		base_paddr = pa_addr(arch_mm_block_from_pte(
+			child_table->entries[0], level - 1));
+		if (!is_aligned(base_paddr, mm_entry_size(level))) {
+			mergeable = false;
+		}
+	}
 	base_attrs = arch_mm_pte_attrs(child_table->entries[0], level - 1);
 
 	/*
 	 * Defrag the remaining entries in the table and check whether they are
 	 * compatible with the base entry meaning the table can be merged into a
-	 * block entry. It assumes addresses are contiguous due to identity
-	 * mapping.
+	 * block entry.
 	 */
-	mergeable = true;
 	for (size_t i = 1; i < MM_PTE_PER_PAGE; ++i) {
-		bool present;
-		ptable_addr_t block_addr =
-			base_addr + (i * mm_entry_size(level - 1));
+		block_vaddr = base_vaddr + (i * mm_entry_size(level - 1));
 
-		mm_ptable_defrag_entry(ptable, block_addr,
+		mm_ptable_defrag_entry(ptable, block_vaddr,
 				       &(child_table->entries[i]), level - 1,
 				       non_secure);
+
+		if (!mergeable) {
+			continue;
+		}
 
 		present = arch_mm_pte_is_present(child_table->entries[i],
 						 level - 1);
@@ -831,6 +867,14 @@ static void mm_ptable_defrag_entry(struct mm_ptable *ptable,
 			continue;
 		}
 
+		block_paddr = base_paddr + (i * mm_entry_size(level - 1));
+		if (block_paddr !=
+		    pa_addr(arch_mm_block_from_pte(child_table->entries[i],
+						   level - 1))) {
+			mergeable = false;
+			continue;
+		}
+
 		if (arch_mm_pte_attrs(child_table->entries[i], level - 1) !=
 		    base_attrs) {
 			mergeable = false;
@@ -844,8 +888,8 @@ static void mm_ptable_defrag_entry(struct mm_ptable *ptable,
 
 	new_entry = mm_merge_table_pte(*entry, level);
 	if (*entry != new_entry) {
-		mm_replace_entry(ptable, base_addr, entry, (uintptr_t)new_entry,
-				 level, non_secure);
+		mm_replace_entry(ptable, base_vaddr, entry,
+				 (uintptr_t)new_entry, level, non_secure);
 	}
 }
 
