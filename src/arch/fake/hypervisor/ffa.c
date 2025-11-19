@@ -545,6 +545,18 @@ bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool)
 	return true;
 }
 
+bool arch_vm_prepare(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+		     paddr_t p_begin, mm_mode_t mode)
+{
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)p_begin;
+	(void)mode;
+
+	return true;
+}
+
 bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
 			      paddr_t end, mm_mode_t mode, struct mpool *ppool)
 {
@@ -557,6 +569,15 @@ bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
 	return true;
 }
 
+void arch_vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+		    paddr_t p_begin, mm_mode_t mode)
+{
+	(void)vm_locked;
+	(void)begin;
+	(void)end;
+	(void)p_begin;
+	(void)mode;
+}
 void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
 			     paddr_t end, mm_mode_t mode, struct mpool *ppool,
 			     ipaddr_t *ipa)

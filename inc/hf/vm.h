@@ -370,16 +370,22 @@ bool vm_is_mailbox_busy(struct vm_locked to);
 bool vm_is_mailbox_other_world_owned(struct vm_locked to);
 bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 		     mm_mode_t mode, ipaddr_t *ipa);
+bool vm_map(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+	    paddr_t p_begin, mm_mode_t mode);
 bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			 mm_mode_t mode);
+bool vm_prepare(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+		paddr_t p_begin, mm_mode_t mode);
 void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			mm_mode_t mode, ipaddr_t *ipa);
-void vm_free_ptables(struct vm *vm);
-void vm_unmap_rxtx(struct vm_locked vm_locked);
-void vm_unmap_memory_regions(struct vm_locked vm_locked);
+void vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+	       paddr_t p_begin, mm_mode_t mode);
 bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end);
 void vm_ptable_defrag(struct vm_locked vm_locked);
+void vm_free_ptables(struct vm *vm);
 bool vm_unmap_hypervisor(struct vm_locked vm_locked);
+void vm_unmap_rxtx(struct vm_locked vm_locked);
+void vm_unmap_memory_regions(struct vm_locked vm_locked);
 
 bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     mm_mode_t *mode);

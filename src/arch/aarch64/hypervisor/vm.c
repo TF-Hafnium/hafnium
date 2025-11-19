@@ -10,7 +10,9 @@
 
 #include "hf/arch/mmu.h"
 
+#include "hf/addr.h"
 #include "hf/dlog.h"
+#include "hf/mm.h"
 
 #include "hypervisor/feature_id.h"
 
@@ -127,13 +129,14 @@ bool arch_vm_init_mm(struct vm *vm)
 	return ret;
 }
 
-bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, mm_mode_t mode)
+bool arch_vm_prepare(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+		     paddr_t p_begin, mm_mode_t mode)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->ptable;
 
 	if (vm_locked.vm->el0_partition) {
-		return mm_identity_prepare(ptable, begin, end, mode);
+		return mm_prepare(ptable, va_from_ipa(begin), va_from_ipa(end),
+				  p_begin, mode);
 	}
 
 #if SECURE_WORLD == 1
@@ -142,25 +145,24 @@ bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
 	}
 #endif
 
-	return mm_vm_identity_prepare(ptable, begin, end, mode);
+	return mm_vm_prepare(ptable, begin, end, p_begin, mode);
 }
 
-void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
-			     paddr_t end, mm_mode_t mode, ipaddr_t *ipa)
+bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
+			      paddr_t end, mm_mode_t mode)
+{
+	return arch_vm_prepare(vm_locked, ipa_from_pa(begin), ipa_from_pa(end),
+			       begin, mode);
+}
+
+void arch_vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+		    paddr_t p_begin, mm_mode_t mode)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->ptable;
 
 	if (vm_locked.vm->el0_partition) {
-		mm_identity_commit(&vm_locked.vm->ptable, begin, end, mode);
-		if (ipa != NULL) {
-			/*
-			 * EL0 partitions are modeled as lightweight VM's, to
-			 * promote code reuse. The below statement returns the
-			 * mapped PA as an IPA, however, for an EL0 partition,
-			 * this is really a VA.
-			 */
-			*ipa = ipa_from_pa(begin);
-		}
+		mm_commit(&vm_locked.vm->ptable, va_from_ipa(begin),
+			  va_from_ipa(end), p_begin, mode);
 	} else {
 #if SECURE_WORLD == 1
 		if (0 != (mode & MM_MODE_NS)) {
@@ -168,7 +170,24 @@ void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
 		}
 #endif
 
-		mm_vm_identity_commit(ptable, begin, end, mode, ipa);
+		mm_vm_commit(ptable, begin, end, p_begin, mode);
+	}
+}
+
+void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
+			     paddr_t end, mm_mode_t mode, ipaddr_t *ipa)
+{
+	arch_vm_commit(vm_locked, ipa_from_pa(begin), ipa_from_pa(end), begin,
+		       mode);
+
+	if (ipa != NULL) {
+		/*
+		 * EL0 partitions are modeled as lightweight VM's, to
+		 * promote code reuse. The below statement returns the
+		 * mapped PA as an IPA, however, for an EL0 partition,
+		 * this is really a VA.
+		 */
+		*ipa = ipa_from_pa(begin);
 	}
 }
 

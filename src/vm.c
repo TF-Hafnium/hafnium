@@ -11,6 +11,9 @@
 #include "hf/arch/spinlock.h"
 #include "hf/arch/vm.h"
 
+#include "hf/addr.h"
+#include "hf/api.h"
+#include "hf/assert.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/ffa.h"
@@ -355,6 +358,21 @@ bool vm_id_is_current_world(ffa_id_t vm_id)
  * made.
  *
  */
+bool vm_map(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+	    paddr_t p_begin, mm_mode_t mode)
+{
+	if (!vm_prepare(vm_locked, begin, end, p_begin, mode)) {
+		return false;
+	}
+
+	vm_commit(vm_locked, begin, end, p_begin, mode);
+
+	return true;
+}
+
+/**
+ * Same as vm_map, but one-to-one
+ */
 bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 		     mm_mode_t mode, ipaddr_t *ipa)
 {
@@ -377,6 +395,15 @@ bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
  * Returns true on success, or false if the update failed and no changes were
  * made.
  */
+bool vm_prepare(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+		paddr_t p_begin, mm_mode_t mode)
+{
+	return arch_vm_prepare(vm_locked, begin, end, p_begin, mode);
+}
+
+/**
+ * Same as vm_prepare, but one-to-one
+ */
 bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			 mm_mode_t mode)
 {
@@ -385,8 +412,17 @@ bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 
 /**
  * Commits the given address mapping to the VM assuming the operation cannot
- * fail. `vm_identity_prepare` must used correctly before this to ensure
+ * fail. `vm_prepare` must be used correctly before this to ensure
  * this condition.
+ */
+void vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
+	       paddr_t p_begin, mm_mode_t mode)
+{
+	arch_vm_commit(vm_locked, begin, end, p_begin, mode);
+}
+
+/**
+ * Same as vm_commit, but one-to-one
  */
 void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			mm_mode_t mode, ipaddr_t *ipa)
