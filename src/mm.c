@@ -553,56 +553,55 @@ static bool mm_ptable_map(struct mm_ptable *ptable, ptable_addr_t v_begin,
  * In particular, multiple calls to this function will result in the
  * corresponding calls to commit the changes to succeed.
  */
-static bool mm_ptable_identity_prepare(struct mm_ptable *ptable,
-				       paddr_t pa_begin, paddr_t pa_end,
-				       mm_attr_t attrs, struct mm_flags flags)
+static bool mm_ptable_prepare(struct mm_ptable *ptable, ptable_addr_t begin,
+			      ptable_addr_t end, paddr_t p_begin,
+			      mm_attr_t attrs, struct mm_flags flags)
 {
 	flags.commit = false;
-	return mm_ptable_map(ptable, pa_addr(pa_begin), pa_addr(pa_end),
-			     pa_addr(pa_begin), attrs, flags);
+	return mm_ptable_map(ptable, begin, end, pa_addr(p_begin), attrs,
+			     flags);
 }
 
 /**
  * Commits the given address mapping to the page table assuming the operation
- * cannot fail. `mm_ptable_identity_prepare` must used correctly before this to
+ * cannot fail. `mm_ptable_prepare` must used correctly before this to
  * ensure this condition.
  *
  * Without the table being properly prepared, the commit may only partially
  * complete if it runs out of memory resulting in an inconsistent state that
  * isn't handled.
  *
- * Since the non-failure assumtion is used in the reasoning about the atomicity
+ * Since the non-failure assumption is used in the reasoning about the atomicity
  * of higher level memory operations, any detected violations result in a panic.
  */
-static void mm_ptable_identity_commit(struct mm_ptable *ptable,
-				      paddr_t pa_begin, paddr_t pa_end,
-				      mm_attr_t attrs, struct mm_flags flags)
+static void mm_ptable_commit(struct mm_ptable *ptable, ptable_addr_t begin,
+			     ptable_addr_t end, paddr_t p_begin,
+			     mm_attr_t attrs, struct mm_flags flags)
 {
 	flags.commit = true;
-	CHECK(mm_ptable_map(ptable, pa_addr(pa_begin), pa_addr(pa_end),
-			    pa_addr(pa_begin), attrs, flags));
+	CHECK(mm_ptable_map(ptable, begin, end, pa_addr(p_begin), attrs,
+			    flags));
 }
 
 /**
- * Updates the given table such that the given physical address range is mapped
- * or not mapped into the address space with the architecture-agnostic mode
- * provided.
+ * Updates the given table such that the given virtual/intermediate physical
+ * address range is mapped or not mapped to the corresponding physical address
+ * range beginning at `p_begin` with the architecture-agnostic mode provided.
  *
  * The page table is updated using the separate prepare and commit stages so
  * that, on failure, a partial update of the address space cannot happen. The
  * table may be left with extra internal tables but the address space is
  * unchanged.
  */
-static bool mm_ptable_identity_update(struct mm_ptable *ptable,
-				      paddr_t pa_begin, paddr_t pa_end,
-				      mm_attr_t attrs, struct mm_flags flags)
+static bool mm_ptable_update(struct mm_ptable *ptable, ptable_addr_t begin,
+			     ptable_addr_t end, paddr_t p_begin,
+			     mm_attr_t attrs, struct mm_flags flags)
 {
-	if (!mm_ptable_identity_prepare(ptable, pa_begin, pa_end, attrs,
-					flags)) {
+	if (!mm_ptable_prepare(ptable, begin, end, p_begin, attrs, flags)) {
 		return false;
 	}
 
-	mm_ptable_identity_commit(ptable, pa_begin, pa_end, attrs, flags);
+	mm_ptable_commit(ptable, begin, end, p_begin, attrs, flags);
 
 	return true;
 }
@@ -1067,7 +1066,7 @@ static struct mm_flags mm_mode_to_flags(mm_mode_t mode)
 }
 
 /**
- * See `mm_ptable_identity_prepare`.
+ * See `mm_ptable_prepare`.
  *
  * This must be called before `mm_identity_commit` for the same mapping.
  *
@@ -1079,12 +1078,12 @@ bool mm_identity_prepare(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 	struct mm_flags flags = mm_mode_to_flags(mode);
 
 	assert(ptable->stage1);
-	return mm_ptable_identity_prepare(
-		ptable, begin, end, arch_mm_mode_to_stage1_attrs(mode), flags);
+	return mm_ptable_prepare(ptable, pa_addr(begin), pa_addr(end), begin,
+				 arch_mm_mode_to_stage1_attrs(mode), flags);
 }
 
 /**
- * See `mm_ptable_identity_commit`.
+ * See `mm_ptable_commit`.
  *
  * `mm_identity_prepare` must be called before this for the same mapping.
  */
@@ -1094,13 +1093,13 @@ void *mm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 	struct mm_flags flags = mm_mode_to_flags(mode);
 
 	assert(ptable->stage1);
-	mm_ptable_identity_commit(ptable, begin, end,
-				  arch_mm_mode_to_stage1_attrs(mode), flags);
+	mm_ptable_commit(ptable, pa_addr(begin), pa_addr(end), begin,
+			 arch_mm_mode_to_stage1_attrs(mode), flags);
 	return ptr_from_va(va_from_pa(begin));
 }
 
 /**
- * See `mm_ptable_identity_prepare`.
+ * See `mm_ptable_prepare`.
  *
  * This must be called before `mm_vm_identity_commit` for the same mapping.
  *
@@ -1111,12 +1110,12 @@ bool mm_vm_identity_prepare(struct mm_ptable *ptable, paddr_t begin,
 {
 	struct mm_flags flags = mm_mode_to_flags(mode);
 
-	return mm_ptable_identity_prepare(
-		ptable, begin, end, arch_mm_mode_to_stage2_attrs(mode), flags);
+	return mm_ptable_prepare(ptable, pa_addr(begin), pa_addr(end), begin,
+				 arch_mm_mode_to_stage2_attrs(mode), flags);
 }
 
 /**
- * See `mm_ptable_identity_commit`.
+ * See `mm_ptable_commit`.
  *
  * `mm_vm_identity_prepare` must be called before this for the same mapping.
  */
@@ -1125,8 +1124,8 @@ void mm_vm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 {
 	struct mm_flags flags = mm_mode_to_flags(mode);
 
-	mm_ptable_identity_commit(ptable, begin, end,
-				  arch_mm_mode_to_stage2_attrs(mode), flags);
+	mm_ptable_commit(ptable, pa_addr(begin), pa_addr(end), begin,
+			 arch_mm_mode_to_stage2_attrs(mode), flags);
 
 	if (ipa != NULL) {
 		*ipa = ipa_from_pa(begin);
@@ -1150,8 +1149,9 @@ bool mm_vm_identity_map(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 			mm_mode_t mode, ipaddr_t *ipa)
 {
 	struct mm_flags flags = mm_mode_to_flags(mode);
-	bool success = mm_ptable_identity_update(
-		ptable, begin, end, arch_mm_mode_to_stage2_attrs(mode), flags);
+	bool success =
+		mm_ptable_update(ptable, pa_addr(begin), pa_addr(end), begin,
+				 arch_mm_mode_to_stage2_attrs(mode), flags);
 
 	if (success && ipa != NULL) {
 		*ipa = ipa_from_pa(begin);
@@ -1495,9 +1495,9 @@ void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
 	struct mm_flags flags = mm_mode_to_flags(mode);
 
 	assert(stage1_locked.ptable->stage1);
-	if (mm_ptable_identity_update(stage1_locked.ptable, begin, end,
-				      arch_mm_mode_to_stage1_attrs(mode),
-				      flags)) {
+	if (mm_ptable_update(stage1_locked.ptable, pa_addr(begin), pa_addr(end),
+			     begin, arch_mm_mode_to_stage1_attrs(mode),
+			     flags)) {
 		return ptr_from_va(va_from_pa(begin));
 	}
 
