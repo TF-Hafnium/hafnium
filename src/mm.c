@@ -16,6 +16,7 @@
 #include "hf/arch/std.h"
 #include "hf/arch/types.h"
 
+#include "hf/addr.h"
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/layout.h"
@@ -1068,64 +1069,115 @@ static struct mm_flags mm_mode_to_flags(mm_mode_t mode)
 /**
  * See `mm_ptable_prepare`.
  *
- * This must be called before `mm_identity_commit` for the same mapping.
+ * This must be called before `mm_commit` for the same mapping.
  *
  * Returns true on success, or false if the update would fail.
  */
-bool mm_identity_prepare(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
-			 mm_mode_t mode)
+bool mm_prepare(struct mm_ptable *ptable, vaddr_t v_begin, vaddr_t v_end,
+		paddr_t p_begin, mm_mode_t mode)
 {
 	struct mm_flags flags = mm_mode_to_flags(mode);
 
 	assert(ptable->stage1);
-	return mm_ptable_prepare(ptable, pa_addr(begin), pa_addr(end), begin,
-				 arch_mm_mode_to_stage1_attrs(mode), flags);
+	return mm_ptable_prepare(ptable, va_addr(v_begin), va_addr(v_end),
+				 p_begin, arch_mm_mode_to_stage1_attrs(mode),
+				 flags);
+}
+
+/**
+ * See `mm_prepare`.
+ *
+ * This is a wrapper that does an `mm_prepare` as one-to-one.
+ */
+bool mm_identity_prepare(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
+			 mm_mode_t mode)
+{
+	return mm_prepare(ptable, va_from_pa(begin), va_from_pa(end), begin,
+			  mode);
 }
 
 /**
  * See `mm_ptable_commit`.
  *
- * `mm_identity_prepare` must be called before this for the same mapping.
+ * `mm_prepare` must be called before this for the same mapping.
  */
-void *mm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
-			 mm_mode_t mode)
+void *mm_commit(struct mm_ptable *ptable, vaddr_t v_begin, vaddr_t v_end,
+		paddr_t p_begin, mm_mode_t mode)
 {
 	struct mm_flags flags = mm_mode_to_flags(mode);
 
 	assert(ptable->stage1);
-	mm_ptable_commit(ptable, pa_addr(begin), pa_addr(end), begin,
+	mm_ptable_commit(ptable, va_addr(v_begin), va_addr(v_end), p_begin,
 			 arch_mm_mode_to_stage1_attrs(mode), flags);
-	return ptr_from_va(va_from_pa(begin));
+	return ptr_from_va(v_begin);
+}
+
+/**
+ * See `mm_commit`.
+ *
+ * This is a wrapper that does an `mm_commit` as one-to-one.
+ */
+void *mm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
+			 mm_mode_t mode)
+{
+	return mm_commit(ptable, va_from_pa(begin), va_from_pa(end), begin,
+			 mode);
 }
 
 /**
  * See `mm_ptable_prepare`.
  *
- * This must be called before `mm_vm_identity_commit` for the same mapping.
+ * This must be called before `mm_vm_commit` for the same mapping.
  *
  * Returns true on success, or false if the update would fail.
+ */
+bool mm_vm_prepare(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
+		   paddr_t p_begin, mm_mode_t mode)
+{
+	struct mm_flags flags = mm_mode_to_flags(mode);
+
+	assert(!ptable->stage1);
+	return mm_ptable_prepare(ptable, ipa_addr(ip_begin), ipa_addr(ip_end),
+				 p_begin, arch_mm_mode_to_stage2_attrs(mode),
+				 flags);
+}
+
+/**
+ * See `mm_vm_prepare`.
+ *
+ * This is a wrapper that does an `mm_vm_prepare` as one-to-one.
  */
 bool mm_vm_identity_prepare(struct mm_ptable *ptable, paddr_t begin,
 			    paddr_t end, mm_mode_t mode)
 {
-	struct mm_flags flags = mm_mode_to_flags(mode);
-
-	return mm_ptable_prepare(ptable, pa_addr(begin), pa_addr(end), begin,
-				 arch_mm_mode_to_stage2_attrs(mode), flags);
+	return mm_vm_prepare(ptable, ipa_from_pa(begin), ipa_from_pa(end),
+			     begin, mode);
 }
 
 /**
  * See `mm_ptable_commit`.
  *
- * `mm_vm_identity_prepare` must be called before this for the same mapping.
+ * `mm_vm_prepare` must be called before this for the same mapping.
+ */
+void mm_vm_commit(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
+		  paddr_t p_begin, mm_mode_t mode)
+{
+	struct mm_flags flags = mm_mode_to_flags(mode);
+
+	assert(!ptable->stage1);
+	mm_ptable_commit(ptable, ipa_addr(ip_begin), ipa_addr(ip_end), p_begin,
+			 arch_mm_mode_to_stage2_attrs(mode), flags);
+}
+
+/**
+ * See `mm_vm_commit`.
+ *
+ * This is a wrapper that does an `mm_vm_commit` as one-to-one.
  */
 void mm_vm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 			   mm_mode_t mode, ipaddr_t *ipa)
 {
-	struct mm_flags flags = mm_mode_to_flags(mode);
-
-	mm_ptable_commit(ptable, pa_addr(begin), pa_addr(end), begin,
-			 arch_mm_mode_to_stage2_attrs(mode), flags);
+	mm_vm_commit(ptable, ipa_from_pa(begin), ipa_from_pa(end), begin, mode);
 
 	if (ipa != NULL) {
 		*ipa = ipa_from_pa(begin);
@@ -1133,9 +1185,9 @@ void mm_vm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 }
 
 /**
- * Updates a VM's page table such that the given physical address range is
- * mapped in the address space at the corresponding address range in the
- * architecture-agnostic mode provided.
+ * Updates a VM's page table such that the given IPA range
+ * is mapped to a contiguous physical memory range of the same size beginning at
+ * p_begin in the architecture-agnostic mode provided.
  *
  * mm_vm_defrag should always be called after a series of page table updates,
  * whether they succeed or fail. This is because on failure extra page table
@@ -1145,13 +1197,27 @@ void mm_vm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
  * Returns true on success, or false if the update failed and no changes were
  * made.
  */
+bool mm_vm_map(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
+	       paddr_t p_begin, mm_mode_t mode)
+{
+	struct mm_flags flags = mm_mode_to_flags(mode);
+
+	assert(!ptable->stage1);
+	return mm_ptable_update(ptable, ipa_addr(ip_begin), ipa_addr(ip_end),
+				p_begin, arch_mm_mode_to_stage2_attrs(mode),
+				flags);
+}
+
+/**
+ * See `mm_vm_map`.
+ *
+ * This is a wrapper that does an `mm_vm_map` as one-to-one.
+ */
 bool mm_vm_identity_map(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 			mm_mode_t mode, ipaddr_t *ipa)
 {
-	struct mm_flags flags = mm_mode_to_flags(mode);
-	bool success =
-		mm_ptable_update(ptable, pa_addr(begin), pa_addr(end), begin,
-				 arch_mm_mode_to_stage2_attrs(mode), flags);
+	bool success = mm_vm_map(ptable, ipa_from_pa(begin), ipa_from_pa(end),
+				 begin, mode);
 
 	if (success && ipa != NULL) {
 		*ipa = ipa_from_pa(begin);
@@ -1168,7 +1234,8 @@ bool mm_vm_unmap(struct mm_ptable *ptable, paddr_t begin, paddr_t end)
 {
 	mm_mode_t mode = MM_MODE_UNMAPPED_MASK;
 
-	return mm_vm_identity_map(ptable, begin, end, mode, NULL);
+	return mm_vm_map(ptable, ipa_from_pa(begin), ipa_from_pa(end),
+			 pa_init(0), mode);
 }
 
 /**
@@ -1485,23 +1552,35 @@ void mm_unlock_stage1(struct mm_stage1_locked *lock)
 }
 
 /**
- * Updates the hypervisor page table such that the given physical address range
- * is mapped into the address space at the corresponding address range in the
- * architecture-agnostic mode provided.
+ * Updates the hypervisor page table such that the given virtual address range
+ * is mapped to a contiguous physical memory range of the same size beginning at
+ * p_begin in the architecture-agnostic mode provided.
  */
-void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
-		      paddr_t end, mm_mode_t mode)
+void *mm_map(struct mm_stage1_locked stage1_locked, vaddr_t v_begin,
+	     vaddr_t v_end, paddr_t p_begin, mm_mode_t mode)
 {
 	struct mm_flags flags = mm_mode_to_flags(mode);
 
 	assert(stage1_locked.ptable->stage1);
-	if (mm_ptable_update(stage1_locked.ptable, pa_addr(begin), pa_addr(end),
-			     begin, arch_mm_mode_to_stage1_attrs(mode),
-			     flags)) {
-		return ptr_from_va(va_from_pa(begin));
+	if (mm_ptable_update(stage1_locked.ptable, va_addr(v_begin),
+			     va_addr(v_end), p_begin,
+			     arch_mm_mode_to_stage1_attrs(mode), flags)) {
+		return ptr_from_va(v_begin);
 	}
 
 	return NULL;
+}
+
+/**
+ * See `mm_map`.
+ *
+ * This is a wrapper that does an `mm_map` as one-to-one.
+ */
+void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
+		      paddr_t end, mm_mode_t mode)
+{
+	return mm_map(stage1_locked, va_from_pa(begin), va_from_pa(end), begin,
+		      mode);
 }
 
 /**
@@ -1512,7 +1591,8 @@ bool mm_unmap(struct mm_stage1_locked stage1_locked, paddr_t begin, paddr_t end)
 {
 	mm_mode_t mode = MM_MODE_UNMAPPED_MASK;
 
-	return mm_identity_map(stage1_locked, begin, end, mode);
+	return mm_map(stage1_locked, va_from_pa(begin), va_from_pa(end),
+		      pa_init(0), mode);
 }
 
 /**
