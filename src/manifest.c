@@ -410,19 +410,47 @@ static enum manifest_return_code parse_uuid(struct uint32list_iter *uuid,
 	return MANIFEST_SUCCESS;
 }
 
-/**
- * Parse the UUIDs and Messaging methods for VM services.
+static enum manifest_return_code parse_messaging_method(
+	struct uint32list_iter *messaging_method, uint16_t *out)
+{
+	uint32_t value;
+
+	TRY(uint32list_get_next(messaging_method, &value));
+	if (value > UINT16_MAX) {
+		return MANIFEST_ERROR_INTEGER_OVERFLOW;
+	}
+	if (value == 0 ||
+	    (value &
+	     ~(FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND |
+	       FFA_PARTITION_INDIRECT_MSG | FFA_PARTITION_DIRECT_REQ2_RECV |
+	       FFA_PARTITION_DIRECT_REQ2_SEND)) != 0U) {
+		dlog_error(
+			"Messaging method specified in the manifest is not "
+			"supported: %x\n",
+			value);
+		return MANIFEST_ERROR_INVALID_MESSAGING_METHOD;
+	}
+
+	*out = (uint16_t)value;
+
+	return MANIFEST_SUCCESS;
+}
+
+/*
+ * Parse the UUIDs and Messaging methods for the VM services.
  */
 static enum manifest_return_code parse_services(const struct fdt_node *node,
 						struct service *services,
 						uint16_t *service_count)
 {
 	struct uint32list_iter uuid;
-	uint16_t first_messaging_method_val;
+	struct uint32list_iter messaging_method;
+	uint16_t shared_messaging_method_value = 0;
 
 	*service_count = 0;
 
 	TRY(read_uint32list(node, "uuid", &uuid));
+	TRY(read_uint32list(node, "messaging-method", &messaging_method));
 
 	while (uint32list_has_next(&uuid)) {
 		if (*service_count == PARTITION_MAX_UUIDS) {
@@ -430,15 +458,55 @@ static enum manifest_return_code parse_services(const struct fdt_node *node,
 		}
 		TRY(parse_uuid(&uuid, &services[*service_count].uuid));
 
+		/*
+		 * If only one messaging method is provided, record it and
+		 * apply it to all services. By definition the value must be
+		 * non-zero so this can be used to see if a value has been
+		 * recorded to use.
+		 */
+		if (shared_messaging_method_value != 0) {
+			services[*service_count].messaging_method =
+				shared_messaging_method_value;
+		} else {
+			if (!uint32list_has_next(&messaging_method)) {
+				return MANIFEST_ERROR_UNMATCHED_MESSAGING_METHODS;
+			}
+			TRY(parse_messaging_method(
+				&messaging_method,
+				&services[*service_count].messaging_method));
+
+			/*
+			 * Check if there is a second messaging method present.
+			 * If not use the first messaging method for all
+			 * services.
+			 */
+			if (*service_count == 0 &&
+			    !uint32list_has_next(&messaging_method)) {
+				shared_messaging_method_value =
+					services[*service_count]
+						.messaging_method;
+			}
+		}
+
 		(*service_count)++;
 	}
 
-	/* All services are given the same messaging methods. */
-	TRY(read_uint16(node, "messaging-method", &first_messaging_method_val));
-	for (int i = 0; i < *service_count; i++) {
-		services[i].messaging_method = first_messaging_method_val;
+	/*
+	 * Check there are no more messaging methods defined that don't match
+	 * with a UUID.
+	 */
+	if (uint32list_has_next(&messaging_method)) {
+		return MANIFEST_ERROR_UNMATCHED_MESSAGING_METHODS;
 	}
-	dlog_verbose("  Messaging method %#x\n", first_messaging_method_val);
+
+	dlog_verbose("  Service Count %u\n", *service_count);
+	for (int i = 0; i < *service_count; i++) {
+		dlog_verbose("  UUID %#x-%x-%x-%x\n", services[i].uuid.uuid[0],
+			     services[i].uuid.uuid[1], services[i].uuid.uuid[2],
+			     services[i].uuid.uuid[3]);
+		dlog_verbose("  Messaging Methods %#x\n",
+			     services[i].messaging_method);
+	}
 
 	return MANIFEST_SUCCESS;
 }
@@ -1077,9 +1145,6 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 	enum manifest_return_code ret_code = MANIFEST_SUCCESS;
 	const char *error_string = "specified in manifest is unsupported";
 	uint32_t k = 0;
-	bool using_req2 = (vm->partition.services[0].messaging_method &
-			   (FFA_PARTITION_DIRECT_REQ2_RECV |
-			    FFA_PARTITION_DIRECT_REQ2_SEND)) != 0;
 
 	/* ensure that the SPM version is compatible */
 	ffa_version = vm->partition.ffa_version;
@@ -1115,19 +1180,20 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
-	if (vm->partition.ffa_version < FFA_VERSION_1_2 && using_req2) {
-		dlog_error("Messaging method %s: %x\n", error_string,
-			   vm->partition.services[0].messaging_method);
-		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
-	}
-
-	if ((vm->partition.services[0].messaging_method &
-	     ~(FFA_PARTITION_DIRECT_REQ_RECV | FFA_PARTITION_DIRECT_REQ_SEND |
-	       FFA_PARTITION_INDIRECT_MSG | FFA_PARTITION_DIRECT_REQ2_RECV |
-	       FFA_PARTITION_DIRECT_REQ2_SEND)) != 0U) {
-		dlog_error("Messaging method %s: %x\n", error_string,
-			   vm->partition.services[0].messaging_method);
-		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	/*
+	 * Check that if any services use DIRECT_REQ2 the SP
+	 * has an FF-A version of v1.2 or greater.
+	 */
+	for (int i = 0; i < vm->partition.service_count; i++) {
+		bool using_req2 = (vm->partition.services[i].messaging_method &
+				   (FFA_PARTITION_DIRECT_REQ2_RECV |
+				    FFA_PARTITION_DIRECT_REQ2_SEND)) != 0;
+		if (using_req2 && vm->partition.ffa_version < FFA_VERSION_1_2) {
+			dlog_error("Messaging method %s: %x\n", error_string,
+				   vm->partition.services[i].messaging_method);
+			ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+			break;
+		}
 	}
 
 	if ((vm->partition.run_time_el == S_EL0 ||
@@ -1846,6 +1912,13 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_INVALID_BOOT_ORDER:
 		return "Boot order should be a unique value less than "
 		       "default largest value";
+	case MANIFEST_ERROR_UNMATCHED_MESSAGING_METHODS:
+		return "Mismatch between UUIDs and corresponding messaging "
+		       "methods. Either one messaging method must be specified "
+		       "for all UUIDs, or one messaging method must be "
+		       "specified for each UUID.";
+	case MANIFEST_ERROR_INVALID_MESSAGING_METHOD:
+		return "Invalid Messaging method specified.";
 	case MANIFEST_ERROR_UUID_ALL_ZEROS:
 		return "UUID should not be NIL";
 	case MANIFEST_ERROR_TOO_MANY_UUIDS:

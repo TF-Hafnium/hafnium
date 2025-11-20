@@ -21,7 +21,7 @@
 	load-address = <0x6280000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0>;
+	messaging-method = <0x7>; /* Direct and indirect requests, must be non-zero. */
 	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
 	gp-register-num = <0>;
 
