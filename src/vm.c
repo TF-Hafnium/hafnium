@@ -143,18 +143,39 @@ bool vm_init_next(ffa_vcpu_count_t vcpu_count, struct mpool *ppool,
 
 bool vm_reinit(struct vm *vm, struct mpool *ppool)
 {
-	size_t vcpu_ppool_entries;
+	size_t vcpu_ppool_size;
+	void *deferred_memory_ptr;
 	bool ret;
 
 	CHECK(vm != NULL);
 
-	vcpu_ppool_entries = (align_up(sizeof(struct vcpu) * (vm->vcpu_count),
-				       MM_PPOOL_ENTRY_SIZE) /
-			      MM_PPOOL_ENTRY_SIZE);
+	vcpu_ppool_size = align_up(sizeof(struct vcpu) * (vm->vcpu_count),
+				   MM_PPOOL_ENTRY_SIZE);
 
-	/* Free the chunk of memory and add back to memory pool. */
 	assert(vm->vcpus != NULL);
-	mpool_add_chunk(ppool, vm->vcpus, vcpu_ppool_entries);
+
+	/*
+	 * A peculiar problem occurs with restarting an SP. If we free the
+	 * pages allocated for old vCPUs of an SP and later request for memory
+	 * to hold new vCPUs, the set of pages allocated are most likely the
+	 * same as the old ones.
+	 * During vcpu_switch assembler routine, SPMC performs saving of
+	 * hardware state to the C data structures of the previously scheduled
+	 * ( i.e., old) vCPU. This means we are unintentionally overwriting the
+	 * contents of the new vCPU data structure.
+	 * Subsequently, SPMC attempts to apply the registers of new vCPU to
+	 * the hardware registers but by this time, these registers in the C
+	 * data structure were already corrupted.
+	 * Hence, defer the freeing of the pages allocated for the old vCPU
+	 * structures. Make a note of the base pointer before it gets reset in
+	 * the vm_init_helper.
+	 */
+	deferred_memory_ptr = vm->vcpus;
+
+	/* Pages used for old vCPU structures must have been freed by now. */
+	if (vm->deferred_mem_ptr != NULL || vm->deferred_mem_size != 0) {
+		return false;
+	}
 
 	ret = vm_init_helper(vm, vm->id, vm->vcpu_count, ppool,
 			     vm->el0_partition, vm->dma_device_count);
@@ -163,6 +184,9 @@ bool vm_reinit(struct vm *vm, struct mpool *ppool)
 		dlog_error("Failed to re-initialize VM.\n");
 		return false;
 	}
+
+	vm->deferred_mem_ptr = deferred_memory_ptr;
+	vm->deferred_mem_size = vcpu_ppool_size;
 
 	return true;
 }

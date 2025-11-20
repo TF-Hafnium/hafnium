@@ -203,6 +203,12 @@ struct vm {
 	struct mm_ptable ptable;
 
 	/**
+	 * Track memory for which the freeing has to be deferred.
+	 */
+	void *deferred_mem_ptr;
+	size_t deferred_mem_size;
+
+	/**
 	 * Set of page tables used for defining the peripheral's secure
 	 * IPA space, in the context of SPMC.
 	 */

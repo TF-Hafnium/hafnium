@@ -407,6 +407,15 @@ struct ffa_value ffa_cpu_cycles_msg_wait_prepare(
 	case RTM_SP_INIT:
 		if (current_locked.vcpu->halted_vcpu != NULL) {
 			resume_halted_vcpu_upon_restart(current_locked, next);
+
+			/* Free the pages used for old vCPU structures. */
+			CHECK(mpool_add_chunk(api_get_ppool(),
+					      current->vm->deferred_mem_ptr,
+					      current->vm->deferred_mem_size));
+
+			current->vm->deferred_mem_ptr = NULL;
+			current->vm->deferred_mem_size = 0;
+
 			dlog_info("Successfully restarted vCPU of SP: %#x\n",
 				  current->vm->id);
 		} else if (!sp_boot_next(current_locked, next,
