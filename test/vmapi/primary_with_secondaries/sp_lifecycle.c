@@ -510,16 +510,31 @@ void base_restart_sp_after_abort_direct_req(
 
 	/*
 	 * By this time, target endpoint should have restarted. Prepare it with
+	 * new workload which would be abort direct message again.
+	 */
+	dlog_verbose("Target endpoint should have restarted\n");
+
+	SERVICE_SELECT(target_sp_info->vm_id, "sp_ffa_abort_dir_req", mb.send);
+	ffa_run(target_sp_info->vm_id, 0);
+
+	/*
+	 * Allocate CPU cycles to helper endpoint to initiate direct request
+	 * with target endpoint.
+	 */
+	ffa_run(helper_info->vm_id, 0);
+
+	/*
+	 * By this time, target endpoint should have restarted. Prepare it with
 	 * new workload which would be simply echoing direct message.
 	 */
 	dlog_verbose("Target endpoint should have restarted\n");
 
+	SERVICE_SELECT(target_sp_info->vm_id, "ffa_direct_message_resp_echo",
+		       mb.send);
 	/*
 	 * Run target endpoint for it to wait for a request from helper
 	 * endpoint.
 	 */
-	SERVICE_SELECT(target_sp_info->vm_id, "ffa_direct_message_resp_echo",
-		       mb.send);
 	ffa_run(target_sp_info->vm_id, 0);
 
 	/* Companion endpoint requests echo from target endpoint. */

@@ -184,13 +184,15 @@ TEST_SERVICE(sp_to_sp_dir_req_expect_to_abort)
 	receive_indirect_message((void *)&target_id, sizeof(target_id),
 				 recv_buf);
 
-	res = ffa_msg_send_direct_req(hf_vm_get_id(), target_id, msg[0], msg[1],
-				      msg[2], msg[3], msg[4]);
+	while (true) {
+		res = ffa_msg_send_direct_req(hf_vm_get_id(), target_id, msg[0],
+					      msg[1], msg[2], msg[3], msg[4]);
 
-	EXPECT_FFA_ERROR(res, FFA_ABORTED);
+		EXPECT_FFA_ERROR(res, FFA_ABORTED);
 
-	/* Yield cycles to PVM. */
-	ffa_yield();
+		/* Yield cycles to PVM. */
+		ffa_yield();
+	}
 }
 
 TEST_SERVICE(sp_active_wait)
