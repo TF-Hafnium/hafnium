@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include "hf/addr.h"
+
 #include <gmock/gmock.h>
 
 extern "C" {
@@ -187,6 +189,76 @@ TEST_F(mm, map_non_identity_simple)
 		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
 	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[1], TOP_LEVEL - 2));
 	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l0[1], TOP_LEVEL - 2)),
+		    Eq(pa_addr(page_paddr)));
+}
+
+/**
+ * Check that a non-identity mapping will use large pages when the paddr is
+ * appropriately aligned.
+ */
+TEST_F(mm, test_map_2M_page_paddr_aligned)
+{
+	constexpr mm_mode_t mode = 0;
+	const paddr_t page_paddr = pa_init(mm_entry_size(1));
+	const ipaddr_t page_begin = ipa_init(0);
+	const ipaddr_t page_end = ipa_add(page_begin, mm_entry_size(1));
+	ASSERT_TRUE(mm_vm_map(&ptable, page_begin, page_end, page_paddr, mode));
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	/* Check that the first large page is mapped and nothing else. */
+	EXPECT_THAT(std::span(tables).last(3),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	auto table_l2 = tables.front();
+	EXPECT_THAT(table_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l1[0], TOP_LEVEL - 1)),
+		    Eq(pa_addr(page_paddr)));
+}
+
+/**
+ * Check that a non-identity mapping will not use large pages when the paddr is
+ * not sufficiently aligned.
+ */
+TEST_F(mm, test_map_2M_page_paddr_not_aligned)
+{
+	constexpr mm_mode_t mode = 0;
+	const paddr_t page_paddr = pa_init(mm_entry_size(0));
+	const ipaddr_t page_begin = ipa_init(0);
+	const ipaddr_t page_end = ipa_add(page_begin, mm_entry_size(1));
+	ASSERT_TRUE(mm_vm_map(&ptable, page_begin, page_end, page_paddr, mode));
+
+	auto tables = get_ptable(ptable);
+	/*
+	 * Check that a large page was not created, as the paddr is not aligned
+	 * to a 2MB boundary
+	 */
+	EXPECT_THAT(std::span(tables).last(3),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	auto table_l2 = tables.front();
+	EXPECT_THAT(table_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[0], TOP_LEVEL - 1));
+
+	auto table_l0 =
+		get_table(arch_mm_table_from_pte(table_l1[0], TOP_LEVEL - 1));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[0], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l0[0], TOP_LEVEL - 2)),
 		    Eq(pa_addr(page_paddr)));
 }
 
