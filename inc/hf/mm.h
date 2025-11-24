@@ -154,69 +154,68 @@ struct mm_stage1_locked {
 	struct mm_ptable *ptable;
 };
 
+bool mm_init(void);
+struct mm_stage1_locked mm_lock_stage1(void);
+ptable_addr_t mm_ptable_addr_space_end(const struct mm_ptable *ptable);
+void mm_vm_dump(const struct mm_ptable *ptable);
 void mm_vm_enable_invalidation(void);
 
+/**
+ * The following functions are used to manipulate stage-1 page tables used for
+ * both Hafnium's own mappings and those of S-EL0 partitions.
+ */
 bool mm_ptable_init(struct mm_ptable *ptable, mm_asid_t id, bool stage1);
-ptable_addr_t mm_ptable_addr_space_end(const struct mm_ptable *ptable);
-
 void mm_ptable_fini(const struct mm_ptable *ptable);
-bool mm_vm_init(struct mm_ptable *ptable, mm_asid_t id);
-void mm_vm_fini(const struct mm_ptable *ptable);
-
 bool mm_identity_prepare(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 			 mm_mode_t mode);
 bool mm_prepare(struct mm_ptable *ptable, vaddr_t v_begin, vaddr_t v_end,
 		paddr_t p_begin, mm_mode_t mode);
+void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
+		      paddr_t end, mm_mode_t mode);
+void *mm_map(struct mm_stage1_locked stage1_locked, vaddr_t v_begin,
+	     vaddr_t v_end, paddr_t p_begin, mm_mode_t mode);
 void *mm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 			 mm_mode_t mode);
 void *mm_commit(struct mm_ptable *ptable, vaddr_t v_begin, vaddr_t v_end,
 		paddr_t p_begin, mm_mode_t mode);
+bool mm_unmap(struct mm_stage1_locked stage1_locked, paddr_t begin,
+	      paddr_t end);
+void mm_defrag(struct mm_stage1_locked stage1_locked);
+void mm_stage1_defrag(struct mm_ptable *ptable);
+bool mm_get_mode(const struct mm_ptable *ptable, vaddr_t begin, vaddr_t end,
+		 mm_mode_t *mode);
+bool mm_get_mode_partial(const struct mm_ptable *ptable, vaddr_t begin,
+			 vaddr_t end, mm_mode_t *mode, vaddr_t *end_ret);
+bool mm_get_range_by_mode(const struct mm_ptable *ptable, vaddr_t *begin,
+			  vaddr_t *end, mm_mode_t mode, vaddr_t *start_addr,
+			  mm_mode_t *ptable_mode);
+struct mm_stage1_locked mm_lock_ptable_unsafe(struct mm_ptable *ptable);
+void mm_unlock_stage1(struct mm_stage1_locked *lock);
 
-bool mm_vm_identity_map(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
-			mm_mode_t mode, ipaddr_t *ipa);
-bool mm_vm_map(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
-	       paddr_t p_begin, mm_mode_t mode);
+/**
+ * The following functions are used to manipulate the stage-2 tables of S-EL1
+ * partitions and devices with an IOMMU configuration.
+ */
+bool mm_vm_init(struct mm_ptable *ptable, mm_asid_t id);
+void mm_vm_fini(const struct mm_ptable *ptable);
 bool mm_vm_identity_prepare(struct mm_ptable *ptable, paddr_t begin,
 			    paddr_t end, mm_mode_t mode);
 bool mm_vm_prepare(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
 		   paddr_t p_begin, mm_mode_t mode);
+bool mm_vm_identity_map(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
+			mm_mode_t mode, ipaddr_t *ipa);
+bool mm_vm_map(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
+	       paddr_t p_begin, mm_mode_t mode);
 void mm_vm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
 			   mm_mode_t mode, ipaddr_t *ipa);
 void mm_vm_commit(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
 		  paddr_t p_begin, mm_mode_t mode);
 bool mm_vm_unmap(struct mm_ptable *ptable, paddr_t begin, paddr_t end);
-void mm_stage1_defrag(struct mm_ptable *ptable);
 void mm_vm_defrag(struct mm_ptable *ptable, bool non_secure);
-void mm_vm_dump(const struct mm_ptable *ptable);
 bool mm_vm_get_mode(const struct mm_ptable *ptable, ipaddr_t begin,
 		    ipaddr_t end, mm_mode_t *mode);
-
 bool mm_vm_get_mode_partial(const struct mm_ptable *ptable, ipaddr_t begin,
 			    ipaddr_t end, mm_mode_t *mode, ipaddr_t *end_ret);
-
-bool mm_get_mode(const struct mm_ptable *ptable, vaddr_t begin, vaddr_t end,
-		 mm_mode_t *mode);
-
-bool mm_get_mode_partial(const struct mm_ptable *ptable, vaddr_t begin,
-			 vaddr_t end, mm_mode_t *mode, vaddr_t *end_ret);
-
 bool mm_vm_get_range_by_mode(const struct mm_ptable *ptable, ipaddr_t *begin,
 			     ipaddr_t *end, mm_mode_t mode,
 			     ipaddr_t *start_addr, mm_mode_t *ptable_mode);
-
-bool mm_get_range_by_mode(const struct mm_ptable *ptable, vaddr_t *begin,
-			  vaddr_t *end, mm_mode_t mode, vaddr_t *start_addr,
-			  mm_mode_t *ptable_mode);
-
-struct mm_stage1_locked mm_lock_ptable_unsafe(struct mm_ptable *ptable);
-struct mm_stage1_locked mm_lock_stage1(void);
-void mm_unlock_stage1(struct mm_stage1_locked *lock);
-void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
-		      paddr_t end, mm_mode_t mode);
-void *mm_map(struct mm_stage1_locked stage1_locked, vaddr_t v_begin,
-	     vaddr_t v_end, paddr_t p_begin, mm_mode_t mode);
-bool mm_unmap(struct mm_stage1_locked stage1_locked, paddr_t begin,
-	      paddr_t end);
-void mm_defrag(struct mm_stage1_locked stage1_locked);
-
-bool mm_init(void);
