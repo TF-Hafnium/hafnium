@@ -149,6 +149,48 @@ TEST_F(mm, map_first_page)
 }
 
 /**
+ * Map the second page of the address space to the first frame of memory.
+ */
+TEST_F(mm, map_non_identity_simple)
+{
+	constexpr mm_mode_t mode = 0;
+	const paddr_t page_paddr = pa_init(0);
+	const ipaddr_t page_begin = ipa_from_pa(pa_add(page_paddr, PAGE_SIZE));
+	const ipaddr_t page_end = ipa_add(page_begin, PAGE_SIZE);
+	ASSERT_TRUE(mm_vm_map(&ptable, page_begin, page_end, page_paddr, mode));
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	/*
+	 * Check that the second page is mapped to the first frame of memory and
+	 * that nothing else is mapped.
+	 */
+	EXPECT_THAT(std::span(tables).last(3),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	auto table_l2 = tables.front();
+	EXPECT_THAT(table_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[0], TOP_LEVEL - 1));
+
+	auto table_l0 =
+		get_table(arch_mm_table_from_pte(table_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table_l0.front(), arch_mm_absent_pte(TOP_LEVEL - 2));
+	EXPECT_THAT(table_l0.subspan(2),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[1], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l0[1], TOP_LEVEL - 2)),
+		    Eq(pa_addr(page_paddr)));
+}
+
+/**
  * The start address is rounded down and the end address is rounded up to page
  * boundaries.
  */
