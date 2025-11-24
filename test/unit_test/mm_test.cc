@@ -1141,6 +1141,349 @@ TEST_F(mm, defrag_block_subtables)
 							   _1, TOP_LEVEL))))));
 }
 
+/**
+ * Any subtable with all blocks with the same attributes should be replaced
+ * with a single block, even when they are non-identity mapped.
+ */
+TEST_F(mm, defrag_block_subtables_non_identity)
+{
+	constexpr mm_mode_t mode = 0;
+	const size_t merged_block_size = mm_entry_size(TOP_LEVEL);
+	const size_t half_block_size = merged_block_size / 2;
+
+	/* Construct an address range that spans a second level page table */
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t middle = ipa_add(begin, half_block_size);
+	const ipaddr_t end = ipa_add(middle, half_block_size);
+
+	/*
+	 * The address chosen here doesn't really matter, as long as it's
+	 * aligned to the top level entry size.
+	 */
+	const paddr_t p_begin = pa_init(16 * mm_entry_size(TOP_LEVEL));
+	const paddr_t p_middle = pa_add(p_begin, half_block_size);
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, middle, p_begin, mode));
+	ASSERT_TRUE(mm_vm_map(&ptable, middle, end, p_middle, mode));
+
+	/* Check that the first top-level entry is initially a table */
+	EXPECT_TRUE(arch_mm_pte_is_table((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+	auto table_l1 = get_table(
+		arch_mm_table_from_pte(get_ptable(ptable).at(0)[0], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l1[0], TOP_LEVEL - 1));
+	mm_attr_t attr_before_defrag =
+		arch_mm_pte_attrs(table_l1[0], TOP_LEVEL - 1);
+
+	mm_vm_defrag(&ptable, false);
+
+	/* Check that the entry is transformed to a block with the correct paddr
+	 * after defrag. */
+	EXPECT_TRUE(arch_mm_pte_is_block((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+	EXPECT_EQ(pa_addr(arch_mm_block_from_pte(
+			  (pte_t)get_ptable(ptable).at(0)[0], TOP_LEVEL)),
+		  pa_addr(p_begin));
+	EXPECT_EQ(arch_mm_pte_attrs((pte_t)get_ptable(ptable).at(0)[0],
+				    TOP_LEVEL),
+		  attr_before_defrag);
+}
+
+/**
+ * Any subtable with all blocks with the same attributes should be replaced
+ * with a single block, even when they are non-identity mapped and invalid.
+ */
+TEST_F(mm, defrag_invalid_block_subtables_non_identity)
+{
+	constexpr mm_mode_t mode = MM_MODE_INVALID;
+	const size_t merged_block_size = mm_entry_size(TOP_LEVEL);
+	const size_t half_block_size = merged_block_size / 2;
+
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t middle = ipa_add(begin, half_block_size);
+	const ipaddr_t end = ipa_add(middle, half_block_size);
+
+	/*
+	 * The address chosen here doesn't really matter, as long as it's
+	 * aligned to the top level entry size.
+	 */
+	const paddr_t p_begin = pa_init(16 * mm_entry_size(TOP_LEVEL));
+	const paddr_t p_middle = pa_add(p_begin, half_block_size);
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, middle, p_begin, mode));
+	ASSERT_TRUE(mm_vm_map(&ptable, middle, end, p_middle, mode));
+	EXPECT_TRUE(arch_mm_pte_is_table((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+
+	mm_vm_defrag(&ptable, false);
+
+	EXPECT_TRUE(arch_mm_pte_is_block((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+	EXPECT_EQ(pa_addr(arch_mm_block_from_pte(
+			  (pte_t)get_ptable(ptable).at(0)[0], TOP_LEVEL)),
+		  pa_addr(p_begin));
+}
+
+/**
+ * Check that a range is not coalesced (specifically for invalid blocks) if it
+ * is not physically contiguous.
+ */
+TEST_F(mm, defrag_invalid_non_contig_block_subtables)
+{
+	constexpr mm_mode_t mode = MM_MODE_INVALID;
+	const size_t merged_block_size = mm_entry_size(TOP_LEVEL);
+	const size_t half_block_size = merged_block_size / 2;
+
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t middle = ipa_add(begin, half_block_size);
+	const ipaddr_t end = ipa_add(middle, half_block_size);
+
+	/*
+	 * The address chosen here doesn't really matter.
+	 */
+	const paddr_t p_begin = pa_init(16 * mm_entry_size(TOP_LEVEL));
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, middle, pa_init(0), mode));
+	ASSERT_TRUE(mm_vm_map(&ptable, middle, end, p_begin, mode));
+	EXPECT_TRUE(arch_mm_pte_is_table((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+
+	mm_vm_defrag(&ptable, false);
+
+	EXPECT_FALSE(arch_mm_pte_is_block((pte_t)get_ptable(ptable).at(0)[0],
+					  TOP_LEVEL));
+}
+
+/**
+ * Check that a range is not coalesced if it is not physically contiguous.
+ */
+TEST_F(mm, defrag_non_contig_block_subtables)
+{
+	constexpr mm_mode_t mode = MM_MODE_R;
+	const size_t merged_block_size = mm_entry_size(TOP_LEVEL);
+	const size_t half_block_size = merged_block_size / 2;
+
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t middle = ipa_add(begin, half_block_size);
+	const ipaddr_t end = ipa_add(middle, half_block_size);
+
+	/*
+	 * The address chosen here doesn't really matter.
+	 */
+	const paddr_t p_begin = pa_init(16 * mm_entry_size(TOP_LEVEL));
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, middle, pa_init(0), mode));
+	ASSERT_TRUE(mm_vm_map(&ptable, middle, end, p_begin, mode));
+	EXPECT_TRUE(arch_mm_pte_is_table((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+	mm_vm_defrag(&ptable, false);
+	EXPECT_FALSE(arch_mm_pte_is_block((pte_t)get_ptable(ptable).at(0)[0],
+					  TOP_LEVEL));
+}
+
+/**
+ * A contiguous range with a non-identity mapped page in the middle should not
+ * be coalesced, because the overall physical mapping is no longer contiguous.
+ */
+TEST_F(mm, defrag_block_subtables_non_identity_middle)
+{
+	constexpr mm_mode_t mode = 0;
+	const size_t merged_block_size = mm_entry_size(TOP_LEVEL);
+	const size_t half_block_size = merged_block_size / 2;
+
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t non_identity_start =
+		ipa_add(begin, half_block_size - mm_entry_size(TOP_LEVEL - 1));
+	const ipaddr_t non_identity_end =
+		ipa_add(non_identity_start, mm_entry_size(TOP_LEVEL - 1));
+	const ipaddr_t end = ipa_add(non_identity_end, half_block_size);
+
+	/*
+	 * The address chosen here doesn't really matter.
+	 */
+	const paddr_t p_begin = pa_init(16 * mm_entry_size(TOP_LEVEL));
+
+	/*
+	 * The mapping is as follows:
+	 *
+	 * [begin, non_identity_start) -> [begin, non_identity_start)
+	 *
+	 * [non_identity_start, non_identity_end] -> [p_begin, p_begin +
+	 * mm_entry_size(TOP_LEVEL -1))
+	 *
+	 * [non_identity_end, end) -> [non_identity_end, end)
+	 *
+	 * The non-identity mapped page in the middle should prevent the whole
+	 * range from being coalesced.
+	 */
+
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_from_ipa(begin),
+				       pa_from_ipa(non_identity_start), mode,
+				       nullptr));
+	ASSERT_TRUE(mm_vm_map(&ptable, non_identity_start, non_identity_end,
+			      p_begin, mode));
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_from_ipa(non_identity_end),
+				       pa_from_ipa(end), mode, nullptr));
+	EXPECT_TRUE(arch_mm_pte_is_table((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+
+	mm_vm_defrag(&ptable, false);
+
+	EXPECT_TRUE(arch_mm_pte_is_table((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+	auto table_l1 = get_table(
+		arch_mm_table_from_pte(get_ptable(ptable).at(0)[0], TOP_LEVEL));
+	size_t index = (half_block_size / mm_entry_size(TOP_LEVEL - 1)) - 1;
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l1[index], TOP_LEVEL - 1));
+	ASSERT_EQ(
+		pa_addr(arch_mm_block_from_pte(table_l1[index], TOP_LEVEL - 1)),
+		pa_addr(p_begin));
+}
+
+/**
+ * Test that defrag doesn't combine a physically contiguous table if the
+ * physical addresss range it corresponds to is not aligned to the size of the
+ * merged entry.
+ */
+TEST_F(mm, defrag_2mb_page_unaligned)
+{
+	constexpr mm_mode_t mode = MM_MODE_R;
+
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t end = ipa_add(begin, mm_entry_size(0) * 512);
+
+	const paddr_t p_begin = pa_init(mm_entry_size(0));
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, end, p_begin, mode));
+	mm_vm_defrag(&ptable, false);
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	/* Check that the range wasn't coalesced. */
+	EXPECT_THAT(std::span(tables).last(3),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	auto table_l2 = tables.front();
+	EXPECT_THAT(table_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[0], TOP_LEVEL - 1));
+
+	auto table_l0 =
+		get_table(arch_mm_table_from_pte(table_l1[0], TOP_LEVEL - 1));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[0], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l0[0], TOP_LEVEL - 2)),
+		    Eq(pa_addr(p_begin)));
+}
+
+/**
+ * Make sure that everything works as intended when the first entry
+ * of a page table refers to a child table, and all other entries are
+ * blocks that could have otherwise been merged.
+ */
+TEST_F(mm, defrag_table_and_blocks)
+{
+	constexpr mm_mode_t mode = MM_MODE_R;
+
+	const paddr_t table_begin = pa_init(mm_entry_size(0) * 10);
+	const paddr_t table_end = pa_add(table_begin, mm_entry_size(0));
+
+	const paddr_t block_begin = pa_init(mm_entry_size(1));
+	const paddr_t block_end = pa_add(block_begin, 511 * mm_entry_size(1));
+
+	/*
+	 * table_1 => {
+	 *   [0] = table_0 => {
+	 * 	   [0] = absent
+	 * 	   [1] = absent
+	 * 	   ...
+	 * 	   [10] = block(0xA000)
+	 * 	   [11] = absent
+	 * 	   ...
+	 * 	   [511] = absent
+	 * 	 }
+	 *   [1] = block(0x200000)
+	 *   [2] = block(0x400000)
+	 *	 ...
+	 *	 [511] = block (0x3fe00000)
+	 * }
+	 */
+
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, table_begin, table_end, mode,
+				       nullptr));
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, block_begin, block_end, mode,
+				       nullptr));
+
+	EXPECT_TRUE(arch_mm_pte_is_table((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+
+	mm_vm_defrag(&ptable, false);
+
+	EXPECT_TRUE(arch_mm_pte_is_table((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+	auto table_l1 = get_table(
+		arch_mm_table_from_pte(get_ptable(ptable).at(0)[0], TOP_LEVEL));
+
+	EXPECT_THAT(table_l1.subspan(1),
+		    Each(Truly(std::bind(arch_mm_pte_is_block, _1,
+					 TOP_LEVEL - 1))));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[0], TOP_LEVEL - 1));
+
+	auto table_l0 =
+		get_table(arch_mm_table_from_pte(table_l1[0], TOP_LEVEL - 1));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[10], TOP_LEVEL - 2));
+	EXPECT_EQ(pa_addr(arch_mm_block_from_pte(table_l0[10], TOP_LEVEL - 2)),
+		  10 * mm_entry_size(0));
+}
+
+/**
+ * Make two adjacent aliased mappings, that is, two distinct virtual address
+ * ranges that correspond to the same physical addresses and ensure that both
+ * are represented correctly after a defrag operation.
+ */
+TEST_F(mm, defrag_aliased_range)
+{
+	constexpr mm_mode_t mode = 0;
+	const size_t merged_block_size = mm_entry_size(TOP_LEVEL);
+	const size_t half_block_size = merged_block_size / 2;
+
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t middle = ipa_add(begin, half_block_size);
+	const ipaddr_t end = ipa_add(middle, half_block_size);
+
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, pa_from_ipa(begin),
+				       pa_from_ipa(middle), mode, nullptr));
+	ASSERT_TRUE(mm_vm_map(&ptable, middle, end, pa_init(0), mode));
+
+	mm_vm_defrag(&ptable, false);
+
+	EXPECT_TRUE(arch_mm_pte_is_table((pte_t)get_ptable(ptable).at(0)[0],
+					 TOP_LEVEL));
+
+	auto table_l1 = get_table(
+		arch_mm_table_from_pte(get_ptable(ptable).at(0)[0], TOP_LEVEL));
+	size_t mid_index = (half_block_size / mm_entry_size(TOP_LEVEL - 1));
+
+	for (auto i = 0; i < mid_index; i++) {
+		ASSERT_TRUE(arch_mm_pte_is_block(table_l1[i], TOP_LEVEL - 1));
+		EXPECT_EQ(pa_addr(arch_mm_block_from_pte(table_l1[i],
+							 TOP_LEVEL - 1)),
+			  i * mm_entry_size(TOP_LEVEL - 1));
+
+		ASSERT_TRUE(arch_mm_pte_is_block(table_l1[mid_index + i],
+						 TOP_LEVEL - 1));
+		EXPECT_EQ(pa_addr(arch_mm_block_from_pte(
+				  table_l1[mid_index + i], TOP_LEVEL - 1)),
+			  i * mm_entry_size(TOP_LEVEL - 1));
+	}
+}
+
 } /* namespace */
 
 namespace mm_test
