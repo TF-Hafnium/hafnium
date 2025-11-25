@@ -61,6 +61,15 @@
 			0xcbd4482f, 0xcbab, 0x4dba, 0x0738d, \
 		}                                            \
 	}
+
+#define SERVICE3_UUID2                                                  \
+	(struct ffa_uuid)                                               \
+	{                                                               \
+		{                                                       \
+			0x0ff35a12, 0xdae3432c, 0xa8191771, 0x61d7bba5, \
+		}                                                       \
+	}
+
 #define SERVICE4                                                       \
 	(struct ffa_uuid)                                              \
 	{                                                              \

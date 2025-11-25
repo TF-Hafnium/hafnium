@@ -339,6 +339,44 @@ TEST(indirect_messaging, invalid_size)
 }
 
 /**
+ * Sender sends an indirect message to SERVICE2_UUID2 and the partition echoes
+ * it back. The intent of the test is to check that when only one messaging
+ * method is defined it applies to all UUIDs.
+ */
+TEST(indirect_messaging, service2_uuid2_indirect_echo)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	const ffa_id_t own_id = hf_vm_get_id();
+	const struct ffa_uuid target_uuid = SERVICE2_UUID2;
+	const char payload[255] = "hello world";
+	char echo_payload[sizeof(payload)] = {0};
+	struct ffa_partition_rxtx_header header;
+	struct ffa_value ret;
+
+	SERVICE_SELECT(service2_info->vm_id, "echo_msg_send2_v1_2", mb.send);
+
+	ret = send_indirect_message_with_uuid(own_id, service2_info->vm_id,
+					      mb.send, payload, sizeof(payload),
+					      target_uuid, 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Run service2 so it can receive and echo the message. */
+	ret = ffa_run(service2_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	header = receive_indirect_message(echo_payload, sizeof(echo_payload),
+					  mb.recv);
+
+	EXPECT_EQ(header.sender, service2_info->vm_id);
+	EXPECT_EQ(header.receiver, own_id);
+	EXPECT_STREQ(echo_payload, payload);
+	for (size_t i = 0; i < 4; i++) {
+		EXPECT_EQ(header.uuid.uuid[i], target_uuid.uuid[i]);
+	}
+}
+
+/**
  * v1.1 message where payload overlaps with the `payload.size` field should
  * fail.
  */

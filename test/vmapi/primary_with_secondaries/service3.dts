@@ -14,14 +14,16 @@
 
         /* FF-A Properties */
         ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
-        uuid = <0xcbd4482f 0xcbab 0x4dba 0x0738d>;
+        uuid = <0xcbd4482f 0xcbab 0x4dba 0x0738d>,
+	       <0x0ff35a12 0xdae3432c 0xa8191771 0x61d7bba5>;
         execution-ctx-count = <8>;
         exception-level = <0>; /* EL1 */
         execution-state = <0>; /* AARCH64 */
         load-address = <0x90000000>; /* To make parsing of manifest happy. it is not yet used. */
         entrypoint-offset = <0x0>;
         xlat-granule = <0>; /* 4KiB */
-        messaging-method = <0x7>; /* Supports direct and indirect requests. */
+	messaging-method = <0x4>, /* Supports indirect requests only. */
+			   <0x7>; /* Supports direct and indirect requests. */
         notification-support; /* Receipt of notifications. */
 
 };

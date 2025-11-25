@@ -52,7 +52,7 @@ ffa_vm_count_t base_helper_sp_abort_dir_req_from_vm(
 	vm_count = ffa_partition_info_get_count(ret);
 
 	/* 5 FF-A partitions with one partition having with 2 UUIDs. */
-	EXPECT_EQ(vm_count, 6);
+	EXPECT_EQ(vm_count, 7);
 
 	ret = ffa_rx_release();
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -109,7 +109,7 @@ TEST(sp_lifecycle, stop_sp_upon_abort)
 							FFA_BUSY);
 
 	/* Service3 SP is still discoverable after aborting. */
-	EXPECT_EQ(vm_count, 6);
+	EXPECT_EQ(vm_count, 7);
 }
 
 /**

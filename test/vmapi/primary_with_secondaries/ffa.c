@@ -68,8 +68,7 @@ TEST(ffa, ffa_partition_info)
 	ret = ffa_partition_info_get(&uuid, 0);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 	vm_count = ret.arg2;
-	EXPECT_EQ(vm_count,
-		  4); /* 3 FF-A partitions, 1 partition with 2 UUIDs. */
+	EXPECT_EQ(vm_count, 5);
 
 	for (uint16_t index = 0; index < vm_count; ++index) {
 		ffa_id_t vm_id = partitions[index].vm_id;

@@ -578,6 +578,44 @@ TEST(direct_message, ffa_send_direct_message_req2_invalid_uuid)
 }
 
 /**
+ * Verify service3 only accepts direct messages that target its second UUID or a
+ * NULL UUID, rejecting its first UUID.
+ */
+TEST_PRECONDITION(direct_message,
+		  ffa_send_direct_message_req2_different_messaging_methods,
+		  service1_service2_and_service3_are_secure)
+{
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+				0x88889999, 0x01010101, 0x23232323, 0x45454545,
+				0x67676767, 0x89898989, 0x11001100, 0x22332233,
+				0x44554455, 0x66776677};
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+	const struct ffa_uuid service3_uuid1 = SERVICE3;
+	const struct ffa_uuid service3_uuid2 = SERVICE3_UUID2;
+	struct ffa_uuid null_uuid;
+	struct ffa_value res;
+
+	SERVICE_SELECT(service3_info->vm_id,
+		       "ffa_direct_message_req2_resp_loop", mb.send);
+	ffa_run(service3_info->vm_id, 0);
+
+	/* UUID1 only supports indirect requests so expect it to fail. */
+	res = ffa_msg_send_direct_req2(hf_vm_get_id(), service3_info->vm_id,
+				       &service3_uuid1, (const uint64_t *)&msg,
+				       ARRAY_SIZE(msg));
+	EXPECT_FFA_ERROR(res, FFA_DENIED);
+
+	/* UUID2 should be accepted and echo the payload back. */
+	echo_test_req2(service3_info->vm_id, service3_uuid2);
+
+	/* Using the NULL UUID should succeed since UUID2 supports direct
+	 * requests. */
+	ffa_uuid_init(0, 0, 0, 0, &null_uuid);
+	echo_test_req2(service3_info->vm_id, null_uuid);
+}
+
+/**
  * Verify that the primary VM can't send direct message responses
  * via FFA_MSG_SEND_DIRECT_RESP2_64.
  */

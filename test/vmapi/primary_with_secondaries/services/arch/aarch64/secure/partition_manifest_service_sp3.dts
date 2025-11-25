@@ -14,14 +14,16 @@
 
 	/* Properties */
 	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-        uuid = <0xcbd4482f 0xcbab 0x4dba 0x0738d>;
+        uuid = <0xcbd4482f 0xcbab 0x4dba 0x0738d>,
+	       <0x0ff35a12 0xdae3432c 0xa8191771 0x61d7bba5>;
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6280000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x7>; /* Supports direct and indirect requests. */
+	messaging-method = <0x4>, /* Supports indirect requests only. */
+			   <0x607>; /* Supports direct (both APIs) and indirect requests. */
 	boot-order = <3>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
