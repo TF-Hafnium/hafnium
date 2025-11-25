@@ -365,6 +365,65 @@ TEST_F(mm, map_across_tables)
 }
 
 /**
+ * Non-identity map a two page range over the boundary of two tables.
+ */
+TEST_F(mm, non_identity_map_across_tables)
+{
+	constexpr mm_mode_t mode = 0;
+	const ipaddr_t map_begin = ipa_init(0x80'0000'0000 - PAGE_SIZE);
+	const ipaddr_t map_end = ipa_add(map_begin, 2 * PAGE_SIZE);
+	const paddr_t pa_begin = pa_init(0);
+	ASSERT_TRUE(mm_vm_map(&ptable, map_begin, map_end, pa_begin, mode));
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	EXPECT_THAT(std::span(tables).last(2),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	/* Check only the last page of the first table is mapped. */
+	auto table0_l2 = tables.front();
+	EXPECT_THAT(table0_l2.first(table0_l2.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table0_l2.last(1)[0], TOP_LEVEL));
+
+	auto table0_l1 = get_table(
+		arch_mm_table_from_pte(table0_l2.last(1)[0], TOP_LEVEL));
+	EXPECT_THAT(table0_l1.first(table0_l1.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table0_l1.last(1)[0], TOP_LEVEL - 1));
+
+	auto table0_l0 = get_table(
+		arch_mm_table_from_pte(table0_l1.last(1)[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table0_l0.first(table0_l0.size() - 1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table0_l0.last(1)[0], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table0_l0.last(1)[0],
+						   TOP_LEVEL - 2)),
+		    Eq(pa_addr(pa_begin)));
+
+	/* Check only the first page of the second table is mapped. */
+	auto table1_l2 = tables[1];
+	EXPECT_THAT(table1_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table1_l2[0], TOP_LEVEL));
+
+	auto table1_l1 =
+		get_table(arch_mm_table_from_pte(table1_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table1_l1.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table1_l1[0], TOP_LEVEL - 1));
+
+	auto table1_l0 =
+		get_table(arch_mm_table_from_pte(table1_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table1_l0.subspan(1),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table1_l0[0], TOP_LEVEL - 2));
+	EXPECT_THAT(
+		pa_addr(arch_mm_block_from_pte(table1_l0[0], TOP_LEVEL - 2)),
+		Eq(pa_addr(pa_add(pa_begin, PAGE_SIZE))));
+}
+
+/**
  * Mapping all of memory creates blocks at the highest level.
  */
 TEST_F(mm, map_all_at_top_level)
