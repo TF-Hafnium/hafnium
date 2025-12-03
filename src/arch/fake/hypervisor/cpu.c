@@ -64,3 +64,8 @@ void arch_cpu_init(struct cpu *c)
 {
 	plat_interrupts_controller_hw_init(c);
 }
+
+struct cpu *arch_current_cpu(void)
+{
+	return cpu_find_index(0);
+}

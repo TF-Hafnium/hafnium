@@ -71,3 +71,5 @@ struct vcpu *arch_vcpu_resume(struct cpu *c);
 uint32_t arch_affinity_to_core_pos(uint64_t reg);
 
 uint32_t arch_find_core_pos(void);
+
+struct cpu *arch_current_cpu(void);

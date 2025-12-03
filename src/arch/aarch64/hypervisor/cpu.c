@@ -365,3 +365,15 @@ uint32_t arch_find_core_pos(void)
 
 	return core_id;
 }
+
+struct cpu *arch_current_cpu(void)
+{
+	struct cpu *current_cpu;
+	uint64_t reg = read_msr(MPIDR_EL1);
+
+	current_cpu = cpu_find(reg & MPIDR_AFFINITY_MASK);
+
+	CHECK(current_cpu != NULL);
+
+	return current_cpu;
+}
