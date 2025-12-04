@@ -107,12 +107,15 @@ if [ "$CODE_COVERAGE" = true ]; then
 fi
 
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --log "$LOG_DIR_BASE/ffa_both_world_partitions_boot_fail_test_sp1" \
              --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_boot_fail_test_sp1.json
 
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --log "$LOG_DIR_BASE/ffa_both_world_partitions_boot_fail_test_sp2" \
              --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_boot_fail_test_sp2.json
 
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --log "$LOG_DIR_BASE/ffa_both_world_partitions_boot_fail_test_sp3" \
              --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_boot_fail_test_sp3.json
 
 if [ $USE_PARITY == true ]
@@ -122,25 +125,32 @@ then
    execute_test HFTEST --partitions_json test/vmapi/ffa_secure_partition_el3_spmc/ffa_secure_partition_only_test.json
 fi
 
-execute_test HFTEST --partitions_json test/vmapi/ffa_secure_partition_only/ffa_secure_partition_only_test.json
+execute_test HFTEST --log "$LOG_DIR_BASE/ffa_secure_partition_only_test" \
+             --partitions_json test/vmapi/ffa_secure_partition_only/ffa_secure_partition_only_test.json
 
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --log "$LOG_DIR_BASE/ffa_both_world_partitions_test" \
              --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_test.json
 
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
+             --log "$LOG_DIR_BASE/primary_with_sp" \
              --partitions_json test/vmapi/primary_with_secondaries/primary_with_sp.json
 
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
-                 --partitions_json test/vmapi/primary_with_secondaries/primary_with_sp_vhe.json
+             --log "$LOG_DIR_BASE/primary_with_sp_vhe" \
+             --partitions_json test/vmapi/primary_with_secondaries/primary_with_sp_vhe.json
 
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
-                 --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_vhe_test.json
+             --log "$LOG_DIR_BASE/ffa_both_world_partitions_vhe_test" \
+             --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_vhe_test.json
 
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
-                 --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_sel1_up_test.json
+             --log "$LOG_DIR_BASE/ffa_both_world_partitions_sel1_up_test" \
+             --partitions_json test/vmapi/ffa_secure_partitions/ffa_both_world_partitions_sel1_up_test.json
 
 execute_test HFTEST --hypervisor "$HYPERVISOR_PATH/hafnium.bin" \
-                 --partitions_json test/vmapi/primary_with_secondaries/sp_lifecycle_support.json
+             --log "$LOG_DIR_BASE/sp_lifecycle_support" \
+             --partitions_json test/vmapi/primary_with_secondaries/sp_lifecycle_support.json
 
 if [ "$CODE_COVERAGE" = true ]; then
   create_configuration_file
