@@ -436,12 +436,14 @@ static enum manifest_return_code parse_messaging_method(
 	return MANIFEST_SUCCESS;
 }
 
-/*
- * Parse the UUIDs and Messaging methods for the VM services.
+/**
+ * Populate the services structs from the uuid list and messaging method list
+ * provided in v1.0 manifest. If only one messaging method is provided it
+ * applies to all UUIDs.
  */
-static enum manifest_return_code parse_services(const struct fdt_node *node,
-						struct service *services,
-						uint16_t *service_count)
+static enum manifest_return_code parse_services_v1_0(
+	const struct fdt_node *node, struct service *services,
+	uint16_t *service_count)
 {
 	struct uint32list_iter uuid;
 	struct uint32list_iter messaging_method;
@@ -459,10 +461,10 @@ static enum manifest_return_code parse_services(const struct fdt_node *node,
 		TRY(parse_uuid(&uuid, &services[*service_count].uuid));
 
 		/*
-		 * If only one messaging method is provided, record it and
-		 * apply it to all services. By definition the value must be
-		 * non-zero so this can be used to see if a value has been
-		 * recorded to use.
+		 * If only one messaging method is provided, record it
+		 * and apply it to all services. By definition the value
+		 * must be non-zero so this can be used to see if a
+		 * value has been recorded to use.
 		 */
 		if (shared_messaging_method_value != 0) {
 			services[*service_count].messaging_method =
@@ -492,11 +494,71 @@ static enum manifest_return_code parse_services(const struct fdt_node *node,
 	}
 
 	/*
-	 * Check there are no more messaging methods defined that don't match
-	 * with a UUID.
+	 * Check there are no more messaging methods defined that don't
+	 * match with a UUID.
 	 */
 	if (uint32list_has_next(&messaging_method)) {
 		return MANIFEST_ERROR_UNMATCHED_MESSAGING_METHODS;
+	}
+
+	return MANIFEST_SUCCESS;
+}
+
+/**
+ * Populate the services array from the service structs.
+ */
+static enum manifest_return_code parse_services_v1_1(
+	const struct fdt_node *node, struct service *services,
+	uint16_t *service_count)
+{
+	struct fdt_node services_node = *node;
+	struct string services_node_name = STRING_INIT("services");
+	struct uint32list_iter uuid;
+	struct uint32list_iter messaging_method;
+
+	*service_count = 0;
+
+	if (!fdt_find_child(&services_node, &services_node_name)) {
+		return MANIFEST_ERROR_NO_SERVICES;
+	}
+	if (!fdt_is_compatible(&services_node, "arm,ffa-manifest-services")) {
+		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+	if (!fdt_first_child(&services_node)) {
+		return MANIFEST_ERROR_NO_SERVICES;
+	}
+
+	do {
+		if (*service_count == PARTITION_MAX_UUIDS) {
+			return MANIFEST_ERROR_TOO_MANY_UUIDS;
+		}
+
+		TRY(read_uint32list(&services_node, "uuid", &uuid));
+		TRY(read_uint32list(&services_node, "messaging-method",
+				    &messaging_method));
+
+		TRY(parse_uuid(&uuid, &services[*service_count].uuid));
+		TRY(parse_messaging_method(
+			&messaging_method,
+			&services[*service_count].messaging_method));
+		(*service_count)++;
+	} while (fdt_next_sibling(&services_node));
+
+	return MANIFEST_SUCCESS;
+}
+
+/*
+ * Parse the UUIDs and Messaging methods for the VM services.
+ */
+static enum manifest_return_code parse_services(const struct fdt_node *node,
+						struct service *services,
+						uint16_t *service_count,
+						uint16_t manifest_version_minor)
+{
+	if (manifest_version_minor == 0) {
+		TRY(parse_services_v1_0(node, services, service_count));
+	} else {
+		TRY(parse_services_v1_1(node, services, service_count));
 	}
 
 	dlog_verbose("  Service Count %u\n", *service_count);
@@ -1317,18 +1379,25 @@ enum manifest_return_code parse_ffa_manifest(
 	struct string boot_info_node_name = STRING_INIT("boot-info");
 	bool managed_exit_field_present = false;
 	enum manifest_return_code ret;
+	uint16_t manifest_version_minor;
 
 	if (!fdt_find_node(fdt, "/", &root)) {
 		return MANIFEST_ERROR_NO_ROOT_NODE;
 	}
 
 	/* Check "compatible" property. */
-	if (!fdt_is_compatible(&root, "arm,ffa-manifest-1.0")) {
+	if (fdt_is_compatible(&root, "arm,ffa-manifest-1.0")) {
+		manifest_version_minor = 0;
+	} else if (fdt_is_compatible(&root, "arm,ffa-manifest-1.1")) {
+		manifest_version_minor = 1;
+	} else {
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
+	dlog_verbose("  Manifest minor version %u.\n", manifest_version_minor);
 
 	TRY(parse_services(&root, vm->partition.services,
-			   &vm->partition.service_count));
+			   &vm->partition.service_count,
+			   manifest_version_minor));
 
 	TRY(read_uint32(&root, "ffa-version", &vm->partition.ffa_version));
 	dlog_verbose("  Expected FF-A version %u.%u\n",
@@ -1944,6 +2013,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_ILLEGAL_ABORT_ACTION:
 		return "Abort action not supported if SP lifecycle is not "
 		       "supported";
+	case MANIFEST_ERROR_NO_SERVICES:
+		return "At least one service must be defined in the manifest.";
 	}
 
 	panic("Unexpected manifest return code.");

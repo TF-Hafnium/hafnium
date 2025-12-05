@@ -99,6 +99,7 @@ enum manifest_return_code {
 	MANIFEST_ERROR_VM_AVAILABILITY_MESSAGE_INVALID,
 	MANIFEST_ERROR_ILLEGAL_LIFECYCLE_SUPPORT,
 	MANIFEST_ERROR_ILLEGAL_ABORT_ACTION,
+	MANIFEST_ERROR_NO_SERVICES,
 };
 
 enum manifest_return_code manifest_init(struct mm_stage1_locked stage1_locked,
