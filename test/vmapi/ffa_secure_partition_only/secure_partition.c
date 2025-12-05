@@ -585,6 +585,43 @@ TEST(arch_features, vm_unaligned_access)
 	EXPECT_EQ(exception_handler_get_num(), 1);
 }
 
+static void arch_pauth_detect(void)
+{
+	uint64_t id_aa64isar1_el1;
+	uint64_t id_aa64isar2_el1;
+	bool api;
+	bool apa;
+	bool apa3;
+	bool gpi;
+	bool gpa;
+	bool gpa3;
+
+	/**
+	 * Arm ARM D8.10 Pointer authentication
+	 * If Pointer authentication is implemented, then both of the following
+	 * are true: exactly one of ID_AA64ISAR1_EL1.GPI, ID_AA64ISAR1_EL1.GPA,
+	 * or ID_AA64ISAR2_EL1.GPA3 fields is nonzero, exactly one of
+	 * ID_AA64ISAR1_EL1.API, ID_AA64ISAR1_EL1.APA, or ID_AA64ISAR2_EL1.APA3
+	 * fields is nonzero.
+	 *
+	 * Note id register reads below trap to Hafnium returning an emulated
+	 * value, although remains silent in this test code sequence.
+	 */
+	id_aa64isar1_el1 = read_msr(id_aa64isar1_el1);
+	id_aa64isar2_el1 = read_msr(id_aa64isar2_el1);
+	api = (id_aa64isar1_el1 & 0xf00) != 0;
+	apa = (id_aa64isar1_el1 & 0xf0) != 0;
+	apa3 = (id_aa64isar2_el1 & 0xf000) != 0;
+	EXPECT_TRUE(api ^ apa ^ apa3);
+	EXPECT_FALSE(api && apa && apa3);
+
+	gpi = (id_aa64isar1_el1 & 0xf0000000) != 0;
+	gpa = (id_aa64isar1_el1 & 0xf000000) != 0;
+	gpa3 = (id_aa64isar2_el1 & 0xf00) != 0;
+	EXPECT_TRUE(gpi ^ gpa ^ gpa3);
+	EXPECT_FALSE(gpi && gpa && gpa3);
+}
+
 /*
  * Validate PAuth can be enabled at S-EL1 and an S-EL1 partition can
  * change its APIAKey.
@@ -592,14 +629,11 @@ TEST(arch_features, vm_unaligned_access)
 TEST(arch_features, enable_pauth)
 {
 	uint64_t sctlr_el1;
-	uint64_t id_aa64isar1_el1;
 	uint64_t sctlr_el1_enia = (UINT64_C(0x1) << 31);
 	uint64_t apiakeylo_el1_val = (0x123456789);
 	uint64_t apiakeyhi_el1_val = (0x987654321);
 
-	/* Check that PAuth is implemented. */
-	id_aa64isar1_el1 = read_msr(id_aa64isar1_el1);
-	EXPECT_NE((id_aa64isar1_el1 & (0xff0)), 0);
+	arch_pauth_detect();
 
 	/* Check that PAuth is enabled at EL1. */
 	sctlr_el1 = read_msr(sctlr_el1);
@@ -645,6 +679,8 @@ TEST(arch_features, pauth_fault)
 {
 	uintptr_t bad_addr = (uintptr_t)&pauth_fault_helper;
 	uint64_t exception_return_addr;
+
+	arch_pauth_detect();
 
 	exception_setup(NULL, exception_handler_skip_to_instruction);
 

@@ -55,6 +55,7 @@
 	\
 	X(ID_AA64ISAR0_EL1  , 3, 0,  0,  6, 0) \
 	X(ID_AA64ISAR1_EL1  , 3, 0,  0,  6, 1) \
+	X(ID_AA64ISAR2_EL1  , 3, 0,  0,  6, 2) \
 	\
 	X(ID_AA64MMFR0_EL1  , 3, 0,  0,  7, 0) \
 	X(ID_AA64MMFR1_EL1  , 3, 0,  0,  7, 1) \
@@ -158,6 +159,24 @@ bool feature_id_is_register_access(uintreg_t esr)
  */
 #define ID_AA64ISAR1_EL1_APA (UINT64_C(0xf) << 24)
 
+/**
+ * FEAT_PAuth: indicates whether the QARMA3 algorithm is implemented in the PE
+ * for generic code authentication in AArch64 state.
+ */
+#define ID_AA64ISAR2_EL1_GPA3 (UINT64_C(0xf) << 8)
+
+/**
+ * FEAT_PAuth: indicates whether the QARMA3 algorithm is implemented in the PE
+ * for address authentication in AArch64 state.
+ */
+#define ID_AA64ISAR2_EL1_APA3 (UINT64_C(0xf) << 12)
+
+/**
+ * FEAT_CONSTPACFIELD: indicates which address bit is used to determine the size
+ * of the PAC field.
+ */
+#define ID_AA64ISAR2_EL1_PAC_FRAC (UINT64_C(0xf) << 24)
+
 void feature_set_traps(struct vm *vm, struct arch_regs *regs)
 {
 	arch_features_t features = vm->arch.trapped_features;
@@ -172,6 +191,7 @@ void feature_set_traps(struct vm *vm, struct arch_regs *regs)
 	vm->arch.tid3_masks.id_aa64pfr1_el1 = ~0ULL;
 	vm->arch.tid3_masks.id_aa64dfr0_el1 = ~0ULL;
 	vm->arch.tid3_masks.id_aa64isar1_el1 = ~0ULL;
+	vm->arch.tid3_masks.id_aa64isar2_el1 = ~0ULL;
 
 	/*
 	 * Always mask VHE feature. No nested virualization support at this
@@ -250,6 +270,11 @@ void feature_set_traps(struct vm *vm, struct arch_regs *regs)
 		vm->arch.tid3_masks.id_aa64isar1_el1 &= ~ID_AA64ISAR1_EL1_GPA;
 		vm->arch.tid3_masks.id_aa64isar1_el1 &= ~ID_AA64ISAR1_EL1_API;
 		vm->arch.tid3_masks.id_aa64isar1_el1 &= ~ID_AA64ISAR1_EL1_APA;
+
+		vm->arch.tid3_masks.id_aa64isar2_el1 &= ~ID_AA64ISAR2_EL1_APA3;
+		vm->arch.tid3_masks.id_aa64isar2_el1 &= ~ID_AA64ISAR2_EL1_GPA3;
+		vm->arch.tid3_masks.id_aa64isar2_el1 &=
+			~ID_AA64ISAR2_EL1_PAC_FRAC;
 	}
 
 	if (features & HF_FEATURE_AMU) {
@@ -316,6 +341,9 @@ bool feature_id_process_access(struct vcpu *vcpu, uintreg_t esr)
 		break;
 	case ID_AA64ISAR1_EL1_ENC:
 		value &= vm->arch.tid3_masks.id_aa64isar1_el1;
+		break;
+	case ID_AA64ISAR2_EL1_ENC:
+		value &= vm->arch.tid3_masks.id_aa64isar2_el1;
 		break;
 	default:
 		break;

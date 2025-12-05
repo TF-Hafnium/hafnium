@@ -32,6 +32,7 @@ struct arch_vm {
 		uintreg_t id_aa64pfr1_el1;
 		uintreg_t id_aa64dfr0_el1;
 		uintreg_t id_aa64isar1_el1;
+		uintreg_t id_aa64isar2_el1;
 	} tid3_masks;
 
 #if SECURE_WORLD == 1
