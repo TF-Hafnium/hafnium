@@ -123,6 +123,33 @@ install dependencies there.
 
    poetry run make doc
 
+
+Output from the build process will be placed in: ``docs/build/html``.
+
+To build the documentation in PDF format, additionally ensure that the following
+packages are installed:
+
+- FreeSerif font
+- latexmk
+- librsvg2-bin
+- xelatex
+- xindy
+
+Below is an example set of instructions to install the required packages
+(tested on Ubuntu):
+
+.. code:: shell
+
+   sudo apt install fonts-freefont-otf latexmk librsvg2-bin texlive-xetex xindy
+
+Once all the dependencies are installed, the ``pdf`` can be built using:
+
+.. code:: shell
+
+   poetry run make -C docs latexpdf
+
+The generated PDF (``hafnium.pdf``) can be found in: ``docs/build/latex``.
+
 --------------
 
 *Copyright (c) 2023, Arm Limited. All rights reserved.*
