@@ -961,6 +961,9 @@ struct ffa_value ffa_retrieve_check_transition(
 	mm_mode_t sender_orig_mode, mm_mode_t *to_mode, bool memory_protected,
 	enum ffa_map_action *map_action)
 {
+	/* Default to a failure state. Callers rely on these values */
+	*to_mode = MM_MODE_INVALID;
+	*map_action = MAP_ACTION_NONE;
 	mm_mode_t orig_to_mode;
 	struct ffa_value ret;
 
@@ -972,8 +975,9 @@ struct ffa_value ffa_retrieve_check_transition(
 		return ret;
 	}
 
-	/* Find the appropriate new mode. */
+	/* Override default mode with the sender's mode on valid transition */
 	*to_mode = sender_orig_mode;
+	*map_action = MAP_ACTION_COMMIT;
 
 	if (share_func == FFA_MEM_RECLAIM_32) {
 		/*
@@ -1053,6 +1057,7 @@ struct ffa_value ffa_retrieve_check_transition(
 
 	default:
 		dlog_error("Invalid share_func %#x.\n", share_func);
+
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -1638,7 +1643,7 @@ struct ffa_value ffa_retrieve_check_update(
 	mm_mode_t *response_mode, bool memory_protected)
 {
 	uint32_t i;
-	mm_mode_t to_mode;
+	mm_mode_t to_mode = MM_MODE_INVALID;
 	struct ffa_value ret;
 	enum ffa_map_action map_action = MAP_ACTION_COMMIT;
 
@@ -1646,6 +1651,7 @@ struct ffa_value ffa_retrieve_check_update(
 	 * Make sure constituents are properly aligned to a 64-bit boundary. If
 	 * not we would get alignment faults trying to read (64-bit) values.
 	 */
+	assert(fragment_count >= 0);
 	for (i = 0; i < fragment_count; ++i) {
 		if (!is_aligned(fragments[i], 8)) {
 			dlog_verbose("Fragment not properly aligned.\n");
@@ -1700,6 +1706,7 @@ struct ffa_value ffa_retrieve_check_update(
 		 * make sure the entire operation will succeed without
 		 * exhausting the page pool.
 		 */
+		assert(to_mode != MM_MODE_INVALID);
 		ret = ffa_region_group_identity_map(
 			to_locked, fragments, fragment_constituent_counts,
 			fragment_count, to_mode, MAP_ACTION_CHECK, NULL);
@@ -1719,7 +1726,7 @@ struct ffa_value ffa_retrieve_check_update(
 	}
 
 	if (map_action != MAP_ACTION_NONE) {
-
+		assert(to_mode != MM_MODE_INVALID);
 		CHECK(ffa_region_group_identity_map(
 			      to_locked, fragments, fragment_constituent_counts,
 			      fragment_count, to_mode, map_action, NULL)
