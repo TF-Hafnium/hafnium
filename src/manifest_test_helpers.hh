@@ -101,8 +101,42 @@ void exec(const char *program, const char *args[], const T &stdin,
 	}
 }
 
+/**
+ * Class for programatically building a Device Tree.
+ *
+ * Usage:
+ *   std::vector<char> dtb = ManifestDtBuilder()
+ *       .Command1()
+ *       .Command2()
+ *       ...
+ *       .CommandN()
+ *       .Build();
+ *
+ * For each node we record it's properties and it's children
+ * separately so when building the dts we can ensure we always
+ * meet the condition that all properties precede subnodes
+ * regardless of the command order to the ManifestDtBuilder.
+ */
 class ManifestDtBuilder
 {
+       private:
+	/*
+	 * Name: The name of the node.
+	 * child_label: If the child we're about to populate with properties
+	 * has a label record it here.
+	 * properties: Holds the properties at that level of the dts.
+	 * children: Holds the properties of the children below.
+	 */
+	struct Node {
+		std::string name;
+		std::string_view child_label;
+		std::ostringstream properties;
+		std::ostringstream children;
+	};
+
+	std::vector<Node> stack_;
+	std::stringstream dts_;
+
        public:
 	ManifestDtBuilder()
 	{
@@ -120,7 +154,15 @@ class ManifestDtBuilder
 		std::vector<char> dtc_stdout;
 
 		/* Finish root node. */
-		EndChild();
+		while (stack_.size() > 1) {
+			EndChild();
+		}
+
+		Node root = std::move(stack_.back());
+		stack_.pop_back();
+
+		dts_ << root.name << " {\n"
+		     << root.properties.str() << root.children.str() << "};\n";
 
 		if (dump) {
 			Dump();
@@ -137,13 +179,29 @@ class ManifestDtBuilder
 
 	ManifestDtBuilder &StartChild(const std::string_view &name)
 	{
-		dts_ << name << " {" << std::endl;
+		stack_.push_back(Node{std::string(name), std::string_view{},
+				      std::ostringstream{},
+				      std::ostringstream{}});
 		return *this;
 	}
 
 	ManifestDtBuilder &EndChild()
 	{
-		dts_ << "};" << std::endl;
+		/* Child must have a parent. */
+		assert(stack_.size() > 1);
+
+		Node child = std::move(stack_.back());
+		stack_.pop_back();
+
+		Node &parent = stack_.back();
+
+		if (!parent.child_label.empty()) {
+			parent.children << parent.child_label << ": ";
+		}
+		parent.children << child.name << " {\n"
+				<< child.properties.str()
+				<< child.children.str() << "};\n";
+
 		return *this;
 	}
 
@@ -211,13 +269,15 @@ class ManifestDtBuilder
 	ManifestDtBuilder &Property(const std::string_view &name,
 				    const std::string_view &value)
 	{
-		dts_ << name << " = " << value << ";" << std::endl;
+		Node &node = stack_.back();
+		node.properties << name << " = " << value << ";" << std::endl;
 		return *this;
 	}
 
 	ManifestDtBuilder &Label(const std::string_view &name)
 	{
-		dts_ << name << ": ";
+		Node &node = stack_.back();
+		node.child_label = name;
 		return *this;
 	}
 
@@ -247,7 +307,9 @@ class ManifestDtBuilder
 	ManifestDtBuilder &StringProperty(const std::string_view &name,
 					  const std::string_view &value)
 	{
-		dts_ << name << " = \"" << value << "\";" << std::endl;
+		Node &node = stack_.back();
+		node.properties << name << " = \"" << value << "\";"
+				<< std::endl;
 		return *this;
 	}
 
@@ -256,24 +318,26 @@ class ManifestDtBuilder
 		const std::vector<std::string_view> &value)
 	{
 		bool is_first = true;
+		Node &node = stack_.back();
 
-		dts_ << name << " = ";
+		node.properties << name << " = ";
 		for (const std::string_view &entry : value) {
 			if (is_first) {
 				is_first = false;
 			} else {
-				dts_ << ", ";
+				node.properties << ", ";
 			}
-			dts_ << "\"" << entry << "\"";
+			node.properties << "\"" << entry << "\"";
 		}
-		dts_ << ";" << std::endl;
+		node.properties << ";" << std::endl;
 		return *this;
 	}
 
 	ManifestDtBuilder &IntegerProperty(const std::string_view &name,
 					   uint32_t value, bool hex = false)
 	{
-		std::ostream_iterator<char> out(dts_);
+		Node &node = stack_.back();
+		std::ostream_iterator<char> out(node.properties);
 
 		if (hex) {
 			std::format_to(out, "{} = <{:#08x}>;\n", name, value);
@@ -288,7 +352,8 @@ class ManifestDtBuilder
 	{
 		uint32_t high = value >> 32;
 		uint32_t low = (uint32_t)value;
-		std::ostream_iterator<char> out(dts_);
+		Node &node = stack_.back();
+		std::ostream_iterator<char> out(node.properties);
 
 		if (hex) {
 			std::format_to(out, "{} = <{:#08x} {:#08x}>;\n", name,
@@ -304,21 +369,21 @@ class ManifestDtBuilder
 		const std::string_view &name,
 		const std::vector<uint32_t> &value)
 	{
-		dts_ << name << " = < ";
+		Node &node = stack_.back();
+		node.properties << name << " = < ";
 		for (const uint32_t entry : value) {
-			dts_ << entry << " ";
+			node.properties << entry << " ";
 		}
-		dts_ << ">;" << std::endl;
+		node.properties << ">;" << std::endl;
 		return *this;
 	}
 
 	ManifestDtBuilder &BooleanProperty(const std::string_view &name)
 	{
-		dts_ << name << ";" << std::endl;
+		Node &node = stack_.back();
+		node.properties << name << ";" << std::endl;
 		return *this;
 	}
-
-	std::stringstream dts_;
 };
 
 class manifest : public ::testing::Test
