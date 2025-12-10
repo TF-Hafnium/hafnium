@@ -190,6 +190,7 @@ executable("unit_tests") {
     "global_env.cc",
     "ipi_test.cc",
     "manifest_test.cc",
+    "manifest_v1_0_test.cc",
     "mm_test.cc",
     "mpool_test.cc",
     "string_test.cc",
