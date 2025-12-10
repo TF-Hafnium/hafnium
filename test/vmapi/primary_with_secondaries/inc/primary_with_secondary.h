@@ -98,10 +98,10 @@
  * Helpers to get services information.
  * Defined with SERVICE_PARTITION_INFO_GET macro.
  */
-struct ffa_partition_info* service1(void* recv);
-struct ffa_partition_info* service2(void* recv);
-struct ffa_partition_info* service3(void* recv);
-struct ffa_partition_info* service4(void* recv);
+struct ffa_partition_info *service1(void *recv);
+struct ffa_partition_info *service2(void *recv);
+struct ffa_partition_info *service3(void *recv);
+struct ffa_partition_info *service4(void *recv);
 
 /* Precondition functions for this test setup. */
 bool service1_is_vm(void);
@@ -130,4 +130,4 @@ bool service1_has_ns_mem_and_sel0(void);
 #define EXTERNAL_INTERRUPT_ID_C 9
 
 /* Helpers common to the setup. */
-bool exception_received(struct ffa_value* run_res, const void* recv_buf);
+bool exception_received(struct ffa_value *run_res, const void *recv_buf);

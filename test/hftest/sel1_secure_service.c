@@ -18,9 +18,9 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
-static struct ffa_boot_info_header* boot_info_header;
+static struct ffa_boot_info_header *boot_info_header;
 
-struct ffa_boot_info_header* get_boot_info_header(void)
+struct ffa_boot_info_header *get_boot_info_header(void)
 {
 	return boot_info_header;
 }
@@ -29,7 +29,7 @@ alignas(4096) uint8_t kstack[MAX_CPUS][4096];
 
 void test_main_sp(bool);
 
-void sp_register_secondary_ep(struct hftest_context* ctx)
+void sp_register_secondary_ep(struct hftest_context *ctx)
 {
 	extern void secondary_ep_entry(void);
 
@@ -42,13 +42,13 @@ void sp_register_secondary_ep(struct hftest_context* ctx)
 	}
 }
 
-void run_service_set_up(struct hftest_context* ctx, struct fdt* fdt)
+void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
 {
 	sp_register_secondary_ep(ctx);
 	hftest_service_set_up(ctx, fdt);
 }
 
-[[noreturn]] void kmain(struct ffa_boot_info_header* boot_info_blob)
+[[noreturn]] void kmain(struct ffa_boot_info_header *boot_info_blob)
 {
 	/*
 	 * Initialize the stage-1 MMU and identity-map the entire address space.

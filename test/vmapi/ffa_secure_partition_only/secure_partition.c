@@ -435,8 +435,8 @@ TEST(ffa_msg_send_direct_req, fails_if_sp_to_nwd)
  */
 TEST(ffa_boot_info, dump_and_validate_boot_info)
 {
-	struct ffa_boot_info_header* boot_info_header = get_boot_info_header();
-	struct ffa_boot_info_desc* fdt_info;
+	struct ffa_boot_info_header *boot_info_header = get_boot_info_header();
+	struct ffa_boot_info_desc *fdt_info;
 
 	dump_boot_info(boot_info_header);
 
@@ -453,11 +453,11 @@ TEST(ffa_boot_info, dump_and_validate_boot_info)
  */
 TEST(ffa_boot_info, parse_fdt)
 {
-	struct ffa_boot_info_header* boot_info_header = get_boot_info_header();
-	struct ffa_boot_info_desc* fdt_info;
+	struct ffa_boot_info_header *boot_info_header = get_boot_info_header();
+	struct ffa_boot_info_desc *fdt_info;
 	struct fdt fdt;
 	struct fdt_node root;
-	void* fdt_ptr;
+	void *fdt_ptr;
 	size_t fdt_len;
 	uint64_t ffa_version;
 
@@ -468,7 +468,7 @@ TEST(ffa_boot_info, parse_fdt)
 
 	HFTEST_LOG("FF-A Manifest Address: %lx", fdt_info->content);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	fdt_ptr = (void*)fdt_info->content;
+	fdt_ptr = (void *)fdt_info->content;
 
 	ASSERT_TRUE(fdt_size_from_header(fdt_ptr, &fdt_len));
 	ASSERT_TRUE(fdt_init_from_ptr(&fdt, fdt_ptr, fdt_len));
@@ -563,7 +563,7 @@ TEST(arch_features, vm_unaligned_access)
 	uint64_t sctlr_el1;
 	uint64_t val = 0x1122334400000000;
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	volatile uint32_t* ptr = (volatile uint32_t*)((uintptr_t)&val + 2);
+	volatile uint32_t *ptr = (volatile uint32_t *)((uintptr_t)&val + 2);
 
 	exception_setup(NULL, exception_handler_skip_instruction);
 
@@ -1037,7 +1037,7 @@ TEST(ffa, ffa_partition_info)
 {
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
-	const struct ffa_partition_info* partitions;
+	const struct ffa_partition_info *partitions;
 	struct ffa_uuid uuid;
 
 	/* A Null UUID requests information for all partitions. */
@@ -1092,7 +1092,7 @@ TEST(ffa_v1_0, ffa_partition_info_v1_0)
 {
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
-	const struct ffa_partition_info* partitions;
+	const struct ffa_partition_info *partitions;
 	struct ffa_uuid uuid;
 
 	/* A Null UUID requests information for all partitions. */

@@ -17,9 +17,9 @@
 
 alignas(4096) uint8_t kstack[4096];
 
-static struct ffa_boot_info_header* boot_info_header;
+static struct ffa_boot_info_header *boot_info_header;
 
-struct ffa_boot_info_header* get_boot_info_header(void)
+struct ffa_boot_info_header *get_boot_info_header(void)
 {
 	return boot_info_header;
 }
@@ -31,7 +31,7 @@ struct ffa_boot_info_header* get_boot_info_header(void)
 	}
 }
 
-void kmain(struct ffa_boot_info_header* boot_info_blob)
+void kmain(struct ffa_boot_info_header *boot_info_blob)
 {
 	/* Dummy fdt. It is not really used */
 	struct fdt fdt;

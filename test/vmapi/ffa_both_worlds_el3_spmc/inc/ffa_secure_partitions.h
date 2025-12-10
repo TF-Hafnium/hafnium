@@ -41,5 +41,5 @@
  * Helpers to get services information.
  * Defined with SERVICE_PARTITION_INFO_GET macro.
  */
-struct ffa_partition_info* service1(void* recv);
-struct ffa_partition_info* service2(void* recv);
+struct ffa_partition_info *service1(void *recv);
+struct ffa_partition_info *service2(void *recv);

@@ -21,8 +21,8 @@ using ::testing::NotNull;
 /**
  * Checks that the given allocations come from the given chunks.
  */
-bool check_allocs(std::vector<std::unique_ptr<char[]>>& chunks,
-		  std::vector<uintptr_t>& allocs, size_t entries_per_chunk,
+bool check_allocs(std::vector<std::unique_ptr<char[]>> &chunks,
+		  std::vector<uintptr_t> &allocs, size_t entries_per_chunk,
 		  size_t entry_size)
 {
 	size_t i, j;
@@ -33,8 +33,8 @@ bool check_allocs(std::vector<std::unique_ptr<char[]>>& chunks,
 
 	sort(allocs.begin(), allocs.end());
 	sort(chunks.begin(), chunks.end(),
-	     [](const std::unique_ptr<char[]>& a,
-		const std::unique_ptr<char[]>& b) {
+	     [](const std::unique_ptr<char[]> &a,
+		const std::unique_ptr<char[]> &b) {
 		     return a.get() < b.get();
 	     });
 
@@ -58,8 +58,8 @@ bool check_allocs(std::vector<std::unique_ptr<char[]>>& chunks,
 /**
  * Add chunks to the given mem pool and chunk vector.
  */
-static void add_chunks(std::vector<std::unique_ptr<char[]>>& chunks,
-		       struct mpool* p, size_t count, size_t size)
+static void add_chunks(std::vector<std::unique_ptr<char[]>> &chunks,
+		       struct mpool *p, size_t count, size_t size)
 {
 	size_t i;
 
@@ -80,7 +80,7 @@ TEST(mpool, allocation)
 	constexpr size_t chunk_count = 10;
 	std::vector<std::unique_ptr<char[]>> chunks;
 	std::vector<uintptr_t> allocs;
-	void* ret;
+	void *ret;
 
 	mpool_init(&p, entry_size);
 
@@ -120,7 +120,7 @@ TEST(mpool, freeing)
 	std::vector<uintptr_t> allocs;
 	size_t i;
 	alignas(entry_size) char entry[entry_size];
-	void* ret;
+	void *ret;
 
 	mpool_init(&p, entry_size);
 
@@ -129,7 +129,7 @@ TEST(mpool, freeing)
 
 	/* Free an entry into the pool, then allocate it back. */
 	mpool_free(&p, &entry[0]);
-	EXPECT_THAT(mpool_alloc(&p), (void*)&entry[0]);
+	EXPECT_THAT(mpool_alloc(&p), (void *)&entry[0]);
 	EXPECT_THAT(mpool_alloc(&p), IsNull());
 
 	/* Allocate a number of chunks and add them to the pool. */
@@ -140,7 +140,7 @@ TEST(mpool, freeing)
 	 * allocation instead of something from the chunks.
 	 */
 	mpool_free(&p, &entry[0]);
-	EXPECT_THAT(mpool_alloc(&p), (void*)&entry[0]);
+	EXPECT_THAT(mpool_alloc(&p), (void *)&entry[0]);
 
 	/* Allocate from the pool until we run out of memory. */
 	while ((ret = mpool_alloc(&p))) {
@@ -152,11 +152,11 @@ TEST(mpool, freeing)
 	 * allocation instead of something from the chunks.
 	 */
 	mpool_free(&p, &entry[0]);
-	EXPECT_THAT(mpool_alloc(&p), (void*)&entry[0]);
+	EXPECT_THAT(mpool_alloc(&p), (void *)&entry[0]);
 
 	/* Add entries back to the pool by freeing them. */
 	for (i = 0; i < allocs.size(); i++) {
-		mpool_free(&p, (void*)allocs[i]);
+		mpool_free(&p, (void *)allocs[i]);
 	}
 	allocs.clear();
 
@@ -182,7 +182,7 @@ TEST(mpool, init_from)
 	std::vector<std::unique_ptr<char[]>> chunks;
 	std::vector<uintptr_t> allocs;
 	size_t i;
-	void* ret;
+	void *ret;
 
 	mpool_init(&p, entry_size);
 
@@ -191,14 +191,14 @@ TEST(mpool, init_from)
 
 	/* Allocate half of the elements. */
 	for (i = 0; i < entries_per_chunk * chunk_count / 2; i++) {
-		void* ret = mpool_alloc(&p);
+		void *ret = mpool_alloc(&p);
 		ASSERT_THAT(ret, NotNull());
 		allocs.push_back((uintptr_t)ret);
 	}
 
 	/* Add entries back to the pool by freeing them. */
 	for (i = 0; i < allocs.size(); i++) {
-		mpool_free(&p, (void*)allocs[i]);
+		mpool_free(&p, (void *)allocs[i]);
 	}
 	allocs.clear();
 
@@ -230,7 +230,7 @@ TEST(mpool, alloc_contiguous)
 	std::vector<std::unique_ptr<char[]>> chunks;
 	std::vector<uintptr_t> allocs;
 	size_t i;
-	void* ret;
+	void *ret;
 	uintptr_t next;
 
 	mpool_init(&p, entry_size);
@@ -289,7 +289,7 @@ TEST(mpool, allocation_with_fallback)
 	constexpr size_t chunk_count = 10;
 	std::vector<std::unique_ptr<char[]>> chunks;
 	std::vector<uintptr_t> allocs;
-	void* ret;
+	void *ret;
 
 	mpool_init(&fallback, entry_size);
 	mpool_init_with_fallback(&p, &fallback);
@@ -320,7 +320,7 @@ TEST(mpool, free_with_fallback)
 	constexpr size_t chunk_count = 1;
 	std::vector<std::unique_ptr<char[]>> chunks;
 	std::vector<uintptr_t> allocs;
-	void* ret;
+	void *ret;
 
 	mpool_init(&fallback, entry_size);
 	mpool_init_with_fallback(&p, &fallback);

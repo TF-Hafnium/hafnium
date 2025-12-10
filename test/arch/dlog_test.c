@@ -40,8 +40,8 @@ const uint64_t i64_max = INT64_MAX;
 #define assert_format(expected, ...) \
 	assert_format_impl(expected, sizeof(expected), __VA_ARGS__)
 
-static void assert_format_impl(char* expected, size_t expected_len,
-			       const char* fmt, ...)
+static void assert_format_impl(char *expected, size_t expected_len,
+			       const char *fmt, ...)
 {
 	struct va_list_wrapper args;
 	size_t chars_written;

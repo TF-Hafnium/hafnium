@@ -195,15 +195,15 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 [[noreturn]] void test_main_sp(bool is_boot_vcpu)
 {
 	/* Use FF-A v1.1 EAC0 boot protocol to retrieve the FDT. */
-	static struct ffa_boot_info_desc* fdt_info;
+	static struct ffa_boot_info_desc *fdt_info;
 	struct mailbox_buffers mb;
-	struct hftest_context* ctx = hftest_get_context();
+	struct hftest_context *ctx = hftest_get_context();
 	struct ffa_value res;
 
 	if (is_boot_vcpu) {
 		struct fdt fdt;
-		void* fdt_ptr;
-		struct ffa_boot_info_header* boot_info_header;
+		void *fdt_ptr;
+		struct ffa_boot_info_header *boot_info_header;
 		extern void secondary_ep_entry(void);
 
 		mb = set_up_mailbox();
@@ -215,7 +215,7 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 					      FFA_BOOT_INFO_TYPE_ID_FDT);
 
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
-		fdt_ptr = (void*)fdt_info->content;
+		fdt_ptr = (void *)fdt_info->content;
 
 		if (!fdt_struct_from_ptr(fdt_ptr, &fdt)) {
 			HFTEST_LOG(HFTEST_LOG_INDENT

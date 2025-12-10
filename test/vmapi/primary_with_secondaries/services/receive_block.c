@@ -34,7 +34,7 @@ TEST_SERVICE(receive_block)
 {
 	int32_t i;
 	const char message[] = "Done waiting";
-	void* send_buf = SERVICE_SEND_BUFFER();
+	void *send_buf = SERVICE_SEND_BUFFER();
 	ffa_id_t own_id = hf_vm_get_id();
 
 	exception_setup(irq, NULL);

@@ -15,7 +15,7 @@
 [[noreturn]] void test_main_sp(bool is_boot_vcpu)
 {
 	/* Use FF-A v1.1 EAC0 boot protocol to retrieve the FDT. */
-	static struct ffa_boot_info_desc* fdt_info;
+	static struct ffa_boot_info_desc *fdt_info;
 
 	/* TODO: Place in a common code path. Currently not possible, because
 	 * the NWd partitions are not loaded with a Partition Package, which SPs
@@ -23,7 +23,7 @@
 	 * partition package.
 	 */
 	if (is_boot_vcpu) {
-		struct ffa_boot_info_header* boot_info_header =
+		struct ffa_boot_info_header *boot_info_header =
 			get_boot_info_header();
 
 		fdt_info = get_boot_info_desc(boot_info_header,
@@ -37,5 +37,5 @@
 	}
 
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	hftest_service_main((void*)fdt_info->content);
+	hftest_service_main((void *)fdt_info->content);
 }

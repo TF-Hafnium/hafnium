@@ -37,7 +37,7 @@ extern uint8_t volatile text_begin[];
  * SPs do not have text_begin set to load_address.
  * TODO: use address as set in the manifest for both VMs and SPs.
  */
-static uintptr_t get_load_address(struct hftest_context* ctx)
+static uintptr_t get_load_address(struct hftest_context *ctx)
 {
 	if (ctx->is_ffa_manifest_parsed) {
 		return ctx->partition_manifest.load_addr;
@@ -46,10 +46,10 @@ static uintptr_t get_load_address(struct hftest_context* ctx)
 	return (uintptr_t)&text_begin[0];
 }
 
-static void update_region_security_state(struct memory_region* mem_region)
+static void update_region_security_state(struct memory_region *mem_region)
 {
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	void* address = (void*)mem_region->base_address;
+	void *address = (void *)mem_region->base_address;
 	size_t page_count = mem_region->page_count;
 	uint32_t attributes = mem_region->attributes;
 
@@ -68,10 +68,10 @@ static void update_region_security_state(struct memory_region* mem_region)
 
 TEST_SERVICE(boot_memory)
 {
-	struct hftest_context* ctx = hftest_get_context();
+	struct hftest_context *ctx = hftest_get_context();
 	uint8_t checksum = 0;
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	uint8_t* mem_ptr = (uint8_t*)get_load_address(ctx);
+	uint8_t *mem_ptr = (uint8_t *)get_load_address(ctx);
 
 	/* Check that the size passed in by Hafnium is what is expected. */
 	ASSERT_EQ(SERVICE_MEMORY_SIZE(), SECONDARY_MEMORY_SIZE);
@@ -91,9 +91,9 @@ TEST_SERVICE(boot_memory)
 
 TEST_SERVICE(boot_memory_underrun)
 {
-	struct hftest_context* ctx = hftest_get_context();
+	struct hftest_context *ctx = hftest_get_context();
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	uint8_t* mem_ptr = (uint8_t*)get_load_address(ctx);
+	uint8_t *mem_ptr = (uint8_t *)get_load_address(ctx);
 	exception_setup(NULL, exception_handler_yield_data_abort);
 	/*
 	 * Try to read memory below the start of the image. This should result
@@ -105,9 +105,9 @@ TEST_SERVICE(boot_memory_underrun)
 
 TEST_SERVICE(boot_memory_overrun)
 {
-	struct hftest_context* ctx = hftest_get_context();
+	struct hftest_context *ctx = hftest_get_context();
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	uint8_t* mem_ptr = (uint8_t*)get_load_address(ctx);
+	uint8_t *mem_ptr = (uint8_t *)get_load_address(ctx);
 	exception_setup(NULL, exception_handler_yield_data_abort);
 	/*
 	 * Try to read memory above the limit defined by memory_size. This
@@ -122,9 +122,9 @@ TEST_SERVICE(boot_memory_overrun)
  */
 TEST_SERVICE(boot_memory_manifest)
 {
-	uint8_t* mem_ptr;
-	struct hftest_context* ctx = hftest_get_context();
-	struct memory_region* mem_region;
+	uint8_t *mem_ptr;
+	struct hftest_context *ctx = hftest_get_context();
+	struct memory_region *mem_region;
 	uint32_t regions_count;
 
 	if (!ctx->is_ffa_manifest_parsed) {
@@ -148,7 +148,7 @@ TEST_SERVICE(boot_memory_manifest)
 		ASSERT_NE(mem_region->attributes & MM_MODE_R, 0);
 
 		// NOLINTNEXTLINE(performance-no-int-to-ptr)
-		mem_ptr = (uint8_t*)mem_region->base_address;
+		mem_ptr = (uint8_t *)mem_region->base_address;
 
 		update_region_security_state(mem_region);
 
@@ -170,10 +170,10 @@ TEST_SERVICE(boot_memory_manifest)
 	ffa_yield();
 }
 
-static void read_memory_region(const volatile struct memory_region* region)
+static void read_memory_region(const volatile struct memory_region *region)
 {
 	/* NOLINTNEXTLINE(performance-no-int-to-ptr) */
-	const volatile uint8_t* ptr = (volatile uint8_t*)region->base_address;
+	const volatile uint8_t *ptr = (volatile uint8_t *)region->base_address;
 	size_t page_count = region->page_count;
 	uint64_t sum = 0;
 
@@ -184,10 +184,10 @@ static void read_memory_region(const volatile struct memory_region* region)
 	ASSERT_NE(sum, 0);
 }
 
-static void write_memory_region(struct memory_region* region)
+static void write_memory_region(struct memory_region *region)
 {
 	/* NOLINTNEXTLINE(performance-no-int-to-ptr) */
-	volatile uint8_t* ptr = (volatile uint8_t*)region->base_address;
+	volatile uint8_t *ptr = (volatile uint8_t *)region->base_address;
 	size_t page_count = region->page_count;
 	uint8_t val;
 
@@ -203,9 +203,9 @@ static void write_memory_region(struct memory_region* region)
  */
 TEST_SERVICE(boot_memory_manifest_relative)
 {
-	struct hftest_context* ctx = hftest_get_context();
-	struct ffa_partition_manifest* manifest = &ctx->partition_manifest;
-	struct memory_region* mem_region;
+	struct hftest_context *ctx = hftest_get_context();
+	struct ffa_partition_manifest *manifest = &ctx->partition_manifest;
+	struct memory_region *mem_region;
 
 	if (!ctx->is_ffa_manifest_parsed) {
 		panic("This test requires the running partition to have "
@@ -258,9 +258,9 @@ TEST_SERVICE(boot_memory_manifest_relative)
  */
 TEST_SERVICE(boot_memory_manifest_relative_test_memory_ro)
 {
-	struct hftest_context* ctx = hftest_get_context();
-	struct ffa_partition_manifest* manifest = &ctx->partition_manifest;
-	struct memory_region* mem_region;
+	struct hftest_context *ctx = hftest_get_context();
+	struct ffa_partition_manifest *manifest = &ctx->partition_manifest;
+	struct memory_region *mem_region;
 
 	if (!ctx->is_ffa_manifest_parsed) {
 		panic("This test requires the running partition to have "
@@ -289,9 +289,9 @@ TEST_SERVICE(boot_memory_manifest_relative_test_memory_ro)
  */
 TEST_SERVICE(boot_memory_manifest_ro_secure_memory)
 {
-	struct hftest_context* ctx = hftest_get_context();
-	struct ffa_partition_manifest* manifest = &ctx->partition_manifest;
-	struct memory_region* mem_region;
+	struct hftest_context *ctx = hftest_get_context();
+	struct ffa_partition_manifest *manifest = &ctx->partition_manifest;
+	struct memory_region *mem_region;
 
 	if (!ctx->is_ffa_manifest_parsed) {
 		panic("This test requires the running partition to have "

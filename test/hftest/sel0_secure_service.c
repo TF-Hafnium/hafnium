@@ -20,21 +20,21 @@
 
 alignas(4096) uint8_t kstack[4096];
 
-static struct ffa_boot_info_header* boot_info_header;
+static struct ffa_boot_info_header *boot_info_header;
 
-struct ffa_boot_info_header* get_boot_info_header(void)
+struct ffa_boot_info_header *get_boot_info_header(void)
 {
 	return boot_info_header;
 }
 
 void test_main_sp(bool);
 
-void run_service_set_up(struct hftest_context* ctx, struct fdt* fdt)
+void run_service_set_up(struct hftest_context *ctx, struct fdt *fdt)
 {
 	hftest_service_set_up(ctx, fdt);
 }
 
-[[noreturn]] void kmain(struct ffa_boot_info_header* boot_info_blob)
+[[noreturn]] void kmain(struct ffa_boot_info_header *boot_info_blob)
 {
 	boot_info_header = boot_info_blob;
 

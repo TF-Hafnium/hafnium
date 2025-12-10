@@ -64,7 +64,7 @@ static struct ffa_value handle_direct_req_cmd(struct mailbox_buffers mb,
  */
 [[noreturn]] void test_main_sp(bool is_boot_vcpu)
 {
-	struct hftest_context* ctx = hftest_get_context();
+	struct hftest_context *ctx = hftest_get_context();
 	struct ffa_value res;
 
 	if (is_boot_vcpu) {

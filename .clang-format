@@ -1,4 +1,6 @@
 BasedOnStyle: Google
+DerivePointerAlignment: False
+PointerAlignment: Right
 
 IndentWidth: 8
 ContinuationIndentWidth: 8
