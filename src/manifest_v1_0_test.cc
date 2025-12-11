@@ -254,4 +254,39 @@ TEST_F(manifest_v1_0, ffa_invalid_messaging_method)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_INVALID_MESSAGING_METHOD);
 }
+
+TEST_F(manifest_v1_0, ffa_validate_sanity_check)
+{
+	/*
+	 * TODO: write test excluding all optional fields of the manifest, in
+	 * accordance with specification.
+	 */
+	struct_manifest *m;
+
+	/* Incompatible messaging method - only endpoints using FF-A version >=
+	 * FF-A v1.2 are allowed to set FFA_PARTITION_DIRECT_REQ2_RECV and
+	 * FFA_PARTITION_DIRECT_REQ2_SEND. */
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("messaging-method", "<0x204>")
+		.Property("ns-interrupts-action", "<0>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_NOT_COMPATIBLE);
+
+	/*
+	 * No need to invoke manifest_dealloac() since manifest TearDown calls
+	 * it when the test ends.
+	 */
+}
 } /* namespace */
