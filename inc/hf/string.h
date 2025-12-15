@@ -15,8 +15,9 @@
 /**
  * Maximum length of a string including the NULL terminator.
  * This is an arbitrary number and can be adjusted to fit use cases.
+ * Currently based on the cannonical UUID string length.
  */
-#define STRING_MAX_SIZE 32
+#define STRING_MAX_SIZE 37
 
 enum string_return_code {
 	STRING_SUCCESS,

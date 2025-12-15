@@ -297,7 +297,7 @@ class ManifestDtBuilder
 			Compatible({ "arm,ffa-manifest-services"});
 			StartChild("service0");
 				Property("messaging-method", "<4>");
-				Property("uuid", "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>");
+				StringProperty("uuid", "b4b5671e-4a90-4fe1-b81f-fb13dae1dacb");
 			EndChild();
 		EndChild();
 		/* clang-format on */

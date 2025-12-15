@@ -389,16 +389,136 @@ static enum manifest_return_code uint32list_get_next(
 	return MANIFEST_SUCCESS;
 }
 
+static int hex_val(char c)
+{
+	if ('0' <= c && c <= '9') {
+		return c - '0';
+	}
+	if ('a' <= c && c <= 'f') {
+		return c - 'a' + 10;
+	}
+	if ('A' <= c && c <= 'F') {
+		return c - 'A' + 10;
+	}
+	return -1;  // invalid
+}
+
+static enum manifest_return_code parse_hexOctet(const char hi_char,
+						const char lo_char,
+						uint8_t *out)
+{
+	int high_nibble = hex_val(hi_char);
+	int low_nibble = hex_val(lo_char);
+
+	if (high_nibble == -1 || low_nibble == -1) {
+		return MANIFEST_ERROR_MALFORMED_UUID;
+	}
+
+	*out = (uint8_t)((high_nibble << 4) | low_nibble);
+	return MANIFEST_SUCCESS;
+}
+
+#define UUID_STRING_LENGTH 36
+#define UUID_STRING_FIRST_HYPHEN_INDEX 8
+#define UUID_STRING_SECOND_HYPHEN_INDEX 13
+#define UUID_STRING_THIRD_HYPHEN_INDEX 18
+#define UUID_STRING_FOURTH_HYPHEN_INDEX 23
+
 /**
- * Parse a UUID from `uuid` into `out`.
+ * Parse a UUID string in canonical form
+ * "00112233-4455-6677-8899-aabbccddeeff"
+ * into the ffa_uuid layout of four uint32_t words:
+ * {0x00112233, 0x44556677, 0x8899aabb, 0xccddeeff}
+ */
+static enum manifest_return_code str_uuid_to_ffa_uuid(const char *str_uuid,
+						      struct ffa_uuid *ffa_uuid)
+{
+	uint8_t bytes[16];
+	uint8_t *cur_byte = bytes;
+	char hi;
+	char lo;
+	int i = 0;
+
+	while (i < UUID_STRING_LENGTH) {
+		/* Check dashes are in the correct place and skip over them. */
+		if (i == UUID_STRING_FIRST_HYPHEN_INDEX ||
+		    i == UUID_STRING_SECOND_HYPHEN_INDEX ||
+		    i == UUID_STRING_THIRD_HYPHEN_INDEX ||
+		    i == UUID_STRING_FOURTH_HYPHEN_INDEX) {
+			if (str_uuid[i] != '-') {
+				return MANIFEST_ERROR_MALFORMED_UUID;
+			}
+			i++;
+		}
+		/*
+		 * For a canonical UUID like
+		 * "00112233-4455-6677-8899-aabbccddeeff" take each hex pair
+		 * (e.g. '00', then '11', ...) and turn it into the
+		 * corresponding byte.
+		 */
+		hi = str_uuid[i++];
+		lo = str_uuid[i++];
+
+		TRY(parse_hexOctet(hi, lo, cur_byte++));
+	}
+
+	if (str_uuid[i] != 0) {
+		return MANIFEST_ERROR_MALFORMED_UUID;
+	}
+
+	/*
+	 * Split bytes into 4 uint32_t.
+	 * In our example:
+	 * bytes[0..15] = {0x00,0x11,0x22,0x33,0x44,0x55,0x66,0x77,
+	 *                 0x88,0x99,0xaa,0xbb,0xcc,0xdd,0xee,0xff}
+	 * -> {0x00112233, 0x44556677, 0x8899aabb, 0xccddeeff}.
+	 */
+	ffa_uuid->uuid[0] =
+		(bytes[0] << 24 | bytes[1] << 16 | bytes[2] << 8 | bytes[3]);
+	ffa_uuid->uuid[1] =
+		(bytes[4] << 24 | bytes[5] << 16 | bytes[6] << 8 | bytes[7]);
+	ffa_uuid->uuid[2] =
+		(bytes[8] << 24 | bytes[9] << 16 | bytes[10] << 8 | bytes[11]);
+	ffa_uuid->uuid[3] = (bytes[12] << 24 | bytes[13] << 16 |
+			     bytes[14] << 8 | bytes[15]);
+
+	return MANIFEST_SUCCESS;
+}
+
+/**
+ * Parse a UUID in the uint32 list format from `uuid` into `out`.
  * Returns `MANIFEST_SUCCESS` if parsing succeeded.
  */
-static enum manifest_return_code parse_uuid(struct uint32list_iter *uuid,
-					    struct ffa_uuid *out)
+static enum manifest_return_code parse_flattened_uuid(
+	struct uint32list_iter *uuid, struct ffa_uuid *out)
 {
 	for (size_t i = 0; i < 4 && uint32list_has_next(uuid); i++) {
 		TRY(uint32list_get_next(uuid, &out->uuid[i]));
 	}
+
+	dlog_verbose("  UUID %#x-%x-%x-%x\n", out->uuid[0], out->uuid[1],
+		     out->uuid[2], out->uuid[3]);
+
+	if (ffa_uuid_is_null(out)) {
+		return MANIFEST_ERROR_UUID_ALL_ZEROS;
+	}
+
+	return MANIFEST_SUCCESS;
+}
+
+/**
+ * Parse a UUID in the canonical string format from `uuid` into `out`
+ * Returns `MANIFEST_SUCCESS` if parsing succeeded.
+ */
+static enum manifest_return_code parse_canonical_uuid(struct string *uuid,
+						      struct ffa_uuid *out)
+{
+	/*
+	 * Canonical UUID format is hexOctets of length 4,2,2,2,6
+	 * separated by a -.
+	 * This needs converting to 4 uint32_t values for storing.
+	 */
+	TRY(str_uuid_to_ffa_uuid(&uuid->data[0], out));
 
 	dlog_verbose("  UUID %#x-%x-%x-%x\n", out->uuid[0], out->uuid[1],
 		     out->uuid[2], out->uuid[3]);
@@ -458,8 +578,8 @@ static enum manifest_return_code parse_services_v1_0(
 		if (*service_count == PARTITION_MAX_UUIDS) {
 			return MANIFEST_ERROR_TOO_MANY_UUIDS;
 		}
-		TRY(parse_uuid(&uuid, &services[*service_count].uuid));
-
+		TRY(parse_flattened_uuid(&uuid,
+					 &services[*service_count].uuid));
 		/*
 		 * If only one messaging method is provided, record it
 		 * and apply it to all services. By definition the value
@@ -513,7 +633,7 @@ static enum manifest_return_code parse_services_v1_1(
 {
 	struct fdt_node services_node = *node;
 	struct string services_node_name = STRING_INIT("services");
-	struct uint32list_iter uuid;
+	struct string uuid;
 	struct uint32list_iter messaging_method;
 
 	*service_count = 0;
@@ -533,11 +653,13 @@ static enum manifest_return_code parse_services_v1_1(
 			return MANIFEST_ERROR_TOO_MANY_UUIDS;
 		}
 
-		TRY(read_uint32list(&services_node, "uuid", &uuid));
+		TRY(read_string(&services_node, "uuid", &uuid));
 		TRY(read_uint32list(&services_node, "messaging-method",
 				    &messaging_method));
 
-		TRY(parse_uuid(&uuid, &services[*service_count].uuid));
+		TRY(parse_canonical_uuid(&uuid,
+					 &services[*service_count].uuid));
+
 		TRY(parse_messaging_method(
 			&messaging_method,
 			&services[*service_count].messaging_method));
@@ -1993,6 +2115,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 	case MANIFEST_ERROR_TOO_MANY_UUIDS:
 		return "Manifest specifies more UUIDs than Hafnium has "
 		       "statically allocated space for";
+	case MANIFEST_ERROR_MALFORMED_UUID:
+		return "The UUID is not specified in the required format.";
 	case MANIFEST_ERROR_MISSING_SMMU_ID:
 		return "SMMU ID must be specified for the given Stream IDs";
 	case MANIFEST_ERROR_MISMATCH_DMA_ACCESS_PERMISSIONS:
