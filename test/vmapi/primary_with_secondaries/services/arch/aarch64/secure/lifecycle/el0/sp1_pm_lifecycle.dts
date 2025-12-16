@@ -9,24 +9,31 @@
 /dts-v1/;
 
 / {
-	compatible = "arm,ffa-manifest-1.0";
+	compatible = "arm,ffa-manifest-1.1";
 	debug_name = "Service1 Lifecycle SP EL0";
 
 	/* Properties */
 	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-	uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>;
 	execution-ctx-count = <1>;
 	exception-level = <1>; /* S-EL0 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6480000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x607>; /* Supports direct (both APIs) and indirect requests. */
 	vm-availability-messages = <0x03>; /* Supports VM created and VM destroyed messages. */
 	boot-order = <1>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
 	lifecycle-support;
+
+	services {
+		compatible = "arm,ffa-manifest-services";
+
+		service0 {
+			uuid = "b4b5671e-4a90-4fe1-b81f-fb13dae1dacb";
+			messaging-method = <0x607>; /* Supports direct (both APIs) and indirect requests. */
+		};
+	};
 
 	/* Boot Info */
 	boot-info {

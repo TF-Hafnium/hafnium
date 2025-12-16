@@ -9,18 +9,29 @@
 /dts-v1/;
 
 / {
-	compatible = "arm,ffa-manifest-1.0";
+	compatible = "arm,ffa-manifest-1.1";
 	debug_name = "partition-manifest";
 
 	/* Properties */
 	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-	uuid = <0x5d45882e 0xf637 0xa720 0xe8669dc>,
-	       <0x6e56993f 0x0748 0xb831 0xf977aed>;
 	execution-ctx-count = <1>;
 	exception-level = <6>; /* EL0 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x90000000>;
 	entrypoint-offset = <0x0>;
 	xlat-granule = <0>; /* 4KiB */
-        messaging-method = <0x7>; /* Supports direct and indirect requests. */
+
+	services {
+		compatible = "arm,ffa-manifest-services";
+
+		service0 {
+			uuid = "5d45882e-0000-f637-0000-a7200e8669dc";
+			messaging-method = <0x7>; /* Direct and indirect requests. */
+		};
+
+		service1 {
+			uuid = "6e56993f-0000-0748-0000-b8310f977aed";
+			messaging-method = <0x7>; /* Direct and indirect requests. */
+		};
+	};
 };

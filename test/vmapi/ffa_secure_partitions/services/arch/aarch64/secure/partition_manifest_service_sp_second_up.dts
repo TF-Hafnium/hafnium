@@ -9,24 +9,31 @@
 /dts-v1/;
 
 / {
-	compatible = "arm,ffa-manifest-1.0";
+	compatible = "arm,ffa-manifest-1.1";
 	debug_name = "SP UP Service Second EL1";
 
 	/* Properties */
 	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-	uuid = <0xa609f132 0x6b4f 0x4c14 0x9489>;
 	execution-ctx-count = <1>; /* An UP Secure Partition. */
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6380000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x607>; /* Supports direct (both APIs) and indirect messages. */
 	vm-availability-messages = <0x03>; /* Subscribed to VM created and VM destroyed messages. */
 	ns-interrupts-action = <2>; /* Non secure interrupts are signaled. */
 	boot-order = <2>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
+
+	services {
+		compatible = "arm,ffa-manifest-services";
+
+		service0 {
+			uuid = "a609f132-0000-6b4f-0000-4c1400009489";
+			messaging-method = <0x607>; /* Supports direct (both APIs) and indirect messages. */
+		};
+	};
 
 	/* Boot Info */
 	boot-info {

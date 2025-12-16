@@ -9,24 +9,35 @@
 /dts-v1/;
 
 / {
-	compatible = "arm,ffa-manifest-1.0";
+	compatible = "arm,ffa-manifest-1.1";
 	debug_name = "Secure Service1";
 
 	/* Properties */
 	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-        uuid = <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>,
-	       <0xfed46119 0xb57c449f 0xa852c15f 0xd346b1fc>; /* Non-secure memory region uuid. */
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6480000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x607>; /* Supports direct (both APIs) and indirect requests. */
 	vm-availability-messages = <0x03>; /* Supports VM created and VM destroyed messages. */
 	boot-order = <1>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
+
+	services {
+		compatible = "arm,ffa-manifest-services";
+
+		service0 {
+			uuid = "b4b5671e-4a90-4fe1-b81f-fb13dae1dacb";
+			messaging-method = <0x607>; /* Supports direct (both APIs) and indirect requests. */
+		};
+
+		ns_mem_service {
+			uuid = "fed46119-b57c-449f-a852-c15fd346b1fc"; /* Non-secure memory region uuid. */
+			messaging-method = <0x607>;
+		};
+	};
 
 	/* Boot Info */
 	boot-info {

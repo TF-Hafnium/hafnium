@@ -9,26 +9,37 @@
 /dts-v1/;
 
 / {
-	compatible = "arm,ffa-manifest-1.0";
+	compatible = "arm,ffa-manifest-1.1";
 	debug_name = "Service2 Lifecycle SP EL1";
 
 	/* Properties */
 	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-        uuid = <0x5d45882e 0xf637 0xa720 0xe8669dc>,
-	       <0x6e56993f 0x0748 0xb831 0xf977aed>;
 	execution-ctx-count = <1>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6380000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x607>; /* Supports direct (both APIs) and indirect requests. */
 	vm-availability-messages = <0x03>; /* Supports VM created and VM destroyed messages. */
 	boot-order = <2>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
 	lifecycle-support;
 	abort-action = <2>; /* Restart */
+
+	services {
+		compatible = "arm,ffa-manifest-services";
+
+		service0 {
+			uuid = "5d45882e-0000-f637-0000-a7200e8669dc";
+			messaging-method = <0x607>; /* Supports direct (both APIs) and indirect requests. */
+		};
+
+		service1 {
+			uuid = "6e56993f-0000-0748-0000-b8310f977aed";
+			messaging-method = <0x607>;
+		};
+	};
 
 	/* Boot Info */
 	boot-info {

@@ -9,7 +9,7 @@
 /dts-v1/;
 
 / {
-	compatible = "arm,ffa-manifest-1.0";
+	compatible = "arm,ffa-manifest-1.1";
 	debug_name = "SP Service First";
 
 	/* Properties */
@@ -21,14 +21,12 @@
 	 * calls anymore.
 	 */
 	ffa-version = <0x00010000>; /* 31:16 - Major, 15:0 - Minor */
-	uuid = <0x9458bb2d 0x353b4ee2 0xaa25710c 0x99b73ddc>;
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6480000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x7>; /* Supports direct and indirect requests. */
 	vm-availability-messages = <0x03>; /* Supports VM created and VM destroyed messages. */
 	ns-interrupts-action = <1>; /* Managed exit is supported. */
 	managed-exit-virq;
@@ -36,6 +34,15 @@
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
 	power-management-messages = <1>; /* Support CPU_OFF power management message. */
+
+	services {
+		compatible = "arm,ffa-manifest-services";
+
+		service0 {
+			uuid = "9458bb2d-353b-4ee2-aa25-710c99b73ddc";
+			messaging-method = <0x7>; /* Supports direct and indirect requests. */
+		};
+	};
 
 	/* Boot Info */
 	boot-info {

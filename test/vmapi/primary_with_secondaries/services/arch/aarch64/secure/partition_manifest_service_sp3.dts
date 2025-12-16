@@ -9,21 +9,17 @@
 /dts-v1/;
 
 / {
-	compatible = "arm,ffa-manifest-1.0";
+	compatible = "arm,ffa-manifest-1.1";
 	debug_name = "Secure Service3";
 
 	/* Properties */
 	ffa-version = <0x00010002>; /* 31:16 - Major, 15:0 - Minor */
-        uuid = <0xcbd4482f 0xcbab 0x4dba 0x0738d>,
-	       <0x0ff35a12 0xdae3432c 0xa8191771 0x61d7bba5>;
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6280000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x4>, /* Supports indirect requests only. */
-			   <0x607>; /* Supports direct (both APIs) and indirect requests. */
 	boot-order = <3>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
@@ -35,6 +31,20 @@
 
 	ns-interrupts-action = <1>; /* Managed exit is supported. */
 	managed-exit-virq;
+
+	services {
+		compatible = "arm,ffa-manifest-services";
+
+		service0 {
+			uuid = "cbd4482f-0000-cbab-0000-4dba0000738d";
+			messaging-method = <0x4>; /* Supports indirect requests only. */
+		};
+
+		service1 {
+			uuid = "0ff35a12-dae3-432c-a819-177161d7bba5";
+			messaging-method = <0x607>; /* Supports direct (both APIs) and indirect requests. */
+		};
+	};
 
 	/* Boot Info */
 	boot-info {

@@ -9,23 +9,30 @@
 /dts-v1/;
 
 / {
-	compatible = "arm,ffa-manifest-1.0";
+	compatible = "arm,ffa-manifest-1.1";
 	debug_name = "Secure Service4";
 
 	/* Properties */
 	/* v1.1 to test backwards compatibility */
 	ffa-version = <0x00010001>; /* 31:16 - Major, 15:0 - Minor */
-        uuid = <0xd6d78930 0x6cb26103 0xda311d35 0xfc03fced>;
 	execution-ctx-count = <8>;
 	exception-level = <2>; /* S-EL1 */
 	execution-state = <0>; /* AARCH64 */
 	load-address = <0x6180000>;
 	entrypoint-offset = <0x2000>;
 	xlat-granule = <0>; /* 4KiB */
-	messaging-method = <0x7>; /* Supports direct and indirect requests. */
 	boot-order = <4>;
 	notification-support; /* Receipt of notifications. */
 	gp-register-num = <0>;
+
+	services {
+		compatible = "arm,ffa-manifest-services";
+
+		service0 {
+			uuid = "d6d78930-6cb2-6103-da31-1d35fc03fced";
+			messaging-method = <0x7>; /* Supports direct and indirect requests. */
+		};
+	};
 
 	/* Boot Info */
 	boot-info {

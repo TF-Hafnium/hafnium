@@ -9,6 +9,7 @@
 /dts-v1/;
 
 / {
+	/* Kept as v1.0 to test v1.0 manifest parsing. */
         compatible = "arm,ffa-manifest-1.0";
         debug_name = "Service3";
 
