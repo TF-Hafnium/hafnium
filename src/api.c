@@ -371,8 +371,11 @@ struct ffa_value api_ffa_abort(struct vcpu *current, struct vcpu **next,
 {
 	assert(args != NULL);
 
-	if (ffa_is_vm_id(current->vm->id)) {
-		dlog_error("FFA_ABORT ABI not supported in NWd.\n");
+	if (ffa_is_vm_id(current->vm->id) ||
+	    current->vm->ffa_version < FFA_VERSION_1_3) {
+		dlog_error(
+			"FFA_ABORT ABI supported only for v1.3 compliant "
+			"SPs.\n");
 		return ffa_error(FFA_NOT_SUPPORTED);
 	}
 
@@ -2728,15 +2731,18 @@ static struct ffa_value ffa_features_function(uint32_t func,
 
 	/*
 	 * This function is restricted to the secure virtual FF-A instance (i.e.
-	 * only report success to SPs).
+	 * only report success to SPs). Note that it is restricted to v1.3
+	 * partitions.
 	 */
 	case FFA_ABORT_32:
 	case FFA_ABORT_64:
-		if (ffa_is_vm_id(current->vm->id)) {
+		if (ffa_is_vm_id(current->vm->id) ||
+		    current->vm->ffa_version < FFA_VERSION_1_3) {
 			dlog_verbose(
 				"FFA_FEATURES: %s is only supported at secure "
-				"virtual FF-A instance\n",
-				ffa_func_name(FFA_YIELD_32));
+				"virtual FF-A instance for v1.3 compliant "
+				"partitions\n",
+				ffa_func_name(func));
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 		return api_ffa_feature_success(0);

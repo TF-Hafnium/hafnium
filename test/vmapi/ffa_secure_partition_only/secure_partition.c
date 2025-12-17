@@ -157,7 +157,7 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_ABORT_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 }
 
 static bool v1_1_or_later(void)

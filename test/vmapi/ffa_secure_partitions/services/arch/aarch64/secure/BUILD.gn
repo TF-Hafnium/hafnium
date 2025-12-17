@@ -283,9 +283,9 @@ partition_package("service_sp_first_package_boot_fail_test") {
   img_offset = "0x2000"
   files = [ [
         "partition_manifest_service_sp_first.dtb",
-        "secure_partitions_services_boot_abort_fail_test.bin",
+        "secure_partitions_services_boot_error_fail_test.bin",
         ":partition_manifest_service_sp_first",
-        ":secure_partitions_services_boot_abort_fail_test",
+        ":secure_partitions_services_boot_error_fail_test",
       ] ]
   output = "service_sp_first_package_boot_abort_fail_test.img"
 }
@@ -309,9 +309,9 @@ partition_package("service_sp_third_package_boot_fail_test") {
   img_offset = "0x2000"
   files = [ [
         "partition_manifest_service_sp_third.dtb",
-        "secure_partitions_services_boot_error_fail_test.bin",
+        "secure_partitions_services_boot_abort_fail_test.bin",
         ":partition_manifest_service_sp_third",
-        ":secure_partitions_services_boot_error_fail_test",
+        ":secure_partitions_services_boot_abort_fail_test",
       ] ]
   output = "service_sp_third_package_boot_error_fail_test.img"
 }
