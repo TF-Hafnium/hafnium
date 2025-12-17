@@ -884,16 +884,23 @@ static void inject_el1_sysreg_trap_exception(struct vcpu *vcpu,
 	inject_el1_unknown_exception(vcpu, esr_el2);
 }
 
-static struct vcpu *hvc_handler(struct vcpu *vcpu)
+static bool is_paravirtualised_interface_call(uint32_t func)
 {
-	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
-	struct vcpu *next = NULL;
+	return ((func == HF_INTERRUPT_ENABLE) || (func == HF_INTERRUPT_GET) ||
+		(func == HF_INTERRUPT_DEACTIVATE) ||
+		(func == HF_INTERRUPT_SEND_IPI) ||
+		(func == HF_INTERRUPT_RECONFIGURE));
+}
 
-	/* Mask out SMCCC SVE hint bit from function id. */
-	args.func &= ~SMCCC_SVE_HINT_MASK;
-
-	if (hvc_smc_handler(args, vcpu, &next)) {
-		return next;
+/*
+ * Handles para-virtualised interface calls.
+ */
+static bool paravirtualised_interface_handler(struct ffa_value args,
+					      struct vcpu *vcpu,
+					      struct vcpu **next)
+{
+	if (!is_paravirtualised_interface_call(args.func)) {
+		return false;
 	}
 
 	switch (args.func) {
@@ -934,7 +941,55 @@ static struct vcpu *hvc_handler(struct vcpu *vcpu)
 	 * In case there has been an update after handling the last
 	 * hypervisor call, update the next vCPU directly in the register.
 	 */
-	vcpu_update_virtual_interrupts(next);
+	vcpu_update_virtual_interrupts(*next);
+
+	return true;
+}
+
+/**
+ * Handles SVC calls.
+ */
+static struct vcpu *svc_handler(struct vcpu *vcpu)
+{
+	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
+	struct vcpu *next = NULL;
+
+	/* Mask out SMCCC SVE hint bit from function id. */
+	args.func &= ~SMCCC_SVE_HINT_MASK;
+
+	if (hvc_smc_handler(args, vcpu, &next)) {
+		return next;
+	}
+
+	/* Handle para-virtualised interface calls. */
+	if (paravirtualised_interface_handler(args, vcpu, &next)) {
+		return next;
+	}
+
+	/* Forward the call to the SPMD */
+	smc_forwarder(vcpu->vm, &args);
+	arch_regs_set_retval(&vcpu->regs, args);
+
+	return next;
+}
+
+/**
+ * Handles HVC calls.
+ */
+static struct vcpu *hvc_handler(struct vcpu *vcpu)
+{
+	struct ffa_value args = arch_regs_get_args(&vcpu->regs);
+	struct vcpu *next = NULL;
+
+	/* Mask out SMCCC SVE hint bit from function id. */
+	args.func &= ~SMCCC_SVE_HINT_MASK;
+
+	if (hvc_smc_handler(args, vcpu, &next)) {
+		return next;
+	}
+
+	/* Handle para-virtualised interface calls. */
+	(void)paravirtualised_interface_handler(args, vcpu, &next);
 
 	return next;
 }
@@ -1260,7 +1315,7 @@ struct vcpu *sync_lower_exception(uintreg_t esr, uintreg_t far)
 		return NULL;
 	case EC_SVC:
 		CHECK(is_el0_partition);
-		return hvc_handler(vcpu);
+		return svc_handler(vcpu);
 	case EC_HVC:
 		if (is_el0_partition) {
 			dlog_warning("Unexpected HVC Trap on EL0 partition\n");
