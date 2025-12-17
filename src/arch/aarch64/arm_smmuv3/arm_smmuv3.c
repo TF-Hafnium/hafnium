@@ -422,7 +422,7 @@ static bool smmuv3_configure_cmdq(struct smmuv3_driver *smmuv3)
 	dlog_verbose("SMMUv3: Total CMDQ entries: %d\n",
 		     (1 << smmuv3->prop.cmdq_entries_log2));
 
-	q_base = memory_alloc((cmdq_size / FFA_PAGE_SIZE) + 1);
+	q_base = memory_alloc(cmdq_size);
 
 	if (q_base == NULL) {
 		dlog_error(
@@ -476,7 +476,7 @@ static bool smmuv3_configure_evtq(struct smmuv3_driver *smmuv3)
 	dlog_verbose("SMMUv3: Total EVTQ entries: %d\n",
 		     (1 << smmuv3->prop.evtq_entries_log2));
 
-	q_base = memory_alloc((evtq_size / FFA_PAGE_SIZE) + 1);
+	q_base = memory_alloc(evtq_size);
 
 	if (q_base == NULL) {
 		dlog_error(
@@ -567,7 +567,7 @@ static bool smmuv3_configure_str_table(struct smmuv3_driver *smmuv3)
 	strtab_size = (1 << smmuv3->prop.stream_n_bits) * STE_SIZE;
 	dlog_verbose("SMMUv3 Total StreamTable entries: %d\n",
 		     (1 << smmuv3->prop.stream_n_bits));
-	tbl_base = memory_alloc((strtab_size / FFA_PAGE_SIZE) + 1);
+	tbl_base = memory_alloc(strtab_size);
 
 	if (tbl_base == NULL) {
 		dlog_error(
