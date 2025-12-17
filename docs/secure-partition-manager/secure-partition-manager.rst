@@ -2106,6 +2106,53 @@ taken by SPMC if any vCPU encounters a fatal error or aborts execution
 voluntarily. Refer to the binding document `[6]`_ for the various abort
 actions supported by hafnium.
 
+Support for live activation of Secure Partitions
+------------------------------------------------
+Live firmware activation updates a Secure Partition without rebooting the
+platform, minimizing disruption in scenarios such as code patching secure
+services in data-center or cloud deployments. Hafnium follows the guidance in
+the FF-A v1.3 ALP2 specification to implement this feature in coordination
+with an LSP managed by the SPMD in EL3.
+
+Live activation currently has the following prerequisites:
+
+- The SP must opt into partition lifecycle support.
+- The current and target SP images must be compatible.
+- Only uniprocessor SPs (single execution context) are supported.
+
+If any prerequisite fails, the SPMC rejects the request. Hafnium currently
+requires that the old and new partition manifests are identical. This helps
+to keep the implementation simpler and ensures the properties of old and
+new manifests are compatible with each other.
+
+Working memory region and staged packages
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During cold boot, TF-A allocates a chunk of physical address space to each
+Secure Partition image (package), referred to as the working memory region. It's
+base address is platform-defined, specified as `load-address` in the SPMC
+manifest.
+
+Hafnium updates partitions in place: the staged package overwrites the existing
+package in the working memory region. Therefore, the framework state must never
+reside inside that region. If overlap is detected, the SPMC rejects the request
+and aborts the partition.
+
+On a successful live activation, the SPMC guarantees that:
+
+- Framework state persists.
+- RX/TX buffers remain mapped at the same VA/IPA (provided they avoid the
+  working memory region) and their contents are preserved.
+- VM and SP notification bindings remain intact.
+- Pending VM, SP, and framework notifications are preserved.
+- Memory regions shared or lent by other endpoints keep their VA/IPA and memory
+  attributes.
+- Metadata for in-flight memory management transactions is preserved so the new
+  image can resume operating on them.
+
+Platform integrators must also declare a live-state buffer under the
+``memory-regions`` node in the partition manifest; refer to the binding
+document `[6]`_ for the full schema and a minimal manifest excerpt.
+
 References
 ==========
 
