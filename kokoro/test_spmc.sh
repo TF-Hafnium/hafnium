@@ -41,10 +41,14 @@ USE_PARITY=false
 CODE_COVERAGE=false
 RUN_TO_COMPLETION=false
 HFTEST_LOG_LEVEL="INFO"  # Default log level
+SUITE=""
+TEST=""
 
 USAGE="Use --parity to run EL3 SPMC testsuite;"
 USAGE+=" --code-coverage to enable code coverage;"
 USAGE+=" --run-to-completion to avoid stopping on test setups that fail, maximizing test run."
+USAGE+=" --suite <regex> to specify suite(s) to run"
+USAGE+=" --test <regex> to specify a test(s) to run"
 
 while test $# -gt 0
 do
@@ -56,6 +60,10 @@ do
     --run-to-completion) RUN_TO_COMPLETION=true
       ;;
     --debug) HFTEST_LOG_LEVEL="DEBUG"
+      ;;
+    --suite) SUITE="$2"; shift
+      ;;
+    --test) TEST="$2"; shift
       ;;
     -h) echo $USAGE
 	exit 1
@@ -95,6 +103,14 @@ HFTEST+=(--out_partitions $OUT/secure_aem_v8a_fvp_vhe_vm_clang)
 HFTEST+=(--log "$LOG_DIR_BASE")
 
 HFTEST+=(--spmc "$SPMC_PATH/hafnium.bin")
+
+if [ -n "$SUITE" ]; then
+  HFTEST+=(--suite "$SUITE")
+fi
+
+if [ -n "$TEST" ]; then
+  HFTEST+=(--test "$TEST")
+fi
 
 # Add hftest loglevel argument
 HFTEST+=(--log-level "$HFTEST_LOG_LEVEL")

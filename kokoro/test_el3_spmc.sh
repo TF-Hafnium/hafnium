@@ -8,16 +8,21 @@
 
 # Default log level
 HFTEST_LOG_LEVEL="INFO"
+SUITE=""
+TEST=""
 
 # Parse script arguments
 while test $# -gt 0
 do
   case "$1" in
-    --debug)
-      HFTEST_LOG_LEVEL="DEBUG"
+    --debug) HFTEST_LOG_LEVEL="DEBUG"
+      ;;
+    --suite) SUITE="$2"; shift
+      ;;
+    --test)TEST="$2"; shift
       ;;
     -h|--help)
-      echo "Usage: $0 [debug|info]"
+      echo "Usage: $0 [debug|info] [--suite <regex>] [--test <regex>]"
       exit 0
       ;;
     *)
@@ -41,6 +46,14 @@ HYPERVISOR_PATH="$OUT/aem_v8a_fvp_vhe_ffa_v1_1_clang"
 
 HFTEST+=(--log "$LOG_DIR_BASE/el3_spmc")
 HFTEST+=(--el3_spmc)
+
+if [ -n "$SUITE" ]; then
+  HFTEST+=(--suite "$SUITE")
+fi
+
+if [ -n "$TEST" ]; then
+  HFTEST+=(--test "$TEST")
+fi
 
 # Add hftest loglevel argument
 HFTEST+=(--log-level "$HFTEST_LOG_LEVEL")

@@ -16,6 +16,8 @@ SKIP_LONG_RUNNING_TESTS=false
 ASSERT_DISABLED_BUILD=false
 DEFAULT_HFTEST_TIMEOUT="600s"
 HFTEST_LOG_LEVEL="INFO"  # Default log level
+SUITE=""
+TEST=""
 
 while test $# -gt 0
 do
@@ -31,6 +33,10 @@ do
     --assert-disabled-build) ASSERT_DISABLED_BUILD=true
       ;;
     --debug) HFTEST_LOG_LEVEL="DEBUG"
+      ;;
+    --suite) SUITE="$2"; shift
+      ;;
+    --test) TEST="$2"; shift
       ;;
     *) echo "Unexpected argument $1"
       exit 1
@@ -81,6 +87,14 @@ then
 fi
 
 HFTEST+=(--log "$LOG_DIR_BASE")
+
+if [ -n "$SUITE" ]; then
+  HFTEST+=(--suite "$SUITE")
+fi
+
+if [ -n "$TEST" ]; then
+  HFTEST+=(--test "$TEST")
+fi
 
 if [ $EL0_TEST_ONLY == false ]
 then
