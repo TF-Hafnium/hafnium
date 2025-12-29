@@ -1232,7 +1232,7 @@ void mm_get_range_by_mode_level(const struct mm_page_table *table,
 				state->next_start_addr = current_addr;
 				return;
 			}
-		} else if (arch_mm_pte_is_table(*pte, level - 1)) {
+		} else if (arch_mm_pte_is_table(*pte, level)) {
 			const struct mm_page_table *child_table =
 				arch_mm_table_from_pte(*pte, level);
 			mm_get_range_by_mode_level(child_table, level - 1, mode,
@@ -1256,7 +1256,7 @@ void mm_get_range_by_mode_level(const struct mm_page_table *table,
 			    (state->mode_found &&
 			     (state->ptable_mode == curr_mode))) {
 				paddr_t ptable_addr =
-					arch_mm_block_from_pte(*pte, level - 1);
+					arch_mm_block_from_pte(*pte, level);
 				dlog_verbose("Mode Found at PTE Addr: %lx\n",
 					     pa_addr(ptable_addr));
 
