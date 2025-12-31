@@ -1308,7 +1308,7 @@ bool mm_vm_get_range_by_mode(const struct mm_ptable *ptable, ipaddr_t *begin,
 	assert(!ptable->stage1);
 
 	while ((current_addr < ptable_end) && !state.mismatch) {
-		mm_get_range_by_mode_level(root_table, root_level, mode,
+		mm_get_range_by_mode_level(root_table, root_level - 1, mode,
 					   ptable->stage1, current_addr,
 					   &state);
 
@@ -1350,7 +1350,7 @@ bool mm_get_range_by_mode(const struct mm_ptable *ptable, vaddr_t *begin,
 						   root_level)];
 
 	while ((current_addr < ptable_end) && !state.mismatch) {
-		mm_get_range_by_mode_level(root_table, root_level, mode,
+		mm_get_range_by_mode_level(root_table, root_level - 1, mode,
 					   ptable->stage1, current_addr,
 					   &state);
 
