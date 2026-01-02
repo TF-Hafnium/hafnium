@@ -1916,9 +1916,24 @@ TEST_PRECONDITION(memory_sharing, give_and_get_back_unaligned, hypervisor_only)
 
 	SERVICE_SELECT(service1_info->vm_id, "ffa_memory_return", mb.send);
 
+	/**
+	 * Chosen offsets to validate unaligned address handling rather than all
+	 * possible byte offsets.
+	 * This keeps the test fast while covering:
+	 * - aligned addresses (0)
+	 * - small unalignments (1, 2, 4, 8)
+	 * - mid-page unalignment
+	 * - page-end boundary unalignment
+	 */
+	static const size_t offsets[] = {
+		0, 1, 2, 4, 8, (PAGE_SIZE / 2), (PAGE_SIZE - 1)};
+
 	/* Check for unaligned pages for either constituent. */
-	for (size_t i = 0; i < PAGE_SIZE; i++) {
-		for (int j = 0; i < PAGE_SIZE; i++) {
+	for (size_t ai = 0; ai < ARRAY_SIZE(offsets); ai++) {
+		for (size_t aj = 0; aj < ARRAY_SIZE(offsets); aj++) {
+			size_t i = offsets[ai];
+			size_t j = offsets[aj];
+
 			/* Skip the case they're both aligned. */
 			if (i == 0 && j == 0) {
 				continue;
