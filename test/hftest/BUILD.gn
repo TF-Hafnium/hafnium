@@ -43,6 +43,7 @@ source_set("hftest_secondary_el0_partition") {
   deps = [
     ":el0_dlog",
     ":el0_fdt_handler",
+    "//src:manifest_helpers",
     "//src:panic",
     "//src/arch/${plat_arch}/hftest:el0_entry",
     "//test/hftest/arch/aarch64/el0:mm",
@@ -63,6 +64,7 @@ source_set("hftest_sel0_partition_base") {
   deps = [
     ":el0_dlog",
     ":el0_fdt_handler",
+    "//src:manifest_helpers",
     "//src:panic",
     "//src/arch/${plat_arch}/hftest:el0_entry",
     "//test/hftest/arch/aarch64/el0:mm",
@@ -247,6 +249,7 @@ source_set("service_common") {
   public_configs = [ ":hftest_config" ]
   sources = [ "service_common.c" ]
   deps = [
+    "//src:manifest_helpers",
     "//src:memiter",
     "//src:panic",
     "//src:std",

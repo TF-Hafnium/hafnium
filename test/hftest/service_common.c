@@ -10,6 +10,7 @@
 #include "hf/fdt.h"
 #include "hf/fdt_handler.h"
 #include "hf/ffa.h"
+#include "hf/manifest_helpers.h"
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/std.h"
@@ -40,23 +41,6 @@ uint8_t *hftest_get_secondary_ec_stack(size_t id)
 struct hftest_context *hftest_get_context(void)
 {
 	return &global_context;
-}
-
-static bool uint32list_has_next(const struct memiter *list)
-{
-	return memiter_size(list) > 0;
-}
-
-static void uint32list_get_next(struct memiter *list, uint32_t *out)
-{
-	uint64_t num;
-
-	CHECK(uint32list_has_next(list));
-	if (!fdt_parse_number(list, sizeof(uint32_t), &num)) {
-		return;
-	}
-
-	*out = (uint32_t)num;
 }
 
 [[noreturn]] void abort(void)
@@ -110,18 +94,22 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 	struct fdt_node ffa_node;
 	struct string mem_region_node_name = STRING_INIT("memory-regions");
 	struct string dev_region_node_name = STRING_INIT("device-regions");
-	struct memiter uuid;
 	struct memiter description;
-	uint32_t uuid_word = 0;
-	uint16_t j = 0;
-	uint16_t i = 0;
 	uint64_t number;
+	uint16_t manifest_version_minor = 0xFFFF;
 
 	CHECK(ctx != NULL);
 	CHECK(fdt != NULL);
 
 	ASSERT_TRUE(fdt_find_node(fdt, "/", &root));
-	EXPECT_TRUE(fdt_is_compatible(&root, "arm,ffa-manifest-1.0"));
+
+	if (fdt_is_compatible(&root, "arm,ffa-manifest-1.0")) {
+		manifest_version_minor = 0;
+	} else if (fdt_is_compatible(&root, "arm,ffa-manifest-1.1")) {
+		manifest_version_minor = 1;
+	}
+	ASSERT_TRUE(manifest_version_minor == 0 || manifest_version_minor == 1);
+
 	ASSERT_TRUE(fdt_read_number(&root, "load-address",
 				    &ctx->partition_manifest.load_addr));
 	EXPECT_TRUE(fdt_read_number(&root, "ffa-version", &number));
@@ -133,30 +121,11 @@ void hftest_parse_ffa_manifest(struct hftest_context *ctx, struct fdt *fdt)
 	EXPECT_TRUE(fdt_read_number(&root, "exception-level", &number));
 	ctx->partition_manifest.run_time_el = (uint16_t)number;
 
-	EXPECT_TRUE(fdt_read_property(&root, "uuid", &uuid));
-
-	/* Parse UUIDs and populate uuid count.*/
-	while (uint32list_has_next(&uuid) && j < PARTITION_MAX_UUIDS) {
-		while (uint32list_has_next(&uuid) && i < 4) {
-			uint32list_get_next(&uuid, &uuid_word);
-			ctx->partition_manifest.services[j].uuid.uuid[i] =
-				uuid_word;
-			i++;
-		}
-
-		EXPECT_FALSE(ffa_uuid_is_null(
-			&ctx->partition_manifest.services[j].uuid));
-
-		dlog_verbose("  UUID %#x-%x-%x-%x\n",
-			     ctx->partition_manifest.services[j].uuid.uuid[0],
-			     ctx->partition_manifest.services[j].uuid.uuid[1],
-			     ctx->partition_manifest.services[j].uuid.uuid[2],
-			     ctx->partition_manifest.services[j].uuid.uuid[3]);
-		j++;
-		i = 0;
-	}
-
-	ctx->partition_manifest.service_count = j;
+	ctx->partition_manifest.service_count = 0;
+	ASSERT_EQ(parse_services(&root, ctx->partition_manifest.services,
+				 &ctx->partition_manifest.service_count,
+				 manifest_version_minor),
+		  MANIFEST_SUCCESS);
 
 	ffa_node = root;
 

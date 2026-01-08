@@ -64,6 +64,7 @@ source_set("src_testable") {
     ":dlog",
     ":fdt",
     ":fdt_handler",
+    ":manifest_helpers",
     ":memiter",
     ":mm",
     ":panic",
@@ -136,6 +137,17 @@ source_set("string") {
   deps = [
     ":memiter",
     ":std",
+  ]
+}
+
+source_set("manifest_helpers") {
+  sources = [ "manifest_helpers.c" ]
+
+  deps = [
+    ":fdt",
+    ":memiter",
+    ":panic",
+    ":string",
   ]
 }
 
