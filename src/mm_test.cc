@@ -72,8 +72,6 @@ class mm : public ::testing::Test
 {
 	void SetUp() override
 	{
-		memory_alloc_init();
-
 		/*
 		 * TODO: replace with direct use of stdlib allocator so
 		 * sanitizers are more effective.

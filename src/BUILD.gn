@@ -194,6 +194,7 @@ executable("unit_tests") {
     "string_test.cc",
     "vcpu_test.cc",
     "vm_test.cc",
+    "global_env.cc",
   ]
   sources += [ "layout_fake.c" ]
   cflags_cc = [

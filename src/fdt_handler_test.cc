@@ -82,7 +82,6 @@ constexpr uint8_t test_dtb[] = {
 
 TEST(fdt, find_memory_ranges)
 {
-	memory_alloc_init();
 	mm_init();
 
 	struct fdt fdt;

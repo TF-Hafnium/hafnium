@@ -42,12 +42,6 @@ class vm : public ::testing::Test
        protected:
 	void SetUp() override
 	{
-		static bool allocator_initialized = false;
-
-		if (!allocator_initialized) {
-			memory_alloc_init();
-			allocator_initialized = true;
-		}
 	}
 
        public:

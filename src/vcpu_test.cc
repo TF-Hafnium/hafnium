@@ -43,8 +43,6 @@ class vcpu : public ::testing::Test
 
 	void SetUp() override
 	{
-		memory_alloc_init();
-
 		test_vm = vm_init(HF_VM_ID_OFFSET, 8, false, 0);
 
 		test_vcpu = vm_get_vcpu(test_vm, 0);

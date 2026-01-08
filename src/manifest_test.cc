@@ -334,7 +334,6 @@ class manifest : public ::testing::Test
 {
 	void SetUp() override
 	{
-		memory_alloc_init();
 	}
 
 	void TearDown() override

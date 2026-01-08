@@ -41,9 +41,6 @@ class ipi : public ::testing::Test
 	struct_vm *test_vm[4];
 	void SetUp() override
 	{
-		/* Prepare the memory allocator for the VM module. */
-		memory_alloc_init();
-
 		for (size_t i = 0; i < std::size(test_vm); i++) {
 			test_vm[i] = vm_init(i + HF_VM_ID_OFFSET, MAX_CPUS,
 					     false, 0);
