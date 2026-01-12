@@ -16,12 +16,8 @@
 void arch_vm_features_set(struct vm *vm);
 bool arch_vm_init_mm(struct vm *vm);
 bool arch_vm_iommu_init_mm(struct vm *vm);
-bool arch_vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, mm_mode_t mode);
 bool arch_vm_prepare(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     paddr_t p_begin, mm_mode_t mode);
-void arch_vm_identity_commit(struct vm_locked vm_locked, paddr_t begin,
-			     paddr_t end, mm_mode_t mode, ipaddr_t *ipa);
 void arch_vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		    paddr_t p_begin, mm_mode_t mode);
 bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end);

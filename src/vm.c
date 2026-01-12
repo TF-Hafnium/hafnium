@@ -407,7 +407,8 @@ bool vm_prepare(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			 mm_mode_t mode)
 {
-	return arch_vm_identity_prepare(vm_locked, begin, end, mode);
+	return vm_prepare(vm_locked, ipa_from_pa(begin), ipa_from_pa(end),
+			  begin, mode);
 }
 
 /**
@@ -427,7 +428,17 @@ void vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 			mm_mode_t mode, ipaddr_t *ipa)
 {
-	arch_vm_identity_commit(vm_locked, begin, end, mode, ipa);
+	vm_commit(vm_locked, ipa_from_pa(begin), ipa_from_pa(end), begin, mode);
+
+	if (ipa != NULL) {
+		/*
+		 * EL0 partitions are modeled as lightweight VM's, to
+		 * promote code reuse. The below statement returns the
+		 * mapped PA as an IPA, however, for an EL0 partition,
+		 * this is really a VA.
+		 */
+		*ipa = ipa_from_pa(begin);
+	}
 }
 
 /**
