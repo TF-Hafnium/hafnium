@@ -56,6 +56,9 @@ run:
     -C pci.pci_smmuv3.mmu.SMMU_S_IDR2: 0
     -C pci.pci_smmuv3.mmu.SMMU_S_IDR3: 0
 
+    # Convert DMA test engine to SMMUv3 test engine
+    -C pci.dma330x4.use_smmuv3testengine_not_dmacs: 1
+
     # Misc FVP controls.
     --stat: null
     -C pctl.startup: 0.0.0.0
