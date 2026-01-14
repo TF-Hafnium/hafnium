@@ -40,15 +40,18 @@ execute_test() {
 USE_PARITY=false
 CODE_COVERAGE=false
 RUN_TO_COMPLETION=false
+WAIT_FOR_DEBUGGER=false
 HFTEST_LOG_LEVEL="INFO"  # Default log level
 SUITE=""
 TEST=""
 
 USAGE="Use --parity to run EL3 SPMC testsuite;"
 USAGE+=" --code-coverage to enable code coverage;"
-USAGE+=" --run-to-completion to avoid stopping on test setups that fail, maximizing test run."
-USAGE+=" --suite <regex> to specify suite(s) to run"
-USAGE+=" --test <regex> to specify a test(s) to run"
+USAGE+=" --run-to-completion to avoid stopping on test setups that fail, maximizing test run;"
+USAGE+=" --log-level [DEBUG|INFO|WARNING|ERROR] to set hftest log level;"
+USAGE+=" --debug to have test(s) wait for a debugger connection;"
+USAGE+=" --suite <regex> to specify suite(s) to run;"
+USAGE+=" --test <regex> to specify a test(s) to run;"
 
 while test $# -gt 0
 do
@@ -59,25 +62,36 @@ do
       ;;
     --run-to-completion) RUN_TO_COMPLETION=true
       ;;
-    --debug) HFTEST_LOG_LEVEL="DEBUG"
+    --debug) WAIT_FOR_DEBUGGER=true
+      ;;
+    --log-level) HFTEST_LOG_LEVEL="$2"; shift
       ;;
     --suite) SUITE="$2"; shift
       ;;
     --test) TEST="$2"; shift
       ;;
-    -h) echo $USAGE
+    -h) echo "$USAGE"
 	exit 1
 	;;
-    --help) echo $USAGE
+    --help) echo "$USAGE"
 	exit 1
 	;;
     *) echo "Unexpected argument $1"
-	echo $USAGE
+	echo "$USAGE"
 	exit 1
 	;;
   esac
   shift
 done
+
+case "$HFTEST_LOG_LEVEL" in
+	DEBUG|INFO|WARNING|ERROR)
+	  ;;
+	*) echo "Unsupported hftest log level $HFTEST_LOG_LEVEL"
+	echo "$USAGE"
+	exit 1
+	;;
+esac
 
 KOKORO_DIR="$(dirname "$0")"
 source $KOKORO_DIR/test_common.sh
@@ -110,6 +124,10 @@ fi
 
 if [ -n "$TEST" ]; then
   HFTEST+=(--test "$TEST")
+fi
+
+if [ $WAIT_FOR_DEBUGGER = true ]; then
+	HFTEST+=(--debug)
 fi
 
 # Add hftest loglevel argument

@@ -14,6 +14,7 @@ USE_TFA=false
 EL0_TEST_ONLY=false
 SKIP_LONG_RUNNING_TESTS=false
 ASSERT_DISABLED_BUILD=false
+WAIT_FOR_DEBUGGER=false
 DEFAULT_HFTEST_TIMEOUT="600s"
 HFTEST_LOG_LEVEL="INFO"  # Default log level
 SUITE=""
@@ -32,7 +33,9 @@ do
       ;;
     --assert-disabled-build) ASSERT_DISABLED_BUILD=true
       ;;
-    --debug) HFTEST_LOG_LEVEL="DEBUG"
+    --debug) WAIT_FOR_DEBUGGER=true
+      ;;
+    --log-level) HFTEST_LOG_LEVEL="$2"; shift
       ;;
     --suite) SUITE="$2"; shift
       ;;
@@ -44,6 +47,14 @@ do
   esac
   shift
 done
+
+case "$HFTEST_LOG_LEVEL" in
+	DEBUG|INFO|WARNING|ERROR)
+	  ;;
+	*) echo "Unsupported hftest log level $HFTEST_LOG_LEVEL"
+	exit 1
+	;;
+esac
 
 # TIMEOUT, PROJECT, OUT, LOG_DIR_BASE set in:
 KOKORO_DIR="$(dirname "$0")"
@@ -94,6 +105,10 @@ fi
 
 if [ -n "$TEST" ]; then
   HFTEST+=(--test "$TEST")
+fi
+
+if [ $WAIT_FOR_DEBUGGER = true ]; then
+	HFTEST+=(--debug)
 fi
 
 if [ $EL0_TEST_ONLY == false ]

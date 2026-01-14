@@ -8,6 +8,7 @@
 
 # Default log level
 HFTEST_LOG_LEVEL="INFO"
+WAIT_FOR_DEBUGGER=false
 SUITE=""
 TEST=""
 
@@ -15,14 +16,16 @@ TEST=""
 while test $# -gt 0
 do
   case "$1" in
-    --debug) HFTEST_LOG_LEVEL="DEBUG"
+    --log-level) HFTEST_LOG_LEVEL="$2"; shift
+      ;;
+    --debug) WAIT_FOR_DEBUGGER=true
       ;;
     --suite) SUITE="$2"; shift
       ;;
     --test)TEST="$2"; shift
       ;;
     -h|--help)
-      echo "Usage: $0 [debug|info] [--suite <regex>] [--test <regex>]"
+      echo "Usage: $0 [--debug] [--log-level [DEBUG|INFO|WARNING|ERROR]] [--suite <regex>] [--test <regex>]"
       exit 0
       ;;
     *)
@@ -33,6 +36,14 @@ do
   esac
   shift
 done
+
+case "$HFTEST_LOG_LEVEL" in
+	DEBUG|INFO|WARNING|ERROR)
+	  ;;
+	*) echo "Unsupported hftest log level $HFTEST_LOG_LEVEL"
+	exit 1
+	;;
+esac
 
 # TIMEOUT, PROJECT, OUT, LOG_DIR_BASE set in:
 KOKORO_DIR="$(dirname "$0")"
@@ -53,6 +64,10 @@ fi
 
 if [ -n "$TEST" ]; then
   HFTEST+=(--test "$TEST")
+fi
+
+if [ $WAIT_FOR_DEBUGGER = true ]; then
+	HFTEST+=(--debug)
 fi
 
 # Add hftest loglevel argument
