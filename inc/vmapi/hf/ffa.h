@@ -310,7 +310,7 @@ static inline const char *ffa_func_name(enum ffa_function func)
 	case FFA_MSG_SEND_DIRECT_REQ2_64:
 		return "FFA_MSG_SEND_DIRECT_REQ2_64";
 	case FFA_MSG_SEND_DIRECT_RESP2_64:
-		return "FFA_MSG_SEND_DIRECT_REQ2_64 ";
+		return "FFA_MSG_SEND_DIRECT_RESP2_64 ";
 	case FFA_ABORT_32:
 		return "FFA_ABORT_32";
 	case FFA_ABORT_64:
