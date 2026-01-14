@@ -6,6 +6,8 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#include <cstdint>
+
 #include "hf/addr.h"
 
 #include <gmock/gmock.h>
@@ -464,6 +466,22 @@ TEST_F(mm, map_already_mapped)
 		get_ptable(ptable),
 		AllOf(SizeIs(4), Each(Each(Truly(std::bind(arch_mm_pte_is_block,
 							   _1, TOP_LEVEL))))));
+}
+
+/**
+ * Test that the paddr is not permitted to overflow in non-identity mappings.
+ */
+TEST_F(mm, map_non_identity_paddr_overflows)
+{
+	constexpr mm_mode_t mode = 0;
+
+	/* End physical address overflows uintptr */
+	ASSERT_FALSE(mm_vm_map(&ptable, ipa_init(0), ipa_init(2 * PAGE_SIZE),
+			       pa_init(UINTPTR_MAX - PAGE_SIZE), mode));
+
+	/* End physical address overflows ptable_end */
+	ASSERT_FALSE(mm_vm_map(&ptable, ipa_init(0), ipa_init(PAGE_SIZE),
+			       VM_MEM_END, mode));
 }
 
 /**
