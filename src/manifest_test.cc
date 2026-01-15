@@ -431,6 +431,39 @@ TEST_F(manifest, ffa_missing_property)
 		  MANIFEST_ERROR_PROPERTY_NOT_FOUND);
 }
 
+TEST_F(manifest, ffa_duplicate_uuid)
+{
+	struct_manifest *m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.1" })
+		.Property("ffa-version", "<0x10000>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("ns-interrupts-action", "<1>")
+		.StartChild("services")
+			.Compatible({ "arm,ffa-manifest-services"})
+			.StartChild("service0")
+				.Property("messaging-method", "<1>")
+				.StringProperty("uuid", "b4b5671e-4a90-4fe1-b81f-fb13dae1dacb")
+			.EndChild()
+			.StartChild("service1")
+				.Property("messaging-method", "<1>")
+				.StringProperty("uuid", "b4b5671e-4a90-4fe1-b81f-fb13dae1dacb")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_DUPLICATE_UUID);
+}
+
 TEST_F(manifest, ffa_validate_sanity_check)
 {
 	/*

@@ -1717,6 +1717,8 @@ const char *manifest_strerror(enum manifest_return_code ret_code)
 		       "statically allocated space for";
 	case MANIFEST_ERROR_MALFORMED_UUID:
 		return "The UUID is not specified in the required format.";
+	case MANIFEST_ERROR_DUPLICATE_UUID:
+		return "UUID must be unique within an SP manifest.";
 	case MANIFEST_ERROR_MISSING_SMMU_ID:
 		return "SMMU ID must be specified for the given Stream IDs";
 	case MANIFEST_ERROR_MISMATCH_DMA_ACCESS_PERMISSIONS:

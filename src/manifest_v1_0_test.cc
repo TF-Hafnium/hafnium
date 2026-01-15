@@ -165,6 +165,31 @@ TEST_F(manifest_v1_0, ffa_valid_multiple_uuids_different_messaging_methods)
 	ASSERT_EQ(vm->partition.ns_interrupts_action, NS_ACTION_ME);
 }
 
+TEST_F(manifest_v1_0, ffa_duplicate_uuid)
+{
+	struct_manifest *m;
+
+	/* clang-format off */
+	std::vector<char>  dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("ffa-version", "<0x10002>")
+		.Property("uuid",
+			 "<0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>,\
+			  <0xb4b5671e 0x4a904fe1 0xb81ffb13 0xdae1dacb>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<2>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("messaging-method", "<4>")
+		.Property("ns-interrupts-action", "<1>")
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_DUPLICATE_UUID);
+}
+
 TEST_F(manifest_v1_0, ffa_multiple_uuids_unmatched_messaging_methods)
 {
 	struct_manifest *m;

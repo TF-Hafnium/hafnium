@@ -256,6 +256,19 @@ static enum manifest_return_code parse_messaging_method(
 	return MANIFEST_SUCCESS;
 }
 
+static bool uuid_already_parsed(const struct service *services,
+				uint16_t service_count,
+				const struct ffa_uuid *uuid)
+{
+	for (uint16_t i = 0; i < service_count; i++) {
+		if (ffa_uuid_equal(&services[i].uuid, uuid)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /**
  * Populate the services structs from the uuid list and messaging method list
  * provided in v1.0 manifest. If only one messaging method is provided it
@@ -280,6 +293,10 @@ static enum manifest_return_code parse_services_v1_0(
 		}
 		TRY(parse_flattened_uuid(&uuid,
 					 &services[*service_count].uuid));
+		if (uuid_already_parsed(services, *service_count,
+					&services[*service_count].uuid)) {
+			return MANIFEST_ERROR_DUPLICATE_UUID;
+		}
 		/*
 		 * If only one messaging method is provided, record it
 		 * and apply it to all services. By definition the value
@@ -359,6 +376,10 @@ static enum manifest_return_code parse_services_v1_1(
 
 		TRY(parse_canonical_uuid(&uuid,
 					 &services[*service_count].uuid));
+		if (uuid_already_parsed(services, *service_count,
+					&services[*service_count].uuid)) {
+			return MANIFEST_ERROR_DUPLICATE_UUID;
+		}
 
 		TRY(parse_messaging_method(
 			&messaging_method,
