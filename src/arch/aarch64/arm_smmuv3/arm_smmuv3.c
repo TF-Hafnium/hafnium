@@ -124,17 +124,23 @@ static bool smmuv3_identify_features(struct smmuv3_driver *smmuv3)
 {
 	uint32_t idr0;
 	uint32_t arch_version;
+	uint32_t arch_maj_version;
+	uint32_t arch_min_version;
 	uint32_t xlat_format;
 
 	arch_version = mmio_read32_offset(smmuv3->base_addr, AIDR);
-	arch_version = EXTRACT(arch_version, ARCH_REV_SHIFT, ARCH_REV_MASK);
+	arch_maj_version = EXTRACT(arch_version, ARCH_MAJOR_REV_SHIFT,
+				   ARCH_MAJOR_REV_MASK);
+	arch_min_version = EXTRACT(arch_version, ARCH_MINOR_REV_SHIFT,
+				   ARCH_MINOR_REV_MASK);
 
-	if (arch_version > 2) {
-		dlog_error("SMMUv3: Unknown architecture version\n");
+	if ((arch_maj_version != ARCH_MAJOR_VERSION_3) ||
+	    (arch_min_version < ARCH_MINOR_VERSION_2)) {
+		dlog_error("SMMUv3: unsupported version.\n");
 		return false;
 	}
 
-	smmuv3->prop.minor_version = arch_version;
+	smmuv3->prop.minor_version = arch_min_version;
 	idr0 = mmio_read32_offset(smmuv3->base_addr, IDR0);
 
 	switch (EXTRACT(idr0, ST_LEVEL_SHIFT, ST_LEVEL_MASK)) {
