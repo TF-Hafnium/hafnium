@@ -2484,7 +2484,7 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 			.arg1 = (uint32_t)memory_region->handle,
 			.arg2 = (uint32_t)(memory_region->handle >> 32),
 			.arg3 = fragment_length,
-			.arg4 = (uint32_t)(sender_to_ret & 0xffff) << 16};
+			.arg4 = (uint32_t)sender_to_ret << 16};
 	}
 
 out:
@@ -2556,12 +2556,23 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 			from_locked, share_states, share_state,
 			&(share_state->sender_orig_mode));
 	} else {
+		/*
+		 * Use sender ID from 'memory_region' assuming
+		 * that at this point it has been validated:
+		 * - MBZ at virtual FF-A instance.
+		 */
+		ffa_id_t sender_to_ret =
+			(from_locked.vm->id == HF_OTHER_WORLD_ID)
+				? memory_region->sender
+				: 0;
+
 		ret = (struct ffa_value){
 			.func = FFA_MEM_FRAG_RX_32,
 			.arg1 = (uint32_t)handle,
 			.arg2 = (uint32_t)(handle >> 32),
 			.arg3 = share_state_next_fragment_offset(share_states,
-								 share_state)};
+								 share_state),
+			.arg4 = (uint32_t)sender_to_ret << 16};
 	}
 	goto out;
 
