@@ -327,7 +327,6 @@ TEST_F(mm, map_reverse_range_rounded_quirk)
 				       &ipa));
 	EXPECT_THAT(ipa_addr(ipa), Eq(20));
 	EXPECT_TRUE(mm_vm_is_mapped(&ptable, ipa));
-	mm_vm_fini(&ptable);
 }
 
 /**
