@@ -5221,6 +5221,7 @@ void api_flush_log_buffer(struct vcpu_locked *vcpu_locked)
 	ffa_id_t vm_id = vcpu->vm->id;
 	ffa_id_t vcpu_id = vcpu_index(vcpu);
 
+	assert(buffer->len < LOG_BUFFER_SIZE);
 	buffer->chars[buffer->len] = '\0';
 	dlog("[%x %u] %s\n", vm_id, vcpu_id, buffer->chars);
 	buffer->len = 0;
@@ -5301,8 +5302,12 @@ struct ffa_value api_ffa_console_log(const struct ffa_value args,
 		} else {
 			log_buffer->chars[log_buffer->len] = c;
 			log_buffer->len++;
-			assert(log_buffer->len <= LOG_BUFFER_SIZE);
-			flush = log_buffer->len == LOG_BUFFER_SIZE;
+			/*
+			 * The last byte of the buffer is reserved for the null
+			 * terminator.
+			 */
+			assert(log_buffer->len < LOG_BUFFER_SIZE);
+			flush = log_buffer->len == (LOG_BUFFER_SIZE - 1);
 		}
 
 		if (flush) {

@@ -22,6 +22,7 @@ export default {
         'ipi',
         'gicv3',
         'manifest',
+        'api',
 
         // Memory sharing & notifications
         'mem_share',
