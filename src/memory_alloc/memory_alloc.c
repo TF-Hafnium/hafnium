@@ -19,9 +19,16 @@ static struct mpool memory_alloc_pool;
 
 void memory_alloc_init(void)
 {
-	mpool_init(&memory_alloc_pool, PAGE_SIZE);
-	mpool_add_chunk(&memory_alloc_pool, memory_alloc_buf,
-			sizeof(memory_alloc_buf));
+	static bool memory_initialized = false;
+
+	assert(!memory_initialized);
+
+	if (!memory_initialized) {
+		mpool_init(&memory_alloc_pool, PAGE_SIZE);
+		mpool_add_chunk(&memory_alloc_pool, memory_alloc_buf,
+				sizeof(memory_alloc_buf));
+		memory_initialized = true;
+	}
 }
 
 void *memory_alloc(size_t size)
