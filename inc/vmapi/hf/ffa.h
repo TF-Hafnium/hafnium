@@ -1576,8 +1576,8 @@ typedef uint32_t ffa_memory_region_flags_t;
 #define FFA_MEMORY_REGION_ADDRESS_RANGE_HINT_MASK ((0xFU) << 5)
 
 /**
- * Struct to store the impdef value seen in Table 11.16 of the
- * FF-A v1.2 ALP0 specification "Endpoint memory access descriptor".
+ * Struct to store the impdef value seen in 1.16 of the FF-A Memory Management
+ * Protocol v1.2 REL0 specification "Endpoint memory access descriptor".
  */
 struct ffa_memory_access_impdef {
 	uint64_t val[2];
@@ -1590,8 +1590,8 @@ static inline struct ffa_memory_access_impdef ffa_memory_access_impdef_init(
 }
 
 /**
- * This corresponds to table 10.16 of the FF-A v1.1 EAC0 specification,
- * "Endpoint memory access descriptor".
+ * This corresponds to table 1.16 of the FF-A Memory Management Protocol
+ * v1.2 REL0 specification, "Endpoint memory access descriptor".
  */
 struct ffa_memory_access {
 	struct ffa_memory_region_attributes receiver_permissions;

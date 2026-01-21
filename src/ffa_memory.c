@@ -2591,6 +2591,23 @@ static inline uint32_t ffa_get_version_memory_access_desc_size(
 	return memory_access_desc_size;
 }
 
+static inline uint32_t ffa_get_composite_offset_v1_0(
+	struct ffa_memory_region_v1_0 *response,
+	uint32_t memory_access_desc_size)
+{
+	assert(response != NULL);
+	return (uint32_t)sizeof(struct ffa_memory_region_v1_0) +
+	       response->receiver_count * memory_access_desc_size;
+}
+
+static inline uint32_t ffa_get_composite_offset(
+	struct ffa_memory_region *response)
+{
+	assert(response != NULL);
+	return response->receivers_offset +
+	       response->receiver_count * response->memory_access_desc_size;
+}
+
 /**
  * Initialises the ffa_composite_memory_region for the descriptor of a retrieve
  * response message.
@@ -2711,12 +2728,17 @@ static bool ffa_hypervisor_retrieve_response_init(
 		ffa_memory_region_init_header_v1_0(retrieve_response_v1_0,
 						   sender, attributes, flags,
 						   handle, 0, receiver_count);
+
+		composite_offset = ffa_get_composite_offset_v1_0(
+			retrieve_response_v1_0, memory_access_desc_size);
 	} else {
 		retrieve_response = (struct ffa_memory_region *)response;
 
 		ffa_memory_region_init_header(
 			retrieve_response, sender, attributes, flags, handle, 0,
 			receiver_count, memory_access_desc_size);
+
+		composite_offset = ffa_get_composite_offset(retrieve_response);
 	}
 
 	/*
@@ -2733,7 +2755,6 @@ static bool ffa_hypervisor_retrieve_response_init(
 		switch (caller_version) {
 		case FFA_VERSION_1_0:
 			assert(retrieve_response_v1_0 != NULL);
-
 			receivers_v1_0 =
 				(struct ffa_memory_access_v1_0 *)
 					retrieve_response_v1_0->receivers;
@@ -2749,10 +2770,6 @@ static bool ffa_hypervisor_retrieve_response_init(
 		}
 
 		assert(sender_receivers != NULL);
-
-		composite_offset =
-			sizeof(struct ffa_memory_region_v1_0) +
-			receiver_count * sizeof(struct ffa_memory_access_v1_0);
 
 		/*
 		 * Loop through the receivers in the memory region cached from
@@ -2808,18 +2825,6 @@ static bool ffa_hypervisor_retrieve_response_init(
 
 	} else {
 		assert(retrieve_response != NULL);
-
-		/*
-		 * Note that `sizeof(struct_ffa_memory_region)` and
-		 * `sizeof(struct ffa_memory_access)` must both be multiples of
-		 * 16 (as verified by the asserts in `ffa_memory.c`, so it is
-		 * guaranteed that the offset we calculate here is aligned to a
-		 * 64-bit boundary and so 64-bit values can be copied without
-		 * alignment faults.
-		 */
-		composite_offset = retrieve_response->receivers_offset +
-				   (receiver_count * memory_access_desc_size);
-
 		assert(sender_receivers != NULL);
 
 		/*
@@ -2936,12 +2941,17 @@ static bool ffa_partition_retrieve_response_init(
 		ffa_memory_region_init_header_v1_0(retrieve_response_v1_0,
 						   sender, attributes, flags,
 						   handle, 0, 1);
+
+		composite_offset = ffa_get_composite_offset_v1_0(
+			retrieve_response_v1_0, memory_access_desc_size);
 	} else {
 		retrieve_response = (struct ffa_memory_region *)response;
 
 		ffa_memory_region_init_header(retrieve_response, sender,
 					      attributes, flags, handle, 0, 1,
 					      memory_access_desc_size);
+
+		composite_offset = ffa_get_composite_offset(retrieve_response);
 	}
 
 	/* Prepare the response based on the version of the partition. */
@@ -2955,14 +2965,12 @@ static bool ffa_partition_retrieve_response_init(
 		switch (caller_version) {
 		case FFA_VERSION_1_0:
 			assert(retrieve_response_v1_0 != 0);
-
 			receivers_v1_0 =
 				(struct ffa_memory_access_v1_0 *)
 					retrieve_response_v1_0->receivers;
 			break;
 		case FFA_VERSION_1_1:
 			assert(retrieve_response != NULL);
-
 			receivers_v1_0 = (struct ffa_memory_access_v1_0 *)
 				ffa_memory_region_get_receiver(
 					retrieve_response, 0);
@@ -2972,9 +2980,6 @@ static bool ffa_partition_retrieve_response_init(
 		}
 
 		assert(receivers_v1_0 != NULL);
-
-		composite_offset = sizeof(struct ffa_memory_region_v1_0) +
-				   sizeof(struct ffa_memory_access_v1_0);
 
 		/*
 		 * Initialized here as in memory retrieve responses we currently
@@ -3010,16 +3015,6 @@ static bool ffa_partition_retrieve_response_init(
 
 		receiver = ffa_memory_region_get_receiver(retrieve_response, 0);
 
-		/*
-		 * Note that `sizeof(struct_ffa_memory_region)` and
-		 * `sizeof(struct ffa_memory_access)` must both be multiples of
-		 * 16 (as verified by the asserts in `ffa_memory.c`, so it is
-		 * guaranteed that the offset we calculate here is aligned to a
-		 * 64-bit boundary and so 64-bit values can be copied without
-		 * alignment faults.
-		 */
-		composite_offset = retrieve_response->receivers_offset +
-				   retrieve_response->memory_access_desc_size;
 		/*
 		 * Initialized here as in memory retrieve responses we
 		 * currently expect one borrower to be specified.
