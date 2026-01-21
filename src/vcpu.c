@@ -152,14 +152,15 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 {
 	struct vm *vm = current->vm;
 	mm_mode_t mode;
-	uint32_t mask = f->mode | MM_MODE_INVALID;
+	uint32_t mask = f->mode | MM_MODE_INVALID | MM_MODE_NS;
 	bool resume;
 	struct vm_locked locked_vm;
 
 	locked_vm = vm_lock(vm);
 	/*
 	 * Check if this is a legitimate fault, i.e., if the page table doesn't
-	 * allow the access attempted by the VM.
+	 * allow the access attempted by the VM or there is a mismatch in the
+	 * security attribute reported in the fault compared to the PTE.
 	 *
 	 * Otherwise, this is a spurious fault, likely because another CPU is
 	 * updating the page table. It is responsible for issuing global TLB
