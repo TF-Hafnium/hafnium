@@ -9,6 +9,7 @@
 #include "hf/arch/gicv3.h"
 
 #include "hf/api.h"
+#include "hf/call.h"
 #include "hf/check.h"
 #include "hf/ffa.h"
 #include "hf/ffa/direct_messaging.h"
@@ -16,6 +17,7 @@
 #include "hf/ffa/lifecycle_msg.h"
 #include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
+#include "hf/live_activation_helper.h"
 #include "hf/load.h"
 #include "hf/plat/interrupts.h"
 #include "hf/plat/memory_alloc.h"
@@ -1012,6 +1014,75 @@ static struct ffa_value abort_action_process(struct vcpu_locked current_locked,
 	return ret_args;
 }
 
+/*
+ * If a partition aborts while in the process of live activation, SPMC puts it
+ * in the ABORTED state and informs EL3 LSP using appropriate framework message
+ * response.
+ */
+static struct ffa_value sp_live_activation_aborted(
+	struct vcpu_locked *current_locked, struct vcpu **next)
+{
+	enum ffa_error lifecycle_request_status;
+	struct vcpu *current = current_locked->vcpu;
+	struct live_activation_tracker_locked tracker_locked;
+	struct live_activation_tracker *tracker;
+	ffa_id_t initiator_id;
+	uint32_t response_func;
+	struct vm_locked vm_locked;
+	struct ffa_value ffa_ret;
+
+	tracker_locked = live_activation_tracker_lock();
+	tracker = tracker_locked.tracker;
+
+	assert(tracker != NULL);
+	assert(tracker->in_progress);
+	assert(tracker->partition_id == current->vm->id);
+
+	/*
+	 * Make note of initiator ID before potentially resetting the tracker.
+	 */
+	initiator_id = tracker->initiator_id;
+
+	if (current->vm->lfa_progress == LFA_PHASE_START) {
+		response_func = FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_START_RESP;
+	} else {
+		assert(current->vm->lfa_progress == LFA_PHASE_FINISH);
+		response_func = FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_FINISH_RESP;
+	}
+
+	/* Unlock vCPU and lock it after VM. */
+	vcpu_unlock(current_locked);
+	vm_locked = vm_lock(current->vm);
+	*current_locked = vcpu_lock(current);
+	vm_set_state(vm_locked, VM_STATE_ABORTING);
+
+	/* Reset live firmware activation tracker. */
+	live_activation_tracker_reset(&tracker_locked);
+	current->vm->lfa_progress = LFA_PHASE_RESET;
+
+	vm_unlock(&vm_locked);
+
+	/* Restore interrupt priority mask. */
+	ffa_interrupts_unmask(current);
+
+	/* SPMC sends ABORTED response status code to LSP. */
+	lifecycle_request_status = FFA_ABORTED;
+	ffa_ret = ffa_framework_msg_resp(HF_SPMC_VM_ID, initiator_id,
+					 response_func,
+					 lifecycle_request_status, 0, 0);
+
+	/*
+	 * Forward the response to SPMD EL3 LSP. The SP vCPU enters ABORTED
+	 * state.
+	 */
+	*next = api_switch_to_other_world(*current_locked, ffa_ret,
+					  VCPU_STATE_ABORTED);
+	live_activation_tracker_unlocked(&tracker_locked);
+
+	/* A placeholder return code. */
+	return api_ffa_interrupt_return(0);
+}
+
 struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked *current_locked,
 				      struct vcpu **next)
 {
@@ -1025,6 +1096,14 @@ struct ffa_value ffa_cpu_cycles_abort(struct vcpu_locked *current_locked,
 	 */
 	current_locked->vcpu->regs.arch_timer.ctl = 0U;
 	timer_vcpu_manage(current_locked->vcpu);
+
+	/*
+	 * Check if SPMC is currently performing live activation of this
+	 * partition.
+	 */
+	if (current_locked->vcpu->vm->lfa_progress != LFA_PHASE_RESET) {
+		return sp_live_activation_aborted(current_locked, next);
+	}
 
 	abort_action = current_locked->vcpu->vm->abort_action;
 
