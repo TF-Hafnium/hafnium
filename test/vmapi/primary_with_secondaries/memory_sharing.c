@@ -4813,6 +4813,170 @@ static void print_amd(struct ffa_address_map_desc *amd_array,
 }
 
 /**
+ * Helper function to validate all common AMDs returned
+ * from FFA_NS_RES_INFO_GET
+ */
+static void validate_common_amds(uint32_t current_size, uint32_t remaining_size,
+				 struct ffa_resource_info_desc_header *header,
+				 struct ffa_address_map_desc *amd_array,
+				 struct ffa_partition_info *service1_info,
+				 struct mailbox_buffers *mb, bool is_sel0)
+{
+	dlog_info("Remaining Size: 0x%x\n", remaining_size);
+	dlog_info("Current Size: 0x%x\n", current_size);
+	dlog_info("\n");
+	dlog_info("Information:\n");
+	dlog_info("  Size: 0x%x\n", header->amd_size);
+	dlog_info("  Count: 0x%x\n", header->amd_count);
+	dlog_info("  Offset: 0x%x\n", header->amd_offset);
+
+	/* Validate the manifest AMD contents. */
+	if (!is_sel0) {
+		EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
+		EXPECT_EQ(amd_array[0].page_count, 1);
+		EXPECT_EQ(amd_array[0].permissions,
+			  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+		EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
+		EXPECT_EQ(amd_array[0].flags,
+			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+		print_amd(amd_array, 0);
+	} else {
+		EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
+		EXPECT_EQ(amd_array[0].page_count, 1);
+		EXPECT_EQ(amd_array[0].permissions, (UNPRIV_R | UNPRIV_W));
+		EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
+		EXPECT_EQ(amd_array[0].flags,
+			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+		print_amd(amd_array, 0);
+	}
+
+	/* Validate the RX buffer AMD contents. */
+	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb->recv);
+	EXPECT_EQ(amd_array[1].page_count, 1);
+	EXPECT_EQ(amd_array[1].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
+	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 1);
+
+	/* Validate the TX buffer AMD contents. */
+	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb->send);
+	EXPECT_EQ(amd_array[2].page_count, 1);
+	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
+	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 2);
+
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 3);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
+}
+
+/**
+ * Helper function to validate all common AMDs returned
+ * from FFA_NS_RES_INFO_GET with donated memory.
+ */
+static void validate_common_amds_with_donation(
+	uint32_t current_size, uint32_t remaining_size,
+	struct ffa_resource_info_desc_header *header,
+	struct ffa_address_map_desc *amd_array,
+	struct ffa_partition_info *service1_info, struct mailbox_buffers *mb,
+	struct ffa_memory_region_constituent *constituents, bool is_sel0)
+{
+	dlog_info("Remaining Size: 0x%x\n", remaining_size);
+	dlog_info("Current Size: 0x%x\n", current_size);
+	dlog_info("\n");
+	dlog_info("Information:\n");
+	dlog_info("  Size: 0x%x\n", header->amd_size);
+	dlog_info("  Count: 0x%x\n", header->amd_count);
+	dlog_info("  Offset: 0x%x\n", header->amd_offset);
+
+	/* Validate the manifest and donated AMD contents. */
+	if (!is_sel0) {
+		EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
+		EXPECT_EQ(amd_array[0].page_count, 1);
+		EXPECT_EQ(amd_array[0].permissions,
+			  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+		EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
+		EXPECT_EQ(amd_array[0].flags,
+			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+		print_amd(amd_array, 0);
+
+		EXPECT_EQ(amd_array[1].base_address, constituents[0].address);
+		EXPECT_EQ(amd_array[1].page_count, constituents[0].page_count);
+		EXPECT_EQ(amd_array[1].permissions,
+			  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+		EXPECT_EQ(amd_array[1].endpoint_id, service1_info->vm_id);
+		EXPECT_EQ(amd_array[1].flags,
+			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+		print_amd(amd_array, 1);
+	} else {
+		EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
+		EXPECT_EQ(amd_array[0].page_count, 1);
+		EXPECT_EQ(amd_array[0].permissions, (UNPRIV_R | UNPRIV_W));
+		EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
+		EXPECT_EQ(amd_array[0].flags,
+			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+		print_amd(amd_array, 0);
+
+		EXPECT_EQ(amd_array[1].base_address, constituents[0].address);
+		EXPECT_EQ(amd_array[1].page_count, constituents[0].page_count);
+		EXPECT_EQ(amd_array[1].permissions, (UNPRIV_R | UNPRIV_W));
+		EXPECT_EQ(amd_array[1].endpoint_id, service1_info->vm_id);
+		EXPECT_EQ(amd_array[1].flags,
+			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+		print_amd(amd_array, 1);
+	}
+
+	/* Validate the RX buffer AMD contents. */
+	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb->recv);
+	EXPECT_EQ(amd_array[2].page_count, 1);
+	EXPECT_EQ(amd_array[2].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
+	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 2);
+
+	/* Validate the TX buffer AMD contents. */
+	EXPECT_EQ(amd_array[3].base_address, (uintptr_t)mb->send);
+	EXPECT_EQ(amd_array[3].page_count, 1);
+	EXPECT_EQ(amd_array[3].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[3].endpoint_id, HF_SPMC_VM_ID);
+	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 3);
+
+	/* Validate the RX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[4].base_address, 0xEFFFF000);
+	EXPECT_EQ(amd_array[4].page_count, 1);
+	EXPECT_EQ(amd_array[4].permissions,
+		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 4);
+
+	/* Validate the TX buffer of the Hypervisor. */
+	EXPECT_EQ(amd_array[5].base_address, 0xEFFFE000);
+	EXPECT_EQ(amd_array[5].page_count, 1);
+	EXPECT_EQ(amd_array[5].permissions, (UNPRIV_R | PRIV_R));
+	EXPECT_EQ(amd_array[5].endpoint_id, 0x00);
+	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
+	print_amd(amd_array, 5);
+}
+
+/**
  * Use the FFA_NS_RES_INFO_GET to obtain information
  * memory that is allocated to all secure partitions.
  */
@@ -4854,56 +5018,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_sp_info,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 }
 
 /**
@@ -4950,56 +5067,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_service1_info,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 }
 
 /**
@@ -5073,56 +5143,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 
 	/* Validate the shared AMD contents. */
 	EXPECT_EQ(amd_array[5].base_address,
@@ -5216,56 +5239,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_reclaim,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 }
 
 /**
@@ -5346,56 +5322,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 
 	/*
 	 * Validate and print the remaining AMDs, take into account
@@ -5507,55 +5436,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_sp_info_sel0,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions, (UNPRIV_R | UNPRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, true);
 }
 
 /**
@@ -5630,55 +5513,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_sel0,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions, (UNPRIV_R | UNPRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, true);
 
 	/* Validate the shared AMD contents. */
 	EXPECT_EQ(amd_array[5].base_address,
@@ -5789,56 +5626,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_multi_perm,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 
 	/* Validate the shared AMD contents. */
 	EXPECT_EQ(amd_array[5].base_address,
@@ -5849,6 +5639,7 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_multi_perm,
 	EXPECT_EQ(amd_array[5].endpoint_id, service1_info->vm_id);
 	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 5);
+
 	EXPECT_EQ(amd_array[6].base_address,
 		  constituents_lend_fragmented_relinquish[1].address);
 	EXPECT_EQ(amd_array[6].page_count,
@@ -5969,56 +5760,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_all_lent_info_multi_rec,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 
 	/* Validate the shared AMD contents. */
 	EXPECT_EQ(amd_array[5].base_address,
@@ -6153,56 +5897,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_target_lent_info_multi_rec,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 
 	/* Validate the shared AMD contents. */
 	EXPECT_EQ(amd_array[5].base_address,
@@ -6382,56 +6079,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_diff_perm,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 
 	/* Validate the shared AMD contents. */
 	EXPECT_EQ(amd_array[5].base_address,
@@ -6559,56 +6209,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_diff_perm_multi_rec,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 
 	/* Validate the shared AMD contents. */
 	EXPECT_EQ(amd_array[5].base_address,
@@ -6620,6 +6223,7 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_lent_info_diff_perm_multi_rec,
 	EXPECT_EQ(amd_array[5].endpoint_id, service1_info->vm_id);
 	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
 	print_amd(amd_array, 5);
+
 	EXPECT_EQ(amd_array[6].base_address,
 		  constituents_lend_fragmented_relinquish[0].address);
 	EXPECT_EQ(amd_array[6].page_count,
@@ -6713,56 +6317,9 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_shared_info,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[1].page_count, 1);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[3].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[3].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
+	/* Validate the common AMDs. */
+	validate_common_amds(current_size, remaining_size, header, amd_array,
+			     service1_info, &mb, false);
 
 	/* Validate the shared AMD contents. */
 	EXPECT_EQ(amd_array[5].base_address, constituents[0].address);
@@ -6847,65 +6404,10 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_donated_info,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the donated AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, constituents[0].address);
-	EXPECT_EQ(amd_array[1].page_count, constituents[0].page_count);
-	EXPECT_EQ(amd_array[1].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[3].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[3].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[5].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[5].page_count, 1);
-	EXPECT_EQ(amd_array[5].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[5].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 5);
+	/* Validate the common AMDs with donation. */
+	validate_common_amds_with_donation(current_size, remaining_size, header,
+					   amd_array, service1_info, &mb,
+					   constituents, false);
 }
 
 /**
@@ -6978,63 +6480,10 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_donated_info_sel0,
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
-	dlog_info("Information:\n");
-	dlog_info("  Size: 0x%x\n", header->amd_size);
-	dlog_info("  Count: 0x%x\n", header->amd_count);
-	dlog_info("  Offset: 0x%x\n", header->amd_offset);
-
-	/* Validate the manifest AMD contents. */
-	EXPECT_EQ(amd_array[0].base_address, 0x9001F000);
-	EXPECT_EQ(amd_array[0].page_count, 1);
-	EXPECT_EQ(amd_array[0].permissions, (UNPRIV_R | UNPRIV_W));
-	EXPECT_EQ(amd_array[0].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[0].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 0);
-
-	/* Validate the donated AMD contents. */
-	EXPECT_EQ(amd_array[1].base_address, constituents[0].address);
-	EXPECT_EQ(amd_array[1].page_count, constituents[0].page_count);
-	EXPECT_EQ(amd_array[1].permissions, (UNPRIV_R | UNPRIV_W));
-	EXPECT_EQ(amd_array[1].endpoint_id, service1_info->vm_id);
-	EXPECT_EQ(amd_array[1].flags, FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 1);
-
-	/* Validate the RX buffer AMD contents. */
-	EXPECT_EQ(amd_array[2].base_address, (uintptr_t)mb.recv);
-	EXPECT_EQ(amd_array[2].page_count, 1);
-	EXPECT_EQ(amd_array[2].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[2].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[2].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 2);
-
-	/* Validate the TX buffer AMD contents. */
-	EXPECT_EQ(amd_array[3].base_address, (uintptr_t)mb.send);
-	EXPECT_EQ(amd_array[3].page_count, 1);
-	EXPECT_EQ(amd_array[3].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[3].endpoint_id, HF_SPMC_VM_ID);
-	EXPECT_EQ(amd_array[3].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 3);
-
-	/* Validate the RX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[4].base_address, 0xEFFFF000);
-	EXPECT_EQ(amd_array[4].page_count, 1);
-	EXPECT_EQ(amd_array[4].permissions,
-		  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-	EXPECT_EQ(amd_array[4].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[4].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 4);
-
-	/* Validate the TX buffer of the Hypervisor. */
-	EXPECT_EQ(amd_array[5].base_address, 0xEFFFE000);
-	EXPECT_EQ(amd_array[5].page_count, 1);
-	EXPECT_EQ(amd_array[5].permissions, (UNPRIV_R | PRIV_R));
-	EXPECT_EQ(amd_array[5].endpoint_id, 0x00);
-	EXPECT_EQ(amd_array[5].flags, FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
-	print_amd(amd_array, 5);
+	/* Validate the common AMDs with donation. */
+	validate_common_amds_with_donation(current_size, remaining_size, header,
+					   amd_array, service1_info, &mb,
+					   constituents, true);
 }
 
 /**
