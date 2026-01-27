@@ -6,4 +6,9 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-export default { extends: ['@commitlint/config-conventional'] };
+export default {
+  extends: ['@commitlint/config-conventional'],
+  rules: {
+        'scope-empty': [2, 'never'],
+      },
+};

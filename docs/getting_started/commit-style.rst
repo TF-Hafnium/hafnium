@@ -31,7 +31,7 @@ To briefly summarize, commit messages are expected to be of the form:
 
 .. code::
 
-    <type>[optional scope]: <description>
+    <type>[scope]: <description>
 
     [optional body]
 
@@ -74,8 +74,25 @@ The following `types` are permissible and are strictly enforced:
 | ``chore``    | Any other change                                              |
 +--------------+---------------------------------------------------------------+
 
-While we don't enforce scopes strictly, we do ask that commits use these if they
-can. These should reference the functionality the patch relates to.
+In the Hafnium project, commit scopes are **mandatory** and are enforced by
+project tooling. All commits must specify a scope identifying the subsystem
+or functional area affected by the change.
+
+.. code::
+
+    Example:
+
+    feat(mm): improve memory allocation path
+    fix(hftest): correct test failure on arm64
+
+The scope must be chosen from a predefined list of approved values. Commits
+without a scope, or with an unapproved scope name, will be rejected by CI
+static-checks.
+
+If none of the existing scopes are appropriate, the patch author is expected
+to update the list of approved scopes and use the new scope consistently in
+the same patch set. The list of approved scopes is maintained in the commit
+message linting configuration file `commitlint config`_
 
 Mandated Trailers
 -----------------
@@ -95,11 +112,6 @@ repository using the "`Clone with commit-msg hook`" clone method, then this shou
 be done automatically for you.
 
 More details may be found in the `Gerrit Change-Ids documentation`_.
-
-.. _Conventional Commits: https://www.conventionalcommits.org/en/v1.0.0
-.. _Gerrit Change-Ids documentation: https://review.trustedfirmware.org/Documentation/user-changeid.html
-.. _Gerrit Signed-off-by Lines guidelines: https://review.trustedfirmware.org/Documentation/user-signedoffby.html
-.. _quick summary: https://www.conventionalcommits.org/en/v1.0.0/#summary
 
 Commit Linting
 --------------
@@ -145,6 +157,11 @@ An example of this is as follows:
   make commitlint COMMITLINT_FROM=HEAD~3 COMMITLINT_TO=HEAD
 
 .. _Commitlint: https://commitlint.js.org
+.. _commitlint config: https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/heads/master/commitlint.config.js
+.. _Conventional Commits: https://www.conventionalcommits.org/en/v1.0.0
+.. _Gerrit Change-Ids documentation: https://review.trustedfirmware.org/Documentation/user-changeid.html
+.. _Gerrit Signed-off-by Lines guidelines: https://review.trustedfirmware.org/Documentation/user-signedoffby.html
+.. _quick summary: https://www.conventionalcommits.org/en/v1.0.0/#summary
 
 --------------
 
