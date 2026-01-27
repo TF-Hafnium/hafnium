@@ -9,6 +9,42 @@
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-        'scope-empty': [2, 'never'],
-      },
+    'scope-empty': [2, 'never'],
+    'scope-enum': [
+      2,
+      'always',
+      [
+        // FF-A
+        'ff-a',
+        'vm',
+        'cpus',
+        'mm',           // memory-management
+        'ipi',
+        'gicv3',
+        'manifest',
+
+        // Memory sharing & notifications
+        'mem_share',
+        'notifications',
+        'interrupts',
+        'iommu',
+
+        // Partition lifecycle
+        'lifecycle',
+
+        // Test framework
+        'hftest',
+        'static-checks',
+
+        // Build and tooling
+        'shrinkwrap',
+        'docker',
+        'commitlint',
+        'git',
+
+        // Fallback scope for any miscellaneous change
+        'misc'
+      ],
+    ],
+  },
 };
