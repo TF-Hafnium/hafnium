@@ -187,6 +187,7 @@ executable("unit_tests") {
     "cpu_test.cc",
     "fdt_handler_test.cc",
     "fdt_test.cc",
+    "global_env.cc",
     "ipi_test.cc",
     "manifest_test.cc",
     "mm_test.cc",
@@ -194,7 +195,6 @@ executable("unit_tests") {
     "string_test.cc",
     "vcpu_test.cc",
     "vm_test.cc",
-    "global_env.cc",
   ]
   sources += [ "layout_fake.c" ]
   cflags_cc = [
