@@ -58,6 +58,9 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	ret = ffa_features(FFA_RX_RELEASE_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
+	ret = ffa_features(FFA_RXTX_MAP_32);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
 	ret = ffa_features(FFA_RXTX_MAP_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
@@ -105,6 +108,10 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 
 	ret = ffa_features(FFA_MEM_PERM_SET_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	/* Only supported by the primary scheduler. */
+	ret = ffa_features(FFA_NOTIFICATION_INFO_GET_64);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 }
 
 /** Validates error return for FFA_FEATURES provided a wrongful feature ID. */

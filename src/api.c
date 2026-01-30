@@ -2552,6 +2552,7 @@ static struct ffa_value ffa_features_function(uint32_t func,
 	/* Check support of the given Function ID. */
 	case FFA_ERROR_32:
 	case FFA_SUCCESS_32:
+	case FFA_SUCCESS_64:
 	case FFA_INTERRUPT_32:
 	case FFA_VERSION_32:
 	case FFA_FEATURES_32:
@@ -2586,9 +2587,31 @@ static struct ffa_value ffa_features_function(uint32_t func,
 	case FFA_NOTIFICATION_UNBIND_32:
 	case FFA_NOTIFICATION_SET_32:
 	case FFA_NOTIFICATION_GET_32:
-	case FFA_NOTIFICATION_INFO_GET_64:
 	case FFA_MSG_SEND2_32:
 		if (FFA_VERSION_1_1 > FFA_VERSION_COMPILED) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+		return api_ffa_feature_success(0);
+
+	case FFA_RX_ACQUIRE_32:
+		if (FFA_VERSION_1_1 > FFA_VERSION_COMPILED) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+		/* Only discoverable to the normal-world hypervisor. */
+		if (current->vm->id != HF_HYPERVISOR_VM_ID) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+		return api_ffa_feature_success(0);
+
+	case FFA_NOTIFICATION_INFO_GET_64:
+		if (FFA_VERSION_1_1 > FFA_VERSION_COMPILED) {
+			return ffa_error(FFA_NOT_SUPPORTED);
+		}
+		if (!vm_is_primary(current->vm)) {
+			dlog_verbose(
+				"FFA_FEATURES: %s is only supported by the "
+				"primary scheduler\n",
+				ffa_func_name(FFA_NOTIFICATION_INFO_GET_64));
 			return ffa_error(FFA_NOT_SUPPORTED);
 		}
 		return api_ffa_feature_success(0);
@@ -2657,6 +2680,7 @@ static struct ffa_value ffa_features_function(uint32_t func,
 		}
 		return api_ffa_feature_success(0);
 
+	case FFA_RXTX_MAP_32:
 	case FFA_RXTX_MAP_64: {
 		uint32_t arg2 = 0;
 		struct ffa_features_rxtx_map_params params = {
