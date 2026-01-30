@@ -141,6 +141,19 @@ struct vcpu *plat_psci_cpu_resume(struct cpu *c)
 	/* Lock the vCPU to update its fields. */
 	vcpu_locked = vcpu_lock(boot_vcpu);
 
+	/*
+	 * When the boot CPU is powered off and then brought back, avoid
+	 * bootstrapping unless the vCPU is newly created or explicitly powered
+	 * down.
+	 * UP SPs are not put into OFF on CPU shutdown as their vCPU must be
+	 * alive on some other CPU and does not need re-bootstrap here.
+	 */
+	if (boot_vcpu->state != VCPU_STATE_CREATED &&
+	    boot_vcpu->state != VCPU_STATE_OFF) {
+		vcpu_unlock(&vcpu_locked);
+		return plat_psci_switch_to_other_world(c);
+	}
+
 	/* Bootstrap the SP vCPU on this CPU. */
 	vcpu_bootstrap(vcpu_locked, c, true);
 
