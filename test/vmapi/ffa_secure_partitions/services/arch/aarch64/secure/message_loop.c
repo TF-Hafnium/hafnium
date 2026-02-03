@@ -379,6 +379,15 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		res = sp_success(hf_vm_get_id(), ffa_sender(res), 0);
 		break;
 	}
+	case SP_ABORT_ON_LIVE_ACTIVATION_INIT_CMD:
+		if (!live_buffer_is_valid(find_live_buffer())) {
+			res = sp_error(hf_vm_get_id(), ffa_sender(res),
+				       FFA_ABORTED);
+			break;
+		}
+		find_live_buffer()->abort_during_live_activation = true;
+		res = sp_success(hf_vm_get_id(), ffa_sender(res), 0);
+		break;
 #endif
 	default:
 		HFTEST_LOG_FAILURE();
@@ -408,6 +417,12 @@ void process_live_activation(bool live_activation_status)
 		live_buffer_init(buffer, sp_id);
 		HFTEST_LOG("Populate live buffer\n");
 	} else {
+		if (buffer->abort_during_live_activation) {
+			buffer->abort_during_live_activation = false;
+			HFTEST_LOG("Aborting during live activation init");
+			ffa_call((struct ffa_value){.func = FFA_ABORT_32});
+		}
+
 		/*
 		 * Newer image after live activation. Attest live
 		 * state buffer produced by previous image.

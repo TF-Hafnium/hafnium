@@ -38,6 +38,13 @@ struct live_buffer {
 	uint8_t counter;
 
 	uint64_t data;
+
+	/*
+	 * Flag to request abort during live activation initialization. It is
+	 * made part of this buffer since it must be preserved across live
+	 * activation.
+	 */
+	bool abort_during_live_activation;
 };
 
 void live_buffer_init(struct live_buffer *buffer, ffa_id_t sp_id);

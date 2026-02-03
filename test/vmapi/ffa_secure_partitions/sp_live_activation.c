@@ -228,6 +228,15 @@ static void set_partition_stop_resp_status(ffa_id_t own_id,
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 }
 
+static void abort_on_live_activation_init(ffa_id_t own_id, ffa_id_t receiver_id)
+{
+	struct ffa_value res;
+
+	res = sp_abort_on_live_activation_init_cmd_send(own_id, receiver_id);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+}
+
 static void start_live_activation_sequence(uint32_t component_id)
 {
 	struct ffa_value res;
@@ -392,4 +401,36 @@ TEST(live_activation, live_activate_sp_stop_request_error)
 
 	set_partition_stop_resp_status(own_id, SP_ID(1), FFA_ABORTED);
 	start_live_activation_sequence_expect_failure(component_id);
+}
+
+/**
+ * Test to validate error propagation when the SP aborts while live activating
+ * its new image.
+ * The SP arranges an FFA_ABORT during the live activation init path. Since
+ * the manifest uses abort-action as `Destroy`, the SP shall be destroyed and
+ * subsequent direct requests must fail with FFA_INVALID_PARAMETERS.
+ */
+TEST(live_activation, live_activate_new_image_abort)
+{
+	uint32_t component_id = 0;
+	uint32_t fw_component_count = 0;
+	ffa_id_t own_id = hf_vm_get_id();
+	struct ffa_value res;
+
+	fw_component_count = check_lfa_framework();
+	EXPECT_TRUE(find_component_id_by_guid(GUID_LOWER_SP1, GUID_HIGHER_SP1,
+					      &component_id,
+					      fw_component_count));
+
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_3), FFA_VERSION_COMPILED);
+	check_echo(own_id, SP_ID(1));
+
+	abort_on_live_activation_init(own_id, SP_ID(1));
+	start_live_activation_sequence_expect_failure(component_id);
+
+	/* Direct request to the aborted SP should fail. */
+	res = sp_echo_cmd_send(own_id, SP_ID(1), 0x11112222, 0x33334444,
+			       0x55556666, 0x77778888);
+	ASSERT_EQ(res.func, FFA_ERROR_32);
+	EXPECT_EQ(ffa_error_code(res), FFA_INVALID_PARAMETERS);
 }

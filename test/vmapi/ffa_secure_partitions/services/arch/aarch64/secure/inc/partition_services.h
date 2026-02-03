@@ -212,6 +212,11 @@ enum sp_cmd {
 	 * stop response framework message.
 	 */
 	SP_SET_PARTITION_STOP_RESP_STATUS_CMD,
+
+	/**
+	 * Request SP to abort during the next live activation.
+	 */
+	SP_ABORT_ON_LIVE_ACTIVATION_INIT_CMD,
 };
 
 /**
@@ -737,4 +742,11 @@ static inline struct ffa_value sp_set_partition_stop_resp_status_cmd_send(
 	return ffa_msg_send_direct_req(source, dest,
 				       SP_SET_PARTITION_STOP_RESP_STATUS_CMD,
 				       status, 0, 0, 0);
+}
+
+static inline struct ffa_value sp_abort_on_live_activation_init_cmd_send(
+	ffa_id_t source, ffa_id_t dest)
+{
+	return ffa_msg_send_direct_req(
+		source, dest, SP_ABORT_ON_LIVE_ACTIVATION_INIT_CMD, 0, 0, 0, 0);
 }

@@ -17,6 +17,7 @@ void live_buffer_init(struct live_buffer *buffer, ffa_id_t sp_id)
 	buffer->activation_token = 0U;
 	buffer->counter = 0U;
 	buffer->partition_id = sp_id;
+	buffer->abort_during_live_activation = false;
 }
 
 bool live_buffer_is_valid(struct live_buffer *buffer)
