@@ -216,6 +216,18 @@ static void unbind_notifications(ffa_id_t own_id, ffa_id_t receiver_id,
 	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
 }
 
+static void set_partition_stop_resp_status(ffa_id_t own_id,
+					   ffa_id_t receiver_id,
+					   uint32_t status)
+{
+	struct ffa_value res;
+
+	res = sp_set_partition_stop_resp_status_cmd_send(own_id, receiver_id,
+							 status);
+	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP_32);
+	EXPECT_EQ(sp_resp(res), SP_SUCCESS);
+}
+
 static void start_live_activation_sequence(uint32_t component_id)
 {
 	struct ffa_value res;
@@ -248,6 +260,40 @@ static void start_live_activation_sequence(uint32_t component_id)
 	lfa_ret = lfa_activate(component_id, 1, 0, 0);
 
 	EXPECT_EQ(lfa_ret, LFA_SUCCESS);
+}
+
+static void start_live_activation_sequence_expect_failure(uint32_t component_id)
+{
+	struct ffa_value res;
+	uint32_t lfa_flags;
+	enum lfa_return_code lfa_ret;
+
+	res = lfa_get_inventory(component_id);
+
+	EXPECT_EQ((uint32_t)res.func, LFA_SUCCESS);
+	lfa_flags = (uint32_t)res.arg3;
+
+	dlog("GUID: %lx - %lx", res.arg1, res.arg2);
+	dlog_verbose("Flags: %lx", res.arg3);
+
+	EXPECT_TRUE(is_activation_pending(lfa_flags));
+
+	EXPECT_TRUE(is_activation_capable(lfa_flags));
+
+	EXPECT_FALSE(is_cpu_reset_during_live_activation(lfa_flags));
+
+	EXPECT_FALSE(is_cpu_rendezvous_required(lfa_flags));
+
+	/* LFA prime should succeed. Not needed to call again. */
+	res = lfa_prime(component_id);
+
+	EXPECT_EQ((uint32_t)res.func, LFA_SUCCESS);
+	EXPECT_EQ(res.arg1, 0U);
+
+	/* Live Activate SP. */
+	lfa_ret = lfa_activate(component_id, 1, 0, 0);
+
+	EXPECT_NE(lfa_ret, LFA_SUCCESS);
 }
 
 /**
@@ -323,4 +369,27 @@ TEST(live_activation, live_activate_sel0_sp)
 					      fw_component_count));
 
 	base_live_activate_sp(SP_ID(2), component_id);
+}
+
+/**
+ * Test to validate error propagation when the SP responds to the partition
+ * stop framework message with a non-success status. The live activation request
+ * should fail in the LFA call path.
+ */
+TEST(live_activation, live_activate_sp_stop_request_error)
+{
+	uint32_t component_id = 0;
+	uint32_t fw_component_count = 0;
+	ffa_id_t own_id = hf_vm_get_id();
+
+	fw_component_count = check_lfa_framework();
+	EXPECT_TRUE(find_component_id_by_guid(GUID_LOWER_SP1, GUID_HIGHER_SP1,
+					      &component_id,
+					      fw_component_count));
+
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_3), FFA_VERSION_COMPILED);
+	check_echo(own_id, SP_ID(1));
+
+	set_partition_stop_resp_status(own_id, SP_ID(1), FFA_ABORTED);
+	start_live_activation_sequence_expect_failure(component_id);
 }

@@ -38,6 +38,9 @@ static uint64_t live_buffer_addr_cached;
 
 static uint64_t live_buffer_size_cached;
 
+static bool stop_resp_status_override;
+static uint32_t stop_resp_status_override_value;
+
 /* FDT of the partition manifest for live-buffer parsing. */
 static struct fdt *manifest_fdt;
 
@@ -200,6 +203,22 @@ static struct ffa_value handle_direct_req_framework_msg(struct ffa_value args)
 		uint32_t counter;
 
 		own_id = hf_vm_get_id();
+
+		if (stop_resp_status_override) {
+			uint32_t status = stop_resp_status_override_value;
+
+			stop_resp_status_override = false;
+			HFTEST_LOG(
+				"Partition stop request received; sending "
+				"error status %#x",
+				status);
+
+			return ffa_framework_message_send_direct_resp(
+				own_id, HF_SPMC_VM_ID,
+				FFA_FRAMEWORK_MSG_PARTITION_STOP_RESP, status,
+				0ULL, 0ULL);
+		}
+
 		buffer = find_live_buffer();
 
 		/*
@@ -351,6 +370,16 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_INCREMENT_SHARED_BUFFER_CMD:
 		res = sp_increment_shared_buffer_cmd(ffa_sender(res));
 		break;
+#if LIVE_ACTIVATION_SUPPORT == 1
+	case SP_SET_PARTITION_STOP_RESP_STATUS_CMD: {
+		uint32_t status = (uint32_t)res.arg4;
+
+		stop_resp_status_override = true;
+		stop_resp_status_override_value = status;
+		res = sp_success(hf_vm_get_id(), ffa_sender(res), 0);
+		break;
+	}
+#endif
 	default:
 		HFTEST_LOG_FAILURE();
 		HFTEST_LOG(HFTEST_LOG_INDENT

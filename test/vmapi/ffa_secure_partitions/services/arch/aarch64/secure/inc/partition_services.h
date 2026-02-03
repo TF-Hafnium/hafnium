@@ -206,6 +206,12 @@ enum sp_cmd {
 	 * Request to increment data in a shared buffer.
 	 */
 	SP_INCREMENT_SHARED_BUFFER_CMD,
+
+	/**
+	 * Request SP to override the status code used for the next partition
+	 * stop response framework message.
+	 */
+	SP_SET_PARTITION_STOP_RESP_STATUS_CMD,
 };
 
 /**
@@ -724,3 +730,11 @@ static inline struct ffa_value sp_increment_shared_buffer_cmd_send(
 }
 
 struct ffa_value sp_increment_shared_buffer_cmd(ffa_id_t sender_id_id);
+
+static inline struct ffa_value sp_set_partition_stop_resp_status_cmd_send(
+	ffa_id_t source, ffa_id_t dest, uint32_t status)
+{
+	return ffa_msg_send_direct_req(source, dest,
+				       SP_SET_PARTITION_STOP_RESP_STATUS_CMD,
+				       status, 0, 0, 0);
+}
