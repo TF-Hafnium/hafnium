@@ -4947,6 +4947,8 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	mm_mode_t new_mode;
 	const mm_mode_t other_mode_mask = ~(MM_MODE_R | MM_MODE_W | MM_MODE_X);
 	vaddr_t end_addr;
+	vaddr_t curr_addr;
+	vaddr_t next_addr;
 
 	if (!ffa_memory_is_mem_perm_set_valid(current)) {
 		dlog_error("FFA_MEM_PERM_SET: not allowed\n");
@@ -5010,9 +5012,10 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	 * All regions accessible by the partition are mapped during boot. If we
 	 * cannot get a successful translation for the page range, the request
 	 * to change permissions is rejected.
-	 * mm_get_mode is used to check if the given address range is already
-	 * mapped. If the range is unmapped, return error. If the range is
-	 * mapped appropriate attributes are returned to the caller. Note that
+	 * As the given address range could be divided into sections mapped with
+	 * different attributes, use mm_get_mode_partial to find each section,
+	 * iterating until the entire range is consumed. If a section is
+	 * unmapped or has incompatible attributes, return error. Note that
 	 * mm_get_mode returns true if the address is in the valid VA range as
 	 * supported by the architecture and MMU configurations, as opposed to
 	 * whether a page is mapped or not. For a page to be known as mapped,
@@ -5020,14 +5023,13 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	 * MM_MODE_INVALID set.
 	 */
 
-	mode_ret = mm_get_mode(&vm_locked.vm->ptable, base_addr,
-			       va_add(base_addr, page_count * PAGE_SIZE),
-			       &original_mode);
+	mode_ret = mm_get_mode_partial(&vm_locked.vm->ptable, base_addr,
+				       end_addr, &original_mode, &curr_addr);
 	if (!mode_ret || (original_mode & MM_MODE_INVALID)) {
 		dlog_error(
 			"FFA_MEM_PERM_SET: range %#016lx - %#016lx is not "
 			"mapped\n",
-			va_addr(base_addr), va_addr(end_addr));
+			va_addr(base_addr), va_addr(curr_addr));
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
@@ -5043,6 +5045,30 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 
 	/* Carry forward non-RWX mode flags. */
 	new_mode |= original_mode & other_mode_mask;
+
+	/* Check the remainder of the input address range. */
+	for (; va_addr(curr_addr) < va_addr(end_addr); curr_addr = next_addr) {
+		mode_ret = mm_get_mode_partial(&vm_locked.vm->ptable, curr_addr,
+					       end_addr, &original_mode,
+					       &next_addr);
+		if (!mode_ret || (original_mode & MM_MODE_INVALID)) {
+			dlog_error(
+				"FFA_MEM_PERM_SET: "
+				"range %#016lx - %#016lx is not mapped\n",
+				va_addr(curr_addr), va_addr(next_addr));
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+
+		/* Each subsequent page must have the same non-RWX flags. */
+		if ((original_mode ^ new_mode) & other_mode_mask) {
+			dlog_error(
+				"FFA_MEM_PERM_SET: "
+				"range has mismatched attributes\n");
+			ret = ffa_error(FFA_INVALID_PARAMETERS);
+			goto out;
+		}
+	}
 
 	/*
 	 * Safe to re-map memory, since we know the requested permissions are
