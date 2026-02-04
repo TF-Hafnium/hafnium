@@ -5062,19 +5062,6 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 		 */
 		mm_stage1_defrag(&vm_locked.vm->ptable);
 
-		/*
-		 * Guaranteed to succeed mapping with old mode since the mapping
-		 * with old mode already existed and we have a local page pool
-		 * that should have sufficient memory to go back to the original
-		 * state.
-		 */
-		CHECK(mm_identity_prepare(&vm_locked.vm->ptable,
-					  pa_from_va(base_addr),
-					  pa_from_va(end_addr), original_mode));
-		mm_identity_commit(&vm_locked.vm->ptable, pa_from_va(base_addr),
-				   pa_from_va(end_addr), original_mode);
-
-		mm_stage1_defrag(&vm_locked.vm->ptable);
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
 	}
