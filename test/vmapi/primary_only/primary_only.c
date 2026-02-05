@@ -239,8 +239,9 @@ TEST_PRECONDITION(ffa, ffa_v1_0_features, v1_0_or_later)
 	ret = ffa_features(FFA_RX_RELEASE_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
+	/* Hafnium only supports the 64 bit variant. */
 	ret = ffa_features(FFA_RXTX_MAP_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_RXTX_MAP_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -354,9 +355,6 @@ TEST_PRECONDITION(ffa, ffa_v_1_2_features, v1_2_or_later)
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP2_64);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-
-	ret = ffa_features(FFA_RXTX_MAP_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
 	ret = ffa_features(FFA_RXTX_MAP_64);

@@ -63,17 +63,9 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	ret = ffa_features(FFA_RX_RELEASE_32);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
+	/* Hafnium only supports the 64 bit variant. */
 	ret = ffa_features(FFA_RXTX_MAP_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-	rxtx_map_params = ffa_features_rxtx_map_params(ret);
-	EXPECT_EQ((uint8_t)rxtx_map_params.min_buf_size,
-		  FFA_RXTX_MAP_MIN_BUF_4K);
-	EXPECT_EQ((uint16_t)rxtx_map_params.mbz, 0);
-	/* max_buf_size is only added as a field in v1.2. */
-	EXPECT_EQ((uint16_t)rxtx_map_params.max_buf_size,
-		  (FFA_VERSION_COMPILED >= FFA_VERSION_1_2)
-			  ? FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT
-			  : 0);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_RXTX_MAP_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
@@ -224,15 +216,6 @@ TEST_PRECONDITION(ffa_features, succeeds_ffa_call_ids_v1_2, v1_2_or_later)
 
 	ret = ffa_features(FFA_MSG_SEND_DIRECT_RESP2_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-
-	ret = ffa_features(FFA_RXTX_MAP_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
-	rxtx_map_params = ffa_features_rxtx_map_params(ret);
-	EXPECT_EQ((uint8_t)rxtx_map_params.min_buf_size,
-		  FFA_RXTX_MAP_MIN_BUF_4K);
-	EXPECT_EQ((uint16_t)rxtx_map_params.mbz, 0);
-	EXPECT_EQ((uint16_t)rxtx_map_params.max_buf_size,
-		  FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT);
 
 	ret = ffa_features(FFA_RXTX_MAP_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);

@@ -2680,7 +2680,6 @@ static struct ffa_value ffa_features_function(uint32_t func,
 		}
 		return api_ffa_feature_success(0);
 
-	case FFA_RXTX_MAP_32:
 	case FFA_RXTX_MAP_64: {
 		uint32_t arg2 = 0;
 		struct ffa_features_rxtx_map_params params = {
