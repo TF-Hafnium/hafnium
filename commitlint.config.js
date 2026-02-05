@@ -42,6 +42,11 @@ export default {
         'commitlint',
         'git',
 
+        // submodules
+        'reference',
+        'dtc',
+        'gtest',
+
         // Fallback scope for any miscellaneous change
         'misc'
       ],
