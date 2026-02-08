@@ -76,6 +76,14 @@ bool service1_is_secure(void)
 	return !ffa_is_vm_id(service1_info->vm_id);
 }
 
+bool service3_is_secure(void)
+{
+	struct mailbox_buffers mb = get_precondition_mailbox();
+	struct ffa_partition_info *service3_info = service3(mb.recv);
+
+	return !ffa_is_vm_id(service3_info->vm_id);
+}
+
 bool service1_and_service2_are_secure(void)
 {
 	struct mailbox_buffers mb = get_precondition_mailbox();

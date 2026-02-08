@@ -118,6 +118,7 @@ bool service2_is_vm(void);
 bool service3_is_vm(void);
 bool service1_is_not_vm(void);
 bool service1_is_secure(void);
+bool service3_is_secure(void);
 bool service1_and_service2_are_secure(void);
 bool service1_service2_and_service3_are_secure(void);
 bool all_services_are_secure(void);
