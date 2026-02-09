@@ -648,7 +648,14 @@ static bool hvc_smc_handler(struct ffa_value args, struct vcpu *vcpu,
 			ffa_notifications_sri_trigger_if_delayed(vcpu->cpu);
 		}
 #endif
-		if (func != FFA_VERSION_32) {
+		/*
+		 * During NS world boot, if a secure interrupt is forwarded
+		 * to Hafnium as FFA_INTERRUPT_32 before FFA_VERSION is
+		 * called, version negotiation is prematurely marked as
+		 * complete. This causes subsequent FFA_VERSION calls in the
+		 * normal world to fail.
+		 */
+		if (func != FFA_VERSION_32 && func != FFA_INTERRUPT_32) {
 			struct vm_locked vm_locked = vm_lock(vcpu->vm);
 
 			vm_locked.vm->ffa_version_negotiated = true;
