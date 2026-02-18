@@ -529,7 +529,7 @@ TEST_PRECONDITION(direct_message, ffa_direct_message_req2_services_yield_echo,
  */
 TEST(direct_message, ffa_send_direct_message_req2_disallowed_smc)
 {
-	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
 				0x88889999};
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_value res;

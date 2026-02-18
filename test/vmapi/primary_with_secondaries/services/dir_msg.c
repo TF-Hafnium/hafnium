@@ -756,7 +756,7 @@ TEST_SERVICE(ffa_direct_msg_resp_ext_registers_preserved)
  */
 TEST_SERVICE(version_does_not_support_req2)
 {
-	const uint32_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
+	const uint64_t msg[] = {0x00001111, 0x22223333, 0x44445555, 0x66667777,
 				0x88889999};
 	void *recv_buf = SERVICE_RECV_BUFFER();
 	struct ffa_value res;
