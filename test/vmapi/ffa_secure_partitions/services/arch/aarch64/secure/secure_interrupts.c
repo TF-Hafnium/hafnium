@@ -275,8 +275,7 @@ struct ffa_value sp_sleep_cmd(ffa_id_t source, uint32_t sleep_ms,
 
 	if (func == FFA_MSG_SEND_DIRECT_REQ2_64) {
 		uint64_t msg[] = {0, time_lapsed};
-		return ffa_msg_send_direct_resp2(own_id, source,
-						 (const uint64_t *)&msg,
+		return ffa_msg_send_direct_resp2(own_id, source, msg,
 						 ARRAY_SIZE(msg));
 	}
 	return sp_success(own_id, source, time_lapsed);

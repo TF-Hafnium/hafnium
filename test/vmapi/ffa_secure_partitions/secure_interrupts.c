@@ -182,8 +182,8 @@ TEST(secure_interrupts, sp_direct_response2_intercepted)
 
 	/* Send request to the SP to sleep uninterrupted. */
 	ffa_uuid_init(0, 0, 0, 0, &uuid);
-	res = ffa_msg_send_direct_req2(own_id, receiver_id, &uuid,
-				       (const uint64_t *)&msg, ARRAY_SIZE(msg));
+	res = ffa_msg_send_direct_req2(own_id, receiver_id, &uuid, msg,
+				       ARRAY_SIZE(msg));
 
 	/*
 	 * Secure interrupt should trigger during this time, SP will handle the

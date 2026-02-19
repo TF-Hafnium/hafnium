@@ -87,8 +87,8 @@ TEST_SERVICE(ffa_direct_message_req2_resp_echo)
 	memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &res.arg4,
 		 MAX_RESP_REGS * sizeof(uint64_t));
 
-	ffa_msg_send_direct_resp2(ffa_receiver(res), ffa_sender(res),
-				  (const uint64_t *)msg, MAX_RESP_REGS);
+	ffa_msg_send_direct_resp2(ffa_receiver(res), ffa_sender(res), msg,
+				  MAX_RESP_REGS);
 
 	FAIL("Direct response not expected to return");
 }
@@ -132,8 +132,8 @@ TEST_SERVICE(ffa_yield_direct_message_resp2_echo)
 	memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &res.arg4,
 		 MAX_RESP_REGS * sizeof(uint64_t));
 
-	ffa_msg_send_direct_resp2(ffa_receiver(res), ffa_sender(res),
-				  (const uint64_t *)msg, MAX_RESP_REGS);
+	ffa_msg_send_direct_resp2(ffa_receiver(res), ffa_sender(res), msg,
+				  MAX_RESP_REGS);
 
 	FAIL("Direct response not expected to return");
 }
@@ -193,8 +193,7 @@ TEST_SERVICE(ffa_direct_message_req2_echo_services)
 	HFTEST_LOG("Echo test with: %x", target_info.vm_id);
 
 	res = ffa_msg_send_direct_req2(hf_vm_get_id(), target_info.vm_id,
-				       &target_uuid, (const uint64_t *)&msg,
-				       ARRAY_SIZE(msg));
+				       &target_uuid, msg, ARRAY_SIZE(msg));
 
 	EXPECT_EQ(res.func, FFA_MSG_SEND_DIRECT_RESP2_64);
 
@@ -422,8 +421,7 @@ TEST_SERVICE(ffa_direct_message_v_1_2_cycle_denied)
 
 	/* Try to send a request back instead of a response. */
 	res = ffa_msg_send_direct_req2(own_id, sender, &target_uuid,
-				       (const uint64_t *)&invalid_msg,
-				       ARRAY_SIZE(invalid_msg));
+				       invalid_msg, ARRAY_SIZE(invalid_msg));
 
 	EXPECT_FFA_ERROR(res, FFA_DENIED);
 
@@ -431,8 +429,7 @@ TEST_SERVICE(ffa_direct_message_v_1_2_cycle_denied)
 	memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &args.arg4,
 		 MAX_RESP_REGS * sizeof(uint64_t));
 
-	ffa_msg_send_direct_resp2(receiver, sender, (const uint64_t *)msg,
-				  MAX_RESP_REGS);
+	ffa_msg_send_direct_resp2(receiver, sender, msg, MAX_RESP_REGS);
 
 	FAIL("Direct response not expected to return");
 }
@@ -466,8 +463,7 @@ TEST_SERVICE(ffa_direct_message_cycle_req_req2_denied)
 
 	/* Try to send a request back instead of a response. */
 	res = ffa_msg_send_direct_req2(own_id, sender, &target_uuid,
-				       (const uint64_t *)&invalid_msg,
-				       ARRAY_SIZE(invalid_msg));
+				       invalid_msg, ARRAY_SIZE(invalid_msg));
 	EXPECT_FFA_ERROR(res, FFA_DENIED);
 
 	ffa_msg_send_direct_resp(ffa_receiver(args), ffa_sender(args),
@@ -500,8 +496,7 @@ TEST_SERVICE(ffa_yield_direct_message_v_1_2_echo_services)
 	HFTEST_LOG("Echo test with: %x", target_info.vm_id);
 
 	res = ffa_msg_send_direct_req2(hf_vm_get_id(), target_info.vm_id,
-				       &target_uuid, (const uint64_t *)&msg,
-				       ARRAY_SIZE(msg));
+				       &target_uuid, msg, ARRAY_SIZE(msg));
 	/*
 	 * Be prepared to allocate CPU cycles to target vCPU if it yields while
 	 * processing direct message.
@@ -546,14 +541,14 @@ TEST_SERVICE(ffa_disallowed_direct_msg_resp2)
 	uint64_t msg[MAX_RESP_REGS];
 
 	ret = ffa_msg_send_direct_resp2(service1_info->vm_id, HF_PRIMARY_VM_ID,
-					(uint64_t *)msg, ARRAY_SIZE(msg));
+					msg, ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(ret, FFA_DENIED);
 
 	args = ffa_msg_wait();
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ2_64);
 
-	ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args),
-				  (uint64_t *)msg, ARRAY_SIZE(msg));
+	ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args), msg,
+				  ARRAY_SIZE(msg));
 
 	FAIL("Direct response not expected to return");
 }
@@ -574,12 +569,11 @@ TEST_SERVICE(ffa_direct_msg_req2_disallowed_smc)
 	EXPECT_FFA_ERROR(ret, FFA_DENIED);
 
 	ret = ffa_msg_send_direct_req2(service1_info->vm_id, ffa_sender(args),
-				       &sender_uuid, (uint64_t *)msg,
-				       ARRAY_SIZE(msg));
+				       &sender_uuid, msg, ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 
-	ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args),
-				  (uint64_t *)msg, ARRAY_SIZE(msg));
+	ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args), msg,
+				  ARRAY_SIZE(msg));
 
 	FAIL("Direct response not expected to return");
 }
@@ -609,20 +603,18 @@ TEST_SERVICE(ffa_disallowed_direct_msg_req2)
 
 	/* Attempt request to NWd VM. */
 	ret = ffa_msg_send_direct_req2(service1_info->vm_id, HF_PRIMARY_VM_ID,
-				       &target_uuid, (uint64_t *)msg,
-				       ARRAY_SIZE(msg));
+				       &target_uuid, msg, ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 
 	ret = ffa_msg_send_direct_req2(service1_info->vm_id, HF_VM_ID_BASE + 10,
-				       &target_uuid, (uint64_t *)msg,
-				       ARRAY_SIZE(msg));
+				       &target_uuid, msg, ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(ret, FFA_INVALID_PARAMETERS);
 
 	args = ffa_msg_wait();
 	EXPECT_EQ(args.func, FFA_MSG_SEND_DIRECT_REQ2_64);
 
-	ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args),
-				  (uint64_t *)msg, ARRAY_SIZE(msg));
+	ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args), msg,
+				  ARRAY_SIZE(msg));
 
 	FAIL("Direct response not expected to return");
 }
@@ -652,17 +644,16 @@ TEST_SERVICE(ffa_direct_msg_resp2_invalid_sender_receiver)
 
 	/* Other receiver ID. */
 	invalid_receiver = ffa_is_vm_id(own_id) ? service2_info->vm_id : own_id;
-	res = ffa_msg_send_direct_resp2(own_id, invalid_receiver,
-					(uint64_t *)msg, ARRAY_SIZE(msg));
+	res = ffa_msg_send_direct_resp2(own_id, invalid_receiver, msg,
+					ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 
 	/* Spoof sender ID. */
-	res = ffa_msg_send_direct_resp2(service2_info->vm_id, sender,
-					(uint64_t *)msg, ARRAY_SIZE(msg));
+	res = ffa_msg_send_direct_resp2(service2_info->vm_id, sender, msg,
+					ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_INVALID_PARAMETERS);
 
-	ffa_msg_send_direct_resp2(own_id, sender, (uint64_t *)msg,
-				  ARRAY_SIZE(msg));
+	ffa_msg_send_direct_resp2(own_id, sender, msg, ARRAY_SIZE(msg));
 
 	FAIL("Direct response not expected to return");
 }
@@ -684,8 +675,8 @@ TEST_SERVICE(ffa_direct_msg_req2_resp_failure)
 
 	memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &args.arg4,
 		 MAX_RESP_REGS * sizeof(uint64_t));
-	ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args),
-				  (uint64_t *)msg, ARRAY_SIZE(msg));
+	ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args), msg,
+				  ARRAY_SIZE(msg));
 
 	FAIL("Direct response not expected to return");
 }
@@ -702,7 +693,7 @@ TEST_SERVICE(ffa_direct_msg_req_resp2_failure)
 		 MAX_RESP_REGS * sizeof(uint64_t));
 	/* Respond to FFA_MSG_SEND_DIRECT_REQ with FFA_MSG_SEND_DIRECT_RESP2. */
 	res = ffa_msg_send_direct_resp2(ffa_receiver(args), ffa_sender(args),
-					(uint64_t *)msg, ARRAY_SIZE(msg));
+					msg, ARRAY_SIZE(msg));
 
 	EXPECT_FFA_ERROR(res, FFA_DENIED);
 
@@ -742,9 +733,9 @@ TEST_SERVICE(ffa_direct_msg_resp_ext_registers_preserved)
 		memcpy_s(&msg, sizeof(uint64_t) * MAX_RESP_REGS, &args.arg4,
 			 MAX_RESP_REGS * sizeof(uint64_t));
 
-		args = ffa_msg_send_direct_resp2(
-			ffa_receiver(args), ffa_sender(args),
-			(const uint64_t *)msg, MAX_RESP_REGS);
+		args = ffa_msg_send_direct_resp2(ffa_receiver(args),
+						 ffa_sender(args), msg,
+						 MAX_RESP_REGS);
 	}
 
 	FAIL("Direct response not expected to return");
@@ -778,8 +769,7 @@ TEST_SERVICE(version_does_not_support_req2)
 
 	/* Attempt to send FFA_MSG_SEND_DIRECT_REQ2 and fail. */
 	res = ffa_msg_send_direct_req2(hf_vm_get_id(), target_info.vm_id,
-				       &target_uuid, (const uint64_t *)&msg,
-				       ARRAY_SIZE(msg));
+				       &target_uuid, msg, ARRAY_SIZE(msg));
 	EXPECT_FFA_ERROR(res, FFA_DENIED);
 	ffa_yield();
 }
@@ -821,8 +811,7 @@ TEST_SERVICE(ffa_direct_message_req2_resp_loop)
 			 MAX_RESP_REGS * sizeof(uint64_t));
 
 		res = ffa_msg_send_direct_resp2(
-			ffa_receiver(res), ffa_sender(res),
-			(const uint64_t *)msg, MAX_RESP_REGS);
+			ffa_receiver(res), ffa_sender(res), msg, MAX_RESP_REGS);
 	}
 }
 
