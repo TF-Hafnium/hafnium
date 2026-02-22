@@ -74,7 +74,7 @@ static void smmuv3_disabled_translation(struct smmuv3_driver *smmuv3)
 		gbpa_reg | COMPOSE(INCOMING_CFG, INSTCFG_SHIFT, INSTCFG_MASK);
 	gbpa_reg =
 		gbpa_reg | COMPOSE(INCOMING_CFG, PRIVCFG_SHIFT, PRIVCFG_MASK);
-	gbpa_reg = gbpa_reg | COMPOSE(INCOMING_CFG, SHCFG_SHIFT, SHCFG_MASK);
+	gbpa_reg = gbpa_reg | COMPOSE(INCOMING_SHCFG, SHCFG_SHIFT, SHCFG_MASK);
 	gbpa_reg =
 		gbpa_reg | COMPOSE(INCOMING_CFG, ALLOCFG_SHIFT, ALLOCFG_MASK);
 	gbpa_reg = gbpa_reg | COMPOSE(INCOMING_CFG, MTCFG_SHIFT, MTCFG_MASK);

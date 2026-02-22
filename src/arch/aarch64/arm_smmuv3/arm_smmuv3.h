@@ -172,6 +172,7 @@
 /* Global ByPass Attribute fields */
 #define BYPASS_GBPA UINT32_C(0)
 #define INCOMING_CFG UINT32_C(0)
+#define INCOMING_SHCFG UINT32_C(1)
 #define UPDATE_SHIFT UINT32_C(31)
 #define UPDATE_MASK UINT32_C(0x1)
 #define ABORT_SHIFT UINT32_C(20)
