@@ -28,6 +28,7 @@ export default {
         'notifications',
         'interrupts',
         'iommu',
+        'smmuv3',
 
         // Partition lifecycle
         'lifecycle',
