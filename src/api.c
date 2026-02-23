@@ -4945,6 +4945,7 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	bool mode_ret;
 	mm_mode_t original_mode;
 	mm_mode_t new_mode;
+	const mm_mode_t other_mode_mask = ~(MM_MODE_R | MM_MODE_W | MM_MODE_X);
 	vaddr_t end_addr;
 
 	if (!ffa_memory_is_mem_perm_set_valid(current)) {
@@ -5039,6 +5040,9 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
+
+	/* Carry forward non-RWX mode flags. */
+	new_mode |= original_mode & other_mode_mask;
 
 	/*
 	 * Safe to re-map memory, since we know the requested permissions are
