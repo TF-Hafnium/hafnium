@@ -68,7 +68,7 @@ static struct spinlock sl = SPINLOCK_INIT;
  * to access them directly.
  */
 size_t dlog_buffer_offset;
-char dlog_buffer[DLOG_BUFFER_SIZE];
+char __attribute__((__used__)) dlog_buffer[DLOG_BUFFER_SIZE];
 
 /**
  * Takes the lock, if it is enabled.
