@@ -1651,6 +1651,7 @@ TEST_F(manifest, ffa_invalid_memory_region_attributes)
 {
 	struct_manifest *m;
 
+	/* WX access should not be allowed */
 	/* clang-format off */
 	std::vector<char>  dtb = ManifestDtBuilder()
 		.FfaValidManifest()
@@ -1665,7 +1666,7 @@ TEST_F(manifest, ffa_invalid_memory_region_attributes)
 				.Description("test-memory")
 				.Property("base-address", "<0x7100000>")
 				.Property("pages-count", "<4>")
-				.Property("attributes", "<7>")
+				.Property("attributes", "<6>")
 			.EndChild()
 			.Label("rx")
 			.StartChild("rx")
@@ -1680,6 +1681,41 @@ TEST_F(manifest, ffa_invalid_memory_region_attributes)
 				.Property("base-address", "<0x7310000>")
 				.Property("pages-count", "<1>")
 				.Property("attributes", "<3>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_INVALID_MEM_PERM);
+	manifest_dealloc();
+
+	/* RWX access should not be allowed for S-EL0 partition */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.Compatible({"arm,ffa-manifest-1.1"})
+		.Property("ffa-version", "<0x10000>")
+		.Property("execution-ctx-count", "<1>")
+		.Property("exception-level", "<1>")
+		.Property("execution-state", "<0>")
+		.Property("entrypoint-offset", "<0x00002000>")
+		.Property("xlat-granule", "<0>")
+		.Property("boot-order", "<0>")
+		.Property("ns-interrupts-action", "<0>")
+		.StartChild("services")
+			.Compatible({ "arm,ffa-manifest-services"})
+			.StartChild("service0")
+				.Property("messaging-method", "<4>")
+				.StringProperty("uuid", "b4b5671e-4a90-4fe1-b81f-fb13dae1dacb")
+			.EndChild()
+		.EndChild()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.StartChild("test-memory")
+				.Description("test-memory")
+				.Property("base-address", "<0x7100000>")
+				.Property("pages-count", "<4>")
+				.Property("attributes", "<7>")
 			.EndChild()
 		.EndChild()
 		.Build();

@@ -575,7 +575,7 @@ static enum manifest_return_code parse_base_address(
 /**
  * Parse and validate a memory region/device region's attributes.
  * Returns an error if:
- * - Memory region attributes are not `R` or `RW` or `RX`.
+ * - Memory region attributes are not `R` or `RW` or `RX` or `RWX`.
  * - Device region attributes are not `R` or `RW`.
  * NOTE: Security attribute is not checked by this function, it is checked in
  * the load phase.
@@ -604,6 +604,8 @@ static enum manifest_return_code parse_ffa_region_attributes(
 		case MANIFEST_REGION_ATTR_READ:
 		case MANIFEST_REGION_ATTR_READ | MANIFEST_REGION_ATTR_WRITE:
 		case MANIFEST_REGION_ATTR_READ | MANIFEST_REGION_ATTR_EXEC:
+		case MANIFEST_REGION_ATTR_READ | MANIFEST_REGION_ATTR_WRITE |
+			MANIFEST_REGION_ATTR_EXEC:
 			break;
 		default:
 			return MANIFEST_ERROR_INVALID_MEM_PERM;
@@ -1022,6 +1024,24 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 			error_string, vm->partition.run_time_el,
 			vm->partition.execution_ctx_count);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	for (uint16_t i = 0; i < vm->partition.mem_region_count; i++) {
+		struct memory_region mem_region;
+		const uint32_t rwx_mask = MANIFEST_REGION_ATTR_READ |
+					  MANIFEST_REGION_ATTR_WRITE |
+					  MANIFEST_REGION_ATTR_EXEC;
+
+		mem_region = vm->partition.mem_regions[i];
+
+		if ((vm->partition.run_time_el == S_EL0 ||
+		     vm->partition.run_time_el == EL0) &&
+		    (mem_region.attributes & rwx_mask) == rwx_mask) {
+			dlog_error(
+				"RWX attributes not supported for EL0 "
+				"partition memory region.\n");
+			ret_code = MANIFEST_ERROR_INVALID_MEM_PERM;
+		}
 	}
 
 	for (uint16_t i = 0; i < vm->partition.dev_region_count; i++) {
