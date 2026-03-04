@@ -70,4 +70,7 @@ declare_args() {
 
   # The version of the FF-A specification to implement. Leave empty to use the latest version.
   ffa_version = ""
+
+  # Flag to enable CVE-2025-10263 workaround. Disabled by default.
+  workaround_cve_2025_10263 = 0
 }

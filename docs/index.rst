@@ -11,6 +11,7 @@ Hafnium Documentation
    process/index
    secure-partition-manager/index
    threat_model_spm
+   security-advisories/index
    change-log
    appendix
    glossary

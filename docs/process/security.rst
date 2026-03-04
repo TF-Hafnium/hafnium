@@ -43,12 +43,15 @@ Security Advisories
 +-----------+------------------------------------------------------------------+
 | ID        | Title                                                            |
 +===========+==================================================================+
-|           |                                                                  |
+| |HFV-1|   | Completion of affected memory accesses may not be guaranteed     |
+|           | by the completion of a TLBI                                      |
 +-----------+------------------------------------------------------------------+
 
 .. _issue tracker: https://github.com/TF-Hafnium/hafnium/issues
 .. _mailing list: https://lists.trustedfirmware.org/mailman3/lists/hafnium.lists.trustedfirmware.org/
 .. _TrustedFirmware.org security incident process: https://trusted-firmware-docs.readthedocs.io/en/latest/security_center/
+
+.. |HFV-1| replace:: :ref:`Advisory HFV-1 (CVE-2025-10263)`
 
 --------------
 

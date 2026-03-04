@@ -272,6 +272,10 @@ void arch_mm_invalidate_stage1_range(ffa_id_t asid, vaddr_t va_begin,
 	uintvaddr_t end = va_addr(va_end);
 	uintvaddr_t it;
 
+	assert(end > begin);
+
+	bool large_range = ((end - begin) > (MAX_TLBI_OPS * PAGE_SIZE));
+
 	/* Sync with page table updates. */
 	arch_mm_sync_table_writes();
 
@@ -280,7 +284,7 @@ void arch_mm_invalidate_stage1_range(ffa_id_t asid, vaddr_t va_begin,
 	 * addresses, which means we have to loop over individual pages. If
 	 * there are too many, it is quicker to invalidate all TLB entries.
 	 */
-	if ((end - begin) > (MAX_TLBI_OPS * PAGE_SIZE)) {
+	if (large_range) {
 		if (VM_TOOLCHAIN == 1) {
 			tlbi(vmalle1is);
 		} else {
@@ -289,6 +293,7 @@ void arch_mm_invalidate_stage1_range(ffa_id_t asid, vaddr_t va_begin,
 	} else {
 		begin >>= 12;
 		end >>= 12;
+
 		/* Invalidate stage-1 TLB, one page from the range at a time. */
 		for (it = begin; it < end;
 		     it += (UINT64_C(1) << (PAGE_BITS - 12))) {
@@ -310,7 +315,7 @@ void arch_mm_invalidate_stage1_range(ffa_id_t asid, vaddr_t va_begin,
 	}
 
 	/* Sync data accesses with TLB invalidation completion. */
-	dsb(ish);
+	arch_mm_tlbi_erratum_sync();
 
 	/* Sync instruction fetches with TLB invalidation completion. */
 	isb();
@@ -326,6 +331,10 @@ void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
 	uintpaddr_t begin = ipa_addr(va_begin);
 	uintpaddr_t end = ipa_addr(va_end);
 	uintpaddr_t it;
+
+	assert(end > begin);
+
+	bool large_range = ((end - begin) > (MAX_TLBI_OPS * PAGE_SIZE));
 
 	(void)vmid;
 
@@ -349,7 +358,7 @@ void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
 	 * addresses, which means we have to loop over individual pages. If
 	 * there are too many, it is quicker to invalidate all TLB entries.
 	 */
-	if ((end - begin) > (MAX_TLBI_OPS * PAGE_SIZE)) {
+	if (large_range) {
 		/*
 		 * Invalidate all stage-1 and stage-2 entries of the TLB for
 		 * the current VMID.
@@ -391,7 +400,7 @@ void arch_mm_invalidate_stage2_range(uint16_t vmid, ipaddr_t va_begin,
 	}
 
 	/* Sync data accesses with TLB invalidation completion. */
-	dsb(ish);
+	arch_mm_tlbi_erratum_sync();
 
 	/* Sync instruction fetches with TLB invalidation completion. */
 	isb();
