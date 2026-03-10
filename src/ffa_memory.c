@@ -2327,6 +2327,63 @@ struct ffa_value ffa_memory_send_validate(
 	return (struct ffa_value){.func = FFA_SUCCESS_32};
 }
 
+/*
+ * Returns whether the VM still has an outstanding memory sharing transaction.
+ *
+ * A transaction is considered outstanding if the VM is the sender of an
+ * allocated share state that has not yet been reclaimed, or if the VM is a
+ * receiver of an allocated share or lend state that has not yet been
+ * reclaimed.
+ */
+bool ffa_memory_vm_share_outstanding(ffa_id_t id)
+{
+	struct share_states_locked share_states = share_states_lock();
+	bool outstanding = false;
+
+	for (uint32_t i = 0; i < MAX_MEM_SHARES; ++i) {
+		struct ffa_memory_share_state *state =
+			&share_states.share_states[i];
+
+		/*
+		 * D0234 in the DEN0077A FF-A v1.3 ALP5 specification applies
+		 * only to outstanding lend and share transactions.
+		 */
+		if (state->memory_region == NULL ||
+		    (state->share_func != FFA_MEM_LEND_32 &&
+		     state->share_func != FFA_MEM_LEND_64 &&
+		     state->share_func != FFA_MEM_SHARE_32 &&
+		     state->share_func != FFA_MEM_SHARE_64)) {
+			continue;
+		}
+
+		/* Sender side: any active handle not yet reclaimed. */
+		if (state->memory_region->sender == id) {
+			outstanding = true;
+			break;
+		}
+
+		/* Receiver side: any active handle not yet reclaimed. */
+		for (uint32_t r = 0; r < state->memory_region->receiver_count;
+		     ++r) {
+			struct ffa_memory_access *receiver =
+				ffa_memory_region_get_receiver(
+					state->memory_region, r);
+
+			if (receiver->receiver_permissions.receiver == id) {
+				outstanding = true;
+				break;
+			}
+		}
+
+		if (outstanding) {
+			break;
+		}
+	}
+	share_states_unlock(&share_states);
+
+	return outstanding;
+}
+
 /**
  * Gets the share state for continuing an operation to donate, lend or share
  * memory, and checks that it is a valid request.

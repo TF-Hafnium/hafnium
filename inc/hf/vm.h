@@ -492,3 +492,27 @@ bool vm_is_discoverable(struct vm *vm);
 bool vm_get_range_by_mode(struct vm_locked vm_locked, uintptr_t *begin,
 			  uintptr_t *end, mm_mode_t mode, uintptr_t *start_addr,
 			  mm_mode_t *ptable_mode);
+
+static inline bool vm_rxtx_mapped(struct vm_locked vm_locked)
+{
+	assert(vm_locked.vm != NULL);
+	return vm_locked.vm->mailbox.send != NULL &&
+	       vm_locked.vm->mailbox.recv != NULL;
+}
+
+static inline bool vm_notifications_any_bound(struct vm_locked vm_locked)
+{
+	const struct notifications *from_sp =
+		&vm_locked.vm->notifications.from_sp;
+	const struct notifications *from_vm =
+		&vm_locked.vm->notifications.from_vm;
+
+	for (uint32_t i = 0U; i < MAX_FFA_NOTIFICATIONS; ++i) {
+		if (from_sp->bindings_sender_id[i] != HF_INVALID_VM_ID ||
+		    from_vm->bindings_sender_id[i] != HF_INVALID_VM_ID) {
+			return true;
+		}
+	}
+
+	return false;
+}

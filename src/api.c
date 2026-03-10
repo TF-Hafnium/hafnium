@@ -2644,6 +2644,30 @@ uint32_t api_interrupt_get(struct vcpu_locked current_locked)
 }
 
 /**
+ * As defined in 13.2.2.1 of the FF-A v1.3 ALP5 specification,
+ * the Framework is in use by a partition if any of the following are true:
+ *   - The RX/TX buffers of the partition are mapped.
+ *   - VM or SP notifications of the partition are bound.
+ *   - Framework notifications of the partition are pending.
+ *   - Any memory regions shared or lent by the partition have not been
+ *     reclaimed.
+ *   - Any memory regions shared with, or lent to, the partition have not been
+ *     relinquished and reclaimed.
+ *   - Apart from a single outstanding invocation of FFA_VERSION, there are
+ *     outstanding invocations of any other FF-A ABI on any PE from the
+ *     partition.
+ * NOTE: For now the invocation count condition has not been implemented. This
+ * will come in a subsequent patch.
+ */
+static bool vm_ffa_in_use(struct vm_locked vm_locked)
+{
+	return vm_rxtx_mapped(vm_locked) ||
+	       vm_notifications_any_bound(vm_locked) ||
+	       vm_are_fwk_notifications_pending(vm_locked) ||
+	       ffa_memory_vm_share_outstanding(vm_locked.vm->id);
+}
+
+/**
  * Check whether the requested version is compatible with the SPMC version.
  * If compatible, return true and set ret to the SPMC version. Otherwise,
  * return false and set ret to the closest version implemented by the SPMC.
@@ -2694,8 +2718,8 @@ static bool ffa_version_get_compatibility_response(
  * Returns Hafnium's version number (`FFA_VERSION_COMPILED`) on success.
  * Returns the closest implemented version if the requested version is
  * incompatible. Returns `SMCCC_INVALID_PARAMETER` if the version is invalid
- * (highest bit set). Returns `SMCCC_NOT_SUPPORTED` if the version has already
- * been negotiated and cannot be changed.
+ * (highest bit set). Returns the Null version if renegotiation is denied
+ * because the framework is already in use by the caller.
  */
 struct ffa_value api_ffa_version(struct vcpu *current,
 				 enum ffa_version requested_version)
@@ -2703,16 +2727,14 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	static_assert(sizeof(enum ffa_version) == 4,
 		      "enum ffa_version must be 4 bytes wide");
 
-	const struct ffa_value error = {.func = SMCCC_NOT_SUPPORTED};
 	const struct ffa_value invalid_parameter = {
 		.func = SMCCC_INVALID_PARAMETER,
 	};
+	const struct ffa_value null_version = {
+		.func = make_ffa_version(0, 0),
+	};
 	struct vm_locked current_vm_locked;
 	struct ffa_value compatibility_ret;
-	uint16_t requested_major;
-	uint16_t requested_minor;
-	uint16_t vm_major;
-	uint16_t vm_minor;
 
 	if (!ffa_version_is_valid(requested_version)) {
 		dlog_error(
@@ -2727,21 +2749,14 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 		return compatibility_ret;
 	}
 
-	requested_major = ffa_version_get_major(requested_version);
-	requested_minor = ffa_version_get_minor(requested_version);
-
 	current_vm_locked = vm_lock(current->vm);
-	vm_major = ffa_version_get_major(current_vm_locked.vm->ffa_version);
-	vm_minor = ffa_version_get_minor(current_vm_locked.vm->ffa_version);
 
-	if (current_vm_locked.vm->ffa_version_negotiated &&
-	    requested_version != current_vm_locked.vm->ffa_version) {
+	if (vm_ffa_in_use(current_vm_locked)) {
 		vm_unlock(&current_vm_locked);
 		dlog_error(
-			"FFA_VERSION: Cannot change FF-A version from v%u.%u "
-			"to v%u.%u after other FF-A calls have been made\n",
-			vm_major, vm_minor, requested_major, requested_minor);
-		return error;
+			"FFA_VERSION: Framework in use, returning Null "
+			"version\n");
+		return null_version;
 	}
 
 	current_vm_locked.vm->ffa_version = requested_version;
