@@ -14,10 +14,7 @@ image_binary("qemuloader") {
 }
 
 source_set("loader") {
-  public_configs = [
-    "//src/arch/aarch64:config",
-    "//third_party/dtc:libfdt_config",
-  ]
+  public_configs = [ "//src/arch/aarch64:config" ]
   sources = [
     "entry.S",
     "fwcfg.c",
