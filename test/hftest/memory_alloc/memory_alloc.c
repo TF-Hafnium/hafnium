@@ -6,7 +6,7 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
-#include <stdbool.h>
+#include "hf/plat/memory_alloc.h"
 
 #include "hf/arch/std.h"
 
@@ -31,10 +31,10 @@ void *memory_alloc(size_t size)
 
 	return mpool_alloc_contiguous(&memory_alloc_pool, count, 1);
 }
-void memory_free(void *begin, size_t size)
+bool memory_free(void *begin, size_t size)
 {
-	CHECK(mpool_add_chunk(&memory_alloc_pool, begin,
-			      align_up(size, memory_alloc_pool.entry_size)));
+	return mpool_add_chunk(&memory_alloc_pool, begin,
+			       align_up(size, memory_alloc_pool.entry_size));
 }
 
 bool memory_alloc_rollback_init(void)

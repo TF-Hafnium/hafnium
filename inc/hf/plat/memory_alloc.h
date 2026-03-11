@@ -6,6 +6,11 @@
  * https://opensource.org/licenses/BSD-3-Clause.
  */
 
+#pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+
 void memory_alloc_init(void);
 void *memory_alloc(size_t size);
 bool memory_free(void *begin, size_t size);
