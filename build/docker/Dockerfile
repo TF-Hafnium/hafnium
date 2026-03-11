@@ -16,6 +16,8 @@ RUN apt-get install -y \
 		flex \
 		git \
 		device-tree-compiler \
+		ninja-build \
+		generate-ninja \
 		wget                           `# for setup_checkpatch.sh` \
 		libpixman-1-0                  `# for QEMU` \
 		libsdl2-2.0-0                  `# for QEMU` \

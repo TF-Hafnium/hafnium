@@ -60,9 +60,8 @@ ifeq ($(UNAME_M),x86_64)
 UNAME_M := x64
 endif
 
-PREBUILTS := $(CURDIR)/prebuilts/$(UNAME_S)-$(UNAME_M)
-GN ?= $(PREBUILTS)/gn/gn
-NINJA ?= $(PREBUILTS)/ninja/ninja
+GN ?= gn
+NINJA ?= ninja
 
 CHECKPATCH_SCRIPT:=$(CURDIR)/out/checkpatch/checkpatch.pl
 

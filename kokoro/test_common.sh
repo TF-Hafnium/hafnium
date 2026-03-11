@@ -16,16 +16,6 @@ set -u
 set -x
 
 TIMEOUT=(timeout --foreground)
-# Set path to prebuilts used in the build.
-UNAME_S=$(uname -s | tr '[:upper:]' '[:lower:]')
-UNAME_M=$(uname -m)
-
-if [ $UNAME_M == "x86_64" ]
-then
-        UNAME_M=x64
-fi
-
-export PREBUILTS="$PWD/prebuilts/${UNAME_S}-${UNAME_M}"
 
 # Find out where libc++.so.1 resides so that LD_LIBRARY_PATH is adjusted to
 # the right toolchain lib path. This is required by unit tests.
@@ -39,8 +29,7 @@ PROJECT="${PROJECT:-reference}"
 OUT="out/${PROJECT}"
 # Use the gn args command to search the value of enable_assertions in the
 # args.gn config file. Use grep to take the value from within the quotes.
-ENABLE_ASSERTIONS_BUILD=$(${PREBUILTS}/gn/gn args out/reference \
-				--list=enable_assertions --short \
+ENABLE_ASSERTIONS_BUILD=$(gn args out/reference --list=enable_assertions --short \
 			  | grep -oP '(?<=").*(?=")')
 if [ "$ENABLE_ASSERTIONS_BUILD" == "1" ]
 then
