@@ -10,6 +10,7 @@ TFA_DIR     := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/../../trusted-firm
 TFTF_DIR    := $(realpath $(dir $(lastword $(MAKEFILE_LIST)))/../../tf-a-tests)
 
 HAFNIUM_TFTF_CONFIG := hafnium-tftf.yaml
+HAFNIUM_BUILD_CONFIG := hafnium-standalone.yaml
 SHRINKWRAP := shrinkwrap
 
 # Named `test_` rather than `test` because make will not run the target if the
@@ -25,6 +26,11 @@ test_spmc: all
 .PHONY: test_el3_spmc
 test_el3_spmc: all
 	./kokoro/test_el3_spmc.sh
+
+.PHONY: test_hafnium_build
+test_hafnium_build:
+	@echo "[+] Building Hafnium (master) via Shrinkwrap ($(HAFNIUM_BUILD_CONFIG)) using remote sources"
+	$(SHRINKWRAP) --runtime=null build $(HAFNIUM_BUILD_CONFIG) --verbose
 
 .PHONY: test_tftf_clean
 test_tftf_clean:

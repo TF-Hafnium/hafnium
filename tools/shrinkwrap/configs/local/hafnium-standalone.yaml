@@ -1,0 +1,40 @@
+#
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Copyright HAFNIUM Contributors.
+#
+
+%YAML 1.2
+---
+description: >-
+  Configuration for building Hafnium standalone using Shrinkwrap with
+  sources fetched from the upstream repository.
+
+  The Hafnium repository is cloned at the revision specified by
+  ``HAFNIUM_REVISION`` (default: master). The target platform can be
+  selected using the ``HAFNIUM_PLAT_CONFIG`` build-time variable.
+
+layers:
+  - hafnium-base.yaml
+
+concrete: true
+
+buildex:
+  btvars:
+    # Determines the branch or SHA to pull for HAFNIUM repository
+    HAFNIUM_REVISION:
+      type: string
+      value: master
+
+    # Determines the HAFNIUM Configuration (a.k.a. platform) to build
+    HAFNIUM_PLAT_CONFIG:
+      type: string
+      value: 'secure_aem_v8a_fvp_vhe'
+
+build:
+  hafnium:
+    repo:
+      revision: ${btvar:HAFNIUM_REVISION}
+
+    params:
+      PROJECT: reference
+      PLATFORM: ${btvar:HAFNIUM_PLAT_CONFIG}
