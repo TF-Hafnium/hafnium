@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2025 The Hafnium Authors.
+# Copyright 2025-2026 The Hafnium Authors.
 #
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file or at
@@ -46,7 +46,7 @@ echo "[+] Shrinkwrap directory: $SHRINKWRAP_DIR"
 export PATH="$SHRINKWRAP_DIR/shrinkwrap/shrinkwrap:$PATH"
 
 # Set up Shrinkwrap environment variables for Build and Packaging
-export SHRINKWRAP_CONFIG="${HAFNIUM_ROOT}/tools/shrinkwrap/configs"
+export SHRINKWRAP_CONFIG="${HAFNIUM_ROOT}/tools/shrinkwrap/configs/kokoro:${HAFNIUM_ROOT}/tools/shrinkwrap/configs/local"
 export WORKSPACE="${HAFNIUM_ROOT}/out"
 export SHRINKWRAP_BUILD="${WORKSPACE}/build"
 export SHRINKWRAP_PACKAGE="${WORKSPACE}/package"
