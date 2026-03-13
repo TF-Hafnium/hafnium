@@ -8,7 +8,7 @@
 description: >-
   Overlay for building Hafnium with locally checked-out sources of
   TF-A, and TFTF.
-  Requires TFA_SRC, and TFTF_SRC btvars to be set externally.
+  Requires HAFNIUM_SRC, TFA_SRC, and TFTF_SRC btvars to be set externally.
 
 buildex:
   btvars:
@@ -20,6 +20,9 @@ buildex:
       type: path
       value: null
 
+    HAFNIUM_SRC:
+      type: path
+      value: null
 
 build:
   tfa:
@@ -27,3 +30,6 @@ build:
 
   tftf:
     sourcedir: ${btvar:TFTF_SRC}
+
+  hafnium:
+    sourcedir: ${btvar:HAFNIUM_SRC}

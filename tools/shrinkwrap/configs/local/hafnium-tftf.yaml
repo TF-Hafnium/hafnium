@@ -72,10 +72,8 @@ description: >-
 layers:
   - tftf-base.yaml
   - tfa-base.yaml
-  - hafnium.yaml
   - hafnium-base.yaml
   - arch/v8.5.yaml
-  - FVP_Base_RevC-2xAEMvA-base.yaml
 
 concrete: true
 
@@ -110,10 +108,9 @@ build:
       revision: ${btvar:TFA_REVISION}
 
     params:
-      BL32: ${artifact:HAFNIUM}
-      BL33: ${artifact:TFTF_BIN}
-      SP_LAYOUT_FILE: ${artifact:SP_LAYOUT}
+      PLAT: fvp
       SPD: spmd
+      ARM_ARCH_MINOR: 5
       CTX_INCLUDE_EL2_REGS: 1
       SPMD_SPM_AT_SEL2: 1
       CTX_INCLUDE_PAUTH_REGS: 1
@@ -121,13 +118,12 @@ build:
       BRANCH_PROTECTION: 1
       GIC_EXT_INTID: 1
       PLAT_TEST_SPM: 1
-      ARM_ARCH_MINOR: 5
+      BL32: ${artifact:HAFNIUM}
+      BL33: ${artifact:TFTF_BIN}
+      SP_LAYOUT_FILE: ${artifact:SP_LAYOUT}
 
 run:
-  rtvars:
-    CACHE_MODEL_ENABLED:
-      type: string
-      value: 0
+  name: FVP_Base_RevC-2xAEMvA
 
   params:
     -C bp.secureflashloader.fname: ${artifact:BL1}
@@ -135,10 +131,54 @@ run:
     '--data cluster0.cpu0': ${artifact:EL3_PAYLOAD_BIN}@0x80000000
     ' --data cluster0.cpu0': ${artifact:NS_BL1U_BIN}@0x0beb8000
     # Cache modelling settings
-    -C cache_state_modelled: ${rtvar:CACHE_MODEL_ENABLED}
+    -C cache_state_modelled: 1
+    -C bp.pl011_uart0.shutdown_tag: '"NOTICE:  Exiting tests."'
+    -C bp.ve_sysregs.exit_on_shutdown: 1
+    -C gic_distributor.ARE-fixed-to-one: 1
+    -C gic_distributor.extended-ppi-count: 64
+    -C gic_distributor.extended-spi-count: 1024
+    -C cluster0.cpu0.etm-present: 0
+    -C cluster0.cpu1.etm-present: 0
+    -C cluster0.cpu2.etm-present: 0
+    -C cluster0.cpu3.etm-present: 0
+    -C cluster0.stage12_tlb_size: 1024
+    -C cluster1.cpu0.etm-present: 0
+    -C cluster1.cpu1.etm-present: 0
+    -C cluster1.cpu2.etm-present: 0
+    -C cluster1.cpu3.etm-present: 0
+    -C cluster1.stage12_tlb_size: 1024
+    -C pci.pci_smmuv3.mmu.SMMU_AIDR: 2
+    -C pci.pci_smmuv3.mmu.SMMU_IDR1: 0x00600002
+    -C pci.pci_smmuv3.mmu.SMMU_IDR3: 0x1714
+    -C pci.pci_smmuv3.mmu.SMMU_S_IDR1: 0xA0000002
+    -C pci.pci_smmuv3.mmu.SMMU_S_IDR2: 0
+    -C pci.pci_smmuv3.mmu.SMMU_S_IDR3: 0
+    -C bp.dram_metadata.is_enabled: 1
+    -C bp.ls64_testing_fifo.op_type: 0
+    -C cluster0.memory_tagging_support_level: 2
+    -C cluster0.has_branch_target_exception: 1
+    -C cluster0.gicv3.extended-interrupt-range-support: 1
+    -C cluster0.check_memory_attributes: 0
+    -C pci.dma330x4.use_smmuv3testengine_not_dmacs: 1
+    -C cci550.force_on_from_start: 1
+    -C pci.pci_smmuv3.mmu.SMMU_IDR0: 0x0046123B
+    -C pci.pci_smmuv3.mmu.SMMU_IDR5: 0xFFFF0472
+    -C cluster0.arm_v8_7_accelerator_support_level: ""
+    -C cluster1.memory_tagging_support_level: 2
+    -C cluster1.has_branch_target_exception: 1
+    -C cluster1.gicv3.extended-interrupt-range-support: 1
+    -C cluster1.check_memory_attributes: 0
+    -C cluster1.arm_v8_7_accelerator_support_level: ""
 
   terminals:
     bp.terminal_0:
       friendly: TF-A
+      port_regex: 'terminal_0: Listening for serial connection on port (\d+)'
+      type: stdout
+      logfile: out/package/hafnium-tftf/log/uart0.log
+
     bp.terminal_1:
-      friendly: HAFNIUM
+      friendly: term1
+      port_regex: 'terminal_1: Listening for serial connection on port (\d+)'
+      type: stdout
+      logfile: out/package/hafnium-tftf/log/uart1.log

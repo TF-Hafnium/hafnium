@@ -57,9 +57,8 @@ ifeq ($(strip $(shell \
 else
 	@echo "[!] One or more local repos not found — falling back to remote clone"
 	@echo "[+] Building from Hafnium root: $(HAFNIUM_DIR)"
-	$(SHRINKWRAP) --runtime=null build \
+	$(SHRINKWRAP) --runtime=null build $(HAFNIUM_TFTF_CONFIG) \
 			--btvar=HAFNIUM_SRC=$(HAFNIUM_DIR) \
-			$(HAFNIUM_TFTF_CONFIG) \
 			--no-sync=hafnium \
 			--verbose
 endif
