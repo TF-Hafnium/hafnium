@@ -127,6 +127,7 @@ vm_kernel("primary_with_secondaries_test_vm") {
     "dir_msg.c",
     "ffa.c",
     "ffa_console_log.c",
+    "ffa_version.c",
     "floating_point.c",
     "indirect_messaging.c",
     "memory_sharing.c",
@@ -226,6 +227,7 @@ vm_kernel("primary_with_secondaries_el0_test_vm") {
   sources = [
     "boot.c",
     "ffa.c",
+    "ffa_version.c",
     "memory_sharing.c",
   ]
 
@@ -319,6 +321,7 @@ vm_kernel("primary_with_sp_test_vm") {
     "boot.c",
     "dir_msg.c",
     "ffa_console_log.c",
+    "ffa_version.c",
     "indirect_messaging.c",
     "memory_sharing.c",
     "rx_ownership.c",
