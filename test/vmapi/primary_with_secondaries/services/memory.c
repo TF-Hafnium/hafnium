@@ -153,6 +153,47 @@ TEST_SERVICE(memory_increment_relinquish_with_clear_check_not_zeroed)
 	}
 }
 
+/**
+ * Attempt to lend normal memory to another SP, reclaim it and check the
+ * SP can access it again.
+ */
+TEST_SERVICE(ffa_lend_normal_memory_to_sp_and_reclaim)
+{
+	struct mailbox_buffers mb = get_service_mailbox();
+	struct ffa_partition_info *service2_info = service2(mb.recv);
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)page, .page_count = 1},
+	};
+	ffa_memory_handle_t handle;
+
+	/* Try write to the memory before sharing. */
+	page[0] = 'h';
+	page[1] = 'e';
+	page[2] = 'l';
+	page[3] = 'l';
+	page[4] = 'o';
+	page[5] = '\n';
+
+	/* Lend memory to next VM. */
+	handle = send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), service2_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
+
+	ffa_yield();
+
+	ASSERT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
+
+	page[0] = 'h';
+	page[1] = 'i';
+	page[2] = '\n';
+
+	ffa_yield();
+}
+
 TEST_SERVICE(memory_increment_check_mem_attr)
 {
 	enum ffa_memory_type type;
