@@ -84,7 +84,7 @@
 		sec_wdog {
 			/* SP805 Trusted Watchdog Module */
 			base-address = <0x00000000 0x2a490000>;
-			pages-count = <32>; /* Two 64KB pages */
+			pages-count = <16>; /* One 64KB page */
 			attributes = <0x3>; /* read-write */
 			interrupts = <56 0x900>;
 		};

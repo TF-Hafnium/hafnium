@@ -263,7 +263,7 @@ A sample can be found at `[7]`_:
 		device_type = "device-memory";
 		reg = <0x0 0x1c090000 0x0 0x40000>, /* UART */
 		      <0x0 0x2bfe0000 0x0 0x20000>, /* SMMUv3TestEngine */
-		      <0x0 0x2a490000 0x0 0x20000>, /* SP805 Trusted Watchdog */
+		      <0x0 0x2a490000 0x0 0x10000>, /* SP805 Trusted Watchdog */
 		      <0x0 0x1c130000 0x0 0x10000>; /* Virtio block device */
 	};
 
