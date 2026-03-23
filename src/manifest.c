@@ -373,6 +373,25 @@ static bool is_memory_region_within_ranges(uintptr_t region_start,
 	return false;
 }
 
+/**
+ * Return true if the region described by `region_start` and `page_count`
+ * is contained by any of `ranges`.
+ */
+static bool is_memory_region_contained_by_ranges(
+	uintptr_t region_start, uint32_t page_count,
+	const struct mem_range ranges[], size_t ranges_size)
+{
+	struct mem_range region = make_mem_range(region_start, page_count);
+
+	for (size_t i = 0; i < ranges_size; i++) {
+		if (mem_range_contains_range(ranges[i], region)) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void dump_memory_ranges(const struct mem_range *ranges,
 			const size_t ranges_size, bool ns)
 {
@@ -406,7 +425,7 @@ static enum manifest_return_code check_partition_memory_is_valid(
 		(attributes & MANIFEST_REGION_ATTR_SECURITY) == 0U;
 	const struct mem_range *ranges_from_manifest;
 	size_t ranges_count;
-	bool within_ranges;
+	bool is_contained;
 	enum manifest_return_code error_return;
 
 	if (!is_device_region) {
@@ -425,10 +444,10 @@ static enum manifest_return_code check_partition_memory_is_valid(
 		error_return = MANIFEST_ERROR_DEVICE_MEM_REGION_INVALID;
 	}
 
-	within_ranges = is_memory_region_within_ranges(
+	is_contained = is_memory_region_contained_by_ranges(
 		base_address, page_count, ranges_from_manifest, ranges_count);
 
-	return within_ranges ? MANIFEST_SUCCESS : error_return;
+	return is_contained ? MANIFEST_SUCCESS : error_return;
 }
 
 /*
