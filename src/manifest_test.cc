@@ -2009,7 +2009,7 @@ TEST_F(manifest, ffa_boot_order_not_unique)
 		.Build();
 	/* clang-format on */
 
-	boot_params_init(&params, nullptr);
+	boot_params_init(&params, {});
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
 	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params),
 		  MANIFEST_ERROR_INVALID_BOOT_ORDER);
@@ -2454,19 +2454,19 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 				.FfaPartition()
 				.LoadAddress((uint64_t)&spkg_1)
 				.VcpuCount(1)
-				.MemSize(0x4000)
+				.MemSize(sp_pkg_get_mem_size(&spkg_1.spkg))
 			.EndChild()
 			.StartChild("vm2")
 				.DebugName("ffa_partition_2")
 				.FfaPartition()
 				.LoadAddress((uint64_t)&spkg_2)
 				.VcpuCount(1)
-				.MemSize(0x4000)
+				.MemSize(sp_pkg_get_mem_size(&spkg_2.spkg))
 			.EndChild()
 		.EndChild()
 		.Build();
 	/* clang-format on */
-	boot_params_init(&params, &spkg_1);
+	boot_params_init(&params, {&spkg_1, &spkg_2});
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
 	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params),
 		  MANIFEST_ERROR_MEM_REGION_OVERLAP);
@@ -2541,19 +2541,19 @@ TEST_F(manifest, ffa_device_region_multi_sps)
 				.FfaPartition()
 				.LoadAddress((uint64_t)&spkg_1)
 				.VcpuCount(1)
-				.MemSize(0x4000)
+				.MemSize(sp_pkg_get_mem_size(&spkg_1.spkg))
 			.EndChild()
 			.StartChild("vm2")
 				.DebugName("ffa_partition_2")
 				.FfaPartition()
 				.LoadAddress((uint64_t)&spkg_2)
 				.VcpuCount(1)
-				.MemSize(0x4000)
+				.MemSize(sp_pkg_get_mem_size(&spkg_2.spkg))
 			.EndChild()
 		.EndChild()
 		.Build();
 	/* clang-format on */
-	boot_params_init(&params, &spkg_1);
+	boot_params_init(&params, {&spkg_1, &spkg_2});
 	memiter_init(&it, core_dtb.data(), core_dtb.size());
 	ASSERT_EQ(manifest_init(mm_stage1_locked, &m, &it, &params),
 		  MANIFEST_SUCCESS);

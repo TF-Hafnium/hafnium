@@ -440,8 +440,9 @@ class manifest : public ::testing::Test
 		}
 	};
 
-	static void boot_params_init(struct boot_params *params,
-				     Partition_package *pkg)
+	static void boot_params_init(
+		struct boot_params *params,
+		std::initializer_list<Partition_package *> pkgs)
 	{
 		/*
 		 * For the manifest tests we only care about the memory ranges
@@ -451,15 +452,18 @@ class manifest : public ::testing::Test
 		params->mem_ranges[0].end = pa_init((uintpaddr_t)0x8ffffff);
 		params->mem_ranges_count = 1;
 
-		if (pkg != nullptr) {
+		assert(pkgs.size() <=
+		       (MAX_MEM_RANGES - params->mem_ranges_count));
+		for (Partition_package *pkg : pkgs) {
 			auto mem_base = (uintpaddr_t)pkg;
 			uintpaddr_t mem_end =
-				mem_base + sp_pkg_get_mem_size(&pkg->spkg);
+				mem_base + sp_pkg_get_mem_size(&pkg->spkg) - 1;
 
+			params->mem_ranges[params->mem_ranges_count].begin =
+				pa_init(mem_base);
+			params->mem_ranges[params->mem_ranges_count].end =
+				pa_init(mem_end);
 			params->mem_ranges_count++;
-
-			params->mem_ranges[1].begin = pa_init(mem_base);
-			params->mem_ranges[1].end = pa_init(mem_end);
 		}
 
 		params->ns_mem_ranges[0].begin =
@@ -488,7 +492,7 @@ class manifest : public ::testing::Test
 		struct boot_params params;
 		enum manifest_return_code ret;
 
-		boot_params_init(&params, nullptr);
+		boot_params_init(&params, {});
 
 		memiter_init(&it, vec.data(), vec.size());
 
@@ -505,7 +509,7 @@ class manifest : public ::testing::Test
 		struct boot_params params;
 		enum manifest_return_code ret;
 
-		boot_params_init(&params, spkg);
+		boot_params_init(&params, {spkg});
 
 		/* clang-format off */
 		std::vector<char> core_dtb = ManifestDtBuilder()
@@ -535,7 +539,7 @@ class manifest : public ::testing::Test
 		struct boot_params params;
 		enum manifest_return_code ret;
 
-		boot_params_init(&params, &spkg);
+		boot_params_init(&params, {&spkg});
 
 		/* clang-format off */
 		std::vector<char> core_dtb = ManifestDtBuilder()
