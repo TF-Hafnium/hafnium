@@ -1,0 +1,119 @@
+#
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Copyright HAFNIUM Contributors.
+#
+
+%YAML 1.2
+---
+description: >-
+  Common base configuration for building and running the TF-A, TFTF
+  and Hafnium software stack using Shrinkwrap.
+
+  This configuration is intended for CI-driven SPM test execution and
+  is shared across SPM based TFTF tests.
+  It defines the common build inputs and runtime model parameters,
+  while test-specific behavior is provided via test specific overlays.
+
+layers:
+  - arch/v8.5.yaml
+
+buildex:
+  btvars:
+    TFA_SRC:
+      type: path
+      value: null
+
+    TFTF_SRC:
+      type: path
+      value: null
+
+    HAFNIUM_SRC:
+      type: path
+      value: null
+
+    TFTF_BUILD:
+      type: string
+      options:
+        - release
+        - debug
+      value: release
+
+    TFA_BUILD:
+      type: string
+      options:
+        - release
+        - debug
+      value: release
+
+build:
+  tfa:
+    sourcedir: ${btvar:TFA_SRC}
+
+  tftf:
+    sourcedir: ${btvar:TFTF_SRC}
+
+  hafnium:
+    sourcedir: ${btvar:HAFNIUM_SRC}
+
+run:
+  name: FVP_Base_RevC-2xAEMvA
+
+  params:
+    -C bp.ve_sysregs.exit_on_shutdown: 1
+    -C bp.dram_metadata.is_enabled: 1
+    -C pctl.startup: 0.0.0.0
+    -C bp.ls64_testing_fifo.op_type: 0
+    -C cache_state_modelled: 1
+    -C pci.dma330x4.use_smmuv3testengine_not_dmacs: 1
+    -C cci550.force_on_from_start: 1
+    -C gic_distributor.ARE-fixed-to-one: 1
+    -C gic_distributor.extended-ppi-count: 64
+    -C gic_distributor.extended-spi-count: 1024
+    -C bp.pl011_uart0.unbuffered_output: 1
+    -C bp.pl011_uart1.unbuffered_output: 1
+    -C bp.pl011_uart2.unbuffered_output: 1
+    -C bp.pl011_uart3.unbuffered_output: 1
+    -C bp.terminal_0.start_port: 5000
+    -C bp.terminal_1.start_port: 5001
+    -C bp.terminal_2.start_port: 5002
+    -C bp.terminal_3.start_port: 5003
+    -C cluster0.cpu0.etm-present: 0
+    -C cluster0.cpu1.etm-present: 0
+    -C cluster0.cpu2.etm-present: 0
+    -C cluster0.cpu3.etm-present: 0
+    -C cluster1.cpu0.etm-present: 0
+    -C cluster1.cpu1.etm-present: 0
+    -C cluster1.cpu2.etm-present: 0
+    -C cluster1.cpu3.etm-present: 0
+    -C cluster1.stage12_tlb_size: 1024
+    -C cluster0.stage12_tlb_size: 1024
+    -C cluster0.check_memory_attributes: 0
+    -C cluster1.check_memory_attributes: 0
+    -C cluster0.has_branch_target_exception: 1
+    -C cluster1.has_branch_target_exception: 1
+    -C cluster0.gicv3.extended-interrupt-range-support: 1
+    -C cluster1.gicv3.extended-interrupt-range-support: 1
+    -C pci.pci_smmuv3.mmu.SMMU_AIDR: 2
+    -C pci.pci_smmuv3.mmu.SMMU_IDR1: 0x00600002
+    -C pci.pci_smmuv3.mmu.SMMU_IDR3: 0x1714
+    -C pci.pci_smmuv3.mmu.SMMU_S_IDR1: 0xA0000002
+    -C pci.pci_smmuv3.mmu.SMMU_S_IDR2: 0
+    -C pci.pci_smmuv3.mmu.SMMU_S_IDR3: 0
+    -C pci.pci_smmuv3.mmu.SMMU_IDR0: 0x0046123B
+    -C pci.pci_smmuv3.mmu.SMMU_IDR5: 0xFFFF0472
+    -C bp.pl011_uart0.shutdown_tag: '"NOTICE:  Exiting tests."'
+    -C bp.secureflashloader.fname: ${artifact:BL1}
+    -C bp.flashloader0.fname: ${artifact:FIP}
+    '--data cluster0.cpu0': ${artifact:EL3_PAYLOAD_BIN}@0x80000000
+    ' --data cluster0.cpu0': ${artifact:NS_BL1U_BIN}@0x0beb8000
+
+  terminals:
+    bp.terminal_0:
+      friendly: TF-A
+      port_regex: 'terminal_0: Listening for serial connection on port (\d+)'
+      type: stdout
+
+    bp.terminal_1:
+      friendly: HAFNIUM
+      port_regex: 'terminal_1: Listening for serial connection on port (\d+)'
+      type: stdout
