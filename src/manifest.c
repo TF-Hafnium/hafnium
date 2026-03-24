@@ -981,10 +981,17 @@ static enum manifest_return_code sanity_check_ffa_manifest(
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
 	}
 
+#if defined(SECURE_WORLD) && SECURE_WORLD == 0
 	if (vm->partition.run_time_el != EL1 &&
-	    vm->partition.run_time_el != S_EL1 &&
-	    vm->partition.run_time_el != S_EL0 &&
 	    vm->partition.run_time_el != EL0) {
+#else  // !defined(SECURE_WORLD) || SECURE_WORLD == 1
+	/*
+	 * Including two cases, one is checking for SECURE_WORLD == 1, another
+	 * one is checking for the test cases in manifest_test.cc
+	 */
+	if (vm->partition.run_time_el != S_EL1 &&
+	    vm->partition.run_time_el != S_EL0) {
+#endif
 		dlog_error("Exception level %s: %d\n", error_string,
 			   vm->partition.run_time_el);
 		ret_code = MANIFEST_ERROR_NOT_COMPATIBLE;
