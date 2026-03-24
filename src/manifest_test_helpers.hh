@@ -12,16 +12,18 @@
 #include <array>
 #include <cstdlib>
 #include <format>
-#include <gmock/gmock.h>
 #include <iostream>
 #include <iterator>
 #include <sstream>
-#include <string_view>
-#include <vector>
 #include <unistd.h>
+#include <vector>
+
+#include <gmock/gmock.h>
+#include <string_view>
 
 extern "C" {
 #include "hf/arch/std.h"
+
 #include "hf/boot_params.h"
 #include "hf/manifest.h"
 #include "hf/mm.h"
