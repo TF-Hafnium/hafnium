@@ -1,0 +1,5 @@
+fvp-spm-live-activate-sp.yaml
+fvp-spm-48bit-pa.yaml
+fvp-spm-ivy-vhe.yaml
+fvp-spm-sve-sme-context-mgmt.yaml
+fvp-spm-crash-debug-cactus-no-pwr-mgmt.yaml

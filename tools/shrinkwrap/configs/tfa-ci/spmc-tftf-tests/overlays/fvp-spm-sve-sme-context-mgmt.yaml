@@ -1,0 +1,193 @@
+#
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Copyright HAFNIUM Contributors.
+#
+
+%YAML 1.2
+---
+description: >-
+  Overlay for CI test configuration:
+  (tf-a-l2-functional-tftf-spm-arm-fvp/fvp-spm-sve+sme,fvp-default,fvp-default:fvp-spm.all)
+
+build:
+  tftf:
+    toolchain: aarch64-none-elf-
+
+    params:
+      PLAT: fvp
+      TESTS: cpu-context-mgmt
+      DEBUG: $$( test '${btvar:TFTF_BUILD}' != debug ; echo $$? )
+      BUILD_BASE: ${param:builddir}
+
+
+    prebuild:
+      # Always perform a clean build. Test configurations use isolated
+      # build directories and parameters vary per overlay, so conditional
+      # clean logic is unnecessary and a full clean ensures correctness.
+      - make ${param:join_equal} clean
+
+    build:
+      # tfa-tests has makefile dependency bug that makes parallel make for more
+      # than ~8 jobs unreliable, so limit it to 8.
+      - "make ${param:join_equal} -j$$(( ${param:jobs} < 8 ? ${param:jobs} : 8 )) all"
+
+    artifacts:
+      TFTF_OUT:
+        path: ${param:builddir}/fvp/${btvar:TFTF_BUILD}
+        export: false
+      TFTF_BIN: ${artifact:TFTF_OUT}/tftf.bin
+      SP_LAYOUT: ${artifact:TFTF_OUT}/sp_layout.json
+      CACTUS_BIN:  ${artifact:TFTF_OUT}/cactus.bin
+      EL3_PAYLOAD_BIN:  ${artifact:TFTF_OUT}/el3_payload/el3_payload.bin
+      NS_BL1U_BIN:  ${artifact:TFTF_OUT}/ns_bl1u.bin
+
+  hafnium:
+    params:
+      PROJECT: reference
+      PLATFORM: secure_aem_v8a_fvp_vhe
+
+    build:
+      # Hafnium doesn't provide a mechanism to forward number of jobs to ninja,
+      # so it will always parallelize across all cpus. Ideally we would specify
+      # max jobs with ${param:jobs}.
+      - make OUT_DIR=${param:builddir} ${param:join_equal}
+
+    artifacts:
+      HAFNIUM: ${param:builddir}/secure_aem_v8a_fvp_vhe_clang/hafnium.bin
+
+  tfa:
+    toolchain: aarch64-none-elf-
+
+    params:
+      PLAT: fvp
+      DEBUG: $$( test '${btvar:TFA_BUILD}' != debug ; echo $$? )
+      BUILD_BASE: ${param:builddir}
+      SPD: spmd
+      CTX_INCLUDE_AARCH32_REGS: 0
+      ARM_ARCH_MAJOR: 8
+      ARM_ARCH_MINOR: 5
+      BRANCH_PROTECTION: 1
+      ENABLE_SVE_FOR_SWD: 1
+      ENABLE_SME_FOR_SWD: 1
+      GIC_EXT_INTID: 1
+      PLAT_TEST_SPM: 1
+      SP_LAYOUT_FILE: ${artifact:SP_LAYOUT}
+      ARM_BL2_SP_LIST_DTS: ${artifact:SP_LIST}
+      BL32: ${artifact:HAFNIUM}
+      BL33: ${artifact:TFTF_BIN}
+
+    prebuild:
+      # Always perform a clean build. Test configurations use isolated
+      # build directories and parameters vary per overlay, so conditional
+      # clean logic is unnecessary and a full clean ensures correctness.
+      - make ${param:join_equal} clean
+
+    build:
+      - "make ${param:join_equal} -j${param:jobs} all fip"
+
+    artifacts:
+      TFA_OUT:
+        path: ${param:builddir}/fvp/${btvar:TFA_BUILD}
+        export: false
+      BL1:  ${artifact:TFA_OUT}/bl1.bin
+      BL2:  ${artifact:TFA_OUT}/bl2.bin
+      BL31: ${artifact:TFA_OUT}/bl31.bin
+      FIP:  ${artifact:TFA_OUT}/fip.bin
+      SP_LIST: ${artifact:TFA_OUT}/sp_list_fragment.dts
+
+run:
+
+  params:
+    -C cluster0.has_ete: 1
+    -C cluster1.has_ete: 1
+    -C cluster0.has_sve: 1
+    -C cluster1.has_sve: 1
+    -C cluster0.sve.veclen: 16
+    -C cluster1.sve.veclen: 16
+    -C cluster0.sve.has_sme: 1
+    -C cluster1.sve.has_sme: 1
+    -C cluster0.sve.has_sme2: 1
+    -C cluster1.sve.has_sme2: 1
+    -C cluster0.sve.has_sme_fa64: 1
+    -C cluster1.sve.has_sme_fa64: 1
+    -C cluster0.has_amu: 1
+    -C cluster1.has_amu: 1
+    -C cluster0.amu_version: 2
+    -C cluster1.amu_version: 2
+    -C cluster0.memory_tagging_support_level: 3
+    -C cluster1.memory_tagging_support_level: 3
+    -C cluster0.has_v8_9_debug_extension: 1
+    -C cluster1.has_v8_9_debug_extension: 1
+    -C cluster0.cpu0.number-of-breakpoints: 64
+    -C cluster1.cpu0.number-of-breakpoints: 64
+    -C cluster0.has_self_hosted_trace_extension: 2
+    -C cluster1.has_self_hosted_trace_extension: 1
+    -C cluster0.has_trbe: 1
+    -C cluster1.has_trbe: 1
+    -C cluster0.has_brbe: 1
+    -C cluster1.has_brbe: 1
+    -C cluster0.has_arm_v9-5: 1
+    -C cluster1.has_arm_v9-5: 1
+    -C cluster0.has_mpam: 2
+    -C cluster1.has_mpam: 2
+    -C cluster0.mpam_frac: 1
+    -C cluster1.mpam_frac: 1
+    -C cluster0.mpam_has_bw_ctrl: 1
+    -C cluster1.mpam_has_bw_ctrl: 1
+    -C cluster0.idte3_support_level: 1
+    -C cluster1.idte3_support_level: 1
+    -C cluster0.has_rndr: 1
+    -C cluster1.has_rndr: 1
+    -C cluster0.has_fgt2: 2
+    -C cluster1.has_fgt2: 2
+    -C cluster0.has_fgwte3: 1
+    -C cluster1.has_fgwte3: 1
+    -C cluster0.has_ebep: 1
+    -C cluster1.has_ebep: 1
+    -C cluster0.ecv_support_level: 2
+    -C cluster1.ecv_support_level: 2
+    -C cluster0.has_permission_indirection_s1: 2
+    -C cluster1.has_permission_indirection_s1: 2
+    -C cluster0.has_permission_overlay_s1: 2
+    -C cluster1.has_permission_overlay_s1: 2
+    -C cluster0.has_permission_overlay_s2: 2
+    -C cluster1.has_permission_overlay_s2: 2
+    -C cluster0.restriction_on_speculative_execution: 2
+    -C cluster1.restriction_on_speculative_execution: 2
+    -C cluster0.has_gcs: 2
+    -C cluster1.has_gcs: 2
+    -C cluster0.has_translation_hardening: 2
+    -C cluster1.has_translation_hardening: 2
+    -C cluster0.has_128_bit_tt_descriptors: 2
+    -C cluster1.has_128_bit_tt_descriptors: 2
+    -C cluster0.has_fpmr: "1"
+    -C cluster1.has_fpmr: "1"
+    -C cluster0.has_v8_7_pmu_extension: 2
+    -C cluster1.has_v8_7_pmu_extension: 2
+    -C cluster0.has_mops_option: 1
+    -C cluster1.has_mops_option: 1
+    -C cluster0.has_delayed_wfe_trap: 2
+    -C cluster1.has_delayed_wfe_trap: 2
+    -C cluster0.has_uinj: "2"
+    -C cluster1.has_uinj: "2"
+    -C cluster0.checked_pointer_arithmetic_support_level: 2
+    -C cluster1.checked_pointer_arithmetic_support_level: 2
+    -C cluster0.has_hardware_dirty_state_tracking_structure: 2
+    -C cluster1.has_hardware_dirty_state_tracking_structure: 2
+    -C cluster0.has_hardware_accelerator_for_cleaning_dirty_state: 2
+    -C cluster1.has_hardware_accelerator_for_cleaning_dirty_state: 2
+    -C cluster1.has_branch_target_exception: 1
+    -C cluster1.gicv3.extended-interrupt-range-support: 1
+    -C cluster1.stage12_tlb_size: 1024
+    -C cluster1.check_memory_attributes: 0
+    -C cluster0.arm_v8_7_accelerator_support_level: "3"
+    -C cluster1.arm_v8_7_accelerator_support_level: "3"
+
+  terminals:
+    bp.terminal_0:
+      friendly: TF-A
+      logfile: out/package/spmc-tftf-tests/fvp-spm-sve-sme-context-mgmt/log/uart0.log
+
+    bp.terminal_1:
+      friendly: HAFNIUM
+      logfile: out/package/spmc-tftf-tests/fvp-spm-sve-sme-context-mgmt/log/uart1.log

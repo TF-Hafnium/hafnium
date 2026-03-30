@@ -1,0 +1,117 @@
+#
+# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-FileCopyrightText: Copyright HAFNIUM Contributors.
+#
+
+%YAML 1.2
+---
+description: >-
+  Overlay for CI test configuration:
+  (tf-a-l2-functional-tftf-spm-arm-fvp/fvp-spm,fvp-ivy-vhe,fvp-default:fvp-spm)
+
+build:
+  tftf:
+    toolchain: aarch64-none-elf-
+
+    params:
+      PLAT: fvp
+      DEBUG: $$( test '${btvar:TFTF_BUILD}' != debug ; echo $$? )
+      BUILD_BASE: ${param:builddir}
+      TESTS: spm
+      IVY_SHIM: 0
+      ARM_ARCH_MINOR: 5
+      BRANCH_PROTECTION: 1
+
+    prebuild:
+      # Always perform a clean build. Test configurations use isolated
+      # build directories and parameters vary per overlay, so conditional
+      # clean logic is unnecessary and a full clean ensures correctness.
+      - make ${param:join_equal} clean
+
+    build:
+      # tfa-tests has makefile dependency bug that makes parallel make for more
+      # than ~8 jobs unreliable, so limit it to 8.
+      - "make ${param:join_equal} -j$$(( ${param:jobs} < 8 ? ${param:jobs} : 8 )) all"
+
+    artifacts:
+      TFTF_OUT:
+        path: ${param:builddir}/fvp/${btvar:TFTF_BUILD}
+        export: false
+      TFTF_BIN: ${artifact:TFTF_OUT}/tftf.bin
+      SP_LAYOUT: ${artifact:TFTF_OUT}/sp_layout.json
+      CACTUS_BIN:  ${artifact:TFTF_OUT}/cactus.bin
+      EL3_PAYLOAD_BIN:  ${artifact:TFTF_OUT}/el3_payload/el3_payload.bin
+      NS_BL1U_BIN:  ${artifact:TFTF_OUT}/ns_bl1u.bin
+
+  hafnium:
+    params:
+      PROJECT: reference
+      PLATFORM: secure_aem_v8a_fvp_vhe
+
+    build:
+      # Hafnium doesn't provide a mechanism to forward number of jobs to ninja,
+      # so it will always parallelize across all cpus. Ideally we would specify
+      # max jobs with ${param:jobs}.
+      - make OUT_DIR=${param:builddir} ${param:join_equal}
+
+    artifacts:
+      HAFNIUM: ${param:builddir}/secure_aem_v8a_fvp_vhe_clang/hafnium.bin
+
+  tfa:
+    toolchain: aarch64-none-elf-
+
+    params:
+      PLAT: fvp
+      DEBUG: $$( test '${btvar:TFA_BUILD}' != debug ; echo $$? )
+      BUILD_BASE: ${param:builddir}
+      SPD: spmd
+      SPMD_SPM_AT_SEL2: 1
+      CTX_INCLUDE_EL2_REGS: 1
+      ARM_ARCH_MAJOR: 8
+      ARM_ARCH_MINOR: 5
+      CTX_INCLUDE_PAUTH_REGS: 1
+      ENABLE_FEAT_MTE2: 1
+      BRANCH_PROTECTION: 1
+      SP_LAYOUT_FILE: ${artifact:SP_LAYOUT}
+      ARM_BL2_SP_LIST_DTS: ${artifact:SP_LIST}
+      BL32: ${artifact:HAFNIUM}
+      BL33: ${artifact:TFTF_BIN}
+      GIC_EXT_INTID: 1
+      PLAT_TEST_SPM: 1
+      TRANSFER_LIST: 1
+
+    prebuild:
+      # Always perform a clean build. Test configurations use isolated
+      # build directories and parameters vary per overlay, so conditional
+      # clean logic is unnecessary and a full clean ensures correctness.
+      - make ${param:join_equal} clean
+
+    build:
+      - "make ${param:join_equal} -j${param:jobs} all fip"
+
+    artifacts:
+      TFA_OUT:
+        path: ${param:builddir}/fvp/${btvar:TFA_BUILD}
+        export: false
+      BL1:  ${artifact:TFA_OUT}/bl1.bin
+      BL2:  ${artifact:TFA_OUT}/bl2.bin
+      BL31: ${artifact:TFA_OUT}/bl31.bin
+      FIP:  ${artifact:TFA_OUT}/fip.bin
+      SP_LIST: ${artifact:TFA_OUT}/sp_list_fragment.dts
+
+run:
+
+  params:
+    -C cluster0.memory_tagging_support_level: 2
+    -C cluster1.memory_tagging_support_level: 2
+    -C cluster0.has_sve: 0
+    -C cluster1.has_sve: 0
+
+  terminals:
+    bp.terminal_0:
+      friendly: TF-A
+      logfile: out/package/spmc-tftf-tests/fvp-spm-ivy-vhe/log/uart0.log
+
+    bp.terminal_1:
+      friendly: HAFNIUM
+      logfile: out/package/spmc-tftf-tests/fvp-spm-ivy-vhe/log/uart1.log
