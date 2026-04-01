@@ -336,6 +336,15 @@ bool service1_and_service2_are_mp_sp(void)
 
 /*
  * The following is a precondition function, for the current system set-up.
+ * Check that service1 is an S-EL1 VM.
+ */
+bool service1_is_sel1_vm(void)
+{
+	return service1_is_vm() && !service1_is_sel0();
+}
+
+/*
+ * The following is a precondition function, for the current system set-up.
  * Check that service1 has a non-secure memory region.
  */
 bool service1_has_ns_mem(void)

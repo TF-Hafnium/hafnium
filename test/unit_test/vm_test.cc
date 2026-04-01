@@ -648,4 +648,63 @@ TEST_F(vm, pending_interrupts_info_retrieved)
 
 	vcpu_unlock(&vcpu_locked);
 }
+
+TEST_F(vm, ffa_invocation_outstanding_vcpu_states)
+{
+	struct_vm *test_vm = vm_find_index(4);
+	struct_vcpu *current = vm_get_vcpu(test_vm, 0);
+	struct_vcpu *next = vm_get_vcpu(test_vm, 1);
+	struct_vm_locked test_vm_locked = vm_lock(test_vm);
+	struct vcpu_locked vcpu_locked;
+	const enum vcpu_state inactive_states[] = {
+		VCPU_STATE_WAITING, VCPU_STATE_CREATED, VCPU_STATE_OFF,
+		VCPU_STATE_ABORTED, VCPU_STATE_NULL,	VCPU_STATE_STOPPED,
+	};
+	const enum vcpu_state active_states[] = {
+		VCPU_STATE_RUNNING,   VCPU_STATE_BLOCKED,
+		VCPU_STATE_PREEMPTED, VCPU_STATE_BLOCKED_INTERRUPT,
+		VCPU_STATE_STARTING,  VCPU_STATE_STOPPING,
+	};
+	const enum vcpu_state original_current_state = current->state;
+	const enum vcpu_state original_next_state = next->state;
+
+	for (enum vcpu_state state : inactive_states) {
+		SCOPED_TRACE(state);
+		vcpu_locked = vcpu_lock(next);
+		next->state = state;
+		vcpu_unlock(&vcpu_locked);
+
+		EXPECT_FALSE(vm_are_ffa_invocations_outstanding(test_vm_locked,
+								current));
+	}
+
+	for (enum vcpu_state state : active_states) {
+		SCOPED_TRACE(state);
+		vcpu_locked = vcpu_lock(next);
+		next->state = state;
+		vcpu_unlock(&vcpu_locked);
+
+		EXPECT_TRUE(vm_are_ffa_invocations_outstanding(test_vm_locked,
+							       current));
+	}
+
+	/* An active current vCPU is excluded from the outstanding check. */
+	vcpu_locked = vcpu_lock(next);
+	next->state = VCPU_STATE_OFF;
+	vcpu_unlock(&vcpu_locked);
+	vcpu_locked = vcpu_lock(current);
+	current->state = VCPU_STATE_RUNNING;
+	vcpu_unlock(&vcpu_locked);
+	EXPECT_FALSE(
+		vm_are_ffa_invocations_outstanding(test_vm_locked, current));
+
+	vcpu_locked = vcpu_lock(current);
+	current->state = original_current_state;
+	vcpu_unlock(&vcpu_locked);
+	vcpu_locked = vcpu_lock(next);
+	next->state = original_next_state;
+	vcpu_unlock(&vcpu_locked);
+
+	vm_unlock(&test_vm_locked);
+}
 } /* namespace */

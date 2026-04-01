@@ -293,3 +293,44 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_notifications_pending)
 
 	ffa_yield();
 }
+
+/*
+ * Service run on vCPU 0 to create a blocked FF-A call while another vCPU
+ * checks the framework-in-use condition.
+ */
+TEST_SERVICE(ffa_version_negotiate_fwk_in_use_blocked_call_blocker)
+{
+	/*
+	 * Remove RX/TX ownership so only the blocked FF-A call gates VERSION.
+	 */
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+
+	/*
+	 * Yield creates the blocked outstanding FF-A call. The caller resumes
+	 * another vCPU to check FFA_VERSION.
+	 */
+	ffa_yield();
+
+	/*
+	 * On resumption, enter WAITING so this vCPU no longer has an
+	 * outstanding invocation when vCPU 1 retries negotiation.
+	 */
+	ffa_msg_wait();
+}
+
+/*
+ * Service run on vCPU 1 to observe FFA_VERSION returning the Null version
+ * while vCPU 0 has a blocked FF-A call outstanding, then succeeding once
+ * vCPU 0 enters WAITING.
+ */
+TEST_SERVICE(ffa_version_negotiate_fwk_in_use_blocked_call_observer)
+{
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+
+	ffa_yield();
+
+	/* The primary resumes this vCPU only after vCPU 0 enters WAITING. */
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+
+	ffa_yield();
+}
