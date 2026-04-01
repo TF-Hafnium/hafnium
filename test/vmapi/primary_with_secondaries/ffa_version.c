@@ -12,6 +12,7 @@
 #include "hf/arch/vm/interrupts.h"
 #include "hf/arch/vm/timer.h"
 
+#include "hf/fdt_handler.h"
 #include "hf/ffa.h"
 #include "hf/std.h"
 
@@ -19,7 +20,19 @@
 
 #include "primary_with_secondary.h"
 #include "test/hftest.h"
+#include "test/semaphore.h"
 #include "test/vmapi/ffa.h"
+
+#define FFA_VERSION_NULL make_ffa_version(0, 0)
+
+struct ffa_version_secondary_cpu_entry_args {
+	ffa_id_t receiver_id;
+	ffa_vcpu_index_t vcpu_id;
+	struct mailbox_buffers mb;
+	struct semaphore ready;
+	struct semaphore go;
+	struct semaphore done;
+};
 
 /*
  * FFA_VERSION fails for an endpoint when the framework is in use.
@@ -146,4 +159,96 @@ TEST(ffa_version, ffa_version_negotiate_fwk_in_use_notifications_pending)
 
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
+}
+
+static void cpu_entry_ffa_version_blocked_call(uintptr_t arg)
+{
+	struct ffa_version_secondary_cpu_entry_args *args =
+		// NOLINTNEXTLINE(performance-no-int-to-ptr)
+		(struct ffa_version_secondary_cpu_entry_args *)arg;
+	struct ffa_value run_res;
+
+	ASSERT_TRUE(args != NULL);
+
+	SERVICE_SELECT_MP(
+		args->receiver_id,
+		"ffa_version_negotiate_fwk_in_use_blocked_call_observer",
+		args->mb.send, args->vcpu_id);
+
+	/* Let the primary know the observer is ready to run. */
+	semaphore_signal(&args->ready);
+
+	/* Check first with vCPU 0 blocked, then with vCPU 0 waiting. */
+	for (unsigned int phase = 0; phase < 2; ++phase) {
+		semaphore_wait(&args->go);
+
+		do {
+			run_res = ffa_run(args->receiver_id, args->vcpu_id);
+		} while (run_res.func == FFA_ERROR_32 &&
+			 ffa_error_code(run_res) == FFA_BUSY);
+
+		EXPECT_EQ(run_res.func, FFA_YIELD_32);
+		semaphore_signal(&args->done);
+	}
+}
+
+static bool blocked_call_cpu_layout_supported(void)
+{
+	const struct fdt *fdt = hftest_get_context()->fdt;
+	struct boot_params params;
+
+	/* hftest_get_cpu_id indexes the FDT CPU list using MAX_CPUS. */
+	return MAX_CPUS > 1 && fdt != NULL &&
+	       fdt_find_cpus(fdt, params.cpu_ids, &params.cpu_count) &&
+	       params.cpu_count == MAX_CPUS && service1_is_mp_sp();
+}
+
+TEST_PRECONDITION(ffa_version,
+		  ffa_version_negotiate_fwk_in_use_blocked_ffa_call,
+		  blocked_call_cpu_layout_supported)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *service1_info = service1(mb.recv);
+	const ffa_vcpu_index_t vcpu_id = 1;
+	struct ffa_value ret;
+	struct ffa_version_secondary_cpu_entry_args args = {
+		.receiver_id = service1_info->vm_id,
+		.vcpu_id = vcpu_id,
+		.mb = mb,
+	};
+
+	SERVICE_SELECT(service1_info->vm_id,
+		       "ffa_version_negotiate_fwk_in_use_blocked_call_blocker",
+		       mb.send);
+
+	semaphore_init(&args.ready);
+	semaphore_init(&args.go);
+	semaphore_init(&args.done);
+
+	ASSERT_TRUE(hftest_cpu_start(hftest_get_cpu_id(vcpu_id),
+				     hftest_get_secondary_ec_stack(vcpu_id),
+				     cpu_entry_ffa_version_blocked_call,
+				     (uintptr_t)&args));
+
+	/* Wait until the observer service is ready to run on vCPU 1. */
+	semaphore_wait(&args.ready);
+
+	/* Run vCPU 0 until it blocks in FFA_YIELD. */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/* Allow vCPU 1 to check FFA_VERSION while vCPU 0 is blocked. */
+	semaphore_signal(&args.go);
+	semaphore_wait(&args.done);
+
+	/*
+	 * Complete vCPU 0's FFA_YIELD and enter FFA_MSG_WAIT. WAITING does
+	 * not count as an outstanding invocation, unlike BLOCKED or RUNNING.
+	 */
+	ret = ffa_run(service1_info->vm_id, 0);
+	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
+
+	/* Retry negotiation on vCPU 1 now that vCPU 0 is inactive. */
+	semaphore_signal(&args.go);
+	semaphore_wait(&args.done);
 }
