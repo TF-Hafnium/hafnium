@@ -94,29 +94,6 @@ SECTIONS
 	rodata_end = .;
 
 	/*
-	 * A platform may choose to link blobs such as the FDT or the initrd
-	 * into the image rather than having them loaded separately. These are
-	 * placed at the end of the image and will not be mapped automatically
-	 * on boot so they can be treated as if they were loaded as separate
-	 * blobs. They are page aligned so they can be mapped individually.
-	 *
-	 * TODO: remove this when the loader can reliably deliver both the
-	 * binary and a separate blob for the initrd.
-	 */
-	. = ALIGN(4096);
-	initrd_begin = .;
-	.initrd : {
-		KEEP(*(.plat.initrd))
-	}
-	initrd_end = .;
-	. = ALIGN(4096);
-	fdt_begin = .;
-	.fdt : {
-		KEEP(*(.plat.fdt))
-	}
-	fdt_end = .;
-
-	/*
 	 * Collect together the read-write data including .bss at the end which
 	 * will be zero'd by the entry code. This is page aligned so it can be
 	 * mapped as non-executable.
