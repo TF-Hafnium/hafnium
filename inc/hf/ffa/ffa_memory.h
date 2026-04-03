@@ -52,8 +52,8 @@ bool ffa_memory_is_mem_perm_set_valid(const struct vcpu *current);
  */
 struct ffa_value ffa_memory_other_world_mem_send(
 	struct vm *from, uint32_t share_func,
-	struct ffa_memory_region **memory_region, uint32_t length,
-	uint32_t fragment_length);
+	struct ffa_memory_region **memory_region, int32_t fragment_offset_delta,
+	uint32_t length, uint32_t fragment_length);
 
 /**
  * Handles the memory reclaim if a memory handle from the other world is

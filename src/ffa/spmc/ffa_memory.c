@@ -88,14 +88,15 @@ bool ffa_memory_is_mem_perm_set_valid(const struct vcpu *current)
 
 struct ffa_value ffa_memory_other_world_mem_send(
 	struct vm *from, uint32_t share_func,
-	struct ffa_memory_region **memory_region, uint32_t length,
-	uint32_t fragment_length)
+	struct ffa_memory_region **memory_region, int32_t fragment_offset_delta,
+	uint32_t length, uint32_t fragment_length)
 {
 	struct ffa_value ret;
 	struct vm_locked from_locked = vm_lock(from);
 
-	ret = ffa_memory_send(from_locked, *memory_region, length,
-			      fragment_length, share_func);
+	ret = ffa_memory_send(from_locked, *memory_region,
+			      fragment_offset_delta, length, fragment_length,
+			      share_func);
 	/*
 	 * ffa_memory_send takes ownership of the memory_region, so
 	 * make sure we don't free it.

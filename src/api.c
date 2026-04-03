@@ -3775,6 +3775,8 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	struct ffa_value ret;
 	bool targets_other_world = false;
 	enum ffa_version ffa_version;
+	uint32_t fragment_length_new;
+	int32_t fragment_offset_delta;
 
 	if (ipa_addr(address) != 0 || page_count != 0) {
 		/*
@@ -3842,13 +3844,17 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		goto out;
 	}
 
+	fragment_length_new = fragment_length;
 	ret = api_ffa_memory_transaction_descriptor_v1_1_from_v1_0(
-		allocated_entry, &fragment_length, &length, ffa_version, true);
+		allocated_entry, &fragment_length_new, &length, ffa_version,
+		true);
 	if (ret.func != FFA_SUCCESS_32) {
 		goto out;
 	}
 
 	memory_region = allocated_entry;
+	fragment_offset_delta =
+		(int32_t)fragment_length_new - (int32_t)fragment_length;
 
 	if (!api_memory_region_check_flags(memory_region, share_func)) {
 		dlog_verbose(
@@ -3912,14 +3918,15 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	}
 
 	if (targets_other_world) {
-		ret = ffa_memory_other_world_mem_send(from, share_func,
-						      &memory_region, length,
-						      fragment_length);
+		ret = ffa_memory_other_world_mem_send(
+			from, share_func, &memory_region, fragment_offset_delta,
+			length, fragment_length_new);
 	} else {
 		struct vm_locked from_locked = vm_lock(from);
 
-		ret = ffa_memory_send(from_locked, memory_region, length,
-				      fragment_length, share_func);
+		ret = ffa_memory_send(from_locked, memory_region,
+				      fragment_offset_delta, length,
+				      fragment_length_new, share_func);
 		/*
 		 * ffa_memory_send takes ownership of the memory_region, so
 		 * make sure we don't free it.

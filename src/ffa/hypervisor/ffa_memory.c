@@ -122,8 +122,9 @@ static struct ffa_value memory_send_other_world_forward(
  */
 static struct ffa_value ffa_memory_other_world_send(
 	struct vm_locked from_locked, struct vm_locked to_locked,
-	struct ffa_memory_region *memory_region, uint32_t memory_share_length,
-	uint32_t fragment_length, uint32_t share_func)
+	struct ffa_memory_region *memory_region, int32_t fragment_offset_delta,
+	uint32_t memory_share_length, uint32_t fragment_length,
+	uint32_t share_func)
 {
 	ffa_memory_handle_t handle;
 	struct share_states_locked share_states;
@@ -163,9 +164,9 @@ static struct ffa_value ffa_memory_other_world_send(
 		}
 
 		handle = ffa_mem_success_handle(ret);
-		share_state = allocate_share_state(share_states, share_func,
-						   memory_region,
-						   fragment_length, handle);
+		share_state = allocate_share_state(
+			share_states, share_func, memory_region,
+			fragment_offset_delta, fragment_length, handle);
 		if (share_state == NULL) {
 			dlog_verbose("%s: failed to allocate share state.\n",
 				     __func__);
@@ -236,9 +237,9 @@ static struct ffa_value ffa_memory_other_world_send(
 			goto out;
 		}
 		handle = ffa_frag_handle(ret);
-		share_state = allocate_share_state(share_states, share_func,
-						   memory_region,
-						   fragment_length, handle);
+		share_state = allocate_share_state(
+			share_states, share_func, memory_region,
+			fragment_offset_delta, fragment_length, handle);
 		if (share_state == NULL) {
 			dlog_verbose("%s: failed to allocate share state.\n",
 				     __func__);
@@ -248,11 +249,16 @@ static struct ffa_value ffa_memory_other_world_send(
 			assert(reclaim_ret.func == FFA_SUCCESS_32);
 			goto out;
 		}
+
+		int32_t fragment_offset =
+			(int32_t)fragment_length - fragment_offset_delta;
+		assert(fragment_offset > 0);
+
 		ret = (struct ffa_value){
 			.func = FFA_MEM_FRAG_RX_32,
 			.arg1 = (uint32_t)handle,
 			.arg2 = (uint32_t)(handle >> 32),
-			.arg3 = fragment_length,
+			.arg3 = (uint32_t)fragment_offset,
 		};
 		/*
 		 * Don't free the memory region fragment, as it has been stored
@@ -272,8 +278,8 @@ out_err:
 
 struct ffa_value ffa_memory_other_world_mem_send(
 	struct vm *from, uint32_t share_func,
-	struct ffa_memory_region **memory_region, uint32_t length,
-	uint32_t fragment_length)
+	struct ffa_memory_region **memory_region, int32_t fragment_offset_delta,
+	uint32_t length, uint32_t fragment_length)
 {
 	struct vm *to;
 	struct ffa_value ret;
@@ -294,7 +300,8 @@ struct ffa_value ffa_memory_other_world_mem_send(
 	} else {
 		ret = ffa_memory_other_world_send(
 			vm_to_from_lock.vm2, vm_to_from_lock.vm1,
-			*memory_region, length, fragment_length, share_func);
+			*memory_region, fragment_offset_delta, length,
+			fragment_length, share_func);
 		/*
 		 * ffa_other_world_memory_send takes ownership of the
 		 * memory_region, so make sure we don't free it.
@@ -521,12 +528,17 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 		 * If the other_world RX buffer is not available, tell the
 		 * sender to retry by returning the current offset again.
 		 */
+		int32_t fragment_offset =
+			(int32_t)share_state_next_fragment_offset(share_states,
+								  share_state);
+		fragment_offset -= share_state->fragment_offset_delta;
+		assert(fragment_offset > 0);
+
 		ret = (struct ffa_value){
 			.func = FFA_MEM_FRAG_RX_32,
 			.arg1 = (uint32_t)handle,
 			.arg2 = (uint32_t)(handle >> 32),
-			.arg3 = share_state_next_fragment_offset(share_states,
-								 share_state),
+			.arg3 = (uint32_t)fragment_offset,
 		};
 		goto out_free_fragment;
 	}
@@ -634,10 +646,16 @@ static struct ffa_value ffa_memory_other_world_send_continue(
 			goto out;
 		}
 
-		ret = (struct ffa_value){.func = FFA_MEM_FRAG_RX_32,
-					 .arg1 = (uint32_t)handle,
-					 .arg2 = (uint32_t)(handle >> 32),
-					 .arg3 = next_fragment_offset};
+		int32_t next_fragment_offset_int =
+			(int32_t)next_fragment_offset;
+		next_fragment_offset_int -= share_state->fragment_offset_delta;
+		assert(next_fragment_offset_int > 0);
+
+		ret = (struct ffa_value){
+			.func = FFA_MEM_FRAG_RX_32,
+			.arg1 = (uint32_t)handle,
+			.arg2 = (uint32_t)(handle >> 32),
+			.arg3 = (uint32_t)next_fragment_offset_int};
 	}
 	goto out;
 

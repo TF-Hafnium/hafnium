@@ -74,8 +74,8 @@ static uint32_t ffa_composite_constituent_offset(
  */
 struct ffa_memory_share_state *allocate_share_state(
 	struct share_states_locked share_states, uint32_t share_func,
-	struct ffa_memory_region *memory_region, uint32_t fragment_length,
-	ffa_memory_handle_t handle)
+	struct ffa_memory_region *memory_region, int32_t fragment_offset_delta,
+	uint32_t fragment_length, ffa_memory_handle_t handle)
 {
 	assert(share_states.share_states != NULL);
 	assert(memory_region != NULL);
@@ -96,6 +96,8 @@ struct ffa_memory_share_state *allocate_share_state(
 			}
 			allocated_state->share_func = share_func;
 			allocated_state->memory_region = memory_region;
+			allocated_state->fragment_offset_delta =
+				fragment_offset_delta;
 			allocated_state->fragment_count = 1;
 			allocated_state->fragments[0] = composite->constituents;
 			allocated_state->fragment_constituent_counts[0] =
@@ -2399,6 +2401,7 @@ bool memory_region_receivers_from_other_world(
  */
 struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 				 struct ffa_memory_region *memory_region,
+				 int32_t fragment_offset_delta,
 				 uint32_t memory_share_length,
 				 uint32_t fragment_length, uint32_t share_func)
 {
@@ -2449,9 +2452,9 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 	 * failed then it would leave the memory in a state where nobody could
 	 * get it back.
 	 */
-	share_state = allocate_share_state(share_states, share_func,
-					   memory_region, fragment_length,
-					   FFA_MEMORY_HANDLE_INVALID);
+	share_state = allocate_share_state(
+		share_states, share_func, memory_region, fragment_offset_delta,
+		fragment_length, FFA_MEMORY_HANDLE_INVALID);
 	if (share_state == NULL) {
 		dlog_verbose("Failed to allocate share state.\n");
 		ret = ffa_error(FFA_NO_MEMORY);
@@ -2479,11 +2482,15 @@ struct ffa_value ffa_memory_send(struct vm_locked from_locked,
 			(from_locked.vm->id == HF_OTHER_WORLD_ID)
 				? memory_region->sender
 				: 0;
+		int32_t fragment_offset =
+			(int32_t)fragment_length - fragment_offset_delta;
+		assert(fragment_offset > 0);
+
 		ret = (struct ffa_value){
 			.func = FFA_MEM_FRAG_RX_32,
 			.arg1 = (uint32_t)memory_region->handle,
 			.arg2 = (uint32_t)(memory_region->handle >> 32),
-			.arg3 = fragment_length,
+			.arg3 = (uint32_t)fragment_offset,
 			.arg4 = (uint32_t)sender_to_ret << 16};
 	}
 
@@ -2565,14 +2572,17 @@ struct ffa_value ffa_memory_send_continue(struct vm_locked from_locked,
 			(from_locked.vm->id == HF_OTHER_WORLD_ID)
 				? memory_region->sender
 				: 0;
+		int32_t fragment_offset =
+			(int32_t)share_state_next_fragment_offset(share_states,
+								  share_state);
+		fragment_offset -= share_state->fragment_offset_delta;
+		assert(fragment_offset > 0);
 
-		ret = (struct ffa_value){
-			.func = FFA_MEM_FRAG_RX_32,
-			.arg1 = (uint32_t)handle,
-			.arg2 = (uint32_t)(handle >> 32),
-			.arg3 = share_state_next_fragment_offset(share_states,
-								 share_state),
-			.arg4 = (uint32_t)sender_to_ret << 16};
+		ret = (struct ffa_value){.func = FFA_MEM_FRAG_RX_32,
+					 .arg1 = (uint32_t)handle,
+					 .arg2 = (uint32_t)(handle >> 32),
+					 .arg3 = (uint32_t)fragment_offset,
+					 .arg4 = (uint32_t)sender_to_ret << 16};
 	}
 	goto out;
 

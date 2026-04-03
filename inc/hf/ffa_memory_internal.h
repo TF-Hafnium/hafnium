@@ -68,6 +68,13 @@ struct ffa_memory_share_state {
 	 */
 	struct ffa_memory_region *memory_region;
 
+	/* *
+	 * The v1.0 memory region descriptor passed from partition should be
+	 * converted to v1.1 before being handled, this records the difference
+	 * between the 2 descriptor for memory sending.
+	 */
+	int32_t fragment_offset_delta;
+
 	struct ffa_memory_region_constituent *fragments[MAX_FRAGMENTS];
 
 	/** The number of constituents in each fragment. */
@@ -155,8 +162,8 @@ struct share_states_locked {
 
 struct ffa_memory_share_state *allocate_share_state(
 	struct share_states_locked share_states, uint32_t share_func,
-	struct ffa_memory_region *memory_region, uint32_t fragment_length,
-	ffa_memory_handle_t handle);
+	struct ffa_memory_region *memory_region, int32_t fragment_offset_delta,
+	uint32_t fragment_length, ffa_memory_handle_t handle);
 struct share_states_locked share_states_lock(void);
 void share_states_unlock(struct share_states_locked *share_states);
 struct ffa_memory_share_state *get_share_state(
