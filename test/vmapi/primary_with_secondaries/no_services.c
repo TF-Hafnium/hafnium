@@ -26,6 +26,12 @@ static_assert(sizeof(recv_page) == PAGE_SIZE, "Recv page is not a page.");
 static hf_ipaddr_t send_page_addr = (hf_ipaddr_t)send_page;
 static hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 
+/* Multi-page buffers for testing dynamic RXTX buffer sizes. */
+static alignas(PAGE_SIZE) uint8_t
+	send_pages_max[FFA_PAGE_SIZE * FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT];
+static alignas(PAGE_SIZE) uint8_t
+	recv_pages_max[FFA_PAGE_SIZE * FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT];
+
 /**
  * Confirms the primary VM has the primary ID.
  */
@@ -237,6 +243,87 @@ TEST(ffa_rxtx_map, succeeds)
 	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
 		  FFA_SUCCESS_32);
 }
+
+/**
+ * Multi-page RXTX_MAP succeeds with the maximum supported page count.
+ *
+ * Only meaningful when RXTX_MAX_PAGE_COUNT > 1; with a single-page
+ * mailbox the call collapses to the existing `succeeds` test.
+ */
+#if RXTX_MAX_PAGE_COUNT > 1
+TEST(ffa_rxtx_map, succeeds_with_max_page_count)
+{
+	EXPECT_EQ(ffa_rxtx_map_pages((hf_ipaddr_t)send_pages_max,
+				     (hf_ipaddr_t)recv_pages_max,
+				     FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT)
+			  .func,
+		  FFA_SUCCESS_32);
+}
+#endif /* RXTX_MAX_PAGE_COUNT > 1 */
+
+/**
+ * RXTX_MAP fails when page_count is zero.
+ */
+TEST(ffa_rxtx_map, fails_with_zero_page_count)
+{
+	EXPECT_FFA_ERROR(ffa_rxtx_map_pages(send_page_addr, recv_page_addr, 0),
+			 FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * RXTX_MAP fails when page_count exceeds the maximum.
+ */
+TEST(ffa_rxtx_map, fails_with_page_count_exceeding_max)
+{
+	EXPECT_FFA_ERROR(
+		ffa_rxtx_map_pages((hf_ipaddr_t)send_pages_max,
+				   (hf_ipaddr_t)recv_pages_max,
+				   FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT + 1),
+		FFA_INVALID_PARAMETERS);
+}
+
+/**
+ * Multi-page send and receive buffers must not overlap.
+ *
+ * Only meaningful when RXTX_MAX_PAGE_COUNT > 1: with a single-page
+ * mailbox the two ranges below land on different pages and there is
+ * no overlap to detect.
+ */
+#if RXTX_MAX_PAGE_COUNT > 1
+TEST(ffa_rxtx_map, fails_with_overlapping_multi_page_buffers)
+{
+	/* recv starts 2 pages into send buffer, causing overlap. */
+	EXPECT_FFA_ERROR(ffa_rxtx_map_pages((hf_ipaddr_t)send_pages_max,
+					    (hf_ipaddr_t)send_pages_max +
+						    FFA_PAGE_SIZE * 2,
+					    FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT),
+			 FFA_INVALID_PARAMETERS);
+}
+#endif /* RXTX_MAX_PAGE_COUNT > 1 */
+
+/**
+ * Unmap and remap with a different page count succeeds.
+ *
+ * Only meaningful when RXTX_MAX_PAGE_COUNT > 1; with a single-page
+ * mailbox both the initial and remap calls request a single page and
+ * the test reduces to the existing `succeeds_in_remapping_region`.
+ */
+#if RXTX_MAX_PAGE_COUNT > 1
+TEST(ffa_rxtx_unmap, succeeds_remap_with_different_page_count)
+{
+	/* Map with single page. */
+	EXPECT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+		  FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+
+	/* Remap with max pages. */
+	EXPECT_EQ(ffa_rxtx_map_pages((hf_ipaddr_t)send_pages_max,
+				     (hf_ipaddr_t)recv_pages_max,
+				     FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT)
+			  .func,
+		  FFA_SUCCESS_32);
+}
+#endif /* RXTX_MAX_PAGE_COUNT > 1 */
 
 /**
  * The primary receives messages from ffa_run().
