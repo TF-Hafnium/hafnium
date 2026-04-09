@@ -91,7 +91,7 @@ For building a local copy of the documentation you will need:
 
 - Python 3 (3.8 or later)
 - PlantUML (1.2017.15 or later)
-- `Poetry`_ (Python dependency manager)
+- `Poetry`_ (Python dependency manager) (1.3.2 or later)
 
 Below is an example set of instructions to get a working environment (tested on
 Ubuntu):
