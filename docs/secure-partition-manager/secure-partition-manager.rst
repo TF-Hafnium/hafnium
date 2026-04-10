@@ -127,6 +127,12 @@ implemented, the SPMC is located at S-EL2, and enabling secure boot:
 FVP model invocation
 --------------------
 
+.. note::
+
+   Hafnium testing (CI and local) is validated against Arm FVP release FM-11.31.
+   Use the Base RevC AEMvA FVP model from this release
+   (e.g. FVP_Base_RevC_AEMvA_11.31_28_Linux_x86), available from `Arm's website`_
+
 The FVP command line needs the following options to exercise the S-EL2 SPMC:
 
 +---------------------------------------------------+------------------------------------+
@@ -2167,6 +2173,8 @@ References
 .. _memory region node: https://trustedfirmware-a.readthedocs.io/en/latest/components/ffa-manifest-binding.html#memory-regions
 
 .. _Firmware Handoff specification: https://github.com/FirmwareHandoff/firmware_handoff/
+
+.. _Arm's website: https://developer.arm.com/Tools%20and%20Software/Fixed%20Virtual%20Platforms/Arm%20Architecture%20FVPs
 
 .. _[1]:
 

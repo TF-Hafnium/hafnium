@@ -43,7 +43,8 @@ export default {
         'docker',
         'commitlint',
         'git',
-	'deps',
+        'deps',
+        'fvp',
 
         // submodules
         'reference',
