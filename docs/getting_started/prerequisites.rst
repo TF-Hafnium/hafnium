@@ -105,7 +105,7 @@ Run the command below to install using Poetry, Python dependencies to build the 
 
 .. code:: shell
 
-    poetry install --with docs
+    poetry install --no-root --with docs
 
 Poetry will create a new virtual environment and install all dependencies listed
 in ``pyproject.toml``. You can get information about this environment, such as
