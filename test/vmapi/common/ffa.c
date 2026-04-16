@@ -1069,6 +1069,10 @@ void partition_info_convert_to_v1_1_format(
 	EXPECT_GT(descriptor_count, 0U);
 	EXPECT_TRUE((incoming != NULL) && (partition_info_v1_1 != NULL));
 
+	if ((incoming == NULL) || (partition_info_v1_1 == NULL)) {
+		return;
+	}
+
 	for (size_t i = 0; i < descriptor_count; i++) {
 		partition_info_v1_1[i].vm_id = incoming[i].vm_id;
 		partition_info_v1_1[i].vcpu_count = incoming[i].vcpu_count;

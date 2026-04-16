@@ -151,9 +151,22 @@ static uint64_t get_live_buffer_size(void)
 static struct live_buffer *find_live_buffer(void)
 {
 	if (live_state_buffer == NULL) {
-		// NOLINTNEXTLINE(performance-no-int-to-ptr)
-		live_state_buffer =
-			(struct live_buffer *)(uintptr_t)get_live_buffer_addr();
+		/*
+		 * The live buffer address is obtained as a raw integer from the
+		 * manifest and must be converted to a typed pointer here.
+		 *
+		 * clang-tidy flags this as:
+		 *   performance-no-int-to-ptr (integer to pointer cast) in
+		 *   static-checks job.
+		 *
+		 * The cast is intentional and unavoidable, so we suppress it.
+		 * clang-format is disabled to keep the expression on a single
+		 * line, ensuring NOLINTNEXTLINE applies to the correct line.
+		 */
+		/* clang-format off */
+		/* NOLINTNEXTLINE(performance-no-int-to-ptr) */
+		live_state_buffer = (struct live_buffer *)(uintptr_t)get_live_buffer_addr();
+		/* clang-format on */
 	}
 
 	return live_state_buffer;

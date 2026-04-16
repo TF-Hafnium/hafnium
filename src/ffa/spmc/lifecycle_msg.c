@@ -34,6 +34,9 @@ static bool load_and_validate_package(struct mm_stage1_locked stage1_locked,
 	bool pkg_ready = false;
 	bool success = false;
 
+	/* NOLINTNEXTLINE(performance-no-int-to-ptr) */
+	void *load_ptr = (void *)load_addr;
+
 	/*
 	 * Map the old instance's package area as RW before copying new
 	 * instance. It might have been marked as read-only during cold boot.
@@ -67,12 +70,12 @@ static bool load_and_validate_package(struct mm_stage1_locked stage1_locked,
 		     load_addr, staging_sz);
 
 	/* Copy and zero trailing bytes */
-	memcpy_s((void *)load_addr, max_size,
-		 ptr_from_va(va_from_pa(staging_pa)), staging_sz);
+	memcpy_s(load_ptr, max_size, ptr_from_va(va_from_pa(staging_pa)),
+		 staging_sz);
 
 	if (staging_sz < max_size) {
-		memset_s((void *)(load_addr + staging_sz),
-			 max_size - staging_sz, 0, max_size - staging_sz);
+		memset_s((char *)load_ptr + staging_sz, max_size - staging_sz,
+			 0, max_size - staging_sz);
 	}
 
 	/*
@@ -80,7 +83,7 @@ static bool load_and_validate_package(struct mm_stage1_locked stage1_locked,
 	 * must be available without the cache. Flush it to ensure it is
 	 * available with caches disabled.
 	 */
-	arch_mm_flush_dcache((void *)load_addr, max_size);
+	arch_mm_flush_dcache(load_ptr, max_size);
 
 	/* Unmap the staging area. */
 	CHECK(mm_unmap(stage1_locked, staging_pa,
