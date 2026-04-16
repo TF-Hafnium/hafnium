@@ -1399,6 +1399,52 @@ TEST_F(manifest, ffa_validate_mem_regions_different_rxtx_sizes)
 		  MANIFEST_ERROR_RXTX_SIZE_MISMATCH);
 }
 
+TEST_F(manifest, ffa_validate_mem_regions_invalid)
+{
+	struct_manifest *m;
+	std::vector<char> dtb;
+
+	/* The memory region is completely not in the range of boot_params. */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x6FFE000>")
+				.Property("pages-count", "<1>")
+				.Property("attributes", "<1>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_INVALID);
+	manifest_dealloc();
+
+	/* The memory region overlaps with the range of boot_params. */
+	/* clang-format off */
+	dtb = ManifestDtBuilder()
+		.FfaValidManifest()
+		.StartChild("memory-regions")
+			.Compatible({ "arm,ffa-manifest-memory-regions" })
+			.Label("rx")
+			.StartChild("rx")
+				.Description("rx-buffer")
+				.Property("base-address", "<0x6FFE000>")
+				.Property("pages-count", "<3>")
+				.Property("attributes", "<1>")
+			.EndChild()
+		.EndChild()
+		.Build();
+	/* clang-format on */
+	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
+		  MANIFEST_ERROR_MEM_REGION_INVALID);
+	manifest_dealloc();
+}
+
 TEST_F(manifest, ffa_validate_dev_regions)
 {
 	struct_manifest *m;
