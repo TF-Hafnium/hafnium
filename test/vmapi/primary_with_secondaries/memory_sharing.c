@@ -5304,21 +5304,27 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 	/* Acquire the resource information descriptor length info. */
 	current_size = (uint32_t)(ret.arg2 >> 32);
 	remaining_size = (uint32_t)ret.arg2;
+	remaining_amds =
+		(current_size / sizeof(struct ffa_address_map_desc)) - 1;
 
 	/*
-	 * We expect 261 AMDs, 1 from service1's manifest, 256 from the
+	 * We expect 517 AMDs, 1 from service1's manifest, 512 from the
 	 * lent pages, 2 from the RX/TX buffers of this test VM, and 2
 	 * from the RX/TX buffers of the Hypervisor. In the first
 	 * transaction, we expect 255 AMDs.
 	 */
-	EXPECT_EQ(current_size,
-		  sizeof(struct ffa_resource_info_desc_header) +
-			  (sizeof(struct ffa_address_map_desc) * 0xFF));
-	EXPECT_EQ(remaining_size, 0x60);
+	const uint32_t total_amd_count =
+		ARRAY_SIZE(constituents_lend_fragmented_relinquish) + 5;
+
+	EXPECT_EQ(current_size, sizeof(struct ffa_resource_info_desc_header) +
+					(sizeof(struct ffa_address_map_desc) *
+					 remaining_amds));
+	EXPECT_EQ(remaining_size, (total_amd_count - remaining_amds) *
+					  sizeof(struct ffa_address_map_desc));
 
 	/* Validate the header contents. */
 	EXPECT_EQ(header->amd_size, sizeof(struct ffa_address_map_desc));
-	EXPECT_EQ(header->amd_count, 0x105);
+	EXPECT_EQ(header->amd_count, total_amd_count);
 	EXPECT_EQ(header->amd_offset,
 		  sizeof(struct ffa_resource_info_desc_header));
 
@@ -5330,63 +5336,47 @@ TEST_PRECONDITION(ffa_ns_res_info_get, get_multiple_calls,
 	 * Validate and print the remaining AMDs, take into account
 	 * the header.
 	 */
-	remaining_amds =
-		(current_size / sizeof(struct ffa_address_map_desc)) - 1;
-	for (uint32_t i = offset_index; i < remaining_amds; i++) {
-		constituent_index = i - offset_index;
-		EXPECT_EQ(amd_array[i].base_address,
-			  constituents_lend_fragmented_relinquish
-				  [constituent_index]
-					  .address);
-		EXPECT_EQ(amd_array[i].page_count,
-			  constituents_lend_fragmented_relinquish
-				  [constituent_index]
-					  .page_count);
-		EXPECT_EQ(amd_array[i].permissions,
-			  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-		EXPECT_EQ(amd_array[i].endpoint_id, service1_info->vm_id);
-		EXPECT_EQ(amd_array[i].flags,
-			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-		print_amd(amd_array, i);
-	}
+	constituent_index = 0;
+	while (true) {
+		uint32_t start_index =
+			(constituent_index == 0) ? offset_index : 0;
 
-	/* Invoke the command to obtain the remaining data. */
-	ret = ffa_ns_res_info_get(FFA_NS_RES_INFO_GET_REQ_CONT_FLAGS);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_64);
+		for (uint32_t i = start_index; i < remaining_amds; i++) {
+			EXPECT_EQ(amd_array[i].base_address,
+				  constituents_lend_fragmented_relinquish
+					  [constituent_index]
+						  .address);
+			EXPECT_EQ(amd_array[i].page_count,
+				  constituents_lend_fragmented_relinquish
+					  [constituent_index]
+						  .page_count);
+			EXPECT_EQ(amd_array[i].permissions,
+				  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
+			EXPECT_EQ(amd_array[i].endpoint_id,
+				  service1_info->vm_id);
+			EXPECT_EQ(amd_array[i].flags,
+				  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
+			print_amd(amd_array, i);
+			constituent_index++;
+		}
 
-	/* Acquire the resource information descriptor length info. */
-	current_size = (uint32_t)(ret.arg2 >> 32);
-	remaining_size = (uint32_t)ret.arg2;
+		if (remaining_size == 0) {
+			break;
+		}
 
-	/* We expect the remaining 6 AMDs. */
-	EXPECT_EQ(current_size, (sizeof(struct ffa_address_map_desc) * 6));
-	EXPECT_EQ(remaining_size, 0);
+		ret = ffa_ns_res_info_get(FFA_NS_RES_INFO_GET_REQ_CONT_FLAGS);
+		EXPECT_EQ(ret.func, FFA_SUCCESS_64);
 
-	dlog_info("Remaining Size: 0x%x\n", remaining_size);
-	dlog_info("Current Size: 0x%x\n", current_size);
-	dlog_info("\n");
+		current_size = (uint32_t)(ret.arg2 >> 32);
+		remaining_size = (uint32_t)ret.arg2;
 
-	/* Point the AMD array to the base of the RX buffer. */
-	amd_array = (struct ffa_address_map_desc *)((uint8_t *)mb.recv);
+		dlog_info("Remaining Size: 0x%x\n", remaining_size);
+		dlog_info("Current Size: 0x%x\n", current_size);
+		dlog_info("\n");
 
-	/* Validate and print the remaining AMDs. */
-	remaining_amds = (current_size / sizeof(struct ffa_address_map_desc));
-	constituent_index++;
-	for (uint32_t i = 0; i < remaining_amds; i++) {
-		EXPECT_EQ(amd_array[i].base_address,
-			  constituents_lend_fragmented_relinquish
-				  [constituent_index + i]
-					  .address);
-		EXPECT_EQ(amd_array[i].page_count,
-			  constituents_lend_fragmented_relinquish
-				  [constituent_index + i]
-					  .page_count);
-		EXPECT_EQ(amd_array[i].permissions,
-			  (UNPRIV_R | UNPRIV_W | PRIV_R | PRIV_W));
-		EXPECT_EQ(amd_array[i].endpoint_id, service1_info->vm_id);
-		EXPECT_EQ(amd_array[i].flags,
-			  FFA_NS_RES_INFO_GET_DIRECTLY_ACC_FLAG);
-		print_amd(amd_array, i);
+		amd_array = (struct ffa_address_map_desc *)((uint8_t *)mb.recv);
+		remaining_amds =
+			(current_size / sizeof(struct ffa_address_map_desc));
 	}
 
 	ret = ffa_mem_reclaim(handle, 0);

@@ -18,7 +18,7 @@
  * and store the information of the memory region
  * for the interrupt status.
  */
-extern uint8_t retrieve_buffer[PAGE_SIZE * 2];
+extern uint8_t retrieve_buffer[PAGE_SIZE * 3];
 
 ffa_memory_handle_t memory_handle;
 

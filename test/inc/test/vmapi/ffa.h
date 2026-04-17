@@ -11,11 +11,14 @@
 #include "vmapi/hf/ffa.h"
 
 /*
- * A number of pages that is large enough that it must take two fragments to
+ * A number of pages that is large enough that it must take three fragments to
  * share.
+ * The execution path of handling three fragments would cover not only FRAG_TX
+ * handler complete path but also the continue path so three fragments is good
+ * for multiple fragments test.
  */
 #define FRAGMENTED_SHARE_PAGE_COUNT \
-	(PAGE_SIZE / sizeof(struct ffa_memory_region_constituent))
+	(2 * PAGE_SIZE / sizeof(struct ffa_memory_region_constituent))
 
 #define EXPECT_FFA_ERROR(value, ffa_error)                 \
 	do {                                               \
