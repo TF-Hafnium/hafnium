@@ -2619,23 +2619,6 @@ static inline uint32_t ffa_get_version_memory_access_desc_size(
 	return memory_access_desc_size;
 }
 
-static inline uint32_t ffa_get_composite_offset_v1_0(
-	struct ffa_memory_region_v1_0 *response,
-	uint32_t memory_access_desc_size)
-{
-	assert(response != NULL);
-	return (uint32_t)sizeof(struct ffa_memory_region_v1_0) +
-	       response->receiver_count * memory_access_desc_size;
-}
-
-static inline uint32_t ffa_get_composite_offset(
-	struct ffa_memory_region *response)
-{
-	assert(response != NULL);
-	return response->receivers_offset +
-	       response->receiver_count * response->memory_access_desc_size;
-}
-
 /**
  * Initialises the ffa_composite_memory_region for the descriptor of a retrieve
  * response message.
@@ -2757,8 +2740,10 @@ static bool ffa_hypervisor_retrieve_response_init(
 						   sender, attributes, flags,
 						   handle, 0, receiver_count);
 
-		composite_offset = ffa_get_composite_offset_v1_0(
-			retrieve_response_v1_0, memory_access_desc_size);
+		composite_offset =
+			ffa_memory_region_init_get_composite_offset_v1_0(
+				retrieve_response_v1_0,
+				memory_access_desc_size);
 	} else {
 		retrieve_response = (struct ffa_memory_region *)response;
 
@@ -2766,7 +2751,8 @@ static bool ffa_hypervisor_retrieve_response_init(
 			retrieve_response, sender, attributes, flags, handle, 0,
 			receiver_count, memory_access_desc_size);
 
-		composite_offset = ffa_get_composite_offset(retrieve_response);
+		composite_offset = ffa_memory_region_init_get_composite_offset(
+			retrieve_response);
 	}
 
 	/*
@@ -2970,8 +2956,10 @@ static bool ffa_partition_retrieve_response_init(
 						   sender, attributes, flags,
 						   handle, 0, 1);
 
-		composite_offset = ffa_get_composite_offset_v1_0(
-			retrieve_response_v1_0, memory_access_desc_size);
+		composite_offset =
+			ffa_memory_region_init_get_composite_offset_v1_0(
+				retrieve_response_v1_0,
+				memory_access_desc_size);
 	} else {
 		retrieve_response = (struct ffa_memory_region *)response;
 
@@ -2979,7 +2967,8 @@ static bool ffa_partition_retrieve_response_init(
 					      attributes, flags, handle, 0, 1,
 					      memory_access_desc_size);
 
-		composite_offset = ffa_get_composite_offset(retrieve_response);
+		composite_offset = ffa_memory_region_init_get_composite_offset(
+			retrieve_response);
 	}
 
 	/* Prepare the response based on the version of the partition. */

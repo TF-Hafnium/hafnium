@@ -101,9 +101,9 @@ static uint32_t ffa_memory_region_init_constituents_v1_0(
 	 */
 	for (i = 0U; i < memory_region->receiver_count; i++) {
 		memory_region->receivers[i].composite_memory_region_offset =
-			sizeof(struct ffa_memory_region) +
-			memory_region->receiver_count *
-				sizeof(struct ffa_memory_access_v1_0);
+			ffa_memory_region_init_get_composite_offset_v1_0(
+				memory_region,
+				sizeof(struct ffa_memory_access_v1_0));
 	}
 
 	composite_memory_region =

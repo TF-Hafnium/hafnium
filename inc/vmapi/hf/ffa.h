@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "hf/assert.h"
 #include "hf/types.h"
 
 /**
@@ -1824,6 +1825,19 @@ ffa_memory_region_get_composite(struct ffa_memory_region *memory_region,
 
 	return (struct ffa_composite_memory_region *)((uint8_t *)memory_region +
 						      offset);
+}
+
+/**
+ * Gets the offset of composite memory regions when initializing the memory
+ * transaction descriptor. This assumes the composite memory regions locates
+ * after memory access descriptor without any gap bytes.
+ */
+static inline uint32_t ffa_memory_region_init_get_composite_offset(
+	struct ffa_memory_region *response)
+{
+	assert(response != NULL);
+	return response->receivers_offset +
+	       response->receiver_count * response->memory_access_desc_size;
 }
 
 static inline uint32_t ffa_mem_relinquish_init(
