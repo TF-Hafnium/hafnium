@@ -1918,6 +1918,17 @@ static ffa_id_t api_get_rxtx_description(struct vm *current_vm, ipaddr_t *send,
 			return HF_INVALID_VM_ID;
 		}
 
+		if (!ffa_endpoint_rx_tx_descriptor_offsets_valid(
+			    endpoint_desc)) {
+			dlog_error(
+				"RXTX descriptor offsets are not 8-byte "
+				"aligned: rx_offset=%#x, tx_offset=%#x\n",
+				endpoint_desc->rx_offset,
+				endpoint_desc->tx_offset);
+			vm_unlock(&vm_locked);
+			return HF_INVALID_VM_ID;
+		}
+
 		rx_region = ffa_endpoint_get_rx_memory_region(endpoint_desc);
 		tx_region = ffa_endpoint_get_tx_memory_region(endpoint_desc);
 

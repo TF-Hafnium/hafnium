@@ -1906,6 +1906,16 @@ struct ffa_endpoint_rx_tx_descriptor {
 	uint32_t pad;
 };
 
+/**
+ * Checks that the RX and TX offsets in the descriptor are 8-byte aligned,
+ * as required by Table 13.28 in the FF-A v1.3 ALP4 specification.
+ */
+static inline bool ffa_endpoint_rx_tx_descriptor_offsets_valid(
+	struct ffa_endpoint_rx_tx_descriptor *desc)
+{
+	return (desc->rx_offset % 8 == 0) && (desc->tx_offset % 8 == 0);
+}
+
 static inline struct ffa_composite_memory_region *
 ffa_endpoint_get_rx_memory_region(struct ffa_endpoint_rx_tx_descriptor *desc)
 {
