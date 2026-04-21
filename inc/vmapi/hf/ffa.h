@@ -38,6 +38,15 @@ static_assert((FFA_VERSION_1_0 <= FFA_VERSION_COMPILED) &&
 		      (FFA_VERSION_1_3 >= FFA_VERSION_COMPILED),
 	      "FFA_VERSION_COMPILED must be between v1.0 and v1.3");
 
+enum version_query_type : uint32_t {
+	VERSION_QUERY_NEGOTIATE = 0,
+	VERSION_QUERY_COMPATIBILITY = 1,
+	VERSION_QUERY_GET_NEGOTIATED = 2
+};
+
+#define FFA_VERSION_QUERY_TYPE_MASK 0x3U
+#define FFA_VERSION_VALID_FLAGS_MASK FFA_VERSION_QUERY_TYPE_MASK
+
 #define FFA_VERSION_MBZ_BIT (1U << 31U)
 #define FFA_VERSION_MAJOR_SHIFT (16U)
 #define FFA_VERSION_MAJOR_MASK (0x7FFFU)
@@ -70,13 +79,15 @@ static inline uint16_t ffa_version_get_minor(enum ffa_version version)
 }
 
 /**
- * Check major versions are equal and the minor version of the caller is
- * less than or equal to the minor version of the callee.
+ * Check both versions are valid, the major versions are equal, and the minor
+ * version of the caller is less than or equal to the minor version of the
+ * callee.
  */
 static inline bool ffa_versions_are_compatible(enum ffa_version caller,
 					       enum ffa_version callee)
 {
-	return ffa_version_get_major(caller) == ffa_version_get_major(callee) &&
+	return ffa_version_is_valid(caller) && ffa_version_is_valid(callee) &&
+	       ffa_version_get_major(caller) == ffa_version_get_major(callee) &&
 	       ffa_version_get_minor(caller) <= ffa_version_get_minor(callee);
 }
 

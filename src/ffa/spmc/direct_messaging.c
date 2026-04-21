@@ -589,7 +589,7 @@ static void handle_spmd_to_spmc_framework_msg(struct ffa_value args,
 		return;
 	case SPMD_FRAMEWORK_MSG_FFA_VERSION_REQ: {
 		struct ffa_value version_ret =
-			api_ffa_version(current, args.arg3);
+			api_ffa_version(current, args.arg3, args.arg4);
 		*ret = ffa_framework_msg_resp(
 			HF_SPMC_VM_ID, HF_SPMD_VM_ID,
 			SPMD_FRAMEWORK_MSG_FFA_VERSION_RESP, version_ret.func,

@@ -2716,12 +2716,13 @@ static bool ffa_version_get_compatibility_response(
  *
  * Returns Hafnium's version number (`FFA_VERSION_COMPILED`) on success.
  * Returns the closest implemented version if the requested version is
- * incompatible. Returns `SMCCC_INVALID_PARAMETER` if the version is invalid
- * (highest bit set). Returns the Null version if renegotiation is denied
+ * incompatible. Returns `SMCCC_INVALID_PARAMETER` if the version or input
+ * flags are invalid. Returns the Null version if renegotiation is denied
  * because the framework is already in use by the caller.
  */
 struct ffa_value api_ffa_version(struct vcpu *current,
-				 enum ffa_version requested_version)
+				 enum ffa_version requested_version,
+				 uint32_t input_flags)
 {
 	static_assert(sizeof(enum ffa_version) == 4,
 		      "enum ffa_version must be 4 bytes wide");
@@ -2734,34 +2735,60 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	};
 	struct vm_locked current_vm_locked;
 	struct ffa_value compatibility_ret;
+	enum version_query_type query_type = (enum version_query_type)(
+		input_flags & FFA_VERSION_QUERY_TYPE_MASK);
 
-	if (!ffa_version_is_valid(requested_version)) {
-		dlog_error(
-			"FFA_VERSION: requested version %#x is invalid "
-			"(highest bit must be zero)\n",
-			requested_version);
+	if ((input_flags & ~FFA_VERSION_VALID_FLAGS_MASK) != 0U ||
+	    query_type > VERSION_QUERY_GET_NEGOTIATED) {
 		return invalid_parameter;
 	}
 
-	if (!ffa_version_get_compatibility_response(requested_version,
-						    &compatibility_ret)) {
+	if (query_type == VERSION_QUERY_GET_NEGOTIATED) {
+		struct ffa_value ret;
+
+		if (requested_version != 0) {
+			dlog_warning("For query type 0x10, w1 SBZ\n");
+		}
+
+		current_vm_locked = vm_lock(current->vm);
+		ret = (struct ffa_value){
+			.func = current_vm_locked.vm->ffa_version};
+		vm_unlock(&current_vm_locked);
+		return ret;
+	}
+
+	if (query_type == VERSION_QUERY_NEGOTIATE) {
+		if (!ffa_version_is_valid(requested_version)) {
+			dlog_error(
+				"FFA_VERSION: requested version %#x is invalid "
+				"(highest bit must be zero)\n",
+				requested_version);
+			return invalid_parameter;
+		}
+
+		if (!ffa_version_get_compatibility_response(
+			    requested_version, &compatibility_ret)) {
+			return compatibility_ret;
+		}
+
+		current_vm_locked = vm_lock(current->vm);
+
+		if (vm_ffa_in_use(current_vm_locked, current)) {
+			vm_unlock(&current_vm_locked);
+			dlog_error(
+				"FFA_VERSION: Framework in use, returning Null "
+				"version\n");
+			return null_version;
+		}
+
+		current_vm_locked.vm->ffa_version = requested_version;
+		vm_unlock(&current_vm_locked);
+
 		return compatibility_ret;
 	}
 
-	current_vm_locked = vm_lock(current->vm);
-
-	if (vm_ffa_in_use(current_vm_locked, current)) {
-		vm_unlock(&current_vm_locked);
-		dlog_error(
-			"FFA_VERSION: Framework in use, returning Null "
-			"version\n");
-		return null_version;
-	}
-
-	current_vm_locked.vm->ffa_version = requested_version;
-	vm_unlock(&current_vm_locked);
-
-	return compatibility_ret;
+	dlog_error("FFA_VERSION: query type %#x not supported\n", query_type);
+	return invalid_parameter;
 }
 
 /**

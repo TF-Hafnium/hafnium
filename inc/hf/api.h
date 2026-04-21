@@ -57,7 +57,8 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id,
 struct ffa_value api_yield(struct vcpu *current, struct vcpu **next,
 			   struct ffa_value *args);
 struct ffa_value api_ffa_version(struct vcpu *current,
-				 uint32_t requested_version);
+				 uint32_t requested_version,
+				 uint32_t input_flags);
 struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 					    const struct ffa_uuid *uuid,
 					    uint32_t flags);
