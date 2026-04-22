@@ -14,11 +14,19 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 FROM="${1:-HEAD~1}"
 TO="${2:-HEAD}"
 
-# Install commitlint only if not already available.
-if [ ! -d "node_modules/@commitlint/cli" ]; then
-  export npm_config_cache=/tmp/.npm
-  npm install -D @commitlint/cli @commitlint/config-conventional
-fi
+# Always run from the repository root so npm and commitlint use the
+# correct package.json, package-lock.json, and commitlint config.
+cd "${ROOT_DIR}"
+
+# Use a writable npm cache location for CI environments.
+export npm_config_cache=/tmp/.npm
+
+# Print runtime versions for easier debugging in Jenkins logs.
+node --version
+npm --version
+
+# Install dependencies exactly as pinned in package-lock.json (clean, reproducible CI install)
+npm ci
 
 # Execute the commitlint command.
 npx commitlint --from=$FROM --to=$TO --verbose
