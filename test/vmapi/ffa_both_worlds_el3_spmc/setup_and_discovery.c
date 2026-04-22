@@ -201,7 +201,7 @@ TEST(ffa, ffa_partition_info_get_v1_0_descriptors)
 	 * First call FF-A version to tell the SPMC our version
 	 * is v1.0.
 	 */
-	version = ffa_version(FFA_VERSION_1_0);
+	version = ffa_version(FFA_VERSION_1_0, VERSION_QUERY_NEGOTIATE);
 	EXPECT_NE(version, (uint32_t)FFA_NOT_SUPPORTED);
 	EXPECT_LE(version, FFA_VERSION_COMPILED);
 

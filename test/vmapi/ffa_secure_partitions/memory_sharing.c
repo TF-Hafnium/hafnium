@@ -30,12 +30,14 @@ alignas(PAGE_SIZE) static uint8_t
 
 SET_UP(memory_sharing_v1_2)
 {
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 SET_UP(memory_sharing_v1_0)
 {
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_0, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 /** Test sharing memory from a v1.2 VM to a v1.0 SP. */

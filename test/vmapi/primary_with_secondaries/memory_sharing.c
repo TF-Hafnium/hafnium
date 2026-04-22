@@ -385,17 +385,20 @@ void send_target_id(ffa_id_t receiver, ffa_id_t target, void *send)
 
 SET_UP(memory_sharing)
 {
-	ASSERT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	ASSERT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 SET_UP(memory_sharing_v1_0)
 {
-	ASSERT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_COMPILED);
+	ASSERT_EQ(ffa_version(FFA_VERSION_1_0, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 SET_UP(memory_sharing_v1_1)
 {
-	ASSERT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
+	ASSERT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 /**

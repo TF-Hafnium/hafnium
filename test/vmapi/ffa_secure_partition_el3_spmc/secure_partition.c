@@ -326,7 +326,8 @@ TEST(ffa_boot_info, parse_fdt)
  */
 TEST(ffa_version, fail_on_invalid_version)
 {
-	EXPECT_EQ(ffa_version(0xffffffff), FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0xffffffff, VERSION_QUERY_NEGOTIATE),
+		  FFA_NOT_SUPPORTED);
 }
 
 /*
@@ -344,14 +345,16 @@ TEST(ffa_version, keeps_negotiated_version_after_other_abis_used)
 	 * A compatible request sets the SP's version to v1.0,
 	 * the SPMC's supported version, v1.2, is returned.
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_1_2);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_0, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_1_2);
 	/* End version negotiation by invoking another FF-A interface. */
 	EXPECT_EQ(ffa_features(FFA_VERSION_32).func, FFA_SUCCESS_32);
 	/*
 	 * A later request cannot change the locked SP version. Verify that the
 	 * version negotiated by the first FFA_VERSION call remains v1.0.
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_1_0);
 }
 
 /**
@@ -365,7 +368,8 @@ TEST(ffa_version, keeps_negotiated_version_incompatible_high)
 	 * manifest version, v1.1. The SPMC's suported version, v1.2, is
 	 * returned.
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_3), FFA_VERSION_1_2);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_3, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_1_2);
 	/*
 	 * End negotiation, then verify that the manifest version was not
 	 * changed.
@@ -375,7 +379,8 @@ TEST(ffa_version, keeps_negotiated_version_incompatible_high)
 	 * The incompatible request did not replace the manifest version. After
 	 * negotiation is locked, FFA_VERSION therefore returns manifest v1.1.
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_1_1);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_1_1);
 }
 
 /**
@@ -389,7 +394,7 @@ TEST(ffa_version, keeps_negotiated_version_incompatible_low)
 	 * manifest version, v1.1. The SPMC's supported version, v1.2, is
 	 * returned.
 	 */
-	EXPECT_EQ(ffa_version(0), FFA_VERSION_1_2);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_NEGOTIATE), FFA_VERSION_1_2);
 	/*
 	 * End negotiation, then verify that the manifest version was not
 	 * changed.
@@ -399,7 +404,8 @@ TEST(ffa_version, keeps_negotiated_version_incompatible_low)
 	 * The incompatible request did not replace the manifest version. After
 	 * negotiation is locked, FFA_VERSION therefore returns manifest v1.1.
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_1_1);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_1_1);
 }
 
 /**

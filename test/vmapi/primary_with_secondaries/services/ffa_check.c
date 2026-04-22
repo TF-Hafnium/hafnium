@@ -60,20 +60,24 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_rxtx)
 	 * R0238: an incompatible request returns the highest supported
 	 * version even while the RX/TX mappings keep the framework in use.
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED + 1), FFA_VERSION_COMPILED);
+	EXPECT_EQ(
+		ffa_version(FFA_VERSION_COMPILED + 1, VERSION_QUERY_NEGOTIATE),
+		FFA_VERSION_COMPILED);
 
 	/*
 	 * Expect the Null version because the RX/TX buffers are still mapped to
 	 * coordinate the service select.
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_NULL);
 
 	/*
 	 * Check that if the buffers are unmapped the version can be
 	 * renegotiated.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	ffa_yield();
 }
@@ -111,11 +115,13 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_mem_share)
 	 * should return the Null version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_NULL);
 
 	/* After reclaiming the memory the FFA_VERSION should now succeed. */
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	ffa_yield();
 }
@@ -154,11 +160,13 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_mem_lend)
 	 * should return the Null version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_NULL);
 
 	/* Reclaiming the memory permits version negotiation again. */
 	EXPECT_EQ(ffa_mem_reclaim(handle, 0).func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	ffa_yield();
 }
@@ -181,7 +189,8 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_mem_borrow)
 	 * FFA_VERSION should return the Null version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_NULL);
 
 	/* Remap the buffers for the relinquish request. */
 	EXPECT_EQ(ffa_rxtx_map((hf_ipaddr_t)SERVICE_SEND_BUFFER(),
@@ -198,7 +207,8 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_mem_borrow)
 	 * Unmap RX/TX Buffer and the FFA_VERSION should now succeed.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	ffa_yield();
 }
@@ -226,7 +236,8 @@ TEST_SERVICE(ffa_version_negotiate_fwk_not_in_use_mem_donate)
 
 	/* Remove RX/TX mappings so the donation is the only relevant state. */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	ffa_yield();
 }
@@ -251,13 +262,15 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_notifications_bound)
 	 * reason the FFA_VERSION should return the Null version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_NULL);
 
 	EXPECT_EQ(ffa_notification_unbind(service2_info->vm_id, hf_vm_get_id(),
 					  bitmap)
 			  .func,
 		  FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	ffa_yield();
 }
@@ -279,7 +292,8 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_notifications_pending)
 	 * FFA_VERSION should return the Null version.
 	 */
 	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_NULL);
 
 	ret = ffa_notification_get(hf_vm_get_id(), 0,
 				   FFA_NOTIFICATION_FLAG_BITMAP_SPM |
@@ -289,7 +303,8 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_notifications_pending)
 	fwk_notif = ffa_notification_get_from_framework(ret);
 	EXPECT_TRUE(is_ffa_hyp_buffer_full_notification(fwk_notif));
 
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	ffa_yield();
 }
@@ -325,12 +340,14 @@ TEST_SERVICE(ffa_version_negotiate_fwk_in_use_blocked_call_blocker)
  */
 TEST_SERVICE(ffa_version_negotiate_fwk_in_use_blocked_call_observer)
 {
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_NULL);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_NULL);
 
 	ffa_yield();
 
 	/* The primary resumes this vCPU only after vCPU 0 enters WAITING. */
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	ffa_yield();
 }

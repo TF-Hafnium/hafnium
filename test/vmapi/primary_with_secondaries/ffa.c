@@ -25,7 +25,8 @@
 SET_UP(ffa)
 {
 	/* Ensure the VM sets its ffa_version to the lastest for testing. */
-	ASSERT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	ASSERT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 TEAR_DOWN(ffa)

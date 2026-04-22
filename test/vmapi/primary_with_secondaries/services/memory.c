@@ -1443,7 +1443,8 @@ TEST_SERVICE(share_ffa_v1_1)
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL,
 		&msg_size);
 
-	EXPECT_NE(ffa_version(FFA_VERSION_1_1), FFA_ERROR_32);
+	EXPECT_NE(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
+		  FFA_ERROR_32);
 
 	ret = ffa_mem_share(msg_size, msg_size);
 
@@ -1496,7 +1497,7 @@ TEST_SERVICE(retrieve_ffa_v1_1)
 	uint32_t memory_region_max_size = HF_MAILBOX_SIZE;
 
 	/* Set version to v1.1. */
-	ffa_version(FFA_VERSION_1_1);
+	ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE);
 
 	receive_indirect_message(send_buf, HF_MAILBOX_SIZE, recv_buf);
 	msg_size = retrv_message->header.size;

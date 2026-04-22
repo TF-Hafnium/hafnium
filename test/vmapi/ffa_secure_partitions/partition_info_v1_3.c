@@ -107,7 +107,7 @@ TEST(partition_info_v1_3, ffa_partition_info_get_null_uuid)
 	 * First call FF-A version to tell the SPMC our version
 	 * is v1.3.
 	 */
-	version = ffa_version(FFA_VERSION_1_3);
+	version = ffa_version(FFA_VERSION_1_3, VERSION_QUERY_NEGOTIATE);
 	EXPECT_EQ(version, FFA_VERSION_COMPILED);
 
 	/* Setup the mailbox (which holds the RX buffer). */
@@ -154,7 +154,7 @@ TEST(partition_info_v1_3, ffa_partition_info_get_regs_null_uuid)
 	 * First call FF-A version to tell the SPMC our version
 	 * is v1.3.
 	 */
-	version = ffa_version(FFA_VERSION_1_3);
+	version = ffa_version(FFA_VERSION_1_3, VERSION_QUERY_NEGOTIATE);
 	EXPECT_EQ(version, FFA_VERSION_COMPILED);
 
 	/*
@@ -219,7 +219,7 @@ TEST(partition_info_v1_3, ffa_partition_info_get_with_protocol_uuid)
 	struct ffa_uuid uuid;
 	enum ffa_version version;
 
-	version = ffa_version(FFA_VERSION_1_3);
+	version = ffa_version(FFA_VERSION_1_3, VERSION_QUERY_NEGOTIATE);
 	EXPECT_EQ(version, FFA_VERSION_COMPILED);
 
 	/* Setup the mailbox (which holds the RX buffer). */
@@ -330,7 +330,7 @@ TEST(partition_info_v1_3, ffa_partition_info_get_with_image_uuid)
 	struct ffa_uuid uuid;
 	enum ffa_version version;
 
-	version = ffa_version(FFA_VERSION_1_3);
+	version = ffa_version(FFA_VERSION_1_3, VERSION_QUERY_NEGOTIATE);
 	EXPECT_EQ(version, FFA_VERSION_COMPILED);
 
 	/* Setup the mailbox (which holds the RX buffer). */

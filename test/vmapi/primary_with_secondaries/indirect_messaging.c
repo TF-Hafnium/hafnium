@@ -18,17 +18,20 @@
 
 SET_UP(indirect_messaging_v1_0)
 {
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_0, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 SET_UP(indirect_messaging_v1_1)
 {
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 SET_UP(indirect_messaging_v1_2)
 {
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 SET_UP(indirect_messaging)
@@ -37,7 +40,8 @@ SET_UP(indirect_messaging)
 	 * Call FFA_VERSION to inform the hypervisor of the compiled FF-A
 	 * Version.
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
 bool v1_0_or_earlier(void)

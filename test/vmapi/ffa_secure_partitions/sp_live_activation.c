@@ -321,7 +321,8 @@ void base_live_activate_sp(ffa_id_t receiver_id, uint32_t component_id)
 	ffa_notifications_bitmap_t bitmap;
 	ffa_id_t own_id = hf_vm_get_id();
 
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_3), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_3, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 	check_echo(own_id, receiver_id);
 
 	/* Share a page with target SP. */
@@ -396,7 +397,8 @@ TEST(live_activation, live_activate_sp_stop_request_error)
 					      &component_id,
 					      fw_component_count));
 
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_3), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_3, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 	check_echo(own_id, SP_ID(1));
 
 	set_partition_stop_resp_status(own_id, SP_ID(1), FFA_ABORTED);
@@ -422,7 +424,8 @@ TEST(live_activation, live_activate_new_image_abort)
 					      &component_id,
 					      fw_component_count));
 
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_3), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_3, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 	check_echo(own_id, SP_ID(1));
 
 	abort_on_live_activation_init(own_id, SP_ID(1));

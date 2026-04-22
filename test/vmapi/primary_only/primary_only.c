@@ -176,29 +176,78 @@ TEAR_DOWN(ffa)
 	EXPECT_FFA_ERROR(ffa_rx_release(), FFA_DENIED);
 }
 
-/** Ensures that the Hafnium FF-A version is reported as expected. */
-TEST(ffa, ffa_version)
+/** Ensures that the Hafnium FF-A version negotiation behaves as expected. */
+TEST(ffa, ffa_version_negotiate)
 {
 	const enum ffa_version current_version = FFA_VERSION_COMPILED;
 	const enum ffa_version older_compatible_version_0 = FFA_VERSION_1_0;
 	const enum ffa_version older_compatible_version_1 = FFA_VERSION_1_1;
 
-	EXPECT_EQ(ffa_version(current_version), current_version);
-	EXPECT_EQ(ffa_version(older_compatible_version_0), current_version);
-	EXPECT_EQ(ffa_version(older_compatible_version_1), current_version);
-	EXPECT_EQ(ffa_version(0x0), FFA_VERSION_1_0);
-	EXPECT_EQ(ffa_version(0x1), FFA_VERSION_1_0);
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED + 1), FFA_VERSION_COMPILED);
-	EXPECT_EQ(ffa_version(0xffff), FFA_VERSION_1_0);
-	EXPECT_EQ(ffa_version(0xfffffff), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(current_version, VERSION_QUERY_NEGOTIATE),
+		  current_version);
+	EXPECT_EQ(ffa_version(older_compatible_version_0,
+			      VERSION_QUERY_NEGOTIATE),
+		  current_version);
+	EXPECT_EQ(ffa_version(older_compatible_version_1,
+			      VERSION_QUERY_NEGOTIATE),
+		  current_version);
+	/*
+	 * Exercise the scenario described by Bullet 4 of Rule 0238 in v1.3 ALP5
+	 * spec: If the callee only implements a version that is incompatible
+	 * and higher than input version number, the lowest incompatible
+	 * version should be returned.
+	 */
+	EXPECT_EQ(ffa_version(0x0, VERSION_QUERY_NEGOTIATE), FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(0x1, VERSION_QUERY_NEGOTIATE), FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(0xffff, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_1_0);
+	/*
+	 * Exercise the scenario described by Bullet 3 of Rule 0238 in v1.3 ALP5
+	 * spec: If the callee only implements a version that is incompatible
+	 * and lower than input version number, the highest incompatible
+	 * version should be returned. Test both incompatible major or minor
+	 * versions.
+	 */
+	EXPECT_EQ(
+		ffa_version(FFA_VERSION_COMPILED + 1, VERSION_QUERY_NEGOTIATE),
+		FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0xfffffff, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ((uint32_t)ffa_version(0x80000000, VERSION_QUERY_NEGOTIATE),
+		  SMCCC_INVALID_PARAMETER);
 }
 
-/** Ensures that an invalid call to FFA_VERSION gets an error back. */
-TEST(ffa, ffa_version_invalid)
+/**
+ * Verify that querying the negotiated version reports the current version
+ * without changing or locking version negotiation.
+ */
+TEST(ffa, ffa_version_query_current_reports_negotiated_version)
 {
-	EXPECT_EQ((uint32_t)ffa_version(0x80000000), SMCCC_INVALID_PARAMETER);
+	const enum ffa_version negotiated_version = FFA_VERSION_1_0;
+
+	EXPECT_EQ(ffa_version(negotiated_version, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  negotiated_version);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 }
 
+/** Verify reserved query flags are rejected without changing the version. */
+TEST(ffa, ffa_version_rejects_reserved_input_flags)
+{
+	const enum ffa_version negotiated_version = FFA_VERSION_1_0;
+
+	EXPECT_EQ(ffa_version(negotiated_version, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  negotiated_version);
+	EXPECT_EQ((uint32_t)ffa_version(
+			  0, VERSION_QUERY_GET_NEGOTIATED | (1U << 2U)),
+		  SMCCC_INVALID_PARAMETER);
+	EXPECT_EQ(ffa_version(0, VERSION_QUERY_GET_NEGOTIATED),
+		  negotiated_version);
+}
 static bool v1_0_or_later(void)
 {
 	return FFA_VERSION_COMPILED >= FFA_VERSION_1_0;

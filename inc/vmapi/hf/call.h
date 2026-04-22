@@ -427,11 +427,13 @@ static inline int64_t hf_interrupt_send_ipi(ffa_vcpu_index_t target_vcpu_id)
 }
 
 /** Obtains the Hafnium's version of the implemented FF-A specification. */
-static inline enum ffa_version ffa_version(enum ffa_version requested_version)
+static inline enum ffa_version ffa_version(enum ffa_version requested_version,
+					   enum version_query_type query_type)
 {
 	return ffa_call((struct ffa_value){
 				.func = FFA_VERSION_32,
 				.arg1 = (uint32_t)requested_version,
+				.arg2 = (uint32_t)query_type,
 			})
 		.func;
 }

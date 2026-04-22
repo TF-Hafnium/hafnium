@@ -52,7 +52,8 @@ TEAR_DOWN(ffa_partition_info_get)
 TEST(ffa_partition_info_get, three_secondary_vms)
 {
 	/* Set ffa_version to v1.2. */
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	struct mailbox_buffers mb;
 	struct ffa_value ret;
@@ -117,7 +118,8 @@ TEST(ffa_partition_info_get, get_v1_0_descriptor)
 	struct ffa_uuid uuid;
 
 	/* Set ffa_version to v1.0. */
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_0, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	/* A Null UUID requests information for all partitions. */
 	ffa_uuid_init(0, 0, 0, 0, &uuid);
@@ -370,7 +372,8 @@ TEST(ffa_rxtx_data_path, partition_info_get_multi_page_no_overcopy)
 	 * (the v1.0 descriptor shape collapses multi-UUID partitions to
 	 * one entry, which would otherwise mismatch).
 	 */
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2, VERSION_QUERY_NEGOTIATE),
+		  FFA_VERSION_COMPILED);
 
 	memset_s(recv_pages_max, recv_size, sentinel, recv_size);
 
