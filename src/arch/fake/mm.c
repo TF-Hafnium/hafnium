@@ -217,5 +217,5 @@ uint32_t arch_mm_get_pa_bits(uint64_t pa_range)
 {
 	(void)pa_range;
 
-	return 40;
+	return 41;
 }
