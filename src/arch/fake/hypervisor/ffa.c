@@ -8,6 +8,8 @@
 
 #include "hf/ffa.h"
 
+#include "hf/arch/vm.h"
+
 #include "hf/ffa/notifications.h"
 #include "hf/ffa_internal.h"
 #include "hf/vcpu.h"
@@ -529,18 +531,16 @@ struct ffa_value ffa_cpu_cycles_yield_prepare(struct vcpu_locked current_locked,
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
 
-bool arch_vm_init_mm(struct vm *vm, struct mpool *ppool)
+bool arch_vm_init_mm(struct vm *vm)
 {
 	(void)vm;
-	(void)ppool;
 
 	return true;
 }
 
-bool arch_vm_iommu_init_mm(struct vm *vm, struct mpool *ppool)
+bool arch_vm_iommu_init_mm(struct vm *vm)
 {
 	(void)vm;
-	(void)ppool;
 
 	return true;
 }
@@ -567,21 +567,18 @@ void arch_vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 	(void)mode;
 }
 
-bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-		   struct mpool *ppool)
+bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end)
 {
 	(void)vm_locked;
 	(void)begin;
 	(void)end;
-	(void)ppool;
 
 	return true;
 }
 
-void arch_vm_ptable_defrag(struct vm_locked vm_locked, struct mpool *ppool)
+void arch_vm_ptable_defrag(struct vm_locked vm_locked)
 {
 	(void)vm_locked;
-	(void)ppool;
 }
 
 bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
@@ -605,13 +602,11 @@ ffa_memory_attributes_t ffa_memory_add_security_bit_from_mode(
 
 struct ffa_value ffa_cpu_cycles_error_32(struct vcpu *current,
 					 struct vcpu **next,
-					 enum ffa_error error_code,
-					 struct mpool *ppool)
+					 enum ffa_error error_code)
 {
 	(void)current;
 	(void)next;
 	(void)error_code;
-	(void)ppool;
 
 	return ffa_error(FFA_NOT_SUPPORTED);
 }
@@ -621,24 +616,21 @@ bool ffa_setup_partition_info_get_regs_forward_allowed(void)
 	return false;
 }
 
-void ffa_vm_free_resources(struct vm_locked vm_locked, struct mpool *ppool)
+void ffa_vm_free_resources(struct vm_locked vm_locked)
 {
 	(void)vm_locked;
-	(void)ppool;
 }
 
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-				   paddr_t end, mm_mode_t mode,
-				   struct mpool *ppool, ipaddr_t *ipa,
-				   struct dma_device_properties *dma_prop)
+				   paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+				   uint8_t dma_device_id)
 {
 	(void)vm_locked;
 	(void)begin;
 	(void)end;
 	(void)mode;
-	(void)ppool;
 	(void)ipa;
-	(void)dma_prop;
+	(void)dma_device_id;
 
 	return true;
 }
@@ -669,22 +661,20 @@ bool ffa_direct_msg_handle_framework_msg_resp(struct ffa_value args,
 	return false;
 }
 
-void arch_vm_fini_mm(struct vm *vm, struct mpool *ppool)
+void arch_vm_fini_mm(struct vm *vm)
 {
 	(void)vm;
-	(void)ppool;
 }
 
-void arch_vm_iommu_fini_mm(struct vm *vm, struct mpool *ppool)
+void arch_vm_iommu_fini_mm(struct vm *vm)
 {
 	(void)vm;
-	(void)ppool;
 }
 
-bool arch_vm_get_range_by_mode(struct vm_locked vm_locked,
-			       const uintptr_t *begin, const uintptr_t *end,
-			       mm_mode_t mode, const uintptr_t *start_addr,
-			       const mm_mode_t *ptable_mode)
+// NOLINTBEGIN(readability-non-const-parameter)
+bool arch_vm_get_range_by_mode(struct vm_locked vm_locked, uintptr_t *begin,
+			       uintptr_t *end, mm_mode_t mode,
+			       uintptr_t *start_addr, mm_mode_t *ptable_mode)
 {
 	(void)vm_locked;
 	(void)begin;
@@ -695,6 +685,7 @@ bool arch_vm_get_range_by_mode(struct vm_locked vm_locked,
 
 	return false;
 }
+// NOLINTEND(readability-non-const-parameter)
 
 struct vcpu *arch_vcpu_get_current(void)
 {
