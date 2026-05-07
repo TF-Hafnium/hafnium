@@ -59,6 +59,7 @@ export default {
 
         // Documentation
         'process',
+        'security',
 
         // Fallback scope for any miscellaneous change
         'misc'
