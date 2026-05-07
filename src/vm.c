@@ -373,7 +373,7 @@ bool vm_map(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 /**
  * Same as vm_map, but one-to-one
  */
-bool vm_identity_map(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
+bool vm_identity_map(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 		     mm_mode_t mode, ipaddr_t *ipa)
 {
 	if (!vm_identity_prepare(vm_locked, begin, end, mode)) {
@@ -404,11 +404,10 @@ bool vm_prepare(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 /**
  * Same as vm_prepare, but one-to-one
  */
-bool vm_identity_prepare(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-			 mm_mode_t mode)
+bool vm_identity_prepare(struct vm_locked vm_locked, ipaddr_t begin,
+			 ipaddr_t end, mm_mode_t mode)
 {
-	return vm_prepare(vm_locked, ipa_from_pa(begin), ipa_from_pa(end),
-			  begin, mode);
+	return vm_prepare(vm_locked, begin, end, pa_from_ipa(begin), mode);
 }
 
 /**
@@ -425,10 +424,10 @@ void vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 /**
  * Same as vm_commit, but one-to-one
  */
-void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
-			mm_mode_t mode, ipaddr_t *ipa)
+void vm_identity_commit(struct vm_locked vm_locked, ipaddr_t begin,
+			ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa)
 {
-	vm_commit(vm_locked, ipa_from_pa(begin), ipa_from_pa(end), begin, mode);
+	vm_commit(vm_locked, begin, end, pa_from_ipa(begin), mode);
 
 	if (ipa != NULL) {
 		/*
@@ -437,7 +436,7 @@ void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
 		 * mapped PA as an IPA, however, for an EL0 partition,
 		 * this is really a VA.
 		 */
-		*ipa = ipa_from_pa(begin);
+		*ipa = begin;
 	}
 }
 
@@ -447,7 +446,7 @@ void vm_identity_commit(struct vm_locked vm_locked, paddr_t begin, paddr_t end,
  * Returns true on success, or false if the update failed and no changes were
  * made.
  */
-bool vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end)
+bool vm_unmap(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end)
 {
 	return arch_vm_unmap(vm_locked, begin, end);
 }
@@ -475,21 +474,24 @@ void vm_free_ptables(struct vm *vm)
 bool vm_unmap_hypervisor(struct vm_locked vm_locked)
 {
 	/* TODO: If we add pages dynamically, they must be included here too. */
-	return vm_unmap(vm_locked, layout_text_begin(), layout_text_end()) &&
-	       vm_unmap(vm_locked, layout_rodata_begin(),
-			layout_rodata_end()) &&
-	       vm_unmap(vm_locked, layout_data_begin(), layout_data_end()) &&
-	       vm_unmap(vm_locked, layout_stacks_begin(), layout_stacks_end());
+	return vm_unmap(vm_locked, ipa_from_pa(layout_text_begin()),
+			ipa_from_pa(layout_text_end())) &&
+	       vm_unmap(vm_locked, ipa_from_pa(layout_rodata_begin()),
+			ipa_from_pa(layout_rodata_end())) &&
+	       vm_unmap(vm_locked, ipa_from_pa(layout_data_begin()),
+			ipa_from_pa(layout_data_end())) &&
+	       vm_unmap(vm_locked, ipa_from_pa(layout_stacks_begin()),
+			ipa_from_pa(layout_stacks_end()));
 }
 
 void vm_unmap_rxtx(struct vm_locked vm_locked)
 {
 	struct vm *vm = vm_locked.vm;
 	struct mm_stage1_locked mm_stage1_locked;
-	paddr_t send_pa_begin;
-	paddr_t send_pa_end;
-	paddr_t recv_pa_begin;
-	paddr_t recv_pa_end;
+	ipaddr_t send_ipa_begin;
+	ipaddr_t send_ipa_end;
+	ipaddr_t recv_ipa_begin;
+	ipaddr_t recv_ipa_end;
 
 	assert(vm != NULL);
 
@@ -503,10 +505,10 @@ void vm_unmap_rxtx(struct vm_locked vm_locked)
 	}
 
 	/* Currently a mailbox size of 1 page is assumed. */
-	send_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.send));
-	send_pa_end = pa_add(send_pa_begin, HF_MAILBOX_SIZE);
-	recv_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.recv));
-	recv_pa_end = pa_add(recv_pa_begin, HF_MAILBOX_SIZE);
+	send_ipa_begin = ipa_from_va(va_from_ptr(vm->mailbox.send));
+	send_ipa_end = ipa_add(send_ipa_begin, HF_MAILBOX_SIZE);
+	recv_ipa_begin = ipa_from_va(va_from_ptr(vm->mailbox.recv));
+	recv_ipa_end = ipa_add(recv_ipa_begin, HF_MAILBOX_SIZE);
 
 	mm_stage1_locked = mm_lock_stage1();
 
@@ -515,15 +517,17 @@ void vm_unmap_rxtx(struct vm_locked vm_locked)
 	 * for the VM. Since this memory region was already mapped for
 	 * the RXTX buffers we can safely remap them.
 	 */
-	CHECK(vm_identity_map(vm_locked, send_pa_begin, send_pa_end,
+	CHECK(vm_identity_map(vm_locked, send_ipa_begin, send_ipa_end,
 			      MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL));
 
-	CHECK(vm_identity_map(vm_locked, recv_pa_begin, recv_pa_end,
+	CHECK(vm_identity_map(vm_locked, recv_ipa_begin, recv_ipa_end,
 			      MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL));
 
 	/* Unmap the buffers in the partition manager. */
-	CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end));
-	CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end));
+	CHECK(mm_unmap(mm_stage1_locked, va_from_ipa(send_ipa_begin),
+		       va_from_ipa(send_ipa_end)));
+	CHECK(mm_unmap(mm_stage1_locked, va_from_ipa(recv_ipa_begin),
+		       va_from_ipa(recv_ipa_end)));
 
 	vm->mailbox.send = NULL;
 	vm->mailbox.recv = NULL;
@@ -553,8 +557,8 @@ bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 	return arch_vm_mem_get_mode(vm_locked, begin, end, mode);
 }
 
-bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-			      paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, ipaddr_t begin,
+			      ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa,
 			      uint8_t dma_device_id)
 {
 	return arch_vm_iommu_mm_identity_map(vm_locked, begin, end, mode, ipa,

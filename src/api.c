@@ -1662,9 +1662,9 @@ static struct ffa_value api_vm_configure_stage1(
 	/*
 	 * Map the send page as read-only in the SPMC/hypervisor address space.
 	 */
-	vm_locked.vm->mailbox.send =
-		mm_identity_map(mm_stage1_locked, pa_send_begin, pa_send_end,
-				MM_MODE_R | extra_mode);
+	vm_locked.vm->mailbox.send = mm_identity_map(
+		mm_stage1_locked, va_from_pa(pa_send_begin),
+		va_from_pa(pa_send_end), MM_MODE_R | extra_mode);
 	if (!vm_locked.vm->mailbox.send) {
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto out;
@@ -1674,9 +1674,9 @@ static struct ffa_value api_vm_configure_stage1(
 	 * Map the receive page as writable in the SPMC/hypervisor address
 	 * space. On failure, unmap the send page before returning.
 	 */
-	vm_locked.vm->mailbox.recv =
-		mm_identity_map(mm_stage1_locked, pa_recv_begin, pa_recv_end,
-				MM_MODE_W | extra_mode);
+	vm_locked.vm->mailbox.recv = mm_identity_map(
+		mm_stage1_locked, va_from_pa(pa_recv_begin),
+		va_from_pa(pa_recv_end), MM_MODE_W | extra_mode);
 	if (!vm_locked.vm->mailbox.recv) {
 		ret = ffa_error(FFA_NO_MEMORY);
 		goto fail_undo_send;
@@ -1691,7 +1691,8 @@ static struct ffa_value api_vm_configure_stage1(
 	 */
 fail_undo_send:
 	vm_locked.vm->mailbox.send = NULL;
-	CHECK(mm_unmap(mm_stage1_locked, pa_send_begin, pa_send_end));
+	CHECK(mm_unmap(mm_stage1_locked, va_from_pa(pa_send_begin),
+		       va_from_pa(pa_send_end)));
 
 out:
 	return ret;
@@ -1804,8 +1805,8 @@ struct ffa_value api_vm_configure_pages(
 			mode |= MM_MODE_USER | MM_MODE_NG;
 		}
 
-		if (!vm_identity_map(vm_locked, pa_send_begin, pa_send_end,
-				     mode, NULL)) {
+		if (!vm_identity_map(vm_locked, ipa_from_pa(pa_send_begin),
+				     ipa_from_pa(pa_send_end), mode, NULL)) {
 			dlog_error(
 				"Cannot allocate a new entry in stage 2 "
 				"translation table.\n");
@@ -1818,8 +1819,8 @@ struct ffa_value api_vm_configure_pages(
 			mode |= MM_MODE_USER | MM_MODE_NG;
 		}
 
-		if (!vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
-				     mode, NULL)) {
+		if (!vm_identity_map(vm_locked, ipa_from_pa(pa_recv_begin),
+				     ipa_from_pa(pa_recv_end), mode, NULL)) {
 			/* TODO: partial defrag of failed range. */
 			/* Recover any memory consumed in failed mapping. */
 			dlog_error("%s: cannot map recv page\n", __func__);
@@ -1865,12 +1866,12 @@ struct ffa_value api_vm_configure_pages(
 	goto out;
 
 fail_undo_send_and_recv:
-	CHECK(vm_identity_map(vm_locked, pa_recv_begin, pa_recv_end,
-			      orig_recv_mode, NULL));
+	CHECK(vm_identity_map(vm_locked, ipa_from_pa(pa_recv_begin),
+			      ipa_from_pa(pa_recv_end), orig_recv_mode, NULL));
 
 fail_undo_send:
-	CHECK(vm_identity_map(vm_locked, pa_send_begin, pa_send_end,
-			      orig_send_mode, NULL));
+	CHECK(vm_identity_map(vm_locked, ipa_from_pa(pa_send_begin),
+			      ipa_from_pa(pa_send_end), orig_send_mode, NULL));
 
 out:
 	return ret;
@@ -2050,10 +2051,10 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 	struct vm_locked vm_locked;
 	ffa_id_t owner_vm_id;
 	struct mm_stage1_locked mm_stage1_locked;
-	paddr_t send_pa_begin;
-	paddr_t send_pa_end;
-	paddr_t recv_pa_begin;
-	paddr_t recv_pa_end;
+	vaddr_t send_va_begin;
+	vaddr_t send_va_end;
+	vaddr_t recv_va_begin;
+	vaddr_t recv_va_end;
 	struct ffa_value ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 
 	if (vm->id == HF_HYPERVISOR_VM_ID && !ffa_is_vm_id(allocator_id)) {
@@ -2093,24 +2094,25 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 	vm_unmap_rxtx(vm_locked);
 
 	if (!vm_id_is_current_world(owner_vm_id)) {
-		send_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.send));
-		send_pa_end = pa_add(send_pa_begin, HF_MAILBOX_SIZE);
-		recv_pa_begin = pa_from_va(va_from_ptr(vm->mailbox.recv));
-		recv_pa_end = pa_add(recv_pa_begin, HF_MAILBOX_SIZE);
+		send_va_begin = va_from_ptr(vm->mailbox.send);
+		send_va_end = va_add(send_va_begin, HF_MAILBOX_SIZE);
+		recv_va_begin = va_from_ptr(vm->mailbox.recv);
+		recv_va_end = va_add(recv_va_begin, HF_MAILBOX_SIZE);
 
 		mm_stage1_locked = mm_lock_stage1();
 
 		ret = arch_other_world_vm_configure_rxtx_unmap(
-			vm_locked, send_pa_begin, send_pa_end, recv_pa_begin,
-			recv_pa_end);
+			vm_locked, pa_from_va(send_va_begin),
+			pa_from_va(send_va_end), pa_from_va(recv_va_begin),
+			pa_from_va(recv_va_end));
 		if (ret.func != FFA_SUCCESS_32) {
 			mm_unlock_stage1(&mm_stage1_locked);
 			goto out;
 		}
 
 		/* Unmap the buffers in the partition manager. */
-		CHECK(mm_unmap(mm_stage1_locked, send_pa_begin, send_pa_end));
-		CHECK(mm_unmap(mm_stage1_locked, recv_pa_begin, recv_pa_end));
+		CHECK(mm_unmap(mm_stage1_locked, send_va_begin, send_va_end));
+		CHECK(mm_unmap(mm_stage1_locked, recv_va_begin, recv_va_end));
 
 		vm->mailbox.send = NULL;
 		vm->mailbox.recv = NULL;
@@ -5190,8 +5192,8 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 	 * Safe to re-map memory, since we know the requested permissions are
 	 * valid, and the memory requested to be re-mapped is also valid.
 	 */
-	if (!mm_identity_prepare(&vm_locked.vm->ptable, pa_from_va(base_addr),
-				 pa_from_va(end_addr), new_mode)) {
+	if (!mm_identity_prepare(&vm_locked.vm->ptable, base_addr, end_addr,
+				 new_mode)) {
 		dlog_error(
 			"FFA_MEM_PERM_SET: remapping memory range %#016lx - "
 			"%#016lx failed\n",
@@ -5208,8 +5210,8 @@ struct ffa_value api_ffa_mem_perm_set(vaddr_t base_addr, uint32_t page_count,
 		goto out;
 	}
 
-	mm_identity_commit(&vm_locked.vm->ptable, pa_from_va(base_addr),
-			   pa_from_va(end_addr), new_mode);
+	mm_identity_commit(&vm_locked.vm->ptable, base_addr, end_addr,
+			   new_mode);
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 

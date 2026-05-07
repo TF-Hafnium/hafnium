@@ -111,8 +111,9 @@ void one_time_init(void)
 			  pa_addr(params->initrd_end) - 1);
 
 		/* Map initrd in, and initialise cpio parser. */
-		initrd = mm_identity_map(mm_stage1_locked, params->initrd_begin,
-					 params->initrd_end, MM_MODE_R);
+		initrd = mm_identity_map(
+			mm_stage1_locked, va_from_pa(params->initrd_begin),
+			va_from_pa(params->initrd_end), MM_MODE_R);
 		if (!initrd) {
 			panic("Unable to map initrd.");
 		}

@@ -60,8 +60,8 @@ void ffa_init(void)
 	 */
 	const uint64_t start = 0x90000000;
 	const uint64_t len = 0x60000000;
-	const paddr_t send_addr = pa_init(start + len - PAGE_SIZE * 1);
-	const paddr_t recv_addr = pa_init(start + len - PAGE_SIZE * 2);
+	const vaddr_t send_addr = va_init(start + len - PAGE_SIZE * 1);
+	const vaddr_t recv_addr = va_init(start + len - PAGE_SIZE * 2);
 
 	if (!ffa_init_is_tee_enabled()) {
 		return;
@@ -81,9 +81,9 @@ void ffa_init(void)
 	 */
 
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	other_world_vm->mailbox.send = (void *)pa_addr(send_addr);
+	other_world_vm->mailbox.send = (void *)va_addr(send_addr);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
-	other_world_vm->mailbox.recv = (void *)pa_addr(recv_addr);
+	other_world_vm->mailbox.recv = (void *)va_addr(recv_addr);
 
 	/*
 	 * Note that send and recv are swapped around, as the send buffer from
@@ -107,10 +107,10 @@ void ffa_init(void)
 	 */
 	mm_stage1_locked = mm_lock_stage1();
 	CHECK(mm_identity_map(mm_stage1_locked, send_addr,
-			      pa_add(send_addr, PAGE_SIZE),
+			      va_add(send_addr, PAGE_SIZE),
 			      MM_MODE_R | MM_MODE_SHARED) != NULL);
 	CHECK(mm_identity_map(mm_stage1_locked, recv_addr,
-			      pa_add(recv_addr, PAGE_SIZE),
+			      va_add(recv_addr, PAGE_SIZE),
 			      MM_MODE_R | MM_MODE_W | MM_MODE_SHARED) != NULL);
 	mm_unlock_stage1(&mm_stage1_locked);
 

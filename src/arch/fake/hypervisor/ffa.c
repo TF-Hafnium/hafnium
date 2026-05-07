@@ -567,7 +567,7 @@ void arch_vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 	(void)mode;
 }
 
-bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end)
+bool arch_vm_unmap(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end)
 {
 	(void)vm_locked;
 	(void)begin;
@@ -621,8 +621,8 @@ void ffa_vm_free_resources(struct vm_locked vm_locked)
 	(void)vm_locked;
 }
 
-bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-				   paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, ipaddr_t begin,
+				   ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa,
 				   uint8_t dma_device_id)
 {
 	(void)vm_locked;

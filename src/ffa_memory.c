@@ -1098,7 +1098,8 @@ static struct ffa_value ffa_region_group_check_actions(
 	struct ffa_value ret;
 	bool is_memory_protected;
 
-	if (!vm_identity_prepare(vm_locked, pa_begin, pa_end, mode)) {
+	if (!vm_identity_prepare(vm_locked, ipa_from_pa(pa_begin),
+				 ipa_from_pa(pa_end), mode)) {
 		dlog_verbose(
 			"%s: memory can't be mapped to %x due to lack of "
 			"memory. Base: %lx end: %lx\n",
@@ -1172,7 +1173,8 @@ static void ffa_region_group_commit_actions(struct vm_locked vm_locked,
 		CHECK(arch_memory_unprotect(pa_begin, pa_end));
 		[[fallthrough]];
 	case MAP_ACTION_COMMIT:
-		vm_identity_commit(vm_locked, pa_begin, pa_end, mode, NULL);
+		vm_identity_commit(vm_locked, ipa_from_pa(pa_begin),
+				   ipa_from_pa(pa_end), mode, NULL);
 		break;
 	default:
 		panic("%s: invalid action to process %x\n", __func__, action);
@@ -1336,7 +1338,7 @@ static bool clear_memory(paddr_t begin, paddr_t end, mm_mode_t extra_mode)
 	bool ret;
 	struct mm_stage1_locked stage1_locked = mm_lock_stage1();
 	void *ptr = mm_identity_map(
-		stage1_locked, begin, end,
+		stage1_locked, va_from_pa(begin), va_from_pa(end),
 		MM_MODE_W | (extra_mode & ffa_memory_get_other_world_mode()));
 	size_t size = pa_difference(begin, end);
 
@@ -1346,7 +1348,7 @@ static bool clear_memory(paddr_t begin, paddr_t end, mm_mode_t extra_mode)
 
 	memset_s(ptr, size, 0, size);
 	arch_mm_flush_dcache(ptr, size);
-	mm_unmap(stage1_locked, begin, end);
+	mm_unmap(stage1_locked, va_from_pa(begin), va_from_pa(end));
 
 	ret = true;
 	goto out;

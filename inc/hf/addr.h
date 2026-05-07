@@ -144,6 +144,14 @@ static inline ipaddr_t ipa_from_pa(paddr_t pa)
 }
 
 /**
+ * Casts a virtual address to an intermediate physical address.
+ */
+static inline ipaddr_t ipa_from_va(vaddr_t va)
+{
+	return ipa_init(va_addr(va));
+}
+
+/**
  * Casts a virtual address to a physical address.
  */
 static inline paddr_t pa_from_va(vaddr_t va)

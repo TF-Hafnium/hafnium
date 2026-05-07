@@ -1142,8 +1142,8 @@ bool smmuv3_driver_init(struct smmuv3_driver *smmuv3, uintpaddr_t base,
 {
 	void *base_addr;
 
-	base_addr = mm_identity_map(stage1_locked, pa_init(base),
-				    pa_init(base + SMMUv3_MEM_SIZE),
+	base_addr = mm_identity_map(stage1_locked, va_init(base),
+				    va_init(base + SMMUv3_MEM_SIZE),
 				    MM_MODE_R | MM_MODE_W | MM_MODE_D);
 	if (base_addr == NULL) {
 		dlog_error(

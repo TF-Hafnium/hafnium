@@ -56,7 +56,8 @@ static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
 	paddr_t to_end = pa_add(to, size);
 	void *ptr;
 
-	ptr = mm_identity_map(stage1_locked, to, to_end, MM_MODE_W);
+	ptr = mm_identity_map(stage1_locked, va_from_pa(to), va_from_pa(to_end),
+			      MM_MODE_W);
 	if (!ptr) {
 		return false;
 	}
@@ -64,7 +65,7 @@ static bool copy_to_unmapped(struct mm_stage1_locked stage1_locked, paddr_t to,
 	memcpy_s(ptr, size, from, size);
 	arch_mm_flush_dcache(ptr, size);
 
-	CHECK(mm_unmap(stage1_locked, to, to_end));
+	CHECK(mm_unmap(stage1_locked, va_from_pa(to), va_from_pa(to_end)));
 
 	return true;
 }
@@ -366,8 +367,8 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 			"Device memory not provided, defaulting to 1 TB.\n");
 
 		if (!vm_identity_map(
-			    vm_locked, pa_init(0),
-			    pa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
+			    vm_locked, ipa_init(0),
+			    ipa_init(UINT64_C(1024) * 1024 * 1024 * 1024),
 			    MM_MODE_R | MM_MODE_W | MM_MODE_D, NULL)) {
 			dlog_error(
 				"Unable to initialise address space for "
@@ -379,8 +380,9 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 
 	/* Map normal memory as such to permit caching, execution, etc. */
 	for (i = 0; i < params->mem_ranges_count; ++i) {
-		if (!vm_identity_map(vm_locked, params->mem_ranges[i].begin,
-				     params->mem_ranges[i].end,
+		if (!vm_identity_map(vm_locked,
+				     ipa_from_pa(params->mem_ranges[i].begin),
+				     ipa_from_pa(params->mem_ranges[i].end),
 				     MM_MODE_R | MM_MODE_W | MM_MODE_X, NULL)) {
 			dlog_error(
 				"Unable to initialise memory for primary "
@@ -392,10 +394,11 @@ static bool load_primary(struct mm_stage1_locked stage1_locked,
 
 	/* Map device memory as such to prevent execution, speculation etc. */
 	for (i = 0; i < params->device_mem_ranges_count; ++i) {
-		if (!vm_identity_map(vm_locked,
-				     params->device_mem_ranges[i].begin,
-				     params->device_mem_ranges[i].end,
-				     MM_MODE_R | MM_MODE_W | MM_MODE_D, NULL)) {
+		if (!vm_identity_map(
+			    vm_locked,
+			    ipa_from_pa(params->device_mem_ranges[i].begin),
+			    ipa_from_pa(params->device_mem_ranges[i].end),
+			    MM_MODE_R | MM_MODE_W | MM_MODE_D, NULL)) {
 			dlog("Unable to initialise device memory for primary "
 			     "VM.\n");
 			ret = false;
@@ -553,8 +556,8 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 	const char *error_string = " region security state ignored for ";
 #endif
 	int j = 0;
-	paddr_t region_begin;
-	paddr_t region_end;
+	ipaddr_t region_begin;
+	ipaddr_t region_end;
 	size_t size;
 	mm_mode_t map_mode;
 	uint32_t attributes;
@@ -569,8 +572,8 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 		 * Identity map memory region for both case,
 		 * VA(S-EL0) or IPA(S-EL1).
 		 */
-		region_begin = pa_init(mem_region.base_address);
-		region_end = pa_add(region_begin, size);
+		region_begin = ipa_init(mem_region.base_address);
+		region_end = ipa_add(region_begin, size);
 
 		attributes = mem_region.attributes;
 		if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
@@ -612,7 +615,7 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 		}
 
 		dlog_verbose("Memory region %#lx - %#lx allocated.\n",
-			     pa_addr(region_begin), pa_addr(region_end));
+			     ipa_addr(region_begin), ipa_addr(region_end));
 
 		j++;
 	}
@@ -620,11 +623,11 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 	/* Map device-regions */
 	j = 0;
 	while (j < manifest_vm->partition.dev_region_count) {
-		region_begin = pa_init(
+		region_begin = ipa_init(
 			manifest_vm->partition.dev_regions[j].base_address);
 		size = manifest_vm->partition.dev_regions[j].page_count *
 		       PAGE_SIZE;
-		region_end = pa_add(region_begin, size);
+		region_end = ipa_add(region_begin, size);
 
 		attributes = manifest_vm->partition.dev_regions[j].attributes;
 		if ((attributes & MANIFEST_REGION_ATTR_SECURITY) != 0) {
@@ -659,8 +662,8 @@ static bool ffa_memory_deny_pvm_access(const struct manifest_vm *manifest_vm,
 				       const struct vm_locked primary_vm_locked)
 {
 	int j = 0;
-	paddr_t region_begin;
-	paddr_t region_end;
+	ipaddr_t region_begin;
+	ipaddr_t region_end;
 	size_t size;
 
 	while (j < manifest_vm->partition.mem_region_count) {
@@ -668,8 +671,8 @@ static bool ffa_memory_deny_pvm_access(const struct manifest_vm *manifest_vm,
 
 		mem_region = manifest_vm->partition.mem_regions[j];
 		size = mem_region.page_count * PAGE_SIZE;
-		region_begin = pa_init(mem_region.base_address);
-		region_end = pa_add(region_begin, size);
+		region_begin = ipa_init(mem_region.base_address);
+		region_end = ipa_add(region_begin, size);
 
 		/* Deny the primary VM access to this memory */
 		if (!vm_unmap(primary_vm_locked, region_begin, region_end)) {
@@ -683,11 +686,11 @@ static bool ffa_memory_deny_pvm_access(const struct manifest_vm *manifest_vm,
 
 	j = 0;
 	while (j < manifest_vm->partition.dev_region_count) {
-		region_begin = pa_init(
+		region_begin = ipa_init(
 			manifest_vm->partition.dev_regions[j].base_address);
 		size = manifest_vm->partition.dev_regions[j].page_count *
 		       PAGE_SIZE;
-		region_end = pa_add(region_begin, size);
+		region_end = ipa_add(region_begin, size);
 
 		/* Deny primary VM access to this region */
 		if (!vm_unmap(primary_vm_locked, region_begin, region_end)) {
@@ -743,7 +746,8 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 		map_mode = MM_MODE_R | MM_MODE_W | MM_MODE_X;
 	}
 
-	if (!vm_identity_map(vm_locked, mem_begin, mem_end, map_mode,
+	if (!vm_identity_map(vm_locked, ipa_from_pa(mem_begin),
+			     ipa_from_pa(mem_end), map_mode,
 			     &partition_primary_ep)) {
 		dlog_error("Unable to initialise memory.\n");
 		ret = false;
@@ -779,15 +783,18 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 	 * side-channel attacks.
 	 */
 	if (is_el0_partition) {
-		CHECK(vm_identity_map(vm_locked, layout_text_begin(),
-				      layout_text_end(), MM_MODE_X, NULL));
+		CHECK(vm_identity_map(
+			vm_locked, ipa_from_pa(layout_text_begin()),
+			ipa_from_pa(layout_text_end()), MM_MODE_X, NULL));
 
-		CHECK(vm_identity_map(vm_locked, layout_rodata_begin(),
-				      layout_rodata_end(), MM_MODE_R, NULL));
+		CHECK(vm_identity_map(
+			vm_locked, ipa_from_pa(layout_rodata_begin()),
+			ipa_from_pa(layout_rodata_end()), MM_MODE_R, NULL));
 
-		CHECK(vm_identity_map(vm_locked, layout_data_begin(),
-				      layout_data_end(), MM_MODE_R | MM_MODE_W,
-				      NULL));
+		CHECK(vm_identity_map(vm_locked,
+				      ipa_from_pa(layout_data_begin()),
+				      ipa_from_pa(layout_data_end()),
+				      MM_MODE_R | MM_MODE_W, NULL));
 
 		CHECK(arch_stack_mm_init(mm_lock_ptable_unsafe(&vm->ptable)));
 
@@ -1119,8 +1126,9 @@ bool load_vms(struct mm_stage1_locked stage1_locked, struct manifest *manifest,
 		}
 
 		/* Deny the primary VM access to this memory. */
-		if (!vm_unmap(primary_vm_locked, secondary_mem_begin,
-			      secondary_mem_end)) {
+		if (!vm_unmap(primary_vm_locked,
+			      ipa_from_pa(secondary_mem_begin),
+			      ipa_from_pa(secondary_mem_end))) {
 			dlog_error(
 				"Unable to unmap secondary VM from primary "
 				"VM.\n");

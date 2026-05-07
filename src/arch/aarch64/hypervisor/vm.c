@@ -13,6 +13,7 @@
 #include "hf/addr.h"
 #include "hf/dlog.h"
 #include "hf/mm.h"
+#include "hf/vm.h"
 
 #include "hypervisor/feature_id.h"
 
@@ -167,7 +168,7 @@ void arch_vm_commit(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 	}
 }
 
-bool arch_vm_unmap(struct vm_locked vm_locked, paddr_t begin, paddr_t end)
+bool arch_vm_unmap(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end)
 {
 	bool ret;
 	mm_mode_t mode = MM_MODE_UNMAPPED_MASK;
@@ -232,8 +233,8 @@ bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 	return ret;
 }
 
-static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, paddr_t begin,
-				     paddr_t end, mm_mode_t mode,
+static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, ipaddr_t begin,
+				     ipaddr_t end, mm_mode_t mode,
 				     uint8_t dma_device_id)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->iommu_ptables[dma_device_id];
@@ -247,8 +248,8 @@ static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, paddr_t begin,
 	return mm_vm_identity_prepare(ptable, begin, end, mode);
 }
 
-static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, paddr_t begin,
-				    paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, ipaddr_t begin,
+				    ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa,
 				    uint8_t dma_device_id)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->iommu_ptables[dma_device_id];
@@ -262,8 +263,8 @@ static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, paddr_t begin,
 	mm_vm_identity_commit(ptable, begin, end, mode, ipa);
 }
 
-bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, paddr_t begin,
-				   paddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, ipaddr_t begin,
+				   ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa,
 				   uint8_t dma_device_id)
 {
 	/*

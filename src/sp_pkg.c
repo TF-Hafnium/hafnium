@@ -54,9 +54,10 @@ static bool sp_pkg_init_v1(struct mm_stage1_locked stage1_locked,
 	 * been mapped already, prior to calling this function.
 	 */
 	if (manifest_size > PAGE_SIZE) {
-		CHECK(mm_identity_map(stage1_locked, pkg_start,
-				      pa_add(pkg_start, manifest_size),
-				      MM_MODE_R));
+		CHECK(mm_identity_map(
+			stage1_locked, va_from_pa(pkg_start),
+			va_from_pa(pa_add(pkg_start, manifest_size)),
+			MM_MODE_R));
 	}
 
 	return true;

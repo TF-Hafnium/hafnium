@@ -54,8 +54,8 @@ bool arch_other_world_vm_init(struct vm *other_world_vm,
 	for (i = 0; i < params->ns_mem_ranges_count; i++) {
 		if (!vm_identity_map(
 			    other_world_vm_locked,
-			    params->ns_mem_ranges[i].begin,
-			    params->ns_mem_ranges[i].end,
+			    ipa_from_pa(params->ns_mem_ranges[i].begin),
+			    ipa_from_pa(params->ns_mem_ranges[i].end),
 			    MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
 			    NULL)) {
 			dlog_error("Normal Memory: %s", err_msg);
@@ -70,8 +70,8 @@ bool arch_other_world_vm_init(struct vm *other_world_vm,
 	for (i = 0; i < params->ns_device_mem_ranges_count; i++) {
 		if (!vm_identity_map(
 			    other_world_vm_locked,
-			    params->ns_device_mem_ranges[i].begin,
-			    params->ns_device_mem_ranges[i].end,
+			    ipa_from_pa(params->ns_device_mem_ranges[i].begin),
+			    ipa_from_pa(params->ns_device_mem_ranges[i].end),
 			    MM_MODE_R | MM_MODE_W | MM_MODE_D | MM_MODE_NS,
 			    NULL)) {
 			dlog_error("Device Memory: %s", err_msg);
@@ -195,13 +195,15 @@ struct ffa_value arch_other_world_vm_configure_rxtx_map(
 	 * being used in memory sharing operations from the NWd, or in further
 	 * `FFA_RXTX_MAP` calls.
 	 */
-	if (!vm_unmap(other_world_locked, pa_send_begin, pa_send_end)) {
+	if (!vm_unmap(other_world_locked, ipa_from_pa(pa_send_begin),
+		      ipa_from_pa(pa_send_end))) {
 		dlog_error("%s: cannot unmap send page from NWd VM\n",
 			   __func__);
 		ret = ffa_error(FFA_ABORTED);
 		goto out_unlock;
 	}
-	if (!vm_unmap(other_world_locked, pa_recv_begin, pa_recv_end)) {
+	if (!vm_unmap(other_world_locked, ipa_from_pa(pa_recv_begin),
+		      ipa_from_pa(pa_recv_end))) {
 		ret = ffa_error(FFA_ABORTED);
 		dlog_error("%s: cannot unmap recv page from NWd VM\n",
 			   __func__);
@@ -233,7 +235,8 @@ struct ffa_value arch_other_world_vm_configure_rxtx_unmap(
 	}
 
 	/* Remap to other world page tables. */
-	if (!vm_identity_map(other_world_locked, pa_send_begin, pa_send_end,
+	if (!vm_identity_map(other_world_locked, ipa_from_pa(pa_send_begin),
+			     ipa_from_pa(pa_send_end),
 			     MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
 			     NULL)) {
 		dlog_error(
@@ -243,14 +246,16 @@ struct ffa_value arch_other_world_vm_configure_rxtx_unmap(
 		return ffa_error(FFA_ABORTED);
 	}
 
-	if (!vm_identity_map(other_world_locked, pa_recv_begin, pa_recv_end,
+	if (!vm_identity_map(other_world_locked, ipa_from_pa(pa_recv_begin),
+			     ipa_from_pa(pa_recv_end),
 			     MM_MODE_R | MM_MODE_W | MM_MODE_X | MM_MODE_NS,
 			     NULL)) {
 		dlog_error(
 			"%s: unable to remap recv page to other world page "
 			"tables\n",
 			__func__);
-		CHECK(vm_unmap(other_world_locked, pa_send_begin, pa_send_end));
+		CHECK(vm_unmap(other_world_locked, ipa_from_pa(pa_send_begin),
+			       ipa_from_pa(pa_send_end)));
 		return ffa_error(FFA_ABORTED);
 	}
 

@@ -1089,11 +1089,10 @@ bool mm_prepare(struct mm_ptable *ptable, vaddr_t v_begin, vaddr_t v_end,
  *
  * This is a wrapper that does an `mm_prepare` as one-to-one.
  */
-bool mm_identity_prepare(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
+bool mm_identity_prepare(struct mm_ptable *ptable, vaddr_t begin, vaddr_t end,
 			 mm_mode_t mode)
 {
-	return mm_prepare(ptable, va_from_pa(begin), va_from_pa(end), begin,
-			  mode);
+	return mm_prepare(ptable, begin, end, pa_from_va(begin), mode);
 }
 
 /**
@@ -1117,11 +1116,10 @@ void *mm_commit(struct mm_ptable *ptable, vaddr_t v_begin, vaddr_t v_end,
  *
  * This is a wrapper that does an `mm_commit` as one-to-one.
  */
-void *mm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
+void *mm_identity_commit(struct mm_ptable *ptable, vaddr_t begin, vaddr_t end,
 			 mm_mode_t mode)
 {
-	return mm_commit(ptable, va_from_pa(begin), va_from_pa(end), begin,
-			 mode);
+	return mm_commit(ptable, begin, end, pa_from_va(begin), mode);
 }
 
 /**
@@ -1147,11 +1145,10 @@ bool mm_vm_prepare(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
  *
  * This is a wrapper that does an `mm_vm_prepare` as one-to-one.
  */
-bool mm_vm_identity_prepare(struct mm_ptable *ptable, paddr_t begin,
-			    paddr_t end, mm_mode_t mode)
+bool mm_vm_identity_prepare(struct mm_ptable *ptable, ipaddr_t begin,
+			    ipaddr_t end, mm_mode_t mode)
 {
-	return mm_vm_prepare(ptable, ipa_from_pa(begin), ipa_from_pa(end),
-			     begin, mode);
+	return mm_vm_prepare(ptable, begin, end, pa_from_ipa(begin), mode);
 }
 
 /**
@@ -1174,13 +1171,13 @@ void mm_vm_commit(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
  *
  * This is a wrapper that does an `mm_vm_commit` as one-to-one.
  */
-void mm_vm_identity_commit(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
-			   mm_mode_t mode, ipaddr_t *ipa)
+void mm_vm_identity_commit(struct mm_ptable *ptable, ipaddr_t begin,
+			   ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa)
 {
-	mm_vm_commit(ptable, ipa_from_pa(begin), ipa_from_pa(end), begin, mode);
+	mm_vm_commit(ptable, begin, end, pa_from_ipa(begin), mode);
 
 	if (ipa != NULL) {
-		*ipa = ipa_from_pa(begin);
+		*ipa = begin;
 	}
 }
 
@@ -1213,29 +1210,27 @@ bool mm_vm_map(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
  *
  * This is a wrapper that does an `mm_vm_map` as one-to-one.
  */
-bool mm_vm_identity_map(struct mm_ptable *ptable, paddr_t begin, paddr_t end,
+bool mm_vm_identity_map(struct mm_ptable *ptable, ipaddr_t begin, ipaddr_t end,
 			mm_mode_t mode, ipaddr_t *ipa)
 {
-	bool success = mm_vm_map(ptable, ipa_from_pa(begin), ipa_from_pa(end),
-				 begin, mode);
+	bool success = mm_vm_map(ptable, begin, end, pa_from_ipa(begin), mode);
 
 	if (success && ipa != NULL) {
-		*ipa = ipa_from_pa(begin);
+		*ipa = begin;
 	}
 
 	return success;
 }
 
 /**
- * Updates the VM's table such that the given physical address range has no
- * connection to the VM.
+ * Updates the VM's table such that the given intermediate physical address
+ * range has no connection to the VM.
  */
-bool mm_vm_unmap(struct mm_ptable *ptable, paddr_t begin, paddr_t end)
+bool mm_vm_unmap(struct mm_ptable *ptable, ipaddr_t begin, ipaddr_t end)
 {
 	mm_mode_t mode = MM_MODE_UNMAPPED_MASK;
 
-	return mm_vm_map(ptable, ipa_from_pa(begin), ipa_from_pa(end),
-			 pa_init(0), mode);
+	return mm_vm_map(ptable, begin, end, pa_init(0), mode);
 }
 
 /**
@@ -1576,23 +1571,21 @@ void *mm_map(struct mm_stage1_locked stage1_locked, vaddr_t v_begin,
  *
  * This is a wrapper that does an `mm_map` as one-to-one.
  */
-void *mm_identity_map(struct mm_stage1_locked stage1_locked, paddr_t begin,
-		      paddr_t end, mm_mode_t mode)
+void *mm_identity_map(struct mm_stage1_locked stage1_locked, vaddr_t begin,
+		      vaddr_t end, mm_mode_t mode)
 {
-	return mm_map(stage1_locked, va_from_pa(begin), va_from_pa(end), begin,
-		      mode);
+	return mm_map(stage1_locked, begin, end, pa_from_va(begin), mode);
 }
 
 /**
  * Updates the hypervisor table such that the given physical address range is
  * not mapped in the address space.
  */
-bool mm_unmap(struct mm_stage1_locked stage1_locked, paddr_t begin, paddr_t end)
+bool mm_unmap(struct mm_stage1_locked stage1_locked, vaddr_t begin, vaddr_t end)
 {
 	mm_mode_t mode = MM_MODE_UNMAPPED_MASK;
 
-	return mm_map(stage1_locked, va_from_pa(begin), va_from_pa(end),
-		      pa_init(0), mode);
+	return mm_map(stage1_locked, begin, end, pa_init(0), mode);
 }
 
 /**
@@ -1636,14 +1629,16 @@ bool mm_init(void)
 	plat_console_mm_init(stage1_locked);
 
 	/* Map each section. */
-	CHECK(mm_identity_map(stage1_locked, layout_text_begin(),
-			      layout_text_end(), MM_MODE_X) != NULL);
+	CHECK(mm_identity_map(stage1_locked, va_from_pa(layout_text_begin()),
+			      va_from_pa(layout_text_end()),
+			      MM_MODE_X) != NULL);
 
-	CHECK(mm_identity_map(stage1_locked, layout_rodata_begin(),
-			      layout_rodata_end(), MM_MODE_R) != NULL);
+	CHECK(mm_identity_map(stage1_locked, va_from_pa(layout_rodata_begin()),
+			      va_from_pa(layout_rodata_end()),
+			      MM_MODE_R) != NULL);
 
-	CHECK(mm_identity_map(stage1_locked, layout_data_begin(),
-			      layout_data_end(),
+	CHECK(mm_identity_map(stage1_locked, va_from_pa(layout_data_begin()),
+			      va_from_pa(layout_data_end()),
 			      MM_MODE_R | MM_MODE_W) != NULL);
 
 	/* Arch-specific stack mapping. */

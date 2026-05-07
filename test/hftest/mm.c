@@ -49,8 +49,8 @@ bool hftest_mm_init(void)
 
 	stage1_locked = hftest_mm_get_stage1();
 	mm_identity_map(stage1_locked,
-			pa_init((uintptr_t)HFTEST_STAGE1_START_ADDRESS),
-			pa_init(mm_ptable_addr_space_end(stage1_locked.ptable)),
+			va_init((uintptr_t)HFTEST_STAGE1_START_ADDRESS),
+			va_init(mm_ptable_addr_space_end(stage1_locked.ptable)),
 			MM_MODE_R | MM_MODE_W | MM_MODE_X);
 
 	arch_vm_mm_enable(&ptable);
@@ -72,8 +72,8 @@ bool hftest_mm_get_mode(const void *base, size_t size, mm_mode_t *mode)
 void hftest_mm_identity_map(const void *base, size_t size, mm_mode_t mode)
 {
 	struct mm_stage1_locked stage1_locked = hftest_mm_get_stage1();
-	paddr_t start = pa_from_va(va_from_ptr(base));
-	paddr_t end = pa_add(start, size);
+	vaddr_t start = va_from_ptr(base);
+	vaddr_t end = va_add(start, size);
 
 	if (mm_identity_map(stage1_locked, start, end, mode) != base) {
 		FAIL("Could not add new page table mapping. Try increasing "

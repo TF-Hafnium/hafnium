@@ -59,8 +59,9 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	size_t i;
 
 	/* Map the fdt header in. */
-	fdt = mm_identity_map(stage1_locked, fdt_addr,
-			      pa_add(fdt_addr, FDT_V17_HEADER_SIZE), MM_MODE_R);
+	fdt = mm_identity_map(stage1_locked, va_from_pa(fdt_addr),
+			      va_from_pa(pa_add(fdt_addr, FDT_V17_HEADER_SIZE)),
+			      MM_MODE_R);
 	if (!fdt) {
 		dlog_error("Unable to map FDT header.\n");
 		return false;
@@ -73,8 +74,8 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 
 	/* Map the fdt (+ a page) in r/w mode in preparation for updating it. */
 	buf_size = fdt_totalsize(fdt) + PAGE_SIZE;
-	fdt = mm_identity_map(stage1_locked, fdt_addr,
-			      pa_add(fdt_addr, buf_size),
+	fdt = mm_identity_map(stage1_locked, va_from_pa(fdt_addr),
+			      va_from_pa(pa_add(fdt_addr, buf_size)),
 			      MM_MODE_R | MM_MODE_W);
 	if (!fdt) {
 		dlog_error("Unable to map FDT in r/w mode.\n");
@@ -144,16 +145,17 @@ bool fdt_patch(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 
 out_unmap_fdt:
 	/* Unmap FDT. */
-	if (!mm_unmap(stage1_locked, fdt_addr,
-		      pa_add(fdt_addr, fdt_totalsize(fdt) + PAGE_SIZE))) {
+	if (!mm_unmap(stage1_locked, va_from_pa(fdt_addr),
+		      va_from_pa(pa_add(fdt_addr,
+					fdt_totalsize(fdt) + PAGE_SIZE)))) {
 		dlog_error("Unable to unmap writable FDT.\n");
 		return false;
 	}
 	return ret;
 
 err_unmap_fdt_header:
-	mm_unmap(stage1_locked, fdt_addr,
-		 pa_add(fdt_addr, FDT_V17_HEADER_SIZE));
+	mm_unmap(stage1_locked, va_from_pa(fdt_addr),
+		 va_from_pa(pa_add(fdt_addr, FDT_V17_HEADER_SIZE)));
 	return false;
 }
 
@@ -168,8 +170,8 @@ bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	int root;
 
 	/* Map the fdt in r/w mode in preparation for updating it. */
-	fdt = mm_identity_map(stage1_locked, fdt_addr,
-			      pa_add(fdt_addr, fdt_max_size),
+	fdt = mm_identity_map(stage1_locked, va_from_pa(fdt_addr),
+			      va_from_pa(pa_add(fdt_addr, fdt_max_size)),
 			      MM_MODE_R | MM_MODE_W);
 
 	if (!fdt) {
@@ -233,8 +235,8 @@ bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 
 out_unmap_fdt:
 	/* Unmap FDT. */
-	if (!mm_unmap(stage1_locked, fdt_addr,
-		      pa_add(fdt_addr, fdt_max_size))) {
+	if (!mm_unmap(stage1_locked, va_from_pa(fdt_addr),
+		      va_from_pa(pa_add(fdt_addr, fdt_max_size)))) {
 		dlog_error("Unable to unmap writable FDT.\n");
 		return false;
 	}

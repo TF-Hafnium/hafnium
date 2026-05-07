@@ -65,8 +65,9 @@ static bool partition_pkg_from_sp_pkg(struct mm_stage1_locked stage1_locked,
 
 	if (ret) {
 		/* Map the whole package as RO. */
-		CHECK(mm_identity_map(stage1_locked, pkg->total.begin,
-				      pkg->total.end, MM_MODE_R) != NULL);
+		CHECK(mm_identity_map(
+			      stage1_locked, va_from_pa(pkg->total.begin),
+			      va_from_pa(pkg->total.end), MM_MODE_R) != NULL);
 	}
 
 	return ret;
@@ -116,8 +117,8 @@ static bool partition_pkg_from_tl(struct mm_stage1_locked stage1_locked,
 	pkg->total.end = pa_add(pkg_start, tl->size);
 
 	/* Map the whole TL as RO. */
-	CHECK(mm_identity_map(stage1_locked, pkg->total.begin, pkg->total.end,
-			      MM_MODE_R));
+	CHECK(mm_identity_map(stage1_locked, va_from_pa(pkg->total.begin),
+			      va_from_pa(pkg->total.end), MM_MODE_R));
 
 	tl_res = transfer_list_check_header(tl);
 
@@ -232,8 +233,8 @@ bool partition_pkg_init(struct mm_stage1_locked stage1_locked,
 	void *mapped_ptr;
 
 	/* Firstly, map a single page to be able to read package header. */
-	mapped_ptr = mm_identity_map(stage1_locked, pkg_start, pkg_first_page,
-				     MM_MODE_R);
+	mapped_ptr = mm_identity_map(stage1_locked, va_from_pa(pkg_start),
+				     va_from_pa(pkg_first_page), MM_MODE_R);
 	assert(mapped_ptr != NULL);
 	assert(pkg != NULL);
 
@@ -275,8 +276,9 @@ bool partition_pkg_init(struct mm_stage1_locked stage1_locked,
 	/* Map Boot info section as RW. */
 	if (pa_addr(pkg->boot_info.begin) != 0U &&
 	    pa_addr(pkg->boot_info.end) != 0U) {
-		CHECK(mm_identity_map(stage1_locked, pkg->boot_info.begin,
-				      pkg->boot_info.end,
+		CHECK(mm_identity_map(stage1_locked,
+				      va_from_pa(pkg->boot_info.begin),
+				      va_from_pa(pkg->boot_info.end),
 				      MM_MODE_R | MM_MODE_W) != NULL);
 	}
 
@@ -285,7 +287,8 @@ bool partition_pkg_init(struct mm_stage1_locked stage1_locked,
 out:
 	/* If failing unmap the memory. */
 	if (!ret) {
-		CHECK(mm_unmap(stage1_locked, pkg_start, pkg_first_page));
+		CHECK(mm_unmap(stage1_locked, va_from_pa(pkg_start),
+			       va_from_pa(pkg_first_page)));
 	}
 
 	return ret;
@@ -294,5 +297,6 @@ out:
 void partition_pkg_deinit(struct mm_stage1_locked stage1_locked,
 			  struct partition_pkg *pkg)
 {
-	CHECK(mm_unmap(stage1_locked, pkg->total.begin, pkg->total.end));
+	CHECK(mm_unmap(stage1_locked, va_from_pa(pkg->total.begin),
+		       va_from_pa(pkg->total.end)));
 }

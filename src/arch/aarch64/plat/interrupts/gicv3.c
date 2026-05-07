@@ -781,10 +781,11 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 	uint32_t gicr_idx;
 
 	for (gicd_idx = 0; gicd_idx < num_gic_dist; gicd_idx++) {
-		base_addr = mm_identity_map(stage1_locked,
-					    gic_mem_ranges[gicd_idx].begin,
-					    gic_mem_ranges[gicd_idx].end,
-					    MM_MODE_R | MM_MODE_W | MM_MODE_D);
+		base_addr = mm_identity_map(
+			stage1_locked,
+			va_from_pa(gic_mem_ranges[gicd_idx].begin),
+			va_from_pa(gic_mem_ranges[gicd_idx].end),
+			MM_MODE_R | MM_MODE_W | MM_MODE_D);
 		if (base_addr == NULL) {
 			dlog_error(
 				"Could not map GICv3 into Hafnium memory "
@@ -825,8 +826,9 @@ bool gicv3_driver_init(struct mm_stage1_locked stage1_locked,
 		 */
 		base_addr = mm_identity_map(
 			stage1_locked,
-			gic_mem_ranges[gicr_idx + num_gic_dist].begin,
-			gic_mem_ranges[gicr_idx + num_gic_dist].end,
+			va_from_pa(
+				gic_mem_ranges[gicr_idx + num_gic_dist].begin),
+			va_from_pa(gic_mem_ranges[gicr_idx + num_gic_dist].end),
 			MM_MODE_R | MM_MODE_W | MM_MODE_D);
 
 		if (base_addr == NULL) {

@@ -11,6 +11,7 @@
 #include "hf/arch/other_world.h"
 #include "hf/arch/std.h"
 
+#include "hf/addr.h"
 #include "hf/check.h"
 #include "hf/ffa/init.h"
 #include "hf/ffa/vm.h"
@@ -292,8 +293,8 @@ void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 	 * manifest_init() and secondary fdt should be empty.
 	 */
 	CHECK(manifest_vm->is_hyp_loaded);
-	CHECK(mm_identity_map(stage1_locked, fdt_addr,
-			      pa_add(fdt_addr, fdt_allocated_size),
+	CHECK(mm_identity_map(stage1_locked, va_from_pa(fdt_addr),
+			      va_from_pa(pa_add(fdt_addr, fdt_allocated_size)),
 			      MM_MODE_R) != NULL);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	CHECK(fdt_init_from_ptr(&partition_fdt, (void *)pa_addr(fdt_addr),
@@ -301,8 +302,9 @@ void ffa_setup_parse_partition_manifest(struct mm_stage1_locked stage1_locked,
 	CHECK(parse_ffa_manifest(&partition_fdt,
 				 (struct manifest_vm *)manifest_vm, NULL,
 				 boot_params) == MANIFEST_SUCCESS);
-	CHECK(mm_unmap(stage1_locked, fdt_addr,
-		       pa_add(fdt_addr, fdt_allocated_size)) == true);
+	CHECK(mm_unmap(stage1_locked, va_from_pa(fdt_addr),
+		       va_from_pa(pa_add(fdt_addr, fdt_allocated_size))) ==
+	      true);
 }
 
 ffa_partition_properties_t ffa_setup_partition_properties(

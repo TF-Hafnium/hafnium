@@ -175,9 +175,9 @@ bool fdt_map(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
 	size_t fdt_len;
 
 	/* Map the fdt header in. */
-	fdt_ptr = mm_identity_map(stage1_locked, fdt_addr,
-				  pa_add(fdt_addr, FDT_V17_HEADER_SIZE),
-				  MM_MODE_R);
+	fdt_ptr = mm_identity_map(
+		stage1_locked, va_from_pa(fdt_addr),
+		va_from_pa(pa_add(fdt_addr, FDT_V17_HEADER_SIZE)), MM_MODE_R);
 	if (!fdt_ptr) {
 		dlog_error("Unable to map FDT header.\n");
 		return NULL;
@@ -189,8 +189,9 @@ bool fdt_map(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
 	}
 
 	/* Map the rest of the fdt in. */
-	fdt_ptr = mm_identity_map(stage1_locked, fdt_addr,
-				  pa_add(fdt_addr, fdt_len), MM_MODE_R);
+	fdt_ptr = mm_identity_map(stage1_locked, va_from_pa(fdt_addr),
+				  va_from_pa(pa_add(fdt_addr, fdt_len)),
+				  MM_MODE_R);
 	if (!fdt_ptr) {
 		dlog_error("Unable to map full FDT.\n");
 		goto fail;
@@ -204,19 +205,20 @@ bool fdt_map(struct fdt *fdt, struct mm_stage1_locked stage1_locked,
 	return true;
 
 fail_full:
-	mm_unmap(stage1_locked, fdt_addr, pa_add(fdt_addr, fdt_len));
+	mm_unmap(stage1_locked, va_from_pa(fdt_addr),
+		 va_from_pa(pa_add(fdt_addr, fdt_len)));
 	return false;
 
 fail:
-	mm_unmap(stage1_locked, fdt_addr,
-		 pa_add(fdt_addr, FDT_V17_HEADER_SIZE));
+	mm_unmap(stage1_locked, va_from_pa(fdt_addr),
+		 va_from_pa(pa_add(fdt_addr, FDT_V17_HEADER_SIZE)));
 	return false;
 }
 
 bool fdt_unmap(struct fdt *fdt, struct mm_stage1_locked stage1_locked)
 {
-	paddr_t begin = pa_from_va(va_from_ptr(fdt_base(fdt)));
-	paddr_t end = pa_add(begin, fdt_size(fdt));
+	vaddr_t begin = va_from_ptr(fdt_base(fdt));
+	vaddr_t end = va_add(begin, fdt_size(fdt));
 
 	if (!mm_unmap(stage1_locked, begin, end)) {
 		return false;

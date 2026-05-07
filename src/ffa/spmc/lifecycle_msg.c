@@ -41,8 +41,8 @@ static bool load_and_validate_package(struct mm_stage1_locked stage1_locked,
 	 * Map the old instance's package area as RW before copying new
 	 * instance. It might have been marked as read-only during cold boot.
 	 */
-	if (mm_identity_map(stage1_locked, pa_init(load_addr),
-			    pa_add(pa_init(load_addr), max_size),
+	if (mm_identity_map(stage1_locked, va_init(load_addr),
+			    va_add(va_init(load_addr), max_size),
 			    MM_MODE_R | MM_MODE_W) == NULL) {
 		dlog_error("%s: failed to map old instance RW at 0x%lx",
 			   __func__, load_addr);
@@ -50,8 +50,8 @@ static bool load_and_validate_package(struct mm_stage1_locked stage1_locked,
 	}
 
 	/* Map the staging area as Read only. */
-	if (mm_identity_map(stage1_locked, staging_pa,
-			    pa_add(staging_pa, staging_sz),
+	if (mm_identity_map(stage1_locked, va_from_pa(staging_pa),
+			    va_from_pa(pa_add(staging_pa, staging_sz)),
 			    MM_MODE_R) == NULL) {
 		dlog_error("%s: failed to map staging R at 0x%lx", __func__,
 			   pa_addr(staging_pa));
@@ -60,8 +60,8 @@ static bool load_and_validate_package(struct mm_stage1_locked stage1_locked,
 		 * TODO: Revert back the old instance's package area to its
 		 * original mode, need not be READ only.
 		 */
-		mm_identity_map(stage1_locked, pa_init(load_addr),
-				pa_add(pa_init(load_addr), staging_sz),
+		mm_identity_map(stage1_locked, va_init(load_addr),
+				va_add(va_init(load_addr), staging_sz),
 				MM_MODE_R);
 		return false;
 	}
@@ -86,8 +86,8 @@ static bool load_and_validate_package(struct mm_stage1_locked stage1_locked,
 	arch_mm_flush_dcache(load_ptr, max_size);
 
 	/* Unmap the staging area. */
-	CHECK(mm_unmap(stage1_locked, staging_pa,
-		       pa_add(staging_pa, staging_sz)));
+	CHECK(mm_unmap(stage1_locked, va_from_pa(staging_pa),
+		       va_from_pa(pa_add(staging_pa, staging_sz))));
 
 	/* Initialize the partition package */
 	if (!partition_pkg_init(stage1_locked, pa_init(load_addr), pkg)) {
@@ -588,9 +588,9 @@ static bool prepare_partition_new_instance(struct vm_locked vm_locked)
 			MM_MODE_R | MM_MODE_X | MM_MODE_USER | MM_MODE_NG;
 
 		if (!vm_identity_map(
-			    vm_locked, pa_init(vm_config->partition.load_addr),
-			    pa_add(pa_init(vm_config->partition.load_addr),
-				   max_size),
+			    vm_locked, ipa_init(vm_config->partition.load_addr),
+			    ipa_add(ipa_init(vm_config->partition.load_addr),
+				    max_size),
 			    map_mode, NULL)) {
 			dlog_error("%s: vm_identity_map RX failed", __func__);
 			goto out;
