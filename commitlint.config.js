@@ -46,6 +46,7 @@ export default {
         'git',
         'deps',
         'fvp',
+        'image',
 
         // submodules
         'reference',

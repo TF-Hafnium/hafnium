@@ -334,7 +334,6 @@ class FvpDriver(Driver, ABC):
         if bl31_override:
             driver._fvp_prebuilt_bl31 = bl31_override
 
-
         # LoggingPriority: CLI > ENV > Default
         logging_level_str = options.get("log_level") or os.getenv("HFTEST_LOG_LEVEL", "INFO")
         if logging_level_str.isdigit():

@@ -16,25 +16,35 @@ This script aims at generating a json file that contains the artifacts of
 partitions that will execute alongside in the same test setup.
 A partition can be:
  - Virtual Machine (VM) - to execute in EL1;
- - Secure Partition (SP) - to execute in S-EL1.
+ - Secure Partition (SP) - to execute in S-EL1;
+ - Partition Package - to be staged for optional live activation of an SP.
 
-A setup can have multiple VMs and multiple SPs executing alongside.
-The json file shall list the VMs and SPs, such as:
+A setup can have multiple VMs and multiple SPs executing alongside, and may
+optionally include partition packages. The json file lists the present
+artifacts, such as:
 {
     "SPs" : [ <SP information>, ... , <SPx Information>],
-    "VMs" : [ <VM information>, ... , <VMx Information>]
+    "VMs" : [ <VM information>, ... , <VMx Information>],
+    "Packages" : [ <Package information>, ... , <Packagex Information>]
 }
 
-Where the information of each partition shall obey the following format:
+The information of each VM or SP shall obey the following format:
 {
      "img" : <path to partition package>.img,
      "dts" : <path to manifest>.dts
+}
+
+The information of each package shall obey the following format:
+{
+     "img" : <path to partition package>.img,
+     "address" : <staging address>
 }
 
 In the arguments of this script provide the path to partition's artifacts
 separated by the character defined as 'ARG_SPLITTER'. Example:
 --sp <path to img>,<path to dts>
 --vm <path to img>,<path to dts>
+--package <path to img>,<staging address>
 """
 
 ARG_SPLITTER = ','
