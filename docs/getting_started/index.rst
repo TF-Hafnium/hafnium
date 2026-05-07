@@ -8,8 +8,6 @@ Getting Started
    prerequisites
    get-source
    building
-   coding-style
-   commit-style
    project-structure
    hafnium-tests
 

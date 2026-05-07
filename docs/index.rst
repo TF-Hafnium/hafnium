@@ -8,6 +8,7 @@ Hafnium Documentation
    Home<self>
    about
    getting_started/index
+   process/index
    secure-partition-manager/index
    threat_model_spm
    change-log

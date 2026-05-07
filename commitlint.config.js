@@ -57,6 +57,9 @@ export default {
         'gtest',
         'prebuilts',
 
+        // Documentation
+        'process',
+
         // Fallback scope for any miscellaneous change
         'misc'
       ],
