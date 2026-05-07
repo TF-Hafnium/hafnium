@@ -528,12 +528,6 @@ static void handle_spmd_lsp_to_spmc_framework_msg(struct ffa_value args,
 		return;
 	}
 
-	/*
-	 * The framework message is conveyed by SPMD LSP to SPMC so the
-	 * current VM id must match to the range of SPMD LSP ids.
-	 */
-	CHECK(current->vm->id == HF_HYPERVISOR_VM_ID);
-
 	switch (func) {
 	case FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_START_REQ:
 		*ret = lifecycle_msg_activation_start_req(args, next);
@@ -575,12 +569,6 @@ static void handle_spmd_to_spmc_framework_msg(struct ffa_value args,
 		*ret = ffa_error(FFA_INVALID_PARAMETERS);
 		return;
 	}
-
-	/*
-	 * The framework message is conveyed by EL3/SPMD to SPMC so the
-	 * current VM id must match to the other world VM id.
-	 */
-	CHECK(current->vm->id == HF_HYPERVISOR_VM_ID);
 
 	switch (func) {
 	case FFA_FRAMEWORK_MSG_PSCI_REQ: {

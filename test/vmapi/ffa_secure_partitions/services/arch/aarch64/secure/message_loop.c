@@ -24,9 +24,9 @@
 #if LIVE_ACTIVATION_SUPPORT == 1
 
 const uint32_t msg[3] = {
-	0x4c4641,  // "LFA"
-	0x53504D,  // "SPM"
-	0x4c5342,  // "LSB" Live State Buffer
+	0x4c4641, /* ASCII: "LFA" */
+	0x53504D, /* ASCII: "SPM" */
+	0x4c5342, /* ASCII: "LSB" */
 };
 
 extern uint64_t shared_nwd_buffer_addr;

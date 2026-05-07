@@ -11,6 +11,12 @@
 #include "hf/vcpu.h"
 #include "hf/vm.h"
 
+/*
+ * Response code to indicate successful handling of partition live activation
+ * start/finish request.
+ */
+#define LFA_RESPONSE_SUCCESS 0ULL
+
 struct ffa_value lifecycle_msg_activation_start_req(struct ffa_value args,
 						    struct vcpu **next);
 

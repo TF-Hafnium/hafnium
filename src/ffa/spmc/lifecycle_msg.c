@@ -262,15 +262,6 @@ struct ffa_value lifecycle_msg_activation_start_req(struct ffa_value args,
 	target_locked = vcpu_lock(target_vcpu);
 
 	/*
-	 * SPMC has already started live activation of a Secure Partition.
-	 */
-	if (tracker->in_progress) {
-		dlog_error("SPMC busy with Live activation\n");
-		live_activation_request_status = FFA_BUSY;
-		goto exit_unlock;
-	}
-
-	/*
 	 * Check if START_REQ is being sent again for activation of a specific
 	 * SP. Since live activation is a transactional process, deny the
 	 * repeated request.
@@ -278,6 +269,15 @@ struct ffa_value lifecycle_msg_activation_start_req(struct ffa_value args,
 	if (target_vm->lfa_progress != LFA_PHASE_RESET) {
 		dlog_error("Repeated live activation start request denied\n");
 		live_activation_request_status = FFA_DENIED;
+		goto exit_unlock;
+	}
+
+	/*
+	 * SPMC has already started live activation of a Secure Partition.
+	 */
+	if (tracker->in_progress) {
+		dlog_error("SPMC busy with Live activation\n");
+		live_activation_request_status = FFA_BUSY;
 		goto exit_unlock;
 	}
 
@@ -291,7 +291,7 @@ struct ffa_value lifecycle_msg_activation_start_req(struct ffa_value args,
 	 */
 	switch (target_vcpu->state) {
 	case VCPU_STATE_WAITING:
-		live_activation_request_status = FFA_SUCCESSFUL; /* Success */
+		live_activation_request_status = LFA_RESPONSE_SUCCESS;
 		initiate_partition_stop_request(target_locked, next, true);
 
 		/*
@@ -322,7 +322,7 @@ struct ffa_value lifecycle_msg_activation_start_req(struct ffa_value args,
 		break;
 	default:
 		dlog_error("Target partition's vCPU not available\n");
-		if (vcpu_is_available(target_vcpu)) {
+		if (vcpu_is_available(target_locked)) {
 			live_activation_request_status = FFA_RETRY;
 		} else {
 			live_activation_request_status = FFA_DENIED;
@@ -393,7 +393,7 @@ struct ffa_value lifecycle_msg_activation_finish_req(struct ffa_value args,
 	struct vcpu *target_vcpu;
 	struct vcpu_locked target_locked;
 	ffa_id_t target_endpoint_id;
-	uint64_t live_activation_request_status = FFA_SUCCESSFUL;
+	uint64_t live_activation_request_status = LFA_RESPONSE_SUCCESS;
 	struct live_activation_tracker_locked tracker_locked;
 	struct live_activation_tracker *tracker;
 	struct vm *live_activate_vm;
@@ -641,7 +641,7 @@ struct ffa_value lifecycle_msg_partition_stop_resp(
 	 */
 	initiator_id = tracker->initiator_id;
 
-	if (lifecycle_request_status == FFA_SUCCESSFUL) {
+	if (lifecycle_request_status == LFA_RESPONSE_SUCCESS) {
 		struct vm_locked vm_locked;
 
 		dlog_verbose("SP%#x stopped for purpose of live activation\n",
@@ -753,8 +753,8 @@ void lifecycle_sp_activation_complete(struct vcpu_locked current_locked,
 	 */
 	ffa_ret = ffa_framework_msg_resp(
 		HF_SPMC_VM_ID, initiator_id,
-		FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_FINISH_RESP, FFA_SUCCESSFUL,
-		0, 0);
+		FFA_FRAMEWORK_MSG_LIVE_ACTIVATION_FINISH_RESP,
+		LFA_RESPONSE_SUCCESS, 0, 0);
 
 	*next = api_switch_to_other_world(current_locked, ffa_ret,
 					  VCPU_STATE_WAITING);

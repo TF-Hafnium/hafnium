@@ -46,5 +46,5 @@ void live_activation_init(void)
 	live_activation_tracker_reset(&tracker_locked);
 
 	live_activation_tracker_unlocked(&tracker_locked);
-	dlog_notice("Live activation tracker initialized\n");
+	dlog_verbose("Live activation tracker initialized\n");
 }

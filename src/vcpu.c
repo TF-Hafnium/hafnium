@@ -12,11 +12,9 @@
 
 #include "hf/check.h"
 #include "hf/dlog.h"
+#include "hf/ffa_partition_manifest.h"
 #include "hf/std.h"
 #include "hf/vm.h"
-
-/** GP register to be used to pass the current vCPU ID, at core bring up. */
-#define PHYS_CORE_IDX_GP_REG 4
 
 /**
  * Locks the given vCPU and updates `locked` to hold the newly locked vCPU.
@@ -836,12 +834,12 @@ out:
 /**
  * Query if a vCPU is available in the context of partition lifecycle.
  */
-bool vcpu_is_available(struct vcpu *vcpu)
+bool vcpu_is_available(struct vcpu_locked locked)
 {
 	enum vcpu_state state;
 
-	assert(vcpu != NULL);
-	state = vcpu->state;
+	assert(locked.vcpu != NULL);
+	state = locked.vcpu->state;
 
 	/*
 	 * A vCPU becomes available when all of the following conditions are
