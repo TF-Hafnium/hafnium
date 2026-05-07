@@ -42,6 +42,9 @@ export default {
         'commitlint',
         'git',
 
+        // Documentation
+        'process',
+
         // Fallback scope for any miscellaneous change
         'misc'
       ],
