@@ -48,6 +48,12 @@ enum manifest_return_code uint32list_get_next(struct uint32list_iter *list,
 enum manifest_return_code parse_flattened_uuid(struct uint32list_iter *uuid,
 					       struct ffa_uuid *out);
 
+enum manifest_return_code parse_image_uuid(const struct fdt_node *node,
+					   struct ffa_uuid *image_uuid,
+					   const struct service *services,
+					   uint16_t service_count,
+					   uint16_t manifest_version_minor);
+
 enum manifest_return_code parse_services(const struct fdt_node *node,
 					 struct service *services,
 					 uint16_t *service_count,

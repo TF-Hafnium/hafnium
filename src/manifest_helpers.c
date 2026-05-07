@@ -206,6 +206,27 @@ enum manifest_return_code parse_flattened_uuid(struct uint32list_iter *uuid,
 	return MANIFEST_SUCCESS;
 }
 
+static enum manifest_return_code parse_image_uuid_v1_0(
+	const struct fdt_node *node, struct ffa_uuid *image_uuid)
+{
+	struct uint32list_iter uuid;
+	enum manifest_return_code ret;
+
+	ret = read_uint32list(node, "image-uuid", &uuid);
+	if (ret != MANIFEST_SUCCESS) {
+		return ret;
+	}
+
+	ret = parse_flattened_uuid(&uuid, image_uuid);
+
+	/* Ensure only a single image UUID is specified. */
+	if (uint32list_has_next(&uuid)) {
+		return MANIFEST_ERROR_TOO_MANY_IMAGE_UUIDS;
+	}
+
+	return ret;
+}
+
 /**
  * Parse a UUID in the canonical string format from `uuid` into `out`
  * Returns `MANIFEST_SUCCESS` if parsing succeeded.
@@ -226,6 +247,17 @@ static enum manifest_return_code parse_canonical_uuid(struct string *uuid,
 	if (ffa_uuid_is_null(out)) {
 		return MANIFEST_ERROR_UUID_ALL_ZEROS;
 	}
+
+	return MANIFEST_SUCCESS;
+}
+
+static enum manifest_return_code parse_image_uuid_v1_1(
+	const struct fdt_node *node, struct ffa_uuid *image_uuid)
+{
+	struct string uuid;
+
+	TRY(read_string(node, "image-uuid", &uuid));
+	TRY(parse_canonical_uuid(&uuid, image_uuid));
 
 	return MANIFEST_SUCCESS;
 }
@@ -412,6 +444,28 @@ enum manifest_return_code parse_services(const struct fdt_node *node,
 			     services[i].protocol_uuid.uuid[3]);
 		dlog_verbose("  Messaging Methods %#x\n",
 			     services[i].messaging_method);
+	}
+
+	return MANIFEST_SUCCESS;
+}
+
+enum manifest_return_code parse_image_uuid(const struct fdt_node *node,
+					   struct ffa_uuid *image_uuid,
+					   const struct service *services,
+					   uint16_t service_count,
+					   uint16_t manifest_version_minor)
+{
+	if (manifest_version_minor == 0) {
+		TRY(parse_image_uuid_v1_0(node, image_uuid));
+	} else {
+		TRY(parse_image_uuid_v1_1(node, image_uuid));
+	}
+
+	/* Image UUID must be different from Protocol UUID(s) */
+	for (uint16_t i = 0; i < service_count; i++) {
+		if (ffa_uuid_equal(image_uuid, &services[i].protocol_uuid)) {
+			return MANIFEST_ERROR_IMAGE_UUID_INVALID;
+		}
 	}
 
 	return MANIFEST_SUCCESS;
