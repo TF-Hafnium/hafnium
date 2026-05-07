@@ -7,3 +7,4 @@ Processes & Policies
 
    coding-style
    commit-style
+   security
