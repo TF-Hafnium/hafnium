@@ -10,6 +10,10 @@
 
 #include "manifest_test_helpers.hh"
 
+extern "C" {
+#include "hf/manifest_helpers.h"
+}
+
 namespace
 {
 using manifest_test::manifest_v1_0;
@@ -313,5 +317,28 @@ TEST_F(manifest_v1_0, ffa_validate_sanity_check)
 	 * No need to invoke manifest_dealloac() since manifest TearDown calls
 	 * it when the test ends.
 	 */
+}
+
+TEST_F(manifest_v1_0, ffa_live_activation_flattened_image_uuid)
+{
+	struct fdt fdt;
+	struct fdt_node root;
+	struct ffa_uuid image_uuid = {};
+
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.0" })
+		.Property("image-uuid",
+			 "<0x00112233 0x44556677 0x8899aabb 0xccddeeff>")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_TRUE(fdt_init_from_ptr(&fdt, dtb.data(), dtb.size()));
+	ASSERT_TRUE(fdt_find_node(&fdt, "/", &root));
+	ASSERT_EQ(parse_image_uuid(&root, &image_uuid, nullptr, 0, 0),
+		  MANIFEST_SUCCESS);
+	ASSERT_THAT(
+		std::span(image_uuid.uuid, 4),
+		ElementsAre(0x00112233, 0x44556677, 0x8899aabb, 0xccddeeff));
 }
 } /* namespace */

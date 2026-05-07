@@ -10,6 +10,10 @@
 
 #include "manifest_test_helpers.hh"
 
+extern "C" {
+#include "hf/manifest_helpers.h"
+}
+
 namespace
 {
 using manifest_test::manifest;
@@ -2873,6 +2877,29 @@ TEST_F(manifest, validate_sp_abort_actions)
 	ASSERT_EQ(ffa_manifest_from_vec(&m, dtb),
 		  MANIFEST_ERROR_ILLEGAL_ABORT_ACTION);
 	manifest_dealloc();
+}
+
+TEST_F(manifest, validate_sp_live_activation_canonical_image_uuid)
+{
+	struct fdt fdt;
+	struct fdt_node root;
+	struct ffa_uuid image_uuid = {};
+
+	/* clang-format off */
+	std::vector<char> dtb = ManifestDtBuilder()
+		.Compatible({ "arm,ffa-manifest-1.1" })
+		.StringProperty("image-uuid",
+				"00112233-4455-6677-8899-aabbccddeeff")
+		.Build();
+	/* clang-format on */
+
+	ASSERT_TRUE(fdt_init_from_ptr(&fdt, dtb.data(), dtb.size()));
+	ASSERT_TRUE(fdt_find_node(&fdt, "/", &root));
+	ASSERT_EQ(parse_image_uuid(&root, &image_uuid, nullptr, 0, 1),
+		  MANIFEST_SUCCESS);
+	ASSERT_THAT(
+		std::span(image_uuid.uuid, 4),
+		ElementsAre(0x00112233, 0x44556677, 0x8899aabb, 0xccddeeff));
 }
 
 } /* namespace */
