@@ -177,6 +177,11 @@ list:
 commitlint:
 	@build/commitlint.sh $(COMMITLINT_FROM) $(COMMITLINT_TO)
 
+# Apply commit message linting to the current branch using Commitlint.
+.PHONY: commitlint-branch
+commitlint-branch:
+	@build/commitlint.sh $$(git merge-base HEAD master) $(COMMITLINT_TO)
+
 # Test utilities
 include ./kokoro/kokoro.mk
 
