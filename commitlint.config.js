@@ -35,6 +35,8 @@ export default {
         'lifecycle',
         'lfa',
 
+	'tl',	// Transfer List
+
         // Test framework
         'hftest',
         'static-checks',

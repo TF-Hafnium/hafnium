@@ -161,8 +161,8 @@ static bool partition_pkg_from_tl(struct mm_stage1_locked stage1_locked,
 	if (last_te->tag_id != TL_TAG_FFA_SP_BINARY) {
 		dlog_error(
 			"%s: partition image must be the last TL "
-			"entry.\n",
-			__func__);
+			"entry; last TL tag id: %#x.\n",
+			__func__, last_te->tag_id);
 		return false;
 	}
 
