@@ -3,6 +3,271 @@
 This document contains a summary of the new features, changes, fixes and known
 issues in each release of Hafnium.
 
+## [2.15.0](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/tags/v2.14.0..refs/tags/v2.15.0) (2026-05-26)
+
+### Highlights
+
+* Memory Management Enhancements:
+    * Introduced new memory allocator APIs to improve flexibility and allocator
+      handling across Hafnium components.
+
+* Developer Experience Improvements:
+    * Introduced multiple framework, tooling, and infrastructure improvements
+      across Hafnium to enhance developer productivity, usability, and overall
+      workflow experience.
+
+* SP Live Activation Support:
+    * Added support for Secure Partition (SP) live activation.
+    * Added support for extended partition info descriptors from FF-A v1.3 spec.
+
+* Secure Partition Enhancements:
+    * Added support for canonical UUID format handling.
+    * Added support for the FF-A v1.1 partition manifest services structure to
+      better associate service UUIDs with their messaging methods.
+
+* Service Protocol Improvements:
+    * Added support to explicitly specify the messaging method for each service
+      protocol UUID.
+
+* Build & CI Improvements:
+    * Added a Jenkins job to execute TF-A/TFTF SPM test groups from Hafnium CI
+      using Shrinkwrap on FVP.
+
+### Features
+
+* **api:** hypervisor rx/tx buffer reporting ([bc001f6](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/bc001f6e8b130bcd63165407f1873094ededb33b))
+* **api:** use the rollback functionality from memory allocator ([97f0624](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/97f0624726b576503f59d42c00624ea1d643f3ad))
+* **arch/cpu:** define arch_current_cpu() ([404bca0](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/404bca0c32af0d7afe3c3edb3d6a595c62dc9900))
+* **arch/vcpu:** define 'arch_vcpu_get_current' ([d528926](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/d528926ee724efb9e90c4162364647731f494c72))
+* **commitlint:** add commitlint-branch target to Makefile ([45e22ab](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/45e22ab75c9b4d103334b43a407813f448a9ca7a))
+* **ff-a:** helpers for compatibility between old and new descriptors ([8de6fc5](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/8de6fc56c5d185b33bc371071a8e2aa20c5b37f3))
+* **ff-a:** report image UUID during partition discovery ([0b40335](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/0b40335fde11ebfe64800148300cf43b3f05abca))
+* **ff-a:** report live activation in partition info descriptor ([bcd15f2](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/bcd15f256e09b6d3f3e14fcc1e79ff61a43bcc0a))
+* **ff-a:** support extended partition info descriptor ([4e80e89](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/4e80e8905509a848a4f2c99c66608b032429a0b8))
+* **ffa_memory:** use memory allocator for region fragments ([5941cc2](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5941cc2720e6a9b8953d51bcbba6078bba500433))
+* **ffa_memory:** use the rollback functionality from memory allocator ([d82b93c](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/d82b93cc29fc5c5fc75997c38b1e9b784ed2db58))
+* **hftest:** integrate dual-UART logs & skip unsupported SP-to-SP tests ([8d11d70](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/8d11d70912556f055c99a4bd365f6840c3fa68b9))
+* **hftest:** memory allocator for the tests ([09bcb30](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/09bcb30a1852a263fb594e4a048d72d012f26392))
+* **hftest:** test partitions depend on memory allocator ([000dadb](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/000dadb58ae1b758a55a7dccfb82befdc33d913e))
+* **kokoro:** add --suite and --test options ([3b3e178](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3b3e17877dfdea9067ca09ecf681f9721aa61e23))
+* **kokoro:** use per-test log directories to prevent overwrites ([da3708d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/da3708dcd2407da4847ad05cabf0f9632972a905))
+* **lfa:** allocate CPU cyles to initialize new SP instance ([b8bb4eb](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b8bb4eb579ca63369379025a900fdc0041dd4792))
+* **lfa:** complete SP live activation and send response to LSP ([6d21674](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/6d2167486ca961f0909aebc953b6c5985ca4cfb7))
+* **lfa:** expect live state buffer in partition manifest ([127a924](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/127a924a51615eeffbeadf00af0213e056cde13f))
+* **lfa:** inform LSP about fatal errors while live activating SP ([e91194d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e91194d64a76d6ecde95a527b62f1eefb13c37e2))
+* **lfa:** introduce global live activation tracker ([3d13914](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3d139149767e179c866af0da400a3f89eea26fdb))
+* **lfa:** introduce support for lifecycle framework message ABIs ([3d9e566](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3d9e56694c6d2c44e286e27bf2a2ca050253bf42))
+* **lfa:** prepare to stop SP for live activation ([2242e90](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/2242e90b3409234885e920e72ac453bfcd12045e))
+* **lfa:** receive stop response for live activation ([f0a062a](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f0a062a45c421855272ea0f86255ffbbbf7a0845))
+* **lfa:** support live activation finish request ([04e9ffa](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/04e9ffa1f8b38f1cf255bb68b90324d934f49574))
+* **lfa:** support live activation start request message ([e9339d6](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e9339d6750cc36e2f38e8fb90599ad5fbb8c648f))
+* **lfa:** validate partition stop response and prepare new instance ([22e0b7c](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/22e0b7ca29b43f7f545068fd1b89dbc9c14deb2b))
+* **lifecycle:** restrict FFA_ABORT to v1.3 compliant SPs ([103efb4](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/103efb4ab7880f67f29d7a8b5f14a5b6fb04cb16))
+* **manifest:** add services struct for v1.1 manifests ([19c087e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/19c087e2b39a5b8900fe877083ebcbc8845cabdd))
+* **manifest:** add support for live activation fields ([9b661ba](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/9b661ba11d8f212a0204d4aba26e3cb95a0cb078))
+* **manifest:** add UUID specific messaging methods ([dc52069](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/dc5206961a3b420973e4445903708c732b369fac))
+* **manifest:** check for duplicate UUIDs within SP manifest ([b1d0c63](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b1d0c633282e52377de882e86473f623beaeeb80))
+* **manifest:** move to canonical string UUID for v1.1 manifest ([5d771ce](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5d771ce445dc835c1bc490545d9d212edbd7e061))
+* **manifest:** support for canonical image uuid parsing ([acb5167](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/acb5167153c6b77e9ac9d77e6c7874fb74970d8e))
+* **manifest:** support for parsing image uuid ([fdfdee7](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/fdfdee708cd591eda86ac66c0b91960e7631ce3d))
+* **memory_alloc:** add rollback allocator using per-CPU mem pools ([5283e32](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5283e32b2fab048f6bdb9197befc57cb5d4db235))
+* **memory_alloc:** add temporary API to get ppool ([b1b2e6e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b1b2e6e8fc0ed5d68803b3038b51e488ad596faf))
+* **memory_alloc:** init memory_alloc ([e372469](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e3724690391e3bb0d5eca16ba60d0288ad9a2731))
+* **memory_alloc:** per CPU rollback memory allocation ([074e627](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/074e627010c529552faffd546a8ec8a809c8d7d1))
+* **misc:** ensure SP image is last entry in transfer list ([872ec89](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/872ec8910cbfcea5f5f340caa1c7e2db73d25ba9))
+* **plat:** define memory alloc library ([f93e961](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f93e9615ec118bb6e2181c83af625feec9158058))
+* **shrinkwrap:** add common base configuration for SPM TFTF tests ([d985168](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/d985168f83772d85d8ac03633b4b7bc0cfa91cc4))
+* **shrinkwrap:** add EL2 SPMC TFTF CI overlays ([9b87fad](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/9b87fada6de6e9b8d74a55677cbdc4d34a943dfa))
+* **shrinkwrap:** add Kokoro target to build Hafnium from remote sources ([f430e5b](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f430e5b2feccc6b49db972a255b14ad02ffd2212))
+* **vm:** extend vm state to aid live activation ([012ecfe](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/012ecfeb23c13d3cf15d59a0ea64d052b98ca5cd))
+
+
+### Performance Improvements
+
+* **ff-a:** remove redundant error handling from api_ffa_mem_perm_set ([85b8a5d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/85b8a5dc32ea22a138dd013b6069d7c5d4192e64))
+
+
+### Bug Fixes
+
+* **api_ffa_mem_send:** check header size before iterating receivers ([a9d6a31](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/a9d6a31f7e48669aa32844a76df30041de830095))
+* **api_ffa_mem_send:** fragment length check ([6828e3e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/6828e3ee69f875fb7b7d698217d1b7a32dac3c7a))
+* **api:** prevent buffer overflow ([6667313](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/66673139fa46e03fd99027064c6d41cab2e4a402))
+* **build:** make GN formatting failures fatal in check-format ([486e00f](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/486e00f48acd55a434ec2b58fecb0eb562582bcf))
+* change error to warning when no tests match ([4740b2d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/4740b2d4c9b7b11dcf1a5983793cc53a5445107a))
+* defer freeing the memory used for old vCPU structures ([f242cb2](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f242cb22c6850c5e1f0287b84fa43646eaa95280))
+* **deps:** poetry readme.rst does not exist error ([3faec86](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3faec86de29e4cfda844140878e2cdaaa9aad72b))
+* **ff-a:** carry forward non-RWX permissions in FFA_MEM_PERM_SET ([bb08d20](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/bb08d20e2d4505fdd8b6af764224559c8cafe6a2))
+* **ff-a:** check alignment on RXTX descriptor offsets ([b9c1912](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b9c1912cbe872d6e9cbeb0238569ddb88728e15c))
+* **ff-a:** drop FFA_RXTX_MAP_32 from features ([aa100c1](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/aa100c1b8ee636b1da4bb20d99af9dee436a1cdf))
+* **ff-a:** relax constraints on FFA_MEM_PERM_SET to align with spec ([5c441ff](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5c441ffa7bbfa4e6a80cf66df7e178898f6f21dc))
+* **ff-a:** version negotiation fails when preempted by S-interrupt ([1fff55d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/1fff55d2923873239150c0aba0f88d8d5740af4d))
+* **ffa_memory:** ff-a v1.1 incorrect struct size in composite offset ([95ccb5d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/95ccb5d19b2a2062cef89efb820adcb2c8410d27))
+* **ffa_memory:** initialise mode and map_action on all exit paths ([d979abb](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/d979abb2643c4035ea46aafc0c82632b9959e9da))
+* **ffa:** align ffa_feature handling and coverage ([7ae7d28](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/7ae7d2817d17489e2982b47e5d3baecde5d9fad6))
+* **hftest:** correct device range ([38b07b6](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/38b07b6bca2857684e990765351fee630aeed890))
+* **hftest:** fix memory_free return type mismatch ([37f2b83](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/37f2b83c5877dbf1c87a4b84af9ef77040ed3c20))
+* **hftest:** fix OOBs in ffa_msg_send_direct_req2 ([0a3a396](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/0a3a396cdc365179637ee2a9bd4dc791bd45e201))
+* **hftest:** resolve -Wenum-compare for ffa_version calls ([96b765f](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/96b765ffef7fba2600250b28ed853abd2a61741d))
+* **interrupts:** clear managed exit flag on FFA_MSG_WAIT ([aa5fdab](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/aa5fdab99a75565a5b92ff6a4790857ee7a1baac))
+* **interrupts:** correct interrupt bitmap size ([5290459](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5290459f7620d9bdaeda5b0b8bb800f122bb4ccf))
+* **lifecycle:** skip boostrapping UP SP vCPU while hotplugging primary CPU ([cc8894a](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/cc8894aeae417e8de7f151ea7b0f637b3a8393ea))
+* **manifest:** sanity check for exception-level ([b456768](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b456768404c854320d8a900fda1bc33f32bf9d5d))
+* **manifest:** validate full memory containment ([76408cf](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/76408cfa35a7e0e60b03b5798eef89e63188eeff))
+* **mem_share:** correct the fragment offset ([a283c02](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/a283c0215a26a12e3759c447035d5c189ba7063e))
+* **mem_share:** populate sender ID in FRAG_RX ([a334fe7](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/a334fe7e5f2b96d97b095002f60b6290b9763a09))
+* **mem_share:** use v1.0 struct for region offset ([b446fd8](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b446fd897c14ae20dd309863d1c9fd7f46b5c584))
+* **memory_alloc:** assert on accidental reinitialisation ([8e70c9d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/8e70c9dea604d11fc5cce685d7f0bd6eb5a01fa3))
+* **misc:** prevent dlog_buffer from being optimised out ([5c41b82](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5c41b8283edb3f44796b6e02de20f565f21e65d3))
+* **mm:** check for security mode mismatch while handling fault ([3b2320a](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3b2320a6acc29bb67d5c0c05d02cebf2a233d461))
+* **mm:** incorrect level used to infer PTE during walk ([69f51f7](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/69f51f762a688f30e3cef659c8b6facfc980fb57))
+* **mm:** incorrect root level specified to mm_get_range_by_mode_level ([3e6c853](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3e6c85336db718a25f88f11d401fc75695f7e7ce))
+* **mm:** remove assumptions about PTE structure ([96415d3](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/96415d374ddc2bd8c26cbaddd8854fda9ba9b78b))
+* perform explicit typecast to avoid sign conversion warnings ([8df91b5](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/8df91b58903022fb68e359d09745169fcfb84b52))
+* **smmuv3:** use correct size for memory alloc ([f52cef1](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f52cef18b179ad735a2efcdd43f6c18d8f637793))
+* **smmuv3:** use incoming shareability for GBPA ([e2eff75](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e2eff756a53cba5383b3865f9f372c6d2365dc1a))
+* **smmu:** version handling ([24c0aaa](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/24c0aaa11b76c52ae9acd75824810dd93f7e54e4))
+* **static-checks:** address clang-tidy findings ([b330f58](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b330f580ae6cd9c3379311541c25d4fe354709c1))
+* **static:** correct argument name in boot_flow APIs ([165750d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/165750dab19d89aa081b8c3c2eb385e7a66e89df))
+* **test:** correct nested loop indices in unaligned page check ([e28aff5](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e28aff5dbe9b777c2826c506a54e8ec5033b1289))
+* trap ID_AA64ISAR2_EL1 for PAuth ([b18b13f](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b18b13f1765252626b8d02ca0c60980db77a8c99))
+* typo in ffa_func_name helper ([823ba51](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/823ba51675a38baa5fb569c8f258183bc0246060))
+* **UT:** initialise memory allocator once per unit test run ([449330b](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/449330b3464def0ec7ffad2e5060c4f20b32d0cb))
+
+
+### Code Refactoring
+
+* **api:** drop ppool argument from init func ([4716979](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/4716979c7caeffbec39378d093bc04f19971e9d8))
+* **api:** drop the 'struct mpool' use ([3a423f7](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3a423f7b55273a6082667afe83b88ce828dbbe85))
+* **arch_init:** drop the 'struct mpool' use ([147b2a1](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/147b2a19417f5fd41170f3b1df22f84cc5c5099c))
+* **arch/vm:** drop the 'struct mpool' use ([5359a0b](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5359a0be4b38aed6283ba6066a750408e73d94d2))
+* **boot_flow:** drop the ppool parameter ([2d6941e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/2d6941e93c451702f13a0abbe1674ff5f978a6af))
+* **commitlint:** switch to deterministic npm ci install ([e2e0ef3](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e2e0ef3e87e8a6bc61baee855cbdfe9e8a8be5ba))
+* drop 'memory_alloc_get_ppool' function ([59c25a1](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/59c25a1e7e15dda14d78d2fa61c40f3e7546777e))
+* **fdt_patch:** drop the 'struct mpool' use ([bde1f07](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/bde1f07cfd5c09347a1377db8d5975910ddcae96))
+* **fdt:** drop dependency to struct mpool ([dbb39d1](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/dbb39d156a835014f310b1c37490f286fce88f80))
+* **fdt:** drop the 'struct mpool' use ([bfec536](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/bfec5360ac45a2cee016443d1579da2d0d9b68be))
+* **ff-a:** drop the 'struct mpool' use ([14ff2ec](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/14ff2ecf8646514f88aa9767cb008611a759ac9a))
+* **ff-a:** drop the 'struct mpool' use ([ee8bfa3](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/ee8bfa3ec066ba99a9320fb2cabc0fa5a31934d6))
+* **ff-a:** drop the 'struct mpool' use ([fadb3f0](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/fadb3f0072c5ad2c265f1b09f4b75089e8a9dfa9))
+* **ffa_memory:** drop the 'struct mpool' use ([61a8210](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/61a8210a16e84c42868617611c023771e75d919d))
+* **ffa:** drop ppool argument from ff-a ([35a333c](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/35a333c4447a4e674f6b576f2c519eaed13a1df3))
+* **gicv3:** drop the 'struct mpool' use ([54c8adb](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/54c8adb9ad1d60205edc5bdc70eb4173d176fa4f))
+* **hftest:** adapt mm tests to ppool-less mm APIs ([40c135b](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/40c135bae84a70f96e6f2089d5236ed09656088a))
+* **hftest:** drop explicit casts for ffa_msg_send_direct_req2/resp2 ([80679fe](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/80679fe9bb59a491f5c03ed2ce09746a7a58b850))
+* **hypervisor:** introduce SVC handler ([de0ad56](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/de0ad569b757d9450d455507ccb2ae93e65fa340))
+* **init:** drop the 'struct mpool' use ([7f38863](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/7f38863fc4d840203ee90ae241ab658072d9d455))
+* **init:** drop the 'struct mpool' use ([92894fb](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/92894fbca36c0f12afd1c41e43f0aac2bf5c1d29))
+* **init:** use the memory_alloc ([bdfd46d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/bdfd46dd52489fd9e3bc65c19eeba525a94ef178))
+* **interrupts:** drop dependency to ppool ([de542d0](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/de542d0d83b48405eaf7cbcae7e25c6738f0d23d))
+* **iommu:** drop the 'struct mpool' use ([76e2a67](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/76e2a672b3004d86722bf2695d2496eb1a7872f6))
+* **load:** drop dependency to ppool argument ([729fe0d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/729fe0d66576510addb6a9b3f9db0ed14ab1c508))
+* **load:** drop the 'struct mpool' use ([0ae9f57](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/0ae9f5789a55cee5221ec7528265742c9b5dd58d))
+* make manifest service parsing common ([b331014](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b3310148e6a1d00329b173abfbdbb77f2a80a8d2))
+* **manifest:** add services struct to VM and partition_manifest ([4d714d3](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/4d714d3f8adf90e7ce38e3f09ec04986cae60540))
+* **manifest:** drop dependency to ppool ([50fab83](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/50fab83e97b48e1ed55c540864d8c8540b0569b5))
+* **mem_share:** make share_state functions consistent ([a2fc3cb](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/a2fc3cb59b6ca951b960b1c925e9d4769d626416))
+* **memory_alloc:** use check on the return of memory free ([d691eac](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/d691eac95894ac45c7520cd041fbb1c78b17e1f7))
+* **mm:** drop ppool argument ([e029ae0](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e029ae0adbfe93186c4466ce118edb0f0feb04a6))
+* **mm:** drop ppool argument from init ([35ef23a](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/35ef23a14150df8e5636b39bcf1a60d7a75a9f4a))
+* **mm:** use the memory_alloc/free functions ([3ea9f74](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3ea9f7480e64b7c8ba19830980babdb1824a63a3))
+* **other_world:** drop the 'struct mpool' use ([a351bc8](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/a351bc8ec7d009d0ede547fb8d2b4379a4b01093))
+* **partition_pkg:** drop the 'struct mpool' use ([c73fa75](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/c73fa75c3e1348dd493960c489a1eac7c70665cf))
+* **pl011:** drop the 'struct mpool' use ([209b14e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/209b14ea0d115c47318b53d6ba075314204d1666))
+* reduce code duplication in ffa_ns_res_info_get tests ([c45e612](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/c45e6125a6b6c158ff7be3977ce6def33ef4e49c))
+* **shrinkwrap:** clean up hafnium-tftf config and sources ([cf7df7f](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/cf7df7f99f4c55e099cdc2e043a3c6dcf8991c8c))
+* **shrinkwrap:** move local development configs under configs/local ([ec4dbe9](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/ec4dbe9d7caeb15a733f650481927c0bd52ddf34))
+* **sp_pkg:** drop the 'struct mpool' use ([18356a0](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/18356a0628ecb8fb2faab7a5b6fa5bb07a7156d6))
+* **static-checks:** fail static-checks on clang-tidy errors ([8836e27](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/8836e2733049b443e7a6e70c01d945652af73dc6))
+* **UT:** drop the 'struct mpool' use ([9e530ea](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/9e530ea5df65a1e893c719ccccc8d806caa8c15f))
+* **vm:** drop the 'struct mpool' use ([24a9062](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/24a9062f10fd2724bd90a4968932b6560abf60e8))
+
+
+### Tests & Framework
+
+* extend test scenario to abort and restart SP twice ([b5e960e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b5e960e3df388392b54f7c5aff2a7e83ea0577e1))
+* **ff-a:** add v1.3 partition_info_get image-UUID coverage ([baa543f](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/baa543f1a6fa3892c729244216d528224a873ac1))
+* **ff-a:** add v1.3 partition_info_get protocol-UUID coverage ([b023cab](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b023cab8058be2d9e3bd66d222513c6365e2cb8a))
+* **ff-a:** validate v1.3 partition_info_get for NULL UUID ([5fb78cb](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5fb78cb647fa3a023be5999d9ee50c005970f570))
+* ffa_ns_res_info_get - add hypervisor rx/tx amds ([3bbe8ef](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3bbe8efa10e717ca8f79ca83f40f9eb0e8143fc6))
+* ffa_ns_res_info_get - donate info ([9d75e27](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/9d75e273004be5369a2854d2a805c24bc2e37a29))
+* ffa_ns_res_info_get - donate info sel0 ([f19d9b9](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f19d9b961f040480cdd5f07b51e735750ece5482))
+* ffa_ns_res_info_get - lend diff permissions ([77e6196](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/77e619699189c931b44d8278d13a2840ccd772a2))
+* ffa_ns_res_info_get - share info ([b2d72e2](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b2d72e280831ac3ee8c8e32c4f8bf33469deb866))
+* **ffa:** test for multiple messaging methods ([5483e96](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5483e96c95f94d893f7f996002274619f66e60e4))
+* **hftest:** allow hftest driver to pick the variant of BL31 binary ([9fa8457](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/9fa845741072b1bf4cdec419cf0237b91ca6199d))
+* **hftest:** build SPs with live activation support ([c6c9349](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/c6c9349cf3eb01f6744ed06ca688b84cf4f979ed))
+* **hftest:** emulate firmware store in hftest framework ([5d8fadb](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5d8fadbe123a959e9d8a485959545e0865f138b2))
+* **hftest:** prepare test setup to exercise SP live activation ([e1115a3](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e1115a37c7892df995d29e64b1dacfa539986fd2))
+* **hftest:** support to load partition packages at specified staging address ([3216d61](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3216d6158c4315e809c9c781130115f7f83cb764))
+* **kokoro:** extend hftest `--debug` flag to `kokoro/test` scripts ([7cac879](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/7cac879e2bff897d30effedb6285e3c739e84259))
+* **lfa:** add helper utilities to exercise live activation ([fade589](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/fade589fd9ddcea011fafc94c66d0277715b7d70))
+* **lfa:** add partition manifests for live activatable SPs ([475f2d2](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/475f2d21c14c16fd5c98af0dca15d2e972a26dd7))
+* **lfa:** add robust checks to SP live activation scenario ([eebaef5](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/eebaef5476ac74a43a625417ff01f87ce0c04f59))
+* **lfa:** ensure shared memory is preserved across live activation ([a87cf83](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/a87cf839e37bc8fdedd56ca632c43e593694b28e))
+* **lfa:** exercise LFA handling when SP fails during live activation ([bd1d24e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/bd1d24eaef28f047ed4bcaa42edf7792604ff2d6))
+* **lfa:** helpers to mimic saving and restoring from live buffer ([644af9f](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/644af9fd51eac753bfd88d9d616efbfb6eb3336b))
+* **lfa:** introduce fictitious live state structure and utilities ([8b1f4c6](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/8b1f4c6aaf94e822ccf021707eb25c62e126bdc8))
+* **lfa:** introduce lfa client utilities for test driver ([92205e3](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/92205e3a41e5df3fe883a89f03b596d022c29922))
+* **lfa:** make SP live activation fail while handling stop request ([887614e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/887614e22c4af23b6cfa11226e35a189970ec29b))
+* **lfa:** prepare SPs to receive live activation status hint from SPMC ([ed79678](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/ed79678c7166459bbd96bd595ba6cc0f410833f7))
+* **lfa:** simple scenario of live activating UP SP ([10c7b88](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/10c7b88e6847001128d44651dbb30c034cd091b8))
+* **lfa:** support partition stop request for live activation ([a258fae](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/a258faedea261966d2c3b17999be3fcda429a8e3))
+* **lfa:** support to dynamically locate live state buffer ([aec5f51](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/aec5f51627948d80f0ab57e5ed473d411401f57a))
+* **manifest:** add image regions to boot params ([77b7e47](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/77b7e470f4ff2331e741acd9d5f89ea0a766913d))
+* **manifest:** add unit tests for canonical image uuid support ([3a04ce9](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3a04ce9bb7ece17230140b0670a548d2673e9ab8))
+* **manifest:** split properties and children in ManifestDtBuilder ([cf56010](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/cf560108023818f417514c2afbc2e96a076ae338))
+* **manifest:** update partitions to use v1.1 ffa manifest ([3ad0c9d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/3ad0c9dce843e4e83e9fc021a440ea6e46002f37))
+* **manifest:** update tests to v1.1 manifest ([281c275](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/281c275a8c9f8c9be5e1d12251e2980dfbd25974))
+* **manifest:** update UUID tests to v1.1 manifest ([4c0425b](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/4c0425b6cd43d2819bf453952f69db45755d8064))
+* **manifest:** validate memory regions invalid ([b664a7b](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/b664a7b235a1bdca4763296aafa9bc414d3563da))
+* **mem_share:** optimize FRAG_TX test path ([e6d28ed](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e6d28ed7e7a949f02c7f1ff0bc06c6fb008c458e))
+* **mm:** remove double mm_vm_fini in mm.map_reverse_range_rounded_quirk ([c0f002d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/c0f002d6eff5225d9fde6883f3fc61baa3a03f2c))
+* **shrinkwrap:** add generic test group runner script ([75cef40](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/75cef40c43e3c541a99358d3674d617e5c1b9cbd))
+
+
+### Build & CI
+
+* **commitlint:** add scopes for submodules ([e263990](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e26399063743eb75827437195eb6e79fa6c04ba1))
+* **commitlint:** add smmuv3 to commit scopes ([dadb2b5](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/dadb2b534e64d1a4bd307eb2893ff13ad1aa9a29))
+* **commitlint:** enforce scopes for commits ([003f08f](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/003f08f359300b95b74cf1fbf32ba5b2cd18597e))
+* **commitlint:** restrict commit scopes to approved list ([867c5fa](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/867c5fafe6d37e3768b0a0a56bed666bab5b7ca5))
+* **deps:** add NVM version file ([cd6a408](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/cd6a40889a5ec093be943e227fceeedd84d60e75))
+* **shrinkwrap:** update shrinkwrap submodule to 2026.3.0 ([d2127a2](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/d2127a20a36ebd639e7202d65987d986159c7a71))
+
+
+### Documentation
+
+* document PDF build dependencies and instructions ([395ec24](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/395ec243334275e51bac1650c5dea8173c21c0be))
+* **fvp:** document FVP model version used in CI and testing ([22601ac](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/22601accbdadbbe54af6ee90f97e3ebb11ca3031))
+* **lfa:** describe support for SP live activation ([97c7605](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/97c76057e571378e32341731fc194c271388aecf))
+* update maintainers list ([66d5e05](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/66d5e0530c2951877b09565a35196695b5c8d881))
+
+
+### Maintenance & Chores
+
+* **build:** sort unit_tests sources in src/BUILD.gn ([e946721](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/e9467212460babc23d3d23a19551cd5ac3b1661d))
+* **deps:** track poetry lockfile ([ae4ebbe](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/ae4ebbecaea05710aceee547c22faffcf9766bac))
+* drop api_init function ([18e7546](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/18e7546299f6f25014a177ea08e9f36b56c196b4))
+* **image:** clarify --package usage in generate_partitions_json ([1164b8a](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/1164b8a78489a16f50b513f88735df2a983ce977))
+* **manifest:** remove unused manifest_deinit path ([19b0feb](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/19b0feb7ebe8d1904932a807ee9db8ea59e07cab))
+* **misc:** clean up initrd boot remnants ([6ac92bd](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/6ac92bd3089cbcf6594666bc07dbad4ba571ff7e))
+* **misc:** miscellaneous fixes ([ae51c7a](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/ae51c7a2e4c56671ed7692d319d09b5ad48d3185))
+* **misc:** small fixes and improvements related to lfa ([91abca4](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/91abca469dfc0f153b22c59b9d237be094d62477))
+* **prebuilts:** new BL31 binary with Live activation support ([c2cf649](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/c2cf649d0d36f2f9b6300019797f11998d14b6a2))
+* **reference:** update submodule for unit test toolchain changes ([d1a2dbd](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/d1a2dbd95beaabc7495fcef07b1c2ad9707dbf50))
+* **reference:** update submodule to fix format changes ([28dfffd](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/28dfffdf24cc853f6878fd8f0ec636ac69a959b3))
+* remove ffa_memory_return_delayed service ([86bfa18](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/86bfa187aee25bda4c5898487cf6c789d40eeee1))
+* remove/move unnecessary headers ([5e48e4b](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/5e48e4b6333df11710cedaefe7eb4ee35c6eef1d))
+* set clang-format PointerAlignment to Right ([7fe7d67](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/7fe7d67cffa475c1cafe42263e34fb60adc04d86))
+* **submodule:** update reference to include UART base address changes ([f9ecd21](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/f9ecd218bc157f35c644bcc8e483f20a4bafb7d1))
+* **tl:** identify final TL entry when image binary is expected ([ae9e92e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/ae9e92e0f2bed3d4e0142e3b5f7140c19bb1579a))
+* update googletest submodule ([0deaa9f](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/0deaa9f7067df1665ba34b3ce416d91c10140f9f))
+
+
+### Code Style
+
+* **misc:** format for *.hh files ([aec094e](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/aec094ea3feabac648b7b70ce861471b2a1b4fe1))
+
 ## [2.14.0](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/tags/v2.13.0..refs/tags/v2.14.0) (2025-11-13)
 
 ### Highlights

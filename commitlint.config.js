@@ -49,6 +49,7 @@ export default {
         'deps',
         'fvp',
         'image',
+        'changelog',
 
         // submodules
         'reference',
