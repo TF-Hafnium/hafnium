@@ -10,6 +10,7 @@
 
 #include <stdatomic.h>
 
+#include "hf/arch/std.h"
 #include "hf/arch/types.h"
 
 #include "vmapi/hf/ffa.h"
@@ -21,7 +22,8 @@
 #define INTERRUPT_REGISTER_BITS 32
 
 struct interrupt_bitmap {
-	uint32_t bitmap[HF_NUM_INTIDS / INTERRUPT_REGISTER_BITS];
+	uint32_t bitmap[align_up(HF_NUM_INTIDS, INTERRUPT_REGISTER_BITS) /
+			INTERRUPT_REGISTER_BITS];
 };
 
 static inline uint32_t interrupt_bitmap_get_value(
