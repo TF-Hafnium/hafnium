@@ -1,0 +1,34 @@
+# Copyright 2026 The Hafnium Authors.
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/BSD-3-Clause.
+
+executable("unit_tests") {
+  testonly = true
+  sources = [
+    "bits_test.cc",
+    "cpu_test.cc",
+    "fdt_handler_test.cc",
+    "fdt_test.cc",
+    "global_env.cc",
+    "ipi_test.cc",
+    "manifest_test.cc",
+    "manifest_v1_0_test.cc",
+    "mm_test.cc",
+    "mpool_test.cc",
+    "string_test.cc",
+    "vcpu_test.cc",
+    "vm_test.cc",
+  ]
+  sources += [ "layout_fake.c" ]
+  cflags_cc = [
+    "-Wno-c99-extensions",
+    "-Wno-nested-anon-types",
+  ]
+  deps = [
+    "//src:memiter",
+    "//src:src_testable",
+    "//third_party/googletest:gtest_main",
+  ]
+}

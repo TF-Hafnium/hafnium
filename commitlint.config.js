@@ -35,11 +35,12 @@ export default {
         'lifecycle',
         'lfa',
 
-	'tl',	// Transfer List
+        'tl',	// Transfer List
 
         // Test framework
         'hftest',
         'static-checks',
+        'unit_test',
 
         // Build and tooling
         'shrinkwrap',
