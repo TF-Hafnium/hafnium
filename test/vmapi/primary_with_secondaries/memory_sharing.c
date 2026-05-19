@@ -2424,14 +2424,13 @@ TEST(memory_sharing, lend_donate)
 	EXPECT_EQ(run_res.func, FFA_YIELD_32);
 
 	/* Ensure we can't donate any sub section of memory to another VM. */
-	constituents[0].page_count = 1;
-	for (size_t i = 1; i < PAGE_SIZE * 2; i++) {
-		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
+	for (size_t i = 0; i < ARRAY_SIZE(constituents); i++) {
+		constituents[i].address += PAGE_SIZE;
+		constituents[i].page_count = 1;
 		EXPECT_EQ(ffa_memory_region_init_single_receiver(
 				  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-				  service2_info->vm_id, constituents,
-				  ARRAY_SIZE(constituents), 0, 0,
-				  FFA_DATA_ACCESS_NOT_SPECIFIED,
+				  service2_info->vm_id, &constituents[i], 1, 0,
+				  0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
@@ -2499,14 +2498,13 @@ TEST(memory_sharing, share_donate)
 				  service1_info->vm_id);
 
 	/* Ensure we can't donate any sub section of memory to another VM. */
-	constituents[0].page_count = 1;
-	for (size_t i = 1; i < PAGE_SIZE * 2; i++) {
-		constituents[0].address = (uint64_t)pages + PAGE_SIZE;
+	for (size_t i = 0; i < ARRAY_SIZE(constituents); i++) {
+		constituents[i].address += PAGE_SIZE;
+		constituents[i].page_count = 1;
 		EXPECT_EQ(ffa_memory_region_init_single_receiver(
 				  mb.send, HF_MAILBOX_SIZE, hf_vm_get_id(),
-				  service2_info->vm_id, constituents,
-				  ARRAY_SIZE(constituents), 0, 0,
-				  FFA_DATA_ACCESS_NOT_SPECIFIED,
+				  service2_info->vm_id, &constituents[i], 1, 0,
+				  0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 				  FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
 				  FFA_MEMORY_NOT_SPECIFIED_MEM,
 				  FFA_MEMORY_CACHE_WRITE_BACK,
