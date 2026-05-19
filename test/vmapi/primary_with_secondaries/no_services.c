@@ -325,6 +325,96 @@ TEST(ffa_rxtx_unmap, succeeds_remap_with_different_page_count)
 }
 #endif /* RXTX_MAX_PAGE_COUNT > 1 */
 
+/*
+ * Skip the data-path tests below in the default single-page build: the
+ * shared mailbox fixture (used by other tests in this binary) is only one
+ * page, so registering a multi-page mailbox here would leave the rest of
+ * the test suite without a usable mailbox. Everything below is meaningful
+ * only when RXTX_MAX_PAGE_COUNT > 1, e.g. the qemu_aarch64_vhe_rxtx16k
+ * variant.
+ */
+#if RXTX_MAX_PAGE_COUNT > 1
+
+/**
+ * Multi-page partition_info_get exercises cpu_message_buffer staging.
+ *
+ * With RXTX_MAX_PAGE_COUNT > 1 the SPMC's per-CPU staging
+ * buffer is several pages large; the SPMC copies partition descriptors
+ * into staging and then into the caller's RX buffer. This test:
+ *
+ * 1. Pre-paints the entire multi-page RX buffer with a sentinel.
+ * 2. Calls partition_info_get against the multi-page mailbox.
+ * 3. Verifies the descriptor data is correct at the start of RX.
+ * 4. Verifies that bytes past the actual descriptor table are zero —
+ *    i.e. the producer cleared the unpopulated tail of the RX buffer and
+ *    did not leak stale staging-buffer contents into the caller's RX area.
+ *
+ * Step 4 validates the FF-A v1.3 section 4.10 requirement that a producer
+ * (here the SPMC, a higher-EL producer to a lower-EL consumer) clears the
+ * unpopulated contents of the buffer it hands to the consumer.
+ */
+TEST(ffa_rxtx_data_path, partition_info_get_multi_page_no_overcopy)
+{
+	const uint8_t sentinel = 0xA5;
+	const size_t recv_size =
+		FFA_PAGE_SIZE * FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT;
+	struct ffa_value ret;
+	struct ffa_uuid uuid;
+	uint32_t partition_count;
+	size_t descriptor_bytes;
+	const struct ffa_partition_info *partitions;
+
+	/*
+	 * Pin the FF-A version so the count returned by the count-only
+	 * call matches the count returned by the descriptor-fetching call
+	 * (the v1.0 descriptor shape collapses multi-UUID partitions to
+	 * one entry, which would otherwise mismatch).
+	 */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_COMPILED);
+
+	memset_s(recv_pages_max, recv_size, sentinel, recv_size);
+
+	EXPECT_EQ(ffa_rxtx_map_pages((hf_ipaddr_t)send_pages_max,
+				     (hf_ipaddr_t)recv_pages_max,
+				     FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT)
+			  .func,
+		  FFA_SUCCESS_32);
+
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+
+	ret = ffa_partition_info_get(&uuid, FFA_PARTITION_COUNT_FLAG);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	partition_count = ret.arg2;
+	ASSERT_GT(partition_count, 0);
+
+	ret = ffa_partition_info_get(&uuid, 0);
+	ASSERT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_EQ(ret.arg2, partition_count);
+
+	partitions = (const struct ffa_partition_info *)recv_pages_max;
+	for (uint32_t i = 0; i < partition_count; i++) {
+		EXPECT_NE(partitions[i].vm_id, 0);
+		EXPECT_GT(partitions[i].vcpu_count, 0);
+	}
+
+	/*
+	 * Anything past the descriptor table must be zero, not the sentinel:
+	 * the producer (SPMC) must clear the unpopulated tail of the RX buffer
+	 * so it cannot leak stale staging-buffer contents to the consumer
+	 * (FF-A v1.3 section 4.10). `ret.arg3` is the size of one descriptor.
+	 */
+	descriptor_bytes = (size_t)partition_count * (size_t)ret.arg3;
+	ASSERT_LE(descriptor_bytes, recv_size);
+	for (size_t i = descriptor_bytes; i < recv_size; i++) {
+		EXPECT_EQ(recv_pages_max[i], 0);
+	}
+
+	EXPECT_EQ(ffa_rx_release().func, FFA_SUCCESS_32);
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+}
+
+#endif /* RXTX_MAX_PAGE_COUNT > 1 */
+
 /**
  * The primary receives messages from ffa_run().
  */
