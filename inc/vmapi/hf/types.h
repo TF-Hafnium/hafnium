@@ -39,8 +39,25 @@ typedef uintptr_t hf_ipaddr_t;
 /** Sleep value for an indefinite period of time. */
 #define HF_SLEEP_INDEFINITE 0xffffffffffffffff
 
-/** The amount of data that can be sent to a mailbox. */
-#define HF_MAILBOX_SIZE ((size_t)4096)
+/**
+ * The maximum number of FF-A pages an RX/TX buffer can occupy, set by the
+ * Hafnium build (see plat_rxtx_max_page_count). Consumers of this header
+ * built outside that build (e.g. the Linux kernel) default to a single
+ * page, matching the historical behaviour.
+ */
+#ifndef RXTX_MAX_PAGE_COUNT
+#define RXTX_MAX_PAGE_COUNT 1
+#endif
+
+/**
+ * The build-time configured mailbox capacity, i.e. the largest RX/TX buffer
+ * that can be registered by a VM via FFA_RXTX_MAP. Derived from the number of
+ * FF-A pages the build allows (RXTX_MAX_PAGE_COUNT), where one FF-A page is
+ * 4 KiB (Table 2.1 of the FF-A specification). A multi-page capacity
+ * accommodates Normal World kernels configured with larger translation
+ * granules (e.g. arm64 Linux with CONFIG_ARM64_16K_PAGES).
+ */
+#define HF_MAILBOX_SIZE ((size_t)4096 * RXTX_MAX_PAGE_COUNT)
 
 /** Interrupt ID returned when there is no interrupt pending. */
 #define HF_INVALID_INTID UINT32_C(0xffffffff)

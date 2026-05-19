@@ -601,10 +601,13 @@ static inline void ffa_rxtx_header_init_with_uuid(
 	header->uuid = uuid;
 }
 
-/* The maximum length possible for a single message. */
+/*
+ * The maximum length possible for a single message. An indirect message
+ * occupies a single FF-A page, independent of the mailbox capacity.
+ */
 #define FFA_PARTITION_MSG_PAYLOAD_MAX_V1_1 \
-	(HF_MAILBOX_SIZE - FFA_RXTX_HEADER_SIZE_V1_1)
-#define FFA_PARTITION_MSG_PAYLOAD_MAX (HF_MAILBOX_SIZE - FFA_RXTX_HEADER_SIZE)
+	(FFA_PAGE_SIZE - FFA_RXTX_HEADER_SIZE_V1_1)
+#define FFA_PARTITION_MSG_PAYLOAD_MAX (FFA_PAGE_SIZE - FFA_RXTX_HEADER_SIZE)
 
 struct ffa_partition_msg {
 	struct ffa_partition_rxtx_header header;
@@ -616,8 +619,8 @@ struct ffa_partition_msg {
 	char payload[FFA_PARTITION_MSG_PAYLOAD_MAX];
 };
 
-static_assert(sizeof(struct ffa_partition_msg) == HF_MAILBOX_SIZE,
-	      "FF-A message size must match mailbox size");
+static_assert(sizeof(struct ffa_partition_msg) == FFA_PAGE_SIZE,
+	      "FF-A indirect message occupies a single FF-A page");
 
 /**
  * Get the partition message's payload, according to the header's `offset`
@@ -1875,7 +1878,7 @@ struct ffa_features_rxtx_map_params {
 
 enum ffa_features_rxtx_map_buf_size {
 	FFA_RXTX_MAP_MIN_BUF_4K = 0,
-	FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT = 1,
+	FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT = RXTX_MAX_PAGE_COUNT,
 };
 
 static inline struct ffa_features_rxtx_map_params ffa_features_rxtx_map_params(

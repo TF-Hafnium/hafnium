@@ -143,8 +143,9 @@ static inline struct ffa_value ffa_yield(void)
 }
 
 /**
- * Configures the pages to send/receive data through. The pages must not be
- * shared.
+ * Configures the pages to send/receive data through, with an explicit page
+ * count. Each page is FFA_PAGE_SIZE (4 KiB). Supports multi-page buffers for
+ * kernels with page sizes larger than 4 KiB. The pages must not be shared.
  *
  * Returns:
  *  - FFA_ERROR FFA_INVALID_PARAMETERS if the given addresses are not properly
@@ -157,13 +158,23 @@ static inline struct ffa_value ffa_yield(void)
  *  - FFA_RX_RELEASE if it was called by the primary VM and the primary VM now
  *    needs to wake up or kick waiters.
  */
+static inline struct ffa_value ffa_rxtx_map_pages(hf_ipaddr_t send,
+						  hf_ipaddr_t recv,
+						  uint32_t page_count)
+{
+	return ffa_call((struct ffa_value){.func = FFA_RXTX_MAP_64,
+					   .arg1 = send,
+					   .arg2 = recv,
+					   .arg3 = page_count});
+}
+
+/**
+ * Maps the RX/TX buffer pair using the default single FF-A page per direction.
+ * Multi-page callers should use ffa_rxtx_map_pages().
+ */
 static inline struct ffa_value ffa_rxtx_map(hf_ipaddr_t send, hf_ipaddr_t recv)
 {
-	return ffa_call(
-		(struct ffa_value){.func = FFA_RXTX_MAP_64,
-				   .arg1 = send,
-				   .arg2 = recv,
-				   .arg3 = HF_MAILBOX_SIZE / FFA_PAGE_SIZE});
+	return ffa_rxtx_map_pages(send, recv, 1);
 }
 
 /**

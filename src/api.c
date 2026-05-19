@@ -69,14 +69,13 @@ static_assert((sizeof(struct ffa_partition_info) & 7) == 0,
  * see `sl_lock_both()`.
  */
 
-static_assert(HF_MAILBOX_SIZE == PAGE_SIZE,
-	      "Currently, a page is mapped for the send and receive buffers so "
-	      "the maximum request is the size of a page.");
+static_assert(FFA_PAGE_SIZE >= PAGE_SIZE,
+	      "An FF-A page must be at least one translation granule.");
 
-static_assert(MM_PPOOL_ENTRY_SIZE >= HF_MAILBOX_SIZE,
-	      "The page pool entry size must be at least as big as the mailbox "
-	      "size, so that memory region descriptors can be copied from the "
-	      "mailbox for memory sharing.");
+static_assert(MM_PPOOL_ENTRY_SIZE >= FFA_PAGE_SIZE,
+	      "The page pool entry size must be at least as big as one FF-A "
+	      "page, so that memory region descriptor fragments can be "
+	      "copied from the mailbox for memory sharing.");
 
 /*
  * Maximum ffa_partition_info entries that can be returned by an invocation
