@@ -15,6 +15,7 @@
 #include "hf/check.h"
 #include "hf/dlog.h"
 #include "hf/list.h"
+#include "hf/std.h"
 #include "hf/types.h"
 
 #include "vmapi/hf/call.h"
@@ -47,10 +48,21 @@ alignas(PAGE_SIZE) static uint8_t cpu_message_buffer[MAX_CPUS][HF_MAILBOX_SIZE];
 uint8_t *cpu_get_buffer(struct cpu *c)
 {
 	size_t cpu_indx = cpu_index(c);
+	uint8_t *buffer;
 
 	CHECK(cpu_indx < MAX_CPUS);
 
-	return cpu_message_buffer[cpu_indx];
+	buffer = cpu_message_buffer[cpu_indx];
+
+	/*
+	 * Wipe the staging area before each use so that residual content
+	 * from a previous FF-A transaction (potentially issued by a
+	 * different VM) cannot influence the current handler or be observed
+	 * by a VM whose mailbox is smaller than the staging buffer.
+	 */
+	memset_s(buffer, HF_MAILBOX_SIZE, 0, HF_MAILBOX_SIZE);
+
+	return buffer;
 }
 
 uint32_t cpu_get_buffer_size(struct cpu *c)
