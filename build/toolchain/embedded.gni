@@ -320,6 +320,9 @@ template("aarch64_common_toolchain") {
       if (defined(invoker.max_image_size)) {
         plat_max_image_size = invoker.max_image_size
       }
+      if (defined(invoker.rxtx_max_page_count)) {
+        plat_rxtx_max_page_count = invoker.rxtx_max_page_count
+      }
       forward_variables_from(invoker.toolchain_args, "*")
     }
 
@@ -368,6 +371,7 @@ template("aarch64_toolchains") {
                              "max_cpus",
                              "max_image_size",
                              "max_vms",
+                             "rxtx_max_page_count",
                              "toolchain_args",
                              "branch_protection",
                            ])
@@ -389,6 +393,7 @@ template("aarch64_toolchains") {
                              "gicr_base_address",
                              "gicr_frames",
                              "max_cpus",
+                             "rxtx_max_page_count",
                              "toolchain_args",
                              "console",
                              "branch_protection",

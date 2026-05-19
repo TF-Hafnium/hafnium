@@ -34,6 +34,11 @@ declare_args() {
   # The number of pages to allocate for the hypervisor heap.
   plat_heap_pages = 0
 
+  # The maximum RX/TX buffer size advertised to and accepted from VMs, in
+  # FF-A pages (4 KiB each). Range is 1..4 (4 KiB..16 KiB). Default of 1
+  # preserves the historical single-page assumption.
+  plat_rxtx_max_page_count = 1
+
   # The level of debug logs to include. This should match one of the levels
   # defined in dlog.h.
   plat_log_level = "LOG_LEVEL_INFO"

@@ -70,8 +70,13 @@ config("platform") {
     "${root_gen_dir}/offset_size_header",
   ]
 
+  assert(
+      plat_rxtx_max_page_count >= 1 && plat_rxtx_max_page_count <= 4,
+      "RX/TX max buffer page count must be between 1 and 4: current = ${plat_rxtx_max_page_count}")
+
   defines = [
     "HEAP_PAGES=${plat_heap_pages}",
+    "RXTX_MAX_PAGE_COUNT=${plat_rxtx_max_page_count}",
     "MAX_CPUS=${plat_max_cpus}",
     "MAX_VMS=${plat_max_vms}",
     "LOG_LEVEL=${plat_log_level}",
