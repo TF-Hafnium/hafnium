@@ -1039,6 +1039,34 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 
 	partitions_max_len = buffer_size / sizeof(struct ffa_partition_info);
 
+	/*
+	 * Also cap the number of entries filled to what fits in the
+	 * caller's registered RX buffer, so the enumeration cannot fill
+	 * staging space that the VM has not registered for receiving. The
+	 * RX buffer holds descriptors in the format the caller's FF-A
+	 * version expects (a smaller, fixed-size descriptor for v1.0), so
+	 * that size, not sizeof(struct ffa_partition_info), is what
+	 * determines how many entries fit there. Skip the cap when only
+	 * the count is requested (no descriptor is written to the RX
+	 * buffer in that case) or when the caller has not registered
+	 * RX/TX buffers yet (buf_size is 0): in the latter case the
+	 * subsequent attempt to write the descriptors to the RX buffer is
+	 * the one that must report the mailbox as not ready (FFA_BUSY),
+	 * rather than this cap masking it as FFA_NO_MEMORY.
+	 */
+	if (!count_flag && current_vm->mailbox.buf_size != 0) {
+		size_t descriptor_size =
+			current_vm->ffa_version == FFA_VERSION_1_0
+				? sizeof(struct ffa_partition_info_v1_0)
+				: sizeof(struct ffa_partition_info);
+		size_t mailbox_max_len =
+			current_vm->mailbox.buf_size / descriptor_size;
+
+		if (mailbox_max_len < partitions_max_len) {
+			partitions_max_len = mailbox_max_len;
+		}
+	}
+
 	if (!api_ffa_fill_partitions_info_array(
 		    partitions, partitions_max_len, uuid, count_flag,
 		    current_vm->id, current_vm->ffa_version, &entries_count)) {
