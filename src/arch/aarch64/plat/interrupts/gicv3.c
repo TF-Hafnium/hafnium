@@ -644,16 +644,19 @@ static inline void populate_redist_base_addrs(struct mem_range *gic_mem_ranges,
 				current_rdist_frame;
 		}
 
-		/* Check if this is the last GICR frame for the specific chip */
-		if (typer_reg & REDIST_LAST_FRAME_MASK) {
-			gicr_idx++;
-			current_rdist_frame =
-				gic_mem_ranges[gicr_idx + num_gic_dist]
-					.begin.pa;
-			continue;
-		}
-
 		current_rdist_frame += GIC_REDIST_FRAMES_OFFSET;
+
+		/* Check if this is the last GICR frame for the specific chip */
+		if ((typer_reg & REDIST_LAST_FRAME_MASK) != 0 ||
+		    current_rdist_frame >=
+			    gic_mem_ranges[gicr_idx + num_gic_dist].end.pa) {
+			gicr_idx++;
+			if (gicr_idx < num_gic_rdist) {
+				current_rdist_frame =
+					gic_mem_ranges[gicr_idx + num_gic_dist]
+						.begin.pa;
+			}
+		}
 	}
 }
 
