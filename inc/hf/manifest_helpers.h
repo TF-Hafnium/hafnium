@@ -24,6 +24,8 @@
 		}                                            \
 	} while (0)
 
+struct manifest_vm;
+
 enum manifest_return_code read_string(const struct fdt_node *node,
 				      const char *property, struct string *out);
 enum manifest_return_code read_optional_string(const struct fdt_node *node,

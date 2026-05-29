@@ -26,6 +26,7 @@
 #include "hf/panic.h"
 #include "hf/plat/boot_flow.h"
 #include "hf/plat/console.h"
+#include "hf/plat/core.h"
 #include "hf/plat/interrupts.h"
 #include "hf/plat/iommu.h"
 #include "hf/plat/memory_alloc.h"
@@ -70,6 +71,7 @@ void one_time_init(void)
 	struct manifest *manifest;
 
 	arch_one_time_init();
+	plat_one_time_init();
 
 	/* Enable locks now that mm is initialised. */
 	dlog_enable_lock();

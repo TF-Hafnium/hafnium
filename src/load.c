@@ -26,6 +26,7 @@
 #include "hf/memiter.h"
 #include "hf/mm.h"
 #include "hf/plat/console.h"
+#include "hf/plat/core.h"
 #include "hf/plat/iommu.h"
 #include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
@@ -797,11 +798,18 @@ static bool load_ffa_partition(struct mm_stage1_locked stage1_locked,
 				      MM_MODE_R | MM_MODE_W, NULL));
 
 		CHECK(arch_stack_mm_init(mm_lock_ptable_unsafe(&vm->ptable)));
+		CHECK(plat_mm_init(mm_lock_ptable_unsafe(&vm->ptable)));
 
 		plat_console_mm_init(mm_lock_ptable_unsafe(&vm->ptable));
 	}
 
 	if (!load_common(stage1_locked, vm_locked, manifest_vm)) {
+		ret = false;
+		goto out;
+	}
+
+	if (!plat_load_ffa_partition(stage1_locked, mem_begin, mem_end,
+				     manifest_vm, current_vm)) {
 		ret = false;
 		goto out;
 	}

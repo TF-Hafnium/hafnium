@@ -29,6 +29,7 @@
 #include "hf/ffa/vm.h"
 #include "hf/ffa_internal.h"
 #include "hf/panic.h"
+#include "hf/plat/core.h"
 #include "hf/plat/interrupts.h"
 #include "hf/timer_mgmt.h"
 #include "hf/vm.h"
@@ -906,6 +907,10 @@ static bool paravirtualised_interface_handler(struct ffa_value args,
 					      struct vcpu *vcpu,
 					      struct vcpu **next)
 {
+	if (plat_paravirt_interface_handler(args, vcpu, next)) {
+		goto out;
+	}
+
 	if (!is_paravirtualised_interface_call(args.func)) {
 		return false;
 	}
@@ -945,6 +950,7 @@ static bool paravirtualised_interface_handler(struct ffa_value args,
 		dlog_verbose("Unsupported function %#lx\n", args.func);
 	}
 
+out:
 	/*
 	 * In case there has been an update after handling the last
 	 * hypervisor call, update the next vCPU directly in the register.

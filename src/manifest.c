@@ -29,6 +29,7 @@
 #include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/partition_pkg.h"
+#include "hf/plat/core.h"
 #include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
@@ -1545,6 +1546,11 @@ enum manifest_return_code parse_ffa_manifest(
 
 	if (!map_dma_device_id_to_stream_ids(vm)) {
 		return MANIFEST_ERROR_NOT_COMPATIBLE;
+	}
+
+	ret = plat_parse_ffa_manifest(fdt, vm, boot_params);
+	if (ret != MANIFEST_SUCCESS) {
+		return ret;
 	}
 
 	return sanity_check_ffa_manifest(vm);

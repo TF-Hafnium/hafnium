@@ -18,6 +18,9 @@ declare_args() {
   # Console driver to be used for the platform, specified as build target.
   plat_console = ""
 
+  # Core hooks to be used for the platform, specified as build target.
+  plat_core = "//src/plat/core:absent"
+
   # IOMMU driver to be used for the platform, specified as build target.
   plat_iommu = ""
 

@@ -78,6 +78,7 @@ source_set("src_testable") {
     "//vmlib",
     plat_boot_flow,
     plat_console,
+    plat_core,
     plat_interrupts,
     plat_iommu,
     plat_memory_alloc,

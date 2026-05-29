@@ -21,6 +21,7 @@
 #include "hf/dlog.h"
 #include "hf/layout.h"
 #include "hf/plat/console.h"
+#include "hf/plat/core.h"
 #include "hf/plat/memory_alloc.h"
 #include "hf/std.h"
 
@@ -1802,6 +1803,9 @@ bool mm_init(void)
 
 	/* Arch-specific stack mapping. */
 	CHECK(arch_stack_mm_init(stage1_locked));
+
+	/* Set up platform-specific mappings. */
+	CHECK(plat_mm_init(stage1_locked));
 
 	return true;
 }
