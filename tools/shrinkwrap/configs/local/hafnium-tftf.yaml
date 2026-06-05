@@ -156,7 +156,7 @@ run:
     -C bp.dram_metadata.is_enabled: 1
     -C bp.ls64_testing_fifo.op_type: 0
     -C cluster0.memory_tagging_support_level: 2
-    -C cluster0.has_branch_target_exception: 1
+    -C cluster0.bti_support_level: 1
     -C cluster0.gicv3.extended-interrupt-range-support: 1
     -C cluster0.check_memory_attributes: 0
     -C pci.dma330x4.use_smmuv3testengine_not_dmacs: 1
@@ -165,7 +165,7 @@ run:
     -C pci.pci_smmuv3.mmu.SMMU_IDR5: 0xFFFF0472
     -C cluster0.arm_v8_7_accelerator_support_level: ""
     -C cluster1.memory_tagging_support_level: 2
-    -C cluster1.has_branch_target_exception: 1
+    -C cluster1.bti_support_level: 1
     -C cluster1.gicv3.extended-interrupt-range-support: 1
     -C cluster1.check_memory_attributes: 0
     -C cluster1.arm_v8_7_accelerator_support_level: ""

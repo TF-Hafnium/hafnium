@@ -148,8 +148,8 @@ The FVP command line needs the following options to exercise the S-EL2 SPMC:
 | - pci.pci_smmuv3.mmu.SMMU_S_IDR2=0                |                                    |
 | - pci.pci_smmuv3.mmu.SMMU_S_IDR3=0                |                                    |
 +---------------------------------------------------+------------------------------------+
-| - cluster0.has_branch_target_exception=1          | Implements FEAT_BTI.               |
-| - cluster1.has_branch_target_exception=1          |                                    |
+| - cluster0.bti_support_level=1                    | Implements FEAT_BTI.               |
+| - cluster1.bti_support_level=1                    |                                    |
 +---------------------------------------------------+------------------------------------+
 | - cluster0.has_pointer_authentication=2           | Implements FEAT_PAuth              |
 | - cluster1.has_pointer_authentication=2           |                                    |
@@ -171,7 +171,7 @@ Sample FVP command line invocation:
     -C bp.pl011_uart2.out_file=fvp-uart2.log \
     -C cluster0.has_arm_v8-5=1 -C cluster1.has_arm_v8-5=1 \
     -C cluster0.has_pointer_authentication=2 -C cluster1.has_pointer_authentication=2 \
-    -C cluster0.has_branch_target_exception=1 -C cluster1.has_branch_target_exception=1 \
+    -C cluster0.bti_support_level=1 -C cluster1.bti_support_level=1 \
     -C cluster0.memory_tagging_support_level=2 -C cluster1.memory_tagging_support_level=2 \
     -C bp.dram_metadata.is_enabled=1 \
     -C pci.pci_smmuv3.mmu.SMMU_AIDR=2 -C pci.pci_smmuv3.mmu.SMMU_IDR0=0x0046123B \

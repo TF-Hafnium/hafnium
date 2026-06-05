@@ -176,7 +176,6 @@ run:
     -C cluster1.has_hardware_dirty_state_tracking_structure: 2
     -C cluster0.has_hardware_accelerator_for_cleaning_dirty_state: 2
     -C cluster1.has_hardware_accelerator_for_cleaning_dirty_state: 2
-    -C cluster1.has_branch_target_exception: 1
     -C cluster1.gicv3.extended-interrupt-range-support: 1
     -C cluster1.stage12_tlb_size: 1024
     -C cluster1.check_memory_attributes: 0

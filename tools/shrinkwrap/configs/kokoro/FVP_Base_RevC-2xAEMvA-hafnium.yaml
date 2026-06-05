@@ -68,8 +68,8 @@ run:
     -C bp.ve_sysregs.mmbSiteDefault: 0
     -C cluster0.has_arm_v8-5: 1
     -C cluster1.has_arm_v8-5: 1
-    -C cluster0.has_branch_target_exception: 1
-    -C cluster1.has_branch_target_exception: 1
+    -C cluster0.bti_support_level: 1
+    -C cluster1.bti_support_level: 1
     -C cluster0.memory_tagging_support_level: 2
     -C cluster1.memory_tagging_support_level: 2
     -C bp.dram_metadata.is_enabled: 1

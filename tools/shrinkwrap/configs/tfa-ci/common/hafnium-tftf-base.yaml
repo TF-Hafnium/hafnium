@@ -89,8 +89,8 @@ run:
     -C cluster0.stage12_tlb_size: 1024
     -C cluster0.check_memory_attributes: 0
     -C cluster1.check_memory_attributes: 0
-    -C cluster0.has_branch_target_exception: 1
-    -C cluster1.has_branch_target_exception: 1
+    -C cluster0.bti_support_level: 1
+    -C cluster1.bti_support_level: 1
     -C cluster0.gicv3.extended-interrupt-range-support: 1
     -C cluster1.gicv3.extended-interrupt-range-support: 1
     -C pci.pci_smmuv3.mmu.SMMU_AIDR: 2
