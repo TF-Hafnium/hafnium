@@ -114,6 +114,27 @@
 #define GET_ESR_FNV(esr) ((esr) & (1 << 10U))
 
 /**
+ * Gets the Stage 1 page table walk bit from the ISS of an instruction/data
+ * abort syndrome.
+ */
+#define GET_ESR_S1PTW(esr) ((esr) & (1 << 7U))
+
+/**
+ * Fault status codes for permission faults in abort syndromes.
+ */
+#define FSC_PERMISSION_FAULT_L0 UINT64_C(0xc)
+#define FSC_PERMISSION_FAULT_L1 UINT64_C(0xd)
+#define FSC_PERMISSION_FAULT_L2 UINT64_C(0xe)
+#define FSC_PERMISSION_FAULT_L3 UINT64_C(0xf)
+
+/**
+ * Returns whether the abort syndrome reports a permission fault.
+ */
+#define IS_ABORT_PERMISSION_FAULT(fsc)         \
+	(((fsc) >= FSC_PERMISSION_FAULT_L0) && \
+	 ((fsc) <= FSC_PERMISSION_FAULT_L3))
+
+/**
  * Define DFSC due to Granule protection fault if this is an RME
  * enabled platform.
  */

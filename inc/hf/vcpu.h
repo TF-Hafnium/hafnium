@@ -137,6 +137,7 @@ struct interrupts {
 
 struct vcpu_fault_info {
 	ipaddr_t ipaddr;
+	bool ipa_valid;
 	vaddr_t vaddr;
 	vaddr_t pc;
 	mm_mode_t mode;

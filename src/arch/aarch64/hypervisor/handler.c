@@ -1137,6 +1137,17 @@ static struct vcpu_fault_info fault_info_init(uintreg_t esr,
 
 	r.mode = mode;
 	r.pc = va_init(vcpu->regs.pc);
+	r.ipa_valid = false;
+
+	/*
+	 * HPFAR_EL2 is architecturally UNKNOWN for a direct stage-2 permission
+	 * fault, so don't derive an IPA from it in that case.
+	 */
+	if (IS_ABORT_PERMISSION_FAULT(fsc) && !GET_ESR_S1PTW(esr)) {
+		r.vaddr = va_init(read_msr(far_el2));
+		r.ipaddr = ipa_init(0);
+		return r;
+	}
 
 	/* Get Hypervisor IPA Fault Address value. */
 	hpfar_el2_val = read_msr(hpfar_el2);
@@ -1169,6 +1180,7 @@ static struct vcpu_fault_info fault_info_init(uintreg_t esr,
 		r.ipaddr = ipa_init(hpfar_el2_fipa |
 				    (read_msr(far_el2) & (PAGE_SIZE - 1)));
 	}
+	r.ipa_valid = true;
 
 	return r;
 }

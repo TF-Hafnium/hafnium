@@ -167,6 +167,16 @@ bool vcpu_handle_page_fault(const struct vcpu *current,
 	 * ensured that the invalidations have completed.)
 	 */
 	if (!locked_vm.vm->el0_partition) {
+		if (!f->ipa_valid) {
+			dlog_warning(
+				"Stage-2 page fault with invalid IPA: pc=%#lx, "
+				"vmid=%#x, vcpu=%u, vaddr=%#lx, mode=%#x\n",
+				va_addr(f->pc), vm->id, vcpu_index(current),
+				va_addr(f->vaddr), f->mode);
+			vm_unlock(&locked_vm);
+			return false;
+		}
+
 		resume = vm_mem_get_mode(locked_vm, f->ipaddr,
 					 ipa_add(f->ipaddr, 1), &mode) &&
 			 (mode & mask) == f->mode;
