@@ -848,16 +848,17 @@ TEST_PRECONDITION(ipi, receive_ipi_preempted_vcpu, service1_is_mp_sp)
 	ret = ffa_run(service1_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_YIELD_32);
 
+	/* Configure GIC. */
+	gicv3_system_setup();
+
 	/* Bring-up the core that sends the IPI. */
 	ASSERT_TRUE(hftest_cpu_start(
 		hftest_get_cpu_id(vcpu1_args.vcpu_id),
 		hftest_get_secondary_ec_stack(vcpu1_args.vcpu_id),
 		cpu_entry_send_ipi, (uintptr_t)&vcpu1_args));
 
-	/* Configure GIC and setup the watchdog timer. */
-	gicv3_system_setup();
+	/* Setup and start the watchdog timer. */
 	setup_wdog_timer_interrupt();
-
 	start_wdog_timer(20);
 
 	/*
