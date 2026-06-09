@@ -10,6 +10,7 @@
 
 #include "hf/addr.h"
 
+#include "gtest/gtest.h"
 #include <gmock/gmock.h>
 
 extern "C" {
@@ -1567,6 +1568,120 @@ TEST_F(mm, defrag_aliased_range)
 				  table_l1[mid_index + i], TOP_LEVEL - 1)),
 			  i * mm_entry_size(TOP_LEVEL - 1));
 	}
+}
+
+/**
+ * Make sure that get range by mode returns the right physical address for a
+ * one-page non-identity mapped region.
+ */
+TEST_F(mm, get_range_by_mode_non_identity)
+{
+	constexpr mm_mode_t mode = MM_MODE_R;
+
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t end = ipa_init(mm_entry_size(0));
+	const paddr_t p_begin = pa_init(mm_entry_size(0));
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, end, p_begin, mode));
+
+	paddr_t p_begin_ret, p_end_ret;
+	ipaddr_t start_addr = ipa_init(0);
+	mm_mode_t ptable_mode;
+
+	ASSERT_TRUE(mm_vm_get_range_by_mode(&ptable, &p_begin_ret, &p_end_ret,
+					    mode, &start_addr, &ptable_mode));
+	EXPECT_EQ(pa_addr(p_begin_ret), pa_addr(p_begin));
+	EXPECT_EQ(pa_addr(p_end_ret),
+		  pa_addr(pa_add(p_begin, mm_entry_size(0))));
+	EXPECT_EQ(ipa_addr(start_addr), ipa_addr(end));
+}
+
+/**
+ * Make sure that get range by mode treats virtually contiguous but physically
+ * disjoint regions as separate ranges.
+ */
+TEST_F(mm, get_range_by_mode_non_identity_two_range)
+{
+	constexpr mm_mode_t mode = MM_MODE_R;
+
+	/*
+	 * These are the mappings that will be created:
+	 *
+	 * [0, 0x1000) -> [0, 0x1000)
+	 * [0x1000, 0x2000) -> [0x200000, 0x201000)
+	 */
+
+	const ipaddr_t begin1 = ipa_init(0);
+	const ipaddr_t end1 = ipa_init(mm_entry_size(0));
+	const paddr_t p_begin1 = pa_init(mm_entry_size(0));
+	const ipaddr_t begin2 = end1;
+	const ipaddr_t end2 = ipa_add(begin2, mm_entry_size(0));
+	const paddr_t p_begin2 = pa_init(mm_entry_size(1));
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin1, end1, p_begin1, mode));
+	ASSERT_TRUE(mm_vm_map(&ptable, begin2, end2, p_begin2, mode));
+
+	paddr_t p_begin_ret, p_end_ret;
+	ipaddr_t start_addr = ipa_init(0);
+	mm_mode_t ptable_mode;
+
+	ASSERT_TRUE(mm_vm_get_range_by_mode(&ptable, &p_begin_ret, &p_end_ret,
+					    mode, &start_addr, &ptable_mode));
+	EXPECT_EQ(pa_addr(p_begin_ret), pa_addr(p_begin1));
+	EXPECT_EQ(pa_addr(p_end_ret),
+		  pa_addr(pa_add(p_begin1, mm_entry_size(0))));
+	EXPECT_EQ(ipa_addr(start_addr), ipa_addr(end1));
+
+	ASSERT_TRUE(mm_vm_get_range_by_mode(&ptable, &p_begin_ret, &p_end_ret,
+					    mode, &start_addr, &ptable_mode));
+	EXPECT_EQ(pa_addr(p_begin_ret), pa_addr(p_begin2));
+	EXPECT_EQ(pa_addr(p_end_ret),
+		  pa_addr(pa_add(p_begin2, mm_entry_size(0))));
+	EXPECT_EQ(ipa_addr(start_addr), ipa_addr(end2));
+}
+
+/**
+ * Make sure that get range by mode works correctly when there is a
+ * virtually/physically contiguous memory region that spans multiple
+ * page tables and levels of page tables.
+ */
+TEST_F(mm, get_range_by_mode_multilevel)
+{
+	constexpr mm_mode_t mode = MM_MODE_R;
+
+	/*
+	 * The table looks like this:
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] = absent
+	 *     [1] = absent
+	 *     [2] = absent
+	 *     ...
+	 *     [511] = 0x3ff000
+	 *   }
+	 *   [1] = 0x400000
+	 * }
+	 */
+
+	const ipaddr_t begin = ipa_init(mm_entry_size(1) - mm_entry_size(0));
+	const ipaddr_t end = ipa_init(2 * mm_entry_size(1));
+	const paddr_t p_begin =
+		pa_init(2 * mm_entry_size(1) - mm_entry_size(0));
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, end, p_begin, mode));
+
+	paddr_t p_begin_ret, p_end_ret;
+	ipaddr_t start_addr = ipa_init(0);
+	mm_mode_t ptable_mode;
+
+	ASSERT_TRUE(mm_vm_get_range_by_mode(&ptable, &p_begin_ret, &p_end_ret,
+					    mode, &start_addr, &ptable_mode));
+	EXPECT_EQ(pa_addr(p_begin_ret), pa_addr(p_begin));
+	EXPECT_EQ(
+		pa_addr(p_end_ret),
+		pa_addr(pa_add(p_begin, mm_entry_size(1) + mm_entry_size(0))));
+	EXPECT_EQ(ipa_addr(start_addr), ipa_addr(end));
 }
 
 } /* namespace */
