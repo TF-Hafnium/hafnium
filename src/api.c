@@ -5449,7 +5449,7 @@ static bool api_ffa_ns_res_info_get_vm_ns_memory(
 			bool ret_val;
 			struct ffa_address_map_desc *amd;
 			uint64_t base_address = begin;
-			uint32_t page_count = ((end - begin) / PAGE_SIZE) + 1;
+			uint32_t page_count = ((end - begin) / PAGE_SIZE);
 			bool privileged = !vm.vm->el0_partition;
 
 			/* Set permissions. */

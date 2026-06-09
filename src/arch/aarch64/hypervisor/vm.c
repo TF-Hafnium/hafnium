@@ -336,22 +336,22 @@ bool arch_vm_get_range_by_mode(struct vm_locked vm_locked, uintptr_t *begin,
 	if (vm_locked.vm->el0_partition) {
 		struct mm_ptable *ptable = &vm_locked.vm->ptable;
 		vaddr_t start_vaddr = va_init(*start_addr);
-		vaddr_t begin_vaddr;
-		vaddr_t end_vaddr;
+		paddr_t begin_paddr;
+		paddr_t end_paddr;
 
-		success = mm_get_range_by_mode(ptable, &begin_vaddr, &end_vaddr,
+		success = mm_get_range_by_mode(ptable, &begin_paddr, &end_paddr,
 					       mode, &start_vaddr, ptable_mode);
 
 		if (success) {
 			*start_addr = va_addr(start_vaddr);
-			*begin = va_addr(begin_vaddr);
-			*end = va_addr(end_vaddr);
+			*begin = pa_addr(begin_paddr);
+			*end = pa_addr(end_paddr);
 		}
 	} else {
 		struct mm_ptable *ptable = &vm_locked.vm->ptable;
 		ipaddr_t start_ipaddr = ipa_init(*start_addr);
-		ipaddr_t begin_ipaddr;
-		ipaddr_t end_ipaddr;
+		paddr_t begin_paddr;
+		paddr_t end_paddr;
 
 #if SECURE_WORLD == 1
 		/*
@@ -363,14 +363,14 @@ bool arch_vm_get_range_by_mode(struct vm_locked vm_locked, uintptr_t *begin,
 		}
 #endif
 
-		success = mm_vm_get_range_by_mode(ptable, &begin_ipaddr,
-						  &end_ipaddr, mode,
+		success = mm_vm_get_range_by_mode(ptable, &begin_paddr,
+						  &end_paddr, mode,
 						  &start_ipaddr, ptable_mode);
 
 		if (success) {
 			*start_addr = ipa_addr(start_ipaddr);
-			*begin = ipa_addr(begin_ipaddr);
-			*end = ipa_addr(end_ipaddr);
+			*begin = pa_addr(begin_paddr);
+			*end = pa_addr(end_paddr);
 		}
 	}
 

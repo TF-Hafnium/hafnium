@@ -1340,16 +1340,16 @@ bool mm_get_mode_partial(const struct mm_ptable *ptable, vaddr_t begin,
 
 struct mm_get_range_by_mode_state {
 	/* Start address of range. */
-	ptable_addr_t begin;
+	paddr_t p_begin;
 	/* End address of range. */
-	ptable_addr_t end;
-	/* Next starting address on subsequent calls. */
-	ptable_addr_t next_start_addr;
+	paddr_t p_end;
+	/* Next starting lookup address on subsequent calls. */
+	ptable_addr_t next_start_vaddr;
 	/* Mode collected from the range. */
 	mm_mode_t ptable_mode;
 	/* Mode was found in range. */
 	bool mode_found : 1;
-	/* Mismatch in mode was detected. */
+	/* Mismatch in mode or a physical discontinuity was detected. */
 	bool mismatch : 1;
 };
 
@@ -1376,7 +1376,7 @@ void mm_get_range_by_mode_level(const struct mm_page_table *table,
 			/* If we had found a mode previously, mismatch. */
 			if (state->mode_found) {
 				state->mismatch = true;
-				state->next_start_addr = current_addr;
+				state->next_start_vaddr = current_addr;
 				return;
 			}
 		} else if (arch_mm_pte_is_table(*pte, level)) {
@@ -1408,20 +1408,39 @@ void mm_get_range_by_mode_level(const struct mm_page_table *table,
 					     pa_addr(ptable_addr));
 
 				/*
-				 * If this is the first time finding the mode
-				 * initialize the state variables.
+				 * If the mode has already been found, make sure
+				 * that this PTE is physically contiguous with
+				 * the last page.
+				 */
+				if (state->mode_found &&
+				    pa_addr(ptable_addr) !=
+					    pa_addr(state->p_end)) {
+					state->mismatch = true;
+					state->next_start_vaddr = current_addr;
+					return;
+				}
+
+				/*
+				 * If this is the first time finding the
+				 * mode initialize the state variables.
 				 */
 				if (!state->mode_found) {
-					state->begin = pa_addr(ptable_addr);
+					state->p_begin = ptable_addr;
 					state->ptable_mode = curr_mode;
 					state->mode_found = true;
 				}
 
-				/* Update the end address. */
-				state->end = pa_addr(ptable_addr);
+				/*
+				 * Update the end address. It should be the
+				 * current ptable_addr plus the size of the
+				 * entry.
+				 */
+				state->p_end = pa_add(ptable_addr,
+						      mm_entry_size(level));
+
 			} else if (state->mode_found) {
 				state->mismatch = true;
-				state->next_start_addr = current_addr;
+				state->next_start_vaddr = current_addr;
 				return;
 			}
 		}
@@ -1436,8 +1455,8 @@ void mm_get_range_by_mode_level(const struct mm_page_table *table,
  * before calling the recursive traversal function. Successful call finds
  * the mode provided within a given range.
  */
-bool mm_vm_get_range_by_mode(const struct mm_ptable *ptable, ipaddr_t *begin,
-			     ipaddr_t *end, mm_mode_t mode,
+bool mm_vm_get_range_by_mode(const struct mm_ptable *ptable, paddr_t *p_begin,
+			     paddr_t *p_end, mm_mode_t mode,
 			     ipaddr_t *start_addr, mm_mode_t *ptable_mode)
 {
 	mm_level_t root_level;
@@ -1464,9 +1483,9 @@ bool mm_vm_get_range_by_mode(const struct mm_ptable *ptable, ipaddr_t *begin,
 	}
 
 	if (state.mode_found) {
-		*begin = ipa_init(state.begin);
-		*end = ipa_init(state.end);
-		*start_addr = ipa_init(state.next_start_addr);
+		*p_begin = state.p_begin;
+		*p_end = state.p_end;
+		*start_addr = ipa_init(state.next_start_vaddr);
 		*ptable_mode = state.ptable_mode;
 	}
 
@@ -1478,8 +1497,8 @@ bool mm_vm_get_range_by_mode(const struct mm_ptable *ptable, ipaddr_t *begin,
  * before calling the recursive traversal function. Successful call finds
  * the mode provided within a given range.
  */
-bool mm_get_range_by_mode(const struct mm_ptable *ptable, vaddr_t *begin,
-			  vaddr_t *end, mm_mode_t mode, vaddr_t *start_addr,
+bool mm_get_range_by_mode(const struct mm_ptable *ptable, paddr_t *p_begin,
+			  paddr_t *p_end, mm_mode_t mode, vaddr_t *start_addr,
 			  mm_mode_t *ptable_mode)
 {
 	mm_level_t root_level;
@@ -1506,9 +1525,9 @@ bool mm_get_range_by_mode(const struct mm_ptable *ptable, vaddr_t *begin,
 	}
 
 	if (state.mode_found) {
-		*begin = va_init(state.begin);
-		*end = va_init(state.end);
-		*start_addr = va_init(state.next_start_addr);
+		*p_begin = state.p_begin;
+		*p_end = state.p_end;
+		*start_addr = va_init(state.next_start_vaddr);
 		*ptable_mode = state.ptable_mode;
 	}
 
