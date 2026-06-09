@@ -25,7 +25,7 @@ void arch_vm_ptable_defrag(struct vm_locked vm_locked);
 bool arch_vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin,
 			  ipaddr_t end, mm_mode_t *mode);
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, ipaddr_t begin,
-				   ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+				   ipaddr_t end, mm_mode_t mode,
 				   uint8_t dma_device_id);
 void arch_vm_fini_mm(struct vm *vm);
 void arch_vm_iommu_fini_mm(struct vm *vm);

@@ -1172,13 +1172,9 @@ void mm_vm_commit(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
  * This is a wrapper that does an `mm_vm_commit` as one-to-one.
  */
 void mm_vm_identity_commit(struct mm_ptable *ptable, ipaddr_t begin,
-			   ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa)
+			   ipaddr_t end, mm_mode_t mode)
 {
 	mm_vm_commit(ptable, begin, end, pa_from_ipa(begin), mode);
-
-	if (ipa != NULL) {
-		*ipa = begin;
-	}
 }
 
 /**
@@ -1211,13 +1207,9 @@ bool mm_vm_map(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
  * This is a wrapper that does an `mm_vm_map` as one-to-one.
  */
 bool mm_vm_identity_map(struct mm_ptable *ptable, ipaddr_t begin, ipaddr_t end,
-			mm_mode_t mode, ipaddr_t *ipa)
+			mm_mode_t mode)
 {
 	bool success = mm_vm_map(ptable, begin, end, pa_from_ipa(begin), mode);
-
-	if (success && ipa != NULL) {
-		*ipa = begin;
-	}
 
 	return success;
 }

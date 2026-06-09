@@ -558,10 +558,10 @@ bool vm_mem_get_mode(struct vm_locked vm_locked, ipaddr_t begin, ipaddr_t end,
 }
 
 bool vm_iommu_mm_identity_map(struct vm_locked vm_locked, ipaddr_t begin,
-			      ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+			      ipaddr_t end, mm_mode_t mode,
 			      uint8_t dma_device_id)
 {
-	return arch_vm_iommu_mm_identity_map(vm_locked, begin, end, mode, ipa,
+	return arch_vm_iommu_mm_identity_map(vm_locked, begin, end, mode,
 					     dma_device_id);
 }
 

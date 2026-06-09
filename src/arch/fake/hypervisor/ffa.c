@@ -622,14 +622,13 @@ void ffa_vm_free_resources(struct vm_locked vm_locked)
 }
 
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, ipaddr_t begin,
-				   ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+				   ipaddr_t end, mm_mode_t mode,
 				   uint8_t dma_device_id)
 {
 	(void)vm_locked;
 	(void)begin;
 	(void)end;
 	(void)mode;
-	(void)ipa;
 	(void)dma_device_id;
 
 	return true;

@@ -249,7 +249,7 @@ static bool arch_vm_iommu_mm_prepare(struct vm_locked vm_locked, ipaddr_t begin,
 }
 
 static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, ipaddr_t begin,
-				    ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+				    ipaddr_t end, mm_mode_t mode,
 				    uint8_t dma_device_id)
 {
 	struct mm_ptable *ptable = &vm_locked.vm->iommu_ptables[dma_device_id];
@@ -260,11 +260,11 @@ static void arch_vm_iommu_mm_commit(struct vm_locked vm_locked, ipaddr_t begin,
 	}
 #endif
 
-	mm_vm_identity_commit(ptable, begin, end, mode, ipa);
+	mm_vm_identity_commit(ptable, begin, end, mode);
 }
 
 bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, ipaddr_t begin,
-				   ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa,
+				   ipaddr_t end, mm_mode_t mode,
 				   uint8_t dma_device_id)
 {
 	/*
@@ -286,8 +286,7 @@ bool arch_vm_iommu_mm_identity_map(struct vm_locked vm_locked, ipaddr_t begin,
 		return false;
 	}
 
-	arch_vm_iommu_mm_commit(vm_locked, begin, end, mode, ipa,
-				dma_device_id);
+	arch_vm_iommu_mm_commit(vm_locked, begin, end, mode, dma_device_id);
 
 	return true;
 }

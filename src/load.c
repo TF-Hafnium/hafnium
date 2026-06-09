@@ -606,7 +606,7 @@ static bool ffa_map_memory_regions(const struct manifest_vm *manifest_vm,
 		 */
 		if (mem_region.dma_prop.stream_count > 0 &&
 		    !vm_iommu_mm_identity_map(
-			    vm_locked, region_begin, region_end, map_mode, NULL,
+			    vm_locked, region_begin, region_end, map_mode,
 			    mem_region.dma_prop.dma_device_id)) {
 			dlog_error(
 				"Unable to map memory-region in the page "

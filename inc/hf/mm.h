@@ -203,11 +203,11 @@ bool mm_vm_identity_prepare(struct mm_ptable *ptable, ipaddr_t begin,
 bool mm_vm_prepare(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
 		   paddr_t p_begin, mm_mode_t mode);
 bool mm_vm_identity_map(struct mm_ptable *ptable, ipaddr_t begin, ipaddr_t end,
-			mm_mode_t mode, ipaddr_t *ipa);
+			mm_mode_t mode);
 bool mm_vm_map(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
 	       paddr_t p_begin, mm_mode_t mode);
 void mm_vm_identity_commit(struct mm_ptable *ptable, ipaddr_t begin,
-			   ipaddr_t end, mm_mode_t mode, ipaddr_t *ipa);
+			   ipaddr_t end, mm_mode_t mode);
 void mm_vm_commit(struct mm_ptable *ptable, ipaddr_t ip_begin, ipaddr_t ip_end,
 		  paddr_t p_begin, mm_mode_t mode);
 bool mm_vm_unmap(struct mm_ptable *ptable, ipaddr_t begin, ipaddr_t end);
