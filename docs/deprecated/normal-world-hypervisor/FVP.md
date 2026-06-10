@@ -23,7 +23,7 @@ $ make && kokoro/test.sh --fvp
 ```
 
 See the `FvpDriver` class in
-[`fvp_driver.py`](../../test/hftest/drivers/fvp_driver.py) for details on how
+[`fvp_driver.py`](../../../test/hftest/drivers/fvp_driver.py) for details on how
 this works.
 
 ## Other resources

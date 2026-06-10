@@ -70,7 +70,7 @@ Hafnium is designed with the following principles in mind:
 
 ## VM model
 
-A [VM](../../inc/hf/vm.h) in Hafnium consists of:
+A [VM](../../../inc/hf/vm.h) in Hafnium consists of:
 
 *   A set of memory pages owned by and/or available to the VM, stored in the
     stage 2 page table managed by Hafnium.
@@ -82,7 +82,7 @@ A [VM](../../inc/hf/vm.h) in Hafnium consists of:
 *   Some internal state maintained by Hafnium (locks, mailbox wait lists,
     mailbox state, log buffer).
 
-Each [vCPU](../../inc/hf/vcpu.h) also has:
+Each [vCPU](../../../inc/hf/vcpu.h) also has:
 
 *   A set of saved registers, for when it isn't being run on a physical CPU.
 *   A current state (switched off, ready to run, running, waiting for a message

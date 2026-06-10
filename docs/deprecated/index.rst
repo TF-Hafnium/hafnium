@@ -1,10 +1,10 @@
-Appendix
-========
+Deprecated Information
+======================
 
 .. toctree::
    :maxdepth: 1
 
-   hypervisor/index
+   normal-world-hypervisor/index
 
 --------------
 

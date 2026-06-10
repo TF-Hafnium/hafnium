@@ -64,11 +64,11 @@ These rules apply to comments and other natural language text.
 ## Coding practices
 
 *   Function macros should be functions instead, that way you get types.
-*   Lock ordering is described at the top of [`api.c`](../../src/api.c).
+*   Lock ordering is described at the top of [`api.c`](../../../src/api.c).
 *   Use opaque types to avoid implicit casts when it will help avoid mistakes.
-    e.g. [`addr.h`](../../inc/hf/addr.h)
+    e.g. [`addr.h`](../../../inc/hf/addr.h)
 *   Avoid inline casting. C doesn't give much protection so be formal about the
-    transformations. e.g. [`addr.h`](../../inc/hf/addr.h)
+    transformations. e.g. [`addr.h`](../../../inc/hf/addr.h)
 *   If a function acquires a resource, there must be a single exit path to free
     the resource. Tracking down multiple exit points is hard and requires
     duplicated code which is harder. This may require splitting functions into
@@ -117,7 +117,7 @@ Logging is done with the `dlog_*` macros, e.g. `dlog_info`. These accept
 printf-style format strings and arguments.
 
 The log level of a build is controlled by the `log_level` argument defined in
-[`BUILDCONFIG.gn`](../../build/BUILDCONFIG.gn). This defaults to `INFO` for debug
+[`BUILDCONFIG.gn`](../../../build/BUILDCONFIG.gn). This defaults to `INFO` for debug
 builds and tests, meaning that all levels except `VERBOSE` will be logged. It is
 recommended to set the log level to `NOTICE` for production builds, to reduce
 binary size and log spam.

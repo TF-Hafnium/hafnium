@@ -13,7 +13,7 @@ Hafnium Documentation
    threat_model_spm
    security-advisories/index
    change-log
-   appendix
+   deprecated/index
    glossary
 
 Hafnium is the Secure Partition Manager (SPM) reference implementation, following the

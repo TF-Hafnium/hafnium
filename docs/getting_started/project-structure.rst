@@ -43,9 +43,6 @@ The source tree is organised as follows:
 
 - `docs`: Documentation.
 
-- `driver/linux`: Linux kernel driver for Hafnium as the hypervisor, in the primary VM (More
-  details see legacy :ref:`Hypervisor` documentation).
-
 - `inc`: Header files.
 
    - `hf`: internal to Hafnium.
@@ -80,6 +77,8 @@ The source tree is organised as follows:
   - `arch`: Implementation of architecture-dependent modules.
 
   - `ffa`: Abstraction over SPMC/hypervisor specific implementation details of FF-A features.
+    This includes the maintained SPMC implementation as well as legacy normal-world
+    hypervisor code paths kept for test coverage.
 
 - `test`: Integration tests
 
