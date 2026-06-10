@@ -57,8 +57,9 @@ TEST_SERVICE(ffa_direct_msg_run)
 TEST_SERVICE(ffa_version_negotiate_fwk_in_use_rxtx)
 {
 	/*
-	 * R0238: an incompatible request returns the highest supported
-	 * version even while the RX/TX mappings keep the framework in use.
+	 * FF-A v1.3 ALP5 R0238: an incompatible request returns the highest
+	 * supported version even while the RX/TX mappings keep the framework in
+	 * use.
 	 */
 	EXPECT_EQ(
 		ffa_version(FFA_VERSION_COMPILED + 1, VERSION_QUERY_NEGOTIATE),

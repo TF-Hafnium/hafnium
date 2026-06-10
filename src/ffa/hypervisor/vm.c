@@ -21,6 +21,16 @@ bool ffa_vm_managed_exit_supported(struct vm *vm)
 	return false;
 }
 
+bool ffa_other_world_ffa_in_use(void)
+{
+	/*
+	 * In the Hypervisor build, HF_OTHER_WORLD_ID refers to the secure world
+	 * rather than the Hypervisor's non-secure physical FF-A instance, so
+	 * the SPMC-side FF-A v1.3 ALP5 D0235 aggregation does not exist here.
+	 */
+	return false;
+}
+
 struct vm_locked ffa_vm_find_locked(ffa_id_t vm_id)
 {
 	if (vm_id_is_current_world(vm_id) || vm_id == HF_OTHER_WORLD_ID) {

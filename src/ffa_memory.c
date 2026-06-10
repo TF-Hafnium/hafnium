@@ -2379,6 +2379,42 @@ bool ffa_memory_vm_share_outstanding(ffa_id_t id)
 			break;
 		}
 	}
+
+	share_states_unlock(&share_states);
+
+	return outstanding;
+}
+
+bool ffa_memory_any_nwd_vm_share_outstanding(void)
+{
+	struct share_states_locked share_states = share_states_lock();
+	bool outstanding = false;
+
+	for (uint32_t i = 0; i < MAX_MEM_SHARES; ++i) {
+		struct ffa_memory_share_state *state =
+			&share_states.share_states[i];
+		ffa_id_t sender_id;
+
+		/*
+		 * D0235 in the FF-A v1.3 ALP5 specification requires
+		 * all memory regions shared or lent by any VM to be reclaimed.
+		 */
+		if (state->memory_region == NULL ||
+		    (state->share_func != FFA_MEM_LEND_32 &&
+		     state->share_func != FFA_MEM_LEND_64 &&
+		     state->share_func != FFA_MEM_SHARE_32 &&
+		     state->share_func != FFA_MEM_SHARE_64)) {
+			continue;
+		}
+
+		sender_id = state->memory_region->sender;
+		if (ffa_is_vm_id(sender_id) &&
+		    sender_id != HF_HYPERVISOR_VM_ID) {
+			outstanding = true;
+			break;
+		}
+	}
+
 	share_states_unlock(&share_states);
 
 	return outstanding;

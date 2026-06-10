@@ -70,6 +70,18 @@ static struct vm_locked ffa_vm_nwd_find_locked(
 	return (struct vm_locked){.vm = NULL};
 }
 
+static bool notifications_have_any_bound_sender(
+	const struct notifications *notifications)
+{
+	for (uint32_t i = 0U; i < MAX_FFA_NOTIFICATIONS; ++i) {
+		if (notifications->bindings_sender_id[i] != HF_INVALID_VM_ID) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /**
  * Allocates a NWd VM structure to the VM of given ID.
  * If a VM with the ID already exists return it.
@@ -105,6 +117,101 @@ out:
 	nwd_vms_unlock(&nwd_vms_locked);
 
 	return vm_locked;
+}
+
+/**
+ * As defined in D0235 of the FF-A v1.3 ALP5 specification, this helper checks
+ * whether the framework is in use by the Hypervisor because any of the
+ * following are true:
+ *   - Any VM still has RX/TX buffers mapped in the SPMC's translation regime.
+ *   - Any SP notification of any VM is bound.
+ *   - Any SPMC framework notification of any VM is pending.
+ */
+static bool nwd_vm_ffa_in_use(struct vm_locked vm_locked)
+{
+	return vm_rxtx_mapped(vm_locked) ||
+	       notifications_have_any_bound_sender(
+		       &vm_locked.vm->notifications.from_sp) ||
+	       vm_are_fwk_notifications_pending(vm_locked);
+}
+
+static bool nwd_vms_any_in_use(void)
+{
+	struct nwd_vms_locked nwd_vms_locked = nwd_vms_lock();
+	bool in_use = false;
+
+	for (uint32_t i = 0U; i < nwd_vms_size; ++i) {
+		struct vm_locked vm_locked;
+
+		if (nwd_vms[i].id == HF_INVALID_VM_ID ||
+		    nwd_vms[i].id == HF_HYPERVISOR_VM_ID) {
+			continue;
+		}
+
+		vm_locked = vm_lock(&nwd_vms[i]);
+		in_use = nwd_vm_ffa_in_use(vm_locked);
+		vm_unlock(&vm_locked);
+
+		if (in_use) {
+			break;
+		}
+	}
+
+	nwd_vms_unlock(&nwd_vms_locked);
+
+	return in_use;
+}
+
+static bool any_sp_has_vm_notifications_bound(void)
+{
+	for (ffa_vm_count_t i = 0; i < vm_get_count(); ++i) {
+		struct vm_locked vm_locked = vm_lock(vm_find_index(i));
+		bool bound = notifications_have_any_bound_sender(
+			&vm_locked.vm->notifications.from_vm);
+
+		vm_unlock(&vm_locked);
+
+		if (bound) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
+ * As defined in D0235 of the FF-A v1.3 ALP5 specification, the
+ * framework is in use by the Hypervisor if any of the following are
+ * true:
+ *   - The Hypervisor RX/TX buffers are mapped.
+ *   - Apart from the current FFA_VERSION invocation, there are
+ * outstanding FF-A invocations on another PE from the Hypervisor.
+ *   - Any VM still has RX/TX buffers mapped in the SPMC's translation
+ * regime.
+ *   - Any SP notification of any VM is bound.
+ *   - Any VM notification of any SP is bound.
+ *   - Any SPMC framework notification of any VM is pending.
+ *   - Any memory region shared or lent by a VM is not yet reclaimed.
+ *
+ * SP vCPU states approximate outstanding invocations; physical
+ * Hypervisor vCPU states track world switches, so the same check does
+ * not apply. In this case we rely on Hypervisor serialization
+ * (FF-A v1.3 ALP5 X0240) and check only known persistent framework use.
+ * Concurrent use during negotiation has CONSTRAINED UNPREDICTABLE
+ * results (FF-A v1.3 ALP5 R0239).
+ */
+bool ffa_other_world_ffa_in_use(void)
+{
+	bool hypervisor_in_use;
+	struct vm_locked other_world_locked;
+
+	other_world_locked = vm_find_locked(HF_OTHER_WORLD_ID);
+	hypervisor_in_use = nwd_vm_ffa_in_use(other_world_locked);
+	vm_unlock(&other_world_locked);
+
+	return hypervisor_in_use || nwd_vms_any_in_use() ||
+	       any_sp_has_vm_notifications_bound() ||
+	       ffa_memory_any_nwd_vm_share_outstanding();
 }
 
 void ffa_vm_nwd_free(struct vm_locked to_destroy_locked)

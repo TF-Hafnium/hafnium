@@ -16,6 +16,13 @@ void ffa_vm_init(void);
 
 struct vm_locked ffa_vm_nwd_alloc(ffa_id_t vm_id);
 
+/**
+ * Returns whether the current build's "other world" endpoint keeps the FF-A
+ * framework in use for FFA_VERSION.
+ * Acquires its own locks; the caller must not hold any VM lock.
+ */
+bool ffa_other_world_ffa_in_use(void);
+
 bool ffa_vm_supports_indirect_messages(struct vm *vm);
 
 bool ffa_vm_notifications_info_get(uint16_t *ids, uint32_t *ids_count,

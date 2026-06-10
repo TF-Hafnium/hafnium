@@ -2782,9 +2782,24 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 		 * given.
 		 */
 		if (query_type == VERSION_QUERY_NEGOTIATE) {
-			current_vm_locked = vm_lock(current->vm);
+			bool caller_is_hypervisor;
+			bool in_use = false;
 
-			if (vm_ffa_in_use(current_vm_locked, current)) {
+			caller_is_hypervisor =
+				current->vm->id == HF_OTHER_WORLD_ID &&
+				ffa_is_vm_id(current->vm->id);
+
+			if (caller_is_hypervisor) {
+				in_use = ffa_other_world_ffa_in_use();
+			}
+
+			current_vm_locked = vm_lock(current->vm);
+			if (!caller_is_hypervisor) {
+				in_use = vm_ffa_in_use(current_vm_locked,
+						       current);
+			}
+
+			if (in_use) {
 				vm_unlock(&current_vm_locked);
 				dlog_error(
 					"FFA_VERSION: Framework in use, "
