@@ -283,6 +283,44 @@ static void mm_replace_entry(const struct mm_ptable *ptable,
 	mm_free_page_pte(v, level);
 }
 
+static bool mm_populate_table_pte_check_overmap(ptable_addr_t block_vaddr,
+						paddr_t block_paddr,
+						uintpaddr_t target_paddr,
+						mm_level_t level)
+{
+	/*
+	 * If the physical address is not in the range of the
+	 * existing large mapping, this is an overmapping.
+	 */
+	if (!(pa_addr(block_paddr) <= target_paddr &&
+	      target_paddr - pa_addr(block_paddr) < mm_entry_size(level))) {
+		dlog_error(
+			"%s: Cannot replace block with table because "
+			"target paddr is not contained in the "
+			"existing block.\n",
+			__func__);
+		return false;
+	}
+
+	/*
+	 * If the difference between the phsyical address and
+	 * the start of the entry isn't the same as the offset
+	 * into the existing large mapping, this is an
+	 * overmapping.
+	 */
+	if (target_paddr - pa_addr(block_paddr) !=
+	    (block_vaddr % mm_entry_size(level))) {
+		dlog_error(
+			"%s: Cannot replace block with table because "
+			"because table output range is "
+			"not equivalent to the existing block output range.\n",
+			__func__);
+		return false;
+	}
+
+	return true;
+}
+
 /**
  * Populates the provided page table entry with a reference to another table if
  * needed, that is, if it does not yet point to another table.
@@ -291,8 +329,9 @@ static void mm_replace_entry(const struct mm_ptable *ptable,
  */
 static struct mm_page_table *mm_populate_table_pte(struct mm_ptable *ptable,
 						   ptable_addr_t begin,
+						   uintpaddr_t p_begin,
 						   pte_t *pte, mm_level_t level,
-						   bool non_secure)
+						   bool non_secure, bool unmap)
 {
 	struct mm_page_table *ntable;
 	pte_t v = *pte;
@@ -306,23 +345,29 @@ static struct mm_page_table *mm_populate_table_pte(struct mm_ptable *ptable,
 		return arch_mm_table_from_pte(v, level);
 	}
 
-	/* Allocate a new table. */
-	ntable = mm_alloc_page_tables(1);
-	if (ntable == NULL) {
-		dlog_error("Failed to allocate memory for page table\n");
-		return NULL;
-	}
-
 	/* Determine template for new pte and its increment. */
 	if (arch_mm_pte_is_block(v, level)) {
 		curr_paddr = arch_mm_block_from_pte(v, level);
 		inc = mm_entry_size(level_below);
 		new_pte = arch_mm_block_pte(level_below, curr_paddr,
 					    arch_mm_pte_attrs(v, level));
+
+		if (!unmap && !mm_populate_table_pte_check_overmap(
+				      begin, curr_paddr, p_begin, level)) {
+			return NULL;
+		}
+
 	} else {
 		curr_paddr = pa_init(0);
 		inc = 0;
 		new_pte = arch_mm_absent_pte(level_below);
+	}
+
+	/* Allocate a new table. */
+	ntable = mm_alloc_page_tables(1);
+	if (ntable == NULL) {
+		dlog_error("Failed to allocate memory for page table\n");
+		return NULL;
 	}
 
 	/* Initialise entries in the new table. */
@@ -346,6 +391,62 @@ static struct mm_page_table *mm_populate_table_pte(struct mm_ptable *ptable,
 			 level, non_secure);
 
 	return ntable;
+}
+
+/**
+ * This helper is used by mm_map_level when deciding if it is valid for a table
+ * entry to be replaced by a single larger block when adding a new mapping. We
+ * want to allow 'remapping' (which is essenially an attribute update of an
+ * existing mapping) but we do not want to allow 'overmapping', which completely
+ * replaces an existing mapping with a new one that corresponds to a different
+ * physical address range.
+ *
+ * Given a page table and a physical address, this function will walk the page
+ * table and recursively check that its entries are either absent or correspond
+ * to the physical address range beginning at paddr_begin.
+ */
+// NOLINTNEXTLINE(misc-no-recursion)
+static bool mm_validate_table_merge(struct mm_page_table *table,
+				    uintpaddr_t paddr_begin, mm_level_t level)
+{
+	size_t i;
+	pte_t *pte;
+
+	for (i = 0; i < MM_PTE_PER_PAGE; i++) {
+		pte = &table->entries[i];
+
+		/*
+		 * If the entry is a block, it should be mapped to the expected
+		 * paddr
+		 */
+		if (arch_mm_pte_is_block(*pte, level)) {
+			if (pa_addr(arch_mm_block_from_pte(*pte, level)) !=
+			    paddr_begin) {
+				dlog_error(
+					"%s: Could not coalesce table because "
+					"an existing mapping would be "
+					"overmapped by this operation.\n",
+					__func__);
+				return false;
+			}
+		}
+
+		/*
+		 * If the entry is a table, we should receursively check that
+		 * its entries are mapped to the expected paddrs.
+		 */
+		if (arch_mm_pte_is_table(*pte, level)) {
+			if (!mm_validate_table_merge(
+				    arch_mm_table_from_pte(*pte, level),
+				    paddr_begin, level - 1)) {
+				return false;
+			}
+		}
+
+		paddr_begin += mm_entry_size(level);
+	}
+
+	return true;
 }
 
 /**
@@ -394,6 +495,46 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
 			   is_aligned(begin, entry_size) &&
 			   is_aligned(*paddr_begin, entry_size)) {
 			/*
+			 * If we are adding new mappings , we want to make sure
+			 * that we are not 'overmapping', which replaces
+			 * existing mappings with completely new ones. We
+			 * continue to allow 'remapping' which updates
+			 * the attributes of an existing mapping.
+			 */
+
+			if (!unmap) {
+				/*
+				 * If a block already exists at the virtual
+				 * address and is mapped to a different physical
+				 * address, return an error.
+				 */
+				if (arch_mm_pte_is_block(*pte, level) &&
+				    pa_addr(arch_mm_block_from_pte(
+					    *pte, level)) != *paddr_begin) {
+					dlog_error(
+						"%s: Overmapping is not "
+						"permitted. Cannot replace "
+						"existing block with block of "
+						"different paddr.\n",
+						__func__);
+					return false;
+				}
+
+				/*
+				 * If a table is already mapped at the virtual
+				 * address, we need to validate that the table
+				 * is currently filled with the appropriate
+				 * mappings before we merge it.
+				 */
+				if (arch_mm_pte_is_table(*pte, level) &&
+				    !mm_validate_table_merge(
+					    arch_mm_table_from_pte(*pte, level),
+					    *paddr_begin, level - 1)) {
+					return false;
+				}
+			}
+
+			/*
 			 * If the entire entry is within the region we want to
 			 * map, map/unmap the whole entry.
 			 */
@@ -414,7 +555,8 @@ static bool mm_map_level(struct mm_ptable *ptable, ptable_addr_t begin,
 			 * replace it with an equivalent subtable and get that.
 			 */
 			struct mm_page_table *nt = mm_populate_table_pte(
-				ptable, begin, pte, level, non_secure);
+				ptable, begin, *paddr_begin, pte, level,
+				non_secure, unmap);
 			if (nt == NULL) {
 				return false;
 			}
