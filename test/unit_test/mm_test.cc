@@ -461,6 +461,355 @@ TEST_F(mm, map_already_mapped)
 }
 
 /**
+ * Map all memory then try and non-identity map a page. Check that the mapping
+ * is rejected and that the page tables are unchanged.
+ */
+TEST_F(mm, already_mapped_non_identity)
+{
+	constexpr mm_mode_t mode = 0;
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, ipa_init(0), VM_MEM_END, mode));
+	ASSERT_FALSE(mm_vm_map(&ptable, ipa_init(0), ipa_init(PAGE_SIZE),
+			       pa_init(PAGE_SIZE), mode));
+	EXPECT_THAT(
+		get_ptable(ptable),
+		AllOf(SizeIs(4), Each(Each(Truly(std::bind(arch_mm_pte_is_block,
+							   _1, TOP_LEVEL))))));
+}
+
+/**
+ * Check that you can remap a subset of an identity-mapped range
+ */
+TEST_F(mm, remap_partial)
+{
+	/*
+	 * Before:
+	 *
+	 * The range [0x0, 0x200000) is identity mapped.
+	 *
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] = [0x0, 0x200000)
+	 *     [1] = absent
+	 *     [2] = absent
+	 *     ...
+	 *   }
+	 *   [1] = absent
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 *
+	 * After:
+	 *
+	 * The range [0x100000, 0x101000) is identity mapped with different
+	 * mode. The operation should succeed.
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] => table_l0 {
+	 *       [0] = 0x0
+	 *       [1] = 0x1000
+	 *       [2] = 0x2000
+	 *       ...
+	 *       [256] = 0x100000 (different mode)
+	 *       ...
+	 *       [511] = 0x1ff000
+	 *     }
+	 *   }
+	 *   [1] = absent
+	 *   ...
+	 * }
+	 */
+
+	constexpr mm_mode_t mode = MM_MODE_R;
+	constexpr mm_mode_t remap_mode = MM_MODE_W;
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t end = ipa_init(mm_entry_size(1));
+	const ipaddr_t remap_begin = ipa_init(mm_entry_size(1) / 2);
+	const ipaddr_t remap_end = ipa_add(remap_begin, PAGE_SIZE);
+
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, begin, end, mode));
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, remap_begin, remap_end,
+				       remap_mode));
+
+	mm_mode_t got_mode;
+	ASSERT_TRUE(mm_vm_get_mode(&ptable, begin, ipa_add(begin, PAGE_SIZE),
+				   &got_mode));
+	EXPECT_THAT(got_mode, Eq(mode));
+	ASSERT_TRUE(mm_vm_get_mode(&ptable, remap_begin, remap_end, &got_mode));
+	EXPECT_THAT(got_mode, Eq(remap_mode));
+
+	auto tables = get_ptable(ptable);
+
+	auto table_l2 = tables.front();
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[0], TOP_LEVEL - 1));
+
+	auto table_l0 =
+		get_table(arch_mm_table_from_pte(table_l1[0], TOP_LEVEL - 1));
+
+	/* Check the first page */
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[0], TOP_LEVEL - 2));
+	ASSERT_EQ(arch_mm_stage2_attrs_to_mode(
+			  arch_mm_pte_attrs(table_l0[0], TOP_LEVEL - 2)),
+		  mode);
+
+	/* Check the middle page */
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[MM_PTE_PER_PAGE / 2],
+					 TOP_LEVEL - 2));
+	ASSERT_EQ(arch_mm_stage2_attrs_to_mode(arch_mm_pte_attrs(
+			  table_l0[MM_PTE_PER_PAGE / 2], TOP_LEVEL - 2)),
+		  remap_mode);
+}
+
+/**
+ * Check that you can remap a subset of an non-identity-mapped range
+ */
+TEST_F(mm, non_identity_remap)
+{
+	/*
+	 * Before:
+	 *
+	 * The range [0x0..0x200000) is non_identity mapped.
+	 *
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] = [0x2000000, 0x400000)
+	 *     [1] = absent
+	 *     [2] = absent
+	 *     ...
+	 *   }
+	 *   [1] = absent
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 *
+	 * After:
+	 *
+	 * The range [0x100000..0x101000) is non-identity mapped with a
+	 * different mode. The operation should succeed.
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] => table_l0 {
+	 *       [0] = 0x200000
+	 *       [1] = 0x201000
+	 *       [2] = 0x202000
+	 *       ...
+	 *       [256] = 0x300000 (different mode)
+	 *       ...
+	 *       [511] = 0x3ff000
+	 *     }
+	 *   }
+	 *   [1] = absent
+	 *   ...
+	 * }
+	 */
+
+	constexpr mm_mode_t mode = MM_MODE_R;
+	constexpr mm_mode_t remap_mode = MM_MODE_W;
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t end = ipa_init(mm_entry_size(1));
+	const ipaddr_t remap_begin = ipa_init(mm_entry_size(1) / 2);
+	const ipaddr_t remap_end = ipa_add(remap_begin, PAGE_SIZE);
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, end, pa_init(mm_entry_size(1)),
+			      mode));
+	ASSERT_TRUE(mm_vm_map(&ptable, remap_begin, remap_end,
+			      pa_init(mm_entry_size(1) + mm_entry_size(1) / 2),
+			      remap_mode));
+
+	mm_mode_t got_mode;
+	ASSERT_TRUE(mm_vm_get_mode(&ptable, begin, ipa_add(begin, PAGE_SIZE),
+				   &got_mode));
+	EXPECT_THAT(got_mode, Eq(mode));
+	ASSERT_TRUE(mm_vm_get_mode(&ptable, remap_begin, remap_end, &got_mode));
+	EXPECT_THAT(got_mode, Eq(remap_mode));
+
+	auto tables = get_ptable(ptable);
+
+	auto table_l2 = tables.front();
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[0], TOP_LEVEL - 1));
+
+	auto table_l0 =
+		get_table(arch_mm_table_from_pte(table_l1[0], TOP_LEVEL - 1));
+
+	/* Check the first page */
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[0], TOP_LEVEL - 2));
+	ASSERT_EQ(pa_addr(arch_mm_block_from_pte(table_l0[0], TOP_LEVEL - 2)),
+		  mm_entry_size(1));
+	ASSERT_EQ(arch_mm_stage2_attrs_to_mode(
+			  arch_mm_pte_attrs(table_l0[0], TOP_LEVEL - 2)),
+		  mode);
+
+	/* Check the middle page */
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[MM_PTE_PER_PAGE / 2],
+					 TOP_LEVEL - 2));
+	ASSERT_EQ(pa_addr(arch_mm_block_from_pte(table_l0[MM_PTE_PER_PAGE / 2],
+						 TOP_LEVEL - 2)),
+		  mm_entry_size(1) + (mm_entry_size(1) / 2));
+	ASSERT_EQ(arch_mm_stage2_attrs_to_mode(arch_mm_pte_attrs(
+			  table_l0[MM_PTE_PER_PAGE / 2], TOP_LEVEL - 2)),
+		  remap_mode);
+}
+
+/**
+ * Test that you can't overmap a mapping within a large page with a random
+ * address.
+ */
+TEST_F(mm, non_identity_overmap_random)
+{
+	/*
+	 * Before:
+	 *
+	 * The range [0x0, 0x200000) is non-identity mapped.
+	 *
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] = [0x200000, 0x400000)
+	 *     [1] = absent
+	 *     ...
+	 *   }
+	 *   [1] = absent
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 *
+	 * After:
+	 *
+	 * A random page in [0x0, 0x200000) is overmapped with a different
+	 * physical address. The operation should fail.
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] = [0x200000, 0x400000)
+	 *     [1] = absent
+	 *     ...
+	 *   }
+	 *   [1] = absent
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 */
+
+	constexpr mm_mode_t mode = MM_MODE_R;
+	constexpr mm_mode_t overmap_mode = MM_MODE_W;
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t end = ipa_init(mm_entry_size(1));
+	const paddr_t p_begin = pa_init(mm_entry_size(1));
+	const ipaddr_t overmap_begin = ipa_init(173 * PAGE_SIZE);
+	const ipaddr_t overmap_end = ipa_add(overmap_begin, PAGE_SIZE);
+	const paddr_t overmap_paddr = pa_init(0xA00000);
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, end, p_begin, mode));
+	ASSERT_FALSE(mm_vm_map(&ptable, overmap_begin, overmap_end,
+			       overmap_paddr, overmap_mode));
+
+	mm_mode_t got_mode;
+	ASSERT_TRUE(mm_vm_get_mode(&ptable, begin, end, &got_mode));
+	EXPECT_THAT(got_mode, Eq(mode));
+	ASSERT_TRUE(
+		mm_vm_get_mode(&ptable, overmap_begin, overmap_end, &got_mode));
+	EXPECT_THAT(got_mode, Eq(mode));
+
+	auto tables = get_ptable(ptable);
+
+	auto table_l2 = tables.front();
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l1[0], TOP_LEVEL - 1)),
+		    Eq(pa_addr(p_begin)));
+}
+
+/**
+ * Test that you can't overmap an existing mapping with a large page when the
+ * new subrange mapping doesn't correspond exactly to the existing range already
+ * within the page.
+ */
+TEST_F(mm, non_identity_overmap_shifted)
+{
+	/*
+	 * Before:
+	 *
+	 * The range [0x0, 0x200000) is non-identity mapped.
+	 *
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] = [0x200000, 0x400000)
+	 *     [1] = absent
+	 *     ...
+	 *   }
+	 *   [1] = absent
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 *
+	 * After:
+	 *
+	 * A random page in [0x0..0x200000) is overmapped with a different
+	 * physical address in the same large page, but not the right one for
+	 * that offset. The operation should fail.
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] = [0x200000, 0x400000)
+	 *     [1] = absent
+	 *     ...
+	 *   }
+	 *   [1] = absent
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 */
+
+	constexpr mm_mode_t mode = MM_MODE_R;
+	constexpr mm_mode_t overmap_mode = MM_MODE_W;
+	constexpr size_t overmap_page_index = 173;
+	const ipaddr_t begin = ipa_init(0);
+	const ipaddr_t end = ipa_init(mm_entry_size(1));
+	const paddr_t p_begin = pa_init(mm_entry_size(1));
+	const ipaddr_t overmap_begin = ipa_init(overmap_page_index * PAGE_SIZE);
+	const ipaddr_t overmap_end = ipa_add(overmap_begin, PAGE_SIZE);
+	const paddr_t overmap_paddr =
+		pa_add(p_begin, (overmap_page_index + 1) * PAGE_SIZE);
+
+	ASSERT_TRUE(mm_vm_map(&ptable, begin, end, p_begin, mode));
+	ASSERT_FALSE(mm_vm_map(&ptable, overmap_begin, overmap_end,
+			       overmap_paddr, overmap_mode));
+
+	mm_mode_t got_mode;
+	ASSERT_TRUE(mm_vm_get_mode(&ptable, begin, end, &got_mode));
+	EXPECT_THAT(got_mode, Eq(mode));
+	ASSERT_TRUE(
+		mm_vm_get_mode(&ptable, overmap_begin, overmap_end, &got_mode));
+	EXPECT_THAT(got_mode, Eq(mode));
+
+	auto tables = get_ptable(ptable);
+
+	auto table_l2 = tables.front();
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l1[0], TOP_LEVEL - 1)),
+		    Eq(pa_addr(p_begin)));
+}
+
+/**
  * Test that the paddr is not permitted to overflow in non-identity mappings.
  */
 TEST_F(mm, map_non_identity_paddr_overflows)
@@ -570,6 +919,390 @@ TEST_F(mm, map_block_replaces_table)
 		get_ptable(ptable),
 		AllOf(SizeIs(4), Each(Each(Truly(std::bind(arch_mm_pte_is_block,
 							   _1, TOP_LEVEL))))));
+}
+
+/**
+ * Map a single page as non-identity and then attempt to identity map the entire
+ * address space, which fails because we reject overmapping.
+ */
+TEST_F(mm, cant_overmap_non_identity)
+{
+	constexpr mm_mode_t mode = 0;
+	const ipaddr_t page_begin = ipa_init(0);
+	const ipaddr_t page_end = ipa_add(page_begin, PAGE_SIZE);
+	ASSERT_TRUE(mm_vm_map(&ptable, page_begin, page_end,
+			      pa_from_ipa(ipa_add(page_begin, PAGE_SIZE)),
+			      mode));
+	ASSERT_FALSE(
+		mm_vm_identity_map(&ptable, ipa_init(0), VM_MEM_END, mode));
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	/* Check that the last three root tables are absent . */
+	EXPECT_THAT(std::span(tables).last(3),
+		    Each(Each(Truly(
+			    std::bind(arch_mm_pte_is_absent, _1, TOP_LEVEL)))));
+
+	auto table_l2 = tables.front();
+	EXPECT_THAT(
+		table_l2.subspan(1),
+		Each(Truly(std::bind(arch_mm_pte_is_absent, _1, TOP_LEVEL))));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table_l1.subspan(1),
+		    Each(Truly(std::bind(arch_mm_pte_is_absent, _1,
+					 TOP_LEVEL - 1))));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[0], TOP_LEVEL - 1));
+
+	auto table_l0 =
+		get_table(arch_mm_table_from_pte(table_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(table_l0.subspan(1),
+		    Each(Truly(std::bind(arch_mm_pte_is_absent, _1,
+					 TOP_LEVEL - 2))));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[0], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l0[0], TOP_LEVEL - 2)),
+		    Eq(PAGE_SIZE));
+}
+
+/**
+ * Test that a failing overmap call does not partially succeed and
+ * change a susbet of a mapping unless the whole mapping can be changed.
+ */
+TEST_F(mm, overmap_no_partial_success)
+{
+	/*
+	 * Before:
+	 *
+	 * The range [0x0, 0x1ff000) is identity mapped.
+	 * The range [0x200000, 0x400000) is non-identity mapped
+	 * The range [0x400000, 0x5ff000) is identity mapped
+	 *
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] => table_l0 = {
+	 *       [0] = 0x0
+	 *       [1] = 0x1000
+	 *       [2] = 0x2000
+	 *       ...
+	 *       [510] = 0x1fe000
+	 *       [511] = absent
+	 *     }
+	 *     [1] = [0xA00000, 0xC00000)
+	 *     [2] => table_l0 = {
+	 *       [0] = 0x400000
+	 *       [1] = 0x401000
+	 *       [2] = 0x402000
+	 *       ...
+	 *       [510] = 0x5fe000
+	 *       [511] = absent
+	 *     }
+	 *   }
+	 * }
+	 *
+	 * After:
+	 *
+	 * The range [0x0, 0x600000) is identity mapped. The operation
+	 * should fail.
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] => table_l0 = {
+	 *       [0] = 0x0
+	 *       [1] = 0x1000
+	 *       [2] = 0x2000
+	 *       ...
+	 *       [510] = 0x1fe000
+	 *       [511] = absent
+	 *     }
+	 *     [1] = [0xA00000, 0xC00000)
+	 *     [2] => table_l0 = {
+	 *       [0] = 0x400000
+	 *       [1] = 0x401000
+	 *       [2] = 0x402000
+	 *       ...
+	 *       [510] = 0x5fe000
+	 *       [511] = absent
+	 *     }
+	 *   }
+	 * }
+	 */
+
+	constexpr mm_mode_t mode = 0;
+
+	/* Map the before state */
+	ASSERT_TRUE(mm_vm_identity_map(
+		&ptable, ipa_init(0),
+		ipa_init(mm_entry_size(1) - mm_entry_size(0)), mode));
+	ASSERT_TRUE(mm_vm_map(&ptable, ipa_init(mm_entry_size(1)),
+			      ipa_init(2 * mm_entry_size(1)),
+			      pa_init(0xA000000), mode));
+	ASSERT_TRUE(mm_vm_identity_map(
+		&ptable, ipa_init(2 * mm_entry_size(1)),
+		ipa_init(3 * mm_entry_size(1) - mm_entry_size(0)), mode));
+
+	/*
+	 * Try to overmap with an identity mapping spanning the entire existing
+	 * mapping
+	 */
+	ASSERT_FALSE(mm_vm_identity_map(&ptable, ipa_init(0),
+					ipa_init(3 * mm_entry_size(1)), mode));
+
+	auto tables = get_ptable(ptable);
+	auto table_l2 = tables.front();
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[0], TOP_LEVEL - 1));
+
+	/* Check the first level 0 table */
+	auto table_l0_0 =
+		get_table(arch_mm_table_from_pte(table_l1[0], TOP_LEVEL - 1));
+
+	/* Make sure that the first entry is still mapped to the right address.
+	 */
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0_0[0], TOP_LEVEL - 2));
+	EXPECT_THAT(
+		pa_addr(arch_mm_block_from_pte(table_l0_0[0], TOP_LEVEL - 2)),
+		Eq(0));
+
+	/*
+	 * Make sure the second last entry is still mapped to the right address.
+	 */
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0_0[MM_PTE_PER_PAGE - 2],
+					 TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(
+			    table_l0_0[MM_PTE_PER_PAGE - 2], TOP_LEVEL - 2)),
+		    Eq(510 * mm_entry_size(0)));
+
+	/*
+	 * Make sure the last entry wasn't changed as a result of the failing
+	 * overmap.
+	 */
+	ASSERT_TRUE(arch_mm_pte_is_absent(table_l0_0[MM_PTE_PER_PAGE - 1],
+					  TOP_LEVEL - 2));
+
+	/* Check the block */
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l1[1], TOP_LEVEL - 1));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l1[1], TOP_LEVEL - 1)),
+		    Eq(0xA000000));
+
+	/* Check the second level 0 table */
+	auto table_l0_2 =
+		get_table(arch_mm_table_from_pte(table_l1[2], TOP_LEVEL - 1));
+
+	/* Make sure that the first entry is still mapped to the right address.
+	 */
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0_2[0], TOP_LEVEL - 2));
+	EXPECT_THAT(
+		pa_addr(arch_mm_block_from_pte(table_l0_2[0], TOP_LEVEL - 2)),
+		Eq(mm_entry_size(1) * 2));
+
+	/*
+	 * Make sure the second last entry is still mapped to the right address.
+	 */
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0_2[MM_PTE_PER_PAGE - 2],
+					 TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(
+			    table_l0_2[MM_PTE_PER_PAGE - 2], TOP_LEVEL - 2)),
+		    Eq(2 * mm_entry_size(1) +
+		       (MM_PTE_PER_PAGE - 2) * mm_entry_size(0)));
+
+	/*
+	 * Make sure the last entry wasn't changed as a result of the failing
+	 * overmap.
+	 */
+	ASSERT_TRUE(arch_mm_pte_is_absent(table_l0_2[MM_PTE_PER_PAGE - 1],
+					  TOP_LEVEL - 2));
+}
+
+/**
+ * Check that a map will caoalesce empty mappings to create a larger block if
+ * possible
+ */
+TEST_F(mm, map_coalesce_partial_entries)
+{
+	/*
+	 * Before:
+	 *
+	 * The range [0x200000, 0x202000) is identity mapped.
+	 *
+	 *
+	 * table_l2 => {
+	 *   [0] = absent,
+	 *   [1] => table_l1 = {
+	 *     [0] => table_l0 = {
+	 *       [0] = 0x200000
+	 *       [1] = 0x201000
+	 *       [2] = absent
+	 *       ...
+	 *     }
+	 *     [1] = absent
+	 *     [2] = absent
+	 *     ...
+	 *   }
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 *
+	 * After:
+	 *
+	 * The range [0x0, 0x400000) is identity mapped. The operation
+	 * should succeed.
+	 *
+	 * table_l2 => {
+	 *   [0] => table_l1 = {
+	 *     [0] = [0x0..0x200000)
+	 *     [1] = [0x200000..0x400000)
+	 *     [2] = absent
+	 *     ...
+	 *   }
+	 *   [1] = absent
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 */
+
+	constexpr mm_mode_t mode = 0;
+
+	const ipaddr_t identity_begin = ipa_init(mm_entry_size(1));
+	const ipaddr_t identity_end =
+		ipa_add(identity_begin, 2 * mm_entry_size(0));
+
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, identity_begin, identity_end,
+				       mode));
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, ipa_init(0),
+				       ipa_init(2 * mm_entry_size(1)), mode));
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	EXPECT_THAT(std::span(tables).last(3),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	auto table_l2 = tables.front();
+	EXPECT_THAT(table_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l1[0], TOP_LEVEL - 1));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l1[0], TOP_LEVEL - 1)),
+		    Eq(0));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l1[1], TOP_LEVEL - 1));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l1[1], TOP_LEVEL - 1)),
+		    Eq(mm_entry_size(1)));
+	EXPECT_THAT(table_l1.subspan(2),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+}
+
+/**
+ * Check that an identity mapping will not succeed if there is a colliding
+ * non-identity mapping already present.
+ */
+TEST_F(mm, map_dont_coalesce_table_non_identity)
+{
+	/*
+	 * Before:
+	 *
+	 * The range [0x200000, 0x202000) is identity mapped.
+	 * The range [0x202000, 0x203000) is non-identity mapped
+	 *
+	 *
+	 * table_l2 => {
+	 *   [0] = absent,
+	 *   [1] => table_l1 = {
+	 *     [0] => table_l0 = {
+	 *       [0] = 0x200000
+	 *       [1] = 0x201000
+	 *       [2] = 0xA00000
+	 *       ...
+	 *     }
+	 *     [1] = absent
+	 *     [2] = absent
+	 *     ...
+	 *   }
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 *
+	 * After:
+	 *
+	 * The range [0x0, 0x400000) is identity mapped. The operation
+	 * should fail.
+	 *
+	 * table_l2 => {
+	 *   [0] = absent,
+	 *   [1] => table_l1 = {
+	 *     [0] => table_l0 = {
+	 *       [0] = 0x200000
+	 *       [1] = 0x201000
+	 *       [2] = 0xA00000
+	 *       ...
+	 *     }
+	 *     [1] = absent
+	 *     [2] = absent
+	 *     ...
+	 *   }
+	 *   [2] = absent
+	 *   ...
+	 * }
+	 */
+
+	constexpr mm_mode_t mode = 0;
+
+	const ipaddr_t identity_begin = ipa_init(mm_entry_size(1));
+	const ipaddr_t identity_end =
+		ipa_add(identity_begin, 2 * mm_entry_size(0));
+	const ipaddr_t non_identity_end =
+		ipa_add(identity_end, mm_entry_size(0));
+	const paddr_t non_identity_paddr = pa_init(0xA00000);
+
+	ASSERT_TRUE(mm_vm_identity_map(&ptable, identity_begin, identity_end,
+				       mode));
+	ASSERT_TRUE(mm_vm_map(&ptable, identity_end, non_identity_end,
+			      non_identity_paddr, mode));
+
+	ASSERT_FALSE(mm_vm_identity_map(&ptable, ipa_init(0),
+					ipa_init(2 * mm_entry_size(1)), mode));
+
+	auto tables = get_ptable(ptable);
+	EXPECT_THAT(tables, SizeIs(4));
+	ASSERT_THAT(TOP_LEVEL, Eq(2));
+
+	EXPECT_THAT(std::span(tables).last(3),
+		    Each(Each(arch_mm_absent_pte(TOP_LEVEL))));
+
+	auto table_l2 = tables.front();
+	EXPECT_THAT(table_l2.subspan(1), Each(arch_mm_absent_pte(TOP_LEVEL)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l2[0], TOP_LEVEL));
+
+	auto table_l1 =
+		get_table(arch_mm_table_from_pte(table_l2[0], TOP_LEVEL));
+	EXPECT_THAT(table_l1.front(), arch_mm_absent_pte(TOP_LEVEL - 1));
+	EXPECT_THAT(table_l1.subspan(2),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 1)));
+	ASSERT_TRUE(arch_mm_pte_is_table(table_l1[1], TOP_LEVEL - 1));
+
+	auto table_l0 =
+		get_table(arch_mm_table_from_pte(table_l1[1], TOP_LEVEL - 1));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[0], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l0[0], TOP_LEVEL - 2)),
+		    Eq(mm_entry_size(1)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[1], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l0[1], TOP_LEVEL - 2)),
+		    Eq(mm_entry_size(1) + mm_entry_size(0)));
+	ASSERT_TRUE(arch_mm_pte_is_block(table_l0[2], TOP_LEVEL - 2));
+	EXPECT_THAT(pa_addr(arch_mm_block_from_pte(table_l0[2], TOP_LEVEL - 2)),
+		    Eq(pa_addr(non_identity_paddr)));
+	EXPECT_THAT(table_l0.subspan(3),
+		    Each(arch_mm_absent_pte(TOP_LEVEL - 2)));
 }
 
 /**
