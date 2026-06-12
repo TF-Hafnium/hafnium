@@ -65,6 +65,15 @@ declare_args() {
   # the maximum number of streams allowed per device, per partition, in the partition manifest
   plat_partition_max_streams_per_device = 4
 
+  # The maximum number of concurrent FF-A memory sharing operations tracked.
+  plat_max_mem_shares = 100
+
+  # The maximum number of fragments in a memory sharing transaction.
+  plat_max_fragments = 20
+
+  # The maximum number of recipients per FF-A memory sharing operation.
+  plat_max_mem_share_recipients = 2
+
   # The number of virtual interrupt IDs which are supported
   plat_num_virtual_interrupts_ids = 64
 

@@ -82,6 +82,9 @@ config("platform") {
     "PARTITION_MAX_DMA_DEVICES=${plat_partition_max_dma_devices}",
     "PARTITION_MAX_INTERRUPTS_PER_DEVICE=${plat_partition_max_intr_per_device}",
     "PARTITION_MAX_STREAMS_PER_DEVICE=${plat_partition_max_streams_per_device}",
+    "MAX_MEM_SHARES=${plat_max_mem_shares}",
+    "MAX_FRAGMENTS=${plat_max_fragments}",
+    "MAX_MEM_SHARE_RECIPIENTS=${plat_max_mem_share_recipients}",
     "HF_NUM_INTIDS=${plat_num_virtual_interrupts_ids}",
     "WORKAROUND_CVE_2025_10263=${workaround_cve_2025_10263}",
   ]

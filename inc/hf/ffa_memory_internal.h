@@ -13,24 +13,16 @@
  */
 #pragma once
 
-#include "hf/mm.h"
-#define MAX_MEM_SHARES 100
-
 #include <stdint.h>
 
 #include "hf/check.h"
 #include "hf/ffa_memory.h"
 #include "hf/ffa_v1_0.h"
+#include "hf/mm.h"
 #include "hf/mpool.h"
 #include "hf/vm.h"
 
 #include "vmapi/hf/ffa.h"
-
-/**
- * The maximum number of fragments into which a memory sharing message may be
- * broken.
- */
-#define MAX_FRAGMENTS 20
 
 static_assert(sizeof(struct ffa_memory_region_constituent) % 16 == 0,
 	      "struct ffa_memory_region_constituent must be a multiple of 16 "
