@@ -33,8 +33,8 @@ static inline bool mem_range_contains_address(struct mem_range range,
 
 static inline bool mem_range_overlaps(struct mem_range a, struct mem_range b)
 {
-	return mem_range_contains_address(a, pa_addr(b.begin)) ||
-	       mem_range_contains_address(a, pa_addr(b.end));
+	return pa_addr(a.begin) <= pa_addr(b.end) &&
+	       pa_addr(b.begin) <= pa_addr(a.end);
 }
 
 static inline bool mem_range_contains_range(struct mem_range a,
