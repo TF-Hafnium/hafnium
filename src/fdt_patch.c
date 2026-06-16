@@ -191,8 +191,8 @@ bool fdt_patch_mem(struct mm_stage1_locked stage1_locked, paddr_t fdt_addr,
 	}
 
 	root = fdt_path_offset(fdt, "/");
-	if (ret < 0) {
-		dlog_error("FDT cannot find root offset. Error: %d\n", ret);
+	if (root < 0) {
+		dlog_error("FDT cannot find root offset. Error: %d\n", root);
 		goto out_unmap_fdt;
 	}
 
