@@ -662,6 +662,41 @@ TEST(sp_lifecycle, sel1_sp_abort_nwd_mem_lend)
 }
 
 /**
+ * Check that an S-EL1 partition reports a direct stage-2 permission fault
+ * when it writes to memory retrieved as read-only.
+ */
+TEST(sp_lifecycle, sel1_sp_reports_permission_fault)
+{
+	struct mailbox_buffers mb = set_up_mailbox();
+	struct ffa_partition_info *target_sp_info = service3(mb.recv);
+	struct ffa_value run_res;
+	struct ffa_memory_region_constituent constituents[] = {
+		{.address = (uint64_t)pages, .page_count = 1},
+	};
+
+	SERVICE_SELECT(target_sp_info->vm_id,
+		       "ffa_memory_retrieve_permission_fault", mb.send);
+
+	memset_s(pages, sizeof(pages), 'b', PAGE_SIZE);
+
+	send_memory_and_retrieve_request(
+		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), target_sp_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
+
+	/* First run retrieves the memory and validates read access. */
+	run_res = ffa_run(target_sp_info->vm_id, 0);
+	EXPECT_EQ(run_res.func, FFA_YIELD_32);
+
+	/* Second run attempts the write and should fault. */
+	run_res = ffa_run(target_sp_info->vm_id, 0);
+	EXPECT_TRUE(exception_received(&run_res, mb.recv));
+}
+
+/**
  * Check that SPMC can reclaim memory owned by an aborting partition.
  *
  * This test involves a target SP and a Companion SP. The target SP lends normal

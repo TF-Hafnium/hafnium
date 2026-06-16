@@ -220,6 +220,28 @@ bool exception_handler_yield_data_abort(void)
 /**
  * EL1 exception handler to use in unit test VMs.
  * Yields control back to the hypervisor and sends the number of exceptions.
+ * Asserts that the abort is a direct permission fault.
+ */
+bool exception_handler_yield_data_abort_permission_fault(void)
+{
+	uintreg_t esr_el1 = read_msr(ESR_EL1);
+	uintreg_t far_el1 = read_msr(FAR_EL1);
+	uintreg_t dfsc = GET_ESR_ISS(esr_el1) & 0x3f;
+
+	EXPECT_EQ(GET_ESR_EC(esr_el1), EC_DATA_ABORT_SAME_EL);
+	EXPECT_NE(far_el1, 0);
+
+	/* This flow expects a direct permission fault, not an S1PTW abort. */
+	EXPECT_EQ(GET_ESR_ISS(esr_el1) & (1U << 7), 0U);
+	EXPECT_GE(dfsc, 0xc);
+	EXPECT_LE(dfsc, 0xf);
+
+	return exception_handler_yield();
+}
+
+/**
+ * EL1 exception handler to use in unit test VMs.
+ * Yields control back to the hypervisor and sends the number of exceptions.
  * Asserts that the Exception Class is Instruction Abort (same EL).
  */
 bool exception_handler_yield_instruction_abort(void)
