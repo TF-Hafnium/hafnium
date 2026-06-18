@@ -284,10 +284,12 @@ static struct vcpu *ffa_interrupts_signal_secure_interrupt(
 			struct ffa_value int_ret =
 				api_ffa_interrupt_return(inject_int_id);
 
-			if (inject_int_id != 0) {
-				assert(v_intid == inject_int_id);
-			}
-
+			/*
+			 * Resume the target with the next pending and enabled
+			 * virtual interrupt. This may differ from the interrupt
+			 * that was just injected if the vCPU already had an
+			 * older pending interrupt queued ahead of it.
+			 */
 			next = target_vcpu;
 
 			vcpu_set_running(target_vcpu_locked, &int_ret);
