@@ -150,7 +150,7 @@ echo "Running in container: $*" 1>&2
 # Also ensure Sphinx/Myst/PlantUML plugin are present in this checkout’s Poetry venv.
 # Idempotent: if already installed, this is a quick no-op; otherwise it bootstraps once.
 # This makes 'poetry run make doc' work out of the box inside the dev container.
-CMD="export PATH=${HAFNIUM_FVP_DIR}/Base_RevC_AEMvA_pkg/models/Linux64_GCC-9.3:\$PATH && \
+CMD="export PATH=${HAFNIUM_FVP_DIR}:\$PATH && \
      source tools/shrinkwrap/shrinkwrap_setup_env.sh && \
      poetry install --with docs --no-root && \
      bash -c \"$*\""
