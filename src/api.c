@@ -2734,7 +2734,6 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 		.func = make_ffa_version(0, 0),
 	};
 	struct vm_locked current_vm_locked;
-	struct ffa_value compatibility_ret;
 	enum version_query_type query_type = (enum version_query_type)(
 		input_flags & FFA_VERSION_QUERY_TYPE_MASK);
 
@@ -2757,7 +2756,10 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 		return ret;
 	}
 
-	if (query_type == VERSION_QUERY_NEGOTIATE) {
+	if (query_type == VERSION_QUERY_NEGOTIATE ||
+	    query_type == VERSION_QUERY_COMPATIBILITY) {
+		struct ffa_value compatibility_ret;
+
 		if (!ffa_version_is_valid(requested_version)) {
 			dlog_error(
 				"FFA_VERSION: requested version %#x is invalid "
@@ -2771,18 +2773,25 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 			return compatibility_ret;
 		}
 
-		current_vm_locked = vm_lock(current->vm);
+		/*
+		 * Only set the VMs version if the negotiate query type is
+		 * given.
+		 */
+		if (query_type == VERSION_QUERY_NEGOTIATE) {
+			current_vm_locked = vm_lock(current->vm);
 
-		if (vm_ffa_in_use(current_vm_locked, current)) {
+			if (vm_ffa_in_use(current_vm_locked, current)) {
+				vm_unlock(&current_vm_locked);
+				dlog_error(
+					"FFA_VERSION: Framework in use, "
+					"returning NULL "
+					"version\n");
+				return null_version;
+			}
+
+			current_vm_locked.vm->ffa_version = requested_version;
 			vm_unlock(&current_vm_locked);
-			dlog_error(
-				"FFA_VERSION: Framework in use, returning Null "
-				"version\n");
-			return null_version;
 		}
-
-		current_vm_locked.vm->ffa_version = requested_version;
-		vm_unlock(&current_vm_locked);
 
 		return compatibility_ret;
 	}
