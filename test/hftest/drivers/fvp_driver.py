@@ -26,21 +26,15 @@ from common import (
     write_file,
     HF_PREBUILTS,
     HF_ROOT,
-    HFTEST_CTRL_FINISHED,
-    MACHINE
+    HFTEST_CTRL_FINISHED
 )
 from driver import Driver, DriverArgs, DriverRunException
 
 DTC_SCRIPT = os.path.join(HF_ROOT, "build", "image", "dtc.py")
 
-try:
-    FVP_BINARY = os.environ['HAFNIUM_FVP']
+FVP_BINARY = os.environ.get('HAFNIUM_FVP')
+if FVP_BINARY is not None:
     print(f"Setting environment FVP: {FVP_BINARY}")
-except KeyError:
-    FVP_BINARY = os.path.join(
-        os.path.dirname(HF_ROOT), "fvp", "Base_RevC_AEMvA_pkg", "models",
-        "Linux64_armv8l_GCC-9.3" if MACHINE == "aarch64" else "Linux64_GCC-9.3",
-        "FVP_Base_RevC-2xAEMvA")
 
 FVP_PREBUILTS_TFA_ROOT = os.path.join(
     HF_PREBUILTS, "linux-aarch64", "trusted-firmware-a", "fvp")
@@ -298,8 +292,15 @@ class FvpDriver(Driver, ABC):
 
         # driver_args setup
         partitions = None
+        if FVP_BINARY is None:
+            raise DriverRunException(
+                "HAFNIUM_FVP is not set.\n"
+                "Set HAFNIUM_FVP to the full path of the "
+                "FVP_Base_RevC-2xAEMvA binary before running hftest with the FVP driver."
+            )
         if not os.path.isfile(FVP_BINARY):
-            raise Exception("Cannot find FVP binary.")
+            raise DriverRunException(f"Cannot find FVP binary: {FVP_BINARY}")
+
         if options.get("partitions_json") is not None:
             partitions_dir = os.path.join(
                 options.get("out_partitions"), "obj", options.get("partitions_json"))
