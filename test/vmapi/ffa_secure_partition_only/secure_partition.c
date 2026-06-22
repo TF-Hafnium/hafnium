@@ -1176,29 +1176,29 @@ TEST(ffa_version, fails_highest_bit_set)
 }
 
 /**
- * Caller's major version is < callee's major version, so they are incompatible.
+ * Caller's major version is < callee's major version, so they are
+ * incompatible and the lowest implemented version is returned.
  */
 TEST(ffa_version, fails_major_version_too_low)
 {
-	EXPECT_EQ((enum ffa_error)ffa_version(make_ffa_version(0, 1)),
-		  FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(make_ffa_version(0, 1)), FFA_VERSION_1_0);
 }
 
 /**
- * Caller's major version is > callee's major version, so they are incompatible.
+ * Caller's major version is > callee's major version, so they are
+ * incompatible and the highest implemented version is returned.
  */
 TEST(ffa_version, fails_major_version_too_high)
 {
-	EXPECT_EQ((enum ffa_error)ffa_version(make_ffa_version(2, 0)),
-		  FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(make_ffa_version(2, 0)), FFA_VERSION_COMPILED);
 }
 
 /**
  * Major versions are equal, but caller's minor version is > callee's minor
- * version, so they are incompatible.
+ * version, so they are incompatible and the highest implemented version is
+ * returned.
  */
 TEST(ffa_version, fails_minor_version_too_high)
 {
-	EXPECT_EQ((enum ffa_error)ffa_version(FFA_VERSION_COMPILED + 1),
-		  FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED + 1), FFA_VERSION_COMPILED);
 }

@@ -186,12 +186,11 @@ TEST(ffa, ffa_version)
 	EXPECT_EQ(ffa_version(current_version), current_version);
 	EXPECT_EQ(ffa_version(older_compatible_version_0), current_version);
 	EXPECT_EQ(ffa_version(older_compatible_version_1), current_version);
-	EXPECT_EQ((enum ffa_error)ffa_version(0x0), FFA_NOT_SUPPORTED);
-	EXPECT_EQ((enum ffa_error)ffa_version(0x1), FFA_NOT_SUPPORTED);
-	EXPECT_EQ((enum ffa_error)ffa_version(FFA_VERSION_COMPILED + 1),
-		  FFA_NOT_SUPPORTED);
-	EXPECT_EQ((enum ffa_error)ffa_version(0xffff), FFA_NOT_SUPPORTED);
-	EXPECT_EQ((enum ffa_error)ffa_version(0xfffffff), FFA_NOT_SUPPORTED);
+	EXPECT_EQ(ffa_version(0x0), FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(0x1), FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED + 1), FFA_VERSION_COMPILED);
+	EXPECT_EQ(ffa_version(0xffff), FFA_VERSION_1_0);
+	EXPECT_EQ(ffa_version(0xfffffff), FFA_VERSION_COMPILED);
 }
 
 /** Ensures that an invalid call to FFA_VERSION gets an error back. */

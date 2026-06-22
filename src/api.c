@@ -2644,13 +2644,58 @@ uint32_t api_interrupt_get(struct vcpu_locked current_locked)
 }
 
 /**
+ * Check whether the requested version is compatible with the SPMC version.
+ * If compatible, return true and set ret to the SPMC version. Otherwise,
+ * return false and set ret to the closest version implemented by the SPMC.
+ */
+static bool ffa_version_get_compatibility_response(
+	enum ffa_version requested_version, struct ffa_value *ret)
+{
+	uint16_t compiled_major = ffa_version_get_major(FFA_VERSION_COMPILED);
+	uint16_t compiled_minor = ffa_version_get_minor(FFA_VERSION_COMPILED);
+	uint16_t requested_major = ffa_version_get_major(requested_version);
+	uint16_t requested_minor = ffa_version_get_minor(requested_version);
+
+	if (!ffa_versions_are_compatible(requested_version,
+					 FFA_VERSION_COMPILED)) {
+		dlog_error(
+			"FFA_VERSION: requested version v%u.%u is not "
+			"compatible with compiled version v%u.%u\n",
+			requested_major, requested_minor, compiled_major,
+			compiled_minor);
+		if (requested_major < ffa_version_get_major(FFA_VERSION_1_0)) {
+			/*
+			 * Per rule R0238 in DEN0077A FF-A v1.3 ALP5, if the
+			 * SPMC only implements a version higher than the
+			 * requested version, return the lowest incompatible
+			 * version.
+			 */
+			*ret = (struct ffa_value){.func = FFA_VERSION_1_0};
+		} else {
+			/*
+			 * Per rule R0238 in DEN0077A FF-A v1.3 ALP5, if the
+			 * SPMC only implements a version lower than the
+			 * requested version, return the highest incompatible
+			 * version.
+			 */
+			*ret = (struct ffa_value){.func = FFA_VERSION_COMPILED};
+		}
+
+		return false;
+	}
+
+	*ret = (struct ffa_value){.func = FFA_VERSION_COMPILED};
+	return true;
+}
+
+/**
  * Negotiate the FF-A version to be used for this FF-A instance.
  *
  * Returns Hafnium's version number (`FFA_VERSION_COMPILED`) on success.
- * Returns `SMCCC_INVALID_PARAMETER` if the version is invalid (highest bit
- * set). Returns `SMCCC_NOT_SUPPORTED` if:
- * - The requested version is incompatible.
- * - The version has already been negotiated and cannot be changed.
+ * Returns the closest implemented version if the requested version is
+ * incompatible. Returns `SMCCC_INVALID_PARAMETER` if the version is invalid
+ * (highest bit set). Returns `SMCCC_NOT_SUPPORTED` if the version has already
+ * been negotiated and cannot be changed.
  */
 struct ffa_value api_ffa_version(struct vcpu *current,
 				 enum ffa_version requested_version)
@@ -2663,9 +2708,7 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 		.func = SMCCC_INVALID_PARAMETER,
 	};
 	struct vm_locked current_vm_locked;
-
-	uint16_t compiled_major = ffa_version_get_major(FFA_VERSION_COMPILED);
-	uint16_t compiled_minor = ffa_version_get_minor(FFA_VERSION_COMPILED);
+	struct ffa_value compatibility_ret;
 	uint16_t requested_major;
 	uint16_t requested_minor;
 	uint16_t vm_major;
@@ -2679,18 +2722,13 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 		return invalid_parameter;
 	}
 
+	if (!ffa_version_get_compatibility_response(requested_version,
+						    &compatibility_ret)) {
+		return compatibility_ret;
+	}
+
 	requested_major = ffa_version_get_major(requested_version);
 	requested_minor = ffa_version_get_minor(requested_version);
-
-	if (!ffa_versions_are_compatible(requested_version,
-					 FFA_VERSION_COMPILED)) {
-		dlog_error(
-			"FFA_VERSION: requested version v%u.%u is not "
-			"compatible with compiled version v%u.%u\n",
-			requested_major, requested_minor, compiled_major,
-			compiled_minor);
-		return error;
-	}
 
 	current_vm_locked = vm_lock(current->vm);
 	vm_major = ffa_version_get_major(current_vm_locked.vm->ffa_version);
@@ -2709,7 +2747,7 @@ struct ffa_value api_ffa_version(struct vcpu *current,
 	current_vm_locked.vm->ffa_version = requested_version;
 	vm_unlock(&current_vm_locked);
 
-	return (struct ffa_value){.func = FFA_VERSION_COMPILED};
+	return compatibility_ret;
 }
 
 /**
