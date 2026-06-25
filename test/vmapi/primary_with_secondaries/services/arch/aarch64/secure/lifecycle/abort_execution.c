@@ -359,8 +359,8 @@ TEST_SERVICE(ffa_memory_retrieve_permission_fault)
  */
 TEST_SERVICE(ffa_lend_memory_to_companion_sp_and_abort)
 {
-	void *send_buf = SERVICE_SEND_BUFFER();
-	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *recv_buf = mb.recv;
 	ffa_id_t companion_id;
 	struct ffa_value ret;
 	struct ffa_memory_region_constituent constituents[] = {
@@ -379,7 +379,7 @@ TEST_SERVICE(ffa_lend_memory_to_companion_sp_and_abort)
 
 	/* Lend a page to the companion and request it to retrieve. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), companion_id,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), companion_id,
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,

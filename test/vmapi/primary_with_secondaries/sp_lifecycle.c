@@ -601,7 +601,7 @@ void base_sp_aborts_mem_lend_transaction(
 
 	/* Lend the memory initially. */
 	handle = send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), target_sp_info->vm_id,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), target_sp_info->vm_id,
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
@@ -623,7 +623,7 @@ void base_sp_aborts_mem_lend_transaction(
 
 	/* Share the memory with a different SP after it has been returned. */
 	handle = send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), companion_info->vm_id,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), companion_info->vm_id,
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
@@ -680,7 +680,7 @@ TEST(sp_lifecycle, sel1_sp_reports_permission_fault)
 	memset_s(pages, sizeof(pages), 'b', PAGE_SIZE);
 
 	send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, mb.send, hf_vm_get_id(), target_sp_info->vm_id,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), target_sp_info->vm_id,
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RO, FFA_DATA_ACCESS_RO,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,

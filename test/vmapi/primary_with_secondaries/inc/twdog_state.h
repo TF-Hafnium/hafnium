@@ -19,4 +19,4 @@ void hftest_twdog_state_page_setup(void *recv_buf, void *send_buf);
 void hftest_twdog_state_share_page_and_init(uint64_t page,
 					    ffa_id_t receivers_ids[],
 					    size_t receivers_count,
-					    void *send_buf);
+					    struct mailbox_buffers *mb);

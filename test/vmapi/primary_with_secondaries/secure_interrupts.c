@@ -161,7 +161,7 @@ TEST(secure_interrupts, sp_to_sp_yield_interrupt_queued)
 	 * the state.
 	 */
 	hftest_twdog_state_share_page_and_init((uint64_t)interrupt_state_page,
-					       memory_receivers, 2, mb.send);
+					       memory_receivers, 2, &mb);
 
 	ret = ffa_run(companion_info->vm_id, 0);
 	EXPECT_EQ(ret.func, FFA_MSG_WAIT_32);
@@ -331,8 +331,8 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu, service1_is_mp_sp)
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
@@ -396,8 +396,8 @@ TEST_PRECONDITION(ipi, receive_ipi_running_vcpu_with_secure_interrupts,
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 
@@ -499,8 +499,8 @@ static void ipi_nwd_waiting_test(
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, vcpu_id);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		vcpu_id);
 
 	EXPECT_EQ(ffa_run(service_id, vcpu_id).func, FFA_MSG_WAIT_32);
 
@@ -745,8 +745,8 @@ TEST_PRECONDITION(ipi, receive_ipi_waiting_vcpu_in_swd, service1_is_mp_sp)
 
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	/* Run the services so they can enter the waiting state. */
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
@@ -841,8 +841,8 @@ TEST_PRECONDITION(ipi, receive_ipi_preempted_vcpu, service1_is_mp_sp)
 	/* Setting buffer to control the IPI state. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	/* Run the service so it can enter the blocked state. */
 	ret = ffa_run(service1_info->vm_id, 0);
@@ -925,8 +925,8 @@ TEST_PRECONDITION(ipi, receive_ipi_blocked_vcpu, service1_is_mp_sp)
 	/* Setting buffer to control the IPI state. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	/* Run the service so it can enter the blocked state. */
 	ret = ffa_run(service1_info->vm_id, 0);
@@ -1033,8 +1033,8 @@ TEST_PRECONDITION(ipi, receive_ipi_multiple_services_to_same_cpu_waiting,
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	/* Run the services so they enter the waiting state. */
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
@@ -1191,8 +1191,8 @@ TEST_PRECONDITION(ipi, receive_ipi_multiple_services_to_same_cpu_running,
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_YIELD_32);
 	/* Run the services so they enter the waiting state. */
@@ -1274,8 +1274,8 @@ TEST_PRECONDITION(ipi, receive_ipi_one_service_to_two_vcpus, service1_is_mp_sp)
 	/* Share memory to setup the IPI state structure. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	EXPECT_EQ(ffa_run(service1_info->vm_id, 0).func, FFA_MSG_WAIT_32);
 
@@ -1380,8 +1380,8 @@ TEST_PRECONDITION(secure_interrupts, sri_triggered_due_to_secure_interrupt,
 	/* Share the interrupt state with both services. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	/* Resume Service2 so it can prepare itself to handle the ESPI. */
 	ret = ffa_run(service2_info->vm_id, 0);
@@ -1517,8 +1517,8 @@ TEST_PRECONDITION(secure_interrupts,
 	/* Share the interrupt state with both. */
 	hftest_ipi_state_share_page_and_init(
 		(uint64_t)interrupt_state_page, memory_receivers,
-		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers),
-		mb.send, 0);
+		receivers_ipi_state_indexes, ARRAY_SIZE(memory_receivers), &mb,
+		0);
 
 	/* FFA_RUN service3 ready for eSPI triggering. */
 	ret = ffa_run(service3_info->vm_id, 0);

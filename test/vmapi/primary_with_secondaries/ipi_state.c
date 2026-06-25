@@ -126,7 +126,7 @@ void hftest_ipi_init_state_from_message(void *recv_buf, void *send_buf)
 ffa_memory_handle_t hftest_ipi_state_share_page_and_init(
 	uint64_t page, ffa_id_t receivers_ids[],
 	uint32_t receivers_ipi_state_indexes[], size_t receivers_count,
-	void *send_buf, uint32_t vcpu_id)
+	struct mailbox_buffers *mb, uint32_t vcpu_id)
 {
 	struct ffa_value ret;
 	ffa_memory_handle_t handle;
@@ -136,7 +136,7 @@ ffa_memory_handle_t hftest_ipi_state_share_page_and_init(
 	}
 
 	handle = share_page_with_endpoints(page, receivers_ids, receivers_count,
-					   send_buf);
+					   mb);
 
 	/* Initialize the state machine to the top of the page. */
 	hftest_ipi_init_state_through_ptr((uintptr_t)page);
@@ -154,7 +154,7 @@ ffa_memory_handle_t hftest_ipi_state_share_page_and_init(
 		 * use for test coordination.
 		 */
 		ret = send_indirect_message(
-			hf_vm_get_id(), receivers_ids[i], send_buf,
+			hf_vm_get_id(), receivers_ids[i], mb->send,
 			&receivers_ipi_state_indexes[i],
 			sizeof(receivers_ipi_state_indexes[0]), 0);
 

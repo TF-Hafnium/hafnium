@@ -63,15 +63,19 @@
 struct mailbox_buffers {
 	void *send;
 	void *recv;
+	/** Size of the send/recv buffers in bytes (per direction). */
+	size_t buf_size;
 };
 
 struct mailbox_buffers set_up_mailbox(void);
+struct mailbox_buffers set_up_mailbox_pages(uint32_t page_count);
+struct mailbox_buffers get_service_mailbox(void);
 void mailbox_unmap_buffers(struct mailbox_buffers *mb);
 void mailbox_receive_retry(void *payload, size_t payload_size,
 			   const void *recv_buf,
 			   struct ffa_partition_rxtx_header *header);
 ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
-	uint32_t share_func, void *tx_buffer, ffa_id_t sender,
+	uint32_t share_func, struct mailbox_buffers *mb, ffa_id_t sender,
 	struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, struct ffa_memory_access receivers_send[],
 	uint32_t receivers_send_count,
@@ -83,7 +87,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	enum ffa_memory_cacheability send_cacheability,
 	enum ffa_memory_cacheability receive_cacheability);
 ffa_memory_handle_t send_memory_and_retrieve_request(
-	uint32_t share_func, void *tx_buffer, ffa_id_t sender,
+	uint32_t share_func, struct mailbox_buffers *mb, ffa_id_t sender,
 	ffa_id_t recipient, struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, ffa_memory_region_flags_t send_flags,
 	ffa_memory_region_flags_t retrieve_flags,
@@ -118,7 +122,7 @@ void send_retrieve_request(
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability, ffa_id_t recipient);
 void send_fragmented_memory_region(
-	struct ffa_value *send_ret, void *tx_buffer,
+	struct ffa_value *send_ret, struct mailbox_buffers *mb,
 	struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t remaining_constituent_count,
 	uint32_t sent_length, uint32_t total_length,
@@ -185,7 +189,7 @@ uint64_t get_shared_page_from_message(void *recv_buf, void *send_buf,
 ffa_memory_handle_t share_page_with_endpoints(uint64_t page,
 					      ffa_id_t receivers_ids[],
 					      size_t receivers_count,
-					      void *send_buf);
+					      struct mailbox_buffers *mb);
 
 void partition_info_convert_to_v1_1_format(
 	const struct ffa_partition_info *incoming,

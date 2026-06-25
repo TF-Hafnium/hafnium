@@ -205,14 +205,14 @@ TEST_SERVICE(memory_increment_check_mem_attr)
 
 TEST_SERVICE(give_memory_and_fault)
 {
-	void *send_buf = SERVICE_SEND_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)&page, .page_count = 1},
 	};
 
 	/* Give memory to the primary. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
+		FFA_MEM_DONATE_32, &mb, hf_vm_get_id(), HF_PRIMARY_VM_ID,
 		constituents, ARRAY_SIZE(constituents),
 		FFA_MEMORY_REGION_FLAG_CLEAR, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
@@ -232,14 +232,14 @@ TEST_SERVICE(give_memory_and_fault)
 
 TEST_SERVICE(lend_memory_and_fault)
 {
-	void *send_buf = SERVICE_SEND_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)&page, .page_count = 1},
 	};
 
 	/* Lend memory to the primary. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), HF_PRIMARY_VM_ID,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), HF_PRIMARY_VM_ID,
 		constituents, ARRAY_SIZE(constituents),
 		FFA_MEMORY_REGION_FLAG_CLEAR, 0, FFA_DATA_ACCESS_RW,
 		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
@@ -264,8 +264,8 @@ TEST_SERVICE(lend_memory_and_fault)
 TEST_SERVICE(ffa_lend_device_memory_secondary_and_fault)
 {
 	volatile uint8_t *ptr;
-	void *send_buf = SERVICE_SEND_BUFFER();
-	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *recv_buf = mb.recv;
 	struct ffa_partition_info *service2_info = service2(recv_buf);
 	struct hftest_context *ctx = hftest_get_context();
 	uintptr_t device_mem_base_addr =
@@ -286,7 +286,7 @@ TEST_SERVICE(ffa_lend_device_memory_secondary_and_fault)
 
 	/* Lend memory to Service2 SP. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), service2_info->vm_id,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), service2_info->vm_id,
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
@@ -308,8 +308,8 @@ TEST_SERVICE(ffa_lend_device_memory_secondary_and_fault)
  */
 TEST_SERVICE(ffa_lend_normal_memory_as_device_secondary_and_fault)
 {
-	void *send_buf = SERVICE_SEND_BUFFER();
-	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *recv_buf = mb.recv;
 	struct ffa_partition_info *service2_info = service2(recv_buf);
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)&page, .page_count = 1},
@@ -322,7 +322,7 @@ TEST_SERVICE(ffa_lend_normal_memory_as_device_secondary_and_fault)
 
 	/* Lend memory to Service2 SP. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), service2_info->vm_id,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), service2_info->vm_id,
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
@@ -404,8 +404,8 @@ TEST_SERVICE(ffa_memory_lend_relinquish_device)
  */
 TEST_SERVICE(ffa_lend_device_memory_to_sp_as_normal)
 {
-	void *send_buf = SERVICE_SEND_BUFFER();
-	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *recv_buf = mb.recv;
 	struct ffa_partition_info *service2_info = service2(recv_buf);
 	struct hftest_context *ctx = hftest_get_context();
 	uintptr_t device_mem_base_addr =
@@ -419,7 +419,7 @@ TEST_SERVICE(ffa_lend_device_memory_to_sp_as_normal)
 	 * request set to Normal memory. This should fail.
 	 */
 	send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), service2_info->vm_id,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), service2_info->vm_id,
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
@@ -438,8 +438,8 @@ TEST_SERVICE(ffa_lend_device_memory_to_sp_as_normal)
 TEST_SERVICE(ffa_lend_device_memory_to_sp_and_reclaim)
 {
 	volatile uint8_t *ptr;
-	void *send_buf = SERVICE_SEND_BUFFER();
-	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *recv_buf = mb.recv;
 	struct ffa_partition_info *service2_info = service2(recv_buf);
 	struct hftest_context *ctx = hftest_get_context();
 	uintptr_t device_mem_base_addr =
@@ -462,7 +462,7 @@ TEST_SERVICE(ffa_lend_device_memory_to_sp_and_reclaim)
 
 	/* Lend memory to next VM. */
 	handle = send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), service2_info->vm_id,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), service2_info->vm_id,
 		constituents, ARRAY_SIZE(constituents), 0, 0,
 		FFA_DATA_ACCESS_RW, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
@@ -559,8 +559,9 @@ TEST_SERVICE(ffa_memory_return)
 {
 	uint8_t *ptr;
 	size_t i;
-	void *recv_buf = SERVICE_RECV_BUFFER();
-	void *send_buf = SERVICE_SEND_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *send_buf = mb.send;
+	void *recv_buf = mb.recv;
 	ffa_id_t target_id;
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
@@ -594,7 +595,7 @@ TEST_SERVICE(ffa_memory_return)
 
 	/* Give the memory back and notify the target_id. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), target_id,
+		FFA_MEM_DONATE_32, &mb, hf_vm_get_id(), target_id,
 		composite->constituents, composite->constituent_count, 0, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
@@ -693,8 +694,8 @@ TEST_SERVICE(ffa_check_lower_bound)
 TEST_SERVICE(ffa_donate_secondary_and_fault)
 {
 	uint8_t *ptr;
-	void *send_buf = SERVICE_SEND_BUFFER();
-	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *recv_buf = mb.recv;
 	struct ffa_partition_info *service2_info = service2(recv_buf);
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)&page, .page_count = 1},
@@ -707,9 +708,9 @@ TEST_SERVICE(ffa_donate_secondary_and_fault)
 
 	/* Donate memory to next VM. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(),
-		service2_info->vm_id, constituents, ARRAY_SIZE(constituents), 0,
-		0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
+		FFA_MEM_DONATE_32, &mb, hf_vm_get_id(), service2_info->vm_id,
+		constituents, ARRAY_SIZE(constituents), 0, 0,
+		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
 		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
@@ -728,8 +729,9 @@ TEST_SERVICE(ffa_donate_secondary_and_fault)
 TEST_SERVICE(ffa_donate_twice)
 {
 	uint32_t msg_size;
-	void *recv_buf = SERVICE_RECV_BUFFER();
-	void *send_buf = SERVICE_SEND_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *recv_buf = mb.recv;
+	void *send_buf = mb.send;
 
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
@@ -754,12 +756,11 @@ TEST_SERVICE(ffa_donate_twice)
 	ffa_yield();
 
 	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), target_id,
-		&constituent, 1, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED,
-		FFA_DATA_ACCESS_RW, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,
-		FFA_INSTRUCTION_ACCESS_NX, FFA_MEMORY_NOT_SPECIFIED_MEM,
-		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
-		FFA_MEMORY_CACHE_WRITE_BACK);
+		FFA_MEM_DONATE_32, &mb, hf_vm_get_id(), target_id, &constituent,
+		1, 0, 0, FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
+		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_NX,
+		FFA_MEMORY_NOT_SPECIFIED_MEM, FFA_MEMORY_NORMAL_MEM,
+		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_CACHE_WRITE_BACK);
 
 	ffa_yield();
 
@@ -899,8 +900,9 @@ TEST_SERVICE(ffa_memory_receive_relinquish_two_pages)
 TEST_SERVICE(ffa_donate_invalid_source)
 {
 	uint32_t msg_size;
-	void *recv_buf = SERVICE_RECV_BUFFER();
-	void *send_buf = SERVICE_SEND_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *recv_buf = mb.recv;
+	void *send_buf = mb.send;
 
 	struct ffa_memory_region *memory_region =
 		(struct ffa_memory_region *)retrieve_buffer;
@@ -911,7 +913,7 @@ TEST_SERVICE(ffa_donate_invalid_source)
 
 	/* Give the memory back and notify the sender. */
 	send_memory_and_retrieve_request(
-		FFA_MEM_DONATE_32, send_buf, hf_vm_get_id(), sender,
+		FFA_MEM_DONATE_32, &mb, hf_vm_get_id(), sender,
 		composite->constituents, composite->constituent_count, 0, 0,
 		FFA_DATA_ACCESS_NOT_SPECIFIED, FFA_DATA_ACCESS_RW,
 		FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED, FFA_INSTRUCTION_ACCESS_X,
@@ -1579,8 +1581,8 @@ TEST_SERVICE(ffa_memory_fail_clear_ro_memory_on_lend_or_donate)
  */
 TEST_SERVICE(ffa_memory_fail_clear_ro_memory_on_retrieve)
 {
-	void *send_buf = SERVICE_SEND_BUFFER();
-	void *recv_buf = SERVICE_RECV_BUFFER();
+	struct mailbox_buffers mb = get_service_mailbox();
+	void *recv_buf = mb.recv;
 	struct ffa_partition_info *service2_info = service2(recv_buf);
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = (uint64_t)0x7200000, .page_count = 1},
@@ -1591,7 +1593,7 @@ TEST_SERVICE(ffa_memory_fail_clear_ro_memory_on_retrieve)
 	 * retrieve request for RO memory, FFA_DENIED is returned.
 	 */
 	send_memory_and_retrieve_request(
-		FFA_MEM_LEND_32, send_buf, hf_vm_get_id(), service2_info->vm_id,
+		FFA_MEM_LEND_32, &mb, hf_vm_get_id(), service2_info->vm_id,
 		constituents, ARRAY_SIZE(constituents), 0,
 		FFA_MEMORY_REGION_FLAG_CLEAR_RELINQUISH, FFA_DATA_ACCESS_RO,
 		FFA_DATA_ACCESS_RO, FFA_INSTRUCTION_ACCESS_NOT_SPECIFIED,

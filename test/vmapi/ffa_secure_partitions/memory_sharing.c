@@ -205,7 +205,7 @@ TEST(memory_sharing_v1_0, force_fragmented_ffa_v1_0)
 	allocator = FFA_MEMORY_HANDLE_ALLOCATOR_SPMC;
 
 	send_fragmented_memory_region(
-		&ret, mb.send, constituents, ARRAY_SIZE(constituents),
+		&ret, &mb, constituents, ARRAY_SIZE(constituents),
 		remaining_constituent_count, fragment_length, total_length,
 		&handle, allocator);
 

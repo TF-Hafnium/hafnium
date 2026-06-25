@@ -19,23 +19,59 @@
 #include "test/hftest.h"
 #include "test/vmapi/ffa.h"
 
-static alignas(PAGE_SIZE) uint8_t send_page[PAGE_SIZE];
-static alignas(PAGE_SIZE) uint8_t recv_page[PAGE_SIZE];
-static_assert(sizeof(send_page) == PAGE_SIZE, "Send page is not a page.");
-static_assert(sizeof(recv_page) == PAGE_SIZE, "Recv page is not a page.");
+/*
+ * Buffers large enough to register the maximum RX/TX mailbox the build
+ * supports. The single-page helper uses the first page; the multi-page
+ * helper registers up to the whole buffer. Sized to
+ * FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT so the same storage works for any
+ * RXTX_MAX_PAGE_COUNT configuration (1 page in the default build).
+ */
+static alignas(PAGE_SIZE)
+	uint8_t send_page[PAGE_SIZE * FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT];
+static alignas(PAGE_SIZE)
+	uint8_t recv_page[PAGE_SIZE * FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT];
 
 static hf_ipaddr_t send_page_addr = (hf_ipaddr_t)send_page;
 static hf_ipaddr_t recv_page_addr = (hf_ipaddr_t)recv_page;
 
 #define MAX_INFO_REGS_ENTRIES_PER_CALL 2
 
-struct mailbox_buffers set_up_mailbox(void)
+/*
+ * Register an RX/TX mailbox of the given size, in FF-A pages. page_count
+ * must be in the range 1..FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT. Lets a test
+ * register a multi-page mailbox so heterogeneous endpoints can coexist in
+ * the same SPMC instance.
+ */
+struct mailbox_buffers set_up_mailbox_pages(uint32_t page_count)
 {
-	ASSERT_EQ(ffa_rxtx_map(send_page_addr, recv_page_addr).func,
+	ASSERT_TRUE(page_count >= 1 &&
+		    page_count <= FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT);
+	ASSERT_EQ(ffa_rxtx_map_pages(send_page_addr, recv_page_addr, page_count)
+			  .func,
 		  FFA_SUCCESS_32);
 	return (struct mailbox_buffers){
 		.send = send_page,
 		.recv = recv_page,
+		.buf_size = (size_t)page_count * FFA_PAGE_SIZE,
+	};
+}
+
+struct mailbox_buffers set_up_mailbox(void)
+{
+	return set_up_mailbox_pages(1);
+}
+
+/*
+ * Wrap the mailbox a service already registered at boot (always one FF-A
+ * page) without re-registering it: `ffa_rxtx_map` fails if called again for
+ * an endpoint that already has a mailbox set up.
+ */
+struct mailbox_buffers get_service_mailbox(void)
+{
+	return (struct mailbox_buffers){
+		.send = SERVICE_SEND_BUFFER(),
+		.recv = SERVICE_RECV_BUFFER(),
+		.buf_size = FFA_PAGE_SIZE,
 	};
 }
 
@@ -101,7 +137,7 @@ void mailbox_receive_retry(void *payload, size_t payload_size,
 }
 
 void send_fragmented_memory_region(
-	struct ffa_value *send_ret, void *tx_buffer,
+	struct ffa_value *send_ret, struct mailbox_buffers *mb,
 	struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, uint32_t remaining_constituent_count,
 	uint32_t sent_length, uint32_t total_length,
@@ -124,7 +160,7 @@ void send_fragmented_memory_region(
 		EXPECT_EQ(send_ret->arg3, sent_length);
 
 		remaining_constituent_count = ffa_memory_fragment_init(
-			tx_buffer, HF_MAILBOX_SIZE,
+			mb->send, mb->buf_size,
 			constituents + constituent_count -
 				remaining_constituent_count,
 			remaining_constituent_count, &fragment_length);
@@ -143,7 +179,7 @@ void send_fragmented_memory_region(
 }
 
 ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
-	uint32_t share_func, void *tx_buffer, ffa_id_t sender,
+	uint32_t share_func, struct mailbox_buffers *mb, ffa_id_t sender,
 	struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, struct ffa_memory_access receivers_send[],
 	uint32_t receivers_send_count,
@@ -155,6 +191,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 	enum ffa_memory_cacheability send_cacheability,
 	enum ffa_memory_cacheability receive_cacheability)
 {
+	void *tx_buffer = mb->send;
 	uint32_t total_length;
 	uint32_t fragment_length;
 	uint32_t msg_size;
@@ -168,7 +205,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 
 	/* Send the first fragment of the memory. */
 	remaining_constituent_count = ffa_memory_region_init(
-		tx_buffer, HF_MAILBOX_SIZE, sender, receivers_send,
+		tx_buffer, mb->buf_size, sender, receivers_send,
 		receivers_send_count, sizeof(struct ffa_memory_access),
 		constituents, constituent_count, 0, send_flags,
 		send_memory_type, send_cacheability, FFA_MEMORY_INNER_SHAREABLE,
@@ -212,10 +249,10 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 			    ? FFA_MEMORY_HANDLE_ALLOCATOR_SPMC
 			    : FFA_MEMORY_HANDLE_ALLOCATOR_HYPERVISOR;
 
-	send_fragmented_memory_region(
-		&ret, tx_buffer, constituents, constituent_count,
-		remaining_constituent_count, fragment_length, total_length,
-		&handle, allocator);
+	send_fragmented_memory_region(&ret, mb, constituents, constituent_count,
+				      remaining_constituent_count,
+				      fragment_length, total_length, &handle,
+				      allocator);
 
 	msg_size = ffa_memory_retrieve_request_init(
 		(struct ffa_memory_region *)retrieve_message->payload, handle,
@@ -236,7 +273,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
 		 * Send the appropriate retrieve request to the VM so that it
 		 * can use it to retrieve the memory.
 		 */
-		EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
+		EXPECT_LE(msg_size, mb->buf_size);
 		ffa_rxtx_header_init(&retrieve_message->header, sender,
 				     receiver->receiver, msg_size);
 		ASSERT_EQ(ffa_msg_send2(0).func, FFA_SUCCESS_32);
@@ -250,7 +287,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request_multi_receiver(
  * request it needs to retrieve it.
  */
 ffa_memory_handle_t send_memory_and_retrieve_request(
-	uint32_t share_func, void *tx_buffer, ffa_id_t sender,
+	uint32_t share_func, struct mailbox_buffers *mb, ffa_id_t sender,
 	ffa_id_t recipient, struct ffa_memory_region_constituent constituents[],
 	uint32_t constituent_count, ffa_memory_region_flags_t send_flags,
 	ffa_memory_region_flags_t retrieve_flags,
@@ -281,7 +318,7 @@ ffa_memory_handle_t send_memory_and_retrieve_request(
 			       retrieve_instruction_access, 0, &impdef_val);
 
 	return send_memory_and_retrieve_request_multi_receiver(
-		share_func, tx_buffer, sender, constituents, constituent_count,
+		share_func, mb, sender, constituents, constituent_count,
 		&receiver_send_permissions, 1, &receiver_retrieve_permissions,
 		1, send_flags, retrieve_flags, send_memory_type,
 		receive_memory_type, send_cacheability, receive_cacheability);
@@ -1029,7 +1066,7 @@ uint64_t get_shared_page_from_message(void *recv_buf, void *send_buf,
 ffa_memory_handle_t share_page_with_endpoints(uint64_t page,
 					      ffa_id_t receivers_ids[],
 					      size_t receivers_count,
-					      void *send_buf)
+					      struct mailbox_buffers *mb)
 {
 	struct ffa_memory_region_constituent constituents[] = {
 		{.address = page, .page_count = 1},
@@ -1047,7 +1084,7 @@ ffa_memory_handle_t share_page_with_endpoints(uint64_t page,
 	}
 
 	return send_memory_and_retrieve_request_multi_receiver(
-		FFA_MEM_SHARE_32, send_buf, HF_PRIMARY_VM_ID, constituents,
+		FFA_MEM_SHARE_32, mb, HF_PRIMARY_VM_ID, constituents,
 		ARRAY_SIZE(constituents), receivers, receivers_count, receivers,
 		receivers_count, 0, 0, FFA_MEMORY_NORMAL_MEM,
 		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,

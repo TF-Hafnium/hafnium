@@ -131,9 +131,19 @@ SERVICE_SET_UP(ffa_mem_perm_get)
 
 	const uint32_t num_pages = range_page_count(data_begin, data_end);
 	uintvaddr_t base_va = (uintvaddr_t)align_down(data_begin, PAGE_SIZE);
-	volatile uint8_t *rx_start = NULL;
-	volatile uint8_t *tx_start = NULL;
-	volatile uint8_t *rx_end = NULL;
+	/*
+	 * The RX/TX buffers are not necessarily adjacent: the underlying
+	 * storage is sized for the largest mailbox the build supports
+	 * (FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT pages each), but only the first
+	 * page of each is actually registered as the buffer, so there may be
+	 * unrelated RW filler pages of .data in between. Use the addresses
+	 * the service actually registered instead of inferring them from
+	 * scanning for the lone RO page.
+	 */
+	volatile uint8_t *rx_start = (volatile uint8_t *)SERVICE_RECV_BUFFER();
+	volatile uint8_t *rx_end = rx_start + PAGE_SIZE;
+	volatile uint8_t *tx_start = (volatile uint8_t *)SERVICE_SEND_BUFFER();
+	volatile uint8_t *tx_end = tx_start + PAGE_SIZE;
 
 	print_range("text", text_begin, text_end);
 	print_range("rodata", rodata_begin, rodata_end);
@@ -149,11 +159,7 @@ SERVICE_SET_UP(ffa_mem_perm_get)
 			 * marked as RO.
 			 */
 			num_ro_pages_in_data++;
-
-			/* NOLINTNEXTLINE(performance-no-int-to-ptr)*/
-			rx_start = (volatile uint8_t *)base_va;
-			rx_end = rx_start + PAGE_SIZE;
-			tx_start = rx_start - PAGE_SIZE;
+			EXPECT_EQ(base_va, (uintvaddr_t)rx_start);
 		} else {
 			EXPECT_EQ(res.arg2, FFA_MEM_PERM_RW);
 		}
@@ -170,15 +176,40 @@ SERVICE_SET_UP(ffa_mem_perm_get)
 	test_perm_get_range(rodata_begin, image_end, rodata_end,
 			    FFA_MEM_PERM_RO);
 
-	test_perm_get_range(data_begin, image_end, tx_start, FFA_MEM_PERM_RW);
 	/*
-	 * The TX page has the same permissions as the rest of data, but
-	 * different mode, so `mm_get_mode_partial` will treat them as
-	 * different.
+	 * Walk the data section in the order the TX and RX buffers actually
+	 * fall, rather than assuming TX is the page immediately before RX:
+	 * whichever buffer has the lower address may be followed by filler
+	 * pages of ordinary RW .data before the next buffer/section begins.
 	 */
-	test_perm_get_range(tx_start, image_end, rx_start, FFA_MEM_PERM_RW);
-	test_perm_get_range(rx_start, image_end, rx_end, FFA_MEM_PERM_RO);
-	test_perm_get_range(rx_end, image_end, data_end, FFA_MEM_PERM_RW);
+	if (tx_start <= rx_start) {
+		test_perm_get_range(data_begin, image_end, tx_start,
+				    FFA_MEM_PERM_RW);
+		/*
+		 * The TX page has the same permissions as the rest of data,
+		 * but different mode, so `mm_get_mode_partial` will treat
+		 * them as different.
+		 */
+		test_perm_get_range(tx_start, image_end, tx_end,
+				    FFA_MEM_PERM_RW);
+		test_perm_get_range(tx_end, image_end, rx_start,
+				    FFA_MEM_PERM_RW);
+		test_perm_get_range(rx_start, image_end, rx_end,
+				    FFA_MEM_PERM_RO);
+		test_perm_get_range(rx_end, image_end, data_end,
+				    FFA_MEM_PERM_RW);
+	} else {
+		test_perm_get_range(data_begin, image_end, rx_start,
+				    FFA_MEM_PERM_RW);
+		test_perm_get_range(rx_start, image_end, rx_end,
+				    FFA_MEM_PERM_RO);
+		test_perm_get_range(rx_end, image_end, tx_start,
+				    FFA_MEM_PERM_RW);
+		test_perm_get_range(tx_start, image_end, tx_end,
+				    FFA_MEM_PERM_RW);
+		test_perm_get_range(tx_end, image_end, data_end,
+				    FFA_MEM_PERM_RW);
+	}
 
 	test_perm_get_range(stacks_begin, image_end, stacks_end,
 			    FFA_MEM_PERM_RW);
