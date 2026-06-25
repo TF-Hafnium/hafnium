@@ -277,6 +277,18 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 		res = sp_echo_cmd(ffa_sender(res), res.arg3, res.arg4, res.arg5,
 				  res.arg6, res.arg7);
 		break;
+	case SP_REMAP_MAILBOX_CMD:
+		res = sp_remap_mailbox_cmd(ffa_sender(res), res.arg4);
+		break;
+	case SP_CHECK_PARTITION_INFO_RX_CMD:
+		res = sp_check_partition_info_rx_cmd(ffa_sender(res));
+		break;
+	case SP_FFA_MEM_LEND_RETRIEVE_CMD: {
+		ffa_memory_handle_t handle =
+			ffa_assemble_handle(res.arg4, res.arg5);
+		res = sp_ffa_mem_lend_retrieve_cmd(ffa_sender(res), handle);
+		break;
+	}
 	case SP_REQ_ECHO_CMD:
 		res = sp_req_echo_cmd(ffa_sender(res), res.arg4, res.arg5,
 				      res.arg6, res.arg7);

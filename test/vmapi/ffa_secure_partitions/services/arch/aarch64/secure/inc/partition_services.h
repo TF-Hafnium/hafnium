@@ -217,6 +217,29 @@ enum sp_cmd {
 	 * Request SP to abort during the next live activation.
 	 */
 	SP_ABORT_ON_LIVE_ACTIVATION_INIT_CMD,
+
+	/**
+	 * Request SP to re-register its RX/TX mailbox with a different size,
+	 * in FF-A pages (val1). The SP unmaps its current mailbox and maps a
+	 * new one of the requested page count, letting a test set up
+	 * heterogeneous mailbox sizes across endpoints in the same SPMC.
+	 */
+	SP_REMAP_MAILBOX_CMD,
+
+	/**
+	 * Request SP to call FFA_PARTITION_INFO_GET into its own RX buffer
+	 * and verify that the SPMC populated only the descriptor table and
+	 * zeroed the unpopulated tail of the (possibly multi-page) mailbox
+	 * (FF-A v1.3 section 4.10). Validates that the per-endpoint
+	 * mailbox.buf_size is honored when the producer writes the RX buffer.
+	 */
+	SP_CHECK_PARTITION_INFO_RX_CMD,
+
+	/**
+	 * Request SP to perform FFA_MEM_RETRIEVE_REQ against a handle that was
+	 * lent (not shared) to it. val1/val2 encode the memory handle.
+	 */
+	SP_FFA_MEM_LEND_RETRIEVE_CMD,
 };
 
 /**
@@ -233,6 +256,33 @@ static inline struct ffa_value sp_echo_cmd_send(ffa_id_t sender,
 
 struct ffa_value sp_echo_cmd(ffa_id_t receiver, uint32_t val1, uint32_t val2,
 			     uint32_t val3, uint32_t val4, uint32_t val5);
+
+/**
+ * Command to request SP to re-register its RX/TX mailbox with page_count
+ * FF-A pages.
+ */
+static inline struct ffa_value sp_remap_mailbox_cmd_send(ffa_id_t sender,
+							 ffa_id_t receiver,
+							 uint32_t page_count)
+{
+	return ffa_msg_send_direct_req(sender, receiver, SP_REMAP_MAILBOX_CMD,
+				       page_count, 0, 0, 0);
+}
+
+struct ffa_value sp_remap_mailbox_cmd(ffa_id_t receiver, uint32_t page_count);
+
+/**
+ * Command to request SP to run FFA_PARTITION_INFO_GET into its own RX and
+ * check the unpopulated tail is zeroed.
+ */
+static inline struct ffa_value sp_check_partition_info_rx_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver)
+{
+	return ffa_msg_send_direct_req(
+		sender, receiver, SP_CHECK_PARTITION_INFO_RX_CMD, 0, 0, 0, 0);
+}
+
+struct ffa_value sp_check_partition_info_rx_cmd(ffa_id_t receiver);
 
 /**
  * Command to request SP to run echo test with second SP.
@@ -640,6 +690,21 @@ static inline struct ffa_value sp_ffa_mem_retrieve_cmd_send(
 struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
 					 ffa_memory_handle_t handle,
 					 enum ffa_version ffa_version);
+
+/**
+ * Command to request SP to perform FFA_MEM_RETRIEVE_REQ against a handle
+ * that was lent (not shared) to it.
+ */
+static inline struct ffa_value sp_ffa_mem_lend_retrieve_cmd_send(
+	ffa_id_t sender, ffa_id_t receiver, ffa_memory_handle_t handle)
+{
+	return ffa_msg_send_direct_req(
+		sender, receiver, SP_FFA_MEM_LEND_RETRIEVE_CMD,
+		(uint32_t)handle, (uint32_t)(handle >> 32), 0, 0);
+}
+
+struct ffa_value sp_ffa_mem_lend_retrieve_cmd(ffa_id_t sender_id,
+					      ffa_memory_handle_t handle);
 
 /**
  * Request to start generic timer.

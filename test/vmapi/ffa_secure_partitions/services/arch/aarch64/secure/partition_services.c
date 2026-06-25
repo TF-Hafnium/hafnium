@@ -25,12 +25,75 @@
 
 uint64_t shared_nwd_buffer_addr;
 
+/* Page count this SP last registered its RX/TX mailbox with. */
+static uint32_t sp_mailbox_page_count = 1;
+
 struct ffa_value sp_echo_cmd(ffa_id_t receiver, uint32_t val1, uint32_t val2,
 			     uint32_t val3, uint32_t val4, uint32_t val5)
 {
 	ffa_id_t own_id = hf_vm_get_id();
 	return ffa_msg_send_direct_resp(own_id, receiver, val1, val2, val3,
 					val4, val5);
+}
+
+struct ffa_value sp_remap_mailbox_cmd(ffa_id_t receiver, uint32_t page_count)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+	struct hftest_context *ctx = hftest_get_context();
+	struct mailbox_buffers mb;
+
+	/*
+	 * Drop the mailbox the SP registered at boot and re-register one of
+	 * the requested size, so the test can give this endpoint a mailbox
+	 * size that differs from other endpoints in the same SPMC.
+	 */
+	if (ffa_rxtx_unmap().func != FFA_SUCCESS_32) {
+		return sp_error(own_id, receiver, FFA_DENIED);
+	}
+
+	mb = set_up_mailbox_pages(page_count);
+	ctx->send = mb.send;
+	ctx->recv = mb.recv;
+	sp_mailbox_page_count = page_count;
+
+	return sp_success(own_id, receiver, page_count);
+}
+
+struct ffa_value sp_check_partition_info_rx_cmd(ffa_id_t receiver)
+{
+	ffa_id_t own_id = hf_vm_get_id();
+	uint8_t *rx = SERVICE_RECV_BUFFER();
+	const size_t rx_size = (size_t)sp_mailbox_page_count * FFA_PAGE_SIZE;
+	const uint8_t sentinel = 0xA5;
+	struct ffa_uuid uuid;
+	struct ffa_value ret;
+	size_t descriptor_bytes;
+
+	/* Pre-paint the whole RX so we can spot any over-copy. */
+	memset_s(rx, rx_size, sentinel, rx_size);
+
+	ffa_uuid_init(0, 0, 0, 0, &uuid);
+	ret = ffa_partition_info_get(&uuid, 0);
+	if (ret.func != FFA_SUCCESS_32) {
+		return sp_error(own_id, receiver, ffa_error_code(ret));
+	}
+
+	/* Bytes past the descriptor table must have been zeroed (4.10). */
+	descriptor_bytes = (size_t)ret.arg2 * (size_t)ret.arg3;
+	if (descriptor_bytes > rx_size) {
+		ffa_rx_release();
+		return sp_error(own_id, receiver, FFA_INVALID_PARAMETERS);
+	}
+	for (size_t i = descriptor_bytes; i < rx_size; i++) {
+		if (rx[i] != 0) {
+			ffa_rx_release();
+			return sp_error(own_id, receiver,
+					FFA_INVALID_PARAMETERS);
+		}
+	}
+
+	ffa_rx_release();
+	return sp_success(own_id, receiver, ret.arg2);
 }
 
 struct ffa_value sp_req_echo_cmd(ffa_id_t test_source, uint32_t val1,
@@ -138,7 +201,12 @@ struct ffa_value sp_ffa_features_cmd(ffa_id_t source, uint32_t feature_func_id)
 					0, 0);
 }
 
-static uint8_t retrieve_buffer[PAGE_SIZE * 2];
+/*
+ * Sized to the build's mailbox capacity (not just two pages) so a retrieve
+ * response as large as the caller's own multi-page RX buffer fits without
+ * overflowing this staging area.
+ */
+alignas(PAGE_SIZE) static uint8_t retrieve_buffer[HF_MAILBOX_SIZE];
 
 static struct ffa_value retrieve_v1_0(ffa_id_t sender_id,
 				      ffa_memory_handle_t handle)
@@ -190,8 +258,9 @@ static struct ffa_value retrieve_v1_0(ffa_id_t sender_id,
 	return sp_success(receiver_id, sender_id, ret.func);
 }
 
-static struct ffa_value retrieve_v1_2_or_later(ffa_id_t sender_id,
-					       ffa_memory_handle_t handle)
+static struct ffa_value retrieve_v1_2_or_later(
+	ffa_id_t sender_id, ffa_memory_handle_t handle,
+	ffa_memory_region_flags_t transaction_type)
 {
 	ffa_id_t receiver_id = hf_vm_get_id();
 	void *rx_buffer = SERVICE_RECV_BUFFER();
@@ -213,9 +282,9 @@ static struct ffa_value retrieve_v1_2_or_later(ffa_id_t sender_id,
 			       &impdef);
 	msg_size = ffa_memory_retrieve_request_init(
 		tx_buffer, handle, sender_id, &receiver_v1_1, 1,
-		sizeof(struct ffa_memory_access), 0,
-		FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE, FFA_MEMORY_NORMAL_MEM,
-		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE);
+		sizeof(struct ffa_memory_access), 0, transaction_type,
+		FFA_MEMORY_NORMAL_MEM, FFA_MEMORY_CACHE_WRITE_BACK,
+		FFA_MEMORY_INNER_SHAREABLE);
 
 	EXPECT_LE(msg_size, HF_MAILBOX_SIZE);
 
@@ -252,9 +321,18 @@ struct ffa_value sp_ffa_mem_retrieve_cmd(ffa_id_t sender_id,
 	case FFA_VERSION_1_1:
 	case FFA_VERSION_1_2:
 	case FFA_VERSION_1_3:
-		return retrieve_v1_2_or_later(sender_id, handle);
+		return retrieve_v1_2_or_later(
+			sender_id, handle,
+			FFA_MEMORY_REGION_TRANSACTION_TYPE_SHARE);
 	}
 	panic("Unknown version %#x\n", ffa_version);
+}
+
+struct ffa_value sp_ffa_mem_lend_retrieve_cmd(ffa_id_t sender_id,
+					      ffa_memory_handle_t handle)
+{
+	return retrieve_v1_2_or_later(sender_id, handle,
+				      FFA_MEMORY_REGION_TRANSACTION_TYPE_LEND);
 }
 
 struct ffa_value sp_increment_shared_buffer_cmd(ffa_id_t sender_id)
