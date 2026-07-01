@@ -580,3 +580,61 @@ TEST(indirect_messaging, relay)
 			 sizeof(expected_message)),
 		  0);
 }
+
+#if RXTX_MAX_PAGE_COUNT > 1
+/*
+ * Verify that FFA_MSG_SEND2 zeros the unpopulated tail of the receiver's RX
+ * buffer when the receiver has registered a multi-page mailbox (FF-A v1.3
+ * section 4.10). The message occupies only the first FF-A page; the remainder
+ * of the registered buffer must be cleared by the producer (the hypervisor).
+ */
+TEST_PRECONDITION(indirect_messaging_v1_2,
+		  msg_send2_zeros_rx_tail_on_multi_page_mailbox,
+		  hypervisor_only)
+{
+	const uint8_t sentinel = 0xA5;
+	const size_t recv_size =
+		(size_t)FFA_PAGE_SIZE * FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT;
+	const char payload[] = "tail-zero check";
+	char recv_payload[sizeof(payload)];
+	struct ffa_value ret;
+	struct mailbox_buffers mb;
+	ffa_id_t sender = hf_vm_get_id();
+	ffa_id_t receiver;
+	const uint8_t *rx;
+
+	mb = set_up_mailbox_pages(FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT);
+	receiver = service1(mb.recv)->vm_id;
+
+	SERVICE_SELECT(receiver, "echo_msg_send2_v1_2", mb.send);
+
+	/*
+	 * Pre-paint the whole multi-page RX buffer with a sentinel so any
+	 * byte the hypervisor fails to zero will be detectable.
+	 */
+	rx = (const uint8_t *)mb.recv;
+	memset_s((void *)rx, recv_size, sentinel, recv_size);
+
+	ret = send_indirect_message_with_uuid(sender, receiver, mb.send,
+					      payload, sizeof(payload),
+					      (struct ffa_uuid){0}, 0);
+	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+
+	ret = ffa_run(receiver, 0);
+	EXPECT_EQ(ret.func, FFA_YIELD_32);
+
+	/*
+	 * receive_indirect_message() consumes the notification and calls
+	 * ffa_rx_release(). After it returns the RX buffer is ours to inspect.
+	 * The echoed message fits in one FF-A page; bytes in pages beyond the
+	 * first must be zero, not the pre-painted sentinel.
+	 */
+	receive_indirect_message(recv_payload, sizeof(recv_payload), mb.recv);
+
+	for (size_t i = FFA_PAGE_SIZE; i < recv_size; i++) {
+		EXPECT_EQ(rx[i], 0);
+	}
+
+	EXPECT_EQ(ffa_rxtx_unmap().func, FFA_SUCCESS_32);
+}
+#endif /* RXTX_MAX_PAGE_COUNT > 1 */

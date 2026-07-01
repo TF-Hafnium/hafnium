@@ -2234,13 +2234,24 @@ static struct ffa_value api_ffa_msg_send2_copy_data(
 	}
 
 	/* Copy data. */
-	if (!memcpy_trapped(receiver_vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
-			    sender_tx_buffer, total_size)) {
+	if (!memcpy_trapped(receiver_vm->mailbox.recv,
+			    receiver_vm->mailbox.buf_size, sender_tx_buffer,
+			    total_size)) {
 		dlog_error(
 			"%s: Failed to copy message to receiver's (%x) RX "
 			"buffer.\n",
 			__func__, receiver_vm->id);
 		return ffa_error(FFA_ABORTED);
+	}
+
+	/*
+	 * Zero the unpopulated tail of the RX buffer (FF-A v1.3 section 4.10).
+	 * The message occupies [0, total_size); clear [total_size, buf_size).
+	 */
+	if (total_size < receiver_vm->mailbox.buf_size) {
+		memset_s((char *)receiver_vm->mailbox.recv + total_size,
+			 receiver_vm->mailbox.buf_size - total_size, 0,
+			 receiver_vm->mailbox.buf_size - total_size);
 	}
 
 	receiver_vm->mailbox.recv_size = total_size;
