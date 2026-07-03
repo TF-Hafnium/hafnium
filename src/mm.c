@@ -266,6 +266,12 @@ static void mm_replace_entry(const struct mm_ptable *ptable,
 	pte_t v = *pte;
 
 	/*
+	 * This function is just for replacing a page table entry, so we expect
+	 * the address to be aligned to the entry size.
+	 */
+	assert(is_aligned(begin, mm_entry_size(level)));
+
+	/*
 	 * We need to do the break-before-make sequence if both values are
 	 * present and the TLB is being invalidated.
 	 */
@@ -386,7 +392,7 @@ static struct mm_page_table *mm_populate_table_pte(struct mm_ptable *ptable,
 	atomic_thread_fence(memory_order_release);
 
 	/* Replace the pte entry, doing a break-before-make if needed. */
-	mm_replace_entry(ptable, begin, pte,
+	mm_replace_entry(ptable, align_down(begin, mm_entry_size(level)), pte,
 			 arch_mm_table_pte(level, pa_init((uintpaddr_t)ntable)),
 			 level, non_secure);
 
