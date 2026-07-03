@@ -3,6 +3,25 @@
 This document contains a summary of the new features, changes, fixes and known
 issues in each release of Hafnium.
 
+## [2.14.1](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/tags/lts-v2.14.0..refs/tags/lts-v2.14.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **security:** add workaround for CVE-2025-10263 ([29d723a](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/29d723a58c1bd28f0abb4b7071375fdb5263923f))
+
+
+### Build & CI
+
+* **commitlint:** enforce scopes for commits ([c72f566](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/c72f566ecdb002a2e935181c365c59be48ecf741))
+* **commitlint:** restrict commit scopes to approved list ([d44a004](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/d44a004fa44a1886645049429acce2edc24665a8))
+
+
+### Documentation
+
+* **process:** move coding and commit style into process ([883f21d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/883f21d8102d727dca74ff405572b3bc54d5ed18))
+* **security:** add security handling guidance ([fd72e9d](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/fd72e9de8f0b27bb20daf9ebafe4e7e0c9b1f496))
+
 ## [2.14.0](https://review.trustedfirmware.org/plugins/gitiles/hafnium/hafnium/+/refs/tags/v2.13.0..refs/tags/v2.14.0) (2025-11-13)
 
 ### Highlights

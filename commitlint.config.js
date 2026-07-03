@@ -45,6 +45,7 @@ export default {
         // Documentation
         'process',
         'security',
+        'changelog',
 
         // Fallback scope for any miscellaneous change
         'misc'
