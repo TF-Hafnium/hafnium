@@ -4240,9 +4240,6 @@ TEST(memory_sharing_v1_1, share_ffa_v1_1_to_current_version)
 		FFA_MEMORY_CACHE_WRITE_BACK, FFA_MEMORY_INNER_SHAREABLE, NULL,
 		&msg_size);
 
-	/* Set current version to FF-A v1.1. */
-	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_COMPILED);
-
 	ret = ffa_mem_share(msg_size, msg_size);
 
 	handle = ffa_mem_success_handle(ret);

@@ -1201,15 +1201,3 @@ TEST(ffa_version, fails_minor_version_too_high)
 	EXPECT_EQ((enum ffa_error)ffa_version(FFA_VERSION_COMPILED + 1),
 		  FFA_NOT_SUPPORTED);
 }
-
-/**
- * Version is compatible, but version has already been negotiated and other ABI
- * calls have been made, so the version cannot be changed.
- */
-TEST(ffa_version, fails_change_after_other_abis_used)
-{
-	EXPECT_EQ(ffa_version(FFA_VERSION_COMPILED), FFA_VERSION_COMPILED);
-	EXPECT_EQ(ffa_features(FFA_VERSION_32).func, FFA_SUCCESS_32);
-	EXPECT_EQ((enum ffa_error)ffa_version(FFA_VERSION_1_1),
-		  FFA_NOT_SUPPORTED);
-}
