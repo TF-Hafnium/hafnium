@@ -33,3 +33,4 @@ See feature requests and bugs through [github](https://github.com/TF-Hafnium/haf
 
 To find more about Hafnium, [view the full documentation](https://hafnium.readthedocs.io/en/latest/).
 It includes valuable resources such as: Getting Started guide, Threat Model, and other documentation.
+
