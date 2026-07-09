@@ -1963,8 +1963,8 @@ uint32_t ffa_memory_region_init_single_receiver(
 	enum ffa_instruction_access instruction_access,
 	enum ffa_memory_type type, enum ffa_memory_cacheability cacheability,
 	enum ffa_memory_shareability shareability,
-	struct ffa_memory_access_impdef *impdef_val, uint32_t *fragment_length,
-	uint32_t *total_length);
+	struct ffa_memory_access_impdef *impdef_val, uint32_t *total_length,
+	uint32_t *fragment_length);
 uint32_t ffa_memory_region_init(
 	struct ffa_memory_region *memory_region, size_t memory_region_max_size,
 	ffa_id_t sender, struct ffa_memory_access receivers[],
@@ -1973,8 +1973,8 @@ uint32_t ffa_memory_region_init(
 	uint32_t constituent_count, uint32_t tag,
 	ffa_memory_region_flags_t flags, enum ffa_memory_type type,
 	enum ffa_memory_cacheability cacheability,
-	enum ffa_memory_shareability shareability, uint32_t *fragment_length,
-	uint32_t *total_length);
+	enum ffa_memory_shareability shareability, uint32_t *total_length,
+	uint32_t *fragment_length);
 uint32_t ffa_memory_retrieve_request_init(
 	struct ffa_memory_region *memory_region, ffa_memory_handle_t handle,
 	ffa_id_t sender, struct ffa_memory_access receivers[],
