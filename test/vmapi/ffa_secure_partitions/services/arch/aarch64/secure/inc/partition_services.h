@@ -56,6 +56,11 @@ static inline uint32_t sp_resp_value(struct ffa_value res)
 	return res.arg4;
 }
 
+static inline uint32_t sp_resp_value2(struct ffa_value res)
+{
+	return res.arg5;
+}
+
 ffa_id_t sp_find_next_endpoint(ffa_id_t self_id);
 
 enum sp_cmd {
@@ -240,6 +245,13 @@ enum sp_cmd {
 	 * lent (not shared) to it. val1/val2 encode the memory handle.
 	 */
 	SP_FFA_MEM_LEND_RETRIEVE_CMD,
+
+	/**
+	 * Request SP to relinquish the memory region it last retrieved
+	 * through `SP_FFA_MEM_LEND_RETRIEVE_CMD`, so the lender can reclaim
+	 * it.
+	 */
+	SP_RELINQUISH_SHARED_BUFFER_CMD,
 };
 
 /**
@@ -800,6 +812,19 @@ static inline struct ffa_value sp_increment_shared_buffer_cmd_send(
 }
 
 struct ffa_value sp_increment_shared_buffer_cmd(ffa_id_t sender_id_id);
+
+/**
+ * Command to request an SP to relinquish the memory region it last
+ * retrieved through a lend, so the lender can reclaim it.
+ */
+static inline struct ffa_value sp_relinquish_shared_buffer_cmd_send(
+	ffa_id_t source, ffa_id_t dest)
+{
+	return ffa_msg_send_direct_req(
+		source, dest, SP_RELINQUISH_SHARED_BUFFER_CMD, 0, 0, 0, 0);
+}
+
+struct ffa_value sp_relinquish_shared_buffer_cmd(ffa_id_t sender_id);
 
 static inline struct ffa_value sp_set_partition_stop_resp_status_cmd_send(
 	ffa_id_t source, ffa_id_t dest, uint32_t status)

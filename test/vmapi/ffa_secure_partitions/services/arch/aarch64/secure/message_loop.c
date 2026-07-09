@@ -395,6 +395,9 @@ static struct ffa_value handle_direct_req_cmd(struct ffa_value res)
 	case SP_INCREMENT_SHARED_BUFFER_CMD:
 		res = sp_increment_shared_buffer_cmd(ffa_sender(res));
 		break;
+	case SP_RELINQUISH_SHARED_BUFFER_CMD:
+		res = sp_relinquish_shared_buffer_cmd(ffa_sender(res));
+		break;
 #if LIVE_ACTIVATION_SUPPORT == 1
 	case SP_SET_PARTITION_STOP_RESP_STATUS_CMD: {
 		uint32_t status = (uint32_t)res.arg4;
