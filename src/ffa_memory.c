@@ -2632,6 +2632,84 @@ static inline uint32_t ffa_get_version_memory_access_desc_size(
 }
 
 /**
+ * Same as `ffa_retrieve_resp_composite_init_and_lengths`, but for a
+ * partition retrieve response, packs as many of the stored send fragments,
+ * starting from the first one, as fit in `response_max_size`, rather than
+ * only the fragment at index 0. This lets a receiver with a mailbox larger
+ * than one FF-A page consume, in a single retrieve response fragment,
+ * memory that was sent fragmented one page at a time.
+ * Outputs, via `fragments_included`, how many send fragments were packed.
+ * Returns false if not even the first fragment fits.
+ */
+static inline bool ffa_retrieve_resp_composite_init_and_lengths_multi(
+	struct ffa_composite_memory_region *composite,
+	struct ffa_memory_region_constituent *const *fragments,
+	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t composite_offset, uint32_t page_count,
+	uint32_t constituent_count, uint32_t response_max_size,
+	uint32_t *total_length, uint32_t *fragment_length,
+	uint32_t *fragments_included)
+{
+	uint32_t constituents_offset;
+	uint32_t max_constituents;
+	uint32_t written_constituents = 0;
+	uint32_t fragments_packed = 0;
+
+	assert(composite != NULL);
+
+	composite->page_count = page_count;
+	composite->constituent_count = constituent_count;
+	composite->reserved_0 = 0;
+
+	constituents_offset =
+		composite_offset + sizeof(struct ffa_composite_memory_region);
+	if (constituents_offset > response_max_size) {
+		return false;
+	}
+	max_constituents = (response_max_size - constituents_offset) /
+			   sizeof(struct ffa_memory_region_constituent);
+
+	for (; fragments_packed < fragment_count; ++fragments_packed) {
+		uint32_t frag_constituent_count =
+			fragment_constituent_counts[fragments_packed];
+
+		if (written_constituents + frag_constituent_count >
+		    max_constituents) {
+			break;
+		}
+
+		for (uint32_t i = 0; i < frag_constituent_count; ++i) {
+			composite->constituents[written_constituents + i] =
+				fragments[fragments_packed][i];
+		}
+		written_constituents += frag_constituent_count;
+	}
+
+	if (fragments_packed == 0) {
+		/* Not even the first fragment fits. */
+		return false;
+	}
+
+	if (total_length != NULL) {
+		*total_length =
+			constituents_offset +
+			composite->constituent_count *
+				sizeof(struct ffa_memory_region_constituent);
+	}
+	if (fragment_length != NULL) {
+		*fragment_length =
+			constituents_offset +
+			written_constituents *
+				sizeof(struct ffa_memory_region_constituent);
+	}
+	if (fragments_included != NULL) {
+		*fragments_included = fragments_packed;
+	}
+
+	return true;
+}
+
+/**
  * Initialises the ffa_composite_memory_region for the descriptor of a retrieve
  * response message.
  * It also computes total_length and fragment_length.
@@ -2646,41 +2724,61 @@ static inline bool ffa_retrieve_resp_composite_init_and_lengths(
 	uint32_t response_max_size, uint32_t *total_length,
 	uint32_t *fragment_length)
 {
-	uint32_t constituents_offset;
+	struct ffa_memory_region_constituent *const fragments[1] = {
+		(struct ffa_memory_region_constituent *)constituents};
+	uint32_t fragments_included;
 
-	assert(composite != NULL);
+	return ffa_retrieve_resp_composite_init_and_lengths_multi(
+		composite, fragments, &fragment_constituent_count, 1,
+		composite_offset, page_count, constituent_count,
+		response_max_size, total_length, fragment_length,
+		&fragments_included);
+}
 
-	composite->page_count = page_count;
-	composite->constituent_count = constituent_count;
-	composite->reserved_0 = 0;
+/**
+ * Packs as many of the stored send fragments (starting at
+ * `start_fragment_index`) as fit in `dest_max_size` into `dest`, for use as
+ * a continuation (`FFA_MEM_FRAG_RX`) fragment of a partition retrieve
+ * response, so a receiver with a mailbox larger than one FF-A page needs
+ * fewer round trips to retrieve memory that was sent fragmented one page at
+ * a time. Called with `end_fragment_index == start_fragment_index + 1` to
+ * pack just a single stored fragment.
+ * Outputs, via `fragments_included`, how many send fragments were packed.
+ */
+static uint32_t ffa_memory_retrieve_continue_fragment_init(
+	struct ffa_memory_region_constituent *dest, size_t dest_max_size,
+	struct ffa_memory_region_constituent *const *fragments,
+	const uint32_t *fragment_constituent_counts,
+	uint32_t start_fragment_index, uint32_t end_fragment_index,
+	uint32_t *fragment_length, uint32_t *fragments_included)
+{
+	uint32_t max_constituents =
+		dest_max_size / sizeof(struct ffa_memory_region_constituent);
+	uint32_t written_constituents = 0;
+	uint32_t frag_idx = start_fragment_index;
 
-	constituents_offset =
-		composite_offset + sizeof(struct ffa_composite_memory_region);
-	if (constituents_offset +
-		    fragment_constituent_count *
-			    sizeof(struct ffa_memory_region_constituent) >
-	    response_max_size) {
-		return false;
+	for (; frag_idx < end_fragment_index; ++frag_idx) {
+		uint32_t frag_constituent_count =
+			fragment_constituent_counts[frag_idx];
+
+		if (written_constituents + frag_constituent_count >
+		    max_constituents) {
+			break;
+		}
+
+		for (uint32_t i = 0; i < frag_constituent_count; ++i) {
+			ffa_copy_memory_region_constituents(
+				&dest[written_constituents + i],
+				&fragments[frag_idx][i]);
+		}
+		written_constituents += frag_constituent_count;
 	}
 
-	for (size_t i = 0; i < fragment_constituent_count; ++i) {
-		composite->constituents[i] = constituents[i];
-	}
+	*fragment_length = written_constituents *
+			   sizeof(struct ffa_memory_region_constituent);
+	*fragments_included = frag_idx - start_fragment_index;
 
-	if (total_length != NULL) {
-		*total_length =
-			constituents_offset +
-			composite->constituent_count *
-				sizeof(struct ffa_memory_region_constituent);
-	}
-	if (fragment_length != NULL) {
-		*fragment_length =
-			constituents_offset +
-			fragment_constituent_count *
-				sizeof(struct ffa_memory_region_constituent);
-	}
-
-	return true;
+	return written_constituents;
 }
 
 /**
@@ -2912,6 +3010,11 @@ static bool ffa_hypervisor_retrieve_response_init(
  * information, receives the receiver structure and granted permissions from all
  * checks done in the handling of FF-A memory retrieve request. It computes the
  * fragment length and total length.
+ * Packs as many send fragments, starting from the first one, as fit in
+ * `response_max_size`, and outputs the number packed via
+ * `fragments_included`, so a receiver with a mailbox bigger than one FF-A
+ * page can receive memory sent fragmented one page at a time without extra
+ * FFA_MEM_FRAG_RX round trips.
  */
 static bool ffa_partition_retrieve_response_init(
 	void *response, enum ffa_version caller_version,
@@ -2920,9 +3023,10 @@ static bool ffa_partition_retrieve_response_init(
 	ffa_memory_attributes_t attributes,
 	ffa_memory_access_permissions_t granted_permissions,
 	struct ffa_memory_access *retrieve_receiver,
-	const struct ffa_memory_region_constituent constituents[],
-	uint32_t fragment_constituent_count, uint32_t *total_length,
-	uint32_t *fragment_length)
+	struct ffa_memory_region_constituent *const *fragments,
+	const uint32_t *fragment_constituent_counts, uint32_t fragment_count,
+	uint32_t *total_length, uint32_t *fragment_length,
+	uint32_t *fragments_included)
 {
 	struct ffa_composite_memory_region *composite_memory_region;
 	uint32_t composite_offset;
@@ -3063,12 +3167,12 @@ static bool ffa_partition_retrieve_response_init(
 			ffa_memory_region_get_composite(retrieve_response, 0);
 	}
 
-	return ffa_retrieve_resp_composite_init_and_lengths(
-		composite_memory_region, constituents,
-		fragment_constituent_count, composite_offset,
+	return ffa_retrieve_resp_composite_init_and_lengths_multi(
+		composite_memory_region, fragments, fragment_constituent_counts,
+		fragment_count, composite_offset,
 		sender_region_composite->page_count,
 		sender_region_composite->constituent_count, response_max_size,
-		total_length, fragment_length);
+		total_length, fragment_length, fragments_included);
 }
 
 /**
@@ -3669,25 +3773,6 @@ static struct ffa_value ffa_memory_retrieve_validate(
 }
 
 /**
- * Whilst processing the retrieve request, the operation could be aborted, and
- * changes to page tables and the share state structures need to be reverted.
- */
-static void ffa_partition_memory_retrieve_request_undo(
-	struct vm_locked from_locked,
-	struct ffa_memory_share_state *share_state, uint32_t receiver_index)
-{
-	/*
-	 * Currently this operation is expected for operations involving the
-	 * 'other_world' vm.
-	 */
-	assert(from_locked.vm->id == HF_OTHER_WORLD_ID);
-	assert(share_state->retrieved_fragment_count[receiver_index] > 0);
-
-	/* Decrement the retrieved fragment count for the given receiver. */
-	share_state->retrieved_fragment_count[receiver_index]--;
-}
-
-/**
  * Whilst processing an hypervisor retrieve request the operation could be
  * aborted. There were no updates to PTs in this case, so decrementing the
  * fragment count retrieved by the hypervisor should be enough.
@@ -3710,6 +3795,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 	struct ffa_value ret;
 	uint32_t total_length;
 	uint32_t fragment_length;
+	uint32_t fragments_included;
 	ffa_id_t receiver_id = to_locked.vm->id;
 	bool is_retrieve_complete = false;
 	uint32_t receiver_index;
@@ -3791,12 +3877,6 @@ static struct ffa_value ffa_partition_retrieve_request(
 		return ret;
 	}
 
-	share_state->retrieved_fragment_count[receiver_index] = 1;
-
-	is_retrieve_complete =
-		share_state->retrieved_fragment_count[receiver_index] ==
-		share_state->fragment_count;
-
 	/* VMs acquire the RX buffer from SPMC. */
 	CHECK(ffa_setup_acquire_receiver_rx(to_locked, &ret));
 
@@ -3808,15 +3888,17 @@ static struct ffa_value ffa_partition_retrieve_request(
 		memory_region->attributes, retrieve_mode);
 
 	/*
-	 * Constituents which we received in the first fragment should
-	 * always fit in the first fragment we are sending, because the
-	 * header is the same size in both cases and we have a fixed
-	 * message buffer size. So `ffa_partition_retrieve_response_init`
-	 * should never fail.
+	 * The first fragment we received should always fit in the first
+	 * fragment we are sending, because the header is the same size in
+	 * both cases and the receiver's mailbox is at least one FF-A page.
+	 * So `ffa_partition_retrieve_response_init` should never fail.
 	 *
 	 * Prepare the memory region descriptor for the retrieve response.
 	 * Provide the pointer to the receiver tracked in the share state
-	 * structures.
+	 * structures. Pack as many of the stored send fragments as fit in
+	 * the receiver's mailbox, so a receiver with a mailbox bigger than
+	 * one FF-A page needs no FFA_MEM_FRAG_RX round trips for memory that
+	 * was sent fragmented one page at a time.
 	 * At this point the retrieve request descriptor from the partition
 	 * has been processed. The `retrieve_request` is expected to be in
 	 * a region that is handled by the SPMC/Hyp. Reuse the same buffer to
@@ -3826,9 +3908,17 @@ static struct ffa_value ffa_partition_retrieve_request(
 	CHECK(ffa_partition_retrieve_response_init(
 		retrieve_request, to_locked.vm->ffa_version,
 		to_locked.vm->mailbox.buf_size, memory_region, attributes,
-		permissions, receiver, share_state->fragments[0],
-		share_state->fragment_constituent_counts[0], &total_length,
-		&fragment_length));
+		permissions, receiver, share_state->fragments,
+		share_state->fragment_constituent_counts,
+		share_state->fragment_count, &total_length, &fragment_length,
+		&fragments_included));
+
+	share_state->retrieved_fragment_count[receiver_index] =
+		fragments_included;
+
+	is_retrieve_complete =
+		share_state->retrieved_fragment_count[receiver_index] ==
+		share_state->fragment_count;
 
 	/*
 	 * Copy the message from the buffer into the partition's mailbox.
@@ -3843,8 +3933,7 @@ static struct ffa_value ffa_partition_retrieve_request(
 			"%x.\n",
 			__func__, to_locked.vm->id);
 
-		ffa_partition_memory_retrieve_request_undo(
-			to_locked, share_state, receiver_index);
+		share_state->retrieved_fragment_count[receiver_index] = 0;
 
 		return ffa_error(FFA_ABORTED);
 	}
@@ -4019,8 +4108,9 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	uint32_t retrieved_constituents_count;
 	uint32_t i;
 	uint32_t expected_fragment_offset;
-	uint32_t remaining_constituent_count;
+	uint32_t written_constituent_count;
 	uint32_t fragment_length;
+	uint32_t fragments_included;
 	uint32_t receiver_index;
 	bool continue_ffa_hyp_mem_retrieve_req;
 
@@ -4142,13 +4232,42 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	 */
 	assert(ffa_setup_acquire_receiver_rx(to_locked, &ret));
 
-	remaining_constituent_count = ffa_memory_fragment_init(
-		(struct ffa_memory_region_constituent *)retrieve_continue_page,
-		to_locked.vm->mailbox.buf_size,
-		share_state->fragments[fragment_index],
-		share_state->fragment_constituent_counts[fragment_index],
-		&fragment_length);
-	CHECK(remaining_constituent_count == 0);
+	if (!continue_ffa_hyp_mem_retrieve_req) {
+		/*
+		 * Pack as many of the remaining stored send fragments as fit
+		 * in the receiver's mailbox, so a receiver with a mailbox
+		 * bigger than one FF-A page needs fewer FFA_MEM_FRAG_RX round
+		 * trips for memory that was sent fragmented one page at a
+		 * time.
+		 */
+		written_constituent_count =
+			ffa_memory_retrieve_continue_fragment_init(
+				(struct ffa_memory_region_constituent *)
+					retrieve_continue_page,
+				to_locked.vm->mailbox.buf_size,
+				share_state->fragments,
+				share_state->fragment_constituent_counts,
+				fragment_index, share_state->fragment_count,
+				&fragment_length, &fragments_included);
+		CHECK(written_constituent_count > 0);
+	} else {
+		/*
+		 * The hypervisor/SPMC internal channel is always exactly one
+		 * FF-A page, so this is the special case of packing just the
+		 * single stored fragment at `fragment_index`.
+		 */
+		written_constituent_count =
+			ffa_memory_retrieve_continue_fragment_init(
+				(struct ffa_memory_region_constituent *)
+					retrieve_continue_page,
+				to_locked.vm->mailbox.buf_size,
+				share_state->fragments,
+				share_state->fragment_constituent_counts,
+				fragment_index, fragment_index + 1,
+				&fragment_length, &fragments_included);
+		CHECK(written_constituent_count > 0);
+		CHECK(fragments_included == 1);
+	}
 
 	/*
 	 * Return FFA_ERROR(FFA_ABORTED) in case the access to the partition's
@@ -4170,7 +4289,8 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	to_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
 
 	if (!continue_ffa_hyp_mem_retrieve_req) {
-		share_state->retrieved_fragment_count[receiver_index]++;
+		share_state->retrieved_fragment_count[receiver_index] +=
+			fragments_included;
 		if (share_state->retrieved_fragment_count[receiver_index] ==
 		    share_state->fragment_count) {
 			ffa_memory_retrieve_complete(share_states, share_state);
