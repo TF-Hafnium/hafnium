@@ -322,8 +322,9 @@ bool ffa_get_nwd_rxtx_buffer_info(struct ffa_address_map_desc *amd,
 			/* Setup the address map descriptor. */
 			ffa_ns_res_info_get_amd_init(
 				amd, (uintptr_t)vm_locked.vm->mailbox.recv,
-				(HF_MAILBOX_SIZE / FFA_PAGE_SIZE), permissions,
-				HF_SPMC_VM_ID,
+				(vm_locked.vm->mailbox.buf_size /
+				 FFA_PAGE_SIZE),
+				permissions, HF_SPMC_VM_ID,
 				FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 		} else if (vm_locked.vm->mailbox.send != NULL) {
 			/*
@@ -338,8 +339,9 @@ bool ffa_get_nwd_rxtx_buffer_info(struct ffa_address_map_desc *amd,
 			/* Setup the address map descriptor. */
 			ffa_ns_res_info_get_amd_init(
 				amd, (uintptr_t)vm_locked.vm->mailbox.send,
-				(HF_MAILBOX_SIZE / FFA_PAGE_SIZE), permissions,
-				HF_SPMC_VM_ID,
+				(vm_locked.vm->mailbox.buf_size /
+				 FFA_PAGE_SIZE),
+				permissions, HF_SPMC_VM_ID,
 				FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 		}
 

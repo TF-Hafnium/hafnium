@@ -2000,4 +2000,4 @@ uint32_t ffa_memory_fragment_init(
 	uint32_t constituent_count, uint32_t *fragment_length);
 void ffa_endpoint_rx_tx_descriptor_init(
 	struct ffa_endpoint_rx_tx_descriptor *desc, ffa_id_t endpoint_id,
-	uint64_t rx_address, uint64_t tx_address);
+	uint64_t rx_address, uint64_t tx_address, uint32_t page_count);

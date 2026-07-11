@@ -426,7 +426,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 
 		partition_info_size = sizeof(struct ffa_partition_info_v1_0);
 		buffer_size = partition_info_size * entries_count;
-		if (buffer_size > HF_MAILBOX_SIZE) {
+		if (buffer_size > vm->mailbox.buf_size) {
 			dlog_error(
 				"Partition information does not fit in the "
 				"VM's RX buffer.\n");
@@ -457,7 +457,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		partition_info_size = sizeof(struct ffa_partition_info);
 		buffer_size = partition_info_size * entries_count;
 
-		if (buffer_size > HF_MAILBOX_SIZE) {
+		if (buffer_size > vm->mailbox.buf_size) {
 			dlog_error(
 				"Partition information does not fit in the "
 				"VM's RX buffer.\n");
@@ -467,7 +467,7 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 		/*
 		 * Populate the VM's RX buffer with the partition information.
 		 */
-		if (!memcpy_trapped(vm->mailbox.recv, HF_MAILBOX_SIZE,
+		if (!memcpy_trapped(vm->mailbox.recv, vm->mailbox.buf_size,
 				    partitions, buffer_size)) {
 			dlog_error(
 				"%s: Failed to copy ffa_partition_info "
@@ -475,6 +475,19 @@ static struct ffa_value send_versioned_partition_info_descriptors(
 				__func__);
 			return ffa_error(FFA_ABORTED);
 		}
+	}
+
+	/*
+	 * Clear the unpopulated tail of the RX buffer so a higher-EL producer
+	 * does not leak stale staging-buffer contents to a lower-EL consumer
+	 * (FF-A v1.3 section 4.10). Only the descriptor table up to
+	 * buffer_size was written above; zero the remainder of the registered
+	 * mailbox.
+	 */
+	if (buffer_size < vm->mailbox.buf_size) {
+		memset_s((char *)vm->mailbox.recv + buffer_size,
+			 vm->mailbox.buf_size - buffer_size, 0,
+			 vm->mailbox.buf_size - buffer_size);
 	}
 
 	vm->mailbox.recv_size = buffer_size;
@@ -884,8 +897,6 @@ struct ffa_value api_ffa_partition_info_get_regs(struct vcpu *current,
 
 	buffer_size = cpu_get_buffer_size(current->cpu);
 
-	/* Expect size to match that of the mailbox. */
-	assert(buffer_size == PAGE_SIZE);
 	assert(partitions != NULL);
 
 	/* TODO: Add support for using tags */
@@ -1024,8 +1035,6 @@ struct ffa_value api_ffa_partition_info_get(struct vcpu *current,
 
 	buffer_size = cpu_get_buffer_size(current->cpu);
 
-	/* Expect size to match that of the mailbox. */
-	assert(buffer_size == PAGE_SIZE);
 	assert(partitions != NULL);
 
 	partitions_max_len = buffer_size / sizeof(struct ffa_partition_info);
@@ -1722,6 +1731,7 @@ struct ffa_value api_vm_configure_pages(
 	mm_mode_t orig_send_mode = 0;
 	mm_mode_t orig_recv_mode = 0;
 	mm_mode_t extra_mode;
+	size_t buf_size;
 
 	/*
 	 * Mailbox send/recv can only be set up once in the lifecycle of a
@@ -1739,13 +1749,15 @@ struct ffa_value api_vm_configure_pages(
 		}
 	}
 
-	/* Hafnium only supports a fixed size of RX/TX buffers. */
-	if (page_count != HF_MAILBOX_SIZE / FFA_PAGE_SIZE) {
-		dlog_error("%s: Page count must be %zu, it is %d\n", __func__,
-			   HF_MAILBOX_SIZE / FFA_PAGE_SIZE, page_count);
+	/* Validate page_count is within supported range. */
+	if (page_count < 1 || page_count > FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT) {
+		dlog_error("%s: Page count must be 1..%d, got %d\n", __func__,
+			   FFA_RXTX_MAP_MAX_BUF_PAGE_COUNT, page_count);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
 	}
+
+	buf_size = (size_t)page_count * FFA_PAGE_SIZE;
 
 	/* Fail if addresses are not page-aligned. */
 	if (!is_aligned(ipa_addr(send), PAGE_SIZE) ||
@@ -1757,12 +1769,13 @@ struct ffa_value api_vm_configure_pages(
 
 	/* Convert to physical addresses. */
 	pa_send_begin = pa_from_ipa(send);
-	pa_send_end = pa_add(pa_send_begin, HF_MAILBOX_SIZE);
+	pa_send_end = pa_add(pa_send_begin, buf_size);
 	pa_recv_begin = pa_from_ipa(recv);
-	pa_recv_end = pa_add(pa_recv_begin, HF_MAILBOX_SIZE);
+	pa_recv_end = pa_add(pa_recv_begin, buf_size);
 
-	/* Fail if the same page is used for the send and receive pages. */
-	if (pa_addr(pa_send_begin) == pa_addr(pa_recv_begin)) {
+	/* Fail if send and receive buffers overlap. */
+	if (pa_addr(pa_send_begin) < pa_addr(pa_recv_end) &&
+	    pa_addr(pa_recv_begin) < pa_addr(pa_send_end)) {
 		dlog_error("%s: Mailbox buffers overlap\n", __func__);
 		ret = ffa_error(FFA_INVALID_PARAMETERS);
 		goto out;
@@ -1774,7 +1787,7 @@ struct ffa_value api_vm_configure_pages(
 		 * Ensure the pages are valid, owned and exclusive to the VM and
 		 * that the VM has the required access to the memory.
 		 */
-		if (!vm_mem_get_mode(vm_locked, send, ipa_add(send, PAGE_SIZE),
+		if (!vm_mem_get_mode(vm_locked, send, ipa_add(send, buf_size),
 				     &orig_send_mode) ||
 		    !api_mode_valid_owned_and_exclusive(orig_send_mode) ||
 		    (orig_send_mode & MM_MODE_R) == 0 ||
@@ -1786,7 +1799,7 @@ struct ffa_value api_vm_configure_pages(
 			goto out;
 		}
 
-		if (!vm_mem_get_mode(vm_locked, recv, ipa_add(recv, PAGE_SIZE),
+		if (!vm_mem_get_mode(vm_locked, recv, ipa_add(recv, buf_size),
 				     &orig_recv_mode) ||
 		    !api_mode_valid_owned_and_exclusive(orig_recv_mode) ||
 		    (orig_recv_mode & MM_MODE_R) == 0) {
@@ -1860,6 +1873,9 @@ struct ffa_value api_vm_configure_pages(
 	if (ret.func != FFA_SUCCESS_32) {
 		goto fail_undo_send_and_recv;
 	}
+
+	/* Store the actual buffer size for this VM. */
+	vm_locked.vm->mailbox.buf_size = buf_size;
 
 	ret = (struct ffa_value){.func = FFA_SUCCESS_32};
 	goto out;
@@ -2094,9 +2110,9 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 
 	if (!vm_id_is_current_world(owner_vm_id)) {
 		send_va_begin = va_from_ptr(vm->mailbox.send);
-		send_va_end = va_add(send_va_begin, HF_MAILBOX_SIZE);
+		send_va_end = va_add(send_va_begin, vm->mailbox.buf_size);
 		recv_va_begin = va_from_ptr(vm->mailbox.recv);
-		recv_va_end = va_add(recv_va_begin, HF_MAILBOX_SIZE);
+		recv_va_end = va_add(recv_va_begin, vm->mailbox.buf_size);
 
 		mm_stage1_locked = mm_lock_stage1();
 
@@ -2115,6 +2131,7 @@ struct ffa_value api_ffa_rxtx_unmap(ffa_id_t allocator_id, struct vcpu *current)
 
 		vm->mailbox.send = NULL;
 		vm->mailbox.recv = NULL;
+		vm->mailbox.buf_size = 0;
 
 		mm_unlock_stage1(&mm_stage1_locked);
 	}
@@ -3771,6 +3788,7 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	struct vm *from = current->vm;
 	struct vm *to;
 	const void *from_msg;
+	size_t from_buf_size;
 	void *allocated_entry;
 	struct ffa_memory_region *memory_region = NULL;
 	struct ffa_value ret;
@@ -3794,11 +3812,6 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
-	if (fragment_length > HF_MAILBOX_SIZE ||
-	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
-		return ffa_error(FFA_INVALID_PARAMETERS);
-	}
-
 	/*
 	 * Check that the sender has configured its send buffer. If the TX
 	 * mailbox at from_msg is configured (i.e. from_msg != NULL) then it can
@@ -3807,10 +3820,16 @@ struct ffa_value api_ffa_mem_send(uint32_t share_func, uint32_t length,
 	 */
 	sl_lock(&from->lock);
 	from_msg = from->mailbox.send;
+	from_buf_size = from->mailbox.buf_size;
 	ffa_version = from->ffa_version;
 	sl_unlock(&from->lock);
 
 	if (from_msg == NULL) {
+		return ffa_error(FFA_INVALID_PARAMETERS);
+	}
+
+	if (fragment_length > from_buf_size ||
+	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 
@@ -4011,7 +4030,7 @@ struct ffa_value api_ffa_mem_retrieve_req(uint32_t length,
 
 	retrieve_msg = cpu_get_buffer(current->cpu);
 	message_buffer_size = cpu_get_buffer_size(current->cpu);
-	if (length > HF_MAILBOX_SIZE || length > message_buffer_size) {
+	if (length > to->mailbox.buf_size || length > message_buffer_size) {
 		dlog_verbose("Retrieve request too long.\n");
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
@@ -4179,7 +4198,7 @@ static struct ffa_value api_get_ffa_mem_relinquish_descriptor(
 	from_msg_size = relinquish_request->endpoint_count * sizeof(ffa_id_t);
 	total_from_msg_size += from_msg_size;
 
-	if (total_from_msg_size > HF_MAILBOX_SIZE ||
+	if (total_from_msg_size > current->vm->mailbox.buf_size ||
 	    total_from_msg_size > dst_size) {
 		dlog_verbose(
 			"Relinquish message too long. Endpoint count: %u\n",
@@ -4314,6 +4333,7 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 {
 	struct vm *from = current->vm;
 	const void *from_msg;
+	size_t from_buf_size;
 	void *fragment_copy;
 	struct ffa_value ret;
 
@@ -4331,6 +4351,7 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	 */
 	sl_lock(&from->lock);
 	from_msg = from->mailbox.send;
+	from_buf_size = from->mailbox.buf_size;
 	sl_unlock(&from->lock);
 
 	if (from_msg == NULL) {
@@ -4343,11 +4364,11 @@ struct ffa_value api_ffa_mem_frag_tx(ffa_memory_handle_t handle,
 	 * the sender from changing it underneath us, and also lets us keep it
 	 * around in the share state table if needed.
 	 */
-	if (fragment_length > HF_MAILBOX_SIZE ||
+	if (fragment_length > from_buf_size ||
 	    fragment_length > MM_PPOOL_ENTRY_SIZE) {
 		dlog_verbose(
-			"Fragment length %d larger than mailbox size %zu.\n",
-			fragment_length, HF_MAILBOX_SIZE);
+			"Fragment length %d larger than buffer size %zu.\n",
+			fragment_length, from_buf_size);
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 	if (fragment_length < sizeof(struct ffa_memory_region_constituent) ||
@@ -5611,8 +5632,8 @@ static bool api_ffa_ns_res_info_get_hypervisor_rx_tx_buffers(
 		/* Setup the address map descriptor. */
 		ffa_ns_res_info_get_amd_init(
 			amd, (uintptr_t)other_world_vm->mailbox.recv,
-			(HF_MAILBOX_SIZE / FFA_PAGE_SIZE), permissions,
-			other_world_vm->id,
+			(other_world_vm->mailbox.buf_size / FFA_PAGE_SIZE),
+			permissions, other_world_vm->id,
 			FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 
 		header->amd_count += 1;
@@ -5636,8 +5657,8 @@ static bool api_ffa_ns_res_info_get_hypervisor_rx_tx_buffers(
 		/* Setup the address map descriptor. */
 		ffa_ns_res_info_get_amd_init(
 			amd, (uintptr_t)other_world_vm->mailbox.send,
-			(HF_MAILBOX_SIZE / FFA_PAGE_SIZE), permissions,
-			other_world_vm->id,
+			(other_world_vm->mailbox.buf_size / FFA_PAGE_SIZE),
+			permissions, other_world_vm->id,
 			FFA_NS_RES_INFO_GET_INDIRECTLY_ACC_FLAG);
 
 		header->amd_count += 1;

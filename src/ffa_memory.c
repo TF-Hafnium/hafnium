@@ -2117,7 +2117,7 @@ struct ffa_value ffa_memory_send_validate(
 		return ffa_error(FFA_INVALID_PARAMETERS);
 	}
 	if (fragment_length < memory_share_length &&
-	    fragment_length < HF_MAILBOX_SIZE) {
+	    fragment_length < from_locked.vm->mailbox.buf_size) {
 		dlog_warning(
 			"Initial fragment length %d smaller than mailbox "
 			"size.\n",
@@ -3824,9 +3824,9 @@ static struct ffa_value ffa_partition_retrieve_request(
 	 * the caller.
 	 */
 	CHECK(ffa_partition_retrieve_response_init(
-		retrieve_request, to_locked.vm->ffa_version, HF_MAILBOX_SIZE,
-		memory_region, attributes, permissions, receiver,
-		share_state->fragments[0],
+		retrieve_request, to_locked.vm->ffa_version,
+		to_locked.vm->mailbox.buf_size, memory_region, attributes,
+		permissions, receiver, share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
 		&fragment_length));
 
@@ -3835,8 +3835,9 @@ static struct ffa_value ffa_partition_retrieve_request(
 	 * The operation might fail unexpectedly due to change in PAS address
 	 * space, or improper values to the sizes of the structures.
 	 */
-	if (!memcpy_trapped(to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
-			    retrieve_request, fragment_length)) {
+	if (!memcpy_trapped(to_locked.vm->mailbox.recv,
+			    to_locked.vm->mailbox.buf_size, retrieve_request,
+			    fragment_length)) {
 		dlog_error(
 			"%s: aborted the copy of response to RX buffer of "
 			"%x.\n",
@@ -3892,7 +3893,7 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 	 * managed by the hypervisor.
 	 */
 	CHECK(ffa_hypervisor_retrieve_response_init(
-		retrieve_request, HF_MAILBOX_SIZE, memory_region,
+		retrieve_request, to_locked.vm->mailbox.buf_size, memory_region,
 		to_locked.vm->ffa_version, share_state->fragments[0],
 		share_state->fragment_constituent_counts[0], &total_length,
 		&fragment_length));
@@ -3902,8 +3903,9 @@ static struct ffa_value ffa_hypervisor_retrieve_request(
 	 * The operation might fail unexpectedly due to change in PAS, or
 	 * improper values for the sizes of the structures.
 	 */
-	if (!memcpy_trapped(to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
-			    retrieve_request, fragment_length)) {
+	if (!memcpy_trapped(to_locked.vm->mailbox.recv,
+			    to_locked.vm->mailbox.buf_size, retrieve_request,
+			    fragment_length)) {
 		dlog_error(
 			"%s: aborted the copy of response to RX buffer of "
 			"%x.\n",
@@ -4142,7 +4144,8 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 
 	remaining_constituent_count = ffa_memory_fragment_init(
 		(struct ffa_memory_region_constituent *)retrieve_continue_page,
-		HF_MAILBOX_SIZE, share_state->fragments[fragment_index],
+		to_locked.vm->mailbox.buf_size,
+		share_state->fragments[fragment_index],
 		share_state->fragment_constituent_counts[fragment_index],
 		&fragment_length);
 	CHECK(remaining_constituent_count == 0);
@@ -4153,7 +4156,8 @@ struct ffa_value ffa_memory_retrieve_continue(struct vm_locked to_locked,
 	 * request is for a VM or the Hypervisor retrieve request, if the PAS
 	 * has been changed externally.
 	 */
-	if (!memcpy_trapped(to_locked.vm->mailbox.recv, HF_MAILBOX_SIZE,
+	if (!memcpy_trapped(to_locked.vm->mailbox.recv,
+			    to_locked.vm->mailbox.buf_size,
 			    retrieve_continue_page, fragment_length)) {
 		dlog_error(
 			"%s: aborted copying fragment to RX buffer of %#x.\n",

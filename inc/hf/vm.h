@@ -79,6 +79,9 @@ struct mailbox {
 	void *recv;
 	const void *send;
 
+	/** The size of the RX/TX buffers in bytes. */
+	size_t buf_size;
+
 	/** The ID of the VM which sent the message currently in `recv`. */
 	ffa_id_t recv_sender;
 

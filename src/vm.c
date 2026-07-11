@@ -70,6 +70,7 @@ static bool vm_init_helper(struct vm *vm, ffa_id_t id,
 	CHECK(vm->vcpus != NULL);
 
 	vm->mailbox.state = MAILBOX_STATE_EMPTY;
+	vm->mailbox.buf_size = 0;
 	vm->el0_partition = el0_partition;
 	vm->dma_device_count = dma_device_count;
 
@@ -504,11 +505,11 @@ void vm_unmap_rxtx(struct vm_locked vm_locked)
 		return;
 	}
 
-	/* Currently a mailbox size of 1 page is assumed. */
+	/* Use the per-VM buffer size for PA range calculation. */
 	send_ipa_begin = ipa_from_va(va_from_ptr(vm->mailbox.send));
-	send_ipa_end = ipa_add(send_ipa_begin, HF_MAILBOX_SIZE);
+	send_ipa_end = ipa_add(send_ipa_begin, vm->mailbox.buf_size);
 	recv_ipa_begin = ipa_from_va(va_from_ptr(vm->mailbox.recv));
-	recv_ipa_end = ipa_add(recv_ipa_begin, HF_MAILBOX_SIZE);
+	recv_ipa_end = ipa_add(recv_ipa_begin, vm->mailbox.buf_size);
 
 	mm_stage1_locked = mm_lock_stage1();
 
@@ -531,6 +532,7 @@ void vm_unmap_rxtx(struct vm_locked vm_locked)
 
 	vm->mailbox.send = NULL;
 	vm->mailbox.recv = NULL;
+	vm->mailbox.buf_size = 0;
 
 	mm_unlock_stage1(&mm_stage1_locked);
 }

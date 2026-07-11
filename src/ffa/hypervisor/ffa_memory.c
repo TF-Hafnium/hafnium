@@ -86,9 +86,18 @@ static struct ffa_value memory_send_other_world_forward(
 {
 	struct ffa_value ret;
 
-	/* Use its own RX buffer. */
-	memcpy_s(other_world_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
-		 memory_region, fragment_length);
+	/*
+	 * Use its own RX buffer. Bound the copy by the channel's actual
+	 * buffer size rather than FFA_MSG_PAYLOAD_MAX (the build-time
+	 * maximum): the hypervisor<->SPMC channel is always exactly one
+	 * FF-A page regardless of RXTX_MAX_PAGE_COUNT. fragment_length is
+	 * already capped at MM_PPOOL_ENTRY_SIZE (one page) by the caller, so
+	 * this isn't an active overflow today, but matches buf_size for
+	 * consistency and to stay correct if that upstream cap ever changes.
+	 */
+	memcpy_s(other_world_locked.vm->mailbox.recv,
+		 other_world_locked.vm->mailbox.buf_size, memory_region,
+		 fragment_length);
 
 	other_world_locked.vm->mailbox.recv_func = share_func;
 	other_world_locked.vm->mailbox.state = MAILBOX_STATE_FULL;
@@ -463,8 +472,13 @@ static struct ffa_value memory_send_continue_other_world_forward(
 {
 	struct ffa_value ret;
 
-	memcpy_s(other_world_locked.vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
-		 fragment, fragment_length);
+	/*
+	 * Bound the copy by the channel's actual buffer size; see the
+	 * comment in memory_send_other_world_forward() above.
+	 */
+	memcpy_s(other_world_locked.vm->mailbox.recv,
+		 other_world_locked.vm->mailbox.buf_size, fragment,
+		 fragment_length);
 
 	other_world_locked.vm->mailbox.recv_func = FFA_MEM_FRAG_TX_32;
 	other_world_locked.vm->mailbox.state = MAILBOX_STATE_FULL;

@@ -84,6 +84,15 @@ void ffa_init(void)
 	other_world_vm->mailbox.send = (void *)va_addr(send_addr);
 	// NOLINTNEXTLINE(performance-no-int-to-ptr)
 	other_world_vm->mailbox.recv = (void *)va_addr(recv_addr);
+	/*
+	 * The internal hypervisor-to-SPMC channel uses a single 4 KiB FF-A page
+	 * per direction: Hafnium itself uses 4 KiB pages, and the reserved PA
+	 * region above is mapped one page per direction (see
+	 * send_addr/recv_addr and the mm_identity_map() calls below). Larger
+	 * RX/TX buffers (up to RXTX_MAX_PAGE_COUNT) are exercised by VMs
+	 * through FFA_RXTX_MAP, not this internal channel.
+	 */
+	other_world_vm->mailbox.buf_size = FFA_PAGE_SIZE;
 
 	/*
 	 * Note that send and recv are swapped around, as the send buffer from
@@ -94,7 +103,7 @@ void ffa_init(void)
 	ffa_setup_rxtx_map_spmc(
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.recv)),
 		pa_from_va(va_from_ptr(other_world_vm->mailbox.send)),
-		HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
+		other_world_vm->mailbox.buf_size / FFA_PAGE_SIZE);
 
 	ffa_init_set_tee_enabled(true);
 

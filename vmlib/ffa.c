@@ -404,7 +404,7 @@ static void ffa_composite_memory_region_init(
  */
 void ffa_endpoint_rx_tx_descriptor_init(
 	struct ffa_endpoint_rx_tx_descriptor *desc, ffa_id_t endpoint_id,
-	uint64_t rx_address, uint64_t tx_address)
+	uint64_t rx_address, uint64_t tx_address, uint32_t page_count)
 {
 	desc->endpoint_id = endpoint_id;
 	desc->reserved = 0;
@@ -420,7 +420,7 @@ void ffa_endpoint_rx_tx_descriptor_init(
 	ffa_composite_memory_region_init(
 		(struct ffa_composite_memory_region *)((uintptr_t)desc +
 						       desc->rx_offset),
-		rx_address, HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
+		rx_address, page_count);
 
 	/*
 	 * TX's composite descriptor is allocated after the RX descriptor.
@@ -435,5 +435,5 @@ void ffa_endpoint_rx_tx_descriptor_init(
 	ffa_composite_memory_region_init(
 		(struct ffa_composite_memory_region *)((uintptr_t)desc +
 						       desc->tx_offset),
-		tx_address, HF_MAILBOX_SIZE / FFA_PAGE_SIZE);
+		tx_address, page_count);
 }

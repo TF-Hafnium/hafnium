@@ -86,7 +86,8 @@ void ffa_setup_rxtx_map_forward(struct vm_locked vm_locked)
 		(struct ffa_endpoint_rx_tx_descriptor *)
 			other_world->mailbox.recv,
 		vm->id, (uintptr_t)vm->mailbox.recv,
-		(uintptr_t)vm->mailbox.send);
+		(uintptr_t)vm->mailbox.send,
+		(uint32_t)(vm->mailbox.buf_size / FFA_PAGE_SIZE));
 
 	ffa_setup_rxtx_map_spmc(pa_init(0), pa_init(0), 0);
 
@@ -416,10 +417,16 @@ bool ffa_ns_res_info_get_forward(struct vm_locked current_locked,
 
 	/*
 	 * Secure World's TX buffer is NWd world RX buffer.
-	 * Copy data from there to VM's buffer.
+	 * Copy data from there to VM's buffer. Bound the copy by both
+	 * buffers' actual sizes rather than FFA_MSG_PAYLOAD_MAX (the
+	 * build-time maximum): the hypervisor<->SPMC channel
+	 * (other_world_locked.vm->mailbox) is always exactly one FF-A page
+	 * regardless of RXTX_MAX_PAGE_COUNT, so using the build maximum here
+	 * reads past the channel's buffer once RXTX_MAX_PAGE_COUNT > 1.
 	 */
-	memcpy_s(vm->mailbox.recv, FFA_MSG_PAYLOAD_MAX,
-		 other_world_locked.vm->mailbox.send, FFA_MSG_PAYLOAD_MAX);
+	memcpy_s(vm->mailbox.recv, vm->mailbox.buf_size,
+		 other_world_locked.vm->mailbox.send,
+		 other_world_locked.vm->mailbox.buf_size);
 
 	vm_unlock(&other_world_locked);
 
