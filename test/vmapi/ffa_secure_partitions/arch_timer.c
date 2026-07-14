@@ -318,7 +318,7 @@ TEST_PRECONDITION_LONG_RUNNING(arch_timer, migrate_with_deadline,
 {
 	struct ffa_value res;
 	ffa_id_t own_id = hf_vm_get_id();
-	struct secondary_cpu_entry_args args;
+	struct secondary_cpu_entry_args args = {.lock = SPINLOCK_INIT};
 	struct mailbox_buffers mb = set_up_mailbox();
 	struct ffa_partition_info *up_receiver_info = service2(mb.recv);
 	ffa_id_t up_receiver_id = up_receiver_info->vm_id;
