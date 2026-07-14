@@ -1431,6 +1431,53 @@ typedef uint64_t ffa_notifications_bitmap_t;
 #define FFA_NOTIFICATION_SPM_BUFFER_FULL_MASK FFA_NOTIFICATION_MASK(0)
 #define FFA_NOTIFICATION_HYP_BUFFER_FULL_MASK FFA_NOTIFICATION_MASK(32)
 
+/* Notification bitmap helper functions. */
+static inline bool ffa_notification_bitmap_is_zero(
+	ffa_notifications_bitmap_t bitmap)
+{
+	return (bitmap == 0U);
+}
+
+static inline bool ffa_notification_bitmap_is_set(
+	ffa_notifications_bitmap_t bitmap, uint32_t id)
+{
+	return ((bitmap & FFA_NOTIFICATION_MASK(id)) != 0U);
+}
+
+static inline void ffa_notification_bitmap_set(
+	ffa_notifications_bitmap_t *bitmap, uint32_t id)
+{
+	*bitmap |= FFA_NOTIFICATION_MASK(id);
+}
+
+static inline void ffa_notification_bitmap_clear(
+	ffa_notifications_bitmap_t *bitmap, uint32_t id)
+{
+	*bitmap &= ~FFA_NOTIFICATION_MASK(id);
+}
+
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_or(
+	ffa_notifications_bitmap_t bitmap1, ffa_notifications_bitmap_t bitmap2)
+{
+	return (bitmap1 | bitmap2);
+}
+
+static inline ffa_notifications_bitmap_t ffa_notification_bitmap_and(
+	ffa_notifications_bitmap_t bitmap1, ffa_notifications_bitmap_t bitmap2)
+{
+	return (bitmap1 & bitmap2);
+}
+
+/**
+ * Returns true if the two notification bitmaps share at least one common
+ * notification ID.
+ */
+static inline bool ffa_notification_bitmap_intersects(
+	ffa_notifications_bitmap_t bitmap1, ffa_notifications_bitmap_t bitmap2)
+{
+	return (bitmap1 & bitmap2) != 0U;
+}
+
 /**
  * Helper functions to check for buffer full notification.
  */

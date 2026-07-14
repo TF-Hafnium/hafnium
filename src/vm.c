@@ -655,7 +655,8 @@ bool vm_are_notifications_pending(struct vm_locked vm_locked, bool from_vm,
 	to_check = vm_get_notifications(vm_locked, from_vm);
 
 	/* Check if there are global pending notifications */
-	return (to_check->global.pending & notifications) != 0U;
+	return ffa_notification_bitmap_intersects(to_check->global.pending,
+						  notifications);
 }
 
 /**
@@ -675,7 +676,8 @@ bool vm_are_global_notifications_pending(struct vm_locked vm_locked)
  */
 bool vm_are_fwk_notifications_pending(struct vm_locked vm_locked)
 {
-	return vm_locked.vm->notifications.framework.pending != 0ULL;
+	return !ffa_notification_bitmap_is_zero(
+		vm_locked.vm->notifications.framework.pending);
 }
 
 bool vm_are_notifications_enabled(struct vm *vm)
@@ -691,7 +693,7 @@ bool vm_locked_are_notifications_enabled(struct vm_locked vm_locked)
 static bool vm_is_notification_bit_set(ffa_notifications_bitmap_t notifications,
 				       uint32_t i)
 {
-	return (notifications & FFA_NOTIFICATION_MASK(i)) != 0U;
+	return ffa_notification_bitmap_is_set(notifications, i);
 }
 
 static void vm_notifications_global_state_count_update(
