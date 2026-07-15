@@ -97,17 +97,18 @@ TEST(ffa_features, succeeds_ffa_call_ids)
 	ret = ffa_features(FFA_SECONDARY_EP_REGISTER_64);
 	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
 
+	/* MEM_PERM_ functions are only for S-EL0 partitions. */
 	ret = ffa_features(FFA_MEM_PERM_GET_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_MEM_PERM_SET_32);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_MEM_PERM_GET_64);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	ret = ffa_features(FFA_MEM_PERM_SET_64);
-	EXPECT_EQ(ret.func, FFA_SUCCESS_32);
+	EXPECT_FFA_ERROR(ret, FFA_NOT_SUPPORTED);
 
 	/* Only supported by the primary scheduler. */
 	ret = ffa_features(FFA_NOTIFICATION_INFO_GET_64);
