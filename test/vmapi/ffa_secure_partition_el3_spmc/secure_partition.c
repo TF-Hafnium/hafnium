@@ -322,6 +322,87 @@ TEST(ffa_boot_info, parse_fdt)
 }
 
 /**
+ * Validate that an invalid FF-A version encoding is rejected.
+ */
+TEST(ffa_version, fail_on_invalid_version)
+{
+	EXPECT_EQ(ffa_version(0xffffffff), FFA_NOT_SUPPORTED);
+}
+
+/*
+ * These tests assume that the EL3 SPMC supports FF-A v1.2. The incompatible
+ * version cases also assume that partition-manifest.dts declares v1.1.
+ * Update the expectations if either fixture version changes.
+ */
+
+/**
+ * Validate that a non-FFA_VERSION call ends FF-A version negotiation.
+ */
+TEST(ffa_version, keeps_negotiated_version_after_other_abis_used)
+{
+	/*
+	 * A compatible request sets the SP's version to v1.0,
+	 * the SPMC's supported version, v1.2, is returned.
+	 */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_0), FFA_VERSION_1_2);
+	/* End version negotiation by invoking another FF-A interface. */
+	EXPECT_EQ(ffa_features(FFA_VERSION_32).func, FFA_SUCCESS_32);
+	/*
+	 * A later request cannot change the locked SP version. Verify that the
+	 * version negotiated by the first FFA_VERSION call remains v1.0.
+	 */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_1), FFA_VERSION_1_0);
+}
+
+/**
+ * Validate that an incompatible version newer than the SPMC's
+ * does not replace the SP's manifest version.
+ */
+TEST(ffa_version, keeps_negotiated_version_incompatible_high)
+{
+	/*
+	 * v1.3 is incompatible with the SPMC's v1.2, so the SP retains its
+	 * manifest version, v1.1. The SPMC's suported version, v1.2, is
+	 * returned.
+	 */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_3), FFA_VERSION_1_2);
+	/*
+	 * End negotiation, then verify that the manifest version was not
+	 * changed.
+	 */
+	EXPECT_EQ(ffa_features(FFA_VERSION_32).func, FFA_SUCCESS_32);
+	/*
+	 * The incompatible request did not replace the manifest version. After
+	 * negotiation is locked, FFA_VERSION therefore returns manifest v1.1.
+	 */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_1_1);
+}
+
+/**
+ * Validate that an incompatible major version does not replace the SP's
+ * manifest version.
+ */
+TEST(ffa_version, keeps_negotiated_version_incompatible_low)
+{
+	/*
+	 * v0.0 is incompatible with the SPMC's v1.2, so the SP retains its
+	 * manifest version, v1.1. The SPMC's supported version, v1.2, is
+	 * returned.
+	 */
+	EXPECT_EQ(ffa_version(0), FFA_VERSION_1_2);
+	/*
+	 * End negotiation, then verify that the manifest version was not
+	 * changed.
+	 */
+	EXPECT_EQ(ffa_features(FFA_VERSION_32).func, FFA_SUCCESS_32);
+	/*
+	 * The incompatible request did not replace the manifest version. After
+	 * negotiation is locked, FFA_VERSION therefore returns manifest v1.1.
+	 */
+	EXPECT_EQ(ffa_version(FFA_VERSION_1_2), FFA_VERSION_1_1);
+}
+
+/**
  * Validate a SP is not meant to use the FFA_NOTIFICATION_INFO_GET interface.
  */
 TEST(ffa_notifications, fails_info_get_from_sp)
